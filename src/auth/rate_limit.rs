@@ -245,9 +245,60 @@ pub fn erfolg(ip: IpAddr, benutzername: &str) {
     tabelle().erfolg(ip, konto(benutzername));
 }
 
+/// Zähler für Maschinen (Maschinenzugang, ADR-0022): eine eigene Tabelle mit denselben Regeln
+/// wie die Anmeldesperre, aber ohne Konto. Er zählt nur unbekannte Zugänge und gescheiterte
+/// Einlösungen, nie eine falsche Uhr oder Signatur eines bekannten Zugangs. Sonst sperrte ein Gerät
+/// mit falscher Uhr die ganze Wache hinter derselben NAT-Adresse aus. Er berührt die
+/// Anmeldesperre nicht und sie ihn nicht (ADR-0016: die Sperre gehört den Anmeldewegen).
+pub mod maschine {
+    use super::{Instant, IpAddr, LazyLock, Mutex, Sperre, Tabelle};
+
+    static FEHLVERSUCHE: LazyLock<Mutex<Tabelle>> =
+        LazyLock::new(|| Mutex::new(Tabelle::default()));
+
+    fn tabelle() -> std::sync::MutexGuard<'static, Tabelle> {
+        FEHLVERSUCHE.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Ist diese Quelle auf den Maschinenwegen gesperrt? Mit Meldedrossel wie [`super::sperre`].
+    pub fn sperre(ip: IpAddr) -> Sperre {
+        tabelle().sperre(ip, Instant::now())
+    }
+
+    /// Vermerkt einen Fehlversuch der Quelle auf einem Maschinenweg.
+    pub fn fehlversuch(ip: IpAddr) {
+        tabelle().fehlversuch(ip, None, Instant::now());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Die Anmeldesperre und der Zähler für Maschinen sind getrennt: zehn Fehlversuche auf dem
+    /// einen Weg sperren den anderen nicht (Spec `maschinenzugang`, „Fehlversuche von Maschinen
+    /// sperren nie die Anmeldung von Menschen“). Eigene Adressen, weil beide Tabellen
+    /// prozessweit sind.
+    #[test]
+    fn maschinenzaehler_und_anmeldesperre_sind_getrennt() {
+        let a = ip("198.51.100.71");
+        for _ in 0..MAX_FEHLVERSUCHE {
+            maschine::fehlversuch(a);
+        }
+        assert!(matches!(maschine::sperre(a), Sperre::Gesperrt { .. }));
+        assert!(!ist_gesperrt(a), "Anmeldung derselben Quelle bleibt frei");
+
+        let b = ip("198.51.100.72");
+        for _ in 0..MAX_FEHLVERSUCHE {
+            fehlversuch(b, Some("max"));
+        }
+        assert!(ist_gesperrt(b));
+        assert_eq!(
+            maschine::sperre(b),
+            Sperre::Frei,
+            "Maschinenwege bleiben frei"
+        );
+    }
 
     fn ip(s: &str) -> IpAddr {
         s.parse().unwrap()
