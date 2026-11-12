@@ -17,6 +17,53 @@ nicht ab und die Anmeldung schlüge fehl.
 Setzt ein Proxy den Kopf nicht, erzwingt `--cookie-secure`
 (`LIFELINE_COOKIE_SECURE=true`) `Secure` für jede Antwort.
 
+## Einwurf nur über TLS (LLH-1654, ADR-0023)
+
+Der Schlüssel eines Einwurf-Zugangs steht in der URL (`/api/v1/einwurf/<schlüssel>/…`,
+`docs/api/einwurf.md`). Der Server nimmt einen Einwurf deshalb nur an, wenn er
+verschlüsselt ankam, sonst antwortet er mit `403 tls_required`
+(`src/public_api/einwurf/routen.rs`, `kam_ueber_tls` in `src/extract.rs`):
+
+- **Eigenes TLS:** mit `--tls` gilt jede Anfrage als verschlüsselt.
+- **Hinter einem Reverse-Proxy:** `X-Forwarded-Proto: https` zählt nur, wenn die
+  Gegenstelle in `--trusted-proxies` (`LIFELINE_TRUSTED_PROXIES`) steht. Ohne diese
+  Liste lehnt der Server jeden Einwurf ab. Anders als bei den Cookies oben reicht der
+  Kopf allein nicht: Hier ist er eine Zugangsbedingung, und jeder könnte ihn setzen.
+- **Der Proxy setzt den Kopf, er hängt ihn nicht an.** Jeder Wert des Kopfes muss
+  `https` lauten. Reicht ein Proxy einen mitgeschickten Wert weiter und hängt seinen
+  an (`https, http`), lehnt der Server ab. Traefik ersetzt den Kopf, solange der
+  Einstiegspunkt keinen vorgelagerten Stellen traut (`forwardedHeaders`).
+- **Ohne TLS nur mit Schalter:** `--einwurf-allow-http`
+  (`LIFELINE_EINWURF_ALLOW_HTTP=true`) nimmt Einwürfe auch unverschlüsselt an. Er ist
+  für ein Netz gedacht, das selbst verschlüsselt (Tailnet, WireGuard). Der Server
+  schreibt beim Start eine Warnzeile, und die Seite „Anbindungen“ warnt, solange er
+  gesetzt ist.
+
+Die Seite „Anbindungen“ zeigt im Paneel „Einwurf-Zugänge“ auch den Fall, dass die
+Instanz weder TLS terminiert noch einen vertrauten Proxy kennt: Dann werden Einwürfe
+abgelehnt.
+
+### Der Proxy protokolliert unter `/api/v1/einwurf/` nichts
+
+Der Server selbst schreibt den Schlüssel in kein Protokoll
+(`docs/betrieb/observability.md`, „Request-Log“). Das Zugriffsprotokoll und die Traces
+eines Reverse-Proxys enthalten aber den Pfad und meist die Abfrage, bei GET also den
+Schlüssel und den Alarmtext. Der Betreiber stellt beides für diese Routen ab.
+
+Mit Traefik ab 3.3 geht das je Router. Ein eigener Router für den Einwurf, ohne
+Zugriffsprotokoll und ohne Traces, zeigt auf denselben Dienst:
+
+```yaml
+labels:
+  - 'traefik.http.routers.lifeline-einwurf.rule=Host(`hub.example`) && PathPrefix(`/api/v1/einwurf/`)'
+  - 'traefik.http.routers.lifeline-einwurf.service=lifeline'
+  - 'traefik.http.routers.lifeline-einwurf.observability.accesslogs=false'
+  - 'traefik.http.routers.lifeline-einwurf.observability.tracing=false'
+```
+
+Bei anderen Proxys gilt dasselbe Ziel: kein Eintrag im Zugriffsprotokoll für Pfade
+unter `/api/v1/einwurf/`, auch nicht bei Fehlern.
+
 ## Cert-Beschaffung (Präzedenz)
 
 Beim Start mit `--tls` wird ein Server-Zertifikat in dieser Reihenfolge

@@ -121,7 +121,7 @@ function AdresseDialog({
       open={neu != null}
       title={neu ? `Adresse für ${neu.zugang.name}` : 'Adresse'}
       closable={false}
-      maskClosable={false}
+      mask={{ closable: false }}
       keyboard={false}
       footer={
         <Button type="primary" onClick={onFertig}>
@@ -187,7 +187,7 @@ function Rueckfrage({
       okButtonProps={{ danger: true, loading: laeuft }}
       cancelButtonProps={{ disabled: laeuft }}
       closable={!laeuft}
-      maskClosable={!laeuft}
+      mask={{ closable: !laeuft }}
       keyboard={!laeuft}
       onOk={() => zugang && onOk(zugang)}
       onCancel={() => {
@@ -291,9 +291,8 @@ export default function EinwurfZugaenge() {
         titel="Einwurf-Zugänge"
         meta={listeQ.isSuccess ? zugaenge.length : undefined}
         aktion={
-          istAdmin && (
+          istAdmin ? (
             <Button
-              size="small"
               icon={<IconPlus />}
               disabled={liste == null || gesperrt != null}
               onClick={() => {
@@ -303,7 +302,7 @@ export default function EinwurfZugaenge() {
             >
               Einwurf-Zugang anlegen
             </Button>
-          )
+          ) : null
         }
         koerperPolster
       >

@@ -25,6 +25,14 @@ Dienstes, auch Backup-, Purge- und DB-Fehler.
   `[A-Za-z0-9-]` (eine UUID passt) und nur einmal gesendet. Jede andere ersetzt der Server
   durch eine eigene UUID, in Log und Antwort.
 - **Pfad:** im Span höchstens 256 Zeichen, gekürzt mit `…`.
+- **Kein Geheimnis im Pfad (LLH-1654, ADR-0023):** Der Schlüssel eines Einwurf-Zugangs steht in
+  der URL. Im Span steht an seiner Stelle `***`: `pfad_fuer_protokoll` (`src/app.rs`) ersetzt
+  den Abschnitt nach `/api/v1/einwurf/` und jeden Abschnitt, der mit `llh_ew_` beginnt
+  (`public_api::einwurf::maskiere_pfad`). Die Abfrage steht nie im Span. Der Test
+  `app::tests::einwurf_schluessel_steht_in_keiner_logzeile` schneidet das Log eines Einwurfs
+  mit und findet weder Schlüssel noch Hash noch Abfrage. Ein Reverse-Proxy davor hat sein
+  eigenes Protokoll: `docs/betrieb-tls.md`, „Der Proxy protokolliert unter `/api/v1/einwurf/`
+  nichts“.
 - **Kopfgröße:** HTTP/1-Köpfe über 32 KiB weist der Server mit `431` ab, bevor ein Handler
   läuft (`verbindung::HTTP1_MAX_KOPF`). HTTP/2 begrenzt die Kopfliste ohnehin auf 16 KiB.
 - **Gesperrte Quelle bei der Anmeldung:** „Anmeldeversuch abgewiesen“ bzw. „Zweitfaktor
