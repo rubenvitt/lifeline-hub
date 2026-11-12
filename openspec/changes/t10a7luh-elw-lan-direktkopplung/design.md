@@ -333,3 +333,22 @@ ADR-0025 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
    erst, wenn beide ELW Protokoll 3 sprechen.
 3. Rückweg: Die Schalter sind aus, Spalten mit Vorgabe stören ältere Lesepfade nicht. Bestehende
    Direktkopplungen widerruft man an beiden Seiten.
+
+## Nachträge
+
+- **12.11.2026, D3: Fingerabdruck in der DB statt in `AppState`.** Der eigene Fingerabdruck steht
+  in `instanz_identitaet.tls_zertifikat` (beim Start gesetzt, ohne `--tls` geleert), wie der
+  Schalter `fuehrung_an`. Grund: Melden und Abgleich laufen nur mit dem Pool, und Tests
+  betreiben mehrere Instanzen in einem Prozess.
+- **12.11.2026, D3: Erkennen beim Einlösen.** Die einlösende Seite weiß vorher nicht, welche Art
+  der Code hat. Sie versucht es zuerst mit dem Plattform-Verifier. Lehnt dieser das Zertifikat ab,
+  folgt ein zweiter Versuch ohne Kettenprüfung mit `nur_vor_ort`; die ausstellende Seite weist
+  dann einen Standardcode mit 409 ab, ohne ihn zu verbrauchen. Abweisungen an eine Gegenstelle mit
+  gültigem Code (Art, Protokoll, `nur_vor_ort`) gehen klar hinaus (409/426), nicht als
+  einheitliches 401.
+- **12.11.2026, D3: Anzeige an der erreichten Seite.** Die Meldung, die einen Zertifikatswechsel
+  auslöst, trägt noch den alten Pin; „Zertifikat bestätigt“ zeigt die erreichte Seite ab der
+  nächsten Meldung.
+- **12.11.2026, Admin-Spur.** Zwei neue Aktionen (`instanz_zertifikat_gewechselt`,
+  `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0330, Muster
+  0317).

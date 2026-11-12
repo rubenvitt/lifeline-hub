@@ -228,6 +228,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         );
     }
     lifeline_hub::instanz::fuehrung::save_schalter(&pool, config.fuehrung).await?;
+    // Fingerabdruck des eigenen TLS-Zertifikats (LLH-1497, design.md D3): erst leeren, unter
+    // `--tls` setzt ihn die Cert-Beschaffung unten neu. Ohne TLS bleibt keine alte Beglaubigung.
+    lifeline_hub::instanz::identitaet::save_tls_zertifikat(&pool, None).await?;
+    let tls_pool = pool.clone();
     lifeline_hub::instanz::melden::set_abstand(config.instanz_melden_sekunden);
     lifeline_hub::instanz::melden::start(pool.clone());
     // Spiegel (LLH-1492): Abgleich der Einsätze mit gekoppelten Instanzen, eigener Takt.
@@ -498,6 +502,11 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         }
 
         let (cert_pfad, key_pfad) = lifeline_hub::tls::beschaffe_cert(&config, sans).await?;
+        let fingerabdruck = std::fs::read(&cert_pfad)
+            .ok()
+            .and_then(|pem| lifeline_hub::instanz::identitaet::tls_fingerabdruck_pem(&pem));
+        lifeline_hub::instanz::identitaet::save_tls_zertifikat(&tls_pool, fingerabdruck.as_deref())
+            .await?;
         let tls_config =
             axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_pfad, &key_pfad).await?;
 

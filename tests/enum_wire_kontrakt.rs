@@ -645,6 +645,8 @@ fn serde_wire_gleich_as_str() {
         LesezugangWiderrufen,
         InstanzCodeAusgestellt,
         InstanzCodeEingeloest,
+        InstanzZertifikatGewechselt,
+        InstanzAdresseGeaendert,
         InstanzGekoppelt,
         InstanzKopplungWiderrufen,
         InstanzKopplungVomGegenueberWiderrufen,
@@ -664,6 +666,8 @@ fn serde_wire_gleich_as_str() {
         MeldetSich,
         WirdGemeldet,
     });
+    // LLH-1497: Wire = DB-CHECK in 0329.
+    enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungArt { Standard, VorOrt });
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungZustand {
         Angebahnt,
         Aktiv,

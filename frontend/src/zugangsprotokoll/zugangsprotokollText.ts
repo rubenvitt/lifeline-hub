@@ -35,6 +35,8 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   lesezugang_widerrufen: 'Lagemonitor-Zugang widerrufen',
   instanz_code_ausgestellt: 'Kopplungscode ausgestellt',
   instanz_code_eingeloest: 'Kopplungscode eingelöst',
+  instanz_zertifikat_gewechselt: 'Zertifikat der Gegenstelle gewechselt',
+  instanz_adresse_geaendert: 'Adresse der Gegenstelle geändert',
   instanz_gekoppelt: 'Instanz gekoppelt',
   instanz_kopplung_widerrufen: 'Instanzkopplung widerrufen',
   instanz_kopplung_vom_gegenueber_widerrufen: 'Instanzkopplung vom Gegenüber widerrufen',

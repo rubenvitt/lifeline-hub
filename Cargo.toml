@@ -24,6 +24,11 @@ serde_json = "1"
 # Clients, die Bytes durchreichen oder pinnen (Kachel-Proxy, Download), setzen `.no_gzip()`.
 # Brotli bot am 01.10.2026 nur Bright Sky an — kein eigenes Feature dafür.
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip"] }
+# Direktkopplung vor Ort (LLH-1497, `src/instanz/zertifikat.rs`): eigener Verifier, der das
+# TLS-Zertifikat der Gegenstelle an einen beglaubigten Fingerabdruck bindet. Dieselben Versionen
+# und derselbe Provider (aws-lc-rs), die reqwest mitbringt; kein zweiter Provider.
+rustls = { version = "0.23", default-features = false, features = ["std", "aws_lc_rs"] }
+rustls-pki-types = { version = "1", features = ["std"] }
 futures = "0.3"
 tracing = "0.1"
 # Nicht blockierendes Log auf stdout (LFH-925, `src/main.rs`).

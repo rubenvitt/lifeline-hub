@@ -1995,6 +1995,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             crate::instanz::extractor::MELDEN_PFAD,
             post(routes::instanz::melden),
         )
+        // Signierte Aussage über das TLS-Zertifikat einer Direktkopplung (LLH-1497).
+        .route(
+            crate::instanz::melden::ZERTIFIKAT_PFAD,
+            post(routes::instanz::zertifikat),
+        )
         // Anträge am Spiegel (LLH-1492): lesen und verwerfen.
         .route(
             "/api/einsaetze/{id}/antraege",
