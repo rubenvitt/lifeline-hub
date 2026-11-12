@@ -73,6 +73,9 @@ percent-encoding = "2"
 rust-embed = "8"
 # OpenAPI-Codegen als Wahrheitsquelle für die Frontend-Typen.
 utoipa = "6"
+# Router und OpenAPI-Dokument der öffentlichen API v1 entstehen zusammen (LLH-1653): eine Route
+# unter `/api/v1/` gibt es nur mit ihrem Dokumenteintrag (`src/public_api/`).
+utoipa-axum = "0.3"
 tower-http = { version = "0.7", features = ["fs", "catch-panic", "trace", "request-id", "set-header", "compression-gzip", "compression-br"] }
 # Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot` (routes/karte.rs).
 tower = { version = "0.5", features = ["util", "limit"] }

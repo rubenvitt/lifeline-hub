@@ -6,6 +6,7 @@ datum: 2026-11-11
 gilt_fuer:
   - src/app.rs
   - src/api_doc.rs
+  - src/public_api/**
   - src/instanz/signatur.rs
   - src/lagemonitor_zugang/**
   - src/routes/lagemonitor_v1.rs
