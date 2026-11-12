@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +11,7 @@ import {
   umgebungRaeumen,
   viteServer,
 } from './e2e/lauf-kern';
+import { createRunDir } from './e2e/run-dir';
 
 // Die Suite ist selbsttragend: `pnpm e2e` startet Backend UND Vite selbst.
 
@@ -35,9 +35,11 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
   ? JSON.parse(vorbelegt)
   : await (async () => {
       const [backendPort, frontendPort] = await freiePorts(2);
-      // Temp-DB je Lauf: kein Cleanup im Repo-Baum, die Specs dürfen ihre
-      // `Date.now()`-Fixtures behalten.
-      const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-e2e-')), 'lifeline.db');
+      // Temp-DB je Lauf: nichts im Repo-Baum, die Specs dürfen ihre `Date.now()`-Fixtures
+      // behalten. Der Hauptprozess löscht das Verzeichnis bei seinem Ende, auch wenn Tests rot
+      // sind oder schon der Webserver nicht startet; verwaiste räumt der nächste Lauf (LLH-1666,
+      // `e2e/run-dir.ts`).
+      const datenbank = join(createRunDir('lifeline-e2e-', { deleteOnExit: true }), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
       // Einmal im Hauptprozess, nicht je Worker: welches Backend der Lauf startet, steht damit im

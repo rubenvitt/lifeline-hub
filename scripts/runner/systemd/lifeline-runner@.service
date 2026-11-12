@@ -1,0 +1,30 @@
+# Ein Platz des eigenen e2e-Runners (LLH-1666, ADR-0025). %i ist die Platznummer.
+# Einrichtung: scripts/runner/README.md. Jeder Durchlauf startet einen frischen Container für
+# genau einen Job (scripts/runner/runner-loop.sh).
+[Unit]
+Description=Lifeline-Hub e2e-Runner, Platz %i
+Documentation=https://github.com/rubenvitt/lifeline-hub/blob/alpha/scripts/runner/README.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+User=lifeline-runner
+Group=lifeline-runner
+EnvironmentFile=/etc/lifeline-runner/runner.env
+ExecStart=/opt/lifeline-runner/repo/scripts/runner/runner-loop.sh %i
+# Die Schleife endet nur bei Fehlern in der Konfiguration; dann nicht im Sekundentakt neu.
+Restart=on-failure
+RestartSec=60
+# runner-loop.sh gibt dem Container 60 s für `docker stop`.
+TimeoutStopSec=90
+KillMode=mixed
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# Home des Dienstnutzers ist /opt/lifeline-runner (README); die Docker-CLI legt dort `.docker/` an.
+ReadWritePaths=-/opt/lifeline-runner/.docker
+
+[Install]
+WantedBy=multi-user.target

@@ -1,6 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +11,7 @@ import {
   umgebungRaeumen,
   viteServer,
 } from './e2e/lauf-kern';
+import { createRunDir } from './e2e/run-dir';
 
 /**
  * Bildlauf der Anwenderdokumentation (LFH-1128, `docs/anwender/AGENTS.md`, „Bilder“): fotografiert
@@ -54,7 +53,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
   ? JSON.parse(vorbelegt)
   : await (async () => {
       const [backendPort, frontendPort] = await freiePorts(2);
-      const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-doku-')), 'lifeline.db');
+      const datenbank = join(createRunDir('lifeline-doku-', { deleteOnExit: true }), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
       console.log(`Backend-Binary: ${binaer}`);

@@ -87,3 +87,16 @@ updates:
         update-types: [minor, patch]
     commit-message:
       prefix: 'chore(deps)'
+
+  # Das Basisimage des eigenen e2e-Runners (LLH-1666, `scripts/runner/Dockerfile`) ist per Tag und
+  # Digest gepinnt. GitHub nimmt Runner, die zu weit hinter dem neuesten Release liegen, nur nach
+  # einer Selbstaktualisierung vor jedem Job an; der Bump hält das Image davor. Der Server baut
+  # den neuen Stand mit seinem wöchentlichen Timer.
+  - package-ecosystem: docker
+    directory: /scripts/runner
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(deps)'
