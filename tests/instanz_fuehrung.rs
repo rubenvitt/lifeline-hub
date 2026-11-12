@@ -3889,6 +3889,212 @@ async fn ein_abgelehnter_eintrag_der_kette_kommt_als_eigene_zeile_zurueck() {
     assert_eq!(band_zaehlt(&elw, e).await, 1);
 }
 
+// ── Zustandsfehler des Stellens sind 422 (LLH-1701) ──────────────────────────────────────────
+
+async fn bruch_stellen(i: &Instanz, cookie: &str, einsatz: i64, bruch: i64) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bruchstelle/{bruch}/antrag"),
+        cookie,
+        Some(&json!({})),
+    )
+    .await
+}
+
+/// Eine Person an einer Meldung der Bruchstelle geht erst, wenn die Meldung beim Führer ist. Bis
+/// dahin antwortet das Stellen mit 422 (der Zustand, `src/AGENTS.md`, Statuscode-Konvention),
+/// und „Alle stellen“ lässt sie mit Grund offen.
+#[tokio::test]
+async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, erika) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    mitglied_werden(&hub, h).await;
+
+    let (s, m) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &erika,
+        Some(
+            &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+                     "inhalt": "Eine Verletzte am Deich", "ereigniszeit": "2026-11-11 09:40:00",
+                     "client_id": "bruch-meldung-422"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    let (s, p) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &erika,
+        Some(&json!({"name": "Muster", "meldung_id": m["id"], "client_id": "bruch-person-422"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    let person_lokal = p["id"].as_i64().unwrap();
+
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert!(ist_spiegel(&elw, e).await);
+
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let id_von = |tabelle: &str| {
+        liste
+            .iter()
+            .find(|l| l["tabelle"] == tabelle)
+            .unwrap_or_else(|| panic!("{tabelle} ist eine Erfassung: {liste:?}"))["id"]
+            .as_i64()
+            .unwrap()
+    };
+    let (meldung, person) = (id_von("meldung"), id_von("einsatz_person"));
+
+    // Die Meldung ist noch offen: erst sie stellen oder verwerfen.
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug ist nicht nachgereicht.");
+
+    // Gestellt, aber noch nicht zurück: Die Person wartet auf sie.
+    let (s, v) = bruch_stellen(&elw, &erika, e, meldung).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug noch nicht beim Führer.");
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "„Alle stellen“ bricht nicht ab: {v}");
+    assert_eq!(v["gestellt"], 0, "{v}");
+    assert_eq!(
+        v["offen"],
+        json!([{"id": person, "grund": "Bezug noch nicht beim Führer."}]),
+        "{v}"
+    );
+
+    // Dieselbe Meldung aus der Antragsroute: eine Erfassung an der Person, die der Führer noch
+    // nicht kennt.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{person_lokal}/sichtung"),
+        &erika,
+        Some(&json!({"kategorie": "sk2", "client_id": "bruch-sichtung-422"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug noch nicht beim Führer.");
+
+    // Ist die Meldung zurück, geht die Person, mit ihr.
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let an_meldung: Vec<Option<i64>> =
+        sqlx::query_scalar("SELECT meldung_id FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(h)
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(an_meldung.len(), 1, "genau einmal");
+    assert!(an_meldung[0].is_some(), "an ihrer Meldung");
+}
+
+/// Läuft die Kette, solange die gestellte Person noch nicht zurück ist (der Takt läuft jede
+/// Sekunde), wartet sie: Kein Eintrag löst sich mit Grund, und kommt die Person, geht der Rest.
+#[tokio::test]
+async fn die_kette_wartet_bis_die_person_zurueck_ist() {
+    let (hub, elw, e, h, erika) = bruch_mit_personen().await;
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let person = liste
+        .iter()
+        .find(|l| l["tabelle"] == "einsatz_person")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    let vorher = bruchstelle(&elw, &erika, e).await;
+
+    // Der Antrag ist noch nicht beim Führer, die Person also nicht zurück.
+    let geaendert = lifeline_hub::instanz::spiegel::bruchstelle::ketten_fortsetzen(&elw.pool)
+        .await
+        .unwrap();
+    assert!(geaendert.is_empty(), "nichts gestellt, nichts gelöst");
+    let wartend = bruchstelle(&elw, &erika, e).await;
+    assert_eq!(wartend, vorher, "die Kette hängt unverändert an der Person");
+    let zeile = wartend.iter().find(|l| l["id"] == person).unwrap();
+    assert!(zeile["folgen_offen"].as_i64().unwrap() >= 3, "{zeile}");
+    let mit_grund: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND grund IS NOT NULL",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(mit_grund, 0, "kein Eintrag hat sich mit Grund gelöst");
+
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let am_hub = personen_mit_namen(&hub, h, "Muster").await;
+    assert_eq!(am_hub.len(), 1);
+    assert_eq!(
+        sichtungen(&hub, am_hub[0]).await,
+        ["sk2", "sk1"],
+        "die Kette hat nach der Rückkehr gestellt"
+    );
+}
+
+#[tokio::test]
+async fn was_sich_nicht_nachreichen_laesst_antwortet_422() {
+    let (_hub, elw, e, _h, erika) = bruch_nach_notuebernahme().await;
+    // Eine Meldung an einem Auftrag reicht sich nicht nach.
+    sqlx::query(
+        "UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.auftrag_id', 1) \
+         WHERE einsatz_id = ? AND art = 'meldung'",
+    )
+    .bind(e)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let meldung: i64 = sqlx::query_scalar(
+        "SELECT id FROM einsatz_bruchstelle WHERE einsatz_id = ? AND art = 'meldung'",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    let (s, v) = bruch_stellen(&elw, &erika, e, meldung).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Lässt sich nicht als Antrag stellen.");
+    assert_eq!(band_zaehlt(&elw, e).await, 2, "nichts gestellt");
+}
+
 // ── Grenzen und Budgets (LLH-1672) ───────────────────────────────────────────────────────────
 
 async fn hinweis(i: &Instanz) -> Option<String> {

@@ -66,16 +66,36 @@ pub fn erklaerung_text(e: &NotuebernahmeErklaerung) -> Result<String, AppError> 
     Ok(text)
 }
 
-/// Das Gegenüber, bei dem die Akte gerade liegt (der Führer ist ein Gegenüber), oder 409.
+/// 409, wenn über die Kopplung zu `g` keine Führung wechselt (Direktkopplung vor Ort, LLH-1497,
+/// Spec `instanz-fuehrung`, „Über eine Direktkopplung wechselt die Führung nicht“).
+pub fn fordere_wechsel(g: &FuehrungGegenueber) -> Result<(), AppError> {
+    if g.art.traegt(crate::instanz::Fluss::Fuehrungswechsel) {
+        Ok(())
+    } else {
+        Err(AppError::Conflict(vor_ort_hinweis(&g.name)))
+    }
+}
+
+/// Grund, warum zu einer Gegenstelle vor Ort keine Führung wechselt.
+pub fn vor_ort_hinweis(name: &str) -> String {
+    format!("{name} ist vor Ort gekoppelt: Führungswechsel dorthin kommt später.")
+}
+
+/// Das Gegenüber, bei dem die Akte gerade liegt (der Führer ist ein Gegenüber), oder 409; auch
+/// 409, wenn es nur vor Ort gekoppelt ist.
 async fn gegenueber_des_fuehrers(
     conn: &mut SqliteConnection,
     a: &AkteZeile,
 ) -> Result<FuehrungGegenueber, AppError> {
-    repo::list_gegenueber(conn, a.org_id)
+    let g = repo::list_gegenueber(conn, a.org_id)
         .await?
         .into_iter()
         .find(|g| g.kennung == a.fuehrer_kennung)
-        .ok_or_else(|| AppError::Conflict("Die führende Instanz ist nicht mehr gekoppelt.".into()))
+        .ok_or_else(|| {
+            AppError::Conflict("Die führende Instanz ist nicht mehr gekoppelt.".into())
+        })?;
+    fordere_wechsel(&g)?;
+    Ok(g)
 }
 
 /// Das Gegenüber `kennung` der Org der Akte, oder 422.
@@ -84,13 +104,15 @@ async fn gegenueber(
     a: &AkteZeile,
     kennung: &str,
 ) -> Result<FuehrungGegenueber, AppError> {
-    repo::list_gegenueber(conn, a.org_id)
+    let g = repo::list_gegenueber(conn, a.org_id)
         .await?
         .into_iter()
         .find(|g| g.kennung == kennung)
         .ok_or_else(|| {
             AppError::UnprocessableEntity("Kein gekoppeltes Gegenüber dieser Org.".into())
-        })
+        })?;
+    fordere_wechsel(&g)?;
+    Ok(g)
 }
 
 fn fordere_fuehrend(a: &AkteZeile, ich: &Ich) -> Result<(), AppError> {

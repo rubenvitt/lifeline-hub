@@ -154,3 +154,47 @@ mod tests {
         assert!(pk.verify(b"hallo!", &sig).is_err());
     }
 }
+
+/// Fingerabdruck eines TLS-Endzertifikats (LLH-1497, design.md D3): SHA-256 über das DER, hex
+/// klein. Dieselbe Form vergleicht der Verifier der Direktkopplung.
+pub fn tls_fingerabdruck(der: &[u8]) -> String {
+    use sha2::Digest;
+    sha2::Sha256::digest(der)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// Fingerabdruck des ersten Zertifikats einer PEM-Datei (das Endzertifikat, das der Server
+/// ausliefert).
+pub fn tls_fingerabdruck_pem(pem: &[u8]) -> Option<String> {
+    use rustls_pki_types::pem::PemObject;
+    rustls_pki_types::CertificateDer::pem_slice_iter(pem)
+        .next()?
+        .ok()
+        .map(|der| tls_fingerabdruck(der.as_ref()))
+}
+
+/// Schreibt beim Start den Fingerabdruck des eigenen TLS-Zertifikats; `None` ohne `--tls`. In der
+/// DB statt im Prozess, weil Tests mehrere Instanzen in einem Prozess betreiben.
+pub async fn save_tls_zertifikat(
+    pool: &SqlitePool,
+    fingerabdruck: Option<&str>,
+) -> anyhow::Result<()> {
+    load_or_create(pool).await?;
+    sqlx::query("UPDATE instanz_identitaet SET tls_zertifikat = ?")
+        .bind(fingerabdruck)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Fingerabdruck des eigenen TLS-Zertifikats, falls diese Instanz selbst TLS spricht.
+pub async fn load_tls_zertifikat(pool: &SqlitePool) -> Result<Option<String>, sqlx::Error> {
+    Ok(
+        sqlx::query_scalar::<_, Option<String>>("SELECT tls_zertifikat FROM instanz_identitaet")
+            .fetch_optional(pool)
+            .await?
+            .flatten(),
+    )
+}

@@ -29,6 +29,7 @@ async fn kopplung_org(pool: &SqlitePool, richtung: InstanzKopplungRichtung) -> i
             name: "Hub",
             softwarestand: "1",
             protokoll: 1,
+            art: crate::instanz::InstanzKopplungArt::Standard,
         },
         richtung,
         (richtung == InstanzKopplungRichtung::MeldetSich).then_some("https://hub.example.org"),

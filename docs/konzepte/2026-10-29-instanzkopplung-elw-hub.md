@@ -205,7 +205,13 @@ sequenceDiagram
   Freigabestufe?
 - **Härtung des Hubs:** er hält Art.-9-Daten im Klartext im Internet (seit LLH-1492 als Risiko
   R27 in Kapitel 11). Offen: Mindestanforderungen an Betrieb (Kapitel 7, `docs/betrieb/`).
-- **Entdeckung im LAN** für ELW↔ELW (mDNS o. ä.).
+- ~~**Entdeckung im LAN** für ELW↔ELW (mDNS o. ä.).~~ beantwortet am 12.11.2026 (LLH-1497):
+  mDNS/DNS-SD hinter `--lan-entdeckung` (Vorgabe aus, nur mit `--tls`), Liste „Im Netz gefunden“
+  beim Einlösen, Neuauflösen per Kennung. Die Direktkopplung vor Ort trägt zuerst nur Spiegel und
+  Anträge; das TLS-Zertifikat beglaubigt eine signierte Aussage, Konten erkennt die
+  Ursprungskennung. Führungswechsel zwischen ELW folgt mit LLH-1678
+  ([ADR-0029](../architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+  `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`).
 
 ## Vorschlag für Folgeaufgaben
 

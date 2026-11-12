@@ -280,6 +280,7 @@ async fn upsert(
                 b.art,
                 &l.schluessel,
                 &l.schluessel,
+                l.ursprung.as_deref(),
             )
             .await?;
             Ok(Upsert::Ok(l.schluessel.clone()))
@@ -373,7 +374,16 @@ async fn upsert(
                     id.to_string()
                 }
             };
-            herkunft::save(conn, zuordnung.id, org_id, b.art, &l.schluessel, &id).await?;
+            herkunft::save(
+                conn,
+                zuordnung.id,
+                org_id,
+                b.art,
+                &l.schluessel,
+                &id,
+                l.ursprung.as_deref(),
+            )
+            .await?;
             Ok(Upsert::Ok(id))
         }
     }

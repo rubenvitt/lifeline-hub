@@ -23,7 +23,10 @@ use crate::instanz::identitaet::{self, parse_oeffentlich, Identitaet};
 use crate::instanz::melden::{self, MeldenAnfrage};
 use crate::instanz::repo::{self, Gegenueber, InstanzKopplungAnzeige};
 use crate::instanz::signatur::{self, ANTWORT_KOPF};
-use crate::instanz::{org_kennung, InstanzKopplungRichtung, InstanzKopplungZustand, PROTOKOLL};
+use crate::instanz::{
+    org_kennung, zertifikat, InstanzKopplungArt, InstanzKopplungRichtung, InstanzKopplungZustand,
+    PROTOKOLL, PROTOKOLL_VOR_ORT,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::Response;
@@ -68,6 +71,11 @@ pub struct InstanzUebersicht {
     /// Passkeys sind eingerichtet (`--webauthn-rp-id`); ohne sie gibt es keine
     /// Unterschriftsschlüssel und damit keinen Kopplungscode.
     pub passkeys_eingerichtet: bool,
+    /// Diese Instanz spricht selbst TLS (`--tls`): Voraussetzung für einen Code der Art „vor Ort“
+    /// (LLH-1497, design.md D3).
+    pub tls_eigen: bool,
+    /// Die LAN-Entdeckung ist eingeschaltet (`--lan-entdeckung`, design.md D6).
+    pub lan_entdeckung: bool,
     /// Der anfragende Admin hat einen gültigen Unterschriftsschlüssel (Voraussetzung für
     /// „Code ausstellen“).
     pub eigener_schluessel: bool,
@@ -105,6 +113,10 @@ pub async fn uebersicht(
         protokoll: PROTOKOLL,
         softwarestand: crate::instanz::softwarestand().to_string(),
         passkeys_eingerichtet: crate::auth::unterschrift::rp().is_some(),
+        tls_eigen: identitaet::load_tls_zertifikat(&state.pool)
+            .await?
+            .is_some(),
+        lan_entdeckung: crate::instanz::entdeckung::is_an(&state.pool).await?,
         eigener_schluessel: eigener,
         datentraeger_bestaetigt: crate::instanz::stammdaten::geheimnis::is_datentraeger_bestaetigt(
             &state.pool,
@@ -125,6 +137,16 @@ pub struct KopplungscodeAntwort {
     pub laeuft_ab_at: String,
     /// Fingerabdruck dieser Instanz zum Abgleich an der einlösenden Seite.
     pub fingerabdruck: String,
+    /// Art der Kopplung, die der Code stiftet (LLH-1497).
+    pub art: InstanzKopplungArt,
+}
+
+/// Body von `POST /api/admin/instanz/codes`; ohne Body eine Standardkopplung.
+#[derive(Debug, Default, Deserialize, ToSchema)]
+pub struct CodeAusstellenBody {
+    /// `vor_ort` für eine Direktkopplung zweier Instanzen im selben Netz (LLH-1497).
+    #[serde(default)]
+    pub art: Option<String>,
 }
 
 /// POST /api/admin/instanz/codes — stellt einen Kopplungscode für die Org des Admins aus. Nur mit
@@ -134,7 +156,30 @@ pub async fn code_ausstellen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
+    rumpf: axum::body::Bytes,
 ) -> Result<(StatusCode, Json<KopplungscodeAntwort>), AppError> {
+    let body: CodeAusstellenBody = if rumpf.iter().all(u8::is_ascii_whitespace) {
+        CodeAusstellenBody::default()
+    } else {
+        serde_json::from_slice(&rumpf)
+            .map_err(|_| AppError::Validation("Ungültiger Body.".into()))?
+    };
+    let art = match body.art.as_deref() {
+        None => InstanzKopplungArt::Standard,
+        Some(a) => InstanzKopplungArt::parse(a)
+            .ok_or_else(|| AppError::Validation("Unbekannte Art der Kopplung.".into()))?,
+    };
+    // Eine Direktkopplung beglaubigt das eigene TLS-Zertifikat (design.md D3): ohne `--tls` gibt
+    // es keins, das sich beglaubigen ließe.
+    if art == InstanzKopplungArt::VorOrt
+        && identitaet::load_tls_zertifikat(&state.pool)
+            .await?
+            .is_none()
+    {
+        return Err(AppError::Conflict(
+            "Eine Direktkopplung vor Ort braucht TLS an dieser Instanz (--tls).".into(),
+        ));
+    }
     {
         let mut conn = state.pool.acquire().await?;
         if unterschrift::list_gueltige_eigene(&mut conn, admin.id)
@@ -164,6 +209,7 @@ pub async fn code_ausstellen(
         &ableitung,
         admin.id,
         &laeuft_ab_at,
+        art,
     )
     .await?;
     admin_audit::schreibe(
@@ -171,7 +217,10 @@ pub async fn code_ausstellen(
         AdminEintrag {
             aktion: AdminAktion::InstanzCodeAusgestellt,
             akteur: &admin,
-            ziel: Ziel::Instanz("Kopplungscode"),
+            ziel: Ziel::Instanz(match art {
+                InstanzKopplungArt::Standard => "Kopplungscode",
+                InstanzKopplungArt::VorOrt => "Kopplungscode (vor Ort)",
+            }),
             angaben: None,
             peer_ip,
         },
@@ -183,6 +232,7 @@ pub async fn code_ausstellen(
             code: kcode::format_anzeige(&code),
             laeuft_ab_at,
             fingerabdruck: i.fingerabdruck(),
+            art,
         }),
     ))
 }
@@ -208,6 +258,11 @@ pub struct KoppelnAnfrage {
     pub softwarestand: String,
     pub org: OrgLeitung,
     pub pruefwert: String,
+    /// Die einlösende Seite nimmt nur einen Code der Art `vor_ort` an: sie erreicht die
+    /// ausstellende nur ohne Vertrauen des Betriebssystems ins Zertifikat (LLH-1497, design.md
+    /// D3). Ein Code einer anderen Art wird dann nicht verbraucht.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub nur_vor_ort: bool,
 }
 
 /// Antwort auf `POST /api/instanz/koppeln`, zusätzlich signiert (Kopf [`ANTWORT_KOPF`]).
@@ -221,6 +276,33 @@ pub struct KoppelnAntwort {
     pub org: OrgLeitung,
     pub unterschrift: Vec<UnterschriftSchluesselLieferung>,
     pub pruefwert: String,
+    /// Art der Kopplung, die der Code stiftet (LLH-1497); fehlt bei Protokoll 2 und heißt dann
+    /// `standard`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub art: Option<String>,
+    /// Direktkopplung: Fingerabdruck des TLS-Zertifikats der ausstellenden Seite, durch die
+    /// Signatur dieser Antwort beglaubigt (design.md D3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_zertifikat: Option<String>,
+}
+
+impl KoppelnAntwort {
+    /// Art der Kopplung; eine unbekannte Art ist ein Fehler der Gegenstelle.
+    fn art(&self) -> Option<InstanzKopplungArt> {
+        match self.art.as_deref() {
+            None => Some(InstanzKopplungArt::Standard),
+            Some(a) => InstanzKopplungArt::parse(a),
+        }
+    }
+}
+
+/// Ziel eines Spur-Eintrags zur Kopplung: der Name der Gegenstelle, bei einer Direktkopplung mit
+/// „(vor Ort)“ (LLH-1497).
+fn spur_ziel(name: &str, art: Option<InstanzKopplungArt>) -> String {
+    match art {
+        Some(InstanzKopplungArt::VorOrt) => format!("{name} (vor Ort)"),
+        _ => name.to_string(),
+    }
 }
 
 fn is_zu_lang(text: &str, max: usize) -> bool {
@@ -247,7 +329,10 @@ pub async fn koppeln(
         .map_err(identitaet_error)?;
     let ergebnis = check_koppeln(&state, &i, &a).await;
     let (org_id, antwort) = match ergebnis {
-        Ok(wert) => wert,
+        Ok(Ok(wert)) => wert,
+        // Mit gültigem Code ist die Gegenstelle ausgewiesen: Abweisungen, die sie beheben kann
+        // (Art, Protokoll), gehen klar hinaus und verbrauchen den Code nicht (LLH-1497).
+        Ok(Err(klar)) => return Err(klar),
         // Nach außen einheitlich 401, auch bei einem Konflikt mit einer bestehenden Kopplung.
         Err(AppError::Unauthorized | AppError::Conflict(_)) => {
             if let Some(ip) = peer_ip {
@@ -261,12 +346,13 @@ pub async fn koppeln(
     let fp = parse_b64(&a.schluessel)
         .map(|b| fingerabdruck(&b))
         .unwrap_or_default();
+    let ziel = spur_ziel(&a.name, antwort.art());
     admin_audit::schreibe_ohne_akteur(
         &state.pool,
         AdminAktion::InstanzCodeEingeloest,
         org_id,
         &a.name,
-        Ziel::Instanz(&a.name),
+        Ziel::Instanz(&ziel),
         Some(ZugangsAngaben {
             instanz_kennung: Some(a.kennung.clone()),
             fingerabdruck: Some(fp),
@@ -285,11 +371,14 @@ pub async fn koppeln(
     ))
 }
 
+/// Prüft und vollzieht das Einlösen. Außen `Err` = nach außen einheitlich 401 (oder ein
+/// technischer Fehler); innen `Err` = klare Abweisung an eine Gegenstelle mit gültigem Code, ohne
+/// dass der Code verbraucht wird.
 async fn check_koppeln(
     state: &AppState,
     i: &Identitaet,
     a: &KoppelnAnfrage,
-) -> Result<(i64, KoppelnAntwort), AppError> {
+) -> Result<Result<(i64, KoppelnAntwort), AppError>, AppError> {
     if is_zu_lang(&a.kennung, KENNUNG_MAX)
         || is_zu_lang(&a.name, NAME_MAX)
         || is_zu_lang(&a.org.kennung, KENNUNG_MAX + 24)
@@ -311,12 +400,16 @@ async fn check_koppeln(
         &a.name,
         &a.jti,
     );
-    let (org_id, unterschrift, k_aussteller) = crate::write_retry!(&state.pool, |conn| {
+    let tls_eigen = identitaet::load_tls_zertifikat(&state.pool).await?;
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
         let Some(code) = repo::find_offener_code(conn, &a.suche, &jetzt).await? else {
             return Err(AppError::Unauthorized);
         };
         if !kcode::is_pruefwert_valid(&code.k_einloeser, &transkript_e, &a.pruefwert) {
             return Err(AppError::Unauthorized);
+        }
+        if let Some(klar) = check_art(conn, a, &code, tls_eigen.as_deref()).await? {
+            return Ok(Err(klar));
         }
         if !repo::consume_code(conn, &a.suche, &jetzt).await? {
             return Err(AppError::Unauthorized);
@@ -329,6 +422,7 @@ async fn check_koppeln(
                 name: &a.name,
                 softwarestand: &a.softwarestand,
                 protokoll: a.protokoll,
+                art: code.art,
             },
             InstanzKopplungRichtung::WirdGemeldet,
             None,
@@ -347,14 +441,18 @@ async fn check_koppeln(
         )
         .await?;
         let (lieferung, _) = unterschrift::grundstock(conn, code.org_id).await?;
-        Ok((code.org_id, lieferung, code.k_aussteller))
+        Ok(Ok((code.org_id, lieferung, code.k_aussteller, code.art)))
     })?;
+    let (org_id, unterschrift, k_aussteller, art) = match ergebnis {
+        Ok(wert) => wert,
+        Err(klar) => return Ok(Err(klar)),
+    };
     let schluessel = i.oeffentlich_b64();
     let pruefwert = kcode::pruefwert(
         &k_aussteller,
         &kcode::transkript_aussteller(&transkript_e, &i.kennung, &schluessel),
     );
-    Ok((
+    Ok(Ok((
         org_id,
         KoppelnAntwort {
             kennung: i.kennung.clone(),
@@ -368,8 +466,54 @@ async fn check_koppeln(
             },
             unterschrift,
             pruefwert,
+            art: Some(art.as_str().to_string()),
+            tls_zertifikat: match art {
+                InstanzKopplungArt::VorOrt => tls_eigen,
+                InstanzKopplungArt::Standard => None,
+            },
         },
-    ))
+    )))
+}
+
+/// Klare Abweisungen beim Einlösen eines gültigen Codes (LLH-1497, Spec `instanz-kopplung`): ein
+/// Code „vor Ort“ an eine zu alte Gegenstelle (426) oder ohne eigenes TLS (409), ein anderer Code
+/// an eine Gegenstelle, die nur „vor Ort“ annimmt (409), und eine andere Art als die der
+/// bestehenden Kopplung (409).
+async fn check_art(
+    conn: &mut sqlx::SqliteConnection,
+    a: &KoppelnAnfrage,
+    code: &repo::OffenerCode,
+    tls_eigen: Option<&str>,
+) -> Result<Option<AppError>, AppError> {
+    if code.art == InstanzKopplungArt::VorOrt && a.protokoll < PROTOKOLL_VOR_ORT {
+        return Ok(Some(AppError::UpgradeRequired(
+            "Eine Direktkopplung vor Ort braucht an beiden Instanzen Protokoll 3. Update nötig: \
+             einlösende Instanz."
+                .into(),
+        )));
+    }
+    if code.art == InstanzKopplungArt::VorOrt && tls_eigen.is_none() {
+        return Ok(Some(AppError::Conflict(
+            "Die ausstellende Instanz spricht kein TLS mehr (--tls); eine Direktkopplung vor Ort \
+             ist so nicht möglich."
+                .into(),
+        )));
+    }
+    // Erst die bestehende Kopplung: ihr Hinweis sagt, welche Art der Code haben muss (Spec
+    // „Art passt nicht“), auch wenn der Versuch ohne Kettenprüfung kam.
+    if let Some(alt) = repo::find_kopplung(conn, &a.kennung).await? {
+        if alt.art() != code.art && repo::is_art_fest(conn, alt.id).await? {
+            return Ok(Some(AppError::Conflict(repo::art_konflikt(alt.art()))));
+        }
+    }
+    if a.nur_vor_ort && code.art != InstanzKopplungArt::VorOrt {
+        return Ok(Some(AppError::Conflict(
+            "Das Zertifikat der anderen Instanz ist nicht vertrauenswürdig. Ohne vertrauenswürdiges \
+             Zertifikat geht nur ein Code der Art „Direktkopplung vor Ort“."
+                .into(),
+        )));
+    }
+    Ok(None)
 }
 
 #[derive(Debug, Deserialize)]
@@ -399,7 +543,8 @@ pub async fn einloesen(
         kennung: org_kennung(&i.kennung, admin.org_id),
         name: org_name(&state.pool, admin.org_id).await?,
     };
-    let antwort = send_einloesen(&i, &adresse, &ableitung, &eigene_org).await?;
+    let (antwort, pin) = send_einloesen(&i, &adresse, &ableitung, &eigene_org).await?;
+    let art = antwort.art().unwrap_or(InstanzKopplungArt::Standard);
     if antwort.kennung == i.kennung {
         return Err(AppError::UnprocessableEntity(
             "Eine Instanz kann sich nicht mit sich selbst koppeln.".into(),
@@ -416,6 +561,7 @@ pub async fn einloesen(
                 name: &antwort.name,
                 softwarestand: &antwort.softwarestand,
                 protokoll: antwort.protokoll,
+                art,
             },
             InstanzKopplungRichtung::MeldetSich,
             Some(&adresse),
@@ -423,6 +569,7 @@ pub async fn einloesen(
             &jetzt,
         )
         .await?;
+        repo::save_tls_zertifikat(conn, kopplung_id, pin.as_deref()).await?;
         let org_zeile = repo::create_org_zuordnung(
             conn,
             kopplung_id,
@@ -455,7 +602,7 @@ pub async fn einloesen(
         AdminEintrag {
             aktion: AdminAktion::InstanzGekoppelt,
             akteur: &admin,
-            ziel: Ziel::Instanz(&antwort.name),
+            ziel: Ziel::Instanz(&spur_ziel(&antwort.name, Some(art))),
             angaben: Some(melden::build_angaben_gegenstelle(
                 &kopplung,
                 &antwort.org.name,
@@ -474,12 +621,67 @@ pub async fn einloesen(
 
 /// Schickt die Einlöse-Anfrage und prüft die Antwort: Prüfwert des Ausstellers (bindet dessen
 /// Schlüssel an den Code) und die Signatur der Antwort mit genau diesem Schlüssel.
+///
+/// Direktkopplung (LLH-1497, design.md D3): Vertraut das Betriebssystem dem Zertifikat der
+/// ausstellenden Seite nicht, geht ein zweiter Versuch ohne Kettenprüfung hinaus, der nur einen
+/// Code „vor Ort“ annimmt (`nur_vor_ort`). Bei einem Code „vor Ort“ muss die signierte Antwort den
+/// Fingerabdruck genau des Zertifikats nennen, über das sie kam; er wird zurückgegeben und gepinnt.
 async fn send_einloesen(
     i: &Identitaet,
     adresse: &str,
     ableitung: &Ableitung,
     eigene_org: &OrgLeitung,
-) -> Result<KoppelnAntwort, AppError> {
+) -> Result<(KoppelnAntwort, Option<String>), AppError> {
+    let unerreichbar = |e: String| {
+        AppError::BadGateway(format!(
+            "Die Instanz unter {adresse} ist nicht erreichbar: {e}"
+        ))
+    };
+    let plattform = crate::ausgehend::client_builder(crate::ausgehend::Zweck::Instanzkopplung)
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(15))
+        .tls_info(true)
+        .build()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    match send_einloesen_mit(i, adresse, ableitung, eigene_org, &plattform, false).await {
+        Err(EinloesenFehler::Zertifikat(_)) => {
+            let erfassung =
+                zertifikat::build_client(None).map_err(|e| AppError::Internal(e.clone()))?;
+            send_einloesen_mit(i, adresse, ableitung, eigene_org, &erfassung, true)
+                .await
+                .map_err(|e| match e {
+                    EinloesenFehler::Zertifikat(t) | EinloesenFehler::Netz(t) => unerreichbar(t),
+                    EinloesenFehler::App(e) => e,
+                })
+        }
+        Err(EinloesenFehler::Netz(t)) => Err(unerreichbar(t)),
+        Err(EinloesenFehler::App(e)) => Err(e),
+        Ok(wert) => Ok(wert),
+    }
+}
+
+enum EinloesenFehler {
+    /// Das Betriebssystem vertraut dem Zertifikat nicht.
+    Zertifikat(String),
+    Netz(String),
+    App(AppError),
+}
+
+impl From<AppError> for EinloesenFehler {
+    fn from(e: AppError) -> Self {
+        Self::App(e)
+    }
+}
+
+async fn send_einloesen_mit(
+    i: &Identitaet,
+    adresse: &str,
+    ableitung: &Ableitung,
+    eigene_org: &OrgLeitung,
+    client: &reqwest::Client,
+    nur_vor_ort: bool,
+) -> Result<(KoppelnAntwort, Option<String>), EinloesenFehler> {
     let schluessel = i.oeffentlich_b64();
     let jti = signatur::new_jti();
     let transkript_e = kcode::transkript_einloeser(
@@ -501,23 +703,23 @@ async fn send_einloesen(
         softwarestand: crate::instanz::softwarestand().to_string(),
         org: eigene_org.clone(),
         pruefwert: kcode::pruefwert(&ableitung.k_einloeser, &transkript_e),
+        nur_vor_ort,
     };
-    let unerreichbar = |e: String| {
-        AppError::BadGateway(format!(
-            "Die Instanz unter {adresse} ist nicht erreichbar: {e}"
-        ))
-    };
-    let resp = crate::ausgehend::client_builder(crate::ausgehend::Zweck::Instanzkopplung)
-        .redirect(reqwest::redirect::Policy::none())
-        .connect_timeout(std::time::Duration::from_secs(5))
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .map_err(|e| AppError::Internal(e.to_string()))?
+    let resp = client
         .post(format!("{adresse}/api/instanz/koppeln"))
         .json(&anfrage)
         .send()
         .await
-        .map_err(|e| unerreichbar(e.without_url().to_string()))?;
+        .map_err(|e| {
+            let zertifikat_fehler = zertifikat::is_zertifikat_fehler(&e);
+            let text = e.without_url().to_string();
+            if zertifikat_fehler {
+                EinloesenFehler::Zertifikat(text)
+            } else {
+                EinloesenFehler::Netz(text)
+            }
+        })?;
+    let gesehen = zertifikat::gesehen(&resp);
     let status = resp.status();
     let token = resp
         .headers()
@@ -526,20 +728,30 @@ async fn send_einloesen(
         .map(str::to_string);
     let rumpf = crate::http_begrenzt::lies_begrenzt(resp, melden::ANTWORT_MAX)
         .await
-        .map_err(|e| unerreichbar(e.to_string()))?;
+        .map_err(|e| EinloesenFehler::Netz(e.to_string()))?;
+    let meldung = || {
+        serde_json::from_slice::<serde_json::Value>(&rumpf)
+            .ok()
+            .and_then(|v| v["error"].as_str().map(str::to_string))
+            .unwrap_or_else(|| "Die andere Instanz lehnt den Code ab.".into())
+    };
     match status.as_u16() {
         200 => {}
         401 => {
             return Err(AppError::UnprocessableEntity(
                 "Der Code ist ungültig, abgelaufen oder schon eingelöst.".into(),
-            ))
+            )
+            .into())
         }
+        409 => return Err(AppError::Conflict(meldung()).into()),
+        426 => return Err(AppError::UpgradeRequired(meldung()).into()),
         429 => {
             return Err(AppError::TooManyRequests(
                 "Die andere Instanz lehnt gerade weitere Versuche ab. Bitte kurz warten.".into(),
-            ))
+            )
+            .into())
         }
-        s => return Err(unerreichbar(format!("Antwort {s}"))),
+        s => return Err(EinloesenFehler::Netz(format!("Antwort {s}"))),
     }
     let nicht_vertrauenswuerdig = |grund: &str| {
         tracing::warn!(
@@ -547,10 +759,10 @@ async fn send_einloesen(
             grund,
             "Antwort beim Einlösen nicht vertrauenswürdig"
         );
-        AppError::BadGateway(format!(
+        EinloesenFehler::App(AppError::BadGateway(format!(
             "Die Antwort von {adresse} ist nicht vertrauenswürdig ({grund}). Steht zwischen den \
              Instanzen etwas, das die Verbindung verändert?"
-        ))
+        )))
     };
     let a: KoppelnAntwort =
         serde_json::from_slice(&rumpf).map_err(|_| nicht_vertrauenswuerdig("Antwort unlesbar"))?;
@@ -575,7 +787,31 @@ async fn send_einloesen(
         chrono::Utc::now().timestamp(),
     )
     .map_err(|e| nicht_vertrauenswuerdig(&e.to_string()))?;
-    Ok(a)
+    // Ab hier ist die Antwort von der ausstellenden Seite signiert: Art und Fingerabdruck sind
+    // ihre Aussage (design.md D3).
+    let pin = match a.art() {
+        Some(InstanzKopplungArt::VorOrt) => {
+            let beglaubigt = a.tls_zertifikat.as_deref();
+            match (beglaubigt, gesehen.as_deref()) {
+                (Some(b), Some(g)) if b == g => Some(g.to_string()),
+                _ => return Err(nicht_vertrauenswuerdig("Zertifikat passt nicht")),
+            }
+        }
+        Some(InstanzKopplungArt::Standard) if !nur_vor_ort => None,
+        // Eine ausstellende Instanz mit Protokoll 2 kennt `nur_vor_ort` nicht und verbraucht
+        // den Code trotzdem (Review LLH-1497): klar sagen, dass er neu ausgestellt werden muss.
+        Some(InstanzKopplungArt::Standard) => {
+            return Err(EinloesenFehler::App(AppError::Conflict(
+                "Das Zertifikat der anderen Instanz ist nicht vertrauenswürdig, und sie hat den \
+                 Code als Standardkopplung eingelöst (eine Instanz ohne Direktkopplung vor Ort). \
+                 Der Code ist verbraucht: das Zertifikat dort vertrauenswürdig machen oder die \
+                 andere Instanz aktualisieren und einen neuen Code ausstellen."
+                    .into(),
+            )))
+        }
+        None => return Err(nicht_vertrauenswuerdig("unbekannte Art der Kopplung")),
+    };
+    Ok((a, pin))
 }
 
 // ── Melden ───────────────────────────────────────────────────────────────────────────────────
@@ -594,6 +830,57 @@ pub async fn melden(
         state.live.web_push().is_some(),
     )
     .await?;
+    Ok(anfrage.antwort(StatusCode::OK, &antwort))
+}
+
+/// Antwort von `GET /api/admin/instanz/lan`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct InstanzLanAntwort {
+    /// Die LAN-Entdeckung läuft hier nicht (`--lan-entdeckung` mit `--tls`).
+    pub aus: bool,
+    #[schema(required)]
+    pub gefunden: Vec<crate::instanz::entdeckung::InstanzGefunden>,
+}
+
+/// GET /api/admin/instanz/lan — sucht einige Sekunden nach angekündigten Instanzen im lokalen
+/// Netz (LLH-1497, Spec `instanz-entdeckung`, „Liste „Im Netz gefunden“ beim Einlösen“). Nur für
+/// Admins; eine Ankündigung begründet kein Vertrauen.
+pub async fn lan(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+) -> Result<Json<InstanzLanAntwort>, AppError> {
+    if !crate::instanz::entdeckung::is_an(&state.pool).await? {
+        return Ok(Json(InstanzLanAntwort {
+            aus: true,
+            gefunden: Vec::new(),
+        }));
+    }
+    Ok(Json(InstanzLanAntwort {
+        aus: false,
+        gefunden: crate::instanz::entdeckung::suche(
+            &state.pool,
+            crate::instanz::entdeckung::SUCHDAUER,
+            Some(admin.org_id),
+        )
+        .await?,
+    }))
+}
+
+/// POST /api/instanz/zertifikat — signierte Aussage über das eigene TLS-Zertifikat für die
+/// meldende Seite einer Direktkopplung (LLH-1497, design.md D3). Ohne Nutzdaten; die meldende
+/// Seite vergleicht die Aussage mit dem Zertifikat, das sie gesehen hat.
+pub async fn zertifikat(
+    State(state): State<AppState>,
+    anfrage: GekoppelteInstanz,
+) -> Result<Response, AppError> {
+    if anfrage.kopplung.richtung() != Some(InstanzKopplungRichtung::WirdGemeldet)
+        || anfrage.kopplung.art() != InstanzKopplungArt::VorOrt
+    {
+        return Err(AppError::Forbidden);
+    }
+    let antwort = melden::ZertifikatAussage {
+        tls_zertifikat: identitaet::load_tls_zertifikat(&state.pool).await?,
+    };
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
@@ -914,6 +1201,14 @@ pub async fn elw_verloren(
     if kopplung.richtung() != Some(InstanzKopplungRichtung::WirdGemeldet) {
         return Err(AppError::UnprocessableEntity(
             "„ELW verloren“ gibt es nur an der Instanz, bei der sich der ELW meldet.".into(),
+        ));
+    }
+    // Über eine Direktkopplung gingen nie Geheimnisse (LLH-1497): nichts zu entwerten.
+    if !kopplung.art().traegt(crate::instanz::Fluss::Geheimnisse) {
+        return Err(AppError::Conflict(
+            "„ELW verloren“ gibt es nur an einer Standardkopplung: vor Ort gehen keine \
+             Passwörter über die Kopplung."
+                .into(),
         ));
     }
     // Nach einem normalen Widerruf bleibt die Aktion, solange dort gelieferte Geheimnisse
