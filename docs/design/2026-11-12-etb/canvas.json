@@ -1,0 +1,34 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-12T18:45:00Z" },
+  "title": "ETB-Neuentwurf: Schreiben und Lesen",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Vorschlag · Fükw 1440 × 900 · kompakt" },
+    "Heute-Fuekw.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 900, "title": "Heute · Fükw 1440 × 900 · kompakt (Bildschirmfoto 12.11.2026)" },
+    "Schreibzeile-Zustaende.dc.html": { "x": 0, "y": 1320, "w": 1180, "h": 1100, "title": "Schreibzeile · fünf Zustände" },
+    "Handy-Lesen.dc.html": { "x": 1260, "y": 1320, "w": 390, "h": 844, "title": "Handy 390 × 844 · lesen, Schreibzeile eingeklappt" },
+    "Handy-Schreiben.dc.html": { "x": 1730, "y": 1320, "w": 390, "h": 844, "title": "Handy 390 × 844 · schreiben" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Heute-Fuekw.dc.html",
+    "Schreibzeile-Zustaende.dc.html",
+    "Handy-Lesen.dc.html",
+    "Handy-Schreiben.dc.html"
+  ],
+  "notes": {
+    "t1": { "x": 0, "y": -300, "text": "ETB: Vorschlag und heutiger Stand", "kind": "title1", "maxW": 2960 },
+    "t2": { "x": 0, "y": 1020, "text": "Schreibzeile und Handy", "kind": "title1", "maxW": 2120 }
+  },
+  "designSystems": [
+    {
+      "title": "Lifeline Hub",
+      "namespace": "lifeline-hub",
+      "artifact": "https://claude.ai/artifact/DKJZJmJyX8CkE4dBJAPyF5",
+      "version": null,
+      "copiedAt": "2026-11-12T18:45:00Z"
+    }
+  ]
+}

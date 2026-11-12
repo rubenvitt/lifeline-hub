@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ETB Handy lesen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.tel{width:390px;height:844px;box-sizing:border-box;display:flex;flex-direction:column;background:#08090b;color:#e8ebee;font-family:"LFH Archivo",system-ui,sans-serif;font-size:15px;line-height:21px;overflow:hidden}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.kl{height:52px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 0;background:#0c0e11;border-bottom:1px solid #22262b}
+.kl button{width:52px;height:52px;border:0;background:transparent;color:#e8ebee;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.kl .ein{flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kl .uhr{font-size:15px}
+.ub{height:20px;flex-shrink:0;background:#e8cc3a;color:#08090b;font-size:12px;font-weight:600;letter-spacing:.08em;display:flex;align-items:center;justify-content:center}
+.sk{height:44px;flex-shrink:0;display:flex;align-items:baseline;gap:10px;padding:10px 12px 0;box-sizing:border-box}
+.sk h1{margin:0;font-size:18px;font-weight:600}
+.sk span{font-size:12px;color:#9aa2ab}
+.fi{height:48px;flex-shrink:0;display:flex;gap:6px;padding:0 12px;align-items:center;border-bottom:1px solid #22262b;overflow:hidden}
+.fi button{height:36px;flex-shrink:0;box-sizing:border-box;padding:0 10px;border:1px solid #626a73;background:#0f1215;color:#9aa2ab;font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.fi button.an{background:#16191d;color:#e8ebee;box-shadow:inset 0 -2px 0 #4d94d6}
+.fi i{width:8px;height:8px;display:inline-block}
+.li{flex:1;min-height:0;overflow:hidden}
+.std{font-size:12px;color:#9aa2ab;padding:2px 12px;background:#0c0e11;border-bottom:1px solid #22262b}
+.z{padding:7px 12px 8px 9px;border-bottom:1px solid #22262b;border-left:3px solid #2e343a;background:#0f1215}
+.z.m{border-left-color:#1677ff}.z.a{border-left-color:#d46b08}.z.e{border-left-color:#8f4be3}.z.b{border-left-color:#ff6b6b}
+.k{display:flex;align-items:baseline;gap:8px;font-size:13px;color:#c6ccd2;white-space:nowrap;overflow:hidden}
+.k .zt{font-size:15px;color:#e8ebee}
+.k .ty{font-size:12px;font-weight:600}
+.m .ty{color:#5c9dff}.a .ty{color:#e8852a}.e .ty{color:#a57ff0}.b .ty{color:#ff6b6b}
+.k .va{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.k small{font-size:12px;color:#9aa2ab}
+.vm{font-size:12px;color:#9aa2ab;margin-top:2px}
+.vm a{color:#8ec2f0}
+.vm .ach{color:#e8cc3a}
+.vm .al{color:#ff6b6b;font-weight:600}
+.sz{flex-shrink:0;display:flex;gap:8px;padding:8px 12px;border-top:1px solid #2e343a;background:#0f1215}
+.sz .ty{height:48px;box-sizing:border-box;padding:0 10px;border:1px solid #626a73;background:#16191d;color:#e8ebee;font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.sz input{flex:1;min-width:0;height:48px;box-sizing:border-box;border:1px solid #626a73;border-left:3px solid #1677ff;background:#08090b;color:#e8ebee;font:inherit;font-size:15px;padding:0 10px}
+.sz input::placeholder{color:#838b94}
+</style>
+</helmet>
+<div class="tel">
+  <header class="kl">
+    <button type="button" aria-label="Menü"><svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><path d="M0 1h22M0 8h22M0 15h22" stroke="currentColor" stroke-width="1.6"/></svg></button>
+    <span class="ein">ÜBUNG – Starkregen Musterstadt</span>
+    <svg width="16" height="14" viewBox="0 0 14 12" role="img" aria-label="verbunden"><path d="M1 4a9 9 0 0 1 12 0M3.5 7a5.5 5.5 0 0 1 7 0" fill="none" stroke="#52c41a" stroke-width="1.6"/><circle cx="7" cy="10" r="1.3" fill="#52c41a"/></svg>
+    <span class="uhr mono">19:26</span>
+  </header>
+  <div class="sk"><h1>ETB</h1><span class="mono">57 Einträge · 6 neue</span></div>
+  <div class="fi" role="group" aria-label="Typ">
+    <button type="button" class="an">Alle</button>
+    <button type="button"><i style="background: #1677ff"></i>Meldung</button>
+    <button type="button"><i style="background: #d46b08"></i>Anordnung</button>
+    <button type="button"><i style="background: #8f4be3"></i>Entscheidung</button>
+    <button type="button">Filter</button>
+  </div>
+  <div class="li">
+    <div class="std mono">17 Uhr</div>
+    <div class="z m"><div class="k"><span class="zt mono">1715</span><span class="ty">Meldung</span><span class="va">Sanitätsgruppe UHS → EL <small>· Funk</small></span></div><div>UHS Turnhalle: acht Patienten in Behandlung, zwei zum Transport bereit.</div></div>
+    <div class="z m"><div class="k"><span class="zt mono">1750</span><span class="ty">Meldung</span><span class="va">Leitstelle Musterstadt → EL <small>· Telefon</small></span></div><div>Mehrere Notrufe aus der Unterstadt: Keller vollgelaufen, Anwohner im Mühlbachweg bitten um Hilfe.</div><div class="vm"><span class="al">SOFORT</span> · <a href="#">Meldung #12 ↗</a></div></div>
+    <div class="std mono">18 Uhr</div>
+    <div class="z a"><div class="k"><span class="zt mono">1805</span><span class="ty">Anordnung</span><span class="va">EL → Logistiktrupp <small>· Funk</small></span></div><div>Stromerzeuger 8 kVA zur UHS Turnhalle verlegen und anschließen.</div><div class="vm"><a href="#">Auftrag #4 ↗</a></div></div>
+    <div class="std mono">19 Uhr</div>
+    <div class="z m"><div class="k"><span class="zt mono">1912</span><span class="ty">Meldung</span><span class="va">Sanitätszug Musterstadt → EL <small>· Funk</small></span></div><div>Keller Mühlbachweg 12 leergepumpt, Trupp rückt ab.</div><div class="vm"><span class="ach">Nachtrag · erfasst 1926</span></div></div>
+    <div class="z b"><div class="k"><span class="zt mono">1921</span><span class="ty">Berichtigung</span><span class="va">Rettungsstaffel → EL <small>· Funk</small></span></div><div>Zu Nr. 230: RTW 83-1, nicht 83-2, ist wieder einsatzbereit am Marktplatz.</div></div>
+    <div class="z m"><div class="k"><span class="zt mono">1924</span><span class="ty">Meldung</span><span class="va">Sanitätsgruppe UHS → EL <small>· Funk</small></span></div><div>Zwei Patienten SK II an RTW übergeben, UHS wieder aufnahmefähig.</div></div>
+  </div>
+  <form class="sz" aria-label="Eintrag erfassen">
+    <button type="button" class="ty"><i style="width: 8px; height: 8px; display: inline-block; background: #1677ff"></i>Meldung ▾</button>
+    <input aria-label="Inhalt" placeholder="Inhalt …">
+  </form>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
