@@ -3652,9 +3652,15 @@ async fn hub_lehnt_ungueltige_akten_mit_hinweis_ab_und_quittiert_nur_plausible_s
         "fuehrung_bis": 0
     }))
     .unwrap();
-    lifeline_hub::instanz::melden::handle_meldung(&hub.pool, &identitaet, &kopplung, &anfrage)
-        .await
-        .unwrap();
+    lifeline_hub::instanz::melden::handle_meldung(
+        &hub.pool,
+        &identitaet,
+        &kopplung,
+        &anfrage,
+        false,
+    )
+    .await
+    .unwrap();
     assert_eq!(fremde(&hub).await.len(), 1, "keine der beiden angelegt");
     let h = hinweis(&hub).await.unwrap_or_default();
     assert!(h.contains("ungültige Führungsakte"), "nicht still: {h:?}");
