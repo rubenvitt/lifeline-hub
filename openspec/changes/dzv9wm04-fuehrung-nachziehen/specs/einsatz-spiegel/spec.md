@@ -30,14 +30,14 @@ Einsatz SHALL eine Kennung tragen, die über Instanzen hinweg gleich bleibt.
 Wird die Org-Zuordnung einer Kopplung widerrufen, MUST der Abgleich ihrer Einsätze enden. Die
 vorhandenen Spiegel SHALL lesbar bleiben, mit „Spiegel von <Gegenstelle>, Abgleich beendet“, und
 weiter schreibgeschützt. Ausstehende Anträge an diesen Spiegeln MUST als abgelehnt mit dem Grund
-„Kopplung widerrufen“ erscheinen. Ausgenommen ist ein Spiegel, für den bei eingeschalteter Führung
-je Einsatz eine Akte vorliegt: Ihn führt die Instanz danach selbst (Spec `instanz-fuehrung`,
-„Widerruf holt die Führung zurück“).
+„Kopplung widerrufen“ erscheinen. Ausgenommen ist bei eingeschalteter Führung je Einsatz ein
+Spiegel, dessen Akte das widerrufene Gegenüber als Führer nennt: Ihn führt die Instanz danach
+selbst (Spec `instanz-fuehrung`, „Widerruf holt die Führung zurück“).
 
 #### Scenario: Widerruf am Hub
 - **WHEN** der Admin am Hub die Org-Zuordnung zu einem ELW widerruft und die Führung je Einsatz ausgeschaltet ist
 - **THEN** bleibt der Spiegel am Hub lesbar und zeigt „Abgleich beendet“, und der ELW liefert nichts mehr
 
 #### Scenario: Widerruf mit Führung je Einsatz
-- **WHEN** der Admin am Hub die Org-Zuordnung zu einem ELW widerruft, die Führung je Einsatz eingeschaltet ist und der Hub den Einsatz des ELW mit Akte spiegelt
+- **WHEN** der Admin am Hub die Org-Zuordnung zu einem ELW widerruft, die Führung je Einsatz eingeschaltet ist und der Hub einen Einsatz spiegelt, den laut Akte der ELW führt
 - **THEN** führt der Hub den Einsatz danach selbst und schreibbar, ausstehende Anträge daran sind mit „Kopplung widerrufen.“ abgelehnt, und der ELW liefert nichts mehr

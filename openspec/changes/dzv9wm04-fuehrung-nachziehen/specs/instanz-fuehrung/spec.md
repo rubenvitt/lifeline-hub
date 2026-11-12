@@ -6,7 +6,7 @@ Eine Instanz, die einen Einsatz nicht führt, MUST ihn als Spiegel der führende
 (Spec `einsatz-spiegel`). Jeder direkte Schreibvorgang an ihm MUST mit dem 409 des Spiegels
 scheitern, ausgenommen die beantragbaren Erfassungen (Spec `spiegel-antraege`). Lesen MUST
 unverändert möglich sein. Die Oberfläche MUST den Einsatz dort mit dem Hinweisband „Spiegel von
-<Name>“ und im Einsatzkopf mit „Führung: <Name>“ zeigen. Die Bedienung der Führung selbst ist
+<Name>“ zeigen, ab mittlerer Fensterbreite dazu im Einsatzkopf „Führung: <Name>“. Die Bedienung der Führung selbst ist
 kein Schreibvorgang am Einsatz.
 
 #### Scenario: Schreiben am abgelösten ELW
@@ -15,7 +15,7 @@ kein Schreibvorgang am Einsatz.
 
 #### Scenario: Lesen bleibt
 - **WHEN** jemand am abgelösten ELW das Einsatztagebuch öffnet
-- **THEN** sieht er alle Einträge, das Hinweisband „Spiegel von Hub Nord“ und im Einsatzkopf „Führung: Hub Nord“
+- **THEN** sieht er alle Einträge, das Hinweisband „Spiegel von Hub Nord“ und auf einem Bildschirm ab mittlerer Breite im Einsatzkopf „Führung: Hub Nord“
 
 #### Scenario: Eigene Führung ohne Chip
 - **WHEN** jemand an der führenden Instanz den Einsatz öffnet
@@ -71,6 +71,10 @@ Einsatzleitung übernimmt mit dem Code.
 #### Scenario: Admin wählt den Beweis
 - **WHEN** ein Admin der Einsatz-Org am Hub denselben Dialog öffnet
 - **THEN** wählt er unter „Beweis“ zwischen „Eigene Unterschrift“ und „Code des Gegenübers“
+
+#### Scenario: Admin einer anderen Org
+- **WHEN** ein Admin einer anderen Org, der Einsatzleitung des Spiegels ist, denselben Dialog öffnet
+- **THEN** bietet der Dialog keine Wahl „Eigene Unterschrift“, sondern nur das Feld für den Code
 
 ### Requirement: Code zur Abgabe erzeugt die meldende Seite
 
@@ -133,19 +137,21 @@ zeigen.
 
 Das System SHALL je Einsatz den Verlauf der Führung zeigen: Epoche, Art des Wechsels, abgebende und
 übernehmende Instanz, wer, warum, wann und gegebenenfalls die Bruchstelle. Notübernahmen,
-verworfene Übernahmen und Widersprüche MUST zusätzlich in der Admin-Spur der Org stehen.
+verworfene Übernahmen und Widersprüche MUST zusätzlich in der Admin-Spur der Org stehen;
+ausgenommen ist das Zurückholen nach einem Widerruf, für das der Widerruf der Kopplung in der
+Spur steht.
 
 #### Scenario: Verlauf nach Notübernahme
 - **WHEN** der ELW eine Notübernahme durch Hub Nord bestätigt hat
-- **THEN** zeigt das Paneel „Führung“ am ELW im Verlauf den Eintrag „1 Angelegt“ und die Notübernahme durch Hub Nord mit Epoche 2, Grund, Unterzeichner und Bruchstelle
+- **THEN** zeigt das Paneel „Führung“ am ELW im Verlauf den Eintrag „1 Angelegt“ und „2 Notübernahme bestätigt · ELW → Hub Nord“ mit Grund, Unterzeichner und Bruchstelle
 
 ## ADDED Requirements
 
 ### Requirement: Den Verlauf der Führung lesen nur Personen
 
 Den Stand und den Verlauf der Führung eines Einsatzes SHALL jede Person lesen können, die den
-Einsatz liest. Ein Gerätekonto MUST darauf 403 bekommen; den Stand der Führung trägt für Geräte
-der Einsatzkopf.
+Einsatz liest. Ein Gerätekonto MUST darauf 403 bekommen; ob ein anderer führt, sieht ein Gerät am
+Hinweisband „Spiegel von …“.
 
 #### Scenario: Gerätekonto fragt den Verlauf ab
 - **WHEN** ein Gerätekonto, das den Einsatz lesen darf, die Führung des Einsatzes abruft
@@ -157,9 +163,10 @@ der Einsatzkopf.
 
 ### Requirement: Widerruf holt die Führung zurück
 
-Endet die Org-Zuordnung einer Kopplung, hier oder beim Gegenüber, SHALL diese Instanz jeden
-Einsatz der Org, den sie als Spiegel dieses Gegenübers hält und dessen Akte das Gegenüber als
-Führer nennt, mit der nächsten Epoche selbst führen. Der Spiegel MUST dabei zu einem eigenen,
+Endet bei eingeschaltetem Schalter die Org-Zuordnung einer Kopplung, hier oder beim Gegenüber,
+SHALL diese Instanz jeden Einsatz der Org, den sie als Spiegel hält und dessen Akte das Gegenüber
+als Führer nennt, mit der nächsten Epoche selbst führen; Bruchstelle ist der Zeitpunkt, zu dem
+sie vom Widerruf erfährt. Der Spiegel MUST dabei zu einem eigenen,
 schreibbaren Einsatz werden. Offene Übernahmen dieses Gegenübers MUST verfallen. Einsätze, die es
 hier nur als Akte gibt, bleiben, wie sie sind.
 

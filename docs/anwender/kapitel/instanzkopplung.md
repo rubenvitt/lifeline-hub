@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
 ---
 
 ## Überblick
@@ -168,11 +168,13 @@ Spiegel, und der Verlauf zeigt „Abgabe per Code“.
 
 ### Führung anfragen
 
-Für einen Admin der Organisation, an der Installation, die sich meldet, etwa am ELW bei Ankunft.
+Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, die sich meldet,
+etwa am ELW bei Ankunft.
 
-1. Unter „Einstellungen“ „Instanzkopplung“ wählen.
-2. Im Paneel „Einsätze beim Gegenüber“ am Einsatz „Führung …“ wählen.
-3. „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie mit der nächsten
+1. Liegt der Einsatz hier als Spiegel vor, am Einsatz „Einsatzdaten“ öffnen. Sonst (nur für einen
+   Admin) unter „Einstellungen“ „Instanzkopplung“ wählen und im Paneel „Einsätze beim Gegenüber“
+   am Einsatz „Führung …“ wählen.
+2. Im Paneel „Führung“ „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie mit der nächsten
    Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
 
 ### Notübernahme
@@ -227,12 +229,16 @@ Meldungen hören auf. Bleibt die andere Installation dauerhaft unerreichbar, sol
 die Kopplung dort selbst widerrufen.
 
 Ist die Führung je Einsatz eingeschaltet, holt jede der beiden Installationen, sobald sie vom
-Widerruf weiß, die Einsätze der Organisation zurück, die sie bisher als Spiegel der anderen hielt: Sie führt sie
-ab dann selbst, mit der nächsten Epoche. Das Hinweisband „Spiegel von …“ verschwindet, der Einsatz
-ist wieder schreibbar, und der Verlauf im Paneel „Führung“ zeigt eine Notübernahme mit dem Grund
-„Kopplung widerrufen“; Bruchstelle ist der Widerruf. Eine Übernahme der anderen Installation, die
-noch auf Bestätigung wartete, verfällt. Was die andere seit dem letzten Abgleich geschrieben hat,
-kommt nicht mehr an.
+Widerruf weiß, die Einsätze der Organisation zurück, die sie als Spiegel hält und die laut
+Paneel „Führung“ die andere führte: Sie führt sie ab dann selbst, mit der nächsten Epoche. Das
+Hinweisband „Spiegel von …“ verschwindet, der Einsatz ist wieder schreibbar, und der Verlauf im
+Paneel „Führung“ zeigt eine Notübernahme mit dem Grund „Kopplung widerrufen“. Bruchstelle ist der
+Zeitpunkt, an dem diese Installation vom Widerruf erfährt: hier sofort, an der anderen mit ihrer
+nächsten Meldung. Was die andere seit dem letzten Abgleich geschrieben hat, kommt nicht mehr an.
+Eine Übernahme der anderen Installation, die noch auf Bestätigung wartete, verfällt. Abgelehnte
+Anträge stehen danach wie nach der Verwahrung in der Zeile oben unter „Anträge abgelehnt“, mit
+„Kopieren“ und „Verwerfen“; neu erfasst wird direkt am nun eigenen Einsatz. In der Admin-Spur
+steht der Widerruf der Kopplung, nicht jeder zurückgeholte Einsatz.
 
 ### Fingerabdruck und Sicherheit
 
@@ -425,8 +431,8 @@ Fassung; die Einsätze-Übersicht der Kopplung nennt ihn unter den Hinweisen. De
 
 Mit dem Widerruf einer Kopplung endet der Abgleich ihrer Einsätze, an beiden Installationen.
 Ohne Führung je Einsatz bleiben vorhandene Spiegel lesbar und gesperrt; das Hinweisband zeigt
-„Abgleich beendet“. Mit eingeschalteter Führung je Einsatz wird jeder Spiegel, dessen Führung
-hier bekannt ist, zum eigenen Einsatz (siehe „Widerruf“ oben). Offene Anträge an die Spiegel sind
+„Abgleich beendet“. Mit eingeschalteter Führung je Einsatz wird jeder Spiegel, den die andere
+Installation führte, zum eigenen Einsatz (siehe „Widerruf“ oben). Offene Anträge an die Spiegel sind
 in beiden Fällen abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Spiegel dabei nicht.
 
 ### Ende eines Spiegels
@@ -457,8 +463,8 @@ ihn gerade führt.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
-dem beantragt wird, und der Einsatzkopf zeigt „Führung: …“ mit dem Namen der führenden
-Installation. An der führenden fehlt dieser Hinweis im Kopf; das Paneel „Führung“ nennt dort
+dem beantragt wird, und der Einsatzkopf zeigt ab mittlerer Fensterbreite „Führung: …“ mit dem
+Namen der führenden Installation. An der führenden fehlt dieser Hinweis im Kopf; das Paneel „Führung“ nennt dort
 „hier“. Unter „Einsätze beim Gegenüber“ steht je Einsatz „Führung: … · Epoche n“. Jeder Wechsel
 zählt die **Epoche** hoch. Übergeben lässt sich die Führung erst, wenn beide Seiten abgeglichen sind
 (sonst „Abgleich läuft noch“); so geht beim Wechsel nichts verloren. Eine Anfrage nimmt die
@@ -485,8 +491,8 @@ Einsatz ist dort sofort ein Spiegel, und der Verlauf zeigt „Abgabe per Code“
 warten. Ein Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
 
 Der Verlauf im Paneel nennt je Wechsel Epoche, Art, von wem an wen, wer, Grund und
-Unterzeichner. Stand und Verlauf liest jede Person, die den Einsatz liest; gekoppelte Geräte
-sehen sie nicht. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; was danach an
+Unterzeichner. Das Paneel mit dem Verlauf liest jede Person, die den Einsatz liest; gekoppelte
+Geräte sehen es nicht, nur wie jede andere Ansicht das Hinweisband „Spiegel von …“. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; was danach an
 der abgelösten Installation geschrieben wurde, kennt die neue nicht. Mit dem Bestätigen wird die
 abgelöste Installation zum Spiegel. Was sie seit der Bruchstelle geschrieben hat und die neue
 nicht kennt, nimmt sie aus dem Einsatz und hebt es auf; das Hinweisband zeigt dann „n Änderungen
