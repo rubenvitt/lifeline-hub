@@ -28,7 +28,7 @@
     "@einsatzzeichen/core": "6.13.0",
     "@einsatzzeichen/maplibre": "6.13.0",
     "@einsatzzeichen/react": "6.13.0",
-    "@einsatzzeichen/schema": "6.13.0",
+    "@einsatzzeichen/schema": "7.0.0",
     "@simplewebauthn/browser": "14.0.0",
     "@tanstack/query-persist-client-core": "5.106.1",
     "@tanstack/react-query": "^5.106.1",
