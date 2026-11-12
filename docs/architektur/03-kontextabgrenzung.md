@@ -33,6 +33,8 @@ flowchart LR
     geraet["Gekoppeltes Gerät,<br/>Lagemonitor<br/>frontend"]
   end
 
+  maschine["Fremdsystem mit Maschinenzugang<br/>(Adapter, Einsatzbuch,<br/>crates/lifeline-machine-client)"]
+
   hub["lifeline-hub<br/>(Server, SQLite eingebettet)"]
 
   subgraph karten["Karten"]
@@ -57,6 +59,7 @@ flowchart LR
   browser -- "HTTP(S), REST + SSE" --> hub
   huelle -- "Webview lädt Server-Adresse" --> hub
   geraet -- "HTTP(S), REST + SSE" --> hub
+  maschine -- "HTTP(S) /api/v1,<br/>Authorization: Machine" --> hub
   browser -. "Redirect zur Anmeldung" .-> idp
   browser -. "Tiles direkt (Quelle ohne Proxy)" .-> online
   huelle -- "Updater: latest.json" --> gh
@@ -78,7 +81,8 @@ flowchart LR
 ```
 
 Alle Pfeile zeigen die Richtung des Verbindungsaufbaus. Der Server baut jede ausgehende
-Verbindung selbst auf; eingehend nimmt er nur Anfragen der Geräte an.
+Verbindung selbst auf; eingehend nimmt er nur Anfragen der Geräte und angebundener Fremdsysteme an,
+diese nur unter `/api/v1/`.
 
 ## 3.3 Schnittstellen
 
@@ -86,6 +90,7 @@ Verbindung selbst auf; eingehend nimmt er nur Anfragen der Geräte an.
 | --- | --- | --- | --- |
 | Oberfläche (eingebettetes `frontend/dist`) | Gerät → Server | HTTP(S), statische Dateien | `src/static_files.rs` (`rust-embed`) |
 | REST-API `/api/…` | Gerät → Server | HTTP(S), JSON; Vertrag als OpenAPI | `src/routes/`, `src/api_doc.rs`, `frontend/src/api/` |
+| Öffentliche API `/api/v1/` | Fremdsystem → Server | HTTP(S), JSON; je Anfrage ein JWS im Kopf `Authorization: Machine`, Antwort signiert in `Lifeline-Signature`; Vertrag `docs/api/public-v1.json` | `src/public_api/`, Referenz-Client `crates/lifeline-machine-client`; [`docs/api/maschinenzugang.md`](../api/maschinenzugang.md) |
 | Live-Kanal | Server → Gerät (vom Gerät geöffnet) | Server-Sent Events, Ereignisnamen als `LiveEvent` | `src/live/`, `frontend/src/live/` |
 | TLS am Server (optional) | Gerät → Server | rustls; eigenes Zertifikat oder selbstsigniertes per `rcgen` | `src/tls/`, `--tls`; [`docs/betrieb-tls.md`](../betrieb-tls.md) |
 | Reverse-Proxy davor (optional) | Proxy → Server | HTTP mit `X-Forwarded-For`/`-Proto` | `--trusted-proxies` in `src/config.rs`; [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md) |

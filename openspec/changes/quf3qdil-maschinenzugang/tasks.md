@@ -139,7 +139,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   `cryptography`. Verifizieren:
   - `python3 -I docs/api/clients/python/machine_client.py --selftest` ist grün;
   - `./scripts/check-all.sh --nur schnell` zeigt den Schritt.
-- [ ] 6.6 `docs/api/maschinenzugang.md`: Ablauf Einlösen und Signieren, Claims, Reihenfolge der
+- [x] 6.6 `docs/api/maschinenzugang.md`: Ablauf Einlösen und Signieren, Claims, Reihenfolge der
   Schlüssel in den Testvektoren, Fehlercodes, Uhr, `me` als erster Aufruf, Verweise auf die
   Clients. Verifizieren: Die Befehle im Dokument laufen gegen einen lokalen Dev-Server (einmal
   von Hand, Ergebnis im PR).
@@ -173,10 +173,10 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
 
 ## 8. Doku und Architektur
 
-- [ ] 8.1 Anwender-Kapitel `docs/anwender/kapitel/anbindungen.md` (Reihenfolge 795, Gruppe
+- [x] 8.1 Anwender-Kapitel `docs/anwender/kapitel/anbindungen.md` (Reihenfolge 795, Gruppe
   Administration, Überblick, Abläufe, Hintergrund), dazu die Zeile in `docs/anwender/README.md`.
   Verifizieren: `anwenderdoku.guard.test.ts` ist grün.
-- [ ] 8.2 Architektur:
+- [x] 8.2 Architektur:
   - Kap. 3: Schnittstelle `/api/v1` für Fremdsysteme;
   - Kap. 5: `src/public_api`, `crates/lifeline-machine-client` und die Seite;
   - Kap. 6: Ablauf „Fremdsystem anbinden“ neben 6.6a;
@@ -184,7 +184,7 @@ Aufgabe entsteht per TDD: zuerst der Test, der rot ist, dann der Code.
   - Kap. 11: R33 fortschreiben.
 
   Verifizieren: `scripts/check-architektur.sh` ist grün.
-- [ ] 8.3 ADR-0022 auf `status: akzeptiert`; `gilt_fuer` um `src/public_api/**` ergänzen, falls
+- [x] 8.3 ADR-0022 auf `status: akzeptiert`; `gilt_fuer` um `src/public_api/**` ergänzen, falls
   nötig vor dem Akzeptieren. Verifizieren: Der Prüfblock läuft in `scripts/check-architektur.sh`
   grün (kein „Bearer“ unter `src/public_api/`, `MachineClient` und `lifeline-machine+jwt`
   vorhanden).

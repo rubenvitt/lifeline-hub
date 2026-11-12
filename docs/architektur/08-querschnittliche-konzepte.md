@@ -222,11 +222,16 @@ selbst signiert). Jede Antwort trägt `X-Content-Type-Options: nosniff`
 [`docs/betrieb-tls.md`](../betrieb-tls.md), [`docs/betrieb-oidc.md`](../betrieb-oidc.md),
 [`docs/betrieb-webauthn.md`](../betrieb-webauthn.md), [`docs/betrieb-mfa.md`](../betrieb-mfa.md).
 
-Maschinen (gekoppelte Instanzen, später Fremdsysteme nach LLH-1148) melden sich nicht mit einer
+Maschinen (gekoppelte Instanzen und Fremdsysteme) melden sich nicht mit einer
 Sitzung an, sondern weisen jede Anfrage mit einem eigenen Ed25519-Schlüssel aus: kompaktes JWS
 mit Wiederholschutz in der DB, Antwort ebenso signiert, Einstieg per Einmal-Code eines Org-Admins
 ([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
-`src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“).
+`src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“). Fremdsysteme
+nutzen dasselbe Verfahren mit eigenem Profil (`lifeline-machine+jwt`, Kopf
+`Authorization: Machine`), eigenen Tabellen und festen Scopes je Zugang, nur unter `/api/v1/`
+([ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+`src/public_api/machine.rs`, Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
+Ihre Fehlversuche zählt ein eigener Zähler je Quelle, nie die Anmeldesperre.
 Erklärungen eines Org-Admins, die eine andere Instanz prüfen soll, unterschreibt er mit einem
 eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`). Einen nachgelieferten neuen
 Schlüssel nimmt die übernehmende Instanz erst nach der Bestätigung eines Admins dort an, der die
