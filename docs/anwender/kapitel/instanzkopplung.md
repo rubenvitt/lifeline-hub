@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/fuehrungText.ts, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs]
 ---
 
 ## Überblick
@@ -464,7 +464,8 @@ Gegen den Hub braucht eine Notübernahme nur den Grund; der Hub nimmt sie mit de
 Meldung an und zeigt sie im Verlauf. Erklären zwei ELW ohne Verbindung beide eine Notübernahme
 gegen denselben Hub, behält der Hub die zuerst gemeldete. Der andere ELW zeigt nach seiner
 nächsten Meldung das Hinweisband „Deine Notübernahme hat am Hub nicht gegriffen, die Führung
-liegt bei …“, und seine Einsatzleitung bekommt die Benachrichtigung „Führung übernommen“. Bis
+liegt bei …“ (war seine Führung keine Notübernahme: „Die Führung liegt am Hub bei …, nicht hier“),
+und seine Einsatzleitung bekommt die Benachrichtigung „Führung übernommen“. Bis
 jemand „Übernahme bestätigen“ wählt, schreibt er weiter; widersprechen lässt sich hier nicht,
 denn der Hub nähme den Widerspruch nicht an. Mit dem Bestätigen wird der Einsatz dort zum
 Spiegel. Ist dieser ELW mit dem führenden ELW nicht selbst gekoppelt, bekommt der Spiegel danach

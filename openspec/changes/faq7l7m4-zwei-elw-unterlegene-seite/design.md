@@ -97,8 +97,10 @@ einem Widerspruch oder einem Verwerfen, also mit derselben Struktur, aber andere
 Die Akte des Hubs landet in `offen` und `offen_bruch_at` wie bei einer gültigen Übernahme gegen
 die ELW (Zweig `OffenHalten`): mit `Folge::Offen` (Benachrichtigung `FuehrungUebernommen` an die
 Einsatzleitung) und `Folge::Kopf`. Eine eigene Spalte gibt es nicht. Konflikt heißt: Der Führer der
-gehaltenen Akte ist kein gekoppeltes Gegenüber der Org. Die Ableitung steht an genau einer Stelle
-(`ist_konflikt(&AkteMeldung, gekoppelt)`). Der Weg läuft über `austausch::entscheide`, das dafür
+gehaltenen Akte ist keiner der Hubs, bei denen sich diese Instanz für die Org meldet
+(`repo::list_hubs`; im Austausch ist das der Absender). Eine zusätzliche Kopplung, über die sich die
+führende ELW bei dieser Instanz meldet, ändert daran nichts. Die Ableitung steht an genau einer
+Stelle (`ist_konflikt(&AkteMeldung, hubs)`). Der Weg läuft über `austausch::entscheide`, das dafür
 den Merker `dritter` bekommt: An der meldenden Seite heißt `dritter` immer offen halten, ohne
 Beweisprüfung und ohne Alarm. Die Tabelle D7 der Vorgänger-Change bekommt damit eine Zeile:
 
@@ -155,15 +157,23 @@ Oberfläche zeigt die Schaltfläche gar nicht erst.
 
 ### D6 Der Konflikt erlischt, sobald der Hub keinen Dritten mehr nennt
 
-Kommt vom Hub eine Akte, deren Führer die ELW selbst oder der Hub ist, während ein Konflikt offen
-ist, leert die ELW `offen` und `offen_bruch_at`, und zwar vor der übrigen Behandlung der Akte. Das
-folgende Live-Ereignis am Kopf blendet das Band aus. Danach nimmt der Ablauf seinen gewohnten Weg:
-Eine Akte des Hubs mit dem Hub als Führer und kleinerer Epoche führt zu `Less`, die ELW schickt ihre
-Akte neu, und der Hub nimmt sie jetzt an. Führt der Hub mit der Epoche eines Dritten, greift D7.
+Einen eigenen Zweig dafür gibt es nicht. Nennt der Hub keinen Dritten mehr, gibt es nur drei
+Wege, und jeder räumt den Konflikt schon ab:
 
-Auch der Widerruf einer Kopplung räumt einen Konflikt ab (`repo::release_nach_widerruf`): Ohne
-Kopplung kommt keine Akte mehr, die ihn erlöschen ließe, und die ELW stünde sonst dauerhaft mit Band
-und gesperrter Übergabe da.
+- Der Hub führt mit der Epoche des Dritten (der gab an ihn zurück): D7 ersetzt die gehaltene Akte,
+  und die Bruchstelle bleibt.
+- Der Hub führt mit einer eigenen Epoche (Widerruf oder Notübernahme gegen den Dritten): Der Zweig
+  `Greater` verwirft oder hält offen, und beides ersetzt `offen` (zum Fehlalarm dabei: LLH-1707).
+- Der Hub nennt die ELW selbst: Der Zweig `!nimmt_mir` räumt `offen` ab.
+
+Ein eigener Zweig davor setzte nur die Bruchstelle neu (Befund aus dem Nach-Review). Eine kleinere
+Epoche mit dem Hub als Führer kann nach einem Konflikt nicht mehr kommen, denn der Hub zählt nur
+weiter.
+
+Der Widerruf einer Kopplung räumt eine offene Übernahme ab, wenn die widerrufene Kopplung ein Hub
+war und kein verbleibender Hub der genannte Führer ist (`repo::release_nach_widerruf`). Ohne den
+Hub kommt keine Akte mehr, die sie ersetzen ließe, und die ELW stünde sonst dauerhaft mit Band und
+gesperrter Übergabe da. Ein Widerruf einer anderen Kopplung der Org räumt nichts ab.
 
 ### D7 Führt der Hub mit der Epoche eines Dritten, entscheidet ein Mensch
 

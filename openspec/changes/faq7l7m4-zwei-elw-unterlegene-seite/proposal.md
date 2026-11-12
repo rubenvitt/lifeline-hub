@@ -27,7 +27,10 @@ gar nicht entstehen kann.
   in diesem Fall mit 422, weil der Hub einen Widerspruch ohnehin ablehnen würde und dann wieder
   beide führten.
 - **Der Konflikt erlischt von selbst,** sobald die erreichte Seite keinen Dritten mehr als Führer
-  nennt.
+  nennt oder die Kopplung zum Hub endet.
+- **Führt der Hub selbst mit der Epoche einer anderen ELW** (sie gab ihm die Führung zurück), hält
+  die ELW das als gewöhnliche Übernahme offen, mit Bestätigen und Widersprechen; einen Widerspruch
+  nimmt der Hub an (abgestimmt am 12.11.2026).
 - **Anzeige:** `FuehrungOffen` bekommt die Markierung `konflikt`. Das Hinweisband zeigt dann „Deine
   Notübernahme hat am Hub nicht gegriffen, die Führung liegt bei …“ und nur „Übernahme bestätigen“.
 - **Tests:** Der Gleichstand-Test, der den Hub-Stand per rohem `UPDATE` baut und an zufälligen
