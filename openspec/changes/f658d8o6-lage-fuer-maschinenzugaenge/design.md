@@ -64,7 +64,7 @@ und v1 darf keinen internen Typ tragen (`src/AGENTS.md`, „Öffentliche API v1�
 
 ### D2 Tabelle `maschinenzugang_freigabe`: ein Einsatz je Zugang, erweiterbar
 
-Migration 0335:
+Migration `0339_maschinenzugang_freigabe.sql` (beim Bau von 0335 umnummeriert, weil `alpha` weiterlief):
 
 ```sql
 CREATE TABLE maschinenzugang_freigabe (
@@ -102,7 +102,8 @@ umgebaut.
 Wirkung, und das Paneel zeigte Schalter ohne Folge.
 
 Freigebbar ist ein Zugang der Org des Einsatzes, nicht widerrufen, nicht abgelaufen, mit
-mindestens einem solchen Scope. Auch ein Zugang im Zustand `wartet` (Code noch nicht eingelöst):
+mindestens einem solchen Scope, und nur an einer Instanz, die sich für die Org nicht bei einem
+Hub meldet (dort lehnt der Extractor jeden Zugang ab). Auch ein Zugang im Zustand `wartet` (Code noch nicht eingelöst):
 die Einsatzleitung kann vorab freigeben, das Paneel zeigt „wartet auf Schlüssel“.
 
 ### D4 Freigabe-Routen am Einsatz, auch am Spiegel
@@ -151,7 +152,7 @@ Einsatz, also genau der Regelfall der Kopplung.
 | Abschluss kommt über den Spiegel | – | Freigabe unwirksam (D2), Zeile fällt mit dem Einsatz oder der nächsten Freigabe |
 | Widerruf des Zugangs | `routes::anbindungen::widerrufen`, in der Transaktion | Zeile löschen, ETB |
 | Entzug des letzten Scopes nach D3 | `routes::anbindungen::aendern`, in der Transaktion | Zeile löschen, ETB |
-| Ablauf („gültig bis“) | – | Extractor antwortet 401; die Liste nach D4 blendet den Zugang aus |
+| Ablauf („gültig bis“) | `routes::anbindungen::aendern`, beim nächsten Ändern des Zugangs | Extractor antwortet 401, die Liste nach D4 blendet den Zugang aus; die Zeile fällt, bevor ein verlängertes „gültig bis“ sie wieder wirken ließe (Befund des Reviews, 12.11.2026), ETB |
 
 Beim Widerruf und beim Entzug schreibt der Admin, nicht die Einsatzleitung. Führt die Instanz den
 Einsatz, entsteht ein System-Eintrag im ETB („Anbindung „{name}“ widerrufen von {person}; der
@@ -247,7 +248,7 @@ Entscheidung Ruben vom 12.11.2026, abweichend von Konzept D6. Entfernt werden:
 - Geteiltes zieht um: `karte_etag`, `lagemeldung`, `LageQuery`, `KARTE_AUS`, `LagemonitorUhsZahl`,
   `LagemonitorLagemeldung` und der Kartenbau nach `src/routes/lagemonitor.rs`. Die Umbenennung
   `baue_karte` → `build_karte` kommt als eigener `refactor`-Commit (Bezeichner-Sprache).
-- Migration 0336: `DROP TABLE lagemonitor_freigabe; DROP TABLE lagemonitor_zugang;` (Kind zuerst,
+- Migration `0340_lagemonitor_zugang_entfernen.sql`: `DROP TABLE lagemonitor_freigabe; DROP TABLE lagemonitor_zugang;` (Kind zuerst,
   ohne Marker). 0269 und 0270 bleiben unangetastet. Die Einträge in `schwaerzung_registry` und
   `spiegel::art` entfallen.
 - Admin-Spur: Die Aktionen `lesezugang_angelegt` und `lesezugang_widerrufen` bleiben im Enum, im
@@ -270,7 +271,10 @@ es gibt keine Stelle mehr, an der er stünde.
 - **Schaltbar**, wenn `leitung && istAktiv` und die Instanz den Einsatz führt oder als Spiegel
   hält (dieselbe Bedingung wie `darfLagebild`).
 - **Query-Key** `einsatzKeys.anbindungen` in `NICHT_LIVE_KEYS` (wie `geraete`): die eigene
-  Änderung setzt die Antwort, ein Abruf des Fremdsystems ist kein Ereignis.
+  Änderung setzt die Antwort, ein Abruf des Fremdsystems ist kein Ereignis. Weil Umstellen,
+  Widerruf und Rechteentzug den Stand von außen ändern, fragt das Paneel alle 30 s nach und
+  nach jedem gescheiterten Umschalten. Ohne Verbindung sind die Schalter gesperrt, die Mutation
+  läuft mit `networkMode: 'always'` (Befunde des Reviews, 12.11.2026).
 - **Seite „Anbindungen“:** `AnbindungAnzeige` bekommt `einsatz_id?` und `einsatz_bezeichnung?`.
   Liste und Ansicht zeigen bei Zugängen nach D3 „liest {Einsatz}“ oder „kein Einsatz
   freigegeben“.
@@ -285,9 +289,9 @@ es gibt keine Stelle mehr, an der er stünde.
 `zugang me`: der kürzeste Weg, eine Anbindung samt Freigabe zu prüfen. TypeScript-Modul und
 Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 
-### D12 ADR-0029 und ADR-0022
+### D12 ADR-0031 und ADR-0022
 
-- **ADR-0029** „Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn
+- **ADR-0031** „Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn
   freigegeben hat“, `gilt_fuer` `src/public_api/**`, `src/routes/einsatz_anbindungen.rs`. Regeln:
   eine v1-Route mit Lese-Scope mit Einsatzbezug bestimmt ihren Einsatz allein über
   `public_api::freigabe`; die Freigabe gilt an der Instanz des Zugangs, wird nicht gespiegelt und
@@ -316,7 +320,7 @@ Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 - [Bestehende `llh_lm_`-Schlüssel gelten nach dem Update nicht mehr, ohne Vorwarnung.] → Bewusst
   entschieden; die Gegenseite ist nicht gebaut. PR-Beschreibung und Commit nennen den Bruch, damit
   er unter „Wichtige Änderungen“ der Versionshinweise landet.
-- [Migration 0336 löscht Daten und ist nicht umkehrbar.] → Die Tabellen tragen nur Hashes und
+- [Migration 0340 löscht Daten und ist nicht umkehrbar.] → Die Tabellen tragen nur Hashes und
   Freigaben; ein Rückweg auf den alten Stand bräuchte neue Schlüssel ohnehin.
 - [Der Umzug des Kartenbaus ändert still die Karte des Lagebild-Links.] → Test: `build_karte`
   liefert für einen festen Einsatz dieselben Bytes wie zuvor; `tests/lagebild_extern.rs` bleibt
@@ -328,12 +332,17 @@ Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 - [`subkind` in der Karte neben `kind` in der UHS-Liste ist uneinheitlich.] → Beide sind lokal
   eindeutig; die Tabelle in D7 kommt in die API-Doku.
 - [Zwei Scope-Listen laufen auseinander: `has_einsatzbezug` und die Routen.] → Test über
-  das Dokument: jede Route, deren Scope `has_einsatzbezug()` trägt, liest ohne Freigabe
-  keinen Einsatz (heute eine Route; LLH-1655 erweitert ihn).
+  das Dokument (`routen_mit_einsatzbezug_lesen_nur_ueber_die_freigabe` in
+  `tests/public_api_lage.rs`): jede Route, deren Scope `has_einsatzbezug()` trägt, steht in
+  seiner Liste und liest ohne Freigabe keinen Einsatz, und kein Scope trägt Einsatzbezug ohne
+  Route. Das Frontend führt keine eigene Liste: der Server nennt je Anbindung
+  `einsatz_freigebbar`.
+- [Eine gespeicherte Geometrie trägt Zusatzschlüssel mit Freitext.] → v1 führt jede Geometrie
+  auf `type` und `coordinates` zurück (`public_api::lage::geometry`).
 
 ## Migration Plan
 
-1. Migrationen 0335 und 0336 laufen beim Start. Vorher `scripts/check-migrationen.sh` gegen
+1. Migrationen 0339 und 0340 laufen beim Start. Vorher `scripts/check-migrationen.sh` gegen
    `origin/alpha`.
 2. Nach dem Update: unter „Anbindungen“ je Monitor einen Zugang mit „Lage lesen“ anlegen, Code am
    Monitor einlösen, Einsatz auf der Seite „Geräte“ freigeben.

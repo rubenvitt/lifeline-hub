@@ -14,7 +14,7 @@
 //!
 //! Maschinenzugang für Fremdsysteme (LLH-1652, Spec `maschinenzugang`): Repo [`zugang`], Scopes
 //! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`]. Die Freigabe eines Einsatzes für
-//! einen Zugang (LLH-1638, ADR-0029) liegt in [`freigabe`].
+//! einen Zugang (LLH-1638, ADR-0031) liegt in [`freigabe`].
 //!
 //! Regeln: `src/AGENTS.md`, „Öffentliche API v1“.
 
