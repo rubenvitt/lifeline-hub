@@ -199,7 +199,19 @@ pub async fn save(
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
+        refresh_nummer(conn, a).await?;
     }
+    Ok(())
+}
+
+/// Liest die Nummer der Akte nach dem Ausrichten neu: Wird der Spiegel dabei zum eigenen Einsatz
+/// und ist seine Nummer hier belegt, hat `spiegel::fuehrung::werde_fuehrer` ihn umnummeriert und
+/// die Zeile nachgezogen (LLH-1703). Der Aufrufer arbeitet mit `a` weiter (Antwort, Admin-Spur).
+async fn refresh_nummer(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Result<(), AppError> {
+    a.nummer = sqlx::query_scalar("SELECT nummer FROM einsatz_fuehrung WHERE id = ?")
+        .bind(a.id)
+        .fetch_one(&mut *conn)
+        .await?;
     Ok(())
 }
 
@@ -243,6 +255,7 @@ pub async fn insert_fremd(conn: &mut SqliteConnection, a: &mut AkteZeile) -> Res
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
+        refresh_nummer(conn, a).await?;
     }
     Ok(())
 }
@@ -580,6 +593,8 @@ pub struct FuehrungGegenueber {
     pub kennung: String,
     pub name: String,
     pub richtung: InstanzKopplungRichtung,
+    /// Art der Kopplung (LLH-1497): über eine Direktkopplung `vor_ort` wechselt die Führung nicht.
+    pub art: crate::instanz::InstanzKopplungArt,
     /// Org-Schlüssel der Akte auf der Leitung (die Org der erreichten Seite).
     #[serde(skip)]
     pub org_schluessel: String,
@@ -603,10 +618,10 @@ pub async fn list_gegenueber(
     org_id: i64,
 ) -> Result<Vec<FuehrungGegenueber>, AppError> {
     let ich = ich(conn).await?;
-    let rows: Vec<(i64, String, String, String, String)> = sqlx::query_as(
+    let rows: Vec<(i64, String, String, String, String, String)> = sqlx::query_as(
         "SELECT k.id, k.gegenueber_kennung, k.gegenueber_name, k.richtung, \
                 CASE WHEN k.richtung = 'meldet_sich' THEN o.fremde_org_kennung \
-                     ELSE ? || '/' || o.org_id END \
+                     ELSE ? || '/' || o.org_id END, k.art \
          FROM instanz_kopplung_org o JOIN instanz_kopplung k ON k.id = o.kopplung_id \
          WHERE o.org_id = ? AND o.widerrufen_at IS NULL AND k.zustand = 'aktiv' \
          ORDER BY k.id",
@@ -617,15 +632,19 @@ pub async fn list_gegenueber(
     .await?;
     Ok(rows
         .into_iter()
-        .filter_map(|(kopplung_id, kennung, name, richtung, org_schluessel)| {
-            Some(FuehrungGegenueber {
-                kopplung_id,
-                kennung,
-                name,
-                richtung: InstanzKopplungRichtung::parse(&richtung)?,
-                org_schluessel,
-            })
-        })
+        .filter_map(
+            |(kopplung_id, kennung, name, richtung, org_schluessel, art)| {
+                Some(FuehrungGegenueber {
+                    kopplung_id,
+                    kennung,
+                    name,
+                    richtung: InstanzKopplungRichtung::parse(&richtung)?,
+                    art: crate::instanz::InstanzKopplungArt::parse(&art)
+                        .unwrap_or(crate::instanz::InstanzKopplungArt::VorOrt),
+                    org_schluessel,
+                })
+            },
+        )
         .collect())
 }
 

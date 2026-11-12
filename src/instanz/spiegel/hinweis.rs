@@ -317,6 +317,8 @@ async fn konto_angabe(
         id: benutzer_id,
         anzeigename: name.unwrap_or_default().chars().take(NAME_MAX).collect(),
         gegen_id,
+        // Ursprungskennung wie in jeder Lieferung (LLH-1497, Spec `stammdaten-verteilung`).
+        ursprung: super::abbildung::konto_ursprung(conn, benutzer_id).await?,
     })
 }
 
