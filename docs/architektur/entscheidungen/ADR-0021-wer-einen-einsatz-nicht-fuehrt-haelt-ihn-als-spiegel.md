@@ -2,7 +2,7 @@
 id: ADR-0021
 titel: Ein Einsatz hat genau eine führende Instanz; wer ihn nicht führt, hält ihn als Spiegel
 status: ersetzt
-ersetzt_durch: ADR-0027
+ersetzt_durch: ADR-0028
 datum: 2026-11-11
 ersetzt: ADR-0020
 gilt_fuer:
