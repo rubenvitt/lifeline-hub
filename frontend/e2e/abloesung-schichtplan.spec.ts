@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Ablösung, Schichtplan (LLH-1554): Raster mit Aufziehen, Verschieben, Kanten und Personen ziehen,
@@ -15,12 +16,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 interface Block {
@@ -50,7 +47,7 @@ async function mitte(l: Locator) {
 test('Schichtplan: Block aufziehen, verschieben, Kante ziehen, Person ziehen', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 900 });
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const neu = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Schichtplan ${Date.now()}` },
@@ -146,7 +143,7 @@ test('Schichtplan: Block aufziehen, verschieben, Kante ziehen, Person ziehen', a
 test('Schichtplan: derselbe Ablauf nur mit der Tastatur', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 900 });
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const neu = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Schichtplan Tastatur ${Date.now()}` },
@@ -226,7 +223,7 @@ test('Schichtplan: Kopie per Zug und per Dialog, Schichten erzeugen mit Konflikt
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 900 });
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const neu = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Schichtplan Kopie ${Date.now()}` },
@@ -352,7 +349,7 @@ test('Schichtplan (LLH-1600): Kontextmenü eines Blocks — kopieren, bearbeiten
 }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 900 });
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
 
   const neu = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Schichtplan Kontextmenü ${Date.now()}` },

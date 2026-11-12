@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Hilfen der Organigramm-Specs (LFH-626), geteilt von `fuehrungsorganisation.spec.ts` und
@@ -21,12 +22,8 @@ export const SUBPIXEL = 0.5;
 /** A4 hoch, nutzbar (wie `funkplan-kern.ts`, `druck-fluss.spec.ts`). */
 export const A4_DRUCKBREITE = 680;
 
-export async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+export async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 export { einsatzAnlegen } from './einsatz-kern';

@@ -29,7 +29,7 @@ async function einsatzMitAuftrag(page: Page): Promise<{ einsatzId: string; nr: n
 
 test.describe('Auftrag aufheben und berichtigen', () => {
   test('aufheben mit Grund, danach unter „Abgeschlossen“', async ({ page }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const { einsatzId, nr } = await einsatzMitAuftrag(page);
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);
     await expect(detail(page).getByText('Sandsäcke zum Deich bringen')).toBeVisible();
@@ -49,7 +49,7 @@ test.describe('Auftrag aufheben und berichtigen', () => {
   });
 
   test('berichtigen schreibt die Änderung ins ETB', async ({ page }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const { einsatzId, nr } = await einsatzMitAuftrag(page);
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);
     await page.getByRole('button', { name: `Aktionen zu Auftrag #${nr}` }).click();
@@ -68,7 +68,7 @@ test.describe('Auftrag aufheben und berichtigen', () => {
   });
 
   test('als Beobachter ohne Aufheben und Berichtigen', async ({ page }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const { einsatzId, nr } = await einsatzMitAuftrag(page);
     await wechsleZuRolle(page, 'beobachter', einsatzId);
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);

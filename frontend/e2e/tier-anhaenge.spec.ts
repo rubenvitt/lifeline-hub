@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { systemBuendelAufklappen } from './etb-kern';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Fotos und Dateien an einem Tier im Browser (LFH-758, Spec `tier-anhaenge`): Ablegen über den
@@ -15,7 +17,6 @@ const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const FUEKW = { width: 1280, height: 900 };
 const SUBPIXEL = 0.5;
-const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const STAFFEL = [
   { dichte: 'kompakt', soll: 30 },
   { dichte: 'komfortabel', soll: 48 },
@@ -25,12 +26,8 @@ const STAFFEL = [
 // Echte Bildbytes: ein Foto-Download wird bereinigt (LFH-747).
 const JPG = MINI_JPEG;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
@@ -46,15 +43,6 @@ async function hoehe(ziel: Locator): Promise<number> {
   const kasten = await ziel.boundingBox();
   expect(kasten, 'kein Kasten messbar').not.toBeNull();
   return Math.round(kasten!.height * 10) / 10;
-}
-
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
-    DICHTE_SCHLUESSEL,
-    dichte,
-  ] as const);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
 const paneel = (page: Page) => page.getByRole('region', { name: 'Fotos und Dateien' });
@@ -128,8 +116,7 @@ test.describe('Dichte-Staffel: Download-Anker und Entfernen am Tier', () => {
       const id = await tierAnlegen(page, einsatzId);
       await seedeAnhang(page, einsatzId, id, 'foto.jpg');
       await page.setViewportSize(FUEKW);
-      await page.goto(`/einsaetze/${einsatzId}/tiere/${id}`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/tiere/${id}`, dichte);
 
       const ziele: Record<string, Locator> = {
         'Download-Anker': paneel(page).getByRole('link', { name: /^foto\.jpg, / }),

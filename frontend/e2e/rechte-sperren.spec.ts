@@ -178,7 +178,7 @@ test('LFH-1141 Einsatzleitung ohne Systemrolle nimmt eine Person der Organisatio
 test('LFH-966 Benutzerverwaltung: eigenes Konto gesperrt, ein anderes ohne Rückfrage deaktiviert', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const anderes = await benutzerAnlegen(page, 'beobachter', 'Abzuschalten');
   await page.goto('/admin/benutzer');
 

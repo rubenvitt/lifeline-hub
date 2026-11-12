@@ -77,7 +77,7 @@ for (const liste of LISTEN) {
     test.setTimeout(90_000);
     await page.setViewportSize(HANDY);
     await beobachteShifts(page);
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const zeile = await liste.saeen(page);
 
     let oeffne!: () => void;

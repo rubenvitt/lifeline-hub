@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kopfFilterAusloeser, kopfFilterWaehlen } from './kopffilter-kern';
 import {
-  anmeldenAls,
+  anmeldenImFormular,
   anmeldenAlsAdmin,
   benachrichtigungenQuittieren,
   benutzerAnlegen,
@@ -64,7 +64,7 @@ test.describe('Schäden: Sortieren und Filtern im Spaltenkopf', () => {
   test('Zustand in der Adresse, Zurück, Neuladen und Sitzung — als Admin und als Beobachter', async ({
     page,
   }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
     const liste = `/einsaetze/${einsatzId}/schaeden`;
 
@@ -118,10 +118,10 @@ test.describe('Schäden: Sortieren und Filtern im Spaltenkopf', () => {
     await expect(page).toHaveURL(/sort=ort/);
     await expect(page.locator('[data-lfh="filterchips"]')).toHaveCount(0);
 
-    // Beobachter: den Stand der Sitzung (hier noch die Sortierung) räumt der Kontowechsel. Das
-    // Abmelden über die API sieht die App nicht; es räumen der Start der Anmeldeseite ohne Sitzung
-    // (401 beim Start) und sicher die Bindung an den Benutzer bei der Anmeldung (LLH-1428). Ohne
-    // Parameter beginnt die Liste daher ohne die Sicht des Admins.
+    // Beobachter: den Stand der Sitzung (hier noch die Sortierung) räumt der Kontowechsel. Ab- und
+    // Anmelden über die API sieht die App nicht; es räumt die Bindung an den Benutzer beim Start
+    // der nächsten Seite (`uebernimm` → `listenGedaechtnisBinden`, LLH-1428). Ohne Parameter
+    // beginnt die Liste daher ohne die Sicht des Admins.
     await wechsleZuRolle(page, 'beobachter', einsatzId);
     await page.goto(liste);
     await expect(page.getByText('Zollhof 4')).toBeVisible();
@@ -138,7 +138,7 @@ test.describe('Schäden: Sortieren und Filtern im Spaltenkopf', () => {
   test('Kontowechsel in einem anderen Tab: nach dem Neuladen keine Sicht der vorigen Person (LLH-1428)', async ({
     page,
   }) => {
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
     const liste = `/einsaetze/${einsatzId}/schaeden`;
     const beobachter = await benutzerAnlegen(page, 'beobachter');
@@ -154,8 +154,11 @@ test.describe('Schäden: Sortieren und Filtern im Spaltenkopf', () => {
 
     // Ein zweiter Tab meldet über die Anmeldeseite den Beobachter an, ohne vorher abzumelden
     // (`auth/AGENTS.md`); dieser Tab lädt über den Konfliktdialog neu, die Sitzung überlebt das.
+    // Über das Formular, nicht die API: nur die Anmeldung im App-Code sendet die Kanalmeldung an
+    // den ersten Tab (`AuthContext.login`), die API-Anmeldung fiele still auf die 403 zurück.
     const tab2 = await page.context().newPage();
-    await anmeldenAls(tab2, beobachter.benutzername, beobachter.passwort);
+    await tab2.goto('/login');
+    await anmeldenImFormular(tab2, beobachter.benutzername, beobachter.passwort);
     const dialog = page.getByRole('dialog').filter({ hasText: 'Anderer Benutzer angemeldet' });
     await dialog.getByRole('button', { name: /weiterarbeiten$/ }).click();
     await expect(page).toHaveURL(/\/einsaetze$/);

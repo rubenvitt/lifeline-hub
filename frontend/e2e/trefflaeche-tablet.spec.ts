@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Trefflächen-Nachweis am Führungs-Tablet: Modulzeilen im INLINE-Rahmen, Kategorie-Ziele der
@@ -57,12 +58,8 @@ const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const EINHEIT = 'Technischer Zug Musterstadt-Nordwest 46';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**
@@ -139,8 +136,8 @@ for (const { dichte, soll } of STAFFEL) {
     page,
   }) => {
     // Anmelden und Anlegen am Projekt-Vorgabemaß, erst danach umstellen.
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `Trefflaeche ${dichte} ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `Trefflaeche ${dichte} ${Date.now()}`);
     const einheitPfad = await seedeEinheit(page, einsatzId);
 
     await page.setViewportSize(TABLET);
@@ -255,8 +252,8 @@ for (const { dichte, soll } of STAFFEL) {
   test(`Führungs-Tablet, Stufe ${dichte}: die Einheitsangabe der Personalliste hält ${soll} px`, async ({
     page,
   }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `Trefflaeche Personal ${dichte} ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `Trefflaeche Personal ${dichte} ${Date.now()}`);
     await seedeEinheit(page, einsatzId);
     const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
       data: { adhoc: { name: KRAFT } },
@@ -325,8 +322,8 @@ for (const { dichte, soll } of STAFFEL) {
   test(`Führungs-Tablet hochkant, Stufe ${dichte}: Hamburger, Akkordeon und Drawer-Schließer halten ${soll} px`, async ({
     page,
   }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `Trefflaeche Drawer ${dichte} ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `Trefflaeche Drawer ${dichte} ${Date.now()}`);
 
     await page.setViewportSize(TABLET_HOCHKANT);
     // `…/personal` klappt „Kräfte & Mittel" auf — die Modulzeilen stehen ohne Klick im Drawer.
@@ -402,7 +399,7 @@ for (const { dichte, soll } of STAFFEL) {
   test(`Führungs-Tablet, Stufe ${dichte}: der Kippschalter selbst hält ${soll} px`, async ({
     page,
   }) => {
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     await page.setViewportSize(TABLET);
     await page.goto('/admin/einstellungen/anmeldung');
     if (dichte === 'handschuh') {
@@ -447,8 +444,8 @@ for (const { dichte, soll } of STAFFEL) {
     page,
   }) => {
     // Gesät wird als Admin, erst dann wechselt die Sitzung im selben Kontext.
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `Trefflaeche Beobachter ${dichte} ${Date.now()}`);
+    await anmelden(page, { startseite: false });
+    const einsatzId = await einsatzPerApi(page, `Trefflaeche Beobachter ${dichte} ${Date.now()}`);
     const einheitPfad = await seedeEinheit(page, einsatzId);
     await wechsleZuRolle(page, 'beobachter', einsatzId);
 
@@ -523,7 +520,7 @@ for (const { dichte, soll } of STAFFEL) {
   test(`Führungs-Tablet, Stufe ${dichte}: jede Anmeldeverfahren-Zeile trägt ihren Sperrgrund und hält ${soll} px (Führungskraft)`, async ({
     page,
   }) => {
-    await anmelden(page);
+    await anmelden(page, { startseite: false });
     await wechsleZuRolle(page, 'fuehrungskraft');
 
     await page.setViewportSize(TABLET);

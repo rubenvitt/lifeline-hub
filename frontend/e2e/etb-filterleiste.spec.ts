@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { pruefe, randKontrast } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Filterleiste und Filterband des Einsatztagebuchs (LLH-1065/LLH-1071, Spec `etb-filterleiste`).
@@ -16,11 +17,7 @@ const ZIEL = { light: 7, dark: 5 } as const;
 
 async function anmelden(page: Page, modus: 'light' | 'dark' = 'light') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
 }
 
 async function einsatzMitEintrag(page: Page): Promise<number> {

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Tippverzögerung in den Entwürfen von Lagebericht und Befehl am Fükw-Maß. Beide schreiben über
@@ -39,12 +40,8 @@ const SCHLECHTESTER_MAX_MS = 150;
 /** Genug Anschläge für einen belastbaren Median, wenige genug für einen kurzen Lauf. */
 const ANSCHLAEGE = 40;
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** „Lagevortrag zur Entscheidung": die Vorlage mit den meisten Abschnitten (acht). */
@@ -144,8 +141,8 @@ function zeile(m: Messung): string {
 test('Tippen in den Entwürfen von Lagebericht und Befehl: Verzögerung Anschlag-bis-Bild bei 1366 px', async ({
   page,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Tippen LB ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Tippen LB ${Date.now()}`);
   const berichtId = await lageberichtAnlegen(page, einsatzId);
 
   await page.setViewportSize({ width: 1366, height: 768 });

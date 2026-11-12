@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { waehleIn, waehleStehend } from './auswahl-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Kommunikationsplan S6 (LFH-848): die Nachweise, die NUR im Browser gehen. jsdom rechnet kein
@@ -33,12 +34,8 @@ const NUMMER = '+49 421 361-12345';
 const HINWEIS = 'Lagedienst rund um die Uhr, außerhalb Bürozeit über Zentrale';
 const ABSCHNITT = 'Deichverteidigung Nordwest II';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, 'admin', PW, optionen);
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {

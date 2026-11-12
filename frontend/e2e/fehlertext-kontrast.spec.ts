@@ -38,7 +38,7 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
 
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 874 Fehlertext ${Date.now()}`,

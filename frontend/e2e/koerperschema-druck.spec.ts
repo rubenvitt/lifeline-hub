@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
 import { pdfAuszug } from './pdf-kern';
 import { ADMIN, ADMIN_PW, anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
@@ -49,13 +49,13 @@ test('Beobachter druckt eine Person mit drei Verletzungen schwarz-weiß; das Öf
   page,
   browserName,
 }) => {
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Körperschema-Druck ${Date.now()}`);
+  await anmeldenAls(page, ADMIN, ADMIN_PW, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Körperschema-Druck ${Date.now()}`);
   const pid = await personSaeen(page, einsatzId);
   const beobachter = await benutzerAnlegen(page, 'beobachter');
   await mitgliedEintragen(page, einsatzId, beobachter.id, 'beobachter');
 
-  await anmeldenAls(page, beobachter.benutzername, beobachter.passwort);
+  await anmeldenAls(page, beobachter.benutzername, beobachter.passwort, { startseite: false });
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto(`/einsaetze/${einsatzId}/personen/${pid}`);
   const kopf = page.getByRole('region', { name: 'Patientenkopf' });
@@ -136,8 +136,8 @@ test('Beobachter druckt eine Person mit drei Verletzungen schwarz-weiß; das Öf
 });
 
 test('unbekannte Person: „nicht gefunden“, kein Druckknopf', async ({ page }) => {
-  await anmeldenAls(page, ADMIN, ADMIN_PW);
-  const einsatzId = await einsatzAnlegen(page, `E2E Körperschema-Druck leer ${Date.now()}`);
+  await anmeldenAls(page, ADMIN, ADMIN_PW, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Körperschema-Druck leer ${Date.now()}`);
   await page.goto(`/einsaetze/${einsatzId}/personen/987654/druck`);
   await expect(page.getByText('Person nicht gefunden')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toHaveCount(0);

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Eigene Führungsstelle als Ort (LFH-1181, Spec `einsatz-fuehrungsstelle`) im echten Browser:
@@ -10,11 +11,7 @@ import { einsatzdatenPfad } from '../src/routing/deeplinks';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 async function anmeldenUndAnlegen(page: Page): Promise<number> {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', PW);
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Führungsstelle ${Date.now()}` },
   });

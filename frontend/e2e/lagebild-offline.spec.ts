@@ -1,6 +1,7 @@
 import { expect, request, test, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Lagebild ohne Netz lesen (LFH-723, design.md D10).
 //
@@ -34,12 +35,8 @@ const backendUrl = lauf
 
 test.use({ baseURL: backendUrl || undefined });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {

@@ -12,7 +12,7 @@ import { seedeVorlage, seedeVorlagenMaterial } from './vorlage-kern';
  * `vorlage-kern.ts` nach dem Muster des Demo-„Sanitätszug Musterstadt“.
  */
 test('Einheit aus Vorlage bilden: Dialog → Vorschau → Meldebild (LLH-1049)', async ({ page }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const neu = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Vorlage ${Date.now()}` },
   });
@@ -75,7 +75,7 @@ test('Einheit aus Vorlage bilden: Dialog → Vorschau → Meldebild (LLH-1049)',
 test('Einheit aus Vorlage bilden: Material am richtigen Ort, ein ETB-Eintrag (LLH-1261)', async ({
   page,
 }) => {
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   const neu = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Vorlagen-Material ${Date.now()}` },
   });

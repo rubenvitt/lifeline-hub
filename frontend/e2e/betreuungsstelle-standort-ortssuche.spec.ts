@@ -61,7 +61,7 @@ test('Betreuungsstelle anlegen: gewählter Standort verortet, Marker auf der Lag
 }) => {
   test.setTimeout(180_000);
   const anfragen = await geocoder(page);
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { id: e } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `E2E Standort ${Date.now()}`,
   });

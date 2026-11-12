@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Das Katalogtabellen-Primitiv am schmalen Schirm: die Tabelle scrollt in sich, drückt die
 // Seite nicht breit, und Kopfzeile und erste Spalte stehen. jsdom rechnet kein Layout.
@@ -13,12 +14,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 test.use({ viewport: { width: BREITE, height: 844 } });
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /**

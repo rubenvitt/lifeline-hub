@@ -39,7 +39,7 @@ async function saeStelle(page: Page): Promise<{ einsatzId: number; stelleId: num
 test('Übersicht → Detailseite → Belegung melden: die Kennzahl folgt, Stammdaten in der Ansicht', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { einsatzId, stelleId } = await saeStelle(page);
 
   await page.goto(`/einsaetze/${einsatzId}/betreuung`);
@@ -92,7 +92,7 @@ test('Übersicht → Detailseite → Belegung melden: die Kennzahl folgt, Stammd
 test('Detailseite → Bedarf anfordern → Nachforderung mit Stellenbezug steht im Paneel „Bedarf“', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { einsatzId, stelleId } = await saeStelle(page);
 
   await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}`);

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { flaeche, kontrast, pruefe, randKontrast, verhaeltnis } from './kontrast-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Browsermessung des Tagmodus: ETB-Typwörter und -kanten (LLH-1320), Zeilentönungen, der leise
 // Systemeintrag, die Lückenmarke der Betroffenen und die Augenbraue (Tertiärtext `schwach`,
@@ -24,11 +25,7 @@ async function pruefeKante(kante: Locator, name: string) {
 
 async function anmelden(page: Page, modus: 'light' | 'dark') {
   await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill('admin');
-  await page.getByLabel('Passwort').fill(process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
 }
 
 async function post(page: Page, pfad: string, data: unknown): Promise<{ id: number }> {

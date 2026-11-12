@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 // Bereitstellungsräume auf der Lagekarte (LLH-1107) — Durchstich im echten Renderer: kommt der
 // Platziermodus aus der BR-Detailseite an, landet der Raum mit Belegung in der Marker-Quelle,
@@ -18,11 +19,7 @@ interface MapHaken {
 }
 
 async function anmeldenAls(page: Page, benutzer: string, passwort: string) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(benutzer);
-  await page.getByLabel('Passwort').fill(passwort);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+  await anmeldenPerApi(page, benutzer, passwort);
 }
 
 async function senden(

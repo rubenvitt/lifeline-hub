@@ -42,7 +42,7 @@ async function etbTexte(page: Page, e: number): Promise<string[]> {
 test('LLH-1572: Liste — versorgt und entlassen in drei Griffen, ein ETB-Eintrag', async ({
   page,
 }) => {
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const { id: e } = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Leichter Fall ${Date.now()}`,
   });

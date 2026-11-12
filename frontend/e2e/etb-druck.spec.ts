@@ -2,7 +2,8 @@ import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { erwarteHandyBreite, mitHandy } from './druckansicht-mobil-kern';
 import { pdfAuszug } from './pdf-kern';
 import { benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * ETB-Druckansicht gegen einen echten Server: Vollabruf über MEHR als eine Serverseite (höchstens
@@ -28,12 +29,8 @@ const BUENDEL = 15;
 
 test.setTimeout(240_000);
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Bis zu drei Versuche bei 503 („bitte erneut versuchen", SQLite-Schreibkonflikt). */
@@ -117,8 +114,8 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   browser,
   browserName,
 }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E ETB-Druck ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E ETB-Druck ${Date.now()}`);
   const saat = await saeen(page, einsatzId);
 
   // Serverwahrheit zum Vergleich: dieselbe Zählung, die auch der ETB-Kopf nimmt.
@@ -284,8 +281,8 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
  * Unter Druckmedium in allen drei Engines, das Blatt nur im Chromium-PDF.
  */
 test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, browserName }) => {
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E ETB-Druck überlang ${Date.now()}`);
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E ETB-Druck überlang ${Date.now()}`);
 
   const satz =
     'Die Lage im Einsatzabschnitt hat sich seit der letzten Meldung verändert, die Kräfte vor ' +

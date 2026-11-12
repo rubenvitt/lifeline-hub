@@ -4,6 +4,8 @@ import { eingeschwungen } from './kontrast-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { ueberstaende } from './ueberstand-kern';
 import { oeffneEbenenGruppe } from './leisten-kern';
+import { anmeldenPerApi } from './anmelde-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Browser-Nachweise der Prüfliste für den Pegel (LFH-606): Trefflächen über die
@@ -20,7 +22,6 @@ import { oeffneEbenenGruppe } from './leisten-kern';
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const THEMA_SCHLUESSEL = 'lifeline-hub.theme';
 const SUBPIXEL = 0.5;
 
@@ -77,12 +78,8 @@ const STATIONEN = {
   },
 };
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
@@ -111,15 +108,6 @@ async function stellePegel(page: Page, einsatzId: string, liste: unknown[]) {
   await page.route('**/api/karte/fachebenen/pegelonline', (route) =>
     route.fulfill({ json: STATIONEN }),
   );
-}
-
-async function stelleDichte(page: Page, dichte: string) {
-  await page.evaluate(([k, v]) => window.localStorage.setItem(k, v), [
-    DICHTE_SCHLUESSEL,
-    dichte,
-  ] as const);
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
 async function haeltStufe(ziel: Locator, soll: number, name: string): Promise<number> {
@@ -268,8 +256,7 @@ test('Einstellungssektion Pegel: Trefflächen über die Staffel, kein Querlauf a
   for (const breite of [1366, 390]) {
     await page.setViewportSize({ width: breite, height: 844 });
     for (const { dichte, soll, sollSM } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/einstellungen/pegel`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/einstellungen/pegel`, dichte);
       const main = page.getByRole('main');
       await expect(main.locator('[data-lfh="pegel-titel"]')).toHaveCount(2);
 
@@ -586,8 +573,7 @@ test('Fachebenen-Inspector: Trefflächen über die Staffel, Abstand im Handschuh
   for (const breite of [1366, 390]) {
     await page.setViewportSize({ width: breite, height: 844 });
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte`, dichte);
       // KASSEL steht nicht in der Liste: der Inspector trägt den Knopf.
       const auswahl = await inspectorOeffnen(page, einsatzId, 'KASSEL');
       const knopf = auswahl.getByRole('button', { name: FESTLEGEN });
@@ -651,8 +637,7 @@ test('Fachebenen-Inspector ohne Schreibrecht (Beobachter): Festlegen fehlt, Tref
   for (const breite of [1366, 390]) {
     await page.setViewportSize({ width: breite, height: 844 });
     for (const { dichte, soll } of STAFFEL) {
-      await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-      await stelleDichte(page, dichte);
+      await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte`, dichte);
       // KASSEL steht nicht in der Liste: beim Admin trägt der Inspector hier den Knopf.
       const auswahl = await inspectorOeffnen(page, einsatzId, 'KASSEL');
 
@@ -737,8 +722,7 @@ test('Fachebenen-Inspector: Tabulaturdurchlauf ohne verdecktes Fokusziel (390 ×
   const einsatzId = await einsatzAnlegen(page, `E2E Pegel Inspector Fokus ${Date.now()}`);
   await stellePegel(page, einsatzId, pegelListe(10));
   await page.setViewportSize({ width: 390, height: 420 });
-  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-  await stelleDichte(page, 'handschuh');
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/lagekarte`, 'handschuh');
   const auswahl = await inspectorOeffnen(page, einsatzId, 'KASSEL');
   const knopf = auswahl.getByRole('button', { name: FESTLEGEN });
   await expect(knopf).toBeEnabled();

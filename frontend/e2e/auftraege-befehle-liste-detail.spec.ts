@@ -47,7 +47,7 @@ for (const kontext of [
     page,
   }) => {
     await page.setViewportSize({ width: kontext.breite, height: kontext.hoehe });
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatz(page);
     await page.goto(`/einsaetze/${einsatzId}/auftraege`);
 
@@ -101,7 +101,7 @@ for (const kontext of [
     page,
   }) => {
     await page.setViewportSize({ width: kontext.breite, height: kontext.hoehe });
-    await anmeldenAlsAdmin(page);
+    await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatz(page);
     await page.goto(`/einsaetze/${einsatzId}/auftraege?reiter=befehle`);
 
@@ -144,7 +144,7 @@ test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-117
   page,
 }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await einsatz(page);
   const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
     data: { name: 'EA Süd' },
@@ -191,7 +191,7 @@ test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-117
 
 test('ab lg bleibt das Detail beim Scrollen der Liste im Blick (Fükw)', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await anmeldenAlsAdmin(page);
+  await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await einsatz(page);
   for (let i = 0; i < 14; i += 1) await auftragPerApi(page, einsatzId, `Auftrag Nummer ${i}`);
   await page.goto(`/einsaetze/${einsatzId}/auftraege`);

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die Kräfte-Module am Handschirm:
@@ -41,12 +42,8 @@ const FUNKRUFNAME = 'Florian Musterstadt 44/1';
 const KRAFT = 'Kirchgassner-Wohlfahrt, Maximiliane';
 const MATERIAL = 'Wolldecke';
 
-async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 /** Seeding per `page.request`: die Session ist Cookie-basiert, der Jar wird geteilt. */
@@ -390,7 +387,7 @@ for (const { dichte, soll } of STAFFEL) {
     page,
   }) => {
     await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `Statusziel ${dichte} ${Date.now()}`);
+    const einsatzId = await einsatzPerApi(page, `Statusziel ${dichte} ${Date.now()}`);
     await seedeAlles(page, einsatzId);
 
     await page.setViewportSize(HANDSCHIRM);
@@ -439,12 +436,12 @@ test('„Einheit bilden" persistiert erst beim Absenden — und nie als „Neue 
   /**
    * Gemessen wird der PERSISTIERTE Bestand über die API, nicht die Anzeige.
    */
-  await anmelden(page);
+  await anmelden(page, { startseite: false });
   /**
    * Der Einsatzname darf die Knopfbeschriftung nicht enthalten: der Einsatz-Switcher in der
    * Kopfzeile trägt den Namen als eigenen Knopf, und die Knopfabfrage träfe ihn.
    */
-  const einsatzId = await einsatzAnlegen(page, `Gliederung ${Date.now()}`);
+  const einsatzId = await einsatzPerApi(page, `Gliederung ${Date.now()}`);
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/einheiten`);
 

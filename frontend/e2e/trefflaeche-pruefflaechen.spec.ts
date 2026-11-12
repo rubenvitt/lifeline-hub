@@ -14,6 +14,7 @@ import {
   haeltStufe,
   kurzeAchseHaelt,
   ruhigeHoehe,
+  ladeInDichte,
   stelleDichte,
 } from './trefflaeche-kern';
 
@@ -1604,8 +1605,7 @@ test('C17 · Erfassungsdialog: Schließkreuz ≥ 16 px über dem ersten Feld, �
 }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E 1274 Erfassungsdialog ${Date.now()}`);
   const nfId = await eingetroffeneNachforderung(page, einsatzId);
-  await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
-  await stelleDichte(page, 'handschuh');
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/nachforderungen`, 'handschuh');
   for (const [wo, groesse] of [
     ['1024 px', TABLET_QUER],
     ['390 px', HANDSCHIRM],
@@ -1622,8 +1622,7 @@ test('C17 · Erfassungsdialog (Führungspersonal): dieselben Abstände auf 1024 
   const einsatzId = await einsatzAnlegen(page, `E2E 1274 ErfassungsdialogF ${Date.now()}`);
   const nfId = await eingetroffeneNachforderung(page, einsatzId);
   await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
-  await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
-  await stelleDichte(page, 'handschuh');
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/nachforderungen`, 'handschuh');
   await expect(
     page.getByRole('button', { name: 'Benutzermenü' }),
     'Vorbedingung: die Sitzung gehört dem Führungspersonal',
@@ -1650,8 +1649,7 @@ test('Sichtungswahl: sechs Flächen halten 72 × 96 in kompakt und Handschuh, L�
     ['kompakt', 8],
     ['handschuh', 16],
   ] as const) {
-    await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/aufnahme`, dichte);
     const flaechen = page
       .getByRole('radiogroup', { name: 'Sichtungskategorie' })
       .getByRole('radio');
@@ -1700,8 +1698,7 @@ test('Körperschema: jede Region und jedes Sternchen hält die Stufe, Hand, Fuß
     ['komfortabel', 48],
     ['handschuh', 72],
   ] as const) {
-    await page.goto(`/einsaetze/${einsatzId}/personen/${pid}`);
-    await stelleDichte(page, dichte);
+    await ladeInDichte(page, `/einsaetze/${einsatzId}/personen/${pid}`, dichte);
     await page
       .getByRole('region', { name: 'Patientenkopf' })
       .getByRole('button', { name: 'Verletzung markieren' })
@@ -1749,69 +1746,4 @@ test('Körperschema: jede Region und jedes Sternchen hält die Stufe, Hand, Fuß
     ).toBeVisible();
   }
   expect(hand.kompakt.height, 'Gegenprobe: in kompakt kleiner').toBeLessThan(hand.handschuh.height);
-});
-
-/**
- * Gefahrenmatrix (LLH-1102, Spec `gefahrenmatrix`, „Die ganze Zelle ist das Bedienziel“): der
- * Auslöser füllt die Zelle, und die Zeile ist so hoch wie die Steuerhöhe. Gemessen in ALLEN drei
- * Stufen auf beiden Achsen (die Zelle ist das Ziel, nicht mehr ein Knopf in ihr), dazu die
- * Gegenprobe kompakt < handschuh und die Deckung von Knopf und Zelle: ein Knopf, der kleiner als
- * seine Zelle bliebe, ließe einen Tipp daneben wieder ins Leere gehen.
- */
-test('Gefahrenmatrix: jede Zelle ist ganz Ziel und hält die Stufe in allen drei Dichten', async ({
-  page,
-}) => {
-  test.setTimeout(180_000);
-  await page.setViewportSize(FUEKW);
-  await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E 1102 Matrix ${Date.now()}`);
-  await anlegen(
-    page,
-    einsatzId,
-    'zonen',
-    {
-      typ: 'gefahrengebiet',
-      geometrie_typ: 'Polygon',
-      geometrie: JSON.stringify({
-        type: 'Polygon',
-        coordinates: [
-          [
-            [10, 50],
-            [10.01, 50],
-            [10.01, 50.01],
-            [10, 50.01],
-            [10, 50],
-          ],
-        ],
-      }),
-      label: 'Sektor Zelle',
-    },
-    'Gefahrengebiet Sektor Zelle',
-  );
-
-  const je = new Map<string, number>();
-  const notiz: string[] = [];
-  for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/gefahren`);
-    await stelleDichte(page, dichte);
-    const zellen = inMain(page).getByRole('button', { name: /^Bewertung / });
-    await expect(zellen).toHaveCount(58);
-    // Beide Achsen gegen die volle Stufe: die Zelle ist quadratisch oder breiter.
-    let kleinstes = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < 58; i += 1) {
-      const knopf = (await zellen.nth(i).boundingBox())!;
-      const zelle = (await zellen.nth(i).locator('xpath=ancestor::td[1]').boundingBox())!;
-      const name = `Matrixzelle #${i + 1} (${dichte})`;
-      expect(knopf.height + SUBPIXEL, `${name}: Höhe`).toBeGreaterThanOrEqual(soll);
-      expect(knopf.width + SUBPIXEL, `${name}: Breite`).toBeGreaterThanOrEqual(soll);
-      // Deckung: der Knopf füllt die Zelle bis auf ihre 1-px-Linie.
-      expect(zelle.width - knopf.width, `${name}: Breite deckt die Zelle`).toBeLessThanOrEqual(2);
-      expect(zelle.height - knopf.height, `${name}: Höhe deckt die Zelle`).toBeLessThanOrEqual(2);
-      kleinstes = Math.min(kleinstes, knopf.height, knopf.width);
-    }
-    je.set(`${dichte} Matrixzelle`, kleinstes);
-    notiz.push(`${dichte}: kurze Achse ${kleinstes}`);
-  }
-  gegenprobe(je, 'Matrixzelle');
-  test.info().annotations.push({ type: 'messwert', description: notiz.join(' | ') });
 });

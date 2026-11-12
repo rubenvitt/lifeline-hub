@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Hilfen der Meldebild-Specs, geteilt von `meldebild-tabelle.spec.ts` und
@@ -12,12 +13,8 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 /** Subpixel-Spielraum für JEDEN Maßvergleich. */
 export const SUBPIXEL = 0.5;
 
-export async function anmelden(page: Page) {
-  await page.goto('/login');
-  await page.getByLabel('Benutzername').fill(ADMIN);
-  await page.getByLabel('Passwort').fill(PW);
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
-  await expect(page).toHaveURL(/\/einsaetze/);
+export async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
+  await anmeldenPerApi(page, ADMIN, PW, optionen);
 }
 
 export { einsatzAnlegen } from './einsatz-kern';
