@@ -10,6 +10,7 @@
 
 pub mod basis32;
 pub mod code;
+pub mod entdeckung;
 pub mod extractor;
 pub mod fuehrung;
 pub mod identitaet;
@@ -18,14 +19,17 @@ pub mod repo;
 pub mod signatur;
 pub mod spiegel;
 pub mod stammdaten;
+pub mod zertifikat;
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
 /// Protokollversion dieser Instanz (design.md D5). Wer sie erhöht, hält die vorige im Code, bis
-/// die übernächste kommt; das Schema von Melden bleibt über alle Versionen nur additiv.
-pub const PROTOKOLL: u32 = 2;
+/// die übernächste kommt; das Schema von Melden bleibt über alle Versionen nur additiv. 3 seit
+/// LLH-1497 ([`PROTOKOLL_VOR_ORT`]); Version 2 bleibt voll verständlich, die neuen Felder sind
+/// optional.
+pub const PROTOKOLL: u32 = 3;
 
 /// Ab dieser Protokollversion kennt eine Instanz den Abgleich der Einsätze (LLH-1492, design.md
 /// D6); mit einem älteren Gegenüber wird nicht gespiegelt.
@@ -88,6 +92,52 @@ wire_enum! {
     }
 }
 
+wire_enum! {
+    /// Art einer Kopplung (LLH-1497, design.md D1). Sie beschreibt die Kopplung, nicht die
+    /// Instanz: dieselbe Instanz kann beim Hub `standard` und bei einem zweiten ELW `vor_ort`
+    /// gekoppelt sein. Was über eine Art fließt, sagt allein [`InstanzKopplungArt::traegt`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum InstanzKopplungArt {
+        /// Alles, was die Richtung trägt: Stammdaten, Geheimnisse, Verwahrung, Führungswechsel.
+        Standard => "standard",
+        /// Direktkopplung vor Ort: nur Akten zur Anzeige, Spiegel und Anträge.
+        VorOrt => "vor_ort",
+    }
+}
+
+/// Ein Fluss, den eine Kopplung je nach Art trägt oder nicht (design.md D2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fluss {
+    /// Stammdaten der Org von der erreichten zur meldenden Seite; Quelle einer Org.
+    Stammdaten,
+    /// Geheimnisse von Konten; macht eine Org „verteilend“ (Passkey-Pflicht, „ELW verloren“).
+    Geheimnisse,
+    /// Übergabe eines abgeschlossenen Einsatzes zur Verwahrung.
+    Verwahrung,
+    /// Übergabe, Anfrage, Notübernahme und Abgabecode zwischen den beiden Seiten.
+    Fuehrungswechsel,
+}
+
+impl InstanzKopplungArt {
+    /// Ob eine Kopplung dieser Art den Fluss trägt (design.md D2): `standard` alles, `vor_ort`
+    /// nichts davon. Jede Stelle, die einen Fluss auslöst oder annimmt, fragt hier.
+    pub fn traegt(self, fluss: Fluss) -> bool {
+        match self {
+            Self::Standard => true,
+            Self::VorOrt => match fluss {
+                Fluss::Stammdaten
+                | Fluss::Geheimnisse
+                | Fluss::Verwahrung
+                | Fluss::Fuehrungswechsel => false,
+            },
+        }
+    }
+}
+
+/// Ab dieser Protokollversion kennt eine Instanz die Direktkopplung vor Ort, das beglaubigte
+/// Zertifikat und die Ursprungskennung (LLH-1497, design.md D7).
+pub const PROTOKOLL_VOR_ORT: u32 = 3;
+
 static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// Setzt den Namen dieser Instanz einmal beim Start (`Config::instanz_anzeigename`).
@@ -141,5 +191,79 @@ mod tests {
     #[test]
     fn org_kennung_traegt_die_instanz() {
         assert_eq!(org_kennung("abc", 7), "abc/7");
+    }
+}
+
+#[cfg(test)]
+mod art_tests {
+    use super::{Fluss, InstanzKopplungArt};
+
+    #[test]
+    fn standard_traegt_alles_vor_ort_nichts() {
+        for f in [
+            Fluss::Stammdaten,
+            Fluss::Geheimnisse,
+            Fluss::Verwahrung,
+            Fluss::Fuehrungswechsel,
+        ] {
+            assert!(InstanzKopplungArt::Standard.traegt(f), "{f:?}");
+            assert!(!InstanzKopplungArt::VorOrt.traegt(f), "{f:?}");
+        }
+    }
+
+    /// Wächter (LLH-1497, design.md D2): Jede Stelle, die einen Fluss auslöst oder annimmt, fragt
+    /// die Art der Kopplung. Verliert eine Stelle die Prüfung, wird dieser Test rot; eine neue
+    /// Stelle gehört in die Liste.
+    #[test]
+    fn jeder_fluss_hat_seine_pruefstellen() {
+        let stellen: &[(&str, &str, usize)] = &[
+            // Stammdaten: Quelle der meldenden Seite, Lieferung der erreichten Seite.
+            (
+                "src/instanz/stammdaten/herkunft.rs",
+                "k.art = 'standard'",
+                1,
+            ),
+            (
+                "src/instanz/melden.rs",
+                "traegt(super::Fluss::Stammdaten)",
+                1,
+            ),
+            // Geheimnisse: „verteilend“ (Passkey-Pflicht) und „ELW verloren“.
+            (
+                "src/instanz/stammdaten/geheimnis.rs",
+                "k.art = 'standard'",
+                1,
+            ),
+            ("src/routes/instanz.rs", "Fluss::Geheimnisse", 1),
+            // Verwahrung: anbieten (meldende Seite) und annehmen (erreichte Seite).
+            ("src/instanz/spiegel/abgleich.rs", "Fluss::Verwahrung", 2),
+            // Verwahrung auch beim Archiv am Ende der Nachbereitung: es wartet nur auf eine
+            // Standardkopplung, die verwahren kann.
+            ("src/einsatz/archiv.rs", "k.art = 'standard'", 1),
+            // Führungswechsel: Bedienung (Übergabe, Code, Anfrage, Notübernahme) und Austausch.
+            (
+                "src/instanz/fuehrung/dienst.rs",
+                "Fluss::Fuehrungswechsel",
+                1,
+            ),
+            // Kein Zurückholen nach dem Widerruf einer Direktkopplung.
+            ("src/instanz/repo.rs", "Fluss::Fuehrungswechsel", 1),
+            // Beide Wege zum Gegenüber (zum Führer, zu einer genannten Instanz) fragen die Art ab.
+            ("src/instanz/fuehrung/dienst.rs", "fordere_wechsel(&g)?", 2),
+            (
+                "src/instanz/fuehrung/austausch.rs",
+                "InstanzKopplungArt::VorOrt",
+                1,
+            ),
+        ];
+        let wurzel = env!("CARGO_MANIFEST_DIR");
+        for (datei, nadel, mindestens) in stellen {
+            let text = std::fs::read_to_string(format!("{wurzel}/{datei}")).unwrap();
+            let n = text.matches(nadel).count();
+            assert!(
+                n >= *mindestens,
+                "{datei}: „{nadel}“ {n}-mal, erwartet mindestens {mindestens}"
+            );
+        }
     }
 }

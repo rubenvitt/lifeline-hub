@@ -215,6 +215,11 @@ pub struct Zeile {
     /// überliest das Feld und lässt die Zeile ohne Daten ebenfalls aus.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub zu_gross: bool,
+    /// Ursprungskennungen der Verweise auf Stammdaten, je Spalte (LLH-1497, design.md D5): bei
+    /// einem einzelnen Verweis der Text, bei Qualifikationslisten ein Objekt „ID beim Absender →
+    /// Ursprung“. Immer aus den Kennungen des Absenders vor jeder Übersetzung.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub ursprung: std::collections::BTreeMap<String, Value>,
 }
 
 /// Größe und SHA-256 (hex) eines Inhalts auf Abruf.
@@ -233,6 +238,10 @@ pub struct KontoAngabe {
     /// Kennung beim Empfänger, wenn der Absender sie kennt (Herkunft der Stammdaten).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gegen_id: Option<i64>,
+    /// Ursprungskennung des Kontos (LLH-1497, design.md D5); fehlt bei Stellvertretern und bei
+    /// Protokoll 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ursprung: Option<String>,
 }
 
 /// Ein Antrag an den Führer (D9, D11).
@@ -253,6 +262,10 @@ pub struct Antrag {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client_id: Option<String>,
     pub erfasst_at: String,
+    /// Ursprungskennungen der Verweise auf Stammdaten im Body, je Pfad (etwa
+    /// `vorlage.vorlage_id`), mit den Kennungen des Antragstellers (LLH-1497, design.md D5).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub ursprung: std::collections::BTreeMap<String, String>,
 }
 
 /// Ergebnis eines Antrags (D11).

@@ -103,6 +103,10 @@ pub struct MeldenAnfrage {
     /// Bis zu diesem Stand der erreichten Seite hat die meldende Seite Akten übernommen.
     #[serde(default)]
     pub fuehrung_bis: i64,
+    /// Direktkopplung: der Fingerabdruck des Zertifikats der erreichten Seite, den die meldende
+    /// Seite als beglaubigt gespeichert hat (LLH-1497, Anzeige „Zertifikat bestätigt“).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_zertifikat: Option<String>,
 }
 
 /// Eine Org in der Antwort.
@@ -202,6 +206,12 @@ pub enum SendError {
     Abgelehnt(u16, String),
     /// Die Antwort war nicht vom Gegenüber signiert oder passte nicht.
     AntwortUngueltig(String),
+    /// Direktkopplung: das gezeigte TLS-Zertifikat ist nicht das beglaubigte (vor dem Senden
+    /// abgebrochen); [`send_signed_bis`] holt dann die signierte Aussage ein.
+    ZertifikatGewechselt,
+    /// Direktkopplung: auch die signierte Aussage beglaubigt das gezeigte Zertifikat nicht; es geht
+    /// nichts hinaus (Spec `instanz-kopplung`).
+    ZertifikatPasstNicht,
 }
 
 impl std::fmt::Display for SendError {
@@ -211,6 +221,9 @@ impl std::fmt::Display for SendError {
             SendError::Abgelehnt(s, t) if t.is_empty() => write!(f, "abgelehnt ({s})"),
             SendError::Abgelehnt(s, t) => write!(f, "abgelehnt ({s}): {t}"),
             SendError::AntwortUngueltig(t) => write!(f, "Antwort ungültig: {t}"),
+            SendError::ZertifikatGewechselt | SendError::ZertifikatPasstNicht => {
+                f.write_str(repo::ZERTIFIKAT_PASST_NICHT)
+            }
         }
     }
 }
@@ -225,22 +238,215 @@ pub struct VerifiedAntwort<T> {
 
 /// Schickt eine signierte Anfrage an das Gegenüber und prüft dessen signierte Antwort.
 pub async fn send_signed<A: Serialize, T: DeserializeOwned>(
+    pool: &SqlitePool,
     identitaet: &Identitaet,
     kopplung: &KopplungZeile,
     pfad: &str,
     anfrage: &A,
 ) -> Result<VerifiedAntwort<T>, SendError> {
-    send_signed_bis(identitaet, kopplung, pfad, anfrage, ANTWORT_MAX).await
+    send_signed_bis(pool, identitaet, kopplung, pfad, anfrage, ANTWORT_MAX).await
 }
 
 /// Wie [`send_signed`], mit eigener Lesegrenze der Antwort (Abgleich, LLH-1492).
+///
+/// Direktkopplung (LLH-1497, design.md D3): Zeigt die Gegenstelle ein anderes als das beglaubigte
+/// Zertifikat, bricht der Versand vor dem Senden ab; dann holt [`bestaetige_zertifikat`] eine
+/// signierte Aussage ohne Nutzdaten ein, und nur wenn sie das gezeigte Zertifikat nennt, geht die
+/// Anfrage einmal neu hinaus.
 pub async fn send_signed_bis<A: Serialize, T: DeserializeOwned>(
+    pool: &SqlitePool,
     identitaet: &Identitaet,
     kopplung: &KopplungZeile,
     pfad: &str,
     anfrage: &A,
     antwort_max: usize,
 ) -> Result<VerifiedAntwort<T>, SendError> {
+    match send_signed_einmal(identitaet, kopplung, pfad, anfrage, antwort_max).await {
+        Err(SendError::ZertifikatGewechselt) => {}
+        sonst => return sonst,
+    }
+    // Kann die Gegenstelle keine gültige Aussage liefern (unsigniert, abgelehnt), passt das
+    // gezeigte Zertifikat nicht; nur ein Netzfehler bleibt einer (Spec „Fremdes Zertifikat“).
+    let neu = match bestaetige_zertifikat(identitaet, kopplung).await {
+        Ok(neu) => neu,
+        Err(SendError::Netz(t)) => return Err(SendError::Netz(t)),
+        Err(_) => return Err(SendError::ZertifikatPasstNicht),
+    };
+    if let Err(e) = save_neues_zertifikat(pool, kopplung, &neu).await {
+        return Err(SendError::Netz(format!(
+            "Zertifikat nicht gespeichert: {e}"
+        )));
+    }
+    let mut k = kopplung.clone();
+    k.tls_zertifikat = Some(neu);
+    match send_signed_einmal(identitaet, &k, pfad, anfrage, antwort_max).await {
+        Err(SendError::ZertifikatGewechselt) => Err(SendError::ZertifikatPasstNicht),
+        sonst => sonst,
+    }
+}
+
+/// Pfad der signierten Aussage über das TLS-Zertifikat (design.md D3).
+pub const ZERTIFIKAT_PFAD: &str = "/api/instanz/zertifikat";
+
+/// Antwort auf `POST /api/instanz/zertifikat`: der Fingerabdruck des Zertifikats, das die
+/// erreichte Seite gerade zeigt, von ihr signiert.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZertifikatAussage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_zertifikat: Option<String>,
+}
+
+/// Holt über eine Verbindung ohne Pin eine signierte Aussage über das Zertifikat der Gegenstelle
+/// ein (leere Anfrage, keine Nutzdaten). Passt die Aussage zum gesehenen Zertifikat, wird sie als
+/// neuer Pin gespeichert und in die Admin-Spur geschrieben (Spec `instanz-kopplung`, „Ein neues
+/// Zertifikat wird vor den Nutzdaten bestätigt“).
+async fn bestaetige_zertifikat(
+    identitaet: &Identitaet,
+    kopplung: &KopplungZeile,
+) -> Result<String, SendError> {
+    let client = super::zertifikat::build_client(None).map_err(SendError::Netz)?;
+    let (antwort, gesehen) = send_signed_mit::<_, ZertifikatAussage>(
+        &client,
+        identitaet,
+        kopplung,
+        ZERTIFIKAT_PFAD,
+        &serde_json::json!({}),
+        ANTWORT_MAX,
+    )
+    .await?;
+    match (antwort.wert.tls_zertifikat, gesehen) {
+        (Some(a), Some(g)) if a == g => Ok(g),
+        _ => Err(SendError::ZertifikatPasstNicht),
+    }
+}
+
+/// Speichert einen per [`bestaetige_zertifikat`] neu beglaubigten Pin samt Spur, wenn er sich
+/// geändert hat. Aufgerufen von den Läufen, die den Pool kennen.
+pub async fn save_neues_zertifikat(
+    pool: &sqlx::SqlitePool,
+    kopplung: &KopplungZeile,
+    neu: &str,
+) -> Result<(), AppError> {
+    if kopplung.tls_zertifikat.as_deref() == Some(neu) {
+        return Ok(());
+    }
+    // Die Verbindung vor der Spur zurückgeben: der Pool kann eine einzige sein.
+    let orgs = {
+        let mut conn = pool.acquire().await?;
+        repo::save_tls_zertifikat(&mut conn, kopplung.id, Some(neu)).await?;
+        repo::list_orgs_aktiv(&mut conn, kopplung.id).await?
+    };
+    for o in orgs {
+        crate::auth::admin_audit::schreibe_ohne_akteur(
+            pool,
+            crate::auth::admin_audit::AdminAktion::InstanzZertifikatGewechselt,
+            o.org_id,
+            &kopplung.gegenueber_name,
+            crate::auth::admin_audit::Ziel::Instanz(&kopplung.gegenueber_name),
+            Some(build_angaben_gegenstelle(kopplung, &o.fremde_org_name)),
+            None,
+        )
+        .await;
+    }
+    Ok(())
+}
+
+/// Sucht die Gegenstelle einer Direktkopplung im LAN unter neuer Adresse (LLH-1497, design.md
+/// D6). Eine Adresse gilt erst, wenn dort die signierte Aussage über das Zertifikat kommt; dann
+/// werden Adresse (und ein neuer Pin) gespeichert und in die Admin-Spur geschrieben.
+/// `Err(Some(fehler))`: eine Adresse antwortete, aber nicht gültig; `Err(None)`: nichts gefunden.
+async fn neu_aufloesen(
+    pool: &SqlitePool,
+    identitaet: &Identitaet,
+    kopplung: &KopplungZeile,
+) -> Result<Result<KopplungZeile, Option<SendError>>, AppError> {
+    if !super::entdeckung::is_an(pool).await? {
+        return Ok(Err(None));
+    }
+    // Nur Ankündigungen mit Kennung UND Fingerabdruck der Gegenstelle: eine gefälschte mit
+    // fremdem Schlüssel kommt gar nicht erst in Frage (die Aussage prüft ohnehin die Signatur).
+    let fingerabdruck = super::basis32::parse_b64(&kopplung.gegenueber_schluessel)
+        .map(|b| super::basis32::fingerabdruck(&b))
+        .unwrap_or_default();
+    let gefunden = super::entdeckung::suche_kennung(
+        pool,
+        &kopplung.gegenueber_kennung,
+        &fingerabdruck,
+        super::entdeckung::SUCHDAUER,
+    )
+    .await?;
+    let mut letzter = None;
+    for adresse in gefunden {
+        let Ok(adresse) = normalize_adresse(&adresse) else {
+            continue;
+        };
+        if kopplung.gegenueber_adresse.as_deref() == Some(adresse.as_str()) {
+            continue;
+        }
+        let mut k = kopplung.clone();
+        k.gegenueber_adresse = Some(adresse.clone());
+        match bestaetige_zertifikat(identitaet, &k).await {
+            Ok(fp) => {
+                let orgs = {
+                    let mut conn = pool.acquire().await?;
+                    repo::save_adresse(&mut conn, kopplung.id, &adresse).await?;
+                    repo::list_orgs_aktiv(&mut conn, kopplung.id).await?
+                };
+                save_neues_zertifikat(pool, kopplung, &fp).await?;
+                for o in orgs {
+                    admin_audit::schreibe_ohne_akteur(
+                        pool,
+                        AdminAktion::InstanzAdresseGeaendert,
+                        o.org_id,
+                        &kopplung.gegenueber_name,
+                        Ziel::Instanz(&kopplung.gegenueber_name),
+                        Some(build_angaben_gegenstelle(&k, &o.fremde_org_name)),
+                        None,
+                    )
+                    .await;
+                }
+                k.tls_zertifikat = Some(fp);
+                return Ok(Ok(k));
+            }
+            Err(e) => letzter = Some(e),
+        }
+    }
+    Ok(Err(letzter))
+}
+
+async fn send_signed_einmal<A: Serialize, T: DeserializeOwned>(
+    identitaet: &Identitaet,
+    kopplung: &KopplungZeile,
+    pfad: &str,
+    anfrage: &A,
+    antwort_max: usize,
+) -> Result<VerifiedAntwort<T>, SendError> {
+    let client = match kopplung.art() {
+        super::InstanzKopplungArt::Standard => client().clone(),
+        super::InstanzKopplungArt::VorOrt => {
+            // Ohne beglaubigten Pin geht über eine Direktkopplung nichts hinaus.
+            let pin = kopplung
+                .tls_zertifikat
+                .as_deref()
+                .ok_or(SendError::ZertifikatGewechselt)?;
+            super::zertifikat::client(pin).map_err(SendError::Netz)?
+        }
+    };
+    send_signed_mit(&client, identitaet, kopplung, pfad, anfrage, antwort_max)
+        .await
+        .map(|(a, _)| a)
+}
+
+/// Eine signierte Anfrage über `client`; liefert die geprüfte Antwort und den Fingerabdruck des
+/// Zertifikats, über das sie kam (nur bei einem Client mit `tls_info`).
+async fn send_signed_mit<A: Serialize, T: DeserializeOwned>(
+    client: &reqwest::Client,
+    identitaet: &Identitaet,
+    kopplung: &KopplungZeile,
+    pfad: &str,
+    anfrage: &A,
+    antwort_max: usize,
+) -> Result<(VerifiedAntwort<T>, Option<String>), SendError> {
     let basis = kopplung
         .gegenueber_adresse
         .as_deref()
@@ -258,14 +464,21 @@ pub async fn send_signed_bis<A: Serialize, T: DeserializeOwned>(
         },
         Utc::now().timestamp(),
     );
-    let resp = client()
+    let resp = client
         .post(format!("{basis}{pfad}"))
         .header(reqwest::header::AUTHORIZATION, format!("{SCHEMA} {token}"))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
         .body(body)
         .send()
         .await
-        .map_err(|e| SendError::Netz(e.without_url().to_string()))?;
+        .map_err(|e| {
+            if super::zertifikat::is_passt_nicht(&e) {
+                SendError::ZertifikatGewechselt
+            } else {
+                SendError::Netz(e.without_url().to_string())
+            }
+        })?;
+    let gesehen = super::zertifikat::gesehen(&resp);
     let status = resp.status().as_u16();
     let antwort_token = resp
         .headers()
@@ -303,10 +516,13 @@ pub async fn send_signed_bis<A: Serialize, T: DeserializeOwned>(
     }
     let wert = serde_json::from_slice(&rumpf)
         .map_err(|e| SendError::AntwortUngueltig(format!("Body unlesbar: {e}")))?;
-    Ok(VerifiedAntwort {
-        wert,
-        uhr_abweichung_s: claims.iat.saturating_sub(jetzt),
-    })
+    Ok((
+        VerifiedAntwort {
+            wert,
+            uhr_abweichung_s: claims.iat.saturating_sub(jetzt),
+        },
+        gesehen,
+    ))
 }
 
 /// Prüft die Listen einer Meldung gegen [`ORGS_MAX`] (gezählt vor dem Entdoppeln) und
@@ -389,6 +605,16 @@ fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
 /// Widerruf mitgehen soll (sie sind schon nicht mehr aktiv). Fehler landen an der Kopplung, nicht
 /// beim Aufrufer.
 pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Result<(), AppError> {
+    melden_einmal_mit(pool, kopplung, true).await
+}
+
+/// Wie [`melden_einmal`]; `aufloesen` erlaubt höchstens ein Neuauflösen der Adresse je Lauf, damit
+/// zwei angekündigte Adressen einander nicht ohne Ende ablösen (LLH-1497, Review).
+async fn melden_einmal_mit(
+    pool: &SqlitePool,
+    kopplung: &KopplungZeile,
+    aufloesen: bool,
+) -> Result<(), AppError> {
     let identitaet = identitaet::load_or_create(pool)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
@@ -403,7 +629,8 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
             if stammdaten::herkunft::find_quelle(conn, o.org_id).await? == Some(o.id) {
                 repo::save_stammdaten_kennzeichen(conn, o.id, &kennzeichen).await?;
                 quellen.push(o.id);
-            } else {
+            } else if kopplung.art().traegt(super::Fluss::Stammdaten) {
+                // Über eine Direktkopplung fließen nie Stammdaten (LLH-1497): kein Hinweis dort.
                 repo::add_stammdaten_hinweise(
                     conn,
                     o.id,
@@ -468,16 +695,32 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
         datentraeger_verschluesselt: datentraeger,
         fuehrung: fuehrung_ausgang.akten,
         fuehrung_bis: fuehrung_empfangen,
+        tls_zertifikat: kopplung.tls_zertifikat.clone(),
     };
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
-        send_signed::<_, MeldenAntwort>(&identitaet, kopplung, MELDEN_PFAD, &anfrage).await;
+        send_signed::<_, MeldenAntwort>(pool, &identitaet, kopplung, MELDEN_PFAD, &anfrage).await;
     let antwort = match ergebnis.and_then(|a| match check_antwort(&a.wert) {
         Ok(()) => Ok(a),
         Err(grund) => Err(SendError::AntwortUngueltig(grund)),
     }) {
         Ok(a) => a,
         Err(f) => {
+            // Direktkopplung nicht erreichbar: die Gegenstelle im LAN unter ihrer Kennung suchen
+            // (LLH-1497, Spec `instanz-entdeckung`). Gefunden und signiert bestätigt, gleich dort
+            // melden; das Neuauflösen findet die dann gespeicherte Adresse nicht noch einmal.
+            let f = if aufloesen
+                && matches!(f, SendError::Netz(_))
+                && kopplung.art() == super::InstanzKopplungArt::VorOrt
+            {
+                match neu_aufloesen(pool, &identitaet, kopplung).await? {
+                    Ok(neu) => return Box::pin(melden_einmal_mit(pool, &neu, false)).await,
+                    Err(Some(probe)) => probe,
+                    Err(None) => f,
+                }
+            } else {
+                f
+            };
             let abstand = next_abstand(abstand_s(), kopplung.fehlversuche as u32 + 1);
             let naechste = add_sekunden(&jetzt, abstand as i64).unwrap_or(jetzt);
             tracing::warn!(kopplung = kopplung.id, fehler = %f, "Meldung bei gekoppelter Instanz gescheitert");
@@ -575,6 +818,20 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
                 ),
             )
             .await?;
+        }
+        // Spricht die Quelle zum ersten Mal Protokoll 3, liefert sie die Ursprungskennung mit
+        // (LLH-1497, design.md D5): einmal von vorn, damit jede übernommene Zeile sie trägt.
+        if kopplung
+            .gegenueber_protokoll
+            .is_some_and(|p| p < i64::from(super::PROTOKOLL_VOR_ORT))
+            && a.protokoll >= super::PROTOKOLL_VOR_ORT
+        {
+            for id in &quellen {
+                sqlx::query("UPDATE instanz_kopplung_org SET stammdaten_stand = 0 WHERE id = ?")
+                    .bind(id)
+                    .execute(&mut *conn)
+                    .await?;
+            }
         }
         if fuehrung_an {
             // Bruchstelle (D11): die letzte erfolgreiche Meldung VOR dieser.
@@ -728,6 +985,14 @@ pub async fn handle_meldung(
             &jetzt,
         )
         .await?;
+        if kopplung.art() == super::InstanzKopplungArt::VorOrt {
+            repo::save_tls_zertifikat_gemeldet(
+                conn,
+                kopplung.id,
+                anfrage.tls_zertifikat.as_deref().filter(|t| t.len() <= 128),
+            )
+            .await?;
+        }
         let alle = repo::list_orgs(conn, kopplung.id).await?;
         let kennung = |o: &repo::OrgZeile| org_kennung(&identitaet.kennung, o.org_id);
         for w in anfrage_widerrufen.iter().copied() {
@@ -788,7 +1053,10 @@ pub async fn handle_meldung(
                         .sum();
                     stammdaten_budget.bytes =
                         stammdaten_budget.bytes.saturating_sub(unterschrift_bytes);
-                    let nach = if mo.stammdaten_stand < 0 {
+                    // Stammdaten und Geheimnisse nur über eine Kopplung, die sie trägt (LLH-1497).
+                    let nach = if mo.stammdaten_stand < 0
+                        || !kopplung.art().traegt(super::Fluss::Stammdaten)
+                    {
                         liefern::Nachlieferung::default()
                     } else {
                         liefern::nachlieferung(
@@ -920,6 +1188,7 @@ mod tests {
             age_empfaenger: None,
             datentraeger_verschluesselt: false,
             fuehrung: Vec::new(),
+            tls_zertifikat: None,
             fuehrung_bis: 0,
         }
     }

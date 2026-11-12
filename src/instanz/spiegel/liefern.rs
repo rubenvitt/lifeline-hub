@@ -362,6 +362,7 @@ async fn konten(
             id,
             anzeigename: name.unwrap_or_default(),
             gegen_id,
+            ursprung: abbildung::konto_ursprung(conn, id).await?,
         });
     }
     Ok(ergebnis)
@@ -379,8 +380,10 @@ async fn baue_zeile(
     let geladen = load_zeile(conn, t, schluessel).await?;
     let mut gegen = None;
     let mut katalogzeile = false;
+    let mut ursprung = std::collections::BTreeMap::new();
     let (daten, blob, geloescht) = match geladen {
         Some((mut daten, blob)) => {
+            ursprung = ursprung_hinaus(conn, t, &daten).await?;
             if a.meldend {
                 stammdaten_hinaus(conn, a, t, &mut daten).await?;
                 if katalog::ist_katalog_daten(t.name, &daten) {
@@ -419,7 +422,48 @@ async fn baue_zeile(
         blob,
         gegen,
         zu_gross: false,
+        ursprung,
     })
+}
+
+/// Ursprungskennungen der Verweise einer Zeile auf Stammdaten, aus den eigenen Kennungen
+/// (LLH-1497, design.md D5).
+async fn ursprung_hinaus(
+    conn: &mut SqliteConnection,
+    t: &Tabelle,
+    daten: &Map<String, Value>,
+) -> Result<std::collections::BTreeMap<String, Value>, AppError> {
+    let mut aus = std::collections::BTreeMap::new();
+    for s in &t.spalten {
+        let Some(ziel) = &s.verweis else { continue };
+        let Some(wert) = daten.get(&s.name) else {
+            continue;
+        };
+        match ziel {
+            Ziel::Stammdaten(art) => {
+                if let Some(id) = wert.as_i64() {
+                    if let Some(u) = abbildung::ursprung(conn, *art, id).await? {
+                        aus.insert(s.name.clone(), Value::from(u));
+                    }
+                }
+            }
+            Ziel::QualiSoll | Ziel::QualiListe => {
+                let mut je = Map::new();
+                for q in quali_ids(wert) {
+                    if let Some(u) =
+                        abbildung::ursprung(conn, StammdatenArt::Qualifikation, q).await?
+                    {
+                        je.insert(q.to_string(), Value::from(u));
+                    }
+                }
+                if !je.is_empty() {
+                    aus.insert(s.name.clone(), Value::Object(je));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(aus)
 }
 
 /// Bytes einer Zeile im Paket.

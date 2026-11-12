@@ -83,6 +83,10 @@ pub struct StammdatenLieferung {
     /// Nur Konten: Passwort-Hash und TOTP, mit age an den Empfänger verschlüsselt (D6).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub geheimnis: Option<String>,
+    /// Ursprungskennung der Zeile, `<instanzkennung>/<schlüssel>` der Instanz, die sie angelegt
+    /// hat (LLH-1497, design.md D5); fehlt bei Protokoll 2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ursprung: Option<String>,
 }
 
 static LIVE: std::sync::OnceLock<crate::live::LiveHub> = std::sync::OnceLock::new();

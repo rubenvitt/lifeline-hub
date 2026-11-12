@@ -1,6 +1,7 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import type {
   ElwVerlorenAntwort,
+  InstanzLanAntwort,
   InstanzKopplungAnzeige,
   LetzterSchluesselHalter,
   InstanzUebersicht,
@@ -21,9 +22,17 @@ export function loadInstanzUebersicht(): Promise<InstanzUebersicht> {
   return apiGet<InstanzUebersicht>('/api/admin/instanz');
 }
 
-/** Stellt einen Kopplungscode aus; der Code steht nur in dieser Antwort. */
-export function issueKopplungscode(): Promise<KopplungscodeAntwort> {
-  return apiSend<KopplungscodeAntwort>('/api/admin/instanz/codes', 'POST');
+/** Stellt einen Kopplungscode aus; der Code steht nur in dieser Antwort. `vorOrt`: Code für eine
+ *  Direktkopplung zweier Instanzen im selben Netz (LLH-1497). */
+export function issueKopplungscode(vorOrt = false): Promise<KopplungscodeAntwort> {
+  return vorOrt
+    ? apiSend<KopplungscodeAntwort>('/api/admin/instanz/codes', 'POST', { art: 'vor_ort' })
+    : apiSend<KopplungscodeAntwort>('/api/admin/instanz/codes', 'POST');
+}
+
+/** Sucht einige Sekunden nach angekündigten Instanzen im lokalen Netz (LLH-1497). */
+export function searchInstanzenImNetz(): Promise<InstanzLanAntwort> {
+  return apiGet<InstanzLanAntwort>('/api/admin/instanz/lan');
 }
 
 /** Koppelt diese Instanz mit dem Code einer anderen unter `adresse`. */
