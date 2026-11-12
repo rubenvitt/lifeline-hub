@@ -26,8 +26,9 @@ describe('SpiegelBand: Liste der Bruchstelle lädt nicht nach (LLH-1646)', () =>
     renderMitProviders(<SpiegelBand einsatz={einsatzFixture({ spiegel })} />);
     const knopf = screen.getByRole('button', { name: /Nicht übernommen/ });
     await user.click(knopf);
-    expect(await screen.findByText('Liste nicht geladen')).toBeInTheDocument();
+    expect(await screen.findByText(/Liste nicht geladen/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Neu laden' })).toBeInTheDocument();
     await user.click(knopf);
-    expect(screen.queryByText('Liste nicht geladen')).toBeNull();
+    expect(screen.queryByText(/Liste nicht geladen/)).toBeNull();
   });
 });
