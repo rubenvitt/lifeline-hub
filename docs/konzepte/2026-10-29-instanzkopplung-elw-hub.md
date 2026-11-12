@@ -48,7 +48,7 @@ sie für spätere Entwürfe tragen.
     Hub führt, der ELW übernimmt bei Ankunft); Pushs für Ereignisse eines ELW versendet der Hub.
     Ungekoppelte Instanzen bleiben, wie sie heute sind. Der Push-Teil ist am 12.11.2026 umgesetzt
     (LLH-1495,
-    [ADR-0025](../architektur/entscheidungen/ADR-0025-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md));
+    [ADR-0027](../architektur/entscheidungen/ADR-0027-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md));
     der Alarm-Teil folgt mit der Alarmübernahme (LLH-1679 nach LLH-1192).
 
 ### Führung

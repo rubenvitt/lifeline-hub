@@ -490,7 +490,7 @@ sequenceDiagram
 
 Führt ein gekoppelter ELW den Einsatz, reist der Anlass im Abgleich zum Hub, und der Hub meldet
 für seine eigenen Empfänger (LLH-1495,
-[ADR-0025](entscheidungen/ADR-0025-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)).
+[ADR-0027](entscheidungen/ADR-0027-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)).
 
 ```mermaid
 sequenceDiagram

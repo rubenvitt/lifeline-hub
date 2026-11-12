@@ -546,7 +546,7 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
   `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
 - **Über den Hub (LLH-1495,
-  [ADR-0025](../docs/architektur/entscheidungen/ADR-0025-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)):**
+  [ADR-0027](../docs/architektur/entscheidungen/ADR-0027-hinweise-eines-gefuehrten-einsatzes-reisen-als-anlass-zum-hub.md)):**
   `melden` und `erledigen` merken für einen hier geführten Einsatz einer gekoppelten Org den
   Anlass in `hinweis_ausgang` vor (`instanz::spiegel::hinweis`), der Abgleich trägt ihn, die
   erreichte Seite meldet ihn nach dem Commit selbst. Bietet sie Push an, lässt `ausliefern` den

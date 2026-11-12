@@ -1,5 +1,5 @@
 ---
-id: ADR-0025
+id: ADR-0027
 titel: Hinweise eines geführten Einsatzes reisen als Anlass zum Hub, der Hub pusht
 status: akzeptiert
 datum: 2026-11-12
@@ -13,7 +13,7 @@ herleitung:
   - LLH-1495 (mit Ruben am 12.11.2026 abgestimmt; Entscheidung 12 aus LLH-1287)
 ---
 
-# ADR-0025: Hinweise eines geführten Einsatzes reisen als Anlass zum Hub, der Hub pusht
+# ADR-0027: Hinweise eines geführten Einsatzes reisen als Anlass zum Hub, der Hub pusht
 
 ## Regeln
 
