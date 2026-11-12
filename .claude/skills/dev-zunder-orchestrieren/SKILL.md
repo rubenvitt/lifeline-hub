@@ -21,11 +21,11 @@ Das **Workflow-Tool und Subagents laufen im Hintergrund und können den User nic
 Lauf fragen.** Daraus folgt die ganze Architektur:
 
 - **Der Main-Loop (du) besitzt alles Interaktive**: Checkpoints, Entscheidungen,
-  Worktree-Anlage, interaktives TDD, Code-Review-Anfragen. Diese Dinge dürfen **nie** in
-  einem Workflow oder Subagent stecken.
+  Worktree-Anlage, interaktives TDD, die Entscheidung über Review-Befunde. Diese Dinge dürfen
+  **nie** in einem Workflow oder Subagent stecken.
 - **Workflows und Subagents besitzen das parallele Schwerlast-Lesen/Bewerten**: viele
   Subtasks/Subsysteme gleichzeitig scannen, konkurrierende Entwürfe bewerten,
-  Review-Dimensionen adversarial verifizieren.
+  den Review vor dem PR samt Gegenprüfung der Befunde.
 
 **Ob und wie viel Fan-out, entscheidest du selbst** — ein Opt-in wie „ultracode“ braucht es
 nicht (Festlegung des Users, 04.10.2026; Regeln, Abwägung Agent oder Workflow und Pflichtinhalt
@@ -271,8 +271,9 @@ Alles andere: ohne Rückfrage setzen, niemals rückwärts oder redundant.
 
 - Status-Spur, Routing, Task-Laden, Reservierung, Worktree-Logik **nicht** hier kopieren → an
   `dev-zunder-ausfuehren` delegieren.
-- **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Review) in einen Workflow oder
-  Subagent stecken — beide können nicht fragen.
+- **Kein** Interaktives (Checkpoint, Worktree-Frage, TDD, Entscheidung über Review-Befunde) in
+  einen Workflow oder Subagent stecken — beide können nicht fragen. Der Review vor dem PR selbst
+  läuft dagegen immer als Subagent oder Workflow (Phase 4).
 - **Kein `/opsx:*` im Workflow oder Subagent** (`explore`, `propose`, `update`, `apply`,
   `archive`) und kein Anlegen oder Ändern unter `openspec/changes/`. Einzige Ausnahme: Ein
   autonomer Dev-Agent hakt Aufgaben einer freigegebenen Change ab. Ein Workflow-Agent oder

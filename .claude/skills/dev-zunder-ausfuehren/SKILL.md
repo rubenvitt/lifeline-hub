@@ -60,7 +60,9 @@ auch dann recht, wenn er den Main-Loop von breitem Lesen entlastet. Herleitung:
 **Agent oder Workflow:** Für einen bis drei unabhängige Jobs das Agent-Tool (kein Skript,
 gleich im Hintergrund). Ein Workflow, wenn es mehrstufig wird (finden → verifizieren) oder mehr
 als drei Agents braucht; Skelette in `dev-zunder-orchestrieren/references/workflow-bausteine.md`.
-Der Größenrichtwert der Umgebung für Workflows gilt weiter.
+Der Größenrichtwert der Umgebung für Workflows gilt weiter. Ausnahme ist der Review vor dem PR:
+Seine Wahl zwischen Agent-Tool und Workflow trifft der Abschnitt „Review vor dem PR“ nach der
+Größe des Diffs.
 
 **Jeder Worker-Prompt bringt mit**, denn Worker sehen weder Systemprompt noch Skill:
 
@@ -260,7 +262,8 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - **OpenSpec-Change archivieren, BEVOR der PR entsteht** (Entscheidung 30.09.2026): Ist die
   `tasks.md` der Change abgehakt, läuft **`/opsx:archive <name>` im selben Branch** — Spec-Sync
   nach `openspec/specs/`, Verschieben nach `openspec/changes/archive/<datum>-<name>/`, Verweise
-  auf den alten Pfad (`AGENTS.md`-Dateien, Code-Kommentare, `docs/`) im selben Commit nachziehen. Nicht
+  auf den alten Pfad (`AGENTS.md`-Dateien, `.claude/`, Code-Kommentare, `docs/`) im selben Commit
+  nachziehen. Nicht
   „nach dem Merge“: das braucht einen zweiten PR, und der bleibt aus (am 30.09.2026 lagen zwölf
   umgesetzte Changes aktiv). Schritt 13 von `check-all.sh` (`scripts/check-openspec-archiv.sh`)
   macht eine abgehakte, nicht archivierte Change rot. Kästchen, die erst die CI des PRs belegt
@@ -317,8 +320,8 @@ das ist Absicht: urteile nur nach dem, was im Repo steht.
 3. `.claude/skills/dev-zunder-ausfuehren/references/review-pruefliste.md` lesen und jede Klasse
    prüfen, deren „Trifft zu, wenn“ auf den Diff passt. Fehler außerhalb der Liste meldest du
    genauso.
-4. <Nur mit Change:> Die Delta-Spec unter `openspec/changes/<name>/specs/` lesen und das
-   Verhalten dagegen prüfen.
+4. <Nur mit Change:> Jede Delta-Spec lesen, die der Branch trägt (`openspec/changes/<name>/specs/`,
+   bei mehreren Changes alle), und das Verhalten dagegen prüfen.
 
 Gib je Befund zurück: Datei und Zeile, Klasse der Prüfliste (oder „außerhalb“), den konkreten
 Fall (welche Eingabe oder welcher Zustand führt zu welchem falschen Ergebnis) und, falls
@@ -326,37 +329,53 @@ naheliegend, den Ausweg. Kein Befund ohne konkreten Fall. Stilfragen, die Pretti
 der Linter entscheiden, sind keine Befunde. Nenne am Ende die Klassen, die du geprüft hast, und
 die, die nicht zutrafen.
 
-Du änderst keine Datei, pushst nicht, öffnest keinen PR, rufst weder Zunder noch `/opsx:*` auf
-und legst nichts unter `openspec/changes/` an. Kannst du etwas nur mit einer Antwort des Menschen
-beurteilen, gib es als offene Frage zurück, statt zu raten.
+Du änderst keine Datei, pushst nicht, öffnest keinen PR, rufst weder Zunder noch `/opsx:*` auf,
+legst nichts unter `openspec/changes/` an und benutzt keine `mcp__hearthbot__`-Tools. Kannst du
+etwas nur mit einer Antwort des Menschen beurteilen, gib es als offene Frage zurück, statt zu
+raten.
 ```
 
-**Gegenprüfung:** Je Befund ein zweiter Agent, parallel, mit dem Auftrag, ihn am Code zu
-widerlegen: „Versuche zu widerlegen: <Befund mit Datei, Zeile, Fall>. Lies den Code, auch die
-Aufrufer und vorhandene Tests. Antworte mit bestätigt oder verworfen und der Begründung; bei
-Unsicherheit verworfen. Du änderst nichts.“ Nur bestätigte Befunde gehen weiter.
+**Gegenprüfung:** Jeder Befund geht an einen zweiten Agenten, der ihn am Code zu widerlegen
+versucht; die Gegenprüfer laufen parallel. Befunde an derselben Stelle oder zum selben Thema darf
+ein Gegenprüfer gemeinsam prüfen, sein Verdikt gibt er trotzdem je Befund. Auftrag:
+
+```text
+Versuche zu widerlegen: <Befund mit Datei, Zeile, Fall>. Lies die Stelle selbst, auch Aufrufer
+und vorhandene Tests. Antworte je Befund mit bestätigt oder verworfen und der Begründung; bei
+Unsicherheit verworfen.
+
+Du änderst keine Datei, pushst nicht, öffnest keinen PR, rufst weder Zunder noch `/opsx:*` auf,
+legst nichts unter `openspec/changes/` an und benutzt keine `mcp__hearthbot__`-Tools. Kannst du
+etwas nur mit einer Antwort des Menschen beurteilen, gib es als offene Frage zurück.
+```
+
+Nur bestätigte Befunde gehen weiter. Fällt ein Gegenprüfer aus, ist sein Befund ungeprüft, nicht
+verworfen: neu prüfen lassen.
 
 **Verbleib:**
 
 | Ergebnis | Was du tust |
 | --- | --- |
-| Bestätigt, ein klarer Ausweg | Beheben, mit Test, der ohne die Behebung rot wird; eigener Commit; Gates der Bereiche erneut |
-| Bestätigt, der Ausweg ändert Verhalten für Anwender oder es gibt mehrere vertretbare Wege | Dem Menschen vorlegen (Task auf `blocked`), wie in „Gemeinsam ausarbeiten“ |
-| Bestätigt, gehört nicht in diesen Task | Aufgabe über `zunder-task-anlegen`, Link im PR |
+| Bestätigt, ein klarer Ausweg | Beheben; ändert die Behebung Verhalten, mit Test, der ohne sie rot wird; eigener Commit; Gates der Bereiche erneut |
+| Bestätigt, mehrere vertretbare Auswege, die das Verhalten für Anwender unterschiedlich ändern | Dem Menschen vorlegen (Task auf `blocked`), wie in „Gemeinsam ausarbeiten“ |
+| Bestätigt, der Fehler liegt in Code oder Text, den der Diff nicht ändert | Aufgabe über `zunder-task-anlegen`, Link im PR; der PR wartet nicht darauf |
 | Verworfen | Im PR mit einem Satz Grund |
 
-Nach einer Behebung läuft kein zweiter voller Review. Ändert sie mehr als die gemeldete Stelle,
-prüft ein Gegenprüfer nur diesen Commit.
+Ein Fehler, den der Diff selbst einführt, wird nie zur Folgeaufgabe. Nach einer Behebung läuft
+kein zweiter voller Review. Ändert sie mehr als die gemeldete Stelle, bekommt ein Agent den
+Reviewer-Auftrag von oben mit `git show <commit>` statt des Branch-Diffs; seine Befunde gehen
+den Weg aller Befunde.
 
 **Nachweis:** Die PR-Beschreibung trägt den Abschnitt „Review“ (Vorlage
-`.github/pull_request_template.md`): je bestätigtem Befund was, wo und der Commit der Behebung,
-je verworfenem was und warum, ohne Befund ein Satz. Lief kein Review, steht dort der Grund (Route
+`.github/pull_request_template.md`): je bestätigtem Befund was, wo und der Commit der Behebung
+oder der Link auf die Folgeaufgabe, je verworfenem was und warum, ohne Befund ein Satz. Lief kein Review, steht dort der Grund (Route
 `trivial`).
 
 **Die Prüfliste wächst mit:** Zeigt ein Fehler nach dem Review (im PR, in der CI, später), dass
 eine Fehlerart fehlt oder ihre Prüffrage ihn nicht trifft, ergänzt die Behebung
 `references/review-pruefliste.md` im selben Branch: eine Fehlerart, kein Einzelfall. Passt der
-Fehler in eine vorhandene Klasse, die Frage schärfen oder das Beispiel tauschen.
+Fehler in eine vorhandene Klasse, die Frage schärfen oder das Beispiel tauschen. Kommt eine
+Klasse dazu oder wird eine umbenannt, `GRUPPEN` im Skelett „Review-find-verify“ nachziehen.
 
 ## Bilder der Änderung
 

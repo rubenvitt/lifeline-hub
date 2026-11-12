@@ -123,7 +123,7 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   jedem „fertig" `verification-before-completion`, vor dem PR der Review.
 - **Review vor dem PR** (12.11.2026, Spec `review-vor-dem-pr`): Der Agent startet ihn selbst, mit
   frischem Kontext gegen die Prüfliste; Befunde werden gegengeprüft, bestätigte vor dem PR
-  behoben, der Verbleib steht im PR unter „Review“. Ablauf: `dev-zunder-ausfuehren`, „Review vor
+  behandelt, der Verbleib steht im PR unter „Review“. Ablauf: `dev-zunder-ausfuehren`, „Review vor
   dem PR“. Herleitung: `openspec/changes/review-vor-dem-pr/design.md`.
 - **Mit dem Menschen** (08.11.2026): vor dem ersten Code den Lösungsweg gemeinsam ausarbeiten
   (außer `trivial`), am Ende Bilder der Änderung in PR und Meldung. Ablauf:

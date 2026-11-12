@@ -31,10 +31,14 @@ werden könnte. Jede Aufgabe nennt deshalb, woran ihr Ergebnis zu prüfen ist.
 - [x] 5.3 `./scripts/check-all.sh --nur schnell` grün (Prettier und der Archiv-Wächter betreffen die geänderten Dateien)
   Lauf vom 12.11.2026 mit `--geaendert` (Schritte 1 2 3 6 8 9 10 11 12 13 14 16): grün 9, 10, 13
   (Archiv-Wächter), 14, 16 (Architekturdoku). Rot 1, 2, 3, 6, 8, 11, 12, jeder mit
-  `mise: command not found`: die Cloud-Sitzung hat kein mise. Keiner dieser Schritte liest eine
-  Datei dieses Diffs (Prettier prüft nur `frontend/` und `website/`). Der volle Lauf gilt in der
-  CI des PRs.
-- [ ] 5.4 Der Review dieser Change selbst läuft nach dem neuen Abschnitt; der PR trägt den Abschnitt „Review“
+  `mise: command not found`: die Cloud-Sitzung hat kein mise. Von diesen liest nur Schritt 12
+  (`check-toolversionen.sh`) Dateien dieses Diffs, nämlich `.claude/skills` und `.github`, auf
+  Versionsangaben wie `node@<n>`; derselbe grep von Hand findet in den geänderten Dateien
+  nichts. Prettier prüft nur `frontend/` und `website/`. Der volle Lauf gilt in der CI des PRs.
+- [x] 5.4 Der Review dieser Change selbst läuft nach dem neuen Abschnitt; der PR trägt den Abschnitt „Review“
+  Lauf vom 12.11.2026: ein Reviewer über den Branch (893 Zeilen, nur Anleitungen), 18 Befunde,
+  drei Gegenprüfer nach Thema. 14 bestätigt und im Folgecommit behoben, 4 verworfen; die Liste
+  steht im Abschnitt „Review“ des PRs.
 
 ## Probelauf
 
@@ -72,6 +76,6 @@ Sie betreffen den Stand vom 09.11.2026 und gehören nicht zu dieser Change.
 
 ## Workflow follow-up
 
-- `/opsx:archive review-vor-dem-pr` vor dem PR, im selben Branch; danach den Verweis in `AGENTS.md` auf den Archivpfad nachziehen.
+- `/opsx:archive review-vor-dem-pr` vor dem PR, im selben Branch; danach die Verweise in `AGENTS.md` und in `dev-zunder-ausfuehren/SKILL.md` („Review vor dem PR“) auf den Archivpfad nachziehen.
 - PR gegen `alpha` mit Plan, Umsetzung und Archiv zusammen.
 - Außerhalb des Repos, bei Ruben: CodeRabbit-App am Repository abschalten oder auf Review nur auf Zuruf stellen.

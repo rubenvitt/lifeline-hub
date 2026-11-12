@@ -44,6 +44,10 @@ pushen, einen PR öffnen oder Zunder aufrufen; er liefert nur Befunde zurück.
 - **WHEN** der Branch eine Change mit Delta-Spec trägt
 - **THEN** bekommt der Reviewer die Delta-Spec und prüft das Verhalten dagegen
 
+#### Scenario: Branch mit mehreren Changes
+- **WHEN** ein Lauf von `dev-zunder-orchestrieren` zwei Changes in einem Branch trägt
+- **THEN** bekommt der Review die Delta-Specs beider Changes
+
 #### Scenario: Reviewer findet einen Fehler
 - **WHEN** der Reviewer einen Fehler im Diff findet
 - **THEN** meldet er ihn mit Datei, Stelle und Begründung zurück und ändert selbst nichts
@@ -74,10 +78,11 @@ Prüfliste verwenden und MUST NOT eigene Review-Dimensionen daneben führen.
 
 ### Requirement: Befunde werden gegengeprüft und vor dem PR behandelt
 Jeder Befund MUST von einem zweiten Agenten gegengeprüft werden, der ihn zu widerlegen versucht
-und ihn im Zweifel verwirft. Ein bestätigter Befund MUST vor dem PR behoben werden; ändert die
-Behebung Verhalten, MUST ein Test sie belegen, der ohne sie rot wird. Verlangt ein bestätigter
-Befund eine Entscheidung des Menschen, MUST der Main-Loop sie ihm vorlegen, statt selbst zu
-wählen.
+und ihn im Zweifel verwirft. Ein bestätigter Befund an dem, was der Diff ändert, MUST vor dem PR
+behoben werden; ändert die Behebung Verhalten, MUST ein Test sie belegen. Hat er mehrere
+vertretbare Auswege, die das Verhalten für Anwender unterschiedlich ändern, MUST der Main-Loop
+sie dem Menschen vorlegen. Liegt der Fehler außerhalb des Diffs, MUST eine Folgeaufgabe
+entstehen.
 
 #### Scenario: Bestätigter Fehler im Code
 - **WHEN** die Gegenprüfung einen Befund bestätigt
@@ -88,9 +93,26 @@ wählen.
 - **THEN** ändert der Main-Loop nichts am Code und nennt den Befund im PR als verworfen mit Grund
 
 #### Scenario: Befund verlangt eine Entscheidung
-- **WHEN** ein bestätigter Befund mehr als einen vertretbaren Ausweg hat, der das Verhalten für
-  Anwender ändert
+- **WHEN** ein bestätigter Befund mehr als einen vertretbaren Ausweg hat und die Auswege das
+  Verhalten für Anwender unterschiedlich ändern
 - **THEN** legt der Main-Loop die Wege dem Menschen vor und wartet auf seine Antwort
+
+#### Scenario: Ein klarer Ausweg, der Verhalten ändert
+- **WHEN** ein bestätigter Befund genau einen vertretbaren Ausweg hat, etwa 422 statt eines
+  angelegten Datensatzes, wie die Spec es verlangt
+- **THEN** behebt der Main-Loop ihn mit Test, ohne den Menschen zu fragen
+
+#### Scenario: Bestätigter Befund in einem Text
+- **WHEN** die Gegenprüfung einen Widerspruch zwischen zwei Anleitungen bestätigt
+- **THEN** behebt der Main-Loop ihn vor dem PR, ohne dass ein Test verlangt ist
+
+#### Scenario: Fehler in Code, den der Diff nicht ändert
+- **WHEN** der Review einen Fehler in Bestandscode neben dem Diff bestätigt
+- **THEN** entsteht eine Folgeaufgabe, der PR nennt ihren Link, und der PR wartet nicht auf sie
+
+#### Scenario: Gegenprüfer fällt aus
+- **WHEN** ein Gegenprüfer kein Verdikt liefert
+- **THEN** gilt der Befund als ungeprüft und wird erneut gegengeprüft, nicht als verworfen
 
 #### Scenario: Behebung nach dem Review
 - **WHEN** der Main-Loop einen bestätigten Befund behoben hat
@@ -103,8 +125,8 @@ kein Review, MUST der Abschnitt den Grund nennen.
 
 #### Scenario: Review mit Befunden
 - **WHEN** der Review zwei Befunde bestätigt und einen verworfen hat
-- **THEN** nennt der Abschnitt „Review“ die zwei mit dem Commit ihrer Behebung und den dritten
-  mit dem Grund, warum er verworfen wurde
+- **THEN** nennt der Abschnitt „Review“ die zwei mit dem Commit ihrer Behebung oder dem Link auf
+  die Folgeaufgabe und den dritten mit dem Grund, warum er verworfen wurde
 
 #### Scenario: Review ohne Befund
 - **WHEN** der Review nichts gefunden hat

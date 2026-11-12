@@ -100,7 +100,9 @@ die Namen seiner Klassen.
 
 ### D4 — Gegenprüfung mit Vorgabe „im Zweifel verworfen“
 
-Je Befund ein zweiter Agent mit dem Auftrag, ihn am Code zu widerlegen. Er antwortet mit
+Je Befund ein zweiter Agent mit dem Auftrag, ihn am Code zu widerlegen; zusammenhängende Befunde
+darf einer gemeinsam prüfen, mit einem Verdikt je Befund. Ein ausgefallener Gegenprüfer macht
+den Befund ungeprüft, nicht verworfen. Er antwortet mit
 `isReal` und Begründung; bei Unsicherheit `false`. So steht es schon im heutigen Skelett und hat
 sich bewährt: Es hält erfundene Befunde aus dem PR.
 
@@ -112,13 +114,18 @@ kostet einen Gate-Lauf.
 
 | Ergebnis | Was der Main-Loop tut |
 | --- | --- |
-| Bestätigt, ein klarer Ausweg | Beheben, mit Test, der ohne die Behebung rot wird; eigener Commit; Gates der Bereiche erneut |
-| Bestätigt, Ausweg ändert Verhalten für Anwender oder hat mehrere vertretbare Wege | Dem Menschen vorlegen (Task auf `blocked`), wie in „Gemeinsam ausarbeiten“ |
-| Bestätigt, gehört nicht in diesen Task | Aufgabe über `zunder-task-anlegen`, Link im Abschnitt „Review“ |
+| Bestätigt, ein klarer Ausweg | Beheben; ändert die Behebung Verhalten, mit Test, der ohne sie rot wird; eigener Commit; Gates der Bereiche erneut |
+| Bestätigt, mehrere vertretbare Auswege, die das Verhalten für Anwender unterschiedlich ändern | Dem Menschen vorlegen (Task auf `blocked`), wie in „Gemeinsam ausarbeiten“ |
+| Bestätigt, der Fehler liegt in Code oder Text, den der Diff nicht ändert | Aufgabe über `zunder-task-anlegen`, Link im Abschnitt „Review“; der PR wartet nicht darauf |
 | Verworfen | Im Abschnitt „Review“ mit einem Satz Grund |
 
-Nach einer Behebung läuft kein zweiter voller Review. Ändert die Behebung mehr als die gemeldete
-Stelle, prüft ein Gegenprüfer nur diesen Commit.
+Ein Fehler, den der Diff selbst einführt, wird nie zur Folgeaufgabe. Nach einer Behebung läuft
+kein zweiter voller Review. Ändert die Behebung mehr als die gemeldete Stelle, bekommt ein Agent
+den Reviewer-Auftrag mit diesem einen Commit statt des Branch-Diffs.
+
+Nachtrag aus dem Review dieser Change (12.11.2026): Die Tabelle sagte zuerst „Ausweg ändert
+Verhalten **oder** mehrere Wege“; damit wäre fast jede Fehlerbehebung an den Menschen gegangen.
+Sie verlangte den roten Test auch für Textbefunde, und die Spec kannte die Folgeaufgabe nicht.
 
 ### D6 — Abschnitt „Review“ in der PR-Vorlage
 
@@ -162,7 +169,7 @@ Inhalt (die Beispiele werden beim Umsetzen aus den Commits übernommen):
 | Berechtigung und Geltungsbereich | Trifft jede ID von außen nur ein Objekt der eigenen Org, Stelle, Einheit oder Kopplung? Gibt ein Replay mehr zurück, als der Aufrufer sehen darf? Wird einem Kopf nur von einem vertrauten Proxy geglaubt? Kann eine Seite der Kopplung der anderen etwas nehmen? | `773b6b44`, `d77a742f`, `aa02a45b`, `3f5c49cc` |
 | Veralteter Zustand im Frontend | Entsteht der Body beim Klick oder beim Rendern? Ist eine Prop beim Einhängen eingefroren? Teilen sich zwei Stellen eine Mutation? Hält eine ausgehängte Komponente noch Aktionen oder Fokus? Endet ein Druck auch außerhalb des Elements? | `4d528bdb`, `4efb2f6b`, `1388a015`, `fd31d60b` |
 | Tests, die nichts prüfen | Wird der Test ohne die Änderung rot? Wartet `waitFor` auf etwas, das wirft? Prüft der Test den echten Grenzwert statt eines Beispiels? Wird das Geprüfte vor oder nach dem Signieren gesetzt? | `f6a4ad11`, `c5a2742a`, `d40bcb76` |
-| Verhalten gegen Spec | Tut der Code, was Spec und Anwenderkapitel sagen, auch im leeren Fall und im Fehlerfall? Antwortet er dort mit dem Statuscode der Konvention? | `6b3942e0`, `a146a42f` |
+| Verhalten gegen Spec und Projektregeln (nach dem Probelauf erweitert) | Tut der Code, was Spec und Anwenderkapitel sagen, auch im leeren Fall und im Fehlerfall? Antwortet jeder Fehlerzweig mit dem Statuscode der Konvention? Hält jede neue Anzeige die Regeln ihrer Bereichs-`AGENTS.md`? | `6b3942e0`, `a146a42f` |
 | Atomarität | Liegt jedes Lesen und Schreiben einer Entscheidung in derselben Transaktion? Werden Felder, die zusammengehören, zusammen gesetzt? Unterscheidet ein Zähler zwei Ereignisse, die gleich oft vorkamen? | `0eb982c7`, `773b6b44`, `a59413e4` |
 | Live-Verteilung | Bekommt jeder, der die Zahl oder den Kopf sieht, das Ereignis, auch ohne das Hauptrecht? Wird nach dem Commit gemeldet? | `b2abdbec`, `da7c3553` |
 | Doku, ADR und Spec untereinander | Widersprechen sich ADR, Konzept, Spec und Anwenderkapitel? Zeigt jeder Verweis auf eine Regel, die es gibt? Nennen die `quellen` eines Kapitels die geänderten Dateien? Hat ein neuer Baustein seine Karte im Design System? | `0e4c7ba8`, `72bb0dcc`, `ae50df0b`, `bd12b604` |
