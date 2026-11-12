@@ -26,11 +26,11 @@ export function fremdeNachladenAlle(fehler: unknown): number | false {
 
 /**
  * Die Antwort des eigenen Servers, dass der Abschnitt hier nicht gilt: 404 ohne Schalter, 403 ohne
- * Admin-Recht. Ein 404 ohne `{error}`-Umschlag kommt von einem Gateway und ist ein Ladefehler.
+ * Admin-Recht. Ohne `{error}`-Umschlag kommt sie von einem Gateway und ist ein Ladefehler.
  */
 function isAusgeblendet(fehler: unknown): boolean {
-  if (!(fehler instanceof ApiError)) return false;
-  return fehler.status === 403 || (fehler.status === 404 && fehler.vomAnwendungsserver);
+  if (!(fehler instanceof ApiError) || !fehler.vomAnwendungsserver) return false;
+  return fehler.status === 403 || fehler.status === 404;
 }
 
 export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolean }) {

@@ -124,6 +124,8 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
     expect(fremdeNachladenAlle(new ApiError(404, 'Nicht gefunden', vomServer))).toBe(false);
     expect(fremdeNachladenAlle(new ApiError(403, 'Keine Berechtigung', vomServer))).toBe(false);
     expect(fremdeNachladenAlle(new ApiError(404, 'Not Found'))).toBe(30_000);
+    // Ein 403 ohne Umschlag kommt von einem Proxy oder einer WAF, nicht vom Recht der Person.
+    expect(fremdeNachladenAlle(new ApiError(403, 'Forbidden'))).toBe(30_000);
     expect(fremdeNachladenAlle(new ApiError(500, 'Interner Fehler'))).toBe(30_000);
     expect(fremdeNachladenAlle(new TypeError('Failed to fetch'))).toBe(30_000);
     expect(fremdeNachladenAlle(null)).toBe(30_000);

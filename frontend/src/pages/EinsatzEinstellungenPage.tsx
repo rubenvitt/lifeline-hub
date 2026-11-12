@@ -189,7 +189,7 @@ export default function EinsatzEinstellungenPage() {
       // ein gesetzter `hinweis` reserviert in `EinsatzSeite` auch leer seinen Abstand.
       hinweis={
         !daten.istAktiv && aktiv !== 'aufbewahrung' ? (
-          <RechteHinweis sichtbar text={EINSATZ_ABGESCHLOSSEN} />
+          <RechteHinweis sichtbar text={daten.rechteGrund(EINSATZ_ABGESCHLOSSEN)} />
         ) : undefined
       }
     >

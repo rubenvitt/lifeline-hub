@@ -449,7 +449,7 @@ Das Paneel „Einsätze beim Gegenüber“ unter „Instanzkopplung“ listet di
 geführt werden: die einer anderen Installation und eigene, deren Führung abgegeben ist. Es zeigt
 sie, solange die Organisation in einer aktiven Kopplung zugeordnet ist; mit dem Widerruf der
 letzten Zuordnung oder Kopplung fallen sie heraus. Ein Einsatz, den die andere Installation
-gelöscht hat und der hier nie gespiegelt wurde, bleibt vorerst stehen. Ist die Führung je Einsatz
+gelöscht hat und der hier nie gespiegelt wurde, bleibt stehen. Ist die Führung je Einsatz
 aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
 steht dort der Fehler mit „Erneut laden“.
 

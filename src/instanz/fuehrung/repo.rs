@@ -1015,8 +1015,8 @@ pub(crate) mod tests {
             .collect()
     }
 
-    // LLH-1675: Eine Akte steht unter „Einsätze beim Gegenüber“ nur, solange ihre Org bei der
-    // Instanz, von der der Einsatz stammt, aktiv zugeordnet ist.
+    // LLH-1675: Eine Akte steht unter „Einsätze beim Gegenüber“ nur, solange ihre Org in einer
+    // aktiven Kopplung zugeordnet ist.
     #[tokio::test]
     async fn widerrufene_zuordnung_nimmt_die_akten_des_gegenuebers_aus_der_liste() {
         let pool = crate::db::test_pool().await;
