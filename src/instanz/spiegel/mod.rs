@@ -14,6 +14,7 @@ pub mod antrag;
 pub mod art;
 pub mod bruchstelle;
 pub mod fuehrung;
+pub mod hinweis;
 pub mod katalog;
 pub mod lebensende;
 pub mod liefern;

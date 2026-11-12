@@ -28,6 +28,10 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
     if let Err(e) = crate::benachrichtigung::repo::aufraeumen(pool, jetzt).await {
         tracing::warn!("Benachrichtigungen nicht abgeräumt: {e}");
     }
+    // Ausgang und Eingang der Hinweise über den Hub (LLH-1495, design.md D2).
+    if let Err(e) = crate::instanz::spiegel::hinweis::aufraeumen(pool, jetzt).await {
+        tracing::warn!("Hinweise über den Hub nicht abgeräumt: {e}");
+    }
     // Lagebesprechung steht an (LLH-1215, design.md D10): 10 min vorher und bei Termin an den
     // Stab. Eigene Fehler und Panics halten die Erinnerungen nicht auf.
     isoliert(

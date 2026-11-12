@@ -472,10 +472,48 @@ async fn melden_mit_fehler(
         );
         return Ok(Vec::new());
     }
+    // Über den Hub (LLH-1495, design.md D2, D4): der Anlass reist zum Hub, unabhängig davon, ob
+    // hier jemand gemeint ist; bietet der Hub Push an, pusht diese Instanz nicht selbst.
+    let ziele = hub_ziele(pool, anlass.einsatz_id).await;
+    if let Err(e) = vormerken_fuer_hub(pool, &ziele, anlass).await {
+        tracing::warn!(einsatz_id = anlass.einsatz_id, fehler = %e, "Hinweis für den Hub nicht vorgemerkt");
+    }
+    let push = !crate::instanz::spiegel::hinweis::pusht_ueber_hub(&ziele);
     let aufgeloest = aufloesung::empfaenger(pool, anlass).await?;
     let mit_stufe = mit_stufe(anlass, &aufgeloest.benutzer_ids, &aufgeloest.still_ids);
-    ausliefern(pool, live, anlass, aufgeloest.org_id, &mit_stufe).await?;
+    ausliefern(pool, live, anlass, aufgeloest.org_id, &mit_stufe, push).await?;
     Ok(aufgeloest.benutzer_ids)
+}
+
+/// Die Kopplungen, über die Hinweise dieses Einsatzes zum Hub reisen (LLH-1495, design.md D4);
+/// ein Fehler gilt als „keine“: dann pusht diese Instanz selbst, nichts geht still verloren.
+async fn hub_ziele(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Vec<crate::instanz::spiegel::hinweis::Ziel> {
+    let ziele = async {
+        let mut conn = pool.acquire().await?;
+        crate::instanz::spiegel::hinweis::ziele(&mut conn, einsatz_id).await
+    };
+    match ziele.await {
+        Ok(z) => z,
+        Err(e) => {
+            tracing::warn!(einsatz_id, fehler = %e, "Kopplungen des Einsatzes nicht lesbar");
+            Vec::new()
+        }
+    }
+}
+
+async fn vormerken_fuer_hub(
+    pool: &SqlitePool,
+    ziele: &[crate::instanz::spiegel::hinweis::Ziel],
+    anlass: &Anlass,
+) -> Result<(), sqlx::Error> {
+    if ziele.is_empty() {
+        return Ok(());
+    }
+    let mut conn = pool.acquire().await?;
+    crate::instanz::spiegel::hinweis::vormerken(&mut conn, ziele, anlass).await
 }
 
 /// Je Empfänger seine Stufe: die der Art, für die Stillen `still` (LLH-1143, design.md D2).
@@ -497,12 +535,14 @@ fn mit_stufe(
 
 /// Schreibt je aufgelöstem Empfänger eine Zeile mit seiner Stufe und stellt sie zu (Live, Web
 /// Push). Nur für Empfänger, die [`aufloesung::empfaenger`] für diesen Anlass geliefert hat.
+/// `push = false`: der Hub pusht für diesen Einsatz (LLH-1495, design.md D4).
 async fn ausliefern(
     pool: &SqlitePool,
     live: &LiveHub,
     anlass: &Anlass,
     org_id: i64,
     mit_stufe: &[(i64, BenachrichtigungStufe)],
+    push: bool,
 ) -> Result<(), crate::error::AppError> {
     if mit_stufe.is_empty() {
         return Ok(());
@@ -529,7 +569,7 @@ async fn ausliefern(
     zustellen(live, org_id, anlass.einsatz_id, anlass.art, &ereignisse);
     // Web Push an die Geräte der Empfänger (LLH-1223, Spec `web-push`): dieselbe Nutzlast wie
     // das Live-Ereignis, in einem eigenen Task; ohne `--web-push` nichts.
-    if let Some(web_push) = live.web_push() {
+    if let Some(web_push) = live.web_push().filter(|_| push) {
         web_push.versenden(
             pool,
             ereignisse
@@ -563,6 +603,20 @@ pub async fn erledigen(
 ) -> usize {
     if ids.is_empty() {
         return 0;
+    }
+    // Für alle erledigt gilt auch am Hub (LLH-1495, design.md D5).
+    let ziele = hub_ziele(pool, einsatz_id).await;
+    if !ziele.is_empty() {
+        let vorgemerkt = async {
+            let mut conn = pool.acquire().await?;
+            crate::instanz::spiegel::hinweis::vormerken_erledigt(
+                &mut conn, &ziele, einsatz_id, art, typ, ids,
+            )
+            .await
+        };
+        if let Err(e) = vorgemerkt.await {
+            tracing::warn!(einsatz_id, fehler = %e, "Erledigt für den Hub nicht vorgemerkt");
+        }
     }
     let zeilen = match repo::quittieren_fuer_bezug(pool, einsatz_id, art, typ, ids).await {
         Ok(z) => z,
@@ -668,7 +722,9 @@ async fn umadressieren_mit_fehler(
             .into_iter()
             .filter(|(id, _)| !hatten.contains(id))
             .collect();
-    ausliefern(pool, live, &anlass, aufgeloest.org_id, &dazu).await
+    // Neu Gemeinte pusht diese Instanz selbst: `umadressieren` reist nicht zum Hub (LLH-1495,
+    // design.md D6), sonst erführen sie es nirgends.
+    ausliefern(pool, live, &anlass, aufgeloest.org_id, &dazu, true).await
 }
 
 /// „Alle gelesen“ (LLH-1143, design.md D4): quittiert die eigenen Zeilen von `benutzer_id` im
