@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Alert, Button, Modal } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Paneel, StatusChip, useRollen } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { loadFuehrungFremd } from '../api/fuehrung';
@@ -17,12 +17,26 @@ import { FUEHRUNG_ART_TEXT, fuehrungKurz } from './fuehrungText';
  */
 export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolean }) {
   const { token } = useRollen();
+  const qc = useQueryClient();
   // Die beim Öffnen gewählte Akte (LLH-1670): Der Dialog hängt nicht am 30-s-Abruf. Steht sie
-  // noch in der Liste, gilt deren neuerer Stand; fällt sie heraus, bleibt der letzte mit Hinweis
-  // stehen, samt getipptem Grund, eingegebenem Code und einer Erfolgsmeldung. Eine eigene Aktion
-  // setzt ihn auf die Antwort des Servers, denn danach fällt die Akte oft aus der Liste (eine
-  // Notübernahme löscht den Spiegel).
+  // in der Liste, gilt deren Stand; fällt sie heraus, bleibt der letzte mit Hinweis stehen, samt
+  // getipptem Grund, eingegebenem Code und einer Erfolgsmeldung.
   const [gewaehlt, setGewaehlt] = useState<FuehrungAnzeige | null>(null);
+  // Solange eine Aktion läuft, bleibt der Dialog offen: Ihre Antwort (etwa der einmalige Code)
+  // hätte sonst keinen Ort.
+  const [laeuft, setLaeuft] = useState(false);
+  // Die Antwort einer eigenen Aktion ist der neueste Stand, in der Liste wie im Dialog, bis der
+  // nächste Abruf gelingt; danach fällt die Akte oft aus der Liste (eine Notübernahme löscht den
+  // Spiegel). Den Dialog betrifft sie nur, solange er noch diese Akte zeigt.
+  const nachAktion = useCallback(
+    (f: FuehrungAnzeige) => {
+      qc.setQueryData<FuehrungAnzeige[]>(globalKeys.instanzkopplungFuehrung(), (liste) =>
+        liste?.map((a) => (a.id === f.id ? f : a)),
+      );
+      setGewaehlt((g) => (g?.id === f.id ? f : g));
+    },
+    [qc],
+  );
   const q = useQuery({
     queryKey: globalKeys.instanzkopplungFuehrung(),
     queryFn: loadFuehrungFremd,
@@ -82,7 +96,12 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
         open={offen != null}
         title={offen ? offen.bezeichnung : ''}
         footer={null}
-        onCancel={() => setGewaehlt(null)}
+        onCancel={() => {
+          if (!laeuft) setGewaehlt(null);
+        }}
+        closable={laeuft ? { disabled: true } : true}
+        mask={{ closable: !laeuft }}
+        keyboard={!laeuft}
         width={640}
         destroyOnHidden
       >
@@ -97,7 +116,13 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
           />
         )}
         {offen && (
-          <FuehrungPaneel fuehrung={offen} darfBedienen={darfBedienen} onGeaendert={setGewaehlt} />
+          <FuehrungPaneel
+            key={offen.id}
+            fuehrung={offen}
+            darfBedienen={darfBedienen}
+            onGeaendert={nachAktion}
+            onLaeuft={setLaeuft}
+          />
         )}
       </Modal>
     </Paneel>

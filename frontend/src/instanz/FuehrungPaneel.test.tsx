@@ -260,7 +260,13 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     // Je Mutation ein Fall: Die Sperre der Knöpfe deckte ein fehlendes `networkMode` sonst zu.
     const offeneUebernahme = () =>
       akte({ offen: { von: 'Hub Nord', epoche: 2, bruch_at: '2026-11-09 14:00:00' } });
-    it.each([
+    const AKTIONEN: {
+      aktion: string;
+      fuehrung: () => FuehrungAnzeige;
+      api: (...args: never[]) => Promise<unknown>;
+      umschlag?: (f: FuehrungAnzeige) => unknown;
+      ausloesen: () => Promise<unknown>;
+    }[] = [
       {
         aktion: 'Übergabe',
         fuehrung: akte,
@@ -276,6 +282,7 @@ describe('FuehrungPaneel (LLH-1491)', () => {
         aktion: 'Abgabe per Code',
         fuehrung: akte,
         api: gibFuehrungPerCodeAb,
+        umschlag: (f: FuehrungAnzeige) => ({ code: 'ABCD-EFGH-JKMN-PQRS', fuehrung: f }),
         ausloesen: async () => {
           await userEvent.click(screen.getByRole('button', { name: 'Führung per Code abgeben' }));
           await bestaetigeRueckfrage('Code erzeugen');
@@ -316,7 +323,8 @@ describe('FuehrungPaneel (LLH-1491)', () => {
           await bestaetigeRueckfrage('Widersprechen');
         },
       },
-    ])(
+    ];
+    it.each(AKTIONEN)(
       '$aktion wird nie angehalten: sie geht sofort hinaus oder scheitert sofort',
       async ({ fuehrung, api, ausloesen }) => {
         // Die Antwort ist hier gleich; geprüft wird nur, ob die Anfrage sofort hinausgeht.
@@ -328,6 +336,33 @@ describe('FuehrungPaneel (LLH-1491)', () => {
         await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
       },
     );
+
+    it.each(AKTIONEN)(
+      '$aktion meldet den Stand, den der Server danach nennt',
+      async ({ fuehrung, api, umschlag, ausloesen }) => {
+        const antwort = akte({ epoche: 9, fuehrer_name: 'Antwort des Servers' });
+        vi.mocked(api).mockResolvedValue((umschlag ? umschlag(antwort) : antwort) as never);
+        const onGeaendert = vi.fn();
+        renderMitProviders(
+          <FuehrungPaneel fuehrung={fuehrung()} darfBedienen onGeaendert={onGeaendert} />,
+        );
+        await ausloesen();
+        await waitFor(() => expect(onGeaendert).toHaveBeenCalledWith(antwort));
+      },
+    );
+
+    it('meldet, solange eine Aktion läuft', async () => {
+      let fertig: (f: FuehrungAnzeige) => void = () => {};
+      vi.mocked(frageFuehrungAn).mockReturnValue(new Promise((r) => (fertig = r)));
+      const onLaeuft = vi.fn();
+      renderMitProviders(
+        <FuehrungPaneel fuehrung={gegenueberFuehrt()} darfBedienen onLaeuft={onLaeuft} />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Führung anfragen' }));
+      await waitFor(() => expect(onLaeuft).toHaveBeenLastCalledWith(true));
+      fertig(gegenueberFuehrt());
+      await waitFor(() => expect(onLaeuft).toHaveBeenLastCalledWith(false));
+    });
 
     it('Netz fällt bei offenem Notübernahme-Dialog weg: der getippte Grund bleibt, nichts geht hinaus', async () => {
       renderMitProviders(<FuehrungPaneel fuehrung={gegenueberFuehrt()} darfBedienen />);

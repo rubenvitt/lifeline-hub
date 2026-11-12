@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { App, Button, Form, Input, Modal, Popconfirm, Radio, Space, Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -185,6 +185,7 @@ export default function FuehrungPaneel({
   titel = 'Führung',
   style,
   onGeaendert,
+  onLaeuft,
 }: {
   fuehrung: FuehrungAnzeige;
   darfBedienen: boolean;
@@ -196,6 +197,8 @@ export default function FuehrungPaneel({
    * sie danach aus der Liste fällt.
    */
   onGeaendert?: (f: FuehrungAnzeige) => void;
+  /** Ob gerade eine Aktion läuft; ein umgebender Dialog sperrt so lange sein Schließen. */
+  onLaeuft?: (laeuft: boolean) => void;
 }) {
   const { token, rollen } = useRollen();
   const { message } = App.useApp();
@@ -256,6 +259,9 @@ export default function FuehrungPaneel({
   // Eine Aktion zur Zeit (LLH-1670): eine zweite während der ersten endete mit 409 neben dem Erfolg.
   const laeuft =
     uebergeben.isPending || perCode.isPending || anfragen.isPending || notuebernahme.isPending;
+  useEffect(() => {
+    onLaeuft?.(laeuft);
+  }, [laeuft, onLaeuft]);
   /** Gesperrt, außer es ist die Aktion, die gerade läuft (die zeigt ihren Ladezustand). */
   const sperre = (selbst: boolean) => ohneNetz || (laeuft && !selbst);
   const beschrieben = ohneNetz ? grundId : undefined;
