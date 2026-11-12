@@ -35,9 +35,22 @@ export function bruchFolgenText(folgen: number): string | null {
   return `+ ${folgen} ${folgen === 1 ? 'Zeile' : 'Zeilen'}`;
 }
 
-/** Lässt sich als Antrag stellen: Antragsart bekannt und Inhalt sichtbar (N1). */
-export function bruchStellbar(e: Pick<BruchErfassung, 'antrag_art' | 'verborgen'>): boolean {
-  return e.antrag_art != null && !e.verborgen;
+/**
+ * Eine gestellte Person, deren Einträge noch folgen (LLH-1657): „3 Einträge folgen“. Sonst
+ * keine Angabe.
+ */
+export function bruchKetteText(
+  e: Pick<BruchErfassung, 'nachgereicht' | 'folgen_offen'>,
+): string | null {
+  if (!e.nachgereicht || e.folgen_offen <= 0) return null;
+  return e.folgen_offen === 1 ? '1 Eintrag folgt' : `${e.folgen_offen} Einträge folgen`;
+}
+
+/** Lässt sich als Antrag stellen: Antragsart bekannt, Inhalt sichtbar, nicht schon gestellt (N1). */
+export function bruchStellbar(
+  e: Pick<BruchErfassung, 'antrag_art' | 'verborgen' | 'nachgereicht'>,
+): boolean {
+  return e.antrag_art != null && !e.verborgen && !e.nachgereicht;
 }
 
 /** Ergebnis von „Alle stellen“, wenn etwas offen blieb: „2 nicht gestellt: Bezug …“. */

@@ -887,6 +887,7 @@ pub async fn quittungen_uebernehmen(
                 q.id,
                 zustand == "abgelehnt",
                 q.ergebnis_schluessel.as_deref(),
+                q.grund.as_deref(),
             )
             .await?;
         }
