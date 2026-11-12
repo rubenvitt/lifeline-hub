@@ -996,11 +996,11 @@ mod tests {
         assert!(rx.try_recv().is_err(), "kein Live-Ereignis");
     }
 
-    /// LLH-1492 (design.md D10): ein Spiegel lässt der Takt aus. Seine fällige Erinnerung und
-    /// seine alte Benachrichtigung bleiben stehen, und kein Schreibversuch scheitert am
-    /// Schutz-Trigger (kein `einsatz_ist_spiegel` im Log). Der eigene Einsatz löst im selben Takt
-    /// aus, und seine alte Benachrichtigung wird abgeräumt: das Abräumen ist EINE Anweisung, die
-    /// an einer Zeile des Spiegels ganz scheiterte.
+    /// LLH-1492 (design.md D10): ein Spiegel lässt der Takt aus. Seine fällige Erinnerung bleibt
+    /// stehen, und kein Schreibversuch scheitert am Schutz-Trigger (kein `einsatz_ist_spiegel` im
+    /// Log). Der eigene Einsatz löst im selben Takt aus. Alte Benachrichtigungen räumt der Takt an
+    /// beiden ab (LLH-1495, design.md D8): `benachrichtigung` wird nicht gespiegelt und hat keinen
+    /// Schutz-Trigger, und am Hub entstehen Hinweise an Spiegeln.
     #[tokio::test]
     async fn spiegel_bleibt_unberuehrt_und_haelt_den_takt_nicht_auf() {
         let (puffer, _log) = crate::test_log::LogPuffer::einfangen();
@@ -1070,7 +1070,7 @@ mod tests {
         .fetch_all(&pool)
         .await
         .unwrap();
-        assert_eq!(uebrig, vec![alte[0]], "nur die alte des Spiegels bleibt");
+        assert!(uebrig.is_empty(), "beide alten abgeräumt: {uebrig:?} von {alte:?}");
         let log = puffer.text();
         assert!(
             !log.contains(crate::instanz::spiegel::SCHUTZ_NACHRICHT),
