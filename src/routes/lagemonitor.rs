@@ -599,7 +599,7 @@ pub(crate) fn karte_json(features: &[KartenFeature]) -> Value {
 
 /// Die Lagekarte des Lagebilds für Externe: [`load_karten_features`] in der Form von
 /// [`karte_json`].
-pub(crate) async fn baue_karte(
+pub(crate) async fn build_karte(
     pool: &SqlitePool,
     kopf: &crate::einsatz::Einsatz,
     verdichtet: &LagemonitorAnzeige,
@@ -801,7 +801,7 @@ mod tests {
     #[tokio::test]
     async fn karte_des_lagebilds_bleibt_byte_fuer_byte() {
         let (pool, kopf, verdichtet) = karten_fall().await;
-        let karte = baue_karte(&pool, &kopf, &verdichtet).await.unwrap();
+        let karte = build_karte(&pool, &kopf, &verdichtet).await.unwrap();
         assert_eq!(serde_json::to_string(&karte).unwrap(), KARTE_LAGEBILD);
     }
 

@@ -23,7 +23,7 @@ use serde_json::Value;
 use utoipa::ToSchema;
 
 use super::lagemonitor::{
-    baue_karte, karte_etag, lagemeldung, verdichte, LageQuery, LagemonitorBetroffene,
+    build_karte, karte_etag, lagemeldung, verdichte, LageQuery, LagemonitorBetroffene,
     LagemonitorKraefte, LagemonitorLagemeldung, LagemonitorUhsZahl, KARTE_AUS,
 };
 
@@ -105,7 +105,7 @@ pub async fn lage(
     let (karte, karte_etag) = if query.karte.as_deref() == Some(KARTE_AUS) {
         (None, None)
     } else {
-        let karte = baue_karte(pool, &kopf, &verdichtet).await?;
+        let karte = build_karte(pool, &kopf, &verdichtet).await?;
         let etag = karte_etag(&karte);
         let gleich = query.karte.as_deref() == Some(etag.as_str());
         ((!gleich).then_some(karte), Some(etag))

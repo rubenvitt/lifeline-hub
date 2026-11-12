@@ -33,7 +33,7 @@ use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
 use super::lagemonitor::{
-    baue_karte, karte_etag, lagemeldung, verdichte, LageQuery, LagemonitorBetroffene,
+    build_karte, karte_etag, lagemeldung, verdichte, LageQuery, LagemonitorBetroffene,
     LagemonitorKraefte, LagemonitorLagemeldung, LagemonitorUhsZahl, KARTE_AUS,
 };
 
@@ -457,7 +457,7 @@ pub async fn abruf(
     let zeige_karte = nimm("karte", query.karte.as_deref() != Some(KARTE_AUS));
 
     let (karte, karte_etag) = if zeige_karte {
-        let mut karte = baue_karte(pool, &kopf, &verdichtet).await?;
+        let mut karte = build_karte(pool, &kopf, &verdichtet).await?;
         if !voll {
             nur_oeffentliche_features(&mut karte);
         }
