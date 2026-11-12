@@ -369,7 +369,7 @@ Herleitung in
     die Ausnahme von der Eindeutigkeit, und eine hier schon vergebene Nummer ließe den Wechsel
     sonst mit 409 scheitern, im Abgleich in jedem Takt. Heute `fuehrung::werde_fuehrer` und
     `lebensende::umwandeln`. Nach einem Führungswechsel an einem lokalen Einsatz meldet der
-    Aufrufer Kopf und Vollabgleich über `instanz::fuehrung::melde_wechsel`, nie `kopf_melden`
+    Aufrufer Kopf und Vollabgleich über `instanz::fuehrung::notify_wechsel`, nie `kopf_melden`
     allein: Der Wechsel kann ins ETB geschrieben haben. Herleitung:
     `openspec/changes/archive/2026-11-12-a36p545r-nummer-beim-fuehrungswechsel/design.md`.
   - Übergabe geht nur abgeglichen (`fordere_abgeglichen`), eine Anfrage wartet am Führer

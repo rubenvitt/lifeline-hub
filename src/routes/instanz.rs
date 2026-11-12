@@ -834,7 +834,7 @@ pub async fn widerrufen(
     if let Some(einsaetze) = widerrufen {
         // Freigegebene Einsätze: geöffnete Oberflächen laden neu (LLH-1491, LLH-1703).
         for einsatz_id in einsaetze {
-            crate::instanz::fuehrung::melde_wechsel(&state.pool, &state.live, einsatz_id).await;
+            crate::instanz::fuehrung::notify_wechsel(&state.pool, &state.live, einsatz_id).await;
         }
         let kopplung = repo::load_kopplung(&state.pool, kopplung_id).await?;
         admin_audit::schreibe(
@@ -972,7 +972,7 @@ pub async fn elw_verloren(
     })?;
     state.live.melde_sitzung_ende(beendet);
     for einsatz_id in freigegeben {
-        crate::instanz::fuehrung::melde_wechsel(&state.pool, &state.live, einsatz_id).await;
+        crate::instanz::fuehrung::notify_wechsel(&state.pool, &state.live, einsatz_id).await;
     }
     let mut angaben = melden::build_angaben_gegenstelle(&kopplung, &vorher.org.fremde_org_name);
     angaben.anzahl = Some(konten);

@@ -161,12 +161,14 @@ mod tests {
         .unwrap();
     }
 
-    /// Ein weiterer Spiegel derselben Org mit der Nummer `lfd`, der Spiegel bleibt.
+    /// Ein weiterer Spiegel derselben Org mit der laufenden Nummer `lfd`, der Spiegel bleibt. Sein
+    /// Text trägt das Präfix der Gegenstelle: So entscheidet allein die Zählung über die neue
+    /// Nummer, nicht das Ausweichen vor einem vergebenen Text.
     async fn fremder_spiegel(pool: &SqlitePool, lfd: i64) {
         sqlx::query(
             "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern, nummer_jahr, \
              nummer_lfd, spiegel) \
-             VALUES (1, 'Fremd', 'E-2026-' || printf('%04d', ?1), 2026, ?1, 1)",
+             VALUES (1, 'Fremd', 'ELW-2026-' || printf('%04d', ?1), 2026, ?1, 1)",
         )
         .bind(lfd)
         .execute(pool)

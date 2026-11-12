@@ -367,9 +367,9 @@ bekommt der übernommene Einsatz dort eine neue Nummer, die über allen ihren Ei
 liegt. Sein Einsatztagebuch nennt dann „Neue Einsatznummer …, bisher …“. Die abgebende
 Installation zeigt die neue Nummer, sobald sie den Einsatz als Spiegel hält, bei einer
 Notübernahme mit Unterschrift also erst nach dem Bestätigen. Übergibt die neue Installation die
-Führung später zurück, bleibt die neue Nummer. Widerspricht der ELW dagegen einer Notübernahme,
-führt er mit seiner Nummer weiter, und der Hub zeigt sie wieder, sobald der ELW den Einsatz das
-nächste Mal ändert.
+Führung später zurück, bleibt die neue Nummer, solange sie dort frei ist. Widerspricht der ELW
+dagegen einer Notübernahme, führt er mit seiner Nummer weiter, und der Hub zeigt sie wieder,
+sobald der ELW den Einsatz das nächste Mal ändert.
 
 Benachrichtigungen werden nicht gespiegelt. Jede Installation führt ihre eigenen; „gelesen“ und
 das Quittieren gelten nur dort.

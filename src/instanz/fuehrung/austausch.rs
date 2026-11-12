@@ -269,7 +269,7 @@ fn quittung_nach(bis: Option<i64>, m: &AkteMeldung) -> Option<i64> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Folge {
     /// Die Führung eines lokalen Einsatzes hat sich geändert: Live-Ereignis `einsatz` und ein
-    /// Vollabgleich (`super::melde_wechsel`).
+    /// Vollabgleich (`super::notify_wechsel`).
     Kopf { einsatz_id: i64 },
     /// Alarm „ungültige Übernahme“ an die Einsatzleitung.
     Alarm { einsatz_id: i64 },
@@ -1169,7 +1169,7 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
     for f in folgen {
         match f {
             Folge::Kopf { einsatz_id } => {
-                super::melde_wechsel(pool, &live, *einsatz_id).await;
+                super::notify_wechsel(pool, &live, *einsatz_id).await;
             }
             Folge::Alarm { einsatz_id } | Folge::Offen { einsatz_id } => {
                 let art = if matches!(f, Folge::Alarm { .. }) {

@@ -151,7 +151,7 @@ pub async fn fordere_enabled(pool: &SqlitePool) -> Result<(), AppError> {
 /// ohne dass der Aufrufer es erfährt: Wird ein Spiegel eigen und ist seine Nummer hier belegt,
 /// steht danach ein Systemeintrag im ETB (LLH-1703). `lagged` lässt offene Schirme alles neu
 /// laden, wie nach jeder Lieferung im Abgleich (`spiegel::abgleich::melde_live`).
-pub async fn melde_wechsel(pool: &SqlitePool, live: &crate::live::LiveHub, einsatz_id: i64) {
+pub async fn notify_wechsel(pool: &SqlitePool, live: &crate::live::LiveHub, einsatz_id: i64) {
     crate::live::org::kopf_melden(pool, live, einsatz_id, &[]).await;
     live.publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Lagged);
 }

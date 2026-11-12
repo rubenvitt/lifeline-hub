@@ -123,7 +123,7 @@ Einsatz so mit seiner neuen Nummer, nicht mit einer, die hier ein anderer Einsat
 Live (Nachtrag aus dem Review, 12.11.2026): Der Kopf allein reicht nicht, denn das Ereignis
 `einsatz` lädt im Client weder das ETB noch den Modulzähler neu, und die ID des Eintrags erreicht
 keinen Aufrufer von `save`. Jeder Führungswechsel an einem lokalen Einsatz meldet deshalb neben
-dem Kopf einen Vollabgleich (`lagged`, `fuehrung::melde_wechsel`), wie jede Lieferung im Abgleich
+dem Kopf einen Vollabgleich (`lagged`, `fuehrung::notify_wechsel`), wie jede Lieferung im Abgleich
 (`spiegel::abgleich::melde_live`). Verworfen: die ID durch `werde_fuehrer`, `richte_aus`, `save`
 und die Dienste reichen (etwa zehn Signaturen für ein Ereignis je Führungswechsel).
 

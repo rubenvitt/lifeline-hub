@@ -30,7 +30,7 @@ ist, dann der Code. Tests im Backend mit `cargo test --test <datei> <name>`.
 
 ## 5. Nach dem Review vor dem PR (12.11.2026)
 
-- [x] 5.1 Live: Jeder Führungswechsel an einem lokalen Einsatz meldet Kopf und Vollabgleich (`fuehrung::melde_wechsel`), damit der Systemeintrag offene Schirme erreicht (design.md D4, Nachtrag). Tests `notuebernahme_bei_gleicher_einsatznummer` (Route) und `uebergabe_meldet_am_hub_kopf_und_vollabgleich` (Abgleich); Mutationsprobe ohne `lagged` macht beide rot.
+- [x] 5.1 Live: Jeder Führungswechsel an einem lokalen Einsatz meldet Kopf und Vollabgleich (`fuehrung::notify_wechsel`), damit der Systemeintrag offene Schirme erreicht (design.md D4, Nachtrag). Tests `notuebernahme_bei_gleicher_einsatznummer` (Route) und `uebergabe_meldet_am_hub_kopf_und_vollabgleich` (Abgleich); Mutationsprobe ohne `lagged` macht beide rot.
 - [x] 5.2 Akte, Antwort und Admin-Spur nennen die neue Nummer (`werde_fuehrer` zieht `einsatz_fuehrung.nummer` mit, `save`/`insert_fremd` lesen neu). Test in `notuebernahme_bei_gleicher_einsatznummer` und `nummer::tests`; Mutationsprobe ohne das `UPDATE` macht den Live-Test rot.
 - [x] 5.3 Delta-Spec: Ausnahme „kein Konto für den Eintrag“, Zählung über Spiegel samt Szenario, eigene Anforderung „Die neue Nummer gilt an beiden Seiten“; Test `die_neue_nummer_liegt_ueber_den_spiegeln`, Rückgabe mit behaltener Nummer im Live-Test.
 - [x] 5.4 Verwahrung mit Führung prüft den Wortlaut des Eintrags und dass kein zweiter entsteht (`mit_fuehrung_verwahrt_der_hub_auch_bei_belegter_nummer`).
