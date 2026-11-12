@@ -33,6 +33,14 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
      Wirkung: ein Satz, warum es kein Bild gibt. Aufnahme und Einbinden:
      `dev-zunder-ausfuehren`, „Bilder der Änderung“. -->
 
+## Review
+
+<!-- Der Review vor dem PR (`dev-zunder-ausfuehren`, „Review vor dem PR“). Lief keiner: der Grund
+     (Route `trivial`). Sonst je Befund eine Zeile:
+     - bestätigt: was, wo, Commit der Behebung (oder Link auf die Folgeaufgabe)
+     - verworfen: was, warum
+     Kein Befund: ein Satz. -->
+
 ## Geprüft
 
 <!-- `./scripts/check-all.sh` ist die Untergrenze, nicht der Nachweis. Was wurde GEMESSEN

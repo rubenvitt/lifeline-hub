@@ -3370,6 +3370,14 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("geklaert", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("geraeumt", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("gesichert_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            // Nachreichen (LLH-1646).
+            scrub("folge_von", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erledigt", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erledigt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("erledigt_von_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("antrag_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("client_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("nachgereicht_als", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     TabellenRegel {
