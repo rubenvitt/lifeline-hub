@@ -22053,7 +22053,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/PushUeberHub",
-                "description": "Push für diesen Nutzer läuft über einen gekoppelten Hub (LLH-1495, Spec `web-push`, „Push-\nEinstellung am gekoppelten ELW verweist auf den Hub“): statt des Schalters ein Hinweis mit\nLink; ein neues Abo lehnt der Server mit 422 ab."
+                "description": "Push für diesen Nutzer läuft über einen gekoppelten Hub, der sein Konto kennt (LLH-1495,\nSpec `web-push`, „Push-Einstellung am gekoppelten ELW verweist auf den Hub“): statt des\nSchalters ein Hinweis mit Link; ein neues Abo lehnt der Server mit 422 ab."
               },
               {
                 "type": "null"
