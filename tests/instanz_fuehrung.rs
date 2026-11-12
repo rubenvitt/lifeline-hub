@@ -683,6 +683,17 @@ async fn unterschrift_eines_admins_einer_anderen_org_ist_403() {
         "der Einsatz gehört der gekoppelten Org: {v}"
     );
     assert_ne!(org_b, 1);
+    // Die Führung bedient er: Die Code-Route hinter demselben Gate lehnt nur die Eingabe ab.
+    // Formal ungültig muss der Code sein, einen wohlgeformten nähme der Hub an und führte.
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme/code"),
+        &fremd,
+        Some(&json!({"grund": "ohne Verbindung", "code": "kaputt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
 
     let start = format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme/start");
     let (s, v) = common::anfrage_json(
