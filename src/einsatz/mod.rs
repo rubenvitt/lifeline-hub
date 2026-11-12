@@ -1,4 +1,5 @@
 pub mod abraeumen;
+pub mod archiv;
 pub mod aufbewahrung_kategorie;
 pub mod berechtigung;
 pub mod effektiv;

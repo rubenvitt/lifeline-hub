@@ -62,8 +62,12 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # 2 vCPU: die lokale Vorgabe von 3 Playwright-Workern überzeichnete den Runner.
-  PW_WORKERS: 2
+  # Parallelität nach den Kernen des Runners (LLH-1664; der Schritt „Runner-Größe“ nennt Kerne
+  # und Speicher). Bei 4 Kernen: Playwright 3 statt 4 Worker, weil Vite-Server und Backend auf
+  # demselben Runner mitrechnen. Zeigen wandernde Infrastruktur-Fehler (goto-Timeout,
+  # ERR_CONNECTION_REFUSED, Kopf von `workers` in frontend/playwright.config.ts), zuerst hier
+  # zurücknehmen. Messwerte vorher/nachher an der Aufgabe LLH-1664.
+  PW_WORKERS: 3
   TZ: Europe/Berlin
 
 jobs:
@@ -283,6 +287,9 @@ jobs:
       - name: Ausführbar machen
         if: env.E2E != 'false'
         run: chmod +x bin/lifeline-hub
+      - name: Runner-Größe
+        if: env.E2E != 'false'
+        run: echo "Kerne $(nproc), Speicher $(free -h | awk '/^Mem:/ {print $2}')" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: e2e-Suite (Anteil ${{ matrix.shard }}/4)
         if: env.E2E != 'false'
         env:

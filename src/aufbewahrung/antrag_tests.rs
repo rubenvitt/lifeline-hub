@@ -246,6 +246,57 @@ async fn geschwaerzter_einsatz_ist_409() {
     ));
 }
 
+/// Ein archivierter Einsatz (LLH-1494, K8): nur das Ersuchen für den ganzen Einsatz geht, und es
+/// löscht das Archiv.
+#[tokio::test]
+async fn archivierter_einsatz_nur_ganz_und_der_vollzug_loescht_das_archiv() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    sqlx::query("UPDATE einsatz SET geloescht_at = ?1, geschwaerzt_at = ?1 WHERE id = ?2")
+        .bind(T0)
+        .bind(b.e1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    for block in [1, 2] {
+        sqlx::query(
+            "INSERT INTO einsatz_archiv (einsatz_id, block, empfaenger_fingerabdruecke, groesse, \
+                sha256, inhalt) VALUES (?, ?, '[]', 3, 'x', X'010203')",
+        )
+        .bind(b.e1)
+        .bind(block)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let e = stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap_err();
+    let AppError::Conflict(m) = e else {
+        panic!("{e:?}")
+    };
+    assert!(m.contains("archiviert"), "{m}");
+
+    let a = stelle(&pool, &b, b.e1, AntragZiel::Einsatz, "E-2026-0751", T0)
+        .await
+        .unwrap();
+    assert!(vollziehen(&pool, a, t(T0) + Duration::hours(25))
+        .await
+        .unwrap());
+    let bloecke: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_archiv WHERE einsatz_id = ?")
+            .bind(b.e1)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(bloecke, 0);
+    let letzter = etb_texte(&pool, b.e1).await.pop().unwrap();
+    assert!(
+        letzter.contains("Archiv des Einsatzes (2 Blöcke)"),
+        "{letzter}"
+    );
+}
+
 #[test]
 fn aktenzeichen_form() {
     assert!(matches!(

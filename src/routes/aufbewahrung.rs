@@ -10,6 +10,7 @@
 //! | POST | `/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege` | Antrag stellen |
 //! | POST | `/api/aufbewahrung/einsaetze/{id}/schwaerzungsantraege/{aid}/zuruecknehmen` | Rücknahme |
 //! | POST | `/api/aufbewahrung/einsaetze/{id}/personensuche` | Pseudonyme Suche (liest nur) |
+//! | GET  | `/api/aufbewahrung/einsaetze/{id}/archiv` | Gültiger Archivblock (age, LLH-1494) |
 //!
 //! **Die Lesesperre der regulären Einsatz-Routen bleibt unberührt** — eine Ausnahme in
 //! `darf_lesen` gäbe Personen mit Namen, Anhänge und Export wieder frei. Jeder Handler nimmt
@@ -313,5 +314,65 @@ pub async fn personensuche(
     Ok((
         [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],
         Json(treffer),
+    ))
+}
+
+/// GET /api/aufbewahrung/einsaetze/{id}/archiv — der gültige Block des Archivs (LLH-1494, K7),
+/// so verschlüsselt, wie er abgelegt ist. Öffnen kann ihn nur, wer einen der privaten
+/// Archiv-Schlüssel der Org hat. Jeder Abruf steht in der Admin-Spur.
+pub async fn archiv_herunterladen(
+    State(state): State<AppState>,
+    AdminUser(benutzer): AdminUser,
+    crate::extract::PeerIp(peer_ip): crate::extract::PeerIp,
+    PfadParam(einsatz_id): PfadParam<i64>,
+) -> Result<impl IntoResponse, AppError> {
+    let kopf = archivkopf(&state, &benutzer, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let angabe = crate::einsatz::archiv::angabe(&state.pool, einsatz_id, &jetzt)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let (block, inhalt) = crate::einsatz::archiv::gueltiger_block(&state.pool, einsatz_id, &jetzt)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let kennung = antrag::einsatz_kennung(kopf.einsatznummer_intern.as_deref(), einsatz_id);
+    crate::auth::admin_audit::schreibe(
+        &state.pool,
+        crate::auth::admin_audit::AdminEintrag {
+            aktion: crate::auth::admin_audit::AdminAktion::ArchivHeruntergeladen,
+            akteur: &benutzer,
+            ziel: crate::auth::admin_audit::Ziel::Archiv(&kennung),
+            angaben: Some(crate::auth::admin_audit::ZugangsAngaben {
+                fingerabdruck: Some(angabe.fingerabdruecke.join(", ")),
+                block: Some(block),
+                ..Default::default()
+            }),
+            peer_ip,
+        },
+    )
+    .await;
+    let datei: String = kennung
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let disposition = HeaderValue::from_str(&format!(
+        "attachment; filename=\"einsatz-{datei}-block-{block}.sqlite.age\""
+    ))
+    .map_err(|e| AppError::Internal(format!("Archiv: Dateiname: {e}")))?;
+    Ok((
+        [
+            (
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/octet-stream"),
+            ),
+            (header::CONTENT_DISPOSITION, disposition),
+            (header::CACHE_CONTROL, HeaderValue::from_static("no-store")),
+        ],
+        inhalt,
     ))
 }

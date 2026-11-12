@@ -43,6 +43,8 @@ set -euo pipefail
 #                    alle fahren und am Ende einmal rot melden)
 # Geteilt wird über die Umgebung, nicht über weitere Flags:
 #   VITEST_SHARD=1/3   PW_SHARD=2/4 (e2e nach gemessener Laufzeit, LFH-1117)
+# Gleichzeitige Testdateien in Vitest (Vorgabe 1; die CI setzt mehr, LLH-1664):
+#   VITEST_WORKERS=2
 # Playwright-Projekte (Vorgabe: alle, so auch die CI; Firefox/WebKit fahren nur die Druck-Specs):
 #   PW_PROJEKTE=chromium   PW_PROJEKTE=firefox,webkit
 NUR="alle"
@@ -74,6 +76,10 @@ if [ -n "$GEAENDERT" ] && [ "$NUR" != alle ]; then
   exit 2
 fi
 VITEST_SHARD="${VITEST_SHARD:-}"
+VITEST_WORKERS="${VITEST_WORKERS:-1}"
+case "$VITEST_WORKERS" in
+  '' | *[!0-9]* | 0) echo "FEHLER: VITEST_WORKERS muss eine Zahl ab 1 sein, nicht '$VITEST_WORKERS'." >&2; exit 2 ;;
+esac
 PW_SHARD="${PW_SHARD:-}"
 PW_PROJEKTE="${PW_PROJEKTE:-}"
 
@@ -142,10 +148,16 @@ schritt_4() {
 
 schritt_5() {
   echo "==> [5/$SCHRITTE] Frontend-Suite${VITEST_SHARD:+ (Anteil $VITEST_SHARD)}"
-  # --no-file-parallelism BLEIBT auch im Shard-Betrieb: Sharding verteilt Dateien über
-  # Maschinen, das Flag steuert die Nebenläufigkeit innerhalb eines Prozesses. Ohne es
-  # startete jeder Shard so viele Worker wie der Runner Kerne hat — die Kontention, die als
-  # Flakiness auftrat.
+  # Nebenläufigkeit IMMER ausdrücklich, auch im Shard-Betrieb: Sharding verteilt Dateien über
+  # Maschinen, die Worker-Zahl steuert die Nebenläufigkeit innerhalb eines Prozesses. Ohne
+  # Vorgabe startete jeder Shard so viele Worker wie der Runner Kerne hat — die Kontention,
+  # die als Flakiness auftrat. Vorgabe ist eine Datei zur Zeit (--no-file-parallelism); die CI
+  # hebt mit VITEST_WORKERS an, gemessen an den Kernen ihres Runners (LLH-1664, Kopf von
+  # .github/workflows/ci.yml).
+  local parallel=(--no-file-parallelism)
+  if [ "$VITEST_WORKERS" -gt 1 ]; then
+    parallel=(--maxWorkers="$VITEST_WORKERS")
+  fi
   local bericht=()
   if [ -n "${VITEST_SHARD:-}" ]; then
     # Im Shard-Betrieb zusätzlich ein Blob-Bericht, damit die Teilläufe zu EINEM Ergebnis
@@ -153,7 +165,7 @@ schritt_5() {
     # `frontend/.vitest/blob/`.
     bericht=(--reporter=default --reporter=blob)
   fi
-  $PNPM -C "$FE" exec vitest run --no-file-parallelism "${bericht[@]}" ${VITEST_SHARD:+--shard="$VITEST_SHARD"}
+  $PNPM -C "$FE" exec vitest run "${parallel[@]}" "${bericht[@]}" ${VITEST_SHARD:+--shard="$VITEST_SHARD"}
 }
 
 schritt_6() {
