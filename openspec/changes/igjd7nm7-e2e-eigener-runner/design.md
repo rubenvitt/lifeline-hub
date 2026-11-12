@@ -123,7 +123,8 @@ Fingerprints teilen; der inhaltsadressierte Compiler-Cache tut das nicht.
 
 ### D6 Aufräumen im Lauf selbst, nicht im Workflow
 
-`frontend/e2e/lauf-kern.ts` bekommt zwei Helfer: `createRunDir(praefix)` legt das
+Ein eigenes Modul `frontend/e2e/run-dir.ts` (ohne Playwright-Import, damit der Selbsttest
+`scripts/e2e-run-dir.test.mjs` es mit nacktem Node lädt) bringt zwei Helfer: `createRunDir(praefix)` legt das
 Verzeichnis an und löscht vorher verwaiste gleichen Präfixes älter als 24 h (Fehler nur als
 Warnung), `deleteRunDir(envKey)` löscht das Verzeichnis des Laufs aus der vererbten
 Umgebungsvariablen. Beide Konfigurationen rufen den ersten im Hauptprozess und tragen ein

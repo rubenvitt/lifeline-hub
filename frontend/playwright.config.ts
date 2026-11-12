@@ -1,6 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { mkdtempSync, readdirSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -12,6 +11,7 @@ import {
   umgebungRaeumen,
   viteServer,
 } from './e2e/lauf-kern';
+import { createRunDir } from './e2e/run-dir';
 
 // Die Suite ist selbsttragend: `pnpm e2e` startet Backend UND Vite selbst.
 
@@ -35,9 +35,10 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
   ? JSON.parse(vorbelegt)
   : await (async () => {
       const [backendPort, frontendPort] = await freiePorts(2);
-      // Temp-DB je Lauf: kein Cleanup im Repo-Baum, die Specs dürfen ihre
-      // `Date.now()`-Fixtures behalten.
-      const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-e2e-')), 'lifeline.db');
+      // Temp-DB je Lauf: nichts im Repo-Baum, die Specs dürfen ihre `Date.now()`-Fixtures
+      // behalten. Das Verzeichnis löscht `globalTeardown` am Ende, verwaiste räumt der nächste
+      // Lauf (LLH-1666, `e2e/run-dir.ts`).
+      const datenbank = join(createRunDir('lifeline-e2e-'), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
       // Einmal im Hauptprozess, nicht je Worker: welches Backend der Lauf startet, steht damit im
@@ -143,6 +144,8 @@ export default defineConfig({
   testIgnore: '**/doku-bilder/**',
   // Standard-Rufname des Admins für die ETB-Erfassung (LFH-894); läuft nach den Webservern.
   globalSetup: './e2e/globale-vorbereitung.ts',
+  // Löscht das Lauf-Verzeichnis, auch nach roten Tests (LLH-1666).
+  globalTeardown: './e2e/global-teardown.ts',
   /**
    * Gedeckelte Worker-Zahl: mit Playwrights Vorgabe (`cpus / 2`) fielen unter Lastdruck
    * wandernde Tests mit Infrastruktur-Signaturen aus (goto-Timeout, ERR_CONNECTION_REFUSED),

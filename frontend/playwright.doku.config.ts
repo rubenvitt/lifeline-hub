@@ -1,6 +1,4 @@
 import { defineConfig, devices } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +11,7 @@ import {
   umgebungRaeumen,
   viteServer,
 } from './e2e/lauf-kern';
+import { createRunDir } from './e2e/run-dir';
 
 /**
  * Bildlauf der Anwenderdokumentation (LFH-1128, `docs/anwender/AGENTS.md`, „Bilder“): fotografiert
@@ -54,7 +53,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
   ? JSON.parse(vorbelegt)
   : await (async () => {
       const [backendPort, frontendPort] = await freiePorts(2);
-      const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-doku-')), 'lifeline.db');
+      const datenbank = join(createRunDir('lifeline-doku-'), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);
       console.log(`Backend-Binary: ${binaer}`);
@@ -70,6 +69,8 @@ export default defineConfig({
   testDir: './e2e/doku-bilder',
   testMatch: '**/*.bilder.ts',
   globalSetup: './e2e/doku-bilder/vorbereitung.ts',
+  // Löscht das Lauf-Verzeichnis, auch nach einem roten Bild (LLH-1666, `e2e/run-dir.ts`).
+  globalTeardown: './e2e/doku-bilder/global-teardown.ts',
   // Ein Worker: die Bilder teilen sich den Demo-Einsatz, und gleichzeitige Aufnahmen sähen
   // einander (Live-Strom, Zähler).
   workers: 1,
