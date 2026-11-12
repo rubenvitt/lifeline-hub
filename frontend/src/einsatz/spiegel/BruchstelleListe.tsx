@@ -13,7 +13,7 @@ import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { monoStil, useRollen } from '../../components/instrument';
 import { darfBeantragen, darfNachreichenVerwerfen } from '../schreibrecht';
-import { bruchArtWort, bruchFolgenText, bruchOffenText, bruchStellbar } from './spiegelText';
+import { bruchArtWort, bruchFolgenText, bruchOffenText, bruchStellbar } from './bruchstelleText';
 
 /** Ab so vielen Einträgen rollt die Liste in sich (N4). */
 const SICHTBARE_ZEILEN = 8;
