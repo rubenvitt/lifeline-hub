@@ -17193,6 +17193,24 @@
           }
         }
       },
+      "PushUeberHub": {
+        "type": "object",
+        "description": "Der Hub, über den Push läuft.",
+        "required": [
+          "name",
+          "adresse"
+        ],
+        "properties": {
+          "adresse": {
+            "type": "string",
+            "description": "Adresse, unter der diese Instanz den Hub erreicht."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name der Instanz, wie sie sich meldet."
+          }
+        }
+      },
       "QualiSollEintrag": {
         "type": "object",
         "description": "Ein Eintrag in der Antwort, mit dem Label der Qualifikation.",
@@ -22048,6 +22066,17 @@
               "$ref": "#/components/schemas/BenachrichtigungArt"
             },
             "description": "Die stummen Eingangsarten am Abo dieser Sitzung (LLH-1482), in Katalogreihenfolge; ohne\nAbo leer."
+          },
+          "ueber_hub": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PushUeberHub",
+                "description": "Push für diesen Nutzer läuft über einen gekoppelten Hub, der sein Konto kennt (LLH-1495,\nSpec `web-push`, „Push-Einstellung am gekoppelten ELW verweist auf den Hub“): statt des\nSchalters ein Hinweis mit Link; ein neues Abo lehnt der Server mit 422 ab."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
