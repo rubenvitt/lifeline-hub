@@ -9,7 +9,7 @@ Stand im Code:
 
 - **Rechnung:** `frontend/src/betreuung/unterkunft/rechnerKern.ts` (`rechne(eingabe, richtwerte)`),
   eine reine Funktion. Sie ist nachsichtig: Ungültiges zählt als 0, Überzähliges wird übergangen.
-- **Fallsammlung:** `tests/fixtures/unterkunft/faelle.json` mit 24 Fällen (`eingabe`, `richtwerte`,
+- **Fallsammlung:** `tests/fixtures/unterkunft/faelle.json` mit 24 Fällen (seit dieser Change 25) (`eingabe`, `richtwerte`,
   `erwartet`), heute nur vom TS-Kern gelesen.
 - **Richtwerte:** Basis in `src/unterkunft/richtwerte_basis.json` (38 Werte, 4 Zelttypen), per
   `include_str!` im Server und per Import in der Oberfläche. Der Server liest daraus bisher nur
@@ -204,11 +204,12 @@ Anmeldung, nicht den Rechner.
 - **Zwei Kerne laufen auseinander** → Die Fallsammlung prüft beide; `frontend/src/betreuung/AGENTS.md`
   verlangt, sie mit jeder Änderung der Rechnung anzupassen. Ein Wächter prüft per Textsuche, dass
   der Rust-Kern jeden Schlüssel der Basis liest (Gegenstück zu `richtwerte.guard.test.ts`).
-  Restrisiko: ein Fall, den die Sammlung nicht kennt. Die Mutationsprobe in den Aufgaben zeigt, dass
-  die Sammlung jede Rundungsregel trifft.
+  Restrisiko: ein Fall, den die Sammlung nicht kennt. Die Mutationsproben in den Aufgaben zeigen,
+  welche Rundungsregeln die Sammlung trifft; für die Glättung fehlte ein Fall, er kam beim
+  Umsetzen dazu (`flaeche_gleitkomma_glatt`).
 - **Gleitkomma unterscheidet sich zwischen JS und Rust** → Beide rechnen IEEE-754-Doubles mit
-  denselben Grundrechenarten in derselben Reihenfolge; `glatt` fängt die Reste vor dem Runden. Der
-  Fall `raeume_gleitkomma` hält das fest.
+  denselben Grundrechenarten in derselben Reihenfolge; `glatt` fängt die Reste vor dem Runden. Die
+  Fälle `raeume_gleitkomma` und `flaeche_gleitkomma_glatt` halten das fest.
 - **Der Vertrag friert die Form des Ergebnisses ein** → Sie ist seit LLH-1520 in der Fallsammlung
   festgehalten und in der Oberfläche im Einsatz. Neue Größen kommen als neue Felder.
 - **`deny_unknown_fields` macht ein späteres optionales Feld für alte Server zum Fehler** → Das

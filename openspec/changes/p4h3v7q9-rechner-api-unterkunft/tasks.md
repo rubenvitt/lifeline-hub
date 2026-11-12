@@ -7,7 +7,7 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
 
 ## 1. Testhelfer für signierte Aufrufe (D8)
 
-- [ ] 1.1 `tests/common/maschine.rs` anlegen und in `tests/common/mod.rs` als Untermodul
+- [x] 1.1 `tests/common/maschine.rs` anlegen und in `tests/common/mod.rs` als Untermodul
   eintragen: `schluessel`, `senden`, `einloesen`, `jetzt`, `signiert`, `angebunden` unverändert
   aus `tests/maschinenzugang.rs` übernehmen, dazu `signiert_mit_body` (signiert über den Body und
   sendet ihn). `tests/maschinenzugang.rs` nutzt die Helfer von dort. Eigener `refactor`-Commit.
@@ -15,22 +15,22 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
 
 ## 2. Basis und Rechenkern (D2, D5)
 
-- [ ] 2.1 `src/unterkunft/mod.rs`: `Basiswert` liest zusätzlich `bezeichnung`, `gruppe` und
+- [x] 2.1 `src/unterkunft/mod.rs`: `Basiswert` liest zusätzlich `bezeichnung`, `gruppe` und
   `einheit`; `zelttypen()` liefert Typ und Bezeichnung aus der Datei.
   Prüfen: Unit-Test in `src/unterkunft/tests.rs` (erst rot): jeder Basiswert hat eine nicht leere
   Bezeichnung, Gruppe und Einheit; `zelttypen()` nennt `sg20`, `sg30`, `sg40`, `sg50` in dieser
   Reihenfolge.
-- [ ] 2.2 `src/unterkunft/rechner.rs` anlegen und in `mod.rs` eintragen: Typen `Eingabe` (Enum je
+- [x] 2.2 `src/unterkunft/rechner.rs` anlegen und in `mod.rs` eintragen: Typen `Eingabe` (Enum je
   Weg, gesamt/getrennt im Typ), `Raum`, `Abzug`, `Richtwerte`, `Ergebnis` und die Rundungshelfer
   `glatt`, `auf`, `ab`, `eine_stelle`, `zwei_stellen`, `ganz`; dazu `nutzflaeche` und `zeltmix`.
   Prüfen: Unit-Tests (erst rot) für `nutzflaeche` (nie negativ, zwei Stellen, 0,3 × 40 ergibt 12)
   und `zeltmix` (15 Personen: Rest ins kleinste passende Zelt; 0 Personen: leer).
-- [ ] 2.3 `rechne(&Eingabe, &Richtwerte) -> Ergebnis` nach `rechnerKern.ts`: Gruppen aus dem Weg,
+- [x] 2.3 `rechne(&Eingabe, &Richtwerte) -> Ergebnis` nach `rechnerKern.ts`: Gruppen aus dem Weg,
   Zelte je Typ und Zeltmix je Gruppe, Material, Sanitär, Gesundheit, Versorgung, Verpflegung.
   Prüfen: Unit-Tests der Spec-Szenarien direkt am Kern (erst rot): 50 Männer und 50 Frauen
   (400 m², 100 Feldbetten, 6 Toiletten, 4 Urinale, 20 Waschplätze, 6 Duschen, 2 500 l Wasser);
   zwei Räume mit Abzug (48 + 22 = 70 Plätze).
-- [ ] 2.4 Wächter: jeder Schlüssel der Basis wird in `src/unterkunft/rechner.rs` gelesen
+- [x] 2.4 Wächter: jeder Schlüssel der Basis wird in `src/unterkunft/rechner.rs` gelesen
   (Textsuche über die Datei, Zeltschlüssel über ihr Muster `zelt_<typ>_…`), als Gegenstück zu
   `richtwerte.guard.test.ts`.
   Prüfen: Probe mit einem vorübergehend aus dem Kern entfernten Schlüssel macht den Test rot;
@@ -38,13 +38,13 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
 
 ## 3. v1-Schemas, Prüfung und Parität (D3, D4)
 
-- [ ] 3.1 `src/public_api/rechner.rs` anlegen und in `public_api/mod.rs` eintragen: `wire_enum!`
+- [x] 3.1 `src/public_api/rechner.rs` anlegen und in `public_api/mod.rs` eintragen: `wire_enum!`
   für Weg, Gruppe, Belegung, Zelttyp und Herkunft, Anfrage `UnterkunftRequest`
   (`deny_unknown_fields` auf jeder Ebene, Zahlen als `f64`), Antwort-Typen für das Ergebnis.
   Einträge in `tests/enum_wire_kontrakt.rs`.
   Prüfen: `cargo test --test enum_wire_kontrakt` grün; Unit-Test: der Zelttyp-Enum nennt genau die
   `zelttypen` der Basis.
-- [ ] 3.2 Prüfung der Anfrage zur Kern-`Eingabe`: erst jedes Feld (400 `invalid_field` mit
+- [x] 3.2 Prüfung der Anfrage zur Kern-`Eingabe`: erst jedes Feld (400 `invalid_field` mit
   Feldname), dann der Zusammenhang (422 `unprocessable`). Grenzen als Konstanten in
   `src/unterkunft/rechner.rs` (`RAEUME_MAX`, `ABZUEGE_MAX`, `MASS_MAX_M`, `FLAECHE_MAX_M2`,
   `ZELTE_JE_TYP_MAX`, `BEZEICHNUNG_MAX`), Personen über `betreuung::MAX_PERSONEN`.
@@ -56,17 +56,21 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
   - 422: Block fehlt, Block eines anderen Wegs, `gesamt` neben `maenner`, `gesamt` bei Trennung,
     Trennung ohne Gruppe, Raum ohne `belegung` bei Trennung, Raum mit `belegung` ohne Trennung.
   - gültig: ohne Trennung nur `maenner` und `frauen`; leere Raumliste; `personen.gesamt = 0`.
-- [ ] 3.3 Paritätstest über `tests/fixtures/unterkunft/faelle.json`: je Fall `eingabe` als
+- [x] 3.3 Paritätstest über `tests/fixtures/unterkunft/faelle.json`: je Fall `eingabe` als
   `UnterkunftRequest` einlesen, prüfen, mit Basis plus `richtwerte` rechnen, als `ergebnis`
   serialisieren und mit `erwartet` vergleichen (Zahlen als `f64`, sonst wörtlich, Listen in
   Reihenfolge). Der Test verlangt mindestens 24 Fälle.
   Prüfen: alle Fälle grün. Mutationsproben, jede einzeln und danach zurückgesetzt, machen den Test
   rot: `auf` statt `ab` bei den Plätzen je Raum; Runden vor statt nach dem Summieren der Gruppen
-  bei den Toiletten; `glatt` entfernt (Fall `raeume_gleitkomma`).
+  bei den Toiletten; `glatt` entfernt.
+  Befund beim Umsetzen: Ohne `glatt` blieb die Sammlung grün; der Fall `raeume_gleitkomma` braucht
+  die Glättung nicht (die Nutzfläche ist schon auf zwei Stellen gerundet). Neu ist der Fall
+  `flaeche_gleitkomma_glatt` (220 m² durch 4,4 m², erwartetes Ergebnis aus dem TS-Kern); mit ihm
+  ist die Probe rot. Die Sammlung hat damit 25 Fälle.
 
 ## 4. Routen (D5, D6)
 
-- [ ] 4.1 `POST /api/v1/rechner/unterkunft` in `src/public_api/rechner.rs` und in
+- [x] 4.1 `POST /api/v1/rechner/unterkunft` in `src/public_api/rechner.rs` und in
   `public_api::router()`: Body aus `client.body`, Prüfung aus 3.2, Org-Werte des Zugangs,
   Werte der Anfrage über `unterkunft::pruefe`, Antwort `UnterkunftResponse` (`ergebnis`,
   `richtwerte` mit `wert` und `herkunft`, `stand`) signiert über `client.antwort`.
@@ -82,13 +86,13 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
   - Leerer Body und kaputtes JSON: 400 `invalid_field`.
   - Zugang nur mit `lage:read`: 403 `missing_scope`; ohne Anmeldung: 401 `unauthorized`.
   - Nach einer Rechnung mit eigenem Wert ist `org_unterkunft_richtwert` unverändert.
-- [ ] 4.2 `GET /api/v1/rechner/unterkunft/richtwerte`: `UnterkunftRichtwerteResponse` mit `stand`,
+- [x] 4.2 `GET /api/v1/rechner/unterkunft/richtwerte`: `UnterkunftRichtwerteResponse` mit `stand`,
   `zelttypen` und je Richtwert `schluessel`, `bezeichnung`, `gruppe`, `einheit`, `min`, `max`,
   `ganzzahl`, `basis`, `wert`, `herkunft`.
   Prüfen in `tests/rechner_api.rs` (erst rot): Org-Wert `wasser_je_person_l = 30` ergibt Basis 25,
   Wert 30, Herkunft `org`, Einheit `l`, Grenzen 5 und 500; vier Zelttypen mit Bezeichnung; kein
   Feld `quelle`; ohne Scope 403.
-- [ ] 4.3 Vertrag nachziehen: `#[utoipa::path]` beider Routen mit `security(("machine" = []))`,
+- [x] 4.3 Vertrag nachziehen: `#[utoipa::path]` beider Routen mit `security(("machine" = []))`,
   Tag „Rechner“, Antworten 400, 401, 403, 422, 429 und `default`; Schemas in `PublicApiDoc`;
   `src/public_api/description.md` (Namenstabelle: Pfade `rechner`, `unterkunft`, `richtwerte`;
   Felder `weg`, `trennung`, `richtwerte`, `herkunft`).
@@ -98,21 +102,21 @@ Vor jeder Änderung `scripts/adr-fuer.sh <pfad>…`. Cargo-Läufe mit dem Bauzie
 
 ## 5. Doku und Anleitungen
 
-- [ ] 5.1 `docs/api/maschinenzugang.md`: Zeile `rechner:use` nennt die beiden Routen; kurzer
+- [x] 5.1 `docs/api/maschinenzugang.md`: Zeile `rechner:use` nennt die beiden Routen; kurzer
   Abschnitt „Rechner Unterkunft“ mit einer Beispielanfrage (ein Fall der Fallsammlung), den
   Ebenen der Richtwerte und dem Hinweis, dass `einsatz_id` noch fehlt.
   Prüfen: die Beispielanfrage steht wörtlich als Fall in `tests/rechner_api.rs` und ergibt 200.
-- [ ] 5.2 Architektur `docs/architektur/05-bausteinsicht.md`: Zeile `src/unterkunft` nennt den
+- [x] 5.2 Architektur `docs/architektur/05-bausteinsicht.md`: Zeile `src/unterkunft` nennt den
   Rechenkern, Zeile `src/public_api` die beiden Routen.
   Prüfen: `scripts/check-architektur.sh` grün.
-- [ ] 5.3 Anwenderdoku: `docs/anwender/kapitel/anbindungen.md` (das Recht „Rechner nutzen“ öffnet
+- [x] 5.3 Anwenderdoku: `docs/anwender/kapitel/anbindungen.md` (das Recht „Rechner nutzen“ öffnet
   jetzt die Unterkunftsrechnung mit den Richtwerten der Organisation; der Satz „Heute nutzt ein
   Fremdsystem nur die Prüfung seiner Anmeldung“ wird berichtigt) und
   `docs/anwender/kapitel/betreuung.md` (Abschnitt „Unterkunftsrechner“: Fremdsysteme rechnen über
   eine Anbindung mit denselben Regeln und den Werten der Organisation, nicht mit denen eines
   Einsatzes).
   Prüfen: die Wächter der Anwenderdoku aus `docs/anwender/AGENTS.md` sind grün.
-- [ ] 5.4 `frontend/src/betreuung/AGENTS.md`, Punkt „Unterkunftsrechner“: zwei Kerne
+- [x] 5.4 `frontend/src/betreuung/AGENTS.md`, Punkt „Unterkunftsrechner“: zwei Kerne
   (`rechnerKern.ts`, `src/unterkunft/rechner.rs`), eine Fallsammlung für beide, die API prüft
   streng, Ebenen der API ohne Einsatz. Kommentare nachziehen, die den Rust-Kern als „später“
   ankündigen: `src/unterkunft/mod.rs`, `rechnerKern.ts`, `rechnerFixture.test.ts`, `_zweck` in
