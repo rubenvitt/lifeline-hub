@@ -103,6 +103,12 @@ pub struct MeldenAnfrage {
     /// Bis zu diesem Stand der erreichten Seite hat die meldende Seite Akten übernommen.
     #[serde(default)]
     pub fuehrung_bis: i64,
+    /// Bis zu diesem eigenen Stand hat die erreichte Seite nach dem Wissen der meldenden Seite
+    /// schon quittiert (ihr `fuehrung_gesendet_bis`, LLH-1708, design.md D5 der Change
+    /// `xi5ugyt8-fuehrung-stand-nach-restore`). Liegt die erreichte Seite darunter, wurde sie aus
+    /// einer Sicherung zurückgespielt. 0 vor LLH-1708.
+    #[serde(default)]
+    pub fuehrung_gesendet_bis: i64,
 }
 
 /// Eine Org in der Antwort.
@@ -468,6 +474,7 @@ pub async fn melden_einmal(pool: &SqlitePool, kopplung: &KopplungZeile) -> Resul
         datentraeger_verschluesselt: datentraeger,
         fuehrung: fuehrung_ausgang.akten,
         fuehrung_bis: fuehrung_empfangen,
+        fuehrung_gesendet_bis: fuehrung_gesendet,
     };
     let jetzt = crate::zeit::jetzt();
     let ergebnis =
@@ -857,6 +864,13 @@ pub async fn handle_meldung(
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
             fuehrung_repo::ensure_akten(conn).await?;
+            // Verlorene Quittung (LLH-1708, D5): Liegt der eigene Empfangsstand unter dem, was die
+            // meldende Seite als quittiert führt, wurde diese Seite zurückgespielt. Dann gilt die
+            // alte Quittung, auch wenn diese Meldung schon eine neue Akte bringt; die meldende
+            // Seite setzt ihren Sendestand darauf zurück und schickt die verlorenen Akten erneut.
+            let empfangen_vorher = fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
+                .await?
+                .1;
             let eingang = fuehrung_austausch::apply_eingang(
                 conn,
                 kopplung,
@@ -877,9 +891,13 @@ pub async fn handle_meldung(
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
             fuehrung_folgen = eingang.folgen;
-            fuehrung_bis = fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
-                .await?
-                .1;
+            fuehrung_bis = if empfangen_vorher < anfrage.fuehrung_gesendet_bis {
+                empfangen_vorher
+            } else {
+                fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
+                    .await?
+                    .1
+            };
             fuehrung_ausgang = fuehrung_austausch::build_ausgang(
                 conn,
                 kopplung,
@@ -940,7 +958,17 @@ mod tests {
             datentraeger_verschluesselt: false,
             fuehrung: Vec::new(),
             fuehrung_bis: 0,
+            fuehrung_gesendet_bis: 0,
         }
+    }
+
+    #[test]
+    fn anfrage_ohne_sendestand_liest_sich_mit_null() {
+        // Eine meldende Seite vor LLH-1708 schickt `fuehrung_gesendet_bis` nicht (D4).
+        let mut v = serde_json::to_value(anfrage(&["h/1"], &[])).unwrap();
+        v.as_object_mut().unwrap().remove("fuehrung_gesendet_bis");
+        let a: MeldenAnfrage = serde_json::from_value(v).unwrap();
+        assert_eq!(a.fuehrung_gesendet_bis, 0);
     }
 
     #[test]

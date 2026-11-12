@@ -4351,3 +4351,37 @@ async fn zurueckgespielt_elw_akten_fliessen_in_beide_richtungen() {
     nur_melden(&elw).await;
     assert!(has_akte(&elw, &hub, h).await, "Hub → ELW");
 }
+
+#[tokio::test]
+async fn zurueckgespielt_hub_verlorene_akte_kommt_auch_wenn_der_elw_inzwischen_aenderte() {
+    // Review B1, design.md D5: Die erste Meldung nach dem Zurückspielen trägt schon eine neue Akte;
+    // ohne den Sendestand in der Meldung quittierte der Hub sie, und die verlorene käme nie.
+    let (hub, elw) = gekoppelt().await;
+    let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    let (stand, gesendet, empfangen): (i64, i64, i64) = sqlx::query_as(
+        "SELECT i.fuehrung_stand, k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis \
+         FROM instanz_identitaet i, instanz_kopplung k",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    let nach = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    zurueckspielen(&hub, stand, gesendet, empfangen).await;
+    sqlx::query("DELETE FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{nach}-%", elw.kennung))
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    // Während des Ausfalls arbeitet der ELW weiter.
+    let waehrend = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&hub, &elw, vor).await);
+    assert!(has_akte(&hub, &elw, waehrend).await);
+    assert!(
+        has_akte(&hub, &elw, nach).await,
+        "die verlorene Akte kommt erneut"
+    );
+}
