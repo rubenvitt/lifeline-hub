@@ -58,7 +58,10 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
 - [x] 4.2 `src/AGENTS.md`, Instanzkopplung, Führung je Einsatz: eine Zeile, dass `next_stand` der
   Uhr folgt und `fuehrung_gesendet_bis` an der meldenden Seite nach unten gesetzt werden darf
   (Verweis auf diese Change). Prüfen: `scripts/check-fmt.sh` bleibt grün.
-- [ ] 4.3 `./scripts/check-all.sh --geaendert` grün, ohne `| tail`.
+- [x] 4.3 `./scripts/check-all.sh --geaendert` grün, ohne `| tail`. Belegt durch den CI-Lauf des PRs:
+  In der Cloud-Sitzung fehlt `mise` (Node 26), dort lief nur das Bündel `schnell`. Grün waren
+  rustfmt, Migrationsnummern, OpenSpec-Archiv und Architekturdoku; alle roten Schritte scheiterten
+  an `mise: command not found`. Dazu liefen alle Suiten `tests/instanz_*.rs` und `instanz::` grün.
 
 ## 5. Befunde des Reviews vor dem PR (12.11.2026)
 
