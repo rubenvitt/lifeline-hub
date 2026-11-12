@@ -349,9 +349,9 @@ ADR-0029 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   auslöst, trägt noch den alten Pin; „Zertifikat bestätigt“ zeigt die erreichte Seite ab der
   nächsten Meldung.
 - **12.11.2026, Admin-Spur.** Zwei neue Aktionen (`instanz_zertifikat_gewechselt`,
-  `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0336; sie baut
-  auf dem Neubau des Maschinenzugangs von `alpha`, 0334, auf, damit dessen Aktionen und die der
-  Archiv-Spur im CHECK bleiben).
+  `instanz_adresse_geaendert`) brauchen den Neubau von `admin_audit` (Migration 0337; sie baut
+  auf dem letzten Neubau von `alpha`, 0335, auf, damit dessen Aktionen, die des Maschinenzugangs
+  und die der Archiv-Spur im CHECK bleiben).
 - **12.11.2026, D4: eigene reine Funktion statt Parameter.** Die Regel steht als
   `austausch::entscheide_vor_ort(bisher, neu, sender, ich)` neben `entscheide`, nicht als
   zusätzlicher Parameter: Sie gilt vor allen richtungsabhängigen Zweigen und unabhängig von der
@@ -398,7 +398,8 @@ ADR-0029 „Auf einer Direktkopplung beglaubigt eine signierte Aussage das TLS-Z
   Tooltip). Die Liste „Im Netz gefunden“ sucht auf Knopfdruck als Mutation, ohne eigenen
   Query-Key: sie ist ein einmaliger Abruf, kein Zustand der Seite.
 - **12.11.2026, Migrationen umgelegt.** `alpha` brachte 0329/0330 (Archiv, LLH-1494); die
-  Migrationen dieser Change liegen jetzt auf 0335 (Art, Zertifikat), 0336 (Spur) und 0337
-  (Ursprung); 0331 bis 0334 brachte `alpha` später noch (Bruchstelle LLH-1657, Hinweise LLH-1495,
-  Maschinenzugang LLH-1652 samt eigenem Neubau von `admin_audit`, dessen Aktionen 0336 übernimmt). Der Neubau von
+  Migrationen dieser Change liegen jetzt auf 0336 (Art, Zertifikat), 0337 (Spur) und 0338
+  (Ursprung); 0331 bis 0335 brachte `alpha` später noch (Bruchstelle LLH-1657, Hinweise LLH-1495,
+  Maschinenzugang LLH-1652 und Archiv einspielen LLH-1494, beide mit eigenem Neubau von
+  `admin_audit`, deren Aktionen 0337 übernimmt). Der Neubau von
   `admin_audit` übernimmt die Liste aus `alpha` samt der vier Archiv-Aktionen.
