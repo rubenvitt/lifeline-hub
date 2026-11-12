@@ -3522,3 +3522,274 @@ async fn ohne_schreibrecht_kein_nachreichen() {
     }
     assert_eq!(band_zaehlt(&elw, e).await, 2);
 }
+
+// ── Personen samt Verlauf nachreichen (LLH-1657) ─────────────────────────────────────────────
+
+/// Wie [`bruch_nach_notuebernahme`], nur schreibt Erika nach dem Bruch Personen: eine neue Person
+/// mit Erst-Sichtung und PAT-Nummer, an ihr eine zweite Sichtung und eine Maßnahme, die sie wieder
+/// aufhebt, und eine Sichtung an einer Person, die der Hub schon kennt. (Hub, ELW, Einsatz am
+/// ELW, Einsatz am Hub, Erikas Cookie am ELW.)
+async fn bruch_mit_personen() -> (Instanz, Instanz, i64, i64, String) {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, erika) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    let bekannt = common::person_anlegen(&elw.app, &erika, e, r#"{"name":"Bekannt"}"#).await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    mitglied_werden(&hub, h).await;
+
+    let schreibe = |pfad: String, body: Value| {
+        let (app, erika) = (elw.app.clone(), erika.clone());
+        async move {
+            let (s, v) = common::anfrage_json(&app, "POST", &pfad, &erika, Some(&body)).await;
+            assert_eq!(s, StatusCode::CREATED, "{pfad}: {v}");
+            v
+        }
+    };
+    let neu = schreibe(
+        format!("/api/einsaetze/{e}/personen"),
+        json!({"name": "Muster", "vorname": "Max", "sichtung": "sk2", "pat_nummer": "PAT-77",
+               "client_id": "bruch-person-1"}),
+    )
+    .await;
+    let p = neu["id"].as_i64().unwrap();
+    schreibe(
+        format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        json!({"kategorie": "sk1", "client_id": "bruch-sichtung-1"}),
+    )
+    .await;
+    let m = schreibe(
+        format!("/api/einsaetze/{e}/personen/{p}/massnahmen"),
+        json!({"art": "blutstillung", "client_id": "bruch-massnahme-1"}),
+    )
+    .await;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{e}/personen/{p}/massnahmen/{}/aufheben",
+            m["id"].as_i64().unwrap()
+        ),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    schreibe(
+        format!("/api/einsaetze/{e}/personen/{bekannt}/sichtung"),
+        json!({"kategorie": "sk3", "client_id": "bruch-sichtung-bekannt"}),
+    )
+    .await;
+
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert!(ist_spiegel(&elw, e).await);
+    assert_eq!(bruch_offen(&elw, e).await, 0, "geklärt");
+    (hub, elw, e, h, erika)
+}
+
+/// Die Personen eines Einsatzes mit Namen (Name, Kennung).
+async fn personen_mit_namen(i: &Instanz, einsatz: i64, name: &str) -> Vec<i64> {
+    sqlx::query_scalar("SELECT id FROM einsatz_person WHERE einsatz_id = ? AND name = ?")
+        .bind(einsatz)
+        .bind(name)
+        .fetch_all(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn sichtungen(i: &Instanz, person: i64) -> Vec<String> {
+    sqlx::query_scalar("SELECT kategorie FROM person_sichtung WHERE person_id = ? ORDER BY id")
+        .bind(person)
+        .fetch_all(&i.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn person_samt_verlauf_kommt_genau_einmal_an_der_richtigen_person_an() {
+    let (hub, elw, e, h, erika) = bruch_mit_personen().await;
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let person = liste
+        .iter()
+        .find(|l| l["tabelle"] == "einsatz_person")
+        .unwrap_or_else(|| panic!("die neue Person ist eine Erfassung: {liste:?}"));
+    assert_eq!(person["antrag_art"], "person", "{person}");
+    assert_eq!(person["kurz"], "Muster, Max");
+    assert!(
+        person["folgen"].as_i64().unwrap() >= 3,
+        "Sichtungen und Maßnahme hängen an ihr: {person}"
+    );
+    let sichtung_bekannt = liste
+        .iter()
+        .find(|l| l["tabelle"] == "person_sichtung")
+        .unwrap_or_else(|| {
+            panic!("die Sichtung an der bekannten Person steht für sich: {liste:?}")
+        });
+    assert_eq!(sichtung_bekannt["antrag_art"], "sichtung");
+    assert_eq!(sichtung_bekannt["kurz"], "SK III");
+    let vorher = band_zaehlt(&elw, e).await;
+
+    // Die Person stellen, zweimal: derselbe Antrag. Die Zeile bleibt, bis die Kette durch ist.
+    let pfad = format!(
+        "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+        person["id"].as_i64().unwrap()
+    );
+    let (s, v1) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v1}");
+    let (s, v2) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v2}");
+    assert_eq!(v1["antrag"]["id"], v2["antrag"]["id"]);
+    assert_eq!(band_zaehlt(&elw, e).await, vorher - 1);
+    let wartend = bruchstelle(&elw, &erika, e).await;
+    let zeile = wartend.iter().find(|l| l["id"] == person["id"]).unwrap();
+    assert_eq!(zeile["nachgereicht"], true, "{zeile}");
+    assert!(zeile["folgen_offen"].as_i64().unwrap() >= 3, "{zeile}");
+    assert!(
+        zeile.get("antrag_art").is_none(),
+        "nicht noch einmal stellbar"
+    );
+
+    // Die bekannte Person: Sichtung sofort stellbar.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{e}/bruchstelle/{}/antrag",
+            sichtung_bekannt["id"].as_i64().unwrap()
+        ),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+
+    // Antrag der Person → Quittung → Person zurück → Kette stellt → Hub führt aus.
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+
+    let am_hub = personen_mit_namen(&hub, h, "Muster").await;
+    assert_eq!(am_hub.len(), 1, "genau einmal");
+    let neu = am_hub[0];
+    assert_eq!(
+        sichtungen(&hub, neu).await,
+        ["sk2", "sk1"],
+        "beide Sichtungen an der neuen Person"
+    );
+    let (pat, status): (Option<String>, String) =
+        sqlx::query_as("SELECT pat_nummer, status FROM einsatz_person WHERE id = ?")
+            .bind(neu)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(pat.as_deref(), Some("PAT-77"), "K2");
+    assert_eq!(
+        status, "betroffen",
+        "Status wie am ELW, mit der Anlage übernommen"
+    );
+    let massnahmen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_massnahme WHERE person_id = ? AND art = 'blutstillung'",
+    )
+    .bind(neu)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(massnahmen, 1, "K4: auch die aufgehobene geht mit");
+    let notizen: Vec<String> =
+        sqlx::query_scalar("SELECT text FROM person_verlaufsnotiz WHERE person_id = ?")
+            .bind(neu)
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(notizen.len(), 1, "eine Nachreich-Notiz: {notizen:?}");
+    assert!(
+        notizen[0].starts_with("Als R-002 erfasst, nach der Notübernahme nachgereicht."),
+        "K3: {notizen:?}"
+    );
+    assert!(
+        notizen[0].contains("Aufgehoben: Maßnahme Blutstillung"),
+        "K4: {notizen:?}"
+    );
+    let bekannt = personen_mit_namen(&hub, h, "Bekannt").await;
+    assert_eq!(
+        sichtungen(&hub, bekannt[0]).await,
+        ["sk3"],
+        "an der bekannten Person"
+    );
+
+    // Liste leer, Band null; ein weiterer Durchlauf und ein erneutes Stellen ändern nichts.
+    assert!(
+        bruchstelle(&elw, &erika, e).await.is_empty(),
+        "{:?}",
+        bruchstelle(&elw, &erika, e).await
+    );
+    assert_eq!(band_zaehlt(&elw, e).await, 0);
+    let (s, _) = common::anfrage_json(&elw.app, "POST", &pfad, &erika, Some(&json!({}))).await;
+    assert!(
+        s == StatusCode::ACCEPTED || s == StatusCode::CONFLICT,
+        "{s}"
+    );
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert_eq!(personen_mit_namen(&hub, h, "Muster").await.len(), 1);
+    assert_eq!(sichtungen(&hub, neu).await.len(), 2);
+    let notizen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM person_verlaufsnotiz WHERE person_id = ?")
+            .bind(neu)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(notizen, 1);
+}
+
+#[tokio::test]
+async fn ein_abgelehnter_eintrag_der_kette_kommt_als_eigene_zeile_zurueck() {
+    let (hub, elw, e, h, erika) = bruch_mit_personen().await;
+    // Die Maßnahme so verfälschen, dass der Hub sie ablehnt (unbekannte Art: 400).
+    sqlx::query(
+        "UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.art', 'unbekannt') \
+         WHERE einsatz_id = ? AND art = 'person_massnahme'",
+    )
+    .bind(e)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["gestellt"], 2, "Person und Sichtung der bekannten: {v}");
+    for _ in 0..5 {
+        abgleichen(&elw).await;
+    }
+    let neu = personen_mit_namen(&hub, h, "Muster").await;
+    assert_eq!(neu.len(), 1);
+    assert_eq!(
+        sichtungen(&hub, neu[0]).await,
+        ["sk2", "sk1"],
+        "der Rest der Kette"
+    );
+    let liste = bruchstelle(&elw, &erika, e).await;
+    assert_eq!(liste.len(), 1, "nur die Maßnahme ist zurück: {liste:?}");
+    assert_eq!(liste[0]["tabelle"], "person_massnahme");
+    assert!(liste[0]["grund"].as_str().is_some(), "{liste:?}");
+    assert_eq!(band_zaehlt(&elw, e).await, 1);
+}

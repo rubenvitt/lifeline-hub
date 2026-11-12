@@ -501,16 +501,28 @@ Art, Absender und Inhalt. Was zu einer Erfassung gehört (der ETB-Eintrag einer 
 nicht eigens da, sondern als „+ n Zeilen“ an ihr. Den Inhalt sieht nur, wer das Modul der Zeile
 nutzen darf.
 
-- **Als Antrag stellen** gibt es für ETB-Einträge und Meldungen. Der Antrag geht im Namen
-  dessen, der klickt, an die führende Installation; Wortlaut und Zeit bleiben, die laufende
-  Nummer im ETB vergibt die führende. Er kommt dort genau einmal an, auch wenn er zweimal
-  gestellt wird. Lehnt die führende ihn ab, steht die Erfassung wieder in der Liste.
+- **Als Antrag stellen** gibt es für ETB-Einträge, Meldungen und Personen sowie für Einträge an
+  einer Person (Sichtung, Verbleib, Notiz, Transport, Anlass, Maßnahme, Verletzung). Der Antrag
+  geht im Namen dessen, der klickt, an die führende Installation; Wortlaut und Zeit bleiben, die
+  laufende Nummer im ETB vergibt die führende. Er kommt dort genau einmal an, auch wenn er
+  zweimal gestellt wird. Lehnt die führende ihn ab, steht die Erfassung wieder in der Liste.
+- **Personen** kommen samt Verlauf: Gestellt wird die Person, ihre Einträge folgen von selbst in
+  der Reihenfolge ihrer Zeit, sobald die Person bei der führenden Installation angekommen ist.
+  Das Band zählt die gestellte Person nicht mehr; in der offenen Liste steht bis dahin „n Einträge
+  folgen“. Danach bekommt die Person eine Notiz, unter welcher Nummer sie vorher erfasst war und
+  was dabei aufgehoben oder bestätigt wurde. Lehnt die führende einen Eintrag ab, steht nur dieser
+  wieder in der Liste, mit Grund. Einträge an einer Person, die die führende schon kennt, stehen
+  einzeln da. Eine Person steht immer für sich, auch an einer neuen Meldung: Ist die Meldung noch
+  offen, zuerst sie stellen oder verwerfen; verworfen kommt die Person ohne sie an. Haushalt und
+  Aufnahme in eine UHS gehen nicht mit; beide stehen als eigene Zeilen da, die Notiz nennt die
+  fehlende Haushaltszuordnung. Beide Installationen brauchen dafür denselben Stand: Eine ältere
+  führende übernimmt PAT-Nummer, Kontamination, Kostform und Unverträglichkeiten nicht.
 - **Alle stellen** erscheint ab zwei solchen Erfassungen und stellt sie in der Reihenfolge ihrer
   Zeit. Was noch nicht geht, etwa eine Meldung, deren Bezug die führende noch nicht kennt, bleibt
   in der Liste; der Grund steht neben dem Knopf.
-- **Verwerfen** legt eine Erfassung nach der Rückfrage „Nicht nachreichen?“ ab. Alles andere
-  als ETB-Einträge und Meldungen (Personen, Lagekarte, Kräfte …) lässt sich nur so erledigen;
-  es ist hier gesichert, die führende Installation erfasst es bei Bedarf neu.
+- **Verwerfen** legt eine Erfassung nach der Rückfrage „Nicht nachreichen?“ ab. Was sich nicht
+  stellen lässt (Lagekarte, Kräfte, eine stornierte Person …), lässt sich nur so erledigen; es
+  ist hier gesichert, die führende Installation erfasst es bei Bedarf neu.
 
 Die Zahl im Band zählt nur, was weder gestellt noch verworfen ist. Stellen und Verwerfen
 braucht Schreibrecht im Einsatz. Ist der Abgleich beendet oder der Einsatz abgeschlossen, bleibt

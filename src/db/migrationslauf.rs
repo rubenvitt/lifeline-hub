@@ -24,7 +24,7 @@
 use std::borrow::Cow;
 
 use sqlx::migrate::{MigrateError, Migration, Migrator};
-use sqlx::{SqliteConnection, SqlitePool};
+use sqlx::SqlitePool;
 
 /// Wie eine Migration eingespielt wird.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,22 +83,6 @@ fn schaltet_fk_aus(zeilen: &[String]) -> bool {
     })
 }
 
-/// `Migrator::run_to(&mut *conn)` lässt den Compiler an den höherrangigen Lebensdauern von
-/// `Acquire` scheitern, sobald ein Aufrufer in einem `tokio::spawn` migriert (Archivbau im
-/// Purge-Scheduler, LLH-1494: „Send is not general enough“). `run_direct` nimmt die Verbindung ohne
-/// `Acquire` und ist in sqlx genau dafür da; `skip = false` wie in `run`/`run_to`.
-async fn bis(
-    migrator: &Migrator,
-    ziel: i64,
-    conn: &mut SqliteConnection,
-) -> Result<(), MigrateError> {
-    migrator.run_direct(Some(ziel), conn, false).await
-}
-
-async fn alle(migrator: &Migrator, conn: &mut SqliteConnection) -> Result<(), MigrateError> {
-    migrator.run_direct(None, conn, false).await
-}
-
 /// Spielt alle ausstehenden Migrationen aus `quelle` ein, Marker-Migrationen atomar (s. Modul).
 pub(super) async fn einspielen(quelle: Migrator, pool: &SqlitePool) -> Result<(), MigrateError> {
     let einteilung: Vec<(i64, Rahmen)> = quelle.iter().map(|m| (m.version, rahmen(m))).collect();
@@ -133,20 +117,25 @@ pub(super) async fn einspielen(quelle: Migrator, pool: &SqlitePool) -> Result<()
         "PRAGMA foreign_keys = ON"
     };
 
+    // `run_direct` statt `run`/`run_to`: deren `Acquire<'a>` macht den Lauf in einem
+    // `tokio::spawn` (Archivbau im Purge-Takt) zu „`Send` is not general enough“; sqlx bietet
+    // `run_direct` genau dafür an. Gleiches Verhalten: `run_to` ruft es mit derselben Verbindung.
     let ergebnis = async {
         for (version, r) in &einteilung {
             if *r != (Rahmen::Atomar { fk_aus: true }) {
                 continue;
             }
-            bis(&migrator, version - 1, &mut conn).await?;
+            migrator
+                .run_direct(Some(version - 1), &mut *conn, false)
+                .await?;
             sqlx::query("PRAGMA foreign_keys = OFF")
                 .execute(&mut *conn)
                 .await?;
-            let umbau = bis(&migrator, *version, &mut conn).await;
+            let umbau = migrator.run_direct(Some(*version), &mut *conn, false).await;
             sqlx::query(zuruecksetzen).execute(&mut *conn).await?;
             umbau?;
         }
-        alle(&migrator, &mut conn).await
+        migrator.run_direct(None, &mut *conn, false).await
     }
     .await;
 
