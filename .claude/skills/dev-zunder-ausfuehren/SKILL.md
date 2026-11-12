@@ -286,9 +286,39 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   `scripts/AGENTS.md`, „Zwei Stufen im PR“). Braucht die Änderung e2e-Rückmeldung, bevor der
   Mensch Auto-Merge einschaltet (UI, Abläufe, Backend-Verhalten), setzt du am eigenen PR das Label
   `e2e`, oder du fährst vorher lokal `./scripts/check-all.sh --geaendert`.
+- **„Baut mit Ziel-Branch“ rot** (Pflicht-Check an fertigen PRs, LLH-1849): Zusammen mit dem
+  aktuellen `alpha` kompiliert der PR nicht, meist weil ein inzwischen gemergter PR etwas
+  geändert hat, das dein PR noch alt benutzt. `alpha` in den Branch mergen (kein Rebase),
+  anpassen, pushen. Die Fehlerausgabe steht im Check.
 - Wird der Task verworfen statt umgesetzt → **Status: `dropped`**, `release_task`
 - Danach: **Abschlussmeldung an den Menschen** (s. u.) — letzter Schritt, nach Merge und
   Board-Status.
+
+## alpha rot: wenn der Stau-Wächter weckt (LLH-1849)
+
+Schlägt die CI auf `alpha` fehl, schreibt der Stau-Wächter an jeden offenen PR gegen `alpha` einen
+Hinweis (Marke `stau-waechter-alpha`). Er bestimmt **höchstens einen** Zuständigen, damit nicht mehrere
+Sitzungen denselben Fix bauen: Am 12.11.2026 waren es vier, und ihre Varianten kollidierten danach
+in jedem PR. Mechanik: `scripts/AGENTS.md`, „Stau-Wächter“.
+
+- **Dein PR ist zuständig** (Hinweis „dieser PR ist zuständig“): Erst prüfen, ob der Fehler im
+  Code liegt. Ist es ein Ausfall oder ein wackliger Test, den fehlgeschlagenen Job neu starten;
+  ein grüner Lauf beendet den Befund. Sonst **sofort** einen eigenen Branch von `alpha` anlegen
+  und einen PR gegen `alpha` mit dem Label **`alpha-rot`** öffnen, als Entwurf genügt, noch vor
+  dem Fix. Das Label belegt den Fix: der Wächter und die übrigen PRs erkennen ihn daran, und der
+  Auftrag wandert nicht nach einer Stunde weiter, während du auf die Antwort des Menschen
+  wartest (Entscheidung 12.11.2026). Dann den Fix in diesem PR bauen, nicht im eigenen. Er stellt
+  Bestehendes wieder her: Route `bug-unklar` bzw. `klar`, keine Change. Die Abstimmung aus
+  „Gemeinsam ausarbeiten“ gilt auch hier; leg Ursache und Fix knapp in einer Nachricht vor, weil
+  alle PRs warten.
+- **Dein Auftrag ist weitergewandert** (der Hinweis zeigt jetzt „`alpha` ist rot“): Hast du den
+  Label-PR noch nicht geöffnet, hörst du auf; ein anderer PR baut den Fix.
+- **Dein PR wartet** (Hinweis „`alpha` ist rot“): den Bruch **nicht** im eigenen PR reparieren,
+  auch wenn deine CI deswegen rot ist. Weiterarbeiten an der eigenen Aufgabe geht. Ist `alpha`
+  wieder grün, mergt der Wächter `alpha` in deinen PR, falls dessen CI rot ist; danach vor dem
+  nächsten Push den Branch holen.
+- **Dein PR ist doppelt** (du hast selbst einen Fix mit `alpha-rot` geöffnet, ein älterer
+  existiert): deinen PR schließen, oder das Label entfernen, wenn er etwas anderes repariert.
 
 ## Review vor dem PR
 
