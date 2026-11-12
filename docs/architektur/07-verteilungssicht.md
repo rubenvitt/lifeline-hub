@@ -80,9 +80,10 @@ kein Docker (Kopf von `compose.yml`).
 | Garage (nur Dev) | `3900` S3-API, `3902` unsignierter Lesepfad | `compose.yml` |
 
 Der Server begrenzt sich selbst: höchstens 1024 Verbindungen, Kopflesefrist 15 s, HTTP/1-Köpfe
-bis 32 KiB (`src/verbindung.rs`). Er stellt sich nicht per mDNS vor; der Hostname kommt vom
-Betriebssystem oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler
-Betrieb“). Beim Herunterfahren bekommen offene Verbindungen 10 s, eine laufende Sicherung bis
+bis 32 KiB (`src/verbindung.rs`). Per mDNS kündigt er sich nur mit `--lan-entdeckung`
+an, zusammen mit `--tls` und nicht auf einem Loopback-Bind, als `_lifeline-hub._tcp` über
+UDP 5353 (`src/instanz/entdeckung.rs`, LLH-1497); sonst kommt der Hostname vom Betriebssystem
+oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler Betrieb“). Beim Herunterfahren bekommen offene Verbindungen 10 s, eine laufende Sicherung bis
 45 s und das Schließen des Pools bis 10 s (`src/main.rs`).
 
 ## 7.4 Speicherorte

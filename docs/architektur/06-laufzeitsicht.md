@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 12.11.2026 (Direktkopplung vor Ort, LLH-1497).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -281,6 +281,36 @@ sequenceDiagram
   meldenden Seite trägt eine letzte Meldung, den der erreichten Seite die Antwort auf die nächste.
 - Neue Unterschriftsschlüssel nimmt E nur mit Gegenzeichnung eines bekannten an
   (`src/auth/unterschrift/repo.rs`, `accept_lieferungen`).
+
+**Direktkopplung vor Ort** (LLH-1497,
+[ADR-0025](entscheidungen/ADR-0025-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)):
+zwei ELW im selben LAN, A mit selbstsigniertem Zertifikat.
+
+```mermaid
+sequenceDiagram
+  participant E as ELW 2, meldet sich (src/instanz/melden.rs)
+  participant A as ELW 1, erreicht (src/routes/instanz.rs)
+  E->>E: GET /api/admin/instanz/lan (src/instanz/entdeckung.rs, mDNS)
+  E->>A: POST /api/instanz/koppeln (Plattform-Verifier scheitert, zweiter Versuch nur_vor_ort)
+  A-->>E: signiert: art vor_ort, tls_zertifikat = Fingerabdruck
+  E->>E: Fingerabdruck = gesehenes Zertifikat? dann Pin speichern
+  loop Melden und Abgleich
+    E->>A: Anfrage nur über den Client mit Pin (src/instanz/zertifikat.rs)
+  end
+  Note over A: Neustart, neues Zertifikat
+  E->>A: POST /api/instanz/zertifikat (ohne Nutzdaten, ohne Pin)
+  A-->>E: signiert: neuer Fingerabdruck
+  E->>A: Meldung mit neuem Pin
+```
+
+- Abweisungen an eine Gegenstelle mit gültigem Code gehen klar hinaus und verbrauchen den Code
+  nicht: 426 bei Protokoll unter 3, 409 bei anderer Art (`src/routes/instanz.rs`, `check_art`).
+- Findet ELW 2 die Gegenstelle nicht, sucht es sie per Kennung im LAN; eine neue Adresse gilt
+  erst nach der signierten Aussage zum Zertifikat (`src/instanz/melden.rs`, `neu_aufloesen`).
+- Über die Direktkopplung fließen nur Akten zur Anzeige, Spiegel und Anträge;
+  `InstanzKopplungArt::traegt` sperrt Stammdaten, Geheimnisse, Verwahrung und Führungswechsel
+  (`src/instanz/mod.rs`). Konten und Stammdaten bildet die Ursprungskennung ab. Nachweis:
+  `tests/instanz_vor_ort.rs`.
 
 ## 6.6b Einsatz spiegeln und am Spiegel beantragen
 

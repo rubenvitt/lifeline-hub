@@ -249,7 +249,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
                 protokoll: lifeline_hub::instanz::PROTOKOLL,
             };
             match lifeline_hub::instanz::entdeckung::starte(&pool, &ankuendigung, port).await {
-                Ok(()) => tracing::info!("LAN-Entdeckung an (mDNS, Port {port})"),
+                // Sicherheitsrelevanter Schalter (docs/betrieb/env-registry.md): sichtbar im LAN.
+                Ok(()) => {
+                    tracing::warn!("LAN-Entdeckung an: Instanz per mDNS angekündigt (Port {port})")
+                }
                 Err(e) => tracing::warn!("LAN-Entdeckung nicht gestartet: {e}"),
             }
         }

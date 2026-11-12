@@ -220,6 +220,13 @@ eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`). Einen n
 Schlüssel nimmt die übernehmende Instanz erst nach der Bestätigung eines Admins dort an, der die
 letzten vier Zeichen des Fingerabdrucks beim Inhaber erfragt (LLH-1605).
 
+Eine Direktkopplung zweier Instanzen vor Ort (LLH-1497) vertraut nicht dem Betriebssystem, sondern
+einer signierten Aussage der Gegenstelle über ihr TLS-Zertifikat und pinnt es
+([ADR-0025](entscheidungen/ADR-0025-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+`src/instanz/zertifikat.rs`). Konten und Stammdaten erkennen zwei Instanzen derselben Quelle an
+ihrer Ursprungskennung `<instanzkennung>/<schlüssel>` (`src/instanz/stammdaten/herkunft.rs`,
+Spec `stammdaten-verteilung`); sie erweitert das Vertrauen in eine gekoppelte Instanz nicht.
+
 Gekoppelte ELW bekommen Konten samt Passwort-Hash und TOTP-Geheimnis, damit die Anmeldung ohne
 Netz geht (LLH-1493). Die Geheimnisse gehen mit age Ende-zu-Ende an den Schlüssel des ELW und nur,
 wenn sein Betreiber die Datenträgerverschlüsselung bestätigt hat. Ein Admin mit Passkey meldet

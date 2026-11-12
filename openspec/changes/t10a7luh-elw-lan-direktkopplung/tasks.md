@@ -26,7 +26,7 @@ Code.
 - [x] 2.3 Koppeln `vor_ort`: Die einlösende Seite ruft im Erfassungsmodus auf, vergleicht `KoppelnAntwort.tls_zertifikat` und speichert erst dann. Prüfung: Integrationstests „Selbstsigniertes Zertifikat“ und „Angreifer in der Mitte mit eigenem Zertifikat“ (TLS-Proxy mit eigenem Zertifikat im Test, keine Seite speichert)
 - [x] 2.4 Route `POST /api/instanz/zertifikat` (signiert, leerer Body, signierte Antwort mit Fingerabdruck). In `melden` bei Abweichung zuerst bestätigen, dann neu senden, mit Admin-Spur „Zertifikat der Gegenstelle gewechselt“. Sonst nichts senden und Zustand „Zertifikat passt nicht“. Prüfung: Integrationstests „Neues Zertifikat nach IP-Wechsel“ und „Fremdes Zertifikat“; Abgleich und Anträge laufen nach dem Wechsel weiter
 - [x] 2.5 Meldung trägt den gespeicherten Fingerabdruck; die erreichte Seite zeigt „Zertifikat bestätigt“ oder „Gegenstelle kennt ein älteres Zertifikat“. Standardkopplungen unverändert (Plattform-Verifier, `https://`). Prüfung: Test je Anzeigezustand und Test „Hub mit öffentlichem Zertifikat“ ohne gespeicherten Fingerabdruck
-- [ ] 2.6 ADR-0025 nach `docs/architektur/entscheidungen/VORLAGE.md` mit Prüfzeilen; Verweis aus ADR-0014; `src/AGENTS.md`, Abschnitt Instanzkopplung: Art und beglaubigtes Zertifikat. Prüfung: `scripts/adr-fuer.sh src/instanz/melden.rs` nennt ADR-0025, `scripts/check-architektur.sh` grün
+- [x] 2.6 ADR-0025 nach `docs/architektur/entscheidungen/VORLAGE.md` mit Prüfzeilen (ADR-0014 als Herleitung, akzeptierte ADRs bleiben unverändert); `src/AGENTS.md`, Abschnitt Instanzkopplung: Art und beglaubigtes Zertifikat. Prüfung: `scripts/adr-fuer.sh src/instanz/melden.rs` nennt ADR-0025, `scripts/check-architektur.sh` grün
 
 ## 3. Nebenwirkungen der Richtung auf `vor_ort` sperren (D2)
 
@@ -56,7 +56,7 @@ Code.
 - [x] 6.3 `src/instanz/entdeckung.rs`: Ankündigen mit TXT `k`, `n`, `f`, `pv` und Suchen ohne die eigene Instanz. Prüfung: Unit-Test der TXT-Bildung (ohne Org-, Konto- oder Einsatzdaten); Test mit zwei Daemons auf derselben Maschine, wo Multicast verfügbar ist (sonst mit `#[ignore]` und Grund, im Nachtrag dokumentiert)
 - [x] 6.4 Route `GET /api/admin/instanz/lan` (Admin, 3 s, `{aus: true}` ohne Schalter, Markierung „schon gekoppelt“). Prüfung: Tests „Nicht-Admin“ → 403 und „Schalter aus“
 - [x] 6.5 Neuauflösen in `melden` für `vor_ort` nach einem Netzfehler, höchstens einmal je Backoff-Stufe. Eine neue Adresse gilt erst nach signierter Antwort und landet in der Admin-Spur. Prüfung: Tests mit einer Such-Naht (Trait) für „Neue IP per DHCP“ und „Antwort nicht signiert“
-- [ ] 6.6 Betriebsdoku: `docs/betrieb/packaging.md` (Satz zu mDNS, `network_mode: host`), `docs/betrieb-tls.md` (Direktkopplung braucht `--tls`), Schalter in der Konfigurationsübersicht. Prüfung: Wächter der Doku grün
+- [x] 6.6 Betriebsdoku: `docs/betrieb/packaging.md` (Satz zu mDNS, `network_mode: host`), `docs/betrieb-tls.md` (Direktkopplung braucht `--tls`), Schalter in der Konfigurationsübersicht. Prüfung: Wächter der Doku grün
 
 ## 7. Oberfläche (D8)
 
@@ -68,8 +68,8 @@ Code.
 
 ## 8. Doku
 
-- [ ] 8.1 Architekturdoku: Kapitel 5 (Bausteine `entdeckung`, `zertifikat`), 6 (Ablauf Koppeln vor Ort und Zertifikatswechsel), 7 (Satz zu mDNS ersetzt, Port 5353/UDP), 8 (Sicherheit: beglaubigtes Zertifikat, Ursprungskennung), 11 (Risiken aus diesem Entwurf), 12 (Glossar: Direktkopplung, Ursprungskennung). Konzeptnotiz: offene Frage „Entdeckung im LAN“ beantwortet. Prüfung: `scripts/check-architektur.sh` grün
-- [ ] 8.2 Anwenderdoku `docs/anwender/kapitel/instanzkopplung.md`: Direktkopplung vor Ort, „Im Netz gefunden“, Zertifikat, was vor Ort nicht geht. Nach `docs/anwender/AGENTS.md`. Prüfung: Wächter der Anwenderdoku grün
+- [x] 8.1 Architekturdoku: Kapitel 5 (Bausteine `entdeckung`, `zertifikat`), 6 (Ablauf Koppeln vor Ort und Zertifikatswechsel), 7 (Satz zu mDNS ersetzt, Port 5353/UDP), 8 (Sicherheit: beglaubigtes Zertifikat, Ursprungskennung), 11 (Risiken aus diesem Entwurf), 12 (Glossar: Direktkopplung, Ursprungskennung). Konzeptnotiz: offene Frage „Entdeckung im LAN“ beantwortet. Prüfung: `scripts/check-architektur.sh` grün
+- [x] 8.2 Anwenderdoku `docs/anwender/kapitel/instanzkopplung.md`: Direktkopplung vor Ort, „Im Netz gefunden“, Zertifikat, was vor Ort nicht geht. Nach `docs/anwender/AGENTS.md`. Prüfung: Wächter der Anwenderdoku grün
 
 ## 9. Abschluss
 
