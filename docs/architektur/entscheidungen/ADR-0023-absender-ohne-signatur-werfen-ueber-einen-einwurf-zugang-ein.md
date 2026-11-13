@@ -76,5 +76,5 @@ Mensch entscheidet weiter (G1). Schlüssel und bei GET auch der Alarmtext stehen
 Betriebsdoku verlangt, dass der Reverse-Proxy dort nichts protokolliert. Die Ablage hält
 Positionen auch außerhalb eines Einsatzes, aber nur die letzte je Kennung und höchstens 24
 Stunden. Wer den Schlüssel hat und die Tagesgrenze ausreizt, erkennt am nächsten Einwurf, ob der
-vorige gezählt wurde. ADR-0014 verlangte für jede Maschine ein Schlüsselpaar; ADR-0031 ersetzt sie und nennt
+vorige gezählt wurde. ADR-0014 verlangte für jede Maschine ein Schlüsselpaar; ADR-0033 ersetzt sie und nennt
 den Einwurf als Ausnahme.

@@ -328,8 +328,8 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
   - Wortlaut: „am bestehenden Vorschlag“ wird „am bestehenden Eintrag der Ablage“; die Regel zum
     TLS-Kopf nennt „jeder Wert“; neu die Obergrenzen aus D8.
   - Danach `status: akzeptiert`. Die Annahme ist Rubens Freigabe dieser Change.
-- **Neue ADR** mit der nächsten freien Nummer (ADR-0031: `alpha` brachte am 12.11.2026 die
-  Nummern 0029 und 0030 mit): `ersetzt: ADR-0014`, dieselben Regeln, `gilt_fuer` und
+- **Neue ADR** mit der nächsten freien Nummer (ADR-0033: `alpha` brachte bis zum 13.11.2026 die
+  Nummern 0029 bis 0032 mit): `ersetzt: ADR-0014`, dieselben Regeln, `gilt_fuer` und
   Prüfung, dazu die Regel, dass der Einwurf nach ADR-0023 die einzige Anmeldung einer Maschine
   ohne Schlüsselpaar ist. ADR-0014 bekommt `status: ersetzt` und `ersetzt_durch`.
 - **Verweise auf ADR-0014** in arc42, `AGENTS.md`-Dateien und Code-Kommentaren zeigen danach auf
@@ -349,7 +349,8 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
   Transportlage, Löschlauf), `ablage.rs` und `routen.rs`, statt einer Datei.
 - **Neue direkte Abhängigkeit `form_urlencoded`:** zerlegt Abfrage und Formular-Body in Paare.
   Sie war über `url` schon im Baum; `Cargo.lock` bekommt keine neue Crate.
-- **`alpha` zusammengeführt:** Die Migrationen heißen 0339 und 0340, die neue ADR 0031.
+- **`alpha` zusammengeführt:** Die Migrationen heißen 0339 und 0340, die neue ADR 0033
+  (zuerst 0031, bis `alpha` am 13.11.2026 selbst eine ADR-0031 brachte), die Risiken R36 und R37.
 - **Paneel-Knopf in normaler Größe:** Die Layout-Gates messen die Trefffläche jeder Seite.
 
 #### Nachträge aus dem Review vor dem PR (13.11.2026)

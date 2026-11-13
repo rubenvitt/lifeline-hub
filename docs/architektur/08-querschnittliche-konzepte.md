@@ -226,7 +226,7 @@ selbst signiert). Jede Antwort trägt `X-Content-Type-Options: nosniff`
 Maschinen (gekoppelte Instanzen und Fremdsysteme) melden sich nicht mit einer
 Sitzung an, sondern weisen jede Anfrage mit einem eigenen Ed25519-Schlüssel aus: kompaktes JWS
 mit Wiederholschutz in der DB, Antwort ebenso signiert, Einstieg per Einmal-Code eines Org-Admins
-([ADR-0031](entscheidungen/ADR-0031-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
+([ADR-0033](entscheidungen/ADR-0033-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
 `src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“). Fremdsysteme
 nutzen dasselbe Verfahren mit eigenem Profil (`lifeline-machine+jwt`, Kopf
 `Authorization: Machine`), eigenen Tabellen und festen Scopes je Zugang, nur unter `/api/v1/`

@@ -250,7 +250,7 @@ sequenceDiagram
 ## 6.6a Instanzen koppeln und melden
 
 Zwei Instanzen (etwa ELW und Hub) koppeln sich per Einmal-Code (LLH-1490,
-[ADR-0031](entscheidungen/ADR-0031-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md)).
+[ADR-0033](entscheidungen/ADR-0033-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md)).
 A stellt aus und wird gemeldet, E löst ein und meldet sich; das Protokoll kennt nur diese
 Richtung, nicht Hub und ELW.
 
