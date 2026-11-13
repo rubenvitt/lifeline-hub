@@ -6,7 +6,7 @@
 //!   deren Ende diese Instanz belegt ([`belegte_enden`]): eine aus einer Sicherung
 //!   zurückgekehrte Instanz meldet nichts. Abgeräumt wird ein Spiegel nur auf Meldung seines
 //!   Führers, laut Akte auch bei fremdem Präfix (LLH-1852, Change
-//!   `r11nl4cv-geloescht-fremdes-praefix`, ADR-0039).
+//!   `r11nl4cv-geloescht-fremdes-praefix`, ADR-0040).
 //!   - Pull (die erreichte Seite führt): die meldende Seite nennt ihre Stände in der Anfrage.
 //!   - Push (die meldende Seite führt): die erreichte Seite nennt die Stände ihrer Spiegel in der
 //!     Antwort, die meldende meldet `geloescht` in der nächsten Anfrage.
@@ -53,7 +53,7 @@ pub async fn geloeschte_akten(
     belegte_enden(conn, kopplung_id, eigene_kennung, akten).await
 }
 
-/// `geloescht` für jede genannte Kennung, deren Ende diese Instanz belegt (ADR-0036, ADR-0039):
+/// `geloescht` für jede genannte Kennung, deren Ende diese Instanz belegt (ADR-0036, ADR-0040):
 /// mit einem Löschvermerk, oder für Löschungen von vor dem Vermerk mit eigenem Präfix und
 /// Löschprotokoll ([`is_altbestand_geloescht`]). In beiden Fällen nur, wenn hier weder Einsatz
 /// noch Akte mit der Kennung steht. Eine unbekannte Kennung wird übergangen: Eine aus einer

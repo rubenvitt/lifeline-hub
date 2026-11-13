@@ -1,5 +1,5 @@
 ---
-id: ADR-0039
+id: ADR-0040
 titel: Ein Spiegel endet nur auf Meldung seines Führers laut Akte, mit demselben Beleg wie eine Akte
 status: akzeptiert
 datum: 2026-11-13
@@ -12,7 +12,7 @@ herleitung:
   - LLH-1852 (Weg mit Ruben am 13.11.2026 abgestimmt)
 ---
 
-# ADR-0039: Ein Spiegel endet nur auf Meldung seines Führers laut Akte, mit demselben Beleg wie eine Akte
+# ADR-0040: Ein Spiegel endet nur auf Meldung seines Führers laut Akte, mit demselben Beleg wie eine Akte
 
 ## Regeln
 
