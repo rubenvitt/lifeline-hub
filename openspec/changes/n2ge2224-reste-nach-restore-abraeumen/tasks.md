@@ -98,6 +98,25 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
   Change. Prüfen: `scripts/check-fmt.sh` grün.
 - [ ] 5.4 `./scripts/check-all.sh --geaendert` lokal grün. Prüfen: Ausgabe ohne roten Schritt.
 
+## 6. Befunde aus dem Review vor dem PR
+
+- [x] 6.1 Wettlauf zweier Meldungen: `apply_bestaende` räumt nur ab, wenn die Stände der
+  Zuordnung vor den Lieferungen noch die gemeldeten sind (`repo::load_staende`). Unit-Tests
+  `ueberholte_bestaende_raeumen_nichts_ab`, `aktuelle_bestaende_raeumen_ab`,
+  `ohne_quelle_bleiben_die_zeilen`. Prüfen: `cargo test instanz::melden`.
+- [x] 6.2 Bestand der Schlüssel nur bei vollständiger Nachlieferung. Integrationstest
+  `widerruf_jenseits_der_ersten_seite_gilt_nicht_als_verloren`. Prüfen:
+  `cargo test --test instanz_kopplung widerruf_jenseits`.
+- [x] 6.3 Hinweise „abgelehnt“ und „nicht mehr geführt“ derselben Meldung in einem Text,
+  Hinweise in Einzahl und Mehrzahl. Tests `zurueckgespielt_hub_ablehnung_und_verlust_stehen_beide_an_der_kopplung`,
+  `hinweise_zum_abraeumen_in_einzahl_und_mehrzahl`. Prüfen: wie 6.1 und 6.2.
+- [x] 6.4 Der Hub hält `BESTAND_STAMMDATEN_MAX` beim Senden ein (`bestand_passt`). Unit-Test
+  `bestand_der_stammdaten_passt_nach_bytes_und_zahl`. Prüfen: `cargo test instanz::melden`.
+- [x] 6.5 Wächter `bestand_ist_was_als_zeile_geliefert_wird` mit einer Zeile jeder Art. Prüfen:
+  `cargo test instanz::stammdaten::bestand`.
+- [x] 6.6 Betriebsdoku, Anwenderdoku und Delta-Spec zur neu vergebenen id und zu den
+  Hinweistexten berichtigt. Prüfen: Abschnitte gelesen, `openspec validate --strict`.
+
 ## Workflow follow-up
 
 - Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“).

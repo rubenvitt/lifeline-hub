@@ -852,38 +852,35 @@ async fn melden_einmal_mit(
                 org_id: o.org_id,
                 fremde_org_kennung: &o.fremde_org_kennung,
             };
+            // Die Bestände gelten nur für die Stände, die diese Meldung nannte (Review LLH-1871):
+            // vor den Lieferungen lesen, die sie selbst heben.
+            let staende_vorher = repo::load_staende(conn, o.id).await?;
             for ab in unterschrift::accept_lieferungen(conn, &ziel, &oa.unterschrift, false, &jetzt)
                 .await?
             {
                 abgelehnt_alle.push((o.clone(), ab));
             }
-            // Was das Gegenüber nicht mehr führt, gilt hier nicht mehr (LLH-1871, design.md D2).
-            if let Some(bestand) = &oa.unterschrift_bestand {
-                for n in unterschrift::revoke_fehlende(conn, o.id, bestand, &jetzt).await? {
-                    nicht_gefuehrt_alle.push((o.clone(), n));
-                }
-            }
-            if quellen.contains(&o.id) {
-                let mut ergebnis =
-                    stammdaten::uebernehmen::uebernehmen(conn, o, &oa.stammdaten, Some(&age))
-                        .await?;
-                // Abräumen, was das Gegenüber nicht mehr führt (D7): über den Löschweg der
-                // Lieferung, der Stand der Zuordnung bleibt.
-                if let Some(liste) = &oa.stammdaten_bestand {
-                    let fehlend = build_fehlende(conn, o.id, liste).await?;
-                    if !fehlend.is_empty() {
-                        let weg =
-                            stammdaten::uebernehmen::uebernehmen(conn, o, &fehlend, Some(&age))
-                                .await?;
-                        ergebnis.geaendert |= weg.geaendert;
-                        ergebnis.deaktivierte_konten.extend(weg.deaktivierte_konten);
-                        ergebnis.hinweise.extend(weg.hinweise);
-                        ergebnis.hinweise.push(format!(
-                            "{} Zeilen, die {} nicht mehr führt, wurden entfernt oder stillgelegt.",
-                            fehlend.len(),
-                            kopplung.gegenueber_name
-                        ));
-                    }
+            let quelle = quellen.contains(&o.id);
+            let mut ergebnis = if quelle {
+                stammdaten::uebernehmen::uebernehmen(conn, o, &oa.stammdaten, Some(&age)).await?
+            } else {
+                Default::default()
+            };
+            // Abräumen, was das Gegenüber nicht mehr führt (LLH-1871, design.md D2, D7): nach den
+            // Lieferungen dieser Antwort, damit ein gelieferter Widerruf als solcher gilt.
+            let weg =
+                apply_bestaende(conn, o, oa, quelle, Some(&age), staende_vorher, &jetzt).await?;
+            nicht_gefuehrt_alle.extend(weg.schluessel.into_iter().map(|n| (o.clone(), n)));
+            if quelle {
+                ergebnis.geaendert |= weg.ergebnis.geaendert;
+                ergebnis
+                    .deaktivierte_konten
+                    .extend(weg.ergebnis.deaktivierte_konten);
+                ergebnis.hinweise.extend(weg.ergebnis.hinweise);
+                if weg.zeilen > 0 {
+                    ergebnis
+                        .hinweise
+                        .push(hinweis_zeilen(weg.zeilen, &kopplung.gegenueber_name));
                 }
                 repo::save_stammdaten_stand(conn, o.id, o.stammdaten_stand, oa.stammdaten_bis)
                     .await?;
@@ -897,29 +894,23 @@ async fn melden_einmal_mit(
                 }
             }
         }
+        // Ein Hinweis je Meldung zu den Schlüsseln: Ablehnung und nicht mehr geführte zusammen,
+        // sonst ersetzte der zweite den ersten (Review LLH-1871).
+        let mut hinweis = Vec::new();
         if let Some((_, ab)) = abgelehnt_alle.last() {
-            repo::set_hinweis(
-                conn,
-                kopplung.id,
-                &format!(
-                    "Unterschriftsschlüssel von {} ({}) abgelehnt: {}",
-                    ab.benutzer_name, ab.fingerabdruck, ab.grund
-                ),
-            )
-            .await?;
+            hinweis.push(format!(
+                "Unterschriftsschlüssel von {} ({}) abgelehnt: {}",
+                ab.benutzer_name, ab.fingerabdruck, ab.grund
+            ));
         }
         if !nicht_gefuehrt_alle.is_empty() {
-            repo::set_hinweis(
-                conn,
-                kopplung.id,
-                &format!(
-                    "{} führt {} Unterschriftsschlüssel nicht mehr (aus einer Sicherung \
-                     zurückgespielt?). Sie gelten hier nicht mehr.",
-                    kopplung.gegenueber_name,
-                    nicht_gefuehrt_alle.len()
-                ),
-            )
-            .await?;
+            hinweis.push(hinweis_schluessel(
+                nicht_gefuehrt_alle.len(),
+                &kopplung.gegenueber_name,
+            ));
+        }
+        if !hinweis.is_empty() {
+            repo::set_hinweis(conn, kopplung.id, &hinweis.join(" ")).await?;
         }
         // Spricht die Quelle zum ersten Mal Protokoll 3, liefert sie die Ursprungskennung mit
         // (LLH-1497, design.md D5): einmal von vorn, damit jede übernommene Zeile sie trägt.
@@ -1025,6 +1016,83 @@ async fn melden_einmal_mit(
         .await;
     }
     Ok(())
+}
+
+/// Ob ein Bestand der Stammdaten in die Antwort passt (LLH-1871, D5): höchstens `bytes` und
+/// höchstens `schluessel` Schlüssel, die Grenze, die die meldende Seite in [`check_antwort`]
+/// prüft. Liefert Bytes und Zahl der Schlüssel.
+fn bestand_passt(
+    bestand: &[StammdatenBestand],
+    bytes: usize,
+    schluessel: usize,
+) -> Option<(usize, usize)> {
+    let b = field_bytes(&bestand);
+    let n: usize = bestand.iter().map(|x| x.schluessel.len()).sum();
+    (b <= bytes && n <= schluessel).then_some((b, n))
+}
+
+/// Hinweis an der Org-Zuordnung zu abgeräumten Zeilen (LLH-1871, D7).
+fn hinweis_zeilen(n: usize, gegenueber: &str) -> String {
+    if n == 1 {
+        format!("1 Zeile, die {gegenueber} nicht mehr führt, wurde entfernt oder stillgelegt.")
+    } else {
+        format!("{n} Zeilen, die {gegenueber} nicht mehr führt, wurden entfernt oder stillgelegt.")
+    }
+}
+
+/// Hinweis an der Kopplung zu widerrufenen Schlüsseln, die das Gegenüber nicht mehr führt (D2).
+fn hinweis_schluessel(n: usize, gegenueber: &str) -> String {
+    let folge = if n == 1 {
+        "Er gilt hier nicht mehr."
+    } else {
+        "Sie gelten hier nicht mehr."
+    };
+    format!(
+        "{gegenueber} führt {n} Unterschriftsschlüssel nicht mehr (aus einer Sicherung \
+         zurückgespielt?). {folge}"
+    )
+}
+
+/// Was das Abräumen nach den Beständen einer Antwort bewirkt hat.
+#[derive(Debug, Default)]
+struct Abgeraeumt {
+    /// Widerrufene Schlüssel.
+    schluessel: Vec<unterschrift::NichtGefuehrt>,
+    /// Ergebnis der Löschungen über die Übernahme.
+    ergebnis: stammdaten::uebernehmen::Ergebnis,
+    /// Zahl der abgeräumten Zeilen.
+    zeilen: usize,
+}
+
+/// Meldende Seite (LLH-1871, design.md D2, D7): widerruft die Schlüssel und räumt (nur als Quelle
+/// der Stammdaten) die Zeilen der Zuordnung ab, die in den Beständen der Antwort fehlen. Das gilt
+/// nur, solange die Stände der Zuordnung vor den Lieferungen dieser Antwort (`staende_vorher`)
+/// noch die gemeldeten sind: Hat eine andere Meldung inzwischen geliefert, ist der Bestand überholt
+/// und fehlte darin, was sie brachte.
+async fn apply_bestaende(
+    conn: &mut sqlx::SqliteConnection,
+    o: &repo::OrgZeile,
+    oa: &MeldenOrgAntwort,
+    quelle: bool,
+    age: Option<&age::x25519::Identity>,
+    staende_vorher: (i64, i64),
+    jetzt: &str,
+) -> Result<Abgeraeumt, AppError> {
+    let mut aus = Abgeraeumt::default();
+    if staende_vorher != (o.unterschrift_stand, o.stammdaten_stand) {
+        return Ok(aus);
+    }
+    if let Some(bestand) = &oa.unterschrift_bestand {
+        aus.schluessel = unterschrift::revoke_fehlende(conn, o.id, bestand, jetzt).await?;
+    }
+    if let (true, Some(liste)) = (quelle, &oa.stammdaten_bestand) {
+        let fehlend = build_fehlende(conn, o.id, liste).await?;
+        if !fehlend.is_empty() {
+            aus.ergebnis = stammdaten::uebernehmen::uebernehmen(conn, o, &fehlend, age).await?;
+            aus.zeilen = fehlend.len();
+        }
+    }
+    Ok(aus)
 }
 
 /// Meldende Seite (LLH-1871, design.md D7): die übernommenen Zeilen der Zuordnung in den Arten der
@@ -1201,6 +1269,7 @@ pub async fn handle_meldung(
         // nächsten Meldung, weil der Stand je Org nur bis zum Gelieferten wandert.
         let mut budget = unterschrift::LIEFERUNGEN_MAX;
         let mut bestand_rest = unterschrift::BESTAND_MAX;
+        let mut schluessel_rest = stammdaten_bestand::BESTAND_STAMMDATEN_MAX;
         bestand_gesendet.clear();
         for mo in anfrage_orgs.iter().copied() {
             // Die jüngste Zuordnung mit dieser Kennung entscheidet.
@@ -1216,6 +1285,10 @@ pub async fn handle_meldung(
                     let lieferung =
                         unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
                             .await?;
+                    // Füllte die Nachlieferung ihr Budget, kann mehr folgen: dann noch kein
+                    // Bestand, sonst gälte ein Widerruf der nächsten Seite schon jetzt als „nicht
+                    // mehr geführt“ (Review LLH-1871).
+                    let vollstaendig = lieferung.len() < budget.min(unterschrift::LIEFERUNGEN_MAX);
                     budget -= lieferung.len();
                     let unterschrift_bytes: usize = lieferung
                         .iter()
@@ -1226,14 +1299,18 @@ pub async fn handle_meldung(
                     // Bestand der Schlüssel (LLH-1871, design.md D1 der Change
                     // `n2ge2224-reste-nach-restore-abraeumen`): mit jeder Antwort, solange er über
                     // alle Orgs unter der Grenze bleibt; geht vom Budget ab wie die Lieferungen.
-                    let unterschrift_bestand = unterschrift::load_bestand(conn, o.org_id)
-                        .await?
-                        .filter(|ids| ids.len() <= bestand_rest);
+                    let unterschrift_bestand = if vollstaendig {
+                        unterschrift::load_bestand(conn, o.org_id)
+                            .await?
+                            .filter(|ids| ids.len() <= bestand_rest)
+                    } else {
+                        None
+                    };
                     if let Some(ids) = &unterschrift_bestand {
                         bestand_rest -= ids.len();
                         stammdaten_budget.bytes =
                             stammdaten_budget.bytes.saturating_sub(field_bytes(ids));
-                    } else {
+                    } else if vollstaendig {
                         tracing::warn!(
                             kopplung = kopplung.id,
                             org_id = o.org_id,
@@ -1283,16 +1360,19 @@ pub async fn handle_meldung(
                                     std::time::Instant::now(),
                                 )
                             {
-                                let bytes = field_bytes(&bestand);
-                                if bytes <= stammdaten_budget.bytes {
+                                if let Some((bytes, schluessel)) = bestand_passt(
+                                    &bestand,
+                                    stammdaten_budget.bytes,
+                                    schluessel_rest,
+                                ) {
                                     stammdaten_budget.bytes -= bytes;
+                                    schluessel_rest -= schluessel;
                                     bestand_gesendet.push((o.id, summe.to_string()));
                                     liste = Some(bestand);
                                 } else {
                                     tracing::warn!(
                                         kopplung = kopplung.id,
                                         org_id = o.org_id,
-                                        bytes,
                                         "Bestand der Stammdaten passt nicht in die Antwort"
                                     );
                                 }
@@ -1564,6 +1644,231 @@ mod tests {
         assert!(check_antwort(&a).is_ok());
         a.orgs[1].stammdaten_bestand = Some(vec![art(halb + 1)]);
         assert!(check_antwort(&a).is_err(), "zu viele Schlüssel");
+    }
+
+    #[test]
+    fn hinweise_zum_abraeumen_in_einzahl_und_mehrzahl() {
+        assert_eq!(
+            hinweis_zeilen(1, "Hub"),
+            "1 Zeile, die Hub nicht mehr führt, wurde entfernt oder stillgelegt."
+        );
+        assert_eq!(
+            hinweis_zeilen(3, "Hub"),
+            "3 Zeilen, die Hub nicht mehr führt, wurden entfernt oder stillgelegt."
+        );
+        assert_eq!(
+            hinweis_schluessel(1, "Hub"),
+            "Hub führt 1 Unterschriftsschlüssel nicht mehr (aus einer Sicherung zurückgespielt?). \
+             Er gilt hier nicht mehr."
+        );
+        assert!(hinweis_schluessel(2, "Hub").ends_with("Sie gelten hier nicht mehr."));
+    }
+
+    #[test]
+    fn bestand_der_stammdaten_passt_nach_bytes_und_zahl() {
+        let b = vec![StammdatenBestand {
+            art: "fahrzeug".into(),
+            schluessel: vec!["1".into(), "2".into(), "3".into()],
+        }];
+        let bytes = field_bytes(&b);
+        assert_eq!(bestand_passt(&b, bytes, 3), Some((bytes, 3)));
+        assert_eq!(bestand_passt(&b, bytes - 1, 3), None, "zu viele Bytes");
+        assert_eq!(bestand_passt(&b, bytes, 2), None, "zu viele Schlüssel");
+    }
+
+    /// Eine meldende Seite mit einer Zuordnung, einem übernommenen gültigen Schlüssel (fremde id
+    /// 10) und einem übernommenen Fahrzeug (fremder Schlüssel 5).
+    async fn elw_mit_uebernommenem() -> (SqlitePool, i64, i64) {
+        use crate::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey;
+        use crate::auth::unterschrift::{
+            UnterschriftSchluesselLieferung, UnterschriftSchluesselZustand,
+        };
+        let pool = crate::db::test_pool().await;
+        crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let k = repo::create_or_renew_kopplung(
+            &mut conn,
+            &repo::Gegenueber {
+                kennung: "hub-kennung",
+                schluessel_b64: "AAAA",
+                name: "Hub",
+                softwarestand: "1",
+                protokoll: PROTOKOLL,
+                art: super::super::InstanzKopplungArt::Standard,
+            },
+            super::super::InstanzKopplungRichtung::MeldetSich,
+            Some("https://hub.example.org"),
+            InstanzKopplungZustand::Aktiv,
+            "2026-11-13 12:00:00",
+        )
+        .await
+        .unwrap();
+        let ko =
+            repo::create_org_zuordnung(&mut conn, k, 1, "hub-kennung/1", "Hub-Org", Some(1), true)
+                .await
+                .unwrap();
+        let p = SoftwarePasskey::new("a", [1u8; 32]);
+        let l = UnterschriftSchluesselLieferung {
+            id: 10,
+            benutzer_name: "admin10".into(),
+            credential_id: p.credential_id.clone(),
+            alg: "es256".into(),
+            schluessel: p.oeffentlich(),
+            rp_id: "hub.example.org".into(),
+            origin: "https://hub.example.org".into(),
+            bezeichnung: "Stick".into(),
+            zustand: UnterschriftSchluesselZustand::Gueltig,
+            gegenzeichnung: None,
+            stand: 3,
+        };
+        let ziel = unterschrift::Ziel {
+            kopplung_org_id: ko,
+            org_id: 1,
+            fremde_org_kennung: "hub-kennung/1",
+        };
+        unterschrift::accept_lieferungen(&mut conn, &ziel, &[l], true, "2026-11-13 12:00:00")
+            .await
+            .unwrap();
+        let fahrzeug: i64 = sqlx::query_scalar(
+            "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Verloren 1') RETURNING id",
+        )
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+        stammdaten::herkunft::save(
+            &mut conn,
+            ko,
+            1,
+            StammdatenArt::Fahrzeug,
+            "5",
+            &fahrzeug.to_string(),
+            None,
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE instanz_kopplung_org SET stammdaten_stand = 7 WHERE id = ?")
+            .bind(ko)
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+        drop(conn);
+        (pool, k, ko)
+    }
+
+    fn leere_bestaende(ko_org: &str) -> MeldenOrgAntwort {
+        MeldenOrgAntwort {
+            org: ko_org.into(),
+            widerrufen: false,
+            unterschrift: Vec::new(),
+            stammdaten: Vec::new(),
+            stammdaten_bis: 7,
+            unterschrift_bestand: Some(Vec::new()),
+            stammdaten_bestand: Some(vec![StammdatenBestand {
+                art: "fahrzeug".into(),
+                schluessel: Vec::new(),
+            }]),
+        }
+    }
+
+    async fn zustand_und_fahrzeuge(pool: &SqlitePool) -> (String, i64) {
+        let zustand: String = sqlx::query_scalar(
+            "SELECT zustand FROM unterschrift_schluessel WHERE herkunft = 'gegenueber'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let fahrzeuge: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fahrzeug")
+            .fetch_one(pool)
+            .await
+            .unwrap();
+        (zustand, fahrzeuge)
+    }
+
+    #[tokio::test]
+    async fn ueberholte_bestaende_raeumen_nichts_ab() {
+        let (pool, k, ko) = elw_mit_uebernommenem().await;
+        let mut conn = pool.acquire().await.unwrap();
+        let o = repo::list_orgs_aktiv(&mut conn, k).await.unwrap().remove(0);
+        assert_eq!(o.id, ko);
+        let oa = leere_bestaende(&o.fremde_org_kennung);
+        // Eine andere Meldung hat inzwischen geliefert: Die Stände sind nicht mehr die gemeldeten.
+        for (u, s) in [
+            (o.unterschrift_stand + 1, o.stammdaten_stand),
+            (o.unterschrift_stand, 0),
+        ] {
+            let a = apply_bestaende(
+                &mut conn,
+                &o,
+                &oa,
+                true,
+                None,
+                (u, s),
+                "2026-11-13 12:01:00",
+            )
+            .await
+            .unwrap();
+            assert!(a.schluessel.is_empty() && a.zeilen == 0, "{u}/{s}");
+        }
+        drop(conn);
+        assert_eq!(
+            zustand_und_fahrzeuge(&pool).await,
+            ("gueltig".to_string(), 1)
+        );
+    }
+
+    #[tokio::test]
+    async fn aktuelle_bestaende_raeumen_ab() {
+        let (pool, k, _) = elw_mit_uebernommenem().await;
+        let mut conn = pool.acquire().await.unwrap();
+        let o = repo::list_orgs_aktiv(&mut conn, k).await.unwrap().remove(0);
+        let oa = leere_bestaende(&o.fremde_org_kennung);
+        let staende = (o.unterschrift_stand, o.stammdaten_stand);
+        let a = apply_bestaende(
+            &mut conn,
+            &o,
+            &oa,
+            true,
+            None,
+            staende,
+            "2026-11-13 12:01:00",
+        )
+        .await
+        .unwrap();
+        assert_eq!(a.schluessel.len(), 1);
+        assert_eq!(a.zeilen, 1);
+        drop(conn);
+        assert_eq!(
+            zustand_und_fahrzeuge(&pool).await,
+            ("widerrufen".to_string(), 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn ohne_quelle_bleiben_die_zeilen() {
+        let (pool, k, _) = elw_mit_uebernommenem().await;
+        let mut conn = pool.acquire().await.unwrap();
+        let o = repo::list_orgs_aktiv(&mut conn, k).await.unwrap().remove(0);
+        let oa = leere_bestaende(&o.fremde_org_kennung);
+        let staende = (o.unterschrift_stand, o.stammdaten_stand);
+        let a = apply_bestaende(
+            &mut conn,
+            &o,
+            &oa,
+            false,
+            None,
+            staende,
+            "2026-11-13 12:01:00",
+        )
+        .await
+        .unwrap();
+        assert_eq!((a.schluessel.len(), a.zeilen), (1, 0));
+        drop(conn);
+        assert_eq!(
+            zustand_und_fahrzeuge(&pool).await,
+            ("widerrufen".to_string(), 1)
+        );
     }
 
     #[test]

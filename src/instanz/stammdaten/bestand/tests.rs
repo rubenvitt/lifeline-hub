@@ -114,11 +114,22 @@ async fn pool_mit_bestand() -> SqlitePool {
         "INSERT INTO organisation (id, name) VALUES (2, 'Fremd')",
     )
     .await;
-    exec(
-        &pool,
+    // Je Art, die die Demo-Daten nicht tragen, eine Zeile: Der Wächter prüft jede Art.
+    for sql in [
         "INSERT OR IGNORE INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'UTC')",
-    )
-    .await;
+        "INSERT OR IGNORE INTO org_modul_einstellung (org_id, modul_key, sichtbar) \
+         VALUES (1, 'etb', 1)",
+        "INSERT OR IGNORE INTO org_fuehrungsfunktion (org_id, funktion, label) \
+         VALUES (1, 's1', 'Personal')",
+        "INSERT INTO verpflegung_vorlage (org_id, bezeichnung, beginn, ende) \
+         VALUES (1, 'Frühstück (Test)', '07:00', '08:00')",
+        "INSERT INTO org_externe_stelle (org_id, bezeichnung, art) \
+         VALUES (1, 'Leitstelle (Test)', 'leitstelle')",
+        "INSERT OR IGNORE INTO org_unterkunft_richtwert (org_id, schluessel, wert, geaendert_at) \
+         VALUES (1, 'flaeche_je_person', 4.5, '2026-11-13 12:00:00')",
+    ] {
+        exec(&pool, sql).await;
+    }
     exec(
         &pool,
         "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (2, 'Fremd 1'), (1, 'Weg 1')",
@@ -216,12 +227,7 @@ async fn bestand_ist_was_als_zeile_geliefert_wird() {
         );
     }
     assert!(im_bestand.contains(&p("konto", "904")));
-    for art in [
-        StammdatenArt::Konto,
-        StammdatenArt::OrgEinstellungen,
-        StammdatenArt::Fahrzeug,
-        StammdatenArt::Sprechgruppe,
-    ] {
+    for art in StammdatenArt::ALLE {
         assert!(arten_mit_zeile.contains(&art), "{art:?} mit Zeile geprüft");
     }
     let sprechgruppen = bestand

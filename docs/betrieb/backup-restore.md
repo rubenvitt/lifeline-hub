@@ -228,7 +228,9 @@ dem Zurückspielen von selbst ab. Ein Eingriff ist nicht nötig, gleich ob die S
   nächsten Meldung als widerrufen, eine solche Zeile wird gelöscht, außer Dienst genommen oder,
   bei Konten, deaktiviert. Die Seite „Instanzkopplung“ am ELW nennt beides als Hinweis. Vergibt
   der Hub die Nummer eines verlorenen Schlüssels oder einer verlorenen Zeile neu, bevor sich der
-  ELW meldet, gilt am ELW bis zur nächsten Lieferung der alte Inhalt.
+  ELW meldet, räumt der ELW sie nicht ab: Er behält den alten Inhalt, bis der neue ankommt. Einen
+  Schlüssel ersetzt der neue erst mit LLH-1853; bis dahin bleibt der alte am ELW gültig, bis die
+  Kopplung neu eingerichtet wird.
 
 **Hinweis an der Kopplung.** Nach dem Zurückspielen erscheint auf der Seite „Instanzkopplung“ meist
 der Hinweis „… hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat (aus einer

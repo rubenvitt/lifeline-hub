@@ -24,7 +24,7 @@ dazu einen Hinweis an der Org-Zuordnung zeigen.
 
 #### Scenario: Hub ändert vor der ersten Meldung
 - **WHEN** der Hub zurückgespielt wird, ein Admin dort ein Fahrzeug anlegt, bevor sich der ELW meldet, und der ELW sich danach meldet
-- **THEN** sind am ELW nach den nächsten Meldungen die Zeilen abgeräumt, die der Hub mit der Sicherung verlor und deren Kennung er nicht neu vergeben hat, und es fehlt keine Zeile, die der Hub führt
+- **THEN** sind am ELW nach den nächsten Meldungen die Zeilen abgeräumt, die der Hub mit der Sicherung verlor und deren Kennung er nicht neu vergeben hat, und keine Zeile, die der ELW schon hatte und der Hub weiter führt, ist abgeräumt
 
 #### Scenario: Gegenstelle älteren Stands
 - **WHEN** eine der beiden Seiten einen älteren Stand hat, der diesen Abgleich nicht kennt

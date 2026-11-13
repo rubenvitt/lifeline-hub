@@ -49,6 +49,10 @@ hineinpasst, bekommt `None`, und das Log warnt. Die Bytes des Bestands gehen wie
 Schlüssel-Lieferungen vom Budget der Stammdaten ab. So bleibt die größte Antwort unter
 `ANTWORT_MAX`, auch bei `ORGS_MAX` Orgs (Test `groesste_antwort_passt_in_die_lesegrenze`).
 
+Der Bestand geht nur, wenn die Nachlieferung der Org in dieser Antwort vollständig ist, also ihr
+Budget nicht füllte. Sonst gälte ein Widerruf, der erst mit der nächsten Seite kommt, schon jetzt
+als „nicht mehr geführt“, mit falschem Hinweis und falscher Spur (Review vor dem PR).
+
 Warum nur die gültigen: Am ELW kann nur ein Schlüssel wirken, den der Hub als gültig geliefert hat.
 Ist er am Hub inzwischen widerrufen, führt das Fehlen in der Liste zum selben Ergebnis wie der
 gelieferte Widerruf. Ein Schlüssel, der am Hub auf Gegenzeichnung wartet, ging nie hinaus.
@@ -65,9 +69,13 @@ jedem Weg des Zurückspielens, ohne dass der Hub den Rückschritt erkennen muss.
 
 ### D2 Der ELW widerruft, was in der Liste fehlt
 
-Nach `accept_lieferungen` und in derselben Transaktion ruft `melden_einmal_mit`
+Nach den Lieferungen der Antwort (`accept_lieferungen`, `uebernehmen`) und in derselben
+Transaktion ruft `melden_einmal_mit` `apply_bestaende` auf. Das ruft
 `unterschrift::revoke_fehlende(conn, kopplung_org_id, &bestand, jetzt)` auf, wenn die Antwort für
-die Org einen Bestand trägt. Eine einzige Anweisung (`fremde_id NOT IN (SELECT value FROM
+die Org einen Bestand trägt. Vorher prüft es, ob die Stände der Zuordnung vor diesen Lieferungen
+noch die gemeldeten waren. Hat eine zweite Meldung derselben Kopplung inzwischen geliefert
+(Hintergrund-Task und „Erneut abgleichen“ laufen ohne Sperre nebeneinander), ist der Bestand
+überholt. In ihm fehlte, was sie brachte, und abgeräumt wird dann nichts (Review vor dem PR). Eine einzige Anweisung (`fremde_id NOT IN (SELECT value FROM
 json_each(?))`, `src/AGENTS.md`, Listen von außen) setzt jeden Schlüssel dieser Zuordnung mit
 `zustand IN ('gueltig', 'wartet_auf_bestaetigung')` auf `widerrufen` (`widerrufen_at` gesetzt,
 `stand` unverändert). Sie liefert Inhabername und Fingerabdruck der widerrufenen Schlüssel zurück.
@@ -75,7 +83,8 @@ json_each(?))`, `src/AGENTS.md`, Listen von außen) setzt jeden Schlüssel diese
 - `abgelehnt` und `widerrufen` bleiben, wie sie sind (wie beim gelieferten Widerruf).
 - Je widerrufenem Schlüssel ein Eintrag `UnterschriftWiderrufen` über
   `admin_audit::schreibe_ohne_akteur` mit dem Grund „führt <Gegenüber> nicht mehr“. Dazu ein
-  Hinweis an der Kopplung (`repo::set_hinweis`).
+  Hinweis an der Kopplung (`repo::set_hinweis`), zusammen mit einem Hinweis „abgelehnt“ derselben
+  Meldung in einem Text: Das Feld hat einen Platz, und der zweite ersetzte sonst den ersten.
 - `check_antwort` lehnt mehr als `BESTAND_MAX` ids je Antwort ab, wie die übrigen Grenzen der Antwort.
 - Fehlt das Feld (`None`, Gegenstelle älteren Stands), geschieht nichts. Eine leere Liste dagegen
   heißt: Der Hub führt keinen gültigen Schlüssel der Org mehr.
@@ -143,8 +152,8 @@ Neustart nicht überdauern muss. Nach einem Neustart geht die Liste höchstens e
 
 ### D7 Der ELW räumt über den Löschweg der Übernahme ab
 
-Trägt die Antwort einen Stammdaten-Bestand, bildet `melden_einmal_mit` nach der regulären
-Übernahme aus `stammdaten_herkunft` der Zuordnung jede `(art, fremder_schluessel)` einer gelisteten
+Trägt die Antwort einen Stammdaten-Bestand, bildet `apply_bestaende` (mit derselben Prüfung der
+Stände wie D2) nach der regulären Übernahme aus `stammdaten_herkunft` der Zuordnung jede `(art, fremder_schluessel)` einer gelisteten
 Art, die in der Liste fehlt, als Lieferung mit `geloescht: true`. Diese gehen durch
 `uebernehmen::uebernehmen`. So gelten dieselben Regeln wie für eine gelieferte Löschung:
 Reihenfolge nach Rang, Nachholen am Verweis, Stilllegen, Konto deaktivieren samt
@@ -152,7 +161,8 @@ Reihenfolge nach Rang, Nachholen am Verweis, Stilllegen, Konto deaktivieren samt
 etwas abgeräumt, kommt ein Hinweis an die Org-Zuordnung (`repo::add_stammdaten_hinweise`):
 „<n> Zeilen, die <Gegenüber> nicht mehr führt, wurden entfernt oder stillgelegt.“
 
-`check_antwort` begrenzt die Liste: höchstens `ARTEN_MAX` Arten je Org und höchstens
+Die erreichte Seite hält beim Senden dieselbe Höchstzahl an Schlüsseln ein, die die meldende in
+`check_antwort` prüft (`bestand_passt`). `check_antwort` begrenzt die Liste: höchstens `ARTEN_MAX` Arten je Org und höchstens
 `BESTAND_STAMMDATEN_MAX` (100 000) Schlüssel je Antwort. Unbekannte Arten überspringt der ELW. Die
 Liste wird nur gegen den eigenen Bestand gelesen, sie steuert keine Abfrage mit externer Länge.
 
