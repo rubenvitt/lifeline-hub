@@ -173,6 +173,9 @@ nachbauen und drifte vom Löschweg der Lieferung ab.
 - **[Der Hub vergibt nach dem Zurückspielen die id eines verlorenen Schlüssels neu]** → Die id steht
   in der Liste, der alte Schlüssel bleibt am ELW, bis der neue ankommt und D5 aus LLH-1853 ihn
   ersetzt. Bis LLH-1853 in `alpha` ist, bleibt diese Lücke.
+- **[Der Hub vergibt nach dem Zurückspielen die id einer verlorenen Zeile neu]** → Er führt die
+  Kennung wieder, der ELW behält die Zeile, bis ihr neuer Inhalt kommt (LLH-1853, D3/D4). Test
+  `zurueckgespielt_hub_aendert_vor_der_meldung_und_raeumt_trotzdem_ab`.
 - **[Last am Hub]** → Bei jeder Meldung eines ELW auf aktuellem Stand eine Abfrage je Art und eine
   über das Log der Org, dazu SHA-256 über einige tausend kurze Zeilen. Das sind wenige
   Millisekunden je Minute und ELW.

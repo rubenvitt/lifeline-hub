@@ -15,8 +15,8 @@ dazu einen Hinweis an der Org-Zuordnung zeigen.
 - **THEN** ist das Fahrzeug am ELW nach den nächsten Meldungen gelöscht, und die Seite „Instanzkopplung“ am ELW zeigt an der Org-Zuordnung einen Hinweis darauf
 
 #### Scenario: Verlorene Zeile mit Einsatzdaten
-- **WHEN** der Hub ein Fahrzeug mit der Sicherung verliert, auf das am ELW Einsatzdaten zeigen
-- **THEN** legt der ELW das Fahrzeug still, statt es zu löschen, und es gehört danach dem ELW
+- **WHEN** der Hub das Material „Decke“ mit der Sicherung verliert, das am ELW ein Einsatz nutzt
+- **THEN** setzt der ELW die Decke außer Dienst, statt sie zu löschen, und sie gehört danach dem ELW
 
 #### Scenario: Verlorenes Konto
 - **WHEN** der Hub ein Konto mit der Sicherung verliert, das er an den ELW geliefert hatte
@@ -24,7 +24,7 @@ dazu einen Hinweis an der Org-Zuordnung zeigen.
 
 #### Scenario: Hub ändert vor der ersten Meldung
 - **WHEN** der Hub zurückgespielt wird, ein Admin dort ein Fahrzeug anlegt, bevor sich der ELW meldet, und der ELW sich danach meldet
-- **THEN** sind am ELW nach den nächsten Meldungen die Zeilen abgeräumt, die der Hub mit der Sicherung verlor, und keine Zeile, die der Hub führt
+- **THEN** sind am ELW nach den nächsten Meldungen die Zeilen abgeräumt, die der Hub mit der Sicherung verlor und deren Kennung er nicht neu vergeben hat, und es fehlt keine Zeile, die der Hub führt
 
 #### Scenario: Gegenstelle älteren Stands
 - **WHEN** eine der beiden Seiten einen älteren Stand hat, der diesen Abgleich nicht kennt

@@ -58,39 +58,41 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
   `merke_gesendet(…)`, Abstand 10 Minuten. Die Zeit kommt als Parameter. Unit-Tests: erster Aufruf
   ja, gleiche Summe vor 10 Minuten nein, danach ja, andere Summe sofort ja, andere Kennung
   unabhängig. Prüfen: wie 2.1.
-- [ ] 3.3 `handle_meldung`: Liste nach D5 bilden (Bedingungen 1–5), Restbudget abziehen, gesendete
+- [x] 3.3 `handle_meldung`: Liste nach D5 bilden (Bedingungen 1–5), Restbudget abziehen, gesendete
   Einträge sammeln und nach dem Commit merken. `melden_einmal_mit`: Prüfsumme je Quell-Org aus der
   Herkunft melden. Integrationstests in `tests/instanz_stammdaten.rs`: (a) gleicher Bestand, keine
   Liste; (b) frisch gekoppelt mit mehr Zeilen als eine Antwort trägt, keine Liste, bis alles da ist.
-  Die Antwort wird dafür über `melden_roh` oder einen Zähler am Hub beobachtet, je nachdem, was die
-  Testhilfen hergeben. Prüfen: `cargo test --test instanz_stammdaten bestand`.
+  Ob eine Liste ging, zeigt die Sendebremse (`bestand::zuletzt_gesendet`, nur lesend). Prüfen:
+  `cargo test --test instanz_stammdaten -- gleicher_bestand waehrend_der`.
 
 ## 4. Stammdaten: Abräumen am ELW (D7)
 
-- [ ] 4.1 `melden_einmal_mit`: Trägt die Antwort einen Bestand, die fehlenden Paare der gelisteten
+- [x] 4.1 `melden_einmal_mit`: Trägt die Antwort einen Bestand, die fehlenden Paare der gelisteten
   Arten als Löschungen durch `uebernehmen` schicken, Ergebnis wie bei der Lieferung verbuchen
   (Sitzungen, Ereignis), Hinweis an der Org-Zuordnung. Integrationstest
-  `zurueckgespielt_hub_verlorenes_fahrzeug_verschwindet_am_elw`: Muster `zurueckspielen_hub` (Zeile
-  und Log über dem Stand der Sicherung löschen, Zähler zurücksetzen). Am ELW ist das Fahrzeug
+  `zurueckgespielt_hub_verlorenes_fahrzeug_verschwindet_am_elw`: Hilfe `hub_verliert` (Zeile und
+  Log über dem Stand der Sicherung löschen, Zähler zurücksetzen). Am ELW ist das Fahrzeug
   danach weg, und die Zuordnung trägt den Hinweis. Ohne 4.1 rot. Prüfen:
   `cargo test --test instanz_stammdaten zurueckgespielt`.
-- [ ] 4.2 Integrationstests: Ein verlorenes Fahrzeug mit Einsatzdaten am ELW wird stillgelegt. Ein
+- [x] 4.2 Integrationstests: Ein verlorenes Material, das am ELW ein Einsatz nutzt, wird
+  stillgelegt. Ein
   verlorenes Konto wird deaktiviert, seine Sitzung am ELW endet. Hat der Hub nach dem Zurückspielen
   vor der Meldung ein Fahrzeug angelegt, sind die verlorenen Zeilen trotzdem abgeräumt, und keine
   geführte Zeile fehlt am ELW. Prüfen: wie 4.1.
-- [ ] 4.3 Integrationstest Sendebremse: Eine bleibende Abweichung (eine Zeile, die der ELW nicht
+- [x] 4.3 Integrationstest Sendebremse: Eine bleibende Abweichung (eine Zeile, die der ELW nicht
   übernehmen kann, Muster `gleicher_kontoname_bleibt_draussen_bis_zum_erneuten_abgleich`) schickt bei
-  zwei Meldungen hintereinander nur einmal die Liste. Prüfen: wie 4.1.
+  zwei Meldungen hintereinander nur einmal die Liste. Prüfen:
+  `cargo test --test instanz_stammdaten bleibende`.
 
 ## 5. Doku und Gates
 
-- [ ] 5.1 `docs/betrieb/backup-restore.md`, Abschnitt „Gekoppelte Instanz zurückspielen“: Verlorene
+- [x] 5.1 `docs/betrieb/backup-restore.md`, Abschnitt „Gekoppelte Instanz zurückspielen“: Verlorene
   Schlüssel und Stammdaten-Zeilen räumt der ELW selbst ab, mit Hinweis an der Kopplung. Prüfen:
   Abschnitt gelesen, Verweise stimmen.
-- [ ] 5.2 `docs/anwender/kapitel/instanzkopplung.md`: die beiden neuen Hinweise am ELW und was sie
+- [x] 5.2 `docs/anwender/kapitel/instanzkopplung.md`: die beiden neuen Hinweise am ELW und was sie
   bedeuten, nach den Regeln in `docs/anwender/AGENTS.md`. Prüfen: die Wächter aus
   `docs/anwender/AGENTS.md` laufen grün.
-- [ ] 5.3 `src/AGENTS.md`, Instanzkopplung: eine Zeile zu Stammdaten-Verteilung bzw.
+- [x] 5.3 `src/AGENTS.md`, Instanzkopplung: eine Zeile zu Stammdaten-Verteilung bzw.
   Unterschriftsschlüsseln. Der Bestand des Hubs (`stammdaten::bestand::load`) muss zu
   `build_lieferung` passen, eine neue Sonderregel dort gehört auch dorthin. Verweis auf diese
   Change. Prüfen: `scripts/check-fmt.sh` grün.

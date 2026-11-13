@@ -223,6 +223,12 @@ dem Zurückspielen von selbst ab. Ein Eingriff ist nicht nötig, gleich ob die S
   den nächsten Meldungen, auch bei mehreren Kopplungen.
 - Akten, die ein zurückgespielter Hub mit der Sicherung verloren hat, schickt der ELW mit den
   nächsten Meldungen erneut. Das gilt auch, wenn der ELW während des Ausfalls weitergearbeitet hat.
+- Unterschriftsschlüssel und Stammdaten-Zeilen, die ein zurückgespielter Hub mit der Sicherung
+  verloren hat, räumt der ELW selbst ab (LLH-1871): Ein solcher Schlüssel gilt dort nach der
+  nächsten Meldung als widerrufen, eine solche Zeile wird gelöscht, außer Dienst genommen oder,
+  bei Konten, deaktiviert. Die Seite „Instanzkopplung“ am ELW nennt beides als Hinweis. Vergibt
+  der Hub die Nummer eines verlorenen Schlüssels oder einer verlorenen Zeile neu, bevor sich der
+  ELW meldet, gilt am ELW bis zur nächsten Lieferung der alte Inhalt.
 
 **Hinweis an der Kopplung.** Nach dem Zurückspielen erscheint auf der Seite „Instanzkopplung“ meist
 der Hinweis „… hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat (aus einer
@@ -245,7 +251,8 @@ ersetzt.
   Verbesserungen nur teilweise. Beide Seiten zu aktualisieren behebt das.
 
 Herleitung:
-`openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
+`openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md` und
+`openspec/changes/archive/2026-11-13-n2ge2224-reste-nach-restore-abraeumen/design.md`.
 
 ## Archiv eines Einsatzes einspielen (LLH-1494)
 
