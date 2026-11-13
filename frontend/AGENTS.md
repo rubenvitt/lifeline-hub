@@ -1140,8 +1140,12 @@ Spec `bedien-arbeitsplatz`).
   Farbe allein), ein gewählter Wert trägt seine Herkunft. Quellen sind Adapter in
   `stammdaten/vorschlagsquellen.ts` (Gruppen „Im Einsatz“, „Stammdaten“, „Zuletzt verwendet“, Demo
   dahinter); eine neue Quelle ändert das Feld nicht. Wertform `{ text, ref? }`, `nurText` wo nur Text
-  gespeichert wird. **Enter bei offener Liste sendet nie** (übernimmt den mit ↓/↑ markierten
-  Vorschlag, sonst den Freitext), bei geschlossener gilt die Norm oben. „In Stammdaten übernehmen“
+  gespeichert wird. **Der oberste passende Vorschlag ist markiert; Enter und Tab nehmen ihn**, Tab
+  springt danach weiter (kein `preventDefault`, rc-select bekommt Tab und Enter der offenen Liste
+  nicht). Freitext trotz Treffer über den letzten Eintrag „„…“ als Freitext übernehmen“; passt
+  nichts, ist er beim Tippen der einzige (Change `kwc2yszv-etb-neuentwurf`, D5). **Enter bei
+  offener Liste sendet nie**, bei geschlossener gilt die Norm oben (`enterSendet`); wer per Enter
+  absendet, nimmt `onUebernahme` mit `ausListe: false`. „In Stammdaten übernehmen“
   nur über einen bestehenden Katalog mit reiner Textanlage (heute „Externe Stellen“), ohne
   Stammdaten-Recht gesperrt mit Grund; nicht in der ETB-Leiste. Eingebaut: ETB Von/An (Chips und
   Rufname-Abfrage), Meldung Absender/Empfänger.
