@@ -112,7 +112,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
     findet `einsatz.updated` (Muster der bestehenden Spiegel-Tests);
   - eine zurückgerollte Transaktion hinterlässt keine Zeile;
   - `cargo test --test demo_daten` ist unverändert grün.
-- [ ] 3.8 Schreiblast messen: Demo-Import der größten Lage vor und nach der Trigger-Migration, je
+- [x] 3.8 Schreiblast messen: Demo-Import der größten Lage vor und nach der Trigger-Migration, je
   drei Läufe. Verifizieren: Die Zahlen stehen als Kommentar an LLH-1655; liegt der Import mehr
   als 10 % langsamer, wird der Befund vor Gruppe 4 mit Ruben besprochen.
 

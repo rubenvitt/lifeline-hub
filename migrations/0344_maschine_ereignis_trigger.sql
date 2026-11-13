@@ -141,10 +141,13 @@ END;
 -- Eine Tabelle, aus der die Lage für Fremdsysteme entsteht, hat sich geändert. Das Änderungslog
 -- `einsatz_aenderung` (0314) bekommt bei jeder Änderung einer gespiegelten Einsatztabelle eine
 -- Zeile, in deren Transaktion; hier hängt die Outbox daran.
+-- Die Freigabe steht zuerst in der Bedingung: ohne sie (der Normalfall, etwa beim Demo-Import und
+-- an jedem ELW) läuft der Rumpf gar nicht an (Messung in LLH-1655, Aufgabe 3.8).
 CREATE TRIGGER einsatz_aenderung_ereignis_i AFTER INSERT ON einsatz_aenderung
 WHEN NEW.art IN ('einsatz_person', 'einsatz_lagekennzahl_wahl', 'einsatz_personal',
                  'einsatz_einheit', 'uhs', 'uhs_platz', 'lagebericht', 'lage_zone',
                  'einsatzabschnitt', 'freies_zeichen', 'meldung', 'kommunikation_status')
+ AND EXISTS (SELECT 1 FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.einsatz_id)
  AND EXISTS (SELECT 1 FROM einsatz WHERE id = NEW.einsatz_id AND status = 'aktiv')
 BEGIN
     DELETE FROM maschine_ereignis
