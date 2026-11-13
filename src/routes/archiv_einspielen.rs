@@ -216,6 +216,9 @@ pub async fn einspielen(
     .await?;
     drop(schluessel);
     drop(ablage);
+    // Offene Einsatzlisten der Org zeigen den neuen Einsatz ohne Neuladen (Org-Ereignis
+    // `einsatzliste`, LFH-734); der Befehl läuft als eigener Prozess und kann das nicht.
+    crate::live::org::einsatzliste_melden(&state.pool, &state.live, e.einsatz_id, &[]).await;
     // Die Spur steht in der Transaktion; die Log-Zeile kommt nach dem Commit (admin_audit).
     tracing::info!(
         aktion = "archiv_eingespielt",

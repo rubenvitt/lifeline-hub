@@ -74,6 +74,7 @@ async fn hochladen(app: &axum::Router, cookie: &str, felder: &[Feld<'_>]) -> (St
 struct Umgebung {
     dir: tempfile::TempDir,
     app: axum::Router,
+    live: lifeline_hub::live::LiveHub,
     pool: SqlitePool,
     admin: String,
     identitaet: age::x25519::Identity,
@@ -91,7 +92,7 @@ impl Umgebung {
 /// archivierten Einsatz, dessen Block über die Archivakte geladen ist.
 async fn umgebung() -> Umgebung {
     let (dir, pool) = lifeline_hub::db::test_pool_datei().await;
-    let (app, pool, _live) = common::setup_mit_optionen_auf(pool, Default::default()).await;
+    let (app, pool, live) = common::setup_mit_optionen_auf(pool, Default::default()).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let identitaet = age::x25519::Identity::generate();
     let (s, v) = anfrage_json(
@@ -144,8 +145,12 @@ async fn umgebung() -> Umgebung {
     .execute(&pool)
     .await
     .unwrap();
-    let live = lifeline_hub::live::LiveHub::new();
-    lifeline_hub::einsatz::purge_scheduler::tick_einmal(&pool, &live, Utc::now()).await;
+    lifeline_hub::einsatz::purge_scheduler::tick_einmal(
+        &pool,
+        &lifeline_hub::live::LiveHub::new(),
+        Utc::now(),
+    )
+    .await;
     let resp = app
         .clone()
         .oneshot(
@@ -165,6 +170,7 @@ async fn umgebung() -> Umgebung {
     Umgebung {
         dir,
         app,
+        live,
         pool,
         admin,
         identitaet,
@@ -272,6 +278,7 @@ async fn verfuegbarkeit_nur_fuer_admins_und_nicht_am_hub() {
 async fn ein_admin_spielt_ein_und_die_spur_nennt_ihn() {
     let u = umgebung().await;
     let schluessel = u.schluessel_text();
+    let mut rx = u.live.abonniere_org();
     let (s, v) = hochladen(
         &u.app,
         &u.admin,
@@ -298,6 +305,21 @@ async fn ein_admin_spielt_ein_und_die_spur_nennt_ihn() {
         .find(|e| e["id"] == neu)
         .unwrap_or_else(|| panic!("eingespielter Einsatz fehlt: {liste}"));
     assert!(e["spiegel"]["archiv_bis"].is_string(), "{e}");
+
+    // Offene Einsatzlisten der Org erfahren davon ohne Neuladen.
+    let admin: lifeline_hub::auth::Benutzer =
+        sqlx::query_as("SELECT * FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&u.pool)
+            .await
+            .unwrap();
+    let abonnent = lifeline_hub::live::org::OrgAbonnent::aus(&admin);
+    let mut gesehen = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if abonnent.sieht(&n) {
+            gesehen.push(n.event.as_str());
+        }
+    }
+    assert_eq!(gesehen, vec!["einsatzliste"]);
 
     let (akteur_id, akteur_name, peer_ip): (Option<i64>, String, Option<String>) = sqlx::query_as(
         "SELECT akteur_id, akteur_name, peer_ip FROM admin_audit \

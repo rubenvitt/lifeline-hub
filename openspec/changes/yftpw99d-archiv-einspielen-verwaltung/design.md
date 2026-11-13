@@ -178,6 +178,13 @@ Nach Erfolg:
   Inhalte, den Hinweisen und dem Sprung „Einsatz öffnen“.
 - Die Einsatzliste und `aufbewahrung()` werden über `queryKeys.ts` invalidiert.
 
+### D9 Einsatzliste live (beim Umsetzen ergänzt)
+
+Nach dem Commit meldet der Handler das Org-Ereignis `einsatzliste` für den neuen Einsatz
+(`live::org::einsatzliste_melden`, LFH-734). Offene Einsatzlisten der Org zeigen ihn dann ohne
+Neuladen. Der Befehl läuft als eigener Prozess ohne Zugang zum Live-Hub, für ihn bleibt es beim
+Neuladen.
+
 ## Risks / Trade-offs
 
 - **Lange Requests über Proxies:** Ein Reverse-Proxy mit 60 s Timeout bricht große Blöcke ab.

@@ -294,7 +294,35 @@ lifeline-hub --db-path … archiv einspielen --datei … --identitaet … --org 
 - Die Übernahme läuft in einer Transaktion. Ein großer Block hält währenddessen die Schreiber des
   laufenden Servers auf; während eines laufenden Einsatzes besser nicht einspielen.
 - Das Zugangsprotokoll hält jedes Einspielen unter „Archiv eingespielt“ fest, in derselben
-  Transaktion wie die Übernahme.
+  Transaktion wie die Übernahme. Beim Befehl steht als Akteur „Befehl archiv einspielen“, in der
+  Verwaltung die Person mit ihrer Adresse.
+
+### Ohne Shell: in der Verwaltung (LLH-1711)
+
+Ein System-Admin spielt einen Block auch ohne Shell ein: Verwaltung → Aufbewahrung → „Archiv
+einspielen“. Er lädt den Block und den privaten Archiv-Schlüssel hoch, als Datei oder als
+eingefügten Text, bei einer geschützten Schlüsseldatei mit Passphrase. Dahinter liegt derselbe
+Ablauf wie beim Befehl, mit denselben Ablehnungen und Hinweisen. Es gibt drei Unterschiede:
+
+- **Nur in die eigene Organisation**, und auch nur, wenn sie im Archiv denselben Namen trägt. Ein
+  Gegenstück zu `--org` gibt es nicht; dafür bleibt der Befehl.
+- **Nicht an einem Hub.** Meldet sich eine andere Instanz bei dieser (eine Kopplung, angebahnt
+  oder aktiv, für irgendeine Organisation), fehlt die Funktion, und der Server lehnt mit 422 ab,
+  bevor er Block oder Schlüssel liest. Ein privater Archiv-Schlüssel gehört nicht an eine
+  öffentlich erreichbare Installation. Widerrufene Kopplungen sperren nicht.
+- **Bis 256 MiB.** Ein größerer Block ist 413; ihn spielt der Befehl ein. Das Einspielen zählt zur
+  Grenze gleichzeitiger Uploads (vier) und läuft im Request: Entschlüsseln, Migrieren und
+  Übernehmen eines großen Blocks dauern. Ein vorgeschalteter Reverse-Proxy braucht dafür einen
+  Lese-Timeout von einigen Minuten (nginx `proxy_read_timeout`, Caddy `read_timeout`), sonst
+  bricht er ab. Der Server merkt den Abbruch und verwirft das Einspielen wie bei Strg+C.
+
+Offene Einsatzlisten der Organisation zeigen einen so eingespielten Einsatz sofort, ohne
+Neuladen. Schlüssel und Passphrase liegen nur für den Aufruf im Speicher des Servers. Sie gehen weder in
+die Datenbank noch auf die Platte noch ins Log. Den verschlüsselten Block schreibt der Server
+während des Uploads in eine Datei `lifeline-zwischen-archiv-0-hochgeladen-…` neben der
+Datenbank; sie verschwindet mit dem Aufruf und nach einem Absturz wie die Zwischendatei des
+Befehls nach 6 Stunden. Kurz liegt der Block also zweimal auf der Platte, verschlüsselt und
+entschlüsselt.
 
 ## Sicherungen und Schwärzung (LFH-725)
 
