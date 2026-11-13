@@ -795,7 +795,7 @@ pub async fn zurueckholen(
 /// (`src/AGENTS.md`, „Backend — Instanzkopplung (LLH-1490)“; LLH-1641, E8). `save` richtete den
 /// Spiegel nicht aus, die Akte widerspräche dem Einsatz, und das nächste Einschalten machte ihn
 /// beim Start schreibbar; solche Einsätze bleiben Spiegel, bis ein Mensch sie zurückholt
-/// (`dienst::zurueckholen`, LLH-1850, ADR-0040). Offene Übernahmen verfallen auch ohne Schalter:
+/// (`dienst::zurueckholen`, LLH-1850, ADR-0041). Offene Übernahmen verfallen auch ohne Schalter:
 /// Dort führt diese Instanz ohnehin, und nach dem Einschalten stünden sie als Konflikt da, dem
 /// niemand mehr widersprechen kann.
 ///

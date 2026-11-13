@@ -1,5 +1,5 @@
 ---
-id: ADR-0040
+id: ADR-0041
 titel: Einen Spiegel ohne gekoppelte Führung holt nur ein Mensch zurück
 status: akzeptiert
 datum: 2026-11-13
@@ -16,7 +16,7 @@ herleitung:
   - LLH-1850 (mit Ruben am 13.11.2026 abgestimmt), LLH-1704
 ---
 
-# ADR-0040: Einen Spiegel ohne gekoppelte Führung holt nur ein Mensch zurück
+# ADR-0041: Einen Spiegel ohne gekoppelte Führung holt nur ein Mensch zurück
 
 ## Regeln
 

@@ -5717,7 +5717,7 @@ async fn endgueltig_loeschen(i: &Instanz, einsatz: i64) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert!(abraeumen::ausfuehren(&i.pool, einsatz).await.unwrap());
+    assert!(abraeumen::ausfuehren(&i.pool, None, einsatz).await.unwrap());
 }
 
 /// Kennungen unter „Einsätze beim Gegenüber“ an einer Instanz.
@@ -6009,6 +6009,52 @@ async fn nach_neuer_kopplung_stehen_die_akten_wieder_und_bleiben() {
     abgleichen(&elw1).await;
     assert_eq!(beim_gegenueber(&elw2).await, vec![k1.clone()]);
     assert_eq!(beim_gegenueber(&hub).await, vec![k1]);
+}
+
+/// Der ELW kennt einen höheren Stand der Unterschriftsschlüssel, als der Hub je vergeben hat
+/// (LLH-1853, D2).
+async fn schluessel_staende_voraus(elw: &Instanz) {
+    sqlx::query("UPDATE instanz_kopplung_org SET unterschrift_stand = unterschrift_stand + 10000")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn rueckschritt_der_fuehrung_und_der_schluessel_stehen_beide_im_hinweis() {
+    let (hub, elw) = gekoppelt().await;
+    let e = jetzt_s() + 10_000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    schluessel_staende_voraus(&elw).await;
+    nur_melden(&elw).await;
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(
+        h.contains("Führungsakten") && h.contains("Unterschriftsschlüssel"),
+        "{h:?}"
+    );
+}
+
+#[tokio::test]
+async fn gleicher_hinweis_der_fuehrung_wie_vorher_bleibt_neben_dem_rueckschritt_stehen() {
+    let (hub, elw) = gekoppelt().await;
+    // Erster Rückschritt nur der Führung: Sein Hinweis steht danach an der Kopplung.
+    let e = jetzt_s() + 10_000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    nur_melden(&elw).await;
+    let vorher = hinweis(&hub).await.unwrap_or_default();
+    assert!(vorher.contains("Führungsakten"), "{vorher:?}");
+    // Zweiter Rückschritt: Die Führung schreibt denselben Text, dazu die Schlüssel.
+    zurueckspielen(&elw, 0, 0, e + 10_000).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    schluessel_staende_voraus(&elw).await;
+    nur_melden(&elw).await;
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(
+        h.contains("Führungsakten") && h.contains("Unterschriftsschlüssel"),
+        "{h:?}"
+    );
 }
 
 // ── Zurückholen ohne gekoppelte Führung (LLH-1850) ───────────────────────────────────────────
