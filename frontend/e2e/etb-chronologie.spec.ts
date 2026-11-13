@@ -299,8 +299,7 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite
   await expect(bereich).toHaveCount(1);
   await expect(bereich.getByText(MELDUNG)).toHaveCount(1);
 
-  // Die Bilanz steht ab `xl` rechts daneben — gemessen wird gegen die Zeitachse selbst.
-  await expect(page.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeVisible();
+  // Gemessen wird gegen die Zeitachse selbst.
   const text = await bereich.locator('.markdown').first().boundingBox();
   const flaeche = await bereich.boundingBox();
   expect(text, 'Meldungstext nicht messbar').not.toBeNull();

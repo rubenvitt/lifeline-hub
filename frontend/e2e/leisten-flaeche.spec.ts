@@ -660,10 +660,11 @@ test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Han
       pfad: `/einsaetze/${matrixId}/etb`,
       verzoegern: /\/api\/einsaetze\/\d+\/etb(\?|$|\/zaehler)/,
       anker: async () =>
-        // 8 gesäte Meldungen + 2 Systemeinträge der beiden angelegten Gefahrengebiete.
+        // 8 gesäte Meldungen; die 2 Systemeinträge der beiden angelegten Gefahrengebiete sind in
+        // der Vorgabe ausgeblendet (kwc2yszv D6).
         expect(
           page.getByRole('region', { name: 'Einsatztagebuch' }).getByTestId('etb-ereigniszeile'),
-        ).toHaveCount(10),
+        ).toHaveCount(8),
     },
     {
       name: 'Lagekarte',

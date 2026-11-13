@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { systemBuendelAufklappen } from './etb-kern';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 import { ladeInDichte } from './trefflaeche-kern';
 
@@ -111,7 +111,7 @@ test('Person: aufklappen, ablegen, herunterladen, protokolliert, pseudonym im ET
   await expect(page.getByRole('cell', { name: 'Datei geladen' }).first()).toBeVisible();
 
   // ── 4 · Pseudonymer ETB-Nachweis ────────────────────────────────────────────────────
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   await expect(page.getByText('Person R-001: Foto abgelegt')).toBeVisible();
   await expect(page.getByText(/Mueller|Erika/)).toHaveCount(0);

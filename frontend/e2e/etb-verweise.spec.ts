@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
+import { etbMitSystem } from './etb-kern';
 
 /**
  * ETB verweist auf Meldung und Nachforderung (LLH-1104, Spec `etb-vorgaenge`): eine Meldung und
@@ -42,7 +43,8 @@ test('Verweise im ETB führen auf die hervorgehobene Meldung und Nachforderung (
   });
   await post(page, `${basis}/nachforderungen/${nf.id}/status`, { status: 'zugesagt' });
 
-  await page.goto(`/einsaetze/${id}/etb`);
+  // Die Stufen einer Nachforderung sind Systemeinträge, in der Vorgabe ausgeblendet (kwc2yszv D6).
+  await page.goto(etbMitSystem(id));
   const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });
   const zeilen = sicht.getByTestId('etb-ereigniszeile');
   const meldungsZeile = zeilen.filter({ hasText: 'Brücke Hauptstraße gesperrt' });

@@ -1283,8 +1283,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
     expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
     ids.push(((await eintrag.json()) as { id: number }).id);
   }
-  // Zwei Berichtigungen, damit die Bilanz Links trägt: unter `xl` steht sie unter der
-  // Zeitachse, und die Leiste klebt auch über ihr.
+  // Zwei Berichtigungen: ihre Zeilen tragen einen Rückverweis als weiteres Fokusziel.
   for (const ziel of ids.slice(0, 2)) {
     const b = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: {
@@ -1318,22 +1317,6 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
       await ausloeser.evaluateAll((els) =>
         els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
       );
-      // Unter `xl` die Links der Bilanz mit — sie stehen dann unter der Zeitachse.
-      const bilanzLinks = page
-        .getByRole('complementary', { name: 'Bilanz des Tagebuchs' })
-        .getByRole('link');
-      const mitBilanz = flaeche.width < 1200;
-      let bilanzZiele: string[] = [];
-      if (mitBilanz) {
-        await expect.poll(() => bilanzLinks.count()).toBeGreaterThanOrEqual(2);
-        bilanzZiele = await bilanzLinks.evaluateAll((els) =>
-          els.map((el, i) => {
-            const kennung = `bilanz ${i}`;
-            el.setAttribute('data-e2e-fokus', kennung);
-            return kennung;
-          }),
-        );
-      }
       const SCHRITTE = ZEILEN * 2 + 16;
       const { reserve, leiste } = await page.evaluate((sel) => {
         const l = document.querySelector(sel)!.getBoundingClientRect();
@@ -1354,9 +1337,6 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
         kern.besuchteZiele.length,
         `${lauf}: Vorbedingung — der Durchlauf muss die Zeitachse ablaufen`,
       ).toBeGreaterThanOrEqual(ANZAHL - 1);
-      for (const ziel of bilanzZiele) {
-        expect(kern.besuchteZiele, `${lauf}: Vorbedingung — ${ziel} besucht`).toContain(ziel);
-      }
 
       await page.evaluate(() => window.scrollTo(0, 0));
       await ausloeser.first().focus();
@@ -1370,7 +1350,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
         `${lauf}: kleinster freier Streifen Ziel ↔ Leiste ${streifen}px, Soll > 0`,
       ).toBeGreaterThan(0);
       gemessen.push(
-        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Ziele (davon Bilanz ${bilanzZiele.length}), Streifen ≥ ${Math.round(streifen)}px`,
+        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Ziele, Streifen ≥ ${Math.round(streifen)}px`,
       );
     }
   }

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { etbMitSystem } from './etb-kern';
 
 /**
  * Die Zeilenhöhe der ETB-Zeitachse in `kompakt` als Layout-Gate (LFH-958, Spec
@@ -140,7 +141,8 @@ test('Systemeinträge: drei stehen als eine Bündelzeile, aufgeklappt hält jede
   }
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
   await page.setViewportSize(BREITEN[0]);
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  // Systemeinträge sind in der Vorgabe aus (kwc2yszv D6).
+  await page.goto(etbMitSystem(einsatzId));
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
   const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
   const buendel = zeitachse.getByTestId('etb-buendelzeile');

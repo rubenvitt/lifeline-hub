@@ -87,10 +87,12 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   (LFH-1121): die Anlage stellt jedes Konto unter Änderungszwang, der erste Passwort-Login endete
   sonst in „Neues Passwort festlegen“ statt auf `/einsaetze`. Der Helfer erledigt den Erstwechsel
   in einem eigenen API-Kontext. Konten nur für Listenzeilen brauchen ihn nicht.
-- **Wer den Wortlaut eines Systemeintrags im ETB prüft, klappt die Bündel auf** (LLH-1106):
-  drei und mehr aufeinanderfolgende Systemeinträge stehen als eine Bündelzeile, ihr Text ist
-  nicht im DOM. Nach dem Laden des ETB `systemBuendelAufklappen(page)` aus `e2e/etb-kern.ts`;
-  sonst bestünde auch eine `toHaveCount(0)`-Prüfung nur, weil der Text zugeklappt ist.
+- **Wer den Wortlaut eines Systemeintrags im ETB prüft, blendet sie ein und klappt die Bündel auf**
+  (kwc2yszv D6, LLH-1106): in der Vorgabe sind Systemeinträge ausgeblendet, das ETB öffnet er
+  über `etbMitSystem(einsatzId)` (`system=an`). Drei und mehr aufeinanderfolgende stehen als eine
+  Bündelzeile, ihr Text ist nicht im DOM: nach dem Laden `systemBuendelAufklappen(page)`. Beide
+  aus `e2e/etb-kern.ts`; sonst bestünde auch eine `toHaveCount(0)`-Prüfung nur, weil der Text
+  ausgeblendet oder zugeklappt ist.
 - **Wer in WebKit Seitenfehler sammelt, navigiert nicht über laufende Abrufe** (LLH-1051): ein
   `goto`, das eine noch ladende Seite verlässt (Einsatzliste direkt nach der Anmeldung über das
   Formular, Org-Strom, Sitzungsprobe), bricht deren Abrufe ab. WebKit meldet jeden davon als
