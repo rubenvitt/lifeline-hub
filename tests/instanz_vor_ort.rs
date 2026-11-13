@@ -8,6 +8,7 @@ mod instanz_hilfen;
 
 use axum::http::StatusCode;
 use instanz_hilfen::*;
+use lifeline_hub::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey;
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 
@@ -524,48 +525,231 @@ async fn fuehrer(i: &Instanz, kennung: &str) -> String {
     .await
 }
 
-#[tokio::test]
-async fn die_gegenstelle_vor_ort_kann_die_fuehrung_nicht_beanspruchen() {
+// ── Führungswechsel vor Ort (LLH-1678, Change `gwcf2shk-fuehrungswechsel-vor-ort`) ──────────
+
+/// Unterschriftsschlüssel von Admin B, registriert an ELW 2 (eigener Passkey).
+fn passkey_b() -> SoftwarePasskey {
+    SoftwarePasskey::new("b", [2u8; 32])
+}
+
+async fn schluessel_b(i: &Instanz) {
+    let p = passkey_b();
+    let oeff = p.oeffentlich();
+    let mut conn = i.pool.acquire().await.unwrap();
+    lifeline_hub::auth::unterschrift::repo::create_lokal(
+        &mut conn,
+        &lifeline_hub::auth::unterschrift::repo::NeuerSchluessel {
+            org_id: 1,
+            benutzer_id: 1,
+            benutzer_name: "Admin B",
+            credential_id: &p.credential_id,
+            schluessel: &oeff,
+            rp_id: RP,
+            origin: ORIGIN,
+            bezeichnung: "Stick B",
+        },
+    )
+    .await
+    .unwrap();
+}
+
+/// Ob die Instanz den Schlüssel von Admin B als gültig führt.
+async fn kennt_b_gueltig(i: &Instanz) -> bool {
+    let n: i64 = eine(
+        &i.pool,
+        &format!(
+            "SELECT COUNT(*) FROM unterschrift_schluessel WHERE credential_id = '{}' \
+             AND zustand = 'gueltig'",
+            passkey_b().credential_id
+        ),
+    )
+    .await;
+    n > 0
+}
+
+async fn benachrichtigungen(i: &Instanz) -> Vec<String> {
+    sqlx::query_scalar("SELECT art FROM benachrichtigung ORDER BY id")
+        .fetch_all(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn post(i: &Instanz, pfad: &str, body: Value) -> (StatusCode, Value) {
+    common::anfrage_json(&i.app, "POST", pfad, &i.admin, Some(&body)).await
+}
+
+async fn fuehrung(i: &Instanz, einsatz: i64) -> Value {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fuehrung"),
+        &i.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v
+}
+
+/// ELW 1 führt einen Einsatz, den ELW 2 vor Ort spiegelt (ELW 2 hat den Code von ELW 1
+/// eingelöst): Kennung, Einsatz an ELW 1, Spiegel an ELW 2.
+struct VorOrtEinsatz {
+    elw1: Instanz,
+    elw2: Instanz,
+    kennung: String,
+    e1: i64,
+    e2: i64,
+    ich1: String,
+    ich2: String,
+}
+
+async fn vor_ort_mit_einsatz() -> VorOrtEinsatz {
     let (elw1, elw2) = vor_ort().await;
     fuehrung_an(&[&elw1, &elw2]).await;
-    let e = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
-    melden(&elw2).await;
-    abgleichen(&elw2).await;
-    let k: String = eine(
+    let e1 = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
+    for _ in 0..2 {
+        melden(&elw2).await;
+        abgleichen(&elw2).await;
+        abgleichen(&elw1).await;
+    }
+    let kennung: String = eine(
         &elw1.pool,
-        &format!("SELECT kennung FROM einsatz WHERE id = {e}"),
+        &format!("SELECT kennung FROM einsatz WHERE id = {e1}"),
+    )
+    .await;
+    let e2: i64 = eine(
+        &elw2.pool,
+        &format!("SELECT id FROM einsatz WHERE kennung = '{kennung}'"),
     )
     .await;
     let ich1 = kennung_von(&elw1).await;
     let ich2 = kennung_von(&elw2).await;
-    assert_eq!(fuehrer(&elw2, &k).await, ich1);
-    // Die Route der Notübernahme an ELW 2 endet mit 409.
-    let s2: i64 = eine(
-        &elw2.pool,
-        &format!("SELECT id FROM einsatz WHERE kennung = '{k}'"),
+    assert_eq!(fuehrer(&elw2, &kennung).await, ich1);
+    VorOrtEinsatz {
+        elw1,
+        elw2,
+        kennung,
+        e1,
+        e2,
+        ich1,
+        ich2,
+    }
+}
+
+/// ELW 2 meldet sich bei ELW 1, beide gleichen ab.
+async fn runde(v: &VorOrtEinsatz) {
+    melden(&v.elw2).await;
+    abgleichen(&v.elw2).await;
+    abgleichen(&v.elw1).await;
+}
+
+/// Notübernahme an ELW 2 mit der Unterschrift von Admin B.
+async fn elw2_uebernimmt_mit_unterschrift(v: &VorOrtEinsatz, grund: &str) {
+    let (s, start) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/notuebernahme/start", v.e2),
+        json!({"grund": grund}),
     )
     .await;
-    let (s, v) = common::anfrage_json(
-        &elw2.app,
-        "POST",
-        &format!("/api/einsaetze/{s2}/fuehrung/notuebernahme"),
-        &elw2.admin,
-        Some(&json!({"grund": "ELW 1 antwortet nicht"})),
+    assert_eq!(s, StatusCode::OK, "{start}");
+    let assertion = passkey_b().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/notuebernahme/abschluss", v.e2),
+        json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;
-    assert_eq!(s, StatusCode::CONFLICT, "{v}");
-    assert!(
-        v["error"].as_str().unwrap().contains("vor Ort gekoppelt"),
-        "{v}"
-    );
-    // ELW 2 behauptet trotzdem eine höhere Epoche mit sich als Führer.
+    assert_eq!(s, StatusCode::OK, "{r}");
+}
+
+#[tokio::test]
+async fn mit_einer_gegenstelle_vor_protokoll_4_bleibt_der_wechsel_gesperrt() {
+    let v = vor_ort_mit_einsatz().await;
     exec(
-        &elw2.pool,
+        &v.elw2.pool,
+        "UPDATE instanz_kopplung SET gegenueber_protokoll = 3",
+    )
+    .await;
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/anfragen", v.e2),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{r}");
+    assert!(
+        r["error"]
+            .as_str()
+            .unwrap()
+            .contains("braucht ein Update für den Führungswechsel vor Ort"),
+        "{r}"
+    );
+    let f = fuehrung(&v.elw2, v.e2).await;
+    assert_eq!(f["gegenueber"][0]["wechsel"], "gesperrt", "{f}");
+    assert!(f["gegenueber"][0]["wechsel_grund"]
+        .as_str()
+        .unwrap()
+        .contains("braucht ein Update"));
+}
+
+#[tokio::test]
+async fn vor_ort_geht_die_uebergabe_in_beide_richtungen() {
+    let v = vor_ort_mit_einsatz().await;
+    let f = fuehrung(&v.elw1, v.e1).await;
+    assert_eq!(f["gegenueber"][0]["wechsel"], "gleichrangig", "{f}");
+    // Die erreichte Seite übergibt an die meldende.
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/uebergeben", v.e1),
+        json!({"an": v.ich2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich2);
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich2);
+    // Und zurück: die meldende Seite übergibt an die erreichte, sobald diese alles hat.
+    runde(&v).await;
+    runde(&v).await;
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/uebergeben", v.e2),
+        json!({"an": v.ich1}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich1);
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich1);
+}
+
+#[tokio::test]
+async fn vor_ort_braucht_die_notuebernahme_einen_beweis() {
+    let v = vor_ort_mit_einsatz().await;
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/notuebernahme", v.e2),
+        json!({"grund": "ELW 1 antwortet nicht"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{r}");
+    assert!(
+        r["error"]
+            .as_str()
+            .unwrap()
+            .contains("Unterschrift oder einen"),
+        "{r}"
+    );
+    // ELW 2 behauptet trotzdem eine höhere Epoche mit sich als Führer, ohne Erklärung.
+    let ich2 = &v.ich2;
+    let k = &v.kennung;
+    exec(
+        &v.elw2.pool,
         "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1",
     )
     .await;
     exec(
-        &elw2.pool,
+        &v.elw2.pool,
         &format!(
             "UPDATE einsatz_fuehrung SET epoche_zaehler = epoche_zaehler + 5, \
              epoche_instanz = '{ich2}', fuehrer_kennung = '{ich2}', fuehrer_name = 'ELW 2', \
@@ -573,36 +757,374 @@ async fn die_gegenstelle_vor_ort_kann_die_fuehrung_nicht_beanspruchen() {
         ),
     )
     .await;
-    melden(&elw2).await;
-    assert_eq!(fuehrer(&elw1, &k).await, ich1, "ELW 1 führt weiter");
-    let hinweis = kopplungen(&elw1).await[0]["hinweis"].clone();
+    melden(&v.elw2).await;
+    assert_eq!(fuehrer(&v.elw1, k).await, v.ich1, "ELW 1 führt weiter");
+    let hinweis = kopplungen(&v.elw1).await[0]["hinweis"].clone();
     assert!(
         hinweis
             .as_str()
             .unwrap_or_default()
-            .contains("über eine Direktkopplung"),
+            .contains("ungültige Übernahme"),
         "{hinweis}"
     );
-    // Das Paneel zeigt die Gegenstelle mit ihrer Art.
-    let (s, v) = common::anfrage(
-        &elw1.app,
-        "GET",
-        &format!("/api/einsaetze/{e}/fuehrung"),
-        &elw1.admin,
-        None,
+    assert!(benachrichtigungen(&v.elw1)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
+    assert!(aktionen(&v.elw1)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+}
+
+#[tokio::test]
+async fn vor_ort_wartet_die_notuebernahme_auf_die_abgebende_seite() {
+    let v = vor_ort_mit_einsatz().await;
+    // Der Schlüssel von B kommt mit der Meldung von ELW 2 als Grundstock zu ELW 1.
+    schluessel_b(&v.elw2).await;
+    runde(&v).await;
+    assert!(kennt_b_gueltig(&v.elw1).await, "ELW 1 kennt B");
+    elw2_uebernimmt_mit_unterschrift(&v, "ELW 1 ausgefallen").await;
+    assert_eq!(
+        fuehrer(&v.elw2, &v.kennung).await,
+        v.ich2,
+        "ELW 2 führt sofort"
+    );
+    runde(&v).await;
+    assert_eq!(
+        fuehrer(&v.elw1, &v.kennung).await,
+        v.ich1,
+        "ELW 1 schreibt weiter, bis die Einsatzleitung entscheidet"
+    );
+    let f = fuehrung(&v.elw1, v.e1).await;
+    assert_eq!(f["offen"]["grund"], "ELW 1 ausgefallen", "{f}");
+    assert_eq!(f["offen"]["konflikt"], false, "{f}");
+    assert!(benachrichtigungen(&v.elw1)
+        .await
+        .contains(&"fuehrung_uebernommen".to_string()));
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/bestaetigen", v.e1),
+        json!({}),
     )
     .await;
-    assert_eq!(s, StatusCode::OK, "{v}");
-    assert_eq!(v["gegenueber"][0]["art"], "vor_ort", "{v}");
-    let (s, v) = common::anfrage_json(
-        &elw1.app,
-        "POST",
-        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
-        &elw1.admin,
-        Some(&json!({"an": ich2})),
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich2);
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich2);
+    let art: String = eine(
+        &v.elw2.pool,
+        &format!(
+            "SELECT art FROM einsatz_fuehrung WHERE kennung = '{}'",
+            v.kennung
+        ),
     )
     .await;
-    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(art, "bestaetigt", "ELW 2 trägt die Bestätigung nach");
+}
+
+#[tokio::test]
+async fn ein_widerspruch_vor_ort_gibt_die_fuehrung_ohne_hin_und_her_zurueck() {
+    let v = vor_ort_mit_einsatz().await;
+    schluessel_b(&v.elw2).await;
+    runde(&v).await;
+    elw2_uebernimmt_mit_unterschrift(&v, "ELW 1 ausgefallen").await;
+    // ELW 2 führt jetzt selbst: Admin B ist dort Einsatzleitung und bekommt den Alarm.
+    exec(
+        &v.elw2.pool,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES ({}, 1, 'einsatzleitung') ON CONFLICT DO UPDATE SET \
+             einsatz_rolle = 'einsatzleitung'",
+            v.e2
+        ),
+    )
+    .await;
+    runde(&v).await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/widersprechen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    for _ in 0..3 {
+        runde(&v).await;
+    }
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich1);
+    assert_eq!(
+        fuehrer(&v.elw2, &v.kennung).await,
+        v.ich1,
+        "ELW 2 gibt zurück"
+    );
+    assert!(benachrichtigungen(&v.elw2)
+        .await
+        .contains(&"fuehrung_ungueltig".to_string()));
+    assert!(aktionen(&v.elw2)
+        .await
+        .contains(&"fuehrung_widerspruch".to_string()));
+    let hinweis = kopplungen(&v.elw2).await[0]["hinweis"].clone();
+    assert!(
+        hinweis
+            .as_str()
+            .unwrap_or_default()
+            .contains("hat der Notübernahme widersprochen"),
+        "{hinweis}"
+    );
+    assert!(
+        !benachrichtigungen(&v.elw1)
+            .await
+            .contains(&"fuehrung_ungueltig".to_string()),
+        "kein Alarm an ELW 1: kein Hin und Her"
+    );
+}
+
+#[tokio::test]
+async fn vor_ort_gibt_auch_die_erreichte_seite_per_code_ab() {
+    let v = vor_ort_mit_einsatz().await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/code", v.e1),
+        json!({"an": v.ich2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let code = r["code"].as_str().unwrap().to_string();
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/notuebernahme/code", v.e2),
+        json!({"grund": "Code per Funk", "code": code}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich2);
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich2);
+    assert!(
+        !benachrichtigungen(&v.elw1)
+            .await
+            .contains(&"fuehrung_ungueltig".to_string()),
+        "der Code trägt"
+    );
+}
+
+#[tokio::test]
+async fn eine_anfrage_vor_ort_entscheidet_die_einsatzleitung() {
+    let v = vor_ort_mit_einsatz().await;
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/anfragen", v.e2),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    for _ in 0..3 {
+        runde(&v).await;
+    }
+    assert_eq!(
+        fuehrer(&v.elw1, &v.kennung).await,
+        v.ich1,
+        "nicht von selbst"
+    );
+    let f = fuehrung(&v.elw1, v.e1).await;
+    assert_eq!(f["anfrage_eingang"]["kennung"], v.ich2, "{f}");
+    let angefragt = |b: Vec<String>| b.iter().filter(|a| *a == "fuehrung_angefragt").count();
+    assert_eq!(angefragt(benachrichtigungen(&v.elw1).await), 1);
+    // Ablehnen: ELW 2 sieht „abgelehnt“, der Eingang verschwindet.
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/anfrage/ablehnen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    runde(&v).await;
+    let f2 = fuehrung(&v.elw2, v.e2).await;
+    assert_eq!(f2["anfrage_abgelehnt"], true, "{f2}");
+    assert_eq!(f2["anfrage_offen"], false, "{f2}");
+    let f = fuehrung(&v.elw1, v.e1).await;
+    assert!(f.get("anfrage_eingang").is_none(), "{f}");
+    // Ohne wartende Anfrage gibt es nichts abzulehnen.
+    let (s, _) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/anfrage/ablehnen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    // Eine neue Anfrage zeigt sich wieder; „Übergeben“ ist die reguläre Übergabe.
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/anfragen", v.e2),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert_eq!(fuehrung(&v.elw2, v.e2).await["anfrage_abgelehnt"], false);
+    runde(&v).await;
+    assert_eq!(
+        fuehrung(&v.elw1, v.e1).await["anfrage_eingang"]["kennung"],
+        v.ich2
+    );
+    assert_eq!(angefragt(benachrichtigungen(&v.elw1).await), 2);
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/uebergeben", v.e1),
+        json!({"an": v.ich2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich2);
+    assert!(fuehrung(&v.elw1, v.e1)
+        .await
+        .get("anfrage_eingang")
+        .is_none());
+}
+
+/// Hub, ELW 1 und ELW 2 (beide beim Hub, ELW 2 vor Ort bei ELW 1) mit einem Einsatz von ELW 1,
+/// den Hub und ELW 2 spiegeln.
+async fn hub_mit_einsatz_von_elw1() -> (Instanz, VorOrtEinsatz) {
+    let (hub, elw1, elw2) = hub_und_zwei_elw().await;
+    fuehrung_an(&[&hub, &elw1, &elw2]).await;
+    let e1 = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
+    for _ in 0..2 {
+        melden(&elw1).await;
+        abgleichen(&elw1).await;
+        abgleichen(&hub).await;
+        melden(&elw2).await;
+        abgleichen(&elw2).await;
+    }
+    let kennung: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e1}"),
+    )
+    .await;
+    let e2: i64 = eine(
+        &elw2.pool,
+        &format!("SELECT id FROM einsatz WHERE kennung = '{kennung}'"),
+    )
+    .await;
+    let ich1 = kennung_von(&elw1).await;
+    let ich2 = kennung_von(&elw2).await;
+    assert_eq!(fuehrer(&hub, &kennung).await, ich1);
+    (
+        hub,
+        VorOrtEinsatz {
+            elw1,
+            elw2,
+            kennung,
+            e1,
+            e2,
+            ich1,
+            ich2,
+        },
+    )
+}
+
+/// ELW 1 fällt aus: ELW 2 erreicht es nicht mehr.
+async fn elw1_faellt_aus(v: &VorOrtEinsatz) {
+    exec(
+        &v.elw2.pool,
+        &format!(
+            "UPDATE instanz_kopplung SET gegenueber_adresse = 'https://127.0.0.1:1' \
+             WHERE gegenueber_kennung = '{}'",
+            v.ich1
+        ),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn der_hub_zieht_eine_uebergabe_zwischen_zwei_elw_nach_dem_zeugnis_nach() {
+    let (hub, v) = hub_mit_einsatz_von_elw1().await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/uebergeben", v.e1),
+        json!({"an": v.ich2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    melden(&v.elw2).await;
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich2);
+    // ELW 2 meldet sich beim Hub, bevor ELW 1 es tut: Die Führung liegt dort noch bei ELW 1.
+    assert_eq!(fuehrer(&hub, &v.kennung).await, v.ich1);
+    // ELW 1, der bisherige Führer, bezeugt die Abgabe.
+    melden(&v.elw1).await;
+    assert_eq!(fuehrer(&hub, &v.kennung).await, v.ich2);
+}
+
+#[tokio::test]
+async fn der_hub_folgt_einer_notuebernahme_vor_ort_mit_bestaetigtem_schluessel() {
+    let (hub, v) = hub_mit_einsatz_von_elw1().await;
+    schluessel_b(&v.elw2).await;
+    melden(&v.elw2).await;
+    // Am Hub wartet der Schlüssel von B auf die Bestätigung eines Admins.
+    let zustand: String = eine(
+        &hub.pool,
+        &format!(
+            "SELECT zustand FROM unterschrift_schluessel WHERE credential_id = '{}'",
+            passkey_b().credential_id
+        ),
+    )
+    .await;
+    assert_eq!(zustand, "wartet_auf_bestaetigung");
+    exec(
+        &hub.pool,
+        &format!(
+            "UPDATE unterschrift_schluessel SET zustand = 'gueltig' WHERE credential_id = '{}'",
+            passkey_b().credential_id
+        ),
+    )
+    .await;
+    abgleichen(&v.elw2).await;
+    elw1_faellt_aus(&v).await;
+    elw2_uebernimmt_mit_unterschrift(&v, "ELW 1 ausgefallen").await;
+    melden(&v.elw2).await;
+    assert_eq!(fuehrer(&hub, &v.kennung).await, v.ich2);
+    assert!(aktionen(&hub)
+        .await
+        .contains(&"fuehrung_notuebernahme".to_string()));
+}
+
+#[tokio::test]
+async fn ohne_bestaetigten_schluessel_und_ohne_zeugen_lehnt_der_hub_ab() {
+    let (hub, v) = hub_mit_einsatz_von_elw1().await;
+    // ELW 1 gibt per Code ab, meldet sich aber nicht mehr beim Hub.
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/code", v.e1),
+        json!({"an": v.ich2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let code = r["code"].as_str().unwrap().to_string();
+    elw1_faellt_aus(&v).await;
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/notuebernahme/code", v.e2),
+        json!({"grund": "Code per Funk", "code": code}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    melden(&v.elw2).await;
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich2);
+    assert_eq!(
+        fuehrer(&hub, &v.kennung).await,
+        v.ich1,
+        "ein Code genügt dem Hub nicht"
+    );
+    let hinweise: Vec<Option<String>> =
+        sqlx::query_scalar("SELECT hinweis FROM instanz_kopplung ORDER BY id")
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert!(
+        hinweise
+            .iter()
+            .flatten()
+            .any(|h| h.contains("beansprucht die Führung")),
+        "{hinweise:?}"
+    );
 }
 
 #[tokio::test]

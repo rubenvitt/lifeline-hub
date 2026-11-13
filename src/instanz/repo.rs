@@ -56,6 +56,11 @@ impl KopplungZeile {
     pub fn art(&self) -> InstanzKopplungArt {
         InstanzKopplungArt::parse(&self.art).unwrap_or(InstanzKopplungArt::VorOrt)
     }
+
+    /// Regel des Führungswechsels zu diesem Gegenüber (LLH-1678, design.md D1).
+    pub fn wechselregel(&self) -> super::Wechselregel {
+        super::wechselregel(self.art(), self.gegenueber_protokoll)
+    }
 }
 
 const KOPPLUNG_SPALTEN: &str = "id, gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
@@ -84,11 +89,66 @@ pub struct OrgZeile {
     pub stammdaten_arten: Option<String>,
     /// Meldende Seite: Hinweise aus der Übernahme, zeilenweise.
     pub stammdaten_hinweis: Option<String>,
+    /// Erreichte Seite einer Direktkopplung: bis zu diesem Stand gelten die Schlüssel der meldenden
+    /// Seite als Grundstock (LLH-1678, design.md D6).
+    pub unterschrift_grundstock_bis: Option<i64>,
+    /// Meldende Seite einer Direktkopplung: bis hierher hat die erreichte Seite die eigenen
+    /// Schlüssel quittiert (LLH-1678, design.md D6).
+    pub unterschrift_gesendet_bis: i64,
 }
 
 const ORG_SPALTEN: &str = "id, kopplung_id, org_id, fremde_org_kennung, fremde_org_name, \
      angelegt_at, widerrufen_at, widerruf_gemeldet_at, unterschrift_stand, stammdaten_stand, \
-     stammdaten_arten, stammdaten_hinweis";
+     stammdaten_arten, stammdaten_hinweis, unterschrift_grundstock_bis, unterschrift_gesendet_bis";
+
+/// Erreichte Seite einer Direktkopplung: setzt einmal, bis zu welchem Stand die Schlüssel der
+/// meldenden Seite als Grundstock gelten, und liefert den geltenden Wert (LLH-1678, design.md D6).
+pub async fn save_unterschrift_grundstock_bis(
+    conn: &mut SqliteConnection,
+    kopplung_org_id: i64,
+    bis: i64,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar(
+        "UPDATE instanz_kopplung_org \
+         SET unterschrift_grundstock_bis = COALESCE(unterschrift_grundstock_bis, ?) \
+         WHERE id = ? RETURNING unterschrift_grundstock_bis",
+    )
+    .bind(bis)
+    .bind(kopplung_org_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Meldende Seite einer Direktkopplung: die Quittung der erreichten Seite für die eigenen
+/// Schlüssel, nur vorwärts (LLH-1678, design.md D6).
+pub async fn save_unterschrift_gesendet_bis(
+    conn: &mut SqliteConnection,
+    kopplung_org_id: i64,
+    bis: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE instanz_kopplung_org \
+         SET unterschrift_gesendet_bis = MAX(unterschrift_gesendet_bis, ?) WHERE id = ?",
+    )
+    .bind(bis)
+    .bind(kopplung_org_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
+/// Wie weit die Schlüssel des Gegenübers dieser Zuordnung hier übernommen sind.
+pub async fn load_unterschrift_stand(
+    conn: &mut SqliteConnection,
+    kopplung_org_id: i64,
+) -> Result<i64, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT unterschrift_stand FROM instanz_kopplung_org WHERE id = ?")
+            .bind(kopplung_org_id)
+            .fetch_one(&mut *conn)
+            .await?,
+    )
+}
 
 // ── Kopplungscodes ───────────────────────────────────────────────────────────────────────────
 

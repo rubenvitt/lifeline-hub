@@ -48,6 +48,12 @@ const SPALTEN: &str = "id, org_id, herkunft, kopplung_org_id, fremde_id, benutze
      benutzer_name, credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, \
      zustand, gegenzeichnung, stand, erstellt_at, widerrufen_at";
 
+/// [`SPALTEN`] mit dem Tabellenpräfix `s.`.
+const SPALTEN_S: &str = "s.id, s.org_id, s.herkunft, s.kopplung_org_id, s.fremde_id, \
+     s.benutzer_id, s.benutzer_name, s.credential_id, s.alg, s.schluessel, s.rp_id, s.origin, \
+     s.bezeichnung, s.fingerabdruck, s.zustand, s.gegenzeichnung, s.stand, s.erstellt_at, \
+     s.widerrufen_at";
+
 impl SchluesselZeile {
     pub fn zustand(&self) -> UnterschriftSchluesselZustand {
         UnterschriftSchluesselZustand::parse(&self.zustand)
@@ -73,6 +79,7 @@ impl SchluesselZeile {
             zustand: self.zustand(),
             gegenzeichnung: self.gegenzeichnung(),
             stand: self.stand,
+            aufnahme_org: None,
         }
     }
 
@@ -86,11 +93,15 @@ impl SchluesselZeile {
     }
 }
 
-/// Nächster `stand` der lokalen Schlüssel einer Org.
+/// Nächster `stand` der lokalen Schlüssel einer Org. Dieselbe Zählung trägt `weiter_stand` der
+/// übernommenen Schlüssel, die diese Instanz über eine Direktkopplung weiterreicht (LLH-1678,
+/// design.md D6).
 async fn next_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
-        "SELECT COALESCE(MAX(stand), 0) + 1 FROM unterschrift_schluessel \
-         WHERE org_id = ? AND herkunft = 'lokal'",
+        "SELECT MAX(COALESCE((SELECT MAX(stand) FROM unterschrift_schluessel \
+                               WHERE org_id = ?1 AND herkunft = 'lokal'), 0), \
+                      COALESCE((SELECT MAX(weiter_stand) FROM unterschrift_schluessel \
+                               WHERE org_id = ?1), 0)) + 1",
     )
     .bind(org_id)
     .fetch_one(&mut *conn)
@@ -325,20 +336,60 @@ async fn decide(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<bool, AppError> {
+    let weiter = next_stand(conn, org_id).await?;
     let n = sqlx::query(
-        "UPDATE unterschrift_schluessel SET zustand = ?, entschieden_at = ?, entschieden_von = ? \
-         WHERE id = ? AND org_id = ? AND herkunft = 'gegenueber' \
+        "UPDATE unterschrift_schluessel SET zustand = ?, entschieden_at = ?, entschieden_von = ?, \
+         weiter_stand = ? WHERE id = ? AND org_id = ? AND herkunft = 'gegenueber' \
          AND zustand = 'wartet_auf_bestaetigung'",
     )
     .bind(zustand.as_str())
     .bind(jetzt)
     .bind(benutzer_id)
+    .bind(weiter)
     .bind(id)
     .bind(org_id)
     .execute(&mut *conn)
     .await?
     .rows_affected();
     Ok(n == 1)
+}
+
+/// Widerruft jede weitere Zeile der Org mit derselben Credential-ID (LLH-1678, design.md D6; Spec
+/// `org-admin-unterschrift`, „Ein Widerruf gilt für den Schlüssel, nicht für die Lieferung“): Ein
+/// Schlüssel, den diese Instanz über mehrere Kopplungen kennt, gilt nach seinem Widerruf über
+/// keine mehr. Jede Zeile bekommt einen neuen Stand, damit der Widerruf weiterwandert.
+async fn widerrufe_credential(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    credential_id: &str,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    let ids: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, herkunft FROM unterschrift_schluessel WHERE org_id = ? AND credential_id = ? \
+         AND zustand NOT IN ('widerrufen', 'abgelehnt')",
+    )
+    .bind(org_id)
+    .bind(credential_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (id, herkunft) in ids {
+        let stand = next_stand(conn, org_id).await?;
+        let spalte = if herkunft == "lokal" {
+            "stand"
+        } else {
+            "weiter_stand"
+        };
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
+             widerrufen_at = COALESCE(widerrufen_at, ?), {spalte} = ? WHERE id = ?"
+        )))
+        .bind(jetzt)
+        .bind(stand)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
 }
 
 /// Widerruft einen lokalen Schlüssel; `false`, wenn er schon widerrufen war.
@@ -360,6 +411,14 @@ pub async fn widerrufen(
     .execute(&mut *conn)
     .await?
     .rows_affected();
+    if n == 1 {
+        let credential: String =
+            sqlx::query_scalar("SELECT credential_id FROM unterschrift_schluessel WHERE id = ?")
+                .bind(id)
+                .fetch_one(&mut *conn)
+                .await?;
+        widerrufe_credential(conn, org_id, &credential, jetzt).await?;
+    }
     Ok(n == 1)
 }
 
@@ -389,56 +448,125 @@ pub async fn alle_des_benutzers_widerrufen(
 /// Grundstock beim Koppeln: alle gültigen lokalen Schlüssel der Org und der höchste Stand. Mehr
 /// als [`LIEFERUNGEN_MAX`] sind ein 409 statt eines abgeschnittenen Grundstocks: was danach mit der
 /// Nachlieferung käme, bräuchte eine Gegenzeichnung, die ein Schlüssel aus der Zeit vor der
-/// Kopplung nicht hat, und ginge still verloren.
+/// Kopplung nicht hat, und ginge still verloren. Über eine Direktkopplung (`weiter`) gehören die
+/// gültigen übernommenen Schlüssel dazu, ohne die der Zuordnung `weiter` selbst (LLH-1678,
+/// design.md D6).
 pub async fn grundstock(
     conn: &mut SqliteConnection,
     org_id: i64,
+    weiter: Weiter,
 ) -> Result<(Vec<UnterschriftSchluesselLieferung>, i64), AppError> {
-    let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
-         AND zustand = 'gueltig' ORDER BY stand LIMIT {}",
-        LIEFERUNGEN_MAX + 1
-    )))
-    .bind(org_id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let zeilen = list_lieferbar(conn, org_id, 0, LIEFERUNGEN_MAX + 1, weiter, true).await?;
     if zeilen.len() > LIEFERUNGEN_MAX {
         return Err(AppError::Conflict(format!(
             "Die Organisation hat mehr als {LIEFERUNGEN_MAX} gültige Unterschriftsschlüssel. \
              Bitte vor dem Koppeln die überzähligen widerrufen."
         )));
     }
-    let stand: i64 = sqlx::query_scalar(
-        "SELECT COALESCE(MAX(stand), 0) FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal'",
-    )
-    .bind(org_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    Ok((
-        zeilen.iter().map(SchluesselZeile::lieferung).collect(),
-        stand,
-    ))
+    let stand = next_stand(conn, org_id).await? - 1;
+    Ok((zeilen, stand))
 }
 
 /// Nachlieferung beim Melden: was sich an gültigen oder widerrufenen lokalen Schlüsseln der Org
 /// seit `seit` geändert hat, höchstens `hoechstens` (gedeckelt auf [`LIEFERUNGEN_MAX`]). Wartende
-/// gehen nie hinaus.
+/// gehen nie hinaus. Über eine Direktkopplung (`weiter`) auch die übernommenen Schlüssel, deren
+/// `weiter_stand` über `seit` liegt (LLH-1678, design.md D6).
 pub async fn nachlieferung(
     conn: &mut SqliteConnection,
     org_id: i64,
     seit: i64,
     hoechstens: usize,
+    weiter: Weiter,
 ) -> Result<Vec<UnterschriftSchluesselLieferung>, AppError> {
-    let zeilen: Vec<SchluesselZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
-         AND stand > ? AND zustand IN ('gueltig', 'widerrufen') ORDER BY stand LIMIT ?"
-    )))
-    .bind(org_id)
-    .bind(seit)
-    .bind(hoechstens.min(LIEFERUNGEN_MAX) as i64)
-    .fetch_all(&mut *conn)
-    .await?;
-    Ok(zeilen.iter().map(SchluesselZeile::lieferung).collect())
+    list_lieferbar(
+        conn,
+        org_id,
+        seit,
+        hoechstens.min(LIEFERUNGEN_MAX),
+        weiter,
+        false,
+    )
+    .await
+}
+
+/// Höchster Stand der Org in der Zählung dieser Instanz (lokal und weitergereicht): bis dahin gilt
+/// die erste Lieferung über eine Direktkopplung als Grundstock (LLH-1678, design.md D6).
+pub async fn hoechster_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64, AppError> {
+    Ok(next_stand(conn, org_id).await? - 1)
+}
+
+/// Ob eine Lieferung übernommene Schlüssel weiterreicht (LLH-1678, design.md D6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Weiter {
+    /// Standardkopplung: nur hier registrierte Schlüssel.
+    NurLokal,
+    /// Direktkopplung: auch übernommene, außer denen, die über diese Org-Zuordnung kamen.
+    AusserZuordnung(i64),
+}
+
+/// Lieferbare Schlüssel nach ihrem Stand in der Zählung dieser Instanz (`stand` der lokalen,
+/// `weiter_stand` der übernommenen). `nur_gueltig` für den Grundstock, sonst auch widerrufene.
+async fn list_lieferbar(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    seit: i64,
+    limit: usize,
+    weiter: Weiter,
+    nur_gueltig: bool,
+) -> Result<Vec<UnterschriftSchluesselLieferung>, AppError> {
+    let zustaende = if nur_gueltig {
+        "('gueltig')"
+    } else {
+        "('gueltig', 'widerrufen')"
+    };
+    let ausser = match weiter {
+        Weiter::NurLokal => None,
+        Weiter::AusserZuordnung(ko) => Some(ko),
+    };
+    let zeilen: Vec<(SchluesselZeile, i64, Option<String>)> = {
+        let rows: Vec<WeiterZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+            "SELECT {SPALTEN_S}, \
+                    CASE WHEN s.herkunft = 'lokal' THEN s.stand ELSE s.weiter_stand END \
+                        AS lieferstand, \
+                    CASE WHEN s.herkunft = 'lokal' THEN NULL ELSE o.fremde_org_kennung END \
+                        AS aufnahme_org \
+             FROM unterschrift_schluessel s \
+             LEFT JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+             WHERE s.org_id = ?1 AND s.zustand IN {zustaende} \
+               AND (s.herkunft = 'lokal' \
+                    OR (?2 IS NOT NULL AND s.herkunft = 'gegenueber' \
+                        AND s.weiter_stand IS NOT NULL AND s.kopplung_org_id <> ?2)) \
+               AND CASE WHEN s.herkunft = 'lokal' THEN s.stand ELSE s.weiter_stand END > ?3 \
+             ORDER BY lieferstand, s.id LIMIT ?4"
+        )))
+        .bind(org_id)
+        .bind(ausser)
+        .bind(seit)
+        .bind(limit as i64)
+        .fetch_all(&mut *conn)
+        .await?;
+        rows.into_iter()
+            .map(|r| (r.zeile, r.lieferstand, r.aufnahme_org))
+            .collect()
+    };
+    Ok(zeilen
+        .into_iter()
+        .map(|(z, stand, aufnahme_org)| {
+            let mut l = z.lieferung();
+            l.stand = stand;
+            l.aufnahme_org = aufnahme_org;
+            l
+        })
+        .collect())
+}
+
+/// Eine lieferbare Zeile samt ihrem Stand in der Zählung dieser Instanz.
+#[derive(sqlx::FromRow)]
+struct WeiterZeile {
+    #[sqlx(flatten)]
+    zeile: SchluesselZeile,
+    lieferstand: i64,
+    aufnahme_org: Option<String>,
 }
 
 /// Ein vom Gegenüber gelieferter Schlüssel, den diese Instanz verworfen hat.
@@ -455,6 +583,8 @@ pub struct Ziel<'a> {
     pub kopplung_org_id: i64,
     pub org_id: i64,
     pub fremde_org_kennung: &'a str,
+    /// Direktkopplung: gelieferte Schlüssel dürfen weitergereicht sein (`aufnahme_org`, LLH-1678).
+    pub vor_ort: bool,
 }
 
 /// Warum eine Gegenzeichnung nicht trägt.
@@ -483,8 +613,14 @@ fn check_gegenzeichnung(
         serde_json::from_str(&g.erklaerung).map_err(|_| verwerfen("Erklärung unlesbar"))?;
     let schluessel_bytes =
         parse_b64(&l.schluessel).ok_or_else(|| verwerfen("Schlüssel unlesbar"))?;
+    // Weitergereicht über eine Direktkopplung: die Erklärung nennt die Org, unter der die
+    // weiterreichende Instanz den Schlüssel bekam (LLH-1678, design.md D6).
+    let org = match (&l.aufnahme_org, ziel.vor_ort) {
+        (Some(o), true) => o.as_str(),
+        _ => ziel.fremde_org_kennung,
+    };
     if e.typ != TYP_AUFNAHME
-        || e.org != ziel.fremde_org_kennung
+        || e.org != org
         || e.credential_id != l.credential_id
         || e.schluessel_hash != sha256_b64(&schluessel_bytes)
         || e.rp_id != l.rp_id
@@ -528,6 +664,39 @@ pub async fn accept_lieferungen(
     grundstock: bool,
     jetzt: &str,
 ) -> Result<Vec<Abgelehnt>, AppError> {
+    let bis = grundstock.then_some(i64::MAX);
+    accept_lieferungen_bis(
+        conn,
+        ziel,
+        lieferungen,
+        bis,
+        GegenzeichnungPflicht::Pflicht,
+        jetzt,
+    )
+    .await
+}
+
+/// Ob ein nachgelieferter Schlüssel eine Gegenzeichnung braucht (LLH-1678, design.md D6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GegenzeichnungPflicht {
+    /// Wie bisher: nur mit Gegenzeichnung eines hier gültigen Schlüssels dieser Zuordnung.
+    Pflicht,
+    /// Schlüssel der meldenden Seite einer Standardkopplung (der ELW am Hub): Der ELW zeichnet
+    /// seine Schlüssel nicht gegen, also wartet jeder ohne Prüfung auf die Bestätigung eines
+    /// Admins hier. Sie dienen nur der Prüfung einer Notübernahme zwischen zwei ELW.
+    NurBestaetigung,
+}
+
+/// Wie [`accept_lieferungen`], aber als Grundstock gilt nur, was bis `grundstock_bis` reicht: die
+/// erste Lieferung der meldenden Seite einer Direktkopplung (LLH-1678, design.md D6).
+pub async fn accept_lieferungen_bis(
+    conn: &mut SqliteConnection,
+    ziel: &Ziel<'_>,
+    lieferungen: &[UnterschriftSchluesselLieferung],
+    grundstock_bis: Option<i64>,
+    gegenzeichnung: GegenzeichnungPflicht,
+    jetzt: &str,
+) -> Result<Vec<Abgelehnt>, AppError> {
     if lieferungen.len() > LIEFERUNGEN_MAX {
         return Err(AppError::Validation(format!(
             "Eine Lieferung darf höchstens {LIEFERUNGEN_MAX} Unterschriftsschlüssel je Org enthalten."
@@ -540,6 +709,7 @@ pub async fn accept_lieferungen(
     // ab dort liefert das Gegenüber erneut.
     let mut zurueckgestellt: Option<i64> = None;
     for l in lieferungen {
+        let grundstock = grundstock_bis.is_some_and(|bis| l.stand <= bis);
         let fp = parse_b64(&l.schluessel)
             .map(|b| fingerabdruck(&b))
             .unwrap_or_default();
@@ -554,15 +724,20 @@ pub async fn accept_lieferungen(
             // Ein hier zurückgewiesener bleibt es: die Entscheidung eines Menschen hier geht vor.
             (UnterschriftSchluesselZustand::Widerrufen, Some((_, z))) if z == "abgelehnt" => {}
             (UnterschriftSchluesselZustand::Widerrufen, Some((id, _))) => {
+                let weiter = next_stand(conn, ziel.org_id).await?;
                 sqlx::query(
                     "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
-                     widerrufen_at = COALESCE(widerrufen_at, ?), stand = ? WHERE id = ?",
+                     widerrufen_at = COALESCE(widerrufen_at, ?), stand = ?, \
+                     weiter_stand = CASE WHEN zustand = 'gueltig' THEN ? ELSE weiter_stand END \
+                     WHERE id = ?",
                 )
                 .bind(jetzt)
                 .bind(l.stand)
+                .bind(weiter)
                 .bind(id)
                 .execute(&mut *conn)
                 .await?;
+                widerrufe_credential(conn, ziel.org_id, &l.credential_id, jetzt).await?;
             }
             // Ein unbekannter widerrufener oder ein noch wartender Schlüssel ändert nichts; ein
             // hier schon bekannter gültiger auch nicht, gleich ob er hier gilt, wartet oder
@@ -576,12 +751,17 @@ pub async fn accept_lieferungen(
             (UnterschriftSchluesselZustand::Gueltig, None) => {
                 // Derselbe Schlüssel unter anderer id: ein widerrufener lebt nie wieder auf, ein
                 // gültiger steht schon da.
+                // Widerrufen oder hier zurückgewiesen gilt org-weit, gleich über welche
+                // Kopplung der Schlüssel kam (LLH-1678, design.md D6).
                 let schon: Option<String> = sqlx::query_scalar(
-                    "SELECT zustand FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
-                     AND (credential_id = ? OR schluessel = ?) \
+                    "SELECT zustand FROM unterschrift_schluessel \
+                     WHERE (kopplung_org_id = ?1 \
+                            OR (org_id = ?2 AND zustand IN ('widerrufen', 'abgelehnt'))) \
+                     AND (credential_id = ?3 OR schluessel = ?4) \
                      ORDER BY zustand IN ('widerrufen', 'abgelehnt') DESC LIMIT 1",
                 )
                 .bind(ziel.kopplung_org_id)
+                .bind(ziel.org_id)
                 .bind(&l.credential_id)
                 .bind(&l.schluessel)
                 .fetch_optional(&mut *conn)
@@ -610,7 +790,7 @@ pub async fn accept_lieferungen(
                     });
                     continue;
                 }
-                if !grundstock {
+                if !grundstock && gegenzeichnung == GegenzeichnungPflicht::Pflicht {
                     let bekannte: Vec<SchluesselZeile> =
                         sqlx::query_as(sqlx::AssertSqlSafe(format!(
                         "SELECT {SPALTEN} FROM unterschrift_schluessel WHERE kopplung_org_id = ? \
@@ -639,8 +819,8 @@ pub async fn accept_lieferungen(
                 sqlx::query(
                     "INSERT INTO unterschrift_schluessel (org_id, herkunft, kopplung_org_id, \
                      fremde_id, benutzer_name, credential_id, alg, schluessel, rp_id, origin, \
-                     bezeichnung, fingerabdruck, zustand, gegenzeichnung, stand) \
-                     VALUES (?, 'gegenueber', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                     bezeichnung, fingerabdruck, zustand, gegenzeichnung, stand, weiter_stand) \
+                     VALUES (?, 'gegenueber', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 )
                 .bind(ziel.org_id)
                 .bind(ziel.kopplung_org_id)
@@ -666,6 +846,12 @@ pub async fn accept_lieferungen(
                         .map(|g| serde_json::to_string(g).expect("serialisierbar")),
                 )
                 .bind(l.stand)
+                // Ein sofort gültiger (Grundstock) geht über eine Direktkopplung weiter.
+                .bind(if grundstock {
+                    Some(next_stand(conn, ziel.org_id).await?)
+                } else {
+                    None
+                })
                 .execute(&mut *conn)
                 .await?;
             }

@@ -58,7 +58,7 @@ wire_enum! {
 wire_enum! {
     /// Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
     /// fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0316_einsatz_fuehrung.sql`)
+    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0347_benachrichtigung_fuehrung_angefragt.sql`)
     /// spiegelt `ALLE`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, ToSchema)]
     pub enum BenachrichtigungArt {
@@ -104,6 +104,9 @@ wire_enum! {
         FuehrungUngueltig => "fuehrung_ungueltig",
         /// Eine gültige Notübernahme wartet auf die Entscheidung der Einsatzleitung (LLH-1491).
         FuehrungUebernommen => "fuehrung_uebernommen",
+        /// Die Gegenstelle einer Direktkopplung bittet um die Führung; die Einsatzleitung
+        /// entscheidet (LLH-1678, Spec `benachrichtigungen`, „Führung angefragt“).
+        FuehrungAngefragt => "fuehrung_angefragt",
     }
     try_from = |s| format!("Ungültige Benachrichtigungsart: {s}");
 }
@@ -142,7 +145,8 @@ impl BenachrichtigungArt {
             | BenachrichtigungArt::ChatErwaehnung
             | BenachrichtigungArt::EinsatzAufnahme
             | BenachrichtigungArt::EinsatzNeu
-            | BenachrichtigungArt::FuehrungUebernommen => BenachrichtigungStufe::Hinweis,
+            | BenachrichtigungArt::FuehrungUebernommen
+            | BenachrichtigungArt::FuehrungAngefragt => BenachrichtigungStufe::Hinweis,
         }
     }
 

@@ -161,6 +161,15 @@ async fn run_anfragen(state: &AppState, a: &AkteZeile) -> Result<FuehrungAnzeige
     danach(state, &saved).await
 }
 
+async fn run_anfrage_ablehnen(
+    state: &AppState,
+    a: &AkteZeile,
+    b: &Benutzer,
+) -> Result<FuehrungAnzeige, AppError> {
+    let saved = dienst::anfrage_ablehnen(&state.pool, a.id, &b.anzeigename).await?;
+    danach(state, &saved).await
+}
+
 async fn run_notuebernahme(
     state: &AppState,
     a: &AkteZeile,
@@ -450,6 +459,16 @@ pub async fn anfragen(
     Ok(Json(run_anfragen(&state, &a).await?))
 }
 
+/// POST /api/einsaetze/{id}/fuehrung/anfrage/ablehnen — die Anfrage der Gegenstelle vor Ort
+/// ablehnen (LLH-1678).
+pub async fn anfrage_ablehnen(
+    State(state): State<AppState>,
+    ctx: EinsatzFuehrungszugriff,
+) -> Result<Json<FuehrungAnzeige>, AppError> {
+    let a = akte_des_einsatzes(&state, ctx.einsatz.id).await?;
+    Ok(Json(run_anfrage_ablehnen(&state, &a, &ctx.benutzer).await?))
+}
+
 /// POST /api/einsaetze/{id}/fuehrung/notuebernahme — gegen die erreichte Seite, mit Grund.
 pub async fn notuebernahme(
     State(state): State<AppState>,
@@ -578,6 +597,15 @@ pub async fn admin_anfragen(
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
     let a = akte_fremd(&state, &admin, id).await?;
     Ok(Json(run_anfragen(&state, &a).await?))
+}
+
+pub async fn admin_anfrage_ablehnen(
+    State(state): State<AppState>,
+    AdminUser(admin): AdminUser,
+    PfadParam(id): PfadParam<i64>,
+) -> Result<Json<FuehrungAnzeige>, AppError> {
+    let a = akte_fremd(&state, &admin, id).await?;
+    Ok(Json(run_anfrage_ablehnen(&state, &a, &admin).await?))
 }
 
 pub async fn admin_notuebernahme(

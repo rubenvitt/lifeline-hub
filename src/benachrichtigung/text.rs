@@ -52,6 +52,7 @@ pub const fn titel(art: BenachrichtigungArt) -> &'static str {
         BenachrichtigungArt::EinsatzNeu => "Neuer Einsatz",
         BenachrichtigungArt::FuehrungUngueltig => "Ungültige Übernahme der Führung",
         BenachrichtigungArt::FuehrungUebernommen => "Führung übernommen",
+        BenachrichtigungArt::FuehrungAngefragt => "Führung angefragt",
         BenachrichtigungArt::Unwetter => "Unwetterwarnung",
     }
 }

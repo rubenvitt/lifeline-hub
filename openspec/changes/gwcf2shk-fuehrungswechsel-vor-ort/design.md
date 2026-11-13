@@ -389,3 +389,29 @@ Die Nummern müssen größer sein als jede auf `origin/alpha` (heute 0345), vorh
      dahin gilt die Sperre mit Hinweis.
 3. Rückweg: Eine Instanz mit Protokoll 3 überliest die neuen Felder. Liegt eine Akte offen, bleibt
    sie dort bestehen. Die neuen Spalten stören ältere Lesepfade nicht.
+
+## Nachträge
+
+- **13.11.2026, D5/D6: ELW-Schlüssel zum Hub (mit Ruben abgestimmt).** Beim Umsetzen zeigte sich:
+  Eine Unterschrift entsteht immer mit einem Schlüssel der unterschreibenden Instanz, denn ein
+  Passkey ist an deren Adresse gebunden. Der Hub kannte nur seine eigenen Schlüssel, Regel (b) hätte
+  also nie gegriffen. Deshalb liefert die meldende Seite einer Standardkopplung dem Hub jetzt ihre
+  hier registrierten Schlüssel (`GegenzeichnungPflicht::NurBestaetigung`):
+  - ohne Gegenzeichnung, denn ein ELW zeichnet nicht gegen;
+  - jeder wartet auf die Bestätigung eines Admins am Hub, ein Grundstock entsteht dort nicht;
+  - der Hub reicht sie nicht weiter.
+
+  Verworfen wurde „(b) entfällt, nur der Zeuge“: Bei einem zerstörten ELW 1 bräuchte es dann eine
+  Notübernahme durch den Hub-Admin und eine Übergabe an ELW 2.
+- **13.11.2026, D6: Quittung an der meldenden Seite.** Die meldende Seite merkt sich, wie weit die
+  erreichte Seite ihre Schlüssel quittiert hat (`instanz_kopplung_org.unterschrift_gesendet_bis`).
+  Die Spalte kam zu den drei in D10 genannten dazu. Die Migration gibt bestehenden übernommenen
+  Schlüsseln einen `weiter_stand` über jedem lokalen Stand. Über eine Direktkopplung, die vor
+  diesem Stand bestand, kommen sie deshalb als Nachlieferung, mit Gegenzeichnung und Bestätigung.
+- **13.11.2026, D6: Widerruf je Credential nicht beim Ende einer Zuordnung.**
+  `fremde_der_zuordnung_widerrufen` widerruft nur die Zeilen der beendeten Zuordnung. Der Schlüssel
+  selbst ist dabei nicht widerrufen und gilt über andere Kopplungen weiter.
+- **13.11.2026, D4: Anfrage und Ablehnung am Stand der Epoche.** `repo::save` löscht
+  `anfrage_von` und `anfrage_abgelehnt`, sobald sich die Epoche ändert. Rechts im `UPDATE` stehen
+  die alten Werte der Zeile. Damit gilt eine Anfrage nur dem Stand, den sie sah, und es braucht
+  keine eigene Löschung an jedem Wechselweg.

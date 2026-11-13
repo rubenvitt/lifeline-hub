@@ -74,7 +74,21 @@ pub struct MeldenOrg {
     /// Stammdaten (die Org hat schon eine andere Quelle).
     #[serde(default)]
     pub stammdaten_stand: i64,
+    /// Direktkopplung: Unterschriftsschlüssel der meldenden Seite seit der Quittung der
+    /// erreichten Seite (LLH-1678, design.md D6). Leer an einer Standardkopplung.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unterschrift: Vec<UnterschriftSchluesselLieferung>,
+    /// Direktkopplung: bis zu diesem Stand gilt die erste Lieferung als Grundstock; die erreichte
+    /// Seite übernimmt den Wert nur einmal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unterschrift_grundstock_bis: Option<i64>,
 }
+
+/// Byte-Budget der Unterschriftsschlüssel in einer Meldung (LLH-1678, design.md D6): neben den
+/// Führungsakten ([`fuehrung_austausch::MELDUNG_BYTES`]) muss alles in [`super::extractor::BODY_MAX`]
+/// passen (Test `groesste_anfrage_passt_in_die_grenze`). Was nicht passt, folgt mit der nächsten
+/// Meldung.
+pub const UNTERSCHRIFT_ANFRAGE_BYTES: usize = 12 * 1024;
 
 /// Body von `POST /api/instanz/melden`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,6 +142,10 @@ pub struct MeldenOrgAntwort {
     /// Bis zu diesem Stand darf die meldende Seite ihren Stammdaten-Stand setzen.
     #[serde(default)]
     pub stammdaten_bis: i64,
+    /// Direktkopplung: bis hierher hat die erreichte Seite die Schlüssel der meldenden Seite
+    /// übernommen (LLH-1678, design.md D6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unterschrift_quittung: Option<i64>,
 }
 
 /// Antwort auf eine Meldung.
@@ -679,13 +697,55 @@ async fn melden_einmal_mit(
     // Höchster Stand, den diese Meldung abdeckt: Mehr darf das Gegenüber nicht quittieren
     // (LLH-1672); sonst fiele, was wegen `AKTEN_MAX` oder des Budgets hier blieb.
     let gesendet_hoechst = fuehrung_ausgang.bis.max(fuehrung_gesendet);
+    // Auch die meldende Seite liefert ihre Schlüssel (LLH-1678, design.md D6): über eine
+    // Direktkopplung samt den übernommenen, mit Grundstock; an den Hub nur die hier registrierten,
+    // dort warten sie auf die Bestätigung eines Admins.
+    let mut schluessel_aus: Vec<(Vec<UnterschriftSchluesselLieferung>, Option<i64>)> =
+        Vec::with_capacity(aktiv.len());
+    {
+        let vor_ort = kopplung.art() == super::InstanzKopplungArt::VorOrt;
+        let mut conn = pool.acquire().await?;
+        let mut bytes = UNTERSCHRIFT_ANFRAGE_BYTES;
+        for o in &aktiv {
+            let weiter = if vor_ort {
+                unterschrift::Weiter::AusserZuordnung(o.id)
+            } else {
+                unterschrift::Weiter::NurLokal
+            };
+            let mut lieferung = unterschrift::nachlieferung(
+                &mut conn,
+                o.org_id,
+                o.unterschrift_gesendet_bis,
+                unterschrift::LIEFERUNGEN_MAX,
+                weiter,
+            )
+            .await?;
+            let mut n = 0;
+            for l in &lieferung {
+                let b = serde_json::to_vec(l).map_or(usize::MAX, |v| v.len());
+                if b > bytes {
+                    break;
+                }
+                bytes -= b;
+                n += 1;
+            }
+            lieferung.truncate(n);
+            let bis = if vor_ort {
+                Some(unterschrift::hoechster_stand(&mut conn, o.org_id).await?)
+            } else {
+                None
+            };
+            schluessel_aus.push((lieferung, bis));
+        }
+    }
     let anfrage = MeldenAnfrage {
         name: super::name().to_string(),
         softwarestand: super::softwarestand().to_string(),
         protokoll: PROTOKOLL,
         orgs: aktiv
             .iter()
-            .map(|o| MeldenOrg {
+            .zip(schluessel_aus)
+            .map(|(o, (unterschrift, grundstock_bis))| MeldenOrg {
                 org: o.fremde_org_kennung.clone(),
                 unterschrift_stand: o.unterschrift_stand,
                 stammdaten_stand: if quellen.contains(&o.id) {
@@ -693,6 +753,8 @@ async fn melden_einmal_mit(
                 } else {
                     -1
                 },
+                unterschrift,
+                unterschrift_grundstock_bis: grundstock_bis,
             })
             .collect(),
         widerrufen: offen.iter().map(|o| o.fremde_org_kennung.clone()).collect(),
@@ -793,7 +855,11 @@ async fn melden_einmal_mit(
                 kopplung_org_id: o.id,
                 org_id: o.org_id,
                 fremde_org_kennung: &o.fremde_org_kennung,
+                vor_ort: kopplung.art() == super::InstanzKopplungArt::VorOrt,
             };
+            if let Some(q) = oa.unterschrift_quittung {
+                repo::save_unterschrift_gesendet_bis(conn, o.id, q).await?;
+            }
             for ab in unterschrift::accept_lieferungen(conn, &ziel, &oa.unterschrift, false, &jetzt)
                 .await?
             {
@@ -1060,9 +1126,59 @@ pub async fn handle_meldung(
             }
             match aktiv {
                 Some(o) => {
-                    let lieferung =
-                        unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
+                    let vor_ort = kopplung.art() == super::InstanzKopplungArt::VorOrt;
+                    // Die Schlüssel der meldenden Seite übernehmen (LLH-1678, design.md D6): über
+                    // eine Direktkopplung ihre erste Lieferung bis `grundstock_bis` als Grundstock,
+                    // sonst mit Gegenzeichnung; vom ELW am Hub nur zur Bestätigung durch einen Admin.
+                    if !mo.unterschrift.is_empty() {
+                        let (bis, pflicht) = if vor_ort {
+                            let bis = repo::save_unterschrift_grundstock_bis(
+                                conn,
+                                o.id,
+                                mo.unterschrift_grundstock_bis.unwrap_or(0),
+                            )
                             .await?;
+                            (Some(bis), unterschrift::GegenzeichnungPflicht::Pflicht)
+                        } else {
+                            (None, unterschrift::GegenzeichnungPflicht::NurBestaetigung)
+                        };
+                        let ziel = unterschrift::Ziel {
+                            kopplung_org_id: o.id,
+                            org_id: o.org_id,
+                            fremde_org_kennung: &o.fremde_org_kennung,
+                            vor_ort,
+                        };
+                        for ab in unterschrift::accept_lieferungen_bis(
+                            conn,
+                            &ziel,
+                            &mo.unterschrift,
+                            bis,
+                            pflicht,
+                            &jetzt,
+                        )
+                        .await?
+                        {
+                            tracing::warn!(
+                                fingerabdruck = %ab.fingerabdruck,
+                                grund = %ab.grund,
+                                "Unterschriftsschlüssel der meldenden Seite abgelehnt"
+                            );
+                        }
+                    }
+                    let quittung = Some(repo::load_unterschrift_stand(conn, o.id).await?);
+                    let weiter = if vor_ort {
+                        unterschrift::Weiter::AusserZuordnung(o.id)
+                    } else {
+                        unterschrift::Weiter::NurLokal
+                    };
+                    let lieferung = unterschrift::nachlieferung(
+                        conn,
+                        o.org_id,
+                        mo.unterschrift_stand,
+                        budget,
+                        weiter,
+                    )
+                    .await?;
                     budget -= lieferung.len();
                     let unterschrift_bytes: usize = lieferung
                         .iter()
@@ -1096,6 +1212,7 @@ pub async fn handle_meldung(
                         unterschrift: lieferung,
                         stammdaten: nach.zeilen,
                         stammdaten_bis: nach.bis.max(mo.stammdaten_stand),
+                        unterschrift_quittung: quittung,
                     });
                 }
                 None => {
@@ -1108,6 +1225,7 @@ pub async fn handle_meldung(
                         unterschrift: Vec::new(),
                         stammdaten: Vec::new(),
                         stammdaten_bis: 0,
+                        unterschrift_quittung: None,
                     });
                 }
             }
@@ -1220,6 +1338,8 @@ mod tests {
                     org: (*o).into(),
                     unterschrift_stand: i as i64,
                     stammdaten_stand: 0,
+                    unterschrift: Vec::new(),
+                    unterschrift_grundstock_bis: None,
                 })
                 .collect(),
             widerrufen: widerrufen.iter().map(|w| (*w).into()).collect(),
@@ -1288,6 +1408,7 @@ mod tests {
                     unterschrift: vec![lieferung.clone(); lieferungen],
                     stammdaten: Vec::new(),
                     stammdaten_bis: 0,
+                    unterschrift_quittung: None,
                 })
                 .collect(),
             fuehrung: Vec::new(),

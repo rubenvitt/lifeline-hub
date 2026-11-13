@@ -132,6 +132,11 @@ pub struct UnterschriftSchluesselLieferung {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gegenzeichnung: Option<Gegenzeichnung>,
     pub stand: i64,
+    /// Weitergereicht über eine Direktkopplung (LLH-1678, design.md D6): die Org-Kennung, unter
+    /// der die weiterreichende Instanz den Schlüssel bekam; gegen sie prüft der Empfänger die
+    /// Erklärung der Gegenzeichnung. Fehlt bei hier registrierten Schlüsseln.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aufnahme_org: Option<String>,
 }
 
 /// Ein Schlüssel, wie die Admin-Seite ihn zeigt.

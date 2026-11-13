@@ -109,7 +109,7 @@ Führung beansprucht, die bei einer dritten Instanz liegt, MUST sie wie bisher a
 - **THEN** zeigt der Hub nach der nächsten Meldung von ELW 1 „Führung: ELW 2“ und spiegelt den Einsatz danach von ELW 2
 
 #### Scenario: ELW 1 bleibt aus, Unterschrift trägt
-- **WHEN** ELW 2 vor Ort mit der Unterschrift eines Org-Admins gegen ELW 1 übernommen hat, ELW 1 nicht zurückkommt und ELW 2 sich beim Hub meldet
+- **WHEN** ELW 2 vor Ort mit der Unterschrift eines Org-Admins gegen ELW 1 übernommen hat, dessen Schlüssel am Hub bestätigt ist, ELW 1 nicht zurückkommt und ELW 2 sich beim Hub meldet
 - **THEN** zeigt der Hub „Führung: ELW 2“ mit Grund und Unterzeichner im Verlauf, und ein Eintrag „Notübernahme durch ELW 2“ steht in seiner Admin-Spur
 
 #### Scenario: Code allein genügt dem Hub nicht

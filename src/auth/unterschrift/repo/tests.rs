@@ -61,6 +61,7 @@ fn lieferung(
         zustand,
         gegenzeichnung: None,
         stand,
+        aufnahme_org: None,
     }
 }
 
@@ -110,6 +111,7 @@ async fn grundstock_gilt_ohne_gegenzeichnung() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     let abgelehnt = accept_lieferungen(
@@ -142,6 +144,7 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -214,6 +217,7 @@ async fn gegengezeichneter_schluessel_wird_angenommen_und_widerruf_uebernommen()
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -319,20 +323,22 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
         UnterschriftSchluesselZustand::WartetAufGegenzeichnung
     );
     // Wartende gehen nicht hinaus, nur der gültige.
-    let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
+    let (grund, _) = grundstock(&mut conn, 1, Weiter::NurLokal).await.unwrap();
     assert_eq!(grund.len(), 1);
-    assert!(nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX)
-        .await
-        .unwrap()
-        .iter()
-        .all(|l| l.credential_id == "a"));
+    assert!(
+        nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX, Weiter::NurLokal)
+            .await
+            .unwrap()
+            .iter()
+            .all(|l| l.credential_id == "a")
+    );
     // Nach dem Widerruf von a ist nichts mehr gültig; Nachlieferung trägt den Widerruf.
     assert!(widerrufen(&mut conn, 1, id_a, JETZT).await.unwrap());
     assert!(
         !widerrufen(&mut conn, 1, id_a, JETZT).await.unwrap(),
         "zweites Mal ohne Wirkung"
     );
-    let n = nachlieferung(&mut conn, 1, 1, LIEFERUNGEN_MAX)
+    let n = nachlieferung(&mut conn, 1, 1, LIEFERUNGEN_MAX, Weiter::NurLokal)
         .await
         .unwrap();
     assert_eq!(n.len(), 1);
@@ -349,6 +355,7 @@ async fn widerrufener_schluessel_lebt_unter_neuer_id_nicht_wieder_auf() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -405,6 +412,7 @@ async fn erklaerung_bindet_herkunft_und_rp_des_neuen_schluessels() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -437,6 +445,7 @@ async fn lieferung_ueber_der_grenze_wird_abgelehnt_und_ein_widerruf_derselben_id
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     let zu_viele: Vec<_> = (0..=LIEFERUNGEN_MAX as i64)
@@ -476,11 +485,11 @@ async fn grundstock_ueber_der_grenze_scheitert_statt_abzuschneiden() {
     for stand in 1..=LIEFERUNGEN_MAX as i64 {
         lokaler_gueltiger(&mut conn, stand).await;
     }
-    let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
+    let (grund, _) = grundstock(&mut conn, 1, Weiter::NurLokal).await.unwrap();
     assert_eq!(grund.len(), LIEFERUNGEN_MAX);
     lokaler_gueltiger(&mut conn, LIEFERUNGEN_MAX as i64 + 1).await;
     assert!(matches!(
-        grundstock(&mut conn, 1).await,
+        grundstock(&mut conn, 1, Weiter::NurLokal).await,
         Err(AppError::Conflict(_))
     ));
 }
@@ -493,7 +502,7 @@ async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
     for stand in 1..=anzahl {
         lokaler_gueltiger(&mut conn, stand).await;
     }
-    let erste = nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX)
+    let erste = nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX, Weiter::NurLokal)
         .await
         .unwrap();
     assert_eq!(erste.len(), LIEFERUNGEN_MAX);
@@ -502,7 +511,7 @@ async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
         bis, LIEFERUNGEN_MAX as i64,
         "nach Stand sortiert, die ältesten zuerst"
     );
-    let rest = nachlieferung(&mut conn, 1, bis, LIEFERUNGEN_MAX)
+    let rest = nachlieferung(&mut conn, 1, bis, LIEFERUNGEN_MAX, Weiter::NurLokal)
         .await
         .unwrap();
     assert_eq!(
@@ -511,7 +520,10 @@ async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
         "der Rest folgt mit der nächsten Meldung"
     );
     assert_eq!(
-        nachlieferung(&mut conn, 1, 0, 3).await.unwrap().len(),
+        nachlieferung(&mut conn, 1, 0, 3, Weiter::NurLokal)
+            .await
+            .unwrap()
+            .len(),
         3,
         "das Restbudget der Antwort deckelt"
     );
@@ -590,6 +602,7 @@ async fn mit_wartendem_b(
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap().detach();
     accept_lieferungen(
@@ -617,6 +630,7 @@ fn ziel_zu(ko: i64) -> Ziel<'static> {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     }
 }
 

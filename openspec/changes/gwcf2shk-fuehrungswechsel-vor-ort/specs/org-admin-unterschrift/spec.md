@@ -22,6 +22,22 @@ ebenso nachliefern.
 - **WHEN** nach dem Koppeln am Hub der Schlüssel von Admin C gegengezeichnet wird und ELW 1 ihn als gültig bestätigt hat
 - **THEN** liefert ELW 1 ihn an ELW 2, und dort wartet er auf die Bestätigung eines Admins
 
+### Requirement: Der ELW liefert seine Schlüssel dem Hub zur Bestätigung
+
+Über eine Standardkopplung SHALL die meldende Seite der erreichten Seite die Unterschriftsschlüssel
+liefern, die bei ihr registriert sind, samt Widerrufen. Die erreichte Seite MUST jeden davon ohne
+Gegenzeichnung als „wartet auf Bestätigung“ führen, auch den ersten; erst die Bestätigung eines
+Admins dort mit den letzten vier Zeichen des Fingerabdrucks macht ihn gültig. Die erreichte Seite
+MUST solche Schlüssel nicht weiterliefern.
+
+#### Scenario: Schlüssel eines ELW-Admins am Hub
+- **WHEN** Admin B an ELW 2 einen Unterschriftsschlüssel registriert und ELW 2 sich beim Hub meldet
+- **THEN** zeigt der Hub den Schlüssel von B als „wartet auf Bestätigung“, und erst nach der Bestätigung dort erkennt der Hub eine Unterschrift von B an
+
+#### Scenario: Widerruf am ELW
+- **WHEN** der Schlüssel von B am Hub gilt und ELW 2 ihn widerruft
+- **THEN** führt der Hub ihn nach der nächsten Meldung von ELW 2 als widerrufen
+
 ### Requirement: Ein Widerruf gilt für den Schlüssel, nicht für die Lieferung
 
 Erfährt eine Instanz, dass ein Unterschriftsschlüssel widerrufen ist, egal über welche Kopplung oder
