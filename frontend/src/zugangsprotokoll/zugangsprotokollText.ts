@@ -64,6 +64,12 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   einwurf_zugang_angelegt: 'Einwurf-Zugang angelegt',
   einwurf_zugang_schluessel_gewechselt: 'Schlüssel eines Einwurf-Zugangs gewechselt',
   einwurf_zugang_widerrufen: 'Einwurf-Zugang widerrufen',
+  maschinenzugang_webhook_angelegt: 'Webhook eingerichtet',
+  maschinenzugang_webhook_geaendert: 'Webhook geändert',
+  maschinenzugang_webhook_entfernt: 'Webhook entfernt',
+  maschinenzugang_webhook_wieder_aufgenommen: 'Webhook wieder aufgenommen',
+  maschinenzugang_webhook_lan_erlaubt: 'Webhook: Ziel im lokalen Netz erlaubt',
+  maschinenzugang_webhook_lan_entzogen: 'Webhook: Ziel im lokalen Netz nicht mehr erlaubt',
 };
 
 /**
@@ -147,6 +153,8 @@ export function instanzText(a: ZugangsAngaben): string | undefined {
       ? `Rechte: ${a.scopes_vorher ? `${a.scopes_vorher.map(scopeText).join(', ')} → ` : ''}${a.scopes.map(scopeText).join(', ')}`
       : null,
     a.adresse ?? null,
+    // Webhook einer Anbindung (LLH-1656): nur der Host des Ziels.
+    a.host ? `Ziel: ${a.host}` : null,
     a.grund ? `Grund: ${a.grund}` : null,
     // „ELW verloren“ (LLH-1493): Konten, deren Passwort und zweiter Faktor ungültig wurden.
     a.anzahl != null ? `${a.anzahl} ${a.anzahl === 1 ? 'Konto' : 'Konten'} gesperrt` : null,

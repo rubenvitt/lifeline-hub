@@ -673,6 +673,12 @@ fn serde_wire_gleich_as_str() {
         EinwurfZugangAngelegt,
         EinwurfZugangSchluesselGewechselt,
         EinwurfZugangWiderrufen,
+        MaschinenzugangWebhookAngelegt,
+        MaschinenzugangWebhookGeaendert,
+        MaschinenzugangWebhookEntfernt,
+        MaschinenzugangWebhookWiederAufgenommen,
+        MaschinenzugangWebhookLanErlaubt,
+        MaschinenzugangWebhookLanEntzogen,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {
@@ -744,6 +750,30 @@ fn serde_wire_gleich_as_str() {
         EinsatzUpdated => "einsatz.updated",
         EinsatzClosed => "einsatz.closed",
         LageChanged => "lage.changed",
+    });
+    // Webhooks (LLH-1656): Anzeige der Verwaltung; `WebhookFehler` steht auch in
+    // `maschine_webhook.letzter_fehler_art` und `maschine_webhook_versuch.fehler_art`.
+    enum_wire!(lifeline_hub::public_api::webhook::WebhookZustand {
+        Aktiv => "aktiv",
+        Fehler => "fehler",
+        Angehalten => "angehalten",
+        Ruht => "ruht",
+    });
+    enum_wire!(lifeline_hub::public_api::webhook::WebhookFehler {
+        Status => "status",
+        Weiterleitung => "weiterleitung",
+        Zeitueberschreitung => "zeitueberschreitung",
+        Verbindung => "verbindung",
+        Tls => "tls",
+        ZielIntern => "ziel_intern",
+        Dns => "dns",
+        ZielUngueltig => "ziel_ungueltig",
+    });
+    enum_wire!(lifeline_hub::public_api::webhook::RuhtGrund {
+        ZugangWartet => "zugang_wartet",
+        ZugangWiderrufen => "zugang_widerrufen",
+        ZugangAbgelaufen => "zugang_abgelaufen",
+        OhneEventsRead => "ohne_events_read",
     });
     // Instanzkopplung (LLH-1490): Wire = DB-CHECK in 0299.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {

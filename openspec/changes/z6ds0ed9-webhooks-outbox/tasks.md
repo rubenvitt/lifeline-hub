@@ -6,39 +6,39 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
 
 ## 1. Tabellen und Admin-Spur
 
-- [ ] 1.1 Migration mit der nächsten Nummer über allen auf `origin/alpha` (voraussichtlich
+- [x] 1.1 Migration mit der nächsten Nummer über allen auf `origin/alpha` (voraussichtlich
   0346): `maschine_webhook` und `maschine_webhook_versuch` (D1). Dazu die Einordnung, die der
   Bestand für neue Tabellen verlangt (Schwärzungs-Registry, `spiegel::art`; Wächter zeigen sie).
   Verifizieren: `scripts/check-migrationen.sh`, `cargo test db::tests`, die Wächter für
   Schwärzung und Spiegel-Arten sind grün, und ein Test belegt `UNIQUE (zugang_id)` und das
   Löschen mit dem Zugang.
-- [ ] 1.2 Sechs neue `AdminAktion`-Varianten (D8) samt Migration, die den CHECK von
+- [x] 1.2 Sechs neue `AdminAktion`-Varianten (D8) samt Migration, die den CHECK von
   `admin_audit` nach Muster 0340 neu baut. Verifizieren: `jede_aktion_passiert_den_db_check`,
   `tests/admin_audit.rs` und `tests/enum_wire_kontrakt.rs` sind grün.
 
 ## 2. Signatur
 
-- [ ] 2.1 Profil Webhook in `src/instanz/signatur.rs` (D4): `EVENT_TYP`, `WebhookClaims`,
+- [x] 2.1 Profil Webhook in `src/instanz/signatur.rs` (D4): `EVENT_TYP`, `WebhookClaims`,
   `sign_webhook` und `verify_webhook`. Verifizieren mit Unit-Tests: Hin- und Rückweg gültig;
   fremder Schlüssel, geänderter Body, falsche `aud`, `exp` vorbei, `exp − iat > 300`, falscher
   `typ` und `alg` `none` scheitern; ein Token des Profils `MACHINE` scheitert am `typ`.
 
 ## 3. Ziel-Schutz
 
-- [ ] 3.1 `public_api::webhook::ziel::klasse` (D5). Verifizieren mit Tabellen-Tests je Bereich:
+- [x] 3.1 `public_api::webhook::ziel::klasse` (D5). Verifizieren mit Tabellen-Tests je Bereich:
   öffentlich v4 und v6; privat `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `fc00::/7`;
   gesperrt Loopback, `169.254.169.254`, `fe80::1`, `224.0.0.1`, `ff02::1`, `255.255.255.255`,
   `0.0.0.0`, `240.0.0.1`, `198.18.0.1`; eingebettetes IPv4 in mapped, compatible, NAT64 und 6to4.
-- [ ] 3.2 `url_pruefen(url, lan_erlaubt)`. Verifizieren: `http`, Userinfo, Fragment,
+- [x] 3.2 `url_pruefen(url, lan_erlaubt)`. Verifizieren: `http`, Userinfo, Fragment,
   `localhost`, `x.localhost`, `https://127.0.0.1/`, `https://[::1]/` und ohne Ausnahme
   `https://10.0.0.5/` ergeben je den passenden `ZielFehler`; mit Ausnahme ist
   `https://10.0.0.5/` erlaubt und `https://169.254.169.254/` weiter gesperrt.
-- [ ] 3.3 `WebhookResolver` fail-closed und die zwei Clients über
+- [x] 3.3 `WebhookResolver` fail-closed und die zwei Clients über
   `ausgehend::client_builder(Zweck::Webhook)` mit `.no_proxy()`, ohne Weiterleitung, nur https;
   Deckel `WEBHOOK` in `http_begrenzt`. Verifizieren: Unit-Test der Filterfunktion des Resolvers
   (gemischtes Ergebnis ergibt nichts; privat nur mit Ausnahme); `tests/ausgehend_kennung_guard.rs`
   grün; die Testliste der Zwecke in `ausgehend.rs` enthält `Webhook`.
-- [ ] 3.4 `Zusteller`-Trait mit dem echten HTTP-Weg (D5): Kopf `Lifeline-Signature`,
+- [x] 3.4 `Zusteller`-Trait mit dem echten HTTP-Weg (D5): Kopf `Lifeline-Signature`,
   `Content-Type`, `Lifeline-Event-Id`, Antwort begrenzt gelesen und verworfen, Abbildung auf
   `WebhookFehler` (D6). Verifizieren: Unit-Test der Abbildung von Status, 3xx und
   reqwest-Fehlerarten; ein Test belegt, dass ein Ziel `https://127.0.0.1:<port>/` ohne
@@ -46,16 +46,16 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
 
 ## 4. Lesen aus der Outbox und Zustellungslogik
 
-- [ ] 4.1 `events::naechstes` und `sichtbare_arten` als `pub(crate)` (D2). Verifizieren in
+- [x] 4.1 `events::naechstes` und `sichtbare_arten` als `pub(crate)` (D2). Verifizieren in
   `tests/public_api_webhook.rs` (Zeilen direkt per SQL unter `tests/`, wie in LLH-1655): nächste
   Zeile des eigenen Zugangs nach dem Cursor; fremder Zugang nie; nicht gewählte Art
   übersprungen; Art ohne Scope übersprungen; ersetztes `lage.changed` liefert die neue Nummer;
-  `Verloren` nur mit `offen_seit` und Cursor unter der Löschgrenze, sonst `Leer` mit stillem
-  Vorrücken.
-- [ ] 4.2 Reine Funktion `naechster_zustand` (D6). Verifizieren mit Unit-Tests: Wartezeiten 1,
+  `Verloren` nur, wenn `offen_id` unter der Löschgrenze liegt; ein Cursor unter der
+  Löschgrenze allein ist kein Verlust.
+- [x] 4.2 Reine Funktion `naechster_zustand` (D6). Verifizieren mit Unit-Tests: Wartezeiten 1,
   2, 4 … 256 min, danach 6 h; Erfolg setzt zurück; der Versuch, der hinter 24 h fiele, liegt
   genau bei `fehler_seit + 24 h`; scheitert er, `angehalten`.
-- [ ] 4.3 Der Lauf `webhook::lauf` (D3) mit Stopp-Signal und `catch_unwind`, verdrahtet in
+- [x] 4.3 Der Lauf `webhook::lauf` (D3) mit Stopp-Signal und `catch_unwind`, verdrahtet in
   `main.rs` samt `herunterfahren`. Verifizieren in `tests/public_api_webhook.rs` mit einem
   aufzeichnenden `Zusteller` und gesteuerter Zeit:
   - drei Ereignisse kommen in aufsteigender Nummer, je ein POST, Body gleich dem Abruf, und
@@ -80,7 +80,7 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
   - Führungskraft liest Zustand und Verlauf, schreibt aber nicht (`403`);
   - PATCH mit alter `basis_geaendert_at` `409`;
   - Wieder aufnehmen aus `aktiv` `409`; aus `angehalten` mit Rückstand bleibt der Cursor, ohne
-    Rückstand (Cursor unter Löschgrenze, `offen_seit` gesetzt) springt er und `verlust_at` ist
+    Rückstand (`offen_id` unter der Löschgrenze) springt er und `verlust_at` ist
     gesetzt;
   - Testereignis: `ping` signiert, Cursor, Zustand und Wartezeit unverändert, ein Verlaufseintrag
     mit `test`, kein Eintrag in der Admin-Spur;

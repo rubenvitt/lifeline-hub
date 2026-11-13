@@ -74,7 +74,7 @@ CREATE TABLE maschine_webhook (
     lan_erlaubt          INTEGER NOT NULL DEFAULT 0 CHECK (lan_erlaubt IN (0, 1)),
     zustand              TEXT NOT NULL DEFAULT 'aktiv' CHECK (zustand IN ('aktiv', 'angehalten')),
     cursor               INTEGER NOT NULL,               -- letzte zugestellte oder übersprungene Nummer
-    offen_seit           TEXT,                           -- ein fälliges Ereignis wartet seit
+    offen_id             INTEGER,                        -- Nummer des wartenden Ereignisses
     fehler_seit          TEXT,                           -- erster Fehlschlag der laufenden Störung
     fehlversuche         INTEGER NOT NULL DEFAULT 0,
     naechster_versuch_at TEXT,
@@ -130,12 +130,16 @@ einer Lesetransaktion wie `lesen_ab`. Die Abfrage nutzt den Index `(zugang_id, i
   liegen außerhalb des Filters und brauchen keinen Schreibzugriff. So schreibt ein ruhiger Webhook
   nie.
 - **Verlust erkennen:** Ein ruhiger Webhook hat oft `cursor < purged_until`, ohne dass ihm etwas
-  fehlt. Verlust liegt nur vor, wenn zugleich `offen_seit` gesetzt ist, also beim letzten Blick
-  ein fälliges Ereignis wartete. Dann `Verloren`: Der Lauf setzt `cursor` auf `head`, setzt
-  `verlust_at` und löscht `offen_seit`. Ohne `offen_seit` rückt der Cursor still auf
-  `purged_until` vor.
-- `offen_seit` wird gesetzt, sobald der Lauf ein fälliges Ereignis findet, das er nicht zustellen
-  kann (Fehlschlag, angehalten, ruhend). Gelöscht wird es, sobald `naechstes` `Leer` liefert.
+  fehlt; gelesen wird ohnehin nur `id > cursor`. Verlust liegt nur vor, wenn das Ereignis, das
+  beim letzten Blick fällig war und nicht zugestellt werden konnte (`offen_id`), inzwischen unter
+  der Löschgrenze liegt (`offen_id <= purged_until`). Dann `Verloren`: Der Lauf setzt `cursor` auf
+  `head`, setzt `verlust_at` und löscht `offen_id`. (Umgesetzt mit der Nummer statt eines
+  Zeitpunkts `offen_seit`, wie zuerst entworfen: Ein Zeitpunkt meldete auch dann Verlust, wenn
+  nur Zeilen anderer Zugänge gelöscht wurden.)
+- `offen_id` wird gesetzt, sobald der Lauf ein fälliges Ereignis findet, das er nicht zustellen
+  kann (Fehlschlag, ruhend), und nur, wenn es noch leer ist. Ein Erfolg und ein leeres Ergebnis
+  löschen es. Ein ersetztes `lage.changed`, dessen alte Nummer später gelöscht wird, gilt dabei
+  als Verlust; das ist nur nach mehr als sieben Tagen Störung möglich und hingenommen.
 
 Alternative: den Cursor auch im Leerlauf auf den Höchststand ziehen. Dann gäbe es eine
 Schreibzeile je Takt und Webhook, sobald irgendwo ein Ereignis entsteht.
@@ -151,7 +155,7 @@ Je Takt:
 1. Webhooks laden mit `zustand = 'aktiv'` und `naechster_versuch_at IS NULL OR <= jetzt`, samt
    Zugang.
 2. **Wirksam?** Der Zugang ist `aktiv`, nicht abgelaufen und hat `events:read`. Wenn nicht, ruht
-   der Webhook. Es geht keine Zustellung hinaus, der Cursor bleibt, und `offen_seit` wird gesetzt,
+   der Webhook. Es geht keine Zustellung hinaus, der Cursor bleibt, und `offen_id` wird gesetzt,
    wenn etwas fällig ist. Die Anzeige nennt den Grund aus dem Zugang.
 3. Je Webhook höchstens 50 Ereignisse nacheinander, dann der nächste Webhook. Der Rest kommt im
    nächsten Takt, damit ein großer Rückstand die anderen nicht aushungert.
@@ -246,8 +250,7 @@ deren Prüfspur gehört nicht in diese Change.
 ### D7: Wiederaufnehmen, Ändern, Entfernen
 
 - **Wieder aufnehmen** (nur aus `angehalten`, sonst `409`): `zustand = 'aktiv'`, Fehlerfelder
-  leer, `naechster_versuch_at = jetzt`. Liegt `cursor < purged_until` und ist `offen_seit`
-  gesetzt, werden `cursor = head` und `verlust_at = jetzt` gesetzt (D2). Sonst bleibt der Cursor,
+  leer, `naechster_versuch_at = jetzt`. Liegt `offen_id <= purged_until`, werden `cursor = head` und `verlust_at = jetzt` gesetzt (D2). Sonst bleibt der Cursor,
   und der Rückstand kommt der Reihe nach.
 - **Hinweis zum Verlust:** steht in der Ansicht, solange `verlust_at` gesetzt ist. Die nächste
   Admin-Aktion am Webhook löscht ihn.
@@ -345,7 +348,7 @@ Unter `/api/admin/anbindungen/{id}/webhook` in `routes::anbindungen` (Untermodul
 - **Takt 2 s** → bis zu 2 s Verzögerung zusätzlich. Für Einsatzbuch und Lagebild genügt das.
 - **Ein langsames Ziel bremst nur sich selbst** → Zeitlimit 15 s, 8 parallel, höchstens 50 je
   Takt. Bei vielen hängenden Zielen verzögern sich die übrigen um höchstens einige Takte.
-- **Verlust-Erkennung über `offen_seit`** → Lief der Server über sieben Tage nicht, kann der
+- **Verlust-Erkennung über `offen_id`** → Lief der Server über sieben Tage nicht, kann der
   Purge beim Start vor dem ersten Takt Zeilen löschen, die der Lauf noch nicht als offen gesehen
   hat. Das ist hingenommen: Der Abrufer hätte denselben Verlust und bekäme `410`.
 - **Instanzschlüssel wechselt** (neue Instanz aus Sicherung, Kopplung) → Empfänger prüfen gegen

@@ -113,6 +113,19 @@ describe('Archiv am Hub (LLH-1494)', () => {
   });
 });
 
+describe('Webhook einer Anbindung (LLH-1656)', () => {
+  it('nennt die Aktionen, trägt den Namen der Anbindung als Ziel und zeigt nur den Host', () => {
+    expect(AKTION_TEXT.maschinenzugang_webhook_angelegt).toBe('Webhook eingerichtet');
+    expect(AKTION_TEXT.maschinenzugang_webhook_lan_erlaubt).toBe(
+      'Webhook: Ziel im lokalen Netz erlaubt',
+    );
+    expect(hasNamensziel('maschinenzugang_webhook_angelegt')).toBe(true);
+    expect(instanzText({ zugang_id: 'z1', host: 'empfaenger.example' })).toBe(
+      'Ziel: empfaenger.example',
+    );
+  });
+});
+
 describe('Einwurf-Zugang (LLH-1654)', () => {
   it('nennt die drei Aktionen und zeigt den Namen des Zugangs als Ziel', () => {
     expect(AKTION_TEXT.einwurf_zugang_angelegt).toBe('Einwurf-Zugang angelegt');

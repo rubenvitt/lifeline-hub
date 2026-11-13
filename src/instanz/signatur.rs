@@ -39,6 +39,16 @@ pub const MACHINE: Profil = Profil {
     antwort_kopf: "Lifeline-Signature",
 };
 
+/// `typ` der Zustellung eines Webhooks an ein Fremdsystem (LLH-1656, Spec `webhook-zustellung`).
+/// Ein eigener Typ, damit weder eine Antwort als Zustellung noch eine Zustellung als Antwort
+/// durchgeht (design.md D4).
+pub const EVENT_TYP: &str = "lifeline-event+jwt";
+/// Kopf, der die Signatur einer Webhook-Zustellung trägt; derselbe wie bei Antworten an
+/// Fremdsysteme.
+pub const EVENT_KOPF: &str = MACHINE.antwort_kopf;
+/// Höchste Lebensdauer der Signatur einer Webhook-Zustellung (Konzept D4: höchstens 5 min).
+pub const EVENT_LEBENSDAUER_S: i64 = 300;
+
 /// `typ` einer Anfrage.
 pub const TYP_ANFRAGE: &str = INSTANZ.typ_anfrage;
 /// `typ` einer Antwort.
@@ -115,6 +125,18 @@ pub struct MachineAntwort {
     pub jti: String,
     pub req: String,
     pub status: u16,
+    pub bh: String,
+}
+
+/// Claims der Zustellung eines Webhooks (LLH-1656). `aud` ist die Kennung des Webhooks: Ein
+/// Empfänger kann eine Zustellung nicht an einen anderen weiterreichen, der sie als echt annähme.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WebhookClaims {
+    pub iss: String,
+    pub aud: String,
+    pub iat: i64,
+    pub exp: i64,
+    pub jti: String,
     pub bh: String,
 }
 
@@ -406,6 +428,56 @@ pub fn sign_machine_antwort(
     sign(identitaet, MACHINE.typ_antwort, &claims)
 }
 
+/// Signiert die Zustellung eines Webhooks (Profil [`EVENT_TYP`], design.md D4). `jti` gibt der
+/// Aufrufer vor, je Versuch neu ([`new_jti`]); die Testvektoren setzen ihn fest.
+pub fn sign_webhook(
+    identitaet: &Identitaet,
+    webhook_id: &str,
+    body: &[u8],
+    jetzt: i64,
+    jti: &str,
+) -> String {
+    let claims = WebhookClaims {
+        iss: identitaet.kennung.clone(),
+        aud: webhook_id.to_string(),
+        iat: jetzt,
+        exp: jetzt + EVENT_LEBENSDAUER_S,
+        jti: jti.to_string(),
+        bh: sha256_b64(body),
+    };
+    sign(identitaet, EVENT_TYP, &claims)
+}
+
+/// Prüft eine Webhook-Zustellung, wie ein Empfänger es tut: Signatur der Instanz, an diesen
+/// Webhook, über genau diesen Body, im Zeitfenster. Der Server braucht sie für Tests und die
+/// Testvektoren; die Referenz-Clients tragen dieselbe Prüfung.
+pub fn verify_webhook(
+    token: &str,
+    instanz_schluessel: &VerifyingKey,
+    webhook_id: &str,
+    body: &[u8],
+    jetzt: i64,
+) -> Result<WebhookClaims, SignaturError> {
+    let c: WebhookClaims = verify(token, EVENT_TYP, instanz_schluessel)?;
+    if c.aud != webhook_id {
+        return Err(SignaturError::Ziel);
+    }
+    if c.bh != sha256_b64(body) {
+        return Err(SignaturError::Body);
+    }
+    let dauer_ok = c
+        .exp
+        .checked_sub(c.iat)
+        .is_some_and(|dauer| dauer > 0 && dauer <= EVENT_LEBENSDAUER_S);
+    if !dauer_ok
+        || c.iat > jetzt.saturating_add(UHR_TOLERANZ_S)
+        || c.exp < jetzt.saturating_sub(UHR_TOLERANZ_S)
+    {
+        return Err(SignaturError::Zeit);
+    }
+    Ok(c)
+}
+
 /// Signiert eine Antwort auf die Anfrage mit `bezug` an `ziel_kennung`.
 pub fn sign_antwort(
     identitaet: &Identitaet,
@@ -496,6 +568,97 @@ mod tests {
             body,
             jetzt,
         )
+    }
+
+    // ---- Webhook-Zustellung (LLH-1656, Spec `webhook-zustellung`) ----
+
+    const WEBHOOK: &str = "0b7f6c2e-9a1d-4e3b-8c5f-2a4d6e8f0a1c";
+    const EREIGNIS: &[u8] =
+        br#"{"id":4712,"type":"einsatz.created","occurred_at":"2026-11-11 19:04:00","einsatz_id":7}"#;
+
+    #[test]
+    fn webhook_hin_und_zurueck_ist_gueltig() {
+        let t = sign_webhook(&elw(), WEBHOOK, EREIGNIS, JETZT, "jti-1");
+        let c = verify_webhook(&t, &pk(&elw()), WEBHOOK, EREIGNIS, JETZT).unwrap();
+        assert_eq!(c.iss, "elw");
+        assert_eq!(c.aud, WEBHOOK);
+        assert_eq!(c.jti, "jti-1");
+        assert_eq!(c.exp - c.iat, EVENT_LEBENSDAUER_S);
+        assert_eq!(parse_kopf(&t, EVENT_TYP).unwrap().kid, "elw");
+        // Auch nach Ablauf der Lebensdauer gilt sie noch innerhalb der Uhrentoleranz.
+        assert!(verify_webhook(&t, &pk(&elw()), WEBHOOK, EREIGNIS, JETZT + 300 + 299).is_ok());
+    }
+
+    #[test]
+    fn webhook_fremder_schluessel_body_aud_und_zeit_scheitern() {
+        let t = sign_webhook(&elw(), WEBHOOK, EREIGNIS, JETZT, "jti-1");
+        assert_eq!(
+            verify_webhook(&t, &pk(&hub()), WEBHOOK, EREIGNIS, JETZT),
+            Err(SignaturError::Signatur)
+        );
+        let mut geaendert = EREIGNIS.to_vec();
+        geaendert[7] = b'3';
+        assert_eq!(
+            verify_webhook(&t, &pk(&elw()), WEBHOOK, &geaendert, JETZT),
+            Err(SignaturError::Body)
+        );
+        assert_eq!(
+            verify_webhook(&t, &pk(&elw()), "anderer-webhook", EREIGNIS, JETZT),
+            Err(SignaturError::Ziel)
+        );
+        assert_eq!(
+            verify_webhook(&t, &pk(&elw()), WEBHOOK, EREIGNIS, JETZT + 300 + 301),
+            Err(SignaturError::Zeit)
+        );
+        assert_eq!(
+            verify_webhook(&t, &pk(&elw()), WEBHOOK, EREIGNIS, JETZT - 301),
+            Err(SignaturError::Zeit)
+        );
+    }
+
+    #[test]
+    fn webhook_mit_zu_langer_lebensdauer_scheitert() {
+        let claims = WebhookClaims {
+            iss: "elw".into(),
+            aud: WEBHOOK.into(),
+            iat: JETZT,
+            exp: JETZT + EVENT_LEBENSDAUER_S + 1,
+            jti: "j".into(),
+            bh: sha256_b64(EREIGNIS),
+        };
+        let t = sign(&elw(), EVENT_TYP, &claims);
+        assert_eq!(
+            verify_webhook(&t, &pk(&elw()), WEBHOOK, EREIGNIS, JETZT),
+            Err(SignaturError::Zeit)
+        );
+    }
+
+    #[test]
+    fn webhook_und_antwort_sind_nicht_verwechselbar() {
+        // Eine Antwort an ein Fremdsystem geht nicht als Zustellung durch, und umgekehrt.
+        let antwort = sign_machine_antwort(&elw(), WEBHOOK, "req", 200, EREIGNIS, JETZT);
+        assert_eq!(
+            verify_webhook(&antwort, &pk(&elw()), WEBHOOK, EREIGNIS, JETZT),
+            Err(SignaturError::Algorithmus)
+        );
+        let zustellung = sign_webhook(&elw(), WEBHOOK, EREIGNIS, JETZT, "j");
+        assert_eq!(
+            parse_kopf(&zustellung, MACHINE.typ_antwort),
+            Err(SignaturError::Algorithmus)
+        );
+        // `alg: none` kommt nicht einmal bis zur Signatur.
+        let kopf = b64(br#"{"alg":"none","typ":"lifeline-event+jwt","kid":"elw"}"#);
+        let rest = zustellung.split_once('.').unwrap().1;
+        assert_eq!(
+            verify_webhook(
+                &format!("{kopf}.{rest}"),
+                &pk(&elw()),
+                WEBHOOK,
+                EREIGNIS,
+                JETZT
+            ),
+            Err(SignaturError::Algorithmus)
+        );
     }
 
     #[test]

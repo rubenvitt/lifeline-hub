@@ -304,8 +304,11 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             behalten: config.backup_behalten,
             empfaenger: backup_empfaenger.clone(),
         },
-        stopp_empfang,
+        stopp_empfang.clone(),
     );
+    // Webhooks (LLH-1656): stellt die Ausgangsereignisse an Fremdsysteme zu. Ohne Webhook ist
+    // jeder Durchgang eine leere Abfrage; das Stoppsignal teilt er mit der Sicherung.
+    let webhook_task = lifeline_hub::public_api::webhook::lauf::starte(pool.clone(), stopp_empfang);
 
     // Datenträgerprüfung (LFH-1100): sofort im Hintergrund, danach stündlich; der Start wartet
     // nicht, und kein Ergebnis hält den Betrieb an.
@@ -600,7 +603,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .await
     };
 
-    herunterfahren(&stopp, backup_task, pool_fuer_ende).await;
+    herunterfahren(&stopp, backup_task, webhook_task, pool_fuer_ende).await;
     ergebnis?;
     Ok(())
 }
@@ -610,17 +613,32 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
 /// schickt; was länger dauert, räumt der nächste Start als Teildatei weg.
 const BACKUP_ENDE_FRIST: std::time::Duration = std::time::Duration::from_secs(45);
 
+/// Wie lange das Herunterfahren auf eine laufende Webhook-Zustellung wartet: ihr Zeitlimit und
+/// etwas Luft für das Festhalten des Ergebnisses.
+const WEBHOOK_ENDE_FRIST: std::time::Duration = std::time::Duration::from_secs(20);
+
 /// Nach dem Serve (LFH-926): Sicherungs-Task stoppen und begrenzt abwarten, dann den Pool
 /// schließen, damit SQLite den WAL zurückschreibt und keine Verbindung mitten im Schreiben
 /// abreißt.
 async fn herunterfahren(
     stopp: &tokio::sync::watch::Sender<bool>,
     backup_task: Option<tokio::task::JoinHandle<()>>,
+    webhook_task: tokio::task::JoinHandle<()>,
     pool: sqlx::SqlitePool,
 ) {
     let _ = stopp.send(true);
     if let Some(task) = backup_task {
         backup::scheduler::auf_ende_warten(task, BACKUP_ENDE_FRIST).await;
+    }
+    // Eine laufende Zustellung endet spätestens nach ihrem Zeitlimit; danach wird abgebrochen.
+    // Ein abgebrochener Versuch wird beim nächsten Start wiederholt (mindestens einmal).
+    let mut webhook_task = webhook_task;
+    if tokio::time::timeout(WEBHOOK_ENDE_FRIST, &mut webhook_task)
+        .await
+        .is_err()
+    {
+        webhook_task.abort();
+        tracing::warn!("Webhook-Zustellung beim Herunterfahren abgebrochen");
     }
     if tokio::time::timeout(std::time::Duration::from_secs(10), pool.close())
         .await
