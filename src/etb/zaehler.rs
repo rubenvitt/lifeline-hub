@@ -1,4 +1,4 @@
-//! Exakte ETB-Zählung eines Einsatzes, gesamt und je Typ (LFH-612: Kopfzahl und Bilanz).
+//! Exakte ETB-Zählung eines Einsatzes, gesamt und je Typ (LFH-612: Kopfzahl und Typ-Segmente).
 //!
 //! Die Zählung folgt DEMSELBEN Filter wie die Liste (`repo::filter_bedingung`): „n Treffer“
 //! muss genau die Menge sein, die die Liste seitenweise liefert.

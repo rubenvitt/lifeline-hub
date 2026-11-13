@@ -14,7 +14,7 @@ import { monoStil, useRollen } from './rollenwerte';
  * vollständig zu halten. Das Wort „Gefiltert“ ist der zweite Kanal (WCAG 1.4.1). Kein Blinken.
  *
  * ZAHLEN nur von außen, und nur aus einer Serverzählung (`frontend/src/etb/AGENTS.md`, „Kopfzahl
- * und Bilanz“): fehlt eine, steht keine. Merkmale in Mono, wo es Werte sind (der Aufrufer
+ * und Typ-Segmente zählt der Server“): fehlt eine, steht keine. Merkmale in Mono, wo es Werte sind (der Aufrufer
  * formuliert sie); zu lang endet die Zeile mit „…“, den vollen Text trägt der Titel. Schmal bricht
  * das Band in Zeilen um, nie seitlich über den Schirm.
  *
