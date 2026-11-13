@@ -347,6 +347,9 @@ async fn schluessel_als_datei_auch_mit_passphrase() {
                 Some("archiv.txt"),
                 schluessel.as_bytes(),
             ),
+            // Zu einem ungeschützten Schlüssel zählt eine Passphrase nicht, auch keine, die kein
+            // Text ist.
+            ("passphrase", None, b"\xff\xfe"),
             ("block", Some("b.age"), &u.block),
         ],
     )

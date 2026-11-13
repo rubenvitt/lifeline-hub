@@ -206,7 +206,15 @@ pub async fn einspielen(
     })?;
     let ablage = ablage.ok_or_else(|| AppError::Validation("Den Archivblock angeben.".into()))?;
 
-    let passphrase = passphrase.as_ref().map(passphrase_aus).transpose()?;
+    // Gebraucht nur für eine geschützte Schlüsseldatei; zu einer ungeschützten zählt sie nicht.
+    let geschuetzt = schluessel
+        .expose_secret()
+        .starts_with(crate::backup::verschluesselung::AGE_KOPF);
+    let passphrase = if geschuetzt {
+        passphrase.as_ref().map(passphrase_aus).transpose()?
+    } else {
+        None
+    };
     // scrypt einer geschützten Schlüsseldatei kostet Sekunden: nicht auf dem Async-Worker.
     let schluessel = tokio::task::spawn_blocking(move || {
         Schluessel::laden_geschuetzt(schluessel.expose_secret(), passphrase)

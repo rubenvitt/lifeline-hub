@@ -51,6 +51,14 @@ function fehlerKopf(fehler: unknown): { titel: string; fallback?: string } {
   return { titel: 'Nicht eingespielt' };
 }
 
+/** Der Server zählt Schlüssel und Passphrase in Bytes (UTF-8), nicht in Zeichen. */
+const hoechstensBytes = (max: number, meldung: string) => ({
+  validator: (_: unknown, wert?: string) =>
+    new TextEncoder().encode(wert ?? '').length > max
+      ? Promise.reject(new Error(meldung))
+      : Promise.resolve(),
+});
+
 const dateiAusListe = (e: { fileList?: UploadFile[] } | UploadFile[]) =>
   (Array.isArray(e) ? e : e?.fileList)?.slice(-1);
 
@@ -167,7 +175,10 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
         <Form.Item
           name="schluesselText"
           label="Schlüssel"
-          rules={[{ required: true, whitespace: true, message: 'Schlüssel einfügen' }]}
+          rules={[
+            { required: true, whitespace: true, message: 'Schlüssel einfügen' },
+            hoechstensBytes(ARCHIV_PRIVATSCHLUESSEL_MAX, 'Das ist kein Archiv-Schlüssel: zu lang'),
+          ]}
         >
           <Input.Password
             placeholder="AGE-SECRET-KEY-1…"
@@ -177,7 +188,12 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
           />
         </Form.Item>
       )}
-      <Form.Item name="passphrase" label="Passphrase der Schlüsseldatei" extra="Nur bei Schutz">
+      <Form.Item
+        name="passphrase"
+        label="Passphrase der Schlüsseldatei"
+        extra="Nur bei Schutz"
+        rules={[hoechstensBytes(ARCHIV_PASSPHRASE_MAX, 'Passphrase zu lang')]}
+      >
         <Input.Password autoComplete="off" maxLength={ARCHIV_PASSPHRASE_MAX} />
       </Form.Item>
     </ErfassungsModal>

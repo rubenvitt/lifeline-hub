@@ -379,6 +379,21 @@ describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
     expect(await screen.findByRole('button', { name: 'Archiv einspielen' })).toBeInTheDocument();
   });
 
+  it('zählt die Passphrase in Bytes wie der Server', async () => {
+    const anfragen = installiereXhrAttrappe();
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    zeigeMitEinsatz();
+    const dialog = await ausfuellen();
+    // 600 Umlaute sind 600 Zeichen, aber 1200 Bytes.
+    await userEvent.click(within(dialog).getByLabelText('Passphrase der Schlüsseldatei'));
+    await userEvent.paste('ä'.repeat(600));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
+    expect(await within(dialog).findByText('Passphrase zu lang')).toBeInTheDocument();
+    expect(anfragen).toHaveLength(0);
+  });
+
   it('sperrt Abbrechen, solange eingespielt wird, und nennt eine Ablehnung „Nicht eingespielt“', async () => {
     const anfragen = installiereXhrAttrappe();
     onTestFinished(() => {

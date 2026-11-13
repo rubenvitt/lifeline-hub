@@ -4,7 +4,8 @@
  *
  * Jede Grenze steht als eigene Zeile „export const“, Name, „=“, Zahl (Unterstriche erlaubt),
  * Semikolon; der Spiegeltest liest die Datei zeilenweise mit einem Muster. Gezählt wird
- * wie beim Server in Unicode-Skalarwerten nach dem Trimmen (`components/zeichenGrenze.tsx`).
+ * wie beim Server in Unicode-Skalarwerten nach dem Trimmen (`components/zeichenGrenze.tsx`);
+ * Grenzen mit „in Bytes“ im Kommentar zählen UTF-8-Bytes (Archiv einspielen, LLH-1711).
  * Herleitung: design.md der Change `lfh-937-eingabegrenzen` (D6, D8).
  */
 
