@@ -63,17 +63,35 @@ pub struct PersonDetail {
     pub verletzungen: Vec<VerletzungAnzeige>,
 }
 
-/// Meldet jede versorgte Person der Einheit `einheit_id` mit `person` (LLH-1682, design.md D5):
-/// ihre Zeile trägt Name und Abschnitt der Einheit per Join. Nach dem Commit; scheitert das
-/// Lesen, bleibt es bei einer Warnung, die Änderung an der Einheit ist gespeichert.
-pub(crate) async fn sse_versorgte_personen(state: &AppState, einsatz_id: i64, einheit_id: i64) {
-    match repo::versorgte_von(&state.pool, einsatz_id, einheit_id).await {
-        Ok(ids) => ids
-            .into_iter()
-            .for_each(|pid| sse_person(state, einsatz_id, pid)),
+/// Mehr Personen meldet ein Schreibweg nicht einzeln (LLH-1682, design.md D5): darüber geht ein
+/// `person` ohne Kennung, und die Tabs gleichen über die Prefixe ab. Gleich `ZEILEN_GRENZE` in
+/// `frontend/src/live/zeilenAbgleich.ts`, ab der ein Tab die Liste ohnehin ganz lädt; hunderte
+/// Einzelereignisse liefen sonst über Kanal und Replay-Ring (je 256 Plätze).
+pub(crate) const PERSONEN_EINZELN_MAX: usize = 10;
+
+/// Meldet die Personen `ids` mit `person`: einzeln bis [`PERSONEN_EINZELN_MAX`], darüber einmal
+/// ohne Kennung.
+pub(crate) fn sse_personen(state: &AppState, einsatz_id: i64, ids: &[i64]) {
+    if ids.len() > PERSONEN_EINZELN_MAX {
+        state.live.publiziere_einsatz(einsatz_id, LiveEvent::Person);
+    } else {
+        for &pid in ids {
+            sse_person(state, einsatz_id, pid);
+        }
+    }
+}
+
+/// Meldet die versorgten Personen der Einheiten `einheit_ids` (LLH-1682, design.md D5): ihre Zeile
+/// trägt Name und Abschnitt der Einheit per Join. Nach dem Commit; scheitert das Lesen, bleibt es
+/// bei einer Warnung, die Änderung an der Einheit ist gespeichert.
+pub(crate) async fn sse_versorgte_personen(state: &AppState, einsatz_id: i64, einheit_ids: &[i64]) {
+    if einheit_ids.is_empty() {
+        return;
+    }
+    match repo::versorgte_von(&state.pool, einsatz_id, einheit_ids).await {
+        Ok(ids) => sse_personen(state, einsatz_id, &ids),
         Err(e) => tracing::warn!(
             einsatz_id,
-            einheit_id,
             fehler = %e,
             "versorgte Personen nicht lesbar, Live-Ereignis entfällt"
         ),

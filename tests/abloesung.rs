@@ -1867,3 +1867,73 @@ async fn vollzug_mit_verbleib_ueber_die_route() {
     assert_eq!(s, StatusCode::OK, "{v:?}");
     assert_eq!(v["abgeloest"]["verbleib"], "entlassen");
 }
+
+/// LLH-1682: Die Abschnittsübergabe ändert den Abschnitt der abgelösten Einheit, den die Zeilen
+/// ihrer versorgten Personen per Join tragen; Vollzug und Rücknahme melden sie mit `person`.
+#[tokio::test]
+async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt(&app, &admin, e, "Deichwache Nord").await;
+    let f1 = einheit(&app, &admin, e, "Florian 1", Some(nord)).await;
+    let f2 = einheit(&app, &admin, e, "Florian 2", None).await;
+    let (s, p) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(&format!(
+            r#"{{"name":"Muster","versorgende_einheit_id":{f1}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p:?}");
+    let pid = p["id"].as_i64().unwrap();
+    let (s, schicht) = anfrage(
+        &app,
+        "POST",
+        &pfad(e),
+        &admin,
+        Some(&format!(r#"{{"einheit_id":{f1},"rhythmus_minuten":360}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{schicht:?}");
+    let vollzug = format!("{}/{}/vollzug", pfad(e), schicht["id"]);
+
+    let gemeldet =
+        |rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>| {
+            let mut ids = Vec::new();
+            while let Ok(n) = rx.try_recv() {
+                if n.event.as_str() == "person" {
+                    let d: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+                    ids.push(d["person_id"].as_i64());
+                }
+            }
+            ids
+        };
+    let mut rx = live.abonniere(e);
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &vollzug,
+        &admin,
+        Some(&format!(
+            r#"{{"abloeser_ids":[{f2}],"abschnitt_uebergeben":true}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(gemeldet(&mut rx), vec![Some(pid)], "Vollzug");
+
+    let (s, r) = anfrage(
+        &app,
+        "POST",
+        &format!("{vollzug}/zuruecknehmen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r:?}");
+    assert_eq!(gemeldet(&mut rx), vec![Some(pid)], "Rücknahme");
+}

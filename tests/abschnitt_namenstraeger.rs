@@ -423,3 +423,69 @@ async fn abschnitt_umbenennen_und_aufloesen_meldet_versorgte_personen() {
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(gemeldete_personen(&mut rx), vec![p], "Auflösen");
 }
+
+/// Je `person`-Ereignis seine `person_id`, `None` für eines ohne Kennung.
+fn person_ereignisse(rx: &mut Receiver<LiveNachricht>) -> Vec<Option<i64>> {
+    let mut ids = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if n.event.as_str() == "person" {
+            let data: Value = serde_json::from_str(&n.data).unwrap();
+            ids.push(data["person_id"].as_i64());
+        }
+    }
+    ids
+}
+
+/// Über zehn versorgte Personen geht ein einziges `person` ohne Kennung: die Tabs laden die Liste
+/// ab dieser Zahl ohnehin ganz, und hunderte Ereignisse liefen über Kanal und Replay-Ring.
+#[tokio::test]
+async fn mehr_als_zehn_versorgte_personen_melden_ein_ereignis_ohne_kennung() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    for _ in 0..11 {
+        versorgte_person(&app, &admin, eid, zug).await;
+    }
+
+    let mut rx = live.abonniere(eid);
+    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({"name": "Neu"}))).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(person_ereignisse(&mut rx), vec![None], "Einheit");
+
+    umbenennen(&app, &admin, eid, nord, json!({"name": "Nordost"})).await;
+    assert_eq!(person_ereignisse(&mut rx), vec![None], "Abschnitt");
+}
+
+/// Ist der neue Name gespeichert, meldet die Einheit ihre versorgten Personen auch dann, wenn ein
+/// späterer Schritt desselben PATCH mit 422 scheitert (Muster der Abschnitts-Route).
+#[tokio::test]
+async fn einheit_meldet_versorgte_personen_auch_wenn_ein_spaeterer_schritt_scheitert() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    let p = versorgte_person(&app, &admin, eid, zug).await;
+
+    let mut rx = live.abonniere(eid);
+    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({"name": "Neu", "sprechgruppe_ids": [987_654]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let personen = format!("/api/einsaetze/{eid}/personen");
+    assert_eq!(
+        feld_in_liste(&app, &admin, &personen, p, "versorgende_einheit_name").await,
+        "Neu",
+        "Vorbedingung: der Name ist gespeichert"
+    );
+    assert_eq!(person_ereignisse(&mut rx), vec![Some(p)]);
+}

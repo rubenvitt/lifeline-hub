@@ -2989,6 +2989,43 @@ async fn abruf_mit_abschnitt_setzt_unterstellung_ereignis_und_etb() {
     assert_eq!(d["einheiten"][0]["id"], l.hlf, "bleibt im Raum: {d}");
 }
 
+/// LLH-1682: Der Abruf mit Ziel-Abschnitt ändert den Abschnitt der Einheit, den die Zeilen ihrer
+/// versorgten Personen per Join tragen; er meldet sie deshalb mit `person`.
+#[tokio::test]
+async fn abruf_mit_abschnitt_meldet_versorgte_personen() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let l = abruf_lage_mit(app, pool).await;
+    let (s, v) = anfrage_json(
+        &l.app,
+        "POST",
+        &format!("/api/einsaetze/{}/personen", l.eid),
+        &l.admin,
+        Some(&json!({"name": "Muster", "versorgende_einheit_id": l.hlf})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let pid = v["id"].as_i64().unwrap();
+
+    let mut rx = live.abonniere(l.eid);
+    let (s, v) = rufe_ab(
+        &l.app,
+        &l.admin,
+        l.eid,
+        l.br,
+        json!({"objekt_typ": "einheit", "objekt_id": l.hlf, "abschnitt_id": l.deich}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let mut gemeldet = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if n.event.as_str() == "person" {
+            let d: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+            gemeldet.push(d["person_id"].as_i64());
+        }
+    }
+    assert_eq!(gemeldet, vec![Some(pid)]);
+}
+
 /// Spec „Liste der Räume mit Belegung“, Szenario „Abgerufene Einheit“ (LLH-1309): die Liste nennt
 /// den Abruf je abgerufener Einheit mit dem Zeitpunkt aus dem Detail, eine nicht abgerufene trägt
 /// keinen; nach dem Ausrücken fällt er weg.

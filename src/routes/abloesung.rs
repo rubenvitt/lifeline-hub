@@ -102,6 +102,9 @@ async fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: VollzugWi
     for ep_id in crate::kraefte_disposition::dedupe(&personen, |id| *id) {
         super::einsatz_personal::sse_personal(state, einsatz_id, ep_id);
     }
+    // Betroffene Personen, deren versorgende Einheit den Abschnitt gewechselt hat (LLH-1682).
+    let gewechselt = crate::kraefte_disposition::dedupe(&wirkung.abschnitt_gewechselt, |id| *id);
+    super::einsatz_person::sse_versorgte_personen(state, einsatz_id, &gewechselt).await;
 }
 
 /// Eine Liste von Ablösern von außen (LLH-1132, `src/AGENTS.md`, „Eingabegrenzen“): mehr als
