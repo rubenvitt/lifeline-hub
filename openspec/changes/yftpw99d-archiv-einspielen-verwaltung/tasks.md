@@ -21,8 +21,8 @@ TDD: zuerst der Test, der rot wird, dann der Code.
 
 ## 4. Route `/api/admin/archiv/einspielen` (D1, D4, D5, D6)
 
-- [ ] 4.1 `GET` liefert `ArchivEinspielenVerfuegbarkeit { verfuegbar }` (AdminUser). Prüfung: Integrationstest in `tests/archiv_einspielen.rs`: Admin 200 mit `true`/`false` je nach Kopplung, Führungskraft 403.
-- [ ] 4.2 `POST` als Multipart (`schluessel` | `schluessel_datei`, `passphrase`, `block`): Hub-Prüfung vor dem Body (422), Schlüssel in `SecretSlice`, Block gestreamt in die Zwischendatei. Dann Kern mit `Ziel::EigeneOrg(benutzer.org_id)` und `Akteur::Person`, Antwort `ArchivEingespieltAnzeige`. Prüfung in `tests/archiv_einspielen.rs`:
+- [x] 4.1 `GET` liefert `ArchivEinspielenVerfuegbarkeit { verfuegbar }` (AdminUser). Prüfung: Integrationstest in `tests/archiv_einspielen.rs`: Admin 200 mit `true`/`false` je nach Kopplung, Führungskraft 403.
+- [x] 4.2 `POST` als Multipart (`schluessel` | `schluessel_datei`, `passphrase`, `block`): Hub-Prüfung vor dem Body (422), Schlüssel in `SecretSlice`, Block gestreamt in die Zwischendatei. Dann Kern mit `Ziel::EigeneOrg(benutzer.org_id)` und `Akteur::Person`, Antwort `ArchivEingespieltAnzeige`. Prüfung in `tests/archiv_einspielen.rs`:
   - Erfolg mit Spur und Person
   - eingefügter Text
   - geschützte Datei mit und ohne Passphrase
@@ -34,10 +34,10 @@ TDD: zuerst der Test, der rot wird, dann der Code.
   - Kopplung einer anderen Org 422
   - nach einem früheren Einspielen weiter verfügbar
   - Führungskraft 403
-- [ ] 4.3 Route in `src/app.rs` mit `DefaultBodyLimit::max(ARCHIV_BLOCK_MAX)` (256 MiB) und `upload_grenze`, Eintrag in `zulassung::OHNE_ZULASSUNGSGRENZE`. Prüfung: `tests/zulassung_guard.rs` grün und ein Test „über 256 MiB ist 413“ in `tests/archiv_einspielen.rs`. Der Test darf die Grenze per Hilfsrouter mit kleinerem Wert prüfen, wenn 256 MiB im Test zu teuer sind.
-- [ ] 4.4 Schlüssel bleibt nicht liegen. Prüfung: Ein Test in `tests/archiv_einspielen.rs` durchsucht nach Erfolg und nach Fehler alle Tabellen (Textspalten, inkl. `admin_audit`) und alle Dateien im Datenverzeichnis nach dem Schlüssel (`AGE-SECRET-KEY-1…`) und der Passphrase und findet nichts. Es bleibt keine Zwischendatei `lifeline-zwischen-…` zurück.
-- [ ] 4.5 Abbruch. Prüfung: Ein Test fällt das Future des Handlers mitten im Einspielen (oder nach dem Streamen) fallen und findet danach keine Zwischendatei.
-- [ ] 4.6 OpenAPI-Einträge (`src/api_doc.rs`) und Typ-Codegen. Prüfung: `scripts/check-typ-codegen.sh` grün, generierte Dateien mitcommittet.
+- [x] 4.3 Route in `src/app.rs` mit `DefaultBodyLimit::max(ARCHIV_BLOCK_MAX)` (256 MiB) und `upload_grenze`, Eintrag in `zulassung::OHNE_ZULASSUNGSGRENZE`. Prüfung: `tests/zulassung_guard.rs` grün und ein Test „über 256 MiB ist 413“ in `tests/archiv_einspielen.rs`. Der Test darf die Grenze per Hilfsrouter mit kleinerem Wert prüfen, wenn 256 MiB im Test zu teuer sind.
+- [x] 4.4 Schlüssel bleibt nicht liegen. Prüfung: Ein Test in `tests/archiv_einspielen.rs` durchsucht nach Erfolg und nach Fehler alle Tabellen (Textspalten, inkl. `admin_audit`) und alle Dateien im Datenverzeichnis nach dem Schlüssel (`AGE-SECRET-KEY-1…`) und der Passphrase und findet nichts. Es bleibt keine Zwischendatei `lifeline-zwischen-…` zurück.
+- [x] 4.5 Abbruch. Prüfung: Ein Test fällt das Future des Handlers mitten im Einspielen (oder nach dem Streamen) fallen und findet danach keine Zwischendatei.
+- [x] 4.6 OpenAPI-Einträge (`src/api_doc.rs`) und Typ-Codegen. Prüfung: `scripts/check-typ-codegen.sh` grün, generierte Dateien mitcommittet.
 - [ ] 4.7 Betriebsdoku `docs/betrieb/backup-restore.md`, Abschnitt „Archiv eines Einsatzes einspielen“: Weg über die Verwaltung, nicht am Hub, 256 MiB, Proxy-Timeout, Befehl für große Blöcke und `--org`. Prüfung: Abschnitt gelesen gegen die Tests aus 4.2 bis 4.5; die Prettier-Prüfung von `scripts/check-all.sh` grün.
 
 ## 5. Oberfläche (D8)

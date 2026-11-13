@@ -1660,6 +1660,72 @@
           }
         }
       },
+      "ArchivEingespieltAnzeige": {
+        "type": "object",
+        "description": "Was eingespielt wurde (`POST /api/admin/archiv/einspielen`).",
+        "required": [
+          "einsatz_id",
+          "bezeichnung",
+          "org_name",
+          "loeschen_at",
+          "inhalte",
+          "hinweise"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "frist_endet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Endet eine Frist des Blocks vor den 7 Tagen: wann (UTC). Die Oberfläche zeigt ihn in der\nAnzeigezone; derselbe Zeitpunkt steht als Satz auch in `hinweise`."
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Was nicht oder anders übernommen wurde, als Sätze wie beim Befehl."
+          },
+          "inhalte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Anhänge und Pläne, die mitkamen."
+          },
+          "loeschen_at": {
+            "type": "string",
+            "description": "Bis wann der Einsatz hier bleibt (UTC); danach räumt der Purge-Lauf ihn ab."
+          },
+          "org_name": {
+            "type": "string"
+          }
+        }
+      },
+      "ArchivEinspielenVerfuegbarkeit": {
+        "type": "object",
+        "description": "Antwort von `GET /api/admin/archiv/einspielen`.",
+        "required": [
+          "verfuegbar"
+        ],
+        "properties": {
+          "verfuegbar": {
+            "type": "boolean",
+            "description": "`false` an einer Instanz, bei der sich eine andere meldet (Hub): dort gehört kein privater\nArchiv-Schlüssel hin."
+          }
+        }
+      },
       "ArchivEmpfaengerAnzeige": {
         "type": "object",
         "description": "Ein Archiv-Empfänger, wie die Verwaltung ihn sieht. Der Schlüssel selbst steht nicht darin,\nnur sein Fingerabdruck.",

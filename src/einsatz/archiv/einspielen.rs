@@ -143,6 +143,13 @@ fn datei_sha256(datei: &Path) -> Result<String, AppError> {
     Ok(hex(&hash.finalize()))
 }
 
+/// Legt die Datei an, in die die Verwaltung einen hochgeladenen Block schreibt (LLH-1711,
+/// design.md D4): neben der Datenbank, nur für den Dienst lesbar, gelöscht beim Fallenlassen und
+/// nach einem Absturz vom Purge-Lauf, sobald sie alt ist.
+pub async fn ablage(pool: &SqlitePool) -> Result<(bauen::Zwischendatei, std::fs::File), AppError> {
+    bauen::zwischendatei(&bauen::verzeichnis(pool).await?, 0, bauen::TEIL_HOCHGELADEN)
+}
+
 /// Spielt den Block `datei` mit `schluessel` in die Org nach `ziel` ein; `akteur` steht in der
 /// Admin-Spur.
 pub async fn einspielen(

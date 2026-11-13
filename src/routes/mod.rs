@@ -2,6 +2,7 @@ pub mod abloesung;
 pub mod abloesung_schichtplan;
 pub mod anbindungen;
 pub mod anhang;
+pub mod archiv_einspielen;
 pub mod archiv_empfaenger;
 pub mod aufbewahrung;
 pub mod auftrag;

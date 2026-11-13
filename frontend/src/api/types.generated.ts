@@ -686,6 +686,36 @@ export interface components {
             /** @description Bis wann dieser Block gilt; `None` = so lange wie der Einsatz. */
             gueltig_bis?: string | null;
         };
+        /** @description Was eingespielt wurde (`POST /api/admin/archiv/einspielen`). */
+        ArchivEingespieltAnzeige: {
+            bezeichnung: string;
+            /** Format: int64 */
+            einsatz_id: number;
+            einsatznummer?: string | null;
+            /**
+             * @description Endet eine Frist des Blocks vor den 7 Tagen: wann (UTC). Die Oberfläche zeigt ihn in der
+             *     Anzeigezone; derselbe Zeitpunkt steht als Satz auch in `hinweise`.
+             */
+            frist_endet_at?: string | null;
+            /** @description Was nicht oder anders übernommen wurde, als Sätze wie beim Befehl. */
+            hinweise: string[];
+            /**
+             * Format: int64
+             * @description Anhänge und Pläne, die mitkamen.
+             */
+            inhalte: number;
+            /** @description Bis wann der Einsatz hier bleibt (UTC); danach räumt der Purge-Lauf ihn ab. */
+            loeschen_at: string;
+            org_name: string;
+        };
+        /** @description Antwort von `GET /api/admin/archiv/einspielen`. */
+        ArchivEinspielenVerfuegbarkeit: {
+            /**
+             * @description `false` an einer Instanz, bei der sich eine andere meldet (Hub): dort gehört kein privater
+             *     Archiv-Schlüssel hin.
+             */
+            verfuegbar: boolean;
+        };
         /**
          * @description Ein Archiv-Empfänger, wie die Verwaltung ihn sieht. Der Schlüssel selbst steht nicht darin,
          *     nur sein Fingerabdruck.
