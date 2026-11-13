@@ -105,6 +105,22 @@ async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name
 }
 
 /**
+ * Eine Meldung — der Typ jedes neuen Entwurfs — trägt als Vorgabe nur An = eigene Stelle; Von ist
+ * Pflicht (Change `kwc2yszv-etb-neuentwurf`, Spec `etb-absender-empfaenger`). Wer senden will,
+ * setzt Von über die Feldzeile; Enter übernimmt und springt in den Inhalt. Eingefügt statt
+ * getippt: jeder Tastendruck zeichnet die Erfassung neu (LFH-672).
+ */
+async function setzeVon(user: ReturnType<typeof userEvent.setup>, wert = 'Florian 3') {
+  const von = await screen.findByRole('combobox', { name: 'Von' });
+  await user.clear(von);
+  await user.paste(wert);
+  await user.keyboard('{Enter}');
+}
+
+/** Die Feldzeile der Erfassung (Zeit, Von, An, Meldeweg) steht: die Leiste ist aufgeklappt. */
+const feldzeile = () => screen.queryByRole('textbox', { name: 'Zeit' });
+
+/**
  * Serverzählung für Kopf und Bilanz, bewusst unabhängig vom geladenen Fenster: der Kopf zeigt, was
  * der Server zählt.
  */
@@ -342,10 +358,18 @@ describe('EtbPage', () => {
       'Florian Leitung',
     );
 
+    // Lage: Von und An tragen beide die eigene Stelle (Spec `etb-absender-empfaenger`); eine
+    // Meldung nähme den Standard nur für An.
+    await user.click(
+      within(screen.getByRole('radiogroup', { name: 'Typ des Eintrags' })).getByRole('radio', {
+        name: 'Lage',
+      }),
+    );
     // Ohne Rufname hält die Pflicht den Eintrag zurück; der Text bleibt stehen.
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await user.type(feld, 'Pegel steigt{Enter}');
-    expect(await screen.findByText(/Von fehlt/)).toBeInTheDocument();
+    expect(await screen.findByText('Absender fehlt')).toBeInTheDocument();
+    expect(screen.getByText('Empfänger fehlt')).toBeInTheDocument();
     expect(body).toBeNull();
     expect(feld).toHaveValue('Pegel steigt');
 
@@ -356,7 +380,8 @@ describe('EtbPage', () => {
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: /Rufnamen/ })).not.toBeInTheDocument(),
     );
-    expect(screen.getByText('Von: Florian Leitung')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveValue('Florian Leitung');
+    expect(screen.getByRole('combobox', { name: 'An' })).toHaveValue('Florian Leitung');
 
     await user.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
@@ -541,11 +566,12 @@ describe('EtbPage', () => {
     setup();
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.type(feld, 'Neuer Eintrag X{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.inhalt).toBe('Neuer Eintrag X');
-    // Von/An aus dem Standard-Rufnamen (LFH-894).
-    expect(body).toMatchObject({ von: 'ELW 1', an: 'ELW 1' });
+    // Von aus der Feldzeile, An aus dem Standard-Rufnamen (LFH-894; Vorgabe einer Meldung).
+    expect(body).toMatchObject({ von: 'Florian 3', an: 'ELW 1' });
   });
 
   it('entfernt den Entwurf auch bei Offline-Enqueue (Netzwerkfehler → eingereiht statt abgelehnt)', async () => {
@@ -556,6 +582,7 @@ describe('EtbPage', () => {
     setup();
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.type(feld, 'Offline-Eintrag{Enter}');
     await waitFor(async () => expect(await entwuerfeLaden(admin.id, 7)).toHaveLength(0));
   });
@@ -585,6 +612,7 @@ describe('EtbPage', () => {
     ]);
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.type(feld, '/langer');
     await user.click(await screen.findByText('Langer Baustein'));
     await waitFor(() => expect(feld).toHaveValue(langerText));
@@ -643,18 +671,20 @@ describe('EtbPage', () => {
       </AdresseSteht>,
       { route: '/einsaetze/7/etb?neu=1' },
     );
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Der Fokus steht im ersten leeren Pflichtfeld der Leiste: eine Meldung ohne Von (Spec „Fokus
+    // im ersten leeren Pflichtfeld“).
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull());
+    await waitFor(() => expect(feldzeile()).toBeNull());
 
     const zwei = { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Zweite Meldung' };
     server.use(http.get('/api/einsaetze/7/etb', () => HttpResponse.json([zwei, eintrag])));
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(7) }));
     expect(await screen.findByText('Zweite Meldung')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull();
+    expect(feldzeile()).toBeNull();
   });
 
   it('ein neuer Link ?neu=1 fokussiert die verlassene Leiste wieder (LLH-1558)', async () => {
@@ -670,15 +700,16 @@ describe('EtbPage', () => {
       </>,
       { route: '/einsaetze/7/etb?neu=1' },
     );
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Fokus im ersten leeren Pflichtfeld der Leiste: Von einer Meldung.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull());
+    await waitFor(() => expect(feldzeile()).toBeNull());
 
     await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
-    await waitFor(() => expect(screen.getByPlaceholderText(/^Inhalt/)).toHaveFocus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
   });
 
@@ -1086,6 +1117,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     const wahl = screen.getByRole('combobox', { name: 'Nach Einheit filtern' });
     const feld = wahl.closest('.ant-select') as HTMLElement;
     await waitFor(() => expect(within(feld).getByText('1. Zug')).toBeInTheDocument());
+    // Erst den Fokus beim Laden abwarten (Meldung ohne Von: Feld Von). Er kommt einen Frame nach
+    // dem Mount der Erfassung und schlösse eine eben geöffnete Liste wieder.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
 
     await userEvent.click(wahl);
     const option = await screen.findByTitle('2. Zug');
@@ -1141,13 +1175,12 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(
       zeitachse.compareDocumentPosition(leiste) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // Die Hülle der Schnellerfassung trägt den Typ als Typwort im Präfix (nach dem Laden der
-    // Entwürfe, LLH-1112).
-    await waitFor(() =>
-      expect(leiste.querySelector('[data-lfh="schnellerfassung-praefix"]')).toHaveTextContent(
-        'Meldung',
-      ),
-    );
+    // Die Erfassung trägt den Typ als Segment „Typ des Eintrags“ in der Feldzeile (nach dem
+    // Laden der Entwürfe; LLH-1112, Change `kwc2yszv-etb-neuentwurf`, Aufgabe 3.1).
+    const typ = await within(leiste as HTMLElement).findByRole('radiogroup', {
+      name: 'Typ des Eintrags',
+    });
+    expect(within(typ).getByRole('radio', { name: 'Meldung' })).toBeChecked();
   });
 
   it('rollt nach einem angenommenen eigenen Eintrag ans Ende — nicht nach einer Ablehnung', async () => {
@@ -1175,6 +1208,7 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
       const user = userEvent.setup();
       const feld = await screen.findByPlaceholderText(/Inhalt/);
       await screen.findByText('Erste Meldung');
+      await setzeVon(user);
       aufrufe.length = 0;
       await user.type(feld, 'Wird abgelehnt{Enter}');
       await waitFor(() => expect(feld).toHaveValue('Wird abgelehnt'));
@@ -1346,6 +1380,7 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     setup();
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.type(feld, 'Offline-Eintrag{Enter}');
     const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
     await waitFor(() =>
@@ -1374,7 +1409,9 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     const user = userEvent.setup();
     await screen.findByText('Erste Meldung');
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await user.type(feld, 'Zwei Fotos vom Deich');
+    // Eingefügt statt getippt: jeder Tastendruck zeichnet die Erfassung neu (LFH-672).
+    await user.click(feld);
+    await user.paste('Zwei Fotos vom Deich');
     await user.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
     expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
     await waitFor(async () =>
@@ -1445,6 +1482,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     const user = userEvent.setup();
     await screen.findByText('Erste Meldung');
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.upload(dateiEingabe(), new File(['x'], 'foto-d.jpg', { type: 'image/jpeg' }));
     await user.type(feld, 'Foto{Enter}');
     expect(await screen.findByText(/Speicher des Servers ist voll/)).toBeInTheDocument();
@@ -1505,6 +1543,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     const user = userEvent.setup();
     await screen.findByText('Erste Meldung');
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
     await user.type(feld, 'Foto{Enter}');
     await screen.findByText('Lädt hoch (1/1) …');
@@ -1547,7 +1586,11 @@ describe('EtbPage — Ablehnungen am Ort (LFH-1077)', () => {
     ]);
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await user.type(feld, 'Wird abgelehnt{Enter}');
+    await setzeVon(user);
+    // Eingefügt statt getippt: jeder Tastendruck zeichnet die Erfassung neu (LFH-672).
+    await user.click(feld);
+    await user.paste('Wird abgelehnt');
+    await user.keyboard('{Enter}');
 
     const leiste = document.querySelector<HTMLElement>('.etb-erfassung-sticky')!;
     expect(await within(leiste).findByText(konflikt)).toBeInTheDocument();
@@ -1912,21 +1955,25 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(screen.queryByRole('button', { name: /^Filter/ })).toBeNull();
   });
 
-  const feldKnopf = () => screen.queryByRole('button', { name: 'Feld' });
-
   it('die Erfassungsleiste startet eingeklappt, ohne Fokus, und klappt beim Fokus auf', async () => {
     setzeViewportBreite(390);
     setup();
     const feld = await screen.findByPlaceholderText(/^Inhalt/);
     await waitFor(() => expect(screen.getAllByText('Erste Meldung').length).toBeGreaterThan(0));
     expect(feld).not.toHaveFocus();
-    expect(feldKnopf()).toBeNull();
+    // Eingeklappt: eine Zeile aus Typ-Knopf und Inhalt, ohne Feldzeile und „Erfassen“.
+    expect(feldzeile()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Erfassen' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Typ des Eintrags: Meldung' })).toBeInTheDocument();
     expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).toHaveStyle({
       display: 'none',
     });
     act(() => feld.focus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
-    expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).not.toHaveStyle({
+    await waitFor(() => expect(feldzeile()).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
+    // Aufgeklappt bleibt das Reiterband weg: es gibt nur einen Entwurf (Spec „Entwurfsreiter
+    // und Vorschau nur bei Bedarf“).
+    expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).toHaveStyle({
       display: 'none',
     });
   });
@@ -1936,16 +1983,16 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     setup();
     const feld = await screen.findByPlaceholderText(/^Inhalt/);
     act(() => feld.focus());
-    await screen.findByRole('button', { name: 'Feld' });
+    await waitFor(() => expect(feldzeile()).toBeInTheDocument());
     act(() => feld.blur());
-    await waitFor(() => expect(feldKnopf()).toBeNull());
+    await waitFor(() => expect(feldzeile()).toBeNull());
 
     act(() => feld.focus());
     await userEvent.type(feld, 'Pegel steigt');
     act(() => feld.blur());
     // Mit Inhalt bleibt alles stehen: gesetzte Felder wären sonst unsichtbar.
     await new Promise((r) => setTimeout(r, 50));
-    expect(feldKnopf()).toBeInTheDocument();
+    expect(feldzeile()).toBeInTheDocument();
   });
 
   it('ein Fokuswechsel in ein schwebendes Teil der Leiste klappt sie nicht zu', async () => {
@@ -1953,8 +2000,9 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     setup();
     const feld = await screen.findByPlaceholderText(/^Inhalt/);
     act(() => feld.focus());
-    await screen.findByRole('button', { name: 'Feld' });
-    // Die Typ-Auswahl und die Chip-Editoren hängt antd an `document.body`.
+    await waitFor(() => expect(feldzeile()).toBeInTheDocument());
+    // Das Typ-Menü und die Vorschlags- und Auswahllisten der Feldzeile hängt antd an
+    // `document.body`.
     const schwebe = document.createElement('div');
     schwebe.className = 'ant-select-dropdown';
     const ziel = document.createElement('button');
@@ -1966,7 +2014,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
         ziel.focus();
       });
       await new Promise((r) => setTimeout(r, 50));
-      expect(feldKnopf()).toBeInTheDocument();
+      expect(feldzeile()).toBeInTheDocument();
     } finally {
       schwebe.remove();
     }
@@ -1975,9 +2023,11 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
   it('?neu=1 fokussiert die Leiste auch unter md und klappt sie auf', async () => {
     setzeViewportBreite(390);
     setup('/einsaetze/7/etb?neu=1');
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Fokus im ersten leeren Pflichtfeld: Von einer Meldung (Spec „Fokus im ersten leeren
+    // Pflichtfeld“); die Leiste ist dabei aufgeklappt.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
   });
 
   it('ein geleerter Filter lässt die offene Filterleiste stehen', async () => {
@@ -2023,12 +2073,14 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(screen.queryByPlaceholderText('Volltextsuche')).toBeNull();
   });
 
-  it('ab md ist die Leiste nie eingeklappt und das Feld hat den Fokus', async () => {
+  it('ab md ist die Leiste nie eingeklappt, der Fokus steht im ersten leeren Pflichtfeld', async () => {
     setzeViewportBreite(820);
     setup();
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
-    expect(feldKnopf()).toBeInTheDocument();
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Meldung ohne Von: der Fokus steht im Feld Von (Spec „Fokus im ersten leeren Pflichtfeld“,
+    // Szenario „Fokus beim Laden“).
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
   });
 });
 
@@ -2258,7 +2310,9 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
     );
     setup('/einsaetze/7/etb?typ=meldung', [zaehlerJeFilter()]);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await userEvent.type(feld, 'Räumen{Enter}');
+    const user = userEvent.setup();
+    await setzeVon(user);
+    await user.type(feld, 'Räumen{Enter}');
     const band = () => document.querySelector('[data-lfh="filterhinweis"]') as HTMLElement;
     await waitFor(() =>
       expect(band()).toHaveTextContent(/Nr\. 135 erfasst – außerhalb des Filters · anzeigen/),
