@@ -16,7 +16,7 @@
 
 ## 3. Abschluss
 
-- [ ] 3.1 `./scripts/check-all.sh` mit den Bündeln für das Backend grün (Format, Clippy-Gate, Tests von `instanz_spiegel`, `instanz_kopplung`, `instanz_fuehrung`); Belege für Schritte, die erst die CI des PRs fährt, mit Verweis auf diesen Lauf.
+- [x] 3.1 `./scripts/check-all.sh` mit den Bündeln für das Backend grün (Format, Clippy-Gate, Tests von `instanz_spiegel`, `instanz_kopplung`, `instanz_fuehrung`); Belege für Schritte, die erst die CI des PRs fährt, mit Verweis auf diesen Lauf. Lokal (13.11.2026): `cargo fmt --check` sauber, `scripts/check-architektur.sh` grün, `cargo test --lib instanz::` und die Suiten `instanz_*` grün; Bündel `schnell` und `rust` belegt die CI des PRs (in der Cloud-Sitzung fehlt `mise`, und alle Testbinaries passen nicht auf die Platte).
 
 ## Workflow follow-up
 
