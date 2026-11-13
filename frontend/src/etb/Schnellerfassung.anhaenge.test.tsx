@@ -563,7 +563,6 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     }
     expect(offen).toEqual([]);
 
-
     await act(async () => freigeben(anzeige(1, 'a.jpg')));
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect(vi.mocked(p.erfassen).mock.calls[0][0]).toMatchObject({
