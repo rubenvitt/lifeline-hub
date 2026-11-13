@@ -2,7 +2,7 @@
 id: ADR-0014
 titel: Maschinen weisen sich mit eigenem Schlüsselpaar und signierten Anfragen aus
 status: ersetzt
-ersetzt_durch: ADR-0033
+ersetzt_durch: ADR-0034
 datum: 2026-11-08
 gilt_fuer:
   - src/instanz/**

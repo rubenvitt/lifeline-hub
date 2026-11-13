@@ -1,5 +1,5 @@
 ---
-id: ADR-0033
+id: ADR-0034
 titel: Maschinen weisen sich mit eigenem Schlüsselpaar und signierten Anfragen aus, außer beim Einwurf
 status: akzeptiert
 datum: 2026-11-12
@@ -16,7 +16,7 @@ herleitung:
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---
 
-# ADR-0033: Maschinen weisen sich mit eigenem Schlüsselpaar und signierten Anfragen aus, außer beim Einwurf
+# ADR-0034: Maschinen weisen sich mit eigenem Schlüsselpaar und signierten Anfragen aus, außer beim Einwurf
 
 ## Regeln
 

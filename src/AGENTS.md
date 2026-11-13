@@ -345,7 +345,7 @@ Spec `passwort-anmeldung`, Herleitung
 ## Backend — Instanzkopplung (LLH-1490)
 
 Zwei Instanzen (ELW und Hub) sprechen nur signiert miteinander; Regeln des Verfahrens in
-[ADR-0033](../docs/architektur/entscheidungen/ADR-0033-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
+[ADR-0034](../docs/architektur/entscheidungen/ADR-0034-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
 Herleitung in
 `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`.
 
@@ -367,7 +367,7 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0028](../docs/architektur/entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md):
+  [ADR-0033](../docs/architektur/entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md):
   - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`

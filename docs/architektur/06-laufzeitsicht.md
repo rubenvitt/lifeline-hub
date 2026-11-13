@@ -250,7 +250,7 @@ sequenceDiagram
 ## 6.6a Instanzen koppeln und melden
 
 Zwei Instanzen (etwa ELW und Hub) koppeln sich per Einmal-Code (LLH-1490,
-[ADR-0033](entscheidungen/ADR-0033-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md)).
+[ADR-0034](entscheidungen/ADR-0034-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md)).
 A stellt aus und wird gemeldet, E löst ein und meldet sich; das Protokoll kennt nur diese
 Richtung, nicht Hub und ELW.
 
@@ -382,7 +382,7 @@ sequenceDiagram
 
 Mit dem Schalter `LIFELINE_FUEHRUNG` tauschen gekoppelte Instanzen in jeder Meldung ihre
 Führungsakten aus (LLH-1491,
-[ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)). Genau eine
+[ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)). Genau eine
 Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung). Seit LLH-1641
 entscheidet die Akte, wer führt, und der Spiegel folgt ihr: wer die Führung abgibt, wird Spiegel
 mit Anträgen; wer sie bekommt, schreibt den bisherigen Spiegel weiter.
@@ -415,8 +415,9 @@ sequenceDiagram
 - Mehrere ELW an einem Hub: Der Hub behält die zuerst angenommene Führung. Nennt er einer ELW, die
   selbst führt, einen Dritten als Führer, hält sie dessen Führung offen und gibt erst nach
   Bestätigung ab (`austausch::ist_konflikt`, ohne Widerspruch); führt der Hub selbst mit der
-  Epoche eines Dritten, hält sie das als gewöhnliche Übernahme offen, und ihr Widerspruch nimmt der
-  Hub an ([ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)).
+  Epoche eines Dritten oder mit einer Erklärung gegen einen Dritten (er holte sich die Führung per
+  Notübernahme oder Widerruf von einer anderen ELW zurück), hält sie das als gewöhnliche Übernahme
+  offen, ohne Alarm, und ihren Widerspruch nimmt der Hub an ([ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)).
 - Gesperrt ist nur der Spiegel (`einsatz.spiegel`, Schutz-Trigger, 409 `einsatz_ist_spiegel`).
   `instanz::spiegel::fuehrung::richte_aus` richtet ihn bei jedem Speichern einer Akte aus
   (`werde_fuehrer`, `werde_spiegel`); die Bedienung zieht `EinsatzFuehrungszugriff`.

@@ -1,5 +1,5 @@
 //! Signierte Nachrichten zwischen gekoppelten Instanzen (design.md D3): kompaktes JWS mit EdDSA,
-//! Muster DPoP/`private_key_jwt`. Vorgabe für LLH-1148 in ADR-0033 (vormals ADR-0014).
+//! Muster DPoP/`private_key_jwt`. Vorgabe für LLH-1148 in ADR-0034 (vormals ADR-0014).
 //!
 //! Selbst geschrieben, weil das Format fest ist: es gibt genau einen Algorithmus (`EdDSA`), und
 //! jeder andere Kopf wird abgelehnt, bevor eine Signatur geprüft wird. Ein JWT-Crate müsste
@@ -10,7 +10,7 @@ use super::identitaet::Identitaet;
 use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-/// Was ein Anmeldeprofil nach ADR-0033 festlegt: `typ` von Anfrage und Antwort, das Schema im
+/// Was ein Anmeldeprofil nach ADR-0034 festlegt: `typ` von Anfrage und Antwort, das Schema im
 /// Kopf `Authorization` und den Kopf der Antwortsignatur. Instanzen und Fremdsysteme
 /// (Maschinenzugang, ADR-0022) teilen Signatur und Prüfung und unterscheiden sich nur hierin; ein
 /// Token des einen Profils scheitert am anderen schon am `typ`.

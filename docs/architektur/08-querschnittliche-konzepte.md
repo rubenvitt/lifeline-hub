@@ -226,7 +226,7 @@ selbst signiert). Jede Antwort trägt `X-Content-Type-Options: nosniff`
 Maschinen (gekoppelte Instanzen und Fremdsysteme) melden sich nicht mit einer
 Sitzung an, sondern weisen jede Anfrage mit einem eigenen Ed25519-Schlüssel aus: kompaktes JWS
 mit Wiederholschutz in der DB, Antwort ebenso signiert, Einstieg per Einmal-Code eines Org-Admins
-([ADR-0033](entscheidungen/ADR-0033-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
+([ADR-0034](entscheidungen/ADR-0034-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
 `src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“). Fremdsysteme
 nutzen dasselbe Verfahren mit eigenem Profil (`lifeline-machine+jwt`, Kopf
 `Authorization: Machine`), eigenen Tabellen und festen Scopes je Zugang, nur unter `/api/v1/`
@@ -269,7 +269,7 @@ am Spiegel auf einen Stellvertreter, der sich nie anmelden kann
 
 Je Einsatz einer gekoppelten Org führt genau eine Instanz (LLH-1491, Schalter
 `LIFELINE_FUEHRUNG`,
-[ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)). Jede andere
+[ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)). Jede andere
 hält den Einsatz als Spiegel (LLH-1641): die Akte entscheidet, `einsatz.spiegel` folgt ihr, und
 nur der Schutz-Trigger des Spiegels sperrt, am Server wie in `schreibrecht.ts`. Am Spiegel wird
 beantragt. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die
