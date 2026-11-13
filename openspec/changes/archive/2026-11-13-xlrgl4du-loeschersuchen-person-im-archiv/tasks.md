@@ -107,8 +107,12 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
       ersetzt durch Personen-Antrag per Befehl, offenen Antrag im Purge-Lauf und das Vormerken
       der Kopien. Kapitel 6 der Architekturdoku, falls dort der Ablauf des Archivs steht.
       Prüfen: `grep` nach „nur ganz“ findet nichts mehr.
-- [ ] 7.2 `./scripts/check-all.sh` grün (oder die Bündel der berührten Bereiche, dazu der Lauf
-      im PR).
+- [x] 7.2 `./scripts/check-all.sh` grün (oder die Bündel der berührten Bereiche, dazu der Lauf
+      im PR). Lokal (Cloud-Sitzung ohne mise, Node 22): Bündel `schnell` grün bis auf Schritt 8
+      und 12, beide umgebungsbedingt (Node-Version, mise-Ersatz), nicht im Diff; `cargo test
+      --lib` 4301 grün; Integrationstests `loeschersuchen`, `aufbewahrung`, `einsatz_archiv`,
+      `admin_audit`, `enum_wire_kontrakt`, `zugangsprotokoll`, `openapi_spec_aktuell` grün;
+      Vitest der berührten Bereiche grün. Der volle Lauf belegt die CI des PRs.
 
 ## Workflow follow-up
 

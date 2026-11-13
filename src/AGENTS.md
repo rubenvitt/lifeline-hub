@@ -898,7 +898,8 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Phase D wartet auf den letzten. Ein Löschersuchen für den ganzen archivierten Einsatz löscht
   alle Blöcke.
 - **Löschersuchen für eine Person im Archiv** (LLH-1712, `archiv/loeschersuchen.rs`, Befehl
-  `archiv loeschersuchen`): Der Server hat keinen privaten Archiv-Schlüssel, deshalb nie im
+  `archiv loeschersuchen`, Spec `aufbewahrung-loeschersuchen`, Herleitung
+  `openspec/changes/archive/2026-11-13-xlrgl4du-loeschersuchen-person-im-archiv/design.md`): Der Server hat keinen privaten Archiv-Schlüssel, deshalb nie im
   Purge-Lauf. Je Einsatz alle Blöcke entschlüsseln, migrieren, `scrubbe_person` je Antrag,
   `VACUUM`, an die **heute geprüften** Schlüssel neu verschlüsseln; abgelegt wird in einer
   Transaktion, die Anträge und `sha256` jeder Zeile gegen den Stand des Baus prüft (sonst nichts),

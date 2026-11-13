@@ -1,5 +1,6 @@
-//! Löschersuchen für eine Person im Archiv vollziehen (LLH-1712, Change
-//! `xlrgl4du-loeschersuchen-person-im-archiv`, design.md D1, D2, D4, D5).
+//! Löschersuchen für eine Person im Archiv vollziehen (LLH-1712, Spec
+//! `aufbewahrung-loeschersuchen`, Herleitung
+//! `openspec/changes/archive/2026-11-13-xlrgl4du-loeschersuchen-person-im-archiv/design.md`, D1, D2, D4, D5).
 //!
 //! Der Server hat nur die öffentlichen Archiv-Schlüssel der Org. Einen Personen-Antrag an einem
 //! archivierten Einsatz lässt der Purge-Lauf deshalb offen (`aufbewahrung::antrag::faellige`);

@@ -1,5 +1,5 @@
-//! Personensuche im Archivblock (LLH-1712, Change `xlrgl4du-loeschersuchen-person-im-archiv`,
-//! design.md D6).
+//! Personensuche im Archivblock (LLH-1712, Spec `aufbewahrung-loeschersuchen`, Herleitung
+//! `openspec/changes/archive/2026-11-13-xlrgl4du-loeschersuchen-person-im-archiv/design.md`, D6).
 //!
 //! Am archivierten Einsatz stehen keine Namen mehr; ein Löschersuchen für eine Person braucht
 //! aber ihre Kennung. Der Befehl `lifeline-hub archiv personen --einsatz … --identitaet …
