@@ -155,6 +155,66 @@ fn ziel_text(art: AntragZielArt, kennung: &str) -> String {
     format!("{} {kennung}", art.bezeichnung())
 }
 
+/// Ob der Einsatz noch Blöcke im Archiv hat (LLH-1494).
+async fn ist_archiviert(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz_archiv WHERE einsatz_id = ?)")
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?,
+    )
+}
+
+/// Die Zeile einer Person dieses Einsatzes zu ihrer Kennung (LLH-1712, Ziel per Kennung):
+/// Betroffene über die Registriernummer (`R-042`), externe Kräfte und Anrufe über die Zeilen-ID
+/// (`EK-17`, `IT-5`). Ein Präfix, das nicht zur Art passt, oder keine Kennung ist 400; ohne
+/// Zeile in diesem Einsatz 404. Ob die Zeile ein zulässiges Ziel ist (Stammkraft), prüft
+/// [`stellen`].
+pub async fn person_aus_kennung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    art: PersonenArt,
+    kennung: &str,
+) -> Result<i64, AppError> {
+    let praefix = match art {
+        PersonenArt::Betroffene => "R-",
+        PersonenArt::ExterneKraft => "EK-",
+        PersonenArt::InfotelefonAnruf => "IT-",
+    };
+    let nr: i64 = kennung
+        .trim()
+        .strip_prefix(praefix)
+        .filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        .and_then(|n| n.parse().ok())
+        .ok_or_else(|| {
+            AppError::Validation(format!(
+                "Die Kennung {} passt nicht zur Zielart {} ({praefix}…)",
+                kennung.trim(),
+                AntragZielArt::von_person(art).as_str()
+            ))
+        })?;
+    let sql = match art {
+        PersonenArt::Betroffene => {
+            "SELECT id FROM einsatz_person WHERE einsatz_id = ? AND registrier_nr = ?"
+        }
+        PersonenArt::ExterneKraft => {
+            "SELECT id FROM einsatz_personal WHERE einsatz_id = ? AND id = ?"
+        }
+        PersonenArt::InfotelefonAnruf => {
+            "SELECT id FROM infotelefon_anruf WHERE einsatz_id = ? AND id = ?"
+        }
+    };
+    sqlx::query_scalar::<_, i64>(sql)
+        .bind(einsatz_id)
+        .bind(nr)
+        .fetch_optional(pool)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
 /// Kennung einer Person dieses Einsatzes. `Ok(None)`, wenn die Zeile nicht zu diesem Einsatz
 /// gehört (→ 404). Eine Personal-Disposition mit Stammdatenbezug ist keine externe Kraft (422).
 async fn person_kennung(
@@ -258,28 +318,11 @@ pub async fn stellen(
                     .into(),
             ));
         }
-        if geschwaerzt_at.is_some() {
-            // Ein archivierter Einsatz (LLH-1494, K8): das Ersuchen für den ganzen Einsatz löscht
-            // das Archiv. Eine Person im Archiv lässt sich ohne Klartext nicht finden.
-            let archiviert: bool = sqlx::query_scalar(
-                "SELECT EXISTS (SELECT 1 FROM einsatz_archiv WHERE einsatz_id = ?)",
-            )
-            .bind(einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?;
-            match (archiviert, &ziel) {
-                (true, AntragZiel::Einsatz) => {}
-                (true, AntragZiel::Person(..)) => {
-                    return Err(AppError::Conflict(
-                        "Der Einsatz ist archiviert. Ein Löschersuchen geht nur für den ganzen \
-                         Einsatz; es löscht das Archiv."
-                            .into(),
-                    ))
-                }
-                (false, _) => {
-                    return Err(AppError::Conflict("Einsatz ist bereits geschwärzt".into()))
-                }
-            }
+        // Ein archivierter Einsatz (LLH-1494, K8; LLH-1712): das Ersuchen für den ganzen Einsatz
+        // löscht das Archiv, eines für eine Person vollzieht der Befehl `archiv loeschersuchen`
+        // mit dem Archiv-Schlüssel in allen Blöcken. Ohne Archiv gibt es nichts mehr zu schwärzen.
+        if geschwaerzt_at.is_some() && !ist_archiviert(&mut *conn, einsatz_id).await? {
+            return Err(AppError::Conflict("Einsatz ist bereits geschwärzt".into()));
         }
         let kennung = match ziel {
             AntragZiel::Einsatz => einsatz_kennung(nummer.as_deref(), einsatz_id),
@@ -550,13 +593,20 @@ pub async fn offener_einsatz_antrag(
     .await?)
 }
 
+/// Bedingung über `schwaerzung_antrag`: ein Personen-Antrag an einem archivierten Einsatz.
+const IM_ARCHIV: &str = "schwaerzung_antrag.ziel_art <> 'einsatz' AND EXISTS (SELECT 1 FROM \
+     einsatz_archiv a WHERE a.einsatz_id = schwaerzung_antrag.einsatz_id)";
+
 /// IDs der fälligen, offenen Anträge (Kandidaten des Purge-Laufs), älteste zuerst.
 pub async fn faellige(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<Vec<i64>, AppError> {
     // Anträge an einem Spiegel bleiben offen (LLH-1492, design.md D10): die Schwärzung kommt
-    // vom Führer über das Log, ein Vollzug hier scheiterte am Schutz-Trigger.
+    // vom Führer über das Log, ein Vollzug hier scheiterte am Schutz-Trigger. Ein Personen-Antrag
+    // an einem archivierten Einsatz bleibt ebenso offen: ihn vollzieht der Befehl mit dem
+    // Archiv-Schlüssel (LLH-1712, `einsatz::archiv::loeschersuchen`).
     Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT id FROM schwaerzung_antrag \
          WHERE zurueckgenommen_at IS NULL AND vollzogen_at IS NULL AND faellig_at <= ? \
+           AND NOT ({IM_ARCHIV}) \
            AND {} \
          ORDER BY faellig_at, id",
         crate::einsatz::spiegel_filter::nicht_gespiegelt("schwaerzung_antrag.einsatz_id")
@@ -600,6 +650,17 @@ pub async fn vollziehen_ergebnis(
     };
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let vollzug = crate::write_retry!(pool, |conn| {
+        // Ein Personen-Antrag am archivierten Einsatz bleibt offen (LLH-1712): der Klartext steht
+        // nur in den Blöcken, und die öffnet allein der Befehl mit dem Archiv-Schlüssel.
+        let im_archiv: bool = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT EXISTS (SELECT 1 FROM schwaerzung_antrag WHERE id = ? AND {IM_ARCHIV})"
+        )))
+        .bind(antrag_id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if im_archiv {
+            return Ok(Vollzug::Nichts);
+        }
         let zeile: Option<AntragZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
             "UPDATE schwaerzung_antrag SET vollzogen_at = ?1 \
              WHERE id = ?2 AND zurueckgenommen_at IS NULL AND vollzogen_at IS NULL \
@@ -616,20 +677,7 @@ pub async fn vollziehen_ergebnis(
         let art = z.ziel_art()?;
         let kennung = gespeicherte_kennung(&mut *conn, art, z.ziel_id, z.einsatz_id).await?;
         let ziel = ziel_text(art, &kennung);
-        let akteur: Option<i64> = sqlx::query_scalar("SELECT id FROM benutzer WHERE id = ?")
-            .bind(z.beantragt_von)
-            .fetch_optional(&mut *conn)
-            .await?;
-        let akteur = match akteur {
-            Some(a) => a,
-            None => crate::einsatz::repo::ermittle_system_akteur(&mut *conn, z.einsatz_id)
-                .await?
-                .ok_or_else(|| {
-                    AppError::Internal(format!(
-                        "Vollzug Antrag {antrag_id}: kein ETB-Akteur auffindbar"
-                    ))
-                })?,
-        };
+        let akteur = vollzugs_akteur(&mut *conn, &z, antrag_id).await?;
         let geschwaerzt: Option<String> =
             sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
                 .bind(z.einsatz_id)
@@ -731,6 +779,71 @@ pub async fn vollziehen_ergebnis(
         crate::einsatz::schwaerzung_nachlauf::nachlaufen(pool, einsatz_id).await;
     }
     Ok(vollzug)
+}
+
+/// Vollzieht einen Personen-Antrag, dessen Person der Befehl `archiv loeschersuchen` in allen
+/// `bloecke` Blöcken des Archivs geschwärzt hat (LLH-1712), in dessen Transaktion: Kennzeichen
+/// „vollzogen“ und ETB-Eintrag ohne Namen. Liefert die Kennung der Person. Der Aufrufer hat
+/// geprüft, dass der Antrag offen und fällig ist; sonst ist es ein Fehler, der alles zurückrollt.
+pub(crate) async fn im_archiv_vollzogen_tx(
+    conn: &mut sqlx::SqliteConnection,
+    antrag_id: i64,
+    etb_startwert: i64,
+    jetzt_s: &str,
+    bloecke: usize,
+) -> Result<String, AppError> {
+    let z: AntragZeile = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "UPDATE schwaerzung_antrag SET vollzogen_at = ?1 \
+         WHERE id = ?2 AND zurueckgenommen_at IS NULL AND vollzogen_at IS NULL \
+           AND faellig_at <= ?1 \
+         RETURNING {ANTRAG_SPALTEN}"
+    )))
+    .bind(jetzt_s)
+    .bind(antrag_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or_else(|| AppError::Internal(format!("Antrag {antrag_id} nicht mehr offen")))?;
+    let art = z.ziel_art()?;
+    let kennung = gespeicherte_kennung(&mut *conn, art, z.ziel_id, z.einsatz_id).await?;
+    let akteur = vollzugs_akteur(&mut *conn, &z, antrag_id).await?;
+    let text = format!(
+        "Löschersuchen (Aktenzeichen {}) vollzogen: personenbezogene Angaben von {} in {bloecke} \
+         {} des Archivs unwiderruflich entfernt. Heruntergeladene Blöcke erreicht das nicht.",
+        z.aktenzeichen,
+        ziel_text(art, &kennung),
+        if bloecke == 1 { "Block" } else { "Blöcken" }
+    );
+    crate::etb::repo::anlegen_tx(
+        &mut *conn,
+        z.einsatz_id,
+        akteur,
+        etb_startwert,
+        system_eintrag(&text),
+    )
+    .await?;
+    Ok(kennung)
+}
+
+/// ETB-Erfasser eines Vollzugs: wer den Antrag gestellt hat, ersatzweise die Akteurskette.
+async fn vollzugs_akteur(
+    conn: &mut sqlx::SqliteConnection,
+    z: &AntragZeile,
+    antrag_id: i64,
+) -> Result<i64, AppError> {
+    let akteur: Option<i64> = sqlx::query_scalar("SELECT id FROM benutzer WHERE id = ?")
+        .bind(z.beantragt_von)
+        .fetch_optional(&mut *conn)
+        .await?;
+    match akteur {
+        Some(a) => Ok(a),
+        None => crate::einsatz::repo::ermittle_system_akteur(&mut *conn, z.einsatz_id)
+            .await?
+            .ok_or_else(|| {
+                AppError::Internal(format!(
+                    "Vollzug Antrag {antrag_id}: kein ETB-Akteur auffindbar"
+                ))
+            }),
+    }
 }
 
 /// Was ein Vollzug geschwärzt hat.

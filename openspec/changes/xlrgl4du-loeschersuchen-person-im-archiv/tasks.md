@@ -4,17 +4,17 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 1. Antrag am archivierten Einsatz (Backend)
 
-- [ ] 1.1 `antrag::stellen` nimmt am archivierten Einsatz einen Personen-Antrag an. Am
+- [x] 1.1 `antrag::stellen` nimmt am archivierten Einsatz einen Personen-Antrag an. Am
       geschwärzten Einsatz ohne Archiv bleibt es bei 409. Test in
       `src/aufbewahrung/antrag_tests.rs`: Der bisherige Test
       `archivierter_einsatz_nur_ganz_und_der_vollzug_loescht_das_archiv` wird umgeschrieben;
       dazu „Archiv abgelaufen“ → 409. Kommentar und 409-Text in `antrag.rs` nachziehen.
-- [ ] 1.2 Ziel per Kennung (design.md D3): `AntragZielEingabe` mit optionalem `kennung`;
+- [x] 1.2 Ziel per Kennung (design.md D3): `AntragZielEingabe` mit optionalem `kennung`;
       `ziel_aus` verlangt genau `id` oder `kennung` bei einer Person, sonst 400. `stellen` löst
       `R-`, `EK-` und `IT-` in der Transaktion auf: falsches Präfix 400, keine Zeile 404,
       Stammkraft 422. Tests: Einheitentests in `antrag_tests.rs`, dazu ein Routentest in
       `tests/aufbewahrung.rs`, der per Kennung stellt.
-- [ ] 1.3 Purge-Lauf lässt Personen-Anträge am archivierten Einsatz offen (D1): `faellige`
+- [x] 1.3 Purge-Lauf lässt Personen-Anträge am archivierten Einsatz offen (D1): `faellige`
       schließt sie aus, `vollziehen_ergebnis` gibt dort `Vollzug::Nichts` zurück, ohne
       `vollzogen_at` zu setzen. Ist das Archiv abgelaufen, gilt wie bisher „bereits
       geschwärzt“. Tests: offen nach 25 Stunden mit unveränderten Blöcken; vollzogen nach
