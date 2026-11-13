@@ -630,9 +630,6 @@ mark.lfh-fundstelle {
   background: var(--lfh-kopf);
   border-top: 1px solid var(--lfh-linie-stark);
 }
-.etb-erfassung-sticky--neben-leiste {
-  padding-inline-end: 0;
-}
 .etb-erfassung-sticky .ant-tabs-nav {
   margin-bottom: 8px;
 }
@@ -702,6 +699,15 @@ main:has([data-lfh='zaehltasten']) {
 }
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
   scroll-padding-block-start: 0px;
+}
+:root:has([data-lfh='etb-kopf-klebt']) {
+  scroll-padding-block-start: calc(
+    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px) +
+      var(--lfh-etb-filterleiste-hoehe, 0px) + var(--lfh-etb-spaltenkopf-hoehe, 0px)
+  );
+}
+:root:has([data-lfh='etb-kopf-klebt'] :focus, [data-lfh='seitenkopf'] :focus) {
+  scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
 :root:has([data-lfh='ausgabe-kurzzeile']) {
   scroll-padding-block-start: calc(
