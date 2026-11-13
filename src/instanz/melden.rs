@@ -894,8 +894,8 @@ async fn melden_einmal_mit(
                 }
             }
         }
-        // Ein Hinweis je Meldung zu den Schlüsseln: Ablehnung und nicht mehr geführte zusammen,
-        // sonst ersetzte der zweite den ersten (Review LLH-1871).
+        // Ein Hinweis je Meldung: Ablehnung, nicht mehr geführte Schlüssel und Führung zusammen,
+        // sonst ersetzte der letzte die übrigen (Review LLH-1871). Geschrieben nach der Führung.
         let mut hinweis = Vec::new();
         if let Some((_, ab)) = abgelehnt_alle.last() {
             hinweis.push(format!(
@@ -908,9 +908,6 @@ async fn melden_einmal_mit(
                 nicht_gefuehrt_alle.len(),
                 &kopplung.gegenueber_name,
             ));
-        }
-        if !hinweis.is_empty() {
-            repo::set_hinweis(conn, kopplung.id, &hinweis.join(" ")).await?;
         }
         // Spricht die Quelle zum ersten Mal Protokoll 3, liefert sie die Ursprungskennung mit
         // (LLH-1497, design.md D5): einmal von vorn, damit jede übernommene Zeile sie trägt.
@@ -948,9 +945,13 @@ async fn melden_einmal_mit(
             // eigenen `gesendet_bis`), wohl aber für jede, in der diese Instanz erreichte Seite ist.
             fuehrung_austausch::repair_stand(conn, kopplung, a.fuehrung_bis).await?;
             if let Some(h) = &eingang.hinweis {
-                repo::set_hinweis(conn, kopplung.id, h).await?;
+                hinweis.push(h.clone());
             }
             fuehrung_folgen = eingang.folgen;
+        }
+        // Ein Hinweis je Meldung: Schlüssel und Führung zusammen, das Feld hat einen Platz.
+        if !hinweis.is_empty() {
+            repo::set_hinweis(conn, kopplung.id, &hinweis.join(" ")).await?;
         }
         repo::update_zustand_nach_orgs(
             conn,
@@ -1018,17 +1019,18 @@ async fn melden_einmal_mit(
     Ok(())
 }
 
-/// Ob ein Bestand der Stammdaten in die Antwort passt (LLH-1871, D5): höchstens `bytes` und
-/// höchstens `schluessel` Schlüssel, die Grenze, die die meldende Seite in [`check_antwort`]
-/// prüft. Liefert Bytes und Zahl der Schlüssel.
-fn bestand_passt(
-    bestand: &[StammdatenBestand],
-    bytes: usize,
-    schluessel: usize,
-) -> Option<(usize, usize)> {
+/// Nimmt einen Bestand der Stammdaten in die Antwort auf, wenn er passt (LLH-1871, D5): in die
+/// restlichen `bytes` und unter die restlichen `schluessel` der Antwort, die Grenze, die die
+/// meldende Seite in [`check_antwort`] über alle Orgs prüft. Zählt beide herunter.
+fn take_bestand(bestand: &[StammdatenBestand], bytes: &mut usize, schluessel: &mut usize) -> bool {
     let b = field_bytes(&bestand);
     let n: usize = bestand.iter().map(|x| x.schluessel.len()).sum();
-    (b <= bytes && n <= schluessel).then_some((b, n))
+    if b > *bytes || n > *schluessel {
+        return false;
+    }
+    *bytes -= b;
+    *schluessel -= n;
+    true
 }
 
 /// Hinweis an der Org-Zuordnung zu abgeräumten Zeilen (LLH-1871, D7).
@@ -1360,13 +1362,11 @@ pub async fn handle_meldung(
                                     std::time::Instant::now(),
                                 )
                             {
-                                if let Some((bytes, schluessel)) = bestand_passt(
+                                if take_bestand(
                                     &bestand,
-                                    stammdaten_budget.bytes,
-                                    schluessel_rest,
+                                    &mut stammdaten_budget.bytes,
+                                    &mut schluessel_rest,
                                 ) {
-                                    stammdaten_budget.bytes -= bytes;
-                                    schluessel_rest -= schluessel;
                                     bestand_gesendet.push((o.id, summe.to_string()));
                                     liste = Some(bestand);
                                 } else {
@@ -1671,9 +1671,22 @@ mod tests {
             schluessel: vec!["1".into(), "2".into(), "3".into()],
         }];
         let bytes = field_bytes(&b);
-        assert_eq!(bestand_passt(&b, bytes, 3), Some((bytes, 3)));
-        assert_eq!(bestand_passt(&b, bytes - 1, 3), None, "zu viele Bytes");
-        assert_eq!(bestand_passt(&b, bytes, 2), None, "zu viele Schlüssel");
+        let (mut rest_b, mut rest_n) = (bytes - 1, 3);
+        assert!(
+            !take_bestand(&b, &mut rest_b, &mut rest_n),
+            "zu viele Bytes"
+        );
+        assert_eq!((rest_b, rest_n), (bytes - 1, 3), "nichts abgezogen");
+        let (mut rest_b, mut rest_n) = (bytes, 2);
+        assert!(
+            !take_bestand(&b, &mut rest_b, &mut rest_n),
+            "zu viele Schlüssel"
+        );
+        // Über mehrere Orgs: Die zweite Liste passt nicht mehr unter die Zahl der Schlüssel.
+        let (mut rest_b, mut rest_n) = (10 * bytes, 5);
+        assert!(take_bestand(&b, &mut rest_b, &mut rest_n));
+        assert_eq!((rest_b, rest_n), (9 * bytes, 2));
+        assert!(!take_bestand(&b, &mut rest_b, &mut rest_n), "zweite Org");
     }
 
     /// Eine meldende Seite mit einer Zuordnung, einem übernommenen gültigen Schlüssel (fremde id

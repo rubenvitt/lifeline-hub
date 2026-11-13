@@ -83,8 +83,9 @@ json_each(?))`, `src/AGENTS.md`, Listen von außen) setzt jeden Schlüssel diese
 - `abgelehnt` und `widerrufen` bleiben, wie sie sind (wie beim gelieferten Widerruf).
 - Je widerrufenem Schlüssel ein Eintrag `UnterschriftWiderrufen` über
   `admin_audit::schreibe_ohne_akteur` mit dem Grund „führt <Gegenüber> nicht mehr“. Dazu ein
-  Hinweis an der Kopplung (`repo::set_hinweis`), zusammen mit einem Hinweis „abgelehnt“ derselben
-  Meldung in einem Text: Das Feld hat einen Platz, und der zweite ersetzte sonst den ersten.
+  Hinweis an der Kopplung (`repo::set_hinweis`), zusammen mit den Hinweisen „abgelehnt“ und der
+  Führung derselben Meldung in einem Text: Das Feld hat einen Platz, und der letzte ersetzte sonst
+  die übrigen.
 - `check_antwort` lehnt mehr als `BESTAND_MAX` ids je Antwort ab, wie die übrigen Grenzen der Antwort.
 - Fehlt das Feld (`None`, Gegenstelle älteren Stands), geschieht nichts. Eine leere Liste dagegen
   heißt: Der Hub führt keinen gültigen Schlüssel der Org mehr.
@@ -162,7 +163,7 @@ etwas abgeräumt, kommt ein Hinweis an die Org-Zuordnung (`repo::add_stammdaten_
 „<n> Zeilen, die <Gegenüber> nicht mehr führt, wurden entfernt oder stillgelegt.“
 
 Die erreichte Seite hält beim Senden dieselbe Höchstzahl an Schlüsseln ein, die die meldende in
-`check_antwort` prüft (`bestand_passt`). `check_antwort` begrenzt die Liste: höchstens `ARTEN_MAX` Arten je Org und höchstens
+`check_antwort` prüft (`take_bestand`). `check_antwort` begrenzt die Liste: höchstens `ARTEN_MAX` Arten je Org und höchstens
 `BESTAND_STAMMDATEN_MAX` (100 000) Schlüssel je Antwort. Unbekannte Arten überspringt der ELW. Die
 Liste wird nur gegen den eigenen Bestand gelesen, sie steuert keine Abfrage mit externer Länge.
 

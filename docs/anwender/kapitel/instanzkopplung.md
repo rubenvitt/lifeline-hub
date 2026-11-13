@@ -322,7 +322,8 @@ Schlüssel registriert, ist der wartende nicht seiner. Ein zurückgewiesener Sch
 nie gültig, auch wenn die andere Installation ihn erneut liefert. Einen eigenen
 Unterschriftsschlüssel braucht man zum Bestätigen nicht.
 
-Mit jeder Meldung nennt die andere Installation die Schlüssel, die sie führt. Fehlt dort einer,
+Hat die andere Installation alle Änderungen an Schlüsseln geschickt, nennt sie bei jeder Meldung
+die Schlüssel, die sie führt. Fehlt dort einer,
 etwa weil sie aus einer Sicherung zurückgespielt wurde, gilt er hier danach als widerrufen, auch
 ein wartender. An der Kopplung steht dann etwa „… führt 1 Unterschriftsschlüssel nicht mehr (aus einer
 Sicherung zurückgespielt?). Er gilt hier nicht mehr.“, und die Admin-Spur nennt den Widerruf

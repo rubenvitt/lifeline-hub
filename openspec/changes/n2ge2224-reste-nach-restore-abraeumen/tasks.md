@@ -110,12 +110,17 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
 - [x] 6.3 Hinweise „abgelehnt“ und „nicht mehr geführt“ derselben Meldung in einem Text,
   Hinweise in Einzahl und Mehrzahl. Tests `zurueckgespielt_hub_ablehnung_und_verlust_stehen_beide_an_der_kopplung`,
   `hinweise_zum_abraeumen_in_einzahl_und_mehrzahl`. Prüfen: wie 6.1 und 6.2.
-- [x] 6.4 Der Hub hält `BESTAND_STAMMDATEN_MAX` beim Senden ein (`bestand_passt`). Unit-Test
+- [x] 6.4 Der Hub hält `BESTAND_STAMMDATEN_MAX` beim Senden ein (`take_bestand`). Unit-Test
   `bestand_der_stammdaten_passt_nach_bytes_und_zahl`. Prüfen: `cargo test instanz::melden`.
 - [x] 6.5 Wächter `bestand_ist_was_als_zeile_geliefert_wird` mit einer Zeile jeder Art. Prüfen:
   `cargo test instanz::stammdaten::bestand`.
 - [x] 6.6 Betriebsdoku, Anwenderdoku und Delta-Spec zur neu vergebenen id und zu den
   Hinweistexten berichtigt. Prüfen: Abschnitte gelesen, `openspec validate --strict`.
+
+- [x] 6.7 Nachreview des Behebungs-Commits: Hinweis der Führung derselben Meldung kommt in denselben
+  Text, `take_bestand` zählt Bytes und Schlüssel über alle Orgs herunter (Unit-Test über zwei
+  Orgs), Spec, Kapitel und Betriebsdoku zu „vollständig“ und zur neu vergebenen id. Prüfen:
+  `cargo test instanz::melden`, `cargo test --test instanz_kopplung`, `openspec validate --strict`.
 
 ## Workflow follow-up
 
