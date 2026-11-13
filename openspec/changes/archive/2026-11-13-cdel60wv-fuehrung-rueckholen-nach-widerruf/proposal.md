@@ -51,5 +51,5 @@ Widerruf verhindern (Zunder LLH-1850).
 - Frontend: `frontend/src/instanz/` (Paneel, Texte, API), `frontend/src/einsatz/spiegel/SpiegelBand.tsx`,
   `frontend/src/api/fuehrung.ts`, generierte Typen.
 - Doku: Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md` (Abschnitt „Widerruf“), neue
-  ADR-0039 (Entscheidung E1), Verweis in `src/instanz/fuehrung/repo.rs` auf LLH-1850 nachziehen.
+  ADR-0040 (Entscheidung E1), Verweis in `src/instanz/fuehrung/repo.rs` auf LLH-1850 nachziehen.
 - Keine Migration: Alles Nötige steht schon in `instanz_kopplung_org` und `einsatz_fuehrung`.

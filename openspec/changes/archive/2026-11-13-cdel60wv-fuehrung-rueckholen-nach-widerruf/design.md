@@ -123,7 +123,7 @@ Ab dann kam nichts mehr vom Gegenüber; die Lücke bis zum Zurückholen bleibt i
 
 ### D7 Neue ADR
 
-Die Entscheidung (E1) bekommt ADR-0039 (nächste freie auf `alpha` am 13.11.2026; vor dem PR mit
+Die Entscheidung (E1) bekommt ADR-0040 (nächste freie auf `alpha` am 13.11.2026; vor dem PR mit
 `scripts/check-adr-nummern.sh` prüfen): „Einen Spiegel ohne gekoppelte Führung holt nur ein Mensch
 zurück“.
 

@@ -417,7 +417,7 @@ Herleitung in
   - Übergabe geht nur abgeglichen (`fordere_abgeglichen`), eine Anfrage wartet am Führer
     (`anfrage_von`), bis der Anfragende alles hat; eine Notübernahme nur an einem Einsatz, der
     hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein; einen Spiegel, dessen
-    Führung danach nicht mehr gekoppelt ist, holt nur ein Mensch zurück (ADR-0039, LLH-1850).
+    Führung danach nicht mehr gekoppelt ist, holt nur ein Mensch zurück (ADR-0040, LLH-1850).
   - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
     `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 der Change
