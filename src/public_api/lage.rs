@@ -312,7 +312,7 @@ pub struct LageParams {
 /// Tabellen, aus denen die Lage stammt. Hält diese Instanz den Einsatz als Spiegel, muss dessen
 /// Freigabestufe die Kategorie jeder dieser Tabellen liefern (design.md D8). Wächter:
 /// `tests::jede_quelle_hat_eine_kategorie`.
-const QUELLEN: &[&str] = &[
+pub(crate) const QUELLEN: &[&str] = &[
     "einsatz",
     "einsatz_person",
     "einsatz_lagekennzahl_wahl",

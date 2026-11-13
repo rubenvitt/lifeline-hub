@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs]
 ---
 
 ## Überblick
@@ -129,13 +129,20 @@ Einwurf-Zugänge.
 | Positionen einliefern     | Positionen melden                                  |
 | Rechner nutzen            | die Rechner verwenden                              |
 
-Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen zwei Rechte etwas:
+Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen vier Rechte etwas:
 
 - „Rechner nutzen“: Damit rechnet ein Fremdsystem Unterkunft und Zelte durch, mit denselben
   Regeln wie der [Unterkunftsrechner](betreuung.md) und mit den Richtwerten der Organisation aus
   den [Stammdaten](stammdaten.md). Eigene Werte darf es je Rechnung mitschicken; gespeichert wird
   davon nichts, und die Werte eines Einsatzes sieht es nicht.
 - „Lage lesen“: das Lagebild eines Einsatzes, siehe unten.
+- „Einsätze lesen“: der Kopf des freigegebenen Einsatzes, also Einsatznummer, Bezeichnung,
+  Stichwort, Einsatzart, Nummer der Leitstelle, Einsatzort mit Koordinate und Beginn.
+  Sachverhalt, meldende Stelle, Zahl der Betroffenen und Personen gehen nicht hinaus.
+- „Ereignisse abrufen“: Das Fremdsystem erfährt, dass sich an seinem freigegebenen Einsatz etwas
+  geändert hat, mit Zeitpunkt und Kennung des Einsatzes, ohne Inhalt. Allein öffnet dieses Recht
+  nichts: Über den Einsatz erfährt nur etwas, wer auch „Einsätze lesen“ hat, über die Lage nur,
+  wer auch „Lage lesen“ hat. Die Ereignisse bleiben sieben Tage abrufbar.
 
 Mit den übrigen Rechten prüft ein Fremdsystem bisher nur seine Anmeldung. Einliefern lässt sich
 heute über einen Einwurf-Zugang (siehe unten). Welche Daten die übrigen Rechte später öffnen,
@@ -143,15 +150,17 @@ nennt dieses Kapitel, sobald es sie gibt. Neben jedem Recht steht der technische
 `alarmmeldungen:write`; so lässt es sich mit der Doku des Fremdsystems vergleichen. Ein
 Fremdsystem legt nie selbst einen Einsatz an.
 
-### Lage lesen braucht die Freigabe der Einsatzleitung
+### Lage und Einsätze lesen braucht die Freigabe der Einsatzleitung
 
-Eine Anbindung mit „Lage lesen“ sieht nur den Einsatz, den die Einsatzleitung auf der Seite
-„Geräte“ ihres Einsatzes im Paneel „Anbindungen“ für sie freigegeben hat, und höchstens einen.
+Eine Anbindung mit „Lage lesen“ oder „Einsätze lesen“ sieht nur den Einsatz, den die
+Einsatzleitung auf der Seite „Geräte“ ihres Einsatzes im Paneel „Anbindungen“ für sie freigegeben
+hat, und höchstens einen. Ohne Freigabe geht nichts hinaus, auch kein Ereignis.
 Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“,
 solange die Anbindung weder widerrufen noch abgelaufen ist. Die
 Freigabe endet mit dem Abschluss des Einsatzes, mit dem Widerruf oder Ablauf der Anbindung und
-wenn ihr „Lage lesen“ genommen wird; bekommt sie das Recht wieder oder wird ein verstrichenes
-„Gültig bis“ verlängert, braucht es eine neue Freigabe.
+mit jeder Änderung an diesen beiden Rechten, wenn eines dazukommt wie wenn eines wegfällt. Die
+Einsatzleitung hat für einen bestimmten Umfang freigegeben und entscheidet über einen anderen neu.
+Auch ein verlängertes „Gültig bis“ braucht eine neue Freigabe.
 Abläufe und Inhalt des Lagebilds: [Externe Lagemonitore](externe-lagemonitore.md).
 
 ### Warum ein Fremdsystem nicht hereinkommt

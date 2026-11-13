@@ -57,8 +57,8 @@ Für den System-Admin:
 Anbindungen anlegen, ändern und widerrufen darf nur der System-Admin. Einen Einsatz freigeben
 oder die Freigabe beenden darf nur die Einsatzleitung dieses Einsatzes, solange er aktiv ist.
 Auch ein System-Admin ohne Rolle im Einsatz gibt nicht frei. Das Paneel „Anbindungen“ zeigt nur
-Anbindungen mit dem Recht „Lage lesen“, die weder widerrufen noch abgelaufen sind; ohne eine
-solche fehlt es.
+Anbindungen mit dem Recht „Lage lesen“ oder „Einsätze lesen“, die weder widerrufen noch
+abgelaufen sind; ohne eine solche fehlt es.
 
 Lehnt der Server ein Umschalten ab, weil die Anbindung inzwischen widerrufen oder abgelaufen
 ist, verschwindet ihre Zeile. Der Grund bleibt im Paneel stehen, bis er geschlossen wird.
@@ -73,13 +73,13 @@ Die Freigabe endet
 
 - mit dem Abschluss des Einsatzes,
 - wenn der System-Admin die Anbindung widerruft oder ihr „Gültig bis“ verstreicht,
-- wenn der System-Admin ihr das Recht „Lage lesen“ nimmt.
+- wenn der System-Admin ihre Rechte „Lage lesen“ oder „Einsätze lesen“ ändert, gleich ob er
+  eines nimmt oder dazugibt.
 
-Bekommt die Anbindung das Recht später wieder oder verlängert der System-Admin ein
-verstrichenes „Gültig bis“, liest sie erst nach einer neuen Freigabe.
+Danach, und auch nach einem verlängerten „Gültig bis“, liest sie erst nach einer neuen Freigabe.
 
-Die Seite „Anbindungen“ nennt an jeder Anbindung mit „Lage lesen“, die weder widerrufen noch
-abgelaufen ist, welchen Einsatz sie gerade liest.
+Die Seite „Anbindungen“ nennt an jeder Anbindung mit „Lage lesen“ oder „Einsätze lesen“, die
+weder widerrufen noch abgelaufen ist, welchen Einsatz sie gerade liest.
 
 ### Was der Monitor erhält
 
@@ -130,7 +130,7 @@ des betroffenen Einsatzes, mit dem Namen der Person. An einem Spiegel geht der E
 Antrag an die führende Instanz. Beim Umstellen bekommt der frühere Einsatz seinen Eintrag, wenn
 die Instanz ihn führt oder die Person auch dort zur Führung gehört.
 
-Widerruft der System-Admin die Anbindung oder nimmt er ihr „Lage lesen“, steht das im
+Widerruft der System-Admin die Anbindung oder ändert er diese Rechte, steht das im
 Einsatztagebuch des gelesenen Einsatzes, wenn die Instanz ihn führt, und immer im
 [Zugangsprotokoll](zugangsprotokoll.md). Das Ende durch ein verstrichenes „Gültig bis“ trägt das
 Einsatztagebuch nach, sobald der System-Admin die Anbindung das nächste Mal ändert, wenn die

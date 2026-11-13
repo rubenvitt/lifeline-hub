@@ -369,17 +369,42 @@ pub async fn aendern(
         let (vorher, nachher) = zugang::aendern(&mut *conn, org_id, &id, &aenderung, &jetzt)
             .await?
             .ok_or(AppError::NotFound)?;
-        // Mit dem letzten Lese-Scope mit Einsatzbezug endet die Freigabe (LLH-1638): bekäme der
-        // Zugang das Recht später wieder, läse er sonst ohne neue Entscheidung der Einsatzleitung.
+        // Jede Änderung an den Lese-Scopes mit Einsatzbezug beendet die Freigabe (LLH-1638,
+        // LLH-1655, Entscheidung Ruben 13.11.2026): Die Einsatzleitung hat für einen Umfang
+        // freigegeben; liest der Zugang mehr oder weniger, entscheidet sie neu. Sonst läse ein
+        // Einsatzbuch, dem ein Admin „Lage lesen“ dazugibt, sofort die Lage, und ein Recht, das
+        // entzogen und wiedergegeben wird, käme ohne neue Entscheidung zurück.
         // Dasselbe gilt für einen abgelaufenen Zugang: seine Freigabe endete mit dem Ablauf, die
         // Zeile steht aber noch. Sie fällt hier, bevor ein verlängertes „gültig bis“ sie wieder
         // wirken ließe.
-        let etb = if vorher.has_einsatzbezug() && !nachher.has_einsatzbezug() {
-            let text = format!(
-                "Anbindung „{}“ darf keine Lage mehr lesen (geändert von {admin_name}); die \
-                 Freigabe dieses Einsatzes ist beendet.",
-                nachher.name
-            );
+        let mit_bezug = |z: &Zugang| -> Vec<Scope> {
+            z.scopes
+                .iter()
+                .copied()
+                .filter(|s| s.has_einsatzbezug())
+                .collect()
+        };
+        let etb = if vorher.has_einsatzbezug() && mit_bezug(&vorher) != mit_bezug(&nachher) {
+            let text = if nachher.has_einsatzbezug() {
+                format!(
+                    "Die Rechte der Anbindung „{}“ mit Bezug auf den Einsatz wurden geändert (von \
+                     {admin_name}); die Freigabe dieses Einsatzes ist beendet und braucht eine \
+                     neue Entscheidung der Einsatzleitung.",
+                    nachher.name
+                )
+            } else {
+                // Ein Zugang, der nur Einsätze las (LLH-1655), hatte nie eine Lage.
+                let was = if vorher.has_scope(Scope::LageRead) {
+                    "darf keine Lage mehr lesen"
+                } else {
+                    "darf den Einsatz nicht mehr lesen"
+                };
+                format!(
+                    "Anbindung „{}“ {was} (geändert von {admin_name}); die Freigabe dieses \
+                     Einsatzes ist beendet.",
+                    nachher.name
+                )
+            };
             freigabe_entziehen_tx(&mut *conn, &nachher.id, von, &text).await?
         } else if vorher.is_abgelaufen(&jetzt) {
             let text = format!(

@@ -289,7 +289,8 @@ Code ein und legt eine nur für den Besitzer lesbare Schlüsseldatei ab.
 
 Die Einsatzleitung eines aktiven Einsatzes SHALL diesen Einsatz für einen Maschinenzugang der Org
 des Einsatzes freigeben und die Freigabe wieder beenden können, sofern der Zugang nicht
-widerrufen oder abgelaufen ist und einen Lese-Scope mit Einsatzbezug trägt (`lage:read`). Die
+widerrufen oder abgelaufen ist und einen Lese-Scope mit Einsatzbezug trägt (`lage:read`,
+`einsaetze:read`). Die
 Seite „Geräte“ des Einsatzes MUST diese Zugänge im Paneel „Anbindungen“ mit Name, Rechten und
 Zustand zeigen. Freigabe und Ende MUST im Einsatztagebuch stehen.
 
@@ -328,6 +329,10 @@ Zustand zeigen. Freigabe und Ende MUST im Einsatztagebuch stehen.
 #### Scenario: Abgeschlossener Einsatz
 - **WHEN** jemand an einem abgeschlossenen Einsatz freigeben will
 - **THEN** antwortet der Server mit 409, und die Schalter des Paneels sind gesperrt
+
+#### Scenario: Zugang nur mit Ereignissen
+- **WHEN** ein Zugang nur `events:read` trägt
+- **THEN** steht er nicht im Paneel „Anbindungen“, denn allein öffnet dieses Recht keinen Einsatz
 
 ### Requirement: Ein Zugang liest höchstens einen Einsatz
 
@@ -387,10 +392,10 @@ bleiben, an der der Zugang angelegt ist, und wird nicht gespiegelt.
 ### Requirement: Die Freigabe endet mit Einsatz, Zugang oder Recht
 
 Eine Freigabe SHALL enden, sobald der Einsatz abgeschlossen ist, der Zugang widerrufen wird, sein
-„gültig bis“ verstrichen ist oder ihm der letzte Lese-Scope mit Einsatzbezug entzogen wird. Nach
-dem Ende MUST der Zugang den Einsatz nicht mehr lesen, auch wenn er später wieder ein solches
-Recht bekommt. Führt die Instanz den Einsatz, MUST dessen Einsatztagebuch Widerruf und Entzug
-nennen.
+„gültig bis“ verstrichen ist oder sich seine Lese-Scopes mit Einsatzbezug ändern, durch Entzug wie
+durch Hinzufügen. Nach dem Ende MUST der Zugang den Einsatz nicht mehr lesen, bis die
+Einsatzleitung erneut freigibt. Führt die Instanz den Einsatz, MUST dessen Einsatztagebuch
+Widerruf und Änderung der Rechte nennen.
 
 #### Scenario: Einsatzabschluss
 - **WHEN** die Einsatzleitung einen freigegebenen Einsatz abschließt
@@ -407,6 +412,18 @@ nennen.
 #### Scenario: Recht entzogen und wieder erteilt
 - **WHEN** ein Admin dem Zugang `lage:read` entzieht und es ihm später wieder gibt
 - **THEN** ist kein Einsatz freigegeben, bis die Einsatzleitung erneut freigibt
+
+#### Scenario: Recht mit Einsatzbezug hinzugefügt
+- **WHEN** ein Admin einem Zugang, der einen Einsatz mit `einsaetze:read` liest, zusätzlich `lage:read` gibt
+- **THEN** ist kein Einsatz mehr freigegeben, `GET /api/v1/lage` antwortet mit `einsatz: null`, und das Einsatztagebuch nennt die Änderung der Rechte
+
+#### Scenario: Eines von zwei Rechten entzogen
+- **WHEN** ein Admin einem Zugang mit `lage:read` und `einsaetze:read` eines der beiden nimmt
+- **THEN** ist kein Einsatz mehr freigegeben, bis die Einsatzleitung erneut freigibt
+
+#### Scenario: Recht ohne Einsatzbezug geändert
+- **WHEN** ein Admin einem Zugang, der einen Einsatz liest, `rechner:use` gibt oder nimmt
+- **THEN** bleibt die Freigabe bestehen
 
 ### Requirement: Die Anbindung zeigt den gelesenen Einsatz
 

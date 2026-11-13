@@ -178,6 +178,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "hinweis_ausgang",
         "Ausgang der Hinweise an den Hub; der Anlass reist im Paket (LLH-1495)",
     ),
+    (
+        "maschine_ereignis",
+        "Ausgang an Fremdsysteme gilt an der Instanz, die ihn ausgibt (LLH-1655)",
+    ),
     ("geraet_kopplung", "Geräte hängen an einer Instanz"),
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),

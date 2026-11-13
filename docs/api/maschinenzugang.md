@@ -36,15 +36,16 @@ Ohne das Binary: die Referenz-Clients unten tun dasselbe.
 | Scope                  | Darf                                          |
 | ---------------------- | --------------------------------------------- |
 | `lage:read`            | Lage lesen (`GET /api/v1/lage`)               |
-| `einsaetze:read`       | Einsätze lesen                                |
+| `einsaetze:read`       | Einsätze lesen (`GET /api/v1/einsaetze`)      |
 | `events:read`          | Ereignisse abrufen (`GET /api/v1/events`)     |
 | `alarmmeldungen:write` | Alarmmeldungen als Vorschlag einliefern       |
 | `positionen:write`     | Positionen einliefern                         |
 | `rechner:use`          | Rechner nutzen (`/api/v1/rechner/unterkunft`) |
 
-Lese-Scopes mit Einsatzbezug (heute `lage:read`) sehen nur den Einsatz, den die Einsatzleitung für
-den Zugang freigegeben hat; siehe „Lage lesen“. Neue Scopes kommen nur hinzu; ein Client
-überspringt unbekannte Werte.
+Lese-Scopes mit Einsatzbezug (`lage:read`, `einsaetze:read`) sehen nur den Einsatz, den die
+Einsatzleitung für den Zugang freigegeben hat; siehe „Lage lesen“ und „Einsätze lesen“.
+`events:read` allein öffnet nichts: Welche Ereignisse ein Zugang sieht, folgt aus seinen übrigen
+Lese-Scopes. Neue Scopes kommen nur hinzu; ein Client überspringt unbekannte Werte.
 
 ## Einlösen im Einzelnen
 
@@ -233,6 +234,150 @@ Die Ausgabe ist die Antwort ohne Karte; `--karte` gibt sie mit aus. Steht dort `
 ist für den Zugang kein Einsatz freigegeben. Aus Rust:
 `lifeline_machine_client::lage(&client, &cred, karte, now)` mit `karte` `None`, `Some("none")`
 oder `Some(<karte_etag>)`.
+
+## Einsätze lesen
+
+Mit dem Scope `einsaetze:read` liest ein Fremdsystem den Kopf des Einsatzes, den die
+Einsatzleitung für seinen Zugang freigegeben hat (Freigabe wie bei „Lage lesen“). Gedacht ist das
+für ein Einsatzbuch, das Stichwort, Ort und Nummern führt.
+
+`GET /api/v1/einsaetze` liefert die Liste und einen Cursor für die Ereignisse:
+
+```json
+{
+  "cursor": 4711,
+  "einsaetze": [
+    {
+      "id": 42,
+      "einsatznummer": "2026-0042",
+      "bezeichnung": "Hochwasser Süd",
+      "stichwort": "B3",
+      "einsatzart": "realeinsatz",
+      "leitstellen_nr": "L-2026-118833",
+      "einsatzort": "Marktplatz 1",
+      "koordinate": { "lat": 52.1, "lon": 9.3 },
+      "begonnen_at": "2026-11-12 16:00:00"
+    }
+  ]
+}
+```
+
+- Ohne Freigabe ist die Liste leer; das ist kein Fehler. Heute steht höchstens ein Einsatz darin,
+  weil ein Zugang höchstens einen liest. Die Form bleibt eine Liste.
+- `stichwort`, `einsatznummer`, `leitstellen_nr`, `einsatzort` und `koordinate` fehlen, wenn sie
+  leer sind. `koordinate` ist WGS 84.
+- Sachverhalt, meldende Stelle, Zahl der Betroffenen, Personen und Mitglieder kommen nicht vor.
+- `GET /api/v1/einsaetze/{id}` liefert denselben Einsatz einzeln. Für jeden anderen Einsatz kommt
+  `404 not_found`, gleich ob er nicht freigegeben, abgeschlossen, fremd oder unbekannt ist.
+
+## Ereignisse abrufen
+
+Mit dem Scope `events:read` erfährt ein Fremdsystem, dass sich an seinem freigegebenen Einsatz
+etwas getan hat. Ein Ereignis sagt nur, **was** sich geändert hat; den Inhalt liest der Client
+danach über `GET /api/v1/einsaetze` oder `GET /api/v1/lage`.
+
+```http
+GET /api/v1/events?after=4711&wait=25
+```
+
+```json
+{
+  "cursor": 4714,
+  "events": [
+    { "id": 4712, "type": "einsatz.updated", "occurred_at": "2026-11-12 19:04:00", "einsatz_id": 42 },
+    { "id": 4714, "type": "lage.changed", "occurred_at": "2026-11-12 19:05:30", "einsatz_id": 42 }
+  ]
+}
+```
+
+| `type`            | Bedeutung                                                      | Sichtbar mit     |
+| ----------------- | -------------------------------------------------------------- | ---------------- |
+| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden (freigegeben).  | `einsaetze:read` |
+| `einsatz.updated` | Ein Feld des Einsatzes aus „Einsätze lesen“ hat sich geändert. | `einsaetze:read` |
+| `einsatz.closed`  | Der Einsatz ist für den Zugang nicht mehr lesbar.              | `einsaetze:read` |
+| `lage.changed`    | Die Lage des Einsatzes kann sich geändert haben.               | `lage:read`      |
+
+`einsatz.closed` kommt beim Abschluss des Einsatzes, wenn die Einsatzleitung die Freigabe
+zurücknimmt oder den Zugang auf einen anderen Einsatz umstellt und wenn der Einsatz gelöscht wird.
+Danach antworten die Leserouten für diesen Einsatz mit `404` bzw. ohne ihn. Wird dem Zugang ein
+Recht genommen, sieht er die Ereignisse dieses Rechts nicht mehr, auch kein `einsatz.closed`; die
+Route des Rechts antwortet dann mit `403 missing_scope`. Nach einer Änderung der Rechte deshalb
+den Stand neu aufbauen (Schritt 1 der Schleife).
+
+**Die Schleife:**
+
+1. Beim ersten Start den Stand aufbauen und den `cursor` merken: mit `einsaetze:read` über
+   `GET /api/v1/einsaetze`, sonst über `GET /api/v1/events` ohne `after` und danach
+   `GET /api/v1/lage`. In dieser Reihenfolge, damit keine Änderung zwischen Stand und Cursor fällt.
+2. `GET /api/v1/events?after=<cursor>&wait=25` aufrufen. Der Abruf bleibt höchstens 25 Sekunden
+   offen und antwortet, sobald ein Ereignis vorliegt (binnen etwa einer Sekunde).
+3. Die Ereignisse verarbeiten, den neuen `cursor` merken, weiter bei 2. Auch eine leere Antwort
+   nennt einen neuen `cursor`; ihn merken, sonst altert der eigene.
+4. Bei `410 cursor_expired` wieder bei 1 beginnen. Ein `403 missing_scope` heißt: dem Zugang
+   wurde ein Recht genommen. An einer Leseroute bei 1 beginnen, mit den Rechten, die er noch hat;
+   am Abruf selbst (`events:read` fehlt) aufhören und den Betreiber fragen, statt zu wiederholen.
+
+**Zu beachten:**
+
+- **Reihenfolge und Lücken:** `id` steigt in der Reihenfolge der Änderungen. Zwischen zwei eigenen
+  Ereignissen können Nummern fehlen; sie gehören anderen Zugängen oder wurden ersetzt.
+- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das
+  alte und trägt eine höhere `id`. In einem lebhaften Einsatz kommt es oft. Die Lage danach
+  höchstens alle paar Sekunden neu lesen, sonst läuft der Zugang in seine Drosselung (60 je
+  Minute, `429` mit `Retry-After`). Das Ereignis meldet eher zu oft als zu selten. Zwei Dinge
+  meldet es nicht: eine Änderung an Stammdaten, die in die Stärke einfließt, und den bloßen Takt
+  des Abgleichs an einem Spiegel (`letzter_abgleich_at`); wer diese Zeit anzeigt, liest die Lage
+  eines Spiegels zusätzlich in festem Abstand, etwa jede Minute. Das Ende des Abgleichs meldet es.
+- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich weiter
+  abrufen.
+- **Warteplätze:** Es warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber
+  antwortet sofort mit `200`, leerer Liste und `Retry-After: 10`: so viele Sekunden bis zum
+  nächsten Abruf warten.
+- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`,
+  ebenso ein Cursor, den der Server nicht kennt (etwa nach dem Zurückspielen einer Sicherung).
+- **Sicherung:** Nach dem Zurückspielen einer Sicherung kann ein gemerkter Cursor wieder gültig
+  aussehen, obwohl der Stand am Server ein anderer ist. Den Stand deshalb regelmäßig neu aufbauen
+  (Schritt 1), etwa stündlich.
+- **Freigabe und Rechte:** Jede Änderung an „Lage lesen“ oder „Einsätze lesen“ beendet die
+  Freigabe; das Fremdsystem sieht `einsatz.closed` (sofern es `einsaetze:read` noch hat) und nach
+  der neuen Freigabe der Einsatzleitung `einsatz.created`.
+- **Unbekannte Arten** überspringen; neue kommen nur hinzu.
+- **Abfragewerte:** `after` ist eine ganze Zahl ab 0, `wait` eine von 0 bis 25. Anderes ergibt
+  `400 invalid_field`. Die Abfrage gehört zum signierten Pfad (`htu`).
+
+In Python, mit [`clients/python/machine_client.py`](clients/python/machine_client.py) daneben:
+
+```python
+import json, os, time, urllib.error, urllib.request
+from machine_client import b64, sign_request, verify_response
+
+
+def get(cred, path):
+    jti, now = b64(os.urandom(16)), int(time.time())
+    auth = sign_request(cred, "GET", path, b"", now, jti)
+    req = urllib.request.Request(cred["base_url"] + path, headers={"Authorization": auth})
+    with urllib.request.urlopen(req, timeout=40) as r:
+        body = r.read()
+        verify_response(cred, r.headers["Lifeline-Signature"], jti, r.status, body, now)
+        return json.loads(body), r.headers.get("Retry-After")
+
+
+cred = json.load(open("lifeline-zugang.json", encoding="utf-8"))
+cursor = get(cred, "/api/v1/einsaetze")[0]["cursor"]
+while True:
+    try:
+        antwort, warten = get(cred, f"/api/v1/events?after={cursor}&wait=25")
+    except urllib.error.HTTPError as e:
+        if e.code != 410:
+            raise
+        cursor = get(cred, "/api/v1/einsaetze")[0]["cursor"]  # cursor_expired: neu aufbauen
+        continue
+    cursor = antwort["cursor"]
+    for ereignis in antwort["events"]:
+        print(ereignis["id"], ereignis["type"], ereignis["einsatz_id"], flush=True)
+    if warten:
+        time.sleep(int(warten))
+```
 
 ## Fehler
 

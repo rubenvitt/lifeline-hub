@@ -79,6 +79,15 @@ einem Ring je Einsatz über `Last-Event-ID` nachgeliefert (`REPLAY_KAPAZITAET`, 
 [`live-abgleich`](../../openspec/specs/live-abgleich/spec.md) fest; Org-Ereignisse regelt
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Org-Ereignisse“.
 
+Fremdsysteme hängen nicht an diesen Strömen. Für sie gibt es eine Outbox (`maschine_ereignis`),
+die Trigger in der Transaktion der Änderung füllen, je freigegebenem Zugang, und den Abruf
+`GET /api/v1/events` mit Cursor und Long-Poll (`src/public_api/events.rs`). Die Ereignisse tragen
+nur Art, Zeit und Einsatz-ID. Regeln:
+[ADR-0038](entscheidungen/ADR-0038-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+Spec [`ereignis-abruf`](../../openspec/specs/ereignis-abruf/spec.md) und
+[`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Ausgangsereignisse für Fremdsysteme“; Ablauf
+in der [Laufzeitsicht](06-laufzeitsicht.md), 6.6f.
+
 ## 8.7 Persistenz
 
 Der Server hält alles in einer SQLite-Datei über sqlx (`src/db.rs`: WAL, Fremdschlüssel,
