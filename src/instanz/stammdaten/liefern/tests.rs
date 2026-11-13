@@ -441,7 +441,12 @@ async fn nur_ein_konto_in_der_antwort_gilt_als_geliefert() {
 async fn hoechster_stand_je_org() {
     let pool = pool_mit_org().await;
     let mut conn = pool.acquire().await.unwrap();
-    assert_eq!(load_hoechster_stand(&mut conn, 1).await.unwrap(), 0);
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 1, &alle_arten())
+            .await
+            .unwrap(),
+        0
+    );
     drop(conn);
     exec(
         &pool,
@@ -455,12 +460,30 @@ async fn hoechster_stand_je_org() {
     .await;
     let eins = stand(&pool, "fahrzeug", "1").await.unwrap();
     let mut conn = pool.acquire().await.unwrap();
-    assert_eq!(load_hoechster_stand(&mut conn, 1).await.unwrap(), eins);
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 1, &alle_arten())
+            .await
+            .unwrap(),
+        eins
+    );
     let zwei: i64 =
         sqlx::query_scalar("SELECT MAX(stand) FROM stammdaten_aenderung WHERE org_id = 2")
             .fetch_one(&mut *conn)
             .await
             .unwrap();
     assert!(zwei > eins);
-    assert_eq!(load_hoechster_stand(&mut conn, 2).await.unwrap(), zwei);
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 2, &alle_arten())
+            .await
+            .unwrap(),
+        zwei
+    );
+    // Eine Art, die die Gegenseite nicht kennt, zählt nicht: sonst wäre sie nie auf Stand.
+    let nur_material: HashSet<StammdatenArt> = [StammdatenArt::Material].into_iter().collect();
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 1, &nur_material)
+            .await
+            .unwrap(),
+        0
+    );
 }

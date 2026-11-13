@@ -115,7 +115,8 @@ wieder.
 `handle_meldung` prüft je aktiver Org, nach der Nachlieferung und in derselben Transaktion:
 
 1. Die Meldung trägt eine Prüfsumme, die Kopplung trägt Stammdaten, `stammdaten_stand >= 0`.
-2. Der ELW hat alle Änderungen: `stammdaten_stand >= MAX(stand)` der Log-Zeilen der Org. Solange
+2. Der ELW hat alle Änderungen: `stammdaten_stand >= MAX(stand)` der Log-Zeilen der Org in den
+   Arten der Meldung (eine Art, die er nicht kennt, erreicht er nie). Solange
    die Nachlieferung läuft, weicht die Prüfsumme ohnehin ab, und die Liste wäre Ballast. Nach einem
    Zurückspielen liegt der gemeldete Stand über dem Höchsten, und die Bedingung gilt.
 3. Die eigene Prüfsumme über den Bestand (D4, nur Arten der Meldung) weicht ab.

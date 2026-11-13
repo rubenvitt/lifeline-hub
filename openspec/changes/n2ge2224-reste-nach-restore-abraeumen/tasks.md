@@ -15,20 +15,20 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
   wartende Schlüssel der Zuordnung ohne id in der Liste werden widerrufen, `abgelehnt` und Schlüssel
   anderer Zuordnungen bleiben, `stand` bleibt, eine leere Liste widerruft alle gültigen und
   wartenden. Prüfen: wie 1.1.
-- [ ] 1.3 Leitung: `MeldenOrgAntwort.unterschrift_bestand: Option<Vec<i64>>` (`serde(default)`),
+- [x] 1.3 Leitung: `MeldenOrgAntwort.unterschrift_bestand: Option<Vec<i64>>` (`serde(default)`),
   gesetzt in `handle_meldung` für jede aktive Org, solange die Antwort unter `BESTAND_MAX` ids
   bleibt, die Bytes gehen vom Budget der Stammdaten ab. `check_antwort` lehnt mehr als `BESTAND_MAX`
   ids je Antwort ab. Unit-Tests in `melden.rs`: eine Antwort ohne das Feld ist lesbar und ergibt
   `None`, eine über der Grenze wird abgelehnt, `groesste_antwort_passt_in_die_lesegrenze` rechnet
   den vollen Bestand mit. Prüfen: `cargo test instanz::melden`.
-- [ ] 1.4 `melden_einmal_mit`: nach `accept_lieferungen` `revoke_fehlende`, wenn ein Bestand kam,
+- [x] 1.4 `melden_einmal_mit`: nach `accept_lieferungen` `revoke_fehlende`, wenn ein Bestand kam,
   dazu je widerrufenem Schlüssel `UnterschriftWiderrufen` ohne Akteur mit Grund und ein Hinweis an
   der Kopplung. Integrationstest `zurueckgespielt_hub_verlorener_schluessel_gilt_am_elw_nicht_mehr`
   in `tests/instanz_kopplung.rs`: Hub legt einen Schlüssel an, er wird gegengezeichnet und
   geliefert. Danach löscht der Hub ihn (nachgestelltes Zurückspielen), der ELW meldet sich. Am ELW
   ist er widerrufen, die Admin-Spur trägt den Eintrag, die Kopplung den Hinweis. Ohne 1.4 rot.
   Prüfen: `cargo test --test instanz_kopplung zurueckgespielt`.
-- [ ] 1.5 Integrationstest: Ein am ELW wartender Schlüssel, den der Hub verliert, wird widerrufen
+- [x] 1.5 Integrationstest: Ein am ELW wartender Schlüssel, den der Hub verliert, wird widerrufen
   und lässt sich danach nicht mehr bestätigen (409 bzw. der bestehende Fehler der Bestätigung). Ein
   am ELW zurückgewiesener bleibt `abgelehnt`. Prüfen: wie 1.4.
 
@@ -44,12 +44,12 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
   Demo-Daten, Org-Einstellungen, einer Sprechgruppe außerhalb des Bereichs (auch einer, die aus dem
   Katalog in einen Einsatz wandert), einem Stellvertreter-, einem Archiv- und einem Gerätekonto: Ein Schlüssel des Logs steht genau dann im Bestand, wenn `build_lieferung` für ihn
   keine Löschung baut (dafür `build_lieferung` `pub(super)`). Prüfen: wie 2.1.
-- [x] 2.3 `liefern::load_hoechster_stand(conn, org_id)` (`MAX(stand)` der Log-Zeilen der Org, 0
-  ohne). Unit-Test mit zwei Orgs. Prüfen: `cargo test instanz::stammdaten::liefern`.
+- [x] 2.3 `liefern::load_hoechster_stand(conn, org_id)` (`MAX(stand)` der Log-Zeilen der Org in den
+  Arten der Meldung, 0 ohne). Unit-Test mit zwei Orgs und einer Art, die die Gegenseite nicht kennt. Prüfen: `cargo test instanz::stammdaten::liefern`.
 
 ## 3. Stammdaten: Leitung und Sendebremse (D3, D5, D6)
 
-- [ ] 3.1 Leitung: `MeldenOrg.stammdaten_pruefsumme: Option<String>`,
+- [x] 3.1 Leitung: `MeldenOrg.stammdaten_pruefsumme: Option<String>`,
   `MeldenOrgAntwort.stammdaten_bestand: Option<Vec<StammdatenBestand>>` (`art`, `schluessel`),
   beide mit `serde(default)` und `skip_serializing_if`. `check_antwort`: höchstens `ARTEN_MAX` Arten
   je Org, höchstens `BESTAND_STAMMDATEN_MAX` Schlüssel je Antwort. Unit-Tests wie 1.3. Prüfen:

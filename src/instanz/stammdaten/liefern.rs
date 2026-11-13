@@ -361,17 +361,22 @@ impl Budget {
     }
 }
 
-/// Höchster Stand der Log-Zeilen der Org, 0 ohne. Meldet die Gegenseite mindestens diesen
-/// Stand, hat sie alle Änderungen (LLH-1871, design.md D5 der Change
-/// `n2ge2224-reste-nach-restore-abraeumen`).
+/// Höchster Stand der Log-Zeilen der Org in den Arten `arten`, 0 ohne. Meldet die Gegenseite
+/// mindestens diesen Stand, hat sie alle Änderungen, die sie übernehmen kann (LLH-1871, design.md
+/// D5 der Change `n2ge2224-reste-nach-restore-abraeumen`).
 pub async fn load_hoechster_stand(
     conn: &mut SqliteConnection,
     org_id: i64,
+    arten: &HashSet<StammdatenArt>,
 ) -> Result<i64, AppError> {
+    let arten_json = serde_json::to_string(&arten.iter().map(|a| a.as_str()).collect::<Vec<_>>())
+        .expect("Arten sind serialisierbar");
     Ok(sqlx::query_scalar(
-        "SELECT COALESCE(MAX(stand), 0) FROM stammdaten_aenderung WHERE org_id = ?",
+        "SELECT COALESCE(MAX(stand), 0) FROM stammdaten_aenderung \
+         WHERE org_id = ? AND art IN (SELECT value FROM json_each(?))",
     )
     .bind(org_id)
+    .bind(arten_json)
     .fetch_one(&mut *conn)
     .await?)
 }

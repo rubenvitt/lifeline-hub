@@ -12,6 +12,7 @@ use super::fuehrung::repo as fuehrung_repo;
 use super::identitaet::{self, parse_oeffentlich, Identitaet};
 use super::repo::{self, KopplungZeile};
 use super::signatur::{self, AnfrageDraft, ANTWORT_KOPF, SCHEMA};
+use super::stammdaten::bestand::{self as stammdaten_bestand, StammdatenBestand};
 use super::stammdaten::{self, liefern, StammdatenArt, StammdatenLieferung};
 use super::{org_kennung, InstanzKopplungZustand, PROTOKOLL};
 use crate::auth::admin_audit::{self, AdminAktion, Ziel, ZugangsAngaben};
@@ -74,6 +75,11 @@ pub struct MeldenOrg {
     /// Stammdaten (die Org hat schon eine andere Quelle).
     #[serde(default)]
     pub stammdaten_stand: i64,
+    /// Prüfsumme der aus dieser Zuordnung übernommenen Zeilen (`stammdaten::bestand::pruefsumme`,
+    /// LLH-1871, design.md D3 der Change `n2ge2224-reste-nach-restore-abraeumen`); fehlt ohne
+    /// Stammdaten aus dieser Zuordnung und vor LLH-1871.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stammdaten_pruefsumme: Option<String>,
 }
 
 /// Body von `POST /api/instanz/melden`.
@@ -128,6 +134,15 @@ pub struct MeldenOrgAntwort {
     /// Bis zu diesem Stand darf die meldende Seite ihren Stammdaten-Stand setzen.
     #[serde(default)]
     pub stammdaten_bis: i64,
+    /// ids der gültigen Unterschriftsschlüssel der Org hier (LLH-1871, design.md D1): Was die
+    /// meldende Seite aus dieser Zuordnung gültig hat und hier fehlt, gilt dort nicht mehr. Fehlt
+    /// vor LLH-1871 und wenn der Bestand nicht mehr in die Antwort passt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unterschrift_bestand: Option<Vec<i64>>,
+    /// Bestand der Stammdaten je Art (D5): nur bei abweichender Prüfsumme und wenn die meldende
+    /// Seite alle Änderungen hat. Was dort aus dieser Zuordnung stammt und hier fehlt, räumt sie ab.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stammdaten_bestand: Option<Vec<StammdatenBestand>>,
 }
 
 /// Antwort auf eine Meldung.
@@ -153,6 +168,15 @@ pub struct MeldenAntwort {
     /// Die erreichte Seite bietet Web Push an (D4).
     #[serde(default)]
     pub web_push: bool,
+}
+
+/// Bytes eines Feldes der Antwort samt Namen und Trennzeichen (LLH-1871): was es vom Budget der
+/// Stammdaten abzieht.
+fn feld_bytes<T: Serialize>(wert: &T) -> usize {
+    serde_json::to_vec(wert)
+        .map(|v| v.len())
+        .unwrap_or(usize::MAX / 2)
+        + 32
 }
 
 fn client() -> &'static reqwest::Client {
@@ -584,6 +608,31 @@ fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
     if stammdaten > stammdaten::STAMMDATEN_MAX + stammdaten::ABHAENGIGE_MAX {
         return Err("zu viele Stammdaten in der Antwort".into());
     }
+    // Bestand (LLH-1871): Schlüssel-ids über alle Orgs, Arten je Org, Stammdaten-Schlüssel über
+    // alle Orgs.
+    let bestand: usize = antwort
+        .orgs
+        .iter()
+        .filter_map(|o| o.unterschrift_bestand.as_ref())
+        .map(Vec::len)
+        .sum();
+    if bestand > unterschrift::BESTAND_MAX {
+        return Err(format!(
+            "mehr als {} Schlüssel im Bestand der Antwort",
+            unterschrift::BESTAND_MAX
+        ));
+    }
+    let listen = antwort
+        .orgs
+        .iter()
+        .filter_map(|o| o.stammdaten_bestand.as_ref());
+    if listen.clone().any(|l| l.len() > stammdaten::ARTEN_MAX) {
+        return Err("zu viele Arten im Bestand der Stammdaten".into());
+    }
+    let schluessel: usize = listen.flatten().map(|b| b.schluessel.len()).sum();
+    if schluessel > stammdaten_bestand::BESTAND_STAMMDATEN_MAX {
+        return Err("zu viele Schlüssel im Bestand der Stammdaten".into());
+    }
     let unterlisten_zu_lang = antwort
         .orgs
         .iter()
@@ -629,12 +678,18 @@ async fn melden_einmal_mit(
     let age = stammdaten::geheimnis::load_or_create_age(pool).await?;
     let datentraeger = stammdaten::geheimnis::is_datentraeger_bestaetigt(pool).await?;
     let kennzeichen = stammdaten::empfangs_kennzeichen(datentraeger);
+    let mut pruefsummen: std::collections::HashMap<i64, String> = Default::default();
     let quellen: Vec<i64> = crate::write_retry!(pool, |conn| {
         let mut quellen = Vec::new();
+        pruefsummen.clear();
         for o in repo::list_orgs_aktiv(conn, kopplung.id).await? {
             if stammdaten::herkunft::find_quelle(conn, o.org_id).await? == Some(o.id) {
                 repo::save_stammdaten_kennzeichen(conn, o.id, &kennzeichen).await?;
                 quellen.push(o.id);
+                // Prüfsumme der übernommenen Zeilen (LLH-1871, design.md D3 der Change
+                // `n2ge2224-reste-nach-restore-abraeumen`).
+                let herkunft = stammdaten_bestand::load_herkunft(conn, o.id).await?;
+                pruefsummen.insert(o.id, stammdaten_bestand::pruefsumme(&herkunft));
             } else if kopplung.art().traegt(super::Fluss::Stammdaten) {
                 // Über eine Direktkopplung fließen nie Stammdaten (LLH-1497): kein Hinweis dort.
                 repo::add_stammdaten_hinweise(
@@ -693,6 +748,7 @@ async fn melden_einmal_mit(
                 } else {
                     -1
                 },
+                stammdaten_pruefsumme: pruefsummen.get(&o.id).cloned(),
             })
             .collect(),
         widerrufen: offen.iter().map(|o| o.fremde_org_kennung.clone()).collect(),
@@ -754,8 +810,10 @@ async fn melden_einmal_mit(
     let mut stammdaten_geaendert: Vec<i64> = Vec::new();
     let mut sitzungen_beendet: Vec<String> = Vec::new();
     let mut fuehrung_folgen = Vec::new();
+    let mut nicht_gefuehrt_alle: Vec<(repo::OrgZeile, unterschrift::NichtGefuehrt)> = Vec::new();
     crate::write_retry!(pool, |conn| {
         abgelehnt_alle.clear();
+        nicht_gefuehrt_alle.clear();
         vom_gegenueber_widerrufen.clear();
         stammdaten_geaendert.clear();
         sitzungen_beendet.clear();
@@ -799,10 +857,34 @@ async fn melden_einmal_mit(
             {
                 abgelehnt_alle.push((o.clone(), ab));
             }
+            // Was das Gegenüber nicht mehr führt, gilt hier nicht mehr (LLH-1871, design.md D2).
+            if let Some(bestand) = &oa.unterschrift_bestand {
+                for n in unterschrift::revoke_fehlende(conn, o.id, bestand, &jetzt).await? {
+                    nicht_gefuehrt_alle.push((o.clone(), n));
+                }
+            }
             if quellen.contains(&o.id) {
-                let ergebnis =
+                let mut ergebnis =
                     stammdaten::uebernehmen::uebernehmen(conn, o, &oa.stammdaten, Some(&age))
                         .await?;
+                // Abräumen, was das Gegenüber nicht mehr führt (D7): über den Löschweg der
+                // Lieferung, der Stand der Zuordnung bleibt.
+                if let Some(liste) = &oa.stammdaten_bestand {
+                    let fehlend = build_fehlende(conn, o.id, liste).await?;
+                    if !fehlend.is_empty() {
+                        let weg =
+                            stammdaten::uebernehmen::uebernehmen(conn, o, &fehlend, Some(&age))
+                                .await?;
+                        ergebnis.geaendert |= weg.geaendert;
+                        ergebnis.deaktivierte_konten.extend(weg.deaktivierte_konten);
+                        ergebnis.hinweise.extend(weg.hinweise);
+                        ergebnis.hinweise.push(format!(
+                            "{} Zeilen, die {} nicht mehr führt, wurden entfernt oder stillgelegt.",
+                            fehlend.len(),
+                            kopplung.gegenueber_name
+                        ));
+                    }
+                }
                 repo::save_stammdaten_stand(conn, o.id, o.stammdaten_stand, oa.stammdaten_bis)
                     .await?;
                 repo::add_stammdaten_hinweise(conn, o.id, &ergebnis.hinweise).await?;
@@ -822,6 +904,19 @@ async fn melden_einmal_mit(
                 &format!(
                     "Unterschriftsschlüssel von {} ({}) abgelehnt: {}",
                     ab.benutzer_name, ab.fingerabdruck, ab.grund
+                ),
+            )
+            .await?;
+        }
+        if !nicht_gefuehrt_alle.is_empty() {
+            repo::set_hinweis(
+                conn,
+                kopplung.id,
+                &format!(
+                    "{} führt {} Unterschriftsschlüssel nicht mehr (aus einer Sicherung \
+                     zurückgespielt?). Sie gelten hier nicht mehr.",
+                    kopplung.gegenueber_name,
+                    nicht_gefuehrt_alle.len()
                 ),
             )
             .await?;
@@ -899,6 +994,21 @@ async fn melden_einmal_mit(
         )
         .await;
     }
+    for (o, n) in &nicht_gefuehrt_alle {
+        let mut angaben = build_angaben_gegenstelle(kopplung, &o.fremde_org_name);
+        angaben.fingerabdruck = Some(n.fingerabdruck.clone());
+        angaben.grund = Some(format!("führt {} nicht mehr", kopplung.gegenueber_name));
+        admin_audit::schreibe_ohne_akteur(
+            pool,
+            AdminAktion::UnterschriftWiderrufen,
+            o.org_id,
+            &kopplung.gegenueber_name,
+            Ziel::Unterschrift(&n.benutzer_name),
+            Some(angaben),
+            None,
+        )
+        .await;
+    }
     for (o, ab) in &abgelehnt_alle {
         let mut angaben = build_angaben_gegenstelle(kopplung, &o.fremde_org_name);
         angaben.fingerabdruck = Some(ab.fingerabdruck.clone());
@@ -915,6 +1025,46 @@ async fn melden_einmal_mit(
         .await;
     }
     Ok(())
+}
+
+/// Meldende Seite (LLH-1871, design.md D7): die übernommenen Zeilen der Zuordnung in den Arten der
+/// Liste, die darin fehlen, als Löschungen. Unbekannte Arten der Liste bleiben außen vor.
+async fn build_fehlende(
+    conn: &mut sqlx::SqliteConnection,
+    kopplung_org_id: i64,
+    liste: &[StammdatenBestand],
+) -> Result<Vec<StammdatenLieferung>, AppError> {
+    let gefuehrt: std::collections::HashMap<&str, std::collections::HashSet<&str>> = liste
+        .iter()
+        .filter(|b| StammdatenArt::parse(&b.art).is_some())
+        .map(|b| {
+            (
+                b.art.as_str(),
+                b.schluessel.iter().map(String::as_str).collect(),
+            )
+        })
+        .collect();
+    let mut fehlend: Vec<StammdatenLieferung> =
+        stammdaten_bestand::load_herkunft(conn, kopplung_org_id)
+            .await?
+            .into_iter()
+            .filter(|(art, schluessel)| {
+                gefuehrt
+                    .get(art.as_str())
+                    .is_some_and(|s| !s.contains(schluessel.as_str()))
+            })
+            .map(|(art, schluessel)| StammdatenLieferung {
+                art,
+                schluessel,
+                stand: 0,
+                geloescht: true,
+                daten: None,
+                geheimnis: None,
+                ursprung: None,
+            })
+            .collect();
+    fehlend.sort_by(|a, b| (&a.art, &a.schluessel).cmp(&(&b.art, &b.schluessel)));
+    Ok(fehlend)
 }
 
 /// Angaben zur Gegenstelle für die Admin-Spur.
@@ -990,6 +1140,7 @@ pub async fn handle_meldung(
     let mut fuehrung_folgen = Vec::new();
     let mut fuehrung_ausgang = fuehrung_austausch::Ausgang::default();
     let mut fuehrung_bis = 0;
+    let mut bestand_gesendet: Vec<(i64, String)> = Vec::new();
     let orgs = crate::write_retry!(pool, |conn| {
         vom_gegenueber.clear();
         fuehrung_folgen.clear();
@@ -1049,6 +1200,8 @@ pub async fn handle_meldung(
         // Die Nachlieferung teilt sich eine Grenze über alle Orgs; was nicht passt, folgt mit der
         // nächsten Meldung, weil der Stand je Org nur bis zum Gelieferten wandert.
         let mut budget = unterschrift::LIEFERUNGEN_MAX;
+        let mut bestand_rest = unterschrift::BESTAND_MAX;
+        bestand_gesendet.clear();
         for mo in anfrage_orgs.iter().copied() {
             // Die jüngste Zuordnung mit dieser Kennung entscheidet.
             let zuordnung = alle.iter().rev().find(|o| kennung(o) == mo.org);
@@ -1070,10 +1223,27 @@ pub async fn handle_meldung(
                         .sum();
                     stammdaten_budget.bytes =
                         stammdaten_budget.bytes.saturating_sub(unterschrift_bytes);
+                    // Bestand der Schlüssel (LLH-1871, design.md D1 der Change
+                    // `n2ge2224-reste-nach-restore-abraeumen`): mit jeder Antwort, solange er über
+                    // alle Orgs unter der Grenze bleibt; geht vom Budget ab wie die Lieferungen.
+                    let unterschrift_bestand = unterschrift::load_bestand(conn, o.org_id)
+                        .await?
+                        .filter(|ids| ids.len() <= bestand_rest);
+                    if let Some(ids) = &unterschrift_bestand {
+                        bestand_rest -= ids.len();
+                        stammdaten_budget.bytes =
+                            stammdaten_budget.bytes.saturating_sub(feld_bytes(ids));
+                    } else {
+                        tracing::warn!(
+                            kopplung = kopplung.id,
+                            org_id = o.org_id,
+                            "Bestand der Unterschriftsschlüssel passt nicht in die Antwort"
+                        );
+                    }
                     // Stammdaten und Geheimnisse nur über eine Kopplung, die sie trägt (LLH-1497).
-                    let nach = if mo.stammdaten_stand < 0
-                        || !kopplung.art().traegt(super::Fluss::Stammdaten)
-                    {
+                    let traegt_stammdaten =
+                        mo.stammdaten_stand >= 0 && kopplung.art().traegt(super::Fluss::Stammdaten);
+                    let nach = if !traegt_stammdaten {
                         liefern::Nachlieferung::default()
                     } else {
                         liefern::nachlieferung(
@@ -1090,12 +1260,54 @@ pub async fn handle_meldung(
                         )
                         .await?
                     };
+                    // Bestand der Stammdaten (D5): nur bei abweichender Prüfsumme, wenn die
+                    // meldende Seite alle Änderungen hat und die Sendebremse es erlaubt.
+                    let mut liste = None;
+                    if let Some(summe) = mo
+                        .stammdaten_pruefsumme
+                        .as_deref()
+                        .filter(|s| s.len() == stammdaten_bestand::PRUEFSUMME_LEN)
+                        .filter(|_| traegt_stammdaten && nach.zeilen.is_empty())
+                    {
+                        let auf_stand = mo.stammdaten_stand
+                            >= liefern::load_hoechster_stand(conn, o.org_id, &arten).await?;
+                        if auf_stand {
+                            let bestand = stammdaten_bestand::load(conn, o.org_id, &arten).await?;
+                            let eigene = stammdaten_bestand::pruefsumme(
+                                &stammdaten_bestand::paare(&bestand),
+                            );
+                            if eigene != summe
+                                && stammdaten_bestand::darf_senden(
+                                    &identitaet.kennung,
+                                    o.id,
+                                    summe,
+                                    std::time::Instant::now(),
+                                )
+                            {
+                                let bytes = feld_bytes(&bestand);
+                                if bytes <= stammdaten_budget.bytes {
+                                    stammdaten_budget.bytes -= bytes;
+                                    bestand_gesendet.push((o.id, summe.to_string()));
+                                    liste = Some(bestand);
+                                } else {
+                                    tracing::warn!(
+                                        kopplung = kopplung.id,
+                                        org_id = o.org_id,
+                                        bytes,
+                                        "Bestand der Stammdaten passt nicht in die Antwort"
+                                    );
+                                }
+                            }
+                        }
+                    }
                     orgs.push(MeldenOrgAntwort {
                         org: mo.org.clone(),
                         widerrufen: false,
                         unterschrift: lieferung,
                         stammdaten: nach.zeilen,
                         stammdaten_bis: nach.bis.max(mo.stammdaten_stand),
+                        unterschrift_bestand,
+                        stammdaten_bestand: liste,
                     });
                 }
                 None => {
@@ -1108,6 +1320,8 @@ pub async fn handle_meldung(
                         unterschrift: Vec::new(),
                         stammdaten: Vec::new(),
                         stammdaten_bis: 0,
+                        unterschrift_bestand: None,
+                        stammdaten_bestand: None,
                     });
                 }
             }
@@ -1178,6 +1392,16 @@ pub async fn handle_meldung(
         }
         Ok(orgs)
     })?;
+    // Erst nach dem Commit: Ein verworfener Versuch hätte die Liste sonst gebremst (D6).
+    let gesendet_at = std::time::Instant::now();
+    for (kopplung_org_id, summe) in &bestand_gesendet {
+        stammdaten_bestand::merke_gesendet(
+            &identitaet.kennung,
+            *kopplung_org_id,
+            summe,
+            gesendet_at,
+        );
+    }
     fuehrung_austausch::run_folgen(pool, kopplung, &fuehrung_folgen).await;
     for o in &vom_gegenueber {
         admin_audit::schreibe_ohne_akteur(
@@ -1220,6 +1444,7 @@ mod tests {
                     org: (*o).into(),
                     unterschrift_stand: i as i64,
                     stammdaten_stand: 0,
+                    stammdaten_pruefsumme: None,
                 })
                 .collect(),
             widerrufen: widerrufen.iter().map(|w| (*w).into()).collect(),
@@ -1288,6 +1513,8 @@ mod tests {
                     unterschrift: vec![lieferung.clone(); lieferungen],
                     stammdaten: Vec::new(),
                     stammdaten_bis: 0,
+                    unterschrift_bestand: None,
+                    stammdaten_bestand: None,
                 })
                 .collect(),
             fuehrung: Vec::new(),
@@ -1296,6 +1523,53 @@ mod tests {
             hinweise: true,
             web_push: false,
         }
+    }
+
+    #[test]
+    fn antwort_eines_aelteren_hubs_traegt_keinen_bestand() {
+        let a: MeldenAntwort = serde_json::from_value(serde_json::json!({
+            "name": "Hub", "softwarestand": "1", "protokoll": PROTOKOLL,
+            "orgs": [{"org": "h/1", "widerrufen": false}]
+        }))
+        .expect("ältere Antwort");
+        assert_eq!(a.orgs[0].unterschrift_bestand, None);
+        assert_eq!(a.orgs[0].stammdaten_bestand, None);
+        let o: MeldenOrg =
+            serde_json::from_value(serde_json::json!({"org": "h/1", "unterschrift_stand": 3}))
+                .expect("ältere Meldung");
+        assert_eq!(o.stammdaten_pruefsumme, None);
+        // Ohne Bestand schreibt die Antwort die Felder nicht: Ein älterer ELW liest sie wie bisher.
+        let text = serde_json::to_string(&antwort(1, 0)).expect("JSON");
+        assert!(!text.contains("bestand"), "{text}");
+    }
+
+    #[test]
+    fn bestand_ueber_der_grenze_ist_ungueltig() {
+        let mut a = antwort(2, 0);
+        a.orgs[0].unterschrift_bestand = Some(vec![1; unterschrift::BESTAND_MAX / 2]);
+        a.orgs[1].unterschrift_bestand = Some(vec![2; unterschrift::BESTAND_MAX / 2]);
+        assert!(check_antwort(&a).is_ok());
+        a.orgs[1].unterschrift_bestand = Some(vec![2; unterschrift::BESTAND_MAX / 2 + 1]);
+        assert!(
+            check_antwort(&a).is_err(),
+            "die Grenze gilt für die ganze Antwort, nicht je Org"
+        );
+
+        let art = |n: usize| StammdatenBestand {
+            art: "fahrzeug".into(),
+            schluessel: vec!["1".into(); n],
+        };
+        let mut a = antwort(2, 0);
+        a.orgs[0].stammdaten_bestand = Some(vec![art(0); stammdaten::ARTEN_MAX]);
+        assert!(check_antwort(&a).is_ok());
+        a.orgs[0].stammdaten_bestand = Some(vec![art(0); stammdaten::ARTEN_MAX + 1]);
+        assert!(check_antwort(&a).is_err(), "zu viele Arten");
+        let halb = stammdaten_bestand::BESTAND_STAMMDATEN_MAX / 2;
+        a.orgs[0].stammdaten_bestand = Some(vec![art(halb)]);
+        a.orgs[1].stammdaten_bestand = Some(vec![art(halb)]);
+        assert!(check_antwort(&a).is_ok());
+        a.orgs[1].stammdaten_bestand = Some(vec![art(halb + 1)]);
+        assert!(check_antwort(&a).is_err(), "zu viele Schlüssel");
     }
 
     #[test]
@@ -1370,8 +1644,13 @@ mod tests {
         // Hülle: alle Org-Einträge, ohne Schlüssel, Stammdaten und Akten.
         let huelle = serde_json::to_vec(&a).expect("JSON").len();
         a.orgs[0].unterschrift = vec![lieferung.clone(); unterschrift::LIEFERUNGEN_MAX];
-        let unterschrift_bytes =
-            serde_json::to_vec(&lieferung).expect("JSON").len() * unterschrift::LIEFERUNGEN_MAX;
+        // Der volle Bestand der Schlüssel (LLH-1871) geht wie die Lieferungen vom Budget ab.
+        let bestand = vec![i64::MAX; unterschrift::BESTAND_MAX];
+        let bestand_bytes = serde_json::to_vec(&bestand).expect("JSON").len();
+        a.orgs[1].unterschrift_bestand = Some(bestand);
+        let unterschrift_bytes = serde_json::to_vec(&lieferung).expect("JSON").len()
+            * unterschrift::LIEFERUNGEN_MAX
+            + bestand_bytes;
         // Führungsakten (LLH-1672): `build_ausgang` packt höchstens `ANTWORT_BYTES`, je Akte
         // höchstens `AKTE_BYTES`.
         let akte = fuehrung_austausch::tests::akte_mit_bytes(fuehrung_austausch::AKTE_BYTES);
