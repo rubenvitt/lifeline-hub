@@ -49,7 +49,7 @@ pub fn check_grund(grund: &str) -> Result<String, AppError> {
 /// Der Text einer Erklärung, wie er in die Akte und unter die Unterschrift geht, oder 422, wenn
 /// er größer ist, als das Gegenüber an einer Akte annimmt ([`austausch::ERKLAERUNG_MAX`] Byte,
 /// dasselbe Maß wie `AkteMeldung::is_in_grenzen_bis`). Jede Erklärung geht vor dem Speichern
-/// hier durch (LLH-1702, ADR-0033): Eine zu große Akte schickt der Ausgang nicht, die
+/// hier durch (LLH-1702, ADR-0034): Eine zu große Akte schickt der Ausgang nicht, die
 /// Notübernahme gälte dann nur lokal, und beide Seiten hielten sich für die führende Instanz.
 ///
 /// Der Unterzeichner ist beim Bauen schon gekürzt ([`crate::auth::truncate_anzeigename`]); was
