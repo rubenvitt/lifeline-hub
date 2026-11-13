@@ -119,16 +119,16 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
 
 ## 8. Doku, ADR und Regeln
 
-- [ ] 8.1 Neue ADR nach `docs/architektur/AGENTS.md` (Nummer, Vorlage, Prüfungen aus D11).
+- [x] 8.1 Neue ADR nach `docs/architektur/AGENTS.md` (Nummer, Vorlage, Prüfungen aus D11).
   Verifizieren: `scripts/adr-fuer.sh src/public_api/webhook/ziel.rs` nennt sie, und der
   ADR-Wächter des Gates ist grün.
-- [ ] 8.2 `src/AGENTS.md` Abschnitt „Webhooks“; Architektur Kapitel 3 und 5. Verifizieren: die
+- [x] 8.2 `src/AGENTS.md` Abschnitt „Webhooks“; Architektur Kapitel 3 und 5. Verifizieren: die
   Wächter der Architekturdoku sind grün.
-- [ ] 8.3 Entwicklerdoku `docs/api/maschinenzugang.md`: Abschnitt „Webhooks empfangen“ mit Body,
+- [x] 8.3 Entwicklerdoku `docs/api/maschinenzugang.md`: Abschnitt „Webhooks empfangen“ mit Body,
   Köpfen, Prüfschritten, Entdoppeln über `id`, Wiederholung, Anhalten, `ping` und kurzen
   Empfänger-Beispielen für TypeScript und Python. Verifizieren: Prettier grün, die Beispiele
   nutzen die Funktionen aus 7.2.
-- [ ] 8.4 Anwenderkapitel `docs/anwender/kapitel/anbindungen.md`: Abläufe „Webhook einrichten“,
+- [x] 8.4 Anwenderkapitel `docs/anwender/kapitel/anbindungen.md`: Abläufe „Webhook einrichten“,
   „Testereignis senden“ und „Webhook wieder aufnehmen“, Hintergrund zu Zuständen, 24 h, Verlust,
   HTTPS und LAN-Ausnahme samt Zertifikat; neue Pfade unter `quellen:`. Verifizieren:
   `anwenderdoku.guard.test.ts` grün.

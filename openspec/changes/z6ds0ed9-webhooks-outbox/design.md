@@ -299,8 +299,11 @@ Unter `/api/admin/anbindungen/{id}/webhook` in `routes::anbindungen` (Untermodul
   - **Mit Webhook:** `BearbeitbaresPaneel` mit denselben drei Feldern und CAS. Dazu ein Chip für
     den Zustand (Töne wie `zustandAnzeige`: aktiv normal, Fehler bedien, angehalten achtung, ruht
     neutral), der letzte Fehler, der nächste Versuch und gegebenenfalls der Hinweis zum Verlust.
-  - **Aktionen** über `WeitereAktionen`: „Testereignis senden“ (Ergebnis als Meldung), „Wieder
-    aufnehmen“ (nur angehalten) und „Webhook entfernen“ (mit Bestätigung).
+  - **Aktionen** als Knöpfe im Kopf eines Paneels „Zustellung“, das auch Zustand, letzten
+    Fehler, nächsten Versuch und die Webhook-Kennung zeigt: „Testereignis senden“ (Ergebnis
+    darunter), „Wieder aufnehmen“ (nur angehalten) und „Webhook entfernen …“ (mit Rückfrage).
+    (Gebaut so statt über `WeitereAktionen`: das Paneel hat genau drei Aktionen, und das
+    Ergebnis des Tests steht neben ihnen.)
 - Ein Paneel „Zustellungen“ zeigt die letzten 50 Versuche, ohne Rumpf: Zeit, Ereignis oder Test,
   Ergebnis, Status oder Fehlerart, Dauer.
 - In der Liste auf „Anbindungen“ steht bei einem angehaltenen Webhook ein Hinweis im Ton
