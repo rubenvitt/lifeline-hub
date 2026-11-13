@@ -1434,6 +1434,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::fuehrung::notuebernahme),
         )
         .route(
+            "/api/einsaetze/{id}/fuehrung/zurueckholen",
+            post(routes::fuehrung::zurueckholen),
+        )
+        .route(
             "/api/einsaetze/{id}/fuehrung/notuebernahme/start",
             post(routes::fuehrung::notuebernahme_start),
         )

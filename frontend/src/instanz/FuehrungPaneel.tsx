@@ -20,6 +20,7 @@ import {
   bestaetigeUebernahme,
   frageFuehrungAn,
   gibFuehrungPerCodeAb,
+  holeFuehrungZurueck,
   uebergebeFuehrung,
   uebernimmFuehrung,
   uebernimmFuehrungMitCode,
@@ -34,6 +35,7 @@ import type { FuehrungAnzeige, FuehrungCodeAntwort, FuehrungVerlaufEintrag } fro
 import {
   FUEHRUNG_ART_TEXT,
   fuehrungMoeglich,
+  kopplungBeendetText,
   offeneUebernahmeTitel,
   vorOrtHinweis,
 } from './fuehrungText';
@@ -183,6 +185,26 @@ interface NotuebernahmeWerte {
   code?: string;
 }
 
+/** Pflichtgrund einer Notübernahme und des Zurückholens, im Formular des jeweiligen Dialogs. */
+function GrundFeld() {
+  return (
+    <Form.Item
+      label="Grund"
+      name="grund"
+      rules={[
+        { required: true, whitespace: true, message: 'Grund angeben' },
+        zeichenRegel(FUEHRUNG_GRUND_MAX, 'Grund'),
+      ]}
+    >
+      <Input.TextArea
+        autoSize={{ minRows: 2, maxRows: 5 }}
+        count={zeichenGrenze(FUEHRUNG_GRUND_MAX)}
+        placeholder="ohne Verbindung seit 40 min"
+      />
+    </Form.Item>
+  );
+}
+
 /**
  * Paneel „Führung“ (LLH-1491): wer führt, mit welcher Epoche, wie es dazu kam, und die Bedienung.
  * Auf der Seite Einsatzdaten für den lokalen Einsatz, auf der Seite „Instanzkopplung“ für einen
@@ -221,7 +243,9 @@ export default function FuehrungPaneel({
   const moeglich = fuehrungMoeglich(fuehrung, { darfUnterschreiben });
   const [neuerCode, setNeuerCode] = useState<FuehrungCodeAntwort | null>(null);
   const [notOffen, setNotOffen] = useState(false);
+  const [zurueckOffen, setZurueckOffen] = useState(false);
   const [form] = Form.useForm<NotuebernahmeWerte>();
+  const [zurueckForm] = Form.useForm<NotuebernahmeWerte>();
   const beweisWahl = Form.useWatch('beweis', form);
   const ohneNetz = useOhneVerbindung();
   const grundId = useId();
@@ -268,9 +292,24 @@ export default function FuehrungPaneel({
       message.success('Führung übernommen');
     },
   });
+  // Nur am lokalen Einsatz (LLH-1850): `moeglich.zurueckholen` verlangt ihn.
+  const zurueckholen = useMutation({
+    ...SOFORT_ODER_NIE,
+    mutationFn: (w: NotuebernahmeWerte) =>
+      holeFuehrungZurueck(fuehrung.einsatz_id ?? 0, (w.grund ?? '').trim()),
+    onSuccess: (f) => {
+      nach();
+      onGeaendert?.(f);
+      message.success('Führung zurückgeholt');
+    },
+  });
   // Eine Aktion zur Zeit (LLH-1670): eine zweite während der ersten endete mit 409 neben dem Erfolg.
   const laeuft =
-    uebergeben.isPending || perCode.isPending || anfragen.isPending || notuebernahme.isPending;
+    uebergeben.isPending ||
+    perCode.isPending ||
+    anfragen.isPending ||
+    notuebernahme.isPending ||
+    zurueckholen.isPending;
   useEffect(() => {
     onLaeuft?.(laeuft);
   }, [laeuft, onLaeuft]);
@@ -282,7 +321,8 @@ export default function FuehrungPaneel({
     moeglich.perCode.length > 0 ||
     moeglich.anfragen ||
     moeglich.notuebernahme ||
-    moeglich.notuebernahmeMitBeweis;
+    moeglich.notuebernahmeMitBeweis ||
+    moeglich.zurueckholen;
 
   const stand = (
     <Datenraster spalten={2}>
@@ -304,6 +344,15 @@ export default function FuehrungPaneel({
   return (
     <Paneel titel={titel} koerperPolster style={style}>
       {stand}
+
+      {fuehrung.fuehrer_beendet_at && !fuehrung.fuehrend && (
+        <Typography.Paragraph
+          style={{ color: rollen.achtungText, marginBlock: `${token.marginMD}px 0` }}
+          data-lfh="fuehrung-beendet"
+        >
+          {kopplungBeendetText(fuehrung.fuehrer_name)} · {zeit(fuehrung.fuehrer_beendet_at)}
+        </Typography.Paragraph>
+      )}
 
       {darfBedienen && ohneNetz && (hatAktionen || fuehrung.offen) && (
         <div style={{ marginBlockStart: token.marginMD }}>
@@ -427,6 +476,20 @@ export default function FuehrungPaneel({
               Notübernahme …
             </Button>
           )}
+          {moeglich.zurueckholen && (
+            <Button
+              danger
+              disabled={sperre(false)}
+              aria-describedby={beschrieben}
+              onClick={() => {
+                zurueckholen.reset();
+                setZurueckOffen(true);
+              }}
+              data-lfh="fuehrung-zurueckholen"
+            >
+              Führung zurückholen …
+            </Button>
+          )}
         </Space>
       )}
       {/* Zwei Gegenstellen können gleich heißen: der Name taugt nicht als Key (Review LLH-1497). */}
@@ -498,20 +561,7 @@ export default function FuehrungPaneel({
           setNotOffen(false);
         }}
       >
-        <Form.Item
-          label="Grund"
-          name="grund"
-          rules={[
-            { required: true, whitespace: true, message: 'Grund angeben' },
-            zeichenRegel(FUEHRUNG_GRUND_MAX, 'Grund'),
-          ]}
-        >
-          <Input.TextArea
-            autoSize={{ minRows: 2, maxRows: 5 }}
-            count={zeichenGrenze(FUEHRUNG_GRUND_MAX)}
-            placeholder="ohne Verbindung seit 40 min"
-          />
-        </Form.Item>
+        <GrundFeld />
         {moeglich.notuebernahmeMitBeweis && (
           <>
             {moeglich.unterschrift && (
@@ -541,6 +591,31 @@ export default function FuehrungPaneel({
             )}
           </>
         )}
+      </ErfassungsModal>
+
+      <ErfassungsModal<NotuebernahmeWerte>
+        offen={zurueckOffen}
+        titel={`Führung von ${fuehrung.fuehrer_name} zurückholen`}
+        form={zurueckForm}
+        erfassenText="Führung zurückholen"
+        unumkehrbar
+        laeuft={zurueckholen.isPending}
+        gesperrt={ohneNetz}
+        zusammenfassung={
+          ohneNetz
+            ? OHNE_VERBINDUNG_NICHT_AENDERBAR
+            : 'Danach führt diese Installation den Einsatz.'
+        }
+        speicherung={zurueckholen}
+        speicherFehlerTitel="Nicht zurückgeholt"
+        onErfassen={(w) => zurueckholen.mutateAsync(w)}
+        onFertig={() => setZurueckOffen(false)}
+        onAbbrechen={() => {
+          zurueckholen.reset();
+          setZurueckOffen(false);
+        }}
+      >
+        <GrundFeld />
       </ErfassungsModal>
 
       <Modal

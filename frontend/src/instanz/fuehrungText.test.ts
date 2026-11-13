@@ -5,6 +5,7 @@ import {
   fuehrungBeiKurz,
   fuehrungKurz,
   fuehrungMoeglich,
+  kopplungBeendetText,
   offeneUebernahmeTitel,
   vorOrtHinweis,
 } from './fuehrungText';
@@ -200,5 +201,36 @@ describe('offeneUebernahmeTitel (LLH-1669)', () => {
     expect(offeneUebernahmeTitel({ von: 'ELW 1', konflikt: true }, 'uebergabe')).toBe(
       'Die Führung liegt am Hub bei ELW 1, nicht hier',
     );
+  });
+});
+
+describe('Zurückholen ohne gekoppelte Führung (LLH-1850)', () => {
+  const beendet = akte({
+    fuehrend: false,
+    fuehrer_name: 'Hub Nord',
+    fuehrer_kennung: 'k-hub',
+    gegenueber: [],
+    fuehrer_beendet_at: '2026-11-10 10:00:00',
+  });
+
+  it('bietet das Zurückholen am Spiegel einer beendeten Kopplung, sonst nichts', () => {
+    const m = fuehrungMoeglich(beendet);
+    expect(m.zurueckholen).toBe(true);
+    expect(m.anfragen).toBe(false);
+    expect(m.notuebernahme).toBe(false);
+    expect(m.notuebernahmeMitBeweis).toBe(false);
+    expect(m.uebergeben).toEqual([]);
+  });
+
+  it('nicht ohne Widerruf, nicht an der eigenen Führung, nicht ohne den Einsatz hier', () => {
+    expect(fuehrungMoeglich({ ...beendet, fuehrer_beendet_at: undefined }).zurueckholen).toBe(
+      false,
+    );
+    expect(fuehrungMoeglich({ ...beendet, fuehrend: true }).zurueckholen).toBe(false);
+    expect(fuehrungMoeglich({ ...beendet, einsatz_id: undefined }).zurueckholen).toBe(false);
+  });
+
+  it('nennt die beendete Kopplung', () => {
+    expect(kopplungBeendetText('Hub Nord')).toBe('Kopplung zu Hub Nord beendet');
   });
 });

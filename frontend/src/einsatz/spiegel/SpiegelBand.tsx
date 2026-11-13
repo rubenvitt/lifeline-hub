@@ -13,6 +13,8 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { NUR_VORLESER, monoStil, useRollen } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { createAndActivateEntwurf } from '../../etb/entwuerfe/entwurfStore';
+import { kopplungBeendetText } from '../../instanz/fuehrungText';
+import { darfFuehrungBedienen } from '../schreibrecht';
 import { IconChevronHoch, IconChevronRunter } from '../../icons';
 import { useSpiegelAntraege } from './useSpiegelAntraege';
 import {
@@ -122,6 +124,13 @@ function BandInhalt({
   const stand = spiegelStand(spiegel, einsatz.status === 'aktiv', jetzt, (w) =>
     zeitKurz(w, konventionen),
   );
+  // Die Kopplung zur führenden Instanz ist beendet (LLH-1850): statt „Abgleich beendet“ der Grund,
+  // und wer die Führung bedient, kommt zum Paneel „Führung“ auf der Seite Einsatzdaten.
+  const navigate = useNavigate();
+  const benutzer = useAuthOptional()?.benutzer;
+  const beendetBei = einsatz.fuehrung?.beendet ? einsatz.fuehrung.bei : null;
+  const standText = beendetBei != null ? kopplungBeendetText(beendetBei) : stand.text;
+  const zurueckholen = beendetBei != null && darfFuehrungBedienen(einsatz, benutzer);
   const zaehler = antragZaehler(spiegel);
   const bruch = bruchText(spiegel);
   const hatAntraege = (antraege?.length ?? 0) > 0 || zaehler.length > 0;
@@ -152,8 +161,18 @@ function BandInhalt({
           style={{ color: stand.gestoert ? rollen.achtungText : rollen.text2 }}
         >
           <span aria-hidden="true">· </span>
-          {stand.text}
+          {standText}
         </span>
+        {zurueckholen && (
+          <Button
+            type="link"
+            onClick={() => navigate(`/einsaetze/${einsatz.id}/einsatzdaten`)}
+            style={{ paddingInline: 0 }}
+            data-lfh="spiegel-band-zurueckholen"
+          >
+            Führung zurückholen
+          </Button>
+        )}
         {/* Angesagt werden nur Zähler und eine Störung: die Zeit läuft im Minutentakt und
             gehört nicht in eine Live-Region (sonst läse der Screenreader sie jede Minute). */}
         <span role="status" style={{ display: 'contents' }}>

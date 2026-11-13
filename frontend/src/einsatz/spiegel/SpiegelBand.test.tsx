@@ -101,6 +101,41 @@ describe('SpiegelBand (LLH-1492, design.md D13)', () => {
     );
   });
 
+  it('nennt die beendete Kopplung und führt die Einsatzleitung zum Zurückholen (LLH-1850)', () => {
+    mitServer([]);
+    const fuehrung = { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false, beendet: true };
+    renderMitProviders(
+      <SpiegelBand
+        einsatz={einsatzFixture({
+          spiegel: spiegel({ beendet: true, antraege_ausstehend: 0, antraege_abgelehnt: 0 }),
+          fuehrung,
+        })}
+      />,
+    );
+    const band = document.querySelector('[data-lfh="spiegel-band"]');
+    expect(band).toHaveTextContent('Kopplung zu Hub Nord beendet');
+    expect(band).not.toHaveTextContent('Abgleich beendet');
+    expect(screen.getByRole('button', { name: 'Führung zurückholen' })).toBeInTheDocument();
+  });
+
+  it('ohne Recht an der Führung nur der Hinweis (LLH-1850)', () => {
+    mitServer([]);
+    server.use(meHandler(benutzerFixture({ id: 11 })));
+    renderMitProviders(
+      <SpiegelBand
+        einsatz={einsatzFixture({
+          meine_rolle: 'beobachter',
+          spiegel: spiegel({ beendet: true, antraege_ausstehend: 0, antraege_abgelehnt: 0 }),
+          fuehrung: { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false, beendet: true },
+        })}
+      />,
+    );
+    expect(document.querySelector('[data-lfh="spiegel-band"]')).toHaveTextContent(
+      'Kopplung zu Hub Nord beendet',
+    );
+    expect(screen.queryByRole('button', { name: 'Führung zurückholen' })).toBeNull();
+  });
+
   it('klappt die Anträge auf: abgelehnte mit Grund, „Verwerfen“ löscht', async () => {
     const verworfen = mitServer();
     const user = userEvent.setup();
