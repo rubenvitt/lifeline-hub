@@ -11,7 +11,7 @@ gilt_fuer:
   - src/public_api/einwurf/**
 herleitung:
   - openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md
-  - openspec/changes/s1i56dpt-einwurf-zugang/design.md
+  - openspec/changes/archive/2026-11-13-s1i56dpt-einwurf-zugang/design.md
   - docs/konzepte/2026-10-29-instanzkopplung-elw-hub.md
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---

@@ -25,11 +25,11 @@ nichts. Ein Einwurf-Schlüssel MUST NOT an einer anderen Route als Anmeldung gel
 ### Requirement: Fehlversuche von Maschinen sperren nie die Anmeldung von Menschen
 
 Der Server SHALL je Quelle in einem eigenen Zähler für Maschinen nur unbekannte Zugangs-IDs,
-gescheiterte Einlösungen und unbekannte Einwurf-Schlüssel zählen. Nach 10 solchen Fehlversuchen
-in 5 Minuten MUST er diese Quelle auf den Maschinenwegen, auch den Einwurf-Routen, mit 429
-abweisen. Dieser Zähler MUST NOT die Anmeldesperre für Passwort, Passkey oder Gerätekopplung
-berühren. Eine falsche Signatur oder Uhr eines bekannten Zugangs MUST NOT in ihm zählen, ebenso
-wenig ein widerrufener, abgelaufener oder durch einen Wechsel abgelöster Einwurf-Schlüssel.
+gescheiterte Einlösungen und unbekannte Einwurf-Schlüssel zählen. Nach 10 Fehlversuchen in 5
+Minuten MUST er sie auf den Maschinenwegen, auch beim Einwurf, mit 429 abweisen. Der Zähler MUST
+NOT die Anmeldesperre für Passwort, Passkey oder Gerätekopplung berühren. Falsche Signatur oder
+Uhr eines bekannten Zugangs und ein widerrufener, abgelaufener oder abgelöster Einwurf-Schlüssel
+MUST NOT zählen.
 
 #### Scenario: Falsche Uhr hinter NAT
 - **WHEN** ein bekannter Zugang hinter derselben IP wie eine Wache mehr als zehnmal mit falscher Uhr signiert

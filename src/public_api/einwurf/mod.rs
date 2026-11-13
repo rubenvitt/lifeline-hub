@@ -12,7 +12,7 @@
 //! **Der Schlüssel steht in keinem Protokoll.** Kein `tracing`-Aufruf in diesem Modul nennt
 //! Pfad, Abfrage, Schlüssel oder Hash; wer etwas protokolliert, nennt die Kennung des Zugangs.
 //!
-//! Herleitung: `openspec/changes/archive/2026-11-12-s1i56dpt-einwurf-zugang/design.md`.
+//! Herleitung: `openspec/changes/archive/2026-11-13-s1i56dpt-einwurf-zugang/design.md`.
 
 pub mod ablage;
 pub mod routen;

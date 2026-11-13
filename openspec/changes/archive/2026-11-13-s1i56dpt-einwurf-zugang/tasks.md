@@ -190,8 +190,11 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
 
 ## 11. Gesamtprüfung
 
-- [ ] 11.1 `./scripts/check-all.sh` läuft grün (ohne `| tail`). Verifizieren: Ausgabe des Laufs;
+- [x] 11.1 `./scripts/check-all.sh` läuft grün (ohne `| tail`). Verifizieren: Ausgabe des Laufs;
   ein Kästchen, das erst die CI des PRs belegt, wird mit Verweis auf diesen Lauf abgehakt.
+  **Beleg ist die CI des PRs** (`.github/workflows/ci.yml` ruft das Skript unverändert): In der
+  Sitzung fehlte `mise`, das Skript lief dort nicht als Ganzes. Einzeln gelaufen sind die
+  Schritte unter „Nachweise (13.11.2026)“.
 - [x] 11.2 Mutationsproben an drei Stellen: TLS-Prüfung entfernt, Maskierung entfernt, Bedingung
   „älter wird nicht übernommen“ umgedreht. Verifizieren: Je Probe wird mindestens ein Test rot;
   danach ist der Code wieder im Ausgangszustand (`git diff` leer).
@@ -222,3 +225,19 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
 - Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“).
 - `/opsx:archive s1i56dpt-einwurf-zugang` im selben Branch, vor dem PR.
 - Bilder der Änderung in PR und Meldung; PR gegen `alpha`; Zunder auf `review`.
+
+## Nachweise (13.11.2026)
+
+- **Review vor dem PR:** vier Reviewer mit frischem Kontext, jeder Befund gegengeprüft; 31
+  bestätigt, drei verworfen. Ein Nachreview über den Korrektur-Commit bestätigte sechs weitere.
+  Behoben in `4e892cd8` und `a38be61d`; Begründungen in `design.md`, D15. Folgeaufgabe für den
+  geerbten Befund: LLH-1868.
+- **Einzeln gelaufen statt `check-all.sh`:** `cargo fmt --check`; `cargo test --test einwurf`
+  (24), `--test public_api` (11), `--test public_api_spec_aktuell`, `--test openapi_spec_aktuell`;
+  Unit-Tests zu `einwurf`, `extract`, `config`, `log_drossel` und der Maskierung in `app`;
+  Vitest für das Paneel, die Seite „Anbindungen“, das Zugangsprotokoll, `globalKeys` und die
+  Wächter der Anwenderdoku; `tsc --noEmit`; ESLint und Prettier der geänderten Dateien;
+  Playwright `e2e/anbindungen.spec.ts` (3 Tests, Chromium); `scripts/check-migrationen.sh`;
+  `scripts/check-architektur.sh`; `openspec validate --strict`.
+- **Nicht gelaufen:** die übrigen Integrationstests des Backends und die übrigen e2e-Specs (zu
+  groß für die Sitzung). Sie laufen in der CI des PRs.

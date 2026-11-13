@@ -10,7 +10,7 @@ gilt_fuer:
   - src/extract.rs
   - src/auth/rate_limit.rs
 herleitung:
-  - openspec/changes/s1i56dpt-einwurf-zugang/design.md
+  - openspec/changes/archive/2026-11-13-s1i56dpt-einwurf-zugang/design.md
   - docs/konzepte/2026-11-11-oeffentliche-api.md
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md
 ---
