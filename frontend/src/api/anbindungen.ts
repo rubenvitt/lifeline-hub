@@ -142,7 +142,10 @@ export interface WebhookEingabe {
   lan_erlaubt: boolean;
 }
 
-/** Teiländerung; `basis_geaendert_at` ist Pflicht (CAS, 409 bei fremder Änderung). */
+/**
+ * Teiländerung; `basis_geaendert_at` ist der Stand beim Öffnen (409 bei fremder Änderung). Fehlt er
+ * („Meine Änderung übernehmen“ nach der Rückfrage), schreibt der Server ohne Vergleich.
+ */
 export interface WebhookPatch {
   url?: string;
   arten?: EventType[];

@@ -34,9 +34,11 @@ use crate::zeit;
 /// Webhooks, die gerade beliefert werden; ein Durchgang lässt sie aus.
 type Laufend = Arc<Mutex<HashSet<String>>>;
 
-/// Startet den Lauf. Er endet, sobald `stopp` auf `true` springt oder sein Sender fällt. Jeder
-/// Takt startet nur Webhooks, die nicht schon beliefert werden, und wartet nicht auf sie: Ein
-/// langsames Ziel hält die übrigen nicht auf. Ein Absturz in einer Belieferung beendet nur diese.
+/// Startet den Lauf. Jeder Takt startet nur Webhooks, die nicht schon beliefert werden, und wartet
+/// nicht auf sie: Ein langsames Ziel hält die übrigen nicht auf. Ein Absturz in einer Belieferung
+/// beendet nur diese. Springt `stopp` auf `true` (oder fällt sein Sender), beginnt keine neue
+/// Belieferung mehr, und der Lauf endet, sobald die laufenden fertig sind; `herunterfahren` in
+/// `main.rs` wartet darauf begrenzt.
 pub fn starte(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<()> {
     let zusteller = Arc::new(HttpZusteller);
     let laufend: Laufend = Arc::default();
@@ -44,6 +46,7 @@ pub fn starte(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(TAKT);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let mut laufende: Vec<JoinHandle<()>> = Vec::new();
         loop {
             tokio::select! {
                 biased;
@@ -53,12 +56,20 @@ pub fn starte(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<
                     }
                 }
                 _ = ticker.tick() => {
+                    laufende.retain(|h| !h.is_finished());
                     // Die Belieferungen laufen weiter; der Takt wartet nicht auf sie.
-                    if let Err(e) = takt(&pool, &zusteller, Utc::now(), &laufend, &plaetze).await {
-                        tracing::error!("Webhook-Durchgang fehlgeschlagen: {e}");
+                    match takt(&pool, &zusteller, Utc::now(), &laufend, &plaetze).await {
+                        Ok(neu) => laufende.extend(neu),
+                        Err(e) => tracing::error!("Webhook-Durchgang fehlgeschlagen: {e}"),
                     }
                 }
             }
+        }
+        // Wer noch auf einen Platz wartet, beginnt nicht mehr; laufende Zustellungen enden mit
+        // ihrem Ergebnis, bevor der Pool schließt.
+        plaetze.close();
+        for h in laufende {
+            let _ = h.await;
         }
         tracing::info!("Webhook-Zustellung beendet");
     })
@@ -104,10 +115,12 @@ async fn takt<Z: Zusteller>(
         }
         let (pool, identitaet, zusteller) = (pool.clone(), identitaet.clone(), zusteller.clone());
         let (laufend, plaetze) = (laufend.clone(), plaetze.clone());
+        // Die Uhr läuft ab hier, auch während der Belieferung auf einen Platz wartet.
+        let gestartet = Instant::now();
         handles.push(tokio::spawn(async move {
             let id = webhook.id;
             if let Ok(_platz) = plaetze.acquire_owned().await {
-                let lauf = beliefern(&pool, &identitaet, &*zusteller, &id, jetzt);
+                let lauf = beliefern(&pool, &identitaet, &*zusteller, &id, jetzt, gestartet);
                 match AssertUnwindSafe(lauf).catch_unwind().await {
                     Ok(Ok(())) => {}
                     Ok(Err(e)) => {
@@ -125,17 +138,17 @@ async fn takt<Z: Zusteller>(
 /// Beliefert einen Webhook der Reihe nach, bis nichts mehr fällig ist, ein Versuch scheitert oder
 /// [`MAX_JE_TAKT`] erreicht ist. Webhook und Zugang werden vor jedem Versuch neu gelesen: Ein
 /// Widerruf, ein entzogenes Recht, ein neues Ziel oder das Entfernen wirken ab dem nächsten
-/// Ereignis. `beginn` ist die Zeit des Durchgangs; jeder Versuch rechnet mit der Zeit, zu der er
-/// geschieht.
+/// Ereignis. `beginn` ist die Zeit des Durchgangs, `gestartet` der Augenblick dazu; jeder Versuch
+/// rechnet mit der Zeit, zu der er geschieht, Wartezeit auf einen Platz eingeschlossen.
 async fn beliefern<Z: Zusteller>(
     pool: &SqlitePool,
     identitaet: &Identitaet,
     zusteller: &Z,
     webhook_id: &str,
     beginn: DateTime<Utc>,
+    gestartet: Instant,
 ) -> Result<(), AppError> {
-    let start = Instant::now();
-    let jetzt = || beginn + chrono::Duration::from_std(start.elapsed()).unwrap_or_default();
+    let jetzt = || beginn + chrono::Duration::from_std(gestartet.elapsed()).unwrap_or_default();
     for _ in 0..MAX_JE_TAKT {
         let (webhook, zugang) = {
             let mut conn = pool.acquire().await?;
@@ -172,7 +185,13 @@ async fn beliefern<Z: Zusteller>(
                 let rueckt = uebersprungen_bis.is_some_and(|bis| bis > webhook.cursor);
                 if rueckt || webhook.offen_id.is_some() || webhook.fehler_seit.is_some() {
                     crate::write_retry!(pool, |conn| {
-                        repo::leer_festhalten(conn, &webhook.id, uebersprungen_bis).await?;
+                        repo::leer_festhalten(
+                            conn,
+                            &webhook.id,
+                            &webhook.geaendert_at,
+                            uebersprungen_bis,
+                        )
+                        .await?;
                         Ok(())
                     })?;
                 }

@@ -78,8 +78,8 @@ Freitext oder Inhalte der Änderung enthalten.
 ### Requirement: Nur ein wirksamer Zugang bekommt Zustellungen
 
 Das System SHALL nur zustellen, solange der Zugang aktiv und nicht abgelaufen ist und das Recht
-`events:read` trägt. Sonst MUST der Webhook ruhen, ohne seinen Cursor zu verändern, und die
-Ansicht MUST den Grund nennen.
+`events:read` trägt. Sonst MUST der Webhook ruhen: Über ein zuzustellendes Ereignis rückt sein
+Cursor dabei nicht vor, und die Ansicht MUST den Grund nennen.
 
 #### Scenario: Widerrufener Zugang
 - **WHEN** ein Admin einen Zugang widerruft, dessen Webhook noch Ereignisse zuzustellen hat

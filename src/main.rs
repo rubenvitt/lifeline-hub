@@ -630,8 +630,9 @@ async fn herunterfahren(
     if let Some(task) = backup_task {
         backup::scheduler::auf_ende_warten(task, BACKUP_ENDE_FRIST).await;
     }
-    // Eine laufende Zustellung endet spätestens nach ihrem Zeitlimit; danach wird abgebrochen.
-    // Ein abgebrochener Versuch wird beim nächsten Start wiederholt (mindestens einmal).
+    // Der Lauf beginnt keine Zustellung mehr und wartet auf die laufenden; jede endet spätestens
+    // nach ihrem Zeitlimit. Was danach noch läuft, wird abgebrochen und beim nächsten Start
+    // wiederholt (mindestens einmal).
     let mut webhook_task = webhook_task;
     if tokio::time::timeout(WEBHOOK_ENDE_FRIST, &mut webhook_task)
         .await

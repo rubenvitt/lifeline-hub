@@ -150,8 +150,9 @@ Schreibzeile je Takt und Webhook, sobald irgendwo ein Ereignis entsteht.
 ### D3: Ein Lauf, Takt 2 s, je Webhook der Reihe nach
 
 `public_api::webhook::lauf::starte(pool, identitaet, stopp) -> JoinHandle`, nach dem Muster von
-`backup::scheduler`: `tokio::select! { biased; stopp…, ticker.tick() }`, `catch_unwind` um die
-Schleife, Ende über `auf_ende_warten` in `main::herunterfahren`.
+`backup::scheduler`: `tokio::select! { biased; stopp…, ticker.tick() }`, `catch_unwind` je
+Belieferung. Beim Stopp schließt der Lauf die Plätze (keine neue Zustellung) und wartet auf die
+laufenden; `main::herunterfahren` wartet darauf höchstens 20 s.
 
 Je Takt:
 
@@ -160,8 +161,9 @@ Je Takt:
    Ziel hält die übrigen nicht auf.
 2. **Vor jedem Versuch** werden Webhook und Zugang neu gelesen: Ein Widerruf, ein entzogenes
    Recht, ein neues Ziel oder das Entfernen wirken ab dem nächsten Ereignis. Darf der Zugang nicht
-   beliefert werden (nicht `aktiv`, abgelaufen, ohne `events:read`), ruht der Webhook; der Cursor
-   bleibt, und `offen_id` wird gesetzt, wenn etwas fällig ist.
+   beliefert werden (nicht `aktiv`, abgelaufen, ohne `events:read`), ruht der Webhook: Über ein
+   zuzustellendes Ereignis rückt der Cursor nicht vor, und `offen_id` wird gesetzt. Über nicht
+   gewählte Arten und ein gelöschtes Ereignis rückt er auch dann (ADR-0039).
 3. Je Webhook höchstens 50 Ereignisse nacheinander, dann der nächste Takt.
 4. Bis zu 8 Webhooks gleichzeitig (Semaphore über alle Takte), je Webhook streng nacheinander.
 5. Während der HTTP-Anfrage hält der Lauf keine Datenbankverbindung. Das Ergebnis schreibt er

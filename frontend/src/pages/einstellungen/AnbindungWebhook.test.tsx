@@ -308,7 +308,30 @@ describe('Webhook · Befunde aus dem Review (LLH-1656)', () => {
     expect(screen.getAllByText(/Ohne Verbindung nicht änderbar/).length).toBeGreaterThan(0);
   });
 
-  it('Verlauf: beim Laden kein „Noch kein Zustellversuch“, beim Fehler die Meldung', async () => {
+  it('Verlauf: beim Laden „wird geladen“, nie „Noch kein Zustellversuch“', async () => {
+    stelleBereit(zugang({ webhook: webhook() }));
+    let antworten: () => void = () => {};
+    server.use(
+      http.get(
+        '/api/admin/anbindungen/a/webhook/versuche',
+        () =>
+          new Promise<Response>((fertig) => {
+            antworten = () => fertig(HttpResponse.json([]));
+          }),
+      ),
+    );
+    renderAnsicht();
+    expect(
+      (await screen.findByText('Verlauf wird geladen …')).closest(
+        '[data-lfh="webhook-verlauf-laedt"]',
+      ),
+    ).not.toBeNull();
+    expect(screen.queryByText('Noch kein Zustellversuch.')).not.toBeInTheDocument();
+    antworten();
+    expect(await screen.findByText('Noch kein Zustellversuch.')).toBeInTheDocument();
+  });
+
+  it('Verlauf: ein Fehler sagt, dass er nicht ladbar ist', async () => {
     stelleBereit(zugang({ webhook: webhook() }));
     server.use(
       http.get('/api/admin/anbindungen/a/webhook/versuche', () =>

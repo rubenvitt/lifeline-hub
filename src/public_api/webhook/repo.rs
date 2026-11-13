@@ -300,15 +300,19 @@ pub async fn offen_vermerken(
 pub async fn leer_festhalten(
     conn: &mut SqliteConnection,
     webhook_id: &str,
+    basis: &str,
     uebersprungen_bis: Option<i64>,
 ) -> Result<(), sqlx::Error> {
+    // Nur auf dem Stand, mit dem gelesen wurde: Hat ein Admin inzwischen eine Art dazugewählt,
+    // dürfte eine Zeile dieser Art nicht übersprungen sein; der nächste Takt rechnet neu.
     sqlx::query(
         "UPDATE maschine_webhook SET offen_id = NULL, fehler_seit = NULL, fehlversuche = 0, \
              naechster_versuch_at = NULL, cursor = MAX(cursor, COALESCE(?, cursor)) \
-         WHERE id = ?",
+         WHERE id = ? AND geaendert_at = ?",
     )
     .bind(uebersprungen_bis)
     .bind(webhook_id)
+    .bind(basis)
     .execute(&mut *conn)
     .await?;
     Ok(())

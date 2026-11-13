@@ -206,14 +206,17 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
   });
   const weiter = useMutation({
     mutationFn: () => nimmWebhookWiederAuf(zugang.id),
-    onMutate: () => testen.reset(),
+    // Einen alten Testfehler räumen, nie einen laufenden Test.
+    onMutate: () => {
+      if (!testen.isPending) testen.reset();
+    },
     onSuccess: (w) => uebernimmWebhook(qc, zugang.id, w),
   });
   const testen = useMutation({
     mutationFn: () => sendeTestereignis(zugang.id),
     onMutate: () => {
       setTest(null);
-      weiter.reset();
+      if (!weiter.isPending) weiter.reset();
     },
     onSuccess: (e) => {
       setTest({ ergebnis: e, ziel });
@@ -380,7 +383,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
                 ]}
                 zugaenglicherName={`Weitere Aktionen zum Webhook von ${zugang.name}`}
                 gesperrt={ohneNetz}
-                laeuft={testen.isPending || entfernen.isPending}
+                laeuft={testen.isPending || entfernen.isPending || weiter.isPending}
                 onWahl={aktionWaehlen}
               />
             </span>
@@ -532,7 +535,10 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
         !q.isError && (
           <PaneelZeile>
             <span style={{ color: rollen.gedaempft }} data-lfh="webhook-verlauf-laedt">
-              Verlauf wird geladen …
+              {/* Ohne Netz pausiert die Abfrage: dann nicht „lädt“ behaupten. */}
+              {q.fetchStatus === 'paused'
+                ? 'Ohne Verbindung nicht geladen.'
+                : 'Verlauf wird geladen …'}
             </span>
           </PaneelZeile>
         )
