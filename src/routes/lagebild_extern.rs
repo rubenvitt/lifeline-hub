@@ -2,8 +2,8 @@
 //! öffentliche Abruf `GET /api/extern/v1/lagebild`.
 //!
 //! Herleitung: `/mnt/project-files/llh-1496/openspec/k11guwns-lagebild-extern/design.md`. Die
-//! Zahlen und die Karte kommen aus derselben Verdichtung wie beim externen Lagemonitor
-//! ([`super::lagemonitor::verdichte`], [`super::lagemonitor_v1`]). Wie dort gilt: **keine Namen,
+//! Zahlen und die Karte kommen aus derselben Verdichtung wie bei der Lage der öffentlichen API
+//! ([`super::lagemonitor::verdichte`], `public_api::lage`). Wie dort gilt: **keine Namen,
 //! keine Personenkennungen, keine freien Notizen**; die Stufe `oeffentlich` zeigt nur
 //! Gesamtzahlen, den Einsatzort und die Absperrungen.
 //!
@@ -16,7 +16,6 @@ use crate::app::AppState;
 use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::einsatz::Einsatzart;
 use crate::error::AppError;
-use crate::etb::EtbTyp;
 use crate::extract::{JsonBody, PfadParam};
 use crate::instanz::spiegel::{Freigabestufe, SpiegelKategorie};
 use crate::lage_zone::LageZoneTyp;
@@ -29,13 +28,14 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
-use super::lagemonitor::{verdichte, LagemonitorBetroffene, LagemonitorKraefte};
-use super::lagemonitor_v1::{
-    baue_karte, karte_etag, lagemeldung, LageQuery, LagemonitorLagemeldung, LagemonitorUhsZahl,
-    KARTE_AUS,
+use super::lagemonitor::{
+    build_karte, karte_etag, lagemeldung, verdichte, LageQuery, LagemonitorBetroffene,
+    LagemonitorKraefte, LagemonitorLagemeldung, LagemonitorUhsZahl, KARTE_AUS,
+};
+use super::leitung_freigabe::{
+    etb_vermerken, fordere_freigabe_moeglich, im_tx_aktiv, SpiegelEintrag,
 };
 
 /// Version des Drahtformats (`/v1`). Neue Felder kommen nur hinzu; wer eines entfernt oder
@@ -91,77 +91,6 @@ const OEFFENTLICHE_ZONEN: &[LageZoneTyp] = &[
 // ---------------------------------------------------------------------------------------------
 // Freigaben der Einsatzleitung
 // ---------------------------------------------------------------------------------------------
-
-/// Darf die Einsatzleitung hier freigeben? Aktiver Einsatz, und diese Instanz führt ihn oder hält
-/// ihn als Spiegel (design.md D2). Wer einen Einsatz nicht führt, hält ihn als Spiegel, der
-/// ETB-Eintrag geht dann als Antrag an den Führer (LLH-1641, ADR-0033).
-fn fordere_freigabe_moeglich(ctx: &EinsatzLesezugriff) -> Result<(), AppError> {
-    ctx.fordere_einsatzleitung()?;
-    if !ctx.einsatz.ist_aktiv() {
-        return Err(AppError::Conflict(
-            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Prüfung in der Transaktion: der Status des Einsatzes (`fordere_aktiv_in_tx` beim Führer). Am
-/// Spiegel führt immer die andere Instanz, der Eintrag geht dort als Antrag.
-async fn im_tx_aktiv(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    spiegel: bool,
-) -> Result<(), AppError> {
-    if !spiegel {
-        return crate::einsatz::repo::fordere_aktiv_in_tx(conn, einsatz_id).await;
-    }
-    let status: Option<String> = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
-        .bind(einsatz_id)
-        .fetch_optional(&mut *conn)
-        .await?;
-    if status.as_deref() != Some("aktiv") {
-        return Err(AppError::Conflict(
-            "Einsatz ist abgeschlossen und schreibgeschützt".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Schreibt den ETB-Eintrag einer Freigabe (design.md D7): beim Führer als Systemeintrag, am
-/// Spiegel als Antrag an den Führer. Liefert die id eines direkt geschriebenen Eintrags.
-async fn etb_vermerken(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    spiegel: Option<SpiegelEintrag<'_>>,
-    von: i64,
-    text: &str,
-) -> Result<Option<i64>, AppError> {
-    if let Some(s) = spiegel {
-        crate::instanz::spiegel::antrag::etb_beantragen_tx(
-            conn,
-            einsatz_id,
-            von,
-            EtbTyp::Entscheidung,
-            text,
-            s.von,
-            s.an,
-        )
-        .await?;
-        return Ok(None);
-    }
-    let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
-    Ok(Some(
-        crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, text).await?,
-    ))
-}
-
-/// Von und An des Antrags am Spiegel: beim Führer ist es eine Entscheidung der Person an den
-/// Empfänger des Links.
-#[derive(Clone, Copy)]
-struct SpiegelEintrag<'a> {
-    von: &'a str,
-    an: &'a str,
-}
 
 fn stufe_wort(stufe: LagebildStufe) -> &'static str {
     match stufe {
@@ -393,6 +322,23 @@ fn uebertragen(stufe: Option<Freigabestufe>, feld: &str) -> bool {
     }
 }
 
+/// Die Freigabestufe, mit der diese Instanz den Einsatz hält. Sie gilt nur am Spiegel; geführt
+/// liegt hier alles (design.md D5). `None`: eine Stufe, die diese Fassung nicht kennt.
+pub(crate) async fn load_freigabestufe(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+) -> Result<Option<Freigabestufe>, AppError> {
+    let stufe_spiegel: Option<String> =
+        sqlx::query_scalar("SELECT freigabestufe FROM einsatz_spiegel WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(match &stufe_spiegel {
+        Some(s) => Freigabestufe::parse(s),
+        None => Some(Freigabestufe::Alles),
+    })
+}
+
 /// GET /api/extern/v1/lagebild — das Lagebild des Links. Ohne wirksamen Schlüssel 401.
 pub async fn abruf(
     State(state): State<AppState>,
@@ -410,16 +356,7 @@ pub async fn abruf(
             .fetch_one(pool)
             .await?;
     let kopf = crate::einsatz::repo::laden(pool, zugriff.einsatz_id).await?;
-    // Die Freigabestufe gilt nur am Spiegel; geführt liegt hier alles (design.md D5).
-    let stufe_spiegel: Option<String> =
-        sqlx::query_scalar("SELECT freigabestufe FROM einsatz_spiegel WHERE einsatz_id = ?")
-            .bind(kopf.id)
-            .fetch_optional(pool)
-            .await?;
-    let freigabestufe = match &stufe_spiegel {
-        Some(s) => Freigabestufe::parse(s),
-        None => Some(Freigabestufe::Alles),
-    };
+    let freigabestufe = load_freigabestufe(pool, kopf.id).await?;
     let quelle = LagebildQuelle {
         spiegel: kopf.spiegel.spiegel_ist,
         letzter_abgleich_at: kopf
@@ -458,7 +395,7 @@ pub async fn abruf(
     let zeige_karte = nimm("karte", query.karte.as_deref() != Some(KARTE_AUS));
 
     let (karte, karte_etag) = if zeige_karte {
-        let mut karte = baue_karte(pool, &kopf, &verdichtet).await?;
+        let mut karte = build_karte(pool, &kopf, &verdichtet).await?;
         if !voll {
             nur_oeffentliche_features(&mut karte);
         }

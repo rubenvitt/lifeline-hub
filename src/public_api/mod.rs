@@ -13,7 +13,8 @@
 //!   interne API hat keine Zusage).
 //!
 //! Maschinenzugang für Fremdsysteme (LLH-1652, Spec `maschinenzugang`): Repo [`zugang`], Scopes
-//! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`].
+//! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`]. Die Freigabe eines Einsatzes für
+//! einen Zugang (LLH-1638, ADR-0035) liegt in [`freigabe`].
 //!
 //! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
 //! [`einwurf`], die einzigen Routen ohne signierte Anfrage.
@@ -26,7 +27,9 @@
 pub mod drossel;
 pub mod einwurf;
 pub mod error;
+pub mod freigabe;
 pub mod kommando;
+pub mod lage;
 pub mod machine;
 pub mod rechner;
 pub mod routen;
@@ -108,6 +111,8 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
         .routes(routes!(routen::redeem).layer(DefaultBodyLimit::max(REDEEM_BODY_MAX)))
         .routes(routes!(routen::jwks))
         .routes(routes!(routen::me).layer(Extension(ScopeAnforderung::Keine)))
+        // Lage des freigegebenen Einsatzes (LLH-1638).
+        .routes(routes!(lage::lage).layer(Extension(ScopeAnforderung::Scope(Scope::LageRead))))
         // Rechner (LLH-1524, Spec `rechner-api-unterkunft`).
         .routes(
             routes!(rechner::calculate_unterkunft)

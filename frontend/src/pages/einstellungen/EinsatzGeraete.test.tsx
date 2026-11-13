@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
+import { einsatzKeys } from '../../api/queryKeys';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
 import { tippeZeit } from '../../test/zeitEingabe';
 import { waehleMenueEintrag } from '../../test/menue';
@@ -50,11 +51,12 @@ const UHS = [
 
 interface Aufbau {
   rolle?: string;
+  status?: string;
   spiegel?: unknown;
   kopplungen?: unknown[];
   sperren?: unknown[];
   ansichten?: unknown[];
-  lagemonitore?: unknown[];
+  anbindungen?: unknown[];
 }
 
 /** Die heute koppelbaren Ansichten, wie der Server sie anbietet (LFH-1040). */
@@ -69,7 +71,7 @@ function stelleBereit(a: Aufbau = {}) {
   const gelesen: string[] = [];
   server.use(
     http.get('/api/einsaetze/1', () =>
-      HttpResponse.json(einsatz(a.rolle, 'aktiv', a.spiegel ?? null)),
+      HttpResponse.json(einsatz(a.rolle, a.status ?? 'aktiv', a.spiegel ?? null)),
     ),
     http.get('/api/einsaetze/1/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
@@ -83,9 +85,7 @@ function stelleBereit(a: Aufbau = {}) {
       });
     }),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
-    http.get('/api/einsaetze/1/lagemonitor-zugaenge', () =>
-      HttpResponse.json(a.lagemonitore ?? []),
-    ),
+    http.get('/api/einsaetze/1/anbindungen', () => HttpResponse.json(a.anbindungen ?? [])),
     http.get('/api/einsaetze/1/lagebild-freigaben', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/betreuung', () =>
       HttpResponse.json({
@@ -462,11 +462,19 @@ describe('EinsatzGeraete (LFH-892)', () => {
     }
   });
 
-  it('koppelt am Spiegel nicht, die Lagemonitor-Freigabe bleibt (LLH-1492)', async () => {
+  it('koppelt am Spiegel nicht, die Freigabe für Anbindungen bleibt (LLH-1492, LLH-1638)', async () => {
     stelleBereit({
       spiegel: SPIEGEL,
-      lagemonitore: [
-        { zugang_id: 1, bezeichnung: 'FüKW 1', freigegeben: false, anderer_einsatz: false },
+      anbindungen: [
+        {
+          zugang_id: 'z-1',
+          name: 'FüKW 1',
+          scopes: ['lage:read'],
+          zustand: 'aktiv',
+          freigegeben: false,
+          anderer_einsatz: false,
+          ruht: false,
+        },
       ],
     });
     rendern();
@@ -476,64 +484,297 @@ describe('EinsatzGeraete (LFH-892)', () => {
       screen.queryByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 1' }),
     ).not.toBeInTheDocument();
     expect(
-      await screen.findByRole('switch', { name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz' }),
+      await screen.findByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
     ).toBeEnabled();
     // Ein Link auf das Lagebild gilt an dieser Instanz; das ETB geht als Antrag (LLH-1496).
     expect(await screen.findByRole('button', { name: /Link ausgeben/ })).toBeEnabled();
   });
 
-  describe('Externe Lagemonitore (LLH-1484)', () => {
-    const zugang = (zugang_id: number, extra: Record<string, unknown> = {}) => ({
-      zugang_id,
-      bezeichnung: `FüKW ${zugang_id}`,
+  describe('Anbindungen (LLH-1638)', () => {
+    const anbindung = (nr: number, extra: Record<string, unknown> = {}) => ({
+      zugang_id: `z-${nr}`,
+      name: `FüKW ${nr}`,
+      scopes: ['lage:read'],
+      zustand: 'aktiv',
       freigegeben: false,
       anderer_einsatz: false,
+      ruht: false,
       ...extra,
     });
 
-    it('bleibt ohne angelegten Zugang weg', async () => {
+    it('bleibt ohne freigebbare Anbindung weg', async () => {
       stelleBereit();
       rendern();
       await screen.findByText('UHS Nord · Tablet 1');
-      expect(screen.queryByText('Externe Lagemonitore')).not.toBeInTheDocument();
+      expect(screen.queryByText('Anbindungen')).not.toBeInTheDocument();
     });
 
-    it('nennt einen Ladefehler statt die Sektion still wegzulassen', async () => {
+    it('nennt einen Ladefehler statt die Sektion still wegzulassen, mit „Erneut abrufen“', async () => {
       stelleBereit();
+      let kaputt = true;
       server.use(
-        http.get('/api/einsaetze/1/lagemonitor-zugaenge', () =>
-          HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+        http.get('/api/einsaetze/1/anbindungen', () =>
+          kaputt
+            ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+            : HttpResponse.json([anbindung(1)]),
         ),
       );
       rendern();
-      expect(await screen.findByText('Externe Lagemonitore nicht ladbar')).toBeInTheDocument();
+      expect(await screen.findByText('Anbindungen nicht ladbar')).toBeInTheDocument();
+      kaputt = false;
+      const paneel = screen.getByRole('region', { name: 'Anbindungen' });
+      await userEvent.setup().click(within(paneel).getByRole('button', { name: 'Erneut abrufen' }));
+      expect(
+        await screen.findByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Anbindungen nicht ladbar')).not.toBeInTheDocument();
     });
 
-    it('gibt den Einsatz per Schalter frei und nennt einen anderen', async () => {
-      stelleBereit({
-        lagemonitore: [zugang(1), zugang(2, { anderer_einsatz: true })],
+    it('sperrt die Schalter am abgeschlossenen Einsatz und zeigt den Stand weiter', async () => {
+      stelleBereit({ status: 'abgeschlossen', anbindungen: [anbindung(1)] });
+      rendern();
+      const schalter = await screen.findByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
       });
-      let methode: string | null = null;
+      expect(schalter).toBeDisabled();
+      expect(screen.getByText('nicht freigegeben')).toBeInTheDocument();
+    });
+
+    it('sperrt die Schalter ohne Verbindung und nennt den Grund', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      let aufrufe = 0;
       server.use(
-        http.put('/api/einsaetze/1/lagemonitor-zugaenge/1/freigabe', ({ request }) => {
-          methode = request.method;
-          return HttpResponse.json([
-            zugang(1, { freigegeben: true }),
-            zugang(2, { anderer_einsatz: true }),
-          ]);
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+          aufrufe += 1;
+          return HttpResponse.json([anbindung(1, { freigegeben: true })]);
         }),
       );
       rendern();
-      await screen.findByText('Externe Lagemonitore');
-      expect(screen.getByText('zeigt einen anderen Einsatz')).toBeInTheDocument();
+      const schalter = await screen.findByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
+      });
+      try {
+        setzeOnline(false);
+        const grund = await screen.findByText('Ohne Verbindung nicht änderbar');
+        expect(schalter).toBeDisabled();
+        expect(schalter).toHaveAttribute('aria-describedby', grund.id);
+        await userEvent.setup().click(schalter);
+        expect(aufrufe).toBe(0);
+      } finally {
+        setzeOnline(true);
+      }
+      await waitFor(() => expect(schalter).toBeEnabled());
+      expect(screen.queryByText('Ohne Verbindung nicht änderbar')).not.toBeInTheDocument();
+    });
+
+    it('zeigt Rechte und Zustand je Anbindung', async () => {
+      stelleBereit({
+        anbindungen: [
+          anbindung(1, { zustand: 'wartet' }),
+          anbindung(2, { anderer_einsatz: true, zuletzt_genutzt_at: '2026-10-04 12:05:00' }),
+        ],
+      });
+      rendern();
+      await screen.findByText('Anbindungen');
+      const zustaende = Array.from(
+        document.querySelectorAll('[data-lfh="einsatz-anbindung-zustand"]'),
+      ).map((e) => e.textContent);
+      expect(zustaende[0]).toBe('nicht freigegeben · wartet auf Schlüssel');
+      expect(zustaende[1]).toMatch(/^liest einen anderen Einsatz · zuletzt /);
+      expect(screen.getAllByText(/Lage lesen/)).toHaveLength(2);
+    });
+
+    it('gibt den Einsatz per Schalter frei und beendet die Freigabe wieder', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      const methoden: string[] = [];
+      server.use(
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', ({ request }) => {
+          methoden.push(request.method);
+          return HttpResponse.json([anbindung(1, { freigegeben: true })]);
+        }),
+        http.delete('/api/einsaetze/1/anbindungen/z-1/freigabe', ({ request }) => {
+          methoden.push(request.method);
+          return HttpResponse.json([anbindung(1)]);
+        }),
+      );
+      rendern();
+      await screen.findByText('Anbindungen');
       const schalter = screen.getByRole('switch', {
-        name: 'Lagemonitor FüKW 1 zeigt diesen Einsatz',
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
       });
       expect(schalter).not.toBeChecked();
-      await userEvent.setup().click(schalter);
-      await waitFor(() => expect(methode).toBe('PUT'));
+      const user = userEvent.setup();
+      await user.click(schalter);
       await waitFor(() => expect(schalter).toBeChecked());
-      expect(screen.getByText('zeigt diesen Einsatz')).toBeInTheDocument();
+      expect(screen.getByText('liest diesen Einsatz')).toBeInTheDocument();
+      await user.click(schalter);
+      await waitFor(() => expect(schalter).not.toBeChecked());
+      expect(methoden).toEqual(['PUT', 'DELETE']);
+    });
+
+    it('sperrt die Schalter ohne Einsatzleitung nicht nur: die Sektion lädt dann gar nicht', async () => {
+      stelleBereit({ rolle: 'fuehrungspersonal', anbindungen: [anbindung(1)] });
+      rendern();
+      expect(await screen.findByText('Nur die Einsatzleitung koppelt Geräte')).toBeInTheDocument();
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    });
+
+    it('nennt einen Fehler beim Umschalten', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      server.use(
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () =>
+          HttpResponse.json(
+            { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
+            { status: 409 },
+          ),
+        ),
+      );
+      rendern();
+      await screen.findByText('Anbindungen');
+      await userEvent
+        .setup()
+        .click(screen.getByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }));
+      expect(await screen.findByText('Nicht umgeschaltet')).toBeInTheDocument();
+    });
+
+    it('lädt nach einem gescheiterten Umschalten neu: die überholte Zeile verschwindet', async () => {
+      stelleBereit({ anbindungen: [anbindung(1), anbindung(2)] });
+      let widerrufen = false;
+      server.use(
+        http.get('/api/einsaetze/1/anbindungen', () =>
+          HttpResponse.json(widerrufen ? [anbindung(2)] : [anbindung(1), anbindung(2)]),
+        ),
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+          // Der Admin hat die Anbindung inzwischen widerrufen.
+          widerrufen = true;
+          return HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 });
+        }),
+      );
+      rendern();
+      const schalter = await screen.findByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
+      });
+      await userEvent.setup().click(schalter);
+      // Die Zeile fehlt nach dem Neuladen: der Grund nennt sie beim Namen.
+      expect(await screen.findByText('Anbindung „FüKW 1“ nicht geändert')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('switch', { name: 'Anbindung FüKW 2 liest diesen Einsatz' }),
+      ).toBeInTheDocument();
+    });
+
+    it('nennt den Grund weiter, wenn die einzige Anbindung nach der Ablehnung fehlt, schließbar', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      let widerrufen = false;
+      server.use(
+        http.get('/api/einsaetze/1/anbindungen', () =>
+          HttpResponse.json(widerrufen ? [] : [anbindung(1)]),
+        ),
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+          widerrufen = true;
+          return HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 });
+        }),
+      );
+      rendern();
+      const schalter = await screen.findByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
+      });
+      const nutzer = userEvent.setup();
+      await nutzer.click(schalter);
+      // Die Zeile ist weg, das Paneel bleibt mit dem Grund stehen.
+      expect(await screen.findByText('Anbindung „FüKW 1“ nicht geändert')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Anbindungen')).toBeInTheDocument();
+      // Der Ort kommt nie wieder: der Grund lässt sich schließen, dann fehlt das Paneel.
+      await nutzer.click(screen.getByRole('button', { name: 'Hinweis schließen' }));
+      await waitFor(() => expect(screen.queryByText('Anbindungen')).not.toBeInTheDocument());
+    });
+
+    it('lässt einen Abruf von vor dem Umschalten die Antwort nicht überschreiben', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      let abrufe = 0;
+      let alterAbrufAntwortet: (() => void) | undefined;
+      server.use(
+        http.get('/api/einsaetze/1/anbindungen', async () => {
+          abrufe += 1;
+          // Der zweite Abruf liest vor dem Umschalten und antwortet erst danach.
+          if (abrufe === 2) {
+            await new Promise<void>((weiter) => {
+              alterAbrufAntwortet = weiter;
+            });
+          }
+          return HttpResponse.json([anbindung(1)]);
+        }),
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () =>
+          HttpResponse.json([anbindung(1, { freigegeben: true })]),
+        ),
+      );
+      const { client } = rendern();
+      const name = 'Anbindung FüKW 1 liest diesen Einsatz';
+      await screen.findByRole('switch', { name });
+      void client.refetchQueries({ queryKey: einsatzKeys.anbindungen(1) });
+      await waitFor(() => expect(abrufe).toBe(2));
+
+      await userEvent.setup().click(screen.getByRole('switch', { name }));
+      await waitFor(() => expect(screen.getByRole('switch', { name })).toBeChecked());
+      alterAbrufAntwortet!();
+      await new Promise((weiter) => setTimeout(weiter, 50));
+      expect(screen.getByRole('switch', { name })).toBeChecked();
+    });
+
+    it('zeigt am gekoppelten ELW die ruhende Freigabe und lässt sie beenden', async () => {
+      stelleBereit({ anbindungen: [anbindung(1, { freigegeben: true, ruht: true })] });
+      let beendet = false;
+      server.use(
+        http.delete('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+          beendet = true;
+          return HttpResponse.json([]);
+        }),
+      );
+      rendern();
+      expect(
+        await screen.findByText('Freigabe ruht: Instanz meldet sich bei einem Hub'),
+      ).toBeInTheDocument();
+      const schalter = screen.getByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
+      });
+      expect(schalter).toBeChecked();
+      expect(schalter).toBeEnabled();
+      await userEvent.setup().click(schalter);
+      await waitFor(() => expect(beendet).toBe(true));
+      // Neu freigeben geht hier nicht: ohne ruhende Freigabe fehlt das Paneel.
+      await waitFor(() => expect(screen.queryByText('Anbindungen')).not.toBeInTheDocument());
+    });
+
+    it('behält die Liste, wenn das Neuladen scheitert, und nennt den veralteten Stand', async () => {
+      stelleBereit({ anbindungen: [anbindung(1)] });
+      let kaputt = false;
+      server.use(
+        http.get('/api/einsaetze/1/anbindungen', () =>
+          kaputt
+            ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+            : HttpResponse.json([anbindung(1)]),
+        ),
+        http.put('/api/einsaetze/1/anbindungen/z-1/freigabe', () => {
+          kaputt = true;
+          return HttpResponse.json({ error: 'Konflikt' }, { status: 409 });
+        }),
+      );
+      rendern();
+      const schalter = await screen.findByRole('switch', {
+        name: 'Anbindung FüKW 1 liest diesen Einsatz',
+      });
+      await userEvent.setup().click(schalter);
+      expect(
+        await screen.findByText('Stand nicht aktuell: neu laden gescheitert'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('switch', { name: 'Anbindung FüKW 1 liest diesen Einsatz' }),
+      ).toBeInTheDocument();
     });
   });
 });

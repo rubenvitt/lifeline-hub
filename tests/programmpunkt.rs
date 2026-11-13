@@ -2,7 +2,7 @@
 //! /api/einsaetze/{id}/programmpunkte`, `PATCH`/`DELETE …/{pid}` und das Feld `programm` des
 //! Lagemonitors. Herleitung: `/mnt/project-files/llh-1570/design.md` (D1–D4).
 
-use axum::body::{to_bytes, Body};
+use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
 use lifeline_hub::live::{LiveEvent, LiveNachricht};
 use serde_json::{json, Value};
@@ -335,49 +335,37 @@ async fn lagemonitor_traegt_die_naechsten_drei_programmpunkte() {
     assert!(v["programm"][0]["zeitpunkt_at"].is_string());
 }
 
-/// Die externe Schnittstelle (LLH-1484) bleibt unverändert: sie trägt keine Programmpunkte.
+/// Die Lage der öffentlichen API (LLH-1638) trägt keine Programmpunkte.
 #[tokio::test]
-async fn lagemonitor_schnittstelle_traegt_kein_programm() {
-    let app = setup().await;
+async fn lage_der_oeffentlichen_api_traegt_kein_programm() {
+    use common::maschine::{angebunden, jetzt, schluessel, signiert};
+
+    let (app, pool) = common::setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     angelegt(&app, &admin, einsatz, "Feuerwerk", &ab_jetzt(90)).await;
-    let (s, v) = anfrage_json(
-        &app,
-        "POST",
-        "/api/lagemonitor-zugaenge",
-        &admin,
-        Some(&json!({"bezeichnung": "Leitstelle"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{v}");
-    let zid = v["zugang"]["id"].as_i64().unwrap();
-    let schluessel = v["schluessel"].as_str().unwrap().to_string();
-    let (s, v) = anfrage(
-        &app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/lagemonitor-zugaenge/{zid}/freigabe"),
-        &admin,
-        None,
-    )
-    .await;
-    assert!(s.is_success(), "{s} {v}");
-
-    let req = Request::builder()
-        .method("GET")
-        .uri("/api/lagemonitor/v1/lage")
-        .header(header::AUTHORIZATION, format!("Bearer {schluessel}"))
-        .body(Body::empty())
+    let ip = "198.51.100.9";
+    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), ip).await;
+    sqlx::query("INSERT INTO maschinenzugang_freigabe (zugang_id, einsatz_id) VALUES (?, ?)")
+        .bind(&cred.zugang_id)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
         .unwrap();
-    let resp = app.clone().oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    let text = String::from_utf8(
-        to_bytes(resp.into_body(), usize::MAX)
-            .await
-            .unwrap()
-            .to_vec(),
+
+    let (s, _, v) = signiert(
+        &app,
+        &cred,
+        "GET",
+        "/api/v1/lage",
+        jetzt(),
+        "jti-programm",
+        ip,
     )
-    .unwrap();
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["einsatz"]["id"], json!(einsatz));
+    let text = v.to_string();
     assert!(!text.contains("Feuerwerk"), "{text}");
     assert!(!text.contains("\"programm\""), "{text}");
 }

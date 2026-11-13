@@ -5120,6 +5120,92 @@ mod tests {
         assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
     }
 
+    /// `migrations/0342_lagemonitor_zugang_entfernen.sql` (LLH-1638) entfernt den Lesezugang per
+    /// Schlüssel `llh_lm_`: beide Tabellen fallen samt Inhalt, ohne hängenden Fremdschlüssel;
+    /// Einsatz, Benutzer und die alten Einträge der Admin-Spur bleiben. Die Nummer liest der Test
+    /// aus der Migration selbst, damit ein Umnummerieren ihn nicht bricht.
+    #[tokio::test]
+    async fn lagemonitor_tabellen_fallen_samt_inhalt() {
+        let entfernen = sqlx::migrate!("./migrations")
+            .iter()
+            .find(|m| m.description == "lagemonitor zugang entfernen")
+            .expect("Migration …_lagemonitor_zugang_entfernen.sql")
+            .version;
+        let pool = pool_bis(
+            SqliteConnectOptions::new().filename(":memory:"),
+            entfernen - 1,
+        )
+        .await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let benutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let zugang: i64 = sqlx::query_scalar(
+            "INSERT INTO lagemonitor_zugang (org_id, bezeichnung, schluessel_hash, angelegt_von) \
+             VALUES (1, 'FüKW', 'hash', ?) RETURNING id",
+        )
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO lagemonitor_freigabe (zugang_id, einsatz_id, freigegeben_von) \
+             VALUES (?, ?, ?)",
+        )
+        .bind(zugang)
+        .bind(einsatz)
+        .bind(benutzer)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel, org_id) \
+             VALUES ('lesezugang_angelegt', ?, 'l', 'FüKW', 1)",
+        )
+        .bind(benutzer)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, entfernen).await;
+
+        let tabellen: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master \
+             WHERE name IN ('lagemonitor_zugang', 'lagemonitor_freigabe', \
+                            'idx_lagemonitor_zugang_org', 'idx_lagemonitor_freigabe_einsatz')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(tabellen, 0, "Tabellen und Indizes sind weg");
+        let fk: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check()")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(fk, 0, "kein hängender Fremdschlüssel");
+        let (einsaetze, spur): (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT COUNT(*) FROM einsatz), \
+                    (SELECT COUNT(*) FROM admin_audit WHERE aktion = 'lesezugang_angelegt')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((einsaetze, spur), (1, 1), "Einsatz und Admin-Spur bleiben");
+    }
+
     const MIGRATION_0269: &str = include_str!("../migrations/0269_admin_audit_lesezugang.sql");
 
     /// 0269 (LLH-1484) baut den aktion-CHECK neu und nimmt dabei `org_id` und ihren Index aus 0191
