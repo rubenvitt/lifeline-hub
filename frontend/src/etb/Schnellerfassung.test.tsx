@@ -1876,3 +1876,74 @@ describe('Befunde aus dem Testnachzug (kwc2yszv)', () => {
     );
   });
 });
+
+describe('Review der Erfassung (kwc2yszv E4–E7)', () => {
+  it('E4: scheitert das Präferenz-Fach, steht der Startfokus trotzdem', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ rufname: { ...rufnameZugriff(null), geladen: false, entschieden: true } })}
+      />,
+    );
+    // Von ist gesetzt, ohne Standard fehlt An: dorthin.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'An' })).toHaveFocus());
+  });
+
+  it('E5: der Pflichtgrund geht, sobald die Seite über die Vorgabe gefüllt ist', async () => {
+    const p = props({ initialWerte: { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Absender fehlt')).toBeVisible();
+    await userEvent.click(screen.getByRole('radio', { name: 'Anordnung' }));
+    expect(screen.queryByText('Absender fehlt')).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Von' })).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('E7: ein per Klick übernommener Freitext bleibt nach Escape stehen', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+    );
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } })}
+      />,
+    );
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(von, 'Flo');
+    await userEvent.click(await screen.findByTitle('„Flo“ als Freitext übernehmen'));
+    await userEvent.keyboard('{Escape}');
+    expect(feldWert('Von')).toBe('Flo');
+  });
+});
+
+describe('Review der Erfassung — Zukunft vor dem Senden (kwc2yszv E6)', () => {
+  mitProzessZone('Europe/Berlin');
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  it('eine Zeit in der Zukunft steht schon vor dem Senden am Feld Zeit', () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({
+          initialWerte: {
+            inhalt: 'Pumpe',
+            typ: 'meldung',
+            // 14:35 Berlin, es ist 14:31.
+            metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-17T12:35:00Z') },
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Zeit liegt in der Zukunft')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Zeit' })).toHaveAttribute('aria-invalid', 'true');
+  });
+});

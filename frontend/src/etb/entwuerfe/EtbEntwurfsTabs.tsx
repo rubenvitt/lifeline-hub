@@ -238,7 +238,10 @@ export default function EtbEntwurfsTabs({
             // Schnellerfassung neu, und `initialWerte` wird nur beim Mount gelesen.
             // Bei ausgeschaltetem Schalter wird geleert statt nur nicht angewandt —
             // sonst tauchten alte Werte beim Wiedereinschalten wieder auf.
-            const naechsteMetadaten = werteBehalten ? nurUebernahme(eintrag) : {};
+            // Nur Ausdrückliches aus dem Entwurf, nie die Vorgabe des Typs aus dem gesendeten
+            // Eintrag: sonst stünde sie im Folgeentwurf fest (Regel „Standard lebt nie im
+            // Entwurf“, Review E2).
+            const naechsteMetadaten = werteBehalten ? nurUebernahme(zuWerte(e).metadaten) : {};
             setUebernahme(naechsteMetadaten);
             // Die Dateien sind jetzt am Eintrag — sie gehen mit dem Entwurf.
             dateienVerwerfen(e.id);

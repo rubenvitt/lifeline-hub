@@ -232,6 +232,8 @@ function ParteiFeld({
         // Nur Enter springt in den Inhalt; Tab gibt der Browser an das nächste Feld weiter
         // (Spec `stammdaten-feld`, „Tab nach dem Tippen“).
         onUebernahme={(u) => {
+          // Der Freitext-Eintrag per Klick ruft weder `onWahl` noch `onEnter` (Review E7).
+          if (!u.vorschlag) uebernimm(u.text);
           if (u.weg === 'enter') onFertig();
         }}
         onEscape={() => setText(null)}

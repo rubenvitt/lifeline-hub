@@ -18,6 +18,11 @@ export interface StandardRufnameZugriff {
    * die nach der Antwort wieder verschwindet, wäre ein Sprung unter dem Cursor.
    */
   geladen: boolean;
+  /**
+   * Ob die Abfrage des Fachs entschieden ist: gelesen, gescheitert oder ohne Sitzung gar nicht
+   * gestellt. Darauf wartet der Startfokus der Erfassung (Review E4); fehlt es, gilt `geladen`.
+   */
+  entschieden?: boolean;
   /** Schreibt den Wert aus `standardRufnameWert`; lehnt bei einem Fehlschlag ab. */
   setze: (wert: string) => Promise<void>;
 }
@@ -41,7 +46,7 @@ export function useStandardRufname(): StandardRufnameZugriff {
   const client = useQueryClient();
   const key = useMemo(() => globalKeys.benutzerEinstellungenVon(benutzerId), [benutzerId]);
 
-  const { data, isSuccess } = useQuery({
+  const { data, isSuccess, isError, fetchStatus } = useQuery({
     queryKey: key,
     queryFn: ladeBenutzerEinstellungen,
     enabled: benutzerId != null,
@@ -63,5 +68,9 @@ export function useStandardRufname(): StandardRufnameZugriff {
     [client, key],
   );
 
-  return useMemo(() => ({ standard, geladen: isSuccess, setze }), [standard, isSuccess, setze]);
+  const entschieden = isSuccess || isError || benutzerId == null || fetchStatus === 'paused';
+  return useMemo(
+    () => ({ standard, geladen: isSuccess, entschieden, setze }),
+    [standard, isSuccess, entschieden, setze],
+  );
 }

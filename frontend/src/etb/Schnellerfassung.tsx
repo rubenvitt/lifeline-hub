@@ -369,6 +369,10 @@ export default function Schnellerfassung({
   const [rufnameAendern, setRufnameAendern] = useState(false);
   /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
   const [pflicht, setPflicht] = useState<('von' | 'an')[]>([]);
+  // Ein Pflichtgrund steht nur, solange die Seite wirklich fehlt: eine Vorgabe nach Typwechsel oder
+  // ein `@` füllen sie ohne `setzeFeld` (Review E5).
+  const fehltJetzt = fehlendeSeiten(wirksam);
+  const pflichtSichtbar = pflicht.filter((seite) => fehltJetzt.includes(seite));
   /** Kennungen der Gründe in der Fußzeile; die Felder verweisen per `aria-describedby` darauf. */
   const pflichtGrundId = useId();
   const zeitGrundId = useId();
@@ -452,12 +456,13 @@ export default function Schnellerfassung({
   const breiteBekannt = Object.keys(screens).length > 0;
   const startFokusErledigt = useRef(false);
   useEffect(() => {
-    if (!breiteBekannt || !rufname.geladen || startFokusErledigt.current) return;
+    const fachEntschieden = rufname.entschieden ?? rufname.geladen;
+    if (!breiteBekannt || !fachEntschieden || startFokusErledigt.current) return;
     startFokusErledigt.current = true;
     if (startFokus && !istEingabefeld(document.activeElement)) fokusStart(true);
     // `fokusStart` liest den Stand dieses Renders; er ist hier gewollt nur einmal gefragt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breiteBekannt, startFokus, rufname.geladen]);
+  }, [breiteBekannt, startFokus, rufname.geladen, rufname.entschieden]);
 
   /** Nach einem Erfolg ohne Remount (Berichtigung, Einzelaufrufer): Fokus nach derselben Regel. */
   const [fokusNachErfassen, setFokusNachErfassen] = useState(0);
@@ -854,7 +859,10 @@ export default function Schnellerfassung({
    */
   useMinutenTakt();
   const jetzt = serverJetzt();
-  const nachtragMin = zukunftsGrund ? null : nachtragMinuten(metadaten.ereigniszeit, jetzt);
+  // Eine Zeit in der Zukunft zeigt ihren Grund schon vor dem Senden (Review E6); `zukunftsGrund`
+  // bleibt der Stand des letzten Sendeversuchs.
+  const zukunftJetzt = zukunftsGrund ?? zukunftsVerstoss(metadaten, jetzt);
+  const nachtragMin = zukunftJetzt ? null : nachtragMinuten(metadaten.ereigniszeit, jetzt);
   // Heute nur die Uhrzeit, sonst mit Tag, in der Darstellung der Person (`anzeige/zeitDarstellung.ts`).
   const zeitAmKnopf =
     nachtragMin != null ? zeitKurz(metadaten.ereigniszeit, konventionen, jetzt) : null;
@@ -927,7 +935,7 @@ export default function Schnellerfassung({
   });
   const gruende = (
     <>
-      {pflicht.map((seite) => (
+      {pflichtSichtbar.map((seite) => (
         <span
           key={seite}
           id={`${pflichtGrundId}-${seite}`}
@@ -939,7 +947,7 @@ export default function Schnellerfassung({
           <span>{FEHLT[seite]}</span>
         </span>
       ))}
-      {zukunftsGrund && (
+      {zukunftJetzt && (
         <span
           id={zeitGrundId}
           role="alert"
@@ -947,10 +955,10 @@ export default function Schnellerfassung({
           style={grundStil(rollen.alarmText)}
         >
           <IconWarndreieck />
-          <span>Zeit {zukunftsGrund}</span>
+          <span>Zeit {zukunftJetzt}</span>
         </span>
       )}
-      {zeitBefehlGrund && !zukunftsGrund && (
+      {zeitBefehlGrund && !zukunftJetzt && (
         // Höflich, nicht `alert`: der Grund erscheint beim Tippen, nicht beim Absenden, und
         // unterbräche sonst die Eingabe am Vorleser.
         <span
@@ -1166,9 +1174,9 @@ export default function Schnellerfassung({
             quellen={vonAnQuellen}
             onFeld={setzeFeld}
             onFertig={fokusInsFeld}
-            pflicht={pflicht}
+            pflicht={pflichtSichtbar}
             pflichtId={(seite) => `${pflichtGrundId}-${seite}`}
-            zeitGrund={zukunftsGrund ?? zeitBefehlGrund}
+            zeitGrund={zukunftJetzt ?? zeitBefehlGrund}
             zeitGrundId={zeitGrundId}
             nachtrag={nachtragMin != null}
             veranlassungOffen={veranlassungOffen}

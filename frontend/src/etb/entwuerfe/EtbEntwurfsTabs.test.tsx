@@ -928,3 +928,22 @@ describe('Entwurfstab schließen — Trefffläche (LFH-724)', () => {
     }
   });
 });
+
+describe('Werte behalten übernimmt nur Ausdrückliches (kwc2yszv, Review E2)', () => {
+  it('nach einer Lage aus der Vorgabe trägt eine folgende Meldung kein Von', async () => {
+    const p = props();
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.click(screen.getByRole('radio', { name: 'Lage' }));
+    expect(feldWert('Von')).toBe('ELW 1');
+    await userEvent.click(feld);
+    await userEvent.paste('Lage ruhig');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    // Der Folgeentwurf ist wieder eine Lage (Werte behalten); als Meldung gilt die Vorgabe neu.
+    await userEvent.click(screen.getByRole('radio', { name: 'Meldung' }));
+    expect(feldWert('Von')).toBe('');
+    expect(feldWert('An')).toBe('ELW 1');
+  });
+});
