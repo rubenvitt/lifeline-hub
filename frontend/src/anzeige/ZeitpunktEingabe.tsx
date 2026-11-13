@@ -111,6 +111,11 @@ function useKalenderLage(): {
   };
 }
 
+/** Liegt der Zeitpunkt am heutigen Tag der Anzeigezone (nach der Serveruhr)? */
+function istHeute(zeitpunkt: Dayjs, zone: string | null): boolean {
+  return zuWanduhr(zeitpunkt, zone).isSame(zuWanduhr(serverJetzt(), zone), 'day');
+}
+
 /** Gleicher Zeitpunkt (am Instant) oder beide leer. */
 function gleich(a: Dayjs | null | undefined, b: Dayjs | null | undefined): boolean {
   if (!a || !b) return !a && !b;
@@ -136,6 +141,18 @@ export interface ZeitpunktEingabeProps {
   schnellwahl?: boolean;
   /** Nur ein Kalendertag, keine Uhrzeit (Anzeige `TT.MM.JJJJ`). */
   nurTag?: boolean;
+  /**
+   * Am heutigen Tag der Anzeigezone nur die Uhrzeit zeigen („1912“), sonst die DTG (ETB-Feldzeile,
+   * Change `kwc2yszv-etb-neuentwurf`): das Feld ist dort schmal, und ein Eintrag ist fast immer von
+   * heute. Getippt wird unverändert.
+   */
+  kurzAnzeige?: boolean;
+  /**
+   * Der Kalenderknopf liegt nicht in der Tab-Folge (ETB-Feldzeile: Tab läuft Zeit → Von → An →
+   * Meldeweg, Spec `etb-schnellerfassung-tastatur`). Mit Maus und Finger bleibt er erreichbar; die
+   * Tastatur tippt die Zeit.
+   */
+  kalenderOhneTabstopp?: boolean;
   /** Eine bloße Uhrzeit liegt am Tag dieses Zeitpunkts und danach (Ende eines Zeitraums). */
   bezug?: Dayjs | null;
   /** `false`: Leeren ist keine gültige Eingabe. */
@@ -172,6 +189,8 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     keineZukunftstage,
     schnellwahl,
     nurTag,
+    kurzAnzeige,
+    kalenderOhneTabstopp,
     bezug,
     allowClear,
     disabled,
@@ -230,7 +249,13 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     if (!istBeruehrung) feldRef.current?.focus({ preventScroll: true });
   }
 
-  const anzeige = wert ? (nurTag ? formatTag(wert, z.zone) : formatDtg(wert, z.zone)) : '';
+  const anzeige = wert
+    ? nurTag
+      ? formatTag(wert, z.zone)
+      : kurzAnzeige && istHeute(wert, z.zone)
+        ? zuWanduhr(wert, z.zone).format('HHmm')
+        : formatDtg(wert, z.zone)
+    : '';
   const deutung: Deutung | null =
     text === null || text === anzeige
       ? null
@@ -400,6 +425,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
           }`}
           aria-haspopup="dialog"
           aria-expanded={offen}
+          tabIndex={kalenderOhneTabstopp ? -1 : undefined}
           disabled={disabled}
           icon={<IconKalender />}
         />

@@ -43,6 +43,10 @@ function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}
     bausteine: [] as EtbBaustein[],
     einsatz,
     rufname: rufnameZugriff(),
+    // Eine Meldung braucht ein Von; An trägt die eigene Stelle (Change `kwc2yszv-etb-neuentwurf`).
+    initialWerte: over.berichtigungZu
+      ? undefined
+      : { inhalt: '', typ: 'meldung' as const, metadaten: { von: 'Florian 3' } },
     ...over,
   };
 }
@@ -433,7 +437,7 @@ describe('Schnellerfassung – Absenden mit Anhängen (LFH-117)', () => {
     await waitFor(() =>
       expect(screen.queryByRole('list', { name: 'Gewählte Anhänge' })).toBeNull(),
     );
-    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveValue('ELW 1');
   });
 
   it('bietet „Anhang" auch im Berichtigungsmodus an', async () => {
@@ -559,10 +563,6 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
     }
     expect(offen).toEqual([]);
 
-    // Auch der Maus-Schnellweg am Chip-Text öffnet keinen Editor.
-    await userEvent.click(screen.getByText('An: Florian 1'));
-    expect(screen.queryByRole('combobox', { name: 'An' })).toBeNull();
-    expect(screen.queryByRole('textbox', { name: 'An' })).toBeNull();
 
     await act(async () => freigeben(anzeige(1, 'a.jpg')));
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
@@ -571,8 +571,8 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
       an: 'Florian 1',
       von: 'Kater 2',
     });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Feld' })).toBeEnabled());
-    expect(screen.getByRole('button', { name: /Eintragstyp/ })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toBeEnabled());
+    expect(screen.getByRole('radio', { name: 'Lage' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('lädt nichts hoch, wenn die Liste über der Grenze liegt', async () => {
@@ -596,6 +596,9 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
 
   it('hält ohne Aufrufer-id eine eigene client_id bis zum Erfolg und nimmt danach eine neue', async () => {
     const p = props({
+      // Mit „Werte behalten“ trägt auch der zweite Eintrag sein Von.
+      werteBehalten: true,
+      onWerteBehaltenChange: vi.fn(),
       erfassen: vi
         .fn<(e: NeuerEintrag) => Promise<void>>()
         .mockRejectedValueOnce(new Error('abgelehnt'))
@@ -734,28 +737,26 @@ describe('Schnellerfassung – Sendezustand (LFH-117, Review)', () => {
 
   // LFH-748 (D4): ein beim Absenden offener Chip-Editor war nicht gesperrt — man tippte, und die
   // Übernahme stieg nur still aus.
-  it('sperrt einen beim Absenden offenen Feld-Editor; nach einem Fehler geht es mit seinem Wert weiter', async () => {
+  it('sperrt die Felder beim Absenden; nach einem Fehler geht es mit ihrem Wert weiter', async () => {
     let scheitern: (grund: Error) => void = () => {};
     hochladen.mockImplementationOnce(() => new Promise((_, r) => (scheitern = r)));
     const p = props();
     const { container } = renderMitProviders(<Schnellerfassung {...p} />);
     await waehle(container, datei('a.jpg'));
     await userEvent.type(feld(), 'Foto');
-    await userEvent.click(screen.getByRole('button', { name: /Feld/ }));
-    // Den Standard-Rufnamen trägt Von schon (Haken im Menü, Wert im Editor).
-    await userEvent.click(await screen.findByText('Von ✓'));
-    const von = await screen.findByLabelText('Von');
+    // Getippt, nicht übernommen: der Klick auf „Erfassen“ verlässt das Feld, und der Wert gilt.
+    const von = screen.getByRole('combobox', { name: 'Von' });
     await userEvent.clear(von);
     await userEvent.type(von, 'Florian');
 
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await screen.findByText('Lädt hoch (1/1) …');
-    expect(screen.getByLabelText('Von')).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toBeDisabled();
 
     await act(async () => scheitern(new Error('Netz weg')));
     await screen.findByText(/a\.jpg konnte nicht hochgeladen werden/);
-    expect(screen.getByLabelText('Von')).toBeEnabled();
-    expect(screen.getByLabelText('Von')).toHaveValue('Florian');
+    expect(screen.getByRole('combobox', { name: 'Von' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveValue('Florian');
     expect(p.erfassen).not.toHaveBeenCalled();
   });
 });

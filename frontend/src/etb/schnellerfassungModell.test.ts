@@ -3,6 +3,10 @@ import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import type { EtbBaustein } from '../api/types';
 import {
+  fehlendeSeiten,
+  hatFormatierung,
+  nachtragHinweis,
+  nachtragMinuten,
   erkenneZeitBefehl,
   zukunftsVerstoss,
   amZeilenanfang,
@@ -294,5 +298,38 @@ describe('zukunftsVerstoss (LLH-1088)', () => {
     expect(zukunftsVerstoss({ ereigniszeit: jetzt.add(4, 'hour') }, jetzt)).toBe(
       'liegt in der Zukunft',
     );
+  });
+});
+
+describe('Feldzeile (kwc2yszv)', () => {
+  it('hatFormatierung erkennt Auszeichnung, Liste und Verweis, nicht reinen Text', () => {
+    expect(hatFormatierung('Pumpe läuft')).toBe(false);
+    expect(hatFormatierung('Lage 1/2 ruhig - Abschnitt Nord')).toBe(false);
+    expect(hatFormatierung('**Achtung** Gas')).toBe(true);
+    expect(hatFormatierung('- Pumpe 1\n- Pumpe 2')).toBe(true);
+    expect(hatFormatierung('1. erstens')).toBe(true);
+    expect(hatFormatierung('siehe [Plan](https://x.de)')).toBe(true);
+    expect(hatFormatierung('# Lage')).toBe(true);
+    expect(hatFormatierung('`Code`')).toBe(true);
+  });
+
+  it('nachtragMinuten: ab einer Minute vor jetzt, sonst null', () => {
+    const jetzt = dayjs.utc('2026-11-13T18:26:00Z');
+    expect(nachtragMinuten(undefined, jetzt)).toBeNull();
+    expect(nachtragMinuten(dayjs.utc('2026-11-13T18:25:30Z'), jetzt)).toBeNull();
+    expect(nachtragMinuten(dayjs.utc('2026-11-13T18:12:00Z'), jetzt)).toBe(14);
+    expect(nachtragMinuten(dayjs.utc('2026-11-13T18:30:00Z'), jetzt)).toBeNull();
+  });
+
+  it('nachtragHinweis nennt Minuten, ab einer Stunde Stunden und Minuten', () => {
+    expect(nachtragHinweis(14)).toBe('Nachtrag · Ereignis vor 14 min');
+    expect(nachtragHinweis(75)).toBe('Nachtrag · Ereignis vor 1 h 15 min');
+    expect(nachtragHinweis(120)).toBe('Nachtrag · Ereignis vor 2 h');
+  });
+
+  it('fehlendeSeiten nennt beide fehlenden Seiten in Feldfolge', () => {
+    expect(fehlendeSeiten({})).toEqual(['von', 'an']);
+    expect(fehlendeSeiten({ von: 'ELW 1' })).toEqual(['an']);
+    expect(fehlendeSeiten({ von: 'ELW 1', an: 'S2' })).toEqual([]);
   });
 });

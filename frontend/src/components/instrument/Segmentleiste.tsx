@@ -59,6 +59,11 @@ export interface SegmentOption<W extends string | number> {
   name?: string;
   /** Aufgelöste Farbe für den 6-px-Punkt (z. B. `etbTypFarbe(typ, token).kante`). */
   punkt?: string;
+  /**
+   * Aufgelöste Farbe einer 2-px-Kante unten am GEWÄHLTEN Segment (ETB-Typ, Change
+   * `kwc2yszv-etb-neuentwurf`): Zusatzkanal neben Wort, Punkt und gewählter Fläche.
+   */
+  kante?: string;
   /** Nur `tablist`: Id der Fläche, die dieses Segment zeigt. */
   steuert?: string;
   /**
@@ -217,11 +222,11 @@ export default function Segmentleiste<W extends string | number>({
               if (!gesperrt) onWechsel(o.wert);
             }}
             onKeyDown={(e) => taste(e, i)}
-            style={
-              hasFullWidth
-                ? { ...segmentStil(token), flexGrow: 1, minWidth: 0 }
-                : segmentStil(token)
-            }
+            style={{
+              ...segmentStil(token),
+              ...(hasFullWidth ? { flexGrow: 1, minWidth: 0 } : {}),
+              ...(aktiv && o.kante != null ? { boxShadow: `inset 0 -2px 0 ${o.kante}` } : {}),
+            }}
           >
             {o.punkt != null && (
               <span

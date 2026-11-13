@@ -1,8 +1,6 @@
-import { IconAuge, IconBueroklammer, IconKreuz, IconPlus, IconWarndreieck } from '../icons';
-import { Alert, Button, Checkbox, Dropdown, Space, Typography, type GlobalToken } from 'antd';
-import dayjs from 'dayjs';
+import { IconAuge, IconBueroklammer, IconKreuz, IconWarndreieck } from '../icons';
+import { Alert, Button, Checkbox, Typography, type InputRef, type RefSelectProps } from 'antd';
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
@@ -10,25 +8,18 @@ import { ApiError, AusgangUnbekannt, fehlerText, type UploadFortschritt } from '
 import { ETB_ANHAENGE_MAX, ladeEtbAnhangHoch, type NeuerEintrag } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import { useOnline } from '../offline/useOnline';
-import type {
-  EinsatzAnzeige,
-  EtbBaustein,
-  EtbEintragAnzeige,
-  EtbTyp,
-  MeldeWeg,
-} from '../api/types';
-import { ERFASSBARE_TYPEN } from './typFarben';
+import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp } from '../api/types';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
-import { Zeichenzaehler, zaehlZeichen, zaehlerText } from '../components/zeichenGrenze';
+import { Zeichenzaehler } from '../components/zeichenGrenze';
 import Tastenkuerzel from '../components/Tastenkuerzel';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
 import { weiter } from '../components/useUploadFortschritt';
 import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import MetaChip from './MetaChip';
+import EtbFeldzeile, { FEHLT, TypKnopf, type ParteiRef } from './EtbFeldzeile';
 import { useFunkrufnamen } from './funkrufnamen';
 import { anVorbelegung } from '../fuehrung/funktionsOptionenKern';
 import {
@@ -39,7 +30,7 @@ import {
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import RufnameAbfrage from './RufnameAbfrage';
-import { ausStandard, fehlendeSeite, wirksameMetadaten } from './standardRufname';
+import { auchInMeldungseingang, ausStandard, wirksameMetadaten } from './standardRufname';
 import type { StandardRufnameZugriff } from './useStandardRufname';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
@@ -49,8 +40,12 @@ import {
   erkenneAtTrigger,
   erkenneSlashTrigger,
   erkenneTypBefehl,
+  fehlendeSeiten,
   filterAtEintraege,
+  hatFormatierung,
   METADATEN_FELDER,
+  nachtragHinweis,
+  nachtragMinuten,
   type MetadatenWerte,
   type MetaFeld,
   type SlashEintrag,
@@ -63,6 +58,9 @@ import { berichtigungTitel } from './zeitachseModell';
 import { neueClientId } from '../offline/clientId';
 import { serverJetzt } from '../offline/serveruhr';
 import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { formatDtg } from '../anzeige/format';
+import { zuWanduhr } from '../anzeige/zeitEingabe';
+import { useMinutenTakt } from '../components/useMinutenTakt';
 import { lageberichtePfad } from '../routing/deeplinks';
 import { istSpiegel } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -116,9 +114,10 @@ interface Props {
   versand?: Versand;
   onVersandChange?: (aenderung: Partial<Versand>) => void;
   /**
-   * Eingeklappt (Handschirm, LFH-955 D4): nur Präfix, Feld, „Vorschau“ und „Erfassen“. Hinweis-,
-   * Feld- und Rufnamenzeile entfallen. Ob, entscheiden `EtbPage` (Fokus) und `EtbEntwurfsTabs`
-   * (leerer Entwurf); die Zeilen hängen hinter dem Feld, es behält dabei seinen Platz im Baum.
+   * Eingeklappt (Handschirm, LFH-955 D4; Change `kwc2yszv-etb-neuentwurf`, Aufgabe 4.1): eine Zeile
+   * aus Typ-Knopf und Inhalt. Feldzeile, Fußzeile mit „Erfassen“ und Rufnamenzeile entfallen. Ob,
+   * entscheiden `EtbPage` (Fokus) und `EtbEntwurfsTabs` (leerer Entwurf); das Feld behält dabei
+   * seinen Platz im Baum.
    */
   eingeklappt?: boolean;
   /**
@@ -127,13 +126,10 @@ interface Props {
    */
   startFokus?: boolean;
   /**
-   * Platz für die Einstellungen „Nur protokollieren“ und „Werte behalten“ ab `md` (LLH-1037
-   * D12): `EtbEntwurfsTabs` reicht ihn im Reiterband, dort stehen sie ohne eigene Zeile. Fehlt
-   * die Angabe, stehen sie rechts in der Chip-Zeile (Berichtigung, Einzelaufrufer); `null` heißt,
-   * der Platz kommt noch (Callback-Ref) — bis dahin stehen sie nirgends statt kurz in der
-   * Chip-Zeile. Unter `md` gilt immer die Hinweiszeile.
+   * „+ weiterer Entwurf“ in der Fußzeile (Spec „Entwurfsreiter und Vorschau nur bei Bedarf“):
+   * `EtbEntwurfsTabs` legt damit einen Entwurf an. Fehlt er (Berichtigung), fehlt der Knopf.
    */
-  einstellungenZiel?: HTMLElement | null;
+  onWeitererEntwurf?: () => void;
 }
 
 /** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
@@ -211,26 +207,9 @@ function uploadFehlerHinweis(datei: File, e: unknown): string {
   return `${datei.name} konnte nicht hochgeladen werden: ${fehlerGrund(e)}. Der Eintrag ist nicht erfasst.`;
 }
 
-/** Ein Farbpunkt je Typ wie in der Segmentleiste (LLH-1112): Zusatzkanal, das Wort trägt. */
-function typMenue(token: GlobalToken) {
-  return ERFASSBARE_TYPEN.map((t) => ({
-    key: t,
-    label: (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
-        <span
-          aria-hidden="true"
-          data-lfh="typ-punkt"
-          style={{ width: 6, height: 6, flex: '0 0 6px', background: etbTypFarbe(t, token).kante }}
-        />
-        {etbTyp[t].label}
-      </span>
-    ),
-  }));
-}
-
 /**
  * Platzhalter: nur, WAS in das Feld gehört (LFH-1078, `frontend/AGENTS.md`, „Texte: zeigen statt
- * erklären“). Typ und Felder zeigen der Präfix-Knopf und „Feld“, die Sendetaste die Kappe an
+ * erklären“). Typ und Felder zeigen die Feldzeile, die Sendetaste die Kappe an
  * „Erfassen“; ein Tastenweg im Platzhalter wäre ein Erklärsatz. Eine Form für jede Breite: kurz
  * genug, dass das mitwachsende Feld bei 390 px nicht umbricht (LFH-373).
  */
@@ -260,32 +239,25 @@ export function nurUebernahme(
 }
 
 /**
- * Rollt eine waagerecht rollende Zeile so, dass `ziel` darin ganz sichtbar ist — NUR
- * waagerecht, nie das Dokument. Die Chip-Eingabe fokussiert mit `preventScroll`; in der
- * einzeiligen Chip-Zeile unter `md` stünde ein neuer Chip sonst hinter dem rechten Rand.
- * `scrollIntoView` rollte auch die Seite.
- */
-export function rolleWaagerechtInsBild(zeile: HTMLElement, ziel: Element): void {
-  const z = zeile.getBoundingClientRect();
-  const r = ziel.getBoundingClientRect();
-  if (r.right > z.right) zeile.scrollLeft += r.right - z.right;
-  else if (r.left < z.left) zeile.scrollLeft -= z.left - r.left;
-}
-
-/**
- * Die Chip-Zeile unter der Eingabe (gesetzte Felder, „Feld", „Werte behalten").
+ * Die Fußzeile unter dem Inhalt (Spec „Einstellungen in der Fußzeile der Erfassung“): links
+ * „Auch in den Meldungseingang“ und „Werte behalten“ samt Hinweisen, rechts die Textknöpfe.
  *
- * Unter `md` EINZEILIG mit waagerechtem Bildlauf: sonst kostete jeder gesetzte Chip im
- * Handschuh-Betrieb eine eigene Reihe, und die angepinnte Leiste wüchse mit der Zahl der
- * Felder (LFH-373). Rein und exportiert, prüfbar ohne Layout.
+ * Unter `md` EINZEILIG mit waagerechtem Bildlauf: sonst kostete jeder Knopf im Handschuh-Betrieb
+ * eine eigene Reihe, und die angepinnte Leiste wüchse (LFH-373). Rein und exportiert, prüfbar
+ * ohne Layout.
  */
-export function chipZeileStil(schmal: boolean, token: { marginXS: number }): CSSProperties {
+export function fusszeileStil(
+  schmal: boolean,
+  token: { marginXS: number; marginSM: number },
+): CSSProperties {
   return {
     display: 'flex',
     flexWrap: schmal ? 'nowrap' : 'wrap',
     alignItems: 'center',
-    gap: token.marginXS,
+    columnGap: token.marginSM,
+    rowGap: token.marginXS,
     marginTop: token.marginXS,
+    fontSize: 12,
     ...(schmal ? { overflowX: 'auto', minWidth: 0 } : {}),
   };
 }
@@ -309,7 +281,7 @@ export default function Schnellerfassung({
   onVersandChange,
   eingeklappt = false,
   startFokus = true,
-  einstellungenZiel,
+  onWeitererEntwurf,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -318,8 +290,7 @@ export default function Schnellerfassung({
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
   // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
   const { istSchmal, istBeruehrung, screens, abBreite } = useViewport();
-  const [vorschauOffen, setVorschauOffen] = useState(false);
-  const chipZeileRef = useRef<HTMLDivElement>(null);
+  const [vorschauGewaehlt, setVorschauGewaehlt] = useState(false);
   const textRef = useRef<TextAreaRef>(null);
   const dateiEingabe = useRef<HTMLInputElement>(null);
   const [eigeneDateien, setEigeneDateien] = useState<File[]>([]);
@@ -350,29 +321,55 @@ export default function Schnellerfassung({
   /** Eigener Schlüssel ohne Aufrufer-id: stabil über Fehlversuche, neu nach jedem Erfolg. */
   const eigeneClientId = useRef<string>(neueClientId());
   const menuRef = useRef<SlashMenuHandle>(null);
-  const feldKnopfRef = useRef<HTMLButtonElement>(null);
+  // Die Felder der Feldzeile, für Fokus (erstes leeres Pflichtfeld, Grund am Feld) und `/`-Menü.
+  const zeitRef = useRef<InputRef>(null);
+  const vonRef = useRef<ParteiRef>(null);
+  const anRef = useRef<ParteiRef>(null);
+  const meldewegRef = useRef<RefSelectProps>(null);
+  const veranlassungRef = useRef<InputRef>(null);
+  /** „+ Veranlassung“ hat das Feld in die Zeile geholt (auch ohne Wert, bis es leer verlassen wird). */
+  const [veranlassungOffen, setVeranlassungOffen] = useState(false);
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
   /**
-   * „Nur protokollieren“ (LLH-1037, Spec `etb-schnellerfassung-tastatur`): aus heißt, ein Eintrag
-   * vom Typ Meldung oder Lage legt den Vorgang im Meldungseingang an. Lebt im Entwurf und springt
-   * nach jedem Erfassen auf aus zurück, auch mit „Werte behalten“ (LLH-1027 D2).
+   * Handwahl des Schalters „Auch in den Meldungseingang“ (LLH-1037; Change
+   * `kwc2yszv-etb-neuentwurf`, design.md D4), gespeichert als `nur_protokollieren`: `true` = von
+   * Hand aus, `false` = von Hand an, `undefined` = Vorgabe (`auchInMeldungseingang`). Lebt im
+   * Entwurf und springt nach jedem Erfassen auf die Vorgabe zurück, auch mit „Werte behalten“.
    */
-  const [nurProtokollieren, setNurProtokollieren] = useState(
-    initialWerte?.nurProtokollieren ?? false,
+  const [nurProtokollieren, setNurProtokollieren] = useState<boolean | undefined>(
+    initialWerte?.nurProtokollieren,
   );
   // `metadaten` hält NUR, was die Person ausdrücklich gesetzt hat. Von/An aus dem
   // Standard-Rufnamen kommen erst über `wirksam` hinzu (LFH-894, design.md D2): so überlebt der
   // Standard das Leeren nach dem Absenden, und kein Entwurf trägt einen veralteten Wert. Die
   // Vorrangregel (Führungsstelle → erstes Sachgebiet) belegt nichts mehr vor, sie ist nur noch
   // der erste Vorschlag der Rufname-Abfrage (D3).
-  const [metadaten, setMetadaten] = useState<MetadatenWerte>(() => initialWerte?.metadaten ?? {});
-  const wirksam = wirksameMetadaten(metadaten, rufname.standard);
+  // Eine Berichtigung trägt Von, An und Meldeweg des berichtigten Eintrags (Spec
+  // `etb-absender-empfaenger`, „Vorbelegung neuer Einträge“), ausdrücklich gesetzt.
+  const [metadaten, setMetadaten] = useState<MetadatenWerte>(
+    () =>
+      initialWerte?.metadaten ??
+      (berichtigungZu
+        ? {
+            von: berichtigungZu.von ?? undefined,
+            an: berichtigungZu.an ?? undefined,
+            meldeweg: berichtigungZu.meldeweg ?? undefined,
+          }
+        : {}),
+  );
+  // Die Vorgabe für Von und An hängt am Typ (Change `kwc2yszv-etb-neuentwurf`, design.md D3); die
+  // Berichtigung hat keine, sie trägt die Werte des berichtigten Eintrags.
+  const vorgabeTyp: EtbTyp = berichtigungZu ? 'berichtigung' : typ;
+  const wirksam = wirksameMetadaten(metadaten, rufname.standard, vorgabeTyp);
   /** Abfragezeile zum Ändern eines gesetzten Standards offen (ohne Standard steht sie immer). */
   const [rufnameAendern, setRufnameAendern] = useState(false);
   /** Grund, warum ein Absenden an der Von/An-Pflicht scheiterte (D7); geht beim nächsten Versuch. */
-  const [pflichtHinweis, setPflichtHinweis] = useState<'von' | 'an' | null>(null);
+  const [pflicht, setPflicht] = useState<('von' | 'an')[]>([]);
+  /** Kennungen der Gründe in der Fußzeile; die Felder verweisen per `aria-describedby` darauf. */
+  const pflichtGrundId = useId();
+  const zeitGrundId = useId();
   /** Kennung des Kurzgrunds neben „Anhang“ (`aria-describedby`, LFH-1078). */
   const anhangGrundId = useId();
   /** Kennung des Grunds neben einem gesperrten „Nur protokollieren“ (LLH-1037). */
@@ -384,22 +381,6 @@ export default function Schnellerfassung({
   /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
   const { zone: anzeigeZone } = useZeitEingabe();
-  const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
-  /**
-   * Der offene Editor wurde für ein Feld OHNE Wert geöffnet (LLH-1842). Er steht dann am Ende der
-   * Chips und bleibt dort, bis er schließt (`chipFelder`), auch wenn sein Wert schon gilt.
-   */
-  const [editNeu, setEditNeu] = useState(false);
-  // Einzeilige Chip-Zeile unter `md`: den gerade bearbeiteten Chip waagerecht ins Bild holen
-  // (die Eingabe fokussiert sich selbst). Ohne Chip in Bearbeitung steht die Zeile am Anfang.
-  useEffect(() => {
-    const zeile = chipZeileRef.current;
-    if (!istSchmal || !zeile) return;
-    const ziel = document.activeElement;
-    if (editFeld == null) zeile.scrollLeft = 0;
-    else if (ziel && zeile.contains(ziel)) rolleWaagerechtInsBild(zeile, ziel);
-  }, [editFeld, istSchmal]);
-
   const [menuOffen, setMenuOffen] = useState(false);
   const [menuFilter, setMenuFilter] = useState('');
   const [triggerStart, setTriggerStart] = useState(-1);
@@ -411,14 +392,10 @@ export default function Schnellerfassung({
   const [menuModus, setMenuModus] = useState<'slash' | 'at'>('slash');
   const [typenAnbieten, setTypenAnbieten] = useState(false);
   /**
-   * Einklappen schließt Feld-Editor und Menü. Der Editor hängt in der Feldzeile, die eingeklappt
-   * entfällt; bliebe `editFeld` stehen, montierte das nächste Aufklappen ihn neu, und sein
-   * Selbstfokus zöge den Fokus aus dem Textfeld (LFH-955). Abgeleitet im Rendern, kein Effekt.
+   * Einklappen schließt das Menü: es hängt an der Leiste, die eingeklappt keine Feldzeile hat.
+   * Abgeleitet im Rendern, kein Effekt.
    */
-  if (eingeklappt && (editFeld != null || menuOffen)) {
-    setEditFeld(null);
-    setMenuOffen(false);
-  }
+  if (eingeklappt && menuOffen) setMenuOffen(false);
 
   const [bausteinOffen, setBausteinOffen] = useState<EtbBaustein | null>(null);
 
@@ -467,21 +444,28 @@ export default function Schnellerfassung({
   // Kein Fokusraub (LFH-1089): die Leiste montiert erst nach dem Laden der Entwürfe. Wer bis dahin
   // schon in einem Eingabefeld tippt (Volltextsuche), behält es, sonst landeten die übrigen
   // Zeichen im Entwurf. Ein fokussierter Knopf oder Link (Sprung über die Navigation) zählt nicht.
+  // Ziel ist das erste leere Pflichtfeld der Feldzeile, sonst der Inhalt (Spec „Fokus im ersten
+  // leeren Pflichtfeld“); dafür wartet der Fokus auch auf den gelesenen Standard (die Vorgabe).
   const breiteBekannt = Object.keys(screens).length > 0;
   const startFokusErledigt = useRef(false);
   useEffect(() => {
-    if (!breiteBekannt || startFokusErledigt.current) return;
+    if (!breiteBekannt || !rufname.geladen || startFokusErledigt.current) return;
     startFokusErledigt.current = true;
-    if (startFokus && !istEingabefeld(document.activeElement)) textRef.current?.focus();
-  }, [breiteBekannt, startFokus]);
+    if (startFokus && !istEingabefeld(document.activeElement)) fokusStart();
+    // `fokusStart` liest den Stand dieses Renders; er ist hier gewollt nur einmal gefragt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [breiteBekannt, startFokus, rufname.geladen]);
+
+  /** Nach einem Erfolg ohne Remount (Berichtigung, Einzelaufrufer): Fokus nach derselben Regel. */
+  const [fokusNachErfassen, setFokusNachErfassen] = useState(0);
+  useEffect(() => {
+    if (fokusNachErfassen > 0) fokusStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fokusNachErfassen]);
 
   /**
-   * Klick daneben schließt das Menü.
-   *
-   * Zwei Ausnahmen, beide notwendig: das **Menü selbst**, weil seine Einträge über
-   * `onMouseDown` wählen und `pointerdown` davor läuft — sonst wäre die Mausauswahl tot. Und
-   * der **Feld-Knopf**, der selbst umschaltet: sonst schlösse dieser Effekt zuerst und der
-   * Klick öffnete danach wieder.
+   * Klick daneben schließt das Menü. Ausnahme ist das **Menü selbst**, weil seine Einträge über
+   * `onMouseDown` wählen und `pointerdown` davor läuft — sonst wäre die Mausauswahl tot.
    */
   useEffect(() => {
     if (!menuOffen) return;
@@ -489,7 +473,6 @@ export default function Schnellerfassung({
       const ziel = ereignis.target;
       const el = ziel instanceof Element ? ziel : ((ziel as Node | null)?.parentElement ?? null);
       if (el?.closest('[data-slash-menu]')) return;
-      if (el && feldKnopfRef.current?.contains(el)) return;
       setMenuOffen(false);
     }
     document.addEventListener('pointerdown', beiZeigerAb);
@@ -497,19 +480,6 @@ export default function Schnellerfassung({
   }, [menuOffen]);
 
   const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => wirksam[f] != null);
-  /*
-   * Die Chips der Zeile in EINER Liste (LLH-1842): gesetzte Felder in fester Folge; ein Feld, dessen
-   * Editor ohne Wert geöffnet wurde, steht am Ende und bleibt dort, solange er offen ist. Die
-   * Ereigniszeit gilt schon beim Verlassen des Felds (`setFeldWert`); wechselte ihr Editor dabei
-   * Platz oder Schlüssel, montierte React ihn neu, und sein Selbstfokus holte den Fokus zurück.
-   */
-  const chipFelder =
-    editFeld == null
-      ? gesetzteFelder
-      : editNeu
-        ? [...gesetzteFelder.filter((f) => f !== editFeld), editFeld]
-        : // Ein gesetztes Feld in Bearbeitung behält seinen Platz, auch wenn es geleert wird.
-          METADATEN_FELDER.map((d) => d.feld).filter((f) => wirksam[f] != null || f === editFeld);
   // Die Abfrage steht nur, wenn das Fach gelesen ist — eine Zeile, die nach der Antwort wieder
   // verschwände, wäre ein Sprung unter dem Cursor. In der Berichtigung gilt der vorhandene
   // Standard, gefragt wird dort nicht.
@@ -524,10 +494,38 @@ export default function Schnellerfassung({
   /** Typ Meldung oder Lage, nicht in der Berichtigung: nur dann gibt es den Weg in den Eingang. */
   const eingangMoeglich = !berichtigungZu && (typ === 'meldung' || typ === 'lage');
   /** Geht dieser Eintrag in den Meldungseingang? Der Client sendet es immer ausdrücklich. */
-  const inMeldungseingang = eingangMoeglich && !meldungenGesperrt && !nurProtokollieren;
+  const inMeldungseingang =
+    eingangMoeglich &&
+    !meldungenGesperrt &&
+    auchInMeldungseingang(nurProtokollieren, wirksam, rufname.standard);
 
   function fokusInsFeld() {
     requestAnimationFrame(() => textRef.current?.focus());
+  }
+
+  /** Fokus in ein Feld der Feldzeile (`/`-Menü, Pflicht- und Zeitgrund). */
+  function fokusFeld(feld: MetaFeld) {
+    if (feld === 'veranlassung') setVeranlassungOffen(true);
+    requestAnimationFrame(() => {
+      const ziel =
+        feld === 'ereigniszeit'
+          ? zeitRef.current
+          : feld === 'von'
+            ? vonRef.current
+            : feld === 'an'
+              ? anRef.current
+              : feld === 'meldeweg'
+                ? meldewegRef.current
+                : veranlassungRef.current;
+      ziel?.focus();
+    });
+  }
+
+  /** Erstes leeres Pflichtfeld, sonst der Inhalt (Spec „Fokus im ersten leeren Pflichtfeld“). */
+  function fokusStart() {
+    const fehlt = berichtigungZu ? undefined : fehlendeSeiten(wirksam)[0];
+    if (fehlt) fokusFeld(fehlt);
+    else textRef.current?.focus();
   }
 
   function aktualisiereTrigger(text: string, caret: number) {
@@ -563,8 +561,6 @@ export default function Schnellerfassung({
     if (zeit?.ok && ausloesen) {
       setMetadaten((m) => ({ ...m, ereigniszeit: zeit.zeitpunkt }));
       setZukunftsGrund(null);
-      // Ein offener Zeit-Editor zeigte weiter seinen alten Wert (LLH-1842): der Chip zeigt den neuen.
-      if (editFeld === 'ereigniszeit') setEditFeld(null);
       text = zeit.rest;
     }
     setZeitBefehlGrund(zeit && !zeit.ok ? zeit.grund : null);
@@ -581,9 +577,7 @@ export default function Schnellerfassung({
 
   /**
    * Entfernt NUR den „/…"-Text, der das Menü ausgelöst hat, und schließt bewusst nicht mit —
-   * das tut `waehleEintrag`. Über den Feld-Knopf geöffnet gibt es keinen Trigger-Text
-   * (`triggerStart === -1`); ein Schließen hinter diesem frühen Ausstieg ließe das Menü über
-   * dem gerade geöffneten Chip-Editor stehen.
+   * das tut `waehleEintrag`.
    */
   function entferneTriggerText() {
     if (triggerStart < 0) return;
@@ -610,45 +604,26 @@ export default function Schnellerfassung({
       setMetadaten((m) => ({ ...m, [feld]: wert }));
       fokusInsFeld();
     } else if (e.art === 'feld') {
-      openEditor(e.key as MetaFeld);
+      fokusFeld(e.key as MetaFeld);
     } else {
       const b = bausteine.find((x) => String(x.id) === e.key) ?? null;
       setBausteinOffen(b);
     }
   }
 
-  /** Öffnet den Editor eines Felds und merkt, ob es dabei schon einen Wert hatte (`chipFelder`). */
-  function openEditor(feld: MetaFeld) {
-    // Schon offen (erneut über „+ Feld“ gewählt): nichts tun. Sein Wert kann inzwischen gelten,
-    // und `editNeu` neu zu bestimmen ließe den offenen Editor an einen anderen Platz springen.
-    if (editFeld === feld) return;
-    setEditNeu(wirksam[feld] == null);
-    setEditFeld(feld);
-  }
-
   /**
-   * Ein offener Editor hat einen Wert übernommen, bleibt aber offen (LLH-1842; Spec `zeiteingabe`,
-   * „Verlassen übernimmt“): die Ereigniszeit, wenn das Feld mit Tab oder Klick verlassen wird. Der
-   * Wert gilt sofort. Sonst stand die Zeit im Feld, das nächste geöffnete Feld ersetzte den
-   * Editor, und der Eintrag bekam „jetzt“. `null` ist das geleerte Feld: keine Ereigniszeit.
-   * Bewusst ohne Sperre beim Senden: der Editor ist dann ohnehin gesperrt, und eine Zeit, die im
-   * Feld steht, aber nicht gälte, wäre derselbe Fehler noch einmal.
+   * Ein Feld der Feldzeile hat einen Wert übernommen; er gilt sofort (Spec „Feste Felder der
+   * Erfassung“). Während des Sendens nimmt die Erfassung nichts an (LFH-748). Ein übernommenes
+   * Von/An merkt sich das Gerät für „Zuletzt verwendet“ (LLH-1144, D5).
    */
-  function setFeldWert(feld: MetaFeld, wert: dayjs.Dayjs | null) {
-    if (feld === 'ereigniszeit') setZukunftsGrund(null);
-    setMetadaten((m) => ({ ...m, [feld]: wert ?? undefined }));
-  }
-
-  function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
+  function setzeFeld<F extends keyof MetadatenWerte>(feld: F, wert: MetadatenWerte[F]) {
     if (sendet) return;
     if (feld === 'ereigniszeit') setZukunftsGrund(null);
-    // Ein übernommenes Von/An merkt sich das Gerät für „Zuletzt verwendet“ (LLH-1144, D5).
     if ((feld === 'von' || feld === 'an') && typeof wert === 'string') {
       merkeZuletzt(KONTEXT_FUNKRUFNAME, wert);
+      setPflicht((p) => p.filter((x) => x !== feld));
     }
     setMetadaten((m) => ({ ...m, [feld]: wert }));
-    setEditFeld(null);
-    fokusInsFeld();
   }
 
   function bausteinEinsetzen(felder: BausteinFelder) {
@@ -679,7 +654,7 @@ export default function Schnellerfassung({
       !e.shiftKey &&
       !e.altKey &&
       (e.ctrlKey || e.metaKey || einzeilerSendet);
-    if (istSendeTaste && editFeld == null) {
+    if (istSendeTaste) {
       e.preventDefault();
       void absenden();
     }
@@ -745,13 +720,13 @@ export default function Schnellerfassung({
   async function absenden() {
     if (sendet || inhalt.trim() === '') return;
     // Von/An-Pflicht (LFH-894, D7): VOR Upload und Warteschlange. Text, Felder und Anhänge
-    // bleiben stehen. Der Hinweis nennt den Zustand und trägt den Weg als Knopf (LFH-1078).
-    const fehlt = fehlendeSeite(wirksam);
-    if (fehlt) {
-      setPflichtHinweis(fehlt);
+    // bleiben stehen; der Grund steht am Feld, der Fokus geht dorthin (Spec „Pflicht im Client“).
+    const fehlen = fehlendeSeiten(wirksam);
+    setPflicht(fehlen);
+    if (fehlen.length > 0) {
+      fokusFeld(fehlen[0]);
       return;
     }
-    setPflichtHinweis(null);
     // Zeichengrenzen des Servers (LFH-937, design.md D8): ebenfalls VOR Upload und Warteschlange.
     // Das Feld kürzt nie (Zähler „zu lang“), und ein Baustein oder Slash-Befehl setzt Text von außen;
     // ein zu langer Eintrag läge sonst bis zum Abgleich in der Offline-Queue und käme abgelehnt
@@ -760,14 +735,12 @@ export default function Schnellerfassung({
     setLaengenHinweis(zuLang);
     if (zuLang) return;
     // Ereigniszeit in der Zukunft (LLH-1088, Spec „Keine Ereigniszeit in der Zukunft“): ebenso
-    // VOR Upload und Warteschlange, nach der Serveruhr. Der Grund steht am Zeit-Chip, Text und
-    // Felder bleiben.
+    // VOR Upload und Warteschlange, nach der Serveruhr. Der Grund steht am Feld Zeit, der Fokus
+    // geht dorthin; Text und Felder bleiben.
     const zukunft = zukunftsVerstoss(wirksam, serverJetzt());
     setZukunftsGrund(zukunft);
     if (zukunft) {
-      // Den Grund trägt der geschlossene Chip. Die Zeit gilt seit LLH-1842 schon beim Verlassen
-      // des Felds, der Editor kann also noch offen stehen: ohne Schließen stünde der Grund nirgends.
-      if (editFeld === 'ereigniszeit') setEditFeld(null);
+      fokusFeld('ereigniszeit');
       return;
     }
     // Nur der UPLOAD braucht Netz. Mit Dateien in der Liste wird ohne Verbindung abgewiesen, ohne
@@ -834,13 +807,14 @@ export default function Schnellerfassung({
       setMetadaten((m) => (uebernahmeAktiv ? nurUebernahme(m) : {}));
       // Der Typ bleibt mit „Werte behalten“ stehen (LLH-1112), sonst beginnt es als Meldung.
       if (!uebernahmeAktiv) setTyp('meldung');
-      // „Nur protokollieren“ springt immer zurück, auch mit „Werte behalten“ (LLH-1027 D2): ein
-      // vergessener Schalter ließe sonst eine Serie am Meldungseingang vorbeilaufen.
-      setNurProtokollieren(false);
-      setEditFeld(null);
+      // „Auch in den Meldungseingang“ springt immer auf die Vorgabe zurück, auch mit „Werte
+      // behalten“ (LLH-1027 D2): ein vergessener Schalter ließe sonst eine Serie am
+      // Meldungseingang vorbeilaufen.
+      setNurProtokollieren(undefined);
+      setVeranlassungOffen(false);
       setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
-      fokusInsFeld();
+      setFokusNachErfassen((n) => n + 1);
     } catch {
       // Abgelehnt: der Grund steht schon an der Erfassung (`ablehnung`), der Wortlaut bleibt im
       // Feld (Erfassungs-Norm, `onErfassen` muss ablehnen). Weiterwerfen hieße hier nur eine
@@ -851,85 +825,82 @@ export default function Schnellerfassung({
   }
 
   /*
-   * DER PRÄFIX IST DER TYPWÄHLER: er zeigt das Typwort („Anordnung“) in der Wortfarbe des Typs,
-   * die Zeile trägt dessen Kante (LLH-1112, Spec `etb-schnellerfassung-tastatur`, „Typwort statt
-   * Slash-Präfix“), und er öffnet auf Klick die Typen als Menü — der Weg für Maus und Handschuh;
-   * die Tastatur nimmt `/typ` am Zeilenanfang. Einen zweiten Wähler für denselben Wert gibt es
-   * bewusst nicht. Im Berichtigungsmodus ist der Typ fest und der Präfix Text.
-   *
-   * Der zugängliche Name enthält das sichtbare Wort (WCAG 2.5.3 „Label in Name"). Die Kante ist
-   * Zusatzkanal (Entscheidung 17.10.2026): das Wort sagt den Typ, auch ohne Farbe.
+   * TYP UND KANTE (LLH-1112, Change `kwc2yszv-etb-neuentwurf`): ab `md` wählt die Segmentleiste der
+   * Feldzeile den Typ, unter `md` der Knopf vor dem Inhalt (er steht auch eingeklappt). Die Zeile
+   * des Inhalts trägt die Kante des Typs. Im Berichtigungsmodus ist der Typ fest; das Wort steht
+   * dann vor dem Inhalt.
    */
-  const praefixTyp: EtbTyp = berichtigungZu ? 'berichtigung' : typ;
-  const typFarbe = etbTypFarbe(praefixTyp, token);
+  const anzeigeTyp: EtbTyp = berichtigungZu ? 'berichtigung' : typ;
+  const typFarbe = etbTypFarbe(anzeigeTyp, token);
+  const typWaehlen = (t: EtbTyp) => {
+    if (sendet) return;
+    setTyp(t);
+  };
   const praefix = berichtigungZu ? (
-    <span style={{ color: typFarbe.wort }}>{etbTyp.berichtigung.label}</span>
-  ) : (
-    <Dropdown
-      trigger={['click']}
-      autoFocus
-      disabled={sendet}
-      menu={{
-        items: typMenue(token),
-        selectable: true,
-        selectedKeys: [typ],
-        onClick: ({ key }) => {
-          if (sendet) return;
-          setTyp(key as EtbTyp);
-          fokusInsFeld();
-        },
-      }}
-    >
-      <Button
-        type="text"
-        disabled={sendet}
-        aria-label={`Eintragstyp ${etbTyp[typ].label} ändern`}
-        style={{ font: 'inherit', color: typFarbe.wort, paddingInline: token.paddingXS }}
-      >
-        {etbTyp[typ].label}
-      </Button>
-    </Dropdown>
-  );
+    <span style={{ color: typFarbe.wort, fontSize: 13 }}>{etbTyp.berichtigung.label}</span>
+  ) : istSchmal ? (
+    <TypKnopf typ={typ} gesperrt={sendet} onTyp={typWaehlen} />
+  ) : undefined;
 
   /*
-   * DIE HINWEISZEILE trägt keinen Tastaturvertrag und keine Befehlsliste mehr (LFH-1078): die
-   * Sendetaste steht als Kappe an „Erfassen“, Typ und Felder zeigen Präfix-Knopf und „Feld“. Sie
-   * bleibt für Zeichengrenze und, unter `md`, „Werte behalten“ — und entfällt, wenn beides fehlt.
+   * NACHTRAG (Spec „Abweichende Ereigniszeit bleibt sichtbar“): eine Ereigniszeit ab einer Minute
+   * vor „jetzt“ steht in der Achtungsrolle, die Fußzeile nennt den Abstand, der Knopf die Zeit.
+   * `useMinutenTakt` hält beides mit der Uhr aktuell.
    */
-  // „Werte behalten": ab `md` bei den Einstellungen (`einstellungenAbMd`: Reiterband oder rechts in
-  // der Chip-Zeile), darunter in der Hinweiszeile — in der einzeilig rollenden Chip-Zeile läge er
-  // sonst hinter dem Bildlauf. In der Hinweiszeile OHNE den
-  // Kästchen-Boden (`antdKaestchen`, LFH-907): im Handschuh-Betrieb höbe er die Zeile von 36 auf
-  // 72 px, und die angepinnte Leiste risse auf dem Handschirm den Deckel der halben Fensterhöhe
-  // (`e2e/leisten-flaeche.spec.ts`, 451 statt höchstens 422 px). Benannte Ausnahme.
-  // Kein Tooltip-Satz (LFH-1078): was stehen bleibt, sieht man nach dem Erfassen an den Chips.
+  useMinutenTakt();
+  const jetzt = serverJetzt();
+  const nachtragMin = zukunftsGrund ? null : nachtragMinuten(metadaten.ereigniszeit, jetzt);
+  const zeitAmKnopf =
+    nachtragMin != null && metadaten.ereigniszeit
+      ? zuWanduhr(metadaten.ereigniszeit, anzeigeZone).isSame(zuWanduhr(jetzt, anzeigeZone), 'day')
+        ? zuWanduhr(metadaten.ereigniszeit, anzeigeZone).format('HHmm')
+        : formatDtg(metadaten.ereigniszeit, anzeigeZone)
+      : null;
+  const knopfText = berichtigungZu
+    ? 'Berichtigung erfassen'
+    : zeitAmKnopf
+      ? `Erfassen als ${zeitAmKnopf}`
+      : 'Erfassen';
+
+  // „Vorschau“ nur, wenn der Inhalt Formatierung trägt (Spec „Entwurfsreiter und Vorschau nur bei
+  // Bedarf“); ohne Formatierung schließt sie von selbst.
+  const formatiert = hatFormatierung(inhalt);
+  const vorschauOffen = vorschauGewaehlt && formatiert;
+
+  // „Werte behalten“ (Fußzeile, links). Gesperrt beim Senden: der laufende Versand hat die
+  // Übernahme schon gelesen. Ohne Kästchen-Boden unter `md` (`antdKaestchen`, LFH-907): im
+  // Handschuh-Betrieb höbe er die einzeilige Fußzeile auf dem Handschirm über das Höhenbudget.
   const schalter = zeigeSchalter ? (
-    // Gesperrt beim Senden: der laufende Versand hat die Übernahme schon gelesen.
     <Checkbox
       checked={werteBehalten}
       disabled={sendet}
       onChange={(e) => onWerteBehaltenChange?.(e.target.checked)}
-      style={istSchmal ? { minHeight: 0 } : undefined}
+      style={istSchmal ? { minHeight: 0, flexShrink: 0 } : { flexShrink: 0 }}
     >
-      <Typography.Text type="secondary">Werte behalten</Typography.Text>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        Werte behalten
+      </Typography.Text>
     </Checkbox>
   ) : null;
 
-  // „Nur protokollieren“ (LLH-1037, design.md D7/D8/D12): neben „Werte behalten“, ab `md` bei den
-  // Einstellungen, darunter in der Hinweiszeile ohne Kästchen-Boden (wie oben). Ohne Freigabe der
-  // Meldungen an und gesperrt, der Grund steht daneben (Wort statt Satz, LFH-1078).
+  // „Auch in den Meldungseingang“ (LLH-1037; Change `kwc2yszv-etb-neuentwurf`, D4): nur bei Meldung
+  // und Lage, Vorgabe an außer bei einem eigenen Vermerk. Ohne Freigabe der Meldungen aus und
+  // gesperrt, der Grund steht daneben (Wort statt Satz, LFH-1078).
   const protokollSchalter = eingangMoeglich ? (
     <span
+      data-lfh="etb-einstellungen"
       style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS, flexShrink: 0 }}
     >
       <Checkbox
-        checked={meldungenGesperrt || nurProtokollieren}
+        checked={inMeldungseingang}
         disabled={sendet || meldungenGesperrt}
         aria-describedby={meldungenGesperrt ? protokollGrundId : undefined}
-        onChange={(e) => setNurProtokollieren(e.target.checked)}
+        onChange={(e) => setNurProtokollieren(!e.target.checked)}
         style={istSchmal ? { minHeight: 0 } : undefined}
       >
-        <Typography.Text type="secondary">Nur protokollieren</Typography.Text>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Auch in den Meldungseingang
+        </Typography.Text>
       </Checkbox>
       {meldungenGesperrt && (
         <span
@@ -943,43 +914,60 @@ export default function Schnellerfassung({
     </span>
   ) : null;
 
-  // Zeichengrenze (LFH-937, D8): Zähler und Hinweis stehen in der Hinweiszeile, nicht unter dem
-  // Feld — eine weitere Zeile risse das Höhenbudget der angepinnten Leiste. Der Zähler erscheint
-  // erst ab 80 % der Grenze; der Hinweis trägt neben der Farbe ein Zeichen und Worte (WCAG 1.4.1).
-  const grenzSichtbar =
-    laengenHinweis != null ||
-    zeitBefehlGrund != null ||
-    zaehlerText(zaehlZeichen(inhalt), ETB_INHALT_MAX) != null;
-  const grenzTeil = (
+  /** Ein Grund in der Fußzeile: Zeichen und Wort neben der Farbe (WCAG 1.4.1). */
+  const grundStil = (farbe: string): CSSProperties => ({
+    color: farbe,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: token.marginXXS,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  });
+  const gruende = (
     <>
-      {zeitBefehlGrund && (
+      {pflicht.map((seite) => (
+        <span
+          key={seite}
+          id={`${pflichtGrundId}-${seite}`}
+          role="alert"
+          data-lfh="etb-pflicht-hinweis"
+          style={grundStil(rollen.alarmText)}
+        >
+          <IconWarndreieck />
+          <span>{FEHLT[seite]}</span>
+        </span>
+      ))}
+      {zukunftsGrund && (
+        <span
+          id={zeitGrundId}
+          role="alert"
+          data-lfh="etb-zeit-grund"
+          style={grundStil(rollen.alarmText)}
+        >
+          <IconWarndreieck />
+          <span>Zeit {zukunftsGrund}</span>
+        </span>
+      )}
+      {zeitBefehlGrund && !zukunftsGrund && (
         // Höflich, nicht `alert`: der Grund erscheint beim Tippen, nicht beim Absenden, und
         // unterbräche sonst die Eingabe am Vorleser.
         <span
+          id={zeitGrundId}
           role="status"
           data-lfh="etb-zeit-hinweis"
-          style={{
-            color: rollen.alarmText,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: token.marginXXS,
-          }}
+          style={grundStil(rollen.alarmText)}
         >
           <IconWarndreieck />
           <span>/zeit: {zeitBefehlGrund}</span>
         </span>
       )}
+      {nachtragMin != null && (
+        <span data-lfh="etb-nachtrag-hinweis" style={grundStil(rollen.achtungText)}>
+          {nachtragHinweis(nachtragMin)}
+        </span>
+      )}
       {laengenHinweis && (
-        <span
-          role="alert"
-          data-lfh="etb-laengen-hinweis"
-          style={{
-            color: rollen.alarmText,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: token.marginXXS,
-          }}
-        >
+        <span role="alert" data-lfh="etb-laengen-hinweis" style={grundStil(rollen.alarmText)}>
           <IconWarndreieck />
           <span>{laengenHinweis}</span>
         </span>
@@ -987,74 +975,12 @@ export default function Schnellerfassung({
       <Zeichenzaehler wert={inhalt} max={ETB_INHALT_MAX} />
     </>
   );
-  const schalterInZeile = istSchmal && (schalter != null || protokollSchalter != null);
-  const hinweiszeile =
-    grenzSichtbar || schalterInZeile ? (
-      <>
-        {grenzTeil}
-        {schalterInZeile && (
-          <span
-            style={{
-              marginInlineStart: 'auto',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: token.marginSM,
-            }}
-          >
-            {protokollSchalter}
-            {schalter}
-          </span>
-        )}
-      </>
-    ) : undefined;
-
-  // Ab `md` stehen beide Einstellungen beisammen und abgesetzt von den Aktionen: im Reiterband,
-  // wenn der Aufrufer dort Platz reicht (LLH-1037 D12), sonst rechts in der Chip-Zeile. In der
-  // Chip-Zeile brach die Gruppe im Handschuh-Betrieb auf dem Fükw um (733 px Karte, 507 px Chips,
-  // 331 px Gruppe), die angepinnte Leiste wuchs um eine Kästchenhöhe. Mit Kästchen-Boden: die
-  // Trefffläche ist dort geprüft (`e2e/trefflaeche-pruefflaechen.spec.ts`).
-  const einstellungenAbMd =
-    !istSchmal && (zeigeSchalter || protokollSchalter != null) ? (
-      <div
-        data-lfh="etb-einstellungen"
-        style={{
-          marginInlineStart: 'auto',
-          flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: token.marginSM,
-        }}
-      >
-        {protokollSchalter}
-        {schalter}
-      </div>
-    ) : null;
 
   const einheitenTreffer =
     menuModus === 'at' ? filterAtEintraege(menuFilter, funkrufnamen, typ) : null;
 
-  const feldKnopf = (
-    <Button
-      ref={feldKnopfRef}
-      disabled={sendet}
-      icon={
-        <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-          <IconPlus />
-        </span>
-      }
-      onClick={() => {
-        setMenuFilter('');
-        setTriggerStart(-1);
-        setMenuModus('slash');
-        setTypenAnbieten(false);
-        setMenuOffen((o) => !o);
-      }}
-    >
-      Feld
-    </Button>
-  );
-
-  // „Anhang" steht bei „Feld": ab `md` hinter den Chips, darunter vorn.
+  // „+ Anhang“: ein antd-Knopf plus unsichtbare Dateieingabe statt antds `Upload` — der wickelte
+  // den Knopf in ein zweites `role="button"` mit eigenem Tabstopp.
   const anGrenze = dateien.length >= ETB_ANHAENGE_MAX;
   // Zweiter Kanal neben dem Grau (WCAG 1.4.1), in wenigen Wörtern statt eines Satzes (LFH-1078):
   // ohne Netz „offline“, sonst der Zähler „3/10“, sobald Dateien gewählt sind — an der Grenze ist
@@ -1064,24 +990,30 @@ export default function Schnellerfassung({
     : dateien.length > 0
       ? `${dateien.length}/${ETB_ANHAENGE_MAX}`
       : null;
+  const textKnopf = (props: React.ComponentProps<typeof Button>) => (
+    <Button
+      type="link"
+      size="small"
+      {...props}
+      style={{ paddingInline: 0, flexShrink: 0, ...props.style }}
+    />
+  );
   // Am Spiegel gehen keine Anhänge (LLH-1492, design.md D9: der Server lehnt sie mit 400 ab).
   const anhangTeil = istSpiegel(einsatz) ? null : (
-    <>
-      {/* „Anhang": ein antd-Knopf plus unsichtbare Dateieingabe statt antds `Upload` — der wickelte
-         den Knopf in ein zweites `role="button"` mit eigenem Tabstopp. So bleibt EIN Bedienziel,
-         und die Höhe kommt aus `controlHeight`. */}
-      <Button
-        disabled={!online || sendet || anGrenze}
-        aria-describedby={anhangGrund != null ? anhangGrundId : undefined}
-        icon={
+    <span
+      style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXXS, flexShrink: 0 }}
+    >
+      {textKnopf({
+        disabled: !online || sendet || anGrenze,
+        'aria-describedby': anhangGrund != null ? anhangGrundId : undefined,
+        icon: (
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
             <IconBueroklammer />
           </span>
-        }
-        onClick={() => dateiEingabe.current?.click()}
-      >
-        Anhang
-      </Button>
+        ),
+        onClick: () => dateiEingabe.current?.click(),
+        children: 'Anhang',
+      })}
       <input
         ref={dateiEingabe}
         type="file"
@@ -1103,7 +1035,84 @@ export default function Schnellerfassung({
           {anhangGrund}
         </span>
       )}
-    </>
+    </span>
+  );
+
+  const erfassenKnopf = (
+    // Die Sendetaste als Kappe statt als Satz (LFH-1078), nur mit feinem Zeiger: mit grobem sendet
+    // Return nicht (LFH-955, D1). Erst ab `lg`: darunter kostete die Kappe dem Textfeld seinen
+    // Anteil an der Zeile. Die Kappe ist `aria-hidden`; die Zeit eines Nachtrags steht im Wort und
+    // damit im zugänglichen Namen. Die Kürzel nennt `aria-keyshortcuts` auf jeder Breite.
+    <Button
+      type="primary"
+      loading={sendet}
+      aria-keyshortcuts={istBeruehrung ? KUERZEL_GROB : KUERZEL_FEIN}
+      onClick={() => void absenden()}
+      style={{ flexShrink: 0 }}
+    >
+      {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : knopfText}
+      {!istBeruehrung && !fortschritt && abBreite('lg') && (
+        <Tastenkuerzel aria-hidden style={{ marginInlineStart: token.marginXS }}>
+          ↵
+        </Tastenkuerzel>
+      )}
+    </Button>
+  );
+
+  const vorschauKnopf = formatiert ? (
+    <Button
+      type="text"
+      icon={
+        <span aria-hidden="true" style={{ display: 'inline-flex' }}>
+          <IconAuge />
+        </span>
+      }
+      aria-pressed={vorschauOffen}
+      onClick={() => setVorschauGewaehlt((v) => !v)}
+    >
+      Vorschau
+    </Button>
+  ) : null;
+
+  const rechts = (
+    <span
+      style={{
+        marginInlineStart: istSchmal ? undefined : 'auto',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: token.marginSM,
+        flexShrink: 0,
+      }}
+    >
+      {!veranlassungOffen &&
+        !metadaten.veranlassung &&
+        textKnopf({
+          disabled: sendet,
+          onClick: () => fokusFeld('veranlassung'),
+          children: '+ Veranlassung',
+        })}
+      {anhangTeil}
+      {onWeitererEntwurf &&
+        textKnopf({ disabled: sendet, onClick: onWeitererEntwurf, children: '+ weiterer Entwurf' })}
+      {!berichtigungZu &&
+        rufname.standard != null &&
+        textKnopf({
+          disabled: sendet,
+          title: `Eigene Stelle: ${rufname.standard.von}`,
+          onClick: () => setRufnameAendern(true),
+          children: 'Eigene Stelle ändern',
+        })}
+      {!berichtigungZu &&
+        typ === 'lage' &&
+        !lageberichteGesperrt &&
+        // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
+        // weiter und ein Upload-Fehler stünde nirgends.
+        textKnopf({
+          disabled: sendet,
+          onClick: () => navigate(lageberichtePfad(einsatz.id)),
+          children: 'Als strukturierten Lagebericht erfassen →',
+        })}
+    </span>
   );
 
   return (
@@ -1136,57 +1145,60 @@ export default function Schnellerfassung({
           onUebernehmen={async (wert) => {
             await rufname.setze(wert);
             setRufnameAendern(false);
-            setPflichtHinweis(null);
+            setPflicht([]);
             fokusInsFeld();
           }}
           onAbbrechen={rufname.standard ? () => setRufnameAendern(false) : undefined}
         />
       )}
 
+      {!eingeklappt && (
+        <div style={{ marginBottom: token.marginXS }}>
+          <EtbFeldzeile
+            typ={berichtigungZu ? null : typ}
+            onTyp={typWaehlen}
+            metadaten={metadaten}
+            wirksam={wirksam}
+            ausVorgabe={(seite) => ausStandard(seite, metadaten, rufname.standard, vorgabeTyp)}
+            quellen={vonAnQuellen}
+            onFeld={setzeFeld}
+            onFertig={fokusInsFeld}
+            pflicht={pflicht}
+            pflichtId={(seite) => `${pflichtGrundId}-${seite}`}
+            zeitGrund={zukunftsGrund ?? zeitBefehlGrund}
+            zeitGrundId={zeitGrundId}
+            nachtrag={nachtragMin != null}
+            veranlassungOffen={veranlassungOffen}
+            onVeranlassungSchliessen={() => setVeranlassungOffen(false)}
+            gesperrt={sendet}
+            schmal={istSchmal}
+            refs={{
+              zeit: zeitRef,
+              von: vonRef,
+              an: anRef,
+              meldeweg: meldewegRef,
+              veranlassung: veranlassungRef,
+            }}
+          />
+        </div>
+      )}
+
       <div style={{ position: 'relative' }}>
         <Schnellerfassungszeile
-          gestapelt={istSchmal}
           // Ab `md` füllt das Textfeld die Zeile, damit ein Funkspruch am Stück gegenzulesen ist
-          // (LFH-955, design.md D2).
+          // (LFH-955, design.md D2). Unter `md` steht der Typ-Knopf davor, auch eingeklappt; das
+          // Feld behält so beim Aufklappen seinen Platz im Baum.
           feldFuellt
           praefix={praefix}
           rahmenFarbe={typFarbe.kante}
           hinweis={
-            // „Vorschau" neben „Erfassen" statt auf eigener Zeile: eine eigene Knopfzeile kostete im
-            // Handschuh-Betrieb eine volle Steuerhöhe der angepinnten Leiste.
-            <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
-              <Button
-                type="text"
-                icon={
-                  <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                    <IconAuge />
-                  </span>
-                }
-                aria-pressed={vorschauOffen}
-                onClick={() => setVorschauOffen((v) => !v)}
-              >
-                Vorschau
-              </Button>
-              {/* Die Sendetaste als Kappe statt als Satz (LFH-1078), nur mit feinem Zeiger: mit grobem
-                 sendet Return nicht (LFH-955, D1). Erst ab `lg`: darunter kostete die Kappe dem
-                 Textfeld seinen Anteil an der Zeile (LFH-955, D2). Die Kappe ist `aria-hidden`, der
-                 Knopfname bleibt das Wort; die Kürzel nennt `aria-keyshortcuts` auf jeder Breite. */}
-              <Button
-                type="primary"
-                loading={sendet}
-                aria-keyshortcuts={istBeruehrung ? KUERZEL_GROB : KUERZEL_FEIN}
-                onClick={() => void absenden()}
-              >
-                {fortschritt ? `Lädt hoch (${fortschritt.n}/${fortschritt.von}) …` : 'Erfassen'}
-                {!istBeruehrung && !fortschritt && abBreite('lg') && (
-                  <Tastenkuerzel aria-hidden style={{ marginInlineStart: token.marginXS }}>
-                    ↵
-                  </Tastenkuerzel>
-                )}
-              </Button>
-            </div>
+            istSchmal ? undefined : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}>
+                {vorschauKnopf}
+                {erfassenKnopf}
+              </div>
+            )
           }
-          hinweiszeile={eingeklappt ? undefined : hinweiszeile}
         >
           {/* Die Schnellerfassung steht ohne eigene Überschrift unter dem Seitentitel (h1). */}
           <MarkdownEditor
@@ -1223,74 +1235,23 @@ export default function Schnellerfassung({
         />
       </div>
 
-      {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt, die
-         EINSTELLUNGEN, wenn kein Reiterband sie aufnimmt. Nicht neben „Erfassen" und nicht zwischen
-         Aktionen: ein Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
+      {/* Fußzeile (Spec „Einstellungen in der Fußzeile der Erfassung“): links Gründe und die
+         beiden Schalter, rechts die Textknöpfe; unter `md` rollt sie waagerecht, nur „Erfassen“
+         steht fest am Ende. */}
       {!eingeklappt && (
-        <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
-          {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
-           brächen ihren Text IN sich um — die Leiste wüchse trotz einzeiliger Zeile. */}
-          <Space wrap={!istSchmal} style={istSchmal ? { flexShrink: 0 } : undefined}>
-            {/* Unter `md` steht „Feld" VORN: in der einzeilig rollenden Zeile rutschte er sonst hinter die
-             gesetzten Chips aus dem Bild. */}
-            {istSchmal && feldKnopf}
-            {istSchmal && anhangTeil}
-            {chipFelder.map((feld) => (
-              <MetaChip
-                key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
-                feld={feld}
-                editing={editFeld === feld}
-                wert={wirksam[feld]}
-                ausStandard={
-                  (feld === 'von' || feld === 'an') &&
-                  ausStandard(feld, metadaten, rufname.standard)
-                }
-                // Der Weg zum Standard selbst (Spec `etb-absender-empfaenger`); in der Berichtigung
-                // wird er nicht geändert.
-                onStandardAendern={
-                  berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
-                }
-                quellen={feld === 'von' || feld === 'an' ? vonAnQuellen : undefined}
-                onCommit={commitFeld}
-                onChange={setFeldWert}
-                onCancel={() => {
-                  setEditFeld(null);
-                  fokusInsFeld();
-                }}
-                onRemove={(f) => {
-                  if (sendet) return;
-                  if (f === 'ereigniszeit') setZukunftsGrund(null);
-                  setMetadaten((m) => ({ ...m, [f]: undefined }));
-                }}
-                onEdit={(f) => {
-                  if (!sendet) openEditor(f);
-                }}
-                // Ein beim Absenden offener Editor nimmt beim Senden nichts an (LFH-748).
-                gesperrt={sendet}
-                grund={feld === 'ereigniszeit' ? zukunftsGrund : null}
-              />
-            ))}
-            {!istSchmal && feldKnopf}
-            {!istSchmal && anhangTeil}
-            {!berichtigungZu && typ === 'lage' && !lageberichteGesperrt && (
-              // Gesperrt beim Senden: der Sprung hängte die Erfassung ab, der Versand liefe unsichtbar
-              // weiter und ein Upload-Fehler stünde nirgends.
-              <Button
-                type="link"
-                disabled={sendet}
-                onClick={() => navigate(lageberichtePfad(einsatz.id))}
-              >
-                Als strukturierten Lagebericht erfassen →
-              </Button>
-            )}
-          </Space>
-          {einstellungenAbMd != null && einstellungenZiel === undefined && einstellungenAbMd}
+        <div style={{ display: 'flex', alignItems: 'center', gap: token.marginSM }}>
+          <div
+            data-lfh="etb-fusszeile"
+            style={{ ...fusszeileStil(istSchmal, token), flex: '1 1 auto' }}
+          >
+            {gruende}
+            {protokollSchalter}
+            {schalter}
+            {rechts}
+          </div>
+          {istSchmal && erfassenKnopf}
         </div>
       )}
-      {einstellungenAbMd != null &&
-        einstellungenZiel != null &&
-        !eingeklappt &&
-        createPortal(einstellungenAbMd, einstellungenZiel)}
 
       {dateien.length > 0 && (
         <ul
@@ -1368,26 +1329,6 @@ export default function Schnellerfassung({
           data-lfh="etb-ablehnung"
           style={{ marginTop: token.marginXS }}
           title={ablehnung}
-        />
-      )}
-      {pflichtHinweis && (
-        <Alert
-          type="error"
-          showIcon
-          data-lfh="etb-pflicht-hinweis"
-          style={{ marginTop: token.marginXS }}
-          title={`${pflichtHinweis === 'von' ? 'Von' : 'An'} fehlt`}
-          action={
-            <Button
-              disabled={sendet}
-              onClick={() => {
-                openEditor(pflichtHinweis);
-                setPflichtHinweis(null);
-              }}
-            >
-              {pflichtHinweis === 'von' ? 'Von' : 'An'} setzen
-            </Button>
-          }
         />
       )}
 

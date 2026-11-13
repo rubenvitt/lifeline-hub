@@ -39,6 +39,8 @@ interface BasisProps {
   id?: string;
   'aria-label'?: string;
   'aria-describedby'?: string;
+  /** Ein Fehler des Aufrufers am Feld (ETB: Pflichtseite fehlt); der Grund steht in `aria-describedby`. */
+  'aria-invalid'?: boolean;
   /** Grenze des Servers (LFH-937): natives `maxLength`, einzeilig. */
   maxLength?: number;
   placeholder?: string;
@@ -282,7 +284,8 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
         id={id}
         aria-label={props['aria-label']}
         aria-describedby={beschreibung}
-        aria-invalid={fehler ? true : undefined}
+        aria-invalid={fehler || props['aria-invalid'] ? true : undefined}
+        status={props['aria-invalid'] ? 'error' : undefined}
         disabled={disabled}
         placeholder={placeholder}
         maxLength={maxLength}

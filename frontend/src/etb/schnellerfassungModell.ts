@@ -323,3 +323,45 @@ export function einheitAusSchluessel(key: string): { feld: 'von' | 'an'; wert: s
   const feld = key.slice(0, trenner) === 'an' ? 'an' : 'von';
   return { feld, wert: key.slice(trenner + 1) };
 }
+
+/**
+ * Trägt der Inhalt Formatierung (Auszeichnung, Überschrift, Liste, Zitat, Code, Verweis)? Nur dann
+ * bietet die Erfassung „Vorschau“ an (Spec `etb-schnellerfassung-tastatur`, „Entwurfsreiter und
+ * Vorschau nur bei Bedarf“). Reiner Text braucht keine Vorschau; im Zweifel lieber angeboten.
+ */
+export function hatFormatierung(text: string): boolean {
+  return (
+    /(\*\*|__)\S/.test(text) ||
+    /(^|\s)[*_][^\s*_][^*_\n]*[*_](\s|$)/.test(text) ||
+    /`[^`\n]+`/.test(text) ||
+    /^\s{0,3}(#{1,6}\s|>\s|[-*+]\s|\d+[.)]\s)/m.test(text) ||
+    /\[[^\]\n]+\]\([^)\s]+\)/.test(text)
+  );
+}
+
+/**
+ * Wie viele volle Minuten die Ereigniszeit vor `jetzt` liegt, ab einer Minute; sonst `null`
+ * (Spec „Abweichende Ereigniszeit bleibt sichtbar“). Eine Zeit in der Zukunft ist kein Nachtrag,
+ * sie ist ein Fehler ({@link zukunftsVerstoss}).
+ */
+export function nachtragMinuten(
+  ereigniszeit: dayjs.Dayjs | undefined,
+  jetzt: dayjs.Dayjs,
+): number | null {
+  if (ereigniszeit == null) return null;
+  const minuten = Math.floor(jetzt.diff(ereigniszeit, 'second') / 60);
+  return minuten >= 1 ? minuten : null;
+}
+
+/** „Nachtrag · Ereignis vor 14 min“, ab einer Stunde in Stunden und Minuten. */
+export function nachtragHinweis(minuten: number): string {
+  const h = Math.floor(minuten / 60);
+  const m = minuten % 60;
+  const dauer = h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`;
+  return `Nachtrag · Ereignis vor ${dauer}`;
+}
+
+/** Die fehlenden Pflichtseiten in Feldfolge (Spec „Pflicht im Client“: fehlen beide, beide). */
+export function fehlendeSeiten(wirksam: MetadatenWerte): ('von' | 'an')[] {
+  return (['von', 'an'] as const).filter((s) => !wirksam[s]?.trim());
+}

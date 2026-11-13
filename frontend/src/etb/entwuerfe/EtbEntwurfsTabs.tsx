@@ -177,15 +177,6 @@ export default function EtbEntwurfsTabs({
    * Dateien. `istLeer` sieht die Dateien nicht, sie liegen nur im Speicher.
    */
   const [verwerfenId, setVerwerfenId] = useState<string | null>(null);
-  /**
-   * Platz der Einstellungen „Nur protokollieren“ und „Werte behalten“ im Reiterband (LLH-1037
-   * D12): rechts neben den Reitern ist auf dem Fükw rund 400 px frei, und das Band ist im
-   * Handschuh-Betrieb höher als ein Kästchen. In der Chip-Zeile brach die Gruppe dort um, die
-   * angepinnte Leiste wuchs um eine Kästchenhöhe. Callback-Ref: der Platz steht in der
-   * Commit-Phase, die Schnellerfassung hängt die Gruppe vor dem ersten Bild hinein.
-   */
-  const [einstellungenZiel, setEinstellungenZiel] = useState<HTMLElement | null>(null);
-
   const onEdit = useCallback(
     (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
       if (action === 'add') neuerEntwurf(werteBehalten ? uebernahme : {});
@@ -288,7 +279,7 @@ export default function EtbEntwurfsTabs({
           onVersandChange={(a) => versandAendern(e.id, a)}
           eingeklappt={eingeklappt}
           startFokus={!einklappbar}
-          einstellungenZiel={einstellungenZiel}
+          onWeitererEntwurf={() => neuerEntwurf(werteBehalten ? uebernahme : {})}
         />
       ) : null,
   }));
@@ -324,11 +315,10 @@ export default function EtbEntwurfsTabs({
         onChange={aktivenSetzen}
         onEdit={onEdit}
         items={items}
-        tabBarExtraContent={{
-          right: <div ref={setEinstellungenZiel} style={{ display: 'flex' }} />,
-        }}
-        // Ausgeblendet, nicht abgehängt: das Feld darunter behält beim Aufklappen seinen Fokus.
-        tabBarStyle={eingeklappt ? { display: 'none' } : undefined}
+        // Die Reiter erst ab dem zweiten Entwurf (Spec „Entwurfsreiter und Vorschau nur bei
+        // Bedarf“); „+ weiterer Entwurf“ steht in der Fußzeile der Erfassung. Ausgeblendet, nicht
+        // abgehängt: das Feld darunter behält beim Aufklappen seinen Fokus.
+        tabBarStyle={eingeklappt || entwuerfe.length < 2 ? { display: 'none' } : undefined}
       />
       {/* Kontrolliertes `<Modal>` statt `Popconfirm`: am × lässt sich keine Blase verankern, und
          der Tastaturweg (Entf) hat gar kein Ziel dafür. */}

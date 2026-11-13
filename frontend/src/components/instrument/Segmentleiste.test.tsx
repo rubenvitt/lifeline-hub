@@ -125,6 +125,20 @@ describe('Segmentleiste', () => {
     expect(online).not.toHaveAttribute('aria-describedby');
   });
 
+  it('das gewählte Segment trägt die Kante seiner Option, die übrigen keine (kwc2yszv)', () => {
+    const optionen: SegmentOption<string>[] = [
+      { wert: 'meldung', label: 'Meldung', punkt: 'rgb(22, 119, 255)', kante: 'rgb(22, 119, 255)' },
+      { wert: 'lage', label: 'Lage', punkt: 'rgb(19, 194, 194)', kante: 'rgb(19, 194, 194)' },
+    ];
+    renderMitProviders(
+      <Segmentleiste optionen={optionen} wert="lage" onWechsel={() => {}} beschriftung="Typ" />,
+    );
+    expect(screen.getByRole('radio', { name: 'Lage' }).style.boxShadow).toContain(
+      'rgb(19, 194, 194)',
+    );
+    expect(screen.getByRole('radio', { name: 'Meldung' }).style.boxShadow).toBe('');
+  });
+
   it('volle Breite (LLH-1642): Leiste als Block, jede Zelle wächst gleich; ohne bleibt sie inline', () => {
     const { rerender } = renderMitProviders(
       <Segmentleiste
