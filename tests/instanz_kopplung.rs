@@ -1590,3 +1590,69 @@ async fn schluessel_einer_widerrufenen_zuordnung_gelten_nicht_mehr() {
     elw_meldet(&elw).await;
     assert!(gueltige_fremde(&uebersicht(&elw).await).is_empty());
 }
+
+// ── Zurückgespielter Hub (LLH-1853) ──────────────────────────────────────────────────────────
+
+/// Zustand und Fingerabdruck eines vom Hub übernommenen Schlüssels am ELW.
+async fn fremder_am_elw(elw: &Instanz, credential_id: &str) -> Option<(String, String)> {
+    sqlx::query_as(
+        "SELECT zustand, fingerabdruck FROM unterschrift_schluessel \
+         WHERE herkunft = 'gegenueber' AND credential_id = ?",
+    )
+    .bind(credential_id)
+    .fetch_optional(&elw.pool)
+    .await
+    .unwrap()
+}
+
+/// Ein neuer Schlüssel am Hub, von A gegengezeichnet und am ELW nachgeliefert.
+async fn neuer_gegengezeichnet(hub: &Instanz, p: &SoftwarePasskey, bezeichnung: &str) -> i64 {
+    let id = schluessel(hub, p, bezeichnung).await;
+    let (s, v) = gegenzeichnen(hub, id, &SoftwarePasskey::new("a", [1u8; 32])).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    id
+}
+
+/// Der Hub spielt eine Sicherung von vor diesem Schlüssel zurück: er ist dort weg.
+async fn verloren_am_hub(hub: &Instanz, id: i64) {
+    sqlx::query("DELETE FROM unterschrift_schluessel WHERE id = ?")
+        .bind(id)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_neuer_schluessel_erreicht_den_elw() {
+    let (hub, elw) = gekoppelt().await;
+    let b = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "Stick B").await;
+    elw_meldet(&elw).await;
+    assert!(fremder_am_elw(&elw, "b").await.is_some());
+    verloren_am_hub(&hub, b).await;
+    neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("c", [3u8; 32]), "Stick C").await;
+    elw_meldet(&elw).await;
+    assert!(
+        fremder_am_elw(&elw, "c").await.is_some(),
+        "der erste Schlüssel nach dem Zurückspielen kommt am ELW an"
+    );
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_widerruf_erreicht_den_elw() {
+    let (hub, elw) = gekoppelt().await;
+    let b = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "Stick B").await;
+    // Sicherung des Hubs: bis hier. C kommt danach und erreicht den ELW noch.
+    let c = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("c", [3u8; 32]), "Stick C").await;
+    elw_meldet(&elw).await;
+    assert!(fremder_am_elw(&elw, "b").await.is_some());
+    verloren_am_hub(&hub, c).await;
+    let pfad = format!("/api/admin/instanz/unterschrift/{b}/widerrufen");
+    let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(
+        fremder_am_elw(&elw, "b").await.unwrap().0,
+        "widerrufen",
+        "der Widerruf nach dem Zurückspielen erreicht den ELW"
+    );
+}

@@ -1243,3 +1243,79 @@ async fn elw_verloren_geht_auch_nach_dem_widerruf_aber_nur_einmal() {
     let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
 }
+
+// ── Zurückgespielter Hub (LLH-1853) ──────────────────────────────────────────────────────────
+
+async fn log_stand(hub: &Instanz) -> i64 {
+    eine(
+        &hub.pool,
+        "SELECT seq FROM sqlite_sequence WHERE name = 'stammdaten_aenderung'",
+    )
+    .await
+}
+
+/// Der Hub spielt eine Sicherung vom Log-Stand `stand` zurück: die Fahrzeuge `verloren` und ihre
+/// Änderungen sind weg, das Log zählt wieder ab dort.
+async fn zurueckspielen_hub(hub: &Instanz, stand: i64, verloren: &[&str]) {
+    for f in verloren {
+        exec(
+            &hub.pool,
+            &format!("DELETE FROM fahrzeug WHERE funkrufname = '{f}'"),
+        )
+        .await;
+    }
+    exec(
+        &hub.pool,
+        &format!("DELETE FROM stammdaten_aenderung WHERE stand > {stand}"),
+    )
+    .await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE sqlite_sequence SET seq = {stand} WHERE name = 'stammdaten_aenderung'"),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_aenderungen_erreichen_den_elw() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Vorher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    let sicherung = log_stand(&hub).await;
+    for f in ["Verloren 1", "Verloren 2", "Verloren 3"] {
+        exec(
+            &hub.pool,
+            &format!("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, '{f}')"),
+        )
+        .await;
+    }
+    melden(&elw).await;
+    lokale_id(&elw, "fahrzeug", "funkrufname", "Verloren 3").await;
+    zurueckspielen_hub(&hub, sicherung, &["Verloren 1", "Verloren 2", "Verloren 3"]).await;
+    exec(
+        &hub.pool,
+        "UPDATE fahrzeug SET funkrufname = 'Vorher 1 geändert' WHERE funkrufname = 'Vorher 1'",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Nachher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    for f in ["Vorher 1 geändert", "Nachher 1"] {
+        assert_eq!(
+            eine::<i64>(
+                &elw.pool,
+                &format!("SELECT COUNT(*) FROM fahrzeug WHERE funkrufname = '{f}'")
+            )
+            .await,
+            1,
+            "{f} erreicht den ELW nach dem Zurückspielen"
+        );
+    }
+}
