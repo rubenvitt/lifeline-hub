@@ -33,6 +33,7 @@ import { ANBINDUNG_NAME_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
 import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
 import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
+import EinwurfZugaenge from './EinwurfZugaenge';
 import {
   ANBINDUNGEN_ABRUF_MS,
   anbindungPath,
@@ -63,6 +64,9 @@ function eingabe(w: FormWerte): AnbindungEingabe {
  * steht genau einmal im Dialog; danach zeigt die Seite nur Fingerabdrücke. Lesen darf, wer in
  * die Verwaltung darf (design.md D11), samt Ablehnungsgrund: das Fremdsystem fragt nicht
  * mit dem Grund zurück, der Betreiber erfährt ihn hier.
+ *
+ * Darunter das Paneel der Einwurf-Zugänge für Absender ohne Signatur (LLH-1654,
+ * `EinwurfZugaenge`), mit eigener Abfrage und eigenen Dialogen.
  */
 export default function Anbindungen() {
   const { benutzer } = useAuth();
@@ -289,6 +293,8 @@ export default function Anbindungen() {
         )}
         {kontext.menue}
       </Paneel>
+
+      <EinwurfZugaenge />
 
       <ErfassungsModal<FormWerte>
         offen={anlegenOffen}

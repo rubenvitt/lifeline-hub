@@ -41,6 +41,18 @@ const zugang = (id: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+/**
+ * Das Paneel der Einwurf-Zugänge (LLH-1654) lädt auf derselben Seite eine eigene Liste; hier ist
+ * sie leer. Seine Tests stehen in `EinwurfZugaenge.test.tsx`.
+ */
+function einwurfLeer() {
+  server.use(
+    http.get('/api/admin/einwurf-zugaenge', () =>
+      HttpResponse.json({ zugaenge: [], gesperrt_grund: null, transport: 'tls' }),
+    ),
+  );
+}
+
 /** Der nächste PATCH mit Basis antwortet 409 (ein anderer hat inzwischen geändert). */
 const konflikt = { offen: false };
 
@@ -57,6 +69,7 @@ function renderSeiten(route = '/admin/einstellungen/anbindungen') {
 
 function stelleBereit(zugaenge: unknown[] = [zugang('a')], gesperrt: string | null = null) {
   konflikt.offen = false;
+  einwurfLeer();
   const aufrufe: { pfad: string; body: unknown }[] = [];
   // Der Stand des Servers: jede Änderung landet hier, damit ein Neuladen sie wieder liefert.
   let stand = [...zugaenge] as { id: string }[];
@@ -263,6 +276,7 @@ describe('Anbindungen (LLH-1652)', () => {
   });
 
   it('ohne Liste kein Anlegen, dafür „Erneut abrufen“', async () => {
+    einwurfLeer();
     server.use(
       http.get('/api/admin/anbindungen', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),

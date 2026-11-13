@@ -925,7 +925,10 @@
           "maschinenzugang_code_ausgestellt",
           "maschinenzugang_schluessel_gebunden",
           "maschinenzugang_geaendert",
-          "maschinenzugang_widerrufen"
+          "maschinenzugang_widerrufen",
+          "einwurf_zugang_angelegt",
+          "einwurf_zugang_schluessel_gewechselt",
+          "einwurf_zugang_widerrufen"
         ]
       },
       "AdressatKategorie": {
@@ -7824,6 +7827,122 @@
           "ausgelassen",
           "keine"
         ]
+      },
+      "EinwurfTransport": {
+        "type": "string",
+        "description": "Über welchen Weg Einwürfe diese Instanz erreichen; die Seite „Anbindungen“ warnt bei\n`http` und `keiner`.",
+        "enum": [
+          "tls",
+          "proxy",
+          "http",
+          "keiner"
+        ]
+      },
+      "EinwurfZugaengeListe": {
+        "type": "object",
+        "description": "Die Einwurf-Zugänge der Org, ob Einwürfe hier angenommen werden und über welchen Weg.",
+        "required": [
+          "zugaenge",
+          "transport"
+        ],
+        "properties": {
+          "gesperrt_grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet: Anlegen und Wechsel\nsind dann gesperrt, und Einwürfe werden abgelehnt."
+          },
+          "transport": {
+            "$ref": "#/components/schemas/EinwurfTransport",
+            "description": "Wie Einwürfe diese Instanz erreichen. Bei `http` nimmt sie Einwürfe unverschlüsselt an,\nbei `keiner` lehnt sie jeden ab."
+          },
+          "zugaenge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinwurfZugangAnzeige"
+            }
+          }
+        }
+      },
+      "EinwurfZugangAnzeige": {
+        "type": "object",
+        "description": "Ein Einwurf-Zugang, wie die Seite „Anbindungen“ ihn zeigt. Ohne Schlüssel.",
+        "required": [
+          "id",
+          "name",
+          "scope",
+          "is_abgelaufen",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "gueltig_bis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_abgelaufen": {
+            "type": "boolean",
+            "description": "„gültig bis“ ist verstrichen; der Zugang verhält sich wie widerrufen."
+          },
+          "name": {
+            "type": "string"
+          },
+          "schluessel_gewechselt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope",
+            "description": "Der Zweck: `alarmmeldungen:write` oder `positionen:write`."
+          },
+          "widerrufen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "widerrufen_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename des Admins, der widerrufen hat."
+          },
+          "zuletzt_genutzt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter angenommener Einwurf, höchstens minütlich fortgeschrieben."
+          }
+        }
+      },
+      "EinwurfZugangSchluessel": {
+        "type": "object",
+        "description": "Ein frisch ausgestellter Schlüssel. Er verlässt den Server nur hier, einmal.",
+        "required": [
+          "zugang",
+          "schluessel"
+        ],
+        "properties": {
+          "schluessel": {
+            "type": "string",
+            "description": "`llh_ew_` und 43 Zeichen. Die Adresse baut die Oberfläche daraus."
+          },
+          "zugang": {
+            "$ref": "#/components/schemas/EinwurfZugangAnzeige"
+          }
+        }
       },
       "ElwVerlorenAntwort": {
         "type": "object",
@@ -23223,7 +23342,7 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.\n- `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder\n  sein Hash.",
         "properties": {
           "adresse": {
             "type": [

@@ -346,6 +346,11 @@ geprüft. Neu geschrieben wird sie mit
 LIFELINE_TESTVEKTOREN_SCHREIBEN=1 cargo test -p lifeline-machine-client
 ```
 
+## Absender ohne Signatur
+
+Ein Absender, der nur eine URL aufrufen kann (BOSWatch, FE2 mit „URL öffnen“, Divera-Webhook,
+OsmAnd), nimmt statt des Maschinenzugangs einen Einwurf-Zugang: [`einwurf.md`](einwurf.md).
+
 ## Betrieb
 
 - Am Hub öffentlich hinter TLS; am ELW, der sich bei einem Hub meldet, nimmt die Instanz keine

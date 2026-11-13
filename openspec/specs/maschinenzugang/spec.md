@@ -168,7 +168,9 @@ Anmeldung abrufbar sein. Ein Fremdsystem darf die Prüfung auslassen.
 
 Eine Route unter `/api/v1/` MUST NOT ein Bearer-Token, ein Sitzungs-Cookie oder ein geteiltes
 Geheimnis als Anmeldung annehmen. Eine Anmelderoute der eigenen Oberfläche MUST NOT
-`Authorization: Machine` annehmen.
+`Authorization: Machine` annehmen. Einzige Ausnahme ist der Einwurf (Spec `einwurf-zugang`): Die
+Routen unter `/api/v1/einwurf/` nehmen einen Schlüssel im Pfad an, schreiben nur und lesen
+nichts. Ein Einwurf-Schlüssel MUST NOT an einer anderen Route als Anmeldung gelten.
 
 #### Scenario: Bearer
 - **WHEN** eine Anfrage an `GET /api/v1/me` oder `GET /api/v1/lage` `Authorization: Bearer …` trägt, auch mit einem früher ausgegebenen Lagemonitor-Schlüssel
@@ -176,6 +178,10 @@ Geheimnis als Anmeldung annehmen. Eine Anmelderoute der eigenen Oberfläche MUST
 
 #### Scenario: Sitzung
 - **WHEN** ein angemeldeter Admin `GET /api/v1/me` mit seinem Sitzungs-Cookie aufruft
+- **THEN** antwortet der Server mit 401
+
+#### Scenario: Einwurf-Schlüssel an einer anderen Route
+- **WHEN** eine Anfrage an `GET /api/v1/me` einen gültigen Einwurf-Schlüssel im Kopf `Authorization` oder in der Abfrage trägt
 - **THEN** antwortet der Server mit 401
 
 ### Requirement: Schlüsselwechsel über einen neuen Code
@@ -206,11 +212,12 @@ ihre `jti` verbrauchen.
 
 ### Requirement: Fehlversuche von Maschinen sperren nie die Anmeldung von Menschen
 
-Der Server SHALL je Quelle in einem eigenen Zähler für Maschinen nur unbekannte Zugangs-IDs und
-gescheiterte Einlösungen zählen. Nach 10 solchen Fehlversuchen in 5 Minuten MUST er diese Quelle
-auf den Maschinenwegen mit 429 abweisen. Dieser Zähler MUST NOT die Anmeldesperre für Passwort,
-Passkey oder Gerätekopplung berühren. Eine falsche Signatur oder Uhr eines bekannten Zugangs MUST
-NOT in ihm zählen.
+Der Server SHALL je Quelle in einem eigenen Zähler für Maschinen nur unbekannte Zugangs-IDs,
+gescheiterte Einlösungen und unbekannte Einwurf-Schlüssel zählen. Nach 10 Fehlversuchen in 5
+Minuten MUST er sie auf den Maschinenwegen, auch beim Einwurf, mit 429 abweisen. Der Zähler MUST
+NOT die Anmeldesperre für Passwort, Passkey oder Gerätekopplung berühren. Falsche Signatur oder
+Uhr eines bekannten Zugangs und ein widerrufener, abgelaufener oder abgelöster Einwurf-Schlüssel
+MUST NOT zählen.
 
 #### Scenario: Falsche Uhr hinter NAT
 - **WHEN** ein bekannter Zugang hinter derselben IP wie eine Wache mehr als zehnmal mit falscher Uhr signiert
@@ -219,6 +226,18 @@ NOT in ihm zählen.
 #### Scenario: Durchprobieren von Zugangs-IDs
 - **WHEN** eine Quelle in 5 Minuten zehn Anfragen mit unbekannten Zugangs-IDs schickt
 - **THEN** antwortet der Server auf weitere Maschinen-Anfragen dieser Quelle mit 429, und die Passwort-Anmeldung von dort bleibt möglich
+
+#### Scenario: Durchprobieren von Einwurf-Schlüsseln
+- **WHEN** eine Quelle in 5 Minuten zehn Einwürfe mit unbekannten Schlüsseln schickt
+- **THEN** antwortet der Server auf weitere Einwürfe dieser Quelle mit 429, auch mit gültigem Schlüssel, und die Passwort-Anmeldung von dort bleibt möglich
+
+#### Scenario: Abgelöster Einwurf-Schlüssel hinter NAT
+- **WHEN** ein Admin den Schlüssel eines Einwurf-Zugangs wechselt und der Absender hinter derselben IP wie eine Wache weiter mehr als zehnmal mit dem alten Schlüssel einwirft
+- **THEN** bekommt er jedes Mal 401, und der neue Schlüssel wird von dieser IP angenommen
+
+#### Scenario: Widerrufener Einwurf-Schlüssel hinter NAT
+- **WHEN** ein Absender hinter derselben IP wie eine Wache mehr als zehnmal mit einem widerrufenen Einwurf-Schlüssel einwirft
+- **THEN** bekommt er jedes Mal 401, und die Maschinenwege dieser IP sind nicht gesperrt
 
 ### Requirement: Admin-Spur und Abrufprotokoll
 

@@ -3817,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-desktop"
-version = "1.0.0-alpha.189"
+version = "1.0.0-alpha.190"
 dependencies = [
  "base64 0.23.1",
  "block2",
@@ -3844,7 +3844,7 @@ dependencies = [
 
 [[package]]
 name = "lifeline-hub"
-version = "1.0.0-alpha.189"
+version = "1.0.0-alpha.190"
 dependencies = [
  "age",
  "anyhow",
@@ -3860,6 +3860,7 @@ dependencies = [
  "clap",
  "ed25519-dalek 3.0.0",
  "flate2",
+ "form_urlencoded",
  "fs4",
  "futures",
  "hkdf 0.13.0",

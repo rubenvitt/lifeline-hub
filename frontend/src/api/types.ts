@@ -36,6 +36,11 @@ export type AnbindungCode = S['AnbindungCode'];
 // Freigabe eines Einsatzes für eine Anbindung durch die Einsatzleitung (LLH-1638)
 export type AnbindungFreigabe = S['AnbindungFreigabe'];
 export type Scope = S['Scope'];
+// Einwurf-Zugänge: Absender ohne Signatur (LLH-1654)
+export type EinwurfZugaengeListe = S['EinwurfZugaengeListe'];
+export type EinwurfZugangAnzeige = S['EinwurfZugangAnzeige'];
+export type EinwurfZugangSchluessel = S['EinwurfZugangSchluessel'];
+export type EinwurfTransport = S['EinwurfTransport'];
 export type ZugangZustand = S['ZugangZustand'];
 export type AblehnungGrund = S['AblehnungGrund'];
 // Lagebild für Externe (LLH-1496)
