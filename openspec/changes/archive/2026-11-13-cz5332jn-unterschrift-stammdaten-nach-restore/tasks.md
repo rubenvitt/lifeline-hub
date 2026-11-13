@@ -39,7 +39,7 @@ Reproduktionstests `zurueckgespielt_hub_*` liegen schon rot auf dem Branch.
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` grün (Lauf oder CI des PRs)
+- [x] 7.1 `./scripts/check-all.sh` grün (Lauf oder CI des PRs). Lokal am 13.11.2026: Bündel `schnell` grün, `cargo test --lib` (4290) und die Suiten `instanz_kopplung`, `instanz_stammdaten`, `instanz_fuehrung`, `instanz_vor_ort`, `instanz_hinweise`, `instanz_lebensende`, `instanz_spiegel`, `patienten_uebergabe`, `instanz_stammdaten_kataloge`, `instanz_stammdaten_live` grün; das volle Bündel `rust` passte nicht in den Speicher der Cloud-Sitzung, es läuft in der CI des PRs
 
 ## Workflow follow-up
 
