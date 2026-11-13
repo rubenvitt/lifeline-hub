@@ -1,7 +1,5 @@
 use crate::error::AppError;
-use crate::kommunikation::{
-    repo as krepo, OBJEKT_AUFTRAG, VOLLZUG_IN_ARBEIT, VOLLZUG_OFFEN, VOLLZUG_VOLLZOGEN,
-};
+use crate::kommunikation::{OBJEKT_AUFTRAG, VOLLZUG_IN_ARBEIT, VOLLZUG_OFFEN, VOLLZUG_VOLLZOGEN};
 use crate::zeitdarstellung::Zeitstil;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -910,33 +908,48 @@ pub async fn setze_in_arbeit(
 /// Auftrag einen Fortschritt, den es nicht mehr gibt, und `COALESCE` in
 /// `setze_in_arbeit` schriebe beim nächsten Mal den alten Stempel fort.
 ///
+/// Nur aus `in_arbeit` und nicht am aufgehobenen Auftrag (LLH-1681): aus `vollzogen` wäre es die
+/// Rücknahme einer Vollzugsmeldung, deren ETB-Meldung stehen bliebe; aus `offen` ein No-op, der
+/// wie Erfolg aussieht. Beide Bedingungen stehen in den schreibenden Anweisungen EINER
+/// Transaktion, damit kein gleichzeitiger Vollzug und kein Aufheben zwischen Prüfen und Schreiben
+/// fällt (wie [`setze_in_arbeit`]). Zustandsfehler → 422, nichts wird geschrieben.
+///
 /// Anders als der Vollzug erzeugt die Rücknahme KEINEN ETB-Eintrag: das Setzen auf
 /// „In Bearbeitung" erzeugt selbst keinen, ein Eintrag nur für dessen Rücknahme
 /// hinterließe im Tagebuch eine Zeile ohne Gegenstück.
-pub async fn setze_offen(
-    pool: &SqlitePool,
-    org_id: i64,
-    einsatz_id: i64,
-    auftrag_id: i64,
-    von_id: i64,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    krepo::setze_vollzug(
-        pool,
-        org_id,
-        einsatz_id,
-        OBJEKT_AUFTRAG,
-        auftrag_id,
-        VOLLZUG_OFFEN,
-        von_id,
-        jetzt,
-    )
-    .await?;
-    sqlx::query("UPDATE auftrag SET in_arbeit_at = NULL WHERE id = ?")
+pub async fn setze_offen(pool: &SqlitePool, auftrag_id: i64) -> Result<(), AppError> {
+    crate::write_retry!(pool, |conn| {
+        let offen = sqlx::query(
+            "UPDATE auftrag SET in_arbeit_at = NULL WHERE id = ? AND aufgehoben_at IS NULL",
+        )
         .bind(auftrag_id)
-        .execute(pool)
-        .await?;
-    Ok(())
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+        if offen == 0 {
+            return Err(AppError::UnprocessableEntity(
+                "Der Auftrag ist aufgehoben".into(),
+            ));
+        }
+        let zurueck = sqlx::query(
+            "UPDATE kommunikation_status \
+             SET vollzug_status = ?, vollzogen_at = NULL, vollzogen_von_id = NULL \
+             WHERE objekt_typ = ? AND objekt_id = ? AND vollzug_status = ?",
+        )
+        .bind(VOLLZUG_OFFEN)
+        .bind(OBJEKT_AUFTRAG)
+        .bind(auftrag_id)
+        .bind(VOLLZUG_IN_ARBEIT)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+        if zurueck == 0 {
+            return Err(AppError::UnprocessableEntity(
+                "Zurücknehmen ist nur aus „In Bearbeitung“ möglich".into(),
+            ));
+        }
+        Ok(())
+    })
 }
 
 /// Meldet Vollzug: Rückmeldetext am Auftrag, Vollzug-Achse → 'vollzogen' und ein
@@ -1001,6 +1014,36 @@ pub async fn melde_vollzug_tx(
             "Der Auftrag ist aufgehoben".into(),
         ));
     }
+    // Vollzug-Achse nur aus `offen` oder `in_arbeit` (LLH-1681), vor der ETB-Meldung und im
+    // selben Commit: ein zweiter, gleichzeitiger Vollzug trifft hier auf den ersten, statt Text,
+    // Zeit und Person zu überschreiben und eine zweite Meldung ins append-only ETB zu legen. Der
+    // Fehler rollt den Rückmeldetext oben mit zurück, ein späterer Teilfehler die Achse.
+    let vollzogen = sqlx::query(
+        "INSERT INTO kommunikation_status \
+           (org_id, einsatz_id, objekt_typ, objekt_id, vollzug_status, vollzogen_at, vollzogen_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?) \
+         ON CONFLICT(objekt_typ, objekt_id) DO UPDATE SET \
+           vollzug_status = excluded.vollzug_status, \
+           vollzogen_at = excluded.vollzogen_at, vollzogen_von_id = excluded.vollzogen_von_id \
+         WHERE kommunikation_status.vollzug_status IN (?, ?)",
+    )
+    .bind(org_id)
+    .bind(einsatz_id)
+    .bind(OBJEKT_AUFTRAG)
+    .bind(auftrag_id)
+    .bind(VOLLZUG_VOLLZOGEN)
+    .bind(jetzt)
+    .bind(von_id)
+    .bind(VOLLZUG_OFFEN)
+    .bind(VOLLZUG_IN_ARBEIT)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if vollzogen == 0 {
+        return Err(AppError::UnprocessableEntity(
+            "Auftrag ist bereits vollzogen".into(),
+        ));
+    }
     let etb_id = crate::etb::repo::anlegen_tx(
         &mut *conn,
         einsatz_id,
@@ -1020,19 +1063,6 @@ pub async fn melde_vollzug_tx(
     )
     .await?;
     link_etb_tx(&mut *conn, etb_id, auftrag_id).await?;
-    // Vollzug-Achse im SELBEN Commit wie ETB-Meldung + Rückmeldetext (atomar):
-    // ein Teilfehler rollt alles zurück, kein verwaister ETB-Eintrag.
-    krepo::setze_vollzug_tx(
-        &mut *conn,
-        org_id,
-        einsatz_id,
-        OBJEKT_AUFTRAG,
-        auftrag_id,
-        VOLLZUG_VOLLZOGEN,
-        von_id,
-        jetzt,
-    )
-    .await?;
     Ok(etb_id)
 }
 
@@ -2175,6 +2205,147 @@ mod tests {
         assert_eq!(nach.auftrag.in_arbeit_at, None);
     }
 
+    /// Zählt die ETB-Meldungen, die am Auftrag hängen.
+    async fn etb_meldungen(pool: &SqlitePool, auftrag_id: i64) -> i64 {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE auftrag_id = ? AND typ = 'meldung'",
+        )
+        .bind(auftrag_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LLH-1681: ein zweiter Vollzug wird im Schreibweg selbst abgelehnt, nicht erst in der
+    /// Route davor. Keine zweite ETB-Meldung, Text, Zeit und Person des ersten bleiben.
+    #[tokio::test]
+    async fn zweiter_vollzug_wird_abgelehnt_und_schreibt_nichts() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        melde_vollzug(&pool, 1, e, d.auftrag.id, b, "Erste", "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        let err = melde_vollzug(
+            &pool,
+            1,
+            e,
+            d.auftrag.id,
+            b,
+            "Zweite",
+            "2026-06-11 10:05:00",
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+        assert_eq!(etb_meldungen(&pool, d.auftrag.id).await, 1);
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:06:00")
+            .await
+            .unwrap();
+        assert_eq!(nach.auftrag.vollzugsmeldung.as_deref(), Some("Erste"));
+        assert_eq!(
+            nach.auftrag.vollzogen_at.as_deref(),
+            Some("2026-06-11 10:00:00")
+        );
+    }
+
+    /// LLH-1681: die Rücknahme holt einen vollzogenen Auftrag nicht auf „offen“ zurück, auch
+    /// wenn sie an der Prüfung der Route vorbeikommt (gleichzeitiger Vollzug).
+    #[tokio::test]
+    async fn ruecknahme_holt_einen_vollzogenen_auftrag_nicht_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
+            .await
+            .unwrap();
+        melde_vollzug(
+            &pool,
+            1,
+            e,
+            d.auftrag.id,
+            b,
+            "Erledigt",
+            "2026-06-11 10:00:00",
+        )
+        .await
+        .unwrap();
+        let err = setze_offen(&pool, d.auftrag.id).await.unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:06:00")
+            .await
+            .unwrap();
+        assert_eq!(nach.auftrag.vollzug_status, VOLLZUG_VOLLZOGEN);
+        assert_eq!(
+            nach.auftrag.vollzogen_at.as_deref(),
+            Some("2026-06-11 10:00:00")
+        );
+        assert_eq!(
+            nach.auftrag.in_arbeit_at.as_deref(),
+            Some("2026-06-11 09:30:00"),
+            "der Zeitstempel geht nur mit einer gelungenen Rücknahme"
+        );
+    }
+
+    /// LLH-1681: die Rücknahme gilt nur aus `in_arbeit`; aus `offen` wäre sie ein No-op, der wie
+    /// Erfolg aussieht.
+    #[tokio::test]
+    async fn ruecknahme_aus_offen_ist_ein_zustandsfehler() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let err = setze_offen(&pool, d.auftrag.id).await.unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_nimmt_in_arbeit_samt_zeitstempel_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
+            .await
+            .unwrap();
+        setze_offen(&pool, d.auftrag.id).await.unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00")
+            .await
+            .unwrap();
+        assert_eq!(nach.auftrag.vollzug_status, VOLLZUG_OFFEN);
+        assert_eq!(nach.auftrag.in_arbeit_at, None);
+    }
+
     #[tokio::test]
     async fn melde_vollzug_setzt_text_status_und_etb_meldung() {
         let pool = crate::db::test_pool().await;
@@ -2382,6 +2553,37 @@ mod tests {
         // Eine inzwischen ersetzte Empfängerzeile (Berichtigung) ist weg, nicht aufgehoben.
         let weg = quittiere_empfaenger(&pool, 99_999, b, "2026-06-11 12:00:00").await;
         assert!(matches!(weg, Err(AppError::NotFound)), "{weg:?}");
+    }
+
+    /// LLH-1681: auch die Rücknahme prüft das Aufheben selbst; der Auftrag behält seinen Stand.
+    #[tokio::test]
+    async fn ruecknahme_lehnt_den_aufgehobenen_ab() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
+            .await
+            .unwrap();
+        hebe_auf_roh(&pool, d.auftrag.id, b, "2026-06-11 10:00:00").await;
+
+        let err = setze_offen(&pool, d.auftrag.id).await.unwrap_err();
+        assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:01:00")
+            .await
+            .unwrap();
+        assert_eq!(nach.auftrag.vollzug_status, VOLLZUG_IN_ARBEIT);
+        assert_eq!(
+            nach.auftrag.in_arbeit_at.as_deref(),
+            Some("2026-06-11 09:30:00")
+        );
     }
 
     #[tokio::test]

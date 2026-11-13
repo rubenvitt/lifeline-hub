@@ -9,7 +9,6 @@ use crate::einsatz::modul::Auftraege;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
-use crate::kommunikation::VOLLZUG_IN_ARBEIT;
 use crate::live::LiveEvent;
 use crate::routes::support::{hoechstens, pflicht_max};
 use crate::zeit::jetzt;
@@ -362,41 +361,16 @@ pub async fn vollzug(
         )?),
         _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
     };
-    // Ein aufgehobener Auftrag nimmt keinen Fortschritt mehr an (LLH-1098), auch keine
-    // Rücknahme: Zustandsfehler → 422.
-    if repo::laden(&state.pool, auftrag_id, &now)
-        .await?
-        .auftrag
-        .bearbeitungsstatus
-        == AuftragBearbeitungsstatus::Aufgehoben
-    {
-        return Err(AppError::UnprocessableEntity(
-            "Der Auftrag ist aufgehoben".into(),
-        ));
-    }
+    // Die Zustandsregeln prüfen die Schreibwege selbst, in ihren schreibenden Anweisungen
+    // (LLH-1681): ein aufgehobener Auftrag nimmt keinen Fortschritt mehr an (LLH-1098), auch
+    // keine Rücknahme; ein vollzogener keinen zweiten Vollzug und keine Rücknahme. Eine Prüfung
+    // hier vorab ließe zwei gleichzeitige Anfragen beide durch. Zustandsfehler → 422.
     match req.status.as_str() {
         // Rücknahme (LFH-343 · C8): nur aus `in_arbeit`. Aus `vollzogen`/`abgenommen`
         // wäre das die Rücknahme einer Vollzugsmeldung — ein fachlicher Vorgang mit
         // eigenem Weg, kein Undo eines Triage-Klicks. Aus `offen` heraus wäre es ein
-        // No-op, der wie Erfolg aussieht. Beides ist ein Zustandsfehler, nicht ein
-        // Feldfehler → 422 (src/error.rs).
-        "offen" => {
-            let aktuell = repo::laden(&state.pool, auftrag_id, &now).await?;
-            if aktuell.auftrag.vollzug_status != VOLLZUG_IN_ARBEIT {
-                return Err(AppError::UnprocessableEntity(
-                    "Zurücknehmen ist nur aus „In Bearbeitung“ möglich".into(),
-                ));
-            }
-            repo::setze_offen(
-                &state.pool,
-                org_id,
-                einsatz_id,
-                auftrag_id,
-                ctx.benutzer.id,
-                &now,
-            )
-            .await?;
-        }
+        // No-op, der wie Erfolg aussieht.
+        "offen" => repo::setze_offen(&state.pool, auftrag_id).await?,
         "in_arbeit" => {
             repo::setze_in_arbeit(
                 &state.pool,
@@ -410,17 +384,6 @@ pub async fn vollzug(
         }
         "vollzogen" => {
             let text = vollzugstext.unwrap_or_default();
-            // Doppel-Vollzug verhindern → sonst zweite ETB-Meldung (append-only).
-            if repo::laden(&state.pool, auftrag_id, &now)
-                .await?
-                .auftrag
-                .vollzug_status
-                == "vollzogen"
-            {
-                return Err(AppError::UnprocessableEntity(
-                    "Auftrag ist bereits vollzogen".into(),
-                ));
-            }
             let etb_id = repo::melde_vollzug(
                 &state.pool,
                 org_id,
@@ -436,7 +399,7 @@ pub async fn vollzug(
         _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
     }
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
-    // Erledigt gemeldet: einmal je Auftrag, ein zweiter Vollzug ist oben schon 422.
+    // Erledigt gemeldet: einmal je Auftrag, ein zweiter Vollzug ist schon im Schreibweg 422.
     if req.status == "vollzogen" {
         crate::auftrag::benachrichtigung::erledigt(
             &state.pool,
