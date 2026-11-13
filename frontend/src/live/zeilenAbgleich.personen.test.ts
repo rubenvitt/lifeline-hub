@@ -221,25 +221,49 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
   });
 
-  it('ändert sich die Liste während des Zeilenabrufs, bleibt die Änderung und die Liste geht an den Sammler', async () => {
+  it('ändert sich die abgerufene Zeile während des Abrufs, bleibt die Änderung und die Zeile wartet aufs nächste Fenster', async () => {
     const { qc, inval, zeilen } = aufbau();
     qc.setQueryData(einsatzKeys.personen(E), [person(1, 1)]);
-    let antworten: (p: Person) => void = () => {};
-    api.loadPersonZeile.mockReturnValue(new Promise<Person>((r) => (antworten = r)));
+    let resolveZeile: (p: Person) => void = () => {};
+    api.loadPersonZeile.mockReturnValueOnce(new Promise<Person>((r) => (resolveZeile = r)));
+    api.loadPersonZeile.mockReturnValue(new Promise<Person>(() => {}));
 
     zeilen.vormerken('personen', 1);
     await fenster();
     expect(api.loadPersonZeile).toHaveBeenCalledTimes(1);
     // Optimistische Änderung (etwa Grundriss), während der Zeilenabruf läuft.
-    await vi.advanceTimersByTimeAsync(5);
     const optimistisch = [person(1, 1, { status: 'vermisst' })];
     qc.setQueryData(einsatzKeys.personen(E), optimistisch);
-    antworten(person(1, 1));
-    await fenster();
+    resolveZeile(person(1, 1));
     await fenster();
 
     expect(qc.getQueryData(einsatzKeys.personen(E))).toEqual(optimistisch);
-    expect(invalidierteKeys(inval)).toEqual([einsatzKeys.personen(E)]);
+    expect(api.loadPersonZeile).toHaveBeenCalledTimes(2);
+    expect(inval).not.toHaveBeenCalled();
+  });
+
+  it('ändert sich während des Abrufs eine andere Zeile, bleibt sie und die abgerufene geht ein', async () => {
+    const { qc, inval, zeilen } = aufbau();
+    qc.setQueryData(einsatzKeys.personen(E), [person(1, 1), person(2, 2)]);
+    let resolveZeile: (p: Person) => void = () => {};
+    api.loadPersonZeile.mockReturnValue(new Promise<Person>((r) => (resolveZeile = r)));
+
+    zeilen.vormerken('personen', 2);
+    await fenster();
+    qc.setQueryData<Person[]>(einsatzKeys.personen(E), (alt) =>
+      alt?.map((p) => (p.id === 1 ? { ...p, status: 'vermisst' } : p)),
+    );
+    resolveZeile(person(2, 2, { name: 'Neu' }));
+    await fenster();
+
+    expect(
+      qc.getQueryData<Person[]>(einsatzKeys.personen(E))?.map((p) => [p.id, p.status, p.name]),
+    ).toEqual([
+      [1, 'vermisst', 'Name 1'],
+      [2, 'betroffen', 'Neu'],
+    ]);
+    expect(api.loadPersonZeile).toHaveBeenCalledTimes(1);
+    expect(inval).not.toHaveBeenCalled();
   });
 
   it(`über ${ZEILEN_GRENZE} Personen im Fenster ruft sie die Listen einmal ab`, async () => {

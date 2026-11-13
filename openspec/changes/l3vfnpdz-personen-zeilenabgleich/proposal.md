@@ -27,7 +27,10 @@ Liste, die im Großschadensfall am schnellsten wächst (Zunder LLH-1682, Audit v
 - Die Zeile trägt Name und Abschnitt der versorgenden Einheit per Join. Bisher hat jedes
   `person`-Ereignis die ganze Liste neu geladen und diese Angaben nebenbei aufgefrischt. Künftig
   sendet der Server `person` je versorgter Person, wenn eine Einheit umbenannt oder einem anderen
-  Abschnitt zugeordnet wird und wenn ein Abschnitt umbenannt oder aufgelöst wird.
+  Abschnitt zugeordnet wird (auch per Abruf aus dem Bereitstellungsraum oder Ablösung) und wenn
+  ein Abschnitt umbenannt oder aufgelöst wird; über zehn Personen einmal ohne Kennung.
+- Ändert sich eine Zeile im Tab, während ihr Abruf läuft (optimistische Änderung), wartet sie aufs
+  nächste Fenster, statt überschrieben zu werden; auch für Schäden.
 - Ohne Kennung, bei gescheitertem Zeilenabruf, nicht geladener Liste oder mehr als
   `ZEILEN_GRENZE` Personen je Fenster bleibt es beim vollen Abgleich, wie bei Schäden.
 
@@ -42,19 +45,22 @@ Keine.
 
 ### Modified Capabilities
 
-- `live-abgleich`: zwei neue Requirements. „Ereignisse zu Personen gleichen zeilenweise ab“
-  (Einsortieren, Storno, Betroffene einer Betreuungsstelle, Nachforderung, Grenze je Fenster)
-  und „Der Zeilenabruf einer Person ist nicht protokolliert“. Das bestehende Requirement zu
-  Entwürfen und Schäden bleibt unverändert.
+- `live-abgleich`: drei neue Requirements. „Ereignisse zu Personen gleichen zeilenweise ab“
+  (Einsortieren, Storno, Betroffene einer Betreuungsstelle, Nachforderung, Grenze je Fenster),
+  „Der Zeilenabruf einer Person ist nicht protokolliert“ und „Der Zeilenabgleich überschreibt
+  keine lokale Änderung“ (gilt auch für Schäden). Das bestehende Requirement zu Entwürfen und
+  Schäden bleibt unverändert.
 
 ## Impact
 
 - Backend: `src/routes/einsatz_person.rs` (neuer Handler), `src/app.rs` (Route),
   `src/geraet/mod.rs` (Routenlisten der Geräte, die die Liste lesen),
   `src/routes/nachforderung.rs` (`person_id` im Ereignis), `src/routes/einsatz_einheit.rs` und
-  `src/routes/einsatzabschnitt.rs` mit `src/einsatzabschnitt/repo.rs` (`person` je versorgter
-  Person), Tests in `tests/einsatz_person.rs`, `tests/geraet_kopplung.rs`,
-  `tests/nachforderung_person.rs` und den Tests von Einheit und Abschnitt.
+  `src/routes/einsatzabschnitt.rs` mit `src/einsatzabschnitt/repo.rs`,
+  `src/routes/einsatz_bereitstellungsraum.rs`, `src/routes/abloesung.rs` mit
+  `src/abloesung/repo.rs` (`person` je versorgter Person), Tests in `tests/einsatz_person.rs`,
+  `tests/geraet_kopplung.rs`, `tests/nachforderung_person.rs`, `tests/abschnitt_namenstraeger.rs`,
+  `tests/einsatz_bereitstellungsraum.rs` und `tests/abloesung.rs`.
 - Frontend: `frontend/src/api/queryKeys.ts` (`ZeilenZiel`, `EINSATZ_STREAM_ZIELE.person`),
   `frontend/src/live/zeilenAbgleich.ts` (Ziel `personen`), `frontend/src/api/einsatzPerson.ts`
   (Zeilenabruf, Vergleich, Form der Auswahl), Tests daneben.

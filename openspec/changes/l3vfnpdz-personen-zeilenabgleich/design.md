@@ -125,13 +125,17 @@ Bisher frischte jedes `person`-Ereignis sie nebenbei auf, weil es die ganze List
 sendet der Server nach dem Commit `person` mit `person_id` je Person mit dieser
 `versorgende_einheit_id`:
 
-- `PATCH …/einheiten/{eid}`, wenn sich Name oder Abschnitt ändern;
+- `PATCH …/einheiten/{eid}`, wenn sich Name oder Abschnitt ändern, gleich nach dem Speichern
+  (ein späterer Schritt desselben PATCH kann noch mit 422 scheitern);
 - Umbenennen und Auflösen eines Abschnitts: `NamensTraeger` (`einsatzabschnitt::repo`) führt
   schon jedes Objekt, das den Abschnittsnamen per Join trägt (LLH-1291), und bekommt die
-  versorgten Personen der Einheiten im Abschnitt dazu.
+  versorgten Personen der Einheiten im Abschnitt dazu;
+- Abruf aus dem Bereitstellungsraum mit Ziel-Abschnitt;
+- Vollzug und Rücknahme einer Ablösung mit Abschnittsübergabe (`VollzugWirkung.abschnitt_gewechselt`).
 
-Über zehn Personen je Fenster lädt der Tab die Liste einmal ganz (`ZEILEN_GRENZE`). Beides ist
-selten, deshalb ist das in Ordnung.
+Über zehn Personen (`PERSONEN_EINZELN_MAX`, gleich `ZEILEN_GRENZE`) sendet der Server ein
+einziges `person` ohne Kennung: Ab dieser Zahl lädt der Tab die Liste ohnehin ganz, und hunderte
+Einzelereignisse liefen über Kanal und Replay-Ring (je 256 Plätze) und lösten `lagged` aus.
 
 - *`einheit` und `abschnitt` ziehen den Prefix `personen`*: verworfen (Abstimmung 13.11.2026).
   `einheit` kommt bei jedem Statuswechsel einer Einheit, im MANV wäre die Volllast nur
@@ -139,18 +143,24 @@ selten, deshalb ist das in Ordnung.
 - *Hinnehmen*: verworfen. Ein dauerhaft offener Leitstellen-Tab zeigte den alten Namen bis zum
   Neuladen.
 
-### D6 Eine Liste, die sich während des Zeilenabrufs geändert hat, geht an den Sammler
+### D6 Eine Zeile, die sich während ihres Abrufs geändert hat, wartet aufs nächste Fenster
 
 Der Zeilenabruf ist kein Query, `cancelQueries` in einem `onMutate` erreicht ihn nicht. Schreibt
 eine optimistische Änderung (Grundriss, Status) während des Abrufs in die Liste, überschriebe die
-Zeile vom Stand davor sie. Der Zeilenabgleich merkt sich deshalb je Liste `dataUpdatedAt` vor dem
-Abruf; hat es sich danach geändert, setzt er nichts ein und gibt die Liste an den Sammler, wie
-vor dieser Change. Das gilt für Schäden genauso.
+Zeile vom Stand davor sie. Der Zeilenabgleich merkt sich deshalb je Liste die Referenz jeder
+abgerufenen Zeile vor dem Abruf. Ist sie danach eine andere, setzt er diese Zeile nicht ein und
+legt ihre Kennung ins nächste Fenster; die übrigen Zeilen gehen ein. Structural Sharing von
+TanStack lässt unveränderte Zeilen dabei gleich. Eine Liste, die erst während des Abrufs geladen
+wurde, geht an den Sammler. Das gilt für Schäden genauso.
+
+- *Ganze Liste an den Sammler, wenn sich `dataUpdatedAt` geändert hat* (erste Behebung):
+  verworfen im Nachreview. Eine optimistische Änderung an einer anderen Zeile hätte einen
+  Listenabruf ausgelöst, der sie vor dem Speichern zurückspringen lassen kann.
 
 ### D7 Bezeichner
 
-Neue Namen folgen der Bezeichner-Sprache (LLH-1312): `loadPersonZeile`, `comparePersonen`,
-`toPersonAuswahl`. `gefiltert` bleibt in der Familie `liste`/`fenster`/`einzeln` derselben Datei,
+Neue Namen folgen der Bezeichner-Sprache (LLH-1312): `loadPersonZeile`, `loadPersonZeileOrNull`,
+`comparePersonen`, `toPersonAuswahl`, `snapshotRows`, `rowOf`, `changedIds`. `gefiltert` bleibt in der Familie `liste`/`fenster`/`einzeln` derselben Datei,
 die diese Change nicht umstellt.
 
 ## Risks / Trade-offs
@@ -162,11 +172,15 @@ die diese Change nicht umstellt.
   totale Ordnung ohne Gleichstand.
 - [Ein Schreibweg ändert die Zeile einer anderen Person ohne eigenes Ereignis] → Bekannt und
   abgedeckt: Haushaltswechsel meldet die nachgerückte Bezugsperson mit, die Nachforderung ihre
-  Person (D3), Einheit und Abschnitt ihre versorgten Personen (D5). Ein künftiger Join in
+  Person (D3), Einheit, Abschnitt, Abruf und Ablösung die versorgten Personen (D5). Ein künftiger Join in
   `SELECT_ALLE` braucht dasselbe; sonst bleibt das Feld bis zum Neuladen, Fokuswechsel oder
   `lagged` stehen.
 - [Ältere Tabs mit altem Frontend] → Frontend und Server kommen aus demselben Binary; ein alter
   Tab kennt die Route nicht und gleicht wie bisher ganz ab.
+- [Neuer Tab nach einem Server-Rollback] → Der alte Server kennt die Zeilen-Route nicht und
+  antwortet mit demselben 404 wie für eine Person außerhalb der Liste; der Tab nähme geänderte
+  Personen bis zum nächsten Listenabruf heraus. Nur ohne Migrationsunterschied möglich (sonst
+  startet das alte Binary nicht); Umgang: siehe PR.
 
 ## Migration Plan
 

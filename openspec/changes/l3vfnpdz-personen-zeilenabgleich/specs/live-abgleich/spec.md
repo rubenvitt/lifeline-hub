@@ -41,7 +41,12 @@ laufende Abrufe gelten dieselben Ausnahmen wie bei Schäden.
 - **WHEN** eine Einheit, die Personen versorgt, umbenannt oder einem anderen Abschnitt zugeordnet
   wird, oder ihr Abschnitt umbenannt oder aufgelöst wird
 - **THEN** zeigen die Personenlisten der anderen Tabs bei diesen Personen den neuen Namen bzw.
-  Abschnitt, ohne neu geladen zu werden
+  Abschnitt, ohne dass jemand die Seite neu lädt; bis zehn Personen nur über ihre Zeilen
+
+#### Scenario: Abruf oder Ablösung wechselt den Abschnitt
+- **WHEN** eine Einheit mit versorgten Personen aus dem Bereitstellungsraum in einen Abschnitt
+  abgerufen wird oder bei einer Ablösung ihren Abschnitt übergibt oder zurückbekommt
+- **THEN** zeigen die Personenlisten der anderen Tabs bei diesen Personen den neuen Abschnitt
 
 #### Scenario: Viele Personen auf einmal
 - **WHEN** nach einem Funkloch Ereignisse zu 40 Personen in einem Sammelfenster eintreffen
@@ -73,3 +78,21 @@ seinen Listen nehmen, ohne sie ganz neu zu laden. Den medizinischen Verlauf lief
 #### Scenario: Einheitengerät
 - **WHEN** ein Einheitengerät eine von seiner Einheit versorgte Person abruft
 - **THEN** fehlen die Personalien wie in seiner Personenliste
+
+### Requirement: Der Zeilenabgleich überschreibt keine lokale Änderung
+
+Ändert sich eine abgerufene Zeile im Tab, während ihr Zeilenabruf läuft (etwa durch eine
+optimistische Änderung), MUST der Zeilenabgleich diese Zeile nicht mit dem abgerufenen Stand
+überschreiben, sondern sie im nächsten Sammelfenster erneut abrufen. Die übrigen abgerufenen
+Zeilen SHALL er einsetzen. Das gilt für Schäden und Personen.
+
+#### Scenario: Person im Grundriss gezogen
+- **WHEN** jemand eine Person im Grundriss auf einen Platz zieht, während ihr Zeilenabruf aus
+  einem fremden Ereignis läuft
+- **THEN** springt sie nicht auf den alten Platz zurück, und ihre Zeile wird im nächsten Fenster
+  erneut abgerufen
+
+#### Scenario: Andere Zeile geändert
+- **WHEN** während des Zeilenabrufs einer Person eine andere Person der Liste lokal geändert wird
+- **THEN** behält die andere Person ihre Änderung, und die abgerufene Zeile geht ein, ohne dass
+  der Tab die Liste ganz neu lädt

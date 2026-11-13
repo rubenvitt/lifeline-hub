@@ -122,7 +122,7 @@ const ungestorniert = (s: Schaden): Schaden | null => (s.storniert_at == null ? 
  * was die Liste dieser Sitzung zeigt; ein 404 (storniert, fremde Stelle am Gerät) heißt, die
  * Person gehört in keine Liste dieses Tabs. Jeder andere Fehler bleibt ein Fehler (Sammler).
  */
-async function loadPersonZeileOderNull(einsatzId: number, id: number): Promise<Person | null> {
+async function loadPersonZeileOrNull(einsatzId: number, id: number): Promise<Person | null> {
   try {
     return await loadPersonZeile(einsatzId, id);
   } catch (e) {
@@ -183,7 +183,7 @@ const ZIELE: Record<ZeilenZiel, Ziel> = {
   // LLH-1682: Liste, Auswahl und die Betroffenen je Stelle; alle aus einem Abruf der nicht
   // protokollierten Zeilen-Route. Der Prefix `personen(e)` erfasst die Stellenlisten mit.
   personen: ziel<Person | null>(
-    loadPersonZeileOderNull,
+    loadPersonZeileOrNull,
     (e) => [einsatzKeys.personen(e), einsatzKeys.personenAuswahl(e)],
     [
       liste(einsatzKeys.personen, personOhneStorno, comparePersonen),
@@ -239,6 +239,18 @@ export function fensterEinsortieren<T extends { id: number }>(
   if (ziel === -1) ziel = seiten.length - 1;
   seiten[ziel] = [...seiten[ziel], zeile].sort(vergleich);
   return { ...alt, pages: seiten };
+}
+
+/**
+ * Die Zeile `id` in den Daten einer Liste: flache Liste, Seitenkette oder Einzelabruf (dessen
+ * Daten die Zeile selbst sind). `undefined`, wenn sie nicht darin steht.
+ */
+function rowOf(data: unknown, id: number): unknown {
+  if (Array.isArray(data)) return data.find((z: { id?: number }) => z?.id === id);
+  if (data && typeof data === 'object' && 'pages' in data) {
+    return (data as InfiniteData<{ id: number }[]>).pages.flat().find((z) => z.id === id);
+  }
+  return (data as { id?: number } | undefined)?.id === id ? data : undefined;
 }
 
 export interface ZeilenSammler {
@@ -298,30 +310,36 @@ export function erzeugeZeilenSammler(
     vorgemerkt.set(ziel, set);
   };
 
-  // Stand jeder geladenen Liste vor dem Zeilenabruf (design.md D6, LLH-1682). Der Abruf ist kein
-  // Query, `cancelQueries` in einem `onMutate` erreicht ihn nicht; eine optimistische Änderung
-  // während des Abrufs würde sonst vom Stand davor überschrieben.
-  const staende = (def: Ziel) =>
+  // Die Zeilen der abgerufenen Kennungen in jeder geladenen Liste vor dem Zeilenabruf (design.md
+  // D6, LLH-1682). Der Abruf ist kein Query, `cancelQueries` in einem `onMutate` erreicht ihn
+  // nicht. Ändert eine optimistische Änderung währenddessen eine dieser Zeilen, ist ihre Referenz
+  // danach eine andere (Structural Sharing lässt unveränderte Zeilen gleich), und die Kennung
+  // wartet aufs nächste Fenster, statt die Änderung mit dem Stand davor zu überschreiben.
+  const snapshotRows = (def: Ziel, ids: readonly number[]) =>
     new Map(
-      def.listen
-        .flatMap(eintraege)
-        .map((key) => [hashKey(key), qc.getQueryState(key)?.dataUpdatedAt] as const),
+      def.listen.flatMap(eintraege).map((key) => {
+        const data = qc.getQueryData(key);
+        return [hashKey(key), new Map(ids.map((id) => [id, rowOf(data, id)]))] as const;
+      }),
     );
 
   const zeilenLaden = async (ziel: ZeilenZiel, ids: number[]) => {
     const def = ZIELE[ziel];
     laufend.add(ziel);
-    const vorher = staende(def);
+    const rowsBefore = snapshotRows(def, ids);
     const ergebnisse = await Promise.allSettled(ids.map((id) => def.laden(einsatzId, id)));
     laufend.delete(ziel);
     if (beendet) return; // `raeumen` hat die Listen schon als veraltet markiert.
     if (ergebnisse.some((e) => e.status === 'rejected')) {
       listenAnSammler(ziel);
     } else {
+      const changedIds = new Set<number>();
       for (const l of def.listen) {
         for (const key of eintraege(l)) {
-          const geaendert = qc.getQueryState(key)?.dataUpdatedAt !== vorher.get(hashKey(key));
-          if (geaendert || qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
+          const before = rowsBefore.get(hashKey(key));
+          // Ohne Schnappschuss ist die Liste erst während des Abrufs geladen worden; ob vor oder
+          // nach der Änderung gelesen, weiß nur ihr nächster Abruf.
+          if (!before || qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
             if (qc.getQueryData(key) !== undefined) sammler.vormerken(key);
             continue;
           }
@@ -330,6 +348,10 @@ export function erzeugeZeilenSammler(
           let neu: unknown = alt;
           for (const [i, e] of ergebnisse.entries()) {
             if (e.status !== 'fulfilled') continue;
+            if (rowOf(alt, ids[i]) !== before.get(ids[i])) {
+              changedIds.add(ids[i]);
+              continue;
+            }
             neu = l.einsetzen(neu, ids[i], e.value, key);
             if (neu === AN_SAMMLER) break;
           }
@@ -337,6 +359,7 @@ export function erzeugeZeilenSammler(
           else if (neu !== alt) qc.setQueryData(key, neu);
         }
       }
+      if (changedIds.size > 0) zurueckstellen(ziel, changedIds);
     }
     planen();
   };
