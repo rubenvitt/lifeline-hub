@@ -305,9 +305,9 @@ es gibt keine Stelle mehr, an der er stünde.
 `zugang me`: der kürzeste Weg, eine Anbindung samt Freigabe zu prüfen. TypeScript-Modul und
 Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 
-### D12 ADR-0033 und ADR-0022
+### D12 ADR-0034 und ADR-0022
 
-- **ADR-0033** „Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn
+- **ADR-0034** „Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn
   freigegeben hat“, `gilt_fuer` `src/public_api/**`, `src/routes/einsatz_anbindungen.rs`. Regeln:
   eine v1-Route mit Lese-Scope mit Einsatzbezug bestimmt ihren Einsatz allein über
   `public_api::freigabe`; die Freigabe gilt an der Instanz des Zugangs, wird nicht gespiegelt und

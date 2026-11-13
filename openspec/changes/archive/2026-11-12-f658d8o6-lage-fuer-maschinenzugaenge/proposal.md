@@ -29,7 +29,7 @@ ist zugleich der erste Lesefall der öffentlichen API.
   `lagemonitor_freigabe`. Bestehende Schlüssel gelten nach dem Update nicht mehr.
 - **Referenz-Client:** Der Rust-Client und das Kommando `lifeline-hub zugang` lesen die Lage;
   darauf baut der Lagemonitor auf.
-- **Entscheidung als ADR-0033** festgehalten: einsatzbezogenes Lesen eines Maschinenzugangs
+- **Entscheidung als ADR-0034** festgehalten: einsatzbezogenes Lesen eines Maschinenzugangs
   läuft immer über die Freigabe, an der Instanz des Zugangs.
 
 ## Capabilities
@@ -66,7 +66,7 @@ ist zugleich der erste Lesefall der öffentlichen API.
 - **Client-Crate:** `crates/lifeline-machine-client` bekommt den Abruf der Lage.
 - **Doku:** `docs/api/maschinenzugang.md`, Anwenderkapitel „Externe Lagemonitore“,
   „Anbindungen“, „Verwaltung“, „Zugangsprotokoll“, „Lagebild für Externe“; arc42 Kapitel 5 und
-  11 (R33); ADR-0022 (`gilt_fuer`), neue ADR-0033; Nachtrag im Konzept
+  11 (R33); ADR-0022 (`gilt_fuer`), neue ADR-0034; Nachtrag im Konzept
   `docs/konzepte/2026-11-11-oeffentliche-api.md`.
 - **Andere Projekte:** LGM-13 trägt nur noch Adresse und Widget-Schalter, LGM-14 liest
   `GET /api/v1/lage` mit dem Referenz-Client. Beides liegt außerhalb dieses Repos.

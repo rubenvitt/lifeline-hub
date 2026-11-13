@@ -1,6 +1,6 @@
 -- LLH-1638 (Change f658d8o6-lage-fuer-maschinenzugaenge, design.md D2): Freigabe eines Einsatzes
 -- für einen Maschinenzugang durch die Einsatzleitung. Lese-Scopes mit Einsatzbezug (`lage:read`)
--- sehen nur den Einsatz, der hier für den Zugang steht (ADR-0022, ADR-0033).
+-- sehen nur den Einsatz, der hier für den Zugang steht (ADR-0022, ADR-0034).
 
 CREATE TABLE maschinenzugang_freigabe (
     zugang_id       TEXT    NOT NULL REFERENCES maschinenzugang(id) ON DELETE CASCADE,
