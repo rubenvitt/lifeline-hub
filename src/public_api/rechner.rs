@@ -10,12 +10,14 @@
 //!
 //! Anders als der Rechner der Oberfläche prüft die API streng (design.md D4): erst jedes Feld für
 //! sich (400 `invalid_field`, der Text nennt das Feld), dann den Zusammenhang (422
-//! `unprocessable`). Wirksam ist je Richtwert Anfrage vor Organisation des Zugangs vor Basis;
-//! Werte eines Einsatzes gehören nicht dazu, `einsatz_id` ist ein unbekanntes Feld (D1).
+//! `unprocessable`). Wirksam ist je Richtwert Anfrage vor Einsatz vor Organisation des Zugangs
+//! vor Basis. Den Einsatz nennt `einsatz_id`; er gilt nur, wenn die Einsatzleitung ihn für den
+//! Zugang freigegeben hat (LLH-1856, ADR-0035, Change `q9b4qq0o-rechner-einsatz-richtwerte`),
+//! sonst 404. Geprüft wird erst die Anfrage, dann der Einsatz (design.md D3).
 
 use std::collections::{BTreeMap, HashMap};
 
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::Response;
 use serde::de::{self, DeserializeOwned, MapAccess, Visitor};
@@ -23,9 +25,11 @@ use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
 use super::error::{ApiError, ErrorCode};
+use super::freigabe;
 use super::machine::MachineClient;
 use crate::app::AppState;
 use crate::betreuung::MAX_PERSONEN;
+use crate::instanz::spiegel::Freigabestufe;
 use crate::unterkunft::rechner::{
     self as kern, Aufteilung, ABZUEGE_MAX, BEZEICHNUNG_MAX, FLAECHE_MAX_M2, MASS_MAX_M, RAEUME_MAX,
     ZELTE_JE_TYP_MAX,
@@ -90,6 +94,9 @@ wire_enum! {
         Basis => "basis",
         /// Wert der Organisation des Zugangs.
         Org => "org",
+        /// Wert des Einsatzes aus `einsatz_id`, den die Einsatzleitung für den Zugang freigegeben
+        /// hat.
+        Einsatz => "einsatz",
         /// Wert aus `richtwerte` dieser Anfrage.
         Anfrage => "anfrage",
     }
@@ -238,6 +245,9 @@ pub struct UnterkunftRequest {
     /// `GET /api/v1/rechner/unterkunft/richtwerte`.
     #[schema(value_type = Option<HashMap<String, f64>>)]
     pub richtwerte: Option<Werte>,
+    /// Einsatz, dessen Richtwerte gelten sollen. Nur ein Einsatz, den die Einsatzleitung für den
+    /// Zugang freigegeben hat, sonst 404. `null` gilt wie fehlend.
+    pub einsatz_id: Option<i64>,
 }
 
 /// Personen einer Gruppe.
@@ -651,9 +661,15 @@ fn raeume_aufteilen(
 /// Prüft die Anfrage und liefert die Eingabe des Kerns und die Richtwerte der Anfrage. Erst jedes
 /// Feld für sich (400), dann der Zusammenhang (422), nach `src/AGENTS.md`,
 /// „Statuscode-Konvention“.
-fn check_request(
-    req: UnterkunftRequest,
-) -> Result<(kern::Eingabe, BTreeMap<String, f64>), ApiError> {
+/// Eine geprüfte Anfrage: Eingabe des Kerns, Richtwerte der Anfrage und der genannte Einsatz,
+/// dessen Freigabe erst der Handler prüft (design.md D3).
+struct CheckedRequest {
+    eingabe: kern::Eingabe,
+    anfrage: BTreeMap<String, f64>,
+    einsatz_id: Option<i64>,
+}
+
+fn check_request(req: UnterkunftRequest) -> Result<CheckedRequest, ApiError> {
     // 1. Jedes Feld für sich, gleich welcher Weg gilt.
     let weg = UnterkunftWeg::parse(&req.weg).ok_or_else(|| {
         invalid(format!(
@@ -760,7 +776,11 @@ fn check_request(
                 .aufteilen("zelte", "", "{}", trennung, None)?,
         ),
     };
-    Ok((eingabe, richtwerte))
+    Ok(CheckedRequest {
+        eingabe,
+        anfrage: richtwerte,
+        einsatz_id: req.einsatz_id,
+    })
 }
 
 fn gruppe(g: kern::Gruppe) -> PersonenGruppe {
@@ -859,39 +879,52 @@ impl From<kern::Ergebnis> for UnterkunftErgebnis {
 }
 
 /// Wirksamer Wert und Herkunft je Schlüssel der Basis, in der Reihenfolge der Basis: Anfrage vor
-/// Organisation vor Basis. Ein gespeicherter Wert zu einem Schlüssel, den die Basis nicht mehr
-/// kennt, fällt weg.
+/// Einsatz vor Organisation vor Basis. Die Ebenen unter der Anfrage legt
+/// [`unterkunft::zusammenfuehren`] übereinander, dieselbe Rangfolge wie in der Oberfläche
+/// (design.md D5); ein gespeicherter Wert zu einem Schlüssel, den die Basis nicht mehr kennt,
+/// fällt dort weg.
 fn wirksame_werte(
     org: &HashMap<String, f64>,
+    einsatz: Option<&HashMap<String, f64>>,
     anfrage: &BTreeMap<String, f64>,
 ) -> Vec<(&'static unterkunft::Basiswert, f64, RichtwertEbene)> {
+    let ebenen = unterkunft::zusammenfuehren(org, einsatz).werte;
     unterkunft::basis()
         .iter()
-        .map(|b| {
-            let (wert, herkunft) = match (anfrage.get(&b.schluessel), org.get(&b.schluessel)) {
-                (Some(a), _) => (*a, RichtwertEbene::Anfrage),
-                (None, Some(o)) => (*o, RichtwertEbene::Org),
-                (None, None) => (b.wert, RichtwertEbene::Basis),
-            };
-            (b, wert, herkunft)
+        .zip(ebenen)
+        .map(|(b, e)| {
+            debug_assert_eq!(b.schluessel, e.schluessel);
+            match anfrage.get(&b.schluessel) {
+                Some(a) => (b, *a, RichtwertEbene::Anfrage),
+                None => (b, e.wert, ebene(e.herkunft)),
+            }
         })
         .collect()
 }
 
-/// Prüft die Anfrage, legt die Ebenen übereinander und rechnet. Ohne Datenbank: die Werte der
-/// Organisation reicht der Aufrufer herein.
+/// Herkunft der internen Ebenen als Wert des Vertrags.
+fn ebene(herkunft: unterkunft::RichtwertHerkunft) -> RichtwertEbene {
+    match herkunft {
+        unterkunft::RichtwertHerkunft::Basis => RichtwertEbene::Basis,
+        unterkunft::RichtwertHerkunft::Org => RichtwertEbene::Org,
+        unterkunft::RichtwertHerkunft::Einsatz => RichtwertEbene::Einsatz,
+    }
+}
+
+/// Legt die Ebenen übereinander und rechnet. Ohne Datenbank: die Werte der Organisation und des
+/// Einsatzes reicht der Aufrufer herein, die Freigabe hat er vorher geprüft.
 fn calculate(
-    req: UnterkunftRequest,
+    checked: CheckedRequest,
     org: &HashMap<String, f64>,
-) -> Result<UnterkunftResponse, ApiError> {
-    let (eingabe, anfrage) = check_request(req)?;
-    let wirksam = wirksame_werte(org, &anfrage);
+    einsatz: Option<&HashMap<String, f64>>,
+) -> UnterkunftResponse {
+    let wirksam = wirksame_werte(org, einsatz, &checked.anfrage);
     let mut rw = kern::Richtwerte::basis();
     for (b, wert, _) in &wirksam {
         rw.setzen(&b.schluessel, *wert);
     }
-    Ok(UnterkunftResponse {
-        ergebnis: kern::rechne(&eingabe, &rw).into(),
+    UnterkunftResponse {
+        ergebnis: kern::rechne(&checked.eingabe, &rw).into(),
         richtwerte: wirksam
             .into_iter()
             .map(|(b, wert, herkunft)| RichtwertWirksam {
@@ -901,7 +934,7 @@ fn calculate(
             })
             .collect(),
         stand: unterkunft::stand().to_string(),
-    })
+    }
 }
 
 /// Die Werte der Organisation eines Zugangs.
@@ -910,11 +943,85 @@ async fn load_org_werte(state: &AppState, org_id: i64) -> Result<HashMap<String,
     Ok(repo::org_werte(&mut conn, org_id).await?)
 }
 
+/// Dieselbe Antwort für jeden Einsatz, den der Zugang nicht lesen darf: nicht freigegeben,
+/// abgeschlossen, fremd oder unbekannt. Sie verrät nicht, ob es den Einsatz gibt.
+fn einsatz_not_found() -> ApiError {
+    ApiError::new(
+        ErrorCode::NotFound,
+        "Kein laufender Einsatz mit dieser Kennung ist für diesen Zugang freigegeben.",
+    )
+}
+
+/// Liefert die Freigabestufe eines Spiegels die Werte des Einsatzes? Ohne sie rechnete der Server
+/// still mit der Organisation und nennte die Herkunft `org` (design.md D2). Eine unbekannte Stufe
+/// liefert nichts.
+fn is_einsatz_werte_vollstaendig(stufe: Option<Freigabestufe>) -> bool {
+    let Some(stufe) = stufe else {
+        return false;
+    };
+    crate::instanz::spiegel::art::kategorie("einsatz_unterkunft_richtwert")
+        .is_some_and(|k| stufe.liefert(k))
+}
+
+/// Die Werte eines Einsatzes, den der Zugang lesen darf (design.md D2); sonst 404.
+async fn load_einsatz_werte(
+    pool: &sqlx::SqlitePool,
+    zugang_id: &str,
+    org_id: i64,
+    einsatz_id: i64,
+) -> Result<HashMap<String, f64>, ApiError> {
+    let lesbar = {
+        let mut conn = pool.acquire().await?;
+        freigabe::is_lesbar(&mut conn, zugang_id, org_id, einsatz_id).await?
+    };
+    if !lesbar {
+        return Err(einsatz_not_found());
+    }
+    let stufe = crate::routes::lagebild_extern::load_freigabestufe(pool, einsatz_id).await?;
+    if !is_einsatz_werte_vollstaendig(stufe) {
+        return Err(einsatz_not_found());
+    }
+    let mut conn = pool.acquire().await?;
+    Ok(repo::einsatz_werte(&mut conn, einsatz_id).await?)
+}
+
+/// Die Werte des genannten Einsatzes, falls die Anfrage einen nennt.
+async fn load_requested_einsatz_werte(
+    state: &AppState,
+    client: &MachineClient,
+    einsatz_id: Option<i64>,
+) -> Result<Option<HashMap<String, f64>>, ApiError> {
+    match einsatz_id {
+        Some(id) => Ok(Some(
+            load_einsatz_werte(&state.pool, &client.zugang.id, client.zugang.org_id, id).await?,
+        )),
+        None => Ok(None),
+    }
+}
+
+/// Abfrage von `GET /api/v1/rechner/unterkunft/richtwerte`. Der Wert kommt als Text und wird im
+/// Handler geprüft, damit ein falscher Wert den Code `invalid_field` bekommt (wie `after` in
+/// `super::events`).
+#[derive(Debug, Deserialize)]
+pub struct RichtwerteQuery {
+    pub einsatz_id: Option<String>,
+}
+
+/// `einsatz_id` der Abfrage: eine ganze Zahl; fehlt sie, gilt kein Einsatz.
+fn parse_einsatz_id(roh: Option<&str>) -> Result<Option<i64>, ApiError> {
+    let Some(roh) = roh else { return Ok(None) };
+    roh.parse::<i64>().map(Some).map_err(|_| {
+        invalid(format!(
+            "einsatz_id: „{roh}“ ist keine ganze Zahl (Kennung eines Einsatzes)"
+        ))
+    })
+}
+
 /// Unterkunft und Zelte durchrechnen. Speichert nichts.
 ///
-/// Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert der
-/// Organisation des Zugangs, sonst die Vorgabe des Programms. Werte eines Einsatzes gehören nicht
-/// dazu.
+/// Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert des Einsatzes aus
+/// `einsatz_id`, sonst der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms. Den
+/// Einsatz nimmt die Rechnung nur, wenn die Einsatzleitung ihn für den Zugang freigegeben hat.
 #[utoipa::path(
     post,
     path = "/api/v1/rechner/unterkunft",
@@ -927,6 +1034,7 @@ async fn load_org_werte(state: &AppState, org_id: i64) -> Result<HashMap<String,
         (status = 400, description = "Ein Feld für sich ist ungültig: kein JSON, unbekanntes oder doppeltes Feld, falscher Typ, unbekannter Wert oder Richtwert, Zahl außerhalb der Grenzen. Der Text nennt das Feld.", body = super::ApiErrorBody),
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
         (status = 403, description = "Dem Zugang fehlt das Recht `rechner:use`", body = super::ApiErrorBody),
+        (status = 404, description = "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt. Geprüft wird nach 400 und 422.", body = super::ApiErrorBody),
         (status = 413, description = "Der Body ist größer als 64 KiB", body = super::ApiErrorBody),
         (status = 422, description = "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg; `personen`, `flaeche` oder `zelte` ohne Angabe; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung. Eine leere Raumliste ist gültig und ergibt 0 Plätze.", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
@@ -937,33 +1045,46 @@ pub async fn calculate_unterkunft(
     State(state): State<AppState>,
     client: MachineClient,
 ) -> Result<Response, ApiError> {
-    let req: UnterkunftRequest = parse_body(&client.body)?;
+    // Erst die Anfrage (400, 422), dann der Einsatz (404): design.md D3.
+    let checked = check_request(parse_body(&client.body)?)?;
+    let einsatz = load_requested_einsatz_werte(&state, &client, checked.einsatz_id).await?;
     let org = load_org_werte(&state, client.zugang.org_id).await?;
-    let antwort = calculate(req, &org)?;
+    let antwort = calculate(checked, &org, einsatz.as_ref());
     Ok(client.antwort(StatusCode::OK, &antwort))
 }
 
 /// Die Richtwerte des Rechners mit Bezeichnung, Einheit und Grenzen, dazu die Zelttypen.
 ///
-/// `wert` ist der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms.
+/// `wert` ist mit `einsatz_id` der Wert dieses Einsatzes, sonst der Wert der Organisation des
+/// Zugangs, sonst die Vorgabe des Programms. Den Einsatz nimmt die Auskunft nur, wenn die
+/// Einsatzleitung ihn für den Zugang freigegeben hat.
 #[utoipa::path(
     get,
     path = "/api/v1/rechner/unterkunft/richtwerte",
     tag = "Rechner",
     operation_id = "get_unterkunft_richtwerte",
     security(("machine" = [])),
+    params(
+        ("einsatz_id" = Option<i64>, Query,
+            description = "Einsatz, dessen Richtwerte gelten sollen; nur ein Einsatz, den die Einsatzleitung für den Zugang freigegeben hat"),
+    ),
     responses(
         (status = 200, description = "Richtwerte und Zelttypen; Antwort signiert im Kopf `Lifeline-Signature`", body = UnterkunftRichtwerteResponse),
+        (status = 400, description = "`einsatz_id` ist keine ganze Zahl (`invalid_field`)", body = super::ApiErrorBody),
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
         (status = 403, description = "Dem Zugang fehlt das Recht `rechner:use`", body = super::ApiErrorBody),
+        (status = 404, description = "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),
 )]
 pub async fn get_unterkunft_richtwerte(
     State(state): State<AppState>,
+    Query(query): Query<RichtwerteQuery>,
     client: MachineClient,
 ) -> Result<Response, ApiError> {
+    let einsatz_id = parse_einsatz_id(query.einsatz_id.as_deref())?;
+    let einsatz = load_requested_einsatz_werte(&state, &client, einsatz_id).await?;
     let org = load_org_werte(&state, client.zugang.org_id).await?;
     let antwort = UnterkunftRichtwerteResponse {
         stand: unterkunft::stand().to_string(),
@@ -974,7 +1095,7 @@ pub async fn get_unterkunft_richtwerte(
                 bezeichnung: z.bezeichnung.clone(),
             })
             .collect(),
-        richtwerte: wirksame_werte(&org, &BTreeMap::new())
+        richtwerte: wirksame_werte(&org, einsatz.as_ref(), &BTreeMap::new())
             .into_iter()
             .map(|(b, wert, herkunft)| RichtwertAuskunft {
                 schluessel: b.schluessel.clone(),

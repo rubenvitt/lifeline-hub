@@ -59,7 +59,16 @@ pub enum AppError {
         meldung: String,
         zeilen: Vec<ZeilenGrund>,
     },
+    /// Die Person steht in keiner Liste dieser Sitzung (404, LLH-1682, Change
+    /// `l3vfnpdz-personen-zeilenabgleich` D4): `{error, grund: "nicht_in_liste"}`. Additiv zum
+    /// Umschlag wie [`AppError::Zeilen`], damit der Client sie vom 404 einer unbekannten Route
+    /// unterscheidet (etwa nach einem Server-Rollback) und nur dann die Zeile herausnimmt.
+    NichtInListe,
 }
+
+/// Wert von `grund` im Umschlag von [`AppError::NichtInListe`]; der Client vergleicht ihn
+/// (`frontend/src/api/client.ts`, `GRUND_NICHT_IN_LISTE`).
+pub const GRUND_NICHT_IN_LISTE: &str = "nicht_in_liste";
 
 crate::wire_enum::wire_enum! {
     /// Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können
@@ -112,7 +121,7 @@ impl std::fmt::Display for AppError {
             }
             AppError::Forbidden => write!(f, "Keine Berechtigung"),
             AppError::ForbiddenMit(m) => write!(f, "{m}"),
-            AppError::NotFound => write!(f, "Nicht gefunden"),
+            AppError::NotFound | AppError::NichtInListe => write!(f, "Nicht gefunden"),
             AppError::Validation(m) => write!(f, "{m}"),
             AppError::Conflict(m) => write!(f, "{m}"),
             AppError::UnprocessableEntity(m) => write!(f, "{m}"),
@@ -145,7 +154,7 @@ impl AppError {
             AppError::OfflineQueueBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
             AppError::SitzungsBenutzerMismatch => StatusCode::PRECONDITION_FAILED,
             AppError::Forbidden | AppError::ForbiddenMit(_) => StatusCode::FORBIDDEN,
-            AppError::NotFound => StatusCode::NOT_FOUND,
+            AppError::NotFound | AppError::NichtInListe => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
@@ -298,6 +307,14 @@ impl IntoResponse for AppError {
             )
                 .into_response();
         }
+        if let AppError::NichtInListe = self {
+            let message = self.public_message();
+            return (
+                status,
+                Json(json!({ "error": message, "grund": GRUND_NICHT_IN_LISTE })),
+            )
+                .into_response();
+        }
         let message = self.public_message();
         (status, Json(json!({ "error": message }))).into_response()
     }
@@ -307,6 +324,16 @@ impl IntoResponse for AppError {
 mod tests {
     use super::*;
     use axum::body::to_bytes;
+
+    #[tokio::test]
+    async fn nicht_in_liste_ist_404_mit_grund() {
+        let resp = AppError::NichtInListe.into_response();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Nicht gefunden");
+        assert_eq!(json["grund"], GRUND_NICHT_IN_LISTE);
+    }
 
     #[tokio::test]
     async fn zu_grosser_body_ist_413_mit_meldung() {

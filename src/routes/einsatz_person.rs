@@ -63,6 +63,41 @@ pub struct PersonDetail {
     pub verletzungen: Vec<VerletzungAnzeige>,
 }
 
+/// Mehr Personen meldet ein Schreibweg nicht einzeln (LLH-1682, design.md D5): darüber geht ein
+/// `person` ohne Kennung, und die Tabs gleichen über die Prefixe ab. Gleich `ZEILEN_GRENZE` in
+/// `frontend/src/live/zeilenAbgleich.ts`, ab der ein Tab die Liste ohnehin ganz lädt; hunderte
+/// Einzelereignisse liefen sonst über Kanal und Replay-Ring (je 256 Plätze).
+pub(crate) const PERSONEN_EINZELN_MAX: usize = 10;
+
+/// Meldet die Personen `ids` mit `person`: einzeln bis [`PERSONEN_EINZELN_MAX`], darüber einmal
+/// ohne Kennung.
+pub(crate) fn sse_personen(state: &AppState, einsatz_id: i64, ids: &[i64]) {
+    if ids.len() > PERSONEN_EINZELN_MAX {
+        state.live.publiziere_einsatz(einsatz_id, LiveEvent::Person);
+    } else {
+        for &pid in ids {
+            sse_person(state, einsatz_id, pid);
+        }
+    }
+}
+
+/// Meldet die versorgten Personen der Einheiten `einheit_ids` (LLH-1682, design.md D5): ihre Zeile
+/// trägt Name und Abschnitt der Einheit per Join. Nach dem Commit; scheitert das Lesen, bleibt es
+/// bei einer Warnung, die Änderung an der Einheit ist gespeichert.
+pub(crate) async fn sse_versorgte_personen(state: &AppState, einsatz_id: i64, einheit_ids: &[i64]) {
+    if einheit_ids.is_empty() {
+        return;
+    }
+    match repo::versorgte_von(&state.pool, einsatz_id, einheit_ids).await {
+        Ok(ids) => sse_personen(state, einsatz_id, &ids),
+        Err(e) => tracing::warn!(
+            einsatz_id,
+            fehler = %e,
+            "versorgte Personen nicht lesbar, Live-Ereignis entfällt"
+        ),
+    }
+}
+
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
 /// (nur einsatz_id + person_id); Clients refetchen die Liste.
 pub(crate) fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
@@ -194,6 +229,39 @@ pub async fn liste(
         liste.iter_mut().for_each(PersonAnzeige::ohne_personalien);
     }
     Ok(Json(liste))
+}
+
+/// GET /api/einsaetze/{id}/personen/{pid}/zeile — genau die Zeile, die die Liste dieser Sitzung
+/// zeigen würde, für den Zeilenabgleich des Live-Feeds (LLH-1682, Spec `live-abgleich`). NICHT
+/// auditiert wie die Liste: jeder Tab ruft sie bei jedem `person`-Ereignis ab, das Detail
+/// schriebe dabei je Abruf eine Protokollzeile. Dieselben Schranken wie die Liste: stornierte
+/// Personen und solche, die ein Gerät nicht sähe (Stellenbindung), sind 404; das Einheitengerät
+/// bekommt keine Personalien.
+pub async fn zeile(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<PersonAnzeige>, AppError> {
+    // Nur was die Liste zeigt (design.md D4): eine Person einer fremden Stelle, eines fremden
+    // Einsatzes oder eine stornierte ist 404 mit `grund`, ohne Personalien; nur daran erkennt
+    // der Tab, dass er sie aus seinen Listen nehmen darf.
+    let nicht_in_liste = |e: AppError| match e {
+        AppError::NotFound => AppError::NichtInListe,
+        e => e,
+    };
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id)
+        .await
+        .map_err(nicht_in_liste)?;
+    let mut person = repo::laden(&state.pool, ctx.einsatz.id, person_id)
+        .await
+        .map_err(nicht_in_liste)?;
+    if person.storniert_at.is_some() {
+        return Err(AppError::NichtInListe);
+    }
+    if ist_einheitengeraet(&ctx) {
+        person.ohne_personalien();
+    }
+    Ok(Json(person))
 }
 
 /// Ob die Sitzung ein Einheitengerät ist (LLH-1579/LLH-1580).

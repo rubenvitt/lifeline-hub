@@ -1,4 +1,5 @@
-import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
+import { hashKey, type InfiniteData, type QueryClient, type QueryKey } from '@tanstack/react-query';
+import { ApiError, GRUND_NICHT_IN_LISTE } from '../api/client';
 import {
   alsSchadenAuswahl,
   alsSchadenMarker,
@@ -10,8 +11,9 @@ import {
   type SchaedenFilter,
   type SchadenSortierung,
 } from '../api/einsatzSchaden';
+import { comparePersonen, loadPersonZeile, toPersonAuswahl } from '../api/einsatzPerson';
 import { einsatzKeys, type ZeilenZiel } from '../api/queryKeys';
-import type { Schaden, SchadenMarker } from '../api/types';
+import type { Person, PersonAuswahl, Schaden, SchadenMarker } from '../api/types';
 import { LIVE_SAMMELFENSTER_MS, type LiveSammler } from './liveInvalidierung';
 
 /**
@@ -44,6 +46,23 @@ function liste<Z, L extends { id: number }>(
   return {
     key,
     einsetzen: (alt, id, zeile) => einsortieren(alt as readonly L[], id, form(zeile), vergleich),
+  };
+}
+
+/**
+ * Flache Listen unter einem Prefix, eine je Filter (Betroffene je Betreuungsstelle, LLH-1682).
+ * `form` sieht den Cache-Key des Eintrags und sagt, ob und wie die Zeile in diese Liste gehört.
+ */
+function gefiltert<Z, L extends { id: number }>(
+  key: (einsatzId: number) => QueryKey,
+  form: (zeile: Z, cacheKey: QueryKey) => L | null,
+  vergleich: (a: L, b: L) => number,
+): ZeilenListe<Z> {
+  return {
+    key,
+    praefix: true,
+    einsetzen: (alt, id, zeile, cacheKey) =>
+      einsortieren(alt as readonly L[], id, form(zeile, cacheKey), vergleich),
   };
 }
 
@@ -98,6 +117,36 @@ function ziel<Z>(
 // die Marker ebenso.
 const ungestorniert = (s: Schaden): Schaden | null => (s.storniert_at == null ? s : null);
 
+/**
+ * Die Zeile einer Person, `null` bei 404 mit Grund `nicht_in_liste` (design.md D4, LLH-1682): Die
+ * Zeilen-Route liefert nur, was die Liste dieser Sitzung zeigt; ihr 404 (storniert, fremde Stelle
+ * am Gerät) heißt, die Person gehört in keine Liste dieses Tabs. Jeder andere Fehler, auch ein 404
+ * ohne Grund (unbekannte Route, etwa nach einem Server-Rollback), bleibt ein Fehler (Sammler).
+ */
+async function loadPersonZeileOrNull(einsatzId: number, id: number): Promise<Person | null> {
+  try {
+    return await loadPersonZeile(einsatzId, id);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404 && e.grund === GRUND_NICHT_IN_LISTE) return null;
+    throw e;
+  }
+}
+
+// Personenliste und Auswahl führen keine stornierten (`storniert_at IS NULL` im Server).
+const personOhneStorno = (p: Person | null): Person | null =>
+  p !== null && p.storniert_at == null ? p : null;
+
+// Betroffene einer Betreuungsstelle: dieselbe Menge wie der Serverfilter `betreuungsstelle_id`
+// (`person::repo::liste_gefiltert`), jüngster Verbleib „Notunterkunft“ an dieser Stelle. Die
+// Stelle ist das letzte Glied von `einsatzKeys.personenDerStelle`.
+const betroffenDerStelle = (p: Person | null, cacheKey: QueryKey): Person | null =>
+  p !== null &&
+  p.storniert_at == null &&
+  p.aktuelle_verbleib_art === 'notunterkunft' &&
+  p.aktuelle_verbleib_betreuungsstelle_id === cacheKey[cacheKey.length - 1]
+    ? p
+    : null;
+
 const ZIELE: Record<ZeilenZiel, Ziel> = {
   // Auswahl, Seitenketten und Einzelabrufe liegen unter `schaeden(e)`, die Marker daneben.
   schaeden: ziel<Schaden>(
@@ -130,6 +179,21 @@ const ZIELE: Record<ZeilenZiel, Ziel> = {
         };
       }),
       einzeln<Schaden>(einsatzKeys.schaedenEinzelnAlle),
+    ],
+  ),
+  // LLH-1682: Liste, Auswahl und die Betroffenen je Stelle; alle aus einem Abruf der nicht
+  // protokollierten Zeilen-Route. Der Prefix `personen(e)` erfasst die Stellenlisten mit.
+  personen: ziel<Person | null>(
+    loadPersonZeileOrNull,
+    (e) => [einsatzKeys.personen(e), einsatzKeys.personenAuswahl(e)],
+    [
+      liste(einsatzKeys.personen, personOhneStorno, comparePersonen),
+      liste<Person | null, PersonAuswahl>(
+        einsatzKeys.personenAuswahl,
+        (p) => (p === null ? null : toPersonAuswahl(p)),
+        comparePersonen,
+      ),
+      gefiltert(einsatzKeys.personenDerStelleAlle, betroffenDerStelle, comparePersonen),
     ],
   ),
 };
@@ -178,6 +242,18 @@ export function fensterEinsortieren<T extends { id: number }>(
   return { ...alt, pages: seiten };
 }
 
+/**
+ * Die Zeile `id` in den Daten einer Liste: flache Liste, Seitenkette oder Einzelabruf (dessen
+ * Daten die Zeile selbst sind). `undefined`, wenn sie nicht darin steht.
+ */
+function rowOf(data: unknown, id: number): unknown {
+  if (Array.isArray(data)) return data.find((z: { id?: number }) => z?.id === id);
+  if (data && typeof data === 'object' && 'pages' in data) {
+    return (data as InfiniteData<{ id: number }[]>).pages.flat().find((z) => z.id === id);
+  }
+  return (data as { id?: number } | undefined)?.id === id ? data : undefined;
+}
+
 export interface ZeilenSammler {
   /** Merkt die Zeile `id` von `ziel` für das laufende Fenster vor. */
   vormerken(ziel: ZeilenZiel, id: number): void;
@@ -187,7 +263,7 @@ export interface ZeilenSammler {
 
 /**
  * Zeilenabgleich einer Live-Verbindung (LFH-931, Spec `live-abgleich`, design.md D3): Ereignisse
- * zu einem Schaden laden nur diese Zeile und sortieren sie in die geladenen
+ * zu einem Schaden oder einer Person (LLH-1682) laden nur diese Zeile und sortieren sie in die geladenen
  * Listen ein, statt den Gesamtbestand neu abzurufen.
  *
  * Wo sich das nicht lohnt oder nicht sicher ist, gehen die Listen an den Sammler der Verbindung
@@ -235,18 +311,41 @@ export function erzeugeZeilenSammler(
     vorgemerkt.set(ziel, set);
   };
 
+  // Die Zeilen der abgerufenen Kennungen in jeder geladenen Liste vor dem Zeilenabruf (design.md
+  // D6, LLH-1682). Der Abruf ist kein Query, `cancelQueries` in einem `onMutate` erreicht ihn
+  // nicht. Ändert eine optimistische Änderung währenddessen eine dieser Zeilen, ist ihre Referenz
+  // danach eine andere (Structural Sharing lässt unveränderte Zeilen gleich), und die Kennung
+  // wartet aufs nächste Fenster, statt die Änderung mit dem Stand davor zu überschreiben.
+  // Nur geladene Listen: eine Liste mit festem Key, die erst während des Abrufs lädt, hat keinen
+  // Schnappschuss und geht an den Sammler.
+  const snapshotRows = (def: Ziel, ids: readonly number[]) =>
+    new Map(
+      def.listen
+        .flatMap(eintraege)
+        .map((key) => [key, qc.getQueryData(key)] as const)
+        .filter(([, data]) => data !== undefined)
+        .map(([key, data]) => {
+          return [hashKey(key), new Map(ids.map((id) => [id, rowOf(data, id)]))] as const;
+        }),
+    );
+
   const zeilenLaden = async (ziel: ZeilenZiel, ids: number[]) => {
     const def = ZIELE[ziel];
     laufend.add(ziel);
+    const rowsBefore = snapshotRows(def, ids);
     const ergebnisse = await Promise.allSettled(ids.map((id) => def.laden(einsatzId, id)));
     laufend.delete(ziel);
     if (beendet) return; // `raeumen` hat die Listen schon als veraltet markiert.
     if (ergebnisse.some((e) => e.status === 'rejected')) {
       listenAnSammler(ziel);
     } else {
+      const changedIds = new Set<number>();
       for (const l of def.listen) {
         for (const key of eintraege(l)) {
-          if (qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
+          const before = rowsBefore.get(hashKey(key));
+          // Ohne Schnappschuss ist die Liste erst während des Abrufs geladen worden; ob vor oder
+          // nach der Änderung gelesen, weiß nur ihr nächster Abruf.
+          if (!before || qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
             if (qc.getQueryData(key) !== undefined) sammler.vormerken(key);
             continue;
           }
@@ -255,6 +354,10 @@ export function erzeugeZeilenSammler(
           let neu: unknown = alt;
           for (const [i, e] of ergebnisse.entries()) {
             if (e.status !== 'fulfilled') continue;
+            if (rowOf(alt, ids[i]) !== before.get(ids[i])) {
+              changedIds.add(ids[i]);
+              continue;
+            }
             neu = l.einsetzen(neu, ids[i], e.value, key);
             if (neu === AN_SAMMLER) break;
           }
@@ -262,6 +365,7 @@ export function erzeugeZeilenSammler(
           else if (neu !== alt) qc.setQueryData(key, neu);
         }
       }
+      if (changedIds.size > 0) zurueckstellen(ziel, changedIds);
     }
     planen();
   };

@@ -47,6 +47,8 @@ fn sse_namens_traeger(state: &AppState, einsatz_id: i64, t: &NamensTraeger) {
     if t.dokumente {
         super::dokument::sse(state, einsatz_id);
     }
+    // Die Personenzeile trägt den Abschnitt der versorgenden Einheit (LLH-1682).
+    super::einsatz_person::sse_personen(state, einsatz_id, &t.personen);
 }
 
 /// Die Rhythmus-Vorgaben der Ablösung listen jeden Abschnitt mit Namen

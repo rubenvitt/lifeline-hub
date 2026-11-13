@@ -370,3 +370,31 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
         "Nachtrag ohne Wert im ETB: {text}"
     );
 }
+
+/// LLH-1682: Das `person`-Ereignis einer Nachforderung mit Personenbezug trägt die Kennung der
+/// Person, damit die Tabs nur ihre Zeile abgleichen statt der ganzen Personenliste.
+#[tokio::test]
+async fn person_ereignis_der_nachforderung_traegt_person_id() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let pid = person_anlegen(&app, &admin, e, "{}").await;
+    let mut rx = live.abonniere(e);
+    let (s, n) = anfordern(&app, &admin, e, Some(pid), serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::CREATED, "{n}");
+
+    let mut nutzlast = None;
+    for _ in 0..20 {
+        match tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await {
+            Ok(Ok(m)) if m.event.as_str() == "person" => {
+                nutzlast = Some(serde_json::from_str::<Value>(&m.data).unwrap());
+                break;
+            }
+            Ok(Ok(_)) => continue,
+            Ok(Err(_)) | Err(_) => break,
+        }
+    }
+    let v = nutzlast.expect("kein `person`-Ereignis");
+    assert_eq!(v["person_id"], pid, "{v}");
+    assert_eq!(v.as_object().unwrap().len(), 2, "nur Kennungen: {v}");
+}

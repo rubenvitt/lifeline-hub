@@ -89,10 +89,15 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   und Listen statt Objekten sind 400), dann der Zusammenhang (422; `maenner` und `frauen` kommen
   als Paar, eine leere Gruppe heißt 0); Grenzen in `src/unterkunft/rechner.rs`, so gewählt, dass
   die größte übliche Anfrage in 64 KiB passt, Personen über `betreuung::MAX_PERSONEN`. Die Antwort
-  trägt keine negative Null. Wirksam ist Anfrage vor
-  Organisation des Zugangs vor Basis; **ohne Einsatz**: `einsatz_id` ist ein unbekanntes Feld, bis
-  es eine Einsatz-Freigabe für Zugänge gibt. Jeder Schlüssel der Basis wird in beiden Kernen
-  gelesen (`richtwerte.guard.test.ts`, `der_kern_liest_jeden_schluessel_der_basis`).
+  trägt keine negative Null. Wirksam ist Anfrage vor Einsatz vor Organisation des Zugangs vor
+  Basis; **den Einsatz nur über die Freigabe** (LLH-1856, Change
+  `q9b4qq0o-rechner-einsatz-richtwerte`): `einsatz_id` im Body bzw. `?einsatz_id` wählt nur unter
+  den Einsätzen, die die Einsatzleitung für den Zugang freigegeben hat
+  (`public_api::freigabe::is_lesbar`, ADR-0035), jeder andere ist dieselbe 404; geprüft wird erst
+  die Anfrage (400/422), dann der Einsatz. Die Rangfolge der Ebenen kommt aus
+  `unterkunft::zusammenfuehren`, die Anfrage liegt darüber; eine neue Ebene kommt dort hinein,
+  nicht in `rechner.rs`. Jeder Schlüssel der Basis wird in beiden Kernen gelesen
+  (`richtwerte.guard.test.ts`, `der_kern_liest_jeden_schluessel_der_basis`).
 - **Registrierstelle** (LLH-1612, Spec `betreuung-registrierung`, ADR-0017, Change
   `hitr91ob-registrierstelle-betreuung`; Server `src/betreuung/registrierung.rs`,
   `src/routes/betreuung_registrierung.rs`, Oberfläche `betreuung/registrierung/`): Registrierte
