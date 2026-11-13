@@ -6,6 +6,9 @@
 //! abhängigen Zeilen gelöscht — die Kaskade auf `einsatz(id)` nimmt ETB, Register und Anhänge
 //! mit. Seine einzige Spur ist danach eine Zeile in `aufbewahrung_loeschprotokoll`: Nummer,
 //! Zeitpunkte, angewandte Frist und Akteur, keine Bezeichnung, kein Ortsbezug, kein ETB-Text.
+//! Trug er eine Kennung für gekoppelte Instanzen, bleibt dazu ihr Löschvermerk
+//! (`instanz::fuehrung::loeschvermerk`, LLH-1699): nur die Kennung, damit ein Gegenüber seine
+//! Führungsakte ohne Spiegel verliert.
 //!
 //! **Fail-closed wie der übrige Purge-Audit:** ohne Akteur (abschließende Person →
 //! Einsatzleitung → System-Admin der Org) keine Löschung; der nächste Lauf versucht es erneut.
@@ -136,6 +139,10 @@ pub async fn loeschen(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
+
+        // Das Ende der Kennung, für Akten, die ein Gegenüber ohne Spiegel hält (LLH-1699); wie
+        // die Protokollzeile nur die Kennung, kein Inhalt des Einsatzes.
+        crate::instanz::fuehrung::loeschvermerk::vermerken_einsatz(&mut *conn, einsatz_id).await?;
 
         // Die Kaskade auf `einsatz(id)` trägt die Löschung; ohne sofortige FK-Prüfung bliebe
         // jede abhängige Zeile verwaist stehen.
@@ -521,6 +528,48 @@ mod tests {
         // Zweiter Aufruf: nichts mehr zu tun, keine zweite Zeile.
         assert!(!loeschen(&pool, e, t(JETZT)).await.unwrap());
         assert_eq!(protokoll_zeilen(&pool, e).await, 1);
+    }
+
+    /// LLH-1699: Die endgültige Löschung hält das Ende der Kennung fest, damit ein Gegenüber
+    /// seine Akte ohne Spiegel verliert; ohne Kennung kennt kein Gegenüber den Einsatz.
+    #[tokio::test]
+    async fn loeschen_vermerkt_das_ende_der_kennung() {
+        let pool = crate::db::test_pool().await;
+        org_frist(&pool, 1, Some(3650)).await;
+        let a = benutzer(&pool, 1, "leit", "keiner").await;
+        let mit = geschwaerzt(
+            &pool,
+            1,
+            "2016-01-01 00:00:00",
+            "2016-03-01 00:00:00",
+            Some(a),
+            7,
+        )
+        .await;
+        let ohne = geschwaerzt(
+            &pool,
+            1,
+            "2016-01-02 00:00:00",
+            "2016-03-01 00:00:00",
+            Some(a),
+            8,
+        )
+        .await;
+        sqlx::query("UPDATE einsatz SET kennung = 'ich/7-ab12cd34' WHERE id = ?")
+            .bind(mit)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        assert!(loeschen(&pool, mit, t(JETZT)).await.unwrap());
+        assert!(loeschen(&pool, ohne, t(JETZT)).await.unwrap());
+
+        let vermerke: Vec<(String, i64)> =
+            sqlx::query_as("SELECT kennung, org_id FROM fuehrung_loeschvermerk")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(vermerke, vec![("ich/7-ab12cd34".to_string(), 1)]);
     }
 
     #[tokio::test]
