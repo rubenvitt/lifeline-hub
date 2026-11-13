@@ -22,7 +22,7 @@ Code. Gegenprobe heißt: die Änderung zurücknehmen, Test rot, wieder einsetzen
 
 ## 4. Doku und Regeln
 
-- [x] 4.1 Neue ADR (nächste freie Nummer, heute `ADR-0041`, design.md D5) mit Regeln und Prüfung (`verbiete 'fn ist_geloescht\('`, `verlange` auf die Führerprüfung in `lebensende.rs`); ADR-0036 bleibt unverändert. Prüfen: `scripts/check-architektur.sh` grün, `scripts/adr-fuer.sh src/instanz/spiegel/lebensende.rs` nennt die neue ADR
+- [x] 4.1 Neue ADR (nächste freie Nummer, heute `ADR-0042`, design.md D5) mit Regeln und Prüfung (`verbiete 'fn ist_geloescht\('`, `verlange` auf die Führerprüfung in `lebensende.rs`); ADR-0036 bleibt unverändert. Prüfen: `scripts/check-architektur.sh` grün, `scripts/adr-fuer.sh src/instanz/spiegel/lebensende.rs` nennt die neue ADR
 - [x] 4.2 Laufzeitsicht (Kapitel 6, „Lebensende“: Beleg über Vermerk auch für Stände, Annahme laut Akte) und Glossar („Löschvermerk“: Beleg auch für Stände von Spiegeln). Prüfen: `scripts/check-architektur.sh` grün
 - [x] 4.3 `src/AGENTS.md`, „Instanzkopplung“ → „Lebensende“ und „Akten ohne Spiegel“: Satz zum Beleg für `geloescht` und zur Annahme nach der Akte, Verweis „(Spiegel mit fremdem Präfix: LLH-1852)“ ersetzt durch die Regel samt Herleitung auf diese Change. Prüfen: Verweise per `grep -rn "LLH-1852" src docs .claude` stimmig
 - [x] 4.4 Anwenderdoku `docs/anwender/kapitel/instanzkopplung.md` („Stehen bleibt auch ein Einsatz, dessen Führung abgegeben wurde und den die übernehmende Installation löscht“ entfällt) und, falls nötig, `aufbewahrung.md` (Satz zum Löschen beim Führer), `quellen:` geprüft; Regeln aus `docs/anwender/AGENTS.md`. Prüfen: Anwenderdoku-Wächter grün (`pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` in `frontend/`, über `mise exec`)
@@ -35,7 +35,7 @@ Code. Gegenprobe heißt: die Änderung zurücknehmen, Test rot, wieder einsetzen
 
 ## 6. Aus dem Review vor dem PR
 
-- [x] 6.1 Befund „eine Runde mehr je Abgleich, wenn die erreichte Seite ein Ende mit fremdem Präfix ablehnt“ (bestätigt): mit Ruben hingenommen, in design.md „Risks“ und ADR-0041 „Konsequenzen“ festgehalten. Prüfen: beide Stellen nennen den Fall, `scripts/check-architektur.sh` grün
+- [x] 6.1 Befund „eine Runde mehr je Abgleich, wenn die erreichte Seite ein Ende mit fremdem Präfix ablehnt“ (bestätigt): mit Ruben hingenommen, in design.md „Risks“ und ADR-0042 „Konsequenzen“ festgehalten. Prüfen: beide Stellen nennen den Fall, `scripts/check-architektur.sh` grün
 - [x] 6.2 Befund „Anwenderdoku verschweigt die Ausnahme bei ausgeschalteter Führung“ (bestätigt) und „Modulkopf `loeschvermerk.rs` nennt nur Akten“ (bestätigt): behoben in f9ee2fb3 (`instanzkopplung.md`, auch Abschnitt „Ende eines Spiegels“, `aufbewahrung.md`, Modulkopf). Prüfen: Anwenderdoku-Wächter 9/9 grün
 - [x] 6.3 Verworfen: Sicherungstest baue nicht den Spec-Fall (prüft gewollt den strengeren Fall ohne Einsatz; „Einsatz oder Akte wieder da“ decken Unit-Tests ab, Testkommentar geschärft) und fehlende Zunder-Zeile in zwei Zwischencommits (Regel gilt je Aufgabe, PR trägt sie). Prüfen: Verbleib im PR unter „Review“
 

@@ -868,7 +868,7 @@ pub async fn fuehrt_laut_akte(
 }
 
 /// Ob `absender` den Spiegel mit der Kennung führt und ihn deshalb als gelöscht melden darf
-/// (LLH-1852, Change `r11nl4cv-geloescht-fremdes-praefix`, D2; ADR-0041). Mit Schalter und Akte
+/// (LLH-1852, Change `r11nl4cv-geloescht-fremdes-praefix`, D2; ADR-0042). Mit Schalter und Akte
 /// entscheidet allein die Akte, auch gegen ein passendes Präfix: Das Abräumen ist unumkehrbar.
 /// Ohne Schalter (die Führung ist eingefroren) oder ohne Akte gilt das Präfix der Kennung.
 pub async fn is_fuehrer_des_spiegels(

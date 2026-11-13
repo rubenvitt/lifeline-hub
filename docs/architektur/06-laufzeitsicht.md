@@ -379,7 +379,7 @@ sequenceDiagram
   Spiegel endet nur, wenn er zu dieser Kopplung gehört und der Absender sein Führer ist: mit
   Führung je Einsatz laut Akte, auch wenn die Kennung mit einer anderen Instanz beginnt (der
   Führer hat den Einsatz übernommen), sonst nach dem Präfix (LLH-1852,
-  [ADR-0041](entscheidungen/ADR-0041-ein-spiegel-endet-nur-auf-meldung-seines-fuehrers-laut-akte.md)).
+  [ADR-0042](entscheidungen/ADR-0042-ein-spiegel-endet-nur-auf-meldung-seines-fuehrers-laut-akte.md)).
   Nachweis: `tests/instanz_lebensende.rs`, `tests/instanz_fuehrung.rs`.
 - **Ende einer Akte ohne Spiegel** (LLH-1699,
   [ADR-0036](entscheidungen/ADR-0036-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
