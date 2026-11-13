@@ -5834,7 +5834,10 @@ async fn loescht_der_hub_einen_uebernommenen_einsatz_raeumt_der_elw_seinen_spieg
     assert!(vermerkt(&hub, &k).await);
     abgleichen(&elw).await;
 
-    assert!(!hat_spiegel(&elw, &k).await, "Pull: der Spiegel am ELW ist abgeräumt");
+    assert!(
+        !hat_spiegel(&elw, &k).await,
+        "Pull: der Spiegel am ELW ist abgeräumt"
+    );
     assert!(vermerkt(&elw, &k).await);
 }
 
@@ -5871,7 +5874,10 @@ async fn loescht_der_elw_einen_uebernommenen_einsatz_raeumt_der_hub_seinen_spieg
     endgueltig_loeschen(&elw, e).await;
     abgleichen(&elw).await;
 
-    assert!(!hat_spiegel(&hub, &k).await, "Push: der Spiegel am Hub ist abgeräumt");
+    assert!(
+        !hat_spiegel(&hub, &k).await,
+        "Push: der Spiegel am Hub ist abgeräumt"
+    );
 }
 
 #[tokio::test]
@@ -5891,5 +5897,8 @@ async fn ein_elw_raeumt_am_hub_keinen_spiegel_ab_den_laut_akte_ein_anderer_fuehr
     endgueltig_loeschen(&elw, e).await;
     abgleichen(&elw).await;
 
-    assert!(hat_spiegel(&hub, &k).await, "die Akte entscheidet, nicht das Präfix");
+    assert!(
+        hat_spiegel(&hub, &k).await,
+        "die Akte entscheidet, nicht das Präfix"
+    );
 }

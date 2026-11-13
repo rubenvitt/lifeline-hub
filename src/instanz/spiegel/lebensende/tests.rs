@@ -346,7 +346,11 @@ async fn ein_stand_gilt_mit_demselben_beleg_wie_eine_akte_als_geloescht() {
         .execute(&pool)
         .await
         .unwrap();
-    for (id, org, art) in [(9001, 1, "verwahrt"), (9002, 2, "verwahrt"), (9003, 1, "spiegel")] {
+    for (id, org, art) in [
+        (9001, 1, "verwahrt"),
+        (9002, 2, "verwahrt"),
+        (9003, 1, "spiegel"),
+    ] {
         sqlx::query(
             "INSERT INTO aufbewahrung_loeschprotokoll (org_id, einsatz_id, art, geloescht_at) \
              VALUES (?, ?, ?, '2026-06-01 00:00:00')",
@@ -472,7 +476,11 @@ async fn spiegel_mit_akte(pool: &SqlitePool, leit: i64, kennung: &str, fuehrer: 
     s
 }
 
-async fn spiegel_uebernehmen(pool: &SqlitePool, k: &KopplungZeile, liste: &[Lebensende]) -> Vec<i64> {
+async fn spiegel_uebernehmen(
+    pool: &SqlitePool,
+    k: &KopplungZeile,
+    liste: &[Lebensende],
+) -> Vec<i64> {
     let mut tx = pool.begin().await.unwrap();
     let ids = geloescht_uebernehmen(&mut tx, k, liste).await.unwrap();
     tx.commit().await.unwrap();

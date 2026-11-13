@@ -867,6 +867,25 @@ pub async fn fuehrt_laut_akte(
     .await?)
 }
 
+/// Ob `absender` den Spiegel mit der Kennung führt und ihn deshalb als gelöscht melden darf
+/// (LLH-1852, Change `r11nl4cv-geloescht-fremdes-praefix`, D2; ADR-0039). Mit Schalter und Akte
+/// entscheidet allein die Akte, auch gegen ein passendes Präfix: Das Abräumen ist unumkehrbar.
+/// Ohne Schalter (die Führung ist eingefroren) oder ohne Akte gilt das Präfix der Kennung.
+pub async fn is_fuehrer_des_spiegels(
+    conn: &mut SqliteConnection,
+    kennung: &str,
+    absender: &str,
+) -> Result<bool, AppError> {
+    if akten::is_enabled_tx(conn).await? {
+        if let Some(akte) = akten::find_by_kennung(conn, kennung).await? {
+            return Ok(akte.fuehrer_kennung == absender);
+        }
+    }
+    Ok(kennung
+        .strip_prefix(absender)
+        .is_some_and(|rest| rest.starts_with('/')))
+}
+
 /// Hängt die Akte des Gegenübers an einen neuen Spiegel desselben Einsatzes (E2).
 pub async fn verknuepfe_akte(
     conn: &mut SqliteConnection,

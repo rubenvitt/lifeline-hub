@@ -505,7 +505,8 @@ pub async fn handle_abgleich(
         }
         // Pull: genannte Einsätze, die hier gelöscht sind; dazu genannte Akten ohne Spiegel,
         // deren Ende diese Instanz belegt (LLH-1699).
-        let mut geloescht = lebensende::geloeschte(conn, kopplung.id, &eigen.kennung, &anfrage.staende).await?;
+        let mut geloescht =
+            lebensende::geloeschte(conn, kopplung.id, &eigen.kennung, &anfrage.staende).await?;
         let platz = EINSAETZE_MAX.saturating_sub(geloescht.len());
         geloescht.extend(
             lebensende::geloeschte_akten(conn, kopplung.id, &eigen.kennung, &anfrage.akten)
