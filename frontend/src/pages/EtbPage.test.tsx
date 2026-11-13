@@ -1306,6 +1306,37 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
     expect(screen.queryByRole('heading', { name: /^Bilanz/ })).toBeNull();
   });
 
+  it('die Kopfzahl wartet auf die Systemzählung, statt zweimal umzubrechen (Review S3)', async () => {
+    setzeViewportBreite(1440);
+    let systemFreigeben: () => void = () => undefined;
+    const systemDa = new Promise<void>((r) => (systemFreigeben = r));
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb/zaehler', async ({ request }) => {
+        const ohne = new URL(request.url).searchParams.get('ohne_system') === 'true';
+        if (!ohne) await systemDa;
+        return HttpResponse.json({
+          gesamt: ohne ? 112 : 412,
+          je_typ: {
+            meldung: 80,
+            anordnung: 20,
+            lage: 2,
+            entscheidung: 9,
+            system: ohne ? 0 : 300,
+            berichtigung: 1,
+          },
+        });
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    // Die Handzählung ist da, die Systemzählung nicht: es steht noch der Platzhalter.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(kopf()).not.toHaveTextContent('112 Einträge');
+    systemFreigeben();
+    await waitFor(() =>
+      expect(kopf()).toHaveTextContent('112 Einträge · 300 Systemeinträge ausgeblendet'),
+    );
+  });
+
   it('nennt im Kopf die Einzahl', async () => {
     setup('/einsaetze/7/etb', [
       http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
@@ -2346,7 +2377,7 @@ describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
     setzeViewportBreite(1366);
     const { container } = setup('/einsaetze/7/etb?eintrag=2', serverSystem());
     expect(
-      await screen.findByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
+      await screen.findByText('Systemeinträge eingeblendet, um den Eintrag zu zeigen'),
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(container.querySelector('[data-zeile="eintrag-2"]')).toHaveClass(
@@ -2368,9 +2399,7 @@ describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?typ=meldung$/),
     );
-    expect(
-      screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
-    ).toBeNull();
+    expect(screen.queryByText('Systemeinträge eingeblendet, um den Eintrag zu zeigen')).toBeNull();
     expect(abrufe.every((a) => new URLSearchParams(a).get('ohne_system') === 'true')).toBe(true);
   });
 
@@ -2392,9 +2421,7 @@ describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
       ),
     );
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
-    expect(
-      screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
-    ).toBeNull();
+    expect(screen.queryByText('Systemeinträge eingeblendet, um den Eintrag zu zeigen')).toBeNull();
     expect(screen.queryByText('Person erfasst')).toBeNull();
   });
 
@@ -2470,6 +2497,9 @@ describe('EtbPage: Filterleiste klebt unter dem Seitenkopf (kwc2yszv)', () => {
       const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
       expect(kopf.style.position).not.toBe('sticky');
       expect(wurzelStil().getPropertyValue('--lfh-etb-filterleiste-hoehe')).toBe('');
+      // Die Leiste misst klebend und rollend gleich hoch (Review S1): ihr Abstand nach unten liegt
+      // in beiden Zuständen in ihr, sonst schaltete das Kleben an der Grenze hin und her.
+      expect(document.getElementById('etb-filterleiste')!.style.display).toBe('flow-root');
     } finally {
       hoehe.mockRestore();
     }

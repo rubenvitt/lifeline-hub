@@ -1263,6 +1263,27 @@ describe('Nach oben', () => {
     }
   });
 
+  it('hält unten seinen Platz frei: das ⋮ der jüngsten Zeile liegt nicht unter ihm (Review S11)', () => {
+    rolle(0);
+    const oben = renderZeitachse({ eintraege: [eintrag()] });
+    expect(oben.container.querySelector('[data-lfh="etb-nach-oben-platz"]')).toBeNull();
+    oben.unmount();
+    rolle(window.innerHeight + 1);
+    try {
+      const { container } = renderZeitachse({ eintraege: [eintrag()] });
+      expect(screen.getByRole('button', { name: 'Nach oben' })).toBeInTheDocument();
+      const platz = container.querySelector<HTMLElement>('[data-lfh="etb-nach-oben-platz"]');
+      expect(platz).not.toBeNull();
+      // Nach der letzten Zeile und vor der schwebenden Schale, so hoch wie Knopf und Abstand.
+      const zeile = container.querySelector('[data-zeile="eintrag-1"]')!;
+      expect(zeile.compareDocumentPosition(platz!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(platz!.nextElementSibling).toHaveAttribute('data-lfh', 'etb-schwebend');
+      expect(parseFloat(platz!.style.height)).toBeGreaterThanOrEqual(30);
+    } finally {
+      rolle(0);
+    }
+  });
+
   it('steht über dem Sammelbanner, nicht darauf', () => {
     rolle(window.innerHeight + 1);
     try {

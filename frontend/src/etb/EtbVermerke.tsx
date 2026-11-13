@@ -54,6 +54,22 @@ function vermerkKlasse(v: Vermerk, extra: string): string {
 /** Breite des „+n“ samt Abstand, die beim Messen frei bleibt (12 px Text, drei Zeichen). */
 const PLUS_RESERVE = 34;
 const LUECKE = 6;
+/** Platz für den Fokusring (2 px Linie, 2 px Abstand) seitlich der schneidenden Hüllen. */
+const RING = 4;
+
+/**
+ * Die Hüllen, die überlange Vermerke abschneiden (`overflow: hidden`), ragen um den Überstand und
+ * den Fokusring über die Zeile hinaus (Polsterung) und nehmen ihn per negativem Rand zurück: die
+ * Zeile bleibt so hoch wie ihr Text, Trefffläche und Fokusring der Verweise bleiben ganz (Review L3).
+ */
+function schnittkante(ueberstand: number) {
+  return {
+    paddingBlock: ueberstand + RING,
+    marginBlock: -(ueberstand + RING),
+    paddingInline: RING,
+    marginInline: -RING,
+  } as const;
+}
 
 /**
  * Wie viele Vermerke passen in die Spalte? Rein, über die gemessenen Breiten. Unbekannte Breite
@@ -111,7 +127,8 @@ export function EtbVermerkSpalte({
             .reduce((s, k) => s + (k as HTMLElement).offsetWidth + LUECKE, 0)
         : 0;
       const n = passendeVermerke(
-        kinder.map((k) => k.scrollWidth),
+        // Die Polsterung der Schnittkante zählt nicht: der negative Rand nimmt sie zurück.
+        kinder.map((k) => k.scrollWidth - (k.style.paddingInline ? 2 * RING : 0)),
         spalte?.clientWidth ? Math.max(1, spalte.clientWidth - neben) : 0,
       );
       setAnzahl((vorher) => (vorher === n ? vorher : n));
@@ -128,7 +145,7 @@ export function EtbVermerkSpalte({
     <div className="etb-vermerk-spalte" data-lfh="etb-vermerk" title={titel || undefined}>
       {vor}
       {!aufgeklappt && vermerke.length > 0 && (
-        <div ref={liste} className="etb-vermerk-liste">
+        <div ref={liste} className="etb-vermerk-liste" style={schnittkante(ueberstand)}>
           {vermerke.map((v, i) => {
             const zuViel = i >= vermerke.length - verborgen;
             return (
@@ -136,6 +153,7 @@ export function EtbVermerkSpalte({
                 key={v.schluessel}
                 data-vermerk={v.schluessel}
                 aria-hidden={zuViel || undefined}
+                style={!zuViel && i === 0 ? schnittkante(ueberstand) : undefined}
                 className={vermerkKlasse(
                   v,
                   zuViel ? 'etb-vermerk--verborgen' : i === 0 ? 'etb-vermerk--erster' : '',

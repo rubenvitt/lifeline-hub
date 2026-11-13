@@ -215,8 +215,8 @@ Adresse der Seite und lässt sich als Link weitergeben; ein gewählter Zeitraum 
 festen Uhrzeiten, ein Link zeigt also beim Empfänger dieselben Einträge, auch im Druck.
 Eingeblendete Systemeinträge stehen dort als „system=an“. Ein älterer Link ohne diese Angabe, der
 früher die Systemeinträge mitzeigte, zeigt sie nicht mehr; ein Link auf einen einzelnen
-Systemeintrag blendet sie selbst ein und meldet „Systemeinträge wieder eingeblendet, um den
-Eintrag zu zeigen“. Auf schmalen Bildschirmen
+Systemeintrag blendet sie selbst ein und meldet „Systemeinträge eingeblendet, um den Eintrag zu
+zeigen“. Auf schmalen Bildschirmen
 rollt der Typ einzeilig im Kopf, die übrigen Filter liegen hinter dem Knopf „Filter“, der die Zahl
 gesetzter Filter trägt (eingeblendete Systemeinträge zählen mit); dort klebt nichts, der Sendestatus
 steht neben dem Typ.

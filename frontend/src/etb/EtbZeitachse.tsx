@@ -108,6 +108,11 @@ interface Props {
    */
   buendeln?: boolean;
   /**
+   * Kleben Seitenkopf und Filterleiste (`etb/etbKopfKleben.ts`)? Nur dann klebt auch der
+   * Spaltenkopf: der Fokusabstand oben rechnet ihn nur dann ein (Review L4).
+   */
+  kopfKlebt?: boolean;
+  /**
    * Zählt je Sprung über `?eintrag=` hoch (auch auf denselben Eintrag). Ein Sprung hebt das
    * Einfrieren auf: das Ziel könnte sonst hinter dem Sammelbanner stehen.
    */
@@ -315,6 +320,7 @@ export default function EtbZeitachse({
   highlightId,
   fundstellen,
   buendeln = true,
+  kopfKlebt = false,
   sprungMarke,
   eigeneBenutzerId,
   amEnde = true,
@@ -761,7 +767,7 @@ export default function EtbZeitachse({
           : {}),
       }}
     >
-      {form === 'spalten' && sichtbar.length > 0 && <EtbSpaltenkopf />}
+      {form === 'spalten' && sichtbar.length > 0 && <EtbSpaltenkopf klebt={kopfKlebt} />}
       {inhalt}
       {/* In der Wurzel: der Fokus im Menü (Portal) steigt im React-Baum zu `betreten` auf und
           hält die Achse wie jeder Fokus in ihr (D4). */}
@@ -772,6 +778,16 @@ export default function EtbZeitachse({
           zugaenglicherName={zeilenMenueName(kontextZeile)}
           onWahl={(key) => fuehreZeilenWahlAus(kontextZeile, key, aufrufe, kontextZusatz)}
           onSchliessen={kontextSchliessen}
+        />
+      )}
+      {/* Steht „Nach oben“, hält die Achse unten seine Höhe frei: in der Funkprotokoll-Ordnung
+          steht er fast immer, und rechts unten läge er sonst auf dem ⋮ der jüngsten Zeile (Review
+          S11). Nur der Knopf, nicht das Banner: das meldet Neues und darf kurz überdecken. */}
+      {weitGerollt && nachObenPasst && (
+        <div
+          aria-hidden="true"
+          data-lfh="etb-nach-oben-platz"
+          style={{ height: token.controlHeight + token.marginXS }}
         />
       )}
       {/* Überlagerung mit Nullhöhe am UNTEREN Rand (LLH-1149): neue Einträge kommen unten an,
@@ -1119,7 +1135,9 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
     const quelle = e ?? (z.art !== 'eintrag' ? z.puffer.eintrag : null)!;
     const anzeige: VonAnAnzeige = vonAnAnzeige(quelle.von, quelle.an);
     const weg = quelle.meldeweg ? MELDEWEG_LABEL[quelle.meldeweg] : undefined;
-    const offenErzwungen = e != null && (hervorgehoben || inhaltGetroffen(e.inhalt, fundstellen));
+    // Ein Systemeintrag steht ungekürzt (Spec, „Systemeinträge leise“): leise, aber ganz.
+    const offenErzwungen =
+      e != null && (e.typ === 'system' || hervorgehoben || inhaltGetroffen(e.inhalt, fundstellen));
     const inhaltKnoten = (
       // Unter dem Stundenkopf (h2) — `#` im Eintrag wird h3 (LFH-621).
       <Markdown variante="kompakt" unterEbene={2} fundstellen={e ? fundstellen : undefined}>
@@ -1248,7 +1266,11 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
       verfasser={verfasserText(ei)}
       weg={ei.meldeweg ? MELDEWEG_LABEL[ei.meldeweg] : undefined}
     >
-      <EtbInhalt offenErzwungen={hervorgehoben || inhaltGetroffen(ei.inhalt, fundstellen)}>
+      <EtbInhalt
+        offenErzwungen={
+          ei.typ === 'system' || hervorgehoben || inhaltGetroffen(ei.inhalt, fundstellen)
+        }
+      >
         <div className={berichtigtDurch(ei).length > 0 ? 'etb-inhalt--berichtigt' : undefined}>
           {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
           <Markdown variante="kompakt" unterEbene={2} fundstellen={fundstellen}>

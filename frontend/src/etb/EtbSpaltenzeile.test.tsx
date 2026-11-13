@@ -175,11 +175,21 @@ describe('Spaltenzeile in kompakter Dichte', () => {
     }
   });
 
-  it('der Spaltenkopf klebt unter dem Kopf der Seite, sonst unter dem Rahmen', () => {
-    const { container } = renderZeitachse({ eintraege: [eintrag()] });
+  it('der Spaltenkopf klebt unter dem Kopf der Seite, solange die Köpfe kleben', () => {
+    const { container } = renderZeitachse({ eintraege: [eintrag()], kopfKlebt: true });
     const kopf = container.querySelector<HTMLElement>('[data-lfh="etb-spaltenkopf"]')!;
     expect(kopf.style.position).toBe('sticky');
     expect(kopf.style.top).toBe('var(--etb-kopf-unterkante, var(--lfh-rahmen-oben, 0px))');
+  });
+
+  it('kleben die Köpfe nicht, rollt der Spaltenkopf mit (Review L4: kein verdecktes Fokusziel)', () => {
+    for (const kopfKlebt of [false, undefined]) {
+      const { container, unmount } = renderZeitachse({ eintraege: [eintrag()], kopfKlebt });
+      const kopf = container.querySelector<HTMLElement>('[data-lfh="etb-spaltenkopf"]')!;
+      expect(kopf.style.position, String(kopfKlebt)).toBe('');
+      expect(kopf.style.top, String(kopfKlebt)).toBe('');
+      unmount();
+    }
   });
 
   it('Langer Absender: Auslassung, voller Text im Titel', () => {
@@ -298,6 +308,29 @@ describe('Vermerke in eigener Spalte', () => {
       '/einsaetze/1/meldungen?meldung=9',
     );
     expect(z.querySelector('[data-lfh="etb-unterzeile"]')).toBeNull();
+  });
+
+  it('der Verweis behält Bedienhöhe und Fokusring: die Schnittkante liegt um den Überstand weiter außen (Review L3)', () => {
+    const { container } = renderZeitachse({
+      eintraege: [eintrag({ meldung_id: 9, meldung_lfd_nr: 5 })],
+    });
+    const spalte = zeileVon(container, 'eintrag-1').querySelector<HTMLElement>(
+      '[data-lfh="etb-vermerk"]',
+    )!;
+    const link = within(spalte).getByRole('link', { name: 'Meldung #5' });
+    const ueberstand = -parseFloat(link.style.marginBlock);
+    expect(ueberstand).toBeGreaterThan(0);
+    // Jede Hülle mit `overflow: hidden` zwischen Verweis und Spalte ragt um den Überstand und den
+    // Fokusring (4 px) über die Zeile hinaus, ohne sie höher zu machen.
+    for (const huelle of [
+      spalte.querySelector<HTMLElement>('.etb-vermerk-liste')!,
+      link.closest<HTMLElement>('.etb-vermerk--erster')!,
+    ]) {
+      expect(huelle.style.paddingBlock, huelle.className).toBe(`${ueberstand + 4}px`);
+      expect(huelle.style.marginBlock, huelle.className).toBe(`-${ueberstand + 4}px`);
+      expect(huelle.style.paddingInline, huelle.className).toBe('4px');
+      expect(huelle.style.marginInline, huelle.className).toBe('-4px');
+    }
   });
 
   it('Berichtigt: Nr. 230 durchgestrichen mit „berichtigt durch Nr. 231“, Nr. 231 nennt „berichtigt Nr. 230“', () => {
@@ -537,16 +570,37 @@ describe('Lange Einträge eingeklappt', () => {
         eintraege: [eintrag({ id: 2, lfd_nr: 2, typ: 'lage', inhalt: LAGEBERICHT })],
       });
       const z = zeileVon(container, 'eintrag-2');
-      // Im Zeitachseneintrag erbt die Hülle die Zeilenhöhe; jsdom rechnet sie nicht aus.
-      if (breite === 390) {
-        expect(z.querySelector('[data-lfh="etb-inhalt"]'), `${breite}`).toHaveAttribute(
-          'data-eingeklappt',
-          'true',
-        );
-        expect(within(z).getByRole('button', { name: 'mehr' })).toBeInTheDocument();
-      } else {
-        expect(z.querySelector('[data-lfh="etb-inhalt"]'), `${breite}`).not.toBeNull();
-      }
+      expect(z.querySelector('[data-lfh="etb-inhalt"]'), `${breite}`).toHaveAttribute(
+        'data-eingeklappt',
+        'true',
+      );
+      expect(within(z).getByRole('button', { name: 'mehr' }), `${breite}`).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('ein langer Systemeintrag steht ungekürzt, ohne „mehr“, in jeder Form', () => {
+    for (const breite of [1366, 900, 390]) {
+      setzeViewportBreite(breite);
+      const { container, unmount } = renderZeitachse({
+        eintraege: [
+          eintrag({
+            id: 2,
+            lfd_nr: 2,
+            typ: 'system',
+            von: 'System',
+            an: 'System',
+            meldeweg: null,
+            inhalt: LAGEBERICHT,
+          }),
+        ],
+      });
+      const z = zeileVon(container, 'eintrag-2');
+      expect(z.querySelector('[data-lfh="etb-inhalt"]'), `${breite}`).not.toHaveAttribute(
+        'data-eingeklappt',
+      );
+      expect(z.querySelector('.etb-inhalt--zu'), `${breite}`).toBeNull();
+      expect(within(z).queryByRole('button', { name: 'mehr' }), `${breite}`).toBeNull();
       unmount();
     }
   });
@@ -558,8 +612,24 @@ describe('Lange Einträge eingeklappt', () => {
     );
     const druck = css.slice(css.indexOf('@media print'));
     expect(druck).toMatch(/\.etb-inhalt--zu\s*\{[^}]*-webkit-line-clamp:\s*unset/);
-    expect(druck).toMatch(/\.etb-inhalt--zu\s*\{[^}]*max-height:\s*none/);
     expect(druck).toMatch(/\.etb-inhalt-umschalter\s*\{[^}]*display:\s*none/);
+  });
+
+  it('der Absatzabstand ist zu und offen derselbe (Review L8)', () => {
+    const css = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'etbSpaltenzeile.css'),
+      'utf8',
+    );
+    const schirm = css.slice(css.indexOf('@media screen'), css.indexOf('@media print'));
+    // Die Ränder fallen für jeden Inhalt weg, nicht nur unter der Klemme …
+    expect(schirm).not.toMatch(/etb-inhalt--zu[^{]*\.markdown/);
+    expect(schirm).toMatch(
+      /\.etb-inhalt\[data-lfh='etb-inhalt'\] \.markdown \*\s*\{[^}]*margin-block:\s*0/,
+    );
+    // … und ein fester Abstand zwischen den Blöcken steht in beiden Zuständen.
+    expect(schirm).toMatch(/\.markdown > \* \+ \*\s*\{[^}]*margin-top:\s*4px/);
+    // Ohne Ersatzhöhe: sie schnitte die dritte Zeile an, sobald Abstände mitzählen.
+    expect(css).not.toMatch(/max-height:\s*3lh/);
   });
 });
 

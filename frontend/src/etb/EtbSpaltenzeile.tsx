@@ -55,10 +55,12 @@ export const NUR_VORLESER: CSSProperties = {
 /**
  * Der Spaltenkopf über der Zeitachse: dieselben Spuren wie die Zeile. Er klebt unter dem Kopf der
  * Seite (`--etb-kopf-unterkante`, gesetzt von der ETB-Seite als Unterkante von Seitenkopf und
- * Filterleiste), sonst unter dem Rahmen. Ein Bild der Spalten, kein Tabellenkopf: Vorleser lesen
+ * Filterleiste), aber nur, solange diese Köpfe kleben (`klebt`, `etb/etbKopfKleben.ts`): sonst
+ * rechnete der Fokusabstand oben ihn nicht ein, ein getabbtes Ziel läge unter ihm (Review L4).
+ * Ein Bild der Spalten, kein Tabellenkopf: Vorleser lesen
  * die Zeilen, die ihre Bezeichnungen selbst tragen (`aria-hidden`).
  */
-export function EtbSpaltenkopf() {
+export function EtbSpaltenkopf({ klebt }: { klebt: boolean }) {
   const { rollen } = useRollen();
   return (
     <div
@@ -66,9 +68,13 @@ export function EtbSpaltenkopf() {
       data-lfh="etb-spaltenkopf"
       className="etb-spaltenraster"
       style={{
-        position: 'sticky',
-        top: 'var(--etb-kopf-unterkante, var(--lfh-rahmen-oben, 0px))',
-        zIndex: 4,
+        ...(klebt
+          ? {
+              position: 'sticky',
+              top: 'var(--etb-kopf-unterkante, var(--lfh-rahmen-oben, 0px))',
+              zIndex: 4,
+            }
+          : {}),
         display: 'grid',
         gridTemplateColumns: ETB_SPALTEN_RASTER,
         columnGap: ETB_SPALTEN_RINNE,

@@ -55,16 +55,20 @@
   -webkit-line-clamp: 3;
   line-clamp: 3;
   overflow: hidden;
-  max-height: 3lh;
 }
 
-/* Zugeklappt ohne Absatz- und Überschriftenränder und mit der Zeilenhöhe der Hülle: sonst
-   schnitte die dritte Zeile mitten durch die Schrift (Abschnitte eines Lageberichts). Nur am
-   Schirm: im Druck klappt nichts ein. */
+/* Ein Absatzmaß für zu und offen (Review L8): die Ränder aus `Markdown.css` fallen weg, alle Blöcke
+   stehen in der Zeilenhöhe der Hülle und 4 px auseinander. So endet die Klemme sauber nach der
+   dritten Zeile (die Abstände zählen in ihre Höhe), und ein kurzer Eintrag sieht nicht anders aus,
+   als wenn er aufgeklappt wäre. Nur am Schirm: der Druck behält die Ränder. */
 @media screen {
-  .etb-inhalt.etb-inhalt--zu .markdown * {
+  .etb-inhalt[data-lfh='etb-inhalt'] .markdown * {
     margin-block: 0;
     line-height: inherit;
+  }
+
+  .etb-inhalt[data-lfh='etb-inhalt'] .markdown > * + * {
+    margin-top: 4px;
   }
 }
 
@@ -143,7 +147,6 @@
     -webkit-line-clamp: unset;
     line-clamp: none;
     overflow: visible;
-    max-height: none;
   }
 
   .etb-inhalt-umschalter {

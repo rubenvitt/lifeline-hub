@@ -50,6 +50,7 @@ import {
 } from 'react';
 import EtbZeitachse, { type GezeigteRaender } from '../etb/EtbZeitachse';
 import EtbSendestatus from '../etb/EtbSendestatus';
+import { vorgemerkteZeile } from '../etb/vorgemerkteZeile';
 import {
   ETB_FILTERLEISTE_OBEN,
   ETB_KOPF_UNTERKANTE,
@@ -603,7 +604,7 @@ export default function EtbPage() {
       navigate(etbFilterPfad(einsatzId, filterMitSystem, { eintrag: zielEintragId }), {
         replace: true,
       });
-      message.info('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen');
+      message.info('Systemeinträge eingeblendet, um den Eintrag zu zeigen');
       return;
     }
     if (richtung === 'da') {
@@ -852,12 +853,12 @@ export default function EtbPage() {
 
   /**
    * Sprung zu den vorgemerkten Zeilen (Sendestatus im Kopf, kwc2yszv D7): sie stehen in der
-   * Funkprotokoll-Ordnung unten in der Zeitachse; gerollt wird zur ersten, wie ein `?eintrag=`.
+   * Funkprotokoll-Ordnung unten in der Zeitachse; gerollt wird wie ein `?eintrag=` zur ersten
+   * abgelehnten, sonst zur ersten ausstehenden (`etb/vorgemerkteZeile.ts`).
    */
   function zuVorgemerkten() {
-    zeitachseKopf.current
-      ?.querySelector('[data-zeile^="ausstehend-"], [data-zeile^="abgelehnt-"]')
-      ?.scrollIntoView?.({ block: 'center' });
+    const wurzel = zeitachseKopf.current;
+    if (wurzel) vorgemerkteZeile(wurzel)?.scrollIntoView?.({ block: 'center' });
   }
   const sendestatus = <EtbSendestatus puffer={puffer} onSprung={zuVorgemerkten} />;
 
@@ -1083,11 +1084,17 @@ export default function EtbPage() {
     </>
   );
 
-  const kopfZahl = kopfMeta({
-    zaehler: zaehlerQuery.data,
-    gefiltert: filterAktiv,
-    systemAusgeblendet: filter.ohne_system ? systemAnzahl : undefined,
-  });
+  // Ohne Filter nennt der Kopf auch die ausgeblendeten Systemeinträge: er wartet auf beide
+  // Zählungen, sonst bräche die Meta-Zeile zweimal um und schöbe die Zeitachse (Review S3,
+  // LLH-1463). Scheitert die Systemzählung, steht die Zahl ohne sie.
+  const systemZahlWartet = !filterAktiv && !!filter.ohne_system && systemZaehlerQuery.isPending;
+  const kopfZahl = systemZahlWartet
+    ? undefined
+    : kopfMeta({
+        zaehler: zaehlerQuery.data,
+        gefiltert: filterAktiv,
+        systemAusgeblendet: filter.ohne_system ? systemAnzahl : undefined,
+      });
 
   return (
     <EinsatzSeite
@@ -1142,19 +1149,21 @@ export default function EtbPage() {
             id="etb-filterleiste"
             hidden={!filterleisteSichtbar}
             data-lfh={kleben.klebt ? 'etb-kopf-klebt' : undefined}
-            style={
-              kleben.klebt
+            style={{
+              // Der Abstand der Leiste nach unten gehört zur Fläche, klebend wie rollend: sonst
+              // rollte die Zeitachse durch einen Spalt, und die gemessene Höhe spränge mit dem
+              // Kleben, das an ihr hängt (Review S1, `etb/etbKopfKleben.ts`). Nicht bei `hidden`: ein
+              // `display` am Element hebt das Attribut auf.
+              display: filterleisteSichtbar ? 'flow-root' : undefined,
+              ...(kleben.klebt
                 ? {
                     position: 'sticky',
                     top: ETB_FILTERLEISTE_OBEN, // --lfh-rahmen-oben + Seitenkopf, `etbKopfKleben.ts`
                     zIndex: FILTERLEISTE_EBENE,
                     background: rollen.grund,
-                    // Der Abstand der Leiste nach unten gehört zur klebenden Fläche, sonst rollte
-                    // die Zeitachse durch einen Spalt.
-                    display: 'flow-root',
                   }
-                : undefined
-            }
+                : {}),
+            }}
           >
             {filterleisteSichtbar && (
               <EtbFilterleiste
@@ -1244,6 +1253,7 @@ export default function EtbPage() {
               fundstellen={filter.q}
               // Unter „System“ sucht jemand genau diese Einträge: dort kein Bündel (LLH-1106).
               buendeln={filter.typ !== 'system'}
+              kopfKlebt={kleben.klebt}
               sprungMarke={hervorhebung?.marke}
               eigeneBenutzerId={benutzer?.id}
               amEnde={amEnde}

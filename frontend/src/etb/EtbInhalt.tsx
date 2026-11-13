@@ -23,7 +23,8 @@ import { useRollen } from '../components/instrument';
  * Vorleser und Markieren sehen ihn.
  *
  * Aufgeklappt steht er bei einem Sprung (`?eintrag=`) und unter einer Volltextsuche mit Treffer
- * im Inhalt (`offenErzwungen`); dann bietet die Zeile kein „weniger“ an. Im Druck klappt nichts
+ * im Inhalt (`offenErzwungen`); dann bietet die Zeile kein „weniger“ an. Ein Systemeintrag steht
+ * immer ungekürzt (Spec, „Systemeinträge leise“). Im Druck klappt nichts
  * ein (`@media print` in `etbSpaltenzeile.css`; der Druck des ETB ist ohnehin `EtbDruckTabelle`).
  */
 export const EINGEKLAPPT_ZEILEN = 3;
