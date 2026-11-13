@@ -139,20 +139,28 @@ async fn archivierter_einsatz(
     (e.id, inhalt)
 }
 
+/// Der private Schlüssel als Text; `frisch` liest ihn wie der Befehl. Das Einspielen nimmt den
+/// Schlüssel und lässt ihn fallen, ein Test mit mehreren Läufen braucht ihn je Lauf neu.
+struct Schluesseltext(String);
+
+impl Schluesseltext {
+    fn frisch(&self) -> Schluessel {
+        Schluessel::laden(self.0.clone().into_bytes(), None, || {
+            panic!("keine Passphrase")
+        })
+        .unwrap()
+    }
+}
+
 /// Der Block als Datei und der Schlüssel, wie ihn der Befehl liest.
 fn als_datei(
     inhalt: &[u8],
     id: &age::x25519::Identity,
-) -> (tempfile::TempDir, PathBuf, Schluessel) {
+) -> (tempfile::TempDir, PathBuf, Schluesseltext) {
     let dir = tempfile::tempdir().unwrap();
     let pfad = dir.path().join("block.age");
     std::fs::write(&pfad, inhalt).unwrap();
-    let schluessel = Schluessel::laden(
-        format!("{}\n", id.to_string().expose_secret()).into_bytes(),
-        None,
-        || panic!("keine Passphrase"),
-    )
-    .unwrap();
+    let schluessel = Schluesseltext(format!("{}\n", id.to_string().expose_secret()));
     (dir, pfad, schluessel)
 }
 
@@ -188,9 +196,16 @@ async fn eingespielt_schreibgeschuetzt_mit_platzhaltern_und_nach_7_tagen_weg() {
     let (_dir, datei, s) = als_datei(&block, &id);
     let jetzt = Utc::now();
 
-    let e = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, jetzt)
-        .await
-        .unwrap();
+    let e = einspielen(
+        &pool,
+        &datei,
+        s.frisch(),
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        jetzt,
+    )
+    .await
+    .unwrap();
     assert_ne!(e.einsatz_id, alt, "eigener Einsatz neben dem Skelett");
     assert_eq!(e.bezeichnung, "Hochwasser");
     assert_eq!(e.inhalte, 1);
@@ -405,7 +420,7 @@ async fn veralteter_block_wird_vor_dem_einspielen_geschwaerzt() {
     let e = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::Org(1),
         Akteur::Befehl,
         Utc::now() + TimeDelta::days(20),
@@ -442,7 +457,7 @@ async fn falscher_schluessel_und_fremde_org_spielen_nichts_ein() {
     let f = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::AusArchiv,
         Akteur::Befehl,
         Utc::now(),
@@ -452,9 +467,16 @@ async fn falscher_schluessel_und_fremde_org_spielen_nichts_ein() {
     assert!(f.to_string().contains("Schlüssel passt nicht"), "{f}");
 
     let (_d2, datei, s) = als_datei(&block, &id);
-    let f = einspielen(&pool, &datei, &s, Ziel::Org(99), Akteur::Befehl, Utc::now())
-        .await
-        .unwrap_err();
+    let f = einspielen(
+        &pool,
+        &datei,
+        s.frisch(),
+        Ziel::Org(99),
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
     assert!(f.to_string().contains("--org"), "{f}");
 
     assert_eq!(
@@ -520,7 +542,7 @@ async fn ein_block_mit_abgelaufener_aufbewahrung_wird_abgelehnt() {
     let f = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::AusArchiv,
         Akteur::Befehl,
         Utc::now() + TimeDelta::days(31),
@@ -565,9 +587,16 @@ async fn eine_frist_des_blocks_kuerzt_die_zeit_hier() {
     let (_dir, datei, s) = als_datei(&block, &id);
     let jetzt = Utc::now();
 
-    let e = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, jetzt)
-        .await
-        .unwrap();
+    let e = einspielen(
+        &pool,
+        &datei,
+        s.frisch(),
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        jetzt,
+    )
+    .await
+    .unwrap();
     let frist: String = eine(
         &pool,
         "SELECT frist_bis FROM einsatz_aufbewahrung_kategorie WHERE kategorie = 'personenauskunft' \
@@ -613,7 +642,7 @@ async fn ein_hier_geloeschter_block_kommt_nicht_zurueck() {
     let f = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::AusArchiv,
         Akteur::Befehl,
         Utc::now(),
@@ -645,7 +674,7 @@ async fn ohne_org_nur_in_die_org_gleichen_namens() {
     let f = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::AusArchiv,
         Akteur::Befehl,
         Utc::now(),
@@ -654,9 +683,16 @@ async fn ohne_org_nur_in_die_org_gleichen_namens() {
     .unwrap_err();
     assert!(f.to_string().contains("--org"), "{f}");
     assert!(f.to_string().contains("KV Süd"), "{f}");
-    let e = einspielen(&pool, &datei, &s, Ziel::Org(1), Akteur::Befehl, Utc::now())
-        .await
-        .unwrap();
+    let e = einspielen(
+        &pool,
+        &datei,
+        s.frisch(),
+        Ziel::Org(1),
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
     assert_eq!(e.org_name, "KV Süd");
 }
 
@@ -671,7 +707,7 @@ async fn ein_loeschersuchen_nimmt_die_eingespielte_kopie_mit() {
     let e = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::AusArchiv,
         Akteur::Befehl,
         Utc::now(),
@@ -737,7 +773,7 @@ async fn ein_endgueltig_geloeschter_einsatz_kommt_nicht_zurueck() {
     let f = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::AusArchiv,
         Akteur::Befehl,
         Utc::now(),
@@ -758,7 +794,7 @@ async fn ein_endgueltig_geloeschter_einsatz_kommt_nicht_zurueck() {
     einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::AusArchiv,
         Akteur::Befehl,
         Utc::now(),
@@ -824,7 +860,7 @@ async fn die_verwaltung_spielt_nur_in_die_eigene_org_gleichen_namens_ein() {
     let f = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::EigeneOrg(2),
         Akteur::Person {
             benutzer: &fremd,
@@ -854,7 +890,7 @@ async fn die_verwaltung_spielt_nur_in_die_eigene_org_gleichen_namens_ein() {
     let e = einspielen(
         &pool,
         &datei,
-        &s,
+        s.frisch(),
         Ziel::EigeneOrg(5),
         Akteur::Person {
             benutzer: &eigen,
@@ -891,7 +927,7 @@ async fn die_spur_nennt_die_person_und_fehlt_bei_einer_ablehnung() {
     einspielen(
         &pool,
         &datei,
-        &falsch,
+        falsch.frisch(),
         Ziel::EigeneOrg(1),
         person,
         Utc::now(),
@@ -908,9 +944,16 @@ async fn die_spur_nennt_die_person_und_fehlt_bei_einer_ablehnung() {
     );
 
     let (_d2, datei, s) = als_datei(&block, &id);
-    let e = einspielen(&pool, &datei, &s, Ziel::EigeneOrg(1), person, Utc::now())
-        .await
-        .unwrap();
+    let e = einspielen(
+        &pool,
+        &datei,
+        s.frisch(),
+        Ziel::EigeneOrg(1),
+        person,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
     let (akteur_id, akteur_name, peer_ip, org_id, ziel): (
         Option<i64>,
         String,
@@ -932,5 +975,90 @@ async fn die_spur_nennt_die_person_und_fehlt_bei_einer_ablehnung() {
         ziel.contains(&e.einsatz_id.to_string())
             || e.einsatznummer.is_some_and(|n| ziel.contains(&n)),
         "{ziel}"
+    );
+}
+
+/// Entschlüsselt `block`, ändert ihn mit `sql` und verschlüsselt ihn wieder an `id`.
+async fn block_umschreiben(block: &[u8], id: &age::x25519::Identity, sql: &str) -> Vec<u8> {
+    use std::io::{Read, Write};
+    let arbeit = tempfile::tempdir().unwrap();
+    let pfad = arbeit.path().join("block.sqlite");
+    let mut klar = Vec::new();
+    age::Decryptor::new(block)
+        .unwrap()
+        .decrypt(std::iter::once(id as &dyn age::Identity))
+        .unwrap()
+        .read_to_end(&mut klar)
+        .unwrap();
+    std::fs::write(&pfad, klar).unwrap();
+    let datei = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(&pfad))
+        .await
+        .unwrap();
+    sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string()))
+        .execute(&datei)
+        .await
+        .unwrap();
+    datei.close().await;
+    let mut geheim = Vec::new();
+    let empfaenger = id.to_public();
+    let mut w =
+        age::Encryptor::with_recipients(std::iter::once(&empfaenger as &dyn age::Recipient))
+            .unwrap()
+            .wrap_output(&mut geheim)
+            .unwrap();
+    w.write_all(&std::fs::read(&pfad).unwrap()).unwrap();
+    w.finish().unwrap();
+    geheim
+}
+
+/// Scheitert das Einspielen erst nach der Übernahme (ein Inhalt passt nicht zu seiner
+/// Prüfsumme), bleibt weder ein Einsatz noch die Spur „Archiv eingespielt“ (LLH-1711, Review).
+#[tokio::test]
+async fn eine_ablehnung_nach_der_uebernahme_hinterlaesst_keine_spur() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let id = schluessel(&pool).await;
+    let fz = fahrzeuge(&pool).await;
+    let (_, block) = archivierter_einsatz(&pool, leit, fz, &[]).await;
+    // Eine andere Abschlusszeit: der Block gilt als einer einer anderen Installation, sonst
+    // lehnte ihn schon die Prüfung gegen das Archiv hier ab.
+    let kaputt = block_umschreiben(
+        &block,
+        &id,
+        "UPDATE anhang SET daten = X'58595A'; \
+         UPDATE einsatz SET abgeschlossen_at = '2020-01-01 00:00:00'",
+    )
+    .await;
+    let (_dir, datei, s) = als_datei(&kaputt, &id);
+    let ada = admin(&pool, 1).await;
+    let vorher = eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz WHERE spiegel = 1").await;
+
+    let f = einspielen(
+        &pool,
+        &datei,
+        s.frisch(),
+        Ziel::EigeneOrg(1),
+        Akteur::Person {
+            benutzer: &ada,
+            peer_ip: None,
+        },
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
+    assert!(f.to_string().contains("Prüfsumme"), "{f}");
+    assert_eq!(
+        eine::<i64>(
+            &pool,
+            "SELECT COUNT(*) FROM admin_audit WHERE aktion = 'archiv_eingespielt'"
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz WHERE spiegel = 1").await,
+        vorher
     );
 }

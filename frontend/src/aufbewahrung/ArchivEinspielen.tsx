@@ -2,13 +2,18 @@ import { Alert, Button, Flex, Form, Input, Radio, Typography, Upload, type Uploa
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { spieleArchivEin, type ArchivEinspielenEingabe } from '../api/archivEinspielen';
+import { AusgangUnbekannt, NetzFehler, fehlerText } from '../api/client';
+import {
+  ARCHIV_BLOCK_MAX_BYTES,
+  ARCHIV_PASSPHRASE_MAX,
+  ARCHIV_PRIVATSCHLUESSEL_MAX,
+} from '../api/eingabegrenzen';
 import { globalKeys } from '../api/queryKeys';
 import type { ArchivEingespielt } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ErfassungsModal } from '../components/Erfassung';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
 import UploadFortschrittAnzeige from '../components/UploadFortschritt';
-import { ablageFehlerKopf, useUploadFortschritt } from '../components/useUploadFortschritt';
+import { useUploadFortschritt } from '../components/useUploadFortschritt';
 import { IconHochladen } from '../icons';
 import { einsatzPfad } from '../routing/deeplinks';
 
@@ -22,9 +27,6 @@ import { einsatzPfad } from '../routing/deeplinks';
  * und Schlüssel stehen; der Grund steht im Dialog.
  */
 
-/** Wortgleich mit der Grenze des Servers (`transfer::ARCHIV_BLOCK_MAX`). */
-export const ARCHIV_BLOCK_MAX = 256 * 1024 * 1024;
-
 const ZU_GROSS =
   'Größer als 256 MiB: diesen Block spielt der Betrieb mit dem Befehl `archiv einspielen` ein';
 
@@ -34,6 +36,19 @@ interface Werte {
   schluesselDatei?: UploadFile[];
   schluesselText?: string;
   passphrase?: string;
+}
+
+/**
+ * Überschrift einer Ablehnung nach der Phase (LFH-654): ohne Antwort vor dem letzten Byte ist
+ * nichts eingespielt, danach ist der Ausgang unklar (dann erst die Aufbewahrung bzw. die
+ * Einsatzliste ansehen, bevor man es noch einmal versucht).
+ */
+function fehlerKopf(fehler: unknown): { titel: string; fallback?: string } {
+  if (fehler instanceof AusgangUnbekannt)
+    return { titel: 'Einspielen unklar', fallback: fehlerText(fehler) };
+  if (fehler instanceof NetzFehler)
+    return { titel: 'Nicht eingespielt', fallback: fehlerText(fehler) };
+  return { titel: 'Nicht eingespielt' };
 }
 
 const dateiAusListe = (e: { fileList?: UploadFile[] } | UploadFile[]) =>
@@ -59,6 +74,8 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
   const [form] = Form.useForm<Werte>();
   const fortschritt = useUploadFortschritt();
   const mutation = useMutation({
+    // Die Variablen tragen den privaten Schlüssel: nach dem Lauf nicht im Cache behalten.
+    gcTime: 0,
     mutationFn: (w: Werte) =>
       fortschritt.begleite((onFortschritt) => spieleArchivEin(eingabe(w), onFortschritt)),
     onSuccess: (ergebnis) => {
@@ -68,6 +85,7 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
     },
   });
   const art = Form.useWatch('schluesselArt', form) ?? 'datei';
+  const kopf = fehlerKopf(mutation.error);
 
   function schliessen() {
     mutation.reset();
@@ -85,8 +103,12 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
       onFertig={schliessen}
       onAbbrechen={schliessen}
       laeuft={mutation.isPending}
+      // Abbrechen bleibt gesperrt, bis die Antwort da ist: der Server spielt sonst weiter ein,
+      // und eine Ablehnung hätte keinen Ort mehr (LFH-1077).
+      speicherung={mutation}
+      speicherFehlerTitel={kopf.titel}
+      speicherFehlerFallback={kopf.fallback}
     >
-      <SpeicherFehler fehler={mutation.error} {...ablageFehlerKopf(mutation.error)} />
       <UploadFortschrittAnzeige
         stand={mutation.isPending ? fortschritt.stand : null}
         pruefenText="Wird eingespielt"
@@ -103,7 +125,7 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
           { required: true, message: 'Archivblock wählen' },
           {
             validator: (_, liste?: UploadFile[]) =>
-              (liste?.[0]?.originFileObj?.size ?? 0) > ARCHIV_BLOCK_MAX
+              (liste?.[0]?.originFileObj?.size ?? 0) > ARCHIV_BLOCK_MAX_BYTES
                 ? Promise.reject(new Error(ZU_GROSS))
                 : Promise.resolve(),
           },
@@ -127,7 +149,15 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
           label="Schlüsseldatei"
           valuePropName="fileList"
           getValueFromEvent={dateiAusListe}
-          rules={[{ required: true, message: 'Schlüsseldatei wählen' }]}
+          rules={[
+            { required: true, message: 'Schlüsseldatei wählen' },
+            {
+              validator: (_, liste?: UploadFile[]) =>
+                (liste?.[0]?.originFileObj?.size ?? 0) > ARCHIV_PRIVATSCHLUESSEL_MAX
+                  ? Promise.reject(new Error('Das ist keine Schlüsseldatei: zu groß'))
+                  : Promise.resolve(),
+            },
+          ]}
         >
           <Upload beforeUpload={() => false} maxCount={1}>
             <Button icon={<IconHochladen />}>Datei wählen</Button>
@@ -139,11 +169,16 @@ export function ArchivEinspielenDialog({ offen, onSchliessen, onEingespielt }: D
           label="Schlüssel"
           rules={[{ required: true, whitespace: true, message: 'Schlüssel einfügen' }]}
         >
-          <Input.Password placeholder="AGE-SECRET-KEY-1…" autoComplete="off" spellCheck={false} />
+          <Input.Password
+            placeholder="AGE-SECRET-KEY-1…"
+            autoComplete="off"
+            spellCheck={false}
+            maxLength={ARCHIV_PRIVATSCHLUESSEL_MAX}
+          />
         </Form.Item>
       )}
       <Form.Item name="passphrase" label="Passphrase der Schlüsseldatei" extra="Nur bei Schutz">
-        <Input.Password autoComplete="off" />
+        <Input.Password autoComplete="off" maxLength={ARCHIV_PASSPHRASE_MAX} />
       </Form.Item>
     </ErfassungsModal>
   );

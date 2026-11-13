@@ -35,9 +35,9 @@ describe('archivEinspielen-API (LLH-1711)', () => {
     expect(fd.get('schluessel_datei')).toBe(datei);
   });
 
-  it('wartet länger als das Upload-Timeout der Anhänge: der Server entschlüsselt und migriert', () => {
+  it('wartet 30 Minuten: das Zeitlimit umfasst Upload und Einspielen', () => {
     const anfragen = installiereXhrAttrappe();
     void spieleArchivEin({ block, schluessel: { art: 'text', text: 'k' } });
-    expect(anfragen[0].timeout).toBe(600_000);
+    expect(anfragen[0].timeout).toBe(1_800_000);
   });
 });

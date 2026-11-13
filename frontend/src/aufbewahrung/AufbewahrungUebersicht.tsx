@@ -224,7 +224,9 @@ export default function AufbewahrungUebersicht() {
     <AdminPage
       titel="Aufbewahrung"
       aktionen={
-        einspielen.data?.verfuegbar && (
+        // Ausgeblendet nur, wo der Server „nicht verfügbar“ sagt (Hub); scheitert die Abfrage,
+        // entscheidet der Server beim Einspielen (422).
+        (einspielen.data?.verfuegbar || einspielen.isError) && (
           <Button type="primary" icon={<IconHochladen />} onClick={() => setEinspielenOffen(true)}>
             Archiv einspielen
           </Button>

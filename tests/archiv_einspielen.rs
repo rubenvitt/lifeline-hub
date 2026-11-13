@@ -650,11 +650,17 @@ async fn ein_abbruch_laesst_keine_zwischendatei_zurueck() {
                 .oneshot(anfrage_hochladen(&u.admin, Body::from(body.clone()))),
         )
         .await;
-        assert!(
-            zwischendateien(u.dir.path()).is_empty(),
-            "nach {ms} ms: {:?}",
-            zwischendateien(u.dir.path())
-        );
+        // Das Entschlüsseln läuft auf einem Blocking-Thread; er bricht mit dem nächsten Block ab
+        // und räumt dann. Gewartet wird höchstens 5 s.
+        let mut uebrig = zwischendateien(u.dir.path());
+        for _ in 0..50 {
+            if uebrig.is_empty() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            uebrig = zwischendateien(u.dir.path());
+        }
+        assert!(uebrig.is_empty(), "nach {ms} ms: {uebrig:?}");
     }
 }
 
@@ -667,10 +673,14 @@ async fn ein_zu_grosser_block_ist_413() {
          --{GRENZE}\r\nContent-Disposition: form-data; name=\"block\"; filename=\"b\"\r\n\
          Content-Type: application/octet-stream\r\n\r\n"
     );
-    // Über der Grenze, in Stücken erzeugt statt im Speicher gehalten.
+    // Ein Byte über der Grenze des Blocks, aber unter der Body-Grenze der Route: so greift die
+    // Prüfung im Handler, nicht erst das Body-Limit. In Stücken erzeugt statt im Speicher gehalten.
     const MIB: usize = 1024 * 1024;
+    let max = lifeline_hub::transfer::ARCHIV_BLOCK_MAX;
+    assert!(max + 1 + 512 < lifeline_hub::transfer::ARCHIV_BLOCK_BODY_MAX);
     let stuecke = std::iter::once(Ok::<_, std::io::Error>(kopf.into_bytes()))
-        .chain((0..257).map(|_| Ok(vec![0u8; MIB])))
+        .chain((0..max / MIB).map(|_| Ok(vec![0u8; MIB])))
+        .chain(std::iter::once(Ok(vec![0u8; 1])))
         .chain(std::iter::once(Ok(
             format!("\r\n--{GRENZE}--\r\n").into_bytes()
         )));

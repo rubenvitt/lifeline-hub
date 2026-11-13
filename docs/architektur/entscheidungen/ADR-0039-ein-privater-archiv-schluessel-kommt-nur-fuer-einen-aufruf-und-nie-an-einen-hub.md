@@ -21,8 +21,10 @@ herleitung:
   aktiv, für irgendeine Org), bevor sie den Body liest.
 - MUST NOT: Ein privater Archiv-Schlüssel oder seine Passphrase steht in der Datenbank, in einer
   Datei, im Log oder in der Admin-Spur.
-- MUST: Schlüssel und Passphrase liegen nur in Puffern, die beim Fallenlassen genullt werden
-  (`age::secrecy`), und nur so lange wie der Aufruf.
+- MUST: Schlüssel und Passphrase liegen im eigenen Code nur in Puffern, die beim Fallenlassen
+  genullt werden (`age::secrecy`), nie als gewöhnlicher `String`, und nur so lange wie der Aufruf.
+- MUST: Entsperren (scrypt), Hashen und Entschlüsseln laufen auf einem Blocking-Thread, nicht auf
+  dem Async-Worker.
 - MUST: Befehl und Verwaltung spielen über denselben Kern ein (`einsatz::archiv::einspielen::einspielen`);
   die Verwaltung nur in die Org der Person mit Namensprüfung (`Ziel::EigeneOrg`).
 - SHOULD: Was einen Block hält, liegt verschlüsselt in einer `Zwischendatei` neben der
@@ -36,6 +38,9 @@ verlange 'pub async fn wird_erreicht\(' src/instanz/repo.rs
 verlange "zustand IN \('angebahnt', 'aktiv'\)" src/instanz/repo.rs
 verlange 'Ziel::EigeneOrg\(benutzer\.org_id\)' src/routes/archiv_einspielen.rs
 verlange 'SecretBox' src/routes/archiv_einspielen.rs
+verbiete 'from_utf8_lossy' src/routes/archiv_einspielen.rs
+verlange 'spawn_blocking' src/routes/archiv_einspielen.rs
+verlange 'spawn_blocking' src/einsatz/archiv/einspielen.rs
 verbiete 'tracing::[a-z]+!\([^)]*schluessel' src/routes/archiv_einspielen.rs
 ```
 

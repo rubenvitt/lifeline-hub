@@ -331,19 +331,27 @@ describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
   const BLOCK = new File(['age-block'], 'einsatz-E-2026-0007-block-1.sqlite.age');
   const SCHLUESSEL = 'AGE-SECRET-KEY-1QQQQ';
 
-  function zeigeMitEinsatz(verfuegbar = true) {
+  /** Zeigt die Seite; `verfuegbar: 'fehler'` lässt die Verfügbarkeitsabfrage scheitern. */
+  function zeigeMitEinsatz(verfuegbar: boolean | 'fehler' = true) {
+    const abfrage = { gefragt: false };
     server.use(
       meHandler(ME_ADMIN),
       http.get('/api/aufbewahrung', () => HttpResponse.json(EINTRAEGE)),
-      http.get('/api/admin/archiv/einspielen', () => HttpResponse.json({ verfuegbar })),
+      http.get('/api/admin/archiv/einspielen', () => {
+        abfrage.gefragt = true;
+        return verfuegbar === 'fehler'
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json({ verfuegbar });
+      }),
     );
-    return renderMitProviders(
+    const { client } = renderMitProviders(
       <Routes>
         <Route path="/admin/aufbewahrung" element={<AufbewahrungUebersicht />} />
         <Route path="/einsaetze/:einsatzId" element={<Ort />} />
       </Routes>,
       { route: '/admin/aufbewahrung' },
     );
+    return { abfrage, client };
   }
 
   /** Öffnet den Dialog, wählt den Block und fügt den Schlüssel als Text ein. */
@@ -358,11 +366,38 @@ describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
   }
 
   it('fehlt an einer Instanz, bei der sich eine andere meldet', async () => {
-    zeigeMitEinsatz(false);
+    const { abfrage } = zeigeMitEinsatz(false);
     await tabelle();
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Archiv einspielen' })).toBeNull(),
+    // Erst nach der Antwort ist die Abwesenheit ein Befund, vorher fehlte der Knopf ohnehin.
+    await waitFor(() => expect(abfrage.gefragt).toBe(true));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: 'Archiv einspielen' })).toBeNull();
+  });
+
+  it('bietet die Aktion an, wenn die Verfügbarkeit nicht abrufbar ist: der Server entscheidet', async () => {
+    zeigeMitEinsatz('fehler');
+    expect(await screen.findByRole('button', { name: 'Archiv einspielen' })).toBeInTheDocument();
+  });
+
+  it('sperrt Abbrechen, solange eingespielt wird, und nennt eine Ablehnung „Nicht eingespielt“', async () => {
+    const anfragen = installiereXhrAttrappe();
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    zeigeMitEinsatz();
+    const dialog = await ausfuellen();
+    expect(within(dialog).getByLabelText('Passphrase der Schlüsseldatei')).toHaveAttribute(
+      'maxLength',
+      '1024',
     );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
+    await waitFor(() => expect(anfragen).toHaveLength(1));
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    anfragen[0].uebertragen();
+    anfragen[0].antworten(400, { error: 'Die Aufbewahrung dieses Einsatzes ist abgelaufen' });
+    expect(await within(dialog).findByText('Nicht eingespielt')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Nicht abgelegt')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
   });
 
   it('schickt Schlüssel und Block und behält bei einer Ablehnung die Eingaben', async () => {
@@ -392,7 +427,7 @@ describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
     onTestFinished(() => {
       vi.unstubAllGlobals();
     });
-    zeigeMitEinsatz();
+    const seite = zeigeMitEinsatz();
     const dialog = await ausfuellen();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
     await waitFor(() => expect(anfragen).toHaveLength(1));
@@ -411,6 +446,17 @@ describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
       frist_endet_at: '2026-11-15 18:00:00',
     });
     const ergebnis = await screen.findByRole('region', { name: 'Eingespielt' });
+    // Der private Schlüssel bleibt nicht als Variable einer Mutation im Cache.
+    await waitFor(() =>
+      expect(
+        JSON.stringify(
+          seite.client
+            .getMutationCache()
+            .getAll()
+            .map((m) => m.state.variables),
+        ),
+      ).not.toContain(SCHLUESSEL),
+    );
     expect(within(ergebnis).getByText(/E-2026-0007 · Hochwasser Nord/)).toBeInTheDocument();
     const bis = zeitpunkt('2026-11-15 18:00:00', DEFAULT_KONVENTIONEN);
     expect(ergebnis).toHaveTextContent(bis);

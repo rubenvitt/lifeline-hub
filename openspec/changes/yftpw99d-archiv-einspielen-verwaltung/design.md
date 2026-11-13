@@ -185,6 +185,26 @@ Nach dem Commit meldet der Handler das Org-Ereignis `einsatzliste` für den neue
 Neuladen. Der Befehl läuft als eigener Prozess ohne Zugang zum Live-Hub, für ihn bleibt es beim
 Neuladen.
 
+### D10 Nachgezogen nach dem Review (13.11.2026)
+
+- **Spur mit dem Abschluss:** „Archiv eingespielt“ entsteht in der Transaktion, die
+  `loeschen_at` setzt, nicht mehr in der Übernahme. Scheitert das Einspielen danach (ein Inhalt
+  passt nicht zu seiner Prüfsumme, der Einsatz wurde abgeräumt), bleibt keine Spur. Das gilt auch
+  für den Befehl.
+- **Blocking-Thread:** Hashen und Entschlüsseln laufen in `spawn_blocking`, ebenso das scrypt
+  einer geschützten Schlüsseldatei. Der Kern nimmt den Schlüssel als Wert und lässt ihn auf dem
+  Thread fallen. Ein Abbruch setzt ein Signal, das das Entschlüsseln mit dem nächsten Block
+  beendet; die Zwischendatei geht dann mit.
+- **Passphrase nie als `String`:** `Schluessel::laden_geschuetzt` nimmt sie als `SecretString`;
+  eine geschützte Datei wird beim Laden entsperrt.
+- **Grenzen im Spiegel:** Block, Schlüssel und Passphrase stehen in `eingabegrenzen.ts`; die
+  Maske nimmt nicht mehr an als der Server.
+- **Oberfläche:** Abbrechen ist gesperrt, solange eingespielt wird (`speicherung`); eine
+  Ablehnung heißt „Nicht eingespielt“; scheitert die Verfügbarkeitsabfrage, steht die Aktion da
+  und der Server entscheidet; die Mutation hält den Schlüssel nicht im Cache (`gcTime: 0`); das
+  Zeitlimit umfasst Upload und Einspielen (30 Minuten).
+- **Meldung ohne UTC:** Eine abgelaufene Aufbewahrung nennt in der Verwaltung keine Zeit.
+
 ## Risks / Trade-offs
 
 - **Lange Requests über Proxies:** Ein Reverse-Proxy mit 60 s Timeout bricht große Blöcke ab.

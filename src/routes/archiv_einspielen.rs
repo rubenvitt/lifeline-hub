@@ -23,7 +23,7 @@ use crate::einsatz::archiv::einspielen::{self, Akteur, Ziel};
 use crate::error::AppError;
 use crate::extract::PeerIp;
 use crate::transfer::ARCHIV_BLOCK_MAX;
-use age::secrecy::{ExposeSecret, SecretBox};
+use age::secrecy::{ExposeSecret, SecretBox, SecretString};
 use axum::extract::multipart::{Field, MultipartError};
 use axum::extract::{Multipart, State};
 use axum::http::StatusCode;
@@ -32,10 +32,11 @@ use serde::Serialize;
 use tokio::io::AsyncWriteExt;
 use utoipa::ToSchema;
 
-/// Eine Identitätsdatei ist wenige hundert Bytes groß.
-const SCHLUESSEL_MAX: usize = 64 * 1024;
+/// Eine Identitätsdatei ist wenige hundert Bytes groß (Spiegel `ARCHIV_PRIVATSCHLUESSEL_MAX`).
+pub const PRIVATSCHLUESSEL_MAX: usize = 64 * 1024;
 
-const PASSPHRASE_MAX: usize = 1024;
+/// Spiegel `ARCHIV_PASSPHRASE_MAX`.
+pub const PASSPHRASE_MAX: usize = 1024;
 
 /// Meldung, wenn der Block über [`ARCHIV_BLOCK_MAX`] liegt.
 const ZU_GROSS: &str = "Der Archivblock ist größer als 256 MiB. Einen so großen Block spielt der \
@@ -116,6 +117,18 @@ async fn geheim_lesen(
     Ok(puffer)
 }
 
+/// Die Passphrase als Geheimnis, ohne Zeilenende. Der Text geht genau einmal in einen Puffer
+/// passender Größe, den `SecretString` übernimmt und beim Fallenlassen nullt; kein Umzug lässt
+/// eine Kopie zurück.
+fn passphrase_aus(roh: &SecretBox<Vec<u8>>) -> Result<SecretString, AppError> {
+    let text = std::str::from_utf8(roh.expose_secret())
+        .map_err(|_| AppError::Validation("Die Passphrase ist kein gültiger Text.".into()))?
+        .trim_end_matches(['\r', '\n']);
+    let mut genau = String::with_capacity(text.len());
+    genau.push_str(text);
+    Ok(SecretString::from(genau))
+}
+
 /// POST /api/admin/archiv/einspielen — Multipart mit `schluessel` (Text) oder `schluessel_datei`
 /// (Datei), optional `passphrase`, und zuletzt `block` (design.md D4). Der Schlüssel kommt vor
 /// dem Block, damit ein unbrauchbarer Aufruf endet, bevor 256 MiB auf die Platte gehen.
@@ -144,7 +157,7 @@ pub async fn einspielen(
                         "Den Schlüssel als Datei oder als Text angeben, nicht beides.".into(),
                     ));
                 }
-                schluessel = Some(geheim_lesen(feld, SCHLUESSEL_MAX, "Der Schlüssel").await?);
+                schluessel = Some(geheim_lesen(feld, PRIVATSCHLUESSEL_MAX, "Der Schlüssel").await?);
             }
             "passphrase" => {
                 if passphrase.is_some() {
@@ -193,19 +206,18 @@ pub async fn einspielen(
     })?;
     let ablage = ablage.ok_or_else(|| AppError::Validation("Den Archivblock angeben.".into()))?;
 
-    let schluessel =
-        Schluessel::laden_aus(schluessel.expose_secret(), None, || match &passphrase {
-            Some(p) => Ok(String::from_utf8_lossy(p.expose_secret()).into_owned()),
-            None => Err(std::io::Error::other(
-                "die Schlüsseldatei ist mit einer Passphrase geschützt; die Passphrase angeben",
-            )),
-        })?;
-    drop(passphrase);
+    let passphrase = passphrase.as_ref().map(passphrase_aus).transpose()?;
+    // scrypt einer geschützten Schlüsseldatei kostet Sekunden: nicht auf dem Async-Worker.
+    let schluessel = tokio::task::spawn_blocking(move || {
+        Schluessel::laden_geschuetzt(schluessel.expose_secret(), passphrase)
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Archiv-Schlüssel laden: {e}")))??;
 
     let e = einspielen::einspielen(
         &state.pool,
         ablage.pfad(),
-        &schluessel,
+        schluessel,
         Ziel::EigeneOrg(benutzer.org_id),
         Akteur::Person {
             benutzer: &benutzer,
@@ -214,7 +226,6 @@ pub async fn einspielen(
         chrono::Utc::now(),
     )
     .await?;
-    drop(schluessel);
     drop(ablage);
     // Offene Einsatzlisten der Org zeigen den neuen Einsatz ohne Neuladen (Org-Ereignis
     // `einsatzliste`, LFH-734); der Befehl läuft als eigener Prozess und kann das nicht.

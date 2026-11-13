@@ -151,33 +151,56 @@ impl Schluessel {
     ) -> Result<Self, AppError> {
         // Der Name nannte früher die Datei in Rückfragen von `age`; Rückfragen gibt es keine mehr.
         let _ = name;
-        if inhalt.starts_with(AGE_KOPF) {
-            let passphrase = passphrase().map_err(|e| {
-                AppError::Validation(format!("Passphrase der Identitätsdatei nicht lesbar: {e}"))
-            })?;
-            let schloss = age::scrypt::Identity::new(SecretString::from(
-                passphrase.trim_end_matches(['\r', '\n']).to_owned(),
-            ));
-            let mut leser = age::Decryptor::new_buffered(inhalt)
-                .map_err(|e| AppError::Validation(format!("Identitätsdatei nicht lesbar: {e}")))?
-                .decrypt(std::iter::once(&schloss as &dyn age::Identity))
-                .map_err(|e| match e {
-                    age::DecryptError::NoMatchingKeys => AppError::Validation(
-                        "Identitätsdatei ist verschlüsselt, aber nicht mit einer Passphrase".into(),
-                    ),
-                    _ => AppError::Validation(
-                        "Die Passphrase passt nicht zur Identitätsdatei, oder die Datei ist \
-                         beschädigt"
-                            .into(),
-                    ),
-                })?;
-            let mut klar = age::secrecy::SecretBox::new(Box::new(Vec::with_capacity(inhalt.len())));
-            leser
-                .read_to_end(age::secrecy::ExposeSecretMut::expose_secret_mut(&mut klar))
-                .map_err(|e| AppError::Validation(format!("Identitätsdatei beschädigt: {e}")))?;
-            return Self::aus_klartext(klar.expose_secret());
+        if !inhalt.starts_with(AGE_KOPF) {
+            return Self::aus_klartext(inhalt);
         }
-        Self::aus_klartext(inhalt)
+        let passphrase = passphrase().map_err(|e| {
+            AppError::Validation(format!("Passphrase der Identitätsdatei nicht lesbar: {e}"))
+        })?;
+        Self::laden_geschuetzt(
+            inhalt,
+            Some(SecretString::from(
+                passphrase.trim_end_matches(['\r', '\n']).to_owned(),
+            )),
+        )
+    }
+
+    /// Wie [`Self::laden_aus`], mit der Passphrase schon als Geheimnis (Archiv einspielen über die
+    /// Verwaltung, LLH-1711): sie entsteht nie als gewöhnlicher `String`. Ohne Passphrase ist eine
+    /// geschützte Datei ein Fehler, eine Passphrase zu einer ungeschützten wird nicht gebraucht.
+    /// Entsperren kostet scrypt (Sekunden): auf einem Blocking-Thread rufen.
+    pub fn laden_geschuetzt(
+        inhalt: &[u8],
+        passphrase: Option<SecretString>,
+    ) -> Result<Self, AppError> {
+        if !inhalt.starts_with(AGE_KOPF) {
+            return Self::aus_klartext(inhalt);
+        }
+        let passphrase = passphrase.ok_or_else(|| {
+            AppError::Validation(
+                "Die Schlüsseldatei ist mit einer Passphrase geschützt; die Passphrase angeben."
+                    .into(),
+            )
+        })?;
+        let schloss = age::scrypt::Identity::new(passphrase);
+        let mut leser = age::Decryptor::new_buffered(inhalt)
+            .map_err(|e| AppError::Validation(format!("Identitätsdatei nicht lesbar: {e}")))?
+            .decrypt(std::iter::once(&schloss as &dyn age::Identity))
+            .map_err(|e| match e {
+                age::DecryptError::NoMatchingKeys => AppError::Validation(
+                    "Identitätsdatei ist verschlüsselt, aber nicht mit einer Passphrase".into(),
+                ),
+                _ => AppError::Validation(
+                    "Die Passphrase passt nicht zur Identitätsdatei, oder die Datei ist \
+                     beschädigt"
+                        .into(),
+                ),
+            })?;
+        let mut klar = age::secrecy::SecretBox::new(Box::new(Vec::with_capacity(inhalt.len())));
+        leser
+            .read_to_end(age::secrecy::ExposeSecretMut::expose_secret_mut(&mut klar))
+            .map_err(|e| AppError::Validation(format!("Identitätsdatei beschädigt: {e}")))?;
+        Self::aus_klartext(klar.expose_secret())
     }
 
     fn aus_klartext(inhalt: &[u8]) -> Result<Self, AppError> {

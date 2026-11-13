@@ -10,8 +10,12 @@ import { apiGet, apiUploadMitFortschritt, type UploadFortschritt } from './clien
 
 const PFAD = '/api/admin/archiv/einspielen';
 
-/** Entschlüsseln, Migrieren und Übernehmen eines großen Blocks dauern im Request. */
-const EINSPIELEN_TIMEOUT_MS = 600_000;
+/**
+ * Das Zeitlimit umfasst Upload UND Einspielen: 256 MiB über eine langsame Leitung plus
+ * Entschlüsseln, Migrieren und Übernehmen. Eine hängende Leitung beendet schon die Leerlauf-Frist
+ * des Servers (`transfer::LEERLAUF_FRIST`).
+ */
+const EINSPIELEN_TIMEOUT_MS = 30 * 60_000;
 
 /** Der private Archiv-Schlüssel: als Datei gewählt oder als Text eingefügt. */
 export type ArchivSchluesselEingabe = { art: 'datei'; datei: File } | { art: 'text'; text: string };

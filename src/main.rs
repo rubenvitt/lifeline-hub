@@ -693,7 +693,7 @@ async fn cmd_archiv_einspielen(
         e = lifeline_hub::einsatz::archiv::einspielen::einspielen(
             &pool,
             Path::new(datei),
-            &schluessel,
+            schluessel,
             org.map_or(
                 lifeline_hub::einsatz::archiv::einspielen::Ziel::AusArchiv,
                 lifeline_hub::einsatz::archiv::einspielen::Ziel::Org,
