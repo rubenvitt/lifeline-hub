@@ -1,15 +1,16 @@
 import { QueryClient } from '@tanstack/react-query';
+import { ApiError } from '../api/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person, PersonAuswahl } from '../api/types';
 import { erzeugeLiveSammler, LIVE_SAMMELFENSTER_MS } from './liveInvalidierung';
 import { erzeugeZeilenSammler, ZEILEN_GRENZE } from './zeilenAbgleich';
 
-const api = vi.hoisted(() => ({ ladePersonZeile: vi.fn() }));
+const api = vi.hoisted(() => ({ loadPersonZeile: vi.fn() }));
 
 vi.mock('../api/einsatzPerson', async (orig) => ({
   ...(await orig<typeof import('../api/einsatzPerson')>()),
-  ladePersonZeile: api.ladePersonZeile,
+  loadPersonZeile: api.loadPersonZeile,
 }));
 
 const E = 7;
@@ -42,6 +43,8 @@ const auswahl = (p: Person): PersonAuswahl => ({
   pat_nummer: p.pat_nummer,
 });
 
+const nichtGefunden = () => new ApiError(404, 'Nicht gefunden', { vomAnwendungsserver: true });
+
 const inStelle = (stelle: number): Partial<Person> => ({
   aktuelle_verbleib_art: 'notunterkunft',
   aktuelle_verbleib_betreuungsstelle_id: stelle,
@@ -66,7 +69,7 @@ async function fenster() {
 
 beforeEach(() => {
   vi.useFakeTimers();
-  api.ladePersonZeile.mockReset();
+  api.loadPersonZeile.mockReset();
 });
 
 afterEach(() => {
@@ -80,13 +83,13 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     const p2 = person(2, 2);
     qc.setQueryData(einsatzKeys.personen(E), [p1, p2]);
     qc.setQueryData(einsatzKeys.personenAuswahl(E), [auswahl(p1), auswahl(p2)]);
-    api.ladePersonZeile.mockResolvedValue(person(2, 2, { status: 'vermisst', name: 'Neu' }));
+    api.loadPersonZeile.mockResolvedValue(person(2, 2, { status: 'vermisst', name: 'Neu' }));
 
     zeilen.vormerken('personen', 2);
     await fenster();
 
-    expect(api.ladePersonZeile).toHaveBeenCalledTimes(1);
-    expect(api.ladePersonZeile).toHaveBeenCalledWith(E, 2);
+    expect(api.loadPersonZeile).toHaveBeenCalledTimes(1);
+    expect(api.loadPersonZeile).toHaveBeenCalledWith(E, 2);
     const liste = qc.getQueryData<Person[]>(einsatzKeys.personen(E));
     expect(liste?.map((p) => [p.id, p.status, p.name])).toEqual([
       [1, 'betroffen', 'Name 1'],
@@ -108,7 +111,7 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     const { qc, zeilen } = aufbau();
     qc.setQueryData(einsatzKeys.personen(E), [person(1, 1), person(3, 3)]);
     qc.setQueryData(einsatzKeys.personenAuswahl(E), [auswahl(person(1, 1)), auswahl(person(3, 3))]);
-    api.ladePersonZeile.mockResolvedValue(person(2, 2));
+    api.loadPersonZeile.mockResolvedValue(person(2, 2));
 
     zeilen.vormerken('personen', 2);
     await fenster();
@@ -122,7 +125,7 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
   it('die Auswahl trägt keine Freitexte der Zeile', async () => {
     const { qc, zeilen } = aufbau();
     qc.setQueryData(einsatzKeys.personenAuswahl(E), []);
-    api.ladePersonZeile.mockResolvedValue(person(1, 1));
+    api.loadPersonZeile.mockResolvedValue(person(1, 1));
 
     zeilen.vormerken('personen', 1);
     await fenster();
@@ -133,13 +136,13 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     );
   });
 
-  it('ein Storno entfernt die Person aus Liste, Auswahl und den Betroffenen ihrer Stelle', async () => {
-    const { qc, zeilen } = aufbau();
+  it('ein 404 (storniert) entfernt die Person aus Liste, Auswahl und Stelle, ohne Listenabruf', async () => {
+    const { qc, inval, zeilen } = aufbau();
     const p = person(1, 1, inStelle(3));
     qc.setQueryData(einsatzKeys.personen(E), [p, person(2, 2)]);
     qc.setQueryData(einsatzKeys.personenAuswahl(E), [auswahl(p), auswahl(person(2, 2))]);
     qc.setQueryData(einsatzKeys.personenDerStelle(E, 3), [p]);
-    api.ladePersonZeile.mockResolvedValue({ ...p, storniert_at: '2026-11-13 10:00:00' });
+    api.loadPersonZeile.mockRejectedValue(nichtGefunden());
 
     zeilen.vormerken('personen', 1);
     await fenster();
@@ -147,6 +150,29 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     expect(ids(qc.getQueryData<Person[]>(einsatzKeys.personen(E)))).toEqual([2]);
     expect(ids(qc.getQueryData<PersonAuswahl[]>(einsatzKeys.personenAuswahl(E)))).toEqual([2]);
     expect(qc.getQueryData<Person[]>(einsatzKeys.personenDerStelle(E, 3))).toEqual([]);
+    await fenster();
+    expect(inval).not.toHaveBeenCalled();
+  });
+
+  it('am Gerät: ein 404 für eine fremde Person lässt die Liste stehen, die eigene Zeile geht ein', async () => {
+    const { qc, inval, zeilen } = aufbau();
+    const liste = [person(1, 1)];
+    qc.setQueryData(einsatzKeys.personen(E), liste);
+    api.loadPersonZeile.mockImplementation((_e: number, id: number) =>
+      id === 1
+        ? Promise.resolve(person(1, 1, { status: 'vermisst' }))
+        : Promise.reject(nichtGefunden()),
+    );
+
+    zeilen.vormerken('personen', 1);
+    zeilen.vormerken('personen', 9);
+    await fenster();
+
+    expect(
+      qc.getQueryData<Person[]>(einsatzKeys.personen(E))?.map((p) => [p.id, p.status]),
+    ).toEqual([[1, 'vermisst']]);
+    await fenster();
+    expect(inval).not.toHaveBeenCalled();
   });
 
   it('ein Verbleib in eine Notunterkunft trägt die Person in deren Betroffene ein, nicht in andere', async () => {
@@ -154,7 +180,7 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     const andere = person(5, 5, inStelle(3));
     qc.setQueryData(einsatzKeys.personenDerStelle(E, 3), [andere]);
     qc.setQueryData(einsatzKeys.personenDerStelle(E, 4), []);
-    api.ladePersonZeile.mockResolvedValue(person(2, 2, inStelle(3)));
+    api.loadPersonZeile.mockResolvedValue(person(2, 2, inStelle(3)));
 
     zeilen.vormerken('personen', 2);
     await fenster();
@@ -169,7 +195,7 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     const { qc, zeilen } = aufbau();
     const p = person(2, 2, inStelle(3));
     qc.setQueryData(einsatzKeys.personenDerStelle(E, 3), [p]);
-    api.ladePersonZeile.mockResolvedValue({
+    api.loadPersonZeile.mockResolvedValue({
       ...p,
       aktuelle_verbleib_art: 'entlassung',
       aktuelle_verbleib_betreuungsstelle_id: null,
@@ -181,11 +207,11 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     expect(qc.getQueryData<Person[]>(einsatzKeys.personenDerStelle(E, 3))).toEqual([]);
   });
 
-  it('scheitert der Zeilenabruf (etwa 404 am Gerät), gleicht sie die Listen als Ganzes ab', async () => {
+  it('scheitert der Zeilenabruf anders als mit 404, gleicht sie die Listen als Ganzes ab', async () => {
     const { qc, inval, zeilen } = aufbau();
     const vorher = [person(1, 1)];
     qc.setQueryData(einsatzKeys.personen(E), vorher);
-    api.ladePersonZeile.mockRejectedValue(new Error('404'));
+    api.loadPersonZeile.mockRejectedValue(new ApiError(503, 'Überlastet'));
 
     zeilen.vormerken('personen', 2);
     await fenster();
@@ -193,6 +219,27 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
 
     expect(qc.getQueryData(einsatzKeys.personen(E))).toBe(vorher);
     expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
+  });
+
+  it('ändert sich die Liste während des Zeilenabrufs, bleibt die Änderung und die Liste geht an den Sammler', async () => {
+    const { qc, inval, zeilen } = aufbau();
+    qc.setQueryData(einsatzKeys.personen(E), [person(1, 1)]);
+    let antworten: (p: Person) => void = () => {};
+    api.loadPersonZeile.mockReturnValue(new Promise<Person>((r) => (antworten = r)));
+
+    zeilen.vormerken('personen', 1);
+    await fenster();
+    expect(api.loadPersonZeile).toHaveBeenCalledTimes(1);
+    // Optimistische Änderung (etwa Grundriss), während der Zeilenabruf läuft.
+    await vi.advanceTimersByTimeAsync(5);
+    const optimistisch = [person(1, 1, { status: 'vermisst' })];
+    qc.setQueryData(einsatzKeys.personen(E), optimistisch);
+    antworten(person(1, 1));
+    await fenster();
+    await fenster();
+
+    expect(qc.getQueryData(einsatzKeys.personen(E))).toEqual(optimistisch);
+    expect(invalidierteKeys(inval)).toEqual([einsatzKeys.personen(E)]);
   });
 
   it(`über ${ZEILEN_GRENZE} Personen im Fenster ruft sie die Listen einmal ab`, async () => {
@@ -203,7 +250,7 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     await fenster();
     await fenster();
 
-    expect(api.ladePersonZeile).not.toHaveBeenCalled();
+    expect(api.loadPersonZeile).not.toHaveBeenCalled();
     expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
   });
 });

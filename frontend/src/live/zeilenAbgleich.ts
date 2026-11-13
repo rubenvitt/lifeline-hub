@@ -1,4 +1,5 @@
-import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
+import { hashKey, type InfiniteData, type QueryClient, type QueryKey } from '@tanstack/react-query';
+import { ApiError } from '../api/client';
 import {
   alsSchadenAuswahl,
   alsSchadenMarker,
@@ -10,9 +11,9 @@ import {
   type SchaedenFilter,
   type SchadenSortierung,
 } from '../api/einsatzSchaden';
-import { alsPersonAuswahl, ladePersonZeile, vergleichePersonen } from '../api/einsatzPerson';
+import { comparePersonen, loadPersonZeile, toPersonAuswahl } from '../api/einsatzPerson';
 import { einsatzKeys, type ZeilenZiel } from '../api/queryKeys';
-import type { Person, Schaden, SchadenMarker } from '../api/types';
+import type { Person, PersonAuswahl, Schaden, SchadenMarker } from '../api/types';
 import { LIVE_SAMMELFENSTER_MS, type LiveSammler } from './liveInvalidierung';
 
 /**
@@ -116,13 +117,29 @@ function ziel<Z>(
 // die Marker ebenso.
 const ungestorniert = (s: Schaden): Schaden | null => (s.storniert_at == null ? s : null);
 
+/**
+ * Die Zeile einer Person, `null` bei 404 (design.md D4, LLH-1682): Die Zeilen-Route liefert nur,
+ * was die Liste dieser Sitzung zeigt; ein 404 (storniert, fremde Stelle am Gerät) heißt, die
+ * Person gehört in keine Liste dieses Tabs. Jeder andere Fehler bleibt ein Fehler (Sammler).
+ */
+async function loadPersonZeileOderNull(einsatzId: number, id: number): Promise<Person | null> {
+  try {
+    return await loadPersonZeile(einsatzId, id);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+}
+
 // Personenliste und Auswahl führen keine stornierten (`storniert_at IS NULL` im Server).
-const personOhneStorno = (p: Person): Person | null => (p.storniert_at == null ? p : null);
+const personOhneStorno = (p: Person | null): Person | null =>
+  p !== null && p.storniert_at == null ? p : null;
 
 // Betroffene einer Betreuungsstelle: dieselbe Menge wie der Serverfilter `betreuungsstelle_id`
 // (`person::repo::liste_gefiltert`), jüngster Verbleib „Notunterkunft“ an dieser Stelle. Die
 // Stelle ist das letzte Glied von `einsatzKeys.personenDerStelle`.
-const betroffenDerStelle = (p: Person, cacheKey: QueryKey): Person | null =>
+const betroffenDerStelle = (p: Person | null, cacheKey: QueryKey): Person | null =>
+  p !== null &&
   p.storniert_at == null &&
   p.aktuelle_verbleib_art === 'notunterkunft' &&
   p.aktuelle_verbleib_betreuungsstelle_id === cacheKey[cacheKey.length - 1]
@@ -165,13 +182,17 @@ const ZIELE: Record<ZeilenZiel, Ziel> = {
   ),
   // LLH-1682: Liste, Auswahl und die Betroffenen je Stelle; alle aus einem Abruf der nicht
   // protokollierten Zeilen-Route. Der Prefix `personen(e)` erfasst die Stellenlisten mit.
-  personen: ziel<Person>(
-    ladePersonZeile,
+  personen: ziel<Person | null>(
+    loadPersonZeileOderNull,
     (e) => [einsatzKeys.personen(e), einsatzKeys.personenAuswahl(e)],
     [
-      liste(einsatzKeys.personen, personOhneStorno, vergleichePersonen),
-      liste(einsatzKeys.personenAuswahl, alsPersonAuswahl, vergleichePersonen),
-      gefiltert(einsatzKeys.personenDerStelleAlle, betroffenDerStelle, vergleichePersonen),
+      liste(einsatzKeys.personen, personOhneStorno, comparePersonen),
+      liste<Person | null, PersonAuswahl>(
+        einsatzKeys.personenAuswahl,
+        (p) => (p === null ? null : toPersonAuswahl(p)),
+        comparePersonen,
+      ),
+      gefiltert(einsatzKeys.personenDerStelleAlle, betroffenDerStelle, comparePersonen),
     ],
   ),
 };
@@ -277,9 +298,20 @@ export function erzeugeZeilenSammler(
     vorgemerkt.set(ziel, set);
   };
 
+  // Stand jeder geladenen Liste vor dem Zeilenabruf (design.md D6, LLH-1682). Der Abruf ist kein
+  // Query, `cancelQueries` in einem `onMutate` erreicht ihn nicht; eine optimistische Änderung
+  // während des Abrufs würde sonst vom Stand davor überschrieben.
+  const staende = (def: Ziel) =>
+    new Map(
+      def.listen
+        .flatMap(eintraege)
+        .map((key) => [hashKey(key), qc.getQueryState(key)?.dataUpdatedAt] as const),
+    );
+
   const zeilenLaden = async (ziel: ZeilenZiel, ids: number[]) => {
     const def = ZIELE[ziel];
     laufend.add(ziel);
+    const vorher = staende(def);
     const ergebnisse = await Promise.allSettled(ids.map((id) => def.laden(einsatzId, id)));
     laufend.delete(ziel);
     if (beendet) return; // `raeumen` hat die Listen schon als veraltet markiert.
@@ -288,7 +320,8 @@ export function erzeugeZeilenSammler(
     } else {
       for (const l of def.listen) {
         for (const key of eintraege(l)) {
-          if (qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
+          const geaendert = qc.getQueryState(key)?.dataUpdatedAt !== vorher.get(hashKey(key));
+          if (geaendert || qc.isFetching({ queryKey: key, exact: true }) > 0 || !aktuell(key)) {
             if (qc.getQueryData(key) !== undefined) sammler.vormerken(key);
             continue;
           }

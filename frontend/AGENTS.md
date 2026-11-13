@@ -1243,9 +1243,10 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   gelten die Prefixe aus `EINSATZ_STREAM_EVENTS`, `lagged` gleicht weiter alles ab. Jeder gezielte
   Key liegt unter den Prefixen seines Ereignisses (`queryKeys.test.ts`); eine zeilenweise
   abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher). Der Zeilenabruf
-  ist so wenig protokolliert wie die Liste: eine auditierte Detail-Route ist keine Zeilenquelle,
+  ist so wenig protokolliert wie die Liste und liefert nur, was sie zeigt; ein 404 heißt „gehört
+  nicht hinein“ und nimmt die Zeile heraus. Eine auditierte Detail-Route ist keine Zeilenquelle,
   jeder Tab schriebe bei jedem Ereignis eine Protokollzeile (Personen: `…/personen/{pid}/zeile`,
-  LLH-1682). Eine
+  LLH-1682). Hat sich eine Liste während des Zeilenabrufs geändert, geht sie an den Sammler. Eine
   Seitenkette (`useInfiniteQuery`) bekommt eine Zeile nur innerhalb des geladenen Fensters
   (`fensterEinsortieren`, LFH-1075); entscheidet über die Zugehörigkeit nur der Server
   (Suchbegriff), geht die Kette an den Sammler. Kennzahlen gleicht immer der Sammler ab.

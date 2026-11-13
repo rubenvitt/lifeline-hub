@@ -169,7 +169,7 @@ export function listePersonenAuswahl(einsatzId: number): Promise<PersonAuswahl[]
  * Ordnung der Personenliste und der Auswahl, wie `ORDER BY registrier_nr` im Server
  * (`src/person/repo.rs`); die Nummer ist je Einsatz eindeutig.
  */
-export function vergleichePersonen(
+export function comparePersonen(
   a: { registrier_nr: number },
   b: { registrier_nr: number },
 ): number {
@@ -177,7 +177,7 @@ export function vergleichePersonen(
 }
 
 /** Eine Zeile der Liste in der Form der Personenauswahl; eine stornierte gehört nicht hinein. */
-export function alsPersonAuswahl(p: Person): PersonAuswahl | null {
+export function toPersonAuswahl(p: Person): PersonAuswahl | null {
   if (p.storniert_at != null) return null;
   return {
     id: p.id,
@@ -194,7 +194,7 @@ export function alsPersonAuswahl(p: Person): PersonAuswahl | null {
  * Liste nicht protokolliert; das Detail (`ladePerson`) schreibt je Abruf eine Audit-Zeile und
  * ist deshalb keine Zeilenquelle.
  */
-export function ladePersonZeile(einsatzId: number, personId: number): Promise<Person> {
+export function loadPersonZeile(einsatzId: number, personId: number): Promise<Person> {
   return apiGet<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}/zeile`);
 }
 

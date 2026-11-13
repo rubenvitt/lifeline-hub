@@ -2,22 +2,22 @@
 
 ## 1. Zeilen-Route im Backend (D1)
 
-- [ ] 1.1 `GET /api/einsaetze/{id}/personen/{pid}/zeile` in `src/routes/einsatz_person.rs` und `src/app.rs`: `EinsatzLesezugriff<Personen>`, `repo::laden`, stornierte Person 404, `stelle::fordere_person`, Einheitengerät ohne Personalien, kein Audit. Beleg: Rust-Tests in `tests/einsatz_person.rs` (Antwort gleich der Listenzeile, stornierte Person 404 ohne Personalien, fremder Einsatz 404, ohne Modulrecht 403, Zugriffsprotokoll der Person bleibt leer)
+- [x] 1.1 `GET /api/einsaetze/{id}/personen/{pid}/zeile` in `src/routes/einsatz_person.rs` und `src/app.rs`: `EinsatzLesezugriff<Personen>`, `repo::laden`, stornierte Person 404, `stelle::fordere_person`, Einheitengerät ohne Personalien, kein Audit. Beleg: Rust-Tests in `tests/einsatz_person.rs` (Antwort gleich der Listenzeile, stornierte Person 404 ohne Personalien, fremder Einsatz 404, ohne Modulrecht 403, Zugriffsprotokoll der Person bleibt leer)
 - [x] 1.2 Route in jede Routenliste der Geräte in `src/geraet/mod.rs`, die `GET …/personen` führt. Beleg: Rust-Tests in `tests/geraet_kopplung.rs` (UHS-Gerät sieht eine Person seiner UHS, bekommt 404 für eine fremde; Einheitengerät bekommt die Zeile ohne Personalien)
 
 ## 2. Ereignisse mit Kennung (D3, D5)
 
 - [x] 2.1 `sse_mit_person` in `src/routes/nachforderung.rs` sendet `person` mit `person_id`. Beleg: Rust-Test in `tests/nachforderung_person.rs`, dass die Nutzlast `person_id` trägt
-- [ ] 2.2 `PATCH …/einheiten/{eid}` sendet nach dem Commit `person` je versorgter Person, wenn sich Name oder Abschnitt der Einheit ändern, sonst nicht. Beleg: Rust-Test (Umbenennen meldet die versorgte Person mit `person_id`, eine Änderung ohne Name und Abschnitt nicht)
-- [ ] 2.3 `NamensTraeger` in `src/einsatzabschnitt/repo.rs` führt die versorgten Personen der Einheiten im Abschnitt; Umbenennen und Auflösen eines Abschnitts senden `person` je Person. Beleg: Rust-Test (Umbenennen des Abschnitts meldet die Person, die eine Einheit dieses Abschnitts versorgt)
+- [x] 2.2 `PATCH …/einheiten/{eid}` sendet nach dem Commit `person` je versorgter Person, wenn sich Name oder Abschnitt der Einheit ändern, sonst nicht. Beleg: Rust-Test (Umbenennen meldet die versorgte Person mit `person_id`, eine Änderung ohne Name und Abschnitt nicht)
+- [x] 2.3 `NamensTraeger` in `src/einsatzabschnitt/repo.rs` führt die versorgten Personen der Einheiten im Abschnitt; Umbenennen und Auflösen eines Abschnitts senden `person` je Person. Beleg: Rust-Test (Umbenennen des Abschnitts meldet die Person, die eine Einheit dieses Abschnitts versorgt)
 
 ## 3. Ziel `personen` im Frontend (D2, D4, D6, D7)
 
-- [ ] 3.1 In `frontend/src/api/einsatzPerson.ts`: Zeilenabruf `loadPersonZeile`, Vergleich `comparePersonen` nach `registrier_nr` und Projektion `toPersonAuswahl`. Beleg: Vitest in `einsatzPerson.test.ts` (Pfad ohne Audit-Route, Ordnung, Projektion ohne Freitexte)
-- [ ] 3.2 Flache Liste unter Prefix mit Cache-Key in `form` und Ziel `personen` in `frontend/src/live/zeilenAbgleich.ts` (Vollliste, Auswahl, Betroffene je Stelle); `ZeilenZiel` in `queryKeys.ts` erweitert; ein 404 setzt `null` ein. Beleg: Vitest in `zeilenAbgleich.personen.test.ts` (Einsortieren nach Registriernummer, Storno als 404 entfernt aus allen drei Listen ohne Listenabruf, Wechsel des Verbleibs in eine Stelle und heraus, fremde Stelle unberührt, ein 404 neben einer geladenen Zeile im selben Fenster, anderer Fehler an den Sammler, mehr als 10 Personen je Fenster an den Sammler)
+- [x] 3.1 In `frontend/src/api/einsatzPerson.ts`: Zeilenabruf `loadPersonZeile`, Vergleich `comparePersonen` nach `registrier_nr` und Projektion `toPersonAuswahl`. Beleg: Vitest in `einsatzPerson.test.ts` (Pfad ohne Audit-Route, Ordnung, Projektion ohne Freitexte)
+- [x] 3.2 Flache Liste unter Prefix mit Cache-Key in `form` und Ziel `personen` in `frontend/src/live/zeilenAbgleich.ts` (Vollliste, Auswahl, Betroffene je Stelle); `ZeilenZiel` in `queryKeys.ts` erweitert; ein 404 setzt `null` ein. Beleg: Vitest in `zeilenAbgleich.personen.test.ts` (Einsortieren nach Registriernummer, Storno als 404 entfernt aus allen drei Listen ohne Listenabruf, Wechsel des Verbleibs in eine Stelle und heraus, fremde Stelle unberührt, ein 404 neben einer geladenen Zeile im selben Fenster, anderer Fehler an den Sammler, mehr als 10 Personen je Fenster an den Sammler)
 - [x] 3.3 `EINSATZ_STREAM_ZIELE.person` in `frontend/src/api/queryKeys.ts`: mit Kennung Zeile `personen` plus `modulZaehler`, `betreuung`, `registrierliste`, `personenTransportmittel` und `personAnhaenge` nur dieser Person; ohne Kennung Prefixe. Beleg: Vitest in `queryKeys.test.ts` (gezielte Keys liegen unter den Prefixen von `person`, fehlende Kennung fällt zurück) und in `useEinsatzLiveStream.test.tsx` (ein `person`-Ereignis mit Kennung ruft die Personenliste nicht ab)
-- [ ] 3.4 Regel in `frontend/AGENTS.md`, „Gezielter Abgleich nach Payload“: der Zeilenabruf schreibt kein Zugriffsprotokoll und liefert nur Listenzeilen, 404 heißt „gehört nicht hinein“; eine auditierte Detail-Route ist keine Zeilenquelle. Beleg: Prettier grün
-- [ ] 3.5 Hat sich eine Liste während des Zeilenabrufs geändert (`dataUpdatedAt`), setzt der Zeilenabgleich nichts ein und gibt sie an den Sammler (D6). Beleg: Vitest (optimistische Änderung während des Abrufs bleibt stehen, die Liste geht an den Sammler)
+- [x] 3.4 Regel in `frontend/AGENTS.md`, „Gezielter Abgleich nach Payload“: der Zeilenabruf schreibt kein Zugriffsprotokoll und liefert nur Listenzeilen, 404 heißt „gehört nicht hinein“; eine auditierte Detail-Route ist keine Zeilenquelle. Beleg: Prettier grün
+- [x] 3.5 Hat sich eine Liste während des Zeilenabrufs geändert (`dataUpdatedAt`), setzt der Zeilenabgleich nichts ein und gibt sie an den Sammler (D6). Beleg: Vitest (optimistische Änderung während des Abrufs bleibt stehen, die Liste geht an den Sammler)
 
 ## 4. Abschluss
 
