@@ -86,10 +86,37 @@ impl SchluesselZeile {
     }
 }
 
-/// Nächster `stand` der lokalen Schlüssel einer Org.
+/// Nächster `stand` der lokalen Schlüssel einer Org: der größere Wert aus „höchster + 1“ und den
+/// Unix-Sekunden jetzt. So liegt nach dem Zurückspielen einer Sicherung jeder neue Stand über dem,
+/// was das Gegenüber schon übernommen hat (LLH-1853, design.md D1 der Change
+/// `cz5332jn-unterschrift-stammdaten-nach-restore`).
 async fn next_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64, AppError> {
+    next_stand_um(conn, org_id, chrono::Utc::now().timestamp()).await
+}
+
+/// [`next_stand`] mit gesetzter Uhr (Unix-Sekunden).
+async fn next_stand_um(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    jetzt_s: i64,
+) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
-        "SELECT COALESCE(MAX(stand), 0) + 1 FROM unterschrift_schluessel \
+        "SELECT MAX(COALESCE(MAX(stand), 0) + 1, ?) FROM unterschrift_schluessel \
+         WHERE org_id = ? AND herkunft = 'lokal'",
+    )
+    .bind(jetzt_s)
+    .bind(org_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Höchster `stand` der lokalen Schlüssel einer Org, 0 ohne Schlüssel.
+pub async fn load_hoechster_stand(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT COALESCE(MAX(stand), 0) FROM unterschrift_schluessel \
          WHERE org_id = ? AND herkunft = 'lokal'",
     )
     .bind(org_id)
@@ -543,13 +570,38 @@ pub async fn accept_lieferungen(
         let fp = parse_b64(&l.schluessel)
             .map(|b| fingerabdruck(&b))
             .unwrap_or_default();
-        let vorhanden: Option<(i64, String)> = sqlx::query_as(
-            "SELECT id, zustand FROM unterschrift_schluessel WHERE kopplung_org_id = ? AND fremde_id = ?",
+        let bekannt: Option<(i64, String, String, String)> = sqlx::query_as(
+            "SELECT id, zustand, credential_id, schluessel FROM unterschrift_schluessel \
+             WHERE kopplung_org_id = ? AND fremde_id = ?",
         )
         .bind(ziel.kopplung_org_id)
         .bind(l.id)
         .fetch_optional(&mut *conn)
         .await?;
+        let vorhanden = match bekannt {
+            // Ein anderer Schlüssel unter bekannter id: Das Gegenüber hat die id neu vergeben,
+            // etwa nach dem Zurückspielen einer Sicherung, und kennt den alten nicht mehr. Er gilt
+            // als widerrufen (ein zurückgewiesener bleibt es) und gibt die id frei; die negative
+            // eigene id vergibt kein Gegenüber (LLH-1853, design.md D5 der Change
+            // `cz5332jn-unterschrift-stammdaten-nach-restore`).
+            Some((id, _, credential_id, schluessel))
+                if credential_id != l.credential_id || schluessel != l.schluessel =>
+            {
+                sqlx::query(
+                    "UPDATE unterschrift_schluessel SET fremde_id = -id, \
+                     widerrufen_at = CASE WHEN zustand = 'abgelehnt' THEN widerrufen_at \
+                     ELSE COALESCE(widerrufen_at, ?) END, \
+                     zustand = CASE WHEN zustand = 'abgelehnt' THEN zustand ELSE 'widerrufen' END \
+                     WHERE id = ?",
+                )
+                .bind(jetzt)
+                .bind(id)
+                .execute(&mut *conn)
+                .await?;
+                None
+            }
+            andere => andere.map(|(id, zustand, _, _)| (id, zustand)),
+        };
         match (l.zustand, vorhanden) {
             // Ein hier zurückgewiesener bleibt es: die Entscheidung eines Menschen hier geht vor.
             (UnterschriftSchluesselZustand::Widerrufen, Some((_, z))) if z == "abgelehnt" => {}

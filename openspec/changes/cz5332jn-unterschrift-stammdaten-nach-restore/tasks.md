@@ -5,14 +5,14 @@ Reproduktionstests `zurueckgespielt_hub_*` liegen schon rot auf dem Branch.
 
 ## 1. Unterschriftsschlüssel: Stand folgt der Uhr (D1)
 
-- [ ] 1.1 `next_stand` in `src/auth/unterschrift/repo.rs` auf `MAX(MAX(stand) + 1, Unix-Sekunden)` umstellen, mit innerer Fassung, die die Sekunden als Argument nimmt. Unit-Tests in `repo/tests.rs`: Uhr über dem Höchsten → Uhr; Höchster über der Uhr → +1. Prüfen: `cargo test --lib unterschrift::repo`
-- [ ] 1.2 Tests, die kleine feste Stände der Schlüssel erwarten, auf relative Aussagen umstellen (`src/auth/unterschrift/repo/tests.rs`, `tests/instanz_kopplung.rs`). Prüfen: `cargo test --lib unterschrift` und `cargo test --test instanz_kopplung` grün, bis auf die Tests aus 2 und 3
-- [ ] 1.3 Prüfen, dass `zurueckgespielt_hub_widerruf_erreicht_den_elw` jetzt grün ist
+- [x] 1.1 `next_stand` in `src/auth/unterschrift/repo.rs` auf `MAX(MAX(stand) + 1, Unix-Sekunden)` umstellen, mit innerer Fassung, die die Sekunden als Argument nimmt. Unit-Tests in `repo/tests.rs`: Uhr über dem Höchsten → Uhr; Höchster über der Uhr → +1. Prüfen: `cargo test --lib unterschrift::repo`
+- [x] 1.2 Tests, die kleine feste Stände der Schlüssel erwarten, auf relative Aussagen umstellen (`src/auth/unterschrift/repo/tests.rs`, `tests/instanz_kopplung.rs`). Prüfen: `cargo test --lib unterschrift` und `cargo test --test instanz_kopplung` grün, bis auf die Tests aus 2 und 3
+- [x] 1.3 Prüfen, dass `zurueckgespielt_hub_widerruf_erreicht_den_elw` jetzt grün ist
 
 ## 2. Unterschriftsschlüssel: andere id ersetzt den alten (D5)
 
-- [ ] 2.1 `accept_lieferungen` liest zur bekannten id `credential_id` und `schluessel`. Weicht einer ab, wird der alte widerrufen (ein abgelehnter bleibt abgelehnt), `fremde_id = -id`, und die Lieferung läuft weiter wie ohne bekannte id. Unit-Tests in `repo/tests.rs`: Ersatz mit gültiger Gegenzeichnung → alter widerrufen, neuer wartet; Ersatz ohne gültige Gegenzeichnung → alter widerrufen, neuer verworfen; abgelehnter alter bleibt abgelehnt; widerrufener Ersatz → alter widerrufen, nichts eingefügt
-- [ ] 2.2 Prüfen, dass `zurueckgespielt_hub_neuer_schluessel_erreicht_den_elw` grün ist und am ELW B widerrufen und C wartend zeigt (Spec-Szenario „Zurückgespielter Hub vergibt eine Kennung neu“)
+- [x] 2.1 `accept_lieferungen` liest zur bekannten id `credential_id` und `schluessel`. Weicht einer ab, wird der alte widerrufen (ein abgelehnter bleibt abgelehnt), `fremde_id = -id`, und die Lieferung läuft weiter wie ohne bekannte id. Unit-Tests in `repo/tests.rs`: Ersatz mit gültiger Gegenzeichnung → alter widerrufen, neuer wartet; Ersatz ohne gültige Gegenzeichnung → alter widerrufen, neuer verworfen; abgelehnter alter bleibt abgelehnt; widerrufener Ersatz → alter widerrufen, nichts eingefügt
+- [x] 2.2 Prüfen, dass `zurueckgespielt_hub_neuer_schluessel_erreicht_den_elw` grün ist und am ELW B widerrufen und C wartend zeigt (Spec-Szenario „Zurückgespielter Hub vergibt eine Kennung neu“)
 
 ## 3. Unterschriftsschlüssel: Netz an der erreichten Seite (D2)
 

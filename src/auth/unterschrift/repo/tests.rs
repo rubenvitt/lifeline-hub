@@ -918,3 +918,152 @@ async fn zurueckgewiesener_schluessel_bleibt_es() {
     assert_eq!(zustand_von(&mut conn, 11).await, "abgelehnt");
     assert_eq!(zustand_von(&mut conn, 10).await, "widerrufen");
 }
+
+#[tokio::test]
+async fn naechster_stand_folgt_der_uhr_und_zaehlt_darueber_weiter() {
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    assert_eq!(next_stand_um(&mut conn, 1, 1_000).await.unwrap(), 1_000);
+    lokaler_gueltiger(&mut conn, 5_000).await;
+    assert_eq!(
+        next_stand_um(&mut conn, 1, 1_000).await.unwrap(),
+        5_001,
+        "liegt der höchste Stand über der Uhr, zählt er weiter"
+    );
+    assert_eq!(next_stand_um(&mut conn, 1, 9_000).await.unwrap(), 9_000);
+    assert_eq!(load_hoechster_stand(&mut conn, 1).await.unwrap(), 5_000);
+    assert_eq!(load_hoechster_stand(&mut conn, 2).await.unwrap(), 0);
+}
+
+// ── Andere id ersetzt den alten Schlüssel (LLH-1853, D5) ─────────────────────────────────────
+
+/// Zustand und fremde id des vom Gegenüber gelieferten Schlüssels mit dieser credential_id.
+async fn fremder(conn: &mut SqliteConnection, credential_id: &str) -> Option<(String, i64)> {
+    sqlx::query_as(
+        "SELECT zustand, fremde_id FROM unterschrift_schluessel WHERE herkunft = 'gegenueber' \
+         AND credential_id = ?",
+    )
+    .bind(credential_id)
+    .fetch_optional(&mut *conn)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn anderer_schluessel_unter_bekannter_id_ersetzt_den_alten() {
+    let pool = pool_mit_admin().await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let (ko, mut conn) = mit_wartendem_b(&pool, &a, &b).await;
+    // Der zurückgespielte Hub vergibt die id von b an c.
+    let c_unter_11 = gegengezeichnet(
+        lieferung(11, &c, UnterschriftSchluesselZustand::Gueltig, 3),
+        &a,
+        FREMDE_ORG,
+    );
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(ko), &[c_unter_11], false, JETZT)
+        .await
+        .unwrap();
+    assert!(ab.is_empty(), "{ab:?}");
+    let (zustand_b, fremde_b) = fremder(&mut conn, "b").await.unwrap();
+    assert_eq!(zustand_b, "widerrufen");
+    assert!(fremde_b < 0, "b gibt die id frei: {fremde_b}");
+    assert_eq!(
+        fremder(&mut conn, "c").await,
+        Some(("wartet_auf_bestaetigung".to_string(), 11))
+    );
+    // Dieselbe Lieferung noch einmal ändert nichts mehr.
+    let erneut = gegengezeichnet(
+        lieferung(11, &c, UnterschriftSchluesselZustand::Gueltig, 3),
+        &a,
+        FREMDE_ORG,
+    );
+    accept_lieferungen(&mut conn, &ziel_zu(ko), &[erneut], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(
+        fremder(&mut conn, "c").await.unwrap().0,
+        "wartet_auf_bestaetigung"
+    );
+}
+
+#[tokio::test]
+async fn ersatz_ohne_gueltige_gegenzeichnung_widerruft_den_alten_und_wird_verworfen() {
+    let pool = pool_mit_admin().await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let boese = SoftwarePasskey::new("boese", [9u8; 32]);
+    let (ko, mut conn) = mit_wartendem_b(&pool, &a, &b).await;
+    let ab = accept_lieferungen(
+        &mut conn,
+        &ziel_zu(ko),
+        &[lieferung(
+            11,
+            &boese,
+            UnterschriftSchluesselZustand::Gueltig,
+            3,
+        )],
+        false,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(fremder(&mut conn, "b").await.unwrap().0, "widerrufen");
+    assert_eq!(fremder(&mut conn, "boese").await, None);
+}
+
+#[tokio::test]
+async fn abgelehnter_alter_bleibt_abgelehnt_wenn_seine_id_neu_vergeben_wird() {
+    let pool = pool_mit_admin().await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let (ko, mut conn) = mit_wartendem_b(&pool, &a, &b).await;
+    let id_b: i64 = sqlx::query_scalar(
+        "SELECT id FROM unterschrift_schluessel WHERE credential_id = 'b' AND herkunft = 'gegenueber'",
+    )
+    .fetch_one(&mut conn)
+    .await
+    .unwrap();
+    assert!(reject(&mut conn, 1, id_b, 1, JETZT).await.unwrap());
+    let c_unter_11 = gegengezeichnet(
+        lieferung(11, &c, UnterschriftSchluesselZustand::Gueltig, 3),
+        &a,
+        FREMDE_ORG,
+    );
+    accept_lieferungen(&mut conn, &ziel_zu(ko), &[c_unter_11], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(fremder(&mut conn, "b").await.unwrap().0, "abgelehnt");
+    assert_eq!(
+        fremder(&mut conn, "c").await.unwrap().0,
+        "wartet_auf_bestaetigung"
+    );
+}
+
+#[tokio::test]
+async fn widerrufener_ersatz_widerruft_den_alten_und_legt_nichts_an() {
+    let pool = pool_mit_admin().await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let (ko, mut conn) = mit_wartendem_b(&pool, &a, &b).await;
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(ko),
+        &[lieferung(
+            11,
+            &c,
+            UnterschriftSchluesselZustand::Widerrufen,
+            3,
+        )],
+        false,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(fremder(&mut conn, "b").await.unwrap().0, "widerrufen");
+    assert_eq!(fremder(&mut conn, "c").await, None);
+}

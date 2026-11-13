@@ -253,6 +253,11 @@ async fn nachlieferung_ueber_mehrere_orgs_bleibt_in_der_grenze() {
     .unwrap();
     assert_eq!(orgs.len(), 2);
     let je_org = max / 2 + 5;
+    // Über dem höchsten Stand des Hubs: der folgt der Uhr (LLH-1853).
+    let basis: i64 = sqlx::query_scalar("SELECT MAX(stand) FROM unterschrift_schluessel")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
     for (org_id, benutzer_id) in &orgs {
         for n in 0..je_org {
             sqlx::query(
@@ -264,7 +269,7 @@ async fn nachlieferung_ueber_mehrere_orgs_bleibt_in_der_grenze() {
             .bind(org_id)
             .bind(benutzer_id)
             .bind(format!("w{org_id}-{n}"))
-            .bind(1000 + n)
+            .bind(basis + 1 + n)
             .execute(&hub.pool)
             .await
             .unwrap();
@@ -287,7 +292,7 @@ async fn nachlieferung_ueber_mehrere_orgs_bleibt_in_der_grenze() {
             .unwrap();
     assert_eq!(
         staende,
-        vec![1000 + je_org - 1; 2],
+        vec![basis + je_org; 2],
         "nach zwei Meldungen ist alles nachgeliefert"
     );
 }
@@ -1131,7 +1136,8 @@ async fn untergeschobener_schluessel_wird_am_elw_verworfen() {
     sqlx::query(
         "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, benutzer_name, \
          credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, stand) \
-         VALUES (1, 'lokal', 1, 'Mallory', 'boese', 'es256', ?, ?, ?, 'boese', 'X', 'gueltig', 99)",
+         VALUES (1, 'lokal', 1, 'Mallory', 'boese', 'es256', ?, ?, ?, 'boese', 'X', 'gueltig', \
+         (SELECT MAX(stand) + 1 FROM unterschrift_schluessel))",
     )
     .bind(SoftwarePasskey::new("boese", [9u8; 32]).oeffentlich())
     .bind(RP)
@@ -1613,6 +1619,21 @@ async fn neuer_gegengezeichnet(hub: &Instanz, p: &SoftwarePasskey, bezeichnung: 
     id
 }
 
+/// Die bisherigen Stände an beiden Seiten liegen `sekunden` zurück: Zwischen der Sicherung des Hubs
+/// und dem Zurückspielen vergeht Zeit, im Test nicht. Negativ = die Uhr des Hubs geht nach.
+async fn staende_zurueck(hub: &Instanz, elw: &Instanz, sekunden: i64) {
+    sqlx::query("UPDATE unterschrift_schluessel SET stand = stand - ? WHERE herkunft = 'lokal'")
+        .bind(sekunden)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE instanz_kopplung_org SET unterschrift_stand = unterschrift_stand - ?")
+        .bind(sekunden)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+}
+
 /// Der Hub spielt eine Sicherung von vor diesem Schlüssel zurück: er ist dort weg.
 async fn verloren_am_hub(hub: &Instanz, id: i64) {
     sqlx::query("DELETE FROM unterschrift_schluessel WHERE id = ?")
@@ -1628,12 +1649,20 @@ async fn zurueckgespielt_hub_neuer_schluessel_erreicht_den_elw() {
     let b = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "Stick B").await;
     elw_meldet(&elw).await;
     assert!(fremder_am_elw(&elw, "b").await.is_some());
+    staende_zurueck(&hub, &elw, 1000).await;
     verloren_am_hub(&hub, b).await;
-    neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("c", [3u8; 32]), "Stick C").await;
+    let c = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("c", [3u8; 32]), "Stick C").await;
+    assert_eq!(c, b, "der Hub vergibt die id des verlorenen Schlüssels neu");
     elw_meldet(&elw).await;
-    assert!(
-        fremder_am_elw(&elw, "c").await.is_some(),
+    assert_eq!(
+        fremder_am_elw(&elw, "c").await.map(|(z, _)| z).as_deref(),
+        Some("wartet_auf_bestaetigung"),
         "der erste Schlüssel nach dem Zurückspielen kommt am ELW an"
+    );
+    assert_eq!(
+        fremder_am_elw(&elw, "b").await.unwrap().0,
+        "widerrufen",
+        "den verlorenen Schlüssel führt der Hub nicht mehr"
     );
 }
 
@@ -1645,6 +1674,7 @@ async fn zurueckgespielt_hub_widerruf_erreicht_den_elw() {
     let c = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("c", [3u8; 32]), "Stick C").await;
     elw_meldet(&elw).await;
     assert!(fremder_am_elw(&elw, "b").await.is_some());
+    staende_zurueck(&hub, &elw, 1000).await;
     verloren_am_hub(&hub, c).await;
     let pfad = format!("/api/admin/instanz/unterschrift/{b}/widerrufen");
     let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
