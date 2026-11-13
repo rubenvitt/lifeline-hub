@@ -104,8 +104,10 @@ etwas zu schreiben, und meldet es. Ohne geprüften Archiv-Schlüssel der Org bri
 
 ### D3 Ziel per Kennung
 
-`AntragZielEingabe` nimmt neben `art` entweder `id` oder `kennung` an. `antrag::stellen` löst
-eine Kennung in seiner Transaktion auf:
+`AntragZielEingabe` nimmt neben `art` entweder `id` oder `kennung` an. Die Route löst eine
+Kennung vor `antrag::stellen` auf (`antrag::person_aus_kennung`); `stellen` prüft das Ziel danach
+in seiner Transaktion wie bisher. IDs ändern sich nicht, eine Zeile verschwindet nur mit dem
+Skelett, und dann ist `stellen` ohnehin 404:
 - `R-<n>` über `registrier_nr`,
 - `EK-<n>` über die `id` einer Disposition ohne `personal_id`,
 - `IT-<n>` über die `id` des Anrufs.
@@ -136,8 +138,8 @@ findet und vormerkt, teilen sich `alle_loeschen_tx` und der neue Vollzug als eig
   der Antragsteller, ersatzweise die Akteurskette.
 - **Admin-Spur:** je Einsatz ein Eintrag `archiv_person_geschwaerzt` über
   `schreibe_ohne_akteur_tx`, mit dem Namen „Befehl archiv loeschersuchen“ und dem Ziel
-  `Ziel::Archiv(<Einsatznummer>)`. Das Detail enthält nur die Zahl der Anträge und Blöcke und
-  die neuen Fingerabdrücke.
+  `Ziel::Archiv(<Einsatznummer>)`, ohne Detail (wie `archiv_eingespielt`); Kennungen und Zahl
+  der Blöcke stehen im ETB.
 - **Suche:** Sie schreibt `archiv_durchsucht` mit dem Einsatz als Ziel, ohne Suchtext.
 - **Migration:** eine neue Migration baut `admin_audit` nach dem Muster von 0340 mit beiden
   Werten im CHECK neu (mit `-- no-transaction`, falls auf `admin_audit` verwiesen wird; nach
@@ -162,10 +164,13 @@ Web-Suche bleibt dabei ohne Namen. Die Mindestlänge von 3 Zeichen gilt wie dort
   offenen Einsatz-Antrag.
 - **Geschwärzt ohne Archiv:** wie bisher keiner.
 
-„Person per Kennung schwärzen“ öffnet einen kleinen Dialog. Er nimmt die Kennung entgegen, leitet
-die Art aus dem Präfix ab und ruft dann den bestehenden `SchwaerzungsantragDialog` mit
-`{ art, kennung }` auf. Der Dialog nennt zusätzlich, dass der Vollzug den Befehl mit dem
-Archiv-Schlüssel braucht, und nennt den Befehl `archiv personen` als Weg zur Kennung. In der
+„Person per Kennung schwärzen“ öffnet einen eigenen Dialog (`ArchivPersonAntragDialog`) mit
+zwei Feldern, Kennung und Aktenzeichen. Das Eintippen der Kennung ist zugleich die Bestätigung
+der Rückfrage; ein zweites Eintippen derselben Kennung brächte nichts. Die Art kommt aus dem
+Präfix, die Form der Kennung (`R-042`) gleicht der Dialog an die des Servers an. Er nennt, dass
+der Vollzug den Befehl mit dem Archiv-Schlüssel braucht, und den Befehl `archiv personen` als
+Weg zur Kennung. Der Einsatz-Antrag am Archiv bleibt im `SchwaerzungsantragDialog`, dessen Text
+dort das Löschen des Archivs nennt. In der
 Antragsliste zeigt ein offener Personen-Antrag am archivierten Einsatz nach Ablauf der
 Fälligkeit „wartet auf Befehl mit Archiv-Schlüssel“. Das leitet das Frontend aus `akte.archiv`,
 Art und Fälligkeit ab; ein neues Feld im DTO braucht es nicht.

@@ -102,7 +102,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 7. Regeln und Abschluss
 
-- [ ] 7.1 `src/AGENTS.md`, „Archiv am Hub“: Der Satz „ein Löschersuchen … geht nur ganz“ wird
+- [x] 7.1 `src/AGENTS.md`, „Archiv am Hub“: Der Satz „ein Löschersuchen … geht nur ganz“ wird
       ersetzt durch Personen-Antrag per Befehl, offenen Antrag im Purge-Lauf und das Vormerken
       der Kopien. Kapitel 6 der Architekturdoku, falls dort der Ablauf des Archivs steht.
       Prüfen: `grep` nach „nur ganz“ findet nichts mehr.

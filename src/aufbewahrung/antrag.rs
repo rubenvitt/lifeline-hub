@@ -282,7 +282,8 @@ fn system_eintrag<'a>(inhalt: &'a str) -> crate::etb::repo::EintragDaten<'a> {
 }
 
 /// Stellt einen Antrag (LFH-751). Prüft in einer Transaktion: Einsatz bekannt (404), eigene
-/// Organisation (403), abgeschlossen und nicht geschwärzt (409), Ziel in diesem Einsatz (404,
+/// Organisation (403), abgeschlossen und nicht geschwärzt, außer archiviert (409), Ziel in diesem
+/// Einsatz (404,
 /// Stammkraft 422), Bestätigung gleich Kennung (422), kein offener oder vollzogener Antrag für
 /// dasselbe Ziel (409). Schreibt den Antrag und den ETB-Eintrag des Admins. Liefert die ID.
 pub async fn stellen(
