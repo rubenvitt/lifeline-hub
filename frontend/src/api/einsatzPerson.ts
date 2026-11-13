@@ -166,6 +166,39 @@ export function listePersonenAuswahl(einsatzId: number): Promise<PersonAuswahl[]
 }
 
 /**
+ * Ordnung der Personenliste und der Auswahl, wie `ORDER BY registrier_nr` im Server
+ * (`src/person/repo.rs`); die Nummer ist je Einsatz eindeutig.
+ */
+export function comparePersonen(
+  a: { registrier_nr: number },
+  b: { registrier_nr: number },
+): number {
+  return a.registrier_nr - b.registrier_nr;
+}
+
+/** Eine Zeile der Liste in der Form der Personenauswahl; eine stornierte gehört nicht hinein. */
+export function toPersonAuswahl(p: Person): PersonAuswahl | null {
+  if (p.storniert_at != null) return null;
+  return {
+    id: p.id,
+    registrier_nr: p.registrier_nr,
+    status: p.status,
+    name: p.name,
+    vorname: p.vorname,
+    pat_nummer: p.pat_nummer,
+  };
+}
+
+/**
+ * Eine Person in der Form der Liste, auch storniert, für den Zeilenabgleich (LLH-1682). Wie die
+ * Liste nicht protokolliert; das Detail (`ladePerson`) schreibt je Abruf eine Audit-Zeile und
+ * ist deshalb keine Zeilenquelle.
+ */
+export function loadPersonZeile(einsatzId: number, personId: number): Promise<Person> {
+  return apiGet<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}/zeile`);
+}
+
+/**
  * Personenliste für die Druckansicht (LFH-727). Schreibt serverseitig EINEN `druck`-Eintrag ins
  * Zugriffsprotokoll und liefert sonst dieselbe Menge wie `listePersonen`. Deshalb nie still
  * wiederholen und nie aus dem Cache der Liste ersetzen (`frontend/src/druck/AGENTS.md`).

@@ -717,7 +717,8 @@ async fn sofort_abraeumen(pool: &SqlitePool, einsatz_id: i64) -> Result<(), AppE
     crate::write_retry!(pool, |conn| {
         abraeumen::vormerken(conn, einsatz_id, AbraeumArt::Spiegel, Some(GEGENSTELLE)).await
     })?;
-    abraeumen::ausfuehren(pool, einsatz_id).await?;
+    // Kein Server, kein Hub: das Einspielen läuft als Kommando (`main.rs`).
+    abraeumen::ausfuehren(pool, None, einsatz_id).await?;
     konten_aufraeumen(pool).await;
     Ok(())
 }

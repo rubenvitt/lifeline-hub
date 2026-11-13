@@ -33,12 +33,21 @@ function isAusgeblendet(fehler: unknown): boolean {
   return fehler.status === 403 || fehler.status === 404;
 }
 
+/**
+ * Dieselbe Akte: ID und Kennung (LLH-1862). Die ID allein trägt nicht, der Server vergibt die ID
+ * einer gelöschten Akte neu; die Kennung nennt den Einsatz.
+ */
+function isGleicheAkte(a: FuehrungAnzeige, b: FuehrungAnzeige): boolean {
+  return a.id === b.id && a.kennung === b.kennung;
+}
+
 export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolean }) {
   const { token } = useRollen();
   const qc = useQueryClient();
   // Die beim Öffnen gewählte Akte (LLH-1670): Der Dialog hängt nicht am 30-s-Abruf. Steht sie
   // in der Liste, gilt deren Stand; fällt sie heraus, bleibt der letzte mit Hinweis stehen, samt
-  // getipptem Grund, eingegebenem Code und einer Erfolgsmeldung.
+  // getipptem Grund, eingegebenem Code und einer Erfolgsmeldung. Eine andere Akte unter derselben
+  // ID ist nicht sie (LLH-1862, `isGleicheAkte`).
   const [gewaehlt, setGewaehlt] = useState<FuehrungAnzeige | null>(null);
   // Solange eine Aktion läuft, bleibt der Dialog offen: Ihre Antwort (etwa der einmalige Code)
   // hätte sonst keinen Ort.
@@ -49,9 +58,9 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
   const nachAktion = useCallback(
     (f: FuehrungAnzeige) => {
       qc.setQueryData<FuehrungAnzeige[]>(globalKeys.instanzkopplungFuehrung(), (liste) =>
-        liste?.map((a) => (a.id === f.id ? f : a)),
+        liste?.map((a) => (isGleicheAkte(a, f) ? f : a)),
       );
-      setGewaehlt((g) => (g?.id === f.id ? f : g));
+      setGewaehlt((g) => (g && isGleicheAkte(g, f) ? f : g));
     },
     [qc],
   );
@@ -80,7 +89,7 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
       </Paneel>
     );
   }
-  const ausDerListe = gewaehlt ? (q.data.find((a) => a.id === gewaehlt.id) ?? null) : null;
+  const ausDerListe = gewaehlt ? (q.data.find((a) => isGleicheAkte(a, gewaehlt)) ?? null) : null;
   const offen = ausDerListe ?? gewaehlt;
   const nichtMehrGelistet = gewaehlt != null && ausDerListe == null;
   return (
@@ -159,7 +168,7 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
         {offen && (
           // Bedienen darf diese Seite nur ein Admin; er darf auch unterschreiben (LLH-1676).
           <FuehrungPaneel
-            key={offen.id}
+            key={`${offen.id}:${offen.kennung}`}
             fuehrung={offen}
             darfBedienen={darfBedienen}
             darfUnterschreiben={darfBedienen}

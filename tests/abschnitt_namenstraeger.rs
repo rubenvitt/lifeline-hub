@@ -318,3 +318,194 @@ async fn umbenennen_erreicht_leser_ohne_abschnittsrecht() {
     let v = fetch_json(&app, &frieda, &vorgaben).await;
     assert_eq!(v[0]["abschnitt_name"], "Nordost", "{v}");
 }
+
+// ---------- Versorgte Personen (LLH-1682) ----------
+//
+// Die Personenzeile trägt Name und Abschnitt der versorgenden Einheit per Join. Seit die Tabs die
+// Personenliste zeilenweise abgleichen, meldet der Server jede versorgte Person mit `person`,
+// wenn sich diese Angaben ändern.
+
+/// Eine Person, die die Einheit `einheit` versorgt.
+async fn versorgte_person(app: &axum::Router, cookie: &str, einsatz: i64, einheit: i64) -> i64 {
+    let (s, v) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen"),
+        cookie,
+        Some(&json!({"name": "Muster", "versorgende_einheit_id": einheit})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// Die `person_id` aller `person`-Ereignisse, die seit dem letzten Lesen am Abo anstehen.
+fn gemeldete_personen(rx: &mut Receiver<LiveNachricht>) -> Vec<i64> {
+    let mut ids = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if n.event.as_str() == "person" {
+            let data: Value = serde_json::from_str(&n.data).unwrap();
+            ids.push(data["person_id"].as_i64().expect("person_id"));
+        }
+    }
+    ids
+}
+
+/// Umbenennen und Umhängen der Einheit melden ihre versorgten Personen, ein anderes Feld nicht.
+#[tokio::test]
+async fn einheit_umbenennen_und_umhaengen_meldet_versorgte_personen() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let sued = abschnitt_anlegen(&app, &admin, eid, "Süd").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    let anderer = einheit_im_abschnitt(&app, &admin, eid, "2. Zug", nord).await;
+    let p1 = versorgte_person(&app, &admin, eid, zug).await;
+    let p2 = versorgte_person(&app, &admin, eid, zug).await;
+    versorgte_person(&app, &admin, eid, anderer).await;
+
+    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let mut rx = live.abonniere(eid);
+    for (body, erwartet, fall) in [
+        (json!({"name": "1. Zug neu"}), vec![p1, p2], "neuer Name"),
+        (
+            json!({"abschnitt_id": sued}),
+            vec![p1, p2],
+            "anderer Abschnitt",
+        ),
+        (json!({"bemerkung": "Deich"}), vec![], "anderes Feld"),
+        (json!({"name": "1. Zug neu"}), vec![], "gleicher Name"),
+    ] {
+        let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::OK, "{fall}: {v}");
+        let mut ids = gemeldete_personen(&mut rx);
+        ids.sort_unstable();
+        assert_eq!(ids, erwartet, "{fall}");
+    }
+    let personen = format!("/api/einsaetze/{eid}/personen");
+    assert_eq!(
+        feld_in_liste(&app, &admin, &personen, p1, "versorgende_einheit_name").await,
+        "1. Zug neu"
+    );
+}
+
+/// Umbenennen und Auflösen des Abschnitts melden die Personen, die eine seiner Einheiten versorgt.
+#[tokio::test]
+async fn abschnitt_umbenennen_und_aufloesen_meldet_versorgte_personen() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let sued = abschnitt_anlegen(&app, &admin, eid, "Süd").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    let fremd = einheit_im_abschnitt(&app, &admin, eid, "3. Zug", sued).await;
+    let p = versorgte_person(&app, &admin, eid, zug).await;
+    versorgte_person(&app, &admin, eid, fremd).await;
+
+    let mut rx = live.abonniere(eid);
+    umbenennen(&app, &admin, eid, nord, json!({"name": "Nordost"})).await;
+    assert_eq!(gemeldete_personen(&mut rx), vec![p], "Umbenennen");
+    let personen = format!("/api/einsaetze/{eid}/personen");
+    assert_eq!(
+        feld_in_liste(
+            &app,
+            &admin,
+            &personen,
+            p,
+            "versorgende_einheit_abschnitt_name"
+        )
+        .await,
+        "Nordost"
+    );
+
+    let (s, _) = anfrage_json(&app, "DELETE", &abschnitt_pfad(eid, nord), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(gemeldete_personen(&mut rx), vec![p], "Auflösen");
+}
+
+/// Je `person`-Ereignis seine `person_id`, `None` für eines ohne Kennung.
+fn person_ereignisse(rx: &mut Receiver<LiveNachricht>) -> Vec<Option<i64>> {
+    let mut ids = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if n.event.as_str() == "person" {
+            let data: Value = serde_json::from_str(&n.data).unwrap();
+            ids.push(data["person_id"].as_i64());
+        }
+    }
+    ids
+}
+
+/// Über zehn versorgte Personen geht ein einziges `person` ohne Kennung: die Tabs laden die Liste
+/// ab dieser Zahl ohnehin ganz, und hunderte Ereignisse liefen über Kanal und Replay-Ring.
+#[tokio::test]
+async fn mehr_als_zehn_versorgte_personen_melden_ein_ereignis_ohne_kennung() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    for _ in 0..11 {
+        versorgte_person(&app, &admin, eid, zug).await;
+    }
+
+    let mut rx = live.abonniere(eid);
+    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({"name": "Neu"}))).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(person_ereignisse(&mut rx), vec![None], "Einheit");
+
+    umbenennen(&app, &admin, eid, nord, json!({"name": "Nordost"})).await;
+    assert_eq!(person_ereignisse(&mut rx), vec![None], "Abschnitt");
+}
+
+/// Genau zehn versorgte Personen gehen noch einzeln, jede mit ihrer Kennung.
+#[tokio::test]
+async fn zehn_versorgte_personen_melden_einzeln() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    let mut erwartet = Vec::new();
+    for _ in 0..10 {
+        erwartet.push(Some(versorgte_person(&app, &admin, eid, zug).await));
+    }
+
+    let mut rx = live.abonniere(eid);
+    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({"name": "Neu"}))).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(person_ereignisse(&mut rx), erwartet);
+}
+
+/// Ist der neue Name gespeichert, meldet die Einheit ihre versorgten Personen auch dann, wenn ein
+/// späterer Schritt desselben PATCH mit 422 scheitert (Muster der Abschnitts-Route).
+#[tokio::test]
+async fn einheit_meldet_versorgte_personen_auch_wenn_ein_spaeterer_schritt_scheitert() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    let p = versorgte_person(&app, &admin, eid, zug).await;
+
+    let mut rx = live.abonniere(eid);
+    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({"name": "Neu", "sprechgruppe_ids": [987_654]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let personen = format!("/api/einsaetze/{eid}/personen");
+    assert_eq!(
+        feld_in_liste(&app, &admin, &personen, p, "versorgende_einheit_name").await,
+        "Neu",
+        "Vorbedingung: der Name ist gespeichert"
+    );
+    assert_eq!(person_ereignisse(&mut rx), vec![Some(p)]);
+}

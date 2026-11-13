@@ -432,5 +432,76 @@ pub async fn nachlieferung(
     Ok(aus)
 }
 
+/// Hebt den Zähler des Änderungslogs (`sqlite_sequence` von `stammdaten_aenderung`) auf mindestens
+/// `auf`; senkt nie. Legt die Zeile an, wenn das Log noch nie geschrieben wurde.
+async fn raise_log_zaehler(conn: &mut SqliteConnection, auf: i64) -> Result<(), AppError> {
+    let n = sqlx::query(
+        "UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name = 'stammdaten_aenderung'",
+    )
+    .bind(auf)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if n == 0 {
+        sqlx::query("INSERT INTO sqlite_sequence (name, seq) VALUES ('stammdaten_aenderung', ?)")
+            .bind(auf)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(())
+}
+
+/// Beim Start (LLH-1853, design.md D3 der Change `cz5332jn-unterschrift-stammdaten-nach-restore`):
+/// Der Zähler des Änderungslogs springt auf mindestens die Unix-Sekunden `jetzt_s`. Nach dem
+/// Zurückspielen einer Sicherung, das immer einen Neustart verlangt, liegt so jede neue Änderung
+/// über dem, was eine meldende Seite vor dem Ausfall übernommen haben kann.
+pub async fn raise_log_stand(pool: &sqlx::SqlitePool, jetzt_s: i64) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    raise_log_zaehler(&mut conn, jetzt_s).await
+}
+
+/// Netz nach einem Rückschritt (LLH-1853, design.md D4): hebt den Zähler des Logs auf mindestens
+/// `gemeldet` und fügt die Log-Zeilen der Org in ihrer Reihenfolge neu ein. Jede bekommt so einen
+/// Stand darüber, und die nächste Nachlieferung liefert die Org ganz. Liefert die Zahl der Zeilen.
+pub async fn renew_log_der_org(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    gemeldet: i64,
+) -> Result<usize, AppError> {
+    raise_log_zaehler(conn, gemeldet).await?;
+    let zeilen: Vec<(String, String)> = sqlx::query_as(
+        "SELECT art, schluessel FROM stammdaten_aenderung WHERE org_id = ? ORDER BY stand",
+    )
+    .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    sqlx::query("DELETE FROM stammdaten_aenderung WHERE org_id = ?")
+        .bind(org_id)
+        .execute(&mut *conn)
+        .await?;
+    for (art, schluessel) in &zeilen {
+        sqlx::query("INSERT INTO stammdaten_aenderung (org_id, art, schluessel) VALUES (?, ?, ?)")
+            .bind(org_id)
+            .bind(art)
+            .bind(schluessel)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(zeilen.len())
+}
+
+/// Höchster Stand der Log-Zeilen einer Org, 0 ohne Zeilen.
+pub async fn load_hoechster_log_stand(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT COALESCE(MAX(stand), 0) FROM stammdaten_aenderung WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
 #[cfg(test)]
 mod tests;

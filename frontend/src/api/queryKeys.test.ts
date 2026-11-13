@@ -917,6 +917,7 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
   it('ohne Kennung fällt die Zuordnung auf die Prefixe zurück', () => {
     expect(ziele('lagebericht', { einsatz_id: 7 })).toBeNull();
     expect(ziele('schaden', { einsatz_id: 7 })).toBeNull();
+    expect(ziele('person', { einsatz_id: 7 })).toBeNull();
     // Das Informationstelefon gleicht immer über den Prefix ab: Liste, Zählung, Einzelabruf.
     expect(EINSATZ_STREAM_ZIELE.infotelefon).toBeUndefined();
   });
@@ -932,6 +933,19 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
     ]);
   });
 
+  // LLH-1682: die Personenlisten zeilenweise, die übrigen Abnehmer des Ereignisses wie bisher, die
+  // Anhänge nur dieser Person.
+  it('ein person-Ereignis mit Kennung trifft die Zeile und die übrigen Abnehmer', () => {
+    expect(ziele('person', { einsatz_id: 7, person_id: 4 })).toEqual([
+      { art: 'zeile', ziel: 'personen', id: 4 },
+      { art: 'key', key: einsatzKeys.modulZaehler(7) },
+      { art: 'key', key: einsatzKeys.betreuung(7) },
+      { art: 'key', key: einsatzKeys.personAnhaenge(7, 4) },
+      { art: 'key', key: einsatzKeys.personenTransportmittel(7) },
+      { art: 'key', key: einsatzKeys.registrierlisteAlle(7) },
+    ]);
+  });
+
   it('jede gezielte Zuordnung trifft nur Keys ihres Ereignisses aus EINSATZ_STREAM_EVENTS', () => {
     const proben: Record<string, Record<string, unknown>[]> = {
       lagebericht: [
@@ -941,6 +955,7 @@ describe('EINSATZ_STREAM_ZIELE (LFH-931)', () => {
       ],
       befehl: [{ befehl_id: 1 }, { befehl_id: 1, anlagen: true }],
       schaden: [{ schaden_id: 1 }, { schaden_id: 1, anhang: true }],
+      person: [{ person_id: 1 }],
     };
     for (const [event, payloads] of Object.entries(proben)) {
       const erlaubt: readonly string[] =

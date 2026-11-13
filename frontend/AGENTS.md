@@ -1242,7 +1242,14 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   Fenster, sonst und bei verdecktem Tab, Fehler oder fehlender Liste der Sammler). Ohne Kennung
   gelten die Prefixe aus `EINSATZ_STREAM_EVENTS`, `lagged` gleicht weiter alles ab. Jeder gezielte
   Key liegt unter den Prefixen seines Ereignisses (`queryKeys.test.ts`); eine zeilenweise
-  abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher). Eine
+  abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher). Der Zeilenabruf
+  ist so wenig protokolliert wie die Liste; eine auditierte Detail-Route ist keine Zeilenquelle,
+  jeder Tab schriebe bei jedem Ereignis eine Protokollzeile. Personen haben deshalb eine eigene
+  Zeilen-Route (`…/personen/{pid}/zeile`, LLH-1682), die nur liefert, was die Liste zeigt; dort
+  heißt ein 404 mit `grund: "nicht_in_liste"` (`ApiError.grund`) „gehört nicht hinein“ und nimmt
+  die Zeile heraus. Jeder andere 404 (unbekannte Route) und bei Schäden jeder 404 geht an den
+  Sammler. Hat sich eine abgerufene Zeile während ihres Abrufs geändert (optimistische Änderung),
+  wird sie nicht überschrieben, sondern im nächsten Fenster erneut abgerufen. Eine
   Seitenkette (`useInfiniteQuery`) bekommt eine Zeile nur innerhalb des geladenen Fensters
   (`fensterEinsortieren`, LFH-1075); entscheidet über die Zugehörigkeit nur der Server
   (Suchbegriff), geht die Kette an den Sammler. Kennzahlen gleicht immer der Sammler ab.
