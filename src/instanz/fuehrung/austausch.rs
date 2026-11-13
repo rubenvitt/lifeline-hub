@@ -1308,9 +1308,21 @@ pub async fn apply_eingang(
     Ok(aus)
 }
 
+/// Jede Folge einmal, in der Reihenfolge ihres ersten Auftretens (LLH-1855): Ein Widerruf und
+/// der Austausch derselben Meldung können denselben Einsatz nennen.
+fn dedupe_folgen(folgen: &[Folge]) -> Vec<&Folge> {
+    let mut eindeutig: Vec<&Folge> = Vec::with_capacity(folgen.len());
+    for f in folgen {
+        if !eindeutig.contains(&f) {
+            eindeutig.push(f);
+        }
+    }
+    eindeutig
+}
+
 /// Führt die Folgen eines Austauschs nach dem Commit aus: Live-Ereignis am Einsatzkopf,
-/// Benachrichtigungen an die Einsatzleitung, Einträge der Admin-Spur. Fehler schlagen nicht durch
-/// (die Meldung ist schon committet).
+/// Benachrichtigungen an die Einsatzleitung, Einträge der Admin-Spur. Gleiche Folgen laufen nur
+/// einmal. Fehler schlagen nicht durch (die Meldung ist schon committet).
 pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folgen: &[Folge]) {
     use crate::benachrichtigung::{
         self as b, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
@@ -1321,7 +1333,7 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
     let live = crate::instanz::stammdaten::live()
         .cloned()
         .unwrap_or_else(crate::live::LiveHub::new);
-    for f in folgen {
+    for f in dedupe_folgen(folgen) {
         match f {
             Folge::Kopf { einsatz_id } => {
                 super::notify_wechsel(pool, &live, *einsatz_id).await;
@@ -1371,6 +1383,27 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    // ── Folgen entdoppeln (LLH-1855) ──────────────────────────────────────────────────────
+
+    #[test]
+    fn gleiche_folgen_laufen_nur_einmal_in_der_reihenfolge_ihres_ersten_auftretens() {
+        let folgen = [
+            Folge::Kopf { einsatz_id: 2 },
+            Folge::Alarm { einsatz_id: 2 },
+            Folge::Kopf { einsatz_id: 1 },
+            Folge::Kopf { einsatz_id: 2 },
+            Folge::Alarm { einsatz_id: 2 },
+        ];
+        assert_eq!(
+            dedupe_folgen(&folgen),
+            vec![
+                &Folge::Kopf { einsatz_id: 2 },
+                &Folge::Alarm { einsatz_id: 2 },
+                &Folge::Kopf { einsatz_id: 1 },
+            ]
+        );
+    }
 
     // ── Rückschritt des Zählers (LLH-1708, design.md D3) ──────────────────────────────────
 
