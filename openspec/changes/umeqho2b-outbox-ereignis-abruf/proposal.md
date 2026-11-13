@@ -47,6 +47,9 @@ Abruf, zweiter sind die Webhooks (LLH-1656).
 - **Freigebbare Zugänge:** Die Einsatzleitung kann einen Einsatz auch für einen Zugang mit
   `einsaetze:read` freigeben, nicht nur für einen mit `lage:read` (LLH-1638). `events:read`
   allein macht einen Zugang nicht freigebbar, weil es keine Ereignisart öffnet.
+- **Rechteänderung beendet die Freigabe:** Ändert ein Admin die Lese-Rechte mit Einsatzbezug eines
+  Zugangs, gleich ob er eines nimmt oder dazugibt, endet die Freigabe; die Einsatzleitung
+  entscheidet neu (Entscheidung Ruben, 13.11.2026, aus dem Review vor dem PR).
 - **Aufbewahrung:** Ereignisse werden nach sieben Tagen gelöscht (Phase C des Purge-Laufs). Die
   Löschgrenze bleibt festgehalten, damit ein alter Cursor erkannt wird.
 - **Neue ADR:** Die Outbox wird per Trigger und je Zugang geschrieben; kein Rust-Schreibweg
@@ -82,9 +85,10 @@ Abruf, zweiter sind die Webhooks (LLH-1656).
 
 ### Modified Capabilities
 
-Keine. `maschinenzugang` und `oeffentliche-api-vertrag` gelten unverändert; die neuen Routen
-erfüllen deren Anforderungen (Scope, Signatur, Drosselung, Dokument, Fehlercode). Die
-Einsatzfreigabe steht in der Spec, die LLH-1638 anlegt oder ändert.
+- `maschinenzugang`: `einsaetze:read` zählt zu den Lese-Scopes mit Einsatzbezug, und jede Änderung
+  dieser Scopes beendet die Freigabe (zwei Anforderungen, Delta in dieser Change). Die neuen
+  Routen erfüllen die übrigen Anforderungen von `maschinenzugang` und
+  `oeffentliche-api-vertrag` (Scope, Signatur, Drosselung, Dokument, Fehlercode) unverändert.
 
 ## Impact
 
@@ -99,17 +103,17 @@ Einsatzfreigabe steht in der Spec, die LLH-1638 anlegt oder ändert.
     Tabelle);
   - kein Eingriff in `src/einsatz/repo.rs`, `src/live/` oder die Spiegel-Übernahme.
 - **Migrationen:** zwei Dateien. Die erste legt die zwei Tabellen an und braucht LLH-1638 nicht.
-  Die zweite legt die Trigger an `einsatz`, `einsatz_aenderung` und `maschinenzugang_freigabe`
-  an und kommt hinter die Migrationen von LLH-1638 (0335, 0336). Beide Nummern liegen über allen
-  auf `alpha`.
+  Die zweite legt die Trigger an `einsatz`, `einsatz_aenderung`, `einsatz_spiegel` und
+  `maschinenzugang_freigabe` an und kommt hinter die Migrationen von LLH-1638 (0341, 0342).
+  Gebaut: 0343 und 0344.
 - **Vertrag:** `docs/api/public-v1.json` wächst um drei Routen und ihre Schemas
   (`cargo test --test public_api_spec_aktuell`); `tests/enum_wire_kontrakt.rs` bekommt die
   Ereignisart.
 - **Frontend:** keine Änderung.
-- **Doku:** `docs/api/ereignisse.md` (neu), `docs/api/maschinenzugang.md`,
-  `docs/anwender/kapitel/anbindungen.md`, `docs/architektur/` (Kapitel 6, 8, 11, neue ADR),
-  `src/AGENTS.md`.
+- **Doku:** `docs/api/maschinenzugang.md` (Abschnitte „Einsätze lesen“ und „Ereignisse
+  abrufen“), `docs/anwender/kapitel/anbindungen.md` und `externe-lagemonitore.md`,
+  `docs/architektur/` (Kapitel 6, 8, 11, ADR-0036), `src/AGENTS.md`.
 - **Abhängigkeit:** LLH-1638 (Change `f658d8o6-lage-fuer-maschinenzugaenge`). Diese Change
   hängt Trigger an dessen Tabelle `maschinenzugang_freigabe` und liest sie in den Leserouten.
-  Tabellen, Abruf und Purge entstehen vorher (Entscheidung Ruben, 12.11.2026); Trigger und
-  Leserouten folgen, sobald LLH-1638 auf `alpha` liegt.
+  Tabellen, Abruf und Purge entstanden vorher (Entscheidung Ruben, 12.11.2026); Trigger und
+  Leserouten auf dem Branch von LLH-1638, das seit 13.11.2026 auf `alpha` liegt.

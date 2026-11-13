@@ -99,7 +99,7 @@ fn aus_zeile(zeile: &SqliteRow) -> Result<Einsatz, AppError> {
 }
 
 /// Die laufenden Einsätze, die der Zugang liest, in der Form der öffentlichen API. Welche das
-/// sind, sagt allein `freigabe` (ADR-0029); die Org wird trotzdem mitgeprüft, denn ein fremder
+/// sind, sagt allein `freigabe` (ADR-0035); die Org wird trotzdem mitgeprüft, denn ein fremder
 /// Einsatz hier wäre ein Datenabfluss.
 async fn lesbare_einsaetze(
     conn: &mut SqliteConnection,

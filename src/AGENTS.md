@@ -150,7 +150,9 @@ Spec `ereignis-abruf`, Herleitung
 `openspec/changes/umeqho2b-outbox-ereignis-abruf/design.md`):
 - **Kein Schreibweg in Rust schreibt in `maschine_ereignis`.** Jede Zeile entsteht in einem
   Trigger (`migrations/0344_maschine_ereignis_trigger.sql`), in der Transaktion der Änderung und
-  je Zeile in `maschinenzugang_freigabe`. `public_api::events` liest und löscht nur. Auch Tests
+  je Zeile in `maschinenzugang_freigabe` (Änderungen nur für gültige Zugänge, das Ende für alle).
+  Ein schon geschriebenes `einsatz.closed` bleibt beim Löschen des Einsatzes stehen.
+  `public_api::events` liest und löscht nur. Auch Tests
   erzeugen Ereignisse über Freigabe, Kopf und Lage; direkt fügt nur ein, wer ein Alter braucht
   (`tests/public_api_events.rs`, `altes_ereignis`).
 - **Ein neues Feld im v1-Schema `Einsatz`** kommt mit seiner Spalte in

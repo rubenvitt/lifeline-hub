@@ -3533,7 +3533,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
     },
     // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------
     // Nur Kennungen, Art und Zeitpunkt (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme);
-    // der Purge-Lauf löscht nach sieben Tagen, der Trigger am Einsatz mit dem Einsatz.
+    // der Purge-Lauf löscht nach sieben Tagen. Mit dem Einsatz gehen die Zeilen über seinen
+    // Inhalt; ein schon geschriebenes Ende bleibt bis zum Purge (Trigger `einsatz_ereignis_d`).
     TabellenRegel {
         tabelle: "maschine_ereignis",
         scoping: Scoping::EinsatzId,

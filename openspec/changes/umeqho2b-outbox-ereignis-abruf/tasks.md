@@ -62,7 +62,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
 
 ## 3. Trigger (nach LLH-1638)
 
-- [ ] 3.1 `git fetch origin alpha` und `origin/alpha` in den Branch mergen (LLH-1638 liegt
+- [x] 3.1 `git fetch origin alpha` und `origin/alpha` in den Branch mergen (LLH-1638 liegt
   darauf); das erzeugte `docs/api/public-v1.json` neu erzeugen statt zusammenführen. Am gemergten
   Stand design.md D1 prüfen:
   - Tabelle `maschinenzugang_freigabe` mit den Spalten aus D1;
@@ -167,11 +167,13 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   drei Regeln aus D14; Wurzel-`AGENTS.md` nur, wenn die Inhaltsangabe der Tabelle es braucht.
   Verifizieren: Die Wurzeldatei bleibt unter 200 Zeilen; Prettier und die Gates der
   Arbeitsanleitungen sind grün.
-- [ ] 5.3 Architektur: Kapitel 6 (Ablauf vom Schreiben bis zum Abruf als Mermaid), Kapitel 8
+- [x] 5.3 Architektur: Kapitel 6 (Ablauf vom Schreiben bis zum Abruf als Mermaid), Kapitel 8
   (Konzept mit Verweis auf Spec `ereignis-abruf` und die ADR), Kapitel 11 (Sicherung und Cursor,
   Liste der Lage-Tabellen), Kapitel 5, falls der Wächter es verlangt. Verifizieren:
   `scripts/check-architektur.sh` ist grün.
-- [x] 5.4 `docs/api/ereignisse.md` (neu): Schleife des Abrufs mit Beispiel, Neuaufbau nach 410,
+- [x] 5.4 Abschnitte „Einsätze lesen“ und „Ereignisse abrufen“ in `docs/api/maschinenzugang.md`
+  (statt einer eigenen Datei `docs/api/ereignisse.md`, wie dort „Lage lesen“ und der Rechner):
+  Schleife des Abrufs mit Beispiel, Neuaufbau nach 410,
   Bedeutung der vier Arten, Empfehlungen aus den Risiken (Einsatzliste regelmäßig neu lesen,
   nach `lage.changed` nicht öfter als alle paar Sekunden nachlesen, unbekannte Arten
   überspringen). `docs/api/maschinenzugang.md`: Scope-Tabelle mit den Pfaden und Verweis.
@@ -194,6 +196,21 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   `einsaetze:read` anlegen und einlösen, Einsatz freigeben, Kopf ändern, abschließen; dazwischen
   `GET /api/v1/events` mit `wait=25`. Verifizieren: Die Ereignisse kommen in Reihenfolge, die
   Antworten stehen im PR; ändert 4.1 das Paneel sichtbar, kommt davon ein Bild dazu.
+
+## 7. Befunde aus dem Review vor dem PR
+
+- [x] 7.1 Ein schon geschriebenes `einsatz.closed` übersteht das Löschen des Einsatzes;
+  `einsatz.updated` und `lage.changed` nur an gültige Zugänge; Trigger an `einsatz_spiegel`;
+  Abruf aus einem Schnappschuss; Leserouten nennen ihren Scope im Dokument. Verifizieren: je ein
+  Test, der ohne die Behebung rot wird (`tests/public_api_ereignis_trigger.rs`,
+  `tests/public_api_events.rs`, `tests/public_api_lage.rs`); `d6eb13bf`, `803ee914`.
+- [x] 7.2 Jede Änderung der Lese-Scopes mit Einsatzbezug beendet die Freigabe (D16, Entscheidung
+  Ruben 13.11.2026), Delta-Spec `maschinenzugang`. Verifizieren:
+  `tests/public_api_einsaetze.rs` (Hinzufügen, eines von zweien entziehen, Recht ohne Bezug),
+  `cargo test --test einsatz_anbindungen` grün.
+- [x] 7.3 Doku nachgezogen: Neuaufbau ohne `einsaetze:read`, kein `einsatz.closed` beim Entzug,
+  `letzter_abgleich_at`, globaler Cursor als Risiko (R40, Entscheidung Ruben). Verifizieren:
+  `scripts/check-architektur.sh` und der Wächter der Anwenderdoku grün.
 
 ## Workflow follow-up
 

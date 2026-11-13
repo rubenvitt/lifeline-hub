@@ -158,8 +158,9 @@ hat, und höchstens einen. Ohne Freigabe geht nichts hinaus, auch kein Ereignis.
 Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“,
 solange die Anbindung weder widerrufen noch abgelaufen ist. Die
 Freigabe endet mit dem Abschluss des Einsatzes, mit dem Widerruf oder Ablauf der Anbindung und
-wenn ihr das letzte dieser beiden Rechte genommen wird; bekommt sie eines wieder oder wird ein
-verstrichenes „Gültig bis“ verlängert, braucht es eine neue Freigabe.
+mit jeder Änderung an diesen beiden Rechten, wenn eines dazukommt wie wenn eines wegfällt. Die
+Einsatzleitung hat für einen bestimmten Umfang freigegeben und entscheidet über einen anderen neu.
+Auch ein verlängertes „Gültig bis“ braucht eine neue Freigabe.
 Abläufe und Inhalt des Lagebilds: [Externe Lagemonitore](externe-lagemonitore.md).
 
 ### Warum ein Fremdsystem nicht hereinkommt

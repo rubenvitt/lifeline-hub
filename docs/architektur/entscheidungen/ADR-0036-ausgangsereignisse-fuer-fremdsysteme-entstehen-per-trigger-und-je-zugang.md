@@ -21,10 +21,13 @@ herleitung:
 - MUST NOT: Ein Schreibweg in Rust fügt in `maschine_ereignis` ein. Rust liest (Abruf
   `GET /api/v1/events`) und löscht (Purge).
 - MUST: Eine Zeile gehört genau einem Zugang. Geschrieben wird je Zeile in
-  `maschinenzugang_freigabe` zum betroffenen Einsatz; der Abruf liest nur Zeilen des eigenen
-  Zugangs.
+  `maschinenzugang_freigabe` zum betroffenen Einsatz, Änderungen (`einsatz.updated`,
+  `lage.changed`) nur für gültige Zugänge (nicht widerrufen, „gültig bis“ nicht verstrichen), das
+  Ende für jeden Zugang mit Freigabe. Der Abruf liest nur Zeilen des eigenen Zugangs.
 - MUST: Ein Ereignis trägt nur Art, Zeitpunkt und Einsatz-ID. Den Inhalt liest das Fremdsystem
   über die Leserouten nach.
+- MUST: Ein geschriebenes `einsatz.closed` bleibt bis zum Purge, auch wenn der Einsatz gelöscht
+  wird; mit dem Einsatz gehen nur die Zeilen über seinen Inhalt.
 - MUST: Von `lage.changed` liegt je Zugang und Einsatz höchstens eine Zeile vor; eine neue
   ersetzt die alte und trägt eine höhere Nummer.
 - MUST: Die Kopfspalten (`public_api::einsaetze::KOPF_SPALTEN`) und die Lage-Tabellen
@@ -61,4 +64,6 @@ deshalb `einsatz.closed`, und eine später erteilte Freigabe meldete sich nicht.
 Kein Schreibweg kann ein Ereignis vergessen, auch der Spiegel am Hub nicht. Der Abruf liest ohne
 Join, und Webhooks (LLH-1656) lesen je Abo dieselben Zeilen. Der Preis: Die Logik steht in SQL,
 eine Änderung braucht eine Migration, und jede Schreibzeile an einer Lage-Tabelle eines
-freigegebenen Einsatzes kostet rund 0,2 ms mehr (gemessen in LLH-1655).
+freigegebenen Einsatzes kostet rund 0,2 ms mehr (gemessen in LLH-1655). Der Cursor ist eine
+Nummer über alle Zugänge; an seiner Differenz sieht ein Zugang, wie viel anderswo geschieht,
+nicht was (hingenommen, Kapitel 11, R40).

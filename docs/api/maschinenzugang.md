@@ -313,7 +313,9 @@ den Stand neu aufbauen (Schritt 1 der Schleife).
    offen und antwortet, sobald ein Ereignis vorliegt (binnen etwa einer Sekunde).
 3. Die Ereignisse verarbeiten, den neuen `cursor` merken, weiter bei 2. Auch eine leere Antwort
    nennt einen neuen `cursor`; ihn merken, sonst altert der eigene.
-4. Bei `410 cursor_expired` und nach `403 missing_scope` wieder bei 1 beginnen.
+4. Bei `410 cursor_expired` wieder bei 1 beginnen. Ein `403 missing_scope` heißt: dem Zugang
+   wurde ein Recht genommen. An einer Leseroute bei 1 beginnen, mit den Rechten, die er noch hat;
+   am Abruf selbst (`events:read` fehlt) aufhören und den Betreiber fragen, statt zu wiederholen.
 
 **Zu beachten:**
 
@@ -322,8 +324,10 @@ den Stand neu aufbauen (Schritt 1 der Schleife).
 - **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das
   alte und trägt eine höhere `id`. In einem lebhaften Einsatz kommt es oft. Die Lage danach
   höchstens alle paar Sekunden neu lesen, sonst läuft der Zugang in seine Drosselung (60 je
-  Minute, `429` mit `Retry-After`). Das Ereignis meldet eher zu oft als zu selten; eine Änderung
-  an Stammdaten, die in die Stärke einfließt, meldet es nicht.
+  Minute, `429` mit `Retry-After`). Das Ereignis meldet eher zu oft als zu selten. Zwei Dinge
+  meldet es nicht: eine Änderung an Stammdaten, die in die Stärke einfließt, und den bloßen Takt
+  des Abgleichs an einem Spiegel (`letzter_abgleich_at`); wer diese Zeit anzeigt, liest die Lage
+  eines Spiegels zusätzlich in festem Abstand, etwa jede Minute. Das Ende des Abgleichs meldet es.
 - **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich weiter
   abrufen.
 - **Warteplätze:** Es warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber
@@ -332,8 +336,11 @@ den Stand neu aufbauen (Schritt 1 der Schleife).
 - **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`,
   ebenso ein Cursor, den der Server nicht kennt (etwa nach dem Zurückspielen einer Sicherung).
 - **Sicherung:** Nach dem Zurückspielen einer Sicherung kann ein gemerkter Cursor wieder gültig
-  aussehen, obwohl der Stand am Server ein anderer ist. `GET /api/v1/einsaetze` deshalb regelmäßig
-  neu lesen, etwa stündlich.
+  aussehen, obwohl der Stand am Server ein anderer ist. Den Stand deshalb regelmäßig neu aufbauen
+  (Schritt 1), etwa stündlich.
+- **Freigabe und Rechte:** Jede Änderung an „Lage lesen“ oder „Einsätze lesen“ beendet die
+  Freigabe; das Fremdsystem sieht `einsatz.closed` (sofern es `einsaetze:read` noch hat) und nach
+  der neuen Freigabe der Einsatzleitung `einsatz.created`.
 - **Unbekannte Arten** überspringen; neue kommen nur hinzu.
 - **Abfragewerte:** `after` ist eine ganze Zahl ab 0, `wait` eine von 0 bis 25. Anderes ergibt
   `400 invalid_field`. Die Abfrage gehört zum signierten Pfad (`htu`).

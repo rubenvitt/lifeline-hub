@@ -544,16 +544,20 @@ sequenceDiagram
 - Die Zeile entsteht im Trigger, in der Transaktion der Änderung
   (`migrations/0344_maschine_ereignis_trigger.sql`); ein Rollback nimmt sie mit. Kein Rust-Code
   schreibt in die Outbox.
-- Geschrieben wird je Freigabe (`maschinenzugang_freigabe`): Beginn der Freigabe ist
-  `einsatz.created`, ihr Ende oder der Abschluss `einsatz.closed`. `lage.changed` hängt am
-  Änderungslog `einsatz_aenderung` und liegt je Zugang und Einsatz höchstens einmal vor.
+- Geschrieben wird je Freigabe (`maschinenzugang_freigabe`), Änderungen nur für gültige
+  Zugänge: Beginn der Freigabe ist `einsatz.created`, ihr Ende oder der Abschluss
+  `einsatz.closed`. `lage.changed` hängt am Änderungslog `einsatz_aenderung` und an
+  `einsatz_spiegel` (Ende des Abgleichs, Freigabestufe) und liegt je Zugang und Einsatz höchstens
+  einmal vor. Jede Änderung der Rechte mit Einsatzbezug beendet die Freigabe.
 - Der Abruf wird nicht geweckt: Er fragt im Takt nach (`events::TAKT`) und hält dazwischen keine
   Verbindung. Es warten höchstens `events::MAX_WARTENDE` Abrufe, je Zugang einer; ein weiterer
   antwortet sofort mit `Retry-After`.
 - Der Cursor ist die fortlaufende Nummer. Der Purge-Lauf löscht nach sieben Tagen
   (`events::purge` in `src/einsatz/purge_scheduler.rs`) und hält die Löschgrenze in
   `maschine_ereignis_stand`; ein Cursor darunter ergibt `410 cursor_expired`, und das Fremdsystem
-  baut über `GET /api/v1/einsaetze` neu auf.
+  baut neu auf: mit `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über
+  `GET /api/v1/events` ohne `after` und `GET /api/v1/lage`. Stand und Zeilen liest der Abruf aus
+  einem Schnappschuss, damit ein Purge dazwischen keine Lücke ohne `410` lässt.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

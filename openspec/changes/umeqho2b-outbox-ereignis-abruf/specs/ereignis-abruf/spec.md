@@ -105,9 +105,13 @@ MUST genau ein `einsatz.closed` entstehen.
 - **WHEN** die Einsatzleitung die Freigabe eines laufenden Einsatzes für einen Zugang zurücknimmt
 - **THEN** liefert der nächste Abruf dieses Zugangs ein `einsatz.closed`, und andere Zugänge mit Freigabe bekommen keines
 
+#### Scenario: Abgeschlossen und gelöscht, bevor der Zugang abruft
+- **WHEN** ein freigegebener Einsatz abgeschlossen und gelöscht wird, während der Zugang nicht abruft
+- **THEN** liefert der nächste Abruf des Zugangs das `einsatz.closed` aus dem Abschluss
+
 #### Scenario: Laufender Einsatz wird gelöscht
 - **WHEN** ein freigegebener laufender Einsatz gelöscht wird, etwa beim Entfernen der Demo-Daten
-- **THEN** liefert der nächste Abruf des Zugangs ein `einsatz.closed` für diesen Einsatz und kein früheres Ereignis mehr zu ihm
+- **THEN** liefert der nächste Abruf des Zugangs ein `einsatz.closed` für diesen Einsatz und kein früheres Ereignis über seinen Inhalt (`einsatz.created`, `einsatz.updated`)
 
 ### Requirement: Eine geänderte Lage meldet lage.changed verdichtet
 
