@@ -1,5 +1,5 @@
 ---
-id: ADR-0039
+id: ADR-0040
 titel: Unterkunft rechnen zwei Kerne nach einer Fallsammlung, Einsatz-Werte nur über die Freigabe
 status: akzeptiert
 datum: 2026-11-13
@@ -17,7 +17,7 @@ herleitung:
   - LLH-1856 (mit Ruben am 13.11.2026 abgestimmt)
 ---
 
-# ADR-0039: Unterkunft rechnen zwei Kerne nach einer Fallsammlung, Einsatz-Werte nur über die Freigabe
+# ADR-0040: Unterkunft rechnen zwei Kerne nach einer Fallsammlung, Einsatz-Werte nur über die Freigabe
 
 ## Regeln
 

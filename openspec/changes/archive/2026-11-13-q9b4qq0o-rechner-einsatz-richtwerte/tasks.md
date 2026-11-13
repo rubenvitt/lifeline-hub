@@ -63,7 +63,7 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst der rote Te
   statt „ohne Einsatz“) und `docs/architektur/05-bausteinsicht.md` (`src/public_api`, Rechner)
   nach `docs/architektur/AGENTS.md`. Prüfen: Prettier grün, `scripts/check-architektur.sh` grün.
 
-- [x] 5.4 ADR-0039 ersetzt ADR-0032 (design.md D6): übrige Regeln unverändert, Einsatz-Werte nur
+- [x] 5.4 ADR-0040 ersetzt ADR-0032 (design.md D6): übrige Regeln unverändert, Einsatz-Werte nur
   über `freigabe::is_lesbar`, Rangfolge aus `unterkunft::zusammenfuehren`; ADR-0032 auf
   `ersetzt`. Prüfen: `scripts/check-architektur.sh` und `scripts/check-adr-nummern.sh` grün.
 
