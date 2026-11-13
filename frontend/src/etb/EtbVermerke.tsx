@@ -156,7 +156,9 @@ export function EtbVermerkSpalte({
           aria-label={
             aufgeklappt
               ? 'Vermerke zuklappen'
-              : `${verborgen} weitere ${verborgen === 1 ? 'Vermerk' : 'Vermerke'} zeigen`
+              : verborgen === 1
+                ? '1 weiterer Vermerk zeigen'
+                : `${verborgen} weitere Vermerke zeigen`
           }
           onClick={() => onAufklappen(!aufgeklappt)}
           style={{ minHeight: token.controlHeight, marginBlock: -ueberstand }}

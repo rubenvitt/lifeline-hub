@@ -457,7 +457,7 @@ describe('Lange Einträge eingeklappt', () => {
     (_, i) => `## Abschnitt ${i + 1}\n\nLage ruhig.`,
   ).join('\n\n');
   beforeEach(() => {
-    // Der Lagebericht belegt 16 Zeilen à 20 px, alles andere eine.
+    // Der Lagebericht belegt 16 Zeilen à 20 px, alles andere eine; die Klemme zeigt drei.
     Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
       configurable: true,
       get(this: HTMLElement) {
@@ -465,9 +465,17 @@ describe('Lange Einträge eingeklappt', () => {
         return this.textContent?.includes('Abschnitt 8') ? 320 : 20;
       },
     });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        if (this.getAttribute('data-lfh') !== 'etb-inhalt') return 0;
+        return this.classList.contains('etb-inhalt--zu') ? 60 : this.scrollHeight;
+      },
+    });
   });
   afterEach(() => {
     delete (HTMLElement.prototype as { scrollHeight?: number }).scrollHeight;
+    delete (HTMLElement.prototype as { clientHeight?: number }).clientHeight;
   });
 
   it('Lagebericht im Strom: höchstens drei Zeilen mit „mehr“, „mehr“ zeigt ihn ganz, „weniger“ klappt zu', async () => {

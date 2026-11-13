@@ -58,6 +58,16 @@
   max-height: 3lh;
 }
 
+/* Zugeklappt ohne Absatz- und Überschriftenränder und mit der Zeilenhöhe der Hülle: sonst
+   schnitte die dritte Zeile mitten durch die Schrift (Abschnitte eines Lageberichts). Nur am
+   Schirm: im Druck klappt nichts ein. */
+@media screen {
+  .etb-inhalt.etb-inhalt--zu .markdown * {
+    margin-block: 0;
+    line-height: inherit;
+  }
+}
+
 .etb-inhalt-umschalter,
 .etb-vermerk-mehr {
   display: inline-flex;

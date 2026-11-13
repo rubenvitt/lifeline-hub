@@ -15,10 +15,12 @@ import { useRollen } from '../components/instrument';
  * ein Inhalt, der mehr als {@link EINGEKLAPPT_ZEILEN} Zeilen belegen würde (ein Lagebericht mit
  * acht Abschnitten), steht auf drei Zeilen mit „mehr“; „weniger“ klappt ihn wieder zu.
  *
- * Gemessen wird, nicht geschätzt: die Höhe des Inhalts gegen drei Zeilenhöhen der Hülle, nach
- * jedem Umbruch neu (`ResizeObserver`). So zählt die Breite der Spalte, nicht die Zeichenzahl.
- * Zugeklappt schneidet CSS (`etb-inhalt--zu`, `-webkit-line-clamp`) — der Text bleibt ganz im
- * DOM: Suche im Browser, Vorleser und Markieren sehen ihn.
+ * Gemessen wird, nicht geschätzt: jeder Inhalt steht unter der Klemme (`etb-inhalt--zu`,
+ * `-webkit-line-clamp: 3`, ohne Absatzränder), und lang ist, was darunter herausragt
+ * (`scrollHeight > clientHeight`), nach jedem Umbruch neu (`ResizeObserver`). So zählt die Breite
+ * der Spalte, nicht die Zeichenzahl, und das Messen kippt nicht: ohne Klemme (aufgeklappt) wird
+ * nicht gemessen, der Befund bleibt stehen. Der Text bleibt ganz im DOM: Suche im Browser,
+ * Vorleser und Markieren sehen ihn.
  *
  * Aufgeklappt steht er bei einem Sprung (`?eintrag=`) und unter einer Volltextsuche mit Treffer
  * im Inhalt (`offenErzwungen`); dann bietet die Zeile kein „weniger“ an. Im Druck klappt nichts
@@ -28,7 +30,9 @@ export const EINGEKLAPPT_ZEILEN = 3;
 
 export interface Einklappen {
   ref: RefObject<HTMLDivElement | null>;
-  /** Steht der Inhalt gerade gekürzt da? */
+  /** Steht der Inhalt unter der Klemme (höchstens drei Zeilen)? */
+  klemme: boolean;
+  /** Steht der Inhalt gerade gekürzt da (Klemme und lang)? */
   zu: boolean;
   /** Belegt der Inhalt mehr als drei Zeilen (und ist nicht erzwungen offen)? Dann gibt es den Knopf. */
   lang: boolean;
@@ -37,11 +41,9 @@ export interface Einklappen {
   id: string;
 }
 
-/** Ragt der Inhalt über drei Zeilen der Hülle? `scrollHeight` gilt zu- wie aufgeklappt. */
+/** Ragt der Inhalt unter der Klemme heraus? Ohne Layout (0 und 0) nie. */
 function istLang(el: HTMLElement): boolean {
-  const zeile = Number.parseFloat(getComputedStyle(el).lineHeight);
-  if (!Number.isFinite(zeile) || zeile <= 0) return false;
-  return el.scrollHeight > zeile * EINGEKLAPPT_ZEILEN + 1;
+  return el.scrollHeight > el.clientHeight + 1;
 }
 
 export function useEinklappen(offenErzwungen: boolean): Einklappen {
@@ -49,19 +51,21 @@ export function useEinklappen(offenErzwungen: boolean): Einklappen {
   const id = useId();
   const [lang, setLang] = useState(false);
   const [offen, setOffen] = useState(false);
+  const klemme = !offen && !offenErzwungen;
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !klemme) return;
     const messen = () => setLang(istLang(el));
     messen();
     const beobachter = new ResizeObserver(messen);
     beobachter.observe(el);
     return () => beobachter.disconnect();
-  }, []);
+  }, [klemme]);
   const umschalten = useCallback(() => setOffen((o) => !o), []);
   return {
     ref,
-    zu: lang && !offen && !offenErzwungen,
+    klemme,
+    zu: lang && klemme,
     lang: lang && !offenErzwungen,
     umschalten,
     id: `${id}-inhalt`,
@@ -84,7 +88,7 @@ export function EinklappHuelle({
       id={einklappen.id}
       data-lfh="etb-inhalt"
       data-eingeklappt={einklappen.zu || undefined}
-      className={einklappen.zu ? 'etb-inhalt etb-inhalt--zu' : 'etb-inhalt'}
+      className={einklappen.klemme ? 'etb-inhalt etb-inhalt--zu' : 'etb-inhalt'}
       style={style}
     >
       {children}
