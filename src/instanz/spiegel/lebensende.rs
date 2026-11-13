@@ -753,9 +753,13 @@ const GRUND_GEAENDERT: &str = "Nach der Übergabe geändert";
 const GRUND_ABGELEHNT: &str = "Verwahrung hier abgelehnt";
 
 /// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat; Fehler holt Phase R nach.
-pub async fn abraeumen_nach_commit(pool: &sqlx::SqlitePool, ids: &[i64]) {
+pub async fn abraeumen_nach_commit(
+    pool: &sqlx::SqlitePool,
+    live: Option<&crate::live::LiveHub>,
+    ids: &[i64],
+) {
     for id in ids {
-        if let Err(e) = abraeumen::ausfuehren(pool, *id).await {
+        if let Err(e) = abraeumen::ausfuehren(pool, live, *id).await {
             tracing::warn!(
                 einsatz_id = id,
                 "Abgleich: Abräumen gescheitert, Phase R holt nach: {e}"

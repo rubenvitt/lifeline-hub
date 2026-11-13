@@ -74,7 +74,7 @@ async fn ohne_merker_bleibt_alles() {
     let leit = leitung(&pool).await;
     let (id, _) = einsatz(&pool, leit).await;
 
-    assert!(!ausfuehren(&pool, id).await.unwrap());
+    assert!(!ausfuehren(&pool, None, id).await.unwrap());
     assert_eq!(
         zaehle(&pool, "SELECT COUNT(*) FROM einsatz WHERE id = ?", id).await,
         1
@@ -88,7 +88,7 @@ async fn verwahrter_einsatz_geht_samt_dateien_und_sperrt_id_und_nummer() {
     let (id, nummer) = einsatz(&pool, leit).await;
 
     vormerken_pool(&pool, id, AbraeumArt::Verwahrt, Some("Hub Kreis")).await;
-    assert!(ausfuehren(&pool, id).await.unwrap());
+    assert!(ausfuehren(&pool, None, id).await.unwrap());
 
     for sql in [
         "SELECT COUNT(*) FROM einsatz WHERE id = ?",
@@ -124,7 +124,7 @@ async fn verwahrter_einsatz_geht_samt_dateien_und_sperrt_id_und_nummer() {
     assert_ne!(neue_nummer, nummer);
 
     assert!(
-        !ausfuehren(&pool, id).await.unwrap(),
+        !ausfuehren(&pool, None, id).await.unwrap(),
         "zweiter Lauf: nichts"
     );
 }
@@ -144,7 +144,7 @@ async fn abraeumen_vermerkt_das_ende_der_kennung() {
 
     for id in [mit, ohne] {
         vormerken_pool(&pool, id, AbraeumArt::Verwahrt, Some("Hub Kreis")).await;
-        assert!(ausfuehren(&pool, id).await.unwrap());
+        assert!(ausfuehren(&pool, None, id).await.unwrap());
     }
 
     let vermerke: Vec<(String, i64)> =
@@ -171,7 +171,7 @@ async fn ein_abgeraeumter_spiegel_bekommt_vom_abraeumen_keinen_vermerk() {
     crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, id).await;
 
     vormerken_pool(&pool, id, AbraeumArt::Spiegel, Some("Hub Kreis")).await;
-    assert!(ausfuehren(&pool, id).await.unwrap());
+    assert!(ausfuehren(&pool, None, id).await.unwrap());
 
     assert_eq!(
         zaehle(&pool, "SELECT COUNT(*) FROM einsatz WHERE id = ?", id).await,
@@ -198,7 +198,7 @@ async fn spiegel_geht_durch_den_schutz_und_traegt_keine_nummer() {
         .is_err());
 
     vormerken_pool(&pool, id, AbraeumArt::Spiegel, Some("ELW 1")).await;
-    assert!(ausfuehren(&pool, id).await.unwrap());
+    assert!(ausfuehren(&pool, None, id).await.unwrap());
 
     assert_eq!(
         zaehle(&pool, "SELECT COUNT(*) FROM einsatz WHERE id = ?", id).await,
@@ -238,7 +238,7 @@ async fn alle_vorgemerkten_holt_nach() {
     let (b, _) = einsatz(&pool, leit).await;
     vormerken_pool(&pool, a, AbraeumArt::Verwahrt, Some("Hub")).await;
 
-    assert_eq!(alle_vorgemerkten(&pool).await, 1);
+    assert_eq!(alle_vorgemerkten(&pool, &LiveHub::new()).await, 1);
     assert_eq!(
         zaehle(&pool, "SELECT COUNT(*) FROM einsatz WHERE id = ?", b).await,
         1
@@ -327,7 +327,7 @@ async fn phase_r_raeumt_spiegel_der_meldenden_seite_nach_der_nachbereitung_ab() 
         .await
         .unwrap();
 
-    assert_eq!(phase_r(&pool, JETZT).await, 1);
+    assert_eq!(phase_r(&pool, &LiveHub::new(), JETZT).await, 1);
     assert!(!gibt_es(&pool, abgelaufen).await);
     for (id, was) in [
         (laeuft, "Nachbereitung läuft"),
@@ -349,7 +349,7 @@ async fn phase_r_raeumt_spiegel_der_meldenden_seite_nach_der_nachbereitung_ab() 
         (art.as_str(), gegenstelle.as_deref()),
         ("spiegel", Some("Gegenstelle"))
     );
-    assert_eq!(phase_r(&pool, JETZT).await, 0, "zweiter Lauf: nichts");
+    assert_eq!(phase_r(&pool, &LiveHub::new(), JETZT).await, 0, "zweiter Lauf: nichts");
 }
 
 #[tokio::test]
@@ -359,7 +359,7 @@ async fn phase_r_laesst_spiegel_am_hub_stehen() {
     kopplung(&pool, "wird_gemeldet").await;
     let id = spiegel(&pool, leit, Some("2026-11-01 00:00:00")).await;
 
-    assert_eq!(phase_r(&pool, JETZT).await, 0);
+    assert_eq!(phase_r(&pool, &LiveHub::new(), JETZT).await, 0);
     assert!(gibt_es(&pool, id).await);
 }
 
@@ -388,6 +388,96 @@ async fn widerruf_zwischen_auswahl_und_vormerken_laesst_den_spiegel_stehen() {
         .await,
         0
     );
-    assert_eq!(alle_vorgemerkten(&pool).await, 0);
+    assert_eq!(alle_vorgemerkten(&pool, &LiveHub::new()).await, 0);
     assert!(gibt_es(&pool, id).await);
+}
+
+// ---------- LLH-1713: Abräumen meldet live ----------
+
+use crate::live::org::{OrgEmpfaenger, OrgLiveEvent};
+use crate::live::{LiveEvent, LiveHub};
+
+/// Was ein Abonnent des Einsatzes und einer des Org-Kanals bis jetzt bekommen haben.
+fn empfangen(
+    einsatz: &mut tokio::sync::broadcast::Receiver<crate::live::LiveNachricht>,
+    org: &mut tokio::sync::broadcast::Receiver<crate::live::org::OrgNachricht>,
+) -> (Vec<LiveEvent>, Vec<crate::live::org::OrgNachricht>) {
+    let mut e = Vec::new();
+    while let Ok(n) = einsatz.try_recv() {
+        e.push(n.event);
+    }
+    let mut o = Vec::new();
+    while let Ok(n) = org.try_recv() {
+        o.push(n);
+    }
+    (e, o)
+}
+
+/// Ein abgeräumter Einsatz verschwindet aus offenen Listen und Einsatzseiten ohne Neuladen: die
+/// Seite bekommt `einsatz` (Kopf holen, am 404 räumen), die Liste `einsatzliste` an die Leser,
+/// die VOR dem `DELETE` Mitglied waren (danach sind die Mitgliedschaften fort).
+#[tokio::test]
+async fn abraeumen_meldet_einsatz_und_liste_an_die_leser_von_vorher() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let (id, _) = einsatz(&pool, leit).await;
+    vormerken_pool(&pool, id, AbraeumArt::Verwahrt, Some("Hub Kreis")).await;
+    let live = LiveHub::new();
+    let mut rx = live.abonniere(id);
+    let mut org = live.abonniere_org();
+
+    assert!(ausfuehren(&pool, Some(&live), id).await.unwrap());
+
+    let (einsatz_ev, org_ev) = empfangen(&mut rx, &mut org);
+    assert!(einsatz_ev.contains(&LiveEvent::Einsatz), "{einsatz_ev:?}");
+    let liste: Vec<_> = org_ev
+        .iter()
+        .filter(|n| n.event == OrgLiveEvent::Einsatzliste)
+        .collect();
+    assert_eq!(liste.len(), 1, "{org_ev:?}");
+    assert_eq!(liste[0].org_id, 1);
+    match &liste[0].empfaenger {
+        OrgEmpfaenger::Einsatzleser { benutzer_ids } => {
+            assert!(benutzer_ids.contains(&leit), "{benutzer_ids:?}")
+        }
+        anders => panic!("falscher Empfänger: {anders:?}"),
+    }
+}
+
+/// Ohne Merker wird nichts gelöscht und nichts gemeldet.
+#[tokio::test]
+async fn ohne_merker_meldet_nichts() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let (id, _) = einsatz(&pool, leit).await;
+    let live = LiveHub::new();
+    let mut rx = live.abonniere(id);
+    let mut org = live.abonniere_org();
+
+    assert!(!ausfuehren(&pool, Some(&live), id).await.unwrap());
+
+    let (einsatz_ev, org_ev) = empfangen(&mut rx, &mut org);
+    assert!(einsatz_ev.is_empty(), "{einsatz_ev:?}");
+    assert!(org_ev.is_empty(), "{org_ev:?}");
+}
+
+/// Phase R des Purge-Laufs meldet mit dem Hub des Laufs (Akzeptanz LLH-1713).
+#[tokio::test]
+async fn phase_r_meldet_den_abgeraeumten_spiegel() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    kopplung(&pool, "meldet_sich").await;
+    let id = spiegel(&pool, leit, Some("2026-11-01 00:00:00")).await;
+    let live = LiveHub::new();
+    let mut rx = live.abonniere(id);
+    let mut org = live.abonniere_org();
+
+    assert_eq!(phase_r(&pool, &live, JETZT).await, 1);
+
+    let (einsatz_ev, org_ev) = empfangen(&mut rx, &mut org);
+    assert!(einsatz_ev.contains(&LiveEvent::Einsatz), "{einsatz_ev:?}");
+    assert!(
+        org_ev.iter().any(|n| n.event == OrgLiveEvent::Einsatzliste),
+        "{org_ev:?}"
+    );
 }

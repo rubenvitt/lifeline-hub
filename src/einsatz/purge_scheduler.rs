@@ -370,7 +370,7 @@ pub async fn tick_mit_rueckschrieb(
     // Eingespielte Archive gehen nach ihrer Zeit denselben Weg (D10), ihre Platzhalter-Konten
     // danach.
     super::archiv::einspielen::faellige_vormerken(pool, &jetzt_s).await;
-    anzahl += super::abraeumen::phase_r(pool, &jetzt_s).await;
+    anzahl += super::abraeumen::phase_r(pool, live, &jetzt_s).await;
     super::archiv::einspielen::konten_aufraeumen(pool).await;
 
     // --- Phase D: endgültige Löschung geschwärzter Skelette (UNUMKEHRBAR, LFH-750) ---

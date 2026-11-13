@@ -18,6 +18,7 @@
 //! nicht abbrechen (der Merker gehört nach ADR-0018 dem Spiegel-Modul).
 
 use crate::error::AppError;
+use crate::live::LiveHub;
 use crate::wire_enum::wire_enum;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -118,7 +119,7 @@ async fn spiegel_vormerken(
 /// Phase R des Purge-Laufs: merkt fällige Spiegel der meldenden Seite vor (D5) und räumt jeden
 /// vorgemerkten Einsatz ab, auch einen, dessen Abräumen nach der Quittung scheiterte. Liefert
 /// die Zahl abgeräumter Einsätze.
-pub async fn phase_r(pool: &SqlitePool, jetzt: &str) -> usize {
+pub async fn phase_r(pool: &SqlitePool, live: &LiveHub, jetzt: &str) -> usize {
     match faellige_spiegel(pool, jetzt).await {
         Ok(faellig) => {
             for (id, _) in faellig {
@@ -141,7 +142,7 @@ pub async fn phase_r(pool: &SqlitePool, jetzt: &str) -> usize {
         }
         Err(e) => tracing::warn!("Purge Phase R: Abfrage fehlgeschlagen: {e}"),
     }
-    alle_vorgemerkten(pool).await
+    alle_vorgemerkten(pool, live).await
 }
 
 /// Löscht die Datei-Inhalte eines vorgemerkten Einsatzes einzeln, je Zeile eine Transaktion
@@ -175,7 +176,11 @@ async fn dateien_einzeln(pool: &SqlitePool, einsatz_id: i64) -> Result<(), AppEr
 /// Die Protokollzeile (D7) übernimmt nur Retain-Spalten des Kopfes. `verwahrt` trägt die Nummer
 /// (sie bleibt gesperrt) und, soweit auffindbar, den Akteur aus der Kette des Purge-Audits;
 /// `spiegel` trägt keine Nummer, die gehört dem Führer. Beide sperren die ID.
-pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError> {
+pub async fn ausfuehren(
+    pool: &SqlitePool,
+    live: Option<&LiveHub>,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
     let gesetzt: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz_abraeumen WHERE einsatz_id = ?)")
             .bind(einsatz_id)
@@ -255,7 +260,7 @@ pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppE
 
 /// [`ausfuehren`] für jeden vorgemerkten Einsatz, Fehler nur geloggt (der nächste Lauf holt nach).
 /// Liefert die Zahl abgeräumter Einsätze.
-pub async fn alle_vorgemerkten(pool: &SqlitePool) -> usize {
+pub async fn alle_vorgemerkten(pool: &SqlitePool, live: &LiveHub) -> usize {
     let ids = match vorgemerkte(pool).await {
         Ok(ids) => ids,
         Err(e) => {
@@ -265,7 +270,7 @@ pub async fn alle_vorgemerkten(pool: &SqlitePool) -> usize {
     };
     let mut n = 0;
     for id in ids {
-        match ausfuehren(pool, id).await {
+        match ausfuehren(pool, Some(live), id).await {
             Ok(true) => n += 1,
             Ok(false) => {}
             Err(e) => tracing::warn!(einsatz_id = id, "Abräumen gescheitert: {e}"),

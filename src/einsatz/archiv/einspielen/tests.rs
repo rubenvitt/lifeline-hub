@@ -341,7 +341,7 @@ async fn eingespielt_schreibgeschuetzt_mit_platzhaltern_und_nach_7_tagen_weg() {
     assert_eq!(faellige_vormerken(&pool, &bald).await, 0);
     let spaeter = crate::zeit::formatiere_utc(jetzt + TimeDelta::days(7));
     assert_eq!(faellige_vormerken(&pool, &spaeter).await, 1);
-    assert_eq!(abraeumen::phase_r(&pool, &spaeter).await, 1);
+    assert_eq!(abraeumen::phase_r(&pool, &crate::live::LiveHub::new(), &spaeter).await, 1);
     assert_eq!(konten_aufraeumen(&pool).await, 1);
     let rest: i64 = eine(
         &pool,
@@ -645,7 +645,7 @@ async fn ein_loeschersuchen_nimmt_die_eingespielte_kopie_mit() {
     .unwrap()
     .flatten();
     assert_eq!(vorgemerkt.as_deref(), Some(GEGENSTELLE));
-    abraeumen::alle_vorgemerkten(&pool).await;
+    abraeumen::alle_vorgemerkten(&pool, &crate::live::LiveHub::new()).await;
     assert_eq!(
         eine::<i64>(
             &pool,
