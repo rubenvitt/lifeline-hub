@@ -39,6 +39,7 @@ import {
   anbindungPath,
   einsatzAnzeige,
   uebernimmAnbindung,
+  webhookZustandAnzeige,
   zustandAnzeige,
 } from './anbindungAnzeige';
 
@@ -273,6 +274,16 @@ export default function Anbindungen() {
                                 ` · widerrufen ${zeit(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
                             </span>
                             {einsatz && <span data-lfh="anbindung-einsatz">{einsatz}</span>}
+                            {z.webhook &&
+                              (z.webhook.zustand === 'angehalten' ||
+                                z.webhook.zustand === 'fehler') && (
+                                <span data-lfh="anbindung-webhook">
+                                  <StatusChip
+                                    ton={webhookZustandAnzeige(z.webhook).ton}
+                                    wort={webhookZustandAnzeige(z.webhook).wort}
+                                  />
+                                </span>
+                              )}
                             {z.letzte_ablehnung && !widerrufenAm && (
                               <span
                                 data-lfh="anbindung-ablehnung"

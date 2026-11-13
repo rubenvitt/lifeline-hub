@@ -1134,5 +1134,41 @@ mod tests {
             sign(&instanz, MACHINE.typ_antwort, &claims),
             r["jws"].as_str().unwrap()
         );
+
+        // Webhook-Zustellung (LLH-1656): der Server signiert byte-gleich, und seine Prüfung sieht
+        // jeden Fall wie der Client.
+        let w = &v["webhooks"];
+        let body = w["body"].as_str().unwrap();
+        assert_eq!(
+            sign_webhook(
+                &instanz,
+                w["webhook_id"].as_str().unwrap(),
+                body.as_bytes(),
+                w["iat"].as_i64().unwrap(),
+                w["jti"].as_str().unwrap(),
+            ),
+            w["jws"].as_str().unwrap()
+        );
+        assert_eq!(w["header"].as_str().unwrap(), EVENT_KOPF);
+        let instanz_pk = pk(&instanz);
+        for f in w["faelle"].as_array().unwrap() {
+            let ergebnis = verify_webhook(
+                f["jws"].as_str().unwrap(),
+                &instanz_pk,
+                f["webhook_id"].as_str().unwrap(),
+                f["body"].as_str().unwrap().as_bytes(),
+                f["now"].as_i64().unwrap(),
+            );
+            let erwartet = match f["fehler"].as_str() {
+                None => None,
+                Some("Signatur") => Some(SignaturError::Signatur),
+                Some("Body") => Some(SignaturError::Body),
+                Some("Ziel") => Some(SignaturError::Ziel),
+                Some("Zeit") => Some(SignaturError::Zeit),
+                Some("Typ") => Some(SignaturError::Algorithmus),
+                Some(anders) => panic!("unbekannter Fehler im Vektor: {anders}"),
+            };
+            assert_eq!(ergebnis.err(), erwartet, "{f}");
+        }
     }
 }

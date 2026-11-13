@@ -5,7 +5,13 @@ import type {
   AnbindungCode,
   AnbindungenListe,
   AnbindungFreigabe,
+  EventType,
+  RuhtGrund,
   Scope,
+  WebhookAnzeige,
+  WebhookFehler,
+  WebhookTestErgebnis,
+  WebhookVersuch,
 } from './types';
 import { apiGet, apiSend } from './client';
 
@@ -127,3 +133,100 @@ export function ablehnungText(a: Pick<AnbindungAblehnung, 'grund' | 'abweichung_
   }
   return GRUND_TEXT[a.grund] ?? a.grund;
 }
+
+// ---- Webhook einer Anbindung (LLH-1656, Spec `webhook-zustellung`) ----
+
+export interface WebhookEingabe {
+  url: string;
+  arten: EventType[];
+  lan_erlaubt: boolean;
+}
+
+/** Teiländerung; `basis_geaendert_at` ist Pflicht (CAS, 409 bei fremder Änderung). */
+export interface WebhookPatch {
+  url?: string;
+  arten?: EventType[];
+  lan_erlaubt?: boolean;
+  basis_geaendert_at?: string;
+}
+
+const webhookPfad = (id: string) => `/api/admin/anbindungen/${encodeURIComponent(id)}/webhook`;
+
+export function richteWebhookEin(id: string, eingabe: WebhookEingabe): Promise<WebhookAnzeige> {
+  return apiSend<WebhookAnzeige>(webhookPfad(id), 'POST', eingabe);
+}
+
+export function aendereWebhook(id: string, patch: WebhookPatch): Promise<WebhookAnzeige> {
+  return apiSend<WebhookAnzeige>(webhookPfad(id), 'PATCH', patch);
+}
+
+export function entferneWebhook(id: string): Promise<void> {
+  return apiSend<void>(webhookPfad(id), 'DELETE');
+}
+
+export function nimmWebhookWiederAuf(id: string): Promise<WebhookAnzeige> {
+  return apiSend<WebhookAnzeige>(`${webhookPfad(id)}/wieder-aufnehmen`, 'POST');
+}
+
+export function sendeTestereignis(id: string): Promise<WebhookTestErgebnis> {
+  return apiSend<WebhookTestErgebnis>(`${webhookPfad(id)}/test`, 'POST');
+}
+
+export function ladeWebhookVersuche(id: string): Promise<WebhookVersuch[]> {
+  return apiGet<WebhookVersuch[]>(`${webhookPfad(id)}/versuche`);
+}
+
+/**
+ * Klartext der Ereignisarten in der Reihenfolge der Auswahl. Exhaustiv: eine neue Art im Backend
+ * bricht hier den Typecheck.
+ */
+export const ART_TEXT: Record<EventType, string> = {
+  'einsatz.created': 'Einsatz lesbar geworden',
+  'einsatz.updated': 'Einsatzkopf geändert',
+  'einsatz.closed': 'Einsatz nicht mehr lesbar',
+  'lage.changed': 'Lage geändert',
+};
+
+export const ARTEN = Object.keys(ART_TEXT) as EventType[];
+
+/**
+ * Das Recht, das eine Art öffnet (wie `EventType::scope` im Backend); dazu braucht jede Art
+ * „Ereignisse abrufen“.
+ */
+export const ART_RECHT: Record<EventType, Scope> = {
+  'einsatz.created': 'einsaetze:read',
+  'einsatz.updated': 'einsaetze:read',
+  'einsatz.closed': 'einsaetze:read',
+  'lage.changed': 'lage:read',
+};
+
+/** Warum der Zugang die Art nicht zugestellt bekäme; `null`, wenn er sie bekommt. */
+export function artGesperrtGrund(art: EventType, scopes: readonly string[]): string | null {
+  if (!scopes.includes('events:read')) return `braucht „${SCOPE_TEXT['events:read']}“`;
+  const recht = ART_RECHT[art];
+  return scopes.includes(recht) ? null : `braucht „${SCOPE_TEXT[recht]}“`;
+}
+
+const FEHLER_TEXT: Record<WebhookFehler, string> = {
+  status: 'Ziel antwortete mit Fehler',
+  weiterleitung: 'Ziel wollte weiterleiten',
+  zeitueberschreitung: 'Keine Antwort in 15 s',
+  verbindung: 'Keine Verbindung zum Ziel',
+  tls: 'Zertifikat des Ziels nicht anerkannt',
+  ziel_intern: 'Ziel liegt in einem gesperrten Netz',
+  dns: 'Name des Ziels nicht auflösbar',
+  ziel_ungueltig: 'Ziel-URL ungültig',
+};
+
+/** Klartext eines Fehlschlags, mit HTTP-Status, falls das Ziel antwortete. */
+export function webhookFehlerText(art: WebhookFehler, status?: number | null): string {
+  const text = FEHLER_TEXT[art] ?? art;
+  return status != null ? `${text} (${status})` : text;
+}
+
+export const RUHT_TEXT: Record<RuhtGrund, string> = {
+  zugang_wartet: 'Code noch nicht eingelöst',
+  zugang_widerrufen: 'Anbindung widerrufen',
+  zugang_abgelaufen: 'Anbindung abgelaufen',
+  ohne_events_read: `Recht „${SCOPE_TEXT['events:read']}“ fehlt`,
+};

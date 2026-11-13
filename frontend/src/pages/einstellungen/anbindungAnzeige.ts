@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { adminSektionPfad } from '../../admin/adminNav';
 import { globalKeys } from '../../api/queryKeys';
-import type { AnbindungAnzeige, AnbindungenListe } from '../../api/types';
+import type { AnbindungAnzeige, AnbindungenListe, WebhookAnzeige } from '../../api/types';
 
 // Gemeinsames der Anbindungen-Seiten (LLH-1652): Liste und Ansicht eines Zugangs.
 
@@ -63,3 +63,23 @@ export function uebernimmAnbindung(qc: QueryClient, z: AnbindungAnzeige): void {
  * Org-Ereignis (`api/queryKeys.ts`, `NICHT_LIVE_GLOBAL_KEYS`).
  */
 export const ANBINDUNGEN_ABRUF_MS = 30_000;
+
+/**
+ * Wort und Ton des Webhook-Zustands (LLH-1656): „angehalten“ verlangt eine Handlung des Admins,
+ * eine Störung zeigt nur, dass der Lauf es weiter versucht. Rein und exportiert für den Test.
+ */
+export function webhookZustandAnzeige(w: Pick<WebhookAnzeige, 'zustand'>): {
+  wort: string;
+  ton: 'normal' | 'bedien' | 'neutral' | 'achtung';
+} {
+  switch (w.zustand) {
+    case 'angehalten':
+      return { wort: 'Webhook angehalten', ton: 'achtung' };
+    case 'fehler':
+      return { wort: 'Webhook gestört', ton: 'bedien' };
+    case 'ruht':
+      return { wort: 'Webhook ruht', ton: 'neutral' };
+    case 'aktiv':
+      return { wort: 'Webhook stellt zu', ton: 'normal' };
+  }
+}

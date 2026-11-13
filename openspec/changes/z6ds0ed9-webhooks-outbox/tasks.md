@@ -91,29 +91,29 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
 
 ## 6. Oberfläche
 
-- [ ] 6.1 API und Query-Keys in `frontend/src/api/anbindungen.ts` und `queryKeys.ts`; Anzeige der
+- [x] 6.1 API und Query-Keys in `frontend/src/api/anbindungen.ts` und `queryKeys.ts`; Anzeige der
   Zustände in `anbindungAnzeige.ts`. Verifizieren: Vitest für die Zuordnung von Zustand zu Text
   und Ton und für die Auswahl der Arten nach den Rechten.
-- [ ] 6.2 Paneel „Webhook“ in `AnbindungAnsicht.tsx` (D9): Einrichten im `ErfassungsModal`,
+- [x] 6.2 Paneel „Webhook“ in `AnbindungAnsicht.tsx` (D9): Einrichten im `ErfassungsModal`,
   Bearbeiten im `BearbeitbaresPaneel`, Aktionen „Testereignis senden“, „Wieder aufnehmen“,
   „Webhook entfernen“, Hinweise zu Verlust und Ruhen. Verifizieren: Vitest in
   `AnbindungAnsicht.test.tsx` für Admin und Führungskraft (keine Bedienknöpfe),
   ausgegraute Arten ohne Recht und die Warnung der LAN-Ausnahme; `mise exec -- pnpm -C frontend
   lint` und `typecheck` grün.
-- [ ] 6.3 Paneel „Zustellungen“ mit den letzten 50 Versuchen und der Hinweis in der Liste der
+- [x] 6.3 Paneel „Zustellungen“ mit den letzten 50 Versuchen und der Hinweis in der Liste der
   Anbindungen. Verifizieren: Vitest für die Liste (angehalten im Ton `achtung`) und für den
   Verlauf ohne Rumpf.
-- [ ] 6.4 e2e in `frontend/e2e/anbindungen.spec.ts`: Webhook an ein unerreichbares öffentliches
+- [x] 6.4 e2e in `frontend/e2e/anbindungen.spec.ts`: Webhook an ein unerreichbares öffentliches
   Ziel einrichten, Testereignis senden, Fehlschlag im Verlauf sehen, Webhook entfernen.
   Verifizieren: die Spec läuft lokal grün.
 
 ## 7. Referenz-Clients und Testvektoren
 
-- [ ] 7.1 Rust-Crate: `verify_webhook` und der Abschnitt `webhooks` der Vektoren (D10), neu
+- [x] 7.1 Rust-Crate: `verify_webhook` und der Abschnitt `webhooks` der Vektoren (D10), neu
   geschrieben mit `LIFELINE_TESTVEKTOREN_SCHREIBEN=1`. Verifizieren: `cargo test -p
   lifeline-machine-client` grün; der Server-Test in `src/instanz/signatur.rs` prüft die neuen
   Vektoren und erzeugt den gültigen Fall byte-gleich.
-- [ ] 7.2 TypeScript `verifyWebhook` und Python `verify_webhook`. Verifizieren:
+- [x] 7.2 TypeScript `verifyWebhook` und Python `verify_webhook`. Verifizieren:
   `machineClient.vektoren.test.ts` und `scripts/check-api-clients.sh` prüfen gültige und alle
   ungültigen Webhook-Vektoren.
 

@@ -37,6 +37,7 @@ import { ANBINDUNG_NAME_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
 import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
 import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
+import AnbindungWebhook from './AnbindungWebhook';
 import {
   ANBINDUNGEN_ABRUF_MS,
   anbindungenPath,
@@ -84,6 +85,7 @@ export function zugangPatch(vorher: ZugangWerte, nachher: ZugangWerte): Anbindun
  * `maschinenzugang`). Name, Rechte und Frist bearbeitet der System-Admin im Paneel „Zugang“
  * (`BearbeitbaresPaneel`, CAS über `geaendert_at`); neuer Code und Widerruf stehen im Kopf. Den
  * Datensatz liefert die Liste der Seite davor (ein Abruf, ein Cache-Fach), alle 30 s frisch.
+ * Darunter der Webhook der Anbindung (LLH-1656, `AnbindungWebhook`).
  */
 export default function AnbindungAnsicht() {
   const { zugangId } = useParams();
@@ -315,6 +317,20 @@ export default function AnbindungAnsicht() {
             )}
           </Datenraster>
         </Paneel>
+        <AnbindungWebhook
+          zugang={zugang}
+          darfSchreiben={istAdmin && !istWiderrufen && gesperrt == null}
+          grund={
+            !istAdmin
+              ? NUR_ADMIN
+              : istWiderrufen
+                ? 'widerrufen'
+                : gesperrt != null
+                  ? 'am Hub anbinden'
+                  : undefined
+          }
+          onNeuLaden={() => void listeQ.refetch()}
+        />
       </div>
 
       <WiderrufDialog
