@@ -5796,14 +5796,6 @@ async fn kennung_am(i: &Instanz, einsatz: i64) -> String {
         .unwrap()
 }
 
-async fn ist_spiegel(i: &Instanz, einsatz: i64) -> bool {
-    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = ?)")
-        .bind(einsatz)
-        .fetch_one(&i.pool)
-        .await
-        .unwrap()
-}
-
 /// Der ELW übergibt einen eigenen Einsatz an den Hub: (Einsatz am ELW, jetzt Spiegel; Einsatz am
 /// Hub; Kennung mit dem Präfix des ELW).
 async fn an_den_hub_uebergeben(hub: &Instanz, elw: &Instanz) -> (i64, i64, String) {
