@@ -56,7 +56,7 @@ pub(crate) fn swr_weg(alter: Option<i64>, ttl: Duration, obergrenze: Option<Dura
 /// SWR-Kern: frisch → sofort, veraltet → sofort plus Hintergrund-Refresh, kalt → blockierend.
 /// `erneuere` liefert ein `'static`-Future für `tokio::spawn`, das die Quelle holt, cacht und
 /// das Ergebnis zurückgibt (`None` bei Fehlschlag). `inflight` lässt je Schlüssel nur einen
-/// Abruf laufen, im Hintergrund wie kalt; der kalte läuft über [`loese_ab`].
+/// Abruf laufen, im Hintergrund wie kalt; beide laufen über [`loese_ab`].
 /// Mit `obergrenze` zählt ein Stand jenseits davon als kalt (LFH-662, [`swr_weg`]).
 async fn liefere_mit_swr<Fut>(
     pool: &SqlitePool,
@@ -79,16 +79,7 @@ where
         (SwrWeg::AltUndErneuern, Some((a, _))) => {
             // Veraltet → alten Stand sofort ausliefern, im Hintergrund erneuern; nur ein Refresh je
             // Schlüssel gleichzeitig.
-            let claimed = inflight.lock().unwrap().insert(key.to_string());
-            if claimed {
-                let inflight = inflight.clone();
-                let key = key.to_string();
-                let fut = erneuere();
-                tokio::spawn(async move {
-                    fut.await;
-                    inflight.lock().unwrap().remove(&key);
-                });
-            }
+            loese_ab(inflight, key, erneuere);
             a
         }
         // Kalt → blockierend, aber nur EIN Abruf je Schlüssel (LLH-1683): sonst teilen sich nach
@@ -2393,6 +2384,45 @@ mod swr_tests {
             Some("neu".to_string()),
             "der Abruf starb mit der abgebrochenen Anfrage"
         );
+    }
+
+    /// LLH-1683: Ein Abruf, der in Panik gerät, gibt seine Marke frei, sonst wäre die Ebene bis
+    /// zum Neustart gesperrt. Gilt für den Hintergrund-Zweig wie für den kalten.
+    #[tokio::test]
+    async fn panik_im_abruf_gibt_die_marke_frei() {
+        let pool = crate::db::test_pool().await;
+        let infl = inflight();
+        async fn panik() -> Option<FachebeneAntwort> {
+            panic!("Abruf in Panik (gewollt im Test)")
+        }
+        // Kalt: die Anfrage selbst antwortet `offline`.
+        let a = liefere_mit_swr(
+            &pool,
+            &infl,
+            "kalt",
+            Duration::from_secs(60),
+            None,
+            || FachebeneAntwort::offline("kalt", "o"),
+            panik,
+        )
+        .await;
+        assert_eq!(a.status, FachebeneStatus::Offline);
+        assert!(infl.lock().unwrap().is_empty(), "kalte Marke frei");
+        // Veraltet: der alte Stand geht raus, die Marke fällt mit der Task.
+        cache::setze(&pool, "alt", &antwort("alt")).await;
+        let a = liefere_mit_swr(
+            &pool,
+            &infl,
+            "alt",
+            Duration::from_secs(0),
+            None,
+            || FachebeneAntwort::offline("alt", "o"),
+            panik,
+        )
+        .await;
+        assert_eq!(a.quelle, "alt");
+        let marke_frei = warte_bis(|| infl.lock().unwrap().is_empty()).await;
+        assert!(marke_frei, "Hintergrund-Marke frei");
     }
 }
 
