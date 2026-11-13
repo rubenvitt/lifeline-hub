@@ -12,6 +12,7 @@ export default function BuchstabierHilfe({
   text,
   zu,
   ohneTabstopp = false,
+  disabled = false,
 }: {
   text: string;
   /** Wozu die Hilfe gehört („Von“), wenn mehrere nebeneinander stehen: im Namen des Knopfs. */
@@ -21,6 +22,8 @@ export default function BuchstabierHilfe({
    * Spec `etb-schnellerfassung-tastatur`). Maus und Finger erreichen ihn weiter.
    */
   ohneTabstopp?: boolean;
+  /** Gesperrt wie das Feld daneben (ETB: während des Sendens). */
+  disabled?: boolean;
 }) {
   const name = zu ? `Buchstabierhilfe zu ${zu}` : 'Buchstabierhilfe';
   const [tafel, setTafel] = useState<Buchstabiertafel>('din5009');
@@ -87,6 +90,7 @@ export default function BuchstabierHilfe({
           type="text"
           aria-label={name}
           tabIndex={ohneTabstopp ? -1 : undefined}
+          disabled={disabled}
           icon={<IconLautsprecher />}
         />
       </Tooltip>

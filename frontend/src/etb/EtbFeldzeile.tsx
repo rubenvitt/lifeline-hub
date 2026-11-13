@@ -195,6 +195,16 @@ function ParteiFeld({
       data-vorgabe={ausVorgabe ? 'ja' : undefined}
       title={ausVorgabe ? 'Vorgabe: eigene Stelle' : undefined}
       style={{ display: 'inline-flex', minWidth: 0, width: breite }}
+      // Beim Betreten ist der Wert markiert: wer tippt, ersetzt die Vorgabe, statt an „ELW 1“
+      // anzuhängen (wie das Feld Zeit).
+      onFocus={(e) => {
+        const feld = e.target;
+        if (!(feld instanceof HTMLInputElement) || text !== null) return;
+        // Nach dem Bild: ein Mausklick setzte die Schreibmarke sonst gleich wieder.
+        requestAnimationFrame(() => {
+          if (document.activeElement === feld) feld.select();
+        });
+      }}
       onBlur={(e) => {
         // Nur, wenn der Fokus das Feld samt Liste verlässt (die Liste hängt im Portal).
         const ziel = e.relatedTarget as Node | null;
@@ -226,7 +236,7 @@ function ParteiFeld({
         onEscape={() => setText(null)}
       />
       {/* Buchstabierhilfe (LFH-110), additiv und ohne Tab-Stopp. */}
-      <BuchstabierHilfe text={text ?? wert ?? ''} zu={label} ohneTabstopp />
+      <BuchstabierHilfe text={text ?? wert ?? ''} zu={label} ohneTabstopp disabled={gesperrt} />
     </span>
   );
 }

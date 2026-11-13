@@ -454,7 +454,7 @@ export default function Schnellerfassung({
   useEffect(() => {
     if (!breiteBekannt || !rufname.geladen || startFokusErledigt.current) return;
     startFokusErledigt.current = true;
-    if (startFokus && !istEingabefeld(document.activeElement)) fokusStart();
+    if (startFokus && !istEingabefeld(document.activeElement)) fokusStart(true);
     // `fokusStart` liest den Stand dieses Renders; er ist hier gewollt nur einmal gefragt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [breiteBekannt, startFokus, rufname.geladen]);
@@ -507,9 +507,11 @@ export default function Schnellerfassung({
   }
 
   /** Fokus in ein Feld der Feldzeile (`/`-Menü, Pflicht- und Zeitgrund). */
-  function fokusFeld(feld: MetaFeld) {
+  function fokusFeld(feld: MetaFeld, nurOhneFremdenFokus = false) {
     if (feld === 'veranlassung') setVeranlassungOffen(true);
     requestAnimationFrame(() => {
+      // Startfokus (LFH-1089): wer im selben Bild in ein anderes Feld gewechselt ist, behält es.
+      if (nurOhneFremdenFokus && istEingabefeld(document.activeElement)) return;
       const ziel =
         feld === 'ereigniszeit'
           ? zeitRef.current
@@ -525,9 +527,9 @@ export default function Schnellerfassung({
   }
 
   /** Erstes leeres Pflichtfeld, sonst der Inhalt (Spec „Fokus im ersten leeren Pflichtfeld“). */
-  function fokusStart() {
+  function fokusStart(nurOhneFremdenFokus = false) {
     const fehlt = berichtigungZu ? undefined : fehlendeSeiten(wirksam)[0];
-    if (fehlt) fokusFeld(fehlt);
+    if (fehlt) fokusFeld(fehlt, nurOhneFremdenFokus);
     else textRef.current?.focus();
   }
 
@@ -1095,8 +1097,9 @@ export default function Schnellerfassung({
           children: '+ Veranlassung',
         })}
       {anhangTeil}
+      {/* Nicht gesperrt beim Senden: ein langer Upload hält keinen weiteren Entwurf auf (LFH-117). */}
       {onWeitererEntwurf &&
-        textKnopf({ disabled: sendet, onClick: onWeitererEntwurf, children: '+ weiterer Entwurf' })}
+        textKnopf({ onClick: onWeitererEntwurf, children: '+ weiterer Entwurf' })}
       {!berichtigungZu &&
         rufname.standard != null &&
         textKnopf({
@@ -1121,7 +1124,12 @@ export default function Schnellerfassung({
   return (
     // `etb-erfassung-card` trägt keine CSS-Regel, bleibt aber: `e2e/seitenrinne.spec.ts` misst an
     // ihr, dass der Inhalt der Leiste auf der Seitenrinne steht.
-    <div className="etb-erfassung-card" data-lfh="etb-erfassung">
+    <div
+      className="etb-erfassung-card"
+      data-lfh="etb-erfassung"
+      // Das erste leere Pflichtfeld, für Fokuswege von außen (`EtbPage`, `?neu=1`).
+      data-startfeld={(berichtigungZu ? undefined : fehlendeSeiten(wirksam)[0]) ?? undefined}
+    >
       {berichtigungZu && (
         <Alert
           type="warning"

@@ -517,8 +517,8 @@ describe('EtbEntwurfsTabs', () => {
   }
 
   /**
-   * Zwei Entwürfe, der erste aktiv und mit Von. Der zweite entsteht VOR dem Senden: während der
-   * einzige Entwurf sendet, ist „+ weiterer Entwurf“ gesperrt und das Reiterband ausgeblendet.
+   * Zwei Entwürfe, der erste aktiv und mit Von. Der zweite entsteht vor dem Senden, damit beide
+   * Reiter von Anfang an stehen.
    */
   async function zweiEntwuerfe() {
     await screen.findByPlaceholderText(/Inhalt/);

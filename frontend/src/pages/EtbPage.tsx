@@ -501,8 +501,20 @@ export default function EtbPage() {
     if (leiste instanceof HTMLElement) {
       // Die Leiste steht am Seitenfuß — ins Bild rollt ihr unteres Ende.
       leiste.scrollIntoView?.({ block: 'end' });
-      const feld = leiste.querySelector('textarea, input');
-      if (feld instanceof HTMLElement) feld.focus();
+      // Ziel ist das erste leere Pflichtfeld, sonst der Inhalt (Spec `etb-schnellerfassung-tastatur`,
+      // „Fokus im ersten leeren Pflichtfeld“); die Schnellerfassung nennt es in `data-startfeld`.
+      // Eingeklappt (Handschirm) steht die Feldzeile noch nicht: erst der Inhalt klappt die Leiste
+      // auf, zwei Bilder später steht das Feld.
+      const fokussiereStart = (): boolean => {
+        const ziel = leiste.querySelector('[data-startfeld]')?.getAttribute('data-startfeld');
+        const pflicht = ziel ? leiste.querySelector(`[data-lfh="etb-feld-${ziel}"] input`) : null;
+        const feld = pflicht ?? leiste.querySelector('textarea');
+        if (feld instanceof HTMLElement) feld.focus();
+        return pflicht != null || !ziel;
+      };
+      if (!fokussiereStart()) {
+        requestAnimationFrame(() => requestAnimationFrame(() => void fokussiereStart()));
+      }
     }
     neuAuftrag.raeume('neu');
   }, [searchParams, neuAuftrag]);

@@ -1836,3 +1836,43 @@ describe('Niedriges Fenster ab md: Felder und Einstellungen in einer rollenden Z
     expect(document.querySelector('[data-lfh="etb-fusszeile"]')).not.toBeNull();
   });
 });
+
+describe('Befunde aus dem Testnachzug (kwc2yszv)', () => {
+  it('„+ weiterer Entwurf“ bleibt beim Senden bedienbar (LFH-117)', async () => {
+    const onWeitererEntwurf = vi.fn();
+    const p = props({
+      onWeitererEntwurf,
+      erfassen: vi.fn<(e: NeuerEintrag) => Promise<void>>(() => new Promise(() => {})),
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lange Sendung{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    const knopf = screen.getByRole('button', { name: '+ weiterer Entwurf' });
+    expect(knopf).toBeEnabled();
+    await userEvent.click(knopf);
+    expect(onWeitererEntwurf).toHaveBeenCalledTimes(1);
+  });
+
+  it('Von und An markieren beim Betreten ihren Wert: Tippen ersetzt die Vorgabe', async () => {
+    renderMitProviders(<Schnellerfassung {...props({ initialWerte: LAGE })} />);
+    const an = screen.getByRole('combobox', { name: 'An' }) as HTMLInputElement;
+    await userEvent.click(an);
+    await waitFor(() => expect(an.selectionEnd).toBe('ELW 1'.length));
+    expect(an.selectionStart).toBe(0);
+  });
+
+  it('nennt das erste leere Pflichtfeld für Fokuswege von außen', () => {
+    const { unmount } = renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } })}
+      />,
+    );
+    const karte = document.querySelector('[data-lfh="etb-erfassung"]')!;
+    expect(karte).toHaveAttribute('data-startfeld', 'von');
+    unmount();
+    renderMitProviders(<Schnellerfassung {...props({ initialWerte: LAGE })} />);
+    expect(document.querySelector('[data-lfh="etb-erfassung"]')).not.toHaveAttribute(
+      'data-startfeld',
+    );
+  });
+});
