@@ -315,9 +315,11 @@ pub enum Entscheid {
 /// Die Annahmeregel als reine Funktion (Tabelle in design.md D7 der Change `v6hj7xl2`, ergänzt in
 /// design.md D3 und D7 der Change `faq7l7m4-zwei-elw-unterlegene-seite`): `richtung` der Kopplung
 /// aus meiner Sicht, `bewiesen` = ob der Beweis gegen meine Schlüssel trägt (nur für die meldende
-/// Seite von Belang), `dritter` = an der Akte ist eine dritte Instanz beteiligt (sie führt, oder
-/// sie hat die Epoche vergeben, mit der die erreichte Seite selbst führt). Dann gibt es keinen
-/// Beweis gegen mich, und niemand hat Unrechtes getan: offen halten, ohne Alarm.
+/// Seite von Belang), `dritter` = an der Akte ist eine dritte Instanz beteiligt (sie führt, oder sie
+/// hat die Epoche vergeben, mit der die erreichte Seite selbst führt), oder die Erklärung nennt
+/// nicht mich, sondern eine andere Instanz als bisherigen Führer eines fremden Stands (Change
+/// `d12cmcx1-hub-epoche-gegen-dritten`). Dann gibt es keinen Beweis gegen mich, und niemand hat
+/// Unrechtes getan: offen halten, ohne Alarm.
 pub fn entscheide(
     richtung: InstanzKopplungRichtung,
     bewiesen: Result<(), String>,
@@ -329,6 +331,14 @@ pub fn entscheide(
         (InstanzKopplungRichtung::MeldetSich, Ok(())) => Entscheid::OffenHalten,
         (InstanzKopplungRichtung::MeldetSich, Err(grund)) => Entscheid::Verwerfen(grund),
     }
+}
+
+/// Ob eine Erklärung gegen diese Instanz gerichtet ist: Sie nennt sie als bisherigen Führer. Nur
+/// dann muss ihr Beweis hier tragen, und nur dann gehören ihre Angaben (Grund, Unterzeichner) zu
+/// einer Übernahme gegen diese Instanz. Eine Erklärung gegen einen anderen zeigt nur, dass beim
+/// Gegenüber etwas ohne diese Instanz geschah (Change `d12cmcx1-hub-epoche-gegen-dritten`, D1).
+pub fn is_gegen_mich(e: &NotuebernahmeErklaerung, kennung: &str) -> bool {
+    e.fuehrer_alt == kennung
 }
 
 /// Übernimmt eine Akte, die mir die Führung nicht nimmt: Epoche und Führer des Absenders, eine
@@ -414,7 +424,7 @@ pub(super) async fn check_unterschrift(
         || e.org != m.org
         || e.epoche_neu != m.epoche
         || e.fuehrer_neu != m.fuehrer
-        || e.fuehrer_alt != ich.kennung
+        || !is_gegen_mich(&e, &ich.kennung)
         || &e.epoche_alt != alt
     {
         return Err("Erklärung passt nicht zur Übernahme".into());
@@ -502,11 +512,14 @@ fn grund_der(m: &AkteMeldung) -> Option<String> {
         .map(|e| e.grund)
 }
 
+/// Der Unterzeichner einer Erklärung; leer heißt, niemand hat unterschrieben (Widerruf, Change
+/// `d12cmcx1-hub-epoche-gegen-dritten`, D2).
 fn unterzeichner_der(m: &AkteMeldung) -> Option<String> {
     m.erklaerung
         .as_deref()
         .and_then(NotuebernahmeErklaerung::parse)
         .map(|e| e.unterzeichner)
+        .filter(|u| !u.is_empty())
 }
 
 /// Text für die Admin-Spur: Einsatz und Grund.
@@ -774,7 +787,7 @@ async fn check_offene(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse)
-            .is_some_and(|e| e.fuehrer_alt == ich.kennung);
+            .is_some_and(|e| is_gegen_mich(&e, &ich.kennung));
         if ist_konflikt(&m, &[kopplung.gegenueber_kennung.as_str()]) || !gegen_mich {
             continue;
         }
@@ -1088,15 +1101,30 @@ pub async fn apply_eingang(
                     folge_dem_absender(conn, &mut a, m, &mut aus).await?;
                     continue;
                 }
+                // Die Erklärung nennt einen anderen als bisherigen Führer, zu einem anderen Stand
+                // als dem, mit dem ich führe: Das Gegenüber hat sich die Führung von einer dritten
+                // Instanz geholt (Notübernahme oder Widerruf), nicht von mir. Ein Beweis gegen mich
+                // liegt nicht vor und wird auch nicht behauptet; ein Mensch entscheidet, ohne
+                // Alarm. Nennt sie meinen Stand mit einem anderen Führer, widerspricht sie sich
+                // (mit meiner Epoche führe ich), und ohne oder mit unlesbarer Erklärung bleibt es
+                // bei der Prüfung (Change `d12cmcx1-hub-epoche-gegen-dritten`, D1).
+                let gegen_dritten = richtung == InstanzKopplungRichtung::MeldetSich
+                    && m.erklaerung
+                        .as_deref()
+                        .and_then(NotuebernahmeErklaerung::parse)
+                        .is_some_and(|e| !is_gegen_mich(&e, &ich.kennung) && e.epoche_alt != alt);
                 let bewiesen = match richtung {
                     InstanzKopplungRichtung::WirdGemeldet => Ok(()),
+                    InstanzKopplungRichtung::MeldetSich if gegen_dritten => {
+                        Err("Erklärung gegen eine andere Instanz".into())
+                    }
                     InstanzKopplungRichtung::MeldetSich => {
                         check_unterschrift(conn, &ich, org_id, m, &alt)
                             .await
                             .map(|_| ())
                     }
                 };
-                match entscheide(richtung, bewiesen, false) {
+                match entscheide(richtung, bewiesen, gegen_dritten) {
                     Entscheid::Annehmen => {
                         let art = FuehrungWechselArt::parse(&m.art);
                         let verwahrung_abgelehnt = a.art() == FuehrungWechselArt::Verwahrung;

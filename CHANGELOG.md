@@ -1,3 +1,62 @@
+## [1.0.0-alpha.189](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.188...v1.0.0-alpha.189) (2026-11-13)
+
+### Wichtige Änderungen
+
+- **Datenbank:** Dieses Release bringt mehrere neue Migrationen mit, unter anderem für die Direktkopplung, den Maschinenzugang, Hinweise über den Hub, Archivblöcke und das Nachreichen aus der Bruchstelle. Sie laufen beim Start automatisch. Vorher eine Sicherung anlegen.
+- **Öffentliche API v1:** Unter `/api/v1/` gibt es jetzt einen festen Vertrag mit eigenem OpenAPI-Dokument und stabilen Fehlercodes. Fremdsysteme melden sich über einen eigenen Maschinenzugang an. Für Anfragen ohne Längenangabe gilt die Größengrenze jetzt ebenfalls.
+- **Push-Benachrichtigungen an gekoppelten ELW:** Hinweise zu einem geführten Einsatz gehen jetzt an den Hub, und der Hub verschickt den Push. Push über den Hub erhalten nur Konten, die der Hub kennt.
+- **Unterschrift beim Führungswechsel:** Die eigene Unterschrift der Einsatzleitung bieten wir nur noch Admins der Organisation an, die den Einsatz führt. Ohne diese Rolle wird sie abgelehnt.
+
+### Führung und Instanzkopplung
+
+- **Neu: Direktkopplung vor Ort.** Zwei ELW koppeln sich im lokalen Netz direkt, ohne Hub. Grundlage ist ein beglaubigtes Zertifikat. Gegenstellen werden im Netz automatisch gefunden und lassen sich unter „Im Netz gefunden“ übernehmen. Konten und Stammdaten tragen eine Ursprungskennung. Eine Direktkopplung löst keine Hub-Nebenwirkungen aus und verschickt keine Hinweise zu Kontogeheimnissen. Wird sie widerrufen, holt das keine Führung zurück.
+- **Zwei ELW an einem Hub:** Der unterlegene ELW erfährt jetzt, dass ein Dritter die Führung hat. „Einsätze beim Gegenüber“ erscheinen nur bei aktiver Zuordnung der Organisation. Ladefehler werden dort angezeigt.
+- **Offene Übernahme:**
+  - Sie springt nicht mehr bei jedem Meldetakt hin und her.
+  - Beim Eingang und beim Bestätigen wird sie erneut geprüft.
+  - Beim Widerruf eines Schlüssels verfällt sie, auch ohne Schalter.
+  - Jeder übernommene Wechsel löscht eine überholte Anfrage.
+- **Widerruf ohne Schalter:** Die Führungsakten bleiben erhalten.
+- **Führungswechsel:** Jeder Wechsel wird in der Admin-Spur und im Einsatzkopf festgehalten. Ohne Netz sind die Aktionen der Führung gesperrt, statt mitten im Ablauf anzuhalten. Der Dialog beim Gegenüber bleibt während einer laufenden Aktion offen und beim richtigen Einsatz. Zum Zeitpunkt eines Wechsels erscheint kein doppelter Hinweis mehr.
+- **Führungsakten:**
+  - Sie werden auch fortgeschrieben, wenn der Einsatz am Hub verwahrt ist.
+  - Eine Akte, die das Gegenüber ablehnt, wird übersprungen und hält den Abgleich nicht mehr an.
+  - Nach dem Zurückspielen einer Sicherung fließen die Akten weiter. Ein Rückschritt des Zählers bleibt erkennbar, auch wenn eine Antwort verloren geht. Der Hinweis, der danach erscheint, ist in der Anwenderdoku erklärt.
+- **Einsatznummer:** Wird ein gespiegelter Einsatz zum eigenen, etwa bei einer Notübernahme mit gleicher Nummer, bekommt er automatisch eine freie Einsatznummer.
+- **Nur-Ansicht am Spiegel:** Auf einem Spiegel nennen die Kräfte-Seiten den Grund „Nur Ansicht“. Die Einstellungen nennen die führende Instanz.
+
+### Spiegel und Bruchstelle
+
+- Personen lassen sich samt Verlauf aus der Bruchstelle nachreichen.
+- Das Band „Nicht übernommen“ klappt auf und bietet „Stellen“ und „Verwerfen“. Nach der letzten Erfassung klappt es wieder zu.
+- Absender und Inhalt stehen in der Liste getrennt. Verweise zwischen Einträgen, die zusammen entfernt wurden, werden aufgelöst. Kann die Liste nicht nachladen, wird angeboten, die Seite neu zu laden.
+- Schwärzt die führende Instanz Einträge, räumt der Spiegel seine Bruchstelle passend auf, aber nur bei einer dort unbekannten Marke.
+
+### Kommunikation und Benachrichtigungen
+
+- Die Push-Einstellung am gekoppelten ELW verweist auf den Hub.
+- Eine Kenntnisnahme reicht nur Meldungen des Einsatzes an den Hub weiter, die tatsächlich gesehen wurden.
+- Alte Benachrichtigungen werden auch am Spiegel abgeräumt.
+
+### Fernmeldewesen
+
+- Bei gleichzeitigen Zuordnungen von Sprechgruppen kann kein ungültiges Paar mehr entstehen.
+
+### Verwaltung
+
+- **Neu: Seite „Anbindungen“.** Admins legen dort Maschinenzugänge für Fremdsysteme an, ändern sie und widerrufen sie. Jeder Zugang hat eigene Leserechte und wird einzeln gedrosselt. Ein widerrufener Zugang hat keinen Schlüssel mehr.
+- **Neu: Archiv-Schlüssel der Organisation.** Archive einer Einsatzakte werden in gestaffelten Blöcken abgelegt und haben eine eigene Oberfläche. Ein Archivblock lässt sich per Befehl wieder einspielen, auch bei Direktkopplungen.
+
+### Schnittstellen
+
+- **Maschinenzugang:** Ein Fremdsystem löst einen Einladungscode ein, prüft seine Identität und ruft die öffentlichen Schlüssel ab. Referenz-Clients in TypeScript und Python liegen bei, außerdem Testvektoren. Zugänge lassen sich auch über die Kommandozeile einrichten.
+- **Neu: Rechner-API für Unterkunft und Zelte** unter `/api/v1/`, beschrieben in der API-Anleitung und in der Anwenderdoku.
+
+### Betrieb und Installation
+
+- Migrationen, die ohne Transaktion laufen müssen, werden jetzt trotzdem atomar eingespielt. Eine abgebrochene Migration hinterlässt keinen halben Stand mehr.
+- Die Anwenderdoku zur Instanzkopplung ist aktualisiert und beschreibt jetzt die Direktkopplung, zwei ELW an einem Hub, den Widerruf bei ausgeschalteter Führung und Hinweise nach dem Zurückspielen einer Sicherung.
+
 ## [1.0.0-alpha.188](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.187...v1.0.0-alpha.188) (2026-11-12)
 
 ### Wichtige Änderungen
