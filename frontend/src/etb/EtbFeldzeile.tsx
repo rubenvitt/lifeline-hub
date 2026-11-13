@@ -201,9 +201,12 @@ function ParteiFeld({
       onFocus={(e) => {
         const feld = e.target;
         if (!(feld instanceof HTMLInputElement) || text !== null) return;
-        // Nach dem Bild: ein Mausklick setzte die Schreibmarke sonst gleich wieder.
+        // Nach dem Bild: ein Mausklick setzte die Schreibmarke sonst gleich wieder. Nur, solange
+        // noch niemand getippt hat: ein Tastendruck vor dem Bild würde sonst markiert und vom
+        // nächsten überschrieben („Florian“ würde „lorian“).
+        const beimBetreten = feld.value;
         requestAnimationFrame(() => {
-          if (document.activeElement === feld) feld.select();
+          if (document.activeElement === feld && feld.value === beimBetreten) feld.select();
         });
       }}
       onBlur={(e) => {

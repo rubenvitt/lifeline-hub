@@ -1492,6 +1492,30 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
   });
 });
 
+describe('Schnellerfassung — Markieren beim Betreten', () => {
+  it('ein Tastendruck vor dem nächsten Bild wird nicht markiert und überschrieben', async () => {
+    const bilder: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      bilder.push(cb);
+      return bilder.length;
+    });
+    try {
+      const p = props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } });
+      renderMitProviders(<Schnellerfassung {...p} />);
+      const von = screen.getByRole('combobox', { name: 'Von' });
+      const user = userEvent.setup();
+      await user.click(von);
+      await user.keyboard('F');
+      // Erst jetzt kommt das Bild, das beim Betreten markieren wollte.
+      act(() => bilder.splice(0).forEach((cb) => cb(0)));
+      await user.keyboard('lorian 7');
+      expect(von).toHaveValue('Florian 7');
+    } finally {
+      raf.mockRestore();
+    }
+  });
+});
+
 describe('Schnellerfassung — eingeklappt (LFH-955, kwc2yszv 4.1)', () => {
   it('unter md eingeklappt eine Zeile aus Typ-Knopf und Inhalt; aufgeklappt Felder und „Erfassen“', () => {
     setzeViewportBreite(390);
