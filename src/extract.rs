@@ -33,7 +33,7 @@ impl<S: Send + Sync> FromRequestParts<S> for PeerIp {
     type Rejection = Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let vertraut = VERTRAUTE_PROXYS.get().map(Vec::as_slice).unwrap_or(&[]);
+        let vertraut = vertraute_proxys();
         Ok(PeerIp(
             parts
                 .extensions
@@ -52,6 +52,59 @@ static VERTRAUTE_PROXYS: OnceLock<Vec<IpNet>> = OnceLock::new();
 pub fn init_vertraute_proxys(netze: Vec<IpNet>) {
     let _ = VERTRAUTE_PROXYS.set(netze);
 }
+
+/// Die Proxy-Liste, wie [`init_vertraute_proxys`] sie gesetzt hat; leer, solange niemand eine
+/// gesetzt hat.
+pub fn vertraute_proxys() -> &'static [IpNet] {
+    VERTRAUTE_PROXYS.get().map(Vec::as_slice).unwrap_or(&[])
+}
+
+/// TCP-Gegenstelle der Anfrage, ohne Blick auf `X-Forwarded-For`; `None`, wenn sie unbekannt ist
+/// (Router-Test ohne `ConnectInfo`).
+pub fn gegenstelle(parts: &Parts) -> Option<IpAddr> {
+    parts
+        .extensions
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ConnectInfo(adresse)| adresse.ip())
+}
+
+/// Kam die Anfrage nachweislich über TLS an (ADR-0023, Spec `einwurf-zugang`)?
+///
+/// Wahr, wenn der Server TLS selbst terminiert (`tls_direkt`), oder wenn die Gegenstelle ein
+/// vertrauenswürdiger Proxy ist und **jeder** Wert von `X-Forwarded-Proto` `https` lautet. Ein
+/// Kopf von einer fremden Gegenstelle zählt nicht, weil ihn jeder setzen kann. Ein Proxy, der
+/// seinen Wert an einen mitgeschickten anhängt statt ihn zu ersetzen, liefert `https, http`: auch
+/// das zählt nicht, sonst gälte der vorangestellte Wert des Clients.
+///
+/// Anders als `auth::session::weitergeleitet_als_https` (dort entscheidet der Kopf nur über das
+/// `Secure` der eigenen Antwort) ist das hier eine Zugangsbedingung.
+pub fn is_tls_nachgewiesen(
+    tls_direkt: bool,
+    gegenstelle: Option<IpAddr>,
+    headers: &HeaderMap,
+    vertraut: &[IpNet],
+) -> bool {
+    if tls_direkt {
+        return true;
+    }
+    let Some(gegenstelle) = gegenstelle.map(|ip| ip.to_canonical()) else {
+        return false;
+    };
+    if !vertraut.iter().any(|netz| netz.contains(&gegenstelle)) {
+        return false;
+    }
+    let mut werte = headers
+        .get_all(X_FORWARDED_PROTO)
+        .iter()
+        .flat_map(|zeile| zeile.as_bytes().split(|b| *b == b','))
+        .peekable();
+    werte.peek().is_some()
+        && werte.all(|wert| {
+            std::str::from_utf8(wert).is_ok_and(|w| w.trim().eq_ignore_ascii_case("https"))
+        })
+}
+
+const X_FORWARDED_PROTO: &str = "x-forwarded-proto";
 
 /// Client-Adresse hinter vertrauenswürdigen Proxys (LFH-604).
 ///
@@ -544,6 +597,94 @@ mod tests {
         let (status, body) = hole("/t/42/hallo").await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, "42/hallo");
+    }
+
+    fn proto(werte: &[&str]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for wert in werte {
+            headers.append("x-forwarded-proto", HeaderValue::from_str(wert).unwrap());
+        }
+        headers
+    }
+
+    /// TLS-Nachweis des Einwurfs (ADR-0023): direktes TLS gilt immer, der Kopf nur von einem
+    /// vertrauten Proxy.
+    #[test]
+    fn tls_nachweis_gilt_direkt_oder_ueber_vertrauten_proxy() {
+        let vertraut = netze(&["10.9.0.0/16"]);
+        let proxy = Some(ip("10.9.0.2"));
+        assert!(
+            is_tls_nachgewiesen(true, None, &HeaderMap::new(), &[]),
+            "direktes TLS"
+        );
+        assert!(is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["https"]),
+            &vertraut
+        ));
+        assert!(is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&[" HTTPS "]),
+            &vertraut
+        ));
+        // Dual-Stack-Socket: die IPv4-Liste greift auch für die gemappte Adresse.
+        assert!(is_tls_nachgewiesen(
+            false,
+            Some(ip("::ffff:10.9.0.2")),
+            &proto(&["https"]),
+            &vertraut
+        ));
+    }
+
+    #[test]
+    fn tls_nachweis_scheitert_ohne_vertrauten_proxy_oder_bei_gemischtem_kopf() {
+        let vertraut = netze(&["10.9.0.0/16"]);
+        let proxy = Some(ip("10.9.0.2"));
+        let fremd = Some(ip("203.0.113.7"));
+        assert!(
+            !is_tls_nachgewiesen(false, fremd, &proto(&["https"]), &vertraut),
+            "Kopf von fremder Gegenstelle ist fälschbar"
+        );
+        assert!(
+            !is_tls_nachgewiesen(false, proxy, &proto(&["https"]), &[]),
+            "ohne Liste traut der Server keinem Proxy"
+        );
+        assert!(
+            !is_tls_nachgewiesen(false, None, &proto(&["https"]), &vertraut),
+            "unbekannte Gegenstelle"
+        );
+        assert!(
+            !is_tls_nachgewiesen(false, proxy, &HeaderMap::new(), &vertraut),
+            "Kopf fehlt"
+        );
+        assert!(!is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["http"]),
+            &vertraut
+        ));
+        // Der Client stellt `https` voran, der Proxy hängt seinen Wert an: in einer Zeile oder
+        // in zweien.
+        assert!(!is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["https, http"]),
+            &vertraut
+        ));
+        assert!(!is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["https", "http"]),
+            &vertraut
+        ));
+        assert!(!is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["https,"]),
+            &vertraut
+        ));
     }
 
     /// Eine nicht-numerische Route-ID liefert 400 im `{error}`-Envelope statt `text/plain`.

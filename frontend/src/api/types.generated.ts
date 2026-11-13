@@ -411,7 +411,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -3087,6 +3087,49 @@ export interface components {
          * @enum {string}
          */
         EintreffenZeitachse: "geschrieben" | "ausgelassen" | "keine";
+        /**
+         * @description Über welchen Weg Einwürfe diese Instanz erreichen; die Seite „Anbindungen“ warnt bei
+         *     `http` und `keiner`.
+         * @enum {string}
+         */
+        EinwurfTransport: "tls" | "proxy" | "http" | "keiner";
+        /** @description Die Einwurf-Zugänge der Org, ob Einwürfe hier angenommen werden und über welchen Weg. */
+        EinwurfZugaengeListe: {
+            /**
+             * @description Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet: Anlegen und Wechsel
+             *     sind dann gesperrt, und Einwürfe werden abgelehnt.
+             */
+            gesperrt_grund?: string | null;
+            /**
+             * @description Wie Einwürfe diese Instanz erreichen. Bei `http` nimmt sie Einwürfe unverschlüsselt an,
+             *     bei `keiner` lehnt sie jeden ab.
+             */
+            transport: components["schemas"]["EinwurfTransport"];
+            zugaenge: components["schemas"]["EinwurfZugangAnzeige"][];
+        };
+        /** @description Ein Einwurf-Zugang, wie die Seite „Anbindungen“ ihn zeigt. Ohne Schlüssel. */
+        EinwurfZugangAnzeige: {
+            angelegt_at: string;
+            gueltig_bis?: string | null;
+            id: string;
+            /** @description „gültig bis“ ist verstrichen; der Zugang verhält sich wie widerrufen. */
+            is_abgelaufen: boolean;
+            name: string;
+            schluessel_gewechselt_at?: string | null;
+            /** @description Der Zweck: `alarmmeldungen:write` oder `positionen:write`. */
+            scope: components["schemas"]["Scope"];
+            widerrufen_at?: string | null;
+            /** @description Anzeigename des Admins, der widerrufen hat. */
+            widerrufen_von_name?: string | null;
+            /** @description Letzter angenommener Einwurf, höchstens minütlich fortgeschrieben. */
+            zuletzt_genutzt_at?: string | null;
+        };
+        /** @description Ein frisch ausgestellter Schlüssel. Er verlässt den Server nur hier, einmal. */
+        EinwurfZugangSchluessel: {
+            /** @description `llh_ew_` und 43 Zeichen. Die Adresse baut die Oberfläche daraus. */
+            schluessel: string;
+            zugang: components["schemas"]["EinwurfZugangAnzeige"];
+        };
         /** @description Antwort auf „ELW verloren“: die Kopplung danach und wie viele Konten betroffen sind. */
         ElwVerlorenAntwort: {
             /** Format: int64 */
@@ -9253,6 +9296,8 @@ export interface components {
          *     - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich
          *       `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich
          *       `scopes_vorher`, falls die Scopes wechselten.
+         *     - `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder
+         *       sein Hash.
          */
         ZugangsAngaben: {
             /** @description Adresse der Gegenstelle (nur auf der Seite, die sich meldet). */

@@ -37,6 +37,11 @@ export type AnbindungAnzeige = S['AnbindungAnzeige'];
 export type AnbindungAblehnung = S['AnbindungAblehnung'];
 export type AnbindungCode = S['AnbindungCode'];
 export type Scope = S['Scope'];
+// Einwurf-Zugänge: Absender ohne Signatur (LLH-1654)
+export type EinwurfZugaengeListe = S['EinwurfZugaengeListe'];
+export type EinwurfZugangAnzeige = S['EinwurfZugangAnzeige'];
+export type EinwurfZugangSchluessel = S['EinwurfZugangSchluessel'];
+export type EinwurfTransport = S['EinwurfTransport'];
 export type ZugangZustand = S['ZugangZustand'];
 export type AblehnungGrund = S['AblehnungGrund'];
 // Lagebild für Externe (LLH-1496)

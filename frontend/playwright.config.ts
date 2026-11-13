@@ -213,7 +213,9 @@ export default defineConfig({
       name: 'Backend',
       // `--kritis-extrakt false`: der KRITIS-Import lüde sonst nach 60 s den
       // Deutschland-Extrakt (mehrere GB je Lauf); die Specs brauchen keinen Bestand.
-      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false --lizenz-akzeptiert`,
+      // `--einwurf-allow-http`: der Test-Server spricht kein TLS; ohne den Schalter lehnte er
+      // jeden Einwurf mit 403 ab (ADR-0023, `e2e/anbindungen.spec.ts`).
+      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false --einwurf-allow-http --lizenz-akzeptiert`,
       url: `${backendUrl}/api/health`,
       // Nie einen fremden Server übernehmen: ein laufender Dev-Stack hätte eine andere DB und ein
       // anderes Admin-Passwort.

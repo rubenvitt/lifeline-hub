@@ -113,6 +113,21 @@ describe('Archiv am Hub (LLH-1494)', () => {
   });
 });
 
+describe('Einwurf-Zugang (LLH-1654)', () => {
+  it('nennt die drei Aktionen und zeigt den Namen des Zugangs als Ziel', () => {
+    expect(AKTION_TEXT.einwurf_zugang_angelegt).toBe('Einwurf-Zugang angelegt');
+    expect(AKTION_TEXT.einwurf_zugang_schluessel_gewechselt).toBe(
+      'Schlüssel eines Einwurf-Zugangs gewechselt',
+    );
+    expect(AKTION_TEXT.einwurf_zugang_widerrufen).toBe('Einwurf-Zugang widerrufen');
+    expect(hasNamensziel('einwurf_zugang_angelegt')).toBe(true);
+    expect(hasNamensziel('einwurf_zugang_schluessel_gewechselt')).toBe(true);
+    expect(hasNamensziel('einwurf_zugang_widerrufen')).toBe(true);
+    // Auch die Anbindung trägt ihren Namen als Ziel (LLH-1652).
+    expect(hasNamensziel('maschinenzugang_angelegt')).toBe(true);
+  });
+});
+
 describe('Angaben einer Anbindung (LLH-1652)', () => {
   it('nennt Rechte vorher → nachher und den abgelösten Schlüssel', () => {
     expect(
