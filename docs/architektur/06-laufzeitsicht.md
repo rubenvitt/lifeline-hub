@@ -378,7 +378,7 @@ sequenceDiagram
   genannt hat (`src/instanz/spiegel/lebensende.rs`, `abgleich.rs`). Nachweis:
   `tests/instanz_lebensende.rs`.
 - **Ende einer Akte ohne Spiegel** (LLH-1699,
-  [ADR-0033](entscheidungen/ADR-0033-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
+  [ADR-0034](entscheidungen/ADR-0034-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
   Wer bei eingeschalteter Führung eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung
   im Abgleich (`SpiegelPaket.akten`), und zwar dem Gegenüber, das über sie entscheidet: dem
   Führer der Akte, die meldende Seite auch ihrem einzigen Hub, solange der Führer nicht selbst
