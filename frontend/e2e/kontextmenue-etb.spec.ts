@@ -90,7 +90,7 @@ test('Handschirm-Zeile: das Kontextmenü zeigt die Einträge des ⋮, mit dem Ve
   await expect(dreipunkt.getByRole('menuitem').first()).toBeVisible();
   const punkte = await eintraegeVon(dreipunkt);
   expect(punkte).toContain('Berichtigen');
-  expect(punkte.at(-1)).toMatch(/^Verfasser: /);
+  expect(punkte[punkte.length - 1]).toMatch(/^Verfasser: /);
   await page.keyboard.press('Escape');
   await expect(dreipunkt).toHaveCount(0);
 
