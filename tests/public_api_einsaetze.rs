@@ -667,3 +667,122 @@ async fn nach_dem_purge_ist_ein_alter_cursor_abgelaufen() {
     let v = ok(&l.app, &cred, &format!("{EVENTS}?after={cursor}")).await;
     assert_eq!(v["events"], json!([]));
 }
+
+// ── Rechteänderung beendet die Freigabe (Entscheidung Ruben, 13.11.2026) ─────────────────────
+
+async fn scopes_setzen(l: &Lage, cred: &Credentials, scopes: Value) {
+    let (s, v) = anfrage_json(
+        &l.app,
+        "PATCH",
+        &format!("{ANBINDUNGEN}/{}", cred.zugang_id),
+        &l.admin,
+        Some(&json!({ "scopes": scopes })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+async fn freigaben(l: &Lage) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM maschinenzugang_freigabe")
+        .fetch_one(&l.pool)
+        .await
+        .unwrap()
+}
+
+/// Ein Admin gibt einer freigegebenen Anbindung ein weiteres Recht mit Einsatzbezug: Sie liest
+/// damit nicht sofort mehr, sondern erst nach einer neuen Entscheidung der Einsatzleitung.
+#[tokio::test]
+async fn ein_hinzugefuegtes_recht_mit_einsatzbezug_beendet_die_freigabe() {
+    let l = lage().await;
+    let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
+    let buch = einsatzbuch(&l, 20).await;
+    freigeben(&l, einsatz, &buch).await;
+
+    scopes_setzen(
+        &l,
+        &buch,
+        json!(["einsaetze:read", "events:read", "lage:read"]),
+    )
+    .await;
+
+    assert_eq!(freigaben(&l).await, 0, "die Freigabe ist beendet");
+    let v = ok(&l.app, &buch, "/api/v1/lage?karte=none").await;
+    assert_eq!(
+        v.get("einsatz"),
+        Some(&Value::Null),
+        "keine Lage ohne neue Freigabe: {v}"
+    );
+    let v = ok(&l.app, &buch, EINSAETZE).await;
+    assert_eq!(v["einsaetze"], json!([]));
+    let v = ok(&l.app, &buch, &format!("{EVENTS}?after=0")).await;
+    assert_eq!(
+        arten(&v),
+        ["einsatz.created", "einsatz.closed", "lage.changed"],
+        "das Fremdsystem erfährt das Ende"
+    );
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Rechte der Anbindung „Einsatzbuch“")
+                && t.contains("Freigabe dieses Einsatzes ist beendet")),
+        "{etb:?}"
+    );
+
+    // Die neue Freigabe meldet sich wie jede.
+    freigeben(&l, einsatz, &buch).await;
+    let v = ok(&l.app, &buch, "/api/v1/lage?karte=none").await;
+    assert_eq!(v["einsatz"]["id"], json!(einsatz));
+}
+
+/// Fällt eines von zwei Rechten mit Einsatzbezug weg, endet die Freigabe ebenso; gibt der Admin
+/// es zurück, liest die Anbindung erst nach einer neuen Freigabe.
+#[tokio::test]
+async fn ein_entzogenes_von_zwei_rechten_beendet_die_freigabe_ebenso() {
+    let l = lage().await;
+    let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
+    let cred = anbindung(
+        &l,
+        "Monitor und Buch",
+        json!(["einsaetze:read", "events:read", "lage:read"]),
+        21,
+    )
+    .await;
+    freigeben(&l, einsatz, &cred).await;
+
+    scopes_setzen(&l, &cred, json!(["einsaetze:read", "events:read"])).await;
+    assert_eq!(freigaben(&l).await, 0);
+
+    scopes_setzen(
+        &l,
+        &cred,
+        json!(["einsaetze:read", "events:read", "lage:read"]),
+    )
+    .await;
+    let v = ok(&l.app, &cred, EINSAETZE).await;
+    assert_eq!(
+        v["einsaetze"],
+        json!([]),
+        "kein Einsatz, bis die Einsatzleitung neu freigibt"
+    );
+}
+
+/// Ein Recht ohne Einsatzbezug ändert an der Freigabe nichts.
+#[tokio::test]
+async fn ein_recht_ohne_einsatzbezug_laesst_die_freigabe_stehen() {
+    let l = lage().await;
+    let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
+    let buch = einsatzbuch(&l, 22).await;
+    freigeben(&l, einsatz, &buch).await;
+
+    scopes_setzen(
+        &l,
+        &buch,
+        json!(["einsaetze:read", "events:read", "rechner:use"]),
+    )
+    .await;
+    scopes_setzen(&l, &buch, json!(["einsaetze:read"])).await;
+
+    assert_eq!(freigaben(&l).await, 1);
+    let v = ok(&l.app, &buch, EINSAETZE).await;
+    assert_eq!(v["einsaetze"][0]["id"], json!(einsatz));
+}

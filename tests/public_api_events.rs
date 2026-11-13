@@ -758,3 +758,60 @@ async fn der_purge_lauf_raeumt_die_ausgangsereignisse() {
         .unwrap();
     assert_eq!(grenze, alt);
 }
+
+/// Ein wartender Abruf prüft die Löschgrenze bei jeder Nachfrage: Läuft der Purge über seinen
+/// Cursor hinweg, antwortet er mit `cursor_expired`, statt eine Lücke als „nichts Neues“ zu melden.
+#[tokio::test]
+async fn ein_wartender_abruf_meldet_einen_purge_ueber_seinen_cursor_als_abgelaufen() {
+    let o = org().await;
+    let (z, einsatz) = angebunden(&o, "A").await;
+    let beginn = stand(&o.pool, &z).await;
+    let raum = Warteraum::neu(4);
+
+    let wartender = {
+        let (pool, z, raum) = (o.pool.clone(), z.clone(), raum.clone());
+        tokio::spawn(async move {
+            events::abrufen_mit(
+                &pool,
+                &z,
+                ALLE_LESE_SCOPES,
+                Some(beginn),
+                Duration::from_secs(25),
+                &raum,
+                TAKT,
+            )
+            .await
+        })
+    };
+    tokio::time::sleep(TAKT * 3).await;
+    // Wie ein Purge, der über den Cursor läuft: Zeilen darüber entstehen und sind gelöscht,
+    // bevor der wartende Abruf sie sieht (eine Transaktion, wie es der Abruf von außen sieht).
+    let mut tx = o.pool.begin().await.unwrap();
+    sqlx::query("UPDATE einsatz SET leitstellen_nr = 'L-weg' WHERE id = ?")
+        .bind(einsatz)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE maschine_ereignis_stand SET purged_until = \
+         (SELECT seq FROM sqlite_sequence WHERE name = 'maschine_ereignis')",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query(
+        "DELETE FROM maschine_ereignis \
+         WHERE id <= (SELECT purged_until FROM maschine_ereignis_stand)",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let fehler = tokio::time::timeout(Duration::from_secs(2), wartender)
+        .await
+        .expect("der Abruf endet bei der nächsten Nachfrage")
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(fehler.code, ErrorCode::CursorExpired);
+}

@@ -703,6 +703,67 @@ async fn das_ende_des_spiegel_abgleichs_meldet_lage_changed_der_takt_nicht() {
     );
 }
 
+/// Wird ein freigegebener Einsatz zum Spiegel (Führung abgegeben) oder hört er auf, einer zu sein
+/// (Führung übernommen, Verwahrung), ändert sich die Lage; ebenso mit der Freigabestufe.
+#[tokio::test]
+async fn spiegel_werden_aufhoeren_und_freigabestufe_melden_lage_changed() {
+    let l = lage().await;
+    let a = zugang_anlegen(&l.pool, l.org, "A").await;
+    let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
+    freigeben(&l.pool, &a, einsatz, l.admin_id).await;
+    let unter_merker = |sql: String| {
+        let pool = l.pool.clone();
+        async move {
+            let mut tx = pool.begin().await.unwrap();
+            for sql in [
+                "INSERT INTO spiegel_uebernahme (id) VALUES (1)".to_string(),
+                sql,
+                "DELETE FROM spiegel_uebernahme".to_string(),
+            ] {
+                sqlx::query(sqlx::AssertSqlSafe(sql))
+                    .execute(&mut *tx)
+                    .await
+                    .unwrap();
+            }
+            tx.commit().await.unwrap();
+        }
+    };
+
+    let ab = hoechste(&l.pool).await;
+    unter_merker(format!(
+        "INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES ({einsatz}, 'x/{einsatz}')"
+    ))
+    .await;
+    assert_eq!(
+        neu_seit(&l.pool, &a, ab).await,
+        vec![e("lage.changed", einsatz)],
+        "wird Spiegel"
+    );
+
+    let ab = hoechste(&l.pool).await;
+    sqlx::query("UPDATE einsatz_spiegel SET freigabestufe = 'ohne_personen' WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        neu_seit(&l.pool, &a, ab).await,
+        vec![e("lage.changed", einsatz)],
+        "Freigabestufe"
+    );
+
+    let ab = hoechste(&l.pool).await;
+    unter_merker(format!(
+        "DELETE FROM einsatz_spiegel WHERE einsatz_id = {einsatz}"
+    ))
+    .await;
+    assert_eq!(
+        neu_seit(&l.pool, &a, ab).await,
+        vec![e("lage.changed", einsatz)],
+        "hört auf, Spiegel zu sein"
+    );
+}
+
 // ── Wege neben der Oberfläche ────────────────────────────────────────────────────────────────
 
 #[tokio::test]
