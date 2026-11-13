@@ -289,9 +289,9 @@ export default function Schnellerfassung({
   // Unter `md` steht das Feld auf eigener Zeile: zwischen Typ-Präfix und „Erfassen" bliebe es
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
   // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
-  const { istSchmal, istBeruehrung, istNiedrig, screens, abBreite } = useViewport();
+  const { istSchmal, istBeruehrung, istNiedrigBei, screens, abBreite } = useViewport();
   // Niedriges Fenster ab `md`: Felder und Fußzeile in einer rollenden Zeile (design.md D9).
-  const einzeilig = istNiedrig && !istSchmal;
+  const einzeilig = istNiedrigBei(token.controlHeight) && !istSchmal;
   const [vorschauGewaehlt, setVorschauGewaehlt] = useState(false);
   const textRef = useRef<TextAreaRef>(null);
   const dateiEingabe = useRef<HTMLInputElement>(null);

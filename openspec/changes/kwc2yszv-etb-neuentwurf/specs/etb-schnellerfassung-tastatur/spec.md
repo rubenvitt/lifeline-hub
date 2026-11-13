@@ -115,12 +115,18 @@ fehlen.
 links, und „+ Veranlassung“, „+ Anhang“ und „+ weiterer Entwurf“ rechts in derselben Zeile. Die
 Erfassungsleiste MUST höchstens die Hälfte der Fensterhöhe belegen und MUST im Handschuh-Betrieb
 die Trefffläche der Dichtestufe halten. Unter `md` SHALL die Fußzeile waagerecht rollen statt
-umzubrechen. Ist das Fenster niedriger als 700 px, SHALL ab `md` die Feldzeile mit Typ-Knopf und
-die Fußzeile in einer einzigen, waagerecht rollenden Zeile über dem Inhalt stehen.
+umzubrechen. Ist das Fenster so niedrig, dass die volle Leiste mehr als die halbe Fensterhöhe
+belegte (kompakt unter 320 px, komfortabel unter 500 px, Handschuh-Betrieb unter 740 px), SHALL ab
+`md` die Feldzeile mit Typ-Knopf und die Fußzeile in einer einzigen, waagerecht rollenden Zeile über
+dem Inhalt stehen.
 
 #### Scenario: Fükw im Handschuh-Betrieb
 - **WHEN** die Erfassung bei 1366 × 768 im Handschuh-Betrieb mit Typ „Meldung“ steht
 - **THEN** stehen beide Schalter in der Fußzeile mit mindestens 72 px Trefffläche, und die Leiste belegt höchstens 384 px
+
+#### Scenario: Fükw im Browserfenster
+- **WHEN** die Erfassung in kompakter Dichte bei 1366 × 620 steht
+- **THEN** stehen Feldzeile mit Typ-Segmenten und Fußzeile wie gezeichnet, nicht einzeilig
 
 #### Scenario: Niedriges Fenster
 - **WHEN** die Erfassung bei 1366 × 520 im Handschuh-Betrieb steht

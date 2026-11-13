@@ -1810,9 +1810,9 @@ describe('Von und An folgen der Tastaturregel des Vorschlagsfelds (kwc2yszv, D5)
 });
 
 describe('Niedriges Fenster ab md: Felder und Einstellungen in einer rollenden Zeile', () => {
-  it('bei 1366 × 520 eine Zeile mit Typ-Knopf, Feldern und Schaltern, keine eigene Fußzeile', () => {
+  it('bei 1366 × 300 (kompakt) eine Zeile mit Typ-Knopf, Feldern und Schaltern, keine eigene Fußzeile', () => {
     setzeViewportBreite(1366);
-    setzeViewportHoehe(520);
+    setzeViewportHoehe(300);
     renderMitProviders(
       <Schnellerfassung {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })} />,
     );
@@ -1829,8 +1829,9 @@ describe('Niedriges Fenster ab md: Felder und Einstellungen in einer rollenden Z
     expect(document.querySelector('[data-lfh="etb-fusszeile"]')).toBeNull();
   });
 
-  it('bei 1366 × 768 bleibt die Feldzeile mit Segmenten und eigener Fußzeile', () => {
+  it('bei 1366 × 620 (Fükw im Browserfenster, kompakt) bleibt die Feldzeile mit Segmenten und Fußzeile', () => {
     setzeViewportBreite(1366);
+    setzeViewportHoehe(620);
     renderMitProviders(<Schnellerfassung {...props()} />);
     expect(screen.getByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeInTheDocument();
     expect(document.querySelector('[data-lfh="etb-fusszeile"]')).not.toBeNull();

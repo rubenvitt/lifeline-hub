@@ -267,7 +267,7 @@ export interface EtbFeldzeileProps {
   gesperrt: boolean;
   schmal: boolean;
   /**
-   * Niedriges Fenster ab `md` (`useViewport().istNiedrig`): Typ-Knopf, Felder und `anhang` (die Fußzeile)
+   * Niedriges Fenster ab `md` (`useViewport().istNiedrigBei`): Typ-Knopf, Felder und `anhang` (die Fußzeile)
    * stehen in einer waagerecht rollenden Zeile.
    */
   einzeilig?: boolean;

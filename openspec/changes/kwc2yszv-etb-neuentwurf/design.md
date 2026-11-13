@@ -99,9 +99,11 @@ Fokus (WCAG 2.4.11, `e2e/fokus-verdeckung.spec.ts`). Ein Druck mit der Vorgabe n
 ### D9 Niedriges Fenster: eine rollende Zeile
 Beim Bau gemessen: im Handschuh-Betrieb sind Feldzeile (zwei Reihen), Inhalt und Fußzeile am
 Fükw 356 px hoch (Grenze 384 px), bei 1366 × 520 aber fast 70 % der Fensterhöhe; Zeilen der
-Zeitachse verschwanden beim Tabben hinter der Leiste. Unter 700 px Fensterhöhe stehen ab `md`
-deshalb Typ-Knopf, Felder und Fußzeile in einer waagerecht rollenden Zeile
-(`useViewport().istNiedrig`, `NIEDRIG_UNTER`). Der Fükw (768 px) behält die gezeichnete Form.
+Zeitachse verschwanden beim Tabben hinter der Leiste. Wäre die volle Leiste höher als die halbe
+Fensterhöhe, stehen ab `md` deshalb Typ-Knopf, Felder und Fußzeile in einer waagerecht rollenden
+Zeile. Die Schwelle hängt an der Dichte (`useViewport().istNiedrigBei`, `NIEDRIG_UNTER`: kompakt
+320, komfortabel 500, Handschuh 740 px), nicht an einer festen Höhe: ein Fükw mit 1366 × 768 hat im
+Browserfenster nur rund 620–660 px und behält in kompakter Dichte die gezeichnete Form (Review E3).
 *Verworfen:* die Leiste ab `md` einklappen wie auf dem Handschirm — beim Schreiben läge sie
 weiter über der halben Höhe.
 
