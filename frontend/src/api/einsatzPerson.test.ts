@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  toPersonAuswahl,
   createMassnahme,
   createVerletzung,
   entfernePersonAnhang,
   ladePersonenDruck,
+  loadPersonZeile,
   revokeMassnahme,
   revokeVerletzung,
   saveTransport,
@@ -12,7 +14,9 @@ import {
   listePersonAnhaenge,
   personAnhangDownloadPfad,
   savePersonFeld,
+  comparePersonen,
 } from './einsatzPerson';
+import type { Person } from './types';
 import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 import type { UploadFortschritt } from './client';
 
@@ -32,6 +36,51 @@ describe('ladePersonenDruck', () => {
     const [pfad, init] = fetchMock.mock.calls[0];
     expect(pfad).toBe('/api/einsaetze/7/personen/druck');
     expect(init?.method ?? 'GET').toBe('GET');
+  });
+});
+
+// LLH-1682: Der Live-Abgleich lädt eine Zeile über die eigene Zeilen-Route, nie über das
+// protokollierende Detail.
+describe('loadPersonZeile', () => {
+  it('ruft genau GET /api/einsaetze/{id}/personen/{pid}/zeile', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"id":3}', { status: 200 }));
+    await expect(loadPersonZeile(7, 3)).resolves.toEqual({ id: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [pfad, init] = fetchMock.mock.calls[0];
+    expect(pfad).toBe('/api/einsaetze/7/personen/3/zeile');
+    expect(init?.method ?? 'GET').toBe('GET');
+  });
+});
+
+describe('comparePersonen und toPersonAuswahl (LLH-1682)', () => {
+  const p = (id: number, registrier_nr: number) =>
+    ({
+      id,
+      registrier_nr,
+      status: 'betroffen',
+      name: 'Muster',
+      vorname: 'Max',
+      pat_nummer: 'P-1',
+      notiz: 'Freitext',
+      storniert_at: null,
+    }) as unknown as Person;
+
+  it('ordnet nach der Registriernummer aufsteigend wie das SQL', () => {
+    expect([p(1, 3), p(2, 1), p(3, 2)].sort(comparePersonen).map((x) => x.id)).toEqual([2, 3, 1]);
+  });
+
+  it('die Auswahl trägt nur die Felder der Auswahl, eine stornierte Person gehört nicht hinein', () => {
+    expect(toPersonAuswahl(p(1, 1))).toEqual({
+      id: 1,
+      registrier_nr: 1,
+      status: 'betroffen',
+      name: 'Muster',
+      vorname: 'Max',
+      pat_nummer: 'P-1',
+    });
+    expect(toPersonAuswahl({ ...p(1, 1), storniert_at: '2026-11-13 10:00:00' })).toBeNull();
   });
 });
 

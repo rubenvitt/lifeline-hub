@@ -311,6 +311,29 @@ describe('erzeugeZeilenSammler (LFH-931)', () => {
     expect(vormerken.mock.calls.map((c) => c[0])).toEqual([einsatzKeys.schaeden(E)]);
   });
 
+  // LLH-1682, design.md D6: `cancelQueries` in einem `onMutate` erreicht den Zeilenabruf nicht.
+  it('ändert jemand die abgerufene Zeile während des Abrufs, bleibt das stehen und die Kennung wartet aufs nächste Fenster', async () => {
+    const { qc, sammler, zeilen } = aufbau();
+    const vormerken = vi.spyOn(sammler, 'vormerken');
+    qc.setQueryData(einsatzKeys.schaeden(E), [schaden(2, 2)]);
+    let zeileFreigeben: (s: Schaden) => void = () => {};
+    api.ladeSchaden.mockReturnValueOnce(new Promise<Schaden>((r) => (zeileFreigeben = r)));
+    api.ladeSchaden.mockReturnValue(new Promise<Schaden>(() => {}));
+
+    zeilen.vormerken('schaeden', 2);
+    await fenster();
+    expect(api.ladeSchaden).toHaveBeenCalledTimes(1);
+
+    const optimistisch = [schaden(2, 2, { ausmass: 'gross' })];
+    qc.setQueryData(einsatzKeys.schaeden(E), optimistisch);
+    zeileFreigeben(schaden(2, 2));
+    await fenster();
+
+    expect(qc.getQueryData(einsatzKeys.schaeden(E))).toEqual(optimistisch);
+    expect(api.ladeSchaden).toHaveBeenCalledTimes(2);
+    expect(vormerken).not.toHaveBeenCalled();
+  });
+
   it('raeumen gibt offene Ziele als Listen an den Sammler und lädt danach nichts mehr', async () => {
     const { qc, sammler, zeilen } = aufbau();
     qc.setQueryData(einsatzKeys.schaeden(E), []);

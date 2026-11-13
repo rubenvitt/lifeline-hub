@@ -278,6 +278,8 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
     ("GET", "/api/einsaetze/{id}/personen"),
+    // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
+    ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
@@ -336,6 +338,8 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
     ("GET", "/api/einsaetze/{id}/personen"),
+    // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
+    ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
@@ -472,6 +476,8 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
         "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
     ),
     ("GET", "/api/einsaetze/{id}/personen"),
+    // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
+    ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
@@ -562,6 +568,8 @@ const EINHEIT: &[(&str, &str)] = &[
     // aktive UHS, RTW als Sofortmeldung) und die aktiven UHS als Ziel wählen. Kein Detail, keine
     // Korrektur: das bleibt UHS und Einsatzleitung.
     ("GET", "/api/einsaetze/{id}/personen"),
+    // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
+    ("GET", "/api/einsaetze/{id}/personen/{pid}/zeile"),
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/uhs"),
 ];

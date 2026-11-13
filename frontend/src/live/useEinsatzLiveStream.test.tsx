@@ -424,6 +424,42 @@ describe('useEinsatzLiveStream', () => {
     expect(keysVon(spy)).not.toContainEqual(['einsatz-schaeden', 3]);
   });
 
+  // LLH-1682: ein Personen-Ereignis mit Kennung lädt nur diese Zeile über die Zeilen-Route, nie
+  // die Personenliste und nie das protokollierende Detail.
+  it('lädt bei einem Personen-Ereignis nur die Zeile, nicht die Liste (LLH-1682)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const abrufe: string[] = [];
+    server.use(
+      http.get('/api/einsaetze/3/personen/:pid/zeile', ({ params }) => {
+        abrufe.push(String(params.pid));
+        return HttpResponse.json({
+          id: 9,
+          registrier_nr: 2,
+          status: 'betroffen',
+          name: 'Neu',
+          storniert_at: null,
+        });
+      }),
+    );
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['einsatz-personen', 3], [{ id: 1, registrier_nr: 1, storniert_at: null }]);
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('person', JSON.stringify({ einsatz_id: 3, person_id: 9 }));
+    await waitFor(() =>
+      expect(
+        client.getQueryData<{ id: number }[]>(['einsatz-personen', 3])?.map((p) => p.id),
+      ).toEqual([1, 9]),
+    );
+    expect(abrufe).toEqual(['9']);
+    expect(keysVon(spy)).not.toContainEqual(['einsatz-personen', 3]);
+    expect(keysVon(spy)).not.toContainEqual(['einsatz-personen-auswahl', 3]);
+  });
+
   // Der lagged-Vollabgleich invalidiert breit (Union aller Event-Keys), löst aber BEWUSST keinen
   // Sofort-Alarm aus — sonst Fehlalarm ohne neue Sofortmeldung.
   it('invalidiert breit und spielt KEINEN Ton bei lagged-Event (LFH-122)', async () => {
