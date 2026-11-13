@@ -103,6 +103,26 @@ pub async fn uebernehmen(
             return Ok(ergebnis);
         }
     }
+    if let Some((id, ..)) = &gefunden {
+        // Ein Spiegel nimmt nur Lieferungen über eine Zuordnung seiner eigenen Org an (LLH-1851,
+        // Spec `einsatz-spiegel`): Nach Widerruf und Neuzuordnung derselben Gegen-Org an eine
+        // andere Org hier zöge er sonst samt Mitgliedschaften zu ihr um. Der Stand am Ende der
+        // Lieferung hält den Absender davon ab, ihn in jedem Takt von vorn zu liefern; der Grund
+        // steht nur im Log, nicht am Spiegel, den die bisherige Org liest (D1–D3 in
+        // `openspec/changes/archive/2026-11-13-d86po4bc-spiegel-nur-gleiche-org/design.md`).
+        let org: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+        if org != e.org_id {
+            ergebnis.hinweise.push(format!(
+                "Einsatz {} gehört hier zu einer anderen Organisation; Lieferung verworfen.",
+                l.kennung
+            ));
+            ergebnis.stand = l.bis;
+            return Ok(ergebnis);
+        }
+    }
     if let Some((id, _, ko, _, beendet)) = &gefunden {
         if *ko != Some(e.kopplung_org_id) || beendet.is_some() {
             // Neu zugeordnet oder neu gekoppelt (der Absender ist derselbe Führer, das prüft der

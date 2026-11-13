@@ -1201,3 +1201,90 @@ async fn ohne_eigene_instanzkennung_gibt_es_keine_erfundene_ursprungskennung() {
     .unwrap();
     assert_eq!(u, None);
 }
+
+/// LLH-1851: Nach Widerruf und Neuzuordnung derselben Gegen-Org an eine andere Org hier nimmt der
+/// Spiegel die Lieferung nicht an. Er bleibt beendet an seiner Zuordnung, und der Absender bekommt
+/// den Stand am Ende der Lieferung, damit er nicht in jedem Takt von vorn liefert.
+#[tokio::test]
+async fn eine_zuordnung_einer_anderen_org_haengt_den_spiegel_nicht_um() {
+    let (f, s) = zwei_seiten().await;
+    let erika = konto(&f, "Erika").await;
+    let einsatz: i64 = eine(
+        &f,
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+    )
+    .await;
+    etb(&f, einsatz, 1, erika).await;
+    while abgleichen(&f, &s, 500).await > 0 {}
+    let spiegel: i64 = eine(&s, "SELECT einsatz_id FROM einsatz_spiegel").await;
+    let mut sc = s.acquire().await.unwrap();
+    super::beende_fuer_zuordnung(&mut sc, 1, "2026-11-13 00:00:00")
+        .await
+        .unwrap();
+    drop(sc);
+    exec(
+        &s,
+        "UPDATE instanz_kopplung_org SET widerrufen_at = '2026-11-13 00:00:00' WHERE id = 1",
+    )
+    .await;
+    exec(
+        &s,
+        "INSERT INTO organisation (id, name) VALUES (2, 'Org Y')",
+    )
+    .await;
+    exec(
+        &s,
+        "INSERT INTO instanz_kopplung_org (id, kopplung_id, org_id, fremde_org_kennung, \
+         fremde_org_name) VALUES (2, 1, 2, 'hub/1', 'Org')",
+    )
+    .await;
+    let vorher: (i64, Option<i64>, Option<String>, i64) = sqlx::query_as(
+        "SELECT e.org_id, s.kopplung_org_id, s.beendet_at, s.stand FROM einsatz e \
+         JOIN einsatz_spiegel s ON s.einsatz_id = e.id WHERE e.id = ?",
+    )
+    .bind(spiegel)
+    .fetch_one(&s)
+    .await
+    .unwrap();
+    let kennung: String = eine(&s, "SELECT fremde_kennung FROM einsatz_spiegel").await;
+    let l = super::paket::EinsatzLieferung {
+        kennung,
+        org: "hub/1".into(),
+        org_id: 1,
+        freigabestufe: "alles".into(),
+        seit: 0,
+        bis: vorher.3 + 10,
+        ..Default::default()
+    };
+    let e = Empfaenger {
+        kopplung_id: 1,
+        kopplung_org_id: 2,
+        org_id: 2,
+        meldend: false,
+        vor_ort: false,
+    };
+    let mut sc = s.acquire().await.unwrap();
+    let erg = uebernehmen::uebernehmen(&mut sc, &e, &l).await.unwrap();
+    drop(sc);
+    assert!(
+        erg.hinweise
+            .iter()
+            .any(|h| h.contains("anderen Organisation")),
+        "{:?}",
+        erg.hinweise
+    );
+    assert_eq!(erg.stand, l.bis, "Stand am Ende der Lieferung");
+    assert_eq!(
+        erg.einsatz_id, None,
+        "kein Hinweis am Spiegel der anderen Org"
+    );
+    let nachher: (i64, Option<i64>, Option<String>, i64) = sqlx::query_as(
+        "SELECT e.org_id, s.kopplung_org_id, s.beendet_at, s.stand FROM einsatz e \
+         JOIN einsatz_spiegel s ON s.einsatz_id = e.id WHERE e.id = ?",
+    )
+    .bind(spiegel)
+    .fetch_one(&s)
+    .await
+    .unwrap();
+    assert_eq!(nachher, vorher, "Spiegel unverändert");
+}
