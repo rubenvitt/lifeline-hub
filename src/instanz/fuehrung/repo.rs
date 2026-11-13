@@ -2,7 +2,7 @@
 //!
 //! Jede gespeicherte Akte richtet ihren Einsatz aus ([`save`] →
 //! `instanz::spiegel::fuehrung::richte_aus`, in der Transaktion des Wechsels): Führt eine andere
-//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0028).
+//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0033).
 
 use super::{Epoche, FuehrungWechselArt};
 use crate::error::AppError;
@@ -589,6 +589,9 @@ pub async fn verwahren(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<b
     Ok(true)
 }
 
+/// Grund einer Führung, die der Widerruf einer Kopplung zurückholt.
+const GRUND_WIDERRUF: &str = "Kopplung widerrufen";
+
 /// Nach dem Widerruf einer Org-Zuordnung (hier oder vom Gegenüber): lokale Einsätze der Org, die
 /// dieses Gegenüber führt, holt diese Instanz mit der nächsten Epoche zurück. Sonst bliebe ein Einsatz
 /// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491). Gibt die
@@ -605,9 +608,13 @@ pub async fn verwahren(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<b
 /// meldende Seiten der Org erfahren es über den Vermerk. Eine neue Zuordnung bringt die Akten
 /// zurück ([`renew_stand_der_org`] beim Gegenüber). Auch das nur mit Schalter: Ohne ihn bleibt
 /// der Stand der Akten, wie er ist.
+///
+/// `org_schluessel` ist der Schlüssel der Org an der widerrufenen Kopplung, wie
+/// [`list_orgs_der_kopplung`] ihn bildet; er steht in der Erklärung, die die Akte danach trägt.
 pub async fn release_nach_widerruf(
     conn: &mut SqliteConnection,
     org_id: i64,
+    org_schluessel: &str,
     gegenueber_kennung: &str,
 ) -> Result<Vec<i64>, AppError> {
     let mut einsaetze = Vec::new();
@@ -675,11 +682,28 @@ pub async fn release_nach_widerruf(
     for id in ids {
         let mut a = load(conn, id).await?;
         let von = a.fuehrer_name.clone();
-        a.set_epoche(&Epoche::naechste([&a.epoche()], &ich.kennung));
+        let alt = a.epoche();
+        let neu = Epoche::naechste([&alt], &ich.kennung);
+        // Eine Erklärung ohne Beweis gegen das widerrufene Gegenüber: Andere meldende Seiten sehen
+        // daran, dass sich die Übernahme nicht gegen sie richtet, und halten sie ohne Alarm offen.
+        // Unterschrieben hat niemand (Change `d12cmcx1-hub-epoche-gegen-dritten`, D2).
+        let erklaerung = super::erklaerung::NotuebernahmeErklaerung {
+            typ: super::erklaerung::TYP_NOTUEBERNAHME.into(),
+            einsatz: a.kennung.clone(),
+            org: org_schluessel.to_string(),
+            epoche_alt: alt,
+            epoche_neu: neu.clone(),
+            fuehrer_alt: a.fuehrer_kennung.clone(),
+            fuehrer_neu: ich.kennung.clone(),
+            grund: GRUND_WIDERRUF.into(),
+            zeitpunkt: crate::zeit::jetzt(),
+            unterzeichner: String::new(),
+        };
+        a.set_epoche(&neu);
         a.fuehrer_kennung = ich.kennung.clone();
         a.fuehrer_name = ich.name.clone();
         a.set_art(FuehrungWechselArt::Notuebernahme);
-        a.erklaerung = None;
+        a.erklaerung = Some(erklaerung.to_text());
         a.beweis = None;
         a.offen = None;
         a.offen_bruch_at = None;
@@ -693,7 +717,7 @@ pub async fn release_nach_widerruf(
             VerlaufNeu {
                 von_name: Some(&von),
                 nach_name: &ich.name,
-                grund: Some("Kopplung widerrufen"),
+                grund: Some(GRUND_WIDERRUF),
                 bruch_at: a.bruch_at.as_deref(),
                 ..VerlaufNeu::default()
             },
@@ -1715,7 +1739,9 @@ pub(crate) mod tests {
         .await
         .unwrap();
 
-        let einsaetze = release_nach_widerruf(&mut conn, 1, "hub").await.unwrap();
+        let einsaetze = release_nach_widerruf(&mut conn, 1, "hub/1", "hub")
+            .await
+            .unwrap();
 
         assert_eq!(einsaetze, vec![gefuehrt]);
         drop(conn);
@@ -1740,7 +1766,9 @@ pub(crate) mod tests {
         gekoppelt(&pool).await;
         fremde_akte(&pool, "hub/5-aa").await;
         let mut conn = pool.acquire().await.unwrap();
-        release_nach_widerruf(&mut conn, 1, "hub").await.unwrap();
+        release_nach_widerruf(&mut conn, 1, "hub/1", "hub")
+            .await
+            .unwrap();
         drop(conn);
         let rest: Vec<String> = akten(&pool).await.into_iter().map(|a| a.kennung).collect();
         assert_eq!(rest, vec!["hub/5-aa".to_string()]);

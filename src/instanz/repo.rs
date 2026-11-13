@@ -491,13 +491,19 @@ pub async fn org_widerrufen(
         // Direktkopplung nicht: das wäre eine Notübernahme gegen die Gegenstelle vor Ort, und
         // beide ELW führten danach denselben Einsatz (LLH-1497, Spec `instanz-fuehrung`, „Über
         // eine Direktkopplung wechselt die Führung nicht“). Der Spiegel bleibt lesbar stehen.
-        let (org_id, gegenueber, art): (i64, String, String) = sqlx::query_as(
-            "SELECT o.org_id, k.gegenueber_kennung, k.art FROM instanz_kopplung_org o \
+        // Der Org-Schlüssel wie in `fuehrung::repo::list_orgs_der_kopplung`: an einem Hub die
+        // Kennung der Org dort, sonst die eigene Kennung mit der Org-ID.
+        let (org_id, gegenueber, art, org_schluessel): (i64, String, String, String) =
+            sqlx::query_as(
+                "SELECT o.org_id, k.gegenueber_kennung, k.art, \
+                 CASE WHEN k.richtung = 'meldet_sich' THEN o.fremde_org_kennung \
+                 ELSE (SELECT kennung FROM instanz_identitaet) || '/' || o.org_id END \
+                 FROM instanz_kopplung_org o \
              JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?",
-        )
-        .bind(org_zeile_id)
-        .fetch_one(&mut *conn)
-        .await?;
+            )
+            .bind(org_zeile_id)
+            .fetch_one(&mut *conn)
+            .await?;
         // Eine unbekannte Art gilt wie `KopplungZeile::art` als die engere: vor Ort.
         let art =
             super::InstanzKopplungArt::parse(&art).unwrap_or(super::InstanzKopplungArt::VorOrt);
@@ -505,8 +511,13 @@ pub async fn org_widerrufen(
             return Ok(Some(Vec::new()));
         }
         Ok(Some(
-            crate::instanz::fuehrung::repo::release_nach_widerruf(conn, org_id, &gegenueber)
-                .await?,
+            crate::instanz::fuehrung::repo::release_nach_widerruf(
+                conn,
+                org_id,
+                &org_schluessel,
+                &gegenueber,
+            )
+            .await?,
         ))
     }
 }
