@@ -1544,3 +1544,135 @@ async fn ein_antrag_ohne_gespeicherte_quittung_wird_nicht_doppelt_ausgefuehrt() 
         "der Antrag ist erledigt"
     );
 }
+
+// ── Neuzuordnung an eine andere Org (LLH-1851) ───────────────────────────────────────────────
+
+/// Legt am Hub eine zweite Org mit eigenem Admin samt Unterschriftsschlüssel an; liefert
+/// (Org, Admin, Cookie).
+async fn zweite_org_mit_admin(hub: &Instanz) -> (i64, i64, String) {
+    let (org, admin) =
+        common::fremde_org_anlegen(&hub.pool, "Org Y", "yadmin", "yadmin-pw-123", "keine").await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET system_rolle = 'admin' WHERE id = {admin}"),
+    )
+    .await;
+    let p = lifeline_hub::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey::new(
+        "y",
+        [2u8; 32],
+    );
+    let oeff = p.oeffentlich();
+    let mut conn = hub.pool.acquire().await.unwrap();
+    lifeline_hub::auth::unterschrift::repo::create_lokal(
+        &mut conn,
+        &lifeline_hub::auth::unterschrift::repo::NeuerSchluessel {
+            org_id: org,
+            benutzer_id: admin,
+            benutzer_name: "Y-Admin",
+            credential_id: &p.credential_id,
+            schluessel: &oeff,
+            rp_id: RP,
+            origin: ORIGIN,
+            bezeichnung: "Stick Y",
+        },
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    let cookie = common::login_cookie(&hub.app, "yadmin", "yadmin-pw-123").await;
+    (org, admin, cookie)
+}
+
+#[tokio::test]
+#[ignore = "LLH-1851: Nachstellung in Arbeit, wird zum Beleg"]
+async fn nachstellung_neuzuordnung_an_andere_org() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let org_x: i64 = eine(&hub.pool, "SELECT org_id FROM benutzer WHERE benutzername = 'admin'").await;
+    let (erika_hub, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    etb_eintrag(&elw, e, "Vor dem Widerruf").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+
+    let zeige = |titel: &'static str| {
+        let pool = hub.pool.clone();
+        async move {
+            let org: i64 = eine(&pool, &format!("SELECT org_id FROM einsatz WHERE id = {s}")).await;
+            let sp: (Option<i64>, Option<String>, i64) = sqlx::query_as(
+                "SELECT kopplung_org_id, beendet_at, stand FROM einsatz_spiegel WHERE einsatz_id = ?",
+            )
+            .bind(s)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let mitglieder: Vec<(i64, String, i64, String)> = sqlx::query_as(
+                "SELECT m.benutzer_id, b.benutzername, b.org_id, m.einsatz_rolle \
+                 FROM einsatz_mitgliedschaft m JOIN benutzer b ON b.id = m.benutzer_id \
+                 WHERE m.einsatz_id = ? ORDER BY m.benutzer_id",
+            )
+            .bind(s)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            let zuordnungen: Vec<(i64, i64, String, Option<String>)> = sqlx::query_as(
+                "SELECT id, org_id, fremde_org_kennung, widerrufen_at FROM instanz_kopplung_org ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            println!(
+                "== {titel}\n  einsatz.org_id = {org}\n  einsatz_spiegel (kopplung_org_id, beendet_at, stand) = {sp:?}\n  mitglieder = {mitglieder:?}\n  zuordnungen = {zuordnungen:?}"
+            );
+        }
+    };
+    zeige("vor dem Widerruf").await;
+
+    // 2. Der Admin der Org X am Hub widerruft, der ELW erfährt es.
+    let kopplung: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung").await;
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{kopplung}/widerrufen"),
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{v}");
+    melden(&elw).await;
+    zeige("nach dem Widerruf").await;
+
+    // 3. Ein Admin der Org Y am Hub stellt einen Code aus, der ELW (Org A) löst ihn ein.
+    let (org_y, _, y_cookie) = zweite_org_mit_admin(&hub).await;
+    let (st, v) = common::anfrage(&hub.app, "POST", "/api/admin/instanz/codes", &y_cookie, None).await;
+    assert_eq!(st, StatusCode::CREATED, "{v}");
+    let code = v["code"].as_str().unwrap().to_string();
+    let (st, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw.admin,
+        Some(&json!({"adresse": hub.adresse, "code": code})),
+    )
+    .await;
+    println!("einloesen: {st} {v}");
+    melden(&elw).await;
+    zeige("nach der Neuzuordnung, vor dem Abgleich").await;
+
+    // 4. Der ELW liefert weiter.
+    etb_eintrag(&elw, e, "Nach der Neuzuordnung").await;
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    zeige("nach dem Abgleich").await;
+    println!("org_x = {org_x}, org_y = {org_y}, erika_hub = {erika_hub}");
+    println!("ETB am Hub: {:?}", etb_inhalte(&hub, s).await);
+
+    // Wer liest den Spiegel jetzt?
+    let (st, _) = common::anfrage(&hub.app, "GET", &format!("/api/einsaetze/{s}"), &erika, None).await;
+    println!("Erika (Org X) GET Einsatz: {st}");
+    let (st, _) = common::anfrage(&hub.app, "GET", &format!("/api/einsaetze/{s}"), &y_cookie, None).await;
+    println!("Y-Admin GET Einsatz: {st}");
+    let (st, v) = common::anfrage(&hub.app, "GET", "/api/einsaetze", &erika, None).await;
+    println!("Erika Liste: {st} {v}");
+    panic!("Beobachtung");
+}
