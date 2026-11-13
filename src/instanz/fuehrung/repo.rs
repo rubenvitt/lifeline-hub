@@ -90,14 +90,43 @@ pub async fn is_enabled_tx(conn: &mut SqliteConnection) -> Result<bool, AppError
     )
 }
 
-/// Nächster Stand dieser Instanz (monoton, Zähler an `instanz_identitaet`).
+/// Nächster Stand dieser Instanz (streng monoton, Zähler an `instanz_identitaet`). Er folgt der
+/// Uhr in Unix-Sekunden: Nach dem Zurückspielen einer Sicherung springt er so über alles, was das
+/// Gegenüber vor dem Ausfall quittiert haben kann (LLH-1708, design.md D1 der Change
+/// `xi5ugyt8-fuehrung-stand-nach-restore`).
 pub async fn next_stand(conn: &mut SqliteConnection) -> Result<i64, AppError> {
+    next_stand_um(conn, chrono::Utc::now().timestamp()).await
+}
+
+/// [`next_stand`] mit gesetzter Uhr: `MAX(Zähler + 1, uhr_s)`.
+async fn next_stand_um(conn: &mut SqliteConnection, uhr_s: i64) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
-        "UPDATE instanz_identitaet SET fuehrung_stand = fuehrung_stand + 1 \
+        "UPDATE instanz_identitaet SET fuehrung_stand = MAX(fuehrung_stand + 1, ?) \
          RETURNING fuehrung_stand",
     )
+    .bind(uhr_s)
     .fetch_one(&mut *conn)
     .await?)
+}
+
+/// Hebt den Zähler auf mindestens `auf`; senkt nie (LLH-1708, design.md D3).
+pub async fn raise_stand(conn: &mut SqliteConnection, auf: i64) -> Result<(), AppError> {
+    sqlx::query("UPDATE instanz_identitaet SET fuehrung_stand = ? WHERE fuehrung_stand < ?")
+        .bind(auf)
+        .bind(auf)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Eigener Zähler dieser Instanz.
+pub async fn load_stand(conn: &mut SqliteConnection) -> Result<i64, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT fuehrung_stand FROM instanz_identitaet")
+            .fetch_optional(&mut *conn)
+            .await?
+            .unwrap_or(0),
+    )
 }
 
 pub async fn load(conn: &mut SqliteConnection, id: i64) -> Result<AkteZeile, AppError> {
@@ -474,6 +503,12 @@ pub async fn verwahren(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<b
 /// dieses Gegenüber führt, holt diese Instanz mit der nächsten Epoche zurück. Sonst bliebe ein Einsatz
 /// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491). Gibt die
 /// Einsätze zurück, deren Akte sich geändert hat; der Aufrufer meldet ihren Kopf nach dem Commit.
+/// Ohne Schalter holt sie nichts zurück (LLH-1704): Die Führung ist dann eingefroren
+/// (`src/AGENTS.md`, „Backend — Instanzkopplung (LLH-1490)“; LLH-1641, E8). `save` richtete den
+/// Spiegel nicht aus, die Akte widerspräche dem Einsatz, und das nächste Einschalten machte ihn
+/// beim Start schreibbar; solche Einsätze bleiben Spiegel (Ausweg: LLH-1850). Offene Übernahmen
+/// verfallen auch ohne Schalter: Dort führt diese Instanz ohnehin, und nach dem Einschalten
+/// stünden sie als Konflikt da, dem niemand mehr widersprechen kann.
 pub async fn release_nach_widerruf(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -523,7 +558,7 @@ pub async fn release_nach_widerruf(
         save(conn, &mut a, true).await?;
         einsaetze.extend(a.einsatz_id);
     }
-    if ids.is_empty() {
+    if ids.is_empty() || !is_enabled_tx(conn).await? {
         return Ok(einsaetze);
     }
     let ich = ich(conn).await?;
@@ -707,6 +742,53 @@ pub async fn save_kopplung_staende(
     .bind(kopplung_id)
     .execute(&mut *conn)
     .await?;
+    Ok(())
+}
+
+/// Setzt `fuehrung_gesendet_bis` auch nach unten: Die Quittung des Gegenübers liegt unter dem,
+/// was es schon bestätigt hatte, es wurde also zurückgespielt und hat Akten verloren
+/// (LLH-1708, design.md D2). Alles darüber geht mit der nächsten Meldung erneut.
+pub async fn reset_gesendet_bis(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    bis: i64,
+) -> Result<(), AppError> {
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_gesendet_bis = ? WHERE id = ?")
+        .bind(bis)
+        .bind(kopplung_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Akten der Orgs `org_ids` mit Stand über `ab` bekommen einen frischen Stand, in der Reihenfolge
+/// ihres Stands (LLH-1708, design.md D3). Wie bei [`renew_stand_der_org`] gehen sie damit auch an
+/// andere Kopplungen erneut, was dort nichts ändert.
+pub async fn renew_stand_ueber(
+    conn: &mut SqliteConnection,
+    org_ids: &[i64],
+    ab: i64,
+) -> Result<(), AppError> {
+    if org_ids.is_empty() {
+        return Ok(());
+    }
+    let platz = vec!["?"; org_ids.len()].join(", ");
+    let sql = format!(
+        "SELECT id FROM einsatz_fuehrung WHERE org_id IN ({platz}) AND stand > ? ORDER BY stand, id"
+    );
+    let mut q = sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql));
+    for id in org_ids {
+        q = q.bind(id);
+    }
+    let ids = q.bind(ab).fetch_all(&mut *conn).await?;
+    for id in ids {
+        let stand = next_stand(conn).await?;
+        sqlx::query("UPDATE einsatz_fuehrung SET stand = ? WHERE id = ?")
+            .bind(stand)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+    }
     Ok(())
 }
 
@@ -1002,6 +1084,203 @@ pub(crate) mod tests {
         .await
         .unwrap();
         assert_eq!(noch_mal, None, "schon widerrufen");
+    }
+
+    /// LLH-1704 (LLH-1641, E8): Ohne Schalter bleibt die Führung eingefroren, auch wenn die
+    /// Kopplung widerrufen wird. Sonst nennte die Akte diese Instanz, während der Einsatz Spiegel
+    /// bleibt, und das nächste Einschalten machte ihn beim Start schreibbar. Eine offene Übernahme
+    /// des widerrufenen Hubs verfällt trotzdem: Sie stünde nach dem Einschalten als Konflikt da,
+    /// dem niemand mehr widersprechen kann (ADR-0028).
+    #[tokio::test]
+    async fn widerruf_ohne_schalter_laesst_die_fuehrung_stehen_und_raeumt_offene_uebernahmen() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        let gefuehrt = einsatz(&pool, "Beim Hub").await;
+        let eigen = einsatz(&pool, "Hier").await;
+        ensure(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut a = find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap();
+        a.fuehrer_kennung = "hub".into();
+        a.fuehrer_name = "Hub Nord".into();
+        save(&mut conn, &mut a, true).await.unwrap();
+        // Am eigenen Einsatz wartet eine Übernahme des Hubs auf die Entscheidung.
+        let mut b = find_by_einsatz(&mut conn, eigen).await.unwrap().unwrap();
+        b.offen = Some(
+            serde_json::to_string(&super::super::austausch::AkteMeldung {
+                kennung: b.kennung.clone(),
+                org: "hub/1".into(),
+                nummer: None,
+                bezeichnung: b.bezeichnung.clone(),
+                stichwort: None,
+                status: b.status.clone(),
+                epoche: Epoche::neu(2, "hub"),
+                fuehrer: "hub".into(),
+                fuehrer_name: "Hub Nord".into(),
+                art: "notuebernahme".into(),
+                erklaerung: None,
+                beweis: None,
+                anfrage: false,
+                offen: false,
+                stand: 1,
+            })
+            .unwrap(),
+        );
+        b.offen_bruch_at = Some("2026-11-10 09:00:00".into());
+        save(&mut conn, &mut b, true).await.unwrap();
+        drop(conn);
+        assert!(ist_spiegel(&pool, gefuehrt).await);
+
+        super::super::save_schalter(&pool, false).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let beim_hub = find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap();
+        let hier = find_by_einsatz(&mut conn, eigen).await.unwrap().unwrap();
+        let verlauf_vorher: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrung_verlauf")
+                .fetch_one(&mut *conn)
+                .await
+                .unwrap();
+        let zeile: i64 = sqlx::query_scalar("SELECT id FROM instanz_kopplung_org")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        let w = crate::instanz::repo::org_widerrufen(
+            &mut conn,
+            zeile,
+            None,
+            "2026-11-10 10:00:00",
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            w,
+            Some(vec![eigen]),
+            "nur die offene Übernahme fällt, der Einsatz beim Hub wird nicht freigegeben"
+        );
+        assert_eq!(
+            find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap(),
+            beim_hub,
+            "die Akte nennt weiter den Hub"
+        );
+        let hier_danach = find_by_einsatz(&mut conn, eigen).await.unwrap().unwrap();
+        assert_eq!(
+            (&hier_danach.offen, &hier_danach.offen_bruch_at),
+            (&None, &None),
+            "die offene Übernahme ist verfallen"
+        );
+        assert_eq!(
+            (hier_danach.epoche(), &hier_danach.fuehrer_kennung),
+            (hier.epoche(), &hier.fuehrer_kennung),
+            "diese Instanz führt mit derselben Epoche weiter"
+        );
+        let verlauf: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fuehrung_verlauf")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        assert_eq!(verlauf, verlauf_vorher, "kein Eintrag im Verlauf");
+        drop(conn);
+
+        super::super::save_schalter(&pool, true).await.unwrap();
+        assert!(
+            ist_spiegel(&pool, gefuehrt).await,
+            "Einschalten macht den Spiegel nicht schreibbar"
+        );
+        assert!(!ist_spiegel(&pool, eigen).await);
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            find_by_einsatz(&mut conn, gefuehrt).await.unwrap().unwrap(),
+            beim_hub,
+            "auch das Einschalten ändert die Akte nicht"
+        );
+    }
+
+    #[tokio::test]
+    async fn der_stand_folgt_der_uhr_und_steigt_streng() {
+        // LLH-1708, design.md D1: Nach dem Zurückspielen springt der Zähler über alles, was das
+        // Gegenüber vor dem Ausfall quittiert haben kann.
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let uhr = 1_800_000_000;
+        assert_eq!(next_stand_um(&mut conn, uhr).await.unwrap(), uhr);
+        assert_eq!(
+            next_stand_um(&mut conn, uhr).await.unwrap(),
+            uhr + 1,
+            "zwei Vergaben in derselben Sekunde"
+        );
+        assert_eq!(
+            next_stand_um(&mut conn, uhr + 100).await.unwrap(),
+            uhr + 100
+        );
+        assert_eq!(
+            next_stand_um(&mut conn, 5).await.unwrap(),
+            uhr + 101,
+            "eine Uhr, die zurückgeht, senkt nie"
+        );
+        let jetzt = chrono::Utc::now().timestamp();
+        assert!(next_stand(&mut conn).await.unwrap() >= jetzt);
+    }
+
+    #[tokio::test]
+    async fn gesendet_bis_laesst_sich_senken_der_rest_bleibt_monoton() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        save_kopplung_staende(&mut conn, 1, Some(50), Some(70))
+            .await
+            .unwrap();
+        reset_gesendet_bis(&mut conn, 1, 20).await.unwrap();
+        assert_eq!(load_kopplung_staende(&mut conn, 1).await.unwrap(), (20, 70));
+        save_kopplung_staende(&mut conn, 1, Some(10), Some(30))
+            .await
+            .unwrap();
+        assert_eq!(
+            load_kopplung_staende(&mut conn, 1).await.unwrap(),
+            (20, 70),
+            "das gewöhnliche Speichern senkt nie"
+        );
+    }
+
+    #[tokio::test]
+    async fn raise_stand_hebt_und_senkt_nie() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        raise_stand(&mut conn, 500).await.unwrap();
+        assert_eq!(load_stand(&mut conn).await.unwrap(), 500);
+        raise_stand(&mut conn, 100).await.unwrap();
+        assert_eq!(load_stand(&mut conn).await.unwrap(), 500);
+    }
+
+    #[tokio::test]
+    async fn renew_stand_ueber_stempelt_nur_ueber_der_grenze_und_nur_die_genannten_orgs() {
+        let pool = crate::db::test_pool().await;
+        gekoppelt(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        for b in ["A", "B", "C"] {
+            einsatz(&pool, b).await;
+        }
+        ensure(&pool).await;
+        let vorher = akten(&pool).await;
+        let grenze = vorher[0].stand;
+        let renew = |org: i64, ab: i64| {
+            let pool = pool.clone();
+            async move {
+                let mut conn = pool.acquire().await.unwrap();
+                renew_stand_ueber(&mut conn, &[org], ab).await.unwrap();
+            }
+        };
+        renew(2, 0).await;
+        assert_eq!(akten(&pool).await, vorher, "andere Org: nichts");
+        renew(1, grenze).await;
+        let nachher = akten(&pool).await;
+        assert_eq!(nachher[0].stand, grenze, "bis zur Grenze bleibt");
+        assert!(nachher[1].stand > vorher[2].stand);
+        assert!(
+            nachher[2].stand > nachher[1].stand,
+            "die Reihenfolge der Stände bleibt"
+        );
     }
 
     #[tokio::test]
