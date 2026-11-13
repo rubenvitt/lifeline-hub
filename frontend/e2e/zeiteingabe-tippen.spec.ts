@@ -3,8 +3,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * Zeitfelder nehmen eine getippte taktische Uhrzeit mit Enter an (LLH-1077, Spec `zeiteingabe`,
- * „Eingabe als Text“ und „Richtung nach Feldart“), gegen den echten Server: der ETB-Chip
- * „Ereigniszeit“, die Auftragsfrist und „Im Einsatz seit“ beim Schichtbeginn der Ablösung.
+ * „Eingabe als Text“ und „Richtung nach Feldart“), gegen den echten Server: das ETB-Feld
+ * „Zeit“, die Auftragsfrist und „Im Einsatz seit“ beim Schichtbeginn der Ablösung.
  *
  * Getippt wird eine Uhrzeit ohne Tag („HHMM“) relativ zu jetzt, damit der Test zu jeder Tageszeit
  * dasselbe prüft: eine Ereigniszeit vor jetzt fällt kurz nach Mitternacht auf gestern, eine Frist
@@ -56,27 +56,33 @@ async function neuerEinsatz(page: Page, name: string): Promise<number> {
   return ((await r.json()) as { id: number }).id;
 }
 
-test('ETB-Chip „Ereigniszeit“: HHMM + Enter übernimmt ohne Maus, der Eintrag trägt die Zeit', async ({
+test('ETB-Feld „Zeit“: HHMM + Enter übernimmt ohne Maus, der Eintrag trägt die Zeit', async ({
   page,
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
-  const einsatzId = await neuerEinsatz(page, 'Zeit-Chip');
+  const einsatzId = await neuerEinsatz(page, 'Zeit-Feld');
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  // Lage: Von und An tragen die Vorgabe (Change `kwc2yszv-etb-neuentwurf`).
+  await page
+    .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+    .getByRole('radio', { name: 'Lage' })
+    .click();
   const inhalt = `Lage ruhig ${Date.now()}`;
   const feld = page.getByPlaceholder('Inhalt …');
   await feld.fill(inhalt);
 
   const zeit = umJetzt(-20);
-  await page.getByRole('button', { name: 'Feld', exact: true }).click();
-  await page.getByRole('option', { name: /^Ereigniszeit/ }).click();
-  const chip = page.getByRole('textbox', { name: 'Ereigniszeit' });
-  await expect(chip).toBeFocused();
-  await chip.fill(hhmm(zeit));
-  await chip.press('Enter');
-  // Übernommen: der Editor schließt, der Chip nennt die Zeit (vor Mitternacht mit Tag).
-  await expect(page.getByText(new RegExp(`^Ereigniszeit: (\\d{2})?${hhmm(zeit)}$`))).toBeVisible();
+  const zeitFeld = page.getByRole('textbox', { name: 'Zeit' });
+  await zeitFeld.fill(hhmm(zeit));
+  await zeitFeld.press('Enter');
+  // Übernommen: Enter springt in den Inhalt, das Feld zeigt die Zeit (vor Mitternacht als DTG),
+  // der Knopf nennt den Nachtrag.
+  await expect(feld).toBeFocused();
+  await expect(zeitFeld).toHaveValue(
+    new RegExp(`^(${hhmm(zeit)}|\\d{2}${hhmm(zeit)}[a-zä]{3}\\d{2})$`),
+  );
 
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page.getByRole('button', { name: /^Erfassen als / }).click();
   await expect(feld).toHaveValue('');
   const r = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
   const eintrag = ((await r.json()) as { inhalt: string; ereigniszeit: string }[]).find(
@@ -192,19 +198,20 @@ test('doppelte Stunde: „0247“ um 02:50 Winterzeit ist im Ereignisfeld drei M
   });
 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page
+    .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+    .getByRole('radio', { name: 'Lage' })
+    .click();
   const inhalt = `Doppelte Stunde ${Date.now()}`;
   const feld = page.getByPlaceholder('Inhalt …');
   await feld.fill(inhalt);
-  await page.getByRole('button', { name: 'Feld', exact: true }).click();
-  await page.getByRole('option', { name: /^Ereigniszeit/ }).click();
-  const chip = page.getByRole('textbox', { name: 'Ereigniszeit' });
-  await expect(chip).toBeFocused();
-  await chip.fill('0247');
-  await chip.press('Enter');
-  // Derselbe Tag, also ohne Tag im Chip.
-  await expect(page.getByText(/^Ereigniszeit: 0247$/)).toBeVisible();
+  const zeitFeld = page.getByRole('textbox', { name: 'Zeit' });
+  await zeitFeld.fill('0247');
+  await zeitFeld.press('Enter');
+  // Derselbe Tag, also ohne Tag im Feld.
+  await expect(zeitFeld).toHaveValue('0247');
 
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await page.getByRole('button', { name: /^Erfassen/ }).click();
   await expect(feld).toHaveValue('');
   const r = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
   const eintrag = ((await r.json()) as { inhalt: string; ereigniszeit: string }[]).find(

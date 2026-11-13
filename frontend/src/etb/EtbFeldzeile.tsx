@@ -211,7 +211,8 @@ function ParteiFeld({
         disabled={gesperrt}
         placeholder={feld === 'von' ? 'Absender' : 'Empfänger'}
         maxLength={ETB_PARTEI_MAX}
-        style={{ width: '100%' }}
+        // Die Marke „frei“ steht in der Zeile, nicht darunter: die Feldzeile hat ein Höhenbudget.
+        style={{ width: '100%', flexWrap: 'nowrap' }}
         quellen={quellen}
         value={text ?? wert ?? ''}
         onChange={setText}
@@ -316,7 +317,7 @@ export default function EtbFeldzeile({
         fehlerId={pflichtId(feld)}
         gesperrt={gesperrt}
         feldRef={refs[feld]}
-        breite={schmal ? '100%' : feld === 'von' ? 230 : 180}
+        breite={schmal ? '100%' : feld === 'von' ? 250 : 220}
         onSetzen={(f, w) => onFeld(f, w)}
         onFertig={onFertig}
       />

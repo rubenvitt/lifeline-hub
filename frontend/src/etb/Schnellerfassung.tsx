@@ -1242,7 +1242,13 @@ export default function Schnellerfassung({
         <div style={{ display: 'flex', alignItems: 'center', gap: token.marginSM }}>
           <div
             data-lfh="etb-fusszeile"
-            style={{ ...fusszeileStil(istSchmal, token), flex: '1 1 auto' }}
+            // Im Handschuh-Betrieb rollt sie auch ab `md` statt umzubrechen: eine zweite Reihe
+            // kostete 72 px, und die Leiste risse am Fükw die halbe Fensterhöhe (Spec „Einstellungen
+            // in der Fußzeile der Erfassung“, Szenario „Fükw im Handschuh-Betrieb“).
+            style={{
+              ...fusszeileStil(istSchmal || token.controlHeight >= 72, token),
+              flex: '1 1 auto',
+            }}
           >
             {gruende}
             {protokollSchalter}
