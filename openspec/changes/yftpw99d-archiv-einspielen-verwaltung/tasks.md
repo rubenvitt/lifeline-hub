@@ -47,7 +47,7 @@ TDD: zuerst der Test, der rot wird, dann der Code.
   - ausgeblendet bei `verfuegbar: false` und für Führungskraft
   - Fehler hält die Eingaben
   - Erfolg zeigt das Ergebnis
-- [ ] 5.3 e2e in `frontend/e2e/aufbewahrung.spec.ts`: Admin spielt einen Block ein (Block über den Download der Akte erzeugt, Schlüssel aus dem Test-Setup). Danach erscheint der Einsatz mit „Aus dem Archiv · bis …“. Prüfung: Spec grün lokal (`--trace off`).
+- [x] 5.3 ~~e2e in `frontend/e2e/aufbewahrung.spec.ts`~~ gestrichen (Entscheidung 13.11.2026): Die e2e-Suite kommt an keinen echten Block, weil nur der Purge-Lauf archiviert und es dafür keinen Auslöser gibt. Nach der e2e-Regel (LLH-1665, `frontend/e2e/AGENTS.md`) gehört der Fall nach `tests/` und Vitest. Abgedeckt durch `tests/archiv_einspielen.rs` (echter Block über HTTP, Einsatz in der Liste mit `archiv_bis`, Live-Ereignis) und `AufbewahrungUebersicht.test.tsx` (Dialog, Fehler, Ergebnis, Sprung in den Einsatz).
 - [x] 5.4 Anwenderkapitel `docs/anwender/kapitel/aufbewahrung.md` („Ein Archiv herunterladen“ → Einspielen in der Verwaltung, „Wer was darf“) mit Bild des Dialogs und des Ergebnisses (`frontend/e2e/doku-bilder/aufbewahrung.bilder.ts`, `pnpm doku:bilder --grep aufbewahrung`). Prüfung: Wächter der Anwenderdoku in `scripts/check-all.sh` grün.
 
 ## 6. Abschluss
