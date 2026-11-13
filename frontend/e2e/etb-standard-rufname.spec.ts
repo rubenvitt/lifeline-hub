@@ -44,7 +44,13 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   expect(gesendet).toEqual([]);
   await expect(feld).toHaveValue(inhalt);
 
+  // Freitext über den eigenen Eintrag (Spec `stammdaten-feld`, „Tastatur“; Change
+  // `kwc2yszv-etb-neuentwurf`, D5).
   await abfrage(page).getByRole('combobox', { name: 'Rufname für Von und An' }).fill('Florian 4/1');
+  await page.getByTitle('„Florian 4/1“ als Freitext übernehmen', { exact: true }).click();
+  await expect(abfrage(page).getByRole('combobox', { name: 'Rufname für Von und An' })).toHaveValue(
+    'Florian 4/1',
+  );
   await abfrage(page).getByRole('button', { name: 'Übernehmen' }).click();
   await expect(abfrage(page)).toHaveCount(0);
   await expect(page.getByText('Von: Florian 4/1')).toBeVisible();
@@ -64,6 +70,62 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   await page.reload();
   await expect(page.getByText('Von: Florian 4/1')).toBeVisible();
   await expect(abfrage(page)).toHaveCount(0);
+});
+
+/**
+ * Tastaturregel des Vorschlagsfelds im echten Browser (Spec `stammdaten-feld`, „Tastatur“; Change
+ * `kwc2yszv-etb-neuentwurf`, D5). Nur hier wertet rc-select die Tasten über `which` aus und hielte
+ * bei offener Liste den Fokus mit Tab fest; jsdom zeigt das nicht (`StammdatenFeld.test.tsx`).
+ */
+test('Abfrage: Tab nimmt den obersten Vorschlag und springt weiter, Enter nimmt ihn ohne zu speichern', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page);
+  for (const name of ['Sanitätsgruppe UHS', 'Sanitätszug Musterstadt']) {
+    const r = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, { data: { name } });
+    expect(r.ok(), `Einheit ${name}: ${r.status()}`).toBe(true);
+  }
+  await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(abfrage(page)).toBeVisible();
+  const feld = abfrage(page).getByRole('combobox', { name: 'Rufname für Von und An' });
+
+  // Tab: der oberste Vorschlag „Im Einsatz“ ist markiert, Tab nimmt ihn und springt weiter.
+  await feld.click();
+  await feld.pressSequentially('San');
+  await expect(page.locator('.ant-select-item-option-active')).toHaveAttribute(
+    'title',
+    'Sanitätsgruppe UHS',
+  );
+  await page.keyboard.press('Tab');
+  await expect(feld).toHaveValue('Sanitätsgruppe UHS');
+  await expect(feld).not.toBeFocused();
+  await expect(
+    abfrage(page).getByRole('checkbox', { name: 'Empfänger wie Absender' }),
+  ).toBeFocused();
+
+  // Enter bei offener Liste nimmt ↓ markierten zweiten Vorschlag und speichert nicht.
+  await feld.fill('');
+  await feld.pressSequentially('San');
+  await expect(page.locator('.ant-select-item-option-active')).toHaveAttribute(
+    'title',
+    'Sanitätsgruppe UHS',
+  );
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.ant-select-item-option-active')).toHaveAttribute(
+    'title',
+    'Sanitätszug Musterstadt',
+  );
+  await page.keyboard.press('Enter');
+  await expect(feld).toHaveValue('Sanitätszug Musterstadt');
+  await expect(feld).toBeFocused();
+  await expect(abfrage(page)).toBeVisible();
+
+  // Enter bei geschlossener Liste speichert den Standard.
+  await page.keyboard.press('Enter');
+  await expect(abfrage(page)).toHaveCount(0);
+  await expect(page.getByText('Von: Sanitätszug Musterstadt')).toBeVisible();
 });
 
 test('als Beobachter keine Abfrage', async ({ page }) => {

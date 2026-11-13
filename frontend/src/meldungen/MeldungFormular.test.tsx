@@ -9,6 +9,7 @@ import MeldungFormular, { vonZuBezug } from './MeldungFormular';
 import type { Einheit, Einsatzabschnitt } from '../api/types';
 import { TEST_VORSCHLAEGE } from '../test/fuehrungsfunktionen';
 import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
+import type { Vorschlagsquelle } from '../components/StammdatenFeld';
 
 /** `onAnlegen` gibt eine Zusage zurück, auf die die Erfassungshülle wartet — wie `mutateAsync`. */
 function anlegenMock() {
@@ -644,5 +645,70 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     expect(await screen.findByText('Frist höchstens 10080 Min')).toBeInTheDocument();
     expect(onAnlegen).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Tastaturregel des Vorschlagsfelds an Absender und Empfänger (Spec `stammdaten-feld`,
+ * Anforderung „Tastatur“; design.md D5 der Change `kwc2yszv-etb-neuentwurf`): Enter und Tab nehmen
+ * den obersten passenden Vorschlag, Freitext trotz Treffer über den eigenen letzten Eintrag. Enter
+ * bei offener Liste sendet die Meldung nie.
+ */
+describe('MeldungFormular — Vorschlagsfeld Absender (Tastatur)', () => {
+  const quellen: Vorschlagsquelle[] = [
+    {
+      id: 'funkrufnamenEinsatz',
+      gruppe: 'einsatz',
+      eintraege: [
+        { label: 'Florian 1', wert: 'Florian 1' },
+        { label: 'Sanitätsgruppe UHS', wert: 'Sanitätsgruppe UHS' },
+      ],
+    },
+  ];
+  function renderMitQuellen(onAnlegen = anlegenMock()) {
+    render(
+      <AntApp>
+        <MeldungFormular senden={false} onAnlegen={onAnlegen} vorschlagsquellen={quellen} />
+      </AntApp>,
+    );
+    return onAnlegen;
+  }
+  const absender = () => screen.getByRole('combobox', { name: 'Absender' });
+  const listeOffen = () => absender().getAttribute('aria-expanded') === 'true';
+
+  it('Enter nach „Flo“ übernimmt „Florian 1“, schließt die Liste und sendet die Meldung nicht', async () => {
+    const onAnlegen = renderMitQuellen();
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage ruhig');
+    await userEvent.type(absender(), 'Flo');
+    await waitFor(() => expect(listeOffen()).toBe(true));
+    await userEvent.keyboard('{Enter}');
+    expect(absender()).toHaveValue('Florian 1');
+    await waitFor(() => expect(listeOffen()).toBe(false));
+    expect(onAnlegen).not.toHaveBeenCalled();
+    // Bei geschlossener Liste gilt die Erfassungs-Norm: Enter sendet.
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({ absender: 'Florian 1' });
+  });
+
+  it('Tab nach „San“ übernimmt „Sanitätsgruppe UHS“ und springt ins nächste Feld', async () => {
+    renderMitQuellen();
+    await userEvent.type(absender(), 'San');
+    await waitFor(() => expect(listeOffen()).toBe(true));
+    await userEvent.tab();
+    expect(absender()).toHaveValue('Sanitätsgruppe UHS');
+    expect(absender()).not.toHaveFocus();
+  });
+
+  it('„Flo“ bleibt über „„Flo“ als Freitext übernehmen“ frei und geht so hinaus', async () => {
+    const onAnlegen = renderMitQuellen();
+    await userEvent.type(absender(), 'Flo');
+    await userEvent.click(await screen.findByTitle('„Flo“ als Freitext übernehmen'));
+    expect(absender()).toHaveValue('Flo');
+    expect(document.querySelector('[data-lfh="quellenmarke"]')).toHaveTextContent('frei');
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage ruhig');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({ absender: 'Flo' });
   });
 });

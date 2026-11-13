@@ -44,7 +44,7 @@ describe('RufnameAbfrage', () => {
     expect(onUebernehmen).toHaveBeenCalledWith('{"von":"ELW 1","an":"ELW 1"}');
   });
 
-  it('nimmt Freitext und übernimmt mit Enter', async () => {
+  it('Freitext: „Abschnitt Nord“ über den eigenen Eintrag wird der Standard', async () => {
     const onUebernehmen = uebernehmen();
     renderMitProviders(
       <RufnameAbfrage
@@ -53,11 +53,58 @@ describe('RufnameAbfrage', () => {
         onUebernehmen={onUebernehmen}
       />,
     );
-    await userEvent.type(
-      screen.getByRole('combobox', { name: 'Rufname für Von und An' }),
-      'Kater 12{Enter}',
+    const feld = screen.getByRole('combobox', { name: 'Rufname für Von und An' });
+    await userEvent.type(feld, 'Abschnitt Nord');
+    await userEvent.click(await screen.findByTitle('„Abschnitt Nord“ als Freitext übernehmen'));
+    expect(feld).toHaveValue('Abschnitt Nord');
+    expect(onUebernehmen).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    expect(onUebernehmen).toHaveBeenCalledWith('{"von":"Abschnitt Nord","an":"Abschnitt Nord"}');
+  });
+
+  it('Enter bei offener Liste nimmt nur den Eintrag; erst Enter bei geschlossener Liste übernimmt', async () => {
+    const onUebernehmen = uebernehmen();
+    renderMitProviders(
+      <RufnameAbfrage
+        quellen={quellenAus(['Florian 1'])}
+        standard={null}
+        onUebernehmen={onUebernehmen}
+      />,
     );
+    const feld = screen.getByRole('combobox', { name: 'Rufname für Von und An' });
+    // Kein Vorschlag passt: der Freitext-Eintrag ist der einzige und markiert.
+    await userEvent.type(feld, 'Kater 12');
+    await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'true'));
+    await userEvent.keyboard('{Enter}');
+    expect(feld).toHaveValue('Kater 12');
+    expect(onUebernehmen).not.toHaveBeenCalled();
+    await waitFor(() => expect(feld).toHaveAttribute('aria-expanded', 'false'));
+    await userEvent.keyboard('{Enter}');
     expect(onUebernehmen).toHaveBeenCalledWith('{"von":"Kater 12","an":"Kater 12"}');
+  });
+
+  it('Vorschläge: Enter nach „Flo“ übernimmt „Florian 1“, das zweite Enter speichert', async () => {
+    const onUebernehmen = uebernehmen();
+    renderMitProviders(
+      <RufnameAbfrage
+        quellen={quellenAus(['Florian 1'])}
+        standard={null}
+        onUebernehmen={onUebernehmen}
+      />,
+    );
+    const feld = screen.getByRole('combobox', { name: 'Rufname für Von und An' });
+    await userEvent.type(feld, 'Flo');
+    await waitFor(() =>
+      expect(document.querySelector('.ant-select-item-option-active')).toHaveAttribute(
+        'title',
+        'Florian 1',
+      ),
+    );
+    await userEvent.keyboard('{Enter}');
+    expect(feld).toHaveValue('Florian 1');
+    expect(onUebernehmen).not.toHaveBeenCalled();
+    await userEvent.keyboard('{Enter}');
+    expect(onUebernehmen).toHaveBeenCalledWith('{"von":"Florian 1","an":"Florian 1"}');
   });
 
   it('schreibt getrennte Seiten, wenn „Empfänger wie Absender“ aus ist', async () => {
