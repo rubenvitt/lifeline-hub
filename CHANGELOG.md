@@ -1,3 +1,14 @@
+## [1.0.0-alpha.190](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.189...v1.0.0-alpha.190) (2026-11-13)
+
+### Führung
+
+- **Führung zurückholen ohne Fehlalarm bei anderen Einsatzleitwagen:** Wenn sich die Zentrale (Hub) die Führung von einem Einsatzleitwagen (ELW) zurückholt, per Notübernahme oder durch Widerruf der Kopplung, haben andere gekoppelte Einsatzleitwagen das bisher als „Ungültige Übernahme“ gemeldet und den neuen Stand verworfen. Das passierte auch, wenn der Wechsel sie gar nicht betraf.
+  - Ein Einsatzleitwagen, gegen den sich der Wechsel nicht richtet, behält den neuen Stand jetzt als offen und gibt keinen Alarm. Die Einsatzleitung bestätigt den Wechsel oder widerspricht ihm.
+  - Wenn eine Zuordnung widerrufen wird, schreibt das System dazu eine eigene Erklärung („Kopplung widerrufen“). Andere Einsatzleitwagen sehen sie im Verlauf.
+  - Der Alarm mit Verwerfen bleibt in drei Fällen: Es fehlt eine Erklärung, sie ist unlesbar, oder sie betrifft den eigenen Stand des Einsatzleitwagens.
+  - Bei einer direkten Kopplung holt ein Widerruf die Führung weiterhin nicht zurück.
+- **Anwenderdokumentation:** Das Kapitel zur Instanzkopplung beschreibt jetzt, wie der Hub die Führung zurückholt.
+
 ## [1.0.0-alpha.189](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.188...v1.0.0-alpha.189) (2026-11-13)
 
 ### Wichtige Änderungen
