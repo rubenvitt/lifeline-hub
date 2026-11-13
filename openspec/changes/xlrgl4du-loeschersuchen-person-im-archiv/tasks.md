@@ -33,7 +33,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 3. Block öffnen und neu bauen (Backend-Kern)
 
-- [ ] 3.1 Gemeinsamen Kern aus `einspielen.rs` und `bauen.rs` herauslösen, ohne Verhalten zu
+- [x] 3.1 Gemeinsamen Kern aus `einspielen.rs` und `bauen.rs` herauslösen, ohne Verhalten zu
       ändern:
       - einen Block aus Bytes in eine Zwischendatei entschlüsseln und migriert öffnen,
       - eine Zwischendatei verschlüsseln und `sha256`/Größe mitzählen (`Mitzaehlen`),
@@ -41,7 +41,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
       Prüfen: Die bestehenden Tests in `src/einsatz/archiv/tests.rs` und
       `src/einsatz/archiv/einspielen/tests.rs` bleiben grün.
-- [ ] 3.2 Neues Modul `src/einsatz/archiv/loeschersuchen.rs` (D2): fällige Anträge je Einsatz
+- [x] 3.2 Neues Modul `src/einsatz/archiv/loeschersuchen.rs` (D2): fällige Anträge je Einsatz
       sammeln, Blöcke bauen (entschlüsseln, migrieren, `scrubbe_person` je Antrag,
       `einsatz_aenderung` leeren, `VACUUM`, neu verschlüsseln an `gepruefte`) und in einer
       `write_retry!`-Transaktion ablegen. Abgelegt werden das bewachte `vollzogen_at`, das
@@ -54,10 +54,10 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
       - keine geprüften Schlüssel → nichts geändert,
       - Antrag zwischen Bauen und Ablage zurückgenommen → nichts geändert,
       - Fotos der Person sind im neuen Block auch als Bytes nicht mehr enthalten.
-- [ ] 3.3 Alte Blöcke (D4): Test, dass ein vor dem Vollzug gelesener Block danach von
+- [x] 3.3 Alte Blöcke (D4): Test, dass ein vor dem Vollzug gelesener Block danach von
       `einspielen` mit „nicht mehr im Archiv“ abgelehnt wird, und dass eine vorher
       eingespielte Kopie zum Abräumen vorgemerkt ist.
-- [ ] 3.4 Spur (D5): je Antrag ein ETB-Systemeintrag mit Aktenzeichen, Art, Kennung und Zahl
+- [x] 3.4 Spur (D5): je Antrag ein ETB-Systemeintrag mit Aktenzeichen, Art, Kennung und Zahl
       der Blöcke, Erfasser wie beim Purge-Vollzug; je Einsatz `archiv_person_geschwaerzt` in
       der Admin-Spur, in derselben Transaktion. Test: Die Einträge stehen da und enthalten den
       Namen der Person nicht.

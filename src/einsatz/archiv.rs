@@ -15,6 +15,7 @@
 
 pub mod bauen;
 pub mod einspielen;
+pub mod loeschersuchen;
 pub use bauen::zwischendateien_aufraeumen;
 
 use crate::einsatz::aufbewahrung_kategorie as kategorie;
@@ -256,11 +257,33 @@ pub async fn alle_loeschen_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
 ) -> Result<u64, AppError> {
-    let kopien: Vec<i64> = sqlx::query_scalar(
-        "SELECT einsatz_id FROM einsatz_archiv_eingespielt WHERE sha256 IN \
-         (SELECT sha256 FROM einsatz_archiv WHERE einsatz_id = ?) ORDER BY einsatz_id",
+    let bloecke: Vec<String> =
+        sqlx::query_scalar("SELECT sha256 FROM einsatz_archiv WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_all(&mut *conn)
+            .await?;
+    kopien_vormerken_tx(&mut *conn, &bloecke).await?;
+    Ok(
+        sqlx::query("DELETE FROM einsatz_archiv WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected(),
     )
-    .bind(einsatz_id)
+}
+
+/// Merkt jede hier eingespielte Kopie eines der Blöcke `sha256` zum Abräumen vor (Phase R):
+/// beim Löschersuchen für den ganzen Einsatz und beim Ersetzen der Blöcke durch das
+/// Löschersuchen für eine Person (LLH-1712).
+pub(super) async fn kopien_vormerken_tx(
+    conn: &mut sqlx::SqliteConnection,
+    sha256: &[String],
+) -> Result<(), AppError> {
+    let kopien: Vec<i64> = sqlx::query_scalar(
+        "SELECT einsatz_id FROM einsatz_archiv_eingespielt \
+         WHERE sha256 IN (SELECT value FROM json_each(?)) ORDER BY einsatz_id",
+    )
+    .bind(serde_json::to_string(sha256).map_err(|e| AppError::Internal(format!("Archiv: {e}")))?)
     .fetch_all(&mut *conn)
     .await?;
     for kopie in kopien {
@@ -272,13 +295,7 @@ pub async fn alle_loeschen_tx(
         )
         .await?;
     }
-    Ok(
-        sqlx::query("DELETE FROM einsatz_archiv WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .execute(&mut *conn)
-            .await?
-            .rows_affected(),
-    )
+    Ok(())
 }
 
 /// Das Archiv eines Einsatzes in der Archivakte.
