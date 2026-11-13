@@ -35,7 +35,7 @@ interface Props {
  * immer ein Paar (`standardRufnameWert`), nie eine Seite allein.
  *
  * Kein Erklärsatz unter den Feldern (LFH-1078): den Weg „nur für diesen Eintrag“ zeigt das
- * Chip-Menü (`MetaChip`), `@`, `/von`, `/an` bleiben ein Beschleuniger ohne Anleitung.
+ * Feldzeile (`EtbFeldzeile`), `@`, `/von`, `/an` bleiben ein Beschleuniger ohne Anleitung.
  */
 export default function RufnameAbfrage({
   quellen,

@@ -48,9 +48,10 @@ Kontrast-Gates mitliefen, für eine Form, die nur das ETB braucht.
 Typ: `Segmentleiste` (unter `md` Knopf mit Pfeil und Menü). Zeit: `ZeitpunktEingabe` mit `art="ereignis"`,
 leer = „jetzt“ (Platzhalter zeigt die Uhrzeit), Schnellwahl im Kalender. Von/An:
 `StammdatenFeld` im Modus `nurText` mit den bisherigen Quellen. Meldeweg: Auswahl aus den bisherigen
-Werten. Die Felder schreiben direkt in `metadaten`; `MetaChip` bleibt nur für die Veranlassung, die
-„+ Veranlassung“ als weiteres Feld in die Zeile holt. `editFeld`, `chipFelder` und `editNeu` aus
-LLH-1842 entfallen.
+Werten. Die Felder schreiben direkt in `metadaten`; die Veranlassung ist ein weiteres Textfeld, das
+„+ Veranlassung“ in die Zeile holt. `MetaChip` entfällt ganz (beim Bau entschieden: ein Chip nur
+für die Veranlassung hätte `editFeld` für ein Feld behalten), ebenso `editFeld`, `chipFelder` und
+`editNeu` aus LLH-1842. Die Buchstabierhilfe (LFH-110) steht neben Von und An, ohne Tab-Stopp.
 *Verworfen:* Chips behalten und nur sichtbarer machen — der Fehlerort von LLH-1842 und LLH-1865
 bliebe.
 

@@ -231,7 +231,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
   // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten, React ruft die Ref dabei mit
   // `null` und dem neuen Handle), und eine fokussierende Ref wie die des ETB-Chips
-  // (`etb/MetaChip.tsx`, `fokusOhneRollen`) holte sich sonst nach jedem Blur den Fokus zurück.
+  // (früher der Zeit-Chip des ETB, `fokusOhneRollen`) holte sich sonst nach jedem Blur den Fokus zurück.
   useLayoutEffect(() => {
     if (!ref) return;
     const setze = (el: InputRef | null) => {

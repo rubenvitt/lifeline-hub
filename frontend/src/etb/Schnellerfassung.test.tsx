@@ -1760,3 +1760,13 @@ describe('Ereigniszeit bleibt nach dem Verlassen des Felds (LLH-1842)', () => {
     expect(onWerteChange).not.toHaveBeenCalled();
   });
 });
+
+describe('Buchstabierhilfe an Von und An (LFH-110)', () => {
+  it('steht an beiden Feldern, ohne die Tab-Folge zu unterbrechen', () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    for (const zu of ['Von', 'An']) {
+      const knopf = screen.getByRole('button', { name: `Buchstabierhilfe zu ${zu}` });
+      expect(knopf).toHaveAttribute('tabindex', '-1');
+    }
+  });
+});

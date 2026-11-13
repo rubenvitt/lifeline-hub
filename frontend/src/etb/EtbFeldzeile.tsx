@@ -11,6 +11,7 @@ import { Select } from '../components/Select';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { serverJetzt } from '../offline/serveruhr';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
+import BuchstabierHilfe from './BuchstabierHilfe';
 import { MELDEWEG_OPTIONEN, TYP_BEFEHLE, type MetadatenWerte } from './schnellerfassungModell';
 
 /*
@@ -224,6 +225,8 @@ function ParteiFeld({
         }}
         onEscape={() => setText(null)}
       />
+      {/* Buchstabierhilfe (LFH-110), additiv und ohne Tab-Stopp. */}
+      <BuchstabierHilfe text={text ?? wert ?? ''} zu={label} ohneTabstopp />
     </span>
   );
 }

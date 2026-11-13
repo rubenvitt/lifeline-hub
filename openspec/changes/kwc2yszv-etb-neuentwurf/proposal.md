@@ -69,6 +69,9 @@ Keine.
   Segment.
 - `etb-zaehler`: Bilanz-Leiste entfällt; Kopf nennt Einträge und ausgeblendete Systemeinträge.
 - `bedien-wortlaut`: das Szenario „Bilanz des ETB“ nennt das Typ-Segment statt der Bilanz.
+- `datensatz-aktionsmenue`: die Chips der ETB-Erfassung entfallen und mit ihnen ihr Kontextmenü.
+- `ereigniszeit-vorgabe`: „Zeit-Chip“ wird das Feld Zeit; es zeigt „jetzt“ nach der Serveruhr.
+- `zeiteingabe`: die Ereigniszeit der ETB-Erfassung steht im Feld Zeit statt im Chip.
 
 ## Impact
 
