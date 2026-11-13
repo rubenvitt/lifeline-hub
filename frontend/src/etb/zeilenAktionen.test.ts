@@ -3,9 +3,11 @@ import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import type { EtbZeile } from './etbZeile';
+import type { Vermerk } from './vermerke';
 import {
   fuehreZeilenWahlAus,
   zeilenAktionen,
+  zeilenMenue,
   zeilenMenueName,
   type ZeilenAufrufe,
   type ZeilenRechte,
@@ -157,5 +159,79 @@ describe('zeilenMenueName (LLH-1597)', () => {
     expect(zeilenMenueName(Z.eintrag)).toBe('Aktionen zu Eintrag 12');
     expect(zeilenMenueName(Z.abgelehnt())).toBe('Aktionen zu abgelehntem Eintrag');
     expect(zeilenMenueName(Z.ausstehend)).toBe('Aktionen zu vorgemerktem Eintrag');
+  });
+});
+
+/**
+ * Was die Spaltenzeile nicht zeigt, nennt ihr Menü (Change `kwc2yszv-etb-neuentwurf`, Spec
+ * `etb-zeitachse-darstellung`): Vermerke als Sprung oder Herunterladen, Marken und Verfasser als
+ * Angabe ohne Wirkung.
+ */
+describe('zeilenMenue — Vermerke und Verfasser hinter den Handlungen', () => {
+  const vermerke: Vermerk[] = [
+    {
+      schluessel: 'meldung',
+      text: 'Meldung #5',
+      ton: 'verweis',
+      pfad: '/einsaetze/7/meldungen?meldung=9',
+    },
+    { schluessel: 'nachtrag', text: 'Nachtrag · erfasst 1926', ton: 'achtung' },
+    {
+      schluessel: 'anhang-2',
+      text: 'Anhang a.pdf',
+      ton: 'verweis',
+      datei: {
+        href: '/api/x',
+        dateiname: 'a.pdf',
+        name: 'a.pdf herunterladen',
+        mime: 'application/pdf',
+      },
+    },
+  ];
+
+  it('hängt Vermerke und Verfasser an die Handlungen, Marken und Verfasser gesperrt', () => {
+    expect(
+      zeilenMenue(
+        Z.eintrag,
+        { ...alle, kannWiedervorlage: false, kannAuftrag: false },
+        {
+          vermerke,
+          verfasser: 'Max · S2',
+        },
+      ),
+    ).toEqual([
+      { key: 'berichtigen', label: 'Berichtigen' },
+      { key: 'vermerk:meldung', label: 'Meldung #5 öffnen' },
+      { key: 'vermerk:nachtrag', label: 'Nachtrag · erfasst 1926', gesperrt: true },
+      { key: 'vermerk:anhang-2', label: 'Anhang a.pdf herunterladen' },
+      { key: 'verfasser', label: 'Verfasser: Max · S2', gesperrt: true },
+    ]);
+  });
+
+  it('ohne Zusatz und an gepufferten Zeilen nur die Handlungen', () => {
+    expect(zeilenMenue(Z.eintrag, alle)).toEqual(zeilenAktionen(Z.eintrag, alle));
+    expect(zeilenMenue(Z.ausstehend, alle, { verfasser: 'Max' })).toEqual([]);
+  });
+
+  it('die Wahl eines Vermerks springt bzw. lädt herunter', () => {
+    const aufrufe = {
+      berichtigen: vi.fn(),
+      wiedervorlage: vi.fn(),
+      auftragErteilen: vi.fn(),
+      erneutSenden: vi.fn(),
+      verwerfen: vi.fn(),
+      oeffne: vi.fn(),
+      herunterladen: vi.fn(),
+    } satisfies ZeilenAufrufe;
+    fuehreZeilenWahlAus(Z.eintrag, 'vermerk:meldung', aufrufe, { vermerke });
+    expect(aufrufe.oeffne).toHaveBeenCalledWith('/einsaetze/7/meldungen?meldung=9');
+    fuehreZeilenWahlAus(Z.eintrag, 'vermerk:anhang-2', aufrufe, { vermerke });
+    expect(aufrufe.herunterladen).toHaveBeenCalledWith(vermerke[2].datei);
+    // Eine Marke tut nichts, ebenso ein unbekannter Vermerk.
+    fuehreZeilenWahlAus(Z.eintrag, 'vermerk:nachtrag', aufrufe, { vermerke });
+    fuehreZeilenWahlAus(Z.eintrag, 'vermerk:fehlt', aufrufe, { vermerke });
+    expect(aufrufe.oeffne).toHaveBeenCalledTimes(1);
+    expect(aufrufe.herunterladen).toHaveBeenCalledTimes(1);
+    expect(aufrufe.berichtigen).not.toHaveBeenCalled();
   });
 });

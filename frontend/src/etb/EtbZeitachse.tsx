@@ -509,7 +509,10 @@ export default function EtbZeitachse({
     onVerwerfen,
     onNurProtokollieren,
   });
+  // Auch `navigate` über die Ref: seine Identität folgt dem Pfad, die Aufrufer bleiben stabil.
+  const navigateRef = useRef(navigate);
   useLayoutEffect(() => {
+    navigateRef.current = navigate;
     handler.current = {
       onBerichtigen,
       onWiedervorlage,
@@ -529,10 +532,10 @@ export default function EtbZeitachse({
       // Immer gesetzt: ob der Weg angeboten wird, sagt `rechte` (aktuelle Prop). Ein beim
       // Einhängen eingefrorenes `undefined` stünde sonst als Eintrag ohne Wirkung da.
       nurProtokollieren: (p) => handler.current.onNurProtokollieren?.(p),
-      oeffne: (pfad) => navigate(pfad),
+      oeffne: (pfad) => navigateRef.current(pfad),
       herunterladen: ladeHerunter,
     }),
-    [navigate],
+    [],
   );
   const kannBerichtigen = onBerichtigen != null;
   const kannWiedervorlage = onWiedervorlage != null;
