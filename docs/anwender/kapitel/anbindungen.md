@@ -160,7 +160,8 @@ Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Eins
 solange die Anbindung weder widerrufen noch abgelaufen ist. Die
 Freigabe endet mit dem Abschluss des Einsatzes, mit dem Widerruf oder Ablauf der Anbindung und
 mit jeder Änderung an diesen beiden Rechten, wenn eines dazukommt wie wenn eines wegfällt. Die
-Einsatzleitung hat für einen bestimmten Umfang freigegeben und entscheidet über einen anderen neu.
+Einsatzleitung hat Lage oder Einsatzkopf in einem bestimmten Umfang freigegeben und entscheidet
+über einen anderen neu.
 Auch ein verlängertes „Gültig bis“ braucht eine neue Freigabe.
 Abläufe und Inhalt des Lagebilds: [Externe Lagemonitore](externe-lagemonitore.md).
 
@@ -168,6 +169,9 @@ Trägt die Anbindung zusätzlich „Rechner nutzen“, rechnet sie mit derselben
 Richtwerten, die der freigegebene Einsatz in seinen
 [Einstellungen](einsatz-einstellungen.md) unter „Unterkunft“ gesetzt hat. Einen eigenen Schalter
 dafür gibt es nicht: wer einer solchen Anbindung den Einsatz freigibt, gibt ihr auch diese Werte.
+Bekommt eine Anbindung, die einen Einsatz liest, „Rechner nutzen“ erst später dazu, bleibt die
+Freigabe bestehen, und die Anbindung rechnet ab da mit den Werten des Einsatzes; das
+Einsatztagebuch nennt das nicht.
 Eine Anbindung nur mit „Rechner nutzen“ steht nicht im Paneel und rechnet immer mit den Werten der
 Organisation. Ein Rechner-Fremdsystem, das die Werte des Einsatzes braucht, bekommt deshalb
 „Einsätze lesen“ dazu.

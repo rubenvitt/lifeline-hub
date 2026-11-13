@@ -45,7 +45,8 @@ Ohne das Binary: die Referenz-Clients unten tun dasselbe.
 Lese-Scopes mit Einsatzbezug (`lage:read`, `einsaetze:read`) sehen nur den Einsatz, den die
 Einsatzleitung für den Zugang freigegeben hat; siehe „Lage lesen“ und „Einsätze lesen“. Dieselbe
 Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes (siehe „Rechner Unterkunft und
-Zelte“).
+Zelte“). Geben oder Nehmen von `rechner:use` beendet eine Freigabe nicht: Ein Zugang, der einen
+Einsatz liest und `rechner:use` dazubekommt, rechnet ab da mit dessen Richtwerten.
 `events:read` allein öffnet nichts: Welche Ereignisse ein Zugang sieht, folgt aus seinen übrigen
 Lese-Scopes. Neue Scopes kommen nur hinzu; ein Client überspringt unbekannte Werte.
 

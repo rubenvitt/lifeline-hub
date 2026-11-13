@@ -597,6 +597,19 @@ async fn einsatz_werte_nur_fuer_den_freigegebenen_einsatz() {
     assert_eq!(ohne_freigabe["code"], "not_found");
 
     einsatz_freigeben(&app, &admin, einsatz, &cred).await;
+    // Ein Zugang nur mit `rechner:use` lässt sich nicht freigeben.
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!(
+            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            nur_rechner.zugang_id
+        ),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{v}");
     let faelle = [
         ("anderer Einsatz", &cred, json!(anderer)),
         ("fremde Org", &cred, json!(fremder)),

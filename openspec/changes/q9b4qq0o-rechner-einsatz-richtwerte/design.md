@@ -125,7 +125,10 @@ ADR-0032 bekommt `status: ersetzt`. Erst beim Umsetzen aufgefallen (Wächter
 - [Ein Zugang mit Freigabe und `rechner:use` sieht die Richtwerte des Einsatzes, auch wenn die
   Einsatzleitung beim Freigeben nur an Lage oder Einsatzkopf dachte] → Die Richtwerte sind
   Planungswerte ohne Personenbezug; das Paneel zeigt die Rechte des Zugangs samt „Rechner nutzen“.
-  Das Anwenderkapitel „Anbindungen“ nennt es ausdrücklich.
+  Das Anwenderkapitel „Anbindungen“ nennt es ausdrücklich, auch den Fall, dass ein Admin
+  `rechner:use` einem Zugang, der schon einen Einsatz liest, erst später gibt: die Freigabe bleibt
+  (Spec `maschinenzugang`, „Recht ohne Einsatzbezug geändert“), und das Einsatztagebuch nennt es
+  nicht (Befund im Review vor dem PR).
 - [Ein Client, der sich auf 400 für `einsatz_id` verlassen hat] → Die Doku nannte das als Übergang
   („gibt es noch nicht“); die Spec von LLH-1524 sah das Feld ausdrücklich vor (D1 dort).
 - [Zwei Datenbankabfragen mehr je Anfrage mit `einsatz_id`] → vernachlässigbar, beide über Index.
