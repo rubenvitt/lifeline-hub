@@ -106,9 +106,15 @@ diese Person. Ohne Kennung `null`, also alle Prefixe wie bisher.
 ### D4 404 heißt „gehört nicht hinein“, andere Fehler gehen an den Sammler
 
 Ein 404 der Zeilen-Route heißt: Diese Person steht in keiner Liste dieser Sitzung (storniert,
-fremder Einsatz, am Gerät einer fremden Stelle). Der Zeilenabgleich setzt dann für sie `null`
-ein, nimmt sie also aus allen Listen, ohne Listenabruf. Andere Fehler (Netz, 403, 5xx) geben die
-Listen wie bei Schäden an den Sammler. Die übrigen Zeilen desselben Fensters gehen weiter ein.
+fremder Einsatz, am Gerät einer fremden Stelle). Er trägt dafür im Umschlag zusätzlich
+`grund: "nicht_in_liste"` (`AppError::NichtInListe`, additiv wie `AppError::Zeilen`). Der
+Zeilenabgleich setzt dann für sie `null` ein, nimmt sie also aus allen Listen, ohne Listenabruf.
+Andere Fehler (Netz, 403, 5xx, ein 404 ohne `grund`) geben die Listen wie bei Schäden an den
+Sammler. Die übrigen Zeilen desselben Fensters gehen weiter ein.
+
+Der `grund` ist nötig, weil eine unbekannte Route denselben 404 liefert (`static_files::serve`):
+Ein Tab mit neuem Bundle an einem zurückgerollten Server nähme sonst jede geänderte Person still
+heraus (Nachreview, Entscheidung 13.11.2026).
 
 Am Gerät ist der 404 der Normalfall: Der Strom filtert `person` nur nach Modul, nicht nach
 Stelle (`routes/live.rs`), fast jedes Ereignis einer großen Lage betrifft eine fremde Person.
@@ -178,9 +184,7 @@ die diese Change nicht umstellt.
 - [Ältere Tabs mit altem Frontend] → Frontend und Server kommen aus demselben Binary; ein alter
   Tab kennt die Route nicht und gleicht wie bisher ganz ab.
 - [Neuer Tab nach einem Server-Rollback] → Der alte Server kennt die Zeilen-Route nicht und
-  antwortet mit demselben 404 wie für eine Person außerhalb der Liste; der Tab nähme geänderte
-  Personen bis zum nächsten Listenabruf heraus. Nur ohne Migrationsunterschied möglich (sonst
-  startet das alte Binary nicht); Umgang: siehe PR.
+  antwortet mit 404 ohne `grund`; der Tab gleicht dann wie bisher ganz ab (D4).
 
 ## Migration Plan
 

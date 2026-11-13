@@ -15,8 +15,9 @@ Liste, die im Großschadensfall am schnellsten wächst (Zunder LLH-1682, Audit v
 - Neue Route `GET /api/einsaetze/{id}/personen/{pid}/zeile`: genau die Zeile, die die Liste dieser
   Sitzung zeigen würde (`PersonAnzeige`), **ohne** Eintrag im Zugriffsprotokoll, mit denselben
   Regeln wie die Liste (Modulrecht Personen, Stellenbindung der Geräte, Einheitengerät ohne
-  Personalien). Eine stornierte oder für die Sitzung unsichtbare Person ist 404; der Tab nimmt
-  sie dann aus seinen Listen. Die Detail-Route taugt nicht als Quelle: Jeder Abruf schreibt eine
+  Personalien). Eine stornierte oder für die Sitzung unsichtbare Person ist 404 mit
+  `grund: "nicht_in_liste"`; der Tab nimmt sie dann aus seinen Listen. Ein 404 ohne diesen
+  Grund (unbekannte Route) lädt die Liste wie bisher ganz. Die Detail-Route taugt nicht als Quelle: Jeder Abruf schreibt eine
   Audit-Zeile.
 - Frontend: Der Zeilenabgleich bekommt das Ziel `personen`. Ein `person`-Ereignis mit
   `person_id` lädt nur diese Zeile und sortiert sie in die geladene Personenliste, die

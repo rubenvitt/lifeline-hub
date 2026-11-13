@@ -54,11 +54,10 @@ laufende Abrufe gelten dieselben Ausnahmen wie bei Schäden.
 
 ### Requirement: Der Zeilenabruf einer Person ist nicht protokolliert
 
-Der Abruf einer einzelnen Person für den Zeilenabgleich SHALL genau die Zeile liefern, die die
-Personenliste derselben Sitzung zeigen würde, mit demselben Recht, und MUST wie die Liste ohne
-Eintrag im Zugriffsprotokoll bleiben. Eine Person, die die Liste nicht zeigt (storniert oder für
-die Sitzung nicht sichtbar), MUST mit 404 beantwortet werden, und der Tab MUST sie dann aus
-seinen Listen nehmen, ohne sie ganz neu zu laden. Den medizinischen Verlauf liefert er nicht.
+Der Zeilenabruf einer Person SHALL genau die Zeile der Personenliste derselben Sitzung liefern,
+mit demselben Recht, und MUST ohne Eintrag im Zugriffsprotokoll bleiben. Für eine Person, die die
+Liste nicht zeigt (storniert, nicht sichtbar), MUST er mit einem als „nicht in der Liste“
+gekennzeichneten 404 antworten; der Tab MUST sie dann ohne Listenabruf aus seinen Listen nehmen.
 
 #### Scenario: Live-Abgleich schreibt kein Protokoll
 - **WHEN** zehn Tabs eine Änderung an einer Person zeilenweise abgleichen
@@ -74,6 +73,11 @@ seinen Listen nehmen, ohne sie ganz neu zu laden. Den medizinischen Verlauf lief
   Personenliste nicht sähe
 - **THEN** antwortet der Server auf den Zeilenabruf mit 404, und das Gerät lädt seine
   Personenliste nicht neu
+
+#### Scenario: 404 einer unbekannten Route
+- **WHEN** der Zeilenabruf mit einem 404 endet, der nicht als „nicht in der Liste“ gekennzeichnet
+  ist (etwa weil der Server die Route nicht kennt)
+- **THEN** behält der Tab die Person und gleicht seine Listen als Ganzes ab
 
 #### Scenario: Einheitengerät
 - **WHEN** ein Einheitengerät eine von seiner Einheit versorgte Person abruft

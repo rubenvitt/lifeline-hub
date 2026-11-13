@@ -8514,7 +8514,7 @@ async fn tablet_ruft_zeile_nur_fuer_personen_der_eigenen_uhs_ab() {
     assert_eq!(zeile["id"], eigene);
     assert_eq!(zeile["name"], "Muster");
 
-    let (s, _) = anfrage(
+    let (s, antwort) = anfrage(
         &app,
         "GET",
         &format!("/api/einsaetze/{einsatz}/personen/{fremde}/zeile"),
@@ -8523,6 +8523,8 @@ async fn tablet_ruft_zeile_nur_fuer_personen_der_eigenen_uhs_ab() {
     )
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
+    // Unterscheidbar vom 404 einer unbekannten Route: nur dieser nimmt die Person heraus.
+    assert_eq!(antwort["grund"], "nicht_in_liste", "{antwort}");
 }
 
 /// Am Einheitengerät trägt die Zeile wie die Liste keine Personalien; eine Person einer anderen

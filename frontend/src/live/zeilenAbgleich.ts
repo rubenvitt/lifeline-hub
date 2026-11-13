@@ -1,5 +1,5 @@
 import { hashKey, type InfiniteData, type QueryClient, type QueryKey } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { ApiError, GRUND_NICHT_IN_LISTE } from '../api/client';
 import {
   alsSchadenAuswahl,
   alsSchadenMarker,
@@ -118,15 +118,16 @@ function ziel<Z>(
 const ungestorniert = (s: Schaden): Schaden | null => (s.storniert_at == null ? s : null);
 
 /**
- * Die Zeile einer Person, `null` bei 404 (design.md D4, LLH-1682): Die Zeilen-Route liefert nur,
- * was die Liste dieser Sitzung zeigt; ein 404 (storniert, fremde Stelle am Gerät) heißt, die
- * Person gehört in keine Liste dieses Tabs. Jeder andere Fehler bleibt ein Fehler (Sammler).
+ * Die Zeile einer Person, `null` bei 404 mit Grund `nicht_in_liste` (design.md D4, LLH-1682): Die
+ * Zeilen-Route liefert nur, was die Liste dieser Sitzung zeigt; ihr 404 (storniert, fremde Stelle
+ * am Gerät) heißt, die Person gehört in keine Liste dieses Tabs. Jeder andere Fehler, auch ein 404
+ * ohne Grund (unbekannte Route, etwa nach einem Server-Rollback), bleibt ein Fehler (Sammler).
  */
 async function loadPersonZeileOrNull(einsatzId: number, id: number): Promise<Person | null> {
   try {
     return await loadPersonZeile(einsatzId, id);
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) return null;
+    if (e instanceof ApiError && e.status === 404 && e.grund === GRUND_NICHT_IN_LISTE) return null;
     throw e;
   }
 }

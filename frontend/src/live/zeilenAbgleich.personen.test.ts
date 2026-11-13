@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
+import { ApiError, GRUND_NICHT_IN_LISTE } from '../api/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person, PersonAuswahl } from '../api/types';
@@ -43,7 +43,8 @@ const auswahl = (p: Person): PersonAuswahl => ({
   pat_nummer: p.pat_nummer,
 });
 
-const nichtGefunden = () => new ApiError(404, 'Nicht gefunden', { vomAnwendungsserver: true });
+const nichtGefunden = () =>
+  new ApiError(404, 'Nicht gefunden', { vomAnwendungsserver: true, grund: GRUND_NICHT_IN_LISTE });
 
 const inStelle = (stelle: number): Partial<Person> => ({
   aktuelle_verbleib_art: 'notunterkunft',
@@ -205,6 +206,22 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     await fenster();
 
     expect(qc.getQueryData<Person[]>(einsatzKeys.personenDerStelle(E, 3))).toEqual([]);
+  });
+
+  it('ein 404 ohne Grund (unbekannte Route, etwa nach einem Server-Rollback) geht an den Sammler', async () => {
+    const { qc, inval, zeilen } = aufbau();
+    const vorher = [person(1, 1)];
+    qc.setQueryData(einsatzKeys.personen(E), vorher);
+    api.loadPersonZeile.mockRejectedValue(
+      new ApiError(404, 'Nicht gefunden', { vomAnwendungsserver: true }),
+    );
+
+    zeilen.vormerken('personen', 1);
+    await fenster();
+    await fenster();
+
+    expect(qc.getQueryData(einsatzKeys.personen(E))).toBe(vorher);
+    expect(invalidierteKeys(inval)).toEqual(SAMMEL_KEYS);
   });
 
   it('scheitert der Zeilenabruf anders als mit 404, gleicht sie die Listen als Ganzes ab', async () => {

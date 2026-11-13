@@ -3289,6 +3289,7 @@ async fn zeile_einer_stornierten_person_ist_404_ohne_personalien() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND, "die Liste führt sie nicht");
+    assert_eq!(antwort["grund"], "nicht_in_liste", "{antwort}");
     assert!(
         !antwort.to_string().contains("Storniert"),
         "keine Personalien: {antwort}"
@@ -3302,7 +3303,7 @@ async fn zeile_fremder_einsatz_ist_404() {
     let e = einsatz_anlegen(&app, &admin).await;
     let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
     let anderer = einsatz_anlegen(&app, &admin).await;
-    let (status, _) = anfrage(
+    let (status, antwort) = anfrage(
         &app,
         "GET",
         &format!("/api/einsaetze/{anderer}/personen/{p}/zeile"),
@@ -3311,6 +3312,7 @@ async fn zeile_fremder_einsatz_ist_404() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(antwort["grund"], "nicht_in_liste", "{antwort}");
 }
 
 #[tokio::test]
@@ -3336,4 +3338,23 @@ async fn zeile_ohne_modulzugriff_ist_403() {
     assert_eq!(s, StatusCode::OK, "Override: {v}");
     let (status, _) = anfrage(&app, "GET", &pfad, &frieda_c, None).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// Eine unbekannte Route unter `/api` antwortet mit 404 ohne `grund`: so unterscheidet der Client
+/// sie vom 404 der Zeilen-Route, etwa nach einem Server-Rollback (LLH-1682, design.md D4).
+#[tokio::test]
+async fn unbekannte_route_ist_404_ohne_grund() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, antwort) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/1/gibt-es-nicht"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(antwort.get("grund").is_none(), "{antwort}");
 }

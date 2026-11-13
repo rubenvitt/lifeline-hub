@@ -242,12 +242,21 @@ pub async fn zeile(
     ctx: EinsatzLesezugriff<Personen>,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
-    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
-    let mut person = repo::laden(&state.pool, ctx.einsatz.id, person_id).await?;
-    // Nur was die Liste zeigt: eine stornierte Person ist 404 ohne Personalien, der Tab nimmt
-    // sie aus seinen Listen (design.md D4).
+    // Nur was die Liste zeigt (design.md D4): eine Person einer fremden Stelle, eines fremden
+    // Einsatzes oder eine stornierte ist 404 mit `grund`, ohne Personalien; nur daran erkennt
+    // der Tab, dass er sie aus seinen Listen nehmen darf.
+    let nicht_in_liste = |e: AppError| match e {
+        AppError::NotFound => AppError::NichtInListe,
+        e => e,
+    };
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id)
+        .await
+        .map_err(nicht_in_liste)?;
+    let mut person = repo::laden(&state.pool, ctx.einsatz.id, person_id)
+        .await
+        .map_err(nicht_in_liste)?;
     if person.storniert_at.is_some() {
-        return Err(AppError::NotFound);
+        return Err(AppError::NichtInListe);
     }
     if ist_einheitengeraet(&ctx) {
         person.ohne_personalien();

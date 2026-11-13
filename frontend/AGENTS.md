@@ -1246,8 +1246,9 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   ist so wenig protokolliert wie die Liste; eine auditierte Detail-Route ist keine Zeilenquelle,
   jeder Tab schriebe bei jedem Ereignis eine Protokollzeile. Personen haben deshalb eine eigene
   Zeilen-Route (`…/personen/{pid}/zeile`, LLH-1682), die nur liefert, was die Liste zeigt; dort
-  heißt ein 404 „gehört nicht hinein“ und nimmt die Zeile heraus (bei Schäden geht ein 404 an den
-  Sammler). Hat sich eine abgerufene Zeile während ihres Abrufs geändert (optimistische Änderung),
+  heißt ein 404 mit `grund: "nicht_in_liste"` (`ApiError.grund`) „gehört nicht hinein“ und nimmt
+  die Zeile heraus. Jeder andere 404 (unbekannte Route) und bei Schäden jeder 404 geht an den
+  Sammler. Hat sich eine abgerufene Zeile während ihres Abrufs geändert (optimistische Änderung),
   wird sie nicht überschrieben, sondern im nächsten Fenster erneut abgerufen. Eine
   Seitenkette (`useInfiniteQuery`) bekommt eine Zeile nur innerhalb des geladenen Fensters
   (`fensterEinsortieren`, LFH-1075); entscheidet über die Zugehörigkeit nur der Server

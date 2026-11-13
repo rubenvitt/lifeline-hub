@@ -4,6 +4,7 @@
 
 - [x] 1.1 `GET /api/einsaetze/{id}/personen/{pid}/zeile` in `src/routes/einsatz_person.rs` und `src/app.rs`: `EinsatzLesezugriff<Personen>`, `repo::laden`, stornierte Person 404, `stelle::fordere_person`, Einheitengerät ohne Personalien, kein Audit. Beleg: Rust-Tests in `tests/einsatz_person.rs` (Antwort gleich der Listenzeile, stornierte Person 404 ohne Personalien, fremder Einsatz 404, ohne Modulrecht 403, Zugriffsprotokoll der Person bleibt leer)
 - [x] 1.2 Route in jede Routenliste der Geräte in `src/geraet/mod.rs`, die `GET …/personen` führt. Beleg: Rust-Tests in `tests/geraet_kopplung.rs` (UHS-Gerät sieht eine Person seiner UHS, bekommt 404 für eine fremde; Einheitengerät bekommt die Zeile ohne Personalien)
+- [x] 1.3 `AppError::NichtInListe` (404 mit `grund: "nicht_in_liste"` im Umschlag); die Zeilen-Route antwortet damit, eine unbekannte Route ohne `grund`; `ApiError.grund` im Client, nur dieser 404 nimmt die Person heraus. Beleg: Rust-Tests (`error::tests`, `tests/einsatz_person.rs`, `tests/geraet_kopplung.rs`), Vitest (`client.test.ts`, `zeilenAbgleich.personen.test.ts`: 404 ohne Grund an den Sammler)
 
 ## 2. Ereignisse mit Kennung (D3, D5)
 
