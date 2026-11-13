@@ -2,7 +2,7 @@
 titel: Aufbewahrung
 gruppen: [administration]
 reihenfolge: 660
-quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs]
+quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs, src/instanz/fuehrung/loeschvermerk.rs]
 ---
 
 ## Überblick
@@ -161,7 +161,9 @@ Bis zum Vollzug lässt sich der Antrag in der Liste des Paneels zurücknehmen.
    Einsatztagebuch im Wortlaut.
 6. **Endgültige Löschung:** Hat die Organisation eine Skelett-Frist, löscht der Server das
    Skelett danach samt Einsatztagebuch. Übrig bleibt eine Zeile im Löschprotokoll der
-   Organisation.
+   Organisation. Kannte eine gekoppelte Installation den Einsatz, bleibt dazu seine technische
+   Kennung als Löschvermerk stehen, ohne Bezeichnung, Ort oder Inhalt; mit ihr erfährt die
+   andere Installation, dass es den Einsatz nicht mehr gibt.
 
 Vormerkung, Schwärzung und jede Änderung einer Frist stehen im Einsatztagebuch.
 

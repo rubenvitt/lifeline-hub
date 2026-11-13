@@ -7,6 +7,10 @@
 //!   - Pull (die erreichte Seite führt): die meldende Seite nennt ihre Stände in der Anfrage.
 //!   - Push (die meldende Seite führt): die erreichte Seite nennt die Stände ihrer Spiegel in der
 //!     Antwort, die meldende meldet `geloescht` in der nächsten Anfrage.
+//!   - Akten ohne Spiegel (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`): Wer eine
+//!     Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung in `akten`. Belegt wird ihr Ende
+//!     mit dem Löschvermerk ([`geloeschte_akten`]), auch für Kennungen mit fremdem Präfix; der
+//!     Empfänger löscht die Akte ([`geloeschte_akten_uebernehmen`]).
 //! - **`verwahrt`** (nur meldende → erreichte Seite): Nach der Nachbereitung übergibt die meldende
 //!   Seite einen eigenen Einsatz. Die erreichte macht aus ihrem vollständigen Spiegel einen eigenen
 //!   Einsatz und quittiert `angenommen`; erst dann räumt die meldende Seite ab.
@@ -74,6 +78,129 @@ pub async fn geloeschte(
     Ok(ergebnis)
 }
 
+/// `geloescht` für jede genannte Akte ohne Spiegel, deren Ende diese Instanz belegt (LLH-1699,
+/// D4): mit einem Löschvermerk, oder für Löschungen von vor dem Vermerk mit eigenem Präfix und
+/// Löschprotokoll ([`is_altbestand_geloescht`]). In beiden Fällen nur, wenn hier weder
+/// Einsatz noch Akte mit der Kennung steht. Eine unbekannte Kennung wird übergangen: Eine aus
+/// einer Sicherung zurückgekehrte Instanz meldet nichts.
+pub async fn geloeschte_akten(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    eigene_kennung: &str,
+    akten: &[String],
+) -> Result<Vec<Lebensende>, AppError> {
+    let mut gesehen = HashSet::new();
+    let kennungen: Vec<String> = akten
+        .iter()
+        .filter(|k| gesehen.insert(k.as_str()))
+        .take(EINSAETZE_MAX)
+        .cloned()
+        .collect();
+    let mut belegt: HashSet<String> =
+        crate::instanz::fuehrung::loeschvermerk::belegte(conn, kopplung_id, &kennungen)
+            .await?
+            .into_iter()
+            .collect();
+    for k in &kennungen {
+        if !belegt.contains(k)
+            && is_altbestand_geloescht(conn, kopplung_id, eigene_kennung, k).await?
+        {
+            belegt.insert(k.clone());
+        }
+    }
+    Ok(kennungen
+        .into_iter()
+        .filter(|k| belegt.contains(k))
+        .map(|kennung| Lebensende {
+            kennung,
+            art: LEBENSENDE_GELOESCHT.into(),
+            stand: 0,
+            kategorien: Vec::new(),
+        })
+        .collect())
+}
+
+/// Beleg für Löschungen von vor dem Löschvermerk: eigenes Präfix, die ID im Löschprotokoll einer
+/// Org, die dieser Kopplung aktiv zugeordnet ist, und hier weder Einsatz noch Akte mit der
+/// Kennung. Die Art `spiegel` zählt nicht: Sie steht auch für einen Spiegel, den diese Instanz
+/// nach der Nachbereitung abgeräumt hat, während der Einsatz beim Führer weiterlebt.
+async fn is_altbestand_geloescht(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    eigene_kennung: &str,
+    kennung: &str,
+) -> Result<bool, AppError> {
+    let Some(id) = kennung
+        .strip_prefix(eigene_kennung)
+        .and_then(|r| r.strip_prefix('/'))
+        .and_then(|r| r.split('-').next())
+        .and_then(|r| r.parse::<i64>().ok())
+    else {
+        return Ok(false);
+    };
+    Ok(sqlx::query_scalar(
+        "SELECT NOT EXISTS (SELECT 1 FROM einsatz WHERE kennung = ?1 OR id = ?2) \
+            AND NOT EXISTS (SELECT 1 FROM einsatz_fuehrung WHERE kennung = ?1) \
+            AND EXISTS (SELECT 1 FROM aufbewahrung_loeschprotokoll p \
+                        JOIN instanz_kopplung_org o ON o.org_id = p.org_id \
+                        WHERE p.einsatz_id = ?2 AND p.art <> ?3 \
+                          AND o.kopplung_id = ?4 AND o.widerrufen_at IS NULL)",
+    )
+    .bind(kennung)
+    .bind(id)
+    .bind(AbraeumArt::Spiegel.as_str())
+    .bind(kopplung_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Löscht die Akten ohne Spiegel, deren Einsatz das Gegenüber als `geloescht` meldet (LLH-1699,
+/// D3), und vermerkt ihr Ende. Nur bei eingeschalteter Führung, nur Akten ohne lokalen Einsatz
+/// einer Org, die dieser Kopplung aktiv zugeordnet ist, und nur, wenn das Gegenüber über diese
+/// Akte entscheidet (`fuehrung::repo::is_gegenueber_zustaendig`, dieselbe Regel wie beim Nennen):
+/// Eine ELW löscht am Hub keine Akte einer anderen. Ein Spiegel endet nicht hier, sondern über
+/// [`geloescht_uebernehmen`]. Liefert die Zahl gelöschter Akten.
+pub async fn geloeschte_akten_uebernehmen(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+    liste: &[Lebensende],
+) -> Result<usize, AppError> {
+    use crate::instanz::fuehrung::repo as akten;
+    let Some(richtung) = kopplung.richtung() else {
+        return Ok(0);
+    };
+    if !liste.iter().any(|l| l.art == LEBENSENDE_GELOESCHT) || !akten::is_enabled_tx(conn).await? {
+        return Ok(0);
+    }
+    let orgs: Vec<i64> = akten::list_orgs_der_kopplung(conn, kopplung.id, richtung)
+        .await?
+        .into_iter()
+        .map(|(org_id, _)| org_id)
+        .collect();
+    let mut geloescht = 0;
+    for l in liste.iter().filter(|l| l.art == LEBENSENDE_GELOESCHT) {
+        let Some(a) = akten::find_by_kennung(conn, &l.kennung).await? else {
+            continue;
+        };
+        if a.einsatz_id.is_some() || !orgs.contains(&a.org_id) {
+            continue;
+        }
+        let gegenueber_der_org = akten::list_gegenueber(conn, a.org_id).await?;
+        if !akten::is_gegenueber_zustaendig(
+            richtung,
+            &a.fuehrer_kennung,
+            &kopplung.gegenueber_kennung,
+            &gegenueber_der_org,
+        ) {
+            continue;
+        }
+        if akten::delete_ohne_spiegel(conn, &a).await? {
+            geloescht += 1;
+        }
+    }
+    Ok(geloescht)
+}
+
 /// Der Spiegel dieser Kopplung mit der Kennung, samt Stand.
 async fn spiegel_der_kopplung(
     conn: &mut SqliteConnection,
@@ -112,6 +239,10 @@ pub async fn geloescht_uebernehmen(
                 Some(&kopplung.gegenueber_name),
             )
             .await?;
+            // Der Führer hat den Einsatz gelöscht: das Ende hier festhalten, damit weitere
+            // meldende Seiten ihre Akte verlieren (LLH-1699, D4). Das Abräumen selbst vermerkt
+            // einen Spiegel nicht, denn nach der Nachbereitung lebt der Einsatz beim Führer weiter.
+            crate::instanz::fuehrung::loeschvermerk::vermerken_einsatz(conn, id).await?;
             ids.push(id);
         }
     }

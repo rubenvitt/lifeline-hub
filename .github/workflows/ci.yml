@@ -22,9 +22,11 @@
 # die Schnellprüfungen laufen immer. Leer heißt GRÜN, nicht fehlend: die Shard-Namen sind
 # Required Checks im Ruleset 17017911, und ein per Job-`if` übersprungener Matrix-Job meldet sich
 # unter seinem unexpandierten Namen („Frontend-Suite ${{ matrix.shard }}/4"), die Pflicht-Checks
-# hingen auf „Expected". Deshalb tragen die Matrix-Jobs die Bedingung an jedem Schritt, die
-# übrigen am Job (ein übersprungener Job ohne Matrix erfüllt seinen Check). Die zweite Stufe
-# nutzt genau dieses Verhalten umgekehrt, damit ihre Checks fehlen (Kopf von `e2e.yml`).
+# hingen auf „Expected". Deshalb tragen die Jobs mit Pflicht-Check die Bedingung an jedem
+# Schritt, nicht am Job. Das gilt auch für die Rust-Suite ohne Matrix: ihr übersprungener Check
+# zeigt GitHub zwar grün, Auto-Merge wartet aber trotzdem (reine Doku- und Website-PRs, #1283 und
+# #1336, mussten von Hand gemergt werden). Nur Jobs ohne Pflicht-Check tragen die Bedingung am
+# Job. Die zweite Stufe nutzt das Fehlen umgekehrt, damit ihre Checks fehlen (Kopf von `e2e.yml`).
 # Im Zweifel wird geprüft: Nur ein ausdrückliches `false` spart, ein roter `aenderungen`-Job
 # lässt alles laufen. Push-Läufe auf Kanal-Branches prüfen immer voll.
 #
@@ -171,13 +173,19 @@ jobs:
   rust:
     name: Rust-Suite
     needs: aenderungen
-    if: ${{ !cancelled() && needs.aenderungen.outputs.rust != 'false' }}
+    # Am Job nur `!cancelled()`, die Bedingung `RUST` steht an jedem Schritt (s. Kopf): der
+    # Pflicht-Check `Rust-Suite` läuft leer grün durch statt übersprungen zu werden.
+    if: ${{ !cancelled() }}
+    env:
+      RUST: ${{ needs.aenderungen.outputs.rust }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.RUST != 'false'
       # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
       - name: Plattenplatz schaffen (nur bei Bedarf)
+        if: env.RUST != 'false'
         run: |
           df -h /
           frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
@@ -190,6 +198,7 @@ jobs:
       # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): Schritt 4 testet
       # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
       - name: System-Werkzeuge für die nativen Crates
+        if: env.RUST != 'false'
         # Die WebKit-Pakete sind groß: bei tröpfelndem Spiegel reichen 300 s je Versuch nicht
         # (LLH-1420). Was ein abgebrochener Versuch schon geladen hat, bleibt im apt-Cache liegen.
         env:
@@ -199,16 +208,20 @@ jobs:
           libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
           librsvg2-dev libayatana-appindicator3-dev
       - name: Rust-Toolchain (stable)
+        if: env.RUST != 'false'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        if: env.RUST != 'false'
         with:
           shared-key: rust-openssl-vendored
           cache-on-failure: true
       - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        if: env.RUST != 'false'
         with:
           version: 2026.9.1
           cache: true
       - name: Rust-Suite
+        if: env.RUST != 'false'
         run: ./scripts/check-all.sh --nur rust
 
   # ── Frontend-Suite, auf vier Runner geteilt ─────────────────────────────────────────
