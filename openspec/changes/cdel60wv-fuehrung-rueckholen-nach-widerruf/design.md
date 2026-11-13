@@ -65,7 +65,7 @@ Eine Akte gilt als „Führung beendet“, wenn
 
 Bedingung 2 hing im ersten Entwurf an irgendeiner widerrufenen Zuordnung der Org zum Führer. Der
 Review vor dem PR fand den Fall dazu: Führt „ELW 1“ und kommt der Spiegel an „ELW 2“ über den Hub,
-genügte eine alte, längst widerrufene Direktkopplung von „ELW 2“ zu „ELW 1“, um ohne Beweis
+genügte eine alte, längst widerrufene Standardkopplung von „ELW 2“ zu „ELW 1“, um ohne Beweis
 zurückzuholen, während „ELW 1“ weiter führt. Damit der Verweis des Spiegels nach dem Widerruf ohne
 Schalter stehen bleibt, lässt `spiegel::fuehrung::richte_aus` beim Einschalten eine widerrufene
 Zuordnung zum Führer stehen, statt sie zu leeren; sie nennt auch die Gegenstelle im Hinweisband.

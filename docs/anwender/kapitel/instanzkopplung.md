@@ -281,8 +281,10 @@ zurückholen“), weil die andere Installation nicht mehr gekoppelt ist. Der Ver
 eine Notübernahme mit Grund und Namen, die Admin-Spur „Führung zurückgeholt von … (Kopplung
 beendet)“. Bruchstelle ist der Zeitpunkt des Widerrufs: Was die andere Installation danach
 geschrieben hat, kommt nicht mehr an. Solange die Organisation mit der führenden Installation
-gekoppelt ist, gibt es dieses Zurückholen nicht; dann gelten Anfrage und Notübernahme. Es ersetzt
-keine neue Kopplung: Wird die Organisation später wieder mit derselben Installation gekoppelt und
+gekoppelt ist, gibt es dieses Zurückholen nicht; dann gelten Anfrage und Notübernahme. Ebenso
+wenig für einen Spiegel, der über eine andere Installation kommt, etwa über den Hub: Dort führt
+die andere Installation weiter, auch wenn diese Organisation früher einmal selbst mit ihr
+gekoppelt war. Es ersetzt keine neue Kopplung: Wird die Organisation später wieder mit derselben Installation gekoppelt und
 hat diese den Einsatz inzwischen weitergeführt, führt sie ihn dort weiter, wie nach jedem
 Widerruf.
 

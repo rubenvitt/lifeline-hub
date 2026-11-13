@@ -32,8 +32,8 @@ herleitung:
   Epoche, Art Notübernahme, Erklärung ohne Beweis gegen die alte Führung. Bruchstelle des
   Zurückholens ist der Widerruf dieser Zuordnung; `spiegel::fuehrung::richte_aus` lässt sie am
   Spiegel stehen.
-- MUST NOT: Zurückholen, solange die Org der führenden Instanz zugeordnet ist, oder wenn sie nie
-  über eine Standardkopplung verbunden war (409).
+- MUST NOT: Zurückholen, solange die Org der führenden Instanz zugeordnet ist, oder wenn der
+  Spiegel nicht über eine widerrufene Standard-Zuordnung zu ihr kam, etwa über einen Hub (409).
 
 ## Prüfung
 
@@ -43,7 +43,7 @@ verlange 'fuehrung_beendet_sql!\(\)' src/instanz/fuehrung/repo.rs
 verbiete 'dienst::zurueckholen\(' 'src/**/*.rs' ':(exclude)src/routes/fuehrung.rs'
 verlange '^pub async fn zurueckholen' src/instanz/fuehrung/repo.rs src/instanz/fuehrung/dienst.rs
 verlange '/api/einsaetze/\{id\}/fuehrung/zurueckholen' src/app.rs
-verlange 'ist_widerrufen_zum_fuehrer' src/instanz/spiegel/fuehrung.rs
+verlange 'is_widerrufen_zum_fuehrer' src/instanz/spiegel/fuehrung.rs
 ```
 
 ## Kontext

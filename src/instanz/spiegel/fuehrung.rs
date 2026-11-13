@@ -58,7 +58,7 @@ pub async fn richte_aus(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<
                 .await?;
             } else if neu.is_none()
                 && ko.is_some()
-                && !ist_widerrufen_zum_fuehrer(conn, &akte, ko).await?
+                && !is_widerrufen_zum_fuehrer(conn, &akte, ko).await?
             {
                 // Die Führung ging an eine Instanz, die hier nicht gekoppelt ist (etwa über eine
                 // Direktkopplung bezeugt, LLH-1497): der Spiegel bleibt lesbar, der Abgleich endet.
@@ -96,7 +96,7 @@ pub async fn richte_alle_aus(conn: &mut SqliteConnection) -> Result<(), AppError
 
 /// Ob die Zuordnung `ko` des Spiegels widerrufen ist und zur Kopplung mit dem Führer der Akte
 /// gehört (LLH-1850).
-async fn ist_widerrufen_zum_fuehrer(
+async fn is_widerrufen_zum_fuehrer(
     conn: &mut SqliteConnection,
     akte: &AkteZeile,
     ko: Option<i64>,

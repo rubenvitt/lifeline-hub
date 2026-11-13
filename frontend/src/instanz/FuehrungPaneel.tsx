@@ -243,8 +243,10 @@ export default function FuehrungPaneel({
   const moeglich = fuehrungMoeglich(fuehrung, { darfUnterschreiben });
   const [neuerCode, setNeuerCode] = useState<FuehrungCodeAntwort | null>(null);
   const [notOffen, setNotOffen] = useState(false);
-  // Der Name der Führung beim Öffnen: der Dialog folgt nicht der Live-Akte (Review LLH-1850).
-  const [zurueckVon, setZurueckVon] = useState<string | null>(null);
+  // Der Name der Führung beim Öffnen: der Dialog folgt nicht der Live-Akte, auch nicht während er
+  // ausblendet (Review LLH-1850).
+  const [zurueckOffen, setZurueckOffen] = useState(false);
+  const [zurueckVon, setZurueckVon] = useState('');
   const [form] = Form.useForm<NotuebernahmeWerte>();
   const [zurueckForm] = Form.useForm<NotuebernahmeWerte>();
   const beweisWahl = Form.useWatch('beweis', form);
@@ -315,12 +317,15 @@ export default function FuehrungPaneel({
     onLaeuft?.(laeuft);
   }, [laeuft, onLaeuft]);
   // Geht das Zurückholen nicht mehr (ein anderer hat zurückgeholt, die Kopplung gilt wieder),
-  // schließt der Dialog; ein laufendes Senden endet mit seiner eigenen Antwort.
-  const zurueckMoeglich = moeglich.zurueckholen;
-  const zurueckLaeuft = zurueckholen.isPending;
+  // schließt der Dialog und leert sein Formular wie jeder andere Weg hinaus; ein laufendes Senden
+  // endet mit seiner eigenen Antwort.
+  const canZurueckholen = moeglich.zurueckholen;
+  const isZurueckholenPending = zurueckholen.isPending;
   useEffect(() => {
-    if (!zurueckMoeglich && !zurueckLaeuft) setZurueckVon(null);
-  }, [zurueckMoeglich, zurueckLaeuft]);
+    if (canZurueckholen || isZurueckholenPending) return;
+    zurueckForm.resetFields();
+    setZurueckOffen(false);
+  }, [canZurueckholen, isZurueckholenPending, zurueckForm]);
   /** Gesperrt, außer es ist die Aktion, die gerade läuft (die zeigt ihren Ladezustand). */
   const sperre = (selbst: boolean) => ohneNetz || (laeuft && !selbst);
   const beschrieben = ohneNetz ? grundId : undefined;
@@ -492,6 +497,7 @@ export default function FuehrungPaneel({
               onClick={() => {
                 zurueckholen.reset();
                 setZurueckVon(fuehrung.fuehrer_name);
+                setZurueckOffen(true);
               }}
               data-lfh="fuehrung-zurueckholen"
             >
@@ -602,8 +608,8 @@ export default function FuehrungPaneel({
       </ErfassungsModal>
 
       <ErfassungsModal<NotuebernahmeWerte>
-        offen={zurueckVon != null}
-        titel={`Führung von ${zurueckVon ?? ''} zurückholen`}
+        offen={zurueckOffen}
+        titel={`Führung von ${zurueckVon} zurückholen`}
         form={zurueckForm}
         erfassenText="Führung zurückholen"
         unumkehrbar
@@ -617,10 +623,10 @@ export default function FuehrungPaneel({
         speicherung={zurueckholen}
         speicherFehlerTitel="Nicht zurückgeholt"
         onErfassen={(w) => zurueckholen.mutateAsync(w)}
-        onFertig={() => setZurueckVon(null)}
+        onFertig={() => setZurueckOffen(false)}
         onAbbrechen={() => {
           zurueckholen.reset();
-          setZurueckVon(null);
+          setZurueckOffen(false);
         }}
       >
         <GrundFeld />

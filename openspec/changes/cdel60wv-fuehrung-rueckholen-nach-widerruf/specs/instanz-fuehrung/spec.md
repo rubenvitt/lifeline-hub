@@ -51,5 +51,5 @@ noch gekoppelt oder kam der Spiegel nicht über eine widerrufene Standard-Zuordn
 - **THEN** bietet das Paneel „Führung zurückholen“ nicht an, und der Server antwortet auf den Aufruf mit 409
 
 #### Scenario: Der Spiegel kommt über einen Hub
-- **WHEN** „ELW 1“ einen Einsatz führt, den „ELW 2“ über den Hub kennt und spiegelt, und die Org an „ELW 2“ früher einmal direkt mit „ELW 1“ gekoppelt war
+- **WHEN** „ELW 1“ einen Einsatz führt, den „ELW 2“ über den Hub kennt und spiegelt, und die Org an „ELW 2“ früher einmal über eine Standardkopplung mit „ELW 1“ gekoppelt war
 - **THEN** bietet „ELW 2“ „Führung zurückholen“ nicht an, und der Server antwortet auf den Aufruf mit 409

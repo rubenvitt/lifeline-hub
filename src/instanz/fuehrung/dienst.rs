@@ -356,7 +356,8 @@ pub async fn notuebernahme_gegen_erreichte(
 /// `instanz-fuehrung`, „Einen Spiegel ohne gekoppelte Führung holt ein Mensch zurück“): mit
 /// Grund, ohne Beweis, Bruchstelle ist der Widerruf der Zuordnung des Spiegels (Change
 /// `cdel60wv-fuehrung-rueckholen-nach-widerruf`, D3–D5). 409, solange der Führer zugeordnet ist
-/// oder wenn er mit der Org nie über eine Standardkopplung verbunden war.
+/// oder wenn der Spiegel nicht über eine widerrufene Standard-Zuordnung zu ihm kam (nie gekoppelt,
+/// nur vor Ort, über einen Hub).
 pub async fn zurueckholen(
     pool: &SqlitePool,
     akte_id: i64,
@@ -374,7 +375,7 @@ pub async fn zurueckholen(
                 if repo::is_zugeordnet(conn, a.org_id, &a.fuehrer_kennung).await? {
                     "Die führende Instanz ist noch gekoppelt."
                 } else {
-                    "Zurückholen geht nur, wenn die Kopplung zur führenden Instanz beendet ist."
+                    "Dieser Spiegel kam nicht über die beendete Kopplung zur führenden Instanz."
                 }
                 .into(),
             ));
@@ -1057,7 +1058,7 @@ mod tests {
         assert!(matches!(
             zurueckholen(&pool, id, "Grund", "Erika").await,
             Err(AppError::Conflict(m))
-                if m == "Zurückholen geht nur, wenn die Kopplung zur führenden Instanz beendet ist."
+                if m == "Dieser Spiegel kam nicht über die beendete Kopplung zur führenden Instanz."
         ));
     }
 

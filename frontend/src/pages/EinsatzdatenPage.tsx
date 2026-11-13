@@ -37,6 +37,7 @@ import { sucheOrtImEinsatz } from '../api/ortSuche';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { einsatzberichtPfad, einsatzEinstellungenPfad, lagekartePfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { SPIEGEL_KOPF_ABRUF_MS } from '../einsatz/spiegel/spiegelText';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -1495,42 +1496,46 @@ function FuehrungAbschnitt({
   const q = useQuery({
     queryKey: einsatzKeys.fuehrung(einsatzId),
     queryFn: () => loadFuehrung(einsatzId),
+    // Solange die Kopplung zur Führung beendet ist, im Takt des Hinweisbands (LLH-1850): Eine
+    // neue Kopplung meldet keinen Kopf, und das Paneel böte sonst weiter das Zurückholen an.
+    refetchInterval: (query) =>
+      query.state.data?.fuehrer_beendet_at ? SPIEGEL_KOPF_ABRUF_MS : false,
   });
   // `?paneel=fuehrung` (Hinweisband „Führung zurückholen“, LLH-1850): einmal zum Paneel rollen,
-  // dann den Auftrag aus der Adresse nehmen (apply-then-clean).
+  // sobald es steht (auch als Fehlerzustand), dann den Auftrag aus der Adresse nehmen
+  // (apply-then-clean).
   const [params, setParams] = useSearchParams();
-  const ziel = useRef<HTMLDivElement>(null);
-  const geladen = q.data != null;
+  const targetRef = useRef<HTMLDivElement>(null);
+  const isPending = q.isPending;
   useEffect(() => {
-    if (!geladen || params.get('paneel') !== 'fuehrung') return;
-    ziel.current?.scrollIntoView?.({ block: 'start' });
+    if (isPending || params.get('paneel') !== 'fuehrung') return;
+    targetRef.current?.scrollIntoView?.({ block: 'start' });
     const rest = new URLSearchParams(params);
     rest.delete('paneel');
     setParams(rest, { replace: true });
-  }, [geladen, params, setParams]);
-  if (!q.data) {
-    // Ein gescheiterter Abruf steht am Platz des Paneels, mit „Erneut laden“ (PaneelZustand).
-    return (
-      <Paneel titel="Führung" style={{ marginTop: token.marginLG }}>
-        <PaneelZustand
-          zustand={q.isError ? 'fehler' : 'laden'}
-          titel="Führung"
-          leerText=""
-          onNeuladen={() => void q.refetch()}
-        >
-          {null}
-        </PaneelZustand>
-      </Paneel>
-    );
-  }
+  }, [isPending, params, setParams]);
   return (
-    <div ref={ziel} data-lfh="fuehrung-abschnitt">
-      <FuehrungPaneel
-        fuehrung={q.data}
-        darfBedienen={darfBedienen}
-        darfUnterschreiben={darfUnterschreiben}
-        style={{ marginTop: token.marginLG }}
-      />
+    <div ref={targetRef} data-lfh="fuehrung-abschnitt">
+      {q.data ? (
+        <FuehrungPaneel
+          fuehrung={q.data}
+          darfBedienen={darfBedienen}
+          darfUnterschreiben={darfUnterschreiben}
+          style={{ marginTop: token.marginLG }}
+        />
+      ) : (
+        // Ein gescheiterter Abruf steht am Platz des Paneels, mit „Erneut laden“ (PaneelZustand).
+        <Paneel titel="Führung" style={{ marginTop: token.marginLG }}>
+          <PaneelZustand
+            zustand={q.isError ? 'fehler' : 'laden'}
+            titel="Führung"
+            leerText=""
+            onNeuladen={() => void q.refetch()}
+          >
+            {null}
+          </PaneelZustand>
+        </Paneel>
+      )}
     </div>
   );
 }
