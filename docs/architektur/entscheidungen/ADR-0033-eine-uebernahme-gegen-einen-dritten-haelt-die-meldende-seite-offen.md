@@ -1,5 +1,5 @@
 ---
-id: ADR-0031
+id: ADR-0033
 titel: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen Dritten hält die meldende Seite ohne Alarm offen
 status: akzeptiert
 datum: 2026-11-12
@@ -18,7 +18,7 @@ herleitung:
   - LLH-1707 und LLH-1669 (mit Ruben am 12.11.2026 abgestimmt), LLH-1641
 ---
 
-# ADR-0031: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen Dritten hält die meldende Seite ohne Alarm offen
+# ADR-0033: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen Dritten hält die meldende Seite ohne Alarm offen
 
 ## Regeln
 

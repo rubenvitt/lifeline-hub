@@ -382,7 +382,7 @@ sequenceDiagram
 
 Mit dem Schalter `LIFELINE_FUEHRUNG` tauschen gekoppelte Instanzen in jeder Meldung ihre
 Führungsakten aus (LLH-1491,
-[ADR-0031](entscheidungen/ADR-0031-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)). Genau eine
+[ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)). Genau eine
 Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung). Seit LLH-1641
 entscheidet die Akte, wer führt, und der Spiegel folgt ihr: wer die Führung abgibt, wird Spiegel
 mit Anträgen; wer sie bekommt, schreibt den bisherigen Spiegel weiter.
@@ -417,7 +417,7 @@ sequenceDiagram
   Bestätigung ab (`austausch::ist_konflikt`, ohne Widerspruch); führt der Hub selbst mit der
   Epoche eines Dritten oder mit einer Erklärung gegen einen Dritten (er holte sich die Führung per
   Notübernahme oder Widerruf von einer anderen ELW zurück), hält sie das als gewöhnliche Übernahme
-  offen, ohne Alarm, und ihren Widerspruch nimmt der Hub an ([ADR-0031](entscheidungen/ADR-0031-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)).
+  offen, ohne Alarm, und ihren Widerspruch nimmt der Hub an ([ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)).
 - Gesperrt ist nur der Spiegel (`einsatz.spiegel`, Schutz-Trigger, 409 `einsatz_ist_spiegel`).
   `instanz::spiegel::fuehrung::richte_aus` richtet ihn bei jedem Speichern einer Akte aus
   (`werde_fuehrer`, `werde_spiegel`); die Bedienung zieht `EinsatzFuehrungszugriff`.
