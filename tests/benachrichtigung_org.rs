@@ -351,6 +351,8 @@ async fn demo_import_meldet_keinen_neuen_einsatz() {
         demo_daten: true,
         zulassungs_budget: None,
         heic_decoder_verzeichnis: None,
+        tls: false,
+        einwurf_allow_http: false,
     })
     .await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

@@ -15,12 +15,16 @@
 //! Maschinenzugang für Fremdsysteme (LLH-1652, Spec `maschinenzugang`): Repo [`zugang`], Scopes
 //! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`].
 //!
+//! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
+//! [`einwurf`], die einzigen Routen ohne signierte Anfrage.
+//!
 //! Fachrouten: Rechner Unterkunft und Zelte in [`rechner`] (LLH-1524, Spec
 //! `rechner-api-unterkunft`).
 //!
 //! Regeln: `src/AGENTS.md`, „Öffentliche API v1“.
 
 pub mod drossel;
+pub mod einwurf;
 pub mod error;
 pub mod kommando;
 pub mod machine;
@@ -113,6 +117,16 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
             routes!(rechner::get_unterkunft_richtwerte)
                 .layer(Extension(ScopeAnforderung::Scope(Scope::RechnerUse))),
         )
+        // Einwurf (LLH-1654, ADR-0023): Schlüssel im Pfad statt Signatur, nur schreibend. Die
+        // Prüfungen stehen in `einwurf::routen`, nicht in einem Extractor.
+        .routes(routes!(
+            einwurf::routen::alarmmeldung_get,
+            einwurf::routen::alarmmeldung_post
+        ))
+        .routes(routes!(
+            einwurf::routen::position_get,
+            einwurf::routen::position_post
+        ))
 }
 
 /// Das fertige Dokument, einmal aus [`router`] gebaut.

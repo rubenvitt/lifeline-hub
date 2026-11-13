@@ -59,6 +59,13 @@ pub struct RouterOptionen {
     /// Austauschverzeichnis des HEIC-Decoders (`--heic-decoder-verzeichnis`, LFH-1000); `None`
     /// = die eingebettete Fassung.
     pub heic_decoder_verzeichnis: Option<PathBuf>,
+    /// Der Server terminiert TLS selbst (`--tls`). Nur der Einwurf fragt danach (ADR-0023): Er
+    /// nimmt Aufrufe nur über TLS an, und `auth::session::cookie_secure()` taugt als Nachweis
+    /// nicht, weil `--cookie-secure` es auch ohne TLS setzt.
+    pub tls: bool,
+    /// Einwürfe auch ohne TLS annehmen (`--einwurf-allow-http`), für ein Netz, das selbst
+    /// verschlüsselt. Die Seite „Anbindungen“ warnt dann.
+    pub einwurf_allow_http: bool,
 }
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand, mit Vorgabe-Optionen (ohne
@@ -1894,6 +1901,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/admin/anbindungen/{id}/widerrufen",
             post(routes::anbindungen::widerrufen),
         )
+        // LLH-1654: Einwurf-Zugänge (Absender ohne Signatur, ADR-0023) verwalten. Die Einwürfe
+        // selbst nimmt `public_api::einwurf` an.
+        .route(
+            "/api/admin/einwurf-zugaenge",
+            get(routes::einwurf_zugaenge::liste).post(routes::einwurf_zugaenge::anlegen),
+        )
+        .route(
+            "/api/admin/einwurf-zugaenge/{id}/schluessel",
+            post(routes::einwurf_zugaenge::schluessel_wechseln),
+        )
+        .route(
+            "/api/admin/einwurf-zugaenge/{id}/widerrufen",
+            post(routes::einwurf_zugaenge::widerrufen),
+        )
         // LLH-1484: Lesezugänge externer Anzeigen (Verwaltung) und ihr Abruf. Der Abruf zieht
         // keinen `CurrentUser`, nur den Schlüssel (`lagemonitor_zugang::LagemonitorZugriff`).
         .route(
@@ -2704,6 +2725,13 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 }),
             crate::zulassung::zulassung,
         ))
+        // Transportlage für den Einwurf (ADR-0023): die Einwurf-Routen und die Verwaltung der
+        // Einwurf-Zugänge lesen sie aus den Extensions der Anfrage. Fehlt sie (Router ohne
+        // diese Schicht), gilt „kein TLS, kein Schalter“.
+        .layer(axum::Extension(crate::public_api::einwurf::Transport {
+            tls: opt.tls,
+            einwurf_allow_http: opt.einwurf_allow_http,
+        }))
         // Öffentliche API v1 (LLH-1653, `public_api::contract_layer`): `code` an jeder Fehlerantwort
         // unter `/api/v1/` und `Cache-Control: no-store`. Außerhalb der Zulassung und von
         // CatchPanic, damit auch Lastabwurf-503 und Panik-500 einen Code bekommen.
@@ -2806,11 +2834,17 @@ async fn fremde_request_id_pruefen(mut request: axum::extract::Request) -> axum:
     request
 }
 
-/// Kürzt den Pfad für das Log auf höchstens [`PFAD_MAX_ZEICHEN`] Zeichen, an einer Zeichengrenze
-/// und mit `…` am Ende.
+/// Der Pfad, wie er im Log steht: zuerst ohne Geheimnis, dann gekürzt.
+///
+/// - Der Schlüssel eines Einwurf-Zugangs steht im Pfad (ADR-0023);
+///   `public_api::einwurf::maskiere_pfad` ersetzt ihn, bevor gekürzt wird. Die Abfrage steht
+///   ohnehin nie im Span.
+/// - Gekürzt wird auf höchstens [`PFAD_MAX_ZEICHEN`] Zeichen, an einer Zeichengrenze und mit `…`
+///   am Ende.
 fn pfad_fuer_protokoll(pfad: &str) -> std::borrow::Cow<'_, str> {
+    let pfad = crate::public_api::einwurf::maskiere_pfad(pfad);
     if pfad.chars().nth(PFAD_MAX_ZEICHEN).is_none() {
-        return std::borrow::Cow::Borrowed(pfad);
+        return pfad;
     }
     let ende = pfad
         .char_indices()
@@ -2959,6 +2993,150 @@ mod tests {
             assert!(gekuerzt.ends_with('…'));
             assert!(lang.starts_with(gekuerzt.trim_end_matches('…')));
         }
+    }
+
+    /// ADR-0023: der Schlüssel eines Einwurf-Zugangs steht nie im Span, auch nicht in einem
+    /// langen Pfad, und die Maske zählt bei der Längengrenze mit.
+    #[test]
+    fn pfad_fuer_das_log_traegt_keinen_einwurf_schluessel() {
+        let schluessel = crate::public_api::einwurf::neuer_schluessel();
+        assert_eq!(
+            pfad_fuer_protokoll(&format!("/api/v1/einwurf/{schluessel}/alarmmeldung")),
+            "/api/v1/einwurf/***/alarmmeldung"
+        );
+        // Ein Schlüssel nahe der Längengrenze: maskiert passt der Pfad, also wird er nicht gekürzt.
+        let lang = format!("/{}/{schluessel}/x", "a".repeat(PFAD_MAX_ZEICHEN - 20));
+        let maskiert = pfad_fuer_protokoll(&lang);
+        assert!(maskiert.ends_with("/***/x"), "{maskiert}");
+        // Ein langer Pfad mit Schlüssel am Anfang: maskiert und gekürzt.
+        let sehr_lang = format!("/api/v1/einwurf/{schluessel}/{}", "a".repeat(400));
+        let gekuerzt = pfad_fuer_protokoll(&sehr_lang);
+        assert!(
+            gekuerzt.starts_with("/api/v1/einwurf/***/aaa"),
+            "{gekuerzt}"
+        );
+        assert_eq!(gekuerzt.chars().count(), PFAD_MAX_ZEICHEN);
+        // Auch ohne Schrägstrich vor dem Schlüssel.
+        let pfad = format!("/api/v1/einwurf{schluessel}/alarmmeldung");
+        let verklebt = pfad_fuer_protokoll(&pfad);
+        assert!(!verklebt.contains(&schluessel[7..]), "{verklebt}");
+    }
+
+    /// Der `AppState` für Tests, die den ganzen Router brauchen.
+    fn einwurf_test_state(pool: sqlx::SqlitePool) -> AppState {
+        use crate::karte::auto_aktualisierung::{AutoAktualisierung, Einstellung};
+        AppState {
+            pool,
+            live: crate::live::LiveHub::new(),
+            fachebenen: crate::karte::FachebenenState::neu(),
+            karten_dir: std::env::temp_dir(),
+            download_client: crate::karte::download::download_client(),
+            download_fortschritt: crate::karte::download::neue_fortschritt_map(),
+            karten_service_url: None,
+            karten_service_token: None,
+            auto_aktualisierung: AutoAktualisierung::neu(
+                Einstellung::default(),
+                reqwest::Client::new(),
+            ),
+            backup_download: Default::default(),
+            backup_empfaenger: Default::default(),
+            datentraeger: Default::default(),
+        }
+    }
+
+    /// Akzeptanzkriterium LLH-1654: der Schlüssel steht in keiner Logzeile. Der Test schickt
+    /// Einwürfe durch den ganzen Router, mit gültigem und mit unbekannten Schlüsseln, bis die
+    /// Sperre der Quelle eine WARN-Zeile im Span der Anfrage schreibt. Das mitgeschnittene Log
+    /// nennt den maskierten Pfad und enthält weder einen Schlüssel noch seinen Hash noch die
+    /// Abfrage.
+    #[tokio::test]
+    async fn einwurf_schluessel_steht_in_keiner_logzeile() {
+        use crate::public_api::einwurf;
+        use crate::public_api::scope::Scope;
+        use axum::body::Body;
+        use axum::extract::ConnectInfo;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+
+        let (puffer, _log) = crate::test_log::LogPuffer::einfangen();
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Test-Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (_, gueltig) = {
+            let mut conn = pool.acquire().await.unwrap();
+            einwurf::anlegen(
+                &mut conn,
+                1,
+                "BOSWatch",
+                Scope::AlarmmeldungenWrite,
+                None,
+                None,
+                &crate::zeit::jetzt(),
+            )
+            .await
+            .unwrap()
+        };
+        let app = build_router_mit(
+            einwurf_test_state(pool.clone()),
+            RouterOptionen {
+                einwurf_allow_http: true,
+                ..Default::default()
+            },
+        );
+        // Eigene Adresse: der Zähler für Maschinen gilt prozessweit.
+        let quelle: std::net::SocketAddr = "198.51.100.231:4711".parse().unwrap();
+        let einwerfen = |schluessel: String| {
+            let app = app.clone();
+            async move {
+                let mut req = Request::builder()
+                    .uri(format!(
+                        "/api/v1/einwurf/{schluessel}/alarmmeldung?text=GEHEIMER-ALARMTEXT"
+                    ))
+                    .body(Body::empty())
+                    .unwrap();
+                req.extensions_mut().insert(ConnectInfo(quelle));
+                app.oneshot(req).await.unwrap().status()
+            }
+        };
+
+        assert_eq!(einwerfen(gueltig.clone()).await, StatusCode::NO_CONTENT);
+        let mut unbekannte = Vec::new();
+        for _ in 0..crate::auth::rate_limit::MAX_FEHLVERSUCHE {
+            let schluessel = einwurf::neuer_schluessel();
+            assert_eq!(
+                einwerfen(schluessel.clone()).await,
+                StatusCode::UNAUTHORIZED
+            );
+            unbekannte.push(schluessel);
+        }
+        // Die Quelle ist jetzt gesperrt, auch mit gültigem Schlüssel; das schreibt die WARN-Zeile.
+        assert_eq!(
+            einwerfen(gueltig.clone()).await,
+            StatusCode::TOO_MANY_REQUESTS
+        );
+
+        let log = puffer.text();
+        assert!(
+            log.contains("pfad=/api/v1/einwurf/***/alarmmeldung"),
+            "der Span nennt den maskierten Pfad:\n{log}"
+        );
+        for schluessel in unbekannte.iter().chain([&gueltig]) {
+            assert!(
+                !log.contains(schluessel.as_str()),
+                "Schlüssel im Log:\n{log}"
+            );
+            assert!(
+                !log.contains(&einwurf::hash(schluessel)),
+                "Hash im Log:\n{log}"
+            );
+        }
+        assert!(!log.contains("llh_ew_"), "{log}");
+        assert!(
+            !log.contains("GEHEIMER-ALARMTEXT"),
+            "Abfrage im Log:\n{log}"
+        );
     }
 
     /// LFH-925: ein 503 schreibt keine ERROR-Zeile aus dem `TraceLayer` mehr, ein 500 weiter.

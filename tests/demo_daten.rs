@@ -103,6 +103,8 @@ async fn mit_freischaltung_anonym_401() {
         demo_daten: true,
         zulassungs_budget: None,
         heic_decoder_verzeichnis: None,
+        tls: false,
+        einwurf_allow_http: false,
     })
     .await;
     for (methode, pfad) in ENDPUNKTE {
@@ -119,6 +121,8 @@ async fn mit_freischaltung_fuehrungskraft_403() {
         demo_daten: true,
         zulassungs_budget: None,
         heic_decoder_verzeichnis: None,
+        tls: false,
+        einwurf_allow_http: false,
     })
     .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
@@ -139,6 +143,8 @@ async fn mit_freischaltung_admin_status_nicht_importiert() {
         demo_daten: true,
         zulassungs_budget: None,
         heic_decoder_verzeichnis: None,
+        tls: false,
+        einwurf_allow_http: false,
     })
     .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
@@ -168,6 +174,8 @@ async fn mit_freischaltung_schreibende_endpunkte_tragen_die_codes_aus_d3() {
         demo_daten: true,
         zulassungs_budget: None,
         heic_decoder_verzeichnis: None,
+        tls: false,
+        einwurf_allow_http: false,
     })
     .await;
     let admin = common::login_cookie(&app, "admin", "startpw12").await;
@@ -417,6 +425,8 @@ const AN: RouterOptionen = RouterOptionen {
     demo_daten: true,
     zulassungs_budget: None,
     heic_decoder_verzeichnis: None,
+    tls: false,
+    einwurf_allow_http: false,
 };
 
 /// Einen Demo-Endpunkt aufrufen; liefert `(Status, Body)`. Ein Status (`{lagen}`) kommt als

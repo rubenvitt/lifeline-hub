@@ -119,6 +119,13 @@ wire_enum! {
         MaschinenzugangGeaendert => "maschinenzugang_geaendert",
         /// Maschinenzugang widerrufen.
         MaschinenzugangWiderrufen => "maschinenzugang_widerrufen",
+        /// Einwurf-Zugang für einen Absender ohne Signatur angelegt (LLH-1654, Migration
+        /// `*_admin_audit_einwurf_zugang.sql`). Der Schlüssel steht nie in der Spur.
+        EinwurfZugangAngelegt => "einwurf_zugang_angelegt",
+        /// Neuer Schlüssel für einen bestehenden Einwurf-Zugang; der alte gilt nicht mehr.
+        EinwurfZugangSchluesselGewechselt => "einwurf_zugang_schluessel_gewechselt",
+        /// Einwurf-Zugang widerrufen.
+        EinwurfZugangWiderrufen => "einwurf_zugang_widerrufen",
     }
 }
 
@@ -139,6 +146,8 @@ pub enum Ziel<'a> {
     Archiv(&'a str),
     /// Ein Maschinenzugang für ein Fremdsystem, mit seinem Namen (LLH-1652).
     Maschinenzugang(&'a str),
+    /// Ein Einwurf-Zugang für einen Absender ohne Signatur, mit seinem Namen (LLH-1654).
+    EinwurfZugang(&'a str),
 }
 
 /// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
@@ -159,6 +168,8 @@ pub enum Ziel<'a> {
 /// - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich
 ///   `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich
 ///   `scopes_vorher`, falls die Scopes wechselten.
+/// - `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder
+///   sein Hash.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ZugangsAngaben {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -254,7 +265,8 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
         | Ziel::Instanz(id)
         | Ziel::Unterschrift(id)
         | Ziel::Archiv(id)
-        | Ziel::Maschinenzugang(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
+        | Ziel::Maschinenzugang(id)
+        | Ziel::EinwurfZugang(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
@@ -349,7 +361,8 @@ fn ziel_teile(ziel: Ziel<'_>) -> (Option<i64>, &str) {
         | Ziel::Instanz(t)
         | Ziel::Unterschrift(t)
         | Ziel::Archiv(t)
-        | Ziel::Maschinenzugang(t) => (None, t),
+        | Ziel::Maschinenzugang(t)
+        | Ziel::EinwurfZugang(t) => (None, t),
     }
 }
 

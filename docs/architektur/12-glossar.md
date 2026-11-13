@@ -1,6 +1,6 @@
 # 12. Glossar
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 12.11.2026 (Einwurf-Zugang, LLH-1654).
 
 Ein Begriff je Zeile. Wo eine Spec oder ein Design den Begriff festlegt, verweist die Zeile
 dorthin, statt ihn neu zu definieren. Begriffe der Oberfläche, die modulübergreifend gelten, legt
@@ -63,6 +63,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 
 | Begriff | Bedeutung | Quelle |
 | --- | --- | --- |
+| Ablage (Einwurf) | Wohin ein Einwurf schreibt: die Tabelle `alarmmeldung` (roh, eine Zeile je Meldung, mit Zähler für erneuten Empfang) und `position_letzte` (eine Position je Zugang und Kennung). Über einen Einwurf-Schlüssel ist sie nicht lesbar. | `src/public_api/einwurf/ablage.rs`, `migrations/0339_einwurf_zugang.sql` |
 | Abräumen | Löschen eines Einsatzes, den diese Instanz nicht mehr halten soll (verwahrt oder Spiegel), mit Zeile im Löschprotokoll; Merker `einsatz_abraeumen`, nachgeholt in Phase R des Purge-Laufs. | `src/einsatz/abraeumen.rs` |
 | ADR | Architekturentscheidung als Datei mit prüfbaren Regeln. | [`docs/architektur/AGENTS.md`](AGENTS.md), [Architekturentscheidungen](09-architekturentscheidungen.md) |
 | Antrag (am Spiegel) | Erfassung an einem Spiegel, die als Antrag zum Führer geht; Zustand `ausstehend`, `zugestellt`, `uebernommen` oder `abgelehnt`. Beantragbar ist nur, was ohne Netz vormerkbar ist (`BEANTRAGBAR`). | `src/instanz/spiegel/antrag.rs`, [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md) |
@@ -81,6 +82,7 @@ Spec [`bedien-begriffe`](../../openspec/specs/bedien-begriffe/spec.md) fest, Mod
 | Epoche (der Führung) | Paar aus Zähler und Kennung der vergebenden Instanz, das jeder Wechsel der Führung hochzählt; das größere Paar gilt, bei gleichem Zähler die größere Kennung. | Spec [`instanz-fuehrung`](../../openspec/specs/instanz-fuehrung/spec.md), `Epoche` in `src/instanz/fuehrung/mod.rs` |
 | Führer (eines Einsatzes) | Die Instanz, die einen Einsatz führt und an gekoppelte Instanzen liefert: ohne Führung je Einsatz die, an der er angelegt wurde, mit ihr die, die seine Führungsakte nennt. | [ADR-0018](entscheidungen/ADR-0018-ein-einsatz-wird-als-spiegel-in-denselben-tabellen-gehalten.md), [ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md), `src/instanz/spiegel/liefern.rs` |
 | Führungsakte | Je Einsatz einer gekoppelten Organisation die Angabe, welche Instanz ihn führt, mit Epoche und Verlauf; sie entscheidet, ob der Einsatz hier ein Spiegel ist. | Spec [`instanz-fuehrung`](../../openspec/specs/instanz-fuehrung/spec.md), [ADR-0021](entscheidungen/ADR-0021-wer-einen-einsatz-nicht-fuehrt-haelt-ihn-als-spiegel.md), `einsatz_fuehrung` in `src/instanz/fuehrung/repo.rs` |
+| Einwurf-Zugang | Zugang für einen Absender, der nur eine URL aufrufen kann (BOSWatch, FE2, Divera-Webhook, OsmAnd): ein Schlüssel im Pfad, genau ein Zweck (Alarmmeldungen oder Positionen), nur schreibend. Der einzelne Aufruf heißt Einwurf. | Spec [`einwurf-zugang`](../../openspec/specs/einwurf-zugang/spec.md), [ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md), `src/public_api/einwurf/` |
 | Funktionsansicht | Was ein gekoppeltes Gerät lesen und schreiben darf (etwa UHS, Abschnitt, Lagemonitor). | Spec [`funktionsansichten`](../../openspec/specs/funktionsansichten/spec.md), [`frontend/src/geraet/AGENTS.md`](../../frontend/src/geraet/AGENTS.md) |
 | Gerätekonto | Konto, unter dem ein gekoppeltes Gerät schreibt; keine Person. | `ist_geraetekonto` in `src/geraet/repo.rs`, Spec [`geraete-kopplung`](../../openspec/specs/geraete-kopplung/spec.md), „Gerätekonto ist keine Person“ |
 | Hülle (Desktop-Hülle) | Tauri-2-App `src-tauri`, deren Webview die https-Adresse des Servers lädt; ohne Anwendungslogik. | [`src-tauri/AGENTS.md`](../../src-tauri/AGENTS.md), `frontend/src/huelle/faehigkeiten.ts` |

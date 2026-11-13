@@ -90,7 +90,7 @@ const GRUND_TEXT: Record<AblehnungGrund, string> = {
   instanz_gekoppelt: 'Instanz meldet sich bei einem Hub',
 };
 
-/** Erlaubte Abweichung der Uhren in Sekunden (ADR-0014). */
+/** Erlaubte Abweichung der Uhren in Sekunden (ADR-0034). */
 const UHR_TOLERANZ_S = 300;
 
 /**
