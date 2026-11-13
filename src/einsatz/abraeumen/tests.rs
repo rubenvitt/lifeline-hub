@@ -129,6 +129,61 @@ async fn verwahrter_einsatz_geht_samt_dateien_und_sperrt_id_und_nummer() {
     );
 }
 
+/// LLH-1699: Auch das Abräumen hält das Ende der Kennung fest (verwahrter Einsatz wie Spiegel).
+#[tokio::test]
+async fn abraeumen_vermerkt_das_ende_der_kennung() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let (mit, _) = einsatz(&pool, leit).await;
+    let (ohne, _) = einsatz(&pool, leit).await;
+    sqlx::query("UPDATE einsatz SET kennung = 'ich/5-ab12cd34' WHERE id = ?")
+        .bind(mit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    for id in [mit, ohne] {
+        vormerken_pool(&pool, id, AbraeumArt::Verwahrt, Some("Hub Kreis")).await;
+        assert!(ausfuehren(&pool, id).await.unwrap());
+    }
+
+    let vermerke: Vec<(String, i64)> =
+        sqlx::query_as("SELECT kennung, org_id FROM fuehrung_loeschvermerk")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(vermerke, vec![("ich/5-ab12cd34".to_string(), 1)]);
+}
+
+/// Ein Spiegel, den diese Instanz nach der Nachbereitung abräumt, lebt beim Führer weiter: Das
+/// Abräumen vermerkt kein Ende (meldet der Führer ihn gelöscht, vermerkt das
+/// `spiegel::lebensende::geloescht_uebernehmen`).
+#[tokio::test]
+async fn ein_abgeraeumter_spiegel_bekommt_vom_abraeumen_keinen_vermerk() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let (id, _) = einsatz(&pool, leit).await;
+    sqlx::query("UPDATE einsatz SET kennung = 'hub/9-ab12cd34' WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, id).await;
+
+    vormerken_pool(&pool, id, AbraeumArt::Spiegel, Some("Hub Kreis")).await;
+    assert!(ausfuehren(&pool, id).await.unwrap());
+
+    assert_eq!(
+        zaehle(&pool, "SELECT COUNT(*) FROM einsatz WHERE id = ?", id).await,
+        0
+    );
+    let vermerke: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fuehrung_loeschvermerk")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(vermerke, 0);
+}
+
 #[tokio::test]
 async fn spiegel_geht_durch_den_schutz_und_traegt_keine_nummer() {
     let pool = crate::db::test_pool().await;

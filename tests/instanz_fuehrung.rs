@@ -5196,3 +5196,339 @@ async fn nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw() {
     .unwrap();
     assert_eq!(gesichert, 1, "der Systemeintrag zur Nummer ist gesichert");
 }
+
+// ── Akten ohne Spiegel enden mit dem Einsatz beim Gegenüber (LLH-1699) ───────────────────────
+//
+// Change `h7shm5au-loeschsignal-spiegellose-akten`: Wer eine Akte ohne lokalen Einsatz hält, nennt
+// ihre Kennung im Abgleich; das Gegenüber meldet `geloescht` nur mit Beleg (Löschprotokoll oder
+// Löschvermerk). Die erreichte Seite reicht das Ende an weitere meldende Seiten weiter (D4), der
+// Widerruf entfernt die Akten des widerrufenen Gegenübers (D5).
+
+async fn abschliessen(i: &Instanz, einsatz: i64) {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &i.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Ein Einsatz an `i`, abgeschlossen vor dem ersten Abgleich: Kein Gegenüber spiegelt ihn, es
+/// bekommt nur die Akte. Liefert Einsatz und Kennung.
+async fn abgeschlossen_ohne_spiegel(i: &Instanz) -> (i64, String) {
+    let e = common::einsatz_anlegen(&i.app, &i.admin).await;
+    abschliessen(i, e).await;
+    // Die Akte (und mit ihr die Kennung) entsteht beim Lesen der Führung.
+    fuehrung(i, e).await;
+    let kennung: String = sqlx::query_scalar("SELECT kennung FROM einsatz WHERE id = ?")
+        .bind(e)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap();
+    (e, kennung)
+}
+
+/// Löscht einen eigenen Einsatz so, wie es die Aufbewahrung tut: Protokollzeile, Vermerk, weg.
+async fn endgueltig_loeschen(i: &Instanz, einsatz: i64) {
+    use lifeline_hub::einsatz::abraeumen::{self, AbraeumArt};
+    let mut tx = i.pool.begin().await.unwrap();
+    abraeumen::vormerken(&mut tx, einsatz, AbraeumArt::Verwahrt, None)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert!(abraeumen::ausfuehren(&i.pool, einsatz).await.unwrap());
+}
+
+/// Kennungen unter „Einsätze beim Gegenüber“ an einer Instanz.
+async fn beim_gegenueber(i: &Instanz) -> Vec<String> {
+    let mut k: Vec<String> = fremde(i)
+        .await
+        .iter()
+        .map(|a| a["kennung"].as_str().unwrap().to_string())
+        .collect();
+    k.sort();
+    k
+}
+
+async fn hat_spiegel(i: &Instanz, kennung: &str) -> bool {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz WHERE kennung = ?)")
+        .bind(kennung)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn vermerkt(i: &Instanz, kennung: &str) -> bool {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM fuehrung_loeschvermerk WHERE kennung = ?)")
+        .bind(kennung)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn akte_ohne_spiegel_am_elw_endet_wenn_der_hub_den_einsatz_loescht() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, k) = abgeschlossen_ohne_spiegel(&hub).await;
+    let (_, bleibt) = abgeschlossen_ohne_spiegel(&hub).await;
+    elw_meldet(&elw).await;
+    let mut beide = vec![k.clone(), bleibt.clone()];
+    beide.sort();
+    assert_eq!(beim_gegenueber(&elw).await, beide);
+    assert!(!hat_spiegel(&elw, &k).await, "nie gespiegelt");
+
+    // Solange der Hub den Einsatz hält, bleibt die Akte.
+    abgleichen(&elw).await;
+    assert_eq!(beim_gegenueber(&elw).await, beide);
+
+    endgueltig_loeschen(&hub, e).await;
+    abgleichen(&elw).await;
+
+    assert_eq!(
+        beim_gegenueber(&elw).await,
+        vec![bleibt],
+        "nur der gelöschte Einsatz fällt heraus"
+    );
+    assert!(vermerkt(&elw, &k).await, "der ELW hält das Ende fest");
+}
+
+#[tokio::test]
+async fn akte_ohne_spiegel_am_hub_endet_wenn_der_elw_den_einsatz_loescht() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, k) = abgeschlossen_ohne_spiegel(&elw).await;
+    let (_, bleibt) = abgeschlossen_ohne_spiegel(&elw).await;
+    elw_meldet(&elw).await;
+    let mut beide = vec![k.clone(), bleibt.clone()];
+    beide.sort();
+    assert_eq!(beim_gegenueber(&hub).await, beide);
+    assert!(!hat_spiegel(&hub, &k).await, "nie gespiegelt");
+
+    endgueltig_loeschen(&elw, e).await;
+    abgleichen(&elw).await;
+
+    assert_eq!(beim_gegenueber(&hub).await, vec![bleibt]);
+    assert!(vermerkt(&hub, &k).await, "der Hub hält das Ende fest");
+}
+
+/// Eine Instanz, die aus einer Sicherung zurückkehrt, kennt den Einsatz nicht mehr, hat aber auch
+/// keinen Beleg für sein Ende: Sie meldet nichts, die Akte beim Gegenüber bleibt.
+#[tokio::test]
+async fn akte_ohne_spiegel_bleibt_wenn_dem_gegenueber_der_beleg_fehlt() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, k) = abgeschlossen_ohne_spiegel(&hub).await;
+    elw_meldet(&elw).await;
+    assert_eq!(beim_gegenueber(&elw).await, vec![k.clone()]);
+
+    // Der Einsatz fehlt am Hub ohne Löschprotokoll und ohne Vermerk.
+    sqlx::query("DELETE FROM einsatz WHERE id = ?")
+        .bind(e)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    assert!(!hat_spiegel(&hub, &k).await);
+    abgleichen(&elw).await;
+
+    assert_eq!(beim_gegenueber(&elw).await, vec![k]);
+}
+
+/// Hub mit zwei ELW; „ELW 1“ führt einen abgeschlossenen Einsatz, den der Hub und „ELW 2“ nur als
+/// Akte kennen. Liefert (Hub, ELW 1, ELW 2, Einsatz an ELW 1, Kennung).
+async fn zwei_elw_mit_akte_von_elw1() -> (Instanz, Instanz, Instanz, i64, String) {
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let (e, k) = abgeschlossen_ohne_spiegel(&elw1).await;
+    elw_meldet(&elw1).await;
+    elw_meldet(&elw2).await;
+    assert_eq!(beim_gegenueber(&hub).await, vec![k.clone()]);
+    assert_eq!(
+        beim_gegenueber(&elw2).await,
+        vec![k.clone()],
+        "der Hub reicht die Akte weiter"
+    );
+    assert!(!hat_spiegel(&elw2, &k).await);
+    (hub, elw1, elw2, e, k)
+}
+
+#[tokio::test]
+async fn zwei_elw_loescht_die_eine_verliert_auch_die_andere_die_akte_ueber_den_hub() {
+    let (hub, elw1, elw2, e, k) = zwei_elw_mit_akte_von_elw1().await;
+
+    endgueltig_loeschen(&elw1, e).await;
+    // Solange der Hub die Akte hält, belegt er nichts.
+    abgleichen(&elw2).await;
+    assert_eq!(beim_gegenueber(&elw2).await, vec![k.clone()]);
+
+    abgleichen(&elw1).await;
+    assert!(beim_gegenueber(&hub).await.is_empty(), "erst der Hub");
+    assert!(vermerkt(&hub, &k).await);
+    abgleichen(&elw2).await;
+    assert!(beim_gegenueber(&elw2).await.is_empty(), "dann ELW 2");
+}
+
+/// Der Hub spiegelt den Einsatz der „ELW 1“, „ELW 2“ kennt ihn nur als Akte. Löscht „ELW 1“ ihn,
+/// räumt der Hub seinen Spiegel ab und hält das Ende fest; „ELW 2“ verliert die Akte.
+#[tokio::test]
+async fn zwei_elw_loescht_die_eine_einen_am_hub_gespiegelten_einsatz_verliert_die_andere_die_akte()
+{
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let e = common::einsatz_anlegen(&elw1.app, &elw1.admin).await;
+    elw_meldet(&elw1).await;
+    abschliessen(&elw1, e).await;
+    elw_meldet(&elw1).await;
+    let k: String = sqlx::query_scalar("SELECT kennung FROM einsatz WHERE id = ?")
+        .bind(e)
+        .fetch_one(&elw1.pool)
+        .await
+        .unwrap();
+    assert!(hat_spiegel(&hub, &k).await, "am Hub gespiegelt");
+    elw_meldet(&elw2).await;
+    assert_eq!(beim_gegenueber(&elw2).await, vec![k.clone()]);
+    assert!(!hat_spiegel(&elw2, &k).await);
+
+    endgueltig_loeschen(&elw1, e).await;
+    abgleichen(&elw1).await;
+    assert!(!hat_spiegel(&hub, &k).await, "Spiegel am Hub abgeräumt");
+    assert!(vermerkt(&hub, &k).await);
+    abgleichen(&elw2).await;
+
+    assert!(beim_gegenueber(&elw2).await.is_empty());
+}
+
+/// Der Hub übernimmt einen Einsatz der „ELW 1“ zur Verwahrung und löscht ihn später endgültig.
+/// Die Kennung beginnt mit der der ELW 1; den Beleg für „ELW 2“ trägt der Löschvermerk.
+#[tokio::test]
+async fn zwei_elw_loescht_der_hub_einen_verwahrten_einsatz_verliert_die_andere_die_akte() {
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let e = common::einsatz_anlegen(&elw1.app, &elw1.admin).await;
+    elw_meldet(&elw1).await;
+    abschliessen(&elw1, e).await;
+    elw_meldet(&elw1).await;
+    let k: String = sqlx::query_scalar("SELECT kennung FROM einsatz WHERE id = ?")
+        .bind(e)
+        .fetch_one(&elw1.pool)
+        .await
+        .unwrap();
+    assert!(k.starts_with(&format!("{}/", elw1.kennung)));
+    sqlx::query("UPDATE einsatz SET nachbereitung_bis = '2000-01-01 00:00:00' WHERE id = ?")
+        .bind(e)
+        .execute(&elw1.pool)
+        .await
+        .unwrap();
+    abgleichen(&elw1).await;
+    let (am_hub, spiegel): (i64, bool) =
+        sqlx::query_as("SELECT id, spiegel FROM einsatz WHERE kennung = ?")
+            .bind(&k)
+            .fetch_one(&hub.pool)
+            .await
+            .unwrap();
+    assert!(!spiegel, "am Hub verwahrt: ein eigener Einsatz");
+    assert!(!hat_spiegel(&elw1, &k).await, "am ELW 1 abgeräumt");
+    elw_meldet(&elw2).await;
+    assert_eq!(beim_gegenueber(&elw2).await, vec![k.clone()]);
+    assert!(!hat_spiegel(&elw2, &k).await);
+
+    endgueltig_loeschen(&hub, am_hub).await;
+    abgleichen(&elw2).await;
+
+    assert!(
+        beim_gegenueber(&elw2).await.is_empty(),
+        "Beleg trotz fremdem Präfix"
+    );
+}
+
+async fn kopplung_widerrufen(i: &Instanz, gegenueber: &Instanz) {
+    let id: i64 =
+        sqlx::query_scalar("SELECT id FROM instanz_kopplung WHERE gegenueber_kennung = ?")
+            .bind(&gegenueber.kennung)
+            .fetch_one(&i.pool)
+            .await
+            .unwrap();
+    let (s, v) = post(
+        i,
+        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+#[tokio::test]
+async fn widerruf_einer_von_zwei_elw_entfernt_ihre_akten_am_hub_und_an_der_anderen() {
+    let (hub, elw1, elw2, _e, k1) = zwei_elw_mit_akte_von_elw1().await;
+    let (_, k2) = abgeschlossen_ohne_spiegel(&elw2).await;
+    elw_meldet(&elw2).await;
+    let mut beide = vec![k1.clone(), k2.clone()];
+    beide.sort();
+    assert_eq!(beim_gegenueber(&hub).await, beide);
+
+    kopplung_widerrufen(&hub, &elw1).await;
+
+    assert_eq!(
+        beim_gegenueber(&hub).await,
+        vec![k2],
+        "nur noch die Einsätze der ELW 2"
+    );
+    assert!(vermerkt(&hub, &k1).await);
+    abgleichen(&elw2).await;
+    assert!(
+        beim_gegenueber(&elw2).await.is_empty(),
+        "ELW 2 verliert die Akte der widerrufenen ELW 1"
+    );
+}
+
+/// Nach Widerruf und neuer Kopplung legt das Gegenüber seine Akten neu auf; der alte Vermerk
+/// belegt nichts mehr, solange die Akte wieder steht.
+#[tokio::test]
+async fn nach_neuer_kopplung_stehen_die_akten_wieder_und_bleiben() {
+    let (hub, elw1, elw2, _e, k1) = zwei_elw_mit_akte_von_elw1().await;
+    kopplung_widerrufen(&hub, &elw1).await;
+    abgleichen(&elw2).await;
+    assert!(beim_gegenueber(&hub).await.is_empty());
+    assert!(beim_gegenueber(&elw2).await.is_empty());
+    // ELW 1 erfährt den Widerruf mit ihrer nächsten Meldung und koppelt neu.
+    sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
+        .execute(&elw1.pool)
+        .await
+        .unwrap();
+    let _ = lifeline_hub::instanz::melden::run_durchlauf(&elw1.pool).await;
+    let zustand: String = sqlx::query_scalar("SELECT zustand FROM instanz_kopplung")
+        .fetch_one(&elw1.pool)
+        .await
+        .unwrap();
+    assert_eq!(zustand, "vom_gegenueber_widerrufen");
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        "/api/admin/instanz/codes",
+        &hub.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = common::anfrage_json(
+        &elw1.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw1.admin,
+        Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    elw_meldet(&elw1).await;
+    assert_eq!(beim_gegenueber(&hub).await, vec![k1.clone()]);
+    assert!(vermerkt(&hub, &k1).await, "der alte Vermerk steht noch");
+    elw_meldet(&elw2).await;
+    assert_eq!(beim_gegenueber(&elw2).await, vec![k1.clone()]);
+
+    // Der Vermerk belegt nichts, solange der Hub die Akte wieder hält.
+    abgleichen(&elw2).await;
+    abgleichen(&elw1).await;
+    assert_eq!(beim_gegenueber(&elw2).await, vec![k1.clone()]);
+    assert_eq!(beim_gegenueber(&hub).await, vec![k1]);
+}

@@ -32,7 +32,8 @@
 //!   (`planung::repo::purge_abgelaufene`), samt Posten, Blöcken und Helfern.
 //! - **Phase D** (UNUMKEHRBAR, LFH-750): ein geschwärzter Einsatz, dessen Skelett-Frist der Org
 //!   abgelaufen ist, wird samt ETB endgültig gelöscht (`skelett_loeschung::loeschen`); seine
-//!   einzige Spur ist das Löschprotokoll der Org. Ohne Org-Frist bleibt das Skelett.
+//!   einzige Spur ist das Löschprotokoll der Org, bei einem Einsatz mit Kennung dazu ihr
+//!   Löschvermerk (LLH-1699). Ohne Org-Frist bleibt das Skelett.
 //! - **Phase R** (UNUMKEHRBAR, LLH-1494): Abräumen nach Verwahrung und Lebensende
 //!   (`abraeumen::phase_r`): vorgemerkte Einsätze und Spiegel der meldenden Seite nach der
 //!   Nachbereitung, und eingespielte Archive nach 7 Tagen (`archiv::einspielen`, samt ihren
