@@ -1772,3 +1772,39 @@ describe('Buchstabierhilfe an Von und An (LFH-110)', () => {
     }
   });
 });
+
+describe('Von und An folgen der Tastaturregel des Vorschlagsfelds (kwc2yszv, D5)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+    );
+  });
+
+  it('Tab übernimmt den obersten Vorschlag und geht zum Feld An, nicht in den Inhalt', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } })}
+      />,
+    );
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(von, 'Flo');
+    await screen.findByTitle('„Flo“ als Freitext übernehmen');
+    await userEvent.tab();
+    expect(feldWert('Von')).toBe('Florian 1');
+    expect(screen.getByRole('combobox', { name: 'An' })).toHaveFocus();
+  });
+
+  it('Enter übernimmt den obersten Vorschlag und springt in den Inhalt, ohne zu senden', async () => {
+    const p = props({ initialWerte: { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(von, 'Flo');
+    await screen.findByTitle('„Flo“ als Freitext übernehmen');
+    await userEvent.keyboard('{Enter}');
+    expect(feldWert('Von')).toBe('Florian 1');
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+});

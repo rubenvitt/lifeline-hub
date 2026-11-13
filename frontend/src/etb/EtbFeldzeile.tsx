@@ -216,13 +216,12 @@ function ParteiFeld({
         quellen={quellen}
         value={text ?? wert ?? ''}
         onChange={setText}
-        onWahl={(v) => {
-          uebernimm(v.wert);
-          onFertig();
-        }}
-        onEnter={(t) => {
-          uebernimm(t);
-          onFertig();
+        onWahl={(v) => uebernimm(v.wert)}
+        onEnter={(t) => uebernimm(t)}
+        // Nur Enter springt in den Inhalt; Tab gibt der Browser an das nächste Feld weiter
+        // (Spec `stammdaten-feld`, „Tab nach dem Tippen“).
+        onUebernahme={(u) => {
+          if (u.weg === 'enter') onFertig();
         }}
         onEscape={() => setText(null)}
       />
