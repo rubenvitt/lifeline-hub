@@ -100,20 +100,18 @@ test('Handschirm-Zeile: das Kontextmenü zeigt die Einträge des ⋮, mit dem Ve
   expect(await eintraegeVon(menue)).toEqual(punkte);
 });
 
-test('Rechtsklick auf den Chip „An“ zeigt dessen Menü; „Bearbeiten“ öffnet das Feld', async ({
+test('die Felder der Erfassung behalten das Browsermenü (kein eigenes Kontextmenü)', async ({
   page,
 }) => {
   const einsatzId = await post(page, '/api/einsaetze', {
-    bezeichnung: `E2E Kontextmenü Chip ${Date.now()}`,
+    bezeichnung: `E2E Kontextmenü Feld ${Date.now()}`,
   });
   await page.goto(`/einsaetze/${einsatzId}/etb`);
-  const chip = page.locator('.ant-tag').filter({ hasText: /^An:/ });
-  await expect(chip).toBeVisible();
-  await chip.getByText(/^An:/).click({ button: 'right' });
-  const menue = menueMitName(page, 'Aktionen zu An');
-  await expect(menue).toBeVisible();
-  const punkte = await eintraegeVon(menue);
-  expect(punkte[0]).toMatch(/Bearbeiten|Nur für diesen Eintrag ändern/);
-  await menue.getByRole('menuitem').first().click();
-  await expect(page.getByRole('combobox', { name: 'An', exact: true })).toBeVisible();
+  const an = page.getByRole('combobox', { name: 'An', exact: true });
+  await expect(an).toBeVisible();
+  await an.click({ button: 'right' });
+  // Das Menü der App hätte die Rolle `menu`; ein Feld zeigt das Menü des Browsers.
+  await expect(page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')).toHaveCount(
+    0,
+  );
 });

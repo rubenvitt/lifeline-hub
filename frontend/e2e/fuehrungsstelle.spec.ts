@@ -83,6 +83,7 @@ for (const breite of [1280, 390]) {
     await expect(
       abfrage.getByRole('combobox', { name: 'Rufname für Von und An', exact: true }),
     ).toHaveValue('Florian B');
-    await expect(page.getByRole('button', { name: 'Aktionen zu An', exact: true })).toHaveCount(0);
+    // Ohne Standard trägt An keine Vorgabe (Change `kwc2yszv-etb-neuentwurf`).
+    await expect(page.getByRole('combobox', { name: 'An', exact: true })).toHaveValue('');
   });
 }

@@ -73,7 +73,11 @@ test('LFH-815: zwei Folgeaufträge aus einer Entscheidung — Zeitachse, Auswahl
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   const eingabe = page.getByPlaceholder('Inhalt …');
   await eingabe.fill(`/entscheidung ${ENTSCHEIDUNG}`);
-  await expect(page.getByRole('button', { name: 'Eintragstyp Entscheidung ändern' })).toBeVisible();
+  await expect(
+    page
+      .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+      .getByRole('radio', { name: 'Entscheidung' }),
+  ).toBeChecked();
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   const sicht = page.getByRole('region', { name: 'Einsatztagebuch' });

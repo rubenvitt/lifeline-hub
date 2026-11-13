@@ -82,8 +82,10 @@ for (const modus of ['light', 'dark'] as const) {
     // 2 px gegen die Zeile selbst und gegen die Leiste, auf der sie steht (LLH-1320).
     await page.getByPlaceholder('Inhalt …').fill('/entscheidung Messung Kante');
     await expect(
-      page.getByRole('button', { name: 'Eintragstyp Entscheidung ändern' }),
-    ).toBeVisible();
+      page
+        .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+        .getByRole('radio', { name: 'Entscheidung' }),
+    ).toBeChecked();
     await page.mouse.move(0, 0);
     const zeile = page.locator('.lfh-schnellerfassung[data-rahmen-farbe]');
     await expect(zeile).toHaveCount(1);

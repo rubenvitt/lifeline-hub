@@ -28,6 +28,11 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   await page.goto(`/einsaetze/${einsatzId}/etb`);
 
   await expect(abfrage(page)).toBeVisible();
+  // Lage: Von und An tragen beide die eigene Stelle (Change `kwc2yszv-etb-neuentwurf`, D3).
+  await page
+    .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+    .getByRole('radio', { name: 'Lage' })
+    .click();
   const feld = page.getByPlaceholder('Inhalt …');
   const inhalt = `Pegel steigt ${Date.now()}`;
 
@@ -40,7 +45,9 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   });
   await feld.fill(inhalt);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
-  await expect(page.locator('[data-lfh="etb-pflicht-hinweis"]')).toContainText('Von fehlt');
+  await expect(page.locator('[data-lfh="etb-pflicht-hinweis"]').first()).toContainText(
+    'Absender fehlt',
+  );
   expect(gesendet).toEqual([]);
   await expect(feld).toHaveValue(inhalt);
 
@@ -53,8 +60,8 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   );
   await abfrage(page).getByRole('button', { name: 'Übernehmen' }).click();
   await expect(abfrage(page)).toHaveCount(0);
-  await expect(page.getByText('Von: Florian 4/1')).toBeVisible();
-  await expect(page.getByText('An: Florian 4/1')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Von', exact: true })).toHaveValue('Florian 4/1');
+  await expect(page.getByRole('combobox', { name: 'An', exact: true })).toHaveValue('Florian 4/1');
 
   const antwort = page.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().endsWith(`/api/einsaetze/${einsatzId}/etb`),
@@ -64,11 +71,12 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   expect(eintrag.status()).toBe(201);
   expect(await eintrag.json()).toMatchObject({ inhalt, von: 'Florian 4/1', an: 'Florian 4/1' });
   const zeile = page.getByTestId('etb-ereigniszeile').filter({ hasText: inhalt });
-  await expect(zeile).toContainText('Florian 4/1 → Florian 4/1');
+  // Von = An: ein eigener Vermerk (Spec `etb-zeitachse-darstellung`).
+  await expect(zeile).toContainText('Vermerk Florian 4/1');
 
-  // Der Standard liegt am Server: nach dem Neuladen keine Abfrage, die Chips stehen wieder.
+  // Der Standard liegt am Server: nach dem Neuladen keine Abfrage; die neue Meldung trägt ihn als An.
   await page.reload();
-  await expect(page.getByText('Von: Florian 4/1')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'An', exact: true })).toHaveValue('Florian 4/1');
   await expect(abfrage(page)).toHaveCount(0);
 });
 
@@ -125,7 +133,10 @@ test('Abfrage: Tab nimmt den obersten Vorschlag und springt weiter, Enter nimmt 
   // Enter bei geschlossener Liste speichert den Standard.
   await page.keyboard.press('Enter');
   await expect(abfrage(page)).toHaveCount(0);
-  await expect(page.getByText('Von: Sanitätszug Musterstadt')).toBeVisible();
+  // Die Meldung trägt die eigene Stelle als An.
+  await expect(page.getByRole('combobox', { name: 'An', exact: true })).toHaveValue(
+    'Sanitätszug Musterstadt',
+  );
 });
 
 test('als Beobachter keine Abfrage', async ({ page }) => {
