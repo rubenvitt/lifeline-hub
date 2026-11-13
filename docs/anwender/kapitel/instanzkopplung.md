@@ -2,40 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen:
-  [
-    frontend/src/instanz/InstanzkopplungSeite.tsx,
-    frontend/src/einsatz/spiegel/,
-    frontend/src/instanz/instanzText.ts,
-    frontend/src/instanz/herkunft.tsx,
-    frontend/src/api/instanz.ts,
-    src/routes/instanz.rs,
-    src/instanz/mod.rs,
-    src/instanz/melden.rs,
-    src/instanz/repo.rs,
-    src/instanz/stammdaten/,
-    src/instanz/spiegel/,
-    src/error.rs,
-    src/auth/unterschrift/repo.rs,
-    src/routes/auth.rs,
-    frontend/src/instanz/FuehrungPaneel.tsx,
-    frontend/src/instanz/FuehrungHinweisband.tsx,
-    frontend/src/instanz/EinsaetzeBeimGegenueber.tsx,
-    frontend/src/components/nurAnsicht.ts,
-    frontend/src/einsatz/schreibrecht.ts,
-    frontend/src/api/fuehrung.ts,
-    src/instanz/fuehrung/,
-    src/routes/fuehrung.rs,
-    src/instanz/entdeckung.rs,
-    src/instanz/zertifikat.rs,
-    frontend/src/instanz/fuehrungText.ts,
-    frontend/src/einsatz/EinsatzLayout.tsx,
-    frontend/src/pages/EinsatzdatenPage.tsx,
-    frontend/src/einsatz/spiegel/abgelehnteAntraege.ts,
-    src/einsatz/kontext.rs,
-    src/benachrichtigung/text.rs,
-    src/geraet/mod.rs,
-  ]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
 ---
 
 ## Überblick
