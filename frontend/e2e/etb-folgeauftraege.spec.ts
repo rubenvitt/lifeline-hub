@@ -85,25 +85,31 @@ test('LFH-815: zwei Folgeaufträge aus einer Entscheidung — Zeitachse, Auswahl
   const zweiter = await auftragErteilen(page, einsatzId, 1, 'Sammelstelle Turnhalle einrichten');
   expect(zweiter.id).not.toBe(erster.id);
 
-  // Je Folgeauftrag ein eigener Verweis an der Entscheidung, in aufsteigender Nummer.
-  const folgeVerweise = entscheidung.getByRole('link', { name: /^Folgeauftrag/ });
+  // Je Folgeauftrag ein eigener Verweis an der Entscheidung, in aufsteigender Nummer. In der
+  // Spaltenzeile (kompakt ab `lg`, Spec `etb-zeitachse-darstellung`, „Vermerke in eigener
+  // Spalte“) passen zwei nicht in die Spalte Vermerk: sie endet mit „+1“, der Titel nennt beide,
+  // „+1“ klappt sie unter dem Text auf.
   const [klein, gross] = [erster, zweiter].sort((a, b) => a.lfd_nr - b.lfd_nr);
+  const vermerk = entscheidung.locator('[data-lfh="etb-vermerk"]');
+  await expect(vermerk).toHaveAttribute(
+    'title',
+    `Folgeauftrag Nr. ${klein.lfd_nr} · Folgeauftrag Nr. ${gross.lfd_nr}`,
+  );
+  await vermerk.getByRole('button', { name: '1 weiterer Vermerk zeigen' }).click();
+  const folgeVerweise = entscheidung
+    .locator('[data-lfh="etb-unterzeile"]')
+    .getByRole('link', { name: /^Folgeauftrag/ });
   await expect(folgeVerweise).toHaveText([
     new RegExp(`^Folgeauftrag Nr\\. ${klein.lfd_nr}\\b`),
     new RegExp(`^Folgeauftrag Nr\\. ${gross.lfd_nr}\\b`),
   ]);
 
-  // Ein Klick wählt den jeweiligen Auftrag aus — und nur ihn. Belegt an der Hervorhebung, nicht
-  // an der URL: `useQueryParamSelektion` räumt `?auftrag=` nach dem Anwenden per `replace`, eine
-  // URL-Zusicherung liefe dagegen um die Wette. Zurück per Verlauf statt `goto`: ein Neuladen
-  // übersetzt im Dev-Server jedes Modul neu und kostet unter drei Workern das Testbudget.
-  for (const [ziel, anderer] of [
-    [erster, zweiter],
-    [zweiter, erster],
-  ]) {
-    await entscheidung
-      .getByRole('link', { name: `Folgeauftrag Nr. ${ziel.lfd_nr}`, exact: true })
-      .click();
+  // Ein Verweis wählt den jeweiligen Auftrag aus — und nur ihn: der erste über den Verweis unter
+  // dem Text, der zweite über das Zeilenmenü, das jeden Vermerk nennt. Belegt an der Hervorhebung,
+  // nicht an der URL: `useQueryParamSelektion` räumt `?auftrag=` nach dem Anwenden per `replace`,
+  // eine URL-Zusicherung liefe dagegen um die Wette. Zurück per Verlauf statt `goto`: ein
+  // Neuladen übersetzt im Dev-Server jedes Modul neu und kostet unter drei Workern das Testbudget.
+  async function istGewaehlt(ziel: { id: number }, anderer: { id: number }) {
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/auftraege(\\?|$)`));
     await expect(page.locator(`[data-auftrag-id="${ziel.id}"]`)).toHaveAttribute(
       'data-hervorgehoben',
@@ -114,9 +120,17 @@ test('LFH-815: zwei Folgeaufträge aus einer Entscheidung — Zeitachse, Auswahl
       'data-hervorgehoben',
       'true',
     );
-    await page.goBack();
-    await expect(entscheidung).toHaveCount(1);
   }
+  await folgeVerweise.filter({ hasText: `Folgeauftrag Nr. ${erster.lfd_nr}` }).click();
+  await istGewaehlt(erster, zweiter);
+  await page.goBack();
+  await expect(entscheidung).toHaveCount(1);
+  await sicht.getByRole('button', { name: 'Aktionen zu Eintrag 1', exact: true }).click();
+  await page
+    .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+    .getByRole('menuitem', { name: `Folgeauftrag Nr. ${zweiter.lfd_nr} öffnen`, exact: true })
+    .click();
+  await istGewaehlt(zweiter, erster);
 
   // Der Überblick zählt die Folgeaufträge an der Entscheidung.
   await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
