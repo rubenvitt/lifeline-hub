@@ -57,14 +57,14 @@ for (const breite of [1280, 390]) {
     await page.getByRole('button', { name: 'Erfassung', exact: true }).click();
     await page.getByRole('button', { name: 'ETB', exact: true }).click();
     await expect(page).toHaveURL(etbPfad(a));
-    // Unter `md` startet die Erfassungsleiste eingeklappt (LFH-955): Chips und Rufname-Abfrage
+    // Unter `md` startet die Erfassungsleiste eingeklappt (LFH-955): Feldzeile und Rufname-Abfrage
     // stehen erst, wenn der Fokus in ihr liegt.
     const insFeld = async () => {
       if (breite < 768) await page.getByPlaceholder(/^Inhalt …/).click();
     };
     await insFeld();
-    await expect(page.getByText('An: ELW 1', { exact: true })).toBeVisible();
-    await expect(page.getByText('An: Florian A', { exact: true })).toHaveCount(0);
+    // An der Meldung trägt die eigene Stelle (Standard-Rufname), nicht die Führungsstelle.
+    await expect(page.getByRole('combobox', { name: 'An', exact: true })).toHaveValue('ELW 1');
     await page.screenshot({
       path: testInfo.outputPath('etb-an-aus-standard.png'),
       animations: 'disabled',
