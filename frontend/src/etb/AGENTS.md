@@ -93,7 +93,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
   Fensters. Der Sendestatus des Puffers (`pufferZustand`) steht als EINE Marke im Kopf
   (`etb/EtbSendestatus.tsx`): „alles übertragen“ mit Haken, sonst „n ausstehend“ bzw. „n
   abgelehnt · m ausstehend“ als Knopf, der zur ersten vorgemerkten Zeile rollt
-  (`[data-zeile^="ausstehend-"]`); ab `md` vor „Drucken / als PDF“, darunter in der Meta-Zeile.
+  (`[data-zeile^="ausstehend-"]`); ab `md` vor „Drucken / als PDF“, darunter in der Aktionszeile hinter dem Typ (in der Meta-Zeile
+  bräche er mit der spät kommenden Zahl um); die Kopfzahl hält bis zur Zählung ihren Platz
+  (`metaPlatzhalter`).
   Die Liste „Berichtigungen“ entfällt, der Typfilter „Berichtigung“ ersetzt sie.
 - **Eine Filterleiste** (LLH-1065/LLH-1080, Spec `etb-filterleiste`, Herleitung
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in

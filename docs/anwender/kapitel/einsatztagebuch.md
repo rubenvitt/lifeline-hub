@@ -178,7 +178,7 @@ Systemeintrag blendet sie selbst ein und meldet „Systemeinträge wieder eingeb
 Eintrag zu zeigen“. Auf schmalen Bildschirmen
 rollt der Typ einzeilig im Kopf, die übrigen Filter liegen hinter dem Knopf „Filter“, der die Zahl
 gesetzter Filter trägt (eingeblendete Systemeinträge zählen mit); dort klebt nichts, der Sendestatus
-steht in der Zeile unter dem Titel.
+steht neben dem Typ.
 
 ### Einen Eintrag berichtigen
 
