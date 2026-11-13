@@ -1,5 +1,5 @@
 //! Löschvermerk je Einsatzkennung (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`,
-//! design.md D4; `migrations/0341_fuehrung_loeschvermerk.sql`).
+//! design.md D4; `migrations/0343_fuehrung_loeschvermerk.sql`).
 //!
 //! Der Vermerk hält fest, dass der Einsatz einer Kennung zu Ende ist: Über diese Instanz ist er
 //! nicht mehr zu haben. Er entsteht in der Transaktion, die den Anlass festschreibt:
