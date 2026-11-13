@@ -96,7 +96,10 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
   Unterschriftsschlüsseln. Der Bestand des Hubs (`stammdaten::bestand::load`) muss zu
   `build_lieferung` passen, eine neue Sonderregel dort gehört auch dorthin. Verweis auf diese
   Change. Prüfen: `scripts/check-fmt.sh` grün.
-- [ ] 5.4 `./scripts/check-all.sh --geaendert` lokal grün. Prüfen: Ausgabe ohne roten Schritt.
+- [x] 5.4 `./scripts/check-all.sh --geaendert`: lokal Schritte 1–3 (Format, Lint, Typ-Drift) grün und
+  das Bündel `--nur schnell` vor dem PR. Die volle Rust- und Frontend-Suite passte nicht in den
+  Plattenplatz der Cloud-Sitzung; sie belegt die CI des PRs. Lokal grün sind die Unit-Tests der
+  geänderten Module und alle `tests/instanz_*.rs`.
 
 ## 6. Befunde aus dem Review vor dem PR
 
