@@ -8,7 +8,7 @@
  * veralteten Wert, und ein geänderter Standard erreicht offene Entwürfe.
  */
 
-import type { BenutzerEinstellungen } from '../api/types';
+import type { BenutzerEinstellungen, EtbTyp } from '../api/types';
 import type { MetadatenWerte } from './schnellerfassungModell';
 
 /**
@@ -63,27 +63,81 @@ export function anWieVon(standard: StandardRufname | null): boolean {
 }
 
 /**
- * Von/An, wie sie angezeigt und gesendet werden: ausdrücklich Gesetztes je Seite, sonst der
- * Standard. Ein leerer String zählt als nicht gesetzt.
+ * Welche Seite die eigene Stelle als Vorgabe trägt, je Typ (Spec `etb-absender-empfaenger`,
+ * „Vorbelegung neuer Einträge“; Change `kwc2yszv-etb-neuentwurf`, design.md D3): eine Meldung
+ * kommt von außen an die eigene Stelle, eine Anordnung geht von ihr aus, Entscheidung und Lage
+ * sind eigene Vermerke. Die leere Seite ist Pflicht und wird von Hand gesetzt.
+ */
+const VORGABE_JE_TYP: Record<EtbTyp, { von: boolean; an: boolean }> = {
+  meldung: { von: false, an: true },
+  anordnung: { von: true, an: false },
+  entscheidung: { von: true, an: true },
+  lage: { von: true, an: true },
+  // Systemeinträge schreibt der Server. Eine Berichtigung trägt Von und An des berichtigten
+  // Eintrags ausdrücklich (`Schnellerfassung`, Startwerte); fehlt dort eine Seite (Bestand vor
+  // LFH-894), gilt die eigene Stelle.
+  system: { von: false, an: false },
+  berichtigung: { von: true, an: true },
+};
+
+/**
+ * Von/An, wie sie angezeigt und gesendet werden: ausdrücklich Gesetztes je Seite, sonst die
+ * Vorgabe des Typs aus dem Standard. Ein leerer String zählt als nicht gesetzt. Ein Typwechsel
+ * ändert nur die Vorgabe, weil der Entwurf nur Ausdrückliches hält.
  */
 export function wirksameMetadaten(
   metadaten: MetadatenWerte,
   standard: StandardRufname | null,
+  typ: EtbTyp,
 ): MetadatenWerte {
+  const vorgabe = VORGABE_JE_TYP[typ];
   return {
     ...metadaten,
-    von: metadaten.von || standard?.von,
-    an: metadaten.an || standard?.an,
+    von: metadaten.von || (vorgabe.von ? standard?.von : undefined),
+    an: metadaten.an || (vorgabe.an ? standard?.an : undefined),
   };
 }
 
-/** Kommt der angezeigte Wert dieser Seite aus dem Standard (kein eigener Wert gesetzt)? */
+/** Kommt der angezeigte Wert dieser Seite aus der Vorgabe (kein eigener Wert gesetzt)? */
 export function ausStandard(
   feld: 'von' | 'an',
   metadaten: MetadatenWerte,
   standard: StandardRufname | null,
+  typ: EtbTyp,
 ): boolean {
-  return !metadaten[feld] && !!standard?.[feld];
+  return !metadaten[feld] && VORGABE_JE_TYP[typ][feld] && !!standard?.[feld];
+}
+
+/** Ist dieser Wert die eigene Stelle, also eine Seite des Standards? */
+function istEigeneStelle(wert: string | undefined, standard: StandardRufname): boolean {
+  const w = wert?.trim();
+  return !!w && (w === standard.von || w === standard.an);
+}
+
+/**
+ * Vorgabe von „Auch in den Meldungseingang“ (Change `kwc2yszv-etb-neuentwurf`, design.md D4): an,
+ * außer Von und An sind beide die eigene Stelle — dann ist der Eintrag ein eigener Vermerk und
+ * gehört nicht in den Eingang. Ohne Standard gibt es keine eigene Stelle: an.
+ */
+export function meldungseingangVorgabe(
+  wirksam: MetadatenWerte,
+  standard: StandardRufname | null,
+): boolean {
+  if (!standard) return true;
+  return !(istEigeneStelle(wirksam.von, standard) && istEigeneStelle(wirksam.an, standard));
+}
+
+/**
+ * Steht der Schalter an? `nurProtokollieren` ist das Entwurfsfeld `nur_protokollieren`, dreiwertig
+ * gelesen: `true` = von Hand aus, `false` = von Hand an, fehlt = Vorgabe.
+ */
+export function auchInMeldungseingang(
+  nurProtokollieren: boolean | undefined,
+  wirksam: MetadatenWerte,
+  standard: StandardRufname | null,
+): boolean {
+  if (nurProtokollieren != null) return !nurProtokollieren;
+  return meldungseingangVorgabe(wirksam, standard);
 }
 
 /** Die erste Seite, die beim Absenden fehlt, sonst `null` (Pflicht, design.md D7). */
