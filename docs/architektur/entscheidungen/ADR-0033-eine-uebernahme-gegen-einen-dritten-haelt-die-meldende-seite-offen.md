@@ -4,7 +4,7 @@ titel: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen
 status: ersetzt
 datum: 2026-11-12
 ersetzt: ADR-0028
-ersetzt_durch: ADR-0041
+ersetzt_durch: ADR-0044
 gilt_fuer:
   - src/instanz/fuehrung/**
   - src/instanz/spiegel/fuehrung.rs
