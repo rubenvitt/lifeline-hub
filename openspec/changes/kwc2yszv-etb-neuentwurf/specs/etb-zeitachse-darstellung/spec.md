@@ -70,11 +70,65 @@ zur Farbe ein zweites Zeichen tragen.
 - **WHEN** Systemeinträge ausgeblendet sind
 - **THEN** meldet der Knopf `aria-pressed="false"`, sein zugänglicher Name bleibt „Systemeinträge zeigen“, und die Zahl steht als Beschreibung daneben
 
+### Requirement: Komfortabel und Handschuh behalten die Spalte
+Ab Breite `md` SHALL die Zeile in den Dichten komfortabel und Handschuh Verfasser, Meldeweg und
+Aktionen rechts untereinander zeigen, mit der Trefffläche der Stufe (48 bzw. 72 px). Unter `md`
+gilt in jeder Dichte die Zeile auf dem Handschirm.
+
+#### Scenario: Tablet quer
+- **WHEN** die Dichte komfortabel ist und die Seite ab Breite `md` steht
+- **THEN** steht das Zeilenmenü rechts unter dem Verfasser und ist mindestens 48 px hoch
+
+### Requirement: Systemeinträge leise
+Ein Systemeintrag SHALL leiser als ein Handeintrag stehen: Text in der gedämpften Textstufe, eine
+Schriftstufe kleiner, ohne Zeilentönung, der Text ungekürzt. Sind Von und An beide die
+Systemkennung, MUST „Von → An“ entfallen. Eine bekannte Seite bleibt sichtbar, ebenso Verfasser
+und Funktion; in der Spaltenzeile stehen sie im Titel und im Zeilenmenü. Die gedämpfte Stufe hält
+den Textboden (Tag ≥ 7 : 1, Nacht ≥ 5 : 1).
+
+#### Scenario: Reiner Systemeintrag
+- **WHEN** ein Systemeintrag Von „System“ und An „System“ trägt
+- **THEN** zeigt seine Zeile kein „System → System“, aber Verfasser und Funktion
+
+#### Scenario: Systemeintrag mit bekannter Seite
+- **WHEN** ein Systemeintrag An „ELW 1“ trägt
+- **THEN** zeigt seine Zeile „System → ELW 1“
+
+#### Scenario: Langer Systemeintrag
+- **WHEN** ein Systemeintrag mehr als drei Zeilen belegt
+- **THEN** steht er ungekürzt, ohne „mehr“
+
+### Requirement: Berichtigt unabhängig vom Fenster
+Trägt ein Eintrag Berichtigungen (`berichtigt_durch`), SHALL er das zeigen, unabhängig davon, ob die
+Berichtigung geladen ist oder zum Filter passt: im `Zeitachseneintrag` eine Statusmarke „berichtigt“
+im Ton Achtung samt Sprung „→ Nr. n“ auf die jüngste Berichtigung in der Kopfzeile, in Spalten- und
+Handschirm-Zeile den Vermerk „berichtigt durch Nr. n“ mit Sprung und den Inhalt durchgestrichen. Der
+Text MUST lesbar bleiben. Weitere Berichtigungen MUST erreichbar sein.
+
+#### Scenario: Berichtigung nicht geladen
+- **WHEN** eine Meldung `berichtigt_durch` mit Nr. 135 trägt und Nr. 135 nicht im Fenster liegt
+- **THEN** zeigt ihre Zeile „berichtigt“ und den Sprung auf Nr. 135
+
+#### Scenario: Typfilter Meldung
+- **WHEN** der Typfilter „Meldung“ gilt und eine Meldung berichtigt wurde
+- **THEN** trägt sie die Kennzeichnung „berichtigt“, obwohl keine Berichtigung in der Liste steht
+
+### Requirement: Nachtrag mit Tag
+Liegen Ereigniszeit und Erfassung eines Eintrags an verschiedenen Kalendertagen der Anzeigezone,
+SHALL der Hinweis auf den Nachtrag die Erfassung mit Tag nennen; am selben Tag genügt die Uhrzeit.
+Im `Zeitachseneintrag` lautet er „nachgetragen …“, in Spalten- und Handschirm-Zeile steht er als
+Vermerk „Nachtrag · erfasst …“. Die Schreibweise MUST der wirksamen Darstellung folgen (Spec
+`zeitdarstellung`): taktisch `110020` bzw. `1421`, sonst `11.10. 00:20` bzw. `14:21`.
+
+#### Scenario: Über Mitternacht
+- **WHEN** ein Eintrag die Ereigniszeit 10.10. 23:50 trägt und am 11.10. um 00:20 erfasst wurde
+- **THEN** nennt der Hinweis „110020“, im `Zeitachseneintrag` als „nachgetragen 110020“, in der Spaltenzeile als „Nachtrag · erfasst 110020“
+
 ## ADDED Requirements
 
 ### Requirement: Vermerke in eigener Spalte
-Verweise und Marken eines Eintrags („Meldung #5 ↗“, „Auftrag #4 ↗“, „Einheit … ↗“, „Nachtrag ·
-erfasst 1926“, „berichtigt durch Nr. 231“, „berichtigt Nr. 230“, „SOFORT“, Anhänge) SHALL in der
+Verweise und Marken eines Eintrags („Meldung #5 ↗“, „Auftrag ↗“, „Einheit … ↗“, „Nachtrag ·
+erfasst 1926“, „berichtigt durch Nr. 231“, „berichtigt Nr. 230“, Anhänge) SHALL in der
 Spalte Vermerk stehen, nicht in einer eigenen Zeile unter dem Inhalt. Reicht die Spalte nicht,
 MUST sie mit „+n“ enden und alle Vermerke im Zeilenmenü und im Titel nennen. Ein berichtigter
 Eintrag SHALL seinen Inhalt durchgestrichen zeigen.

@@ -16,7 +16,7 @@ ging bis LLH-1842 still verloren. Den Umbau hat Ruben am 12.11.2026 als Entwurf 
 
 - **Schreibzeile in der Reihenfolge des Papier-ETB:** Typ, Zeit, Von, An und Meldeweg stehen als
   feste, beschriftete Felder über dem Inhalt, Tab läuft sie der Reihe nach ab. „+ Feld“ und die
-  Chips mit Editor entfallen; „+ Veranlassung“, „+ Anhang“ und „+ weiterer Entwurf“ bleiben als
+  Chips mit Editor entfallen; „+ Veranlassung“, „Anhang“ und „+ weiterer Entwurf“ bleiben als
   Textknöpfe. Der Typ ist eine Auswahl aus vier Segmenten. Die Kurzbefehle (`/typ`, `/zeit`, `@`)
   bleiben als Beschleuniger und füllen dieselben Felder.
 - **Vorgabe für Von und An nach Typ:** Meldung An = eigene Stelle, Von leer; Anordnung Von = eigene

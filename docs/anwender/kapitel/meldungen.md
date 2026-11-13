@@ -50,7 +50,8 @@ Für Einsatzleitung und Führungspersonal:
 
 3. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ ausfüllen. Beim Tippen schlägt das
    Feld Funkrufnamen und Stellen vor, in den Gruppen „Im Einsatz“, „Stammdaten“ und „Zuletzt
-   verwendet“; ein Vorschlag wird per Klick oder mit Pfeiltaste und Enter übernommen. Ist die
+   verwendet“. Der oberste passende Vorschlag ist markiert, ein genau getippter steht zuoberst;
+   Enter oder Tab übernehmen ihn, die Pfeiltasten wählen einen anderen, ein Klick ebenso. Ist die
    Meldung an eine Funktion im Stab gerichtet, unter „Empfängerfunktion“ die Einsatzleitung oder
    das Sachgebiet wählen; ein leeres „Empfänger / Adressat“ füllt sich dabei mit dem Kürzel, etwa
    „S2“. Bei Bedarf „Empfänger / Adressat“ frei eintragen oder ändern.
@@ -64,7 +65,8 @@ dieser Art steht unter „Weitere Angaben“ zusätzlich „Verortung (optional)
 [Lagemeldungen](lagemeldungen.md)).
 
 Absender und Empfänger dürfen frei getippt sein, etwa für eine fremde Einheit oder die Polizei vor
-Ort. Neben dem Feld steht dann „frei“, bei einem übernommenen Vorschlag seine Herkunft („Im
+Ort. Passt ein Vorschlag, übernimmt der letzte Eintrag der Liste, etwa „„Polizei“ als Freitext
+übernehmen“, den getippten Text; passt keiner, gilt der Text. Neben dem Feld steht dann „frei“, bei einem übernommenen Vorschlag seine Herkunft („Im
 Einsatz“ oder „Stammdaten“). Neben einem freien Wert legt „In Stammdaten übernehmen“ ihn als
 externe Stelle der Art „Sonstige“ an, damit er beim nächsten Mal vorgeschlagen wird; das dürfen
 nur System-Admins, alle anderen sehen den Knopf gesperrt mit „nur System-Admin“. Die Art lässt
@@ -281,8 +283,9 @@ die Meldung.
 
 Umgekehrt legt ein im ETB erfasster Eintrag vom Typ „Meldung“ oder „Lage“ die Meldung selbst an,
 als Art „Sonstige“ beziehungsweise „Lagemeldung“, mit „Von“ als Absender und „An“ als Empfänger.
-Sie steht im Meldungseingang wie jede erfasste Meldung und bekommt keinen zweiten ETB-Eintrag. Mit
-„Nur protokollieren“ entsteht keine Meldung.
+Sie steht im Meldungseingang wie jede erfasste Meldung und bekommt keinen zweiten ETB-Eintrag. Ohne
+das Häkchen „Auch in den Meldungseingang“ entsteht keine Meldung; es steht aus, wenn „Von“ und „An“
+beide die eigene Stelle sind (Kapitel [Einsatztagebuch](einsatztagebuch.md)).
 
 Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12 in die Lage
 übernommen“; eine erneute Übernahme schreibt keinen, eine Lagemeldung ebenfalls nicht. Einträge

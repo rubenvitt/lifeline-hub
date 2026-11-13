@@ -112,7 +112,7 @@ fehlen.
 
 ### Requirement: Einstellungen in der Fußzeile der Erfassung
 „Auch in den Meldungseingang“ und „Werte behalten“ SHALL in der Fußzeile unter dem Inhalt stehen,
-links, und „+ Veranlassung“, „+ Anhang“ und „+ weiterer Entwurf“ rechts in derselben Zeile. Die
+links, und „+ Veranlassung“, „Anhang“ (mit Büroklammer) und „+ weiterer Entwurf“ rechts in derselben Zeile. Die
 Erfassungsleiste MUST höchstens die Hälfte der Fensterhöhe belegen und MUST im Handschuh-Betrieb
 die Trefffläche der Dichtestufe halten. Unter `md` SHALL die Fußzeile waagerecht rollen statt
 umzubrechen. Ist das Fenster so niedrig, dass die volle Leiste mehr als die halbe Fensterhöhe
@@ -161,6 +161,14 @@ Textknopf „+ Veranlassung“ liegen.
 #### Scenario: Reihenfolge per Tastatur
 - **WHEN** der Fokus im Feld Zeit steht und dreimal Tab gedrückt wird
 - **THEN** steht der Fokus im Feld Meldeweg, beim vierten Tab im Inhalt
+
+### Requirement: Feldzeile auf dem Handschirm
+Unter Breite `md` SHALL die Feldzeile Zeit und Meldeweg nebeneinander zeigen, darunter Von und An;
+der Typ steht als Knopf vor dem Inhalt. Tab MUST dort dieser Lesefolge folgen.
+
+#### Scenario: Tab auf dem Handschirm
+- **WHEN** die Erfassung bei 390 × 844 aufgeklappt ist und der Fokus im Feld Zeit steht
+- **THEN** führt Tab nach Meldeweg, dann Von, dann An
 
 ### Requirement: Fokus im ersten leeren Pflichtfeld
 Beim Laden des ETB und nach jedem erfolgreichen Erfassen SHALL der Fokus im ersten leeren

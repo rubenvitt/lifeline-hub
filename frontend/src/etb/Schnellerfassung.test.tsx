@@ -1025,7 +1025,7 @@ describe('Schnellerfassung — Fußzeile (Spec „Einstellungen in der Fußzeile
     },
   );
 
-  it('rechts stehen „+ Veranlassung“, „+ Anhang“ und „+ weiterer Entwurf“ als Textknöpfe', async () => {
+  it('rechts stehen „+ Veranlassung“, „Anhang“ und „+ weiterer Entwurf“ als Textknöpfe', async () => {
     const onWeitererEntwurf = vi.fn();
     renderMitProviders(<Schnellerfassung {...props({ onWeitererEntwurf })} />);
     const fuss = document.querySelector('[data-lfh="etb-fusszeile"]')!;

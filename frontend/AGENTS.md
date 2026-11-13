@@ -1147,8 +1147,9 @@ Spec `bedien-arbeitsplatz`).
   offener Liste sendet nie**, bei geschlossener gilt die Norm oben (`enterSendet`); wer per Enter
   absendet, nimmt `onUebernahme` mit `ausListe: false`. „In Stammdaten übernehmen“
   nur über einen bestehenden Katalog mit reiner Textanlage (heute „Externe Stellen“), ohne
-  Stammdaten-Recht gesperrt mit Grund; nicht in der ETB-Leiste. Eingebaut: ETB Von/An (Chips und
-  Rufname-Abfrage), Meldung Absender/Empfänger.
+  Stammdaten-Recht gesperrt mit Grund; nicht in der ETB-Leiste. Eingebaut: ETB Von/An (Feldzeile und
+  Rufname-Abfrage), Meldung Absender/Empfänger. Ein genau getippter Vorschlag steht zuoberst; ohne
+  Tippen oder Pfeilmarkierung nehmen Enter und Tab keinen Vorschlag.
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme
