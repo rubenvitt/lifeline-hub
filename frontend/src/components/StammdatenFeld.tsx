@@ -7,6 +7,7 @@ import {
   type ComponentRef,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
   type Ref,
 } from 'react';
 import { DEMO_GROUP, DemoLabel } from '../stammdaten/demoAuswahl';
@@ -33,6 +34,25 @@ export type {
 /** Der Ref des Eingabefelds (antds `AutoComplete`), etwa für `focus({ preventScroll })`. */
 type FeldRef = Ref<ComponentRef<typeof AutoComplete>>;
 
+/** Wie ein Wert übernommen wurde: Enter, Tab oder Klick auf einen Listeneintrag. */
+export type UebernahmeWeg = 'enter' | 'tab' | 'klick';
+
+/**
+ * Eine Übernahme (`onUebernahme`): der Text, der jetzt im Feld steht, und der Vorschlag, wenn
+ * einer gewählt ist; ohne `vorschlag` ist es der getippte Text (Freitext-Eintrag, oder Enter bei
+ * geschlossener Liste).
+ */
+export interface StammdatenFeldUebernahme {
+  text: string;
+  vorschlag?: Vorschlag;
+  weg: UebernahmeWeg;
+  /**
+   * Ein Eintrag der offenen Liste (Vorschlag oder Freitext-Eintrag); `false` heißt Enter bei
+   * geschlossener Liste, der Moment der Erfassungs-Norm (wer per Enter absendet, sendet nur dann).
+   */
+  ausListe: boolean;
+}
+
 interface BasisProps {
   /** Die Adapter aus `stammdaten/vorschlagsquellen.ts`; das Feld kennt keine einzelne Quelle. */
   quellen: readonly Vorschlagsquelle[];
@@ -50,15 +70,27 @@ interface BasisProps {
   /** Stil des Eingabefelds; Vorgabe: es füllt die Zeile. */
   feldStil?: CSSProperties;
   ref?: FeldRef;
-  /** Ein Vorschlag ist gewählt (Klick, oder Enter auf dem markierten). */
+  /** Ein Vorschlag ist übernommen (Klick, Enter oder Tab auf dem markierten). */
   onWahl?: (vorschlag: Vorschlag) => void;
   /**
-   * Enter hat den getippten Text übernommen (Liste zu, oder offen ohne Markierung). Bei offener
-   * Liste sendet das Feld das Formular nie mit (design.md D3).
+   * Enter hat den getippten Text übernommen: über den Freitext-Eintrag der offenen Liste, oder bei
+   * geschlossener Liste. Bei offener Liste sendet das Feld das Formular nie mit.
    */
   onEnter?: (text: string) => void;
   /** Escape bei geschlossener Liste; bei offener schließt Escape nur die Liste. */
   onEscape?: () => void;
+  /**
+   * Jede Übernahme mit ihrem Weg, NACH `onChange` und `onWahl`/`onEnter`: ein Listeneintrag per
+   * Enter, Tab oder Klick, oder Enter bei geschlossener Liste (der stehende Text). Tippen,
+   * Escape und Verlassen ohne Eintrag sind keine Übernahme. Tab bewegt den Fokus danach selbst
+   * weiter; wer bei Enter woanders hin will (ETB: in den Inhalt), tut das hier bei `weg: 'enter'`.
+   */
+  onUebernahme?: (uebernahme: StammdatenFeldUebernahme) => void;
+  /**
+   * Darf Enter bei geschlossener Liste das umgebende Formular absenden (Erfassungs-Norm)? Vorgabe
+   * `true`. `false` verhindert es; der Aufrufer reagiert über `onUebernahme`/`onEnter`.
+   */
+  enterSendet?: boolean;
 }
 
 type WertProps =
@@ -68,6 +100,20 @@ type WertProps =
 export type StammdatenFeldProps = BasisProps & WertProps;
 
 const LEER: StammdatenWert = { text: '' };
+
+/**
+ * Schlüssel der Listeneinträge in rc-select. Nie der Wert selbst: rc-select markiert beim Tippen
+ * die erste Option, deren Wert mit dem Text BEGINNT („Auto scroll“ in `OptionList`), und nicht die
+ * oberste; ein unsichtbares Präfix, das niemand tippt, lässt die oberste markiert
+ * (`defaultActiveFirstOption`).
+ */
+const SCHLUESSEL_PRAEFIX = '⁠';
+const schluesselVon = (v: Vorschlag) => SCHLUESSEL_PRAEFIX + v.wert;
+/** Der Freitext-Eintrag; kein Vorschlag hat einen leeren Wert (`baueVorschlagsliste`). */
+const FREITEXT_SCHLUESSEL = SCHLUESSEL_PRAEFIX;
+
+/** Der letzte Listeneintrag (Spec `stammdaten-feld`, Anforderung „Tastatur“). */
+const freitextBeschriftung = (text: string) => `„${text}“ als Freitext übernehmen`;
 
 /**
  * StammdatenFeld — Vorschlagsfeld „aus Stammdaten oder frei“ (LLH-1144, Spec `stammdaten-feld`,
@@ -83,9 +129,16 @@ const LEER: StammdatenWert = { text: '' };
  * Wertform (D1): `{ text, ref? }`, im Modus `nurText` der reine Text (die Marke leitet sich dann
  * aus dem Treffer ab).
  *
- * Tastatur (D3): ↓ öffnet, Enter übernimmt den markierten Vorschlag, sonst den Freitext, Escape
- * schließt. Enter bei offener Liste sendet nie; bei geschlossener gilt die Erfassungs-Norm. Enter
- * öffnet die Liste nicht (rc-select täte es, `BaseSelect` `onInternalKeyDown`).
+ * Tastatur (ETB-Neuentwurf, design.md D5; in jedem Modus): Beim Tippen ist der oberste passende
+ * Vorschlag markiert, ↓/↑ verschieben die Markierung. Enter und Tab nehmen den markierten Eintrag
+ * und schließen die Liste; Tab springt danach regulär weiter. Der letzte Eintrag „„<Text>“ als
+ * Freitext übernehmen“ nimmt den getippten Text unverändert; passt kein Vorschlag, ist er der
+ * einzige und damit markiert. Umschalt+Tab und Verlassen nehmen nichts, der getippte Text bleibt
+ * stehen. Escape schließt eine offene Liste, erst bei geschlossener meldet das Feld es weiter.
+ * Enter bei offener Liste sendet nie; bei geschlossener gilt die Erfassungs-Norm (`enterSendet`).
+ * Enter und Tab bei offener Liste nimmt das Feld selbst, rc-select bekommt sie nicht: es hielte
+ * bei Tab den Fokus fest (`OptionList`, `preventDefault`), und Enter öffnete eine geschlossene
+ * Liste (`BaseSelect` `onInternalKeyDown`).
  *
  * Trefflächen (D6): die Zeilen sind antds Optionen mit `optionHeight = controlHeight`, also
  * 30/48/72 px je Dichte; kein `size`, kein eigenes Maß.
@@ -103,8 +156,10 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
     onWahl,
     onEnter,
     onEscape,
+    onUebernahme,
+    enterSendet = true,
   } = props;
-  const { token } = useRollen();
+  const { token, rollen } = useRollen();
   const { message } = App.useApp();
   const markeId = useId();
   const grundId = useId();
@@ -119,57 +174,96 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
   };
 
   const [offen, setOffen] = useState(false);
-  /** Der markierte Vorschlag (rc-select `onActive`); `null` heißt: Enter nimmt den Freitext. */
+  /** Wird seit dem letzten Öffnen getippt? Erst dann steht ein einsamer Freitext-Eintrag. */
+  const [getippt, setGetippt] = useState(false);
+  /**
+   * Der markierte Eintrag, wie rc-select ihn meldet (`onActive`: Vorgabe, Pfeile, Maus). Er bleibt
+   * über das Schließen stehen, wie rc-selects eigene Markierung; ein veralteter Schlüssel fällt auf
+   * den obersten Eintrag zurück (`markierterEintrag`).
+   */
   const aktivRef = useRef<string | null>(null);
   /** Läuft gerade ein Enter? Dann bleibt die Liste zu (s. Dateikopf). */
   const enterRef = useRef(false);
-  /** Wurde in der offenen Liste mit ↓/↑ markiert? Nur dann nimmt Enter den Vorschlag. */
-  const pfeilRef = useRef(false);
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   /** Gerade angelegt, die Quelle hat es aber noch nicht neu geladen. */
   const [angelegt, setAngelegt] = useState<string | null>(null);
 
   const liste = useMemo(() => baueVorschlagsliste(quellen, text), [quellen, text]);
-  const optionen = useMemo(
-    () => [
+  /** Alle Vorschläge in der Folge der Liste (Gruppen, dann Demo). */
+  const vorschlaege = useMemo(
+    () => [...liste.gruppen.flatMap((g) => g.eintraege), ...liste.demo],
+    [liste],
+  );
+  // Freitext trotz Treffer über einen eigenen, letzten Eintrag; er entfällt, wenn der Text schon
+  // genau ein Vorschlag ist. Passt kein Vorschlag, steht er nur, solange getippt wird: ein Klick
+  // in einen stehenden Wert öffnete sonst eine Liste aus diesem einen Eintrag, und das erste
+  // Escape bräche nicht mehr ab. Ohne jede Quelle gibt es keine Liste und damit keinen Eintrag.
+  const zeigeFreitext =
+    quellen.length > 0 &&
+    text.trim() !== '' &&
+    !vorschlaege.some((v) => v.wert === text.trim()) &&
+    (vorschlaege.length > 0 || getippt);
+  const optionen = useMemo(() => {
+    const vorschlagsOption = (v: Vorschlag, label: ReactNode) => ({
+      value: schluesselVon(v),
+      label,
+      title: v.label,
+      // Die versteckte Liste für Screenreader zeigte sonst den Schlüssel (rc-select `renderItem`).
+      'aria-label': v.label,
+    });
+    return [
       ...liste.gruppen.map((g) => ({
         label: g.titel,
         title: g.titel,
-        options: g.eintraege.map((v) => ({ value: v.wert, label: v.label, title: v.label })),
+        options: g.eintraege.map((v) => vorschlagsOption(v, v.label)),
       })),
       ...(liste.demo.length > 0
         ? [
             {
               label: DEMO_GROUP,
               title: DEMO_GROUP,
-              options: liste.demo.map((v) => ({
-                value: v.wert,
-                label: <DemoLabel>{v.label}</DemoLabel>,
-                title: v.label,
-              })),
+              options: liste.demo.map((v) => vorschlagsOption(v, <DemoLabel>{v.label}</DemoLabel>)),
             },
           ]
         : []),
-    ],
-    [liste],
-  );
-  const nachWert = useMemo(() => {
+      ...(zeigeFreitext
+        ? [
+            {
+              value: FREITEXT_SCHLUESSEL,
+              label: freitextBeschriftung(text),
+              title: freitextBeschriftung(text),
+              'aria-label': freitextBeschriftung(text),
+              'data-lfh': 'freitext-eintrag',
+              // Abgesetzt von den Vorschlägen wie im Entwurf (`Schreibzeile-Zustaende.dc.html`).
+              style: { borderTop: `1px solid ${rollen.linie}` },
+            },
+          ]
+        : []),
+    ];
+  }, [liste, zeigeFreitext, text, rollen.linie]);
+  const nachSchluessel = useMemo(() => {
     const karte = new Map<string, Vorschlag>();
-    for (const v of [...liste.gruppen.flatMap((g) => g.eintraege), ...liste.demo]) {
-      karte.set(v.wert, v);
-    }
+    for (const v of vorschlaege) karte.set(schluesselVon(v), v);
     return karte;
-  }, [liste]);
+  }, [vorschlaege]);
 
   const listeOffen = offen && optionen.length > 0;
 
+  /** Der Eintrag, den Enter/Tab jetzt nähmen: der markierte, sonst der oberste. */
+  function markierterEintrag(): Vorschlag | 'freitext' | null {
+    const aktiv = aktivRef.current;
+    if (aktiv != null) {
+      if (aktiv === FREITEXT_SCHLUESSEL && zeigeFreitext) return 'freitext';
+      const v = nachSchluessel.get(aktiv);
+      if (v) return v;
+    }
+    return vorschlaege[0] ?? (zeigeFreitext ? 'freitext' : null);
+  }
+
   const oeffne = (auf: boolean) => {
     if (auf && enterRef.current) return;
-    if (!auf) {
-      aktivRef.current = null;
-      pfeilRef.current = false;
-    }
+    if (!auf) setGetippt(false);
     setOffen(auf);
   };
 
@@ -186,18 +280,29 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
   const sperrGrund = uebernahme?.gesperrt ?? (zuLang ? 'zu lang' : null);
   const zeigeUebernahme = herkunft === 'frei' && uebernahme != null;
 
-  function waehle(v: Vorschlag) {
+  /** Nimmt einen Eintrag der Liste: einen Vorschlag oder den getippten Text. */
+  function nimm(eintrag: Vorschlag | 'freitext', weg: UebernahmeWeg) {
     setFehler(null);
-    setze({ text: v.wert, ...(v.ref ? { ref: v.ref } : {}) });
     oeffne(false);
-    onWahl?.(v);
+    if (eintrag === 'freitext') {
+      // Unverändert, und ausdrücklich frei: keine Referenz eines exakten Treffers.
+      setze({ text });
+      if (weg === 'enter') onEnter?.(text);
+      onUebernahme?.({ text, weg, ausListe: true });
+      return;
+    }
+    setze({ text: eintrag.wert, ...(eintrag.ref ? { ref: eintrag.ref } : {}) });
+    onWahl?.(eintrag);
+    onUebernahme?.({ text: eintrag.wert, vorschlag: eintrag, weg, ausListe: true });
   }
 
-  function nimmFreitext() {
+  /** Enter bei geschlossener Liste: der stehende Text gilt. */
+  function nimmStehendenText() {
     // Ein exakter Treffer ist kein freier Wert: er bekommt seine Referenz (Modus mit `ref`).
     const treffer = exakterTreffer(text, quellen);
     if (treffer?.ref && !wert.ref) setze({ text, ref: treffer.ref });
     onEnter?.(text);
+    onUebernahme?.({ text, weg: 'enter', ausListe: false });
   }
 
   function beiTasteVorab(e: KeyboardEvent<HTMLElement>) {
@@ -205,22 +310,32 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
     if ((e.target as HTMLElement).getAttribute('role') !== 'combobox') return;
     if (e.key === 'Enter') {
       if (e.nativeEvent.isComposing) return;
-      // Mit ↓/↑ markiert: rc-select wählt den Vorschlag und verhindert das Absenden selbst. Die
-      // Markierung, die rc-select beim Tippen auf einen Präfix-Treffer setzt (`OptionList`, „Auto
-      // scroll“), zählt nicht: Enter nach dem Tippen nimmt den getippten Text (D3).
-      if (listeOffen && pfeilRef.current && aktivRef.current != null) return;
       enterRef.current = true;
       if (listeOffen) {
+        // Selbst nehmen: rc-select bekommt das Enter nicht (s. Dateikopf).
         e.preventDefault();
         e.stopPropagation();
-        oeffne(false);
+        const eintrag = markierterEintrag();
+        if (eintrag) nimm(eintrag, 'enter');
+        else oeffne(false);
+        return;
       }
-      nimmFreitext();
+      if (!enterSendet) e.preventDefault();
+      nimmStehendenText();
+      return;
+    }
+    if (e.key === 'Tab') {
+      if (!listeOffen) return;
+      // Nie `preventDefault`: der Browser bewegt den Fokus weiter. rc-select bekommt die Taste
+      // nicht, es hielte den Fokus fest (s. Dateikopf).
+      e.stopPropagation();
+      const eintrag = e.shiftKey ? null : markierterEintrag();
+      if (eintrag) nimm(eintrag, 'tab');
+      else oeffne(false);
       return;
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      if (listeOffen) pfeilRef.current = true;
-      else if (e.key === 'ArrowDown' && optionen.length > 0) setOffen(true);
+      if (!listeOffen && e.key === 'ArrowDown' && optionen.length > 0) setOffen(true);
       return;
     }
     if (e.key === 'Escape') {
@@ -294,19 +409,27 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
         options={optionen}
         open={listeOffen}
         onOpenChange={oeffne}
-        defaultActiveFirstOption={false}
+        onBlur={() => setGetippt(false)}
+        // Der oberste Eintrag ist markiert (Spec `stammdaten-feld`, „Tastatur“).
+        defaultActiveFirstOption
         onActive={(v) => {
           aktivRef.current = v == null ? null : String(v);
         }}
         onSearch={(eingabe) => {
           setFehler(null);
-          pfeilRef.current = false;
           setze({ text: eingabe });
+          setGetippt(true);
           if (eingabe && !enterRef.current) setOffen(true);
         }}
+        // Nur noch der Klick: Enter und Tab nimmt das Feld selbst (`beiTasteVorab`).
         onSelect={(v) => {
-          const vorschlag = nachWert.get(String(v));
-          if (vorschlag) waehle(vorschlag);
+          const schluessel = String(v);
+          if (schluessel === FREITEXT_SCHLUESSEL) {
+            nimm('freitext', 'klick');
+            return;
+          }
+          const vorschlag = nachSchluessel.get(schluessel);
+          if (vorschlag) nimm(vorschlag, 'klick');
         }}
       />
       {herkunft && (

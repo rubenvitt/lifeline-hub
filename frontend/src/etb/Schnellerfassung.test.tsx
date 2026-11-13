@@ -1114,9 +1114,11 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
   it('übernimmt den Rufnamen aus der Abfrage über den Zugriff', async () => {
     const rufname = rufnameZugriff(null);
     renderMitProviders(<Schnellerfassung {...props({ rufname })} />);
+    // Das erste Enter nimmt den Freitext-Eintrag der offenen Liste, das zweite übernimmt
+    // (Spec `stammdaten-feld`, „Tastatur“).
     await userEvent.type(
       screen.getByRole('combobox', { name: 'Rufname für Von und An' }),
-      'ELW 1{Enter}',
+      'ELW 1{Enter}{Enter}',
     );
     await waitFor(() => expect(rufname.setze).toHaveBeenCalledWith('{"von":"ELW 1","an":"ELW 1"}'));
   });

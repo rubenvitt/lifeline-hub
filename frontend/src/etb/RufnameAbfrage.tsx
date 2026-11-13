@@ -75,8 +75,10 @@ export default function RufnameAbfrage({
   }
 
   /**
-   * Enter im Feld übernimmt; ein markierter Vorschlag nimmt Enter selbst (`onWahl`), Escape bei
-   * offener Liste schließt nur die Liste (`components/StammdatenFeld.tsx`).
+   * Enter bei geschlossener Liste übernimmt den Standard. Bei offener Liste nimmt Enter nur den
+   * markierten Eintrag (Vorschlag oder „„…“ als Freitext übernehmen“) und schließt sie; Escape bei
+   * offener Liste schließt nur die Liste (Spec `stammdaten-feld`, „Tastatur“,
+   * `components/StammdatenFeld.tsx`).
    */
   const feld = (id: string, wert: string, setze: (v: string) => void, name: string) => (
     <StammdatenFeld
@@ -91,7 +93,9 @@ export default function RufnameAbfrage({
       quellen={quellen}
       // Grenze des Servers für Von/An (LFH-937).
       maxLength={ETB_PARTEI_MAX}
-      onEnter={() => void uebernehmen()}
+      onUebernahme={(u) => {
+        if (u.weg === 'enter' && !u.ausListe) void uebernehmen();
+      }}
       onEscape={onAbbrechen}
       disabled={laeuft}
       style={{ minWidth: 200, flex: '1 1 200px', maxWidth: 320 }}
