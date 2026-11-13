@@ -1204,7 +1204,7 @@ async fn ohne_eigene_instanzkennung_gibt_es_keine_erfundene_ursprungskennung() {
 
 /// LLH-1851: Nach Widerruf und Neuzuordnung derselben Gegen-Org an eine andere Org hier nimmt der
 /// Spiegel die Lieferung nicht an. Er bleibt beendet an seiner Zuordnung, und der Absender bekommt
-/// den Stand am Ende der Lieferung, damit er nicht in jedem Takt von vorn liefert.
+/// Stand 0: Über diese Zuordnung ist nichts übernommen (design.md D2).
 #[tokio::test]
 async fn eine_zuordnung_einer_anderen_org_haengt_den_spiegel_nicht_um() {
     let (f, s) = zwei_seiten().await;
@@ -1273,7 +1273,7 @@ async fn eine_zuordnung_einer_anderen_org_haengt_den_spiegel_nicht_um() {
         "{:?}",
         erg.hinweise
     );
-    assert_eq!(erg.stand, l.bis, "Stand am Ende der Lieferung");
+    assert_eq!(erg.stand, 0, "nichts übernommen");
     assert_eq!(
         erg.einsatz_id, None,
         "kein Hinweis am Spiegel der anderen Org"

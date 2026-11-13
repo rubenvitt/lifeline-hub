@@ -33,7 +33,8 @@ So kommt es dazu:
 
 - Ein Spiegel nimmt Lieferungen nur über eine Zuordnung seiner eigenen Org an. Dann ändern sich
   durch eine Lieferung weder seine Org noch seine Mitgliedschaften über die Org-Grenze.
-- Der Absender wiederholt eine verworfene Lieferung nicht in jedem Takt.
+- Kein Stand behauptet einen Abgleich, den es nicht gab: Eine verworfene Lieferung meldet nichts
+  als übernommen (D2).
 
 **Non-Goals:**
 
@@ -60,16 +61,32 @@ vor dem Zweig „Neu zugeordnet“.
 - **Erwogen:** nur im Zweig „Neu zugeordnet“ prüfen. Das deckt denselben Fall ab, lässt die
   Invariante aber vom Zustand der Zeile abhängen.
 
-### D2 — Verworfen wird mit dem Stand am Ende der Lieferung
+### D2 — Verworfen wird mit Stand 0 (nach dem Review geändert, 13.11.2026)
 
-Das Ergebnis nennt `stand = l.bis`, ohne `einsatz_id`. Der Absender merkt sich diesen Stand für die
-Zuordnung der Org Y und liefert danach nur noch Neues, das ebenso verworfen wird. Der Stand des
-Spiegels selbst (`einsatz_spiegel.stand`) bleibt unberührt. Wird Org X später wieder zugeordnet,
-beginnt diese Zuordnung ohnehin bei 0 (`spiegel_ziel` ist leer), und der Spiegel holt alles nach.
+Das Ergebnis nennt `stand = 0`, ohne `einsatz_id`, wie bei „andere Kopplung“: Über die Zuordnung
+der Org Y ist nichts übernommen, und genau das meldet der Stand. Der Stand des Spiegels selbst
+(`einsatz_spiegel.stand`) bleibt unberührt. Wird Org X später wieder zugeordnet, beginnt diese
+Zuordnung ohnehin bei 0 (`spiegel_ziel` ist leer), und der Spiegel holt alles nach.
 
-- **Erwogen:** `stand = 0` (wie bei „andere Kopplung“) oder `l.seit` (wie bei „hier geführt“). Mit
-  beiden liefert der Absender denselben Einsatz in jedem Takt von vorn. Das kostet Budget der
-  Leitung und verdrängt andere Einsätze, ohne dass sich je etwas ändert.
+Folge in beiden Richtungen: Der Führer liefert den Einsatz bei jedem Abgleich von vorn, bis er
+abgeschlossen ist (`list_gefuehrt` nimmt einen abgeschlossenen, ungenannten Einsatz nicht mehr mit).
+Das kostet je Abgleich Leitungsbudget, einen Platz von `EINSAETZE_MAX` und eine Logzeile. Der Fall
+setzt Widerruf und Neuzuordnung an eine andere Org voraus und kommt kaum vor.
+
+- **Zuerst gewählt, verworfen:** `stand = l.bis`. Der Review vor dem PR zeigte zweierlei:
+  - In Pull (der Hub führt, der ELW meldet sich und spiegelt) erreicht der Stand den Absender
+    nie. Der ELW verwirft das Ergebnis von `uebernehme_alle`, nennt den beendeten Spiegel nicht in
+    `eigene_staende`, und der Hub liefert trotzdem ab 0.
+  - In Push setzte er den Stand der neuen Zuordnung am ELW auf „aktuell“, obwohl der Hub nichts
+    übernommen hatte. `spiegel::fuehrung::ist_abgeglichen` und `offene_aenderungen` nehmen das
+    Maximum über alle Zuordnungen der Kopplung und hätten eine Übergabe als abgeglichen
+    durchgelassen.
+- **Verworfen:** Pull dicht machen, indem die meldende Seite verworfene Stände merkt und in der
+  nächsten Anfrage nennt. Das ist mehr Code im Abgleich, und das falsche „abgeglichen“ bliebe.
+  Nebenwirkung: Ein Löschsignal des Führers räumte dann auch den beendeten Spiegel der Org X ab
+  (`lebensende::spiegel_der_kopplung`).
+- **Verworfen:** `l.bis` lassen und nur auf Push einschränken. Dann bleibt das falsche
+  „abgeglichen“.
 
 ### D3 — Der Grund steht im Log, nicht am Spiegel
 
@@ -99,8 +116,10 @@ geht in `Ergebnis::hinweise`, und `uebernehme_alle` loggt ihn wie jeden Hinweis
 - [Ein Hub ist schon im falschen Zustand] → Er bleibt so. Dort gilt `einsatz.org_id = Y` und die
   Zuordnung gehört Org Y, die Prüfung lässt die Lieferung also durch. Eine Reparatur ist bewusst
   ausgelassen.
-- [Der Absender hält den verworfenen Einsatz für abgeglichen] → Er zeigt ihn mit dem Stand für
-  Org Y. Inhaltlich fehlt dort nichts, was Org Y zustünde.
+- [Der Führer liefert den verworfenen Einsatz bis zu seinem Abschluss in jedem Abgleich neu] →
+  Begrenzt durch Budget und `EINSAETZE_MAX`, so wie heute schon bei „andere Kopplung“. Die
+  Mandantentrennung geht vor. Wer es abstellen will, widerruft die Zuordnung der Org Y oder
+  schließt den Einsatz ab.
 
 ## Migration Plan
 

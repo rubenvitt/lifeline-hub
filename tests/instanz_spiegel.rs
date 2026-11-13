@@ -1703,14 +1703,16 @@ async fn neue_zuordnung_an_eine_andere_org_laesst_den_spiegel_bei_seiner_org() {
     .await;
     assert_eq!(st, StatusCode::OK, "{v}");
     assert_eq!(v["org_id"], vorher.0);
-    // Der ELW liefert den verworfenen Einsatz nicht in jedem Takt von vorn (design.md D2).
-    let stand_y: i64 = eine(
-        &elw.pool,
-        "SELECT z.stand FROM spiegel_ziel z JOIN instanz_kopplung_org o ON o.id = z.kopplung_org_id \
-         WHERE o.widerrufen_at IS NULL",
+    // Über die Zuordnung der Org Y ist nichts übernommen, und genau das sagt ihr Stand am ELW
+    // (design.md D2): Er gilt nicht als abgeglichen.
+    let stand_y: Option<i64> = sqlx::query_scalar(
+        "SELECT MAX(z.stand) FROM spiegel_ziel z JOIN instanz_kopplung_org o \
+         ON o.id = z.kopplung_org_id WHERE o.widerrufen_at IS NULL",
     )
-    .await;
-    assert!(stand_y > 0, "Stand der Zuordnung Y am ELW: {stand_y}");
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(stand_y.unwrap_or(0), 0, "Stand der Zuordnung Y am ELW");
 }
 
 /// LLH-1851: Wird dieselbe Org am Hub nach dem Widerruf erneut zugeordnet, lebt der Spiegel wieder

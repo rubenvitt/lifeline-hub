@@ -16,8 +16,10 @@ für diesen Einsatz aufgehoben.
   an: Die Org des Einsatzes muss der Org der liefernden Zuordnung gleichen.
 - Gleicht sie nicht, wird die Lieferung verworfen. Der Spiegel bleibt, wie er ist: beendet,
   lesbar und geschützt für seine Org. Der Grund steht im Log der empfangenden Instanz.
-- Die empfangende Seite nennt dem Absender für diesen Einsatz den Stand am Ende der Lieferung,
-  damit er ihn nicht in jedem Takt von vorn liefert.
+- Die empfangende Seite meldet für diesen Einsatz Stand 0: Über die neue Zuordnung ist nichts
+  übernommen. Der Absender liefert ihn deshalb bis zu seinem Abschluss in jedem Abgleich neu, wie
+  heute schon bei einer Lieferung über eine andere Kopplung (design.md D2, nach dem Review
+  geändert).
 - Keine Reparatur bestehender Daten: Ein Hub, der schon in diesem Zustand ist, bleibt, wie er ist
   (abgestimmt am 13.11.2026).
 

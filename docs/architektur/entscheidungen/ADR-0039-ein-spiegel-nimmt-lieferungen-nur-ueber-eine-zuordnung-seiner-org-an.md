@@ -18,8 +18,9 @@ herleitung:
   (`Empfaenger::org_id`); weichen sie ab, wird die Lieferung verworfen.
 - MUST NOT: Eine Lieferung ändert nie die Org eines vorhandenen Spiegels und hängt ihn nie an
   eine Zuordnung einer anderen Org, auch nicht nach Widerruf und Neuzuordnung derselben Gegen-Org.
-- MUST: Eine so verworfene Lieferung nennt dem Absender den Stand am Ende der Lieferung und keine
-  `einsatz_id`; der Grund steht nur im Log, nie am Spiegel der bisherigen Org.
+- MUST: Eine so verworfene Lieferung meldet Stand 0 und keine `einsatz_id`: Über diese Zuordnung
+  ist nichts übernommen, und kein Stand darf einen Abgleich behaupten, den es nicht gab. Der Grund
+  steht nur im Log, nie am Spiegel der bisherigen Org.
 
 ## Prüfung
 
@@ -40,6 +41,7 @@ Mitgliedschaft, deshalb muss ein Spiegel dieselbe Org behalten, solange er beste
 ## Konsequenzen
 
 Die bisherige Org behält ihren beendeten, lesbaren Spiegel, wie nach jedem Widerruf. Die neue Org
-bekommt diesen einen Einsatz nicht; neue Einsätze des Gegenübers kommen bei ihr normal an. Einen
+bekommt diesen einen Einsatz nicht; neue Einsätze des Gegenübers kommen bei ihr normal an. Der
+Führer liefert den verworfenen Einsatz bis zu seinem Abschluss in jedem Abgleich neu. Einen
 eigenen Spiegel je Org für denselben Einsatz gibt es nicht (verworfen in design.md D4). Ein Hub,
 der schon im falschen Zustand ist, wird nicht repariert.
