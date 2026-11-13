@@ -239,7 +239,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
         koerperPolster
         aktion={
           darfSchreiben && (
-            <Button size="small" disabled={ohneNetz} onClick={() => setEinrichtenOffen(true)}>
+            <Button disabled={ohneNetz} onClick={() => setEinrichtenOffen(true)}>
               Webhook einrichten
             </Button>
           )
@@ -356,7 +356,6 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
               {/* Eine Hauptaktion, der Rest gebündelt (frontend/AGENTS.md, LFH-365). */}
               {webhook.zustand === 'angehalten' ? (
                 <Button
-                  size="small"
                   type="primary"
                   disabled={ohneNetz}
                   loading={weiter.isPending}
@@ -366,7 +365,6 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
                 </Button>
               ) : (
                 <Button
-                  size="small"
                   disabled={ohneNetz}
                   loading={testen.isPending}
                   onClick={() => aktionWaehlen('test')}
