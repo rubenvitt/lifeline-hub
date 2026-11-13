@@ -1369,7 +1369,7 @@ async fn zurueckgespielt_hub_mit_nachgehender_uhr_liefert_die_org_erneut() {
     );
     let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
     let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
-    assert!(h.contains("Stammdaten von"), "{h:?}");
+    assert!(h.contains("Erneut an") && h.contains("Stammdaten"), "{h:?}");
 }
 
 #[tokio::test]
@@ -1431,7 +1431,7 @@ async fn zurueckgespielt_elw_bekommt_das_fahrzeug_erneut() {
 }
 
 #[tokio::test]
-async fn rueckschritt_bei_schluesseln_und_stammdaten_nennt_beides_mit_org() {
+async fn rueckschritt_bei_schluesseln_und_stammdaten_nennt_beide_stroeme() {
     let (hub, elw) = gekoppelt().await;
     melden(&elw).await;
     // Der ELW kennt höhere Stände beider Ströme, als der Hub je vergeben hat (Hub zurückgespielt,
@@ -1445,10 +1445,11 @@ async fn rueckschritt_bei_schluesseln_und_stammdaten_nennt_beides_mit_org() {
     melden(&elw).await;
     let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
     let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
-    let org: String = eine(&hub.pool, "SELECT name FROM organisation WHERE id = 1").await;
     assert!(
-        h.contains(&format!("Unterschriftsschlüssel von {org}"))
-            && h.contains(&format!("Stammdaten von {org}")),
+        h.contains("Erneut an") && h.contains("Unterschriftsschlüssel, Stammdaten."),
         "{h:?}"
     );
+    // Ohne Org-Namen: Eine Kopplung mit mehreren Orgs zeigt ihren Hinweis jeder davon.
+    let org: String = eine(&hub.pool, "SELECT name FROM organisation WHERE id = 1").await;
+    assert!(!h.contains(&org), "{h:?}");
 }

@@ -804,7 +804,6 @@ pub async fn discard_angebahnte(pool: &SqlitePool, grenze: &str) -> Result<u64, 
     Ok((ids.len() + verwaist.len()) as u64)
 }
 
-/// Setzt einen bleibenden Hinweis an der Kopplung.
 /// Der Hinweis an einer Kopplung, falls einer steht.
 pub async fn load_hinweis(
     conn: &mut SqliteConnection,
@@ -821,6 +820,7 @@ pub async fn load_hinweis(
     )
 }
 
+/// Setzt einen bleibenden Hinweis an der Kopplung.
 pub async fn set_hinweis(
     conn: &mut SqliteConnection,
     kopplung_id: i64,

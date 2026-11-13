@@ -72,15 +72,17 @@ gemeldet ≤ höchster.
 
 `handle_meldung` prüft das je aktiver Org vor `unterschrift::nachlieferung`, in derselben
 Transaktion. Liegt der gemeldete Stand darüber und höchstens bei `STAND_RAISE_MAX` (2³⁹, wie
-LLH-1708), ruft sie `unterschrift::renew_stand_ueber(conn, org_id, gemeldet)` auf. Das stempelt
+LLH-1708), ruft sie `unterschrift::renew_schluessel_stand_ueber(conn, org_id, gemeldet)` auf. Das stempelt
 **alle** gültigen und widerrufenen lokalen Schlüssel der Org in der Reihenfolge ihres Stands neu auf
 `gemeldet + 1, gemeldet + 2, …`. Die Nachlieferung derselben Meldung nimmt sie gleich mit, wie
-bisher in Seiten zu 64. An der Kopplung steht dann ein Hinweis, der jede Org und jeden Strom nennt, der erneut geht:
+bisher in Seiten zu 64. An der Kopplung steht dann ein Hinweis, der jeden Strom nennt, der erneut geht:
 „<Gegenüber> kennt schon spätere Stände, als diese Instanz vergeben hat (aus einer Sicherung
-zurückgespielt?). Erneut an <Gegenüber> gehen: Unterschriftsschlüssel von <Org>, Stammdaten von
-<Org>.“ `handle_meldung` sammelt die Teile über alle Orgs und setzt ihn einmal am Ende der
-Transaktion. Hat dieselbe Meldung schon einen Hinweis der Führung gesetzt, steht er dahinter
-(Review, 13.11.2026: sonst überschrieb D4 den Hinweis aus D2).
+zurückgespielt?). Erneut an <Gegenüber> gehen: Unterschriftsschlüssel, Stammdaten.“
+`handle_meldung` sammelt die Ströme über alle Orgs und setzt den Hinweis einmal, nach der Schleife
+und vor dem Führungsblock. Steht nach dem Führungsblock etwas anderes da, hat die Führung in dieser
+Meldung einen Hinweis gesetzt, und er steht hinter dem eigenen (Review, 13.11.2026: sonst überschrieb
+D4 den Hinweis aus D2 oder die Führung beide). Der Hinweis nennt keine Org: Mehrere Orgs teilen
+sich eine Kopplung, und jede sähe sonst die Namen der anderen.
 
 - **Alle statt einer Auswahl:** Welche Schlüssel seit dem Zurückspielen neu oder widerrufen sind,
   weiß die Seite nicht. Es sind wenige. Einen schon bekannten gültigen Schlüssel übergeht die

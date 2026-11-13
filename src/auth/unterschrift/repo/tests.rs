@@ -1095,7 +1095,12 @@ async fn neu_stempeln_hebt_gueltige_und_widerrufene_ueber_den_gemeldeten_stand()
     .execute(&mut *conn)
     .await
     .unwrap();
-    assert_eq!(renew_stand_ueber(&mut conn, 1, 100).await.unwrap(), 3);
+    assert_eq!(
+        renew_schluessel_stand_ueber(&mut conn, 1, 100)
+            .await
+            .unwrap(),
+        3
+    );
     let staende: Vec<(String, i64)> = sqlx::query_as(
         "SELECT credential_id, stand FROM unterschrift_schluessel ORDER BY credential_id",
     )
@@ -1112,5 +1117,10 @@ async fn neu_stempeln_hebt_gueltige_und_widerrufene_ueber_den_gemeldeten_stand()
         ],
         "in der alten Reihenfolge, wartende bleiben"
     );
-    assert_eq!(renew_stand_ueber(&mut conn, 2, 100).await.unwrap(), 0);
+    assert_eq!(
+        renew_schluessel_stand_ueber(&mut conn, 2, 100)
+            .await
+            .unwrap(),
+        0
+    );
 }

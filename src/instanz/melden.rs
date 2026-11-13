@@ -604,17 +604,6 @@ fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
     Ok(())
 }
 
-/// Name einer eigenen Org für einen Hinweis.
-async fn load_org_name(conn: &mut sqlx::SqliteConnection, org_id: i64) -> Result<String, AppError> {
-    Ok(
-        sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
-            .bind(org_id)
-            .fetch_optional(&mut *conn)
-            .await?
-            .unwrap_or_else(|| format!("Org {org_id}")),
-    )
-}
-
 // ── Meldende Seite ───────────────────────────────────────────────────────────────────────────
 
 /// Meldet sich einmal bei einer Kopplung, in der diese Instanz sich meldet, und übernimmt die
@@ -1061,9 +1050,9 @@ pub async fn handle_meldung(
         // nächsten Meldung, weil der Stand je Org nur bis zum Gelieferten wandert.
         let mut budget = unterschrift::LIEFERUNGEN_MAX;
         // Was nach einem Rückschritt dieser Seite erneut geht (LLH-1853, D2 und D4): ein Hinweis
-        // für alle Ströme und Orgs, damit keiner den anderen überschreibt.
-        let mut erneut: Vec<String> = Vec::new();
-        let hinweis_vorher = repo::load_hinweis(conn, kopplung.id).await?;
+        // für alle Ströme, damit keiner den anderen überschreibt. Ohne Org-Namen: Eine Kopplung
+        // mit mehreren Orgs zeigt ihren Hinweis jeder davon.
+        let mut erneut: Vec<&str> = Vec::new();
         for mo in anfrage_orgs.iter().copied() {
             // Die jüngste Zuordnung mit dieser Kennung entscheidet.
             let zuordnung = alle.iter().rev().find(|o| kennung(o) == mo.org);
@@ -1082,14 +1071,17 @@ pub async fn handle_meldung(
                     if mo.unterschrift_stand
                         > unterschrift::load_hoechster_stand(conn, o.org_id).await?
                         && mo.unterschrift_stand <= fuehrung_austausch::STAND_RAISE_MAX
-                        && unterschrift::renew_stand_ueber(conn, o.org_id, mo.unterschrift_stand)
-                            .await?
+                        && unterschrift::renew_schluessel_stand_ueber(
+                            conn,
+                            o.org_id,
+                            mo.unterschrift_stand,
+                        )
+                        .await?
                             > 0
                     {
-                        erneut.push(format!(
-                            "Unterschriftsschlüssel von {}",
-                            load_org_name(conn, o.org_id).await?
-                        ));
+                        if !erneut.contains(&"Unterschriftsschlüssel") {
+                            erneut.push("Unterschriftsschlüssel");
+                        }
                     }
                     let lieferung =
                         unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
@@ -1117,10 +1109,9 @@ pub async fn handle_meldung(
                                 .await?
                                 > 0
                         {
-                            erneut.push(format!(
-                                "Stammdaten von {}",
-                                load_org_name(conn, o.org_id).await?
-                            ));
+                            if !erneut.contains(&"Stammdaten") {
+                                erneut.push("Stammdaten");
+                            }
                         }
                         liefern::nachlieferung(
                             conn,
@@ -1165,6 +1156,19 @@ pub async fn handle_meldung(
             InstanzKopplungZustand::VomGegenueberWiderrufen,
         )
         .await?;
+        // Vor der Führung gesetzt: Was danach anders dasteht, hat diese Meldung geschrieben.
+        let rueckschritt_hinweis = (!erneut.is_empty()).then(|| {
+            format!(
+                "{} kennt schon spätere Stände, als diese Instanz vergeben hat (aus einer \
+                 Sicherung zurückgespielt?). Erneut an {} gehen: {}.",
+                kopplung.gegenueber_name,
+                kopplung.gegenueber_name,
+                erneut.join(", ")
+            )
+        });
+        if let Some(eigen) = &rueckschritt_hinweis {
+            repo::set_hinweis(conn, kopplung.id, eigen).await?;
+        }
         if fuehrung_an {
             // Führung je Einsatz (LLH-1491, D3, D7): erst übernehmen (eine Anfrage wird dabei
             // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite. Davor ein
@@ -1222,20 +1226,14 @@ pub async fn handle_meldung(
             )
             .await?;
         }
-        if !erneut.is_empty() {
-            let eigen = format!(
-                "{} kennt schon spätere Stände, als diese Instanz vergeben hat (aus einer \
-                 Sicherung zurückgespielt?). Erneut an {} gehen: {}.",
-                kopplung.gegenueber_name,
-                kopplung.gegenueber_name,
-                erneut.join(", ")
-            );
-            // Hat diese Meldung schon einen Hinweis gesetzt (Führung), bleibt er dahinter stehen.
-            let neu = match repo::load_hinweis(conn, kopplung.id).await? {
-                Some(h) if Some(&h) != hinweis_vorher.as_ref() => format!("{eigen} {h}"),
-                _ => eigen,
-            };
-            repo::set_hinweis(conn, kopplung.id, &neu).await?;
+        // Hat die Führung in dieser Meldung einen Hinweis gesetzt, bleibt er dahinter stehen.
+        if let Some(eigen) = &rueckschritt_hinweis {
+            if let Some(h) = repo::load_hinweis(conn, kopplung.id)
+                .await?
+                .filter(|h| h != eigen)
+            {
+                repo::set_hinweis(conn, kopplung.id, &format!("{eigen} {h}")).await?;
+            }
         }
         Ok(orgs)
     })?;

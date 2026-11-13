@@ -16,7 +16,7 @@ Reproduktionstests `zurueckgespielt_hub_*` liegen schon rot auf dem Branch.
 
 ## 3. Unterschriftsschlüssel: Netz an der erreichten Seite (D2)
 
-- [x] 3.1 `unterschrift::renew_stand_ueber(conn, org_id, gemeldet)` und eine Abfrage des höchsten lokalen Stands. Unit-Test: gültige und widerrufene Schlüssel bekommen `gemeldet + 1 …` in der alten Reihenfolge, wartende bleiben
+- [x] 3.1 `unterschrift::renew_schluessel_stand_ueber(conn, org_id, gemeldet)` und eine Abfrage des höchsten lokalen Stands. Unit-Test: gültige und widerrufene Schlüssel bekommen `gemeldet + 1 …` in der alten Reihenfolge, wartende bleiben
 - [x] 3.2 In `handle_meldung` (`src/instanz/melden.rs`) je aktiver Org vor `unterschrift::nachlieferung`: gemeldeter Stand über dem Höchsten und höchstens 2³⁹ → neu stempeln und Hinweis an der Kopplung. Integrationstest `zurueckgespielt_hub_mit_nachgehender_uhr_widerruf_erreicht_den_elw` (Stände über der Uhr, Widerruf kommt an, Hinweis steht) und `unplausibler_unterschrift_stand_stempelt_nicht_neu`
 - [x] 3.3 Integrationstest `zurueckgespielt_elw_bekommt_den_schluessel_erneut` (Spec-Szenario „ELW zurückgespielt“). Prüfen: `cargo test --test instanz_kopplung` grün
 

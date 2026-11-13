@@ -263,7 +263,7 @@ dem Zurückspielen des Hubs ohne Eingriff weiter:
   ganz. Das geschieht meist auch bei richtiger Uhr, solange am Hub seit dem Zurückspielen nichts
   geändert wurde, und es fängt eine nachgehende Uhr ab. Die Kopplung zeigt dann „… kennt schon
   spätere Stände, als diese Instanz vergeben hat (aus einer Sicherung zurückgespielt?). Erneut an …
-  gehen: Unterschriftsschlüssel von <Org>, Stammdaten von <Org>.“ Das ist kein Fehler.
+  gehen: Unterschriftsschlüssel, Stammdaten.“ Das ist kein Fehler.
 
 **Grenzen:**
 

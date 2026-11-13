@@ -128,7 +128,7 @@ pub async fn load_hoechster_stand(
 /// lokalen Schlüssel der Org in der Reihenfolge ihres Stands neu auf `gemeldet + 1, + 2, …`, damit
 /// die nächste Nachlieferung sie erneut liefert. Wartende bleiben, sie gehen nicht hinaus. Liefert
 /// die Zahl der neu gestempelten.
-pub async fn renew_stand_ueber(
+pub async fn renew_schluessel_stand_ueber(
     conn: &mut SqliteConnection,
     org_id: i64,
     gemeldet: i64,

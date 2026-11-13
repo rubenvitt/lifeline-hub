@@ -18,7 +18,7 @@ herleitung:
 
 - MUST: Den Stand eines lokalen Unterschriftsschlüssels vergibt nur `unterschrift::repo::next_stand`,
   und der vergibt `MAX(höchster Stand der Org + 1, Unix-Sekunden)`.
-- MUST: Sonst setzt nur `unterschrift::repo::renew_stand_ueber` den Stand lokaler Schlüssel, gerufen
+- MUST: Sonst setzt nur `unterschrift::repo::renew_schluessel_stand_ueber` den Stand lokaler Schlüssel, gerufen
   allein aus `melden::handle_meldung`, wenn der gemeldete Stand einer Org über ihrem höchsten liegt
   und höchstens `STAND_RAISE_MAX` ist.
 - MUST: `run_server` hebt nach den Migrationen den Zähler von `stammdaten_aenderung` per
@@ -34,8 +34,7 @@ herleitung:
 
 ```sh
 verlange 'MAX\(COALESCE\(MAX\(stand\), 0\) \+ 1, \?\)' src/auth/unterschrift/repo.rs
-verbiete 'unterschrift::(repo::)?(\{[^}]*)?renew_stand_ueber' 'src/**/*.rs' ':(exclude)src/instanz/melden.rs'
-verbiete 'renew_stand_ueber\(' 'src/auth/**/*.rs' ':(exclude)src/auth/unterschrift/repo.rs' ':(exclude)src/auth/unterschrift/repo/tests.rs'
+verbiete 'renew_schluessel_stand_ueber' 'src/**/*.rs' ':(exclude)src/auth/unterschrift/repo.rs' ':(exclude)src/auth/unterschrift/repo/tests.rs' ':(exclude)src/instanz/melden.rs'
 verlange 'raise_log_stand\(' src/main.rs
 verbiete 'renew_log_der_org\(' 'src/**/*.rs' ':(exclude)src/instanz/stammdaten/liefern.rs' ':(exclude)src/instanz/stammdaten/liefern/tests.rs' ':(exclude)src/instanz/melden.rs'
 verlange 'fremde_id = -id' src/auth/unterschrift/repo.rs
