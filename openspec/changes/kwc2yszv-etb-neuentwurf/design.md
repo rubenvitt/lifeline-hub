@@ -91,6 +91,15 @@ Filterleiste und Spaltenkopf kleben mit `top: var(--lfh-rahmen-oben)` plus der H
 Seitenkopfs (Regel „Wer oben klebt, hängt sich unter den Rahmen“). Der Fokusabstand
 (`scroll-padding-block-start`) wächst um ihre Höhe, damit ein Sprung nicht unter ihnen landet.
 
+### D9 Niedriges Fenster: eine rollende Zeile
+Beim Bau gemessen: im Handschuh-Betrieb sind Feldzeile (zwei Reihen), Inhalt und Fußzeile am
+Fükw 356 px hoch (Grenze 384 px), bei 1366 × 520 aber fast 70 % der Fensterhöhe; Zeilen der
+Zeitachse verschwanden beim Tabben hinter der Leiste. Unter 700 px Fensterhöhe stehen ab `md`
+deshalb Typ-Knopf, Felder und Fußzeile in einer waagerecht rollenden Zeile
+(`etb/useNiedrigesFenster.ts`). Der Fükw (768 px) behält die gezeichnete Form.
+*Verworfen:* die Leiste ab `md` einklappen wie auf dem Handschirm — beim Schreiben läge sie
+weiter über der halben Höhe.
+
 ## Risks / Trade-offs
 
 - [Die Leiste wird eine Zeile höher] → Feldzeile, Inhalt, Fußzeile ≈ 130 px am Fükw; die Grenze

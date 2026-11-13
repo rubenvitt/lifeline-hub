@@ -115,11 +115,16 @@ fehlen.
 links, und „+ Veranlassung“, „+ Anhang“ und „+ weiterer Entwurf“ rechts in derselben Zeile. Die
 Erfassungsleiste MUST höchstens die Hälfte der Fensterhöhe belegen und MUST im Handschuh-Betrieb
 die Trefffläche der Dichtestufe halten. Unter `md` SHALL die Fußzeile waagerecht rollen statt
-umzubrechen.
+umzubrechen. Ist das Fenster niedriger als 700 px, SHALL ab `md` die Feldzeile mit Typ-Knopf und
+die Fußzeile in einer einzigen, waagerecht rollenden Zeile über dem Inhalt stehen.
 
 #### Scenario: Fükw im Handschuh-Betrieb
 - **WHEN** die Erfassung bei 1366 × 768 im Handschuh-Betrieb mit Typ „Meldung“ steht
 - **THEN** stehen beide Schalter in der Fußzeile mit mindestens 72 px Trefffläche, und die Leiste belegt höchstens 384 px
+
+#### Scenario: Niedriges Fenster
+- **WHEN** die Erfassung bei 1366 × 520 im Handschuh-Betrieb steht
+- **THEN** stehen Typ, Zeit, Von, An, Weg und beide Schalter in einer rollenden Zeile über dem Inhalt, und beim Tabben durch die Zeitachse verschwindet keine Zeile hinter der Leiste
 
 ### Requirement: Meldungseingang ohne Recht der Meldungen
 Ist das Modul Meldungen für die Person nicht freigegeben, SHALL der Schalter „Auch in den
