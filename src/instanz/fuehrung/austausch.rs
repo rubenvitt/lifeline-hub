@@ -37,9 +37,14 @@ const ERKLAERUNG_MAX: usize = 4096;
 /// Größter Zähler einer gelieferten Epoche: weit über jedem echten Verlauf, weit unter dem
 /// Überlauf (`Epoche::naechste` rechnet plus eins).
 const ZAEHLER_MAX: i64 = 1 << 40;
-/// Größter Stand einer gelieferten Akte (LLH-1672): Stände zählen je Änderung eins hoch, wie
-/// Epochen weit darüber; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
+/// Größter Stand einer gelieferten Akte (LLH-1672): Stände folgen den Unix-Sekunden und zählen
+/// je Änderung mindestens eins hoch (LLH-1708, `repo::next_stand`), um 2026 also bei 1,8 · 10⁹,
+/// weit darunter; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
 const STAND_MAX: i64 = 1 << 40;
+/// Bis hierher darf eine Quittung des Gegenübers den eigenen Zähler heben (LLH-1708, design.md
+/// D3): Eine gekoppelte Seite soll ihn nicht bis an [`STAND_MAX`] treiben können, ab dem jede
+/// weitere Akte abgelehnt würde.
+pub const STAND_RAISE_MAX: i64 = STAND_MAX / 2;
 /// Länge eines Prüfwerts aus dem Abgabecode (HMAC-SHA256, Base64url: 43 Zeichen) mit Luft.
 const PRUEFWERT_MAX: usize = 64;
 /// Größte Akte in Byte (JSON), die hinausgeht: passt in jede Meldung ([`MELDUNG_BYTES`]) und
@@ -778,6 +783,65 @@ async fn check_offene(
     Ok(())
 }
 
+/// Rückschritt des eigenen Zählers (LLH-1708, design.md D3 der Change
+/// `xi5ugyt8-fuehrung-stand-nach-restore`): Quittiert das Gegenüber an `kopplung` mehr, als dieser
+/// Zähler je vergeben hat, wurde diese Instanz aus einer Sicherung zurückgespielt, und ihre Uhr fing
+/// das nicht ab ([`repo::next_stand`]). Dann hebt sie den Zähler über die Quittung und stempelt
+/// die Akten **jeder** aktiven Kopplung neu, in der sie erreichte Seite ist, jeweils über deren
+/// gespeichertem `fuehrung_gesendet_bis`: Das ist mit der Sicherung zurückgekehrt und nennt, was
+/// dieses Gegenüber sicher hat. Jede davon und `kopplung` selbst bekommen einen Hinweis. Nur eine
+/// Kopplung neu zu stempeln reichte nicht: Der Zähler gilt je Instanz, und nach dem Heben sähe eine
+/// zweite Kopplung ihren Rückschritt nicht mehr (Review B2).
+///
+/// Läuft an beiden Seiten in der Transaktion der Meldung, an der erreichten vor `ensure_akten` und
+/// [`apply_eingang`], damit auch deren Stände über der Quittung liegen. Liefert, ob er hob.
+pub async fn repair_stand(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+    quittung: i64,
+) -> Result<bool, AppError> {
+    if !(1..=STAND_RAISE_MAX).contains(&quittung) || quittung <= repo::load_stand(conn).await? {
+        return Ok(false);
+    }
+    repo::raise_stand(conn, quittung).await?;
+    let grund = "aus einer Sicherung zurückgespielt?";
+    for k in crate::instanz::repo::list_erreicht_aktiv(conn).await? {
+        let (gesendet, _) = repo::load_kopplung_staende(conn, k.id).await?;
+        let orgs =
+            repo::list_orgs_der_kopplung(conn, k.id, InstanzKopplungRichtung::WirdGemeldet).await?;
+        let ids: Vec<i64> = orgs.iter().map(|(id, _)| *id).collect();
+        repo::renew_stand_ueber(conn, &ids, gesendet).await?;
+        if k.id != kopplung.id {
+            crate::instanz::repo::set_hinweis(
+                conn,
+                k.id,
+                &format!(
+                    "Der Zähler der Führungsakten lag unter einer Quittung ({grund}). Die Akten \
+                     gehen erneut an {}.",
+                    k.gegenueber_name
+                ),
+            )
+            .await?;
+        }
+    }
+    let erneut = if kopplung.richtung() == Some(InstanzKopplungRichtung::WirdGemeldet) {
+        format!(" Die Akten gehen erneut an {}.", kopplung.gegenueber_name)
+    } else {
+        String::new()
+    };
+    crate::instanz::repo::set_hinweis(
+        conn,
+        kopplung.id,
+        &format!(
+            "{} hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat \
+             ({grund}).{erneut}",
+            kopplung.gegenueber_name
+        ),
+    )
+    .await?;
+    Ok(true)
+}
+
 /// Übernimmt die Akten einer Nachricht des Gegenübers. `zuletzt_gesehen` ist der Zeitpunkt der
 /// letzten erfolgreichen Meldung vor dieser Nachricht (Bruchstelle, D11).
 pub async fn apply_eingang(
@@ -1276,6 +1340,115 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    // ── Rückschritt des Zählers (LLH-1708, design.md D3) ──────────────────────────────────
+
+    /// Zur Kopplung 1 aus `repo::tests::gekoppelt` (diese Instanz meldet sich, Org 1) kommen zwei,
+    /// in denen sie erreichte Seite ist: Kopplung 2 mit Org 2, Kopplung 3 mit Org 1.
+    async fn drei_kopplungen(pool: &sqlx::SqlitePool) {
+        repo::tests::gekoppelt(pool).await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Zweite')")
+            .execute(pool)
+            .await
+            .unwrap();
+        for (id, org) in [(2, 2), (3, 1)] {
+            sqlx::query(
+                "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+                 gegenueber_name, richtung, zustand) \
+                 VALUES (?, ?, 's', ?, 'wird_gemeldet', 'aktiv')",
+            )
+            .bind(id)
+            .bind(format!("elw{id}"))
+            .bind(format!("ELW {id}"))
+            .execute(pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+                 fremde_org_name) VALUES (?, ?, ?, 'Org')",
+            )
+            .bind(id)
+            .bind(org)
+            .bind(format!("elw{id}/9"))
+            .execute(pool)
+            .await
+            .unwrap();
+        }
+    }
+
+    async fn stand_der_akte(pool: &sqlx::SqlitePool) -> i64 {
+        sqlx::query_scalar("SELECT stand FROM einsatz_fuehrung WHERE org_id = 1")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn hinweis_an(pool: &sqlx::SqlitePool, id: i64) -> String {
+        sqlx::query_scalar::<_, Option<String>>("SELECT hinweis FROM instanz_kopplung WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+            .unwrap_or_default()
+    }
+
+    /// Ruft `repair_stand` für Kopplung `id` mit `quittung`; liefert, ob gehoben wurde.
+    async fn repair(pool: &sqlx::SqlitePool, id: i64, quittung: i64) -> bool {
+        let k = crate::instanz::repo::load_kopplung(pool, id).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        repair_stand(&mut conn, &k, quittung).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn rueckschritt_an_einer_kopplung_stempelt_jede_erreichte_kopplung_neu() {
+        // Review B2: Die Akte der Org 1 hängt nur an Kopplung 3 (als erreichte Seite). Erkennt
+        // Kopplung 2 den Rückschritt und hebt den Zähler, sähe Kopplung 3 ihn danach nicht mehr.
+        let pool = crate::db::test_pool().await;
+        drei_kopplungen(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        repo::tests::einsatz(&pool, "Lage").await;
+        repo::tests::ensure(&pool).await;
+        let quittung = stand_der_akte(&pool).await + 1000;
+        assert!(repair(&pool, 2, quittung).await);
+        assert!(
+            stand_der_akte(&pool).await > quittung,
+            "Kopplung 3 bekommt sie erneut"
+        );
+        assert!(hinweis_an(&pool, 2).await.contains("ELW 2"));
+        assert!(hinweis_an(&pool, 3).await.contains("erneut an ELW 3"));
+        assert!(
+            !repair(&pool, 2, quittung).await,
+            "einmal gehoben, nicht wieder"
+        );
+    }
+
+    #[tokio::test]
+    async fn heben_an_der_meldenden_seite_stempelt_die_erreichten_kopplungen_neu() {
+        let pool = crate::db::test_pool().await;
+        drei_kopplungen(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        repo::tests::einsatz(&pool, "Lage").await;
+        repo::tests::ensure(&pool).await;
+        let quittung = stand_der_akte(&pool).await + 1000;
+        assert!(repair(&pool, 1, quittung).await);
+        assert!(stand_der_akte(&pool).await > quittung);
+        assert!(hinweis_an(&pool, 1).await.contains("Hub Nord"));
+        assert!(hinweis_an(&pool, 3).await.contains("erneut an ELW 3"));
+    }
+
+    #[tokio::test]
+    async fn eine_quittung_hebt_genau_bis_zur_grenze() {
+        // Review B6: genau auf der Grenze hebt sie, eins darüber nicht.
+        let pool = crate::db::test_pool().await;
+        drei_kopplungen(&pool).await;
+        assert!(!repair(&pool, 2, STAND_RAISE_MAX + 1).await);
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(repo::load_stand(&mut conn).await.unwrap() < STAND_RAISE_MAX);
+        drop(conn);
+        assert!(repair(&pool, 2, STAND_RAISE_MAX).await);
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(repo::load_stand(&mut conn).await.unwrap(), STAND_RAISE_MAX);
+    }
     use crate::auth::unterschrift::pruefen::{
         AUTHENTICATOR_DATA_MAX, CLIENT_DATA_JSON_MAX, CREDENTIAL_ID_MAX, SIGNATUR_MAX,
     };
