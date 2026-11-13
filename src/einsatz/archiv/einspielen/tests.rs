@@ -341,7 +341,10 @@ async fn eingespielt_schreibgeschuetzt_mit_platzhaltern_und_nach_7_tagen_weg() {
     assert_eq!(faellige_vormerken(&pool, &bald).await, 0);
     let spaeter = crate::zeit::formatiere_utc(jetzt + TimeDelta::days(7));
     assert_eq!(faellige_vormerken(&pool, &spaeter).await, 1);
-    assert_eq!(abraeumen::phase_r(&pool, &crate::live::LiveHub::new(), &spaeter).await, 1);
+    assert_eq!(
+        abraeumen::phase_r(&pool, &crate::live::LiveHub::new(), &spaeter).await,
+        1
+    );
     assert_eq!(konten_aufraeumen(&pool).await, 1);
     let rest: i64 = eine(
         &pool,

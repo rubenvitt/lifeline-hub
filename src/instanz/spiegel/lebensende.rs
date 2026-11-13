@@ -752,7 +752,8 @@ const GRUND_GEAENDERT: &str = "Nach der Übergabe geändert";
 /// Grund, wenn diese Instanz die Verwahrung abgelehnt hatte, bevor die Quittung kam (LLH-1647).
 const GRUND_ABGELEHNT: &str = "Verwahrung hier abgelehnt";
 
-/// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat; Fehler holt Phase R nach.
+/// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat, und meldet es über `live`
+/// (LLH-1713); Fehler holt Phase R nach.
 pub async fn abraeumen_nach_commit(
     pool: &sqlx::SqlitePool,
     live: Option<&crate::live::LiveHub>,

@@ -366,7 +366,7 @@ pub async fn tick_mit_rueckschrieb(
     // --- Phase R: Abräumen nach Verwahrung und Lebensende (UNUMKEHRBAR, LLH-1494) ---
     // Holt Merker nach, deren Abräumen nach dem Abgleich scheiterte, und räumt Spiegel der
     // meldenden Seite nach der Nachbereitung ab (design.md D5, D6). Schreibt den WAL selbst
-    // zurück.
+    // zurück und meldet Einsatz und Liste wie Phase A (LLH-1713).
     // Eingespielte Archive gehen nach ihrer Zeit denselben Weg (D10), ihre Platzhalter-Konten
     // danach.
     super::archiv::einspielen::faellige_vormerken(pool, &jetzt_s).await;

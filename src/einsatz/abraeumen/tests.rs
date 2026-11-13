@@ -349,7 +349,11 @@ async fn phase_r_raeumt_spiegel_der_meldenden_seite_nach_der_nachbereitung_ab() 
         (art.as_str(), gegenstelle.as_deref()),
         ("spiegel", Some("Gegenstelle"))
     );
-    assert_eq!(phase_r(&pool, &LiveHub::new(), JETZT).await, 0, "zweiter Lauf: nichts");
+    assert_eq!(
+        phase_r(&pool, &LiveHub::new(), JETZT).await,
+        0,
+        "zweiter Lauf: nichts"
+    );
 }
 
 #[tokio::test]
