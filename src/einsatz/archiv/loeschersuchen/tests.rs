@@ -447,7 +447,7 @@ async fn alter_download_gesperrt_und_kopie_vorgemerkt() {
         Some(super::super::einspielen::GEGENSTELLE)
     );
     // Die Kopie geht, dann wird der alte Download erneut versucht.
-    crate::einsatz::abraeumen::alle_vorgemerkten(&pool).await;
+    crate::einsatz::abraeumen::alle_vorgemerkten(&pool, &crate::live::LiveHub::new()).await;
     let e = super::super::einspielen::einspielen(&pool, &datei, &s, None, Utc::now())
         .await
         .unwrap_err();
