@@ -19,7 +19,7 @@ use crate::instanz::fuehrung::dienst::{self, FuehrungAnzeige};
 use crate::instanz::fuehrung::erklaerung::{FuehrungBeweis, NotuebernahmeErklaerung};
 use crate::instanz::fuehrung::repo::{self, AkteZeile};
 use crate::instanz::fuehrung::{self as fuehrung};
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
@@ -40,6 +40,13 @@ pub struct GrundBody {
 pub struct CodeBody {
     pub grund: String,
     pub code: String,
+}
+
+/// Gegenprobe an einer Akte des Gegenübers (LLH-1862): die Kennung der Akte, die die Oberfläche
+/// zeigt. Die ID allein trägt nicht, SQLite vergibt sie nach dem Löschen neu.
+#[derive(Debug, Deserialize)]
+pub struct AkteParams {
+    pub kennung: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,7 +130,7 @@ async fn run_uebergeben(
     b: &Benutzer,
     an: &str,
 ) -> Result<FuehrungAnzeige, AppError> {
-    let saved = dienst::uebergeben(&state.pool, a.id, an, &b.anzeigename).await?;
+    let saved = dienst::uebergeben(&state.pool, a.as_akte_ref(), an, &b.anzeigename).await?;
     danach(state, &saved).await
 }
 
@@ -134,7 +141,7 @@ async fn run_code(
     an: &str,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungCodeAntwort, AppError> {
-    let (c, saved) = dienst::code_abgeben(&state.pool, a.id, an, &b.anzeigename).await?;
+    let (c, saved) = dienst::code_abgeben(&state.pool, a.as_akte_ref(), an, &b.anzeigename).await?;
     // Der Code ist die Zustimmung dieser Seite zur Notübernahme durch das Gegenüber (LLH-1674).
     let text = format!(
         "Abgabecode für die Notübernahme durch {} erzeugt",
@@ -157,7 +164,7 @@ async fn run_code(
 }
 
 async fn run_anfragen(state: &AppState, a: &AkteZeile) -> Result<FuehrungAnzeige, AppError> {
-    let saved = dienst::anfragen(&state.pool, a.id).await?;
+    let saved = dienst::anfragen(&state.pool, a.as_akte_ref()).await?;
     danach(state, &saved).await
 }
 
@@ -170,7 +177,7 @@ async fn run_notuebernahme(
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
     let saved =
-        dienst::notuebernahme_gegen_erreichte(&state.pool, a.id, grund, &b.anzeigename).await?;
+        dienst::notuebernahme_gegen_erreichte(&state.pool, a.as_akte_ref(), grund, &b.anzeigename).await?;
     let text = format!("Notübernahme gegen {vorher}: {}", grund.trim());
     spur(
         state,
@@ -220,7 +227,7 @@ async fn run_start(
         ));
     }
     let e =
-        dienst::build_erklaerung_gegen_meldende(&state.pool, a.id, grund, &b.anzeigename).await?;
+        dienst::build_erklaerung_gegen_meldende(&state.pool, a.as_akte_ref(), grund, &b.anzeigename).await?;
     let erklaerung = dienst::erklaerung_text(&e)?;
     let zeremonie = zeremonie::store(Zeremonie::Fuehrungserklaerung {
         benutzer_id: b.id,
@@ -284,7 +291,7 @@ async fn run_abschluss(
     let vorher = a.fuehrer_name.clone();
     let saved = dienst::notuebernahme_gegen_meldende(
         &state.pool,
-        a.id,
+        a.as_akte_ref(),
         &e,
         &FuehrungBeweis::Unterschrift {
             assertion: body.assertion.clone(),
@@ -314,7 +321,7 @@ async fn run_mit_code(
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
     let saved =
-        dienst::notuebernahme_mit_code(&state.pool, a.id, &body.grund, &body.code, &b.anzeigename)
+        dienst::notuebernahme_mit_code(&state.pool, a.as_akte_ref(), &body.grund, &body.code, &b.anzeigename)
             .await?;
     let text = format!(
         "Notübernahme gegen {vorher} mit Code: {}",
@@ -339,7 +346,7 @@ async fn run_bestaetigen(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let eigene_notuebernahme = a.art() == fuehrung::FuehrungWechselArt::Notuebernahme;
-    let (saved, konflikt) = dienst::bestaetigen(&state.pool, a.id, &b.anzeigename).await?;
+    let (saved, konflikt) = dienst::bestaetigen(&state.pool, a.as_akte_ref(), &b.anzeigename).await?;
     let text = if konflikt {
         // Die erreichte Seite nannte einen Dritten (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
         // D4): keine Notübernahme gegen diese Instanz, und die Erklärung gehört einer anderen ELW.
@@ -385,7 +392,7 @@ async fn run_widersprechen(
     b: &Benutzer,
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
-    let saved = dienst::widersprechen(&state.pool, a.id, &b.anzeigename).await?;
+    let saved = dienst::widersprechen(&state.pool, a.as_akte_ref(), &b.anzeigename).await?;
     spur(
         state,
         AdminAktion::FuehrungWiderspruch,
@@ -530,9 +537,14 @@ pub async fn widersprechen(
 
 // ── Akten des Gegenübers (Admin) ─────────────────────────────────────────────────────────────
 
-async fn akte_fremd(state: &AppState, admin: &Benutzer, id: i64) -> Result<AkteZeile, AppError> {
+async fn akte_fremd(
+    state: &AppState,
+    admin: &Benutzer,
+    id: i64,
+    p: &AkteParams,
+) -> Result<AkteZeile, AppError> {
     fuehrung::fordere_enabled(&state.pool).await?;
-    dienst::load_fremde(&state.pool, admin.org_id, id).await
+    dienst::load_fremde(&state.pool, admin.org_id, id, p.kennung.as_deref()).await
 }
 
 /// GET /api/admin/instanz/fuehrung — Einsätze beim Gegenüber (Akten ohne lokalen Einsatz).
@@ -554,9 +566,10 @@ pub async fn admin_uebergeben(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
     JsonBody(body): JsonBody<AnBody>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(run_uebergeben(&state, &a, &admin, &body.an).await?))
 }
 
@@ -564,10 +577,11 @@ pub async fn admin_code_abgeben(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
     PeerIp(peer_ip): PeerIp,
     JsonBody(body): JsonBody<AnBody>,
 ) -> Result<Json<FuehrungCodeAntwort>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(run_code(&state, &a, &admin, &body.an, peer_ip).await?))
 }
 
@@ -575,8 +589,9 @@ pub async fn admin_anfragen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(run_anfragen(&state, &a).await?))
 }
 
@@ -585,9 +600,10 @@ pub async fn admin_notuebernahme(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
     JsonBody(body): JsonBody<GrundBody>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(
         run_notuebernahme(&state, &a, &admin, &body.grund, peer_ip).await?,
     ))
@@ -597,9 +613,10 @@ pub async fn admin_notuebernahme_start(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
     JsonBody(body): JsonBody<GrundBody>,
 ) -> Result<Json<FuehrungUnterschriftStart>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(run_start(&state, &a, &admin, &body.grund).await?))
 }
 
@@ -608,9 +625,10 @@ pub async fn admin_notuebernahme_abschluss(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
     JsonBody(body): JsonBody<AbschlussBody>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(
         run_abschluss(&state, &a, &admin, &body, peer_ip).await?,
     ))
@@ -621,9 +639,10 @@ pub async fn admin_notuebernahme_code(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
     JsonBody(body): JsonBody<CodeBody>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(
         run_mit_code(&state, &a, &admin, &body, peer_ip).await?,
     ))
@@ -634,8 +653,9 @@ pub async fn admin_bestaetigen(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(run_bestaetigen(&state, &a, &admin, peer_ip).await?))
 }
 
@@ -644,7 +664,8 @@ pub async fn admin_widersprechen(
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(run_widersprechen(&state, &a, &admin, peer_ip).await?))
 }

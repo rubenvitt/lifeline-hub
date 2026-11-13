@@ -75,7 +75,7 @@ function useNachFuehrung(einsatzId?: number) {
 }
 
 function ortVon(f: FuehrungAnzeige): FuehrungOrt {
-  return f.einsatz_id != null ? { einsatzId: f.einsatz_id } : { akteId: f.id };
+  return f.einsatz_id != null ? { einsatzId: f.einsatz_id } : { akteId: f.id, kennung: f.kennung };
 }
 
 /**

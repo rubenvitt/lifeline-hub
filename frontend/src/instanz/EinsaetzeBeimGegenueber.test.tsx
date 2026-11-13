@@ -55,7 +55,7 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Führung …' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Führung anfragen' }));
-    expect(frageFuehrungAn).toHaveBeenCalledWith({ akteId: 4 });
+    expect(frageFuehrungAn).toHaveBeenCalledWith({ akteId: 4, kennung: 'k-hub/3' });
   });
 
   it('ohne Schalter (404) fehlt der Abschnitt', async () => {
@@ -159,6 +159,38 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
       within(nochDa).getByText(/Nicht mehr unter „Einsätze beim Gegenüber“/),
     ).toBeInTheDocument();
     expect(within(nochDa).getByRole('button', { name: 'Führung anfragen' })).toBeEnabled();
+  });
+
+  // LLH-1862: SQLite vergibt die ID einer gelöschten Akte neu. Eine andere Akte unter derselben ID
+  // ist nicht die gewählte: Der Dialog bleibt beim gezeigten Einsatz, mit Hinweis, und die
+  // Anfrage nennt dessen Kennung.
+  it('liegt unter der ID ein anderer Einsatz, bleibt der Dialog beim gezeigten (LLH-1862)', async () => {
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([akte]);
+    vi.mocked(frageFuehrungAn).mockRejectedValue(
+      new ApiError(409, 'Unter dieser Akte liegt inzwischen ein anderer Einsatz.', {
+        vomAnwendungsserver: true,
+      }),
+    );
+    const client = neuerQueryClient();
+    renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />, { client });
+    await userEvent.click(await screen.findByRole('button', { name: 'Führung …' }));
+    await screen.findByRole('dialog');
+    vi.mocked(loadFuehrungFremd).mockResolvedValue([
+      { ...akte, kennung: 'k-hub/9', nummer: 'E2026-0009', bezeichnung: 'Hochwasser' },
+    ]);
+    await client.invalidateQueries({ queryKey: globalKeys.instanzkopplungFuehrung() });
+    expect(await screen.findByText('E2026-0009 Hochwasser')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Stadtfest')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Hochwasser')).toBeNull();
+    expect(
+      within(dialog).getByText(/Nicht mehr unter „Einsätze beim Gegenüber“/),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Führung anfragen' }));
+    expect(frageFuehrungAn).toHaveBeenCalledWith({ akteId: 4, kennung: 'k-hub/3' });
+    expect(
+      await within(dialog).findByText(/Unter dieser Akte liegt inzwischen ein anderer Einsatz/),
+    ).toBeInTheDocument();
   });
 
   it('ein neuer Stand aus der Liste erreicht den offenen Dialog (LLH-1670)', async () => {
