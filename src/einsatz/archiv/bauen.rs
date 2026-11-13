@@ -282,8 +282,14 @@ fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
 /// Teil im Namen der Zwischendatei des Befehls `archiv einspielen` (`einspielen.rs`).
 pub(super) const TEIL_EINSPIELEN: &str = "einspielen";
 
-/// So alt muss die Zwischendatei eines Einspielens sein, bevor der Serverstart sie löscht: der
-/// Befehl läuft als eigener Prozess und kann gerade an ihr arbeiten.
+/// Teil im Namen der Datei, in die die Verwaltung einen hochgeladenen Block schreibt (LLH-1711,
+/// design.md D4). Sie ist verschlüsselt, wird aber wie ein Einspielen erst alt gelöscht: ein
+/// großer Upload dauert.
+pub(super) const TEIL_HOCHGELADEN: &str = "hochgeladen";
+
+/// So alt muss die Zwischendatei eines Einspielens oder Uploads sein, bevor der Purge-Lauf sie
+/// löscht: der Befehl läuft als eigener Prozess, ein Upload als eigener Request, und beide
+/// können gerade an ihr arbeiten.
 const EINSPIELEN_LIEGT_STUNDEN: u64 = 6;
 
 /// Löscht Zwischendateien, die ein abgebrochener Bau liegen ließ (`Drop` läuft bei einem
@@ -304,7 +310,9 @@ pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     for eintrag in eintraege.flatten() {
         let name = eintrag.file_name();
         let name_s = name.to_string_lossy();
-        let einspielen = name_s.contains(&format!("-{TEIL_EINSPIELEN}-"));
+        let einspielen = [TEIL_EINSPIELEN, TEIL_HOCHGELADEN]
+            .iter()
+            .any(|teil| name_s.contains(&format!("-{teil}-")));
         let frisch = || {
             eintrag
                 .metadata()

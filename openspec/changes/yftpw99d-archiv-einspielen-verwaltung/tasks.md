@@ -5,19 +5,19 @@ TDD: zuerst der Test, der rot wird, dann der Code.
 
 ## 1. Kern: Ziel und Akteur (D2)
 
-- [ ] 1.1 `Ziel` (`AusArchiv`, `Org`, `EigeneOrg`) und `Akteur` (`Befehl`, `Person`) in `src/einsatz/archiv/einspielen.rs` einführen und den Befehl in `src/main.rs` auf `Ziel::AusArchiv`/`Ziel::Org` mit `Akteur::Befehl` umstellen. Prüfung: die bestehenden Tests in `src/einsatz/archiv/tests.rs` bleiben grün, ohne Änderung ihrer Erwartungen.
-- [ ] 1.2 `Ziel::EigeneOrg` mit Namensprüfung und eigener Meldung ohne `--org`. Prüfung: Ein neuer Test in `src/einsatz/archiv/tests.rs` lehnt einen Block mit anderem Org-Namen ab, ohne einen Einsatz anzulegen; ein Block mit gleichem Namen geht ein, auch bei anderer Org-ID.
-- [ ] 1.3 `admin_audit::schreibe_tx` mit Akteur und `peer_ip` in der Transaktion; `Akteur::Person` schreibt darüber. Prüfung: Ein Test findet nach dem Einspielen `archiv_eingespielt` mit `akteur_id`, `akteur_name` und `peer_ip` der Person. Ein Test mit falschem Schlüssel findet keinen Eintrag.
-- [ ] 1.4 `frist_endet_at` an `Eingespielt` (D7). Der Befehl gibt weiter denselben Satz aus. Prüfung: Unit-Test im Kern für einen Block mit früherer Kategorie-Frist.
+- [x] 1.1 `Ziel` (`AusArchiv`, `Org`, `EigeneOrg`) und `Akteur` (`Befehl`, `Person`) in `src/einsatz/archiv/einspielen.rs` einführen und den Befehl in `src/main.rs` auf `Ziel::AusArchiv`/`Ziel::Org` mit `Akteur::Befehl` umstellen. Prüfung: die bestehenden Tests in `src/einsatz/archiv/tests.rs` bleiben grün, ohne Änderung ihrer Erwartungen.
+- [x] 1.2 `Ziel::EigeneOrg` mit Namensprüfung und eigener Meldung ohne `--org`. Prüfung: Ein neuer Test in `src/einsatz/archiv/tests.rs` lehnt einen Block mit anderem Org-Namen ab, ohne einen Einsatz anzulegen; ein Block mit gleichem Namen geht ein, auch bei anderer Org-ID.
+- [x] 1.3 `admin_audit::schreibe_tx` mit Akteur und `peer_ip` in der Transaktion; `Akteur::Person` schreibt darüber. Prüfung: Ein Test findet nach dem Einspielen `archiv_eingespielt` mit `akteur_id`, `akteur_name` und `peer_ip` der Person. Ein Test mit falschem Schlüssel findet keinen Eintrag.
+- [x] 1.4 `frist_endet_at` an `Eingespielt` (D7). Der Befehl gibt weiter denselben Satz aus. Prüfung: Unit-Test im Kern für einen Block mit früherer Kategorie-Frist.
 
 ## 2. Hub-Sperre (D3)
 
-- [ ] 2.1 `instanz::repo::wird_erreicht` mit Test in `src/instanz/repo.rs`. Prüfung: `wird_gemeldet` angebahnt und aktiv liefern `true`. `widerrufen`, `vom_gegenueber_widerrufen`, `meldet_sich` und die Pseudo-Kopplung eines Einspielens liefern `false`.
+- [x] 2.1 `instanz::repo::wird_erreicht` mit Test in `src/instanz/repo.rs`. Prüfung: `wird_gemeldet` angebahnt und aktiv liefern `true`. `widerrufen`, `vom_gegenueber_widerrufen`, `meldet_sich` und die Pseudo-Kopplung eines Einspielens liefern `false`.
 
 ## 3. Schlüssel aus dem Speicher (D4)
 
-- [ ] 3.1 `Schluessel::laden` nimmt einen geliehenen Puffer (Variante neben der bestehenden), ohne ungeschützte Kopie. Der Befehl nutzt sie unverändert weiter. Prüfung: Unit-Tests in `src/backup/verschluesselung.rs` laden Klartext-Identität, Identität mit Passphrase und lehnen eine fehlende Passphrase mit `Validation` ab.
-- [ ] 3.2 Neuer Teil `TEIL_HOCHGELADEN` für die Zwischendatei des hochgeladenen Blocks. `zwischendateien_aufraeumen` räumt ihn mit auf. Prüfung: Test in `src/einsatz/archiv/tests.rs` oder `bauen.rs`, dass eine alte Datei dieses Teils gelöscht wird und eine junge bleibt.
+- [x] 3.1 `Schluessel::laden` nimmt einen geliehenen Puffer (Variante neben der bestehenden), ohne ungeschützte Kopie. Der Befehl nutzt sie unverändert weiter. Prüfung: Unit-Tests in `src/backup/verschluesselung.rs` laden Klartext-Identität, Identität mit Passphrase und lehnen eine fehlende Passphrase mit `Validation` ab.
+- [x] 3.2 Neuer Teil `TEIL_HOCHGELADEN` für die Zwischendatei des hochgeladenen Blocks. `zwischendateien_aufraeumen` räumt ihn mit auf. Prüfung: Test in `src/einsatz/archiv/tests.rs` oder `bauen.rs`, dass eine alte Datei dieses Teils gelöscht wird und eine junge bleibt.
 
 ## 4. Route `/api/admin/archiv/einspielen` (D1, D4, D5, D6)
 

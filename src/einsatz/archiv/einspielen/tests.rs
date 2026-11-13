@@ -188,7 +188,9 @@ async fn eingespielt_schreibgeschuetzt_mit_platzhaltern_und_nach_7_tagen_weg() {
     let (_dir, datei, s) = als_datei(&block, &id);
     let jetzt = Utc::now();
 
-    let e = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, jetzt).await.unwrap();
+    let e = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, jetzt)
+        .await
+        .unwrap();
     assert_ne!(e.einsatz_id, alt, "eigener Einsatz neben dem Skelett");
     assert_eq!(e.bezeichnung, "Hochwasser");
     assert_eq!(e.inhalte, 1);
@@ -400,9 +402,16 @@ async fn veralteter_block_wird_vor_dem_einspielen_geschwaerzt() {
     let (_, block) = archivierter_einsatz(&pool, leit, fz, &[(K::Personenauskunft, 10)]).await;
     let (_dir, datei, s) = als_datei(&block, &id);
 
-    let e = einspielen(&pool, &datei, &s, Ziel::Org(1), Akteur::Befehl, Utc::now() + TimeDelta::days(20))
-        .await
-        .unwrap();
+    let e = einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::Org(1),
+        Akteur::Befehl,
+        Utc::now() + TimeDelta::days(20),
+    )
+    .await
+    .unwrap();
     assert!(
         e.hinweise.iter().any(|h| h.contains("personenauskunft")),
         "{:?}",
@@ -430,9 +439,16 @@ async fn falscher_schluessel_und_fremde_org_spielen_nichts_ein() {
 
     let fremd = age::x25519::Identity::generate();
     let (_d1, datei, s) = als_datei(&block, &fremd);
-    let f = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, Utc::now())
-        .await
-        .unwrap_err();
+    let f = einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
     assert!(f.to_string().contains("Schlüssel passt nicht"), "{f}");
 
     let (_d2, datei, s) = als_datei(&block, &id);
@@ -501,9 +517,16 @@ async fn ein_block_mit_abgelaufener_aufbewahrung_wird_abgelehnt() {
         .unwrap();
     let (_d, datei, s) = als_datei(&block, &id);
     let vorher = eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz").await;
-    let f = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, Utc::now() + TimeDelta::days(31))
-        .await
-        .unwrap_err();
+    let f = einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        Utc::now() + TimeDelta::days(31),
+    )
+    .await
+    .unwrap_err();
     assert!(f.to_string().contains("Aufbewahrung"), "{f}");
     assert_eq!(
         eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz").await,
@@ -542,7 +565,9 @@ async fn eine_frist_des_blocks_kuerzt_die_zeit_hier() {
     let (_dir, datei, s) = als_datei(&block, &id);
     let jetzt = Utc::now();
 
-    let e = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, jetzt).await.unwrap();
+    let e = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, jetzt)
+        .await
+        .unwrap();
     let frist: String = eine(
         &pool,
         "SELECT frist_bis FROM einsatz_aufbewahrung_kategorie WHERE kategorie = 'personenauskunft' \
@@ -585,9 +610,16 @@ async fn ein_hier_geloeschter_block_kommt_nicht_zurueck() {
     )
     .await;
     let vorher = eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz").await;
-    let f = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, Utc::now())
-        .await
-        .unwrap_err();
+    let f = einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
     assert!(f.to_string().contains("nicht mehr im Archiv"), "{f}");
     assert_eq!(
         eine::<i64>(&pool, "SELECT COUNT(*) FROM einsatz").await,
@@ -610,9 +642,16 @@ async fn ohne_org_nur_in_die_org_gleichen_namens() {
     )
     .await;
 
-    let f = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, Utc::now())
-        .await
-        .unwrap_err();
+    let f = einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
     assert!(f.to_string().contains("--org"), "{f}");
     assert!(f.to_string().contains("KV Süd"), "{f}");
     let e = einspielen(&pool, &datei, &s, Ziel::Org(1), Akteur::Befehl, Utc::now())
@@ -629,9 +668,16 @@ async fn ein_loeschersuchen_nimmt_die_eingespielte_kopie_mit() {
     let fz = fahrzeuge(&pool).await;
     let (alt, block) = archivierter_einsatz(&pool, leit, fz, &[]).await;
     let (_dir, datei, s) = als_datei(&block, &id);
-    let e = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, Utc::now())
-        .await
-        .unwrap();
+    let e = einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
 
     let mut conn = pool.acquire().await.unwrap();
     let geloescht = super::super::alle_loeschen_tx(&mut conn, alt)
@@ -688,9 +734,16 @@ async fn ein_endgueltig_geloeschter_einsatz_kommt_nicht_zurueck() {
     .await
     .unwrap();
 
-    let f = einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, Utc::now())
-        .await
-        .unwrap_err();
+    let f = einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
     assert!(f.to_string().contains("endgültig gelöscht"), "{f}");
 
     // Gleiche ID und Nummer, aber ein anderer Abschluss: ein Einsatz einer anderen Installation.
@@ -702,9 +755,16 @@ async fn ein_endgueltig_geloeschter_einsatz_kommt_nicht_zurueck() {
         ),
     )
     .await;
-    einspielen(&pool, &datei, &s, Ziel::AusArchiv, Akteur::Befehl, Utc::now())
-        .await
-        .unwrap();
+    einspielen(
+        &pool,
+        &datei,
+        &s,
+        Ziel::AusArchiv,
+        Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -828,9 +888,16 @@ async fn die_spur_nennt_die_person_und_fehlt_bei_einer_ablehnung() {
     };
 
     let (_d1, datei, falsch) = als_datei(&block, &age::x25519::Identity::generate());
-    einspielen(&pool, &datei, &falsch, Ziel::EigeneOrg(1), person, Utc::now())
-        .await
-        .unwrap_err();
+    einspielen(
+        &pool,
+        &datei,
+        &falsch,
+        Ziel::EigeneOrg(1),
+        person,
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
     assert_eq!(
         eine::<i64>(
             &pool,
@@ -861,5 +928,9 @@ async fn die_spur_nennt_die_person_und_fehlt_bei_einer_ablehnung() {
     assert_eq!(akteur_name, ada.benutzername);
     assert_eq!(peer_ip.as_deref(), Some("192.0.2.7"));
     assert_eq!(org_id, 1);
-    assert!(ziel.contains(&e.einsatz_id.to_string()) || e.einsatznummer.is_some_and(|n| ziel.contains(&n)), "{ziel}");
+    assert!(
+        ziel.contains(&e.einsatz_id.to_string())
+            || e.einsatznummer.is_some_and(|n| ziel.contains(&n)),
+        "{ziel}"
+    );
 }

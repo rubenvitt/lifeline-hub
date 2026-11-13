@@ -407,7 +407,9 @@ pub(crate) mod tests {
         .unwrap();
         let schluessel = Schluessel::laden_aus(&identitaet, None, keine_passphrase).unwrap();
         assert_eq!(
-            schluessel.entschluessele_datei(&geheim, Vec::new()).unwrap(),
+            schluessel
+                .entschluessele_datei(&geheim, Vec::new())
+                .unwrap(),
             b"inhalt"
         );
 
@@ -423,7 +425,9 @@ pub(crate) mod tests {
         schreiber.finish().unwrap();
         let schluessel = Schluessel::laden_aus(&geschuetzt, None, || Ok("geheim".into())).unwrap();
         assert_eq!(
-            schluessel.entschluessele_datei(&geheim, Vec::new()).unwrap(),
+            schluessel
+                .entschluessele_datei(&geheim, Vec::new())
+                .unwrap(),
             b"inhalt"
         );
         // Ohne Passphrase: abgelehnt, nicht entsperrt.

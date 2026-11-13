@@ -351,6 +351,34 @@ pub async fn schreibe_ohne_akteur_tx(
     einfuegen_ohne_akteur(conn, aktion, org_id, gegenstelle, ziel, None, None).await
 }
 
+/// Ein Eintrag mit handelnder Person in der Transaktion `conn` und mit Fehler: für einen
+/// Schreibweg, der ohne seinen Eintrag nicht gelten soll (Archiv einspielen über die Verwaltung,
+/// LLH-1711). Wie [`schreibe`] in der Org der Person, aber ohne eigene Log-Zeile: die Transaktion
+/// kann wiederholt werden, der Aufrufer protokolliert nach dem Commit.
+pub async fn schreibe_tx(
+    conn: &mut sqlx::SqliteConnection,
+    aktion: AdminAktion,
+    akteur: &Benutzer,
+    ziel: Ziel<'_>,
+    peer_ip: Option<IpAddr>,
+) -> Result<(), sqlx::Error> {
+    let (ziel_benutzer_id, ziel) = ziel_teile(ziel);
+    sqlx::query(
+        "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
+         VALUES (?, ?, ?, ?, ?, NULL, ?, ?)",
+    )
+    .bind(aktion.as_str())
+    .bind(akteur.id)
+    .bind(crate::auth::benutzername::fuer_protokoll(&akteur.benutzername))
+    .bind(ziel_benutzer_id)
+    .bind(crate::auth::benutzername::fuer_protokoll(ziel))
+    .bind(peer_ip.map(|ip| ip.to_string()))
+    .bind(akteur.org_id)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 /// Konto (falls eines) und Text eines Ziels.
 fn ziel_teile(ziel: Ziel<'_>) -> (Option<i64>, &str) {
     match ziel {

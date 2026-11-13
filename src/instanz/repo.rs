@@ -641,7 +641,12 @@ pub async fn list_erreicht_aktiv(
 /// (LLH-1711, design.md D3). Die Org-Zuordnungen eingespielter Archivblöcke stehen immer auf
 /// `widerrufen` und zählen nicht.
 pub async fn wird_erreicht(pool: &SqlitePool) -> Result<bool, AppError> {
-    Ok(false)
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_kopplung WHERE richtung = 'wird_gemeldet' \
+         AND zustand IN ('angebahnt', 'aktiv'))",
+    )
+    .fetch_one(pool)
+    .await?)
 }
 
 /// Aktive Kopplungen, in denen diese Instanz sich meldet (Abgleich der Einsätze, LLH-1492).
@@ -1224,7 +1229,13 @@ mod tests {
         kopplung(&pool, "b", "wird_gemeldet", "widerrufen").await;
         kopplung(&pool, "c", "wird_gemeldet", "vom_gegenueber_widerrufen").await;
         // So legt das Einspielen eines Archivblocks seine Org-Zuordnung an.
-        kopplung(&pool, "archiv/0123456789abcdef", "wird_gemeldet", "widerrufen").await;
+        kopplung(
+            &pool,
+            "archiv/0123456789abcdef",
+            "wird_gemeldet",
+            "widerrufen",
+        )
+        .await;
         assert!(!wird_erreicht(&pool).await.unwrap());
         kopplung(&pool, "d", "wird_gemeldet", "angebahnt").await;
         assert!(wird_erreicht(&pool).await.unwrap(), "angebahnt");

@@ -239,7 +239,7 @@ async fn einspielen_aus(
                  angeben."
             ))
         })?;
-    if ziel == Ziel::AusArchiv {
+    if !matches!(ziel, Ziel::Org(_)) {
         // Org-IDs vergibt jede Installation selbst: ohne --org nur in die Org gleichen Namens.
         let im_archiv: Option<String> =
             sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
@@ -247,11 +247,15 @@ async fn einspielen_aus(
                 .fetch_optional(archiv)
                 .await?;
         if im_archiv.as_deref() != Some(org_name.as_str()) {
-            return Err(AppError::Validation(format!(
-                "Organisation {ziel_org} heißt hier „{org_name}“, im Archiv „{}“; mit --org die \
-                 Ziel-Organisation angeben.",
-                im_archiv.unwrap_or_default()
-            )));
+            let im_archiv = im_archiv.unwrap_or_default();
+            return Err(AppError::Validation(if ziel == Ziel::AusArchiv {
+                format!(
+                    "Organisation {ziel_org} heißt hier „{org_name}“, im Archiv „{im_archiv}“; \
+                     mit --org die Ziel-Organisation angeben."
+                )
+            } else {
+                format!("Der Block gehört zur Organisation „{im_archiv}“, nicht zu „{org_name}“.")
+            }));
         }
     }
 
@@ -275,6 +279,7 @@ async fn einspielen_aus(
         .filter(|f| f.as_str() > jetzt_s)
         .chain(kopf.retention_bis.clone())
         .fold(sieben_tage.clone(), |a, f| a.min(f));
+    let frist_endet_at = (loeschen_at < sieben_tage).then(|| loeschen_at.clone());
     if loeschen_at < sieben_tage {
         hinweise.push(format!(
             "Eine Frist des Blocks endet am {loeschen_at} (UTC); der Einsatz geht dann schon."
@@ -373,7 +378,7 @@ async fn einspielen_aus(
         loeschen_at,
         inhalte,
         hinweise,
-        frist_endet_at: None,
+        frist_endet_at,
     })
 }
 
@@ -597,16 +602,15 @@ async fn uebernehmen_tx(
         kopf.einsatznummer_intern.as_deref(),
         einsatz_id,
     );
+    let aktion = crate::auth::admin_audit::AdminAktion::ArchivEingespielt;
+    let ziel = crate::auth::admin_audit::Ziel::Archiv(&ziel);
     match akteur {
-        Akteur::Befehl | Akteur::Person { .. } => {
-            crate::auth::admin_audit::schreibe_ohne_akteur_tx(
-                conn,
-                crate::auth::admin_audit::AdminAktion::ArchivEingespielt,
-                ziel_org,
-                BEFEHL,
-                crate::auth::admin_audit::Ziel::Archiv(&ziel),
-            )
-            .await?;
+        Akteur::Befehl => {
+            crate::auth::admin_audit::schreibe_ohne_akteur_tx(conn, aktion, ziel_org, BEFEHL, ziel)
+                .await?;
+        }
+        Akteur::Person { benutzer, peer_ip } => {
+            crate::auth::admin_audit::schreibe_tx(conn, aktion, benutzer, ziel, peer_ip).await?;
         }
     }
     Ok((einsatz_id, hinweise))
