@@ -42,8 +42,8 @@ herleitung:
 - MUST: Jeder Einwurf-Zugang ist gedrosselt, und die Ablage hat Obergrenzen je Zugang; ein
   unbekannter Schlüssel zählt im Zähler für Maschinen je IP, nicht in der Anmeldesperre. Ein
   widerrufener, abgelaufener oder durch einen Wechsel abgelöster Schlüssel zählt nicht.
-- MUST: Die Antwort unterscheidet eine neue Meldung nicht von einer Wiederholung, auch nicht an
-  einer Obergrenze.
+- MUST: Eine Antwort unterscheidet eine neue Meldung nicht von einer Wiederholung, auch nicht an
+  einer Obergrenze. (Mittelbar bleibt es am Zähler der Tagesgrenze ablesbar; siehe Konsequenzen.)
 - MUST: Anlegen, Wechsel und Widerruf stehen in `admin_audit`, nie mit Schlüssel oder Hash.
 - SHOULD: Ein Absender, der signieren kann, bekommt einen Zugang nach ADR-0022, und einer, der POST
   kann, nimmt POST statt GET.
@@ -56,8 +56,9 @@ verlange 'SCHLUESSEL_PRAEFIX: &str = "llh_ew_"' src/public_api/einwurf/mod.rs
 verlange 'is_tls_nachgewiesen' src/public_api/einwurf/routen.rs
 verlange 'rate_limit::maschine::fehlversuch' src/public_api/einwurf/routen.rs
 verlange 'is_abgeloest' src/public_api/einwurf/routen.rs
-# Kein Logfeld trägt Schlüssel, Hash, Pfad, Abfrage oder Inhalt. Zeilenweise, weil rustfmt
-# `tracing`-Aufrufe umbricht: ein Feld steht als `name = …` oder `%name` auf seiner Zeile.
+# Kein Logfeld trägt Schlüssel, Hash, Pfad, Abfrage oder Inhalt (Einzeiler und umbrochen).
+verbiete 'tracing::' src/public_api/einwurf/mod.rs src/public_api/einwurf/ablage.rs
+verbiete 'tracing::[a-z]+!\(.*[%?( ](schluessel|hash|pfad|uri|abfrage|query|rohdaten|body|inhalt)[ ,=)]' src/public_api/einwurf/routen.rs
 verbiete '^ *[%?]?(schluessel|hash|pfad|uri|abfrage|query|rohdaten|body|inhalt)( =|,$)' src/public_api/einwurf/routen.rs
 ```
 
@@ -74,5 +75,6 @@ Wer den Schlüssel kennt, kann in die Ablage einwerfen, aber nichts lesen und ni
 Mensch entscheidet weiter (G1). Schlüssel und bei GET auch der Alarmtext stehen in der URL; die
 Betriebsdoku verlangt, dass der Reverse-Proxy dort nichts protokolliert. Die Ablage hält
 Positionen auch außerhalb eines Einsatzes, aber nur die letzte je Kennung und höchstens 24
-Stunden. ADR-0014 verlangte für jede Maschine ein Schlüsselpaar; ADR-0031 ersetzt sie und nennt
+Stunden. Wer den Schlüssel hat und die Tagesgrenze ausreizt, erkennt am nächsten Einwurf, ob der
+vorige gezählt wurde. ADR-0014 verlangte für jede Maschine ein Schlüsselpaar; ADR-0031 ersetzt sie und nennt
 den Einwurf als Ausnahme.

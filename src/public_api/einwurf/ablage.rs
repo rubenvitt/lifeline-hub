@@ -111,17 +111,43 @@ fn paare(roh: &[u8]) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Löst `%XX` zu Bytes auf, wie `form_urlencoded`, aber ohne ungültige Folgen zu ersetzen.
+fn percent_decode_bytes(roh: &str) -> Vec<u8> {
+    let bytes = roh.as_bytes();
+    let hex = |b: u8| (b as char).to_digit(16).map(|z| z as u8);
+    let mut aus = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes.get(i..i + 3) {
+            Some([b'%', a, b]) if hex(*a).is_some() && hex(*b).is_some() => {
+                aus.push(hex(*a).unwrap_or(0) * 16 + hex(*b).unwrap_or(0));
+                i += 3;
+            }
+            _ => {
+                aus.push(bytes[i]);
+                i += 1;
+            }
+        }
+    }
+    aus
+}
+
 /// Ging beim Dekodieren etwas verloren? `form_urlencoded` ersetzt Bytes, die kein UTF-8 sind
-/// (etwa `%F6` aus einem Latin-1-Absender), durch U+FFFD. Steht das Ersatzzeichen in den Paaren,
-/// ohne dass der Absender es selbst geschickt hat, lassen sich die Bytes aus den Paaren nicht
-/// zurückgewinnen.
-fn is_verlustbehaftet(roh: &str, paare: &[(String, String)]) -> bool {
-    const ERSATZ: char = '\u{FFFD}';
-    paare
-        .iter()
-        .any(|(name, wert)| name.contains(ERSATZ) || wert.contains(ERSATZ))
-        && !roh.contains(ERSATZ)
-        && !roh.to_ascii_uppercase().contains("%EF%BF%BD")
+/// (etwa `%F6` aus einem Latin-1-Absender), durch U+FFFD; die Bytes lassen sich aus den Paaren
+/// dann nicht zurückgewinnen. Geprüft werden die dekodierten Bytes selbst, nicht das
+/// Ersatzzeichen: Ein Absender darf U+FFFD schicken. `&` und `=` sind ASCII und trennen jede
+/// Folge, die Prüfung über das Ganze gilt deshalb für jedes Paar.
+fn is_verlustbehaftet(roh: &str) -> bool {
+    std::str::from_utf8(&percent_decode_bytes(roh)).is_err()
+}
+
+/// Kam ein Wert des Felds `name` nicht als UTF-8 an? Wie [`is_verlustbehaftet`], aber nur für
+/// dieses Feld: Ein anderes Feld derselben Abfrage ändert das Ergebnis nicht.
+fn is_feld_verlustbehaftet(roh: &str, name: &str) -> bool {
+    roh.split('&').any(|paar| {
+        let (n, wert) = paar.split_once('=').unwrap_or((paar, ""));
+        percent_decode_bytes(&n.replace('+', " ")) == name.as_bytes() && is_verlustbehaftet(wert)
+    })
 }
 
 /// Hat ein Paar Inhalt? `?&` und `?=` sind eine Abfrage ohne Inhalt.
@@ -185,7 +211,7 @@ pub fn alarm_inhalt(einwurf: &Einwurf<'_>) -> Result<AlarmInhalt, ApiError> {
         roh.insert("abfrage".into(), serde_json::json!(abfrage));
         // Unverändert heißt auch: nichts geht beim Dekodieren verloren. Kam die Abfrage nicht in
         // UTF-8 (FE2 oder ältere Skripte unter Windows), liegt sie zusätzlich roh dabei.
-        if is_verlustbehaftet(einwurf.abfrage, &abfrage) {
+        if is_verlustbehaftet(einwurf.abfrage) {
             roh.insert("abfrage_roh".into(), serde_json::json!(einwurf.abfrage));
         }
     }
@@ -398,9 +424,10 @@ pub fn position_inhalt(einwurf: &Einwurf<'_>, jetzt: &str) -> Result<PositionInh
         .ok_or_else(|| ungueltig("id fehlt"))?;
     // Eine Kennung, die nicht als UTF-8 ankam, fiele mit anderen zusammen (`L%F6sch1` und
     // `L%FCsch1` würden beide zu `L\u{FFFD}sch1`) und überschriebe deren Position.
-    if kennung.contains('\u{FFFD}')
-        && (is_verlustbehaftet(einwurf.abfrage, &abfrage) || is_verlustbehaftet(body, &body_felder))
-    {
+    // Ein JSON-Body ist immer UTF-8; bei ihm findet die Suche nach `id=` kein Feld.
+    if ["id", "deviceid"].iter().any(|name| {
+        is_feld_verlustbehaftet(einwurf.abfrage, name) || is_feld_verlustbehaftet(body, name)
+    }) {
         return Err(ungueltig("id: kein gültiges UTF-8"));
     }
     if kennung.chars().count() > POSITION_KENNUNG_MAX {
@@ -615,6 +642,10 @@ mod tests {
             let inhalt = alarm_inhalt(&abfrage(utf8)).unwrap();
             assert!(self::roh(&inhalt).get("abfrage_roh").is_none(), "{utf8}");
         }
+        // Ein Ersatzzeichen in einem Feld entschuldigt kein verlorenes Byte in einem anderen.
+        let gemischt = "text=K%F6ln&x=%EF%BF%BD";
+        let inhalt = alarm_inhalt(&abfrage(gemischt)).unwrap();
+        assert_eq!(self::roh(&inhalt)["abfrage_roh"], gemischt);
     }
 
     #[test]
@@ -1027,6 +1058,22 @@ mod tests {
         // Eine Kennung, die nicht als UTF-8 kam, fiele mit anderen zusammen.
         assert_eq!(status("id=L%F6sch1&lat=1&lon=2"), StatusCode::BAD_REQUEST);
         assert!(position_inhalt(&abfrage("id=L%C3%B6sch1&lat=1&lon=2"), JETZT).is_ok());
+        // Je Feld geprüft: Ein Ersatzzeichen an anderer Stelle rettet die Kennung nicht, und
+        // eine Kennung mit echtem U+FFFD (JSON ist immer UTF-8) ist gültig.
+        assert_eq!(
+            status("id=L%F6sch1&note=%EF%BF%BD&lat=1&lon=2"),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status("deviceid=L%F6sch1&lat=1&lon=2"),
+            StatusCode::BAD_REQUEST
+        );
+        assert!(position_inhalt(&abfrage("id=a&note=K%F6ln&lat=1&lon=2"), JETZT).is_ok());
+        let json = body(
+            "application/json",
+            "{\"id\":\"a\u{FFFD}b\",\"lat\":1,\"lon\":2}",
+        );
+        assert!(position_inhalt(&json, JETZT).is_ok());
         assert_eq!(
             status("id=a&lat=1&lon=2&timestamp=2026-11-12T10:30:00Z"),
             StatusCode::UNPROCESSABLE_ENTITY,

@@ -359,11 +359,17 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
   wäre der alte Schlüssel „unbekannt“ und sperrte nach zehn Aufrufen die Quelle, auch für den
   neuen Schlüssel. Der Hash des alten bleibt deshalb liegen, bis der Zugang gelöscht wird; die
   Antwort bleibt 401.
-- **Die Antwort unterscheidet nie neu und wiederholt:** Die Tagesgrenze wird vor der
-  Doppelerkennung geprüft. Sonst hätte ein Angreifer an der Grenze erfragen können, ob ein
-  Inhalt oder eine Kennung schon in der Ablage liegt.
+- **Eine Antwort unterscheidet nie neu und wiederholt:** Die Tagesgrenze wird vor der
+  Doppelerkennung geprüft. Sonst hätte ein Angreifer an der Grenze mit einem Aufruf erfragen
+  können, ob ein Inhalt oder eine Kennung schon in der Ablage liegt. **Restlücke, bewusst
+  gelassen:** Eine Wiederholung zählt nicht mit. Wer den Schlüssel hat, den Zugang auf 4 999
+  füllt, einen Kandidaten und dann eine neue Meldung schickt, liest an deren Antwort ab, ob der
+  Kandidat gezählt wurde. Das kostet Tausende Einwürfe, verrät nur, ob ein schon bekannter Inhalt
+  ankam, und fällt über die WARN-Zeile auf. Schließen ließe es sich nur, wenn auch
+  Wiederholungen zählten; dann bremste ein Absender, der jede Minute wiederholt, sich selbst.
 - **Nur GET und POST:** axum beantwortet HEAD über die GET-Route; ein HEAD hätte abgelegt. Jede
-  andere Methode ergibt 405.
+  andere Methode ergibt 405, bei HEAD mit `Allow: GET, POST`. Für PUT und andere antwortet axum
+  selbst und nennt im Kopf `Allow` auch HEAD; das bleibt so.
 - **Leer heißt ohne Inhalt:** `?&` oder `?=` trägt kein Paar und gilt als leer (422).
 - **Abfrage ohne UTF-8 geht nicht verloren:** War das Dekodieren verlustbehaftet, liegt die
   Abfrage zusätzlich als `abfrage_roh` in den Rohdaten. Die Kennung einer Position muss UTF-8
@@ -371,7 +377,12 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
 - **Maskierung fasst jeden Abschnitt, der das Präfix enthält**, auch prozentkodiert, statt nur
   den nach `/api/v1/einwurf/`.
 - **Kein Wechsel bei abgelaufenem Zugang** (409): Der neue Schlüssel wäre sofort ungültig.
-- **Drossel hinterlässt eine Spur:** eine WARN-Zeile je Zugang und Minute (`Sammelzeile`).
+- **Drossel und Tagesgrenze hinterlassen eine Spur:** je eine WARN-Zeile je Zugang und Minute
+  (`log_drossel::SammelzeileJe`, je Zugang gezählt, damit ein lauter Zugang keinen leisen
+  verdeckt).
+- **UTF-8 wird an den Bytes geprüft, je Feld:** nicht am Ersatzzeichen. Ein Absender darf U+FFFD
+  schicken, und ein Ersatzzeichen in einem Feld entschuldigt kein verlorenes Byte in einem
+  anderen.
 - **Paneel ohne Netz:** Die Aktionen sind mit Grund gesperrt, die Mutationen laufen sofort oder
   nie (`networkMode: 'always'`), damit kein Schlüsselwechsel vorgemerkt wird.
 - **Bewusst so gelassen:** (a) Zwischen Prüfung und Schreiben kann ein Widerruf liegen; der

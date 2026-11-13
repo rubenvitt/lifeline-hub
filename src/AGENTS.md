@@ -139,7 +139,8 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   Einwurf-Route ergänzt, ruft sie auf. **Kein `tracing`-Aufruf nennt Pfad, Abfrage, Schlüssel
   oder Hash** (die Kennung des Zugangs genügt); der Span trägt den Pfad schon maskiert
   (`pfad_fuer_protokoll`, Test `app::tests::einwurf_schluessel_steht_in_keiner_logzeile`). Eine
-  Antwort trägt nie Daten und unterscheidet neu nicht von wiederholt.
+  Antwort trägt nie Daten und unterscheidet neu nicht von wiederholt. Was ein Schlüsselinhaber je
+  Aufruf auslösen kann, loggt als `log_drossel::SammelzeileJe` je Zugang.
 
 ## Anhänge
 

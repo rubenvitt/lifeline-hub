@@ -83,8 +83,18 @@
               }
             }
           },
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "413": {
-            "description": "Abfrage über 8 KiB oder Body über 16 KiB",
+            "description": "Abfrage über 8 KiB, Body über 16 KiB oder abgelegte Rohdaten über 48 KiB",
             "content": {
               "application/json": {
                 "schema": {
@@ -188,8 +198,18 @@
               }
             }
           },
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "413": {
-            "description": "Abfrage über 8 KiB oder Body über 16 KiB",
+            "description": "Abfrage über 8 KiB, Body über 16 KiB oder abgelegte Rohdaten über 48 KiB",
             "content": {
               "application/json": {
                 "schema": {
@@ -322,6 +342,16 @@
               }
             }
           },
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
           "413": {
             "description": "Abfrage über 8 KiB oder Body über 16 KiB",
             "content": {
@@ -419,6 +449,16 @@
           },
           "403": {
             "description": "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Alarmmeldungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
             "content": {
               "application/json": {
                 "schema": {

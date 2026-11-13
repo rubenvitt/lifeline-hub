@@ -25,7 +25,8 @@ https://hub.example/api/v1/einwurf/llh_ew_Q2x…/position
   `403 missing_scope`.
 - „Schlüssel wechseln“ gibt eine neue Adresse aus; die alte gilt im selben Augenblick nicht mehr.
   Ein Widerruf wirkt ebenfalls sofort. Ein abgelaufener Zugang bekommt keinen neuen Schlüssel.
-- Nur GET und POST. Jede andere Methode, auch HEAD, ergibt `405` und legt nichts ab.
+- Nur GET und POST. Jede andere Methode, auch HEAD, ergibt `405` und legt nichts ab; die Antwort
+  auf HEAD nennt `Allow: GET, POST`.
 
 ## Nur über TLS
 
@@ -120,8 +121,8 @@ folgt mit der Ortung (Zunder LLH-1199).
 
 ## Antworten
 
-Jede Antwort trägt `Cache-Control: no-store`. Eine neue Meldung und eine Wiederholung sind nicht
-zu unterscheiden.
+Jede Antwort trägt `Cache-Control: no-store`. An einer Antwort sind eine neue Meldung und eine
+Wiederholung nicht zu unterscheiden.
 
 | Status | `code` | Bedeutung |
 | --- | --- | --- |
@@ -138,7 +139,8 @@ zu unterscheiden.
 ## Grenzen
 
 - 30 Einwürfe am Stück je Zugang, einer je zwei Sekunden nach. Wird ein Zugang gedrosselt,
-  schreibt der Server eine Warnzeile mit der Kennung des Zugangs (höchstens eine je Minute).
+  schreibt der Server eine Warnzeile mit der Kennung des Zugangs (je Zugang höchstens eine je
+  Minute). Dasselbe gilt an der Tagesgrenze.
 - Höchstens 5 000 neue Alarmmeldungen je Zugang in 24 Stunden. Wiederholungen zählen nicht mit;
   ist die Grenze erreicht, bekommt aber jeder Einwurf `429`, auch eine Wiederholung.
 - Ein Eintrag der Ablage ist höchstens 48 KiB groß. Text mit vielen Steuer- oder

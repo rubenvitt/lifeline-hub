@@ -337,6 +337,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
       zugaenge: [
         zugang('a', { gueltig_bis: '2027-01-01 00:00:00' }),
         zugang('b', { gueltig_bis: '2027-03-01 00:00:00' }),
+        zugang('c', { widerrufen_at: '2026-11-12 09:00:00', widerrufen_von_name: 'Administrator' }),
       ],
     });
     renderMitProviders(<EinwurfZugaenge />);
@@ -347,6 +348,11 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
       )![1];
     expect(frist('BOSWatch a')).toMatch(/27/);
     expect(frist('BOSWatch a')).not.toBe(frist('BOSWatch b'));
+    const widerruf = /widerrufen (\S+) von Administrator/.exec(
+      screen.getByText('BOSWatch c').closest<HTMLElement>('[data-lfh="einwurf-eintrag"]')!
+        .textContent,
+    )![1];
+    expect(widerruf).toMatch(/nov26$/);
   });
 
   it('behält die Zahl im Kopf, wenn das Neuladen scheitert', async () => {
@@ -394,7 +400,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     });
 
     it('lässt eine offene Rückfrage sofort scheitern, statt sie vorzumerken', async () => {
-      const aufrufe = stelleBereit();
+      stelleBereit();
       const user = userEvent.setup();
       renderMitProviders(<EinwurfZugaenge />);
       await screen.findByText('BOSWatch a');
@@ -404,12 +410,22 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
       });
       // Das Netz fällt weg, während die Rückfrage offen ist.
       setzeOnline(false);
-      server.use(http.post('/api/admin/einwurf-zugaenge/a/schluessel', () => HttpResponse.error()));
+      let versuche = 0;
+      server.use(
+        http.post('/api/admin/einwurf-zugaenge/a/schluessel', () => {
+          versuche += 1;
+          return HttpResponse.error();
+        }),
+      );
       await user.click(within(dialog).getByRole('button', { name: 'Schlüssel wechseln' }));
+      // Sofort versucht und gescheitert, nicht angehalten: Abbrechen geht.
       expect(await within(dialog).findByText('Schlüssel nicht gewechselt')).toBeInTheDocument();
-      // Nicht vorgemerkt: Abbrechen geht, und nichts ging hinaus.
       expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
-      expect(aufrufe).toEqual([]);
+      expect(versuche).toBe(1);
+      // Nicht vorgemerkt: Kehrt das Netz zurück, geht nichts von selbst hinaus.
+      setzeOnline(true);
+      await new Promise((fertig) => setTimeout(fertig, 100));
+      expect(versuche).toBe(1);
     });
 
     it('sagt ohne Cache, dass nichts geladen ist, statt endlos zu laden', async () => {

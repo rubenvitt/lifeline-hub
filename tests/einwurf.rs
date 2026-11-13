@@ -667,6 +667,7 @@ async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
     )
     .await;
     assert_eq!(kopf.status, StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(kopf.headers[header::ALLOW], "GET, POST");
     assert_eq!(
         anzahl(&pool, "alarmmeldung").await,
         vorher,

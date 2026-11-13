@@ -7,15 +7,17 @@
 
 use axum::body::to_bytes;
 use axum::extract::{FromRequestParts, Request, State};
-use axum::http::header::CONTENT_TYPE;
+use axum::http::header::{ALLOW, CONTENT_TYPE};
 use axum::http::request::Parts;
-use axum::http::{Method, StatusCode};
+use axum::http::{HeaderValue, Method, StatusCode};
+use axum::response::{IntoResponse, Response};
 
 use super::ablage::{self, AlarmErgebnis, Einwurf, PositionErgebnis};
 use super::{EinwurfZugang, Transport};
 use crate::app::AppState;
 use crate::auth::rate_limit;
 use crate::extract::{gegenstelle, is_tls_nachgewiesen, vertraute_proxys, PeerIp, PfadParam};
+use crate::log_drossel::SammelzeileJe;
 use crate::public_api::scope::Scope;
 use crate::public_api::{drossel, zugang, ApiError, ErrorCode};
 
@@ -105,9 +107,10 @@ async fn check_einwurf(
 
     if let Err(warten) = drossel::try_take_einwurf(&zugang.id) {
         // Der Absender bekommt 429; viele wiederholen nicht. Damit der Betreiber es erfährt,
-        // steht es im Log, als Sammelzeile: Wer den Schlüssel hat, löst sie je Aufruf aus.
-        static GEDROSSELT: crate::log_drossel::Sammelzeile = crate::log_drossel::Sammelzeile::neu();
-        if let Some(f) = GEDROSSELT.zaehlen() {
+        // steht es im Log, als Sammelzeile: Wer den Schlüssel hat, löst sie je Aufruf aus. Je
+        // Zugang gezählt, damit ein dauernd gedrosselter Zugang keinen anderen verdeckt.
+        static GEDROSSELT: SammelzeileJe = SammelzeileJe::neu();
+        if let Some(f) = GEDROSSELT.zaehlen(&zugang.id) {
             tracing::warn!(
                 zugang = %zugang.id,
                 anzahl = f.anzahl,
@@ -120,19 +123,29 @@ async fn check_einwurf(
     Ok(zugang)
 }
 
-/// Nimmt einen Einwurf an: prüfen, Inhalt lesen, in die Ablage des Zwecks schreiben.
-async fn annehmen(
+/// Nimmt einen Einwurf an, oder lehnt jede andere Methode als GET und POST ab.
+async fn annehmen(state: AppState, schluessel: String, req: Request, zweck: Scope) -> Response {
+    // axum reicht HEAD an den GET-Handler weiter. Ein Einwurf schreibt aber: `curl -I` oder ein
+    // Link-Prüfer legte sonst eine Meldung an. Vor jeder Prüfung des Schlüssels, damit die
+    // Antwort für jeden Schlüssel gleich ist.
+    if req.method() != Method::GET && req.method() != Method::POST {
+        let mut antwort = ApiError::from_code(ErrorCode::MethodNotAllowed).into_response();
+        antwort
+            .headers_mut()
+            .insert(ALLOW, HeaderValue::from_static("GET, POST"));
+        return antwort;
+    }
+    ablegen(state, schluessel, req, zweck).await.into_response()
+}
+
+/// Prüfen, Inhalt lesen, in die Ablage des Zwecks schreiben.
+async fn ablegen(
     state: AppState,
     schluessel: String,
     req: Request,
     zweck: Scope,
 ) -> Result<StatusCode, ApiError> {
     let (mut parts, body) = req.into_parts();
-    // axum reicht HEAD an den GET-Handler weiter. Ein Einwurf schreibt aber: `curl -I` oder ein
-    // Link-Prüfer legte sonst eine Meldung an.
-    if parts.method != Method::GET && parts.method != Method::POST {
-        return Err(ApiError::from_code(ErrorCode::MethodNotAllowed));
-    }
     let zugang = check_einwurf(&state, &mut parts, &schluessel, zweck).await?;
 
     // Die v1-Schicht hat den Body schon bis 64 KiB gepuffert; hier gilt die engere Grenze.
@@ -181,11 +194,17 @@ async fn annehmen(
     match ergebnis {
         AlarmErgebnis::Neu | AlarmErgebnis::Wiederholung => Ok(StatusCode::NO_CONTENT),
         AlarmErgebnis::Tagesgrenze => {
-            tracing::warn!(
-                zugang = %zugang.id,
-                grenze = ablage::ALARMMELDUNGEN_JE_TAG,
-                "Einwurf-Zugang hat die Tagesgrenze der Ablage erreicht"
-            );
+            // An der Grenze löst jeder Einwurf diese Stelle aus: Sammelzeile je Zugang.
+            static VOLL: SammelzeileJe = SammelzeileJe::neu();
+            if let Some(f) = VOLL.zaehlen(&zugang.id) {
+                tracing::warn!(
+                    zugang = %zugang.id,
+                    grenze = ablage::ALARMMELDUNGEN_JE_TAG,
+                    anzahl = f.anzahl,
+                    seit_s = f.seit_s,
+                    "Einwurf-Zugang hat die Tagesgrenze der Ablage erreicht, Sammelzeile"
+                );
+            }
             Err(ApiError::rate_limited(3600))
         }
     }
@@ -212,7 +231,8 @@ async fn annehmen(
         (status = 400, description = "Kennung zu lang oder Body kein UTF-8 (`invalid_field`)", body = super::super::ApiErrorBody),
         (status = 401, description = "Schlüssel unbekannt, widerrufen oder abgelaufen", body = super::super::ApiErrorBody),
         (status = 403, description = "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Positionen.", body = super::super::ApiErrorBody),
-        (status = 413, description = "Abfrage über 8 KiB oder Body über 16 KiB", body = super::super::ApiErrorBody),
+        (status = 405, description = "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)", body = super::super::ApiErrorBody),
+        (status = 413, description = "Abfrage über 8 KiB, Body über 16 KiB oder abgelegte Rohdaten über 48 KiB", body = super::super::ApiErrorBody),
         (status = 422, description = "Leerer Einwurf: weder Abfrage noch Body", body = super::super::ApiErrorBody),
         (status = 429, description = "Gedrosselt (30 je Minute und Zugang, 5 000 neue Meldungen je Tag) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit", body = super::super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::super::ApiErrorBody),
@@ -222,7 +242,7 @@ pub async fn alarmmeldung_get(
     State(state): State<AppState>,
     PfadParam(schluessel): PfadParam<String>,
     req: Request,
-) -> Result<StatusCode, ApiError> {
+) -> Response {
     annehmen(state, schluessel, req, Scope::AlarmmeldungenWrite).await
 }
 
@@ -245,7 +265,8 @@ pub async fn alarmmeldung_get(
         (status = 400, description = "Kennung zu lang oder Body kein UTF-8 (`invalid_field`)", body = super::super::ApiErrorBody),
         (status = 401, description = "Schlüssel unbekannt, widerrufen oder abgelaufen", body = super::super::ApiErrorBody),
         (status = 403, description = "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Positionen.", body = super::super::ApiErrorBody),
-        (status = 413, description = "Abfrage über 8 KiB oder Body über 16 KiB", body = super::super::ApiErrorBody),
+        (status = 405, description = "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)", body = super::super::ApiErrorBody),
+        (status = 413, description = "Abfrage über 8 KiB, Body über 16 KiB oder abgelegte Rohdaten über 48 KiB", body = super::super::ApiErrorBody),
         (status = 422, description = "Leerer Einwurf: weder Abfrage noch Body", body = super::super::ApiErrorBody),
         (status = 429, description = "Gedrosselt (30 je Minute und Zugang, 5 000 neue Meldungen je Tag) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit", body = super::super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::super::ApiErrorBody),
@@ -255,7 +276,7 @@ pub async fn alarmmeldung_post(
     State(state): State<AppState>,
     PfadParam(schluessel): PfadParam<String>,
     req: Request,
-) -> Result<StatusCode, ApiError> {
+) -> Response {
     annehmen(state, schluessel, req, Scope::AlarmmeldungenWrite).await
 }
 
@@ -282,6 +303,7 @@ pub async fn alarmmeldung_post(
         (status = 400, description = "Kennung oder Koordinate fehlt oder ist ungültig, Zeitstempel unlesbar (`invalid_field`)", body = super::super::ApiErrorBody),
         (status = 401, description = "Schlüssel unbekannt, widerrufen oder abgelaufen", body = super::super::ApiErrorBody),
         (status = 403, description = "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Alarmmeldungen.", body = super::super::ApiErrorBody),
+        (status = 405, description = "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)", body = super::super::ApiErrorBody),
         (status = 413, description = "Abfrage über 8 KiB oder Body über 16 KiB", body = super::super::ApiErrorBody),
         (status = 422, description = "Zeitstempel mehr als 5 Minuten in der Zukunft, oder der Zugang hält schon 200 Kennungen", body = super::super::ApiErrorBody),
         (status = 429, description = "Gedrosselt (30 je Minute und Zugang) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit", body = super::super::ApiErrorBody),
@@ -292,7 +314,7 @@ pub async fn position_get(
     State(state): State<AppState>,
     PfadParam(schluessel): PfadParam<String>,
     req: Request,
-) -> Result<StatusCode, ApiError> {
+) -> Response {
     annehmen(state, schluessel, req, Scope::PositionenWrite).await
 }
 
@@ -314,6 +336,7 @@ pub async fn position_get(
         (status = 400, description = "Kennung oder Koordinate fehlt oder ist ungültig, Zeitstempel unlesbar (`invalid_field`)", body = super::super::ApiErrorBody),
         (status = 401, description = "Schlüssel unbekannt, widerrufen oder abgelaufen", body = super::super::ApiErrorBody),
         (status = 403, description = "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Alarmmeldungen.", body = super::super::ApiErrorBody),
+        (status = 405, description = "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)", body = super::super::ApiErrorBody),
         (status = 413, description = "Abfrage über 8 KiB oder Body über 16 KiB", body = super::super::ApiErrorBody),
         (status = 422, description = "Zeitstempel mehr als 5 Minuten in der Zukunft, oder der Zugang hält schon 200 Kennungen", body = super::super::ApiErrorBody),
         (status = 429, description = "Gedrosselt (30 je Minute und Zugang) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit", body = super::super::ApiErrorBody),
@@ -324,6 +347,6 @@ pub async fn position_post(
     State(state): State<AppState>,
     PfadParam(schluessel): PfadParam<String>,
     req: Request,
-) -> Result<StatusCode, ApiError> {
+) -> Response {
     annehmen(state, schluessel, req, Scope::PositionenWrite).await
 }
