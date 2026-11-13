@@ -17,7 +17,7 @@ use crate::extract::{JsonBody, PeerIp, PfadParam};
 use crate::instanz::code;
 use crate::instanz::fuehrung::dienst::{self, FuehrungAnzeige};
 use crate::instanz::fuehrung::erklaerung::{FuehrungBeweis, NotuebernahmeErklaerung};
-use crate::instanz::fuehrung::repo::{self, AkteZeile};
+use crate::instanz::fuehrung::repo::{self, AkteRef, AkteZeile};
 use crate::instanz::fuehrung::{self as fuehrung};
 use axum::extract::{Query, State};
 use axum::Json;
@@ -78,9 +78,12 @@ pub struct FuehrungUnterschriftStart {
 
 // ── Gemeinsame Abläufe ───────────────────────────────────────────────────────────────────────
 
-async fn anzeige(state: &AppState, akte_id: i64) -> Result<FuehrungAnzeige, AppError> {
+/// Lädt mit Gegenprobe (LLH-1862): Liegt unter der ID inzwischen ein anderer Einsatz, etwa weil
+/// zwischen dem Commit einer Aktion und diesem Lesen die Akte gelöscht und die ID neu vergeben
+/// wurde, antwortet die Route mit 409 statt mit dem fremden Einsatz.
+async fn anzeige(state: &AppState, akte: AkteRef<'_>) -> Result<FuehrungAnzeige, AppError> {
     let mut conn = state.pool.acquire().await?;
-    let a = repo::load(&mut conn, akte_id).await?;
+    let a = repo::load_ref(&mut conn, akte).await?;
     dienst::anzeige(&mut conn, &a).await
 }
 
@@ -93,7 +96,7 @@ async fn danach(state: &AppState, a: &AkteZeile) -> Result<FuehrungAnzeige, AppE
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::fuehrung::notify_wechsel(&state.pool, &state.live, einsatz_id).await;
     }
-    anzeige(state, a.id).await
+    anzeige(state, a.as_akte_ref()).await
 }
 
 async fn spur(
@@ -177,7 +180,8 @@ async fn run_notuebernahme(
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
     let saved =
-        dienst::notuebernahme_gegen_erreichte(&state.pool, a.as_akte_ref(), grund, &b.anzeigename).await?;
+        dienst::notuebernahme_gegen_erreichte(&state.pool, a.as_akte_ref(), grund, &b.anzeigename)
+            .await?;
     let text = format!("Notübernahme gegen {vorher}: {}", grund.trim());
     spur(
         state,
@@ -226,8 +230,13 @@ async fn run_start(
                 .into(),
         ));
     }
-    let e =
-        dienst::build_erklaerung_gegen_meldende(&state.pool, a.as_akte_ref(), grund, &b.anzeigename).await?;
+    let e = dienst::build_erklaerung_gegen_meldende(
+        &state.pool,
+        a.as_akte_ref(),
+        grund,
+        &b.anzeigename,
+    )
+    .await?;
     let erklaerung = dienst::erklaerung_text(&e)?;
     let zeremonie = zeremonie::store(Zeremonie::Fuehrungserklaerung {
         benutzer_id: b.id,
@@ -320,9 +329,14 @@ async fn run_mit_code(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let vorher = a.fuehrer_name.clone();
-    let saved =
-        dienst::notuebernahme_mit_code(&state.pool, a.as_akte_ref(), &body.grund, &body.code, &b.anzeigename)
-            .await?;
+    let saved = dienst::notuebernahme_mit_code(
+        &state.pool,
+        a.as_akte_ref(),
+        &body.grund,
+        &body.code,
+        &b.anzeigename,
+    )
+    .await?;
     let text = format!(
         "Notübernahme gegen {vorher} mit Code: {}",
         body.grund.trim()
@@ -346,7 +360,8 @@ async fn run_bestaetigen(
     peer_ip: Option<IpAddr>,
 ) -> Result<FuehrungAnzeige, AppError> {
     let eigene_notuebernahme = a.art() == fuehrung::FuehrungWechselArt::Notuebernahme;
-    let (saved, konflikt) = dienst::bestaetigen(&state.pool, a.as_akte_ref(), &b.anzeigename).await?;
+    let (saved, konflikt) =
+        dienst::bestaetigen(&state.pool, a.as_akte_ref(), &b.anzeigename).await?;
     let text = if konflikt {
         // Die erreichte Seite nannte einen Dritten (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
         // D4): keine Notübernahme gegen diese Instanz, und die Erklärung gehört einer anderen ELW.
@@ -420,7 +435,7 @@ pub async fn lesen(
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
     fuehrung::fordere_enabled(&state.pool).await?;
     let a = akte_des_einsatzes(&state, ctx.einsatz.id).await?;
-    Ok(Json(anzeige(&state, a.id).await?))
+    Ok(Json(anzeige(&state, a.as_akte_ref()).await?))
 }
 
 /// POST /api/einsaetze/{id}/fuehrung/uebergeben — reguläre Übergabe an ein Gegenüber.

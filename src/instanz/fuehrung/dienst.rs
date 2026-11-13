@@ -4,7 +4,9 @@
 
 use super::austausch::{self, AkteMeldung};
 use super::erklaerung::{self, FuehrungBeweis, NotuebernahmeErklaerung, TYP_NOTUEBERNAHME};
-use super::repo::{self, AkteRef, AkteZeile, FuehrungGegenueber, FuehrungVerlaufEintrag, Ich, VerlaufNeu};
+use super::repo::{
+    self, AkteRef, AkteZeile, FuehrungGegenueber, FuehrungVerlaufEintrag, Ich, VerlaufNeu,
+};
 use super::{Epoche, FuehrungWechselArt, GRUND_MAX};
 use crate::error::AppError;
 use crate::instanz::{code, InstanzKopplungRichtung};
