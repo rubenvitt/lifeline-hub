@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod maschine;
+
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
 use lifeline_hub::app::{build_router, build_router_mit, AppState, RouterOptionen};

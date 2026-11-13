@@ -2,7 +2,7 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 530
-quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs, frontend/src/pages/RegistrierlisteDruckPage.tsx]
+quellen: [src/public_api/rechner.rs, frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs, frontend/src/pages/RegistrierlisteDruckPage.tsx]
 ---
 
 ## Überblick
@@ -301,6 +301,11 @@ Die Richtwerte bringt das Programm mit („Vorgabe“). Die Organisation kann je
 [Einstellungen](einsatz-einstellungen.md) unter „Unterkunft“. Es gilt der Wert des Einsatzes vor
 dem der Organisation vor der Vorgabe; die Vorgabe bleibt in jeder Zeile sichtbar. Ohne geladene
 Werte des Einsatzes rechnet die Seite mit den Vorgaben und zeigt „Basiswerte“ im Kopf.
+
+Ein Fremdsystem mit dem Recht „Rechner nutzen“ ([Anbindungen](anbindungen.md)) rechnet nach
+denselben Regeln, aber auf dem Server: mit den Werten der Organisation und, wenn es welche
+mitschickt, eigenen Werten für diese eine Rechnung. Die Werte eines Einsatzes gelten dort nicht.
+Was es rechnet, steht in keinem Einsatz.
 
 ### Verpflegung
 

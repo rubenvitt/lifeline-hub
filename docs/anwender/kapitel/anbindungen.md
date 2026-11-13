@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs]
 ---
 
 ## Überblick
@@ -128,10 +128,14 @@ Einwurf-Zugänge.
 | Positionen einliefern     | Positionen melden                                  |
 | Rechner nutzen            | die Rechner verwenden                              |
 
-Die Rechte stehen fest, die Wege dahinter kommen nach und nach: Über eine Anbindung nutzt ein
-Fremdsystem heute nur die Prüfung seiner Anmeldung. Einliefern lässt sich heute über einen
-Einwurf-Zugang (siehe unten). Welche Daten ein Recht später öffnet, nennt dieses Kapitel, sobald
-es sie gibt. Neben jedem Recht steht der technische Name, etwa `alarmmeldungen:write`; so lässt es sich
+Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnet ein Recht etwas:
+„Rechner nutzen“. Damit rechnet ein Fremdsystem Unterkunft und Zelte durch, mit denselben Regeln
+wie der [Unterkunftsrechner](betreuung.md) und mit den Richtwerten der Organisation aus den
+[Stammdaten](stammdaten.md). Eigene Werte darf es je Rechnung mitschicken; gespeichert wird davon
+nichts, und die Werte eines Einsatzes sieht es nicht. Mit den übrigen Rechten prüft ein
+Fremdsystem bisher nur seine Anmeldung. Einliefern lässt sich heute über einen Einwurf-Zugang
+(siehe unten). Welche Daten die übrigen Rechte später öffnen, nennt dieses Kapitel, sobald es sie
+gibt. Neben jedem Recht steht der technische Name, etwa `alarmmeldungen:write`; so lässt es sich
 mit der Doku des Fremdsystems vergleichen. Ein Fremdsystem legt nie selbst einen Einsatz an.
 
 ### Warum ein Fremdsystem nicht hereinkommt

@@ -65,9 +65,10 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Prüfkette 403 (vor dem Lesen) → 404 → 409, geschlossen erlaubt; der Storno der Stelle löst den
   Bezug in seiner Transaktion (`stelle_stornieren_tx`). Kein „Bedarf melden“ auf dem Gerät.
 - **Unterkunftsrechner** (LLH-1520, Spec `unterkunftsrechner`, `pages/UnterkunftPlanenPage.tsx`,
-  `betreuung/unterkunft/`): rechnet nur im Browser (`rechnerKern.ts`); der Rust-Kern der
-  Rechner-API folgt mit LLH-1524. **Eine Fallsammlung** `tests/fixtures/unterkunft/faelle.json`
-  prüft den Kern (ab LLH-1524 beide); wer rechnet, ändert sie mit. **Eine Basis** `src/unterkunft/richtwerte_basis.json` (Wert, Grenzen,
+  `betreuung/unterkunft/`): die Oberfläche rechnet nur im Browser (`rechnerKern.ts`), für
+  Fremdsysteme rechnet der Server (`src/unterkunft/rechner.rs`, LLH-1524, s. u.). **Eine
+  Fallsammlung** `tests/fixtures/unterkunft/faelle.json` prüft beide Kerne; wer eine Seite ändert,
+  ändert die andere und die Fallsammlung mit. **Eine Basis** `src/unterkunft/richtwerte_basis.json` (Wert, Grenzen,
   Herkunft `belegt`/`annahme`, Quelle), Rust per `include_str!`, die Oberfläche per Import;
   `richtwerte.guard.test.ts` hält Kern und Basis deckungsgleich. Wirksam ist Einsatz vor
   Organisation vor Basis (`org_unterkunft_richtwert`, `einsatz_unterkunft_richtwert`, `null`
@@ -76,6 +77,22 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   ändert nur die Kapazität der Stelle und legt Nachforderungen über den bestehenden Schreibweg an
   (je Posten eine, mit `betreuungsstelle_id`); Belegung und „in Betreuung“ bleiben unberührt.
   Quellenangaben nennen Vorschriften und Werke, nie Personen; ohne Quelle „Ausgangstabellen“.
+- **Rechner-API Unterkunft** (LLH-1524, Spec `rechner-api-unterkunft`, Herleitung
+  `openspec/changes/archive/2026-11-12-p4h3v7q9-rechner-api-unterkunft/design.md`; `src/public_api/rechner.rs`,
+  Regeln der Routen in `src/AGENTS.md`, „Öffentliche API v1“): `POST /api/v1/rechner/unterkunft`
+  und `GET …/richtwerte` mit Scope `rechner:use`. **Die Anfrage hat die Form der `eingabe` der
+  Fallsammlung, die Antwort die von `erwartet`**; der Paritätstest
+  (`src/public_api/rechner/tests.rs`) schickt jeden Fall durch Einlesen, Prüfung, Rechnung und
+  Serialisierung. Ein neues Feld der Rechnung kommt also in beide Kerne, die Fallsammlung und die
+  v1-Schemas (nur additiv, `docs/api/public-v1.json`). **Die API prüft streng, die Maske
+  nachsichtig**: erst jedes Feld (400, der Text nennt es, auch bei falschem Typ; doppelte Schlüssel
+  und Listen statt Objekten sind 400), dann der Zusammenhang (422; `maenner` und `frauen` kommen
+  als Paar, eine leere Gruppe heißt 0); Grenzen in `src/unterkunft/rechner.rs`, so gewählt, dass
+  die größte übliche Anfrage in 64 KiB passt, Personen über `betreuung::MAX_PERSONEN`. Die Antwort
+  trägt keine negative Null. Wirksam ist Anfrage vor
+  Organisation des Zugangs vor Basis; **ohne Einsatz**: `einsatz_id` ist ein unbekanntes Feld, bis
+  es eine Einsatz-Freigabe für Zugänge gibt. Jeder Schlüssel der Basis wird in beiden Kernen
+  gelesen (`richtwerte.guard.test.ts`, `der_kern_liest_jeden_schluessel_der_basis`).
 - **Registrierstelle** (LLH-1612, Spec `betreuung-registrierung`, ADR-0017, Change
   `hitr91ob-registrierstelle-betreuung`; Server `src/betreuung/registrierung.rs`,
   `src/routes/betreuung_registrierung.rs`, Oberfläche `betreuung/registrierung/`): Registrierte

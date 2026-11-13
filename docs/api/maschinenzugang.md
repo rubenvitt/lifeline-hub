@@ -1,6 +1,6 @@
 # Maschinenzugang: Fremdsysteme an Lifeline Hub anbinden
 
-Stand: 12.11.2026 · LLH-1652 · Regeln: [ADR-0022](../architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
+Stand: 12.11.2026 · LLH-1652, LLH-1524 · Regeln: [ADR-0022](../architektur/entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
 Spec `maschinenzugang`, Vertrag der API: [`public-v1.json`](public-v1.json).
 
 Ein Fremdsystem (Alarm-Adapter, Lagemonitor, Einsatzbuch, Rechner) meldet sich mit einem eigenen
@@ -33,14 +33,14 @@ Ohne das Binary: die Referenz-Clients unten tun dasselbe.
 
 ## Scopes
 
-| Scope                  | Darf                                      |
-| ---------------------- | ----------------------------------------- |
-| `lage:read`            | Lage lesen (`GET /api/v1/lage`)           |
-| `einsaetze:read`       | Einsätze lesen                            |
-| `events:read`          | Ereignisse abrufen (`GET /api/v1/events`) |
-| `alarmmeldungen:write` | Alarmmeldungen als Vorschlag einliefern   |
-| `positionen:write`     | Positionen einliefern                     |
-| `rechner:use`          | Rechner nutzen                            |
+| Scope                  | Darf                                          |
+| ---------------------- | --------------------------------------------- |
+| `lage:read`            | Lage lesen (`GET /api/v1/lage`)               |
+| `einsaetze:read`       | Einsätze lesen                                |
+| `events:read`          | Ereignisse abrufen (`GET /api/v1/events`)     |
+| `alarmmeldungen:write` | Alarmmeldungen als Vorschlag einliefern       |
+| `positionen:write`     | Positionen einliefern                         |
+| `rechner:use`          | Rechner nutzen (`/api/v1/rechner/unterkunft`) |
 
 Lese-Scopes mit Einsatzbezug sehen nur Einsätze, die die Einsatzleitung für den Zugang freigegeben
 hat. Neue Scopes kommen nur hinzu; ein Client überspringt unbekannte Werte.
@@ -157,6 +157,81 @@ Ein `401` nennt bewusst keinen Grund. Der Admin sieht ihn auf der Seite „Anbin
 etwa „Uhr geht 7 min nach“, „Body passt nicht zur Signatur (bh)“ oder „Anfrage für eine andere
 Instanz (aud)“. Bei `5xx`, `429` und Zeitüberschreitung mit Backoff und neuer `jti` wiederholen,
 bei anderen `4xx` nicht.
+
+## Rechner Unterkunft und Zelte
+
+Mit dem Scope `rechner:use` rechnet ein Fremdsystem eine Unterkunft durch, mit denselben Regeln
+wie der Rechner der Oberfläche (LLH-1524, Spec `rechner-api-unterkunft`). Die Rechnung speichert
+nichts.
+
+`POST /api/v1/rechner/unterkunft` nimmt `weg` (`personen`, `raeume`, `flaeche` oder `zelte`),
+`trennung` (Männer und Frauen getrennt) und genau den Block des Wegs:
+
+```json
+{
+  "weg": "raeume",
+  "trennung": false,
+  "raeume": [
+    {
+      "bezeichnung": "Halle",
+      "laenge_m": 15,
+      "breite_m": 13.5,
+      "abzuege": [{ "laenge_m": 4, "breite_m": 2.5 }]
+    },
+    {
+      "bezeichnung": "Gymnastikraum",
+      "laenge_m": 12,
+      "breite_m": 8,
+      "abzuege": [{ "laenge_m": 3, "breite_m": 2 }]
+    }
+  ]
+}
+```
+
+Die Antwort trägt `ergebnis` (hier 48 und 22 Plätze je Raum, 70 gesamt, dazu Material, Sanitär,
+Gesundheit, Versorgung und Verpflegung für 70 Personen), `richtwerte` (jeder Richtwert mit
+wirksamem Wert und Herkunft) und `stand` (Stand der Vorgaben). Weitere Beispiele für jeden Weg
+stehen als `eingabe` und `erwartet` in
+[`tests/fixtures/unterkunft/faelle.json`](../../tests/fixtures/unterkunft/faelle.json); jede
+`eingabe` dort ist eine gültige Anfrage. Trägt ein Fall `richtwerte`, gehören sie als Feld
+`richtwerte` in die Anfrage, sonst kommt nicht `erwartet` heraus. `erwartet` gilt, solange die
+Organisation keine eigenen Werte gesetzt hat.
+
+**Richtwerte.** Wirksam ist je Schlüssel:
+
+1. der Wert aus `richtwerte` der Anfrage (Herkunft `anfrage`), etwa
+   `"richtwerte": { "wasser_je_person_l": 15 }`,
+2. sonst der Wert, den die Organisation des Zugangs in ihren Stammdaten gesetzt hat (`org`),
+3. sonst die Vorgabe des Programms (`basis`).
+
+Schlüssel, Bezeichnung, Einheit und Grenzen jedes Richtwerts und die Zelttypen nennt
+`GET /api/v1/rechner/unterkunft/richtwerte`. Werte, die ein Einsatz für sich gesetzt hat, gehören
+nicht dazu: Ein Feld `einsatz_id` gibt es noch nicht, es wird als unbekanntes Feld abgelehnt.
+
+**Prüfung.** Anders als die Maske der Oberfläche rechnet die API nie still mit 0. Zusammen passen
+die Felder, wenn
+
+- genau der Block des Wegs da ist;
+- ohne Trennung `gesamt` steht (bei Personen und Fläche gehen stattdessen `maenner` und `frauen`
+  zusammen, dann zählt die Summe; Zelte brauchen `gesamt`);
+- mit Trennung `maenner` und `frauen` stehen, beide und ohne `gesamt`; eine leere Gruppe ist
+  ausdrücklich `0`, bei Zelten `{}`;
+- ein Raum genau dann eine `belegung` trägt, wenn getrennt wird.
+
+| Status | `code`          | Wann                                                                                            |
+| ------ | --------------- | ----------------------------------------------------------------------------------------------- |
+| 400    | `invalid_field` | Ein Feld für sich: unbekanntes Feld, unbekannter Richtwert, Zahl außerhalb der Grenzen.         |
+| 422    | `unprocessable` | Die Felder passen nicht zusammen, etwa ein Block eines anderen Wegs oder `gesamt` bei Trennung. |
+
+Der Text nennt das Feld, etwa `raeume[1].laenge_m`, auch bei einem falschen Typ. Ein doppelter
+Schlüssel und eine Liste an Stelle eines Objekts sind 400.
+
+Grenzen: höchstens 200 Räume mit je höchstens 5 Abzügen, Maße über 0 und höchstens 1000 m, Flächen
+höchstens 1 000 000 m², Personen je Angabe höchstens 1 000 000, Zelte je Typ höchstens 1000,
+Bezeichnung eines Raums höchstens 80 Zeichen. Daneben gilt wie überall die Body-Grenze von 64 KiB
+(`413 payload_too_large`): 200 Räume mit je 5 Abzügen passen hinein, wenn die Bezeichnungen kurz
+bleiben, die Maße höchstens zwei Nachkommastellen tragen und das JSON ohne Einrückung geschrieben
+ist. Eine leere Raumliste ist gültig und ergibt 0 Plätze.
 
 ## Referenz-Clients
 
