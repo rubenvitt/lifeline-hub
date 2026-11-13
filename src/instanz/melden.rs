@@ -864,7 +864,9 @@ async fn melden_einmal_mit(
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
-            fuehrung_folgen = eingang.folgen;
+            // Anhängen, nicht zuweisen (LLH-1855): Die Kopf-Folgen eines Widerrufs durch das
+            // Gegenüber stehen schon in der Liste.
+            fuehrung_folgen.extend(eingang.folgen);
         }
         repo::update_zustand_nach_orgs(
             conn,
@@ -1160,7 +1162,9 @@ pub async fn handle_meldung(
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
-            fuehrung_folgen = eingang.folgen;
+            // Anhängen, nicht zuweisen (LLH-1855): Die Kopf-Folgen eines Widerrufs durch das
+            // Gegenüber stehen schon in der Liste.
+            fuehrung_folgen.extend(eingang.folgen);
             fuehrung_bis = if rueckschritt {
                 empfangen_vorher
             } else {
