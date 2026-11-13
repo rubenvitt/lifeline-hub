@@ -546,6 +546,14 @@ async fn leerer_und_zu_grosser_einwurf_werden_abgelehnt() {
     let leer = sende(&app, &pfad, Einwurf::default()).await;
     assert_eq!(leer.status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(leer.code(), "unprocessable");
+    for ohne_inhalt in ["?&", "?="] {
+        let antwort = sende(&app, &format!("{pfad}{ohne_inhalt}"), Einwurf::default()).await;
+        assert_eq!(
+            antwort.status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{ohne_inhalt}"
+        );
+    }
 
     let gross = sende(
         &app,
@@ -560,9 +568,13 @@ async fn leerer_und_zu_grosser_einwurf_werden_abgelehnt() {
     assert_eq!(gross.status, StatusCode::PAYLOAD_TOO_LARGE);
     assert_eq!(gross.code(), "payload_too_large");
 
-    let lange_abfrage = format!("{pfad}?text={}", "x".repeat(8 * 1024));
+    let lange_abfrage = format!("{pfad}?text={}", "x".repeat(8 * 1024 - 4));
     let antwort = sende(&app, &lange_abfrage, Einwurf::default()).await;
-    assert_eq!(antwort.status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(
+        antwort.status,
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "8 KiB und ein Byte"
+    );
 
     let kein_utf8 = sende(
         &app,
@@ -629,7 +641,7 @@ async fn ein_zugang_schreibt_nur_fuer_seinen_zweck() {
 
 #[tokio::test]
 async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
-    let (app, _pool, admin) = setup().await;
+    let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
     einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
 
@@ -643,6 +655,23 @@ async fn es_gibt_keinen_leseweg_ueber_den_schluessel() {
         let antwort = sende(&app, &pfad, Einwurf::default()).await;
         assert_eq!(antwort.status, StatusCode::NOT_FOUND, "{pfad}");
     }
+    // HEAD reicht axum an den GET-Handler weiter; ein Einwurf schreibt aber, also 405.
+    let vorher = anzahl(&pool, "alarmmeldung").await;
+    let kopf = sende(
+        &app,
+        &format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=per-head"),
+        Einwurf {
+            methode: "HEAD",
+            ..Default::default()
+        },
+    )
+    .await;
+    assert_eq!(kopf.status, StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(
+        anzahl(&pool, "alarmmeldung").await,
+        vorher,
+        "HEAD legt nichts ab"
+    );
     for methode in ["DELETE", "PUT", "PATCH"] {
         let antwort = sende(
             &app,
@@ -770,14 +799,27 @@ async fn der_31_einwurf_wird_gedrosselt() {
     let (app, pool, admin) = setup().await;
     let (_, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
     let (_, anderer) = zugang(&app, &admin, "FE2", "alarmmeldungen:write").await;
-    for i in 0..30 {
-        let antwort = einwerfen(&app, &schluessel, &format!("alarmmeldung?text={i}")).await;
-        assert_eq!(antwort.status, StatusCode::NO_CONTENT, "Einwurf {}", i + 1);
-    }
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=zu-viel").await;
-    assert_eq!(antwort.status, StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(antwort.code(), "rate_limited");
-    let warten: u64 = antwort.headers[header::RETRY_AFTER]
+    // Bis zur ersten 429 einwerfen statt genau 30 zu zählen: Die Drossel füllt alle zwei
+    // Sekunden einen Einwurf nach, auf einem beladenen Runner gehen deshalb auch 31 oder 32
+    // durch. Die genaue Zahl prüft der Unit-Test in `drossel.rs` mit eingespeister Zeit.
+    let mut angenommen: i64 = 0;
+    let gedrosselt = loop {
+        let antwort = einwerfen(
+            &app,
+            &schluessel,
+            &format!("alarmmeldung?text={angenommen}"),
+        )
+        .await;
+        if antwort.status == StatusCode::TOO_MANY_REQUESTS {
+            break antwort;
+        }
+        assert_eq!(antwort.status, StatusCode::NO_CONTENT);
+        angenommen += 1;
+        assert!(angenommen < 60, "die Drossel greift nicht");
+    };
+    assert!(angenommen >= 30, "nur {angenommen} Einwürfe gingen durch");
+    assert_eq!(gedrosselt.code(), "rate_limited");
+    let warten: u64 = gedrosselt.headers[header::RETRY_AFTER]
         .to_str()
         .unwrap()
         .parse()
@@ -785,8 +827,8 @@ async fn der_31_einwurf_wird_gedrosselt() {
     assert!(warten >= 1);
     assert_eq!(
         anzahl(&pool, "alarmmeldung").await,
-        30,
-        "der 31. ist nicht gespeichert"
+        angenommen,
+        "der gedrosselte Einwurf ist nicht gespeichert"
     );
     // Je Zugang getrennt.
     assert_eq!(
@@ -877,6 +919,78 @@ async fn widerrufene_schluessel_zaehlen_nicht_im_maschinenzaehler() {
     assert_eq!(antwort.status, StatusCode::NO_CONTENT);
 }
 
+/// Nach einem Schlüsselwechsel ruft der Absender noch eine Weile die alte Adresse auf. Der alte
+/// Schlüssel ist dann „bekannt, aber ungültig“ wie ein widerrufener: Er zählt nicht, sonst wäre
+/// die Quelle gesperrt, bevor jemand die neue Adresse einträgt.
+#[tokio::test]
+async fn abgeloeste_schluessel_zaehlen_nicht_im_maschinenzaehler() {
+    let (app, _pool, admin) = setup().await;
+    let (id, alt) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
+    let (_, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{LISTE}/{id}/schluessel"),
+        &admin,
+        None,
+    )
+    .await;
+    let neu = v["schluessel"].as_str().unwrap().to_string();
+    let quelle = "198.51.100.213:5000";
+    let von = |schluessel: String| {
+        let app = app.clone();
+        async move {
+            sende(
+                &app,
+                &format!("/api/v1/einwurf/{schluessel}/alarmmeldung?text=a"),
+                Einwurf {
+                    quelle: Some(quelle),
+                    ..Default::default()
+                },
+            )
+            .await
+            .status
+        }
+    };
+    for _ in 0..12 {
+        assert_eq!(von(alt.clone()).await, StatusCode::UNAUTHORIZED);
+    }
+    assert_eq!(
+        von(neu).await,
+        StatusCode::NO_CONTENT,
+        "die Quelle ist nicht gesperrt"
+    );
+    let ip = quelle.parse::<SocketAddr>().unwrap().ip();
+    assert_eq!(
+        lifeline_hub::auth::rate_limit::maschine::sperre(ip),
+        lifeline_hub::auth::rate_limit::Sperre::Frei
+    );
+}
+
+#[tokio::test]
+async fn abgelaufener_zugang_bekommt_keinen_neuen_schluessel() {
+    let (app, pool, admin) = setup().await;
+    let (id, _) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
+    sqlx::query("UPDATE einwurf_zugang SET gueltig_bis = '2020-01-01 00:00:00' WHERE id = ?")
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{LISTE}/{id}/schluessel"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(
+        spur(&pool).await.len(),
+        1,
+        "nur das Anlegen steht in der Spur"
+    );
+}
+
 #[tokio::test]
 async fn tagesgrenze_der_ablage_ergibt_429() {
     let (app, pool, admin) = setup().await;
@@ -891,10 +1005,33 @@ async fn tagesgrenze_der_ablage_ergibt_429() {
     .execute(&pool)
     .await
     .unwrap();
-    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=zu-viel").await;
-    assert_eq!(antwort.status, StatusCode::TOO_MANY_REQUESTS);
-    assert_eq!(antwort.headers[header::RETRY_AFTER], "3600");
+    // Eine vorhandene Meldung, die an der Grenze noch einmal kommt, bekommt dieselbe Antwort wie
+    // eine neue: Die Antwort verrät nicht, was in der Ablage liegt.
+    let bekannt = lifeline_hub::public_api::einwurf::ablage::alarm_inhalt(
+        &lifeline_hub::public_api::einwurf::ablage::Einwurf {
+            abfrage: "text=schon-da",
+            inhaltstyp: None,
+            body: b"",
+        },
+    )
+    .unwrap();
+    sqlx::query("UPDATE alarmmeldung SET inhalt_hash = ?, rohdaten = ? WHERE id = 1")
+        .bind(&bekannt.inhalt_hash)
+        .bind(&bekannt.rohdaten)
+        .execute(&pool)
+        .await
+        .unwrap();
+    for abfrage in ["text=zu-viel", "text=schon-da"] {
+        let antwort = einwerfen(&app, &schluessel, &format!("alarmmeldung?{abfrage}")).await;
+        assert_eq!(antwort.status, StatusCode::TOO_MANY_REQUESTS, "{abfrage}");
+        assert_eq!(antwort.headers[header::RETRY_AFTER], "3600");
+    }
     assert_eq!(anzahl(&pool, "alarmmeldung").await, 5000);
+    let vermerkt: i64 = sqlx::query_scalar("SELECT SUM(erneut_empfangen_anzahl) FROM alarmmeldung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(vermerkt, 0);
 }
 
 // ── Einwurf: Position ───────────────────────────────────────────────────────────────────────
@@ -993,7 +1130,7 @@ async fn die_201_kennung_wird_abgelehnt() {
     let (app, pool, admin) = setup().await;
     let (id, schluessel) = zugang(&app, &admin, "Flotte", "positionen:write").await;
     sqlx::query(
-        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 200) \
+        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 199) \
          INSERT INTO position_letzte (org_id, zugang_id, kennung, lat, lon, gemessen_at, \
          empfangen_at, rohdaten) SELECT (SELECT org_id FROM einwurf_zugang WHERE id = ?1), ?1, \
          'k' || i, 1, 2, '2020-01-01 00:00:00', datetime('now'), '{}' FROM n",
@@ -1002,6 +1139,13 @@ async fn die_201_kennung_wird_abgelehnt() {
     .execute(&pool)
     .await
     .unwrap();
+    // 199 stehen: die 200. Kennung geht, die 201. nicht.
+    assert_eq!(
+        einwerfen(&app, &schluessel, "position?id=zweihundert&lat=1&lon=2")
+            .await
+            .status,
+        StatusCode::NO_CONTENT
+    );
     let antwort = einwerfen(&app, &schluessel, "position?id=neu&lat=1&lon=2").await;
     assert_eq!(antwort.status, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(anzahl(&pool, "position_letzte").await, 200);

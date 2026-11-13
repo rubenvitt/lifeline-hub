@@ -24,7 +24,8 @@ https://hub.example/api/v1/einwurf/llh_ew_Q2x…/position
 - Ein Zugang hat genau einen Zweck. An der Route des anderen Zwecks antwortet er mit
   `403 missing_scope`.
 - „Schlüssel wechseln“ gibt eine neue Adresse aus; die alte gilt im selben Augenblick nicht mehr.
-  Ein Widerruf wirkt ebenfalls sofort.
+  Ein Widerruf wirkt ebenfalls sofort. Ein abgelaufener Zugang bekommt keinen neuen Schlüssel.
+- Nur GET und POST. Jede andere Methode, auch HEAD, ergibt `405` und legt nichts ab.
 
 ## Nur über TLS
 
@@ -43,8 +44,12 @@ unter `/api/v1/einwurf/` weder Pfad noch Abfrage protokollieren.
 ## Alarmmeldung
 
 Der Server legt ab, was ankommt, und deutet es nicht: Abfrage und Body unverändert. Er verlangt
-nur, dass eines von beiden nicht leer ist. Die Deutung (Stichwort, Ort, Einsatzmittel) macht
-später ein Adapter.
+nur, dass eines von beiden Inhalt trägt (`?&` allein ist leer). Die Deutung (Stichwort, Ort,
+Einsatzmittel) macht später ein Adapter.
+
+Die Abfrage liegt als dekodierte Paare in der Ablage. Kam sie nicht in UTF-8 an (etwa `%F6` für
+„ö“ aus einem Latin-1-Absender), liegt sie zusätzlich so dabei, wie sie ankam, damit nichts
+verloren geht.
 
 ```sh
 # BOSWatch: nur GET, Platzhalter in der Abfrage
@@ -76,7 +81,11 @@ eines JSON-Objekts. Der Body geht der Abfrage vor.
   vermerkt; still verworfen wird nichts.
 - Ohne Kennung zählt der Inhalt Byte für Byte. Die zwei Minuten laufen ab dem letzten Empfang.
   Kommt derselbe Inhalt später, entsteht ein neuer Eintrag mit Verweis auf den früheren.
-- Ein Absender ohne `external_id` wiederholt deshalb höchstens zwei Minuten lang.
+- Ein Absender ohne Kennung wiederholt deshalb höchstens zwei Minuten lang.
+- Eine `message_id` muss je Meldung eindeutig bleiben, solange der Eintrag lebt (7 Tage). Zählt
+  ein Absender sie nach einem Neustart wieder von 1 hoch, gilt eine neue Meldung als
+  Wiederholung der alten: Sie wird gezählt, ihr Inhalt aber nicht abgelegt. Eine `external_id` je
+  Alarm verhindert das.
 
 Abgelegte Alarmmeldungen werden sieben Tage nach dem ersten Empfang gelöscht.
 
@@ -97,7 +106,10 @@ curl -i 'https://hub.example/api/v1/einwurf/llh_ew_Q2x…/position?id=elw1&lat=5
 - Die Felder stehen in der Abfrage, in einem Formular-Body oder in einem flachen JSON-Objekt.
 - Je Zugang und `id` hält der Server genau eine Position. Eine neue ersetzt sie, ohne Verlauf.
 - Eine Position mit älterem Zeitstempel als die gespeicherte wird nicht übernommen; die Antwort
-  ist trotzdem `204`.
+  ist trotzdem `204`. Springt die Uhr eines Absenders zurück (etwa auf ein Werksdatum), bleibt
+  die gespeicherte Position deshalb stehen, bis sie nach 24 Stunden verfällt. Ein Absender ohne
+  verlässliche Uhr lässt `timestamp` besser weg.
+- Die Kennung muss gültiges UTF-8 sein, sonst `400`.
 - Ein Zeitstempel, der mehr als 5 Minuten in der Zukunft liegt, ist `422`.
 - Weitere Felder (`speed`, `bearing`, `altitude`, `accuracy`, `batt` …) werden mit der Position
   abgelegt und mit ihr ersetzt.
@@ -114,22 +126,28 @@ zu unterscheiden.
 | Status | `code` | Bedeutung |
 | --- | --- | --- |
 | 204 | – | angenommen, kein Body |
+| 405 | `method_not_allowed` | andere Methode als GET oder POST, auch HEAD |
 | 400 | `invalid_field` | Kennung zu lang, Body kein UTF-8, Koordinate oder Zeitstempel unlesbar |
 | 401 | `unauthorized` | Schlüssel unbekannt, widerrufen oder abgelaufen |
 | 403 | `tls_required` | nicht über TLS angekommen |
 | 403 | `missing_scope` | der Zugang hat den anderen Zweck |
-| 413 | `payload_too_large` | Body über 16 KiB oder Abfrage über 8 KiB |
+| 413 | `payload_too_large` | Body über 16 KiB, Abfrage über 8 KiB oder abgelegte Rohdaten über 48 KiB |
 | 422 | `unprocessable` | leerer Einwurf, Zeitstempel in der Zukunft, zu viele Kennungen |
 | 429 | `rate_limited` | gedrosselt; `Retry-After` nennt die Wartezeit in Sekunden |
 
 ## Grenzen
 
-- 30 Einwürfe am Stück je Zugang, einer je zwei Sekunden nach.
-- Höchstens 5 000 neue Alarmmeldungen je Zugang in 24 Stunden; Wiederholungen zählen nicht.
+- 30 Einwürfe am Stück je Zugang, einer je zwei Sekunden nach. Wird ein Zugang gedrosselt,
+  schreibt der Server eine Warnzeile mit der Kennung des Zugangs (höchstens eine je Minute).
+- Höchstens 5 000 neue Alarmmeldungen je Zugang in 24 Stunden. Wiederholungen zählen nicht mit;
+  ist die Grenze erreicht, bekommt aber jeder Einwurf `429`, auch eine Wiederholung.
+- Ein Eintrag der Ablage ist höchstens 48 KiB groß. Text mit vielen Steuer- oder
+  Anführungszeichen wird beim Ablegen länger und kann die Grenze schon unter 16 KiB erreichen.
 - Höchstens 200 Kennungen mit einer Position je Zugang.
 - Zehn Einwürfe mit unbekanntem Schlüssel in fünf Minuten sperren die Quelle für die
-  Maschinenwege, auch für signierte Anfragen. Ein widerrufener oder abgelaufener Schlüssel zählt
-  nicht. Die Anmeldung von Menschen ist davon nie betroffen.
+  Maschinenwege, auch für signierte Anfragen. Ein widerrufener, abgelaufener oder durch einen
+  Wechsel abgelöster Schlüssel zählt nicht: Wer nach einem Wechsel noch die alte Adresse aufruft,
+  bekommt `401`, sperrt aber niemanden aus. Die Anmeldung von Menschen ist davon nie betroffen.
 - Drosselung und Sperre liegen im Prozessspeicher; ein Neustart setzt sie zurück.
 
 ## Betrieb
@@ -137,4 +155,5 @@ zu unterscheiden.
 - Am ELW, der sich für seine Org bei einem Hub meldet, nimmt die Instanz keine Einwürfe an.
   Einwurf-Zugänge gehören dann an den Hub.
 - Der Server schreibt den Schlüssel in kein Protokoll: Im Pfad jeder Logzeile steht `***`
-  (`pfad_fuer_protokoll`, `src/app.rs`), die Abfrage steht nie darin.
+  (`pfad_fuer_protokoll`, `src/app.rs`), die Abfrage steht nie darin. Das gilt auch für einen
+  vertippten Pfad, solange der Schlüssel sein Präfix `llh_ew_` trägt.

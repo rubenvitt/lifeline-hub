@@ -57,7 +57,8 @@ ADR-0014 legte am 08.11.2026 fest, dass jede Maschine ein Schlüsselpaar hat und
 signiert: das Verfahren nach dem Muster DPoP/`private_key_jwt`, das ohne gemeinsames Geheimnis
 auskommt, Wiederholungen erkennt und auch dann trägt, wenn TLS unterwandert ist. BOSWatch, FE2 mit
 „URL öffnen“, der Divera-Webhook und OsmAnd können aber nicht signieren. Mit ADR-0023 gibt es für
-sie den Einwurf; diese ADR übernimmt die Regeln von ADR-0014 unverändert und nennt die Ausnahme.
+sie den Einwurf. Diese ADR übernimmt die Regeln von ADR-0014 zum Verfahren, nennt statt des
+damals offenen LLH-1148 die Fremdsysteme nach ADR-0022 und fügt die Ausnahme hinzu.
 
 ## Konsequenzen
 

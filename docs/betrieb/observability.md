@@ -27,7 +27,8 @@ Dienstes, auch Backup-, Purge- und DB-Fehler.
 - **Pfad:** im Span höchstens 256 Zeichen, gekürzt mit `…`.
 - **Kein Geheimnis im Pfad (LLH-1654, ADR-0023):** Der Schlüssel eines Einwurf-Zugangs steht in
   der URL. Im Span steht an seiner Stelle `***`: `pfad_fuer_protokoll` (`src/app.rs`) ersetzt
-  den Abschnitt nach `/api/v1/einwurf/` und jeden Abschnitt, der mit `llh_ew_` beginnt
+  den Abschnitt nach `/api/v1/einwurf/` und jeden Abschnitt, der `llh_ew_` enthält, auch
+  prozentkodiert
   (`public_api::einwurf::maskiere_pfad`). Die Abfrage steht nie im Span. Der Test
   `app::tests::einwurf_schluessel_steht_in_keiner_logzeile` schneidet das Log eines Einwurfs
   mit und findet weder Schlüssel noch Hash noch Abfrage. Ein Reverse-Proxy davor hat sein

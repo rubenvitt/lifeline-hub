@@ -499,12 +499,12 @@ sequenceDiagram
   Hub-->>A: 204 ohne Body (Cache-Control: no-store)
 ```
 
-- Die Reihenfolge der Prüfungen steht an einer Stelle (`pruefe` in
-  `src/public_api/einwurf/routen.rs`): Der TLS-Nachweis (`kam_ueber_tls`, `src/extract.rs`) kommt
+- Die Reihenfolge der Prüfungen steht an einer Stelle (`check_einwurf` in
+  `src/public_api/einwurf/routen.rs`): Der TLS-Nachweis (`is_tls_nachgewiesen`, `src/extract.rs`) kommt
   vor der Suche, damit eine Klartext-Anfrage kein Orakel für Schlüssel ist.
-- Eine Alarmmeldung wird nicht gedeutet. Mit `external_id` oder `message_id` ist sie dauerhaft
-  idempotent; ohne Kennung gilt gleicher Inhalt desselben Zugangs zwei Minuten lang als
-  Wiederholung und wird am Eintrag gezählt (`alarmmeldung_ablegen` in
+- Eine Alarmmeldung wird nicht gedeutet. Mit `message_id` ist sie dauerhaft idempotent, mit
+  `external_id` allein bei gleichem Inhalt; ohne Kennung gilt gleicher Inhalt desselben Zugangs
+  zwei Minuten lang als Wiederholung und wird am Eintrag gezählt (`alarmmeldung_ablegen` in
   `src/public_api/einwurf/ablage.rs`). Den Einsatzvorschlag baut LLH-1192 auf der Ablage.
 - Eine Position ersetzt die letzte ihrer Kennung, wenn sie nicht älter ist (`position_ablegen`,
   Tabelle `position_letzte`); einen Verlauf gibt es nicht.

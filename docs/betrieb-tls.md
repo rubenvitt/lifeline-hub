@@ -22,7 +22,7 @@ Setzt ein Proxy den Kopf nicht, erzwingt `--cookie-secure`
 Der Schlüssel eines Einwurf-Zugangs steht in der URL (`/api/v1/einwurf/<schlüssel>/…`,
 `docs/api/einwurf.md`). Der Server nimmt einen Einwurf deshalb nur an, wenn er
 verschlüsselt ankam, sonst antwortet er mit `403 tls_required`
-(`src/public_api/einwurf/routen.rs`, `kam_ueber_tls` in `src/extract.rs`):
+(`src/public_api/einwurf/routen.rs`, `is_tls_nachgewiesen` in `src/extract.rs`):
 
 - **Eigenes TLS:** mit `--tls` gilt jede Anfrage als verschlüsselt.
 - **Hinter einem Reverse-Proxy:** `X-Forwarded-Proto: https` zählt nur, wenn die
@@ -35,9 +35,10 @@ verschlüsselt ankam, sonst antwortet er mit `403 tls_required`
   Einstiegspunkt keinen vorgelagerten Stellen traut (`forwardedHeaders`).
 - **Ohne TLS nur mit Schalter:** `--einwurf-allow-http`
   (`LIFELINE_EINWURF_ALLOW_HTTP=true`) nimmt Einwürfe auch unverschlüsselt an. Er ist
-  für ein Netz gedacht, das selbst verschlüsselt (Tailnet, WireGuard). Der Server
-  schreibt beim Start eine Warnzeile, und die Seite „Anbindungen“ warnt, solange er
-  gesetzt ist.
+  für ein Netz gedacht, das selbst verschlüsselt (Tailnet, WireGuard). Ohne `--tls`
+  schreibt der Server dann beim Start eine Warnzeile, und die Seite „Anbindungen“
+  warnt. Mit `--tls` hat der Schalter keine Wirkung, weil nichts unverschlüsselt
+  ankommt.
 
 Die Seite „Anbindungen“ zeigt im Paneel „Einwurf-Zugänge“ auch den Fall, dass die
 Instanz weder TLS terminiert noch einen vertrauten Proxy kennt: Dann werden Einwürfe

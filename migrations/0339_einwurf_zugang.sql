@@ -22,6 +22,16 @@ CREATE TABLE einwurf_zugang (
 );
 CREATE INDEX idx_einwurf_zugang_org ON einwurf_zugang (org_id);
 
+-- Abgelöste Schlüssel (nach „Schlüssel wechseln“), nur als Hash. Ein Einwurf mit einem solchen
+-- Schlüssel ist „bekannt, aber ungültig“: 401, ohne im Zähler für Maschinen zu zählen. Sonst
+-- sperrte ein Absender, der noch die alte Adresse aufruft, die Quelle für alle Zugänge dahinter.
+CREATE TABLE einwurf_schluessel_abgeloest (
+    schluessel_hash TEXT PRIMARY KEY,
+    zugang_id       TEXT NOT NULL REFERENCES einwurf_zugang(id) ON DELETE CASCADE,
+    abgeloest_at    TEXT NOT NULL
+);
+CREATE INDEX idx_einwurf_schluessel_abgeloest_zugang ON einwurf_schluessel_abgeloest (zugang_id);
+
 -- Ablage der eingegangenen Alarmmeldungen: eine Zeile je Meldung, roh. `zugang_id` trägt keinen
 -- Fremdschlüssel, weil später auch Maschinenzugänge hierher schreiben (LLH-1192); die Org hängt
 -- über `org_id` daran. Gelöscht 7 Tage nach `empfangen_at` (`public_api::einwurf::purge`).

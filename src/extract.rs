@@ -78,7 +78,7 @@ pub fn gegenstelle(parts: &Parts) -> Option<IpAddr> {
 ///
 /// Anders als `auth::session::weitergeleitet_als_https` (dort entscheidet der Kopf nur über das
 /// `Secure` der eigenen Antwort) ist das hier eine Zugangsbedingung.
-pub fn kam_ueber_tls(
+pub fn is_tls_nachgewiesen(
     tls_direkt: bool,
     gegenstelle: Option<IpAddr>,
     headers: &HeaderMap,
@@ -614,13 +614,23 @@ mod tests {
         let vertraut = netze(&["10.9.0.0/16"]);
         let proxy = Some(ip("10.9.0.2"));
         assert!(
-            kam_ueber_tls(true, None, &HeaderMap::new(), &[]),
+            is_tls_nachgewiesen(true, None, &HeaderMap::new(), &[]),
             "direktes TLS"
         );
-        assert!(kam_ueber_tls(false, proxy, &proto(&["https"]), &vertraut));
-        assert!(kam_ueber_tls(false, proxy, &proto(&[" HTTPS "]), &vertraut));
+        assert!(is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["https"]),
+            &vertraut
+        ));
+        assert!(is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&[" HTTPS "]),
+            &vertraut
+        ));
         // Dual-Stack-Socket: die IPv4-Liste greift auch für die gemappte Adresse.
-        assert!(kam_ueber_tls(
+        assert!(is_tls_nachgewiesen(
             false,
             Some(ip("::ffff:10.9.0.2")),
             &proto(&["https"]),
@@ -634,37 +644,47 @@ mod tests {
         let proxy = Some(ip("10.9.0.2"));
         let fremd = Some(ip("203.0.113.7"));
         assert!(
-            !kam_ueber_tls(false, fremd, &proto(&["https"]), &vertraut),
+            !is_tls_nachgewiesen(false, fremd, &proto(&["https"]), &vertraut),
             "Kopf von fremder Gegenstelle ist fälschbar"
         );
         assert!(
-            !kam_ueber_tls(false, proxy, &proto(&["https"]), &[]),
+            !is_tls_nachgewiesen(false, proxy, &proto(&["https"]), &[]),
             "ohne Liste traut der Server keinem Proxy"
         );
         assert!(
-            !kam_ueber_tls(false, None, &proto(&["https"]), &vertraut),
+            !is_tls_nachgewiesen(false, None, &proto(&["https"]), &vertraut),
             "unbekannte Gegenstelle"
         );
         assert!(
-            !kam_ueber_tls(false, proxy, &HeaderMap::new(), &vertraut),
+            !is_tls_nachgewiesen(false, proxy, &HeaderMap::new(), &vertraut),
             "Kopf fehlt"
         );
-        assert!(!kam_ueber_tls(false, proxy, &proto(&["http"]), &vertraut));
+        assert!(!is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["http"]),
+            &vertraut
+        ));
         // Der Client stellt `https` voran, der Proxy hängt seinen Wert an: in einer Zeile oder
         // in zweien.
-        assert!(!kam_ueber_tls(
+        assert!(!is_tls_nachgewiesen(
             false,
             proxy,
             &proto(&["https, http"]),
             &vertraut
         ));
-        assert!(!kam_ueber_tls(
+        assert!(!is_tls_nachgewiesen(
             false,
             proxy,
             &proto(&["https", "http"]),
             &vertraut
         ));
-        assert!(!kam_ueber_tls(false, proxy, &proto(&["https,"]), &vertraut));
+        assert!(!is_tls_nachgewiesen(
+            false,
+            proxy,
+            &proto(&["https,"]),
+            &vertraut
+        ));
     }
 
     /// Eine nicht-numerische Route-ID liefert 400 im `{error}`-Envelope statt `text/plain`.

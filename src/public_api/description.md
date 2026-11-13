@@ -75,8 +75,10 @@ nimmt den Maschinenzugang.
 - **Position:** `id`, `lat`, `lon` und optional `timestamp` (OsmAnd-Protokoll). Je Zugang und
   `id` hält der Server genau eine Position, ohne Verlauf; eine mit älterem Zeitstempel wird
   nicht übernommen.
-- Grenzen: Body höchstens 16 KiB, Abfrage höchstens 8 KiB, 30 Einwürfe je Minute und Zugang,
-  5 000 neue Alarmmeldungen je Zugang in 24 Stunden, 200 Kennungen für Positionen je Zugang.
+- Nur GET und POST; jede andere Methode, auch HEAD, ergibt `405`.
+- Grenzen: Body höchstens 16 KiB, Abfrage höchstens 8 KiB, abgelegte Rohdaten höchstens 48 KiB,
+  30 Einwürfe je Minute und Zugang, 5 000 neue Alarmmeldungen je Zugang in 24 Stunden, 200
+  Kennungen für Positionen je Zugang.
 
 ## Grenzen
 

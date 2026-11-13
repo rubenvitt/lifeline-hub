@@ -72,8 +72,43 @@ pub fn has_schluessel_form(text: &str) -> bool {
         })
 }
 
-/// Ersetzt im Pfad den Abschnitt nach `/api/v1/einwurf/` und jeden Abschnitt, der mit dem
-/// Schlüsselpräfix beginnt, durch [`MASKE`]. Die zweite Regel fängt vertippte Pfade, die zu
+/// Löst `%XX` in einem Pfadabschnitt auf, nur für den Vergleich mit dem Schlüsselpräfix. Was
+/// kein ASCII ergibt, wird zu `?`: Der Schlüssel selbst besteht nur aus ASCII.
+fn percent_decode_ascii(abschnitt: &str) -> String {
+    let bytes = abschnitt.as_bytes();
+    let hex = |b: u8| (b as char).to_digit(16).map(|z| z as u8);
+    let mut aus = String::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let dekodiert = match bytes.get(i..i + 3) {
+            Some([b'%', a, b]) => hex(*a).zip(hex(*b)).map(|(a, b)| a * 16 + b),
+            _ => None,
+        };
+        let byte = match dekodiert {
+            Some(byte) => {
+                i += 3;
+                byte
+            }
+            None => {
+                i += 1;
+                bytes[i - 1]
+            }
+        };
+        aus.push(if byte.is_ascii() { byte as char } else { '?' });
+    }
+    aus
+}
+
+/// Trägt der Pfadabschnitt einen Einwurf-Schlüssel? Das Präfix zählt an jeder Stelle des
+/// Abschnitts und auch prozentkodiert: `einwurfllh_ew_…` (Schrägstrich vergessen) und
+/// `llh%5Few%5F…` führen zu keiner Route, landeten aber im Protokoll.
+fn has_schluessel(abschnitt: &str) -> bool {
+    abschnitt.contains(SCHLUESSEL_PRAEFIX)
+        || (abschnitt.contains('%') && percent_decode_ascii(abschnitt).contains(SCHLUESSEL_PRAEFIX))
+}
+
+/// Ersetzt im Pfad den Abschnitt nach `/api/v1/einwurf/` und jeden Abschnitt, der das
+/// Schlüsselpräfix enthält, durch [`MASKE`]. Die zweite Regel fängt vertippte Pfade, die zu
 /// keiner Route führen und trotzdem im Protokoll landen.
 pub fn maskiere_pfad(pfad: &str) -> Cow<'_, str> {
     let einwurf = pfad
@@ -81,10 +116,7 @@ pub fn maskiere_pfad(pfad: &str) -> Cow<'_, str> {
         .and_then(|rest| rest.strip_prefix("/einwurf/"))
         .map(|rest| rest.split('/').next().unwrap_or_default())
         .filter(|abschnitt| !abschnitt.is_empty());
-    let mit_praefix = pfad
-        .split('/')
-        .any(|abschnitt| abschnitt.starts_with(SCHLUESSEL_PRAEFIX));
-    if einwurf.is_none() && !mit_praefix {
+    if einwurf.is_none() && !pfad.split('/').any(has_schluessel) {
         return Cow::Borrowed(pfad);
     }
     // Abschnitt 0 ist leer (führender Schrägstrich), 1–3 sind `api`, `v1`, `einwurf`.
@@ -92,7 +124,7 @@ pub fn maskiere_pfad(pfad: &str) -> Cow<'_, str> {
         .split('/')
         .enumerate()
         .map(|(i, abschnitt)| {
-            if (i == 4 && einwurf.is_some()) || abschnitt.starts_with(SCHLUESSEL_PRAEFIX) {
+            if (i == 4 && einwurf.is_some()) || has_schluessel(abschnitt) {
                 MASKE
             } else {
                 abschnitt
@@ -280,7 +312,7 @@ pub async fn liste(
 }
 
 /// Ein Zugang der Org; `None`, wenn er unbekannt ist oder einer anderen Org gehört.
-pub async fn laden_in_org(
+pub async fn load_in_org(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: &str,
@@ -319,14 +351,18 @@ pub async fn find_by_schluessel(
 }
 
 /// Gibt einem Zugang der Org einen neuen Schlüssel; der alte gilt ab dem Commit nicht mehr.
-/// `Ok(None)`: unbekannt oder fremd. Ein widerrufener Zugang bekommt keinen (409).
+/// `Ok(None)`: unbekannt oder fremd. Ein widerrufener oder abgelaufener Zugang bekommt keinen
+/// (409): Die neue Adresse gälte nicht, und „gültig bis“ lässt sich nicht ändern.
+///
+/// Der abgelöste Hash bleibt in `einwurf_schluessel_abgeloest` stehen, damit [`is_abgeloest`]
+/// den alten Schlüssel als „bekannt, aber ungültig“ erkennt.
 pub async fn schluessel_wechseln(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: &str,
     jetzt: &str,
 ) -> Result<Option<String>, AppError> {
-    let Some(zugang) = laden_in_org(conn, org_id, id).await? else {
+    let Some(zugang) = load_in_org(conn, org_id, id).await? else {
         return Ok(None);
     };
     if zugang.is_widerrufen() {
@@ -334,7 +370,20 @@ pub async fn schluessel_wechseln(
             "Ein widerrufener Zugang bekommt keinen neuen Schlüssel.".into(),
         ));
     }
+    if zugang.is_abgelaufen(jetzt) {
+        return Err(AppError::Conflict(
+            "Ein abgelaufener Zugang bekommt keinen neuen Schlüssel.".into(),
+        ));
+    }
     let schluessel = neuer_schluessel();
+    sqlx::query(
+        "INSERT OR IGNORE INTO einwurf_schluessel_abgeloest (schluessel_hash, zugang_id, \
+         abgeloest_at) SELECT schluessel_hash, id, ?1 FROM einwurf_zugang WHERE id = ?2",
+    )
+    .bind(jetzt)
+    .bind(id)
+    .execute(&mut *conn)
+    .await?;
     sqlx::query(
         "UPDATE einwurf_zugang SET schluessel_hash = ?, schluessel_gewechselt_at = ? \
          WHERE id = ? AND widerrufen_at IS NULL",
@@ -347,6 +396,20 @@ pub async fn schluessel_wechseln(
     Ok(Some(schluessel))
 }
 
+/// War der Schlüssel einmal gültig und ist durch einen Wechsel abgelöst? Dann ist er „bekannt,
+/// aber ungültig“ wie ein widerrufener: 401, ohne Fehlversuch im Zähler für Maschinen.
+pub async fn is_abgeloest(conn: &mut SqliteConnection, schluessel: &str) -> Result<bool, AppError> {
+    if !has_schluessel_form(schluessel) {
+        return Ok(false);
+    }
+    let treffer: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einwurf_schluessel_abgeloest WHERE schluessel_hash = ?")
+            .bind(hash(schluessel))
+            .fetch_optional(&mut *conn)
+            .await?;
+    Ok(treffer.is_some())
+}
+
 /// Widerruft einen Zugang der Org. `Ok(None)`: unbekannt oder fremd; `Ok(Some(false))`: war
 /// schon widerrufen (keine Wirkung, kein Eintrag in der Admin-Spur).
 pub async fn widerrufen(
@@ -356,7 +419,7 @@ pub async fn widerrufen(
     von: Option<i64>,
     jetzt: &str,
 ) -> Result<Option<bool>, AppError> {
-    if laden_in_org(conn, org_id, id).await?.is_none() {
+    if load_in_org(conn, org_id, id).await?.is_none() {
         return Ok(None);
     }
     let n = sqlx::query(
@@ -422,7 +485,7 @@ pub(crate) mod tests {
         let (id, schluessel) = anlegen(&mut c, 1, "BOSWatch Wache 1", scope, None, None, JETZT)
             .await
             .unwrap();
-        let zugang = laden_in_org(&mut c, 1, &id).await.unwrap().unwrap();
+        let zugang = load_in_org(&mut c, 1, &id).await.unwrap().unwrap();
         (zugang, schluessel)
     }
 
@@ -505,6 +568,36 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn schluessel_mitten_im_abschnitt_und_prozentkodiert_wird_maskiert() {
+        let s = neuer_schluessel();
+        let kodiert = s.replace('_', "%5F");
+        let ganz_kodiert: String = s.bytes().map(|b| format!("%{b:02x}")).collect();
+        for pfad in [
+            // Schrägstrich zwischen Adresse und Schlüssel vergessen.
+            format!("/api/v1/einwurf{s}/alarmmeldung"),
+            format!("/api/v1/einwurf={s}/alarmmeldung"),
+            format!("/api/v1/einwurff/'{s}'/alarmmeldung"),
+            format!("/api/v1/einwurff/{kodiert}/alarmmeldung"),
+            format!("/api/v1/einwurff/{ganz_kodiert}/alarmmeldung"),
+        ] {
+            let maskiert = maskiere_pfad(&pfad);
+            assert!(maskiert.contains(MASKE), "{pfad}");
+            assert!(!maskiert.contains(&s[7..]), "{pfad} → {maskiert}");
+            assert!(!maskiert.contains(&kodiert[9..]), "{pfad} → {maskiert}");
+            assert!(
+                !maskiert.contains(&ganz_kodiert[21..]),
+                "{pfad} → {maskiert}"
+            );
+        }
+        // Ein Prozentzeichen ohne Schlüssel maskiert nichts.
+        assert_eq!(
+            maskiere_pfad("/api/einsaetze/a%20b"),
+            "/api/einsaetze/a%20b"
+        );
+        assert_eq!(maskiere_pfad("/x/100%/y%zz"), "/x/100%/y%zz");
+    }
+
+    #[test]
     fn fremder_pfad_bleibt_unveraendert() {
         for pfad in ["/api/v1/me", "/api/einsaetze/7", "/", "", "/api/v1/einwurf"] {
             assert!(matches!(maskiere_pfad(pfad), Cow::Borrowed(p) if p == pfad));
@@ -533,7 +626,7 @@ pub(crate) mod tests {
         let mut c = pool.acquire().await.unwrap();
         assert_eq!(zugang.scope, Scope::AlarmmeldungenWrite);
         assert!(!zugang.is_widerrufen());
-        assert!(laden_in_org(&mut c, 999, &zugang.id)
+        assert!(load_in_org(&mut c, 999, &zugang.id)
             .await
             .unwrap()
             .is_none());
@@ -603,6 +696,39 @@ pub(crate) mod tests {
             .await
             .unwrap()
             .is_none());
+        // Der alte Schlüssel ist „bekannt, aber ungültig“, auch nach einem zweiten Wechsel; ein
+        // nie vergebener ist es nicht.
+        let dritter = schluessel_wechseln(&mut c, 1, &zugang.id, "2026-11-12 12:00:00")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(is_abgeloest(&mut c, &alt).await.unwrap());
+        assert!(is_abgeloest(&mut c, &neu).await.unwrap());
+        assert!(!is_abgeloest(&mut c, &dritter).await.unwrap());
+        assert!(!is_abgeloest(&mut c, &neuer_schluessel()).await.unwrap());
+        assert!(!is_abgeloest(&mut c, "llh_ew_kurz").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn abgelaufener_zugang_bekommt_keinen_neuen_schluessel() {
+        let pool = db::test_pool().await;
+        let (zugang, schluessel) = neuer_zugang(&pool, Scope::AlarmmeldungenWrite).await;
+        sqlx::query("UPDATE einwurf_zugang SET gueltig_bis = '2026-11-12 09:00:00' WHERE id = ?")
+            .bind(&zugang.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut c = pool.acquire().await.unwrap();
+        let fehler = schluessel_wechseln(&mut c, 1, &zugang.id, JETZT)
+            .await
+            .unwrap_err();
+        assert!(matches!(fehler, AppError::Conflict(_)));
+        // Nichts geändert: der alte Schlüssel bleibt der des Zugangs.
+        assert!(find_by_schluessel(&mut c, &schluessel)
+            .await
+            .unwrap()
+            .is_some());
+        assert!(!is_abgeloest(&mut c, &schluessel).await.unwrap());
     }
 
     #[tokio::test]
@@ -647,7 +773,7 @@ pub(crate) mod tests {
         let (zugang, _) = neuer_zugang(&pool, Scope::AlarmmeldungenWrite).await;
         let mut c = pool.acquire().await.unwrap();
         async fn stand(c: &mut SqliteConnection, id: &str) -> Option<String> {
-            laden_in_org(c, 1, id)
+            load_in_org(c, 1, id)
                 .await
                 .unwrap()
                 .unwrap()

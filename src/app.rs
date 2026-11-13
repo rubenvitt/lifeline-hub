@@ -2995,8 +2995,8 @@ mod tests {
         }
     }
 
-    /// ADR-0023: der Schlüssel eines Einwurf-Zugangs steht nie im Span; maskiert wird vor dem
-    /// Kürzen, sonst schnitte die Kürzung den Abschnitt an und die Maske griffe nicht mehr.
+    /// ADR-0023: der Schlüssel eines Einwurf-Zugangs steht nie im Span, auch nicht in einem
+    /// langen Pfad, und die Maske zählt bei der Längengrenze mit.
     #[test]
     fn pfad_fuer_das_log_traegt_keinen_einwurf_schluessel() {
         let schluessel = crate::public_api::einwurf::neuer_schluessel();
@@ -3004,11 +3004,22 @@ mod tests {
             pfad_fuer_protokoll(&format!("/api/v1/einwurf/{schluessel}/alarmmeldung")),
             "/api/v1/einwurf/***/alarmmeldung"
         );
-        // Ein Schlüssel, der über die Kürzungsgrenze reicht.
+        // Ein Schlüssel nahe der Längengrenze: maskiert passt der Pfad, also wird er nicht gekürzt.
         let lang = format!("/{}/{schluessel}/x", "a".repeat(PFAD_MAX_ZEICHEN - 20));
-        let gekuerzt = pfad_fuer_protokoll(&lang);
-        assert!(!gekuerzt.contains("llh_ew_"), "{gekuerzt}");
-        assert!(gekuerzt.chars().count() <= PFAD_MAX_ZEICHEN);
+        let maskiert = pfad_fuer_protokoll(&lang);
+        assert!(maskiert.ends_with("/***/x"), "{maskiert}");
+        // Ein langer Pfad mit Schlüssel am Anfang: maskiert und gekürzt.
+        let sehr_lang = format!("/api/v1/einwurf/{schluessel}/{}", "a".repeat(400));
+        let gekuerzt = pfad_fuer_protokoll(&sehr_lang);
+        assert!(
+            gekuerzt.starts_with("/api/v1/einwurf/***/aaa"),
+            "{gekuerzt}"
+        );
+        assert_eq!(gekuerzt.chars().count(), PFAD_MAX_ZEICHEN);
+        // Auch ohne Schrägstrich vor dem Schlüssel.
+        let pfad = format!("/api/v1/einwurf{schluessel}/alarmmeldung");
+        let verklebt = pfad_fuer_protokoll(&pfad);
+        assert!(!verklebt.contains(&schluessel[7..]), "{verklebt}");
     }
 
     /// Der `AppState` für Tests, die den ganzen Router brauchen.

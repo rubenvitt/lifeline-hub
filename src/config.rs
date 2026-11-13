@@ -491,8 +491,9 @@ pub struct Config {
     /// Einwürfe (`/api/v1/einwurf/…`, ADR-0023) auch ohne TLS annehmen. **Default aus:** Der
     /// Schlüssel eines Einwurf-Zugangs steht in der URL, und der Einwurf verlangt deshalb TLS
     /// (`--tls`, oder `X-Forwarded-Proto: https` von einem Proxy aus `--trusted-proxies`). Der
-    /// Schalter ist nur für ein Netz gedacht, das selbst verschlüsselt (Tailnet, WireGuard); die
-    /// Seite „Anbindungen“ warnt, solange er gesetzt ist. Die Env nimmt nur `true`/`false`.
+    /// Schalter ist nur für ein Netz gedacht, das selbst verschlüsselt (Tailnet, WireGuard); ohne
+    /// `--tls` warnt die Seite „Anbindungen“, solange er gesetzt ist. Die Env nimmt nur
+    /// `true`/`false`.
     #[arg(long, env = "LIFELINE_EINWURF_ALLOW_HTTP", default_value_t = false)]
     pub einwurf_allow_http: bool,
 
@@ -1304,8 +1305,6 @@ mod tests {
         assert_eq!(c.tls_hostname.as_deref(), Some("elw.local"));
     }
 
-    /// LFH-603: `Secure` ohne eigenes TLS (hinter einem TLS-Proxy). Vorgabe aus, damit der lokale
-    /// HTTP-Betrieb unverändert bleibt; die Env nimmt nur `true`/`false` (wie `LIFELINE_TLS`).
     /// Einwurf ohne TLS (ADR-0023): Vorgabe aus, per Flag und per Umgebung an.
     #[test]
     fn einwurf_allow_http_vorgabe_aus_und_zuschaltbar() {
@@ -1321,6 +1320,8 @@ mod tests {
         );
     }
 
+    /// LFH-603: `Secure` ohne eigenes TLS (hinter einem TLS-Proxy). Vorgabe aus, damit der lokale
+    /// HTTP-Betrieb unverändert bleibt; die Env nimmt nur `true`/`false` (wie `LIFELINE_TLS`).
     #[test]
     fn cookie_secure_vorgabe_aus_und_zuschaltbar() {
         assert!(!parse_hermetisch(["lifeline-hub"]).cookie_secure);

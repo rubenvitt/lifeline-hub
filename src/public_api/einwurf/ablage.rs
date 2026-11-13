@@ -22,6 +22,11 @@ use crate::public_api::{ApiError, ErrorCode};
 pub const BODY_MAX: usize = 16 * 1024;
 /// Höchstgröße der Abfrage eines Einwurfs.
 pub const ABFRAGE_MAX: usize = 8 * 1024;
+/// Höchstgröße der gespeicherten Rohdaten einer Alarmmeldung. JSON bläht Anführungs- und
+/// Steuerzeichen auf (bis sechsfach); diese Grenze macht die Größe eines Eintrags trotzdem fest.
+pub const ROHDATEN_MAX: usize = 48 * 1024;
+/// So viele Zeichen von `Content-Type` werden mit abgelegt.
+pub const INHALTSTYP_MAX: usize = 255;
 /// Höchstlänge von `external_id` und `message_id` in Zeichen.
 pub const KENNUNG_MAX: usize = 200;
 /// Höchstlänge der Kennung einer Position in Zeichen.
@@ -106,6 +111,26 @@ fn paare(roh: &[u8]) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Ging beim Dekodieren etwas verloren? `form_urlencoded` ersetzt Bytes, die kein UTF-8 sind
+/// (etwa `%F6` aus einem Latin-1-Absender), durch U+FFFD. Steht das Ersatzzeichen in den Paaren,
+/// ohne dass der Absender es selbst geschickt hat, lassen sich die Bytes aus den Paaren nicht
+/// zurückgewinnen.
+fn is_verlustbehaftet(roh: &str, paare: &[(String, String)]) -> bool {
+    const ERSATZ: char = '\u{FFFD}';
+    paare
+        .iter()
+        .any(|(name, wert)| name.contains(ERSATZ) || wert.contains(ERSATZ))
+        && !roh.contains(ERSATZ)
+        && !roh.to_ascii_uppercase().contains("%EF%BF%BD")
+}
+
+/// Hat ein Paar Inhalt? `?&` und `?=` sind eine Abfrage ohne Inhalt.
+fn has_inhalt(paare: &[(String, String)]) -> bool {
+    paare
+        .iter()
+        .any(|(name, wert)| !name.is_empty() || !wert.is_empty())
+}
+
 /// Der erste nicht leere Wert eines Felds; der Body geht der Abfrage vor.
 fn feld<'f>(
     body: &'f [(String, String)],
@@ -128,7 +153,8 @@ pub struct AlarmInhalt {
     /// SHA-256 über die rohe Abfrage, ein Trennbyte und den Body. Keine Normalisierung: Derselbe
     /// Absender erzeugt bei einer Wiederholung dieselben Bytes, und alles Weitere wäre Deutung.
     pub inhalt_hash: String,
-    /// JSON mit `abfrage`, `inhaltstyp` und `body`, je nur wenn vorhanden.
+    /// JSON mit `abfrage` (dekodierte Paare), `abfrage_roh` (nur wenn das Dekodieren etwas
+    /// verlor), `inhaltstyp` und `body`, je nur wenn vorhanden; höchstens [`ROHDATEN_MAX`].
     pub rohdaten: String,
 }
 
@@ -136,12 +162,12 @@ pub struct AlarmInhalt {
 /// leer sind (422).
 pub fn alarm_inhalt(einwurf: &Einwurf<'_>) -> Result<AlarmInhalt, ApiError> {
     let body = einwurf.body_text()?;
-    if einwurf.abfrage.is_empty() && body.is_empty() {
+    let abfrage = einwurf.abfrage_paare();
+    if !has_inhalt(&abfrage) && body.is_empty() {
         return Err(nicht_verarbeitbar(
             "Der Einwurf ist leer: weder Abfrage noch Body.",
         ));
     }
-    let abfrage = einwurf.abfrage_paare();
     let body_felder = einwurf.body_felder(body);
     let kennung = |name: &str| -> Result<Option<String>, ApiError> {
         match feld(&body_felder, &abfrage, name) {
@@ -155,10 +181,16 @@ pub fn alarm_inhalt(einwurf: &Einwurf<'_>) -> Result<AlarmInhalt, ApiError> {
     let message_id = kennung("message_id")?;
 
     let mut roh = serde_json::Map::new();
-    if !abfrage.is_empty() {
+    if has_inhalt(&abfrage) {
         roh.insert("abfrage".into(), serde_json::json!(abfrage));
+        // Unverändert heißt auch: nichts geht beim Dekodieren verloren. Kam die Abfrage nicht in
+        // UTF-8 (FE2 oder ältere Skripte unter Windows), liegt sie zusätzlich roh dabei.
+        if is_verlustbehaftet(einwurf.abfrage, &abfrage) {
+            roh.insert("abfrage_roh".into(), serde_json::json!(einwurf.abfrage));
+        }
     }
     if let Some(typ) = einwurf.inhaltstyp.filter(|t| !t.is_empty()) {
+        let typ: String = typ.chars().take(INHALTSTYP_MAX).collect();
         roh.insert("inhaltstyp".into(), serde_json::json!(typ));
     }
     if !body.is_empty() {
@@ -170,11 +202,15 @@ pub fn alarm_inhalt(einwurf: &Einwurf<'_>) -> Result<AlarmInhalt, ApiError> {
     bytes.push(0);
     bytes.extend_from_slice(einwurf.body);
 
+    let rohdaten = serde_json::Value::Object(roh).to_string();
+    if rohdaten.len() > ROHDATEN_MAX {
+        return Err(ApiError::from_code(ErrorCode::PayloadTooLarge));
+    }
     Ok(AlarmInhalt {
         external_id,
         message_id,
         inhalt_hash: crate::anhang::repo::sha256_hex(&bytes),
-        rohdaten: serde_json::Value::Object(roh).to_string(),
+        rohdaten,
     })
 }
 
@@ -186,7 +222,7 @@ pub enum AlarmErgebnis {
     /// Am bestehenden Eintrag als erneut empfangen vermerkt.
     Wiederholung,
     /// Der Zugang hat [`ALARMMELDUNGEN_JE_TAG`] neue Einträge in 24 Stunden erreicht; nichts
-    /// gespeichert.
+    /// gespeichert und nichts vermerkt, auch für eine Wiederholung.
     Tagesgrenze,
 }
 
@@ -212,6 +248,20 @@ pub async fn alarmmeldung_ablegen(
     inhalt: &AlarmInhalt,
     jetzt: &str,
 ) -> Result<AlarmErgebnis, AppError> {
+    // Die Tagesgrenze zuerst: Ist sie erreicht, bekommt jeder Einwurf dieselbe Antwort (429),
+    // auch eine Wiederholung. Sonst verriete die Antwort, ob eine Kennung oder ein Inhalt schon
+    // in der Ablage liegt (Spec: neu und wiederholt sind nicht zu unterscheiden).
+    let heute: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM alarmmeldung WHERE zugang_id = ? AND empfangen_at > ?",
+    )
+    .bind(&zugang.id)
+    .bind(vor(jetzt, 24 * 3600)?)
+    .fetch_one(&mut *conn)
+    .await?;
+    if heute >= ALARMMELDUNGEN_JE_TAG {
+        return Ok(AlarmErgebnis::Tagesgrenze);
+    }
+
     let mut frueher_id: Option<i64> = None;
     let wiederholung: Option<i64> = if let Some(message_id) = &inhalt.message_id {
         sqlx::query_scalar(
@@ -266,17 +316,6 @@ pub async fn alarmmeldung_ablegen(
         .execute(&mut *conn)
         .await?;
         return Ok(AlarmErgebnis::Wiederholung);
-    }
-
-    let heute: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM alarmmeldung WHERE zugang_id = ? AND empfangen_at > ?",
-    )
-    .bind(&zugang.id)
-    .bind(vor(jetzt, 24 * 3600)?)
-    .fetch_one(&mut *conn)
-    .await?;
-    if heute >= ALARMMELDUNGEN_JE_TAG {
-        return Ok(AlarmErgebnis::Tagesgrenze);
     }
 
     sqlx::query(
@@ -357,6 +396,13 @@ pub fn position_inhalt(einwurf: &Einwurf<'_>, jetzt: &str) -> Result<PositionInh
     let kennung = lies("id")
         .or_else(|| lies("deviceid"))
         .ok_or_else(|| ungueltig("id fehlt"))?;
+    // Eine Kennung, die nicht als UTF-8 ankam, fiele mit anderen zusammen (`L%F6sch1` und
+    // `L%FCsch1` würden beide zu `L\u{FFFD}sch1`) und überschriebe deren Position.
+    if kennung.contains('\u{FFFD}')
+        && (is_verlustbehaftet(einwurf.abfrage, &abfrage) || is_verlustbehaftet(body, &body_felder))
+    {
+        return Err(ungueltig("id: kein gültiges UTF-8"));
+    }
     if kennung.chars().count() > POSITION_KENNUNG_MAX {
         return Err(ungueltig(format!(
             "id: höchstens {POSITION_KENNUNG_MAX} Zeichen"
@@ -543,9 +589,55 @@ mod tests {
 
     #[test]
     fn leerer_einwurf_ist_422() {
-        let fehler = alarm_inhalt(&abfrage("")).unwrap_err();
-        assert_eq!(fehler.status, StatusCode::UNPROCESSABLE_ENTITY);
-        assert_eq!(fehler.code, ErrorCode::Unprocessable);
+        // Auch eine Abfrage ohne Inhalt ist leer: nur Trenner, nur ein Gleichheitszeichen.
+        for leer in ["", "&", "&&", "=", "=&="] {
+            let fehler = alarm_inhalt(&abfrage(leer)).unwrap_err();
+            assert_eq!(fehler.status, StatusCode::UNPROCESSABLE_ENTITY, "{leer:?}");
+            assert_eq!(fehler.code, ErrorCode::Unprocessable);
+        }
+        // Ein Name ohne Wert und ein Wert ohne Name sind Inhalt.
+        assert!(alarm_inhalt(&abfrage("alarm")).is_ok());
+        assert!(alarm_inhalt(&abfrage("=Brand")).is_ok());
+    }
+
+    /// „Unverändert“ gilt auch für eine Abfrage, die nicht in UTF-8 kam: Die Paare tragen dann
+    /// das Ersatzzeichen, und die rohe Abfrage liegt dabei.
+    #[test]
+    fn abfrage_ohne_utf8_liegt_zusaetzlich_roh_dabei() {
+        let latin1 = "text=Brand%20K%F6ln&ric=1";
+        let inhalt = alarm_inhalt(&abfrage(latin1)).unwrap();
+        let roh = roh(&inhalt);
+        assert_eq!(roh["abfrage"][0][1], "Brand K\u{FFFD}ln");
+        assert_eq!(roh["abfrage_roh"], latin1);
+
+        // Gültiges UTF-8 braucht die Rohform nicht, auch wenn der Absender selbst U+FFFD schickt.
+        for utf8 in ["text=Brand%20K%C3%B6ln", "text=%EF%BF%BD", "text=%ef%bf%bd"] {
+            let inhalt = alarm_inhalt(&abfrage(utf8)).unwrap();
+            assert!(self::roh(&inhalt).get("abfrage_roh").is_none(), "{utf8}");
+        }
+    }
+
+    #[test]
+    fn inhaltstyp_wird_gekuerzt_und_die_rohdaten_sind_begrenzt() {
+        let lang = format!("text/plain; x={}", "y".repeat(4000));
+        let inhalt = alarm_inhalt(&body(&lang, "Brand")).unwrap();
+        let typ = roh(&inhalt)["inhaltstyp"].as_str().unwrap().to_string();
+        assert_eq!(typ.chars().count(), INHALTSTYP_MAX);
+
+        // Steuerzeichen bläht JSON sechsfach auf: 16 KiB Body würden 96 KiB Rohdaten.
+        let steuerzeichen = "\u{1}".repeat(BODY_MAX);
+        let fehler = alarm_inhalt(&body("text/plain", &steuerzeichen)).unwrap_err();
+        assert_eq!(fehler.code, ErrorCode::PayloadTooLarge);
+        // Gewöhnlicher Text in voller Größe samt voller Abfrage bleibt darunter.
+        let abfrage = format!("text={}", "x".repeat(ABFRAGE_MAX - 5));
+        let voll = "x".repeat(BODY_MAX);
+        let einwurf = Einwurf {
+            abfrage: &abfrage,
+            inhaltstyp: Some("text/plain"),
+            body: voll.as_bytes(),
+        };
+        let inhalt = alarm_inhalt(&einwurf).unwrap();
+        assert!(inhalt.rohdaten.len() <= ROHDATEN_MAX);
     }
 
     #[test]
@@ -555,10 +647,15 @@ mod tests {
         assert_eq!(fehler.code, ErrorCode::PayloadTooLarge);
         assert!(alarm_inhalt(&body("text/plain", &gross[..BODY_MAX])).is_ok());
 
-        let lang = format!("text={}", "x".repeat(ABFRAGE_MAX));
+        let lang = format!("text={}", "x".repeat(ABFRAGE_MAX - 4));
+        assert_eq!(lang.len(), ABFRAGE_MAX + 1);
         assert_eq!(
             alarm_inhalt(&abfrage(&lang)).unwrap_err().code,
             ErrorCode::PayloadTooLarge
+        );
+        assert!(
+            alarm_inhalt(&abfrage(&lang[..ABFRAGE_MAX])).is_ok(),
+            "genau die Grenze geht"
         );
 
         let kennung = format!("external_id={}", "ä".repeat(KENNUNG_MAX + 1));
@@ -800,7 +897,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tagesgrenze_haelt_neue_eintraege_an_und_wiederholungen_nicht() {
+    async fn tagesgrenze_haelt_neue_eintraege_und_wiederholungen_an() {
         let pool = db::test_pool().await;
         let (zugang, _) = neuer_zugang(&pool, Scope::AlarmmeldungenWrite).await;
         ablegen(&pool, &zugang, "text=erste", "2026-11-12 09:59:00").await;
@@ -819,11 +916,18 @@ mod tests {
             ablegen(&pool, &zugang, "text=zu-viel", JETZT).await,
             AlarmErgebnis::Tagesgrenze
         );
+        // An der Grenze bekommt auch eine Wiederholung dieselbe Antwort: sonst verriete sie, ob
+        // ein Inhalt schon in der Ablage liegt. Vermerkt wird dann nichts.
         assert_eq!(
             ablegen(&pool, &zugang, "text=erste", JETZT).await,
-            AlarmErgebnis::Wiederholung,
-            "eine Wiederholung zählt nicht"
+            AlarmErgebnis::Tagesgrenze
         );
+        let vermerkt: i64 =
+            sqlx::query_scalar("SELECT SUM(erneut_empfangen_anzahl) FROM alarmmeldung")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(vermerkt, 0);
         // 24 Stunden nach dem ersten Eintrag ist wieder Platz.
         assert_eq!(
             ablegen(&pool, &zugang, "text=morgen", "2026-11-13 09:59:01").await,
@@ -918,6 +1022,11 @@ mod tests {
         }
         let lang = format!("id={}&lat=1&lon=2", "k".repeat(POSITION_KENNUNG_MAX + 1));
         assert_eq!(status(&lang), StatusCode::BAD_REQUEST);
+        let genau = format!("id={}&lat=1&lon=2", "k".repeat(POSITION_KENNUNG_MAX));
+        assert!(position_inhalt(&abfrage(&genau), JETZT).is_ok());
+        // Eine Kennung, die nicht als UTF-8 kam, fiele mit anderen zusammen.
+        assert_eq!(status("id=L%F6sch1&lat=1&lon=2"), StatusCode::BAD_REQUEST);
+        assert!(position_inhalt(&abfrage("id=L%C3%B6sch1&lat=1&lon=2"), JETZT).is_ok());
         assert_eq!(
             status("id=a&lat=1&lon=2&timestamp=2026-11-12T10:30:00Z"),
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -1010,13 +1119,18 @@ mod tests {
              INSERT INTO position_letzte (org_id, zugang_id, kennung, lat, lon, gemessen_at, \
              empfangen_at, rohdaten) SELECT 1, ?, 'k' || i, 1, 2, ?, ?, '{}' FROM n",
         )
-        .bind(KENNUNGEN_JE_ZUGANG)
+        .bind(KENNUNGEN_JE_ZUGANG - 1)
         .bind(&a.id)
         .bind("2026-11-12 09:00:00")
         .bind("2026-11-12 09:00:00")
         .execute(&pool)
         .await
         .unwrap();
+        // 199 Kennungen stehen: die 200. geht, die 201. nicht.
+        assert_eq!(
+            position(&pool, &a, "id=zweihundert&lat=1&lon=2", JETZT).await,
+            PositionErgebnis::Uebernommen
+        );
         assert_eq!(
             position(&pool, &a, "id=neu&lat=1&lon=2", JETZT).await,
             PositionErgebnis::ZuVieleKennungen

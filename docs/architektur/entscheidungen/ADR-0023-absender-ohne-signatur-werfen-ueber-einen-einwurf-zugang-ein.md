@@ -26,11 +26,11 @@ herleitung:
 - MUST: Ein Einwurf schreibt nur in die Ablage seines Scopes (`alarmmeldungen:write` oder
   `positionen:write`) und nur für seine Org; er legt keinen Einsatz an und ändert keinen.
 - MUST NOT: Ein Einwurf liest etwas; die Antwort trägt außer Status und Fehler keine Daten.
-- MUST: Eine eingeworfene Alarmmeldung wird roh abgelegt. Mit `message_id` oder `external_id` ist
-  sie dauerhaft idempotent. Erst ohne Kennung zählt der Inhalt: Gleicher Inhalt desselben Zugangs
-  höchstens 2 Minuten nach dem letzten Empfang wird am bestehenden Eintrag der Ablage als erneut
-  empfangen vermerkt; später ergibt er einen neuen Eintrag mit Verweis auf den früheren. Still
-  verworfen wird keine.
+- MUST: Eine eingeworfene Alarmmeldung wird roh abgelegt. Dieselbe `message_id` zur selben
+  `external_id` ist dauerhaft eine Wiederholung, ebenso derselbe Inhalt zur selben `external_id`.
+  Ohne Kennung gilt gleicher Inhalt desselben Zugangs höchstens 2 Minuten nach dem letzten
+  Empfang als Wiederholung; später ergibt er einen neuen Eintrag mit Verweis auf den früheren.
+  Eine Wiederholung wird am bestehenden Eintrag vermerkt. Still verworfen wird keine.
 - MUST: Eine eingeworfene Position ersetzt nur die letzte Position ihrer Kennung, ohne Verlauf;
   eine mit älterem Zeitstempel als die gespeicherte wird nicht übernommen.
 - MUST: Ein Einwurf wird nur über TLS angenommen (`--tls`, oder jeder Wert von
@@ -40,7 +40,10 @@ herleitung:
 - MUST: Der Pfadabschnitt nach `/einwurf/` erscheint in keinem Protokoll; `pfad_fuer_protokoll`
   maskiert ihn.
 - MUST: Jeder Einwurf-Zugang ist gedrosselt, und die Ablage hat Obergrenzen je Zugang; ein
-  unbekannter Schlüssel zählt im Zähler für Maschinen je IP, nicht in der Anmeldesperre.
+  unbekannter Schlüssel zählt im Zähler für Maschinen je IP, nicht in der Anmeldesperre. Ein
+  widerrufener, abgelaufener oder durch einen Wechsel abgelöster Schlüssel zählt nicht.
+- MUST: Die Antwort unterscheidet eine neue Meldung nicht von einer Wiederholung, auch nicht an
+  einer Obergrenze.
 - MUST: Anlegen, Wechsel und Widerruf stehen in `admin_audit`, nie mit Schlüssel oder Hash.
 - SHOULD: Ein Absender, der signieren kann, bekommt einen Zugang nach ADR-0022, und einer, der POST
   kann, nimmt POST statt GET.
@@ -50,9 +53,12 @@ herleitung:
 ```sh
 verlange 'einwurf::maskiere_pfad' src/app.rs
 verlange 'SCHLUESSEL_PRAEFIX: &str = "llh_ew_"' src/public_api/einwurf/mod.rs
-verlange 'kam_ueber_tls' src/public_api/einwurf/routen.rs
+verlange 'is_tls_nachgewiesen' src/public_api/einwurf/routen.rs
 verlange 'rate_limit::maschine::fehlversuch' src/public_api/einwurf/routen.rs
-verbiete 'tracing::[a-z]+!\([^)]*(schluessel|hash|uri|query)' 'src/public_api/einwurf/**'
+verlange 'is_abgeloest' src/public_api/einwurf/routen.rs
+# Kein Logfeld trägt Schlüssel, Hash, Pfad, Abfrage oder Inhalt. Zeilenweise, weil rustfmt
+# `tracing`-Aufrufe umbricht: ein Feld steht als `name = …` oder `%name` auf seiner Zeile.
+verbiete '^ *[%?]?(schluessel|hash|pfad|uri|abfrage|query|rohdaten|body|inhalt)( =|,$)' src/public_api/einwurf/routen.rs
 ```
 
 ## Kontext

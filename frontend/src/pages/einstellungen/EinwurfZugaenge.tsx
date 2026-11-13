@@ -11,10 +11,10 @@ import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue
 import { ErfassungsModal } from '../../components/Erfassung';
 import KopierbarerText from '../../components/KopierbarerText';
 import { SeitenFehler } from '../../components/SeitenZustand';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { RechteHinweis, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import { zeitKurz, zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../../anzeige/zeitEingabe';
 import { SCOPE_TEXT } from '../../api/anbindungen';
@@ -30,6 +30,7 @@ import {
 } from '../../api/einwurfZugaenge';
 import { ANBINDUNG_NAME_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import type {
   EinwurfTransport,
   EinwurfZugaengeListe,
@@ -86,6 +87,24 @@ export function transportHinweis(
   return null;
 }
 
+/**
+ * Die Seite ist über http geöffnet, der Server nimmt Einwürfe aber nur über https an
+ * (Transportlage `proxy`): Die Adresse im Dialog beginnt dann mit `http://` und gäbe beim
+ * Absender 403, nachdem der Schlüssel im Klartext über die Leitung ging. Rein und exportiert
+ * für den Test.
+ */
+export function adresseBrauchtHttps(transport: EinwurfTransport, protokoll: string): boolean {
+  return protokoll === 'http:' && transport !== 'http';
+}
+
+/**
+ * Wechsel, Widerruf und Anlegen gehen sofort hinaus oder scheitern sofort, nie später: Eine
+ * angehaltene Mutation ginge sonst bei der Rückkehr des Netzes hinaus, auch nach Verlassen der
+ * Seite, und der neue Schlüssel landete im Nichts, während der alte schon nicht mehr gilt
+ * (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“; Muster `FuehrungPaneel`).
+ */
+const SOFORT_ODER_NIE = { networkMode: 'always' } as const;
+
 /** Setzt die Antwort einer eigenen Änderung in die Liste und lässt sie danach neu laden. */
 function uebernimmZugang(qc: QueryClient, z: EinwurfZugangAnzeige): void {
   qc.setQueryData<EinwurfZugaengeListe>(globalKeys.einwurfZugaenge(), (alt) =>
@@ -107,9 +126,11 @@ function uebernimmZugang(qc: QueryClient, z: EinwurfZugangAnzeige): void {
  */
 function AdresseDialog({
   neu,
+  transport,
   onFertig,
 }: {
   neu: EinwurfZugangSchluessel | null;
+  transport: EinwurfTransport | undefined;
   onFertig: () => void;
 }) {
   const { token, rollen } = useRollen();
@@ -136,6 +157,14 @@ function AdresseDialog({
           style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
         >
           <span style={{ color: rollen.gedaempft }}>Nur jetzt sichtbar.</span>
+          {transport && adresseBrauchtHttps(transport, window.location.protocol) && (
+            <Alert
+              type="warning"
+              showIcon
+              title="Adresse beginnt mit http"
+              description="Der Server nimmt Einwürfe nur über https an."
+            />
+          )}
           <KopierbarerText text={adresse} bezeichnung="Adresse">
             <span
               data-lfh="einwurf-adresse-text"
@@ -220,6 +249,7 @@ export default function EinwurfZugaenge() {
   const [wechselFuer, setWechselFuer] = useState<EinwurfZugangAnzeige | null>(null);
   const [widerrufFuer, setWiderrufFuer] = useState<EinwurfZugangAnzeige | null>(null);
   const [form] = Form.useForm<FormWerte>();
+  const ohneNetz = useOhneVerbindung();
 
   const listeQ = useQuery({
     queryKey: globalKeys.einwurfZugaenge(),
@@ -228,6 +258,7 @@ export default function EinwurfZugaenge() {
   });
 
   const anlegen = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: createEinwurfZugang,
     onSuccess: (antwort) => {
       uebernimmZugang(qc, antwort.zugang);
@@ -235,6 +266,7 @@ export default function EinwurfZugaenge() {
     },
   });
   const wechseln = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: (z: EinwurfZugangAnzeige) => wechsleEinwurfSchluessel(z.id),
     onSuccess: (antwort) => {
       uebernimmZugang(qc, antwort.zugang);
@@ -243,6 +275,7 @@ export default function EinwurfZugaenge() {
     },
   });
   const widerrufen = useMutation({
+    ...SOFORT_ODER_NIE,
     mutationFn: (z: EinwurfZugangAnzeige) => widerrufeEinwurfZugang(z.id),
     onSuccess: (z) => {
       uebernimmZugang(qc, z);
@@ -255,17 +288,36 @@ export default function EinwurfZugaenge() {
   const zugaenge = liste?.zugaenge ?? [];
   const gesperrt = liste?.gesperrt_grund ?? null;
   const hinweis = liste ? transportHinweis(liste.transport) : null;
+  // Ohne Netz und ohne Cache bleibt die Abfrage pausiert (die Liste liegt bewusst nicht auf der
+  // Platte): dann sagt das Paneel das, statt endlos zu laden.
+  const ohneNetzUngeladen = liste == null && listeQ.isPending && listeQ.fetchStatus === 'paused';
   const zeit = (wert: string) => zeitKurz(wert, konv);
+  // Frist und Widerruf mit Monat und Jahr: Die Zeile ist die einzige Stelle, die sie zeigt, und
+  // „gültig bis“ liegt oft Monate entfernt.
+  const zeitVoll = (wert: string) => zeitpunkt(wert, konv);
+
+  /** Ohne Netz stehen die Einträge da, aber gesperrt (Spec `datensatz-aktionsmenue`). */
+  const ohneNetzGesperrt = ohneNetz ? ({ gesperrt: true } as const) : {};
 
   /** Aktionen eines Zugangs, EINE Quelle für ⋮ und Kontextmenü (LLH-1599). */
   const menue: WeitereAktionen<EinwurfZugangAnzeige> | undefined = istAdmin
     ? {
+        // Ein abgelaufener Zugang bekommt keinen neuen Schlüssel: Die neue Adresse gälte nicht,
+        // und „gültig bis“ lässt sich nicht ändern. Dafür wird widerrufen und neu angelegt.
         eintraege: (z) =>
           z.widerrufen_at
             ? []
             : [
-                ...(gesperrt ? [] : [{ key: 'wechseln', label: 'Schlüssel wechseln …' }]),
-                { key: 'widerrufen', icon: <IconKreuz />, label: 'Widerrufen …', gefahr: true },
+                ...(gesperrt || z.is_abgelaufen
+                  ? []
+                  : [{ key: 'wechseln', label: 'Schlüssel wechseln …', ...ohneNetzGesperrt }]),
+                {
+                  key: 'widerrufen',
+                  icon: <IconKreuz />,
+                  label: 'Widerrufen …',
+                  gefahr: true,
+                  ...ohneNetzGesperrt,
+                },
               ],
         zugaenglicherName: (z) => `Aktionen zu Einwurf-Zugang ${z.name}`,
         laeuft: () => wechseln.isPending || widerrufen.isPending,
@@ -289,12 +341,15 @@ export default function EinwurfZugaenge() {
     <div data-lfh="einwurf-zugaenge" style={{ marginBlockStart: token.margin }}>
       <Paneel
         titel="Einwurf-Zugänge"
-        meta={listeQ.isSuccess ? zugaenge.length : undefined}
+        meta={liste != null ? zugaenge.length : undefined}
         aktion={
           istAdmin ? (
             <Button
               icon={<IconPlus />}
-              disabled={liste == null || gesperrt != null}
+              disabled={liste == null || gesperrt != null || ohneNetz}
+              aria-describedby={
+                ohneNetz ? 'einwurf-ohne-netz' : gesperrt ? 'einwurf-gesperrt' : undefined
+              }
               onClick={() => {
                 anlegen.reset();
                 setAnlegenOffen(true);
@@ -306,8 +361,30 @@ export default function EinwurfZugaenge() {
         }
         koerperPolster
       >
+        {ohneNetz && (
+          <div
+            id="einwurf-ohne-netz"
+            data-lfh="einwurf-ohne-netz"
+            style={{ marginBlockEnd: token.marginSM }}
+          >
+            <RechteHinweis sichtbar text={OHNE_VERBINDUNG_NICHT_AENDERBAR} />
+          </div>
+        )}
+        {gesperrt && (
+          <div
+            id="einwurf-gesperrt"
+            data-lfh="einwurf-gesperrt"
+            style={{ marginBlockEnd: token.marginSM }}
+          >
+            <RechteHinweis sichtbar marke="Am Hub anbinden" text={gesperrt} />
+          </div>
+        )}
         {liste == null ? (
-          listeQ.isError ? (
+          ohneNetzUngeladen ? (
+            <span data-lfh="einwurf-ungeladen" style={{ color: rollen.gedaempft }}>
+              Einwurf-Zugänge ohne Verbindung nicht geladen
+            </span>
+          ) : listeQ.isError ? (
             <SeitenFehler
               text="Einwurf-Zugänge nicht ladbar"
               ursache={listeQ.error}
@@ -379,12 +456,12 @@ export default function EinwurfZugaenge() {
                               {z.zuletzt_genutzt_at
                                 ? `zuletzt genutzt ${zeit(z.zuletzt_genutzt_at)}`
                                 : 'noch nie genutzt'}
-                              {z.gueltig_bis && ` · gültig bis ${zeit(z.gueltig_bis)}`}
+                              {z.gueltig_bis && ` · gültig bis ${zeitVoll(z.gueltig_bis)}`}
                               {z.schluessel_gewechselt_at &&
                                 !widerrufenAm &&
                                 ` · Schlüssel gewechselt ${zeit(z.schluessel_gewechselt_at)}`}
                               {z.widerrufen_at &&
-                                ` · widerrufen ${zeit(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
+                                ` · widerrufen ${zeitVoll(z.widerrufen_at)}${z.widerrufen_von_name ? ` von ${z.widerrufen_von_name}` : ''}`}
                             </span>
                           </span>
                         }
@@ -441,7 +518,7 @@ export default function EinwurfZugaenge() {
         zugang={wechselFuer}
         titel={(name) => `Schlüssel von ${name} wechseln?`}
         okText="Schlüssel wechseln"
-        folge="Der bisherige Schlüssel gilt ab sofort nicht mehr. Der Absender braucht die neue Adresse."
+        folge="Der bisherige Schlüssel gilt ab sofort nicht mehr, der Absender braucht die neue Adresse."
         fehlerTitel="Schlüssel nicht gewechselt"
         laeuft={wechseln.isPending}
         fehler={wechseln.error}
@@ -452,14 +529,14 @@ export default function EinwurfZugaenge() {
         zugang={widerrufFuer}
         titel={(name) => `${name} widerrufen?`}
         okText="Widerrufen"
-        folge="Der Absender kommt ab sofort nicht mehr herein. Andere Zugänge bleiben unberührt."
+        folge="Der Absender kommt ab sofort nicht mehr herein."
         fehlerTitel="Nicht widerrufen"
         laeuft={widerrufen.isPending}
         fehler={widerrufen.error}
         onOk={(z) => widerrufen.mutate(z)}
         onAbbrechen={() => setWiderrufFuer(null)}
       />
-      <AdresseDialog neu={neu} onFertig={() => setNeu(null)} />
+      <AdresseDialog neu={neu} transport={liste?.transport} onFertig={() => setNeu(null)} />
     </div>
   );
 }

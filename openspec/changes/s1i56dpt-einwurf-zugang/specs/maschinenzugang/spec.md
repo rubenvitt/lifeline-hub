@@ -29,7 +29,7 @@ gescheiterte Einlösungen und unbekannte Einwurf-Schlüssel zählen. Nach 10 sol
 in 5 Minuten MUST er diese Quelle auf den Maschinenwegen, auch den Einwurf-Routen, mit 429
 abweisen. Dieser Zähler MUST NOT die Anmeldesperre für Passwort, Passkey oder Gerätekopplung
 berühren. Eine falsche Signatur oder Uhr eines bekannten Zugangs MUST NOT in ihm zählen, ebenso
-wenig ein widerrufener oder abgelaufener Einwurf-Schlüssel.
+wenig ein widerrufener, abgelaufener oder durch einen Wechsel abgelöster Einwurf-Schlüssel.
 
 #### Scenario: Falsche Uhr hinter NAT
 - **WHEN** ein bekannter Zugang hinter derselben IP wie eine Wache mehr als zehnmal mit falscher Uhr signiert
@@ -42,6 +42,10 @@ wenig ein widerrufener oder abgelaufener Einwurf-Schlüssel.
 #### Scenario: Durchprobieren von Einwurf-Schlüsseln
 - **WHEN** eine Quelle in 5 Minuten zehn Einwürfe mit unbekannten Schlüsseln schickt
 - **THEN** antwortet der Server auf weitere Einwürfe dieser Quelle mit 429, auch mit gültigem Schlüssel, und die Passwort-Anmeldung von dort bleibt möglich
+
+#### Scenario: Abgelöster Einwurf-Schlüssel hinter NAT
+- **WHEN** ein Admin den Schlüssel eines Einwurf-Zugangs wechselt und der Absender hinter derselben IP wie eine Wache weiter mehr als zehnmal mit dem alten Schlüssel einwirft
+- **THEN** bekommt er jedes Mal 401, und der neue Schlüssel wird von dieser IP angenommen
 
 #### Scenario: Widerrufener Einwurf-Schlüssel hinter NAT
 - **WHEN** ein Absender hinter derselben IP wie eine Wache mehr als zehnmal mit einem widerrufenen Einwurf-Schlüssel einwirft

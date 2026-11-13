@@ -76,8 +76,9 @@ Der Einwurf speichert, was ankam, und erkennt nur `external_id` und `message_id`
 
 ### D3 Datenmodell
 
-Drei Tabellen, Nummern über allen auf `origin/alpha` (nach dem Zusammenführen von `alpha` am 12.11.2026: 0339), eine vierte Migration baut den
-CHECK von `admin_audit` neu (0340).
+Vier Tabellen in einer Migration, Nummern über allen auf `origin/alpha` (nach dem Zusammenführen
+von `alpha` am 12.11.2026: 0339); eine zweite Migration baut den CHECK von `admin_audit` neu
+(0340). Die vierte Tabelle, `einwurf_schluessel_abgeloest`, kam mit dem Review dazu (D15).
 
 ```sql
 CREATE TABLE einwurf_zugang (
@@ -120,6 +121,12 @@ CREATE TABLE position_letzte (
     empfangen_at TEXT    NOT NULL,
     rohdaten     TEXT    NOT NULL,   -- übrige Felder (Geschwindigkeit, Richtung …), ersetzt mit
     PRIMARY KEY (zugang_id, kennung)
+);
+
+CREATE TABLE einwurf_schluessel_abgeloest (
+    schluessel_hash TEXT PRIMARY KEY,   -- Hash eines Schlüssels, den ein Wechsel abgelöst hat
+    zugang_id       TEXT NOT NULL REFERENCES einwurf_zugang(id) ON DELETE CASCADE,
+    abgeloest_at    TEXT NOT NULL
 );
 ```
 
@@ -176,7 +183,7 @@ In einer Transaktion (`write_retry!`) wird genau einer von drei Wegen genommen:
 
 ### D6 Reihenfolge der Prüfungen
 
-Eine Funktion `pruefe` in `src/public_api/einwurf/routen.rs` (kein Extractor mit `Rejection`,
+Eine Funktion `check_einwurf` in `src/public_api/einwurf/routen.rs` (kein Extractor mit `Rejection`,
 damit die Reihenfolge an einer Stelle steht), aufgerufen von den vier Handlern:
 
 1. **TLS-Nachweis** (D7), sonst `403 tls_required`. Vor der Suche, damit eine Klartext-Anfrage
@@ -196,7 +203,7 @@ Zeit ist dafür nicht nötig.
 
 ### D7 TLS-Nachweis
 
-- Neue Funktion in `src/extract.rs`: `kam_ueber_tls(tls_direkt, gegenstelle, headers, vertraut)`.
+- Neue Funktion in `src/extract.rs`: `is_tls_nachgewiesen(tls_direkt, gegenstelle, headers, vertraut)`.
   Sie ist wahr, wenn der Server TLS selbst terminiert oder wenn die Gegenstelle in der Liste
   steht, `X-Forwarded-Proto` vorhanden ist und **jeder** Wert `https` lautet. So gilt weder ein
   Kopf von einer fremden Gegenstelle noch ein Wert, den ein Client vor den des Proxys gesetzt
@@ -206,7 +213,8 @@ Zeit ist dafür nicht nötig.
   Admin-Liste lesen sie dort. Kein neues Feld in `AppState` und kein weiteres `OnceLock`: Tests
   prüfen „an“ und „aus“ im selben Binary (Begründung wie bei `RouterOptionen` selbst).
 - **Schalter:** `--einwurf-allow-http`, `LIFELINE_EINWURF_ALLOW_HTTP`, Vorgabe aus. Beim Start
-  schreibt der Server eine Warnzeile, wenn er gesetzt ist.
+  schreibt der Server eine Warnzeile, wenn er gesetzt ist und `--tls` fehlt; mit `--tls` hat er
+  keine Wirkung.
 - **Lage für die Seite:** `EinwurfTransport` als Wire-Enum mit `tls`, `proxy` (Liste der
   vertrauten Proxys nicht leer), `http` (Schalter) und `keiner`. Das Paneel warnt bei `http` und
   `keiner`.
@@ -223,9 +231,12 @@ Zeit ist dafür nicht nötig.
   einziger Zugang bei 30 Aufrufen je Minute und 64 KiB je Aufruf bis zu 2,7 GB am Tag.
   - Body höchstens 16 KiB (`DefaultBodyLimit` an den Routen, wie beim Einlösen), Abfrage
     höchstens 8 KiB: 413.
+  - Ein Eintrag der Ablage höchstens 48 KiB (`ROHDATEN_MAX`): 413. Body und Abfrage zusammen
+    sind 24 KiB; die JSON-Hülle kann Steuer- und Anführungszeichen auf das Sechsfache dehnen.
   - Höchstens 5 000 neue Alarmmeldungen je Zugang in 24 Stunden: 429 mit `Retry-After: 3600`.
-    Gezählt wird in der Schreib-Transaktion; Wiederholungen zählen nicht. Das sind im
-    schlimmsten Fall 80 MB am Tag und 560 MB in der Löschfrist.
+    Gezählt wird in der Schreib-Transaktion; Wiederholungen zählen nicht mit, bekommen an der
+    Grenze aber dieselbe Antwort. Das sind im schlimmsten Fall 240 MB am Tag und 1,7 GB in der
+    Löschfrist.
   - Höchstens 200 Kennungen je Zugang: 422.
 
 ### D9 Maskierung
@@ -312,7 +323,7 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
   - `gilt_fuer`: `src/public_api/**`, `src/routes/einwurf_zugaenge.rs`, `src/extract.rs`,
     `src/app.rs`, `src/auth/rate_limit.rs`.
   - Prüfung: `verlange 'einwurf::maskiere_pfad' src/app.rs`, das Präfix `llh_ew_` in
-    `src/public_api/einwurf/mod.rs`, `kam_ueber_tls` und der Fehlversuch im Maschinenzähler in
+    `src/public_api/einwurf/mod.rs`, `is_tls_nachgewiesen` und der Fehlversuch im Maschinenzähler in
     `einwurf/routen.rs`, dazu ein Verbot von `tracing`-Aufrufen mit Schlüssel, Hash oder Pfad.
   - Wortlaut: „am bestehenden Vorschlag“ wird „am bestehenden Eintrag der Ablage“; die Regel zum
     TLS-Kopf nennt „jeder Wert“; neu die Obergrenzen aus D8.
@@ -340,6 +351,35 @@ Eigene Datei `src/routes/einwurf_zugaenge.rs`, registriert in `src/app.rs`:
   Sie war über `url` schon im Baum; `Cargo.lock` bekommt keine neue Crate.
 - **`alpha` zusammengeführt:** Die Migrationen heißen 0339 und 0340, die neue ADR 0031.
 - **Paneel-Knopf in normaler Größe:** Die Layout-Gates messen die Trefffläche jeder Seite.
+
+#### Nachträge aus dem Review vor dem PR (13.11.2026)
+
+- **Abgelöste Schlüssel zählen nicht** (Tabelle `einwurf_schluessel_abgeloest`): Nach einem
+  Wechsel ruft der Absender die alte Adresse weiter auf, bis jemand sie umträgt. Ohne die Tabelle
+  wäre der alte Schlüssel „unbekannt“ und sperrte nach zehn Aufrufen die Quelle, auch für den
+  neuen Schlüssel. Der Hash des alten bleibt deshalb liegen, bis der Zugang gelöscht wird; die
+  Antwort bleibt 401.
+- **Die Antwort unterscheidet nie neu und wiederholt:** Die Tagesgrenze wird vor der
+  Doppelerkennung geprüft. Sonst hätte ein Angreifer an der Grenze erfragen können, ob ein
+  Inhalt oder eine Kennung schon in der Ablage liegt.
+- **Nur GET und POST:** axum beantwortet HEAD über die GET-Route; ein HEAD hätte abgelegt. Jede
+  andere Methode ergibt 405.
+- **Leer heißt ohne Inhalt:** `?&` oder `?=` trägt kein Paar und gilt als leer (422).
+- **Abfrage ohne UTF-8 geht nicht verloren:** War das Dekodieren verlustbehaftet, liegt die
+  Abfrage zusätzlich als `abfrage_roh` in den Rohdaten. Die Kennung einer Position muss UTF-8
+  sein (400), sonst fielen zwei Geräte auf dieselbe Ersatzkennung.
+- **Maskierung fasst jeden Abschnitt, der das Präfix enthält**, auch prozentkodiert, statt nur
+  den nach `/api/v1/einwurf/`.
+- **Kein Wechsel bei abgelaufenem Zugang** (409): Der neue Schlüssel wäre sofort ungültig.
+- **Drossel hinterlässt eine Spur:** eine WARN-Zeile je Zugang und Minute (`Sammelzeile`).
+- **Paneel ohne Netz:** Die Aktionen sind mit Grund gesperrt, die Mutationen laufen sofort oder
+  nie (`networkMode: 'always'`), damit kein Schlüsselwechsel vorgemerkt wird.
+- **Bewusst so gelassen:** (a) Zwischen Prüfung und Schreiben kann ein Widerruf liegen; der
+  Einwurf landet dann noch. (b) Mit `--tls` hinter einem Proxy, der `http` meldet, gilt die
+  direkte Verbindung. (c) Springt die Uhr eines Absenders zurück, bleibt seine Position bis zu
+  24 Stunden stehen. (d) Dieselbe `message_id` mit anderem Inhalt wird nur gezählt. (c) und (d)
+  stehen in `docs/api/einwurf.md`; ob sie so bleiben, entscheidet der Leseweg (LLH-1192,
+  LLH-1199).
 
 ## Risks / Trade-offs
 

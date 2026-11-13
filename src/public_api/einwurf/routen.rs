@@ -9,13 +9,13 @@ use axum::body::to_bytes;
 use axum::extract::{FromRequestParts, Request, State};
 use axum::http::header::CONTENT_TYPE;
 use axum::http::request::Parts;
-use axum::http::StatusCode;
+use axum::http::{Method, StatusCode};
 
 use super::ablage::{self, AlarmErgebnis, Einwurf, PositionErgebnis};
 use super::{EinwurfZugang, Transport};
 use crate::app::AppState;
 use crate::auth::rate_limit;
-use crate::extract::{gegenstelle, kam_ueber_tls, vertraute_proxys, PeerIp, PfadParam};
+use crate::extract::{gegenstelle, is_tls_nachgewiesen, vertraute_proxys, PeerIp, PfadParam};
 use crate::public_api::scope::Scope;
 use crate::public_api::{drossel, zugang, ApiError, ErrorCode};
 
@@ -29,12 +29,13 @@ fn unauthorized() -> ApiError {
 /// 1. TLS-Nachweis, vor der Suche: eine Klartext-Anfrage ist kein Orakel für Schlüssel und zählt
 ///    nirgends.
 /// 2. Sperre der Quelle im Zähler für Maschinen (nie die Anmeldesperre).
-/// 3. Form des Schlüssels und Suche über den Hash; ein unbekannter zählt als Fehlversuch.
+/// 3. Form des Schlüssels und Suche über den Hash; ein unbekannter zählt als Fehlversuch. Ein
+///    durch einen Wechsel abgelöster Schlüssel ist bekannt und zählt nicht.
 /// 4. Zustand: widerrufen, abgelaufen oder gekoppelter ELW. Zählt nicht, sonst sperrte ein
 ///    Absender mit altem Schlüssel die Wache hinter derselben Adresse aus.
 /// 5. Zweck gegen die Route.
 /// 6. Drossel je Zugang.
-async fn pruefe(
+async fn check_einwurf(
     state: &AppState,
     parts: &mut Parts,
     schluessel: &str,
@@ -45,7 +46,7 @@ async fn pruefe(
         .get::<Transport>()
         .copied()
         .unwrap_or_default();
-    let verschluesselt = kam_ueber_tls(
+    let verschluesselt = is_tls_nachgewiesen(
         transport.tls,
         gegenstelle(parts),
         &parts.headers,
@@ -73,10 +74,16 @@ async fn pruefe(
         super::find_by_schluessel(&mut conn, schluessel).await?
     };
     let Some(zugang) = gefunden else {
-        if let Some(ip) = peer_ip {
-            rate_limit::maschine::fehlversuch(ip);
+        let abgeloest = {
+            let mut conn = state.pool.acquire().await?;
+            super::is_abgeloest(&mut conn, schluessel).await?
+        };
+        if !abgeloest {
+            if let Some(ip) = peer_ip {
+                rate_limit::maschine::fehlversuch(ip);
+            }
+            tracing::debug!("Einwurf mit unbekanntem Schlüssel");
         }
-        tracing::debug!("Einwurf mit unbekanntem Schlüssel");
         return Err(unauthorized());
     };
 
@@ -97,6 +104,17 @@ async fn pruefe(
     }
 
     if let Err(warten) = drossel::try_take_einwurf(&zugang.id) {
+        // Der Absender bekommt 429; viele wiederholen nicht. Damit der Betreiber es erfährt,
+        // steht es im Log, als Sammelzeile: Wer den Schlüssel hat, löst sie je Aufruf aus.
+        static GEDROSSELT: crate::log_drossel::Sammelzeile = crate::log_drossel::Sammelzeile::neu();
+        if let Some(f) = GEDROSSELT.zaehlen() {
+            tracing::warn!(
+                zugang = %zugang.id,
+                anzahl = f.anzahl,
+                seit_s = f.seit_s,
+                "Einwürfe gedrosselt (mehr als 30 am Stück je Zugang), Sammelzeile"
+            );
+        }
         return Err(ApiError::rate_limited(drossel::retry_after_s(warten)));
     }
     Ok(zugang)
@@ -110,7 +128,12 @@ async fn annehmen(
     zweck: Scope,
 ) -> Result<StatusCode, ApiError> {
     let (mut parts, body) = req.into_parts();
-    let zugang = pruefe(&state, &mut parts, &schluessel, zweck).await?;
+    // axum reicht HEAD an den GET-Handler weiter. Ein Einwurf schreibt aber: `curl -I` oder ein
+    // Link-Prüfer legte sonst eine Meldung an.
+    if parts.method != Method::GET && parts.method != Method::POST {
+        return Err(ApiError::from_code(ErrorCode::MethodNotAllowed));
+    }
+    let zugang = check_einwurf(&state, &mut parts, &schluessel, zweck).await?;
 
     // Die v1-Schicht hat den Body schon bis 64 KiB gepuffert; hier gilt die engere Grenze.
     let body = to_bytes(body, ablage::BODY_MAX)

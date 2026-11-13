@@ -37,7 +37,7 @@ Der Server SHALL unter `GET` und `POST /api/v1/einwurf/{schluessel}/alarmmeldung
 `…/position` Einwürfe annehmen, ohne Signatur, Sitzung oder Kopf `Authorization`. Ein
 angenommener Einwurf MUST in die Ablage der Org des Zugangs geschrieben und mit 204 beantwortet
 werden. Ein unbekannter, widerrufener oder abgelaufener Schlüssel MUST 401 mit dem Code
-`unauthorized` ergeben.
+`unauthorized` ergeben. Jede andere Methode, auch HEAD, MUST 405 ergeben und nichts speichern.
 
 #### Scenario: Gültiger Schlüssel
 - **WHEN** ein Absender `GET /api/v1/einwurf/<schlüssel>/alarmmeldung?text=Brand` mit einem gültigen Schlüssel aufruft
@@ -50,6 +50,10 @@ werden. Ein unbekannter, widerrufener oder abgelaufener Schlüssel MUST 401 mit 
 #### Scenario: Abgelaufen
 - **WHEN** das „gültig bis“ eines Zugangs verstrichen ist und ein Einwurf mit seinem Schlüssel kommt
 - **THEN** antwortet der Server mit 401
+
+#### Scenario: HEAD schreibt nicht
+- **WHEN** jemand die Adresse eines Zugangs mit HEAD aufruft
+- **THEN** antwortet der Server mit 405, und die Ablage ist unverändert
 
 ### Requirement: Ein Zugang schreibt nur für seinen Zweck
 
@@ -115,8 +119,8 @@ prüft. Nur ein ausdrücklicher Schalter des Betreibers hebt das auf.
 
 Der Server MUST NOT einen Einwurf-Schlüssel in eine Logzeile, einen Trace-Span, die Admin-Spur
 oder eine Fehlermeldung schreiben. Im protokollierten Pfad MUST der Abschnitt nach `/einwurf/`
-und jeder Abschnitt mit dem Präfix `llh_ew_` durch einen festen Platzhalter ersetzt sein. Die
-Abfrage MUST NOT protokolliert werden.
+und jeder Abschnitt, der das Präfix `llh_ew_` enthält, auch prozentkodiert, durch einen festen
+Platzhalter ersetzt sein. Die Abfrage MUST NOT protokolliert werden.
 
 #### Scenario: Trace-Span
 - **WHEN** ein Einwurf mit gültigem Schlüssel verarbeitet wird und das Log mitgeschnitten wird
@@ -124,6 +128,10 @@ Abfrage MUST NOT protokolliert werden.
 
 #### Scenario: Vertippter Pfad
 - **WHEN** jemand `/api/v1/einwurff/llh_ew_…/alarmmeldung` aufruft
+- **THEN** enthält keine Logzeile den Schlüssel
+
+#### Scenario: Schrägstrich vergessen
+- **WHEN** jemand `/api/v1/einwurfllh_ew_…/alarmmeldung` aufruft
 - **THEN** enthält keine Logzeile den Schlüssel
 
 #### Scenario: Fehlerfall
@@ -146,9 +154,11 @@ in ganzen Sekunden antworten und nichts speichern.
 
 ### Requirement: Die Ablage hat Obergrenzen
 
-Ein Einwurf MUST NOT mehr als 16 KiB Body und 8 KiB Abfrage tragen; darüber antwortet der Server
-mit 413 und dem Code `payload_too_large`. Je Zugang MUST der Server höchstens 5 000 neue
-Alarmmeldungen in 24 Stunden und höchstens 200 Kennungen für Positionen speichern.
+Ein Einwurf MUST NOT mehr als 16 KiB Body und 8 KiB Abfrage tragen, und die abgelegten Rohdaten
+einer Alarmmeldung MUST NOT 48 KiB überschreiten; darüber antwortet der Server mit 413 und dem
+Code `payload_too_large`. Je Zugang MUST der Server höchstens 5 000 neue Alarmmeldungen in 24
+Stunden und höchstens 200 Kennungen für Positionen speichern. Ist die Tagesgrenze erreicht, MUST
+jeder Einwurf einer Alarmmeldung 429 ergeben, auch eine Wiederholung.
 
 #### Scenario: Zu großer Body
 - **WHEN** ein Einwurf einen Body von 17 KiB trägt
@@ -158,6 +168,14 @@ Alarmmeldungen in 24 Stunden und höchstens 200 Kennungen für Positionen speich
 - **WHEN** ein Zugang in 24 Stunden 5 000 neue Alarmmeldungen eingeworfen hat und eine weitere neue schickt
 - **THEN** antwortet der Server mit 429 und `Retry-After`, und nichts wird gespeichert
 
+#### Scenario: Wiederholung an der Tagesgrenze
+- **WHEN** die Tagesgrenze erreicht ist und eine schon abgelegte Meldung noch einmal kommt
+- **THEN** antwortet der Server ebenfalls mit 429, und am bestehenden Eintrag wird nichts vermerkt
+
+#### Scenario: Aufgeblähte Rohdaten
+- **WHEN** ein Einwurf 16 KiB Steuerzeichen als Body trägt
+- **THEN** antwortet der Server mit 413 und speichert nichts
+
 #### Scenario: Zu viele Kennungen
 - **WHEN** an einem Zugang 200 Kennungen eine Position haben und eine Position für eine weitere Kennung kommt
 - **THEN** antwortet der Server mit 422, und die 200 bestehenden Positionen bleiben
@@ -166,9 +184,8 @@ Alarmmeldungen in 24 Stunden und höchstens 200 Kennungen für Positionen speich
 
 Der Server SHALL eine eingeworfene Alarmmeldung unverändert ablegen: die Abfrage und den Body,
 dazu Zugang, Org und Empfangszeit. Er MUST den Inhalt nicht deuten und keine Felder verlangen,
-außer dass Abfrage oder Body nicht leer sind. Ein leerer Einwurf MUST 422 mit dem Code
-`unprocessable` ergeben. Aus Abfrage, Formularfeldern oder JSON-Body erkennt er nur
-`external_id` und `message_id`; eine Kennung über 200 Zeichen MUST 400 ergeben.
+außer dass Abfrage oder Body Inhalt tragen; ein leerer Einwurf MUST 422 mit dem Code
+`unprocessable` ergeben. Kam die Abfrage nicht in UTF-8, MUST sie zusätzlich roh abgelegt sein.
 
 #### Scenario: BOSWatch-Aufruf
 - **WHEN** ein Absender `…/alarmmeldung?ric=1234567&subric=a&text=B2%20Wohnung` aufruft
@@ -179,8 +196,26 @@ außer dass Abfrage oder Body nicht leer sind. Ein leerer Einwurf MUST 422 mit d
 - **THEN** enthält der Eintrag den Body unverändert und die Kennung `LS-1`
 
 #### Scenario: Leerer Einwurf
-- **WHEN** ein Absender `…/alarmmeldung` ohne Abfrage und ohne Body aufruft
+- **WHEN** ein Absender `…/alarmmeldung` ohne Abfrage und ohne Body aufruft, oder nur mit `?&`
 - **THEN** antwortet der Server mit 422 und dem Code `unprocessable`
+
+#### Scenario: Abfrage in Latin-1
+- **WHEN** ein Absender `…/alarmmeldung?text=Brand%20K%F6ln` aufruft
+- **THEN** antwortet der Server mit 204, und der Eintrag enthält neben den dekodierten Paaren die Abfrage, wie sie ankam
+
+### Requirement: Der Server erkennt nur zwei Kennungen
+
+Aus Abfrage, Formularfeldern oder der obersten Ebene eines JSON-Bodys SHALL der Server nur
+`external_id` und `message_id` erkennen; der Body geht der Abfrage vor. Eine Kennung über 200
+Zeichen MUST 400 mit dem Code `invalid_field` ergeben.
+
+#### Scenario: Kennung im JSON-Body
+- **WHEN** ein Absender per POST `{"external_id": "LS-1", "message_id": 7}` schickt
+- **THEN** trägt der Eintrag die Kennungen `LS-1` und `7`
+
+#### Scenario: Zu lange Kennung
+- **WHEN** ein Absender eine `external_id` mit 201 Zeichen schickt
+- **THEN** antwortet der Server mit 400 und speichert nichts
 
 ### Requirement: Eine Meldung mit Kennung ist dauerhaft idempotent
 
@@ -238,8 +273,9 @@ löschen. Ein erneuter Empfang MUST die Frist nicht verlängern.
 
 Der Server SHALL eine eingeworfene Position mit Kennung (`id` oder `deviceid`), `lat`, `lon` und
 optionalem `timestamp` annehmen. Je Zugang und Kennung MUST er genau eine Position halten: Eine
-neue ersetzt die gespeicherte, ohne Verlauf. Fehlt die Kennung oder liegt eine Koordinate
-außerhalb des Wertebereichs, MUST er mit 400 und dem Code `invalid_field` antworten.
+neue ersetzt die gespeicherte, ohne Verlauf. Fehlt die Kennung, ist sie kein gültiges UTF-8 oder
+liegt eine Koordinate außerhalb des Wertebereichs, MUST er mit 400 und dem Code `invalid_field`
+antworten.
 
 #### Scenario: OsmAnd-Aufruf
 - **WHEN** ein Absender `…/position?id=elw1&lat=52.1&lon=9.3&timestamp=1794423731` aufruft
@@ -281,7 +317,7 @@ keine neuere für dieselbe Kennung kam.
 Ein Admin SHALL einen Einwurf-Zugang widerrufen und seinen Schlüssel wechseln können. Nach dem
 Widerruf MUST jeder Einwurf mit dem Schlüssel 401 ergeben. Der Wechsel gibt einen neuen Schlüssel
 aus; der alte MUST im selben Augenblick 401 ergeben. Name, Zweck und „gültig bis“ bleiben beim
-Wechsel. Ein widerrufener Zugang MUST NOT einen neuen Schlüssel bekommen.
+Wechsel. Ein widerrufener oder abgelaufener Zugang MUST NOT einen neuen Schlüssel bekommen.
 
 #### Scenario: Widerruf
 - **WHEN** ein Admin einen Zugang widerruft und danach ein Einwurf mit dessen Schlüssel kommt
@@ -294,6 +330,10 @@ Wechsel. Ein widerrufener Zugang MUST NOT einen neuen Schlüssel bekommen.
 #### Scenario: Wechsel nach Widerruf
 - **WHEN** ein Admin den Schlüssel eines widerrufenen Zugangs wechseln will
 - **THEN** antwortet der Server mit 409
+
+#### Scenario: Wechsel nach Ablauf
+- **WHEN** das „gültig bis“ eines Zugangs verstrichen ist
+- **THEN** bietet die Seite keinen Schlüsselwechsel an, und der Server antwortet darauf mit 409
 
 ### Requirement: Anlegen, Wechsel und Widerruf stehen in der Admin-Spur
 
@@ -330,9 +370,28 @@ schließt. Wer kein System-Admin ist, sieht die Liste ohne Aktionen.
 - **WHEN** ein Zugang einen Einwurf angenommen hat und die Seite neu lädt
 - **THEN** zeigt die Zeile des Zugangs „zuletzt genutzt“ mit dem Zeitpunkt
 
+#### Scenario: Frist mit Datum
+- **WHEN** ein Zugang „gültig bis“ zum 01.03.2027 hat
+- **THEN** nennt die Zeile die Frist mit Tag, Monat und Jahr
+
 #### Scenario: Nur lesen
 - **WHEN** eine Führungskraft ohne System-Admin-Recht die Seite öffnet
 - **THEN** sieht sie die Zugänge, aber keine Aktion zum Anlegen, Wechseln oder Widerrufen
+
+### Requirement: Ohne Verbindung wird nichts vorgemerkt
+
+Meldet der Browser keine Verbindung, MUST das Paneel Anlegen, Schlüsselwechsel und Widerruf mit
+Grund sperren. Eine Aktion MUST sofort hinausgehen oder sofort scheitern; sie MUST NOT für später
+vorgemerkt werden. Sonst gälte der alte Schlüssel nach der Rückkehr des Netzes nicht mehr, und
+den neuen sähe niemand.
+
+#### Scenario: Ohne Verbindung
+- **WHEN** der Browser keine Verbindung meldet
+- **THEN** sind Anlegen, „Schlüssel wechseln …“ und „Widerrufen …“ gesperrt, und das Paneel nennt den Grund
+
+#### Scenario: Netz fällt bei offener Rückfrage weg
+- **WHEN** der Admin eine Rückfrage bestätigt, während keine Verbindung besteht
+- **THEN** scheitert die Aktion sofort mit einer Fehlermeldung im Dialog, und nach der Rückkehr des Netzes geht nichts hinaus
 
 ### Requirement: Die Seite warnt, wenn Einwürfe unverschlüsselt möglich oder unmöglich sind
 
@@ -347,6 +406,10 @@ vertrauten Proxy kennt und den Schalter nicht gesetzt hat: Dann lehnt sie jeden 
 #### Scenario: Kein Weg mit TLS
 - **WHEN** die Instanz ohne TLS, ohne vertraute Proxys und ohne den Schalter läuft
 - **THEN** zeigt das Paneel den Hinweis, dass Einwürfe abgelehnt werden
+
+#### Scenario: Adresse mit http
+- **WHEN** der Admin die Seite über http geöffnet hat und der Betreiber Einwürfe ohne TLS nicht erlaubt
+- **THEN** warnt der Dialog mit der Adresse, dass sie mit http beginnt und der Server nur https annimmt
 
 ### Requirement: Ein gekoppelter ELW nimmt keine Einwürfe an
 

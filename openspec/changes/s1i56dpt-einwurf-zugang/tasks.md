@@ -30,7 +30,7 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
 
 ## 3. TLS-Nachweis und Schalter
 
-- [x] 3.1 `src/extract.rs`: `kam_ueber_tls(tls_direkt, gegenstelle, headers, vertraut)` nach
+- [x] 3.1 `src/extract.rs`: `is_tls_nachgewiesen(tls_direkt, gegenstelle, headers, vertraut)` nach
   design.md D7. Verifizieren: Unit-Tests für „direktes TLS“, „vertrauter Proxy mit https“,
   „fremde Gegenstelle mit https-Kopf“, „https, http vom vertrauten Proxy“, „Kopf fehlt“,
   „Gegenstelle unbekannt“ und eine IPv4-gemappte Gegenstelle.
@@ -201,7 +201,7 @@ der Bezeichner-Sprache der Wurzel-`AGENTS.md` (Fachbegriffe deutsch, Technik eng
 - **5.4 und 11.2, Mutationsproben:** Drei Fehler zugleich eingebaut, danach wiederhergestellt
   (`git status` sauber). Ohne den Aufruf von `einwurf::maskiere_pfad` in `pfad_fuer_protokoll`
   werden `app::tests::einwurf_schluessel_steht_in_keiner_logzeile` und
-  `pfad_fuer_das_log_traegt_keinen_einwurf_schluessel` rot. Ohne die TLS-Prüfung in `pruefe` wird
+  `pfad_fuer_das_log_traegt_keinen_einwurf_schluessel` rot. Ohne die TLS-Prüfung in `check_einwurf` (damals `pruefe`) wird
   `ohne_tls_und_ohne_schalter_ist_jeder_einwurf_403` (`tests/einwurf.rs`) rot. Mit umgedrehtem
   Vergleich in `position_ablegen` werden `aeltere_position_wird_nicht_uebernommen`,
   `neue_position_ersetzt_die_alte_ohne_verlauf` und

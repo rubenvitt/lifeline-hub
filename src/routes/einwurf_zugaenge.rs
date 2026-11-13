@@ -151,7 +151,7 @@ pub async fn anlegen(
             &jetzt,
         )
         .await?;
-        let z = einwurf::laden_in_org(&mut *conn, org_id, &id)
+        let z = einwurf::load_in_org(&mut *conn, org_id, &id)
             .await?
             .ok_or_else(|| AppError::Internal("Einwurf-Zugang verschwunden".into()))?;
         Ok((z, schluessel))
@@ -189,7 +189,7 @@ pub async fn schluessel_wechseln(
     let org_id = admin.org_id;
     let (z, schluessel) = crate::write_retry!(&state.pool, |conn| {
         // Erst die Existenz, dann die Sperre: ein fremder Zugang bleibt 404, auch am ELW.
-        if einwurf::laden_in_org(&mut *conn, org_id, &id)
+        if einwurf::load_in_org(&mut *conn, org_id, &id)
             .await?
             .is_none()
         {
@@ -201,7 +201,7 @@ pub async fn schluessel_wechseln(
         let schluessel = einwurf::schluessel_wechseln(&mut *conn, org_id, &id, &jetzt)
             .await?
             .ok_or(AppError::NotFound)?;
-        let z = einwurf::laden_in_org(&mut *conn, org_id, &id)
+        let z = einwurf::load_in_org(&mut *conn, org_id, &id)
             .await?
             .ok_or(AppError::NotFound)?;
         Ok((z, schluessel))
@@ -238,7 +238,7 @@ pub async fn widerrufen(
         let wirkung = einwurf::widerrufen(&mut *conn, org_id, &id, Some(von), &jetzt)
             .await?
             .ok_or(AppError::NotFound)?;
-        let z = einwurf::laden_in_org(&mut *conn, org_id, &id)
+        let z = einwurf::load_in_org(&mut *conn, org_id, &id)
             .await?
             .ok_or(AppError::NotFound)?;
         Ok((wirkung, z))

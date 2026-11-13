@@ -135,7 +135,7 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   sonst packte die Kompression keine v1-Antwort mehr.
 - **Einwurf** (LLH-1654, [ADR-0023](../docs/architektur/entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md),
   Spec `einwurf-zugang`): die einzigen v1-Routen ohne `MachineClient`. Die Prüfungen stehen in
-  genau einer Funktion (`pruefe` in `public_api/einwurf/routen.rs`), TLS-Nachweis zuerst; wer eine
+  genau einer Funktion (`check_einwurf` in `public_api/einwurf/routen.rs`), TLS-Nachweis zuerst; wer eine
   Einwurf-Route ergänzt, ruft sie auf. **Kein `tracing`-Aufruf nennt Pfad, Abfrage, Schlüssel
   oder Hash** (die Kennung des Zugangs genügt); der Span trägt den Pfad schon maskiert
   (`pfad_fuer_protokoll`, Test `app::tests::einwurf_schluessel_steht_in_keiner_logzeile`). Eine

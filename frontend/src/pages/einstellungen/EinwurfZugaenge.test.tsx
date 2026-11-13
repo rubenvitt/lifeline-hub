@@ -2,11 +2,15 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
 import { waehleMenueEintrag } from '../../test/menue';
-import EinwurfZugaenge, { einwurfZustand, transportHinweis } from './EinwurfZugaenge';
+import EinwurfZugaenge, {
+  adresseBrauchtHttps,
+  einwurfZustand,
+  transportHinweis,
+} from './EinwurfZugaenge';
 import { einwurfAdresse } from '../../api/einwurfZugaenge';
 
 vi.mock('../../auth/AuthContext', () => ({
@@ -170,7 +174,9 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     // Escape schließt den Dialog nicht: der Schlüssel ginge verloren, bevor er eingetragen ist.
     screen.getByRole('button', { name: 'Fertig' }).focus();
     await user.keyboard('{Escape}');
+    await user.click(document.querySelector<HTMLElement>('.ant-modal-wrap')!);
     expect(screen.getByText(adresse)).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Adresse für OsmAnd ELW' })).toBeVisible();
     const adressDialog = screen.getByRole('dialog', { name: 'Adresse für OsmAnd ELW' });
     expect(within(adressDialog).queryByRole('button', { name: /Close|Schließen/ })).toBeNull();
 
@@ -294,7 +300,12 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     const user = userEvent.setup();
     renderMitProviders(<EinwurfZugaenge />);
     await screen.findByText('BOSWatch a');
-    expect(screen.getByRole('button', { name: /Einwurf-Zugang anlegen/ })).toBeDisabled();
+    // Das Paneel nennt den Grund selbst, auch wenn die Nachbarliste nicht geladen ist.
+    const grund = document.querySelector<HTMLElement>('[data-lfh="einwurf-gesperrt"]')!;
+    expect(grund.textContent).toMatch(/meldet sich für die Organisation bei Hub Kreis/);
+    const knopf = screen.getByRole('button', { name: /Einwurf-Zugang anlegen/ });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAttribute('aria-describedby', 'einwurf-gesperrt');
     await user.click(menueKnopf('BOSWatch a'));
     expect(await screen.findByRole('menuitem', { name: /Widerrufen/ })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /Schlüssel wechseln/ })).not.toBeInTheDocument();
@@ -307,6 +318,108 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     stelleBereit({ transport });
     renderMitProviders(<EinwurfZugaenge />);
     expect(await screen.findByText(titel)).toBeInTheDocument();
+  });
+
+  it('bietet für einen abgelaufenen Zugang keinen Schlüsselwechsel an', async () => {
+    stelleBereit({
+      zugaenge: [zugang('a', { is_abgelaufen: true, gueltig_bis: '2026-01-01 00:00:00' })],
+    });
+    const user = userEvent.setup();
+    renderMitProviders(<EinwurfZugaenge />);
+    await screen.findByText('BOSWatch a');
+    await user.click(menueKnopf('BOSWatch a'));
+    expect(await screen.findByRole('menuitem', { name: /Widerrufen/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Schlüssel wechseln/ })).not.toBeInTheDocument();
+  });
+
+  it('zeigt Frist und Widerruf mit Monat und Jahr', async () => {
+    stelleBereit({
+      zugaenge: [
+        zugang('a', { gueltig_bis: '2027-01-01 00:00:00' }),
+        zugang('b', { gueltig_bis: '2027-03-01 00:00:00' }),
+      ],
+    });
+    renderMitProviders(<EinwurfZugaenge />);
+    await screen.findByText('BOSWatch a');
+    const frist = (name: string) =>
+      /gültig bis (\S+)/.exec(
+        screen.getByText(name).closest<HTMLElement>('[data-lfh="einwurf-eintrag"]')!.textContent,
+      )![1];
+    expect(frist('BOSWatch a')).toMatch(/27/);
+    expect(frist('BOSWatch a')).not.toBe(frist('BOSWatch b'));
+  });
+
+  it('behält die Zahl im Kopf, wenn das Neuladen scheitert', async () => {
+    let fehlschlag = false;
+    stelleBereit();
+    server.use(
+      http.get('/api/admin/einwurf-zugaenge', () =>
+        fehlschlag
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json({ zugaenge: [zugang('a')], gesperrt_grund: null, transport: 'tls' }),
+      ),
+    );
+    const { client } = renderMitProviders(<EinwurfZugaenge />);
+    await screen.findByText('BOSWatch a');
+    const kopf = () => document.querySelector<HTMLElement>('[data-lfh="einwurf-zugaenge"]')!;
+    expect(kopf().textContent).toMatch(/Einwurf-Zugänge\s*1/);
+    fehlschlag = true;
+    await client.refetchQueries();
+    expect(await screen.findByText(/Stand nicht aktuell/)).toBeInTheDocument();
+    expect(kopf().textContent).toMatch(/Einwurf-Zugänge\s*1/);
+  });
+
+  describe('ohne Verbindung', () => {
+    afterEach(() => setzeOnline(true));
+
+    it('sperrt Anlegen und die Aktionen der Zeile mit Grund', async () => {
+      stelleBereit();
+      const user = userEvent.setup();
+      renderMitProviders(<EinwurfZugaenge />);
+      await screen.findByText('BOSWatch a');
+      setzeOnline(false);
+      const knopf = await screen.findByRole('button', { name: /Einwurf-Zugang anlegen/ });
+      await waitFor(() => expect(knopf).toBeDisabled());
+      expect(knopf).toHaveAttribute('aria-describedby', 'einwurf-ohne-netz');
+      expect(document.getElementById('einwurf-ohne-netz')?.textContent).toMatch(
+        /Ohne Verbindung nicht änderbar/,
+      );
+      await user.click(menueKnopf('BOSWatch a'));
+      const wechsel = await screen.findByRole('menuitem', { name: /Schlüssel wechseln/ });
+      expect(wechsel).toHaveAttribute('aria-disabled', 'true');
+      expect(screen.getByRole('menuitem', { name: /Widerrufen/ })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+    });
+
+    it('lässt eine offene Rückfrage sofort scheitern, statt sie vorzumerken', async () => {
+      const aufrufe = stelleBereit();
+      const user = userEvent.setup();
+      renderMitProviders(<EinwurfZugaenge />);
+      await screen.findByText('BOSWatch a');
+      await waehleMenueEintrag(menueKnopf('BOSWatch a'), /Schlüssel wechseln/);
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Schlüssel von BOSWatch a wechseln?',
+      });
+      // Das Netz fällt weg, während die Rückfrage offen ist.
+      setzeOnline(false);
+      server.use(http.post('/api/admin/einwurf-zugaenge/a/schluessel', () => HttpResponse.error()));
+      await user.click(within(dialog).getByRole('button', { name: 'Schlüssel wechseln' }));
+      expect(await within(dialog).findByText('Schlüssel nicht gewechselt')).toBeInTheDocument();
+      // Nicht vorgemerkt: Abbrechen geht, und nichts ging hinaus.
+      expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+      expect(aufrufe).toEqual([]);
+    });
+
+    it('sagt ohne Cache, dass nichts geladen ist, statt endlos zu laden', async () => {
+      setzeOnline(false);
+      stelleBereit();
+      renderMitProviders(<EinwurfZugaenge />);
+      expect(
+        await screen.findByText('Einwurf-Zugänge ohne Verbindung nicht geladen'),
+      ).toBeInTheDocument();
+    });
   });
 
   it('ohne Liste kein Anlegen, dafür „Erneut abrufen“', async () => {
@@ -343,6 +456,15 @@ describe('Einwurf-Zugänge · Wortlaut und Adresse', () => {
     expect(transportHinweis('proxy')).toBeNull();
     expect(transportHinweis('http')?.text).toMatch(/unverschlüsselt/);
     expect(transportHinweis('keiner')?.text).toMatch(/--tls.*--trusted-proxies/);
+  });
+
+  it('warnt vor einer http-Adresse, wenn der Server https verlangt', () => {
+    expect(adresseBrauchtHttps('proxy', 'http:')).toBe(true);
+    expect(adresseBrauchtHttps('tls', 'http:')).toBe(true);
+    expect(adresseBrauchtHttps('keiner', 'http:')).toBe(true);
+    // Mit dem Schalter des Betreibers ist http gewollt; über https gibt es nichts zu warnen.
+    expect(adresseBrauchtHttps('http', 'http:')).toBe(false);
+    expect(adresseBrauchtHttps('proxy', 'https:')).toBe(false);
   });
 
   it('die Adresse trägt den Unterpfad des Zwecks', () => {

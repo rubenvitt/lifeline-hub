@@ -2,23 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen:
-  [
-    frontend/src/pages/einstellungen/Anbindungen.tsx,
-    frontend/src/pages/einstellungen/AnbindungAnsicht.tsx,
-    frontend/src/api/anbindungen.ts,
-    src/routes/anbindungen.rs,
-    src/public_api/machine.rs,
-    src/public_api/routen.rs,
-    src/public_api/zugang.rs,
-    src/public_api/kommando.rs,
-    frontend/src/pages/einstellungen/EinwurfZugaenge.tsx,
-    frontend/src/api/einwurfZugaenge.ts,
-    src/routes/einwurf_zugaenge.rs,
-    src/public_api/einwurf/mod.rs,
-    src/public_api/einwurf/routen.rs,
-    src/public_api/einwurf/ablage.rs,
-  ]
+quellen: [frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs]
 ---
 
 ## Überblick
@@ -112,7 +96,9 @@ Wenn die Adresse in fremde Hände geraten sein kann:
 3. Die neue Adresse beim Absender eintragen und „Fertig“ wählen.
 
 Der bisherige Schlüssel gilt ab der Bestätigung nicht mehr. Bis die neue Adresse beim Absender
-eingetragen ist, werden seine Einwürfe abgelehnt.
+eingetragen ist, werden seine Einwürfe abgelehnt; gesperrt wird dadurch niemand. Ein abgelaufener
+Zugang bekommt keinen neuen Schlüssel: Sein Menü bietet nur „Widerrufen …“, danach wird er neu
+angelegt.
 
 ### Einwurf-Zugang widerrufen
 
@@ -181,7 +167,8 @@ Eintrag: Der Server vermerkt am ersten, wie oft und wann er erneut kam. Ohne eig
 Absenders gilt das zwei Minuten lang nach dem letzten Empfang; danach entsteht ein neuer Eintrag.
 
 Je Zugang nimmt der Server höchstens 30 Einwürfe am Stück an, danach einen alle zwei Sekunden,
-dazu höchstens 5 000 neue Alarmmeldungen am Tag und Positionen für 200 Kennungen.
+dazu höchstens 5 000 neue Alarmmeldungen am Tag und Positionen für 200 Kennungen. Ist die
+Tagesgrenze erreicht, lehnt er jeden weiteren Einwurf des Zugangs ab, bis wieder Platz ist.
 
 ### Einwurf nur verschlüsselt
 

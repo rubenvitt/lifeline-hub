@@ -109,7 +109,7 @@ verschlüsselten Datenträger; die Anwendung verschlüsselt nicht selbst und pr�
 | --- | --- | --- |
 | eigenes TLS (`--tls`) | Zertifikat in der Reihenfolge eigenes Paar, Cache neben der DB, `mkcert`, selbst signiert (`rcgen`); `--bind` muss IP:Port sein; HTTP/2 per ALPN | `src/tls/mod.rs`, `src/main.rs`, [`betrieb-tls.md`](../betrieb-tls.md) |
 | hinter einem Reverse-Proxy | `X-Forwarded-Proto: https` setzt `Secure` je Anfrage; `--trusted-proxies` legt fest, wem `X-Forwarded-For` geglaubt wird | `SichererTransport` (`src/auth/session.rs`), `extract::init_vertraute_proxys` (`src/main.rs`) |
-| Einwurf (`/api/v1/einwurf/`) | nur über TLS: `--tls`, oder `X-Forwarded-Proto: https` von einer Gegenstelle aus `--trusted-proxies`; sonst `403 tls_required`. `--einwurf-allow-http` hebt das für ein Netz auf, das selbst verschlüsselt | `kam_ueber_tls` (`src/extract.rs`), `pruefe` (`src/public_api/einwurf/routen.rs`), `RouterOptionen` (`src/app.rs`), [`betrieb-tls.md`](../betrieb-tls.md) |
+| Einwurf (`/api/v1/einwurf/`) | nur über TLS: `--tls`, oder `X-Forwarded-Proto: https` von einer Gegenstelle aus `--trusted-proxies`; sonst `403 tls_required`. `--einwurf-allow-http` hebt das für ein Netz auf, das selbst verschlüsselt | `is_tls_nachgewiesen` (`src/extract.rs`), `check_einwurf` (`src/public_api/einwurf/routen.rs`), `RouterOptionen` (`src/app.rs`), [`betrieb-tls.md`](../betrieb-tls.md) |
 | Klartext-HTTP | funktioniert, aber ohne Service Worker, PWA, Passkey, Eigenposition und Einwurf | [`packaging.md`](../betrieb/packaging.md), „Lokaler Betrieb“ |
 
 Die Desktop-App nimmt nur `https` mit Hostnamen an ([`desktop-app.md`](../betrieb/desktop-app.md),
