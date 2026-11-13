@@ -673,9 +673,15 @@ pub async fn bilden_mit_einheit(
             });
         }
     }
+    // Eine Anfrage vor Ort beantwortet das Paneel „Führung“ auf den Einsatzdaten (LLH-1678).
+    let pfad = if art == BenachrichtigungArt::FuehrungAngefragt {
+        format!("/einsaetze/{einsatz_id}/einsatzdaten")
+    } else {
+        pfad(einsatz_id, bezug)
+    };
     Ok(Text {
         titel: bezug_titel(bezug.typ).unwrap_or(titel(art)).to_string(),
         detail,
-        pfad: pfad(einsatz_id, bezug),
+        pfad,
     })
 }

@@ -3,8 +3,8 @@
 ### Requirement: Führung angefragt
 
 Fragt die Gegenstelle einer Direktkopplung die Führung eines Einsatzes an, den diese Instanz führt,
-SHALL die Einsatzleitung des Einsatzes einen Hinweis „Führung angefragt“ mit Sprung zum Paneel
-„Führung“ erhalten. Dieselbe Anfrage MUST höchstens einen Hinweis auslösen, auch wenn sie mit
+SHALL die Einsatzleitung des Einsatzes einen Hinweis „Führung angefragt“ mit Sprung zu den
+Einsatzdaten mit dem Paneel „Führung“ erhalten. Dieselbe Anfrage MUST höchstens einen Hinweis auslösen, auch wenn sie mit
 mehreren Meldungen wiederkommt.
 
 #### Scenario: ELW 2 fragt an

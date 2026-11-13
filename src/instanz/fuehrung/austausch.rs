@@ -90,6 +90,12 @@ pub struct AkteMeldung {
     /// design.md D4). Optional auf der Leitung, Protokoll 3 kennt es nicht.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anfrage_abgelehnt: Option<String>,
+    /// Zeitpunkt der abgelehnten Anfrage beim Anfragenden: Die Ablehnung gilt genau ihr.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anfrage_abgelehnt_seit: Option<String>,
+    /// Mit `anfrage`: der Zeitpunkt der Anfrage hier, ihre Kennung (LLH-1678, design.md D4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anfrage_seit: Option<String>,
 }
 
 /// Kürzt einen Text auf höchstens `max` Zeichen.
@@ -125,6 +131,8 @@ impl AkteMeldung {
             offen: a.offen.is_some(),
             stand: a.stand,
             anfrage_abgelehnt: a.anfrage_abgelehnt.clone(),
+            anfrage_abgelehnt_seit: a.anfrage_abgelehnt_seit.clone(),
+            anfrage_seit: a.anfrage_at.clone(),
         }
     }
 
@@ -191,6 +199,8 @@ impl AkteMeldung {
                 .as_deref()
                 .is_none_or(|e| e.len() <= ERKLAERUNG_MAX)
             && self.anfrage_abgelehnt.as_deref().is_none_or(kurz)
+            && self.anfrage_abgelehnt_seit.as_deref().is_none_or(kurz)
+            && self.anfrage_seit.as_deref().is_none_or(kurz)
             && self.is_beweis_in_grenzen()
             && self.is_stand_plausibel()
             && self.bytes() <= bytes_max
@@ -819,8 +829,9 @@ async fn pruefe_vor_ort(
 
 /// Merkt sich die Anfrage der Gegenstelle einer Direktkopplung an einer Akte, die diese Instanz
 /// führt (LLH-1678, design.md D4): Die Einsatzleitung entscheidet, die Führung geht nicht von
-/// selbst. Eine neue Anfrage benachrichtigt sie einmal; hat sie die Anfrage abgelehnt, zählt eine
-/// wiederkehrende nicht, bis die Gegenstelle sie zurücknimmt.
+/// selbst. Eine Anfrage erkennt sie an ihrem Zeitpunkt beim Anfragenden (`anfrage_seit`): Eine
+/// neue benachrichtigt einmal, die abgelehnte zählt nicht wieder. Wartet schon die Anfrage einer
+/// anderen Gegenstelle, bleibt sie stehen, und die Kopplung nennt die zweite.
 async fn merke_anfrage_vor_ort(
     conn: &mut SqliteConnection,
     kopplung: &KopplungZeile,
@@ -829,12 +840,27 @@ async fn merke_anfrage_vor_ort(
     aus: &mut Eingang,
 ) -> Result<(), AppError> {
     let sender = kopplung.gegenueber_kennung.as_str();
-    let von = repo::load_anfrage_von(conn, a.id).await?;
+    let (von, von_seit) = repo::load_anfrage_von(conn, a.id).await?;
     if m.anfrage {
-        if a.anfrage_abgelehnt.as_deref() == Some(sender) || von.as_deref() == Some(sender) {
+        let abgelehnt = a.anfrage_abgelehnt.as_deref() == Some(sender)
+            && a.anfrage_abgelehnt_seit == m.anfrage_seit;
+        let schon = von.as_deref() == Some(sender) && von_seit == m.anfrage_seit;
+        if abgelehnt || schon {
             return Ok(());
         }
-        repo::save_anfrage_von(conn, a.id, Some(sender)).await?;
+        if von.as_deref().is_some_and(|v| v != sender) {
+            aus.hinweis = Some(format!(
+                "{} bittet ebenfalls um die Führung von „{}“; eine andere Anfrage wartet noch",
+                kopplung.gegenueber_name, a.bezeichnung
+            ));
+            return Ok(());
+        }
+        repo::save_anfrage_von(conn, a.id, Some(sender), m.anfrage_seit.as_deref()).await?;
+        if a.anfrage_abgelehnt.as_deref() == Some(sender) {
+            a.anfrage_abgelehnt = None;
+            a.anfrage_abgelehnt_seit = None;
+            repo::save(conn, a, false).await?;
+        }
         if let Some(einsatz_id) = a.einsatz_id {
             aus.folgen.push(Folge::Anfrage { einsatz_id });
             aus.folgen.push(Folge::Kopf { einsatz_id });
@@ -844,13 +870,14 @@ async fn merke_anfrage_vor_ort(
     // Die Gegenstelle fragt nicht (mehr) an: ihre wartende Anfrage fällt weg, und eine Ablehnung
     // hat sie gesehen.
     if von.as_deref() == Some(sender) {
-        repo::save_anfrage_von(conn, a.id, None).await?;
+        repo::save_anfrage_von(conn, a.id, None, None).await?;
         if let Some(einsatz_id) = a.einsatz_id {
             aus.folgen.push(Folge::Kopf { einsatz_id });
         }
     }
     if a.anfrage_abgelehnt.as_deref() == Some(sender) {
         a.anfrage_abgelehnt = None;
+        a.anfrage_abgelehnt_seit = None;
         repo::save(conn, a, false).await?;
     }
     Ok(())
@@ -892,16 +919,18 @@ async fn nimm_ablehnung_an(
     Ok(())
 }
 
-/// Ob eine der Instanzen `kennungen` für die Org `org_id` eine gleichrangige Gegenstelle einer
-/// Direktkopplung ist (LLH-1678, design.md D2).
+/// Ob die Instanz `kennung` für die Org `org_id` eine gleichrangige Gegenstelle einer
+/// Direktkopplung ist (LLH-1678, design.md D2). Nur der genannte Führer zählt: Führt ein echter
+/// Dritter mit einer Epoche der Gegenstelle, bleibt es beim Offenhalten (Review vor dem PR).
 async fn is_gleichrangig_gekoppelt(
     conn: &mut SqliteConnection,
     org_id: i64,
-    kennungen: &[&str],
+    kennung: &str,
 ) -> Result<bool, AppError> {
-    Ok(repo::list_gegenueber(conn, org_id).await?.iter().any(|g| {
-        g.wechsel == Wechselregel::Gleichrangig && kennungen.contains(&g.kennung.as_str())
-    }))
+    Ok(repo::list_gegenueber(conn, org_id)
+        .await?
+        .iter()
+        .any(|g| g.wechsel == Wechselregel::Gleichrangig && g.kennung == kennung))
 }
 
 /// Ob eine offene Übernahme ein Konflikt ist (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
@@ -1222,6 +1251,7 @@ pub async fn apply_eingang(
                 stand: 0,
                 geaendert_at: String::new(),
                 anfrage_abgelehnt: None,
+                anfrage_abgelehnt_seit: None,
             };
             repo::insert_fremd(conn, &mut a).await?;
             repo::add_verlauf(
@@ -1264,14 +1294,13 @@ pub async fn apply_eingang(
             // Einen eigenen Zweig zum Erlöschen braucht es nicht (D6): Nennt der Hub keinen Dritten
             // mehr, ersetzt die nächste Akte die gehaltene (halte_offen, D7), oder Verwerfen bzw.
             // Annahme unten räumen `offen` ab.
-            // Nennt der Hub als Führer oder Vergeber der Epoche meine gleichrangige Gegenstelle
-            // vor Ort, ist sie kein Dritter: Über einen Wechsel zwischen uns beiden entscheidet
+            // Nennt der Hub als Führer meine gleichrangige Gegenstelle vor Ort, ist sie kein
+            // Dritter: Über einen Wechsel zwischen uns beiden entscheidet
             // allein die Direktkopplung, der Hub reicht ihn nur weiter (LLH-1678, design.md D2).
             if ich_fuehre
                 && fremd_vergeben
                 && (dritter_fuehrt || dritte_epoche)
-                && !is_gleichrangig_gekoppelt(conn, a.org_id, &[&m.fuehrer, &m.epoche.instanz])
-                    .await?
+                && !is_gleichrangig_gekoppelt(conn, a.org_id, &m.fuehrer).await?
             {
                 // Läuft über die Annahmeregel (src/AGENTS.md); mit einem Dritten heißt sie offen
                 // halten.
@@ -1664,6 +1693,9 @@ pub async fn apply_eingang(
                     && m.fuehrer == sender
                     && a.anfrage_at.is_some()
                     && m.anfrage_abgelehnt.as_deref() == Some(ich.kennung.as_str())
+                    // Die Ablehnung gilt der Anfrage, die sie sah; eine neuere bleibt stehen.
+                    && (m.anfrage_abgelehnt_seit.is_none()
+                        || m.anfrage_abgelehnt_seit == a.anfrage_at)
                 {
                     nimm_ablehnung_an(conn, kopplung, &mut a, &mut aus).await?;
                     continue;
@@ -2047,6 +2079,7 @@ pub(crate) mod tests {
             stand: STAND_MAX,
             geaendert_at: String::new(),
             anfrage_abgelehnt: None,
+            anfrage_abgelehnt_seit: None,
         };
         let raus = AkteMeldung::aus(&zeile, &"\u{1}".repeat(88));
         assert!(
@@ -2097,6 +2130,7 @@ pub(crate) mod tests {
             stand: 7,
             geaendert_at: String::new(),
             anfrage_abgelehnt: None,
+            anfrage_abgelehnt_seit: None,
         };
         let m = AkteMeldung::aus(&zeile, "hub/1");
         assert_eq!(m.bezeichnung.chars().count(), TEXT_MAX);

@@ -553,6 +553,19 @@ async fn schluessel_b(i: &Instanz) {
     .unwrap();
 }
 
+/// Ein Admin bestätigt den nachgelieferten Schlüssel von B (wie mit dem Fingerabdruck).
+async fn bestaetige_b(i: &Instanz) {
+    exec(
+        &i.pool,
+        &format!(
+            "UPDATE unterschrift_schluessel SET zustand = 'gueltig' WHERE credential_id = '{}' \
+             AND zustand = 'wartet_auf_bestaetigung'",
+            passkey_b().credential_id
+        ),
+    )
+    .await;
+}
+
 /// Ob die Instanz den Schlüssel von Admin B als gültig führt.
 async fn kennt_b_gueltig(i: &Instanz) -> bool {
     let n: i64 = eine(
@@ -778,9 +791,11 @@ async fn vor_ort_braucht_die_notuebernahme_einen_beweis() {
 #[tokio::test]
 async fn vor_ort_wartet_die_notuebernahme_auf_die_abgebende_seite() {
     let v = vor_ort_mit_einsatz().await;
-    // Der Schlüssel von B kommt mit der Meldung von ELW 2 als Grundstock zu ELW 1.
+    // B kommt nach der ersten Meldung von ELW 2: An ELW 1 wartet er, bis ein Admin bestätigt.
     schluessel_b(&v.elw2).await;
     runde(&v).await;
+    assert!(!kennt_b_gueltig(&v.elw1).await, "B wartet an ELW 1");
+    bestaetige_b(&v.elw1).await;
     assert!(kennt_b_gueltig(&v.elw1).await, "ELW 1 kennt B");
     elw2_uebernimmt_mit_unterschrift(&v, "ELW 1 ausgefallen").await;
     assert_eq!(
@@ -826,6 +841,7 @@ async fn ein_widerspruch_vor_ort_gibt_die_fuehrung_ohne_hin_und_her_zurueck() {
     let v = vor_ort_mit_einsatz().await;
     schluessel_b(&v.elw2).await;
     runde(&v).await;
+    bestaetige_b(&v.elw1).await;
     elw2_uebernimmt_mit_unterschrift(&v, "ELW 1 ausgefallen").await;
     // ELW 2 führt jetzt selbst: Admin B ist dort Einsatzleitung und bekommt den Alarm.
     exec(
@@ -1968,9 +1984,23 @@ async fn auch_die_ausstellende_seite_uebernimmt_vor_ort_nur_mit_beweis() {
 #[tokio::test]
 async fn ein_spaeter_schluessel_der_meldenden_seite_wartet_vor_ort_auf_bestaetigung() {
     let v = vor_ort_mit_einsatz().await;
+    // Ohne eigene Schlüssel war die erste Meldung von ELW 2 leer; sie setzt die Grenze trotzdem.
+    let bis: Option<i64> = eine(
+        &v.elw1.pool,
+        "SELECT unterschrift_grundstock_bis FROM instanz_kopplung_org",
+    )
+    .await;
+    // Ihr höchster Stand ist der Schlüssel, den ELW 2 von ELW 1 bekam (geht nicht zurück).
+    assert!(
+        bis.is_some(),
+        "Grenze des Grundstocks nach leerer erster Meldung"
+    );
     schluessel_b(&v.elw2).await;
     runde(&v).await;
-    assert!(kennt_b_gueltig(&v.elw1).await, "Grundstock");
+    assert!(
+        !kennt_b_gueltig(&v.elw1).await,
+        "B gilt nicht als Grundstock"
+    );
     let c = SoftwarePasskey::new("c", [3u8; 32]);
     let oeff = c.oeffentlich();
     {
@@ -2005,10 +2035,50 @@ async fn ein_spaeter_schluessel_der_meldenden_seite_wartet_vor_ort_auf_bestaetig
 
 #[tokio::test]
 async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
+    // ELW 2 führt nach einer Übergabe, ELW 1 fragt an; an ELW 2 hat ein Konto nur Lesezugriff.
     let v = vor_ort_mit_einsatz().await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/uebergeben", v.e1),
+        json!({"an": v.ich2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    runde(&v).await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/anfragen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(
+        fuehrung(&v.elw2, v.e2).await["anfrage_eingang"]["kennung"],
+        v.ich1
+    );
     // Der zuletzt aufgebaute Router ist der von ELW 2 (`common::benutzer_anlegen`).
-    common::benutzer_anlegen(&v.elw2.app, &v.elw2.admin, "helfer", "keine").await;
+    let id = common::benutzer_anlegen(&v.elw2.app, &v.elw2.admin, "helfer", "keine").await;
+    exec(
+        &v.elw2.pool,
+        &format!(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES ({}, {id}, 'fuehrungspersonal')",
+            v.e2
+        ),
+    )
+    .await;
     let helfer = common::login_cookie(&v.elw2.app, "helfer", "helferpw1").await;
+    let (s, _) = common::anfrage(
+        &v.elw2.app,
+        "GET",
+        &format!("/api/einsaetze/{}/fuehrung", v.e2),
+        &helfer,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "liest die Führung");
     let (s, _) = common::anfrage_json(
         &v.elw2.app,
         "POST",
@@ -2017,10 +2087,86 @@ async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
         Some(&json!({})),
     )
     .await;
-    assert!(
-        s == StatusCode::FORBIDDEN || s == StatusCode::NOT_FOUND,
-        "ohne Recht: {s}"
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/anfrage/ablehnen", v.e2),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+}
+
+#[tokio::test]
+async fn eine_neue_anfrage_nach_der_ablehnung_zeigt_sich_auch_ohne_zwischenmeldung() {
+    let v = vor_ort_mit_einsatz().await;
+    let anfragen = || async {
+        let (s, r) = post(
+            &v.elw2,
+            &format!("/api/einsaetze/{}/fuehrung/anfragen", v.e2),
+            json!({}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{r}");
+    };
+    anfragen().await;
+    runde(&v).await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/anfrage/ablehnen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(fuehrung(&v.elw2, v.e2).await["anfrage_abgelehnt"], true);
+    // Sofort erneut anfragen: Die Rücknahme der alten Anfrage hat ELW 1 nie gesehen.
+    anfragen().await;
+    runde(&v).await;
+    assert_eq!(
+        fuehrung(&v.elw1, v.e1).await["anfrage_eingang"]["kennung"],
+        v.ich2,
+        "die neue Anfrage zeigt sich"
     );
+    // Und die Benachrichtigung springt zum Paneel „Führung“.
+    let id: i64 = eine(
+        &v.elw1.pool,
+        "SELECT MAX(id) FROM benachrichtigung WHERE art = 'fuehrung_angefragt'",
+    )
+    .await;
+    let (s, b) = common::anfrage(
+        &v.elw1.app,
+        "GET",
+        &format!("/api/benachrichtigungen/{id}"),
+        &v.elw1.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["pfad"], format!("/einsaetze/{}/einsatzdaten", v.e1));
+}
+
+#[tokio::test]
+async fn ablehnen_gilt_nur_fuer_eine_anfrage_vor_ort() {
+    let (hub, v) = hub_mit_einsatz_von_elw1().await;
+    // An ELW 1 wartet (konstruiert) eine Anfrage des Hubs über die Standardkopplung.
+    let ich_hub = kennung_von(&hub).await;
+    exec(
+        &v.elw1.pool,
+        &format!(
+            "UPDATE einsatz_fuehrung SET anfrage_von = '{ich_hub}' WHERE kennung = '{}'",
+            v.kennung
+        ),
+    )
+    .await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/anfrage/ablehnen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{r}");
+    assert!(r["error"].as_str().unwrap().contains("vor Ort"), "{r}");
 }
 
 #[tokio::test]

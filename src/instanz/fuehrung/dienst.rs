@@ -284,7 +284,14 @@ pub async fn anfragen(pool: &SqlitePool, akte_id: i64) -> Result<AkteZeile, AppE
                 "Anfragen kann nur die Seite, die sich meldet.".into(),
             ));
         }
-        a.anfrage_at = Some(crate::zeit::jetzt());
+        // Mit Mikrosekunden: Der Zeitpunkt ist zugleich die Kennung der Anfrage vor Ort
+        // (`AkteMeldung::anfrage_seit`, LLH-1678), und eine neue Anfrage in derselben Sekunde wie
+        // eine abgelehnte muss sich von ihr unterscheiden.
+        a.anfrage_at = Some(
+            chrono::Utc::now()
+                .format("%Y-%m-%d %H:%M:%S%.6f")
+                .to_string(),
+        );
         a.anfrage_abgelehnt = None;
         repo::save(conn, &mut a, true).await?;
         Ok(a)
@@ -673,16 +680,23 @@ pub async fn anfrage_ablehnen(
         let ich = repo::ich(conn).await?;
         let mut a = repo::load(conn, akte_id).await?;
         fordere_fuehrend(&a, &ich)?;
-        let von = repo::load_anfrage_von(conn, a.id)
-            .await?
-            .ok_or_else(|| AppError::Conflict("Keine Anfrage wartet.".into()))?;
-        let name = repo::list_gegenueber(conn, a.org_id)
-            .await?
-            .into_iter()
-            .find(|g| g.kennung == von)
-            .map_or_else(|| von.clone(), |g| g.name);
-        repo::save_anfrage_von(conn, a.id, None).await?;
+        let gegenueber_liste = repo::list_gegenueber(conn, a.org_id).await?;
+        let (von, seit) = repo::load_anfrage_von(conn, a.id).await?;
+        // Nur eine Anfrage vor Ort entscheidet ein Mensch; die wartende Anfrage einer
+        // Standardkopplung erfüllt der Hub selbst, sobald der ELW alles hat (Review vor dem PR).
+        let g = von
+            .as_deref()
+            .and_then(|v| {
+                gegenueber_liste
+                    .iter()
+                    .find(|g| g.kennung == v && g.wechsel == Wechselregel::Gleichrangig)
+            })
+            .ok_or_else(|| AppError::Conflict("Keine Anfrage vor Ort wartet.".into()))?;
+        let name = g.name.clone();
+        let von = g.kennung.clone();
+        repo::save_anfrage_von(conn, a.id, None, None).await?;
         a.anfrage_abgelehnt = Some(von);
+        a.anfrage_abgelehnt_seit = seit;
         repo::save(conn, &mut a, true).await?;
         let grund = format!("Anfrage von {name} abgelehnt");
         repo::add_verlauf(
@@ -821,7 +835,7 @@ pub async fn anzeige(
         offen,
         anfrage_offen: a.anfrage_at.is_some(),
         anfrage_abgelehnt: a.anfrage_abgelehnt.as_deref() == Some(ich.kennung.as_str()),
-        anfrage_eingang: match repo::load_anfrage_von(conn, a.id).await? {
+        anfrage_eingang: match repo::load_anfrage_von(conn, a.id).await?.0 {
             Some(von) if a.fuehrer_kennung == ich.kennung => gegenueber
                 .iter()
                 .find(|g| g.kennung == von && g.wechsel == Wechselregel::Gleichrangig)

@@ -261,23 +261,25 @@ Unterschrift“.
   passt, folgt mit der nächsten Meldung.
 
 **Grundstock der meldenden Seite**
-- Mit ihrer ersten Lieferung über die Zuordnung nennt die meldende Seite `grundstock_bis`, ihren
-  höchsten Stand zu diesem Zeitpunkt.
+- Mit ihrer ersten Meldung über die Zuordnung, auch einer ohne Schlüssel, nennt die meldende Seite
+  `grundstock_bis`, ihren höchsten Stand zu diesem Zeitpunkt.
 - Die erreichte Seite speichert ihn einmal in `instanz_kopplung_org.unterschrift_grundstock_bis`.
   Spätere Angaben überliest sie.
 - Zeilen bis zu diesem Stand übernimmt sie wie einen Grundstock: sofort gültig. Alles danach
-  braucht Gegenzeichnung und Bestätigung.
+  wartet ohne Gegenzeichnung auf die Bestätigung eines Admins (siehe Nachträge).
 - Die Bindung durch den Code gilt in beide Richtungen („Der Code bindet die Schlüssel beider
   Seiten“). Die einlösende Seite ist also so gut verankert wie die ausstellende.
 
 **Widerruf je Credential**
-- Das gilt für `accept_lieferungen` (Zweig Widerruf), für `widerrufen`, `alle_des_benutzers_widerrufen`
-  und `fremde_der_zuordnung_widerrufen`.
-- Dort wird jede Zeile der Org mit derselben `credential_id` auf `widerrufen` gesetzt, mit neuem
-  `weiter_stand`, damit der Widerruf weiterwandert.
+- Das gilt für `accept_lieferungen` (Zweig Widerruf), für `widerrufen` und
+  `alle_des_benutzers_widerrufen`, nicht für das Ende einer Zuordnung (siehe Nachträge).
+- Dort wird jede übernommene Zeile der Org mit derselben `credential_id` auf `widerrufen` gesetzt,
+  mit neuem `weiter_stand`, damit der Widerruf weiterwandert. Aus einer Lieferung wirkt das nur für
+  eine Zeile, die hier gültig war, und mit deren gespeicherter Credential-ID.
 - Ein Schlüssel, der über eine andere Zuordnung später wieder als gültig kommt, trifft auf
   „Schlüssel war widerrufen“. Die vorhandene Prüfung `schon` wird dafür auf die ganze Org statt auf
-  die Zuordnung erweitert, nur für widerrufene und abgelehnte Zeilen.
+  die Zuordnung erweitert, nur für widerrufene und abgelehnte Zeilen einer noch geltenden
+  Zuordnung.
 
 **Verworfene Alternativen**
 - *Nur in Richtung der ausstellenden Seite weiterreichen:* Dann kennt die ausstellende Seite die
@@ -428,3 +430,33 @@ Die Nummern müssen größer sein als jede auf `origin/alpha` (heute 0345), vorh
   ihre gleichrangige Gegenstelle als Führer oder Vergeber der Epoche nennt
   (`austausch::is_gleichrangig_gekoppelt`). Über diesen Wechsel entscheidet allein die
   Direktkopplung.
+- **13.11.2026, Befunde aus dem Review vor dem PR.**
+  - *Widerruf aus einer Lieferung:* Er nahm die Credential-ID der Lieferung, nicht die der
+    gespeicherten Zeile. Ein Gegenüber konnte so mit einer eigenen Zeile fremde und sogar lokale
+    Schlüssel widerrufen. Jetzt wirkt er weiter nur für eine Zeile, die hier gültig war, und nur
+    mit deren Credential-ID, und nur auf übernommene Zeilen. Eine Credential-ID, die hier schon für
+    einen anderen Schlüssel steht, nimmt keine Lieferung an. Bewusst bleibt: Ein Widerruf über eine
+    Zuordnung, über die der Schlüssel nie kam, wirkt nicht; das Gegenüber, das ihn lieferte,
+    meldet den Widerruf selbst.
+  - *Ende einer Zuordnung:* Die org-weite Prüfung `schon` zählt widerrufene Zeilen einer beendeten
+    Zuordnung nicht mehr; sonst nähme ein neues Koppeln die Schlüssel nie wieder an.
+  - *Grenze des Grundstocks:* Sie gilt ab der ersten Meldung, auch einer leeren.
+  - *Nachlieferung über die Direktkopplung an die meldende Seite:* Auch sie wartet ohne
+    Gegenzeichnung auf einen Admin. Die erste Schlüsselzeile eines Hubs trägt keine Gegenzeichnung
+    und ginge sonst verloren.
+  - *Grenzen gelieferter Felder* (`check_felder`): Was hier gespeichert wird, geht weiter und muss
+    in jede Lieferung passen.
+  - *Keine Weitergabe von ELW-Schlüsseln:* Am Hub bestätigte Schlüssel eines ELW (Zuordnung einer
+    Standardkopplung, an der diese Instanz erreicht wird) gehen nicht weiter.
+  - *Kennung einer Anfrage:* Eine Anfrage vor Ort trägt ihren Zeitpunkt (`anfrage_seit`, mit
+    Mikrosekunden). Eine Ablehnung gilt genau dieser Anfrage (`anfrage_abgelehnt_seit`). So geht
+    eine neue Anfrage nicht verloren, die vor der Rücknahme der alten ankommt.
+  - *Zwei Gegenstellen fragen an:* Die erste wartet weiter, die zweite steht als Hinweis an ihrer
+    Kopplung. Überschrieben wird nichts mehr.
+  - *Ablehnen nur vor Ort:* Eine wartende Anfrage einer Standardkopplung ist kein Fall für
+    „Ablehnen“ (409); der Hub erfüllt sie selbst.
+  - *Offenhalten am Hub:* Übersprungen wird nur, wenn der genannte Führer die gleichrangige
+    Gegenstelle ist, nicht schon, wenn nur die Epoche von ihr stammt.
+  - *Sprung der Benachrichtigung:* „Führung angefragt“ öffnet die Einsatzdaten mit dem Paneel
+    „Führung“.
+  - *Code-Abgabe mit mehreren Zielen:* Der Knopf nennt das Ziel (gesehen in den Bildern).

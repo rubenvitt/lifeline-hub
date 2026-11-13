@@ -860,8 +860,24 @@ async fn melden_einmal_mit(
             if let Some(q) = oa.unterschrift_quittung {
                 repo::save_unterschrift_gesendet_bis(conn, o.id, q).await?;
             }
-            for ab in unterschrift::accept_lieferungen(conn, &ziel, &oa.unterschrift, false, &jetzt)
-                .await?
+            // Über eine Direktkopplung wartet jeder nachgelieferte Schlüssel ohne Gegenzeichnung auf
+            // einen Admin hier: Die erreichte Seite reicht auch Schlüssel weiter, die bei ihr ohne
+            // Gegenzeichnung gelten (der erste eines Hubs), sie gingen sonst verloren (Review vor
+            // dem PR, design.md D6).
+            let pflicht = if ziel.vor_ort {
+                unterschrift::GegenzeichnungPflicht::NurBestaetigung
+            } else {
+                unterschrift::GegenzeichnungPflicht::Pflicht
+            };
+            for ab in unterschrift::accept_lieferungen_bis(
+                conn,
+                &ziel,
+                &oa.unterschrift,
+                None,
+                pflicht,
+                &jetzt,
+            )
+            .await?
             {
                 abgelehnt_alle.push((o.clone(), ab));
             }
@@ -1130,24 +1146,24 @@ pub async fn handle_meldung(
                     // Die Schlüssel der meldenden Seite übernehmen (LLH-1678, design.md D6): über
                     // eine Direktkopplung ihre erste Lieferung bis `grundstock_bis` als Grundstock,
                     // alles danach und alles vom ELW am Hub nur zur Bestätigung durch einen Admin.
+                    // Die Grenze des Grundstocks gilt ab der ersten Meldung, auch einer leeren:
+                    // Sonst würde ein später registrierter Schlüssel sie erst setzen und als
+                    // Grundstock gelten (Review vor dem PR).
+                    let grundstock_bis = match (vor_ort, mo.unterschrift_grundstock_bis) {
+                        (true, Some(bis)) => {
+                            Some(repo::save_unterschrift_grundstock_bis(conn, o.id, bis).await?)
+                        }
+                        (true, None) => o.unterschrift_grundstock_bis,
+                        (false, _) => None,
+                    };
                     if !mo.unterschrift.is_empty() {
-                        let (bis, pflicht) = if vor_ort {
-                            let bis = repo::save_unterschrift_grundstock_bis(
-                                conn,
-                                o.id,
-                                mo.unterschrift_grundstock_bis.unwrap_or(0),
-                            )
-                            .await?;
-                            // Die meldende Seite zeichnet ihre Schlüssel nicht gegen (ihre Org
-                            // verteilt dort nicht): nach dem Grundstock wartet jeder auf einen
-                            // Admin hier, wie die Schlüssel eines ELW am Hub.
-                            (
-                                Some(bis),
-                                unterschrift::GegenzeichnungPflicht::NurBestaetigung,
-                            )
-                        } else {
-                            (None, unterschrift::GegenzeichnungPflicht::NurBestaetigung)
-                        };
+                        // Die meldende Seite zeichnet ihre Schlüssel nicht gegen (ihre Org verteilt
+                        // dort nicht): nach dem Grundstock wartet jeder auf einen Admin hier, wie
+                        // die Schlüssel eines ELW am Hub.
+                        let (bis, pflicht) = (
+                            grundstock_bis,
+                            unterschrift::GegenzeichnungPflicht::NurBestaetigung,
+                        );
                         let ziel = unterschrift::Ziel {
                             kopplung_org_id: o.id,
                             org_id: o.org_id,

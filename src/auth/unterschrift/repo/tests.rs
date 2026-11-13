@@ -1126,3 +1126,154 @@ async fn vom_elw_am_hub_wartet_jeder_schluessel_ohne_gegenzeichnung() {
         "wartet_auf_bestaetigung"
     );
 }
+
+// ── Befunde aus dem Review vor dem PR (LLH-1678) ──────────────────────────────────────────────
+
+#[tokio::test]
+async fn ein_widerruf_nimmt_die_credential_id_der_gespeicherten_zeile() {
+    let pool = pool_mit_admin().await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let x = SoftwarePasskey::new("x", [9u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    // Lokaler Admin-Schlüssel A (vor der Kopplung, also gültig), danach liefert das Gegenüber
+    // einen wartenden Schlüssel X (id 5).
+    create_lokal(
+        &mut conn,
+        &NeuerSchluessel {
+            org_id: 1,
+            benutzer_id: 1,
+            benutzer_name: "Admin A",
+            credential_id: &a.credential_id,
+            schluessel: &a.oeffentlich(),
+            rp_id: RP,
+            origin: ORIGIN,
+            bezeichnung: "Stick A",
+        },
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    let ko = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::WirdGemeldet).await;
+    let mut conn = pool.acquire().await.unwrap();
+    accept_lieferungen_bis(
+        &mut conn,
+        &ziel_zu(ko),
+        &[lieferung(5, &x, UnterschriftSchluesselZustand::Gueltig, 1)],
+        None,
+        GegenzeichnungPflicht::NurBestaetigung,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    // Widerruf der id 5 mit der Credential-ID von A: A bleibt gültig.
+    let mut falsch = lieferung(5, &x, UnterschriftSchluesselZustand::Widerrufen, 2);
+    falsch.credential_id = a.credential_id.clone();
+    accept_lieferungen(&mut conn, &ziel_zu(ko), &[falsch], false, JETZT)
+        .await
+        .unwrap();
+    let zustand_a: String =
+        sqlx::query_scalar("SELECT zustand FROM unterschrift_schluessel WHERE herkunft = 'lokal'")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(zustand_a, "gueltig");
+    // Eine Lieferung, die die Credential-ID von A mit anderem Schlüssel nennt, nimmt hier keiner an.
+    let y = SoftwarePasskey::new("y", [8u8; 32]);
+    let mut unterschoben = lieferung(6, &y, UnterschriftSchluesselZustand::Gueltig, 3);
+    unterschoben.credential_id = a.credential_id.clone();
+    let ab = accept_lieferungen_bis(
+        &mut conn,
+        &ziel_zu(ko),
+        &[unterschoben],
+        None,
+        GegenzeichnungPflicht::NurBestaetigung,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(
+        ab[0].grund,
+        "Credential-ID steht hier für einen anderen Schlüssel"
+    );
+}
+
+#[tokio::test]
+async fn nach_dem_ende_einer_zuordnung_nimmt_ein_neues_koppeln_den_schluessel_wieder() {
+    let pool = pool_mit_admin().await;
+    let alt = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let neu = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let gueltig = lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1);
+    accept_lieferungen(&mut conn, &ziel_zu(alt), &[gueltig.clone()], true, JETZT)
+        .await
+        .unwrap();
+    fremde_der_zuordnung_widerrufen(&mut conn, alt, JETZT)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = ? WHERE id = ?")
+        .bind(JETZT)
+        .bind(alt)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(neu), &[gueltig], true, JETZT)
+        .await
+        .unwrap();
+    assert!(ab.is_empty(), "{ab:?}");
+    assert_eq!(
+        zustand_in(&mut conn, neu, &a.credential_id).await,
+        "gueltig"
+    );
+}
+
+#[tokio::test]
+async fn ueberlange_felder_einer_lieferung_werden_abgelehnt() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let mut lang = lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1);
+    lang.bezeichnung = "x".repeat(20 * 1024);
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(ko), &[lang], true, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(ab[0].grund, "Felder über den Grenzen");
+}
+
+#[tokio::test]
+async fn schluessel_eines_elw_am_hub_gehen_nicht_weiter() {
+    let pool = pool_mit_admin().await;
+    // Diese Instanz ist der Hub: ein ELW meldet sich über eine Standardkopplung.
+    let vom_elw = kopplung_org(&pool, InstanzKopplungRichtung::WirdGemeldet).await;
+    let vor_ort = kopplung_org_mit(&pool, "elw-3", InstanzKopplungRichtung::WirdGemeldet).await;
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    accept_lieferungen_bis(
+        &mut conn,
+        &ziel_zu(vom_elw),
+        &[lieferung(1, &b, UnterschriftSchluesselZustand::Gueltig, 1)],
+        None,
+        GegenzeichnungPflicht::NurBestaetigung,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    let id: i64 = sqlx::query_scalar("SELECT id FROM unterschrift_schluessel WHERE fremde_id = 1")
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+    assert!(confirm(&mut conn, 1, id, 1, JETZT).await.unwrap());
+    let weiter = nachlieferung(
+        &mut conn,
+        1,
+        0,
+        LIEFERUNGEN_MAX,
+        Weiter::AusserZuordnung(vor_ort),
+    )
+    .await
+    .unwrap();
+    assert!(weiter.is_empty(), "{weiter:?}");
+}

@@ -3322,6 +3322,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("anfrage_von", G_FUEHRUNG),
             // LLH-1678: abgelehnte Anfrage vor Ort, nur die Kennung der Instanz.
             retain("anfrage_abgelehnt", G_FUEHRUNG),
+            retain("anfrage_seit", G_ZEIT),
+            retain("anfrage_abgelehnt_seit", G_ZEIT),
         ],
     },
     TabellenRegel {

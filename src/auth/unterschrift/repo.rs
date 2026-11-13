@@ -366,7 +366,7 @@ async fn widerrufe_credential(
 ) -> Result<(), AppError> {
     let ids: Vec<(i64, String)> = sqlx::query_as(
         "SELECT id, herkunft FROM unterschrift_schluessel WHERE org_id = ? AND credential_id = ? \
-         AND zustand NOT IN ('widerrufen', 'abgelehnt')",
+         AND zustand NOT IN ('widerrufen', 'abgelehnt') AND herkunft = 'gegenueber'",
     )
     .bind(org_id)
     .bind(credential_id)
@@ -532,10 +532,12 @@ async fn list_lieferbar(
                         AS aufnahme_org \
              FROM unterschrift_schluessel s \
              LEFT JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+             LEFT JOIN instanz_kopplung k ON k.id = o.kopplung_id \
              WHERE s.org_id = ?1 AND s.zustand IN {zustaende} \
                AND (s.herkunft = 'lokal' \
                     OR (?2 IS NOT NULL AND s.herkunft = 'gegenueber' \
-                        AND s.weiter_stand IS NOT NULL AND s.kopplung_org_id <> ?2)) \
+                        AND s.weiter_stand IS NOT NULL AND s.kopplung_org_id <> ?2 \
+                        AND NOT (k.richtung = 'wird_gemeldet' AND k.art = 'standard'))) \
                AND CASE WHEN s.herkunft = 'lokal' THEN s.stand ELSE s.weiter_stand END > ?3 \
              ORDER BY lieferstand, s.id LIMIT ?4"
         )))
@@ -576,6 +578,48 @@ pub struct Abgelehnt {
     pub benutzer_name: String,
     pub grund: String,
 }
+
+/// Grenzen der Felder eines gelieferten Schlüssels (Review vor dem PR): Was hier gespeichert wird,
+/// geht über eine Direktkopplung weiter und muss in jede Lieferung passen
+/// (`melden::tests::groesste_anfrage_passt_in_die_grenze`). Dieselben Grenzen wie beim
+/// Registrieren und Gegenzeichnen.
+fn check_felder(l: &UnterschriftSchluesselLieferung) -> Result<(), String> {
+    use super::pruefen::{
+        AUTHENTICATOR_DATA_MAX, CLIENT_DATA_JSON_MAX, CREDENTIAL_ID_MAX, SIGNATUR_MAX,
+    };
+    let zeichen = |t: &str| t.chars().count();
+    let ok = l.credential_id.len() <= CREDENTIAL_ID_MAX
+        && zeichen(&l.benutzer_name) <= NAME_MAX
+        && zeichen(&l.bezeichnung) <= crate::routes::instanz::BEZEICHNUNG_MAX
+        && l.schluessel.len() <= SCHLUESSEL_MAX
+        && l.rp_id.len() <= RP_ID_MAX
+        && l.origin.len() <= ORIGIN_MAX
+        && l.aufnahme_org
+            .as_deref()
+            .is_none_or(|o| o.len() <= ORG_KENNUNG_MAX)
+        && l.gegenzeichnung.as_ref().is_none_or(|g| {
+            g.erklaerung.len() <= ERKLAERUNG_MAX
+                && g.unterzeichner_credential_id.len() <= CREDENTIAL_ID_MAX
+                && g.assertion.credential_id.len() <= CREDENTIAL_ID_MAX
+                && g.assertion.authenticator_data.len() <= AUTHENTICATOR_DATA_MAX
+                && g.assertion.client_data_json.len() <= CLIENT_DATA_JSON_MAX
+                && g.assertion.signatur.len() <= SIGNATUR_MAX
+        });
+    if ok {
+        Ok(())
+    } else {
+        Err("Felder über den Grenzen".into())
+    }
+}
+
+/// Grenzen gelieferter Felder ([`check_felder`]): SEC1-Punkt P-256 unkomprimiert in Base64url (87),
+/// RP-ID als DNS-Name (253), Origin mit Schema und Port, Org-Kennung `<instanz>/<id>`, Erklärung
+/// der Aufnahme.
+const SCHLUESSEL_MAX: usize = 128;
+const RP_ID_MAX: usize = 253;
+const ORIGIN_MAX: usize = 300;
+const ORG_KENNUNG_MAX: usize = 128;
+const ERKLAERUNG_MAX: usize = 4096;
 
 /// Wohin gelieferte Schlüssel gehören: welche Org-Zuordnung, welche lokale Org, welche Org dort.
 #[derive(Debug, Clone, Copy)]
@@ -713,8 +757,9 @@ pub async fn accept_lieferungen_bis(
         let fp = parse_b64(&l.schluessel)
             .map(|b| fingerabdruck(&b))
             .unwrap_or_default();
-        let vorhanden: Option<(i64, String)> = sqlx::query_as(
-            "SELECT id, zustand FROM unterschrift_schluessel WHERE kopplung_org_id = ? AND fremde_id = ?",
+        let vorhanden: Option<(i64, String, String)> = sqlx::query_as(
+            "SELECT id, zustand, credential_id FROM unterschrift_schluessel \
+             WHERE kopplung_org_id = ? AND fremde_id = ?",
         )
         .bind(ziel.kopplung_org_id)
         .bind(l.id)
@@ -722,8 +767,8 @@ pub async fn accept_lieferungen_bis(
         .await?;
         match (l.zustand, vorhanden) {
             // Ein hier zurückgewiesener bleibt es: die Entscheidung eines Menschen hier geht vor.
-            (UnterschriftSchluesselZustand::Widerrufen, Some((_, z))) if z == "abgelehnt" => {}
-            (UnterschriftSchluesselZustand::Widerrufen, Some((id, _))) => {
+            (UnterschriftSchluesselZustand::Widerrufen, Some((_, z, _))) if z == "abgelehnt" => {}
+            (UnterschriftSchluesselZustand::Widerrufen, Some((id, zustand, credential))) => {
                 let weiter = next_stand(conn, ziel.org_id).await?;
                 sqlx::query(
                     "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
@@ -737,7 +782,13 @@ pub async fn accept_lieferungen_bis(
                 .bind(id)
                 .execute(&mut *conn)
                 .await?;
-                widerrufe_credential(conn, ziel.org_id, &l.credential_id, jetzt).await?;
+                // Weiter wirkt nur der Widerruf eines Schlüssels, der hier über diese Zuordnung
+                // galt, und zwar mit dessen gespeicherter Credential-ID, nie mit der aus der
+                // Lieferung (Review vor dem PR): Sonst widerriefe ein Gegenüber mit einer
+                // beliebigen eigenen Zeile fremde Schlüssel.
+                if zustand == "gueltig" {
+                    widerrufe_credential(conn, ziel.org_id, &credential, jetzt).await?;
+                }
             }
             // Ein unbekannter widerrufener oder ein noch wartender Schlüssel ändert nichts; ein
             // hier schon bekannter gültiger auch nicht, gleich ob er hier gilt, wartet oder
@@ -749,14 +800,27 @@ pub async fn accept_lieferungen_bis(
             | (UnterschriftSchluesselZustand::Abgelehnt, _)
             | (UnterschriftSchluesselZustand::Gueltig, Some(_)) => {}
             (UnterschriftSchluesselZustand::Gueltig, None) => {
+                if let Err(grund) = check_felder(l) {
+                    abgelehnt.push(Abgelehnt {
+                        fingerabdruck: fp,
+                        benutzer_name: crate::auth::truncate_anzeigename(&l.benutzer_name),
+                        grund,
+                    });
+                    continue;
+                }
                 // Derselbe Schlüssel unter anderer id: ein widerrufener lebt nie wieder auf, ein
                 // gültiger steht schon da.
                 // Widerrufen oder hier zurückgewiesen gilt org-weit, gleich über welche
                 // Kopplung der Schlüssel kam (LLH-1678, design.md D6).
+                // Nicht gezählt werden Zeilen einer beendeten Zuordnung: Deren Widerruf betrifft die
+                // Zuordnung, nicht den Schlüssel (design.md D6, Nachtrag).
                 let schon: Option<String> = sqlx::query_scalar(
                     "SELECT zustand FROM unterschrift_schluessel \
                      WHERE (kopplung_org_id = ?1 \
-                            OR (org_id = ?2 AND zustand IN ('widerrufen', 'abgelehnt'))) \
+                            OR (org_id = ?2 AND zustand IN ('widerrufen', 'abgelehnt') \
+                                AND (kopplung_org_id IS NULL OR kopplung_org_id IN \
+                                     (SELECT id FROM instanz_kopplung_org \
+                                      WHERE widerrufen_at IS NULL)))) \
                      AND (credential_id = ?3 OR schluessel = ?4) \
                      ORDER BY zustand IN ('widerrufen', 'abgelehnt') DESC LIMIT 1",
                 )
@@ -781,6 +845,26 @@ pub async fn accept_lieferungen_bis(
                     }
                     Some(_) => continue,
                     None => {}
+                }
+                // Eine Credential-ID, die hier schon für einen anderen Schlüssel steht, nimmt
+                // keine Lieferung an (Review vor dem PR): Sonst gäbe sich ein Gegenüber für den
+                // Schlüssel eines Admins aus und widerriefe ihn später.
+                let fremd_belegt: bool = sqlx::query_scalar(
+                    "SELECT EXISTS (SELECT 1 FROM unterschrift_schluessel WHERE org_id = ? \
+                     AND credential_id = ? AND schluessel <> ?)",
+                )
+                .bind(ziel.org_id)
+                .bind(&l.credential_id)
+                .bind(&l.schluessel)
+                .fetch_one(&mut *conn)
+                .await?;
+                if fremd_belegt {
+                    abgelehnt.push(Abgelehnt {
+                        fingerabdruck: fp,
+                        benutzer_name: l.benutzer_name.clone(),
+                        grund: "Credential-ID steht hier für einen anderen Schlüssel".into(),
+                    });
+                    continue;
                 }
                 if l.alg != ALG_ES256 {
                     abgelehnt.push(Abgelehnt {

@@ -78,7 +78,9 @@ MUST die führende Seite die Führung nicht von selbst abgeben. Sie SHALL im Pan
 „Führung angefragt“ an die Einsatzleitung des Einsatzes auslösen. „Übergeben“ MUST eine reguläre
 Übergabe an die anfragende Seite sein. „Ablehnen“ SHALL die Anfrage beenden: Die anfragende
 Seite MUST nach der nächsten Meldung „Anfrage abgelehnt“ zeigen und ihre Anfrage zurücknehmen;
-eine neue Anfrage derselben Seite MUST danach wieder angezeigt werden. Eine Anfrage gilt nur dem
+eine neue Anfrage derselben Seite MUST danach wieder angezeigt werden, auch wenn sie gestellt wird,
+bevor die Rücknahme die führende Seite erreicht hat. Wartet schon die Anfrage einer anderen
+Gegenstelle, MUST sie stehen bleiben, und die Kopplung der zweiten zeigt einen Hinweis. Eine Anfrage gilt nur dem
 Stand, den sie sah: Wechselt die Führung, verfällt sie.
 
 #### Scenario: Anfrage an ELW 1
@@ -88,6 +90,10 @@ Stand, den sie sah: Wechselt die Führung, verfällt sie.
 #### Scenario: Übergeben auf Anfrage
 - **WHEN** die Einsatzleitung an ELW 1 dort „Übergeben“ wählt
 - **THEN** führt nach der nächsten Meldung ELW 2, und der Hinweis „bittet um die Führung“ verschwindet
+
+#### Scenario: Neue Anfrage gleich nach der Ablehnung
+- **WHEN** ELW 2 die Ablehnung gesehen hat und sofort erneut „Führung anfragen“ wählt
+- **THEN** zeigt ELW 1 nach der nächsten Meldung wieder „ELW 2 bittet um die Führung“
 
 #### Scenario: Ablehnen
 - **WHEN** die Einsatzleitung an ELW 1 „Ablehnen“ wählt
