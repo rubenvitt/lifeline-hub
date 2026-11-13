@@ -552,7 +552,7 @@ pub async fn handle_abgleich(
         })
     })?;
     melde_live(pool, &uebernommen).await;
-    lebensende::abraeumen_nach_commit(pool, &abzuraeumen).await;
+    lebensende::abraeumen_nach_commit(pool, Some(live), &abzuraeumen).await;
     super::hinweis::ausfuehren(pool, live, hinweis_folgen).await;
     Ok(antwort)
 }
@@ -744,7 +744,8 @@ pub async fn abgleich_einmal(
         })
         .map_err(fehler)?;
         melde_live(pool, &uebernommen).await;
-        lebensende::abraeumen_nach_commit(pool, &abzuraeumen).await;
+        lebensende::abraeumen_nach_commit(pool, crate::instanz::stammdaten::live(), &abzuraeumen)
+            .await;
         // Anträge an Einsätze, die hier geführt werden; die Quittungen gehen mit der nächsten
         // Anfrage hinaus.
         let mut ausgefuehrt = false;

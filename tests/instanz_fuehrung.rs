@@ -5713,7 +5713,7 @@ async fn endgueltig_loeschen(i: &Instanz, einsatz: i64) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert!(abraeumen::ausfuehren(&i.pool, einsatz).await.unwrap());
+    assert!(abraeumen::ausfuehren(&i.pool, None, einsatz).await.unwrap());
 }
 
 /// Kennungen unter „Einsätze beim Gegenüber“ an einer Instanz.
