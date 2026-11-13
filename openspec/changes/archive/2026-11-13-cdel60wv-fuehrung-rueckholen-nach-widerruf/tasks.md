@@ -21,7 +21,7 @@
 ## 4. Doku und Verweise
 
 - [x] 4.1 Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md`, Abschnitt „Widerruf“: Absatz „Ist die Führung je Einsatz ausgeschaltet …“ auf das Zurückholen umschreiben (wer, wo, Grund, Bruchstelle, ersetzt keine Kopplung). Prüfen: Doku-Wächter in `check-all.sh` grün.
-- [x] 4.2 ADR-0041 „Einen Spiegel ohne gekoppelte Führung holt nur ein Mensch zurück“ nach `docs/architektur/entscheidungen/VORLAGE.md`; Verweis „Ausweg: LLH-1850“ in `src/instanz/fuehrung/repo.rs` auf die neue Bedienung nachziehen; `src/AGENTS.md`, Instanzkopplung, prüfen, ob ein Satz zu LLH-1704 nachzuziehen ist. Prüfen: `scripts/check-adr-nummern.sh` und `scripts/adr-fuer.sh src/instanz/fuehrung/dienst.rs` nennen ADR-0041.
+- [x] 4.2 ADR-0043 „Einen Spiegel ohne gekoppelte Führung holt nur ein Mensch zurück“ nach `docs/architektur/entscheidungen/VORLAGE.md`; Verweis „Ausweg: LLH-1850“ in `src/instanz/fuehrung/repo.rs` auf die neue Bedienung nachziehen; `src/AGENTS.md`, Instanzkopplung, prüfen, ob ein Satz zu LLH-1704 nachzuziehen ist. Prüfen: `scripts/check-adr-nummern.sh` und `scripts/adr-fuer.sh src/instanz/fuehrung/dienst.rs` nennen ADR-0043.
 
 ## 5. Verifikation
 
