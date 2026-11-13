@@ -1311,13 +1311,13 @@ pub async fn apply_eingang(
 /// Jede Folge einmal, in der Reihenfolge ihres ersten Auftretens (LLH-1855): Ein Widerruf und
 /// der Austausch derselben Meldung können denselben Einsatz nennen.
 fn dedupe_folgen(folgen: &[Folge]) -> Vec<&Folge> {
-    let mut eindeutig: Vec<&Folge> = Vec::with_capacity(folgen.len());
+    let mut unique: Vec<&Folge> = Vec::with_capacity(folgen.len());
     for f in folgen {
-        if !eindeutig.contains(&f) {
-            eindeutig.push(f);
+        if !unique.contains(&f) {
+            unique.push(f);
         }
     }
-    eindeutig
+    unique
 }
 
 /// Führt die Folgen eines Austauschs nach dem Commit aus: Live-Ereignis am Einsatzkopf,
