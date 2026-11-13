@@ -20,6 +20,7 @@ import {
   bestaetigeUebernahme,
   frageFuehrungAn,
   gibFuehrungPerCodeAb,
+  lehneAnfrageAb,
   uebergebeFuehrung,
   uebernimmFuehrung,
   uebernimmFuehrungMitCode,
@@ -33,9 +34,9 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { FuehrungAnzeige, FuehrungCodeAntwort, FuehrungVerlaufEintrag } from '../api/types';
 import {
   FUEHRUNG_ART_TEXT,
+  anfrageEingangTitel,
   fuehrungMoeglich,
   offeneUebernahmeTitel,
-  vorOrtHinweis,
 } from './fuehrungText';
 
 /** Folge der Übergabe und der Abgabe per Code: steht in der Rückfrage, nicht neben dem Knopf. */
@@ -253,6 +254,15 @@ export default function FuehrungPaneel({
       message.success('Führung angefragt');
     },
   });
+  const ablehnen = useMutation({
+    ...SOFORT_ODER_NIE,
+    mutationFn: () => lehneAnfrageAb(ort),
+    onSuccess: (f) => {
+      nach();
+      onGeaendert?.(f);
+      message.success('Anfrage abgelehnt');
+    },
+  });
   const notuebernahme = useMutation({
     ...SOFORT_ODER_NIE,
     mutationFn: (w: NotuebernahmeWerte) => {
@@ -270,7 +280,11 @@ export default function FuehrungPaneel({
   });
   // Eine Aktion zur Zeit (LLH-1670): eine zweite während der ersten endete mit 409 neben dem Erfolg.
   const laeuft =
-    uebergeben.isPending || perCode.isPending || anfragen.isPending || notuebernahme.isPending;
+    uebergeben.isPending ||
+    perCode.isPending ||
+    anfragen.isPending ||
+    ablehnen.isPending ||
+    notuebernahme.isPending;
   useEffect(() => {
     onLaeuft?.(laeuft);
   }, [laeuft, onLaeuft]);
@@ -282,7 +296,8 @@ export default function FuehrungPaneel({
     moeglich.perCode.length > 0 ||
     moeglich.anfragen ||
     moeglich.notuebernahme ||
-    moeglich.notuebernahmeMitBeweis;
+    moeglich.notuebernahmeMitBeweis ||
+    moeglich.anfrageEingang != null;
 
   const stand = (
     <Datenraster spalten={2}>
@@ -298,6 +313,11 @@ export default function FuehrungPaneel({
       <Datenfeld label="Zuletzt">{FUEHRUNG_ART_TEXT[fuehrung.art]}</Datenfeld>
       <Datenfeld label="Bruchstelle">{fuehrung.bruch_at ? zeit(fuehrung.bruch_at) : '—'}</Datenfeld>
       {fuehrung.anfrage_offen && <Datenfeld label="Anfrage">beim Gegenüber gestellt</Datenfeld>}
+      {fuehrung.anfrage_abgelehnt && !fuehrung.anfrage_offen && (
+        <Datenfeld label="Anfrage">
+          <span data-lfh="fuehrung-anfrage-abgelehnt">abgelehnt</span>
+        </Datenfeld>
+      )}
     </Datenraster>
   );
 
@@ -343,6 +363,62 @@ export default function FuehrungPaneel({
                 onGeaendert={onGeaendert}
               />
             </div>
+          )}
+        </div>
+      )}
+
+      {moeglich.anfrageEingang && (
+        <div
+          data-lfh="fuehrung-anfrage-eingang"
+          style={{
+            marginBlockStart: token.marginMD,
+            padding: token.paddingSM,
+            border: `1px solid ${rollen.achtungText}`,
+          }}
+        >
+          <Typography.Text strong style={{ color: rollen.achtungText }}>
+            {anfrageEingangTitel(moeglich.anfrageEingang.name)}
+          </Typography.Text>
+          {darfBedienen && (
+            <Space wrap style={{ display: 'flex', marginBlockStart: token.marginSM }}>
+              <Popconfirm
+                title={`Führung an ${moeglich.anfrageEingang.name} übergeben?`}
+                description={ABGABE_FOLGE}
+                okText="Führung übergeben"
+                cancelText="Abbrechen"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => {
+                  if (!sperre(false) && moeglich.anfrageEingang)
+                    uebergeben.mutate(moeglich.anfrageEingang.kennung);
+                }}
+              >
+                <Button
+                  type="primary"
+                  loading={
+                    uebergeben.isPending && uebergeben.variables === moeglich.anfrageEingang.kennung
+                  }
+                  disabled={sperre(
+                    uebergeben.isPending &&
+                      uebergeben.variables === moeglich.anfrageEingang.kennung,
+                  )}
+                  aria-describedby={beschrieben}
+                  data-lfh="fuehrung-anfrage-uebergeben"
+                >
+                  Übergeben
+                </Button>
+              </Popconfirm>
+              <Button
+                loading={ablehnen.isPending}
+                disabled={sperre(ablehnen.isPending)}
+                aria-describedby={beschrieben}
+                onClick={() => {
+                  if (!sperre(false)) ablehnen.mutate();
+                }}
+                data-lfh="fuehrung-anfrage-ablehnen"
+              >
+                Ablehnen
+              </Button>
+            </Space>
           )}
         </div>
       )}
@@ -430,19 +506,20 @@ export default function FuehrungPaneel({
         </Space>
       )}
       {/* Zwei Gegenstellen können gleich heißen: der Name taugt nicht als Key (Review LLH-1497). */}
-      {moeglich.vorOrt.map((name, i) => (
+      {moeglich.gesperrt.map((grund, i) => (
         <Typography.Paragraph
           key={`vo-${i}`}
           style={{ color: rollen.gedaempft, marginBlock: token.marginXS }}
           data-lfh="fuehrung-vor-ort"
         >
-          {vorOrtHinweis(name)}
+          {grund}
         </Typography.Paragraph>
       ))}
       <div style={{ marginBlockStart: token.marginSM }}>
         <SpeicherFehler fehler={uebergeben.error} titel="Nicht übergeben" />
         <SpeicherFehler fehler={perCode.error} titel="Kein Code" />
         <SpeicherFehler fehler={anfragen.error} titel="Nicht angefragt" />
+        <SpeicherFehler fehler={ablehnen.error} titel="Nicht abgelehnt" />
       </div>
 
       <Typography.Title level={5} style={{ marginBlockStart: token.marginMD }}>

@@ -5,8 +5,9 @@ import {
   fuehrungBeiKurz,
   fuehrungKurz,
   fuehrungMoeglich,
+  anfrageEingangTitel,
   offeneUebernahmeTitel,
-  vorOrtHinweis,
+  updateHinweis,
 } from './fuehrungText';
 
 const hub: FuehrungGegenueber = {
@@ -15,6 +16,7 @@ const hub: FuehrungGegenueber = {
   name: 'Hub Nord',
   richtung: 'meldet_sich',
   art: 'standard',
+  wechsel: 'nach_richtung',
 };
 const elw: FuehrungGegenueber = {
   kopplung_id: 2,
@@ -22,6 +24,7 @@ const elw: FuehrungGegenueber = {
   name: 'ELW 1',
   richtung: 'wird_gemeldet',
   art: 'standard',
+  wechsel: 'nach_richtung',
 };
 
 const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
@@ -36,6 +39,7 @@ const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
   fuehrend: true,
   art: 'angelegt',
   anfrage_offen: false,
+  anfrage_abgelehnt: false,
   verwahrt: false,
   gegenueber: [hub],
   verlauf: [],
@@ -130,13 +134,19 @@ describe('fuehrungMoeglich (LLH-1491)', () => {
   });
 });
 
-describe('Führung vor Ort (LLH-1497)', () => {
+describe('Führung vor Ort (LLH-1497, LLH-1678)', () => {
   const vorOrt: FuehrungGegenueber = {
     kopplung_id: 3,
     kennung: 'k-elw2',
     name: 'ELW 2',
     richtung: 'wird_gemeldet',
     art: 'vor_ort',
+    wechsel: 'gleichrangig',
+  };
+  const veraltet: FuehrungGegenueber = {
+    ...vorOrt,
+    wechsel: 'gesperrt',
+    wechsel_grund: 'ELW 2 braucht ein Update für den Führungswechsel vor Ort.',
   };
   const akte = (teil: Partial<FuehrungAnzeige>): FuehrungAnzeige => ({
     id: 1,
@@ -152,34 +162,76 @@ describe('Führung vor Ort (LLH-1497)', () => {
     fuehrend: true,
     art: 'angelegt',
     anfrage_offen: false,
+    anfrage_abgelehnt: false,
     verwahrt: false,
     gegenueber: [hub, vorOrt],
     verlauf: [],
     ...teil,
   });
+  const fuehrtElw2 = {
+    fuehrend: false,
+    fuehrer_kennung: 'k-elw2',
+    fuehrer_name: 'ELW 2',
+    fuehrer_richtung: 'wird_gemeldet' as const,
+  };
 
-  it('übergibt nicht an eine Gegenstelle vor Ort und nennt den Grund', () => {
+  it('übergibt an eine gleichrangige Gegenstelle, auch per Code', () => {
     const m = fuehrungMoeglich(akte({}));
+    expect(m.uebergeben.map((g) => g.name)).toEqual(['Hub Nord', 'ELW 2']);
+    expect(m.perCode.map((g) => g.name)).toEqual(['Hub Nord', 'ELW 2']);
+    expect(m.gesperrt).toEqual([]);
+  });
+
+  it('nennt bei einer Gegenstelle mit altem Protokoll den Grund statt eines Ziels', () => {
+    const m = fuehrungMoeglich(akte({ gegenueber: [hub, veraltet] }));
     expect(m.uebergeben.map((g) => g.name)).toEqual(['Hub Nord']);
-    expect(m.vorOrt).toEqual(['ELW 2']);
-    expect(vorOrtHinweis('ELW 2')).toBe(
-      'ELW 2 ist vor Ort gekoppelt: Führungswechsel dorthin kommt später.',
+    expect(m.gesperrt).toEqual(['ELW 2 braucht ein Update für den Führungswechsel vor Ort.']);
+    expect(updateHinweis('ELW 2')).toBe(
+      'ELW 2 braucht ein Update für den Führungswechsel vor Ort.',
     );
   });
 
-  it('führt die Gegenstelle vor Ort, gibt es weder Anfrage noch Notübernahme', () => {
+  it('gegen die führende Gegenstelle vor Ort: anfragen und nur mit Beweis übernehmen', () => {
+    const m = fuehrungMoeglich(akte(fuehrtElw2), { darfUnterschreiben: true });
+    expect(m.anfragen).toBe(true);
+    expect(m.notuebernahme).toBe(false);
+    expect(m.notuebernahmeMitBeweis).toBe(true);
+    expect(m.unterschrift).toBe(true);
+  });
+
+  it('auch als erreichte Seite gilt vor Ort: kein Übernehmen ohne Beweis', () => {
     const m = fuehrungMoeglich(
       akte({
-        fuehrend: false,
-        fuehrer_kennung: 'k-elw2',
-        fuehrer_name: 'ELW 2',
-        fuehrer_richtung: 'wird_gemeldet',
+        ...fuehrtElw2,
+        fuehrer_richtung: 'meldet_sich',
+        gegenueber: [hub, { ...vorOrt, richtung: 'meldet_sich' }],
       }),
     );
+    expect(m.notuebernahme).toBe(false);
+    expect(m.notuebernahmeMitBeweis).toBe(true);
+    expect(m.anfragen).toBe(true);
+  });
+
+  it('führt eine veraltete Gegenstelle, gibt es weder Anfrage noch Notübernahme', () => {
+    const m = fuehrungMoeglich(akte({ ...fuehrtElw2, gegenueber: [hub, veraltet] }));
     expect(m.anfragen).toBe(false);
     expect(m.notuebernahme).toBe(false);
     expect(m.notuebernahmeMitBeweis).toBe(false);
-    expect(m.vorOrt).toEqual(['ELW 2']);
+    expect(m.gesperrt).toEqual(['ELW 2 braucht ein Update für den Führungswechsel vor Ort.']);
+  });
+
+  it('zeigt die Anfrage der Gegenstelle nur, solange diese Instanz frei führt', () => {
+    const anfrage_eingang = { kennung: 'k-elw2', name: 'ELW 2' };
+    expect(fuehrungMoeglich(akte({ anfrage_eingang })).anfrageEingang).toEqual(anfrage_eingang);
+    expect(
+      fuehrungMoeglich(
+        akte({
+          anfrage_eingang,
+          offen: { von: 'ELW 2', epoche: 2, bruch_at: '2026-11-09 14:00:00', konflikt: false },
+        }),
+      ).anfrageEingang,
+    ).toBeNull();
+    expect(anfrageEingangTitel('ELW 2')).toBe('ELW 2 bittet um die Führung');
   });
 });
 

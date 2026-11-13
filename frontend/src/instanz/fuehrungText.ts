@@ -52,14 +52,16 @@ export function fuehrungBeiKurz(bei: string): string {
 export interface FuehrungMoeglich {
   /** Gegenüber, an die übergeben werden kann (nur wenn diese Instanz führt, nichts offen ist). */
   uebergeben: FuehrungAnzeige['gegenueber'];
-  /** Gegenüber, an die per Code abgegeben werden kann (nur die erreichte Seite). */
+  /** Gegenüber, an die per Code abgegeben werden kann: als meldende Seite einer Standardkopplung
+   *  oder an jede Gegenstelle vor Ort (LLH-1678). */
   perCode: FuehrungAnzeige['gegenueber'];
-  /** Die Führung beim Gegenüber erbitten (meldende Seite, das Gegenüber führt). */
+  /** Die Führung beim Gegenüber erbitten (meldende Seite oder vor Ort, das Gegenüber führt). */
   anfragen: boolean;
-  /** Notübernahme ohne Beweis gegen die erreichte Seite. Nur mit dem Einsatz hier als Spiegel
-   *  (LLH-1641): ohne ihn hätte diese Instanz nichts zum Weiterführen. */
+  /** Notübernahme ohne Beweis gegen die erreichte Seite einer Standardkopplung. Nur mit dem
+   *  Einsatz hier als Spiegel (LLH-1641): ohne ihn hätte diese Instanz nichts zum Weiterführen. */
   notuebernahme: boolean;
-  /** Notübernahme gegen die meldende Seite: mit Unterschrift oder Code. */
+  /** Notübernahme mit Unterschrift oder Code: gegen die meldende Seite und vor Ort immer
+   *  (LLH-1678, Spec `instanz-fuehrung`). */
   notuebernahmeMitBeweis: boolean;
   /** Bei `notuebernahmeMitBeweis` die eigene Unterschrift als Beweis anbieten: nur wer
    *  `darfFuehrungUnterschreiben` (Admin der Einsatz-Org, LLH-1676, Spec `instanz-fuehrung`).
@@ -67,14 +69,21 @@ export interface FuehrungMoeglich {
   unterschrift: boolean;
   /** Eine Übernahme gegen diese Instanz wartet auf Bestätigen oder Widersprechen. */
   entscheiden: boolean;
-  /** Gegenüber vor Ort, mit denen die Führung hier wechseln würde, es aber nicht darf
-   *  (LLH-1497): der Grund steht im Paneel. */
-  vorOrt: string[];
+  /** Eine Gegenstelle vor Ort bittet um die Führung; die Einsatzleitung entscheidet (LLH-1678). */
+  anfrageEingang: FuehrungAnzeige['anfrage_eingang'] | null;
+  /** Gründe, warum die Führung zu einer Gegenstelle nicht wechselt, wo sie es sonst würde
+   *  (Gegenstelle vor Ort vor Protokoll 4, wörtlich wie die 409). */
+  gesperrt: string[];
 }
 
 /** Grund, warum zu einer Gegenstelle vor Ort keine Führung wechselt (wörtlich wie die 409). */
-export function vorOrtHinweis(name: string): string {
-  return `${name} ist vor Ort gekoppelt: Führungswechsel dorthin kommt später.`;
+export function updateHinweis(name: string): string {
+  return `${name} braucht ein Update für den Führungswechsel vor Ort.`;
+}
+
+/** Titel einer Anfrage vor Ort an dieser Instanz. */
+export function anfrageEingangTitel(name: string): string {
+  return `${name} bittet um die Führung`;
 }
 
 export function fuehrungMoeglich(
@@ -84,26 +93,37 @@ export function fuehrungMoeglich(
   // Einen verwahrten Einsatz führt nur noch diese Instanz (LLH-1647).
   const frei = f.fuehrend && !f.offen && !f.verwahrt;
   const liegtHier = f.einsatz_id != null;
-  // Über eine Direktkopplung vor Ort wechselt die Führung nicht (LLH-1497).
-  const standard = f.gegenueber.filter((g) => g.art === 'standard');
-  const fuehrerVorOrt = f.gegenueber.find(
-    (g) => g.kennung === f.fuehrer_kennung && g.art === 'vor_ort',
-  );
-  const wechselZumFuehrer = !f.fuehrend && fuehrerVorOrt == null;
-  const vorOrt = frei
-    ? f.gegenueber.filter((g) => g.art === 'vor_ort').map((g) => g.name)
-    : fuehrerVorOrt && !f.fuehrend
-      ? [fuehrerVorOrt.name]
+  // Die Regel je Gegenüber kommt vom Server (LLH-1678, design.md D1): `nach_richtung` an einer
+  // Standardkopplung, `gleichrangig` vor Ort, `gesperrt` vor Ort mit älterer Gegenstelle.
+  const grund = (g: FuehrungAnzeige['gegenueber'][number]) =>
+    g.wechsel_grund ?? updateHinweis(g.name);
+  const tragend = f.gegenueber.filter((g) => g.wechsel !== 'gesperrt');
+  const fuehrer = f.gegenueber.find((g) => g.kennung === f.fuehrer_kennung);
+  const zumFuehrerGesperrt = fuehrer?.wechsel === 'gesperrt';
+  const gleichrangig = fuehrer?.wechsel === 'gleichrangig';
+  const wechselZumFuehrer = !f.fuehrend && !zumFuehrerGesperrt;
+  const gesperrt = frei
+    ? f.gegenueber.filter((g) => g.wechsel === 'gesperrt').map(grund)
+    : fuehrer && zumFuehrerGesperrt && !f.fuehrend
+      ? [grund(fuehrer)]
       : [];
-  const mitBeweis = liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'wird_gemeldet';
+  const mitBeweis =
+    liegtHier && wechselZumFuehrer && (gleichrangig || f.fuehrer_richtung === 'wird_gemeldet');
   return {
-    uebergeben: frei ? standard : [],
-    perCode: frei ? standard.filter((g) => g.richtung === 'meldet_sich') : [],
-    anfragen: wechselZumFuehrer && f.fuehrer_richtung === 'meldet_sich' && !f.anfrage_offen,
-    notuebernahme: liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'meldet_sich',
+    uebergeben: frei ? tragend : [],
+    perCode: frei
+      ? tragend.filter((g) => g.wechsel === 'gleichrangig' || g.richtung === 'meldet_sich')
+      : [],
+    anfragen:
+      wechselZumFuehrer &&
+      (gleichrangig || f.fuehrer_richtung === 'meldet_sich') &&
+      !f.anfrage_offen,
+    notuebernahme:
+      liegtHier && wechselZumFuehrer && !gleichrangig && f.fuehrer_richtung === 'meldet_sich',
     notuebernahmeMitBeweis: mitBeweis,
     unterschrift: mitBeweis && darfUnterschreiben,
     entscheiden: f.offen != null,
-    vorOrt,
+    anfrageEingang: frei ? (f.anfrage_eingang ?? null) : null,
+    gesperrt,
   };
 }

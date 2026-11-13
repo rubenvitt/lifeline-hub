@@ -91,6 +91,13 @@ export function kopplungHinweise(
   if (k.zustand === 'widerrufen' && k.richtung === 'meldet_sich' && k.letzter_fehler) {
     aus.push('Widerruf noch nicht beim Gegenüber, wird nachgereicht');
   }
+  if (
+    k.art === 'vor_ort' &&
+    k.gegenueber_protokoll != null &&
+    k.gegenueber_protokoll < PROTOKOLL_FUEHRUNG_VOR_ORT
+  ) {
+    aus.push(`Führungswechsel vor Ort erst nach Update von ${k.gegenueber_name}`);
+  }
   if (k.protokoll === 'update_hier') aus.push('Update nötig: diese Instanz ist zu alt');
   if (k.protokoll === 'update_gegenueber') aus.push('Update nötig: das Gegenüber ist zu alt');
   if (k.uhr_abweichung_s != null && Math.abs(k.uhr_abweichung_s) > UHR_HINWEIS_AB_S) {
@@ -150,8 +157,11 @@ export function codeVorOrtSperre(u: InstanzUebersicht): string | undefined {
 
 /** Erklärung der Direktkopplung vor Ort, kurz (Knopf, Code-Dialog, Kopplung). */
 export const VOR_ORT_ERKLAERUNG =
-  'Direktkopplung vor Ort: zwei Instanzen im selben Netz lesen einander und stellen Anträge. ' +
-  'Kein Führungswechsel, keine Stammdaten, keine Verwahrung.';
+  'Direktkopplung vor Ort: zwei Instanzen im selben Netz lesen einander, stellen Anträge und ' +
+  'geben die Führung gleichrangig weiter. Keine Stammdaten, keine Verwahrung.';
+
+/** Ab dieser Protokollversion der Gegenstelle wechselt die Führung vor Ort (LLH-1678). */
+export const PROTOKOLL_FUEHRUNG_VOR_ORT = 4;
 
 /** Chip einer Direktkopplung. */
 export const VOR_ORT_CHIP = 'vor Ort';

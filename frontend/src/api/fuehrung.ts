@@ -35,9 +35,14 @@ export function gibFuehrungPerCodeAb(ort: FuehrungOrt, an: string): Promise<Fueh
   return apiSend<FuehrungCodeAntwort>(`${fuehrungBasis(ort)}/code`, 'POST', { an });
 }
 
-/** Die Führung beim Gegenüber erbitten (meldende Seite). */
+/** Die Führung beim Gegenüber erbitten (meldende Seite, vor Ort jede Seite). */
 export function frageFuehrungAn(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
   return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/anfragen`, 'POST');
+}
+
+/** Die Anfrage der Gegenstelle vor Ort ablehnen (LLH-1678); die Führung bleibt hier. */
+export function lehneAnfrageAb(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
+  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/anfrage/ablehnen`, 'POST');
 }
 
 /** Notübernahme gegen die erreichte Seite: nur mit Grund. */

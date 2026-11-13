@@ -12,6 +12,7 @@ vi.mock('../api/fuehrung', () => ({
   bestaetigeUebernahme: vi.fn(),
   frageFuehrungAn: vi.fn(),
   gibFuehrungPerCodeAb: vi.fn(),
+  lehneAnfrageAb: vi.fn(),
   uebergebeFuehrung: vi.fn(),
   uebernimmFuehrung: vi.fn(),
   uebernimmFuehrungMitCode: vi.fn(),
@@ -23,6 +24,7 @@ import {
   bestaetigeUebernahme,
   frageFuehrungAn,
   gibFuehrungPerCodeAb,
+  lehneAnfrageAb,
   uebergebeFuehrung,
   uebernimmFuehrung,
   uebernimmFuehrungMitCode,
@@ -42,6 +44,7 @@ const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
   fuehrend: true,
   art: 'angelegt',
   anfrage_offen: false,
+  anfrage_abgelehnt: false,
   verwahrt: false,
   gegenueber: [
     {
@@ -50,6 +53,7 @@ const akte = (teil: Partial<FuehrungAnzeige> = {}): FuehrungAnzeige => ({
       name: 'Hub Nord',
       richtung: 'meldet_sich',
       art: 'standard',
+      wechsel: 'nach_richtung',
     },
   ],
   verlauf: [
@@ -316,6 +320,100 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     expect(within(dialog).getByText('Beweis')).toBeInTheDocument();
     expect(within(dialog).getByText('Eigene Unterschrift')).toBeInTheDocument();
     expect(within(dialog).getByText('Code des Gegenübers')).toBeInTheDocument();
+  });
+
+  describe('Führung vor Ort (LLH-1678)', () => {
+    const vorOrt = {
+      kopplung_id: 2,
+      kennung: 'k-elw2',
+      name: 'ELW 2',
+      richtung: 'wird_gemeldet' as const,
+      art: 'vor_ort' as const,
+      wechsel: 'gleichrangig' as const,
+    };
+
+    it('eine Anfrage vor Ort wird übergeben oder abgelehnt', async () => {
+      vi.mocked(lehneAnfrageAb).mockResolvedValue(akte());
+      vi.mocked(uebergebeFuehrung).mockResolvedValue(akte({ fuehrend: false }));
+      renderMitProviders(
+        <FuehrungPaneel
+          fuehrung={akte({
+            gegenueber: [vorOrt],
+            anfrage_eingang: { kennung: 'k-elw2', name: 'ELW 2' },
+          })}
+          darfBedienen
+        />,
+      );
+      expect(screen.getByText('ELW 2 bittet um die Führung')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
+      await waitFor(() => expect(lehneAnfrageAb).toHaveBeenCalledWith({ einsatzId: 7 }));
+      await userEvent.click(screen.getByRole('button', { name: 'Übergeben' }));
+      expect(uebergebeFuehrung).not.toHaveBeenCalled();
+      await bestaetigeRueckfrage('Führung übergeben');
+      await waitFor(() =>
+        expect(uebergebeFuehrung).toHaveBeenCalledWith({ einsatzId: 7 }, 'k-elw2'),
+      );
+    });
+
+    it('ohne Recht zeigt die Anfrage nur, wer bittet', () => {
+      renderMitProviders(
+        <FuehrungPaneel
+          fuehrung={akte({
+            gegenueber: [vorOrt],
+            anfrage_eingang: { kennung: 'k-elw2', name: 'ELW 2' },
+          })}
+          darfBedienen={false}
+        />,
+      );
+      expect(screen.getByText('ELW 2 bittet um die Führung')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Ablehnen' })).toBeNull();
+    });
+
+    it('nennt eine abgelehnte Anfrage im Stand', () => {
+      renderMitProviders(
+        <FuehrungPaneel
+          fuehrung={akte({
+            fuehrend: false,
+            fuehrer_kennung: 'k-elw2',
+            fuehrer_name: 'ELW 2',
+            gegenueber: [vorOrt],
+            anfrage_abgelehnt: true,
+          })}
+          darfBedienen
+        />,
+      );
+      expect(screen.getByText('abgelehnt')).toBeInTheDocument();
+    });
+
+    it('gegen die Gegenstelle vor Ort verlangt die Notübernahme einen Beweis', async () => {
+      vi.mocked(uebernimmFuehrungMitCode).mockResolvedValue(akte());
+      renderMitProviders(
+        <FuehrungPaneel
+          fuehrung={akte({
+            fuehrend: false,
+            fuehrer_kennung: 'k-elw2',
+            fuehrer_name: 'ELW 2',
+            fuehrer_richtung: 'meldet_sich',
+            gegenueber: [{ ...vorOrt, richtung: 'meldet_sich' }],
+          })}
+          darfBedienen
+        />,
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Notübernahme …' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByLabelText('Code')).toBeInTheDocument();
+      await userEvent.type(within(dialog).getByLabelText('Grund'), 'ELW 2 ausgefallen');
+      await userEvent.type(within(dialog).getByLabelText('Code'), 'ABCD-EFGH-JKMN-PQRS');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Führung übernehmen' }));
+      await waitFor(() =>
+        expect(uebernimmFuehrungMitCode).toHaveBeenCalledWith(
+          { einsatzId: 7 },
+          'ELW 2 ausgefallen',
+          'ABCD-EFGH-JKMN-PQRS',
+        ),
+      );
+      expect(uebernimmFuehrung).not.toHaveBeenCalled();
+    });
   });
 
   describe('ohne Netz (LLH-1670)', () => {
