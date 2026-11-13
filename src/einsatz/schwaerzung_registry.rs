@@ -3050,7 +3050,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("vollzogen_at", G_ZEIT),
         ],
     },
-    // ---------- Freigabe für Maschinenzugänge (LLH-1638, migrations/0339_maschinenzugang_freigabe.sql) ----------
+    // ---------- Freigabe für Maschinenzugänge (LLH-1638, migrations/0341_maschinenzugang_freigabe.sql) ----------
     TabellenRegel {
         tabelle: "maschinenzugang_freigabe",
         scoping: Scoping::EinsatzId,

@@ -5120,7 +5120,7 @@ mod tests {
         assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
     }
 
-    /// `migrations/0340_lagemonitor_zugang_entfernen.sql` (LLH-1638) entfernt den Lesezugang per
+    /// `migrations/0342_lagemonitor_zugang_entfernen.sql` (LLH-1638) entfernt den Lesezugang per
     /// Schlüssel `llh_lm_`: beide Tabellen fallen samt Inhalt, ohne hängenden Fremdschlüssel;
     /// Einsatz, Benutzer und die alten Einträge der Admin-Spur bleiben. Die Nummer liest der Test
     /// aus der Migration selbst, damit ein Umnummerieren ihn nicht bricht.

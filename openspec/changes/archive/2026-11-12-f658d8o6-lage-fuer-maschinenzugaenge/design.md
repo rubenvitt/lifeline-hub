@@ -64,7 +64,7 @@ und v1 darf keinen internen Typ tragen (`src/AGENTS.md`, „Öffentliche API v1�
 
 ### D2 Tabelle `maschinenzugang_freigabe`: ein Einsatz je Zugang, erweiterbar
 
-Migration `0339_maschinenzugang_freigabe.sql` (beim Bau von 0335 umnummeriert, weil `alpha` weiterlief):
+Migration `0341_maschinenzugang_freigabe.sql` (beim Bau von 0335 umnummeriert, weil `alpha` weiterlief):
 
 ```sql
 CREATE TABLE maschinenzugang_freigabe (
@@ -260,7 +260,7 @@ Entscheidung Ruben vom 12.11.2026, abweichend von Konzept D6. Entfernt werden:
 - Geteiltes zieht um: `karte_etag`, `lagemeldung`, `LageQuery`, `KARTE_AUS`, `LagemonitorUhsZahl`,
   `LagemonitorLagemeldung` und der Kartenbau nach `src/routes/lagemonitor.rs`. Die Umbenennung
   `baue_karte` → `build_karte` kommt als eigener `refactor`-Commit (Bezeichner-Sprache).
-- Migration `0340_lagemonitor_zugang_entfernen.sql`: `DROP TABLE lagemonitor_freigabe; DROP TABLE lagemonitor_zugang;` (Kind zuerst,
+- Migration `0342_lagemonitor_zugang_entfernen.sql`: `DROP TABLE lagemonitor_freigabe; DROP TABLE lagemonitor_zugang;` (Kind zuerst,
   ohne Marker). 0269 und 0270 bleiben unangetastet. Die Einträge in `schwaerzung_registry` und
   `spiegel::art` entfallen.
 - Admin-Spur: Die Aktionen `lesezugang_angelegt` und `lesezugang_widerrufen` bleiben im Enum, im
