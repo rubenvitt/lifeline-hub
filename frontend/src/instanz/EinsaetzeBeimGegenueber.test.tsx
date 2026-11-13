@@ -186,11 +186,17 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
     expect(
       within(dialog).getByText(/Nicht mehr unter „Einsätze beim Gegenüber“/),
     ).toBeInTheDocument();
+    const abrufeVorher = vi.mocked(loadFuehrungFremd).mock.calls.length;
     await userEvent.click(within(dialog).getByRole('button', { name: 'Führung anfragen' }));
     expect(frageFuehrungAn).toHaveBeenCalledWith({ akteId: 4, kennung: 'k-hub/3' });
     expect(
       await within(dialog).findByText(/Unter dieser Akte liegt inzwischen ein anderer Einsatz/),
     ).toBeInTheDocument();
+    // Die 409 lädt die Liste gleich neu, nicht erst mit dem nächsten 30-s-Abruf: Wer die Zeile
+    // erneut wählt, bekommt den Einsatz, der jetzt unter der ID liegt.
+    await waitFor(() =>
+      expect(vi.mocked(loadFuehrungFremd).mock.calls.length).toBeGreaterThan(abrufeVorher),
+    );
   });
 
   it('ein neuer Stand aus der Liste erreicht den offenen Dialog (LLH-1670)', async () => {
