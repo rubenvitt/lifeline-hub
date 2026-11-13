@@ -401,7 +401,7 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0039](../docs/architektur/entscheidungen/ADR-0039-ueber-eine-direktkopplung-gibt-keine-seite-ohne-beweis-und-einsatzleitung-ab.md):
+  [ADR-0040](../docs/architektur/entscheidungen/ADR-0040-ueber-eine-direktkopplung-gibt-keine-seite-ohne-beweis-und-einsatzleitung-ab.md):
   - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
