@@ -63,6 +63,7 @@ import {
   etbFilterPfad,
   einsatzberichtPfad,
   parseEtbFilter,
+  parseEtbDruckFilter,
   parsePersonenSicht,
   parseBerichtAuswahl,
   personalPfad,
@@ -1007,8 +1008,9 @@ describe('einsatzberichtPfad (LFH-726)', () => {
 });
 
 describe('etbDruckPfad (LFH-22)', () => {
-  it('zeigt mit der Vorgabe auf die Druckansicht des Tagebuchs', () => {
-    expect(etbDruckPfad(7, { ohne_system: true })).toBe('/einsaetze/7/etb/druck');
+  it('ohne Merkmal druckt das vollständige Tagebuch (Spec `etb-druck`, „Ungefiltert“)', () => {
+    expect(etbDruckPfad(7, {})).toBe('/einsaetze/7/etb/druck');
+    expect(parseEtbDruckFilter(new URLSearchParams(''))).toEqual({});
   });
 
   it('trägt den Filter durch URLSearchParams hin und zurück — auch mit & = und Leerzeichen', () => {
@@ -1022,15 +1024,26 @@ describe('etbDruckPfad (LFH-22)', () => {
     };
     const pfad = etbDruckPfad(7, filter);
     expect(pfad.startsWith('/einsaetze/7/etb/druck?')).toBe(true);
-    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual(filter);
+    expect(parseEtbDruckFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual(filter);
   });
 
-  it('druckt eingeblendete Systemeinträge mit (`system=an`), die Vorgabe ohne', () => {
-    // Spec „Systemeinträge zeigen“: der Zustand übersteht den Druck.
-    expect(etbDruckPfad(7, { ohne_system: true })).toBe('/einsaetze/7/etb/druck');
-    const pfad = etbDruckPfad(7, {});
-    expect(pfad).toBe('/einsaetze/7/etb/druck?system=an');
-    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({});
+  it('die Seite übergibt ihren Ausschluss ausdrücklich (`system=aus`), gedruckt wird ihre Sicht (Review S7)', () => {
+    // Spec „Systemeinträge zeigen“: der Zustand übersteht den Druck — in beide Richtungen.
+    const ohne = etbDruckPfad(7, { ohne_system: true });
+    expect(ohne).toBe('/einsaetze/7/etb/druck?system=aus');
+    expect(parseEtbDruckFilter(new URLSearchParams(ohne.split('?')[1]))).toEqual({
+      ohne_system: true,
+    });
+    expect(etbDruckPfad(7, {})).toBe('/einsaetze/7/etb/druck');
+    // Ein alter Druck-Link mit `ohne_system=true` gilt weiter; neben `typ=system` fällt er weg.
+    expect(parseEtbDruckFilter(new URLSearchParams('ohne_system=true'))).toEqual({
+      ohne_system: true,
+    });
+    expect(parseEtbDruckFilter(new URLSearchParams('typ=system&system=aus'))).toEqual({
+      typ: 'system',
+    });
+    // Ein mitgebrachtes `system=an` (Rückweg der Seite) ändert am Druck nichts.
+    expect(parseEtbDruckFilter(new URLSearchParams('system=an'))).toEqual({});
   });
 });
 

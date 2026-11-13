@@ -94,7 +94,9 @@ Beim Bau ergänzt: Seitenkopf, Filterleiste und Spaltenkopf kleben nur, solange 
 höchstens ein Drittel der Fensterhöhe belegen (`etb/etbKopfKleben.ts`, `KLEBEN_HOECHSTENS`); bei
 1366 × 520 im Handschuh-Betrieb bliebe zwischen ihnen und der Erfassung sonst kein Platz für den
 Fokus (WCAG 2.4.11, `e2e/fokus-verdeckung.spec.ts`). Ein Druck mit der Vorgabe nennt im Druckkopf
-„ohne Systemeinträge“; den Druck ordnet LLH-1837 neu.
+„ohne Systemeinträge“; die Seite übergibt den Ausschluss dafür ausdrücklich (`system=aus`), eine
+Druckadresse ohne Merkmal druckt wie bisher das vollständige Tagebuch (Review S7, Entscheidung
+13.11.2026, Spec `etb-druck`). Den Druck ordnet LLH-1837 neu.
 
 ### D9 Niedriges Fenster: eine rollende Zeile
 Beim Bau gemessen: im Handschuh-Betrieb sind Feldzeile (zwei Reihen), Inhalt und Fußzeile am

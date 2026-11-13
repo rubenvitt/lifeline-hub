@@ -14,7 +14,7 @@ import DruckKnopf from '../components/druck/DruckKnopf';
 import { ladeEtbVollstaendig } from '../etb/druckAbruf';
 import { auswahlZeilen } from '../etb/druckAuswahl';
 import EtbDruckTabelle from '../etb/EtbDruckTabelle';
-import { etbFilterPfad, parseEtbFilter } from '../routing/deeplinks';
+import { etbFilterPfad, parseEtbDruckFilter } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import { modulName } from '../einsatz/modulRegistry';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
@@ -36,7 +36,7 @@ function umfang(anzahl: number): string {
  *
  * Schnappschuss: `einsatzKeys.etbDruck` ist nicht live; „Neu laden" holt neue Einträge.
  *
- * Der Filter kommt aus der Adresse (`parseEtbFilter`), ein unbekannter Wert fällt ganz weg. Ein 403
+ * Der Filter kommt aus der Adresse (`parseEtbDruckFilter`), ein unbekannter Wert fällt ganz weg. Ein 403
  * der Liste heißt „kein Zugriff", ohne Druckknopf.
  */
 export default function EtbDruckPage() {
@@ -48,7 +48,7 @@ export default function EtbDruckPage() {
   const [searchParams] = useSearchParams();
   // Über den String memoisiert, nicht über die Instanz (Begründung in `EtbPage`).
   const filterText = searchParams.toString();
-  const filter = useMemo(() => parseEtbFilter(new URLSearchParams(filterText)), [filterText]);
+  const filter = useMemo(() => parseEtbDruckFilter(new URLSearchParams(filterText)), [filterText]);
   const [geladen, setGeladen] = useState(0);
 
   const einsatzQuery = useQuery({

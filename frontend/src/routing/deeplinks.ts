@@ -707,9 +707,15 @@ export function etbFilterPfad(
   });
 }
 
+/** Merkmal `system=aus` der Druckadresse: die Seite druckt ohne Systemeinträge (Review S7). */
+const SYSTEM_AUSGEBLENDET = 'aus';
+
 /**
- * Druckansicht des Tagebuchs mit derselben Filterachse wie {@link etbPfad}; eine Umkehr
- * ({@link parseEtbFilter}) für beide Adressen, damit genau die gezeigte Auswahl gedruckt wird.
+ * Druckansicht des Tagebuchs mit derselben Filterachse wie {@link etbPfad}, damit genau die
+ * gezeigte Auswahl gedruckt wird. Anders als die Seite ist ohne Merkmal NICHTS ausgeschlossen
+ * (Spec `etb-druck`, „Ungefiltert“: „vollständiges Tagebuch“; Regel der Druckansichten unten):
+ * die Seite übergibt ihren Ausschluss deshalb ausdrücklich als `system=aus`. Umkehr:
+ * {@link parseEtbDruckFilter}.
  */
 export function etbDruckPfad(
   einsatzId: number,
@@ -721,8 +727,20 @@ export function etbDruckPfad(
     von: filter.von,
     bis: filter.bis,
     einheit_id: filter.einheit_id,
-    system: systemEingeblendet(filter) ? SYSTEM_EINGEBLENDET : undefined,
+    system: filter.ohne_system ? SYSTEM_AUSGEBLENDET : undefined,
   });
+}
+
+/**
+ * Umkehr von {@link etbDruckPfad}: dieselbe Achse wie {@link parseEtbFilter}, aber ausgeschlossen
+ * wird nur auf `system=aus` (oder ein alter Link mit `ohne_system=true`) und nie neben
+ * `typ=system` (der Server wiese die Kombination mit 422 ab).
+ */
+export function parseEtbDruckFilter(params: URLSearchParams): EtbFilterWerte {
+  const { ohne_system: _vorgabe, ...werte } = parseEtbFilter(params);
+  void _vorgabe;
+  const aus = params.get('system') === SYSTEM_AUSGEBLENDET || params.get('ohne_system') === 'true';
+  return aus && werte.typ !== 'system' ? { ...werte, ohne_system: true } : werte;
 }
 
 /**

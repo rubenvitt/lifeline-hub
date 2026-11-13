@@ -72,6 +72,10 @@ Keine.
 - `datensatz-aktionsmenue`: die Chips der ETB-Erfassung entfallen und mit ihnen ihr Kontextmenü.
 - `ereigniszeit-vorgabe`: „Zeit-Chip“ wird das Feld Zeit; es zeigt „jetzt“ nach der Serveruhr.
 - `zeiteingabe`: die Ereigniszeit der ETB-Erfassung steht im Feld Zeit statt im Chip.
+- `etb-zeitachse-fenster`: Kopfzahl und Typ-Segmente statt Bilanz zählen nach dem Server, nicht
+  nach dem geladenen Fenster.
+- `etb-druck`: der Ausschluss der Systemeinträge reist ausdrücklich in die Druckansicht; ohne ihn
+  druckt sie das vollständige Tagebuch.
 
 ## Impact
 

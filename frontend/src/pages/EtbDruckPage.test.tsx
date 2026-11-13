@@ -154,7 +154,7 @@ describe('EtbDruckPage', () => {
 
   it('nennt die Auswahl aus der Adresse im Kopf, mit Einheitenname statt Kennung', async () => {
     tagebuch([eintrag(1)]);
-    rendere('?typ=meldung&einheit_id=3');
+    rendere('?typ=meldung&einheit_id=3&system=aus');
     await fertig();
     const kopf = within(document.querySelector<HTMLElement>('[data-lfh="druckkopf"]')!);
     expect(
@@ -162,7 +162,7 @@ describe('EtbDruckPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('druckt in der Vorgabe ohne Systemeinträge und sagt es im Kopf (kwc2yszv D6)', async () => {
+  it('ohne Merkmal druckt sie das vollständige Tagebuch (Spec `etb-druck`, „Ungefiltert“)', async () => {
     const abrufe: URLSearchParams[] = [];
     server.use(
       http.get('/api/einsaetze/7/etb', ({ request }) => {
@@ -171,6 +171,22 @@ describe('EtbDruckPage', () => {
       }),
     );
     rendere();
+    await fertig();
+    expect(abrufe.length).toBeGreaterThan(0);
+    expect(abrufe.every((p) => p.get('ohne_system') === null)).toBe(true);
+    const kopf = within(document.querySelector<HTMLElement>('[data-lfh="druckkopf"]')!);
+    expect(kopf.getByText('vollständiges Tagebuch')).toBeInTheDocument();
+  });
+
+  it('mit `system=aus` (Vorgabe der Seite) druckt sie ohne Systemeinträge und sagt es im Kopf (Review S7)', async () => {
+    const abrufe: URLSearchParams[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        abrufe.push(new URL(request.url).searchParams);
+        return HttpResponse.json([eintrag(1)]);
+      }),
+    );
+    rendere('?system=aus');
     await fertig();
     expect(abrufe.length).toBeGreaterThan(0);
     expect(abrufe.every((p) => p.get('ohne_system') === 'true')).toBe(true);
