@@ -260,7 +260,8 @@ Ist die Führung je Einsatz ausgeschaltet, wenn die Installation vom Widerruf er
 keinen Einsatz zurück, auch nicht, wenn die Führung später wieder eingeschaltet wird: Der Spiegel
 bleibt gesperrt, und das Paneel „Führung“ bietet nichts an, bis die Organisation erneut mit
 derselben Installation gekoppelt ist. Eine Übernahme, die noch auf Bestätigung wartete, verfällt
-auch dann.
+auch dann. Die nie gespiegelten Einsätze der widerrufenen Installation bleiben in diesem Fall
+unter „Einsätze beim Gegenüber“ stehen.
 
 ### Fingerabdruck und Sicherheit
 
@@ -528,8 +529,14 @@ ihn gerade führt.
 Das Paneel „Einsätze beim Gegenüber“ unter „Instanzkopplung“ listet die Einsätze, die hier nicht
 geführt werden: die einer anderen Installation und eigene, deren Führung abgegeben ist. Es zeigt
 sie, solange die Organisation in einer aktiven Kopplung zugeordnet ist; mit dem Widerruf der
-letzten Zuordnung oder Kopplung fallen sie heraus. Ein Einsatz, den die andere Installation
-gelöscht hat und der hier nie gespiegelt wurde, bleibt stehen. Ist die Führung je Einsatz
+letzten Zuordnung oder Kopplung fallen sie heraus. Wird eine von mehreren Kopplungen widerrufen,
+fallen die Einsätze heraus, die die widerrufene Installation führt. Ein nie gespiegelter
+Einsatz, den die führende Installation endgültig gelöscht hat, verschwindet mit dem nächsten
+Abgleich. Kennt eine Installation ihn nur über den Hub, etwa ein zweiter Einsatzleitwagen,
+verschwindet er dort einen Abgleich später; hängt die Organisation an zwei Hubs, bleibt er dort
+stehen. Stehen bleibt auch ein Einsatz, dessen Führung abgegeben wurde und den die übernehmende
+Installation löscht, und jeder Einsatz, den eine Gegenstelle mit einem älteren Stand gelöscht
+hat. Ist die Führung je Einsatz
 aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
 steht dort der Fehler mit „Erneut laden“.
 
@@ -578,6 +585,11 @@ Kopplung zu ihm, zeigt der ELW „Führung übernommen von …“ mit „Überna
 weiter, und der Hub nimmt das an. Wer per Code abgibt, schreibt ab dem Code nicht mehr: Der
 Einsatz ist dort sofort ein Spiegel, und der Verlauf zeigt „Abgabe per Code“, ohne auf den Hub zu
 warten. Ein Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
+
+Die Erklärung einer Notübernahme nennt als Unterzeichner höchstens die ersten 200 Zeichen des
+Anzeigenamens. Wäre sie trotzdem größer, als die andere Installation annimmt, lehnt der Server
+die Notübernahme ab („Die Erklärung der Notübernahme ist zu groß für die Übertragung. Bitte den
+Grund kürzen.“), und die Führung bleibt, wo sie war. Mit gewöhnlichem Text kommt das nicht vor.
 
 Der Verlauf im Paneel nennt je Wechsel Epoche, Art, von wem an wen, wer, Grund und
 Unterzeichner. Das Paneel mit dem Verlauf liest jede Person, die den Einsatz liest; gekoppelte

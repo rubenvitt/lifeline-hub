@@ -2,7 +2,7 @@
 titel: Lagebild für Externe
 gruppen: [fuehrung]
 reihenfolge: 790
-quellen: [frontend/src/pages/einstellungen/EinsatzLagebildExtern.tsx, frontend/src/extern/LagebildExternPage.tsx, src/routes/lagebild_extern.rs, src/lagebild_extern/mod.rs, src/routes/lagemonitor_v1.rs]
+quellen: [frontend/src/pages/einstellungen/EinsatzLagebildExtern.tsx, frontend/src/extern/LagebildExternPage.tsx, src/routes/lagebild_extern.rs, src/lagebild_extern/mod.rs, src/routes/lagemonitor.rs]
 ---
 
 ## Überblick
@@ -14,7 +14,7 @@ dafür je Empfänger einen **Link** aus. Der Link öffnet eine Seite nur zum Les
 
 Jeder Link hat eine **Stufe**: „Lagebild“ zeigt Zahlen, Unfallhilfsstellen, Karte und
 Lagemeldung, „Öffentlich“ nur die Gesamtzahlen, den Einsatzort und die Absperrungen. Für einen
-eigenen Monitor mit Schnittstelle siehe [Externe Lagemonitore](externe-lagemonitore.md).
+eigenen Monitor, der als Anbindung liest, siehe [Externe Lagemonitore](externe-lagemonitore.md).
 
 ## Abläufe
 

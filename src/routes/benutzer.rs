@@ -2,14 +2,14 @@ use crate::app::AppState;
 use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
 use crate::auth::session::{self, AdminUser};
 use crate::auth::{
-    BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, PASSWORT_HASH_SSO_ONLY, ROLLE_ADMIN,
-    ROLLE_KEINER,
+    BenutzerAnzeige, OrgRolle, SystemRolle, ANZEIGENAME_MAX, ORG_ROLLE_KEINE,
+    PASSWORT_HASH_SSO_ONLY, ROLLE_ADMIN, ROLLE_KEINER,
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PeerIp;
 use crate::extract::PfadParam;
-use crate::routes::support::{parse_enum, pflicht};
+use crate::routes::support::{parse_enum, pflicht, pflicht_max};
 use axum::extract::State;
 use axum::http::{header, StatusCode};
 use axum::Json;
@@ -145,7 +145,7 @@ pub async fn anlegen(
     pflicht(&req.benutzername, "Benutzername")?;
     // Dieselbe Vorverarbeitung wie der Login (LFH-921, LFH-981): getrimmt, höchstens 128 Zeichen.
     let benutzername = crate::auth::benutzername::normalisiere(&req.benutzername)?;
-    pflicht(&req.anzeigename, "Anzeigename")?;
+    let anzeigename = pflicht_max(&req.anzeigename, "Anzeigename", ANZEIGENAME_MAX)?;
     pruefe_passwort_laenge(&req.passwort)?;
     let rolle = req.system_rolle.as_deref().unwrap_or(ROLLE_KEINER);
     pruefe_system_rolle(rolle)?;
@@ -168,7 +168,7 @@ pub async fn anlegen(
          VALUES (?, ?, ?, ?, ?, ?, 1)",
     )
     .bind(org_id)
-    .bind(req.anzeigename.trim())
+    .bind(&anzeigename)
     .bind(benutzername)
     .bind(&hash)
     .bind(rolle)
@@ -387,7 +387,10 @@ pub async fn bearbeiten(
 
     // Zielwerte auflösen: mitgeschickt → validieren; sonst Bestandswert (partielle PATCH-Semantik).
     let anzeigename = match &req.anzeigename {
-        Some(n) => pflicht(n, "Anzeigename")?,
+        // Auch unverändert mitgeschickt geprüft (LLH-1702, design.md D2 der Change
+        // `a13nxa2k-notuebernahme-erklaerung-begrenzen`): ein Bestandsname über der Grenze ist
+        // 400, bis ihn jemand beim Bearbeiten kürzt. Der Server kürzt hier nichts.
+        Some(n) => pflicht_max(n, "Anzeigename", ANZEIGENAME_MAX)?,
         None => ziel.anzeigename.clone(),
     };
 

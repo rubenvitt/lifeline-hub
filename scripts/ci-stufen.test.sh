@@ -150,6 +150,21 @@ pruefe "ci.yml fragt ci-auswahl.sh eins" enthaelt "$a" "scripts/ci-auswahl.sh ei
 c="$(job "$CI" e2e)"; c_if="$(job_if "$CI" e2e)"
 pruefe "ci.yml ruft e2e.yml auf" enthaelt "$c" "uses: ./.github/workflows/e2e.yml"
 pruefe "ci.yml ruft e2e.yml nur bei Push" enthaelt "$c_if" "github.event_name == 'push'"
+# Jobs mit Pflicht-Check laufen leer grün statt übersprungen: am Job nur `!cancelled()`, die
+# Bedingung an jedem Schritt. Ein übersprungener Check zeigt GitHub grün, Auto-Merge wartet aber
+# (#1283, #1336); bei einem Matrix-Job fehlte er ganz.
+for paar in rust:RUST frontend:FRONTEND; do
+  id="${paar%%:*}"; var="${paar#*:}"
+  b="$(job "$CI" "$id")"
+  pruefe "$id: am Job nur !cancelled()" gleich "$(job_if "$CI" "$id")" '${{ !cancelled() }}'
+  pruefe "$id: liest $var aus der Auswahl" \
+    enthaelt "$b" "$var: \${{ needs.aenderungen.outputs.$id }}"
+  # `|| true`: ohne Treffer endet `grep -c` mit 1, und `set -e` bräche den Test stumm ab.
+  schritte="$(grep -cE '^      - ' <<< "$b" || true)"
+  bedingt="$(grep -cE "^        if: .*env\.$var != 'false'" <<< "$b" || true)"
+  pruefe "$id: jeder Schritt trägt die Bedingung $var ($bedingt von $schritte)" \
+    test "$schritte" -gt 0 -a "$schritte" -eq "$bedingt"
+done
 r="$(job "$CI" release)"
 for n in schnell rust frontend e2e; do
   pruefe "release wartet auf $n" grep -qE "^    needs: \[.*\b$n\b.*\]" <<< "$r"

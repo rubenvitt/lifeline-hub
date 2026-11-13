@@ -260,8 +260,6 @@ export const QUALI_SOLL_ANZAHL_MAX = 50;
 export const UHS_SOLL_ANZAHL_MAX = 200;
 /** Notiz eines Nachtrags oder einer nachgetragenen Periode in der Kräfte-Zeitachse (LLH-1538). */
 export const ZEITACHSE_NOTIZ_MAX = 500;
-/** Bezeichnung eines Lesezugangs für einen externen Lagemonitor (LLH-1484). */
-export const LAGEMONITOR_BEZEICHNUNG_MAX = 60;
 /** Empfänger eines Links auf das Lagebild für Externe (LLH-1496). */
 export const LAGEBILD_EMPFAENGER_MAX = 80;
 /** Bezeichnung eines Archiv-Schlüssels der Organisation (LLH-1494). */
@@ -270,3 +268,5 @@ export const ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX = 100;
 export const ARCHIV_SCHLUESSEL_MAX = 10;
 /** Name einer Anbindung (Maschinenzugang eines Fremdsystems, LLH-1652). */
 export const ANBINDUNG_NAME_MAX = 80;
+/** Anzeigename eines Kontos (LLH-1702); steht als Unterzeichner in der Erklärung einer Notübernahme. */
+export const ANZEIGENAME_MAX = 200;

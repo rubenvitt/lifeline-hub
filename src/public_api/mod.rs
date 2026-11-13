@@ -13,7 +13,8 @@
 //!   interne API hat keine Zusage).
 //!
 //! Maschinenzugang für Fremdsysteme (LLH-1652, Spec `maschinenzugang`): Repo [`zugang`], Scopes
-//! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`].
+//! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`]. Die Freigabe eines Einsatzes für
+//! einen Zugang (LLH-1638, ADR-0035) liegt in [`freigabe`].
 //!
 //! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
 //! [`einwurf`], die einzigen Routen ohne signierte Anfrage.
@@ -24,9 +25,13 @@
 //! Regeln: `src/AGENTS.md`, „Öffentliche API v1“.
 
 pub mod drossel;
+pub mod einsaetze;
 pub mod einwurf;
 pub mod error;
+pub mod events;
+pub mod freigabe;
 pub mod kommando;
+pub mod lage;
 pub mod machine;
 pub mod rechner;
 pub mod routen;
@@ -108,6 +113,24 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
         .routes(routes!(routen::redeem).layer(DefaultBodyLimit::max(REDEEM_BODY_MAX)))
         .routes(routes!(routen::jwks))
         .routes(routes!(routen::me).layer(Extension(ScopeAnforderung::Keine)))
+        // Ausgangsereignisse (LLH-1655).
+        .routes(
+            routes!(events::events)
+                .layer(Extension(ScopeAnforderung::Scope(scope::Scope::EventsRead))),
+        )
+        // Freigegebene Einsätze (LLH-1655).
+        .routes(
+            routes!(einsaetze::liste).layer(Extension(ScopeAnforderung::Scope(
+                scope::Scope::EinsaetzeRead,
+            ))),
+        )
+        .routes(
+            routes!(einsaetze::einzeln).layer(Extension(ScopeAnforderung::Scope(
+                scope::Scope::EinsaetzeRead,
+            ))),
+        )
+        // Lage des freigegebenen Einsatzes (LLH-1638).
+        .routes(routes!(lage::lage).layer(Extension(ScopeAnforderung::Scope(Scope::LageRead))))
         // Rechner (LLH-1524, Spec `rechner-api-unterkunft`).
         .routes(
             routes!(rechner::calculate_unterkunft)

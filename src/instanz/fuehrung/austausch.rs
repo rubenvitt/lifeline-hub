@@ -33,7 +33,10 @@ pub const MELDUNG_BYTES: usize = 40 * 1024;
 pub const ANTWORT_BYTES: usize = 128 * 1024;
 /// Obergrenzen der Textfelder einer gelieferten Akte (Zeichen).
 const TEXT_MAX: usize = 500;
-const ERKLAERUNG_MAX: usize = 4096;
+/// Größte Erklärung einer gelieferten Akte in Byte. Dieselbe Grenze hält die Seite ein, die eine
+/// Erklärung erzeugt (`dienst::erklaerung_text`, LLH-1702): sonst gälte eine Notübernahme lokal,
+/// die das Gegenüber nie annimmt.
+pub(super) const ERKLAERUNG_MAX: usize = 4096;
 /// Größter Zähler einer gelieferten Epoche: weit über jedem echten Verlauf, weit unter dem
 /// Überlauf (`Epoche::naechste` rechnet plus eins).
 const ZAEHLER_MAX: i64 = 1 << 40;

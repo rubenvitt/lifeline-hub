@@ -27,6 +27,20 @@ export function zustandAnzeige(z: Pick<AnbindungAnzeige, 'zustand' | 'is_abgelau
 }
 
 /**
+ * Welchen Einsatz eine Anbindung gerade liest (LLH-1638); die Einsatzleitung gibt ihn auf der
+ * Seite „Geräte“ frei. `null`, wenn die Zeile fehlt: der Server nennt die Anbindung nicht
+ * freigebbar (ohne Lese-Recht mit Einsatzbezug, widerrufen, abgelaufen, oder die Instanz meldet
+ * sich bei einem Hub). Welche Rechte Einsatzbezug haben, weiß allein der Server. Rein und
+ * exportiert für den Test.
+ */
+export function einsatzAnzeige(
+  z: Pick<AnbindungAnzeige, 'einsatz_freigebbar' | 'einsatz_bezeichnung'>,
+): string | null {
+  if (!z.einsatz_freigebbar) return null;
+  return z.einsatz_bezeichnung ? `liest ${z.einsatz_bezeichnung}` : 'kein Einsatz freigegeben';
+}
+
+/**
  * Setzt die Antwort einer eigenen Änderung in die Liste und lässt sie danach neu laden: die
  * Antwort zeigt den Zugang sofort, der Abruf alles, was andere inzwischen geändert haben.
  */

@@ -54,6 +54,11 @@ Spec `eingabegrenzen`, Herleitung
   das Feld besitzt, Prüfung über `routes::support::pflicht_max`/`pflicht_max_tri`/`optional_max`
   (`hoechstens` für schon getrimmten Text): Zeichen nach dem Trimmen, 400
   „{Feld} darf höchstens {max} Zeichen lang sein“, vor jedem 422 des Zusammenhangs.
+- **Der Anzeigename eines Kontos** (`auth::ANZEIGENAME_MAX`, LLH-1702) wird an der Maske wie
+  jeder Freitext mit 400 abgelehnt. Ein Name, den kein Mensch hier eingibt (Stammdaten einer
+  gekoppelten Instanz, SSO-Erstanmeldung, Stellvertreter eines fremden Kontos, jeder neue
+  Eingang), geht durch `auth::truncate_anzeigename` und wird gekürzt übernommen, ohne Hinweis:
+  das Konto soll deshalb nicht fehlen.
 - **Text, der unverändert ins ETB gelangt, trägt die ETB-Grenzen** (`etb::INHALT_MAX`,
   `etb::PARTEI_MAX`) an seinem Eingang, nicht in `etb::repo`: Systemtexte dürfen dort nicht
   scheitern. Ein neuer Weg ins ETB prüft selbst.
@@ -141,6 +146,35 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   (`pfad_fuer_protokoll`, Test `app::tests::einwurf_schluessel_steht_in_keiner_logzeile`). Eine
   Antwort trägt nie Daten und unterscheidet neu nicht von wiederholt. Was ein Schlüsselinhaber je
   Aufruf auslösen kann, loggt als `log_drossel::SammelzeileJe` je Zugang.
+
+## Backend — Ausgangsereignisse für Fremdsysteme (LLH-1655)
+
+Outbox `maschine_ereignis` und Abruf `GET /api/v1/events`
+([ADR-0038](../docs/architektur/entscheidungen/ADR-0038-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+Spec `ereignis-abruf`, Herleitung
+`openspec/changes/archive/2026-11-13-umeqho2b-outbox-ereignis-abruf/design.md`):
+- **Kein Schreibweg in Rust schreibt in `maschine_ereignis`.** Jede Zeile entsteht in einem
+  Trigger (`migrations/0345_maschine_ereignis_trigger.sql`), in der Transaktion der Änderung und
+  je Zeile in `maschinenzugang_freigabe` (Änderungen nur für gültige Zugänge, das Ende für alle).
+  Ein schon geschriebenes `einsatz.closed` bleibt beim Löschen des Einsatzes stehen.
+  `public_api::events` liest und löscht nur. Auch Tests
+  erzeugen Ereignisse über Freigabe, Kopf und Lage; direkt fügt nur ein, wer ein Alter braucht
+  (`tests/public_api_events.rs`, `altes_ereignis`).
+- **Ein neues Feld im v1-Schema `Einsatz`** kommt mit seiner Spalte in
+  `public_api::einsaetze::KOPF_SPALTEN`, und eine neue Migration baut `einsatz_ereignis_kopf` neu
+  (Wächter `tests/public_api_ereignis_trigger.rs`, `der_kopf_trigger_kennt_genau_die_kopfspalten`).
+  Sonst bliebe `einsatz.updated` für dieses Feld aus.
+- **Liest die Lage aus einer weiteren Tabelle** (`public_api::lage::QUELLEN`), kommt sie in
+  `public_api::events::LAGE_ARTEN` und in den Trigger `einsatz_aenderung_ereignis_i`, wieder per
+  neuer Migration (Wächter `lage_arten_sind_die_quellen_der_lage_und_stehen_im_trigger`). Der
+  Trigger hängt am Änderungslog `einsatz_aenderung`; eine Lage-Tabelle muss deshalb gespiegelt
+  sein.
+- **Die Freigabe endet als gelöschte Zeile**, nie per `INSERT OR REPLACE` (löscht ohne
+  DELETE-Trigger).
+- **Eine neue Ereignisart** kommt in `EventType` und in den CHECK von `maschine_ereignis.type`
+  (neue Migration, Abgleich in `tests/public_api_events.rs`); keine wird umbenannt.
+- **Der wartende Abruf** hält zwischen zwei Nachfragen keine Datenbankverbindung und nimmt seinen
+  Platz aus `events::Warteraum`; die Route steht nicht in `zulassung::OHNE_ZULASSUNGSGRENZE`.
 
 ## Anhänge
 
@@ -494,6 +528,26 @@ Herleitung in
     `einsatz_abraeumen` in der beschließenden Transaktion, Löschen nach dem Commit, Phase R holt
     nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
     `tests/instanz_lebensende.rs`.
+  - **Akten ohne Spiegel (LLH-1699)**, Spec `instanz-fuehrung`,
+    [ADR-0036](../docs/architektur/entscheidungen/ADR-0036-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md),
+    Herleitung
+    `openspec/changes/archive/2026-11-12-h7shm5au-loeschsignal-spiegellose-akten/design.md`
+    (D1–D5): Wer eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung in
+    `SpiegelPaket.akten` (`fuehrung::repo::list_ohne_spiegel`). `geloescht` dafür belegt allein
+    `lebensende::geloeschte_akten`: Löschvermerk (`fuehrung_loeschvermerk`) oder, für ältere
+    Löschungen, eigenes Präfix im Löschprotokoll, und hier weder Einsatz noch Akte mit der
+    Kennung; nie „kenne ich nicht“. **Wo ein Einsatz mit Kennung endet, entsteht in derselben
+    Transaktion der Vermerk** (`fuehrung::loeschvermerk::vermerken_einsatz`): Skelett-Löschung,
+    Abräumen eines verwahrten Einsatzes, `geloescht` des Führers an einem Spiegel
+    (`lebensende::geloescht_uebernehmen`); nicht, wenn die meldende Seite einen Spiegel nach der
+    Nachbereitung abräumt. **Eine Akte ohne Einsatz löscht nur
+    `fuehrung::repo::delete_ohne_spiegel`** (schreibt den Vermerk: Signal, Widerruf). Wem eine
+    Seite die Akte nennt und von wem sie das Signal annimmt, sagt eine Regel für beides:
+    `fuehrung::repo::is_gegenueber_zustaendig` (der Führer der Akte; die meldende Seite auch ihr
+    einziger Hub, solange der Führer nicht selbst ihr Gegenüber ist). Genannt wird nur, was
+    `paket::is_kennung_nennbar` besteht (höchstens `KENNUNG_BYTES_MAX` Byte, druckbares ASCII);
+    die Akten gehen vom Paket-Budget ab (`abgleich::budget_fuer_zeilen`). Der Weg über die Stände bleibt, wie er ist (Spiegel mit fremdem Präfix:
+    LLH-1852). Nachweis: `tests/instanz_fuehrung.rs`, Abschnitt „Akten ohne Spiegel“.
 - **Direktkopplung vor Ort (LLH-1497)**, Specs `instanz-kopplung`, `instanz-entdeckung`,
   [ADR-0029](../docs/architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
   Herleitung `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`:
@@ -817,7 +871,8 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   Org-Einstellung `skelett_dauer_tage` (ab Abschluss, frühestens die Schwärzung) abgelaufen ist;
   ohne Einstellung bleibt das Skelett. Einzige Spur ist `aufbewahrung_loeschprotokoll` (keine
   Bezeichnung, kein Ort, kein ETB-Text), geschrieben in derselben Transaktion, Akteur
-  fail-closed wie beim Purge-Audit. Erstmaliges Setzen und Verkürzen der Frist ohne
+  fail-closed wie beim Purge-Audit; trug der Einsatz eine Kennung, dazu ihr Löschvermerk
+  (`fuehrung_loeschvermerk`, LLH-1699: nur die Kennung, s. „Instanzkopplung“, Akten ohne Spiegel). Erstmaliges Setzen und Verkürzen der Frist ohne
   `skelett_dauer_bestaetigt` → 409. Das Protokoll sperrt ID und Einsatznummer
   (`einsatz::repo::anlegen_tx`). Herleitung:
   `openspec/changes/archive/2026-10-02-lfh-750-skelett-endgueltig-loeschen/design.md`.

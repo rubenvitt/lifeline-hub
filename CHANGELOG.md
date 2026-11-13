@@ -1,3 +1,60 @@
+## [1.0.0-alpha.191](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.190...v1.0.0-alpha.191) (2026-11-13)
+
+### Wichtige Änderungen
+
+- **Der Lesezugang für externe Lagemonitore per Bearer-Schlüssel entfällt ohne Übergang.** Ab dieser Version gibt es die Schnittstelle `GET /api/lagemonitor/v1/lage`, die Schlüssel `llh_lm_…`, die Verwaltungsseite „Lagemonitore“ und das Paneel „Externe Lagemonitore“ nicht mehr. Bestehende Schlüssel gelten nach dem Update nicht mehr. Eine Migration löscht die bisherigen Lagemonitor-Zugänge und -Freigaben mit allen Inhalten. Ältere Einträge im Zugangsprotokoll der Admins bleiben lesbar.
+- **Lagemonitore werden jetzt als Anbindung angebunden.** Dafür legt man unter „Anbindungen“ einen Zugang mit der Berechtigung „Lage lesen“ an. Der Lagemonitor ruft die Lage dann mit Signatur über `GET /api/v1/lage` ab. Er sieht nur den Einsatz, den die Einsatzleitung für ihn freigegeben hat.
+- **Neuer Startschalter `--einwurf-allow-http`.** Der neue Einwurf-Zugang (siehe unten) nimmt Daten nur über TLS an, entweder direkt oder über einen vertrauten Proxy. Sonst lehnt er sie ab. Mit dem Schalter nimmt er Daten auch unverschlüsselt an.
+- **Anzeigenamen sind auf 200 Zeichen begrenzt.** Wer ein Konto über die Schnittstelle mit einem längeren Namen anlegt oder ändert, bekommt eine Fehlermeldung. Namen, die von außen kommen (vom Hub, bei der ersten Anmeldung per SSO, von Stellvertretern), werden ohne Hinweis auf 200 Zeichen gekürzt. Vorhandene längere Namen bleiben unverändert stehen.
+
+### Einsatztagebuch
+
+- Eine eingetippte Ereigniszeit gilt jetzt schon, wenn man das Feld mit Tab oder Klick verlässt. Bisher bekam der Eintrag „jetzt“, wenn man danach ein weiteres Feld öffnete oder mit offenem Zeitfeld absendete.
+- Liegt die Ereigniszeit in der Zukunft, schließt der Zeit-Editor, und der Grund steht am Zeit-Chip. Bisher war das Senden gesperrt, ohne dass ein Grund angezeigt wurde.
+- Wer das Zeitfeld leert, bekommt wieder „jetzt“. Bisher wurde in diesem Fall noch die vorher übernommene Zeit gesendet.
+- Ändert man die Zeit mit `/zeit`, während der Zeit-Editor offen ist, zeigt der Chip jetzt die neue Zeit.
+
+### Lagekarte
+
+- Der Griff zum Ziehen des Radius bleibt nach dem Loslassen unter dem Zeiger. Bisher sprang er bei Last, zum Beispiel auf langsamen Tablets, oder nach einem Wechsel der Zonenart an den Ostrand des Kreises.
+
+### Anbindungen und Schnittstellen
+
+- **Einsatz für Anbindungen freigeben:** Auf der Seite „Geräte“ gibt es das neue Paneel „Anbindungen“. Dort schaltet die Einsatzleitung, welche Anbindung mit „Lage lesen“ ihren Einsatz lesen darf.
+  - Jeder Zugang liest höchstens einen Einsatz. Gibt man ihn für einen anderen Einsatz frei, liest er ab dann nur diesen.
+  - Die Freigabe wirkt auch an einem gespiegelten Einsatz.
+  - Freigabe und Ende stehen im Einsatztagebuch.
+  - Die Freigabe endet, wenn der Einsatz abgeschlossen, die Anbindung widerrufen oder ihre Berechtigung zum Lesen entzogen wird oder der Zugang abläuft. Ein verlängerter Zugang braucht eine neue Freigabe.
+  - Ohne Verbindung sind die Schalter mit sichtbarem Grund gesperrt. Kann der Stand nicht abgerufen werden, erscheint der Hinweis „Stand nicht aktuell“.
+  - Eine Freigabe, die schon bestand, bevor sich die Instanz bei einem Hub angemeldet hat, wird als ruhend angezeigt und lässt sich beenden.
+- **Neue Lage-Schnittstelle:** Sie liefert den Kopf des Einsatzes, Zahlen, Unfallhilfsstellen, offene Sofortmeldungen, die Lagemeldung und die Karte, aber keine Daten zu Personen. Die Karte lässt sich weglassen oder nur bei Änderungen abrufen. Ohne Freigabe kommt eine leere Antwort ohne Einsatz.
+- Die Seite „Anbindungen“ zeigt, welchen Einsatz eine Anbindung gerade liest.
+- Neues Kommando `lifeline-hub zugang lage`: Es prüft, ob Anbindung und Freigabe stehen. Mit `--karte` holt es auch die Karte.
+- **Einwurf-Zugang für Absender ohne Signatur** (zum Beispiel BOSWatch, FE2, Divera-Webhook, OsmAnd):
+  - Admins legen auf der Seite „Anbindungen“ im neuen Paneel „Einwurf-Zugänge“ einen Zugang mit Name, Zweck und Ablaufdatum an.
+  - Die Adresse mit dem Schlüssel wird nur einmal angezeigt. Schlüsselwechsel und Widerruf wirken sofort.
+  - Angenommen werden Alarmmeldungen und Positionen. Doppelte Alarmmeldungen werden erkannt, von jeder Kennung bleibt nur die letzte Position.
+  - Alarmmeldungen werden nach 7 Tagen gelöscht, Positionen nach 24 Stunden.
+  - Pro Zugang sind 30 Einwürfe pro Minute erlaubt.
+  - Der Schlüssel erscheint in keinem Protokoll.
+  - Das Paneel weist darauf hin, wenn Einwürfe unverschlüsselt angenommen oder mangels TLS abgelehnt werden.
+
+### Instanzkopplung und Führung
+
+- Löscht die führende Instanz einen Einsatz, verschwindet er beim nächsten Abgleich auch bei den Gegenübern unter „Einsätze beim Gegenüber“. Das gilt auch für Einsätze, die dort nie gespiegelt wurden. Bisher blieben sie dort dauerhaft stehen.
+  - Das Ende wird über den Hub an weitere ELW weitergegeben.
+  - Eine Instanz, die aus einer Sicherung zurückgespielt wurde, meldet keine Löschungen.
+- Eine Notübernahme wird abgelehnt, wenn ihre Erklärung für das Gegenüber zu groß wäre. Das passiert, bevor sie lokal wirkt. Bisher konnten sich dadurch beide Seiten für die führende Instanz halten. Als Unterzeichner trägt die Erklärung höchstens die ersten 200 Zeichen des Anzeigenamens.
+- Eine Notübernahme mit Unterschrift verlangt jetzt auch auf dem Server einen Admin aus der Organisation des Einsatzes, wie es die Oberfläche schon tat.
+
+### Verwaltung
+
+- Das Feld für den Anzeigenamen in der Benutzerverwaltung zählt die Zeichen mit und erlaubt höchstens 200. Ist ein vorhandener Name länger, lässt sich das Konto erst nach dem Kürzen speichern.
+
+### Website
+
+- lifeline-hub.de hat jetzt eine Sitemap und eine `robots.txt`.
+
 ## [1.0.0-alpha.190](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.189...v1.0.0-alpha.190) (2026-11-13)
 
 ### Führung

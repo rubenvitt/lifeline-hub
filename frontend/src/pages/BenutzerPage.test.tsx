@@ -8,6 +8,7 @@ import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils'
 import { setzeViewportBreite } from '../test/viewport';
 import BenutzerPage from './BenutzerPage';
 import { globalKeys } from '../api/queryKeys';
+import { ANZEIGENAME_MAX } from '../api/eingabegrenzen';
 import { adminFixture } from '../test/fixtures';
 import { warteAufMenueFokus } from '../test/menue';
 import { eintraegeVon, oeffneKontextmenue, trennerVon } from '../test/kontextmenue';
@@ -169,6 +170,84 @@ describe('BenutzerPage', () => {
     await waitFor(() => expect(patchBody).not.toBeNull());
     expect(patchBody).toMatchObject({ anzeigename: 'Eva Neu' });
     await waitFor(() => expect(screen.getByText('Eva Neu')).toBeInTheDocument());
+  });
+
+  it('Grenze: ein Anzeigename über 200 Zeichen nennt die Überlänge, kürzt nicht und legt nichts an', async () => {
+    let gesendet = false;
+    server.use(
+      meHandler(benutzer()),
+      http.get('/api/benutzer', () => HttpResponse.json([benutzer()])),
+      http.post('/api/benutzer', () => {
+        gesendet = true;
+        return HttpResponse.json(benutzer({ id: 2 }), { status: 201 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
+      { route: '/admin/benutzer' },
+    );
+    await nutzer.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
+    const zuLang = 'x'.repeat(ANZEIGENAME_MAX + 1);
+    const name = screen.getByLabelText('Anzeigename');
+    await nutzer.click(name);
+    await nutzer.paste(zuLang);
+    await nutzer.type(screen.getByLabelText('Benutzername'), 'eva');
+    await nutzer.type(screen.getByLabelText('Passwort'), 'geheim123');
+    await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    expect(
+      await screen.findByText('Anzeigename darf höchstens 200 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('201 / 200 · zu lang')).toBeInTheDocument();
+    expect(name).toHaveValue(zuLang);
+    expect(gesendet).toBe(false);
+  });
+
+  it('Grenze: ein Bestandsname über 200 Zeichen bleibt beim Bearbeiten stehen und sperrt das Speichern', async () => {
+    let gesendet = false;
+    const zuLang = 'Eva' + 'x'.repeat(ANZEIGENAME_MAX);
+    server.use(
+      meHandler(benutzer()),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer(),
+          benutzer({ id: 2, anzeigename: zuLang, benutzername: 'eva', system_rolle: 'keiner' }),
+        ]),
+      ),
+      http.patch('/api/benutzer/2', () => {
+        gesendet = true;
+        return HttpResponse.json(benutzer({ id: 2 }));
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(
+      <Routes>
+        <Route path="/admin/benutzer" element={<BenutzerPage />} />
+        <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+      </Routes>,
+      { route: '/admin/benutzer' },
+    );
+    await nutzer.click(
+      await screen.findByRole('button', { name: `Aktionen zu Benutzer ${zuLang} (@eva)` }),
+    );
+    const menue = await offenesMenue();
+    await warteAufMenueFokus();
+    await nutzer.click(within(menue).getByRole('menuitem', { name: 'Bearbeiten' }));
+
+    const name = await screen.findByLabelText('Anzeigename');
+    expect(name).toHaveValue(zuLang);
+    expect(screen.getByText('203 / 200 · zu lang')).toBeInTheDocument();
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    expect(
+      await screen.findByText('Anzeigename darf höchstens 200 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(name).toHaveValue(zuLang);
+    expect(gesendet).toBe(false);
   });
 
   it('reaktiviert einen deaktivierten Benutzer', async () => {

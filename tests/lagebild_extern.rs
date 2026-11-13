@@ -232,7 +232,7 @@ async fn ohne_gueltigen_schluessel_ist_401_und_der_schluessel_oeffnet_nichts_and
         "/api/einsaetze".to_string(),
         format!("/api/einsaetze/{einsatz}"),
         pfad(einsatz),
-        "/api/lagemonitor/v1/lage".to_string(),
+        "/api/v1/lage".to_string(),
     ] {
         let (s, _) = abruf(&app, &uri, Some(&schluessel)).await;
         assert_eq!(s, StatusCode::UNAUTHORIZED, "{uri}");

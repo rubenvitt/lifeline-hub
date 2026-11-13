@@ -40,6 +40,7 @@ import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
 import {
   ANBINDUNGEN_ABRUF_MS,
   anbindungenPath,
+  einsatzAnzeige,
   uebernimmAnbindung,
   zustandAnzeige,
 } from './anbindungAnzeige';
@@ -146,6 +147,7 @@ export default function AnbindungAnsicht() {
 
   const zeit = (wert: string) => zeitKurz(wert, konv);
   const zustand = zustandAnzeige(zugang);
+  const einsatz = einsatzAnzeige(zugang);
   const istWiderrufen = zugang.zustand === 'widerrufen';
   const gesperrt = liste.gesperrt_grund ?? null;
 
@@ -281,6 +283,11 @@ export default function AnbindungAnsicht() {
             <Datenfeld label="Zuletzt genutzt">
               {zugang.zuletzt_genutzt_at ? zeit(zugang.zuletzt_genutzt_at) : 'noch nie'}
             </Datenfeld>
+            {einsatz && (
+              <Datenfeld label="Einsatz">
+                <span data-lfh="anbindung-einsatz">{einsatz}</span>
+              </Datenfeld>
+            )}
             {zugang.fingerabdruck_neu && (
               <Datenfeld label="Neuer Schlüssel" breit>
                 <span style={monoStil(13)}>{zugang.fingerabdruck_neu}</span>

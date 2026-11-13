@@ -1,7 +1,9 @@
 //! Anbindungen: Maschinenzugänge für Fremdsysteme verwalten (LLH-1652, Spec `maschinenzugang`,
 //! design.md D11). Lesen darf, wer die Verwaltung sieht; anlegen, ändern, Code ausstellen und
 //! widerrufen nur der System-Admin, immer für die eigene Org. Die Anmeldung der Fremdsysteme
-//! selbst trägt `public_api`.
+//! selbst trägt `public_api`. Welchen Einsatz ein Zugang liest, entscheidet die Einsatzleitung
+//! (`routes::einsatz_anbindungen`, LLH-1638); Widerruf und Entzug des Leserechts beenden diese
+//! Freigabe hier.
 
 use crate::app::AppState;
 use crate::auth::admin_audit::{self, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
@@ -10,8 +12,10 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PeerIp, PfadParam};
 use crate::instanz::basis32::{fingerabdruck, parse_b64};
 use crate::instanz::{code as kcode, identitaet};
+use crate::public_api::freigabe;
 use crate::public_api::scope::{parse_scopes, AblehnungGrund, Scope, ZugangZustand};
 use crate::public_api::zugang::{self, Zugang};
+use crate::routes::einsatz_anbindungen::freigabe_entziehen_tx;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -52,6 +56,15 @@ pub struct AnbindungAnzeige {
     pub widerrufen_von_name: Option<String>,
     pub zuletzt_genutzt_at: Option<String>,
     pub letzte_ablehnung: Option<AnbindungAblehnung>,
+    /// Für diesen Zugang lässt sich hier ein Einsatz freigeben (LLH-1638): Lese-Recht mit
+    /// Einsatzbezug, nicht widerrufen, nicht abgelaufen, und die Instanz nimmt für die Org
+    /// Fremdsysteme an. Die Seite zeigt dann, welchen Einsatz er liest.
+    pub einsatz_freigebbar: bool,
+    /// Der aktive Einsatz, den der Zugang gerade liest (Freigabe der Einsatzleitung, LLH-1638).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatz_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatz_bezeichnung: Option<String>,
 }
 
 fn fingerabdruck_von(schluessel: Option<&str>) -> Option<String> {
@@ -84,7 +97,27 @@ impl AnbindungAnzeige {
                 }),
                 _ => None,
             },
+            einsatz_freigebbar: false,
+            einsatz_id: None,
+            einsatz_bezeichnung: None,
         }
+    }
+
+    /// Wie [`Self::aus`], mit dem Einsatz, den der Zugang gerade liest.
+    async fn load(
+        conn: &mut sqlx::SqliteConnection,
+        z: &Zugang,
+        jetzt: &str,
+    ) -> Result<Self, AppError> {
+        let mut anzeige = Self::aus(z, jetzt);
+        if freigabe::is_freigebbar(z, jetzt) && !freigabe::is_org_am_hub(conn, z.org_id).await? {
+            anzeige.einsatz_freigebbar = true;
+            if let Some((id, bezeichnung)) = freigabe::gelesener_einsatz(conn, &z.id).await? {
+                anzeige.einsatz_id = Some(id);
+                anzeige.einsatz_bezeichnung = Some(bezeichnung);
+            }
+        }
+        Ok(anzeige)
     }
 }
 
@@ -241,11 +274,10 @@ pub async fn liste(
         .await
         .map_err(|e| AppError::Internal(format!("Instanzidentität: {e}")))?;
     let mut conn = state.pool.acquire().await?;
-    let zugaenge = zugang::liste(&mut conn, benutzer.org_id)
-        .await?
-        .iter()
-        .map(|z| AnbindungAnzeige::aus(z, &jetzt))
-        .collect();
+    let mut zugaenge = Vec::new();
+    for z in zugang::liste(&mut conn, benutzer.org_id).await? {
+        zugaenge.push(AnbindungAnzeige::load(&mut conn, &z, &jetzt).await?);
+    }
     Ok(Json(AnbindungenListe {
         zugaenge,
         gesperrt_grund: gesperrt_grund(&mut conn, benutzer.org_id).await?,
@@ -264,7 +296,7 @@ pub async fn anlegen(
     let jetzt = crate::zeit::jetzt();
     let (name, scopes, gueltig_bis) = check_eingabe(&body, &jetzt)?;
     let (org_id, von) = (admin.org_id, admin.id);
-    let (z, code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
+    let (z, code, laeuft_ab_at, anzeige) = crate::write_retry!(&state.pool, |conn| {
         if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
             return Err(AppError::Conflict(grund));
         }
@@ -282,7 +314,8 @@ pub async fn anlegen(
         let z = zugang::laden(&mut *conn, &id)
             .await?
             .ok_or_else(|| AppError::Internal("Maschinenzugang verschwunden".into()))?;
-        Ok((z, code, laeuft_ab_at))
+        let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt).await?;
+        Ok((z, code, laeuft_ab_at, anzeige))
     })?;
     admin_audit::schreibe(
         &state.pool,
@@ -302,7 +335,7 @@ pub async fn anlegen(
     Ok((
         StatusCode::CREATED,
         Json(AnbindungCode {
-            zugang: AnbindungAnzeige::aus(&z, &jetzt),
+            zugang: anzeige,
             code,
             laeuft_ab_at,
         }),
@@ -330,12 +363,65 @@ pub async fn aendern(
             .transpose()?,
         basis: body.basis_geaendert_at,
     };
-    let org_id = admin.org_id;
-    let (vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
-        zugang::aendern(&mut *conn, org_id, &id, &aenderung, &jetzt)
+    let (org_id, von) = (admin.org_id, admin.id);
+    let admin_name = admin.anzeigename.clone();
+    let (vorher, nachher, etb, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        let (vorher, nachher) = zugang::aendern(&mut *conn, org_id, &id, &aenderung, &jetzt)
             .await?
-            .ok_or(AppError::NotFound)
+            .ok_or(AppError::NotFound)?;
+        // Jede Änderung an den Lese-Scopes mit Einsatzbezug beendet die Freigabe (LLH-1638,
+        // LLH-1655, Entscheidung Ruben 13.11.2026): Die Einsatzleitung hat für einen Umfang
+        // freigegeben; liest der Zugang mehr oder weniger, entscheidet sie neu. Sonst läse ein
+        // Einsatzbuch, dem ein Admin „Lage lesen“ dazugibt, sofort die Lage, und ein Recht, das
+        // entzogen und wiedergegeben wird, käme ohne neue Entscheidung zurück.
+        // Dasselbe gilt für einen abgelaufenen Zugang: seine Freigabe endete mit dem Ablauf, die
+        // Zeile steht aber noch. Sie fällt hier, bevor ein verlängertes „gültig bis“ sie wieder
+        // wirken ließe.
+        let mit_bezug = |z: &Zugang| -> Vec<Scope> {
+            z.scopes
+                .iter()
+                .copied()
+                .filter(|s| s.has_einsatzbezug())
+                .collect()
+        };
+        let etb = if vorher.has_einsatzbezug() && mit_bezug(&vorher) != mit_bezug(&nachher) {
+            let text = if nachher.has_einsatzbezug() {
+                format!(
+                    "Die Rechte der Anbindung „{}“ mit Bezug auf den Einsatz wurden geändert (von \
+                     {admin_name}); die Freigabe dieses Einsatzes ist beendet und braucht eine \
+                     neue Entscheidung der Einsatzleitung.",
+                    nachher.name
+                )
+            } else {
+                // Ein Zugang, der nur Einsätze las (LLH-1655), hatte nie eine Lage.
+                let was = if vorher.has_scope(Scope::LageRead) {
+                    "darf keine Lage mehr lesen"
+                } else {
+                    "darf den Einsatz nicht mehr lesen"
+                };
+                format!(
+                    "Anbindung „{}“ {was} (geändert von {admin_name}); die Freigabe dieses \
+                     Einsatzes ist beendet.",
+                    nachher.name
+                )
+            };
+            freigabe_entziehen_tx(&mut *conn, &nachher.id, von, &text).await?
+        } else if vorher.is_abgelaufen(&jetzt) {
+            let text = format!(
+                "Die Freigabe dieses Einsatzes für die Anbindung „{}“ ist mit deren Ablauf \
+                 beendet.",
+                nachher.name
+            );
+            freigabe_entziehen_tx(&mut *conn, &nachher.id, von, &text).await?
+        } else {
+            None
+        };
+        let anzeige = AnbindungAnzeige::load(&mut *conn, &nachher, &jetzt).await?;
+        Ok((vorher, nachher, etb, anzeige))
     })?;
+    if let Some((einsatz_id, etb_id)) = etb {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     if vorher != nachher {
         admin_audit::schreibe(
             &state.pool,
@@ -355,7 +441,7 @@ pub async fn aendern(
         )
         .await;
     }
-    Ok(Json(AnbindungAnzeige::aus(&nachher, &jetzt)))
+    Ok(Json(anzeige))
 }
 
 /// GET /api/admin/anbindungen/{id} — ein Zugang der eigenen Org (Ansicht, Deeplink).
@@ -371,7 +457,9 @@ pub async fn laden(
     let z = zugang::laden_in_org(&mut conn, benutzer.org_id, &id)
         .await?
         .ok_or(AppError::NotFound)?;
-    Ok(Json(AnbindungAnzeige::aus(&z, &crate::zeit::jetzt())))
+    Ok(Json(
+        AnbindungAnzeige::load(&mut conn, &z, &crate::zeit::jetzt()).await?,
+    ))
 }
 
 /// POST /api/admin/anbindungen/{id}/code — neuer Einmal-Code für einen bestehenden Zugang
@@ -384,7 +472,7 @@ pub async fn code(
 ) -> Result<(StatusCode, Json<AnbindungCode>), AppError> {
     let jetzt = crate::zeit::jetzt();
     let (org_id, von) = (admin.org_id, admin.id);
-    let (z, code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
+    let (z, code, laeuft_ab_at, anzeige) = crate::write_retry!(&state.pool, |conn| {
         let z = zugang::laden_in_org(&mut *conn, org_id, &id)
             .await?
             .ok_or(AppError::NotFound)?;
@@ -397,7 +485,8 @@ pub async fn code(
             return Err(AppError::Conflict(grund));
         }
         let (code, laeuft_ab_at) = neuer_code(&mut *conn, &id, von, &jetzt).await?;
-        Ok((z, code, laeuft_ab_at))
+        let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt).await?;
+        Ok((z, code, laeuft_ab_at, anzeige))
     })?;
     admin_audit::schreibe(
         &state.pool,
@@ -418,7 +507,7 @@ pub async fn code(
     Ok((
         StatusCode::CREATED,
         Json(AnbindungCode {
-            zugang: AnbindungAnzeige::aus(&z, &jetzt),
+            zugang: anzeige,
             code,
             laeuft_ab_at,
         }),
@@ -437,15 +526,26 @@ pub async fn widerrufen(
     let (org_id, von) = (admin.org_id, admin.id);
     // Der Stand für Antwort und Spur kommt aus derselben Transaktion: scheiterte ein Lesen nach
     // dem Commit, gälte der Widerruf ohne Spureintrag (Prüfliste, Atomarität).
-    let (wirkung, z) = crate::write_retry!(&state.pool, |conn| {
+    let admin_name = admin.anzeigename.clone();
+    let (wirkung, z, etb) = crate::write_retry!(&state.pool, |conn| {
         let wirkung = zugang::widerrufen(&mut *conn, org_id, &id, Some(von), &jetzt)
             .await?
             .ok_or(AppError::NotFound)?;
         let z = zugang::laden(&mut *conn, &id)
             .await?
             .ok_or(AppError::NotFound)?;
-        Ok((wirkung, z))
+        // Der Widerruf beendet auch die Freigabe (LLH-1638); das ETB des gelesenen Einsatzes
+        // nennt es. Auch ohne Wirkung am Zugang: eine stehengebliebene Zeile fällt hier mit.
+        let text = format!(
+            "Anbindung „{}“ widerrufen von {admin_name}; der Einsatz wird dort nicht mehr gelesen.",
+            z.name
+        );
+        let etb = freigabe_entziehen_tx(&mut *conn, &id, von, &text).await?;
+        Ok((wirkung, z, etb))
     })?;
+    if let Some((einsatz_id, etb_id)) = etb {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     if wirkung {
         admin_audit::schreibe(
             &state.pool,

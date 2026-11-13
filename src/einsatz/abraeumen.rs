@@ -11,7 +11,8 @@
 //! Merker stehen, und Phase R des Purge-Laufs holt nach ([`vorgemerkte`]).
 //!
 //! Gelöscht wird wie bei der endgültigen Löschung (`skelett_loeschung`): Datei-Inhalte einzeln
-//! (LFH-905), dann eine Transaktion mit Protokollzeile und `DELETE FROM einsatz`, dessen Kaskade
+//! (LFH-905), dann eine Transaktion mit Protokollzeile, bei einem verwahrten Einsatz dem
+//! Löschvermerk der Kennung (`instanz::fuehrung::loeschvermerk`, LLH-1699) und `DELETE FROM einsatz`, dessen Kaskade
 //! den Rest nimmt, zuletzt der Rückschrieb des WAL. Gelöscht wird über
 //! `instanz::spiegel::loeschen_unter_merker`, damit die Schutz-Trigger eines Spiegels das Löschen
 //! nicht abbrechen (der Merker gehört nach ADR-0018 dem Spiegel-Modul).
@@ -217,6 +218,14 @@ pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppE
         .bind(akteur)
         .execute(&mut *conn)
         .await?;
+        // Das Ende der Kennung, für Akten, die ein Gegenüber ohne Spiegel hält (LLH-1699): Ein
+        // verwahrter Einsatz ist an dieser Instanz zu Ende. Ein Spiegel nicht unbedingt: Nach der
+        // Nachbereitung lebt der Einsatz beim Führer weiter; meldet der Führer ihn gelöscht,
+        // vermerkt das `spiegel::lebensende::geloescht_uebernehmen`.
+        if verwahrt {
+            crate::instanz::fuehrung::loeschvermerk::vermerken_einsatz(&mut *conn, einsatz_id)
+                .await?;
+        }
         crate::db::fk_pruefung_sicherstellen(&mut *conn, "Abräumen").await?;
         let n = crate::instanz::spiegel::loeschen_unter_merker(
             conn,

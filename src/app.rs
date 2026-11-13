@@ -1470,15 +1470,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/geraete/{gid}/widerrufen",
             post(routes::geraet::widerrufen),
         )
-        // LLH-1484: Freigabe des Einsatzes für Lesezugänge externer Anzeigen, Einsatzleitung.
+        // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
+        // Spiegel).
         .route(
-            "/api/einsaetze/{id}/lagemonitor-zugaenge",
-            get(routes::lagemonitor_zugang::einsatz_liste),
+            "/api/einsaetze/{id}/anbindungen",
+            get(routes::einsatz_anbindungen::liste),
         )
         .route(
-            "/api/einsaetze/{id}/lagemonitor-zugaenge/{zid}/freigabe",
-            put(routes::lagemonitor_zugang::freigeben)
-                .delete(routes::lagemonitor_zugang::freigabe_beenden),
+            "/api/einsaetze/{id}/anbindungen/{zid}/freigabe",
+            put(routes::einsatz_anbindungen::freigeben)
+                .delete(routes::einsatz_anbindungen::freigabe_beenden),
         )
         // LLH-1496: Lagebild für Externe, Links je Empfänger (Einsatzleitung, auch am Spiegel).
         .route(
@@ -1914,20 +1915,6 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/admin/einwurf-zugaenge/{id}/widerrufen",
             post(routes::einwurf_zugaenge::widerrufen),
-        )
-        // LLH-1484: Lesezugänge externer Anzeigen (Verwaltung) und ihr Abruf. Der Abruf zieht
-        // keinen `CurrentUser`, nur den Schlüssel (`lagemonitor_zugang::LagemonitorZugriff`).
-        .route(
-            "/api/lagemonitor-zugaenge",
-            get(routes::lagemonitor_zugang::liste).post(routes::lagemonitor_zugang::anlegen),
-        )
-        .route(
-            "/api/lagemonitor-zugaenge/{zid}/widerrufen",
-            post(routes::lagemonitor_zugang::widerrufen),
-        )
-        .route(
-            "/api/lagemonitor/v1/lage",
-            get(routes::lagemonitor_v1::lage),
         )
         // LLH-1496: Abruf des Lagebilds für Externe. Kein `CurrentUser`, nur der Schlüssel aus
         // dem Link (`lagebild_extern::LagebildZugriff`), IP-Sperre wie die Gerätekopplung.

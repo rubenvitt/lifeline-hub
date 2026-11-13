@@ -377,6 +377,19 @@ sequenceDiagram
   Antwort, im Push in der nächsten Anfrage, nachdem die erreichte Seite die Stände ihrer Spiegel
   genannt hat (`src/instanz/spiegel/lebensende.rs`, `abgleich.rs`). Nachweis:
   `tests/instanz_lebensende.rs`.
+- **Ende einer Akte ohne Spiegel** (LLH-1699,
+  [ADR-0036](entscheidungen/ADR-0036-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
+  Wer bei eingeschalteter Führung eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung
+  im Abgleich (`SpiegelPaket.akten`), und zwar dem Gegenüber, das über sie entscheidet: dem
+  Führer der Akte, die meldende Seite auch ihrem einzigen Hub, solange der Führer nicht selbst
+  ihr Gegenüber ist (`fuehrung::repo::is_gegenueber_zustaendig`). Das Gegenüber meldet `geloescht` auf demselben Weg
+  wie für Spiegel, aber nur mit Beleg: Löschvermerk (`src/instanz/fuehrung/loeschvermerk.rs`)
+  oder, für ältere Löschungen, eigenes Präfix im Löschprotokoll. Der Vermerk entsteht, wo ein
+  Einsatz endet (Skelett-Löschung, Verwahrung, `geloescht` des Führers an einem Spiegel). Der
+  Empfänger löscht die Akte und vermerkt ihr Ende selbst; so erfährt es eine weitere ELW vom Hub
+  mit ihrem nächsten Abgleich. Der Widerruf einer Org-Zuordnung löscht und vermerkt die Akten
+  ohne Spiegel, die das widerrufene Gegenüber führt (`fuehrung::repo::release_nach_widerruf`).
+  Nachweis: `tests/instanz_fuehrung.rs`.
 
 ## 6.6c Führung je Einsatz: Notübernahme gegen den ELW
 
@@ -513,6 +526,51 @@ sequenceDiagram
   `src/app.rs`, `einwurf::maskiere_pfad`).
 - Der Purge-Lauf löscht Alarmmeldungen nach 7 Tagen und Positionen nach 24 Stunden
   (`einwurf::purge`, aufgerufen in `src/einsatz/purge_scheduler.rs`).
+
+## 6.6f Ausgangsereignis: vom Schreiben bis zum Abruf
+
+Ein Fremdsystem erfährt über `GET /api/v1/events`, dass sich an seinem freigegebenen Einsatz etwas
+getan hat (LLH-1655,
+[ADR-0038](entscheidungen/ADR-0038-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+Spec [`ereignis-abruf`](../../openspec/specs/ereignis-abruf/spec.md)).
+
+```mermaid
+sequenceDiagram
+  participant W as Schreibweg (Route, Spiegel-Übernahme, Demo-Import)
+  participant DB as SQLite (Trigger, maschine_ereignis)
+  participant Hub as lifeline-hub (src/public_api/events.rs)
+  participant F as Fremdsystem
+  F->>Hub: GET /api/v1/events?after=4711&wait=25
+  Hub->>DB: Höchststand, Zeilen des Zugangs nach 4711
+  DB-->>Hub: keine
+  Note over Hub: Warteplatz belegen, Verbindung freigeben
+  W->>DB: BEGIN, UPDATE einsatz SET stichwort
+  DB->>DB: Trigger einsatz_ereignis_kopf: Zeile je Freigabe
+  W->>DB: COMMIT
+  Hub->>DB: nach einer Sekunde erneut lesen
+  DB-->>Hub: einsatz.updated (4712)
+  Hub-->>F: {cursor: 4712, events: [...]} (Lifeline-Signature)
+  F->>Hub: GET /api/v1/einsaetze/42
+  Hub-->>F: Einsatzkopf
+```
+
+- Die Zeile entsteht im Trigger, in der Transaktion der Änderung
+  (`migrations/0345_maschine_ereignis_trigger.sql`); ein Rollback nimmt sie mit. Kein Rust-Code
+  schreibt in die Outbox.
+- Geschrieben wird je Freigabe (`maschinenzugang_freigabe`), Änderungen nur für gültige
+  Zugänge: Beginn der Freigabe ist `einsatz.created`, ihr Ende oder der Abschluss
+  `einsatz.closed`. `lage.changed` hängt am Änderungslog `einsatz_aenderung` und an
+  `einsatz_spiegel` (Ende des Abgleichs, Freigabestufe) und liegt je Zugang und Einsatz höchstens
+  einmal vor. Jede Änderung der Rechte mit Einsatzbezug beendet die Freigabe.
+- Der Abruf wird nicht geweckt: Er fragt im Takt nach (`events::TAKT`) und hält dazwischen keine
+  Verbindung. Es warten höchstens `events::MAX_WARTENDE` Abrufe, je Zugang einer; ein weiterer
+  antwortet sofort mit `Retry-After`.
+- Der Cursor ist die fortlaufende Nummer. Der Purge-Lauf löscht nach sieben Tagen
+  (`events::purge` in `src/einsatz/purge_scheduler.rs`) und hält die Löschgrenze in
+  `maschine_ereignis_stand`; ein Cursor darunter ergibt `410 cursor_expired`, und das Fremdsystem
+  baut neu auf: mit `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über
+  `GET /api/v1/events` ohne `after` und `GET /api/v1/lage`. Stand und Zeilen liest der Abruf aus
+  einem Schnappschuss, damit ein Purge dazwischen keine Lücke ohne `410` lässt.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

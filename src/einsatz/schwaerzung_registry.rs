@@ -143,6 +143,8 @@ pub struct TabellenRegel {
 const G_PK: &str = "Primärschlüssel (Struktur, kein Personenbezug)";
 const G_FK: &str =
     "Struktur-/Benutzer-FK (INTEGER-Referenz; System-Nutzer, kein Betroffenen-Freitext)";
+const G_FK_MASCHINE: &str =
+    "Kennung eines Maschinenzugangs (UUID eines Fremdsystems, kein Personenbezug)";
 const G_SCOPE: &str = "Einsatz-Scope-FK (Struktur)";
 const G_ZEIT: &str = "Zeitstempel (Struktur/Audit, kein Personenbezug)";
 const G_WEB_PUSH: &str =
@@ -3050,9 +3052,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("vollzogen_at", G_ZEIT),
         ],
     },
-    // ---------- Freigabe für externe Anzeigen (LLH-1484, migrations/0270) ----------
+    // ---------- Freigabe für Maschinenzugänge (LLH-1638, migrations/0341_maschinenzugang_freigabe.sql) ----------
     TabellenRegel {
-        tabelle: "lagemonitor_freigabe",
+        tabelle: "maschinenzugang_freigabe",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
         person_bezug: None,
@@ -3527,6 +3529,23 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("daten", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("erstellt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------
+    // Nur Kennungen, Art und Zeitpunkt (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme);
+    // der Purge-Lauf löscht nach sieben Tagen. Mit dem Einsatz gehen die Zeilen über seinen
+    // Inhalt; ein schon geschriebenes Ende bleibt bis zum Purge (Trigger `einsatz_ereignis_d`).
+    TabellenRegel {
+        tabelle: "maschine_ereignis",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("zugang_id", G_FK_MASCHINE),
+            retain("type", G_ENUM),
+            retain("einsatz_id", G_SCOPE),
+            retain("occurred_at", G_ZEIT),
         ],
     },
     TabellenRegel {

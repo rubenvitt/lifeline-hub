@@ -143,7 +143,7 @@ pub async fn stellvertreter(
     org_id: i64,
     angabe: &KontoAngabe,
 ) -> Result<i64, sqlx::Error> {
-    let name = angabe.anzeigename.chars().take(200).collect::<String>();
+    let name = crate::auth::truncate_anzeigename(&angabe.anzeigename);
     let vorhanden: Option<i64> = sqlx::query_scalar(
         "SELECT benutzer_id FROM spiegel_konto WHERE kopplung_id = ? AND fremde_id = ?",
     )
