@@ -30,19 +30,19 @@ type Zeile = (i64, String, String, i64);
 
 async fn welt() -> Welt {
     let (app, pool) = setup_mit_pool().await;
-    welt_aus(app, pool).await
+    welt_from(app, pool).await
 }
 
 /// Wie [`welt`], auf dem Datei-Pool (WAL, mehrere Verbindungen): erst dort laufen zwei Anfragen
 /// wirklich gleichzeitig und warten an der Schreibsperre (LLH-1681).
-async fn welt_nebenlaeufig() -> (tempfile::TempDir, Welt) {
+async fn welt_concurrent() -> (tempfile::TempDir, Welt) {
     let (dir, pool) = lifeline_hub::db::test_pool_datei().await;
     let (app, pool, _live) =
         setup_mit_optionen_auf(pool, lifeline_hub::app::RouterOptionen::default()).await;
-    (dir, welt_aus(app, pool).await)
+    (dir, welt_from(app, pool).await)
 }
 
-async fn welt_aus(app: axum::Router, pool: sqlx::SqlitePool) -> Welt {
+async fn welt_from(app: axum::Router, pool: sqlx::SqlitePool) -> Welt {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let anna = benutzer_anlegen(&app, &admin, "annika", "keine").await;
@@ -562,22 +562,22 @@ async fn etb_meldungen(pool: &sqlx::SqlitePool, auftrag: i64) -> i64 {
 /// Wartet, bis beide Anfragen an der gehaltenen Schreibsperre hängen, gibt sie frei und liefert
 /// beide Statuscodes. Die Sperre hält eine fremde Verbindung, ohne etwas zu schreiben: beide
 /// Anfragen lesen den Auftrag vorher unverändert.
-async fn gleichzeitig(
+async fn concurrently(
     pool: &sqlx::SqlitePool,
     a: impl std::future::Future<Output = StatusCode>,
     b: impl std::future::Future<Output = StatusCode>,
 ) -> (StatusCode, StatusCode) {
-    let sperre = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
-    let beide = async { tokio::join!(a, b) };
-    tokio::pin!(beide);
+    let lock = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    let both = async { tokio::join!(a, b) };
+    tokio::pin!(both);
     assert!(
-        tokio::time::timeout(std::time::Duration::from_millis(500), &mut beide)
+        tokio::time::timeout(std::time::Duration::from_millis(500), &mut both)
             .await
             .is_err(),
         "beide Anfragen warten an der Schreibsperre"
     );
-    sperre.rollback().await.unwrap();
-    beide.await
+    lock.rollback().await.unwrap();
+    both.await
 }
 
 /// LLH-1681, Fall 1: Zugführer und S3 melden nach demselben Funkspruch beide „vollzogen“. Beide
@@ -585,7 +585,7 @@ async fn gleichzeitig(
 /// eine ETB-Meldung und eine Benachrichtigung „erledigt“, Text und Person des ersten bleiben.
 #[tokio::test]
 async fn gleichzeitiger_doppelvollzug_meldet_einmal() {
-    let (_dir, w) = welt_nebenlaeufig().await;
+    let (_dir, w) = welt_concurrent().await;
     let ep_bert = w.personal("Bert Brandt", Some(w.bert)).await;
     let ep_carla = w.personal("Carla Cramer", Some(w.carla)).await;
     let anna = w.cookie("annika").await;
@@ -596,7 +596,7 @@ async fn gleichzeitiger_doppelvollzug_meldet_einmal() {
         .await;
     let auftrag = a["id"].as_i64().unwrap();
 
-    let (s_bert, s_carla) = gleichzeitig(
+    let (s_bert, s_carla) = concurrently(
         &w.pool,
         w.vollzug(
             &bert,
@@ -632,12 +632,12 @@ async fn gleichzeitiger_doppelvollzug_meldet_einmal() {
     .fetch_one(&w.pool)
     .await
     .unwrap();
-    let (erwartet_text, erwartet_von) = if s_bert == StatusCode::OK {
+    let (expected_text, expected_von) = if s_bert == StatusCode::OK {
         ("Sandsäcke liegen", w.bert)
     } else {
         ("Deich gesichert", w.carla)
     };
-    assert_eq!((text.as_str(), von), (erwartet_text, erwartet_von));
+    assert_eq!((text.as_str(), von), (expected_text, expected_von));
 }
 
 /// LLH-1681, Fall 2: „Rückgängig“ liest den Auftrag noch in Bearbeitung, während eine andere
@@ -645,7 +645,7 @@ async fn gleichzeitiger_doppelvollzug_meldet_einmal() {
 /// wartet an der Sperre und trifft danach auf den Vollzug: 422, der Vollzug bleibt bestehen.
 #[tokio::test]
 async fn ruecknahme_ueberholt_keinen_gleichzeitigen_vollzug() {
-    let (_dir, w) = welt_nebenlaeufig().await;
+    let (_dir, w) = welt_concurrent().await;
     let ep_bert = w.personal("Bert Brandt", Some(w.bert)).await;
     let anna = w.cookie("annika").await;
     let bert = w.cookie("bertram").await;
