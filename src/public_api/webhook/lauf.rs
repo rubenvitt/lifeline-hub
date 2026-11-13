@@ -39,7 +39,7 @@ type Laufend = Arc<Mutex<HashSet<String>>>;
 /// beendet nur diese. Springt `stopp` auf `true` (oder fällt sein Sender), beginnt keine neue
 /// Belieferung mehr, und der Lauf endet, sobald die laufenden fertig sind; `herunterfahren` in
 /// `main.rs` wartet darauf begrenzt.
-pub fn starte(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<()> {
+pub fn start(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<()> {
     let zusteller = Arc::new(HttpZusteller);
     let laufend: Laufend = Arc::default();
     let plaetze = Arc::new(Semaphore::new(PARALLEL));
@@ -152,7 +152,7 @@ async fn beliefern<Z: Zusteller>(
     for _ in 0..MAX_JE_TAKT {
         let (webhook, zugang) = {
             let mut conn = pool.acquire().await?;
-            let Some(webhook) = repo::laden(&mut conn, webhook_id).await? else {
+            let Some(webhook) = repo::load(&mut conn, webhook_id).await? else {
                 return Ok(());
             };
             let Some(zugang) = zugang::laden(&mut conn, &webhook.zugang_id).await? else {
@@ -185,7 +185,7 @@ async fn beliefern<Z: Zusteller>(
                 let rueckt = uebersprungen_bis.is_some_and(|bis| bis > webhook.cursor);
                 if rueckt || webhook.offen_id.is_some() || webhook.fehler_seit.is_some() {
                     crate::write_retry!(pool, |conn| {
-                        repo::leer_festhalten(
+                        repo::record_leer(
                             conn,
                             &webhook.id,
                             &webhook.geaendert_at,
@@ -203,7 +203,7 @@ async fn beliefern<Z: Zusteller>(
                     "Webhook: wartendes Ereignis ist schon gelöscht, setzt beim aktuellen Stand an"
                 );
                 crate::write_retry!(pool, |conn| {
-                    repo::verlust_festhalten(conn, &webhook.id, head, &jetzt_s).await?;
+                    repo::record_verlust(conn, &webhook.id, head, &jetzt_s).await?;
                     Ok(())
                 })?;
             }
@@ -211,7 +211,7 @@ async fn beliefern<Z: Zusteller>(
                 if ruht {
                     if webhook.offen_id.is_none() {
                         crate::write_retry!(pool, |conn| {
-                            repo::offen_vermerken(conn, &webhook.id, ereignis.id).await?;
+                            repo::mark_offen(conn, &webhook.id, ereignis.id).await?;
                             Ok(())
                         })?;
                     }
@@ -240,7 +240,7 @@ async fn beliefern<Z: Zusteller>(
                 let danach = zeit::formatiere_utc(jetzt());
                 if ergebnis.is_erfolg() {
                     let gilt = crate::write_retry!(pool, |conn| {
-                        Ok(repo::erfolg_festhalten(
+                        Ok(repo::record_erfolg(
                             conn,
                             &webhook.id,
                             &webhook.geaendert_at,
@@ -262,7 +262,7 @@ async fn beliefern<Z: Zusteller>(
                         &danach,
                     );
                     crate::write_retry!(pool, |conn| {
-                        repo::fehlschlag_festhalten(
+                        repo::record_fehlschlag(
                             conn,
                             &webhook.id,
                             &webhook.geaendert_at,
@@ -322,7 +322,7 @@ pub async fn testereignis<Z: Zusteller>(
         })
         .await;
     crate::write_retry!(pool, |conn| {
-        repo::test_festhalten(conn, &webhook.id, &ergebnis, &jetzt_s).await?;
+        repo::record_test(conn, &webhook.id, &ergebnis, &jetzt_s).await?;
         Ok(())
     })?;
     Ok(ergebnis)

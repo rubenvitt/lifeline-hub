@@ -308,7 +308,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     );
     // Webhooks (LLH-1656): stellt die Ausgangsereignisse an Fremdsysteme zu. Ohne Webhook ist
     // jeder Durchgang eine leere Abfrage; das Stoppsignal teilt er mit der Sicherung.
-    let webhook_task = lifeline_hub::public_api::webhook::lauf::starte(pool.clone(), stopp_empfang);
+    let webhook_task = lifeline_hub::public_api::webhook::lauf::start(pool.clone(), stopp_empfang);
 
     // Datenträgerprüfung (LFH-1100): sofort im Hintergrund, danach stündlich; der Start wartet
     // nicht, und kein Ergebnis hält den Betrieb an.

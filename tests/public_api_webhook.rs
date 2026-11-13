@@ -14,7 +14,7 @@ use lifeline_hub::instanz::identitaet::{self, parse_oeffentlich};
 use lifeline_hub::instanz::signatur::verify_webhook;
 use lifeline_hub::public_api::events::{self, EventType, Naechstes};
 use lifeline_hub::public_api::scope::Scope;
-use lifeline_hub::public_api::webhook::lauf::{durchgang, starte, testereignis};
+use lifeline_hub::public_api::webhook::lauf::{durchgang, start, testereignis};
 use lifeline_hub::public_api::webhook::repo::{self, Eingabe, Webhook};
 use lifeline_hub::public_api::webhook::ziel::{Ergebnis, Zusteller, Zustellung};
 use lifeline_hub::public_api::webhook::{WebhookFehler, VERLAUF_MAX};
@@ -70,7 +70,7 @@ async fn zugang_mit(o: &Org, name: &str, scopes: &[Scope]) -> String {
 
 async fn webhook_anlegen(o: &Org, zugang_id: &str, arten: &[EventType]) -> Webhook {
     let mut conn = o.pool.acquire().await.unwrap();
-    repo::anlegen(
+    repo::create(
         &mut conn,
         zugang_id,
         &Eingabe {
@@ -86,7 +86,7 @@ async fn webhook_anlegen(o: &Org, zugang_id: &str, arten: &[EventType]) -> Webho
 
 async fn webhook(o: &Org, zugang_id: &str) -> Webhook {
     let mut conn = o.pool.acquire().await.unwrap();
-    repo::laden_fuer_zugang(&mut conn, zugang_id)
+    repo::load_by_zugang(&mut conn, zugang_id)
         .await
         .unwrap()
         .unwrap()
@@ -204,7 +204,7 @@ async fn ein_webhook_je_zugang_und_er_geht_mit_dem_zugang() {
     let z = zugang_mit(&o, "Einsatzbuch", ALLE_LESE_SCOPES).await;
     webhook_anlegen(&o, &z, &[EventType::EinsatzCreated]).await;
 
-    let zweiter = repo::anlegen(
+    let zweiter = repo::create(
         &mut *o.pool.acquire().await.unwrap(),
         &z,
         &Eingabe {
@@ -334,7 +334,7 @@ async fn verlust_nur_wenn_das_wartende_ereignis_geloescht_ist() {
     einsatz_freigeben(&o, &z).await;
     let (_, purged_vorher) = {
         let mut c = o.pool.acquire().await.unwrap();
-        events::stand_lesen(&mut c).await.unwrap()
+        events::load_stand(&mut c).await.unwrap()
     };
     assert_eq!(purged_vorher, 0);
 
@@ -636,7 +636,7 @@ async fn testereignis_aendert_weder_cursor_noch_zustand() {
 async fn stoppsignal_beendet_den_lauf() {
     let o = org().await;
     let (tx, rx) = tokio::sync::watch::channel(false);
-    let task = starte(o.pool.clone(), rx);
+    let task = start(o.pool.clone(), rx);
     tx.send(true).unwrap();
     tokio::time::timeout(std::time::Duration::from_secs(5), task)
         .await
@@ -775,11 +775,11 @@ async fn fehlschlag_an_ein_altes_ziel_macht_die_ruecksetzung_nicht_rueckgaengig(
             let (pool, zid) = (pool.clone(), zid.clone());
             Box::pin(async move {
                 // Während der Versuch läuft, ändert der Admin das Ziel.
-                let w = repo::laden_fuer_zugang(&mut *pool.acquire().await.unwrap(), &zid)
+                let w = repo::load_by_zugang(&mut *pool.acquire().await.unwrap(), &zid)
                     .await
                     .unwrap()
                     .unwrap();
-                repo::aendern(
+                repo::update(
                     &mut *pool.acquire().await.unwrap(),
                     &zid,
                     Some(&w.geaendert_at),

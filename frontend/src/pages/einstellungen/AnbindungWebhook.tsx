@@ -23,13 +23,13 @@ import {
   ARTEN,
   ART_TEXT,
   RUHT_TEXT,
-  aendereWebhook,
+  updateWebhook,
   artGesperrtGrund,
-  entferneWebhook,
-  ladeWebhookVersuche,
+  deleteWebhook,
+  loadWebhookVersuche,
   nimmWebhookWiederAuf,
-  richteWebhookEin,
-  sendeTestereignis,
+  createWebhook,
+  sendTestereignis,
   webhookFehlerText,
   type WebhookEingabe,
   type WebhookPatch,
@@ -193,11 +193,11 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
     void qc.invalidateQueries({ queryKey: globalKeys.anbindungWebhookVersuche(zugang.id) });
 
   const einrichten = useMutation({
-    mutationFn: (e: WebhookEingabe) => richteWebhookEin(zugang.id, e),
+    mutationFn: (e: WebhookEingabe) => createWebhook(zugang.id, e),
     onSuccess: (w) => uebernimmWebhook(qc, zugang.id, w),
   });
   const entfernen = useMutation({
-    mutationFn: () => entferneWebhook(zugang.id),
+    mutationFn: () => deleteWebhook(zugang.id),
     onSuccess: () => {
       setEntfernenOffen(false);
       setTest(null);
@@ -213,7 +213,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
     onSuccess: (w) => uebernimmWebhook(qc, zugang.id, w),
   });
   const testen = useMutation({
-    mutationFn: () => sendeTestereignis(zugang.id),
+    mutationFn: () => sendTestereignis(zugang.id),
     onMutate: () => {
       setTest(null);
       if (!weiter.isPending) weiter.reset();
@@ -336,7 +336,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
         patch={webhookPatch}
         onSpeichern={async (patch, basis) => {
           // Ohne Basis („Meine Änderung übernehmen“ nach dem 409) schreibt der Server ohne Vergleich.
-          const w = await aendereWebhook(zugang.id, {
+          const w = await updateWebhook(zugang.id, {
             ...patch,
             ...(basis !== undefined ? { basis_geaendert_at: basis } : {}),
           });
@@ -515,7 +515,7 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
   const { konventionen: konv } = useAnzeigeKonventionen();
   const q = useQuery({
     queryKey: globalKeys.anbindungWebhookVersuche(zugangId),
-    queryFn: () => ladeWebhookVersuche(zugangId),
+    queryFn: () => loadWebhookVersuche(zugangId),
     refetchInterval: ANBINDUNGEN_ABRUF_MS,
   });
   const versuche = q.data ?? [];

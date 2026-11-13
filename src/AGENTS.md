@@ -187,7 +187,7 @@ Spec `webhook-zustellung`, Herleitung
   Webhooks; sie erscheint in der Auswahl, sobald `EventType` sie kennt (Frontend: `ART_TEXT`,
   `ART_RECHT` in `frontend/src/api/anbindungen.ts`).
 - **Ausgehend nur über `webhook::ziel::client`:** kein zweiter Client für Webhooks, keine
-  Zustellung an einer Prüfung von `url_pruefen` vorbei (IP-Literale umgehen den Resolver).
+  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver).
 - **Der Lauf hält während der HTTP-Anfrage keine Datenbankverbindung**; das Ergebnis schreibt er
   danach in einer Transaktion (`write_retry!`). Tests stellen über einen eigenen `Zusteller` zu;
   Loopback ist für den echten Weg immer gesperrt, einen Schalter dafür gibt es nicht.

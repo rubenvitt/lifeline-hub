@@ -1906,9 +1906,9 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // (`public_api::webhook::lauf`).
         .route(
             "/api/admin/anbindungen/{id}/webhook",
-            post(routes::anbindungen_webhook::anlegen)
-                .patch(routes::anbindungen_webhook::aendern)
-                .delete(routes::anbindungen_webhook::entfernen),
+            post(routes::anbindungen_webhook::create)
+                .patch(routes::anbindungen_webhook::update)
+                .delete(routes::anbindungen_webhook::delete),
         )
         .route(
             "/api/admin/anbindungen/{id}/webhook/wieder-aufnehmen",

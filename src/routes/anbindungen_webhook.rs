@@ -24,7 +24,7 @@ use crate::public_api::events::EventType;
 use crate::public_api::scope::ZugangZustand;
 use crate::public_api::webhook::lauf::testereignis;
 use crate::public_api::webhook::repo::{self, Eingabe, Versuch, Webhook};
-use crate::public_api::webhook::ziel::{host_von, url_pruefen, HttpZusteller};
+use crate::public_api::webhook::ziel::{self, host_von, HttpZusteller};
 use crate::public_api::webhook::{ruht_grund, RuhtGrund, WebhookFehler, WebhookZustand, URL_MAX};
 use crate::public_api::zugang::{self, Zugang};
 use crate::routes::anbindungen::gesperrt_grund;
@@ -123,7 +123,7 @@ impl WebhookAnzeige {
         jetzt: &str,
         mit_url: bool,
     ) -> Result<Option<Self>, AppError> {
-        Ok(repo::laden_fuer_zugang(conn, &z.id)
+        Ok(repo::load_by_zugang(conn, &z.id)
             .await?
             .map(|w| Self::aus(&w, z, jetzt, mit_url)))
     }
@@ -198,7 +198,7 @@ pub struct WebhookAenderung {
 /// Ziel-URL: Pflicht, höchstens [`URL_MAX`] Zeichen, und sie besteht den Ziel-Schutz (400).
 fn check_url(roh: &str, lan_erlaubt: bool) -> Result<String, AppError> {
     let url = crate::routes::support::pflicht_max(roh, "url", URL_MAX)?;
-    url_pruefen(&url, lan_erlaubt)
+    ziel::check_url(&url, lan_erlaubt)
         .map_err(|f| AppError::Validation(format!("url: {}", f.text())))?;
     Ok(url)
 }
@@ -268,7 +268,7 @@ async fn spur(
 
 /// POST /api/admin/anbindungen/{id}/webhook — richtet den Webhook ein (201). Schon einer da: 409.
 /// Admin-Spur `maschinenzugang_webhook_angelegt`, mit LAN-Ausnahme zusätzlich `…_lan_erlaubt`.
-pub async fn anlegen(
+pub async fn create(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
@@ -284,7 +284,7 @@ pub async fn anlegen(
     let org_id = admin.org_id;
     let (z, w) = crate::write_retry!(&state.pool, |conn| {
         let z = zugang_fuer_schreiben(&mut *conn, org_id, &id).await?;
-        let w = repo::anlegen(&mut *conn, &z.id, &eingabe, &jetzt).await?;
+        let w = repo::create(&mut *conn, &z.id, &eingabe, &jetzt).await?;
         Ok((z, w))
     })?;
     spur(
@@ -316,7 +316,7 @@ pub async fn anlegen(
 /// PATCH /api/admin/anbindungen/{id}/webhook — ändert Ziel, Arten oder LAN-Ausnahme; Konflikt
 /// über `basis_geaendert_at` (409). Admin-Spur `…_geaendert` bei geändertem Ziel oder geänderten
 /// Arten, `…_lan_erlaubt`/`…_lan_entzogen` beim Umschalten der Ausnahme.
-pub async fn aendern(
+pub async fn update(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
@@ -328,7 +328,7 @@ pub async fn aendern(
     let org_id = admin.org_id;
     let (z, vorher, nachher) = crate::write_retry!(&state.pool, |conn| {
         let z = zugang_fuer_schreiben(&mut *conn, org_id, &id).await?;
-        let vorher = repo::laden_fuer_zugang(&mut *conn, &z.id)
+        let vorher = repo::load_by_zugang(&mut *conn, &z.id)
             .await?
             .ok_or(AppError::NotFound)?;
         let lan_erlaubt = body.lan_erlaubt.unwrap_or(vorher.lan_erlaubt);
@@ -340,7 +340,7 @@ pub async fn aendern(
             arten: arten.clone().unwrap_or_else(|| vorher.arten()),
             lan_erlaubt,
         };
-        let (vorher, nachher) = repo::aendern(
+        let (vorher, nachher) = repo::update(
             &mut *conn,
             &z.id,
             body.basis_geaendert_at.as_deref(),
@@ -375,7 +375,7 @@ pub async fn aendern(
 
 /// DELETE /api/admin/anbindungen/{id}/webhook — entfernt den Webhook samt Verlauf (204).
 /// Admin-Spur `maschinenzugang_webhook_entfernt`.
-pub async fn entfernen(
+pub async fn delete(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PeerIp(peer_ip): PeerIp,
@@ -389,7 +389,7 @@ pub async fn entfernen(
         let z = zugang::laden_in_org(&mut *conn, org_id, &id)
             .await?
             .ok_or(AppError::NotFound)?;
-        let w = repo::entfernen(&mut *conn, &z.id)
+        let w = repo::delete(&mut *conn, &z.id)
             .await?
             .ok_or(AppError::NotFound)?;
         Ok((z, w))
@@ -445,7 +445,7 @@ pub async fn test(
     let w = {
         let mut conn = state.pool.acquire().await?;
         let z = zugang_fuer_schreiben(&mut conn, admin.org_id, &id).await?;
-        repo::laden_fuer_zugang(&mut conn, &z.id)
+        repo::load_by_zugang(&mut conn, &z.id)
             .await?
             .ok_or(AppError::NotFound)?
     };
@@ -472,7 +472,7 @@ pub async fn versuche(
     let z = zugang::laden_in_org(&mut conn, benutzer.org_id, &id)
         .await?
         .ok_or(AppError::NotFound)?;
-    let w = repo::laden_fuer_zugang(&mut conn, &z.id)
+    let w = repo::load_by_zugang(&mut conn, &z.id)
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(Json(

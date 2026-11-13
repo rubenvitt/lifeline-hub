@@ -155,15 +155,15 @@ export interface WebhookPatch {
 
 const webhookPfad = (id: string) => `/api/admin/anbindungen/${encodeURIComponent(id)}/webhook`;
 
-export function richteWebhookEin(id: string, eingabe: WebhookEingabe): Promise<WebhookAnzeige> {
+export function createWebhook(id: string, eingabe: WebhookEingabe): Promise<WebhookAnzeige> {
   return apiSend<WebhookAnzeige>(webhookPfad(id), 'POST', eingabe);
 }
 
-export function aendereWebhook(id: string, patch: WebhookPatch): Promise<WebhookAnzeige> {
+export function updateWebhook(id: string, patch: WebhookPatch): Promise<WebhookAnzeige> {
   return apiSend<WebhookAnzeige>(webhookPfad(id), 'PATCH', patch);
 }
 
-export function entferneWebhook(id: string): Promise<void> {
+export function deleteWebhook(id: string): Promise<void> {
   return apiSend<void>(webhookPfad(id), 'DELETE');
 }
 
@@ -171,11 +171,11 @@ export function nimmWebhookWiederAuf(id: string): Promise<WebhookAnzeige> {
   return apiSend<WebhookAnzeige>(`${webhookPfad(id)}/wieder-aufnehmen`, 'POST');
 }
 
-export function sendeTestereignis(id: string): Promise<WebhookTestErgebnis> {
+export function sendTestereignis(id: string): Promise<WebhookTestErgebnis> {
   return apiSend<WebhookTestErgebnis>(`${webhookPfad(id)}/test`, 'POST');
 }
 
-export function ladeWebhookVersuche(id: string): Promise<WebhookVersuch[]> {
+export function loadWebhookVersuche(id: string): Promise<WebhookVersuch[]> {
   return apiGet<WebhookVersuch[]>(`${webhookPfad(id)}/versuche`);
 }
 

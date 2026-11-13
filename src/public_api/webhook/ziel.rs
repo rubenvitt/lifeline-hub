@@ -5,7 +5,7 @@
 //! - [`klasse`] ordnet eine Adresse ein: öffentlich, privat (nur mit LAN-Ausnahme) oder immer
 //!   gesperrt (Loopback, Link-Local samt Metadatenadresse, Multicast, Broadcast, unbestimmt,
 //!   reserviert).
-//! - [`url_pruefen`] prüft die URL selbst, auch IP-Literale: reqwest löst sie nicht über den
+//! - [`check_url`] prüft die URL selbst, auch IP-Literale: reqwest löst sie nicht über den
 //!   Resolver auf.
 //! - [`WebhookResolver`] löst den Namen selbst auf und gibt nur geprüfte Adressen an reqwest
 //!   (fail-closed, festgehalten wie `karte::proxy::SichererResolver`).
@@ -113,7 +113,7 @@ fn eingebettetes_v4(v6: &Ipv6Addr) -> Option<Ipv4Addr> {
 }
 
 /// Ist die Adresse als Ziel erlaubt?
-pub fn erlaubt(ip: &IpAddr, lan_erlaubt: bool) -> bool {
+pub fn is_erlaubt(ip: &IpAddr, lan_erlaubt: bool) -> bool {
     match klasse(ip) {
         Adressklasse::Oeffentlich => true,
         Adressklasse::Privat => lan_erlaubt,
@@ -155,8 +155,8 @@ impl ZielFehler {
 }
 
 /// Prüft eine Ziel-URL: `https`, ohne Anmeldedaten und Anker, mit Host, nicht `localhost`, und
-/// ein IP-Literal nach [`erlaubt`]. Läuft beim Speichern und vor jedem Versuch.
-pub fn url_pruefen(roh: &str, lan_erlaubt: bool) -> Result<Url, ZielFehler> {
+/// ein IP-Literal nach [`is_erlaubt`]. Läuft beim Speichern und vor jedem Versuch.
+pub fn check_url(roh: &str, lan_erlaubt: bool) -> Result<Url, ZielFehler> {
     let url = Url::parse(roh.trim()).map_err(|_| ZielFehler::Unlesbar)?;
     if url.scheme() != "https" {
         return Err(ZielFehler::NichtHttps);
@@ -174,7 +174,7 @@ pub fn url_pruefen(roh: &str, lan_erlaubt: bool) -> Result<Url, ZielFehler> {
         .trim_end_matches(']')
         .parse::<IpAddr>()
     {
-        Ok(ip) if !erlaubt(&ip, lan_erlaubt) => return Err(ZielFehler::Intern),
+        Ok(ip) if !is_erlaubt(&ip, lan_erlaubt) => return Err(ZielFehler::Intern),
         Ok(_) => {}
         Err(_) => {
             let name = host.trim_end_matches('.').to_ascii_lowercase();
@@ -209,8 +209,8 @@ impl std::error::Error for ZielInternFehler {}
 
 /// Filtert aufgelöste Adressen fail-closed: Ist eine nicht erlaubt, kommt keine zurück (auch bei
 /// gemischtem Ergebnis; sonst wäre DNS-Rebinding ein Weg nach innen).
-pub fn adressen_filtern(adressen: Vec<SocketAddr>, lan_erlaubt: bool) -> Vec<SocketAddr> {
-    if adressen.iter().any(|a| !erlaubt(&a.ip(), lan_erlaubt)) {
+pub fn filter_adressen(adressen: Vec<SocketAddr>, lan_erlaubt: bool) -> Vec<SocketAddr> {
+    if adressen.iter().any(|a| !is_erlaubt(&a.ip(), lan_erlaubt)) {
         Vec::new()
     } else {
         adressen
@@ -233,7 +233,7 @@ impl Resolve for WebhookResolver {
                 .await
                 .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?
                 .collect();
-            let geprueft = adressen_filtern(adressen, lan_erlaubt);
+            let geprueft = filter_adressen(adressen, lan_erlaubt);
             if geprueft.is_empty() {
                 return Err(Box::new(ZielInternFehler) as Box<dyn std::error::Error + Send + Sync>);
             }
@@ -308,7 +308,7 @@ impl Zusteller for HttpZusteller {
     async fn senden(&self, z: Zustellung) -> Ergebnis {
         let start = Instant::now();
         let dauer = || start.elapsed().as_millis().min(i64::MAX as u128) as i64;
-        let url = match url_pruefen(&z.url, z.lan_erlaubt) {
+        let url = match check_url(&z.url, z.lan_erlaubt) {
             Ok(url) => url,
             Err(ZielFehler::Intern) => return fehlschlag(None, WebhookFehler::ZielIntern, 0),
             Err(_) => return fehlschlag(None, WebhookFehler::ZielUngueltig, 0),
@@ -458,15 +458,15 @@ mod tests {
 
     #[test]
     fn erlaubt_nur_mit_ausnahme_privat() {
-        assert!(erlaubt(&ip("93.184.216.34"), false));
-        assert!(!erlaubt(&ip("10.0.0.5"), false));
-        assert!(erlaubt(&ip("10.0.0.5"), true));
-        assert!(!erlaubt(&ip("169.254.169.254"), true));
-        assert!(!erlaubt(&ip("127.0.0.1"), true));
+        assert!(is_erlaubt(&ip("93.184.216.34"), false));
+        assert!(!is_erlaubt(&ip("10.0.0.5"), false));
+        assert!(is_erlaubt(&ip("10.0.0.5"), true));
+        assert!(!is_erlaubt(&ip("169.254.169.254"), true));
+        assert!(!is_erlaubt(&ip("127.0.0.1"), true));
     }
 
     #[test]
-    fn url_pruefen_lehnt_ab() {
+    fn check_url_lehnt_ab() {
         let faelle = [
             ("kein url", ZielFehler::Unlesbar),
             ("http://empfaenger.example/hook", ZielFehler::NichtHttps),
@@ -489,23 +489,23 @@ mod tests {
             ("https://[::ffff:169.254.169.254]/", ZielFehler::Intern),
         ];
         for (roh, erwartet) in faelle {
-            assert_eq!(url_pruefen(roh, false), Err(erwartet), "{roh}");
+            assert_eq!(check_url(roh, false), Err(erwartet), "{roh}");
         }
     }
 
     #[test]
-    fn url_pruefen_mit_lan_ausnahme() {
-        assert!(url_pruefen("https://10.0.0.5/hook", true).is_ok());
-        assert!(url_pruefen("https://[fd00::5]:8443/hook", true).is_ok());
+    fn check_url_mit_lan_ausnahme() {
+        assert!(check_url("https://10.0.0.5/hook", true).is_ok());
+        assert!(check_url("https://[fd00::5]:8443/hook", true).is_ok());
         assert_eq!(
-            url_pruefen("https://169.254.169.254/", true),
+            check_url("https://169.254.169.254/", true),
             Err(ZielFehler::Intern)
         );
         assert_eq!(
-            url_pruefen("https://127.0.0.1/", true),
+            check_url("https://127.0.0.1/", true),
             Err(ZielFehler::Intern)
         );
-        assert!(url_pruefen("https://empfaenger.example/hook?t=1", false).is_ok());
+        assert!(check_url("https://empfaenger.example/hook?t=1", false).is_ok());
     }
 
     #[test]
@@ -523,16 +523,16 @@ mod tests {
     #[test]
     fn filter_ist_fail_closed() {
         let oeffentlich = vec![sock("93.184.216.34"), sock("2606:4700::1")];
-        assert_eq!(adressen_filtern(oeffentlich.clone(), false), oeffentlich);
+        assert_eq!(filter_adressen(oeffentlich.clone(), false), oeffentlich);
         // gemischt: nichts
-        assert!(adressen_filtern(vec![sock("93.184.216.34"), sock("10.0.0.5")], false).is_empty());
+        assert!(filter_adressen(vec![sock("93.184.216.34"), sock("10.0.0.5")], false).is_empty());
         // privat nur mit Ausnahme
         assert_eq!(
-            adressen_filtern(vec![sock("192.168.10.20")], true),
+            filter_adressen(vec![sock("192.168.10.20")], true),
             vec![sock("192.168.10.20")]
         );
         // gesperrt auch mit Ausnahme
-        assert!(adressen_filtern(vec![sock("192.168.10.20"), sock("127.0.0.1")], true).is_empty());
+        assert!(filter_adressen(vec![sock("192.168.10.20"), sock("127.0.0.1")], true).is_empty());
     }
 
     #[tokio::test]

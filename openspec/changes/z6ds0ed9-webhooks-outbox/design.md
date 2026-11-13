@@ -149,7 +149,7 @@ Schreibzeile je Takt und Webhook, sobald irgendwo ein Ereignis entsteht.
 
 ### D3: Ein Lauf, Takt 2 s, je Webhook der Reihe nach
 
-`public_api::webhook::lauf::starte(pool, identitaet, stopp) -> JoinHandle`, nach dem Muster von
+`public_api::webhook::lauf::start(pool, stopp) -> JoinHandle`, nach dem Muster von
 `backup::scheduler`: `tokio::select! { biased; stopp…, ticker.tick() }`, `catch_unwind` je
 Belieferung. Beim Stopp schließt der Lauf die Plätze (keine neue Zustellung) und wartet auf die
 laufenden; `main::herunterfahren` wartet darauf höchstens 20 s.
@@ -216,7 +216,7 @@ Neues Modul `public_api::webhook::ziel`:
     `fc00::/7`.
   - Eingebettetes IPv4 (mapped, compatible, NAT64, 6to4) wird wie bei `ip_ist_intern` ausgepackt
     und rekursiv geprüft.
-- `fn url_pruefen(url, lan_erlaubt) -> Result<Url, ZielFehler>`: Schema `https`, ohne
+- `fn check_url(url, lan_erlaubt) -> Result<Url, ZielFehler>`: Schema `https`, ohne
   Userinfo und Fragment, Host nicht `localhost`/`*.localhost`, ein IP-Literal nach `klasse`.
   reqwest löst IP-Literale nicht über den Resolver auf, also muss diese Prüfung sie fangen. Sie
   läuft beim Speichern und vor jedem Versuch, damit eine verschärfte Regel auch alte Ziele trifft.
@@ -235,7 +235,7 @@ Neues Modul `public_api::webhook::ziel`:
 
 **Für Tests:** Weil Loopback immer gesperrt ist, läuft die Zustellung im Lauf über einen Trait
 `Zusteller` (`async fn senden(&self, ziel, lan, kopf, body) -> Ergebnis`). Integrations-Tests
-setzen einen aufzeichnenden Zusteller ein, der echte HTTP-Weg wird über `klasse`, `url_pruefen`
+setzen einen aufzeichnenden Zusteller ein, der echte HTTP-Weg wird über `klasse`, `check_url`
 und den Resolver als Einheit getestet. Einen Schalter für Loopback im Produktivbinary gibt es
 nicht.
 

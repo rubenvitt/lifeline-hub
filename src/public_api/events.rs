@@ -365,7 +365,7 @@ async fn eigene_bis(
 }
 
 /// Höchststand und Löschgrenze der Outbox (Wiederaufnahme eines Webhooks, LLH-1656).
-pub async fn stand_lesen(conn: &mut SqliteConnection) -> Result<(i64, i64), sqlx::Error> {
+pub async fn load_stand(conn: &mut SqliteConnection) -> Result<(i64, i64), sqlx::Error> {
     let st = stand(conn).await?;
     Ok((st.head, st.purged_until))
 }

@@ -96,7 +96,7 @@ fn neuer_stand(vorher: &str, jetzt: &str) -> String {
 }
 
 /// Der Webhook eines Zugangs.
-pub async fn laden_fuer_zugang(
+pub async fn load_by_zugang(
     conn: &mut SqliteConnection,
     zugang_id: &str,
 ) -> Result<Option<Webhook>, sqlx::Error> {
@@ -109,7 +109,7 @@ pub async fn laden_fuer_zugang(
 }
 
 /// Ein Webhook über seine Kennung.
-pub async fn laden(
+pub async fn load(
     conn: &mut SqliteConnection,
     webhook_id: &str,
 ) -> Result<Option<Webhook>, sqlx::Error> {
@@ -131,18 +131,18 @@ pub struct Eingabe {
 
 /// Legt den Webhook eines Zugangs an. Er beginnt beim Höchststand der Outbox (D1). Gibt es schon
 /// einen: 409.
-pub async fn anlegen(
+pub async fn create(
     conn: &mut SqliteConnection,
     zugang_id: &str,
     eingabe: &Eingabe,
     jetzt: &str,
 ) -> Result<Webhook, AppError> {
-    if laden_fuer_zugang(conn, zugang_id).await?.is_some() {
+    if load_by_zugang(conn, zugang_id).await?.is_some() {
         return Err(AppError::Conflict(
             "Diese Anbindung hat schon einen Webhook.".into(),
         ));
     }
-    let (head, _) = events::stand_lesen(conn).await?;
+    let (head, _) = events::load_stand(conn).await?;
     let id = uuid::Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO maschine_webhook \
@@ -159,7 +159,7 @@ pub async fn anlegen(
     .bind(jetzt)
     .execute(&mut *conn)
     .await?;
-    laden_fuer_zugang(conn, zugang_id)
+    load_by_zugang(conn, zugang_id)
         .await?
         .ok_or_else(|| AppError::Internal("Webhook verschwunden".into()))
 }
@@ -168,14 +168,14 @@ pub async fn anlegen(
 /// beruht (409, wenn er nicht mehr stimmt; ohne Basis wird ohne Vergleich geschrieben). Der Cursor bleibt; ein geändertes Ziel setzt die
 /// Störung zurück, ein angehaltener Webhook bleibt angehalten. Ohne wirksame Änderung kein
 /// Schreiben, und vorher gleich nachher.
-pub async fn aendern(
+pub async fn update(
     conn: &mut SqliteConnection,
     zugang_id: &str,
     basis: Option<&str>,
     eingabe: &Eingabe,
     jetzt: &str,
 ) -> Result<Option<(Webhook, Webhook)>, AppError> {
-    let Some(vorher) = laden_fuer_zugang(conn, zugang_id).await? else {
+    let Some(vorher) = load_by_zugang(conn, zugang_id).await? else {
         return Ok(None);
     };
     if basis.is_some_and(|b| b != vorher.geaendert_at) {
@@ -209,18 +209,18 @@ pub async fn aendern(
     .bind(&vorher.id)
     .execute(&mut *conn)
     .await?;
-    let nachher = laden_fuer_zugang(conn, zugang_id)
+    let nachher = load_by_zugang(conn, zugang_id)
         .await?
         .ok_or_else(|| AppError::Internal("Webhook verschwunden".into()))?;
     Ok(Some((vorher, nachher)))
 }
 
 /// Entfernt den Webhook samt Verlauf. Liefert den entfernten.
-pub async fn entfernen(
+pub async fn delete(
     conn: &mut SqliteConnection,
     zugang_id: &str,
 ) -> Result<Option<Webhook>, AppError> {
-    let Some(vorher) = laden_fuer_zugang(conn, zugang_id).await? else {
+    let Some(vorher) = load_by_zugang(conn, zugang_id).await? else {
         return Ok(None);
     };
     sqlx::query("DELETE FROM maschine_webhook WHERE id = ?")
@@ -238,7 +238,7 @@ pub async fn wieder_aufnehmen(
     zugang_id: &str,
     jetzt: &str,
 ) -> Result<Option<Webhook>, AppError> {
-    let Some(vorher) = laden_fuer_zugang(conn, zugang_id).await? else {
+    let Some(vorher) = load_by_zugang(conn, zugang_id).await? else {
         return Ok(None);
     };
     if !vorher.is_angehalten() {
@@ -246,7 +246,7 @@ pub async fn wieder_aufnehmen(
             "Der Webhook ist nicht angehalten.".into(),
         ));
     }
-    let (head, purged_until) = events::stand_lesen(conn).await?;
+    let (head, purged_until) = events::load_stand(conn).await?;
     let verloren = vorher.offen_id.is_some_and(|offen| offen <= purged_until);
     let stand = neuer_stand(&vorher.geaendert_at, jetzt);
     sqlx::query(
@@ -265,7 +265,7 @@ pub async fn wieder_aufnehmen(
     .bind(&stand)
     .execute(&mut *conn)
     .await?;
-    Ok(laden_fuer_zugang(conn, zugang_id).await?)
+    Ok(load_by_zugang(conn, zugang_id).await?)
 }
 
 /// Aktive Webhooks, deren nächster Versuch fällig ist, mit der Org ihres Zugangs.
@@ -281,7 +281,7 @@ pub async fn faellige(pool: &SqlitePool, jetzt: &str) -> Result<Vec<Webhook>, sq
 }
 
 /// Hält fest, dass ein fälliges Ereignis wartet, falls noch keines vermerkt ist (D2).
-pub async fn offen_vermerken(
+pub async fn mark_offen(
     conn: &mut SqliteConnection,
     webhook_id: &str,
     ereignis_id: i64,
@@ -297,7 +297,7 @@ pub async fn offen_vermerken(
 /// Nichts ist fällig: eine Störung ist vorbei, und der Cursor rückt über übersprungene Zeilen
 /// (nicht gewählte Arten, fehlendes Recht) hinweg. Der Aufrufer ruft es nur, wenn sich etwas
 /// ändert; so schreibt ein ruhiger Webhook nie.
-pub async fn leer_festhalten(
+pub async fn record_leer(
     conn: &mut SqliteConnection,
     webhook_id: &str,
     basis: &str,
@@ -320,7 +320,7 @@ pub async fn leer_festhalten(
 
 /// Das wartende Ereignis ist gelöscht: beim Höchststand ansetzen, Verlust festhalten. Die
 /// Störung um das verlorene Ereignis ist damit vorbei.
-pub async fn verlust_festhalten(
+pub async fn record_verlust(
     conn: &mut SqliteConnection,
     webhook_id: &str,
     head: i64,
@@ -343,7 +343,7 @@ pub async fn verlust_festhalten(
 /// `geaendert_at` beim Laden vor dem Versuch: Hat ein Admin den Webhook seither geändert, gilt
 /// der Versuch dem alten Stand, und nur der Verlauf hält ihn fest (dann `false`; das Ereignis
 /// kommt erneut, mindestens einmal).
-pub async fn erfolg_festhalten(
+pub async fn record_erfolg(
     conn: &mut SqliteConnection,
     webhook_id: &str,
     basis: &str,
@@ -370,9 +370,9 @@ pub async fn erfolg_festhalten(
 }
 
 /// Ein Versuch ist gescheitert: Störung fortschreiben oder anhalten, Verlaufseintrag. Wie bei
-/// [`erfolg_festhalten`] nur auf dem Stand `basis`: Ein Fehlschlag an ein inzwischen geändertes
+/// [`record_erfolg`] nur auf dem Stand `basis`: Ein Fehlschlag an ein inzwischen geändertes
 /// Ziel macht das Zurücksetzen der Störung durch den Admin nicht rückgängig.
-pub async fn fehlschlag_festhalten(
+pub async fn record_fehlschlag(
     conn: &mut SqliteConnection,
     webhook_id: &str,
     basis: &str,
@@ -422,7 +422,7 @@ pub async fn fehlschlag_festhalten(
 }
 
 /// Ein Testereignis: nur ein Verlaufseintrag, sonst nichts (Spec „Testzustellung“).
-pub async fn test_festhalten(
+pub async fn record_test(
     conn: &mut SqliteConnection,
     webhook_id: &str,
     ergebnis: &Ergebnis,
