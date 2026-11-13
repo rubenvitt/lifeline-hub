@@ -505,7 +505,9 @@ in beiden Fällen abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Sp
 Ein zur Löschung vorgemerkter Einsatz ist auch am Spiegel gesperrt, eine Wiederherstellung
 hebt die Sperre auch dort auf, und eine Schwärzung kommt ebenso an. Löscht die Installation, die
 einen Einsatz führt, ihn endgültig, löscht die andere ihren Spiegel beim nächsten Abgleich; das
-Löschprotokoll dort nennt die Gegenstelle, aber keine Nummer.
+Löschprotokoll dort nennt die Gegenstelle, aber keine Nummer. Hat die führende Installation den
+Einsatz übernommen, gilt das nur, solange an der anderen die Führung je Einsatz eingeschaltet
+ist; sonst bleibt der Spiegel dort stehen.
 
 Nach dem Ende der Nachbereitung übergibt ein ELW seine eigenen Einsätze dem Hub zur Verwahrung:
 Der Spiegel am Hub wird dabei zu einem eigenen Einsatz des Hubs, und der ELW löscht seinen.
@@ -535,10 +537,11 @@ Einsatz, den die führende Installation endgültig gelöscht hat, verschwindet m
 Abgleich. Kennt eine Installation ihn nur über den Hub, etwa ein zweiter Einsatzleitwagen,
 verschwindet er dort einen Abgleich später; hängt die Organisation an zwei Hubs, bleibt er dort
 stehen. Ein eigener Einsatz, dessen Führung abgegeben wurde, verschwindet ebenso mit dem
-nächsten Abgleich, sobald die übernehmende Installation ihn endgültig löscht. Stehen bleibt jeder
-Einsatz, den eine Gegenstelle mit einem älteren Stand gelöscht hat. Ist die Führung je Einsatz
-aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
-steht dort der Fehler mit „Erneut laden“.
+nächsten Abgleich, sobald die übernehmende Installation ihn endgültig löscht (auch aus der
+Einsatzliste: der Spiegel wird gelöscht). Stehen bleibt jeder Einsatz, den eine Gegenstelle
+mit einem älteren Stand gelöscht hat. Ist die Führung je Einsatz aus oder fehlt das Recht eines
+System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden, steht dort der Fehler mit
+„Erneut laden“.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an

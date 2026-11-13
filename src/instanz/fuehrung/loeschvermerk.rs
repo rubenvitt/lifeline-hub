@@ -14,8 +14,10 @@
 //! Der Einsatz lebt beim Führer weiter.
 //!
 //! Mit ihm belegt eine Instanz das Lebensende `geloescht` für eine Akte, die das Gegenüber ohne
-//! Spiegel hält, auch für Kennungen mit fremdem Präfix ([`belegte`]). Ohne Vermerk meldet sie
-//! nichts: eine aus einer Sicherung zurückgekehrte Instanz löscht beim Gegenüber keine Akte.
+//! Spiegel hält, und für den Stand eines Spiegels (LLH-1852, ADR-0039), auch für Kennungen mit
+//! fremdem Präfix ([`belegte`], gerufen aus `spiegel::lebensende::belegte_enden`). Ohne Vermerk
+//! meldet sie nichts: eine aus einer Sicherung zurückgekehrte Instanz löscht beim Gegenüber weder
+//! Akte noch Spiegel.
 
 use crate::error::AppError;
 use sqlx::SqliteConnection;
