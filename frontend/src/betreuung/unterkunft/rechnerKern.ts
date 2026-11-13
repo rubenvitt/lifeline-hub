@@ -2,8 +2,9 @@
  * Rechenkern Unterkunft und Zelte (LLH-1520, design.md D1; POC LLH-1519).
  *
  * Reine Funktion `rechne(eingabe, richtwerte) → ergebnis`. Läuft im Browser, also auch ohne Netz.
- * Die erwarteten Ergebnisse stehen sprachneutral in `tests/fixtures/unterkunft/faelle.json`; die
- * spätere Rechner-API (LLH-1524) muss dieselben Fälle bestehen.
+ * Die erwarteten Ergebnisse stehen sprachneutral in `tests/fixtures/unterkunft/faelle.json`; der
+ * Rust-Kern der Rechner-API (`src/unterkunft/rechner.rs`, LLH-1524) besteht dieselben Fälle. Wer
+ * hier die Rechnung ändert, ändert ihn und die Fallsammlung mit.
  *
  * Grundsatz: Bedarf wird aufgerundet, eine Kapazität aus Fläche abgerundet, gerundet wird erst am
  * Ende jeder Größe. Bei Raum-Grundlage zählt jeder Raum einzeln (abgerundet, dann summiert); bei
