@@ -213,7 +213,8 @@ Ohne Verbindung zum Hub gibt die Installation, die sich meldet, die Führung per
 „Führung per Code abgeben“, Rückfrage mit „Code erzeugen“ bestätigen und den Code, der nur
 einmal erscheint, per Funk oder Telefon durchgeben. Ab dem Code ist der Einsatz hier ein
 Spiegel, und der Verlauf zeigt „Abgabe per Code“. Über eine Direktkopplung vor Ort geben beide
-Installationen so ab.
+Installationen so ab; gibt es mehrere Ziele, nennt der Knopf das Ziel („Führung per Code an …
+abgeben“).
 
 ### Führung anfragen
 

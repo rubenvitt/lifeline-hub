@@ -355,6 +355,19 @@ describe('FuehrungPaneel (LLH-1491)', () => {
       );
     });
 
+    it('mit Hub und Gegenstelle vor Ort nennt jeder Code-Knopf sein Ziel', () => {
+      const hub = akte().gegenueber[0];
+      renderMitProviders(
+        <FuehrungPaneel fuehrung={akte({ gegenueber: [hub, vorOrt] })} darfBedienen />,
+      );
+      expect(
+        screen.getByRole('button', { name: 'Führung per Code an Hub Nord abgeben' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Führung per Code an ELW 2 abgeben' }),
+      ).toBeInTheDocument();
+    });
+
     it('ohne Recht zeigt die Anfrage nur, wer bittet', () => {
       renderMitProviders(
         <FuehrungPaneel

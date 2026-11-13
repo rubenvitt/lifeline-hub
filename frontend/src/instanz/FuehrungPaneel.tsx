@@ -471,7 +471,10 @@ export default function FuehrungPaneel({
                   aria-describedby={beschrieben}
                   data-lfh="fuehrung-code"
                 >
-                  Führung per Code abgeben
+                  {/* Mehrere Ziele (Hub und Gegenstelle vor Ort, LLH-1678): der Knopf nennt es. */}
+                  {moeglich.perCode.length > 1
+                    ? `Führung per Code an ${g.name} abgeben`
+                    : 'Führung per Code abgeben'}
                 </Button>
               </Popconfirm>
             );
