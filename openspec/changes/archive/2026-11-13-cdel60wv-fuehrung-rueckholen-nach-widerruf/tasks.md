@@ -25,7 +25,7 @@
 
 ## 5. Verifikation
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert` grün (ohne `| tail`); Bilder des Paneels und des Hinweisbands in der Lage per Wegwerf-Spec aufgenommen.
+- [x] 5.1 `./scripts/check-all.sh --geaendert` grün (ohne `| tail`); Bilder des Paneels und des Hinweisbands in der Lage per Wegwerf-Spec aufgenommen. Lokal (13.11.2026): Schritte 1–3 (rustfmt, Lint, Typ-Drift samt Typecheck) grün, dazu alle Lib-Tests und die berührten Suiten (instanz_*, einsatz_kontext*, enum_wire_kontrakt, openapi_spec_aktuell) und die volle Vitest-Suite; die volle Rust-Suite und e2e passten nicht ins Plattenkontingent der Cloud-Sitzung und belegt die CI dieses PRs.
 
 ## Workflow follow-up
 
