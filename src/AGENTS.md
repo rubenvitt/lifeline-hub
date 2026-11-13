@@ -495,7 +495,7 @@ Herleitung in
     nach) oder die Skelett-Löschung; beide schreiben das Löschprotokoll. Nachweis:
     `tests/instanz_lebensende.rs`.
   - **Akten ohne Spiegel (LLH-1699)**, Spec `instanz-fuehrung`,
-    [ADR-0035](../docs/architektur/entscheidungen/ADR-0035-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md),
+    [ADR-0036](../docs/architektur/entscheidungen/ADR-0036-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md),
     Herleitung
     `openspec/changes/archive/2026-11-12-h7shm5au-loeschsignal-spiegellose-akten/design.md`
     (D1–D5): Wer eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung in

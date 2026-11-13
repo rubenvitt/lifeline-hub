@@ -189,10 +189,10 @@ Weitergabe).
 
 Der Filter in `list_fremde_der_org` bleibt, sein Kommentar verliert den Verweis auf LLH-1699.
 
-### D6 Die Entscheidung steht als ADR-0035
+### D6 Die Entscheidung steht als ADR-0036
 
 Nach `docs/architektur/AGENTS.md` (Mitänderungsregel) bekommt eine Entscheidung der Route
-`entwurf` eine ADR: `ADR-0035` hält die Regeln aus D2–D4 mit Prüfung fest; Laufzeitsicht (6) und
+`entwurf` eine ADR: `ADR-0036` hält die Regeln aus D2–D4 mit Prüfung fest; Laufzeitsicht (6) und
 Glossar (12) nennen Ablauf und Begriff.
 
 ### Nachträge aus dem Review vor dem PR (12.11.2026)
