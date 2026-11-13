@@ -22,9 +22,9 @@ Reproduktionstests `zurueckgespielt_hub_*` liegen schon rot auf dem Branch.
 
 ## 4. Stammdaten: Startsprung (D3)
 
-- [ ] 4.1 `stammdaten::raise_log_stand(pool, jetzt_s)` in `src/instanz/stammdaten/` (hebt `sqlite_sequence` für `stammdaten_aenderung`, legt die Zeile an, wenn sie fehlt, senkt nie). Unit-Tests: heben, nicht senken, fehlende Zeile, und die nächste Log-Zeile liegt darüber
-- [ ] 4.2 Aufruf in `run_server` (`src/main.rs`) nach `db::migrate`. Im Reproduktionstest `zurueckgespielt_hub_aenderungen_erreichen_den_elw` den Neustart durch den Aufruf nachstellen; prüfen: grün
-- [ ] 4.3 Tests, die kleine feste Log-Stände erwarten, auf relative Aussagen umstellen. Prüfen: `cargo test --test instanz_stammdaten --test instanz_stammdaten_kataloge --test instanz_stammdaten_live` und `cargo test --lib instanz::stammdaten`
+- [x] 4.1 `stammdaten::raise_log_stand(pool, jetzt_s)` in `src/instanz/stammdaten/` (hebt `sqlite_sequence` für `stammdaten_aenderung`, legt die Zeile an, wenn sie fehlt, senkt nie). Unit-Tests: heben, nicht senken, fehlende Zeile, und die nächste Log-Zeile liegt darüber
+- [x] 4.2 Aufruf in `run_server` (`src/main.rs`) nach `db::migrate`. Im Reproduktionstest `zurueckgespielt_hub_aenderungen_erreichen_den_elw` den Neustart durch den Aufruf nachstellen; prüfen: grün
+- [x] 4.3 Tests, die kleine feste Log-Stände erwarten, auf relative Aussagen umstellen. Prüfen: `cargo test --test instanz_stammdaten --test instanz_stammdaten_kataloge --test instanz_stammdaten_live` und `cargo test --lib instanz::stammdaten`
 
 ## 5. Stammdaten: Netz an der erreichten Seite (D4)
 

@@ -1276,6 +1276,17 @@ async fn zurueckspielen_hub(hub: &Instanz, stand: i64, verloren: &[&str]) {
     .await;
 }
 
+/// Was der Start nach dem Zurückspielen tut (`run_server`): den Zähler des Logs auf die Uhr heben.
+async fn neustart(hub: &Instanz) {
+    let jetzt = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    lifeline_hub::instanz::stammdaten::liefern::raise_log_stand(&hub.pool, jetzt)
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
 async fn zurueckgespielt_hub_aenderungen_erreichen_den_elw() {
     let (hub, elw) = gekoppelt().await;
@@ -1296,6 +1307,8 @@ async fn zurueckgespielt_hub_aenderungen_erreichen_den_elw() {
     melden(&elw).await;
     lokale_id(&elw, "fahrzeug", "funkrufname", "Verloren 3").await;
     zurueckspielen_hub(&hub, sicherung, &["Verloren 1", "Verloren 2", "Verloren 3"]).await;
+    // Zurückspielen verlangt den Neustart, und der hebt den Zähler des Logs auf die Uhr (D3).
+    neustart(&hub).await;
     exec(
         &hub.pool,
         "UPDATE fahrzeug SET funkrufname = 'Vorher 1 geändert' WHERE funkrufname = 'Vorher 1'",
