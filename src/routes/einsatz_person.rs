@@ -196,6 +196,25 @@ pub async fn liste(
     Ok(Json(liste))
 }
 
+/// GET /api/einsaetze/{id}/personen/{pid}/zeile — eine Person in der Form der Liste, auch
+/// storniert, für den Zeilenabgleich des Live-Feeds (LLH-1682, Spec `live-abgleich`). NICHT
+/// auditiert wie die Liste: jeder Tab ruft sie bei jedem `person`-Ereignis ab, das Detail
+/// schriebe dabei je Abruf eine Protokollzeile. Dieselben Schranken wie die Liste: Stellenbindung
+/// der Geräte (eine Person, die das Gerät nicht sähe, ist 404) und das Einheitengerät ohne
+/// Personalien.
+pub async fn zeile(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<PersonAnzeige>, AppError> {
+    stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    let mut person = repo::laden(&state.pool, ctx.einsatz.id, person_id).await?;
+    if ist_einheitengeraet(&ctx) {
+        person.ohne_personalien();
+    }
+    Ok(Json(person))
+}
+
 /// Ob die Sitzung ein Einheitengerät ist (LLH-1579/LLH-1580).
 fn ist_einheitengeraet(ctx: &crate::einsatz::kontext::EinsatzKontext) -> bool {
     ctx.geraet

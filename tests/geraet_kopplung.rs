@@ -8485,3 +8485,95 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
         "{etb:?}"
     );
 }
+
+// ---------- Zeilenabruf für den Live-Abgleich (LLH-1682) ----------
+
+/// Das Tablet gleicht seine Personenliste zeilenweise ab: die Person seiner UHS bekommt es, eine
+/// Person, die es in der Liste nicht sähe, ist 404 wie im Detail.
+#[tokio::test]
+async fn tablet_ruft_zeile_nur_fuer_personen_der_eigenen_uhs_ab() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let eigene = person_in(&app, &admin, einsatz, Some(nord)).await["id"]
+        .as_i64()
+        .unwrap();
+    let fremde = person_in(&app, &admin, einsatz, Some(sued)).await["id"]
+        .as_i64()
+        .unwrap();
+
+    let (s, zeile) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{eigene}/zeile"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{zeile}");
+    assert_eq!(zeile["id"], eigene);
+    assert_eq!(zeile["name"], "Muster");
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/{fremde}/zeile"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Am Einheitengerät trägt die Zeile wie die Liste keine Personalien; eine Person einer anderen
+/// Einheit ist 404 (LLH-1580 K5).
+#[tokio::test]
+async fn einheitengeraet_ruft_zeile_ohne_personalien_ab() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
+    let personen = format!("/api/einsaetze/{}/personen", l.einsatz);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &admin,
+        Some(&json!({"name": "Meier", "versorgende_einheit_id": l.zug_ost})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let eigene = v["id"].as_i64().unwrap();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &personen,
+        &admin,
+        Some(&json!({"name": "Fremd", "versorgende_einheit_id": l.zug_nord})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let fremde = v["id"].as_i64().unwrap();
+
+    let (s, zeile) = anfrage(
+        &app,
+        "GET",
+        &format!("{personen}/{eigene}/zeile"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{zeile}");
+    assert_eq!(zeile["id"], eigene);
+    assert_eq!(zeile["name"], Value::Null, "ohne Namen: {zeile}");
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{personen}/{fremde}/zeile"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}

@@ -27,15 +27,16 @@ pub(super) fn sse(state: &AppState, einsatz_id: i64) {
 
 /// Wie [`sse`], und bei einer Nachforderung mit Personenbezug zusätzlich `person` (LLH-1573
 /// design.md D4): die Personenantwort trägt den Stand des Rettungsmittels, die Personenliste (UHS,
-/// Lage) lädt ihn so ohne Leserecht auf Nachforderungen nach. Das Detail einer Person (Patientenkopf)
-/// bleibt wie bei jeder anderen Änderung nicht live: jeder Detailabruf schreibt eine Audit-Zeile; es
-/// lädt beim nächsten Öffnen.
+/// Lage) lädt ihn so ohne Leserecht auf Nachforderungen nach. Mit der Kennung der Person gleichen
+/// die Tabs nur ihre Zeile ab (LLH-1682). Das Detail einer Person (Patientenkopf) bleibt wie bei
+/// jeder anderen Änderung nicht live: jeder Detailabruf schreibt eine Audit-Zeile; es lädt beim
+/// nächsten Öffnen.
 fn sse_mit_person(state: &AppState, n: &NachforderungAnzeige) {
     sse(state, n.einsatz_id);
-    if n.person_id.is_some() {
+    if let Some(person_id) = n.person_id {
         state
             .live
-            .publiziere_einsatz(n.einsatz_id, LiveEvent::Person);
+            .publiziere_objekt(n.einsatz_id, LiveEvent::Person, "person_id", person_id);
     }
 }
 
