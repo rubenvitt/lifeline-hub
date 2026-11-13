@@ -24,9 +24,8 @@ test.beforeEach(async ({ page }) => {
   await anmeldenAlsAdmin(page);
 });
 
-test('Rechtsklick auf einen Eintrag zeigt die Einträge des ⋮; „Berichtigen“ wirkt wie dort', async ({
-  page,
-}) => {
+/** Ein Einsatz mit einem Eintrag; liefert seine Zeile auf der ETB-Seite in der erwarteten Form. */
+async function eintragZeile(page: Page, form: 'spalten' | 'handschirm'): Promise<Locator> {
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Kontextmenü ETB ${Date.now()}`,
   });
@@ -41,6 +40,15 @@ test('Rechtsklick auf einen Eintrag zeigt die Einträge des ⋮; „Berichtigen�
     .locator('[data-testid="etb-ereigniszeile"]')
     .filter({ hasText: 'Wasserentnahme' });
   await expect(zeile).toHaveCount(1);
+  // Vorbedingung: die Zeilenform der Fläche (Spec `etb-zeitachse-darstellung`).
+  await expect(zeile).toHaveAttribute('data-lfh-form', form);
+  return zeile;
+}
+
+test('Rechtsklick auf einen Eintrag zeigt die Einträge des ⋮; „Berichtigen“ wirkt wie dort', async ({
+  page,
+}) => {
+  const zeile = await eintragZeile(page, 'spalten');
 
   // Die Quelle: das ⋮ derselben Zeile.
   const knopf = zeile.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
@@ -62,6 +70,34 @@ test('Rechtsklick auf einen Eintrag zeigt die Einträge des ⋮; „Berichtigen�
   await menue.getByRole('menuitem', { name: 'Berichtigen' }).click();
   await expect(menue).toHaveCount(0);
   await expect(page.getByText(/Berichtigung zu Nr\. \d+/).first()).toBeVisible();
+});
+
+/**
+ * Auf dem Handschirm steht der Eintrag als Handschirm-Zeile (Kopfzeile, Text in voller Breite):
+ * das ⋮ steht in der Kopfzeile, das Kontextmenü zeigt dieselben Einträge, samt Verfasser.
+ */
+test('Handschirm-Zeile: das Kontextmenü zeigt die Einträge des ⋮, mit dem Verfasser', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const zeile = await eintragZeile(page, 'handschirm');
+  const knopf = zeile
+    .locator('[data-lfh="etb-kopfzeile"]')
+    .getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
+  const name = (await knopf.getAttribute('aria-label'))!;
+  await knopf.click();
+  const dreipunkt = page.locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  await expect(dreipunkt.getByRole('menuitem').first()).toBeVisible();
+  const punkte = await eintraegeVon(dreipunkt);
+  expect(punkte).toContain('Berichtigen');
+  expect(punkte[punkte.length - 1]).toMatch(/^Verfasser: /);
+  await page.keyboard.press('Escape');
+  await expect(dreipunkt).toHaveCount(0);
+
+  await zeile.getByText('Wasserentnahme an Hydrant 4 bereit').click({ button: 'right' });
+  const menue = menueMitName(page, name);
+  await expect(menue).toBeVisible();
+  expect(await eintraegeVon(menue)).toEqual(punkte);
 });
 
 test('Rechtsklick auf den Chip „An“ zeigt dessen Menü; „Bearbeiten“ öffnet das Feld', async ({

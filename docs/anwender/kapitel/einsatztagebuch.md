@@ -2,7 +2,7 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbFeldzeile.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbFeldzeile.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md, frontend/src/etb/EtbSpaltenzeile.tsx, frontend/src/etb/EtbHandschirmzeile.tsx, frontend/src/etb/EtbVermerke.tsx, frontend/src/etb/vermerke.ts, frontend/src/etb/EtbInhalt.tsx, frontend/src/etb/etbSpalten.ts]
 ---
 
 ## Überblick
@@ -33,13 +33,33 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
    rollen liest zurück; „Ältere laden“ über der Zeitachse holt frühere Einträge. Wer weiter als
    eine Bildschirmhöhe zurückgerollt ist, kommt rechts über der Erfassungsleiste mit „Nach oben“
    in einem Zug zum Anfang mit Filterleiste und „Ältere laden“.
-3. Sind seit dem letzten Besuch Einträge hinzugekommen, trennt eine Linie wie „Neu seit 1304 · 14
+3. In der Bediendichte „Kompakt“ auf einem breiten Bildschirm steht jeder Eintrag in einer Zeile
+   mit den Spalten „Zeit“, „Nr.“, „Typ“, „Von → An“, „Inhalt“ und „Vermerk“; der Spaltenkopf
+   bleibt beim Rollen stehen. Hinter „Von → An“ steht der Meldeweg, etwa „ELW 1 → EL · Funk“; ist
+   der Text länger als die Spalte, endet er mit „…“, und der volle Text erscheint beim Zeigen auf
+   die Spalte. Sind Von und An dieselbe Stelle, steht dort „Vermerk EL“ statt „EL → EL“.
+4. Verweise und Marken stehen in der Spalte „Vermerk“, etwa „Meldung #5 ↗“, „Nachtrag · erfasst
+   1926“, „berichtigt durch Nr. 231“, „berichtigt Nr. 230“ oder ein Anhang. Passen nicht alle
+   hinein, endet die Spalte mit „+2“: „+2“ zeigt alle unter dem Text, „zuklappen“ nimmt sie
+   zurück. Alle Vermerke nennt auch das Zeigen auf die Spalte und das Menü „Aktionen zu Eintrag
+   …“, aus dem ein Verweis sich öffnen und ein Anhang sich herunterladen lässt.
+5. Ein langer Eintrag, etwa ein Lagebericht, steht auf drei Zeilen; „mehr“ zeigt ihn ganz,
+   „weniger“ klappt ihn wieder zu. Ein Link auf den Eintrag und eine Volltextsuche, die in seinem
+   Text trifft, zeigen ihn ganz.
+6. Sind seit dem letzten Besuch Einträge hinzugekommen, trennt eine Linie wie „Neu seit 1304 · 14
    Einträge“ die gesichteten von den neuen. Liegt der zuletzt gesichtete Eintrag nicht im
    geladenen Teil oder ist ein Filter gesetzt, steht derselbe Hinweis über der Zeitachse, mit „Zur
    Marke springen“. „alle als gesichtet markieren“ setzt die Lesemarke auf den neuesten Eintrag.
-4. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
+7. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
    läuft mit. Wer hochgerollt hat oder ein Menü in der Zeitachse offen hat, sieht stattdessen
    unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende.
+
+Wer einen Eintrag geschrieben hat, erscheint beim Zeigen auf die Zeile und im Menü „Aktionen zu
+Eintrag …“ als „Verfasser: …“; die Zeile selbst bleibt einzeilig. Ein berichtigter Eintrag steht
+durchgestrichen da, lesbar wie zuvor. In den Bediendichten „Komfortabel“ und „Handschuh“ und auf
+mittelbreiten Bildschirmen stehen Verfasser und Meldeweg rechts im Eintrag und die Verweise unter
+dem Text, ein Nachtrag als „⧖ nachgetragen um …“. Auf dem Handy trägt jeder Eintrag oben eine
+Kopfzeile mit Zeit, Typ und Von → An, darunter den Text in voller Breite und darunter die Verweise.
 
 Die Seitenleiste „Bilanz“ zählt die Einträge nach Typ und nennt die jüngsten Berichtigungen; ist
 ein Filter gesetzt, heißt sie „Bilanz im Filter“. Einträge vom Typ „Lage“ zählt sie als
@@ -199,12 +219,15 @@ Für Einsatzleitung und Führungspersonal:
 
 3. „Erfassen“ wählen. „Abbrechen“ verlässt den Modus ohne Eintrag.
 
-Der alte Eintrag trägt danach in seiner Kopfzeile die Marke „berichtigt“ und den Sprung „→ Nr. …“
-auf die jüngste Berichtigung; sein Text bleibt unverändert lesbar. Die Marke steht auch, wenn die
+Der alte Eintrag steht danach durchgestrichen da, sein Text bleibt lesbar. In der Spalte
+„Vermerk“ trägt er „berichtigt durch Nr. …“ als Sprung auf die Berichtigung; in den Bediendichten
+„Komfortabel“ und „Handschuh“ steht in seiner Kopfzeile die Marke „berichtigt“ mit dem Sprung
+„→ Nr. …“ auf die jüngste Berichtigung. Die Kennzeichnung steht auch, wenn die
 Berichtigung gerade nicht angezeigt ist, etwa unter dem Typfilter „Meldung“, und ebenso im
 Lagebild und im Überblick. In der Lageentwicklung eines Lagevortrags steht eine berichtigte
 Entscheidung mit dem Text „berichtigt → Nr. …“. Die Berichtigung
-zeigt „berichtigt Nr. …“ mit dem Verweis „Grundeintrag anzeigen ↗“. Auch eine Berichtigung lässt
+zeigt „berichtigt Nr. …“, in der Spalte „Vermerk“ als Sprung, sonst mit dem Verweis „Grundeintrag
+anzeigen ↗“. Auch eine Berichtigung lässt
 sich wieder berichtigen; die Erfassungsleiste nennt dann die Kette, etwa „Berichtigung zu Nr. 135
 (berichtigt Nr. 134)“.
 
@@ -242,8 +265,9 @@ erteilen (keine Berechtigung)“ da. Wie Aufträge weiterlaufen, beschreibt das 
 
 Das ETB ist ein Beleg. Ein Eintrag bleibt so, wie er erfasst wurde; die Korrektur steht als
 eigener, verknüpfter Eintrag daneben. Weicht die Ereigniszeit um mindestens eine Minute vom
-Eingang ab, zeigt der Eintrag „⧖ nachgetragen um …“; wurde er an einem anderen Tag erfasst als
-das Ereignis, steht der Tag dabei, etwa „⧖ nachgetragen 110020“.
+Eingang ab, zeigt der Eintrag in der Spalte „Vermerk“ „Nachtrag · erfasst …“ (in den
+Bediendichten „Komfortabel“ und „Handschuh“ „⧖ nachgetragen um …“); wurde er an einem anderen Tag
+erfasst als das Ereignis, steht der Tag dabei, etwa „Nachtrag · erfasst 110020“.
 
 ### Automatische Einträge
 

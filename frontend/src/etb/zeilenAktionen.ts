@@ -9,6 +9,7 @@ import type { MenueEintrag } from '../components/MenueAusloeser';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import type { EtbZeile } from './etbZeile';
+import type { Vermerk } from './vermerke';
 
 export type ZeilenAktion =
   'berichtigen' | 'wiedervorlage' | 'auftrag' | 'erneut' | 'nurProtokollieren' | 'verwerfen';
@@ -35,6 +36,20 @@ export interface ZeilenAufrufe {
   verwerfen: (p: AbgelehnterEintrag) => void;
   /** Fehlt, wenn die Seite den Weg nicht anbietet. */
   nurProtokollieren?: (p: AbgelehnterEintrag) => void;
+  /** Sprung auf das Ziel eines Vermerks (Spaltenzeile, `zeilenMenue`). */
+  oeffne?: (pfad: string) => void;
+  /** Datei eines Vermerks herunterladen (Anhang, Dokument). */
+  herunterladen?: (datei: NonNullable<Vermerk['datei']>) => void;
+}
+
+/**
+ * Was eine Zeile im Menü zusätzlich nennt, weil sie es nicht zeigt (Spec
+ * `etb-zeitachse-darstellung`, „Spaltenzeile in kompakter Dichte“ und „Vermerke in eigener
+ * Spalte“): die Spaltenzeile ihre Vermerke und den Verfasser, die Handschirm-Zeile den Verfasser.
+ */
+export interface ZeilenZusatz {
+  vermerke?: readonly Vermerk[];
+  verfasser?: string;
 }
 
 /**
@@ -79,8 +94,48 @@ export function zeilenAktionen(z: EtbZeile, r: ZeilenRechte): MenueEintrag<Zeile
   ];
 }
 
+const VERMERK = 'vermerk:';
+
+/**
+ * Die ganze Liste des ⋮ und des Kontextmenüs: die Handlungen ({@link zeilenAktionen}), dahinter,
+ * was die Zeile nicht zeigt ({@link ZeilenZusatz}) — Verweise und Dateien als Sprung bzw.
+ * Herunterladen, Marken (Nachtrag) und der Verfasser als Angabe ohne Wirkung (gesperrt). EINE
+ * Liste für ⋮ und Kontextmenü; ob die Zeile ein Kontextmenü trägt, entscheiden weiter allein die
+ * Handlungen (ohne sie bleibt das Browsermenü).
+ */
+export function zeilenMenue(
+  z: EtbZeile,
+  r: ZeilenRechte,
+  zusatz?: ZeilenZusatz,
+): MenueEintrag<string>[] {
+  const aktionen: MenueEintrag<string>[] = zeilenAktionen(z, r);
+  if (z.art !== 'eintrag' || zusatz == null) return aktionen;
+  return [
+    ...aktionen,
+    ...(zusatz.vermerke ?? []).map((v): MenueEintrag<string> => ({
+      key: `${VERMERK}${v.schluessel}`,
+      label: v.datei ? `${v.text} herunterladen` : v.pfad ? `${v.text} öffnen` : v.text,
+      ...(v.datei || v.pfad ? {} : { gesperrt: true as const }),
+    })),
+    ...(zusatz.verfasser
+      ? [{ key: 'verfasser', label: `Verfasser: ${zusatz.verfasser}`, gesperrt: true as const }]
+      : []),
+  ];
+}
+
 /** Führt die Wahl aus ⋮, Knopf oder Kontextmenü aus; ein Schlüssel der falschen Zeilenart tut nichts. */
-export function fuehreZeilenWahlAus(z: EtbZeile, key: string, a: ZeilenAufrufe): void {
+export function fuehreZeilenWahlAus(
+  z: EtbZeile,
+  key: string,
+  a: ZeilenAufrufe,
+  zusatz?: ZeilenZusatz,
+): void {
+  if (key.startsWith(VERMERK)) {
+    const v = zusatz?.vermerke?.find((x) => `${VERMERK}${x.schluessel}` === key);
+    if (v?.pfad) a.oeffne?.(v.pfad);
+    else if (v?.datei) a.herunterladen?.(v.datei);
+    return;
+  }
   if (z.art === 'eintrag') {
     if (key === 'berichtigen') a.berichtigen(z.eintrag);
     if (key === 'wiedervorlage') a.wiedervorlage(z.eintrag);

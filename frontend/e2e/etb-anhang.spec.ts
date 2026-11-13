@@ -55,9 +55,16 @@ test('erfasst einen Eintrag mit Anhang und lädt ihn über die ETB-Route', async
   await feld.fill('Foto der Schadenstelle');
   await feld.press('Enter');
 
-  const verweis = page
-    .locator('[data-lfh="etb-zeitachse"]')
-    .getByRole('link', { name: /^Lagefoto Süd\.jpg, .*, Anhang zu Nr\. 1 herunterladen$/ });
+  const zeitachse = page.locator('[data-lfh="etb-zeitachse"]');
+  await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(1);
+  // In der Spaltenzeile steht der Anhang in der Spalte Vermerk; trägt der Eintrag daneben einen
+  // Verweis (Meldung im Meldungseingang), endet die Spalte mit „+n“, das alle unter dem Text
+  // zeigt (Spec `etb-zeitachse-darstellung`, „Vermerke in eigener Spalte“).
+  const weitere = zeitachse.getByRole('button', { name: /^\d+ weitere(r)? Vermerke? zeigen$/ });
+  if (await weitere.isVisible()) await weitere.click();
+  const verweis = zeitachse.getByRole('link', {
+    name: /^Lagefoto Süd\.jpg, .*, Anhang zu Nr\. 1 herunterladen$/,
+  });
   await expect(verweis).toBeVisible();
   await expect(liste, 'nach dem Erfassen ist die Liste leer').toHaveCount(0);
 

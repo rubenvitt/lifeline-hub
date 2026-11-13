@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
@@ -13,6 +13,14 @@ import EtbZeitachse, { gezeigteRaender } from './EtbZeitachse';
 import { LANGDRUCK_MS } from '../components/useKontextMenue';
 
 type ZeitachsenProps = ComponentProps<typeof EtbZeitachse>;
+
+/*
+ * Diese Datei prüft die Zeitachse in der Form des gemeinsamen `Zeitachseneintrag` (komfortabel,
+ * Handschuh, kompakt zwischen `md` und `lg`): 900 px, unter `lg`. Die Spaltenzeile (kompakt ab
+ * `lg`) und die Handschirm-Zeile (unter `md`) prüft `EtbSpaltenzeile.test.tsx`. Der globale
+ * `afterEach` setzt die Breite zurück.
+ */
+beforeEach(() => setzeViewportBreite(900));
 
 function renderZeitachse(
   props: Omit<Partial<ZeitachsenProps>, 'zeilen'> & {

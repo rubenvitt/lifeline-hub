@@ -150,16 +150,38 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md`): ⋮, Knöpfe der abgelehnten Zeile und
   Kontextmenü lesen EINE Liste (`etb/zeilenAktionen.ts`, `zeilenAktionen` + `fuehreZeilenWahlAus`);
   ein Hook und ein `KontextMenue` je Zeitachse, die gemerkte Zeile bekommt nur die stabile Fabrik.
-  Vorgemerkte Zeilen, Bündelzeilen und Zeilen ohne Einträge tragen keine Handler (Browsermenü).
+  Vorgemerkte Zeilen, Bündelzeilen und Zeilen ohne Handlungen tragen keine Handler (Browsermenü).
   Das Menü steht in der Wurzel der Zeitachse und friert sie beim Öffnen ein. Im ETB kein langer
   Druck (`langerDruck: false`, Entscheidung Ruben 09.11.2026: Text am Tablet markierbar). Die
   Felder der Erfassung behalten das Browsermenü.
-- ≥ 50 % Meldungstext im Fükw: `e2e/etb-chronologie.spec.ts`, gegen die **Contentbreite**.
-- **Kompakte Zeile** (LFH-958, `zeitachsenAufbau` in `components/instrument/Zeitachseneintrag.tsx`):
-  unter 48 px Bedienhöhe stehen Verfasser (einzeilig, Titel mit Volltext) und Weg in der
-  Kopfzeile. Ein Zeilenmenü geht über `menue`, das in `kompakt` am Ende der Kopfzeile steht;
-  `aktionen` sind Text-Knöpfe und bleiben rechts. Nachweis ≤ 56 px und ≥ 9 Einträge bei
-  1440 × 900: `e2e/etb-zeilenhoehe.spec.ts`.
+- **Spaltenzeile** (Change `kwc2yszv-etb-neuentwurf`, design.md D1, Spec
+  `etb-zeitachse-darstellung`): in kompakter Dichte ab `lg` steht eine Zeile in festen Spalten
+  Zeit · Nr. · Typ · Von → An · Inhalt · Vermerk · ⋮ (`etb/EtbSpaltenzeile.tsx`). Spaltenkopf
+  (`EtbSpaltenkopf`) und Zeile lesen dieselben Spuren (`ETB_SPALTEN_RASTER`, `etb/etbSpalten.ts`),
+  nie gemessen; Von → An und Vermerk hängen an der Breite der Zeitachse (Container
+  `etb-zeitachse`, `etb/etbSpaltenzeile.css`: ab 1100 px 210 und 124 px, darunter 13 % und 11 %).
+  Komfortabel, Handschuh und kompakt unter `lg` behalten `Zeitachseneintrag` (elf andere Nutzer,
+  für das ETB nicht umbauen); unter `md` gilt in jeder Dichte `etb/EtbHandschirmzeile.tsx`
+  (Kopfzeile, darunter der Text in voller Breite, Vermerke darunter). Die Form wählt nur
+  `etbZeilenform`.
+  - Von → An in Textschrift ≥ 13 px, Meldeweg gedämpft dahinter, zu lang mit Auslassung und dem
+    vollen Text als Titel; gleiche Seiten als „Vermerk <Stelle>“ (`vonAnAnzeige`, auch im
+    `Zeitachseneintrag`). Kein Text einer Zeile unter 12 px.
+  - Der Verfasser hat keine Spalte: Titel der Zeile und Zeilenmenü. Verweise und Marken kommen aus
+    EINER Liste (`etb/vermerke.ts`) für Spalte, Handschirm-Zeile, Menü und Titel; die Spalte endet
+    bei Überlauf mit „+n“, das sie unter dem Text aufklappt (`EtbVermerkSpalte`). ⋮ und
+    Kontextmenü zeigen dieselbe Liste (`zeilenMenue`): Handlungen, dann Vermerke (Sprung oder
+    Herunterladen, Marken gesperrt), dann „Verfasser: …“. Ob eine Zeile ein Kontextmenü trägt,
+    entscheiden nur die Handlungen. „SOFORT“ fehlt: ein Eintrag trägt keine Priorität.
+  - Lange Einträge stehen unter der Klemme (`etb/EtbInhalt.tsx`: drei Zeilen, ohne Absatzränder,
+    lang ist, was unter ihr herausragt), mit „mehr“/„weniger“; offen bei `?eintrag=` und bei
+    einem Treffer der Volltextsuche im Inhalt, im Druck nie (`@media print`).
+  - Der Spaltenkopf klebt unter `--etb-kopf-unterkante` (setzt die Seite: Unterkante von
+    Seitenkopf und Filterleiste), ohne sie unter `--lfh-rahmen-oben`.
+  - Nachweis: ≤ 36 px und ≥ 14 Einträge zwischen Filter- und Erfassungsleiste bei 1440 × 900
+    (`e2e/etb-zeilenhoehe.spec.ts`); ab 1200 px bekommt die Spalte Inhalt ≥ 45 % der
+    **Contentbreite** und ist die breiteste Spalte, bei 390 px nutzt der Text ≥ 330 px
+    (`e2e/etb-chronologie.spec.ts`).
 - **ETB-Entwürfe schreiben nur über `etb/entwuerfe/entwurfStore.ts`** (LFH-521): ein Neuladen
   bricht offene IndexedDB-Transaktionen ab, deshalb steht jeder Auftrag vor dem ersten `await`
   synchron im Vorlauf (`localStorage`, ein Schlüssel `lifeline-etb-entwuerfe-ausstehend:<id>` je

@@ -4,10 +4,16 @@ import { anmeldenPerApi } from './anmelde-kern';
 
 /**
  * Die ETB-Chronologie als Layoutmessung: das Tagebuch ist auf ALLEN Breiten eine Zeitachse
- * (`src/etb/EtbZeitachse.tsx`, Struktur-Pins in `EtbZeitachse.test.tsx`). Gemessen wird, dass
- * der Meldungstext Platz hat und nichts überläuft.
+ * (`src/etb/EtbZeitachse.tsx`, Struktur-Pins in `EtbZeitachse.test.tsx` und
+ * `EtbSpaltenzeile.test.tsx`). Gemessen wird, dass der Meldungstext Platz hat und nichts
+ * überläuft.
  *
- * DER GESÄTE TEXT DER ERSTEN BLÖCKE IST KURZ: für die ≥50-%-Zusicherung ist ein kurzer Text
+ * DIE REGEL (`frontend/src/etb/AGENTS.md`, „Spaltenzeile“; Change `kwc2yszv-etb-neuentwurf`,
+ * design.md „Risks“): ab 1200 px bekommt der Inhalt mindestens 45 % der Contentbreite, und in der
+ * Spaltenzeile ist die Spalte Inhalt die breiteste. Vorher galten 50 %; Von → An hat seit dem
+ * Neuentwurf eine eigene Spalte (Entwurf `docs/design/2026-11-12-etb/`, „Abweichungen“).
+ *
+ * DER GESÄTE TEXT DER ERSTEN BLÖCKE IST KURZ: für die ≥45-%-Zusicherung ist ein kurzer Text
  * der schwere Fall (ein langer machte sie trivial). Den langen Text prüft der dritte Block.
  *
  * GEMESSEN WIRD GEGEN DIE CONTENTBREITE, nie gegen den eigenen Container: der Befund ist in
@@ -24,8 +30,11 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const HANDSCHIRM = { width: 390, height: 844 };
 const FUEKW = { width: 1366, height: 768 };
 
-/** Anteil der Contentbreite, den der Meldungstext im Fükw mindestens bekommt (AK#1). */
-const MINDESTANTEIL = 0.5;
+/** Anteil der Contentbreite, den der Meldungstext ab 1200 px mindestens bekommt (Regel oben). */
+const MINDESTANTEIL = 0.45;
+
+/** Breite, die der Inhalt auf dem Handschirm (390 × 844) mindestens nutzt (Spec, „390 px“). */
+const HANDSCHIRM_TEXT = 330;
 
 /** Subpixel-Spielraum: `boundingBox()` liefert Fließkomma, Chromium rechnet unter Last anders. */
 const SUBPIXEL = 0.5;
@@ -108,9 +117,10 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
  * (Rumpf UND jeder Scrollcontainer der Sicht), und der Meldungstext hat Platz.
  *
  * DIE ANTEILSSCHWELLEN SIND SETZUNGEN [abgeleitet]: neben dem Text stehen Zeit/Nr. und
- * Verfasser/Weg/Aktion, bei 390 px im Handschuh nimmt allein der Aktionsknopf 72 px. 30 % ist
- * der Boden für schmale Schirme, ab 1200 px die Hälfte der Sicht. Die Messwerte hängen am
- * Lauf; wer die Schwellen schärft, schärft sie gegen diese Anhänge.
+ * Verfasser/Weg/Aktion bzw. die Spalten der Spaltenzeile. 30 % ist der Boden für schmale Schirme,
+ * ab 1200 px 45 % der Sicht; in der Spaltenzeile ist der Inhalt zudem die breiteste Spalte. Unter
+ * `md` steht die Handschirm-Zeile: der Text nutzt die volle Zeilenbreite (bei 390 px ≥ 330 px).
+ * Die Messwerte hängen am Lauf; wer die Schwellen schärft, schärft sie gegen diese Anhänge.
  */
 test.describe('Neuentwurf S4: Zeitachse auf allen Breiten', () => {
   test.use({ hasTouch: true });
@@ -135,12 +145,25 @@ test.describe('Neuentwurf S4: Zeitachse auf allen Breiten', () => {
         await expect(sicht.getByTestId('etb-ereigniszeile')).toHaveCount(1);
         const mass = await sicht.evaluate((element) => {
           const text = element.querySelector<HTMLElement>('.markdown')!;
+          const zeile = element.querySelector<HTMLElement>('[data-testid="etb-ereigniszeile"]')!;
           const container = [...element.querySelectorAll<HTMLElement>('*')].filter((knoten) =>
             ['auto', 'scroll'].includes(getComputedStyle(knoten).overflowX),
           );
+          // In der Spaltenzeile: die breiteste der übrigen Spalten (ohne die Typkante).
+          const andere =
+            zeile.getAttribute('data-lfh-form') === 'spalten'
+              ? [...zeile.children]
+                  .filter(
+                    (k) => !['typkante', 'etb-inhalt'].includes(k.getAttribute('data-lfh') ?? ''),
+                  )
+                  .map((k) => k.getBoundingClientRect().width)
+              : [];
           return {
+            form: zeile.getAttribute('data-lfh-form') ?? 'zeitachse',
             sicht: element.getBoundingClientRect().width,
             text: text.getBoundingClientRect().width,
+            textLinks: text.getBoundingClientRect().left - zeile.getBoundingClientRect().left,
+            breitesteAndere: Math.max(0, ...andere),
             bodyUeberlauf: document.body.scrollWidth - window.innerWidth,
             innererUeberlauf: Math.max(
               0,
@@ -155,6 +178,18 @@ test.describe('Neuentwurf S4: Zeitachse auf allen Breiten', () => {
         expect(mass.text / mass.sicht, `Textanteil bei ${wo}`).toBeGreaterThanOrEqual(
           breite >= 1200 ? MINDESTANTEIL : 0.3,
         );
+        if (mass.form === 'spalten') {
+          expect(mass.text, `Inhalt ist die breiteste Spalte bei ${wo}`).toBeGreaterThanOrEqual(
+            mass.breitesteAndere,
+          );
+        }
+        if (breite === HANDSCHIRM.width) {
+          // Handschirm-Zeile: der Text beginnt am linken Rand der Zeile (Typkante und Einzug) und
+          // nutzt die Breite, die Menü und Verfasser ihm nicht nehmen.
+          expect(mass.form, `Zeilenform bei ${wo}`).toBe('handschirm');
+          expect(mass.textLinks, `Textanfang bei ${wo}`).toBeLessThanOrEqual(16);
+          expect(mass.text, `Textbreite bei ${wo}`).toBeGreaterThanOrEqual(HANDSCHIRM_TEXT);
+        }
         messungen.push({ breite, dichte, ...mass });
       }
       await testInfo.attach('zeitachse-messung.json', {
@@ -285,7 +320,7 @@ test('bei 390 px scrollt der Seitenrumpf nicht seitlich, und die Chronologie ste
   await expect(page.getByPlaceholder('Inhalt …')).toBeInViewport();
 });
 
-test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite', async ({
+test('bei 1366 px bekommt der Meldungstext mindestens 45 % der Zeitachsenbreite', async ({
   page,
 }) => {
   await anmelden(page, { startseite: false });
@@ -298,9 +333,12 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite
   const bereich = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(bereich).toHaveCount(1);
   await expect(bereich.getByText(MELDUNG)).toHaveCount(1);
-
-  // Die Bilanz steht ab `xl` rechts daneben — gemessen wird gegen die Zeitachse selbst.
-  await expect(page.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeVisible();
+  // Vorbedingung: im Fükw (kompakt ab `lg`) steht die Spaltenzeile. Gemessen wird gegen die
+  // Zeitachse selbst, nicht gegen das Fenster.
+  await expect(bereich.getByTestId('etb-ereigniszeile')).toHaveAttribute(
+    'data-lfh-form',
+    'spalten',
+  );
   const text = await bereich.locator('.markdown').first().boundingBox();
   const flaeche = await bereich.boundingBox();
   expect(text, 'Meldungstext nicht messbar').not.toBeNull();
@@ -312,7 +350,7 @@ test('bei 1366 px bekommt der Meldungstext mindestens die halbe Zeitachsenbreite
   expect(
     anteil,
     `Meldungstext bekommt ${Math.round(anteil * 100)} % der Zeitachse ` +
-      `(${Math.round(text!.width)}px von ${Math.round(flaeche!.width)}px), Soll ≥ 50 %`,
+      `(${Math.round(text!.width)}px von ${Math.round(flaeche!.width)}px), Soll ≥ 45 %`,
   ).toBeGreaterThanOrEqual(MINDESTANTEIL);
 });
 

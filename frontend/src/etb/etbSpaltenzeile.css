@@ -1,0 +1,152 @@
+/*
+ * Leseansicht des ETB (Change `kwc2yszv-etb-neuentwurf`, design.md D1, Spec
+ * `etb-zeitachse-darstellung`): Spaltenzeile, Spaltenkopf, Handschirm-Zeile, eingeklappter Inhalt.
+ * Maße aus dem Entwurf `docs/design/2026-11-12-etb/Main.dc.html` (Zeit 15, Inhalt 14, Von → An 13,
+ * Typ und Vermerk 12 px; nichts darunter). Spaltenspuren: `etb/etbSpalten.ts`.
+ */
+
+/* Die Zeitachse ist der Container der Spaltenbreiten: gemessen wird ihre Breite, nicht der
+   Viewport (Modulpanel und Seitenleisten ändern sie). */
+.etb-zeitachse--spalten {
+  container: etb-zeitachse / inline-size;
+}
+
+/* Unter 1100 px Zeitachsenbreite Anteile statt der Entwurfsmaße: sonst fiele die Spalte Inhalt
+   unter 45 % der Contentbreite (`etb/etbSpalten.ts`, `ETB_SPALTEN`). */
+.etb-spaltenraster {
+  --etb-spalte-vonan: minmax(0, 13%);
+  --etb-spalte-vermerk: minmax(0, 11%);
+}
+
+@container etb-zeitachse (min-width: 1100px) {
+  .etb-spaltenraster {
+    --etb-spalte-vonan: 210px;
+    --etb-spalte-vermerk: 124px;
+  }
+}
+
+.etb-spaltenraster > * {
+  min-width: 0;
+}
+
+/* Der Inhalt einer Spaltenzeile: 14/20 wie im Entwurf, Absatzränder fallen am Rand weg
+   (`components/Markdown.css`). Ein Systemeintrag setzt `--etb-inhalt-groesse` auf 12 px (leise). */
+.etb-spaltenzeile .etb-inhalt,
+.etb-handschirmzeile .etb-inhalt {
+  font-size: var(--etb-inhalt-groesse, 14px);
+  line-height: 20px;
+}
+
+.etb-spaltenzeile .etb-inhalt .markdown,
+.etb-handschirmzeile .etb-inhalt .markdown {
+  line-height: inherit;
+}
+
+/* Berichtigt: der Inhalt bleibt lesbar, aber durchgestrichen (Spec, „Vermerke in eigener
+   Spalte“, Szenario „Berichtigt“). */
+.etb-inhalt--berichtigt {
+  text-decoration: line-through;
+  text-decoration-color: var(--lfh-gedaempft);
+}
+
+.etb-inhalt--zu {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  max-height: 3lh;
+}
+
+/* Zugeklappt ohne Absatz- und Überschriftenränder und mit der Zeilenhöhe der Hülle: sonst
+   schnitte die dritte Zeile mitten durch die Schrift (Abschnitte eines Lageberichts). Nur am
+   Schirm: im Druck klappt nichts ein. */
+@media screen {
+  .etb-inhalt.etb-inhalt--zu .markdown * {
+    margin-block: 0;
+    line-height: inherit;
+  }
+}
+
+.etb-inhalt-umschalter,
+.etb-vermerk-mehr {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--lfh-bedien-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.etb-inhalt-umschalter:hover,
+.etb-vermerk-mehr:hover {
+  text-decoration: underline;
+}
+
+/* Die Spalte Vermerk: eine Zeile, was nicht passt, steht hinter „+n“. */
+.etb-vermerk-spalte {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--lfh-gedaempft);
+}
+
+.etb-vermerk-liste {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.etb-vermerk {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.etb-vermerk--erster {
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+
+.etb-vermerk--erster > :is(a, span):not([aria-hidden='true']) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.etb-vermerk--verborgen {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.etb-vermerk a {
+  color: var(--lfh-bedien-text);
+}
+
+.etb-vermerk--achtung {
+  color: var(--lfh-achtung-text);
+}
+
+@media print {
+  .etb-inhalt--zu {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: none;
+    overflow: visible;
+    max-height: none;
+  }
+
+  .etb-inhalt-umschalter {
+    display: none;
+  }
+}

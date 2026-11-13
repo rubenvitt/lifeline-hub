@@ -122,7 +122,8 @@ test('ETB: „/zeit -10 Lage ruhig“ + Enter erfasst einen Nachtrag mit dem Res
     .getByTestId('etb-ereigniszeile')
     .filter({ hasText: inhalt });
   await expect(zeile).toHaveCount(1);
-  await expect(zeile).toContainText('nachgetragen');
+  // Spaltenzeile: „Nachtrag · erfasst …“ in der Spalte Vermerk; sonst „⧖ nachgetragen um …“.
+  await expect(zeile).toContainText(/Nachtrag · erfasst|nachgetragen/);
 });
 
 /**
