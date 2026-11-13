@@ -1060,6 +1060,29 @@ pub async fn handle_meldung(
             }
             match aktiv {
                 Some(o) => {
+                    // Rückschritt dieser Seite (LLH-1853, design.md D2 der Change
+                    // `cz5332jn-unterschrift-stammdaten-nach-restore`): Die meldende Seite kennt
+                    // einen Stand, den diese Seite nie vergeben hat. Dann gehen die Schlüssel der
+                    // Org erneut, über dem gemeldeten Stand.
+                    if mo.unterschrift_stand
+                        > unterschrift::load_hoechster_stand(conn, o.org_id).await?
+                        && mo.unterschrift_stand <= fuehrung_austausch::STAND_RAISE_MAX
+                        && unterschrift::renew_stand_ueber(conn, o.org_id, mo.unterschrift_stand)
+                            .await?
+                            > 0
+                    {
+                        repo::set_hinweis(
+                            conn,
+                            kopplung.id,
+                            &format!(
+                                "{} kennt schon spätere Unterschriftsschlüssel, als diese Instanz \
+                                 vergeben hat (aus einer Sicherung zurückgespielt?). Die \
+                                 Schlüssel gehen erneut an {}.",
+                                kopplung.gegenueber_name, kopplung.gegenueber_name
+                            ),
+                        )
+                        .await?;
+                    }
                     let lieferung =
                         unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
                             .await?;

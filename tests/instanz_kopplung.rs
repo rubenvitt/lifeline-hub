@@ -1686,3 +1686,76 @@ async fn zurueckgespielt_hub_widerruf_erreicht_den_elw() {
         "der Widerruf nach dem Zurückspielen erreicht den ELW"
     );
 }
+
+#[tokio::test]
+async fn zurueckgespielt_hub_mit_nachgehender_uhr_widerruf_erreicht_den_elw() {
+    let (hub, elw) = gekoppelt().await;
+    let b = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "Stick B").await;
+    let c = neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("c", [3u8; 32]), "Stick C").await;
+    elw_meldet(&elw).await;
+    // Die verlorenen Stände liegen über der Uhr des Hubs (seine Uhr geht nach): D1 greift nicht.
+    staende_zurueck(&hub, &elw, -10_000).await;
+    verloren_am_hub(&hub, c).await;
+    let pfad = format!("/api/admin/instanz/unterschrift/{b}/widerrufen");
+    let (s, v) = common::anfrage(&hub.app, "POST", &pfad, &hub.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(
+        fremder_am_elw(&elw, "b").await.unwrap().0,
+        "widerrufen",
+        "das Netz (D2) stempelt neu"
+    );
+    let h = uebersicht(&hub).await["kopplungen"][0]["hinweis"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(h.contains("erneut"), "{h:?}");
+}
+
+#[tokio::test]
+async fn unplausibler_unterschrift_stand_stempelt_nicht_neu() {
+    let (hub, elw) = gekoppelt().await;
+    let vorher: i64 = sqlx::query_scalar("SELECT MAX(stand) FROM unterschrift_schluessel")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE instanz_kopplung_org SET unterschrift_stand = ?")
+        .bind(1_i64 << 40)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    let nachher: i64 = sqlx::query_scalar("SELECT MAX(stand) FROM unterschrift_schluessel")
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    assert_eq!(nachher, vorher);
+}
+
+#[tokio::test]
+async fn zurueckgespielt_elw_bekommt_den_schluessel_erneut() {
+    let (hub, elw) = gekoppelt().await;
+    // Sicherung des ELW: Er kennt nur A.
+    let sicherung: i64 = sqlx::query_scalar("SELECT unterschrift_stand FROM instanz_kopplung_org")
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap();
+    neuer_gegengezeichnet(&hub, &SoftwarePasskey::new("b", [2u8; 32]), "Stick B").await;
+    elw_meldet(&elw).await;
+    assert!(fremder_am_elw(&elw, "b").await.is_some());
+    // Der ELW spielt die Sicherung zurück: B ist dort weg, der Stand wieder der alte.
+    sqlx::query("DELETE FROM unterschrift_schluessel WHERE credential_id = 'b'")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE instanz_kopplung_org SET unterschrift_stand = ?")
+        .bind(sicherung)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    elw_meldet(&elw).await;
+    assert_eq!(
+        fremder_am_elw(&elw, "b").await.map(|(z, _)| z).as_deref(),
+        Some("wartet_auf_bestaetigung")
+    );
+}

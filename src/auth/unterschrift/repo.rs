@@ -124,6 +124,32 @@ pub async fn load_hoechster_stand(
     .await?)
 }
 
+/// Netz nach einem Rückschritt (LLH-1853, design.md D2): stempelt die gültigen und widerrufenen
+/// lokalen Schlüssel der Org in der Reihenfolge ihres Stands neu auf `gemeldet + 1, + 2, …`, damit
+/// die nächste Nachlieferung sie erneut liefert. Wartende bleiben, sie gehen nicht hinaus. Liefert
+/// die Zahl der neu gestempelten.
+pub async fn renew_stand_ueber(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    gemeldet: i64,
+) -> Result<usize, AppError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
+         AND zustand IN ('gueltig', 'widerrufen') ORDER BY stand, id",
+    )
+    .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (n, id) in (1i64..).zip(&ids) {
+        sqlx::query("UPDATE unterschrift_schluessel SET stand = ? WHERE id = ?")
+            .bind(gemeldet + n)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(ids.len())
+}
+
 /// Hat die Org eine Kopplung, in der eine andere Instanz ihre Schlüssel bekommt (wir stellen aus,
 /// das Gegenüber meldet sich)?
 pub async fn is_org_verteilt(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {

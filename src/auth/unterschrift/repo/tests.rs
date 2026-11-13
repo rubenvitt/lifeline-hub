@@ -1067,3 +1067,45 @@ async fn widerrufener_ersatz_widerruft_den_alten_und_legt_nichts_an() {
     assert_eq!(fremder(&mut conn, "b").await.unwrap().0, "widerrufen");
     assert_eq!(fremder(&mut conn, "c").await, None);
 }
+
+// ── Netz: neu stempeln nach einem Rückschritt (LLH-1853, D2) ─────────────────────────────────
+
+#[tokio::test]
+async fn neu_stempeln_hebt_gueltige_und_widerrufene_ueber_den_gemeldeten_stand() {
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    for stand in [5, 3, 4, 7] {
+        lokaler_gueltiger(&mut conn, stand).await;
+    }
+    sqlx::query(
+        "UPDATE unterschrift_schluessel SET zustand = 'widerrufen' WHERE credential_id = 'c4'",
+    )
+    .execute(&mut *conn)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE unterschrift_schluessel SET zustand = 'wartet_auf_gegenzeichnung' \
+         WHERE credential_id = 'c7'",
+    )
+    .execute(&mut *conn)
+    .await
+    .unwrap();
+    assert_eq!(renew_stand_ueber(&mut conn, 1, 100).await.unwrap(), 3);
+    let staende: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT credential_id, stand FROM unterschrift_schluessel ORDER BY credential_id",
+    )
+    .fetch_all(&mut *conn)
+    .await
+    .unwrap();
+    assert_eq!(
+        staende,
+        vec![
+            ("c3".to_string(), 101),
+            ("c4".to_string(), 102),
+            ("c5".to_string(), 103),
+            ("c7".to_string(), 7),
+        ],
+        "in der alten Reihenfolge, wartende bleiben"
+    );
+    assert_eq!(renew_stand_ueber(&mut conn, 2, 100).await.unwrap(), 0);
+}
