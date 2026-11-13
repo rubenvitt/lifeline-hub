@@ -1132,58 +1132,51 @@ async fn vom_elw_am_hub_wartet_jeder_schluessel_ohne_gegenzeichnung() {
 #[tokio::test]
 async fn ein_widerruf_nimmt_die_credential_id_der_gespeicherten_zeile() {
     let pool = pool_mit_admin().await;
+    let vom_hub = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let vor_ort = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::WirdGemeldet).await;
     let a = SoftwarePasskey::new("a", [1u8; 32]);
     let x = SoftwarePasskey::new("x", [9u8; 32]);
     let mut conn = pool.acquire().await.unwrap();
-    // Lokaler Admin-Schlüssel A (vor der Kopplung, also gültig), danach liefert das Gegenüber
-    // einen wartenden Schlüssel X (id 5).
-    create_lokal(
+    // A gilt über den Hub, X über die Direktkopplung (beide Grundstock).
+    accept_lieferungen(
         &mut conn,
-        &NeuerSchluessel {
-            org_id: 1,
-            benutzer_id: 1,
-            benutzer_name: "Admin A",
-            credential_id: &a.credential_id,
-            schluessel: &a.oeffentlich(),
-            rp_id: RP,
-            origin: ORIGIN,
-            bezeichnung: "Stick A",
-        },
-    )
-    .await
-    .unwrap();
-    drop(conn);
-    let ko = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::WirdGemeldet).await;
-    let mut conn = pool.acquire().await.unwrap();
-    accept_lieferungen_bis(
-        &mut conn,
-        &ziel_zu(ko),
-        &[lieferung(5, &x, UnterschriftSchluesselZustand::Gueltig, 1)],
-        None,
-        GegenzeichnungPflicht::NurBestaetigung,
+        &ziel_zu(vom_hub),
+        &[lieferung(1, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
         JETZT,
     )
     .await
     .unwrap();
-    // Widerruf der id 5 mit der Credential-ID von A: A bleibt gültig.
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(vor_ort),
+        &[lieferung(5, &x, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    // Die Gegenstelle widerruft ihre id 5, nennt aber die Credential-ID von A: X fällt, A bleibt.
     let mut falsch = lieferung(5, &x, UnterschriftSchluesselZustand::Widerrufen, 2);
     falsch.credential_id = a.credential_id.clone();
-    accept_lieferungen(&mut conn, &ziel_zu(ko), &[falsch], false, JETZT)
+    accept_lieferungen(&mut conn, &ziel_zu(vor_ort), &[falsch], false, JETZT)
         .await
         .unwrap();
-    let zustand_a: String =
-        sqlx::query_scalar("SELECT zustand FROM unterschrift_schluessel WHERE herkunft = 'lokal'")
-            .fetch_one(&mut *conn)
-            .await
-            .unwrap();
-    assert_eq!(zustand_a, "gueltig");
-    // Eine Lieferung, die die Credential-ID von A mit anderem Schlüssel nennt, nimmt hier keiner an.
+    assert_eq!(
+        zustand_in(&mut conn, vom_hub, &a.credential_id).await,
+        "gueltig"
+    );
+    assert_eq!(
+        zustand_in(&mut conn, vor_ort, &x.credential_id).await,
+        "widerrufen"
+    );
+    // Eine Lieferung, die die Credential-ID von A mit anderem Schlüssel nennt, nimmt keiner an.
     let y = SoftwarePasskey::new("y", [8u8; 32]);
     let mut unterschoben = lieferung(6, &y, UnterschriftSchluesselZustand::Gueltig, 3);
     unterschoben.credential_id = a.credential_id.clone();
     let ab = accept_lieferungen_bis(
         &mut conn,
-        &ziel_zu(ko),
+        &ziel_zu(vor_ort),
         &[unterschoben],
         None,
         GegenzeichnungPflicht::NurBestaetigung,
@@ -1196,6 +1189,41 @@ async fn ein_widerruf_nimmt_die_credential_id_der_gespeicherten_zeile() {
         ab[0].grund,
         "Credential-ID steht hier für einen anderen Schlüssel"
     );
+}
+
+#[tokio::test]
+async fn ein_echt_widerrufener_lebt_auch_nach_dem_ende_seiner_zuordnung_nicht_wieder_auf() {
+    let pool = pool_mit_admin().await;
+    let alt = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let neu = kopplung_org_mit(&pool, "elw-3", InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let gueltig = lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1);
+    accept_lieferungen(&mut conn, &ziel_zu(alt), &[gueltig.clone()], true, JETZT)
+        .await
+        .unwrap();
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(alt),
+        &[lieferung(
+            7,
+            &a,
+            UnterschriftSchluesselZustand::Widerrufen,
+            2,
+        )],
+        false,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    fremde_der_zuordnung_widerrufen(&mut conn, alt, JETZT)
+        .await
+        .unwrap();
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(neu), &[gueltig], true, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(ab[0].grund, "Schlüssel war widerrufen");
 }
 
 #[tokio::test]

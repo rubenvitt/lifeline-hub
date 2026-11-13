@@ -448,11 +448,20 @@ Die Nummern müssen größer sein als jede auf `origin/alpha` (heute 0345), vorh
     in jede Lieferung passen.
   - *Keine Weitergabe von ELW-Schlüsseln:* Am Hub bestätigte Schlüssel eines ELW (Zuordnung einer
     Standardkopplung, an der diese Instanz erreicht wird) gehen nicht weiter.
-  - *Kennung einer Anfrage:* Eine Anfrage vor Ort trägt ihren Zeitpunkt (`anfrage_seit`, mit
-    Mikrosekunden). Eine Ablehnung gilt genau dieser Anfrage (`anfrage_abgelehnt_seit`). So geht
-    eine neue Anfrage nicht verloren, die vor der Rücknahme der alten ankommt.
+  - *Kennung einer Anfrage:* Eine Anfrage vor Ort trägt eine zufällige Kennung (`anfrage_kennung`,
+    am Führer `anfrage_von_kennung`), nicht ihren Zeitpunkt: Zeitpunkte bleiben im Format von
+    ADR-0012. Eine Ablehnung gilt genau dieser Anfrage (`anfrage_abgelehnt_kennung`). So geht eine
+    neue Anfrage nicht verloren, die vor der Rücknahme der alten ankommt.
   - *Zwei Gegenstellen fragen an:* Die erste wartet weiter, die zweite steht als Hinweis an ihrer
-    Kopplung. Überschrieben wird nichts mehr.
+    Kopplung; ebenso, solange die erste ihre Ablehnung noch nicht gesehen hat. Überschrieben wird
+    nichts mehr.
+  - *Ende einer Zuordnung:* Ihre Zeilen tragen `zuordnung_beendet`. Nur solche Zeilen halten ein
+    späteres Koppeln nicht auf; ein echter Widerruf und eine Zurückweisung durch einen Menschen
+    gelten weiter org-weit (zweiter Review-Durchgang).
+  - *Offen:* Ein Widerruf über eine Zeile, die hier nur wartete, wirkt nicht weiter. Sonst könnte
+    ein Gegenüber einen echten Schlüssel liefern und gleich widerrufen und so Unterschriften
+    sperren. Dafür bleibt ein Schlüssel, den der Hub widerrief, an einem ELW gültig, bis dieser
+    den Widerruf über die Kopplung erfährt, über die er ihn bekam. Das liegt dem Menschen vor.
   - *Ablehnen nur vor Ort:* Eine wartende Anfrage einer Standardkopplung ist kein Fall für
     „Ablehnen“ (409); der Hub erfüllt sie selbst.
   - *Offenhalten am Hub:* Übersprungen wird nur, wenn der genannte Führer die gleichrangige

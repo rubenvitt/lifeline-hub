@@ -2322,3 +2322,89 @@ async fn elw1_faellt_aus_elw2_uebernimmt_der_hub_folgt_und_elw1_bestaetigt() {
         "der Hub spiegelt den Einsatz weiter, jetzt von ELW 2"
     );
 }
+
+#[tokio::test]
+async fn schluessel_der_meldenden_seite_aus_der_zeit_vor_dem_koppeln_gelten_als_grundstock() {
+    let elw1 = instanz_tls().await;
+    let elw2 = instanz().await;
+    schluessel(&elw1).await;
+    schluessel_b(&elw2).await;
+    let code = code_vor_ort(&elw1).await;
+    let (s, v) = einloesen(&elw2, &elw1, &code).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    melden(&elw2).await;
+    assert!(kennt_b_gueltig(&elw1).await, "B gilt an ELW 1 sofort");
+}
+
+#[tokio::test]
+async fn fragen_zwei_gegenstellen_an_wartet_die_erste_und_die_zweite_steht_als_hinweis() {
+    let elw1 = instanz_tls().await;
+    let elw2 = instanz().await;
+    let elw3 = instanz().await;
+    schluessel(&elw1).await;
+    for i in [&elw2, &elw3] {
+        let code = code_vor_ort(&elw1).await;
+        let (s, v) = einloesen(i, &elw1, &code).await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    fuehrung_an(&[&elw1, &elw2, &elw3]).await;
+    let e1 = common::einsatz_anlegen_mit(&elw1.app, &elw1.admin, "Unwetter").await;
+    for _ in 0..2 {
+        for i in [&elw2, &elw3] {
+            melden(i).await;
+            abgleichen(i).await;
+        }
+    }
+    let k: String = eine(
+        &elw1.pool,
+        &format!("SELECT kennung FROM einsatz WHERE id = {e1}"),
+    )
+    .await;
+    let ich2 = kennung_von(&elw2).await;
+    for i in [&elw2, &elw3] {
+        let e: i64 = eine(
+            &i.pool,
+            &format!("SELECT id FROM einsatz WHERE kennung = '{k}'"),
+        )
+        .await;
+        let (s, r) = post(
+            i,
+            &format!("/api/einsaetze/{e}/fuehrung/anfragen"),
+            json!({}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{r}");
+        melden(i).await;
+    }
+    melden(&elw2).await;
+    melden(&elw3).await;
+    assert_eq!(
+        fuehrung(&elw1, e1).await["anfrage_eingang"]["kennung"],
+        ich2
+    );
+    let hinweise: Vec<Option<String>> =
+        sqlx::query_scalar("SELECT hinweis FROM instanz_kopplung ORDER BY id")
+            .fetch_all(&elw1.pool)
+            .await
+            .unwrap();
+    assert!(
+        hinweise
+            .iter()
+            .flatten()
+            .any(|h| h.contains("bittet ebenfalls")),
+        "{hinweise:?}"
+    );
+    let n: i64 = eine(
+        &elw1.pool,
+        "SELECT COUNT(*) FROM benachrichtigung WHERE art = 'fuehrung_angefragt'",
+    )
+    .await;
+    assert!(n >= 1);
+    let einmal_je_empfaenger: i64 = eine(
+        &elw1.pool,
+        "SELECT MAX(c) FROM (SELECT COUNT(*) AS c FROM benachrichtigung \
+         WHERE art = 'fuehrung_angefragt' GROUP BY benutzer_id)",
+    )
+    .await;
+    assert_eq!(einmal_je_empfaenger, 1, "kein zweiter Hinweis");
+}

@@ -39,14 +39,16 @@ pub struct AkteZeile {
     /// Abgelehnte Anfrage vor Ort (LLH-1678, design.md D4): am Führer die Kennung der
     /// Gegenstelle, deren Anfrage abgelehnt ist; am Anfragenden die eigene Kennung.
     pub anfrage_abgelehnt: Option<String>,
-    /// Am Führer: der Zeitpunkt der abgelehnten Anfrage beim Anfragenden (ihre Kennung).
-    pub anfrage_abgelehnt_seit: Option<String>,
+    /// Am Führer: die Kennung der abgelehnten Anfrage.
+    pub anfrage_abgelehnt_kennung: Option<String>,
+    /// Am Anfragenden: Kennung der laufenden Anfrage vor Ort (Zufallswert, LLH-1678, D4).
+    pub anfrage_kennung: Option<String>,
 }
 
 const SPALTEN: &str = "id, kennung, einsatz_id, org_id, nummer, bezeichnung, stichwort, status, \
      epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, erklaerung, beweis, \
      offen, offen_bruch_at, abgabe_schluessel, anfrage_at, bruch_at, stand, geaendert_at, \
-     anfrage_abgelehnt, anfrage_abgelehnt_seit";
+     anfrage_abgelehnt, anfrage_abgelehnt_kennung, anfrage_kennung";
 
 impl AkteZeile {
     pub fn epoche(&self) -> Epoche {
@@ -298,18 +300,18 @@ pub async fn save(
     // Eine Anfrage gilt nur dem Stand, den sie sah (LLH-1673): Mit einer neuen Epoche fallen die
     // wartende Anfrage (`anfrage_von`) und eine abgelehnte (`anfrage_abgelehnt`) weg (LLH-1678,
     // design.md D4). Rechts stehen die alten Werte der Zeile.
-    (a.anfrage_abgelehnt, a.anfrage_abgelehnt_seit) = sqlx::query_as(
+    (a.anfrage_abgelehnt, a.anfrage_abgelehnt_kennung) = sqlx::query_as(
         "UPDATE einsatz_fuehrung SET \
          anfrage_von = CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN anfrage_von END, \
-         anfrage_seit = CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN anfrage_seit END, \
+         anfrage_von_kennung = CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN anfrage_von_kennung END, \
          anfrage_abgelehnt = CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN ?3 END, \
-         anfrage_abgelehnt_seit = \
+         anfrage_abgelehnt_kennung = \
              CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN ?21 END, \
          nummer = ?4, bezeichnung = ?5, stichwort = ?6, status = ?7, \
          epoche_zaehler = ?1, epoche_instanz = ?2, fuehrer_kennung = ?8, fuehrer_name = ?9, \
          art = ?10, erklaerung = ?11, beweis = ?12, offen = ?13, offen_bruch_at = ?14, \
          abgabe_schluessel = ?15, anfrage_at = ?16, bruch_at = ?17, stand = ?18, \
-         geaendert_at = ?19 WHERE id = ?20 RETURNING anfrage_abgelehnt, anfrage_abgelehnt_seit",
+         geaendert_at = ?19, anfrage_kennung = ?22 WHERE id = ?20 RETURNING anfrage_abgelehnt, anfrage_abgelehnt_kennung",
     )
     .bind(a.epoche_zaehler)
     .bind(&a.epoche_instanz)
@@ -331,7 +333,8 @@ pub async fn save(
     .bind(a.stand)
     .bind(&a.geaendert_at)
     .bind(a.id)
-    .bind(&a.anfrage_abgelehnt_seit)
+    .bind(&a.anfrage_abgelehnt_kennung)
+    .bind(&a.anfrage_kennung)
     .fetch_one(&mut *conn)
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
@@ -348,10 +351,12 @@ pub async fn load_anfrage_von(
     akte_id: i64,
 ) -> Result<(Option<String>, Option<String>), AppError> {
     Ok(
-        sqlx::query_as("SELECT anfrage_von, anfrage_seit FROM einsatz_fuehrung WHERE id = ?")
-            .bind(akte_id)
-            .fetch_one(&mut *conn)
-            .await?,
+        sqlx::query_as(
+            "SELECT anfrage_von, anfrage_von_kennung FROM einsatz_fuehrung WHERE id = ?",
+        )
+        .bind(akte_id)
+        .fetch_one(&mut *conn)
+        .await?,
     )
 }
 
@@ -362,12 +367,14 @@ pub async fn save_anfrage_von(
     von: Option<&str>,
     seit: Option<&str>,
 ) -> Result<(), AppError> {
-    sqlx::query("UPDATE einsatz_fuehrung SET anfrage_von = ?, anfrage_seit = ? WHERE id = ?")
-        .bind(von)
-        .bind(seit)
-        .bind(akte_id)
-        .execute(&mut *conn)
-        .await?;
+    sqlx::query(
+        "UPDATE einsatz_fuehrung SET anfrage_von = ?, anfrage_von_kennung = ? WHERE id = ?",
+    )
+    .bind(von)
+    .bind(seit)
+    .bind(akte_id)
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 
@@ -1326,8 +1333,8 @@ pub(crate) mod tests {
                 offen: false,
                 stand: 1,
                 anfrage_abgelehnt: None,
-                anfrage_abgelehnt_seit: None,
-                anfrage_seit: None,
+                anfrage_abgelehnt_kennung: None,
+                anfrage_kennung: None,
             })
             .unwrap(),
         );
@@ -1534,7 +1541,8 @@ pub(crate) mod tests {
             stand: 0,
             geaendert_at: String::new(),
             anfrage_abgelehnt: None,
-            anfrage_abgelehnt_seit: None,
+            anfrage_abgelehnt_kennung: None,
+            anfrage_kennung: None,
         };
         let mut conn = pool.acquire().await.unwrap();
         insert_fremd(&mut conn, &mut a).await.unwrap();

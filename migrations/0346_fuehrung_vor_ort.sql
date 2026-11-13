@@ -17,12 +17,21 @@
 -- 5. Übernommene Schlüssel, die schon gelten oder widerrufen sind, bekommen einen `weiter_stand`
 --    über jedem lokalen Stand der Org, damit sie über eine Direktkopplung weitergehen.
 ALTER TABLE einsatz_fuehrung ADD COLUMN anfrage_abgelehnt TEXT;
--- Kennung einer Anfrage vor Ort ist ihr Zeitpunkt beim Anfragenden (`anfrage_at` dort): am Führer
--- der der wartenden (`anfrage_seit`) und der der abgelehnten Anfrage (`anfrage_abgelehnt_seit`).
--- So gilt eine Ablehnung genau einer Anfrage, und eine neue derselben Gegenstelle zeigt sich.
-ALTER TABLE einsatz_fuehrung ADD COLUMN anfrage_seit TEXT;
-ALTER TABLE einsatz_fuehrung ADD COLUMN anfrage_abgelehnt_seit TEXT;
+-- Jede Anfrage vor Ort trägt eine Kennung (Zufallswert, `anfrage_kennung` beim Anfragenden): am
+-- Führer die der wartenden (`anfrage_von_kennung`) und die der abgelehnten Anfrage
+-- (`anfrage_abgelehnt_kennung`). So gilt eine Ablehnung genau einer Anfrage, und eine neue
+-- derselben Gegenstelle zeigt sich.
+ALTER TABLE einsatz_fuehrung ADD COLUMN anfrage_kennung TEXT;
+ALTER TABLE einsatz_fuehrung ADD COLUMN anfrage_von_kennung TEXT;
+ALTER TABLE einsatz_fuehrung ADD COLUMN anfrage_abgelehnt_kennung TEXT;
 ALTER TABLE unterschrift_schluessel ADD COLUMN weiter_stand INTEGER;
+-- Widerrufen, weil die Zuordnung endete, nicht weil der Schlüssel widerrufen ist: Eine solche Zeile
+-- hält ein späteres Koppeln nicht auf. Bestehende widerrufene Zeilen einer beendeten Zuordnung
+-- gelten als solche.
+ALTER TABLE unterschrift_schluessel ADD COLUMN zuordnung_beendet INTEGER NOT NULL DEFAULT 0;
+UPDATE unterschrift_schluessel SET zuordnung_beendet = 1
+ WHERE zustand = 'widerrufen' AND kopplung_org_id IN
+       (SELECT id FROM instanz_kopplung_org WHERE widerrufen_at IS NOT NULL);
 ALTER TABLE instanz_kopplung_org ADD COLUMN unterschrift_grundstock_bis INTEGER;
 ALTER TABLE instanz_kopplung_org ADD COLUMN unterschrift_gesendet_bis INTEGER NOT NULL DEFAULT 0;
 UPDATE unterschrift_schluessel

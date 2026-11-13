@@ -284,14 +284,10 @@ pub async fn anfragen(pool: &SqlitePool, akte_id: i64) -> Result<AkteZeile, AppE
                 "Anfragen kann nur die Seite, die sich meldet.".into(),
             ));
         }
-        // Mit Mikrosekunden: Der Zeitpunkt ist zugleich die Kennung der Anfrage vor Ort
-        // (`AkteMeldung::anfrage_seit`, LLH-1678), und eine neue Anfrage in derselben Sekunde wie
-        // eine abgelehnte muss sich von ihr unterscheiden.
-        a.anfrage_at = Some(
-            chrono::Utc::now()
-                .format("%Y-%m-%d %H:%M:%S%.6f")
-                .to_string(),
-        );
+        a.anfrage_at = Some(crate::zeit::jetzt());
+        // Die Kennung dieser Anfrage vor Ort (LLH-1678, design.md D4): Eine Ablehnung gilt genau
+        // ihr, eine neue Anfrage unterscheidet sich, auch in derselben Sekunde.
+        a.anfrage_kennung = Some(uuid::Uuid::new_v4().to_string());
         a.anfrage_abgelehnt = None;
         repo::save(conn, &mut a, true).await?;
         Ok(a)
@@ -696,7 +692,7 @@ pub async fn anfrage_ablehnen(
         let von = g.kennung.clone();
         repo::save_anfrage_von(conn, a.id, None, None).await?;
         a.anfrage_abgelehnt = Some(von);
-        a.anfrage_abgelehnt_seit = seit;
+        a.anfrage_abgelehnt_kennung = seit;
         repo::save(conn, &mut a, true).await?;
         let grund = format!("Anfrage von {name} abgelehnt");
         repo::add_verlauf(

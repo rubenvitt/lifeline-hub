@@ -812,15 +812,14 @@ pub async fn accept_lieferungen_bis(
                 // gültiger steht schon da.
                 // Widerrufen oder hier zurückgewiesen gilt org-weit, gleich über welche
                 // Kopplung der Schlüssel kam (LLH-1678, design.md D6).
-                // Nicht gezählt werden Zeilen einer beendeten Zuordnung: Deren Widerruf betrifft die
-                // Zuordnung, nicht den Schlüssel (design.md D6, Nachtrag).
+                // Nicht gezählt werden Zeilen, die nur mit ihrer Zuordnung endeten
+                // (`zuordnung_beendet`): Das betrifft die Zuordnung, nicht den Schlüssel
+                // (design.md D6, Nachtrag). Eine Zurückweisung durch einen Menschen gilt immer.
                 let schon: Option<String> = sqlx::query_scalar(
                     "SELECT zustand FROM unterschrift_schluessel \
                      WHERE (kopplung_org_id = ?1 \
-                            OR (org_id = ?2 AND zustand IN ('widerrufen', 'abgelehnt') \
-                                AND (kopplung_org_id IS NULL OR kopplung_org_id IN \
-                                     (SELECT id FROM instanz_kopplung_org \
-                                      WHERE widerrufen_at IS NULL)))) \
+                            OR (org_id = ?2 AND (zustand = 'abgelehnt' \
+                                OR (zustand = 'widerrufen' AND zuordnung_beendet = 0)))) \
                      AND (credential_id = ?3 OR schluessel = ?4) \
                      ORDER BY zustand IN ('widerrufen', 'abgelehnt') DESC LIMIT 1",
                 )
@@ -962,7 +961,7 @@ pub async fn fremde_der_zuordnung_widerrufen(
     jetzt: &str,
 ) -> Result<(), AppError> {
     sqlx::query(
-        "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
+        "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', zuordnung_beendet = 1, \
          widerrufen_at = COALESCE(widerrufen_at, ?) WHERE kopplung_org_id = ? \
          AND zustand NOT IN ('widerrufen', 'abgelehnt')",
     )
