@@ -27,6 +27,7 @@ import {
   widersprecheUebernahme,
   type FuehrungOrt,
 } from '../api/fuehrung';
+import { istKonflikt } from '../api/client';
 import { FUEHRUNG_GRUND_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
@@ -74,8 +75,19 @@ function useNachFuehrung(einsatzId?: number) {
   };
 }
 
+/**
+ * Ein 409 heißt, der Stand hat sich geändert: die Führung liegt woanders, oder unter der Akte liegt
+ * inzwischen ein anderer Einsatz (LLH-1862). Dann gleich neu laden, nicht erst mit dem nächsten
+ * Abruf: sonst führte jeder weitere Versuch mit dem alten Stand wieder auf die 409.
+ */
+function nachKonflikt(nach: () => void) {
+  return (e: unknown) => {
+    if (istKonflikt(e)) nach();
+  };
+}
+
 function ortVon(f: FuehrungAnzeige): FuehrungOrt {
-  return f.einsatz_id != null ? { einsatzId: f.einsatz_id } : { akteId: f.id };
+  return f.einsatz_id != null ? { einsatzId: f.einsatz_id } : { akteId: f.id, kennung: f.kennung };
 }
 
 /**
@@ -105,6 +117,7 @@ export function UebernahmeEntscheidung({
   const grundId = ohneNetzGrundId ?? eigeneGrundId;
   const bestaetigen = useMutation({
     ...SOFORT_ODER_NIE,
+    onError: nachKonflikt(nach),
     mutationFn: () => bestaetigeUebernahme(ort),
     onSuccess: (f) => {
       nach();
@@ -114,6 +127,7 @@ export function UebernahmeEntscheidung({
   });
   const widersprechen = useMutation({
     ...SOFORT_ODER_NIE,
+    onError: nachKonflikt(nach),
     mutationFn: () => widersprecheUebernahme(ort),
     onSuccess: (f) => {
       nach();
@@ -228,6 +242,7 @@ export default function FuehrungPaneel({
 
   const uebergeben = useMutation({
     ...SOFORT_ODER_NIE,
+    onError: nachKonflikt(nach),
     mutationFn: (an: string) => uebergebeFuehrung(ort, an),
     onSuccess: (f) => {
       nach();
@@ -237,6 +252,7 @@ export default function FuehrungPaneel({
   });
   const perCode = useMutation({
     ...SOFORT_ODER_NIE,
+    onError: nachKonflikt(nach),
     mutationFn: (an: string) => gibFuehrungPerCodeAb(ort, an),
     onSuccess: (c) => {
       nach();
@@ -246,6 +262,7 @@ export default function FuehrungPaneel({
   });
   const anfragen = useMutation({
     ...SOFORT_ODER_NIE,
+    onError: nachKonflikt(nach),
     mutationFn: () => frageFuehrungAn(ort),
     onSuccess: (f) => {
       nach();
@@ -255,6 +272,7 @@ export default function FuehrungPaneel({
   });
   const notuebernahme = useMutation({
     ...SOFORT_ODER_NIE,
+    onError: nachKonflikt(nach),
     mutationFn: (w: NotuebernahmeWerte) => {
       const grund = (w.grund ?? '').trim();
       if (!moeglich.notuebernahmeMitBeweis) return uebernimmFuehrung(ort, grund);
