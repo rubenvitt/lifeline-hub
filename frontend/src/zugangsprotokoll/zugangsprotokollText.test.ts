@@ -107,6 +107,10 @@ describe('Archiv am Hub (LLH-1494)', () => {
     expect(hasNamensziel('archiv_heruntergeladen')).toBe(true);
     expect(AKTION_TEXT.archiv_eingespielt).toBe('Archiv eingespielt');
     expect(hasNamensziel('archiv_eingespielt')).toBe(true);
+    // LLH-1712: Löschersuchen für eine Person im Archiv und die Suche danach, per Befehl.
+    expect(AKTION_TEXT.archiv_person_geschwaerzt).toBe('Person im Archiv geschwärzt');
+    expect(AKTION_TEXT.archiv_durchsucht).toBe('Archiv durchsucht');
+    expect(hasNamensziel('archiv_person_geschwaerzt')).toBe(true);
     expect(instanzText({ fingerabdruck: 'ab12:cd34', block: 2 })).toBe(
       'Fingerabdruck ab12:cd34 · Block 2',
     );

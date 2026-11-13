@@ -22,7 +22,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 2. Admin-Spur
 
-- [ ] 2.1 `AdminAktion::ArchivPersonGeschwaerzt` (`archiv_person_geschwaerzt`) und
+- [x] 2.1 `AdminAktion::ArchivPersonGeschwaerzt` (`archiv_person_geschwaerzt`) und
       `ArchivDurchsucht` (`archiv_durchsucht`) anlegen. Die neue Migration baut den CHECK von
       `admin_audit` nach dem Muster 0340 neu; die Nummer liegt über der höchsten auf
       `origin/alpha`, geprüft mit `scripts/check-migrationen.sh`. Dazu die Varianten in
