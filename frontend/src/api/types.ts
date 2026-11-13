@@ -1916,6 +1916,8 @@ export type ArchivAkte = S['ArchivAkteAnzeige'];
 // Archiv am Hub (LLH-1494): Block der Archivakte und Archiv-Schlüssel der Org.
 export type ArchivAngabe = S['ArchivAngabe'];
 export type ArchivEmpfaengerAnzeige = S['ArchivEmpfaengerAnzeige'];
+export type ArchivEingespielt = S['ArchivEingespieltAnzeige'];
+export type ArchivEinspielenVerfuegbarkeit = S['ArchivEinspielenVerfuegbarkeit'];
 export type NeuerArchivEmpfaenger = S['NeuerArchivEmpfaenger'];
 export type ArchivPerson = S['ArchivPersonAnzeige'];
 export type ArchivTier = S['ArchivTierAnzeige'];

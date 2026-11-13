@@ -13,6 +13,9 @@ describe('UploadFortschritt (LFH-654)', () => {
 
   it('zeigt in der Prüfphase keine Zahl', () => {
     expect(sichtbarerText({ phase: 'pruefen' })).toBe('Datei wird geprüft');
+    // LLH-1711: nach dem Upload eines Archivblocks prüft der Server nicht, er spielt ein.
+    expect(sichtbarerText({ phase: 'pruefen' }, 'Wird eingespielt')).toBe('Wird eingespielt');
+    expect(ansageText({ phase: 'pruefen' }, 'Wird eingespielt')).toBe('Wird eingespielt');
   });
 
   it('sagt nur in 10-%-Schritten an, nicht bei jedem Ereignis', () => {

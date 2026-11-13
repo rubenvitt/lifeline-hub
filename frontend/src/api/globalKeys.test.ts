@@ -43,6 +43,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.instanzkopplung()).toEqual(['instanzkopplung']);
     // Archiv-Schlüssel der Org (LLH-1494), Verwaltung → Einstellungen.
     expect(globalKeys.orgArchivSchluessel()).toEqual(['org-archiv-schluessel']);
+    expect(globalKeys.archivEinspielen()).toEqual(['archiv-einspielen']);
     expect(globalKeys.instanzkopplungLetzteSchluessel()).toEqual([
       'instanzkopplung',
       'letzte-schluessel',
@@ -159,10 +160,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 47 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 48 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(47);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(47);
+    expect(werte).toHaveLength(48);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(48);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

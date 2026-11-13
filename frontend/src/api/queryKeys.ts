@@ -1069,6 +1069,8 @@ export const GLOBAL_KEYS = {
   instanzkopplung: 'instanzkopplung',
   // Archiv-Schlüssel der Org (LLH-1494): Empfänger der Archive am Ende der Nachbereitung.
   orgArchivSchluessel: 'org-archiv-schluessel',
+  // Archiv einspielen (LLH-1711): ob diese Instanz Blöcke annimmt (nicht am Hub).
+  archivEinspielen: 'archiv-einspielen',
   // Herkunft der Stammdaten (LLH-1493): welche Zeilen vom Hub kommen; frisch mit `stammdaten`.
   stammdatenHerkunft: 'stammdaten-herkunft',
   // Präferenzen des ANGEMELDETEN Benutzers.
@@ -1194,6 +1196,7 @@ export const globalKeys = {
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
   stammdatenHerkunft: () => [GLOBAL_KEYS.stammdatenHerkunft] as const,
   orgArchivSchluessel: () => [GLOBAL_KEYS.orgArchivSchluessel] as const,
+  archivEinspielen: () => [GLOBAL_KEYS.archivEinspielen] as const,
   /**
    * Halter des letzten Unterschriftsschlüssels (LLH-1605), für die Warnung der Benutzerverwaltung.
    * Liegt unter dem Prefix `instanzkopplung`: wer die Kopplungen abgleicht, gleicht sie mit ab.
@@ -1392,6 +1395,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
  * - `orgArchivSchluessel` (LLH-1494): Verwaltung der Archiv-Schlüssel, nur der System-Admin;
  *   die eigene Änderung setzt die Antwort.
+ * - `archivEinspielen` (LLH-1711): ob die Instanz Archivblöcke annimmt; ändert sich nur mit einer
+ *   Kopplung, gelesen beim Öffnen der Aufbewahrung.
  * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
@@ -1417,6 +1422,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgArchivSchluessel,
+  GLOBAL_KEYS.archivEinspielen,
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
   GLOBAL_KEYS.benutzerEinstellungen,

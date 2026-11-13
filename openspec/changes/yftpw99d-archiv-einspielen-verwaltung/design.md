@@ -170,7 +170,7 @@ etwa drei Felder im Modal):
 - **Schlüssel:** Umschalter Datei oder Text, ein Feld je Wahl
 - **Passphrase:** optional, `type=password`, `autocomplete=off`
 
-Senden geht über `apiUpload` mit `mutateAsync`, damit die Eingaben bei einer Ablehnung bleiben.
+Senden geht über `apiUploadMitFortschritt` (XHR mit Byte-Fortschritt, wie alle großen Uploads im Haus; nach dem letzten Byte „Wird eingespielt“) mit `mutateAsync`, damit die Eingaben bei einer Ablehnung bleiben.
 Nach Erfolg:
 
 - Der Dialog schließt und setzt sich zurück, die Schlüsselfelder werden geleert.

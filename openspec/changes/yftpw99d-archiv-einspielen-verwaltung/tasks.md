@@ -42,8 +42,8 @@ TDD: zuerst der Test, der rot wird, dann der Code.
 
 ## 5. Oberfläche (D8)
 
-- [ ] 5.1 API-Modul `frontend/src/api/archivEinspielen.ts` (Verfügbarkeit, `apiUpload` mit 10 Minuten) und Query-Key in `queryKeys.ts`. Prüfung: Vitest für den Aufbau des FormData (Reihenfolge Schlüssel, Passphrase, Block; nur eines der Schlüsselfelder).
-- [ ] 5.2 Primäraktion und `ErfassungsModal` auf `AufbewahrungUebersicht.tsx`: Block, Schlüssel (Datei oder Text), Passphrase. Nur System-Admin und `verfuegbar`; Fehler im Dialog mit erhaltenen Eingaben; nach Erfolg Schlüsselfelder geleert, Ergebnisfeld mit Einsatz, „bis …“ in der Anzeigezone, Inhalten, Hinweisen und „Einsatz öffnen“; Einsatzliste und Aufbewahrung invalidiert. Prüfung: Vitest
+- [x] 5.1 API-Modul `frontend/src/api/archivEinspielen.ts` (Verfügbarkeit, `apiUploadMitFortschritt` mit 10 Minuten) und Query-Key in `queryKeys.ts`. Prüfung: Vitest für den Aufbau des FormData (Reihenfolge Schlüssel, Passphrase, Block; nur eines der Schlüsselfelder).
+- [x] 5.2 Primäraktion und `ErfassungsModal` auf `AufbewahrungUebersicht.tsx`: Block, Schlüssel (Datei oder Text), Passphrase. Nur System-Admin und `verfuegbar`; Fehler im Dialog mit erhaltenen Eingaben; nach Erfolg Schlüsselfelder geleert, Ergebnisfeld mit Einsatz, „bis …“ in der Anzeigezone, Inhalten, Hinweisen und „Einsatz öffnen“; Einsatzliste und Aufbewahrung invalidiert. Prüfung: Vitest
   - ausgeblendet bei `verfuegbar: false` und für Führungskraft
   - Fehler hält die Eingaben
   - Erfolg zeigt das Ergebnis
