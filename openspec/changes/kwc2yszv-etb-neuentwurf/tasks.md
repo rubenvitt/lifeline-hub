@@ -54,7 +54,7 @@ ohne die Änderung rot ist, dann der Code. Pfade ohne Präfix relativ zu `fronte
 
 - [x] 8.1 Bestätigte Befunde mit klarem Ausweg behoben, je mit Test (Erfassung E1–E7; Zeitachse L3–L8; Seite S1, S3, S5, S9–S12), Specs und Kapitel nachgezogen (E8–E11, L5, L6, S8). Nachweis: Commits auf dem Branch, Abschnitt „Review“ im PR.
 - [x] 8.2 Entscheidungen Ruben: Bild-Anhang mit „Vorschau“ und „Original (mit Standort)“ im Zeilenmenü (L1), Download aus dem Menü über den Spiegel-Weg (L2), Lesemarke ohne ausgeblendete Systemeinträge (S4), Druck ohne Merkmal vollständig, Ausschluss als `system=aus` (S7). Nachweis: `etb/zeilenAktionen.test.ts`, `components/anhangHerunterladen.test.ts`, `tests/etb_lesemarke.rs`, `routing/deeplinks.test.ts`, `pages/EtbDruckPage.test.tsx`.
-- [ ] 8.3 Bilder der Kapitel „Einsatztagebuch“, „Arbeiten ohne Netz“ und „Drucken und Export“ neu erzeugt. Nachweis: Bilder zeigen „Nach oben“ unter der jüngsten Zeile, den vorgemerkten Eintrag unten und den Druck mit „vollständiges Tagebuch“.
+- [x] 8.3 Bilder der Kapitel „Einsatztagebuch“, „Arbeiten ohne Netz“ und „Drucken und Export“ neu erzeugt. Nachweis: Bilder zeigen „Nach oben“ unter der jüngsten Zeile, den vorgemerkten Eintrag unten und den Druck mit „vollständiges Tagebuch“.
 
 ## Workflow follow-up
 

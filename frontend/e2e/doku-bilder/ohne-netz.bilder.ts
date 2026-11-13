@@ -6,7 +6,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep ohne-netz`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   etb-ohne-netz.png  frontend/src/live/LiveStatusBanner.tsx, components/Kopfleiste.tsx,
- *                      components/Datenstand.tsx, etb/EtbZeitachse.tsx, etb/Schnellerfassung.tsx
+ *                      components/Datenstand.tsx, etb/EtbZeitachse.tsx, etb/Schnellerfassung.tsx,
+ *                      etb/EtbSendestatus.tsx, pages/EtbPage.tsx
  *
  * Der vorgemerkte Eintrag geht nie hinaus: Der Test endet ohne Netz, und mit dem Browserkontext
  * verschwindet die Warteschlange. Ein gesendeter ETB-Eintrag stünde unveränderlich in jedem
@@ -44,10 +45,14 @@ test.describe(KAPITEL, () => {
     await expect(ausstehend).toContainText('Pegel am Mühlbach');
     await expect(ausstehend).toContainText('vorgemerkt');
     await expect(page.getByLabel('1 ausstehende Offline-Aktion')).toContainText('ausstehend');
+    await expect(page.locator('[data-lfh="sendestatus"]')).toHaveText('1 ausstehend');
+    await expect(page.getByText('1 Eintrag offline vorgemerkt')).toBeVisible();
+    // Ans Ende: dort steht der vorgemerkte Eintrag (Funkprotokoll-Ordnung, LLH-1149).
     await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur();
-      window.scrollTo(0, 0);
+      window.scrollTo(0, document.documentElement.scrollHeight);
     });
+    await expect(ausstehend).toBeInViewport();
     await fotografiere(page, KAPITEL, 'etb-ohne-netz');
     // Kein `setOffline(false)`: der Eintrag bliebe nicht vorgemerkt, sondern ginge ins ETB.
   });
