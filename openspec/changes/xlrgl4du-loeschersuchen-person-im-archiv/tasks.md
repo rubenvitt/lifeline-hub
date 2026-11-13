@@ -64,7 +64,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 4. Personensuche im Block (Backend-Kern)
 
-- [ ] 4.1 Neues Modul `src/einsatz/archiv/personen.rs` (D6): gültigen Block entschlüsseln,
+- [x] 4.1 Neues Modul `src/einsatz/archiv/personen.rs` (D6): gültigen Block entschlüsseln,
       migrieren, `aufbewahrung::suche::personensuche` auf der Zwischendatei ausführen, je
       Treffer Art, Kennung, Erfassungszeit und Namen liefern und `archiv_durchsucht` schreiben.
       Suchtext unter 3 Zeichen → Fehler, ohne Spur. Tests: Treffer mit Namen, Spur ohne
@@ -72,13 +72,13 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 5. Befehle
 
-- [ ] 5.1 `ArchivBefehl::Loeschersuchen { identitaet, einsatz: Option<i64> }` und
+- [x] 5.1 `ArchivBefehl::Loeschersuchen { identitaet, einsatz: Option<i64> }` und
       `ArchivBefehl::Personen { einsatz, identitaet, suche }` in `src/config.rs`, dazu der
       Dispatch und `cmd_archiv_*` in `src/main.rs`: Schlüssel über `identitaet_laden`,
       `db::stand_abweichung`, Abbruch bei Signal. Die Ausgabe nennt je Einsatz die Anträge,
       die Blöcke und die Fehler. Prüfen: Ein Parse-Test der Unterbefehle (Muster der
       vorhandenen CLI-Tests) und ein Lauf von `cargo run -- archiv loeschersuchen --help`.
-- [ ] 5.2 Betriebsdoku `docs/betrieb/backup-restore.md`: Abschnitt „Löschersuchen für eine
+- [x] 5.2 Betriebsdoku `docs/betrieb/backup-restore.md`: Abschnitt „Löschersuchen für eine
       Person im Archiv“ mit beiden Befehlen, Schlüsselweg, Abbruchfällen und der Grenze für
       Downloads. Prüfen: Die Befehle laufen so, wie sie dort stehen (`--help`).
 

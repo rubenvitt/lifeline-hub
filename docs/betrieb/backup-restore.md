@@ -296,6 +296,52 @@ lifeline-hub --db-path … archiv einspielen --datei … --identitaet … --org 
 - Das Zugangsprotokoll hält jedes Einspielen unter „Archiv eingespielt“ fest, in derselben
   Transaktion wie die Übernahme.
 
+## Löschersuchen für eine Person im Archiv (LLH-1712)
+
+Ein Löschersuchen für **eine Person** an einem archivierten Einsatz stellt der Admin in der
+Archivakte, mit der Kennung der Person (`R-042`, `EK-17`, `IT-5`). Nach 24 Stunden vollzieht es
+nicht der Purge-Lauf: Der Server hat nur die öffentlichen Archiv-Schlüssel der Organisation und
+kann die Blöcke nicht öffnen. Bis zum Vollzug bleibt der Antrag offen, und die Archivakte zeigt
+„wartet auf Befehl mit Archiv-Schlüssel“. Vollzogen wird per Befehl auf dem Server, mit einem
+privaten Archiv-Schlüssel und mit der Version, mit der der Server läuft:
+
+```bash
+lifeline-hub --db-path /var/lib/lifeline/lifeline.db archiv loeschersuchen \
+             --identitaet archiv-schluessel.txt
+# nur einen Einsatz (ID aus der Adresse der Archivakte)
+lifeline-hub --db-path … archiv loeschersuchen --identitaet - --einsatz 751
+```
+
+- Jeder Block des Einsatzes wird entschlüsselt (Zwischendatei neben der Datenbank, wie beim
+  Einspielen), auf den Stand dieser Version gebracht und die Person darin so geschwärzt wie bei
+  einem Löschersuchen am Einsatz. Danach wird der Block an die **heute geprüften**
+  Archiv-Schlüssel der Organisation neu verschlüsselt. Ein inzwischen entfernter Schlüssel
+  öffnet ihn danach nicht mehr. Nummer und Frist der Blöcke bleiben, alle übrigen Inhalte auch.
+- Ersetzt werden die Blöcke erst, wenn alle gebaut sind, in einer Transaktion zusammen mit dem
+  Antrag, einem Eintrag im Einsatztagebuch (Aktenzeichen, Kennung, Zahl der Blöcke) und einem
+  Eintrag im Zugangsprotokoll („Person im Archiv geschwärzt“), alle ohne Namen. Passt der
+  Schlüssel nicht, hat die Organisation keinen geprüften Schlüssel mehr, wird der Antrag
+  inzwischen zurückgenommen oder löscht der Purge-Lauf währenddessen einen abgelaufenen Block,
+  bleibt alles, wie es war. Der Befehl nennt das; ein späterer Aufruf baut neu.
+- **Alte Blöcke:** Ein vor dem Vollzug heruntergeladener Block lässt sich an dieser Installation
+  danach nicht mehr einspielen. Eine hier eingespielte Kopie eines alten Blocks geht mit dem
+  nächsten Purge-Lauf. Heruntergeladene Blöcke und Kopien an anderen Installationen erreicht der
+  Vollzug nicht; sie sind beim Löschersuchen von Hand mit zu löschen.
+- Strg+C oder SIGTERM brechen ab, ohne etwas zu ändern; die Zwischendateien gehen mit.
+
+**Kennung finden.** Am archivierten Einsatz gibt es keine Namen mehr. Die Kennung zu einem Namen
+liefert die Suche im gültigen Block des Archivs:
+
+```bash
+lifeline-hub --db-path … archiv personen --einsatz 751 --identitaet archiv-schluessel.txt \
+             --suche "Mustermann"
+```
+
+Sie sucht wie die Personensuche der Archivakte (ganze Wörter des Namens, bei Kräften und Anrufen
+auch Rufnummern ab sechs Ziffern) und nennt je Treffer Kennung, Art, Erfassungszeit und Namen,
+nur im Terminal. Am Archiv ändert sie nichts. Das Zugangsprotokoll hält jede Suche unter „Archiv
+durchsucht“ fest, ohne den Suchtext.
+
 ## Sicherungen und Schwärzung (LFH-725)
 
 Nach Ablauf von Aufbewahrungsfrist und Karenz schwärzt der Server die Personendaten eines

@@ -16,6 +16,7 @@
 pub mod bauen;
 pub mod einspielen;
 pub mod loeschersuchen;
+pub mod personen;
 pub use bauen::zwischendateien_aufraeumen;
 
 use crate::einsatz::aufbewahrung_kategorie as kategorie;

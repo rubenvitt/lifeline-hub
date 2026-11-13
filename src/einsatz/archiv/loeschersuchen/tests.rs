@@ -15,14 +15,14 @@ const FOTO: &[u8] = b"FOTO-VON-ERIKA-MUSTERMANN";
 
 /// Ein archivierter Einsatz in zwei Blöcken (Personenauskunft endet nach 60 Tagen) mit der
 /// Betroffenen R-001 „Erika Mustermann“ samt Foto und dem Nachbarn R-002 „Max Nachbar“.
-struct Archiv {
-    einsatz: i64,
-    leit: i64,
-    erika: i64,
-    identitaet: age::x25519::Identity,
+pub(crate) struct Archiv {
+    pub(crate) einsatz: i64,
+    pub(crate) leit: i64,
+    pub(crate) erika: i64,
+    pub(crate) identitaet: age::x25519::Identity,
 }
 
-async fn archiv(pool: &SqlitePool) -> Archiv {
+pub(crate) async fn archiv(pool: &SqlitePool) -> Archiv {
     let leit = leitung(pool).await;
     let identitaet = schluessel(pool).await;
     let e = anlegen(
@@ -142,7 +142,7 @@ async fn antrag(pool: &SqlitePool, a: &Archiv, stunden: i64) -> i64 {
     .unwrap()
 }
 
-fn schluessel_von(id: &age::x25519::Identity) -> Schluessel {
+pub(crate) fn schluessel_von(id: &age::x25519::Identity) -> Schluessel {
     Schluessel::laden(
         format!("{}\n", id.to_string().expose_secret()).into_bytes(),
         None,

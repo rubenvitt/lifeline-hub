@@ -69,6 +69,21 @@ async fn main() -> anyhow::Result<()> {
                     org,
                 },
         }) => cmd_archiv_einspielen(&config.db_path, &datei, &identitaet, org).await,
+        Some(Command::Archiv {
+            befehl:
+                ArchivBefehl::Loeschersuchen {
+                    identitaet,
+                    einsatz,
+                },
+        }) => cmd_archiv_loeschersuchen(&config.db_path, &identitaet, einsatz).await,
+        Some(Command::Archiv {
+            befehl:
+                ArchivBefehl::Personen {
+                    einsatz,
+                    identitaet,
+                    suche,
+                },
+        }) => cmd_archiv_personen(&config.db_path, einsatz, &identitaet, &suche).await,
         Some(Command::Zugang(befehl)) => {
             lifeline_hub::public_api::kommando::ausfuehren(befehl).await
         }
@@ -720,6 +735,123 @@ async fn cmd_archiv_einspielen(
     );
     for h in &e.hinweise {
         println!("Hinweis: {h}");
+    }
+    Ok(())
+}
+
+/// Öffnet die Datenbank für einen Archiv-Befehl neben dem laufenden Server: sie muss den Stand
+/// dieser Version haben, migriert wird nicht.
+async fn archiv_db(db_path: &str) -> anyhow::Result<sqlx::SqlitePool> {
+    if !Path::new(db_path).exists() {
+        anyhow::bail!("Datenbank nicht gefunden: {db_path} — Server wurde noch nicht gestartet?");
+    }
+    let pool = db::connect(db_path).await?;
+    if let Some(abweichung) = db::stand_abweichung(&pool).await? {
+        pool.close().await;
+        anyhow::bail!(
+            "Die Datenbank passt nicht zu dieser Version ({abweichung}). Mit der Version \
+             aufrufen, mit der der Server läuft."
+        );
+    }
+    Ok(pool)
+}
+
+/// Subkommando `archiv loeschersuchen` (LLH-1712, design.md D1/D2): fällige Löschersuchen für
+/// Personen an archivierten Einsätzen in allen Blöcken vollziehen. Ein Fehler an einem Einsatz
+/// hält die übrigen nicht auf; der Befehl endet dann mit einem Fehler.
+async fn cmd_archiv_loeschersuchen(
+    db_path: &str,
+    identitaet: &str,
+    einsatz: Option<i64>,
+) -> anyhow::Result<()> {
+    use lifeline_hub::einsatz::archiv::loeschersuchen;
+    let schluessel = identitaet_laden(identitaet)?;
+    let pool = archiv_db(db_path).await?;
+    let ids = match einsatz {
+        Some(id) => vec![id],
+        None => loeschersuchen::faellige_einsaetze(&pool, chrono::Utc::now())
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?,
+    };
+    if ids.is_empty() {
+        pool.close().await;
+        println!("Keine fälligen Löschersuchen für Personen im Archiv.");
+        return Ok(());
+    }
+    let mut fehler = 0;
+    for id in ids {
+        // Ein Abbruch (Strg+C, SIGTERM) lässt den Lauf fallen: so löscht `Drop` die
+        // entschlüsselten Zwischendateien, und vor der Ablage ist nichts geändert.
+        let ergebnis = tokio::select! {
+            e = loeschersuchen::vollziehen(&pool, id, &schluessel, chrono::Utc::now()) => Some(e),
+            () = shutdown_signal() => None,
+        };
+        match ergebnis {
+            None => {
+                pool.close().await;
+                anyhow::bail!("Abgebrochen. Die entschlüsselten Zwischendateien sind gelöscht.");
+            }
+            Some(Ok(Some(v))) => println!(
+                "Einsatz {} (ID {}): {} in {} {} des Archivs geschwärzt.",
+                v.einsatz_kennung,
+                v.einsatz_id,
+                v.personen.join(", "),
+                v.bloecke,
+                if v.bloecke == 1 { "Block" } else { "Blöcken" }
+            ),
+            Some(Ok(None)) => println!(
+                "Einsatz {id}: kein fälliger Antrag mit Archiv, oder Antrag bzw. Archiv haben \
+                 sich während des Laufs geändert; nichts geändert."
+            ),
+            Some(Err(e)) => {
+                eprintln!("Einsatz {id}: {e}");
+                fehler += 1;
+            }
+        }
+    }
+    pool.close().await;
+    if fehler > 0 {
+        anyhow::bail!("{fehler} Einsatz/Einsätze nicht vollzogen; dort ist nichts geändert.");
+    }
+    Ok(())
+}
+
+/// Subkommando `archiv personen` (LLH-1712, design.md D6): im gültigen Block eines archivierten
+/// Einsatzes nach einer Person suchen. Den Suchtext schreibt der Befehl in kein Log.
+async fn cmd_archiv_personen(
+    db_path: &str,
+    einsatz: i64,
+    identitaet: &str,
+    suche: &str,
+) -> anyhow::Result<()> {
+    let schluessel = identitaet_laden(identitaet)?;
+    let pool = archiv_db(db_path).await?;
+    let ergebnis = tokio::select! {
+        e = lifeline_hub::einsatz::archiv::personen::suchen(
+            &pool, einsatz, &schluessel, suche, chrono::Utc::now(),
+        ) => Some(e),
+        () = shutdown_signal() => None,
+    };
+    pool.close().await;
+    let Some(ergebnis) = ergebnis else {
+        anyhow::bail!("Abgebrochen. Die entschlüsselte Zwischendatei ist gelöscht.");
+    };
+    let treffer = ergebnis.map_err(|e| anyhow::anyhow!("{e}"))?;
+    if treffer.is_empty() {
+        println!("Keine Treffer.");
+    }
+    for t in treffer {
+        println!(
+            "{}\t{}\terfasst {} (UTC)\t{}",
+            t.kennung,
+            t.art.bezeichnung(),
+            t.erfasst_at,
+            if t.name.is_empty() {
+                "(Name geschwärzt)"
+            } else {
+                t.name.as_str()
+            }
+        );
     }
     Ok(())
 }
