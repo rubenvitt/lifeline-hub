@@ -247,6 +247,44 @@ ersetzt.
 Herleitung:
 `openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
 
+#### Unterschriftsschlüssel und Stammdaten (LLH-1853)
+
+Auch die Unterschriftsschlüssel und die Stammdaten, die ein Hub an seine ELW verteilt, fließen nach
+dem Zurückspielen des Hubs ohne Eingriff weiter:
+
+- Schlüssel, die danach registriert, gegengezeichnet oder widerrufen werden, erreichen den ELW mit
+  den nächsten Meldungen. Ein Widerruf gilt dort also auch nach dem Zurückspielen.
+- Stammdaten, die danach am Hub geändert werden, erreichen den ELW mit den nächsten Meldungen. Dafür
+  hebt der Server beim Start den Zähler der Stammdaten-Änderungen auf die Uhrzeit.
+- Bekommt ein neuer Schlüssel am Hub dieselbe Nummer wie einer, der mit der Sicherung verloren
+  ging, führt der ELW den alten als widerrufen und den neuen als „wartet auf Bestätigung“.
+- Kennt der ELW schon Stände, die der zurückgespielte Hub nicht mehr hat, erkennt der Hub den
+  Rückstand an der nächsten Meldung und schickt die Schlüssel bzw. die Stammdaten der Org einmal
+  ganz. Das geschieht meist auch bei richtiger Uhr, solange am Hub seit dem Zurückspielen nichts
+  geändert wurde, und es fängt eine nachgehende Uhr ab. Die Kopplung zeigt dann „… kennt schon
+  spätere Stände, als diese Instanz vergeben hat (aus einer Sicherung zurückgespielt?). Erneut an …
+  gehen: Unterschriftsschlüssel, Stammdaten.“ Das ist kein Fehler.
+
+**Grenzen:**
+
+- **Verlorene Einträge bleiben am ELW.** Schlüssel und Stammdaten, die der Hub nach der Sicherung
+  angelegt, schon an den ELW geliefert und dann mit der Sicherung verloren hat, bleiben am ELW
+  stehen. Ein solcher Schlüssel gilt dort weiter, bis der Hub seine Nummer neu vergibt (dann
+  widerruft ihn der ELW) oder die Org neu gekoppelt wird (Zunder LLH-1871).
+- **Die Uhr des Servers muss stimmen.** Geht sie nach und ändert der Hub vor der ersten Meldung
+  mindestens so viel, wie verloren ging, kommt eine Änderung erst mit ihrer nächsten. Für
+  Stammdaten hilft dann „Erneut abgleichen“ am ELW.
+- **VM-Snapshot mit laufendem Server.** Ohne Neustart springt der Zähler der Stammdaten nicht; es
+  gilt dasselbe wie bei nachgehender Uhr. Nach einem Snapshot steht die Uhr außerdem oft kurz
+  zurück. Stellt sie sich vor der nächsten Meldung des ELW über die verlorenen Stände, und folgt
+  noch eine Schlüsselaktion, erreicht ein Widerruf aus dieser Zeit den ELW nicht (Zunder LLH-1871).
+  Server nach einem Snapshot neu starten und den ELW sich melden lassen, bevor Schlüssel geändert
+  werden.
+- **Mehrere ELW.** Hatte ein zweiter ELW weiter übernommen als der zuerst meldende, kann er einzelne
+  der erneut geschickten Einträge verpassen (Zunder LLH-1871).
+
+Herleitung: `openspec/changes/archive/2026-11-13-cz5332jn-unterschrift-stammdaten-nach-restore/design.md`.
+
 ## Archiv eines Einsatzes einspielen (LLH-1494)
 
 Ein Archivblock aus der Archivakte (`einsatz-…-block-<n>.sqlite.age`, siehe Anwenderdoku

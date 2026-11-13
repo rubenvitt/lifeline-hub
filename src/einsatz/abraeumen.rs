@@ -7,8 +7,9 @@
 //!   Seite nach der Nachbereitung (D5).
 //!
 //! Wer das Abräumen beschließt, setzt in seiner Transaktion den Merker [`vormerken`]
-//! (`einsatz_abraeumen`); [`ausfuehren`] löscht nach dem Commit. Ein Absturz dazwischen lässt den
-//! Merker stehen, und Phase R des Purge-Laufs holt nach ([`vorgemerkte`]).
+//! (`einsatz_abraeumen`); [`ausfuehren`] löscht nach dem Commit und meldet es live (LLH-1713).
+//! Ein Absturz dazwischen lässt den Merker stehen, und Phase R des Purge-Laufs holt nach
+//! ([`vorgemerkte`]).
 //!
 //! Gelöscht wird wie bei der endgültigen Löschung (`skelett_loeschung`): Datei-Inhalte einzeln
 //! (LFH-905), dann eine Transaktion mit Protokollzeile, bei einem verwahrten Einsatz dem
@@ -18,6 +19,7 @@
 //! nicht abbrechen (der Merker gehört nach ADR-0018 dem Spiegel-Modul).
 
 use crate::error::AppError;
+use crate::live::LiveHub;
 use crate::wire_enum::wire_enum;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -116,9 +118,9 @@ async fn spiegel_vormerken(
 }
 
 /// Phase R des Purge-Laufs: merkt fällige Spiegel der meldenden Seite vor (D5) und räumt jeden
-/// vorgemerkten Einsatz ab, auch einen, dessen Abräumen nach der Quittung scheiterte. Liefert
-/// die Zahl abgeräumter Einsätze.
-pub async fn phase_r(pool: &SqlitePool, jetzt: &str) -> usize {
+/// vorgemerkten Einsatz ab, auch einen, dessen Abräumen nach der Quittung scheiterte, und meldet
+/// ihn über `live` (LLH-1713). Liefert die Zahl abgeräumter Einsätze.
+pub async fn phase_r(pool: &SqlitePool, live: &LiveHub, jetzt: &str) -> usize {
     match faellige_spiegel(pool, jetzt).await {
         Ok(faellig) => {
             for (id, _) in faellig {
@@ -141,7 +143,7 @@ pub async fn phase_r(pool: &SqlitePool, jetzt: &str) -> usize {
         }
         Err(e) => tracing::warn!("Purge Phase R: Abfrage fehlgeschlagen: {e}"),
     }
-    alle_vorgemerkten(pool).await
+    alle_vorgemerkten(pool, live).await
 }
 
 /// Löscht die Datei-Inhalte eines vorgemerkten Einsatzes einzeln, je Zeile eine Transaktion
@@ -172,10 +174,19 @@ async fn dateien_einzeln(pool: &SqlitePool, einsatz_id: i64) -> Result<(), AppEr
 /// Räumt einen vorgemerkten Einsatz ab (UNUMKEHRBAR): Datei-Inhalte, dann Protokollzeile und
 /// Einsatz in einer Transaktion, dann der WAL. `Ok(false)`, wenn kein Merker (mehr) steht.
 ///
+/// Mit `live` meldet es nach dem Commit wie jeder Löschweg (`src/AGENTS.md`, Org-Ereignisse,
+/// LLH-1713): `einsatz` an offene Einsatzseiten (sie holen den Kopf und räumen am 404) und
+/// `einsatzliste` an die Leser, gelesen VOR dem `DELETE`, weil die Mitgliedschaften mitgehen.
+/// `None` nur, wo kein Server läuft (Kommando `archiv einspielen`).
+///
 /// Die Protokollzeile (D7) übernimmt nur Retain-Spalten des Kopfes. `verwahrt` trägt die Nummer
 /// (sie bleibt gesperrt) und, soweit auffindbar, den Akteur aus der Kette des Purge-Audits;
 /// `spiegel` trägt keine Nummer, die gehört dem Führer. Beide sperren die ID.
-pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError> {
+pub async fn ausfuehren(
+    pool: &SqlitePool,
+    live: Option<&LiveHub>,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
     let gesetzt: bool =
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz_abraeumen WHERE einsatz_id = ?)")
             .bind(einsatz_id)
@@ -186,14 +197,14 @@ pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppE
     }
     dateien_einzeln(pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let geloescht = crate::write_retry!(pool, |conn| {
+    let leser = crate::write_retry!(pool, |conn| {
         let merker: Option<(String, Option<String>)> =
             sqlx::query_as("SELECT art, gegenstelle FROM einsatz_abraeumen WHERE einsatz_id = ?")
                 .bind(einsatz_id)
                 .fetch_optional(&mut *conn)
                 .await?;
         let Some((art, gegenstelle)) = merker else {
-            return Ok(false);
+            return Ok(None);
         };
         let verwahrt = art == AbraeumArt::Verwahrt.as_str();
         let akteur = if verwahrt {
@@ -227,6 +238,12 @@ pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppE
                 .await?;
         }
         crate::db::fk_pruefung_sicherstellen(&mut *conn, "Abräumen").await?;
+        let Some(leser) = crate::live::org::einsatzleser_lesen(&mut *conn, einsatz_id).await?
+        else {
+            return Err(AppError::Internal(format!(
+                "Abräumen von Einsatz {einsatz_id}: Einsatz fehlt"
+            )));
+        };
         let n = crate::instanz::spiegel::loeschen_unter_merker(
             conn,
             "DELETE FROM einsatz WHERE id = ?",
@@ -238,8 +255,13 @@ pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppE
                 "Abräumen von Einsatz {einsatz_id}: {n} Zeilen statt 1"
             )));
         }
-        Ok(true)
+        Ok(Some(leser))
     })?;
+    let geloescht = leser.is_some();
+    if let (Some(leser), Some(live)) = (leser, live) {
+        live.publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Einsatz);
+        leser.melden(live);
+    }
     if geloescht {
         match crate::db::wal_zurueckschreiben(pool).await {
             Ok(true) => {}
@@ -255,7 +277,7 @@ pub async fn ausfuehren(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppE
 
 /// [`ausfuehren`] für jeden vorgemerkten Einsatz, Fehler nur geloggt (der nächste Lauf holt nach).
 /// Liefert die Zahl abgeräumter Einsätze.
-pub async fn alle_vorgemerkten(pool: &SqlitePool) -> usize {
+pub async fn alle_vorgemerkten(pool: &SqlitePool, live: &LiveHub) -> usize {
     let ids = match vorgemerkte(pool).await {
         Ok(ids) => ids,
         Err(e) => {
@@ -265,7 +287,7 @@ pub async fn alle_vorgemerkten(pool: &SqlitePool) -> usize {
     };
     let mut n = 0;
     for id in ids {
-        match ausfuehren(pool, id).await {
+        match ausfuehren(pool, Some(live), id).await {
             Ok(true) => n += 1,
             Ok(false) => {}
             Err(e) => tracing::warn!(einsatz_id = id, "Abräumen gescheitert: {e}"),
