@@ -4,7 +4,9 @@
 
 use super::austausch::{self, AkteMeldung};
 use super::erklaerung::{self, FuehrungBeweis, NotuebernahmeErklaerung, TYP_NOTUEBERNAHME};
-use super::repo::{self, AkteZeile, FuehrungGegenueber, FuehrungVerlaufEintrag, Ich, VerlaufNeu};
+use super::repo::{
+    self, AkteRef, AkteZeile, FuehrungGegenueber, FuehrungVerlaufEintrag, Ich, VerlaufNeu,
+};
 use super::{Epoche, FuehrungWechselArt, GRUND_MAX};
 use crate::error::AppError;
 use crate::instanz::{code, InstanzKopplungRichtung, Wechselregel};
@@ -178,13 +180,13 @@ fn fordere_spiegel_hier(a: &AkteZeile) -> Result<(), AppError> {
 /// Reguläre Übergabe an das Gegenüber `an` (Spec „Reguläre Übergabe durch die führende Instanz“).
 pub async fn uebergeben(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     an: &str,
     wer: &str,
 ) -> Result<AkteZeile, AppError> {
     let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
-        let mut a = repo::load(conn, akte_id).await?;
+        let mut a = repo::load_ref(conn, akte).await?;
         fordere_fuehrend(&a, &ich)?;
         fordere_nicht_verwahrt(conn, &a).await?;
         let g = gegenueber(conn, &a, an).await?;
@@ -226,14 +228,14 @@ pub async fn uebergeben(
 /// das die erreichte Seite ist. Liefert den Code in Normalform, genau einmal.
 pub async fn code_abgeben(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     an: &str,
     wer: &str,
 ) -> Result<(String, AkteZeile), AppError> {
     let c = code::generate();
     let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
-        let mut a = repo::load(conn, akte_id).await?;
+        let mut a = repo::load_ref(conn, akte).await?;
         fordere_fuehrend(&a, &ich)?;
         fordere_nicht_verwahrt(conn, &a).await?;
         let g = gegenueber(conn, &a, an).await?;
@@ -273,10 +275,10 @@ pub async fn code_abgeben(
 }
 
 /// Anfrage der meldenden Seite an eine Akte, die das Gegenüber führt (D9).
-pub async fn anfragen(pool: &SqlitePool, akte_id: i64) -> Result<AkteZeile, AppError> {
+pub async fn anfragen(pool: &SqlitePool, akte: AkteRef<'_>) -> Result<AkteZeile, AppError> {
     let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
-        let mut a = repo::load(conn, akte_id).await?;
+        let mut a = repo::load_ref(conn, akte).await?;
         fordere_nicht_fuehrend(&a, &ich)?;
         let g = gegenueber_des_fuehrers(conn, &a).await?;
         if !wie_meldend(&g) {
@@ -300,14 +302,14 @@ pub async fn anfragen(pool: &SqlitePool, akte_id: i64) -> Result<AkteZeile, AppE
 /// ein Mensch der übernehmenden Seite“): ohne Beweis, mit Grund.
 pub async fn notuebernahme_gegen_erreichte(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     grund: &str,
     wer: &str,
 ) -> Result<AkteZeile, AppError> {
     let grund = check_grund(grund)?;
     let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
-        let mut a = repo::load(conn, akte_id).await?;
+        let mut a = repo::load_ref(conn, akte).await?;
         fordere_nicht_fuehrend(&a, &ich)?;
         fordere_spiegel_hier(&a)?;
         let g = gegenueber_des_fuehrers(conn, &a).await?;
@@ -373,14 +375,14 @@ pub async fn notuebernahme_gegen_erreichte(
 /// die Akte nicht von einer Seite geführt wird, die sich hier meldet.
 pub async fn build_erklaerung_gegen_meldende(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     grund: &str,
     unterzeichner: &str,
 ) -> Result<NotuebernahmeErklaerung, AppError> {
     let grund = check_grund(grund)?;
     let mut conn = pool.acquire().await?;
     let ich = repo::ich(&mut conn).await?;
-    let a = repo::load(&mut conn, akte_id).await?;
+    let a = repo::load_ref(&mut conn, akte).await?;
     fordere_nicht_fuehrend(&a, &ich)?;
     fordere_spiegel_hier(&a)?;
     let g = gegenueber_des_fuehrers(&mut conn, &a).await?;
@@ -412,14 +414,17 @@ pub async fn build_erklaerung_gegen_meldende(
 /// noch zur Akte passen (sonst 409: inzwischen hat sich die Führung geändert).
 pub async fn notuebernahme_gegen_meldende(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     e: &NotuebernahmeErklaerung,
     beweis: &FuehrungBeweis,
     wer: &str,
 ) -> Result<AkteZeile, AppError> {
     crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
-        let mut a = repo::load(conn, akte_id).await?;
+        let mut a = repo::load_ref(conn, akte).await?;
+        // Die Erklärung nennt ihren Einsatz; unter der ID kann inzwischen ein anderer liegen, mit
+        // gleicher Epoche und gleichem Führer (LLH-1862).
+        repo::check_kennung(&a, &e.einsatz)?;
         if a.epoche() != e.epoche_alt || a.fuehrer_kennung != e.fuehrer_alt {
             return Err(AppError::Conflict(
                 "Die Führung hat sich inzwischen geändert.".into(),
@@ -462,7 +467,7 @@ pub async fn notuebernahme_gegen_meldende(
 /// prüft erst die meldende Seite.
 pub async fn notuebernahme_mit_code(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     grund: &str,
     code_eingabe: &str,
     wer: &str,
@@ -470,7 +475,7 @@ pub async fn notuebernahme_mit_code(
     let c = code::normalize(code_eingabe).ok_or_else(|| {
         AppError::UnprocessableEntity("Der Code hat 16 Zeichen aus Ziffern und Buchstaben.".into())
     })?;
-    let mut e = build_erklaerung_gegen_meldende(pool, akte_id, grund, wer).await?;
+    let mut e = build_erklaerung_gegen_meldende(pool, akte, grund, wer).await?;
     // Die meldende Seite hat die Epoche beim Erzeugen des Codes mit ihrer Kennung reserviert.
     e.epoche_neu = Epoche::naechste([&e.epoche_alt], &e.fuehrer_alt);
     let schluessel = erklaerung::abgabe_schluessel(&c, &e.einsatz, &e.epoche_neu);
@@ -479,7 +484,7 @@ pub async fn notuebernahme_mit_code(
     let beweis = FuehrungBeweis::Code {
         pruefwert: erklaerung::code_pruefwert(&schluessel, &text),
     };
-    notuebernahme_gegen_meldende(pool, akte_id, &e, &beweis, wer).await
+    notuebernahme_gegen_meldende(pool, akte, &e, &beweis, wer).await
 }
 
 /// Bestätigt eine offene Übernahme gegen diese Instanz (meldende Seite): sie gilt, die Bruchstelle
@@ -490,12 +495,12 @@ pub async fn notuebernahme_mit_code(
 /// anders.
 pub async fn bestaetigen(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     wer: &str,
 ) -> Result<(AkteZeile, bool), AppError> {
     let (a, konflikt) = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
-        let mut a = repo::load(conn, akte_id).await?;
+        let mut a = repo::load_ref(conn, akte).await?;
         let m: AkteMeldung = a
             .offen
             .as_deref()
@@ -602,12 +607,12 @@ pub fn konflikt_text(eigene_notuebernahme: bool, fuehrer: &str) -> String {
 /// Widerspricht einer offenen Übernahme: diese Instanz führt mit der nächsten Epoche weiter (D10).
 pub async fn widersprechen(
     pool: &SqlitePool,
-    akte_id: i64,
+    akte: AkteRef<'_>,
     wer: &str,
 ) -> Result<AkteZeile, AppError> {
     let a = crate::write_retry!(pool, |conn| {
         let ich = repo::ich(conn).await?;
-        let mut a = repo::load(conn, akte_id).await?;
+        let mut a = repo::load_ref(conn, akte).await?;
         let m: AkteMeldung = a
             .offen
             .as_deref()
@@ -863,15 +868,23 @@ pub async fn load_fuer_einsatz(pool: &SqlitePool, einsatz_id: i64) -> Result<Akt
 /// Lädt eine Akte der Org `org_id` für die Seite „Instanzkopplung“; sonst 404. Gelistet werden
 /// dort die Akten des Gegenübers ([`repo::list_fremde_der_org`]); eine Akte, die inzwischen hier
 /// führt, antwortet weiter (409 aus den Regeln statt 404, LLH-1641).
+///
+/// `kennung` ist die Gegenprobe der Oberfläche (LLH-1862): die Kennung der Akte, die der Dialog
+/// zeigt. Liegt unter der ID inzwischen ein anderer Einsatz, 409; ohne Kennung wie bisher. Die
+/// Org prüft sie zuerst, damit eine Akte einer anderen Org 404 bleibt.
 pub async fn load_fremde(
     pool: &SqlitePool,
     org_id: i64,
     akte_id: i64,
+    kennung: Option<&str>,
 ) -> Result<AkteZeile, AppError> {
     let mut conn = pool.acquire().await?;
     let a = repo::load(&mut conn, akte_id).await?;
     if a.org_id != org_id {
         return Err(AppError::NotFound);
+    }
+    if let Some(k) = kennung {
+        repo::check_kennung(&a, k)?;
     }
     Ok(a)
 }

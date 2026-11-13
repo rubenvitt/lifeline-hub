@@ -1,19 +1,25 @@
 import type { FuehrungAnzeige, FuehrungCodeAntwort } from './types';
-import { apiGet, apiSend } from './client';
+import { apiGet, apiSend, mitParametern } from './client';
 import { unterschreibeErklaerung } from './instanz';
 
 // Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`). Jede Aktion gibt es zweimal: am lokalen
 // Einsatz (`/api/einsaetze/{id}/fuehrung`, Einsatzleitung oder Admin der Einsatz-Org) und an einer
-// Akte des Gegenübers (`/api/admin/instanz/fuehrung/{akte}`, Admin der Org). `basis` ist einer
-// der beiden Pfade, gebildet von `fuehrungBasis`.
+// Akte des Gegenübers (`/api/admin/instanz/fuehrung/{akte}`, Admin der Org). Den Pfad einer
+// Aktion bildet `fuehrungPfad`.
 
-/** Wo die Führung bedient wird: am Einsatz oder an einer Akte des Gegenübers. */
-export type FuehrungOrt = { einsatzId: number } | { akteId: number };
+/**
+ * Wo die Führung bedient wird: am Einsatz oder an einer Akte des Gegenübers. Die Akte trägt ihre
+ * Kennung als Gegenprobe (LLH-1862): Der Server vergibt die ID einer gelöschten Akte neu und lehnt
+ * mit 409 ab, wenn unter ihr inzwischen ein anderer Einsatz liegt.
+ */
+export type FuehrungOrt = { einsatzId: number } | { akteId: number; kennung: string };
 
-export function fuehrungBasis(ort: FuehrungOrt): string {
+export function fuehrungPfad(ort: FuehrungOrt, aktion: string): string {
   return 'einsatzId' in ort
-    ? `/api/einsaetze/${ort.einsatzId}/fuehrung`
-    : `/api/admin/instanz/fuehrung/${ort.akteId}`;
+    ? `/api/einsaetze/${ort.einsatzId}/fuehrung/${aktion}`
+    : mitParametern(`/api/admin/instanz/fuehrung/${ort.akteId}/${aktion}`, {
+        kennung: ort.kennung,
+      });
 }
 
 export function loadFuehrung(einsatzId: number): Promise<FuehrungAnzeige> {
@@ -27,17 +33,17 @@ export function loadFuehrungFremd(): Promise<FuehrungAnzeige[]> {
 
 /** Reguläre Übergabe an das Gegenüber `an` (Instanzkennung). */
 export function uebergebeFuehrung(ort: FuehrungOrt, an: string): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/uebergeben`, 'POST', { an });
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'uebergeben'), 'POST', { an });
 }
 
 /** Abgabe per Code: der Code steht nur in dieser Antwort. */
 export function gibFuehrungPerCodeAb(ort: FuehrungOrt, an: string): Promise<FuehrungCodeAntwort> {
-  return apiSend<FuehrungCodeAntwort>(`${fuehrungBasis(ort)}/code`, 'POST', { an });
+  return apiSend<FuehrungCodeAntwort>(fuehrungPfad(ort, 'code'), 'POST', { an });
 }
 
 /** Die Führung beim Gegenüber erbitten (meldende Seite, vor Ort jede Seite). */
 export function frageFuehrungAn(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/anfragen`, 'POST');
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'anfragen'), 'POST');
 }
 
 /** Die Anfrage der Gegenstelle vor Ort ablehnen (LLH-1678); die Führung bleibt hier. */
@@ -47,7 +53,7 @@ export function lehneAnfrageAb(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
 
 /** Notübernahme gegen die erreichte Seite: nur mit Grund. */
 export function uebernimmFuehrung(ort: FuehrungOrt, grund: string): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/notuebernahme`, 'POST', { grund });
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'notuebernahme'), 'POST', { grund });
 }
 
 /** Notübernahme gegen die meldende Seite mit der Unterschrift eines eigenen Schlüssels. */
@@ -55,10 +61,9 @@ export function uebernimmFuehrungMitUnterschrift(
   ort: FuehrungOrt,
   grund: string,
 ): Promise<FuehrungAnzeige> {
-  const basis = fuehrungBasis(ort);
   return unterschreibeErklaerung<FuehrungAnzeige>(
-    `${basis}/notuebernahme/start`,
-    `${basis}/notuebernahme/abschluss`,
+    fuehrungPfad(ort, 'notuebernahme/start'),
+    fuehrungPfad(ort, 'notuebernahme/abschluss'),
     { grund },
   );
 }
@@ -69,16 +74,16 @@ export function uebernimmFuehrungMitCode(
   grund: string,
   code: string,
 ): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/notuebernahme/code`, 'POST', {
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'notuebernahme/code'), 'POST', {
     grund,
     code,
   });
 }
 
 export function bestaetigeUebernahme(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/bestaetigen`, 'POST');
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'bestaetigen'), 'POST');
 }
 
 export function widersprecheUebernahme(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/widersprechen`, 'POST');
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'widersprechen'), 'POST');
 }
