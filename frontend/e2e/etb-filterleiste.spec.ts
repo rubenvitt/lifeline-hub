@@ -139,15 +139,18 @@ test('1440 × 900 kompakt, am Ende der Zeitachse: Kopf und Filterleiste kleben, 
     `Filterleiste unter dem Seitenkopf`,
   ).toBeLessThanOrEqual(1);
   // Der Spaltenkopf der Zeitachse klebt an `--etb-kopf-unterkante`, direkt unter der Leiste.
-  if (m.spaltenkopfOben != null) {
-    expect(
-      Math.abs(m.spaltenkopfOben - m.leisteUnten),
-      'Spaltenkopf unter der Leiste',
-    ).toBeLessThanOrEqual(1);
-  }
+  expect(m.spaltenkopfOben, 'Vorbedingung: der Spaltenkopf steht (kompakt ab lg)').not.toBeNull();
+  expect(
+    Math.abs(m.spaltenkopfOben! - m.leisteUnten),
+    'Spaltenkopf unter der Leiste',
+  ).toBeLessThanOrEqual(1);
 
   // Der gesetzte Filter steht an der Arbeitsposition: das gewählte Segment ist im Bild.
-  await expect(page.getByRole('radio', { name: 'Meldung' })).toBeInViewport();
+  await expect(
+    page.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' }).getByRole('radio', {
+      name: 'Meldung',
+    }),
+  ).toBeInViewport();
   // Die Suche ist zuoberst an ihrer Stelle, nicht von der Zeitachse überdeckt — und bedienbar.
   const suche = page.getByRole('searchbox', { name: 'Volltextsuche' });
   await expect(suche).toBeInViewport();
