@@ -5839,7 +5839,9 @@ async fn ohne_beleg_meldet_der_hub_nichts_und_der_spiegel_bleibt() {
     let (_, h, k) = an_den_hub_uebergeben(&hub, &elw).await;
 
     endgueltig_loeschen(&hub, h).await;
-    // Wie eine Sicherung ohne die Spur der Löschung: weder Vermerk noch Löschprotokoll.
+    // Ohne Spur der Löschung, wie nach einer Sicherung: weder Vermerk noch Löschprotokoll. Bewusst
+    // ohne den Einsatz wiederherzustellen, damit allein der fehlende Beleg die Meldung verhindert
+    // (Einsatz oder Akte wieder da: `loeschvermerk::tests`, `lebensende::tests`).
     for sql in [
         "DELETE FROM fuehrung_loeschvermerk",
         "DELETE FROM aufbewahrung_loeschprotokoll",
