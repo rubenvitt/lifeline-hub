@@ -995,7 +995,7 @@
           "Rechner"
         ],
         "summary": "Unterkunft und Zelte durchrechnen. Speichert nichts.",
-        "description": "Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert der\nOrganisation des Zugangs, sonst die Vorgabe des Programms. Werte eines Einsatzes gehören nicht\ndazu.",
+        "description": "Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert des Einsatzes aus\n`einsatz_id`, sonst der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms. Den\nEinsatz nimmt die Rechnung nur, wenn die Einsatzleitung ihn für den Zugang freigegeben hat.",
         "operationId": "calculate_unterkunft",
         "requestBody": {
           "content": {
@@ -1040,6 +1040,16 @@
           },
           "403": {
             "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt. Geprüft wird nach 400 und 422.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1102,8 +1112,20 @@
           "Rechner"
         ],
         "summary": "Die Richtwerte des Rechners mit Bezeichnung, Einheit und Grenzen, dazu die Zelttypen.",
-        "description": "`wert` ist der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms.",
+        "description": "`wert` ist mit `einsatz_id` der Wert dieses Einsatzes, sonst der Wert der Organisation des\nZugangs, sonst die Vorgabe des Programms. Den Einsatz nimmt die Auskunft nur, wenn die\nEinsatzleitung ihn für den Zugang freigegeben hat.",
         "operationId": "get_unterkunft_richtwerte",
+        "parameters": [
+          {
+            "name": "einsatz_id",
+            "in": "query",
+            "description": "Einsatz, dessen Richtwerte gelten sollen; nur ein Einsatz, den die Einsatzleitung für den Zugang freigegeben hat",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Richtwerte und Zelttypen; Antwort signiert im Kopf `Lifeline-Signature`",
@@ -1111,6 +1133,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UnterkunftRichtwerteResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`einsatz_id` ist keine ganze Zahl (`invalid_field`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
                 }
               }
             }
@@ -1127,6 +1159,16 @@
           },
           "403": {
             "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`einsatz_id` nennt keinen laufenden Einsatz, den die Einsatzleitung für den Zugang freigegeben hat (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt",
             "content": {
               "application/json": {
                 "schema": {
@@ -2401,6 +2443,7 @@
         "enum": [
           "basis",
           "org",
+          "einsatz",
           "anfrage"
         ]
       },
@@ -2622,6 +2665,14 @@
           "trennung"
         ],
         "properties": {
+          "einsatz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Einsatz, dessen Richtwerte gelten sollen. Nur ein Einsatz, den die Einsatzleitung für den\nZugang freigegeben hat, sonst 404. `null` gilt wie fehlend."
+          },
           "flaeche": {
             "oneOf": [
               {

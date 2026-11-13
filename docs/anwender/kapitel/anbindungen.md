@@ -134,7 +134,8 @@ Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen vi
 - „Rechner nutzen“: Damit rechnet ein Fremdsystem Unterkunft und Zelte durch, mit denselben
   Regeln wie der [Unterkunftsrechner](betreuung.md) und mit den Richtwerten der Organisation aus
   den [Stammdaten](stammdaten.md). Eigene Werte darf es je Rechnung mitschicken; gespeichert wird
-  davon nichts, und die Werte eines Einsatzes sieht es nicht.
+  davon nichts. Die Werte eines Einsatzes nimmt es nur für den Einsatz, den die Einsatzleitung für
+  die Anbindung freigegeben hat (unten).
 - „Lage lesen“: das Lagebild eines Einsatzes, siehe unten.
 - „Einsätze lesen“: der Kopf des freigegebenen Einsatzes, also Einsatznummer, Bezeichnung,
   Stichwort, Einsatzart, Nummer der Leitstelle, Einsatzort mit Koordinate und Beginn.
@@ -162,6 +163,14 @@ mit jeder Änderung an diesen beiden Rechten, wenn eines dazukommt wie wenn eine
 Einsatzleitung hat für einen bestimmten Umfang freigegeben und entscheidet über einen anderen neu.
 Auch ein verlängertes „Gültig bis“ braucht eine neue Freigabe.
 Abläufe und Inhalt des Lagebilds: [Externe Lagemonitore](externe-lagemonitore.md).
+
+Trägt die Anbindung zusätzlich „Rechner nutzen“, rechnet sie mit derselben Freigabe auch mit den
+Richtwerten, die der freigegebene Einsatz in seinen
+[Einstellungen](einsatz-einstellungen.md) unter „Unterkunft“ gesetzt hat. Einen eigenen Schalter
+dafür gibt es nicht: wer einer solchen Anbindung den Einsatz freigibt, gibt ihr auch diese Werte.
+Eine Anbindung nur mit „Rechner nutzen“ steht nicht im Paneel und rechnet immer mit den Werten der
+Organisation. Ein Rechner-Fremdsystem, das die Werte des Einsatzes braucht, bekommt deshalb
+„Einsätze lesen“ dazu.
 
 ### Warum ein Fremdsystem nicht hereinkommt
 
