@@ -25,6 +25,18 @@ fn basis_ist_lesbar() {
 }
 
 #[test]
+fn basis_nennt_bezeichnung_gruppe_einheit_und_zelttypen() {
+    for b in basis() {
+        assert!(!b.bezeichnung.trim().is_empty(), "{}", b.schluessel);
+        assert!(!b.gruppe.trim().is_empty(), "{}", b.schluessel);
+        assert!(!b.einheit.trim().is_empty(), "{}", b.schluessel);
+    }
+    let typen: Vec<&str> = zelttypen().iter().map(|z| z.typ.as_str()).collect();
+    assert_eq!(typen, ["sg20", "sg30", "sg40", "sg50"]);
+    assert!(zelttypen().iter().all(|z| !z.bezeichnung.is_empty()));
+}
+
+#[test]
 fn pruefe_grenzen_ganzzahl_und_unbekannt() {
     assert!(pruefe("flaeche_je_person_m2", 3.5).is_ok());
     assert!(matches!(

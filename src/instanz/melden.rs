@@ -103,6 +103,12 @@ pub struct MeldenAnfrage {
     /// Bis zu diesem Stand der erreichten Seite hat die meldende Seite Akten übernommen.
     #[serde(default)]
     pub fuehrung_bis: i64,
+    /// Bis zu diesem eigenen Stand hat die erreichte Seite nach dem Wissen der meldenden Seite
+    /// schon quittiert (ihr `fuehrung_gesendet_bis`, LLH-1708, design.md D5 der Change
+    /// `xi5ugyt8-fuehrung-stand-nach-restore`). Liegt die erreichte Seite darunter, wurde sie aus
+    /// einer Sicherung zurückgespielt. 0 vor LLH-1708.
+    #[serde(default)]
+    pub fuehrung_gesendet_bis: i64,
     /// Direktkopplung: der Fingerabdruck des Zertifikats der erreichten Seite, den die meldende
     /// Seite als beglaubigt gespeichert hat (LLH-1497, Anzeige „Zertifikat bestätigt“).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -695,6 +701,7 @@ async fn melden_einmal_mit(
         datentraeger_verschluesselt: datentraeger,
         fuehrung: fuehrung_ausgang.akten,
         fuehrung_bis: fuehrung_empfangen,
+        fuehrung_gesendet_bis: fuehrung_gesendet,
         tls_zertifikat: kopplung.tls_zertifikat.clone(),
     };
     let jetzt = crate::zeit::jetzt();
@@ -844,6 +851,16 @@ async fn melden_einmal_mit(
             .await?;
             fuehrung_repo::save_kopplung_staende(conn, kopplung.id, Some(quittung), eingang.bis)
                 .await?;
+            // Rückschritt des Gegenübers (LLH-1708, D2): Seine Quittung liegt unter dem, was es
+            // schon bestätigt hatte, es hat also Akten mit einer Sicherung verloren. 0 sagt ein
+            // Gegenüber ohne Schalter oder vor LLH-1491 immer; das ist kein Rückschritt.
+            if a.fuehrung_bis > 0 && a.fuehrung_bis < fuehrung_gesendet {
+                fuehrung_repo::reset_gesendet_bis(conn, kopplung.id, a.fuehrung_bis).await?;
+            }
+            // Rückschritt des eigenen Zählers (D3): Wer selbst zurückgespielt wurde, hebt ihn über
+            // die Quittung. Für diese Kopplung braucht es kein neues Stempeln (sie sendet ab dem
+            // eigenen `gesendet_bis`), wohl aber für jede, in der diese Instanz erreichte Seite ist.
+            fuehrung_austausch::repair_stand(conn, kopplung, a.fuehrung_bis).await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
@@ -1104,8 +1121,22 @@ pub async fn handle_meldung(
         .await?;
         if fuehrung_an {
             // Führung je Einsatz (LLH-1491, D3, D7): erst übernehmen (eine Anfrage wird dabei
-            // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite.
+            // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite. Davor ein
+            // Rückschritt des eigenen Zählers (LLH-1708, D3), damit jeder Stand dieser Meldung
+            // über der Quittung liegt.
+            fuehrung_austausch::repair_stand(conn, kopplung, anfrage.fuehrung_bis).await?;
             fuehrung_repo::ensure_akten(conn).await?;
+            // Verlorene Quittung (LLH-1708, D5): Liegt der eigene Empfangsstand unter dem, was die
+            // meldende Seite als quittiert führt, wurde diese Seite zurückgespielt. Dann gilt die
+            // alte Quittung, auch wenn diese Meldung schon eine neue Akte bringt; die meldende
+            // Seite setzt ihren Sendestand darauf zurück und schickt die verlorenen Akten erneut.
+            // Bis dahin bleibt der Empfangsstand stehen, damit auch eine Wiederholung nach einer
+            // verlorenen Antwort den Rückschritt noch zeigt. Nur bei 0 nicht: Eine Quittung 0
+            // setzt die meldende Seite nicht zurück, sie schickte sonst ewig dieselbe Seite.
+            let empfangen_vorher = fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
+                .await?
+                .1;
+            let rueckschritt = empfangen_vorher < anfrage.fuehrung_gesendet_bis;
             let eingang = fuehrung_austausch::apply_eingang(
                 conn,
                 kopplung,
@@ -1119,16 +1150,24 @@ pub async fn handle_meldung(
                 conn,
                 kopplung.id,
                 Some(anfrage.fuehrung_bis),
-                eingang.bis,
+                if rueckschritt && empfangen_vorher > 0 {
+                    None
+                } else {
+                    eingang.bis
+                },
             )
             .await?;
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
             fuehrung_folgen = eingang.folgen;
-            fuehrung_bis = fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
-                .await?
-                .1;
+            fuehrung_bis = if rueckschritt {
+                empfangen_vorher
+            } else {
+                fuehrung_repo::load_kopplung_staende(conn, kopplung.id)
+                    .await?
+                    .1
+            };
             fuehrung_ausgang = fuehrung_austausch::build_ausgang(
                 conn,
                 kopplung,
@@ -1190,7 +1229,17 @@ mod tests {
             fuehrung: Vec::new(),
             tls_zertifikat: None,
             fuehrung_bis: 0,
+            fuehrung_gesendet_bis: 0,
         }
+    }
+
+    #[test]
+    fn anfrage_ohne_sendestand_liest_sich_mit_null() {
+        // Eine meldende Seite vor LLH-1708 schickt `fuehrung_gesendet_bis` nicht (D4).
+        let mut v = serde_json::to_value(anfrage(&["h/1"], &[])).unwrap();
+        v.as_object_mut().unwrap().remove("fuehrung_gesendet_bis");
+        let a: MeldenAnfrage = serde_json::from_value(v).unwrap();
+        assert_eq!(a.fuehrung_gesendet_bis, 0);
     }
 
     #[test]

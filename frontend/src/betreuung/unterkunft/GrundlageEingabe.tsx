@@ -7,7 +7,10 @@ import { Segmentleiste, useRollen, type SegmentOption } from '../../components/i
 import type { Eingabe, Raum, Weg, Zeltbestand } from './rechnerKern';
 import { ZELTTYPEN, type ZeltTyp } from './richtwerte';
 
-/** Grenzen der Eingabe (design.md D8): Raumzahl und Maße wie die spätere API. */
+/**
+ * Grenzen der Eingabe (design.md D8): Raumzahl und Maße wie die Rechner-API
+ * (`src/unterkunft/rechner.rs`, LLH-1524). Die API nimmt bis 1 000 000 Personen, die Maske ist enger.
+ */
 export const RAEUME_MAX = 200;
 export const MASS_MAX_M = 1000;
 export const PERSONEN_MAX = 100_000;
