@@ -48,11 +48,11 @@ TDD: zuerst der Test, der rot wird, dann der Code.
   - Fehler hält die Eingaben
   - Erfolg zeigt das Ergebnis
 - [ ] 5.3 e2e in `frontend/e2e/aufbewahrung.spec.ts`: Admin spielt einen Block ein (Block über den Download der Akte erzeugt, Schlüssel aus dem Test-Setup). Danach erscheint der Einsatz mit „Aus dem Archiv · bis …“. Prüfung: Spec grün lokal (`--trace off`).
-- [ ] 5.4 Anwenderkapitel `docs/anwender/kapitel/aufbewahrung.md` („Ein Archiv herunterladen“ → Einspielen in der Verwaltung, „Wer was darf“) mit Bild des Dialogs und des Ergebnisses (`frontend/e2e/doku-bilder/aufbewahrung.bilder.ts`, `pnpm doku:bilder --grep aufbewahrung`). Prüfung: Wächter der Anwenderdoku in `scripts/check-all.sh` grün.
+- [x] 5.4 Anwenderkapitel `docs/anwender/kapitel/aufbewahrung.md` („Ein Archiv herunterladen“ → Einspielen in der Verwaltung, „Wer was darf“) mit Bild des Dialogs und des Ergebnisses (`frontend/e2e/doku-bilder/aufbewahrung.bilder.ts`, `pnpm doku:bilder --grep aufbewahrung`). Prüfung: Wächter der Anwenderdoku in `scripts/check-all.sh` grün.
 
 ## 6. Abschluss
 
-- [ ] 6.1 Architekturdoku nach `docs/architektur/AGENTS.md` (Mitänderungsregel) geprüft und, falls ein Kapitel den Weg „nur per Befehl“ nennt, nachgezogen. Prüfung: `grep -rn "archiv einspielen" docs/architektur` gesichtet.
+- [x] 6.1 Architekturdoku nach `docs/architektur/AGENTS.md` (Mitänderungsregel) geprüft und, falls ein Kapitel den Weg „nur per Befehl“ nennt, nachgezogen. Prüfung: `grep -rn "archiv einspielen" docs/architektur` gesichtet.
 - [ ] 6.2 `./scripts/check-all.sh --geaendert` grün; der volle Lauf belegt die CI des PRs.
 
 ## Workflow follow-up
