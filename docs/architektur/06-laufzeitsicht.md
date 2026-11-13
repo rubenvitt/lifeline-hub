@@ -250,7 +250,7 @@ sequenceDiagram
 ## 6.6a Instanzen koppeln und melden
 
 Zwei Instanzen (etwa ELW und Hub) koppeln sich per Einmal-Code (LLH-1490,
-[ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md)).
+[ADR-0034](entscheidungen/ADR-0034-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md)).
 A stellt aus und wird gemeldet, E löst ein und meldet sich; das Protokoll kennt nur diese
 Richtung, nicht Hub und ELW.
 
@@ -493,6 +493,39 @@ sequenceDiagram
 - Unbekannte Zugänge und gescheiterte Einlösungen zählen je Quelle im Zähler für Maschinen
   (`src/auth/rate_limit.rs`, `maschine`), nie in der Anmeldesperre; je Zugang drosselt
   `src/public_api/drossel.rs`.
+
+## 6.6e Einwurf ohne Signatur
+
+Ein Absender, der nur eine URL aufrufen kann, wirft über einen Schlüssel im Pfad ein (LLH-1654,
+[ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md),
+Spec [`einwurf-zugang`](../../openspec/specs/einwurf-zugang/spec.md)).
+
+```mermaid
+sequenceDiagram
+  participant Admin as frontend Anbindungen
+  participant Hub as lifeline-hub (src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/)
+  participant A as Absender (BOSWatch, FE2, OsmAnd)
+  Admin->>Hub: POST /api/admin/einwurf-zugaenge {name, scope}
+  Hub-->>Admin: Schlüssel llh_ew_… (einmal), gespeichert nur als SHA-256
+  A->>Hub: GET /api/v1/einwurf/<schlüssel>/alarmmeldung?…
+  Hub->>Hub: TLS-Nachweis, Sperre der Quelle, Suche über den Hash, Zustand, Zweck, Drossel
+  Hub->>Hub: ablage: roh ablegen oder als Wiederholung vermerken
+  Hub-->>A: 204 ohne Body (Cache-Control: no-store)
+```
+
+- Die Reihenfolge der Prüfungen steht an einer Stelle (`check_einwurf` in
+  `src/public_api/einwurf/routen.rs`): Der TLS-Nachweis (`is_tls_nachgewiesen`, `src/extract.rs`) kommt
+  vor der Suche, damit eine Klartext-Anfrage kein Orakel für Schlüssel ist.
+- Eine Alarmmeldung wird nicht gedeutet. Mit `message_id` ist sie dauerhaft idempotent, mit
+  `external_id` allein bei gleichem Inhalt; ohne Kennung gilt gleicher Inhalt desselben Zugangs
+  zwei Minuten lang als Wiederholung und wird am Eintrag gezählt (`alarmmeldung_ablegen` in
+  `src/public_api/einwurf/ablage.rs`). Den Einsatzvorschlag baut LLH-1192 auf der Ablage.
+- Eine Position ersetzt die letzte ihrer Kennung, wenn sie nicht älter ist (`position_ablegen`,
+  Tabelle `position_letzte`); einen Verlauf gibt es nicht.
+- Der Span der Anfrage nennt den Pfad mit `***` statt des Schlüssels (`pfad_fuer_protokoll` in
+  `src/app.rs`, `einwurf::maskiere_pfad`).
+- Der Purge-Lauf löscht Alarmmeldungen nach 7 Tagen und Positionen nach 24 Stunden
+  (`einwurf::purge`, aufgerufen in `src/einsatz/purge_scheduler.rs`).
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

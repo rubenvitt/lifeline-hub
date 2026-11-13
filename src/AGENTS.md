@@ -133,6 +133,14 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   puffert ihn; ein Handler bekommt den Body ganz); jede Antwort `Cache-Control: no-store`
   (`public_api::contract_layer`, montiert in `app.rs`). Die innere Schicht setzt den Kopf nicht,
   sonst packte die Kompression keine v1-Antwort mehr.
+- **Einwurf** (LLH-1654, [ADR-0023](../docs/architektur/entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md),
+  Spec `einwurf-zugang`): die einzigen v1-Routen ohne `MachineClient`. Die Prüfungen stehen in
+  genau einer Funktion (`check_einwurf` in `public_api/einwurf/routen.rs`), TLS-Nachweis zuerst; wer eine
+  Einwurf-Route ergänzt, ruft sie auf. **Kein `tracing`-Aufruf nennt Pfad, Abfrage, Schlüssel
+  oder Hash** (die Kennung des Zugangs genügt); der Span trägt den Pfad schon maskiert
+  (`pfad_fuer_protokoll`, Test `app::tests::einwurf_schluessel_steht_in_keiner_logzeile`). Eine
+  Antwort trägt nie Daten und unterscheidet neu nicht von wiederholt. Was ein Schlüsselinhaber je
+  Aufruf auslösen kann, loggt als `log_drossel::SammelzeileJe` je Zugang.
 
 ## Anhänge
 
@@ -337,7 +345,7 @@ Spec `passwort-anmeldung`, Herleitung
 ## Backend — Instanzkopplung (LLH-1490)
 
 Zwei Instanzen (ELW und Hub) sprechen nur signiert miteinander; Regeln des Verfahrens in
-[ADR-0014](../docs/architektur/entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
+[ADR-0034](../docs/architektur/entscheidungen/ADR-0034-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
 Herleitung in
 `openspec/changes/archive/2026-11-08-ckq15vzr-instanzkopplung-schluessel/design.md`.
 

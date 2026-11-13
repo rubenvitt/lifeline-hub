@@ -18,6 +18,8 @@ const AN: RouterOptionen = RouterOptionen {
     demo_daten: true,
     zulassungs_budget: None,
     heic_decoder_verzeichnis: None,
+    tls: false,
+    einwurf_allow_http: false,
 };
 
 async fn admin(app: &axum::Router) -> String {

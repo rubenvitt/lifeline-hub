@@ -14,6 +14,8 @@ const AN: RouterOptionen = RouterOptionen {
     demo_daten: true,
     zulassungs_budget: None,
     heic_decoder_verzeichnis: None,
+    tls: false,
+    einwurf_allow_http: false,
 };
 
 const CSV: &[u8] = include_bytes!("../frontend/public/beispiele/schichtplan-stadtfest.csv");

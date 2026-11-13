@@ -435,6 +435,16 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     }
     lifeline_hub::extract::init_vertraute_proxys(config.trusted_proxies.clone());
 
+    // Einwurf ohne TLS (ADR-0023): der Schalter nimmt Schlüssel und Alarmtext im Klartext an und
+    // steht deshalb im Log. Unter `--tls` kommt ohnehin nichts unverschlüsselt an.
+    if config.einwurf_allow_http && !config.tls {
+        tracing::warn!(
+            "Einwürfe werden auch ohne TLS angenommen: --einwurf-allow-http \
+             (LIFELINE_EINWURF_ALLOW_HTTP). Der Schlüssel eines Einwurf-Zugangs steht in der \
+             URL; nur in einem Netz setzen, das selbst verschlüsselt."
+        );
+    }
+
     // Demo-Daten: der Schalter reist als Router-Option. Er öffnet einen harten Löschweg und steht
     // deshalb im Log.
     if config.demo_daten {
@@ -505,6 +515,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             demo_daten: config.demo_daten,
             zulassungs_budget: None,
             heic_decoder_verzeichnis: config.heic_decoder_verzeichnis.clone(),
+            tls: config.tls,
+            einwurf_allow_http: config.einwurf_allow_http,
         },
     );
     lifeline_hub::instanz::spiegel::takt::start(spiegel_pool, app.clone());

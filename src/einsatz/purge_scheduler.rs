@@ -301,6 +301,12 @@ pub async fn tick_mit_rueckschrieb(
         tracing::error!("Purge Maschinenzugang fehlgeschlagen: {e}");
     }
 
+    // Einwurf (LLH-1654): Alarmmeldungen der Ablage nach 7 Tagen, letzte Positionen nach 24
+    // Stunden.
+    if let Err(e) = crate::public_api::einwurf::purge(pool, &crate::zeit::jetzt()).await {
+        tracing::error!("Purge Einwurf-Ablage fehlgeschlagen: {e}");
+    }
+
     // Admin-Spur (LFH-1005): dieselbe Lage wie das Auth-Audit, eigene, längere Frist.
     match crate::auth::admin_audit::purge_abgelaufene(pool).await {
         Ok(0) => {}
