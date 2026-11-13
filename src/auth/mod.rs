@@ -51,6 +51,19 @@ pub const PASSWORT_HASH_SSO_ONLY: &str = "!sso-kein-lokales-passwort";
 /// Einmalpasswort oder Passkey.
 pub const PASSWORT_HASH_KEIN_LOKALES: &str = "!kein-lokales-passwort";
 
+/// Höchstlänge des Anzeigenamens eines Kontos in Zeichen (LLH-1702, `src/AGENTS.md`,
+/// „Eingabegrenzen“). Der Name steht als Unterzeichner in der Erklärung einer Notübernahme, deren
+/// Größe das Gegenüber begrenzt (`instanz::fuehrung::dienst::erklaerung_text`).
+pub const ANZEIGENAME_MAX: usize = 200;
+
+/// Kürzt einen Anzeigenamen, den kein Mensch an dieser Instanz eingibt (Stammdaten einer
+/// gekoppelten Instanz, SSO-Erstanmeldung, Stellvertreter, Unterzeichner einer Erklärung), auf
+/// seine ersten [`ANZEIGENAME_MAX`] Zeichen. Eingaben an einer Maske werden nicht gekürzt,
+/// sondern mit 400 abgelehnt (`routes::support::pflicht_max`).
+pub fn truncate_anzeigename(name: &str) -> String {
+    name.chars().take(ANZEIGENAME_MAX).collect()
+}
+
 wire_enum! {
     /// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -223,6 +236,15 @@ pub struct BenutzerAnzeige {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn name_an_der_grenze_bleibt_und_ein_laengerer_verliert_nur_den_rest() {
+        let genau = "ä".repeat(ANZEIGENAME_MAX);
+        assert_eq!(truncate_anzeigename(&genau), genau, "Zeichen, nicht Byte");
+        let lang = format!("{genau}xyz");
+        assert_eq!(truncate_anzeigename(&lang), genau);
+        assert_eq!(truncate_anzeigename("Erika"), "Erika");
+    }
 
     fn benutzer_mit(system_rolle: &str, org_rolle: &str) -> Benutzer {
         Benutzer {

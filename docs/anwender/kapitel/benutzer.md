@@ -2,7 +2,7 @@
 titel: Benutzer
 gruppen: [administration]
 reihenfolge: 650
-quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/instanz/herkunft.tsx, frontend/src/auth/EinmalpasswortVergeben.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs]
+quellen: [frontend/src/pages/BenutzerPage.tsx, frontend/src/instanz/herkunft.tsx, frontend/src/auth/EinmalpasswortVergeben.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/admin/adminNav.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/LoginPage.tsx, src/routes/benutzer.rs, src/routes/sitzung.rs, src/auth/session.rs, src/auth/mod.rs, src/auth/oidc/provisioning.rs, src/instanz/stammdaten/uebernehmen.rs]
 ---
 
 ## Überblick
@@ -146,6 +146,14 @@ Anmeldung.
 Einen eingerichteten zweiten Faktor setzt die Verwaltung zurück (oben). Dabei enden alle
 Anmeldungen der Person, auch die eigene, wenn ein System-Admin das eigene Konto zurücksetzt, und
 alle Wiederherstellungscodes verfallen. Bis zur neuen Einrichtung im Profil genügt das Passwort.
+
+### Anzeigename
+
+Der Anzeigename ist höchstens 200 Zeichen lang. Ab 160 Zeichen zeigt das Feld den Stand als
+„n / 200“, darüber „zu lang“; gekürzt wird nichts, „Anlegen“ und „Speichern“ gehen erst wieder,
+wenn der Name passt. Das gilt auch für ein älteres Konto mit längerem Namen, sobald es bearbeitet
+wird. Ein Name, den niemand hier eintippt, wird dagegen auf seine ersten 200 Zeichen gekürzt
+übernommen: bei einem Konto vom Hub und bei der ersten Anmeldung über die Organisation (SSO).
 
 ### Konten vom Hub
 

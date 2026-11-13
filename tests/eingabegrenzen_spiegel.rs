@@ -7,8 +7,8 @@ use std::collections::BTreeMap;
 use lifeline_hub::abloesung::schichtplan;
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
-    abloesung, auftrag, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage, einsatz,
-    einsatz_vorlage, etb, externe_stelle, fahrzeug, fuehrung, gefahr, infotelefon,
+    abloesung, auftrag, auth, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage,
+    einsatz, einsatz_vorlage, etb, externe_stelle, fahrzeug, fuehrung, gefahr, infotelefon,
     kraefte_disposition, lage_zone, lagebesprechung, lagebild_extern, material, nachforderung,
     person, personal, planung, programmpunkt, schaden, schichtmodell, sprechgruppe, verpflegung,
     vorlagendokument, zeitachse,
@@ -16,6 +16,7 @@ use lifeline_hub::{
 
 fn backend() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
+        ("ANZEIGENAME_MAX", auth::ANZEIGENAME_MAX),
         ("ETB_INHALT_MAX", etb::INHALT_MAX),
         (
             "BETREUUNG_STELLE_BEZEICHNUNG_MAX",

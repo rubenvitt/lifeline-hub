@@ -46,6 +46,26 @@ pub fn check_grund(grund: &str) -> Result<String, AppError> {
     Ok(g.to_string())
 }
 
+/// Der Text einer Erklärung, wie er in die Akte und unter die Unterschrift geht, oder 422, wenn
+/// er größer ist, als das Gegenüber an einer Akte annimmt ([`austausch::ERKLAERUNG_MAX`] Byte,
+/// dasselbe Maß wie `AkteMeldung::is_in_grenzen_bis`). Jede Erklärung geht vor dem Speichern
+/// hier durch (LLH-1702, ADR-0037): Eine zu große Akte schickt der Ausgang nicht, die
+/// Notübernahme gälte dann nur lokal, und beide Seiten hielten sich für die führende Instanz.
+///
+/// Der Unterzeichner ist beim Bauen schon gekürzt ([`crate::auth::truncate_anzeigename`]); was
+/// dann noch zu groß ist, liegt am Grund (Steuerzeichen kosten in JSON sechs Byte je Zeichen).
+pub fn erklaerung_text(e: &NotuebernahmeErklaerung) -> Result<String, AppError> {
+    let text = NotuebernahmeErklaerung::to_text(e);
+    if text.len() > austausch::ERKLAERUNG_MAX {
+        return Err(AppError::UnprocessableEntity(
+            "Die Erklärung der Notübernahme ist zu groß für die Übertragung. Bitte den Grund \
+             kürzen."
+                .into(),
+        ));
+    }
+    Ok(text)
+}
+
 /// 409, wenn über die Kopplung zu `g` keine Führung wechselt (Direktkopplung vor Ort, LLH-1497,
 /// Spec `instanz-fuehrung`, „Über eine Direktkopplung wechselt die Führung nicht“).
 pub fn fordere_wechsel(g: &FuehrungGegenueber) -> Result<(), AppError> {
@@ -301,13 +321,15 @@ pub async fn notuebernahme_gegen_erreichte(
             fuehrer_neu: ich.kennung.clone(),
             grund: grund.clone(),
             zeitpunkt: crate::zeit::jetzt(),
-            unterzeichner: wer.to_string(),
+            unterzeichner: crate::auth::truncate_anzeigename(wer),
         };
+        // Vor jeder Änderung an der Akte: ein 422 lässt die Führung, wo sie war.
+        let text = erklaerung_text(&e)?;
         a.set_epoche(&neu);
         a.fuehrer_kennung = ich.kennung.clone();
         a.fuehrer_name = ich.name.clone();
         a.set_art(FuehrungWechselArt::Notuebernahme);
-        a.erklaerung = Some(e.to_text());
+        a.erklaerung = Some(text);
         a.beweis = None;
         a.anfrage_at = None;
         a.bruch_at = None;
@@ -351,7 +373,7 @@ pub async fn build_erklaerung_gegen_meldende(
         ));
     }
     let alt = a.epoche();
-    Ok(NotuebernahmeErklaerung {
+    let e = NotuebernahmeErklaerung {
         typ: TYP_NOTUEBERNAHME.into(),
         einsatz: a.kennung.clone(),
         org: g.org_schluessel,
@@ -361,8 +383,12 @@ pub async fn build_erklaerung_gegen_meldende(
         fuehrer_neu: ich.kennung,
         grund,
         zeitpunkt: crate::zeit::jetzt(),
-        unterzeichner: unterzeichner.to_string(),
-    })
+        unterzeichner: crate::auth::truncate_anzeigename(unterzeichner),
+    };
+    // Schon hier, damit eine zu große Erklärung gar nicht erst zur Unterschrift vorliegt; der
+    // Vollzug prüft den endgültigen Text noch einmal (der Weg mit Code ändert die Epoche).
+    erklaerung_text(&e)?;
+    Ok(e)
 }
 
 /// Vollzieht eine Notübernahme gegen die meldende Seite mit geprüftem Beweis. Die Erklärung muss
@@ -383,6 +409,7 @@ pub async fn notuebernahme_gegen_meldende(
             ));
         }
         fordere_spiegel_hier(&a)?;
+        let text = erklaerung_text(e)?;
         let von = a.fuehrer_name.clone();
         a.set_epoche(&e.epoche_neu);
         a.fuehrer_kennung = e.fuehrer_neu.clone();
@@ -391,7 +418,7 @@ pub async fn notuebernahme_gegen_meldende(
             FuehrungBeweis::Unterschrift { .. } => FuehrungWechselArt::Notuebernahme,
             FuehrungBeweis::Code { .. } => FuehrungWechselArt::CodeAbgabe,
         });
-        a.erklaerung = Some(e.to_text());
+        a.erklaerung = Some(text);
         a.beweis = Some(serde_json::to_string(beweis).expect("serialisierbar"));
         a.bruch_at = None;
         repo::save(conn, &mut a, true).await?;
@@ -430,7 +457,8 @@ pub async fn notuebernahme_mit_code(
     // Die meldende Seite hat die Epoche beim Erzeugen des Codes mit ihrer Kennung reserviert.
     e.epoche_neu = Epoche::naechste([&e.epoche_alt], &e.fuehrer_alt);
     let schluessel = erklaerung::abgabe_schluessel(&c, &e.einsatz, &e.epoche_neu);
-    let text = e.to_text();
+    // Der endgültige Text, nach dem Tausch der Epoche: über ihn rechnet der Prüfwert.
+    let text = erklaerung_text(&e)?;
     let beweis = FuehrungBeweis::Code {
         pruefwert: erklaerung::code_pruefwert(&schluessel, &text),
     };
@@ -756,4 +784,54 @@ pub async fn load_fremde(
         return Err(AppError::NotFound);
     }
     Ok(a)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn erklaerung_mit_grund(grund: String) -> NotuebernahmeErklaerung {
+        NotuebernahmeErklaerung {
+            typ: TYP_NOTUEBERNAHME.into(),
+            einsatz: "elw/1".into(),
+            org: "org".into(),
+            epoche_alt: Epoche::neu(1, "hub"),
+            epoche_neu: Epoche::neu(2, "elw"),
+            fuehrer_alt: "hub".into(),
+            fuehrer_neu: "elw".into(),
+            grund,
+            zeitpunkt: "2026-11-12 20:00:00".into(),
+            unterzeichner: "Erika Beispiel".into(),
+        }
+    }
+
+    /// Die Grenze ist die des Empfängers, in Byte des Texts: genau `ERKLAERUNG_MAX` geht durch,
+    /// ein Byte mehr ist 422 und nennt, was zu kürzen ist (LLH-1702).
+    #[test]
+    fn erklaerung_genau_an_der_grenze_geht_durch_und_ein_byte_mehr_ist_422() {
+        let leer = erklaerung_mit_grund(String::new()).to_text().len();
+        let genau = erklaerung_mit_grund("g".repeat(austausch::ERKLAERUNG_MAX - leer));
+        let text = erklaerung_text(&genau).expect("an der Grenze");
+        assert_eq!(text.len(), austausch::ERKLAERUNG_MAX);
+        assert_eq!(text, genau.to_text());
+
+        let drueber = erklaerung_mit_grund("g".repeat(austausch::ERKLAERUNG_MAX - leer + 1));
+        match erklaerung_text(&drueber) {
+            Err(AppError::UnprocessableEntity(m)) => assert_eq!(
+                m,
+                "Die Erklärung der Notübernahme ist zu groß für die Übertragung. Bitte den \
+                 Grund kürzen."
+            ),
+            anderes => panic!("erwartet 422, war {anderes:?}"),
+        }
+    }
+
+    /// Gezählt wird, was auf die Leitung geht: ein Steuerzeichen kostet in JSON sechs Byte.
+    #[test]
+    fn steuerzeichen_zaehlen_mit_ihrer_laenge_in_json() {
+        let leer = erklaerung_mit_grund(String::new()).to_text().len();
+        let zeichen = (austausch::ERKLAERUNG_MAX - leer) / 6 + 1;
+        assert!(erklaerung_text(&erklaerung_mit_grund("\u{1}".repeat(zeichen))).is_err());
+        assert!(erklaerung_text(&erklaerung_mit_grund("g".repeat(zeichen))).is_ok());
+    }
 }
