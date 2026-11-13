@@ -59,6 +59,37 @@ impl AkteZeile {
     pub fn set_art(&mut self, art: FuehrungWechselArt) {
         self.art = art.as_str().to_string();
     }
+
+    /// Diese Akte als [`AkteRef`]: Wer sie in einer späteren Transaktion neu lädt, trifft dieselbe.
+    pub fn as_akte_ref(&self) -> AkteRef<'_> {
+        AkteRef {
+            id: self.id,
+            kennung: &self.kennung,
+        }
+    }
+}
+
+/// Die Akte, die ein Aufrufer meint (LLH-1862): ID samt Kennung als Gegenprobe. Die ID allein
+/// trägt nicht, weil `einsatz_fuehrung.id` ein `INTEGER PRIMARY KEY` ohne `AUTOINCREMENT` ist und
+/// SQLite die größte ID nach dem Löschen neu vergibt; die Kennung ist `UNIQUE` und bleibt.
+#[derive(Debug, Clone, Copy)]
+pub struct AkteRef<'a> {
+    pub id: i64,
+    pub kennung: &'a str,
+}
+
+/// Text der 409, wenn unter der ID inzwischen ein anderer Einsatz liegt.
+pub const AKTE_GEWECHSELT: &str =
+    "Unter dieser Akte liegt inzwischen ein anderer Einsatz. Die Liste neu laden und die Akte \
+     erneut wählen.";
+
+/// Prüft, ob `a` die gemeinte Akte ist; sonst 409 [`AKTE_GEWECHSELT`].
+pub fn check_kennung(a: &AkteZeile, kennung: &str) -> Result<(), AppError> {
+    if a.kennung == kennung {
+        Ok(())
+    } else {
+        Err(AppError::Conflict(AKTE_GEWECHSELT.into()))
+    }
 }
 
 /// Eigene Kennung und Name dieser Instanz.
@@ -137,6 +168,14 @@ pub async fn load(conn: &mut SqliteConnection, id: i64) -> Result<AkteZeile, App
     .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)
+}
+
+/// [`load`] mit Gegenprobe der Kennung (LLH-1862): 404 ohne Zeile, 409, wenn unter der ID ein
+/// anderer Einsatz liegt.
+pub async fn load_ref(conn: &mut SqliteConnection, r: AkteRef<'_>) -> Result<AkteZeile, AppError> {
+    let a = load(conn, r.id).await?;
+    check_kennung(&a, r.kennung)?;
+    Ok(a)
 }
 
 pub async fn find_by_einsatz(

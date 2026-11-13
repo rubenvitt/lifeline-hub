@@ -8,6 +8,7 @@ mod common;
 use axum::http::StatusCode;
 use lifeline_hub::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey;
 use lifeline_hub::auth::unterschrift::repo as unterschrift;
+use lifeline_hub::instanz::fuehrung::repo::AKTE_GEWECHSELT;
 use serde_json::{json, Value};
 
 const RP: &str = "hub.example.org";
@@ -863,6 +864,221 @@ async fn akte_einer_anderen_org_ist_404() {
     let f = &fremde(&elw).await[0];
     assert_eq!(f["anfrage_offen"], false, "nichts hat die Akte verändert");
     assert_eq!(f["fuehrer_kennung"], hub.kennung);
+}
+
+// ── Gegenprobe über die Kennung (LLH-1862) ───────────────────────────────────────────────────
+//
+// `einsatz_fuehrung.id` ist `INTEGER PRIMARY KEY` ohne `AUTOINCREMENT`: SQLite vergibt die größte
+// ID nach dem Löschen neu. Die Tests ändern die Kennung unter der ID; das ist derselbe Zustand wie
+// Löschen und Neuanlage.
+
+/// Setzt unter `akte` einen anderen Einsatz, wie ihn eine Neuanlage unter der alten ID brächte.
+async fn anderer_einsatz_unter(i: &Instanz, akte: i64, kennung: &str) {
+    sqlx::query("UPDATE einsatz_fuehrung SET kennung = ? WHERE id = ?")
+        .bind(kennung)
+        .bind(akte)
+        .execute(&i.pool)
+        .await
+        .unwrap();
+}
+
+fn mit_kennung(pfad: &str, kennung: &str) -> String {
+    let q = form_urlencoded::Serializer::new(String::new())
+        .append_pair("kennung", kennung)
+        .finish();
+    format!("{pfad}?{q}")
+}
+
+/// Der Dialog „Führung …“ schickt die Kennung der Akte, die er zeigt. Liegt unter der ID
+/// inzwischen ein anderer Einsatz, lehnt jede Bedienroute mit 409 ab und ändert nichts; mit der
+/// passenden Kennung und ohne Kennung geht sie wie bisher.
+#[tokio::test]
+async fn bedienung_einer_akte_unter_neu_vergebener_id_ist_409() {
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let f = &fremde(&elw).await[0];
+    let akte = f["id"].as_i64().unwrap();
+    let gezeigt = f["kennung"].as_str().unwrap().to_string();
+    let neu = format!("{}/999", hub.kennung);
+    anderer_einsatz_unter(&elw, akte, &neu).await;
+
+    for (pfad, body) in [
+        ("uebergeben", json!({"an": hub.kennung})),
+        ("code", json!({"an": hub.kennung})),
+        ("anfragen", json!({})),
+        ("notuebernahme", json!({"grund": "Funkausfall"})),
+        ("notuebernahme/start", json!({"grund": "Funkausfall"})),
+        (
+            "notuebernahme/code",
+            json!({"grund": "Funkausfall", "code": "AAAA"}),
+        ),
+        ("bestaetigen", json!({})),
+        ("widersprechen", json!({})),
+    ] {
+        let (s, v) = post(
+            &elw,
+            &mit_kennung(
+                &format!("/api/admin/instanz/fuehrung/{akte}/{pfad}"),
+                &gezeigt,
+            ),
+            body,
+        )
+        .await;
+        // Der Text unterscheidet die Gegenprobe von den 409 der Regeln (Führung liegt beim
+        // Gegenüber, keine Übernahme wartet), die hier sonst auch anschlügen.
+        assert_eq!(s, StatusCode::CONFLICT, "{pfad}: {v}");
+        assert_eq!(v["error"], AKTE_GEWECHSELT, "{pfad}: {v}");
+    }
+    let f = &fremde(&elw).await[0];
+    assert_eq!(f["anfrage_offen"], false, "nichts angefragt");
+    assert_eq!(f["kennung"], neu.as_str());
+
+    let (s, v) = post(
+        &elw,
+        &mit_kennung(
+            &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+            &neu,
+        ),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "passende Kennung: {v}");
+    assert_eq!(v["anfrage_offen"], true);
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "ohne Kennung wie bisher: {v}");
+}
+
+/// Zwischen dem Laden in der Route und der Schreibtransaktion kann die Akte wechseln: Jeder Dienst
+/// prüft die Kennung in seiner Transaktion selbst, vor seinen Regeln.
+#[tokio::test]
+async fn dienst_prueft_die_kennung_in_seiner_transaktion() {
+    use lifeline_hub::error::AppError;
+    use lifeline_hub::instanz::fuehrung::dienst;
+    use lifeline_hub::instanz::fuehrung::erklaerung::{
+        FuehrungBeweis, NotuebernahmeErklaerung, TYP_NOTUEBERNAHME,
+    };
+    use lifeline_hub::instanz::fuehrung::repo::AkteRef;
+    use lifeline_hub::instanz::fuehrung::Epoche;
+
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let f = &fremde(&elw).await[0];
+    let akte = f["id"].as_i64().unwrap();
+    let gezeigt = f["kennung"].as_str().unwrap().to_string();
+    let r = AkteRef {
+        id: akte,
+        kennung: &gezeigt,
+    };
+    anderer_einsatz_unter(&elw, akte, &format!("{}/999", hub.kennung)).await;
+
+    let ist_gewechselt = |name: &str, r: Result<(), AppError>| match r {
+        Err(AppError::Conflict(t)) => assert_eq!(t, AKTE_GEWECHSELT, "{name}"),
+        anders => panic!("{name}: erwartet 409, war {anders:?}"),
+    };
+    let p = &elw.pool;
+    ist_gewechselt(
+        "uebergeben",
+        dienst::uebergeben(p, r, &hub.kennung, "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "code_abgeben",
+        dienst::code_abgeben(p, r, &hub.kennung, "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt("anfragen", dienst::anfragen(p, r).await.map(drop));
+    ist_gewechselt(
+        "notuebernahme_gegen_erreichte",
+        dienst::notuebernahme_gegen_erreichte(p, r, "Probe", "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "build_erklaerung_gegen_meldende",
+        dienst::build_erklaerung_gegen_meldende(p, r, "Probe", "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "notuebernahme_mit_code",
+        dienst::notuebernahme_mit_code(p, r, "Probe", "ABCD-EFGH-JKLM-NPQR", "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "bestaetigen",
+        dienst::bestaetigen(p, r, "Erika").await.map(drop),
+    );
+    ist_gewechselt(
+        "widersprechen",
+        dienst::widersprechen(p, r, "Erika").await.map(drop),
+    );
+    // Die Erklärung nennt die gezeigte Akte; Inhalt und Beweis zählen nicht, die Kennung scheitert
+    // vorher.
+    let e = NotuebernahmeErklaerung {
+        typ: TYP_NOTUEBERNAHME.into(),
+        einsatz: gezeigt.clone(),
+        org: "org".into(),
+        epoche_alt: Epoche::neu(1, &hub.kennung),
+        epoche_neu: Epoche::neu(2, &elw.kennung),
+        fuehrer_alt: hub.kennung.clone(),
+        fuehrer_neu: elw.kennung.clone(),
+        grund: "Probe".into(),
+        zeitpunkt: "2026-11-13 12:00:00".into(),
+        unterzeichner: "Erika".into(),
+    };
+    let beweis = FuehrungBeweis::Code {
+        pruefwert: "p".into(),
+    };
+    ist_gewechselt(
+        "notuebernahme_gegen_meldende",
+        dienst::notuebernahme_gegen_meldende(p, r, &e, &beweis, "Erika")
+            .await
+            .map(drop),
+    );
+    let f = &fremde(&elw).await[0];
+    assert_eq!(f["anfrage_offen"], false, "nichts angefragt: {f}");
+    assert_eq!(
+        f["fuehrer_kennung"], hub.kennung,
+        "Führung unverändert: {f}"
+    );
+}
+
+/// Eine Unterschrift gilt dem Einsatz ihrer Erklärung. Liegt unter der ID der Zeremonie beim
+/// Abschluss ein anderer Einsatz, übernimmt der Hub ihn nicht, auch wenn Epoche und Führer gleich
+/// sind.
+#[tokio::test]
+async fn unterschrift_fuer_einen_anderen_einsatz_unter_derselben_id_wird_abgelehnt() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, akte) = elw_einsatz(&hub, &elw).await;
+    let (s, start) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start"),
+        json!({"grund": "Funkausfall"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{start}");
+    anderer_einsatz_unter(&hub, akte, &format!("{}/999", elw.kennung)).await;
+    let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/abschluss"),
+        json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let f = &fremde(&hub).await[0];
+    assert_eq!(f["fuehrend"], false, "der Hub hat nicht übernommen: {f}");
+    assert_eq!(f["fuehrer_kennung"], elw.kennung);
 }
 
 #[tokio::test]
@@ -5417,10 +5633,19 @@ async fn vollzug_gegen_die_meldende_seite_lehnt_eine_zu_grosse_erklaerung_selbst
     use lifeline_hub::error::AppError;
     use lifeline_hub::instanz::fuehrung::dienst;
     use lifeline_hub::instanz::fuehrung::erklaerung::FuehrungBeweis;
+    use lifeline_hub::instanz::fuehrung::repo::AkteRef;
 
     let (hub, elw) = gekoppelt().await;
     let (_, akte) = elw_einsatz(&hub, &elw).await;
-    let mut e = dienst::build_erklaerung_gegen_meldende(&hub.pool, akte, "Sonde", "Erika")
+    let kennung = fremde(&hub).await[0]["kennung"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let ref_ = AkteRef {
+        id: akte,
+        kennung: &kennung,
+    };
+    let mut e = dienst::build_erklaerung_gegen_meldende(&hub.pool, ref_, "Sonde", "Erika")
         .await
         .unwrap();
     e.grund = "g".repeat(ERKLAERUNG_BYTES);
@@ -5428,7 +5653,7 @@ async fn vollzug_gegen_die_meldende_seite_lehnt_eine_zu_grosse_erklaerung_selbst
 
     let ergebnis = dienst::notuebernahme_gegen_meldende(
         &hub.pool,
-        akte,
+        ref_,
         &e,
         &FuehrungBeweis::Code {
             pruefwert: "p".into(),

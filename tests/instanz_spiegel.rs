@@ -1544,3 +1544,216 @@ async fn ein_antrag_ohne_gespeicherte_quittung_wird_nicht_doppelt_ausgefuehrt() 
         "der Antrag ist erledigt"
     );
 }
+
+// ── Neuzuordnung an eine andere Org (LLH-1851) ───────────────────────────────────────────────
+
+/// Legt am Hub eine zweite Org mit einem Admin (samt Unterschriftsschlüssel, damit er Codes
+/// ausstellen kann) und einer Führungskraft an; liefert (Org, Cookie Admin, Cookie Führungskraft).
+async fn zweite_org(hub: &Instanz) -> (i64, String, String) {
+    let (org, admin) =
+        common::fremde_org_anlegen(&hub.pool, "Org Y", "yadmin", "yadmin-pw-123", "keine").await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE benutzer SET system_rolle = 'admin' WHERE id = {admin}"),
+    )
+    .await;
+    let hash = lifeline_hub::auth::password::hash("yfk-pw-1234").unwrap();
+    sqlx::query(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, \
+         org_rolle) VALUES (?, 'Y-Führung', 'yfk', ?, 'keiner', 'fuehrungskraft')",
+    )
+    .bind(org)
+    .bind(&hash)
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    let p = lifeline_hub::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey::new(
+        "y", [2u8; 32],
+    );
+    let oeff = p.oeffentlich();
+    let mut conn = hub.pool.acquire().await.unwrap();
+    lifeline_hub::auth::unterschrift::repo::create_lokal(
+        &mut conn,
+        &lifeline_hub::auth::unterschrift::repo::NeuerSchluessel {
+            org_id: org,
+            benutzer_id: admin,
+            benutzer_name: "Y-Admin",
+            credential_id: &p.credential_id,
+            schluessel: &oeff,
+            rp_id: RP,
+            origin: ORIGIN,
+            bezeichnung: "Stick Y",
+        },
+    )
+    .await
+    .unwrap();
+    drop(conn);
+    let admin_cookie = common::login_cookie(&hub.app, "yadmin", "yadmin-pw-123").await;
+    let fk_cookie = common::login_cookie(&hub.app, "yfk", "yfk-pw-1234").await;
+    (org, admin_cookie, fk_cookie)
+}
+
+/// Der Admin am Hub (Cookie) widerruft die Zuordnung seiner Org; der ELW erfährt es.
+async fn widerrufen_am_hub(hub: &Instanz, elw: &Instanz, cookie: &str) {
+    let kopplung: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung").await;
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "POST",
+        &format!("/api/admin/instanz/kopplungen/{kopplung}/widerrufen"),
+        cookie,
+        None,
+    )
+    .await;
+    assert!(st.is_success(), "{v}");
+    melden(elw).await;
+}
+
+/// Der Admin am Hub (Cookie) stellt einen Code aus, der ELW löst ihn ein: dieselbe Kopplung, eine
+/// neue Zuordnung der Org des ELW an die Org dieses Admins.
+async fn neu_zuordnen(hub: &Instanz, elw: &Instanz, cookie: &str) {
+    let (st, v) = common::anfrage(&hub.app, "POST", "/api/admin/instanz/codes", cookie, None).await;
+    assert_eq!(st, StatusCode::CREATED, "{v}");
+    let (st, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        "/api/admin/instanz/einloesen",
+        &elw.admin,
+        Some(&json!({"adresse": hub.adresse, "code": v["code"]})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::CREATED, "{v}");
+    melden(elw).await;
+}
+
+/// Org, Zuordnung, Ende des Abgleichs und Mitglieder (Konto, Org des Kontos, Rolle) eines Spiegels.
+#[allow(clippy::type_complexity)]
+async fn spiegel_zustand(
+    hub: &Instanz,
+    s: i64,
+) -> (i64, Option<i64>, Option<String>, Vec<(i64, i64, String)>) {
+    let (org, ko, beendet): (i64, Option<i64>, Option<String>) = sqlx::query_as(
+        "SELECT e.org_id, s.kopplung_org_id, s.beendet_at FROM einsatz e \
+         JOIN einsatz_spiegel s ON s.einsatz_id = e.id WHERE e.id = ?",
+    )
+    .bind(s)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    let mitglieder = sqlx::query_as(
+        "SELECT m.benutzer_id, b.org_id, m.einsatz_rolle FROM einsatz_mitgliedschaft m \
+         JOIN benutzer b ON b.id = m.benutzer_id WHERE m.einsatz_id = ? ORDER BY m.benutzer_id",
+    )
+    .bind(s)
+    .fetch_all(&hub.pool)
+    .await
+    .unwrap();
+    (org, ko, beendet, mitglieder)
+}
+
+/// LLH-1851: Nach dem Widerruf ordnet ein Admin einer anderen Org am Hub dieselbe Org des ELW neu
+/// zu. Der beendete Spiegel bleibt bei seiner Org, statt mitsamt Mitgliedern umzuziehen.
+#[tokio::test]
+async fn neue_zuordnung_an_eine_andere_org_laesst_den_spiegel_bei_seiner_org() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    etb_eintrag(&elw, e, "Vor dem Widerruf").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    widerrufen_am_hub(&hub, &elw, &hub.admin).await;
+    let vorher = spiegel_zustand(&hub, s).await;
+    assert!(vorher.2.is_some(), "Abgleich beendet");
+
+    let (_, y_admin, y_fk) = zweite_org(&hub).await;
+    neu_zuordnen(&hub, &elw, &y_admin).await;
+    etb_eintrag(&elw, e, "Nach der Neuzuordnung").await;
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+
+    assert_eq!(
+        spiegel_zustand(&hub, s).await,
+        vorher,
+        "Org, Zuordnung, Ende und Mitglieder unverändert"
+    );
+    let etb = etb_inhalte(&hub, s).await;
+    assert!(etb.contains(&"Vor dem Widerruf".to_string()), "{etb:?}");
+    assert!(
+        !etb.contains(&"Nach der Neuzuordnung".to_string()),
+        "keine Lieferung über die Zuordnung der Org Y: {etb:?}"
+    );
+    let (st, _) =
+        common::anfrage(&hub.app, "GET", &format!("/api/einsaetze/{s}"), &y_fk, None).await;
+    assert_eq!(
+        st,
+        StatusCode::FORBIDDEN,
+        "die Führungskraft der Org Y liest ihn nicht"
+    );
+    let (st, liste) = common::anfrage(&hub.app, "GET", "/api/einsaetze", &y_fk, None).await;
+    assert_eq!(st, StatusCode::OK);
+    assert_eq!(liste.as_array().map(Vec::len), Some(0), "{liste}");
+    // Erika (Org X) behält ihren Lesezugriff auf den beendeten Spiegel ihrer Org.
+    let (st, v) = common::anfrage(
+        &hub.app,
+        "GET",
+        &format!("/api/einsaetze/{s}"),
+        &erika,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(v["org_id"], vorher.0);
+    // Über die Zuordnung der Org Y ist nichts übernommen, und genau das sagt ihr Stand am ELW
+    // (design.md D2): Er gilt nicht als abgeglichen.
+    let stand_y: Option<i64> = sqlx::query_scalar(
+        "SELECT MAX(z.stand) FROM spiegel_ziel z JOIN instanz_kopplung_org o \
+         ON o.id = z.kopplung_org_id WHERE o.widerrufen_at IS NULL",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(stand_y.unwrap_or(0), 0, "Stand der Zuordnung Y am ELW");
+}
+
+/// LLH-1851: Wird dieselbe Org am Hub nach dem Widerruf erneut zugeordnet, lebt der Spiegel wieder
+/// auf.
+#[tokio::test]
+async fn neue_zuordnung_an_dieselbe_org_gleicht_den_spiegel_wieder_ab() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    etb_eintrag(&elw, e, "Vor dem Widerruf").await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    widerrufen_am_hub(&hub, &elw, &hub.admin).await;
+    let (org, _, _, mitglieder) = spiegel_zustand(&hub, s).await;
+
+    neu_zuordnen(&hub, &elw, &hub.admin).await;
+    etb_eintrag(&elw, e, "Nach der Neuzuordnung").await;
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+
+    let (org_nach, ko, beendet, mitglieder_nach) = spiegel_zustand(&hub, s).await;
+    assert_eq!(org_nach, org);
+    assert!(beendet.is_none(), "wieder im Abgleich");
+    let aktiv: i64 = eine(
+        &hub.pool,
+        "SELECT id FROM instanz_kopplung_org WHERE widerrufen_at IS NULL",
+    )
+    .await;
+    assert_eq!(ko, Some(aktiv), "an der neuen Zuordnung");
+    assert_eq!(mitglieder_nach, mitglieder);
+    assert!(etb_inhalte(&hub, s)
+        .await
+        .contains(&"Nach der Neuzuordnung".to_string()));
+    let (st, _) = common::anfrage(
+        &hub.app,
+        "GET",
+        &format!("/api/einsaetze/{s}"),
+        &erika,
+        None,
+    )
+    .await;
+    assert_eq!(st, StatusCode::OK);
+}
