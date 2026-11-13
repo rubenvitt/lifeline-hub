@@ -192,7 +192,7 @@ async fn save_lieferung(
     Ok(())
 }
 
-async fn build_lieferung(
+pub(super) async fn build_lieferung(
     conn: &mut SqliteConnection,
     org_id: i64,
     art: StammdatenArt,
@@ -359,6 +359,21 @@ impl Budget {
             leer: true,
         }
     }
+}
+
+/// Höchster Stand der Log-Zeilen der Org, 0 ohne. Meldet die Gegenseite mindestens diesen
+/// Stand, hat sie alle Änderungen (LLH-1871, design.md D5 der Change
+/// `n2ge2224-reste-nach-restore-abraeumen`).
+pub async fn load_hoechster_stand(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT COALESCE(MAX(stand), 0) FROM stammdaten_aenderung WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 /// Nachlieferung der Org `org_id` seit `seit` innerhalb von `budget`, nur `arten` (D2). Jede

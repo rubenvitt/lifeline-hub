@@ -43,8 +43,11 @@ D2 und D4) sind noch nicht in `alpha`. Diese Change braucht sie nicht.
 ### D1 Der Bestand der Schlüssel geht mit jeder Antwort
 
 `MeldenOrgAntwort` bekommt `unterschrift_bestand: Option<Vec<i64>>`: die ids der lokalen Schlüssel
-der Org mit `zustand = 'gueltig'`, gelesen in derselben Transaktion wie die Nachlieferung. Bei mehr
-als `BESTAND_MAX` (1024) Schlüsseln geht `None` und eine Warnung ins Log.
+der Org mit `zustand = 'gueltig'`, gelesen in derselben Transaktion wie die Nachlieferung. Eine
+Antwort trägt über alle Orgs höchstens `BESTAND_MAX` (1024) ids. Eine Org, deren Bestand nicht mehr
+hineinpasst, bekommt `None`, und das Log warnt. Die Bytes des Bestands gehen wie die der
+Schlüssel-Lieferungen vom Budget der Stammdaten ab. So bleibt die größte Antwort unter
+`ANTWORT_MAX`, auch bei `ORGS_MAX` Orgs (Test `groesste_antwort_passt_in_die_lesegrenze`).
 
 Warum nur die gültigen: Am ELW kann nur ein Schlüssel wirken, den der Hub als gültig geliefert hat.
 Ist er am Hub inzwischen widerrufen, führt das Fehlen in der Liste zum selben Ergebnis wie der
@@ -73,16 +76,17 @@ json_each(?))`, `src/AGENTS.md`, Listen von außen) setzt jeden Schlüssel diese
 - Je widerrufenem Schlüssel ein Eintrag `UnterschriftWiderrufen` über
   `admin_audit::schreibe_ohne_akteur` mit dem Grund „führt <Gegenüber> nicht mehr“. Dazu ein
   Hinweis an der Kopplung (`repo::set_hinweis`).
-- `check_antwort` lehnt mehr als `BESTAND_MAX` ids je Org ab, wie die übrigen Grenzen der Antwort.
+- `check_antwort` lehnt mehr als `BESTAND_MAX` ids je Antwort ab, wie die übrigen Grenzen der Antwort.
 - Fehlt das Feld (`None`, Gegenstelle älteren Stands), geschieht nichts. Eine leere Liste dagegen
   heißt: Der Hub führt keinen gültigen Schlüssel der Org mehr.
 
 ### D3 Prüfsumme der übernommenen Zeilen in der Meldung
 
 `MeldenOrg` bekommt `stammdaten_pruefsumme: Option<String>`. Der ELW setzt sie nur für eine Org, deren
-Stammdaten er aus dieser Zuordnung bezieht (`stammdaten_stand >= 0`). Sie ist SHA-256 (hex) über die
-nach `(art, schluessel)` sortierten Zeilen `art \x1f schluessel \n` aus `stammdaten_herkunft` der
-Zuordnung. Gebildet wird sie in einer gemeinsamen Funktion `stammdaten::bestand::pruefsumme`, die
+Stammdaten er aus dieser Zuordnung bezieht (`stammdaten_stand >= 0`). Sie sind die ersten 128 Bit (32 Zeichen hex) von
+SHA-256 über die nach `(art, schluessel)` sortierten Zeilen `art \x1f schluessel \n` aus
+`stammdaten_herkunft` der Zuordnung. 128 Bit genügen, um eine Abweichung zu erkennen, und halten die
+Meldung unter `extractor::BODY_MAX` (64 KiB, davon bis zu 40 KiB Führungsakten). Gebildet wird sie in einer gemeinsamen Funktion `stammdaten::bestand::pruefsumme`, die
 auch der Hub benutzt. Ändert sich dort die Form, ändern sich beide Seiten gemeinsam.
 
 **Verworfen:**

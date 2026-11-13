@@ -11,6 +11,7 @@
 //! damit kein Schreibweg sie umgeht.
 
 pub mod art;
+pub mod bestand;
 pub mod geheimnis;
 pub mod herkunft;
 pub mod liefern;

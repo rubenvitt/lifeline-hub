@@ -436,3 +436,31 @@ async fn nur_ein_konto_in_der_antwort_gilt_als_geliefert() {
             .collect::<Vec<_>>()
     );
 }
+
+#[tokio::test]
+async fn hoechster_stand_je_org() {
+    let pool = pool_mit_org().await;
+    let mut conn = pool.acquire().await.unwrap();
+    assert_eq!(load_hoechster_stand(&mut conn, 1).await.unwrap(), 0);
+    drop(conn);
+    exec(
+        &pool,
+        "INSERT INTO fahrzeug (id, org_id, funkrufname) VALUES (1, 1, 'A')",
+    )
+    .await;
+    exec(
+        &pool,
+        "INSERT INTO fahrzeug (id, org_id, funkrufname) VALUES (2, 2, 'B')",
+    )
+    .await;
+    let eins = stand(&pool, "fahrzeug", "1").await.unwrap();
+    let mut conn = pool.acquire().await.unwrap();
+    assert_eq!(load_hoechster_stand(&mut conn, 1).await.unwrap(), eins);
+    let zwei: i64 =
+        sqlx::query_scalar("SELECT MAX(stand) FROM stammdaten_aenderung WHERE org_id = 2")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert!(zwei > eins);
+    assert_eq!(load_hoechster_stand(&mut conn, 2).await.unwrap(), zwei);
+}
