@@ -110,11 +110,11 @@ Basis nicht mehr kennt, fällt dort schon still weg.
 Verworfen: *die Rangfolge in `rechner.rs` um einen Zweig erweitern.* Kleiner, aber dann führten
 zwei Stellen dieselbe Regel, und eine dritte Ebene (etwa die Betreuungsstelle) liefe auseinander.
 
-### D6 ADR-0032 wird durch ADR-0040 ersetzt
+### D6 ADR-0032 wird durch ADR-0041 ersetzt
 
 ADR-0032 verbot der Rechner-API, Werte eines Einsatzes zu lesen, „solange es keine
 Einsatz-Freigabe für den Zugang gibt“, und prüfte das mit `verbiete 'einsatz_werte'`. Akzeptierte
-ADRs sind unveränderlich (`docs/architektur/AGENTS.md`, „Entscheidungen“): ADR-0040 übernimmt
+ADRs sind unveränderlich (`docs/architektur/AGENTS.md`, „Entscheidungen“): ADR-0041 übernimmt
 ihre übrigen Regeln unverändert, ersetzt das Verbot durch die Regel aus D2 und hält D5 fest; ihre
 Prüfung verlangt `freigabe::is_lesbar` und `unterkunft::zusammenfuehren` in `rechner.rs`.
 ADR-0032 bekommt `status: ersetzt`. Erst beim Umsetzen aufgefallen (Wächter

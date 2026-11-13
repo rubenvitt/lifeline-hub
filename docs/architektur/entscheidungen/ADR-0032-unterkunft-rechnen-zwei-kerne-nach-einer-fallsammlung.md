@@ -10,7 +10,7 @@ gilt_fuer:
   - frontend/src/betreuung/unterkunft/rechnerKern.ts
   - frontend/src/betreuung/unterkunft/rechnerFixture.test.ts
   - tests/fixtures/unterkunft/**
-ersetzt_durch: ADR-0040
+ersetzt_durch: ADR-0041
 herleitung:
   - openspec/changes/archive/2026-11-12-p4h3v7q9-rechner-api-unterkunft/design.md
   - LLH-1524 (mit Ruben am 12.11.2026 abgestimmt)
