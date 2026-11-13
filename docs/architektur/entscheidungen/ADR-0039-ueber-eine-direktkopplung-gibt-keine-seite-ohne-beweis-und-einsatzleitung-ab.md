@@ -14,7 +14,7 @@ gilt_fuer:
   - frontend/src/einsatz/schreibrecht.ts
   - frontend/src/instanz/fuehrungText.ts
 herleitung:
-  - openspec/changes/gwcf2shk-fuehrungswechsel-vor-ort/design.md
+  - openspec/changes/archive/2026-11-13-gwcf2shk-fuehrungswechsel-vor-ort/design.md
   - openspec/changes/archive/2026-11-12-faq7l7m4-zwei-elw-unterlegene-seite/design.md
   - LLH-1678 (mit Ruben am 13.11.2026 abgestimmt), LLH-1707, LLH-1669, LLH-1641
 ---

@@ -425,7 +425,7 @@ Herleitung in
     (`openspec/changes/archive/2026-11-12-faq7l7m4-zwei-elw-unterlegene-seite/design.md`) nach. Ist ein Dritter beteiligt (mehrere ELW an einem
     Hub), hält die meldende Seite offen; ob das ein Konflikt ist, sagt `austausch::ist_konflikt`.
   - **Nach welcher Regel die Führung zu einem Gegenüber wechselt, sagt `instanz::wechselregel`**
-    (LLH-1678, Herleitung `openspec/changes/gwcf2shk-fuehrungswechsel-vor-ort/design.md`):
+    (LLH-1678, Herleitung `openspec/changes/archive/2026-11-13-gwcf2shk-fuehrungswechsel-vor-ort/design.md`):
     `nach_richtung` (Standardkopplung, Tabellen oben), `gleichrangig` (Direktkopplung, beide mit
     Protokoll 4: jede Seite wie die meldende), `gesperrt` (Direktkopplung mit älterer Gegenstelle).
     Über eine Direktkopplung entscheidet `austausch::entscheide_vor_ort` vor allen Zweigen der

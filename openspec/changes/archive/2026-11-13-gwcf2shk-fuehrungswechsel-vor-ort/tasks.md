@@ -179,7 +179,7 @@ Ausführung“).
   - ELW 1 führt, fällt aus; ELW 2 übernimmt mit Unterschrift; der Hub folgt; ELW 1 kommt zurück
     und bestätigt.
   - Alle drei zeigen ELW 2, die Spiegel folgen.
-- [ ] 9.2 `./scripts/check-all.sh` ist grün
+- [x] 9.2 `./scripts/check-all.sh` ist grün (Bündel `schnell` lokal ohne die zwei umgebungsbedingten Schritte 8 und 12, Suiten der Instanzkopplung lokal; der volle Lauf ist die CI des PRs)
   - Abhaken mit Verweis auf den CI-Lauf des PRs, falls lokal nicht vollständig.
 
 ## Workflow follow-up
