@@ -19,10 +19,12 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   fordert alle drei. Eine Datei, die eine Suite aus einem fremden Bereich liest (Rust liest
   `frontend/src/api/openapi.json`, Vitest liest `src-tauri/src/faehigkeiten.js`), braucht
   einen Querbezug in `bereiche.sh`; `scripts/bereiche.test.sh` (Schritt 11) sucht solche
-  Pfade im Quelltext und wird rot, wenn einer fehlt. Übersprungene Matrix-Jobs laufen leer
-  und grün durch statt per Job-`if`, sonst hingen ihre Required Checks auf „Expected"
-  (Kopf von `ci.yml`). `check-all.sh --geaendert` wählt lokal dieselben Suiten wie die CI im
-  PR, `--auswahl` zeigt sie nur an; ohne Argument läuft alles.
+  Pfade im Quelltext und wird rot, wenn einer fehlt. Jobs mit Pflicht-Check (Rust-Suite,
+  Frontend-Shards) laufen leer und grün durch statt per Job-`if`: ein übersprungener Matrix-Job
+  hinge auf „Expected", ein übersprungener ohne Matrix zeigt grün, hält Auto-Merge aber auf
+  (#1283, #1336). Kopf von `ci.yml`; die Form prüft `scripts/ci-stufen.test.sh`.
+  `check-all.sh --geaendert` wählt lokal dieselben Suiten wie die CI im PR, `--auswahl` zeigt sie
+  nur an; ohne Argument läuft alles.
 - **Zwei Stufen im PR** (LLH-1662): `ci.yml` prüft jeden Push (Schnellprüfungen, Rust, Vitest).
   e2e-Binary und `e2e 1/4` bis `4/4` stehen in `.github/workflows/e2e.yml` und laufen erst,
   wenn der PR **fertig** ist: Auto-Merge an oder Label `e2e`. Beim Einschalten startet die
