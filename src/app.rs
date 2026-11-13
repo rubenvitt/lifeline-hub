@@ -1902,6 +1902,26 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/admin/anbindungen/{id}/widerrufen",
             post(routes::anbindungen::widerrufen),
         )
+        // LLH-1656: Webhook einer Anbindung. Zugestellt wird im Hintergrund
+        // (`public_api::webhook::lauf`).
+        .route(
+            "/api/admin/anbindungen/{id}/webhook",
+            post(routes::anbindungen_webhook::anlegen)
+                .patch(routes::anbindungen_webhook::aendern)
+                .delete(routes::anbindungen_webhook::entfernen),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/webhook/wieder-aufnehmen",
+            post(routes::anbindungen_webhook::wieder_aufnehmen),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/webhook/test",
+            post(routes::anbindungen_webhook::test),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/webhook/versuche",
+            get(routes::anbindungen_webhook::versuche),
+        )
         // LLH-1654: Einwurf-Zugänge (Absender ohne Signatur, ADR-0023) verwalten. Die Einwürfe
         // selbst nimmt `public_api::einwurf` an.
         .route(

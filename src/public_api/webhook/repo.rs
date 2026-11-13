@@ -83,6 +83,18 @@ pub fn arten_json(arten: &[EventType]) -> String {
     serde_json::to_string(&liste).expect("Liste von Texten ist serialisierbar")
 }
 
+/// Neuer Stand für das optimistische Lock: `jetzt`, aber streng nach `vorher`. Die Zeit hat
+/// Sekunden-Auflösung; zwei Änderungen in derselben Sekunde bekämen sonst denselben Stand, und
+/// eine veraltete Änderung ginge durch.
+fn neuer_stand(vorher: &str, jetzt: &str) -> String {
+    if jetzt > vorher {
+        return jetzt.to_string();
+    }
+    crate::zeit::parse(vorher)
+        .map(|t| crate::zeit::formatiere(t + chrono::Duration::seconds(1)))
+        .unwrap_or_else(|| jetzt.to_string())
+}
+
 /// Der Webhook eines Zugangs.
 pub async fn laden_fuer_zugang(
     conn: &mut SqliteConnection,
@@ -180,6 +192,7 @@ pub async fn aendern(
         return Ok(Some((vorher.clone(), vorher)));
     }
     let ziel_neu = vorher.url != eingabe.url || vorher.lan_erlaubt != eingabe.lan_erlaubt;
+    let stand = neuer_stand(&vorher.geaendert_at, jetzt);
     sqlx::query(
         "UPDATE maschine_webhook SET url = ?1, arten = ?2, lan_erlaubt = ?3, geaendert_at = ?4, \
              verlust_at = NULL, \
@@ -192,7 +205,7 @@ pub async fn aendern(
     .bind(&eingabe.url)
     .bind(&arten)
     .bind(eingabe.lan_erlaubt)
-    .bind(jetzt)
+    .bind(&stand)
     .bind(ziel_neu)
     .bind(&vorher.id)
     .execute(&mut *conn)
@@ -236,10 +249,11 @@ pub async fn wieder_aufnehmen(
     }
     let (head, purged_until) = events::stand_lesen(conn).await?;
     let verloren = vorher.offen_id.is_some_and(|offen| offen <= purged_until);
+    let stand = neuer_stand(&vorher.geaendert_at, jetzt);
     sqlx::query(
         "UPDATE maschine_webhook SET zustand = 'aktiv', angehalten_at = NULL, \
              fehler_seit = NULL, fehlversuche = 0, naechster_versuch_at = NULL, \
-             geaendert_at = ?1, \
+             geaendert_at = ?5, \
              cursor = CASE WHEN ?2 THEN ?3 ELSE cursor END, \
              offen_id = CASE WHEN ?2 THEN NULL ELSE offen_id END, \
              verlust_at = CASE WHEN ?2 THEN ?1 ELSE NULL END \
@@ -249,6 +263,7 @@ pub async fn wieder_aufnehmen(
     .bind(verloren)
     .bind(head)
     .bind(&vorher.id)
+    .bind(&stand)
     .execute(&mut *conn)
     .await?;
     Ok(laden_fuer_zugang(conn, zugang_id).await?)
@@ -442,4 +457,26 @@ pub async fn versuche(
     .bind(VERLAUF_MAX)
     .fetch_all(&mut *conn)
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::neuer_stand;
+
+    #[test]
+    fn stand_steigt_auch_in_derselben_sekunde() {
+        assert_eq!(
+            neuer_stand("2026-11-13 10:00:00", "2026-11-13 10:00:05"),
+            "2026-11-13 10:00:05"
+        );
+        assert_eq!(
+            neuer_stand("2026-11-13 10:00:00", "2026-11-13 10:00:00"),
+            "2026-11-13 10:00:01"
+        );
+        // Uhr zurückgestellt: trotzdem nach dem alten Stand.
+        assert_eq!(
+            neuer_stand("2026-11-13 10:00:09", "2026-11-13 10:00:00"),
+            "2026-11-13 10:00:10"
+        );
+    }
 }

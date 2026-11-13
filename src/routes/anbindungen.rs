@@ -15,6 +15,7 @@ use crate::instanz::{code as kcode, identitaet};
 use crate::public_api::freigabe;
 use crate::public_api::scope::{parse_scopes, AblehnungGrund, Scope, ZugangZustand};
 use crate::public_api::zugang::{self, Zugang};
+use crate::routes::anbindungen_webhook::WebhookAnzeige;
 use crate::routes::einsatz_anbindungen::freigabe_entziehen_tx;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -65,6 +66,9 @@ pub struct AnbindungAnzeige {
     pub einsatz_id: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatz_bezeichnung: Option<String>,
+    /// Der Webhook des Zugangs, falls einer eingerichtet ist (LLH-1656).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webhook: Option<WebhookAnzeige>,
 }
 
 fn fingerabdruck_von(schluessel: Option<&str>) -> Option<String> {
@@ -100,6 +104,7 @@ impl AnbindungAnzeige {
             einsatz_freigebbar: false,
             einsatz_id: None,
             einsatz_bezeichnung: None,
+            webhook: None,
         }
     }
 
@@ -110,6 +115,7 @@ impl AnbindungAnzeige {
         jetzt: &str,
     ) -> Result<Self, AppError> {
         let mut anzeige = Self::aus(z, jetzt);
+        anzeige.webhook = WebhookAnzeige::load(conn, z, jetzt).await?;
         if freigabe::is_freigebbar(z, jetzt) && !freigabe::is_org_am_hub(conn, z.org_id).await? {
             anzeige.einsatz_freigebbar = true;
             if let Some((id, bezeichnung)) = freigabe::gelesener_einsatz(conn, &z.id).await? {

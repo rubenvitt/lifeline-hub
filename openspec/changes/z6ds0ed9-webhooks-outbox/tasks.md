@@ -71,10 +71,10 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
 
 ## 5. Admin-API
 
-- [ ] 5.1 DTOs `WebhookAnzeige`, `WebhookVersuch`, `TestErgebnis`, Enums `WebhookZustand` und
+- [x] 5.1 DTOs `WebhookAnzeige`, `WebhookVersuch`, `TestErgebnis`, Enums `WebhookZustand` und
   `WebhookFehler`; `AnbindungAnzeige.webhook`. Verifizieren: `scripts/check-typ-codegen.sh`
   grün, beide generierten Dateien mitcommittet, Einträge in `tests/enum_wire_kontrakt.rs`.
-- [ ] 5.2 Routen aus D8 mit `URL_MAX` (Spiegel in `frontend/src/api/eingabegrenzen.ts`), CAS und
+- [x] 5.2 Routen aus D8 mit `URL_MAX` (Spiegel in `frontend/src/api/eingabegrenzen.ts`), CAS und
   Admin-Spur nach dem Commit. Verifizieren in `tests/anbindungen_webhook.rs`:
   - Anlegen `201`, zweites Anlegen `409`, leere oder unbekannte Art `400`, `http` `400`;
   - Führungskraft liest Zustand und Verlauf, schreibt aber nicht (`403`);
