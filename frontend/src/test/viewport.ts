@@ -20,9 +20,12 @@ export const VIEWPORT_STANDARD = 1024;
 type Hoerer = (ereignis: MediaQueryListEvent) => void;
 
 const BREITEN_MUSTER = /\((min|max)-width:\s*([0-9.]+)px\)/;
+const HOEHEN_MUSTER = /\((min|max)-height:\s*([0-9.]+)px\)/;
 const ZEIGER_GROB = '(pointer: coarse)';
 
 let breite = VIEWPORT_STANDARD;
+/** Default-Höhe: 768 px wie jsdoms `window.innerHeight`, ein Fükw-Schirm. */
+let hoehe = 768;
 let zeigerGrob = false;
 let erfasst: string[] = [];
 const hoerer = new Map<string, Set<Hoerer>>();
@@ -38,6 +41,11 @@ function trifftZu(abfrage: string): boolean {
   if (treffer) {
     const schwelle = Number.parseFloat(treffer[2]);
     return treffer[1] === 'min' ? breite >= schwelle : breite <= schwelle;
+  }
+  const hoch = HOEHEN_MUSTER.exec(abfrage);
+  if (hoch) {
+    const schwelle = Number.parseFloat(hoch[2]);
+    return hoch[1] === 'min' ? hoehe >= schwelle : hoehe <= schwelle;
   }
   if (normiert(abfrage) === ZEIGER_GROB) return zeigerGrob;
   return false;
@@ -101,6 +109,11 @@ export function setzeViewportBreite(breiteInPx: number): void {
   breite = breiteInPx;
 }
 
+/** Setzt die Fensterhöhe für `min-height`/`max-height`-Abfragen; VOR dem Render aufrufen. */
+export function setzeViewportHoehe(hoeheInPx: number): void {
+  hoehe = hoeheInPx;
+}
+
 /** Setzt die Zeigerart (grob = Berührung), ohne ein Änderungsereignis zu feuern. */
 export function setzeZeigerGrob(grob: boolean): void {
   zeigerGrob = grob;
@@ -158,6 +171,7 @@ export function hoererAnzahl(): number {
 /** Räumt Breite, Zeigerart, Mitschrift und Zuhörer auf den Ausgangszustand zurück. */
 export function setzeViewportZurueck(): void {
   breite = VIEWPORT_STANDARD;
+  hoehe = 768;
   zeigerGrob = false;
   erfasst = [];
   hoerer.clear();

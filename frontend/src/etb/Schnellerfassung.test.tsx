@@ -1,7 +1,7 @@
 import { createRef } from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
+import { setzeViewportBreite, setzeViewportHoehe, setzeZeigerGrob } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
@@ -1806,5 +1806,33 @@ describe('Von und An folgen der Tastaturregel des Vorschlagsfelds (kwc2yszv, D5)
     expect(feldWert('Von')).toBe('Florian 1');
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
     expect(p.erfassen).not.toHaveBeenCalled();
+  });
+});
+
+describe('Niedriges Fenster ab md: Felder und Einstellungen in einer rollenden Zeile', () => {
+  it('bei 1366 × 520 eine Zeile mit Typ-Knopf, Feldern und Schaltern, keine eigene Fußzeile', () => {
+    setzeViewportBreite(1366);
+    setzeViewportHoehe(520);
+    renderMitProviders(
+      <Schnellerfassung {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })} />,
+    );
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="etb-feldzeile"]')!;
+    expect(zeile.style.flexWrap).toBe('nowrap');
+    expect(zeile.style.overflowX).toBe('auto');
+    expect(screen.queryByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeNull();
+    expect(zeile.contains(screen.getByRole('button', { name: 'Typ des Eintrags: Meldung' }))).toBe(
+      true,
+    );
+    for (const name of ['Werte behalten', 'Auch in den Meldungseingang']) {
+      expect(zeile.contains(screen.getByRole('checkbox', { name })), name).toBe(true);
+    }
+    expect(document.querySelector('[data-lfh="etb-fusszeile"]')).toBeNull();
+  });
+
+  it('bei 1366 × 768 bleibt die Feldzeile mit Segmenten und eigener Fußzeile', () => {
+    setzeViewportBreite(1366);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.getByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="etb-fusszeile"]')).not.toBeNull();
   });
 });

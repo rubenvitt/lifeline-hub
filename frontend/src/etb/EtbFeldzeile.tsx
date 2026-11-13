@@ -253,6 +253,13 @@ export interface EtbFeldzeileProps {
   onVeranlassungSchliessen: () => void;
   gesperrt: boolean;
   schmal: boolean;
+  /**
+   * Niedriges Fenster ab `md` (`useNiedrigesFenster`): Typ-Knopf, Felder und `anhang` (die Fußzeile)
+   * stehen in einer waagerecht rollenden Zeile.
+   */
+  einzeilig?: boolean;
+  /** Was im einzeiligen Modus hinter den Feldern in derselben Zeile steht (Fußzeile). */
+  anhang?: ReactNode;
   refs: FeldRefs;
 }
 
@@ -274,6 +281,8 @@ export default function EtbFeldzeile({
   onVeranlassungSchliessen,
   gesperrt,
   schmal,
+  einzeilig = false,
+  anhang,
   refs,
 }: EtbFeldzeileProps) {
   const { token } = useRollen();
@@ -382,6 +391,30 @@ export default function EtbFeldzeile({
         {partei('von')}
         {partei('an')}
         {veranlassung}
+      </div>
+    );
+  }
+
+  if (einzeilig) {
+    return (
+      <div
+        data-lfh="etb-feldzeile"
+        style={{
+          display: 'flex',
+          flexWrap: 'nowrap',
+          overflowX: 'auto',
+          minWidth: 0,
+          alignItems: 'center',
+          columnGap: token.marginSM,
+        }}
+      >
+        {typ != null && <TypKnopf typ={typ} gesperrt={gesperrt} onTyp={onTyp} />}
+        {zeit}
+        {partei('von')}
+        {partei('an')}
+        {meldeweg}
+        {veranlassung}
+        {anhang}
       </div>
     );
   }

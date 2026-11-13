@@ -43,6 +43,8 @@ async function lageErfassen(page: Page, inhalt: string, von?: string) {
   if (von) {
     const feld = page.getByRole('combobox', { name: 'Von' });
     await feld.fill(von);
+    // Erst wenn die Liste steht: Enter nimmt dann den Freitext-Eintrag (Spec `stammdaten-feld`).
+    await expect(page.getByTitle(`„${von}“ als Freitext übernehmen`)).toBeVisible();
     // Enter übernimmt und springt in den Inhalt (Spec `etb-schnellerfassung-tastatur`).
     await feld.press('Enter');
     await expect(page.getByPlaceholder(/Inhalt/)).toBeFocused();

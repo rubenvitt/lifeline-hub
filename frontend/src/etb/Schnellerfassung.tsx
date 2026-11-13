@@ -61,6 +61,7 @@ import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { formatDtg } from '../anzeige/format';
 import { zuWanduhr } from '../anzeige/zeitEingabe';
 import { useMinutenTakt } from '../components/useMinutenTakt';
+import { useNiedrigesFenster } from './useNiedrigesFenster';
 import { lageberichtePfad } from '../routing/deeplinks';
 import { istSpiegel } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -290,6 +291,8 @@ export default function Schnellerfassung({
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
   // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
   const { istSchmal, istBeruehrung, screens, abBreite } = useViewport();
+  // Niedriges Fenster ab `md`: Felder und Fußzeile in einer rollenden Zeile (`useNiedrigesFenster`).
+  const einzeilig = useNiedrigesFenster() && !istSchmal;
   const [vorschauGewaehlt, setVorschauGewaehlt] = useState(false);
   const textRef = useRef<TextAreaRef>(null);
   const dateiEingabe = useRef<HTMLInputElement>(null);
@@ -1172,6 +1175,17 @@ export default function Schnellerfassung({
             onVeranlassungSchliessen={() => setVeranlassungOffen(false)}
             gesperrt={sendet}
             schmal={istSchmal}
+            einzeilig={einzeilig}
+            anhang={
+              einzeilig ? (
+                <>
+                  {gruende}
+                  {protokollSchalter}
+                  {schalter}
+                  {rechts}
+                </>
+              ) : undefined
+            }
             refs={{
               zeit: zeitRef,
               von: vonRef,
@@ -1238,7 +1252,7 @@ export default function Schnellerfassung({
       {/* Fußzeile (Spec „Einstellungen in der Fußzeile der Erfassung“): links Gründe und die
          beiden Schalter, rechts die Textknöpfe; unter `md` rollt sie waagerecht, nur „Erfassen“
          steht fest am Ende. */}
-      {!eingeklappt && (
+      {!eingeklappt && !einzeilig && (
         <div style={{ display: 'flex', alignItems: 'center', gap: token.marginSM }}>
           <div
             data-lfh="etb-fusszeile"
