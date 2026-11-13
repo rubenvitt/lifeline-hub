@@ -1,5 +1,5 @@
 ---
-id: ADR-0034
+id: ADR-0037
 titel: Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der Sender ab, bevor sie lokal gilt
 status: akzeptiert
 datum: 2026-11-12
@@ -11,7 +11,7 @@ herleitung:
   - LLH-1702 (mit Ruben am 12.11.2026 abgestimmt), LLH-1672
 ---
 
-# ADR-0034: Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der Sender ab, bevor sie lokal gilt
+# ADR-0037: Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der Sender ab, bevor sie lokal gilt
 
 ## Regeln
 
