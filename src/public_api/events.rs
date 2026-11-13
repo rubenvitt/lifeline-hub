@@ -20,7 +20,7 @@ use axum::extract::{Query, State};
 use axum::http::{header::RETRY_AFTER, HeaderValue, StatusCode};
 use axum::response::Response;
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::time::Instant;
 use utoipa::ToSchema;
@@ -153,12 +153,12 @@ struct Stand {
     purged_until: i64,
 }
 
-async fn stand(pool: &SqlitePool) -> Result<Stand, sqlx::Error> {
+async fn stand(conn: &mut SqliteConnection) -> Result<Stand, sqlx::Error> {
     let (head, purged_until): (i64, i64) = sqlx::query_as(
         "SELECT COALESCE((SELECT seq FROM sqlite_sequence WHERE name = 'maschine_ereignis'), 0), \
                 COALESCE((SELECT purged_until FROM maschine_ereignis_stand WHERE id = 1), 0)",
     )
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(Stand { head, purged_until })
 }
@@ -166,7 +166,8 @@ async fn stand(pool: &SqlitePool) -> Result<Stand, sqlx::Error> {
 /// Der Höchststand der Outbox: der Cursor, ab dem ein Abruf nichts verpasst, was nach diesem
 /// Aufruf festgeschrieben wird. Die Einsatzliste liest ihn **vor** den Einsätzen (design.md D11).
 pub async fn hoechststand(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
-    Ok(stand(pool).await?.head)
+    let mut conn = pool.acquire().await?;
+    Ok(stand(&mut conn).await?.head)
 }
 
 /// Die Arten, die ein Zugang mit diesen Scopes sieht.
@@ -181,7 +182,7 @@ fn sichtbare_arten(scopes: &[Scope]) -> Vec<EventType> {
 /// Cursor. `head` wurde vor diesem Aufruf gelesen: alles bis dorthin ist festgeschrieben, alles
 /// Spätere liegt über dem gelieferten Cursor.
 async fn seite(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     zugang_id: &str,
     arten: &[EventType],
     after: i64,
@@ -205,7 +206,8 @@ async fn seite(
         liste.push_bind(art.as_str());
     }
     abfrage.push(") ORDER BY id LIMIT ").push_bind(SEITE);
-    let zeilen: Vec<(i64, String, String, i64)> = abfrage.build_query_as().fetch_all(pool).await?;
+    let zeilen: Vec<(i64, String, String, i64)> =
+        abfrage.build_query_as().fetch_all(&mut *conn).await?;
 
     let events: Vec<Event> = zeilen
         .into_iter()
@@ -238,21 +240,42 @@ pub async fn lesen(
     scopes: &[Scope],
     after: Option<i64>,
 ) -> Result<EventsResponse, ApiError> {
-    let stand = stand(pool).await?;
     let Some(after) = after else {
         return Ok(EventsResponse {
-            cursor: stand.head,
+            cursor: hoechststand(pool).await?,
             events: Vec::new(),
         });
     };
+    lesen_ab(pool, zugang_id, &sichtbare_arten(scopes), after).await
+}
+
+/// Stand und Zeilen aus **einem** Schnappschuss: eine Lesetransaktion auf einer Verbindung, die
+/// danach sofort zurückgeht. Zwei getrennte Abfragen ließen einen Purge dazwischen; die Prüfung
+/// sähe die alte Löschgrenze, die Seite den schon gelöschten Bereich, und statt `410` käme eine
+/// Antwort mit Lücke.
+async fn lesen_ab(
+    pool: &SqlitePool,
+    zugang_id: &str,
+    arten: &[EventType],
+    after: i64,
+) -> Result<EventsResponse, ApiError> {
+    let mut tx = pool.begin().await?;
+    let stand = stand(&mut tx).await?;
     if after < stand.purged_until || after > stand.head {
-        return Err(ApiError::new(
-            ErrorCode::CursorExpired,
-            "Der Cursor ist abgelaufen. Einsätze über GET /api/v1/einsaetze neu lesen und mit dem \
-             dort gelieferten Cursor fortfahren.",
-        ));
+        return Err(cursor_abgelaufen());
     }
-    Ok(seite(pool, zugang_id, &sichtbare_arten(scopes), after, stand.head).await?)
+    let antwort = seite(&mut tx, zugang_id, arten, after, stand.head).await?;
+    tx.commit().await?;
+    Ok(antwort)
+}
+
+fn cursor_abgelaufen() -> ApiError {
+    ApiError::new(
+        ErrorCode::CursorExpired,
+        "Der Cursor ist abgelaufen. Den Stand neu aufbauen: mit „Einsätze lesen“ über \
+         GET /api/v1/einsaetze und dessen Cursor, sonst über GET /api/v1/events ohne after und \
+         danach GET /api/v1/lage.",
+    )
 }
 
 /// Zählt die wartenden Abrufe: insgesamt höchstens `max`, je Zugang höchstens einer. Klonbar,
@@ -361,8 +384,7 @@ pub async fn abrufen_mit(
         }
         tokio::time::sleep(takt.min(ende - jetzt)).await;
         // Weiter ab dem zuletzt geprüften Stand: davor lag nichts für diesen Zugang.
-        let head = stand(pool).await?.head;
-        antwort = seite(pool, zugang_id, &arten, antwort.cursor, head).await?;
+        antwort = lesen_ab(pool, zugang_id, &arten, antwort.cursor).await?;
         if !antwort.events.is_empty() {
             break;
         }
@@ -446,7 +468,7 @@ fn parse_wait(roh: Option<&str>) -> Result<Duration, ApiError> {
     path = "/api/v1/events",
     tag = "Ereignisse",
     operation_id = "get_events",
-    security(("machine" = [])),
+    security(("machine" = ["events:read"])),
     params(
         ("after" = Option<i64>, Query,
             description = "Cursor aus der letzten Antwort oder aus `GET /api/v1/einsaetze`. Ohne ihn antwortet der Abruf sofort mit dem aktuellen Stand und ohne Ereignisse."),
@@ -461,7 +483,7 @@ fn parse_wait(roh: Option<&str>) -> Result<Duration, ApiError> {
         (status = 400, description = "`after` oder `wait` ungültig (`invalid_field`)", body = super::ApiErrorBody),
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
         (status = 403, description = "Dem Zugang fehlt `events:read` (`missing_scope`)", body = super::ApiErrorBody),
-        (status = 410, description = "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): Einsätze über `GET /api/v1/einsaetze` neu lesen und mit dem dort gelieferten Cursor fortfahren", body = super::ApiErrorBody),
+        (status = 410, description = "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): den Stand neu aufbauen, mit `einsaetze:read` über `GET /api/v1/einsaetze` und dessen Cursor, sonst über `GET /api/v1/events` ohne `after` und danach `GET /api/v1/lage`", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),

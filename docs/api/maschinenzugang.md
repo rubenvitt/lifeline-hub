@@ -298,17 +298,22 @@ GET /api/v1/events?after=4711&wait=25
 | `lage.changed`    | Die Lage des Einsatzes kann sich geändert haben.               | `lage:read`      |
 
 `einsatz.closed` kommt beim Abschluss des Einsatzes, wenn die Einsatzleitung die Freigabe
-zurücknimmt oder den Zugang auf einen anderen Einsatz umstellt, und wenn dem Zugang das Recht
-genommen wird. Danach antworten die Leserouten für diesen Einsatz mit `404` bzw. ohne ihn.
+zurücknimmt oder den Zugang auf einen anderen Einsatz umstellt und wenn der Einsatz gelöscht wird.
+Danach antworten die Leserouten für diesen Einsatz mit `404` bzw. ohne ihn. Wird dem Zugang ein
+Recht genommen, sieht er die Ereignisse dieses Rechts nicht mehr, auch kein `einsatz.closed`; die
+Route des Rechts antwortet dann mit `403 missing_scope`. Nach einer Änderung der Rechte deshalb
+den Stand neu aufbauen (Schritt 1 der Schleife).
 
 **Die Schleife:**
 
-1. Beim ersten Start `GET /api/v1/einsaetze` lesen und den `cursor` merken.
+1. Beim ersten Start den Stand aufbauen und den `cursor` merken: mit `einsaetze:read` über
+   `GET /api/v1/einsaetze`, sonst über `GET /api/v1/events` ohne `after` und danach
+   `GET /api/v1/lage`. In dieser Reihenfolge, damit keine Änderung zwischen Stand und Cursor fällt.
 2. `GET /api/v1/events?after=<cursor>&wait=25` aufrufen. Der Abruf bleibt höchstens 25 Sekunden
    offen und antwortet, sobald ein Ereignis vorliegt (binnen etwa einer Sekunde).
 3. Die Ereignisse verarbeiten, den neuen `cursor` merken, weiter bei 2. Auch eine leere Antwort
    nennt einen neuen `cursor`; ihn merken, sonst altert der eigene.
-4. Bei `410 cursor_expired` wieder bei 1 beginnen.
+4. Bei `410 cursor_expired` und nach `403 missing_scope` wieder bei 1 beginnen.
 
 **Zu beachten:**
 

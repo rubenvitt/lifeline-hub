@@ -7,11 +7,16 @@
 -- die alte und trägt eine höhere Nummer. Ein Leser, der die alte schon hat, sieht die neue;
 -- einer, der sie noch nicht hat, verliert nichts.
 --
--- Zwei Listen stehen auch in Rust und werden gegen diese Datei geprüft
--- (`tests/public_api_ereignis_trigger.rs`): die Kopfspalten
--- (`public_api::einsaetze::KOPF_SPALTEN`) und die Lage-Tabellen
--- (`public_api::events::LAGE_ARTEN`). Wer eine Liste ändert, baut den Trigger in einer neuen
--- Migration neu.
+-- Drei Listen stehen auch in Rust und werden gegen diese Datei geprüft: die Kopfspalten
+-- (`public_api::einsaetze::KOPF_SPALTEN`, Test in `tests/public_api_ereignis_trigger.rs`), die
+-- Lage-Tabellen und die Lage-Spalten des Kopfs (`public_api::events::LAGE_ARTEN` und
+-- `LAGE_KOPF_SPALTEN`, Tests in `src/public_api/events.rs`). Wer eine Liste ändert, baut den
+-- Trigger in einer neuen Migration neu.
+--
+-- `einsatz.updated` und `lage.changed` gehen nur an gültige Zugänge (nicht widerrufen, „gültig
+-- bis“ nicht verstrichen): ein abgelaufener Zugang sammelt sonst Ereignisse zu einem Einsatz, der
+-- in dieser Zeit nicht für ihn lesbar war. Das Ende (`einsatz.closed`) geht an jeden Zugang mit
+-- Freigabe; es meldet nur, was er nicht mehr lesen darf.
 
 -- Freigabe erteilt: der Einsatz wird für den Zugang lesbar.
 CREATE TRIGGER maschinenzugang_freigabe_ereignis_i AFTER INSERT ON maschinenzugang_freigabe
@@ -85,8 +90,10 @@ WHEN NEW.status = 'aktiv' AND (
     OR OLD.begonnen_at IS NOT NEW.begonnen_at)
 BEGIN
     INSERT INTO maschine_ereignis (zugang_id, type, einsatz_id)
-        SELECT zugang_id, 'einsatz.updated', NEW.id
-        FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.id;
+        SELECT f.zugang_id, 'einsatz.updated', NEW.id
+        FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+        WHERE f.einsatz_id = NEW.id;
 END;
 
 -- Die Kopffelder, die in die Lage einfließen.
@@ -103,10 +110,14 @@ WHEN NEW.status = 'aktiv' AND (
 BEGIN
     DELETE FROM maschine_ereignis
         WHERE type = 'lage.changed' AND einsatz_id = NEW.id
-          AND zugang_id IN (SELECT zugang_id FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.id);
+          AND zugang_id IN (SELECT f.zugang_id FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+                            WHERE f.einsatz_id = NEW.id);
     INSERT INTO maschine_ereignis (zugang_id, type, einsatz_id)
-        SELECT zugang_id, 'lage.changed', NEW.id
-        FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.id;
+        SELECT f.zugang_id, 'lage.changed', NEW.id
+        FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+        WHERE f.einsatz_id = NEW.id;
 END;
 
 -- Der Einsatz läuft nicht mehr. Der Abschluss über die Oberfläche löscht die Freigaben danach in
@@ -125,11 +136,19 @@ BEGIN
         FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.id;
 END;
 
--- Der Einsatz wird gelöscht: seine Zeilen gehen mit. Lief er noch (Demo-Daten entfernen,
--- Abräumen), bleibt sein Ende als Ereignis. BEFORE, weil die Kaskade die Freigaben danach nimmt.
+-- Der Einsatz wird gelöscht (Demo-Daten entfernen, Abräumen, endgültige Löschung). Was über seinen
+-- Inhalt berichtet (`einsatz.created`, `einsatz.updated`), geht mit. Ein schon geschriebenes Ende
+-- (`einsatz.closed` und das `lage.changed` dazu) bleibt stehen, bis der Purge es nimmt: Ein
+-- Zugang, der gerade nicht abruft, erführe sonst nie, dass der Einsatz für ihn endete. Lief der
+-- Einsatz noch, entsteht sein Ende hier. BEFORE, weil die Kaskade die Freigaben danach nimmt.
 CREATE TRIGGER einsatz_ereignis_d BEFORE DELETE ON einsatz
 BEGIN
-    DELETE FROM maschine_ereignis WHERE einsatz_id = OLD.id;
+    DELETE FROM maschine_ereignis
+        WHERE einsatz_id = OLD.id AND type IN ('einsatz.created', 'einsatz.updated');
+    DELETE FROM maschine_ereignis
+        WHERE einsatz_id = OLD.id AND type = 'lage.changed' AND OLD.status = 'aktiv'
+          AND zugang_id IN (SELECT zugang_id FROM maschinenzugang_freigabe
+                            WHERE einsatz_id = OLD.id);
     INSERT INTO maschine_ereignis (zugang_id, type, einsatz_id)
         SELECT zugang_id, 'einsatz.closed', OLD.id
         FROM maschinenzugang_freigabe WHERE einsatz_id = OLD.id AND OLD.status = 'aktiv';
@@ -152,9 +171,67 @@ WHEN NEW.art IN ('einsatz_person', 'einsatz_lagekennzahl_wahl', 'einsatz_persona
 BEGIN
     DELETE FROM maschine_ereignis
         WHERE type = 'lage.changed' AND einsatz_id = NEW.einsatz_id
-          AND zugang_id IN (SELECT zugang_id FROM maschinenzugang_freigabe
-                            WHERE einsatz_id = NEW.einsatz_id);
+          AND zugang_id IN (SELECT f.zugang_id FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+                            WHERE f.einsatz_id = NEW.einsatz_id);
     INSERT INTO maschine_ereignis (zugang_id, type, einsatz_id)
-        SELECT zugang_id, 'lage.changed', NEW.einsatz_id
-        FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.einsatz_id;
+        SELECT f.zugang_id, 'lage.changed', NEW.einsatz_id
+        FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+        WHERE f.einsatz_id = NEW.einsatz_id;
+END;
+
+-- Ein Spiegel hört auf, abgeglichen zu werden (Widerruf der Kopplung, Führung an eine nicht
+-- gekoppelte Instanz), seine Freigabestufe ändert sich, oder der Einsatz wird Spiegel bzw. hört
+-- auf, einer zu sein (Verwahrung). Das ändert die Lage (`einsatz.spiegel` in `GET /api/v1/lage`,
+-- `public_api::lage::lage_einsatz`), ohne dass eine Lage-Tabelle oder der Kopf sich ändert.
+-- `letzter_abgleich_at` ändert sich mit jedem Abgleich und löst bewusst nichts aus.
+CREATE TRIGGER einsatz_spiegel_ereignis_u
+AFTER UPDATE OF beendet_at, freigabestufe ON einsatz_spiegel
+WHEN (OLD.beendet_at IS NOT NEW.beendet_at OR OLD.freigabestufe IS NOT NEW.freigabestufe)
+ AND EXISTS (SELECT 1 FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.einsatz_id)
+ AND EXISTS (SELECT 1 FROM einsatz WHERE id = NEW.einsatz_id AND status = 'aktiv')
+BEGIN
+    DELETE FROM maschine_ereignis
+        WHERE type = 'lage.changed' AND einsatz_id = NEW.einsatz_id
+          AND zugang_id IN (SELECT f.zugang_id FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+                            WHERE f.einsatz_id = NEW.einsatz_id);
+    INSERT INTO maschine_ereignis (zugang_id, type, einsatz_id)
+        SELECT f.zugang_id, 'lage.changed', NEW.einsatz_id
+        FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+        WHERE f.einsatz_id = NEW.einsatz_id;
+END;
+
+CREATE TRIGGER einsatz_spiegel_ereignis_i AFTER INSERT ON einsatz_spiegel
+WHEN EXISTS (SELECT 1 FROM maschinenzugang_freigabe WHERE einsatz_id = NEW.einsatz_id)
+ AND EXISTS (SELECT 1 FROM einsatz WHERE id = NEW.einsatz_id AND status = 'aktiv')
+BEGIN
+    DELETE FROM maschine_ereignis
+        WHERE type = 'lage.changed' AND einsatz_id = NEW.einsatz_id
+          AND zugang_id IN (SELECT f.zugang_id FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+                            WHERE f.einsatz_id = NEW.einsatz_id);
+    INSERT INTO maschine_ereignis (zugang_id, type, einsatz_id)
+        SELECT f.zugang_id, 'lage.changed', NEW.einsatz_id
+        FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+        WHERE f.einsatz_id = NEW.einsatz_id;
+END;
+
+CREATE TRIGGER einsatz_spiegel_ereignis_d AFTER DELETE ON einsatz_spiegel
+WHEN EXISTS (SELECT 1 FROM maschinenzugang_freigabe WHERE einsatz_id = OLD.einsatz_id)
+ AND EXISTS (SELECT 1 FROM einsatz WHERE id = OLD.einsatz_id AND status = 'aktiv')
+BEGIN
+    DELETE FROM maschine_ereignis
+        WHERE type = 'lage.changed' AND einsatz_id = OLD.einsatz_id
+          AND zugang_id IN (SELECT f.zugang_id FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+                            WHERE f.einsatz_id = OLD.einsatz_id);
+    INSERT INTO maschine_ereignis (zugang_id, type, einsatz_id)
+        SELECT f.zugang_id, 'lage.changed', OLD.einsatz_id
+        FROM maschinenzugang_freigabe f JOIN maschinenzugang z ON z.id = f.zugang_id
+          AND z.zustand <> 'widerrufen' AND (z.gueltig_bis IS NULL OR z.gueltig_bis > datetime('now'))
+        WHERE f.einsatz_id = OLD.einsatz_id;
 END;

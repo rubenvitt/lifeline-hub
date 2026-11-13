@@ -487,13 +487,47 @@ async fn ein_geloeschter_laufender_einsatz_hinterlaesst_nur_sein_ende() {
 }
 
 #[tokio::test]
-async fn ein_geloeschter_abgeschlossener_einsatz_hinterlaesst_keine_zeile() {
+async fn ein_geloeschter_abgeschlossener_einsatz_behaelt_sein_noch_nicht_abgeholtes_ende() {
     let l = lage().await;
     let a = zugang_anlegen(&l.pool, l.org, "A").await;
     let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
     freigeben(&l.pool, &a, einsatz, l.admin_id).await;
+    kopf_patch(&l, einsatz, json!({ "leitstellen_nr": "L-1" })).await;
+    let ab = hoechste(&l.pool).await;
     abschliessen(&l, einsatz).await;
-    assert!(!ereignisse(&l.pool, &a).await.is_empty());
+    let ende = neu_seit(&l.pool, &a, ab).await;
+    assert_eq!(
+        ende,
+        vec![e("einsatz.closed", einsatz), e("lage.changed", einsatz)]
+    );
+
+    // Gelöscht, bevor der Zugang abruft (Demo-Daten entfernen, Abräumen eines Spiegels).
+    sqlx::query("DELETE FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        ereignisse(&l.pool, &a).await,
+        ende,
+        "das Ende bleibt, was über den Inhalt berichtete, geht mit"
+    );
+}
+
+/// Ein Zugang, dessen Freigabe vorher endete, behält sein `einsatz.closed`, auch wenn der
+/// laufende Einsatz danach gelöscht wird; der andere Zugang bekommt sein Ende beim Löschen.
+#[tokio::test]
+async fn ein_geloeschter_laufender_einsatz_nimmt_das_ende_eines_anderen_zugangs_nicht_mit() {
+    let l = lage().await;
+    let a = zugang_anlegen(&l.pool, l.org, "A").await;
+    let b = zugang_anlegen(&l.pool, l.org, "B").await;
+    let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
+    freigeben(&l.pool, &a, einsatz, l.admin_id).await;
+    freigeben(&l.pool, &b, einsatz, l.admin_id).await;
+    let mut conn = l.pool.acquire().await.unwrap();
+    assert!(freigabe::beenden_tx(&mut conn, &a, einsatz).await.unwrap());
+    drop(conn);
 
     sqlx::query("DELETE FROM einsatz WHERE id = ?")
         .bind(einsatz)
@@ -501,7 +535,14 @@ async fn ein_geloeschter_abgeschlossener_einsatz_hinterlaesst_keine_zeile() {
         .await
         .unwrap();
 
-    assert_eq!(alle(&l.pool).await, 0);
+    assert_eq!(
+        ereignisse(&l.pool, &a).await,
+        vec![e("einsatz.closed", einsatz), e("lage.changed", einsatz)]
+    );
+    assert_eq!(
+        ereignisse(&l.pool, &b).await,
+        vec![e("einsatz.closed", einsatz), e("lage.changed", einsatz)]
+    );
 }
 
 // ── Lage (design.md D6) ──────────────────────────────────────────────────────────────────────
@@ -515,7 +556,7 @@ async fn viele_aenderungen_an_der_lage_ergeben_je_zugang_ein_lage_changed() {
     freigeben(&l.pool, &a, einsatz, l.admin_id).await;
     freigeben(&l.pool, &b, einsatz, l.admin_id).await;
 
-    let mut letzte = hoechste(&l.pool).await;
+    let mut vorige = std::collections::HashMap::new();
     for i in 0..20 {
         person_anlegen(
             &l.app,
@@ -538,9 +579,13 @@ async fn viele_aenderungen_an_der_lage_ergeben_je_zugang_ein_lage_changed() {
                 anzahl, 1,
                 "je Zugang und Einsatz höchstens ein lage.changed"
             );
-            assert!(id > letzte, "mit jeder Änderung eine höhere Nummer");
+            if let Some(vorher) = vorige.insert(z.clone(), id) {
+                assert!(
+                    id > vorher,
+                    "mit jeder Änderung eine höhere Nummer je Zugang"
+                );
+            }
         }
-        letzte = hoechste(&l.pool).await - 2;
     }
     // Eine Person ist kein Kopf: kein einsatz.updated.
     assert!(ereignisse(&l.pool, &a)
@@ -568,6 +613,94 @@ async fn ein_eintrag_im_einsatztagebuch_aendert_die_lage_nicht() {
     assert_eq!(s, StatusCode::CREATED, "{v}");
 
     assert!(neu_seit(&l.pool, &a, ab).await.is_empty());
+}
+
+// ── Gültigkeit des Zugangs und Spiegel ─────────────────────────────────────────────────────
+
+/// Ein abgelaufener Zugang sammelt keine Änderungen; sein Ende bekommt er trotzdem.
+#[tokio::test]
+async fn ein_abgelaufener_zugang_sammelt_keine_aenderungen_bekommt_aber_das_ende() {
+    let l = lage().await;
+    let a = zugang_anlegen(&l.pool, l.org, "A").await;
+    let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
+    freigeben(&l.pool, &a, einsatz, l.admin_id).await;
+    sqlx::query("UPDATE maschinenzugang SET gueltig_bis = '2026-01-01 00:00:00' WHERE id = ?")
+        .bind(&a)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    let ab = hoechste(&l.pool).await;
+
+    kopf_patch(&l, einsatz, json!({ "stichwort": "B3" })).await;
+    person_anlegen(&l.app, &l.admin, einsatz, r#"{"nachname":"Muster"}"#).await;
+    assert!(
+        neu_seit(&l.pool, &a, ab).await.is_empty(),
+        "nach Ablauf entstehen weder einsatz.updated noch lage.changed"
+    );
+
+    abschliessen(&l, einsatz).await;
+    assert_eq!(
+        neu_seit(&l.pool, &a, ab).await,
+        vec![e("einsatz.closed", einsatz), e("lage.changed", einsatz)]
+    );
+}
+
+/// Ein Spiegel, dessen Abgleich endet oder dessen Freigabestufe sich ändert, hat eine andere Lage
+/// (`einsatz.spiegel` in `GET /api/v1/lage`); der Zeitpunkt des Abgleichs allein nicht.
+#[tokio::test]
+async fn das_ende_des_spiegel_abgleichs_meldet_lage_changed_der_takt_nicht() {
+    let l = lage().await;
+    let a = zugang_anlegen(&l.pool, l.org, "A").await;
+    let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
+    let mut tx = l.pool.begin().await.unwrap();
+    for sql in [
+        "INSERT INTO spiegel_uebernahme (id) VALUES (1)".to_string(),
+        format!(
+            "INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES ({einsatz}, 'x/{einsatz}')"
+        ),
+        "DELETE FROM spiegel_uebernahme".to_string(),
+    ] {
+        sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
+    freigeben(&l.pool, &a, einsatz, l.admin_id).await;
+
+    let ab = hoechste(&l.pool).await;
+    sqlx::query(
+        "UPDATE einsatz_spiegel SET letzter_abgleich_at = datetime('now') WHERE einsatz_id = ?",
+    )
+    .bind(einsatz)
+    .execute(&l.pool)
+    .await
+    .unwrap();
+    assert!(
+        neu_seit(&l.pool, &a, ab).await.is_empty(),
+        "der Takt allein meldet nichts"
+    );
+
+    sqlx::query("UPDATE einsatz_spiegel SET beendet_at = datetime('now') WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        neu_seit(&l.pool, &a, ab).await,
+        vec![e("lage.changed", einsatz)]
+    );
+
+    let ab = hoechste(&l.pool).await;
+    sqlx::query("UPDATE einsatz_spiegel SET beendet_at = beendet_at WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    assert!(
+        neu_seit(&l.pool, &a, ab).await.is_empty(),
+        "ein gleicher Wert meldet nichts"
+    );
 }
 
 // ── Wege neben der Oberfläche ────────────────────────────────────────────────────────────────

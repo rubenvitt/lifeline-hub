@@ -136,7 +136,7 @@ async fn lesbare_einsaetze(
     path = "/api/v1/einsaetze",
     tag = "Einsätze",
     operation_id = "get_einsaetze",
-    security(("machine" = [])),
+    security(("machine" = ["einsaetze:read"])),
     responses(
         (status = 200, description = "Freigegebene laufende Einsätze (ohne Freigabe eine leere Liste) und der Cursor dazu; Antwort signiert im Kopf `Lifeline-Signature`", body = EinsaetzeResponse),
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
@@ -163,7 +163,7 @@ pub async fn liste(
     path = "/api/v1/einsaetze/{id}",
     tag = "Einsätze",
     operation_id = "get_einsatz",
-    security(("machine" = [])),
+    security(("machine" = ["einsaetze:read"])),
     params(("id" = i64, Path, description = "Kennung des Einsatzes, wie `einsatz_id` in den Ereignissen")),
     responses(
         (status = 200, description = "Der Einsatz; Antwort signiert im Kopf `Lifeline-Signature`", body = Einsatz),

@@ -386,7 +386,7 @@ async fn routen_mit_einsatzbezug_lesen_nur_ueber_die_freigabe() {
     use lifeline_hub::public_api::scope::Scope;
 
     /// Routen, deren Einsatz allein aus `public_api::freigabe` kommt.
-    const UEBER_FREIGABE: &[&str] = &[LAGE];
+    const UEBER_FREIGABE: &[&str] = &[LAGE, "/api/v1/einsaetze", "/api/v1/einsaetze/{id}"];
 
     let dokument = serde_json::to_value(lifeline_hub::public_api::openapi()).unwrap();
     let mut scopes_im_dokument = Vec::new();
@@ -426,18 +426,47 @@ async fn routen_mit_einsatzbezug_lesen_nur_ueber_die_freigabe() {
     // Ohne Freigabe liest keine dieser Routen einen Einsatz.
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
-    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), IP).await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let scopes: Vec<&str> = Scope::ALLE
+        .iter()
+        .filter(|s| s.has_einsatzbezug())
+        .map(|s| s.as_str())
+        .collect();
+    let cred = angebunden(&app, &admin, json!(scopes), &schluessel(1), IP).await;
     for (i, pfad) in UEBER_FREIGABE.iter().enumerate() {
-        let (s, _, v) = signiert(&app, &cred, "GET", pfad, jetzt(), &format!("jti-{i}"), IP).await;
-        assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
-        // Der Schlüssel muss da sein und `null` tragen: `v["einsatz"].is_null()` wäre auch bei
-        // fehlendem Schlüssel oder leerem Body wahr (`src/AGENTS.md`, Typ-Codegen, Testfalle).
-        assert_eq!(
-            v.get("einsatz"),
-            Some(&Value::Null),
-            "{pfad} liest ohne Freigabe: {v}"
-        );
+        let konkret = pfad.replace("{id}", &einsatz.to_string());
+        let (s, _, v) = signiert(
+            &app,
+            &cred,
+            "GET",
+            &konkret,
+            jetzt(),
+            &format!("jti-{i}"),
+            IP,
+        )
+        .await;
+        // Je Form der Antwort ihr Zeichen für „kein Einsatz“. Der Schlüssel muss da sein:
+        // `v["einsatz"].is_null()` wäre auch bei fehlendem Schlüssel oder leerem Body wahr
+        // (`src/AGENTS.md`, Typ-Codegen, Testfalle).
+        match *pfad {
+            LAGE => {
+                assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
+                assert_eq!(
+                    v.get("einsatz"),
+                    Some(&Value::Null),
+                    "{pfad} liest ohne Freigabe: {v}"
+                );
+            }
+            "/api/v1/einsaetze" => {
+                assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
+                assert_eq!(v.get("einsaetze"), Some(&json!([])), "{pfad}: {v}");
+            }
+            "/api/v1/einsaetze/{id}" => {
+                assert_eq!(s, StatusCode::NOT_FOUND, "{pfad}: {v}");
+                assert_eq!(v["code"], "not_found", "{pfad}: {v}");
+            }
+            andere => panic!("{andere}: hier fehlt, woran man „kein Einsatz“ erkennt"),
+        }
         // Unabhängig von der Form der Antwort: der Einsatz der Org kommt nicht vor.
         assert!(
             !v.to_string().contains("Stadtfest"),

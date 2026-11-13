@@ -374,7 +374,7 @@ async fn einsaetze_lesen_macht_freigebbar_ereignisse_abrufen_allein_nicht() {
 }
 
 #[tokio::test]
-async fn der_entzug_von_einsaetze_lesen_beendet_die_freigabe_und_meldet_closed() {
+async fn der_entzug_von_einsaetze_lesen_beendet_die_freigabe_und_schreibt_closed() {
     let l = lage().await;
     let einsatz = einsatz_anlegen_mit(&l.app, &l.admin, "Hochwasser").await;
     let buch = anbindung(

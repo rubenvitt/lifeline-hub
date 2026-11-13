@@ -87,7 +87,9 @@ und `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.
 - **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das
   alte und trägt eine höhere `id`.
 - **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;
-  der Client liest dann die Einsätze neu und fährt mit dem dort gelieferten Cursor fort.
+  der Client baut den Stand neu auf und fährt mit dem dabei gelieferten Cursor fort: mit
+  `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über `GET /api/v1/events` ohne `after` und
+  danach `GET /api/v1/lage`.
 
 ## Grenzen
 
