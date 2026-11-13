@@ -1,4 +1,4 @@
-//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0029,
+//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0034,
 //! Spec `maschinenzugang`, „Einsatzbezogenes Lesen braucht die Freigabe der Einsatzleitung“).
 //!
 //! Das Paneel „Anbindungen“ der Seite „Geräte“ liest und schaltet hier. Die Zugänge legt der
@@ -10,7 +10,7 @@
 //! oder als Spiegel: Fremdsysteme kommen am Hub an, ein vom ELW geführter Einsatz liegt dort als
 //! Spiegel. Der ETB-Eintrag geht am Spiegel als Antrag an den Führer
 //! ([`super::leitung_freigabe`]). Herleitung:
-//! `openspec/changes/f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D4, D5).
+//! `openspec/changes/archive/2026-11-12-f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D4, D5).
 
 use super::leitung_freigabe::{
     etb_vermerken, fordere_freigabe_moeglich, im_tx_aktiv, SpiegelEintrag,

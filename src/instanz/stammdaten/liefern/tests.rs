@@ -5,6 +5,10 @@ use sqlx::SqlitePool;
 
 async fn pool_mit_org() -> SqlitePool {
     let pool = crate::db::test_pool().await;
+    // Die Ursprungskennung braucht die eigene Instanzkennung (LLH-1497).
+    crate::instanz::identitaet::load_or_create(&pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'DRK KV Nord'), (2, 'Fremd')")
         .execute(&pool)
         .await

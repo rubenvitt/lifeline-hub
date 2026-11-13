@@ -719,7 +719,7 @@ pub async fn abschliessen(
     // würde das sonst als bestätigungspflichtige Verkürzung werten (LFH-135).
     if ergebnis.rows_affected() == 1 {
         // LLH-1638: Maschinenzugänge lesen nur laufende Einsätze; der Abschluss beendet ihre
-        // Freigabe in derselben Transaktion (ADR-0029).
+        // Freigabe in derselben Transaktion (ADR-0034).
         crate::public_api::freigabe::delete_fuer_einsatz_tx(&mut tx, einsatz_id).await?;
         if let Some(dauer) =
             super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)

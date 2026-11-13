@@ -168,8 +168,12 @@ sie eine reguläre Übergabe von ihr selbst bestätigt oder eine Erklärung trä
 von einem gültigen Unterschriftsschlüssel der zugeordneten Org über genau diese Erklärung stammt
 oder deren Code zu ihrem Abgabecode passt. Sonst MUST sie die Akte verwerfen und weiter führen.
 Ausgenommen ist eine Akte, an der eine dritte Instanz beteiligt ist (sie führt, oder sie hat die
-Epoche vergeben, mit der die erreichte Seite selbst führt): Die MUST die meldende Seite ohne Alarm
-offen halten, bis die Einsatzleitung entscheidet.
+Epoche vergeben, mit der die erreichte Seite selbst führt), und eine Akte, deren Erklärung nicht
+die meldende Seite, sondern eine andere Instanz als bisherigen Führer eines anderen Stands nennt
+als dessen, mit dem die meldende Seite führt: Die MUST die meldende Seite ohne Alarm offen halten,
+bis die Einsatzleitung entscheidet. Eine Akte ohne Erklärung, mit unlesbarer Erklärung oder mit
+einer Erklärung, die den Stand der meldenden Seite mit einem anderen bisherigen Führer nennt, fällt
+nicht unter die Ausnahme.
 
 #### Scenario: Gültige Unterschrift
 - **WHEN** der ELW eine Erklärung des Hubs erhält, die Admin A mit einem am ELW gültigen Schlüssel unterschrieben hat
@@ -182,6 +186,22 @@ offen halten, bis die Einsatzleitung entscheidet.
 #### Scenario: Ungültige Übernahme
 - **WHEN** der ELW eine Übernahme ohne gültige Unterschrift und ohne passenden Code erhält
 - **THEN** führt der ELW weiter, löst die Benachrichtigung „Ungültige Übernahme der Führung“ an die Einsatzleitung aus und schreibt einen Eintrag in die Admin-Spur
+
+#### Scenario: Übernahme ohne Erklärung
+- **WHEN** der ELW führt und der Hub sich mit eigener, größerer Epoche als Führer meldet, ohne Erklärung
+- **THEN** verwirft der ELW die Übernahme mit der Benachrichtigung „Ungültige Übernahme der Führung“ und führt mit der nächsten Epoche weiter
+
+#### Scenario: Erklärung über den eigenen Stand mit anderem Führer
+- **WHEN** der ELW mit Epoche (1, ELW) führt und der Hub eine unterschriebene Erklärung schickt, die (1, ELW) als bisherigen Stand und eine andere Instanz als bisherigen Führer nennt
+- **THEN** verwirft der ELW die Übernahme mit der Benachrichtigung „Ungültige Übernahme der Führung“
+
+#### Scenario: Hub holt sich die Führung per Notübernahme von ELW 1 zurück
+- **WHEN** „ELW 2“ ohne Verbindung eine Notübernahme mit Epoche (2, ELW 2) gegen den Hub erklärt, am Hub „ELW 1“ mit (2, ELW 1) führt, der Hub per unterschriebener Notübernahme gegen „ELW 1“ mit (3, Hub) zurückholt und „ELW 2“ sich meldet
+- **THEN** zeigt „ELW 2“ „Führung übernommen von Hub“ mit „Übernahme bestätigen“ und „Widersprechen“, ohne Grund und Unterzeichner der Erklärung gegen „ELW 1“, ohne Alarm „Ungültige Übernahme der Führung“ und ohne Eintrag in der Admin-Spur, und schreibt weiter
+
+#### Scenario: Hub holt sich die Führung per Widerruf von ELW 1 zurück
+- **WHEN** „ELW 2“ ohne Verbindung eine Notübernahme mit Epoche (2, ELW 2) gegen den Hub erklärt, am Hub „ELW 1“ mit (2, ELW 1) führt, der Admin am Hub die Org-Zuordnung von „ELW 1“ widerruft und „ELW 2“ sich meldet
+- **THEN** zeigt „ELW 2“ „Führung übernommen von Hub“ mit „Übernahme bestätigen“ und „Widersprechen“, ohne Alarm „Ungültige Übernahme der Führung“ und ohne Eintrag in der Admin-Spur, und schreibt weiter
 
 ### Requirement: Die meldende Seite gibt nie still ab
 
@@ -232,7 +252,6 @@ Spur steht.
 #### Scenario: Verlauf nach Notübernahme
 - **WHEN** der ELW eine Notübernahme durch Hub Nord bestätigt hat
 - **THEN** zeigt das Paneel „Führung“ am ELW im Verlauf den Eintrag „1 Angelegt“ und „2 Notübernahme bestätigt · ELW → Hub Nord“ mit Grund, Unterzeichner und Bruchstelle
-
 
 ### Requirement: Die unterlegene meldende Seite hält die Führung des Dritten offen
 
@@ -302,10 +321,13 @@ Hinweisband „Spiegel von …“.
 
 ### Requirement: Widerruf holt die Führung zurück
 
-Endet bei eingeschaltetem Schalter die Org-Zuordnung einer Kopplung, hier oder beim Gegenüber,
+Endet bei eingeschaltetem Schalter die Org-Zuordnung einer Standardkopplung, hier oder beim Gegenüber,
 SHALL diese Instanz jeden Einsatz der Org, den sie als Spiegel hält und dessen Akte das Gegenüber
 als Führer nennt, mit der nächsten Epoche selbst und schreibbar führen; Bruchstelle ist der
-Zeitpunkt, zu dem sie vom Widerruf erfährt. Offene Übernahmen dieses Gegenübers MUST verfallen.
+Zeitpunkt, zu dem sie vom Widerruf erfährt. Die Akte MUST danach eine Erklärung ohne Beweis
+tragen, die das Gegenüber als bisherigen Führer und „Kopplung widerrufen“ als Grund nennt, damit
+andere meldende Seiten die Übernahme als gegen eine dritte Instanz gerichtet erkennen. Offene
+Übernahmen dieses Gegenübers MUST verfallen.
 
 #### Scenario: Widerruf am ELW
 - **WHEN** der Hub einen Einsatz mit Epoche (3, Hub) führt, den der ELW spiegelt, und der Admin am ELW die Org-Zuordnung widerruft
@@ -314,3 +336,115 @@ Zeitpunkt, zu dem sie vom Widerruf erfährt. Offene Übernahmen dieses Gegenübe
 #### Scenario: Offene Übernahme verfällt
 - **WHEN** am ELW eine gültige Notübernahme des Hubs auf Bestätigung wartet und die Org-Zuordnung zum Hub widerrufen wird
 - **THEN** verschwindet „Führung übernommen von …“, und der ELW führt weiter
+
+#### Scenario: Ein dritter ELW sieht den Widerruf im Verlauf
+- **WHEN** „ELW 1“ einen Einsatz führt, „ELW 2“ dessen Akte über den Hub kennt, ohne zu führen, und der Admin am Hub die Org-Zuordnung von „ELW 1“ widerruft
+- **THEN** zeigt der Verlauf dieser Akte an „ELW 2“ nach der nächsten Meldung den Wechsel zum Hub mit dem Grund „Kopplung widerrufen“, ohne Unterzeichner
+
+### Requirement: Der Austausch übersteht das Zurückspielen einer Sicherung
+
+Nach dem Zurückspielen einer gekoppelten Instanz aus einer Sicherung SHALL der Austausch der
+Führungsakten ohne Eingriff weiterlaufen: Jede danach geänderte Akte MUST das Gegenüber mit den
+nächsten Meldungen erreichen, auch bei mehreren Kopplungen. Ausgenommen ist eine zurückgespielte
+Seite mit nachgehender Uhr, die vor ihrer ersten Meldung mehr Stände vergibt, als verloren gingen,
+oder deren Gegenstellen verschieden weit quittiert hatten.
+
+#### Scenario: Hub zurückgespielt, neuer Einsatz am Hub
+- **WHEN** der Hub aus einer Sicherung von gestern zurückgespielt wird, danach am Hub ein Einsatz der gekoppelten Org angelegt wird und der ELW sich meldet
+- **THEN** zeigt der ELW unter „Einsätze beim Gegenüber“ diesen Einsatz mit „Führung: Hub · Epoche 1“
+
+#### Scenario: ELW zurückgespielt, neuer Einsatz am ELW
+- **WHEN** der ELW aus einer Sicherung zurückgespielt wird, danach am ELW ein Einsatz der gekoppelten Org angelegt wird und der ELW sich meldet
+- **THEN** zeigt der Hub diesen Einsatz mit „Führung: ELW · Epoche 1“, und ein danach am Hub angelegter Einsatz erreicht den ELW mit der nächsten Meldung
+
+#### Scenario: Zurückgespielte Seite mit nachgehender Uhr
+- **WHEN** der Hub zurückgespielt wird, seine Uhr hinter dem Zeitpunkt der verlorenen Stände steht und am Hub ein Einsatz angelegt wird, bevor der ELW sich meldet
+- **THEN** erreicht dieser Einsatz den ELW mit der nächsten Meldung, und die Seite „Instanzkopplung“ am Hub zeigt den Hinweis, dass die Akten erneut gehen
+
+#### Scenario: Zwei Kopplungen am zurückgespielten Hub
+- **WHEN** ein Hub mit „ELW 1“ und „ELW 2“ mit nachgehender Uhr zurückgespielt wird, beide gleich weit quittiert hatten, am Hub ein Einsatz einer Org angelegt wird, die nur „ELW 2“ zugeordnet ist, und „ELW 1“ sich zuerst meldet
+- **THEN** erreicht der Einsatz „ELW 2“ mit dessen nächster Meldung
+
+### Requirement: Verlorene Führungsakten kommen erneut
+
+Akten, die eine zurückgespielte erreichte Seite mit der Sicherung verloren hat und die die meldende
+Seite noch kennt, SHALL die meldende Seite ihr mit den nächsten Meldungen erneut übergeben, auch wenn
+sie während des Ausfalls weitere Akten geändert hat. Ausgenommen sind eine Sicherung von vor der
+ersten Übernahme der erreichten Seite und eine Gegenstelle älteren Stands. Das Protokoll der Meldung
+MUST dafür nur additiv wachsen.
+
+#### Scenario: Hub zurückgespielt, Akte des ELW ging verloren
+- **WHEN** der ELW nach der Sicherung des Hubs einen Einsatz angelegt und gemeldet hat, der Hub dann aus dieser Sicherung zurückgespielt wird und der ELW sich wieder meldet
+- **THEN** zeigt der Hub diesen Einsatz des ELW nach den nächsten Meldungen wieder unter „Einsätze beim Gegenüber“
+
+#### Scenario: ELW hat während des Ausfalls geändert
+- **WHEN** der Hub zurückgespielt wird und der ELW in dieser Zeit einen weiteren Einsatz anlegt, sodass schon seine erste Meldung danach eine neue Akte trägt
+- **THEN** zeigt der Hub nach den nächsten Meldungen sowohl den neuen Einsatz als auch den verlorenen
+
+#### Scenario: Antwort auf die erste Meldung geht verloren
+- **WHEN** der Hub zurückgespielt wird, der ELW in dieser Zeit einen weiteren Einsatz anlegt und die Antwort auf seine erste Meldung danach ihn nicht erreicht
+- **THEN** zeigt der Hub nach den nächsten Meldungen trotzdem den verlorenen Einsatz wieder
+
+### Requirement: Über eine Direktkopplung wechselt die Führung nicht
+
+Eine Instanz MUST die Führung eines Einsatzes nicht an die Gegenstelle einer Direktkopplung
+übergeben, nicht bei ihr anfragen, nicht gegen sie notübernehmen und keinen Abgabecode für sie
+erzeugen. Die Oberfläche MUST diese Bedienungen für eine solche Gegenstelle nicht anbieten und
+den Grund zeigen; ein direkter Aufruf MUST mit 409 enden. Die Akten MUST weiter ausgetauscht und
+angezeigt werden.
+
+#### Scenario: Übergabe an ELW vor Ort
+- **WHEN** die Einsatzleitung an ELW 1 im Paneel „Führung“ das Ziel für eine Übergabe wählt und ELW 2 nur über eine Direktkopplung gekoppelt ist
+- **THEN** fehlt ELW 2 in der Auswahl, und das Paneel zeigt „ELW 2 ist vor Ort gekoppelt: Führungswechsel dorthin kommt später“
+
+#### Scenario: Notübernahme per Route
+- **WHEN** ein Admin an ELW 2 die Route der Notübernahme für einen Einsatz aufruft, den ELW 1 führt und den ELW 2 nur über die Direktkopplung kennt
+- **THEN** antwortet der Server mit 409, und die Führung bleibt bei ELW 1
+
+#### Scenario: Einsätze beim Gegenüber
+- **WHEN** ELW 1 einen Einsatz der zugeordneten Org führt und ELW 2 sich als Direktkopplung meldet
+- **THEN** zeigt ELW 2 unter „Einsätze beim Gegenüber“ den Einsatz mit „Führung: ELW 1“
+
+#### Scenario: Widerruf einer Direktkopplung
+- **WHEN** ELW 1 einen Einsatz führt, den ELW 2 über die Direktkopplung spiegelt, und der Admin an ELW 2 die Org-Zuordnung widerruft
+- **THEN** holt ELW 2 die Führung nicht zurück: die Akte nennt weiter ELW 1, und der Spiegel bleibt lesbar stehen (die Anforderung „Widerruf holt die Führung zurück“ gilt nur für Standardkopplungen)
+
+### Requirement: Eine Direktkopplung nimmt keinen Führungswechsel zwischen ihren Seiten an
+
+Erhält eine Instanz über eine Direktkopplung eine Akte, die die Führung von der einen Seite dieser
+Kopplung auf die andere legt, MUST sie die Akte verwerfen, gleich in welcher Richtung die
+Kopplung läuft, weiter nach ihrer bisherigen Akte verfahren und an der Kopplung einen Hinweis
+zeigen.
+
+#### Scenario: Gegenstelle beansprucht die Führung
+- **WHEN** ELW 1 einen Einsatz führt und ELW 2 über die Direktkopplung eine Akte mit höherer Epoche und sich als Führer meldet
+- **THEN** führt ELW 1 weiter, und die Kopplung an ELW 1 zeigt „ELW 2 beansprucht die Führung von „<Einsatz>“ über eine Direktkopplung: abgelehnt“
+
+### Requirement: Eine Abgabe des Führers an eine dritte Instanz gilt auch vor Ort
+
+Erhält eine Instanz über eine Direktkopplung von der Gegenstelle, die einen Einsatz bisher
+führte, eine Akte mit höherer Epoche, die eine dritte Instanz als Führer nennt, SHALL sie diese
+Akte annehmen, gleich in welcher Richtung die Kopplung läuft. Ihr Spiegel MUST danach der neuen
+führenden Instanz folgen oder, wenn diese hier nicht gekoppelt ist, als „Abgleich beendet“
+stehen bleiben.
+
+#### Scenario: ELW übergibt an den Hub
+- **WHEN** ELW 1 einen Einsatz an den Hub übergibt und ELW 2 diesen Einsatz über die Direktkopplung von ELW 1 spiegelt und selbst beim Hub gekoppelt ist
+- **THEN** zeigt ELW 2 „Führung: Hub“ und spiegelt den Einsatz danach vom Hub
+
+#### Scenario: Neuer Führer hier nicht gekoppelt
+- **WHEN** ELW 1 einen Einsatz an den Hub übergibt und ELW 2 nur mit ELW 1 gekoppelt ist
+- **THEN** zeigt ELW 2 „Führung: Hub“ und den Spiegel mit „Die führende Instanz ist hier nicht gekoppelt.“
+
+### Requirement: Verwahrung nur über eine Standardkopplung
+
+Eine Instanz MUST einen abgeschlossenen Einsatz nur über eine Standardkopplung zur Verwahrung
+anbieten. Über eine Direktkopplung MUST keine Verwahrung angeboten oder angenommen werden.
+
+#### Scenario: Nachbereitung abgelaufen, ELW mit Hub und vor Ort
+- **WHEN** die Nachbereitungsfrist eines Einsatzes an ELW 2 abläuft und ELW 2 beim Hub und als Direktkopplung bei ELW 1 gekoppelt ist
+- **THEN** bietet ELW 2 den Einsatz nur dem Hub zur Verwahrung an
+
+#### Scenario: Nur vor Ort gekoppelt
+- **WHEN** die Nachbereitungsfrist eines Einsatzes an ELW 2 abläuft und ELW 2 nur als Direktkopplung bei ELW 1 gekoppelt ist
+- **THEN** bietet ELW 2 den Einsatz niemandem zur Verwahrung an, und ELW 1 macht aus seinem Spiegel keinen eigenen Einsatz

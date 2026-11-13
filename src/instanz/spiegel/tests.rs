@@ -28,7 +28,15 @@ where
 /// (Hub): Push wie im häufigsten Fall.
 async fn zwei_seiten() -> (SqlitePool, SqlitePool) {
     let f = crate::db::test_pool().await;
+    // Die Ursprungskennung braucht die eigene Instanzkennung (LLH-1497).
+    crate::instanz::identitaet::load_or_create(&f)
+        .await
+        .unwrap();
     let s = crate::db::test_pool().await;
+    // Die Ursprungskennung braucht die eigene Instanzkennung (LLH-1497).
+    crate::instanz::identitaet::load_or_create(&s)
+        .await
+        .unwrap();
     for (pool, richtung, adresse) in [
         (&f, "meldet_sich", "'https://hub.example.org'"),
         (&s, "wird_gemeldet", "NULL"),
@@ -116,6 +124,7 @@ async fn abgleichen(f: &SqlitePool, s: &SqlitePool, zeilen: usize) -> usize {
         kopplung_org_id: 1,
         org_id: 1,
         meldend: false,
+        vor_ort: false,
     };
     for l in &lieferungen {
         let erg = uebernehmen::uebernehmen(&mut sc, &e, l).await.unwrap();
@@ -406,6 +415,7 @@ async fn unbekannte_freigabestufe_haelt_den_spiegel_an() {
         kopplung_org_id: 1,
         org_id: 1,
         meldend: false,
+        vor_ort: false,
     };
     let erg = uebernehmen::uebernehmen(&mut sc, &e, &l).await.unwrap();
     assert_eq!(erg.stand, vorher, "Stand bleibt");
@@ -581,6 +591,7 @@ async fn gegen_id_auf_ein_fremdes_konto_wird_stellvertreter() {
         id,
         anzeigename: format!("Konto {id}"),
         gegen_id: Some(gegen_id),
+        ursprung: None,
     };
 
     let lokal = konto_lokal(&mut conn, 1, 1, 1, false, &angabe(10, eigen))
@@ -668,6 +679,7 @@ async fn ohne_katalogzeile_eines_aelteren_absenders_rueckt_der_spiegel_vor() {
         kopplung_org_id: 1,
         org_id: 1,
         meldend: false,
+        vor_ort: false,
     };
     for (katalog, rueckt_vor) in [(true, false), (false, true)] {
         l.katalog = katalog;
@@ -887,6 +899,7 @@ async fn eine_zeile_ueber_der_paketgrenze_kommt_als_hinweis_und_haelt_den_abglei
             kopplung_org_id: 1,
             org_id: 1,
             meldend: false,
+            vor_ort: false,
         },
         &l,
     )
@@ -1009,4 +1022,182 @@ async fn schwaerzung_nimmt_die_kopien_und_laesst_offene_zeilen_weiter_fragen() {
     drop(conn);
     assert_eq!(eine::<i64>(&pool, &anzahl).await, 0);
     assert_eq!(eine::<i64>(&pool, &offen).await, 0);
+}
+
+// ── Ursprungskennung (LLH-1497, design.md D5) ───────────────────────────────────────────────
+
+#[tokio::test]
+async fn nach_ursprung_findet_eigene_und_uebernommene_zeilen_nie_fremde_org_oder_stellvertreter() {
+    use super::abbildung::{konto_ursprung, nach_ursprung, ursprung};
+    use crate::instanz::stammdaten::StammdatenArt;
+    let (pool, _) = zwei_seiten().await;
+    crate::instanz::identitaet::load_or_create(&pool)
+        .await
+        .unwrap();
+    let ich: String = eine(&pool, "SELECT kennung FROM instanz_identitaet").await;
+    // Eigene Zeile: eigenes Präfix.
+    let fz: i64 = eine(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Eigen 1') RETURNING id",
+    )
+    .await;
+    assert_eq!(
+        ursprung(
+            &mut *pool.acquire().await.unwrap(),
+            StammdatenArt::Fahrzeug,
+            fz
+        )
+        .await
+        .unwrap()
+        .as_deref(),
+        Some(format!("{ich}/{fz}").as_str())
+    );
+    assert_eq!(
+        nach_ursprung(
+            &mut *pool.acquire().await.unwrap(),
+            1,
+            StammdatenArt::Fahrzeug,
+            &format!("{ich}/{fz}")
+        )
+        .await
+        .unwrap(),
+        Some(fz)
+    );
+    // Eine Zeile einer anderen Org gilt nicht.
+    exec(
+        &pool,
+        "INSERT OR IGNORE INTO organisation (id, name) VALUES (2, 'Fremd')",
+    )
+    .await;
+    let fremd: i64 = eine(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (2, 'Fremd 1') RETURNING id",
+    )
+    .await;
+    assert_eq!(
+        nach_ursprung(
+            &mut *pool.acquire().await.unwrap(),
+            1,
+            StammdatenArt::Fahrzeug,
+            &format!("{ich}/{fremd}")
+        )
+        .await
+        .unwrap(),
+        None
+    );
+    // Übernommene Zeile: über die gespeicherte Ursprungskennung.
+    let vom_hub: i64 = eine(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Hub 1') RETURNING id",
+    )
+    .await;
+    exec(
+        &pool,
+        &format!(
+            "INSERT INTO stammdaten_herkunft (kopplung_org_id, org_id, art, fremder_schluessel, \
+             lokaler_schluessel, ursprung) VALUES (1, 1, 'fahrzeug', '7', '{vom_hub}', 'hub/7')"
+        ),
+    )
+    .await;
+    assert_eq!(
+        ursprung(
+            &mut *pool.acquire().await.unwrap(),
+            StammdatenArt::Fahrzeug,
+            vom_hub
+        )
+        .await
+        .unwrap()
+        .as_deref(),
+        Some("hub/7")
+    );
+    assert_eq!(
+        nach_ursprung(
+            &mut *pool.acquire().await.unwrap(),
+            1,
+            StammdatenArt::Fahrzeug,
+            "hub/7"
+        )
+        .await
+        .unwrap(),
+        Some(vom_hub)
+    );
+    assert_eq!(
+        nach_ursprung(
+            &mut *pool.acquire().await.unwrap(),
+            1,
+            StammdatenArt::Fahrzeug,
+            "hub/8"
+        )
+        .await
+        .unwrap(),
+        None
+    );
+    // Ein Stellvertreter hat keine Ursprungskennung und wird nie gewählt.
+    let sv = konto(&pool, "stellvertreter").await;
+    exec(
+        &pool,
+        &format!(
+            "INSERT INTO spiegel_konto (kopplung_id, fremde_id, benutzer_id) VALUES (1, 99, {sv})"
+        ),
+    )
+    .await;
+    assert_eq!(
+        konto_ursprung(&mut *pool.acquire().await.unwrap(), sv)
+            .await
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        nach_ursprung(
+            &mut *pool.acquire().await.unwrap(),
+            1,
+            StammdatenArt::Konto,
+            &format!("{ich}/{sv}")
+        )
+        .await
+        .unwrap(),
+        None
+    );
+}
+
+/// Protokoll 2 und 3 verstehen einander (LLH-1497, design.md D7): Die neuen Felder sind optional,
+/// fehlen in einer Nachricht von Protokoll 2 und stehen leer gar nicht auf der Leitung.
+#[test]
+fn die_neuen_felder_sind_optional_und_fehlen_leer_auf_der_leitung() {
+    use super::paket::{Antrag, KontoAngabe, Zeile};
+    let zeile: Zeile = serde_json::from_value(serde_json::json!({
+        "art": "etb_eintrag", "schluessel": "1", "stand": 3, "kategorie": "etb"
+    }))
+    .unwrap();
+    assert!(zeile.ursprung.is_empty());
+    let text = serde_json::to_string(&zeile).unwrap();
+    assert!(!text.contains("ursprung"), "{text}");
+    let konto: KontoAngabe =
+        serde_json::from_value(serde_json::json!({"id": 1, "anzeigename": "A"})).unwrap();
+    assert_eq!(konto.ursprung, None);
+    assert!(!serde_json::to_string(&konto).unwrap().contains("ursprung"));
+    let antrag: Antrag = serde_json::from_value(serde_json::json!({
+        "id": 1, "kennung": "x/1", "art": "etb", "methode": "POST", "pfad_vorlage": "/",
+        "daten": {}, "konto": {"id": 1, "anzeigename": "A"}, "erfasst_at": "2026-11-12 08:00:00"
+    }))
+    .unwrap();
+    assert!(antrag.ursprung.is_empty());
+    let l: crate::instanz::stammdaten::StammdatenLieferung =
+        serde_json::from_value(serde_json::json!({"art": "konto", "schluessel": "1", "stand": 1}))
+            .unwrap();
+    assert_eq!(l.ursprung, None);
+}
+
+#[tokio::test]
+async fn ohne_eigene_instanzkennung_gibt_es_keine_erfundene_ursprungskennung() {
+    // Liefern aus einer Archivdatei (LLH-1494): dort fehlt `instanz_identitaet`.
+    let pool = crate::db::test_pool().await;
+    let u = super::abbildung::ursprung(
+        &mut *pool.acquire().await.unwrap(),
+        crate::instanz::stammdaten::StammdatenArt::Fahrzeug,
+        42,
+    )
+    .await
+    .unwrap();
+    assert_eq!(u, None);
 }

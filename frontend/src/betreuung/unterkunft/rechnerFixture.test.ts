@@ -7,8 +7,8 @@ import { mitOverrides } from './richtwerte';
 
 /**
  * Gemeinsame Testfälle (LLH-1520, design.md D1): `tests/fixtures/unterkunft/faelle.json`. Dieselbe
- * Datei liest später der Rust-Kern der Rechner-API (LLH-1524); ändert eine Seite die Rechnung ohne
- * die Datei, wird ihre Suite rot.
+ * Datei liest der Rust-Kern der Rechner-API (LLH-1524, `src/public_api/rechner/tests.rs`); ändert
+ * eine Seite die Rechnung ohne die Datei, wird ihre Suite rot.
  */
 const fixture = JSON.parse(
   readFileSync(

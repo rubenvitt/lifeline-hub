@@ -67,6 +67,12 @@ wire_enum! {
         /// Eine andere Instanz hat einen Kopplungscode dieser Org eingelöst (ausstellende Seite;
         /// ausgelöst vom Gegenüber, ohne handelnde Person).
         InstanzCodeEingeloest => "instanz_code_eingeloest",
+        /// Die Gegenstelle einer Direktkopplung zeigt ein neues TLS-Zertifikat, das sie signiert
+        /// beglaubigt hat (LLH-1497; meldende Seite, ohne handelnde Person).
+        InstanzZertifikatGewechselt => "instanz_zertifikat_gewechselt",
+        /// Die Gegenstelle einer Direktkopplung wurde im LAN unter neuer Adresse gefunden und hat
+        /// dort signiert geantwortet (LLH-1497; meldende Seite, ohne handelnde Person).
+        InstanzAdresseGeaendert => "instanz_adresse_geaendert",
         /// Diese Instanz hat sich mit dem Code einer anderen gekoppelt (einlösende Seite).
         InstanzGekoppelt => "instanz_gekoppelt",
         /// Die Org-Zuordnung einer Kopplung hier widerrufen.

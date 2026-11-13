@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -59,6 +59,20 @@ Für den System-Admin der anderen Installation (etwa im Einsatzleitwagen):
 2. „Adresse der anderen Instanz“ und „Kopplungscode“ eintragen und „Koppeln“ wählen.
 3. Die neue Zeile unter „Gekoppelte Instanzen“ nennt den Fingerabdruck der anderen
    Installation. Er muss mit dem übereinstimmen, den deren Dialog gezeigt hat.
+
+### Zwei Installationen vor Ort direkt koppeln
+
+Für die System-Admins zweier Installationen im selben Netz, etwa zweier Einsatzleitwagen am
+Schadensort ohne Internet:
+
+1. An der ersten Installation unter „Einstellungen“, „Instanzkopplung“ „Code vor Ort“ wählen. Der
+   Dialog zeigt Code, Adresse und Fingerabdruck und nennt die Grenzen einer Direktkopplung.
+2. An der zweiten Installation „Code einlösen“ und darin „Im Netz suchen“ wählen. Nach einigen
+   Sekunden stehen die gefundenen Installationen mit Fingerabdruck und Adresse da.
+3. Bei der ersten Installation „Übernehmen“ wählen, „Kopplungscode“ eintragen und „Koppeln“
+   wählen. Ohne Treffer die Adresse von Hand eintragen.
+4. Beide Zeilen unter „Gekoppelte Instanzen“ tragen „vor Ort“ und „Zertifikat bestätigt“; der
+   Fingerabdruck muss mit dem aus dem Dialog der ersten Installation übereinstimmen.
 
 ### Nachgelieferten Unterschriftsschlüssel bestätigen
 
@@ -242,12 +256,50 @@ Anträge stehen danach wie nach der Verwahrung in der Zeile oben unter „Anträ
 „Kopieren“ und „Verwerfen“; neu erfasst wird direkt am nun eigenen Einsatz. In der Admin-Spur
 steht der Widerruf der Kopplung, nicht jeder zurückgeholte Einsatz.
 
+Ist die Führung je Einsatz ausgeschaltet, wenn die Installation vom Widerruf erfährt, holt sie
+keinen Einsatz zurück, auch nicht, wenn die Führung später wieder eingeschaltet wird: Der Spiegel
+bleibt gesperrt, und das Paneel „Führung“ bietet nichts an, bis die Organisation erneut mit
+derselben Installation gekoppelt ist. Eine Übernahme, die noch auf Bestätigung wartete, verfällt
+auch dann.
+
 ### Fingerabdruck und Sicherheit
 
 Jede Installation hat ein eigenes Schlüsselpaar; der Fingerabdruck ist eine Kurzform davon. Alle
 Nachrichten zwischen gekoppelten Installationen sind damit signiert. Der Code selbst geht nie
 über die Leitung; wer sich zwischen beide Installationen schaltet, fällt beim Einlösen auf, und
 das Koppeln scheitert.
+
+### Direktkopplung vor Ort
+
+Eine Kopplung mit „Code vor Ort“ verbindet zwei Installationen im selben Netz, ohne dass eine
+davon ein öffentlicher Server ist. Darüber gehen nur die Einsätze zum Mitlesen und die Anträge:
+Die eine Installation liest die Einsätze der anderen und beantragt dort Erfassungen, wie an
+jedem Spiegel. Nicht über eine Direktkopplung gehen:
+
+- die Führung eines Einsatzes (Übergabe, Anfrage, Notübernahme, Abgabe per Code); das Paneel
+  „Führung“ nennt den Grund,
+- Stammdaten und Passwörter; „Stammdaten erneut abgleichen“ und „ELW verloren“ fehlen dort,
+- die Verwahrung nach der Nachbereitung.
+
+Konten, Fahrzeuge und andere Stammdaten, die beide Installationen vom selben Hub haben, gelten
+als dieselben: Einsatzrollen und Fahrzeuge erscheinen im Spiegel richtig, und ein Antrag wird im
+Namen desselben Kontos ausgeführt. Ein Konto, das es nur an der beantragenden Installation gibt,
+lehnt die andere mit „Konto am Führer unbekannt“ ab.
+
+Die Verbindung ist verschlüsselt, auch mit einem selbst erzeugten Zertifikat: Beim Koppeln nennt
+die erste Installation den Fingerabdruck ihres Zertifikats in einer signierten Antwort, und die
+zweite merkt ihn sich. Zeigt die erste später ein neues Zertifikat, etwa nach einem Neustart mit
+anderer IP-Adresse, holt die zweite zuerst eine signierte Bestätigung ein und schickt erst dann
+wieder Daten. Die Zeile der Kopplung zeigt „Zertifikat bestätigt“, „Zertifikat passt nicht: es
+geht nichts hinaus“ oder an der ersten Installation „Gegenstelle kennt ein älteres Zertifikat
+dieser Instanz“, bis die nächste Meldung durch ist.
+
+„Code vor Ort“ steht nur zur Verfügung, wenn die Installation selbst HTTPS spricht (Betrieb mit
+`--tls`); hinter einem vorgeschalteten Proxy gibt es ihn nicht. „Im Netz suchen“ findet nur
+etwas, wenn der Betreiber die Suche im Netz eingeschaltet hat (`--lan-entdeckung`), sonst steht
+„LAN-Entdeckung ist aus“ da. Ändert sich die Adresse der ersten Installation, sucht die zweite
+sie im Netz neu und übernimmt die neue Adresse erst nach deren signierter Bestätigung. Eine
+Ankündigung im Netz allein koppelt nie: Ohne gültigen Code entsteht keine Kopplung.
 
 ### Unterschriftsschlüssel
 
@@ -362,6 +414,14 @@ Sonst legt der Spiegel eine Kopie als Sprechgruppe des Einsatzes an. Nur diese K
 
 Einsatznummern vergibt jede Installation selbst. Ein Spiegel trägt die Nummer der Installation,
 die ihn führt; am Hub kann deshalb ein eigener Einsatz dieselbe Nummer tragen wie ein Spiegel.
+Wechselt die Führung und hat die übernehmende Installation die Nummer schon selbst vergeben,
+bekommt der übernommene Einsatz dort eine neue Nummer, die über allen ihren Einsätzen des Jahres
+liegt. Sein Einsatztagebuch nennt dann „Neue Einsatznummer …, bisher …“. Die abgebende
+Installation zeigt die neue Nummer, sobald sie den Einsatz als Spiegel hält, bei einer
+Notübernahme mit Unterschrift also erst nach dem Bestätigen. Übergibt die neue Installation die
+Führung später zurück, bleibt die neue Nummer, solange sie dort frei ist. Widerspricht der ELW
+dagegen einer Notübernahme, führt er mit seiner Nummer weiter, und der Hub zeigt sie wieder,
+sobald der ELW den Einsatz das nächste Mal ändert.
 
 Benachrichtigungen werden nicht gespiegelt. Jede Installation führt ihre eigenen; „gelesen“ und
 das Quittieren gelten nur dort.
@@ -512,7 +572,8 @@ Spiegel. Ist dieser ELW mit dem führenden ELW nicht selbst gekoppelt, bekommt d
 keine Änderungen mehr und zeigt das im Hinweisband; was er seit seiner Notübernahme erfasst hat,
 bleibt dort als Bruchstelle aufgehoben. Wird die Kopplung zum Hub widerrufen, verschwindet das
 Hinweisband, und der ELW führt weiter. Hat der Hub die Führung inzwischen von einem anderen ELW
-zurückbekommen, zeigt der ELW „Führung übernommen von …“ mit „Übernahme bestätigen“ und
+zurückbekommen oder sie sich von ihm zurückgeholt, per Notübernahme oder durch den Widerruf der
+Kopplung zu ihm, zeigt der ELW „Führung übernommen von …“ mit „Übernahme bestätigen“ und
 „Widersprechen“, ohne Alarm; widerspricht die Einsatzleitung, führt er mit der nächsten Epoche
 weiter, und der Hub nimmt das an. Wer per Code abgibt, schreibt ab dem Code nicht mehr: Der
 Einsatz ist dort sofort ein Spiegel, und der Verlauf zeigt „Abgabe per Code“, ohne auf den Hub zu
@@ -570,3 +631,11 @@ oder Schwärzen des Einsatzes ist die Liste leer.
 „Update nötig“ heißt, die Programmstände liegen zu weit auseinander; Melden geht weiter, sonst
 nichts. Kennt die andere Installation noch keine Spiegel, werden keine Einsätze abgeglichen. „Uhr weicht ab“ erscheint ab zwei Minuten Abweichung; ab fünf Minuten lehnen die
 Installationen einander ab.
+
+Nach dem Zurückspielen einer Sicherung zeigt die Kopplung meist „… hat schon spätere Führungsakten
+quittiert, als diese Instanz vergeben hat (aus einer Sicherung zurückgespielt?)“, an weiteren
+Kopplungen „Der Zähler der Führungsakten lag unter einer Quittung …“. Das ist kein Fehler: Die
+Installation hat den Rückstand erkannt und schickt die Akten erneut, eingreifen muss niemand. Akten,
+die die andere Installation mit der Sicherung verloren hat, kommen mit den nächsten Meldungen
+wieder. Die Uhr des Servers muss dafür stimmen; die Grenzen nennt die Betriebsdoku
+(`docs/betrieb/backup-restore.md`, „Gekoppelte Instanz zurückspielen“).

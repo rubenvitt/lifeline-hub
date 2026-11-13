@@ -8,7 +8,10 @@ use serde_json::{json, Value};
 
 mod common;
 use common::maschine::{angebunden, jetzt, schluessel, senden, signiert};
-use common::{anfrage, anfrage_json, einsatz_anlegen_mit, login_cookie, setup_mit_pool};
+use common::{
+    anfrage, anfrage_json, einheit_bilden, einsatz_anlegen_mit, login_cookie, setup_mit_pool,
+    stammpersonal_disponieren,
+};
 
 const LAGE: &str = "/api/v1/lage";
 const IP: &str = "198.51.100.7";
@@ -310,6 +313,137 @@ async fn ohne_scope_403_mit_bearer_401_und_ein_abgeschlossener_einsatz_ist_null(
     let v = lage(&app, &monitor, "").await;
     assert!(v["einsatz"].is_null(), "{v}");
     assert!(v.get("karte").is_none());
+}
+
+/// Spec `lage-schnittstelle`, „Zahlen des Einsatzes“ und „Sofortmeldung“: zwei Einheiten, acht
+/// Kräfte und zwei offene Sofortmeldungen kommen als diese Zahlen an, ohne Meldungstext.
+#[tokio::test]
+async fn lage_zaehlt_einheiten_kraefte_und_offene_sofortmeldungen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), IP).await;
+    freigeben(&pool, &cred, einsatz).await;
+
+    einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
+    einheit_bilden(&app, &admin, einsatz, "Trupp 2").await;
+    for i in 0..8 {
+        stammpersonal_disponieren(&app, &admin, einsatz, &format!("Kraft {i}")).await;
+    }
+    for (art, prio, inhalt) in [
+        ("sofortmeldung", "sofort", "Herr Geheimrat eingeklemmt"),
+        ("lagemeldung", "sofort", "Gasgeruch bei Familie Verborgen"),
+        ("lagemeldung", "normal", "Lage ruhig"),
+    ] {
+        post(
+            &app,
+            &admin,
+            &format!("/api/einsaetze/{einsatz}/meldungen"),
+            json!({
+                "absender": "Melder Unbekannt",
+                "empfaenger": "Empfaengerin Vertraulich",
+                "meldeweg": "persoenlich",
+                "inhalt": inhalt,
+                "meldungsart": art,
+                "prioritaet": prio,
+                "ereigniszeit": "2026-10-04 10:00:00",
+            }),
+        )
+        .await;
+    }
+
+    let v = lage(&app, &cred, "?karte=none").await;
+    let e = &v["einsatz"];
+    assert_eq!(e["kraefte"]["einheiten"], json!(2), "{v}");
+    assert_eq!(e["kraefte"]["personal"], json!(8), "{v}");
+    let s = &e["kraefte"]["staerke"];
+    assert_eq!(
+        s["fuehrer"].as_u64().unwrap()
+            + s["unterfuehrer"].as_u64().unwrap()
+            + s["mannschaft"].as_u64().unwrap(),
+        8,
+        "die Stärke zählt jede Kraft: {v}"
+    );
+    assert_eq!(e["sofortmeldungen_offen"], json!(2), "{v}");
+    let text = v.to_string();
+    for wort in [
+        "Geheimrat",
+        "Verborgen",
+        "Unbekannt",
+        "Vertraulich",
+        "Kraft 0",
+    ] {
+        assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
+    }
+}
+
+/// ADR-0034: Ein Lese-Scope mit Einsatzbezug (`Scope::has_einsatzbezug`) und die Routen, die
+/// ihren Einsatz aus der Freigabe nehmen, laufen nicht auseinander. Kommt eine Route mit einem
+/// solchen Scope dazu, steht sie hier, und der Test darunter belegt, dass sie ohne Freigabe
+/// keinen Einsatz liest.
+#[tokio::test]
+async fn routen_mit_einsatzbezug_lesen_nur_ueber_die_freigabe() {
+    use lifeline_hub::public_api::scope::Scope;
+
+    /// Routen, deren Einsatz allein aus `public_api::freigabe` kommt.
+    const UEBER_FREIGABE: &[&str] = &[LAGE];
+
+    let dokument = serde_json::to_value(lifeline_hub::public_api::openapi()).unwrap();
+    let mut scopes_im_dokument = Vec::new();
+    for (pfad, methoden) in dokument["paths"].as_object().unwrap() {
+        for (_, operation) in methoden.as_object().unwrap() {
+            let Some(security) = operation.get("security").and_then(|s| s.as_array()) else {
+                continue;
+            };
+            for eintrag in security {
+                for scope in eintrag["machine"].as_array().into_iter().flatten() {
+                    let scope = Scope::parse(scope.as_str().unwrap())
+                        .unwrap_or_else(|| panic!("{pfad}: unbekannter Scope {scope}"));
+                    if scope.has_einsatzbezug() {
+                        assert!(
+                            UEBER_FREIGABE.contains(&pfad.as_str()),
+                            "{pfad} verlangt {} (Einsatzbezug), steht aber nicht in \
+                             UEBER_FREIGABE",
+                            scope.as_str()
+                        );
+                        scopes_im_dokument.push(scope);
+                    }
+                }
+            }
+        }
+    }
+    // Umgekehrt: ein Scope gilt erst als „mit Einsatzbezug“, wenn seine Route steht. Sonst
+    // zeigte das Paneel „Anbindungen“ einen Schalter ohne Wirkung.
+    for scope in Scope::ALLE {
+        assert_eq!(
+            scope.has_einsatzbezug(),
+            scopes_im_dokument.contains(&scope),
+            "{}: has_einsatzbezug und die Routen des Dokuments passen nicht zusammen",
+            scope.as_str()
+        );
+    }
+
+    // Ohne Freigabe liest keine dieser Routen einen Einsatz.
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), IP).await;
+    for (i, pfad) in UEBER_FREIGABE.iter().enumerate() {
+        let (s, _, v) = signiert(&app, &cred, "GET", pfad, jetzt(), &format!("jti-{i}"), IP).await;
+        assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
+        // Der Schlüssel muss da sein und `null` tragen: `v["einsatz"].is_null()` wäre auch bei
+        // fehlendem Schlüssel oder leerem Body wahr (`src/AGENTS.md`, Typ-Codegen, Testfalle).
+        assert_eq!(
+            v.get("einsatz"),
+            Some(&Value::Null),
+            "{pfad} liest ohne Freigabe: {v}"
+        );
+        // Unabhängig von der Form der Antwort: der Einsatz der Org kommt nicht vor.
+        assert!(
+            !v.to_string().contains("Stadtfest"),
+            "{pfad} nennt ohne Freigabe einen Einsatz: {v}"
+        );
+    }
 }
 
 /// Der frühere Schlüsselweg (LLH-1484) ist entfernt: Pfad und Verwaltung gibt es nicht mehr.

@@ -1,4 +1,4 @@
-//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0029,
+//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0034,
 //! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/anbindungen`, ein Einsatz je Zugang,
 //! Ende der Freigabe, Anzeige an der Anbindung und das Verhalten an einem Spiegel.
 
@@ -474,6 +474,203 @@ async fn widerruf_und_entzug_des_rechts_beenden_die_freigabe() {
     anfrage(&app, "POST", &format!("{pfad}/widerrufen"), &admin, None).await;
     let etb = system_etb_inhalte(&app, &admin, einsatz).await;
     assert_eq!(zaehle(&etb, "Anbindung „FüKW Anzeige“ widerrufen von"), 1);
+}
+
+/// Spec `maschinenzugang`, „Die Freigabe endet mit Einsatz, Zugang oder Recht“: Verstreicht
+/// „gültig bis“, endet die Freigabe. Verlängert der Admin den Zugang danach, liest er erst nach
+/// einer neuen Freigabe wieder.
+#[tokio::test]
+async fn ablauf_beendet_die_freigabe_auch_wenn_der_zugang_verlaengert_wird() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let monitor = angebunden_als(
+        &app,
+        &admin,
+        "FüKW Monitor",
+        json!(["lage:read"]),
+        &schluessel(1),
+        IP,
+    )
+    .await;
+    let zid = monitor.zugang_id.clone();
+    let pfad = format!("{ANBINDUNGEN}/{zid}");
+    freigeben(&app, &admin, einsatz, &zid).await;
+    assert_eq!(
+        lage(&app, &monitor).await.unwrap()["einsatz"]["id"],
+        json!(einsatz)
+    );
+
+    // Abgelaufen: 401 für das Fremdsystem, die Verwaltung nennt keinen Einsatz mehr.
+    sqlx::query(
+        "UPDATE maschinenzugang SET gueltig_bis = datetime('now', '-1 minute') WHERE id = ?",
+    )
+    .bind(&zid)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert!(lage(&app, &monitor).await.is_none(), "401 nach dem Ablauf");
+    let a = anbindung(&app, &admin, &zid).await;
+    assert_eq!(a["einsatz_freigebbar"], json!(false));
+    assert!(a.get("einsatz_id").is_none(), "{a}");
+
+    // Verlängert: der Zugang kommt wieder herein, liest aber keinen Einsatz.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({"gueltig_bis": "2099-01-01 00:00:00"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["einsatz_freigebbar"], json!(true), "{v}");
+    assert!(v.get("einsatz_id").is_none(), "{v}");
+    assert!(
+        lage(&app, &monitor).await.unwrap()["einsatz"].is_null(),
+        "ohne neue Freigabe kein Einsatz"
+    );
+    assert_eq!(freigaben(&pool).await, 0);
+    let z = liste(&app, &admin, einsatz).await;
+    assert_eq!(z[0]["freigegeben"], json!(false));
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert_eq!(
+        zaehle(
+            &etb,
+            "für die Anbindung „FüKW Monitor“ ist mit deren Ablauf beendet"
+        ),
+        1,
+        "{etb:?}"
+    );
+
+    // Die Einsatzleitung gibt neu frei.
+    freigeben(&app, &admin, einsatz, &zid).await;
+    assert_eq!(
+        lage(&app, &monitor).await.unwrap()["einsatz"]["id"],
+        json!(einsatz)
+    );
+}
+
+/// Die Org des Admins meldet sich bei einem Hub (aktive Kopplung, meldende Seite).
+async fn org_an_hub_koppeln(pool: &sqlx::SqlitePool) {
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let kopplung: i64 = sqlx::query_scalar(
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
+         richtung, gegenueber_adresse, zustand) VALUES ('hub-1', 'X', 'Hub Kreis', 'meldet_sich', \
+         'https://hub.example', 'aktiv') RETURNING id",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
+         VALUES (?, ?, 'hub-1/1', 'Kreis')",
+    )
+    .bind(kopplung)
+    .bind(org)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// Spec `maschinenzugang`, „Ein gekoppelter ELW nimmt keine Fremdsysteme an“: Meldet sich die
+/// Instanz für die Org bei einem Hub, gibt es hier nichts freizugeben, auch nicht für einen
+/// Zugang aus der Zeit davor.
+#[tokio::test]
+async fn am_gekoppelten_elw_bleibt_das_paneel_leer() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let monitor = angebunden_als(
+        &app,
+        &admin,
+        "FüKW Monitor",
+        json!(["lage:read"]),
+        &schluessel(1),
+        IP,
+    )
+    .await;
+    assert_eq!(
+        liste(&app, &admin, einsatz).await.as_array().unwrap().len(),
+        1
+    );
+
+    org_an_hub_koppeln(&pool).await;
+
+    assert!(liste(&app, &admin, einsatz)
+        .await
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let (s, _) = freigeben(&app, &admin, einsatz, &monitor.zugang_id).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let a = anbindung(&app, &admin, &monitor.zugang_id).await;
+    assert_eq!(a["einsatz_freigebbar"], json!(false), "{a}");
+}
+
+/// Eine Freigabe von vor der Kopplung ruht am gekoppelten ELW: das Fremdsystem liest nicht, die
+/// Einsatzleitung sieht die Zeile und kann die Freigabe beenden. Ohne die Zeile gälte die
+/// Freigabe nach dem Ende der Kopplung wieder, ohne dass sie jemand gesehen hätte.
+#[tokio::test]
+async fn am_gekoppelten_elw_ruht_die_freigabe_und_laesst_sich_beenden() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let monitor = angebunden_als(
+        &app,
+        &admin,
+        "FüKW Monitor",
+        json!(["lage:read"]),
+        &schluessel(1),
+        IP,
+    )
+    .await;
+    let zweiter = angebunden_als(
+        &app,
+        &admin,
+        "Monitor Stab",
+        json!(["lage:read"]),
+        &schluessel(2),
+        IP,
+    )
+    .await;
+    let (s, _) = freigeben(&app, &admin, einsatz, &monitor.zugang_id).await;
+    assert_eq!(s, StatusCode::OK);
+    let v = liste(&app, &admin, einsatz).await;
+    assert_eq!(v.as_array().unwrap().len(), 2, "{v}");
+    assert_eq!(v[0]["ruht"], json!(false), "{v}");
+
+    org_an_hub_koppeln(&pool).await;
+
+    // Das Fremdsystem wird abgewiesen, die Freigabe steht weiter in der Tabelle.
+    assert!(lage(&app, &monitor).await.is_none());
+    assert_eq!(freigaben(&pool).await, 1);
+    // Im Paneel steht nur die bestehende Freigabe, als ruhend.
+    let v = liste(&app, &admin, einsatz).await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v[0]["zugang_id"], json!(monitor.zugang_id));
+    assert_eq!(v[0]["freigegeben"], json!(true));
+    assert_eq!(v[0]["ruht"], json!(true));
+    // Neu freigeben geht hier nicht.
+    let (s, _) = freigeben(&app, &admin, einsatz, &zweiter.zugang_id).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+
+    let (s, v) = beenden(&app, &admin, einsatz, &monitor.zugang_id).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.as_array().unwrap().is_empty(), "{v}");
+    assert_eq!(freigaben(&pool).await, 0);
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert_eq!(
+        zaehle(
+            &etb,
+            "Freigabe für die Anbindung „FüKW Monitor“ beendet von"
+        ),
+        1,
+        "{etb:?}"
+    );
 }
 
 // ── Am Spiegel (design.md D4, D5, D8) ────────────────────────────────────────────────────────

@@ -901,6 +901,8 @@
           "lesezugang_widerrufen",
           "instanz_code_ausgestellt",
           "instanz_code_eingeloest",
+          "instanz_zertifikat_gewechselt",
+          "instanz_adresse_geaendert",
           "instanz_gekoppelt",
           "instanz_kopplung_widerrufen",
           "instanz_kopplung_vom_gegenueber_widerrufen",
@@ -1069,7 +1071,8 @@
           "zustand",
           "is_abgelaufen",
           "angelegt_at",
-          "geaendert_at"
+          "geaendert_at",
+          "einsatz_freigebbar"
         ],
         "properties": {
           "angelegt_at": {
@@ -1080,6 +1083,10 @@
               "string",
               "null"
             ]
+          },
+          "einsatz_freigebbar": {
+            "type": "boolean",
+            "description": "Für diesen Zugang lässt sich hier ein Einsatz freigeben (LLH-1638): Lese-Recht mit\nEinsatzbezug, nicht widerrufen, nicht abgelaufen, und die Instanz nimmt für die Org\nFremdsysteme an. Die Seite zeigt dann, welchen Einsatz er liest."
           },
           "einsatz_id": {
             "type": [
@@ -1192,7 +1199,8 @@
           "scopes",
           "zustand",
           "freigegeben",
-          "anderer_einsatz"
+          "anderer_einsatz",
+          "ruht"
         ],
         "properties": {
           "anderer_einsatz": {
@@ -1205,6 +1213,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "ruht": {
+            "type": "boolean",
+            "description": "Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an:\ndie Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden."
           },
           "scopes": {
             "type": "array",
@@ -9300,9 +9312,14 @@
           "kopplung_id",
           "kennung",
           "name",
-          "richtung"
+          "richtung",
+          "art"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/InstanzKopplungArt",
+            "description": "Art der Kopplung (LLH-1497): über eine Direktkopplung `vor_ort` wechselt die Führung nicht."
+          },
           "kennung": {
             "type": "string"
           },
@@ -10504,6 +10521,45 @@
           }
         }
       },
+      "InstanzGefunden": {
+        "type": "object",
+        "description": "Eine im lokalen Netz gefundene Instanz.",
+        "required": [
+          "kennung",
+          "name",
+          "fingerabdruck",
+          "protokoll",
+          "adressen",
+          "gekoppelt"
+        ],
+        "properties": {
+          "adressen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Adressen zum Einlösen, bevorzugt IPv4, etwa `https://192.168.1.20:8443`."
+          },
+          "fingerabdruck": {
+            "type": "string"
+          },
+          "gekoppelt": {
+            "type": "boolean",
+            "description": "Mit dieser Instanz besteht schon eine Kopplung."
+          },
+          "kennung": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "protokoll": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "InstanzKopplungAnzeige": {
         "type": "object",
         "description": "Eine Kopplung, wie die Admin-Seite sie zeigt: aus Sicht einer Org.",
@@ -10518,9 +10574,14 @@
           "org",
           "wartende_schluessel",
           "ohne_gueltigen_schluessel",
-          "spiegel"
+          "spiegel",
+          "art"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/InstanzKopplungArt",
+            "description": "Art der Kopplung (LLH-1497)."
+          },
           "gegenueber_adresse": {
             "type": [
               "string",
@@ -10595,6 +10656,17 @@
             "format": "int64",
             "description": "Vom Gegenüber nachgelieferte Unterschriftsschlüssel, die hier auf Bestätigung warten\n(LLH-1605)."
           },
+          "zertifikat": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InstanzZertifikatZustand",
+                "description": "Zustand des beglaubigten TLS-Zertifikats, nur an einer Direktkopplung (design.md D3)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "zuletzt_gesehen_at": {
             "type": [
               "string",
@@ -10605,6 +10677,14 @@
             "$ref": "#/components/schemas/InstanzKopplungZustand"
           }
         }
+      },
+      "InstanzKopplungArt": {
+        "type": "string",
+        "description": "Art einer Kopplung (LLH-1497, design.md D1). Sie beschreibt die Kopplung, nicht die\nInstanz: dieselbe Instanz kann beim Hub `standard` und bei einem zweiten ELW `vor_ort`\ngekoppelt sein. Was über eine Art fließt, sagt allein [`InstanzKopplungArt::traegt`].",
+        "enum": [
+          "standard",
+          "vor_ort"
+        ]
       },
       "InstanzKopplungRichtung": {
         "type": "string",
@@ -10623,6 +10703,26 @@
           "widerrufen",
           "vom_gegenueber_widerrufen"
         ]
+      },
+      "InstanzLanAntwort": {
+        "type": "object",
+        "description": "Antwort von `GET /api/admin/instanz/lan`.",
+        "required": [
+          "aus",
+          "gefunden"
+        ],
+        "properties": {
+          "aus": {
+            "type": "boolean",
+            "description": "Die LAN-Entdeckung läuft hier nicht (`--lan-entdeckung` mit `--tls`)."
+          },
+          "gefunden": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstanzGefunden"
+            }
+          }
+        }
       },
       "InstanzOrgZuordnung": {
         "type": "object",
@@ -10776,6 +10876,8 @@
           "protokoll",
           "softwarestand",
           "passkeys_eingerichtet",
+          "tls_eigen",
+          "lan_entdeckung",
           "eigener_schluessel",
           "datentraeger_bestaetigt",
           "kopplungen",
@@ -10802,6 +10904,10 @@
               "$ref": "#/components/schemas/InstanzKopplungAnzeige"
             }
           },
+          "lan_entdeckung": {
+            "type": "boolean",
+            "description": "Die LAN-Entdeckung ist eingeschaltet (`--lan-entdeckung`, design.md D6)."
+          },
           "name": {
             "type": "string"
           },
@@ -10822,8 +10928,21 @@
           },
           "softwarestand": {
             "type": "string"
+          },
+          "tls_eigen": {
+            "type": "boolean",
+            "description": "Diese Instanz spricht selbst TLS (`--tls`): Voraussetzung für einen Code der Art „vor Ort“\n(LLH-1497, design.md D3)."
           }
         }
+      },
+      "InstanzZertifikatZustand": {
+        "type": "string",
+        "description": "Zustand des beglaubigten Zertifikats einer Direktkopplung (LLH-1497, design.md D3).",
+        "enum": [
+          "bestaetigt",
+          "passt_nicht",
+          "gegenstelle_kennt_aelteres"
+        ]
       },
       "JetztAktualisierenAntwort": {
         "type": "object",
@@ -11396,9 +11515,14 @@
         "required": [
           "code",
           "laeuft_ab_at",
-          "fingerabdruck"
+          "fingerabdruck",
+          "art"
         ],
         "properties": {
+          "art": {
+            "$ref": "#/components/schemas/InstanzKopplungArt",
+            "description": "Art der Kopplung, die der Code stiftet (LLH-1497)."
+          },
           "code": {
             "type": "string",
             "description": "In Vierergruppen, z. B. `ABCD-EFGH-JKMN-PQRS`."

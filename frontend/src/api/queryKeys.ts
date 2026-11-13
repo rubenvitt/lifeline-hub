@@ -519,7 +519,9 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  * - `geraete` (LFH-892): Kopplungen sieht nur die Einsatzleitung auf ihrer Einstellungsseite; die
  *   eigene Änderung setzt die Antwort, der letzte Zugriff eines Geräts ist kein Ereignis.
  * - `anbindungen` (LLH-1638): wie `geraete`; die Freigabe setzt die Antwort, ein Abruf des
- *   Fremdsystems ist kein Ereignis.
+ *   Fremdsystems ist kein Ereignis. Umstellen von einem anderen Einsatz aus, Widerruf und
+ *   Rechteentzug ändern den Stand von außen: das Paneel fragt dafür alle 30 s nach
+ *   (`pages/einstellungen/EinsatzAnbindungen.tsx`).
  * - `lagebildFreigaben` (LLH-1496): wie `anbindungen`; Anlegen und Widerruf setzen die
  *   Antwort, eine Öffnung des Links ist kein Ereignis.
  * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).

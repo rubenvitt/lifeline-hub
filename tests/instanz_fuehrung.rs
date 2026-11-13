@@ -2034,6 +2034,208 @@ async fn bestaetigt_die_elw_die_fuehrung_des_hubs_wird_sie_spiegel() {
     assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
 }
 
+// ── Der Hub holt sich die Führung von einer anderen ELW zurück (LLH-1707) ─────────────────────
+//
+// Change `d12cmcx1-hub-epoche-gegen-dritten`: Richtet sich die Erklärung der Akte des Hubs gegen
+// eine andere ELW, hält die ELW sie ohne Alarm offen wie bei D7 der Change `faq7l7m4`.
+
+/// Wie der Hub die Führung von ELW 1 zurückholt.
+#[derive(Clone, Copy)]
+enum Zurueckholen {
+    /// Unterschriebene Notübernahme gegen ELW 1.
+    Notuebernahme,
+    /// Widerruf der Kopplung zu ELW 1 am Hub.
+    Widerruf,
+}
+
+/// Drei Instanzen, der Hub führt einen eigenen Einsatz mit (1, Hub), beide ELW kennen ihn. Mit
+/// `elw2_erklaert` erklärt ELW 2 ohne Verbindung die Notübernahme (2, ELW 2). ELW 1 übernimmt am Hub
+/// per Notübernahme mit (2, ELW 1), dann holt der Hub die Führung auf dem Weg `weg` mit (3, Hub)
+/// zurück. Ergebnis: (Hub, ELW 2, Einsatz am Hub, Einsatz an ELW 2); ELW 2 hat sich noch nicht
+/// gemeldet, seit der Hub zurückgeholt hat.
+async fn hub_holt_von_elw1_zurueck(
+    weg: Zurueckholen,
+    elw2_erklaert: bool,
+) -> (Instanz, Instanz, i64, i64) {
+    let (hub, elw1) = gekoppelt().await;
+    let elw2 = weiterer_elw(&hub).await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw1).await;
+    elw_meldet(&elw2).await;
+    let (akte1, _) = akte_und_einsatz(&elw1).await;
+    let (akte2, e2) = akte_und_einsatz(&elw2).await;
+    if elw2_erklaert {
+        ohne_verbindung(&elw2).await;
+        notuebernahme_gegen_hub(&elw2, akte2).await;
+    }
+    notuebernahme_gegen_hub(&elw1, akte1).await;
+    elw_meldet(&elw1).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], elw1.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 2);
+    if !elw2_erklaert {
+        // ELW 2 führt nicht und kennt die Akte über den Hub mit ELW 1 als Führer.
+        elw_meldet(&elw2).await;
+        let f = fuehrung(&elw2, e2).await;
+        assert_eq!(f["fuehrer_kennung"], elw1.kennung, "{f}");
+        assert_eq!(f["epoche"], 2);
+    }
+    match weg {
+        Zurueckholen::Notuebernahme => {
+            let akte = am_hub["id"].as_i64().unwrap();
+            hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW 1 ohne Verbindung").await;
+        }
+        Zurueckholen::Widerruf => {
+            let (_, u) =
+                common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+            let id = u["kopplungen"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|k| k["gegenueber_kennung"] == elw1.kennung.as_str())
+                .unwrap()["id"]
+                .as_i64()
+                .unwrap();
+            let (s, v) = post(
+                &hub,
+                &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+                json!({}),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK, "{v}");
+        }
+    }
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], hub.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 3);
+    if elw2_erklaert {
+        wieder_verbunden(&elw2, &hub).await;
+    }
+    (hub, elw2, h, e2)
+}
+
+/// ELW 2 meldet sich mehrmals und hält die Akte des Hubs offen: kein Konflikt, keine Angaben der
+/// Erklärung gegen ELW 1, ein Hinweis, kein Alarm, und sie schreibt weiter.
+async fn haelt_den_hub_offen_ohne_alarm(hub: &Instanz, elw2: &Instanz, h: i64, e2: i64) {
+    for _ in 0..3 {
+        elw_meldet(elw2).await;
+    }
+    let am_hub = fuehrung(hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], hub.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 3);
+    let f = fuehrung(elw2, e2).await;
+    assert_eq!(f["fuehrend"], true, "sie gibt nie still ab: {f}");
+    assert_ne!(f["art"], "verworfen", "{f}");
+    assert_eq!(
+        f["offen"]["konflikt"], false,
+        "der Hub ist kein Dritter: {f}"
+    );
+    assert_eq!(f["offen"]["epoche"], 3, "{f}");
+    assert!(
+        f["offen"]["grund"].is_null() && f["offen"]["unterzeichner"].is_null(),
+        "die Erklärung richtet sich gegen ELW 1: {f}"
+    );
+    let arten = benachrichtigungen(&elw2.pool).await;
+    assert_eq!(anzahl(&arten, "fuehrung_uebernommen"), 1, "{arten:?}");
+    assert_eq!(anzahl(&arten, "fuehrung_ungueltig"), 0, "{arten:?}");
+    assert!(!aktionen(&elw2.pool)
+        .await
+        .contains(&"fuehrung_verworfen".to_string()));
+    let (s, v) = etb(elw2, e2).await;
+    assert_eq!(
+        s,
+        StatusCode::CREATED,
+        "bis zur Entscheidung schreibt sie: {v}"
+    );
+}
+
+#[tokio::test]
+async fn holt_der_hub_per_notuebernahme_gegen_elw_1_zurueck_haelt_elw_2_offen_ohne_alarm() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Notuebernahme, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+}
+
+#[tokio::test]
+async fn holt_der_hub_per_widerruf_von_elw_1_zurueck_haelt_elw_2_offen_ohne_alarm() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+}
+
+#[tokio::test]
+async fn bestaetigt_elw_2_die_zurueckgeholte_fuehrung_des_hubs_wird_sie_spiegel() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Notuebernahme, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/einsaetze/{e2}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], false);
+    assert_eq!(v["fuehrer_kennung"], hub.kennung);
+    assert_eq!(v["epoche"], 3);
+    assert!(ist_spiegel(&elw2, e2).await);
+    let spur: String =
+        sqlx::query_scalar("SELECT detail FROM admin_audit ORDER BY id DESC LIMIT 1")
+            .fetch_one(&elw2.pool)
+            .await
+            .unwrap();
+    assert!(
+        !spur.contains("Notübernahme durch"),
+        "der Hub hat nichts gegen ELW 2 erklärt: {spur}"
+    );
+    elw_meldet(&elw2).await;
+    assert_eq!(fuehrung(&hub, h).await["fuehrer_kennung"], hub.kennung);
+}
+
+#[tokio::test]
+async fn widerspricht_elw_2_der_zurueckgeholten_fuehrung_nimmt_der_hub_ihre_naechste_epoche_an() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Notuebernahme, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+    let (s, v) = post(
+        &elw2,
+        &format!("/api/einsaetze/{e2}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["epoche"], 4);
+    elw_meldet(&elw2).await;
+    let am_hub = fuehrung(&hub, h).await;
+    assert_eq!(am_hub["fuehrer_kennung"], elw2.kennung, "{am_hub}");
+    assert_eq!(am_hub["epoche"], 4);
+    let f = fuehrung(&elw2, e2).await;
+    assert_eq!(f["epoche"], 4);
+    assert!(f["offen"].is_null(), "{f}");
+}
+
+#[tokio::test]
+async fn ein_dritter_elw_sieht_den_widerruf_im_verlauf_ohne_unterzeichner() {
+    let (hub, elw2, _h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, false).await;
+    elw_meldet(&elw2).await;
+    let f = fuehrung(&elw2, e2).await;
+    assert_eq!(f["fuehrend"], false, "{f}");
+    assert_eq!(f["epoche"], 3, "{f}");
+    assert_eq!(f["fuehrer_kennung"], hub.kennung, "{f}");
+    let verlauf = f["verlauf"].as_array().unwrap();
+    assert!(
+        verlauf.iter().any(|v| v["epoche_zaehler"] == 2),
+        "ELW 2 kannte die Führung von ELW 1 vor dem Widerruf: {f}"
+    );
+    let letzter = verlauf
+        .iter()
+        .max_by_key(|v| v["epoche_zaehler"].as_i64())
+        .unwrap()
+        .clone();
+    assert_eq!(letzter["epoche_zaehler"], 3, "{f}");
+    assert_eq!(letzter["grund"], "Kopplung widerrufen", "{f}");
+    assert!(
+        letzter["unterzeichner"].is_null(),
+        "niemand hat unterschrieben: {f}"
+    );
+}
+
 #[tokio::test]
 async fn bestaetigen_des_konflikts_macht_die_unterlegene_elw_zum_spiegel() {
     let z = zwei_notuebernahmen().await;
@@ -3889,6 +4091,212 @@ async fn ein_abgelehnter_eintrag_der_kette_kommt_als_eigene_zeile_zurueck() {
     assert_eq!(band_zaehlt(&elw, e).await, 1);
 }
 
+// ── Zustandsfehler des Stellens sind 422 (LLH-1701) ──────────────────────────────────────────
+
+async fn bruch_stellen(i: &Instanz, cookie: &str, einsatz: i64, bruch: i64) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bruchstelle/{bruch}/antrag"),
+        cookie,
+        Some(&json!({})),
+    )
+    .await
+}
+
+/// Eine Person an einer Meldung der Bruchstelle geht erst, wenn die Meldung beim Führer ist. Bis
+/// dahin antwortet das Stellen mit 422 (der Zustand, `src/AGENTS.md`, Statuscode-Konvention),
+/// und „Alle stellen“ lässt sie mit Grund offen.
+#[tokio::test]
+async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
+    let (hub, elw) = gekoppelt().await;
+    let (erika_elw, erika) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    abgleichen(&elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW ausgefallen").await;
+    mitglied_werden(&hub, h).await;
+
+    let (s, m) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/meldungen"),
+        &erika,
+        Some(
+            &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+                     "inhalt": "Eine Verletzte am Deich", "ereigniszeit": "2026-11-11 09:40:00",
+                     "client_id": "bruch-meldung-422"}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    let (s, p) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &erika,
+        Some(&json!({"name": "Muster", "meldung_id": m["id"], "client_id": "bruch-person-422"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{p}");
+    let person_lokal = p["id"].as_i64().unwrap();
+
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/bestaetigen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    abgleichen(&elw).await;
+    abgleichen(&elw).await;
+    assert!(ist_spiegel(&elw, e).await);
+
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let id_von = |tabelle: &str| {
+        liste
+            .iter()
+            .find(|l| l["tabelle"] == tabelle)
+            .unwrap_or_else(|| panic!("{tabelle} ist eine Erfassung: {liste:?}"))["id"]
+            .as_i64()
+            .unwrap()
+    };
+    let (meldung, person) = (id_von("meldung"), id_von("einsatz_person"));
+
+    // Die Meldung ist noch offen: erst sie stellen oder verwerfen.
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug ist nicht nachgereicht.");
+
+    // Gestellt, aber noch nicht zurück: Die Person wartet auf sie.
+    let (s, v) = bruch_stellen(&elw, &erika, e, meldung).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug noch nicht beim Führer.");
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bruchstelle/antraege"),
+        &erika,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "„Alle stellen“ bricht nicht ab: {v}");
+    assert_eq!(v["gestellt"], 0, "{v}");
+    assert_eq!(
+        v["offen"],
+        json!([{"id": person, "grund": "Bezug noch nicht beim Führer."}]),
+        "{v}"
+    );
+
+    // Dieselbe Meldung aus der Antragsroute: eine Erfassung an der Person, die der Führer noch
+    // nicht kennt.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{person_lokal}/sichtung"),
+        &erika,
+        Some(&json!({"kategorie": "sk2", "client_id": "bruch-sichtung-422"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug noch nicht beim Führer.");
+
+    // Ist die Meldung zurück, geht die Person, mit ihr.
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    for _ in 0..3 {
+        abgleichen(&elw).await;
+    }
+    let an_meldung: Vec<Option<i64>> =
+        sqlx::query_scalar("SELECT meldung_id FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(h)
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(an_meldung.len(), 1, "genau einmal");
+    assert!(an_meldung[0].is_some(), "an ihrer Meldung");
+}
+
+/// Läuft die Kette, solange die gestellte Person noch nicht zurück ist (der Takt läuft jede
+/// Sekunde), wartet sie: Kein Eintrag löst sich mit Grund, und kommt die Person, geht der Rest.
+#[tokio::test]
+async fn die_kette_wartet_bis_die_person_zurueck_ist() {
+    let (hub, elw, e, h, erika) = bruch_mit_personen().await;
+    let liste = bruchstelle(&elw, &erika, e).await;
+    let person = liste
+        .iter()
+        .find(|l| l["tabelle"] == "einsatz_person")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, v) = bruch_stellen(&elw, &erika, e, person).await;
+    assert_eq!(s, StatusCode::ACCEPTED, "{v}");
+    let vorher = bruchstelle(&elw, &erika, e).await;
+
+    // Der Antrag ist noch nicht beim Führer, die Person also nicht zurück.
+    let geaendert = lifeline_hub::instanz::spiegel::bruchstelle::ketten_fortsetzen(&elw.pool)
+        .await
+        .unwrap();
+    assert!(geaendert.is_empty(), "nichts gestellt, nichts gelöst");
+    let wartend = bruchstelle(&elw, &erika, e).await;
+    assert_eq!(wartend, vorher, "die Kette hängt unverändert an der Person");
+    let zeile = wartend.iter().find(|l| l["id"] == person).unwrap();
+    assert!(zeile["folgen_offen"].as_i64().unwrap() >= 3, "{zeile}");
+    let mit_grund: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND grund IS NOT NULL",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(mit_grund, 0, "kein Eintrag hat sich mit Grund gelöst");
+
+    for _ in 0..4 {
+        abgleichen(&elw).await;
+    }
+    let am_hub = personen_mit_namen(&hub, h, "Muster").await;
+    assert_eq!(am_hub.len(), 1);
+    assert_eq!(
+        sichtungen(&hub, am_hub[0]).await,
+        ["sk2", "sk1"],
+        "die Kette hat nach der Rückkehr gestellt"
+    );
+}
+
+#[tokio::test]
+async fn was_sich_nicht_nachreichen_laesst_antwortet_422() {
+    let (_hub, elw, e, _h, erika) = bruch_nach_notuebernahme().await;
+    // Eine Meldung an einem Auftrag reicht sich nicht nach.
+    sqlx::query(
+        "UPDATE einsatz_bruchstelle SET daten = json_set(daten, '$.auftrag_id', 1) \
+         WHERE einsatz_id = ? AND art = 'meldung'",
+    )
+    .bind(e)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+    let meldung: i64 = sqlx::query_scalar(
+        "SELECT id FROM einsatz_bruchstelle WHERE einsatz_id = ? AND art = 'meldung'",
+    )
+    .bind(e)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    let (s, v) = bruch_stellen(&elw, &erika, e, meldung).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Lässt sich nicht als Antrag stellen.");
+    assert_eq!(band_zaehlt(&elw, e).await, 2, "nichts gestellt");
+}
+
 // ── Grenzen und Budgets (LLH-1672) ───────────────────────────────────────────────────────────
 
 async fn hinweis(i: &Instanz) -> Option<String> {
@@ -4173,4 +4581,470 @@ async fn lauter_uebersprungene_akten_loesen_keine_sofortige_meldung_aus() {
     );
     let h = hinweis(&hub).await.unwrap_or_default();
     assert!(h.contains("geht nicht an"), "{h:?}");
+}
+
+// ── Nach dem Zurückspielen einer Sicherung (LLH-1708) ────────────────────────────────────────
+//
+// Change `xi5ugyt8-fuehrung-stand-nach-restore`. Das Zurückspielen wird nachgestellt, soweit es
+// den Austausch betrifft: Zähler und Stände der Kopplung bekommen den Wert der Sicherung, und was
+// erst danach ankam, fehlt. Damit die Zeitachse eines echten Ausfalls in eine Sekunde passt,
+// liegen die verlorenen Stände in der Vergangenheit (`jetzt_s() - 1000`).
+
+fn jetzt_s() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+/// Setzt Zähler und Stände der Kopplung einer Instanz auf den Stand einer Sicherung.
+async fn zurueckspielen(i: &Instanz, stand: i64, gesendet: i64, empfangen: i64) {
+    sqlx::query("UPDATE instanz_identitaet SET fuehrung_stand = ?")
+        .bind(stand)
+        .execute(&i.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE instanz_kopplung SET fuehrung_gesendet_bis = ?, fuehrung_empfangen_bis = ?",
+    )
+    .bind(gesendet)
+    .bind(empfangen)
+    .execute(&i.pool)
+    .await
+    .unwrap();
+}
+
+/// Kennt `i` die Akte des Einsatzes `einsatz` der Instanz `ursprung`? (Kennung
+/// `<Instanz>/<Einsatz-ID>-<Zufall>`.)
+async fn has_akte(i: &Instanz, ursprung: &Instanz, einsatz: i64) -> bool {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{einsatz}-%", ursprung.kennung))
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+        == 1
+}
+
+/// Die Akten der neuen Einsätze entstehen sonst erst in der Meldung (`ensure_akten`); hier
+/// vorher, wie wenn jemand die Führung oder die Seite „Instanzkopplung“ öffnet.
+async fn akten_anlegen(i: &Instanz) {
+    fremde(i).await;
+}
+
+/// Nur die Meldung, ohne Abgleich der Einsätze: Die Akte bleibt beim Gegenüber ohne Spiegel.
+async fn nur_melden(elw: &Instanz) {
+    sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    lifeline_hub::instanz::melden::run_durchlauf(&elw.pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_neue_einsaetze_erreichen_den_elw() {
+    let (hub, elw) = gekoppelt().await;
+    // Vor dem Ausfall hatte der ELW Akten des Hubs bis E übernommen; die Sicherung des Hubs
+    // stammt von kurz vor E (D1: die Uhr ist seitdem weitergelaufen).
+    let e = jetzt_s() - 1000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, e - 1, e - 1, 0).await;
+    // Zwei Einsätze vor der ersten Meldung: Ohne Uhr bekäme der erste den Stand E und ginge nie
+    // hinaus, und der zweite höbe den Zähler über E, sodass auch das Netz (D3) nichts sähe.
+    let a = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let b = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    akten_anlegen(&hub).await;
+    nur_melden(&elw).await;
+    assert!(
+        has_akte(&elw, &hub, a).await,
+        "der erste Einsatz nach dem Zurückspielen"
+    );
+    assert!(has_akte(&elw, &hub, b).await);
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_bekommt_die_verlorene_akte_des_elw_erneut() {
+    let (hub, elw) = gekoppelt().await;
+    let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&hub, &elw, vor).await);
+    // Sicherung des Hubs: Er hatte den ELW bis hier übernommen.
+    let (stand, gesendet, empfangen): (i64, i64, i64) = sqlx::query_as(
+        "SELECT i.fuehrung_stand, k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis \
+         FROM instanz_identitaet i, instanz_kopplung k",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert!(empfangen > 0);
+    let nach = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&hub, &elw, nach).await);
+    // Der Hub spielt die Sicherung zurück: die Akte von danach ist weg.
+    zurueckspielen(&hub, stand, gesendet, empfangen).await;
+    sqlx::query("DELETE FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{nach}-%", elw.kennung))
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    // Erste Meldung: Der Hub quittiert weniger, der ELW setzt seinen Sendestand zurück (D2).
+    nur_melden(&elw).await;
+    nur_melden(&elw).await;
+    assert!(
+        has_akte(&hub, &elw, nach).await,
+        "die verlorene Akte kommt erneut"
+    );
+}
+
+#[tokio::test]
+async fn quittung_null_eines_gegenuebers_ohne_schalter_sendet_nicht_erneut() {
+    let (_hub, elw) = gekoppelt_mit(false, true).await;
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let gesendet = jetzt_s() + 5;
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_gesendet_bis = ?")
+        .bind(gesendet)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    nur_melden(&elw).await;
+    let (g, _, _) = staende(&elw).await;
+    assert_eq!(g, gesendet, "0 ist kein Rückschritt");
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_mit_nachgehender_uhr_holt_das_netz() {
+    let (hub, elw) = gekoppelt().await;
+    // Die verlorenen Stände liegen über der Uhr des Hubs (seine Uhr geht nach): D1 greift nicht.
+    let e = jetzt_s() + 10_000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    let a = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    akten_anlegen(&hub).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&elw, &hub, a).await, "das Netz (D3) stempelt neu");
+    let (_, _, stand) = staende(&hub).await;
+    assert!(stand > e, "der Zähler liegt über der Quittung: {stand}");
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(h.contains("erneut"), "{h:?}");
+}
+
+#[tokio::test]
+async fn unplausible_quittung_hebt_den_zaehler_nicht() {
+    let (hub, elw) = gekoppelt().await;
+    let riesig = 1_i64 << 40;
+    zurueckspielen(&elw, 0, 0, riesig).await;
+    nur_melden(&elw).await;
+    let (_, _, stand) = staende(&hub).await;
+    assert!(stand < 1 << 39, "{stand}");
+}
+
+#[tokio::test]
+async fn zurueckgespielt_elw_akten_fliessen_in_beide_richtungen() {
+    let (hub, elw) = gekoppelt().await;
+    let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&hub, &elw, vor).await);
+    // Der ELW spielt zurück; vor dem Ausfall lief seine Uhr vor, der Hub hat Stände bis E.
+    let e = jetzt_s() + 10_000;
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
+        .bind(e)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    zurueckspielen(&elw, 3, 0, 0).await;
+    let neu = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&hub, &elw, neu).await, "ELW → Hub");
+    let (_, _, stand) = staende(&elw).await;
+    assert!(stand >= e, "der ELW hebt seinen Zähler (D3): {stand}");
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&elw, &hub, h).await, "Hub → ELW");
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_verlorene_akte_kommt_auch_wenn_der_elw_inzwischen_aenderte() {
+    // Review B1, design.md D5: Die erste Meldung nach dem Zurückspielen trägt schon eine neue Akte;
+    // ohne den Sendestand in der Meldung quittierte der Hub sie, und die verlorene käme nie.
+    let (hub, elw) = gekoppelt().await;
+    let vor = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    let (stand, gesendet, empfangen): (i64, i64, i64) = sqlx::query_as(
+        "SELECT i.fuehrung_stand, k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis \
+         FROM instanz_identitaet i, instanz_kopplung k",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    let nach = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    zurueckspielen(&hub, stand, gesendet, empfangen).await;
+    sqlx::query("DELETE FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{nach}-%", elw.kennung))
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    // Während des Ausfalls arbeitet der ELW weiter.
+    let waehrend = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    nur_melden(&elw).await;
+    assert!(has_akte(&hub, &elw, vor).await);
+    assert!(has_akte(&hub, &elw, waehrend).await);
+    assert!(
+        has_akte(&hub, &elw, nach).await,
+        "die verlorene Akte kommt erneut"
+    );
+}
+
+#[tokio::test]
+async fn antwort_hebt_den_zaehler_des_elw_genau_bis_zur_grenze() {
+    // Review B6: Die meldende Seite hebt ihren Zähler auf eine Quittung bis `STAND_RAISE_MAX`,
+    // darüber nicht.
+    use lifeline_hub::instanz::fuehrung::austausch::STAND_RAISE_MAX;
+    let (hub, elw) = gekoppelt().await;
+    let quittiert = |wert: i64| {
+        let pool = hub.pool.clone();
+        async move {
+            sqlx::query("UPDATE instanz_kopplung SET fuehrung_empfangen_bis = ?")
+                .bind(wert)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+    quittiert(STAND_RAISE_MAX + 1).await;
+    nur_melden(&elw).await;
+    let (_, _, stand) = staende(&elw).await;
+    assert!(stand < STAND_RAISE_MAX, "{stand}");
+    quittiert(STAND_RAISE_MAX).await;
+    nur_melden(&elw).await;
+    let (_, _, stand) = staende(&elw).await;
+    assert_eq!(stand, STAND_RAISE_MAX);
+    assert!(hinweis(&elw)
+        .await
+        .unwrap_or_default()
+        .contains("zurückgespielt"));
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_erkennt_den_rueckschritt_auch_nach_verlorener_antwort() {
+    // Zweiter Review, Befund B-1: Erreicht die Antwort mit der alten Quittung den ELW nicht, muss
+    // die nächste Meldung den Rückschritt wieder zeigen; sonst kämen die verlorenen Akten nie.
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    let (stand, gesendet, empfangen): (i64, i64, i64) = sqlx::query_as(
+        "SELECT i.fuehrung_stand, k.fuehrung_gesendet_bis, k.fuehrung_empfangen_bis \
+         FROM instanz_identitaet i, instanz_kopplung k",
+    )
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    let nach = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    nur_melden(&elw).await;
+    zurueckspielen(&hub, stand, gesendet, empfangen).await;
+    sqlx::query("DELETE FROM einsatz_fuehrung WHERE kennung LIKE ?")
+        .bind(format!("{}/{nach}-%", elw.kennung))
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let (elw_gesendet, _, _) = staende(&elw).await;
+    nur_melden(&elw).await;
+    // Die Antwort ging verloren: Der ELW behält seinen Sendestand.
+    sqlx::query("UPDATE instanz_kopplung SET fuehrung_gesendet_bis = ?")
+        .bind(elw_gesendet)
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    nur_melden(&elw).await;
+    nur_melden(&elw).await;
+    assert!(
+        has_akte(&hub, &elw, nach).await,
+        "die verlorene Akte kommt trotzdem erneut"
+    );
+}
+
+// ── Einsatznummer beim Führungswechsel (LLH-1703, Spec `einsatznummer`) ──────────────────────
+
+async fn nummer(i: &Instanz, einsatz: i64) -> String {
+    sqlx::query_scalar("SELECT einsatznummer_intern FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Dieselbe Nummer mit einer anderen laufenden Nummer (`E-2026-0001`, 3 → `E-2026-0003`).
+fn mit_lfd(nummer: &str, lfd: u32) -> String {
+    let (kopf, _) = nummer.rsplit_once('-').unwrap();
+    format!("{kopf}-{lfd:04}")
+}
+
+/// Systemeinträge im ETB, die eine Umnummerierung festhalten.
+async fn nummer_eintraege(i: &Instanz, einsatz: i64) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' \
+         AND inhalt LIKE 'Neue Einsatznummer %' ORDER BY id",
+    )
+    .bind(einsatz)
+    .fetch_all(&i.pool)
+    .await
+    .unwrap()
+}
+
+/// Fehler der letzten Meldung des ELW.
+async fn meldefehler(elw: &Instanz) -> Option<String> {
+    sqlx::query_scalar("SELECT letzter_fehler FROM instanz_kopplung")
+        .fetch_one(&elw.pool)
+        .await
+        .unwrap()
+}
+
+/// Die empfangende Seite einer Übergabe wird im Abgleich zum Führer: Trägt sie die Nummer schon
+/// selbst, bekommt der übernommene Einsatz eine freie, und die Meldung läuft weiter.
+#[tokio::test]
+async fn uebergabe_an_den_hub_bei_gleicher_einsatznummer() {
+    let (hub, elw) = gekoppelt().await;
+    let eigen = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let alt = nummer(&elw, e).await;
+    assert_eq!(nummer(&hub, eigen).await, alt, "beide Seiten zählen ab 1");
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None, "die Meldung läuft durch");
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(!ist_spiegel(&hub, h).await, "der Hub führt den Einsatz");
+    let neu = mit_lfd(&alt, 2);
+    assert_eq!(nummer(&hub, h).await, neu, "freie Nummer am Hub");
+    assert_eq!(nummer(&hub, eigen).await, alt, "der eigene behält seine");
+    let eintraege = nummer_eintraege(&hub, h).await;
+    assert_eq!(eintraege.len(), 1, "{eintraege:?}");
+    assert!(
+        eintraege[0].contains(&neu) && eintraege[0].contains(&alt),
+        "{eintraege:?}"
+    );
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None);
+    assert_eq!(
+        nummer(&hub, h).await,
+        neu,
+        "eine zweite Meldung ändert nichts"
+    );
+    assert_eq!(nummer_eintraege(&hub, h).await.len(), 1);
+    assert_eq!(nummer(&elw, e).await, neu, "der Spiegel am ELW folgt");
+}
+
+/// Gibt der ELW seinen ersten Einsatz ab und legt einen neuen an, trägt der wieder dieselbe
+/// Nummer (Spiegel zählen nicht mit). Holt der ELW den ersten zurück, stoßen beide aufeinander.
+#[tokio::test]
+async fn anfrage_des_elw_bei_gleicher_einsatznummer() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let alt = nummer(&elw, e).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert!(ist_spiegel(&elw, e).await);
+    let zweiter = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    assert_eq!(
+        nummer(&elw, zweiter).await,
+        alt,
+        "Voraussetzung: die Nummer des Spiegels ist wieder vergeben"
+    );
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    assert_eq!(meldefehler(&elw).await, None, "die Meldung läuft durch");
+    let a = fuehrung(&elw, e).await;
+    assert_eq!(a["fuehrend"], true, "{a}");
+    let neu = mit_lfd(&alt, 2);
+    assert_eq!(nummer(&elw, e).await, neu, "freie Nummer am ELW");
+    assert_eq!(nummer(&elw, zweiter).await, alt, "der neue behält seine");
+    let eintraege = nummer_eintraege(&elw, e).await;
+    assert_eq!(eintraege.len(), 1, "{eintraege:?}");
+    assert!(
+        eintraege[0].contains(&neu) && eintraege[0].contains(&alt),
+        "{eintraege:?}"
+    );
+}
+
+#[tokio::test]
+async fn freie_nummer_bleibt_beim_fuehrungswechsel() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(!ist_spiegel(&hub, h).await);
+    assert_eq!(nummer(&hub, h).await, nummer(&elw, e).await);
+    assert!(nummer_eintraege(&hub, h).await.is_empty());
+}
+
+/// Widerspricht der ELW einer Notübernahme, fällt der Hub zum Spiegel zurück. Mit dem nächsten
+/// Kopf des ELW trägt der Einsatz dort wieder dessen Nummer (ein Spiegel ist von der
+/// Eindeutigkeit ausgenommen); der Systemeintrag zur Nummer ist eine Änderung, die der ELW nicht
+/// kennt, und liegt in der Bruchstelle. Dass diese Bruchstelle danach nicht geklärt wird, ist
+/// LLH-1854 und hier nicht geprüft.
+#[tokio::test]
+async fn nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw() {
+    let (hub, elw) = gekoppelt().await;
+    let eigen = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let alt = nummer(&elw, e).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert_eq!(nummer(&hub, h).await, mit_lfd(&alt, 2), "umnummeriert");
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        nummer(&elw, e).await,
+        alt,
+        "der ELW führt weiter mit seiner"
+    );
+    // Der ELW ändert den Kopf: Der Abgleich bringt ihn zum Hub.
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        Some(&json!({"leitstellen_nr": "L-4711"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..2 {
+        elw_meldet(&elw).await;
+        assert_eq!(meldefehler(&elw).await, None, "die Meldung läuft durch");
+    }
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt wieder");
+    assert_eq!(nummer(&hub, h).await, alt, "Nummer des ELW");
+    assert_eq!(nummer(&hub, eigen).await, alt, "der eigene unberührt");
+    let gesichert: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM einsatz_bruchstelle WHERE einsatz_id = ? AND art = 'etb_eintrag'",
+    )
+    .bind(h)
+    .fetch_one(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(gesichert, 1, "der Systemeintrag zur Nummer ist gesichert");
 }

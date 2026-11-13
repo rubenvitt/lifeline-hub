@@ -37,6 +37,7 @@ const zugang = (id: string, extra: Record<string, unknown> = {}) => ({
   widerrufen_von_name: null,
   zuletzt_genutzt_at: null,
   letzte_ablehnung: null,
+  einsatz_freigebbar: false,
   ...extra,
 });
 
@@ -302,10 +303,11 @@ describe('Anbindungen · gelesener Einsatz (LLH-1638)', () => {
       zugang('a', {
         name: 'FüKW Monitor',
         scopes: ['lage:read'],
+        einsatz_freigebbar: true,
         einsatz_id: 7,
         einsatz_bezeichnung: 'Stadtfest',
       }),
-      zugang('b', { name: 'Wache', scopes: ['lage:read'] }),
+      zugang('b', { name: 'Wache', scopes: ['lage:read'], einsatz_freigebbar: true }),
       zugang('c', { name: 'Alarm-Adapter' }),
     ]);
     renderSeiten();
@@ -318,31 +320,23 @@ describe('Anbindungen · gelesener Einsatz (LLH-1638)', () => {
 
   it('zeigt ihn auch in der Ansicht', async () => {
     stelleBereit([
-      zugang('a', { scopes: ['lage:read'], einsatz_id: 7, einsatz_bezeichnung: 'Stadtfest' }),
+      zugang('a', {
+        scopes: ['lage:read'],
+        einsatz_freigebbar: true,
+        einsatz_id: 7,
+        einsatz_bezeichnung: 'Stadtfest',
+      }),
     ]);
     renderSeiten('/admin/einstellungen/anbindungen/a');
     expect(await screen.findByText('liest Stadtfest')).toBeInTheDocument();
   });
 
-  it('Wortlaut: nur mit Leserecht mit Einsatzbezug, nicht widerrufen, nicht abgelaufen', () => {
-    const basis = { scopes: ['lage:read'], zustand: 'aktiv', is_abgelaufen: false } as const;
-    expect(einsatzAnzeige({ ...basis, scopes: [...basis.scopes] })).toBe(
-      'kein Einsatz freigegeben',
+  it('Wortlaut: nur wenn der Server die Anbindung freigebbar nennt', () => {
+    expect(einsatzAnzeige({ einsatz_freigebbar: true })).toBe('kein Einsatz freigegeben');
+    expect(einsatzAnzeige({ einsatz_freigebbar: true, einsatz_bezeichnung: 'Stadtfest' })).toBe(
+      'liest Stadtfest',
     );
-    expect(
-      einsatzAnzeige({ ...basis, scopes: [...basis.scopes], einsatz_bezeichnung: 'Stadtfest' }),
-    ).toBe('liest Stadtfest');
-    expect(einsatzAnzeige({ ...basis, scopes: ['rechner:use'] })).toBeNull();
-    // „Einsätze lesen“ braucht die Freigabe ebenso (LLH-1655); „Ereignisse abrufen“ allein öffnet
-    // nichts und zeigt deshalb keine Zeile.
-    expect(einsatzAnzeige({ ...basis, scopes: ['einsaetze:read', 'events:read'] })).toBe(
-      'kein Einsatz freigegeben',
-    );
-    expect(einsatzAnzeige({ ...basis, scopes: ['events:read'] })).toBeNull();
-    expect(
-      einsatzAnzeige({ ...basis, scopes: [...basis.scopes], zustand: 'widerrufen' }),
-    ).toBeNull();
-    expect(einsatzAnzeige({ ...basis, scopes: [...basis.scopes], is_abgelaufen: true })).toBeNull();
+    expect(einsatzAnzeige({ einsatz_freigebbar: false })).toBeNull();
   });
 });
 

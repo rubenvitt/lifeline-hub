@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 12.11.2026 (Direktkopplung vor Ort, LLH-1497).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -282,6 +282,36 @@ sequenceDiagram
 - Neue Unterschriftsschlüssel nimmt E nur mit Gegenzeichnung eines bekannten an
   (`src/auth/unterschrift/repo.rs`, `accept_lieferungen`).
 
+**Direktkopplung vor Ort** (LLH-1497,
+[ADR-0029](entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md)):
+zwei ELW im selben LAN, A mit selbstsigniertem Zertifikat.
+
+```mermaid
+sequenceDiagram
+  participant E as ELW 2, meldet sich (src/instanz/melden.rs)
+  participant A as ELW 1, erreicht (src/routes/instanz.rs)
+  E->>E: GET /api/admin/instanz/lan (src/instanz/entdeckung.rs, mDNS)
+  E->>A: POST /api/instanz/koppeln (Plattform-Verifier scheitert, zweiter Versuch nur_vor_ort)
+  A-->>E: signiert: art vor_ort, tls_zertifikat = Fingerabdruck
+  E->>E: Fingerabdruck = gesehenes Zertifikat? dann Pin speichern
+  loop Melden und Abgleich
+    E->>A: Anfrage nur über den Client mit Pin (src/instanz/zertifikat.rs)
+  end
+  Note over A: Neustart, neues Zertifikat
+  E->>A: POST /api/instanz/zertifikat (ohne Nutzdaten, ohne Pin)
+  A-->>E: signiert: neuer Fingerabdruck
+  E->>A: Meldung mit neuem Pin
+```
+
+- Abweisungen an eine Gegenstelle mit gültigem Code gehen klar hinaus und verbrauchen den Code
+  nicht: 426 bei Protokoll unter 3, 409 bei anderer Art (`src/routes/instanz.rs`, `check_art`).
+- Findet ELW 2 die Gegenstelle nicht, sucht es sie per Kennung im LAN; eine neue Adresse gilt
+  erst nach der signierten Aussage zum Zertifikat (`src/instanz/melden.rs`, `neu_aufloesen`).
+- Über die Direktkopplung fließen nur Akten zur Anzeige, Spiegel und Anträge;
+  `InstanzKopplungArt::traegt` sperrt Stammdaten, Geheimnisse, Verwahrung und Führungswechsel
+  (`src/instanz/mod.rs`). Konten und Stammdaten bildet die Ursprungskennung ab. Nachweis:
+  `tests/instanz_vor_ort.rs`.
+
 ## 6.6b Einsatz spiegeln und am Spiegel beantragen
 
 Eine gekoppelte Instanz hält die Einsätze der zugeordneten Orgs, die sie nicht führt, als
@@ -352,7 +382,7 @@ sequenceDiagram
 
 Mit dem Schalter `LIFELINE_FUEHRUNG` tauschen gekoppelte Instanzen in jeder Meldung ihre
 Führungsakten aus (LLH-1491,
-[ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)). Genau eine
+[ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)). Genau eine
 Instanz führt einen Einsatz; die Epoche ist ein Paar (Zähler, Instanzkennung). Seit LLH-1641
 entscheidet die Akte, wer führt, und der Spiegel folgt ihr: wer die Führung abgibt, wird Spiegel
 mit Anträgen; wer sie bekommt, schreibt den bisherigen Spiegel weiter.
@@ -385,8 +415,9 @@ sequenceDiagram
 - Mehrere ELW an einem Hub: Der Hub behält die zuerst angenommene Führung. Nennt er einer ELW, die
   selbst führt, einen Dritten als Führer, hält sie dessen Führung offen und gibt erst nach
   Bestätigung ab (`austausch::ist_konflikt`, ohne Widerspruch); führt der Hub selbst mit der
-  Epoche eines Dritten, hält sie das als gewöhnliche Übernahme offen, und ihr Widerspruch nimmt der
-  Hub an ([ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)).
+  Epoche eines Dritten oder mit einer Erklärung gegen einen Dritten (er holte sich die Führung per
+  Notübernahme oder Widerruf von einer anderen ELW zurück), hält sie das als gewöhnliche Übernahme
+  offen, ohne Alarm, und ihren Widerspruch nimmt der Hub an ([ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)).
 - Gesperrt ist nur der Spiegel (`einsatz.spiegel`, Schutz-Trigger, 409 `einsatz_ist_spiegel`).
   `instanz::spiegel::fuehrung::richte_aus` richtet ihn bei jedem Speichern einer Akte aus
   (`werde_fuehrer`, `werde_spiegel`); die Bedienung zieht `EinsatzFuehrungszugriff`.

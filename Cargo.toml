@@ -19,11 +19,22 @@ sqlx = { version = "0.9", features = ["runtime-tokio", "sqlite", "migrate", "sql
 libsqlite3-sys = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Feldpfad in Einlesefehlern der öffentlichen API (LLH-1524); axum bringt die Crate schon mit.
+serde_path_to_error = "0.1"
 # `gzip` (LFH-599): die Fachebenen-Quellen packen auf Anfrage (ODL 890 KB → 81 KB, PEGELONLINE
 # 754 KB → 71 KB). Das Feature schaltet Angebot und Entpacken für JEDEN Client per Vorgabe ein;
 # Clients, die Bytes durchreichen oder pinnen (Kachel-Proxy, Download), setzen `.no_gzip()`.
 # Brotli bot am 01.10.2026 nur Bright Sky an — kein eigenes Feature dafür.
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "gzip"] }
+# Direktkopplung vor Ort (LLH-1497, `src/instanz/zertifikat.rs`): eigener Verifier, der das
+# TLS-Zertifikat der Gegenstelle an einen beglaubigten Fingerabdruck bindet. Dieselben Versionen
+# und derselbe Provider (aws-lc-rs), die reqwest mitbringt; kein zweiter Provider.
+rustls = { version = "0.23", default-features = false, features = ["std", "aws_lc_rs"] }
+rustls-pki-types = { version = "1", features = ["std"] }
+# LAN-Entdeckung der Direktkopplung (LLH-1497, `src/instanz/entdeckung.rs`): mDNS/DNS-SD in
+# reinem Rust mit eigenem Thread, ohne Avahi/Bonjour. Ohne Vorgabe-Features (kein async über
+# flume, kein `log`); fest gepinnt, Version älter als zwei Wochen.
+mdns-sd = { version = "=0.21.6", default-features = false }
 futures = "0.3"
 tracing = "0.1"
 # Nicht blockierendes Log auf stdout (LFH-925, `src/main.rs`).
@@ -178,7 +189,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.188"
+version = "1.0.0-alpha.189"
 
 [workspace]
 members = [".", "crates/karten-katalog", "crates/lifeline-machine-client", "karten-service", "src-tauri"]

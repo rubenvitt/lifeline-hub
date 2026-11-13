@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Lifeline Hub, öffentliche API",
-    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | – | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Lese-Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`) sieht nur den Einsatz, den die\nEinsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist\ndas höchstens einer. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null` und\n`GET /api/v1/einsaetze` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/einsaetze/{id}`\nantwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen\nEinsatz.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Ereignisse\n\n`GET /api/v1/events` (Scope `events:read`) sagt einem Fremdsystem, dass sich an einem für seinen\nZugang freigegebenen Einsatz etwas getan hat. Ein Ereignis trägt nur `id`, `type`, `occurred_at`\nund `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.\n\n| `type` | Bedeutung | Sichtbar mit |\n| --- | --- | --- |\n| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden. | `einsaetze:read` |\n| `einsatz.updated` | Ein Feld des Einsatzes hat sich geändert. | `einsaetze:read` |\n| `einsatz.closed` | Der Einsatz ist für den Zugang nicht mehr lesbar. | `einsaetze:read` |\n| `lage.changed` | Die Lage des Einsatzes kann sich geändert haben. | `lage:read` |\n\n- **Cursor:** `id` steigt fortlaufend. Jede Antwort nennt einen `cursor`; der nächste Abruf gibt\n  ihn als `after` mit. Ohne `after` kommt der aktuelle Stand ohne Ereignisse.\n- **Warten:** `wait` hält den Abruf höchstens 25 Sekunden offen, bis ein Ereignis vorliegt. Es\n  warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber antwortet sofort und\n  setzt `Retry-After`.\n- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich mit dem\n  neuen Cursor weiter abrufen.\n- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das\n  alte und trägt eine höhere `id`.\n- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;\n  der Client liest dann die Einsätze neu und fährt mit dem dort gelieferten Cursor fort.\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
+    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | `karte` | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Lese-Scope mit Einsatzbezug (`lage:read`) sieht nur den Einsatz, den die Einsatzleitung für\nden Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist das höchstens\neiner. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null`, nicht mit einem Fehler.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
     "version": "1"
   },
   "servers": [
@@ -12,281 +12,6 @@
     }
   ],
   "paths": {
-    "/api/v1/einsaetze": {
-      "get": {
-        "tags": [
-          "Einsätze"
-        ],
-        "summary": "Die laufenden Einsätze, die die Einsatzleitung für den Zugang freigegeben hat, mit dem Cursor\nfür `GET /api/v1/events`. Dient dem ersten Aufbau und dem Neuaufbau nach `cursor_expired`.",
-        "operationId": "get_einsaetze",
-        "responses": {
-          "200": {
-            "description": "Freigegebene laufende Einsätze (ohne Freigabe eine leere Liste) und der Cursor dazu; Antwort signiert im Kopf `Lifeline-Signature`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EinsaetzeResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt `einsaetze:read` (`missing_scope`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": []
-          }
-        ]
-      }
-    },
-    "/api/v1/einsaetze/{id}": {
-      "get": {
-        "tags": [
-          "Einsätze"
-        ],
-        "summary": "Ein laufender Einsatz, der für den Zugang freigegeben ist.",
-        "operationId": "get_einsatz",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "Kennung des Einsatzes, wie `einsatz_id` in den Ereignissen",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Der Einsatz; Antwort signiert im Kopf `Lifeline-Signature`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Einsatz"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt `einsaetze:read` (`missing_scope`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Kein laufender Einsatz mit dieser Kennung, der für den Zugang freigegeben ist (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": []
-          }
-        ]
-      }
-    },
-    "/api/v1/events": {
-      "get": {
-        "tags": [
-          "Ereignisse"
-        ],
-        "summary": "Ereignisse des Zugangs nach einem Cursor, auf Wunsch mit Warten (Long-Poll).",
-        "description": "Ohne `after` kommt der aktuelle Stand ohne Ereignisse. Mit `wait` bleibt der Abruf offen, bis\nein Ereignis vorliegt oder die Zeit abläuft. Kommt eine volle Seite (500), liegt vermutlich\nmehr vor: gleich mit dem neuen Cursor weiter abrufen.",
-        "operationId": "get_events",
-        "parameters": [
-          {
-            "name": "after",
-            "in": "query",
-            "description": "Cursor aus der letzten Antwort oder aus `GET /api/v1/einsaetze`. Ohne ihn antwortet der Abruf sofort mit dem aktuellen Stand und ohne Ereignisse.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "wait",
-            "in": "query",
-            "description": "Höchste Wartezeit in ganzen Sekunden (0 bis 25), bis ein Ereignis vorliegt. Ohne ihn wartet der Abruf nicht.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "maximum": 25,
-              "minimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Ereignisse nach `after`, aufsteigend nach `id`; Antwort signiert im Kopf `Lifeline-Signature`. Trägt die Antwort `Retry-After`, war kein Warteplatz frei (höchstens 32 Abrufe warten zugleich, je Zugang einer): so viele Sekunden bis zum nächsten Abruf warten.",
-            "headers": {
-              "Retry-After": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int64",
-                  "minimum": 0
-                },
-                "description": "Nur an einer leeren Antwort ohne Warteplatz: Sekunden bis zum nächsten Abruf"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EventsResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "`after` oder `wait` ungültig (`invalid_field`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt `events:read` (`missing_scope`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "410": {
-            "description": "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): Einsätze über `GET /api/v1/einsaetze` neu lesen und mit dem dort gelieferten Cursor fortfahren",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": []
-          }
-        ]
-      }
-    },
     "/api/v1/instanz/jwks.json": {
       "get": {
         "tags": [
@@ -485,6 +210,180 @@
         }
       }
     },
+    "/api/v1/rechner/unterkunft": {
+      "post": {
+        "tags": [
+          "Rechner"
+        ],
+        "summary": "Unterkunft und Zelte durchrechnen. Speichert nichts.",
+        "description": "Wirksam ist je Richtwert der Wert aus `richtwerte` der Anfrage, sonst der Wert der\nOrganisation des Zugangs, sonst die Vorgabe des Programms. Werte eines Einsatzes gehören nicht\ndazu.",
+        "operationId": "calculate_unterkunft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnterkunftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Ergebnis, wirksame Richtwerte und Stand der Basis; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnterkunftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ein Feld für sich ist ungültig: kein JSON, unbekanntes oder doppeltes Feld, falscher Typ, unbekannter Wert oder Richtwert, Zahl außerhalb der Grenzen. Der Text nennt das Feld.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Der Body ist größer als 64 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Die Felder passen nicht zusammen: Block fehlt oder gehört zu einem anderen Weg; `personen`, `flaeche` oder `zelte` ohne Angabe; `gesamt` neben einer Gruppe oder bei Trennung; von `maenner` und `frauen` fehlt eine; Zelte ohne Trennung ohne `gesamt`; Belegung eines Raums passt nicht zur Trennung. Eine leere Raumliste ist gültig und ergibt 0 Plätze.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
+    "/api/v1/rechner/unterkunft/richtwerte": {
+      "get": {
+        "tags": [
+          "Rechner"
+        ],
+        "summary": "Die Richtwerte des Rechners mit Bezeichnung, Einheit und Grenzen, dazu die Zelttypen.",
+        "description": "`wert` ist der Wert der Organisation des Zugangs, sonst die Vorgabe des Programms.",
+        "operationId": "get_unterkunft_richtwerte",
+        "responses": {
+          "200": {
+            "description": "Richtwerte und Zelttypen; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnterkunftRichtwerteResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `rechner:use`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
     "/api/v1/zugang/redeem": {
       "post": {
         "tags": [
@@ -559,6 +458,25 @@
   },
   "components": {
     "schemas": {
+      "AbzugAngabe": {
+        "type": "object",
+        "description": "Abzug von der Fläche eines Raums (Bühne, Fluchtweg). Maße in Metern, größer als 0 und\nhöchstens 1000.",
+        "required": [
+          "laenge_m",
+          "breite_m"
+        ],
+        "properties": {
+          "breite_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "laenge_m": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "ApiErrorBody": {
         "type": "object",
         "description": "Body jeder Fehlerantwort unter `/api/v1/`.",
@@ -573,92 +491,6 @@
           "error": {
             "type": "string",
             "description": "Lesbarer Text (deutsch). Kein Vertrag: Clients werten `code` aus."
-          }
-        }
-      },
-      "EinsaetzeResponse": {
-        "type": "object",
-        "description": "Antwort der Einsatzliste.",
-        "required": [
-          "cursor",
-          "einsaetze"
-        ],
-        "properties": {
-          "cursor": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Stand der Ereignisse zu dieser Liste: als `after` an `GET /api/v1/events` geben, dann\ngeht nichts verloren, was sich nach dem Lesen ändert."
-          },
-          "einsaetze": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Einsatz"
-            },
-            "description": "Die laufenden Einsätze, die für den Zugang freigegeben sind. Heute höchstens einer."
-          }
-        }
-      },
-      "Einsatz": {
-        "type": "object",
-        "description": "Ein laufender Einsatz, der für den Zugang freigegeben ist: der Kopf, ohne Sachverhalt,\nmeldende Stelle, Betroffene und Personen.",
-        "required": [
-          "id",
-          "bezeichnung",
-          "einsatzart",
-          "begonnen_at"
-        ],
-        "properties": {
-          "begonnen_at": {
-            "type": "string",
-            "description": "Beginn in UTC, `JJJJ-MM-TT hh:mm:ss`."
-          },
-          "bezeichnung": {
-            "type": "string"
-          },
-          "einsatzart": {
-            "$ref": "#/components/schemas/LageEinsatzart"
-          },
-          "einsatznummer": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Einsatznummer der Organisation."
-          },
-          "einsatzort": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Einsatzort als Text."
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Kennung des Einsatzes an dieser Instanz; dieselbe wie `einsatz_id` in den Ereignissen."
-          },
-          "koordinate": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Koordinate"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "leitstellen_nr": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Nummer des Einsatzes bei der Leitstelle."
-          },
-          "stichwort": {
-            "type": [
-              "string",
-              "null"
-            ]
           }
         }
       },
@@ -682,67 +514,39 @@
           "unavailable"
         ]
       },
-      "Event": {
+      "FlaecheAngabe": {
         "type": "object",
-        "description": "Ein Ausgangsereignis: Art, Zeit und Einsatz, sonst nichts. Den Inhalt liest der Client über\ndie Leserouten nach.",
-        "required": [
-          "id",
-          "type",
-          "occurred_at",
-          "einsatz_id"
-        ],
+        "description": "Fläche in Quadratmetern, aufgeteilt wie `personen`: `gesamt_m2` oder `maenner_m2` und\n`frauen_m2` zusammen.",
         "properties": {
-          "einsatz_id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Kennung des Einsatzes an dieser Instanz."
+          "frauen_m2": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "maximum": 1000000,
+            "minimum": 0
           },
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Fortlaufende Nummer; steigt in der Reihenfolge der Änderungen."
+          "gesamt_m2": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "maximum": 1000000,
+            "minimum": 0
           },
-          "occurred_at": {
-            "type": "string",
-            "description": "Zeitpunkt in UTC, `JJJJ-MM-TT hh:mm:ss`."
-          },
-          "type": {
-            "$ref": "#/components/schemas/EventType",
-            "description": "Art des Ereignisses. Unbekannte Werte überspringen."
+          "maenner_m2": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "maximum": 1000000,
+            "minimum": 0
           }
-        }
-      },
-      "EventType": {
-        "type": "string",
-        "description": "Art eines Ereignisses. Neue Arten kommen nur hinzu; ein Client überspringt unbekannte.",
-        "enum": [
-          "einsatz.created",
-          "einsatz.updated",
-          "einsatz.closed",
-          "lage.changed"
-        ]
-      },
-      "EventsResponse": {
-        "type": "object",
-        "description": "Antwort des Abrufs.",
-        "required": [
-          "cursor",
-          "events"
-        ],
-        "properties": {
-          "cursor": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Stand, bis zu dem geprüft wurde; der nächste Abruf nennt ihn als `after`."
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Event"
-            },
-            "description": "Ereignisse des Zugangs nach `after`, aufsteigend nach `id`, höchstens 500."
-          }
-        }
+        },
+        "additionalProperties": false
       },
       "Jwk": {
         "type": "object",
@@ -797,26 +601,6 @@
             "items": {
               "$ref": "#/components/schemas/Jwk"
             }
-          }
-        }
-      },
-      "Koordinate": {
-        "type": "object",
-        "description": "Ort des Einsatzes auf der Karte, WGS 84.",
-        "required": [
-          "lat",
-          "lon"
-        ],
-        "properties": {
-          "lat": {
-            "type": "number",
-            "format": "double",
-            "description": "Breite in Grad."
-          },
-          "lon": {
-            "type": "number",
-            "format": "double",
-            "description": "Länge in Grad."
           }
         }
       },
@@ -1458,6 +1242,104 @@
           }
         }
       },
+      "PersonenAngabe": {
+        "type": "object",
+        "description": "Personenzahl: ohne Trennung `gesamt` oder `maenner` und `frauen` zusammen (dann zählt die\nSumme), mit Trennung `maenner` und `frauen`, beide; eine leere Gruppe ist 0.",
+        "properties": {
+          "frauen": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "maximum": 1000000,
+            "minimum": 0
+          },
+          "gesamt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "maximum": 1000000,
+            "minimum": 0
+          },
+          "maenner": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "maximum": 1000000,
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "PersonenGruppe": {
+        "type": "string",
+        "description": "Gruppe, für die gerechnet wurde: alle zusammen oder Männer und Frauen getrennt.",
+        "enum": [
+          "gesamt",
+          "maenner",
+          "frauen"
+        ]
+      },
+      "RaumAngabe": {
+        "type": "object",
+        "description": "Ein Raum. Maße in Metern, größer als 0 und höchstens 1000.",
+        "required": [
+          "laenge_m",
+          "breite_m"
+        ],
+        "properties": {
+          "abzuege": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AbzugAngabe"
+            },
+            "description": "Höchstens 5 Abzüge."
+          },
+          "belegung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RaumBelegung",
+                "description": "Bei Trennung Pflicht, ohne Trennung nicht erlaubt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Höchstens 80 Zeichen; steht ohne Leerraum am Rand im Ergebnis."
+          },
+          "breite_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "laenge_m": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RaumBelegung": {
+        "type": "string",
+        "description": "Welche Gruppe einen Raum belegt (nur bei Trennung).",
+        "enum": [
+          "maenner",
+          "frauen"
+        ]
+      },
       "RedeemRequest": {
         "type": "object",
         "description": "Body von `POST /api/v1/zugang/redeem`. Der Code selbst geht nie über die Leitung.",
@@ -1509,6 +1391,93 @@
           }
         }
       },
+      "RichtwertAuskunft": {
+        "type": "object",
+        "description": "Ein Richtwert mit seinen Angaben.",
+        "required": [
+          "schluessel",
+          "bezeichnung",
+          "gruppe",
+          "einheit",
+          "min",
+          "max",
+          "ganzzahl",
+          "basis",
+          "wert",
+          "herkunft"
+        ],
+        "properties": {
+          "basis": {
+            "type": "number",
+            "format": "double",
+            "description": "Vorgabe des Programms."
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einheit": {
+            "type": "string"
+          },
+          "ganzzahl": {
+            "type": "boolean",
+            "description": "Nur ganze Zahlen erlaubt."
+          },
+          "gruppe": {
+            "type": "string",
+            "description": "Gliederung für die Anzeige, etwa `schlafen` oder `sanitaer`."
+          },
+          "herkunft": {
+            "$ref": "#/components/schemas/RichtwertEbene"
+          },
+          "max": {
+            "type": "number",
+            "format": "double"
+          },
+          "min": {
+            "type": "number",
+            "format": "double",
+            "description": "Kleinster und größter Wert, den `richtwerte` einer Anfrage annehmen darf."
+          },
+          "schluessel": {
+            "type": "string"
+          },
+          "wert": {
+            "type": "number",
+            "format": "double",
+            "description": "Wirksamer Wert ohne Werte einer Anfrage."
+          }
+        }
+      },
+      "RichtwertEbene": {
+        "type": "string",
+        "description": "Ebene, aus der ein wirksamer Richtwert stammt. `anfrage` gibt es nur in der Antwort einer\nRechnung.",
+        "enum": [
+          "basis",
+          "org",
+          "anfrage"
+        ]
+      },
+      "RichtwertWirksam": {
+        "type": "object",
+        "description": "Ein Richtwert, mit dem gerechnet wurde.",
+        "required": [
+          "schluessel",
+          "wert",
+          "herkunft"
+        ],
+        "properties": {
+          "herkunft": {
+            "$ref": "#/components/schemas/RichtwertEbene"
+          },
+          "schluessel": {
+            "type": "string"
+          },
+          "wert": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
       "Scope": {
         "type": "string",
         "description": "Was ein Maschinenzugang darf (Konzept D2). Wire-Werte nach LFH-1312: Fachbegriff deutsch,\nZugriffsart englisch. Neue Werte kommen nur hinzu (Stabilitätszusage v1).",
@@ -1520,6 +1489,543 @@
           "positionen:write",
           "rechner:use"
         ]
+      },
+      "UnterkunftErgebnis": {
+        "type": "object",
+        "description": "Ergebnis einer Rechnung. Bedarf ist aufgerundet, Kapazität abgerundet.",
+        "required": [
+          "weg",
+          "trennung",
+          "personen",
+          "gruppen",
+          "kapazitaet",
+          "schlafen",
+          "material",
+          "sanitaer",
+          "gesundheit",
+          "versorgung",
+          "verpflegung"
+        ],
+        "properties": {
+          "gesundheit": {
+            "$ref": "#/components/schemas/UnterkunftGesundheit"
+          },
+          "gruppen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnterkunftGruppe"
+            }
+          },
+          "kapazitaet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnterkunftKapazitaet",
+                "description": "Beim Weg `personen` `null`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "material": {
+            "$ref": "#/components/schemas/UnterkunftMaterial"
+          },
+          "personen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Personen, für die gerechnet wurde: die Angabe oder die errechnete Kapazität.",
+            "minimum": 0
+          },
+          "sanitaer": {
+            "$ref": "#/components/schemas/UnterkunftSanitaer"
+          },
+          "schlafen": {
+            "$ref": "#/components/schemas/UnterkunftSchlafen"
+          },
+          "trennung": {
+            "type": "boolean"
+          },
+          "verpflegung": {
+            "$ref": "#/components/schemas/UnterkunftVerpflegung"
+          },
+          "versorgung": {
+            "$ref": "#/components/schemas/UnterkunftVersorgung"
+          },
+          "weg": {
+            "$ref": "#/components/schemas/UnterkunftWeg"
+          }
+        }
+      },
+      "UnterkunftGesundheit": {
+        "type": "object",
+        "required": [
+          "betten",
+          "flaeche_m2",
+          "isolierstation"
+        ],
+        "properties": {
+          "betten": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "flaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "isolierstation": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UnterkunftGruppe": {
+        "type": "object",
+        "description": "Personen einer Gruppe.",
+        "required": [
+          "gruppe",
+          "personen"
+        ],
+        "properties": {
+          "gruppe": {
+            "$ref": "#/components/schemas/PersonenGruppe"
+          },
+          "personen": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftKapazitaet": {
+        "type": "object",
+        "description": "Kapazität aus Räumen, Fläche oder Zelten.",
+        "required": [
+          "plaetze",
+          "raeume"
+        ],
+        "properties": {
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "raeume": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/UnterkunftRaum"
+            },
+            "description": "Die Räume einzeln; nur beim Weg `raeume`, sonst `null`."
+          }
+        }
+      },
+      "UnterkunftMaterial": {
+        "type": "object",
+        "required": [
+          "feldbetten",
+          "decken"
+        ],
+        "properties": {
+          "decken": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "feldbetten": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftRaum": {
+        "type": "object",
+        "description": "Ein Raum im Ergebnis: Nutzfläche nach Abzügen und Plätze (abgerundet).",
+        "required": [
+          "bezeichnung",
+          "nutzflaeche_m2",
+          "plaetze",
+          "gruppe"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "gruppe": {
+            "$ref": "#/components/schemas/PersonenGruppe"
+          },
+          "nutzflaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "plaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftRequest": {
+        "type": "object",
+        "description": "Body von `POST /api/v1/rechner/unterkunft`: `weg`, `trennung` und genau der Block des Wegs.\nEin unbekanntes Feld ist 400. Der ganze Body ist höchstens 64 KiB groß.",
+        "required": [
+          "weg",
+          "trennung"
+        ],
+        "properties": {
+          "flaeche": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FlaecheAngabe",
+                "description": "Nur beim Weg `flaeche`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "personen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PersonenAngabe",
+                "description": "Nur beim Weg `personen`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "raeume": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RaumAngabe"
+            },
+            "description": "Nur beim Weg `raeume`; höchstens 200 Räume."
+          },
+          "richtwerte": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Richtwerte nur für diese Anfrage, Schlüssel → Wert. Schlüssel und Grenzen nennt\n`GET /api/v1/rechner/unterkunft/richtwerte`.",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "trennung": {
+            "type": "boolean",
+            "description": "Männer und Frauen getrennt unterbringen und rechnen."
+          },
+          "weg": {
+            "$ref": "#/components/schemas/UnterkunftWeg"
+          },
+          "zelte": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZelteAngabe",
+                "description": "Nur beim Weg `zelte`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "UnterkunftResponse": {
+        "type": "object",
+        "description": "Antwort auf `POST /api/v1/rechner/unterkunft`.",
+        "required": [
+          "ergebnis",
+          "richtwerte",
+          "stand"
+        ],
+        "properties": {
+          "ergebnis": {
+            "$ref": "#/components/schemas/UnterkunftErgebnis"
+          },
+          "richtwerte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RichtwertWirksam"
+            },
+            "description": "Jeder Richtwert der Basis genau einmal, mit dem wirksamen Wert."
+          },
+          "stand": {
+            "type": "string",
+            "description": "Stand der Basis (`JJJJ-MM-TT`)."
+          }
+        }
+      },
+      "UnterkunftRichtwerteResponse": {
+        "type": "object",
+        "description": "Antwort auf `GET /api/v1/rechner/unterkunft/richtwerte`.",
+        "required": [
+          "stand",
+          "zelttypen",
+          "richtwerte"
+        ],
+        "properties": {
+          "richtwerte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RichtwertAuskunft"
+            }
+          },
+          "stand": {
+            "type": "string",
+            "description": "Stand der Basis (`JJJJ-MM-TT`)."
+          },
+          "zelttypen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZelttypAngabe"
+            }
+          }
+        }
+      },
+      "UnterkunftSanitaer": {
+        "type": "object",
+        "required": [
+          "toiletten",
+          "urinale",
+          "waschplaetze",
+          "duschen"
+        ],
+        "properties": {
+          "duschen": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "toiletten": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "urinale": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "waschplaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftSchlafen": {
+        "type": "object",
+        "required": [
+          "flaeche_m2",
+          "zelte_je_typ",
+          "zeltmix",
+          "zeltmix_grundflaeche_m2",
+          "zeltmix_platzbedarf_m2"
+        ],
+        "properties": {
+          "flaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "zelte_je_typ": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeltAnzahl"
+            },
+            "description": "Zelte, wenn nur dieser Typ aufgebaut wird."
+          },
+          "zeltmix": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeltAnzahl"
+            },
+            "description": "Wenigste Zelte: das größte zuerst, der Rest ins kleinste passende."
+          },
+          "zeltmix_grundflaeche_m2": {
+            "type": "number",
+            "format": "double"
+          },
+          "zeltmix_platzbedarf_m2": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grundfläche samt Abstand zwischen den Zelten.",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftVerpflegung": {
+        "type": "object",
+        "required": [
+          "ausgabestellen",
+          "sitzplaetze",
+          "garnituren",
+          "aufenthaltszelte_je_typ"
+        ],
+        "properties": {
+          "aufenthaltszelte_je_typ": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeltAnzahl"
+            }
+          },
+          "ausgabestellen": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "garnituren": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "sitzplaetze": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftVersorgung": {
+        "type": "object",
+        "required": [
+          "wasser_l_tag",
+          "davon_trinkwasser_l_tag",
+          "faekalien_l_tag",
+          "abfall_l_tag"
+        ],
+        "properties": {
+          "abfall_l_tag": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "davon_trinkwasser_l_tag": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "faekalien_l_tag": {
+            "type": "number",
+            "format": "double"
+          },
+          "wasser_l_tag": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "UnterkunftWeg": {
+        "type": "string",
+        "description": "Grundlage der Rechnung: wovon sie ausgeht.",
+        "enum": [
+          "personen",
+          "raeume",
+          "flaeche",
+          "zelte"
+        ]
+      },
+      "ZeltAnzahl": {
+        "type": "object",
+        "description": "Anzahl je Zelttyp.",
+        "required": [
+          "typ",
+          "anzahl"
+        ],
+        "properties": {
+          "anzahl": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "typ": {
+            "$ref": "#/components/schemas/ZeltTyp"
+          }
+        }
+      },
+      "ZeltTyp": {
+        "type": "string",
+        "description": "Zelttyp, SG 20 bis SG 50.",
+        "enum": [
+          "sg20",
+          "sg30",
+          "sg40",
+          "sg50"
+        ]
+      },
+      "ZelteAngabe": {
+        "type": "object",
+        "description": "Zeltbestand: je Gruppe die Anzahl je Zelttyp (`sg20`, `sg30`, `sg40`, `sg50`), höchstens 1000\nje Typ. Ohne Trennung `gesamt`, mit Trennung `maenner` und `frauen`, beide; eine Gruppe ohne\nZelte ist `{}`.",
+        "properties": {
+          "frauen": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "gesamt": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "maenner": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ZelttypAngabe": {
+        "type": "object",
+        "description": "Ein Zelttyp mit seiner Bezeichnung.",
+        "required": [
+          "typ",
+          "bezeichnung"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/ZeltTyp"
+          }
+        }
       }
     },
     "securitySchemes": {

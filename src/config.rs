@@ -547,6 +547,14 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_FUEHRUNG", default_value_t = false)]
     pub fuehrung: bool,
 
+    /// LAN-Entdeckung für die Direktkopplung vor Ort (LLH-1497, Spec `instanz-entdeckung`):
+    /// kündigt die Instanz per mDNS/DNS-SD als `_lifeline-hub._tcp` an und sucht andere im
+    /// lokalen Netz. **Vorgabe AUS**; wirkt nur mit `--tls` und nie auf einem Loopback-Bind. Ohne
+    /// den Schalter sendet die Instanz kein Multicast. Die Umgebungsvariable nimmt nur
+    /// `true`/`false`.
+    #[arg(long, env = "LIFELINE_LAN_ENTDECKUNG", default_value_t = false)]
+    pub lan_entdeckung: bool,
+
     /// Abstand in Sekunden des Abgleichs gespiegelter Einsätze, solange an einer Kopplung ein
     /// Einsatz aktiv ist oder etwas aussteht (LLH-1492, design.md D12); sonst gilt der Abstand der
     /// Meldung. Bei Fehlern verdoppelt er sich bis zehn Minuten.

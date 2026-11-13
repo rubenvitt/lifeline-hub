@@ -645,6 +645,8 @@ fn serde_wire_gleich_as_str() {
         LesezugangWiderrufen,
         InstanzCodeAusgestellt,
         InstanzCodeEingeloest,
+        InstanzZertifikatGewechselt,
+        InstanzAdresseGeaendert,
         InstanzGekoppelt,
         InstanzKopplungWiderrufen,
         InstanzKopplungVomGegenueberWiderrufen,
@@ -684,6 +686,33 @@ fn serde_wire_gleich_as_str() {
         Aktiv => "aktiv",
         Widerrufen => "widerrufen",
     });
+    // Rechner-API Unterkunft (LLH-1524): Wire der öffentlichen API v1, wächst nur.
+    enum_wire!(lifeline_hub::public_api::rechner::UnterkunftWeg {
+        Personen => "personen",
+        Raeume => "raeume",
+        Flaeche => "flaeche",
+        Zelte => "zelte",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::PersonenGruppe {
+        Gesamt => "gesamt",
+        Maenner => "maenner",
+        Frauen => "frauen",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::RaumBelegung {
+        Maenner => "maenner",
+        Frauen => "frauen",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::ZeltTyp {
+        Sg20 => "sg20",
+        Sg30 => "sg30",
+        Sg40 => "sg40",
+        Sg50 => "sg50",
+    });
+    enum_wire!(lifeline_hub::public_api::rechner::RichtwertEbene {
+        Basis => "basis",
+        Org => "org",
+        Anfrage => "anfrage",
+    });
     enum_wire!(lifeline_hub::public_api::scope::AblehnungGrund {
         Uhr => "uhr",
         Signatur => "signatur",
@@ -710,6 +739,13 @@ fn serde_wire_gleich_as_str() {
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungRichtung {
         MeldetSich,
         WirdGemeldet,
+    });
+    // LLH-1497: Wire = DB-CHECK in 0336.
+    enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungArt { Standard, VorOrt });
+    enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzZertifikatZustand {
+        Bestaetigt,
+        PasstNicht,
+        GegenstelleKenntAelteres,
     });
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungZustand {
         Angebahnt,

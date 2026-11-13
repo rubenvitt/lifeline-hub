@@ -238,6 +238,13 @@ eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`). Einen n
 Schlüssel nimmt die übernehmende Instanz erst nach der Bestätigung eines Admins dort an, der die
 letzten vier Zeichen des Fingerabdrucks beim Inhaber erfragt (LLH-1605).
 
+Eine Direktkopplung zweier Instanzen vor Ort (LLH-1497) vertraut nicht dem Betriebssystem, sondern
+einer signierten Aussage der Gegenstelle über ihr TLS-Zertifikat und pinnt es
+([ADR-0029](entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
+`src/instanz/zertifikat.rs`). Konten und Stammdaten erkennen zwei Instanzen derselben Quelle an
+ihrer Ursprungskennung `<instanzkennung>/<schlüssel>` (`src/instanz/stammdaten/herkunft.rs`,
+Spec `stammdaten-verteilung`); sie erweitert das Vertrauen in eine gekoppelte Instanz nicht.
+
 Gekoppelte ELW bekommen Konten samt Passwort-Hash und TOTP-Geheimnis, damit die Anmeldung ohne
 Netz geht (LLH-1493). Die Geheimnisse gehen mit age Ende-zu-Ende an den Schlüssel des ELW und nur,
 wenn sein Betreiber die Datenträgerverschlüsselung bestätigt hat. Ein Admin mit Passkey meldet
@@ -258,7 +265,7 @@ am Spiegel auf einen Stellvertreter, der sich nie anmelden kann
 
 Je Einsatz einer gekoppelten Org führt genau eine Instanz (LLH-1491, Schalter
 `LIFELINE_FUEHRUNG`,
-[ADR-0028](entscheidungen/ADR-0028-eine-fuehrende-instanz-unter-mehreren-elw-gilt-die-zuerst-angenommene.md)). Jede andere
+[ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)). Jede andere
 hält den Einsatz als Spiegel (LLH-1641): die Akte entscheidet, `einsatz.spiegel` folgt ihr, und
 nur der Schutz-Trigger des Spiegels sperrt, am Server wie in `schreibrecht.ts`. Am Spiegel wird
 beantragt. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die

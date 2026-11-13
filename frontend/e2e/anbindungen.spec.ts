@@ -97,6 +97,9 @@ test('Lagemonitor anbinden, Einsatz freigeben, Lage lesen', async ({ page, reque
   await dialog.getByRole('button', { name: 'Anlegen und Code zeigen' }).click();
   const code = (await page.locator('[data-lfh="anbindung-code-text"]').textContent())!;
   await page.getByRole('button', { name: 'Fertig' }).click();
+  // Die Ansicht der neuen Anbindung: noch liest sie nichts.
+  await expect(page).toHaveURL(/\/admin\/einstellungen\/anbindungen\/[0-9a-f-]{36}$/);
+  await expect(page.locator('[data-lfh="anbindung-titel"]')).toContainText(name);
   await expect(page.locator('[data-lfh="anbindung-einsatz"]')).toHaveText(
     'kein Einsatz freigegeben',
   );

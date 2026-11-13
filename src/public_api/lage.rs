@@ -1,4 +1,4 @@
-//! `GET /api/v1/lage` (LLH-1638, Spec `lage-schnittstelle`, ADR-0029): das Lagebild des Einsatzes,
+//! `GET /api/v1/lage` (LLH-1638, Spec `lage-schnittstelle`, ADR-0034): das Lagebild des Einsatzes,
 //! den die Einsatzleitung für den Zugang freigegeben hat ([`super::freigabe`]).
 //!
 //! Die Zahlen kommen aus derselben Verdichtung wie beim gekoppelten Lagemonitor
@@ -9,7 +9,8 @@
 //!
 //! Alle Typen hier sind eigene v1-Schemas. Enums werden mit erschöpfendem `From` aus den internen
 //! abgebildet: ein neuer interner Wert bricht den Build, statt still im Vertrag zu erscheinen.
-//! Herleitung: `openspec/changes/f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D1, D6–D8).
+//! Herleitung:
+//! `openspec/changes/archive/2026-11-12-f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D1, D6–D8).
 
 use super::error::ApiError;
 use super::freigabe;
@@ -338,6 +339,40 @@ fn is_lage_vollstaendig(stufe: Option<Freigabestufe>) -> bool {
         .all(|t| crate::instanz::spiegel::art::kategorie(t).is_some_and(|k| stufe.liefert(k)))
 }
 
+/// Führt eine gespeicherte GeoJSON-Geometrie auf `type` und `coordinates` zurück (bei einer
+/// `GeometryCollection` auf `type` und `geometries`). Die Zonen- und Abschnittsrouten speichern
+/// den gesendeten Text; ein Zusatzschlüssel darin (etwa eine Notiz) ginge sonst mit hinaus.
+/// Unbekanntes bleibt weg.
+fn geometry(roh: &Value) -> Option<Value> {
+    let typ = roh.get("type")?.as_str()?;
+    match typ {
+        "Point" | "MultiPoint" | "LineString" | "MultiLineString" | "Polygon" | "MultiPolygon" => {
+            let coordinates = roh.get("coordinates")?;
+            is_zahlenfeld(coordinates)
+                .then(|| serde_json::json!({ "type": typ, "coordinates": coordinates }))
+        }
+        "GeometryCollection" => {
+            let geometries: Vec<Value> = roh
+                .get("geometries")?
+                .as_array()?
+                .iter()
+                .filter_map(geometry)
+                .collect();
+            Some(serde_json::json!({ "type": typ, "geometries": geometries }))
+        }
+        _ => None,
+    }
+}
+
+/// Besteht der Wert nur aus Zahlen und Listen davon? So tragen Koordinaten keinen Text.
+fn is_zahlenfeld(wert: &Value) -> bool {
+    match wert {
+        Value::Number(_) => true,
+        Value::Array(teile) => teile.iter().all(is_zahlenfeld),
+        _ => false,
+    }
+}
+
 /// Die Karte in der Form der öffentlichen API (design.md D7).
 fn lage_karte(features: Vec<KartenFeature>) -> LageKarte {
     let features = features
@@ -377,7 +412,7 @@ fn lage_karte(features: Vec<KartenFeature>) -> LageKarte {
             };
             Some(LageKarteFeature {
                 typ: "Feature",
-                geometry: f.geometrie,
+                geometry: geometry(&f.geometrie)?,
                 properties,
             })
         })
@@ -576,6 +611,65 @@ mod tests {
         for status in UhsStatus::ALLE {
             assert_eq!(LageUhsState::from(status).as_str(), status.as_str());
         }
+    }
+
+    /// Gespeicherte Geometrien sind der Text des Aufrufers: nur `type` und Koordinaten gehen
+    /// hinaus, kein Zusatzschlüssel und kein Text an Stelle einer Zahl.
+    #[test]
+    fn geometrie_traegt_nur_typ_und_koordinaten() {
+        let polygon = json!([[[9.0, 52.0], [9.1, 52.0], [9.0, 52.1], [9.0, 52.0]]]);
+        let roh = json!({
+            "type": "Polygon",
+            "coordinates": polygon,
+            "notiz": "Herr Muster gestürzt",
+            "properties": { "name": "Muster" },
+        });
+        assert_eq!(
+            geometry(&roh),
+            Some(json!({ "type": "Polygon", "coordinates": polygon }))
+        );
+        let sammlung = json!({
+            "type": "GeometryCollection",
+            "titel": "Muster",
+            "geometries": [roh, { "type": "Unbekannt", "coordinates": [1, 2] }],
+        });
+        assert_eq!(
+            geometry(&sammlung),
+            Some(json!({
+                "type": "GeometryCollection",
+                "geometries": [{ "type": "Polygon", "coordinates": polygon }],
+            }))
+        );
+        // Text an Stelle einer Koordinate, ein Feature oder gar kein Typ: bleibt weg.
+        assert_eq!(
+            geometry(&json!({ "type": "Point", "coordinates": [9.0, "Muster"] })),
+            None
+        );
+        assert_eq!(
+            geometry(&json!({ "type": "Feature", "geometry": roh })),
+            None
+        );
+        assert_eq!(geometry(&json!({ "coordinates": [9.0, 52.0] })), None);
+
+        let karte = lage_karte(vec![
+            KartenFeature {
+                geometrie: roh.clone(),
+                art: KartenFeatureArt::Zone {
+                    id: 3,
+                    typ: LageZoneTyp::Absperrbereich,
+                },
+            },
+            KartenFeature {
+                geometrie: json!({ "type": "Point", "coordinates": "Muster" }),
+                art: KartenFeatureArt::Einsatzort,
+            },
+        ]);
+        let text = serde_json::to_string(&karte).unwrap();
+        assert!(
+            !text.contains("Muster") && !text.contains("notiz"),
+            "{text}"
+        );
+        assert_eq!(karte.features.len(), 1, "die kaputte Geometrie bleibt weg");
     }
 
     #[test]

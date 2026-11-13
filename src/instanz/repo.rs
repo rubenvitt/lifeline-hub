@@ -2,7 +2,7 @@
 
 use super::basis32::{b64, fingerabdruck, parse_b64};
 use super::code::Ableitung;
-use super::{InstanzKopplungRichtung, InstanzKopplungZustand};
+use super::{InstanzKopplungArt, InstanzKopplungRichtung, InstanzKopplungZustand};
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -32,6 +32,13 @@ pub struct KopplungZeile {
     pub gegenueber_age_empfaenger: Option<String>,
     /// Erreichte Seite: das Gegenüber hat die Datenträgerverschlüsselung bestätigt.
     pub gegenueber_datentraeger_verschluesselt: bool,
+    /// Art der Kopplung (LLH-1497, design.md D1): `standard` oder `vor_ort`.
+    pub art: String,
+    /// Meldende Seite einer Direktkopplung: beglaubigter Fingerabdruck des TLS-Zertifikats der
+    /// erreichten Seite (design.md D3).
+    pub tls_zertifikat: Option<String>,
+    /// Erreichte Seite: der Fingerabdruck, den die meldende Seite zuletzt als gespeichert nannte.
+    pub tls_zertifikat_gemeldet: Option<String>,
     /// Meldende Seite: das Gegenüber nimmt Hinweise an (LLH-1495, design.md D4).
     pub gegenueber_hinweise: bool,
     /// Meldende Seite: das Gegenüber bietet Web Push an.
@@ -45,13 +52,18 @@ impl KopplungZeile {
     pub fn richtung(&self) -> Option<InstanzKopplungRichtung> {
         InstanzKopplungRichtung::parse(&self.richtung)
     }
+    /// Art der Kopplung; eine unbekannte gilt als die engere `vor_ort` (nichts fließt zu viel).
+    pub fn art(&self) -> InstanzKopplungArt {
+        InstanzKopplungArt::parse(&self.art).unwrap_or(InstanzKopplungArt::VorOrt)
+    }
 }
 
 const KOPPLUNG_SPALTEN: &str = "id, gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
      richtung, gegenueber_adresse, zustand, zuletzt_gesehen_at, gegenueber_softwarestand, \
      gegenueber_protokoll, letzter_fehler, hinweis, uhr_abweichung_s, fehlversuche, \
      naechste_meldung_at, angebahnt_at, erstellt_at, gegenueber_age_empfaenger, \
-     gegenueber_datentraeger_verschluesselt, gegenueber_hinweise, gegenueber_web_push";
+     gegenueber_datentraeger_verschluesselt, art, tls_zertifikat, tls_zertifikat_gemeldet, \
+     gegenueber_hinweise, gegenueber_web_push";
 
 /// Eine Org-Zuordnung einer Kopplung.
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -87,10 +99,11 @@ pub async fn code_ausstellen(
     ableitung: &Ableitung,
     von: i64,
     laeuft_ab_at: &str,
+    art: InstanzKopplungArt,
 ) -> Result<(), AppError> {
     sqlx::query(
         "INSERT INTO instanz_kopplungscode (suche, org_id, k_einloeser, k_aussteller, \
-         ausgestellt_von, laeuft_ab_at) VALUES (?, ?, ?, ?, ?, ?)",
+         ausgestellt_von, laeuft_ab_at, art) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&ableitung.suche)
     .bind(org_id)
@@ -98,6 +111,7 @@ pub async fn code_ausstellen(
     .bind(b64(&ableitung.k_aussteller))
     .bind(von)
     .bind(laeuft_ab_at)
+    .bind(art.as_str())
     .execute(pool)
     .await?;
     Ok(())
@@ -110,6 +124,8 @@ pub struct OffenerCode {
     pub k_einloeser: [u8; 32],
     pub k_aussteller: [u8; 32],
     pub ausgestellt_von: Option<i64>,
+    /// Art der Kopplung, die der Code stiftet (LLH-1497).
+    pub art: InstanzKopplungArt,
 }
 
 /// Liest einen noch nicht eingelösten, nicht abgelaufenen Code.
@@ -118,15 +134,15 @@ pub async fn find_offener_code(
     suche: &str,
     jetzt: &str,
 ) -> Result<Option<OffenerCode>, AppError> {
-    let zeile: Option<(i64, String, String, Option<i64>)> = sqlx::query_as(
-        "SELECT org_id, k_einloeser, k_aussteller, ausgestellt_von FROM instanz_kopplungscode \
+    let zeile: Option<(i64, String, String, Option<i64>, String)> = sqlx::query_as(
+        "SELECT org_id, k_einloeser, k_aussteller, ausgestellt_von, art FROM instanz_kopplungscode \
          WHERE suche = ? AND eingeloest_at IS NULL AND laeuft_ab_at > ?",
     )
     .bind(suche)
     .bind(jetzt)
     .fetch_optional(&mut *conn)
     .await?;
-    let Some((org_id, ke, ka, von)) = zeile else {
+    let Some((org_id, ke, ka, von, art)) = zeile else {
         return Ok(None);
     };
     let lesen = |t: &str| -> Result<[u8; 32], AppError> {
@@ -139,6 +155,8 @@ pub async fn find_offener_code(
         k_einloeser: lesen(&ke)?,
         k_aussteller: lesen(&ka)?,
         ausgestellt_von: von,
+        art: InstanzKopplungArt::parse(&art)
+            .ok_or_else(|| AppError::Internal("Kopplungscode beschädigt".into()))?,
     }))
 }
 
@@ -208,6 +226,8 @@ pub struct Gegenueber<'a> {
     pub name: &'a str,
     pub softwarestand: &'a str,
     pub protokoll: u32,
+    /// Art der Kopplung (LLH-1497); eine bestehende Kopplung mit aktiver Org behält ihre.
+    pub art: InstanzKopplungArt,
 }
 
 /// Legt die Kopplung an oder erneuert eine bestehende (neuer Code derselben Gegenstelle). Eine
@@ -229,6 +249,13 @@ pub async fn create_or_renew_kopplung(
                 "Mit dieser Instanz besteht schon eine Kopplung in der anderen Richtung.".into(),
             ));
         }
+        // Eine andere Art, solange eine Org-Zuordnung gilt: nie (Spec `instanz-kopplung`, „Eine
+        // weitere Org übernimmt die Art der Kopplung“). Ohne aktive Org darf sie wechseln, aber
+        // nicht, solange dorthin gelieferte Geheimnisse gelten: sonst ginge „ELW verloren“ für sie
+        // verloren (Review LLH-1497).
+        if alt.art() != g.art && is_art_fest(conn, alt.id).await? {
+            return Err(AppError::Conflict(art_konflikt(alt.art())));
+        }
         // Ein anderer Schlüssel unter bekannter Kennung: solange eine Org-Zuordnung gilt, nie.
         // Die Kennung ist nicht geheim, sonst übernähme ein Code einer anderen Org die Kopplung.
         if alt.gegenueber_schluessel != g.schluessel_b64
@@ -245,8 +272,8 @@ pub async fn create_or_renew_kopplung(
              gegenueber_adresse = ?, gegenueber_softwarestand = ?, gegenueber_protokoll = ?, \
              zustand = CASE WHEN ? THEN zustand ELSE ? END, \
              angebahnt_at = CASE WHEN ? THEN angebahnt_at ELSE ? END, \
-             letzter_fehler = NULL, hinweis = NULL, fehlversuche = 0, naechste_meldung_at = NULL \
-             WHERE id = ?",
+             letzter_fehler = NULL, hinweis = NULL, fehlversuche = 0, naechste_meldung_at = NULL, \
+             art = ? WHERE id = ?",
         )
         .bind(g.schluessel_b64)
         .bind(g.name)
@@ -257,6 +284,7 @@ pub async fn create_or_renew_kopplung(
         .bind(zustand_neu.as_str())
         .bind(aktiv)
         .bind(angebahnt)
+        .bind(g.art.as_str())
         .bind(alt.id)
         .execute(&mut *conn)
         .await?;
@@ -265,7 +293,7 @@ pub async fn create_or_renew_kopplung(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
          richtung, gegenueber_adresse, zustand, gegenueber_softwarestand, gegenueber_protokoll, \
-         angebahnt_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         angebahnt_at, art) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(g.kennung)
     .bind(g.schluessel_b64)
@@ -276,9 +304,37 @@ pub async fn create_or_renew_kopplung(
     .bind(g.softwarestand)
     .bind(i64::from(g.protokoll))
     .bind(angebahnt)
+    .bind(g.art.as_str())
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)
+}
+
+/// Ob die Art einer Kopplung feststeht: eine gültige Org-Zuordnung oder dorthin gelieferte
+/// Kontogeheimnisse (die „ELW verloren“ noch entwerten können muss).
+pub async fn is_art_fest(conn: &mut SqliteConnection, kopplung_id: i64) -> Result<bool, AppError> {
+    if !list_orgs_aktiv(conn, kopplung_id).await?.is_empty() {
+        return Ok(true);
+    }
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_geheimnis_lieferung l \
+         JOIN instanz_kopplung_org o ON o.id = l.kopplung_org_id WHERE o.kopplung_id = ?)",
+    )
+    .bind(kopplung_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Text des Konflikts, wenn ein Code einer anderen Art auf eine bestehende Kopplung trifft.
+pub fn art_konflikt(bestehend: InstanzKopplungArt) -> String {
+    match bestehend {
+        InstanzKopplungArt::VorOrt => "Mit dieser Instanz besteht schon eine Direktkopplung vor \
+             Ort. Bitte einen Code der Art „Direktkopplung vor Ort“ verwenden."
+            .into(),
+        InstanzKopplungArt::Standard => "Mit dieser Instanz besteht schon eine \
+             Standardkopplung. Bitte einen Code ohne „Direktkopplung vor Ort“ verwenden."
+            .into(),
+    }
 }
 
 /// Bindet eine Org dieser Instanz an eine Org des Gegenübers. Ist eine der beiden in dieser
@@ -431,17 +487,37 @@ pub async fn org_widerrufen(
         crate::instanz::stammdaten::herkunft::delete_fuer_zuordnung(conn, org_zeile_id).await?;
         // Der Abgleich ihrer Einsätze endet; Spiegel bleiben lesbar (LLH-1492, D14).
         crate::instanz::spiegel::beende_fuer_zuordnung(conn, org_zeile_id, jetzt).await?;
-        // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491).
-        let (org_id, gegenueber): (i64, String) = sqlx::query_as(
-            "SELECT o.org_id, k.gegenueber_kennung FROM instanz_kopplung_org o \
+        // Einsätze, die das Gegenüber führte, holt diese Instanz zurück (LLH-1491). Über eine
+        // Direktkopplung nicht: das wäre eine Notübernahme gegen die Gegenstelle vor Ort, und
+        // beide ELW führten danach denselben Einsatz (LLH-1497, Spec `instanz-fuehrung`, „Über
+        // eine Direktkopplung wechselt die Führung nicht“). Der Spiegel bleibt lesbar stehen.
+        // Der Org-Schlüssel wie in `fuehrung::repo::list_orgs_der_kopplung`: an einem Hub die
+        // Kennung der Org dort, sonst die eigene Kennung mit der Org-ID.
+        let (org_id, gegenueber, art, org_schluessel): (i64, String, String, String) =
+            sqlx::query_as(
+                "SELECT o.org_id, k.gegenueber_kennung, k.art, \
+                 CASE WHEN k.richtung = 'meldet_sich' THEN o.fremde_org_kennung \
+                 ELSE (SELECT kennung FROM instanz_identitaet) || '/' || o.org_id END \
+                 FROM instanz_kopplung_org o \
              JOIN instanz_kopplung k ON k.id = o.kopplung_id WHERE o.id = ?",
-        )
-        .bind(org_zeile_id)
-        .fetch_one(&mut *conn)
-        .await?;
+            )
+            .bind(org_zeile_id)
+            .fetch_one(&mut *conn)
+            .await?;
+        // Eine unbekannte Art gilt wie `KopplungZeile::art` als die engere: vor Ort.
+        let art =
+            super::InstanzKopplungArt::parse(&art).unwrap_or(super::InstanzKopplungArt::VorOrt);
+        if !art.traegt(super::Fluss::Fuehrungswechsel) {
+            return Ok(Some(Vec::new()));
+        }
         Ok(Some(
-            crate::instanz::fuehrung::repo::release_nach_widerruf(conn, org_id, &gegenueber)
-                .await?,
+            crate::instanz::fuehrung::repo::release_nach_widerruf(
+                conn,
+                org_id,
+                &org_schluessel,
+                &gegenueber,
+            )
+            .await?,
         ))
     }
 }
@@ -544,6 +620,19 @@ pub async fn list_faellige_meldungen(
     )))
     .bind(jetzt)
     .fetch_all(pool)
+    .await?)
+}
+
+/// Aktive Kopplungen, in denen diese Instanz erreichte Seite ist (Neustempeln nach einem
+/// Rückschritt des Zählers, LLH-1708).
+pub async fn list_erreicht_aktiv(
+    conn: &mut SqliteConnection,
+) -> Result<Vec<KopplungZeile>, AppError> {
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {KOPPLUNG_SPALTEN} FROM instanz_kopplung \
+         WHERE richtung = 'wird_gemeldet' AND zustand = 'aktiv' ORDER BY id"
+    )))
+    .fetch_all(&mut *conn)
     .await?)
 }
 
@@ -824,6 +913,59 @@ pub struct InstanzKopplungAnzeige {
     /// Abgleich der Einsätze (LLH-1492, Spec `einsatz-spiegel`, „Die Seite Instanzkopplung zeigt
     /// den Abgleich“).
     pub spiegel: InstanzSpiegelStand,
+    /// Art der Kopplung (LLH-1497).
+    pub art: InstanzKopplungArt,
+    /// Zustand des beglaubigten TLS-Zertifikats, nur an einer Direktkopplung (design.md D3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zertifikat: Option<InstanzZertifikatZustand>,
+}
+
+crate::wire_enum::wire_enum! {
+    /// Zustand des beglaubigten Zertifikats einer Direktkopplung (LLH-1497, design.md D3).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum InstanzZertifikatZustand {
+        /// Meldende Seite: gespeichert und zuletzt passend; erreichte Seite: das Gegenüber nennt
+        /// das aktuelle eigene Zertifikat.
+        Bestaetigt => "bestaetigt",
+        /// Meldende Seite: das gezeigte Zertifikat ist nicht beglaubigt, es geht nichts hinaus.
+        PasstNicht => "passt_nicht",
+        /// Erreichte Seite: das Gegenüber nennt ein anderes als das aktuelle eigene Zertifikat.
+        GegenstelleKenntAelteres => "gegenstelle_kennt_aelteres",
+    }
+}
+
+/// `letzter_fehler` einer Direktkopplung, deren Gegenstelle ein nicht beglaubigtes Zertifikat
+/// zeigt (Spec `instanz-kopplung`, „Ein neues Zertifikat wird vor den Nutzdaten bestätigt“).
+pub const ZERTIFIKAT_PASST_NICHT: &str = "Zertifikat passt nicht";
+
+/// Zustand des Zertifikats einer Kopplung für die Anzeige; `eigenes` ist der Fingerabdruck des
+/// eigenen TLS-Zertifikats.
+pub fn zertifikat_zustand(
+    k: &KopplungZeile,
+    eigenes: Option<&str>,
+) -> Option<InstanzZertifikatZustand> {
+    if k.art() != InstanzKopplungArt::VorOrt {
+        return None;
+    }
+    match k.richtung()? {
+        InstanzKopplungRichtung::MeldetSich => {
+            if k.letzter_fehler.as_deref() == Some(ZERTIFIKAT_PASST_NICHT) {
+                Some(InstanzZertifikatZustand::PasstNicht)
+            } else {
+                k.tls_zertifikat
+                    .as_ref()
+                    .map(|_| InstanzZertifikatZustand::Bestaetigt)
+            }
+        }
+        InstanzKopplungRichtung::WirdGemeldet => {
+            let gemeldet = k.tls_zertifikat_gemeldet.as_deref()?;
+            Some(if Some(gemeldet) == eigenes {
+                InstanzZertifikatZustand::Bestaetigt
+            } else {
+                InstanzZertifikatZustand::GegenstelleKenntAelteres
+            })
+        }
+    }
 }
 
 /// Abgleich der Einsätze an einer Kopplung.
@@ -921,6 +1063,7 @@ pub async fn list_fuer_org(
     .bind(org_id)
     .fetch_all(pool)
     .await?;
+    let eigenes_tls = super::identitaet::load_tls_zertifikat(pool).await?;
     let mut aus = Vec::with_capacity(orgs.len());
     for o in orgs {
         let k = load_kopplung(pool, o.kopplung_id).await?;
@@ -957,7 +1100,9 @@ pub async fn list_fuer_org(
             n == 0
         };
         let spiegel = load_spiegel_stand(pool, &k, &o).await?;
+        let zertifikat = zertifikat_zustand(&k, eigenes_tls.as_deref());
         let mut anzeige = to_anzeige(k, o, konten);
+        anzeige.zertifikat = zertifikat;
         anzeige.spiegel = spiegel;
         anzeige.wartende_schluessel = wartende;
         anzeige.ohne_gueltigen_schluessel = ohne_gueltigen;
@@ -1000,6 +1145,8 @@ fn to_anzeige(k: KopplungZeile, o: OrgZeile, konten_mit_geheimnis: i64) -> Insta
         .unwrap_or_default();
     InstanzKopplungAnzeige {
         id: k.id,
+        art: k.art(),
+        zertifikat: None,
         richtung: k
             .richtung()
             .unwrap_or(InstanzKopplungRichtung::WirdGemeldet),
@@ -1071,4 +1218,52 @@ mod tests {
             "geräumt"
         );
     }
+}
+
+/// Meldende Seite: beglaubigter Fingerabdruck des TLS-Zertifikats der erreichten Seite einer
+/// Direktkopplung (LLH-1497, design.md D3); `None` bei einer Standardkopplung.
+pub async fn save_tls_zertifikat(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    fingerabdruck: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE instanz_kopplung SET tls_zertifikat = ? WHERE id = ?")
+        .bind(fingerabdruck)
+        .bind(kopplung_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Erreichte Seite: der Fingerabdruck, den die meldende Seite in ihrer Meldung als beglaubigt
+/// nennt (Anzeige des Zertifikatszustands, LLH-1497).
+pub async fn save_tls_zertifikat_gemeldet(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    fingerabdruck: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE instanz_kopplung SET tls_zertifikat_gemeldet = ? WHERE id = ?")
+        .bind(fingerabdruck)
+        .bind(kopplung_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
+/// Meldende Seite einer Direktkopplung: neue Adresse der Gegenstelle, im LAN gefunden und signiert
+/// bestätigt (LLH-1497, design.md D6).
+pub async fn save_adresse(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    adresse: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE instanz_kopplung SET gegenueber_adresse = ? \
+         WHERE id = ? AND richtung = 'meldet_sich'",
+    )
+    .bind(adresse)
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }

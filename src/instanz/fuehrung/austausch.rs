@@ -19,7 +19,7 @@ use crate::auth::unterschrift::pruefen;
 use crate::auth::unterschrift::repo as unterschrift;
 use crate::error::AppError;
 use crate::instanz::repo::KopplungZeile;
-use crate::instanz::InstanzKopplungRichtung;
+use crate::instanz::{InstanzKopplungArt, InstanzKopplungRichtung};
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 
@@ -37,9 +37,14 @@ const ERKLAERUNG_MAX: usize = 4096;
 /// Größter Zähler einer gelieferten Epoche: weit über jedem echten Verlauf, weit unter dem
 /// Überlauf (`Epoche::naechste` rechnet plus eins).
 const ZAEHLER_MAX: i64 = 1 << 40;
-/// Größter Stand einer gelieferten Akte (LLH-1672): Stände zählen je Änderung eins hoch, wie
-/// Epochen weit darüber; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
+/// Größter Stand einer gelieferten Akte (LLH-1672): Stände folgen den Unix-Sekunden und zählen
+/// je Änderung mindestens eins hoch (LLH-1708, `repo::next_stand`), um 2026 also bei 1,8 · 10⁹,
+/// weit darunter; ein Stand darüber setzte die Quittung dauerhaft aufs Maximum.
 const STAND_MAX: i64 = 1 << 40;
+/// Bis hierher darf eine Quittung des Gegenübers den eigenen Zähler heben (LLH-1708, design.md
+/// D3): Eine gekoppelte Seite soll ihn nicht bis an [`STAND_MAX`] treiben können, ab dem jede
+/// weitere Akte abgelehnt würde.
+pub const STAND_RAISE_MAX: i64 = STAND_MAX / 2;
 /// Länge eines Prüfwerts aus dem Abgabecode (HMAC-SHA256, Base64url: 43 Zeichen) mit Luft.
 const PRUEFWERT_MAX: usize = 64;
 /// Größte Akte in Byte (JSON), die hinausgeht: passt in jede Meldung ([`MELDUNG_BYTES`]) und
@@ -268,7 +273,8 @@ fn quittung_nach(bis: Option<i64>, m: &AkteMeldung) -> Option<i64> {
 /// Was nach dem Commit eines Austauschs zu tun ist.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Folge {
-    /// Der Kopf eines lokalen Einsatzes hat sich geändert (Live-Ereignis `einsatz`).
+    /// Die Führung eines lokalen Einsatzes hat sich geändert: Live-Ereignis `einsatz` und ein
+    /// Vollabgleich (`super::notify_wechsel`).
     Kopf { einsatz_id: i64 },
     /// Alarm „ungültige Übernahme“ an die Einsatzleitung.
     Alarm { einsatz_id: i64 },
@@ -306,9 +312,11 @@ pub enum Entscheid {
 /// Die Annahmeregel als reine Funktion (Tabelle in design.md D7 der Change `v6hj7xl2`, ergänzt in
 /// design.md D3 und D7 der Change `faq7l7m4-zwei-elw-unterlegene-seite`): `richtung` der Kopplung
 /// aus meiner Sicht, `bewiesen` = ob der Beweis gegen meine Schlüssel trägt (nur für die meldende
-/// Seite von Belang), `dritter` = an der Akte ist eine dritte Instanz beteiligt (sie führt, oder
-/// sie hat die Epoche vergeben, mit der die erreichte Seite selbst führt). Dann gibt es keinen
-/// Beweis gegen mich, und niemand hat Unrechtes getan: offen halten, ohne Alarm.
+/// Seite von Belang), `dritter` = an der Akte ist eine dritte Instanz beteiligt (sie führt, oder sie
+/// hat die Epoche vergeben, mit der die erreichte Seite selbst führt), oder die Erklärung nennt
+/// nicht mich, sondern eine andere Instanz als bisherigen Führer eines fremden Stands (Change
+/// `d12cmcx1-hub-epoche-gegen-dritten`). Dann gibt es keinen Beweis gegen mich, und niemand hat
+/// Unrechtes getan: offen halten, ohne Alarm.
 pub fn entscheide(
     richtung: InstanzKopplungRichtung,
     bewiesen: Result<(), String>,
@@ -319,6 +327,78 @@ pub fn entscheide(
         (InstanzKopplungRichtung::MeldetSich, _) if dritter => Entscheid::OffenHalten,
         (InstanzKopplungRichtung::MeldetSich, Ok(())) => Entscheid::OffenHalten,
         (InstanzKopplungRichtung::MeldetSich, Err(grund)) => Entscheid::Verwerfen(grund),
+    }
+}
+
+/// Ob eine Erklärung gegen diese Instanz gerichtet ist: Sie nennt sie als bisherigen Führer. Nur
+/// dann muss ihr Beweis hier tragen, und nur dann gehören ihre Angaben (Grund, Unterzeichner) zu
+/// einer Übernahme gegen diese Instanz. Eine Erklärung gegen einen anderen zeigt nur, dass beim
+/// Gegenüber etwas ohne diese Instanz geschah (Change `d12cmcx1-hub-epoche-gegen-dritten`, D1).
+pub fn is_gegen_mich(e: &NotuebernahmeErklaerung, kennung: &str) -> bool {
+    e.fuehrer_alt == kennung
+}
+
+/// Übernimmt eine Akte, die mir die Führung nicht nimmt: Epoche und Führer des Absenders, eine
+/// überholte offene Übernahme fällt weg, Verlauf und Kopf folgen.
+async fn folge_dem_absender(
+    conn: &mut SqliteConnection,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let von = a.fuehrer_name.clone();
+    uebernimm(a, m);
+    if a.offen
+        .as_deref()
+        .is_some_and(|o| serde_json::from_str::<AkteMeldung>(o).is_ok_and(|o| o.epoche <= m.epoche))
+    {
+        a.offen = None;
+        a.offen_bruch_at = None;
+    }
+    repo::save(conn, a, true).await?;
+    repo::add_verlauf(
+        conn,
+        a,
+        VerlaufNeu {
+            von_name: Some(&von),
+            nach_name: &m.fuehrer_name,
+            grund: grund_der(m).as_deref(),
+            unterzeichner: unterzeichner_der(m).as_deref(),
+            ..VerlaufNeu::default()
+        },
+    )
+    .await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        aus.folgen.push(Folge::Kopf { einsatz_id });
+    }
+    Ok(())
+}
+
+/// Wie eine Akte mit höherer Epoche über eine Direktkopplung vor Ort behandelt wird (LLH-1497,
+/// Change `t10a7luh-elw-lan-direktkopplung`, design.md D4), gleich in welcher Richtung die
+/// Kopplung läuft.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VorOrtEntscheid {
+    /// Die Führung wechselte zwischen den beiden Seiten: verwerfen, Hinweis an der Kopplung.
+    Verwerfen,
+    /// Der bisherige Führer ist der Absender und bezeugt seine Abgabe an eine dritte Instanz oder
+    /// führt mit neuer Epoche weiter: annehmen, der Spiegel folgt.
+    Annehmen,
+    /// Weder noch (etwa von einer Dritten weitergereicht): nur zur Anzeige, nichts ändert sich.
+    NurAnzeige,
+}
+
+/// Die Annahmeregel einer Direktkopplung als reine Funktion (Tabelle in design.md D4): `bisher`
+/// der Führer laut eigener Akte, `neu` der Führer der eingehenden Akte, `sender` und `ich` die
+/// beiden Seiten der Kopplung.
+pub fn entscheide_vor_ort(bisher: &str, neu: &str, sender: &str, ich: &str) -> VorOrtEntscheid {
+    let seite = |k: &str| k == sender || k == ich;
+    if seite(bisher) && seite(neu) && bisher != neu {
+        VorOrtEntscheid::Verwerfen
+    } else if bisher == sender {
+        VorOrtEntscheid::Annehmen
+    } else {
+        VorOrtEntscheid::NurAnzeige
     }
 }
 
@@ -341,7 +421,7 @@ pub(super) async fn check_unterschrift(
         || e.org != m.org
         || e.epoche_neu != m.epoche
         || e.fuehrer_neu != m.fuehrer
-        || e.fuehrer_alt != ich.kennung
+        || !is_gegen_mich(&e, &ich.kennung)
         || &e.epoche_alt != alt
     {
         return Err("Erklärung passt nicht zur Übernahme".into());
@@ -429,11 +509,14 @@ fn grund_der(m: &AkteMeldung) -> Option<String> {
         .map(|e| e.grund)
 }
 
+/// Der Unterzeichner einer Erklärung; leer heißt, niemand hat unterschrieben (Widerruf, Change
+/// `d12cmcx1-hub-epoche-gegen-dritten`, D2).
 fn unterzeichner_der(m: &AkteMeldung) -> Option<String> {
     m.erklaerung
         .as_deref()
         .and_then(NotuebernahmeErklaerung::parse)
         .map(|e| e.unterzeichner)
+        .filter(|u| !u.is_empty())
 }
 
 /// Text für die Admin-Spur: Einsatz und Grund.
@@ -701,7 +784,7 @@ async fn check_offene(
             .erklaerung
             .as_deref()
             .and_then(NotuebernahmeErklaerung::parse)
-            .is_some_and(|e| e.fuehrer_alt == ich.kennung);
+            .is_some_and(|e| is_gegen_mich(&e, &ich.kennung));
         if ist_konflikt(&m, &[kopplung.gegenueber_kennung.as_str()]) || !gegen_mich {
             continue;
         }
@@ -711,6 +794,65 @@ async fn check_offene(
         }
     }
     Ok(())
+}
+
+/// Rückschritt des eigenen Zählers (LLH-1708, design.md D3 der Change
+/// `xi5ugyt8-fuehrung-stand-nach-restore`): Quittiert das Gegenüber an `kopplung` mehr, als dieser
+/// Zähler je vergeben hat, wurde diese Instanz aus einer Sicherung zurückgespielt, und ihre Uhr fing
+/// das nicht ab ([`repo::next_stand`]). Dann hebt sie den Zähler über die Quittung und stempelt
+/// die Akten **jeder** aktiven Kopplung neu, in der sie erreichte Seite ist, jeweils über deren
+/// gespeichertem `fuehrung_gesendet_bis`: Das ist mit der Sicherung zurückgekehrt und nennt, was
+/// dieses Gegenüber sicher hat. Jede davon und `kopplung` selbst bekommen einen Hinweis. Nur eine
+/// Kopplung neu zu stempeln reichte nicht: Der Zähler gilt je Instanz, und nach dem Heben sähe eine
+/// zweite Kopplung ihren Rückschritt nicht mehr (Review B2).
+///
+/// Läuft an beiden Seiten in der Transaktion der Meldung, an der erreichten vor `ensure_akten` und
+/// [`apply_eingang`], damit auch deren Stände über der Quittung liegen. Liefert, ob er hob.
+pub async fn repair_stand(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+    quittung: i64,
+) -> Result<bool, AppError> {
+    if !(1..=STAND_RAISE_MAX).contains(&quittung) || quittung <= repo::load_stand(conn).await? {
+        return Ok(false);
+    }
+    repo::raise_stand(conn, quittung).await?;
+    let grund = "aus einer Sicherung zurückgespielt?";
+    for k in crate::instanz::repo::list_erreicht_aktiv(conn).await? {
+        let (gesendet, _) = repo::load_kopplung_staende(conn, k.id).await?;
+        let orgs =
+            repo::list_orgs_der_kopplung(conn, k.id, InstanzKopplungRichtung::WirdGemeldet).await?;
+        let ids: Vec<i64> = orgs.iter().map(|(id, _)| *id).collect();
+        repo::renew_stand_ueber(conn, &ids, gesendet).await?;
+        if k.id != kopplung.id {
+            crate::instanz::repo::set_hinweis(
+                conn,
+                k.id,
+                &format!(
+                    "Der Zähler der Führungsakten lag unter einer Quittung ({grund}). Die Akten \
+                     gehen erneut an {}.",
+                    k.gegenueber_name
+                ),
+            )
+            .await?;
+        }
+    }
+    let erneut = if kopplung.richtung() == Some(InstanzKopplungRichtung::WirdGemeldet) {
+        format!(" Die Akten gehen erneut an {}.", kopplung.gegenueber_name)
+    } else {
+        String::new()
+    };
+    crate::instanz::repo::set_hinweis(
+        conn,
+        kopplung.id,
+        &format!(
+            "{} hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat \
+             ({grund}).{erneut}",
+            kopplung.gegenueber_name
+        ),
+    )
+    .await?;
+    Ok(true)
 }
 
 /// Übernimmt die Akten einer Nachricht des Gegenübers. `zuletzt_gesehen` ist der Zeitpunkt der
@@ -861,6 +1003,25 @@ pub async fn apply_eingang(
                     }
                     continue;
                 }
+                // Direktkopplung vor Ort (LLH-1497, D4): kein Führungswechsel zwischen den beiden
+                // Seiten, gleich in welcher Richtung; die Abgabe des bisherigen Führers an eine
+                // Dritte gilt, damit der Spiegel ihr folgt.
+                if kopplung.art() == InstanzKopplungArt::VorOrt {
+                    match entscheide_vor_ort(&a.fuehrer_kennung, &m.fuehrer, sender, &ich.kennung) {
+                        VorOrtEntscheid::Verwerfen => {
+                            aus.hinweis = Some(format!(
+                                "{} beansprucht die Führung von „{}“ über eine Direktkopplung: \
+                                 abgelehnt",
+                                kopplung.gegenueber_name, a.bezeichnung
+                            ));
+                        }
+                        VorOrtEntscheid::Annehmen => {
+                            folge_dem_absender(conn, &mut a, m, &mut aus).await?;
+                        }
+                        VorOrtEntscheid::NurAnzeige => {}
+                    }
+                    continue;
+                }
                 // Die erreichte Seite nimmt von der meldenden nur sie selbst oder sich als Führer
                 // an; die meldende sieht auch eine Übergabe an eine dritte Instanz (mehrere ELW an
                 // einem Hub), nimmt sie aber nur zur Anzeige oder mit Beweis an (unten).
@@ -931,44 +1092,36 @@ pub async fn apply_eingang(
                 }
                 if !nimmt_mir {
                     let gewinne = m.fuehrer == ich.kennung && !ich_fuehre;
-                    let von = a.fuehrer_name.clone();
-                    uebernimm(&mut a, m);
                     if gewinne {
                         a.bruch_at = None;
                     }
-                    if a.offen.as_deref().is_some_and(|o| {
-                        serde_json::from_str::<AkteMeldung>(o).is_ok_and(|o| o.epoche <= m.epoche)
-                    }) {
-                        a.offen = None;
-                        a.offen_bruch_at = None;
-                    }
-                    repo::save(conn, &mut a, true).await?;
-                    repo::add_verlauf(
-                        conn,
-                        &a,
-                        VerlaufNeu {
-                            von_name: Some(&von),
-                            nach_name: &m.fuehrer_name,
-                            grund: grund_der(m).as_deref(),
-                            unterzeichner: unterzeichner_der(m).as_deref(),
-                            ..VerlaufNeu::default()
-                        },
-                    )
-                    .await?;
-                    if let Some(einsatz_id) = a.einsatz_id {
-                        aus.folgen.push(Folge::Kopf { einsatz_id });
-                    }
+                    folge_dem_absender(conn, &mut a, m, &mut aus).await?;
                     continue;
                 }
+                // Die Erklärung nennt einen anderen als bisherigen Führer, zu einem anderen Stand
+                // als dem, mit dem ich führe: Das Gegenüber hat sich die Führung von einer dritten
+                // Instanz geholt (Notübernahme oder Widerruf), nicht von mir. Ein Beweis gegen mich
+                // liegt nicht vor und wird auch nicht behauptet; ein Mensch entscheidet, ohne
+                // Alarm. Nennt sie meinen Stand mit einem anderen Führer, widerspricht sie sich
+                // (mit meiner Epoche führe ich), und ohne oder mit unlesbarer Erklärung bleibt es
+                // bei der Prüfung (Change `d12cmcx1-hub-epoche-gegen-dritten`, D1).
+                let gegen_dritten = richtung == InstanzKopplungRichtung::MeldetSich
+                    && m.erklaerung
+                        .as_deref()
+                        .and_then(NotuebernahmeErklaerung::parse)
+                        .is_some_and(|e| !is_gegen_mich(&e, &ich.kennung) && e.epoche_alt != alt);
                 let bewiesen = match richtung {
                     InstanzKopplungRichtung::WirdGemeldet => Ok(()),
+                    InstanzKopplungRichtung::MeldetSich if gegen_dritten => {
+                        Err("Erklärung gegen eine andere Instanz".into())
+                    }
                     InstanzKopplungRichtung::MeldetSich => {
                         check_unterschrift(conn, &ich, org_id, m, &alt)
                             .await
                             .map(|_| ())
                     }
                 };
-                match entscheide(richtung, bewiesen, false) {
+                match entscheide(richtung, bewiesen, gegen_dritten) {
                     Entscheid::Annehmen => {
                         let art = FuehrungWechselArt::parse(&m.art);
                         let verwahrung_abgelehnt = a.art() == FuehrungWechselArt::Verwahrung;
@@ -1168,7 +1321,7 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
     for f in folgen {
         match f {
             Folge::Kopf { einsatz_id } => {
-                crate::live::org::kopf_melden(pool, &live, *einsatz_id, &[]).await;
+                super::notify_wechsel(pool, &live, *einsatz_id).await;
             }
             Folge::Alarm { einsatz_id } | Folge::Offen { einsatz_id } => {
                 let art = if matches!(f, Folge::Alarm { .. }) {
@@ -1215,6 +1368,115 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    // ── Rückschritt des Zählers (LLH-1708, design.md D3) ──────────────────────────────────
+
+    /// Zur Kopplung 1 aus `repo::tests::gekoppelt` (diese Instanz meldet sich, Org 1) kommen zwei,
+    /// in denen sie erreichte Seite ist: Kopplung 2 mit Org 2, Kopplung 3 mit Org 1.
+    async fn drei_kopplungen(pool: &sqlx::SqlitePool) {
+        repo::tests::gekoppelt(pool).await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Zweite')")
+            .execute(pool)
+            .await
+            .unwrap();
+        for (id, org) in [(2, 2), (3, 1)] {
+            sqlx::query(
+                "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+                 gegenueber_name, richtung, zustand) \
+                 VALUES (?, ?, 's', ?, 'wird_gemeldet', 'aktiv')",
+            )
+            .bind(id)
+            .bind(format!("elw{id}"))
+            .bind(format!("ELW {id}"))
+            .execute(pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+                 fremde_org_name) VALUES (?, ?, ?, 'Org')",
+            )
+            .bind(id)
+            .bind(org)
+            .bind(format!("elw{id}/9"))
+            .execute(pool)
+            .await
+            .unwrap();
+        }
+    }
+
+    async fn stand_der_akte(pool: &sqlx::SqlitePool) -> i64 {
+        sqlx::query_scalar("SELECT stand FROM einsatz_fuehrung WHERE org_id = 1")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn hinweis_an(pool: &sqlx::SqlitePool, id: i64) -> String {
+        sqlx::query_scalar::<_, Option<String>>("SELECT hinweis FROM instanz_kopplung WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+            .unwrap_or_default()
+    }
+
+    /// Ruft `repair_stand` für Kopplung `id` mit `quittung`; liefert, ob gehoben wurde.
+    async fn repair(pool: &sqlx::SqlitePool, id: i64, quittung: i64) -> bool {
+        let k = crate::instanz::repo::load_kopplung(pool, id).await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        repair_stand(&mut conn, &k, quittung).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn rueckschritt_an_einer_kopplung_stempelt_jede_erreichte_kopplung_neu() {
+        // Review B2: Die Akte der Org 1 hängt nur an Kopplung 3 (als erreichte Seite). Erkennt
+        // Kopplung 2 den Rückschritt und hebt den Zähler, sähe Kopplung 3 ihn danach nicht mehr.
+        let pool = crate::db::test_pool().await;
+        drei_kopplungen(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        repo::tests::einsatz(&pool, "Lage").await;
+        repo::tests::ensure(&pool).await;
+        let quittung = stand_der_akte(&pool).await + 1000;
+        assert!(repair(&pool, 2, quittung).await);
+        assert!(
+            stand_der_akte(&pool).await > quittung,
+            "Kopplung 3 bekommt sie erneut"
+        );
+        assert!(hinweis_an(&pool, 2).await.contains("ELW 2"));
+        assert!(hinweis_an(&pool, 3).await.contains("erneut an ELW 3"));
+        assert!(
+            !repair(&pool, 2, quittung).await,
+            "einmal gehoben, nicht wieder"
+        );
+    }
+
+    #[tokio::test]
+    async fn heben_an_der_meldenden_seite_stempelt_die_erreichten_kopplungen_neu() {
+        let pool = crate::db::test_pool().await;
+        drei_kopplungen(&pool).await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        repo::tests::einsatz(&pool, "Lage").await;
+        repo::tests::ensure(&pool).await;
+        let quittung = stand_der_akte(&pool).await + 1000;
+        assert!(repair(&pool, 1, quittung).await);
+        assert!(stand_der_akte(&pool).await > quittung);
+        assert!(hinweis_an(&pool, 1).await.contains("Hub Nord"));
+        assert!(hinweis_an(&pool, 3).await.contains("erneut an ELW 3"));
+    }
+
+    #[tokio::test]
+    async fn eine_quittung_hebt_genau_bis_zur_grenze() {
+        // Review B6: genau auf der Grenze hebt sie, eins darüber nicht.
+        let pool = crate::db::test_pool().await;
+        drei_kopplungen(&pool).await;
+        assert!(!repair(&pool, 2, STAND_RAISE_MAX + 1).await);
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(repo::load_stand(&mut conn).await.unwrap() < STAND_RAISE_MAX);
+        drop(conn);
+        assert!(repair(&pool, 2, STAND_RAISE_MAX).await);
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(repo::load_stand(&mut conn).await.unwrap(), STAND_RAISE_MAX);
+    }
     use crate::auth::unterschrift::pruefen::{
         AUTHENTICATOR_DATA_MAX, CLIENT_DATA_JSON_MAX, CREDENTIAL_ID_MAX, SIGNATUR_MAX,
     };
@@ -1502,6 +1764,48 @@ pub(crate) mod tests {
             ist_konflikt(&akte_von("hub", 3), &[]),
             "ohne Kopplung führt ein Dritter"
         );
+    }
+
+    /// Tabelle aus design.md D4 (LLH-1497): Zeilen je Fall, beide Richtungen sind dieselbe Regel.
+    #[test]
+    fn annahmeregel_vor_ort_ueber_alle_zellen() {
+        use VorOrtEntscheid::*;
+        let (s, i, d) = ("sender", "ich", "dritte");
+        // Wechsel zwischen den beiden Seiten, in beide Richtungen.
+        assert_eq!(
+            entscheide_vor_ort(i, s, s, i),
+            Verwerfen,
+            "Sender nimmt mir die Führung"
+        );
+        assert_eq!(
+            entscheide_vor_ort(s, i, s, i),
+            Verwerfen,
+            "Sender gibt sie mir"
+        );
+        // Der bisherige Führer ist der Absender.
+        assert_eq!(
+            entscheide_vor_ort(s, d, s, i),
+            Annehmen,
+            "Abgabe an eine Dritte"
+        );
+        assert_eq!(
+            entscheide_vor_ort(s, s, s, i),
+            Annehmen,
+            "Sender führt weiter"
+        );
+        // Alles andere nur zur Anzeige.
+        assert_eq!(
+            entscheide_vor_ort(d, s, s, i),
+            NurAnzeige,
+            "Sender beansprucht von Dritter"
+        );
+        assert_eq!(entscheide_vor_ort(d, d, s, i), NurAnzeige);
+        assert_eq!(
+            entscheide_vor_ort(i, d, s, i),
+            NurAnzeige,
+            "meine Führung an eine Dritte"
+        );
+        assert_eq!(entscheide_vor_ort(i, i, s, i), NurAnzeige);
     }
 
     #[test]
