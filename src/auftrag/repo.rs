@@ -849,7 +849,7 @@ pub(crate) async fn snap_anzeige_fuer(
 /// gemeldet hat. Beide Bedingungen stehen in den schreibenden Anweisungen einer Transaktion,
 /// damit kein paralleler Vollzug oder kein Aufheben zwischen Prüfen und Schreiben fällt
 /// (wie [`melde_vollzug_tx`], LLH-1098). Zustandsfehler → 422, nichts wird geschrieben.
-pub async fn setze_in_arbeit(
+pub async fn set_in_arbeit(
     pool: &SqlitePool,
     org_id: i64,
     einsatz_id: i64,
@@ -902,22 +902,22 @@ pub async fn setze_in_arbeit(
 
 /// Nimmt den Bearbeitungsfortschritt auf 'offen' zurück (LFH-343 · C8, Befund H50).
 ///
-/// Der Gegenweg zu {@link setze_in_arbeit}: seit C8 kostet „In Bearbeitung" einen
+/// Der Gegenweg zu {@link set_in_arbeit}: seit C8 kostet „In Bearbeitung" einen
 /// Klick statt zweier, und der Rückgängig-Toast braucht einen Weg, den der Server
 /// annimmt. Der Zeitstempel geht MIT zurück — bliebe er stehen, behauptete der
 /// Auftrag einen Fortschritt, den es nicht mehr gibt, und `COALESCE` in
-/// `setze_in_arbeit` schriebe beim nächsten Mal den alten Stempel fort.
+/// `set_in_arbeit` schriebe beim nächsten Mal den alten Stempel fort.
 ///
 /// Nur aus `in_arbeit` und nicht am aufgehobenen Auftrag (LLH-1681): aus `vollzogen` wäre es die
 /// Rücknahme einer Vollzugsmeldung, deren ETB-Meldung stehen bliebe; aus `offen` ein No-op, der
 /// wie Erfolg aussieht. Beide Bedingungen stehen in den schreibenden Anweisungen EINER
 /// Transaktion, damit kein gleichzeitiger Vollzug und kein Aufheben zwischen Prüfen und Schreiben
-/// fällt (wie [`setze_in_arbeit`]). Zustandsfehler → 422, nichts wird geschrieben.
+/// fällt (wie [`set_in_arbeit`]). Zustandsfehler → 422, nichts wird geschrieben.
 ///
 /// Anders als der Vollzug erzeugt die Rücknahme KEINEN ETB-Eintrag: das Setzen auf
 /// „In Bearbeitung" erzeugt selbst keinen, ein Eintrag nur für dessen Rücknahme
 /// hinterließe im Tagebuch eine Zeile ohne Gegenstück.
-pub async fn setze_offen(pool: &SqlitePool, auftrag_id: i64) -> Result<(), AppError> {
+pub async fn set_offen(pool: &SqlitePool, auftrag_id: i64) -> Result<(), AppError> {
     crate::write_retry!(pool, |conn| {
         let offen = sqlx::query(
             "UPDATE auftrag SET in_arbeit_at = NULL WHERE id = ? AND aufgehoben_at IS NULL",
@@ -2146,7 +2146,7 @@ mod tests {
         )
         .await
         .unwrap();
-        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:00:00")
+        set_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:00:00")
             .await
             .unwrap();
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00")
@@ -2186,7 +2186,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let err = setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:05:00")
+        let err = set_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:05:00")
             .await
             .unwrap_err();
         assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
@@ -2272,7 +2272,7 @@ mod tests {
         )
         .await
         .unwrap();
-        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
+        set_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
             .await
             .unwrap();
         melde_vollzug(
@@ -2286,7 +2286,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let err = setze_offen(&pool, d.auftrag.id).await.unwrap_err();
+        let err = set_offen(&pool, d.auftrag.id).await.unwrap_err();
         assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:06:00")
             .await
@@ -2318,7 +2318,7 @@ mod tests {
         )
         .await
         .unwrap();
-        let err = setze_offen(&pool, d.auftrag.id).await.unwrap_err();
+        let err = set_offen(&pool, d.auftrag.id).await.unwrap_err();
         assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
     }
 
@@ -2335,10 +2335,10 @@ mod tests {
         )
         .await
         .unwrap();
-        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
+        set_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
             .await
             .unwrap();
-        setze_offen(&pool, d.auftrag.id).await.unwrap();
+        set_offen(&pool, d.auftrag.id).await.unwrap();
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00")
             .await
             .unwrap();
@@ -2533,7 +2533,7 @@ mod tests {
             "{abnahme:?}"
         );
 
-        let in_arbeit = setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 11:30:00").await;
+        let in_arbeit = set_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 11:30:00").await;
         assert!(
             matches!(in_arbeit, Err(AppError::UnprocessableEntity(_))),
             "{in_arbeit:?}"
@@ -2569,12 +2569,12 @@ mod tests {
         )
         .await
         .unwrap();
-        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
+        set_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 09:30:00")
             .await
             .unwrap();
         hebe_auf_roh(&pool, d.auftrag.id, b, "2026-06-11 10:00:00").await;
 
-        let err = setze_offen(&pool, d.auftrag.id).await.unwrap_err();
+        let err = set_offen(&pool, d.auftrag.id).await.unwrap_err();
         assert!(matches!(err, AppError::UnprocessableEntity(_)), "{err:?}");
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:01:00")
             .await

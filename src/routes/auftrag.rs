@@ -370,9 +370,9 @@ pub async fn vollzug(
         // wäre das die Rücknahme einer Vollzugsmeldung — ein fachlicher Vorgang mit
         // eigenem Weg, kein Undo eines Triage-Klicks. Aus `offen` heraus wäre es ein
         // No-op, der wie Erfolg aussieht.
-        "offen" => repo::setze_offen(&state.pool, auftrag_id).await?,
+        "offen" => repo::set_offen(&state.pool, auftrag_id).await?,
         "in_arbeit" => {
-            repo::setze_in_arbeit(
+            repo::set_in_arbeit(
                 &state.pool,
                 org_id,
                 einsatz_id,
