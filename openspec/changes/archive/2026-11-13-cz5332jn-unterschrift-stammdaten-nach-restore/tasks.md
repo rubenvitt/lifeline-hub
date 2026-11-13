@@ -34,8 +34,8 @@ Reproduktionstests `zurueckgespielt_hub_*` liegen schon rot auf dem Branch.
 
 ## 6. Doku
 
-- [ ] 6.1 `docs/betrieb/backup-restore.md`, Abschnitt „Gekoppelte Instanz zurückspielen“: Unterschriftsschlüssel und Stammdaten, die neuen Hinweise, die Grenzen (Uhr, Reste nach LLH-1871); Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md` an der Stelle zum Zurückspielen ebenso. Prüfen: in `frontend/` `mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` grün
-- [ ] 6.2 Neue ADR „Stände der Schlüssel und des Stammdaten-Logs folgen der Uhr, ein Rückschritt zeigt sich am gemeldeten Stand“ (nächste freie Nummer auf `alpha`) mit Regeln und Prüfung; Kapitel 11 R35 um Schlüssel und Stammdaten ergänzen. Prüfen: `scripts/check-architektur.sh` grün
+- [x] 6.1 `docs/betrieb/backup-restore.md`, Abschnitt „Gekoppelte Instanz zurückspielen“: Unterschriftsschlüssel und Stammdaten, die neuen Hinweise, die Grenzen (Uhr, Reste nach LLH-1871); Anwenderkapitel `docs/anwender/kapitel/instanzkopplung.md` an der Stelle zum Zurückspielen ebenso. Prüfen: in `frontend/` `mise exec -- pnpm exec vitest run src/hilfe/anwenderdoku.guard.test.ts` grün
+- [x] 6.2 Neue ADR „Stände der Schlüssel und des Stammdaten-Logs folgen der Uhr, ein Rückschritt zeigt sich am gemeldeten Stand“ (nächste freie Nummer auf `alpha`) mit Regeln und Prüfung; Kapitel 11 R35 um Schlüssel und Stammdaten ergänzen. Prüfen: `scripts/check-architektur.sh` grün
 
 ## 7. Abschluss
 
