@@ -157,5 +157,15 @@ pub fn merke_gesendet(kennung: &str, kopplung_org_id: i64, pruefsumme: &str, jet
     );
 }
 
+/// Prüfsumme und Zeitpunkt der letzten Liste an diese Kopplungs-Org, falls eine ging. Nur lesend,
+/// für die Integrationstests.
+pub fn zuletzt_gesendet(kennung: &str, kopplung_org_id: i64) -> Option<(String, Instant)> {
+    bremse()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&(kennung.to_string(), kopplung_org_id))
+        .cloned()
+}
+
 #[cfg(test)]
 mod tests;

@@ -1267,7 +1267,7 @@ pub async fn handle_meldung(
                         .stammdaten_pruefsumme
                         .as_deref()
                         .filter(|s| s.len() == stammdaten_bestand::PRUEFSUMME_LEN)
-                        .filter(|_| traegt_stammdaten && nach.zeilen.is_empty())
+                        .filter(|_| traegt_stammdaten)
                     {
                         let auf_stand = mo.stammdaten_stand
                             >= liefern::load_hoechster_stand(conn, o.org_id, &arten).await?;

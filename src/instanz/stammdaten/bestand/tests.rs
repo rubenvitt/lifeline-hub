@@ -74,6 +74,8 @@ fn sendebremse_haelt_dieselbe_abweichung_zehn_minuten() {
         darf_senden("bremse-test-b", 1, "s1", t0 + Duration::from_secs(1)),
         "andere Instanz"
     );
+    assert_eq!(zuletzt_gesendet(kennung, 1), Some(("s1".to_string(), t0)));
+    assert_eq!(zuletzt_gesendet(kennung, 2), None);
 }
 
 // ── Bestand an der erreichten Seite ──────────────────────────────────────────────────────────
