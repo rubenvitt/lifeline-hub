@@ -1,8 +1,10 @@
 //! Fetch-Logik je Quelle mit Stale-while-revalidate (SWR):
 //! frischer Cache → sofort; veralteter Cache → sofort den alten Stand ausliefern und im
-//! Hintergrund erneuern (nicht blockierend); gar kein Cache → einmalig blockierend holen.
-//! Ausnahme Energie (LFH-81): dort wird auch der kalte Abruf von der Anfrage gelöst und nur
-//! bis zu einer Wartefrist abgewartet (`liefere_geloest`).
+//! Hintergrund erneuern (nicht blockierend); gar kein Cache → einmalig blockierend holen. Je
+//! Schlüssel läuft dabei höchstens ein Abruf, als eigene Task, die den Cache auch nach einem
+//! Abbruch der Anfrage schreibt; wer die Marke belegt findet, bekommt `offline` (LLH-1683).
+//! Ausnahme Energie (LFH-81): dort wird der kalte Abruf nur bis zu einer Wartefrist abgewartet
+//! (`liefere_geloest`).
 
 use crate::error::AppError;
 use crate::http_begrenzt::{lies_json_begrenzt, lies_text_begrenzt, DECKEL_FACHEBENE};
@@ -54,7 +56,8 @@ pub(crate) fn swr_weg(alter: Option<i64>, ttl: Duration, obergrenze: Option<Dura
 
 /// SWR-Kern: frisch → sofort, veraltet → sofort plus Hintergrund-Refresh, kalt → blockierend.
 /// `erneuere` liefert ein `'static`-Future für `tokio::spawn`, das die Quelle holt, cacht und
-/// das Ergebnis zurückgibt (`None` bei Fehlschlag). `inflight` verhindert doppelte Refreshes.
+/// das Ergebnis zurückgibt (`None` bei Fehlschlag). `inflight` lässt je Schlüssel nur einen
+/// Abruf laufen, im Hintergrund wie kalt; beide laufen über [`loese_ab`].
 /// Mit `obergrenze` zählt ein Stand jenseits davon als kalt (LFH-662, [`swr_weg`]).
 async fn liefere_mit_swr<Fut>(
     pool: &SqlitePool,
@@ -77,19 +80,18 @@ where
         (SwrWeg::AltUndErneuern, Some((a, _))) => {
             // Veraltet → alten Stand sofort ausliefern, im Hintergrund erneuern; nur ein Refresh je
             // Schlüssel gleichzeitig.
-            let claimed = inflight.lock().unwrap().insert(key.to_string());
-            if claimed {
-                let inflight = inflight.clone();
-                let key = key.to_string();
-                let fut = erneuere();
-                tokio::spawn(async move {
-                    fut.await;
-                    inflight.lock().unwrap().remove(&key);
-                });
-            }
+            loese_ab(inflight, key, erneuere);
             a
         }
-        _ => erneuere().await.unwrap_or_else(offline), // kalt → blockierend
+        // Kalt → blockierend, aber nur EIN Abruf je Schlüssel (LLH-1683): sonst teilen sich nach
+        // langem Uplink-Ausfall alle offenen Lagekarten die schmale Leitung, jeder Abruf reißt
+        // die 8-s-Grenze des Clients, und der Cache füllt sich nie. Wer den Schlüssel belegt
+        // findet, antwortet sofort `offline` und trifft beim nächsten Poll den Cache. Der Abruf
+        // läuft als eigene Task und schreibt den Cache auch, wenn diese Anfrage abbricht.
+        _ => match loese_ab(inflight, key, erneuere) {
+            Some(abruf) => abruf.await.ok().flatten().unwrap_or_else(offline),
+            None => offline(),
+        },
     }
 }
 
@@ -799,10 +801,9 @@ pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> Fachebene
     }
 }
 
-/// Einzelspur für den Fächer. Der kalte Zweig von `liefere_mit_swr` kennt keinen Riegel; hier
-/// startete sonst jeder Bediener, der die Ebene bei leerem Cache einschaltet, eigene 333
-/// Abrufe, und schon zwei gleichzeitig lösten die Drosselung aus. Bewusst nicht im geteilten
-/// `liefere_mit_swr`, das fünf weitere Ebenen trägt.
+/// Einzelspur für den Fächer, Rückfallebene hinter der `inflight`-Marke (die gilt nur für EINE
+/// `inflight`-Menge). Ohne Riegel startete jeder Bediener, der die Ebene bei leerem Cache
+/// einschaltet, eigene 333 Abrufe, und schon zwei gleichzeitig lösten die Drosselung aus.
 static AUTOBAHN_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
 async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
@@ -1190,7 +1191,7 @@ where
     )
 }
 
-/// SWR mit **gelöstem** kaltem Pfad — die Energie-Variante von [`liefere_mit_swr`].
+/// SWR mit **Wartefrist** im kalten Pfad — die Energie-Variante von [`liefere_mit_swr`].
 ///
 /// Kalt läuft der Abruf per `tokio::spawn` und wird nur bis `bis` abgewartet. Reißt er die
 /// Frist, trägt der Teil zu dieser Antwort nichts bei; der Abruf schreibt Cache bzw.
@@ -2262,6 +2263,167 @@ mod swr_tests {
         assert_eq!(a.status, crate::karte::typen::FachebeneStatus::Ok);
         assert_eq!(a.quelle, "alt");
         assert_eq!(a.abgerufen, Some(vor_30_h));
+    }
+
+    /// Obergrenze für Warteschleifen der Tests unten; im Erfolgsfall endet jede nach Millisekunden.
+    const HALT: Duration = Duration::from_secs(5);
+
+    /// Wartet, bis `bedingung` gilt, höchstens [`HALT`].
+    async fn warte_bis(mut bedingung: impl FnMut() -> bool) -> bool {
+        tokio::time::timeout(HALT, async {
+            while !bedingung() {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .is_ok()
+    }
+
+    /// LLH-1683: Bei kaltem Cache (etwa ein Warnstand über der Obergrenze nach langem
+    /// Uplink-Ausfall) startet nur EINE von N gleichzeitigen Anfragen einen Abruf. Die übrigen
+    /// antworten sofort `offline`, statt sich die schmale Leitung zu teilen.
+    #[tokio::test]
+    async fn parallele_kalte_anfragen_starten_hoechstens_einen_abruf() {
+        const N: usize = 20;
+        let pool = crate::db::test_pool().await;
+        let infl = inflight();
+        let abrufe = Arc::new(AtomicUsize::new(0));
+        let fertig = Arc::new(AtomicUsize::new(0));
+        let tor = Arc::new(tokio::sync::Semaphore::new(0));
+        let anfragen = (0..N).map(|_| {
+            let (z, t, f) = (abrufe.clone(), tor.clone(), fertig.clone());
+            let (pool, infl) = (&pool, &infl);
+            async move {
+                let a = liefere_mit_swr(
+                    pool,
+                    infl,
+                    "k",
+                    Duration::from_secs(60),
+                    None,
+                    || FachebeneAntwort::offline("k", "o"),
+                    move || {
+                        z.fetch_add(1, Ordering::SeqCst);
+                        async move {
+                            let _ = t.acquire().await;
+                            Some(antwort("neu"))
+                        }
+                    },
+                )
+                .await;
+                f.fetch_add(1, Ordering::SeqCst);
+                a
+            }
+        });
+        // Das Tor öffnet, sobald alle außer einer geantwortet haben oder alle selbst abrufen.
+        let oeffner = async {
+            warte_bis(|| {
+                fertig.load(Ordering::SeqCst) == N - 1 || abrufe.load(Ordering::SeqCst) == N
+            })
+            .await;
+            tor.add_permits(N);
+        };
+        let (antworten, ()) = tokio::time::timeout(
+            HALT,
+            futures::future::join(futures::future::join_all(anfragen), oeffner),
+        )
+        .await
+        .expect("alle Anfragen beantwortet");
+        assert_eq!(
+            abrufe.load(Ordering::SeqCst),
+            1,
+            "genau ein Abruf nach außen"
+        );
+        assert_eq!(antworten.iter().filter(|a| a.quelle == "neu").count(), 1);
+        assert_eq!(
+            antworten
+                .iter()
+                .filter(|a| a.status == FachebeneStatus::Offline)
+                .count(),
+            N - 1
+        );
+        assert!(infl.lock().unwrap().is_empty(), "Marke nach dem Abruf frei");
+    }
+
+    /// LLH-1683: Bricht die wartende Anfrage ab (Client weg, Anfragebudget), läuft der kalte Abruf
+    /// zu Ende und füllt den Cache; sonst begänne jede Anfrage den Download von vorn.
+    #[tokio::test]
+    async fn abgebrochene_kalte_anfrage_fuellt_den_cache_trotzdem() {
+        let pool = crate::db::test_pool().await;
+        let infl = inflight();
+        let tor = Arc::new(tokio::sync::Semaphore::new(0));
+        let gestartet = Arc::new(AtomicUsize::new(0));
+        let (t, g, pool2) = (tor.clone(), gestartet.clone(), pool.clone());
+        let anfrage = liefere_mit_swr(
+            &pool,
+            &infl,
+            "k",
+            Duration::from_secs(60),
+            None,
+            || FachebeneAntwort::offline("k", "o"),
+            move || {
+                g.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    let _ = t.acquire().await;
+                    let a = antwort("neu");
+                    cache::setze(&pool2, "k", &a).await;
+                    Some(a)
+                }
+            },
+        );
+        // Die Anfrage fällt weg, sobald der Abruf begonnen hat und während er noch wartet.
+        tokio::select! {
+            _ = anfrage => panic!("die Anfrage darf bei geschlossenem Tor nicht antworten"),
+            begonnen = warte_bis(|| gestartet.load(Ordering::SeqCst) == 1) => {
+                assert!(begonnen, "der Abruf hat begonnen");
+            }
+        }
+        tor.add_permits(1);
+        let marke_frei = warte_bis(|| infl.lock().unwrap().is_empty()).await;
+        assert!(marke_frei, "Marke nach dem Abruf frei");
+        assert_eq!(
+            cache::eintrag(&pool, "k").await.map(|(a, _)| a.quelle),
+            Some("neu".to_string()),
+            "der Abruf starb mit der abgebrochenen Anfrage"
+        );
+    }
+
+    /// LLH-1683: Ein Abruf, der in Panik gerät, gibt seine Marke frei, sonst wäre die Ebene bis
+    /// zum Neustart gesperrt. Gilt für den Hintergrund-Zweig wie für den kalten.
+    #[tokio::test]
+    async fn panik_im_abruf_gibt_die_marke_frei() {
+        let pool = crate::db::test_pool().await;
+        let infl = inflight();
+        async fn panik() -> Option<FachebeneAntwort> {
+            panic!("Abruf in Panik (gewollt im Test)")
+        }
+        // Kalt: die Anfrage selbst antwortet `offline`.
+        let a = liefere_mit_swr(
+            &pool,
+            &infl,
+            "kalt",
+            Duration::from_secs(60),
+            None,
+            || FachebeneAntwort::offline("kalt", "o"),
+            panik,
+        )
+        .await;
+        assert_eq!(a.status, FachebeneStatus::Offline);
+        assert!(infl.lock().unwrap().is_empty(), "kalte Marke frei");
+        // Veraltet: der alte Stand geht raus, die Marke fällt mit der Task.
+        cache::setze(&pool, "alt", &antwort("alt")).await;
+        let a = liefere_mit_swr(
+            &pool,
+            &infl,
+            "alt",
+            Duration::from_secs(0),
+            None,
+            || FachebeneAntwort::offline("alt", "o"),
+            panik,
+        )
+        .await;
+        assert_eq!(a.quelle, "alt");
+        let marke_frei = warte_bis(|| infl.lock().unwrap().is_empty()).await;
+        assert!(marke_frei, "Hintergrund-Marke frei");
     }
 }
 

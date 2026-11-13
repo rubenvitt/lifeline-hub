@@ -115,6 +115,14 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 
 ## Hinweise zur Anbindung
 
+- **Kalter Abruf: ein Abruf je Ebene (LLH-1683).** Fehlt ein Stand oder liegt ein Warnstand
+  über der Obergrenze, holt die erste Anfrage die Quelle und wartet darauf. Jede weitere, die
+  währenddessen kommt, antwortet sofort `offline` und bekommt den Stand beim nächsten Poll.
+  Der Abruf läuft als eigene Task und schreibt den Cache auch dann, wenn die wartende Anfrage
+  abbricht. Sonst teilten sich nach langem Uplink-Ausfall alle offenen Lagekarten die schmale
+  Leitung, jeder Abruf risse die 8-s-Schranke des Clients, und der Cache füllte sich nie.
+  Gilt für alle Ebenen über `liefere_mit_swr` (DWD, NINA, PEGELONLINE, ODL, Hochwasser,
+  Luftqualität); Energie und Autobahn hatten den Riegel schon.
 - **NINA** ist die einzige Quelle mit einem zweistufigen Abruf (Übersichtsliste ohne
   Geometrie → Einzel-Geometrie je Warnung). Der Aggregator lädt die Geometrien parallel und
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
