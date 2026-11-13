@@ -1961,6 +1961,44 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('Damm');
   });
 
+  it('der Sendestatus steht in der Aktionszeile, die Zahl hält ihren Platz, bevor sie kommt (kwc2yszv)', async () => {
+    // Läge der Sendestatus in der Meta-Zeile, bräche sie mit der spät kommenden Zahl um und schöbe
+    // die Zeitachse (`e2e/leisten-flaeche.spec.ts`, „Laden ohne Sprung“).
+    setzeViewportBreite(390);
+    let freigeben: () => void = () => {};
+    const zaehlung = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb/zaehler', async () => {
+        await zaehlung;
+        return HttpResponse.json({
+          gesamt: 1,
+          je_typ: {
+            meldung: 1,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: 0,
+            berichtigung: 0,
+          },
+        });
+      }),
+    ]);
+    const aktionen = await kopf();
+    await screen.findByText('Erste Meldung');
+    const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(aktionen.querySelector('[data-lfh="sendestatus"]')).toHaveTextContent(
+      'alles übertragen',
+    );
+    expect(k.querySelector('.lfh-seitenkopf__meta [data-lfh="sendestatus"]')).toBeNull();
+    // Solange die Zählung aussteht, hält ein stummer Platzhalter die Breite der Zahl.
+    expect(k.querySelector('[data-lfh="meta-platzhalter"]')).toHaveTextContent(/Einträge/);
+    freigeben();
+    await waitFor(() => expect(k).toHaveTextContent('1 Eintrag'));
+    expect(k.querySelector('[data-lfh="meta-platzhalter"]')).toBeNull();
+  });
+
   it('der Typfilter steht einzeilig und rollt waagerecht', async () => {
     setzeViewportBreite(390);
     setup();

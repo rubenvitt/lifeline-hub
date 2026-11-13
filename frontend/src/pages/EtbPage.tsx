@@ -1002,6 +1002,12 @@ export default function EtbPage() {
   const kopfAktionen = istSchmal ? (
     <>
       {typleiste}
+      {/* Sendestatus in der Aktionszeile, nicht in der Meta-Zeile: dort bräche er mit der spät
+          kommenden Zahl um und schöbe die Zeitachse; hier nimmt er der rollenden Typleiste Breite,
+          keine Höhe (kwc2yszv D7). */}
+      <span style={{ display: 'inline-flex', alignItems: 'center', flex: '0 0 auto' }}>
+        {sendestatus}
+      </span>
       <Button
         aria-expanded={filterleisteSichtbar}
         aria-controls="etb-filterleiste"
@@ -1020,8 +1026,7 @@ export default function EtbPage() {
     </>
   ) : (
     <>
-      {/* Sendestatus vor dem Druck (kwc2yszv D7, Entwurf `Main.dc.html`); unter `md` steht er in
-          der eigenen Meta-Zeile, hier kostete er die Typleiste Breite. */}
+      {/* Sendestatus vor dem Druck (kwc2yszv D7, Entwurf `Main.dc.html`). */}
       <span style={{ display: 'inline-flex', alignItems: 'center' }}>{sendestatus}</span>
       {/* Einstieg in die Druckansicht: öffnet und sendet nichts ab, gehört also in den Kopf
           — sekundär, „genau eine Primäraktion" bleibt. Link mit Knopfgestalt (Strg/⌘+Klick
@@ -1083,18 +1088,18 @@ export default function EtbPage() {
           items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: modulName('etb') }]}
         />
       }
-      meta={
-        // Unter `md` steht der Sendestatus in der eigenen Meta-Zeile (`EinsatzSeite.css`), ab `md`
-        // rechts vor dem Druck.
-        istSchmal ? (
-          <>
-            {kopfZahl}
-            {kopfZahl && ' · '}
-            {sendestatus}
-          </>
-        ) : (
-          kopfZahl
-        )
+      meta={kopfZahl}
+      // Die Form der Zahl, solange die Zählung aussteht (LLH-1463): kommt sie spät, bräche die
+      // Meta-Zeile sonst erst dann um und schöbe die Zeitachse (`e2e/leisten-flaeche.spec.ts`).
+      // Scheitert die Zählung, kommt keine Zahl mehr: dann auch kein Platzhalter.
+      metaPlatzhalter={
+        zaehlerQuery.isError
+          ? undefined
+          : filterAktiv
+            ? '000 Treffer'
+            : filter.ohne_system
+              ? '000 Einträge · 000 Systemeinträge ausgeblendet'
+              : '000 Einträge'
       }
       dataUpdatedAt={etbQuery.dataUpdatedAt}
       aktionen={kopfAktionen}

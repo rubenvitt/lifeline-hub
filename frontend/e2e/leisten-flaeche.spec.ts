@@ -312,7 +312,8 @@ for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
     await page.setViewportSize({ width: 390, height: 844 });
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `Flaeche 955 Hand ${Date.now()}`);
-    for (let n = 1; n <= 6; n += 1) {
+    // Zehn Einträge: die Seite rollt auch ohne die frühere Bilanz unter der Zeitachse (kwc2yszv D7).
+    for (let n = 1; n <= 10; n += 1) {
       const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
         data: {
           typ: 'meldung',
@@ -328,7 +329,7 @@ for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
     const zeilen = page
       .getByRole('region', { name: 'Einsatztagebuch' })
       .getByTestId('etb-ereigniszeile');
-    await expect(zeilen).toHaveCount(6);
+    await expect(zeilen).toHaveCount(10);
     await expect(page.locator('.etb-erfassung-sticky textarea')).toBeVisible();
     await schriftenGeladen(page);
     await page.evaluate(() => window.scrollTo(0, 0));
