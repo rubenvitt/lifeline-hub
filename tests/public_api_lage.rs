@@ -377,7 +377,7 @@ async fn lage_zaehlt_einheiten_kraefte_und_offene_sofortmeldungen() {
     }
 }
 
-/// ADR-0031: Ein Lese-Scope mit Einsatzbezug (`Scope::has_einsatzbezug`) und die Routen, die
+/// ADR-0033: Ein Lese-Scope mit Einsatzbezug (`Scope::has_einsatzbezug`) und die Routen, die
 /// ihren Einsatz aus der Freigabe nehmen, laufen nicht auseinander. Kommt eine Route mit einem
 /// solchen Scope dazu, steht sie hier, und der Test darunter belegt, dass sie ohne Freigabe
 /// keinen Einsatz liest.

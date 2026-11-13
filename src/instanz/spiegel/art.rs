@@ -160,7 +160,7 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("etb_lesemarke", "Lesestand einer Person an dieser Instanz"),
     (
         "maschinenzugang_freigabe",
-        "Zugänge von Fremdsystemen hängen an einer Instanz (LLH-1638, ADR-0031)",
+        "Zugänge von Fremdsystemen hängen an einer Instanz (LLH-1638, ADR-0033)",
     ),
     (
         "lagebild_freigabe",

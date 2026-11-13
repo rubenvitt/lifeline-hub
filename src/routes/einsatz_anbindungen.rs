@@ -1,4 +1,4 @@
-//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0031,
+//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0033,
 //! Spec `maschinenzugang`, „Einsatzbezogenes Lesen braucht die Freigabe der Einsatzleitung“).
 //!
 //! Das Paneel „Anbindungen“ der Seite „Geräte“ liest und schaltet hier. Die Zugänge legt der

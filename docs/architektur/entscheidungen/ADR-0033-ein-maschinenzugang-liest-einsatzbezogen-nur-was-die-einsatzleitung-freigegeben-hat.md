@@ -1,5 +1,5 @@
 ---
-id: ADR-0031
+id: ADR-0033
 titel: Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn freigegeben hat
 status: akzeptiert
 datum: 2026-11-12
@@ -12,7 +12,7 @@ herleitung:
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---
 
-# ADR-0031: Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn freigegeben hat
+# ADR-0033: Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn freigegeben hat
 
 ## Regeln
 

@@ -16,7 +16,7 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 - [x] 2.2 Tabelle in `einsatz::schwaerzung_registry::TABELLEN` und `instanz::spiegel::art::AUSGENOMMEN` einordnen; die Wächter `jede_einsatz_scoped_spalte_ist_klassifiziert`, `entdeckte_tabellen_gleich_registry_tabellen` und `art::tests::jede_einsatztabelle_ist_eingeordnet` grün
 - [x] 2.3 `Scope::has_einsatzbezug()` mit Unit-Test: wahr für `lage:read`, falsch für alle anderen heutigen Scopes
 - [x] 2.4 `src/public_api/freigabe.rs` mit `list_fuer_einsatz`, `freigeben_tx`, `beenden_tx`, `delete_fuer_einsatz_tx`, `delete_fuer_zugang_tx`, `freigegebener_einsatz`; Unit-Tests: Neu, Keine, Abgelöst, ein Einsatz für zwei Zugänge, wirksam nur am aktiven und nicht gelöschten Einsatz, Liste ohne widerrufene, abgelaufene und nicht freigebbare Zugänge
-- [x] 2.5 ADR-0031 nach D12 anlegen (`scripts/adr-fuer.sh --alle` für die Nummer, Vorlage `VORLAGE.md`, unter 80 Zeilen, Prüfblock); `scripts/check-architektur.sh` grün
+- [x] 2.5 ADR-0033 nach D12 anlegen (`scripts/adr-fuer.sh --alle` für die Nummer, Vorlage `VORLAGE.md`, unter 80 Zeilen, Prüfblock); `scripts/check-architektur.sh` grün
 
 ## 3. Route `GET /api/v1/lage` (D1, D6, D7, D8; Spec `lage-schnittstelle`)
 
@@ -81,5 +81,5 @@ TDD; vor jeder Gruppe `scripts/adr-fuer.sh <pfade>` und die `AGENTS.md` auf dem 
 ## Workflow follow-up
 
 - Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), Befunde in den Abschnitt „Review“ des PRs.
-- `/opsx:archive f658d8o6-lage-fuer-maschinenzugaenge` im selben Branch vor dem PR, Verweise auf den Archivpfad nachziehen (ADR-0031 `herleitung`, Code-Kommentare).
+- `/opsx:archive f658d8o6-lage-fuer-maschinenzugaenge` im selben Branch vor dem PR, Verweise auf den Archivpfad nachziehen (ADR-0033 `herleitung`, Code-Kommentare).
 - PR gegen `alpha`, Aufgabe auf `review` mit `pr_url`.
