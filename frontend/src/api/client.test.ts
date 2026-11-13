@@ -20,6 +20,7 @@ import {
   type UploadFortschritt,
   istKonflikt,
   setzeErwartetenBenutzer,
+  GRUND_NICHT_IN_LISTE,
 } from './client';
 
 afterEach(() => {
@@ -516,6 +517,24 @@ describe('ApiError.zeilen — Gründe je Zeile (LLH-1100)', () => {
     expect(ohne.zeilen).toEqual([]);
     const schief = (await apiSend('/api/schief', 'POST', {}).catch((x: unknown) => x)) as ApiError;
     expect(schief.zeilen).toEqual([]);
+  });
+});
+
+// LLH-1682: Der 404 der Zeilen-Route trägt `grund`, der einer unbekannten Route nicht.
+describe('ApiError.grund', () => {
+  it('übernimmt den Grund eines 404 und lässt ihn ohne Feld leer', async () => {
+    server.use(
+      http.get('/api/zeile', () =>
+        HttpResponse.json({ error: 'Nicht gefunden', grund: 'nicht_in_liste' }, { status: 404 }),
+      ),
+      http.get('/api/unbekannt', () =>
+        HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
+      ),
+    );
+    const zeile = (await apiGet('/api/zeile').catch((x: unknown) => x)) as ApiError;
+    expect(zeile.grund).toBe(GRUND_NICHT_IN_LISTE);
+    const unbekannt = (await apiGet('/api/unbekannt').catch((x: unknown) => x)) as ApiError;
+    expect(unbekannt.grund).toBeNull();
   });
 });
 

@@ -193,6 +193,24 @@ pub async fn liste_gefiltert(
     )
 }
 
+/// Nicht stornierte Personen, die eine der Einheiten `einheit_ids` versorgt (LLH-1682): ihre Zeile
+/// trägt Name und Abschnitt der Einheit per Join.
+pub async fn versorgte_von(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_ids: &[i64],
+) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT id FROM einsatz_person WHERE einsatz_id = ? \
+         AND versorgende_einheit_id IN (SELECT value FROM json_each(?)) \
+         AND storniert_at IS NULL ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(crate::kraefte_disposition::ids_json(einheit_ids))
+    .fetch_all(pool)
+    .await?)
+}
+
 /// Personenauswahl eines Einsatzes (LFH-940): nicht storniert, nach Registriernummer.
 pub async fn auswahl(
     pool: &SqlitePool,

@@ -54,6 +54,9 @@ pub struct VollzugWirkung {
     pub personen: Vec<i64>,
     /// Bereitstellungsräume, deren Belegung Vollzug oder Rücknahme geändert haben (LLH-1308).
     pub raeume: Vec<i64>,
+    /// Einheiten, deren Abschnitt die Übergabe oder ihre Rücknahme geändert hat: die Zeilen ihrer
+    /// versorgten Personen tragen ihn per Join (LLH-1682).
+    pub abschnitt_gewechselt: Vec<i64>,
     /// ETB-Einträge und Hinweise der Kopplung an die Zeitachse (LLH-1128/LLH-1131), etwa eine
     /// entfallene Planung der entlassenen Einheit; nach dem Commit über `publish_kopplung`.
     pub kopplung: Wirkung,
@@ -2999,7 +3002,9 @@ async fn vollziehen_einheit_tx(
             .execute(&mut *conn)
             .await?;
         wirkung.einheiten.push(roh.einheit_id);
-        wirkung.einheiten.extend(knoten_ids);
+        wirkung.einheiten.extend(knoten_ids.iter().copied());
+        wirkung.abschnitt_gewechselt.push(roh.einheit_id);
+        wirkung.abschnitt_gewechselt.extend(knoten_ids);
         abschnitt_name = abschnitt_tx(conn, abschnitt).await?.map(|(n, _)| n);
     }
 
@@ -4072,8 +4077,10 @@ pub async fn zuruecknehmen(
             .rows_affected();
             if selbst > 0 {
                 wirkung.einheiten.push(roh.einheit_id);
+                wirkung.abschnitt_gewechselt.push(roh.einheit_id);
             }
-            wirkung.einheiten.extend(abloeser);
+            wirkung.einheiten.extend(abloeser.iter().copied());
+            wirkung.abschnitt_gewechselt.extend(abloeser);
             zurueck = abschnitt_tx(conn, abschnitt).await?.map(|(n, _)| n);
         }
         sqlx::query(
