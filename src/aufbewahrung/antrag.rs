@@ -481,11 +481,17 @@ pub async fn zuruecknehmen(
             let Some(v) = vorher else {
                 return Err(AppError::NotFound);
             };
+            // Ein Personen-Antrag am archivierten Einsatz wartet auf den Befehl (LLH-1712).
+            let im_archiv = v.ziel_art != AntragZielArt::Einsatz.as_str()
+                && ist_archiviert(&mut *conn, einsatz_id).await?;
             return Err(AppError::Conflict(
                 if v.vollzogen_at.is_some() {
                     "Der Antrag ist vollzogen — eine Rücknahme ist nicht mehr möglich"
                 } else if v.zurueckgenommen_at.is_some() {
                     "Der Antrag ist bereits zurückgenommen"
+                } else if im_archiv {
+                    "Die 24 Stunden sind abgelaufen — der Antrag wartet auf den Befehl mit dem \
+                     Archiv-Schlüssel"
                 } else {
                     "Die 24 Stunden sind abgelaufen — der Antrag wird im nächsten Purge-Lauf \
                      vollzogen"

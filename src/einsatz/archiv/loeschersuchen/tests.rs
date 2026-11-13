@@ -360,37 +360,32 @@ async fn neu_verschluesselt_an_die_geprueften_schluessel() {
     }
 }
 
-/// Zurückgenommen, während die Blöcke gebaut wurden: die Ablage prüft in ihrer Transaktion und
-/// ändert nichts.
+/// Ein zweiter Lauf hat den Antrag vollzogen, während dieser die Blöcke baute: die Ablage prüft
+/// in ihrer Transaktion und ändert nichts, die Blöcke des zweiten Laufs bleiben.
 #[tokio::test]
-async fn zurueckgenommen_waehrend_des_baus_aendert_nichts() {
+async fn parallel_vollzogen_waehrend_des_baus_aendert_nichts() {
     let pool = crate::db::test_pool().await;
     let a = archiv(&pool).await;
-    let antrag = antrag(&pool, &a, 25).await;
-    let vorher = bloecke(&pool, a.einsatz).await;
-    let bau = neu_bauen(&pool, a.einsatz, &schluessel_von(&a.identitaet), Utc::now())
+    antrag(&pool, &a, 25).await;
+    let s = schluessel_von(&a.identitaet);
+    let bau = neu_bauen(&pool, a.einsatz, &s, Utc::now())
         .await
         .unwrap()
         .expect("gebaut");
-    // Nachgestellt ohne die 24-Stunden-Grenze der Route: hier zählt nur, dass der Antrag zwischen
-    // Bau und Ablage nicht mehr offen ist.
-    sqlx::query(
-        "UPDATE schwaerzung_antrag SET zurueckgenommen_at = datetime('now'), \
-            zurueckgenommen_von = beantragt_von WHERE id = ?",
-    )
-    .bind(antrag)
-    .execute(&pool)
-    .await
-    .unwrap();
+    vollziehen(&pool, a.einsatz, &s, Utc::now())
+        .await
+        .unwrap()
+        .expect("der zweite Lauf vollzieht");
+    let nach_dem_zweiten = bloecke(&pool, a.einsatz).await;
     assert_eq!(ablegen(&pool, bau).await.unwrap(), None);
-    assert_eq!(bloecke(&pool, a.einsatz).await, vorher);
+    assert_eq!(bloecke(&pool, a.einsatz).await, nach_dem_zweiten);
     let spur: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM admin_audit WHERE aktion = 'archiv_person_geschwaerzt'",
     )
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(spur, 0);
+    assert_eq!(spur, 1, "nur der zweite Lauf schreibt die Spur");
 }
 
 /// Phase N hat während des Baus einen abgelaufenen Block gelöscht: die Ablage erkennt das

@@ -185,9 +185,9 @@ und alle übrigen Inhalte MUST gleich bleiben.
 - **WHEN** die Organisation keinen geprüften Archiv-Schlüssel mehr hat
 - **THEN** bricht der Befehl für diesen Einsatz mit einer Meldung ab, und Blöcke und Antrag sind unverändert
 
-#### Scenario: Zurückgenommen während des Laufs
-- **WHEN** der Antrag zurückgenommen wird, während der Befehl die Blöcke neu baut
-- **THEN** bleiben die Blöcke unverändert, und der Antrag bleibt zurückgenommen
+#### Scenario: Zweiter Lauf zur selben Zeit
+- **WHEN** ein zweiter Aufruf des Befehls den Antrag vollzieht, während der erste die Blöcke neu baut
+- **THEN** ändert der erste nichts mehr, und es bleiben die Blöcke und die Spur des zweiten
 
 ### Requirement: Alte Blöcke nach dem Vollzug im Archiv
 

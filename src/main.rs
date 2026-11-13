@@ -804,19 +804,28 @@ async fn cmd_archiv_loeschersuchen(
     let mut abgebrochen = false;
     let mut fehler = 0;
     let mut vollzogen = 0;
-    for id in ids {
+    let anzahl = ids.len();
+    for (nr, id) in ids.into_iter().enumerate() {
         // Abbrechbar ist nur das Bauen: ein Abbruch lässt es fallen, `Drop` löscht die
         // entschlüsselten Zwischendateien, und an diesem Einsatz ist nichts geändert. Die Ablage
         // ist eine Transaktion und läuft zu Ende; ein Abbruch während ihr wirkt danach.
-        let gebaut = if abgebrochen {
-            None
-        } else {
-            tokio::select! {
-                b = loeschersuchen::neu_bauen(&pool, id, &schluessel, chrono::Utc::now()) => {
-                    Some(b)
+        if abgebrochen {
+            // Das Signal kam während der vorigen Ablage; die ist vollzogen und gemeldet.
+            pool.close().await;
+            anyhow::bail!(
+                "Abgebrochen nach der Ablage von {vollzogen} Einsatz/Einsätzen; {} nicht \
+                 bearbeitet, ab Einsatz {id}.{}",
+                anzahl - nr,
+                if fehler > 0 {
+                    format!(" {fehler} Einsatz/Einsätze vorher nicht vollzogen.")
+                } else {
+                    String::new()
                 }
-                () = &mut abbruch => None,
-            }
+            );
+        }
+        let gebaut = tokio::select! {
+            b = loeschersuchen::neu_bauen(&pool, id, &schluessel, chrono::Utc::now()) => Some(b),
+            () = &mut abbruch => None,
         };
         let ergebnis = match gebaut {
             None => {
@@ -867,16 +876,18 @@ async fn cmd_archiv_loeschersuchen(
             }
         }
     }
+    // Ein Signal während der letzten Ablage beendet nichts mehr: alles ist bearbeitet.
+    let mehrere_orgs: bool = org.is_none()
+        && einsatz.is_none()
+        && sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organisation")
+            .fetch_one(&pool)
+            .await?
+            > 1;
     pool.close().await;
-    if abgebrochen {
-        anyhow::bail!(
-            "Abgebrochen nach der laufenden Ablage; die übrigen Einsätze sind nicht bearbeitet."
-        );
-    }
     if fehler > 0 {
         anyhow::bail!(
             "{fehler} Einsatz/Einsätze nicht vollzogen; dort ist nichts geändert.{}",
-            if org.is_none() && einsatz.is_none() {
+            if mehrere_orgs {
                 " Gehören sie zu einer anderen Organisation, mit --org eingrenzen."
             } else {
                 ""

@@ -333,6 +333,28 @@ async fn archivierter_einsatz_person_bleibt_im_purge_offen() {
     assert_eq!(inhalt, vec![1, 2, 3]);
 }
 
+/// LLH-1712: nach den 24 Stunden nennt die Ablehnung der Rücknahme am Archiv den Befehl, nicht
+/// den Purge-Lauf.
+#[tokio::test]
+async fn archivierter_einsatz_ruecknahme_nach_24_stunden_nennt_den_befehl() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    archiviere_attrappe(&pool, b.e1, 1).await;
+    let a = stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    let e = zuruecknehmen(&pool, b.e1, a, b.admin, t(T0) + Duration::hours(25))
+        .await
+        .unwrap_err();
+    let AppError::Conflict(m) = e else {
+        panic!("{e:?}")
+    };
+    assert!(
+        m.contains("Archiv-Schlüssel") && !m.contains("Purge"),
+        "{m}"
+    );
+}
+
 /// LLH-1712: ist das Archiv inzwischen ganz abgelaufen, erledigt der Purge-Lauf den offenen
 /// Personen-Antrag wie an jedem geschwärzten Einsatz.
 #[tokio::test]

@@ -53,7 +53,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
       - noch nicht fällig → nichts,
       - falscher Schlüssel → nichts geändert,
       - keine geprüften Schlüssel → nichts geändert,
-      - Antrag zwischen Bauen und Ablage zurückgenommen → nichts geändert,
+      - ein zweiter Lauf vollzieht zwischen Bauen und Ablage → nichts geändert,
       - Fotos der Person sind im neuen Block auch als Bytes nicht mehr enthalten.
 - [x] 3.3 Alte Blöcke (D4): Test, dass ein vor dem Vollzug gelesener Block danach von
       `einspielen` mit „nicht mehr im Archiv“ abgelehnt wird, und dass eine vorher

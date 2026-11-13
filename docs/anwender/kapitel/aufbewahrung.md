@@ -2,7 +2,7 @@
 titel: Aufbewahrung
 gruppen: [administration]
 reihenfolge: 660
-quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/ArchivPersonAntragDialog.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/einsatz/archiv/loeschersuchen.rs, src/einsatz/archiv/personen.rs, src/aufbewahrung/antrag.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs, src/instanz/fuehrung/loeschvermerk.rs]
+quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/ArchivPersonAntragDialog.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/main.rs, src/config.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/einsatz/archiv/loeschersuchen.rs, src/einsatz/archiv/personen.rs, src/aufbewahrung/antrag.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs, src/instanz/fuehrung/loeschvermerk.rs]
 ---
 
 ## Überblick
@@ -159,8 +159,8 @@ Archiv-Schlüssel der Organisation hat:
 5. „Person schwärzen lassen“ wählen. In den ersten 24 Stunden lässt sich der Antrag in der Liste
    zurücknehmen.
 6. Nach 24 Stunden steht am Antrag „wartet auf Befehl mit Archiv-Schlüssel“. Dann auf dem Server
-   `lifeline-hub archiv loeschersuchen --identitaet <Schlüsseldatei> --org <ID>` ausführen
-   lassen, die ID der eigenen Organisation. Die
+   `lifeline-hub archiv loeschersuchen --identitaet <Schlüsseldatei> --einsatz <ID>` ausführen
+   lassen, mit der ID aus Schritt 1. Die
    Ausgabe nennt je Einsatz die Kennungen und die Zahl der Blöcke; danach steht der Antrag als
    vollzogen in der Liste.
 
@@ -279,8 +279,8 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 - Ein Löschersuchen wartet nicht auf Frist und Karenz. Es wird 24 Stunden nach dem Erfassen
   vollzogen; bis dahin lässt es sich zurücknehmen. Ausnahme ist eines für eine Person an einem
   archivierten Einsatz: Es lässt sich ebenso nur in den ersten 24 Stunden zurücknehmen, vollzogen
-  wird es aber erst, wenn auf dem Server der Befehl mit dem Archiv-Schlüssel läuft. Bis dahin steht
-  es offen in der Liste, mit „wartet auf Befehl mit Archiv-Schlüssel“.
+  wird es aber erst, wenn auf dem Server der Befehl mit dem Archiv-Schlüssel läuft. Nach den
+  24 Stunden steht es bis dahin offen in der Liste, mit „wartet auf Befehl mit Archiv-Schlüssel“.
 - **Person:** Entfernt werden Name, Kontakt, Adresse und Notizen der Person, bei Betroffenen
   auch ihre Fotos und Dateien. Erwähnungen in Freitexten (Einsatztagebuch, Chat,
   Führungsmodule) bleiben stehen.

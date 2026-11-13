@@ -322,9 +322,9 @@ lifeline-hub --db-path … archiv loeschersuchen --identitaet … --org 2
 - Ersetzt werden die Blöcke erst, wenn alle gebaut sind, in einer Transaktion zusammen mit dem
   Antrag, einem Eintrag im Einsatztagebuch (Aktenzeichen, Kennung, Zahl der Blöcke) und einem
   Eintrag im Zugangsprotokoll („Person im Archiv geschwärzt“), alle ohne Namen. Passt der
-  Schlüssel nicht, hat die Organisation keinen geprüften Schlüssel mehr, wird der Antrag
-  inzwischen zurückgenommen oder löscht der Purge-Lauf währenddessen einen abgelaufenen Block,
-  bleibt alles, wie es war. Der Befehl nennt das; ein späterer Aufruf baut neu.
+  Schlüssel nicht, hat die Organisation keinen geprüften Schlüssel mehr, hat ein zweiter Aufruf
+  den Antrag inzwischen vollzogen oder löscht der Purge-Lauf währenddessen einen abgelaufenen
+  Block, bleibt alles, wie es war. Der Befehl nennt das; ein späterer Aufruf baut neu.
 - **Alte Blöcke:** Ein vor dem Vollzug heruntergeladener Block lässt sich an dieser Installation
   danach nicht mehr einspielen. Eine hier eingespielte Kopie eines alten Blocks geht mit dem
   nächsten Purge-Lauf. Heruntergeladene Blöcke und Kopien an anderen Installationen erreicht der
