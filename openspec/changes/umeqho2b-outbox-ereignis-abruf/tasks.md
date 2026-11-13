@@ -160,10 +160,10 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
 
 ## 5. Regeln und Doku
 
-- [ ] 5.1 Neue ADR nach D14 mit der nächsten freien Nummer (`git fetch origin alpha`,
+- [x] 5.1 Neue ADR nach D14 mit der nächsten freien Nummer (`git fetch origin alpha`,
   `scripts/adr-fuer.sh --alle`, offene PRs). Verifizieren: `scripts/check-architektur.sh` ist
   grün, die Prüfung der ADR läuft durch.
-- [ ] 5.2 `src/AGENTS.md`: Abschnitt „Ausgangsereignisse für Fremdsysteme (LLH-1655)“ mit den
+- [x] 5.2 `src/AGENTS.md`: Abschnitt „Ausgangsereignisse für Fremdsysteme (LLH-1655)“ mit den
   drei Regeln aus D14; Wurzel-`AGENTS.md` nur, wenn die Inhaltsangabe der Tabelle es braucht.
   Verifizieren: Die Wurzeldatei bleibt unter 200 Zeilen; Prettier und die Gates der
   Arbeitsanleitungen sind grün.
@@ -177,12 +177,12 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   überspringen). `docs/api/maschinenzugang.md`: Scope-Tabelle mit den Pfaden und Verweis.
   Verifizieren: Das Beispiel ist gegen den laufenden Server mit dem Rust-Referenz-Client oder dem
   Kommando einmal durchgespielt; die Ausgabe steht im PR.
-- [ ] 5.5 `docs/anwender/kapitel/anbindungen.md`: Abschnitt „Rechte“ sagt, was „Einsätze lesen“
+- [x] 5.5 `docs/anwender/kapitel/anbindungen.md`: Abschnitt „Rechte“ sagt, was „Einsätze lesen“
   und „Ereignisse abrufen“ heute öffnen, und dass ohne Freigabe der Einsatzleitung nichts
   hinausgeht. Der Satz „Heute nutzt ein Fremdsystem nur die Prüfung seiner Anmeldung“ fällt,
   soweit LLH-1638 ihn stehen ließ. Zeigt ein Bild des Kapitels das Paneel aus 4.1, wird es neu
   erzeugt. Verifizieren: `mise exec -- pnpm -C frontend test anwenderdoku` ist grün.
-- [ ] 5.6 Konzept `docs/konzepte/2026-11-11-oeffentliche-api.md`: im Abschnitt „Richtung hinaus“
+- [x] 5.6 Konzept `docs/konzepte/2026-11-11-oeffentliche-api.md`: im Abschnitt „Richtung hinaus“
   ein Satz mit Verweis auf die ADR, dass Trigger und Sichtbarkeit je Zugang den Wortlaut dort
   ablösen. Verifizieren: Der Verweis löst auf.
 

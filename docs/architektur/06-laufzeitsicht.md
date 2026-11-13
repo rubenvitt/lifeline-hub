@@ -481,6 +481,47 @@ sequenceDiagram
   (`src/auth/rate_limit.rs`, `maschine`), nie in der Anmeldesperre; je Zugang drosselt
   `src/public_api/drossel.rs`.
 
+## 6.6e Ausgangsereignis: vom Schreiben bis zum Abruf
+
+Ein Fremdsystem erfährt über `GET /api/v1/events`, dass sich an seinem freigegebenen Einsatz etwas
+getan hat (LLH-1655,
+[ADR-0036](entscheidungen/ADR-0036-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+Spec [`ereignis-abruf`](../../openspec/specs/ereignis-abruf/spec.md)).
+
+```mermaid
+sequenceDiagram
+  participant W as Schreibweg (Route, Spiegel-Übernahme, Demo-Import)
+  participant DB as SQLite (Trigger, maschine_ereignis)
+  participant Hub as lifeline-hub (src/public_api/events.rs)
+  participant F as Fremdsystem
+  F->>Hub: GET /api/v1/events?after=4711&wait=25
+  Hub->>DB: Höchststand, Zeilen des Zugangs nach 4711
+  DB-->>Hub: keine
+  Note over Hub: Warteplatz belegen, Verbindung freigeben
+  W->>DB: BEGIN, UPDATE einsatz SET stichwort
+  DB->>DB: Trigger einsatz_ereignis_kopf: Zeile je Freigabe
+  W->>DB: COMMIT
+  Hub->>DB: nach einer Sekunde erneut lesen
+  DB-->>Hub: einsatz.updated (4712)
+  Hub-->>F: {cursor: 4712, events: [...]} (Lifeline-Signature)
+  F->>Hub: GET /api/v1/einsaetze/42
+  Hub-->>F: Einsatzkopf
+```
+
+- Die Zeile entsteht im Trigger, in der Transaktion der Änderung
+  (`migrations/0344_maschine_ereignis_trigger.sql`); ein Rollback nimmt sie mit. Kein Rust-Code
+  schreibt in die Outbox.
+- Geschrieben wird je Freigabe (`maschinenzugang_freigabe`): Beginn der Freigabe ist
+  `einsatz.created`, ihr Ende oder der Abschluss `einsatz.closed`. `lage.changed` hängt am
+  Änderungslog `einsatz_aenderung` und liegt je Zugang und Einsatz höchstens einmal vor.
+- Der Abruf wird nicht geweckt: Er fragt im Takt nach (`events::TAKT`) und hält dazwischen keine
+  Verbindung. Es warten höchstens `events::MAX_WARTENDE` Abrufe, je Zugang einer; ein weiterer
+  antwortet sofort mit `Retry-After`.
+- Der Cursor ist die fortlaufende Nummer. Der Purge-Lauf löscht nach sieben Tagen
+  (`events::purge` in `src/einsatz/purge_scheduler.rs`) und hält die Löschgrenze in
+  `maschine_ereignis_stand`; ein Cursor darunter ergibt `410 cursor_expired`, und das Fremdsystem
+  baut über `GET /api/v1/einsaetze` neu auf.
+
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 
 ```mermaid

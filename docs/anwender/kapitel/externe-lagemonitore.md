@@ -57,7 +57,7 @@ Für den System-Admin:
 Anbindungen anlegen, ändern und widerrufen darf nur der System-Admin. Einen Einsatz freigeben
 oder die Freigabe beenden darf nur die Einsatzleitung dieses Einsatzes, solange er aktiv ist.
 Auch ein System-Admin ohne Rolle im Einsatz gibt nicht frei. Das Paneel „Anbindungen“ zeigt nur
-Anbindungen mit dem Recht „Lage lesen“, die weder widerrufen noch abgelaufen sind; ohne eine
+Anbindungen mit dem Recht „Lage lesen“ oder „Einsätze lesen“, die weder widerrufen noch abgelaufen sind; ohne eine
 solche fehlt es.
 
 Lehnt der Server ein Umschalten ab, weil die Anbindung inzwischen widerrufen oder abgelaufen
@@ -78,8 +78,8 @@ Die Freigabe endet
 Bekommt die Anbindung das Recht später wieder oder verlängert der System-Admin ein
 verstrichenes „Gültig bis“, liest sie erst nach einer neuen Freigabe.
 
-Die Seite „Anbindungen“ nennt an jeder Anbindung mit „Lage lesen“, die weder widerrufen noch
-abgelaufen ist, welchen Einsatz sie gerade liest.
+Die Seite „Anbindungen“ nennt an jeder Anbindung mit „Lage lesen“ oder „Einsätze lesen“, die
+weder widerrufen noch abgelaufen ist, welchen Einsatz sie gerade liest.
 
 ### Was der Monitor erhält
 

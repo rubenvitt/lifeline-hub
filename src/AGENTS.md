@@ -134,6 +134,33 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   (`public_api::contract_layer`, montiert in `app.rs`). Die innere Schicht setzt den Kopf nicht,
   sonst packte die Kompression keine v1-Antwort mehr.
 
+## Backend — Ausgangsereignisse für Fremdsysteme (LLH-1655)
+
+Outbox `maschine_ereignis` und Abruf `GET /api/v1/events`
+([ADR-0036](../docs/architektur/entscheidungen/ADR-0036-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+Spec `ereignis-abruf`, Herleitung
+`openspec/changes/umeqho2b-outbox-ereignis-abruf/design.md`):
+- **Kein Schreibweg in Rust schreibt in `maschine_ereignis`.** Jede Zeile entsteht in einem
+  Trigger (`migrations/0344_maschine_ereignis_trigger.sql`), in der Transaktion der Änderung und
+  je Zeile in `maschinenzugang_freigabe`. `public_api::events` liest und löscht nur. Auch Tests
+  erzeugen Ereignisse über Freigabe, Kopf und Lage; direkt fügt nur ein, wer ein Alter braucht
+  (`tests/public_api_events.rs`, `altes_ereignis`).
+- **Ein neues Feld im v1-Schema `Einsatz`** kommt mit seiner Spalte in
+  `public_api::einsaetze::KOPF_SPALTEN`, und eine neue Migration baut `einsatz_ereignis_kopf` neu
+  (Wächter `tests/public_api_ereignis_trigger.rs`, `der_kopf_trigger_kennt_genau_die_kopfspalten`).
+  Sonst bliebe `einsatz.updated` für dieses Feld aus.
+- **Liest die Lage aus einer weiteren Tabelle** (`public_api::lage::QUELLEN`), kommt sie in
+  `public_api::events::LAGE_ARTEN` und in den Trigger `einsatz_aenderung_ereignis_i`, wieder per
+  neuer Migration (Wächter `lage_arten_sind_die_quellen_der_lage_und_stehen_im_trigger`). Der
+  Trigger hängt am Änderungslog `einsatz_aenderung`; eine Lage-Tabelle muss deshalb gespiegelt
+  sein.
+- **Die Freigabe endet als gelöschte Zeile**, nie per `INSERT OR REPLACE` (löscht ohne
+  DELETE-Trigger).
+- **Eine neue Ereignisart** kommt in `EventType` und in den CHECK von `maschine_ereignis.type`
+  (neue Migration, Abgleich in `tests/public_api_events.rs`); keine wird umbenannt.
+- **Der wartende Abruf** hält zwischen zwei Nachfragen keine Datenbankverbindung und nimmt seinen
+  Platz aus `events::Warteraum`; die Route steht nicht in `zulassung::OHNE_ZULASSUNGSGRENZE`.
+
 ## Anhänge
 
 **ETB-Anhänge (LFH-117)** (`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`)
