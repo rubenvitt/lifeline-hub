@@ -260,7 +260,7 @@ async fn loeschen(i: &Instanz, einsatz: i64) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert!(abraeumen::ausfuehren(&i.pool, einsatz).await.unwrap());
+    assert!(abraeumen::ausfuehren(&i.pool, None, einsatz).await.unwrap());
 }
 
 #[tokio::test]
@@ -313,7 +313,12 @@ async fn ein_spiegel_am_elw_geht_nach_der_nachbereitung_der_einsatz_am_hub_bleib
     let s: i64 = eine(&elw.pool, "SELECT einsatz_id FROM einsatz_spiegel").await;
 
     assert_eq!(
-        abraeumen::phase_r(&elw.pool, "2026-11-11 12:00:00").await,
+        abraeumen::phase_r(
+            &elw.pool,
+            &lifeline_hub::live::LiveHub::new(),
+            "2026-11-11 12:00:00"
+        )
+        .await,
         1
     );
     assert!(!gibt_es(&elw.pool, &format!("SELECT 1 FROM einsatz WHERE id = {s}")).await);
