@@ -117,6 +117,13 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
 
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
+    // Zähler des Stammdaten-Logs auf die Uhr (LLH-1853, D3): Nach dem Zurückspielen einer
+    // Sicherung liegt jede neue Änderung über dem, was ein gekoppelter ELW schon übernommen hat.
+    lifeline_hub::instanz::stammdaten::liefern::raise_log_stand(
+        &pool,
+        chrono::Utc::now().timestamp(),
+    )
+    .await?;
     // Versionsstand der Instanz: Versionswechsel erkennen, bevor Anfragen kommen (Spec `versionsstand`).
     lifeline_hub::versionsstand::repo::beim_start(
         &pool,

@@ -1244,6 +1244,216 @@ async fn elw_verloren_geht_auch_nach_dem_widerruf_aber_nur_einmal() {
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
 }
 
+// ── Zurückgespielter Hub (LLH-1853) ──────────────────────────────────────────────────────────
+
+async fn log_stand(hub: &Instanz) -> i64 {
+    eine(
+        &hub.pool,
+        "SELECT seq FROM sqlite_sequence WHERE name = 'stammdaten_aenderung'",
+    )
+    .await
+}
+
+/// Der Hub spielt eine Sicherung vom Log-Stand `stand` zurück: die Fahrzeuge `verloren` und ihre
+/// Änderungen sind weg, das Log zählt wieder ab dort.
+async fn zurueckspielen_hub(hub: &Instanz, stand: i64, verloren: &[&str]) {
+    for f in verloren {
+        exec(
+            &hub.pool,
+            &format!("DELETE FROM fahrzeug WHERE funkrufname = '{f}'"),
+        )
+        .await;
+    }
+    exec(
+        &hub.pool,
+        &format!("DELETE FROM stammdaten_aenderung WHERE stand > {stand}"),
+    )
+    .await;
+    exec(
+        &hub.pool,
+        &format!("UPDATE sqlite_sequence SET seq = {stand} WHERE name = 'stammdaten_aenderung'"),
+    )
+    .await;
+}
+
+/// Was der Start nach dem Zurückspielen tut (`run_server`): den Zähler des Logs auf die Uhr heben.
+async fn neustart(hub: &Instanz) {
+    let jetzt = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    lifeline_hub::instanz::stammdaten::liefern::raise_log_stand(&hub.pool, jetzt)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_aenderungen_erreichen_den_elw() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Vorher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    let sicherung = log_stand(&hub).await;
+    for f in ["Verloren 1", "Verloren 2", "Verloren 3"] {
+        exec(
+            &hub.pool,
+            &format!("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, '{f}')"),
+        )
+        .await;
+    }
+    melden(&elw).await;
+    lokale_id(&elw, "fahrzeug", "funkrufname", "Verloren 3").await;
+    zurueckspielen_hub(&hub, sicherung, &["Verloren 1", "Verloren 2", "Verloren 3"]).await;
+    // Zurückspielen verlangt den Neustart, und der hebt den Zähler des Logs auf die Uhr (D3).
+    neustart(&hub).await;
+    exec(
+        &hub.pool,
+        "UPDATE fahrzeug SET funkrufname = 'Vorher 1 geändert' WHERE funkrufname = 'Vorher 1'",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Nachher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    for f in ["Vorher 1 geändert", "Nachher 1"] {
+        assert_eq!(
+            eine::<i64>(
+                &elw.pool,
+                &format!("SELECT COUNT(*) FROM fahrzeug WHERE funkrufname = '{f}'")
+            )
+            .await,
+            1,
+            "{f} erreicht den ELW nach dem Zurückspielen"
+        );
+    }
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_mit_nachgehender_uhr_liefert_die_org_erneut() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Vorher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    let sicherung = log_stand(&hub).await;
+    for f in ["Verloren 1", "Verloren 2", "Verloren 3"] {
+        exec(
+            &hub.pool,
+            &format!("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, '{f}')"),
+        )
+        .await;
+    }
+    melden(&elw).await;
+    // Ohne Startsprung (die Uhr des Hubs geht nach): nur das Netz (D4) hilft.
+    zurueckspielen_hub(&hub, sicherung, &["Verloren 1", "Verloren 2", "Verloren 3"]).await;
+    exec(
+        &hub.pool,
+        "UPDATE fahrzeug SET funkrufname = 'Vorher 1 geändert' WHERE funkrufname = 'Vorher 1'",
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            "SELECT COUNT(*) FROM fahrzeug WHERE funkrufname = 'Vorher 1 geändert'"
+        )
+        .await,
+        1
+    );
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
+    assert!(h.contains("Erneut an") && h.contains("Stammdaten"), "{h:?}");
+}
+
+#[tokio::test]
+async fn unplausibler_stammdaten_stand_stempelt_nicht_neu() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    let vorher = log_stand(&hub).await;
+    exec(
+        &elw.pool,
+        &format!(
+            "UPDATE instanz_kopplung_org SET stammdaten_stand = {}",
+            1_i64 << 40
+        ),
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(log_stand(&hub).await, vorher);
+}
+
+#[tokio::test]
+async fn zurueckgespielt_elw_bekommt_das_fahrzeug_erneut() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    // Sicherung des ELW: bis hier.
+    let sicherung: i64 = eine(
+        &elw.pool,
+        "SELECT stammdaten_stand FROM instanz_kopplung_org",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Nach der Sicherung')",
+    )
+    .await;
+    melden(&elw).await;
+    let id = lokale_id(&elw, "fahrzeug", "funkrufname", "Nach der Sicherung").await;
+    // Der ELW spielt die Sicherung zurück: Fahrzeug, Herkunft und Stand sind wieder die alten.
+    exec(
+        &elw.pool,
+        "INSERT INTO stammdaten_uebernahme (id) VALUES (1)",
+    )
+    .await;
+    exec(&elw.pool, &format!("DELETE FROM fahrzeug WHERE id = {id}")).await;
+    exec(
+        &elw.pool,
+        &format!(
+            "DELETE FROM stammdaten_herkunft WHERE art = 'fahrzeug' AND lokaler_schluessel = '{id}'"
+        ),
+    )
+    .await;
+    exec(&elw.pool, "DELETE FROM stammdaten_uebernahme").await;
+    exec(
+        &elw.pool,
+        &format!("UPDATE instanz_kopplung_org SET stammdaten_stand = {sicherung}"),
+    )
+    .await;
+    melden(&elw).await;
+    lokale_id(&elw, "fahrzeug", "funkrufname", "Nach der Sicherung").await;
+}
+
+#[tokio::test]
+async fn rueckschritt_bei_schluesseln_und_stammdaten_nennt_beide_stroeme() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    // Der ELW kennt höhere Stände beider Ströme, als der Hub je vergeben hat (Hub zurückgespielt,
+    // Uhr geht nach).
+    exec(
+        &elw.pool,
+        "UPDATE instanz_kopplung_org SET unterschrift_stand = unterschrift_stand + 10000, \
+         stammdaten_stand = stammdaten_stand + 10000",
+    )
+    .await;
+    melden(&elw).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
+    assert!(
+        h.contains("Erneut an") && h.contains("Unterschriftsschlüssel, Stammdaten."),
+        "{h:?}"
+    );
+    // Ohne Org-Namen: Eine Kopplung mit mehreren Orgs zeigt ihren Hinweis jeder davon.
+    let org: String = eine(&hub.pool, "SELECT name FROM organisation WHERE id = 1").await;
+    assert!(!h.contains(&org), "{h:?}");
+}
+
 // ── Zurückgespielter Hub: Reste am ELW abräumen (LLH-1871) ───────────────────────────────────
 
 use lifeline_hub::instanz::stammdaten::bestand;
@@ -1331,6 +1541,8 @@ async fn zurueckgespielt_hub_verlorenes_fahrzeug_verschwindet_am_elw() {
         &["DELETE FROM fahrzeug WHERE funkrufname = 'Verloren 1'"],
     )
     .await;
+    // Das Netz aus LLH-1853 liefert die Org erst neu, die Liste folgt mit der nächsten Meldung.
+    melden(&elw).await;
     melden(&elw).await;
     assert_eq!(
         anzahl(
@@ -1373,6 +1585,7 @@ async fn zurueckgespielt_hub_verlorenes_material_im_einsatz_wird_stillgelegt() {
     assert_eq!(s, StatusCode::CREATED, "{v}");
 
     hub_verliert(&hub, sicherung, &["DELETE FROM material"]).await;
+    melden(&elw).await;
     melden(&elw).await;
     assert_eq!(
         eine::<String>(
@@ -1419,6 +1632,7 @@ async fn zurueckgespielt_hub_verlorenes_konto_wird_deaktiviert_und_seine_sitzung
         &["DELETE FROM benutzer WHERE benutzername = 'verlust'"],
     )
     .await;
+    melden(&elw).await;
     melden(&elw).await;
     assert_eq!(
         anzahl(

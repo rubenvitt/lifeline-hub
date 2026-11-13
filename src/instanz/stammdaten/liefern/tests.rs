@@ -437,6 +437,100 @@ async fn nur_ein_konto_in_der_antwort_gilt_als_geliefert() {
     );
 }
 
+// ── Zurückspielen (LLH-1853, D3 und D4) ──────────────────────────────────────────────────────
+
+async fn seq(pool: &SqlitePool) -> Option<i64> {
+    sqlx::query_scalar("SELECT seq FROM sqlite_sequence WHERE name = 'stammdaten_aenderung'")
+        .fetch_optional(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn log_zaehler_springt_auf_die_uhr_und_sinkt_nie() {
+    let pool = pool_mit_org().await;
+    exec(
+        &pool,
+        "DELETE FROM sqlite_sequence WHERE name = 'stammdaten_aenderung'",
+    )
+    .await;
+    raise_log_stand(&pool, 1_000).await.unwrap();
+    assert_eq!(
+        seq(&pool).await,
+        Some(1_000),
+        "fehlt die Zeile, entsteht sie"
+    );
+    raise_log_stand(&pool, 500).await.unwrap();
+    assert_eq!(seq(&pool).await, Some(1_000), "sinkt nie");
+    exec(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Nach dem Start')",
+    )
+    .await;
+    let id: i64 =
+        sqlx::query_scalar("SELECT id FROM fahrzeug WHERE funkrufname = 'Nach dem Start'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(stand(&pool, "fahrzeug", &id.to_string()).await.unwrap() > 1_000);
+}
+
+#[tokio::test]
+async fn neu_stempeln_hebt_die_org_ueber_den_gemeldeten_stand() {
+    let pool = pool_mit_org().await;
+    for (org, name) in [(1, "A"), (2, "Fremd 1"), (1, "B"), (1, "C")] {
+        exec(
+            &pool,
+            &format!("INSERT INTO fahrzeug (org_id, funkrufname) VALUES ({org}, '{name}')"),
+        )
+        .await;
+    }
+    let vorher_fremd: Vec<i64> = sqlx::query_scalar(
+        "SELECT stand FROM stammdaten_aenderung WHERE org_id = 2 ORDER BY stand",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let vorher: Vec<(String, String)> = sqlx::query_as(
+        "SELECT art, schluessel FROM stammdaten_aenderung WHERE org_id = 1 ORDER BY stand",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert!(!vorher.is_empty());
+    let mut conn = pool.acquire().await.unwrap();
+    assert_eq!(
+        renew_log_der_org(&mut conn, 1, 5_000).await.unwrap(),
+        vorher.len()
+    );
+    drop(conn);
+    let nachher: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT stand, art, schluessel FROM stammdaten_aenderung WHERE org_id = 1 ORDER BY stand",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert!(nachher.iter().all(|(s, _, _)| *s > 5_000), "{nachher:?}");
+    assert_eq!(
+        nachher
+            .into_iter()
+            .map(|(_, a, s)| (a, s))
+            .collect::<Vec<_>>(),
+        vorher,
+        "in der alten Reihenfolge"
+    );
+    let nachher_fremd: Vec<i64> = sqlx::query_scalar(
+        "SELECT stand FROM stammdaten_aenderung WHERE org_id = 2 ORDER BY stand",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(nachher_fremd, vorher_fremd, "andere Orgs bleiben");
+    // Die Nachlieferung ab dem gemeldeten Stand bringt die ganze Org.
+    let n = liefere(&pool, 5_000, 1_000).await;
+    assert_eq!(n.zeilen.len(), vorher.len());
+}
+
 #[tokio::test]
 async fn hoechster_stand_je_org() {
     let pool = pool_mit_org().await;

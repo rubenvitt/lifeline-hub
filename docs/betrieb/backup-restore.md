@@ -228,10 +228,9 @@ dem Zurückspielen von selbst ab. Ein Eingriff ist nicht nötig, gleich ob die S
   nächsten Meldung als widerrufen, eine solche Zeile wird gelöscht, außer Dienst genommen oder,
   bei Konten, deaktiviert. Die Seite „Instanzkopplung“ am ELW nennt beides als Hinweis. Vergibt
   der Hub die Nummer eines verlorenen Schlüssels oder einer verlorenen Zeile neu, bevor sich der
-  ELW meldet, räumt der ELW sie nicht ab: Er behält den alten Inhalt. Den neuen Inhalt einer Zeile
-  und einen neuen Schlüssel, der den alten ersetzt, liefert der Hub erst mit LLH-1853. Bis dahin
-  ändert sich die Zeile am ELW erst mit ihrer nächsten Änderung am Hub, und der alte Schlüssel
-  bleibt am ELW gültig, bis ein Admin am ELW ihn widerruft oder die Kopplung neu eingerichtet wird.
+  ELW meldet, räumt der ELW sie nicht ab: Der neue Inhalt ersetzt den alten mit der nächsten
+  Lieferung, und den alten Schlüssel führt der ELW dann als widerrufen (Abschnitt
+  „Unterschriftsschlüssel und Stammdaten“ unten).
 
 **Hinweis an der Kopplung.** Nach dem Zurückspielen erscheint auf der Seite „Instanzkopplung“ meist
 der Hinweis „… hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat (aus einer
@@ -256,6 +255,43 @@ ersetzt.
 Herleitung:
 `openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md` und
 `openspec/changes/archive/2026-11-13-n2ge2224-reste-nach-restore-abraeumen/design.md`.
+
+#### Unterschriftsschlüssel und Stammdaten (LLH-1853)
+
+Auch die Unterschriftsschlüssel und die Stammdaten, die ein Hub an seine ELW verteilt, fließen nach
+dem Zurückspielen des Hubs ohne Eingriff weiter:
+
+- Schlüssel, die danach registriert, gegengezeichnet oder widerrufen werden, erreichen den ELW mit
+  den nächsten Meldungen. Ein Widerruf gilt dort also auch nach dem Zurückspielen.
+- Stammdaten, die danach am Hub geändert werden, erreichen den ELW mit den nächsten Meldungen. Dafür
+  hebt der Server beim Start den Zähler der Stammdaten-Änderungen auf die Uhrzeit.
+- Bekommt ein neuer Schlüssel am Hub dieselbe Nummer wie einer, der mit der Sicherung verloren
+  ging, führt der ELW den alten als widerrufen und den neuen als „wartet auf Bestätigung“.
+- Kennt der ELW schon Stände, die der zurückgespielte Hub nicht mehr hat, erkennt der Hub den
+  Rückstand an der nächsten Meldung und schickt die Schlüssel bzw. die Stammdaten der Org einmal
+  ganz. Das geschieht meist auch bei richtiger Uhr, solange am Hub seit dem Zurückspielen nichts
+  geändert wurde, und es fängt eine nachgehende Uhr ab. Die Kopplung zeigt dann „… kennt schon
+  spätere Stände, als diese Instanz vergeben hat (aus einer Sicherung zurückgespielt?). Erneut an …
+  gehen: Unterschriftsschlüssel, Stammdaten.“ Das ist kein Fehler.
+
+**Grenzen:**
+
+- **Verlorene Einträge** räumt der ELW selbst ab, siehe oben (LLH-1871). Die Liste der Stammdaten
+  geht erst, wenn der ELW alle Änderungen hat, also meist eine Meldung nach der vollen Lieferung.
+- **Die Uhr des Servers muss stimmen.** Geht sie nach und ändert der Hub vor der ersten Meldung
+  mindestens so viel, wie verloren ging, kommt eine Änderung erst mit ihrer nächsten. Für
+  Stammdaten hilft dann „Erneut abgleichen“ am ELW.
+- **VM-Snapshot mit laufendem Server.** Ohne Neustart springt der Zähler der Stammdaten nicht; es
+  gilt dasselbe wie bei nachgehender Uhr. Nach einem Snapshot steht die Uhr außerdem oft kurz
+  zurück. Stellt sie sich vor der nächsten Meldung des ELW über die verlorenen Stände, und folgt
+  noch eine Schlüsselaktion, kommt ein Widerruf aus dieser Zeit am ELW erst über den Bestand der
+  Schlüssel an (LLH-1871), ein neuer Schlüssel gar nicht. Server nach einem Snapshot neu starten
+  und den ELW sich melden lassen, bevor Schlüssel geändert werden.
+- **Mehrere ELW.** Hatte ein zweiter ELW weiter übernommen als der zuerst meldende, kann er einzelne
+  der erneut geschickten Änderungen verpassen. Was der Hub nicht mehr führt, räumt aber auch er ab
+  (LLH-1871).
+
+Herleitung: `openspec/changes/archive/2026-11-13-cz5332jn-unterschrift-stammdaten-nach-restore/design.md`.
 
 ## Archiv eines Einsatzes einspielen (LLH-1494)
 
