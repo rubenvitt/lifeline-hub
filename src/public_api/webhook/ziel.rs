@@ -73,8 +73,9 @@ fn klasse_v6(v6: &Ipv6Addr) -> Adressklasse {
     if v6.is_loopback()
         || v6.is_unspecified()
         || v6.is_multicast() // ff00::/8
-        || (s[0] & 0xffc0) == 0xfe80
-    // fe80::/10 Link-Local
+        || (s[0] & 0xffc0) == 0xfe80 // fe80::/10 Link-Local
+        || (s[0] == 0x0064 && s[1] == 0xff9b && s[2] == 0x0001)
+    // 64:ff9b:1::/48 NAT64 für lokale Netze (RFC 8215): das Ziel dahinter ist nicht zu prüfen
     {
         return Adressklasse::Gesperrt;
     }
@@ -89,7 +90,7 @@ fn klasse_v6(v6: &Ipv6Addr) -> Adressklasse {
 }
 
 /// IPv4 in einer IPv6-Adresse: mapped (`::ffff:a.b.c.d`), compatible (`::a.b.c.d`), NAT64
-/// (`64:ff9b::/96`) und 6to4 (`2002::/16`).
+/// (`64:ff9b::/96`), SIIT (`::ffff:0:a.b.c.d`) und 6to4 (`2002::/16`).
 fn eingebettetes_v4(v6: &Ipv6Addr) -> Option<Ipv4Addr> {
     let s = v6.segments();
     let aus = |hoch: u16, tief: u16| {
@@ -99,6 +100,10 @@ fn eingebettetes_v4(v6: &Ipv6Addr) -> Option<Ipv4Addr> {
         return Some(v4);
     }
     if s[..6] == [0x0064, 0xff9b, 0, 0, 0, 0] {
+        return Some(aus(s[6], s[7]));
+    }
+    // SIIT, IPv4-übersetzt (`::ffff:0:a.b.c.d`, RFC 7915).
+    if s[..6] == [0, 0, 0, 0, 0xffff, 0] {
         return Some(aus(s[6], s[7]));
     }
     if s[0] == 0x2002 {
@@ -445,6 +450,10 @@ mod tests {
         assert_eq!(klasse(&ip("64:ff9b::c0a8:0a14")), Adressklasse::Privat);
         assert_eq!(klasse(&ip("2002:7f00:0001::")), Adressklasse::Gesperrt);
         assert_eq!(klasse(&ip("2002:5db8:d822::")), Adressklasse::Oeffentlich);
+        // SIIT und NAT64 für lokale Netze
+        assert_eq!(klasse(&ip("::ffff:0:7f00:1")), Adressklasse::Gesperrt);
+        assert_eq!(klasse(&ip("::ffff:0:a00:5")), Adressklasse::Privat);
+        assert_eq!(klasse(&ip("64:ff9b:1::5db8:d822")), Adressklasse::Gesperrt);
     }
 
     #[test]

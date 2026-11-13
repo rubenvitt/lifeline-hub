@@ -8853,6 +8853,8 @@ export interface components {
             fehlversuche: number;
             /** @description Optimistisches Lock für Änderungen. */
             geaendert_at: string;
+            /** @description Der Server des Ziels; sieht jeder, der die Anbindung sieht. */
+            host: string;
             /** @description Kennung des Webhooks; zugleich `aud` jeder Signatur, gegen die der Empfänger prüft. */
             id: string;
             lan_erlaubt: boolean;
@@ -8860,7 +8862,8 @@ export interface components {
             letzter_fehler?: components["schemas"]["WebhookLetzterFehler"] | null;
             naechster_versuch_at?: string | null;
             ruht_grund?: components["schemas"]["RuhtGrund"] | null;
-            url: string;
+            /** @description Die ganze Ziel-URL; nur für den System-Admin, weil ihr Pfad ein Token tragen kann. */
+            url?: string | null;
             /**
              * @description Ereignisse gingen verloren, bevor sie zugestellt waren; der Empfänger muss den Stand über
              *     die Leserouten neu lesen.

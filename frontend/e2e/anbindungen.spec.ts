@@ -255,7 +255,8 @@ test('Webhook einrichten, Testereignis senden, entfernen', async ({ page }) => {
   const versuch = page.locator('[data-lfh="webhook-versuch"]').first();
   await expect(versuch).toContainText('Test');
 
-  await page.getByRole('button', { name: 'Webhook entfernen …' }).click();
+  await page.getByRole('button', { name: /Weitere Aktionen zum Webhook/ }).click();
+  await page.getByRole('menuitem', { name: 'Webhook entfernen …' }).click();
   await page
     .getByRole('dialog', { name: 'Webhook entfernen?' })
     .getByRole('button', { name: 'Entfernen' })

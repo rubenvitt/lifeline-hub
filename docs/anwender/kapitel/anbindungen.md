@@ -84,13 +84,15 @@ Für den System-Admin:
    ankreuzen.
 5. „Einrichten“ wählen.
 
-Danach stehen die Paneele „Webhook“, „Zustellung“ und „Zustellungen“. Die „Webhook-Kennung (aud)“
+Danach stehen die Paneele „Webhook“, „Zustellung“ und „Zustellungen“. Ohne Verbindung zum
+Server sind die Aktionen gesperrt. Die „Webhook-Kennung (aud)“
 braucht der Betreiber des Fremdsystems, um die Zustellungen zu prüfen. Ziel, Arten und die
 Ausnahme ändert „Bearbeiten“ im Paneel „Webhook“.
 
 ### Testereignis senden
 
-1. Im Paneel „Zustellung“ „Testereignis senden“ wählen.
+1. Im Paneel „Zustellung“ „Testereignis senden“ wählen; bei einem angehaltenen Webhook steht es
+   im Menü „Weitere Aktionen zum Webhook“ neben „Wieder aufnehmen“.
 2. Das Ergebnis steht sofort darunter, etwa „Testereignis: zugestellt (204)“ oder der Grund des
    Fehlschlags, und als „Test“ unter „Zustellungen“.
 
@@ -104,7 +106,8 @@ Die Zustellung beginnt beim nächsten Durchgang wieder, mit dem Ereignis, an dem
 
 ### Webhook entfernen
 
-1. Im Paneel „Zustellung“ „Webhook entfernen …“ wählen.
+1. Im Paneel „Zustellung“ das Menü „Weitere Aktionen zum Webhook“ öffnen und „Webhook
+   entfernen …“ wählen.
 2. Die Rückfrage mit „Entfernen“ bestätigen.
 
 Webhook und Verlauf sind danach gelöscht. Ein neuer Webhook beginnt beim aktuellen Stand.
@@ -155,7 +158,8 @@ lassen sich nicht nachträglich ändern: Dafür wird der Zugang widerrufen und n
 Anlegen, ändern, neuen Code ausstellen und widerrufen darf nur der System-Admin, und nur für die
 eigene Organisation; ebenso einen Webhook einrichten, ändern, entfernen, wieder aufnehmen und
 ein Testereignis senden. Eine Führungskraft sieht Liste und Ansicht samt Zustellungen ohne
-Aktionen. Dasselbe gilt für
+Aktionen; vom Ziel eines Webhooks sieht sie nur den Server, nicht die ganze Adresse, weil diese
+einen Schlüssel des Fremdsystems tragen kann. Dasselbe gilt für
 Einwurf-Zugänge.
 
 ### Rechte

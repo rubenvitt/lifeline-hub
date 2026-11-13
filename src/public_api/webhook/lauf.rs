@@ -9,14 +9,16 @@
 //! Den Weg nach draußen nimmt der Lauf als [`Zusteller`] entgegen; Tests setzen einen ein, der
 //! aufzeichnet (Loopback ist für den echten Weg immer gesperrt).
 
+use std::collections::HashSet;
 use std::panic::AssertUnwindSafe;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use sqlx::SqlitePool;
 use tokio::sync::{watch, Semaphore};
-use tokio::task::{JoinHandle, JoinSet};
+use tokio::task::JoinHandle;
 
 use super::repo::{self, Webhook};
 use super::ziel::{Ergebnis, HttpZusteller, Zusteller, Zustellung};
@@ -29,10 +31,16 @@ use crate::public_api::events::{self, Naechstes};
 use crate::public_api::zugang;
 use crate::zeit;
 
-/// Startet den Lauf. Er endet, sobald `stopp` auf `true` springt oder sein Sender fällt; eine
-/// laufende Zustellung wird zu Ende geführt. Ein Absturz in einem Durchgang beendet nur diesen.
+/// Webhooks, die gerade beliefert werden; ein Durchgang lässt sie aus.
+type Laufend = Arc<Mutex<HashSet<String>>>;
+
+/// Startet den Lauf. Er endet, sobald `stopp` auf `true` springt oder sein Sender fällt. Jeder
+/// Takt startet nur Webhooks, die nicht schon beliefert werden, und wartet nicht auf sie: Ein
+/// langsames Ziel hält die übrigen nicht auf. Ein Absturz in einer Belieferung beendet nur diese.
 pub fn starte(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<()> {
     let zusteller = Arc::new(HttpZusteller);
+    let laufend: Laufend = Arc::default();
+    let plaetze = Arc::new(Semaphore::new(PARALLEL));
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(TAKT);
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
@@ -45,11 +53,9 @@ pub fn starte(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<
                     }
                 }
                 _ = ticker.tick() => {
-                    let lauf = durchgang(&pool, &zusteller, Utc::now());
-                    match AssertUnwindSafe(lauf).catch_unwind().await {
-                        Ok(Ok(())) => {}
-                        Ok(Err(e)) => tracing::error!("Webhook-Durchgang fehlgeschlagen: {e}"),
-                        Err(_) => tracing::error!("Webhook-Durchgang abgestürzt"),
+                    // Die Belieferungen laufen weiter; der Takt wartet nicht auf sie.
+                    if let Err(e) = takt(&pool, &zusteller, Utc::now(), &laufend, &plaetze).await {
+                        tracing::error!("Webhook-Durchgang fehlgeschlagen: {e}");
                     }
                 }
             }
@@ -58,74 +64,115 @@ pub fn starte(pool: SqlitePool, mut stopp: watch::Receiver<bool>) -> JoinHandle<
     })
 }
 
-/// Ein Durchgang zum Zeitpunkt `jetzt`.
+/// Ein Durchgang zum Zeitpunkt `jetzt`, der wartet, bis jede gestartete Belieferung fertig ist
+/// (für Tests und Werkzeuge; der Lauf selbst wartet nicht).
 pub async fn durchgang<Z: Zusteller>(
     pool: &SqlitePool,
     zusteller: &Arc<Z>,
     jetzt: DateTime<Utc>,
 ) -> Result<(), AppError> {
-    let jetzt_s = zeit::formatiere_utc(jetzt);
-    let faellige = repo::faellige(pool, &jetzt_s).await?;
-    if faellige.is_empty() {
-        return Ok(());
-    }
-    let identitaet = Arc::new(instanz_identitaet(pool).await?);
+    let laufend: Laufend = Arc::default();
     let plaetze = Arc::new(Semaphore::new(PARALLEL));
-    let mut alle = JoinSet::new();
-    for webhook in faellige {
-        let platz = plaetze
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("Semaphore bleibt offen");
-        let (pool, identitaet, zusteller) = (pool.clone(), identitaet.clone(), zusteller.clone());
-        alle.spawn(async move {
-            let _platz = platz;
-            let id = webhook.id.clone();
-            if let Err(e) = beliefern(&pool, &identitaet, &*zusteller, webhook, jetzt).await {
-                tracing::error!(webhook = %id, "Webhook-Zustellung fehlgeschlagen: {e}");
-            }
-        });
+    for handle in takt(pool, zusteller, jetzt, &laufend, &plaetze).await? {
+        let _ = handle.await;
     }
-    while alle.join_next().await.is_some() {}
     Ok(())
 }
 
+/// Startet für jeden fälligen Webhook, der nicht schon beliefert wird, eine Belieferung und
+/// liefert ihre Handles. Höchstens [`PARALLEL`] liefern gleichzeitig (`plaetze`).
+async fn takt<Z: Zusteller>(
+    pool: &SqlitePool,
+    zusteller: &Arc<Z>,
+    jetzt: DateTime<Utc>,
+    laufend: &Laufend,
+    plaetze: &Arc<Semaphore>,
+) -> Result<Vec<JoinHandle<()>>, AppError> {
+    let faellige = repo::faellige(pool, &zeit::formatiere_utc(jetzt)).await?;
+    if faellige.is_empty() {
+        return Ok(Vec::new());
+    }
+    let identitaet = Arc::new(instanz_identitaet(pool).await?);
+    let mut handles = Vec::new();
+    for webhook in faellige {
+        if !laufend
+            .lock()
+            .expect("Merker nicht vergiftet")
+            .insert(webhook.id.clone())
+        {
+            continue;
+        }
+        let (pool, identitaet, zusteller) = (pool.clone(), identitaet.clone(), zusteller.clone());
+        let (laufend, plaetze) = (laufend.clone(), plaetze.clone());
+        handles.push(tokio::spawn(async move {
+            let id = webhook.id;
+            if let Ok(_platz) = plaetze.acquire_owned().await {
+                let lauf = beliefern(&pool, &identitaet, &*zusteller, &id, jetzt);
+                match AssertUnwindSafe(lauf).catch_unwind().await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => {
+                        tracing::error!(webhook = %id, "Webhook-Zustellung fehlgeschlagen: {e}")
+                    }
+                    Err(_) => tracing::error!(webhook = %id, "Webhook-Zustellung abgestürzt"),
+                }
+            }
+            laufend.lock().expect("Merker nicht vergiftet").remove(&id);
+        }));
+    }
+    Ok(handles)
+}
+
 /// Beliefert einen Webhook der Reihe nach, bis nichts mehr fällig ist, ein Versuch scheitert oder
-/// [`MAX_JE_TAKT`] erreicht ist.
+/// [`MAX_JE_TAKT`] erreicht ist. Webhook und Zugang werden vor jedem Versuch neu gelesen: Ein
+/// Widerruf, ein entzogenes Recht, ein neues Ziel oder das Entfernen wirken ab dem nächsten
+/// Ereignis. `beginn` ist die Zeit des Durchgangs; jeder Versuch rechnet mit der Zeit, zu der er
+/// geschieht.
 async fn beliefern<Z: Zusteller>(
     pool: &SqlitePool,
     identitaet: &Identitaet,
     zusteller: &Z,
-    webhook: Webhook,
-    jetzt: DateTime<Utc>,
+    webhook_id: &str,
+    beginn: DateTime<Utc>,
 ) -> Result<(), AppError> {
-    let jetzt_s = zeit::formatiere_utc(jetzt);
-    let zugang = {
-        let mut conn = pool.acquire().await?;
-        zugang::laden(&mut conn, &webhook.zugang_id).await?
-    };
-    let Some(zugang) = zugang else {
-        return Ok(());
-    };
-    let ruht = ruht_grund(&zugang, &jetzt_s).is_some();
-    let sichtbar = events::sichtbare_arten(&zugang.scopes);
-    let arten: Vec<_> = webhook
-        .arten()
-        .into_iter()
-        .filter(|a| sichtbar.contains(a))
-        .collect();
-
-    let mut cursor = webhook.cursor;
-    let mut offen = webhook.offen_id;
-    let mut fehler_seit = webhook.fehler_seit.clone();
-    let mut fehlversuche = webhook.fehlversuche;
+    let start = Instant::now();
+    let jetzt = || beginn + chrono::Duration::from_std(start.elapsed()).unwrap_or_default();
     for _ in 0..MAX_JE_TAKT {
-        match events::naechstes(pool, &webhook.zugang_id, &arten, cursor, offen).await? {
-            Naechstes::Leer => {
-                if offen.is_some() {
+        let (webhook, zugang) = {
+            let mut conn = pool.acquire().await?;
+            let Some(webhook) = repo::laden(&mut conn, webhook_id).await? else {
+                return Ok(());
+            };
+            let Some(zugang) = zugang::laden(&mut conn, &webhook.zugang_id).await? else {
+                return Ok(());
+            };
+            (webhook, zugang)
+        };
+        if webhook.is_angehalten() {
+            return Ok(());
+        }
+        let jetzt_s = zeit::formatiere_utc(jetzt());
+        let ruht = ruht_grund(&zugang, &jetzt_s).is_some();
+        let sichtbar = events::sichtbare_arten(&zugang.scopes);
+        let arten: Vec<_> = webhook
+            .arten()
+            .into_iter()
+            .filter(|a| sichtbar.contains(a))
+            .collect();
+
+        match events::naechstes(
+            pool,
+            &webhook.zugang_id,
+            &arten,
+            webhook.cursor,
+            webhook.offen_id,
+        )
+        .await?
+        {
+            Naechstes::Leer { uebersprungen_bis } => {
+                let rueckt = uebersprungen_bis.is_some_and(|bis| bis > webhook.cursor);
+                if rueckt || webhook.offen_id.is_some() || webhook.fehler_seit.is_some() {
                     crate::write_retry!(pool, |conn| {
-                        repo::offen_loeschen(conn, &webhook.id).await?;
+                        repo::leer_festhalten(conn, &webhook.id, uebersprungen_bis).await?;
                         Ok(())
                     })?;
                 }
@@ -140,12 +187,10 @@ async fn beliefern<Z: Zusteller>(
                     repo::verlust_festhalten(conn, &webhook.id, head, &jetzt_s).await?;
                     Ok(())
                 })?;
-                cursor = cursor.max(head);
-                offen = None;
             }
             Naechstes::Ereignis(ereignis) => {
                 if ruht {
-                    if offen.is_none() {
+                    if webhook.offen_id.is_none() {
                         crate::write_retry!(pool, |conn| {
                             repo::offen_vermerken(conn, &webhook.id, ereignis.id).await?;
                             Ok(())
@@ -160,7 +205,7 @@ async fn beliefern<Z: Zusteller>(
                     identitaet,
                     &webhook.id,
                     &body,
-                    jetzt.timestamp(),
+                    jetzt().timestamp(),
                     &new_jti(),
                 );
                 let ergebnis = zusteller
@@ -172,32 +217,40 @@ async fn beliefern<Z: Zusteller>(
                         body,
                     })
                     .await;
+                // Festgehalten wird mit der Zeit nach dem Versuch.
+                let danach = zeit::formatiere_utc(jetzt());
                 if ergebnis.is_erfolg() {
-                    crate::write_retry!(pool, |conn| {
-                        repo::erfolg_festhalten(
+                    let gilt = crate::write_retry!(pool, |conn| {
+                        Ok(repo::erfolg_festhalten(
                             conn,
                             &webhook.id,
+                            &webhook.geaendert_at,
                             ereignis.id,
                             &ergebnis,
-                            &jetzt_s,
+                            &danach,
                         )
-                        .await?;
-                        Ok(())
+                        .await?)
                     })?;
-                    cursor = ereignis.id;
-                    offen = None;
-                    fehler_seit = None;
-                    fehlversuche = 0;
+                    if !gilt {
+                        // Ein Admin hat den Webhook während des Versuchs geändert; der nächste
+                        // Takt beginnt mit dem neuen Stand.
+                        return Ok(());
+                    }
                 } else {
-                    let folge = nach_fehlschlag(fehler_seit.as_deref(), fehlversuche, &jetzt_s);
+                    let folge = nach_fehlschlag(
+                        webhook.fehler_seit.as_deref(),
+                        webhook.fehlversuche,
+                        &danach,
+                    );
                     crate::write_retry!(pool, |conn| {
                         repo::fehlschlag_festhalten(
                             conn,
                             &webhook.id,
+                            &webhook.geaendert_at,
                             ereignis.id,
                             &ergebnis,
                             &folge,
-                            &jetzt_s,
+                            &danach,
                         )
                         .await?;
                         Ok(())

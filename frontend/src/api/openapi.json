@@ -22406,7 +22406,7 @@
         "description": "Der Webhook einer Anbindung, wie die Verwaltung ihn zeigt.",
         "required": [
           "id",
-          "url",
+          "host",
           "arten",
           "lan_erlaubt",
           "zustand",
@@ -22444,6 +22444,10 @@
           "geaendert_at": {
             "type": "string",
             "description": "Optimistisches Lock für Änderungen."
+          },
+          "host": {
+            "type": "string",
+            "description": "Der Server des Ziels; sieht jeder, der die Anbindung sieht."
           },
           "id": {
             "type": "string",
@@ -22485,7 +22489,11 @@
             ]
           },
           "url": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die ganze Ziel-URL; nur für den System-Admin, weil ihr Pfad ein Token tragen kann."
           },
           "verlust_at": {
             "type": [

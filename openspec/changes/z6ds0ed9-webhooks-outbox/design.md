@@ -126,9 +126,12 @@ einer Lesetransaktion wie `lesen_ab`. Die Abfrage nutzt den Index `(zugang_id, i
   `sichtbare_arten` wird dafür `pub(crate)`.
 - Der Lauf liest vor jedem Versuch neu und merkt sich die Nummer nicht. Ersetzt ein neues
   `lage.changed` das wartende, gilt beim nächsten Versuch das neue.
-- **Der Cursor rückt nur bei Erfolg vor**, auf die zugestellte Nummer. Nicht gewählte Arten
-  liegen außerhalb des Filters und brauchen keinen Schreibzugriff. So schreibt ein ruhiger Webhook
-  nie.
+- **Über ein zuzustellendes Ereignis rückt der Cursor nur bei Erfolg vor.** Liefert
+  `naechstes` nichts, nennt es die höchste eigene Zeile dazwischen (`uebersprungen_bis`, nicht
+  gewählte oder nicht erlaubte Arten); der Webhook rückt darüber hinweg, damit eine später
+  gewählte Art nicht rückwirkend kommt (Spec „Nicht gewählte Art“). Geschrieben wird nur, wenn
+  es eigene übersprungene Zeilen gibt; ein ruhiger Webhook schreibt nie. (Nachgezogen aus dem
+  Review: zuerst rückte der Cursor nur bei Erfolg vor.)
 - **Verlust erkennen:** Ein ruhiger Webhook hat oft `cursor < purged_until`, ohne dass ihm etwas
   fehlt; gelesen wird ohnehin nur `id > cursor`. Verlust liegt nur vor, wenn das Ereignis, das
   beim letzten Blick fällig war und nicht zugestellt werden konnte (`offen_id`), inzwischen unter
@@ -152,16 +155,22 @@ Schleife, Ende über `auf_ende_warten` in `main::herunterfahren`.
 
 Je Takt:
 
-1. Webhooks laden mit `zustand = 'aktiv'` und `naechster_versuch_at IS NULL OR <= jetzt`, samt
-   Zugang.
-2. **Wirksam?** Der Zugang ist `aktiv`, nicht abgelaufen und hat `events:read`. Wenn nicht, ruht
-   der Webhook. Es geht keine Zustellung hinaus, der Cursor bleibt, und `offen_id` wird gesetzt,
-   wenn etwas fällig ist. Die Anzeige nennt den Grund aus dem Zugang.
-3. Je Webhook höchstens 50 Ereignisse nacheinander, dann der nächste Webhook. Der Rest kommt im
-   nächsten Takt, damit ein großer Rückstand die anderen nicht aushungert.
-4. Bis zu 8 Webhooks gleichzeitig (`JoinSet` mit Semaphore), je Webhook streng nacheinander.
+1. Webhooks laden mit `zustand = 'aktiv'` und `naechster_versuch_at IS NULL OR <= jetzt`, ohne
+   die, die gerade beliefert werden. Der Takt wartet nicht auf die Belieferungen: Ein langsames
+   Ziel hält die übrigen nicht auf.
+2. **Vor jedem Versuch** werden Webhook und Zugang neu gelesen: Ein Widerruf, ein entzogenes
+   Recht, ein neues Ziel oder das Entfernen wirken ab dem nächsten Ereignis. Darf der Zugang nicht
+   beliefert werden (nicht `aktiv`, abgelaufen, ohne `events:read`), ruht der Webhook; der Cursor
+   bleibt, und `offen_id` wird gesetzt, wenn etwas fällig ist.
+3. Je Webhook höchstens 50 Ereignisse nacheinander, dann der nächste Takt.
+4. Bis zu 8 Webhooks gleichzeitig (Semaphore über alle Takte), je Webhook streng nacheinander.
 5. Während der HTTP-Anfrage hält der Lauf keine Datenbankverbindung. Das Ergebnis schreibt er
-   danach über `write_retry!` in einer Transaktion: Webhook-Zeile und Verlaufseintrag.
+   danach in einer Transaktion, **nur auf dem Stand, mit dem der Versuch begann**
+   (`geaendert_at`); sonst steht der Versuch nur im Verlauf, und das Ereignis kommt erneut.
+6. Jeder Versuch rechnet mit seiner eigenen Zeit (Signatur, Verlauf, Backoff), nicht mit der des
+   Takts. Ein leerer Blick oder ein Verlust beendet auch die Störung (`fehler_seit`).
+
+(Punkte 1, 2, 5 und 6 nachgezogen aus dem Review vor dem PR.)
 
 Der Takt von 2 s bestimmt die Verzögerung bis zur Zustellung. Ein Wecken beim Commit gibt es
 nicht, aus demselben Grund wie beim Abruf (LLH-1655, D9).
@@ -299,11 +308,13 @@ Unter `/api/admin/anbindungen/{id}/webhook` in `routes::anbindungen` (Untermodul
   - **Mit Webhook:** `BearbeitbaresPaneel` mit denselben drei Feldern und CAS. Dazu ein Chip für
     den Zustand (Töne wie `zustandAnzeige`: aktiv normal, Fehler bedien, angehalten achtung, ruht
     neutral), der letzte Fehler, der nächste Versuch und gegebenenfalls der Hinweis zum Verlust.
-  - **Aktionen** als Knöpfe im Kopf eines Paneels „Zustellung“, das auch Zustand, letzten
-    Fehler, nächsten Versuch und die Webhook-Kennung zeigt: „Testereignis senden“ (Ergebnis
-    darunter), „Wieder aufnehmen“ (nur angehalten) und „Webhook entfernen …“ (mit Rückfrage).
-    (Gebaut so statt über `WeitereAktionen`: das Paneel hat genau drei Aktionen, und das
-    Ergebnis des Tests steht neben ihnen.)
+  - **Aktionen** im Kopf eines Paneels „Zustellung“, das auch Zustand, letzten Fehler, nächsten
+    Versuch und die Webhook-Kennung zeigt: eine Hauptaktion („Wieder aufnehmen“ bei einem
+    angehaltenen, sonst „Testereignis senden“), der Rest im `MenueAusloeser` („Webhook entfernen
+    …“ als Gefahr, mit Rückfrage), nach „Datensatz-Aktionen werden gebündelt“. Ohne Verbindung
+    sind die Aktionen gesperrt (`OHNE_VERBINDUNG_NICHT_AENDERBAR`).
+  - **Ziel-URL nur für den System-Admin** (Entscheidung Ruben, 13.11.2026, aus dem Review): Wer
+    sonst den Admin-Bereich sieht, bekommt nur den Host (`WebhookAnzeige.host`, `url` fehlt).
 - Ein Paneel „Zustellungen“ zeigt die letzten 50 Versuche, ohne Rumpf: Zeit, Ereignis oder Test,
   Ergebnis, Status oder Fehlerart, Dauer.
 - In der Liste auf „Anbindungen“ steht bei einem angehaltenen Webhook ein Hinweis im Ton

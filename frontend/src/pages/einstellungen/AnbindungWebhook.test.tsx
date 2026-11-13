@@ -1,10 +1,11 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
+import { offenesMenue } from '../../test/menue';
 import Anbindungen from './Anbindungen';
 import AnbindungAnsicht from './AnbindungAnsicht';
 import { LAN_WARNUNG, versuchText, webhookPatch } from './AnbindungWebhook';
@@ -24,6 +25,7 @@ import { adminFixture, authWertFixture, benutzerFixture } from '../../test/fixtu
 const webhook = (extra: Record<string, unknown> = {}) => ({
   id: 'wh-1',
   url: 'https://empfaenger.example/hook',
+  host: 'empfaenger.example',
   arten: ['einsatz.created', 'einsatz.closed'],
   lan_erlaubt: false,
   zustand: 'aktiv',
@@ -263,6 +265,102 @@ describe('Webhook einer Anbindung (LLH-1656)', () => {
     });
     await screen.findByText('Einsatzbuch');
     expect(document.querySelector('[data-lfh="anbindung-webhook"]')).toBeNull();
+  });
+});
+
+describe('Webhook · Befunde aus dem Review (LLH-1656)', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue(authWertFixture(adminFixture()));
+  });
+  afterEach(() => setzeOnline(true));
+
+  it('ohne Admin-Rolle steht der Host statt der URL', async () => {
+    vi.mocked(useAuth).mockReturnValue(authWertFixture(benutzerFixture()));
+    stelleBereit(zugang({ webhook: { ...webhook(), url: undefined } }));
+    renderAnsicht();
+    expect(await screen.findByText('empfaenger.example')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="webhook-url"]')!.textContent).toBe(
+      'empfaenger.example',
+    );
+  });
+
+  it('bündelt die übrigen Aktionen im Menü, Entfernen als Gefahr', async () => {
+    stelleBereit(zugang({ webhook: webhook({ zustand: 'angehalten' }) }));
+    const user = userEvent.setup();
+    renderAnsicht();
+    await screen.findByRole('button', { name: 'Wieder aufnehmen' });
+    expect(screen.queryByRole('button', { name: 'Testereignis senden' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Weitere Aktionen zum Webhook/ }));
+    const menue = await waitFor(() => offenesMenue());
+    expect(
+      within(menue).getByRole('menuitem', { name: 'Testereignis senden' }),
+    ).toBeInTheDocument();
+    const entfernen = within(menue).getByRole('menuitem', { name: 'Webhook entfernen …' });
+    expect(entfernen.className).toMatch(/danger/);
+  });
+
+  it('ohne Netz: Aktionen gesperrt mit Grund', async () => {
+    stelleBereit(zugang({ webhook: webhook() }));
+    renderAnsicht();
+    const knopf = await screen.findByRole('button', { name: 'Testereignis senden' });
+    setzeOnline(false);
+    await waitFor(() => expect(knopf).toBeDisabled());
+    expect(screen.getAllByText(/Ohne Verbindung nicht änderbar/).length).toBeGreaterThan(0);
+  });
+
+  it('Verlauf: beim Laden kein „Noch kein Zustellversuch“, beim Fehler die Meldung', async () => {
+    stelleBereit(zugang({ webhook: webhook() }));
+    server.use(
+      http.get('/api/admin/anbindungen/a/webhook/versuche', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderAnsicht();
+    expect(await screen.findByText('Verlauf nicht ladbar')).toBeInTheDocument();
+    expect(screen.queryByText('Noch kein Zustellversuch.')).not.toBeInTheDocument();
+  });
+
+  it('ein Testergebnis verschwindet, sobald das Ziel ein anderes ist', async () => {
+    const aufrufe = stelleBereit(zugang({ webhook: webhook() }));
+    // Der Server kennt nach dem PATCH das neue Ziel, auch beim Neuabruf der Liste.
+    let stand = webhook();
+    server.use(
+      http.get('/api/admin/anbindungen', () =>
+        HttpResponse.json({
+          zugaenge: [zugang({ webhook: stand })],
+          gesperrt_grund: null,
+          instanz_fingerabdruck: 'ABCD',
+        }),
+      ),
+      http.patch('/api/admin/anbindungen/a/webhook', async ({ request }) => {
+        aufrufe.push({ pfad: 'aendern', body: await request.json() });
+        stand = webhook({
+          url: 'https://neu.example/',
+          host: 'neu.example',
+          geaendert_at: '2026-11-13 10:00:00',
+        });
+        return HttpResponse.json(stand);
+      }),
+    );
+    const user = userEvent.setup();
+    renderAnsicht();
+    await user.click(await screen.findByRole('button', { name: 'Testereignis senden' }));
+    await screen.findByText(/^Testereignis:/);
+
+    await user.click(screen.getByRole('button', { name: 'Webhook bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Ziel-URL' });
+    await user.clear(feld);
+    await user.type(feld, 'https://neu.example/');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(aufrufe).toContainEqual({
+        pfad: 'aendern',
+        body: { url: 'https://neu.example/', basis_geaendert_at: '2026-11-13 09:00:00' },
+      }),
+    );
+    // Die Antwort steht sofort, und das alte Testergebnis gilt nicht mehr.
+    expect(await screen.findByText('https://neu.example/')).toBeInTheDocument();
+    expect(screen.queryByText(/^Testereignis:/)).not.toBeInTheDocument();
   });
 });
 

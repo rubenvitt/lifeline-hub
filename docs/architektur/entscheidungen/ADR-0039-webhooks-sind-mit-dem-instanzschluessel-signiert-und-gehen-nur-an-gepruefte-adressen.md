@@ -27,8 +27,12 @@ herleitung:
   private Netze nur, wenn der Admin am Webhook die LAN-Ausnahme gesetzt hat.
 - MUST NOT: Die Antwort eines Ziels wird gespeichert; festgehalten werden nur Status, Fehlerart
   und Dauer.
-- MUST: Der Cursor eines Webhooks rückt nur nach einer `2xx`-Antwort vor; ein Fehlschlag hält
-  die folgenden Ereignisse zurück.
+- MUST: Über ein zuzustellendes Ereignis rückt der Cursor nur nach einer `2xx`-Antwort vor; ein
+  Fehlschlag hält die folgenden zurück. Über nicht gewählte oder nicht erlaubte Arten rückt er
+  hinweg, über ein gelöschtes wartendes Ereignis springt er auf den Höchststand und hält den
+  Verlust fest, auch wenn der Zugang gerade ruht.
+- MUST: Ein Ergebnis gilt nur für den Stand, mit dem der Versuch begann; hat ein Admin den Webhook
+  inzwischen geändert, steht es nur im Verlauf.
 
 ## Prüfung
 

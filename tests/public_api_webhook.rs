@@ -271,12 +271,20 @@ async fn naechstes_liest_nur_eigene_und_gewaehlte_zeilen() {
     assert_eq!(erstes.event_type, EventType::EinsatzCreated);
     assert_eq!(erstes.einsatz_id, ea);
 
-    // Nur `einsatz.closed` gewählt: nichts fällig.
+    // Nur `einsatz.closed` gewählt: nichts fällig, und die eigenen Zeilen sind übersprungen.
+    let eigene_hoechste: i64 =
+        sqlx::query_scalar("SELECT MAX(id) FROM maschine_ereignis WHERE zugang_id = ?")
+            .bind(&a)
+            .fetch_one(&o.pool)
+            .await
+            .unwrap();
     assert_eq!(
         events::naechstes(&o.pool, &a, &[EventType::EinsatzClosed], 0, None)
             .await
             .unwrap(),
-        Naechstes::Leer
+        Naechstes::Leer {
+            uebersprungen_bis: Some(eigene_hoechste)
+        }
     );
 
     // Nach allen Zeilen von A: nichts, auch wenn B noch Zeilen hat.
@@ -290,7 +298,9 @@ async fn naechstes_liest_nur_eigene_und_gewaehlte_zeilen() {
         events::naechstes(&o.pool, &a, &EventType::ALLE, hoechste_a, None)
             .await
             .unwrap(),
-        Naechstes::Leer
+        Naechstes::Leer {
+            uebersprungen_bis: None
+        }
     );
 }
 
@@ -337,7 +347,9 @@ async fn verlust_nur_wenn_das_wartende_ereignis_geloescht_ist() {
         events::naechstes(&o.pool, &z, &EventType::ALLE, 0, None)
             .await
             .unwrap(),
-        Naechstes::Leer
+        Naechstes::Leer {
+            uebersprungen_bis: None
+        }
     );
     // Wartete Ereignis 1, ist es verloren.
     assert_eq!(
@@ -630,4 +642,168 @@ async fn stoppsignal_beendet_den_lauf() {
         .await
         .expect("Lauf endet binnen der Frist")
         .unwrap();
+}
+
+// ---------------------------------------------------------------- Befunde aus dem Review
+
+/// Ruft je Zustellung eine Aktion mit der Nummer des Versuchs auf (ab 1), bevor er antwortet.
+struct MitAktion<
+    F: Fn(usize) -> futures::future::BoxFuture<'static, Ergebnis> + Send + Sync + 'static,
+> {
+    aktion: F,
+    gesendet: Mutex<Vec<Zustellung>>,
+}
+
+impl<F: Fn(usize) -> futures::future::BoxFuture<'static, Ergebnis> + Send + Sync + 'static>
+    Zusteller for MitAktion<F>
+{
+    async fn senden(&self, z: Zustellung) -> Ergebnis {
+        let n = {
+            let mut g = self.gesendet.lock().unwrap();
+            g.push(z);
+            g.len()
+        };
+        (self.aktion)(n).await
+    }
+}
+
+fn ok() -> Ergebnis {
+    Ergebnis {
+        status: Some(204),
+        fehler: None,
+        dauer_ms: 1,
+    }
+}
+
+fn kaputt() -> Ergebnis {
+    Ergebnis {
+        status: Some(503),
+        fehler: Some(WebhookFehler::Status),
+        dauer_ms: 1,
+    }
+}
+
+#[tokio::test]
+async fn nicht_gewaehlte_arten_werden_uebersprungen_und_nie_nachgeliefert() {
+    let o = org().await;
+    let z = zugang_mit(&o, "A", ALLE_LESE_SCOPES).await;
+    webhook_anlegen(&o, &z, &[EventType::EinsatzClosed]).await;
+    let e = einsatz_freigeben(&o, &z).await;
+    kopf_aendern(&o, e, 1).await;
+    let auf = Aufzeichner::neu(true);
+    durchgang(&o.pool, &auf, Utc::now()).await.unwrap();
+    assert_eq!(auf.anzahl(), 0);
+    let w = webhook(&o, &z).await;
+    assert_eq!(
+        w.cursor,
+        events::hoechststand(&o.pool).await.unwrap(),
+        "rückt darüber hinweg"
+    );
+
+    // Wählt der Admin `einsatz.updated` dazu, kommt das alte nicht nachträglich.
+    sqlx::query("UPDATE maschine_webhook SET arten = '[\"einsatz.updated\",\"einsatz.closed\"]'")
+        .execute(&o.pool)
+        .await
+        .unwrap();
+    durchgang(&o.pool, &auf, Utc::now()).await.unwrap();
+    assert_eq!(auf.anzahl(), 0);
+}
+
+#[tokio::test]
+async fn nichts_mehr_faellig_beendet_die_stoerung() {
+    let o = org().await;
+    let (z, _) = drei_ereignisse(&o).await;
+    let auf = Aufzeichner::neu(false);
+    durchgang(&o.pool, &auf, Utc::now()).await.unwrap();
+    let w = webhook(&o, &z).await;
+    assert!(w.fehler_seit.is_some() && w.offen_id.is_some());
+
+    // Der Admin wählt alle Arten ab, die anstehen: nichts ist mehr fällig.
+    sqlx::query("UPDATE maschine_webhook SET arten = '[\"einsatz.closed\"]'")
+        .execute(&o.pool)
+        .await
+        .unwrap();
+    durchgang(&o.pool, &auf, Utc::now() + Duration::minutes(2))
+        .await
+        .unwrap();
+    let w = webhook(&o, &z).await;
+    assert_eq!(w.fehler_seit, None);
+    assert_eq!(w.fehlversuche, 0);
+    assert_eq!(w.naechster_versuch_at, None);
+    assert_eq!(w.offen_id, None);
+}
+
+#[tokio::test]
+async fn widerruf_mitten_im_durchgang_stoppt_die_zustellung() {
+    let o = org().await;
+    let (z, _) = drei_ereignisse(&o).await;
+    let pool = o.pool.clone();
+    let zid = z.clone();
+    let auf = Arc::new(MitAktion {
+        gesendet: Mutex::new(Vec::new()),
+        aktion: move |n| {
+            let (pool, zid) = (pool.clone(), zid.clone());
+            Box::pin(async move {
+                if n == 1 {
+                    sqlx::query("UPDATE maschinenzugang SET zustand = 'widerrufen' WHERE id = ?")
+                        .bind(&zid)
+                        .execute(&pool)
+                        .await
+                        .unwrap();
+                }
+                ok()
+            })
+        },
+    });
+    durchgang(&o.pool, &auf, Utc::now()).await.unwrap();
+    assert_eq!(
+        auf.gesendet.lock().unwrap().len(),
+        1,
+        "nach dem Widerruf geht nichts mehr hinaus"
+    );
+}
+
+#[tokio::test]
+async fn fehlschlag_an_ein_altes_ziel_macht_die_ruecksetzung_nicht_rueckgaengig() {
+    let o = org().await;
+    let (z, _) = drei_ereignisse(&o).await;
+    let pool = o.pool.clone();
+    let zid = z.clone();
+    let auf = Arc::new(MitAktion {
+        gesendet: Mutex::new(Vec::new()),
+        aktion: move |_| {
+            let (pool, zid) = (pool.clone(), zid.clone());
+            Box::pin(async move {
+                // Während der Versuch läuft, ändert der Admin das Ziel.
+                let w = repo::laden_fuer_zugang(&mut *pool.acquire().await.unwrap(), &zid)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                repo::aendern(
+                    &mut *pool.acquire().await.unwrap(),
+                    &zid,
+                    Some(&w.geaendert_at),
+                    &Eingabe {
+                        url: "https://neu.example/hook".into(),
+                        arten: w.arten(),
+                        lan_erlaubt: false,
+                    },
+                    "2099-01-01 00:00:00",
+                )
+                .await
+                .unwrap();
+                kaputt()
+            })
+        },
+    });
+    durchgang(&o.pool, &auf, Utc::now()).await.unwrap();
+    let w = webhook(&o, &z).await;
+    assert_eq!(w.url, "https://neu.example/hook");
+    assert_eq!(w.fehler_seit, None, "der Fehlschlag galt dem alten Ziel");
+    assert_eq!(w.fehlversuche, 0);
+    // Der Versuch steht trotzdem im Verlauf.
+    let verlauf = repo::versuche(&mut *o.pool.acquire().await.unwrap(), &w.id)
+        .await
+        .unwrap();
+    assert_eq!(verlauf.len(), 1);
 }

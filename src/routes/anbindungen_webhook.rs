@@ -44,7 +44,11 @@ pub struct WebhookLetzterFehler {
 pub struct WebhookAnzeige {
     /// Kennung des Webhooks; zugleich `aud` jeder Signatur, gegen die der Empfänger prüft.
     pub id: String,
-    pub url: String,
+    /// Die ganze Ziel-URL; nur für den System-Admin, weil ihr Pfad ein Token tragen kann.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Der Server des Ziels; sieht jeder, der die Anbindung sieht.
+    pub host: String,
     pub arten: Vec<EventType>,
     pub lan_erlaubt: bool,
     pub zustand: WebhookZustand,
@@ -72,7 +76,8 @@ pub struct WebhookAnzeige {
 }
 
 impl WebhookAnzeige {
-    pub fn aus(w: &Webhook, z: &Zugang, jetzt: &str) -> Self {
+    /// `mit_url`: die ganze URL nur für den System-Admin (Entscheidung Ruben 13.11.2026).
+    pub fn aus(w: &Webhook, z: &Zugang, jetzt: &str, mit_url: bool) -> Self {
         let ruht = ruht_grund(z, jetzt);
         let zustand = if w.is_angehalten() {
             WebhookZustand::Angehalten
@@ -93,7 +98,8 @@ impl WebhookAnzeige {
         };
         WebhookAnzeige {
             id: w.id.clone(),
-            url: w.url.clone(),
+            url: mit_url.then(|| w.url.clone()),
+            host: host_von(&w.url).unwrap_or_default(),
             arten: w.arten(),
             lan_erlaubt: w.lan_erlaubt,
             zustand,
@@ -115,10 +121,11 @@ impl WebhookAnzeige {
         conn: &mut SqliteConnection,
         z: &Zugang,
         jetzt: &str,
+        mit_url: bool,
     ) -> Result<Option<Self>, AppError> {
         Ok(repo::laden_fuer_zugang(conn, &z.id)
             .await?
-            .map(|w| Self::aus(&w, z, jetzt)))
+            .map(|w| Self::aus(&w, z, jetzt, mit_url)))
     }
 }
 
@@ -182,8 +189,10 @@ pub struct WebhookAenderung {
     pub arten: Option<Vec<String>>,
     #[serde(default)]
     pub lan_erlaubt: Option<bool>,
-    /// Optimistisches Lock: `geaendert_at` beim Öffnen. Weicht er ab → 409.
-    pub basis_geaendert_at: String,
+    /// Optimistisches Lock: `geaendert_at` beim Öffnen. Weicht er ab → 409; fehlt er („Meine
+    /// Änderung übernehmen“ nach der Rückfrage), wird ohne Vergleich geschrieben.
+    #[serde(default)]
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// Ziel-URL: Pflicht, höchstens [`URL_MAX`] Zeichen, und sie besteht den Ziel-Schutz (400).
@@ -300,7 +309,7 @@ pub async fn anlegen(
     }
     Ok((
         StatusCode::CREATED,
-        Json(WebhookAnzeige::aus(&w, &z, &jetzt)),
+        Json(WebhookAnzeige::aus(&w, &z, &jetzt, true)),
     ))
 }
 
@@ -334,7 +343,7 @@ pub async fn aendern(
         let (vorher, nachher) = repo::aendern(
             &mut *conn,
             &z.id,
-            &body.basis_geaendert_at,
+            body.basis_geaendert_at.as_deref(),
             &eingabe,
             &jetzt,
         )
@@ -361,7 +370,7 @@ pub async fn aendern(
         };
         spur(&state, &admin, aktion, &z, &nachher.url, peer_ip).await;
     }
-    Ok(Json(WebhookAnzeige::aus(&nachher, &z, &jetzt)))
+    Ok(Json(WebhookAnzeige::aus(&nachher, &z, &jetzt, true)))
 }
 
 /// DELETE /api/admin/anbindungen/{id}/webhook — entfernt den Webhook samt Verlauf (204).
@@ -423,7 +432,7 @@ pub async fn wieder_aufnehmen(
         peer_ip,
     )
     .await;
-    Ok(Json(WebhookAnzeige::aus(&w, &z, &jetzt)))
+    Ok(Json(WebhookAnzeige::aus(&w, &z, &jetzt, true)))
 }
 
 /// POST /api/admin/anbindungen/{id}/webhook/test — sendet ein signiertes `ping` und wartet auf

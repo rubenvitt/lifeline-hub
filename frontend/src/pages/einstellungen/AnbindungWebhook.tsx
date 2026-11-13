@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Alert, Button, Checkbox, Form, Input, Modal } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../../components/Erfassung';
+import { MenueAusloeser } from '../../components/MenueAusloeser';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import {
   BearbeitbaresPaneel,
   Datenfeld,
@@ -13,7 +15,8 @@ import {
   useRollen,
   type BearbeitbaresFeld,
 } from '../../components/instrument';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { SeitenFehler } from '../../components/SeitenZustand';
+import { RechteHinweis, SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import {
@@ -35,7 +38,9 @@ import { WEBHOOK_URL_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
 import type {
   AnbindungAnzeige,
+  AnbindungenListe,
   EventType,
+  WebhookAnzeige,
   WebhookTestErgebnis,
   WebhookVersuch,
 } from '../../api/types';
@@ -130,6 +135,30 @@ export function versuchText(v: Pick<WebhookVersuch, 'erfolg' | 'status' | 'fehle
   return v.fehler_art ? webhookFehlerText(v.fehler_art, v.status) : 'gescheitert';
 }
 
+/**
+ * Setzt den Webhook einer Anbindung in die Liste und lässt sie danach neu laden: die Antwort zeigt
+ * den neuen Stand sofort (auch als Basis der nächsten Bearbeitung), der Abruf alles Übrige.
+ */
+function uebernimmWebhook(
+  qc: ReturnType<typeof useQueryClient>,
+  zugangId: string,
+  webhook: WebhookAnzeige | null,
+): void {
+  qc.setQueryData<AnbindungenListe>(globalKeys.anbindungen(), (alt) =>
+    alt
+      ? {
+          ...alt,
+          zugaenge: alt.zugaenge.map((z) =>
+            z.id === zugangId ? { ...z, webhook: webhook ?? undefined } : z,
+          ),
+        }
+      : alt,
+  );
+  void qc.invalidateQueries({ queryKey: globalKeys.anbindungen() });
+}
+
+type ZustellungAktion = 'weiter' | 'test' | 'entfernen';
+
 interface Props {
   zugang: AnbindungAnzeige;
   darfSchreiben: boolean;
@@ -152,36 +181,53 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
   const [form] = Form.useForm<WebhookWerte>();
   const [einrichtenOffen, setEinrichtenOffen] = useState(false);
   const [entfernenOffen, setEntfernenOffen] = useState(false);
-  const [test, setTest] = useState<WebhookTestErgebnis | null>(null);
+  // Das Ergebnis eines Tests gilt dem Ziel, an das er ging; ein neues Ziel blendet es aus.
+  const [test, setTest] = useState<{ ergebnis: WebhookTestErgebnis; ziel: string } | null>(null);
+  const ohneNetz = useOhneVerbindung();
   const webhook = zugang.webhook ?? null;
+  const ziel = webhook ? `${webhook.id}|${webhook.url ?? webhook.host}` : '';
+  // Ohne Netz pausierten die Aufrufe und gingen später an ein womöglich anderes Ziel.
+  const darfAendern = darfSchreiben && !ohneNetz;
 
-  const neuLaden = () => void qc.invalidateQueries({ queryKey: globalKeys.anbindungen() });
   const versucheNeu = () =>
     void qc.invalidateQueries({ queryKey: globalKeys.anbindungWebhookVersuche(zugang.id) });
 
   const einrichten = useMutation({
     mutationFn: (e: WebhookEingabe) => richteWebhookEin(zugang.id, e),
-    onSuccess: neuLaden,
+    onSuccess: (w) => uebernimmWebhook(qc, zugang.id, w),
   });
   const entfernen = useMutation({
     mutationFn: () => entferneWebhook(zugang.id),
     onSuccess: () => {
       setEntfernenOffen(false);
-      neuLaden();
+      setTest(null);
+      uebernimmWebhook(qc, zugang.id, null);
     },
   });
   const weiter = useMutation({
     mutationFn: () => nimmWebhookWiederAuf(zugang.id),
-    onSuccess: neuLaden,
+    onMutate: () => testen.reset(),
+    onSuccess: (w) => uebernimmWebhook(qc, zugang.id, w),
   });
   const testen = useMutation({
     mutationFn: () => sendeTestereignis(zugang.id),
-    onMutate: () => setTest(null),
+    onMutate: () => {
+      setTest(null);
+      weiter.reset();
+    },
     onSuccess: (e) => {
-      setTest(e);
+      setTest({ ergebnis: e, ziel });
       versucheNeu();
     },
   });
+  const aktionWaehlen = (a: ZustellungAktion) => {
+    if (a === 'weiter') weiter.mutate();
+    else if (a === 'test') testen.mutate();
+    else {
+      entfernen.reset();
+      setEntfernenOffen(true);
+    }
+  };
 
   if (!webhook) {
     return (
@@ -190,12 +236,17 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
         koerperPolster
         aktion={
           darfSchreiben && (
-            <Button size="small" onClick={() => setEinrichtenOffen(true)}>
+            <Button size="small" disabled={ohneNetz} onClick={() => setEinrichtenOffen(true)}>
               Webhook einrichten
             </Button>
           )
         }
       >
+        {darfSchreiben && ohneNetz && (
+          <div style={{ marginBlockEnd: token.marginSM }}>
+            <RechteHinweis sichtbar text={OHNE_VERBINDUNG_NICHT_AENDERBAR} />
+          </div>
+        )}
         <span style={{ color: rollen.gedaempft }} data-lfh="webhook-leer">
           Ein Webhook stellt die Ereignisse dieser Anbindung als signierte Anfrage an das
           Fremdsystem zu, statt dass es selbst abruft.
@@ -243,7 +294,8 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
       label: 'Ziel-URL',
       breit: true,
       mono: true,
-      anzeige: <span data-lfh="webhook-url">{webhook.url}</span>,
+      // Die ganze URL bekommt nur der System-Admin; sonst steht der Server des Ziels da.
+      anzeige: <span data-lfh="webhook-url">{webhook.url ?? webhook.host}</span>,
       eingabe: <Input maxLength={WEBHOOK_URL_MAX} autoComplete="off" />,
       regeln: URL_REGELN,
     },
@@ -272,19 +324,24 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
         titel="Webhook"
         meta={<StatusChip ton={zustand.ton} wort={zustand.wort} />}
         datensatz={webhook}
-        werte={{ url: webhook.url, arten: [...webhook.arten], lan_erlaubt: webhook.lan_erlaubt }}
+        werte={{
+          url: webhook.url ?? '',
+          arten: [...webhook.arten],
+          lan_erlaubt: webhook.lan_erlaubt,
+        }}
         felder={felder}
         patch={webhookPatch}
         onSpeichern={async (patch, basis) => {
-          await aendereWebhook(zugang.id, {
+          // Ohne Basis („Meine Änderung übernehmen“ nach dem 409) schreibt der Server ohne Vergleich.
+          const w = await aendereWebhook(zugang.id, {
             ...patch,
-            basis_geaendert_at: basis ?? webhook.geaendert_at,
+            ...(basis !== undefined ? { basis_geaendert_at: basis } : {}),
           });
-          neuLaden();
+          uebernimmWebhook(qc, zugang.id, w);
         }}
         onNeuLaden={onNeuLaden}
-        darfSchreiben={darfSchreiben}
-        grund={grund}
+        darfSchreiben={darfAendern}
+        grund={darfSchreiben && ohneNetz ? OHNE_VERBINDUNG_NICHT_AENDERBAR : grund}
         modus="paneel"
         spalten={2}
       />
@@ -292,49 +349,66 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
         titel="Zustellung"
         aktion={
           darfSchreiben && (
-            <span style={{ display: 'inline-flex', gap: token.marginXS }}>
-              {webhook.zustand === 'angehalten' && (
+            <span style={{ display: 'inline-flex', gap: token.marginXS, alignItems: 'center' }}>
+              {/* Eine Hauptaktion, der Rest gebündelt (frontend/AGENTS.md, LFH-365). */}
+              {webhook.zustand === 'angehalten' ? (
                 <Button
                   size="small"
                   type="primary"
+                  disabled={ohneNetz}
                   loading={weiter.isPending}
-                  onClick={() => weiter.mutate()}
+                  onClick={() => aktionWaehlen('weiter')}
                 >
                   Wieder aufnehmen
                 </Button>
+              ) : (
+                <Button
+                  size="small"
+                  disabled={ohneNetz}
+                  loading={testen.isPending}
+                  onClick={() => aktionWaehlen('test')}
+                >
+                  Testereignis senden
+                </Button>
               )}
-              <Button size="small" loading={testen.isPending} onClick={() => testen.mutate()}>
-                Testereignis senden
-              </Button>
-              <Button
-                size="small"
-                danger
-                onClick={() => {
-                  entfernen.reset();
-                  setEntfernenOffen(true);
-                }}
-              >
-                Webhook entfernen …
-              </Button>
+              <MenueAusloeser<ZustellungAktion>
+                eintraege={[
+                  ...(webhook.zustand === 'angehalten'
+                    ? [{ key: 'test' as const, label: 'Testereignis senden' }]
+                    : []),
+                  { key: 'entfernen', label: 'Webhook entfernen …', gefahr: true },
+                ]}
+                zugaenglicherName={`Weitere Aktionen zum Webhook von ${zugang.name}`}
+                gesperrt={ohneNetz}
+                laeuft={testen.isPending || entfernen.isPending}
+                onWahl={aktionWaehlen}
+              />
             </span>
           )
         }
       >
-        {(weiter.error || testen.error) && (
+        {darfSchreiben && ohneNetz && (
           <PaneelZeile>
-            <SpeicherFehler
-              fehler={weiter.error ?? testen.error}
-              titel={weiter.error ? 'Nicht wieder aufgenommen' : 'Testereignis nicht gesendet'}
-            />
+            <RechteHinweis sichtbar text={OHNE_VERBINDUNG_NICHT_AENDERBAR} />
           </PaneelZeile>
         )}
-        {test && (
+        {weiter.error && (
+          <PaneelZeile>
+            <SpeicherFehler fehler={weiter.error} titel="Nicht wieder aufgenommen" />
+          </PaneelZeile>
+        )}
+        {testen.error && (
+          <PaneelZeile>
+            <SpeicherFehler fehler={testen.error} titel="Testereignis nicht gesendet" />
+          </PaneelZeile>
+        )}
+        {test && test.ziel === ziel && (
           <PaneelZeile>
             <span
               data-lfh="webhook-test"
-              style={{ color: test.erfolg ? rollen.text : rollen.achtungText }}
+              style={{ color: test.ergebnis.erfolg ? rollen.text : rollen.achtungText }}
             >
-              {`Testereignis: ${versuchText(test)} · ${test.dauer_ms} ms`}
+              {`Testereignis: ${versuchText(test.ergebnis)} · ${test.ergebnis.dauer_ms} ms`}
             </span>
           </PaneelZeile>
         )}
@@ -355,7 +429,7 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
               {webhook.zustand === 'ruht' && webhook.ruht_grund
                 ? `ruht: ${RUHT_TEXT[webhook.ruht_grund]}`
                 : webhook.zustand === 'angehalten'
-                  ? `angehalten${webhook.angehalten_at ? ` seit ${zeit(webhook.angehalten_at)}` : ''} · nach 24 h ohne Erfolg`
+                  ? `angehalten${webhook.angehalten_at ? ` seit ${zeit(webhook.angehalten_at)}` : ''}${webhook.fehler_seit ? ` · erster Fehlschlag ${zeit(webhook.fehler_seit)}` : ''} · 24 h ohne Erfolg`
                   : webhook.zustand === 'fehler'
                     ? `gestört${webhook.fehler_seit ? ` seit ${zeit(webhook.fehler_seit)}` : ''} · ${webhook.fehlversuche} Fehlversuch(e)`
                     : 'stellt zu'}
@@ -387,9 +461,16 @@ export default function AnbindungWebhook({ zugang, darfSchreiben, grund, onNeuLa
         title="Webhook entfernen?"
         okText="Entfernen"
         okButtonProps={{ danger: true, loading: entfernen.isPending }}
+        cancelButtonProps={{ disabled: entfernen.isPending }}
         cancelText="Abbrechen"
+        // Solange das Entfernen läuft, bleibt die Rückfrage offen: ihr Fehler stünde sonst nirgends.
+        closable={!entfernen.isPending}
+        maskClosable={!entfernen.isPending}
+        keyboard={!entfernen.isPending}
         onOk={() => entfernen.mutate()}
-        onCancel={() => setEntfernenOffen(false)}
+        onCancel={() => {
+          if (!entfernen.isPending) setEntfernenOffen(false);
+        }}
       >
         <p>
           Das Fremdsystem bekommt keine Ereignisse mehr zugestellt. Ein neuer Webhook beginnt beim
@@ -437,11 +518,27 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
   const versuche = q.data ?? [];
   return (
     <Paneel titel="Zustellungen" meta={q.data ? `${versuche.length} von höchstens 50` : undefined}>
-      {versuche.length === 0 ? (
+      {q.isError && (
         <PaneelZeile>
-          <span style={{ color: rollen.gedaempft }}>
-            {q.isError ? 'Verlauf nicht ladbar' : 'Noch kein Zustellversuch.'}
-          </span>
+          <SeitenFehler
+            text={q.data ? 'Stand nicht aktuell: neu laden gescheitert' : 'Verlauf nicht ladbar'}
+            ursache={q.error}
+            onWiederholen={() => void q.refetch()}
+            laedt={q.isFetching}
+          />
+        </PaneelZeile>
+      )}
+      {!q.data ? (
+        !q.isError && (
+          <PaneelZeile>
+            <span style={{ color: rollen.gedaempft }} data-lfh="webhook-verlauf-laedt">
+              Verlauf wird geladen …
+            </span>
+          </PaneelZeile>
+        )
+      ) : versuche.length === 0 ? (
+        <PaneelZeile>
+          <span style={{ color: rollen.gedaempft }}>Noch kein Zustellversuch.</span>
         </PaneelZeile>
       ) : (
         versuche.map((v, i) => (

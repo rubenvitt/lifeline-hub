@@ -108,17 +108,16 @@ pub async fn laden_fuer_zugang(
     .await
 }
 
-/// Die Webhooks der Zugänge einer Org (Liste der Anbindungen).
-pub async fn liste_fuer_org(
+/// Ein Webhook über seine Kennung.
+pub async fn laden(
     conn: &mut SqliteConnection,
-    org_id: i64,
-) -> Result<Vec<Webhook>, sqlx::Error> {
+    webhook_id: &str,
+) -> Result<Option<Webhook>, sqlx::Error> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "SELECT {SPALTEN} FROM maschine_webhook \
-         WHERE zugang_id IN (SELECT id FROM maschinenzugang WHERE org_id = ?)"
+        "SELECT {SPALTEN} FROM maschine_webhook WHERE id = ?"
     )))
-    .bind(org_id)
-    .fetch_all(&mut *conn)
+    .bind(webhook_id)
+    .fetch_optional(&mut *conn)
     .await
 }
 
@@ -166,20 +165,20 @@ pub async fn anlegen(
 }
 
 /// Ändert Ziel, Arten und LAN-Ausnahme (D7). `basis` ist `geaendert_at`, auf dem die Änderung
-/// beruht (409, wenn er nicht mehr stimmt). Der Cursor bleibt; ein geändertes Ziel setzt die
+/// beruht (409, wenn er nicht mehr stimmt; ohne Basis wird ohne Vergleich geschrieben). Der Cursor bleibt; ein geändertes Ziel setzt die
 /// Störung zurück, ein angehaltener Webhook bleibt angehalten. Ohne wirksame Änderung kein
 /// Schreiben, und vorher gleich nachher.
 pub async fn aendern(
     conn: &mut SqliteConnection,
     zugang_id: &str,
-    basis: &str,
+    basis: Option<&str>,
     eingabe: &Eingabe,
     jetzt: &str,
 ) -> Result<Option<(Webhook, Webhook)>, AppError> {
     let Some(vorher) = laden_fuer_zugang(conn, zugang_id).await? else {
         return Ok(None);
     };
-    if vorher.geaendert_at != basis {
+    if basis.is_some_and(|b| b != vorher.geaendert_at) {
         return Err(AppError::Conflict(
             "Der Webhook wurde zwischenzeitlich geändert.".into(),
         ));
@@ -295,21 +294,28 @@ pub async fn offen_vermerken(
     Ok(())
 }
 
-/// Nichts wartet mehr; schreibt nur, wenn etwas vermerkt war.
-pub async fn offen_loeschen(
+/// Nichts ist fällig: eine Störung ist vorbei, und der Cursor rückt über übersprungene Zeilen
+/// (nicht gewählte Arten, fehlendes Recht) hinweg. Der Aufrufer ruft es nur, wenn sich etwas
+/// ändert; so schreibt ein ruhiger Webhook nie.
+pub async fn leer_festhalten(
     conn: &mut SqliteConnection,
     webhook_id: &str,
+    uebersprungen_bis: Option<i64>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE maschine_webhook SET offen_id = NULL WHERE id = ? AND offen_id IS NOT NULL",
+        "UPDATE maschine_webhook SET offen_id = NULL, fehler_seit = NULL, fehlversuche = 0, \
+             naechster_versuch_at = NULL, cursor = MAX(cursor, COALESCE(?, cursor)) \
+         WHERE id = ?",
     )
+    .bind(uebersprungen_bis)
     .bind(webhook_id)
     .execute(&mut *conn)
     .await?;
     Ok(())
 }
 
-/// Das wartende Ereignis ist gelöscht: beim Höchststand ansetzen, Verlust festhalten.
+/// Das wartende Ereignis ist gelöscht: beim Höchststand ansetzen, Verlust festhalten. Die
+/// Störung um das verlorene Ereignis ist damit vorbei.
 pub async fn verlust_festhalten(
     conn: &mut SqliteConnection,
     webhook_id: &str,
@@ -317,7 +323,8 @@ pub async fn verlust_festhalten(
     jetzt: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "UPDATE maschine_webhook SET cursor = MAX(cursor, ?), offen_id = NULL, verlust_at = ? \
+        "UPDATE maschine_webhook SET cursor = MAX(cursor, ?), offen_id = NULL, verlust_at = ?, \
+             fehler_seit = NULL, fehlversuche = 0, naechster_versuch_at = NULL \
          WHERE id = ?",
     )
     .bind(head)
@@ -328,32 +335,43 @@ pub async fn verlust_festhalten(
     Ok(())
 }
 
-/// Ein Ereignis ist zugestellt: Cursor vor, Störung vorbei, Verlaufseintrag.
+/// Ein Ereignis ist zugestellt: Cursor vor, Störung vorbei, Verlaufseintrag. `basis` ist
+/// `geaendert_at` beim Laden vor dem Versuch: Hat ein Admin den Webhook seither geändert, gilt
+/// der Versuch dem alten Stand, und nur der Verlauf hält ihn fest (dann `false`; das Ereignis
+/// kommt erneut, mindestens einmal).
 pub async fn erfolg_festhalten(
     conn: &mut SqliteConnection,
     webhook_id: &str,
+    basis: &str,
     ereignis_id: i64,
     ergebnis: &Ergebnis,
     jetzt: &str,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
+) -> Result<bool, sqlx::Error> {
+    let gilt = sqlx::query(
         "UPDATE maschine_webhook SET cursor = MAX(cursor, ?), offen_id = NULL, \
              fehler_seit = NULL, fehlversuche = 0, naechster_versuch_at = NULL, \
              letzter_erfolg_at = ? \
-         WHERE id = ?",
+         WHERE id = ? AND geaendert_at = ? AND zustand = 'aktiv'",
     )
     .bind(ereignis_id)
     .bind(jetzt)
     .bind(webhook_id)
+    .bind(basis)
     .execute(&mut *conn)
-    .await?;
-    versuch_eintragen(conn, webhook_id, Some(ereignis_id), false, ergebnis, jetzt).await
+    .await?
+    .rows_affected()
+        > 0;
+    versuch_eintragen(conn, webhook_id, Some(ereignis_id), false, ergebnis, jetzt).await?;
+    Ok(gilt)
 }
 
-/// Ein Versuch ist gescheitert: Störung fortschreiben oder anhalten, Verlaufseintrag.
+/// Ein Versuch ist gescheitert: Störung fortschreiben oder anhalten, Verlaufseintrag. Wie bei
+/// [`erfolg_festhalten`] nur auf dem Stand `basis`: Ein Fehlschlag an ein inzwischen geändertes
+/// Ziel macht das Zurücksetzen der Störung durch den Admin nicht rückgängig.
 pub async fn fehlschlag_festhalten(
     conn: &mut SqliteConnection,
     webhook_id: &str,
+    basis: &str,
     ereignis_id: i64,
     ergebnis: &Ergebnis,
     folge: &NachFehlschlag,
@@ -382,7 +400,7 @@ pub async fn fehlschlag_festhalten(
              letzter_fehler_at = ?5, letzter_fehler_status = ?6, letzter_fehler_art = ?7, \
              zustand = CASE WHEN ?8 THEN 'angehalten' ELSE zustand END, \
              angehalten_at = CASE WHEN ?8 THEN ?5 ELSE angehalten_at END \
-         WHERE id = ?9",
+         WHERE id = ?9 AND geaendert_at = ?10 AND zustand = 'aktiv'",
     )
     .bind(ereignis_id)
     .bind(fehler_seit)
@@ -393,6 +411,7 @@ pub async fn fehlschlag_festhalten(
     .bind(ergebnis.fehler.map(|f| f.as_str()))
     .bind(angehalten)
     .bind(webhook_id)
+    .bind(basis)
     .execute(&mut *conn)
     .await?;
     versuch_eintragen(conn, webhook_id, Some(ereignis_id), false, ergebnis, jetzt).await

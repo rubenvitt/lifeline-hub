@@ -109,13 +109,17 @@ impl AnbindungAnzeige {
     }
 
     /// Wie [`Self::aus`], mit dem Einsatz, den der Zugang gerade liest.
+    ///
+    /// `mit_url`: ob die Ziel-URL des Webhooks ganz dabei ist (nur für den System-Admin; sonst
+    /// nur ihr Host, LLH-1656).
     async fn load(
         conn: &mut sqlx::SqliteConnection,
         z: &Zugang,
         jetzt: &str,
+        mit_url: bool,
     ) -> Result<Self, AppError> {
         let mut anzeige = Self::aus(z, jetzt);
-        anzeige.webhook = WebhookAnzeige::load(conn, z, jetzt).await?;
+        anzeige.webhook = WebhookAnzeige::load(conn, z, jetzt, mit_url).await?;
         if freigabe::is_freigebbar(z, jetzt) && !freigabe::is_org_am_hub(conn, z.org_id).await? {
             anzeige.einsatz_freigebbar = true;
             if let Some((id, bezeichnung)) = freigabe::gelesener_einsatz(conn, &z.id).await? {
@@ -282,7 +286,7 @@ pub async fn liste(
     let mut conn = state.pool.acquire().await?;
     let mut zugaenge = Vec::new();
     for z in zugang::liste(&mut conn, benutzer.org_id).await? {
-        zugaenge.push(AnbindungAnzeige::load(&mut conn, &z, &jetzt).await?);
+        zugaenge.push(AnbindungAnzeige::load(&mut conn, &z, &jetzt, benutzer.ist_admin()).await?);
     }
     Ok(Json(AnbindungenListe {
         zugaenge,
@@ -320,7 +324,7 @@ pub async fn anlegen(
         let z = zugang::laden(&mut *conn, &id)
             .await?
             .ok_or_else(|| AppError::Internal("Maschinenzugang verschwunden".into()))?;
-        let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt).await?;
+        let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt, true).await?;
         Ok((z, code, laeuft_ab_at, anzeige))
     })?;
     admin_audit::schreibe(
@@ -422,7 +426,7 @@ pub async fn aendern(
         } else {
             None
         };
-        let anzeige = AnbindungAnzeige::load(&mut *conn, &nachher, &jetzt).await?;
+        let anzeige = AnbindungAnzeige::load(&mut *conn, &nachher, &jetzt, true).await?;
         Ok((vorher, nachher, etb, anzeige))
     })?;
     if let Some((einsatz_id, etb_id)) = etb {
@@ -464,7 +468,7 @@ pub async fn laden(
         .await?
         .ok_or(AppError::NotFound)?;
     Ok(Json(
-        AnbindungAnzeige::load(&mut conn, &z, &crate::zeit::jetzt()).await?,
+        AnbindungAnzeige::load(&mut conn, &z, &crate::zeit::jetzt(), benutzer.ist_admin()).await?,
     ))
 }
 
@@ -491,7 +495,7 @@ pub async fn code(
             return Err(AppError::Conflict(grund));
         }
         let (code, laeuft_ab_at) = neuer_code(&mut *conn, &id, von, &jetzt).await?;
-        let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt).await?;
+        let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt, true).await?;
         Ok((z, code, laeuft_ab_at, anzeige))
     })?;
     admin_audit::schreibe(
@@ -533,7 +537,7 @@ pub async fn widerrufen(
     // Der Stand für Antwort und Spur kommt aus derselben Transaktion: scheiterte ein Lesen nach
     // dem Commit, gälte der Widerruf ohne Spureintrag (Prüfliste, Atomarität).
     let admin_name = admin.anzeigename.clone();
-    let (wirkung, z, etb) = crate::write_retry!(&state.pool, |conn| {
+    let (wirkung, z, etb, anzeige) = crate::write_retry!(&state.pool, |conn| {
         let wirkung = zugang::widerrufen(&mut *conn, org_id, &id, Some(von), &jetzt)
             .await?
             .ok_or(AppError::NotFound)?;
@@ -547,7 +551,9 @@ pub async fn widerrufen(
             z.name
         );
         let etb = freigabe_entziehen_tx(&mut *conn, &id, von, &text).await?;
-        Ok((wirkung, z, etb))
+        // Mit Webhook: die Antwort ersetzt den Datensatz in der Ansicht (LLH-1656).
+        let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt, true).await?;
+        Ok((wirkung, z, etb, anzeige))
     })?;
     if let Some((einsatz_id, etb_id)) = etb {
         state.live.publiziere(einsatz_id, etb_id);
@@ -570,5 +576,5 @@ pub async fn widerrufen(
         )
         .await;
     }
-    Ok(Json(AnbindungAnzeige::aus(&z, &jetzt)))
+    Ok(Json(anzeige))
 }

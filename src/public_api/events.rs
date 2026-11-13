@@ -275,8 +275,10 @@ async fn lesen_ab(
 pub enum Naechstes {
     /// Das nächste fällige Ereignis nach dem Cursor.
     Ereignis(Event),
-    /// Nichts fällig.
-    Leer,
+    /// Nichts fällig. `uebersprungen_bis`: die höchste Nummer eigener Zeilen nach dem Cursor, die
+    /// nicht zugestellt werden (Art nicht gewählt oder ohne Recht); der Webhook rückt darüber
+    /// hinweg (Spec `webhook-zustellung`, „Nicht gewählte Art“). `None`, wenn es keine gibt.
+    Leer { uebersprungen_bis: Option<i64> },
     /// Das zuletzt fällige, nicht zugestellte Ereignis (`offen_id`) ist schon gelöscht. Der Webhook
     /// setzt beim Höchststand `head` an.
     Verloren { head: i64 },
@@ -298,8 +300,18 @@ pub async fn naechstes(
     if offen_id.is_some_and(|offen| offen <= stand.purged_until) {
         return Ok(Naechstes::Verloren { head: stand.head });
     }
-    if arten.is_empty() || after >= stand.head {
-        return Ok(Naechstes::Leer);
+    if after >= stand.head {
+        return Ok(Naechstes::Leer {
+            uebersprungen_bis: None,
+        });
+    }
+    // Ohne gewählte Art ist jede eigene Zeile übersprungen.
+    if arten.is_empty() {
+        let bis = eigene_bis(&mut tx, zugang_id, after, stand.head).await?;
+        tx.commit().await?;
+        return Ok(Naechstes::Leer {
+            uebersprungen_bis: bis,
+        });
     }
     let mut abfrage = sqlx::QueryBuilder::new(
         "SELECT id, type, occurred_at, einsatz_id FROM maschine_ereignis WHERE zugang_id = ",
@@ -315,20 +327,41 @@ pub async fn naechstes(
     abfrage.push(") ORDER BY id LIMIT 1");
     let zeile: Option<(i64, String, String, i64)> =
         abfrage.build_query_as().fetch_optional(&mut *tx).await?;
-    tx.commit().await?;
-    Ok(match zeile {
-        Some((id, art, occurred_at, einsatz_id)) => match EventType::parse(&art) {
-            Some(event_type) => Naechstes::Ereignis(Event {
-                id,
-                event_type,
-                occurred_at,
-                einsatz_id,
-            }),
-            // Der CHECK lässt nur bekannte Arten zu, und die Abfrage filtert auf sie.
-            None => Naechstes::Leer,
+    let ereignis = zeile.and_then(|(id, art, occurred_at, einsatz_id)| {
+        // Der CHECK lässt nur bekannte Arten zu, und die Abfrage filtert auf sie.
+        Some(Event {
+            id,
+            event_type: EventType::parse(&art)?,
+            occurred_at,
+            einsatz_id,
+        })
+    });
+    let ergebnis = match ereignis {
+        Some(e) => Naechstes::Ereignis(e),
+        // Nichts Gewähltes bis `head`: alle eigenen Zeilen dazwischen sind übersprungen.
+        None => Naechstes::Leer {
+            uebersprungen_bis: eigene_bis(&mut tx, zugang_id, after, stand.head).await?,
         },
-        None => Naechstes::Leer,
-    })
+    };
+    tx.commit().await?;
+    Ok(ergebnis)
+}
+
+/// Die höchste Nummer einer Zeile des Zugangs in `(after, head]`, gleich welcher Art.
+async fn eigene_bis(
+    conn: &mut SqliteConnection,
+    zugang_id: &str,
+    after: i64,
+    head: i64,
+) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT MAX(id) FROM maschine_ereignis WHERE zugang_id = ? AND id > ? AND id <= ?",
+    )
+    .bind(zugang_id)
+    .bind(after)
+    .bind(head)
+    .fetch_one(&mut *conn)
+    .await
 }
 
 /// Höchststand und Löschgrenze der Outbox (Wiederaufnahme eines Webhooks, LLH-1656).

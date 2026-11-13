@@ -193,6 +193,13 @@ async fn fuehrungskraft_liest_aber_schreibt_nicht() {
     let (s, ansicht) = anfrage_json(&app, "GET", &format!("{LISTE}/{id}"), &fk, None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(ansicht["webhook"]["id"].is_string());
+    // Nur der Host, nie die ganze URL: ihr Pfad kann ein Token tragen (Entscheidung 13.11.2026).
+    assert_eq!(ansicht["webhook"]["host"], "empfaenger.example");
+    assert!(ansicht["webhook"].get("url").is_none(), "{ansicht}");
+    let (_, liste) = anfrage_json(&app, "GET", LISTE, &fk, None).await;
+    assert!(liste["zugaenge"][0]["webhook"].get("url").is_none());
+    let (_, als_admin) = anfrage_json(&app, "GET", &format!("{LISTE}/{id}"), &admin, None).await;
+    assert_eq!(als_admin["webhook"]["url"], "https://empfaenger.example/");
     let (s, _) = anfrage_json(&app, "GET", &format!("{}/versuche", pfad(&id)), &fk, None).await;
     assert_eq!(s, StatusCode::OK);
 
@@ -423,4 +430,54 @@ async fn am_gekoppelten_elw_ist_einrichten_gesperrt() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
+}
+
+#[tokio::test]
+async fn aendern_ohne_basis_schreibt_ohne_vergleich() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"] }),
+    )
+    .await;
+    // „Meine Änderung übernehmen“ nach einem 409 sendet keine Basis.
+    let (s, w) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad(&id),
+        &admin,
+        Some(&json!({ "arten": ["einsatz.closed"] })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert_eq!(w["arten"], json!(["einsatz.closed"]));
+}
+
+#[tokio::test]
+async fn widerruf_antwortet_mit_dem_webhook() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = anbindung(&app, &admin).await;
+    einrichten(
+        &app,
+        &admin,
+        &id,
+        json!({ "url": "https://empfaenger.example/", "arten": ["einsatz.created"] }),
+    )
+    .await;
+    let (s, z) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{LISTE}/{id}/widerrufen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success());
+    assert_eq!(z["webhook"]["zustand"], "ruht", "{z}");
+    assert_eq!(z["webhook"]["ruht_grund"], "zugang_widerrufen");
 }

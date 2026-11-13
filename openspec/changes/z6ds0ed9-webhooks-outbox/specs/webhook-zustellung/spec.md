@@ -22,11 +22,12 @@ leeren Auswahl von Ereignisarten. Wird der Zugang gelöscht, MUST sein Webhook m
 ### Requirement: Nur der System-Admin richtet Webhooks ein
 
 Anlegen, Ändern, Entfernen, Wiederaufnehmen und die Testzustellung SHALL nur dem System-Admin
-offenstehen. Den Zustand und den Verlauf MUST jeder sehen können, der den Admin-Bereich sieht.
+offenstehen. Den Zustand und den Verlauf MUST jeder sehen können, der den Admin-Bereich sieht. Die
+ganze Ziel-URL MUST nur der System-Admin bekommen; alle anderen sehen nur den Host des Ziels.
 
 #### Scenario: Führungskraft liest
 - **WHEN** eine org-weite Führungskraft ohne Admin-Rolle die Ansicht einer Anbindung öffnet
-- **THEN** sieht sie Ziel, Arten, Zustand und Verlauf des Webhooks, aber keinen Bedienknopf zum Ändern
+- **THEN** sieht sie den Host des Ziels, Arten, Zustand und Verlauf des Webhooks, aber weder die ganze Ziel-URL noch einen Bedienknopf zum Ändern
 
 #### Scenario: Führungskraft schreibt
 - **WHEN** eine org-weite Führungskraft ohne Admin-Rolle einen Webhook über die Admin-API anlegt
