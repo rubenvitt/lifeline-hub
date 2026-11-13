@@ -5836,7 +5836,11 @@ async fn nach_widerruf_ohne_schalter_holt_die_einsatzleitung_den_spiegel_zurueck
     let (hub, elw, e) = spiegel_ohne_kopplung().await;
     assert!(ist_spiegel(&elw, e).await);
     let (s, v) = etb(&elw, e).await;
-    assert_eq!(s, StatusCode::CONFLICT, "gesperrt, der Abgleich ist beendet: {v}");
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "gesperrt, der Abgleich ist beendet: {v}"
+    );
     let f = fuehrung(&elw, e).await;
     assert_eq!(
         f["fuehrer_kennung"], hub.kennung,
