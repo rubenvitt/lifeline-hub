@@ -197,7 +197,8 @@ Mit dem Ende der Nachbereitung gilt an einem ELW, der mit einem Hub gekoppelt is
 Ohne Kopplung zu einem Hub bleibt ein Einsatz nach der Nachbereitung, wo er ist, außer die
 Organisation hat einen geprüften Archiv-Schlüssel (siehe „Archiv nach der Nachbereitung“). Löscht eine
 Installation einen Einsatz, den sie führt, löscht die gekoppelte ihren Spiegel davon beim
-nächsten Abgleich.
+nächsten Abgleich, auch wenn sie den Einsatz ursprünglich selbst angelegt und die Führung
+abgegeben hat.
 
 ### Archiv nach der Nachbereitung
 

@@ -5781,3 +5781,115 @@ async fn nach_neuer_kopplung_stehen_die_akten_wieder_und_bleiben() {
     assert_eq!(beim_gegenueber(&elw2).await, vec![k1.clone()]);
     assert_eq!(beim_gegenueber(&hub).await, vec![k1]);
 }
+
+// ── Spiegel mit fremdem Präfix enden mit dem Einsatz beim Führer (LLH-1852) ──────────────────
+//
+// Change `r11nl4cv-geloescht-fremdes-praefix`: Der Führer belegt `geloescht` für den Stand eines
+// Spiegels wie für eine Akte (Vermerk, D1), und der Spiegel endet nur, wenn seine Akte den
+// Absender als Führer nennt (D2), gleich mit welcher Instanzkennung die Kennung beginnt.
+
+async fn kennung_am(i: &Instanz, einsatz: i64) -> String {
+    sqlx::query_scalar("SELECT kennung FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+async fn ist_spiegel(i: &Instanz, einsatz: i64) -> bool {
+    sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = ?)")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Der ELW übergibt einen eigenen Einsatz an den Hub: (Einsatz am ELW, jetzt Spiegel; Einsatz am
+/// Hub; Kennung mit dem Präfix des ELW).
+async fn an_den_hub_uebergeben(hub: &Instanz, elw: &Instanz) -> (i64, i64, String) {
+    let (e, akte) = elw_einsatz(hub, elw).await;
+    abgleichen(elw).await;
+    let (s, v) = post(
+        elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(elw).await;
+    let h = einsatz_der_akte(hub, akte).await;
+    let k = kennung_am(elw, e).await;
+    assert!(ist_spiegel(elw, e).await, "der ELW spiegelt jetzt");
+    assert!(!ist_spiegel(hub, h).await, "der Hub führt");
+    assert!(k.starts_with(&format!("{}/", elw.kennung)), "{k}");
+    (e, h, k)
+}
+
+#[tokio::test]
+async fn loescht_der_hub_einen_uebernommenen_einsatz_raeumt_der_elw_seinen_spiegel_ab() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, h, k) = an_den_hub_uebergeben(&hub, &elw).await;
+
+    endgueltig_loeschen(&hub, h).await;
+    assert!(vermerkt(&hub, &k).await);
+    abgleichen(&elw).await;
+
+    assert!(!hat_spiegel(&elw, &k).await, "Pull: der Spiegel am ELW ist abgeräumt");
+    assert!(vermerkt(&elw, &k).await);
+}
+
+#[tokio::test]
+async fn ohne_beleg_meldet_der_hub_nichts_und_der_spiegel_bleibt() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, h, k) = an_den_hub_uebergeben(&hub, &elw).await;
+
+    endgueltig_loeschen(&hub, h).await;
+    // Wie eine Sicherung ohne die Spur der Löschung: weder Vermerk noch Löschprotokoll.
+    for sql in [
+        "DELETE FROM fuehrung_loeschvermerk",
+        "DELETE FROM aufbewahrung_loeschprotokoll",
+    ] {
+        sqlx::query(sql).execute(&hub.pool).await.unwrap();
+    }
+    abgleichen(&elw).await;
+
+    assert!(hat_spiegel(&elw, &k).await, "ohne Beleg kein Abräumen");
+}
+
+#[tokio::test]
+async fn loescht_der_elw_einen_uebernommenen_einsatz_raeumt_der_hub_seinen_spiegel_ab() {
+    let (hub, elw) = gekoppelt().await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let (akte, e) = akte_und_einsatz(&elw).await;
+    let k = kennung_am(&elw, e).await;
+    notuebernahme_gegen_hub(&elw, akte).await;
+    elw_meldet(&elw).await;
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt jetzt");
+    assert!(k.starts_with(&format!("{}/", hub.kennung)), "{k}");
+
+    endgueltig_loeschen(&elw, e).await;
+    abgleichen(&elw).await;
+
+    assert!(!hat_spiegel(&hub, &k).await, "Push: der Spiegel am Hub ist abgeräumt");
+}
+
+#[tokio::test]
+async fn ein_elw_raeumt_am_hub_keinen_spiegel_ab_den_laut_akte_ein_anderer_fuehrt() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    let k = kennung_am(&elw, e).await;
+    assert!(ist_spiegel(&hub, h).await);
+    // Laut Akte am Hub führt inzwischen eine andere ELW; das Präfix nennt weiter den ELW.
+    sqlx::query("UPDATE einsatz_fuehrung SET fuehrer_kennung = 'andere-elw' WHERE id = ?")
+        .bind(akte)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+
+    endgueltig_loeschen(&elw, e).await;
+    abgleichen(&elw).await;
+
+    assert!(hat_spiegel(&hub, &k).await, "die Akte entscheidet, nicht das Präfix");
+}

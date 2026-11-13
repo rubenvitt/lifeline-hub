@@ -55,6 +55,7 @@ async fn ist_geloescht(
 /// `geloescht` für jede genannte Kennung, deren Einsatz diese Instanz gelöscht hat.
 pub async fn geloeschte(
     conn: &mut SqliteConnection,
+    _kopplung_id: i64,
     eigene_kennung: &str,
     staende: &[EinsatzStand],
 ) -> Result<Vec<Lebensende>, AppError> {

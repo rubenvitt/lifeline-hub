@@ -292,6 +292,7 @@ async fn verwahrung_macht_den_spiegel_zum_eigenen_einsatz() {
 async fn gemeldet_wird_nur_was_hier_geloescht_ist() {
     let pool = crate::db::test_pool().await;
     let leit = leitung(&pool).await;
+    kopplung(&pool, "wird_gemeldet").await;
     let (weg, _) = einsatz(&pool, leit).await;
     let (da, _) = einsatz(&pool, leit).await;
     let mut tx = pool.begin().await.unwrap();
@@ -315,13 +316,83 @@ async fn gemeldet_wird_nur_was_hier_geloescht_ist() {
         stand("ich/kaputt".into()),
     ];
     let mut conn = pool.acquire().await.unwrap();
-    let ende = geloeschte(&mut conn, "ich", &staende).await.unwrap();
+    let ende = geloeschte(&mut conn, 1, "ich", &staende).await.unwrap();
     assert_eq!(
         ende.iter().map(|l| l.kennung.clone()).collect::<Vec<_>>(),
         vec![format!("ich/{weg}")],
         "nur im Löschprotokoll, einmal, mit eigenem Präfix"
     );
     assert_eq!(ende[0].art, LEBENSENDE_GELOESCHT);
+}
+
+fn stand(kennung: &str) -> EinsatzStand {
+    EinsatzStand {
+        kennung: kennung.into(),
+        stand: 1,
+        bruch: Vec::new(),
+    }
+}
+
+/// LLH-1852 (Change `r11nl4cv-geloescht-fremdes-praefix`, D1): Ein genannter Stand braucht
+/// denselben Beleg wie eine genannte Akte. Der Vermerk belegt auch fremde Präfixe; das
+/// Löschprotokoll nur das eigene, nur für eine Org der Kopplung und nie für einen abgeräumten
+/// Spiegel.
+#[tokio::test]
+async fn ein_stand_gilt_mit_demselben_beleg_wie_eine_akte_als_geloescht() {
+    let pool = crate::db::test_pool().await;
+    leitung(&pool).await;
+    kopplung(&pool, "wird_gemeldet").await;
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Andere')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    for (id, org, art) in [(9001, 1, "verwahrt"), (9002, 2, "verwahrt"), (9003, 1, "spiegel")] {
+        sqlx::query(
+            "INSERT INTO aufbewahrung_loeschprotokoll (org_id, einsatz_id, art, geloescht_at) \
+             VALUES (?, ?, ?, '2026-06-01 00:00:00')",
+        )
+        .bind(org)
+        .bind(id)
+        .bind(art)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    {
+        let mut conn = pool.acquire().await.unwrap();
+        // Übernommen und hier endgültig gelöscht: die Kennung trägt das Präfix des ELW.
+        crate::instanz::fuehrung::loeschvermerk::vermerken(&mut conn, "elw1/5-ab", 1)
+            .await
+            .unwrap();
+        crate::instanz::fuehrung::loeschvermerk::vermerken(&mut conn, "elw1/7-cd", 1)
+            .await
+            .unwrap();
+    }
+    // Die Akte ist wieder da: der alte Vermerk belegt nichts mehr.
+    akte(&pool, "elw1/7-cd", 1, "elw1").await;
+
+    let staende: Vec<EinsatzStand> = [
+        "elw1/5-ab",
+        "elw1/5-ab",
+        "ich/9001-aa",
+        "ich/9002-bb",
+        "ich/9003-cc",
+        "elw1/7-cd",
+        "ich/9999-zz",
+        "elw1/6-unbekannt",
+    ]
+    .into_iter()
+    .map(stand)
+    .collect();
+    let mut conn = pool.acquire().await.unwrap();
+    let ende = geloeschte(&mut conn, 1, "ich", &staende).await.unwrap();
+    assert_eq!(
+        ende.iter().map(|l| l.kennung.as_str()).collect::<Vec<_>>(),
+        vec!["elw1/5-ab", "ich/9001-aa"],
+        "Vermerk und Löschprotokoll der Kopplung, nicht fremde Org, abgeräumter Spiegel, \
+         wiedergekommene Akte oder Unbekanntes"
+    );
+    assert!(ende.iter().all(|l| l.art == LEBENSENDE_GELOESCHT));
 }
 
 #[tokio::test]
@@ -372,6 +443,94 @@ async fn geloescht_merkt_nur_spiegel_dieser_kopplung_vor() {
             .await
             .unwrap();
     assert_eq!(vermerkt, vec!["gegen/7"]);
+}
+
+// ── Spiegel enden nur auf Meldung ihres Führers (LLH-1852, D2) ──────────────────────────────
+
+/// Schalter direkt setzen: `save_schalter` legte Akten an und richtete die Spiegel aus.
+async fn schalter(pool: &SqlitePool, an: bool) {
+    crate::instanz::identitaet::load_or_create(pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE instanz_identitaet SET fuehrung_an = ?")
+        .bind(an)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+/// Ein Spiegel aus Kopplung 1 samt Akte, die `fuehrer` als Führer nennt.
+async fn spiegel_mit_akte(pool: &SqlitePool, leit: i64, kennung: &str, fuehrer: &str) -> i64 {
+    let s = spiegel(pool, leit, kennung, 2).await;
+    let a = akte(pool, kennung, 1, fuehrer).await;
+    sqlx::query("UPDATE einsatz_fuehrung SET einsatz_id = ? WHERE id = ?")
+        .bind(s)
+        .bind(a)
+        .execute(pool)
+        .await
+        .unwrap();
+    s
+}
+
+async fn spiegel_uebernehmen(pool: &SqlitePool, k: &KopplungZeile, liste: &[Lebensende]) -> Vec<i64> {
+    let mut tx = pool.begin().await.unwrap();
+    let ids = geloescht_uebernehmen(&mut tx, k, liste).await.unwrap();
+    tx.commit().await.unwrap();
+    ids
+}
+
+#[tokio::test]
+async fn mit_schalter_entscheidet_die_akte_ueber_das_abraeumen() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let k = kopplung(&pool, "meldet_sich").await;
+    // Übernommen: Kennung mit dem Präfix des ELW, die Akte nennt das Gegenüber als Führer.
+    let uebernommen = spiegel_mit_akte(&pool, leit, "elw1/5-ab", "gegen").await;
+    // Abgegeben: Präfix des Gegenübers, aber laut Akte führt eine andere Instanz.
+    let abgegeben = spiegel_mit_akte(&pool, leit, "gegen/6-cd", "elw2").await;
+    // Ohne Akte gilt das Präfix.
+    let ohne_akte = spiegel(&pool, leit, "gegen/7-ef", 2).await;
+    let fremd_ohne_akte = spiegel(&pool, leit, "elw1/8-gh", 2).await;
+    schalter(&pool, true).await;
+
+    let mut ids = spiegel_uebernehmen(
+        &pool,
+        &k,
+        &[
+            geloescht("elw1/5-ab"),
+            geloescht("gegen/6-cd"),
+            geloescht("gegen/7-ef"),
+            geloescht("elw1/8-gh"),
+        ],
+    )
+    .await;
+    ids.sort();
+    assert_eq!(ids, vec![uebernommen, ohne_akte]);
+    assert_eq!(vermerke(&pool).await, vec!["elw1/5-ab", "gegen/7-ef"]);
+    let vorgemerkt: Vec<i64> =
+        sqlx::query_scalar("SELECT einsatz_id FROM einsatz_abraeumen ORDER BY einsatz_id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(!vorgemerkt.contains(&abgegeben) && !vorgemerkt.contains(&fremd_ohne_akte));
+}
+
+#[tokio::test]
+async fn ohne_schalter_gilt_nur_das_praefix() {
+    let pool = crate::db::test_pool().await;
+    let leit = leitung(&pool).await;
+    let k = kopplung(&pool, "meldet_sich").await;
+    spiegel_mit_akte(&pool, leit, "elw1/5-ab", "gegen").await;
+    let eigen = spiegel_mit_akte(&pool, leit, "gegen/6-cd", "elw2").await;
+    schalter(&pool, false).await;
+
+    let ids = spiegel_uebernehmen(
+        &pool,
+        &k,
+        &[geloescht("elw1/5-ab"), geloescht("gegen/6-cd")],
+    )
+    .await;
+    assert_eq!(ids, vec![eigen], "die eingefrorene Akte zählt nicht");
 }
 
 // ── Akten ohne Spiegel (LLH-1699, Change `h7shm5au-loeschsignal-spiegellose-akten`) ──────────

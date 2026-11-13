@@ -534,9 +534,9 @@ fallen die Einsätze heraus, die die widerrufene Installation führt. Ein nie ge
 Einsatz, den die führende Installation endgültig gelöscht hat, verschwindet mit dem nächsten
 Abgleich. Kennt eine Installation ihn nur über den Hub, etwa ein zweiter Einsatzleitwagen,
 verschwindet er dort einen Abgleich später; hängt die Organisation an zwei Hubs, bleibt er dort
-stehen. Stehen bleibt auch ein Einsatz, dessen Führung abgegeben wurde und den die übernehmende
-Installation löscht, und jeder Einsatz, den eine Gegenstelle mit einem älteren Stand gelöscht
-hat. Ist die Führung je Einsatz
+stehen. Ein eigener Einsatz, dessen Führung abgegeben wurde, verschwindet ebenso mit dem
+nächsten Abgleich, sobald die übernehmende Installation ihn endgültig löscht. Stehen bleibt jeder
+Einsatz, den eine Gegenstelle mit einem älteren Stand gelöscht hat. Ist die Führung je Einsatz
 aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
 steht dort der Fehler mit „Erneut laden“.
 

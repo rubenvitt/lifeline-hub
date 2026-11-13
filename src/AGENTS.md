@@ -519,8 +519,14 @@ Herleitung in
     `/mnt/project-files/llh-1494/tkky2noy-archiv-nachbereitung/design.md` (D2–D7): Der Führer
     liefert einen abgeschlossenen Einsatz weiter, solange die Gegenseite einen niedrigeren Stand
     nennt, auch soft-gelöscht oder geschwärzt (`liefern::list_gefuehrt`). `geloescht` meldet
-    eine Seite nur für genannte Kennungen mit eigenem Präfix, deren ID im eigenen
-    Löschprotokoll steht (eine aus der Sicherung zurückgekehrte Instanz meldet nichts).
+    eine Seite für genannte Stände nur mit demselben Beleg wie für Akten ohne Spiegel (unten);
+    eine aus der Sicherung zurückgekehrte Instanz meldet nichts. **Einen Spiegel räumt
+    `geloescht` nur ab, wenn er zu dieser Kopplung gehört und der Absender sein Führer ist**
+    (`spiegel::fuehrung::is_fuehrer_des_spiegels`: mit Schalter und Akte allein die Akte, sonst
+    das Präfix; LLH-1852,
+    [ADR-0039](../docs/architektur/entscheidungen/ADR-0039-ein-spiegel-endet-nur-auf-meldung-seines-fuehrers-laut-akte.md),
+    Herleitung
+    `openspec/changes/archive/2026-11-13-r11nl4cv-geloescht-fremdes-praefix/design.md`).
     `verwahrt` geht nur von der meldenden Seite aus; die erreichte wandelt ihren Spiegel erst
     bei gleichem Stand und ohne fehlenden Anhang (`spiegel::lebensende::verwahrung_annehmen`),
     und erst ihre Quittung `angenommen` merkt den Einsatz der meldenden Seite zum Abräumen vor.
@@ -546,8 +552,10 @@ Herleitung in
     `fuehrung::repo::is_gegenueber_zustaendig` (der Führer der Akte; die meldende Seite auch ihr
     einziger Hub, solange der Führer nicht selbst ihr Gegenüber ist). Genannt wird nur, was
     `paket::is_kennung_nennbar` besteht (höchstens `KENNUNG_BYTES_MAX` Byte, druckbares ASCII);
-    die Akten gehen vom Paket-Budget ab (`abgleich::budget_fuer_zeilen`). Der Weg über die Stände bleibt, wie er ist (Spiegel mit fremdem Präfix:
-    LLH-1852). Nachweis: `tests/instanz_fuehrung.rs`, Abschnitt „Akten ohne Spiegel“.
+    die Akten gehen vom Paket-Budget ab (`abgleich::budget_fuer_zeilen`). Denselben Beleg nimmt
+    `lebensende::geloeschte` für die Stände von Spiegeln (LLH-1852). Nachweis:
+    `tests/instanz_fuehrung.rs`, Abschnitte „Akten ohne Spiegel“ und „Spiegel mit fremdem
+    Präfix“.
 - **Direktkopplung vor Ort (LLH-1497)**, Specs `instanz-kopplung`, `instanz-entdeckung`,
   [ADR-0029](../docs/architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
   Herleitung `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`:
