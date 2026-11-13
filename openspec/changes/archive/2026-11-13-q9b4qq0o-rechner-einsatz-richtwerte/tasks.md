@@ -69,12 +69,19 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (erst der rote Te
 
 ## 6. Gesamtprüfung
 
-- [ ] 6.1 `./scripts/check-all.sh` grün; ersatzweise in der Cloud-Sitzung die Schritte, die dort
+- [x] 6.1 `./scripts/check-all.sh` grün; ersatzweise in der Cloud-Sitzung die Schritte, die dort
   laufen (mindestens `check-fmt.sh`, `check-typ-codegen.sh`, `check-architektur.sh`,
   `check-schreibweisen.sh`, `cargo test --lib`, Integrationstests `rechner_api`,
   `maschinenzugang`, `public_api`, `public_api_lage`, `public_api_spec_aktuell`,
   `enum_wire_kontrakt`, dazu `anwenderdoku.guard.test.ts`), der Rest über die CI des PRs (mit
-  Verweis auf den Lauf abhaken).
+  Verweis auf den Lauf abhaken). In der Cloud-Sitzung am 13.11.2026 grün: `check-fmt.sh`,
+  `check-typ-codegen.sh` (alle fünf Schritte; Node 22 statt 26 aus `mise.toml`, `mise` fehlt
+  dort), `check-architektur.sh`, `check-adr-nummern.sh`, `check-schreibweisen.sh`,
+  `check-openspec-archiv.sh`, `check-migrationen.sh`, `cargo test --lib` (4291 Tests), die
+  Integrationstests `rechner_api`, `maschinenzugang`, `public_api`, `public_api_lage`,
+  `public_api_einsaetze`, `public_api_spec_aktuell`, `enum_wire_kontrakt`, dazu
+  `anwenderdoku.guard.test.ts`, `richtwerte.guard.test.ts`, `rechnerFixture.test.ts`. Den Rest
+  (übrige Integrationstests, ganze Vitest-Suite, Lint, e2e) belegt die CI des PRs.
 
 ## Workflow follow-up
 
