@@ -1,6 +1,6 @@
 //! Ausgangsereignisse für Fremdsysteme: der Abruf `GET /api/v1/events` (LLH-1655, Spec
 //! `ereignis-abruf`, Herleitung
-//! `openspec/changes/umeqho2b-outbox-ereignis-abruf/design.md`).
+//! `openspec/changes/archive/2026-11-13-umeqho2b-outbox-ereignis-abruf/design.md`).
 //!
 //! Die Outbox ist die Tabelle `maschine_ereignis`. **Dieses Modul schreibt nie hinein:** Jede
 //! Zeile entsteht in einem Trigger, in der Transaktion der Änderung, und gehört genau einem

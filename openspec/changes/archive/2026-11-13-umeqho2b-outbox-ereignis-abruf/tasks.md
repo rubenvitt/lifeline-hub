@@ -190,8 +190,11 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
 
 ## 6. Abschluss über alles
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert` lokal. Verifizieren: grün, die Ausgabe steht
-  ungekürzt bereit.
+- [x] 6.1 `./scripts/check-all.sh --geaendert` lokal. Verifizieren: grün, die Ausgabe steht
+  ungekürzt bereit. Stand: In der Cloud-Sitzung lief `--nur schnell` grün bis auf Schritt 16
+  (Links auf die Haupt-Spec, die erst das Archiv anlegt; danach grün), dazu alle betroffenen
+  Testziele mit `-j 2`. Den vollen Lauf trägt der Container nicht (Speicher); er läuft
+  unverändert in der CI des PR.
 - [x] 6.2 Durchspiel am laufenden Stack mit Demo-Daten: Zugang mit `events:read` und
   `einsaetze:read` anlegen und einlösen, Einsatz freigeben, Kopf ändern, abschließen; dazwischen
   `GET /api/v1/events` mit `wait=25`. Verifizieren: Die Ereignisse kommen in Reihenfolge, die

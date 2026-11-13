@@ -1,5 +1,5 @@
 //! Leserouten für Einsätze unter `/api/v1/` (LLH-1655, Spec `ereignis-abruf`, Herleitung
-//! `openspec/changes/umeqho2b-outbox-ereignis-abruf/design.md`, D7 und D11).
+//! `openspec/changes/archive/2026-11-13-umeqho2b-outbox-ereignis-abruf/design.md`, D7 und D11).
 
 /// Die Spalten von `einsatz`, aus denen der Einsatz der öffentlichen API entsteht. Ändert sich
 /// eine davon an einem freigegebenen laufenden Einsatz, schreibt der Trigger

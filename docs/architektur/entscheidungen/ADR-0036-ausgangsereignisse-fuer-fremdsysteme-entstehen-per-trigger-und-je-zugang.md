@@ -8,7 +8,7 @@ gilt_fuer:
   - src/public_api/einsaetze.rs
   - migrations/*_maschine_ereignis*.sql
 herleitung:
-  - openspec/changes/umeqho2b-outbox-ereignis-abruf/design.md
+  - openspec/changes/archive/2026-11-13-umeqho2b-outbox-ereignis-abruf/design.md
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---
 
