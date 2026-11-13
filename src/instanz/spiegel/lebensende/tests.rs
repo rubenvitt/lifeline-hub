@@ -300,7 +300,7 @@ async fn gemeldet_wird_nur_was_hier_geloescht_ist() {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert!(abraeumen::ausfuehren(&pool, weg).await.unwrap());
+    assert!(abraeumen::ausfuehren(&pool, None, weg).await.unwrap());
 
     let stand = |k: String| EinsatzStand {
         kennung: k,
@@ -722,7 +722,7 @@ async fn eine_genannte_akte_gilt_nur_mit_beleg_als_geloescht() {
             .await
             .unwrap();
     }
-    assert!(abraeumen::ausfuehren(&pool, alt).await.unwrap());
+    assert!(abraeumen::ausfuehren(&pool, None, alt).await.unwrap());
     assert_eq!(vermerke(&pool).await, vec!["elw1/5-ab"]);
     // Ein eigener Einsatz, der noch steht, und eine Kennung, die hier niemand kennt (Rückkehr aus
     // einer Sicherung): beides ohne Beleg.

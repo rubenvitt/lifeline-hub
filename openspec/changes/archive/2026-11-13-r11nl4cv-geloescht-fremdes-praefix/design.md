@@ -118,7 +118,7 @@ Ohne Schalter ändert sich deshalb nur der engere Altbeleg (D1).
 
 ADR-0036 ist akzeptiert und damit unveränderlich; diese Change weicht nicht von ihr ab, sondern
 dehnt den Beleg auf Stände aus und regelt das Abräumen. Eine neue ADR (nächste freie Nummer,
-heute `ADR-0040`) hält fest: ein Beleg für Stände und Akten, Art `spiegel` ist kein Beleg, ein
+heute `ADR-0041`) hält fest: ein Beleg für Stände und Akten, Art `spiegel` ist kein Beleg, ein
 Spiegel endet nur auf Meldung seines Führers (Akte vor Präfix). Prüfung per `verbiete` auf
 `ist_geloescht` und `verlange` auf die Führerprüfung in `geloescht_uebernehmen`. Laufzeitsicht
 (Kapitel 6, Lebensende) und Glossar („Löschvermerk“) ziehen nach, ebenso `src/AGENTS.md`.

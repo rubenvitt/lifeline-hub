@@ -6,7 +6,7 @@
 //!   deren Ende diese Instanz belegt ([`belegte_enden`]): eine aus einer Sicherung
 //!   zurückgekehrte Instanz meldet nichts. Abgeräumt wird ein Spiegel nur auf Meldung seines
 //!   Führers, laut Akte auch bei fremdem Präfix (LLH-1852, Change
-//!   `r11nl4cv-geloescht-fremdes-praefix`, ADR-0040).
+//!   `r11nl4cv-geloescht-fremdes-praefix`, ADR-0041).
 //!   - Pull (die erreichte Seite führt): die meldende Seite nennt ihre Stände in der Anfrage.
 //!   - Push (die meldende Seite führt): die erreichte Seite nennt die Stände ihrer Spiegel in der
 //!     Antwort, die meldende meldet `geloescht` in der nächsten Anfrage.
@@ -53,7 +53,7 @@ pub async fn geloeschte_akten(
     belegte_enden(conn, kopplung_id, eigene_kennung, akten).await
 }
 
-/// `geloescht` für jede genannte Kennung, deren Ende diese Instanz belegt (ADR-0036, ADR-0040):
+/// `geloescht` für jede genannte Kennung, deren Ende diese Instanz belegt (ADR-0036, ADR-0041):
 /// mit einem Löschvermerk, oder für Löschungen von vor dem Vermerk mit eigenem Präfix und
 /// Löschprotokoll ([`is_altbestand_geloescht`]). In beiden Fällen nur, wenn hier weder Einsatz
 /// noch Akte mit der Kennung steht. Eine unbekannte Kennung wird übergangen: Eine aus einer
@@ -734,10 +734,15 @@ const GRUND_GEAENDERT: &str = "Nach der Übergabe geändert";
 /// Grund, wenn diese Instanz die Verwahrung abgelehnt hatte, bevor die Quittung kam (LLH-1647).
 const GRUND_ABGELEHNT: &str = "Verwahrung hier abgelehnt";
 
-/// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat; Fehler holt Phase R nach.
-pub async fn abraeumen_nach_commit(pool: &sqlx::SqlitePool, ids: &[i64]) {
+/// Räumt nach dem Commit ab, was ein Abgleich vorgemerkt hat, und meldet es über `live`
+/// (LLH-1713); Fehler holt Phase R nach.
+pub async fn abraeumen_nach_commit(
+    pool: &sqlx::SqlitePool,
+    live: Option<&crate::live::LiveHub>,
+    ids: &[i64],
+) {
     for id in ids {
-        if let Err(e) = abraeumen::ausfuehren(pool, *id).await {
+        if let Err(e) = abraeumen::ausfuehren(pool, live, *id).await {
             tracing::warn!(
                 einsatz_id = id,
                 "Abgleich: Abräumen gescheitert, Phase R holt nach: {e}"

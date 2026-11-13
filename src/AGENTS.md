@@ -524,7 +524,7 @@ Herleitung in
     `geloescht` nur ab, wenn er zu dieser Kopplung gehört und der Absender sein Führer ist**
     (`spiegel::fuehrung::is_fuehrer_des_spiegels`: mit Schalter und Akte allein die Akte, sonst
     das Präfix; LLH-1852,
-    [ADR-0040](../docs/architektur/entscheidungen/ADR-0040-ein-spiegel-endet-nur-auf-meldung-seines-fuehrers-laut-akte.md),
+    [ADR-0041](../docs/architektur/entscheidungen/ADR-0041-ein-spiegel-endet-nur-auf-meldung-seines-fuehrers-laut-akte.md),
     Herleitung
     `openspec/changes/archive/2026-11-13-r11nl4cv-geloescht-fremdes-praefix/design.md`).
     `verwahrt` geht nur von der meldenden Seite aus; die erreichte wandelt ihren Spiegel erst
