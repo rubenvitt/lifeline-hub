@@ -1332,3 +1332,100 @@ async fn zurueckgespielt_hub_aenderungen_erreichen_den_elw() {
         );
     }
 }
+
+#[tokio::test]
+async fn zurueckgespielt_hub_mit_nachgehender_uhr_liefert_die_org_erneut() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Vorher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    let sicherung = log_stand(&hub).await;
+    for f in ["Verloren 1", "Verloren 2", "Verloren 3"] {
+        exec(
+            &hub.pool,
+            &format!("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, '{f}')"),
+        )
+        .await;
+    }
+    melden(&elw).await;
+    // Ohne Startsprung (die Uhr des Hubs geht nach): nur das Netz (D4) hilft.
+    zurueckspielen_hub(&hub, sicherung, &["Verloren 1", "Verloren 2", "Verloren 3"]).await;
+    exec(
+        &hub.pool,
+        "UPDATE fahrzeug SET funkrufname = 'Vorher 1 geändert' WHERE funkrufname = 'Vorher 1'",
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<i64>(
+            &elw.pool,
+            "SELECT COUNT(*) FROM fahrzeug WHERE funkrufname = 'Vorher 1 geändert'"
+        )
+        .await,
+        1
+    );
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
+    assert!(h.contains("erneut"), "{h:?}");
+}
+
+#[tokio::test]
+async fn unplausibler_stammdaten_stand_stempelt_nicht_neu() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    let vorher = log_stand(&hub).await;
+    exec(
+        &elw.pool,
+        &format!(
+            "UPDATE instanz_kopplung_org SET stammdaten_stand = {}",
+            1_i64 << 40
+        ),
+    )
+    .await;
+    melden(&elw).await;
+    assert_eq!(log_stand(&hub).await, vorher);
+}
+
+#[tokio::test]
+async fn zurueckgespielt_elw_bekommt_das_fahrzeug_erneut() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    // Sicherung des ELW: bis hier.
+    let sicherung: i64 = eine(
+        &elw.pool,
+        "SELECT stammdaten_stand FROM instanz_kopplung_org",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Nach der Sicherung')",
+    )
+    .await;
+    melden(&elw).await;
+    let id = lokale_id(&elw, "fahrzeug", "funkrufname", "Nach der Sicherung").await;
+    // Der ELW spielt die Sicherung zurück: Fahrzeug, Herkunft und Stand sind wieder die alten.
+    exec(
+        &elw.pool,
+        "INSERT INTO stammdaten_uebernahme (id) VALUES (1)",
+    )
+    .await;
+    exec(&elw.pool, &format!("DELETE FROM fahrzeug WHERE id = {id}")).await;
+    exec(
+        &elw.pool,
+        &format!(
+            "DELETE FROM stammdaten_herkunft WHERE art = 'fahrzeug' AND lokaler_schluessel = '{id}'"
+        ),
+    )
+    .await;
+    exec(&elw.pool, "DELETE FROM stammdaten_uebernahme").await;
+    exec(
+        &elw.pool,
+        &format!("UPDATE instanz_kopplung_org SET stammdaten_stand = {sicherung}"),
+    )
+    .await;
+    melden(&elw).await;
+    lokale_id(&elw, "fahrzeug", "funkrufname", "Nach der Sicherung").await;
+}

@@ -1099,6 +1099,28 @@ pub async fn handle_meldung(
                     {
                         liefern::Nachlieferung::default()
                     } else {
+                        // Rückschritt dieser Seite (LLH-1853, design.md D4): Die meldende Seite
+                        // kennt einen Log-Stand der Org, den diese Seite nie vergeben hat. Dann
+                        // geht die Org einmal ganz, über dem gemeldeten Stand.
+                        if mo.stammdaten_stand
+                            > liefern::load_hoechster_log_stand(conn, o.org_id).await?
+                            && mo.stammdaten_stand <= fuehrung_austausch::STAND_RAISE_MAX
+                            && liefern::renew_log_der_org(conn, o.org_id, mo.stammdaten_stand)
+                                .await?
+                                > 0
+                        {
+                            repo::set_hinweis(
+                                conn,
+                                kopplung.id,
+                                &format!(
+                                    "{} kennt schon spätere Stammdaten, als diese Instanz \
+                                     vergeben hat (aus einer Sicherung zurückgespielt?). Die \
+                                     Stammdaten gehen erneut an {}.",
+                                    kopplung.gegenueber_name, kopplung.gegenueber_name
+                                ),
+                            )
+                            .await?;
+                        }
                         liefern::nachlieferung(
                             conn,
                             o.org_id,

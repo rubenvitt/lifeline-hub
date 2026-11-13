@@ -28,9 +28,9 @@ Reproduktionstests `zurueckgespielt_hub_*` liegen schon rot auf dem Branch.
 
 ## 5. Stammdaten: Netz an der erreichten Seite (D4)
 
-- [ ] 5.1 `stammdaten::renew_log_der_org(conn, org_id, gemeldet)`: Zähler auf mindestens `gemeldet` heben, Log-Zeilen der Org in Reihenfolge neu einfügen. Unit-Test: alle Zeilen der Org liegen danach über `gemeldet` in alter Reihenfolge, andere Orgs unberührt, ein Trigger-Eintrag danach liegt darüber
-- [ ] 5.2 In `handle_meldung` je Org vor `liefern::nachlieferung` (nur Stand ≥ 0, nur Kopplungen, die Stammdaten tragen): gemeldeter Stand über dem Höchsten der Org und höchstens 2³⁹ → neu stempeln und Hinweis. Integrationstests `zurueckgespielt_hub_mit_nachgehender_uhr_liefert_die_org_erneut` (ohne Startsprung, Hinweis steht) und `unplausibler_stammdaten_stand_stempelt_nicht_neu`
-- [ ] 5.3 Integrationstest `zurueckgespielt_elw_bekommt_das_fahrzeug_erneut` (Spec-Szenario „ELW zurückgespielt“). Prüfen: `cargo test --test instanz_stammdaten` grün
+- [x] 5.1 `stammdaten::renew_log_der_org(conn, org_id, gemeldet)`: Zähler auf mindestens `gemeldet` heben, Log-Zeilen der Org in Reihenfolge neu einfügen. Unit-Test: alle Zeilen der Org liegen danach über `gemeldet` in alter Reihenfolge, andere Orgs unberührt, ein Trigger-Eintrag danach liegt darüber
+- [x] 5.2 In `handle_meldung` je Org vor `liefern::nachlieferung` (nur Stand ≥ 0, nur Kopplungen, die Stammdaten tragen): gemeldeter Stand über dem Höchsten der Org und höchstens 2³⁹ → neu stempeln und Hinweis. Integrationstests `zurueckgespielt_hub_mit_nachgehender_uhr_liefert_die_org_erneut` (ohne Startsprung, Hinweis steht) und `unplausibler_stammdaten_stand_stempelt_nicht_neu`
+- [x] 5.3 Integrationstest `zurueckgespielt_elw_bekommt_das_fahrzeug_erneut` (Spec-Szenario „ELW zurückgespielt“). Prüfen: `cargo test --test instanz_stammdaten` grün
 
 ## 6. Doku
 
