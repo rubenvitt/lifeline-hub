@@ -1890,6 +1890,19 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{p:?}");
     let pid = p["id"].as_i64().unwrap();
+    // Auch der Ablöser wechselt den Abschnitt; seine versorgte Person kommt mit.
+    let (s, q) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        Some(&format!(
+            r#"{{"name":"Ablöser","versorgende_einheit_id":{f2}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{q:?}");
+    let qid = q["id"].as_i64().unwrap();
     let (s, schicht) = anfrage(
         &app,
         "POST",
@@ -1924,7 +1937,9 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v:?}");
-    assert_eq!(gemeldet(&mut rx), vec![Some(pid)], "Vollzug");
+    let mut ids = gemeldet(&mut rx);
+    ids.sort_unstable();
+    assert_eq!(ids, vec![Some(pid), Some(qid)], "Vollzug");
 
     let (s, r) = anfrage(
         &app,
@@ -1935,5 +1950,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
-    assert_eq!(gemeldet(&mut rx), vec![Some(pid)], "Rücknahme");
+    let mut ids = gemeldet(&mut rx);
+    ids.sort_unstable();
+    assert_eq!(ids, vec![Some(pid), Some(qid)], "Rücknahme");
 }

@@ -316,12 +316,17 @@ export function erzeugeZeilenSammler(
   // nicht. Ändert eine optimistische Änderung währenddessen eine dieser Zeilen, ist ihre Referenz
   // danach eine andere (Structural Sharing lässt unveränderte Zeilen gleich), und die Kennung
   // wartet aufs nächste Fenster, statt die Änderung mit dem Stand davor zu überschreiben.
+  // Nur geladene Listen: eine Liste mit festem Key, die erst während des Abrufs lädt, hat keinen
+  // Schnappschuss und geht an den Sammler.
   const snapshotRows = (def: Ziel, ids: readonly number[]) =>
     new Map(
-      def.listen.flatMap(eintraege).map((key) => {
-        const data = qc.getQueryData(key);
-        return [hashKey(key), new Map(ids.map((id) => [id, rowOf(data, id)]))] as const;
-      }),
+      def.listen
+        .flatMap(eintraege)
+        .map((key) => [key, qc.getQueryData(key)] as const)
+        .filter(([, data]) => data !== undefined)
+        .map(([key, data]) => {
+          return [hashKey(key), new Map(ids.map((id) => [id, rowOf(data, id)]))] as const;
+        }),
     );
 
   const zeilenLaden = async (ziel: ZeilenZiel, ids: number[]) => {

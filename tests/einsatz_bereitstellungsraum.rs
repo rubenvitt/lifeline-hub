@@ -2582,6 +2582,47 @@ async fn uebernehmen_mit_abschnitt() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+/// LLH-1682: Die Übernahme mit Abschnitt ändert den Abschnitt der Einheit, den die Zeilen ihrer
+/// schon versorgten Personen per Join tragen; sie meldet sie deshalb mit `person`.
+#[tokio::test]
+async fn uebernehmen_mit_abschnitt_meldet_versorgte_personen() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let deich = abschnitt_anlegen(&app, &cookie, eid, "EA Deich").await;
+    let br = br_anlegen_und_aktivieren(&app, &cookie, eid, "Sportplatz").await;
+    let (einheit, _, _) = unangemeldet_buchen(&app, &cookie, eid, br, "FL 1").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/personen"),
+        &cookie,
+        Some(&json!({"name": "Muster", "versorgende_einheit_id": einheit})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let pid = v["id"].as_i64().unwrap();
+
+    let mut rx = live.abonniere(eid);
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{}/uebernehmen", einheit_pfad(eid, einheit)),
+        &cookie,
+        Some(&json!({"abschnitt_id": deich})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut gemeldet = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if n.event.as_str() == "person" {
+            let d: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+            gemeldet.push(d["person_id"].as_i64());
+        }
+    }
+    assert_eq!(gemeldet, vec![Some(pid)]);
+}
+
 /// Übernehmen mit Über-Einheit; Zyklus 400, fremder Abschnitt 404, Meldung schon quittiert
 /// gelingt, aufgelöst 409, ohne Recht Einheiten 403.
 #[tokio::test]

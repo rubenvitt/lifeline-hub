@@ -283,6 +283,25 @@ describe('Zeilenabgleich der Personen (LLH-1682)', () => {
     expect(inval).not.toHaveBeenCalled();
   });
 
+  it('eine Liste, die erst während des Abrufs lädt, geht an den Sammler statt die Zeile zu bekommen', async () => {
+    const { qc, inval, zeilen } = aufbau();
+    qc.setQueryData(einsatzKeys.personen(E), [person(1, 1)]);
+    let resolveZeile: (p: Person) => void = () => {};
+    api.loadPersonZeile.mockReturnValue(new Promise<Person>((r) => (resolveZeile = r)));
+
+    zeilen.vormerken('personen', 2);
+    await fenster();
+    // Die Auswahl lädt erst jetzt, etwa weil die Sprungpalette aufgeht; X ist dort schon weg.
+    qc.setQueryData(einsatzKeys.personenAuswahl(E), [auswahl(person(1, 1))]);
+    resolveZeile(person(2, 2));
+    await fenster();
+    await fenster();
+
+    expect(ids(qc.getQueryData<PersonAuswahl[]>(einsatzKeys.personenAuswahl(E)))).toEqual([1]);
+    expect(ids(qc.getQueryData<Person[]>(einsatzKeys.personen(E)))).toEqual([1, 2]);
+    expect(invalidierteKeys(inval)).toEqual([einsatzKeys.personenAuswahl(E)]);
+  });
+
   it(`über ${ZEILEN_GRENZE} Personen im Fenster ruft sie die Listen einmal ab`, async () => {
     const { qc, inval, zeilen } = aufbau();
     qc.setQueryData(einsatzKeys.personen(E), []);

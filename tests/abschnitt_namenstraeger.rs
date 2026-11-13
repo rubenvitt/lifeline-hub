@@ -459,6 +459,26 @@ async fn mehr_als_zehn_versorgte_personen_melden_ein_ereignis_ohne_kennung() {
     assert_eq!(person_ereignisse(&mut rx), vec![None], "Abschnitt");
 }
 
+/// Genau zehn versorgte Personen gehen noch einzeln, jede mit ihrer Kennung.
+#[tokio::test]
+async fn zehn_versorgte_personen_melden_einzeln() {
+    let (app, _pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin).await;
+    let nord = abschnitt_anlegen(&app, &admin, eid, "Nord").await;
+    let zug = einheit_im_abschnitt(&app, &admin, eid, "1. Zug", nord).await;
+    let mut erwartet = Vec::new();
+    for _ in 0..10 {
+        erwartet.push(Some(versorgte_person(&app, &admin, eid, zug).await));
+    }
+
+    let mut rx = live.abonniere(eid);
+    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({"name": "Neu"}))).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(person_ereignisse(&mut rx), erwartet);
+}
+
 /// Ist der neue Name gespeichert, meldet die Einheit ihre versorgten Personen auch dann, wenn ein
 /// späterer Schritt desselben PATCH mit 422 scheitert (Muster der Abschnitts-Route).
 #[tokio::test]

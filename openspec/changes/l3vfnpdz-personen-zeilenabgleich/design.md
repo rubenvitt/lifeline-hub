@@ -136,7 +136,8 @@ sendet der Server nach dem Commit `person` mit `person_id` je Person mit dieser
 - Umbenennen und Auflösen eines Abschnitts: `NamensTraeger` (`einsatzabschnitt::repo`) führt
   schon jedes Objekt, das den Abschnittsnamen per Join trägt (LLH-1291), und bekommt die
   versorgten Personen der Einheiten im Abschnitt dazu;
-- Abruf aus dem Bereitstellungsraum mit Ziel-Abschnitt;
+- Abruf aus dem Bereitstellungsraum mit Ziel-Abschnitt und Übernahme einer unangemeldeten
+  Einheit mit Abschnitt (sie kann schon Personen versorgen);
 - Vollzug und Rücknahme einer Ablösung mit Abschnittsübergabe (`VollzugWirkung.abschnitt_gewechselt`).
 
 Über zehn Personen (`PERSONEN_EINZELN_MAX`, gleich `ZEILEN_GRENZE`) sendet der Server ein
@@ -157,7 +158,13 @@ Zeile vom Stand davor sie. Der Zeilenabgleich merkt sich deshalb je Liste die Re
 abgerufenen Zeile vor dem Abruf. Ist sie danach eine andere, setzt er diese Zeile nicht ein und
 legt ihre Kennung ins nächste Fenster; die übrigen Zeilen gehen ein. Structural Sharing von
 TanStack lässt unveränderte Zeilen dabei gleich. Eine Liste, die erst während des Abrufs geladen
-wurde, geht an den Sammler. Das gilt für Schäden genauso.
+wurde, hat keinen Schnappschuss und geht an den Sammler. Das gilt für Schäden genauso.
+
+Geschützt ist der eine Abruf. Läuft die Mutation hinter der optimistischen Änderung länger als
+das nächste Fenster, kann der erneute Abruf noch den alten Stand lesen, bis `onSuccess` oder das
+eigene Ereignis der Mutation ihn ersetzt; so war es vor dieser Change bei jedem Ereignis. Auf
+laufende Mutationen zu warten (`isMutating`) ist verworfen: die Offline-Warteschlange hielte den
+Zeilenabgleich dann beliebig lange an.
 
 - *Ganze Liste an den Sammler, wenn sich `dataUpdatedAt` geändert hat* (erste Behebung):
   verworfen im Nachreview. Eine optimistische Änderung an einer anderen Zeile hätte einen

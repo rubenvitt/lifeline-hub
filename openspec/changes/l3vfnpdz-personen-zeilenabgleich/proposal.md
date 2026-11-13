@@ -54,16 +54,19 @@ Keine.
 
 ## Impact
 
-- Backend: `src/routes/einsatz_person.rs` (neuer Handler), `src/app.rs` (Route),
+- Backend: `src/routes/einsatz_person.rs` (neuer Handler), `src/app.rs` (Route), `src/error.rs`
+  (`AppError::NichtInListe`), `src/person/repo.rs` (versorgte Personen),
   `src/geraet/mod.rs` (Routenlisten der Geräte, die die Liste lesen),
   `src/routes/nachforderung.rs` (`person_id` im Ereignis), `src/routes/einsatz_einheit.rs` und
   `src/routes/einsatzabschnitt.rs` mit `src/einsatzabschnitt/repo.rs`,
-  `src/routes/einsatz_bereitstellungsraum.rs`, `src/routes/abloesung.rs` mit
+  `src/routes/einsatz_bereitstellungsraum.rs`, `src/routes/einsatz_einheit.rs` (Übernahme),
+  `src/routes/abloesung.rs` mit
   `src/abloesung/repo.rs` (`person` je versorgter Person), Tests in `tests/einsatz_person.rs`,
   `tests/geraet_kopplung.rs`, `tests/nachforderung_person.rs`, `tests/abschnitt_namenstraeger.rs`,
   `tests/einsatz_bereitstellungsraum.rs` und `tests/abloesung.rs`.
 - Frontend: `frontend/src/api/queryKeys.ts` (`ZeilenZiel`, `EINSATZ_STREAM_ZIELE.person`),
   `frontend/src/live/zeilenAbgleich.ts` (Ziel `personen`), `frontend/src/api/einsatzPerson.ts`
-  (Zeilenabruf, Vergleich, Form der Auswahl), Tests daneben.
+  (Zeilenabruf, Vergleich, Form der Auswahl), `frontend/src/api/client.ts` (`ApiError.grund`),
+  Tests daneben.
 - Keine Migration, kein neues Antwort-DTO (die Route liefert das vorhandene `PersonAnzeige`),
   also auch kein Typ-Codegen-Lauf nötig.

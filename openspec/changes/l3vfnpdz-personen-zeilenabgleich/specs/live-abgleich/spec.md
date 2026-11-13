@@ -45,7 +45,8 @@ laufende Abrufe gelten dieselben Ausnahmen wie bei Schäden.
 
 #### Scenario: Abruf oder Ablösung wechselt den Abschnitt
 - **WHEN** eine Einheit mit versorgten Personen aus dem Bereitstellungsraum in einen Abschnitt
-  abgerufen wird oder bei einer Ablösung ihren Abschnitt übergibt oder zurückbekommt
+  abgerufen oder mit Abschnitt übernommen wird, oder bei einer Ablösung ihren Abschnitt übergibt
+  oder zurückbekommt
 - **THEN** zeigen die Personenlisten der anderen Tabs bei diesen Personen den neuen Abschnitt
 
 #### Scenario: Viele Personen auf einmal
@@ -93,8 +94,8 @@ Zeilen SHALL er einsetzen. Das gilt für Schäden und Personen.
 #### Scenario: Person im Grundriss gezogen
 - **WHEN** jemand eine Person im Grundriss auf einen Platz zieht, während ihr Zeilenabruf aus
   einem fremden Ereignis läuft
-- **THEN** springt sie nicht auf den alten Platz zurück, und ihre Zeile wird im nächsten Fenster
-  erneut abgerufen
+- **THEN** überschreibt dieser Abruf ihren neuen Platz nicht, und ihre Zeile wird im nächsten
+  Fenster erneut abgerufen
 
 #### Scenario: Andere Zeile geändert
 - **WHEN** während des Zeilenabrufs einer Person eine andere Person der Liste lokal geändert wird
