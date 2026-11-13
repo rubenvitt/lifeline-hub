@@ -2,11 +2,11 @@
 
 ### Requirement: Schlüssel und Widerrufe überstehen das Zurückspielen einer Sicherung
 
-Nach dem Zurückspielen einer gekoppelten Instanz aus einer Sicherung SHALL die Nachlieferung der
-Unterschriftsschlüssel ohne Eingriff weiterlaufen. Jeder danach gegengezeichnete oder widerrufene
-Schlüssel MUST das Gegenüber mit den nächsten Meldungen erreichen, auch wenn die Uhr der
-zurückgespielten Seite nachgeht. Ausgenommen ist eine nachgehende Uhr, bei der vor der ersten
-Meldung mehr Stände vergeben werden, als verloren gingen.
+Nach dem Zurückspielen einer Instanz aus einer Sicherung SHALL jeder danach gegengezeichnete oder
+widerrufene Schlüssel das Gegenüber ohne Eingriff mit den nächsten Meldungen erreichen, auch bei
+nachgehender Uhr. Ausgenommen: Die Seite vergibt bei nachgehender Uhr vor der ersten Meldung
+mindestens so viele Stände, wie verloren gingen, oder ihre Uhr läuft bis dahin über die verlorenen
+Stände; eine zweite Gegenstelle hatte weiter übernommen als die zuerst meldende.
 
 #### Scenario: Hub zurückgespielt, neuer Schlüssel
 - **WHEN** der Hub aus einer Sicherung zurückgespielt wird, danach Admin C einen Unterschriftsschlüssel registriert, Admin A ihn gegenzeichnet und der ELW sich meldet

@@ -654,6 +654,7 @@ wieder. Die Uhr des Servers muss dafür stimmen; die Grenzen nennt die Betriebsd
 
 Dasselbe gilt für Unterschriftsschlüssel und Stammdaten: Was der Hub nach dem Zurückspielen
 registriert, widerruft oder ändert, erreicht den ELW mit den nächsten Meldungen. Erkennt der Hub
-dabei einen Rückstand, zeigt die Kopplung „… kennt schon spätere Unterschriftsschlüssel …“ oder
-„… kennt schon spätere Stammdaten …“ und schickt sie einmal ganz. Ein Schlüssel, den der Hub mit der
-Sicherung verloren hat, gilt am ELW weiter, bis die Organisation neu gekoppelt wird.
+dabei einen Rückstand, zeigt die Kopplung „… kennt schon spätere Stände …“ mit der Liste dessen, was
+erneut geht („Unterschriftsschlüssel von …“, „Stammdaten von …“), und schickt es einmal ganz. Ein
+Schlüssel, den der Hub mit der Sicherung verloren hat, gilt am ELW weiter, bis der Hub seine Nummer
+neu vergibt oder die Organisation neu gekoppelt wird.

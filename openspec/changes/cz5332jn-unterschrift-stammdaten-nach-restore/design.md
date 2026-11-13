@@ -75,8 +75,12 @@ Transaktion. Liegt der gemeldete Stand darüber und höchstens bei `STAND_RAISE_
 LLH-1708), ruft sie `unterschrift::renew_stand_ueber(conn, org_id, gemeldet)` auf. Das stempelt
 **alle** gültigen und widerrufenen lokalen Schlüssel der Org in der Reihenfolge ihres Stands neu auf
 `gemeldet + 1, gemeldet + 2, …`. Die Nachlieferung derselben Meldung nimmt sie gleich mit, wie
-bisher in Seiten zu 64. An der Kopplung steht dann der Hinweis „Der Stand der Unterschriftsschlüssel
-lag unter dem von <Gegenüber> gemeldeten. Die Schlüssel von <Org> gehen erneut an <Gegenüber>.“
+bisher in Seiten zu 64. An der Kopplung steht dann ein Hinweis, der jede Org und jeden Strom nennt, der erneut geht:
+„<Gegenüber> kennt schon spätere Stände, als diese Instanz vergeben hat (aus einer Sicherung
+zurückgespielt?). Erneut an <Gegenüber> gehen: Unterschriftsschlüssel von <Org>, Stammdaten von
+<Org>.“ `handle_meldung` sammelt die Teile über alle Orgs und setzt ihn einmal am Ende der
+Transaktion. Hat dieselbe Meldung schon einen Hinweis der Führung gesetzt, steht er dahinter
+(Review, 13.11.2026: sonst überschrieb D4 den Hinweis aus D2).
 
 - **Alle statt einer Auswahl:** Welche Schlüssel seit dem Zurückspielen neu oder widerrufen sind,
   weiß die Seite nicht. Es sind wenige. Einen schon bekannten gültigen Schlüssel übergeht die
@@ -121,8 +125,7 @@ als `bis` nur Stände dieser Org. Ohne Zurückspielen gilt daher stets gemeldet 
 `stammdaten::renew_log_der_org(conn, org_id, gemeldet)` auf: `sqlite_sequence` auf mindestens den
 gemeldeten Stand heben, die Log-Zeilen der Org in Reihenfolge lesen, löschen und in derselben
 Reihenfolge neu einfügen. Jede bekommt so einen Stand über dem gemeldeten. Die Nachlieferung liefert
-dann die ganze Org erneut, in Seiten nach dem bestehenden Budget. Der Hinweis an der Kopplung lautet
-wie in D2, mit „Stammdaten“ statt „Schlüssel“.
+dann die ganze Org erneut, in Seiten nach dem bestehenden Budget. Der Hinweis ist derselbe wie in D2.
 
 - **Ganz statt einer Auswahl:** wie D2. Unveränderte Zeilen übernimmt die meldende Seite ohne Wirkung.
 - **Nur Orgs dieser Kopplung,** nur mit Stand `≥ 0` und nur über eine Kopplung, die Stammdaten
@@ -156,13 +159,26 @@ also gewinnt es dadurch keine neue Macht.
 
 ## Risks / Trade-offs
 
-- **[Uhr der zurückgespielten Seite geht nach, und sie vergibt vor der ersten Meldung mehr Stände
-  bzw. Änderungen, als verloren gingen]** → Weder D1/D3 noch D2/D4 greifen. Die Stände dazwischen
-  erreichen die meldende Seite erst mit ihrer nächsten Änderung. Für Stammdaten hilft „Erneut
-  abgleichen“ an der meldenden Seite. Die Kopplung zeigt die Uhrabweichung (`uhr_abweichung_s`).
-- **[VM-Snapshot mit laufendem Prozess]** → D3 springt nicht. Bei richtiger Uhr greift D4, denn der
-  Log-Zähler steht dann unter dem gemeldeten Stand, bis die Seite mehr Änderungen hat als verloren
-  gingen. Danach gilt das Risiko darüber.
+Die Erkennung in D2 und D4 vergleicht nur den gemeldeten Stand mit dem eigenen Höchsten (Review,
+13.11.2026). Daraus folgen die ersten drei Restlücken. Für die Schlüssel schließt sie die
+Bestandsliste aus LLH-1871: Der Hub schickt in jeder Antwort die ids seiner gültigen Schlüssel,
+und der ELW widerruft, was darin fehlt. Am 13.11.2026 so abgestimmt.
+
+- **[Uhr der zurückgespielten Seite geht nach, und sie vergibt vor der ersten Meldung mindestens so
+  viele Stände bzw. Änderungen, wie verloren gingen]** → Weder D1/D3 noch D2/D4 greifen. Die Stände
+  dazwischen erreichen die meldende Seite erst mit ihrer nächsten Änderung. Für Stammdaten hilft
+  „Erneut abgleichen“ an der meldenden Seite. Die Kopplung zeigt die Uhrabweichung
+  (`uhr_abweichung_s`).
+- **[Die Uhr läuft vor der ersten Meldung über die verlorenen Stände]** → Typisch nach einem
+  VM-Snapshot: Die Uhr steht kurz zurück, ein Admin widerruft B, NTP stellt die Uhr, eine weitere
+  Schlüsselaktion bekommt einen Stand über dem gemeldeten. Dann sieht D2 keinen Rückschritt, und
+  der Widerruf von B erreicht den ELW nicht. Das ist sicherheitsrelevant. Abhilfe: die
+  Bestandsliste aus LLH-1871.
+- **[Zweite Gegenstelle, die weiter übernommen hatte als die zuerst meldende]** → D2/D4 stempeln
+  über dem Stand der zuerst meldenden. Liegt der Stand der zweiten im neu gestempelten Bereich,
+  verpasst sie dessen untere Einträge. Abhilfe für Schlüssel: LLH-1871.
+- **[VM-Snapshot mit laufendem Prozess]** → D3 springt nicht. Bei richtiger Uhr greift D4, solange die
+  Seite weniger Änderungen hat als verloren gingen. Danach gilt das erste Risiko.
 - **[Verlorene Schlüssel und Zeilen bleiben an der meldenden Seite]** → Folgeaufgabe LLH-1871. Ein
   verlorener Schlüssel bleibt dort gültig, bis seine id neu vergeben wird (D5) oder ein Admin dort
   neu koppelt.
@@ -170,8 +186,11 @@ also gewinnt es dadurch keine neue Macht.
   mehrere Meldungen. Konten mit Geheimnissen gehen nur unter den Bedingungen von D6 der
   Stammdaten-Verteilung hinaus, wie bei jeder Lieferung.
 - **[Eine fehlerhafte Gegenstelle meldet wiederholt Stände knapp über dem Höchsten]** → Jede Meldung
-  stempelt und liefert die Org dann neu und überschreibt den Hinweis an der Kopplung. Begrenzt durch
-  2³⁹ und die Seitengröße. Schaden an Daten entsteht nicht, weil die Inhalte unverändert sind.
+  stempelt die Org neu und liefert sie ganz. Das Neustempeln schreibt jede Log-Zeile der Org in der
+  Schreibtransaktion der Meldung neu (O(N), nicht durch das Budget begrenzt), die Lieferung danach
+  in Seiten. Ein gekoppeltes Gegenüber kann das bei jeder Meldung erneut auslösen, bis 2³⁹. Schaden
+  an Daten entsteht nicht, die Last trägt der Hub. Eine Gegenstelle, der man das zutraut, ist
+  ohnehin zu entkoppeln (Review, 13.11.2026, so hingenommen).
 - **[Tests, die kleine feste Stände erwarten]** → Sie werden auf relative Aussagen umgestellt
   (tasks.md).
 

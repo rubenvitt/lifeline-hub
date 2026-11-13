@@ -2,11 +2,11 @@
 
 ### Requirement: Stammdaten-Änderungen überstehen das Zurückspielen einer Sicherung
 
-Nach dem Zurückspielen einer gekoppelten Instanz aus einer Sicherung SHALL die Nachlieferung der
-Stammdaten ohne Eingriff weiterlaufen. Jede danach an der erreichten Seite geänderte Zeile MUST die
-meldende Seite mit den nächsten Meldungen erreichen. Geht die Uhr der zurückgespielten erreichten
-Seite nach, MUST sie die Stammdaten der Org einmal ganz neu liefern. Ausgenommen ist eine
-nachgehende Uhr, bei der vor der ersten Meldung mehr Änderungen geschehen, als verloren gingen.
+Nach dem Zurückspielen einer Instanz aus einer Sicherung SHALL jede danach an der erreichten Seite
+geänderte Zeile die meldende Seite ohne Eingriff mit den nächsten Meldungen erreichen. Geht ihre
+Uhr nach, MUST sie die Stammdaten der Org einmal ganz neu liefern. Ausgenommen: Bei nachgehender
+Uhr oder ohne Neustart geschehen vor der ersten Meldung mindestens so viele Änderungen, wie
+verloren gingen.
 
 #### Scenario: Hub zurückgespielt, Fahrzeug geändert
 - **WHEN** der Hub aus einer Sicherung zurückgespielt und neu gestartet wird, danach ein Admin am Hub den Funkrufnamen eines verteilten Fahrzeugs ändert und ein Fahrzeug anlegt und der ELW sich meldet
