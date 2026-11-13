@@ -769,6 +769,17 @@ async fn cmd_archiv_loeschersuchen(
     use lifeline_hub::einsatz::archiv::loeschersuchen;
     let schluessel = identitaet_laden(identitaet)?;
     let pool = archiv_db(db_path).await?;
+    if let Some(org) = org {
+        let bekannt: bool =
+            sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM organisation WHERE id = ?)")
+                .bind(org)
+                .fetch_one(&pool)
+                .await?;
+        if !bekannt {
+            pool.close().await;
+            anyhow::bail!("Organisation {org} gibt es hier nicht.");
+        }
+    }
     let ids = match einsatz {
         Some(id) => vec![id],
         None => loeschersuchen::faellige_einsaetze(&pool, chrono::Utc::now(), org)
@@ -777,18 +788,35 @@ async fn cmd_archiv_loeschersuchen(
     };
     if ids.is_empty() {
         pool.close().await;
-        println!("Keine fälligen Löschersuchen für Personen im Archiv.");
+        match org {
+            Some(org) => println!(
+                "Keine fälligen Löschersuchen für Personen im Archiv der Organisation {org}."
+            ),
+            None => println!("Keine fälligen Löschersuchen für Personen im Archiv."),
+        }
         return Ok(());
     }
+    // Das Signal einmal abonniert, über alle Einsätze: ein Strg+C oder SIGTERM während einer
+    // Ablage geht sonst verloren (tokio hat den Handler da schon übernommen, und ein später
+    // abonniertes Signal sieht es nicht mehr).
+    let abbruch = shutdown_signal();
+    tokio::pin!(abbruch);
+    let mut abgebrochen = false;
     let mut fehler = 0;
     let mut vollzogen = 0;
     for id in ids {
-        // Abbrechbar ist nur das Bauen: ein Abbruch (Strg+C, SIGTERM) lässt es fallen, `Drop`
-        // löscht die entschlüsselten Zwischendateien, und an diesem Einsatz ist nichts geändert.
-        // Die Ablage danach ist eine Transaktion und läuft zu Ende.
-        let gebaut = tokio::select! {
-            b = loeschersuchen::neu_bauen(&pool, id, &schluessel, chrono::Utc::now()) => Some(b),
-            () = shutdown_signal() => None,
+        // Abbrechbar ist nur das Bauen: ein Abbruch lässt es fallen, `Drop` löscht die
+        // entschlüsselten Zwischendateien, und an diesem Einsatz ist nichts geändert. Die Ablage
+        // ist eine Transaktion und läuft zu Ende; ein Abbruch während ihr wirkt danach.
+        let gebaut = if abgebrochen {
+            None
+        } else {
+            tokio::select! {
+                b = loeschersuchen::neu_bauen(&pool, id, &schluessel, chrono::Utc::now()) => {
+                    Some(b)
+                }
+                () = &mut abbruch => None,
+            }
         };
         let ergebnis = match gebaut {
             None => {
@@ -803,7 +831,17 @@ async fn cmd_archiv_loeschersuchen(
                     }
                 );
             }
-            Some(Ok(Some(bau))) => loeschersuchen::ablegen(&pool, bau).await,
+            Some(Ok(Some(bau))) => {
+                let ablage = loeschersuchen::ablegen(&pool, bau);
+                tokio::pin!(ablage);
+                // Die Ablage läuft zu Ende; ein Signal währenddessen merkt sich der Befehl.
+                loop {
+                    tokio::select! {
+                        r = &mut ablage => break r,
+                        () = &mut abbruch, if !abgebrochen => abgebrochen = true,
+                    }
+                }
+            }
             Some(Ok(None)) => Ok(None),
             Some(Err(e)) => Err(e),
         };
@@ -830,10 +868,19 @@ async fn cmd_archiv_loeschersuchen(
         }
     }
     pool.close().await;
+    if abgebrochen {
+        anyhow::bail!(
+            "Abgebrochen nach der laufenden Ablage; die übrigen Einsätze sind nicht bearbeitet."
+        );
+    }
     if fehler > 0 {
         anyhow::bail!(
-            "{fehler} Einsatz/Einsätze nicht vollzogen; dort ist nichts geändert. Gehören sie zu \
-             einer anderen Organisation, mit --org eingrenzen."
+            "{fehler} Einsatz/Einsätze nicht vollzogen; dort ist nichts geändert.{}",
+            if org.is_none() && einsatz.is_none() {
+                " Gehören sie zu einer anderen Organisation, mit --org eingrenzen."
+            } else {
+                ""
+            }
         );
     }
     Ok(())

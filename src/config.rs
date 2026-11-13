@@ -872,7 +872,7 @@ pub enum ArchivBefehl {
         einsatz: Option<i64>,
         /// Nur Einsätze dieser Organisation (ID). Ein Archiv-Schlüssel öffnet nur die Blöcke
         /// seiner Organisation; an einer Installation mit mehreren gehört die Angabe dazu.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "einsatz")]
         org: Option<i64>,
     },
     /// Im Archiv eines Einsatzes nach einer Person suchen, um ihre Kennung für ein Löschersuchen
@@ -1980,6 +1980,24 @@ mod tests {
             ),
             andere => panic!("{andere:?}"),
         }
+        // `--org` grenzt nur die Suche nach fälligen Einsätzen ein; mit `--einsatz` zusammen wäre
+        // sie still wirkungslos.
+        assert!(try_parse_mit_env(
+            "LIFELINE_UNBENUTZT",
+            "x",
+            &[
+                "lifeline-hub",
+                "archiv",
+                "loeschersuchen",
+                "--identitaet",
+                "-",
+                "--einsatz",
+                "7",
+                "--org",
+                "2"
+            ]
+        )
+        .is_err());
         // Ohne Schlüssel und Suchtext kein Befehl (die Variable ist für den Befehl ohne Belang).
         assert!(try_parse_mit_env(
             "LIFELINE_UNBENUTZT",

@@ -156,9 +156,11 @@ Archiv-Schlüssel der Organisation hat:
    im Ablauf oben fortfahren.
 4. Unter „Kennung der Person“ die Kennung eintragen, etwa `R-042`; darunter steht die Art der
    Person. Das „Aktenzeichen des Löschersuchens“ eintragen, ohne Namen.
-5. „Person schwärzen lassen“ wählen.
+5. „Person schwärzen lassen“ wählen. In den ersten 24 Stunden lässt sich der Antrag in der Liste
+   zurücknehmen.
 6. Nach 24 Stunden steht am Antrag „wartet auf Befehl mit Archiv-Schlüssel“. Dann auf dem Server
-   `lifeline-hub archiv loeschersuchen --identitaet <Schlüsseldatei>` ausführen lassen. Die
+   `lifeline-hub archiv loeschersuchen --identitaet <Schlüsseldatei> --org <ID>` ausführen
+   lassen, die ID der eigenen Organisation. Die
    Ausgabe nennt je Einsatz die Kennungen und die Zahl der Blöcke; danach steht der Antrag als
    vollzogen in der Liste.
 
@@ -275,7 +277,10 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 ### Löschersuchen
 
 - Ein Löschersuchen wartet nicht auf Frist und Karenz. Es wird 24 Stunden nach dem Erfassen
-  vollzogen; bis dahin lässt es sich zurücknehmen.
+  vollzogen; bis dahin lässt es sich zurücknehmen. Ausnahme ist eines für eine Person an einem
+  archivierten Einsatz: Es lässt sich ebenso nur in den ersten 24 Stunden zurücknehmen, vollzogen
+  wird es aber erst, wenn auf dem Server der Befehl mit dem Archiv-Schlüssel läuft. Bis dahin steht
+  es offen in der Liste, mit „wartet auf Befehl mit Archiv-Schlüssel“.
 - **Person:** Entfernt werden Name, Kontakt, Adresse und Notizen der Person, bei Betroffenen
   auch ihre Fotos und Dateien. Erwähnungen in Freitexten (Einsatztagebuch, Chat,
   Führungsmodule) bleiben stehen.

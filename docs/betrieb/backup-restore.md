@@ -333,10 +333,16 @@ lifeline-hub --db-path … archiv loeschersuchen --identitaet … --org 2
   Befehl auch die Einsätze der anderen, scheitert dort am Schlüssel und endet mit einem Fehler,
   obwohl die eigenen vollzogen sind.
 - Strg+C oder SIGTERM während des Neubaus brechen ab: Am gerade bearbeiteten Einsatz ändert sich
-  nichts, und die Zwischendateien gehen mit; schon gemeldete Einsätze bleiben vollzogen. Das
-  Ablegen danach ist eine Transaktion und läuft zu Ende.
-- Der Befehl hält immer nur einen Block im Arbeitsspeicher. Neben der Datenbank braucht er Platz
-  für alle neu verschlüsselten Blöcke des Einsatzes und einen entschlüsselten.
+  nichts, und die Zwischendateien gehen mit; schon gemeldete Einsätze bleiben vollzogen. Kommt
+  das Signal während des Ablegens, läuft diese Transaktion zu Ende, und der Befehl hört danach
+  auf.
+- Der Befehl hält immer nur einen Block im Arbeitsspeicher, braucht aber Platz auf der Platte:
+  für den entschlüsselten Block zweimal (`VACUUM` legt eine Kopie an, im Temp-Verzeichnis und
+  als Journal neben der Datei), für alle neu verschlüsselten Blöcke des Einsatzes, und während
+  des Ablegens noch einmal so viel im Write-Ahead-Log der Datenbank, dazu die genullten Seiten der
+  alten Blöcke. Grob gerechnet: dreimal die Größe des Archivs des Einsatzes frei. Fehlt der Platz,
+  scheitert die Ablage und wird zurückgerollt; in der Zeit ist die Platte aber auch für den
+  laufenden Server voll.
 
 **Kennung finden.** Am archivierten Einsatz gibt es keine Namen mehr. Die Kennung zu einem Namen
 liefert die Suche im gültigen Block des Archivs:

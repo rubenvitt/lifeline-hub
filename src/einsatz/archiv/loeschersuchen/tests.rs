@@ -249,17 +249,35 @@ async fn faellige_einsaetze_je_organisation() {
     let pool = crate::db::test_pool().await;
     let a = archiv(&pool).await;
     antrag(&pool, &a, 25).await;
+    // Ein zweiter archivierter Einsatz, der Organisation 2 gehört.
+    let b = archiv(&pool).await;
+    antrag(&pool, &b, 25).await;
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Andere')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE einsatz SET org_id = 2 WHERE id = ?")
+        .bind(b.einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
     assert_eq!(
         faellige_einsaetze(&pool, Utc::now(), Some(1))
             .await
             .unwrap(),
         vec![a.einsatz]
     );
-    sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Andere')")
-        .execute(&pool)
-        .await
-        .unwrap();
-    assert!(faellige_einsaetze(&pool, Utc::now(), Some(2))
+    assert_eq!(
+        faellige_einsaetze(&pool, Utc::now(), Some(2))
+            .await
+            .unwrap(),
+        vec![b.einsatz]
+    );
+    assert_eq!(
+        faellige_einsaetze(&pool, Utc::now(), None).await.unwrap(),
+        vec![a.einsatz, b.einsatz]
+    );
+    assert!(faellige_einsaetze(&pool, Utc::now(), Some(3))
         .await
         .unwrap()
         .is_empty());
