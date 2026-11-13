@@ -2,7 +2,7 @@
 //!
 //! Jede gespeicherte Akte richtet ihren Einsatz aus ([`save`] →
 //! `instanz::spiegel::fuehrung::richte_aus`, in der Transaktion des Wechsels): Führt eine andere
-//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0033).
+//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0039).
 
 use super::{Epoche, FuehrungWechselArt};
 use crate::error::AppError;

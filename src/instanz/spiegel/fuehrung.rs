@@ -1,5 +1,5 @@
 //! Führung je Einsatz auf dem Spiegel (LLH-1641, Entwurf E1–E7, mit Ruben am 11.11.2026
-//! abgestimmt; ADR-0018, ADR-0033).
+//! abgestimmt; ADR-0018, ADR-0039).
 //!
 //! Die Akte (`einsatz_fuehrung`) entscheidet, wer einen Einsatz führt; die Zeile in
 //! `einsatz_spiegel` folgt ihr ([`richte_aus`]), und allein sie sperrt (Trigger und Antragsschicht

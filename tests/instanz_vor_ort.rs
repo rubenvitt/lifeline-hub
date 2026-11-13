@@ -1907,3 +1907,272 @@ async fn ein_widerruf_der_direktkopplung_holt_die_fuehrung_nicht_zurueck() {
     .await;
     assert_ne!(art, "notuebernahme");
 }
+
+// ── Führungswechsel vor Ort: weitere Fälle (LLH-1678) ──────────────────────────────────────────
+
+#[tokio::test]
+async fn auch_die_ausstellende_seite_uebernimmt_vor_ort_nur_mit_beweis() {
+    let v = vor_ort_mit_einsatz().await;
+    // ELW 2 führt nach einer Übergabe.
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/uebergeben", v.e1),
+        json!({"an": v.ich2}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    runde(&v).await;
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich2);
+    // Admin A an ELW 1 (Schlüssel aus dem Grundstock, ELW 2 kennt ihn) übernimmt mit Unterschrift.
+    let (s, start) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/notuebernahme/start", v.e1),
+        json!({"grund": "ELW 2 ausgefallen"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{start}");
+    let assertion = SoftwarePasskey::new("a", [1u8; 32]).sign(
+        start["erklaerung"].as_str().unwrap(),
+        ORIGIN,
+        RP,
+        0x05,
+    );
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/notuebernahme/abschluss", v.e1),
+        json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich1);
+    runde(&v).await;
+    assert_eq!(
+        fuehrer(&v.elw2, &v.kennung).await,
+        v.ich2,
+        "ELW 2 hält offen, bis seine Einsatzleitung entscheidet"
+    );
+    let f = fuehrung(&v.elw2, v.e2).await;
+    assert_eq!(f["offen"]["grund"], "ELW 2 ausgefallen", "{f}");
+    let (s, r) = post(
+        &v.elw2,
+        &format!("/api/einsaetze/{}/fuehrung/bestaetigen", v.e2),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    runde(&v).await;
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich1);
+}
+
+#[tokio::test]
+async fn ein_spaeter_schluessel_der_meldenden_seite_wartet_vor_ort_auf_bestaetigung() {
+    let v = vor_ort_mit_einsatz().await;
+    schluessel_b(&v.elw2).await;
+    runde(&v).await;
+    assert!(kennt_b_gueltig(&v.elw1).await, "Grundstock");
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let oeff = c.oeffentlich();
+    {
+        let mut conn = v.elw2.pool.acquire().await.unwrap();
+        lifeline_hub::auth::unterschrift::repo::create_lokal(
+            &mut conn,
+            &lifeline_hub::auth::unterschrift::repo::NeuerSchluessel {
+                org_id: 1,
+                benutzer_id: 1,
+                benutzer_name: "Admin C",
+                credential_id: &c.credential_id,
+                schluessel: &oeff,
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Stick C",
+            },
+        )
+        .await
+        .unwrap();
+    }
+    runde(&v).await;
+    let zustand: String = eine(
+        &v.elw1.pool,
+        &format!(
+            "SELECT zustand FROM unterschrift_schluessel WHERE credential_id = '{}'",
+            c.credential_id
+        ),
+    )
+    .await;
+    assert_eq!(zustand, "wartet_auf_bestaetigung");
+}
+
+#[tokio::test]
+async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
+    let v = vor_ort_mit_einsatz().await;
+    // Der zuletzt aufgebaute Router ist der von ELW 2 (`common::benutzer_anlegen`).
+    common::benutzer_anlegen(&v.elw2.app, &v.elw2.admin, "helfer", "keine").await;
+    let helfer = common::login_cookie(&v.elw2.app, "helfer", "helferpw1").await;
+    let (s, _) = common::anfrage_json(
+        &v.elw2.app,
+        "POST",
+        &format!("/api/einsaetze/{}/fuehrung/anfrage/ablehnen", v.e2),
+        &helfer,
+        Some(&json!({})),
+    )
+    .await;
+    assert!(
+        s == StatusCode::FORBIDDEN || s == StatusCode::NOT_FOUND,
+        "ohne Recht: {s}"
+    );
+}
+
+#[tokio::test]
+async fn nach_dem_nachziehen_am_hub_landen_alle_beim_widerspruch_von_elw1() {
+    let (hub, v) = hub_mit_einsatz_von_elw1().await;
+    schluessel_b(&v.elw2).await;
+    melden(&v.elw2).await;
+    // B kam nach dem Grundstock: an ELW 1 und am Hub wartet er auf einen Admin.
+    for i in [&hub, &v.elw1] {
+        let zustand: String = eine(
+            &i.pool,
+            &format!(
+                "SELECT zustand FROM unterschrift_schluessel WHERE credential_id = '{}'",
+                passkey_b().credential_id
+            ),
+        )
+        .await;
+        assert_eq!(zustand, "wartet_auf_bestaetigung");
+        exec(
+            &i.pool,
+            &format!(
+                "UPDATE unterschrift_schluessel SET zustand = 'gueltig' WHERE credential_id = '{}'",
+                passkey_b().credential_id
+            ),
+        )
+        .await;
+    }
+    abgleichen(&v.elw2).await;
+    let adresse_elw1: String = eine(
+        &v.elw2.pool,
+        &format!(
+            "SELECT gegenueber_adresse FROM instanz_kopplung WHERE gegenueber_kennung = '{}'",
+            v.ich1
+        ),
+    )
+    .await;
+    elw1_faellt_aus(&v).await;
+    elw2_uebernimmt_mit_unterschrift(&v, "ELW 1 ausgefallen").await;
+    melden(&v.elw2).await;
+    assert_eq!(
+        fuehrer(&hub, &v.kennung).await,
+        v.ich2,
+        "der Hub folgt der Unterschrift"
+    );
+    // ELW 1 kommt zurück und widerspricht.
+    exec(
+        &v.elw2.pool,
+        &format!(
+            "UPDATE instanz_kopplung SET gegenueber_adresse = '{adresse_elw1}' \
+             WHERE gegenueber_kennung = '{}'",
+            v.ich1
+        ),
+    )
+    .await;
+    melden(&v.elw2).await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/widersprechen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    for _ in 0..3 {
+        melden(&v.elw1).await;
+        melden(&v.elw2).await;
+    }
+    assert_eq!(fuehrer(&v.elw1, &v.kennung).await, v.ich1);
+    assert_eq!(fuehrer(&v.elw2, &v.kennung).await, v.ich1);
+    assert_eq!(
+        fuehrer(&hub, &v.kennung).await,
+        v.ich1,
+        "alle drei bei ELW 1"
+    );
+}
+
+#[tokio::test]
+async fn elw1_faellt_aus_elw2_uebernimmt_der_hub_folgt_und_elw1_bestaetigt() {
+    // Gesamtlauf (tasks 9.1): Hub, ELW 1 und ELW 2.
+    let (hub, v) = hub_mit_einsatz_von_elw1().await;
+    schluessel_b(&v.elw2).await;
+    melden(&v.elw2).await;
+    // B kam nach dem Grundstock: an ELW 1 und am Hub wartet er auf einen Admin.
+    for i in [&hub, &v.elw1] {
+        let zustand: String = eine(
+            &i.pool,
+            &format!(
+                "SELECT zustand FROM unterschrift_schluessel WHERE credential_id = '{}'",
+                passkey_b().credential_id
+            ),
+        )
+        .await;
+        assert_eq!(zustand, "wartet_auf_bestaetigung");
+        exec(
+            &i.pool,
+            &format!(
+                "UPDATE unterschrift_schluessel SET zustand = 'gueltig' WHERE credential_id = '{}'",
+                passkey_b().credential_id
+            ),
+        )
+        .await;
+    }
+    abgleichen(&v.elw2).await;
+    let adresse_elw1: String = eine(
+        &v.elw2.pool,
+        &format!(
+            "SELECT gegenueber_adresse FROM instanz_kopplung WHERE gegenueber_kennung = '{}'",
+            v.ich1
+        ),
+    )
+    .await;
+    elw1_faellt_aus(&v).await;
+    elw2_uebernimmt_mit_unterschrift(&v, "ELW 1 ausgefallen").await;
+    melden(&v.elw2).await;
+    abgleichen(&hub).await;
+    assert_eq!(fuehrer(&hub, &v.kennung).await, v.ich2);
+    exec(
+        &v.elw2.pool,
+        &format!(
+            "UPDATE instanz_kopplung SET gegenueber_adresse = '{adresse_elw1}' \
+             WHERE gegenueber_kennung = '{}'",
+            v.ich1
+        ),
+    )
+    .await;
+    melden(&v.elw2).await;
+    let (s, r) = post(
+        &v.elw1,
+        &format!("/api/einsaetze/{}/fuehrung/bestaetigen", v.e1),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    for _ in 0..2 {
+        melden(&v.elw1).await;
+        melden(&v.elw2).await;
+        abgleichen(&hub).await;
+        abgleichen(&v.elw1).await;
+        abgleichen(&v.elw2).await;
+    }
+    for i in [&hub, &v.elw1, &v.elw2] {
+        assert_eq!(fuehrer(i, &v.kennung).await, v.ich2);
+    }
+    let spiegel_am_hub: i64 = eine(
+        &hub.pool,
+        &format!(
+            "SELECT spiegel FROM einsatz WHERE kennung = '{}'",
+            v.kennung
+        ),
+    )
+    .await;
+    assert_eq!(
+        spiegel_am_hub, 1,
+        "der Hub spiegelt den Einsatz weiter, jetzt von ELW 2"
+    );
+}

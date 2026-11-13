@@ -1129,7 +1129,7 @@ pub async fn handle_meldung(
                     let vor_ort = kopplung.art() == super::InstanzKopplungArt::VorOrt;
                     // Die Schlüssel der meldenden Seite übernehmen (LLH-1678, design.md D6): über
                     // eine Direktkopplung ihre erste Lieferung bis `grundstock_bis` als Grundstock,
-                    // sonst mit Gegenzeichnung; vom ELW am Hub nur zur Bestätigung durch einen Admin.
+                    // alles danach und alles vom ELW am Hub nur zur Bestätigung durch einen Admin.
                     if !mo.unterschrift.is_empty() {
                         let (bis, pflicht) = if vor_ort {
                             let bis = repo::save_unterschrift_grundstock_bis(
@@ -1138,7 +1138,13 @@ pub async fn handle_meldung(
                                 mo.unterschrift_grundstock_bis.unwrap_or(0),
                             )
                             .await?;
-                            (Some(bis), unterschrift::GegenzeichnungPflicht::Pflicht)
+                            // Die meldende Seite zeichnet ihre Schlüssel nicht gegen (ihre Org
+                            // verteilt dort nicht): nach dem Grundstock wartet jeder auf einen
+                            // Admin hier, wie die Schlüssel eines ELW am Hub.
+                            (
+                                Some(bis),
+                                unterschrift::GegenzeichnungPflicht::NurBestaetigung,
+                            )
                         } else {
                             (None, unterschrift::GegenzeichnungPflicht::NurBestaetigung)
                         };
@@ -1444,10 +1450,9 @@ mod tests {
         );
     }
 
-    /// Die größte zulässige Antwort muss in [`ANTWORT_MAX`] passen, sonst bliebe Melden bei vielen
-    /// Schlüsseln dauerhaft an einer unlesbaren Antwort hängen.
-    #[test]
-    fn groesste_antwort_passt_in_die_lesegrenze() {
+    /// Die größte Lieferung eines Unterschriftsschlüssels: jedes Feld so groß, wie es beim
+    /// Registrieren und Gegenzeichnen höchstens angenommen wird.
+    fn groesste_lieferung() -> UnterschriftSchluesselLieferung {
         // Jedes Feld so groß, wie es beim Registrieren und Gegenzeichnen höchstens angenommen
         // wird; Namen und Bezeichnung mit Umlauten (zwei Byte je Zeichen).
         use crate::auth::unterschrift::pruefen::{
@@ -1464,24 +1469,60 @@ mod tests {
             "origin": "o".repeat(261), "alg": "es256"
         }))
         .expect("Erklärung");
-        let lieferung: UnterschriftSchluesselLieferung =
-            serde_json::from_value(serde_json::json!({
-                "id": i64::MAX, "benutzer_name": name, "credential_id": cid,
-                "schluessel": "s".repeat(87), "alg": "es256", "rp_id": "r".repeat(253),
-                "origin": "o".repeat(261), "bezeichnung": bezeichnung,
-                "zustand": "widerrufen", "stand": i64::MAX,
-                "gegenzeichnung": {
-                    "erklaerung": erklaerung,
-                    "assertion": {
-                        "credential_id": cid,
-                        "authenticator_data": "a".repeat(AUTHENTICATOR_DATA_MAX),
-                        "client_data_json": "c".repeat(CLIENT_DATA_JSON_MAX),
-                        "signatur": "s".repeat(SIGNATUR_MAX)
-                    },
-                    "unterzeichner_credential_id": cid
-                }
-            }))
-            .expect("Lieferung");
+        serde_json::from_value(serde_json::json!({
+            "id": i64::MAX, "benutzer_name": name, "credential_id": cid,
+            "schluessel": "s".repeat(87), "alg": "es256", "rp_id": "r".repeat(253),
+            "origin": "o".repeat(261), "bezeichnung": bezeichnung,
+            "zustand": "widerrufen", "stand": i64::MAX,
+            "gegenzeichnung": {
+                "erklaerung": erklaerung,
+                "assertion": {
+                    "credential_id": cid,
+                    "authenticator_data": "a".repeat(AUTHENTICATOR_DATA_MAX),
+                    "client_data_json": "c".repeat(CLIENT_DATA_JSON_MAX),
+                    "signatur": "s".repeat(SIGNATUR_MAX)
+                },
+                "unterzeichner_credential_id": cid
+            }
+        }))
+        .expect("Lieferung")
+    }
+
+    /// Die meldende Seite liefert ihre Schlüssel in der Meldung (LLH-1678, design.md D6): Die
+    /// größte Lieferung passt allein ins Budget, sonst bliebe sie ewig hängen, und eine Meldung mit
+    /// vollen Akten und vollem Schlüsselbudget passt in die Körpergrenze.
+    #[test]
+    fn groesste_anfrage_passt_in_die_grenze() {
+        let lieferung = groesste_lieferung();
+        let eine = serde_json::to_vec(&lieferung).expect("JSON").len();
+        assert!(
+            eine <= UNTERSCHRIFT_ANFRAGE_BYTES,
+            "{eine} Byte je Schlüssel über {UNTERSCHRIFT_ANFRAGE_BYTES}"
+        );
+        let mut a = anfrage(&["k"; 4], &[]);
+        for o in &mut a.orgs {
+            o.org = "k".repeat(88);
+            o.unterschrift_grundstock_bis = Some(i64::MAX);
+        }
+        a.orgs[0].unterschrift = vec![lieferung; UNTERSCHRIFT_ANFRAGE_BYTES / eine];
+        let akte = fuehrung_austausch::tests::akte_mit_bytes(fuehrung_austausch::AKTE_BYTES);
+        let akte_bytes = serde_json::to_vec(&akte).expect("JSON").len();
+        a.fuehrung = vec![akte; fuehrung_austausch::MELDUNG_BYTES / akte_bytes];
+        a.age_empfaenger = Some("a".repeat(70));
+        a.tls_zertifikat = Some("f".repeat(64));
+        let groesse = serde_json::to_vec(&a).expect("JSON").len();
+        assert!(
+            groesse <= super::super::extractor::BODY_MAX,
+            "{groesse} Byte über {}",
+            super::super::extractor::BODY_MAX
+        );
+    }
+
+    /// Die größte zulässige Antwort muss in [`ANTWORT_MAX`] passen, sonst bliebe Melden bei vielen
+    /// Schlüsseln dauerhaft an einer unlesbaren Antwort hängen.
+    #[test]
+    fn groesste_antwort_passt_in_die_lesegrenze() {
+        let lieferung = groesste_lieferung();
         let mut a = antwort(ORGS_MAX, 0);
         for o in &mut a.orgs {
             o.org = "k".repeat(88);

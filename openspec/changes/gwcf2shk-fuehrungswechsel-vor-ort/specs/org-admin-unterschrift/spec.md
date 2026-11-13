@@ -6,9 +6,10 @@
 zugeordneten Org liefern, die sie selbst als gültig führt: die hier registrierten und die von
 einem Gegenüber übernommenen, nicht aber die, die sie über genau diese Kopplung bekommen hat. Was
 eine Seite beim Koppeln und mit ihrer ersten Lieferung über die Direktkopplung schickt, MUST als
-Grundstock sofort gelten; spätere Neuzugänge MUST wie jede Nachlieferung eine Gegenzeichnung eines
-hier gültigen Schlüssels tragen und auf die Bestätigung eines Admins warten. Widerrufe MUST sie
-ebenso nachliefern.
+Grundstock sofort gelten. Spätere Neuzugänge MUST auf die Bestätigung eines Admins warten; die der
+erreichten Seite MUST dazu wie jede Nachlieferung eine Gegenzeichnung eines hier gültigen
+Schlüssels tragen, die der meldenden Seite nicht, denn sie zeichnet ihre Schlüssel nicht gegen.
+Widerrufe MUST sie ebenso nachliefern.
 
 #### Scenario: Schlüssel des Hubs erreicht ELW 2 über ELW 1
 - **WHEN** ELW 1 vom Hub den gültigen Schlüssel von Admin A kennt und ELW 2 nur über eine Direktkopplung mit ELW 1 gekoppelt ist
@@ -17,6 +18,10 @@ ebenso nachliefern.
 #### Scenario: Schlüssel der meldenden Seite erreicht die erreichte Seite
 - **WHEN** ELW 2 den Code von ELW 1 eingelöst hat und an ELW 2 Admin B einen Schlüssel registriert hat, den ELW 1 noch nicht kennt
 - **THEN** führt ELW 1 nach der ersten Meldung von ELW 2 den Schlüssel von B als gültig
+
+#### Scenario: Neuer Schlüssel an der meldenden Seite später
+- **WHEN** nach der ersten Meldung an ELW 2 Admin C einen Schlüssel registriert und ELW 2 sich bei ELW 1 meldet
+- **THEN** führt ELW 1 den Schlüssel von C als „wartet auf Bestätigung“
 
 #### Scenario: Neuer Schlüssel des Hubs später
 - **WHEN** nach dem Koppeln am Hub der Schlüssel von Admin C gegengezeichnet wird und ELW 1 ihn als gültig bestätigt hat

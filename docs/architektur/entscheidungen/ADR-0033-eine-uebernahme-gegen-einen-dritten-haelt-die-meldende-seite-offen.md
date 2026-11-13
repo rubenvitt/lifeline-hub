@@ -1,9 +1,10 @@
 ---
 id: ADR-0033
 titel: Ein Einsatz hat genau eine führende Instanz; eine Übernahme gegen einen Dritten hält die meldende Seite ohne Alarm offen
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-12
 ersetzt: ADR-0028
+ersetzt_durch: ADR-0039
 gilt_fuer:
   - src/instanz/fuehrung/**
   - src/instanz/spiegel/fuehrung.rs

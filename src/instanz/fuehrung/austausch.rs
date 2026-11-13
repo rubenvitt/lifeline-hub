@@ -892,6 +892,18 @@ async fn nimm_ablehnung_an(
     Ok(())
 }
 
+/// Ob eine der Instanzen `kennungen` für die Org `org_id` eine gleichrangige Gegenstelle einer
+/// Direktkopplung ist (LLH-1678, design.md D2).
+async fn is_gleichrangig_gekoppelt(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    kennungen: &[&str],
+) -> Result<bool, AppError> {
+    Ok(repo::list_gegenueber(conn, org_id).await?.iter().any(|g| {
+        g.wechsel == Wechselregel::Gleichrangig && kennungen.contains(&g.kennung.as_str())
+    }))
+}
+
 /// Ob eine offene Übernahme ein Konflikt ist (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
 /// design.md D3): Die erreichte Seite nennt als Führer eine Instanz, die keiner der Hubs ist, bei
 /// denen sich diese Instanz für die Org meldet (`hubs`, [`repo::list_hubs`]; im Austausch der
@@ -1252,7 +1264,15 @@ pub async fn apply_eingang(
             // Einen eigenen Zweig zum Erlöschen braucht es nicht (D6): Nennt der Hub keinen Dritten
             // mehr, ersetzt die nächste Akte die gehaltene (halte_offen, D7), oder Verwerfen bzw.
             // Annahme unten räumen `offen` ab.
-            if ich_fuehre && fremd_vergeben && (dritter_fuehrt || dritte_epoche) {
+            // Nennt der Hub als Führer oder Vergeber der Epoche meine gleichrangige Gegenstelle
+            // vor Ort, ist sie kein Dritter: Über einen Wechsel zwischen uns beiden entscheidet
+            // allein die Direktkopplung, der Hub reicht ihn nur weiter (LLH-1678, design.md D2).
+            if ich_fuehre
+                && fremd_vergeben
+                && (dritter_fuehrt || dritte_epoche)
+                && !is_gleichrangig_gekoppelt(conn, a.org_id, &[&m.fuehrer, &m.epoche.instanz])
+                    .await?
+            {
                 // Läuft über die Annahmeregel (src/AGENTS.md); mit einem Dritten heißt sie offen
                 // halten.
                 debug_assert_eq!(

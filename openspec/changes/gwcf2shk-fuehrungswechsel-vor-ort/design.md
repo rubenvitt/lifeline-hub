@@ -415,3 +415,16 @@ Die Nummern müssen größer sein als jede auf `origin/alpha` (heute 0345), vorh
   `anfrage_von` und `anfrage_abgelehnt`, sobald sich die Epoche ändert. Rechts im `UPDATE` stehen
   die alten Werte der Zeile. Damit gilt eine Anfrage nur dem Stand, den sie sah, und es braucht
   keine eigene Löschung an jedem Wechselweg.
+- **13.11.2026, D6: spätere Schlüssel der meldenden Seite vor Ort.** Die meldende Seite einer
+  Direktkopplung zeichnet nicht gegen, weil ihre Org dort nicht „verteilend“ ist. Was nach dem
+  Grundstock von ihr kommt, wartet deshalb ohne Gegenzeichnung auf einen Admin
+  (`NurBestaetigung`), wie die Schlüssel eines ELW am Hub. Mit Pflicht zur Gegenzeichnung würde
+  jeder spätere Schlüssel verworfen.
+- **13.11.2026, D2: Der Hub reicht einen Wechsel vor Ort nur weiter.** Gefunden im Test „ELW 1
+  widerspricht, nachdem der Hub der Unterschrift gefolgt ist“. Der Hub nannte ELW 1 noch ELW 2 als
+  Führer, und ELW 1 hielt das als Übernahme „eines Dritten“ offen (Regel von `faq7l7m4`, D3).
+  Danach verwarf ELW 1 sie an der Direktkopplung gegen die eigene neue Epoche, und beide Seiten
+  schaukelten sich hoch. Die meldende Seite einer Standardkopplung hält deshalb nichts offen, was
+  ihre gleichrangige Gegenstelle als Führer oder Vergeber der Epoche nennt
+  (`austausch::is_gleichrangig_gekoppelt`). Über diesen Wechsel entscheidet allein die
+  Direktkopplung.
