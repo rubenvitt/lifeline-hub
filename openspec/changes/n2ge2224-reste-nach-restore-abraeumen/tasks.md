@@ -34,7 +34,7 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
 
 ## 2. Stammdaten: Bestand und Prüfsumme (D3, D4)
 
-- [x] 2.1 Neues Modul `src/instanz/stammdaten/bestand.rs` mit `pruefsumme(&[(String, String)])`
+- [x] 2.1 Neues Modul `src/instanz/stammdaten/bestand.rs` mit `checksum(&[(String, String)])`
   (erste 128 Bit von SHA-256, hex, über sortierte `art \x1f schluessel \n`). Unit-Tests: die Reihenfolge der Eingabe
   ändert nichts, ein anderer Schlüssel oder eine andere Art ändert die Summe, die leere Menge hat
   eine feste Summe. Prüfen: `cargo test instanz::stammdaten::bestand`.
@@ -49,20 +49,20 @@ Jede Aufgabe entsteht per `superpowers:test-driven-development`: erst der Test, 
 
 ## 3. Stammdaten: Leitung und Sendebremse (D3, D5, D6)
 
-- [x] 3.1 Leitung: `MeldenOrg.stammdaten_pruefsumme: Option<String>`,
+- [x] 3.1 Leitung: `MeldenOrg.stammdaten_checksum: Option<String>`,
   `MeldenOrgAntwort.stammdaten_bestand: Option<Vec<StammdatenBestand>>` (`art`, `schluessel`),
   beide mit `serde(default)` und `skip_serializing_if`. `check_antwort`: höchstens `ARTEN_MAX` Arten
   je Org, höchstens `BESTAND_STAMMDATEN_MAX` Schlüssel je Antwort. Unit-Tests wie 1.3. Prüfen:
   `cargo test instanz::melden`.
-- [x] 3.2 Sendebremse in `bestand.rs`: `darf_senden(kennung, kopplung_org_id, pruefsumme, jetzt)` und
-  `merke_gesendet(…)`, Abstand 10 Minuten. Die Zeit kommt als Parameter. Unit-Tests: erster Aufruf
+- [x] 3.2 Sendebremse in `bestand.rs`: `can_send(kennung, kopplung_org_id, pruefsumme, jetzt)` und
+  `mark_sent(…)`, Abstand 10 Minuten. Die Zeit kommt als Parameter. Unit-Tests: erster Aufruf
   ja, gleiche Summe vor 10 Minuten nein, danach ja, andere Summe sofort ja, andere Kennung
   unabhängig. Prüfen: wie 2.1.
 - [x] 3.3 `handle_meldung`: Liste nach D5 bilden (Bedingungen 1–5), Restbudget abziehen, gesendete
   Einträge sammeln und nach dem Commit merken. `melden_einmal_mit`: Prüfsumme je Quell-Org aus der
   Herkunft melden. Integrationstests in `tests/instanz_stammdaten.rs`: (a) gleicher Bestand, keine
   Liste; (b) frisch gekoppelt mit mehr Zeilen als eine Antwort trägt, keine Liste, bis alles da ist.
-  Ob eine Liste ging, zeigt die Sendebremse (`bestand::zuletzt_gesendet`, nur lesend). Prüfen:
+  Ob eine Liste ging, zeigt die Sendebremse (`bestand::last_sent`, nur lesend). Prüfen:
   `cargo test --test instanz_stammdaten -- gleicher_bestand waehrend_der`.
 
 ## 4. Stammdaten: Abräumen am ELW (D7)

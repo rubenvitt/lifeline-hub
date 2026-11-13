@@ -1294,7 +1294,7 @@ async fn letzte_liste(hub: &Instanz) -> Option<(String, std::time::Instant)> {
         .unwrap()
         .kennung;
     let ko: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung_org").await;
-    bestand::zuletzt_gesendet(&kennung, ko)
+    bestand::last_sent(&kennung, ko)
 }
 
 async fn anzahl(pool: &sqlx::SqlitePool, sql: &str) -> i64 {

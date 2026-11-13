@@ -22,11 +22,11 @@ use std::time::{Duration, Instant};
 
 /// Länge der Prüfsumme in Zeichen (hex, die ersten 128 Bit von SHA-256): genug, um eine
 /// Abweichung zu erkennen, und klein genug für die Meldung (`extractor::BODY_MAX`).
-pub const PRUEFSUMME_LEN: usize = 32;
+pub const CHECKSUM_LEN: usize = 32;
 /// Höchstzahl Schlüssel des Bestands je Antwort (`src/AGENTS.md`, Listen von außen).
 pub const BESTAND_STAMMDATEN_MAX: usize = 100_000;
 /// Bleibt dieselbe Abweichung bestehen, geht die Liste höchstens so oft (D6).
-pub const SENDEBREMSE: Duration = Duration::from_secs(10 * 60);
+pub const SEND_THROTTLE: Duration = Duration::from_secs(10 * 60);
 
 /// Der Bestand einer Art: alle Schlüssel, die die erreichte Seite in dieser Org führt. Steht eine
 /// Art in der Liste, räumt die meldende Seite sie ab, auch mit leerer Liste.
@@ -38,7 +38,7 @@ pub struct StammdatenBestand {
 }
 
 /// Prüfsumme über Paare `(art, schluessel)`, unabhängig von ihrer Reihenfolge (D3).
-pub fn pruefsumme(paare: &[(String, String)]) -> String {
+pub fn checksum(paare: &[(String, String)]) -> String {
     let mut sortiert: Vec<&(String, String)> = paare.iter().collect();
     sortiert.sort();
     let mut h = Sha256::new();
@@ -49,14 +49,14 @@ pub fn pruefsumme(paare: &[(String, String)]) -> String {
         h.update([b'\n']);
     }
     let summe = h.finalize();
-    summe[..PRUEFSUMME_LEN / 2]
+    summe[..CHECKSUM_LEN / 2]
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect()
 }
 
 /// Die Paare eines Bestands.
-pub fn paare(bestand: &[StammdatenBestand]) -> Vec<(String, String)> {
+pub fn pairs(bestand: &[StammdatenBestand]) -> Vec<(String, String)> {
     bestand
         .iter()
         .flat_map(|b| b.schluessel.iter().map(|s| (b.art.clone(), s.clone())))
@@ -128,21 +128,21 @@ pub async fn load(
     Ok(aus)
 }
 
-type Bremse = HashMap<(String, i64), (String, Instant)>;
+type Throttle = HashMap<(String, i64), (String, Instant)>;
 
-fn bremse() -> &'static Mutex<Bremse> {
-    static BREMSE: OnceLock<Mutex<Bremse>> = OnceLock::new();
-    BREMSE.get_or_init(|| Mutex::new(HashMap::new()))
+fn throttle() -> &'static Mutex<Throttle> {
+    static THROTTLE: OnceLock<Mutex<Throttle>> = OnceLock::new();
+    THROTTLE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 /// Ob die Liste an diese Kopplungs-Org gehen darf (D6): beim ersten Mal, bei einer anderen
-/// Prüfsumme der meldenden Seite oder [`SENDEBREMSE`] nach der letzten Liste. `kennung` ist die
+/// Prüfsumme der meldenden Seite oder [`SEND_THROTTLE`] nach der letzten Liste. `kennung` ist die
 /// eigene Instanzkennung: Mehrere Instanzen in einem Prozess (Tests) teilen sich die Bremse.
-pub fn darf_senden(kennung: &str, kopplung_org_id: i64, pruefsumme: &str, jetzt: Instant) -> bool {
-    let bremse = bremse().lock().unwrap_or_else(|e| e.into_inner());
-    match bremse.get(&(kennung.to_string(), kopplung_org_id)) {
-        Some((summe, zuletzt)) => {
-            summe != pruefsumme || jetzt.saturating_duration_since(*zuletzt) >= SENDEBREMSE
+pub fn can_send(kennung: &str, kopplung_org_id: i64, checksum: &str, jetzt: Instant) -> bool {
+    let entries = throttle().lock().unwrap_or_else(|e| e.into_inner());
+    match entries.get(&(kennung.to_string(), kopplung_org_id)) {
+        Some((sum, last)) => {
+            sum != checksum || jetzt.saturating_duration_since(*last) >= SEND_THROTTLE
         }
         None => true,
     }
@@ -150,17 +150,17 @@ pub fn darf_senden(kennung: &str, kopplung_org_id: i64, pruefsumme: &str, jetzt:
 
 /// Hält fest, dass die Liste gegangen ist. Erst nach dem Commit der Antwort aufrufen: Eine
 /// wiederholte Transaktion unterdrückte die Liste sonst (D6).
-pub fn merke_gesendet(kennung: &str, kopplung_org_id: i64, pruefsumme: &str, jetzt: Instant) {
-    bremse().lock().unwrap_or_else(|e| e.into_inner()).insert(
+pub fn mark_sent(kennung: &str, kopplung_org_id: i64, checksum: &str, jetzt: Instant) {
+    throttle().lock().unwrap_or_else(|e| e.into_inner()).insert(
         (kennung.to_string(), kopplung_org_id),
-        (pruefsumme.to_string(), jetzt),
+        (checksum.to_string(), jetzt),
     );
 }
 
 /// Prüfsumme und Zeitpunkt der letzten Liste an diese Kopplungs-Org, falls eine ging. Nur lesend,
 /// für die Integrationstests.
-pub fn zuletzt_gesendet(kennung: &str, kopplung_org_id: i64) -> Option<(String, Instant)> {
-    bremse()
+pub fn last_sent(kennung: &str, kopplung_org_id: i64) -> Option<(String, Instant)> {
+    throttle()
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .get(&(kennung.to_string(), kopplung_org_id))

@@ -11,26 +11,26 @@ fn p(art: &str, schluessel: &str) -> (String, String) {
 
 #[test]
 fn pruefsumme_haengt_nicht_an_der_reihenfolge() {
-    let a = pruefsumme(&[p("fahrzeug", "1"), p("konto", "2"), p("fahrzeug", "3")]);
-    let b = pruefsumme(&[p("fahrzeug", "3"), p("fahrzeug", "1"), p("konto", "2")]);
+    let a = checksum(&[p("fahrzeug", "1"), p("konto", "2"), p("fahrzeug", "3")]);
+    let b = checksum(&[p("fahrzeug", "3"), p("fahrzeug", "1"), p("konto", "2")]);
     assert_eq!(a, b);
-    assert_eq!(a.len(), PRUEFSUMME_LEN);
+    assert_eq!(a.len(), CHECKSUM_LEN);
     assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
 }
 
 #[test]
 fn pruefsumme_aendert_sich_mit_schluessel_und_art() {
-    let basis = pruefsumme(&[p("fahrzeug", "1"), p("konto", "2")]);
-    assert_ne!(basis, pruefsumme(&[p("fahrzeug", "1"), p("konto", "3")]));
-    assert_ne!(basis, pruefsumme(&[p("material", "1"), p("konto", "2")]));
-    assert_ne!(basis, pruefsumme(&[p("fahrzeug", "1")]));
+    let basis = checksum(&[p("fahrzeug", "1"), p("konto", "2")]);
+    assert_ne!(basis, checksum(&[p("fahrzeug", "1"), p("konto", "3")]));
+    assert_ne!(basis, checksum(&[p("material", "1"), p("konto", "2")]));
+    assert_ne!(basis, checksum(&[p("fahrzeug", "1")]));
     // Die Trennzeichen lassen keine Verschiebung zwischen Art und Schlüssel zu.
-    assert_ne!(pruefsumme(&[p("ab", "c")]), pruefsumme(&[p("a", "bc")]));
+    assert_ne!(checksum(&[p("ab", "c")]), checksum(&[p("a", "bc")]));
 }
 
 #[test]
 fn pruefsumme_der_leeren_menge_ist_fest() {
-    assert_eq!(pruefsumme(&[]), "e3b0c44298fc1c149afbf4c8996fb924");
+    assert_eq!(checksum(&[]), "e3b0c44298fc1c149afbf4c8996fb924");
 }
 
 #[test]
@@ -45,37 +45,37 @@ fn paare_eines_bestands() {
             schluessel: Vec::new(),
         },
     ];
-    assert_eq!(paare(&b), vec![p("fahrzeug", "1"), p("fahrzeug", "2")]);
+    assert_eq!(pairs(&b), vec![p("fahrzeug", "1"), p("fahrzeug", "2")]);
 }
 
 #[test]
 fn sendebremse_haelt_dieselbe_abweichung_zehn_minuten() {
     let t0 = Instant::now();
     let kennung = "bremse-test-a";
-    assert!(darf_senden(kennung, 1, "s1", t0), "erstes Mal");
-    merke_gesendet(kennung, 1, "s1", t0);
-    assert!(!darf_senden(kennung, 1, "s1", t0 + Duration::from_secs(60)));
-    assert!(!darf_senden(
+    assert!(can_send(kennung, 1, "s1", t0), "erstes Mal");
+    mark_sent(kennung, 1, "s1", t0);
+    assert!(!can_send(kennung, 1, "s1", t0 + Duration::from_secs(60)));
+    assert!(!can_send(
         kennung,
         1,
         "s1",
-        t0 + SENDEBREMSE - Duration::from_secs(1)
+        t0 + SEND_THROTTLE - Duration::from_secs(1)
     ));
-    assert!(darf_senden(kennung, 1, "s1", t0 + SENDEBREMSE));
+    assert!(can_send(kennung, 1, "s1", t0 + SEND_THROTTLE));
     assert!(
-        darf_senden(kennung, 1, "s2", t0 + Duration::from_secs(1)),
+        can_send(kennung, 1, "s2", t0 + Duration::from_secs(1)),
         "andere Prüfsumme sofort"
     );
     assert!(
-        darf_senden(kennung, 2, "s1", t0 + Duration::from_secs(1)),
+        can_send(kennung, 2, "s1", t0 + Duration::from_secs(1)),
         "andere Kopplungs-Org"
     );
     assert!(
-        darf_senden("bremse-test-b", 1, "s1", t0 + Duration::from_secs(1)),
+        can_send("bremse-test-b", 1, "s1", t0 + Duration::from_secs(1)),
         "andere Instanz"
     );
-    assert_eq!(zuletzt_gesendet(kennung, 1), Some(("s1".to_string(), t0)));
-    assert_eq!(zuletzt_gesendet(kennung, 2), None);
+    assert_eq!(last_sent(kennung, 1), Some(("s1".to_string(), t0)));
+    assert_eq!(last_sent(kennung, 2), None);
 }
 
 // ── Bestand an der erreichten Seite ──────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ async fn bestand_ist_was_als_zeile_geliefert_wird() {
         StammdatenArt::ALLE.len(),
         "jede Art steht im Bestand, auch leer"
     );
-    let im_bestand: HashSet<(String, String)> = paare(&bestand).into_iter().collect();
+    let im_bestand: HashSet<(String, String)> = pairs(&bestand).into_iter().collect();
     let log: Vec<(String, String)> = sqlx::query_as(
         "SELECT art, schluessel FROM stammdaten_aenderung WHERE org_id = 1 ORDER BY stand",
     )

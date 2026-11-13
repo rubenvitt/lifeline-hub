@@ -75,11 +75,11 @@ pub struct MeldenOrg {
     /// Stammdaten (die Org hat schon eine andere Quelle).
     #[serde(default)]
     pub stammdaten_stand: i64,
-    /// Prüfsumme der aus dieser Zuordnung übernommenen Zeilen (`stammdaten::bestand::pruefsumme`,
+    /// Prüfsumme der aus dieser Zuordnung übernommenen Zeilen (`stammdaten::bestand::checksum`,
     /// LLH-1871, design.md D3 der Change `n2ge2224-reste-nach-restore-abraeumen`); fehlt ohne
     /// Stammdaten aus dieser Zuordnung und vor LLH-1871.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stammdaten_pruefsumme: Option<String>,
+    pub stammdaten_checksum: Option<String>,
 }
 
 /// Body von `POST /api/instanz/melden`.
@@ -172,7 +172,7 @@ pub struct MeldenAntwort {
 
 /// Bytes eines Feldes der Antwort samt Namen und Trennzeichen (LLH-1871): was es vom Budget der
 /// Stammdaten abzieht.
-fn feld_bytes<T: Serialize>(wert: &T) -> usize {
+fn field_bytes<T: Serialize>(wert: &T) -> usize {
     serde_json::to_vec(wert)
         .map(|v| v.len())
         .unwrap_or(usize::MAX / 2)
@@ -678,10 +678,10 @@ async fn melden_einmal_mit(
     let age = stammdaten::geheimnis::load_or_create_age(pool).await?;
     let datentraeger = stammdaten::geheimnis::is_datentraeger_bestaetigt(pool).await?;
     let kennzeichen = stammdaten::empfangs_kennzeichen(datentraeger);
-    let mut pruefsummen: std::collections::HashMap<i64, String> = Default::default();
+    let mut checksums: std::collections::HashMap<i64, String> = Default::default();
     let quellen: Vec<i64> = crate::write_retry!(pool, |conn| {
         let mut quellen = Vec::new();
-        pruefsummen.clear();
+        checksums.clear();
         for o in repo::list_orgs_aktiv(conn, kopplung.id).await? {
             if stammdaten::herkunft::find_quelle(conn, o.org_id).await? == Some(o.id) {
                 repo::save_stammdaten_kennzeichen(conn, o.id, &kennzeichen).await?;
@@ -689,7 +689,7 @@ async fn melden_einmal_mit(
                 // Prüfsumme der übernommenen Zeilen (LLH-1871, design.md D3 der Change
                 // `n2ge2224-reste-nach-restore-abraeumen`).
                 let herkunft = stammdaten_bestand::load_herkunft(conn, o.id).await?;
-                pruefsummen.insert(o.id, stammdaten_bestand::pruefsumme(&herkunft));
+                checksums.insert(o.id, stammdaten_bestand::checksum(&herkunft));
             } else if kopplung.art().traegt(super::Fluss::Stammdaten) {
                 // Über eine Direktkopplung fließen nie Stammdaten (LLH-1497): kein Hinweis dort.
                 repo::add_stammdaten_hinweise(
@@ -748,7 +748,7 @@ async fn melden_einmal_mit(
                 } else {
                     -1
                 },
-                stammdaten_pruefsumme: pruefsummen.get(&o.id).cloned(),
+                stammdaten_checksum: checksums.get(&o.id).cloned(),
             })
             .collect(),
         widerrufen: offen.iter().map(|o| o.fremde_org_kennung.clone()).collect(),
@@ -1232,7 +1232,7 @@ pub async fn handle_meldung(
                     if let Some(ids) = &unterschrift_bestand {
                         bestand_rest -= ids.len();
                         stammdaten_budget.bytes =
-                            stammdaten_budget.bytes.saturating_sub(feld_bytes(ids));
+                            stammdaten_budget.bytes.saturating_sub(field_bytes(ids));
                     } else {
                         tracing::warn!(
                             kopplung = kopplung.id,
@@ -1264,27 +1264,26 @@ pub async fn handle_meldung(
                     // meldende Seite alle Änderungen hat und die Sendebremse es erlaubt.
                     let mut liste = None;
                     if let Some(summe) = mo
-                        .stammdaten_pruefsumme
+                        .stammdaten_checksum
                         .as_deref()
-                        .filter(|s| s.len() == stammdaten_bestand::PRUEFSUMME_LEN)
+                        .filter(|s| s.len() == stammdaten_bestand::CHECKSUM_LEN)
                         .filter(|_| traegt_stammdaten)
                     {
                         let auf_stand = mo.stammdaten_stand
                             >= liefern::load_hoechster_stand(conn, o.org_id, &arten).await?;
                         if auf_stand {
                             let bestand = stammdaten_bestand::load(conn, o.org_id, &arten).await?;
-                            let eigene = stammdaten_bestand::pruefsumme(
-                                &stammdaten_bestand::paare(&bestand),
-                            );
+                            let eigene =
+                                stammdaten_bestand::checksum(&stammdaten_bestand::pairs(&bestand));
                             if eigene != summe
-                                && stammdaten_bestand::darf_senden(
+                                && stammdaten_bestand::can_send(
                                     &identitaet.kennung,
                                     o.id,
                                     summe,
                                     std::time::Instant::now(),
                                 )
                             {
-                                let bytes = feld_bytes(&bestand);
+                                let bytes = field_bytes(&bestand);
                                 if bytes <= stammdaten_budget.bytes {
                                     stammdaten_budget.bytes -= bytes;
                                     bestand_gesendet.push((o.id, summe.to_string()));
@@ -1395,12 +1394,7 @@ pub async fn handle_meldung(
     // Erst nach dem Commit: Ein verworfener Versuch hätte die Liste sonst gebremst (D6).
     let gesendet_at = std::time::Instant::now();
     for (kopplung_org_id, summe) in &bestand_gesendet {
-        stammdaten_bestand::merke_gesendet(
-            &identitaet.kennung,
-            *kopplung_org_id,
-            summe,
-            gesendet_at,
-        );
+        stammdaten_bestand::mark_sent(&identitaet.kennung, *kopplung_org_id, summe, gesendet_at);
     }
     fuehrung_austausch::run_folgen(pool, kopplung, &fuehrung_folgen).await;
     for o in &vom_gegenueber {
@@ -1444,7 +1438,7 @@ mod tests {
                     org: (*o).into(),
                     unterschrift_stand: i as i64,
                     stammdaten_stand: 0,
-                    stammdaten_pruefsumme: None,
+                    stammdaten_checksum: None,
                 })
                 .collect(),
             widerrufen: widerrufen.iter().map(|w| (*w).into()).collect(),
@@ -1537,7 +1531,7 @@ mod tests {
         let o: MeldenOrg =
             serde_json::from_value(serde_json::json!({"org": "h/1", "unterschrift_stand": 3}))
                 .expect("ältere Meldung");
-        assert_eq!(o.stammdaten_pruefsumme, None);
+        assert_eq!(o.stammdaten_checksum, None);
         // Ohne Bestand schreibt die Antwort die Felder nicht: Ein älterer ELW liest sie wie bisher.
         let text = serde_json::to_string(&antwort(1, 0)).expect("JSON");
         assert!(!text.contains("bestand"), "{text}");

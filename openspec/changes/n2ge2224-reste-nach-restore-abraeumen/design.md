@@ -82,11 +82,11 @@ json_each(?))`, `src/AGENTS.md`, Listen von außen) setzt jeden Schlüssel diese
 
 ### D3 Prüfsumme der übernommenen Zeilen in der Meldung
 
-`MeldenOrg` bekommt `stammdaten_pruefsumme: Option<String>`. Der ELW setzt sie nur für eine Org, deren
+`MeldenOrg` bekommt `stammdaten_checksum: Option<String>`. Der ELW setzt sie nur für eine Org, deren
 Stammdaten er aus dieser Zuordnung bezieht (`stammdaten_stand >= 0`). Sie sind die ersten 128 Bit (32 Zeichen hex) von
 SHA-256 über die nach `(art, schluessel)` sortierten Zeilen `art \x1f schluessel \n` aus
 `stammdaten_herkunft` der Zuordnung. 128 Bit genügen, um eine Abweichung zu erkennen, und halten die
-Meldung unter `extractor::BODY_MAX` (64 KiB, davon bis zu 40 KiB Führungsakten). Gebildet wird sie in einer gemeinsamen Funktion `stammdaten::bestand::pruefsumme`, die
+Meldung unter `extractor::BODY_MAX` (64 KiB, davon bis zu 40 KiB Führungsakten). Gebildet wird sie in einer gemeinsamen Funktion `stammdaten::bestand::checksum`, die
 auch der Hub benutzt. Ändert sich dort die Form, ändern sich beide Seiten gemeinsam.
 
 **Verworfen:**
