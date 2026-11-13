@@ -3,6 +3,8 @@
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
+  // Öffentliche Adresse; daraus baut `src/pages/sitemap.xml.ts` absolute URLs.
+  site: 'https://lifeline-hub.de',
   output: 'static',
   trailingSlash: 'ignore',
   build: { format: 'directory' },

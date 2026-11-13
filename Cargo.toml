@@ -89,6 +89,9 @@ utoipa = "6"
 utoipa-axum = "0.3"
 # Erkennt beim Puffern unter `/api/v1/` die überschrittene Body-Grenze (`LengthLimitError`).
 http-body-util = "0.1"
+# Zerlegt Abfrage und Formular-Body eines Einwurfs in Paare (`src/public_api/einwurf/ablage.rs`);
+# über `url` ohnehin im Baum.
+form_urlencoded = "1"
 tower-http = { version = "0.7", features = ["fs", "catch-panic", "trace", "request-id", "set-header", "compression-gzip", "compression-br"] }
 # Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot` (routes/karte.rs).
 tower = { version = "0.5", features = ["util", "limit"] }
@@ -189,7 +192,7 @@ clamav = ["dep:clamav-client"]
 # `cargo set-version -p lifeline-hub` (release.config.mjs), beide Pakete erben sie. Zwei eigene
 # Versionsfelder drifteten beim Einmergen eines alpha-Releases auseinander.
 [workspace.package]
-version = "1.0.0-alpha.189"
+version = "1.0.0-alpha.190"
 
 [workspace]
 members = [".", "crates/karten-katalog", "crates/lifeline-machine-client", "karten-service", "src-tauri"]

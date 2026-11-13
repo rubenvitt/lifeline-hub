@@ -1,4 +1,4 @@
-//! Freigabe eines Einsatzes für einen Maschinenzugang (LLH-1638, ADR-0034, Spec
+//! Freigabe eines Einsatzes für einen Maschinenzugang (LLH-1638, ADR-0035, Spec
 //! `maschinenzugang`, „Einsatzbezogenes Lesen braucht die Freigabe der Einsatzleitung“).
 //!
 //! Ein Lese-Scope mit Einsatzbezug ([`Scope::has_einsatzbezug`]) sieht nur den Einsatz, den die

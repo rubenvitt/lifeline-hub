@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 23.10.2026 (alpha dcc500f5).
+Stand: 12.11.2026 (Einwurf-Zugang, LLH-1654).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -86,7 +86,7 @@ nur Art, Zeit und Einsatz-ID. Regeln:
 [ADR-0036](entscheidungen/ADR-0036-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
 Spec [`ereignis-abruf`](../../openspec/specs/ereignis-abruf/spec.md) und
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Ausgangsereignisse für Fremdsysteme“; Ablauf
-in der [Laufzeitsicht](06-laufzeitsicht.md), 6.6e.
+in der [Laufzeitsicht](06-laufzeitsicht.md), 6.6f.
 
 ## 8.7 Persistenz
 
@@ -235,13 +235,17 @@ selbst signiert). Jede Antwort trägt `X-Content-Type-Options: nosniff`
 Maschinen (gekoppelte Instanzen und Fremdsysteme) melden sich nicht mit einer
 Sitzung an, sondern weisen jede Anfrage mit einem eigenen Ed25519-Schlüssel aus: kompaktes JWS
 mit Wiederholschutz in der DB, Antwort ebenso signiert, Einstieg per Einmal-Code eines Org-Admins
-([ADR-0014](entscheidungen/ADR-0014-maschinen-weisen-sich-mit-schluesselpaar-und-signierten-anfragen-aus.md),
+([ADR-0034](entscheidungen/ADR-0034-maschinen-weisen-sich-mit-schluesselpaar-aus-ausser-beim-einwurf.md),
 `src/instanz/`, [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Instanzkopplung“). Fremdsysteme
 nutzen dasselbe Verfahren mit eigenem Profil (`lifeline-machine+jwt`, Kopf
 `Authorization: Machine`), eigenen Tabellen und festen Scopes je Zugang, nur unter `/api/v1/`
 ([ADR-0022](entscheidungen/ADR-0022-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1.md),
 `src/public_api/machine.rs`, Spec [`maschinenzugang`](../../openspec/specs/maschinenzugang/spec.md)).
 Ihre Fehlversuche zählt ein eigener Zähler je Quelle, nie die Anmeldesperre.
+Einzige Ausnahme vom Schlüsselpaar ist der Einwurf für Absender, die nicht signieren können: ein
+Schlüssel im Pfad, nur unter `/api/v1/einwurf/`, nur schreibend, nur über TLS und nie im Protokoll
+([ADR-0023](entscheidungen/ADR-0023-absender-ohne-signatur-werfen-ueber-einen-einwurf-zugang-ein.md),
+`src/public_api/einwurf/`, Spec [`einwurf-zugang`](../../openspec/specs/einwurf-zugang/spec.md)).
 Erklärungen eines Org-Admins, die eine andere Instanz prüfen soll, unterschreibt er mit einem
 eigenen Passkey, der nie zur Anmeldung taugt (`src/auth/unterschrift/`). Einen nachgelieferten neuen
 Schlüssel nimmt die übernehmende Instanz erst nach der Bestätigung eines Admins dort an, der die

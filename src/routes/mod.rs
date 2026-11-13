@@ -35,6 +35,7 @@ pub mod einsatz_uhs;
 pub mod einsatz_uhs_kraefte;
 pub mod einsatz_vorlage;
 pub mod einsatzabschnitt;
+pub mod einwurf_zugaenge;
 pub mod erinnerung;
 pub mod etb;
 pub mod etb_baustein;

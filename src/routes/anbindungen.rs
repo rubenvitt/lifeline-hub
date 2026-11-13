@@ -150,7 +150,7 @@ pub struct AnbindungEingabe {
     pub gueltig_bis: Option<String>,
 }
 
-fn check_name(roh: &str) -> Result<String, AppError> {
+pub(crate) fn check_name(roh: &str) -> Result<String, AppError> {
     crate::routes::support::pflicht_max(roh, "name", NAME_MAX)
 }
 
@@ -170,7 +170,10 @@ fn check_scopes(roh: &[String]) -> Result<Vec<Scope>, AppError> {
 }
 
 /// „gültig bis“ in der Zukunft (UTC, `zeit::FORMAT` oder ohne Sekunden); leer heißt unbegrenzt.
-fn check_gueltig_bis(roh: Option<&str>, jetzt: &str) -> Result<Option<String>, AppError> {
+pub(crate) fn check_gueltig_bis(
+    roh: Option<&str>,
+    jetzt: &str,
+) -> Result<Option<String>, AppError> {
     match roh.map(str::trim) {
         None | Some("") => Ok(None),
         Some(roh) => {
@@ -221,7 +224,7 @@ pub struct AnbindungAenderung {
 }
 
 /// Text für den gekoppelten ELW (design.md D10), `None` wenn Anbindungen hier angenommen werden.
-async fn gesperrt_grund(
+pub(crate) async fn gesperrt_grund(
     conn: &mut SqliteConnection,
     org_id: i64,
 ) -> Result<Option<String>, AppError> {

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Lifeline Hub, öffentliche API",
-    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | `karte` | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Lese-Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`) sieht nur den Einsatz, den die\nEinsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist\ndas höchstens einer. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null` und\n`GET /api/v1/einsaetze` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/einsaetze/{id}`\nantwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen\nEinsatz.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Ereignisse\n\n`GET /api/v1/events` (Scope `events:read`) sagt einem Fremdsystem, dass sich an einem für seinen\nZugang freigegebenen Einsatz etwas getan hat. Ein Ereignis trägt nur `id`, `type`, `occurred_at`\nund `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.\n\n| `type` | Bedeutung | Sichtbar mit |\n| --- | --- | --- |\n| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden. | `einsaetze:read` |\n| `einsatz.updated` | Ein Feld des Einsatzes hat sich geändert. | `einsaetze:read` |\n| `einsatz.closed` | Der Einsatz ist für den Zugang nicht mehr lesbar. | `einsaetze:read` |\n| `lage.changed` | Die Lage des Einsatzes kann sich geändert haben. | `lage:read` |\n\n- **Cursor:** `id` steigt fortlaufend. Jede Antwort nennt einen `cursor`; der nächste Abruf gibt\n  ihn als `after` mit. Ohne `after` kommt der aktuelle Stand ohne Ereignisse.\n- **Warten:** `wait` hält den Abruf höchstens 25 Sekunden offen, bis ein Ereignis vorliegt. Es\n  warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber antwortet sofort und\n  setzt `Retry-After`.\n- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich mit dem\n  neuen Cursor weiter abrufen.\n- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das\n  alte und trägt eine höhere `id`.\n- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;\n  der Client baut den Stand neu auf und fährt mit dem dabei gelieferten Cursor fort: mit\n  `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über `GET /api/v1/events` ohne `after` und\n  danach `GET /api/v1/lage`.\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
+    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0022.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nFachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben\n(`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | `karte` | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Lese-Scope mit Einsatzbezug (`lage:read`) sieht nur den Einsatz, den die Einsatzleitung für\nden Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist das höchstens\neiner. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null`, nicht mit einem Fehler.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Einwurf\n\nAbsender, die nur eine URL aufrufen und nicht signieren können (BOSWatch, FE2 mit „URL öffnen“,\nDivera-Webhook, OsmAnd), werfen über einen Einwurf-Zugang ein (ADR-0023). Wer signieren kann,\nnimmt den Maschinenzugang.\n\n- Der Schlüssel (`llh_ew_…`) steht im Pfad: `/api/v1/einwurf/{schluessel}/alarmmeldung` oder\n  `…/position`, je nach Zweck des Zugangs. Er ist die Anmeldung; einen Kopf `Authorization` gibt\n  es hier nicht.\n- Ein Einwurf schreibt nur und liest nichts. Die Antwort ist `204` ohne Body oder ein Fehler.\n  Eine neue Meldung und eine Wiederholung bekommen dieselbe Antwort.\n- Nur über TLS, sonst `403 tls_required`. Wer POST kann, nimmt POST: Bei GET stehen Schlüssel und\n  Inhalt in der URL.\n- **Alarmmeldung:** Abfrage und Body werden unverändert abgelegt und nicht gedeutet. Der Server\n  erkennt nur `external_id` und `message_id`. Mit ihnen ist eine Wiederholung dauerhaft\n  idempotent; ohne sie gilt gleicher Inhalt desselben Zugangs zwei Minuten lang als\n  Wiederholung, danach entsteht ein neuer Eintrag.\n- **Position:** `id`, `lat`, `lon` und optional `timestamp` (OsmAnd-Protokoll). Je Zugang und\n  `id` hält der Server genau eine Position, ohne Verlauf; eine mit älterem Zeitstempel wird\n  nicht übernommen.\n- Nur GET und POST; jede andere Methode, auch HEAD, ergibt `405`.\n- Grenzen: Body höchstens 16 KiB, Abfrage höchstens 8 KiB, abgelegte Rohdaten höchstens 48 KiB,\n  30 Einwürfe je Minute und Zugang, 5 000 neue Alarmmeldungen je Zugang in 24 Stunden, 200\n  Kennungen für Positionen je Zugang.\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß, bei einem Einwurf 16 KiB.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
     "version": "1"
   },
   "servers": [
@@ -12,219 +12,49 @@
     }
   ],
   "paths": {
-    "/api/v1/einsaetze": {
+    "/api/v1/einwurf/{schluessel}/alarmmeldung": {
       "get": {
         "tags": [
-          "Einsätze"
+          "Einwurf"
         ],
-        "summary": "Die laufenden Einsätze, die die Einsatzleitung für den Zugang freigegeben hat, mit dem Cursor\nfür `GET /api/v1/events`. Dient dem ersten Aufbau und dem Neuaufbau nach `cursor_expired`.",
-        "operationId": "get_einsaetze",
-        "responses": {
-          "200": {
-            "description": "Freigegebene laufende Einsätze (ohne Freigabe eine leere Liste) und der Cursor dazu; Antwort signiert im Kopf `Lifeline-Signature`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EinsaetzeResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt `einsaetze:read` (`missing_scope`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": [
-              "einsaetze:read"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/einsaetze/{id}": {
-      "get": {
-        "tags": [
-          "Einsätze"
-        ],
-        "summary": "Ein laufender Einsatz, der für den Zugang freigegeben ist.",
-        "operationId": "get_einsatz",
+        "summary": "Eine Alarmmeldung per URL einwerfen (Absender, die nur GET können, etwa BOSWatch).",
+        "description": "Die Abfrage wird unverändert abgelegt und nicht gedeutet. Erkannt werden nur `external_id`\nund `message_id`: Mit ihnen ist eine Wiederholung dauerhaft idempotent. Ohne sie gilt\ngleicher Inhalt desselben Zugangs zwei Minuten lang als Wiederholung. Wer POST kann, nimmt\nPOST: Bei GET stehen Schlüssel und Inhalt in der URL.",
+        "operationId": "einwurf_alarmmeldung_get",
         "parameters": [
           {
-            "name": "id",
+            "name": "schluessel",
             "in": "path",
-            "description": "Kennung des Einsatzes, wie `einsatz_id` in den Ereignissen",
+            "description": "Schlüssel des Einwurf-Zugangs (`llh_ew_…`). Er ist die Anmeldung; kein Kopf `Authorization`.",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string"
+            }
+          },
+          {
+            "name": "external_id",
+            "in": "query",
+            "description": "Kennung des Alarms beim Absender, höchstens 200 Zeichen.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "query",
+            "description": "Kennung dieser einen Meldung; bleibt bei einer Wiederholung gleich. Höchstens 200 Zeichen.",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
         "responses": {
-          "200": {
-            "description": "Der Einsatz; Antwort signiert im Kopf `Lifeline-Signature`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Einsatz"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Dem Zugang fehlt `einsaetze:read` (`missing_scope`)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Kein laufender Einsatz mit dieser Kennung, der für den Zugang freigegeben ist (`not_found`); die Antwort verrät nicht, ob es den Einsatz gibt",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          },
-          "default": {
-            "description": "Fehler mit stabilem `code`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorBody"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "machine": [
-              "einsaetze:read"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/events": {
-      "get": {
-        "tags": [
-          "Ereignisse"
-        ],
-        "summary": "Ereignisse des Zugangs nach einem Cursor, auf Wunsch mit Warten (Long-Poll).",
-        "description": "Ohne `after` kommt der aktuelle Stand ohne Ereignisse. Mit `wait` bleibt der Abruf offen, bis\nein Ereignis vorliegt oder die Zeit abläuft. Kommt eine volle Seite (500), liegt vermutlich\nmehr vor: gleich mit dem neuen Cursor weiter abrufen.",
-        "operationId": "get_events",
-        "parameters": [
-          {
-            "name": "after",
-            "in": "query",
-            "description": "Cursor aus der letzten Antwort oder aus `GET /api/v1/einsaetze`. Ohne ihn antwortet der Abruf sofort mit dem aktuellen Stand und ohne Ereignisse.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "wait",
-            "in": "query",
-            "description": "Höchste Wartezeit in ganzen Sekunden (0 bis 25), bis ein Ereignis vorliegt. Ohne ihn wartet der Abruf nicht.",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "maximum": 25,
-              "minimum": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Ereignisse nach `after`, aufsteigend nach `id`; Antwort signiert im Kopf `Lifeline-Signature`. Trägt die Antwort `Retry-After`, war kein Warteplatz frei (höchstens 32 Abrufe warten zugleich, je Zugang einer): so viele Sekunden bis zum nächsten Abruf warten.",
-            "headers": {
-              "Retry-After": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int64",
-                  "minimum": 0
-                },
-                "description": "Nur an einer leeren Antwort ohne Warteplatz: Sekunden bis zum nächsten Abruf"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EventsResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Angenommen: neu abgelegt oder als Wiederholung vermerkt. Kein Body."
           },
           "400": {
-            "description": "`after` oder `wait` ungültig (`invalid_field`)",
+            "description": "Kennung zu lang oder Body kein UTF-8 (`invalid_field`)",
             "content": {
               "application/json": {
                 "schema": {
@@ -234,7 +64,7 @@
             }
           },
           "401": {
-            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "description": "Schlüssel unbekannt, widerrufen oder abgelaufen",
             "content": {
               "application/json": {
                 "schema": {
@@ -244,7 +74,7 @@
             }
           },
           "403": {
-            "description": "Dem Zugang fehlt `events:read` (`missing_scope`)",
+            "description": "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Positionen.",
             "content": {
               "application/json": {
                 "schema": {
@@ -253,8 +83,28 @@
               }
             }
           },
-          "410": {
-            "description": "Der Cursor ist älter als die Aufbewahrung von sieben Tagen oder gehört zu einem anderen Stand (`cursor_expired`): den Stand neu aufbauen, mit `einsaetze:read` über `GET /api/v1/einsaetze` und dessen Cursor, sonst über `GET /api/v1/events` ohne `after` und danach `GET /api/v1/lage`",
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Abfrage über 8 KiB, Body über 16 KiB oder abgelegte Rohdaten über 48 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Leerer Einwurf: weder Abfrage noch Body",
             "content": {
               "application/json": {
                 "schema": {
@@ -264,7 +114,7 @@
             }
           },
           "429": {
-            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "description": "Gedrosselt (30 je Minute und Zugang, 5 000 neue Meldungen je Tag) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit",
             "content": {
               "application/json": {
                 "schema": {
@@ -283,14 +133,381 @@
               }
             }
           }
-        },
-        "security": [
+        }
+      },
+      "post": {
+        "tags": [
+          "Einwurf"
+        ],
+        "summary": "Eine Alarmmeldung per POST einwerfen.",
+        "description": "Der Body wird unverändert abgelegt, gleich in welchem Format (JSON, Formular, Text, XML),\nund nicht gedeutet. `external_id` und `message_id` liest der Server aus einem JSON-Objekt\n(oberste Ebene), aus Formularfeldern oder aus der Abfrage; der Body geht vor.",
+        "operationId": "einwurf_alarmmeldung_post",
+        "parameters": [
           {
-            "machine": [
-              "events:read"
-            ]
+            "name": "schluessel",
+            "in": "path",
+            "description": "Schlüssel des Einwurf-Zugangs (`llh_ew_…`). Er ist die Anmeldung; kein Kopf `Authorization`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
-        ]
+        ],
+        "requestBody": {
+          "description": "Beliebiger Inhalt als UTF-8, höchstens 16 KiB. Auch `application/x-www-form-urlencoded`, `text/plain` oder XML.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Angenommen: neu abgelegt oder als Wiederholung vermerkt. Kein Body."
+          },
+          "400": {
+            "description": "Kennung zu lang oder Body kein UTF-8 (`invalid_field`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Schlüssel unbekannt, widerrufen oder abgelaufen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Positionen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Abfrage über 8 KiB, Body über 16 KiB oder abgelegte Rohdaten über 48 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Leerer Einwurf: weder Abfrage noch Body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt (30 je Minute und Zugang, 5 000 neue Meldungen je Tag) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/einwurf/{schluessel}/position": {
+      "get": {
+        "tags": [
+          "Einwurf"
+        ],
+        "summary": "Eine Position per URL einwerfen (OsmAnd-Protokoll, auch Traccar-Client).",
+        "description": "Je Zugang und Kennung hält der Server genau eine Position, ohne Verlauf. Eine Position mit\nälterem Zeitstempel als die gespeicherte wird nicht übernommen und trotzdem mit 204\nbeantwortet. Weitere Felder (`speed`, `bearing`, `altitude`, `accuracy`, `batt` …) werden\nmit der Position abgelegt und mit ihr ersetzt.",
+        "operationId": "einwurf_position_get",
+        "parameters": [
+          {
+            "name": "schluessel",
+            "in": "path",
+            "description": "Schlüssel des Einwurf-Zugangs (`llh_ew_…`). Er ist die Anmeldung; kein Kopf `Authorization`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Kennung des Absenders, höchstens 128 Zeichen. Auch `deviceid`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lat",
+            "in": "query",
+            "description": "Breite in Grad (WGS 84), -90 bis 90.",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "description": "Länge in Grad (WGS 84), -180 bis 180.",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          {
+            "name": "timestamp",
+            "in": "query",
+            "description": "Zeitpunkt der Messung: Unix-Sekunden, Unix-Millisekunden oder RFC 3339. Ohne ihn gilt der Empfang.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Angenommen: übernommen, oder nicht übernommen, weil die gespeicherte Position jünger ist. Kein Body."
+          },
+          "400": {
+            "description": "Kennung oder Koordinate fehlt oder ist ungültig, Zeitstempel unlesbar (`invalid_field`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Schlüssel unbekannt, widerrufen oder abgelaufen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Alarmmeldungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Abfrage über 8 KiB oder Body über 16 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Zeitstempel mehr als 5 Minuten in der Zukunft, oder der Zugang hält schon 200 Kennungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt (30 je Minute und Zugang) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Einwurf"
+        ],
+        "summary": "Eine Position per POST einwerfen.",
+        "description": "Die Felder `id` (oder `deviceid`), `lat`, `lon` und `timestamp` stehen in einem\nFormular-Body, in einem flachen JSON-Objekt oder in der Abfrage; der Body geht vor.",
+        "operationId": "einwurf_position_post",
+        "parameters": [
+          {
+            "name": "schluessel",
+            "in": "path",
+            "description": "Schlüssel des Einwurf-Zugangs (`llh_ew_…`). Er ist die Anmeldung; kein Kopf `Authorization`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Flaches Objekt mit `id`, `lat`, `lon` und optional `timestamp`; auch als `application/x-www-form-urlencoded`. Höchstens 16 KiB.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Angenommen: übernommen, oder nicht übernommen, weil die gespeicherte Position jünger ist. Kein Body."
+          },
+          "400": {
+            "description": "Kennung oder Koordinate fehlt oder ist ungültig, Zeitstempel unlesbar (`invalid_field`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Schlüssel unbekannt, widerrufen oder abgelaufen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`tls_required`: nicht über TLS angekommen. `missing_scope`: der Zugang ist für Alarmmeldungen.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Andere Methode als GET oder POST, auch HEAD; nichts wird abgelegt (`method_not_allowed`, Kopf `Allow: GET, POST`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Abfrage über 8 KiB oder Body über 16 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Zeitstempel mehr als 5 Minuten in der Zukunft, oder der Zugang hält schon 200 Kennungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt (30 je Minute und Zugang) oder Quelle gesperrt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/instanz/jwks.json": {
@@ -775,92 +992,6 @@
           }
         }
       },
-      "EinsaetzeResponse": {
-        "type": "object",
-        "description": "Antwort der Einsatzliste.",
-        "required": [
-          "cursor",
-          "einsaetze"
-        ],
-        "properties": {
-          "cursor": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Stand der Ereignisse zu dieser Liste: als `after` an `GET /api/v1/events` geben, dann\ngeht nichts verloren, was sich nach dem Lesen ändert."
-          },
-          "einsaetze": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Einsatz"
-            },
-            "description": "Die laufenden Einsätze, die für den Zugang freigegeben sind. Heute höchstens einer."
-          }
-        }
-      },
-      "Einsatz": {
-        "type": "object",
-        "description": "Ein laufender Einsatz, der für den Zugang freigegeben ist: der Kopf, ohne Sachverhalt,\nmeldende Stelle, Betroffene und Personen.",
-        "required": [
-          "id",
-          "bezeichnung",
-          "einsatzart",
-          "begonnen_at"
-        ],
-        "properties": {
-          "begonnen_at": {
-            "type": "string",
-            "description": "Beginn in UTC, `JJJJ-MM-TT hh:mm:ss`."
-          },
-          "bezeichnung": {
-            "type": "string"
-          },
-          "einsatzart": {
-            "$ref": "#/components/schemas/LageEinsatzart"
-          },
-          "einsatznummer": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Einsatznummer der Organisation."
-          },
-          "einsatzort": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Einsatzort als Text."
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Kennung des Einsatzes an dieser Instanz; dieselbe wie `einsatz_id` in den Ereignissen."
-          },
-          "koordinate": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Koordinate"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "leitstellen_nr": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Nummer des Einsatzes bei der Leitstelle."
-          },
-          "stichwort": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        }
-      },
       "ErrorCode": {
         "type": "string",
         "description": "Stabiler Fehlercode unter `/api/v1/`. Innerhalb von v1 kommen Codes nur hinzu; keiner wird\numbenannt, umgedeutet oder entfernt. Clients überspringen unbekannte Werte.",
@@ -880,68 +1011,6 @@
           "internal_error",
           "unavailable"
         ]
-      },
-      "Event": {
-        "type": "object",
-        "description": "Ein Ausgangsereignis: Art, Zeit und Einsatz, sonst nichts. Den Inhalt liest der Client über\ndie Leserouten nach.",
-        "required": [
-          "id",
-          "type",
-          "occurred_at",
-          "einsatz_id"
-        ],
-        "properties": {
-          "einsatz_id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Kennung des Einsatzes an dieser Instanz."
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Fortlaufende Nummer; steigt in der Reihenfolge der Änderungen."
-          },
-          "occurred_at": {
-            "type": "string",
-            "description": "Zeitpunkt in UTC, `JJJJ-MM-TT hh:mm:ss`."
-          },
-          "type": {
-            "$ref": "#/components/schemas/EventType",
-            "description": "Art des Ereignisses. Unbekannte Werte überspringen."
-          }
-        }
-      },
-      "EventType": {
-        "type": "string",
-        "description": "Art eines Ereignisses. Neue Arten kommen nur hinzu; ein Client überspringt unbekannte.",
-        "enum": [
-          "einsatz.created",
-          "einsatz.updated",
-          "einsatz.closed",
-          "lage.changed"
-        ]
-      },
-      "EventsResponse": {
-        "type": "object",
-        "description": "Antwort des Abrufs.",
-        "required": [
-          "cursor",
-          "events"
-        ],
-        "properties": {
-          "cursor": {
-            "type": "integer",
-            "format": "int64",
-            "description": "Stand, bis zu dem geprüft wurde; der nächste Abruf nennt ihn als `after`."
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Event"
-            },
-            "description": "Ereignisse des Zugangs nach `after`, aufsteigend nach `id`, höchstens 500."
-          }
-        }
       },
       "FlaecheAngabe": {
         "type": "object",
@@ -1030,26 +1099,6 @@
             "items": {
               "$ref": "#/components/schemas/Jwk"
             }
-          }
-        }
-      },
-      "Koordinate": {
-        "type": "object",
-        "description": "Ort des Einsatzes auf der Karte, WGS 84.",
-        "required": [
-          "lat",
-          "lon"
-        ],
-        "properties": {
-          "lat": {
-            "type": "number",
-            "format": "double",
-            "description": "Breite in Grad."
-          },
-          "lon": {
-            "type": "number",
-            "format": "double",
-            "description": "Länge in Grad."
           }
         }
       },

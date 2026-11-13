@@ -598,6 +598,154 @@ async fn unterschrift_der_einsatzleitung_ohne_admin_rolle_ist_403() {
     assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
 }
 
+/// Macht ein Konto am Spiegel zur Einsatzleitung, an jedem Schreibweg vorbei: die
+/// Mitglieder-Verwaltung prüft die Org im SQL und der Spiegelschutz sperrt jedes andere
+/// Schreiben, also unter dem Merker der Übernahme.
+async fn einsatzleitung_am_spiegel(i: &Instanz, einsatz: i64, benutzer: i64) {
+    let mut tx = i.pool.begin().await.unwrap();
+    sqlx::query("INSERT OR IGNORE INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+         VALUES (?, ?, 'einsatzleitung')",
+    )
+    .bind(einsatz)
+    .bind(benutzer)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// LLH-1705 (Spec `instanz-fuehrung`, „Unterschreiben MUST nur ein Admin der Org“): Der Admin
+/// einer anderen Org bedient als Einsatzleitung die Führung des Spiegels, unterschreiben kann er
+/// nicht. Der ELW prüfte seine Unterschrift gegen die Schlüssel der Einsatz-Org und verwürfe die
+/// Übernahme erst, nachdem der Hub schon geführt hat. Gegenprobe: der Admin der Einsatz-Org
+/// beginnt die Unterschrift an derselben Route.
+#[tokio::test]
+async fn unterschrift_eines_admins_einer_anderen_org_ist_403() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, akte) = elw_einsatz(&hub, &elw).await;
+    let spiegel = einsatz_der_akte(&hub, akte).await;
+    let (org_b, admin_b) = common::fremde_org_anlegen(
+        &hub.pool,
+        "Fremde Org",
+        "orgbadmin",
+        "orgbadminpw1",
+        "keine",
+    )
+    .await;
+    sqlx::query("UPDATE benutzer SET system_rolle = 'admin' WHERE id = ?")
+        .bind(admin_b)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    // Mit eigenem gültigem Schlüssel: am Schlüssel scheitert der Aufruf nicht.
+    let p = SoftwarePasskey::new("b", [2u8; 32]);
+    {
+        let mut conn = hub.pool.acquire().await.unwrap();
+        unterschrift::create_lokal(
+            &mut conn,
+            &unterschrift::NeuerSchluessel {
+                org_id: org_b,
+                benutzer_id: admin_b,
+                benutzer_name: "orgbadmin",
+                credential_id: &p.credential_id,
+                schluessel: &p.oeffentlich(),
+                rp_id: RP,
+                origin: ORIGIN,
+                bezeichnung: "Stick B",
+            },
+        )
+        .await
+        .unwrap();
+    }
+    einsatzleitung_am_spiegel(&hub, spiegel, admin_b).await;
+    let fremd = common::login_cookie(&hub.app, "orgbadmin", "orgbadminpw1").await;
+    let (s, v) = common::anfrage(
+        &hub.app,
+        "GET",
+        &format!("/api/einsaetze/{spiegel}"),
+        &fremd,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["meine_rolle"], "einsatzleitung", "{v}");
+    assert_eq!(
+        v["org_id"], 1,
+        "der Einsatz gehört der gekoppelten Org: {v}"
+    );
+    assert_ne!(org_b, 1);
+    // Die Führung bedient er: Die Code-Route hinter demselben Gate lehnt nur die Eingabe ab.
+    // Formal ungültig muss der Code sein, einen wohlgeformten nähme der Hub an und führte.
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme/code"),
+        &fremd,
+        Some(&json!({"grund": "ohne Verbindung", "code": "kaputt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    let start = format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme/start");
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &start,
+        &fremd,
+        Some(&json!({"grund": "ohne Verbindung"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+
+    let (s, v) = post(&hub, &start, json!({"grund": "ohne Verbindung"})).await;
+    assert_eq!(s, StatusCode::OK, "Admin der Einsatz-Org: {v}");
+    assert!(v["zeremonie"].is_string(), "{v}");
+}
+
+/// LLH-1705: Der Abschluss prüft dasselbe wie der Start. Verliert ein Konto die Admin-Rolle
+/// zwischen Start und Abschluss, trägt seine Unterschrift nicht mehr, auch wenn es als
+/// Einsatzleitung die Führung weiter bedient.
+#[tokio::test]
+async fn abschluss_der_unterschrift_ohne_admin_rolle_ist_403() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, akte) = elw_einsatz(&hub, &elw).await;
+    let spiegel = einsatz_der_akte(&hub, akte).await;
+    einsatzleitung_am_spiegel(&hub, spiegel, 1).await;
+    let pfad = format!("/api/einsaetze/{spiegel}/fuehrung/notuebernahme");
+    let (s, start) = post(
+        &hub,
+        &format!("{pfad}/start"),
+        json!({"grund": "ohne Verbindung"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{start}");
+    let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
+
+    sqlx::query("UPDATE benutzer SET system_rolle = 'keiner' WHERE id = 1")
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    let (s, v) = post(
+        &hub,
+        &format!("{pfad}/abschluss"),
+        json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    let a = fuehrung(&hub, spiegel).await;
+    assert_eq!(a["fuehrend"], false, "der Hub hat nicht übernommen: {a}");
+    assert_eq!(a["fuehrer_kennung"], elw.kennung);
+}
+
 #[tokio::test]
 async fn elw_fragt_an_und_uebernimmt_bei_ankunft() {
     let (hub, elw) = gekoppelt().await;

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ETB Vorschlag Fükw</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.nacht{--grund:#08090b;--fl:#0f1215;--fl2:#14171b;--fl3:#16191d;--kopf:#0c0e11;--lin:#22262b;--lin2:#2e343a;--st:#626a73;--tx:#e8ebee;--tx2:#c6ccd2;--ged:#9aa2ab;--bed:#4d94d6;--bedtx:#8ec2f0;--aufbed:#08090b;--ach:#e8cc3a;--achfl:#1c1705;--al:#ff6b6b;--alfl:#1c0a0d;--ok:#7ddc4a;--bedfl:#0d1620;--tm:#5c9dff;--tmk:#1677ff;--ta:#e8852a;--tak:#d46b08;--te:#a57ff0;--tek:#8f4be3;--tl:#13c2c2;--tlk:#13c2c2}
+.tag{--grund:#e9ebee;--fl:#ffffff;--fl2:#f5f6f8;--fl3:#e1e4e8;--kopf:#eef0f2;--lin:#d4d8dd;--lin2:#b9bfc6;--st:#79818a;--tx:#111418;--tx2:#2b3138;--ged:#363d45;--bed:#154e84;--bedtx:#144779;--aufbed:#ffffff;--ach:#604200;--achfl:#f7efd5;--al:#8f1c12;--alfl:#f9e3e3;--ok:#155234;--bedfl:#e4edf7;--tm:#0a47a6;--tmk:#1677ff;--ta:#7a3700;--tak:#b35600;--te:#5b1fae;--tek:#722ed1;--tl:#005357;--tlk:#0e8c90}
+.etb{width:1440px;height:900px;box-sizing:border-box;display:flex;flex-direction:column;background:var(--grund);color:var(--tx);font-family:"LFH Archivo",system-ui,sans-serif;font-size:14px;line-height:20px;overflow:hidden}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.kl{height:52px;flex-shrink:0;display:flex;align-items:center;background:#0c0e11;border-bottom:1px solid #22262b;color:#e8ebee}
+.kl .mz{width:60px;height:52px;display:flex;align-items:center;justify-content:center;border-right:1px solid #22262b}
+.kl .ein{display:flex;align-items:center;gap:10px;padding:0 16px;font-size:16px;font-weight:600}
+.kl .nr{font-size:13px;color:#a0a8b1;font-weight:500}
+.kl .su{margin-left:auto;width:220px;height:32px;box-sizing:border-box;border:1px solid #626a73;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#a0a8b1}
+.kl .zl{height:52px;display:flex;align-items:center;padding:0 16px;border-left:1px solid #22262b;gap:8px;font-size:12px;color:#a0a8b1}
+.kl .uhr{font-size:17px;color:#e8ebee}
+.rumpf{flex:1;min-height:0;display:flex}
+.rail{width:60px;flex-shrink:0;background:#0c0e11;border-right:1px solid #22262b;display:flex;flex-direction:column}
+.rail a{height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:.04em;color:#a0a8b1;text-decoration:none;border-left:2px solid transparent}
+.rail a.an{color:#e8ebee;background:#16191d;border-left-color:#4d94d6}
+.mp{width:208px;flex-shrink:0;background:#0c0e11;border-right:1px solid #22262b;color:#e8ebee;padding-top:14px;box-sizing:border-box}
+.mp .ab{font-size:12px;font-weight:600;color:#a0a8b1;padding:0 12px 10px}
+.mp a{display:flex;justify-content:space-between;align-items:center;height:36px;padding:0 12px;font-size:14px;color:#c6ccd2;text-decoration:none;border-left:2px solid transparent}
+.mp a.an{background:#16191d;color:#e8ebee;border-left-color:#4d94d6;font-weight:600}
+.mp a span{font-size:12px;color:#a0a8b1;font-weight:500}
+.inh{flex:1;min-width:0;display:flex;flex-direction:column}
+.sk{height:44px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 24px;border-bottom:1px solid var(--lin)}
+.sk h1{margin:0;font-size:18px;font-weight:600}
+.sk .meta{font-size:12px;color:var(--ged)}
+.sk .ok{margin-left:auto;font-size:12px;color:var(--ok)}
+.kn{height:30px;box-sizing:border-box;padding:0 12px;border:1px solid var(--st);background:var(--fl);color:var(--tx);font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.fi{height:44px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 24px;border-bottom:1px solid var(--lin);background:var(--grund)}
+.seg{display:flex}
+.seg button{height:30px;box-sizing:border-box;padding:0 10px;margin-left:-1px;border:1px solid var(--st);background:var(--fl);color:var(--ged);font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.seg button:first-child{margin-left:0}
+.seg button.an{background:var(--fl3);color:var(--tx);box-shadow:inset 0 -2px 0 var(--bed)}
+.seg i{width:8px;height:8px;display:inline-block}
+.seg b{font-weight:500;color:var(--ged)}
+.fi .fe{height:30px;box-sizing:border-box;border:1px solid var(--st);background:var(--fl);color:var(--ged);font:inherit;font-size:13px;padding:0 10px}
+.sp{height:26px;flex-shrink:0;display:grid;grid-template-columns:48px 34px 78px 210px minmax(0,1fr) 124px 24px;column-gap:10px;align-items:center;padding:0 24px 0 37px;background:var(--kopf);border-bottom:1px solid var(--lin);font-size:12px;color:var(--ged)}
+.li{flex:1;min-height:0;overflow:hidden;padding:0 24px}
+.std{font-size:12px;color:var(--ged);padding:2px 13px;background:var(--kopf);border-bottom:1px solid var(--lin)}
+.z{display:grid;grid-template-columns:48px 34px 78px 210px minmax(0,1fr) 124px 24px;column-gap:10px;align-items:baseline;padding:5px 0 6px 10px;border-bottom:1px solid var(--lin);border-left:3px solid var(--lin2);background:var(--fl)}
+.z.m{border-left-color:var(--tmk)}.z.a{border-left-color:var(--tak)}.z.e{border-left-color:var(--tek)}.z.l{border-left-color:var(--tlk)}.z.b{border-left-color:var(--al)}
+.z.neu{background:var(--bedfl)}
+.zt{font-size:15px;font-weight:500}
+.nr{font-size:12px;color:var(--ged)}
+.ty{font-size:12px;font-weight:600}
+.m .ty{color:var(--tm)}.a .ty{color:var(--ta)}.e .ty{color:var(--te)}.l .ty{color:var(--tl)}.b .ty{color:var(--al)}
+.va{font-size:13px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.va small{font-size:12px;color:var(--ged)}
+.in s{color:var(--ged)}
+.vm{font-size:12px;color:var(--ged);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vm a{color:var(--bedtx)}
+.vm .ach{color:var(--ach)}
+.vm .al{color:var(--al);font-weight:600}
+.me{width:24px;height:20px;border:0;background:transparent;color:var(--ged);font-size:16px;line-height:20px;padding:0}
+.lm{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--bedtx);padding:2px 0}
+.lm::before,.lm::after{content:"";flex:1;height:1px;background:var(--bed)}
+.sz{flex-shrink:0;border-top:1px solid var(--lin2);background:var(--fl);padding:10px 24px 8px;display:flex;flex-direction:column;gap:8px}
+.ra{display:flex;align-items:center;gap:14px}
+.fd{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ged)}
+.fd input,.fd select{height:30px;box-sizing:border-box;border:1px solid var(--st);background:var(--grund);color:var(--tx);font:inherit;font-size:13px;padding:0 8px}
+.rb{display:flex;gap:8px}
+.rb textarea{flex:1;height:40px;box-sizing:border-box;resize:none;border:1px solid var(--bed);border-left:3px solid var(--tmk);box-shadow:0 0 0 2px var(--bedfl);background:var(--grund);color:var(--tx);font:inherit;font-size:14px;line-height:20px;padding:9px 10px}
+.pr{height:40px;padding:0 16px;border:0;background:var(--bed);color:var(--aufbed);font:inherit;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+.kap{border:1px solid currentColor;font-size:11px;line-height:14px;padding:0 4px}
+.rc{display:flex;align-items:center;gap:18px;font-size:12px;color:var(--ged)}
+.rc label{display:inline-flex;align-items:center;gap:6px}
+.rc .tk{margin-left:auto;display:flex;gap:16px}
+.rc .tk button{border:0;background:transparent;color:var(--bedtx);font:inherit;font-size:12px;padding:0}
+</style>
+</helmet>
+<div class="etb {{modus}}">
+  <header class="kl">
+    <div class="mz"><svg width="26" height="18" viewBox="0 0 26 18" role="img" aria-label="lifeline-hub"><path d="M1 10h6l3-8 5 14 3-9h7" fill="none" stroke="#e8ebee" stroke-width="2"/><rect x="21" y="5" width="4" height="4" fill="#a8071a"/></svg></div>
+    <div class="ein"><svg width="8" height="8" aria-hidden="true"><rect width="8" height="8" fill="#52c41a"/></svg><span class="nr mono">E-2026-0001</span><span>ÜBUNG – Starkregen Musterstadt</span></div>
+    <div class="su"><span>Suchen …</span><span class="kap mono">Strg+K</span></div>
+    <div class="zl"><svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true"><path d="M1 4a9 9 0 0 1 12 0M3.5 7a5.5 5.5 0 0 1 7 0" fill="none" stroke="#52c41a" stroke-width="1.6"/><circle cx="7" cy="10" r="1.3" fill="#52c41a"/></svg><span class="mono">SYNC</span></div>
+    <div class="zl"><span class="uhr mono">19:26</span></div>
+    <div class="zl"><span class="mono" style="color: #e8ebee">AD</span><span>Einsatzleitung</span></div>
+  </header>
+  <div class="rumpf">
+    <nav class="rail" aria-label="Bereiche">
+      <a href="#"><svg width="20" height="18" viewBox="0 0 20 18" aria-hidden="true"><path d="M7 1h6v4H7zM1 13h6v4H1zM13 13h6v4h-6zM10 5v4M4 13V9h12v4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>FÜHRUNG</a>
+      <a href="#"><svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><path d="M1 2h12v9H1zM13 5h5l3 3v3h-8z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="13" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="17" cy="13" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>KRÄFTE</a>
+      <a href="#" class="an"><svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true"><path d="M2 3h12v16H2zM5 1h6v4H5zM5 9h6M5 13h6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>ERFASSEN</a>
+      <a href="#"><svg width="20" height="18" viewBox="0 0 20 18" aria-hidden="true"><path d="M1 3l6-2 6 2 6-2v14l-6 2-6-2-6 2zM7 1v14M13 3v14" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>LAGE</a>
+      <a href="#"><svg width="20" height="18" viewBox="0 0 20 18" aria-hidden="true"><path d="M1 2h18v11H9l-5 4v-4H1z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>KOMM.</a>
+    </nav>
+    <nav class="mp" aria-label="Module">
+      <div class="ab">Erfassung</div>
+      <a href="#" class="an">ETB<span class="mono">57</span></a>
+      <a href="#">Betroffene<span class="mono">24</span></a>
+      <a href="#">Unfallhilfsstellen</a>
+      <a href="#">Evakuierung<span class="mono">1</span></a>
+      <a href="#">Betreuung<span class="mono">1</span></a>
+      <a href="#">Tiere</a>
+      <a href="#">Schäden</a>
+    </nav>
+    <main class="inh">
+      <div class="sk">
+        <h1>ETB</h1>
+        <span class="meta mono">57 Einträge · 171 Systemeinträge ausgeblendet · Stand 1926</span>
+        <span class="ok">✓ alles übertragen</span>
+        <button class="kn" type="button">Drucken / als PDF</button>
+      </div>
+      <div class="fi">
+        <div class="seg" role="group" aria-label="Typ">
+          <button type="button" class="an">Alle <b class="mono">57</b></button>
+          <button type="button"><i style="background: var(--tmk)"></i>Meldung <b class="mono">34</b></button>
+          <button type="button"><i style="background: var(--tak)"></i>Anordnung <b class="mono">8</b></button>
+          <button type="button"><i style="background: var(--tek)"></i>Entscheidung <b class="mono">6</b></button>
+          <button type="button"><i style="background: var(--tlk)"></i>Lage <b class="mono">8</b></button>
+          <button type="button"><i style="background: var(--al)"></i>Berichtigung <b class="mono">1</b></button>
+        </div>
+        <button class="kn" type="button" aria-pressed="false">System <span class="mono" style="color: var(--ged)">171</span></button>
+        <button class="kn" type="button">Zeitraum ▾</button>
+        <button class="kn" type="button">Einheit ▾</button>
+        <input class="fe" style="flex: 1; min-width: 0" aria-label="Volltextsuche" placeholder="Volltextsuche">
+      </div>
+      <div class="sp"><span>Zeit</span><span>Nr.</span><span>Typ</span><span>Von → An</span><span>Inhalt</span><span>Vermerk</span><span></span></div>
+      <div class="li">
+        <div class="std mono">16 Uhr</div>
+        <div class="z l"><span class="zt mono">1630</span><span class="nr mono">135</span><span class="ty">Lage</span><span class="va">Vermerk EL</span><span class="in">Lagebericht 1 – Starkregen Musterstadt: Lage in EA 1.1 kritisch, übrige Abschnitte planmäßig.</span><span class="vm"><a href="#">Lagebericht ↗</a> · <a href="#">mehr</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 135">⋮</button></div>
+        <div class="z a"><span class="zt mono">1635</span><span class="nr mono">136</span><span class="ty">Anordnung</span><span class="va">EL → Sanitätszug Musterstadt <small>· Funk</small></span><span class="in">Erkundung Kirchberg: Hangbereich oberhalb der Kirchstraße beobachten und Veränderungen sofort melden.</span><span class="vm"><a href="#">Auftrag #5 ↗</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 136">⋮</button></div>
+        <div class="z m"><span class="zt mono">1645</span><span class="nr mono">138</span><span class="ty">Meldung</span><span class="va">Sanitätszug Musterstadt → EL <small>· Funk</small></span><span class="in">Einsatzleitwagen am Marktplatz, Verbindung zu allen Einheiten steht.</span><span class="vm"><a href="#">Meldung #5 ↗</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 138">⋮</button></div>
+        <div class="z m"><span class="zt mono">1655</span><span class="nr mono">140</span><span class="ty">Meldung</span><span class="va">Rettungsstaffel → EL <small>· Funk</small></span><span class="in">RTW Musterstadt 83-2 mit Patientin auf dem Weg ins Krankenhaus, RTW 83-1 am Marktplatz.</span><span class="vm"><a href="#">Meldung #6 ↗</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 140">⋮</button></div>
+        <div class="std mono">17 Uhr</div>
+        <div class="z e"><span class="zt mono">1700</span><span class="nr mono">141</span><span class="ty">Entscheidung</span><span class="va">Vermerk EL</span><span class="in">Weitere Sanitätsgruppe über die Leitstelle nachgefordert. Die Betreuung richtet zusätzliche Plätze in der Gesamtschule ein.</span><span class="vm"></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 141">⋮</button></div>
+        <div class="z m"><span class="zt mono">1705</span><span class="nr mono">142</span><span class="ty">Meldung</span><span class="va">Betreuungsgruppe → EL <small>· Funk</small></span><span class="in">Gesamtschule: 71 Personen in Betreuung, Verpflegung für den Abend angefordert.</span><span class="vm"><a href="#">Meldung #7 ↗</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 142">⋮</button></div>
+        <div class="z m"><span class="zt mono">1715</span><span class="nr mono">143</span><span class="ty">Meldung</span><span class="va">Sanitätsgruppe UHS → EL <small>· Funk</small></span><span class="in">UHS Turnhalle: acht Patienten in Behandlung, zwei zum Transport bereit.</span><span class="vm"><a href="#">Meldung #8 ↗</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 143">⋮</button></div>
+        <div class="z l"><span class="zt mono">1720</span><span class="nr mono">144</span><span class="ty">Lage</span><span class="va">Vermerk EL</span><span class="in">Regen lässt nach, Pegel Mühlbach stagniert. Nächste Lagebesprechung ist angesetzt.</span><span class="vm"></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 144">⋮</button></div>
+        <div class="lm">bis hier gesichtet · 6 neue</div>
+        <div class="z m neu"><span class="zt mono">1750</span><span class="nr mono">151</span><span class="ty">Meldung</span><span class="va">Leitstelle Musterstadt → EL <small>· Telefon</small></span><span class="in">Mehrere Notrufe aus der Unterstadt: Keller vollgelaufen, Anwohner im Mühlbachweg bitten um Hilfe.</span><span class="vm"><span class="al">SOFORT</span> · <a href="#">Meldung #12 ↗</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 151">⋮</button></div>
+        <div class="std mono">18 Uhr</div>
+        <div class="z a neu"><span class="zt mono">1805</span><span class="nr mono">158</span><span class="ty">Anordnung</span><span class="va">EL → Logistiktrupp <small>· Funk</small></span><span class="in">Stromerzeuger 8 kVA zur UHS Turnhalle verlegen und anschließen.</span><span class="vm"><a href="#">Auftrag #4 ↗</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 158">⋮</button></div>
+        <div class="std mono">19 Uhr</div>
+        <div class="z m neu"><span class="zt mono">1912</span><span class="nr mono">229</span><span class="ty">Meldung</span><span class="va">Sanitätszug Musterstadt → EL <small>· Funk</small></span><span class="in">Keller Mühlbachweg 12 leergepumpt, Trupp rückt ab.</span><span class="vm"><span class="ach">Nachtrag · erfasst 1926</span></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 229">⋮</button></div>
+        <div class="z m neu"><span class="zt mono">1918</span><span class="nr mono">230</span><span class="ty">Meldung</span><span class="va">Rettungsstaffel → EL <small>· Funk</small></span><span class="in"><s>RTW 83-2 wieder einsatzbereit am Marktplatz.</s></span><span class="vm">berichtigt durch <a href="#">Nr. 231</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 230">⋮</button></div>
+        <div class="z b neu"><span class="zt mono">1921</span><span class="nr mono">231</span><span class="ty">Berichtigung</span><span class="va">Rettungsstaffel → EL <small>· Funk</small></span><span class="in">Zu Nr. 230: RTW 83-1, nicht 83-2, ist wieder einsatzbereit am Marktplatz.</span><span class="vm">berichtigt <a href="#">Nr. 230</a></span><button class="me" type="button" aria-label="Aktionen zu Eintrag 231">⋮</button></div>
+      </div>
+      <form class="sz" aria-label="Eintrag erfassen">
+        <div class="ra">
+          <div class="seg" role="group" aria-label="Typ des Eintrags">
+            <button type="button" class="an" style="box-shadow: inset 0 -2px 0 var(--tmk)"><i style="background: var(--tmk)"></i>Meldung</button>
+            <button type="button"><i style="background: var(--tak)"></i>Anordnung</button>
+            <button type="button"><i style="background: var(--tek)"></i>Entscheidung</button>
+            <button type="button"><i style="background: var(--tlk)"></i>Lage</button>
+          </div>
+          <label class="fd">Zeit <input class="mono" style="width: 96px" value="jetzt · 1926"></label>
+          <label class="fd">Von <input style="width: 210px" value="Sanitätsgruppe UHS"></label>
+          <label class="fd">An <input style="width: 150px" value="EL"></label>
+          <label class="fd">Weg <select style="width: 96px"><option>Funk</option><option>Telefon</option><option>Melder</option><option>mündlich</option></select></label>
+        </div>
+        <div class="rb">
+          <textarea aria-label="Inhalt">Zwei Patienten SK II an RTW übergeben, UHS wieder aufnahmefähig.</textarea>
+          <button class="pr" type="submit">Erfassen <span class="kap mono">↵</span></button>
+        </div>
+        <div class="rc">
+          <label><input type="checkbox" checked> auch in den Meldungseingang</label>
+          <label><input type="checkbox"> Von und An behalten</label>
+          <div class="tk">
+            <button type="button">+ Veranlassung</button>
+            <button type="button">+ Anhang</button>
+            <button type="button">+ weiterer Entwurf</button>
+          </div>
+        </div>
+      </form>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"modus":{"editor":"enum","options":["nacht","tag"],"default":"nacht","section":"Darstellung"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { modus: this.props.modus ?? 'nacht' };
+}
+}
+</script>
+</body>
+</html>

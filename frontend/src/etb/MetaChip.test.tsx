@@ -444,6 +444,85 @@ describe('MetaChip — Ereigniszeit in der Anzeigezone (LFH-692)', () => {
   });
 });
 
+/**
+ * LLH-1842 (Spec `zeiteingabe`, „Verlassen übernimmt“): Wer die Zeit tippt und das Feld mit Tab
+ * oder Klick verlässt, sah sie im Feld stehen, die Schnellerfassung erfuhr sie aber nie; der
+ * nächste Editor ersetzte den Chip, und der Eintrag bekam „jetzt“.
+ */
+describe('MetaChip — Ereigniszeit: Verlassen übernimmt (LLH-1842)', () => {
+  mitProzessZone('UTC');
+  const BERLIN = { zeitzone: 'Europe/Berlin' };
+
+  function editor(over: Partial<React.ComponentProps<typeof MetaChip>> = {}) {
+    const rufe = { onCommit: vi.fn(), onChange: vi.fn() };
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <MetaChip
+          feld="ereigniszeit"
+          editing
+          wert={dayjs.utc('2026-07-14 10:00:00')}
+          onCancel={vi.fn()}
+          onRemove={vi.fn()}
+          onEdit={vi.fn()}
+          {...rufe}
+          {...over}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    return rufe;
+  }
+
+  it('Tab aus dem Feld meldet die getippte Zeit und lässt den Editor offen', async () => {
+    const user = userEvent.setup();
+    const { onCommit, onChange } = editor();
+    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit' });
+    await user.clear(feld);
+    // 14.07.2026 14:25 Berliner Wanduhr = 12:25 UTC.
+    await user.type(feld, '141425jul26');
+    await user.tab();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toBe('ereigniszeit');
+    expect((onChange.mock.calls[0][1] as dayjs.Dayjs).toISOString()).toBe(
+      '2026-07-14T12:25:00.000Z',
+    );
+    // Geschlossen wird nur ausdrücklich (Enter, Schnellwahl, Kalender).
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: 'Ereigniszeit' })).toBeInTheDocument();
+  });
+
+  it('eine unlesbare Eingabe meldet beim Verlassen nichts', async () => {
+    const user = userEvent.setup();
+    const { onCommit, onChange } = editor();
+    const feld = screen.getByRole('textbox', { name: 'Ereigniszeit' });
+    await user.clear(feld);
+    await user.type(feld, 'xyz');
+    await user.tab();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('ein geleertes Feld meldet beim Verlassen „kein Zeitpunkt“', async () => {
+    const user = userEvent.setup();
+    const { onCommit, onChange } = editor();
+    await user.clear(screen.getByRole('textbox', { name: 'Ereigniszeit' }));
+    await user.tab();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith('ereigniszeit', null);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it('Enter im geleerten Feld schließt den Editor, ohne eine Zeit zu übernehmen', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const { onCommit, onChange } = editor({ onCancel });
+    await user.clear(screen.getByRole('textbox', { name: 'Ereigniszeit' }));
+    await user.keyboard('{Enter}');
+    expect(onChange).toHaveBeenCalledWith('ereigniszeit', null);
+    expect(onCancel).toHaveBeenCalledWith('ereigniszeit');
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+});
+
 /** LFH-895: Der Editor eines leeren Zeit-Chips schlägt „jetzt“ nach der Serveruhr vor. */
 describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
   mitProzessZone('UTC');

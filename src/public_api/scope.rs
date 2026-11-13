@@ -20,7 +20,7 @@ wire_enum! {
 
 impl Scope {
     /// Lese-Scope mit Einsatzbezug: Er sieht nur den Einsatz, den die Einsatzleitung für den
-    /// Zugang freigegeben hat (`super::freigabe`, ADR-0034). Ein neuer solcher Scope kommt hier
+    /// Zugang freigegeben hat (`super::freigabe`, ADR-0035). Ein neuer solcher Scope kommt hier
     /// dazu, sobald seine Route steht; vorher zeigte das Paneel „Anbindungen“ einen Schalter
     /// ohne Wirkung.
     ///

@@ -182,8 +182,11 @@ export function mittenGriffSteht(mitte: GeoPunkt | null, radiusM: number | null)
 }
 
 export interface KreisGriff {
-  /** Lage nachführen (Mitte/Radius geändert); ohne Mitte hängt der Griff nicht an der Karte. */
-  setze(mitte: GeoPunkt | null, radiusM: number | null): void;
+  /**
+   * Lage nachführen (Mitte/Radius geändert); ohne Mitte hängt der Griff nicht an der Karte. Der
+   * Randgriff geht dabei in den Osten, außer er steht bei gleicher Mitte schon auf diesem Radius.
+   */
+  set(mitte: GeoPunkt | null, radiusM: number | null): void;
   zerstoeren(): void;
 }
 
@@ -260,7 +263,7 @@ export function erzeugeKreisGriff(
     if (r != null) onRadius(r, true);
   });
 
-  const setzeMitte = () => {
+  const setMitte = () => {
     const steht = onMitte != null && mittenGriffSteht(mitte, radius);
     if (!steht || !mitte) {
       if (mitteDran) mittenMarker.remove();
@@ -275,17 +278,22 @@ export function erzeugeKreisGriff(
   };
 
   return {
-    setze(m, radiusM) {
+    set(m, radiusM) {
+      const gleicheMitte = mitte != null && m != null && mitte.lat === m.lat && mitte.lon === m.lon;
       mitte = m;
       radius = radiusM;
-      setzeMitte();
+      setMitte();
       if (!m) {
         if (dran) marker.remove();
         dran = false;
         return;
       }
+      // Ergibt die Lage des Griffs schon den Radius, hat ihn ein Zug dorthin gelegt: er bleibt
+      // unter dem Zeiger. Die Kartenfläche ruft `set` im Commit, und der erste Commit nach
+      // `dragend` bringt den zuletzt gezogenen Radius (LLH-1700).
+      const stehtAufRadius = gleicheMitte && radiusJetzt() === radiusM;
       // Mitten im Zug setzt der Zeiger die Lage, nicht der gemeldete Radius.
-      if (!ziehend) {
+      if (!ziehend && !stehtAufRadius) {
         const p = griffLage(m, radiusM);
         marker.setLngLat([p.lon, p.lat]);
       }

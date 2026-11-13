@@ -1,4 +1,4 @@
-//! `GET /api/v1/lage` (LLH-1638, Spec `lage-schnittstelle`, ADR-0034): das Lagebild des Einsatzes,
+//! `GET /api/v1/lage` (LLH-1638, Spec `lage-schnittstelle`, ADR-0035): das Lagebild des Einsatzes,
 //! den die Einsatzleitung für den Zugang freigegeben hat ([`super::freigabe`]).
 //!
 //! Die Zahlen kommen aus derselben Verdichtung wie beim gekoppelten Lagemonitor
