@@ -27,12 +27,12 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste
   unten direkt über der Erfassung, Stundengruppen aufsteigend, gepufferte ganz unten (abgelehnte
   zuletzt), ihre Hinweise unter der Zeitachse. Gekehrt wird nur in der Darstellung
-  (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Bilanz, Druck und Sprung behalten die
+  (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Druck und Sprung behalten die
   Serverordnung. Den Bildlauf am Dokument trägt `components/useFunkprotokollLauf.ts`: Öffnen am
   Ende (außer mit `?eintrag=`), Mitlaufen am Ende an der jüngsten Zeile, Anker beim Nachladen
   oben (`overflow-anchor: none`, eigene Korrektur). „Ende“ ist die Unterkante der
-  Zeitachsenspalte über der Erfassung (`ende`), nicht das Dokumentende: unter `xl` steht die
-  Bilanz darunter, um die Höhe der Erfassung abgesetzt. Eingefroren wird bei Fokus in der Achse ODER
+  Zeitachsenspalte über der Erfassung (`ende`), nicht das Dokumentende: darunter stehen die
+  Hinweise zu vorgemerkten Einträgen. Eingefroren wird bei Fokus in der Achse ODER
   nicht am Ende; das Sammelbanner steht unten über der Erfassung. Nach dem eigenen Eintrag rollt
   die Seite ans Ende. Die Lesemarke ist eine Trennlinie unter dem zuletzt gesichteten Eintrag,
   wenn er im ungefilterten Fenster steht (`lesemarkeImFenster`), sonst ein Banner mit „Zur Marke
@@ -42,8 +42,6 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `useNachObenPasst`): macht eine hohe Leiste (Anhangliste, Hinweise) den Platz zu knapp, steht er
   unsichtbar und ist kein Tab-Stopp. Lagemeldungen bleiben neueste zuerst.
   `KARTEN_EIGENBAU` ist leer (`datensicht.guard.test.ts` pinnt 0).
-- Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`); unter `xl` erst nach der ersten Liste, dann
-  stehend (Riegel `bilanzFrei`, nicht `isLoading`).
 - **Erfassung** hängt auf jeder Breite als `fuss` an der Wurzel von `EinsatzSeite`
   (`.etb-erfassung-sticky`; ≤ 50 % Fensterhöhe, oben voll sichtbar — `e2e/leisten-flaeche.spec.ts`,
   `fokus-verdeckung.spec.ts`). Fokusabstand per `scroll-margin-block-end`
@@ -80,10 +78,23 @@ Ableitungen in `etb/zeitachseModell.ts`)
     60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und Warteschlange, Grund
     am Chip); der Server begrenzt sie nicht. Ein Nachtrag über Mitternacht nennt die Erfassung mit
     Tag (`nachtragText`).
-- **Kopfzahl und Bilanz zählt der Server über DENSELBEN Filter** (LFH-612, `GET …/etb/zaehler`,
-  `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität
-  `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
-  Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
+- **Kopfzahl und Typ-Segmente zählt der Server über DENSELBEN Filter** (LFH-612,
+  `GET …/etb/zaehler`, `etb/repo.rs:filter_bedingung`, Parameter nur über
+  `routes/etb.rs:filter_merkmale`; Parität `tests/etb_zaehler.rs`). Ein Bilanz-Paneel gibt es
+  nicht mehr (kwc2yszv D7, Spec `etb-zaehler`, Herleitung
+  `openspec/changes/kwc2yszv-etb-neuentwurf/design.md`). Kopf (`kopfMeta`): ohne Filter „112
+  Einträge · 300 Systemeinträge ausgeblendet“ (Handeinträge, `handeintraege`; die Zahl der
+  ausgeblendeten aus derselben Zählung ohne Ausschluss und ohne Typ), mit Filter „7 Treffer“
+  (`gesamt` der gefilterten Zählung); Einzahl bei 1; keine Tagesgrenze. Typ-Segmente
+  (`segmentZahl`, `segmentTitel`): `je_typ` der Zählung über den Filter OHNE Typ — ein Segment
+  nennt, was ein Wechsel zeigte —, „Alle“ die Handeinträge; die Zahl steht in Mono hinter dem
+  Wort (`SegmentOption.zahl`), der Name bleibt das Typwort, Titel und Beschreibung tragen die
+  Mehrzahl („Lagefeststellungen: 2“). Ohne Zählung steht **keine** Zahl da, nie die des geladenen
+  Fensters. Der Sendestatus des Puffers (`pufferZustand`) steht als EINE Marke im Kopf
+  (`etb/EtbSendestatus.tsx`): „alles übertragen“ mit Haken, sonst „n ausstehend“ bzw. „n
+  abgelehnt · m ausstehend“ als Knopf, der zur ersten vorgemerkten Zeile rollt
+  (`[data-zeile^="ausstehend-"]`); ab `md` vor „Drucken / als PDF“, darunter in der Meta-Zeile.
+  Die Liste „Berichtigungen“ entfällt, der Typfilter „Berichtigung“ ersetzt sie.
 - **Eine Filterleiste** (LLH-1065/LLH-1080, Spec `etb-filterleiste`, Herleitung
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in
   `EtbFilterleiste` über der Zeitachse, in zwei Gruppen — Typ-Segmente und Umschaltknopf „System“
@@ -93,11 +104,30 @@ Ableitungen in `etb/zeitachseModell.ts`)
   sind Sprungwerte der Seite aus der URL. Der Zeitraum schreibt bei jeder Wahl ABSOLUTE,
   minutengenaue Grenzen (`anzeige/zeitfenster.ts`); „Seit letzter Lagebesprechung“ nur mit
   Freigabe `lagebesprechung` und abgehaltener Besprechung (`lagebesprechung/useLetzteLagebesprechung.ts`).
-- **Systemeinträge ausblenden** (LFH-958, Spec `etb-zeitachse-darstellung`): `ohne_system=true`
-  ist ein Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste,
-  `zaehler` und `anzahl` erben ihn zusammen. Zustand in der URL (`etbPfad`/`parseEtbFilter`),
-  nur `true` oder fehlend; neben `typ=system` fällt er weg (sonst 422, `filterZusammenfuehren`).
-  Ein `?eintrag=`, der unter dem Ausschluss nicht auftaucht, blendet wieder ein und sagt es.
+  **Kleben** (kwc2yszv D8, `etb/etbKopfKleben.ts`): ab `md` kleben Seitenkopf
+  (`EinsatzSeite kopfKlebt`) und Filterleiste unter dem Rahmen (`top: var(--lfh-rahmen-oben)` + gemessene Höhe
+  des Seitenkopfs), solange sie mit Rahmen und Spaltenkopf höchstens ein Drittel der Fensterhöhe
+  nehmen (`KLEBEN_HOECHSTENS`): sonst bliebe zwischen ihnen und der angepinnten Erfassung kein Platz
+  und ein getabbtes Ziel läge ganz verdeckt (`e2e/fokus-verdeckung.spec.ts`, 1366 × 520
+  Handschuh). Der Seitencontainer `[data-lfh="etb-seite"]` trägt `--etb-kopf-unterkante` (Rahmen +
+  Seitenkopf + Filterleiste); dort klebt der Spaltenkopf der Zeitachse
+  (`[data-lfh="etb-spaltenkopf"]`). Den Fokusabstand oben trägt `scroll-padding-block-start` am
+  Dokument (`index.css`, Marke `etb-kopf-klebt`), ausgesetzt bei Fokus in den Köpfen; „Nach oben“
+  rechnet die Köpfe mit (`useEtbKopfHoehe`). Nachweis `e2e/etb-filterleiste.spec.ts` („am Ende der
+  Zeitachse“).
+- **Systemeinträge sind in der Vorgabe aus** (LFH-958, kwc2yszv D6, Spec
+  `etb-zeitachse-darstellung`, „Systemeinträge zeigen“): am Server ist `ohne_system=true` ein
+  Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste, `zaehler`
+  und `anzahl` erben ihn zusammen. In der Adresse steht das Gegenteil: ohne Merkmal setzt
+  `parseEtbFilter` den Ausschluss, nur `system=an` blendet ein; ein alter Link mit
+  `ohne_system=true` gilt wie die Vorgabe, einer ohne Merkmal blendet jetzt ebenfalls aus. Neben
+  `typ=system` fällt der Ausschluss weg (sonst 422, `filterZusammenfuehren`). Einen Filter schreibt
+  nur `etbFilterPfad` (bzw. `etbDruckPfad`) in eine Adresse; `etbPfad` nimmt kein `ohne_system`
+  (Typ `never`), sonst fiele ein `system=an` still heraus. Der Ausschluss ist kein Filter
+  (`istGefiltert`): Kopf „Einträge“, kein Filterband, kein „ohne System“ unter den Merkmalen;
+  eingeblendet zählt er in „Filter (n)“. Ein `?eintrag=`, der unter dem Ausschluss ohne Typfilter
+  nicht auftaucht, blendet ein und sagt es (auch, wenn es ihn nicht gibt); unter einem Typfilter
+  räumt er still. e2e öffnet Systemeinträge über `etbMitSystem` (`e2e/AGENTS.md`).
 - **Systemeinträge leise und gebündelt** (LLH-1106, Spec `etb-zeitachse-darstellung`): ein
   Systemeintrag steht als `Zeitachseneintrag leise` (Text `gedaempft`, `textKlein`, ungekürzt,
   ohne Tönung); „System → System“ entfällt (`etb/systemKennung.ts` spiegelt
