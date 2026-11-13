@@ -84,18 +84,18 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 6. Archivakte (Frontend)
 
-- [ ] 6.1 `antragswege` mit Archivzustand (D7): archiviert → Person per Kennung immer, Einsatz
+- [x] 6.1 `antragswege` mit Archivzustand (D7): archiviert → Person per Kennung immer, Einsatz
       ohne offenen Einsatz-Antrag; geschwärzt ohne Archiv → keiner. Tests in
       `Loeschersuchen.test.tsx` (die Fälle zu `geschwaerzt` umschreiben, die neuen Fälle
       dazu).
-- [ ] 6.2 Dialog „Person per Kennung schwärzen“: Kennung eingeben, Art aus dem Präfix, dann der
+- [x] 6.2 Dialog „Person per Kennung schwärzen“: Kennung eingeben, Art aus dem Präfix, dann der
       bestehende `SchwaerzungsantragDialog` mit `{ art, kennung }`. Er nennt den Vollzug per
       Befehl und `archiv personen` als Weg zur Kennung. `antragBody` sendet `kennung` statt
       `id`. Tests: reine Funktionen (Präfix → Art, ungültige Kennung gesperrt, Body)
       und ein Rendertest des Dialogs.
-- [ ] 6.3 Hinweis an offenen, fälligen Personen-Anträgen am Archiv: „wartet auf Befehl mit
+- [x] 6.3 Hinweis an offenen, fälligen Personen-Anträgen am Archiv: „wartet auf Befehl mit
       Archiv-Schlüssel“. Prüfen mit einem Rendertest in `Loeschersuchen.test.tsx`.
-- [ ] 6.4 Anwenderkapitel `docs/anwender/kapitel/aufbewahrung.md` nachziehen (Sätze zu „nur
+- [x] 6.4 Anwenderkapitel `docs/anwender/kapitel/aufbewahrung.md` nachziehen (Sätze zu „nur
       ganzer Einsatz“, Abschnitt „Person“, archivierter Einsatz). Bild der Archivakte neu
       aufnehmen, falls das Kapitel eines zeigt. Prüfen mit den Wächtern der Anwenderdoku aus
       `check-all.sh`.

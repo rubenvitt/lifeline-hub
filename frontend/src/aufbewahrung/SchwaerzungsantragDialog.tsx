@@ -68,12 +68,15 @@ export function antragBody(ziel: AntragZielWahl, werte: AntragWerte): NeuerSchwa
 interface SchwaerzungsantragDialogProps {
   einsatzId: number;
   ziel: AntragZielWahl;
+  /** Der Einsatz ist archiviert (LLH-1712): der Einsatz-Antrag löscht das Archiv. */
+  archiv?: boolean;
   onSchliessen: () => void;
 }
 
 export default function SchwaerzungsantragDialog({
   einsatzId,
   ziel,
+  archiv = false,
   onSchliessen,
 }: SchwaerzungsantragDialogProps) {
   const qc = useQueryClient();
@@ -122,9 +125,11 @@ export default function SchwaerzungsantragDialog({
           </span>
         }
         description={
-          istEinsatz
-            ? 'Schwärzt alle personenbezogenen Angaben, unabhängig von Frist und Karenz. Das Einsatztagebuch bleibt im Wortlaut. Bis zum Vollzug zurücknehmbar.'
-            : `Entfernt ${personenUmfang(ziel.art)}. Bis zum Vollzug zurücknehmbar.`
+          istEinsatz && archiv
+            ? 'Löscht alle Blöcke des Archivs unwiderruflich. Heruntergeladene Blöcke erreicht das nicht. Bis zum Vollzug zurücknehmbar.'
+            : istEinsatz
+              ? 'Schwärzt alle personenbezogenen Angaben, unabhängig von Frist und Karenz. Das Einsatztagebuch bleibt im Wortlaut. Bis zum Vollzug zurücknehmbar.'
+              : `Entfernt ${personenUmfang(ziel.art)}. Bis zum Vollzug zurücknehmbar.`
         }
       />
       {!istEinsatz && (

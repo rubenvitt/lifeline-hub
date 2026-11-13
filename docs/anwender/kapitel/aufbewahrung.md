@@ -2,7 +2,7 @@
 titel: Aufbewahrung
 gruppen: [administration]
 reihenfolge: 660
-quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs, src/instanz/fuehrung/loeschvermerk.rs]
+quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/ArchivPersonAntragDialog.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/einsatz/archiv/loeschersuchen.rs, src/einsatz/archiv/personen.rs, src/aufbewahrung/antrag.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs, src/instanz/fuehrung/loeschvermerk.rs]
 ---
 
 ## Überblick
@@ -130,8 +130,8 @@ Für System-Admins, wenn eine Person die Löschung ihrer Daten verlangt:
 2. Im Paneel „Löschersuchen (Art. 17)“ „Person suchen und schwärzen“ wählen, unter „Name oder
    Rufnummer“ den ganzen Namen oder die Rufnummer eintragen, „Suchen“ wählen und beim Treffer
    „Antrag stellen“. Soll der ganze Einsatz geschwärzt werden, stattdessen „Einsatz sofort
-   schwärzen“ wählen. Bei einem archivierten Einsatz gibt es keine Personensuche: Das
-   Löschersuchen geht dort nur für den ganzen Einsatz und löscht das Archiv.
+   schwärzen“ wählen. Ein archivierter Einsatz hat keine Personensuche; dafür gibt es den
+   nächsten Ablauf.
 3. Das „Aktenzeichen des Löschersuchens“ eintragen, ohne Namen.
 4. Zur Bestätigung die angezeigte Kennung eintippen.
 
@@ -141,6 +141,26 @@ Für System-Admins, wenn eine Person die Löschung ihrer Daten verlangt:
    „Löschersuchen erfasst — Vollzug in 24 Stunden“.
 
 Bis zum Vollzug lässt sich der Antrag in der Liste des Paneels zurücknehmen.
+
+### Einem Löschersuchen an einem archivierten Einsatz nachkommen
+
+Für System-Admins, zusammen mit jemandem, der den Server betreibt und einen privaten
+Archiv-Schlüssel der Organisation hat:
+
+1. Die Kennung der Person auf dem Server suchen lassen:
+   `lifeline-hub archiv personen --einsatz <ID> --identitaet <Schlüsseldatei> --suche <Name>`.
+   Die ID steht in der Adresse der Archivakte; die Ausgabe nennt je Treffer Kennung und Namen.
+2. In der Verwaltung „Aufbewahrung“ öffnen und die Archivakte des Einsatzes wählen.
+3. Im Paneel „Löschersuchen (Art. 17)“ „Person per Kennung schwärzen“ wählen. Soll der ganze
+   Einsatz samt Archiv gelöscht werden, stattdessen „Einsatz und Archiv löschen“ wählen und wie
+   im Ablauf oben fortfahren.
+4. Unter „Kennung der Person“ die Kennung eintragen, etwa `R-042`; darunter steht die Art der
+   Person. Das „Aktenzeichen des Löschersuchens“ eintragen, ohne Namen.
+5. „Person schwärzen lassen“ wählen.
+6. Nach 24 Stunden steht am Antrag „wartet auf Befehl mit Archiv-Schlüssel“. Dann auf dem Server
+   `lifeline-hub archiv loeschersuchen --identitaet <Schlüsseldatei>` ausführen lassen. Die
+   Ausgabe nennt je Einsatz die Kennungen und die Zahl der Blöcke; danach steht der Antrag als
+   vollzogen in der Liste.
 
 ## Hintergrund
 
@@ -218,8 +238,11 @@ jeden ihrer Einsätze, sobald dessen Nachbereitung endet:
   Löschung vorgemerkt, geschwärzt oder zum Abräumen vorgemerkt ist, ein Demo-Einsatz und ein
   Einsatz mit offenem Löschersuchen. Ein ELW, der seine Einsätze einem Hub übergibt,
   archiviert nicht selbst.
-- Ein **Löschersuchen** an einem archivierten Einsatz geht nur für den ganzen Einsatz; sein
-  Vollzug löscht alle Blöcke unwiderruflich.
+- Ein **Löschersuchen** an einem archivierten Einsatz für den ganzen Einsatz löscht alle Blöcke
+  unwiderruflich. Eines für eine Person entfernt sie aus allen Blöcken; die Blöcke behalten
+  Nummer und Frist und werden an die heute geprüften Schlüssel der Organisation neu
+  verschlüsselt. Den Vollzug übernimmt nicht der Server allein, sondern ein Befehl mit einem
+  privaten Archiv-Schlüssel; bis dahin bleibt der Antrag offen.
 - Die Skelett-Frist wartet, bis der letzte Block gelöscht ist.
 
 ### Fristen je Datenkategorie
@@ -261,9 +284,12 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 - Das Aktenzeichen bleibt im Einsatztagebuch stehen und darf deshalb keinen Namen enthalten.
 - Möglich ist ein Löschersuchen nur an einem abgeschlossenen, noch nicht geschwärzten Einsatz.
   Ausnahme ist ein archivierter Einsatz: Er ist schon geschwärzt, ein Löschersuchen für den
-  ganzen Einsatz löscht sein Archiv. Heruntergeladene Blöcke erreicht es nicht: Sie sind mit zu
-  löschen. An dieser Installation lässt sich ein so gelöschter Block nicht wieder einspielen, und
-  eine schon eingespielte Kopie geht mit.
+  ganzen Einsatz löscht sein Archiv, eines für eine Person schwärzt sie in allen Blöcken.
+  Heruntergeladene Blöcke erreicht beides nicht: Sie sind mit zu löschen. An dieser Installation
+  lässt sich ein vorher heruntergeladener Block danach nicht mehr einspielen, und eine schon
+  eingespielte Kopie geht mit.
+- Die Suche nach der Kennung im Archiv und der Vollzug im Archiv stehen im Zugangsprotokoll
+  („Archiv durchsucht“, „Person im Archiv geschwärzt“), ohne Suchtext und ohne Namen.
 
 ### Wer was darf
 
