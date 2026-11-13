@@ -1127,7 +1127,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     const zeile = container.querySelector('[data-zeile="eintrag-1"]')!;
     expect(zeile).toHaveAttribute('data-lfh-eintrag', 'zeitachse');
     expect(zeile).toHaveAttribute('data-typ', 'meldung');
-    expect(within(zeile as HTMLElement).getByText('Nr. 1')).toBeInTheDocument();
+    // In der Spaltenzeile (kompakt ab `lg`) steht die Zahl unter dem Kopf „Nr.“; „Nr. “ davor
+    // liest nur der Vorleser (`EtbSpaltenzeile`).
+    expect(zeile).toHaveTextContent('Nr. 1');
     expect(zeile.querySelector('[data-lfh="typwort"]')).toHaveTextContent('Meldung');
     expect(zeile.querySelector('[data-lfh="typkante"]')).not.toBeNull();
   });
