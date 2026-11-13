@@ -572,6 +572,9 @@ pub struct NamensTraeger {
     /// Ob ein lebendes Dokument den Abschnitt als Bezug trägt. Ein Wahrheitswert genügt: das
     /// Ereignis `dokument` trägt keine Kennung (`routes::dokument::sse`).
     pub dokumente: bool,
+    /// Nicht stornierte Personen, die eine Einheit des Abschnitts versorgt: ihre Zeile trägt den
+    /// Abschnitt per Join, die Tabs gleichen sie zeilenweise ab (LLH-1682).
+    pub personen: Vec<i64>,
 }
 
 /// [`NamensTraeger`] des Abschnitts `id`, auch stornierte (die Listen zeigen sie mit Marke).
@@ -617,12 +620,23 @@ pub async fn namens_traeger(
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
+    let personen = sqlx::query_scalar(
+        "SELECT p.id FROM einsatz_person p \
+           JOIN einsatz_einheit e ON e.id = p.versorgende_einheit_id \
+          WHERE e.abschnitt_id = ? AND p.einsatz_id = ? AND p.storniert_at IS NULL \
+          ORDER BY p.id",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
     Ok(NamensTraeger {
         raeume,
         stellen,
         bezirke,
         einheiten,
         dokumente,
+        personen,
     })
 }
 

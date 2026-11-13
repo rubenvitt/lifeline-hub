@@ -43,7 +43,10 @@ Ohne das Binary: die Referenz-Clients unten tun dasselbe.
 | `rechner:use`          | Rechner nutzen (`/api/v1/rechner/unterkunft`) |
 
 Lese-Scopes mit Einsatzbezug (`lage:read`, `einsaetze:read`) sehen nur den Einsatz, den die
-Einsatzleitung für den Zugang freigegeben hat; siehe „Lage lesen“ und „Einsätze lesen“.
+Einsatzleitung für den Zugang freigegeben hat; siehe „Lage lesen“ und „Einsätze lesen“. Dieselbe
+Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes (siehe „Rechner Unterkunft und
+Zelte“). Geben oder Nehmen von `rechner:use` beendet eine Freigabe nicht: Ein Zugang, der einen
+Einsatz liest und `rechner:use` dazubekommt, rechnet ab da mit dessen Richtwerten.
 `events:read` allein öffnet nichts: Welche Ereignisse ein Zugang sieht, folgt aus seinen übrigen
 Lese-Scopes. Neue Scopes kommen nur hinzu; ein Client überspringt unbekannte Werte.
 
@@ -438,12 +441,21 @@ Organisation keine eigenen Werte gesetzt hat.
 
 1. der Wert aus `richtwerte` der Anfrage (Herkunft `anfrage`), etwa
    `"richtwerte": { "wasser_je_person_l": 15 }`,
-2. sonst der Wert, den die Organisation des Zugangs in ihren Stammdaten gesetzt hat (`org`),
-3. sonst die Vorgabe des Programms (`basis`).
+2. sonst, wenn die Anfrage `einsatz_id` nennt, der Wert, den dieser Einsatz in seinen
+   Einstellungen gesetzt hat (`einsatz`),
+3. sonst der Wert, den die Organisation des Zugangs in ihren Stammdaten gesetzt hat (`org`),
+4. sonst die Vorgabe des Programms (`basis`).
 
 Schlüssel, Bezeichnung, Einheit und Grenzen jedes Richtwerts und die Zelttypen nennt
-`GET /api/v1/rechner/unterkunft/richtwerte`. Werte, die ein Einsatz für sich gesetzt hat, gehören
-nicht dazu: Ein Feld `einsatz_id` gibt es noch nicht, es wird als unbekanntes Feld abgelehnt.
+`GET /api/v1/rechner/unterkunft/richtwerte`, mit `?einsatz_id=<id>` samt den Werten des Einsatzes.
+
+**Werte eines Einsatzes** (LLH-1856). Die Rechnung nimmt sie mit `"einsatz_id": <id>` im Body, die
+Auskunft mit `?einsatz_id=<id>`. Das geht nur für den Einsatz, den die Einsatzleitung für den
+Zugang freigegeben hat (wie bei „Lage lesen“), und nur, solange er läuft. Freigeben lässt sich ein
+Zugang mit `lage:read` oder `einsaetze:read`; für einen Rechner-Zugang empfiehlt sich
+`einsaetze:read`, denn `GET /api/v1/einsaetze` nennt die `id` des freigegebenen Einsatzes. Jeder
+andere Einsatz, ob nicht freigegeben, abgeschlossen, fremd oder unbekannt, ergibt stets dieselbe
+`404 not_found`. Ohne `einsatz_id` (oder mit `null`) bleibt der Einsatz außen vor.
 
 **Prüfung.** Anders als die Maske der Oberfläche rechnet die API nie still mit 0. Zusammen passen
 die Felder, wenn
@@ -459,6 +471,9 @@ die Felder, wenn
 | ------ | --------------- | ----------------------------------------------------------------------------------------------- |
 | 400    | `invalid_field` | Ein Feld für sich: unbekanntes Feld, unbekannter Richtwert, Zahl außerhalb der Grenzen.         |
 | 422    | `unprocessable` | Die Felder passen nicht zusammen, etwa ein Block eines anderen Wegs oder `gesamt` bei Trennung. |
+| 404    | `not_found`     | `einsatz_id` nennt keinen Einsatz, den die Einsatzleitung für den Zugang freigegeben hat.       |
+
+Geprüft wird in dieser Reihenfolge: erst die Anfrage (400, 422), dann der Einsatz (404).
 
 Der Text nennt das Feld, etwa `raeume[1].laenge_m`, auch bei einem falschen Typ. Ein doppelter
 Schlüssel und eine Liste an Stelle eines Objekts sind 400.

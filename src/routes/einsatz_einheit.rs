@@ -732,6 +732,12 @@ pub async fn update(
         },
     )
     .await?;
+    // Die Personenzeile trägt Name und Abschnitt der versorgenden Einheit (LLH-1682). Sofort
+    // melden: `patche` hat gespeichert, ein späterer Schritt (Sprechgruppen) kann noch mit 422
+    // scheitern (Muster `routes::einsatzabschnitt::update`).
+    if vorher.name != nachher.name || vorher.abschnitt_id != nachher.abschnitt_id {
+        super::einsatz_person::sse_versorgte_personen(&state, einsatz_id, &[eid]).await;
+    }
 
     // Führer authoritativ setzen (Mitgliedschaft bereits geprüft) + ETB bei Änderung.
     if fuehrer_wechsel {
@@ -932,6 +938,11 @@ pub async fn uebernehmen(
     }
     if ergebnis.meldung_id.is_some() {
         crate::meldung::sse(&state, einsatz_id);
+    }
+    // Eine unangemeldete Einheit kann schon Personen versorgen; deren Zeilen tragen den
+    // Abschnitt der Einheit per Join (LLH-1682).
+    if u.abschnitt_id.is_some() {
+        super::einsatz_person::sse_versorgte_personen(&state, einsatz_id, &[eid]).await;
     }
     Ok(Json(
         einheit_repo::laden(&state.pool, einsatz_id, eid).await?,

@@ -1218,6 +1218,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/personen/{pid}/druck",
             get(routes::einsatz_person::detail_druck),
         )
+        // Zeilenabruf des Live-Abgleichs (LLH-1682): nicht protokolliert wie die Liste.
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/zeile",
+            get(routes::einsatz_person::zeile),
+        )
         .route(
             "/api/einsaetze/{id}/personen/{pid}",
             get(routes::einsatz_person::detail),
