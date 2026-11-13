@@ -15,10 +15,10 @@ Code. Gegenprobe heißt: die Änderung zurücknehmen, Test rot, wieder einsetzen
 
 ## 3. Integration über zwei Instanzen (Spec-Delta `instanz-fuehrung`)
 
-- [ ] 3.1 `tests/instanz_fuehrung.rs` (Abschnitt neben „Akten ohne Spiegel“): Hub übernimmt einen abgeschlossenen Einsatz des ELW (Notübernahme oder Übergabe über vorhandene Helfer), löscht ihn endgültig (Skelett-Löschung) → nach dem nächsten Abgleich ist der Spiegel am ELW abgeräumt (Pull). Prüfen: Test grün, rot ohne 1.2 oder 2.2
-- [ ] 3.2 Umgekehrt: ELW übernimmt einen Einsatz des Hubs und löscht ihn endgültig → der Hub räumt seinen Spiegel mit dem nächsten Abgleich des ELW ab (Push). Prüfen: Test grün, rot ohne 1.2 oder 2.2
-- [ ] 3.3 Rückkehr aus einer Sicherung: Hub mit gelöschtem Vermerk und Protokoll (Stand vor der Löschung nachgestellt, Einsatz nicht mehr da) meldet nichts, der Spiegel am ELW bleibt. Prüfen: Test grün
-- [ ] 3.4 Zwei ELW an einem Hub: ELW 1 meldet den Einsatz, den laut Akte ELW 2 führt, als gelöscht → der Spiegel am Hub bleibt (Szenario „Ein ELW meldet den Einsatz eines anderen“). Prüfen: Test grün, `tests/instanz_lebensende.rs` ohne Schalter (vorhandene Tests zum Löschen) unverändert grün
+- [x] 3.1 `tests/instanz_fuehrung.rs` (Abschnitt neben „Akten ohne Spiegel“): Hub übernimmt einen abgeschlossenen Einsatz des ELW (Notübernahme oder Übergabe über vorhandene Helfer), löscht ihn endgültig (Skelett-Löschung) → nach dem nächsten Abgleich ist der Spiegel am ELW abgeräumt (Pull). Prüfen: Test grün, rot ohne 1.2 oder 2.2
+- [x] 3.2 Umgekehrt: ELW übernimmt einen Einsatz des Hubs und löscht ihn endgültig → der Hub räumt seinen Spiegel mit dem nächsten Abgleich des ELW ab (Push). Prüfen: Test grün, rot ohne 1.2 oder 2.2
+- [x] 3.3 Rückkehr aus einer Sicherung: Hub mit gelöschtem Vermerk und Protokoll (Stand vor der Löschung nachgestellt, Einsatz nicht mehr da) meldet nichts, der Spiegel am ELW bleibt. Prüfen: Test grün
+- [x] 3.4 Zwei ELW an einem Hub: ELW 1 meldet den Einsatz, den laut Akte ELW 2 führt, als gelöscht → der Spiegel am Hub bleibt (Szenario „Ein ELW meldet den Einsatz eines anderen“). Prüfen: Test grün, `tests/instanz_lebensende.rs` ohne Schalter (vorhandene Tests zum Löschen) unverändert grün. Ergebnis 13.11.2026: `instanz_fuehrung` 116 grün, `instanz_lebensende` 11 grün; Gegenprobe (Umsetzung aus 9550ab80 zurückgenommen): 3.1, 3.2 und 3.4 rot, 3.3 grün (Netz für „ohne Beleg nichts“)
 
 ## 4. Doku und Regeln
 
@@ -30,8 +30,8 @@ Code. Gegenprobe heißt: die Änderung zurücknehmen, Test rot, wieder einsetzen
 ## 5. Abschluss
 
 - [ ] 5.1 `cargo test --lib instanz::` und `--lib einsatz::`, `--test instanz_fuehrung --test instanz_lebensende --test instanz_spiegel`, `scripts/check-fmt.sh`, dann `./scripts/check-all.sh` im Bündel, das die Umgebung trägt (der volle Lauf ist die CI des PRs). Prüfen: alles grün, Messung hier vermerkt
-- [ ] 5.2 Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde behandelt und im PR unter „Review“. Prüfen: Verbleib je Befund festgehalten
-- [ ] 5.3 Bilder der Änderung: keine sichtbare Wirkung außer einer verschwundenen Zeile in „Einsätze beim Gegenüber“; der Bildlauf kennt keine zwei gekoppelten Instanzen. Im PR ein Satz, warum es kein Bild gibt. Prüfen: Satz steht im PR
+- [x] 5.2 Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde behandelt und im PR unter „Review“. Prüfen: Verbleib je Befund festgehalten. Gelaufen am 13.11.2026: ein Reviewer mit frischem Kontext (5 Befunde), drei Gegenprüfer (3 bestätigt, 2 verworfen); Verbleib in Gruppe 6
+- [x] 5.3 Bilder der Änderung: keine sichtbare Wirkung außer einer verschwundenen Zeile in „Einsätze beim Gegenüber“; der Bildlauf kennt keine zwei gekoppelten Instanzen. Im PR ein Satz, warum es kein Bild gibt. Prüfen: Satz steht im PR. Ergebnis: kein Bild; der Bildlauf (`frontend/e2e/doku-bilder/`) kennt keine zwei gekoppelten Instanzen, sichtbar ist nur eine fehlende Zeile, belegt durch die Integrationstests aus Gruppe 3
 
 ## 6. Aus dem Review vor dem PR
 
