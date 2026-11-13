@@ -10,8 +10,9 @@ import {
   type SchaedenFilter,
   type SchadenSortierung,
 } from '../api/einsatzSchaden';
+import { alsPersonAuswahl, ladePersonZeile, vergleichePersonen } from '../api/einsatzPerson';
 import { einsatzKeys, type ZeilenZiel } from '../api/queryKeys';
-import type { Schaden, SchadenMarker } from '../api/types';
+import type { Person, Schaden, SchadenMarker } from '../api/types';
 import { LIVE_SAMMELFENSTER_MS, type LiveSammler } from './liveInvalidierung';
 
 /**
@@ -44,6 +45,23 @@ function liste<Z, L extends { id: number }>(
   return {
     key,
     einsetzen: (alt, id, zeile) => einsortieren(alt as readonly L[], id, form(zeile), vergleich),
+  };
+}
+
+/**
+ * Flache Listen unter einem Prefix, eine je Filter (Betroffene je Betreuungsstelle, LLH-1682).
+ * `form` sieht den Cache-Key des Eintrags und sagt, ob und wie die Zeile in diese Liste gehört.
+ */
+function gefiltert<Z, L extends { id: number }>(
+  key: (einsatzId: number) => QueryKey,
+  form: (zeile: Z, cacheKey: QueryKey) => L | null,
+  vergleich: (a: L, b: L) => number,
+): ZeilenListe<Z> {
+  return {
+    key,
+    praefix: true,
+    einsetzen: (alt, id, zeile, cacheKey) =>
+      einsortieren(alt as readonly L[], id, form(zeile, cacheKey), vergleich),
   };
 }
 
@@ -98,6 +116,19 @@ function ziel<Z>(
 // die Marker ebenso.
 const ungestorniert = (s: Schaden): Schaden | null => (s.storniert_at == null ? s : null);
 
+// Personenliste und Auswahl führen keine stornierten (`storniert_at IS NULL` im Server).
+const personOhneStorno = (p: Person): Person | null => (p.storniert_at == null ? p : null);
+
+// Betroffene einer Betreuungsstelle: dieselbe Menge wie der Serverfilter `betreuungsstelle_id`
+// (`person::repo::liste_gefiltert`), jüngster Verbleib „Notunterkunft“ an dieser Stelle. Die
+// Stelle ist das letzte Glied von `einsatzKeys.personenDerStelle`.
+const betroffenDerStelle = (p: Person, cacheKey: QueryKey): Person | null =>
+  p.storniert_at == null &&
+  p.aktuelle_verbleib_art === 'notunterkunft' &&
+  p.aktuelle_verbleib_betreuungsstelle_id === cacheKey[cacheKey.length - 1]
+    ? p
+    : null;
+
 const ZIELE: Record<ZeilenZiel, Ziel> = {
   // Auswahl, Seitenketten und Einzelabrufe liegen unter `schaeden(e)`, die Marker daneben.
   schaeden: ziel<Schaden>(
@@ -130,6 +161,17 @@ const ZIELE: Record<ZeilenZiel, Ziel> = {
         };
       }),
       einzeln<Schaden>(einsatzKeys.schaedenEinzelnAlle),
+    ],
+  ),
+  // LLH-1682: Liste, Auswahl und die Betroffenen je Stelle; alle aus einem Abruf der nicht
+  // protokollierten Zeilen-Route. Der Prefix `personen(e)` erfasst die Stellenlisten mit.
+  personen: ziel<Person>(
+    ladePersonZeile,
+    (e) => [einsatzKeys.personen(e), einsatzKeys.personenAuswahl(e)],
+    [
+      liste(einsatzKeys.personen, personOhneStorno, vergleichePersonen),
+      liste(einsatzKeys.personenAuswahl, alsPersonAuswahl, vergleichePersonen),
+      gefiltert(einsatzKeys.personenDerStelleAlle, betroffenDerStelle, vergleichePersonen),
     ],
   ),
 };
@@ -187,7 +229,7 @@ export interface ZeilenSammler {
 
 /**
  * Zeilenabgleich einer Live-Verbindung (LFH-931, Spec `live-abgleich`, design.md D3): Ereignisse
- * zu einem Schaden laden nur diese Zeile und sortieren sie in die geladenen
+ * zu einem Schaden oder einer Person (LLH-1682) laden nur diese Zeile und sortieren sie in die geladenen
  * Listen ein, statt den Gesamtbestand neu abzurufen.
  *
  * Wo sich das nicht lohnt oder nicht sicher ist, gehen die Listen an den Sammler der Verbindung

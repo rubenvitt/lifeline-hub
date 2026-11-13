@@ -2,19 +2,19 @@
 
 ## 1. Zeilen-Route im Backend (D1)
 
-- [ ] 1.1 `GET /api/einsaetze/{id}/personen/{pid}/zeile` in `src/routes/einsatz_person.rs` und `src/app.rs`: `EinsatzLesezugriff<Personen>`, `repo::laden` (auch storniert), `stelle::fordere_person`, Einheitengerät ohne Personalien, kein Audit. Beleg: Rust-Tests in `tests/einsatz_person.rs` (Antwort gleich der Listenzeile, stornierte Person mit `storniert_at`, fremder Einsatz 404, ohne Modulrecht 403, Zugriffsprotokoll der Person bleibt leer)
-- [ ] 1.2 Route in jede Routenliste der Geräte in `src/geraet/mod.rs`, die `GET …/personen` führt. Beleg: Rust-Tests in `tests/geraet_kopplung.rs` (UHS-Gerät sieht eine Person seiner UHS, bekommt 404 für eine fremde; Einheitengerät bekommt die Zeile ohne Personalien)
+- [x] 1.1 `GET /api/einsaetze/{id}/personen/{pid}/zeile` in `src/routes/einsatz_person.rs` und `src/app.rs`: `EinsatzLesezugriff<Personen>`, `repo::laden` (auch storniert), `stelle::fordere_person`, Einheitengerät ohne Personalien, kein Audit. Beleg: Rust-Tests in `tests/einsatz_person.rs` (Antwort gleich der Listenzeile, stornierte Person mit `storniert_at`, fremder Einsatz 404, ohne Modulrecht 403, Zugriffsprotokoll der Person bleibt leer)
+- [x] 1.2 Route in jede Routenliste der Geräte in `src/geraet/mod.rs`, die `GET …/personen` führt. Beleg: Rust-Tests in `tests/geraet_kopplung.rs` (UHS-Gerät sieht eine Person seiner UHS, bekommt 404 für eine fremde; Einheitengerät bekommt die Zeile ohne Personalien)
 
 ## 2. Nachforderung mit Kennung (D3)
 
-- [ ] 2.1 `sse_mit_person` in `src/routes/nachforderung.rs` sendet `person` mit `person_id`. Beleg: Rust-Test in `tests/nachforderung_person.rs`, dass die Nutzlast `person_id` trägt
+- [x] 2.1 `sse_mit_person` in `src/routes/nachforderung.rs` sendet `person` mit `person_id`. Beleg: Rust-Test in `tests/nachforderung_person.rs`, dass die Nutzlast `person_id` trägt
 
 ## 3. Ziel `personen` im Frontend (D2, D4)
 
-- [ ] 3.1 In `frontend/src/api/einsatzPerson.ts`: Zeilenabruf `ladePersonZeile`, Vergleich nach `registrier_nr` und Projektion auf `PersonAuswahl`. Beleg: Vitest in `einsatzPerson.test.ts` (Pfad ohne Audit-Route, Ordnung, Projektion ohne Freitexte)
-- [ ] 3.2 Flache Liste unter Prefix mit Cache-Key in `form` und Ziel `personen` in `frontend/src/live/zeilenAbgleich.ts` (Vollliste, Auswahl, Betroffene je Stelle); `ZeilenZiel` in `queryKeys.ts` erweitert. Beleg: Vitest in `zeilenAbgleich.test.ts` (Einsortieren nach Registriernummer, Storno entfernt aus allen drei Listen, Wechsel des Verbleibs in eine Stelle und heraus, fremde Stelle unberührt, 404 geht an den Sammler, mehr als 10 Personen je Fenster an den Sammler)
-- [ ] 3.3 `EINSATZ_STREAM_ZIELE.person` in `frontend/src/api/queryKeys.ts`: mit Kennung Zeile `personen` plus `modulZaehler`, `betreuung`, `registrierliste`, `personenTransportmittel` und `personAnhaenge` nur dieser Person; ohne Kennung Prefixe. Beleg: Vitest in `queryKeys.test.ts` (gezielte Keys liegen unter den Prefixen von `person`, fehlende Kennung fällt zurück) und in `useEinsatzLiveStream.test.tsx` (ein `person`-Ereignis mit Kennung ruft die Personenliste nicht ab)
-- [ ] 3.4 Regel in `frontend/AGENTS.md`, „Gezielter Abgleich nach Payload“: der Zeilenabruf schreibt kein Zugriffsprotokoll, eine auditierte Detail-Route ist keine Zeilenquelle. Beleg: Prettier grün
+- [x] 3.1 In `frontend/src/api/einsatzPerson.ts`: Zeilenabruf `ladePersonZeile`, Vergleich nach `registrier_nr` und Projektion auf `PersonAuswahl`. Beleg: Vitest in `einsatzPerson.test.ts` (Pfad ohne Audit-Route, Ordnung, Projektion ohne Freitexte)
+- [x] 3.2 Flache Liste unter Prefix mit Cache-Key in `form` und Ziel `personen` in `frontend/src/live/zeilenAbgleich.ts` (Vollliste, Auswahl, Betroffene je Stelle); `ZeilenZiel` in `queryKeys.ts` erweitert. Beleg: Vitest in `zeilenAbgleich.personen.test.ts` (Einsortieren nach Registriernummer, Storno entfernt aus allen drei Listen, Wechsel des Verbleibs in eine Stelle und heraus, fremde Stelle unberührt, 404 geht an den Sammler, mehr als 10 Personen je Fenster an den Sammler)
+- [x] 3.3 `EINSATZ_STREAM_ZIELE.person` in `frontend/src/api/queryKeys.ts`: mit Kennung Zeile `personen` plus `modulZaehler`, `betreuung`, `registrierliste`, `personenTransportmittel` und `personAnhaenge` nur dieser Person; ohne Kennung Prefixe. Beleg: Vitest in `queryKeys.test.ts` (gezielte Keys liegen unter den Prefixen von `person`, fehlende Kennung fällt zurück) und in `useEinsatzLiveStream.test.tsx` (ein `person`-Ereignis mit Kennung ruft die Personenliste nicht ab)
+- [x] 3.4 Regel in `frontend/AGENTS.md`, „Gezielter Abgleich nach Payload“: der Zeilenabruf schreibt kein Zugriffsprotokoll, eine auditierte Detail-Route ist keine Zeilenquelle. Beleg: Prettier grün
 
 ## 4. Abschluss
 
