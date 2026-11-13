@@ -551,6 +551,53 @@ describe('StammdatenFeld', () => {
  * belegt am CSS, das antd im Theme der App erzeugt (wie die Vorschauen des Design Systems), weil
  * jsdom kein Layout misst (`frontend/AGENTS.md`, Erfassungs-Norm, letzter Punkt).
  */
+describe('StammdatenFeld — nichts übernehmen, was niemand gemeint hat (kwc2yszv, Review E1)', () => {
+  const zwoelf: Vorschlagsquelle = {
+    id: 'funkrufnamenEinsatz',
+    gruppe: 'einsatz',
+    eintraege: [{ label: 'Florian 12', wert: 'Florian 12' }],
+  };
+  const eins: Vorschlagsquelle = {
+    id: 'fahrzeugeStammdaten',
+    gruppe: 'stammdaten',
+    eintraege: [{ label: 'Florian 1', wert: 'Florian 1' }],
+  };
+
+  it('Enter nach exakt „Florian 1“ nimmt „Florian 1“, nicht den obersten „Florian 12“', async () => {
+    const onWert = vi.fn();
+    renderMitProviders(<MitWert nurText quellen={[zwoelf, eins]} onWert={onWert} />);
+    await userEvent.type(feld(), 'Florian 1');
+    await waitFor(() => expect(offeneListe()).not.toBeNull());
+    await userEvent.keyboard('{Enter}');
+    expect(feld()).toHaveValue('Florian 1');
+  });
+
+  it('Tab ohne Tippen nimmt keinen Vorschlag: ein stehender Wert bleibt', async () => {
+    function Stehend() {
+      const [wert, setWert] = useState('Flor');
+      return (
+        <>
+          <StammdatenFeld
+            nurText
+            aria-label="Absender"
+            quellen={[zwoelf, eins]}
+            value={wert}
+            onChange={setWert}
+          />
+          <input aria-label="danach" />
+        </>
+      );
+    }
+    renderMitProviders(<Stehend />);
+    // Ein Klick öffnet die Liste (rc-select öffnet beim Mausdruck); getippt ist nichts.
+    await userEvent.click(feld());
+    await waitFor(() => expect(offeneListe()).not.toBeNull());
+    await userEvent.tab();
+    expect(feld()).toHaveValue('Flor');
+    expect(screen.getByRole('textbox', { name: 'danach' })).toHaveFocus();
+  });
+});
+
 describe('StammdatenFeld — Trefflächen je Dichte', () => {
   it.each([
     ['kompakt', 30],

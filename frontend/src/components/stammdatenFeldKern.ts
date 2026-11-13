@@ -121,6 +121,19 @@ export function baueVorschlagsliste(
     }
     if (eintraege.length > 0) gruppen.push({ gruppe, titel: GRUPPEN_TITEL[gruppe], eintraege });
   }
+  // Ein exakter Treffer steht zuoberst, samt seiner Gruppe: Enter und Tab nehmen den obersten
+  // Vorschlag, und wer „Florian 1“ ganz tippt, meint nicht „Florian 12“ einer früheren Gruppe
+  // (Change `kwc2yszv-etb-neuentwurf`, Review E1).
+  if (filter) {
+    const g = gruppen.findIndex((x) => x.eintraege.some((v) => schluessel(v.wert) === filter));
+    if (g >= 0) {
+      const gruppe = gruppen[g];
+      const i = gruppe.eintraege.findIndex((v) => schluessel(v.wert) === filter);
+      const eintraege = [gruppe.eintraege[i], ...gruppe.eintraege.filter((_, j) => j !== i)];
+      gruppen.splice(g, 1);
+      gruppen.unshift({ ...gruppe, eintraege });
+    }
+  }
   return { gruppen, demo };
 }
 

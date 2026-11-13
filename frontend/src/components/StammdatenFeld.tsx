@@ -184,6 +184,12 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
   const aktivRef = useRef<string | null>(null);
   /** Läuft gerade ein Enter? Dann bleibt die Liste zu (s. Dateikopf). */
   const enterRef = useRef(false);
+  /**
+   * Hat die Person seit dem Öffnen mit ↓/↑ markiert? Nur dann, oder nach Tippen, nehmen Enter und
+   * Tab einen Eintrag: ein Klick in einen stehenden Wert öffnet die Liste, und ein Tab danach
+   * ersetzte ihn sonst still durch den obersten Vorschlag (Review E1).
+   */
+  const pfeilRef = useRef(false);
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   /** Gerade angelegt, die Quelle hat es aber noch nicht neu geladen. */
@@ -252,6 +258,7 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
 
   /** Der Eintrag, den Enter/Tab jetzt nähmen: der markierte, sonst der oberste. */
   function markierterEintrag(): Vorschlag | 'freitext' | null {
+    if (!getippt && !pfeilRef.current) return null;
     const aktiv = aktivRef.current;
     if (aktiv != null) {
       if (aktiv === FREITEXT_SCHLUESSEL && zeigeFreitext) return 'freitext';
@@ -263,6 +270,7 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
 
   const oeffne = (auf: boolean) => {
     if (auf && enterRef.current) return;
+    pfeilRef.current = false;
     if (!auf) setGetippt(false);
     setOffen(auf);
   };
@@ -317,7 +325,11 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
         e.stopPropagation();
         const eintrag = markierterEintrag();
         if (eintrag) nimm(eintrag, 'enter');
-        else oeffne(false);
+        else {
+          // Nichts gewählt: Enter übernimmt den stehenden Text wie bei geschlossener Liste.
+          oeffne(false);
+          nimmStehendenText();
+        }
         return;
       }
       if (!enterSendet) e.preventDefault();
@@ -335,6 +347,7 @@ export default function StammdatenFeld(props: StammdatenFeldProps) {
       return;
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (listeOffen) pfeilRef.current = true;
       if (!listeOffen && e.key === 'ArrowDown' && optionen.length > 0) setOffen(true);
       return;
     }
