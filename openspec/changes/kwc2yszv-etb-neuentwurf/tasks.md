@@ -31,10 +31,10 @@ ohne die Änderung rot ist, dann der Code. Pfade ohne Präfix relativ zu `fronte
 
 ## 5. Leseansicht
 
-- [ ] 5.1 `etb/EtbSpaltenzeile.tsx` mit geteiltem Spaltenraster und Spaltenkopf für kompakt ab `lg`; Von → An ≥ 13 px Textschrift, nichts unter 12 px, Verfasser im Titel und Zeilenmenü. Nachweis: Szenarien „Einzeiliger Eintrag im Fükw“ (≤ 36 px, ≥ 14 Einträge), „Spalten fluchten“, „Langer Absender“, „Bedienbarer Verfasser“, „Langer Verfasser“; `e2e/etb-zeilenhoehe.spec.ts` auf die neuen Werte.
-- [ ] 5.2 Spalte Vermerk mit allen Verweisen und Marken, „+n“ bei Überlauf, durchgestrichener berichtigter Inhalt; „Vermerk <Stelle>“ bei Von = An. Nachweis: Szenarien „Meldung mit Verweis“, „Berichtigt“, „Entscheidung der Einsatzleitung“; `e2e/etb-verweise.spec.ts`, `e2e/etb-folgeauftraege.spec.ts` grün.
-- [ ] 5.3 Lange Einträge auf drei Zeilen mit „mehr“/„weniger“, aufgeklappt bei Sprung und Suchtreffer, nie im Druck. Nachweis: Szenario „Lagebericht im Strom“, Druck-Test unverändert grün.
-- [ ] 5.4 Handschirm-Zeile (Kopfzeile, Text in voller Breite); komfortabel und Handschuh behalten `Zeitachseneintrag`. Nachweis: Szenario „390 px“; `e2e/kontextmenue-etb.spec.ts` grün (Menü an Spaltenzeile und Handschirm-Zeile).
+- [x] 5.1 `etb/EtbSpaltenzeile.tsx` mit geteiltem Spaltenraster und Spaltenkopf für kompakt ab `lg`; Von → An ≥ 13 px Textschrift, nichts unter 12 px, Verfasser im Titel und Zeilenmenü. Nachweis: Szenarien „Einzeiliger Eintrag im Fükw“ (≤ 36 px, ≥ 14 Einträge), „Spalten fluchten“, „Langer Absender“, „Bedienbarer Verfasser“, „Langer Verfasser“; `e2e/etb-zeilenhoehe.spec.ts` auf die neuen Werte.
+- [x] 5.2 Spalte Vermerk mit allen Verweisen und Marken, „+n“ bei Überlauf, durchgestrichener berichtigter Inhalt; „Vermerk <Stelle>“ bei Von = An. Nachweis: Szenarien „Meldung mit Verweis“, „Berichtigt“, „Entscheidung der Einsatzleitung“; `e2e/etb-verweise.spec.ts`, `e2e/etb-folgeauftraege.spec.ts` grün.
+- [x] 5.3 Lange Einträge auf drei Zeilen mit „mehr“/„weniger“, aufgeklappt bei Sprung und Suchtreffer, nie im Druck. Nachweis: Szenario „Lagebericht im Strom“, Druck-Test unverändert grün.
+- [x] 5.4 Handschirm-Zeile (Kopfzeile, Text in voller Breite); komfortabel und Handschuh behalten `Zeitachseneintrag`. Nachweis: Szenario „390 px“; `e2e/kontextmenue-etb.spec.ts` grün (Menü an Spaltenzeile und Handschirm-Zeile).
 - [ ] 5.5 Regel „≥ 50 % Meldungstext“ fortschreiben (`frontend/src/etb/AGENTS.md`, `e2e/etb-chronologie.spec.ts`: Spalte Inhalt ≥ 45 % und breiteste Spalte), Abschnitt „Kompakte Zeile“ dort ersetzen; Anwenderkapitel Abschnitt „Lesen“. Nachweis: `e2e/etb-chronologie.spec.ts` lokal grün.
 
 ## 6. Filterleiste, Systemeinträge, Zahlen
