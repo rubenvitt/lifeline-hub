@@ -27,7 +27,7 @@ ohne die Änderung rot ist, dann der Code. Pfade ohne Präfix relativ zu `fronte
 
 ## 4. Erfassung am Handschirm
 
-- [ ] 4.1 Unter `md` eingeklappt eine Zeile (Typ-Knopf, Inhalt); beim Fokus klappen Zeit und Weg, Von, An und „Erfassen“ über der Tastatur auf, nur der Primärknopf klebt. Nachweis: Zeichenfläche „Handy schreiben“ nachgestellt bei 390 × 844 und 390 × 500, `e2e/leisten-flaeche.spec.ts` (zwei Einträge ganz im Bild).
+- [x] 4.1 Unter `md` eingeklappt eine Zeile (Typ-Knopf, Inhalt); beim Fokus klappen Zeit und Weg, Von, An und „Erfassen“ über der Tastatur auf, nur der Primärknopf klebt. Nachweis: Zeichenfläche „Handy schreiben“ nachgestellt bei 390 × 844 und 390 × 500, `e2e/leisten-flaeche.spec.ts` (zwei Einträge ganz im Bild).
 
 ## 5. Leseansicht
 
@@ -48,7 +48,7 @@ ohne die Änderung rot ist, dann der Code. Pfade ohne Präfix relativ zu `fronte
 
 - [x] 7.1 Bilder des Anwenderkapitels neu erzeugen (`pnpm doku:bilder --grep einsatztagebuch`) und Design System neu erzeugen, falls ein vorgestellter Baustein geändert wurde (`pnpm design-system`). Nachweis: Bilder im Kapitel zeigen die neue Ansicht, `designSystem.guard.test.ts` grün.
 - [ ] 7.2 `./scripts/check-all.sh --geaendert` grün (in der Cloud-Sitzung ohne `mise`: Frontend-Suite, Typprüfung, Lint, Prettier und die betroffenen e2e-Specs einzeln, Verweis auf die CI des PRs).
-- [ ] 7.3 Zeichenflächen des Entwurfs gegen die laufende App nachgestellt (Fükw Nacht und Tag, Tablet, Handschuh, Handy) und Bilder der Änderung aufgenommen.
+- [x] 7.3 Zeichenflächen des Entwurfs gegen die laufende App nachgestellt (Fükw Nacht und Tag, Tablet, Handschuh, Handy) und Bilder der Änderung aufgenommen.
 
 ## Workflow follow-up
 
