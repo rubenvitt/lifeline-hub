@@ -1,4 +1,4 @@
-//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0034,
+//! Freigabe eines Einsatzes für Maschinenzugänge durch die Einsatzleitung (LLH-1638, ADR-0035,
 //! Spec `maschinenzugang`): Routen unter `/api/einsaetze/{id}/anbindungen`, ein Einsatz je Zugang,
 //! Ende der Freigabe, Anzeige an der Anbindung und das Verhalten an einem Spiegel.
 

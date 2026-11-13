@@ -305,9 +305,9 @@ es gibt keine Stelle mehr, an der er stünde.
 `zugang me`: der kürzeste Weg, eine Anbindung samt Freigabe zu prüfen. TypeScript-Modul und
 Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 
-### D12 ADR-0034 und ADR-0022
+### D12 ADR-0035 und ADR-0022
 
-- **ADR-0034** „Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn
+- **ADR-0035** „Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn
   freigegeben hat“, `gilt_fuer` `src/public_api/**`, `src/routes/einsatz_anbindungen.rs`. Regeln:
   eine v1-Route mit Lese-Scope mit Einsatzbezug bestimmt ihren Einsatz allein über
   `public_api::freigabe`; die Freigabe gilt an der Instanz des Zugangs, wird nicht gespiegelt und
@@ -336,7 +336,7 @@ Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 - [Bestehende `llh_lm_`-Schlüssel gelten nach dem Update nicht mehr, ohne Vorwarnung.] → Bewusst
   entschieden; die Gegenseite ist nicht gebaut. PR-Beschreibung und Commit nennen den Bruch, damit
   er unter „Wichtige Änderungen“ der Versionshinweise landet.
-- [Migration 0340 löscht Daten und ist nicht umkehrbar.] → Die Tabellen tragen nur Hashes und
+- [Migration 0342 löscht Daten und ist nicht umkehrbar.] → Die Tabellen tragen nur Hashes und
   Freigaben; ein Rückweg auf den alten Stand bräuchte neue Schlüssel ohnehin.
 - [Der Umzug des Kartenbaus ändert still die Karte des Lagebild-Links.] → Test: `build_karte`
   liefert für einen festen Einsatz dieselben Bytes wie zuvor; `tests/lagebild_extern.rs` bleibt
@@ -358,7 +358,7 @@ Python-Beispiel bleiben beim Verfahren; sie brauchen keinen eigenen Abruf.
 
 ## Migration Plan
 
-1. Migrationen 0339 und 0340 laufen beim Start. Vorher `scripts/check-migrationen.sh` gegen
+1. Migrationen 0341 und 0342 laufen beim Start. Vorher `scripts/check-migrationen.sh` gegen
    `origin/alpha`.
 2. Nach dem Update: unter „Anbindungen“ je Monitor einen Zugang mit „Lage lesen“ anlegen, Code am
    Monitor einlösen, Einsatz auf der Seite „Geräte“ freigeben.
