@@ -237,7 +237,7 @@ Glossar (12) nennen Ablauf und Begriff.
 
 ## Migration Plan
 
-- `0339_fuehrung_loeschvermerk.sql` legt nur die Tabelle an; vor dem Push `git fetch origin alpha`
+- `0341_fuehrung_loeschvermerk.sql` legt nur die Tabelle an; vor dem Push `git fetch origin alpha`
   und `scripts/check-migrationen.sh`.
 - Gemischter Betrieb: Eine neue Instanz neben einer älteren nennt Akten und bekommt keine Antwort;
   die ältere nennt nichts. Kein Schritt hängt an der Reihenfolge der Updates.
