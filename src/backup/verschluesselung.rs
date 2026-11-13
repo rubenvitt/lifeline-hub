@@ -135,12 +135,24 @@ impl Schluessel {
         name: Option<String>,
         passphrase: impl FnOnce() -> io::Result<String>,
     ) -> Result<Self, AppError> {
+        Self::laden_aus(&inhalt, name, passphrase)
+    }
+
+    /// Wie [`Self::laden`], aber aus einem geliehenen Puffer: wer den Schlüssel geschützt im
+    /// Speicher hält (LLH-1711, design.md D4), legt so keine ungeschützte Kopie an. Kopiert wird
+    /// nur eine mit Passphrase verschlüsselte Datei, deren Inhalt ohne die Passphrase nichts
+    /// verrät.
+    pub fn laden_aus(
+        inhalt: &[u8],
+        name: Option<String>,
+        passphrase: impl FnOnce() -> io::Result<String>,
+    ) -> Result<Self, AppError> {
         if inhalt.starts_with(AGE_KOPF) {
             let passphrase = passphrase().map_err(|e| {
                 AppError::Validation(format!("Passphrase der Identitätsdatei nicht lesbar: {e}"))
             })?;
             let identitaet = age::encrypted::Identity::from_buffer(
-                io::Cursor::new(inhalt),
+                io::Cursor::new(inhalt.to_vec()),
                 name,
                 FestePassphrase(Arc::new(SecretString::from(
                     passphrase.trim_end_matches(['\r', '\n']).to_owned(),
@@ -377,6 +389,48 @@ pub(crate) mod tests {
                 .unwrap(),
             b"inhalt"
         );
+    }
+
+    /// LLH-1711, design.md D4: die Verwaltung leiht den Puffer, den sie geschützt hält.
+    #[test]
+    fn laden_aus_einem_geliehenen_puffer_mit_und_ohne_passphrase() {
+        let dir = tempfile::tempdir().unwrap();
+        let klartext = dir.path().join("klartext");
+        std::fs::write(&klartext, b"inhalt").unwrap();
+        let (empfaenger, identitaet) = schluesselpaar();
+        let geheim = dir.path().join("geheim.age");
+        std::fs::write(
+            &geheim,
+            verschluessele_datei(&klartext, Vec::new(), &empfaenger, &AtomicBool::new(false))
+                .unwrap(),
+        )
+        .unwrap();
+        let schluessel = Schluessel::laden_aus(&identitaet, None, keine_passphrase).unwrap();
+        assert_eq!(
+            schluessel.entschluessele_datei(&geheim, Vec::new()).unwrap(),
+            b"inhalt"
+        );
+
+        let mut passphrase = age::scrypt::Recipient::new(SecretString::from("geheim".to_owned()));
+        passphrase.set_work_factor(10);
+        let mut geschuetzt = Vec::new();
+        let mut schreiber =
+            age::Encryptor::with_recipients(std::iter::once(&passphrase as &dyn age::Recipient))
+                .unwrap()
+                .wrap_output(&mut geschuetzt)
+                .unwrap();
+        schreiber.write_all(&identitaet).unwrap();
+        schreiber.finish().unwrap();
+        let schluessel = Schluessel::laden_aus(&geschuetzt, None, || Ok("geheim".into())).unwrap();
+        assert_eq!(
+            schluessel.entschluessele_datei(&geheim, Vec::new()).unwrap(),
+            b"inhalt"
+        );
+        // Ohne Passphrase: abgelehnt, nicht entsperrt.
+        let ohne = Schluessel::laden_aus(&geschuetzt, None, || {
+            Err(io::Error::other("keine Passphrase angegeben"))
+        });
+        assert!(matches!(ohne, Err(AppError::Validation(_))));
     }
 
     #[test]

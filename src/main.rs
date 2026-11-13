@@ -694,7 +694,11 @@ async fn cmd_archiv_einspielen(
             &pool,
             Path::new(datei),
             &schluessel,
-            org,
+            org.map_or(
+                lifeline_hub::einsatz::archiv::einspielen::Ziel::AusArchiv,
+                lifeline_hub::einsatz::archiv::einspielen::Ziel::Org,
+            ),
+            lifeline_hub::einsatz::archiv::einspielen::Akteur::Befehl,
             chrono::Utc::now(),
         ) => Some(e),
         () = shutdown_signal() => None,
