@@ -24,7 +24,7 @@
 
 ## 4. Abschluss
 
-- [ ] 4.1 Integration: `./scripts/check-all.sh` grün (in der Cloud-Sitzung mindestens Bündel `schnell`, Vitest gesamt mit `TZ=Europe/Berlin` und die betroffenen Rust-Test-Binaries samt `--lib`; das volle `rust`- und `e2e`-Bündel trägt die CI)
+- [x] 4.1 Integration: `./scripts/check-all.sh` grün (in der Cloud-Sitzung mindestens Bündel `schnell`, Vitest gesamt mit `TZ=Europe/Berlin` und die betroffenen Rust-Test-Binaries samt `--lib`; das volle `rust`- und `e2e`-Bündel trägt die CI). Lauf 13.11.2026 auf 6f027330: 19 Rust-Testdateien samt 4 283 Lib-Tests grün, Vitest 19 849 grün, Bündel `schnell` grün
 
 ## Workflow follow-up
 
