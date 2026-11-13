@@ -593,18 +593,22 @@ pub async fn verwahren(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<b
 const GRUND_WIDERRUF: &str = "Kopplung widerrufen";
 
 /// SQL-Ausdruck „Führung beendet“ über die Akte mit dem Alias `ef` (LLH-1850, Change
-/// `cdel60wv-fuehrung-rueckholen-nach-widerruf`, D2): Die Akte nennt eine andere Instanz als
-/// Führer, zu der die Org mindestens eine widerrufene Zuordnung einer Standardkopplung und keine
-/// geltende Zuordnung irgendeiner Kopplung hat. So bleibt ein Spiegel stehen, wenn der Widerruf bei
-/// ausgeschaltetem Schalter kam (LLH-1704); ein Mensch holt ihn zurück ([`zurueckholen`]). Der
-/// Einsatzkopf (`einsatz::repo`, `fuehrung_spalten!`) und [`find_fuehrung_beendet`] lesen
-/// denselben Ausdruck. Eine unbekannte Art zählt nicht (wie `KopplungZeile::art`: vor Ort).
+/// `cdel60wv-fuehrung-rueckholen-nach-widerruf`, D2): Der Einsatz liegt hier als Spiegel, und
+/// zwar über eine widerrufene Zuordnung einer Standardkopplung zu der Instanz, die die Akte als
+/// Führer nennt; eine geltende Zuordnung der Org zu ihr gibt es nicht. So bleibt ein Spiegel
+/// stehen, wenn der Widerruf bei ausgeschaltetem Schalter kam (LLH-1704); ein Mensch holt ihn
+/// zurück ([`zurueckholen`]). An die Zuordnung des Spiegels gebunden, damit eine alte, fremde
+/// Kopplung zum Führer nicht zählt, wenn der Einsatz über einen Hub kommt (Review LLH-1850). Den
+/// Verweis lässt `spiegel::fuehrung::richte_aus` dafür stehen. Der Einsatzkopf (`einsatz::repo`,
+/// `fuehrung_spalten!`) und [`find_fuehrung_beendet`] lesen denselben Ausdruck. Eine unbekannte
+/// Art zählt nicht (wie `KopplungZeile::art`: vor Ort).
 macro_rules! fuehrung_beendet_sql {
     () => {
         "(ef.fuehrer_kennung <> (SELECT kennung FROM instanz_identitaet) \
-          AND EXISTS (SELECT 1 FROM instanz_kopplung_org bo \
+          AND EXISTS (SELECT 1 FROM einsatz_spiegel bsp \
+              JOIN instanz_kopplung_org bo ON bo.id = bsp.kopplung_org_id \
               JOIN instanz_kopplung bk ON bk.id = bo.kopplung_id \
-              WHERE bo.org_id = ef.org_id AND bk.gegenueber_kennung = ef.fuehrer_kennung \
+              WHERE bsp.einsatz_id = ef.einsatz_id AND bk.gegenueber_kennung = ef.fuehrer_kennung \
               AND bo.widerrufen_at IS NOT NULL AND bk.art = 'standard') \
           AND NOT EXISTS (SELECT 1 FROM instanz_kopplung_org bo \
               JOIN instanz_kopplung bk ON bk.id = bo.kopplung_id \
@@ -617,7 +621,7 @@ pub(crate) use fuehrung_beendet_sql;
 /// Die beendete Kopplung zur Führung einer Akte ([`fuehrung_beendet_sql`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuehrungBeendet {
-    /// Org-Schlüssel der jüngsten widerrufenen Zuordnung, wie [`list_orgs_der_kopplung`] ihn
+    /// Org-Schlüssel der widerrufenen Zuordnung des Spiegels, wie [`list_orgs_der_kopplung`] ihn
     /// bildet; er steht in der Erklärung des Zurückholens.
     pub org_schluessel: String,
     /// Ihr Widerruf (UTC): die Bruchstelle des Zurückholens (D5).
@@ -625,8 +629,8 @@ pub struct FuehrungBeendet {
 }
 
 /// Die beendete Kopplung zur Führung der Akte `akte_id`, oder `None`, wenn die Akte diese Instanz
-/// nennt, ihr Führer noch zugeordnet ist oder mit der Org nie über eine Standardkopplung verbunden
-/// war. Bei mehreren Widerrufen gilt der jüngste.
+/// nennt, ihr Führer noch zugeordnet ist oder der Einsatz nicht über eine widerrufene
+/// Standard-Zuordnung zu ihm gespiegelt wurde.
 pub async fn find_fuehrung_beendet(
     conn: &mut SqliteConnection,
     akte_id: i64,
@@ -636,12 +640,11 @@ pub async fn find_fuehrung_beendet(
                 ELSE (SELECT kennung FROM instanz_identitaet) || '/' || o.org_id END, \
                 o.widerrufen_at \
          FROM einsatz_fuehrung ef \
-         JOIN instanz_kopplung_org o ON o.org_id = ef.org_id \
+         JOIN einsatz_spiegel sp ON sp.einsatz_id = ef.einsatz_id \
+         JOIN instanz_kopplung_org o ON o.id = sp.kopplung_org_id \
          JOIN instanz_kopplung k ON k.id = o.kopplung_id \
-              AND k.gegenueber_kennung = ef.fuehrer_kennung \
-         WHERE ef.id = ? AND o.widerrufen_at IS NOT NULL AND k.art = 'standard' AND ",
-        fuehrung_beendet_sql!(),
-        " ORDER BY o.widerrufen_at DESC, o.id DESC LIMIT 1"
+         WHERE ef.id = ? AND ",
+        fuehrung_beendet_sql!()
     ))
     .bind(akte_id)
     .fetch_optional(&mut *conn)
@@ -2020,11 +2023,13 @@ pub(crate) mod tests {
         assert_eq!(find_fuehrung_beendet(&mut conn, akte).await.unwrap(), None);
     }
 
+    /// Review LLH-1850: Es zählt die Zuordnung, über die der Einsatz gespiegelt wurde, nicht eine
+    /// spätere zum selben Führer.
     #[tokio::test]
-    async fn bei_mehreren_widerrufen_gilt_der_juengste() {
+    async fn es_zaehlt_die_zuordnung_des_spiegels() {
         let pool = crate::db::test_pool().await;
         let (_, akte) = spiegel_ohne_kopplung(&pool).await;
-        // Erneut zugeordnet (mit anderem Schlüssel am Hub) und wieder widerrufen.
+        // Erneut zugeordnet (mit anderem Schlüssel am Hub) und ohne Schalter wieder widerrufen.
         sqlx::query(
             "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
              fremde_org_name) VALUES (1, 1, 'hub/7', 'Hub-Org')",
@@ -2032,16 +2037,69 @@ pub(crate) mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        // Schalter aus, damit auch dieser Widerruf nichts zurückholt.
         super::super::save_schalter(&pool, false).await.unwrap();
         widerrufen(&pool, "2026-11-11 08:00:00").await;
         super::super::save_schalter(&pool, true).await.unwrap();
         assert_eq!(
             beendet(&pool, akte).await,
             Some(FuehrungBeendet {
-                org_schluessel: "hub/7".into(),
-                widerrufen_at: "2026-11-11 08:00:00".into(),
+                org_schluessel: "hub/1".into(),
+                widerrufen_at: "2026-11-10 10:00:00".into(),
             })
         );
+    }
+
+    /// Review LLH-1850: Kommt der Spiegel über einen Hub (oder hängt er an keiner Zuordnung), zählt
+    /// eine alte, widerrufene Standardkopplung zum Führer nicht.
+    #[tokio::test]
+    async fn eine_fremde_alte_zuordnung_zum_fuehrer_zaehlt_nicht() {
+        let pool = crate::db::test_pool().await;
+        let (e, akte) = spiegel_ohne_kopplung(&pool).await;
+        sqlx::query("UPDATE einsatz_spiegel SET kopplung_org_id = NULL WHERE einsatz_id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(beendet(&pool, akte).await, None);
+        // Ein Hub, über den der Spiegel heute kommt: der Führer ist dort nicht zugeordnet.
+        sqlx::query(
+            "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand) \
+             VALUES (2, 'hub2', 's2', 'Hub Süd', 'meldet_sich', 'http://127.0.0.1:2', 'aktiv')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let zeile: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (2, 1, 'hub2/1', 'Hub-Org') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_spiegel SET kopplung_org_id = ? WHERE einsatz_id = ?")
+            .bind(zeile)
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(beendet(&pool, akte).await, None);
+    }
+
+    /// Das Einschalten lässt die widerrufene Zuordnung am Spiegel stehen (Review LLH-1850): Sie
+    /// nennt die Gegenstelle im Hinweisband.
+    #[tokio::test]
+    async fn einschalten_laesst_die_widerrufene_zuordnung_am_spiegel() {
+        let pool = crate::db::test_pool().await;
+        let (e, _) = spiegel_ohne_kopplung(&pool).await;
+        let (ko, beendet_at): (Option<i64>, Option<String>) = sqlx::query_as(
+            "SELECT kopplung_org_id, beendet_at FROM einsatz_spiegel WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(ko.is_some(), "Verweis bleibt");
+        assert!(beendet_at.is_some(), "Abgleich beendet");
     }
 }

@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useLocation } from 'react-router';
 import * as entwurfStore from '../../etb/entwuerfe/entwurfStore';
 import type { BruchErfassung, EinsatzSpiegelAnzeige, SpiegelAntragAnzeige } from '../../api/types';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
@@ -116,6 +117,44 @@ describe('SpiegelBand (LLH-1492, design.md D13)', () => {
     expect(band).toHaveTextContent('Kopplung zu Hub Nord beendet');
     expect(band).not.toHaveTextContent('Abgleich beendet');
     expect(screen.getByRole('button', { name: 'Führung zurückholen' })).toBeInTheDocument();
+  });
+
+  it('der Link führt zum Paneel „Führung“ auf der Seite Einsatzdaten (LLH-1850)', async () => {
+    mitServer([]);
+    function Ort() {
+      const l = useLocation();
+      return <output data-testid="ort">{l.pathname + l.search}</output>;
+    }
+    renderMitProviders(
+      <>
+        <SpiegelBand
+          einsatz={einsatzFixture({
+            spiegel: spiegel({ beendet: true, antraege_ausstehend: 0, antraege_abgelehnt: 0 }),
+            fuehrung: { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false, beendet: true },
+          })}
+        />
+        <Ort />
+      </>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Führung zurückholen' }));
+    expect(screen.getByTestId('ort')).toHaveTextContent(
+      '/einsaetze/1/einsatzdaten?paneel=fuehrung',
+    );
+  });
+
+  it('ersetzt nur „Abgleich beendet“, keinen laufenden Abgleich (Review LLH-1850)', () => {
+    mitServer([]);
+    renderMitProviders(
+      <SpiegelBand
+        einsatz={einsatzFixture({
+          spiegel: spiegel({ antraege_ausstehend: 0, antraege_abgelehnt: 0 }),
+          fuehrung: { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false, beendet: true },
+        })}
+      />,
+    );
+    const band = document.querySelector('[data-lfh="spiegel-band"]');
+    expect(band).not.toHaveTextContent('Kopplung zu Hub Nord beendet');
+    expect(screen.queryByRole('button', { name: 'Führung zurückholen' })).toBeNull();
   });
 
   it('ohne Recht an der Führung nur der Hinweis (LLH-1850)', () => {

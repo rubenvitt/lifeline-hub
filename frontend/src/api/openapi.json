@@ -9349,7 +9349,7 @@
               "string",
               "null"
             ],
-            "description": "Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der\njüngste Widerruf (UTC). Dann bietet das Paneel „Führung zurückholen“ (LLH-1850)."
+            "description": "Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der\nWiderruf der Zuordnung des Spiegels (UTC). Dann bietet das Paneel „Führung zurückholen“\n(LLH-1850)."
           },
           "fuehrer_kennung": {
             "type": "string"

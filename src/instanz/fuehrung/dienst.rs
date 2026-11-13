@@ -354,7 +354,7 @@ pub async fn notuebernahme_gegen_erreichte(
 
 /// Holt einen Spiegel zurück, dessen Führer nicht mehr gekoppelt ist (LLH-1850, Spec
 /// `instanz-fuehrung`, „Einen Spiegel ohne gekoppelte Führung holt ein Mensch zurück“): mit
-/// Grund, ohne Beweis, Bruchstelle ist der jüngste Widerruf (Change
+/// Grund, ohne Beweis, Bruchstelle ist der Widerruf der Zuordnung des Spiegels (Change
 /// `cdel60wv-fuehrung-rueckholen-nach-widerruf`, D3–D5). 409, solange der Führer zugeordnet ist
 /// oder wenn er mit der Org nie über eine Standardkopplung verbunden war.
 pub async fn zurueckholen(
@@ -755,7 +755,8 @@ pub struct FuehrungAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fuehrer_richtung: Option<InstanzKopplungRichtung>,
     /// Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der
-    /// jüngste Widerruf (UTC). Dann bietet das Paneel „Führung zurückholen“ (LLH-1850).
+    /// Widerruf der Zuordnung des Spiegels (UTC). Dann bietet das Paneel „Führung zurückholen“
+    /// (LLH-1850).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fuehrer_beendet_at: Option<String>,
     pub verlauf: Vec<FuehrungVerlaufEintrag>,

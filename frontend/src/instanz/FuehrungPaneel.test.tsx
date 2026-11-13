@@ -221,6 +221,23 @@ describe('FuehrungPaneel (LLH-1491)', () => {
       expect(screen.queryByRole('button', { name: 'Führung zurückholen …' })).toBeNull();
     });
 
+    it('schließt den Dialog, wenn das Zurückholen nicht mehr geht (Review LLH-1850)', async () => {
+      const { rerender } = renderMitProviders(<FuehrungPaneel fuehrung={beendet()} darfBedienen />);
+      await userEvent.click(screen.getByRole('button', { name: 'Führung zurückholen …' }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      rerender(
+        <FuehrungPaneel
+          fuehrung={akte({ fuehrend: true, fuehrer_name: 'ELW 1', epoche: 4 })}
+          darfBedienen
+        />,
+      );
+      await waitFor(() => expect(screen.queryByText('Führung von ELW 1 zurückholen')).toBeNull());
+      // Geschlossen: jsdom beendet die Ausblend-Animation von antd nicht, der Dialog steht im Abgang.
+      await waitFor(() =>
+        expect(document.querySelector('[role=dialog]')).toHaveClass('ant-zoom-leave'),
+      );
+    });
+
     it('ohne Grund geht nichts hinaus', async () => {
       renderMitProviders(<FuehrungPaneel fuehrung={beendet()} darfBedienen />);
       await userEvent.click(screen.getByRole('button', { name: 'Führung zurückholen …' }));

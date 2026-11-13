@@ -5858,6 +5858,10 @@ async fn nach_widerruf_ohne_schalter_holt_die_einsatzleitung_den_spiegel_zurueck
     .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(kopf["fuehrung"]["beendet"], true, "{kopf}");
+    assert_eq!(
+        kopf["spiegel"]["gegenstelle"], f["fuehrer_name"],
+        "das Band nennt die Gegenstelle, nicht „Gegenstelle“: {kopf}"
+    );
     let widerruf = f["fuehrer_beendet_at"].clone();
 
     let fuehrer = common::login_cookie(&elw.app, "fuehrer", "fuehrerpw1").await;

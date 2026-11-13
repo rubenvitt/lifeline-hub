@@ -6,6 +6,7 @@ datum: 2026-11-13
 gilt_fuer:
   - src/instanz/fuehrung/**
   - src/routes/fuehrung.rs
+  - src/instanz/spiegel/fuehrung.rs
   - src/einsatz/repo.rs
   - frontend/src/instanz/Fuehrung*
   - frontend/src/instanz/fuehrung*
@@ -19,8 +20,9 @@ herleitung:
 
 ## Regeln
 
-- MUST: Nennt die Akte eines Spiegels eine Instanz, zu der die Org keine geltende, aber eine
-  widerrufene Zuordnung einer Standardkopplung hat („Führung beendet“), bleibt der Einsatz
+- MUST: Hängt ein Spiegel an einer widerrufenen Zuordnung einer Standardkopplung zu der Instanz,
+  die seine Akte als Führer nennt, und hat die Org keine geltende zu ihr („Führung beendet“; über
+  einen Hub gespiegelt zählt nicht), bleibt der Einsatz
   Spiegel, bis die Einsatzleitung oder ein Admin der Einsatz-Org ihn mit Grund zurückholt
   (`POST …/fuehrung/zurueckholen`, `EinsatzFuehrungszugriff`). Kein Start-, Schalter- oder
   Taktpfad gibt ihn frei.
@@ -28,7 +30,8 @@ herleitung:
   `fuehrung::repo`); Einsatzkopf und Dienst lesen ihn.
 - MUST: Zurückholen und das Rückholen beim Widerruf gehen über `repo::zurueckholen`: nächste
   Epoche, Art Notübernahme, Erklärung ohne Beweis gegen die alte Führung. Bruchstelle des
-  Zurückholens ist der jüngste Widerruf.
+  Zurückholens ist der Widerruf dieser Zuordnung; `spiegel::fuehrung::richte_aus` lässt sie am
+  Spiegel stehen.
 - MUST NOT: Zurückholen, solange die Org der führenden Instanz zugeordnet ist, oder wenn sie nie
   über eine Standardkopplung verbunden war (409).
 
@@ -40,6 +43,7 @@ verlange 'fuehrung_beendet_sql!\(\)' src/instanz/fuehrung/repo.rs
 verbiete 'dienst::zurueckholen\(' 'src/**/*.rs' ':(exclude)src/routes/fuehrung.rs'
 verlange '^pub async fn zurueckholen' src/instanz/fuehrung/repo.rs src/instanz/fuehrung/dienst.rs
 verlange '/api/einsaetze/\{id\}/fuehrung/zurueckholen' src/app.rs
+verlange 'ist_widerrufen_zum_fuehrer' src/instanz/spiegel/fuehrung.rs
 ```
 
 ## Kontext

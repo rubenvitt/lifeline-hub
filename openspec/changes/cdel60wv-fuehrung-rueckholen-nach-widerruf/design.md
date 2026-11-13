@@ -59,9 +59,16 @@ Neue Route `POST /api/einsaetze/{id}/fuehrung/zurueckholen` (`GrundBody`, Gate
 Eine Akte gilt als „Führung beendet“, wenn
 
 1. der Schalter an ist, die Akte einen lokalen Einsatz hat und eine andere Instanz nennt,
-2. es zur Org eine widerrufene Zuordnung einer Kopplung mit `gegenueber_kennung` = Führer und Art
-   `standard` gibt und
+2. der Spiegel des Einsatzes an einer widerrufenen Zuordnung einer Kopplung mit
+   `gegenueber_kennung` = Führer und Art `standard` hängt (`einsatz_spiegel.kopplung_org_id`) und
 3. es zur Org keine nicht widerrufene Zuordnung irgendeiner Kopplung zu dieser Kennung gibt.
+
+Bedingung 2 hing im ersten Entwurf an irgendeiner widerrufenen Zuordnung der Org zum Führer. Der
+Review vor dem PR fand den Fall dazu: Führt „ELW 1“ und kommt der Spiegel an „ELW 2“ über den Hub,
+genügte eine alte, längst widerrufene Direktkopplung von „ELW 2“ zu „ELW 1“, um ohne Beweis
+zurückzuholen, während „ELW 1“ weiter führt. Damit der Verweis des Spiegels nach dem Widerruf ohne
+Schalter stehen bleibt, lässt `spiegel::fuehrung::richte_aus` beim Einschalten eine widerrufene
+Zuordnung zum Führer stehen, statt sie zu leeren; sie nennt auch die Gegenstelle im Hinweisband.
 
 Bedingung 3 nimmt jede Art und jeden Zustand der Kopplung: Ist die Org wieder (oder angebahnt)
 zugeordnet, gilt der reguläre Weg über Anfrage oder Notübernahme. Eine unbekannte Art zählt wie
@@ -69,7 +76,8 @@ zugeordnet, gilt der reguläre Weg über Anfrage oder Notübernahme. Eine unbeka
 
 Die Bedingung steht genau einmal als SQL-Ausdruck (Makro in `fuehrung::repo`, wie
 `fuehrung_spalten!`), den der Einsatzkopf und `repo::find_fuehrung_beendet` benutzen. Letztere
-liefert Name, Org-Schlüssel (wie `org_widerrufen` ihn bildet) und den jüngsten `widerrufen_at`.
+liefert Org-Schlüssel (wie `org_widerrufen` ihn bildet) und `widerrufen_at` der Zuordnung des
+Spiegels.
 
 ### D3 Vollzug wie `release_nach_widerruf`, aus einer gemeinsamen Funktion
 
@@ -96,9 +104,9 @@ von dieser Akte nichts. Das selbsttätige Rückholen kommt ebenfalls ohne Beweis
 - *Nur Admin* verworfen (am Checkpoint): Die Einsatzleitung stünde vor einem gesperrten Einsatz und
   müsste jemanden holen, ohne dass das etwas absichert.
 
-### D5 Bruchstelle: jüngster Widerruf
+### D5 Bruchstelle: Widerruf der Zuordnung des Spiegels
 
-`bruch_at` = `MAX(widerrufen_at)` der widerrufenen Standard-Zuordnungen der Org zu dieser Kennung.
+`bruch_at` = `widerrufen_at` der Zuordnung, an der der Spiegel hängt (D2).
 Ab dann kam nichts mehr vom Gegenüber; die Lücke bis zum Zurückholen bleibt im Verlauf sichtbar.
 
 ### D6 Anzeige
@@ -120,6 +128,13 @@ Die Entscheidung (E1) bekommt ADR-0039 (nächste freie auf `alpha` am 13.11.2026
 zurück“.
 
 ## Risks / Trade-offs
+
+- [Ein Spiegel, dessen Verweis ein Einschalten vor dieser Änderung schon geleert hat] → Er wird
+  nicht als „Führung beendet“ erkannt und bleibt wie vor LLH-1850; Ausweg bleibt eine neue
+  Kopplung. Die Lage setzt Widerruf ohne Schalter und Einschalten zwischen LLH-1704 und dieser
+  Änderung voraus.
+- [Eine neue Kopplung meldet keinen Kopf] → Das Hinweisband ruft den Kopf auch bei beendeter
+  Führung im Takt ab und bietet das Zurückholen danach nicht mehr an.
 
 - [Die alte Führung wird erneut gekoppelt und führte inzwischen weiter] → Wie nach dem
   selbsttätigen Rückholen: Die meldende Seite verwirft die Akte ohne Beweis und führt weiter

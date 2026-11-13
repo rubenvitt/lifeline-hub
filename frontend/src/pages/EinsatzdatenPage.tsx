@@ -34,10 +34,10 @@ import {
 import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
 import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { sucheOrtImEinsatz } from '../api/ortSuche';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { einsatzberichtPfad, einsatzEinstellungenPfad, lagekartePfad } from '../routing/deeplinks';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
@@ -1496,6 +1496,18 @@ function FuehrungAbschnitt({
     queryKey: einsatzKeys.fuehrung(einsatzId),
     queryFn: () => loadFuehrung(einsatzId),
   });
+  // `?paneel=fuehrung` (Hinweisband „Führung zurückholen“, LLH-1850): einmal zum Paneel rollen,
+  // dann den Auftrag aus der Adresse nehmen (apply-then-clean).
+  const [params, setParams] = useSearchParams();
+  const ziel = useRef<HTMLDivElement>(null);
+  const geladen = q.data != null;
+  useEffect(() => {
+    if (!geladen || params.get('paneel') !== 'fuehrung') return;
+    ziel.current?.scrollIntoView?.({ block: 'start' });
+    const rest = new URLSearchParams(params);
+    rest.delete('paneel');
+    setParams(rest, { replace: true });
+  }, [geladen, params, setParams]);
   if (!q.data) {
     // Ein gescheiterter Abruf steht am Platz des Paneels, mit „Erneut laden“ (PaneelZustand).
     return (
@@ -1512,12 +1524,14 @@ function FuehrungAbschnitt({
     );
   }
   return (
-    <FuehrungPaneel
-      fuehrung={q.data}
-      darfBedienen={darfBedienen}
-      darfUnterschreiben={darfUnterschreiben}
-      style={{ marginTop: token.marginLG }}
-    />
+    <div ref={ziel} data-lfh="fuehrung-abschnitt">
+      <FuehrungPaneel
+        fuehrung={q.data}
+        darfBedienen={darfBedienen}
+        darfUnterschreiben={darfUnterschreiben}
+        style={{ marginTop: token.marginLG }}
+      />
+    </div>
   );
 }
 

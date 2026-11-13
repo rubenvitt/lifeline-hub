@@ -20,7 +20,7 @@ Widerruf verhindern (Zunder LLH-1850).
 - Der Vollzug folgt dem Rückholen beim Widerruf (Art „Notübernahme“, Erklärung ohne Beweis gegen
   die alte Führung, damit eine dritte meldende Seite die Übernahme ohne Alarm offen hält). Dazu
   kommen der Grund des Menschen, sein Name im Verlauf und ein Eintrag in der Admin-Spur.
-  Bruchstelle ist der jüngste Widerruf einer Zuordnung der Org zu dieser Installation.
+  Bruchstelle ist der Widerruf der Zuordnung, über die der Einsatz gespiegelt wurde.
 - Bedienen dürfen Einsatzleitung und Admin der Einsatz-Org, in beide Richtungen ohne Unterschrift
   oder Code, weil die alte Führung nichts mehr prüfen kann.
 - Das Hinweisband des Spiegels nennt die beendete Kopplung („Kopplung zu … beendet“) und führt

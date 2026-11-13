@@ -15,6 +15,7 @@ import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { createAndActivateEntwurf } from '../../etb/entwuerfe/entwurfStore';
 import { kopplungBeendetText } from '../../instanz/fuehrungText';
 import { darfFuehrungBedienen } from '../schreibrecht';
+import { einsatzdatenPfad } from '../../routing/deeplinks';
 import { IconChevronHoch, IconChevronRunter } from '../../icons';
 import { useSpiegelAntraege } from './useSpiegelAntraege';
 import {
@@ -73,7 +74,9 @@ export default function SpiegelBand({ einsatz }: { einsatz: EinsatzAnzeige | und
   useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
-    enabled: aktiv && spiegel?.beendet === false,
+    // Auch, solange die Kopplung zur Führung beendet ist (LLH-1850): Eine neue Kopplung meldet
+    // keinen Kopf, und das Band böte sonst weiter das Zurückholen an.
+    enabled: aktiv && (spiegel?.beendet === false || einsatz?.fuehrung?.beendet === true),
     refetchInterval: SPIEGEL_KOPF_ABRUF_MS,
   });
   const antraege = useSpiegelAntraege(einsatzId, aktiv);
@@ -128,7 +131,11 @@ function BandInhalt({
   // und wer die Führung bedient, kommt zum Paneel „Führung“ auf der Seite Einsatzdaten.
   const navigate = useNavigate();
   const benutzer = useAuthOptional()?.benutzer;
-  const beendetBei = einsatz.fuehrung?.beendet ? einsatz.fuehrung.bei : null;
+  // Nur dort, wo sonst „Abgleich beendet“ stünde.
+  const beendetBei =
+    einsatz.fuehrung?.beendet && spiegel.beendet && !spiegel.archiv_bis
+      ? einsatz.fuehrung.bei
+      : null;
   const standText = beendetBei != null ? kopplungBeendetText(beendetBei) : stand.text;
   const zurueckholen = beendetBei != null && darfFuehrungBedienen(einsatz, benutzer);
   const zaehler = antragZaehler(spiegel);
@@ -166,7 +173,7 @@ function BandInhalt({
         {zurueckholen && (
           <Button
             type="link"
-            onClick={() => navigate(`/einsaetze/${einsatz.id}/einsatzdaten`)}
+            onClick={() => navigate(einsatzdatenPfad(einsatz.id, { paneel: 'fuehrung' }))}
             style={{ paddingInline: 0 }}
             data-lfh="spiegel-band-zurueckholen"
           >

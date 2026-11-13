@@ -2,13 +2,13 @@
 
 ### Requirement: Einen Spiegel ohne gekoppelte Führung holt ein Mensch zurück
 
-Nennt bei eingeschaltetem Schalter die Akte eines Spiegels eine Installation als Führer, zu der
-die Org keine geltende, aber mindestens eine widerrufene Zuordnung einer Standardkopplung hat,
-SHALL das Paneel „Führung“ „Führung zurückholen“ anbieten und das Hinweisband die beendete
+Nennt bei eingeschaltetem Schalter die Akte eines Spiegels eine Installation als Führer, über
+deren inzwischen widerrufene Zuordnung einer Standardkopplung der Einsatz gespiegelt wurde, und
+hat die Org keine geltende Zuordnung zu ihr, SHALL das Paneel „Führung“ „Führung zurückholen“ anbieten und das Hinweisband die beendete
 Kopplung nennen. Bedienen SHALL, wer an dieser Instanz die Führung bedient, mit Grund, ohne
 Unterschrift und ohne Code. Danach MUST diese Instanz den Einsatz mit der nächsten Epoche
 schreibbar führen; die Akte MUST eine Erklärung ohne Beweis gegen die alte Führung mit dem Grund
-tragen, Bruchstelle ist der jüngste Widerruf einer solchen Zuordnung, und Verlauf und Admin-Spur
+tragen, Bruchstelle ist der Widerruf dieser Zuordnung, und Verlauf und Admin-Spur
 MUST den Wechsel mit Bediener festhalten.
 
 #### Scenario: Zurückholen nach Widerruf ohne Schalter
@@ -35,8 +35,8 @@ MUST den Wechsel mit Bediener festhalten.
 
 Ein Spiegel, dessen Führung nicht mehr gekoppelt ist, MUST Spiegel bleiben, bis ein Mensch ihn
 zurückholt, auch über Neustart und Einschalten des Schalters hinweg. Ist die führende Installation
-noch gekoppelt oder war sie mit der Org nie über eine Standardkopplung verbunden, MUST der Server
-das Zurückholen mit 409 ablehnen.
+noch gekoppelt oder kam der Spiegel nicht über eine widerrufene Standard-Zuordnung zu ihr, etwa
+über einen Hub, MUST der Server das Zurückholen mit 409 ablehnen.
 
 #### Scenario: Ohne Handlung bleibt der Spiegel
 - **WHEN** nach Widerruf ohne Schalter die Führung wieder eingeschaltet wird und der ELW neu startet
@@ -49,3 +49,7 @@ das Zurückholen mit 409 ablehnen.
 #### Scenario: Führer nie über eine Standardkopplung zugeordnet
 - **WHEN** die Akte eine Installation als Führer nennt, mit der die Org nur über eine Direktkopplung vor Ort oder gar nicht gekoppelt war
 - **THEN** bietet das Paneel „Führung zurückholen“ nicht an, und der Server antwortet auf den Aufruf mit 409
+
+#### Scenario: Der Spiegel kommt über einen Hub
+- **WHEN** „ELW 1“ einen Einsatz führt, den „ELW 2“ über den Hub kennt und spiegelt, und die Org an „ELW 2“ früher einmal direkt mit „ELW 1“ gekoppelt war
+- **THEN** bietet „ELW 2“ „Führung zurückholen“ nicht an, und der Server antwortet auf den Aufruf mit 409

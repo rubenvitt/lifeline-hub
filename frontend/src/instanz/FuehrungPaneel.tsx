@@ -243,7 +243,8 @@ export default function FuehrungPaneel({
   const moeglich = fuehrungMoeglich(fuehrung, { darfUnterschreiben });
   const [neuerCode, setNeuerCode] = useState<FuehrungCodeAntwort | null>(null);
   const [notOffen, setNotOffen] = useState(false);
-  const [zurueckOffen, setZurueckOffen] = useState(false);
+  // Der Name der Führung beim Öffnen: der Dialog folgt nicht der Live-Akte (Review LLH-1850).
+  const [zurueckVon, setZurueckVon] = useState<string | null>(null);
   const [form] = Form.useForm<NotuebernahmeWerte>();
   const [zurueckForm] = Form.useForm<NotuebernahmeWerte>();
   const beweisWahl = Form.useWatch('beweis', form);
@@ -313,6 +314,13 @@ export default function FuehrungPaneel({
   useEffect(() => {
     onLaeuft?.(laeuft);
   }, [laeuft, onLaeuft]);
+  // Geht das Zurückholen nicht mehr (ein anderer hat zurückgeholt, die Kopplung gilt wieder),
+  // schließt der Dialog; ein laufendes Senden endet mit seiner eigenen Antwort.
+  const zurueckMoeglich = moeglich.zurueckholen;
+  const zurueckLaeuft = zurueckholen.isPending;
+  useEffect(() => {
+    if (!zurueckMoeglich && !zurueckLaeuft) setZurueckVon(null);
+  }, [zurueckMoeglich, zurueckLaeuft]);
   /** Gesperrt, außer es ist die Aktion, die gerade läuft (die zeigt ihren Ladezustand). */
   const sperre = (selbst: boolean) => ohneNetz || (laeuft && !selbst);
   const beschrieben = ohneNetz ? grundId : undefined;
@@ -483,7 +491,7 @@ export default function FuehrungPaneel({
               aria-describedby={beschrieben}
               onClick={() => {
                 zurueckholen.reset();
-                setZurueckOffen(true);
+                setZurueckVon(fuehrung.fuehrer_name);
               }}
               data-lfh="fuehrung-zurueckholen"
             >
@@ -594,8 +602,8 @@ export default function FuehrungPaneel({
       </ErfassungsModal>
 
       <ErfassungsModal<NotuebernahmeWerte>
-        offen={zurueckOffen}
-        titel={`Führung von ${fuehrung.fuehrer_name} zurückholen`}
+        offen={zurueckVon != null}
+        titel={`Führung von ${zurueckVon ?? ''} zurückholen`}
         form={zurueckForm}
         erfassenText="Führung zurückholen"
         unumkehrbar
@@ -609,10 +617,10 @@ export default function FuehrungPaneel({
         speicherung={zurueckholen}
         speicherFehlerTitel="Nicht zurückgeholt"
         onErfassen={(w) => zurueckholen.mutateAsync(w)}
-        onFertig={() => setZurueckOffen(false)}
+        onFertig={() => setZurueckVon(null)}
         onAbbrechen={() => {
           zurueckholen.reset();
-          setZurueckOffen(false);
+          setZurueckVon(null);
         }}
       >
         <GrundFeld />
