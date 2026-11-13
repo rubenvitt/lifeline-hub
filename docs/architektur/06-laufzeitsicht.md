@@ -531,7 +531,7 @@ sequenceDiagram
 
 Ein Fremdsystem erfährt über `GET /api/v1/events`, dass sich an seinem freigegebenen Einsatz etwas
 getan hat (LLH-1655,
-[ADR-0037](entscheidungen/ADR-0037-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+[ADR-0038](entscheidungen/ADR-0038-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
 Spec [`ereignis-abruf`](../../openspec/specs/ereignis-abruf/spec.md)).
 
 ```mermaid

@@ -1,5 +1,5 @@
 ---
-id: ADR-0037
+id: ADR-0038
 titel: Ausgangsereignisse für Fremdsysteme entstehen per Trigger und je Zugang
 status: akzeptiert
 datum: 2026-11-13
@@ -12,7 +12,7 @@ herleitung:
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---
 
-# ADR-0037: Ausgangsereignisse für Fremdsysteme entstehen per Trigger und je Zugang
+# ADR-0038: Ausgangsereignisse für Fremdsysteme entstehen per Trigger und je Zugang
 
 ## Regeln
 

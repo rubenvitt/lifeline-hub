@@ -112,7 +112,7 @@ Abruf, zweiter sind die Webhooks (LLH-1656).
 - **Frontend:** keine Änderung.
 - **Doku:** `docs/api/maschinenzugang.md` (Abschnitte „Einsätze lesen“ und „Ereignisse
   abrufen“), `docs/anwender/kapitel/anbindungen.md` und `externe-lagemonitore.md`,
-  `docs/architektur/` (Kapitel 6, 8, 11, ADR-0037), `src/AGENTS.md`.
+  `docs/architektur/` (Kapitel 6, 8, 11, ADR-0038), `src/AGENTS.md`.
 - **Abhängigkeit:** LLH-1638 (Change `f658d8o6-lage-fuer-maschinenzugaenge`). Diese Change
   hängt Trigger an dessen Tabelle `maschinenzugang_freigabe` und liest sie in den Leserouten.
   Tabellen, Abruf und Purge entstanden vorher (Entscheidung Ruben, 12.11.2026); Trigger und

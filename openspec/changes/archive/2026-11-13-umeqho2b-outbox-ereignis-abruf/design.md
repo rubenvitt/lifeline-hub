@@ -97,7 +97,7 @@ Was daraus folgt:
   Die Trigger `_d` und `_i` melden es; der Trigger `_u` (D5) bleibt als Netz für einen künftigen
   UPDATE-Weg, ein Test stellt per UPDATE um.
 - **`INSERT OR REPLACE` darf es nicht werden.** `REPLACE` löscht ohne DELETE-Trigger (geprüft);
-  das ergäbe ein zweites `einsatz.created` und kein `einsatz.closed`. ADR-0037 verbietet es.
+  das ergäbe ein zweites `einsatz.created` und kein `einsatz.closed`. ADR-0038 verbietet es.
 - **Die Zeile endet durch Löschen** beim Abschluss, beim Zurücknehmen, beim Widerruf des Zugangs
   und bei jeder Änderung seiner Lese-Scopes mit Einsatzbezug (D16). Kommt der Abschluss über den Spiegel, bleibt
   die Zeile stehen und ist nur unwirksam (LLH-1638 D2); D5 deckt das über den Status ab.
@@ -438,7 +438,7 @@ Minuten).
 
 ### D14: Regeln und Entscheidung festhalten
 
-- **Neue ADR** (gebaut als ADR-0037; 0034 und 0035 belegen LLH-1654 und LLH-1638, 0036 das Löschsignal spiegelloser Akten): „Ausgangsereignisse für Fremdsysteme entstehen
+- **Neue ADR** (gebaut als ADR-0038; 0034 bis 0037 sind auf `alpha` anderweitig vergeben): „Ausgangsereignisse für Fremdsysteme entstehen
   per Trigger und je Zugang“. Regeln: Zeilen in `maschine_ereignis` schreibt nur ein Trigger; der
   Abruf liest nur Zeilen des eigenen Zugangs; ein Ereignis trägt nur Art, Zeit und Einsatz-ID.
   Prüfung: `verbiete 'INSERT INTO maschine_ereignis' 'src/**'` (Tests fügen über die Trigger
@@ -538,5 +538,5 @@ Rechte (dann erweitert der Admin den Umfang ohne die Einsatzleitung).
 
 ## Open Questions
 
-Keine. Migrationen und ADR sind gegen `alpha` vom 13.11.2026 nummeriert (0344, 0345, ADR-0037; vom Autofix bzw. nach dem Merge umgelegt);
+Keine. Migrationen und ADR sind gegen `alpha` vom 13.11.2026 nummeriert (0344, 0345, ADR-0038; vom Autofix bzw. nach dem Merge umgelegt);
 ein späterer Konflikt fängt der Autofix bzw. der Commit-Status `ADR-Nummern`.
