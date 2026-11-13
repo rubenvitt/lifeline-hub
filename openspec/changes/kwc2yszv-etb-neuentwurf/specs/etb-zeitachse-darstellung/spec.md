@@ -124,6 +124,26 @@ Vermerk „Nachtrag · erfasst …“. Die Schreibweise MUST der wirksamen Darst
 - **WHEN** ein Eintrag die Ereigniszeit 10.10. 23:50 trägt und am 11.10. um 00:20 erfasst wurde
 - **THEN** nennt der Hinweis „110020“, im `Zeitachseneintrag` als „nachgetragen 110020“, in der Spaltenzeile als „Nachtrag · erfasst 110020“
 
+### Requirement: Lesemarke als Trennlinie
+Gibt es ungesichtete Einträge und liegt der zuletzt gesichtete im geladenen, ungefilterten Fenster,
+SHALL die Zeitachse unter ihm eine Trennlinie „Neu seit <Uhrzeit> · n Einträge“ mit „Als gesichtet
+markieren“ zeigen. Liegt er außerhalb des Fensters oder unter einem Filter, MUST dieselbe Angabe
+als schmales Banner mit „Zur Marke springen“ erscheinen. Die Seite öffnet trotzdem am Ende. Blendet
+die Zeitachse die Systemeinträge aus, MUST die Zahl sie nicht mitzählen: ein Banner über Einträge,
+die nicht zu sehen sind, führte ins Leere.
+
+#### Scenario: Marke im Fenster
+- **WHEN** Nr. 120 zuletzt gesichtet wurde und 14 neuere Einträge geladen sind
+- **THEN** steht zwischen Nr. 120 und Nr. 121 die Linie „Neu seit …“ mit 14 Einträgen, und die Seite steht am Ende
+
+#### Scenario: Marke außerhalb
+- **WHEN** der zuletzt gesichtete Eintrag nicht im geladenen Fenster liegt
+- **THEN** steht ein Banner mit derselben Angabe und „Zur Marke springen“, und keine Linie steht in der Achse
+
+#### Scenario: Nur neue Systemeinträge
+- **WHEN** seit der letzten Sichtung nur Systemeinträge dazukamen und die Zeitachse sie ausblendet
+- **THEN** steht weder Linie noch Banner
+
 ## ADDED Requirements
 
 ### Requirement: Vermerke in eigener Spalte

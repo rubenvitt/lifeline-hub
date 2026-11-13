@@ -50,6 +50,7 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
    Einträge“ die gesichteten von den neuen. Liegt der zuletzt gesichtete Eintrag nicht im
    geladenen Teil oder ist ein Filter gesetzt, steht derselbe Hinweis über der Zeitachse, mit „Zur
    Marke springen“. „alle als gesichtet markieren“ setzt die Lesemarke auf den neuesten Eintrag.
+   Ausgeblendete Systemeinträge zählen dabei nicht als neu.
 7. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
    läuft mit. Wer hochgerollt hat oder ein Menü in der Zeitachse offen hat, sieht stattdessen
    unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende.

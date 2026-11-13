@@ -1264,9 +1264,12 @@ describe('Nach oben', () => {
   });
 
   it('hält unten seinen Platz frei: das ⋮ der jüngsten Zeile liegt nicht unter ihm (Review S11)', () => {
+    // Der Platz steht schon vor dem Knopf: erschiene er erst mit ihm (nach dem Sprung ans Ende),
+    // wüchse er unter dem Bild, und die jüngste Zeile bliebe verdeckt.
     rolle(0);
     const oben = renderZeitachse({ eintraege: [eintrag()] });
-    expect(oben.container.querySelector('[data-lfh="etb-nach-oben-platz"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Nach oben' })).toBeNull();
+    expect(oben.container.querySelector('[data-lfh="etb-nach-oben-platz"]')).not.toBeNull();
     oben.unmount();
     rolle(window.innerHeight + 1);
     try {

@@ -30,11 +30,16 @@ pub struct EtbLesemarkeAnzeige {
     pub hoechste_lfd_nr: Option<i64>,
 }
 
-/// Liest den Lesestand von `benutzer_id` im Einsatz `einsatz_id`.
+/// Liest den Lesestand von `benutzer_id` im Einsatz `einsatz_id`. Mit `ohne_system` zählen
+/// Systemeinträge nicht als neu: die Seite blendet sie in ihrer Vorgabe aus, und ein Banner über
+/// unsichtbare Einträge führte ins Leere (Change `kwc2yszv-etb-neuentwurf`, Review S4).
+/// `hoechste_lfd_nr` bleibt die höchste Nummer überhaupt: „alle als gesichtet markieren“ deckt
+/// auch die ausgeblendeten ab.
 pub async fn laden(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,
+    ohne_system: bool,
 ) -> Result<EtbLesemarkeAnzeige, AppError> {
     let marke: Option<(i64, String)> = sqlx::query_as(
         "SELECT gesichtet_lfd_nr, gesichtet_at FROM etb_lesemarke \
@@ -47,12 +52,14 @@ pub async fn laden(
     let grenze = marke.as_ref().map(|(nr, _)| *nr).unwrap_or(0);
 
     let (neue_anzahl, hoechste_lfd_nr): (i64, Option<i64>) = sqlx::query_as(
-        "SELECT COALESCE(SUM(CASE WHEN lfd_nr > ? AND erfasser_id <> ? THEN 1 ELSE 0 END), 0), \
+        "SELECT COALESCE(SUM(CASE WHEN lfd_nr > ? AND erfasser_id <> ? \
+                                    AND (? = 0 OR typ <> 'system') THEN 1 ELSE 0 END), 0), \
                 MAX(lfd_nr) \
          FROM etb_eintrag WHERE einsatz_id = ?",
     )
     .bind(grenze)
     .bind(benutzer_id)
+    .bind(ohne_system)
     .bind(einsatz_id)
     .fetch_one(pool)
     .await?;

@@ -212,6 +212,27 @@ describe('EtbPage', () => {
     ).toBeTruthy();
   });
 
+  it('die Lesemarke zählt wie die Achse: ohne Systemeinträge, solange sie ausgeblendet sind (Review S4)', async () => {
+    const abrufe: string[] = [];
+    const handler = [
+      http.get('/api/einsaetze/7/etb/lesemarke', ({ request }) => {
+        abrufe.push(new URL(request.url).search);
+        return HttpResponse.json({ neue_anzahl: 4, hoechste_lfd_nr: 1 });
+      }),
+    ];
+    const { unmount } = setup('/einsaetze/7/etb', handler);
+    await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    expect(abrufe.length).toBeGreaterThan(0);
+    expect(abrufe.every((s) => s === '?ohne_system=true')).toBe(true);
+    unmount();
+
+    abrufe.length = 0;
+    setup('/einsaetze/7/etb?system=an', handler);
+    await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    expect(abrufe.length).toBeGreaterThan(0);
+    expect(abrufe.every((s) => s === '')).toBe(true);
+  });
+
   it('LLH-1149: steht die Marke im Fenster, ist sie eine Linie IN der Achse, unter Filter ein Banner', async () => {
     const zwei = { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Zweite Meldung' };
     const handler = [
@@ -1846,6 +1867,8 @@ describe('EtbPage — Einstieg in den Druck (LFH-22)', () => {
       typ: 'meldung',
       q: 'Damm',
       einheit_id: '5',
+      // Der Ausschluss der Seite reist ausdrücklich mit: ohne Merkmal druckte der Druck alles.
+      system: 'aus',
     });
   });
 
@@ -1996,7 +2019,9 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(within(k).queryByRole('link', { name: 'Drucken / als PDF' })).toBeNull();
     expect(within(k).queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
     await weitereWaehlen('Drucken / als PDF');
-    await waitFor(() => expect(screen.getByTestId('ort-suche').textContent).toBe('?typ=meldung'));
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche').textContent).toBe('?typ=meldung&system=aus'),
+    );
   });
 
   it('auch die Einsatzleitung findet im Menü nur die Druckansicht (LFH-960)', async () => {
@@ -2429,9 +2454,10 @@ describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
     setzeViewportBreite(1366);
     setup('/einsaetze/7/etb?system=an', serverSystem());
     await screen.findByText('Person erfasst');
+    // Eingeblendet heißt für den Druck: kein Ausschluss, also gar kein Merkmal (Review S7).
     expect(screen.getByRole('link', { name: 'Drucken / als PDF' })).toHaveAttribute(
       'href',
-      '/einsaetze/7/etb/druck?system=an',
+      '/einsaetze/7/etb/druck',
     );
   });
 });

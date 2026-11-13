@@ -691,7 +691,7 @@ export default function EtbPage() {
    * Lesemarke (LLH-1149, D3): steht der zuletzt gesichtete Eintrag im ungefilterten Fenster, ist
    * sie eine Linie in der Achse, sonst ein Banner darüber. Derselbe Abruf wie im Banner.
    */
-  const lesemarkeQuery = useEtbLesemarke(einsatzId);
+  const lesemarkeQuery = useEtbLesemarke(einsatzId, !!filter.ohne_system);
   const geladeneNummern = useMemo(() => eintraege.map((e) => e.lfd_nr), [eintraege]);
   const markeInAchse = lesemarkeImFenster(lesemarkeQuery.data, geladeneNummern, filterAktiv);
   const markeNr = lesemarkeQuery.data?.gesichtet_lfd_nr;
@@ -700,10 +700,17 @@ export default function EtbPage() {
       markeInAchse && markeNr != null
         ? {
             nachLfdNr: markeNr,
-            knoten: <EtbLesemarkeBanner key="lesemarke" einsatzId={einsatzId} form="linie" />,
+            knoten: (
+              <EtbLesemarkeBanner
+                key="lesemarke"
+                einsatzId={einsatzId}
+                form="linie"
+                ohneSystem={!!filter.ohne_system}
+              />
+            ),
           }
         : undefined,
-    [markeInAchse, markeNr, einsatzId],
+    [markeInAchse, markeNr, einsatzId, filter.ohne_system],
   );
 
   // Die Ränder meldet die Zeitachse aus den GEZEIGTEN Zeilen (`onGezeigt`): was sie zurückhält,
@@ -1227,7 +1234,9 @@ export default function EtbPage() {
             {/* „neu seit Ihrer letzten Sichtung" — als Linie in der Achse, wenn die Marke im
                 Fenster steht, sonst hier als Banner im Fluss; das Sammelbanner des
                 Live-Zuflusses liegt dagegen auf der Zeitachse. */}
-            {!markeInAchse && <EtbLesemarkeBanner einsatzId={einsatzId} />}
+            {!markeInAchse && (
+              <EtbLesemarkeBanner einsatzId={einsatzId} ohneSystem={!!filter.ohne_system} />
+            )}
             {/* Funkprotokoll (LLH-1149): ältere Einträge stehen oben, also auch der Weg zu ihnen.
                 Die Lesestelle hält `useFunkprotokollLauf` beim Einfügen darüber. */}
             {etbQuery.hasNextPage && (

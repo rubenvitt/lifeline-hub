@@ -780,10 +780,12 @@ export default function EtbZeitachse({
           onSchliessen={kontextSchliessen}
         />
       )}
-      {/* Steht „Nach oben“, hält die Achse unten seine Höhe frei: in der Funkprotokoll-Ordnung
-          steht er fast immer, und rechts unten läge er sonst auf dem ⋮ der jüngsten Zeile (Review
-          S11). Nur der Knopf, nicht das Banner: das meldet Neues und darf kurz überdecken. */}
-      {weitGerollt && nachObenPasst && (
+      {/* Die Achse hält unten die Höhe von „Nach oben“ frei: in der Funkprotokoll-Ordnung steht er
+          fast immer, und rechts unten läge er sonst auf dem ⋮ der jüngsten Zeile (Review S11).
+          IMMER, nicht erst mit dem Knopf: der erscheint nach dem Sprung ans Ende, ein dann
+          wachsender Platz läge unter dem Bild und die Zeile bliebe verdeckt. Nur für den Knopf,
+          nicht für das Banner: das meldet Neues und darf kurz überdecken. */}
+      {sichtbar.length > 0 && (
         <div
           aria-hidden="true"
           data-lfh="etb-nach-oben-platz"
