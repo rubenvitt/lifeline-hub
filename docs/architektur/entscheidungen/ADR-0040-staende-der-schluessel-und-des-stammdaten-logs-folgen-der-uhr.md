@@ -1,5 +1,5 @@
 ---
-id: ADR-0039
+id: ADR-0040
 titel: Stände der Unterschriftsschlüssel und des Stammdaten-Logs folgen der Uhr, ein Rückschritt zeigt sich am gemeldeten Stand
 status: akzeptiert
 datum: 2026-11-13
@@ -12,7 +12,7 @@ herleitung:
   - openspec/changes/archive/2026-11-13-cz5332jn-unterschrift-stammdaten-nach-restore/design.md
 ---
 
-# ADR-0039: Stände der Unterschriftsschlüssel und des Stammdaten-Logs folgen der Uhr, ein Rückschritt zeigt sich am gemeldeten Stand
+# ADR-0040: Stände der Unterschriftsschlüssel und des Stammdaten-Logs folgen der Uhr, ein Rückschritt zeigt sich am gemeldeten Stand
 
 ## Regeln
 
