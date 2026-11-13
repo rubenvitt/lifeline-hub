@@ -229,6 +229,33 @@ describe('Spaltenzeile in kompakter Dichte', () => {
     );
   });
 
+  it('Bild-Anhang: das Zeilenmenü öffnet die Großansicht, auch ohne „+n“ (Review L1)', async () => {
+    renderZeitachse({
+      eintraege: [
+        eintrag({
+          anhaenge: [
+            {
+              id: 9,
+              einsatz_id: 1,
+              dateiname: 'dach.jpg',
+              mime: 'image/jpeg',
+              groesse: 2048,
+              hochgeladen_von: 1,
+              erstellt_at: '2026-05-23 10:00:00',
+            },
+          ],
+        }),
+      ],
+    });
+    const menue = await oeffneMenue(1);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Vorschau: dach.jpg' }));
+    const dialog = await screen.findByRole('dialog');
+    const gross = within(dialog)
+      .getAllByRole('img')
+      .find((i) => i.getAttribute('src')?.includes('fassung=grossansicht'));
+    expect(gross).toHaveAttribute('src', '/api/einsaetze/1/etb/1/anhaenge/9?fassung=grossansicht');
+  });
+
   it('Bedienbarer Verfasser: auch Lesende haben das ⋮ mit dem Verfasser, das Browsermenü bleibt', async () => {
     const { container } = renderZeitachse({ eintraege: [eintrag()] });
     const z = zeileVon(container, 'eintrag-1');

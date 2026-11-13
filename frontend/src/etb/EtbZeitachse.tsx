@@ -1,4 +1,7 @@
-import { Button, Space } from 'antd';
+import { App, Button, Image, Space } from 'antd';
+import { grossansichtPfad, originalDateiname, originalPfad } from '../api/anhangFassung';
+import { ladeAnhangHerunter } from '../components/anhangHerunterladen';
+import { useSpiegelAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
 import {
   Fragment,
   memo,
@@ -220,17 +223,6 @@ function inhaltGetroffen(inhalt: string, begriff?: string): boolean {
   return fundstellenIn(inhalt, suchphrasen(begriff)).length > 0;
 }
 
-/** Datei eines Vermerks aus dem Zeilenmenü herunterladen — wie ein Klick auf ihren Verweis. */
-function ladeHerunter(datei: NonNullable<Vermerk['datei']>): void {
-  const a = document.createElement('a');
-  a.href = datei.href;
-  a.download = datei.dateiname;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-
 /**
  * Was das Menü einer Zeile zusätzlich nennt (`ZeilenZusatz`): in der Spaltenzeile Vermerke und
  * Verfasser, in der Handschirm-Zeile den Verfasser; der `Zeitachseneintrag` zeigt beides selbst.
@@ -240,11 +232,12 @@ function zeilenZusatz(
   z: EtbZeile,
   form: EtbZeilenform,
   vermerke: () => readonly Vermerk[],
+  darfOriginal: boolean,
 ): ZeilenZusatz | undefined {
   if (z.art !== 'eintrag' || form === 'zeitachse') return undefined;
   return {
     verfasser: verfasserText(z.eintrag),
-    ...(form === 'spalten' ? { vermerke: vermerke() } : {}),
+    ...(form === 'spalten' ? { vermerke: vermerke(), darfOriginal } : {}),
   };
 }
 
@@ -517,8 +510,21 @@ export default function EtbZeitachse({
   });
   // Auch `navigate` über die Ref: seine Identität folgt dem Pfad, die Aufrufer bleiben stabil.
   const navigateRef = useRef(navigate);
+  // Downloads aus dem Zeilenmenü (Review L2): am Spiegel erst laden, das Ergebnis als Meldung.
+  const { message } = App.useApp();
+  const { spiegel } = useSpiegelAusCache(einsatzId);
+  const ladeOptionen = useRef({
+    spiegel,
+    melde: (art: 'info' | 'error', text: string) => void message[art](text),
+  });
+  // Großansicht eines Bild-Anhangs aus dem Zeilenmenü (Review L1); `null`: zu.
+  const [menueVorschau, setMenueVorschau] = useState<string | null>(null);
   useLayoutEffect(() => {
     navigateRef.current = navigate;
+    ladeOptionen.current = {
+      spiegel,
+      melde: (art, text) => void message[art](text),
+    };
     handler.current = {
       onBerichtigen,
       onWiedervorlage,
@@ -539,7 +545,15 @@ export default function EtbZeitachse({
       // Einhängen eingefrorenes `undefined` stünde sonst als Eintrag ohne Wirkung da.
       nurProtokollieren: (p) => handler.current.onNurProtokollieren?.(p),
       oeffne: (pfad) => navigateRef.current(pfad),
-      herunterladen: ladeHerunter,
+      // Wie ein Klick auf den Verweis, am Spiegel mit „wird geholt“ als Meldung (Review L2).
+      herunterladen: (d) => void ladeAnhangHerunter(d.href, d.dateiname, ladeOptionen.current),
+      original: (d) =>
+        void ladeAnhangHerunter(
+          originalPfad(d.href),
+          originalDateiname(d.dateiname),
+          ladeOptionen.current,
+        ),
+      vorschau: (d) => setMenueVorschau(grossansichtPfad(d.href)),
     }),
     [],
   );
@@ -604,15 +618,19 @@ export default function EtbZeitachse({
   const kontextZusatz =
     kontextZeile == null
       ? undefined
-      : zeilenZusatz(kontextZeile, form, () =>
-          kontextZeile.art === 'eintrag'
-            ? vermerkeVon(kontextZeile.eintrag, {
-                einsatzId,
-                grundeintrag: index.grundeintrag(kontextZeile.eintrag),
-                konventionen,
-                dokumente: dokumente?.get(kontextZeile.eintrag.id),
-              })
-            : [],
+      : zeilenZusatz(
+          kontextZeile,
+          form,
+          () =>
+            kontextZeile.art === 'eintrag'
+              ? vermerkeVon(kontextZeile.eintrag, {
+                  einsatzId,
+                  grundeintrag: index.grundeintrag(kontextZeile.eintrag),
+                  konventionen,
+                  dokumente: dokumente?.get(kontextZeile.eintrag.id),
+                })
+              : [],
+          darfOriginal,
         );
   const kontextListe = kontextZeile == null ? [] : zeilenMenue(kontextZeile, rechte, kontextZusatz);
   /*
@@ -780,6 +798,14 @@ export default function EtbZeitachse({
           onSchliessen={kontextSchliessen}
         />
       )}
+      {/* Großansicht aus dem Zeilenmenü (Review L1): dieselbe Überlagerung wie am Vorschaubild
+          (`AnhangVorschauGruppe`), ohne eigenes Bild im Fluss. */}
+      {menueVorschau != null && (
+        <Image.PreviewGroup
+          items={[menueVorschau]}
+          preview={{ open: true, onOpenChange: (offen) => !offen && setMenueVorschau(null) }}
+        />
+      )}
       {/* Die Achse hält unten die Höhe von „Nach oben“ frei: in der Funkprotokoll-Ordnung steht er
           fast immer, und rechts unten läge er sonst auf dem ⋮ der jüngsten Zeile (Review S11).
           IMMER, nicht erst mit dem Knopf: der erscheint nach dem Sprung ans Ende, ein dann
@@ -932,7 +958,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
           }),
     [e, form, einsatzId, index, konventionen, dokumente],
   );
-  const zusatz = zeilenZusatz(z, form, () => vermerke);
+  const zusatz = zeilenZusatz(z, form, () => vermerke, darfOriginal);
   const menueListe = zeilenMenue(z, rechte, zusatz);
 
   function knoepfe(): ReactNode {

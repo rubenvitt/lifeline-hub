@@ -234,4 +234,50 @@ describe('zeilenMenue — Vermerke und Verfasser hinter den Handlungen', () => {
     expect(aufrufe.herunterladen).toHaveBeenCalledTimes(1);
     expect(aufrufe.berichtigen).not.toHaveBeenCalled();
   });
+
+  describe('Bild-Anhang: Vorschau und Original auch ohne „+n“ (Review L1)', () => {
+    const foto: Vermerk = {
+      schluessel: 'anhang-3',
+      text: 'Anhang dach.jpg',
+      ton: 'verweis',
+      datei: {
+        href: '/api/einsaetze/7/etb/1/anhaenge/3',
+        dateiname: 'dach.jpg',
+        name: 'dach.jpg herunterladen',
+        mime: 'image/jpeg',
+      },
+    };
+
+    it('nennt Vorschau und, wer Originale laden darf, das Original', () => {
+      const r = { ...alle, kannBerichtigen: false, kannWiedervorlage: false, kannAuftrag: false };
+      expect(zeilenMenue(Z.eintrag, r, { vermerke: [foto], darfOriginal: true })).toEqual([
+        { key: 'vermerk:anhang-3', label: 'Anhang dach.jpg herunterladen' },
+        { key: 'vorschau:anhang-3', label: 'Vorschau: dach.jpg' },
+        { key: 'original:anhang-3', label: 'Original (mit Standort): dach.jpg herunterladen' },
+      ]);
+      // Ohne das Recht kein Original; eine PDF hat weder Vorschau noch Original.
+      expect(
+        zeilenMenue(Z.eintrag, r, { vermerke: [foto, vermerke[2]] }).map((m) => m.key),
+      ).toEqual(['vermerk:anhang-3', 'vorschau:anhang-3', 'vermerk:anhang-2']);
+    });
+
+    it('die Wahl zeigt die Vorschau bzw. lädt das Original', () => {
+      const aufrufe = {
+        berichtigen: vi.fn(),
+        wiedervorlage: vi.fn(),
+        auftragErteilen: vi.fn(),
+        erneutSenden: vi.fn(),
+        verwerfen: vi.fn(),
+        herunterladen: vi.fn(),
+        vorschau: vi.fn(),
+        original: vi.fn(),
+      } satisfies ZeilenAufrufe;
+      const zusatz = { vermerke: [foto], darfOriginal: true };
+      fuehreZeilenWahlAus(Z.eintrag, 'vorschau:anhang-3', aufrufe, zusatz);
+      expect(aufrufe.vorschau).toHaveBeenCalledWith(foto.datei);
+      fuehreZeilenWahlAus(Z.eintrag, 'original:anhang-3', aufrufe, zusatz);
+      expect(aufrufe.original).toHaveBeenCalledWith(foto.datei);
+      expect(aufrufe.herunterladen).not.toHaveBeenCalled();
+    });
+  });
 });

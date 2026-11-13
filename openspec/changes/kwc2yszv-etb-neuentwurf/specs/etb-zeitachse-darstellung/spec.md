@@ -161,6 +161,22 @@ Eintrag SHALL seinen Inhalt durchgestrichen zeigen.
 - **WHEN** Nr. 230 durch Nr. 231 berichtigt ist
 - **THEN** zeigt Nr. 230 ihren Inhalt durchgestrichen und „berichtigt durch Nr. 231“ als Vermerk
 
+### Requirement: Anhänge im Zeilenmenü
+Ein Bild-Anhang SHALL im Zeilenmenü der Spaltenzeile neben „herunterladen“ auch „Vorschau“
+(Großansicht in der App) und, wer Originale laden darf, „Original (mit Standort)“ anbieten:
+Vorschaubild und Original stehen in der Spalte Vermerk nicht. Ein Download aus dem Menü MUST am
+Spiegel denselben Weg nehmen wie der Verweis und „wird geholt“ melden, statt eine Fehlerantwort als
+Datei zu speichern.
+
+#### Scenario: Ein Foto ohne weitere Vermerke
+- **WHEN** an einem Eintrag nur ein Foto hängt und die Spalte kein „+n“ trägt
+- **THEN** öffnet „Vorschau: <Datei>“ im Zeilenmenü die Großansicht, und wer Originale laden darf,
+  findet dort „Original (mit Standort): <Datei> herunterladen“
+
+#### Scenario: Anhang am Spiegel noch nicht da
+- **WHEN** die Instanz ein Spiegel ist und der Anhang noch nicht geholt wurde
+- **THEN** meldet „herunterladen“ im Zeilenmenü „wird geholt“ und speichert keine Datei
+
 ### Requirement: Eigener Vermerk statt Von → An
 Sind Von und An eines Eintrags gleich, SHALL die Spalte Von → An „Vermerk <Stelle>“ zeigen statt
 „<Stelle> → <Stelle>“.

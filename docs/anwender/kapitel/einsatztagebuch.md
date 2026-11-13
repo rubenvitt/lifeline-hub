@@ -350,6 +350,11 @@ Zeile stehen darin „Erneut senden“, „Nur protokollieren“ (wenn die Zeile
 markierter Text behalten das Menü des Browsers. Am Tablet öffnet ein langer Druck im ETB kein
 Menü: Text bleibt markierbar, die Aktionen stehen im Menü „⋮“.
 
+Am Bildschirm mit Spalten nennt das Menü auch die Vermerke der Zeile. Ein Foto bietet dort
+„Vorschau: …“ für die Großansicht und, wer Originale laden darf, „Original (mit Standort): …
+herunterladen“, auch wenn die Spalte Vermerk kein Vorschaubild zeigt. Ist der Anhang auf einer
+gespiegelten Instanz noch nicht da, meldet das Herunterladen „wird geholt“.
+
 ### Abgeschlossener Einsatz
 
 Nach dem Abschluss des Einsatzes ist das ETB nur noch lesbar. Abgeschlossen wird in den

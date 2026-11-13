@@ -5,6 +5,7 @@
  * Liste und wählen über dieselbe Funktion. So steht kein Weg nur an einem Ort.
  */
 import type { EtbEintragAnzeige } from '../api/types';
+import { ORIGINAL_TEXT, hatServerVorschau, istBildMime } from '../api/anhangFassung';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import type { AbgelehnterEintrag } from '../offline/queue';
@@ -40,6 +41,10 @@ export interface ZeilenAufrufe {
   oeffne?: (pfad: string) => void;
   /** Datei eines Vermerks herunterladen (Anhang, Dokument). */
   herunterladen?: (datei: NonNullable<Vermerk['datei']>) => void;
+  /** Großansicht eines Bild-Anhangs (Review L1). */
+  vorschau?: (datei: NonNullable<Vermerk['datei']>) => void;
+  /** Original eines Bild-Anhangs mit Standort herunterladen (Review L1). */
+  original?: (datei: NonNullable<Vermerk['datei']>) => void;
 }
 
 /**
@@ -50,6 +55,8 @@ export interface ZeilenAufrufe {
 export interface ZeilenZusatz {
   vermerke?: readonly Vermerk[];
   verfasser?: string;
+  /** Darf die Person Originale laden (`useDarfOriginalLaden`)? Dann nennt ein Bild sein Original. */
+  darfOriginal?: boolean;
 }
 
 /**
@@ -95,6 +102,37 @@ export function zeilenAktionen(z: EtbZeile, r: ZeilenRechte): MenueEintrag<Zeile
 }
 
 const VERMERK = 'vermerk:';
+const VORSCHAU = 'vorschau:';
+const ORIGINAL = 'original:';
+
+/**
+ * Ein Vermerk im Menü; ein Bild-Anhang dazu mit „Vorschau“ und, wer darf, „Original (mit
+ * Standort)“ (Review L1): die Spaltenzeile zeigt Vorschaubild und Original erst nach „+n“, bei
+ * einem einzelnen Foto gar nicht. So bleibt beides an jeder Zeile erreichbar.
+ */
+function vermerkEintraege(v: Vermerk, darfOriginal: boolean): MenueEintrag<string>[] {
+  const eintrag: MenueEintrag<string> = {
+    key: `${VERMERK}${v.schluessel}`,
+    label: v.datei ? `${v.text} herunterladen` : v.pfad ? `${v.text} öffnen` : v.text,
+    ...(v.datei || v.pfad ? {} : { gesperrt: true as const }),
+  };
+  const d = v.datei;
+  if (d == null) return [eintrag];
+  return [
+    eintrag,
+    ...(hatServerVorschau(d.mime)
+      ? [{ key: `${VORSCHAU}${v.schluessel}`, label: `Vorschau: ${d.dateiname}` }]
+      : []),
+    ...(darfOriginal && istBildMime(d.mime)
+      ? [
+          {
+            key: `${ORIGINAL}${v.schluessel}`,
+            label: `${ORIGINAL_TEXT}: ${d.dateiname} herunterladen`,
+          },
+        ]
+      : []),
+  ];
+}
 
 /**
  * Die ganze Liste des ⋮ und des Kontextmenüs: die Handlungen ({@link zeilenAktionen}), dahinter,
@@ -112,11 +150,7 @@ export function zeilenMenue(
   if (z.art !== 'eintrag' || zusatz == null) return aktionen;
   return [
     ...aktionen,
-    ...(zusatz.vermerke ?? []).map((v): MenueEintrag<string> => ({
-      key: `${VERMERK}${v.schluessel}`,
-      label: v.datei ? `${v.text} herunterladen` : v.pfad ? `${v.text} öffnen` : v.text,
-      ...(v.datei || v.pfad ? {} : { gesperrt: true as const }),
-    })),
+    ...(zusatz.vermerke ?? []).flatMap((v) => vermerkEintraege(v, zusatz.darfOriginal === true)),
     ...(zusatz.verfasser
       ? [{ key: 'verfasser', label: `Verfasser: ${zusatz.verfasser}`, gesperrt: true as const }]
       : []),
@@ -130,10 +164,13 @@ export function fuehreZeilenWahlAus(
   a: ZeilenAufrufe,
   zusatz?: ZeilenZusatz,
 ): void {
-  if (key.startsWith(VERMERK)) {
-    const v = zusatz?.vermerke?.find((x) => `${VERMERK}${x.schluessel}` === key);
-    if (v?.pfad) a.oeffne?.(v.pfad);
-    else if (v?.datei) a.herunterladen?.(v.datei);
+  for (const praefix of [VERMERK, VORSCHAU, ORIGINAL]) {
+    if (!key.startsWith(praefix)) continue;
+    const v = zusatz?.vermerke?.find((x) => `${praefix}${x.schluessel}` === key);
+    if (praefix === VORSCHAU && v?.datei) a.vorschau?.(v.datei);
+    else if (praefix === ORIGINAL && v?.datei) a.original?.(v.datei);
+    else if (praefix === VERMERK && v?.pfad) a.oeffne?.(v.pfad);
+    else if (praefix === VERMERK && v?.datei) a.herunterladen?.(v.datei);
     return;
   }
   if (z.art === 'eintrag') {
