@@ -42,15 +42,18 @@ const leer = '—';
 
 /** Welche Antragswege die Akte anbietet — rein, ohne Render prüfbar. Ein geschwärzter Einsatz
  *  mit Archiv (`akte.archiv`) bietet beide an; ob ein Einsatz-Antrag offen ist, sagt dort die
- *  Liste der Anträge, nicht der Zustand (LLH-1712). */
+ *  Liste der Anträge, nicht der Zustand (LLH-1712). Ist sie noch nicht geladen oder gescheitert
+ *  (`undefined`), bleibt der Einsatz-Weg dort weg, statt erst am 409 des Servers zu scheitern. */
 export function antragswege(
   akte: Pick<ArchivAkte, 'zustand'> & Partial<Pick<ArchivAkte, 'archiv'>>,
-  antraege: Schwaerzungsantrag[] = [],
+  antraege?: Schwaerzungsantrag[],
 ): { person: boolean; einsatz: boolean; archiv: boolean } {
   const geschwaerzt = akte.zustand === 'geschwaerzt' || akte.zustand === 'loeschung_ausstehend';
   if (geschwaerzt) {
     if (!akte.archiv) return { person: false, einsatz: false, archiv: false };
-    const einsatzOffen = antraege.some((a) => a.ziel_art === 'einsatz' && a.stand === 'offen');
+    const einsatzOffen =
+      antraege === undefined ||
+      antraege.some((a) => a.ziel_art === 'einsatz' && a.stand === 'offen');
     return { person: true, einsatz: !einsatzOffen, archiv: true };
   }
   return { person: true, einsatz: akte.zustand !== 'schwaerzung_beantragt', archiv: false };

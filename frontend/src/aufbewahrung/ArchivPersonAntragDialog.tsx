@@ -1,12 +1,14 @@
 import { Alert, App, Form, Input, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { stelleSchwaerzungsantrag } from '../api/aufbewahrung';
 import { globalKeys } from '../api/queryKeys';
 import type { AntragZielArt, NeuerSchwaerzungsantrag } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZIEL_ART } from './archivText';
-import { personenUmfang } from './SchwaerzungsantragDialog';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { personenUmfang, vollzugAb } from './SchwaerzungsantragDialog';
 
 /**
  * Löschersuchen für eine Person an einem archivierten Einsatz (LLH-1712, Spec
@@ -71,6 +73,7 @@ export default function ArchivPersonAntragDialog({
   const qc = useQueryClient();
   const { token } = theme.useToken();
   const { message } = App.useApp();
+  const [faellig] = useState(() => vollzugAb(new Date()));
   const [form] = Form.useForm<Werte>();
   const kennung = Form.useWatch('kennung', form);
   const aktenzeichen = Form.useWatch('aktenzeichen', form);
@@ -106,13 +109,20 @@ export default function ArchivPersonAntragDialog({
         type="warning"
         showIcon
         style={{ marginBottom: token.margin }}
-        title="Nach 24 Stunden unwiderruflich"
+        title={
+          <span data-lfh="antrag-faellig">
+            Nach 24 Stunden unwiderruflich — Vollzug frühestens ab etwa{' '}
+            <ZeitAnzeige wert={faellig} />
+          </span>
+        }
         description={
           <>
             Entfernt {ziel ? personenUmfang(ziel.art) : 'Name, Kontakt, Adresse und Notizen'} aus
-            allen Blöcken des Archivs. Vollzogen wird mit dem Archiv-Schlüssel der Organisation per
-            Befehl <Typography.Text code>lifeline-hub archiv loeschersuchen</Typography.Text> auf
-            dem Server. Heruntergeladene Blöcke erreicht das nicht. Bis zum Vollzug zurücknehmbar.
+            allen Blöcken des Archivs. Vollzogen wird danach mit dem Archiv-Schlüssel der
+            Organisation per Befehl{' '}
+            <Typography.Text code>lifeline-hub archiv loeschersuchen</Typography.Text> auf dem
+            Server. Heruntergeladene Blöcke erreicht das nicht. In den ersten 24 Stunden
+            zurücknehmbar.
           </>
         }
       />
