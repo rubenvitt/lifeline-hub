@@ -13,9 +13,12 @@ import {
   filterMitTyp,
   filterZusammenfuehren,
   gruppiereNachStunde,
+  handeintraege,
+  istGefiltert,
   kopfMeta,
+  segmentTitel,
+  segmentZahl,
   nachtragText,
-  letzteBerichtigungen,
   pufferZustand,
   stundenKopf,
   teileZufluss,
@@ -169,16 +172,6 @@ describe('berichtigungsindex', () => {
     const b = e({ id: 2, typ: 'berichtigung', berichtigt_eintrag_id: 77 });
     expect(berichtigungsindex([b]).grundeintrag(b)).toEqual({ id: 77, lfd_nr: null });
   });
-
-  it('liefert die jüngsten Berichtigungen in Serverordnung', () => {
-    const liste = [
-      e({ id: 4, typ: 'berichtigung' }),
-      e({ id: 3 }),
-      e({ id: 2, typ: 'berichtigung' }),
-      e({ id: 1, typ: 'berichtigung' }),
-    ];
-    expect(letzteBerichtigungen(liste, 2).map((x) => x.id)).toEqual([4, 2]);
-  });
 });
 
 describe('Bilanz und Kopfzahl — exakt aus der Serverzählung (LFH-612)', () => {
@@ -204,19 +197,76 @@ describe('Bilanz und Kopfzahl — exakt aus der Serverzählung (LFH-612)', () =>
     expect(mit[mit.length - 1]).toEqual({ typ: 'system', anzahl: 1 });
   });
 
+  const zaehler = (je: Partial<typeof null_je_typ>) => {
+    const je_typ = { ...null_je_typ, ...je };
+    return { gesamt: Object.values(je_typ).reduce((a, b) => a + b, 0), je_typ };
+  };
+
+  it('zählt Handeinträge ohne Systemeinträge', () => {
+    expect(handeintraege(zaehler({ meldung: 80, lage: 2, system: 300 }).je_typ)).toBe(82);
+  });
+
   it.each([
-    [{ gesamt: 412, filterAktiv: false }, '412 Einträge'],
-    [{ gesamt: 1, filterAktiv: false }, '1 Eintrag'],
-    [{ gesamt: 7, filterAktiv: true }, '7 Treffer'],
-    [{ gesamt: 1, filterAktiv: true }, '1 Treffer'],
-    [{ gesamt: 0, filterAktiv: true }, '0 Treffer'],
+    // Spec `etb-zaehler`, „Kopf ohne Filter“: 112 Handeinträge, 300 Systemeinträge ausgeblendet.
+    [
+      { zaehler: zaehler({ meldung: 100, anordnung: 12 }), systemAusgeblendet: 300 },
+      '112 Einträge · 300 Systemeinträge ausgeblendet',
+    ],
+    [
+      { zaehler: zaehler({ meldung: 1 }), systemAusgeblendet: 1 },
+      '1 Eintrag · 1 Systemeintrag ausgeblendet',
+    ],
+    // Nichts ausgeblendet (eingeblendet oder keine da): nur die Handeinträge.
+    [{ zaehler: zaehler({ meldung: 112, system: 300 }) }, '112 Einträge'],
+    [{ zaehler: zaehler({ meldung: 5 }), systemAusgeblendet: 0 }, '5 Einträge'],
+    // Die Zahl der ausgeblendeten fehlt noch: keine Behauptung über sie.
+    [{ zaehler: zaehler({ meldung: 5 }), systemAusgeblendet: undefined }, '5 Einträge'],
+    [{ zaehler: zaehler({ meldung: 7 }), gefiltert: true, systemAusgeblendet: 9 }, '7 Treffer'],
+    [{ zaehler: zaehler({ meldung: 1 }), gefiltert: true }, '1 Treffer'],
+    [{ zaehler: zaehler({}), gefiltert: true }, '0 Treffer'],
   ])('Kopf-Meta %#', (args, text) => {
-    expect(kopfMeta(args)).toBe(text);
+    expect(kopfMeta({ gefiltert: false, ...args })).toBe(text);
   });
 
   it('behauptet ohne Zählung keine Zahl', () => {
-    expect(kopfMeta({ gesamt: undefined, filterAktiv: false })).toBeUndefined();
-    expect(kopfMeta({ gesamt: undefined, filterAktiv: true })).toBeUndefined();
+    expect(
+      kopfMeta({ zaehler: undefined, gefiltert: false, systemAusgeblendet: 300 }),
+    ).toBeUndefined();
+    expect(kopfMeta({ zaehler: undefined, gefiltert: true })).toBeUndefined();
+  });
+
+  it('nennt am Segment die Zahl aus je_typ, an „Alle“ die Handeinträge', () => {
+    const je = zaehler({ meldung: 80, lage: 2, system: 300 }).je_typ;
+    expect(segmentZahl(je, 'meldung')).toBe(80);
+    expect(segmentZahl(je, 'lage')).toBe(2);
+    expect(segmentZahl(je, 'alle')).toBe(82);
+    expect(segmentZahl(je, 'system')).toBe(300);
+    expect(segmentZahl(undefined, 'meldung')).toBeUndefined();
+  });
+
+  it('nennt im Titel des Segments die Mehrzahl, nie „Lagemeldungen“ (Spec `bedien-wortlaut`)', () => {
+    expect(segmentTitel('lage', 2)).toBe('Lagefeststellungen: 2');
+    expect(segmentTitel('meldung', 1)).toBe('Meldungen: 1');
+    expect(segmentTitel('alle', 82)).toBe('Handeinträge: 82');
+    expect(segmentTitel('lage', undefined)).toBeUndefined();
+  });
+});
+
+describe('istGefiltert (kwc2yszv D6)', () => {
+  it('zählt den Ausschluss der Systemeinträge nicht als Filter: er ist die Vorgabe', () => {
+    expect(istGefiltert({})).toBe(false);
+    expect(istGefiltert({ ohne_system: true })).toBe(false);
+  });
+
+  it.each([
+    [{ q: 'Deich' }],
+    [{ typ: 'meldung' as const }],
+    [{ von: '2026-05-23 10:00:00' }],
+    [{ bis: '2026-05-23 10:00:00' }],
+    [{ einheit_id: 3 }],
+    [{ erfasser_id: 1 }],
+  ])('erkennt jedes andere Merkmal als Filter: %o', (filter) => {
+    expect(istGefiltert({ ...filter, ohne_system: true })).toBe(true);
   });
 });
 

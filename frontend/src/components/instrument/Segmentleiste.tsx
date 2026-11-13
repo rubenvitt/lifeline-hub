@@ -66,6 +66,14 @@ export interface SegmentOption<W extends string | number> {
    * Sperre — ein stumm gesperrtes Segment ist von „kaputt" nicht zu unterscheiden.
    */
   gesperrt?: string;
+  /**
+   * Zahl hinter dem Wortlaut, in Mono (ETB: Einträge je Typ, kwc2yszv D7). Sie gehört nicht zum
+   * Namen: der bliebe sonst bei jeder neuen Zählung ein anderer und würde neu angesagt. Sie steht
+   * als Beschreibung ({@link titel} oder die Zahl selbst).
+   */
+  zahl?: number;
+  /** Titel und Beschreibung zur Zahl („Lagefeststellungen: 8“); nur mit {@link zahl}. */
+  titel?: string;
 }
 
 /**
@@ -196,7 +204,11 @@ export default function Segmentleiste<W extends string | number>({
       {optionen.map((o, i) => {
         const aktiv = i === gewaehltIndex;
         const gesperrt = o.gesperrt != null && o.gesperrt !== '';
-        const beschreibungId = gesperrt ? `${grundId}-${i}` : undefined;
+        const grundBeschreibung = gesperrt ? `${grundId}-${i}` : undefined;
+        const mitZahl = o.zahl != null;
+        const zahlBeschreibung = mitZahl ? `${grundId}-${i}-zahl` : undefined;
+        const beschreibungId =
+          [grundBeschreibung, zahlBeschreibung].filter(Boolean).join(' ') || undefined;
         const knopf = (
           <button
             ref={(el) => {
@@ -207,7 +219,9 @@ export default function Segmentleiste<W extends string | number>({
             aria-checked={alsTab ? undefined : aktiv}
             aria-selected={alsTab ? aktiv : undefined}
             aria-controls={alsTab ? o.steuert : undefined}
-            aria-label={o.name}
+            // Mit Zahl trüge der Inhalt sie in den Namen; der Name bleibt der Wortlaut.
+            aria-label={o.name ?? (mitZahl ? o.label : undefined)}
+            title={mitZahl ? o.titel : undefined}
             aria-disabled={gesperrt || undefined}
             aria-describedby={beschreibungId}
             data-gesperrt={gesperrt || undefined}
@@ -231,9 +245,14 @@ export default function Segmentleiste<W extends string | number>({
               />
             )}
             {o.label}
+            {mitZahl && (
+              <span data-lfh="segment-zahl" style={monoStil(12)}>
+                {o.zahl}
+              </span>
+            )}
             {gesperrt && (
               // Der Grund als Beschreibung — sichtbar trägt ihn der Tooltip.
-              <span id={beschreibungId} hidden>
+              <span id={grundBeschreibung} hidden>
                 {o.gesperrt}
               </span>
             )}
@@ -258,6 +277,12 @@ export default function Segmentleiste<W extends string | number>({
             }
           >
             {gesperrt ? <Tooltip title={o.gesperrt}>{knopf}</Tooltip> : knopf}
+            {/* Neben dem Knopf, nicht darin: sonst stünde der Titel im Text des Segments. */}
+            {mitZahl && (
+              <span id={zahlBeschreibung} hidden>
+                {o.titel ?? String(o.zahl)}
+              </span>
+            )}
           </span>
         );
       })}

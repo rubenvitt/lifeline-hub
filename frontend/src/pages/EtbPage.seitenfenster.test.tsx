@@ -188,8 +188,11 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     expect(listenAbrufe.length).toBeLessThanOrEqual(5);
     expect(zeile(container, 50)).not.toBeNull();
     // Das Neuladen gelingt, statt mit den Optionen einer fremden Abfrage im selben Cache-Fach zu
-    // scheitern (LLH-1412): ohne Lagebesprechung trug die Nachtragsabfrage denselben Schlüssel.
-    expect(client.getQueryState(einsatzKeys.etbListe(7, {}))?.status).toBe('success');
+    // scheitern (LLH-1412): ohne Lagebesprechung trug die Nachtragsabfrage denselben Schlüssel. Der
+    // Schlüssel trägt die Vorgabe ohne Systemeinträge (kwc2yszv D6).
+    expect(client.getQueryState(einsatzKeys.etbListe(7, { ohne_system: true }))?.status).toBe(
+      'success',
+    );
   }, 120000);
 
   it('Kopfzahl bleibt die Serverzählung, nicht das Fenster', async () => {
@@ -250,14 +253,11 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     const user = userEvent.setup();
     const { container } = setup('/einsaetze/7/etb?eintrag=50');
     await warteAufHervorhebung(container, 50);
-    // Die Bilanz sagt, dass ihre Berichtigungen nicht die jüngsten sind.
-    expect(document.querySelector('[data-lfh="bilanz-ausschnitt"]')).not.toBeNull();
 
     const feld = await screen.findByPlaceholderText(/Inhalt/);
     await user.type(feld, 'Pegel steigt{Enter}');
     await waitFor(() => expect(zeile(container, GESAMT + 1)).not.toBeNull(), { timeout: 30000 });
     expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull();
-    expect(document.querySelector('[data-lfh="bilanz-ausschnitt"]')).toBeNull();
   }, 120000);
 
   it('scheitert das Blättern am Server, gibt der Sprung auf, statt endlos abzurufen', async () => {

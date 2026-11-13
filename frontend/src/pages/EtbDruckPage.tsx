@@ -14,7 +14,7 @@ import DruckKnopf from '../components/druck/DruckKnopf';
 import { ladeEtbVollstaendig } from '../etb/druckAbruf';
 import { auswahlZeilen } from '../etb/druckAuswahl';
 import EtbDruckTabelle from '../etb/EtbDruckTabelle';
-import { etbPfad, parseEtbFilter } from '../routing/deeplinks';
+import { etbFilterPfad, parseEtbFilter } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
 import { modulName } from '../einsatz/modulRegistry';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
@@ -100,7 +100,7 @@ export default function EtbDruckPage() {
     einheitName: (eid) => einheitenQuery.data?.find((e) => e.id === eid)?.name,
   });
 
-  const zurueck = etbPfad(einsatzId, filter);
+  const zurueck = etbFilterPfad(einsatzId, filter);
 
   return (
     <EinsatzSeite
