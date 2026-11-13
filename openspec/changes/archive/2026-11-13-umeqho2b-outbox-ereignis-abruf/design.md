@@ -168,8 +168,8 @@ allen auf `alpha`:
 
 1. die Tabellen unten; sie braucht LLH-1638 nicht und entsteht zuerst;
 2. die Trigger aus D5; sie liest `maschinenzugang_freigabe` und kommt deshalb hinter die
-   Migrationen von LLH-1638 (0341 und 0342). Gebaut: `0343_maschine_ereignis.sql` und
-   `0344_maschine_ereignis_trigger.sql`.
+   Migrationen von LLH-1638 (0341 und 0342). Gebaut: `0344_maschine_ereignis.sql` und
+   `0345_maschine_ereignis_trigger.sql`.
 
 Belegt LLH-1638 bis zu seinem Merge die Nummer der ersten, legt der Autofix sie um
 (Wurzel-`AGENTS.md`, Migrationsvergabe). Die Reihenfolge der beiden bleibt dabei erhalten, und

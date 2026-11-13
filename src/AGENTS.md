@@ -149,7 +149,7 @@ Outbox `maschine_ereignis` und Abruf `GET /api/v1/events`
 Spec `ereignis-abruf`, Herleitung
 `openspec/changes/archive/2026-11-13-umeqho2b-outbox-ereignis-abruf/design.md`):
 - **Kein Schreibweg in Rust schreibt in `maschine_ereignis`.** Jede Zeile entsteht in einem
-  Trigger (`migrations/0344_maschine_ereignis_trigger.sql`), in der Transaktion der Änderung und
+  Trigger (`migrations/0345_maschine_ereignis_trigger.sql`), in der Transaktion der Änderung und
   je Zeile in `maschinenzugang_freigabe` (Änderungen nur für gültige Zugänge, das Ende für alle).
   Ein schon geschriebenes `einsatz.closed` bleibt beim Löschen des Einsatzes stehen.
   `public_api::events` liest und löscht nur. Auch Tests

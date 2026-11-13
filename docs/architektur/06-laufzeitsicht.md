@@ -542,7 +542,7 @@ sequenceDiagram
 ```
 
 - Die Zeile entsteht im Trigger, in der Transaktion der Änderung
-  (`migrations/0344_maschine_ereignis_trigger.sql`); ein Rollback nimmt sie mit. Kein Rust-Code
+  (`migrations/0345_maschine_ereignis_trigger.sql`); ein Rollback nimmt sie mit. Kein Rust-Code
   schreibt in die Outbox.
 - Geschrieben wird je Freigabe (`maschinenzugang_freigabe`), Änderungen nur für gültige
   Zugänge: Beginn der Freigabe ist `einsatz.created`, ihr Ende oder der Abschluss

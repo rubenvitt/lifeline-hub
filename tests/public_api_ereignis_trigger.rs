@@ -1,5 +1,5 @@
 //! Die Trigger, die die Outbox `maschine_ereignis` füllen (LLH-1655, Spec `ereignis-abruf`,
-//! Migration `0344_maschine_ereignis_trigger.sql`): Welche Änderung meldet welchem Zugang
+//! Migration `0345_maschine_ereignis_trigger.sql`): Welche Änderung meldet welchem Zugang
 //! welches Ereignis, auf jedem Schreibweg und in der Transaktion der Änderung.
 
 mod common;
