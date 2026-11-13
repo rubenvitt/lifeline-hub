@@ -34,8 +34,11 @@ test.describe(KAPITEL, () => {
     await expect(page.getByText(/^Stand \d{4} · offline$/)).toBeVisible();
     await expect(page.getByText('Offline — keine Verbindung zum Server.')).toBeVisible();
 
-    // Erfassen wie mit Netz: der Eintrag wird vorgemerkt.
-    await feld.fill('Funkmeldung Abschnitt Nord: Pegel am Mühlbach steigt weiter.');
+    // Erfassen wie mit Netz: der Eintrag wird vorgemerkt. Eine Meldung braucht ein Von.
+    const von = page.getByRole('combobox', { name: 'Von', exact: true });
+    await von.fill('Abschnitt Nord');
+    await von.press('Enter');
+    await feld.fill('Funkmeldung: Pegel am Mühlbach steigt weiter.');
     await feld.press('Enter');
     const ausstehend = page.locator('.etb-ausstehend');
     await expect(ausstehend).toContainText('Pegel am Mühlbach');

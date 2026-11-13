@@ -7,7 +7,7 @@ ohne die Änderung rot ist, dann der Code. Pfade ohne Präfix relativ zu `fronte
 
 - [x] 1.1 `etb/standardRufname.ts`: `wirksameMetadaten` und `ausStandard` nehmen den Typ und liefern die Vorgabe der Tabelle (Meldung: An = eigene Stelle; Anordnung: Von = eigene Stelle; Entscheidung, Lage: beide). Nachweis: Unit-Tests je Typ, Typwechsel mit ausdrücklichem Von, `@` bei Meldung und Anordnung (`etb/standardRufname.test.ts`).
 - [x] 1.2 `etb/schnellerfassungModell.ts`/`etb/entwuerfe/entwurfModell.ts`: Vorgabe „Auch in den Meldungseingang“ (an, außer Von = An = eigene Stelle), `nur_protokollieren` dreiwertig gelesen (fehlt = Vorgabe). Nachweis: Unit-Tests für Vorgabe, Handwahl, Zurücksetzen nach dem Erfassen, alter Entwurf mit `nur_protokollieren: true`.
-- [ ] 1.3 Alle Aufrufer von `wirksameMetadaten` reichen den Typ durch (Schnellerfassung, Berichtigung, Warteschlange `offline/useEtbErfassung.ts`). Nachweis: `npx vitest run src/etb src/offline` grün, `tsc --noEmit` grün.
+- [x] 1.3 Alle Aufrufer von `wirksameMetadaten` reichen den Typ durch (Schnellerfassung, Berichtigung, Warteschlange `offline/useEtbErfassung.ts`). Nachweis: `npx vitest run src/etb src/offline` grün, `tsc --noEmit` grün.
 
 ## 2. Tastaturregel des Vorschlagsfelds
 
@@ -35,18 +35,18 @@ ohne die Änderung rot ist, dann der Code. Pfade ohne Präfix relativ zu `fronte
 - [x] 5.2 Spalte Vermerk mit allen Verweisen und Marken, „+n“ bei Überlauf, durchgestrichener berichtigter Inhalt; „Vermerk <Stelle>“ bei Von = An. Nachweis: Szenarien „Meldung mit Verweis“, „Berichtigt“, „Entscheidung der Einsatzleitung“; `e2e/etb-verweise.spec.ts`, `e2e/etb-folgeauftraege.spec.ts` grün.
 - [x] 5.3 Lange Einträge auf drei Zeilen mit „mehr“/„weniger“, aufgeklappt bei Sprung und Suchtreffer, nie im Druck. Nachweis: Szenario „Lagebericht im Strom“, Druck-Test unverändert grün.
 - [x] 5.4 Handschirm-Zeile (Kopfzeile, Text in voller Breite); komfortabel und Handschuh behalten `Zeitachseneintrag`. Nachweis: Szenario „390 px“; `e2e/kontextmenue-etb.spec.ts` grün (Menü an Spaltenzeile und Handschirm-Zeile).
-- [ ] 5.5 Regel „≥ 50 % Meldungstext“ fortschreiben (`frontend/src/etb/AGENTS.md`, `e2e/etb-chronologie.spec.ts`: Spalte Inhalt ≥ 45 % und breiteste Spalte), Abschnitt „Kompakte Zeile“ dort ersetzen; Anwenderkapitel Abschnitt „Lesen“. Nachweis: `e2e/etb-chronologie.spec.ts` lokal grün.
+- [x] 5.5 Regel „≥ 50 % Meldungstext“ fortschreiben (`frontend/src/etb/AGENTS.md`, `e2e/etb-chronologie.spec.ts`: Spalte Inhalt ≥ 45 % und breiteste Spalte), Abschnitt „Kompakte Zeile“ dort ersetzen; Anwenderkapitel Abschnitt „Lesen“. Nachweis: `e2e/etb-chronologie.spec.ts` lokal grün.
 
 ## 6. Filterleiste, Systemeinträge, Zahlen
 
-- [ ] 6.1 Systemeinträge in der Vorgabe aus: Adresse `system=an` zum Einblenden, ohne Merkmal `ohne_system=true` an den Server, alter Link mit `ohne_system=true` gilt als Vorgabe (`routing/deeplinks.ts`, `pages/EtbPage.tsx`, Druck-Link). Nachweis: Szenarien von „Systemeinträge zeigen“ als Tests; `routing/deeplinks.test.ts`.
-- [ ] 6.2 Bilanz-Paneel entfernen (`etb/EtbBilanz.tsx` samt Test), Zahlen je Typ an den Segmenten, Kopf „n Einträge · m Systemeinträge ausgeblendet“ bzw. „n Treffer“, Sendestatus-Marke mit Sprung zu den vorgemerkten Zeilen. Nachweis: Szenarien von „ETB-Kopf und Typ-Segmente zeigen die exakte Zahl“ als Tests in `pages/EtbPage.test.tsx`.
-- [ ] 6.3 Filterleiste und Spaltenkopf kleben unter dem Seitenkopf (`--lfh-rahmen-oben`), Fokusabstand angepasst. Nachweis: Szenario „An der Arbeitsposition“, `components/rahmenOben.guard.test.ts` grün, `e2e/etb-filterleiste.spec.ts` und `e2e/etb-seitenfenster.spec.ts` lokal grün.
-- [ ] 6.4 Anwenderkapitel Abschnitte „Filtern“ und „Bilanz“ umschreiben (Bilanz entfällt, Zahlen am Segment, Systemeinträge in der Vorgabe aus). Nachweis: Wächter der Anwenderdoku grün.
+- [x] 6.1 Systemeinträge in der Vorgabe aus: Adresse `system=an` zum Einblenden, ohne Merkmal `ohne_system=true` an den Server, alter Link mit `ohne_system=true` gilt als Vorgabe (`routing/deeplinks.ts`, `pages/EtbPage.tsx`, Druck-Link). Nachweis: Szenarien von „Systemeinträge zeigen“ als Tests; `routing/deeplinks.test.ts`.
+- [x] 6.2 Bilanz-Paneel entfernen (`etb/EtbBilanz.tsx` samt Test), Zahlen je Typ an den Segmenten, Kopf „n Einträge · m Systemeinträge ausgeblendet“ bzw. „n Treffer“, Sendestatus-Marke mit Sprung zu den vorgemerkten Zeilen. Nachweis: Szenarien von „ETB-Kopf und Typ-Segmente zeigen die exakte Zahl“ als Tests in `pages/EtbPage.test.tsx`.
+- [x] 6.3 Filterleiste und Spaltenkopf kleben unter dem Seitenkopf (`--lfh-rahmen-oben`), Fokusabstand angepasst. Nachweis: Szenario „An der Arbeitsposition“, `components/rahmenOben.guard.test.ts` grün, `e2e/etb-filterleiste.spec.ts` und `e2e/etb-seitenfenster.spec.ts` lokal grün.
+- [x] 6.4 Anwenderkapitel Abschnitte „Filtern“ und „Bilanz“ umschreiben (Bilanz entfällt, Zahlen am Segment, Systemeinträge in der Vorgabe aus). Nachweis: Wächter der Anwenderdoku grün.
 
 ## 7. Integration
 
-- [ ] 7.1 Bilder des Anwenderkapitels neu erzeugen (`pnpm doku:bilder --grep einsatztagebuch`) und Design System neu erzeugen, falls ein vorgestellter Baustein geändert wurde (`pnpm design-system`). Nachweis: Bilder im Kapitel zeigen die neue Ansicht, `designSystem.guard.test.ts` grün.
+- [x] 7.1 Bilder des Anwenderkapitels neu erzeugen (`pnpm doku:bilder --grep einsatztagebuch`) und Design System neu erzeugen, falls ein vorgestellter Baustein geändert wurde (`pnpm design-system`). Nachweis: Bilder im Kapitel zeigen die neue Ansicht, `designSystem.guard.test.ts` grün.
 - [ ] 7.2 `./scripts/check-all.sh --geaendert` grün (in der Cloud-Sitzung ohne `mise`: Frontend-Suite, Typprüfung, Lint, Prettier und die betroffenen e2e-Specs einzeln, Verweis auf die CI des PRs).
 - [ ] 7.3 Zeichenflächen des Entwurfs gegen die laufende App nachgestellt (Fükw Nacht und Tag, Tablet, Handschuh, Handy) und Bilder der Änderung aufgenommen.
 
