@@ -1684,9 +1684,10 @@ async fn neue_zuordnung_an_eine_andere_org_laesst_den_spiegel_bei_seiner_org() {
     );
     let (st, _) =
         common::anfrage(&hub.app, "GET", &format!("/api/einsaetze/{s}"), &y_fk, None).await;
-    assert!(
-        !st.is_success(),
-        "die Führungskraft der Org Y liest ihn nicht: {st}"
+    assert_eq!(
+        st,
+        StatusCode::FORBIDDEN,
+        "die Führungskraft der Org Y liest ihn nicht"
     );
     let (st, liste) = common::anfrage(&hub.app, "GET", "/api/einsaetze", &y_fk, None).await;
     assert_eq!(st, StatusCode::OK);
