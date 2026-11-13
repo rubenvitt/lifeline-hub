@@ -19,11 +19,17 @@ Fachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschri
 | Art | Deutsch (Fachbegriff) | Englisch (Technik) |
 | --- | --- | --- |
 | Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |
-| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state` |
-| Abfrage | – | `after`, `wait` |
+| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |
+| Abfrage | `karte` | `after`, `wait` |
 | Fehler | Text (`error`) | `code` |
 
 Felder sind `snake_case`.
+
+## Einsatzbezug
+
+Ein Lese-Scope mit Einsatzbezug (`lage:read`) sieht nur den Einsatz, den die Einsatzleitung für
+den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist das höchstens
+einer. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null`, nicht mit einem Fehler.
 
 ## Zeitpunkte
 

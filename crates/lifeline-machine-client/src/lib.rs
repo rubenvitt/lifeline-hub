@@ -28,6 +28,9 @@ pub const TYP_RESPONSE: &str = "lifeline-machine-response+jwt";
 pub const SCHEME: &str = "Machine";
 /// Kopf, der die Antwortsignatur trägt.
 pub const RESPONSE_HEADER: &str = "Lifeline-Signature";
+
+/// Wert von `?karte=`, mit dem `GET /api/v1/lage` die Karte weglässt.
+pub const KARTE_NONE: &str = "none";
 /// Höchste Lebensdauer eines Tokens in Sekunden.
 pub const LIFETIME_S: i64 = 60;
 /// Erlaubte Abweichung der Uhren in Sekunden.
@@ -490,7 +493,7 @@ impl Credentials {
 #[cfg(feature = "http")]
 mod http;
 #[cfg(feature = "http")]
-pub use http::{me, redeem};
+pub use http::{lage, me, redeem};
 
 #[cfg(test)]
 mod vektoren;

@@ -2011,6 +2011,35 @@ fn public_api_error_code_wire() {
     } in lifeline_hub::public_api::ErrorCode::ALLE);
 }
 
+/// `GET /api/v1/lage` (LLH-1638): eigene Enums der öffentlichen API. Ihre Werte sind Vertrag; ein
+/// Wert kommt nur hinzu.
+#[test]
+fn public_api_lage_wire() {
+    enum_wire!(lifeline_hub::public_api::lage::LageEinsatzart {
+        Realeinsatz => "realeinsatz",
+        Uebung => "uebung",
+        Sanitaetsdienst => "sanitaetsdienst",
+        Bereitstellung => "bereitstellung",
+    } in lifeline_hub::public_api::lage::LageEinsatzart::ALLE);
+    enum_wire!(lifeline_hub::public_api::lage::LageUhsKind {
+        Patientenablage => "patientenablage",
+        Behandlungsplatz => "behandlungsplatz",
+        Verletztensammelstelle => "verletztensammelstelle",
+        Sonstige => "sonstige",
+    } in lifeline_hub::public_api::lage::LageUhsKind::ALLE);
+    enum_wire!(lifeline_hub::public_api::lage::LageUhsState {
+        Geplant => "geplant",
+        Aktiv => "aktiv",
+        Aufgeloest => "aufgeloest",
+    } in lifeline_hub::public_api::lage::LageUhsState::ALLE);
+    enum_wire!(lifeline_hub::public_api::lage::LageZoneKind {
+        Gefahrengebiet => "gefahrengebiet",
+        Absperrbereich => "absperrbereich",
+        Absperrgrenze => "absperrgrenze",
+        Sperrgebiet => "sperrgebiet",
+    } in lifeline_hub::public_api::lage::LageZoneKind::ALLE);
+}
+
 #[test]
 fn zeilen_art_wire() {
     enum_wire!(lifeline_hub::error::ZeilenArt {

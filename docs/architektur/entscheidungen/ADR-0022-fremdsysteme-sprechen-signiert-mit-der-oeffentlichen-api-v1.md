@@ -10,8 +10,6 @@ gilt_fuer:
   - src/routes/anbindungen.rs
   - crates/lifeline-machine-client/**
   - src/instanz/signatur.rs
-  - src/lagemonitor_zugang/**
-  - src/routes/lagemonitor_v1.rs
 herleitung:
   - docs/konzepte/2026-11-11-oeffentliche-api.md
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md

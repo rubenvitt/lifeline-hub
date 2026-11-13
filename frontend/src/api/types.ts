@@ -28,14 +28,13 @@ export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];
 export type KopplungsCode = S['KopplungsCode'];
 export type GeraeteUebersicht = S['GeraeteUebersicht'];
-export type LesezugangAnzeige = S['LesezugangAnzeige'];
-export type LesezugangFreigabe = S['LesezugangFreigabe'];
-export type LesezugangMitSchluessel = S['LesezugangMitSchluessel'];
 // Anbindungen: Maschinenzugänge für Fremdsysteme (LLH-1652)
 export type AnbindungenListe = S['AnbindungenListe'];
 export type AnbindungAnzeige = S['AnbindungAnzeige'];
 export type AnbindungAblehnung = S['AnbindungAblehnung'];
 export type AnbindungCode = S['AnbindungCode'];
+// Freigabe eines Einsatzes für eine Anbindung durch die Einsatzleitung (LLH-1638)
+export type AnbindungFreigabe = S['AnbindungFreigabe'];
 export type Scope = S['Scope'];
 // Einwurf-Zugänge: Absender ohne Signatur (LLH-1654)
 export type EinwurfZugaengeListe = S['EinwurfZugaengeListe'];

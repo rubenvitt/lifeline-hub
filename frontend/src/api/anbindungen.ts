@@ -4,6 +4,7 @@ import type {
   AnbindungAnzeige,
   AnbindungCode,
   AnbindungenListe,
+  AnbindungFreigabe,
   Scope,
 } from './types';
 import { apiGet, apiSend } from './client';
@@ -50,6 +51,26 @@ export function stelleAnbindungsCodeAus(id: string): Promise<AnbindungCode> {
 
 export function widerrufeAnbindung(id: string): Promise<AnbindungAnzeige> {
   return apiSend<AnbindungAnzeige>(`/api/admin/anbindungen/${id}/widerrufen`, 'POST');
+}
+
+/**
+ * Die Anbindungen der Org, für die sich ein Einsatz freigeben lässt, aus Sicht dieses Einsatzes
+ * (LLH-1638). Nur die Einsatzleitung liest und schaltet sie.
+ */
+export function loadEinsatzAnbindungen(einsatzId: number): Promise<AnbindungFreigabe[]> {
+  return apiGet<AnbindungFreigabe[]>(`/api/einsaetze/${einsatzId}/anbindungen`);
+}
+
+/** Gibt den Einsatz für die Anbindung frei (an) oder beendet die Freigabe (aus). */
+export function setAnbindungFreigabe(
+  einsatzId: number,
+  zugangId: string,
+  an: boolean,
+): Promise<AnbindungFreigabe[]> {
+  return apiSend<AnbindungFreigabe[]>(
+    `/api/einsaetze/${einsatzId}/anbindungen/${encodeURIComponent(zugangId)}/freigabe`,
+    an ? 'PUT' : 'DELETE',
+  );
 }
 
 /**

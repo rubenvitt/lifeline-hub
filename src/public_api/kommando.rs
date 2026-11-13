@@ -1,5 +1,5 @@
-//! Kommando `lifeline-hub zugang …` (LLH-1652, design.md D9): Einlösen eines Einmal-Codes und
-//! die Prüfroute für Betreiber eines Fremdsystems. Die Krypto steckt im Referenz-Client
+//! Kommando `lifeline-hub zugang …` (LLH-1652, design.md D9): Einlösen eines Einmal-Codes, die
+//! Prüfroute und die Lage (LLH-1638) für Betreiber eines Fremdsystems. Die Krypto steckt im Referenz-Client
 //! `lifeline-machine-client`; hier nur Schlüsseldatei und Ausgabe.
 
 use crate::config::ZugangCommand;
@@ -80,15 +80,29 @@ pub async fn ausfuehren(befehl: ZugangCommand) -> anyhow::Result<()> {
             Ok(())
         }
         ZugangCommand::Me { datei } => {
-            let text = std::fs::read_to_string(&datei).with_context(|| format!("{datei} lesen"))?;
-            let cred: Credentials = serde_json::from_str(&text)
-                .with_context(|| format!("{datei} ist keine Schlüsseldatei"))?;
+            let cred = read_schluesseldatei(&datei)?;
             let jetzt = chrono::Utc::now().timestamp();
             let me = lifeline_machine_client::me(&client()?, &cred, jetzt).await?;
             println!("{}", serde_json::to_string_pretty(&me)?);
             Ok(())
         }
+        ZugangCommand::Lage { datei, karte } => {
+            let cred = read_schluesseldatei(&datei)?;
+            let jetzt = chrono::Utc::now().timestamp();
+            // Ohne `--karte` bleibt die Karte weg: am Terminal zählen Einsatz und Zahlen, und die
+            // Karte ist der größte Teil der Antwort.
+            let abfrage = (!karte).then_some(lifeline_machine_client::KARTE_NONE);
+            let lage = lifeline_machine_client::lage(&client()?, &cred, abfrage, jetzt).await?;
+            println!("{}", serde_json::to_string_pretty(&lage)?);
+            Ok(())
+        }
     }
+}
+
+/// Liest die Schlüsseldatei aus `redeem`.
+fn read_schluesseldatei(datei: &str) -> anyhow::Result<Credentials> {
+    let text = std::fs::read_to_string(datei).with_context(|| format!("{datei} lesen"))?;
+    serde_json::from_str(&text).with_context(|| format!("{datei} ist keine Schlüsseldatei"))
 }
 
 #[cfg(test)]
@@ -153,6 +167,26 @@ mod tests {
             }
             andere => panic!("{andere:?}"),
         }
+    }
+
+    #[test]
+    fn lage_wird_geparst_und_laesst_die_karte_ohne_schalter_weg() {
+        use clap::Parser;
+        let parse = |args: &[&str]| {
+            let mut alle = vec!["lifeline-hub", "zugang", "lage"];
+            alle.extend_from_slice(args);
+            match crate::config::Config::try_parse_from(alle).unwrap().command {
+                Some(crate::config::Command::Zugang(ZugangCommand::Lage { datei, karte })) => {
+                    (datei, karte)
+                }
+                andere => panic!("{andere:?}"),
+            }
+        };
+        assert_eq!(parse(&["zugang.json"]), ("zugang.json".to_string(), false));
+        assert_eq!(
+            parse(&["zugang.json", "--karte"]),
+            ("zugang.json".to_string(), true)
+        );
     }
 
     /// Scheitert das Einlösen, bleibt keine leere Schlüsseldatei liegen; ist das Ziel nicht

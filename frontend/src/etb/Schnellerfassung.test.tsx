@@ -1527,3 +1527,187 @@ describe('Nur protokollieren', () => {
     expect(label.style.minHeight).toBe(inHinweiszeile ? '0px' : '');
   });
 });
+
+/**
+ * LLH-1842: Eine getippte Ereigniszeit, die mit Tab oder Klick verlassen wurde, stand im Feld,
+ * galt aber nicht. Öffnete man ein weiteres Feld oder sendete mit offenem Zeit-Editor, bekam der
+ * Eintrag „jetzt“ (Spec `zeiteingabe`, „Verlassen übernimmt“).
+ */
+describe('Ereigniszeit bleibt nach dem Verlassen des Felds (LLH-1842)', () => {
+  mitProzessZone('Europe/Berlin');
+  // 14:31 Berlin.
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  /** Tippt den Inhalt, öffnet „+ Feld › Ereigniszeit“, tippt die Zeit und verlässt das Feld mit Tab. */
+  async function tippeZeitUndVerlasse(
+    nutzer: ReturnType<typeof userEvent.setup>,
+    eingabe = '1420',
+  ) {
+    await nutzer.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe läuft');
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    await nutzer.click(await screen.findByText('Ereigniszeit'));
+    const zeit = await screen.findByLabelText('Ereigniszeit');
+    await nutzer.clear(zeit);
+    await nutzer.type(zeit, eingabe);
+    await nutzer.tab();
+    // Der Editor bleibt derselbe Knoten und holt den Fokus nicht zurück: ein neu montierter
+    // fokussierte sich selbst, und Tab käme nie aus dem Feld.
+    expect(screen.getByLabelText('Ereigniszeit')).toBe(zeit);
+    expect(zeit).not.toHaveFocus();
+    return zeit;
+  }
+
+  it('ein weiteres Feld lässt die Zeit als Chip stehen, und der Eintrag trägt sie', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    await tippeZeitUndVerlasse(nutzer);
+
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    await nutzer.click(await screen.findByText('Meldeweg'));
+    expect(await screen.findByText('Ereigniszeit: 1420')).toBeInTheDocument();
+
+    // Enter im Inhalt sendet nicht, solange ein Editor offen ist; der Knopf sendet.
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      inhalt: 'Pumpe läuft',
+      ereigniszeit: '2026-10-17 12:20:00',
+    });
+  });
+
+  it('Senden mit offenem Zeit-Editor sendet die getippte Zeit', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    await tippeZeitUndVerlasse(nutzer);
+    // Der Editor steht noch offen: verlassen, nicht mit Enter geschlossen.
+    expect(screen.getByLabelText('Ereigniszeit')).toBeInTheDocument();
+
+    // Enter im Inhalt sendet nicht, solange ein Editor offen ist; der Knopf sendet.
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      ereigniszeit: '2026-10-17 12:20:00',
+    });
+  });
+
+  it('ein danach geleertes Feld nimmt die Zeit zurück: der Eintrag bekommt „jetzt“', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    const zeit = await tippeZeitUndVerlasse(nutzer);
+    await nutzer.clear(zeit);
+    await nutzer.tab();
+    expect(screen.getByLabelText('Ereigniszeit')).toHaveValue('');
+
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      ereigniszeit: '2026-10-17 12:31:00',
+    });
+  });
+
+  it('ein gesetzter Chip, zum Bearbeiten geöffnet und geleert, behält seinen Editor', async () => {
+    const p = props({
+      initialWerte: {
+        inhalt: 'Pumpe läuft',
+        typ: 'meldung',
+        metadaten: { ereigniszeit: dayjs.utc('2026-10-17T12:20:00Z') },
+      },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByText('Ereigniszeit: 1420'));
+    const zeit = await screen.findByLabelText('Ereigniszeit');
+    await nutzer.clear(zeit);
+    await nutzer.tab();
+    expect(screen.getByLabelText('Ereigniszeit')).toBe(zeit);
+
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      ereigniszeit: '2026-10-17 12:31:00',
+    });
+  });
+
+  it('eine Zeit in der Zukunft sendet nicht, und der Chip nennt den Grund', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    // 14:41 bei Serverzeit 14:31.
+    await tippeZeitUndVerlasse(nutzer, '+10');
+
+    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    const grund = await screen.findByText(/liegt in der Zukunft/);
+    expect(grund.closest('.ant-tag')).toHaveTextContent('Ereigniszeit: 1441');
+    expect(screen.queryByLabelText('Ereigniszeit')).toBeNull();
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('„/zeit“ bei offenem Zeit-Editor schließt ihn: der Chip zeigt die neue Zeit', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    await nutzer.click(await screen.findByText('Ereigniszeit'));
+    await screen.findByLabelText('Ereigniszeit');
+
+    const inhalt = screen.getByPlaceholderText(/Inhalt/);
+    await nutzer.click(inhalt);
+    await nutzer.type(inhalt, '/zeit 1400 Pumpe');
+    expect(inhalt).toHaveValue('Pumpe');
+    expect(screen.getByText('Ereigniszeit: 1400')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Ereigniszeit')).toBeNull();
+    expect(inhalt).toHaveFocus();
+  });
+
+  it('die erneute Wahl des offenen Felds lässt den Editor an seinem Platz', async () => {
+    const p = props({
+      initialWerte: {
+        inhalt: '',
+        typ: 'meldung',
+        metadaten: { von: 'ELW 1', an: 'Leitstelle' },
+      },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    const zeit = await tippeZeitUndVerlasse(nutzer);
+    const stehtNachAn = () =>
+      (screen.getByText(/^An:/).compareDocumentPosition(zeit) &
+        Node.DOCUMENT_POSITION_FOLLOWING) !==
+      0;
+    expect(stehtNachAn()).toBe(true);
+
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    await nutzer.click(await screen.findByText('Ereigniszeit ✓'));
+    expect(screen.getByLabelText('Ereigniszeit')).toBe(zeit);
+    expect(stehtNachAn()).toBe(true);
+  });
+
+  it('ein geöffneter, unberührter Zeit-Editor setzt keine Ereigniszeit', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const nutzer = userEvent.setup();
+    await nutzer.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe läuft');
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    await nutzer.click(await screen.findByText('Ereigniszeit'));
+    await screen.findByLabelText('Ereigniszeit');
+    await nutzer.tab();
+
+    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
+    await nutzer.click(await screen.findByText('Meldeweg'));
+    await waitFor(() => expect(screen.queryByLabelText('Ereigniszeit')).toBeNull());
+    expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
+  });
+});

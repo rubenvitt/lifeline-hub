@@ -68,7 +68,7 @@ import {
   type StellenWert,
 } from './geraeteKern';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
-import EinsatzLagemonitore from './EinsatzLagemonitore';
+import EinsatzAnbindungen from './EinsatzAnbindungen';
 import EinsatzLagebildExtern from './EinsatzLagebildExtern';
 
 /**
@@ -119,12 +119,12 @@ export default function EinsatzGeraete() {
   const leitung = istEinsatzLeitung(daten.einsatz);
   const darf = leitung && daten.istAktiv;
   // Koppeln und Widerrufen schreiben einen ETB-Eintrag; am Spiegel sperrt das die Datenbank
-  // (LLH-1492). Die Freigabe externer Lagemonitore bleibt lokal und hängt weiter an `darf`.
+  // (LLH-1492).
   const darfKoppeln = darf && darfEinsatzLeiten(daten.einsatz);
-  // Lagebild für Externe (LLH-1496): der Link gilt an dieser Instanz, auch am Spiegel (der
-  // ETB-Eintrag geht dort als Antrag); führt eine andere Instanz ohne Spiegel hier, lehnt der
-  // Server ab.
-  const darfLagebild = darf && (istSpiegel(daten.einsatz) || fuehrtHier(daten.einsatz));
+  // Lagebild für Externe (LLH-1496) und Anbindungen (LLH-1638): die Freigabe gilt an dieser
+  // Instanz, auch am Spiegel (der ETB-Eintrag geht dort als Antrag); führt eine andere Instanz
+  // ohne Spiegel hier, lehnt der Server ab.
+  const darfFreigeben = darf && (istSpiegel(daten.einsatz) || fuehrtHier(daten.einsatz));
 
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [anlegenVorbelegung, setAnlegenVorbelegung] = useState<AnlegenWerte | undefined>();
@@ -387,9 +387,9 @@ export default function EinsatzGeraete() {
         {kontext.menue}
       </Formularpaneel>
 
-      <EinsatzLagemonitore einsatzId={einsatzId} darf={darf} />
+      <EinsatzAnbindungen einsatzId={einsatzId} darf={darfFreigeben} />
 
-      <EinsatzLagebildExtern einsatzId={einsatzId} darf={darfLagebild} />
+      <EinsatzLagebildExtern einsatzId={einsatzId} darf={darfFreigeben} />
 
       <ErfassungsModal<AnlegenWerte>
         offen={anlegenOffen}

@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>ETB Schreibzeile Zustände</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.bl{width:1180px;height:1100px;box-sizing:border-box;padding:28px 32px;display:flex;flex-direction:column;gap:16px;background:#08090b;color:#e8ebee;font-family:"LFH Archivo",system-ui,sans-serif;font-size:14px;line-height:20px}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.zu{display:flex;flex-direction:column;gap:8px}
+.zu h2{margin:0;font-size:14px;font-weight:600}
+.zu p{margin:0;font-size:13px;color:#9aa2ab}
+.sz{position:relative;border:1px solid #2e343a;background:#0f1215;padding:10px 16px 8px;display:flex;flex-direction:column;gap:8px}
+.ra{display:flex;align-items:center;gap:14px}
+.seg{display:flex}
+.seg button{height:30px;box-sizing:border-box;padding:0 10px;margin-left:-1px;border:1px solid #626a73;background:#0f1215;color:#9aa2ab;font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.seg button:first-child{margin-left:0}
+.seg button.an{background:#16191d;color:#e8ebee}
+.seg i{width:8px;height:8px;display:inline-block}
+.fd{display:flex;align-items:center;gap:6px;font-size:12px;color:#9aa2ab}
+.fd input,.fd select{height:30px;box-sizing:border-box;border:1px solid #626a73;background:#08090b;color:#e8ebee;font:inherit;font-size:13px;padding:0 8px}
+.fd input::placeholder,.rb textarea::placeholder{color:#838b94}
+.fd .fok{border-color:#4d94d6;box-shadow:0 0 0 2px #0d1620}
+.fd .feh{border-color:#ff6b6b}
+.fd .ach{border-color:#e8cc3a;color:#e8cc3a}
+.fd .zu2{border-style:dashed;color:#9aa2ab}
+.rb{display:flex;gap:8px}
+.rb textarea{flex:1;height:40px;box-sizing:border-box;resize:none;border:1px solid #626a73;border-left:3px solid #1677ff;background:#08090b;color:#e8ebee;font:inherit;font-size:14px;line-height:20px;padding:9px 10px}
+.pr{height:40px;padding:0 16px;border:0;background:#4d94d6;color:#08090b;font:inherit;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+.kap{border:1px solid currentColor;font-size:11px;line-height:14px;padding:0 4px}
+.rc{display:flex;align-items:center;gap:18px;font-size:12px;color:#9aa2ab}
+.rc label{display:inline-flex;align-items:center;gap:6px}
+.rc .tk{margin-left:auto;display:flex;gap:16px}
+.rc .tk button,.bn button{border:0;background:transparent;color:#8ec2f0;font:inherit;font-size:12px;padding:0}
+.rc .fe{color:#ff6b6b}
+.rc .hw{color:#e8cc3a}
+.vl{width:300px;margin-left:452px;border:1px solid #2e343a;background:#14171b;box-shadow:0 8px 24px rgba(0,0,0,.6);font-size:13px}
+.vl div{padding:6px 10px}
+.vl .gk{font-size:12px;color:#9aa2ab}
+.vl .mk{background:#08172b;color:#8ec2f0}
+.vl .ft{border-top:1px solid #22262b;color:#c6ccd2}
+.bn{display:flex;align-items:center;gap:12px;padding:6px 10px;background:#1c0a0d;border-left:3px solid #ff6b6b;font-size:13px}
+.bn span{color:#9aa2ab}
+</style>
+</helmet>
+<div class="bl">
+  <section class="zu">
+    <h2>1 · Leer, Typ Meldung</h2>
+    <p>Vorgabe: An = eigene Stelle, Zeit = jetzt, Weg = zuletzt genutzt. Der Fokus steht im ersten leeren Pflichtfeld.</p>
+    <form class="sz" aria-label="Eintrag erfassen, leer">
+      <div class="ra">
+        <div class="seg" role="group" aria-label="Typ des Eintrags">
+          <button type="button" class="an" style="box-shadow: inset 0 -2px 0 #1677ff"><i style="background: #1677ff"></i>Meldung</button>
+          <button type="button"><i style="background: #d46b08"></i>Anordnung</button>
+          <button type="button"><i style="background: #8f4be3"></i>Entscheidung</button>
+          <button type="button"><i style="background: #13c2c2"></i>Lage</button>
+        </div>
+        <label class="fd">Zeit <input class="mono" style="width: 96px" value="jetzt · 1926"></label>
+        <label class="fd">Von <input class="fok" style="width: 210px" placeholder="Absender"></label>
+        <label class="fd">An <input style="width: 150px" value="EL"></label>
+        <label class="fd">Weg <select style="width: 96px"><option>Funk</option></select></label>
+      </div>
+      <div class="rb">
+        <textarea aria-label="Inhalt" placeholder="Inhalt …"></textarea>
+        <button class="pr" type="submit">Erfassen <span class="kap mono">↵</span></button>
+      </div>
+      <div class="rc">
+        <label><input type="checkbox" checked> auch in den Meldungseingang</label>
+        <label><input type="checkbox"> Von und An behalten</label>
+        <div class="tk"><button type="button">+ Veranlassung</button><button type="button">+ Anhang</button><button type="button">+ weiterer Entwurf</button></div>
+      </div>
+    </form>
+  </section>
+  <section class="zu">
+    <h2>2 · Absender wählen</h2>
+    <p>Enter und Tab nehmen den markierten Vorschlag und springen in den Inhalt. Freitext gibt es nur über den eigenen Eintrag am Ende der Liste.</p>
+    <div class="vl" role="listbox" aria-label="Vorschläge für Von">
+      <div class="gk">Im Einsatz</div>
+      <div class="mk" role="option" aria-selected="true">Sanitätsgruppe UHS</div>
+      <div role="option" aria-selected="false">Sanitätszug Musterstadt</div>
+      <div class="ft" role="option" aria-selected="false">„Sanit“ als Freitext übernehmen</div>
+    </div>
+    <form class="sz" aria-label="Eintrag erfassen, Absender wählen">
+      <div class="ra">
+        <div class="seg" role="group" aria-label="Typ des Eintrags">
+          <button type="button" class="an" style="box-shadow: inset 0 -2px 0 #1677ff"><i style="background: #1677ff"></i>Meldung</button>
+          <button type="button"><i style="background: #d46b08"></i>Anordnung</button>
+          <button type="button"><i style="background: #8f4be3"></i>Entscheidung</button>
+          <button type="button"><i style="background: #13c2c2"></i>Lage</button>
+        </div>
+        <label class="fd">Zeit <input class="mono" style="width: 96px" value="jetzt · 1926"></label>
+        <label class="fd">Von <input class="fok" style="width: 210px" value="Sanit"></label>
+        <label class="fd">An <input style="width: 150px" value="EL"></label>
+        <label class="fd">Weg <select style="width: 96px"><option>Funk</option></select></label>
+      </div>
+      <div class="rb">
+        <textarea aria-label="Inhalt" placeholder="Inhalt …"></textarea>
+        <button class="pr" type="submit">Erfassen <span class="kap mono">↵</span></button>
+      </div>
+      <div class="rc">
+        <label><input type="checkbox" checked> auch in den Meldungseingang</label>
+        <label><input type="checkbox"> Von und An behalten</label>
+      </div>
+    </form>
+  </section>
+  <section class="zu">
+    <h2>3 · Nachtrag</h2>
+    <p>Eine Zeit, die von „jetzt“ abweicht, bleibt als Feld sichtbar, trägt die Achtungsfarbe und steht am Sendeknopf.</p>
+    <form class="sz" aria-label="Eintrag erfassen, Nachtrag">
+      <div class="ra">
+        <div class="seg" role="group" aria-label="Typ des Eintrags">
+          <button type="button" class="an" style="box-shadow: inset 0 -2px 0 #1677ff"><i style="background: #1677ff"></i>Meldung</button>
+          <button type="button"><i style="background: #d46b08"></i>Anordnung</button>
+          <button type="button"><i style="background: #8f4be3"></i>Entscheidung</button>
+          <button type="button"><i style="background: #13c2c2"></i>Lage</button>
+        </div>
+        <label class="fd">Zeit <input class="mono ach" style="width: 96px" value="1912"></label>
+        <label class="fd">Von <input style="width: 210px" value="Sanitätszug Musterstadt"></label>
+        <label class="fd">An <input style="width: 150px" value="EL"></label>
+        <label class="fd">Weg <select style="width: 96px"><option>Funk</option></select></label>
+      </div>
+      <div class="rb">
+        <textarea aria-label="Inhalt">Keller Mühlbachweg 12 leergepumpt, Trupp rückt ab.</textarea>
+        <button class="pr" type="submit">Erfassen als <span class="mono">1912</span> <span class="kap mono">↵</span></button>
+      </div>
+      <div class="rc">
+        <span class="hw">Nachtrag · Ereignis vor 14 min</span>
+        <label><input type="checkbox" checked> auch in den Meldungseingang</label>
+        <label><input type="checkbox"> Von und An behalten</label>
+      </div>
+    </form>
+  </section>
+  <section class="zu">
+    <h2>4 · Anordnung</h2>
+    <p>Die Vorgabe kehrt sich um: Von = eigene Stelle, An ist Pflicht. Der Fehler steht am Feld, gesendet wird nicht.</p>
+    <form class="sz" aria-label="Eintrag erfassen, Anordnung">
+      <div class="ra">
+        <div class="seg" role="group" aria-label="Typ des Eintrags">
+          <button type="button"><i style="background: #1677ff"></i>Meldung</button>
+          <button type="button" class="an" style="box-shadow: inset 0 -2px 0 #d46b08"><i style="background: #d46b08"></i>Anordnung</button>
+          <button type="button"><i style="background: #8f4be3"></i>Entscheidung</button>
+          <button type="button"><i style="background: #13c2c2"></i>Lage</button>
+        </div>
+        <label class="fd">Zeit <input class="mono" style="width: 96px" value="jetzt · 1926"></label>
+        <label class="fd">Von <input style="width: 210px" value="EL"></label>
+        <label class="fd">An <input class="feh" style="width: 150px" placeholder="Empfänger" aria-invalid="true"></label>
+        <label class="fd">Weg <select style="width: 96px"><option>Funk</option></select></label>
+      </div>
+      <div class="rb">
+        <textarea aria-label="Inhalt" style="border-left-color: #d46b08">Trupp 2 sichert Zufahrt Kirchstraße bis zum Eintreffen der Polizei.</textarea>
+        <button class="pr" type="submit">Erfassen <span class="kap mono">↵</span></button>
+      </div>
+      <div class="rc">
+        <span class="fe">Empfänger fehlt</span>
+        <label><input type="checkbox"> Von und An behalten</label>
+        <div class="tk"><button type="button">+ als Auftrag anlegen</button><button type="button">+ Anhang</button></div>
+      </div>
+    </form>
+  </section>
+  <section class="zu">
+    <h2>5 · Berichtigung</h2>
+    <p>Typ, Zeit, Von und An kommen aus dem berichtigten Eintrag und sind gesperrt; geschrieben wird nur der neue Wortlaut.</p>
+    <form class="sz" aria-label="Berichtigung erfassen">
+      <div class="bn"><strong>Berichtigung zu Nr. 230</strong><span class="mono">1918 · Rettungsstaffel → EL</span><button type="button" style="margin-left: auto">Abbrechen</button></div>
+      <div class="ra">
+        <label class="fd">Zeit <input class="mono zu2" style="width: 96px" value="1918" disabled></label>
+        <label class="fd">Von <input class="zu2" style="width: 210px" value="Rettungsstaffel" disabled></label>
+        <label class="fd">An <input class="zu2" style="width: 150px" value="EL" disabled></label>
+        <label class="fd">Weg <input class="zu2" style="width: 96px" value="Funk" disabled></label>
+      </div>
+      <div class="rb">
+        <textarea aria-label="Berichtigter Wortlaut" style="border-left-color: #ff6b6b">RTW 83-1, nicht 83-2, ist wieder einsatzbereit am Marktplatz.</textarea>
+        <button class="pr" type="submit">Berichtigung erfassen <span class="kap mono">↵</span></button>
+      </div>
+    </form>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1180,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

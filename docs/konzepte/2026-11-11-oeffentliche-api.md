@@ -60,7 +60,7 @@ Weitere Befunde:
 | D3 | Vertrag | **Alles Öffentliche liegt unter `/api/v1/`.** Es hat ein eigenes OpenAPI-Dokument mit Pfaden und eigenem Drift-Test. Nur dort gilt eine Stabilitätszusage; die interne API bleibt ohne Zusage. |
 | D4 | Hinaus | **Eine Outbox von Anfang an.** Ausgangsereignisse werden in derselben Transaktion wie die Änderung geschrieben. Erster Leser ist der Abruf `GET /api/v1/events`. Zweiter Leser sind Webhooks; sie kommen direkt danach und werden mit dem Instanzschlüssel signiert, nicht per HMAC. |
 | D5 | Absender ohne Signatur | **Einwurf-Zugang** (E1 vom 10.11.): ein geheimer Schlüssel im Pfad, der nur in eine Ablage schreibt. Festgehalten als **ADR-0023**, weil die Nummer 0015 schon vergeben war. |
-| D6 | Lagemonitor | Er wird auf D1 umgestellt (E2, LLH-1638) und zieht nach `GET /api/v1/lage` um. Der alte Pfad bleibt eine Übergangszeit lang. |
+| D6 | Lagemonitor | Er wird auf D1 umgestellt (E2, LLH-1638) und zieht nach `GET /api/v1/lage` um. Der alte Pfad bleibt eine Übergangszeit lang. **Nachtrag 12.11.2026 (Ruben, LLH-1638):** kein Übergang. Der alte Pfad `/api/lagemonitor/v1/lage` und die Schlüssel `llh_lm_` sind mit der Umstellung entfernt, weil die Gegenseite noch nicht gebaut war. Freigabe und Ende: [ADR-0035](../architektur/entscheidungen/ADR-0035-ein-maschinenzugang-liest-einsatzbezogen-nur-was-die-einsatzleitung-freigegeben-hat.md). |
 | D7 | Lagebild-Link | Der Lagebild-Link (`llh_lb_`) ist **kein Maschinenzugang**, sondern ein Link für Menschen ohne Konto. Er bleibt, wie er ist, und gehört nicht zu `/api/v1`. |
 | D8 | Mehrere Instanzen | Eingehendes kommt am Hub an. Eine ungekoppelte Instanz verhält sich wie ein Hub (G5, Entscheidung 12 der Instanzkopplung). An einem Spiegel antwortet ein Schreibweg wie bisher mit 409. |
 | D9 | Sprache | **Auf dem Wire gilt dieselbe Regel wie im Code**, siehe Wurzel-`AGENTS.md`, „Bezeichner-Sprache“ (LFH-1312): Fachbegriffe deutsch, alles andere englisch. Fehlertexte sind Prosa und bleiben deutsch; Vertrag ist der englische `code`. |
@@ -509,7 +509,7 @@ Am 11.11.2026 als Unteraufgaben von LLH-1148 angelegt, in dieser Reihenfolge:
    - Referenz-Clients und Testvektoren
 2. **LLH-1653 Öffentliches OpenAPI-Dokument und Fehlercode** für `/api/v1`, mit Drift-Test.
 3. **LLH-1638 Lagemonitor:** Umstellung auf den Maschinenzugang, Umzug nach `/api/v1/lage`,
-   Übergang für `llh_lm_`.
+   Übergang für `llh_lm_` (umgesetzt am 12.11.2026 ohne Übergang, siehe Nachtrag an D6).
 4. **LLH-1654 Einwurf-Zugang** (ADR-0023) mit Maskierung, Doppelerkennung und Nachfolgerin für
    ADR-0014. Ihn brauchen BOSWatch, FE2, Divera und OsmAnd.
 5. **LLH-1655 Outbox und Ereignis-Abruf** `GET /api/v1/events`, samt Leserouten für Einsätze.

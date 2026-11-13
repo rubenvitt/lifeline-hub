@@ -9,9 +9,9 @@ use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
     abloesung, auftrag, auth, bereitstellungsraum, betreuung, chat, einheit, einheit_vorlage,
     einsatz, einsatz_vorlage, etb, externe_stelle, fahrzeug, fuehrung, gefahr, infotelefon,
-    kraefte_disposition, lage_zone, lagebesprechung, lagebild_extern, lagemonitor_zugang, material,
-    nachforderung, person, personal, planung, programmpunkt, schaden, schichtmodell, sprechgruppe,
-    verpflegung, vorlagendokument, zeitachse,
+    kraefte_disposition, lage_zone, lagebesprechung, lagebild_extern, material, nachforderung,
+    person, personal, planung, programmpunkt, schaden, schichtmodell, sprechgruppe, verpflegung,
+    vorlagendokument, zeitachse,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -287,10 +287,6 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("ZEITACHSE_GRUND_MAX", zeitachse::GRUND_MAX),
         ("ZEITACHSE_NOTIZ_MAX", zeitachse::NOTIZ_MAX),
-        (
-            "LAGEMONITOR_BEZEICHNUNG_MAX",
-            lagemonitor_zugang::BEZEICHNUNG_MAX,
-        ),
         (
             "ANBINDUNG_NAME_MAX",
             lifeline_hub::routes::anbindungen::NAME_MAX,

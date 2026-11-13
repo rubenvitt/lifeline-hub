@@ -1,7 +1,9 @@
-//! Helfer für signierte Aufrufe eines Fremdsystems unter `/api/v1/` (LLH-1652): Anbindung
-//! anlegen, Code einlösen, signieren und senden. Genutzt von `tests/maschinenzugang.rs` und
-//! `tests/rechner_api.rs`.
+//! Helfer für signierte Anfragen eines Fremdsystems unter `/api/v1/` (LLH-1652, LLH-1638):
+//! Anbindung anlegen, Code einlösen, signieren und senden. Geteilt von
+//! `tests/maschinenzugang.rs`, `tests/public_api_lage.rs`, `tests/einsatz_anbindungen.rs`,
+//! `tests/programmpunkt.rs` und `tests/rechner_api.rs`.
 
+use super::anfrage_json;
 use axum::body::{to_bytes, Body};
 use axum::extract::ConnectInfo;
 use axum::http::{Request, StatusCode};
@@ -11,10 +13,19 @@ use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tower::ServiceExt;
 
+/// Verwaltung der Anbindungen.
+pub const ANBINDUNGEN: &str = "/api/admin/anbindungen";
+
+/// Deterministischer Schlüssel eines Fremdsystems.
 pub fn schluessel(n: u8) -> SigningKey {
     SigningKey::from_bytes(&[n; 32])
 }
 
+pub fn jetzt() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+/// Sendet roh, mit der Quell-IP `ip`; liefert Status, Köpfe und Body.
 pub async fn senden(
     app: &axum::Router,
     methode: &str,
@@ -44,6 +55,15 @@ pub async fn senden(
     (status, headers, bytes)
 }
 
+/// Legt eine Anbindung an (`POST /api/admin/anbindungen`).
+pub async fn anbindung_anlegen(
+    app: &axum::Router,
+    admin: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    anfrage_json(app, "POST", ANBINDUNGEN, admin, Some(&body)).await
+}
+
 /// Löst `code` mit `key` ein; liefert Status und, bei Erfolg, die Zugangsdaten.
 pub async fn einloesen(
     app: &axum::Router,
@@ -69,10 +89,6 @@ pub async fn einloesen(
         s,
         Some(finish_redeem(&d, key, "http://test", &antwort).unwrap()),
     )
-}
-
-pub fn jetzt() -> i64 {
-    chrono::Utc::now().timestamp()
 }
 
 /// Signiert und sendet ohne Body; liefert Status, Köpfe und Body als JSON.
@@ -105,7 +121,23 @@ pub async fn signiert_mit_body(
     (s, h, serde_json::from_slice(&b).unwrap_or(Value::Null))
 }
 
-/// Legt als `admin` eine Anbindung mit `scopes` an und löst ihren Code ein.
+/// Legt eine Anbindung mit Namen an und löst ihren Code ein.
+pub async fn angebunden_als(
+    app: &axum::Router,
+    admin: &str,
+    name: &str,
+    scopes: Value,
+    key: &SigningKey,
+    ip: &str,
+) -> Credentials {
+    let (s, v) = anbindung_anlegen(app, admin, json!({ "name": name, "scopes": scopes })).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, cred) = einloesen(app, v["code"].as_str().unwrap(), key, ip).await;
+    assert_eq!(s, StatusCode::OK);
+    cred.unwrap()
+}
+
+/// Legt eine Anbindung „Fremdsystem“ an und löst ihren Code ein.
 pub async fn angebunden(
     app: &axum::Router,
     admin: &str,
@@ -113,16 +145,5 @@ pub async fn angebunden(
     key: &SigningKey,
     ip: &str,
 ) -> Credentials {
-    let (s, v) = super::anfrage_json(
-        app,
-        "POST",
-        "/api/admin/anbindungen",
-        admin,
-        Some(&json!({ "name": "Fremdsystem", "scopes": scopes })),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED, "{v}");
-    let (s, cred) = einloesen(app, v["code"].as_str().unwrap(), key, ip).await;
-    assert_eq!(s, StatusCode::OK);
-    cred.unwrap()
+    angebunden_als(app, admin, "Fremdsystem", scopes, key, ip).await
 }

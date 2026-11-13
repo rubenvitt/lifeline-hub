@@ -821,15 +821,8 @@ async fn scope_pruefung_und_route_ohne_angabe() {
 async fn kein_bearer_und_keine_sitzung_unter_v1() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, v) = anfrage_json(
-        &app,
-        "POST",
-        "/api/lagemonitor-zugaenge",
-        &admin,
-        Some(&json!({ "bezeichnung": "Monitor" })),
-    )
-    .await;
-    let lm = v["schluessel"].as_str().unwrap().to_string();
+    // Die Form eines früheren Lagemonitor-Schlüssels (LLH-1484, entfernt mit LLH-1638).
+    let lm = "llh_lm_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_string();
     let ip = "198.51.100.80";
     let (s, _, _) = senden(
         &app,
@@ -995,7 +988,7 @@ async fn gekoppelter_elw_lehnt_vorhandene_zugaenge_ab() {
 /// Kommando und Referenz-Client gegen einen echten Server (6.3): einlösen, Schlüsseldatei
 /// schreiben, `me` mit geprüfter Antwortsignatur.
 #[tokio::test]
-async fn kommando_loest_ein_und_ruft_me_gegen_einen_echten_server() {
+async fn kommando_loest_ein_und_ruft_me_und_lage_gegen_einen_echten_server() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, v) = anlegen(
@@ -1034,6 +1027,46 @@ async fn kommando_loest_ein_und_ruft_me_gegen_einen_echten_server() {
         .unwrap();
     assert_eq!(me["zugang_id"], json!(cred.zugang_id));
     assert_eq!(me["name"], "CLI");
+
+    // Lage (LLH-1638): ohne Freigabe `einsatz: null`; nach der Freigabe der Einsatz, die Karte
+    // nur ohne `none`. Die Abfrage steht im signierten Pfad.
+    let lage = lifeline_machine_client::lage(&client, &gelesen, Some("none"), jetzt())
+        .await
+        .unwrap();
+    assert!(lage["einsatz"].is_null(), "{lage}");
+    let einsatz = common::einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let (s, v) = common::anfrage(
+        &app,
+        "PUT",
+        &format!(
+            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            cred.zugang_id
+        ),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let lage = lifeline_machine_client::lage(&client, &gelesen, Some("none"), jetzt())
+        .await
+        .unwrap();
+    assert_eq!(lage["einsatz"]["bezeichnung"], "Stadtfest");
+    assert!(lage.get("karte").is_none());
+    let lage = lifeline_machine_client::lage(&client, &gelesen, None, jetzt())
+        .await
+        .unwrap();
+    assert_eq!(lage["karte"]["type"], "FeatureCollection");
+    let etag = lage["karte_etag"].as_str().unwrap().to_string();
+    let lage = lifeline_machine_client::lage(&client, &gelesen, Some(&etag), jetzt())
+        .await
+        .unwrap();
+    assert!(lage.get("karte").is_none(), "unveränderte Karte bleibt weg");
+    assert!(
+        lifeline_machine_client::lage(&client, &gelesen, Some("a b"), jetzt())
+            .await
+            .is_err(),
+        "ein Wert, der nicht in die Abfrage passt, wird nicht gesendet"
+    );
 }
 
 // ── Befunde des Reviews vor dem PR ──────────────────────────────────────────────────────────

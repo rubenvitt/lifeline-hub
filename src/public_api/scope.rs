@@ -18,6 +18,16 @@ wire_enum! {
     }
 }
 
+impl Scope {
+    /// Lese-Scope mit Einsatzbezug: Er sieht nur den Einsatz, den die Einsatzleitung für den
+    /// Zugang freigegeben hat (`super::freigabe`, ADR-0035). Ein neuer solcher Scope kommt hier
+    /// dazu, sobald seine Route steht; vorher zeigte das Paneel „Anbindungen“ einen Schalter
+    /// ohne Wirkung.
+    pub fn has_einsatzbezug(self) -> bool {
+        matches!(self, Scope::LageRead)
+    }
+}
+
 wire_enum! {
     /// Zustand eines Maschinenzugangs. „Abgelaufen“ ist kein Zustand, sondern ergibt sich aus
     /// `gueltig_bis` (design.md D2).
@@ -105,6 +115,16 @@ mod tests {
             parse_scopes(["lage:read", "alles:write"]),
             Err("alles:write".to_string())
         );
+    }
+
+    #[test]
+    fn nur_lage_lesen_hat_einsatzbezug() {
+        let mit: Vec<&str> = Scope::ALLE
+            .iter()
+            .filter(|s| s.has_einsatzbezug())
+            .map(|s| s.as_str())
+            .collect();
+        assert_eq!(mit, ["lage:read"]);
     }
 
     #[test]

@@ -139,8 +139,8 @@ export const EINSATZ_KEYS = {
   modulVorgaben: 'einsatz-modul-vorgaben',
   // Gerätekopplungen der Einsatzleitung (LFH-892).
   geraete: 'einsatz-geraete',
-  // Freigaben externer Lagemonitore an diesem Einsatz (LLH-1484), Seite der Geräte.
-  lagemonitorZugaenge: 'einsatz-lagemonitor-zugaenge',
+  // Freigaben für Anbindungen (Maschinenzugänge) an diesem Einsatz (LLH-1638), Seite der Geräte.
+  anbindungen: 'einsatz-anbindungen',
   // Links auf das Lagebild für Externe (LLH-1496), Seite der Geräte.
   lagebildFreigaben: 'einsatz-lagebild-freigaben',
   // Effektive Modulfreigaben des angemeldeten Benutzers (LFH-669); daraus liest das Modul-Gate.
@@ -518,9 +518,11 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   eigene Änderung in der Verwaltung invalidiert sie für alle Einsätze.
  * - `geraete` (LFH-892): Kopplungen sieht nur die Einsatzleitung auf ihrer Einstellungsseite; die
  *   eigene Änderung setzt die Antwort, der letzte Zugriff eines Geräts ist kein Ereignis.
- * - `lagemonitorZugaenge` (LLH-1484): wie `geraete`; die Freigabe setzt die Antwort, ein Abruf
- *   des externen Monitors ist kein Ereignis.
- * - `lagebildFreigaben` (LLH-1496): wie `lagemonitorZugaenge`; Anlegen und Widerruf setzen die
+ * - `anbindungen` (LLH-1638): wie `geraete`; die Freigabe setzt die Antwort, ein Abruf des
+ *   Fremdsystems ist kein Ereignis. Umstellen von einem anderen Einsatz aus, Widerruf und
+ *   Rechteentzug ändern den Stand von außen: das Paneel fragt dafür alle 30 s nach
+ *   (`pages/einstellungen/EinsatzAnbindungen.tsx`).
+ * - `lagebildFreigaben` (LLH-1496): wie `anbindungen`; Anlegen und Widerruf setzen die
  *   Antwort, eine Öffnung des Links ist kein Ereignis.
  * - `modulFreigaben`: abgeleitet aus Overrides und Org-Vorgaben, beide ohne LiveEvent (LFH-669).
  *   Die eigene Änderung invalidiert die Mutation; die eines anderen wirkt beim nächsten Abruf,
@@ -574,7 +576,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.modulOverrides,
   EINSATZ_KEYS.modulVorgaben,
   EINSATZ_KEYS.geraete,
-  EINSATZ_KEYS.lagemonitorZugaenge,
+  EINSATZ_KEYS.anbindungen,
   EINSATZ_KEYS.lagebildFreigaben,
   EINSATZ_KEYS.modulFreigaben,
   EINSATZ_KEYS.benachrichtigungVerlauf,
@@ -674,9 +676,8 @@ export const einsatzKeys = {
   modulVorgabenAlle: () => [EINSATZ_KEYS.modulVorgaben] as const,
   /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
   geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
-  /** Lagemonitor-Zugänge der Org aus Sicht dieses Einsatzes (LLH-1484), nicht live. */
-  lagemonitorZugaenge: (einsatzId: number) =>
-    [EINSATZ_KEYS.lagemonitorZugaenge, einsatzId] as const,
+  /** Anbindungen der Org aus Sicht dieses Einsatzes (LLH-1638), nicht live. */
+  anbindungen: (einsatzId: number) => [EINSATZ_KEYS.anbindungen, einsatzId] as const,
   /** Links auf das Lagebild für Externe an diesem Einsatz (LLH-1496), nicht live. */
   lagebildFreigaben: (einsatzId: number) => [EINSATZ_KEYS.lagebildFreigaben, einsatzId] as const,
   // einsatzId nullbar aus demselben Grund wie bei `einsatz`.
@@ -1058,8 +1059,6 @@ export const GLOBAL_KEYS = {
   orgEinstellungen: 'org-einstellungen',
   orgModulEinstellungen: 'org-modul-einstellungen',
   authProvider: 'auth-provider',
-  // Lesezugänge externer Lagemonitore (LLH-1484), Verwaltung.
-  lagemonitorZugaenge: 'lagemonitor-zugaenge',
   // Anbindungen: Maschinenzugänge für Fremdsysteme (LLH-1652), Verwaltung.
   anbindungen: 'anbindungen',
   // Einwurf-Zugänge für Absender ohne Signatur (LLH-1654), Verwaltung auf derselben Seite.
@@ -1188,7 +1187,6 @@ export const globalKeys = {
   orgEinstellungen: () => [GLOBAL_KEYS.orgEinstellungen] as const,
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
-  lagemonitorZugaenge: () => [GLOBAL_KEYS.lagemonitorZugaenge] as const,
   anbindungen: () => [GLOBAL_KEYS.anbindungen] as const,
   einwurfZugaenge: () => [GLOBAL_KEYS.einwurfZugaenge] as const,
   /** Abruf der Seite `/extern` (LLH-1496). Ohne den Schlüssel: der bleibt aus dem Cache. */
@@ -1384,11 +1382,9 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * {@link ORG_STREAM_EVENTS} auftaucht ODER hier steht.
  *
  * - `benutzer`, `authProvider`: Benutzerverwaltung und Anmeldewege, nur für den Admin.
- * - `lagemonitorZugaenge` (LLH-1484): Verwaltung der Lesezugänge; die eigene Änderung setzt die
- *   Antwort, eine Freigabe am Einsatz wirkt beim nächsten Abruf.
  * - `anbindungen` (LLH-1652): Verwaltung der Maschinenzugänge; die eigene Änderung setzt die
- *   Antwort. Ablehnungen und „zuletzt genutzt“ zeigt der nächste Abruf, kein Ereignis je Anfrage
- *   eines Fremdsystems.
+ *   Antwort. Ablehnungen, „zuletzt genutzt“ und eine Freigabe am Einsatz (LLH-1638) zeigt der
+ *   nächste Abruf, kein Ereignis je Anfrage eines Fremdsystems.
  * - `einwurfZugaenge` (LLH-1654): Verwaltung der Einwurf-Zugänge; die eigene Änderung setzt die
  *   Antwort. „Zuletzt genutzt“ zeigt der nächste Abruf, kein Ereignis je Einwurf.
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
@@ -1416,7 +1412,6 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
 export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
   GLOBAL_KEYS.authProvider,
-  GLOBAL_KEYS.lagemonitorZugaenge,
   GLOBAL_KEYS.anbindungen,
   GLOBAL_KEYS.einwurfZugaenge,
   GLOBAL_KEYS.lagebildExtern,

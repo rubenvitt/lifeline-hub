@@ -467,6 +467,18 @@ export interface components {
         /** @description Ein Zugang, wie die Seite „Anbindungen“ ihn zeigt. Schlüssel nur als Fingerabdruck. */
         AnbindungAnzeige: {
             angelegt_at: string;
+            einsatz_bezeichnung?: string | null;
+            /**
+             * @description Für diesen Zugang lässt sich hier ein Einsatz freigeben (LLH-1638): Lese-Recht mit
+             *     Einsatzbezug, nicht widerrufen, nicht abgelaufen, und die Instanz nimmt für die Org
+             *     Fremdsysteme an. Die Seite zeigt dann, welchen Einsatz er liest.
+             */
+            einsatz_freigebbar: boolean;
+            /**
+             * Format: int64
+             * @description Der aktive Einsatz, den der Zugang gerade liest (Freigabe der Einsatzleitung, LLH-1638).
+             */
+            einsatz_id?: number | null;
             fingerabdruck?: string | null;
             /** @description Während eines Schlüsselwechsels: der neue Schlüssel, bis er zum ersten Mal signiert. */
             fingerabdruck_neu?: string | null;
@@ -491,6 +503,24 @@ export interface components {
             code: string;
             laeuft_ab_at: string;
             zugang: components["schemas"]["AnbindungAnzeige"];
+        };
+        /** @description Ein Maschinenzugang aus Sicht eines Einsatzes (Paneel „Anbindungen“ der Seite „Geräte“). */
+        AnbindungFreigabe: {
+            /** @description Der Zugang liest gerade einen anderen aktiven Einsatz; Einschalten stellt ihn um. */
+            anderer_einsatz: boolean;
+            /** @description Der Zugang liest diesen Einsatz. */
+            freigegeben: boolean;
+            name: string;
+            /**
+             * @description Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an:
+             *     die Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden.
+             */
+            ruht: boolean;
+            scopes: components["schemas"]["Scope"][];
+            zugang_id: string;
+            zuletzt_genutzt_at?: string | null;
+            /** @description `wartet`, solange das Fremdsystem seinen Code noch nicht eingelöst hat. */
+            zustand: components["schemas"]["ZugangZustand"];
         };
         /** @description Die Zugänge der Org und, falls Anbindungen hier nicht angenommen werden, der Grund. */
         AnbindungenListe: {
@@ -5107,28 +5137,6 @@ export interface components {
             /** Format: int64 */
             vermisst: number;
         };
-        /**
-         * @description Der gezeigte Einsatz, ohne Sachverhalt, Adresstext und meldende Stelle. Die Koordinate des
-         *     Einsatzorts steht als Feature `einsatzort` in der Karte.
-         */
-        LagemonitorEinsatz: {
-            /** @description UTC, SQLite-Format. */
-            begonnen_at: string;
-            betroffene: components["schemas"]["LagemonitorBetroffene"];
-            bezeichnung: string;
-            einsatzart: components["schemas"]["Einsatzart"];
-            kraefte: components["schemas"]["LagemonitorKraefte"];
-            lagemeldung: components["schemas"]["LagemonitorLagemeldung"] | null;
-            sanitaetsdienst?: components["schemas"]["LagemonitorSanitaetsdienst"] | null;
-            /**
-             * Format: int64
-             * @description Unbestätigte, nicht erledigte Sofortmeldungen; nur die Zahl.
-             */
-            sofortmeldungen_offen: number;
-            stichwort?: string | null;
-            /** @description Nicht aufgelöste UHS mit Belegung als Zahl; die Lage steht in der Karte. */
-            uhs: components["schemas"]["LagemonitorUhsZahl"][];
-        };
         /** @description Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke. */
         LagemonitorKraefte: {
             /** Format: int64 */
@@ -5136,17 +5144,6 @@ export interface components {
             /** Format: int64 */
             personal: number;
             staerke: components["schemas"]["Staerke"];
-        };
-        /** @description Antwort der Schnittstelle. */
-        LagemonitorLage: {
-            /** Format: int32 */
-            api_version: number;
-            einsatz: components["schemas"]["LagemonitorEinsatz"] | null;
-            karte?: components["schemas"]["GeoJsonFeatureCollection"] | null;
-            /** @description Fassung der Karte; fehlt ohne Einsatz und bei `?karte=aus`. */
-            karte_etag?: string | null;
-            /** @description Zeitpunkt der Berechnung (UTC, SQLite-Format). */
-            stand_at: string;
         };
         /** @description Die Lagemeldung für die Anzeige. */
         LagemonitorLagemeldung: {
@@ -5240,41 +5237,6 @@ export interface components {
             /** Format: int64 */
             id: number;
             typ: components["schemas"]["LageZoneTyp"];
-        };
-        /** @description Ein Lesezugang, wie die Verwaltung ihn sieht. Der Schlüssel steht nie darin. */
-        LesezugangAnzeige: {
-            /** @description UTC im SQLite-Format. */
-            angelegt_at: string;
-            /** @description Anzeigename der Person, die ihn angelegt hat; fehlt, wenn ihr Konto gelöscht ist. */
-            angelegt_von_name?: string | null;
-            bezeichnung: string;
-            einsatz_bezeichnung?: string | null;
-            /**
-             * Format: int64
-             * @description Der Einsatz, den der Zugang gerade zeigt; fehlt ohne aktive Freigabe.
-             */
-            einsatz_id?: number | null;
-            /** Format: int64 */
-            id: number;
-            widerrufen_at?: string | null;
-            /** @description Letzter Abruf (höchstens minütlich fortgeschrieben); fehlt, solange ihn niemand nutzte. */
-            zuletzt_genutzt_at?: string | null;
-        };
-        /** @description Ein Lesezugang aus Sicht eines Einsatzes (Seite „Geräte“ der Einsatzleitung). */
-        LesezugangFreigabe: {
-            /** @description Der Zugang zeigt gerade einen anderen aktiven Einsatz. Welchen, sagt die Antwort nicht. */
-            anderer_einsatz: boolean;
-            bezeichnung: string;
-            /** @description Dieser Einsatz ist für den Zugang freigegeben. */
-            freigegeben: boolean;
-            /** Format: int64 */
-            zugang_id: number;
-            zuletzt_genutzt_at?: string | null;
-        };
-        /** @description Ein frisch angelegter Zugang. Der Schlüssel verlässt den Server nur hier, einmal. */
-        LesezugangMitSchluessel: {
-            schluessel: string;
-            zugang: components["schemas"]["LesezugangAnzeige"];
         };
         /**
          * @description Die beim Auflösen festgehaltene Besetzung einer Einheit (LLH-1266, design.md D1/D2). Namen

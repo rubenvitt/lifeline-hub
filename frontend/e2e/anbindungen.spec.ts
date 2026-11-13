@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { einsatzPerApi } from './einsatz-kern';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 import {
   finishRedeem,
@@ -72,6 +73,84 @@ test('Anbindung anlegen, Code einlösen, signiert abrufen', async ({ page, reque
   await page.getByRole('link', { name: 'Anbindungen' }).click();
   const zeile = page.locator('[data-lfh="anbindung-eintrag"]', { hasText: `${name} neu` });
   await expect(zeile).toContainText('zuletzt genutzt');
+});
+
+/**
+ * Lage für einen Lagemonitor (LLH-1638, Specs `maschinenzugang` und `lage-schnittstelle`): der
+ * Ablauf über Verwaltung, Einsatz und Fremdsystem. Ohne Freigabe liest die Anbindung nichts; die
+ * Einsatzleitung schaltet sie auf der Seite „Geräte“ ein, danach liefert `GET /api/v1/lage` den
+ * Einsatz, und die Verwaltung nennt ihn. Rechte, Umstellen, Ende und Spiegel prüfen
+ * `tests/einsatz_anbindungen.rs` und `tests/public_api_lage.rs`.
+ */
+test('Lagemonitor anbinden, Einsatz freigeben, Lage lesen', async ({ page, request, baseURL }) => {
+  await anmeldenAlsAdmin(page, { startseite: false });
+  const stempel = Date.now();
+  const einsatzName = `Stadtfest e2e ${stempel}`;
+  const einsatzId = await einsatzPerApi(page, einsatzName);
+
+  await page.goto('/admin/einstellungen/anbindungen');
+  await page.getByRole('button', { name: 'Anbindung anlegen' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Anbindung anlegen' });
+  const name = `FüKW Monitor e2e ${stempel}`;
+  await dialog.getByRole('textbox', { name: 'Name' }).fill(name);
+  await dialog.getByRole('checkbox', { name: /Lage lesen/ }).click();
+  await dialog.getByRole('button', { name: 'Anlegen und Code zeigen' }).click();
+  const code = (await page.locator('[data-lfh="anbindung-code-text"]').textContent())!;
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  // Die Ansicht der neuen Anbindung: noch liest sie nichts.
+  await expect(page).toHaveURL(/\/admin\/einstellungen\/anbindungen\/[0-9a-f-]{36}$/);
+  await expect(page.locator('[data-lfh="anbindung-titel"]')).toContainText(name);
+  await expect(page.locator('[data-lfh="anbindung-einsatz"]')).toHaveText(
+    'kein Einsatz freigegeben',
+  );
+
+  const schluessel = await generateKey();
+  const { derivation, request: einloesen } = await prepareRedeem(code, schluessel.publicKey);
+  const antwort = await request.post('/api/v1/zugang/redeem', { data: einloesen });
+  expect(antwort.status()).toBe(200);
+  const cred = await finishRedeem(derivation, schluessel, baseURL!, await antwort.json());
+  const lage = async () => {
+    const pfad = '/api/v1/lage?karte=none';
+    const auth = await signRequest(
+      cred,
+      'GET',
+      pfad,
+      new TextEncoder().encode(''),
+      Math.floor(Date.now() / 1000),
+      `e2e-lage-${Date.now()}-${Math.random()}`,
+    );
+    const r = await request.get(pfad, { headers: { authorization: auth } });
+    expect(r.status()).toBe(200);
+    return (await r.json()) as { einsatz: { id: number; bezeichnung: string } | null };
+  };
+  expect((await lage()).einsatz).toBeNull();
+
+  // Die Einsatzleitung gibt ihren Einsatz frei.
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/geraete`);
+  const schalter = page.getByRole('switch', { name: `Anbindung ${name} liest diesen Einsatz` });
+  await expect(schalter).not.toBeChecked();
+  await schalter.click();
+  await expect(schalter).toBeChecked();
+  const zeile = page.locator('[data-lfh="einsatz-anbindung"]', { hasText: name });
+  await expect(zeile.locator('[data-lfh="einsatz-anbindung-zustand"]')).toContainText(
+    'liest diesen Einsatz',
+  );
+  const gelesen = (await lage()).einsatz;
+  expect(gelesen?.id).toBe(Number(einsatzId));
+  expect(gelesen?.bezeichnung).toBe(einsatzName);
+
+  // Die Verwaltung nennt den gelesenen Einsatz.
+  await page.goto('/admin/einstellungen/anbindungen');
+  const eintrag = page.locator('[data-lfh="anbindung-eintrag"]', { hasText: name });
+  await expect(eintrag.locator('[data-lfh="anbindung-einsatz"]')).toHaveText(
+    `liest ${einsatzName}`,
+  );
+
+  // Freigabe beenden: das Fremdsystem liest nichts mehr.
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/geraete`);
+  await schalter.click();
+  await expect(schalter).not.toBeChecked();
+  expect((await lage()).einsatz).toBeNull();
 });
 
 /**
