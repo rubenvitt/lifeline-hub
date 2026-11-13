@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
  * Zeile oben, neueste unten direkt über einer angepinnten Erfassung. Genutzt von ETB und
  * Informationstelefon, damit es nur eine Leserichtung gibt.
  *
- * Drei Aufgaben, alle ohne eigenen Bildlauf-Container (der bräche Rahmen, Bilanzspalte und
+ * Drei Aufgaben, alle ohne eigenen Bildlauf-Container (der bräche Rahmen, klebende Köpfe und
  * Fokusabstand):
  *
  * 1. **Öffnen am Ende.** Steht die Liste zum ersten Mal (`bereit`), rollt die Seite einmal ans
@@ -67,7 +67,8 @@ interface Optionen {
   /** Beim Öffnen nicht ans Ende rollen, etwa weil ein Sprungziel selbst rollt. */
   ohneStartlauf?: boolean;
   /**
-   * Wo das Ende liegt, wenn unter der Liste noch etwas steht (ETB unter `xl`: die Bilanz): die
+   * Wo das Ende liegt, wenn unter der Liste noch etwas steht (ETB: Hinweise zu vorgemerkten
+   * Einträgen): die
    * Unterkante von `spalte` direkt über der angepinnten Erfassung, deren gemessene Höhe in
    * `fussVariable` am Dokument steht (`components/fokusabstandUnten.ts`). Ohne Angabe ist das
    * Ende das Dokumentende. Darunter weitergerollt gilt weiter „am Ende“, und Mitlaufen zieht

@@ -1003,7 +1003,7 @@ export const einsatzKeys = {
   // Eigene Lesemarke als Sub-Key unter DEMSELBEN Prefix wie die Liste: jedes `etb`-Ereignis zieht
   // die Zahl „neu seit Ihrer letzten Sichtung“ mit.
   etbLesemarke: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId, 'lesemarke'] as const,
-  // Exakte Zählung unter demselben Prefix. Der Filter ist Teil des Keys: Kopf und Bilanz zählen
+  // Exakte Zählung unter demselben Prefix. Der Filter ist Teil des Keys: Kopf und Typ-Segmente zählen
   // genau, was die Liste zeigt.
   etbZaehler: <F>(einsatzId: number, filter: F) =>
     [EINSATZ_KEYS.etb, einsatzId, 'zaehler', filter] as const,

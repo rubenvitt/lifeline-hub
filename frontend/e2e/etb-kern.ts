@@ -1,6 +1,15 @@
 import { expect, type Page } from '@playwright/test';
 
 /**
+ * Adresse des ETB mit eingeblendeten Systemeinträgen (kwc2yszv D6): in der Vorgabe sind sie aus,
+ * erst `system=an` zeigt sie. Wer einen Systemeintrag in der Zeitachse prüft, öffnet diese Adresse
+ * — auch für eine `toHaveCount(0)`-Prüfung, die sonst schon bestünde, weil er ausgeblendet ist.
+ */
+export function etbMitSystem(einsatzId: number | string): string {
+  return `/einsaetze/${einsatzId}/etb?system=an`;
+}
+
+/**
  * Klappt jede Bündelzeile der ETB-Zeitachse auf (LLH-1106): drei und mehr aufeinanderfolgende
  * Systemeinträge stehen sonst als eine Zeile „n Systemeinträge · … · anzeigen“, ihr Text ist
  * nicht im DOM. Wer den Wortlaut eines Systemeintrags prüft — auch, dass etwas NICHT darin

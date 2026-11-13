@@ -2,7 +2,7 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbFeldzeile.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md, frontend/src/etb/EtbSpaltenzeile.tsx, frontend/src/etb/EtbHandschirmzeile.tsx, frontend/src/etb/EtbVermerke.tsx, frontend/src/etb/vermerke.ts, frontend/src/etb/EtbInhalt.tsx, frontend/src/etb/etbSpalten.ts]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbFeldzeile.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md, frontend/src/etb/EtbSpaltenzeile.tsx, frontend/src/etb/EtbHandschirmzeile.tsx, frontend/src/etb/EtbVermerke.tsx, frontend/src/etb/vermerke.ts, frontend/src/etb/EtbInhalt.tsx, frontend/src/etb/etbSpalten.ts, frontend/src/etb/EtbSendestatus.tsx, frontend/src/etb/etbKopfKleben.ts, frontend/src/routing/deeplinks.ts]
 ---
 
 ## Überblick
@@ -61,10 +61,12 @@ mittelbreiten Bildschirmen stehen Verfasser und Meldeweg rechts im Eintrag und d
 dem Text, ein Nachtrag als „⧖ nachgetragen um …“. Auf dem Handy trägt jeder Eintrag oben eine
 Kopfzeile mit Zeit, Typ und Von → An, darunter den Text in voller Breite und darunter die Verweise.
 
-Die Seitenleiste „Bilanz“ zählt die Einträge nach Typ und nennt die jüngsten Berichtigungen; ist
-ein Filter gesetzt, heißt sie „Bilanz im Filter“. Einträge vom Typ „Lage“ zählt sie als
-„Lagefeststellungen“; „Lagemeldungen“ ist das eigene Modul der lagerelevanten Meldungen
-(Kapitel [Lagemeldungen](lagemeldungen.md)).
+Der Seitenkopf nennt die Zahl der Einträge, etwa „57 Einträge · 171 Systemeinträge ausgeblendet“,
+und rechts den Sendestatus: „alles übertragen“, solange nichts aussteht. Die Zahl je Typ steht an
+den Typ-Segmenten der Filterleiste; der Titel eines Segments nennt die Mehrzahl, Einträge vom Typ
+„Lage“ etwa als „Lagefeststellungen“. „Lagemeldungen“ ist das eigene Modul der lagerelevanten
+Meldungen (Kapitel [Lagemeldungen](lagemeldungen.md)). Berichtigungen findet der Typfilter
+„Berichtigung“.
 
 ### Einen Eintrag erfassen
 
@@ -179,12 +181,16 @@ nennt den Grund.
 
 ### Einträge suchen und filtern
 
-Alle Filter stehen in einer Leiste direkt über der Zeitachse.
+Alle Filter stehen in einer Leiste direkt über der Zeitachse. Ist das Fenster hoch genug, bleibt
+sie mit dem Seitenkopf beim Rollen oben stehen; ein gesetzter Filter ist so auch am Ende der
+Zeitachse über der Erfassung zu sehen und zu ändern.
 
 1. Einen Typ wählen: „Alle“, „Meldung“, „Anordnung“, „Entscheidung“, „Lage“ oder „Berichtigung“.
-2. Mit dem Knopf „System“ die automatischen Systemeinträge aus- und einblenden; die Zahl daneben
-   nennt, wie viele es sind. Ausgeblendet steht dort „… ausgeblendet“ und der Punkt ist
-   gestrichen.
+   Jedes Segment trägt die Zahl seiner Einträge, „Alle“ die Summe ohne Systemeinträge. Ist ein
+   Zeitraum, eine Einheit oder eine Suche gesetzt, zählen die Segmente nur, was dazu passt.
+2. Systemeinträge sind beim Öffnen ausgeblendet. Der Knopf „System“ blendet sie ein und wieder
+   aus; die Zahl daneben nennt, wie viele es sind, ausgeblendet ist sein Punkt gestrichen. Der
+   Seitenkopf nennt dann, wie viele ausgeblendet sind, etwa „171 Systemeinträge ausgeblendet“.
 3. „Zeitraum“ öffnet eine Schnellwahl: „Letzte Stunde“, „Letzte 4 Stunden“, „Seit letzter
    Lagebesprechung“ (nur, wenn eine abgehalten ist) und „Heute“. Unter „Eigener Zeitraum“ lassen
    sich „von“ und „bis“ taktisch tippen („1400“, „171400“); „bis“ leer heißt bis jetzt. „Zeitraum
@@ -192,8 +198,10 @@ Alle Filter stehen in einer Leiste direkt über der Zeitachse.
    etwa „seit 1345“.
 4. Bei Bedarf eine Einheit wählen oder in die „Volltextsuche“ tippen.
 5. Solange ein Filter gesetzt ist, steht direkt über der Erfassung ein bernsteinfarbenes Band,
-   etwa „Gefiltert · 7 von 134 Einträgen sichtbar · Meldung · seit 1345“. „Filter zurücksetzen“
-   darin führt zur vollen Liste zurück.
+   etwa „Gefiltert · 7 von 134 Einträgen sichtbar · Meldung · seit 1345“, und der Seitenkopf
+   nennt „7 Treffer“. „Filter zurücksetzen“ darin führt zur vollen Liste zurück; die
+   Systemeinträge sind danach wieder ausgeblendet. Das Ausblenden der Systemeinträge allein gilt
+   nicht als Filter.
 
 Passt ein eben erfasster Eintrag nicht zum Filter, nennt das Band „Nr. … erfasst – außerhalb des
 Filters“; „anzeigen“ hebt den Filter auf und springt zum Eintrag. Unter „Seit letzter
@@ -204,9 +212,14 @@ um sie.
 Die Volltextsuche findet Wortanfänge in Inhalt, „Von“, „An“ und „Veranlassung“, ohne auf Groß-
 und Kleinschreibung zu achten; bei mehreren Wörtern müssen alle vorkommen. Der Filter steht in der
 Adresse der Seite und lässt sich als Link weitergeben; ein gewählter Zeitraum steht dort mit
-festen Uhrzeiten, ein Link zeigt also beim Empfänger dieselben Einträge. Auf schmalen Bildschirmen
+festen Uhrzeiten, ein Link zeigt also beim Empfänger dieselben Einträge, auch im Druck.
+Eingeblendete Systemeinträge stehen dort als „system=an“. Ein älterer Link ohne diese Angabe, der
+früher die Systemeinträge mitzeigte, zeigt sie nicht mehr; ein Link auf einen einzelnen
+Systemeintrag blendet sie selbst ein und meldet „Systemeinträge wieder eingeblendet, um den
+Eintrag zu zeigen“. Auf schmalen Bildschirmen
 rollt der Typ einzeilig im Kopf, die übrigen Filter liegen hinter dem Knopf „Filter“, der die Zahl
-gesetzter Filter trägt.
+gesetzter Filter trägt (eingeblendete Systemeinträge zählen mit); dort klebt nichts, der Sendestatus
+steht neben dem Typ.
 
 ### Einen Eintrag berichtigen
 
@@ -295,7 +308,9 @@ Verpflegung „241200sep26–1330“, steht sie in der Zeitdarstellung des Einsa
 Organisation, nicht in der Wahl an deinem Gerät: der Eintrag ist für alle derselbe. Ältere Einträge
 behalten die Schreibweise, mit der sie geschrieben wurden.
 
-Systemeinträge stehen leiser als Handeinträge: kleinere, gedämpfte Schrift, der Text ungekürzt.
+Systemeinträge sind beim Öffnen ausgeblendet; „System“ in der Filterleiste blendet sie ein
+(siehe „Einträge suchen und filtern“). Eingeblendet stehen sie leiser als Handeinträge: kleinere,
+gedämpfte Schrift, der Text ungekürzt.
 „System → System“ entfällt, eine bekannte Seite wie „System → ELW 1“ bleibt. Folgen drei oder mehr
 Systemeinträge innerhalb einer Stunde direkt aufeinander, fasst das ETB sie zu einer Zeile
 „3 Systemeinträge · 1301–1312 · anzeigen“ zusammen; „anzeigen“ klappt sie auf, „zuklappen“
@@ -316,7 +331,9 @@ Taucht der Entwurf nach dem Neuladen wieder auf, lässt er sich erneut verwerfen
 ### Ohne Netz
 
 Ohne Verbindung nimmt das ETB Einträge weiter an und merkt sie als „offline vorgemerkt“ vor. Sie
-gehen raus, sobald das Netz zurück ist. Lehnt der Server einen vorgemerkten Eintrag ab, steht er
+gehen raus, sobald das Netz zurück ist. Bis dahin nennt der Seitenkopf statt „alles übertragen“
+etwa „2 ausstehend“ (bei einer Ablehnung zuerst „1 abgelehnt“); ein Klick darauf springt zu den
+vorgemerkten Zeilen. Lehnt der Server einen vorgemerkten Eintrag ab, steht er
 mit „Erneut senden“ und „Verwerfen“ in der Zeitachse. Ein vorgemerkter Eintrag vom Typ „Meldung“
 oder „Lage“ legt seine Meldung erst beim Senden an; wird er abgelehnt, etwa weil das Modul
 Meldungen inzwischen gesperrt ist, bietet seine Zeile zusätzlich „Nur protokollieren“, und er geht

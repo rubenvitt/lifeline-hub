@@ -60,6 +60,7 @@ import {
   pegelZielPfad,
   etbPfad,
   etbDruckPfad,
+  etbFilterPfad,
   einsatzberichtPfad,
   parseEtbFilter,
   parsePersonenSicht,
@@ -896,53 +897,95 @@ describe('etbPfad mit Filterachse (LFH-342 · C7)', () => {
       q: 'br and',
       typ: 'meldung',
       von: '2026-08-21 06:00:00',
+      ohne_system: true,
     });
   });
 
   it('verwirft einen unbekannten Typ GANZ statt halb zu füllen', () => {
     // Wie bei `parsePlatzierenAuftrag`: ein unbrauchbarer Wert ergibt gar keinen Filter.
-    expect(parseEtbFilter(new URLSearchParams('q=x&typ=quatsch'))).toEqual({ q: 'x' });
+    expect(parseEtbFilter(new URLSearchParams('q=x&typ=quatsch&system=an'))).toEqual({ q: 'x' });
   });
 
   it('trägt die Einheit hin und zurück (LFH-616)', () => {
     const pfad = etbPfad(7, { einheit_id: 12 });
     expect(pfad).toBe('/einsaetze/7/etb?einheit_id=12');
-    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({ einheit_id: 12 });
-  });
-
-  it.each(['abc', '0', '-3', '1.5', ''])('verwirft einheit_id=%s GANZ (LFH-616)', (wert) => {
-    expect(parseEtbFilter(new URLSearchParams(`q=x&einheit_id=${wert}`))).toEqual({ q: 'x' });
-  });
-
-  it('trägt den Ausschluss der Systemeinträge hin und zurück (LFH-958)', () => {
-    const pfad = etbPfad(7, { ohne_system: true, typ: 'meldung' });
-    expect(pfad).toBe('/einsaetze/7/etb?typ=meldung&ohne_system=true');
     expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({
-      typ: 'meldung',
+      einheit_id: 12,
       ohne_system: true,
     });
   });
 
-  it.each(['false', '0', 'ja', ''])(
-    'liest ohne_system=%s nicht als Ausschluss (LFH-958)',
+  it.each(['abc', '0', '-3', '1.5', ''])('verwirft einheit_id=%s GANZ (LFH-616)', (wert) => {
+    expect(parseEtbFilter(new URLSearchParams(`q=x&einheit_id=${wert}&system=an`))).toEqual({
+      q: 'x',
+    });
+  });
+
+  /*
+   * Systemeinträge in der Vorgabe aus (kwc2yszv, design.md D6, Spec `etb-zeitachse-darstellung`,
+   * „Systemeinträge zeigen“): ohne Merkmal schickt die Seite `ohne_system=true` an den Server,
+   * eingeblendet steht `system=an` in der Adresse.
+   */
+  it('liest eine Adresse ohne Merkmal als Ausschluss der Systemeinträge (Vorgabe)', () => {
+    expect(parseEtbFilter(new URLSearchParams(''))).toEqual({ ohne_system: true });
+    expect(parseEtbFilter(new URLSearchParams('q=x'))).toEqual({ q: 'x', ohne_system: true });
+  });
+
+  it('liest `system=an` als eingeblendet: kein Ausschluss an den Server', () => {
+    expect(parseEtbFilter(new URLSearchParams('system=an'))).toEqual({});
+    expect(parseEtbFilter(new URLSearchParams('q=x&system=an'))).toEqual({ q: 'x' });
+  });
+
+  it.each(['aus', 'true', '1', ''])('liest system=%s wie die Vorgabe (ausgeblendet)', (wert) => {
+    expect(parseEtbFilter(new URLSearchParams(`system=${wert}`))).toEqual({ ohne_system: true });
+  });
+
+  it.each(['true', '1', 'false', 'ja'])(
+    'nimmt einen alten Link mit ohne_system=%s wie die Vorgabe',
     (wert) => {
-      expect(parseEtbFilter(new URLSearchParams(`q=x&ohne_system=${wert}`))).toEqual({ q: 'x' });
+      expect(parseEtbFilter(new URLSearchParams(`q=x&ohne_system=${wert}`))).toEqual({
+        q: 'x',
+        ohne_system: true,
+      });
     },
   );
 
-  it('nimmt `1` als Ausschluss, schreibt aber `true` (LFH-958)', () => {
-    expect(parseEtbFilter(new URLSearchParams('ohne_system=1'))).toEqual({ ohne_system: true });
+  it('lässt `system=an` vor einem alten `ohne_system=true` gelten', () => {
+    expect(parseEtbFilter(new URLSearchParams('ohne_system=true&system=an'))).toEqual({});
   });
 
   it('lässt typ=system vor dem Ausschluss gelten; die Seite schickt nie die 422 (LFH-958)', () => {
+    expect(parseEtbFilter(new URLSearchParams('typ=system'))).toEqual({ typ: 'system' });
     expect(parseEtbFilter(new URLSearchParams('typ=system&ohne_system=true'))).toEqual({
       typ: 'system',
     });
   });
 
-  it('liefert für eine leere Query ein leeres Filterobjekt', () => {
-    // Ohne Parameter ist kein Filter gesetzt (Gegenaussage zu `filterAktiv` in `EtbPage`).
-    expect(parseEtbFilter(new URLSearchParams(''))).toEqual({});
+  it('schreibt eingeblendete Systemeinträge als `system=an`, die Vorgabe gar nicht', () => {
+    expect(etbPfad(7, { system: true, typ: 'meldung' })).toBe(
+      '/einsaetze/7/etb?typ=meldung&system=an',
+    );
+    expect(etbPfad(7, { typ: 'meldung' })).toBe('/einsaetze/7/etb?typ=meldung');
+  });
+
+  it('etbFilterPfad trägt den Filter der Seite hin und zurück, mit und ohne Systemeinträge', () => {
+    const ohne = { q: 'Deich', typ: 'meldung' as const, ohne_system: true as const };
+    const pfadOhne = etbFilterPfad(7, ohne);
+    expect(pfadOhne).toBe('/einsaetze/7/etb?q=Deich&typ=meldung');
+    expect(parseEtbFilter(new URLSearchParams(pfadOhne.split('?')[1]))).toEqual(ohne);
+
+    const mit = { q: 'Deich', einheit_id: 12 };
+    const pfadMit = etbFilterPfad(7, mit);
+    expect(pfadMit).toBe('/einsaetze/7/etb?q=Deich&einheit_id=12&system=an');
+    expect(parseEtbFilter(new URLSearchParams(pfadMit.split('?')[1]))).toEqual(mit);
+  });
+
+  it('etbFilterPfad nimmt den Sprung mit und schreibt neben typ=system kein Merkmal', () => {
+    expect(etbFilterPfad(7, { ohne_system: true }, { eintrag: 5 })).toBe(
+      '/einsaetze/7/etb?eintrag=5',
+    );
+    expect(etbFilterPfad(7, {}, { eintrag: 5 })).toBe('/einsaetze/7/etb?eintrag=5&system=an');
+    expect(etbFilterPfad(7, { typ: 'system' })).toBe('/einsaetze/7/etb?typ=system');
   });
 });
 
@@ -964,8 +1007,8 @@ describe('einsatzberichtPfad (LFH-726)', () => {
 });
 
 describe('etbDruckPfad (LFH-22)', () => {
-  it('zeigt ohne Filter auf die Druckansicht des Tagebuchs', () => {
-    expect(etbDruckPfad(7, {})).toBe('/einsaetze/7/etb/druck');
+  it('zeigt mit der Vorgabe auf die Druckansicht des Tagebuchs', () => {
+    expect(etbDruckPfad(7, { ohne_system: true })).toBe('/einsaetze/7/etb/druck');
   });
 
   it('trägt den Filter durch URLSearchParams hin und zurück — auch mit & = und Leerzeichen', () => {
@@ -980,6 +1023,14 @@ describe('etbDruckPfad (LFH-22)', () => {
     const pfad = etbDruckPfad(7, filter);
     expect(pfad.startsWith('/einsaetze/7/etb/druck?')).toBe(true);
     expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual(filter);
+  });
+
+  it('druckt eingeblendete Systemeinträge mit (`system=an`), die Vorgabe ohne', () => {
+    // Spec „Systemeinträge zeigen“: der Zustand übersteht den Druck.
+    expect(etbDruckPfad(7, { ohne_system: true })).toBe('/einsaetze/7/etb/druck');
+    const pfad = etbDruckPfad(7, {});
+    expect(pfad).toBe('/einsaetze/7/etb/druck?system=an');
+    expect(parseEtbFilter(new URLSearchParams(pfad.split('?')[1]))).toEqual({});
   });
 });
 

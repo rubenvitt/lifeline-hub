@@ -6,6 +6,7 @@ import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
 import { uhrzeit, zeitKurz } from '../anzeige/zeitDarstellung';
 import type { EtbZeile } from './etbZeile';
 import { istNachgetragen } from './typFarben';
+import { etbTypMehrzahl } from '../theme/statusFarben';
 
 /** Zahl je Typ aus der serverseitigen Zählung (LFH-612). */
 type EtbTypZaehler = EtbZaehler['je_typ'];
@@ -194,18 +195,12 @@ export function berichtigungsindex(eintraege: readonly EtbEintragAnzeige[]): Ber
   };
 }
 
-/** Die jüngsten Berichtigungen unter den geladenen Einträgen, neueste zuerst. */
-export function letzteBerichtigungen(
-  eintraege: readonly EtbEintragAnzeige[],
-  anzahl = 3,
-): EtbEintragAnzeige[] {
-  // Die Serverordnung IST neueste zuerst — hier wird nicht umsortiert.
-  return eintraege.filter((e) => e.typ === 'berichtigung').slice(0, anzahl);
-}
-
 // ── Bilanz ──────────────────────────────────────────────────────────────────────────
 
-/** Die Reihenfolge der Bilanz — wie die Typ-Segmente, System nur bei Bedarf (s. u.). */
+/**
+ * Die Reihenfolge der Bilanz (Einsatzbericht) und die Handeinträge — wie die Typ-Segmente, System
+ * nur bei Bedarf (s. u.).
+ */
 const BILANZ_TYPEN: readonly EtbTyp[] = [
   'meldung',
   'anordnung',
@@ -233,18 +228,71 @@ export function typBilanz(jeTyp: EtbTypZaehler): BilanzZeile[] {
 }
 
 /**
- * Seitenkopf-Meta: die exakte Zahl vom Server (LFH-612) — „n Einträge" ohne, „n Treffer" unter
- * einem Filter. Ohne Zählung (lädt, gescheitert) steht NICHTS: eine Zahl aus dem geladenen
- * Fenster behauptete eine Vollständigkeit, die es nicht gibt.
+ * Ist ein Filter gesetzt, der die Menge einschränkt? Der Ausschluss der Systemeinträge zählt nicht:
+ * er ist die Vorgabe (kwc2yszv D6, Spec `etb-zeitachse-darstellung`, „Systemeinträge zeigen“). Ohne
+ * Filter heißt der Kopf „n Einträge“, das Filterband fehlt, und der Leertitel lädt zum Erfassen.
+ */
+export function istGefiltert(filter: EtbFilterWerte): boolean {
+  return (
+    !!filter.q ||
+    filter.typ != null ||
+    !!filter.von ||
+    !!filter.bis ||
+    filter.einheit_id != null ||
+    filter.erfasser_id != null
+  );
+}
+
+/** Die Handeinträge einer Zählung: alle Typen außer `system` (Spec `etb-zaehler`). */
+export function handeintraege(jeTyp: EtbTypZaehler): number {
+  return BILANZ_TYPEN.reduce((summe, typ) => summe + jeTyp[typ], 0);
+}
+
+/**
+ * Die Zahl an einem Typ-Segment der Filterleiste (Spec `etb-filterleiste`, kwc2yszv D7): je Typ aus
+ * `je_typ`, an „Alle“ die Summe der Handeinträge. Ohne Zählung keine Zahl.
+ */
+export function segmentZahl(
+  jeTyp: EtbTypZaehler | undefined,
+  segment: TypSegment,
+): number | undefined {
+  if (!jeTyp) return undefined;
+  return segment === 'alle' ? handeintraege(jeTyp) : jeTyp[segment];
+}
+
+/**
+ * Titel und Beschreibung eines Typ-Segments: die Mehrzahl samt Zahl („Lagefeststellungen: 2“,
+ * Spec `bedien-wortlaut`, „Bilanz des ETB“). Das Segment selbst trägt das Typwort. Ohne Zahl kein
+ * Titel: er wiederholte nur das Wort.
+ */
+export function segmentTitel(segment: TypSegment, zahl: number | undefined): string | undefined {
+  if (zahl == null) return undefined;
+  return `${segment === 'alle' ? 'Handeinträge' : etbTypMehrzahl[segment]}: ${zahl}`;
+}
+
+/**
+ * Seitenkopf-Meta: die exakte Zahl vom Server (LFH-612, Spec `etb-zaehler`). Ohne Filter „n
+ * Einträge“ mit der Zahl der Handeinträge, bei ausgeblendeten Systemeinträgen gefolgt von „· m
+ * Systemeinträge ausgeblendet“; unter einem Filter „n Treffer“ mit `gesamt` der gefilterten
+ * Zählung. Ohne Zählung (lädt, gescheitert) steht NICHTS: eine Zahl aus dem geladenen Fenster
+ * behauptete eine Vollständigkeit, die es nicht gibt. Fehlt nur die Zahl der ausgeblendeten,
+ * fehlt nur ihr Teil.
  */
 export function kopfMeta(args: {
-  gesamt: number | undefined;
-  filterAktiv: boolean;
+  zaehler: EtbZaehler | undefined;
+  gefiltert: boolean;
+  /** Wie viele Systemeinträge der Ausschluss verbirgt; fehlt, wenn keiner gilt oder sie lädt. */
+  systemAusgeblendet?: number;
 }): string | undefined {
-  const { gesamt, filterAktiv } = args;
-  if (gesamt === undefined) return undefined;
-  if (filterAktiv) return gesamt === 1 ? '1 Treffer' : `${gesamt} Treffer`;
-  return gesamt === 1 ? '1 Eintrag' : `${gesamt} Einträge`;
+  const { zaehler, gefiltert, systemAusgeblendet } = args;
+  if (zaehler === undefined) return undefined;
+  if (gefiltert) return zaehler.gesamt === 1 ? '1 Treffer' : `${zaehler.gesamt} Treffer`;
+  const hand = handeintraege(zaehler.je_typ);
+  const eintraege = hand === 1 ? '1 Eintrag' : `${hand} Einträge`;
+  if (!systemAusgeblendet) return eintraege;
+  const system =
+    systemAusgeblendet === 1 ? '1 Systemeintrag' : `${systemAusgeblendet} Systemeinträge`;
+  return `${eintraege} · ${system} ausgeblendet`;
 }
 
 // ── Puffer ──────────────────────────────────────────────────────────────────────────

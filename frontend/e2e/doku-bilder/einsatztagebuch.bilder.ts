@@ -7,7 +7,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep einsatztagebuch`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   zeitachse.png       frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx,
- *                       frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/EtbBilanz.tsx
+ *                       frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/EtbFilterleiste.tsx,
+ *                       frontend/src/etb/EtbSendestatus.tsx
  *   erfassung.png       frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx,
  *                       frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx
  *   berichtigung.png    frontend/src/etb/Schnellerfassung.tsx (Berichtigung)
@@ -35,9 +36,12 @@ async function fokusWeg(page: Page) {
 }
 
 test.describe(KAPITEL, () => {
-  test('Zeitachse beim Öffnen am Ende, Bilanz und Erfassungsleiste', async ({ page }) => {
+  test('Zeitachse beim Öffnen am Ende, Filterleiste und Erfassungsleiste', async ({ page }) => {
     await etbOeffnen(page);
-    await expect(page.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeVisible();
+    // Die Zahlen je Typ stehen an den Segmenten der Filterleiste (kwc2yszv D7, statt der Bilanz).
+    await expect(
+      page.locator('[data-lfh="etb-filterleiste"] [data-lfh="segment-zahl"]').first(),
+    ).toBeVisible();
     await fokusWeg(page);
     await fotografiere(page, KAPITEL, 'zeitachse');
   });

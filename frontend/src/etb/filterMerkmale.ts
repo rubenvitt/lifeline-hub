@@ -12,8 +12,8 @@ interface MerkmalOptionen {
 
 /**
  * Die gesetzten Filtermerkmale kurz, für das Filterband (LLH-1071, `Filterhinweis`): „Meldung ·
- * seit 1345 · „Deich“ · Einheit ELW 1 · ohne System“. Dieselbe Folge wie der Druckkopf
- * (`druckAuswahl.ts`, Typ, Zeitraum, Suchbegriff, Einheit, Systemeinträge), aber im Wortlaut der
+ * seit 1345 · „Deich“ · Einheit ELW 1“. Dieselbe Folge wie der Druckkopf
+ * (`druckAuswahl.ts`, Typ, Zeitraum, Suchbegriff, Einheit), aber im Wortlaut der
  * Leiste und taktisch, nicht als Satz. Leer ohne Filter: dann steht kein Band.
  *
  * Wie im Druck erscheint keine Datenbank-Kennung: eine Einheit ohne lesbaren Namen heißt „eine
@@ -33,6 +33,7 @@ export function filterMerkmale(
     const name = einheitName(filter.einheit_id);
     merkmale.push(name ? `Einheit ${name}` : 'eine Einheit');
   }
-  if (filter.ohne_system) merkmale.push('ohne System');
+  // Der Ausschluss der Systemeinträge ist die Vorgabe, kein Merkmal (kwc2yszv D6): das Band stünde
+  // sonst auf jeder frisch geöffneten Seite. Wie viele ausgeblendet sind, nennt der Kopf.
   return merkmale;
 }

@@ -26,16 +26,36 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
-import { etbDruckPfad, etbPfad, parseEtbFilter, parseRouteId } from '../routing/deeplinks';
+import {
+  etbDruckPfad,
+  etbFilterPfad,
+  etbPfad,
+  parseEtbFilter,
+  parseRouteId,
+} from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import type { Speicherung } from '../components/Erfassung';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import EtbZeitachse, { type GezeigteRaender } from '../etb/EtbZeitachse';
-import EtbBilanz from '../etb/EtbBilanz';
+import EtbSendestatus from '../etb/EtbSendestatus';
+import {
+  ETB_FILTERLEISTE_OBEN,
+  ETB_KOPF_UNTERKANTE,
+  ETB_KOPF_UNTERKANTE_WERT,
+  useEtbKopfKleben,
+} from '../etb/etbKopfKleben';
 import EtbLesemarkeBanner, { useEtbLesemarke } from '../etb/EtbLesemarkeBanner';
 import { lesemarkeImFenster } from '../etb/lesemarkeModell';
 import { Select } from '../components/Select';
@@ -85,25 +105,32 @@ import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import {
   dokumenteJeEintrag,
   filterZusammenfuehren,
+  istGefiltert,
   kopfMeta,
   pufferZustand,
+  segmentTitel,
+  segmentZahl,
   typSegmente,
   type TypSegment,
 } from '../etb/zeitachseModell';
 
-/** Breite der Seitenleiste „Bilanz" — ab `xl`. */
-const LEISTE_BREITE = 260;
+/**
+ * Stapelebene der klebenden Filterleiste (kwc2yszv D8): unter dem klebenden Seitenkopf
+ * (`KOPF_KLEBT_EBENE` 30, ihre Popups liegen in antds Overlays), über der angepinnten Erfassung (20),
+ * damit die Zeitachse beim Rollen darunter verschwindet.
+ */
+const FILTERLEISTE_EBENE = 25;
 
 /**
- * Wie viele Filter der aufklappbaren Leiste gesetzt sind: Volltext, Zeitraum, Einheit und der
- * Ausschluss der Systemeinträge (LFH-958).
+ * Wie viele Merkmale der aufklappbaren Leiste von der Vorgabe abweichen: Volltext, Zeitraum,
+ * Einheit und eingeblendete Systemeinträge (kwc2yszv D6: ausgeblendet ist die Vorgabe).
  */
 function leistenFilterZahl(filter: EtbFilterWerte): number {
   return (
     (filter.q ? 1 : 0) +
     (filter.von || filter.bis ? 1 : 0) +
     (filter.einheit_id != null ? 1 : 0) +
-    (filter.ohne_system ? 1 : 0)
+    (!filter.ohne_system && filter.typ !== 'system' ? 1 : 0)
   );
 }
 
@@ -140,7 +167,8 @@ export default function EtbPage() {
    */
   const [filterMarke, setFilterMarke] = useState(0);
   const filterWurzel = useRef<HTMLDivElement>(null);
-  const filterAktiv = Object.keys(filter).length > 0;
+  // Der Ausschluss der Systemeinträge ist die Vorgabe, kein Filter (kwc2yszv D6).
+  const filterAktiv = istGefiltert(filter);
 
   /**
    * Kam die Filteränderung von der Leiste selbst? Dann darf sie nicht neu aufgesetzt werden — der
@@ -178,8 +206,8 @@ export default function EtbPage() {
    * getippten Suchbegriff Feld und Fokus.
    */
   function filterAendern(teil: Partial<EtbFilterWerte>) {
-    const vorher = etbPfad(einsatzId, filterRef.current);
-    const neu = etbPfad(einsatzId, filterZusammenfuehren(filterRef.current, teil));
+    const vorher = etbFilterPfad(einsatzId, filterRef.current);
+    const neu = etbFilterPfad(einsatzId, filterZusammenfuehren(filterRef.current, teil));
     // Keine Navigation ohne Änderung: die Marke bliebe sonst stehen und schluckte die nächste
     // fremde Änderung.
     if (neu === vorher) return;
@@ -242,49 +270,54 @@ export default function EtbPage() {
     getPreviousPageParam: (erste, _alle, param) => vorigerSeitenParam(erste, param),
   });
 
-  // Riegel für die Bilanz unter `xl`: sie erscheint erst, wenn die Liste zum ersten Mal steht
-  // (sonst schöben die eintreffenden Zeilen sie aus dem Bild), und bleibt danach. `isLoading`
-  // allein hinge an jedem neuen Query-Schlüssel, die Bilanz verschwände bei jedem Filterwechsel und
-  // beim Wiederverbinden nach einem Offline-Start. `isLoading` statt `isPending`, weil ein offline
-  // pausierter Abruf nicht lädt — dann trägt die Bilanz den Puffer. Je Einsatz, damit ein
-  // Einsatzwechsel im selben Baum die Sperre neu setzt; Zustand statt Ref, abgeleitet während des
-  // Renderns.
-  const [bilanzFreiFuer, setBilanzFreiFuer] = useState<number | null>(null);
-  if (!etbQuery.isLoading && bilanzFreiFuer !== einsatzId) setBilanzFreiFuer(einsatzId);
-  const bilanzFrei = bilanzFreiFuer === einsatzId || !etbQuery.isLoading;
-
-  // Exakte Zählung über denselben Filter wie die Liste — für Kopf und Bilanz. Unter dem
-  // `etb`-Prefix, das `etb`-Live-Ereignis zieht sie mit.
+  /*
+   * Exakte Zählungen (LFH-612, Spec `etb-zaehler`, kwc2yszv D7), alle unter dem `etb`-Präfix, das
+   * `etb`-Live-Ereignis zieht sie mit. Gleiche Filter ergeben gleiche Schlüssel: ohne Typfilter
+   * teilen sich Kopf und Segmente EINE Abfrage.
+   *  - Kopf: über denselben Filter wie die Liste („n Treffer“ ist genau ihre Menge).
+   *  - Typ-Segmente: derselbe Filter ohne den Typ — ein Segment nennt, was ein Wechsel zeigte.
+   *  - System: dazu ohne den Ausschluss — die Zahl am Umschaltknopf und „m Systemeinträge
+   *    ausgeblendet“ im Kopf (LFH-958).
+   */
   const zaehlerQuery = useQuery({
     queryKey: einsatzKeys.etbZaehler(einsatzId, filter),
     queryFn: () => ladeEtbZaehler(einsatzId, filter),
   });
-  // Wie viele Systemeinträge der Ausschluss verbirgt (LFH-958): dieselbe Zählung ohne ihn. Läuft
-  // nur, solange er gilt; ohne Ausschluss steht die Zahl schon in `zaehlerQuery`.
-  const filterMitSystem = useMemo<EtbFilterWerte>(() => {
-    const { ohne_system: _aus, ...rest } = filter;
-    void _aus;
+  const filterOhneTyp = useMemo<EtbFilterWerte>(() => {
+    const { typ: _typ, ...rest } = filter;
+    void _typ;
     return rest;
   }, [filter]);
+  const segmentQuery = useQuery({
+    queryKey: einsatzKeys.etbZaehler(einsatzId, filterOhneTyp),
+    queryFn: () => ladeEtbZaehler(einsatzId, filterOhneTyp),
+  });
+  const filterMitSystem = useMemo<EtbFilterWerte>(() => {
+    const { ohne_system: _aus, ...rest } = filterOhneTyp;
+    void _aus;
+    return rest;
+  }, [filterOhneTyp]);
   const systemZaehlerQuery = useQuery({
     queryKey: einsatzKeys.etbZaehler(einsatzId, filterMitSystem),
     queryFn: () => ladeEtbZaehler(einsatzId, filterMitSystem),
-    enabled: filter.ohne_system === true,
   });
   /*
-   * Die Gesamtzahl für das Filterband (LLH-1071, „n von m“): dieselbe Zählung ohne Filter, unter
-   * demselben Präfix und in derselben Bauart wie Kopf und Bilanz — der Modulzähler liefe über ein
-   * anderes Sammelfenster und stünde kurz neben einer unpassenden Trefferzahl. Ohne Filter ist es
-   * derselbe Key wie `zaehlerQuery`.
+   * Die Gesamtzahl für das Filterband (LLH-1071, „n von m“): dieselbe Zählung ohne Filter, aber mit
+   * der Vorgabe der Systemeinträge — „7 von 112“ vergleicht dieselbe Art Einträge. Unter demselben
+   * Präfix und in derselben Bauart wie der Kopf: der Modulzähler liefe über ein anderes
+   * Sammelfenster und stünde kurz neben einer unpassenden Trefferzahl.
    */
+  const gesamtFilter = useMemo<EtbFilterWerte>(
+    () => (filter.ohne_system ? { ohne_system: true } : {}),
+    [filter.ohne_system],
+  );
   const gesamtQuery = useQuery({
-    queryKey: einsatzKeys.etbZaehler(einsatzId, {}),
-    queryFn: () => ladeEtbZaehler(einsatzId, {}),
+    queryKey: einsatzKeys.etbZaehler(einsatzId, gesamtFilter),
+    queryFn: () => ladeEtbZaehler(einsatzId, gesamtFilter),
     enabled: filterAktiv,
   });
   const systemZahlId = useId();
-  const systemAnzahl = (filter.ohne_system ? systemZaehlerQuery.data : zaehlerQuery.data)?.je_typ
-    .system;
+  const systemAnzahl = systemZaehlerQuery.data?.je_typ.system;
 
   // Dokumente der Ablage mit ETB-Bezug (LFH-743): EINE Sammelabfrage über die Dokumentenliste,
   // nach Eintrag zugeordnet. Das Modulrecht `dokumente` bleibt maßgeblich — ohne Freigabe (auch
@@ -401,7 +434,28 @@ export default function EtbPage() {
   const highlightId = hervorhebung?.id ?? null;
   const zeitachseKopf = useRef<HTMLDivElement>(null);
   const zeitachsenSpalte = useRef<HTMLDivElement>(null);
-  const { abBreite, istSchmal } = useViewport();
+  const { istSchmal } = useViewport();
+  /*
+   * Seitenkopf und Filterleiste kleben ab `md` unter dem Rahmen, solange sie ins Fenster passen
+   * (kwc2yszv D8, `etb/etbKopfKleben.ts`). Die Messung braucht die Elemente als Callback-Refs; die
+   * bestehenden Ref-Objekte (Tastatur-Ebene, Bildlauf) bleiben daneben bedient.
+   */
+  const kleben = useEtbKopfKleben(!istSchmal);
+  const { filterleisteRef, zeitachseRef } = kleben;
+  const filterWurzelRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      filterWurzel.current = el;
+      filterleisteRef(el);
+    },
+    [filterleisteRef],
+  );
+  const zeitachseKopfRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      zeitachseKopf.current = el;
+      zeitachseRef(el);
+    },
+    [zeitachseRef],
+  );
   /**
    * Handschirm, zuerst die Zeitachse (LFH-955, design.md D4): unter `md` stehen Volltext,
    * Zeitraum und Einheit hinter „Filter“, Druck und Abschluss im Menü „Weitere“, und die
@@ -542,10 +596,11 @@ export default function EtbPage() {
       return;
     }
     if (richtung !== 'da' && !gescheitert && filter.ohne_system && filter.typ == null) {
-      // Das Ziel kann ein ausgeblendeter Systemeintrag sein (LFH-958, design.md D5): einblenden
-      // und erneut suchen. Der zweite Durchlauf findet ihn oder räumt den Param wie sonst. Unter
-      // einem Typfilter verbirgt der Ausschluss nichts, was der Filter zeigen würde.
-      navigate(etbPfad(einsatzId, { ...filterMitSystem, eintrag: zielEintragId }), {
+      // Das Ziel kann ein ausgeblendeter Systemeintrag sein (LFH-958, design.md D5; seit kwc2yszv D6
+      // die Vorgabe): einblenden und erneut suchen. Der zweite Durchlauf findet ihn oder räumt den
+      // Param wie sonst. Unter einem Typfilter verbirgt der Ausschluss nichts, was der Filter zeigen
+      // würde.
+      navigate(etbFilterPfad(einsatzId, filterMitSystem, { eintrag: zielEintragId }), {
         replace: true,
       });
       message.info('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen');
@@ -664,8 +719,8 @@ export default function EtbPage() {
     aelteste: gezeigt.aelteste,
     kopfImFenster: !etbQuery.hasPreviousPage,
     ohneStartlauf: zielEintragId != null,
-    // Unter `xl` steht die Bilanz unter der Spalte: das Ende ist die Spalte über der Erfassung,
-    // nicht das Dokumentende — sonst stünde beim Öffnen die Bilanz im Bild statt Nr. 134.
+    // Das Ende ist die Spalte über der Erfassung, nicht das Dokumentende: unter ihr stehen noch die
+    // Hinweise zu vorgemerkten Einträgen.
     ende: { spalte: zeitachsenSpalte, fussVariable: FOKUSABSTAND_ETB },
   });
 
@@ -779,15 +834,32 @@ export default function EtbPage() {
     einheitOptionen.push({ value: filter.einheit_id, label: `Einheit ${filter.einheit_id}` });
   }
 
-  const breit = abBreite('xl');
   const filterleisteSichtbar = !istSchmal || filterOffen;
   const puffer = pufferZustand(ausstehend, abgelehnt);
-  const segmentOptionen: SegmentOption<TypSegment>[] = typSegmente(filter.typ).map((t) => ({
-    wert: t,
-    label: t === 'alle' ? 'Alle' : etbTyp[t].label,
-    // Der Punkt ist Zierde neben dem Wort; „Alle" trägt die neutrale Stufe.
-    punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
-  }));
+  // Die Zahl je Typ steht am Segment (kwc2yszv D7, statt einer Bilanz-Leiste); ohne Zählung keine.
+  const segmentJeTyp = segmentQuery.data?.je_typ;
+  const segmentOptionen: SegmentOption<TypSegment>[] = typSegmente(filter.typ).map((t) => {
+    const zahl = segmentZahl(segmentJeTyp, t);
+    return {
+      wert: t,
+      label: t === 'alle' ? 'Alle' : etbTyp[t].label,
+      // Der Punkt ist Zierde neben dem Wort; „Alle" trägt die neutrale Stufe.
+      punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
+      zahl,
+      titel: segmentTitel(t, zahl),
+    };
+  });
+
+  /**
+   * Sprung zu den vorgemerkten Zeilen (Sendestatus im Kopf, kwc2yszv D7): sie stehen in der
+   * Funkprotokoll-Ordnung unten in der Zeitachse; gerollt wird zur ersten, wie ein `?eintrag=`.
+   */
+  function zuVorgemerkten() {
+    zeitachseKopf.current
+      ?.querySelector('[data-zeile^="ausstehend-"], [data-zeile^="abgelehnt-"]')
+      ?.scrollIntoView?.({ block: 'center' });
+  }
+  const sendestatus = <EtbSendestatus puffer={puffer} onSprung={zuVorgemerkten} />;
 
   /*
    * Das Filterband (LLH-1071, Spec `etb-filterleiste`, „Filterband über der Erfassung“): bei jedem
@@ -869,19 +941,12 @@ export default function EtbPage() {
     ) : null;
 
   // Die Erfassung hängt auf jeder Breite als `fuss` an der Seitenwurzel: in der Zeitachsenspalte
-  // stiege sie nie über deren Oberkante, und an zwei Orten je nach Breite hängte ein Wechsel über
-  // `xl` sie neu ein — der Text einer laufenden Berichtigung wäre weg. Ab `xl` endet sie über den
-  // Außenrand vor der Bilanzspalte. Das Filterband steht im selben Fuß, darüber; ohne
-  // Schreibrecht steht es dort allein.
+  // stiege sie nie über deren Oberkante, und an zwei Orten je nach Breite hängte ein Wechsel der
+  // Breite sie neu ein — der Text einer laufenden Berichtigung wäre weg. Das Filterband steht im
+  // selben Fuß, darüber; ohne Schreibrecht steht es dort allein.
   const erfassung =
     darfErfassen || band ? (
-      <div
-        ref={erfassungRef}
-        className={
-          breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
-        }
-        style={breit ? { marginInlineEnd: LEISTE_BREITE + token.marginLG } : undefined}
-      >
+      <div ref={erfassungRef} className="etb-erfassung-sticky">
         {band}
         {/* Fokus in der Leiste klappt sie auf (D4, `components/fokusInLeiste.ts`); das Band
             gehört nicht dazu, ein Zurücksetzen klappt die Erfassung nicht auf. */}
@@ -949,6 +1014,12 @@ export default function EtbPage() {
   const kopfAktionen = istSchmal ? (
     <>
       {typleiste}
+      {/* Sendestatus in der Aktionszeile, nicht in der Meta-Zeile: dort bräche er mit der spät
+          kommenden Zahl um und schöbe die Zeitachse; hier nimmt er der rollenden Typleiste Breite,
+          keine Höhe (kwc2yszv D7). */}
+      <span style={{ display: 'inline-flex', alignItems: 'center', flex: '0 0 auto' }}>
+        {sendestatus}
+      </span>
       <Button
         aria-expanded={filterleisteSichtbar}
         aria-controls="etb-filterleiste"
@@ -967,6 +1038,8 @@ export default function EtbPage() {
     </>
   ) : (
     <>
+      {/* Sendestatus vor dem Druck (kwc2yszv D7, Entwurf `Main.dc.html`). */}
+      <span style={{ display: 'inline-flex', alignItems: 'center' }}>{sendestatus}</span>
       {/* Einstieg in die Druckansicht: öffnet und sendet nichts ab, gehört also in den Kopf
           — sekundär, „genau eine Primäraktion" bleibt. Link mit Knopfgestalt (Strg/⌘+Klick
           öffnet einen Tab). Der aktive Filter geht mit. */}
@@ -996,23 +1069,25 @@ export default function EtbPage() {
         onWechsel={(an) => filterAendern({ ohne_system: an ? undefined : true })}
         zugaenglicherName="Systemeinträge zeigen"
         label="System"
-        zahl={
-          systemAnzahl == null
-            ? undefined
-            : filter.ohne_system
-              ? `${systemAnzahl} ausgeblendet`
-              : String(systemAnzahl)
-        }
+        // „System 171“ wie im Entwurf; dass sie ausgeblendet sind, sagen Zustand und Kopf
+        // (kwc2yszv D6).
+        zahl={systemAnzahl == null ? undefined : String(systemAnzahl)}
         beschreibungId={systemAnzahl != null ? systemZahlId : undefined}
         punkt={etbTypFarbe('system', token).kante}
       />
       {systemAnzahl != null && (
         <span id={systemZahlId} hidden>
-          {filter.ohne_system ? `${systemAnzahl} ausgeblendet` : systemAnzahl}
+          {systemAnzahl}
         </span>
       )}
     </>
   );
+
+  const kopfZahl = kopfMeta({
+    zaehler: zaehlerQuery.data,
+    gefiltert: filterAktiv,
+    systemAusgeblendet: filter.ohne_system ? systemAnzahl : undefined,
+  });
 
   return (
     <EinsatzSeite
@@ -1025,7 +1100,19 @@ export default function EtbPage() {
           items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: modulName('etb') }]}
         />
       }
-      meta={kopfMeta({ gesamt: zaehlerQuery.data?.gesamt, filterAktiv })}
+      meta={kopfZahl}
+      // Die Form der Zahl, solange die Zählung aussteht (LLH-1463): kommt sie spät, bräche die
+      // Meta-Zeile sonst erst dann um und schöbe die Zeitachse (`e2e/leisten-flaeche.spec.ts`).
+      // Scheitert die Zählung, kommt keine Zahl mehr: dann auch kein Platzhalter.
+      metaPlatzhalter={
+        zaehlerQuery.isError
+          ? undefined
+          : filterAktiv
+            ? '000 Treffer'
+            : filter.ohne_system
+              ? '000 Einträge · 000 Systemeinträge ausgeblendet'
+              : '000 Einträge'
+      }
       dataUpdatedAt={etbQuery.dataUpdatedAt}
       aktionen={kopfAktionen}
       // Nur mit Inhalt gesetzt: ein leerer Slot hielte Abstand (LFH-1078, Erfahrung aus P1).
@@ -1033,20 +1120,42 @@ export default function EtbPage() {
         darfErfassen ? undefined : <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz)} />
       }
       fuss={erfassung}
+      kopfKlebt={kleben.klebt}
+      kopfRef={kleben.seitenkopfRef}
     >
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: breit ? 'row' : 'column',
-          alignItems: breit ? 'flex-start' : 'stretch',
-          gap: token.marginLG,
-        }}
-      >
-        <div ref={zeitachsenSpalte} style={{ flex: '1 1 auto', minWidth: 0 }}>
+      {/* Die Zeitachse nimmt die ganze Breite: die Bilanz-Spalte ab `xl` ist entfallen (kwc2yszv
+          D7), ihre Zahlen stehen an den Typ-Segmenten und im Kopf. Der Container trägt die
+          Unterkante der klebenden Köpfe für den Spaltenkopf der Zeitachse (D8,
+          `etb/etbKopfKleben.ts`). */}
+      <div>
+        <div
+          ref={zeitachsenSpalte}
+          data-lfh="etb-seite"
+          style={{ minWidth: 0, [ETB_KOPF_UNTERKANTE]: ETB_KOPF_UNTERKANTE_WERT } as CSSProperties}
+        >
           {/* Eine Filterleiste über der Zeitachse (LLH-1065): ab `md` Typ, System, Zeitraum,
               Einheit und Volltext; unter `md` hinter „Filter (n)“. Entprellung und die Weiche
-              „eigene gegen fremde Änderung" in `EtbFilterleiste` und im Effekt oben. */}
-          <div ref={filterWurzel} id="etb-filterleiste" hidden={!filterleisteSichtbar}>
+              „eigene gegen fremde Änderung" in `EtbFilterleiste` und im Effekt oben. Ab `md`
+              klebt sie unter dem Seitenkopf, solange beide ins Fenster passen (D8). */}
+          <div
+            ref={filterWurzelRef}
+            id="etb-filterleiste"
+            hidden={!filterleisteSichtbar}
+            data-lfh={kleben.klebt ? 'etb-kopf-klebt' : undefined}
+            style={
+              kleben.klebt
+                ? {
+                    position: 'sticky',
+                    top: ETB_FILTERLEISTE_OBEN, // --lfh-rahmen-oben + Seitenkopf, `etbKopfKleben.ts`
+                    zIndex: FILTERLEISTE_EBENE,
+                    background: rollen.grund,
+                    // Der Abstand der Leiste nach unten gehört zur klebenden Fläche, sonst rollte
+                    // die Zeitachse durch einen Spalt.
+                    display: 'flow-root',
+                  }
+                : undefined
+            }
+          >
             {filterleisteSichtbar && (
               <EtbFilterleiste
                 key={filterMarke}
@@ -1102,7 +1211,7 @@ export default function EtbPage() {
           )}
 
           <div
-            ref={zeitachseKopf}
+            ref={zeitachseKopfRef}
             data-lfh="etb-zeitachse-rahmen"
             style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
           >
@@ -1222,40 +1331,6 @@ export default function EtbPage() {
             />
           )}
         </div>
-
-        {/* Seitenleiste ab `xl` rechts, darunter unter der Zeitachsenspalte — nicht dazwischen,
-            damit die angepinnte Erfassung am Fuß bleibt. Darunter erst, wenn die Liste steht
-            (Riegel `bilanzFrei`), sonst schöben die eintreffenden Zeilen sie aus dem Bild. */}
-        {(breit || bilanzFrei) && (
-          <aside
-            aria-label="Bilanz des Tagebuchs"
-            style={
-              breit
-                ? {
-                    flex: `0 0 ${LEISTE_BREITE}px`,
-                    width: LEISTE_BREITE,
-                    position: 'sticky',
-                    // Unter dem klebenden Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen).
-                    top: `calc(var(--lfh-rahmen-oben, 0px) + ${token.margin}px)`,
-                  }
-                : // Darunter um die Höhe der angepinnten Erfassung abgesetzt (LLH-1149): am Ende
-                  // steht die Spalte direkt über der Erfassung, und die Bilanz läge sonst mit
-                  // ihrer Oberkante hinter ihr im Fenster und rutschte bei jedem Mitlaufen.
-                  { marginBlockStart: `var(${FOKUSABSTAND_ETB}, 0px)` }
-            }
-          >
-            <EtbBilanz
-              einsatzId={einsatzId}
-              eintraege={eintraege}
-              zaehler={zaehlerQuery.data}
-              zaehlerFehler={zaehlerQuery.isError}
-              filterAktiv={filterAktiv}
-              puffer={puffer}
-              unbestimmt={!etbQuery.isSuccess}
-              ausschnitt={etbQuery.hasPreviousPage}
-            />
-          </aside>
-        )}
       </div>
 
       {darfSchreiben && (

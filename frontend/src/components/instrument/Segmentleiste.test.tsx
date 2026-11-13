@@ -74,6 +74,32 @@ describe('Segmentleiste', () => {
     expect(punkt).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('eine Zahl am Segment (ETB, kwc2yszv D7) steht sichtbar, der Name bleibt der Wortlaut', () => {
+    renderMitProviders(
+      <Segmentleiste
+        optionen={[
+          { wert: 'alle', label: 'Alle', zahl: 57 },
+          { wert: 'lage', label: 'Lage', zahl: 8, titel: 'Lagefeststellungen: 8' },
+          { wert: 'anordnung', label: 'Anordnung' },
+        ]}
+        wert="alle"
+        onWechsel={() => {}}
+        beschriftung="x"
+      />,
+    );
+    const lage = screen.getByRole('radio', { name: 'Lage' });
+    expect(lage).toHaveTextContent(/^Lage\s*8$/);
+    expect(lage.querySelector('[data-lfh="segment-zahl"]')).toHaveTextContent('8');
+    expect(lage).toHaveAttribute('title', 'Lagefeststellungen: 8');
+    expect(lage).toHaveAccessibleDescription('Lagefeststellungen: 8');
+    // Ohne Titel beschreibt die Zahl allein.
+    expect(screen.getByRole('radio', { name: 'Alle' })).toHaveAccessibleDescription('57');
+    // Ohne Zahl kein Zusatz.
+    const anordnung = screen.getByRole('radio', { name: 'Anordnung' });
+    expect(anordnung.querySelector('[data-lfh="segment-zahl"]')).toBeNull();
+    expect(anordnung).not.toHaveAttribute('title');
+  });
+
   it('naechsterIndex läuft im Kreis und kennt Pos1/Ende', () => {
     expect(naechsterIndex('ArrowRight', 2, 3)).toBe(0);
     expect(naechsterIndex('ArrowLeft', 0, 3)).toBe(2);
