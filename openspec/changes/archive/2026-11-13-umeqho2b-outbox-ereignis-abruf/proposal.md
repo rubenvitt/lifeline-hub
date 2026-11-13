@@ -105,14 +105,14 @@ Abruf, zweiter sind die Webhooks (LLH-1656).
 - **Migrationen:** zwei Dateien. Die erste legt die zwei Tabellen an und braucht LLH-1638 nicht.
   Die zweite legt die Trigger an `einsatz`, `einsatz_aenderung`, `einsatz_spiegel` und
   `maschinenzugang_freigabe` an und kommt hinter die Migrationen von LLH-1638 (0341, 0342).
-  Gebaut: 0343 und 0344.
+  Gebaut: 0344 und 0345 (0343 belegt inzwischen `fuehrung_loeschvermerk`).
 - **Vertrag:** `docs/api/public-v1.json` wächst um drei Routen und ihre Schemas
   (`cargo test --test public_api_spec_aktuell`); `tests/enum_wire_kontrakt.rs` bekommt die
   Ereignisart.
 - **Frontend:** keine Änderung.
 - **Doku:** `docs/api/maschinenzugang.md` (Abschnitte „Einsätze lesen“ und „Ereignisse
   abrufen“), `docs/anwender/kapitel/anbindungen.md` und `externe-lagemonitore.md`,
-  `docs/architektur/` (Kapitel 6, 8, 11, ADR-0036), `src/AGENTS.md`.
+  `docs/architektur/` (Kapitel 6, 8, 11, ADR-0037), `src/AGENTS.md`.
 - **Abhängigkeit:** LLH-1638 (Change `f658d8o6-lage-fuer-maschinenzugaenge`). Diese Change
   hängt Trigger an dessen Tabelle `maschinenzugang_freigabe` und liest sie in den Leserouten.
   Tabellen, Abruf und Purge entstanden vorher (Entscheidung Ruben, 12.11.2026); Trigger und

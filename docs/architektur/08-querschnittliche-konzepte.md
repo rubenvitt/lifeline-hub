@@ -83,7 +83,7 @@ Fremdsysteme hängen nicht an diesen Strömen. Für sie gibt es eine Outbox (`ma
 die Trigger in der Transaktion der Änderung füllen, je freigegebenem Zugang, und den Abruf
 `GET /api/v1/events` mit Cursor und Long-Poll (`src/public_api/events.rs`). Die Ereignisse tragen
 nur Art, Zeit und Einsatz-ID. Regeln:
-[ADR-0036](entscheidungen/ADR-0036-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+[ADR-0037](entscheidungen/ADR-0037-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
 Spec [`ereignis-abruf`](../../openspec/specs/ereignis-abruf/spec.md) und
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Ausgangsereignisse für Fremdsysteme“; Ablauf
 in der [Laufzeitsicht](06-laufzeitsicht.md), 6.6f.

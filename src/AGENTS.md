@@ -145,7 +145,7 @@ Spec `oeffentliche-api-vertrag`, Herleitung
 ## Backend — Ausgangsereignisse für Fremdsysteme (LLH-1655)
 
 Outbox `maschine_ereignis` und Abruf `GET /api/v1/events`
-([ADR-0036](../docs/architektur/entscheidungen/ADR-0036-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
+([ADR-0037](../docs/architektur/entscheidungen/ADR-0037-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md),
 Spec `ereignis-abruf`, Herleitung
 `openspec/changes/archive/2026-11-13-umeqho2b-outbox-ereignis-abruf/design.md`):
 - **Kein Schreibweg in Rust schreibt in `maschine_ereignis`.** Jede Zeile entsteht in einem

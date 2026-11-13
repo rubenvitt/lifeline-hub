@@ -339,7 +339,7 @@ Claims des JWS (`aud` ist die Instanz-UUID aus dem Einlösen):
 
 > **Stand 13.11.2026 (LLH-1655):** Outbox, Abruf und Leserouten sind gebaut. Zwei Punkte dieses
 > Abschnitts sind abgelöst
-> ([ADR-0036](../architektur/entscheidungen/ADR-0036-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md)):
+> ([ADR-0037](../architektur/entscheidungen/ADR-0037-ausgangsereignisse-fuer-fremdsysteme-entstehen-per-trigger-und-je-zugang.md)):
 > Geschrieben wird per Trigger statt in den `_tx`-Funktionen, und sichtbar ist ein Ereignis für
 > den Zugang, dem es beim Schreiben zugeordnet wurde, statt nach einem Filter beim Lesen.
 > `einsatz.created` und `einsatz.closed` melden deshalb Beginn und Ende der Lesbarkeit für einen
