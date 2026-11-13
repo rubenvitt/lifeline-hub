@@ -1,9 +1,10 @@
 //! Fetch-Logik je Quelle mit Stale-while-revalidate (SWR):
 //! frischer Cache → sofort; veralteter Cache → sofort den alten Stand ausliefern und im
 //! Hintergrund erneuern (nicht blockierend); gar kein Cache → einmalig blockierend holen. Je
-//! Schlüssel läuft dabei höchstens ein Abruf; wer ihn belegt findet, bekommt `offline` (LLH-1683).
-//! Ausnahme Energie (LFH-81): dort wird auch der kalte Abruf von der Anfrage gelöst und nur
-//! bis zu einer Wartefrist abgewartet (`liefere_geloest`).
+//! Schlüssel läuft dabei höchstens ein Abruf, als eigene Task, die den Cache auch nach einem
+//! Abbruch der Anfrage schreibt; wer die Marke belegt findet, bekommt `offline` (LLH-1683).
+//! Ausnahme Energie (LFH-81): dort wird der kalte Abruf nur bis zu einer Wartefrist abgewartet
+//! (`liefere_geloest`).
 
 use crate::error::AppError;
 use crate::http_begrenzt::{lies_json_begrenzt, lies_text_begrenzt, DECKEL_FACHEBENE};
@@ -1190,7 +1191,7 @@ where
     )
 }
 
-/// SWR mit **gelöstem** kaltem Pfad — die Energie-Variante von [`liefere_mit_swr`].
+/// SWR mit **Wartefrist** im kalten Pfad — die Energie-Variante von [`liefere_mit_swr`].
 ///
 /// Kalt läuft der Abruf per `tokio::spawn` und wird nur bis `bis` abgewartet. Reißt er die
 /// Frist, trägt der Teil zu dieser Antwort nichts bei; der Abruf schreibt Cache bzw.
