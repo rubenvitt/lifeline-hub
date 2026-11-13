@@ -74,8 +74,9 @@ async fn main() -> anyhow::Result<()> {
                 ArchivBefehl::Loeschersuchen {
                     identitaet,
                     einsatz,
+                    org,
                 },
-        }) => cmd_archiv_loeschersuchen(&config.db_path, &identitaet, einsatz).await,
+        }) => cmd_archiv_loeschersuchen(&config.db_path, &identitaet, einsatz, org).await,
         Some(Command::Archiv {
             befehl:
                 ArchivBefehl::Personen {
@@ -763,13 +764,14 @@ async fn cmd_archiv_loeschersuchen(
     db_path: &str,
     identitaet: &str,
     einsatz: Option<i64>,
+    org: Option<i64>,
 ) -> anyhow::Result<()> {
     use lifeline_hub::einsatz::archiv::loeschersuchen;
     let schluessel = identitaet_laden(identitaet)?;
     let pool = archiv_db(db_path).await?;
     let ids = match einsatz {
         Some(id) => vec![id],
-        None => loeschersuchen::faellige_einsaetze(&pool, chrono::Utc::now())
+        None => loeschersuchen::faellige_einsaetze(&pool, chrono::Utc::now(), org)
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))?,
     };
@@ -779,31 +781,49 @@ async fn cmd_archiv_loeschersuchen(
         return Ok(());
     }
     let mut fehler = 0;
+    let mut vollzogen = 0;
     for id in ids {
-        // Ein Abbruch (Strg+C, SIGTERM) lässt den Lauf fallen: so löscht `Drop` die
-        // entschlüsselten Zwischendateien, und vor der Ablage ist nichts geändert.
-        let ergebnis = tokio::select! {
-            e = loeschersuchen::vollziehen(&pool, id, &schluessel, chrono::Utc::now()) => Some(e),
+        // Abbrechbar ist nur das Bauen: ein Abbruch (Strg+C, SIGTERM) lässt es fallen, `Drop`
+        // löscht die entschlüsselten Zwischendateien, und an diesem Einsatz ist nichts geändert.
+        // Die Ablage danach ist eine Transaktion und läuft zu Ende.
+        let gebaut = tokio::select! {
+            b = loeschersuchen::neu_bauen(&pool, id, &schluessel, chrono::Utc::now()) => Some(b),
             () = shutdown_signal() => None,
         };
-        match ergebnis {
+        let ergebnis = match gebaut {
             None => {
                 pool.close().await;
-                anyhow::bail!("Abgebrochen. Die entschlüsselten Zwischendateien sind gelöscht.");
+                anyhow::bail!(
+                    "Abgebrochen. Die entschlüsselten Zwischendateien sind gelöscht; an Einsatz \
+                     {id} ist nichts geändert{}.",
+                    if vollzogen > 0 {
+                        ", die zuvor gemeldeten Einsätze bleiben vollzogen"
+                    } else {
+                        ""
+                    }
+                );
             }
-            Some(Ok(Some(v))) => println!(
-                "Einsatz {} (ID {}): {} in {} {} des Archivs geschwärzt.",
-                v.einsatz_kennung,
-                v.einsatz_id,
-                v.personen.join(", "),
-                v.bloecke,
-                if v.bloecke == 1 { "Block" } else { "Blöcken" }
-            ),
-            Some(Ok(None)) => println!(
+            Some(Ok(Some(bau))) => loeschersuchen::ablegen(&pool, bau).await,
+            Some(Ok(None)) => Ok(None),
+            Some(Err(e)) => Err(e),
+        };
+        match ergebnis {
+            Ok(Some(v)) => {
+                vollzogen += 1;
+                println!(
+                    "Einsatz {} (ID {}): {} in {} {} des Archivs geschwärzt.",
+                    v.einsatz_kennung,
+                    v.einsatz_id,
+                    v.personen.join(", "),
+                    v.bloecke,
+                    if v.bloecke == 1 { "Block" } else { "Blöcken" }
+                )
+            }
+            Ok(None) => println!(
                 "Einsatz {id}: kein fälliger Antrag mit Archiv, oder Antrag bzw. Archiv haben \
                  sich während des Laufs geändert; nichts geändert."
             ),
-            Some(Err(e)) => {
+            Err(e) => {
                 eprintln!("Einsatz {id}: {e}");
                 fehler += 1;
             }
@@ -811,7 +831,10 @@ async fn cmd_archiv_loeschersuchen(
     }
     pool.close().await;
     if fehler > 0 {
-        anyhow::bail!("{fehler} Einsatz/Einsätze nicht vollzogen; dort ist nichts geändert.");
+        anyhow::bail!(
+            "{fehler} Einsatz/Einsätze nicht vollzogen; dort ist nichts geändert. Gehören sie zu \
+             einer anderen Organisation, mit --org eingrenzen."
+        );
     }
     Ok(())
 }

@@ -134,6 +134,28 @@ mit dem Archiv-Schlüssel wartet.
 - **WHEN** der Admin die Akte eines archivierten Einsatzes mit einem vor 30 Stunden gestellten, offenen Antrag für `R-042` öffnet
 - **THEN** trägt der Antrag den Hinweis, dass er auf den Befehl mit dem Archiv-Schlüssel wartet
 
+### Requirement: Rückfrage vor dem Antrag
+
+Vor dem Absenden SHALL eine Rückfrage stehen, die das Ziel pseudonym nennt, die
+Unwiderruflichkeit nach 24 Stunden und die Fälligkeit benennt und Aktenzeichen sowie das
+Eintippen der Kennung verlangt. Erst wenn beides ausgefüllt ist und die Kennung übereinstimmt,
+MUST sich der Antrag absenden lassen. Für eine Person an einem archivierten Einsatz gibt es keine
+angezeigte Kennung: Dort MUST das Eintippen einer gültigen Kennung (`R-…`, `EK-…`, `IT-…`)
+zugleich das Ziel bestimmen und die Bestätigung sein; die Rückfrage MUST dann die Art der Person
+zur eingetippten Kennung nennen.
+
+#### Scenario: Kennung stimmt nicht
+- **WHEN** der Admin in der Rückfrage für `R-042` die Kennung `R-04` eintippt
+- **THEN** bleibt die Aktion zum Absenden gesperrt
+
+#### Scenario: Person im Archiv
+- **WHEN** der Admin am archivierten Einsatz in der Rückfrage „Person per Kennung schwärzen“ die Kennung `r-42` und ein Aktenzeichen eintippt
+- **THEN** nennt die Rückfrage „Betroffene Person R-042“ und die Fälligkeit, und der Antrag lässt sich absenden
+
+#### Scenario: Keine Kennung
+- **WHEN** der Admin dort `X-1` eintippt
+- **THEN** bleibt die Aktion zum Absenden gesperrt
+
 ## ADDED Requirements
 
 ### Requirement: Vollzug eines Personen-Antrags im Archiv

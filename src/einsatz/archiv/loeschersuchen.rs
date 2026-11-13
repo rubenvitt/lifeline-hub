@@ -47,19 +47,24 @@ pub struct Vollzogen {
     pub bloecke: usize,
 }
 
-/// Einsätze mit fälligen Personen-Anträgen und Archiv, aufsteigend.
+/// Einsätze mit fälligen Personen-Anträgen und Archiv, aufsteigend; mit `org` nur die dieser
+/// Organisation (ein Archiv-Schlüssel öffnet nur die Blöcke seiner Organisation).
 pub async fn faellige_einsaetze(
     pool: &SqlitePool,
     jetzt: DateTime<Utc>,
+    org: Option<i64>,
 ) -> Result<Vec<i64>, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT DISTINCT s.einsatz_id FROM schwaerzung_antrag s \
+           JOIN einsatz e ON e.id = s.einsatz_id \
          WHERE s.ziel_art NOT IN ('einsatz', 'medienkontakt') \
-           AND s.zurueckgenommen_at IS NULL AND s.vollzogen_at IS NULL AND s.faellig_at <= ? \
+           AND s.zurueckgenommen_at IS NULL AND s.vollzogen_at IS NULL AND s.faellig_at <= ?1 \
            AND EXISTS (SELECT 1 FROM einsatz_archiv a WHERE a.einsatz_id = s.einsatz_id) \
+           AND (?2 IS NULL OR e.org_id = ?2) \
          ORDER BY s.einsatz_id",
     )
     .bind(crate::zeit::formatiere_utc(jetzt))
+    .bind(org)
     .fetch_all(pool)
     .await?)
 }
@@ -101,7 +106,7 @@ struct NeuerBlock {
 }
 
 /// Die neu gebauten Blöcke eines Einsatzes, bereit zur Ablage.
-pub(super) struct Bau {
+pub struct Bau {
     einsatz_id: i64,
     org_id: i64,
     einsatz_kennung: String,
@@ -128,7 +133,7 @@ pub async fn vollziehen(
 }
 
 /// Schritt 1, ohne Schreibsperre: alle Blöcke neu bauen.
-pub(super) async fn neu_bauen(
+pub async fn neu_bauen(
     pool: &SqlitePool,
     einsatz_id: i64,
     schluessel: &Schluessel,
@@ -139,8 +144,10 @@ pub(super) async fn neu_bauen(
     if antraege.is_empty() {
         return Ok(None);
     }
-    let alte: Vec<(i64, i64, String, Vec<u8>)> = sqlx::query_as(
-        "SELECT id, block, sha256, inhalt FROM einsatz_archiv WHERE einsatz_id = ? ORDER BY block",
+    // Erst nur die Kennzeichen; die Inhalte einzeln, damit nie mehr als ein Block im Speicher
+    // liegt (Anhänge machen sie groß, wie beim Archivieren).
+    let alte: Vec<(i64, i64, String)> = sqlx::query_as(
+        "SELECT id, block, sha256 FROM einsatz_archiv WHERE einsatz_id = ? ORDER BY block",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -173,7 +180,17 @@ pub(super) async fn neu_bauen(
 
     let verzeichnis = bauen::verzeichnis(pool).await?;
     let mut bloecke = Vec::with_capacity(alte.len());
-    for (zeile, block, alt_sha256, inhalt) in alte {
+    for (zeile, block, alt_sha256) in alte {
+        let Some(inhalt): Option<Vec<u8>> =
+            sqlx::query_scalar("SELECT inhalt FROM einsatz_archiv WHERE id = ? AND sha256 = ?")
+                .bind(zeile)
+                .bind(&alt_sha256)
+                .fetch_optional(pool)
+                .await?
+        else {
+            // Inzwischen gelöscht oder ersetzt: der nächste Aufruf baut neu.
+            return Ok(None);
+        };
         let teil = format!("{}{block}", bauen::TEIL_LOESCHERSUCHEN);
         let klar = bauen::entschluesseln(&inhalt, schluessel, &verzeichnis, einsatz_id, &teil)
             .map_err(|e| match e {
@@ -220,7 +237,7 @@ pub(super) async fn neu_bauen(
 
 /// Schritt 2, in einer Transaktion: prüfen, dass Anträge und Archiv noch dem Stand des Baus
 /// entsprechen, dann ersetzen und die Spur schreiben. `Ok(None)`, wenn nicht.
-pub(super) async fn ablegen(pool: &SqlitePool, bau: Bau) -> Result<Option<Vollzogen>, AppError> {
+pub async fn ablegen(pool: &SqlitePool, bau: Bau) -> Result<Option<Vollzogen>, AppError> {
     let Bau {
         einsatz_id,
         org_id,
@@ -230,13 +247,6 @@ pub(super) async fn ablegen(pool: &SqlitePool, bau: Bau) -> Result<Option<Vollzo
         fingerabdruecke,
         jetzt_s,
     } = bau;
-    let inhalte = bloecke
-        .iter()
-        .map(|b| {
-            std::fs::read(b.datei.pfad())
-                .map_err(|e| AppError::Internal(format!("Archiv: neuer Block lesen: {e}")))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let anzahl = bloecke.len();
     let personen = crate::write_retry!(pool, |conn| {
@@ -263,7 +273,11 @@ pub(super) async fn ablegen(pool: &SqlitePool, bau: Bau) -> Result<Option<Vollzo
         }
         let alte_sha: Vec<String> = bloecke.iter().map(|b| b.alt_sha256.clone()).collect();
         super::kopien_vormerken_tx(&mut *conn, &alte_sha).await?;
-        for (b, inhalt) in bloecke.iter().zip(&inhalte) {
+        // Je Block einzeln gelesen, wie beim Archivieren (`archiv::archivieren`): nie alle
+        // neuen Blöcke zugleich im Speicher.
+        for b in &bloecke {
+            let inhalt = std::fs::read(b.datei.pfad())
+                .map_err(|e| AppError::Internal(format!("Archiv: neuer Block lesen: {e}")))?;
             sqlx::query(
                 "UPDATE einsatz_archiv SET sha256 = ?, groesse = ?, inhalt = ?, \
                     empfaenger_fingerabdruecke = ? WHERE id = ?",

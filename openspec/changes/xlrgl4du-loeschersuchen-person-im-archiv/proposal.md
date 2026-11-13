@@ -18,8 +18,8 @@ keinen Antrag an, auch nicht den für den ganzen Einsatz, den Server und Anwende
   Ziel lässt sich dafür statt per ID auch per Kennung angeben (`R-042`, `EK-17`, `IT-5`).
 - **Purge-Lauf:** Er vollzieht einen Personen-Antrag an einem archivierten Einsatz nicht mehr. Der
   Antrag bleibt offen; heute würde er still als „bereits geschwärzt“ erledigt.
-- **Neuer Befehl `lifeline-hub archiv loeschersuchen --identitaet …`:** Er vollzieht die fälligen
-  Personen-Anträge an archivierten Einsätzen:
+- **Neuer Befehl `lifeline-hub archiv loeschersuchen --identitaet … [--einsatz …] [--org …]`:**
+  Er vollzieht die fälligen Personen-Anträge an archivierten Einsätzen:
   - Jeder Block des Einsatzes wird entschlüsselt, die Person darin nach der Klassifikation
     geschwärzt und der Block an die geprüften Archiv-Schlüssel der Organisation neu
     verschlüsselt.
@@ -53,7 +53,9 @@ Keine.
   zulässig, und eine Person lässt sich als Ziel per Kennung angeben. Ein solcher Antrag vollzieht
   sich nicht im Purge-Lauf, sondern per Befehl mit dem Archiv-Schlüssel, in allen Blöcken. Eine
   Personensuche im Archivblock läuft per Befehl. Die Archivakte bietet die Antragswege am
-  archivierten Einsatz an.
+  archivierten Einsatz an; deren Rückfrage nimmt die Kennung zugleich als Bestätigung.
+- `aufbewahrung-archiv`: Geschwärzt wird außer im Purge-Lauf auch durch den Befehl, der eine
+  Person in den Blöcken eines Archivs schwärzt.
 
 ## Impact
 

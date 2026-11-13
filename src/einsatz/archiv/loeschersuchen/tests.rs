@@ -201,7 +201,7 @@ async fn person_aus_allen_bloecken_entfernt_staffel_bleibt() {
 
     let antrag = antrag(&pool, &a, 25).await;
     assert_eq!(
-        faellige_einsaetze(&pool, Utc::now()).await.unwrap(),
+        faellige_einsaetze(&pool, Utc::now(), None).await.unwrap(),
         vec![a.einsatz]
     );
     let v = vollziehen(&pool, a.einsatz, &schluessel_von(&a.identitaet), Utc::now())
@@ -237,7 +237,29 @@ async fn person_aus_allen_bloecken_entfernt_staffel_bleibt() {
     // schon nach Frist geschwärzt).
     let klar = klartext(&nachher[0].3, &a.identitaet);
     assert!(enthaelt(&klar, b"Nachbar") && enthaelt(&klar, b"0160 1111111"));
-    assert!(faellige_einsaetze(&pool, Utc::now())
+    assert!(faellige_einsaetze(&pool, Utc::now(), None)
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+/// `--org`: nur die Einsätze dieser Organisation (ein Schlüssel öffnet nur ihre Blöcke).
+#[tokio::test]
+async fn faellige_einsaetze_je_organisation() {
+    let pool = crate::db::test_pool().await;
+    let a = archiv(&pool).await;
+    antrag(&pool, &a, 25).await;
+    assert_eq!(
+        faellige_einsaetze(&pool, Utc::now(), Some(1))
+            .await
+            .unwrap(),
+        vec![a.einsatz]
+    );
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Andere')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(faellige_einsaetze(&pool, Utc::now(), Some(2))
         .await
         .unwrap()
         .is_empty());
@@ -249,7 +271,7 @@ async fn noch_nicht_faellig_aendert_nichts() {
     let a = archiv(&pool).await;
     let antrag = antrag(&pool, &a, 23).await;
     let vorher = bloecke(&pool, a.einsatz).await;
-    assert!(faellige_einsaetze(&pool, Utc::now())
+    assert!(faellige_einsaetze(&pool, Utc::now(), None)
         .await
         .unwrap()
         .is_empty());

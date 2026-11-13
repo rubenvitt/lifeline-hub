@@ -310,6 +310,8 @@ lifeline-hub --db-path /var/lib/lifeline/lifeline.db archiv loeschersuchen \
              --identitaet archiv-schluessel.txt
 # nur einen Einsatz (ID aus der Adresse der Archivakte)
 lifeline-hub --db-path … archiv loeschersuchen --identitaet - --einsatz 751
+# nur die Einsätze einer Organisation (ein Schlüssel öffnet nur die Blöcke seiner Organisation)
+lifeline-hub --db-path … archiv loeschersuchen --identitaet … --org 2
 ```
 
 - Jeder Block des Einsatzes wird entschlüsselt (Zwischendatei neben der Datenbank, wie beim
@@ -327,7 +329,14 @@ lifeline-hub --db-path … archiv loeschersuchen --identitaet - --einsatz 751
   danach nicht mehr einspielen. Eine hier eingespielte Kopie eines alten Blocks geht mit dem
   nächsten Purge-Lauf. Heruntergeladene Blöcke und Kopien an anderen Installationen erreicht der
   Vollzug nicht; sie sind beim Löschersuchen von Hand mit zu löschen.
-- Strg+C oder SIGTERM brechen ab, ohne etwas zu ändern; die Zwischendateien gehen mit.
+- Führt die Installation mehrere Organisationen, gehört `--org` dazu: Ohne sie versucht der
+  Befehl auch die Einsätze der anderen, scheitert dort am Schlüssel und endet mit einem Fehler,
+  obwohl die eigenen vollzogen sind.
+- Strg+C oder SIGTERM während des Neubaus brechen ab: Am gerade bearbeiteten Einsatz ändert sich
+  nichts, und die Zwischendateien gehen mit; schon gemeldete Einsätze bleiben vollzogen. Das
+  Ablegen danach ist eine Transaktion und läuft zu Ende.
+- Der Befehl hält immer nur einen Block im Arbeitsspeicher. Neben der Datenbank braucht er Platz
+  für alle neu verschlüsselten Blöcke des Einsatzes und einen entschlüsselten.
 
 **Kennung finden.** Am archivierten Einsatz gibt es keine Namen mehr. Die Kennung zu einem Namen
 liefert die Suche im gültigen Block des Archivs:
@@ -340,7 +349,8 @@ lifeline-hub --db-path … archiv personen --einsatz 751 --identitaet archiv-sch
 Sie sucht wie die Personensuche der Archivakte (ganze Wörter des Namens, bei Kräften und Anrufen
 auch Rufnummern ab sechs Ziffern) und nennt je Treffer Kennung, Art, Erfassungszeit und Namen,
 nur im Terminal. Am Archiv ändert sie nichts. Das Zugangsprotokoll hält jede Suche unter „Archiv
-durchsucht“ fest, ohne den Suchtext.
+durchsucht“ fest, ohne den Suchtext. Der Suchtext steht aber in der Prozessliste und in der
+Shell-History; wer das vermeiden will, schaltet die History für den Aufruf ab.
 
 ## Sicherungen und Schwärzung (LFH-725)
 

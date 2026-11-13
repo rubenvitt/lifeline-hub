@@ -49,8 +49,11 @@ Siehe proposal.md, „Why“. Der Stand im Code:
 
 ### D1 Vollzug per Befehl, Antrag bleibt bis dahin offen
 
-`lifeline-hub archiv loeschersuchen --identitaet <datei|-> [--einsatz <id>]` vollzieht alle
-fälligen Personen-Anträge an archivierten Einsätzen, mit `--einsatz` nur die eines Einsatzes.
+`lifeline-hub archiv loeschersuchen --identitaet <datei|-> [--einsatz <id>] [--org <id>]`
+vollzieht alle fälligen Personen-Anträge an archivierten Einsätzen, mit `--einsatz` nur die
+eines Einsatzes, mit `--org` nur die einer Organisation: Ein Archiv-Schlüssel öffnet nur die
+Blöcke seiner Organisation (Review vor dem PR). Abbrechbar ist nur das Bauen; die Ablage ist
+eine Transaktion und läuft zu Ende, damit die Meldung des Befehls stimmt.
 Den Schlüssel liest er wie `archiv einspielen` (`identitaet_laden`, Passphrase über stdin), den
 Stand der Datenbank prüft er mit `db::stand_abweichung`. Der Befehl darf bei laufendem Server
 laufen.
@@ -87,6 +90,9 @@ Je Einsatz geht der Lauf in zwei Schritten vor.
   ein Antrag nicht mehr offen, wird alles zurückgerollt. Der nächste Aufruf baut neu.
 - Eingespielte Kopien der alten `sha256` zum Abräumen vormerken (D4).
 - ETB-Einträge und Admin-Spur schreiben (D5).
+
+Im Arbeitsspeicher liegt dabei immer nur ein Block: das Bauen liest jeden alten Inhalt einzeln,
+die Ablage jeden neuen einzeln aus seiner Datei (wie `archiv::archivieren`).
 
 Ein Lauf schwärzt alle fälligen Anträge eines Einsatzes zusammen, sodass jeder Block nur einmal
 gebaut wird. Auch ein Block mit abgelaufener Frist, den Phase N noch nicht gelöscht hat, wird

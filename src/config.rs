@@ -870,6 +870,10 @@ pub enum ArchivBefehl {
         /// Nur diesen Einsatz (ID); ohne Angabe alle mit fälligen Anträgen.
         #[arg(long)]
         einsatz: Option<i64>,
+        /// Nur Einsätze dieser Organisation (ID). Ein Archiv-Schlüssel öffnet nur die Blöcke
+        /// seiner Organisation; an einer Installation mit mehreren gehört die Angabe dazu.
+        #[arg(long)]
+        org: Option<i64>,
     },
     /// Im Archiv eines Einsatzes nach einer Person suchen, um ihre Kennung für ein Löschersuchen
     /// zu finden (LLH-1712).
@@ -1927,8 +1931,9 @@ mod tests {
                     ArchivBefehl::Loeschersuchen {
                         identitaet,
                         einsatz,
+                        org,
                     },
-            }) => assert_eq!((identitaet.as_str(), einsatz), ("-", Some(7))),
+            }) => assert_eq!((identitaet.as_str(), einsatz, org), ("-", Some(7), None)),
             andere => panic!("{andere:?}"),
         }
         let c = parse_hermetisch([
@@ -1937,11 +1942,17 @@ mod tests {
             "loeschersuchen",
             "--identitaet",
             "k.txt",
+            "--org",
+            "2",
         ]);
         assert!(matches!(
             c.command,
             Some(Command::Archiv {
-                befehl: ArchivBefehl::Loeschersuchen { einsatz: None, .. }
+                befehl: ArchivBefehl::Loeschersuchen {
+                    einsatz: None,
+                    org: Some(2),
+                    ..
+                }
             })
         ));
         let c = parse_hermetisch([

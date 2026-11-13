@@ -10,10 +10,11 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
       `archivierter_einsatz_nur_ganz_und_der_vollzug_loescht_das_archiv` wird umgeschrieben;
       dazu „Archiv abgelaufen“ → 409. Kommentar und 409-Text in `antrag.rs` nachziehen.
 - [x] 1.2 Ziel per Kennung (design.md D3): `AntragZielEingabe` mit optionalem `kennung`;
-      `ziel_aus` verlangt genau `id` oder `kennung` bei einer Person, sonst 400. `stellen` löst
-      `R-`, `EK-` und `IT-` in der Transaktion auf: falsches Präfix 400, keine Zeile 404,
-      Stammkraft 422. Tests: Einheitentests in `antrag_tests.rs`, dazu ein Routentest in
-      `tests/aufbewahrung.rs`, der per Kennung stellt.
+      `ziel_aus` verlangt genau `id` oder `kennung` bei einer Person, sonst 400. Die Route löst
+      `R-`, `EK-` und `IT-` vor `stellen` auf (`antrag::person_aus_kennung`): falsches Präfix 400,
+      keine Zeile 404; `stellen` prüft danach wie bisher (Stammkraft 422). Tests: Einheitentests
+      in `antrag_tests.rs`, dazu ein Routentest in `tests/loeschersuchen.rs`, der per Kennung
+      stellt.
 - [x] 1.3 Purge-Lauf lässt Personen-Anträge am archivierten Einsatz offen (D1): `faellige`
       schließt sie aus, `vollziehen_ergebnis` gibt dort `Vollzug::Nichts` zurück, ohne
       `vollzogen_at` zu setzen. Ist das Archiv abgelaufen, gilt wie bisher „bereits
@@ -72,7 +73,7 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
 
 ## 5. Befehle
 
-- [x] 5.1 `ArchivBefehl::Loeschersuchen { identitaet, einsatz: Option<i64> }` und
+- [x] 5.1 `ArchivBefehl::Loeschersuchen { identitaet, einsatz, org }` und
       `ArchivBefehl::Personen { einsatz, identitaet, suche }` in `src/config.rs`, dazu der
       Dispatch und `cmd_archiv_*` in `src/main.rs`: Schlüssel über `identitaet_laden`,
       `db::stand_abweichung`, Abbruch bei Signal. Die Ausgabe nennt je Einsatz die Anträge,
@@ -88,11 +89,11 @@ Jede Aufgabe entsteht per TDD: zuerst der Test, der ohne die Änderung rot ist.
       ohne offenen Einsatz-Antrag; geschwärzt ohne Archiv → keiner. Tests in
       `Loeschersuchen.test.tsx` (die Fälle zu `geschwaerzt` umschreiben, die neuen Fälle
       dazu).
-- [x] 6.2 Dialog „Person per Kennung schwärzen“: Kennung eingeben, Art aus dem Präfix, dann der
-      bestehende `SchwaerzungsantragDialog` mit `{ art, kennung }`. Er nennt den Vollzug per
-      Befehl und `archiv personen` als Weg zur Kennung. `antragBody` sendet `kennung` statt
-      `id`. Tests: reine Funktionen (Präfix → Art, ungültige Kennung gesperrt, Body)
-      und ein Rendertest des Dialogs.
+- [x] 6.2 Dialog „Person per Kennung schwärzen“ (`ArchivPersonAntragDialog`, D7): Kennung und
+      Aktenzeichen; die Kennung bestimmt Art und Ziel und ist zugleich die Bestätigung, der
+      Dialog nennt Art, Fälligkeit, den Vollzug per Befehl und `archiv personen` als Weg zur
+      Kennung; Body mit `kennung` statt `id`. Tests: reine Funktionen (Präfix → Art, ungültige
+      Kennung, Body) und ein Rendertest des Dialogs.
 - [x] 6.3 Hinweis an offenen, fälligen Personen-Anträgen am Archiv: „wartet auf Befehl mit
       Archiv-Schlüssel“. Prüfen mit einem Rendertest in `Loeschersuchen.test.tsx`.
 - [x] 6.4 Anwenderkapitel `docs/anwender/kapitel/aufbewahrung.md` nachziehen (Sätze zu „nur
