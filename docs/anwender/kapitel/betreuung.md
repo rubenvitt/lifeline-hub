@@ -304,8 +304,9 @@ Werte des Einsatzes rechnet die Seite mit den Vorgaben und zeigt „Basiswerte�
 
 Ein Fremdsystem mit dem Recht „Rechner nutzen“ ([Anbindungen](anbindungen.md)) rechnet nach
 denselben Regeln, aber auf dem Server: mit den Werten der Organisation und, wenn es welche
-mitschickt, eigenen Werten für diese eine Rechnung. Die Werte eines Einsatzes gelten dort nicht.
-Was es rechnet, steht in keinem Einsatz.
+mitschickt, eigenen Werten für diese eine Rechnung. Die Werte eines Einsatzes gelten dort nur für
+den Einsatz, den die Einsatzleitung für das Fremdsystem freigegeben hat, und nur, wenn es nach
+ihnen fragt. Was es rechnet, steht in keinem Einsatz.
 
 ### Verpflegung
 
