@@ -586,6 +586,11 @@ weiter, und der Hub nimmt das an. Wer per Code abgibt, schreibt ab dem Code nich
 Einsatz ist dort sofort ein Spiegel, und der Verlauf zeigt „Abgabe per Code“, ohne auf den Hub zu
 warten. Ein Tippfehler am Hub zeigt sich erst am ELW, als verworfene Übernahme.
 
+Die Erklärung einer Notübernahme nennt als Unterzeichner höchstens die ersten 200 Zeichen des
+Anzeigenamens. Wäre sie trotzdem größer, als die andere Installation annimmt, lehnt der Server
+die Notübernahme ab („Die Erklärung der Notübernahme ist zu groß für die Übertragung. Bitte den
+Grund kürzen.“), und die Führung bleibt, wo sie war. Mit gewöhnlichem Text kommt das nicht vor.
+
 Der Verlauf im Paneel nennt je Wechsel Epoche, Art, von wem an wen, wer, Grund und
 Unterzeichner. Das Paneel mit dem Verlauf liest jede Person, die den Einsatz liest; gekoppelte
 Geräte sehen es nicht, nur wie jede andere Ansicht das Hinweisband „Spiegel von …“. Die **Bruchstelle** ist die letzte Meldung vor einer Übernahme; was danach an
