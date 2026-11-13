@@ -117,8 +117,8 @@ Verworfen:
 `docs/architektur/AGENTS.md`, „Mitänderungsregel“: eine Entscheidung der Route `entwurf` (E1)
 bekommt eine ADR. Titel sinngemäß „Eine Erklärung, die das Gegenüber ablehnen würde, lehnt der
 Sender ab, bevor sie lokal gilt“, `gilt_fuer: src/instanz/fuehrung/**`, Nummer die nächste freie
-auf `alpha` zum Zeitpunkt der Umsetzung (ADR-0031: 0029 trägt der offene PR #1318, 0030 liegt
-auf `alpha`), dazu `src/routes/fuehrung.rs`. Regeln: Jeder Text einer Erklärung kommt aus
+auf `alpha` zum Zeitpunkt der Umsetzung (ADR-0033: die Nummern davor waren bei den Merges
+schon von anderen PRs belegt, zuerst 0029, dann 0031), dazu `src/routes/fuehrung.rs`. Regeln: Jeder Text einer Erklärung kommt aus
 `erklaerung_text`; gekürzt wird nur der Unterzeichner, auf `ANZEIGENAME_MAX`. Prüfung per
 `verlange`/`verbiete` auf `dienst.rs` und `routes/fuehrung.rs` (kein `e.to_text()` mehr).
 
