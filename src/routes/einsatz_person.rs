@@ -63,6 +63,23 @@ pub struct PersonDetail {
     pub verletzungen: Vec<VerletzungAnzeige>,
 }
 
+/// Meldet jede versorgte Person der Einheit `einheit_id` mit `person` (LLH-1682, design.md D5):
+/// ihre Zeile trägt Name und Abschnitt der Einheit per Join. Nach dem Commit; scheitert das
+/// Lesen, bleibt es bei einer Warnung, die Änderung an der Einheit ist gespeichert.
+pub(crate) async fn sse_versorgte_personen(state: &AppState, einsatz_id: i64, einheit_id: i64) {
+    match repo::versorgte_von(&state.pool, einsatz_id, einheit_id).await {
+        Ok(ids) => ids
+            .into_iter()
+            .for_each(|pid| sse_person(state, einsatz_id, pid)),
+        Err(e) => tracing::warn!(
+            einsatz_id,
+            einheit_id,
+            fehler = %e,
+            "versorgte Personen nicht lesbar, Live-Ereignis entfällt"
+        ),
+    }
+}
+
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
 /// (nur einsatz_id + person_id); Clients refetchen die Liste.
 pub(crate) fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
@@ -196,12 +213,12 @@ pub async fn liste(
     Ok(Json(liste))
 }
 
-/// GET /api/einsaetze/{id}/personen/{pid}/zeile — eine Person in der Form der Liste, auch
-/// storniert, für den Zeilenabgleich des Live-Feeds (LLH-1682, Spec `live-abgleich`). NICHT
+/// GET /api/einsaetze/{id}/personen/{pid}/zeile — genau die Zeile, die die Liste dieser Sitzung
+/// zeigen würde, für den Zeilenabgleich des Live-Feeds (LLH-1682, Spec `live-abgleich`). NICHT
 /// auditiert wie die Liste: jeder Tab ruft sie bei jedem `person`-Ereignis ab, das Detail
-/// schriebe dabei je Abruf eine Protokollzeile. Dieselben Schranken wie die Liste: Stellenbindung
-/// der Geräte (eine Person, die das Gerät nicht sähe, ist 404) und das Einheitengerät ohne
-/// Personalien.
+/// schriebe dabei je Abruf eine Protokollzeile. Dieselben Schranken wie die Liste: stornierte
+/// Personen und solche, die ein Gerät nicht sähe (Stellenbindung), sind 404; das Einheitengerät
+/// bekommt keine Personalien.
 pub async fn zeile(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personen>,
@@ -209,6 +226,11 @@ pub async fn zeile(
 ) -> Result<Json<PersonAnzeige>, AppError> {
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let mut person = repo::laden(&state.pool, ctx.einsatz.id, person_id).await?;
+    // Nur was die Liste zeigt: eine stornierte Person ist 404 ohne Personalien, der Tab nimmt
+    // sie aus seinen Listen (design.md D4).
+    if person.storniert_at.is_some() {
+        return Err(AppError::NotFound);
+    }
     if ist_einheitengeraet(&ctx) {
         person.ohne_personalien();
     }

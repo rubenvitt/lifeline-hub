@@ -791,6 +791,10 @@ pub async fn update(
     if vorher.name != final_anzeige.name {
         super::einsatz_bereitstellungsraum::sse_br_der_einheit(&state, einsatz_id, eid).await;
     }
+    // Die Personenzeile trägt Name und Abschnitt der versorgenden Einheit (LLH-1682).
+    if vorher.name != final_anzeige.name || vorher.abschnitt_id != nachher.abschnitt_id {
+        super::einsatz_person::sse_versorgte_personen(&state, einsatz_id, eid).await;
+    }
     Ok(Json(final_anzeige))
 }
 

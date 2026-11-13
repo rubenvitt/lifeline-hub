@@ -193,6 +193,23 @@ pub async fn liste_gefiltert(
     )
 }
 
+/// Nicht stornierte Personen, die die Einheit `einheit_id` versorgt (LLH-1682): ihre Zeile trägt
+/// Name und Abschnitt der Einheit per Join.
+pub async fn versorgte_von(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT id FROM einsatz_person WHERE einsatz_id = ? AND versorgende_einheit_id = ? \
+         AND storniert_at IS NULL ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 /// Personenauswahl eines Einsatzes (LFH-940): nicht storniert, nach Registriernummer.
 pub async fn auswahl(
     pool: &SqlitePool,

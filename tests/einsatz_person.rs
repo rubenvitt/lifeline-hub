@@ -3266,11 +3266,11 @@ async fn zeile_liefert_listenzeile_ohne_audit() {
 }
 
 #[tokio::test]
-async fn zeile_liefert_auch_stornierte_person() {
+async fn zeile_einer_stornierten_person_ist_404_ohne_personalien() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Storniert"}"#).await;
     let (status, _) = anfrage(
         &app,
         "DELETE",
@@ -3280,7 +3280,7 @@ async fn zeile_liefert_auch_stornierte_person() {
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let (status, zeile) = anfrage(
+    let (status, antwort) = anfrage(
         &app,
         "GET",
         &format!("/api/einsaetze/{e}/personen/{p}/zeile"),
@@ -3288,9 +3288,11 @@ async fn zeile_liefert_auch_stornierte_person() {
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(zeile["id"], p);
-    assert!(zeile["storniert_at"].is_string(), "{zeile}");
+    assert_eq!(status, StatusCode::NOT_FOUND, "die Liste führt sie nicht");
+    assert!(
+        !antwort.to_string().contains("Storniert"),
+        "keine Personalien: {antwort}"
+    );
 }
 
 #[tokio::test]
