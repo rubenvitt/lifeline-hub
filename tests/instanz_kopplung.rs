@@ -1709,7 +1709,7 @@ async fn zurueckgespielt_hub_mit_nachgehender_uhr_widerruf_erreicht_den_elw() {
         .as_str()
         .unwrap_or_default()
         .to_string();
-    assert!(h.contains("erneut"), "{h:?}");
+    assert!(h.contains("Unterschriftsschlüssel von"), "{h:?}");
 }
 
 #[tokio::test]

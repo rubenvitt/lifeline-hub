@@ -604,6 +604,17 @@ fn check_antwort(antwort: &MeldenAntwort) -> Result<(), String> {
     Ok(())
 }
 
+/// Name einer eigenen Org für einen Hinweis.
+async fn load_org_name(conn: &mut sqlx::SqliteConnection, org_id: i64) -> Result<String, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
+            .bind(org_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .unwrap_or_else(|| format!("Org {org_id}")),
+    )
+}
+
 // ── Meldende Seite ───────────────────────────────────────────────────────────────────────────
 
 /// Meldet sich einmal bei einer Kopplung, in der diese Instanz sich meldet, und übernimmt die
@@ -1049,6 +1060,10 @@ pub async fn handle_meldung(
         // Die Nachlieferung teilt sich eine Grenze über alle Orgs; was nicht passt, folgt mit der
         // nächsten Meldung, weil der Stand je Org nur bis zum Gelieferten wandert.
         let mut budget = unterschrift::LIEFERUNGEN_MAX;
+        // Was nach einem Rückschritt dieser Seite erneut geht (LLH-1853, D2 und D4): ein Hinweis
+        // für alle Ströme und Orgs, damit keiner den anderen überschreibt.
+        let mut erneut: Vec<String> = Vec::new();
+        let hinweis_vorher = repo::load_hinweis(conn, kopplung.id).await?;
         for mo in anfrage_orgs.iter().copied() {
             // Die jüngste Zuordnung mit dieser Kennung entscheidet.
             let zuordnung = alle.iter().rev().find(|o| kennung(o) == mo.org);
@@ -1071,17 +1086,10 @@ pub async fn handle_meldung(
                             .await?
                             > 0
                     {
-                        repo::set_hinweis(
-                            conn,
-                            kopplung.id,
-                            &format!(
-                                "{} kennt schon spätere Unterschriftsschlüssel, als diese Instanz \
-                                 vergeben hat (aus einer Sicherung zurückgespielt?). Die \
-                                 Schlüssel gehen erneut an {}.",
-                                kopplung.gegenueber_name, kopplung.gegenueber_name
-                            ),
-                        )
-                        .await?;
+                        erneut.push(format!(
+                            "Unterschriftsschlüssel von {}",
+                            load_org_name(conn, o.org_id).await?
+                        ));
                     }
                     let lieferung =
                         unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
@@ -1109,17 +1117,10 @@ pub async fn handle_meldung(
                                 .await?
                                 > 0
                         {
-                            repo::set_hinweis(
-                                conn,
-                                kopplung.id,
-                                &format!(
-                                    "{} kennt schon spätere Stammdaten, als diese Instanz \
-                                     vergeben hat (aus einer Sicherung zurückgespielt?). Die \
-                                     Stammdaten gehen erneut an {}.",
-                                    kopplung.gegenueber_name, kopplung.gegenueber_name
-                                ),
-                            )
-                            .await?;
+                            erneut.push(format!(
+                                "Stammdaten von {}",
+                                load_org_name(conn, o.org_id).await?
+                            ));
                         }
                         liefern::nachlieferung(
                             conn,
@@ -1220,6 +1221,21 @@ pub async fn handle_meldung(
                 fuehrung_austausch::ANTWORT_BYTES,
             )
             .await?;
+        }
+        if !erneut.is_empty() {
+            let eigen = format!(
+                "{} kennt schon spätere Stände, als diese Instanz vergeben hat (aus einer \
+                 Sicherung zurückgespielt?). Erneut an {} gehen: {}.",
+                kopplung.gegenueber_name,
+                kopplung.gegenueber_name,
+                erneut.join(", ")
+            );
+            // Hat diese Meldung schon einen Hinweis gesetzt (Führung), bleibt er dahinter stehen.
+            let neu = match repo::load_hinweis(conn, kopplung.id).await? {
+                Some(h) if Some(&h) != hinweis_vorher.as_ref() => format!("{eigen} {h}"),
+                _ => eigen,
+            };
+            repo::set_hinweis(conn, kopplung.id, &neu).await?;
         }
         Ok(orgs)
     })?;

@@ -34,7 +34,8 @@ herleitung:
 
 ```sh
 verlange 'MAX\(COALESCE\(MAX\(stand\), 0\) \+ 1, \?\)' src/auth/unterschrift/repo.rs
-verbiete 'unterschrift::renew_stand_ueber\(' 'src/**/*.rs' ':(exclude)src/instanz/melden.rs'
+verbiete 'unterschrift::(repo::)?(\{[^}]*)?renew_stand_ueber' 'src/**/*.rs' ':(exclude)src/instanz/melden.rs'
+verbiete 'renew_stand_ueber\(' 'src/auth/**/*.rs' ':(exclude)src/auth/unterschrift/repo.rs' ':(exclude)src/auth/unterschrift/repo/tests.rs'
 verlange 'raise_log_stand\(' src/main.rs
 verbiete 'renew_log_der_org\(' 'src/**/*.rs' ':(exclude)src/instanz/stammdaten/liefern.rs' ':(exclude)src/instanz/stammdaten/liefern/tests.rs' ':(exclude)src/instanz/melden.rs'
 verlange 'fremde_id = -id' src/auth/unterschrift/repo.rs

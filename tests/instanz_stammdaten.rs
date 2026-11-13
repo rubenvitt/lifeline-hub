@@ -1369,7 +1369,7 @@ async fn zurueckgespielt_hub_mit_nachgehender_uhr_liefert_die_org_erneut() {
     );
     let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
     let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
-    assert!(h.contains("erneut"), "{h:?}");
+    assert!(h.contains("Stammdaten von"), "{h:?}");
 }
 
 #[tokio::test]
@@ -1428,4 +1428,27 @@ async fn zurueckgespielt_elw_bekommt_das_fahrzeug_erneut() {
     .await;
     melden(&elw).await;
     lokale_id(&elw, "fahrzeug", "funkrufname", "Nach der Sicherung").await;
+}
+
+#[tokio::test]
+async fn rueckschritt_bei_schluesseln_und_stammdaten_nennt_beides_mit_org() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    // Der ELW kennt höhere Stände beider Ströme, als der Hub je vergeben hat (Hub zurückgespielt,
+    // Uhr geht nach).
+    exec(
+        &elw.pool,
+        "UPDATE instanz_kopplung_org SET unterschrift_stand = unterschrift_stand + 10000, \
+         stammdaten_stand = stammdaten_stand + 10000",
+    )
+    .await;
+    melden(&elw).await;
+    let (_, v) = common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
+    let h = v["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
+    let org: String = eine(&hub.pool, "SELECT name FROM organisation WHERE id = 1").await;
+    assert!(
+        h.contains(&format!("Unterschriftsschlüssel von {org}"))
+            && h.contains(&format!("Stammdaten von {org}")),
+        "{h:?}"
+    );
 }

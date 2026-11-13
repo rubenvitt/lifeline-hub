@@ -1064,7 +1064,12 @@ async fn widerrufener_ersatz_widerruft_den_alten_und_legt_nichts_an() {
     )
     .await
     .unwrap();
-    assert_eq!(fremder(&mut conn, "b").await.unwrap().0, "widerrufen");
+    let (zustand_b, fremde_b) = fremder(&mut conn, "b").await.unwrap();
+    assert_eq!(zustand_b, "widerrufen");
+    assert!(
+        fremde_b < 0,
+        "ersetzt, nicht als b widerrufen: die id ist frei ({fremde_b})"
+    );
     assert_eq!(fremder(&mut conn, "c").await, None);
 }
 
