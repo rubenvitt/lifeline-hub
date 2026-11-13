@@ -633,8 +633,9 @@ pub async fn admin_anfrage_ablehnen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
     PfadParam(id): PfadParam<i64>,
+    Query(p): Query<AkteParams>,
 ) -> Result<Json<FuehrungAnzeige>, AppError> {
-    let a = akte_fremd(&state, &admin, id).await?;
+    let a = akte_fremd(&state, &admin, id, &p).await?;
     Ok(Json(run_anfrage_ablehnen(&state, &a, &admin).await?))
 }
 

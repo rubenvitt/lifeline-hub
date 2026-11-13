@@ -48,7 +48,7 @@ export function frageFuehrungAn(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
 
 /** Die Anfrage der Gegenstelle vor Ort ablehnen (LLH-1678); die Führung bleibt hier. */
 export function lehneAnfrageAb(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`${fuehrungBasis(ort)}/anfrage/ablehnen`, 'POST');
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'anfrage/ablehnen'), 'POST');
 }
 
 /** Notübernahme gegen die erreichte Seite: nur mit Grund. */
