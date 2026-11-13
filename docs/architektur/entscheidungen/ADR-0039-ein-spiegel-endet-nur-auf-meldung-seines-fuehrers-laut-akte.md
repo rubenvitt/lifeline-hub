@@ -49,4 +49,5 @@ gelöscht, von dem sie nur ihren Spiegel abgeräumt hatte.
 Ein Beleg gilt für Stände und Akten, und eine aus einer Sicherung zurückgekehrte Instanz meldet
 weiter nichts. Ein Spiegel folgt beim Abräumen derselben Akte wie beim Schreiben (LLH-1641).
 Ohne Schalter bleibt ein Spiegel mit fremdem Präfix nach der Löschung beim Führer stehen; einen
-solchen gibt es nur, wenn die Führung nach einer Übernahme ausgeschaltet wurde.
+solchen gibt es nur, wenn die Führung nach einer Übernahme ausgeschaltet wurde. Dann, und an
+einer älteren Gegenstelle, kostet die abgelehnte Meldung im Push je Abgleich eine Runde mehr.

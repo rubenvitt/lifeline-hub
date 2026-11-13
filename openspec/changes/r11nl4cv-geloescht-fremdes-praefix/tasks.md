@@ -33,6 +33,12 @@ Code. Gegenprobe heißt: die Änderung zurücknehmen, Test rot, wieder einsetzen
 - [ ] 5.2 Review vor dem PR über den ganzen Branch (`dev-zunder-ausfuehren`, „Review vor dem PR“), bestätigte Befunde behandelt und im PR unter „Review“. Prüfen: Verbleib je Befund festgehalten
 - [ ] 5.3 Bilder der Änderung: keine sichtbare Wirkung außer einer verschwundenen Zeile in „Einsätze beim Gegenüber“; der Bildlauf kennt keine zwei gekoppelten Instanzen. Im PR ein Satz, warum es kein Bild gibt. Prüfen: Satz steht im PR
 
+## 6. Aus dem Review vor dem PR
+
+- [x] 6.1 Befund „eine Runde mehr je Abgleich, wenn die erreichte Seite ein Ende mit fremdem Präfix ablehnt“ (bestätigt): mit Ruben hingenommen, in design.md „Risks“ und ADR-0039 „Konsequenzen“ festgehalten. Prüfen: beide Stellen nennen den Fall, `scripts/check-architektur.sh` grün
+- [x] 6.2 Befund „Anwenderdoku verschweigt die Ausnahme bei ausgeschalteter Führung“ (bestätigt) und „Modulkopf `loeschvermerk.rs` nennt nur Akten“ (bestätigt): behoben in f9ee2fb3 (`instanzkopplung.md`, auch Abschnitt „Ende eines Spiegels“, `aufbewahrung.md`, Modulkopf). Prüfen: Anwenderdoku-Wächter 9/9 grün
+- [x] 6.3 Verworfen: Sicherungstest baue nicht den Spec-Fall (prüft gewollt den strengeren Fall ohne Einsatz; „Einsatz oder Akte wieder da“ decken Unit-Tests ab, Testkommentar geschärft) und fehlende Zunder-Zeile in zwei Zwischencommits (Regel gilt je Aufgabe, PR trägt sie). Prüfen: Verbleib im PR unter „Review“
+
 ## Workflow follow-up
 
 - `/opsx:archive r11nl4cv-geloescht-fremdes-praefix` im selben Branch vor dem PR (Spec-Sync nach `openspec/specs/instanz-fuehrung`)

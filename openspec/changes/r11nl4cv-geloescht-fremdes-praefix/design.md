@@ -132,6 +132,14 @@ Spiegel endet nur auf Meldung seines Führers (Akte vor Präfix). Prüfung per `
 - **Schalter nach einer Übernahme ausgeschaltet** → ein Spiegel mit fremdem Präfix endet dann
   nicht auf `geloescht`; an der meldenden Seite räumt ihn Phase R nach der Nachbereitung ab, an
   der erreichten bleibt er wie heute. Folgt der eingefrorenen Führung (LLH-1704).
+- **Eine Runde mehr je Abgleich, wenn die erreichte Seite ablehnt** (Review vor dem PR, mit
+  Ruben am 13.11.2026 als hinnehmbar entschieden) → Führt die meldende Seite einen übernommenen
+  Einsatz mit fremdem Präfix und löscht ihn, belegt sie das Ende im Push; nimmt die erreichte
+  Seite es nicht an (Schalter dort nach der Übernahme aus, oder eine ältere Version beim
+  gestaffelten Update), nennt sie den Stand weiter, und jeder Abgleich dieser Kopplung braucht eine
+  zusätzliche signierte Runde (`geloescht_offen` in `abgleich_einmal`, gedeckelt durch
+  `RUNDEN_MAX`). Kein Datenverlust; die Lage endet mit dem Update oder dem Einschalten. Eine
+  Merkliste abgelehnter Meldungen wäre neuer Zustand, der veralten kann.
 - **Gemischter Betrieb** → eine ältere Instanz meldet für fremde Präfixe nichts und nimmt sie
   nicht an; der Spiegel bleibt dort wie heute. Eine ältere Instanz meldet weiter über Art
   `spiegel`; eine neue Gegenseite nimmt das nur an, wenn die Akte den Absender als Führer nennt.
