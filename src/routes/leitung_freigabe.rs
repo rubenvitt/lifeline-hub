@@ -12,7 +12,7 @@ use sqlx::SqliteConnection;
 
 /// Darf die Einsatzleitung hier freigeben? Aktiver Einsatz, und diese Instanz führt ihn oder hält
 /// ihn als Spiegel. Wer einen Einsatz nicht führt, hält ihn als Spiegel, der ETB-Eintrag geht
-/// dann als Antrag an den Führer (LLH-1641, ADR-0040).
+/// dann als Antrag an den Führer (LLH-1641, ADR-0041).
 pub(crate) fn fordere_freigabe_moeglich(ctx: &EinsatzLesezugriff) -> Result<(), AppError> {
     ctx.fordere_einsatzleitung()?;
     if !ctx.einsatz.ist_aktiv() {

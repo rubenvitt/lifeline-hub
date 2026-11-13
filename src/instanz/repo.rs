@@ -864,6 +864,22 @@ pub async fn discard_angebahnte(pool: &SqlitePool, grenze: &str) -> Result<u64, 
     Ok((ids.len() + verwaist.len()) as u64)
 }
 
+/// Der Hinweis an einer Kopplung, falls einer steht.
+pub async fn load_hinweis(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(
+        sqlx::query_scalar::<_, Option<String>>(
+            "SELECT hinweis FROM instanz_kopplung WHERE id = ?",
+        )
+        .bind(kopplung_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .flatten(),
+    )
+}
+
 /// Setzt einen bleibenden Hinweis an der Kopplung.
 pub async fn set_hinweis(
     conn: &mut SqliteConnection,

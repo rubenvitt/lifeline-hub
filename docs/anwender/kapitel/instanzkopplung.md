@@ -696,3 +696,10 @@ Installation hat den Rückstand erkannt und schickt die Akten erneut, eingreifen
 die die andere Installation mit der Sicherung verloren hat, kommen mit den nächsten Meldungen
 wieder. Die Uhr des Servers muss dafür stimmen; die Grenzen nennt die Betriebsdoku
 (`docs/betrieb/backup-restore.md`, „Gekoppelte Instanz zurückspielen“).
+
+Dasselbe gilt für Unterschriftsschlüssel und Stammdaten: Was der Hub nach dem Zurückspielen
+registriert, widerruft oder ändert, erreicht den ELW mit den nächsten Meldungen. Erkennt der Hub
+dabei einen Rückstand, zeigt die Kopplung „… kennt schon spätere Stände …“ mit der Liste dessen, was
+erneut geht („Unterschriftsschlüssel“, „Stammdaten“), und schickt es einmal ganz. Ein
+Schlüssel, den der Hub mit der Sicherung verloren hat, gilt am ELW weiter, bis der Hub seine Nummer
+neu vergibt oder die Organisation neu gekoppelt wird.

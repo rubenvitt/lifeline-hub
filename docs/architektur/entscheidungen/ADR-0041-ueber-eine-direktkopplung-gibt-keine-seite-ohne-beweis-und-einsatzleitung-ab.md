@@ -1,5 +1,5 @@
 ---
-id: ADR-0040
+id: ADR-0041
 titel: Ein Einsatz hat genau eine führende Instanz; über eine Direktkopplung gibt keine Seite ohne Beweis und ohne ihre Einsatzleitung ab
 status: akzeptiert
 datum: 2026-11-13
@@ -19,7 +19,7 @@ herleitung:
   - LLH-1678 (mit Ruben am 13.11.2026 abgestimmt), LLH-1707, LLH-1669, LLH-1641
 ---
 
-# ADR-0040: Ein Einsatz hat genau eine führende Instanz; über eine Direktkopplung gibt keine Seite ohne Beweis und ohne ihre Einsatzleitung ab
+# ADR-0041: Ein Einsatz hat genau eine führende Instanz; über eine Direktkopplung gibt keine Seite ohne Beweis und ohne ihre Einsatzleitung ab
 
 ## Regeln
 

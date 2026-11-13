@@ -93,19 +93,85 @@ impl SchluesselZeile {
     }
 }
 
-/// Nächster `stand` der lokalen Schlüssel einer Org. Dieselbe Zählung trägt `weiter_stand` der
+/// Nächster `stand` der lokalen Schlüssel einer Org: der größere Wert aus „höchster + 1“ und den
+/// Unix-Sekunden jetzt. So liegt nach dem Zurückspielen einer Sicherung jeder neue Stand über dem,
+/// was das Gegenüber schon übernommen hat (LLH-1853, design.md D1 der Change
+/// `cz5332jn-unterschrift-stammdaten-nach-restore`). Dieselbe Zählung trägt `weiter_stand` der
 /// übernommenen Schlüssel, die diese Instanz über eine Direktkopplung weiterreicht (LLH-1678,
-/// design.md D6).
+/// design.md D6); „höchster“ zählt sie mit.
 async fn next_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64, AppError> {
+    next_stand_um(conn, org_id, chrono::Utc::now().timestamp()).await
+}
+
+/// [`next_stand`] mit gesetzter Uhr (Unix-Sekunden).
+async fn next_stand_um(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    jetzt_s: i64,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT MAX(MAX(COALESCE(MAX(stand), 0) + 1, ?), \
+                    (SELECT COALESCE(MAX(weiter_stand), 0) + 1 FROM unterschrift_schluessel \
+                     WHERE org_id = ?2)) \
+         FROM unterschrift_schluessel WHERE org_id = ?2 AND herkunft = 'lokal'",
+    )
+    .bind(jetzt_s)
+    .bind(org_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Höchster Stand, den diese Instanz für eine Org je vergeben hat: `stand` der lokalen und
+/// `weiter_stand` der weitergereichten Schlüssel (LLH-1678), 0 ohne Schlüssel. Bis dahin gilt die
+/// erste Lieferung über eine Direktkopplung als Grundstock, und darüber zeigt ein gemeldeter Stand
+/// einen Rückschritt (LLH-1853).
+pub async fn load_hoechster_stand(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT MAX(COALESCE((SELECT MAX(stand) FROM unterschrift_schluessel \
                                WHERE org_id = ?1 AND herkunft = 'lokal'), 0), \
                       COALESCE((SELECT MAX(weiter_stand) FROM unterschrift_schluessel \
-                               WHERE org_id = ?1), 0)) + 1",
+                               WHERE org_id = ?1), 0))",
     )
     .bind(org_id)
     .fetch_one(&mut *conn)
     .await?)
+}
+
+/// Netz nach einem Rückschritt (LLH-1853, design.md D2): stempelt die gültigen und widerrufenen
+/// lokalen Schlüssel der Org in der Reihenfolge ihres Stands neu auf `gemeldet + 1, + 2, …`, damit
+/// die nächste Nachlieferung sie erneut liefert. Wartende bleiben, sie gehen nicht hinaus. Liefert
+/// die Zahl der neu gestempelten. Übernommene Schlüssel, die eine Direktkopplung weiterreicht,
+/// bekommen ebenso einen neuen `weiter_stand` (LLH-1678, design.md D6).
+pub async fn renew_schluessel_stand_ueber(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    gemeldet: i64,
+) -> Result<usize, AppError> {
+    let zeilen: Vec<(i64, bool)> = sqlx::query_as(
+        "SELECT id, herkunft = 'lokal' FROM unterschrift_schluessel WHERE org_id = ? \
+         AND zustand IN ('gueltig', 'widerrufen') \
+         AND (herkunft = 'lokal' OR weiter_stand IS NOT NULL) \
+         ORDER BY CASE WHEN herkunft = 'lokal' THEN stand ELSE weiter_stand END, id",
+    )
+    .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    for (n, (id, lokal)) in (1i64..).zip(&zeilen) {
+        let sql = if *lokal {
+            "UPDATE unterschrift_schluessel SET stand = ? WHERE id = ?"
+        } else {
+            "UPDATE unterschrift_schluessel SET weiter_stand = ? WHERE id = ?"
+        };
+        sqlx::query(sql)
+            .bind(gemeldet + n)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+    }
+    Ok(zeilen.len())
 }
 
 /// Hat die Org eine Kopplung, in der eine andere Instanz ihre Schlüssel bekommt (wir stellen aus,
@@ -489,12 +555,6 @@ pub async fn nachlieferung(
     .await
 }
 
-/// Höchster Stand der Org in der Zählung dieser Instanz (lokal und weitergereicht): bis dahin gilt
-/// die erste Lieferung über eine Direktkopplung als Grundstock (LLH-1678, design.md D6).
-pub async fn hoechster_stand(conn: &mut SqliteConnection, org_id: i64) -> Result<i64, AppError> {
-    Ok(next_stand(conn, org_id).await? - 1)
-}
-
 /// Ob eine Lieferung übernommene Schlüssel weiterreicht (LLH-1678, design.md D6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Weiter {
@@ -757,14 +817,43 @@ pub async fn accept_lieferungen_bis(
         let fp = parse_b64(&l.schluessel)
             .map(|b| fingerabdruck(&b))
             .unwrap_or_default();
-        let vorhanden: Option<(i64, String, String)> = sqlx::query_as(
-            "SELECT id, zustand, credential_id FROM unterschrift_schluessel \
+        let bekannt: Option<(i64, String, String, String)> = sqlx::query_as(
+            "SELECT id, zustand, credential_id, schluessel FROM unterschrift_schluessel \
              WHERE kopplung_org_id = ? AND fremde_id = ?",
         )
         .bind(ziel.kopplung_org_id)
         .bind(l.id)
         .fetch_optional(&mut *conn)
         .await?;
+        let vorhanden = match bekannt {
+            // Ein anderer Schlüssel unter bekannter id: Das Gegenüber hat die id neu vergeben,
+            // etwa nach dem Zurückspielen einer Sicherung, und kennt den alten nicht mehr. Er gilt
+            // als widerrufen (ein zurückgewiesener bleibt es) und gibt die id frei; die negative
+            // eigene id vergibt kein Gegenüber (LLH-1853, design.md D5 der Change
+            // `cz5332jn-unterschrift-stammdaten-nach-restore`).
+            Some((id, _, credential_id, schluessel))
+                if credential_id != l.credential_id || schluessel != l.schluessel =>
+            {
+                // Galt er hier, reicht eine Direktkopplung den Widerruf mit einem neuen
+                // `weiter_stand` weiter (LLH-1678, design.md D6).
+                let weiter = next_stand(conn, ziel.org_id).await?;
+                sqlx::query(
+                    "UPDATE unterschrift_schluessel SET fremde_id = -id, \
+                     weiter_stand = CASE WHEN zustand = 'gueltig' THEN ? ELSE weiter_stand END, \
+                     widerrufen_at = CASE WHEN zustand = 'abgelehnt' THEN widerrufen_at \
+                     ELSE COALESCE(widerrufen_at, ?) END, \
+                     zustand = CASE WHEN zustand = 'abgelehnt' THEN zustand ELSE 'widerrufen' END \
+                     WHERE id = ?",
+                )
+                .bind(weiter)
+                .bind(jetzt)
+                .bind(id)
+                .execute(&mut *conn)
+                .await?;
+                None
+            }
+            andere => andere.map(|(id, zustand, credential, _)| (id, zustand, credential)),
+        };
         match (l.zustand, vorhanden) {
             // Ein hier zurückgewiesener bleibt es: die Entscheidung eines Menschen hier geht vor.
             (UnterschriftSchluesselZustand::Widerrufen, Some((_, z, _))) if z == "abgelehnt" => {}

@@ -334,3 +334,70 @@ async fn uebergabe_meldet_am_hub_kopf_und_vollabgleich() {
         "{gemeldet:?}"
     );
 }
+
+/// Widerruft die einzige Kopplung der Instanz.
+async fn kopplung_widerrufen(i: &Instanz) {
+    let id: i64 = eine(&i.pool, "SELECT id FROM instanz_kopplung").await;
+    let (s, v) = post(
+        i,
+        &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Meldende Seite (LLH-1855): Der ELW hat seinen Einsatz an den Hub übergeben, der Hub widerruft
+/// die Kopplung. Mit der nächsten Meldung holt der ELW den Einsatz zurück; der Austausch derselben
+/// Meldung darf das Kopf-Ereignis des Widerrufs nicht verdrängen.
+#[tokio::test]
+async fn widerruf_durch_den_hub_meldet_am_elw_den_zurueckgeholten_einsatz() {
+    let _serial = lock_serial().await;
+    let (hub, elw, live, e, _akte) = setup().await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    melden(&elw).await;
+    kopplung_widerrufen(&hub).await;
+    let mut rx = live.abonniere(e);
+    melden(&elw).await;
+    let fuehrt: bool = eine(
+        &elw.pool,
+        &format!(
+            "SELECT fuehrer_kennung = (SELECT kennung FROM instanz_identitaet) \
+             FROM einsatz_fuehrung WHERE einsatz_id = {e}"
+        ),
+    )
+    .await;
+    assert!(fuehrt, "der ELW führt nach dem Widerruf wieder");
+    assert!(has_kopf(&mut rx), "der Widerruf meldet den Einsatzkopf");
+}
+
+/// Erreichte Seite (LLH-1855): Der ELW widerruft die Kopplung und meldet das dem Hub sofort
+/// (`melden_einmal`). Der Hub übernimmt seinen Spiegel des ELW-Einsatzes und meldet dessen Kopf.
+#[tokio::test]
+async fn widerruf_durch_den_elw_meldet_am_hub_den_uebernommenen_spiegel() {
+    let _serial = lock_serial().await;
+    let (hub, elw, live, _e, akte) = setup().await;
+    let h: i64 = eine(
+        &hub.pool,
+        &format!("SELECT einsatz_id FROM einsatz_fuehrung WHERE id = {akte}"),
+    )
+    .await;
+    let mut rx = live.abonniere(h);
+    kopplung_widerrufen(&elw).await;
+    let fuehrt: bool = eine(
+        &hub.pool,
+        &format!(
+            "SELECT fuehrer_kennung = (SELECT kennung FROM instanz_identitaet) \
+             FROM einsatz_fuehrung WHERE id = {akte}"
+        ),
+    )
+    .await;
+    assert!(fuehrt, "der Hub führt nach dem Widerruf");
+    assert!(has_kopf(&mut rx), "der Widerruf meldet den Einsatzkopf");
+}
