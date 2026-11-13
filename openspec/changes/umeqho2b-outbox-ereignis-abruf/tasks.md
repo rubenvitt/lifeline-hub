@@ -171,7 +171,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
   (Konzept mit Verweis auf Spec `ereignis-abruf` und die ADR), Kapitel 11 (Sicherung und Cursor,
   Liste der Lage-Tabellen), Kapitel 5, falls der Wächter es verlangt. Verifizieren:
   `scripts/check-architektur.sh` ist grün.
-- [ ] 5.4 `docs/api/ereignisse.md` (neu): Schleife des Abrufs mit Beispiel, Neuaufbau nach 410,
+- [x] 5.4 `docs/api/ereignisse.md` (neu): Schleife des Abrufs mit Beispiel, Neuaufbau nach 410,
   Bedeutung der vier Arten, Empfehlungen aus den Risiken (Einsatzliste regelmäßig neu lesen,
   nach `lage.changed` nicht öfter als alle paar Sekunden nachlesen, unbekannte Arten
   überspringen). `docs/api/maschinenzugang.md`: Scope-Tabelle mit den Pfaden und Verweis.
@@ -190,7 +190,7 @@ in `tests/common` liegen (LLH-1638, dort Aufgabe 3.2).
 
 - [ ] 6.1 `./scripts/check-all.sh --geaendert` lokal. Verifizieren: grün, die Ausgabe steht
   ungekürzt bereit.
-- [ ] 6.2 Durchspiel am laufenden Stack mit Demo-Daten: Zugang mit `events:read` und
+- [x] 6.2 Durchspiel am laufenden Stack mit Demo-Daten: Zugang mit `events:read` und
   `einsaetze:read` anlegen und einlösen, Einsatz freigeben, Kopf ändern, abschließen; dazwischen
   `GET /api/v1/events` mit `wait=25`. Verifizieren: Die Ereignisse kommen in Reihenfolge, die
   Antworten stehen im PR; ändert 4.1 das Paneel sichtbar, kommt davon ein Bild dazu.
