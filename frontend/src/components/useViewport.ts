@@ -19,7 +19,8 @@ import type { Breakpoint } from 'antd';
  ── Ein Satz Hörer für die ganze Seite (LFH-947) ───────────────────────────────────────
  * Die Abfragen leben in EINEM modulweiten Store (`useSyncExternalStore`): sieben Breiten aus
  * antds Schwellen (`theme.getDesignToken()`, dieselbe Karte wie `Grid.useBreakpoint`) und die
- * Zeigerfrage, also höchstens 8 Hörer, egal wie viele Zeilen fragen. Vorher hing jede
+ * Zeigerfrage, dazu die Höhenfrage `istNiedrig` (kwc2yszv), also höchstens 9 Hörer, egal wie
+ * viele Zeilen fragen. Vorher hing jede
  * Zeitachsenzeile 8 eigene an (`Grid.useBreakpoint` baut seinen Beobachter je Instanz). Der
  * Store hängt sich beim ersten Abonnenten an und beim letzten ab; der Snapshot ist ein
  * stabiles Objekt, das nur bei einer geänderten Antwort neu entsteht.
@@ -62,7 +63,16 @@ interface ViewportZustand {
   istSchmal: boolean;
   /** Primärer Zeiger ist grob (Finger/Handschuh) statt Maus/Stift. */
   istBeruehrung: boolean;
+  /**
+   * Fenster niedriger als {@link NIEDRIG_UNTER} (ETB-Erfassung einzeilig, Change
+   * `kwc2yszv-etb-neuentwurf`, design.md D9).
+   */
+  istNiedrig: boolean;
 }
+
+/** Fensterhöhe, unter der {@link ViewportZustand.istNiedrig} gilt: Fükw (768) und Tablet quer liegen darüber. */
+export const NIEDRIG_UNTER = 700;
+const NIEDRIG = `(max-height: ${NIEDRIG_UNTER - 1}px)`;
 
 /**
  * Reine Ableitung, damit die Erst-Render-Semantik prüfbar ist, ohne zu rendern.
@@ -103,13 +113,18 @@ function breitenAbfragen(): Record<Breakpoint, string> {
 interface Momentaufnahme {
   screens: ScreensKarte;
   istBeruehrung: boolean;
+  istNiedrig: boolean;
 }
 
 /**
  * Die Abfragen, gebaut beim ersten Fragen und gehalten, solange jemand abonniert. Eine
  * `MediaQueryList` antwortet über `matches` immer aktuell; Hörer hängen nur an Abonnenten.
  */
-let abfragen: { breiten: [Breakpoint, MediaQueryList][]; zeiger: MediaQueryList } | null = null;
+let abfragen: {
+  breiten: [Breakpoint, MediaQueryList][];
+  zeiger: MediaQueryList;
+  niedrig: MediaQueryList;
+} | null = null;
 const abonnenten = new Set<() => void>();
 let letzte: Momentaufnahme | null = null;
 
@@ -120,6 +135,7 @@ function gebaut() {
       window.matchMedia(abfrage),
     ]),
     zeiger: window.matchMedia(ZEIGER_GROB),
+    niedrig: window.matchMedia(NIEDRIG),
   };
   return abfragen;
 }
@@ -129,10 +145,11 @@ function benachrichtige() {
 }
 
 function abonniere(melde: () => void): () => void {
-  const { breiten, zeiger } = gebaut();
+  const { breiten, zeiger, niedrig } = gebaut();
   if (abonnenten.size === 0) {
     for (const [, mql] of breiten) mql.addEventListener('change', benachrichtige);
     zeiger.addEventListener('change', benachrichtige);
+    niedrig.addEventListener('change', benachrichtige);
   }
   abonnenten.add(melde);
   return () => {
@@ -140,6 +157,7 @@ function abonniere(melde: () => void): () => void {
     if (abonnenten.size === 0) {
       for (const [, mql] of breiten) mql.removeEventListener('change', benachrichtige);
       zeiger.removeEventListener('change', benachrichtige);
+      niedrig.removeEventListener('change', benachrichtige);
       // Ohne Abonnenten frisch bauen: die nächste Seite fragt die dann gültige Umgebung.
       abfragen = null;
     }
@@ -151,19 +169,21 @@ function abonniere(melde: () => void): () => void {
  * sind — `useSyncExternalStore` verlangt einen stabilen Snapshot.
  */
 function momentaufnahme(): Momentaufnahme {
-  const { breiten, zeiger } = gebaut();
+  const { breiten, zeiger, niedrig } = gebaut();
   const istBeruehrung = zeiger.matches;
+  const istNiedrig = niedrig.matches;
   const vorher = letzte;
   if (
     vorher &&
     vorher.istBeruehrung === istBeruehrung &&
+    vorher.istNiedrig === istNiedrig &&
     breiten.every(([punkt, mql]) => vorher.screens[punkt] === mql.matches)
   ) {
     return vorher;
   }
   const screens: ScreensKarte = {};
   for (const [punkt, mql] of breiten) screens[punkt] = mql.matches;
-  letzte = { screens, istBeruehrung };
+  letzte = { screens, istBeruehrung, istNiedrig };
   return letzte;
 }
 
@@ -174,9 +194,9 @@ export function useViewport(): ViewportZustand {
   const aufnahme = useSyncExternalStore(abonniere, momentaufnahme);
   let zustand = zustaende.get(aufnahme);
   if (!zustand) {
-    const { screens, istBeruehrung } = aufnahme;
+    const { screens, istBeruehrung, istNiedrig } = aufnahme;
     const abBreite = (punkt: AbBreitePunkt) => abBreiteAus(screens, punkt);
-    zustand = { screens, abBreite, istSchmal: !abBreite('md'), istBeruehrung };
+    zustand = { screens, abBreite, istSchmal: !abBreite('md'), istBeruehrung, istNiedrig };
     zustaende.set(aufnahme, zustand);
   }
   return zustand;

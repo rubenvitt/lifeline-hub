@@ -255,6 +255,11 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
     await warteAufHervorhebung(container, 50);
 
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    // Eine Meldung braucht ein Von (Change `kwc2yszv-etb-neuentwurf`); Enter springt in den Inhalt.
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await user.clear(von);
+    await user.paste('Florian 3');
+    await user.keyboard('{Enter}');
     await user.type(feld, 'Pegel steigt{Enter}');
     await waitFor(() => expect(zeile(container, GESAMT + 1)).not.toBeNull(), { timeout: 30000 });
     expect(screen.queryByRole('button', { name: 'Neuere laden' })).toBeNull();

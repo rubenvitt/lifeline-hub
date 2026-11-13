@@ -3,8 +3,9 @@ import type { Dayjs } from 'dayjs';
 import { useState, type ComponentRef, type CSSProperties, type ReactNode, type Ref } from 'react';
 import type { EtbTyp, MeldeWeg } from '../api/types';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
-import { useZeitEingabe, ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
-import { zuWanduhr } from '../anzeige/zeitEingabe';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { uhrzeit } from '../anzeige/zeitDarstellung';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
 import { Segmentleiste, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -264,7 +265,7 @@ export interface EtbFeldzeileProps {
   gesperrt: boolean;
   schmal: boolean;
   /**
-   * Niedriges Fenster ab `md` (`useNiedrigesFenster`): Typ-Knopf, Felder und `anhang` (die Fußzeile)
+   * Niedriges Fenster ab `md` (`useViewport().istNiedrig`): Typ-Knopf, Felder und `anhang` (die Fußzeile)
    * stehen in einer waagerecht rollenden Zeile.
    */
   einzeilig?: boolean;
@@ -296,10 +297,10 @@ export default function EtbFeldzeile({
   refs,
 }: EtbFeldzeileProps) {
   const { token } = useRollen();
-  const { zone } = useZeitEingabe();
+  const { konventionen } = useAnzeigeKonventionen();
   // Der Platzhalter nennt die Uhrzeit von „jetzt“ und läuft mit der Minute (`useMinutenTakt`).
   useMinutenTakt();
-  const jetztText = zuWanduhr(serverJetzt(), zone).format('HHmm');
+  const jetztText = uhrzeit(serverJetzt(), konventionen);
 
   const zeit = (
     <Beschriftet label="Zeit" schmal={schmal}>

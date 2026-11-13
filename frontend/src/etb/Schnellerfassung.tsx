@@ -58,10 +58,9 @@ import { berichtigungTitel } from './zeitachseModell';
 import { neueClientId } from '../offline/clientId';
 import { serverJetzt } from '../offline/serveruhr';
 import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
-import { formatDtg } from '../anzeige/format';
-import { zuWanduhr } from '../anzeige/zeitEingabe';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useMinutenTakt } from '../components/useMinutenTakt';
-import { useNiedrigesFenster } from './useNiedrigesFenster';
 import { lageberichtePfad } from '../routing/deeplinks';
 import { istSpiegel } from '../einsatz/schreibrecht';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -290,9 +289,9 @@ export default function Schnellerfassung({
   // Unter `md` steht das Feld auf eigener Zeile: zwischen Typ-Präfix und „Erfassen" bliebe es
   // zu schmal, und die angepinnte Leiste wüchse über die Hälfte des Fensters (LFH-373).
   // Die Zeigerart entscheidet über den Enter-Vertrag (LFH-955), die Breite nur über das Layout.
-  const { istSchmal, istBeruehrung, screens, abBreite } = useViewport();
-  // Niedriges Fenster ab `md`: Felder und Fußzeile in einer rollenden Zeile (`useNiedrigesFenster`).
-  const einzeilig = useNiedrigesFenster() && !istSchmal;
+  const { istSchmal, istBeruehrung, istNiedrig, screens, abBreite } = useViewport();
+  // Niedriges Fenster ab `md`: Felder und Fußzeile in einer rollenden Zeile (design.md D9).
+  const einzeilig = istNiedrig && !istSchmal;
   const [vorschauGewaehlt, setVorschauGewaehlt] = useState(false);
   const textRef = useRef<TextAreaRef>(null);
   const dateiEingabe = useRef<HTMLInputElement>(null);
@@ -384,6 +383,7 @@ export default function Schnellerfassung({
   /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
   const { zone: anzeigeZone } = useZeitEingabe();
+  const { konventionen } = useAnzeigeKonventionen();
   const [menuOffen, setMenuOffen] = useState(false);
   const [menuFilter, setMenuFilter] = useState('');
   const [triggerStart, setTriggerStart] = useState(-1);
@@ -855,12 +855,9 @@ export default function Schnellerfassung({
   useMinutenTakt();
   const jetzt = serverJetzt();
   const nachtragMin = zukunftsGrund ? null : nachtragMinuten(metadaten.ereigniszeit, jetzt);
+  // Heute nur die Uhrzeit, sonst mit Tag, in der Darstellung der Person (`anzeige/zeitDarstellung.ts`).
   const zeitAmKnopf =
-    nachtragMin != null && metadaten.ereigniszeit
-      ? zuWanduhr(metadaten.ereigniszeit, anzeigeZone).isSame(zuWanduhr(jetzt, anzeigeZone), 'day')
-        ? zuWanduhr(metadaten.ereigniszeit, anzeigeZone).format('HHmm')
-        : formatDtg(metadaten.ereigniszeit, anzeigeZone)
-      : null;
+    nachtragMin != null ? zeitKurz(metadaten.ereigniszeit, konventionen, jetzt) : null;
   const knopfText = berichtigungZu
     ? 'Berichtigung erfassen'
     : zeitAmKnopf
@@ -996,12 +993,7 @@ export default function Schnellerfassung({
       ? `${dateien.length}/${ETB_ANHAENGE_MAX}`
       : null;
   const textKnopf = (props: React.ComponentProps<typeof Button>) => (
-    <Button
-      type="link"
-      size="small"
-      {...props}
-      style={{ paddingInline: 0, flexShrink: 0, ...props.style }}
-    />
+    <Button type="link" {...props} style={{ paddingInline: 0, flexShrink: 0, ...props.style }} />
   );
   // Am Spiegel gehen keine Anhänge (LLH-1492, design.md D9: der Server lehnt sie mit 400 ab).
   const anhangTeil = istSpiegel(einsatz) ? null : (

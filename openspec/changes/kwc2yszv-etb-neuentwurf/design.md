@@ -101,7 +101,7 @@ Beim Bau gemessen: im Handschuh-Betrieb sind Feldzeile (zwei Reihen), Inhalt und
 Fükw 356 px hoch (Grenze 384 px), bei 1366 × 520 aber fast 70 % der Fensterhöhe; Zeilen der
 Zeitachse verschwanden beim Tabben hinter der Leiste. Unter 700 px Fensterhöhe stehen ab `md`
 deshalb Typ-Knopf, Felder und Fußzeile in einer waagerecht rollenden Zeile
-(`etb/useNiedrigesFenster.ts`). Der Fükw (768 px) behält die gezeichnete Form.
+(`useViewport().istNiedrig`, `NIEDRIG_UNTER`). Der Fükw (768 px) behält die gezeichnete Form.
 *Verworfen:* die Leiste ab `md` einklappen wie auf dem Handschirm — beim Schreiben läge sie
 weiter über der halben Höhe.
 
