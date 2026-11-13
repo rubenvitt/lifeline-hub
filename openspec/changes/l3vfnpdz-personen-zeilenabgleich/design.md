@@ -38,18 +38,24 @@ Daneben `personenAuswahl(e)` (Picker, Sprungpalette, Chat).
 **Non-Goals:**
 
 - Die Liste selbst blättern oder nach Phase trennen (eigene Aufgabe, falls die Erstlast stört).
-- Andere Ereignisse, die die Personenliste heute mitziehen, umstellen (`uhs`, `einheit`,
-  `nachforderung` ohne Personenbezug): Sie bleiben beim Prefix-Abgleich.
+- Den Prefix `personen` anderen Ereignissen hinzufügen. Heute zieht ihn nur `person`; `uhs`,
+  `einheit`, `abschnitt` und `nachforderung` gleichen nur eigene Keys ab (`personenUhs`,
+  `personenEinheiten` usw.). Join-Felder halten D5 und das Ereignis `person` aktuell.
 - Den Zeilenabgleich auf Sammelabrufe umbauen.
 
 ## Decisions
 
 ### D1 Eigene Zeilen-Route statt Detail oder `?ids=`
 
-`GET /api/einsaetze/{id}/personen/{pid}/zeile` liefert `PersonAnzeige` aus `repo::laden` (also
-auch stornierte), hinter `EinsatzLesezugriff<Personen>`, ohne Audit. Stellenbindung über
+`GET /api/einsaetze/{id}/personen/{pid}/zeile` liefert genau die Zeile, die die Liste dieser
+Sitzung zeigen würde: `PersonAnzeige` aus `repo::laden`, hinter `EinsatzLesezugriff<Personen>`,
+ohne Audit. Stornierte Personen sind 404, wie die Liste sie nicht führt; Stellenbindung über
 `stelle::fordere_person` (404, wie das Detail), Einheitengerät über
 `PersonAnzeige::ohne_personalien`, wie die Liste.
+
+- *Stornierte mitliefern* (erster Entwurf): verworfen nach dem Review. Die Route hätte die
+  Personalien stornierter Personen unprotokolliert lesbar gemacht, die bisher nur das
+  auditierte Detail zeigt; zum Entfernen genügt dem Tab der 404 (D4).
 
 - *Detail-Route*: verworfen. Jeder Tab schriebe bei jedem Ereignis eine Protokollzeile, und die
   Antwort trägt den ganzen Verlauf.
@@ -97,12 +103,55 @@ diese Person. Ohne Kennung `null`, also alle Prefixe wie bisher.
 `publiziere_einsatz`. Die Nutzlast bleibt eine Kennung (ADR-0003). Wire-Name und Rechtefilter
 ändern sich nicht.
 
-### D4 Unsichtbar und Fehler laufen über den Sammler
+### D4 404 heißt „gehört nicht hinein“, andere Fehler gehen an den Sammler
 
-Antwortet die Zeilen-Route mit 404 (Person einer fremden Stelle, am Einheitengerät auch eine
-stornierte, gelöschte Person), scheitert der Abruf, und der Zeilenabgleich gibt die Listen wie
-bei Schäden an den Sammler. Das ist selten und bleibt korrekt; ein eigener „gehört nicht
-hinein“-Weg für 404 lohnt die Unterscheidung von echten Fehlern nicht.
+Ein 404 der Zeilen-Route heißt: Diese Person steht in keiner Liste dieser Sitzung (storniert,
+fremder Einsatz, am Gerät einer fremden Stelle). Der Zeilenabgleich setzt dann für sie `null`
+ein, nimmt sie also aus allen Listen, ohne Listenabruf. Andere Fehler (Netz, 403, 5xx) geben die
+Listen wie bei Schäden an den Sammler. Die übrigen Zeilen desselben Fensters gehen weiter ein.
+
+Am Gerät ist der 404 der Normalfall: Der Strom filtert `person` nur nach Modul, nicht nach
+Stelle (`routes/live.rs`), fast jedes Ereignis einer großen Lage betrifft eine fremde Person.
+
+- *404 wie jeder Fehler an den Sammler* (erster Entwurf): verworfen nach dem Review. Ein Gerät
+  hätte je fremdem Ereignis einen Zeilenabruf **und** die Vollliste geladen, mehr als vorher.
+  Die Unterscheidung ist eindeutig: die Sichtbarkeit einer UHS oder Betreuungsstelle wächst nur,
+  am Einheitengerät heißt 404, die Zeile fällt aus der Liste.
+
+### D5 Einheit und Abschnitt melden ihre versorgten Personen
+
+Die Zeile trägt `versorgende_einheit_name` und `versorgende_einheit_abschnitt_*` per Join.
+Bisher frischte jedes `person`-Ereignis sie nebenbei auf, weil es die ganze Liste lud. Künftig
+sendet der Server nach dem Commit `person` mit `person_id` je Person mit dieser
+`versorgende_einheit_id`:
+
+- `PATCH …/einheiten/{eid}`, wenn sich Name oder Abschnitt ändern;
+- Umbenennen und Auflösen eines Abschnitts: `NamensTraeger` (`einsatzabschnitt::repo`) führt
+  schon jedes Objekt, das den Abschnittsnamen per Join trägt (LLH-1291), und bekommt die
+  versorgten Personen der Einheiten im Abschnitt dazu.
+
+Über zehn Personen je Fenster lädt der Tab die Liste einmal ganz (`ZEILEN_GRENZE`). Beides ist
+selten, deshalb ist das in Ordnung.
+
+- *`einheit` und `abschnitt` ziehen den Prefix `personen`*: verworfen (Abstimmung 13.11.2026).
+  `einheit` kommt bei jedem Statuswechsel einer Einheit, im MANV wäre die Volllast nur
+  verschoben.
+- *Hinnehmen*: verworfen. Ein dauerhaft offener Leitstellen-Tab zeigte den alten Namen bis zum
+  Neuladen.
+
+### D6 Eine Liste, die sich während des Zeilenabrufs geändert hat, geht an den Sammler
+
+Der Zeilenabruf ist kein Query, `cancelQueries` in einem `onMutate` erreicht ihn nicht. Schreibt
+eine optimistische Änderung (Grundriss, Status) während des Abrufs in die Liste, überschriebe die
+Zeile vom Stand davor sie. Der Zeilenabgleich merkt sich deshalb je Liste `dataUpdatedAt` vor dem
+Abruf; hat es sich danach geändert, setzt er nichts ein und gibt die Liste an den Sammler, wie
+vor dieser Change. Das gilt für Schäden genauso.
+
+### D7 Bezeichner
+
+Neue Namen folgen der Bezeichner-Sprache (LLH-1312): `loadPersonZeile`, `comparePersonen`,
+`toPersonAuswahl`. `gefiltert` bleibt in der Familie `liste`/`fenster`/`einzeln` derselben Datei,
+die diese Change nicht umstellt.
 
 ## Risks / Trade-offs
 
@@ -111,10 +160,11 @@ hinein“-Weg für 404 lohnt die Unterscheidung von echten Fehlern nicht.
   Betroffenen mehr, und der nächste volle Abruf heilt es. Test mit Wechsel hin und weg.
 - [Ordnung im Client weicht ab] → `registrier_nr` ist je Einsatz eindeutig (UNIQUE), also eine
   totale Ordnung ohne Gleichstand.
-- [Ein Schreibweg ändert die Zeile einer anderen Person ohne eigenes Ereignis] → Heute bekannt:
-  Haushaltswechsel meldet die nachgerückte Bezugsperson mit. Anzeigefelder aus anderen Tabellen
-  (Name der versorgenden Einheit, Abschnitt, Rettungsmittel) ändern sich über andere Ereignisse,
-  die die Listen weiter per Prefix abgleichen.
+- [Ein Schreibweg ändert die Zeile einer anderen Person ohne eigenes Ereignis] → Bekannt und
+  abgedeckt: Haushaltswechsel meldet die nachgerückte Bezugsperson mit, die Nachforderung ihre
+  Person (D3), Einheit und Abschnitt ihre versorgten Personen (D5). Ein künftiger Join in
+  `SELECT_ALLE` braucht dasselbe; sonst bleibt das Feld bis zum Neuladen, Fokuswechsel oder
+  `lagged` stehen.
 - [Ältere Tabs mit altem Frontend] → Frontend und Server kommen aus demselben Binary; ein alter
   Tab kennt die Route nicht und gleicht wie bisher ganz ab.
 

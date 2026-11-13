@@ -37,24 +37,38 @@ laufende Abrufe gelten dieselben Ausnahmen wie bei Schäden.
   geändert wird
 - **THEN** trägt das Ereignis die Kennung der Person, und die anderen Tabs laden nur ihre Zeile
 
+#### Scenario: Versorgende Einheit umbenannt
+- **WHEN** eine Einheit, die Personen versorgt, umbenannt oder einem anderen Abschnitt zugeordnet
+  wird, oder ihr Abschnitt umbenannt oder aufgelöst wird
+- **THEN** zeigen die Personenlisten der anderen Tabs bei diesen Personen den neuen Namen bzw.
+  Abschnitt, ohne neu geladen zu werden
+
 #### Scenario: Viele Personen auf einmal
 - **WHEN** nach einem Funkloch Ereignisse zu 40 Personen in einem Sammelfenster eintreffen
 - **THEN** ruft der Tab die Personenliste einmal ganz ab statt 40 Personen einzeln
 
 ### Requirement: Der Zeilenabruf einer Person ist nicht protokolliert
 
-Der Abruf einer einzelnen Person für den Zeilenabgleich SHALL dieselbe Form, dasselbe Recht und
-dieselbe Sichtbarkeit haben wie die Personenliste und MUST wie diese ohne Eintrag im
-Zugriffsprotokoll bleiben. Er MUST auch eine stornierte Person liefern, damit der Tab sie aus
-seinen Listen nehmen kann. Den medizinischen Verlauf liefert er nicht.
+Der Abruf einer einzelnen Person für den Zeilenabgleich SHALL genau die Zeile liefern, die die
+Personenliste derselben Sitzung zeigen würde, mit demselben Recht, und MUST wie die Liste ohne
+Eintrag im Zugriffsprotokoll bleiben. Eine Person, die die Liste nicht zeigt (storniert oder für
+die Sitzung nicht sichtbar), MUST mit 404 beantwortet werden, und der Tab MUST sie dann aus
+seinen Listen nehmen, ohne sie ganz neu zu laden. Den medizinischen Verlauf liefert er nicht.
 
 #### Scenario: Live-Abgleich schreibt kein Protokoll
 - **WHEN** zehn Tabs eine Änderung an einer Person zeilenweise abgleichen
 - **THEN** steht im Zugriffsprotokoll dieser Person kein neuer Eintrag
 
+#### Scenario: Stornierte Person
+- **WHEN** eine Person storniert wird und ein Tab ihre Zeile abruft
+- **THEN** antwortet der Server mit 404 ohne Personalien, und der Tab nimmt sie aus seinen
+  Listen
+
 #### Scenario: Gerät einer anderen Stelle
-- **WHEN** ein gekoppeltes Gerät eine Person abruft, die es in seiner Personenliste nicht sähe
-- **THEN** antwortet der Server mit 404
+- **WHEN** ein gekoppeltes Gerät ein Ereignis zu einer Person erhält, die es in seiner
+  Personenliste nicht sähe
+- **THEN** antwortet der Server auf den Zeilenabruf mit 404, und das Gerät lädt seine
+  Personenliste nicht neu
 
 #### Scenario: Einheitengerät
 - **WHEN** ein Einheitengerät eine von seiner Einheit versorgte Person abruft

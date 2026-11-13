@@ -12,16 +12,22 @@ Liste, die im Großschadensfall am schnellsten wächst (Zunder LLH-1682, Audit v
 
 ## What Changes
 
-- Neue Route `GET /api/einsaetze/{id}/personen/{pid}/zeile`: eine Person in der Form der Liste
-  (`PersonAnzeige`), auch storniert, **ohne** Eintrag im Zugriffsprotokoll, mit denselben Regeln
-  wie die Liste (Modulrecht Personen, Stellenbindung der Geräte, Einheitengerät ohne Personalien).
-  Die Detail-Route taugt dafür nicht: Jeder Abruf schreibt eine Audit-Zeile.
+- Neue Route `GET /api/einsaetze/{id}/personen/{pid}/zeile`: genau die Zeile, die die Liste dieser
+  Sitzung zeigen würde (`PersonAnzeige`), **ohne** Eintrag im Zugriffsprotokoll, mit denselben
+  Regeln wie die Liste (Modulrecht Personen, Stellenbindung der Geräte, Einheitengerät ohne
+  Personalien). Eine stornierte oder für die Sitzung unsichtbare Person ist 404; der Tab nimmt
+  sie dann aus seinen Listen. Die Detail-Route taugt nicht als Quelle: Jeder Abruf schreibt eine
+  Audit-Zeile.
 - Frontend: Der Zeilenabgleich bekommt das Ziel `personen`. Ein `person`-Ereignis mit
   `person_id` lädt nur diese Zeile und sortiert sie in die geladene Personenliste, die
   Personenauswahl und die Betroffenen je Betreuungsstelle ein. Die übrigen Abfragen, die das
   Ereignis heute abgleicht (Modulzähler, Betreuung, Registrierliste, Transportmittel), gleicht
   es weiter ab; die Anhangliste nur noch für diese eine Person.
 - Eine Nachforderung mit Personenbezug sendet ihr `person`-Ereignis künftig mit `person_id`.
+- Die Zeile trägt Name und Abschnitt der versorgenden Einheit per Join. Bisher hat jedes
+  `person`-Ereignis die ganze Liste neu geladen und diese Angaben nebenbei aufgefrischt. Künftig
+  sendet der Server `person` je versorgter Person, wenn eine Einheit umbenannt oder einem anderen
+  Abschnitt zugeordnet wird und wenn ein Abschnitt umbenannt oder aufgelöst wird.
 - Ohne Kennung, bei gescheitertem Zeilenabruf, nicht geladener Liste oder mehr als
   `ZEILEN_GRENZE` Personen je Fenster bleibt es beim vollen Abgleich, wie bei Schäden.
 
@@ -45,8 +51,10 @@ Keine.
 
 - Backend: `src/routes/einsatz_person.rs` (neuer Handler), `src/app.rs` (Route),
   `src/geraet/mod.rs` (Routenlisten der Geräte, die die Liste lesen),
-  `src/routes/nachforderung.rs` (`person_id` im Ereignis), Tests in `tests/einsatz_person.rs`,
-  `tests/geraet_kopplung.rs`, `tests/nachforderung_person.rs`.
+  `src/routes/nachforderung.rs` (`person_id` im Ereignis), `src/routes/einsatz_einheit.rs` und
+  `src/routes/einsatzabschnitt.rs` mit `src/einsatzabschnitt/repo.rs` (`person` je versorgter
+  Person), Tests in `tests/einsatz_person.rs`, `tests/geraet_kopplung.rs`,
+  `tests/nachforderung_person.rs` und den Tests von Einheit und Abschnitt.
 - Frontend: `frontend/src/api/queryKeys.ts` (`ZeilenZiel`, `EINSATZ_STREAM_ZIELE.person`),
   `frontend/src/live/zeilenAbgleich.ts` (Ziel `personen`), `frontend/src/api/einsatzPerson.ts`
   (Zeilenabruf, Vergleich, Form der Auswahl), Tests daneben.
