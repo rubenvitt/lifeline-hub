@@ -1,7 +1,7 @@
-import { App, Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
+import { Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
 import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -19,6 +19,7 @@ import { vorlage } from '../lageberichte/vorlagen';
 import LageberichtText from '../lageberichte/LageberichtText';
 import DokumentEntwurf, { type AbschnittAktion } from '../entwurf/DokumentEntwurf';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
+import { useDokumentFreigabe } from '../entwurf/useDokumentFreigabe';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import AbschnittUebernahme from '../lageberichte/AbschnittUebernahme';
 import LeereAbschnitteFuellen from '../lageberichte/LeereAbschnitteFuellen';
@@ -85,7 +86,6 @@ function LageberichtDetail() {
   const einsatzId = Number(id);
   const berichtId = Number(lbId);
   const idGueltig = parseRouteId(lbId) != null;
-  const { message } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<FormWerte>();
@@ -243,36 +243,13 @@ function LageberichtDetail() {
     [einsatzId, form, markiereGeaendert, vorlageKey, standGrenze],
   );
 
-  /**
-   * Ein Klick, ein PATCH: der Klick blurrt zuerst das Feld, der Blur-Autosave ist schon unterwegs,
-   * und `speichereJetzt` hängt sich an ihn an. Quittung, Zeitstempel und `invalidate` liegen im
-   * Hook; hier bleibt der Erfolgs-Toast.
-   *
-   * Kein `onError`: `speichereJetzt` legt den Grund in `speicherFehler` ab, der Alert steht oben
-   * auf der Seite. Ein Toast daneben wäre eine zweite Wahrheit, die nach drei Sekunden geht.
-   */
-  const speichernMutation = useMutation({
-    mutationFn: (werte: FormWerte) => schutz.speichereJetzt(werte),
-    onSuccess: () => message.success('Entwurf gespeichert'),
-  });
-
-  /**
-   * Die validierten Werte des Freigabe-Versuchs und zugleich der Auf-Zu-Zustand des Dialogs (`!==
-   * null` heißt offen). So kann der Dialog nicht ohne die Werte stehen, mit denen er gespeichert
-   * werden soll.
-   */
-  const [freigabeWerte, setFreigabeWerte] = useState<FormWerte | null>(null);
-
-  /**
-   * Kein `onError`: der Grund steht als `freigebenMutation.error` im Bestätigungsdialog, der bei
-   * Ablehnung offen bleibt.
-   */
-  const freigebenMutation = useMutation({
-    mutationFn: () => gibLageberichtFrei(einsatzId, berichtId),
-    onSuccess: () => {
-      invalidate();
-      message.success('Bericht freigegeben');
-    },
+  /** Speichern → Freigeben → Dialog, gemeinsam mit dem Zwilling (`entwurf/useDokumentFreigabe.ts`). */
+  const freigabe = useDokumentFreigabe<FormWerte>({
+    form,
+    schutz,
+    gibFrei: () => gibLageberichtFrei(einsatzId, berichtId),
+    erfolgText: 'Bericht freigegeben',
+    onFreigegeben: invalidate,
   });
 
   /**
@@ -327,48 +304,6 @@ function LageberichtDetail() {
       ? verteilerNamesFromForm(formVerteiler, verteilerQuellen, bericht.verteiler)
       : verteilerNames(bericht.verteiler);
 
-  const freigabeBestaetigen = async () => {
-    // Pflichtfelder vor dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
-    let werte: FormWerte;
-    try {
-      werte = await form.validateFields();
-    } catch {
-      return; // Validierungsfehler werden am Formular angezeigt.
-    }
-    // Ein frisch geöffneter Dialog zeigt keinen alten Grund: react-query hält `error` bis zum
-    // nächsten `mutate()`.
-    freigebenMutation.reset();
-    setFreigabeWerte(werte);
-  };
-
-  /**
-   * Kein eigener `sendetRef`-Riegel wie in `Erfassung.tsx`/`OtpEingabe.tsx`: antds `Button` sperrt
-   * seinen Klick selbst, solange `loading` steht, und hier ist der Knopf der einzige Weg (dort
-   * umgeht ein Tastenkürzel den Knopf). Ein zweiter Riegel ließe sich von antds eigenem nicht
-   * unterscheiden.
-   */
-  const freigabeAusfuehren = async () => {
-    if (freigabeWerte === null) return;
-    // /freigeben validiert den persistierten Stand, nicht den Editor-Inhalt: erst speichern, sonst
-    // würde ein eben befüllter Entwurf als „leer" abgelehnt. Über denselben Weg wie der Knopf: ein
-    // laufender Blur-Autosave wird abgewartet statt gedoppelt. Der Hook quittiert bei Erfolg selbst
-    // — sonst fragte der Browser beim Neuladen nach Änderungen an einem nicht mehr editierbaren
-    // Bericht.
-    try {
-      await schutz.speichereJetzt(freigabeWerte);
-    } catch {
-      // Kein Toast: der Grund steht als `schutz.speicherFehler` im Dialog, der offen bleibt. Der
-      // Seiten-Alert bleibt daneben stehen, er überlebt das Schließen des Dialogs.
-      return;
-    }
-    try {
-      await freigebenMutation.mutateAsync();
-    } catch {
-      return; // Grund steht als `freigebenMutation.error` im Dialog; er bleibt offen.
-    }
-    setFreigabeWerte(null);
-  };
-
   return (
     <div className="lagebericht-print-root" data-lfh="druckwurzel">
       {/* Rückfrage vor dem Verlassen mit ungespeicherter Fassung — Zwilling in `BefehlDetailPage`
@@ -389,18 +324,9 @@ function LageberichtDetail() {
         }}
       />
       <FreigabeDialog
-        offen={freigabeWerte !== null}
         titel="Lagebericht freigeben?"
         warnung="Endgültig: geht ins ETB, Korrektur nur per Fortschreibung."
-        speicherFehler={schutz.speicherFehler}
-        freigabeFehler={freigebenMutation.error}
-        // `speichertGerade` deckt den Vorlauf ab, auch wenn der Klick sich an einen laufenden
-        // Blur-Autosave anhängt. Hier richtig und nicht die Falle von `speichernMutation`: dieser
-        // Knopf existiert nur bei offenem Dialog, der Vorlauf ist genau der Vorgang, auf den der
-        // Dialog wartet.
-        laeuft={schutz.speichertGerade || freigebenMutation.isPending}
-        onAbbrechen={() => setFreigabeWerte(null)}
-        onFreigeben={() => void freigabeAusfuehren()}
+        {...freigabe.dialog}
       />
       {/* Seitenkopf (`EinsatzSeite`) — Zwilling in `BefehlDetailPage`. Die Aktionsleiste bricht
           im Kopf selbst um, „Freigeben" bleibt auf 390 px erreichbar. Im Druck blendet
@@ -481,14 +407,10 @@ function LageberichtDetail() {
                       Knopf und benennt ihn zu „loading Entwurf speichern" um — bei
                       `speichertGerade` bei jedem stillen Autosave. Der Riegel gegen den
                       Doppel-PATCH liegt im Hook, nicht an diesem `loading`. */}
-                  <Button onClick={() => form.submit()} loading={speichernMutation.isPending}>
+                  <Button onClick={() => form.submit()} loading={freigabe.speichertKnopf}>
                     Entwurf speichern
                   </Button>
-                  <Button
-                    type="primary"
-                    onClick={freigabeBestaetigen}
-                    loading={freigebenMutation.isPending}
-                  >
+                  <Button type="primary" onClick={freigabe.bestaetigen} loading={freigabe.gibtFrei}>
                     Freigeben
                   </Button>
                 </>
@@ -535,7 +457,7 @@ function LageberichtDetail() {
             // Zweiter Auslöser neben der Frist: ein verlassenes Feld. `onBlur` steigt aus den
             // Feldern auf.
             onBlur={schutz.autosaveJetzt}
-            onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
+            onFinish={(werte) => freigabe.speichern(werte as FormWerte)}
           >
             {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
                 (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
