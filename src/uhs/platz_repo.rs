@@ -254,13 +254,7 @@ pub async fn setze_verfuegbarkeit(
     // Reservierung erfordert unbelegten Platz (Spec: Verfügbarkeits-Statuswechsel,
     // letzter Punkt — andere Wechsel sind auch bei aktiver Belegung erlaubt).
     if verfuegbarkeit == "reserviert" {
-        let belegt: Option<i64> = sqlx::query_scalar(
-            "SELECT id FROM einsatz_person WHERE aktueller_platz_id = ? LIMIT 1",
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
-        if belegt.is_some() {
+        if ist_belegt(pool, uhs_id, id).await? {
             return Err(AppError::UnprocessableEntity(
                 "Platz ist belegt — Reservierung nicht möglich".into(),
             ));
@@ -287,11 +281,10 @@ pub async fn setze_verfuegbarkeit(
     laden(pool, uhs_id, id).await
 }
 
-/// Soft-Delete eines Platzes; blockt mit `Conflict`, wenn aktuell belegt.
-///
-/// Die Belegung zählt nur für Plätze der UHS im Pfad (LLH-1694): ein fremder Platz endet wie ein
-/// unbelegter mit 404 im Storno, sonst verriete 409 gegen 404 die Belegung fremder Plätze.
-pub async fn storniere(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<(), AppError> {
+/// Ob eine Person auf dem Platz `id` der UHS `uhs_id` liegt. Ein Platz einer anderen UHS gilt als
+/// unbelegt (LLH-1694): Der Schreibweg danach trifft ihn nicht und endet mit 404, sonst verriete
+/// 409 bzw. 422 gegen 404 die Belegung fremder Plätze.
+async fn ist_belegt(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<bool, AppError> {
     let belegt: Option<i64> = sqlx::query_scalar(
         "SELECT ep.id FROM einsatz_person ep \
          JOIN uhs_platz p ON p.id = ep.aktueller_platz_id \
@@ -301,7 +294,13 @@ pub async fn storniere(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<(), Ap
     .bind(uhs_id)
     .fetch_optional(pool)
     .await?;
-    if belegt.is_some() {
+    Ok(belegt.is_some())
+}
+
+/// Soft-Delete eines Platzes; blockt mit `Conflict`, wenn aktuell belegt (nur Plätze der UHS im
+/// Pfad, [`ist_belegt`]).
+pub async fn storniere(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<(), AppError> {
+    if ist_belegt(pool, uhs_id, id).await? {
         return Err(AppError::Conflict(
             "Platz ist aktuell belegt — Storno nicht möglich".into(),
         ));
@@ -657,6 +656,59 @@ mod tests {
         let err = storniere(&pool, u, p.id).await.unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
         let _ = b;
+    }
+
+    /// LLH-1694: Auch die Reservierung verrät die Belegung eines fremden Platzes nicht: 404 wie
+    /// bei einem unbelegten, nicht 422.
+    #[tokio::test]
+    async fn reservierung_fremden_belegten_platzes_ist_404_nicht_422() {
+        let pool = test_pool().await;
+        let (b, e, u, pa, pb) = setup(&pool).await;
+        let fremd = uhs_repo::anlegen(
+            &pool,
+            e,
+            b,
+            uhs_repo::NeueDaten {
+                lat: None,
+                lon: None,
+                typ: "behandlungsplatz",
+                bezeichnung: "BHP 51",
+                abschnitt_id: None,
+                standort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        let p = anlegen(
+            &pool,
+            fremd.id,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 1",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? WHERE id = ?",
+        )
+        .bind(fremd.id)
+        .bind(p.id)
+        .bind(pb)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let err = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "fremder belegter Platz → 404, war {err:?}"
+        );
     }
 
     /// LLH-1694: Ein belegter Platz einer anderen UHS antwortet wie ein unbelegter mit 404. Sonst
