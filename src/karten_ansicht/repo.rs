@@ -304,31 +304,37 @@ pub async fn setze_standard(
     id: i64,
     benutzer_id: i64,
 ) -> Result<Option<KartenAnsichtAnzeige>, AppError> {
-    let mut tx = pool.begin().await?;
-    let existiert: Option<i64> =
-        sqlx::query_scalar("SELECT id FROM karten_ansicht WHERE einsatz_id = ? AND id = ?")
+    // BEGIN IMMEDIATE über `write_retry!` (LLH-1693): erst lesen, dann schreiben scheiterte unter
+    // deferred `BEGIN` bei einem fremden Schreiber sofort mit BUSY (503).
+    let existiert = crate::write_retry!(pool, |conn| {
+        let existiert: Option<i64> =
+            sqlx::query_scalar("SELECT id FROM karten_ansicht WHERE einsatz_id = ? AND id = ?")
+                .bind(einsatz_id)
+                .bind(id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        if existiert.is_none() {
+            return Ok(false); // nichts geschrieben
+        }
+        sqlx::query("UPDATE karten_ansicht SET ist_standard = 0 WHERE einsatz_id = ? AND id <> ?")
             .bind(einsatz_id)
             .bind(id)
-            .fetch_optional(&mut *tx)
+            .execute(&mut *conn)
             .await?;
-    if existiert.is_none() {
-        return Ok(None); // Rollback beim Drop
-    }
-    sqlx::query("UPDATE karten_ansicht SET ist_standard = 0 WHERE einsatz_id = ? AND id <> ?")
+        sqlx::query(
+            "UPDATE karten_ansicht SET ist_standard = 1, geaendert_at = datetime('now'), \
+                 geaendert_von = ? WHERE einsatz_id = ? AND id = ?",
+        )
+        .bind(benutzer_id)
         .bind(einsatz_id)
         .bind(id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
-    sqlx::query(
-        "UPDATE karten_ansicht SET ist_standard = 1, geaendert_at = datetime('now'), \
-             geaendert_von = ? WHERE einsatz_id = ? AND id = ?",
-    )
-    .bind(benutzer_id)
-    .bind(einsatz_id)
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
+        Ok(true)
+    })?;
+    if !existiert {
+        return Ok(None);
+    }
     laden(pool, einsatz_id, id).await
 }
 
@@ -422,4 +428,60 @@ pub async fn loesche(
         crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(pool, g).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// LLH-1693: `setze_standard` liest (Existenz) und schreibt dann. Hält ein anderer Schreiber
+    /// gerade die Sperre, wartet es, statt mit BUSY (503) zu scheitern.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn setze_standard_wartet_auf_einen_fremden_schreiber() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let benutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, benutzername, passwort_hash, anzeigename) \
+             VALUES (1, 'tester', 'x', 'Tester') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let neu = anlegen(
+            &pool,
+            einsatz,
+            &AnsichtNeu {
+                name: "Nord".into(),
+                basemap_modus: None,
+                online_stil: None,
+                karten_theme: None,
+                layer_sichtbar: None,
+                fachebenen_sichtbar: None,
+                zentrum_lat: None,
+                zentrum_lon: None,
+                zoom: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
+
+        let halter =
+            crate::tx::halte_schreibsperre(&pool, std::time::Duration::from_millis(300)).await;
+        let a = setze_standard(&pool, einsatz, neu.id, benutzer)
+            .await
+            .unwrap()
+            .expect("eigene Ansicht");
+        halter.await.unwrap();
+        assert!(a.ist_standard);
+    }
 }
