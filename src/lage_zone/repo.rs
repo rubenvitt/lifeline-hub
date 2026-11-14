@@ -821,8 +821,7 @@ mod tests {
             .await
             .unwrap();
 
-        let halter =
-            crate::tx::halte_schreibsperre(&pool, std::time::Duration::from_millis(300)).await;
+        let halter = crate::tx::hold_write_lock(&pool, std::time::Duration::from_millis(300)).await;
         let n = aktualisiere(
             &pool,
             einsatz,

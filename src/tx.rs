@@ -105,7 +105,7 @@ macro_rules! write_retry {
 /// `SQLITE_BUSY`; eine unter `write_retry!` wartet und gelingt. Braucht den Datei-Pool
 /// (`db::test_pool_datei`) und eine Zeile `organisation` mit `id = 1`.
 #[cfg(test)]
-pub(crate) async fn halte_schreibsperre(
+pub(crate) async fn hold_write_lock(
     pool: &sqlx::SqlitePool,
     dauer: Duration,
 ) -> tokio::task::JoinHandle<()> {

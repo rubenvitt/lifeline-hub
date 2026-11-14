@@ -313,8 +313,7 @@ mod tests {
         let e = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
         abschliessen(&pool, e.id, leit).await.unwrap();
 
-        let halter =
-            crate::tx::halte_schreibsperre(&pool, std::time::Duration::from_millis(300)).await;
+        let halter = crate::tx::hold_write_lock(&pool, std::time::Duration::from_millis(300)).await;
         let r = setzen(&pool, e.id, leit, Some("2030-01-01 00:00:00"))
             .await
             .unwrap();
