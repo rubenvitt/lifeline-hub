@@ -403,7 +403,7 @@ pub(crate) async fn pruefe_zuordenbar(
          WHERE id IN (SELECT value FROM json_each(?)) AND org_id = ? \
            AND (einsatz_id IS NULL OR einsatz_id = ?)",
     )
-    .bind(ids_json(ids)?)
+    .bind(crate::kraefte_disposition::ids_json(ids))
     .bind(org_id)
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -438,7 +438,7 @@ pub(crate) async fn pruefe_kein_lokales_paar(
          ORDER BY k.id LIMIT 1",
         nutzende_einsaetze("k.id")
     )))
-    .bind(ids_json(ids)?)
+    .bind(crate::kraefte_disposition::ids_json(ids))
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
@@ -451,10 +451,6 @@ pub(crate) async fn pruefe_kein_lokales_paar(
 }
 
 /// IDs als JSON-Array für `json_each(?)`.
-fn ids_json(ids: &[i64]) -> Result<String, AppError> {
-    serde_json::to_string(ids)
-        .map_err(|e| AppError::Internal(format!("Sprechgruppen-ids serialisieren: {e}")))
-}
 
 /// Wer eine Sprechgruppe trägt (Zuordnungen aus 0073 und 0145). Eine Zuordnung entsteht und
 /// vergeht für alle Wege — PATCH mit `sprechgruppe_ids` als ganze Menge und die Einzel-Endpunkte
@@ -535,7 +531,7 @@ pub async fn ersetzen_tx(
 ) -> Result<(), AppError> {
     pruefe_kein_lokales_paar(conn, einsatz_id, ids).await?;
     let (tabelle, spalte, bezug) = ziel.ort();
-    let ids = ids_json(ids)?;
+    let ids = crate::kraefte_disposition::ids_json(ids);
     sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM {tabelle} WHERE {spalte} = ? \
            AND sprechgruppe_id NOT IN (SELECT value FROM json_each(?))"
