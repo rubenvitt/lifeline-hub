@@ -16,7 +16,7 @@
 //! }
 //! ```
 //!
-//! Mit `sqlx = |s| <Meldung>;` (nach einem `try_from`) kommen `sqlx::Type` und `sqlx::Decode` als
+//! Mit `sqlx = |s| <Meldung>;` (steht nach einem etwaigen `try_from`) kommen `sqlx::Type` und `sqlx::Decode` als
 //! Textspalte dazu (LLH-1690): gespeichert wird `as_str()`, gelesen über `parse()`, ein unbekannter
 //! Wert ist ein Decode-Fehler mit der Meldung. Für nullbare Spalten liefert sqlx' Blanket-Impl
 //! für `Option<T>` NULL → `None`; `#[sqlx(try_from = …)]` ginge dort nicht (Orphan-Rule).

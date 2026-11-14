@@ -450,8 +450,6 @@ pub(crate) async fn pruefe_kein_lokales_paar(
     Ok(())
 }
 
-/// IDs als JSON-Array für `json_each(?)`.
-
 /// Wer eine Sprechgruppe trägt (Zuordnungen aus 0073 und 0145). Eine Zuordnung entsteht und
 /// vergeht für alle Wege — PATCH mit `sprechgruppe_ids` als ganze Menge und die Einzel-Endpunkte
 /// `PUT/DELETE …/sprechgruppen/{sg}` (LFH-893, design.md D5) — nur über [`zuordnen_tx`] und

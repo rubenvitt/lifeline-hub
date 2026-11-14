@@ -656,8 +656,6 @@ struct StelleKurz {
     storniert: bool,
 }
 
-/// IDs als JSON-Array für `json_each(?)`.
-
 /// Die Stellen des Einsatzes unter `ids`, nach Bezeichnung — EINE Anweisung für die ganze Liste
 /// (`src/AGENTS.md`, „Eingabegrenzen“: ID-Listen mit einer von N unabhängigen Zahl von
 /// Anweisungen). Fremde und unbekannte Kennungen fehlen im Ergebnis.
