@@ -830,6 +830,27 @@ enum Bezug {
     Fehlt,
 }
 
+/// Ob `schluessel` in `tabelle` als entfernte Zeile in der Bruchstelle steht, gleich in welchem
+/// Zustand (LLH-1864): Nur dann kann ein Verweis darauf ohne Herkunft noch auf etwas warten
+/// ([`antrag::lege_an_tx`]).
+pub(super) async fn is_entfernt(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    tabelle: &str,
+    schluessel: &str,
+) -> Result<bool, AppError> {
+    let zeile: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_bruchstelle \
+         WHERE einsatz_id = ? AND art = ? AND schluessel = ? AND entfernt = 1 LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(tabelle)
+    .bind(schluessel)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(zeile.is_some())
+}
+
 /// Wie steht der Verweis auf `schluessel` in `tabelle` (LLH-1646, Drei-Wege-Antwort LLH-1657)?
 async fn bezug(
     conn: &mut SqliteConnection,
