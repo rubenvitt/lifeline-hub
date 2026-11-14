@@ -65,6 +65,12 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useViewport } from '../components/useViewport';
+import ZumKopfKnopf from '../components/ZumKopfKnopf';
+import {
+  LISTEN_MAX_SEITEN,
+  kopfVerlassen,
+  useKopfBeimVerlassen,
+} from '../components/listenFenster';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
 import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -186,13 +192,14 @@ export default function MeldungenPage() {
     queryFn: () => ladeMeldungKennzahlen(einsatzId, richtungFilter),
     placeholderData: (prev) => prev,
   });
-  // Kein Seitendeckel (D6): die Kette wächst nur, solange jemand tief in „Abgeschlossen" blättert.
-  // Ein Ereignis lädt nur die schon geladenen Seiten neu, die Cursor rechnet TanStack dabei aus den
-  // frischen Seiten nach.
+  // Seitenfenster (LLH-1687, `components/listenFenster.ts`): ein Ereignis lädt höchstens so viele
+  // Seiten neu, wie im Fenster liegen; die Cursor rechnet TanStack dabei aus den frischen Seiten
+  // nach. Fällt die neueste Seite heraus, führt „Zu den neuesten springen“ zurück.
   const abgeschlosseneQuery = useInfiniteQuery({
     queryKey: einsatzKeys.meldungenPhase(einsatzId, 'abgeschlossen', richtungsKey),
     queryFn: ({ pageParam }) => listeAbgeschlosseneMeldungen(einsatzId, richtungFilter, pageParam),
     initialPageParam: undefined as AbschlussCursor | undefined,
+    maxPages: LISTEN_MAX_SEITEN,
     getNextPageParam: (letzte) =>
       letzte.length < MELDUNGEN_SEITE ? undefined : abschlussCursor(letzte[letzte.length - 1]),
     enabled: ansicht === 'abgeschlossen',
@@ -215,6 +222,15 @@ export default function MeldungenPage() {
       return true;
     });
   }, [abgeschlosseneQuery.data]);
+  // Ohne Kopf im Fenster (LLH-1687) ist die geladene Zahl keine Position mehr: dann endet „Ältere
+  // laden“ allein an `hasNextPage`, und die Zeile nennt keine Gesamtzahl.
+  const abgeschlossenSchluessel = einsatzKeys.meldungenPhase(
+    einsatzId,
+    'abgeschlossen',
+    richtungsKey,
+  );
+  const ohneKopf = kopfVerlassen(abgeschlosseneQuery.data);
+  useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
   // Zwei Gruppen in der Offen-Ansicht: die erste Frage der Triage ist „was hat noch niemand
   // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung steht danach unter
   // einer neuen Normalmeldung; das ist gewollt. Innerhalb jeder Gruppe ordnet `vergleicheMeldung` —
@@ -932,6 +948,12 @@ export default function MeldungenPage() {
               />
             </div>
           )}
+          {kopfVerlassen(abgeschlosseneQuery.data) && (
+            <ZumKopfKnopf
+              schluessel={abgeschlossenSchluessel}
+              ladeKopf={() => listeAbgeschlosseneMeldungen(einsatzId, richtungFilter)}
+            />
+          )}
           {abgeschlosseneQuery.isPending ? (
             <div style={{ textAlign: 'center', padding: token.paddingLG }}>
               <Spin />
@@ -942,7 +964,7 @@ export default function MeldungenPage() {
           {/* Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
               sagt, dass es keine gibt. */}
           {abgeschlosseneQuery.hasNextPage &&
-            (kennzahlen == null || abgeschlossene.length < kennzahlen.erledigt) && (
+            (ohneKopf || kennzahlen == null || abgeschlossene.length < kennzahlen.erledigt) && (
               <div style={{ textAlign: 'center', marginTop: token.margin }}>
                 <Button
                   onClick={() => void abgeschlosseneQuery.fetchNextPage()}
@@ -951,7 +973,8 @@ export default function MeldungenPage() {
                   Ältere laden
                 </Button>
                 <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                  {abgeschlossene.length}
+                  {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
                 </div>
               </div>
             )}
