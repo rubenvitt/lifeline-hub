@@ -45,8 +45,8 @@ verbiete '^pub mod (stab|presse);' src/lib.rs
 verlange '^pub const MODUL_KEYS' src/einsatz/modul.rs
 test -z "$(awk '/^pub const MODUL_KEYS/,/^\];/' src/einsatz/modul.rs | grep '"stab"' || true)"
 verbiete "key: 'stab'" frontend/src/einsatz/modulRegistry.ts
-# Die Migrationstests in src/db.rs belegen das Löschen und nennen die Tabellen deshalb.
-verbiete 'einsatz_stabsfunktion|einsatz_stab_checkliste' 'src/**/*.rs' ':(exclude)src/db.rs'
+# Die Migrationstests in src/db/tests.rs belegen das Löschen und nennen die Tabellen deshalb.
+verbiete 'einsatz_stabsfunktion|einsatz_stab_checkliste' 'src/**/*.rs' ':(exclude)src/db/tests.rs'
 verlange 'einsatz_mitgliedschaft' 'src/fuehrung/**/*.rs'
 ```
 

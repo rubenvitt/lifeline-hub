@@ -907,7 +907,7 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   stehen) und `journal_size_limit` (LFH-928), und nach einer Schwärzung oder einem Sweep mit
   Löschungen schreibt der Purge-Lauf den WAL per `db::wal_zurueckschreiben` zurück. Die Haupt-DB
   nur über `db::connect` öffnen. Netz:
-  `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler.rs`). Herleitung und
+  `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler/tests.rs`). Herleitung und
   Messung: `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
 - **Fristen je Datenkategorie** (LFH-749, Spec `aufbewahrung-kategorien`): jede Scrub-Spalte
   trägt im Typ eine `Zuordnung` (Kategorie, Personenstamm, Einsatz); die Kategorie-Spalten pinnt
