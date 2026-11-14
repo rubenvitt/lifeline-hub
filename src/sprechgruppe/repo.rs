@@ -384,7 +384,7 @@ pub async fn liste_fuer_einsatz(
 /// Prüft, ob alle `ids` zur `org_id` als Katalog-Eintrag (`einsatz_id IS NULL`)
 /// **oder** als einsatz-lokale Sprechgruppe mit genau diesem `einsatz_id` gehören.
 /// Jede ID, die diese Bedingung nicht erfüllt, ergibt `UnprocessableEntity`. Das Paar mit einer
-/// gleichnamigen Einsatz-Sprechgruppe (409) prüft erst die Schreibtransaktion
+/// gleichnamigen Einsatz-Sprechgruppe (409) prüft maßgeblich die Schreibtransaktion
 /// ([`zuordnen_tx`], [`ersetzen_tx`], LLH-1650): Vorab auf eigener Verbindung könnte eine
 /// gleichzeitig angelegte Einsatz-Sprechgruppe durchrutschen.
 pub(crate) async fn pruefe_zuordenbar(
@@ -418,9 +418,11 @@ pub(crate) async fn pruefe_zuordenbar(
 
 /// LLH-1645: Eine Katalog-Sprechgruppe, die der Einsatz noch nicht nutzt, darf kein Paar mit
 /// einer gleichnamigen Einsatz-Sprechgruppe stiften (etwa eine deaktivierte, die der Picker
-/// nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar. Nur in der
-/// Schreibtransaktion der Zuordnung aufrufen (LLH-1650): Unter BEGIN IMMEDIATE sieht sie eine
-/// gleichzeitig angelegte Einsatz-Sprechgruppe, oder deren Anlegen sieht danach die Nutzung.
+/// nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar. Maßgeblich
+/// ist der Aufruf in der Schreibtransaktion der Zuordnung (LLH-1650): Unter BEGIN IMMEDIATE sieht
+/// sie eine gleichzeitig angelegte Einsatz-Sprechgruppe, oder deren Anlegen sieht danach die
+/// Nutzung. Ein Aufrufer, der vorher anderes schreibt, prüft zusätzlich vorab (Einheit-PATCH,
+/// LLH-1692), damit der vorhersehbare Fall nichts halb speichert.
 pub(crate) async fn pruefe_kein_lokales_paar(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
