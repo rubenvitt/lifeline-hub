@@ -14,7 +14,8 @@ import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
-import { gewaehlteOptionen } from '../test/auswahlListe';
+import { gewaehlteOptionen, waehle } from '../test/auswahlListe';
+import { listeQualifikationen } from '../api/qualifikationen';
 
 dayjs.extend(utc);
 
@@ -79,9 +80,11 @@ vi.mock('../api/abloesungen', () => ({
 
 // Schichtplan (LLH-1554): Plan, UHS, Stamm-Personal und Qualifikationen der Ansicht „Schichtplan“.
 const fetchSchichtplan = vi.fn();
+const createSchichtplanHelfer = vi.fn();
 vi.mock('../api/schichtplan', async (orig) => ({
   ...(await orig<typeof import('../api/schichtplan')>()),
   fetchSchichtplan: (...a: unknown[]) => fetchSchichtplan(...a),
+  createSchichtplanHelfer: (...a: unknown[]) => createSchichtplanHelfer(...a),
 }));
 vi.mock('../api/einsatzUhs', async (orig) => ({
   ...(await orig<typeof import('../api/einsatzUhs')>()),
@@ -2010,5 +2013,161 @@ describe('AbloesungPage — Schichtplan (LLH-1554)', () => {
     await userEvent.click(screen.getByRole('radio', { name: 'Schichten' }));
     await waitFor(() => expect(adresse.suche).toBe('?ansicht=laufend'));
     expect(screen.getByRole('radio', { name: 'Laufend' })).toBeChecked();
+  });
+});
+
+describe('AbloesungPage — Helfer im Schichtplan (Change y106s29r, Spec kraefte-schichtplan)', () => {
+  const PLAN = {
+    bloecke: [
+      {
+        id: 1,
+        von: inMinuten(-30),
+        bis: inMinuten(90),
+        posten: { art: 'einheit', einheit_id: 11, bezeichnung: 'Florian 1', aufgeloest: false },
+        befunde: [],
+        offene_anforderungen: [],
+        offene_plaetze: 1,
+        personen: [],
+        personen_anzahl: 0,
+        soll_anzahl: 1,
+        version: 1,
+      },
+    ],
+    grenzwerte: {
+      max_dienst_eigen: false,
+      max_dienst_minuten: 720,
+      min_ruhe_eigen: false,
+      min_ruhe_minuten: 600,
+    },
+    helfer: [] as unknown[] | null,
+    wechsel: [],
+  };
+  const helferListe = () =>
+    document.querySelector<HTMLElement>('[data-lfh="schichtplan-helfer"]') as HTMLElement;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setzeViewportBreite(1440);
+    freigaben.wert = freigabenFixture();
+    einsatz.wert = {
+      id: 1,
+      bezeichnung: 'Stadtfest',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      einsatzart: 'sanitaetsdienst',
+      begonnen_at: inMinuten(-120),
+    } as typeof einsatz.wert;
+    laufendLiefert([]);
+    listeEinheitenPerioden.mockResolvedValue([]);
+    listeEinsatzPersonal.mockResolvedValue([]);
+    fetchEinsatzSchichtmodell.mockResolvedValue({ vorwarnung_minuten: 30, laufende_schichten: 0 });
+    listeAbloesungVorgaben.mockResolvedValue([
+      { abschnitt_id: 7, abschnitt_name: 'Deichwache Nord', rhythmus_minuten: 360 },
+    ]);
+    fetchSchichtplan.mockResolvedValue(PLAN);
+    vi.mocked(listeQualifikationen).mockResolvedValue([{ id: 5, label: 'Sanitäter' }] as Awaited<
+      ReturnType<typeof listeQualifikationen>
+    >);
+  });
+
+  it('ein angelegter Helfer steht in der Liste und sofort zum Einteilen bereit', async () => {
+    const MIA = {
+      id: 31,
+      name: 'Mia Beispiel',
+      organisation: 'DRK OV Nord',
+      qualifikationen: [5],
+    };
+    createSchichtplanHelfer.mockImplementation(() => {
+      fetchSchichtplan.mockResolvedValue({ ...PLAN, helfer: [MIA] });
+      return Promise.resolve(MIA);
+    });
+    renderPage();
+    await screen.findByRole('region', { name: 'Schichtplan' });
+    await userEvent.click(screen.getByRole('button', { name: 'Helfer' }));
+    await userEvent.click(within(helferListe()).getByRole('button', { name: 'Helfer anlegen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Helfer anlegen' });
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Mia Beispiel');
+    await userEvent.type(within(dialog).getByLabelText('Organisation'), 'DRK OV Nord');
+    await waehle('Qualifikationen', 'Sanitäter');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Helfer anlegen' }));
+    await waitFor(() =>
+      expect(createSchichtplanHelfer).toHaveBeenCalledWith(1, {
+        name: 'Mia Beispiel',
+        organisation: 'DRK OV Nord',
+        qualifikationen: [5],
+      }),
+    );
+    expect(await within(helferListe()).findByText('Mia Beispiel')).toBeInTheDocument();
+    expect(within(helferListe()).getByText('Sanitäter')).toBeInTheDocument();
+    // Zurück zum Plan: sie steht in der Seitenleiste zum Ziehen auf einen Block.
+    await userEvent.click(screen.getByRole('button', { name: 'Helfer' }));
+    const leiste = await screen.findByRole('complementary', { name: 'Personen zum Einteilen' });
+    expect(await within(leiste).findByText('Mia Beispiel')).toBeInTheDocument();
+  });
+
+  it('Kennung und Herkunft eines eingelesenen Helfers stehen nur lesend da', async () => {
+    fetchSchichtplan.mockResolvedValue({
+      ...PLAN,
+      helfer: [
+        {
+          id: 32,
+          name: 'Jan Import',
+          kennung: 'H-0815',
+          herkunft: 'Dienstplan KV',
+          qualifikationen: [],
+        },
+      ],
+    });
+    renderPage();
+    await screen.findByRole('region', { name: 'Schichtplan' });
+    await userEvent.click(screen.getByRole('button', { name: 'Helfer' }));
+    const liste = helferListe();
+    expect(await within(liste).findByText('H-0815')).toBeInTheDocument();
+    expect(within(liste).getByText('Dienstplan KV')).toBeInTheDocument();
+    await userEvent.click(within(liste).getByRole('button', { name: 'Jan Import bearbeiten' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Helfer Jan Import' });
+    expect(within(dialog).getByText('H-0815')).toBeInTheDocument();
+    expect(within(dialog).getByText('Dienstplan KV')).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Kennung')).toBeNull();
+    expect(within(dialog).queryByLabelText('Herkunft')).toBeNull();
+    expect(within(dialog).queryByDisplayValue('H-0815')).toBeNull();
+    expect(within(dialog).queryByDisplayValue('Dienstplan KV')).toBeNull();
+  });
+
+  it('ohne Freigabe Personal zeigt die Helferliste keine Namen und keinen Knopf zum Anlegen', async () => {
+    freigaben.wert = freigabenFixture({ personal: { zugriff: false } });
+    fetchSchichtplan.mockResolvedValue({ ...PLAN, helfer: null });
+    renderPage();
+    await screen.findByRole('region', { name: 'Schichtplan' });
+    await userEvent.click(screen.getByRole('button', { name: 'Helfer' }));
+    const liste = helferListe();
+    expect(within(liste).getByText('Modul Personal gesperrt')).toBeInTheDocument();
+    expect(within(liste).queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Helfer anlegen' })).toBeNull();
+  });
+
+  it('scheitert der Plan, bietet die Helferliste kein Anlegen wie bei einem leeren Plan an', async () => {
+    // Review zu LLH-1684: ohne geladenen Plan ist unbekannt, ob es Helfer gibt; „Noch keine Helfer“
+    // samt „Helfer anlegen“ wäre eine falsche Aussage.
+    fetchSchichtplan.mockRejectedValue(new Error('Server nicht erreichbar'));
+    renderPage();
+    await screen.findByRole('region', { name: 'Schichtplan' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Helfer' }));
+    expect(helferListe()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Helfer anlegen' })).toBeNull();
+  });
+
+  it('ohne Schreibrecht am Einsatz lässt die Helferliste nur lesen', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    fetchSchichtplan.mockResolvedValue({
+      ...PLAN,
+      helfer: [{ id: 33, name: 'Ole Lesend', qualifikationen: [] }],
+    });
+    renderPage();
+    await screen.findByRole('region', { name: 'Schichtplan' });
+    await userEvent.click(screen.getByRole('button', { name: 'Helfer' }));
+    expect(await within(helferListe()).findByText('Ole Lesend')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Helfer anlegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ole Lesend bearbeiten' })).toBeNull();
   });
 });

@@ -31,7 +31,7 @@ use serde::Deserialize;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::abloesung::schichtplan::uebernahme::repo::{
-    self as kern, bestand_tx, planen, schreiben_tx, Geschrieben, Rechte,
+    self as kern, bestand_tx, planen, write_tx, Geschrieben, Rechte,
 };
 use crate::abloesung::schichtplan::uebernahme::{
     Entscheidungen, ImportVorschau, PaketBlock, PaketGrenzwerte, PaketPerson, PaketPosten,
@@ -593,7 +593,7 @@ pub async fn uebernehmen(
             crate::einsatz::einstellungen::etb_startwert(&mut *conn, v.einsatz_id).await?;
         // Die Bezeichnung (höchstens `planung::BEZEICHNUNG_MAX`) hält die ETB-Grenze.
         let anlass = format!("Planung „{}“ übernommen", v.quelle.bezeichnung);
-        let geschrieben = schreiben_tx(
+        let geschrieben = write_tx(
             conn,
             v.einsatz_id,
             benutzer.org_id,
@@ -644,11 +644,12 @@ async fn mark_uebernommen_tx(
             .bind(planung_id)
             .fetch_one(&mut *conn)
             .await?;
-    let kennzahlen = super::repo::kennzahlen_von(
+    let kennzahlen = super::repo::load_kennzahlen(
         conn,
         benutzer.org_id,
         planung_id,
         SchichtplanGrenzwerte::aus(max, ruhe),
+        crate::abloesung::schichtplan::plan_repo::utc(jetzt)?,
     )
     .await?;
     let json = serde_json::to_string(&kennzahlen)

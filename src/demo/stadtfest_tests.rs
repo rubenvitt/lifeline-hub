@@ -396,7 +396,9 @@ async fn stadtfest_bringt_die_demo_planung_mit() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let p = crate::planung::repo::laden(&pool, 1, id).await.unwrap();
+    let p = crate::planung::repo::load(&pool, 1, id, chrono::Utc::now())
+        .await
+        .unwrap();
     // 4. Juli 2026 ist ein Samstag: die Planung liegt eine Woche später, in Sommerzeit.
     assert_eq!(p.kopf.von, "2026-07-11 08:00:00");
     assert_eq!(p.kopf.bis, "2026-07-11 22:00:00");

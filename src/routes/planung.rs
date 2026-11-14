@@ -12,11 +12,11 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::abloesung::schichtplan::repo::{HelferEingabe, HelferPatch};
+use crate::abloesung::schichtplan::plan_repo::{self, BlockPatch};
 use crate::abloesung::schichtplan::uebernahme::{Entscheidungen, ENTSCHEIDUNGEN_MAX};
 use crate::abloesung::schichtplan::{
-    zerlegung, PlanHelferAnzeige, PlanPerson, BLOCK_MIN_MINUTEN, HELFER_TELEFON_MAX,
-    HELFER_TEXT_MAX, MAX_DIENST_BEREICH, MIN_RUHE_BEREICH, NOTIZ_MAX, PLAN_PERSONEN_MAX,
+    zerlegung, PlanHelferAnzeige, PlanPerson, BLOCK_MIN_MINUTEN, MAX_DIENST_BEREICH,
+    MIN_RUHE_BEREICH, NOTIZ_MAX,
 };
 use crate::app::AppState;
 use crate::einsatz::Einsatzart;
@@ -24,7 +24,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::planung::repo::{
-    self, BlockEingabe, BlockPatch, Herkunft, KopfEingabe, KopfPatch, PostenEingabe, PostenPatch,
+    self, BlockEingabe, Herkunft, KopfEingabe, KopfPatch, PostenEingabe, PostenPatch, Vorplanung,
 };
 use crate::planung::zugriff::{Planer, PlanungsZugriff};
 use crate::planung::{programm, uebernahme};
@@ -34,11 +34,13 @@ use crate::planung::{
 };
 use crate::programmpunkt::{Programmpunkt, PROGRAMMPUNKT_BEZEICHNUNG_MAX};
 use crate::routes::abloesung_schichtplan::{
-    grenzwert, planzeit, qualifikationen, soll_anzahl, zeitraum,
+    erzeugen_felder, grenzwert, personen, soll_anzahl, version, zeitraum, zeitraum_patch,
+    HelferAendern, HelferAnlegen, VersionParams,
 };
 use crate::routes::programmpunkt::{parse_zeitpunkt, NeuerProgrammpunkt, ProgrammpunktPatch};
 use crate::routes::support;
 use crate::uhs::UhsTyp;
+use crate::write_retry;
 use crate::zeit::jetzt;
 
 /// Nach einem wirksamen Schreibweg: das Org-Ereignis an die Planer.
@@ -46,8 +48,22 @@ fn melde(state: &AppState, org_id: i64, planung_id: i64) {
     state.live.publiziere_planung(org_id, planung_id);
 }
 
+/// Die Planung als Art des Plan-Kerns (`plan_repo`).
+fn plan(z: &PlanungsZugriff) -> Vorplanung {
+    Vorplanung {
+        org_id: z.benutzer.org_id,
+        planung_id: z.planung_id,
+    }
+}
+
 async fn planung(state: &AppState, z: &PlanungsZugriff) -> Result<PlanungAnzeige, AppError> {
-    repo::laden(&state.pool, z.benutzer.org_id, z.planung_id).await
+    repo::load(
+        &state.pool,
+        z.benutzer.org_id,
+        z.planung_id,
+        chrono::Utc::now(),
+    )
+    .await
 }
 
 /// GET /api/planungen/{id}/export — die Planung als Excel-Mappe (LLH-1557, design.md D5): wer
@@ -85,21 +101,13 @@ pub enum PersonEingabe {
     Helfer { helfer_id: i64 },
 }
 
-/// Personen eines Blocks: höchstens [`PLAN_PERSONEN_MAX`] vor dem Entdoppeln (400).
-fn personen(liste: Vec<PersonEingabe>) -> Result<Vec<PlanPerson>, AppError> {
-    if liste.len() > PLAN_PERSONEN_MAX {
-        return Err(AppError::Validation(format!(
-            "personen: höchstens {PLAN_PERSONEN_MAX} Personen"
-        )));
-    }
-    let personen: Vec<PlanPerson> = liste
-        .into_iter()
-        .map(|p| match p {
+impl From<PersonEingabe> for PlanPerson {
+    fn from(p: PersonEingabe) -> Self {
+        match p {
             PersonEingabe::Stamm { personal_id } => PlanPerson::Stamm(personal_id),
             PersonEingabe::Helfer { helfer_id } => PlanPerson::Helfer(helfer_id),
-        })
-        .collect();
-    Ok(crate::kraefte_disposition::dedupe(&personen, |p| *p))
+        }
+    }
 }
 
 fn schichtlaenge(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppError> {
@@ -118,12 +126,12 @@ fn schichtlaenge(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppEr
 // ---------------------------------------------------------------------------------------------
 
 /// GET /api/planungen — die Planungen der eigenen Organisation mit Kennzahlen.
-pub async fn liste(
+pub async fn list(
     State(state): State<AppState>,
     Planer(benutzer): Planer,
 ) -> Result<Json<Vec<PlanungListeneintrag>>, AppError> {
     Ok(Json(
-        repo::liste(&state.pool, benutzer.org_id, chrono::Utc::now()).await?,
+        repo::list(&state.pool, benutzer.org_id, chrono::Utc::now()).await?,
     ))
 }
 
@@ -149,14 +157,14 @@ pub struct PlanungAnlegen {
 }
 
 /// POST /api/planungen — legt eine Planung an (201, ganze Planung). Bezeichnung doppelt 409.
-pub async fn anlegen(
+pub async fn create(
     State(state): State<AppState>,
     Planer(benutzer): Planer,
     JsonBody(req): JsonBody<PlanungAnlegen>,
 ) -> Result<(StatusCode, Json<PlanungAnzeige>), AppError> {
     let von = planungszeit(&req.von, "Beginn")?;
     let bis = planungszeit(&req.bis, "Ende")?;
-    repo::pruefe_zeitraum(&von, &bis)?;
+    repo::check_zeitraum(&von, &bis)?;
     let eingabe = KopfEingabe {
         bezeichnung: support::pflicht_max(&req.bezeichnung, "bezeichnung", BEZEICHNUNG_MAX)?,
         einsatzart: match req.einsatzart.as_deref() {
@@ -183,16 +191,16 @@ pub async fn anlegen(
         )?
         .flatten(),
     };
-    let id = repo::anlegen(&state.pool, benutzer.org_id, benutzer.id, &eingabe).await?;
+    let id = repo::create(&state.pool, benutzer.org_id, benutzer.id, &eingabe).await?;
     melde(&state, benutzer.org_id, id);
     Ok((
         StatusCode::CREATED,
-        Json(repo::laden(&state.pool, benutzer.org_id, id).await?),
+        Json(repo::load(&state.pool, benutzer.org_id, id, chrono::Utc::now()).await?),
     ))
 }
 
 /// GET /api/planungen/{id}
-pub async fn lesen(
+pub async fn load(
     State(state): State<AppState>,
     z: PlanungsZugriff,
 ) -> Result<Json<PlanungAnzeige>, AppError> {
@@ -226,7 +234,7 @@ pub struct PlanungAendern {
 }
 
 /// PATCH /api/planungen/{id} — Kopf, CAS über `version` (409).
-pub async fn aendern(
+pub async fn update(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<PlanungAendern>,
@@ -245,7 +253,7 @@ pub async fn aendern(
         .map(|b| planungszeit(b, "Ende"))
         .transpose()?;
     if let (Some(v), Some(b)) = (&von, &bis) {
-        repo::pruefe_zeitraum(v, b)?;
+        repo::check_zeitraum(v, b)?;
     }
     let koordinate = match (req.ort_lat, req.ort_lon) {
         (None, None) => None,
@@ -270,7 +278,7 @@ pub async fn aendern(
         )?,
         min_ruhe: grenzwert(req.min_ruhe_minuten, "min_ruhe_minuten", MIN_RUHE_BEREICH)?,
     };
-    repo::aendern(
+    repo::update(
         &state.pool,
         z.benutzer.org_id,
         z.planung_id,
@@ -284,11 +292,11 @@ pub async fn aendern(
 }
 
 /// DELETE /api/planungen/{id} — samt Posten, Blöcken und Helfern (204).
-pub async fn loeschen(
+pub async fn delete(
     State(state): State<AppState>,
     z: PlanungsZugriff,
 ) -> Result<StatusCode, AppError> {
-    repo::loeschen(&state.pool, z.benutzer.org_id, z.planung_id).await?;
+    repo::delete(&state.pool, z.benutzer.org_id, z.planung_id).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -354,7 +362,7 @@ fn herkunft(req: &PostenAnlegen) -> Result<Herkunft, AppError> {
 
 /// POST /api/planungen/{id}/posten — am Ende der Reihenfolge (201, ganze Planung). Höchstens
 /// [`POSTEN_MAX`] je Planung (422), Bezeichnung in der Planung doppelt 409.
-pub async fn posten_anlegen(
+pub async fn create_posten(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<PostenAnlegen>,
@@ -367,7 +375,7 @@ pub async fn posten_anlegen(
         soll_anzahl: soll_anzahl(req.soll_anzahl)?,
         quali_soll: quali_soll::form_tri(req.quali_soll)?,
     };
-    repo::posten_anlegen(&state.pool, z.benutzer.org_id, z.planung_id, &eingabe).await?;
+    repo::create_posten(&state.pool, z.benutzer.org_id, z.planung_id, &eingabe).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok((StatusCode::CREATED, Json(planung(&state, &z).await?)))
 }
@@ -389,7 +397,7 @@ pub struct PostenAendern {
 
 /// PATCH /api/planungen/{id}/posten/{pid} — Bezeichnung, Abschnitt, Schichtlänge, Soll; die
 /// Herkunft bleibt. Bestehende Blöcke behalten ihr Soll.
-pub async fn posten_aendern(
+pub async fn update_posten(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,
@@ -406,7 +414,7 @@ pub async fn posten_aendern(
         soll_anzahl: soll_anzahl(req.soll_anzahl)?,
         quali_soll: quali_soll::form_tri(req.quali_soll)?,
     };
-    repo::posten_aendern(&state.pool, z.benutzer.org_id, z.planung_id, pid, &patch).await?;
+    repo::update_posten(&state.pool, z.benutzer.org_id, z.planung_id, pid, &patch).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(Json(planung(&state, &z).await?))
 }
@@ -419,13 +427,13 @@ pub struct PostenLoeschenParams {
 
 /// DELETE /api/planungen/{id}/posten/{pid}?mit_bloecken=true — samt seinen Blöcken; sind darin
 /// Personen eingeteilt, nur mit `mit_bloecken` (422 sonst).
-pub async fn posten_loeschen(
+pub async fn delete_posten(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,
     Query(params): Query<PostenLoeschenParams>,
 ) -> Result<StatusCode, AppError> {
-    repo::posten_loeschen(
+    repo::delete_posten(
         &state.pool,
         z.benutzer.org_id,
         z.planung_id,
@@ -489,7 +497,7 @@ pub struct BlockAnlegen {
 }
 
 /// POST /api/planungen/{id}/bloecke — liefert die ganze Planung (201).
-pub async fn block_anlegen(
+pub async fn create_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<BlockAnlegen>,
@@ -504,7 +512,7 @@ pub async fn block_anlegen(
         personen: personen(req.personen)?,
         notiz: support::optional_max(req.notiz, "notiz", NOTIZ_MAX)?,
     };
-    repo::block_anlegen(
+    repo::create_block(
         &state.pool,
         z.benutzer.org_id,
         z.planung_id,
@@ -539,25 +547,14 @@ pub struct BlockAendern {
 }
 
 /// PATCH /api/planungen/{id}/bloecke/{bid} — CAS über `version` (409).
-pub async fn block_aendern(
+pub async fn update_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, bid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<BlockAendern>,
 ) -> Result<Json<PlanungAnzeige>, AppError> {
-    let version = req
-        .version
-        .ok_or_else(|| AppError::Validation("version fehlt".into()))?;
-    let (von, bis) = match (req.von.as_deref(), req.bis.as_deref()) {
-        (Some(v), Some(b)) => {
-            let (v, b) = zeitraum(v, b)?;
-            (Some(v), Some(b))
-        }
-        (v, b) => (
-            v.map(|v| planzeit(v, "Beginn")).transpose()?,
-            b.map(|b| planzeit(b, "Ende")).transpose()?,
-        ),
-    };
+    let version = version(req.version)?;
+    let (von, bis) = zeitraum_patch(req.von.as_deref(), req.bis.as_deref())?;
     let patch = BlockPatch {
         version,
         posten: req.posten_id,
@@ -568,37 +565,26 @@ pub async fn block_aendern(
         personen: req.personen.map(personen).transpose()?,
         notiz: support::optional_max_tri(req.notiz, "notiz", NOTIZ_MAX)?,
     };
-    repo::block_aendern(
-        &state.pool,
-        z.benutzer.org_id,
-        z.planung_id,
-        bid,
-        z.benutzer.id,
-        &patch,
-        &jetzt(),
-    )
-    .await?;
+    let (plan, jetzt) = (plan(&z), jetzt());
+    write_retry!(&state.pool, |conn| {
+        plan_repo::update_block_tx(conn, &plan, bid, z.benutzer.id, &patch, &jetzt).await
+    })?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(Json(planung(&state, &z).await?))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct VersionParams {
-    #[serde(default)]
-    version: Option<i64>,
-}
-
 /// DELETE /api/planungen/{id}/bloecke/{bid}?version=… (409 bei veraltetem Stand).
-pub async fn block_loeschen(
+pub async fn delete_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, bid)): PfadParam<(i64, i64)>,
     Query(params): Query<VersionParams>,
 ) -> Result<StatusCode, AppError> {
-    let version = params
-        .version
-        .ok_or_else(|| AppError::Validation("version fehlt".into()))?;
-    repo::block_loeschen(&state.pool, z.benutzer.org_id, z.planung_id, bid, version).await?;
+    let version = params.version()?;
+    let (plan, jetzt) = (plan(&z), jetzt());
+    write_retry!(&state.pool, |conn| {
+        plan_repo::delete_block_tx(conn, &plan, bid, version, true, z.benutzer.id, &jetzt).await
+    })?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -623,20 +609,7 @@ pub async fn erzeugen(
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<Erzeugen>,
 ) -> Result<(StatusCode, Json<PlanungAnzeige>), AppError> {
-    let von = planzeit(&req.von, "Beginn")?;
-    let bis = planzeit(&req.bis, "Ende")?;
-    let dauer = crate::zeit::parse_utc(&bis)
-        .zip(crate::zeit::parse_utc(&von))
-        .map(|(b, v)| (b - v).num_minutes());
-    if !dauer.is_some_and(|m| m >= BLOCK_MIN_MINUTEN) {
-        return Err(AppError::Validation(format!(
-            "Der Zeitraum dauert mindestens {BLOCK_MIN_MINUTEN} Minuten"
-        )));
-    }
-    let laenge = req
-        .laenge_minuten
-        .map(zerlegung::pruefe_laenge)
-        .transpose()?;
+    let (von, bis, laenge) = erzeugen_felder(&req.von, &req.bis, req.laenge_minuten)?;
     repo::erzeugen(
         &state.pool,
         z.benutzer.org_id,
@@ -656,85 +629,45 @@ pub async fn erzeugen(
 // Helfer
 // ---------------------------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HelferAnlegen {
-    name: String,
-    #[serde(default)]
-    telefon: Option<String>,
-    #[serde(default)]
-    organisation: Option<String>,
-    #[serde(default)]
-    qualifikationen: Vec<i64>,
-}
-
 /// POST /api/planungen/{id}/helfer (201, der Helfer).
-pub async fn helfer_anlegen(
+pub async fn create_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<HelferAnlegen>,
 ) -> Result<(StatusCode, Json<PlanHelferAnzeige>), AppError> {
-    let eingabe = HelferEingabe {
-        name: support::pflicht_max(&req.name, "name", HELFER_TEXT_MAX)?,
-        telefon: support::optional_max(req.telefon, "telefon", HELFER_TELEFON_MAX)?,
-        organisation: support::optional_max(req.organisation, "organisation", HELFER_TEXT_MAX)?,
-        qualifikationen: qualifikationen(&req.qualifikationen)?,
-    };
-    let helfer = repo::helfer_anlegen(
-        &state.pool,
-        z.benutzer.org_id,
-        z.planung_id,
-        z.benutzer.id,
-        &eingabe,
-    )
-    .await?;
+    let (eingabe, plan) = (req.eingabe()?, plan(&z));
+    let helfer = write_retry!(&state.pool, |conn| {
+        plan_repo::create_helfer_tx(conn, &plan, z.benutzer.id, &eingabe).await
+    })?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok((StatusCode::CREATED, Json(helfer)))
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HelferAendern {
-    #[serde(default)]
-    name: Option<String>,
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    telefon: Option<Option<String>>,
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    organisation: Option<Option<String>>,
-    #[serde(default)]
-    qualifikationen: Option<Vec<i64>>,
-}
-
 /// PATCH /api/planungen/{id}/helfer/{hid}
-pub async fn helfer_aendern(
+pub async fn update_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, hid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<HelferAendern>,
 ) -> Result<Json<PlanHelferAnzeige>, AppError> {
-    let patch = HelferPatch {
-        name: support::pflicht_max_tri(req.name.as_deref(), "name", HELFER_TEXT_MAX)?,
-        telefon: support::optional_max_tri(req.telefon, "telefon", HELFER_TELEFON_MAX)?,
-        organisation: support::optional_max_tri(req.organisation, "organisation", HELFER_TEXT_MAX)?,
-        qualifikationen: req
-            .qualifikationen
-            .as_deref()
-            .map(qualifikationen)
-            .transpose()?,
-    };
-    let helfer =
-        repo::helfer_aendern(&state.pool, z.benutzer.org_id, z.planung_id, hid, &patch).await?;
+    let (patch, plan) = (req.patch()?, plan(&z));
+    let helfer = write_retry!(&state.pool, |conn| {
+        plan_repo::update_helfer_tx(conn, &plan, hid, &patch).await
+    })?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(Json(helfer))
 }
 
 /// DELETE /api/planungen/{id}/helfer/{hid} — nimmt den Helfer aus allen Blöcken.
-pub async fn helfer_loeschen(
+pub async fn delete_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, hid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    repo::helfer_loeschen(&state.pool, z.benutzer.org_id, z.planung_id, hid).await?;
+    let (plan, jetzt) = (plan(&z), jetzt());
+    write_retry!(&state.pool, |conn| {
+        plan_repo::delete_helfer_tx(conn, &plan, hid, z.benutzer.id, &jetzt).await
+    })?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -746,7 +679,7 @@ pub async fn helfer_loeschen(
 /// POST /api/planungen/{id}/programmpunkte (201, der Programmpunkt). Grenzen wie am Einsatz:
 /// Bezeichnung Pflicht und höchstens 100 Zeichen, Zeitpunkt im Jahresbereich (400), höchstens 50
 /// je Planung (422).
-pub async fn programmpunkt_anlegen(
+pub async fn create_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<NeuerProgrammpunkt>,
@@ -771,7 +704,7 @@ pub async fn programmpunkt_anlegen(
 }
 
 /// PATCH /api/planungen/{id}/programmpunkte/{pid} — Bezeichnung und/oder Zeitpunkt.
-pub async fn programmpunkt_aendern(
+pub async fn update_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,
@@ -801,7 +734,7 @@ pub async fn programmpunkt_aendern(
 }
 
 /// DELETE /api/planungen/{id}/programmpunkte/{pid} (204).
-pub async fn programmpunkt_loeschen(
+pub async fn delete_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,

@@ -1,7 +1,7 @@
 import { Input } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { aenderePlanung } from '../api/planungen';
+import { updatePlanung } from '../api/planungen';
 import { PLANUNG_BEZEICHNUNG_MAX, PLANUNG_ORT_MAX } from '../api/eingabegrenzen';
 import { globalKeys } from '../api/queryKeys';
 import type { Einsatzart, Planung, PlanungAendernBody, PlanungKopf as Kopf } from '../api/types';
@@ -23,7 +23,7 @@ import {
   minRuheRegel,
   zeitraumRegel,
 } from './planungRegeln';
-import { uebernimmPlanung } from './planungCache';
+import { applyPlanung } from './planungCache';
 
 export interface KopfWerte {
   bezeichnung: string;
@@ -99,8 +99,8 @@ export default function PlanungKopf({
     // Ohne Basis („Meine Änderung übernehmen“) gilt der neueste bekannte Stand.
     const neuester = qc.getQueryData<Planung>(globalKeys.planung(kopf.id))?.kopf.version;
     const version = basis !== undefined ? Number(basis) : (neuester ?? kopf.version);
-    const p = await aenderePlanung(kopf.id, { version, ...patch });
-    uebernimmPlanung(qc, p);
+    const p = await updatePlanung(kopf.id, { version, ...patch });
+    applyPlanung(qc, p);
     void qc.invalidateQueries({ queryKey: globalKeys.planungen(), exact: true });
   };
 

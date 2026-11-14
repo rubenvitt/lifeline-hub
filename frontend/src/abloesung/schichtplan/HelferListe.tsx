@@ -1,27 +1,26 @@
-import { Button, Form, Input, Modal, Space } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button, Form, Input, Modal, Space, Typography } from 'antd';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
   SCHICHTPLAN_HELFER_QUALIFIKATIONEN_MAX,
   SCHICHTPLAN_HELFER_TELEFON_MAX,
   SCHICHTPLAN_HELFER_TEXT_MAX,
-} from '../api/eingabegrenzen';
-import { aenderePlanungHelfer, legePlanungHelferAn, loeschePlanungHelfer } from '../api/planungen';
-import { listeQualifikationen } from '../api/qualifikationen';
-import { globalKeys } from '../api/queryKeys';
+} from '../../api/eingabegrenzen';
+import { listeQualifikationen } from '../../api/qualifikationen';
+import { globalKeys } from '../../api/queryKeys';
 import type {
-  Planung,
   SchichtplanHelfer,
   SchichtplanHelferAendernBody,
   SchichtplanHelferBody,
-} from '../api/types';
-import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
-import { useRollen } from '../components/instrument';
-import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
-import { nachText, werteAus } from '../components/katalogVergleich';
-import { Select } from '../components/Select';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { teilwortSuche } from '../components/teilwortSuche';
+} from '../../api/types';
+import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
+import { Datenfeld, Datenraster, monoStil, useRollen } from '../../components/instrument';
+import { MODUL_PERSONAL_GESPERRT } from '../../components/nurAnsicht';
+import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabelle';
+import { nachText, werteAus } from '../../components/katalogVergleich';
+import { Select } from '../../components/Select';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { teilwortSuche } from '../../components/teilwortSuche';
 
 interface HelferWerte {
   name: string;
@@ -65,6 +64,7 @@ function HelferDialog({
   onSchliessen: () => void;
 }) {
   const [form] = Form.useForm<HelferWerte>();
+  const { token } = useRollen();
   const qualiQuery = useQuery({
     queryKey: globalKeys.qualifikationen(),
     queryFn: listeQualifikationen,
@@ -109,6 +109,17 @@ function HelferDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
+      {/* Kennung und Herkunft (Einlesen, Übernahme aus einer Planung) nur lesend, ohne Eingabe. */}
+      {helfer && (helfer.kennung || helfer.herkunft) && (
+        <Datenraster spalten={2} style={{ marginBottom: token.margin }}>
+          {helfer.kennung && (
+            <Datenfeld label="Kennung" mono>
+              {helfer.kennung}
+            </Datenfeld>
+          )}
+          {helfer.herkunft && <Datenfeld label="Herkunft">{helfer.herkunft}</Datenfeld>}
+        </Datenraster>
+      )}
       <Form.Item<HelferWerte>
         label="Name"
         name="name"
@@ -146,21 +157,56 @@ function HelferDialog({
   );
 }
 
-/**
- * Reiter „Helfer“ einer Planung (LLH-1586): Personen ohne Stammdatensatz, nur in dieser Planung,
- * etwa von einer anderen Organisation. Sie stehen in der Seitenleiste des Plans unter „Helfer“.
- * Ein gelöschter Helfer verschwindet aus allen Blöcken; die Rückfrage nennt, aus wie vielen.
- */
-export default function PlanungHelferListe({
-  planung,
-  readOnly = false,
-}: {
-  planung: Planung;
-  /** Übernommen (LLH-1587): ohne Anlegen und Aktionen. */
+/** Schreibwege der Helfer eines Plans; jede Antwort ist der Helfer, nicht der ganze Plan. */
+export interface HelferListeApi {
+  create: (body: SchichtplanHelferBody) => Promise<SchichtplanHelfer>;
+  update: (helferId: number, body: SchichtplanHelferAendernBody) => Promise<SchichtplanHelfer>;
+  delete: (helferId: number) => Promise<unknown>;
+}
+
+/** Übernahme in den Cache des Plans nach einem Schreibweg. */
+export interface HelferListeCache {
+  /** Setzt den gespeicherten Helfer sofort in den Plan (optional). */
+  set?: (helfer: SchichtplanHelfer) => void;
+  /** Lädt den Plan neu; das Speichern wartet darauf. */
+  invalidate: () => Promise<unknown>;
+}
+
+interface HelferListeProps {
+  /** Die Helfer des Plans; `null` ohne Freigabe des Moduls Personal (Sperrhinweis statt Liste). */
+  helfer: readonly SchichtplanHelfer[] | null;
+  /** Blöcke des Plans: die Rückfrage beim Löschen nennt, aus wie vielen der Helfer fällt. */
+  bloecke: readonly { personen?: readonly { helfer_id?: number | null }[] | null }[];
+  /** Nur lesen: ohne Anlegen und Aktionen. */
   readOnly?: boolean;
-}) {
-  const planungId = planung.kopf.id;
-  const qc = useQueryClient();
+  /** Grund der Sperre, wenn `helfer` `null` ist. Vorgabe: Modul Personal gesperrt. */
+  gesperrt?: string;
+  api: HelferListeApi;
+  cache: HelferListeCache;
+  /** `data-lfh` der Wurzel, je Plan („planung-helfer“, „schichtplan-helfer“). */
+  dataLfh: string;
+}
+
+/**
+ * Helfer eines Plans (LLH-1586; Change `y106s29r-blockplan-kern`, design.md D7): Personen ohne
+ * Stammdatensatz, nur in diesem Plan, etwa von einer anderen Organisation. Sie stehen in der
+ * Seitenleiste des Plans unter „Helfer“. Ein gelöschter Helfer verschwindet aus allen Blöcken; die
+ * Rückfrage nennt, aus wie vielen. Kennung und Herkunft (Einlesen, Übernahme aus einer Planung)
+ * stehen nur lesend da, die Spalten nur, wenn ein Helfer sie trägt.
+ *
+ * Träger: der Reiter „Helfer“ einer Planung (`planung/PlanungPage`) und der Knopf „Helfer“ in der
+ * Werkzeugzeile des Schichtplans im Einsatz (`SchichtplanAnsicht`). Die Hülle reicht Daten, API und
+ * Cache-Übernahme.
+ */
+export default function HelferListe({
+  helfer: helferListe,
+  bloecke,
+  readOnly = false,
+  gesperrt = MODUL_PERSONAL_GESPERRT,
+  api,
+  cache,
+  dataLfh,
+}: HelferListeProps) {
   const { token } = useRollen();
   const [dialog, setDialog] = useState<{ helfer: SchichtplanHelfer | null } | null>(null);
   const [zuLoeschen, setZuLoeschen] = useState<SchichtplanHelfer | null>(null);
@@ -175,30 +221,29 @@ export default function PlanungHelferListe({
   const qualiText = (h: SchichtplanHelfer) =>
     h.qualifikationen.map((id) => qualiNamen.get(id) ?? '?').join(', ');
 
-  const neuLaden = () => qc.invalidateQueries({ queryKey: globalKeys.planung(planungId) });
   const speichernMut = useMutation({
     mutationFn: (s: HelferSpeichern) =>
-      s.art === 'anlegen'
-        ? legePlanungHelferAn(planungId, s.body)
-        : aenderePlanungHelfer(planungId, s.helferId, s.body),
-    onSuccess: neuLaden,
+      s.art === 'anlegen' ? api.create(s.body) : api.update(s.helferId, s.body),
+    onSuccess: (h) => {
+      cache.set?.(h);
+      return cache.invalidate();
+    },
   });
   const loeschenMut = useMutation({
-    mutationFn: (helferId: number) => loeschePlanungHelfer(planungId, helferId),
+    mutationFn: (helferId: number) => api.delete(helferId),
     onSuccess: async () => {
       setZuLoeschen(null);
-      await neuLaden();
+      await cache.invalidate();
     },
   });
 
+  const helfer = helferListe ?? [];
   const bloeckeMit = (h: SchichtplanHelfer) =>
-    planung.bloecke.filter((b) => b.personen.some((p) => p.helfer_id === h.id)).length;
+    bloecke.filter((b) => (b.personen ?? []).some((p) => p.helfer_id === h.id)).length;
   const loeschAnzahl = zuLoeschen ? bloeckeMit(zuLoeschen) : 0;
 
-  const organisationWerte = werteAus(planung.helfer, (h) => h.organisation);
-  const qualiWerte = werteAus(planung.helfer, (h) =>
-    h.qualifikationen.map((id) => qualiNamen.get(id)),
-  );
+  const organisationWerte = werteAus(helfer, (h) => h.organisation);
+  const qualiWerte = werteAus(helfer, (h) => h.qualifikationen.map((id) => qualiNamen.get(id)));
 
   const spalten: KatalogSpalte<SchichtplanHelfer>[] = [
     {
@@ -234,6 +279,31 @@ export default function PlanungHelferListe({
       onFilter: (wert, h) => h.qualifikationen.some((id) => qualiNamen.get(id) === wert),
       render: (_, h) => qualiText(h) || '—',
     },
+    // Nur lesend und nur, wenn ein Helfer sie trägt (Einlesen, Übernahme aus einer Planung).
+    ...(helfer.some((h) => h.kennung)
+      ? [
+          {
+            title: 'Kennung',
+            key: 'kennung',
+            abBreite: 'md',
+            suchText: (h: SchichtplanHelfer) => h.kennung,
+            sorter: nachText((h: SchichtplanHelfer) => h.kennung),
+            render: (_: unknown, h: SchichtplanHelfer) =>
+              h.kennung ? <span style={monoStil(13)}>{h.kennung}</span> : '—',
+          } satisfies KatalogSpalte<SchichtplanHelfer>,
+        ]
+      : []),
+    ...(helfer.some((h) => h.herkunft)
+      ? [
+          {
+            title: 'Herkunft',
+            key: 'herkunft',
+            abBreite: 'md',
+            sorter: nachText((h: SchichtplanHelfer) => h.herkunft),
+            render: (_: unknown, h: SchichtplanHelfer) => h.herkunft ?? '—',
+          } satisfies KatalogSpalte<SchichtplanHelfer>,
+        ]
+      : []),
     {
       title: 'Aktionen',
       key: 'aktionen',
@@ -265,9 +335,20 @@ export default function PlanungHelferListe({
   ];
   const sichtbareSpalten = readOnly ? spalten.filter((sp) => sp.key !== 'aktionen') : spalten;
 
-  // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint die Planung.
+  // Ohne Personal keine Namen und kein Anlegen (Server: `helfer` ist `null`).
+  if (helferListe == null) {
+    return (
+      <div data-lfh={dataLfh}>
+        <Typography.Text type="secondary" data-lfh="helfer-sperre">
+          {gesperrt}
+        </Typography.Text>
+      </div>
+    );
+  }
+
+  // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint den Plan.
   return (
-    <div data-lfh="planung-helfer">
+    <div data-lfh={dataLfh}>
       {/* Zielabstand zur Werkzeugzeile der Tabelle darunter (LLH-1595): 7 / 11 / 16 px. */}
       {!readOnly && (
         <Space style={{ marginBottom: token.marginSM }}>
@@ -283,7 +364,7 @@ export default function PlanungHelferListe({
       )}
       <KatalogTabelle
         rowKey="id"
-        dataSource={planung.helfer}
+        dataSource={helfer}
         columns={sichtbareSpalten}
         spaltenSchalter={{ bezeichnung: 'Helfer' }}
         mehrzahl="Helfern"

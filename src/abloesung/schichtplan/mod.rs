@@ -27,6 +27,7 @@ use crate::wire_enum::wire_enum;
 
 pub mod ausgabe;
 pub mod kopplung;
+pub mod plan_repo;
 pub mod pruefung;
 pub mod repo;
 pub mod uebernahme;

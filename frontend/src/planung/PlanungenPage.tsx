@@ -2,7 +2,7 @@ import { Button, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useState } from 'react';
-import { listePlanungen } from '../api/planungen';
+import { listPlanungen } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { PlanungListeneintrag } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -43,7 +43,7 @@ export default function PlanungenPage() {
   const { konventionen } = useAnzeigeKonventionen();
   const { istSchmal } = useViewport();
   const [anlegen, setAnlegen] = useState(false);
-  const query = useQuery({ queryKey: globalKeys.planungen(), queryFn: listePlanungen });
+  const query = useQuery({ queryKey: globalKeys.planungen(), queryFn: listPlanungen });
   const jetzt = Date.now();
 
   const kennzahl = (

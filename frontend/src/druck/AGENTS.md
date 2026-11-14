@@ -119,7 +119,9 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (`abloesung/schichtplan/ausgabe/SchichtplanBlaetter.tsx`) lesen nur den Ausgabeplan
   (`ausgabePlan.ts`, aus dem Einsatz über `ausEinsatzPlan.ts` mit den Zeilen der Ansicht, damit
   Aushang und Raster dieselbe Folge haben); eine spätere Quelle (Vorplanung) bekommt einen eigenen
-  Adapter, die Blätter bleiben. Jedes Blatt ist ein `druck-kapitel` mit eigenem Druckkopf
+  Adapter, die Blätter bleiben. Wahl, „Neu laden“, `DruckKnopf`, Hinweise und Blätter teilt die
+  Seite mit `planung/PlanungDruckPage.tsx` über `abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt.tsx`;
+  Rahmen und Laden bleiben je Seite. Jedes Blatt ist ein `druck-kapitel` mit eigenem Druckkopf
   (`ebene={2}`). Nachweis `e2e/schichtplan-druck.spec.ts` (drei Engines, PDF in Chromium).
 - **Personendruck nur über `GET …/personen/druck`**: jeder Abruf schreibt einen `druck`-Eintrag in
   `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache;

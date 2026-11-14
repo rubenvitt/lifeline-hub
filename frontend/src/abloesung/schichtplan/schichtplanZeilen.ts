@@ -3,7 +3,6 @@ import type {
   Einheit,
   EinsatzPersonal,
   Personal,
-  Schichtplan,
   SchichtplanBefund,
   SchichtplanBlock,
   SchichtplanBlockBody,
@@ -63,7 +62,7 @@ interface ZeilenQuellen {
  * Untereinheiten, mit dem geerbten Abschnitt), dann die UHS; danach „Ohne Abschnitt“, zuletzt die
  * Pause. Aufgelöste Posten stehen nur, solange sie Blöcke tragen.
  */
-export function baueZeilen({ einheiten, uhs, abschnitte, bloecke }: ZeilenQuellen): RasterZeile[] {
+export function buildZeilen({ einheiten, uhs, abschnitte, bloecke }: ZeilenQuellen): RasterZeile[] {
   const namen = new Map(abschnitte.map((a) => [a.abschnitt_id, a.abschnitt_name]));
   const geerbt = abschnittDerEinheit(einheiten ?? []);
   const jeAbschnitt = new Map<number | null, RasterZeile[]>();
@@ -204,10 +203,6 @@ export function alsRasterBlock(block: SchichtplanBlock): RasterBlock {
     ampel,
     ampelWort: wort,
   };
-}
-
-export function rasterBloecke(plan: Schichtplan | undefined): RasterBlock[] {
-  return (plan?.bloecke ?? []).map(alsRasterBlock);
 }
 
 // ── Personen ─────────────────────────────────────────────────────────────────────────────────
