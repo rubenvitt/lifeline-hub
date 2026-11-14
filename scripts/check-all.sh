@@ -22,7 +22,7 @@
 set -euo pipefail
 
 # Bündel-Auswahl für die parallele CI. OHNE Argument läuft alles — der Weg vor dem Merge.
-#   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories,
+#   --nur schnell    rustfmt, Lint, Typ-Drift, Advisories und Karenzzeit,
 #                    Selbsttests der Gate-Skripte,
 #                    Migrationsnummern gegen origin/alpha,
 #                    Werkzeugversionen aus mise.toml,
@@ -175,8 +175,16 @@ schritt_5() {
 }
 
 schritt_6() {
-  echo "==> [6/$SCHRITTE] Abhängigkeiten auf bekannte Schwachstellen prüfen"
-  "$ROOT/scripts/check-deps.sh"
+  echo "==> [6/$SCHRITTE] Abhängigkeiten: Schwachstellen und Karenzzeit"
+  # Beide Prüfungen laufen, auch wenn die erste rot ist: sonst käme ein Karenz-Verstoß neben
+  # einem Advisory erst im nächsten Lauf ans Licht.
+  local rc=0
+  "$ROOT/scripts/check-deps.sh" || rc=$?
+  # Kein Lockfile führt ein Paket, das jünger als die Karenzzeit ist (LLH-1884): Cloudflare baut
+  # die Website mit dieser Regel, die PR-CI installiert sie aber nicht. Netzabhängig wie der
+  # Advisory-Scan davor; ein Verstoß heilt mit der Zeit, der Lauf wird dann neu gestartet.
+  "$ROOT/scripts/check-karenzzeit.sh" || rc=$?
+  return "$rc"
 }
 
 # Stellt frontend/dist bereit — den Prod-Bundle für e2e/lagekarte-offline-precache.spec.ts
@@ -317,11 +325,14 @@ schritt_8() {
 }
 
 schritt_9() {
-  echo "==> [9/$SCHRITTE] Advisory-Gate liest das Lockfile (Selbsttest, LFH-316)"
+  echo "==> [9/$SCHRITTE] Advisory-Gate und Karenz-Prüfung lesen das Lockfile (Selbsttests, LFH-316, LLH-1884)"
   # Schritt 6 fragt die Advisory-Datenbank (netzabhängig); dieser Selbsttest fragt ohne Netz,
   # WORAUF Schritt 6 schaut — ein Gate, das eine Teilmenge prüft, meldet „OK" wie eines, das
   # alles geprüft hat.
   "$ROOT/scripts/check-deps.test.sh"
+  # Dasselbe für die Karenz-Prüfung in Schritt 6 (LLH-1884): ließe sie ein Paket aus oder
+  # verschluckte sie das Urteil von pnpm, fiele ein zu junges Paket wieder erst bei Cloudflare auf.
+  "$ROOT/scripts/check-karenzzeit.test.sh"
 }
 
 schritt_10() {

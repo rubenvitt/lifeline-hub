@@ -1,6 +1,13 @@
 # Nur Einstellungen für das Release-Werkzeug im Wurzelpaket (package.json); das Frontend hat
 # seine eigene Datei unter frontend/. pnpm 11 liest Overrides nur hier, nicht aus package.json.
 
+# Karenzzeit für frisch veröffentlichte Pakete (LLH-1884): 1440 Minuten = 24 Stunden.
+# Ausdrücklich gesetzt, damit Gate und Cloudflare dieselbe Zahl lesen und ein pnpm-Update die
+# Vorgabe nicht still verschiebt. Geprüft wird sie an jedem PR (scripts/check-karenzzeit.sh,
+# Schritt 6). Nicht senken, um einen roten Lauf grün zu bekommen: der Lauf wird neu gestartet,
+# sobald das Paket alt genug ist.
+minimumReleaseAge: 1440
+
 overrides:
   # semantic-release-claude-changelog@2.0.0 (neueste) verlangt `^0.1.37` und bliebe damit auf
   # 0.1.x — mit Claude Code 2.0.77, das Workload Identity Federation nicht kennt. Der

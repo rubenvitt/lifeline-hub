@@ -4,8 +4,11 @@
 # selbst. Was die Zahl trotzdem tragen muss, weil ein anderes Werkzeug sie liest, prüft dieses
 # Skript gegen den Block:
 #
-#   - `packageManager` in package.json und frontend/package.json (corepack, pnpm)
-#   - `engines.node` in beiden package.json (pnpm prüft die Node-Version)
+#   - `packageManager` in package.json, frontend/package.json und website/package.json
+#     (corepack, pnpm)
+#   - `engines.node` in denselben drei package.json (pnpm prüft die Node-Version)
+#   - website/.node-version: Cloudflare Pages baut die Website mit der Node-Version aus dieser
+#     Datei und liest `engines` nicht (LLH-1884; ohne Datei nahm es seine Vorgabe 22.x)
 #   - die Node-Version des Devcontainers (.devcontainer/devcontainer.json)
 #
 # Und es bricht an jeder harten `node@<zahl>`/`pnpm@<zahl>` sowie an `actions/setup-node` in
@@ -75,10 +78,17 @@ pruefe_gleich() { # <beschreibung> <soll> <ist>
   fi
 }
 
-for paket in package.json frontend/package.json; do
+for paket in package.json frontend/package.json website/package.json; do
   pruefe_gleich "$paket packageManager" "pnpm@$PNPM" "$(json_wert "$ROOT/$paket" packageManager)"
   pruefe_gleich "$paket engines.node" "$NODE" "$(json_wert "$ROOT/$paket" $'engines\x1fnode')"
 done
+# Erste Zeile, ohne Leerraum und Windows-Zeilenende; ein führendes `v` gilt als Abweichung,
+# damit die Datei Zeichen für Zeichen der Zahl aus mise.toml folgt.
+node_version_datei=""
+if [ -f "$ROOT/website/.node-version" ]; then
+  node_version_datei="$(head -n 1 "$ROOT/website/.node-version" | tr -d '[:space:]')"
+fi
+pruefe_gleich "website/.node-version (Cloudflare Pages)" "$NODE" "$node_version_datei"
 pruefe_gleich ".devcontainer Node" "$NODE" \
   "$(json_wert "$ROOT/.devcontainer/devcontainer.json" $'features\x1fghcr.io/devcontainers/features/node:1\x1fversion')"
 
