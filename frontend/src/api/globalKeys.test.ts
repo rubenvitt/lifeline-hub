@@ -36,6 +36,8 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.planungDruck(7)).toEqual(['planung-druck', 7]);
     // Anbindungen für Fremdsysteme (LLH-1652), Verwaltung → Einstellungen.
     expect(globalKeys.anbindungen()).toEqual(['anbindungen']);
+    // Verlauf der Zustellversuche eines Webhooks (LLH-1656), je Anbindung.
+    expect(globalKeys.anbindungWebhookVersuche('z1')).toEqual(['anbindung-webhook-versuche', 'z1']);
     // Einwurf-Zugänge für Absender ohne Signatur (LLH-1654), auf derselben Seite.
     expect(globalKeys.einwurfZugaenge()).toEqual(['einwurf-zugaenge']);
     // Seite des Lagebilds für Externe (LLH-1496), ohne den Schlüssel im Key.
@@ -43,6 +45,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.instanzkopplung()).toEqual(['instanzkopplung']);
     // Archiv-Schlüssel der Org (LLH-1494), Verwaltung → Einstellungen.
     expect(globalKeys.orgArchivSchluessel()).toEqual(['org-archiv-schluessel']);
+    expect(globalKeys.archivEinspielen()).toEqual(['archiv-einspielen']);
     expect(globalKeys.instanzkopplungLetzteSchluessel()).toEqual([
       'instanzkopplung',
       'letzte-schluessel',
@@ -159,10 +162,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 47 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 48 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(47);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(47);
+    expect(werte).toHaveLength(48);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(48);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

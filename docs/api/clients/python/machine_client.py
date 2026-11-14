@@ -8,6 +8,7 @@ Doku docs/api/maschinenzugang.md). Braucht nur `cryptography` (pip install crypt
 """
 import base64, hashlib, hmac, json, os, struct, sys, time, urllib.request
 
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from cryptography.hazmat.primitives.kdf.hkdf import HKDFExpand
 from cryptography.hazmat.primitives import hashes, serialization
@@ -75,6 +76,36 @@ def verify_response(cred: dict, token: str, req_jti: str, status: int, body: byt
         raise ValueError("Antwortsignatur passt nicht")
 
 
+def verify_webhook(instanz_public_key: str, instanz_id: str, webhook_id: str, token: str,
+                   body: bytes, now: int) -> dict:
+    """Prüft eine eingehende Webhook-Zustellung (LLH-1656): `token` ist der Kopf
+    `Lifeline-Signature`, `body` die empfangenen Bytes, `webhook_id` die Kennung des Webhooks von
+    der Seite „Anbindungen“. Wirft ValueError mit dem Grund (Typ, Signatur, Absender, Ziel, Body,
+    Zeit). Erst danach den Body parsen; doppelt zugestellte Ereignisse über `id` erkennen."""
+    try:
+        h, c, s = token.split(".")
+        kopf = json.loads(unb64(h))
+    except ValueError as e:
+        raise ValueError("Webhook-Signatur unlesbar") from e
+    if kopf.get("alg") != "EdDSA" or kopf.get("typ") != "lifeline-event+jwt":
+        raise ValueError("Typ")
+    try:
+        Ed25519PublicKey.from_public_bytes(unb64(instanz_public_key)).verify(
+            unb64(s), (h + "." + c).encode())
+    except InvalidSignature as e:
+        raise ValueError("Signatur") from e
+    cl = json.loads(unb64(c))
+    if cl["iss"] != instanz_id:
+        raise ValueError("Absender")
+    if cl["aud"] != webhook_id:
+        raise ValueError("Ziel")
+    if cl["bh"] != b64(hashlib.sha256(body).digest()):
+        raise ValueError("Body")
+    if not (0 < cl["exp"] - cl["iat"] <= 300 and cl["iat"] <= now + 300 and cl["exp"] >= now - 300):
+        raise ValueError("Zeit")
+    return cl
+
+
 def redeem(base_url: str, code: str, key: Ed25519PrivateKey | None = None) -> dict:
     key = key or Ed25519PrivateKey.generate()
     pub = b64(key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw))
@@ -121,6 +152,14 @@ def selftest(pfad: str) -> None:
         assert auth == "Machine " + a["jws"], "JWS " + a["path"]
     r = v["response"]
     verify_response(cred, r["jws"], r["req"], r["status"], r["body"].encode(), r["iat"])
+    for f in v["webhooks"]["faelle"]:
+        try:
+            verify_webhook(v["instanz_public_key"], v["instanz_id"], f["webhook_id"], f["jws"],
+                           f["body"].encode(), f["now"])
+            fehler = None
+        except ValueError as e:
+            fehler = str(e)
+        assert fehler == f["fehler"], f"Webhook {f['name']}: {fehler} statt {f['fehler']}"
     print("Testvektoren: ok")
 
 

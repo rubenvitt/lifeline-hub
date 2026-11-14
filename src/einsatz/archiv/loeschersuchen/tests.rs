@@ -424,9 +424,16 @@ async fn alter_download_gesperrt_und_kopie_vorgemerkt() {
     let dir = tempfile::tempdir().unwrap();
     let datei = dir.path().join("block.age");
     std::fs::write(&datei, &alt).unwrap();
-    let kopie = super::super::einspielen::einspielen(&pool, &datei, &s, None, Utc::now())
-        .await
-        .unwrap();
+    let kopie = super::super::einspielen::einspielen(
+        &pool,
+        &datei,
+        schluessel_von(&a.identitaet),
+        super::super::einspielen::Ziel::AusArchiv,
+        super::super::einspielen::Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap();
 
     antrag(&pool, &a, 25).await;
     vollziehen(&pool, a.einsatz, &s, Utc::now())
@@ -448,9 +455,16 @@ async fn alter_download_gesperrt_und_kopie_vorgemerkt() {
     );
     // Die Kopie geht, dann wird der alte Download erneut versucht.
     crate::einsatz::abraeumen::alle_vorgemerkten(&pool, &crate::live::LiveHub::new()).await;
-    let e = super::super::einspielen::einspielen(&pool, &datei, &s, None, Utc::now())
-        .await
-        .unwrap_err();
+    let e = super::super::einspielen::einspielen(
+        &pool,
+        &datei,
+        schluessel_von(&a.identitaet),
+        super::super::einspielen::Ziel::AusArchiv,
+        super::super::einspielen::Akteur::Befehl,
+        Utc::now(),
+    )
+    .await
+    .unwrap_err();
     assert!(
         matches!(e, AppError::Validation(ref m) if m.contains("nicht mehr im Archiv")),
         "{e:?}"

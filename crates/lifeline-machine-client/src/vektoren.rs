@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 pub(crate) const CODE: &str = "abcd-efgh-jkmn-pqrs";
 pub(crate) const ZUGANG_ID: &str = "0f8c2a6e-3b1d-4c5a-9e7f-2d4b6a8c0e12";
 pub(crate) const INSTANZ_ID: &str = "7d3e9b1a-5c2f-4e8d-a6b4-1f0c3e5a7b9d";
+pub(crate) const WEBHOOK_ID: &str = "3c9e1f7a-2b4d-4f6e-8a0c-5d7b9e1f3a2c";
 
 fn seed(start: u8) -> [u8; 32] {
     std::array::from_fn(|i| start.wrapping_add(i as u8))
@@ -102,6 +103,8 @@ fn berechne() -> Value {
         )
         .is_ok());
 
+    let webhooks = webhook_vektoren(&client, &instanz, &instanz_pub);
+
     json!({
         "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0022, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
         "code": CODE,
@@ -126,6 +129,118 @@ fn berechne() -> Value {
             "claims_json": serde_json::to_string(&antwort_claims).unwrap(),
             "jws": antwort_jws,
         },
+        "webhooks": webhooks,
+    })
+}
+
+/// Webhook-Zustellung (LLH-1656): ein gültiger Fall und je ungültigem Fall der erwartete Fehler
+/// (`Signatur`, `Body`, `Ziel`, `Zeit`, `Typ`). Jeder Client prüft `jws` gegen `body`,
+/// `webhook_id` und `now` und muss genau diesen Fehler melden.
+fn webhook_vektoren(client: &SigningKey, instanz: &SigningKey, instanz_pub: &[u8; 32]) -> Value {
+    let body = r#"{"id":4712,"type":"einsatz.created","occurred_at":"2026-11-11 19:04:00","einsatz_id":7}"#;
+    let iat = 1_794_423_800;
+    let claims = WebhookClaims {
+        iss: INSTANZ_ID.into(),
+        aud: WEBHOOK_ID.into(),
+        iat,
+        exp: iat + EVENT_LIFETIME_S,
+        jti: "MDEyMzQ1Njc4OTo7PD0-Pw".into(),
+        bh: sha256_b64(body.as_bytes()),
+    };
+    let jws = sign_compact(instanz, TYP_EVENT, INSTANZ_ID, &claims);
+    let fremd = sign_compact(client, TYP_EVENT, INSTANZ_ID, &claims);
+    let falscher_typ = sign_compact(instanz, TYP_RESPONSE, INSTANZ_ID, &claims);
+    let geaendert = body.replace("4712", "4713");
+    let fall =
+        |name: &str, jws: &str, body: &str, webhook_id: &str, now: i64, fehler: Option<&str>| {
+            json!({
+                "name": name,
+                "jws": jws,
+                "body": body,
+                "webhook_id": webhook_id,
+                "now": now,
+                "fehler": fehler,
+            })
+        };
+    let faelle = vec![
+        fall("gueltig", &jws, body, WEBHOOK_ID, iat, None),
+        fall(
+            "fremder_schluessel",
+            &fremd,
+            body,
+            WEBHOOK_ID,
+            iat,
+            Some("Signatur"),
+        ),
+        fall(
+            "geaenderter_body",
+            &jws,
+            &geaendert,
+            WEBHOOK_ID,
+            iat,
+            Some("Body"),
+        ),
+        fall(
+            "falsche_aud",
+            &jws,
+            body,
+            "anderer-webhook",
+            iat,
+            Some("Ziel"),
+        ),
+        fall(
+            "abgelaufen",
+            &jws,
+            body,
+            WEBHOOK_ID,
+            iat + EVENT_LIFETIME_S + CLOCK_TOLERANCE_S + 1,
+            Some("Zeit"),
+        ),
+        fall(
+            "falscher_typ",
+            &falscher_typ,
+            body,
+            WEBHOOK_ID,
+            iat,
+            Some("Typ"),
+        ),
+    ];
+    // Der Client selbst muss jeden Fall so sehen.
+    for f in &faelle {
+        let ergebnis = verify_webhook(
+            f["jws"].as_str().unwrap(),
+            &b64(instanz_pub),
+            INSTANZ_ID,
+            f["webhook_id"].as_str().unwrap(),
+            f["body"].as_str().unwrap().as_bytes(),
+            f["now"].as_i64().unwrap(),
+        );
+        match f["fehler"].as_str() {
+            None => assert!(ergebnis.is_ok(), "{f}: {ergebnis:?}"),
+            Some(w) => assert_eq!(
+                ergebnis.unwrap_err(),
+                Error::InvalidWebhook(match w {
+                    "Signatur" => "Signatur",
+                    "Body" => "Body",
+                    "Ziel" => "Ziel",
+                    "Zeit" => "Zeit",
+                    _ => "Typ",
+                }),
+                "{f}"
+            ),
+        }
+    }
+    let teile: Vec<&str> = jws.split('.').collect();
+    json!({
+        "header": RESPONSE_HEADER,
+        "webhook_id": WEBHOOK_ID,
+        "body": body,
+        "iat": iat,
+        "jti": claims.jti,
+        "header_json": String::from_utf8(parse_b64(teile[0]).unwrap()).unwrap(),
+        "claims_json": String::from_utf8(parse_b64(teile[1]).unwrap()).unwrap(),
+        "jws": jws,
+        "faelle": faelle,
     })
 }
 

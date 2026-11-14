@@ -15,14 +15,17 @@ import type { UploadFortschritt } from '../api/client';
  * `progress`-Ereignis. Angesagt wird über eine eigene, unsichtbare Region in 10-%-Schritten und
  * beim Phasenwechsel; den genauen Wert trägt der Balken (`aria-valuenow`).
  */
-export function sichtbarerText(stand: UploadFortschritt): string {
-  if (stand.phase === 'pruefen') return 'Datei wird geprüft';
+/** Was nach dem letzten Byte geschieht; ohne Angabe Virenscan und Speichern. */
+const PRUEFEN = 'Datei wird geprüft';
+
+export function sichtbarerText(stand: UploadFortschritt, pruefenText = PRUEFEN): string {
+  if (stand.phase === 'pruefen') return pruefenText;
   if (stand.anteil == null) return 'Wird hochgeladen';
   return `Wird hochgeladen · ${prozent(stand.anteil)} %`;
 }
 
-export function ansageText(stand: UploadFortschritt): string {
-  if (stand.phase === 'pruefen' || stand.anteil == null) return sichtbarerText(stand);
+export function ansageText(stand: UploadFortschritt, pruefenText = PRUEFEN): string {
+  if (stand.phase === 'pruefen' || stand.anteil == null) return sichtbarerText(stand, pruefenText);
   return `Wird hochgeladen · ${Math.floor(prozent(stand.anteil) / 10) * 10} %`;
 }
 
@@ -38,9 +41,16 @@ const NUR_VORLESEN: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-export default function UploadFortschrittAnzeige({ stand }: { stand: UploadFortschritt | null }) {
+export default function UploadFortschrittAnzeige({
+  stand,
+  pruefenText = PRUEFEN,
+}: {
+  stand: UploadFortschritt | null;
+  /** Text nach dem letzten Byte, wenn der Server etwas anderes tut als prüfen (Archiv einspielen). */
+  pruefenText?: string;
+}) {
   if (stand == null) return null;
-  const text = sichtbarerText(stand);
+  const text = sichtbarerText(stand, pruefenText);
   const zahl = stand.phase === 'senden' && stand.anteil != null ? prozent(stand.anteil) : null;
   return (
     <Flex vertical>
@@ -54,7 +64,7 @@ export default function UploadFortschrittAnzeige({ stand }: { stand: UploadForts
         aria-valuenow={zahl ?? undefined}
       />
       <span aria-live="polite" style={NUR_VORLESEN}>
-        {ansageText(stand)}
+        {ansageText(stand, pruefenText)}
       </span>
     </Flex>
   );
