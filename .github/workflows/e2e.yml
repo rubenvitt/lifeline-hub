@@ -256,13 +256,26 @@ jobs:
       - name: Frontend-Abhängigkeiten
         if: env.E2E != 'false'
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
+      # SYSTEM IM CACHE-SCHLÜSSEL: Playwright lädt je Ubuntu-Version einen eigenen WebKit-Build
+      # (`webkit-ubuntu-24.04.zip`, `webkit-ubuntu-26.04.zip`), legt ihn aber unter demselben
+      # Verzeichnis ab (`webkit-2336`). Ein Schlüssel nur mit `runner.os` gab dem Image
+      # ubuntu-26.04 den Build für 24.04 aus dem Cache, `playwright install` sah ihn als
+      # vorhanden, und jeder WebKit-Start scheiterte an `libicudata.so.74` (Lauf 43535205929,
+      # alle vier Shards rot). Ebenso gehören die .deb-Pakete zu genau einer Version.
+      - name: System für die Cache-Schlüssel
+        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        id: betriebssystem
+        run: |
+          . /etc/os-release
+          echo "kennung=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+          echo "Cache-Schlüssel für ${ID}-${VERSION_ID}"
       # Die Browserliste steht im Schlüssel: ein Eintrag aus der Zeit, als nur Chromium installiert
       # wurde, darf nicht als Treffer für alle drei gelten.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: env.E2E != 'false' && runner.environment == 'github-hosted'
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ steps.betriebssystem.outputs.kennung }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
       # SYSTEMPAKETE AUS DEM CACHE: Firefox und WebKit brauchen rund 125 MB .deb-Pakete, die das
       # Runner-Image nicht mitbringt. Der Ubuntu-Mirror lieferte sie im ersten Lauf (PR #338) in
       # zwei Shards mit 60–90 kB/s, 24 bzw. 34 min, und riss das 40-min-Limit; im dritten Shard in
@@ -279,8 +292,8 @@ jobs:
         id: apt-cache
         with:
           path: ~/.cache/apt-playwright
-          key: apt-playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
-          restore-keys: apt-playwright-${{ runner.os }}-${{ runner.arch }}-
+          key: apt-playwright-${{ runner.os }}-${{ steps.betriebssystem.outputs.kennung }}-${{ runner.arch }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: apt-playwright-${{ runner.os }}-${{ steps.betriebssystem.outputs.kennung }}-${{ runner.arch }}-
       - name: Systempakete aus dem Cache bereitlegen
         if: env.E2E != 'false' && runner.environment == 'github-hosted'
         run: |
