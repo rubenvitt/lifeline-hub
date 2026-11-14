@@ -631,6 +631,83 @@ struct WeiterZeile {
     aufnahme_org: Option<String>,
 }
 
+/// Höchstzahl ids im Bestand je Org (`src/AGENTS.md`, Listen von außen); darüber geht keiner.
+pub const BESTAND_MAX: usize = 1024;
+
+/// Bestand beim Melden (LLH-1871, design.md D1 der Change
+/// `n2ge2224-reste-nach-restore-abraeumen`): die ids der gültigen Schlüssel der Org, die hier
+/// lieferbar sind, aufsteigend: die lokalen und über eine Direktkopplung (`weiter`) auch die
+/// weitergereichten, mit demselben Filter wie [`nachlieferung`] (LLH-1678). Sonst widerriefe die
+/// Gegenseite jeden weitergereichten Schlüssel als „nicht mehr geführt“. Was die Gegenseite von
+/// hier gültig hat und hier fehlt, gilt dort nicht mehr. `None` über [`BESTAND_MAX`].
+pub async fn load_bestand(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    weiter: Weiter,
+) -> Result<Option<Vec<i64>>, AppError> {
+    let ausser = match weiter {
+        Weiter::NurLokal => None,
+        Weiter::AusserZuordnung(ko) => Some(ko),
+    };
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT s.id FROM unterschrift_schluessel s \
+         LEFT JOIN instanz_kopplung_org o ON o.id = s.kopplung_org_id \
+         LEFT JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE s.org_id = ?1 AND s.zustand = 'gueltig' \
+           AND (s.herkunft = 'lokal' \
+                OR (?2 IS NOT NULL AND s.herkunft = 'gegenueber' \
+                    AND s.weiter_stand IS NOT NULL AND s.kopplung_org_id <> ?2 \
+                    AND NOT (k.richtung = 'wird_gemeldet' AND k.art = 'standard'))) \
+         ORDER BY s.id LIMIT ?3",
+    )
+    .bind(org_id)
+    .bind(ausser)
+    .bind(BESTAND_MAX as i64 + 1)
+    .fetch_all(&mut *conn)
+    .await?;
+    if ids.len() > BESTAND_MAX {
+        tracing::warn!(
+            org_id,
+            "Mehr gültige Unterschriftsschlüssel, als der Bestand trägt"
+        );
+        return Ok(None);
+    }
+    Ok(Some(ids))
+}
+
+/// Ein Schlüssel vom Gegenüber, den [`revoke_fehlende`] widerrufen hat.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct NichtGefuehrt {
+    pub benutzer_name: String,
+    pub fingerabdruck: String,
+}
+
+/// Widerruft jeden gültigen oder wartenden Schlüssel der Zuordnung, dessen id im Bestand des
+/// Gegenübers fehlt: Das Gegenüber führt ihn nicht mehr, etwa nach dem Zurückspielen einer
+/// Sicherung (LLH-1871, design.md D2). Ein abgelehnter bleibt es; der Stand bleibt.
+pub async fn revoke_fehlende(
+    conn: &mut SqliteConnection,
+    kopplung_org_id: i64,
+    bestand: &[i64],
+    jetzt: &str,
+) -> Result<Vec<NichtGefuehrt>, AppError> {
+    let liste = serde_json::to_string(bestand)
+        .map_err(|e| AppError::Internal(format!("Bestand nicht lesbar: {e}")))?;
+    Ok(sqlx::query_as(
+        "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
+         widerrufen_at = COALESCE(widerrufen_at, ?) \
+         WHERE kopplung_org_id = ? AND herkunft = 'gegenueber' \
+         AND zustand IN ('gueltig', 'wartet_auf_bestaetigung') \
+         AND fremde_id NOT IN (SELECT value FROM json_each(?)) \
+         RETURNING benutzer_name, fingerabdruck",
+    )
+    .bind(jetzt)
+    .bind(kopplung_org_id)
+    .bind(liste)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
 /// Ein vom Gegenüber gelieferter Schlüssel, den diese Instanz verworfen hat.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Abgelehnt {

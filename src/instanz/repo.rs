@@ -727,6 +727,19 @@ pub async fn save_stammdaten_kennzeichen(
     Ok(())
 }
 
+/// Meldende Seite: Stände der Schlüssel und Stammdaten einer Org-Zuordnung, wie sie jetzt sind.
+pub async fn load_staende(
+    conn: &mut SqliteConnection,
+    org_zeile_id: i64,
+) -> Result<(i64, i64), AppError> {
+    Ok(sqlx::query_as(
+        "SELECT unterschrift_stand, stammdaten_stand FROM instanz_kopplung_org WHERE id = ?",
+    )
+    .bind(org_zeile_id)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
 /// Meldende Seite: übernommener Stand, nur vorwärts und nur, wenn er noch der gemeldete ist. Hat
 /// „Erneut abgleichen“ ihn inzwischen auf 0 gesetzt, bleibt es dabei.
 pub async fn save_stammdaten_stand(
