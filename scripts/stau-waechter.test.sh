@@ -638,6 +638,28 @@ printf '%s\n' \
 lauf "$r" false false true
 pruefe "37 abgebrochen, dann grün: grün, nicht gemergt" "POST haengt" "$(log "$r")"
 
+# 37b — „Baut mit Ziel-Branch“ rechnet nach einem Merge auf alpha neu (LLH-1889): ein jüngerer Check
+# auf „läuft“ neben dem älteren Grün. Der PR wartet zu Recht, kein „grün, nicht gemergt“. Und ein
+# älterer, noch offener Check (überholter Lauf) neben einem jüngeren Grün hält ihn nicht auf.
+r="$(repo_neu zielbaulaeuft)"
+aendere "$r" feature b.txt "feature"
+printf '%s\n' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+  'e2e 1/4|completed|success|2026-11-12T10:03:00Z|2026-11-12T11:00:00Z' \
+  'Baut mit Ziel-Branch|completed|success|2026-11-12T10:05:00Z|2026-11-12T10:15:00Z' \
+  'Baut mit Ziel-Branch|in_progress||2026-11-12T11:30:00Z|' | checks "$r"
+lauf "$r" false false true
+pruefe "37b Baut mit Ziel-Branch rechnet neu: kein Befund" "" "$(log "$r")"
+r="$(repo_neu zielbaualtoffen)"
+aendere "$r" feature b.txt "feature"
+printf '%s\n' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
+  'e2e 1/4|completed|success|2026-11-12T10:03:00Z|2026-11-12T11:00:00Z' \
+  'Baut mit Ziel-Branch|in_progress||2026-11-12T10:05:00Z|' \
+  'Baut mit Ziel-Branch|completed|success|2026-11-12T10:20:00Z|2026-11-12T10:30:00Z' | checks "$r"
+lauf "$r" false false true
+pruefe "37b älterer offener neben jüngerem Grün: grün, nicht gemergt" "POST haengt" "$(log "$r")"
+
 # 38 — Nur abgebrochene e2e-Läufe auf dem Kopf (ein später eingereihtes „Auto-Merge aus“ brach
 # den Lauf ab): die Stufe fehlt.
 r="$(repo_neu nurabgebrochen)"

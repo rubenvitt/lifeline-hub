@@ -15,14 +15,16 @@
 #   scripts/ziel-branch-build.sh einzellauf <pr-nr> <ref> <check-id> <ziel-branch> <ziel-sha>
 #       Im Einzellauf: rechnet nur, wenn <ref> der Kopf-Branch des PRs ist, der PR in diesem
 #       Repository liegt und <ref> kein Kanal-Branch ist (ein von Hand ohne --ref gestarteter Lauf
-#       liefe sonst auf alpha). Schließt <check-id> als übernommen und arbeitet dann wie
-#       `auswahl`: ein frischer Check, damit kein Check eines abgebrochenen PR-Laufs jünger bleibt.
+#       liefe sonst auf alpha). Arbeitet dann wie `auswahl`: ein frischer Check. Den Check
+#       <check-id> von `verteilen` lässt er offen; ihn schließt `melden` mit dem Ergebnis.
 #   scripts/ziel-branch-build.sh melden <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> \
 #       <ergebnis> <ausgabe-datei>
 #       Schließt den Check <check-id>: ergebnis `gruen` → grün; `rot`, `konflikt`, `veraltet`,
-#       leer oder unbekannt → rot. Steht der PR-Kopf weiter oder der Ziel-Branch um mehr als
-#       Release-Commits (die mit `[skip ci]` keinen Lauf starten) weiter, ist das Ergebnis
-#       überholt (abgebrochen); den neuen Stand rechnet dessen eigener Lauf.
+#       leer oder unbekannt → rot. Mit demselben Ergebnis schließt er jeden älteren (kleinere ID)
+#       noch offenen Check dieses Namens auf dem Kopf. Steht der PR-Kopf weiter oder der
+#       Ziel-Branch um mehr als Release-Commits (die mit `[skip ci]` keinen Lauf starten) weiter,
+#       ist das Ergebnis überholt: der Check bleibt auf „läuft“, und das Ergebnis zum neuen Stand
+#       schließt ihn (LLH-1889: nie „abgebrochen“, das zeigt den PR rot).
 #   Exit 0 = gelaufen · 1 = an mindestens einem PR gescheitert (die übrigen sind bearbeitet) ·
 #   2 = Aufruf- oder Umgebungsfehler
 #   Umgebung: ZBB_GH  Kommando für GitHub-Zugriffe (Vorgabe gh; der Selbsttest setzt eine Attrappe)
@@ -30,7 +32,9 @@
 # WARUM: Die CI eines PRs prüft den Stand des Ziel-Branches beim letzten Push. Am 12.11.2026 waren
 # #1319 und #1315 einzeln grün und brachen `alpha` zusammen. Bewegt sich der Ziel-Branch, muss der
 # Check an jedem fertigen PR neu rechnen, und bis dahin soll kein altes Grün stehen bleiben: daher
-# „läuft“ sofort beim Verteilen (ein Restfenster bis dahin bleibt, design.md). Gerechnet wird nie im
+# „läuft“ sofort beim Verteilen (ein Restfenster bis dahin bleibt, design.md). Ein überholter oder
+# ersetzter Lauf schließt keinen Check als abgebrochen (LLH-1889): am 14.11.2026 standen so zehn
+# PRs ohne Fehler rot, und Auto-Merge mergte nichts. Gerechnet wird nie im
 # Push-Lauf selbst: der hat den Cache-Bereich des Kanal-Branches, und PR-Code dort könnte einen
 # Cache anlegen, den der Release-Build liest. Der eigene Lauf auf dem PR-Branch hat dessen Bereich. Ein PR in Arbeit rechnet erst, wenn er fertig ist (wie die
 # zweite Stufe, LLH-1662); bis dahin fehlt oder wartet der Check, und er ist nicht mergebar.
@@ -158,9 +162,7 @@ einzellauf() { # <pr-nr> <ref> <check-id> <ziel-branch> <ziel-sha>
     printf '[]\n'
     return 0
   fi
-  gh_api -X PATCH "repos/$REPO/check-runs/$alt_id" -f status=completed -f conclusion=cancelled \
-    -f "output[title]=Übernommen" -f "output[summary]=Der eigene Lauf dieses PRs rechnet mit einem neuen Check." > /dev/null \
-    || echo "PR #$nr: alter Check $alt_id nicht geschlossen" >&2
+  echo "PR #$nr: Check $alt_id von verteilen bleibt offen, melden schließt ihn" >&2
   auswahl_aus "$ziel" "$ziel_sha" "$prs"
 }
 
@@ -177,10 +179,10 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
   jetzt_kopf="$(gh_api "repos/$REPO/pulls/$nr" --jq .head.sha)"
   jetzt_ziel="$(gh_api "repos/$REPO/git/ref/heads/$ziel" --jq .object.sha)"
   if [ "$jetzt_kopf" != "$kopf" ] || { [ "$jetzt_ziel" != "$ziel_sha" ] && ! nur_release_weiter "$ziel_sha" "$jetzt_ziel"; }; then
-    echo "PR #$nr: überholt (PR $(kurz "$jetzt_kopf"), $ziel $(kurz "$jetzt_ziel"))" >&2
-    gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=completed -f conclusion=cancelled \
-      -f "output[title]=Überholt" \
-      -f "output[summary]=Gerechnet gegen PR $(kurz "$kopf") und \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter. Das Ergebnis zum neuen Stand meldet dessen eigener Lauf (ein neuer Commit am PR oder ein Merge auf \`$ziel\` startet ihn)." > /dev/null
+    echo "PR #$nr: überholt (PR $(kurz "$jetzt_kopf"), $ziel $(kurz "$jetzt_ziel")), Check bleibt auf „läuft“" >&2
+    gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=in_progress \
+      -f "output[title]=Überholt, rechnet neu" \
+      -f "output[summary]=Gerechnet gegen PR $(kurz "$kopf") und \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter. Das Ergebnis zum neuen Stand meldet dessen eigener Lauf (ein neuer Commit am PR oder ein Merge auf \`$ziel\` startet ihn) und schließt dabei auch diesen Check." > /dev/null
     return 0
   fi
   [ -f "$datei" ] && ausgabe="$(tail -c 60000 "$datei")"
@@ -195,9 +197,26 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
       text="Der Kompilierlauf hat kein Ergebnis geliefert (\`${ergebnis:-leer}\`). Der Check gilt als rot, bis ein Lauf grün meldet." ;;
   esac
   echo "PR #$nr: $ergebnis → $fazit" >&2
-  gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=completed -f conclusion="$fazit" \
-    -f "output[title]=$titel" -f "output[summary]=$text" \
-    -f "output[text]=${ausgabe:+$(printf '```\n%s\n```' "$ausgabe")}" > /dev/null
+  schliessen "$id" "$fazit" "$titel" "$text" "$ausgabe"
+  # Ältere offene Checks des Kopfes (von `verteilen`, eines ersetzten wartenden oder eines
+  # überholten Laufs) gelten mit: sie rechneten gegen denselben oder einen älteren Stand. Ein
+  # jüngerer entstand nach der Prüfung oben zu einem neueren Stand und bleibt offen. Nicht lesbar:
+  # kein Abbruch, die älteren schließt der nächste Lauf.
+  local aeltere alt
+  aeltere="$(gh_api "repos/$REPO/commits/$kopf/check-runs?check_name=$(jq -rn --arg n "$NAME" '$n | @uri')&per_page=100" \
+    --paginate --jq '.check_runs[] | select(.status != "completed") | .id' 2> /dev/null)" \
+    || { echo "PR #$nr: ältere Checks nicht lesbar, bleiben offen" >&2; return 0; }
+  for alt in $(sort -n <<< "$aeltere"); do
+    [ "$alt" -lt "$id" ] || continue
+    echo "PR #$nr: älterer Check $alt → $fazit" >&2
+    schliessen "$alt" "$fazit" "$titel" "$text" "$ausgabe" || echo "PR #$nr: älterer Check $alt nicht geschlossen" >&2
+  done
+}
+
+schliessen() { # <check-id> <conclusion> <titel> <text> <ausgabe>
+  gh_api -X PATCH "repos/$REPO/check-runs/$1" -f status=completed -f conclusion="$2" \
+    -f "output[title]=$3" -f "output[summary]=$4" \
+    -f "output[text]=${5:+$(printf '```\n%s\n```' "$5")}" > /dev/null
 }
 
 aufruf() { sed -n '6,/^#   Umgebung/p' "$0" >&2; exit 2; }

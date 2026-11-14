@@ -98,6 +98,15 @@ hat_check() { # <fake> <sha> <status>
   printf '{"total_count":1,"check_runs":[{"id":1,"name":"Baut mit Ziel-Branch","status":"%s"}]}\n' "$3" \
     > "$1/checks-$2.json"
 }
+# Mehrere Check-Runs „Baut mit Ziel-Branch“ auf <sha>, je Argument "<id>:<status>".
+checks_auf() { # <fake> <sha> <id:status>…
+  local f="$1" sha="$2" json='[]' e
+  shift 2
+  for e in "$@"; do
+    json="$(jq -c --argjson id "${e%%:*}" --arg st "${e#*:}" '. + [{id: $id, name: "Baut mit Ziel-Branch", status: $st}]' <<< "$json")"
+  done
+  jq -n --argjson r "$json" '{total_count: ($r | length), check_runs: $r}' > "$f/checks-$sha.json"
+}
 lauf() { # <fake> <args…>  → stdout nach $ARBEIT/ausgabe; ZBB_EXIT: erwarteter Exit (Vorgabe 0)
   local f="$1" code=0
   shift
@@ -213,13 +222,14 @@ pruefe "5 Fork: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 
 echo "==> Baut mit Ziel-Branch: Einzellauf"
 
-# 13 — Einzellauf auf dem Branch des PRs: der Check von `verteilen` wird übernommen, ein frischer
-# Check rechnet (sonst bliebe ein Check eines abgebrochenen PR-Laufs als jüngster auf „läuft“).
+# 13 — Einzellauf auf dem Branch des PRs: ein frischer Check rechnet. Den von `verteilen` schließt
+# er NICHT als abgebrochen (LLH-1889: das zeigte den PR rot); ihn schließt `melden` mit dem
+# Ergebnis, wie jeden älteren offenen Check des Kopfes.
 f="$(neu einzel)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 lauf "$f" einzellauf 7 zweig7 800 alpha zielsha
-pruefe "13 Einzellauf: alter Check übernommen, frischer läuft" \
-  "PATCH 800 cancelled;POST k7 in_progress Baut mit Ziel-Branch" "$(log "$f")"
+pruefe "13 Einzellauf: frischer Check läuft, der alte bleibt offen" \
+  "POST k7 in_progress Baut mit Ziel-Branch" "$(log "$f")"
 pruefe "13 Einzellauf rechnet den PR" "7:k7:901" "$(liste)"
 
 # 14 — Einzellauf auf einem Kanal-Branch (von Hand ohne --ref gestartet): nie rechnen.
@@ -273,12 +283,15 @@ lauf "$f" melden 7 k7 901 alpha zielsha konflikt "$ARBEIT/ausgabe-baut"
 pruefe "8 Konflikt: Check rot" "PATCH 901 failure" "$(log "$f")"
 pruefe "8 Konflikt als Grund" 1 "$(grep -c 'Konflikt' "$f/text-901")"
 
-# 9 — Der Ziel-Branch ist inzwischen weiter: das Ergebnis ist überholt, nicht grün.
+# 9 — Der Ziel-Branch ist inzwischen weiter: das Ergebnis ist überholt, nicht grün. Der Check
+# bleibt auf „läuft“ (LLH-1889: abgebrochen zeigte den PR rot); das Ergebnis zum neuen Stand
+# schließt ihn.
 f="$(neu zielweiter)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 echo neuerezielsha > "$f/ref-alpha"
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
-pruefe "9 Ziel-Branch weiter: überholt" "PATCH 901 cancelled" "$(log "$f")"
+pruefe "9 Ziel-Branch weiter: überholt, Check läuft weiter" "PATCH 901 in_progress" "$(log "$f")"
+pruefe "9 überholt steht im Check" 1 "$(grep -c 'inzwischen steht einer davon weiter' "$f/text-901")"
 
 # 9b — alpha ist nur um einen Release-Commit weiter ([skip ci], startet keinen Lauf): das Ergebnis
 # gilt, sonst hinge der PR bis zum nächsten Merge.
@@ -289,12 +302,45 @@ echo '{"status":"ahead","commits":[{"commit":{"message":"chore(release): 1.0.0-a
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
 pruefe "9b nur Release-Commit dazu: Ergebnis gilt" "PATCH 901 success" "$(log "$f")"
 
-# 10 — Der PR hat einen neuen Kopf: überholt.
+# 10 — Der PR hat einen neuen Kopf: überholt, der Check bleibt auf „läuft“.
 f="$(neu kopfweiter)"
 printf '%s\n' '7|k7neu|false|false|true|' | prs "$f"
 echo zielsha > "$f/ref-alpha"
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
-pruefe "10 PR-Kopf weiter: überholt" "PATCH 901 cancelled" "$(log "$f")"
+pruefe "10 PR-Kopf weiter: überholt, Check läuft weiter" "PATCH 901 in_progress" "$(log "$f")"
+
+# 10b — Auch mit älteren offenen Checks: ein überholtes Ergebnis schließt keinen davon.
+f="$(neu ueberholtaeltere)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo neuerezielsha > "$f/ref-alpha"
+checks_auf "$f" k7 '850:in_progress' '901:in_progress'
+lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
+pruefe "10b überholt: kein älterer Check geschlossen" "PATCH 901 in_progress" "$(log "$f")"
+
+# 16 — Ein gültiges Ergebnis schließt jeden älteren offenen Check des Kopfes (verteilen, ein
+# ersetzter wartender Lauf, ein überholter Lauf) mit demselben Ergebnis. Ein jüngerer offener
+# (angelegt nach der Prüfung, zu einem neueren Stand) und ein abgeschlossener bleiben, wie sie sind.
+f="$(neu schliesstaeltere)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo zielsha > "$f/ref-alpha"
+checks_auf "$f" k7 '700:completed' '800:queued' '850:in_progress' '901:in_progress' '950:in_progress'
+lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
+pruefe "16 grün schließt die älteren offenen mit" "PATCH 901 success;PATCH 800 success;PATCH 850 success" "$(log "$f")"
+f="$(neu schliesstaeltererot)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo zielsha > "$f/ref-alpha"
+checks_auf "$f" k7 '850:in_progress' '901:in_progress'
+lauf "$f" melden 7 k7 901 alpha zielsha rot "$ARBEIT/ausgabe-baut"
+pruefe "16 rot schließt die älteren offenen ebenso rot" "PATCH 901 failure;PATCH 850 failure" "$(log "$f")"
+
+# 16b — Die Checks des Kopfes sind nicht lesbar: der eigene ist trotzdem geschlossen, der Lauf
+# endet ohne Fehler (die älteren schließt der nächste Lauf).
+f="$(neu schliesstkaputt)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo zielsha > "$f/ref-alpha"
+touch "$f/checkruns-kaputt"
+lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
+pruefe "16b Checks nicht lesbar: eigener grün" "PATCH 901 success" "$(log "$f")"
 
 # 11 — Kein Ergebnis (Kompilierlauf abgebrochen oder ohne Ausgabe): rot, nie grün.
 f="$(neu ohneergebnis)"
@@ -363,7 +409,10 @@ form "F8 melden läuft auch nach rotem Kompilieren" 0 hat "$M" "if: .*!cancelled
 form "F9 Einschalten von Auto-Merge löst aus" 0 hat "$W" 'types: \[.*auto_merge_enabled'
 form "F9 Label löst aus" 0 hat "$W" 'types: \[.*labeled'
 form "F9 Einzellauf je PR möglich" 0 hat "$W" '^  workflow_dispatch:'
-form "F10 ältere Läufe brechen ab" 0 hat "$W" 'cancel-in-progress: true'
+# LLH-1889: ein abgebrochener Lauf hinterließ „Kompilieren“ und „Melden“ abgebrochen am PR (rot).
+# Ein neuer Anstoß ersetzt nur den wartenden Lauf.
+form "F10 kein Lauf bricht einen laufenden ab" 0 hat "$W" '^  cancel-in-progress: false$'
+form "F10 nirgends cancel-in-progress: true" 1 hat "$W" 'cancel-in-progress: true'
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest von ziel-branch-build.sh." >&2

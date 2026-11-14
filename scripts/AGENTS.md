@@ -102,7 +102,12 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   (`workflow_dispatch`); ein nicht fertiger mit Check (auch ein Entwurf) bekommt „wartet“, ein
   Branch ohne den Workflow einen roten Check mit „`alpha` hineinmergen“. Der Einzellauf rechnet
   nur auf dem Kopf-Branch eines PRs dieses Repositorys, nie auf einem Kanal-Branch, und legt einen
-  frischen Check an. Der Check entsteht über
+  frischen Check an. **Warteschlange statt Abbruch** (LLH-1889): je PR rechnet ein Lauf, einer
+  wartet, ein neuer Anstoß ersetzt den wartenden (`cancel-in-progress: false`, auch bei neuem
+  PR-Commit); so bündeln sich Merges auf den jüngsten Stand. **Kein Check und kein Job endet
+  abgebrochen, weil er überholt ist**: ein überholter Check bleibt auf „läuft“, und das gültige
+  Ergebnis schließt jeden älteren offenen Check des Kopfes mit (jüngere bleiben offen). Abgebrochen
+  hieß am PR rot, und am 14.11.2026 mergte so nichts mehr. Der Check entsteht über
   die Checks-API, nie als Job-Name (ein übersprungener Job meldete grün). **PR-Code läuft nie in
   einem Lauf auf einem Kanal-Branch** (dessen Cache-Bereich liest der Release-Build; Runtime-Token
   und `sudo` umgehen jedes `save-if`), nur im Job `kompilieren` eines PR- oder Einzellaufs: dort
