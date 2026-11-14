@@ -263,6 +263,78 @@ async fn aktiver_und_geschwaerzter_einsatz_sind_409() {
     assert_eq!(s, StatusCode::CONFLICT, "Suche im geschwärzten Einsatz");
 }
 
+/// LLH-1712: an einem archivierten Einsatz geht ein Personen-Antrag, auch per Kennung; die
+/// Kennung muss zur Zielart passen, und genau eines von `id` und `kennung` steht im Ziel.
+#[tokio::test]
+async fn archivierter_einsatz_personen_antrag_per_kennung() {
+    let l = lage().await;
+    let uri = antraege_uri(l.einsatz);
+    sqlx::query(
+        "UPDATE einsatz SET geloescht_at = datetime('now'), geschwaerzt_at = datetime('now') \
+         WHERE id = ?",
+    )
+    .bind(l.einsatz)
+    .execute(&l.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_archiv (einsatz_id, block, empfaenger_fingerabdruecke, groesse, \
+            sha256, inhalt) VALUES (?, 1, '[]', 3, 'x', X'010203')",
+    )
+    .bind(l.einsatz)
+    .execute(&l.pool)
+    .await
+    .unwrap();
+
+    for (ziel, erwartet) in [
+        // Kennung passt nicht zur Art, keine Kennung, beides oder nichts: 400.
+        (
+            json!({"art": "betroffene", "kennung": "IT-5"}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"art": "betroffene", "kennung": "R-"}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"art": "betroffene", "id": l.person, "kennung": "R-001"}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"art": "einsatz", "kennung": "R-001"}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (json!({"art": "betroffene"}), StatusCode::BAD_REQUEST),
+        // Keine Person mit dieser Kennung im Einsatz: 404.
+        (
+            json!({"art": "betroffene", "kennung": "R-099"}),
+            StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let body = json!({"ziel": ziel, "aktenzeichen": "DS-2026-014", "bestaetigung": "R-001"});
+        let (s, v) = anfrage_json(&l.app, "POST", &uri, &l.admin, Some(&body)).await;
+        assert_eq!(s, erwartet, "{ziel}: {v}");
+    }
+    assert_eq!(antrag_anzahl(&l.pool).await, 0);
+
+    let body = json!({
+        "ziel": {"art": "betroffene", "kennung": "r-1"},
+        "aktenzeichen": "DS-2026-014",
+        "bestaetigung": "R-001",
+    });
+    let (s, v) = anfrage_json(&l.app, "POST", &uri, &l.admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Präfix in Großbuchstaben: {v}");
+    let body = json!({
+        "ziel": {"art": "betroffene", "kennung": "R-001"},
+        "aktenzeichen": "DS-2026-014",
+        "bestaetigung": "R-001",
+    });
+    let (s, v) = anfrage_json(&l.app, "POST", &uri, &l.admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["ziel_kennung"], "R-001");
+    assert_eq!(v["ziel_id"], l.person);
+}
+
 #[tokio::test]
 async fn einsatz_antrag_zustand_und_ruecknahme() {
     let l = lage().await;

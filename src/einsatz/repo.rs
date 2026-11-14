@@ -310,10 +310,15 @@ macro_rules! einsatzleiter_joins {
 /// `instanz::fuehrung::FuehrungSpalten`.
 macro_rules! fuehrung_spalten {
     () => {
-        "COALESCE(ef.fuehrer_kennung <> (SELECT kennung FROM instanz_identitaet), 0) \
+        concat!(
+            "COALESCE(ef.fuehrer_kennung <> (SELECT kennung FROM instanz_identitaet), 0) \
            AS fuehrung_fremd, \
          ef.epoche_zaehler AS fuehrung_epoche, ef.fuehrer_name AS fuehrung_fuehrer, \
-         ef.offen IS NOT NULL AS fuehrung_offen"
+         ef.offen IS NOT NULL AS fuehrung_offen, \
+         COALESCE(ef.einsatz_id IS NOT NULL AND ",
+            crate::instanz::fuehrung::repo::fuehrung_beendet_sql!(),
+            ", 0) AS fuehrung_beendet"
+        )
     };
 }
 

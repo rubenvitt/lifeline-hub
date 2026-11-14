@@ -246,8 +246,8 @@ describe('darfOriginalLaden (LFH-747)', () => {
 // Einsatz hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641). Bedienen darf die Führung die
 // Einsatzleitung oder der Admin der Einsatz-Org, auch am abgeschlossenen Einsatz.
 describe('Führung je Einsatz (LLH-1491)', () => {
-  const hier = { fuehrend: true, bei: 'ELW 1', epoche: 1, offen: false };
-  const hub = { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false };
+  const hier = { fuehrend: true, bei: 'ELW 1', epoche: 1, offen: false, beendet: false };
+  const hub = { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false, beendet: false };
   const el = { ...aktiv, meine_rolle: 'einsatzleitung' as const };
   const orgAdmin = { ...admin, org_id: 1 };
   const orgKeiner = { ...keiner, org_id: 1 };

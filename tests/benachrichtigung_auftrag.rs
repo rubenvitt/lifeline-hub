@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, funktion_setzen, login_cookie,
-    rolle_setzen, setup_mit_pool,
+    rolle_setzen, setup_mit_optionen_auf, setup_mit_pool,
 };
 
 struct Welt {
@@ -30,6 +30,19 @@ type Zeile = (i64, String, String, i64);
 
 async fn welt() -> Welt {
     let (app, pool) = setup_mit_pool().await;
+    welt_from(app, pool).await
+}
+
+/// Wie [`welt`], auf dem Datei-Pool (WAL, mehrere Verbindungen): erst dort laufen zwei Anfragen
+/// wirklich gleichzeitig und warten an der Schreibsperre (LLH-1681).
+async fn welt_concurrent() -> (tempfile::TempDir, Welt) {
+    let (dir, pool) = lifeline_hub::db::test_pool_datei().await;
+    let (app, pool, _live) =
+        setup_mit_optionen_auf(pool, lifeline_hub::app::RouterOptionen::default()).await;
+    (dir, welt_from(app, pool).await)
+}
+
+async fn welt_from(app: axum::Router, pool: sqlx::SqlitePool) -> Welt {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let anna = benutzer_anlegen(&app, &admin, "annika", "keine").await;
@@ -535,4 +548,167 @@ async fn erledigt_meldet_dem_auftraggeber() {
     assert!(alle
         .iter()
         .all(|z| z.0 != w.carla && (z.0 != w.bert || z.1 == "auftrag_erteilt")));
+}
+
+/// Zählt die ETB-Meldungen am Auftrag (die Vollzugsmeldung ist eine, append-only).
+async fn etb_meldungen(pool: &sqlx::SqlitePool, auftrag: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE auftrag_id = ? AND typ = 'meldung'")
+        .bind(auftrag)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Wartet, bis beide Anfragen an der gehaltenen Schreibsperre hängen, gibt sie frei und liefert
+/// beide Statuscodes. Die Sperre hält eine fremde Verbindung, ohne etwas zu schreiben: beide
+/// Anfragen lesen den Auftrag vorher unverändert.
+async fn concurrently(
+    pool: &sqlx::SqlitePool,
+    a: impl std::future::Future<Output = StatusCode>,
+    b: impl std::future::Future<Output = StatusCode>,
+) -> (StatusCode, StatusCode) {
+    let lock = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    let both = async { tokio::join!(a, b) };
+    tokio::pin!(both);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(500), &mut both)
+            .await
+            .is_err(),
+        "beide Anfragen warten an der Schreibsperre"
+    );
+    lock.rollback().await.unwrap();
+    both.await
+}
+
+/// LLH-1681, Fall 1: Zugführer und S3 melden nach demselben Funkspruch beide „vollzogen“. Beide
+/// lesen den Auftrag als offen; nur der erste Vollzug kommt durch, der zweite bekommt 422. Genau
+/// eine ETB-Meldung und eine Benachrichtigung „erledigt“, Text und Person des ersten bleiben.
+#[tokio::test]
+async fn gleichzeitiger_doppelvollzug_meldet_einmal() {
+    let (_dir, w) = welt_concurrent().await;
+    let ep_bert = w.personal("Bert Brandt", Some(w.bert)).await;
+    let ep_carla = w.personal("Carla Cramer", Some(w.carla)).await;
+    let anna = w.cookie("annika").await;
+    let bert = w.cookie("bertram").await;
+    let carla = w.cookie("carla").await;
+    let a = w
+        .erteilen(&anna, json!([person(ep_bert), person(ep_carla)]))
+        .await;
+    let auftrag = a["id"].as_i64().unwrap();
+
+    let (s_bert, s_carla) = concurrently(
+        &w.pool,
+        w.vollzug(
+            &bert,
+            auftrag,
+            json!({ "status": "vollzogen", "vollzugsmeldung": "Sandsäcke liegen" }),
+        ),
+        w.vollzug(
+            &carla,
+            auftrag,
+            json!({ "status": "vollzogen", "vollzugsmeldung": "Deich gesichert" }),
+        ),
+    )
+    .await;
+
+    let mut codes = [s_bert, s_carla];
+    codes.sort();
+    assert_eq!(
+        codes,
+        [StatusCode::OK, StatusCode::UNPROCESSABLE_ENTITY],
+        "bert {s_bert}, carla {s_carla}"
+    );
+    assert_eq!(etb_meldungen(&w.pool, auftrag).await, 1);
+    assert_eq!(
+        w.zeilen_der_art("auftrag_erledigt").await,
+        vec![(w.anna, "auftrag_erledigt".into(), "auftrag".into(), auftrag)]
+    );
+    let (text, von): (String, i64) = sqlx::query_as(
+        "SELECT a.vollzugsmeldung, k.vollzogen_von_id FROM auftrag a \
+         JOIN kommunikation_status k ON k.objekt_typ = 'auftrag' AND k.objekt_id = a.id \
+         WHERE a.id = ?",
+    )
+    .bind(auftrag)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    let (expected_text, expected_von) = if s_bert == StatusCode::OK {
+        ("Sandsäcke liegen", w.bert)
+    } else {
+        ("Deich gesichert", w.carla)
+    };
+    assert_eq!((text.as_str(), von), (expected_text, expected_von));
+}
+
+/// LLH-1681, Fall 2: „Rückgängig“ liest den Auftrag noch in Bearbeitung, während eine andere
+/// Verbindung den Vollzug schon geschrieben, aber noch nicht festgeschrieben hat. Die Rücknahme
+/// wartet an der Sperre und trifft danach auf den Vollzug: 422, der Vollzug bleibt bestehen.
+#[tokio::test]
+async fn ruecknahme_ueberholt_keinen_gleichzeitigen_vollzug() {
+    let (_dir, w) = welt_concurrent().await;
+    let ep_bert = w.personal("Bert Brandt", Some(w.bert)).await;
+    let anna = w.cookie("annika").await;
+    let bert = w.cookie("bertram").await;
+    let a = w.erteilen(&anna, json!([person(ep_bert)])).await;
+    let auftrag = a["id"].as_i64().unwrap();
+    assert_eq!(
+        w.vollzug(&bert, auftrag, json!({ "status": "in_arbeit" }))
+            .await,
+        StatusCode::OK
+    );
+
+    let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(w.einsatz)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    let startwert = lifeline_hub::einsatz::einstellungen::etb_startwert(&w.pool, w.einsatz)
+        .await
+        .unwrap();
+    let mut vollzug = w.pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    lifeline_hub::auftrag::repo::melde_vollzug_tx(
+        &mut vollzug,
+        org_id,
+        w.einsatz,
+        auftrag,
+        w.bert,
+        startwert,
+        "Sandsäcke liegen",
+        "2026-11-13 10:00:00",
+    )
+    .await
+    .unwrap();
+
+    let ruecknahme = w.vollzug(&bert, auftrag, json!({ "status": "offen" }));
+    tokio::pin!(ruecknahme);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(500), &mut ruecknahme)
+            .await
+            .is_err(),
+        "die Rücknahme wartet an der Schreibsperre"
+    );
+    vollzug.commit().await.unwrap();
+    assert_eq!(ruecknahme.await, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (status, at): (String, Option<String>) = sqlx::query_as(
+        "SELECT vollzug_status, vollzogen_at FROM kommunikation_status \
+         WHERE objekt_typ = 'auftrag' AND objekt_id = ?",
+    )
+    .bind(auftrag)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(status, "vollzogen");
+    assert_eq!(at.as_deref(), Some("2026-11-13 10:00:00"));
+    let in_arbeit_at: Option<String> =
+        sqlx::query_scalar("SELECT in_arbeit_at FROM auftrag WHERE id = ?")
+            .bind(auftrag)
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    assert!(
+        in_arbeit_at.is_some(),
+        "die Rücknahme hat nichts geschrieben"
+    );
+    assert_eq!(etb_meldungen(&w.pool, auftrag).await, 1);
 }

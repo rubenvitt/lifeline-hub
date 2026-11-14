@@ -3231,3 +3231,130 @@ async fn altes_geburtsdatum_in_freier_form_haelt_andere_felder_nicht_auf() {
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(json["geburtsdatum"], "ca. 1980");
 }
+
+// ---------- Zeilenabruf für den Live-Abgleich (LLH-1682) ----------
+
+#[tokio::test]
+async fn zeile_liefert_listenzeile_ohne_audit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Zeile","antreff_ort":"Halle"}"#).await;
+    let (status, zeile) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{p}/zeile"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(zeile, liste[0], "dieselbe Form wie die Listenzeile");
+    assert!(
+        zeile.get("sichtungen").is_none(),
+        "kein medizinischer Verlauf"
+    );
+    assert_eq!(audit_anzahl(&app, &admin, e, p).await, 0);
+}
+
+#[tokio::test]
+async fn zeile_einer_stornierten_person_ist_404_ohne_personalien() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Storniert"}"#).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (status, antwort) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{p}/zeile"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "die Liste führt sie nicht");
+    assert_eq!(antwort["grund"], "nicht_in_liste", "{antwort}");
+    assert!(
+        !antwort.to_string().contains("Storniert"),
+        "keine Personalien: {antwort}"
+    );
+}
+
+#[tokio::test]
+async fn zeile_fremder_einsatz_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let (status, antwort) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{anderer}/personen/{p}/zeile"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(antwort["grund"], "nicht_in_liste", "{antwort}");
+}
+
+#[tokio::test]
+async fn zeile_ohne_modulzugriff_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, frieda, "fuehrungspersonal").await;
+    let frieda_c = login_cookie(&app, "frieda", "friedapw1").await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/zeile");
+    let (status, _) = anfrage(&app, "GET", &pfad, &frieda_c, None).await;
+    assert_eq!(status, StatusCode::OK, "Vorbedingung: mit Modul sichtbar");
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/personen"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override: {v}");
+    let (status, _) = anfrage(&app, "GET", &pfad, &frieda_c, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// Eine unbekannte Route unter `/api` antwortet mit 404 ohne `grund`: so unterscheidet der Client
+/// sie vom 404 der Zeilen-Route, etwa nach einem Server-Rollback (LLH-1682, design.md D4).
+#[tokio::test]
+async fn unbekannte_route_ist_404_ohne_grund() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, antwort) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/1/gibt-es-nicht"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(antwort.get("grund").is_none(), "{antwort}");
+}

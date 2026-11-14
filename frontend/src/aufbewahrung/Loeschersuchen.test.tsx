@@ -10,6 +10,10 @@ import { renderMitProviders, sortTarget } from '../test/utils';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import Loeschersuchen, { antragswege } from './Loeschersuchen';
 import PersonensucheDialog from './PersonensucheDialog';
+import ArchivPersonAntragDialog, {
+  archivAntragBody,
+  kennungAusEingabe,
+} from './ArchivPersonAntragDialog';
 import SchwaerzungsantragDialog, {
   type AntragZielWahl,
   antragBody,
@@ -204,6 +208,18 @@ function antrag(over: Partial<Schwaerzungsantrag> = {}): Schwaerzungsantrag {
   };
 }
 
+const ARCHIV: NonNullable<ArchivAkte['archiv']> = {
+  archiviert_at: '2026-06-01 08:00:00',
+  block: 1,
+  bloecke: 2,
+  groesse: 1024,
+  fingerabdruecke: ['age1abc'],
+};
+
+function archivierteAkte(): ArchivAkte {
+  return { ...akte('geschwaerzt'), archiv: ARCHIV };
+}
+
 function akte(zustand: ArchivAkte['zustand']): ArchivAkte {
   return {
     kopf: {
@@ -339,12 +355,167 @@ describe('Loeschersuchen', () => {
   });
 
   it('Antragswege je Zustand', () => {
-    expect(antragswege({ zustand: 'frist_laeuft' })).toEqual({ person: true, einsatz: true });
-    expect(antragswege({ zustand: 'vorgemerkt' })).toEqual({ person: true, einsatz: true });
+    const offen = { person: true, einsatz: true, archiv: false };
+    expect(antragswege({ zustand: 'frist_laeuft' })).toEqual(offen);
+    expect(antragswege({ zustand: 'vorgemerkt' })).toEqual(offen);
     expect(antragswege({ zustand: 'schwaerzung_beantragt' })).toEqual({
       person: true,
       einsatz: false,
+      archiv: false,
     });
-    expect(antragswege({ zustand: 'geschwaerzt' })).toEqual({ person: false, einsatz: false });
+    const keiner = { person: false, einsatz: false, archiv: false };
+    expect(antragswege({ zustand: 'geschwaerzt' })).toEqual(keiner);
+    expect(antragswege({ zustand: 'loeschung_ausstehend' })).toEqual(keiner);
+  });
+
+  it('Antragswege am archivierten Einsatz (LLH-1712)', () => {
+    const archiviert = { zustand: 'geschwaerzt' as const, archiv: ARCHIV };
+    expect(antragswege(archiviert, [])).toEqual({ person: true, einsatz: true, archiv: true });
+    expect(antragswege({ ...archiviert, zustand: 'loeschung_ausstehend' }, [])).toEqual({
+      person: true,
+      einsatz: true,
+      archiv: true,
+    });
+    // Ein offener Einsatz-Antrag nimmt den Einsatz-Weg, nicht den Personen-Weg.
+    expect(
+      antragswege(archiviert, [antrag({ ziel_art: 'einsatz', ziel_kennung: 'E-2026-0007' })]),
+    ).toEqual({ person: true, einsatz: false, archiv: true });
+    // Ohne geladene Liste ist offen, ob ein Einsatz-Antrag besteht: kein Einsatz-Weg.
+    expect(antragswege(archiviert, undefined)).toEqual({
+      person: true,
+      einsatz: false,
+      archiv: true,
+    });
+    // Ein zurückgenommener zählt nicht.
+    expect(
+      antragswege(archiviert, [
+        antrag({ ziel_art: 'einsatz', stand: 'zurueckgenommen', zuruecknehmbar: false }),
+      ]),
+    ).toEqual({ person: true, einsatz: true, archiv: true });
+  });
+
+  it('Archivierter Einsatz: „Einsatz und Archiv löschen“ und „Person per Kennung schwärzen“', async () => {
+    server.use(http.get(`${BASIS}/schwaerzungsantraege`, () => HttpResponse.json([])));
+    renderMitProviders(<Loeschersuchen einsatzId={7} akte={archivierteAkte()} />);
+    expect(await screen.findByRole('button', { name: 'Einsatz und Archiv löschen' })).toHaveClass(
+      'ant-btn-dangerous',
+    );
+    expect(screen.queryByRole('button', { name: 'Person suchen und schwärzen' })).toBeNull();
+    expect(screen.queryByText('Einsatz bereits geschwärzt')).toBeNull();
+    const u = userEvent.setup();
+    await u.click(screen.getByRole('button', { name: 'Einsatz und Archiv löschen' }));
+    const rueckfrage = await screen.findByRole('dialog', {
+      name: 'Löschersuchen: Einsatz E-2026-0007',
+    });
+    expect(within(rueckfrage).getByText(/Löscht alle Blöcke des Archivs/)).toBeInTheDocument();
+    await u.click(within(rueckfrage).getByRole('button', { name: 'Abbrechen' }));
+    await u.click(screen.getByRole('button', { name: 'Person per Kennung schwärzen' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Löschersuchen: Person im Archiv' }),
+    ).toBeInTheDocument();
+  });
+
+  it('Archivierter Einsatz: ohne geladene Antragsliste kein Einsatz-Weg', async () => {
+    server.use(
+      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderMitProviders(<Loeschersuchen einsatzId={7} akte={archivierteAkte()} />);
+    expect(await screen.findByText('Löschersuchen nicht ladbar')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Einsatz und Archiv löschen' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Person per Kennung schwärzen' }),
+    ).toBeInTheDocument();
+  });
+
+  it('Archivierter Einsatz: ein fälliger Personen-Antrag wartet auf den Befehl', async () => {
+    server.use(
+      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+        HttpResponse.json([
+          antrag({ zuruecknehmbar: false }),
+          antrag({ id: 2, ziel_kennung: 'EK-17', ziel_art: 'externe_kraft' }),
+        ]),
+      ),
+    );
+    renderMitProviders(<Loeschersuchen einsatzId={7} akte={archivierteAkte()} />);
+    const faellig = (await screen.findByText('R-042')).closest('tr')!;
+    expect(
+      within(faellig as HTMLElement).getByText('wartet auf Befehl mit Archiv-Schlüssel'),
+    ).toBeInTheDocument();
+    // Innerhalb der 24 Stunden noch nicht: dort steht „Zurücknehmen“.
+    const frisch = screen.getByText('EK-17').closest('tr')!;
+    expect(
+      within(frisch as HTMLElement).queryByText('wartet auf Befehl mit Archiv-Schlüssel'),
+    ).toBeNull();
+  });
+
+  it('Ohne Archiv wartet kein Antrag auf einen Befehl', async () => {
+    server.use(
+      http.get(`${BASIS}/schwaerzungsantraege`, () =>
+        HttpResponse.json([antrag({ zuruecknehmbar: false })]),
+      ),
+    );
+    renderMitProviders(<Loeschersuchen einsatzId={7} akte={akte('frist_laeuft')} />);
+    await screen.findByText('R-042');
+    expect(screen.queryByText('wartet auf Befehl mit Archiv-Schlüssel')).toBeNull();
+  });
+});
+
+// ---------- Antrag per Kennung am archivierten Einsatz (LLH-1712) ----------
+
+describe('ArchivPersonAntragDialog', () => {
+  it('liest Art und Kennung aus der Eingabe', () => {
+    expect(kennungAusEingabe('R-042')).toEqual({ art: 'betroffene', kennung: 'R-042' });
+    expect(kennungAusEingabe(' r-42 ')).toEqual({ art: 'betroffene', kennung: 'R-042' });
+    expect(kennungAusEingabe('R-1234')).toEqual({ art: 'betroffene', kennung: 'R-1234' });
+    expect(kennungAusEingabe('ek-017')).toEqual({ art: 'externe_kraft', kennung: 'EK-17' });
+    expect(kennungAusEingabe('IT-5')).toEqual({ art: 'infotelefon_anruf', kennung: 'IT-5' });
+    for (const falsch of ['', 'R-', 'R-0', 'X-1', 'R42', 'EK-1a', 'MK-3']) {
+      expect(kennungAusEingabe(falsch), falsch).toBeNull();
+    }
+  });
+
+  it('baut den Body mit der Kennung als Ziel und Bestätigung', () => {
+    expect(archivAntragBody({ art: 'externe_kraft', kennung: 'EK-17' }, ' DS-2026-014 ')).toEqual({
+      ziel: { art: 'externe_kraft', kennung: 'EK-17' },
+      aktenzeichen: 'DS-2026-014',
+      bestaetigung: 'EK-17',
+    });
+  });
+
+  it('sendet erst mit gültiger Kennung und Aktenzeichen, nennt den Befehl', async () => {
+    server.use(
+      http.post(`${BASIS}/schwaerzungsantraege`, async ({ request }) => {
+        gesendet.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderMitProviders(<ArchivPersonAntragDialog einsatzId={7} onSchliessen={() => {}} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Löschersuchen: Person im Archiv' });
+    expect(dialog.querySelector('[data-lfh="antrag-faellig"]')).not.toBeNull();
+    expect(within(dialog).getByText(/In den ersten 24 Stunden zurücknehmbar/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Bis zum Vollzug zurücknehmbar/)).toBeNull();
+    expect(within(dialog).getByText(/lifeline-hub archiv personen/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/lifeline-hub archiv loeschersuchen/)).toBeInTheDocument();
+    const knopf = within(dialog).getByRole('button', { name: 'Person schwärzen lassen' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveClass('ant-btn-dangerous');
+    const u = userEvent.setup();
+    const [kennung, az] = within(dialog).getAllByRole('textbox');
+    await u.type(kennung!, 'X-1');
+    await u.type(az!, 'DS-2026-014');
+    expect(knopf).toBeDisabled();
+    await u.clear(kennung!);
+    await u.type(kennung!, 'r-42');
+    expect(within(dialog).getByText('Betroffene Person R-042')).toBeInTheDocument();
+    expect(knopf).toBeEnabled();
+    await u.click(knopf);
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toEqual({
+      ziel: { art: 'betroffene', kennung: 'R-042' },
+      aktenzeichen: 'DS-2026-014',
+      bestaetigung: 'R-042',
+    });
   });
 });

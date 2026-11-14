@@ -46,7 +46,8 @@ Der Archiv-Namensraum SHALL ausschließlich lesende Abrufe anbieten, mit drei Au
 Wiederherstellen, dem Stellen eines Schwärzungsantrags und seiner Rücknahme. Die Personensuche
 ist ein lesender Abruf, auch wenn sie ihren Suchtext im Anfrage-Body trägt. Über den Namensraum
 MUST sich keine Angabe eines Einsatzes, einer Person, eines Tiers, eines Schadens oder eines
-ETB-Eintrags unmittelbar ändern lassen; geschwärzt wird nur durch den Vollzug im Purge-Lauf. Die
+ETB-Eintrags unmittelbar ändern lassen; geschwärzt wird nur durch den Vollzug im Purge-Lauf,
+eine Person in den Blöcken eines Archivs nur durch den Befehl mit dem Archiv-Schlüssel. Die
 regulären Einsatz-Routen MUST für einen gesperrten Einsatz weiter 403 liefern, auch dem
 System-Admin. Das gilt für Detail, ETB, Personen, Tiere, Schäden, Anhänge, Dokumente, Chat,
 Lagekarte, Export und Live-Strom.

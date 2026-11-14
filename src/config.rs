@@ -855,6 +855,43 @@ pub enum ArchivBefehl {
         #[arg(long)]
         org: Option<i64>,
     },
+    /// Fällige Löschersuchen für Personen an archivierten Einsätzen vollziehen (LLH-1712).
+    ///
+    /// Jeder Block des Archivs wird mit einem privaten Archiv-Schlüssel geöffnet, die Person darin
+    /// geschwärzt und der Block an die geprüften Archiv-Schlüssel der Organisation neu
+    /// verschlüsselt. Ältere Downloads lassen sich danach hier nicht mehr einspielen. Geht auch bei
+    /// laufendem Server, mit dessen Version.
+    Loeschersuchen {
+        /// `age`-Identitätsdatei mit einem privaten Archiv-Schlüssel (`AGE-SECRET-KEY-1…`); `-`
+        /// liest sie von stdin. Eine mit Passphrase geschützte Datei (`age -p`) fragt die
+        /// Passphrase auf stdin ab.
+        #[arg(long)]
+        identitaet: String,
+        /// Nur diesen Einsatz (ID); ohne Angabe alle mit fälligen Anträgen.
+        #[arg(long)]
+        einsatz: Option<i64>,
+        /// Nur Einsätze dieser Organisation (ID). Ein Archiv-Schlüssel öffnet nur die Blöcke
+        /// seiner Organisation; an einer Installation mit mehreren gehört die Angabe dazu.
+        #[arg(long, conflicts_with = "einsatz")]
+        org: Option<i64>,
+    },
+    /// Im Archiv eines Einsatzes nach einer Person suchen, um ihre Kennung für ein Löschersuchen
+    /// zu finden (LLH-1712).
+    ///
+    /// Sucht im gültigen Block nach Name oder Kontakt, wie die Personensuche der Archivakte, und
+    /// nennt Kennung und Namen nur hier im Terminal. Die Admin-Spur hält die Suche ohne Suchtext
+    /// fest.
+    Personen {
+        /// Der archivierte Einsatz (ID, wie in der Adresse der Archivakte).
+        #[arg(long)]
+        einsatz: i64,
+        /// `age`-Identitätsdatei mit einem privaten Archiv-Schlüssel; `-` liest sie von stdin.
+        #[arg(long)]
+        identitaet: String,
+        /// Name oder Kontakt, mindestens 3 Zeichen.
+        #[arg(long)]
+        suche: String,
+    },
 }
 
 /// Unterkommandos von `lifeline-hub zugang`.
@@ -1874,5 +1911,99 @@ mod tests {
             vec!["OpenFreeMap Dark".to_string()],
             "nur ein dunkler Eintrag"
         );
+    }
+
+    /// LLH-1712: die Befehle für das Löschersuchen und die Suche im Archiv.
+    #[test]
+    fn archiv_loeschersuchen_und_personen() {
+        let c = parse_hermetisch([
+            "lifeline-hub",
+            "archiv",
+            "loeschersuchen",
+            "--identitaet",
+            "-",
+            "--einsatz",
+            "7",
+        ]);
+        match c.command {
+            Some(Command::Archiv {
+                befehl:
+                    ArchivBefehl::Loeschersuchen {
+                        identitaet,
+                        einsatz,
+                        org,
+                    },
+            }) => assert_eq!((identitaet.as_str(), einsatz, org), ("-", Some(7), None)),
+            andere => panic!("{andere:?}"),
+        }
+        let c = parse_hermetisch([
+            "lifeline-hub",
+            "archiv",
+            "loeschersuchen",
+            "--identitaet",
+            "k.txt",
+            "--org",
+            "2",
+        ]);
+        assert!(matches!(
+            c.command,
+            Some(Command::Archiv {
+                befehl: ArchivBefehl::Loeschersuchen {
+                    einsatz: None,
+                    org: Some(2),
+                    ..
+                }
+            })
+        ));
+        let c = parse_hermetisch([
+            "lifeline-hub",
+            "archiv",
+            "personen",
+            "--einsatz",
+            "7",
+            "--identitaet",
+            "k.txt",
+            "--suche",
+            "Mustermann",
+        ]);
+        match c.command {
+            Some(Command::Archiv {
+                befehl:
+                    ArchivBefehl::Personen {
+                        einsatz,
+                        identitaet,
+                        suche,
+                    },
+            }) => assert_eq!(
+                (einsatz, identitaet.as_str(), suche.as_str()),
+                (7, "k.txt", "Mustermann")
+            ),
+            andere => panic!("{andere:?}"),
+        }
+        // `--org` grenzt nur die Suche nach fälligen Einsätzen ein; mit `--einsatz` zusammen wäre
+        // sie still wirkungslos.
+        assert!(try_parse_mit_env(
+            "LIFELINE_UNBENUTZT",
+            "x",
+            &[
+                "lifeline-hub",
+                "archiv",
+                "loeschersuchen",
+                "--identitaet",
+                "-",
+                "--einsatz",
+                "7",
+                "--org",
+                "2"
+            ]
+        )
+        .is_err());
+        // Ohne Schlüssel und Suchtext kein Befehl (die Variable ist für den Befehl ohne Belang).
+        assert!(try_parse_mit_env(
+            "LIFELINE_UNBENUTZT",
+            "x",
+            &["lifeline-hub", "archiv", "personen", "--einsatz", "7"]
+        )
+        .is_err());
     }
 }

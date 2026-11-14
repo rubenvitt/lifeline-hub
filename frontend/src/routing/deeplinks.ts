@@ -235,8 +235,12 @@ export function tierePfad(einsatzId: number, opts: { neu?: boolean } = {}): stri
   return mitQuery(einsatzModulPfad(einsatzId, 'tiere'), { neu: opts.neu ? 1 : undefined });
 }
 
-export function einsatzdatenPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'einsatzdaten');
+/**
+ * Seite Einsatzdaten. `?paneel=fuehrung` ist ein AUFTRAG (apply-then-clean): die Seite rollt zum
+ * Paneel „Führung“, sobald es geladen ist (LLH-1850, Hinweisband „Führung zurückholen“).
+ */
+export function einsatzdatenPfad(einsatzId: number, opts: { paneel?: 'fuehrung' } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'einsatzdaten'), { paneel: opts.paneel });
 }
 
 /**

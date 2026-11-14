@@ -720,6 +720,11 @@ pub async fn abruf(
         body.objekt_id,
         &ergebnis.mitgenommen,
     );
+    // Der Ziel-Abschnitt ändert den Abschnitt der Einheit, den die Zeilen ihrer versorgten
+    // Personen per Join tragen (LLH-1682).
+    if typ == ObjektTyp::Einheit && abschnitt.is_some() {
+        super::einsatz_person::sse_versorgte_personen(&state, einsatz_id, &[body.objekt_id]).await;
+    }
     if let Some(auftrag_id) = ergebnis.auftrag_id {
         crate::auftrag::nach_erteilung(&state, einsatz_id, auftrag_id, ctx.benutzer.id, &now)
             .await?;

@@ -180,12 +180,22 @@ impl Schluessel {
     pub(crate) fn entschluessele_datei<W: Write>(
         &self,
         quelle: &Path,
-        mut ausgabe: W,
+        ausgabe: W,
     ) -> Result<W, AppError> {
         let eingabe = io::BufReader::new(
             std::fs::File::open(quelle)
                 .map_err(|e| AppError::Validation(format!("Sicherungsdatei nicht lesbar: {e}")))?,
         );
+        self.entschluessele(eingabe, ausgabe)
+    }
+
+    /// Wie [`Self::entschluessele_datei`], aus einem Leser (etwa einem Archivblock aus der
+    /// Datenbank, LLH-1712).
+    pub(crate) fn entschluessele<R: io::BufRead, W: Write>(
+        &self,
+        eingabe: R,
+        mut ausgabe: W,
+    ) -> Result<W, AppError> {
         let entschluesseler = age::Decryptor::new_buffered(eingabe).map_err(|e| {
             AppError::Validation(format!("Verschlüsselte Sicherung nicht lesbar: {e}"))
         })?;

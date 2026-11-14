@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { meHandler, server } from '../test/server';
@@ -186,6 +186,8 @@ interface SetupOpts {
   benutzer?: BenutzerAnzeige;
   /** Anzeigezone; ohne gilt die Browserzone (kein Provider, wie bisher). */
   zeitzone?: string;
+  /** Adresse beim Start; ohne `/einsaetze/7/einsatzdaten`. */
+  route?: string;
 }
 
 function setup(opts: SetupOpts = {}) {
@@ -216,7 +218,15 @@ function setup(opts: SetupOpts = {}) {
   );
   const routen = (
     <Routes>
-      <Route path="/einsaetze/:id/einsatzdaten" element={<EinsatzdatenPage />} />
+      <Route
+        path="/einsaetze/:id/einsatzdaten"
+        element={
+          <>
+            <EinsatzdatenPage />
+            <Adresse />
+          </>
+        }
+      />
     </Routes>
   );
   return renderMitProviders(
@@ -227,8 +237,14 @@ function setup(opts: SetupOpts = {}) {
     ) : (
       routen
     ),
-    { route: '/einsaetze/7/einsatzdaten' },
+    { route: opts.route ?? '/einsaetze/7/einsatzdaten' },
   );
+}
+
+/** Die aktuelle Adresse samt Query, für Sprungaufträge (`?paneel=`). */
+function Adresse() {
+  const l = useLocation();
+  return <output data-testid="adresse">{l.pathname + l.search}</output>;
 }
 
 describe('gleicherZeitpunkt (LFH-472)', () => {
@@ -2184,5 +2200,61 @@ describe('EinsatzdatenPage · Paneel Einsatzort (LFH-1175)', () => {
       screen.queryByRole('button', { name: /^(Adresse|Koordinate) (bearbeiten|eintragen)$/ }),
     ).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ort suchen' })).toBeNull();
+  });
+});
+
+describe('Sprung zum Paneel „Führung“ (LLH-1850)', () => {
+  const fuehrung = {
+    id: 9,
+    kennung: 'elw/7-ab',
+    einsatz_id: 7,
+    bezeichnung: 'Hochwasser',
+    status: 'aktiv',
+    epoche: 3,
+    fuehrer_name: 'Hub Nord',
+    fuehrer_kennung: 'hub',
+    fuehrend: false,
+    art: 'uebergabe',
+    anfrage_offen: false,
+    verwahrt: false,
+    gegenueber: [],
+    fuehrer_beendet_at: '2026-11-10 10:00:00',
+    verlauf: [],
+  };
+  const kopf = { fuehrend: false, bei: 'Hub Nord', epoche: 3, offen: false, beendet: true };
+
+  it('rollt einmal zum Paneel und nimmt den Auftrag aus der Adresse', async () => {
+    const rolle = vi.fn();
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = rolle;
+    try {
+      server.use(http.get('/api/einsaetze/7/fuehrung', () => HttpResponse.json(fuehrung)));
+      setup({ einsatz: { fuehrung: kopf }, route: '/einsaetze/7/einsatzdaten?paneel=fuehrung' });
+      expect(await screen.findByRole('button', { name: 'Führung zurückholen …' })).toBeVisible();
+      await waitFor(() =>
+        expect(screen.getByTestId('adresse')).toHaveTextContent(/^\/einsaetze\/7\/einsatzdaten$/),
+      );
+      expect(rolle).toHaveBeenCalledTimes(1);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
+  it('rollt auch, wenn die Führung nicht lädt', async () => {
+    const rolle = vi.fn();
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = rolle;
+    try {
+      server.use(
+        http.get('/api/einsaetze/7/fuehrung', () => new HttpResponse(null, { status: 500 })),
+      );
+      setup({ einsatz: { fuehrung: kopf }, route: '/einsaetze/7/einsatzdaten?paneel=fuehrung' });
+      await waitFor(() =>
+        expect(screen.getByTestId('adresse')).toHaveTextContent(/^\/einsaetze\/7\/einsatzdaten$/),
+      );
+      expect(rolle).toHaveBeenCalledTimes(1);
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
   });
 });

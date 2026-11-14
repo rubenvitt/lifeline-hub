@@ -12,7 +12,9 @@ use serde_json::{json, Value};
 
 mod common;
 use common::maschine::{angebunden, jetzt, schluessel, senden, signiert, signiert_mit_body};
-use common::{anfrage_json, fremde_org_anlegen, login_cookie, setup_mit_pool};
+use common::{
+    anfrage, anfrage_json, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie, setup_mit_pool,
+};
 
 const RECHNEN: &str = "/api/v1/rechner/unterkunft";
 const RICHTWERTE: &str = "/api/v1/rechner/unterkunft/richtwerte";
@@ -237,9 +239,11 @@ async fn ungueltige_eingaben_tragen_code_und_nennen_das_feld() {
             "invalid_field",
             "wasser_je_person_l muss zwischen 5 und 500 liegen",
         ),
-        // Einsatz-Werte gibt es an dieser Route nicht (design.md D1).
+        // Ein unbekanntes Feld nennt seinen Namen.
+        (mit("einsatz", json!(1)), 400, "invalid_field", "einsatz"),
+        // `einsatz_id` ist eine ganze Zahl (LLH-1856).
         (
-            mit("einsatz_id", json!(1)),
+            mit("einsatz_id", json!("1")),
             400,
             "invalid_field",
             "einsatz_id",
@@ -427,4 +431,257 @@ async fn abrufe_stehen_im_abrufprotokoll() {
         .unwrap();
     routen.sort();
     assert_eq!(routen, [RECHNEN, RICHTWERTE]);
+}
+
+// ---------------------------------------------------------------------------------------------
+// LLH-1856: Werte eines freigegebenen Einsatzes über `einsatz_id`.
+// ---------------------------------------------------------------------------------------------
+
+/// Ein Zugang, wie ihn die Doku für Einsatz-Werte empfiehlt: `rechner:use` und `einsaetze:read`.
+async fn planung(app: &axum::Router, admin: &str, n: u8, ip: &str) -> Credentials {
+    angebunden(
+        app,
+        admin,
+        json!(["rechner:use", "einsaetze:read"]),
+        &schluessel(n),
+        ip,
+    )
+    .await
+}
+
+/// Die Einsatzleitung gibt den Einsatz für den Zugang frei (Paneel „Anbindungen“).
+async fn einsatz_freigeben(app: &axum::Router, admin: &str, einsatz: i64, cred: &Credentials) {
+    let (s, v) = anfrage(
+        app,
+        "PUT",
+        &format!(
+            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            cred.zugang_id
+        ),
+        admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// Setzt einen Richtwert des Einsatzes über die interne Route (Einstellungen des Einsatzes).
+async fn einsatz_wert_setzen(
+    app: &axum::Router,
+    admin: &str,
+    einsatz: i64,
+    schluessel: &str,
+    wert: f64,
+) {
+    let (s, v) = anfrage_json(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/unterkunft-richtwerte/{schluessel}"),
+        admin,
+        Some(&json!({ "wert": wert })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+fn personen_mit_einsatz(einsatz: Value) -> Value {
+    json!({
+        "weg": "personen",
+        "trennung": false,
+        "personen": { "gesamt": 100 },
+        "einsatz_id": einsatz
+    })
+}
+
+/// Akzeptanz aus LLH-1856: Ein Zugang mit Freigabe für E rechnet mit dem Wert von E und bekommt
+/// die Herkunft `einsatz`; Anfrage vor Einsatz vor Organisation; ohne `einsatz_id` wie bisher.
+#[tokio::test]
+async fn rechnet_mit_den_werten_des_freigegebenen_einsatzes() {
+    let (app, _pool, admin, _cred, ip) = aufbau(221).await;
+    let cred = planung(&app, &admin, 222, &ip).await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    org_wert_setzen(&app, &admin, "wasser_je_person_l", 30.0).await;
+    org_wert_setzen(&app, &admin, "flaeche_je_person_m2", 5.0).await;
+    einsatz_wert_setzen(&app, &admin, einsatz, "wasser_je_person_l", 40.0).await;
+    einsatz_freigeben(&app, &admin, einsatz, &cred).await;
+
+    let (s, h, v) = rechnen(
+        &app,
+        &cred,
+        &ip,
+        "e1",
+        &personen_mit_einsatz(json!(einsatz)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(h.contains_key("lifeline-signature"), "Antwort signiert");
+    assert_eq!(v["ergebnis"]["versorgung"]["wasser_l_tag"], 4000);
+    let wasser = richtwert(&v, "wasser_je_person_l");
+    assert_eq!(
+        (wasser["wert"].as_f64(), &wasser["herkunft"]),
+        (Some(40.0), &json!("einsatz"))
+    );
+    // Der Einsatz hat keinen eigenen Wert: es gilt die Organisation.
+    assert_eq!(richtwert(&v, "flaeche_je_person_m2")["herkunft"], "org");
+    assert_eq!(
+        v["ergebnis"]["schlafen"]["flaeche_m2"].as_f64(),
+        Some(500.0)
+    );
+    assert_eq!(richtwert(&v, "dusche_je_personen")["herkunft"], "basis");
+
+    // Die Anfrage geht dem Einsatz vor.
+    let mut eigen = personen_mit_einsatz(json!(einsatz));
+    eigen["richtwerte"] = json!({ "wasser_je_person_l": 15 });
+    let (s, _, v) = rechnen(&app, &cred, &ip, "e2", &eigen).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ergebnis"]["versorgung"]["wasser_l_tag"], 1500);
+    assert_eq!(richtwert(&v, "wasser_je_person_l")["herkunft"], "anfrage");
+
+    // Ohne `einsatz_id` bleiben die Werte des Einsatzes draußen, ebenso mit `null`.
+    for (jti, body) in [
+        (
+            "e3",
+            json!({ "weg": "personen", "trennung": false, "personen": { "gesamt": 100 } }),
+        ),
+        ("e4", personen_mit_einsatz(Value::Null)),
+    ] {
+        let (s, _, v) = rechnen(&app, &cred, &ip, jti, &body).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["ergebnis"]["versorgung"]["wasser_l_tag"], 3000);
+        assert_eq!(richtwert(&v, "wasser_je_person_l")["herkunft"], "org");
+    }
+
+    // Die Auskunft mit und ohne Einsatz.
+    let pfad = format!("{RICHTWERTE}?einsatz_id={einsatz}");
+    let (s, h, v) = signiert(&app, &cred, "GET", &pfad, jetzt(), "e5", &ip).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(h.contains_key("lifeline-signature"), "Antwort signiert");
+    let wasser = richtwert(&v, "wasser_je_person_l");
+    assert_eq!(wasser["basis"].as_f64(), Some(25.0));
+    assert_eq!(wasser["wert"].as_f64(), Some(40.0));
+    assert_eq!(wasser["herkunft"], "einsatz");
+    assert_eq!(richtwert(&v, "flaeche_je_person_m2")["herkunft"], "org");
+    let (s, _, v) = signiert(&app, &cred, "GET", RICHTWERTE, jetzt(), "e6", &ip).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(richtwert(&v, "wasser_je_person_l")["herkunft"], "org");
+}
+
+/// Spec `rechner-api-unterkunft`, „Einsatz-Werte gibt es nur für einen freigegebenen Einsatz“:
+/// jeder andere Fall ist dieselbe 404, eine ungültige Anfrage zuerst 400 oder 422.
+#[tokio::test]
+async fn einsatz_werte_nur_fuer_den_freigegebenen_einsatz() {
+    let (app, pool, admin, nur_rechner, ip) = aufbau(223).await;
+    let cred = planung(&app, &admin, 224, &ip).await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let anderer = einsatz_anlegen_mit(&app, &admin, "Hochwasser").await;
+    let (fremd_org, _) =
+        fremde_org_anlegen(&pool, "Fremd-Orga", "fremdadmin", "fremdpw12", "keine").await;
+    let fremder: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (?, 'Fremd') RETURNING id",
+    )
+    .bind(fremd_org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // Ohne Freigabe.
+    let (s, _, ohne_freigabe) = rechnen(
+        &app,
+        &cred,
+        &ip,
+        "n0",
+        &personen_mit_einsatz(json!(einsatz)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{ohne_freigabe}");
+    assert_eq!(ohne_freigabe["code"], "not_found");
+
+    einsatz_freigeben(&app, &admin, einsatz, &cred).await;
+    // Ein Zugang nur mit `rechner:use` lässt sich nicht freigeben.
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!(
+            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            nur_rechner.zugang_id
+        ),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{v}");
+    let faelle = [
+        ("anderer Einsatz", &cred, json!(anderer)),
+        ("fremde Org", &cred, json!(fremder)),
+        ("unbekannt", &cred, json!(999_999)),
+        ("negativ", &cred, json!(-1)),
+        // Nur `rechner:use`: lässt sich nicht freigeben, liest also keinen Einsatz.
+        ("nur rechner:use", &nur_rechner, json!(einsatz)),
+    ];
+    for (i, (fall, zugang, id)) in faelle.iter().enumerate() {
+        let (s, _, v) = rechnen(
+            &app,
+            zugang,
+            &ip,
+            &format!("n{}", i + 1),
+            &personen_mit_einsatz(id.clone()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{fall}: {v}");
+        assert_eq!(v, ohne_freigabe, "{fall}: dieselbe Antwort");
+    }
+
+    // Die Auskunft ebenso.
+    let pfad = format!("{RICHTWERTE}?einsatz_id={anderer}");
+    let (s, _, v) = signiert(&app, &cred, "GET", &pfad, jetzt(), "n7", &ip).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "{v}");
+    assert_eq!(v, ohne_freigabe);
+
+    // Eine ungültige Anfrage ist 422, auch mit einem nicht lesbaren Einsatz.
+    let kaputt = json!({ "weg": "personen", "trennung": false, "einsatz_id": anderer });
+    let (s, _, v) = rechnen(&app, &cred, &ip, "n8", &kaputt).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    // Der freigegebene Einsatz geht, bis er abgeschlossen ist.
+    let (s, _, v) = rechnen(
+        &app,
+        &cred,
+        &ip,
+        "n9",
+        &personen_mit_einsatz(json!(einsatz)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    let (s, _, v) = rechnen(
+        &app,
+        &cred,
+        &ip,
+        "n10",
+        &personen_mit_einsatz(json!(einsatz)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "abgeschlossen: {v}");
+    assert_eq!(v, ohne_freigabe);
+}
+
+#[tokio::test]
+async fn auskunft_mit_einsatz_id_keine_zahl_ist_400() {
+    let (app, _pool, admin, _cred, ip) = aufbau(225).await;
+    let cred = planung(&app, &admin, 226, &ip).await;
+    for (i, wert) in ["abc", "", "7.5"].iter().enumerate() {
+        let pfad = format!("{RICHTWERTE}?einsatz_id={wert}");
+        let (s, _, v) = signiert(&app, &cred, "GET", &pfad, jetzt(), &format!("q{i}"), &ip).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{wert}: {v}");
+        assert_eq!(v["code"], "invalid_field");
+        assert!(v["error"].as_str().unwrap().contains("einsatz_id"), "{v}");
+    }
 }

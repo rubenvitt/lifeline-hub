@@ -69,6 +69,22 @@ async fn main() -> anyhow::Result<()> {
                     org,
                 },
         }) => cmd_archiv_einspielen(&config.db_path, &datei, &identitaet, org).await,
+        Some(Command::Archiv {
+            befehl:
+                ArchivBefehl::Loeschersuchen {
+                    identitaet,
+                    einsatz,
+                    org,
+                },
+        }) => cmd_archiv_loeschersuchen(&config.db_path, &identitaet, einsatz, org).await,
+        Some(Command::Archiv {
+            befehl:
+                ArchivBefehl::Personen {
+                    einsatz,
+                    identitaet,
+                    suche,
+                },
+        }) => cmd_archiv_personen(&config.db_path, einsatz, &identitaet, &suche).await,
         Some(Command::Zugang(befehl)) => {
             lifeline_hub::public_api::kommando::ausfuehren(befehl).await
         }
@@ -117,6 +133,13 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
 
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
+    // Zähler des Stammdaten-Logs auf die Uhr (LLH-1853, D3): Nach dem Zurückspielen einer
+    // Sicherung liegt jede neue Änderung über dem, was ein gekoppelter ELW schon übernommen hat.
+    lifeline_hub::instanz::stammdaten::liefern::raise_log_stand(
+        &pool,
+        chrono::Utc::now().timestamp(),
+    )
+    .await?;
     // Versionsstand der Instanz: Versionswechsel erkennen, bevor Anfragen kommen (Spec `versionsstand`).
     lifeline_hub::versionsstand::repo::beim_start(
         &pool,
@@ -720,6 +743,203 @@ async fn cmd_archiv_einspielen(
     );
     for h in &e.hinweise {
         println!("Hinweis: {h}");
+    }
+    Ok(())
+}
+
+/// Öffnet die Datenbank für einen Archiv-Befehl neben dem laufenden Server: sie muss den Stand
+/// dieser Version haben, migriert wird nicht.
+async fn archiv_db(db_path: &str) -> anyhow::Result<sqlx::SqlitePool> {
+    if !Path::new(db_path).exists() {
+        anyhow::bail!("Datenbank nicht gefunden: {db_path} — Server wurde noch nicht gestartet?");
+    }
+    let pool = db::connect(db_path).await?;
+    if let Some(abweichung) = db::stand_abweichung(&pool).await? {
+        pool.close().await;
+        anyhow::bail!(
+            "Die Datenbank passt nicht zu dieser Version ({abweichung}). Mit der Version \
+             aufrufen, mit der der Server läuft."
+        );
+    }
+    Ok(pool)
+}
+
+/// Subkommando `archiv loeschersuchen` (LLH-1712, design.md D1/D2): fällige Löschersuchen für
+/// Personen an archivierten Einsätzen in allen Blöcken vollziehen. Ein Fehler an einem Einsatz
+/// hält die übrigen nicht auf; der Befehl endet dann mit einem Fehler.
+async fn cmd_archiv_loeschersuchen(
+    db_path: &str,
+    identitaet: &str,
+    einsatz: Option<i64>,
+    org: Option<i64>,
+) -> anyhow::Result<()> {
+    use lifeline_hub::einsatz::archiv::loeschersuchen;
+    let schluessel = identitaet_laden(identitaet)?;
+    let pool = archiv_db(db_path).await?;
+    if let Some(org) = org {
+        let bekannt: bool =
+            sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM organisation WHERE id = ?)")
+                .bind(org)
+                .fetch_one(&pool)
+                .await?;
+        if !bekannt {
+            pool.close().await;
+            anyhow::bail!("Organisation {org} gibt es hier nicht.");
+        }
+    }
+    let ids = match einsatz {
+        Some(id) => vec![id],
+        None => loeschersuchen::faellige_einsaetze(&pool, chrono::Utc::now(), org)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?,
+    };
+    if ids.is_empty() {
+        pool.close().await;
+        match org {
+            Some(org) => println!(
+                "Keine fälligen Löschersuchen für Personen im Archiv der Organisation {org}."
+            ),
+            None => println!("Keine fälligen Löschersuchen für Personen im Archiv."),
+        }
+        return Ok(());
+    }
+    // Das Signal einmal abonniert, über alle Einsätze: ein Strg+C oder SIGTERM während einer
+    // Ablage geht sonst verloren (tokio hat den Handler da schon übernommen, und ein später
+    // abonniertes Signal sieht es nicht mehr).
+    let abbruch = shutdown_signal();
+    tokio::pin!(abbruch);
+    let mut abgebrochen = false;
+    let mut fehler = 0;
+    let mut vollzogen = 0;
+    let anzahl = ids.len();
+    for (nr, id) in ids.into_iter().enumerate() {
+        // Abbrechbar ist nur das Bauen: ein Abbruch lässt es fallen, `Drop` löscht die
+        // entschlüsselten Zwischendateien, und an diesem Einsatz ist nichts geändert. Die Ablage
+        // ist eine Transaktion und läuft zu Ende; ein Abbruch während ihr wirkt danach.
+        if abgebrochen {
+            // Das Signal kam während der vorigen Ablage; die ist vollzogen und gemeldet.
+            pool.close().await;
+            anyhow::bail!(
+                "Abgebrochen nach der Ablage von {vollzogen} Einsatz/Einsätzen; {} nicht \
+                 bearbeitet, ab Einsatz {id}.{}",
+                anzahl - nr,
+                if fehler > 0 {
+                    format!(" {fehler} Einsatz/Einsätze vorher nicht vollzogen.")
+                } else {
+                    String::new()
+                }
+            );
+        }
+        let gebaut = tokio::select! {
+            b = loeschersuchen::neu_bauen(&pool, id, &schluessel, chrono::Utc::now()) => Some(b),
+            () = &mut abbruch => None,
+        };
+        let ergebnis = match gebaut {
+            None => {
+                pool.close().await;
+                anyhow::bail!(
+                    "Abgebrochen. Die entschlüsselten Zwischendateien sind gelöscht; an Einsatz \
+                     {id} ist nichts geändert{}.",
+                    if vollzogen > 0 {
+                        ", die zuvor gemeldeten Einsätze bleiben vollzogen"
+                    } else {
+                        ""
+                    }
+                );
+            }
+            Some(Ok(Some(bau))) => {
+                let ablage = loeschersuchen::ablegen(&pool, bau);
+                tokio::pin!(ablage);
+                // Die Ablage läuft zu Ende; ein Signal währenddessen merkt sich der Befehl.
+                loop {
+                    tokio::select! {
+                        r = &mut ablage => break r,
+                        () = &mut abbruch, if !abgebrochen => abgebrochen = true,
+                    }
+                }
+            }
+            Some(Ok(None)) => Ok(None),
+            Some(Err(e)) => Err(e),
+        };
+        match ergebnis {
+            Ok(Some(v)) => {
+                vollzogen += 1;
+                println!(
+                    "Einsatz {} (ID {}): {} in {} {} des Archivs geschwärzt.",
+                    v.einsatz_kennung,
+                    v.einsatz_id,
+                    v.personen.join(", "),
+                    v.bloecke,
+                    if v.bloecke == 1 { "Block" } else { "Blöcken" }
+                )
+            }
+            Ok(None) => println!(
+                "Einsatz {id}: kein fälliger Antrag mit Archiv, oder Antrag bzw. Archiv haben \
+                 sich während des Laufs geändert; nichts geändert."
+            ),
+            Err(e) => {
+                eprintln!("Einsatz {id}: {e}");
+                fehler += 1;
+            }
+        }
+    }
+    // Ein Signal während der letzten Ablage beendet nichts mehr: alles ist bearbeitet.
+    let mehrere_orgs: bool = org.is_none()
+        && einsatz.is_none()
+        && sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM organisation")
+            .fetch_one(&pool)
+            .await?
+            > 1;
+    pool.close().await;
+    if fehler > 0 {
+        anyhow::bail!(
+            "{fehler} Einsatz/Einsätze nicht vollzogen; dort ist nichts geändert.{}",
+            if mehrere_orgs {
+                " Gehören sie zu einer anderen Organisation, mit --org eingrenzen."
+            } else {
+                ""
+            }
+        );
+    }
+    Ok(())
+}
+
+/// Subkommando `archiv personen` (LLH-1712, design.md D6): im gültigen Block eines archivierten
+/// Einsatzes nach einer Person suchen. Den Suchtext schreibt der Befehl in kein Log.
+async fn cmd_archiv_personen(
+    db_path: &str,
+    einsatz: i64,
+    identitaet: &str,
+    suche: &str,
+) -> anyhow::Result<()> {
+    let schluessel = identitaet_laden(identitaet)?;
+    let pool = archiv_db(db_path).await?;
+    let ergebnis = tokio::select! {
+        e = lifeline_hub::einsatz::archiv::personen::suchen(
+            &pool, einsatz, &schluessel, suche, chrono::Utc::now(),
+        ) => Some(e),
+        () = shutdown_signal() => None,
+    };
+    pool.close().await;
+    let Some(ergebnis) = ergebnis else {
+        anyhow::bail!("Abgebrochen. Die entschlüsselte Zwischendatei ist gelöscht.");
+    };
+    let treffer = ergebnis.map_err(|e| anyhow::anyhow!("{e}"))?;
+    if treffer.is_empty() {
+        println!("Keine Treffer.");
+    }
+    for t in treffer {
+        println!(
+            "{}\t{}\terfasst {} (UTC)\t{}",
+            t.kennung,
+            t.art.bezeichnung(),
+            t.erfasst_at,
+            if t.name.is_empty() {
+                "(Name geschwärzt)"
+            } else {
+                t.name.as_str()
+            }
+        );
     }
     Ok(())
 }

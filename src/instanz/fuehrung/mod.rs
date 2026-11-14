@@ -104,6 +104,9 @@ pub struct EinsatzFuehrung {
     pub epoche: i64,
     /// Eine Notübernahme gegen diese Instanz wartet auf die Einsatzleitung.
     pub offen: bool,
+    /// Die Kopplung zur führenden Instanz ist beendet: ein Mensch kann die Führung zurückholen
+    /// (LLH-1850, `repo::fuehrung_beendet_sql`).
+    pub beendet: bool,
 }
 
 /// Spalten der Führung am geladenen Einsatz (`einsatz::repo`, Makros `fuehrung_spalten!` und
@@ -116,6 +119,8 @@ pub struct FuehrungSpalten {
     pub fuehrung_epoche: Option<i64>,
     pub fuehrung_fuehrer: Option<String>,
     pub fuehrung_offen: bool,
+    /// Die Kopplung zur führenden Instanz ist beendet (LLH-1850).
+    pub fuehrung_beendet: bool,
 }
 
 impl FuehrungSpalten {
@@ -125,6 +130,7 @@ impl FuehrungSpalten {
             bei: self.fuehrung_fuehrer.clone()?,
             epoche: self.fuehrung_epoche?,
             offen: self.fuehrung_offen,
+            beendet: self.fuehrung_beendet,
         })
     }
 }
