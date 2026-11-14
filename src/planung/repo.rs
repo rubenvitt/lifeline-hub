@@ -598,7 +598,7 @@ pub(crate) async fn load_kennzahlen(
 
 /// Die Planungen der Organisation: laufende und künftige zuerst, dann vergangene, je nach
 /// Beginn. Kennzahlen nur, wenn das Ende höchstens [`KENNZAHLEN_TAGE`] zurückliegt.
-pub async fn liste(
+pub async fn list(
     pool: &SqlitePool,
     org_id: i64,
     jetzt: DateTime<Utc>,

@@ -2213,11 +2213,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
         .route(
             "/api/planungen",
-            get(routes::planung::liste).post(routes::planung::create),
+            get(routes::planung::list).post(routes::planung::create),
         )
         .route(
             "/api/planungen/{id}",
-            get(routes::planung::lesen)
+            get(routes::planung::load)
                 .patch(routes::planung::update)
                 .delete(routes::planung::delete),
         )

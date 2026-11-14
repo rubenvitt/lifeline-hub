@@ -448,7 +448,7 @@ impl<'a> Sammler<'a> {
     }
 }
 
-/// Wie der Raster des Einsatzes ordnet (`schichtplanZeilen.ts`, `baueZeilen`): nach Abschnitt in
+/// Wie der Raster des Einsatzes ordnet (`schichtplanZeilen.ts`, `buildZeilen`): nach Abschnitt in
 /// der Gliederung, darin Einheiten vor UHS, danach „ohne Abschnitt“, zuletzt die Pause.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EinsatzGliederung {

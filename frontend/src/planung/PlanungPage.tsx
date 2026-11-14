@@ -8,7 +8,7 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { tagUndUhrzeit } from '../anzeige/zeitDarstellung';
 import {
   updatePlanungHelfer,
-  ladePlanung,
+  loadPlanung,
   createPlanungHelfer,
   deletePlanung,
   deletePlanungHelfer,
@@ -56,7 +56,7 @@ export default function PlanungPage() {
 
   const query = useQuery({
     queryKey: globalKeys.planung(planungId ?? 0),
-    queryFn: () => ladePlanung(planungId as number),
+    queryFn: () => loadPlanung(planungId as number),
     enabled: planungId != null,
   });
   const loeschenMut = useMutation({

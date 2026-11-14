@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
-import { ladePlanung } from '../api/planungen';
+import { loadPlanung } from '../api/planungen';
 import { listeQualifikationen } from '../api/qualifikationen';
 import { globalKeys } from '../api/queryKeys';
 import SchichtplanDruckInhalt from '../abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt';
@@ -33,7 +33,7 @@ export default function PlanungDruckPage() {
     queryKey: globalKeys.planungDruck(planungId ?? 0),
     queryFn: async () => {
       const [planung, qualifikationen] = await Promise.all([
-        ladePlanung(planungId as number),
+        loadPlanung(planungId as number),
         listeQualifikationen(),
       ]);
       return { planung, qualifikationen, geladenAt: new Date().toISOString() };

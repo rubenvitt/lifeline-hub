@@ -126,12 +126,12 @@ fn schichtlaenge(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppEr
 // ---------------------------------------------------------------------------------------------
 
 /// GET /api/planungen — die Planungen der eigenen Organisation mit Kennzahlen.
-pub async fn liste(
+pub async fn list(
     State(state): State<AppState>,
     Planer(benutzer): Planer,
 ) -> Result<Json<Vec<PlanungListeneintrag>>, AppError> {
     Ok(Json(
-        repo::liste(&state.pool, benutzer.org_id, chrono::Utc::now()).await?,
+        repo::list(&state.pool, benutzer.org_id, chrono::Utc::now()).await?,
     ))
 }
 
@@ -200,7 +200,7 @@ pub async fn create(
 }
 
 /// GET /api/planungen/{id}
-pub async fn lesen(
+pub async fn load(
     State(state): State<AppState>,
     z: PlanungsZugriff,
 ) -> Result<Json<PlanungAnzeige>, AppError> {

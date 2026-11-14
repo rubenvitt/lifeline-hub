@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { describe, vi } from 'vitest';
-import { ladePlanung } from '../api/planungen';
+import { loadPlanung } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung, PlanungBlock } from '../api/types';
 import {
@@ -25,7 +25,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../api/planungen', async (orig) => ({
   ...(await orig<typeof import('../api/planungen')>()),
-  ladePlanung: api.load,
+  loadPlanung: api.load,
   createPlanungBlock: api.create,
   updatePlanungBlock: api.update,
   deletePlanungBlock: api.delete,
@@ -140,7 +140,7 @@ function stand({ ohne = [], neu = 0 }: { ohne?: number[]; neu?: number } = {}): 
 function PlanungAusCache() {
   const q = useQuery({
     queryKey: globalKeys.planung(PLANUNG_ID),
-    queryFn: () => ladePlanung(PLANUNG_ID),
+    queryFn: () => loadPlanung(PLANUNG_ID),
   });
   return q.data ? <PlanungSchichtplan planung={q.data} /> : null;
 }

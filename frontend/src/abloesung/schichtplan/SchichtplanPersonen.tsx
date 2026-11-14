@@ -8,7 +8,7 @@ import { PERSONEN_GRUPPEN, type PersonOption } from './schichtplanZeilen';
 /**
  * Seitenleiste des Schichtplans (LLH-1554): wer eingeteilt werden kann, nach „Verfügbar“, „Im
  * Einsatz“, „Stamm“ und „Helfer“, zum Ziehen auf einen Block. Gezogen wird mit dnd-kit und
- * `ZugPointerSensor` (Kontext in `SchichtplanAnsicht`); jede Zeile ist ganz der Griff
+ * `ZugPointerSensor` (Kontext in `SchichtplanEditor`); jede Zeile ist ganz der Griff
  * (`touch-action: none`), damit es auch auf dem Führungs-Tablet zieht. Die Zeilen sind keine
  * Tastaturziele: den Weg ohne Ziehen trägt das Feld „Personen“ im Blockdialog (WCAG 2.5.7), wie
  * in der Gliederung (`pages/einsatzabschnitte/GliederungDrag.tsx`).

@@ -308,23 +308,26 @@ export default function SchichtplanAnsicht({
         {werkzeuge}
       </>
     ),
-    alternative: isHelferOpen ? (
-      <HelferListe
-        dataLfh="schichtplan-helfer"
-        helfer={plan ? (plan.helfer ?? null) : personenGesperrt ? null : []}
-        bloecke={plan?.bloecke ?? []}
-        readOnly={!darfSchreiben}
-        api={{
-          create: (body) => createSchichtplanHelfer(einsatzId, body),
-          update: (helferId, body) => updateSchichtplanHelfer(einsatzId, helferId, body),
-          delete: (helferId) => deleteSchichtplanHelfer(einsatzId, helferId),
-        }}
-        cache={{
-          set: setHelfer,
-          invalidate: () => qc.invalidateQueries({ queryKey: planKey }),
-        }}
-      />
-    ) : undefined,
+    // Ohne geladenen Plan bleibt das Raster mit Ladekreis bzw. Fehlerhinweis stehen: eine leere
+    // Helferliste mit „Helfer anlegen“ behauptete sonst einen leeren Plan (Review zu LLH-1684).
+    alternative:
+      isHelferOpen && plan ? (
+        <HelferListe
+          dataLfh="schichtplan-helfer"
+          helfer={plan.helfer ?? null}
+          bloecke={plan?.bloecke ?? []}
+          readOnly={!darfSchreiben}
+          api={{
+            create: (body) => createSchichtplanHelfer(einsatzId, body),
+            update: (helferId, body) => updateSchichtplanHelfer(einsatzId, helferId, body),
+            delete: (helferId) => deleteSchichtplanHelfer(einsatzId, helferId),
+          }}
+          cache={{
+            set: setHelfer,
+            invalidate: () => qc.invalidateQueries({ queryKey: planKey }),
+          }}
+        />
+      ) : undefined,
     header: (
       <>
         {plan && (

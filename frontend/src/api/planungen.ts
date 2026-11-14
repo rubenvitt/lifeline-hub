@@ -29,11 +29,11 @@ import type {
 const basis = (id: number) => `/api/planungen/${id}`;
 
 /** Offene zuerst, dann nach Beginn; ältere ohne gerechnete Kennzahlen. */
-export function listePlanungen(): Promise<PlanungListeneintrag[]> {
+export function listPlanungen(): Promise<PlanungListeneintrag[]> {
   return apiGet<PlanungListeneintrag[]>('/api/planungen');
 }
 
-export function ladePlanung(id: number): Promise<Planung> {
+export function loadPlanung(id: number): Promise<Planung> {
   return apiGet<Planung>(basis(id));
 }
 

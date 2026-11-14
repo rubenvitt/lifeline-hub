@@ -8,7 +8,7 @@ use sqlx::{SqliteConnection, SqlitePool};
 use super::plan::{
     from_einsatz, from_planung, AusgabeKopf, AusgabePlan, EinsatzGliederung, QualiNamen, Quelle,
 };
-use crate::abloesung::schichtplan::repo as plan_repo;
+use crate::abloesung::schichtplan::repo as einsatz_plan_repo;
 use crate::einsatz::Einsatz;
 use crate::error::AppError;
 use crate::zeit;
@@ -102,7 +102,7 @@ pub async fn einsatz(
     sicht: Sicht,
     jetzt: &str,
 ) -> Result<AusgabePlan, AppError> {
-    let plan = plan_repo::load(pool, einsatz.id, einsatz.org_id, true, jetzt).await?;
+    let plan = einsatz_plan_repo::load(pool, einsatz.id, einsatz.org_id, true, jetzt).await?;
     let mut conn = pool.acquire().await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz.id).await?;
     let gliederung = gliederung(&mut conn, einsatz.id, sicht).await?;

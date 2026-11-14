@@ -30,7 +30,7 @@ export type ApiMock = Mock<(...args: unknown[]) => Promise<unknown>>;
 
 /** Die Schreib- und Lesewege, die der Editor ruft; je Hülle auf ihr API-Modul gelegt. */
 export interface PlanEditorApi {
-  /** Plan laden (Einsatz `fetchSchichtplan`, Planung `ladePlanung`). */
+  /** Plan laden (Einsatz `fetchSchichtplan`, Planung `loadPlanung`). */
   load: ApiMock;
   /** Block anlegen: `(planId, body)`. */
   create: ApiMock;

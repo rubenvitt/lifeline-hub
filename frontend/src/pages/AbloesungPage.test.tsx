@@ -2146,6 +2146,17 @@ describe('AbloesungPage — Helfer im Schichtplan (Change y106s29r, Spec kraefte
     expect(screen.queryByRole('button', { name: 'Helfer anlegen' })).toBeNull();
   });
 
+  it('scheitert der Plan, bietet die Helferliste kein Anlegen wie bei einem leeren Plan an', async () => {
+    // Review zu LLH-1684: ohne geladenen Plan ist unbekannt, ob es Helfer gibt; „Noch keine Helfer“
+    // samt „Helfer anlegen“ wäre eine falsche Aussage.
+    fetchSchichtplan.mockRejectedValue(new Error('Server nicht erreichbar'));
+    renderPage();
+    await screen.findByRole('region', { name: 'Schichtplan' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Helfer' }));
+    expect(helferListe()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Helfer anlegen' })).toBeNull();
+  });
+
   it('ohne Schreibrecht am Einsatz lässt die Helferliste nur lesen', async () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     fetchSchichtplan.mockResolvedValue({
