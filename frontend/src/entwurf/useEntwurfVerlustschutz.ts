@@ -30,7 +30,7 @@ interface VerlustschutzArgs<D, W extends object> {
   onGespeichert?: () => void;
 }
 
-interface Verlustschutz<W extends object> {
+export interface Verlustschutz<W extends object> {
   /** Gibt es eine Fassung im Formular, die noch nicht auf dem Server steht? */
   ungespeichert: boolean;
   /** Uhrzeit (`1430` bzw. `14:30`) des letzten erfolgreichen Speicherns (Autosave oder Knopf), sonst `null`. */
