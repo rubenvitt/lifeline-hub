@@ -153,23 +153,26 @@ liste() { jq -r -c '[.[] | "\(.nr):\(.kopf):\(.check_id)"] | join(" ")' "$ARBEIT
 
 echo "==> Baut mit Ziel-Branch: Verteilen nach einem Push auf alpha"
 
-# 1 — Fertig ist, wer Auto-Merge oder das Label e2e hat. Ein fertiger PR bekommt den Check auf
-# „läuft“ und einen eigenen Lauf auf seinem Branch (der Push-Lauf kompiliert nie selbst). Ein
-# nicht fertiger mit Check wartet, auch ein Entwurf. Forks rechnen nie.
+# 1 — Fertig ist, wer Auto-Merge an hat; kein Label macht fertig, auch nicht `voll` oder das
+# frühere `e2e` (LLH-1889). Ein fertiger PR bekommt den Check auf „läuft“ und einen eigenen Lauf
+# auf seinem Branch (der Push-Lauf kompiliert nie selbst). Ein nicht fertiger mit Check wartet,
+# auch ein Entwurf. Forks rechnen nie.
 f="$(neu push)"
 printf '%s\n' \
   '1|k1|false|false|true|' \
-  '2|k2|false|false|false|e2e' \
+  '2|k2|false|false|true|voll' \
   '3|k3|false|false|false|' \
-  '4|k4|false|false|false|anderes' \
+  '4|k4|false|false|false|voll' \
   '5|k5|true|false|false|e2e' \
-  '6|k6|false|true|true|' | prs "$f"
+  '6|k6|false|true|true|' \
+  '7|k7|false|false|false|e2e' | prs "$f"
 hat_check "$f" k3 completed
 hat_check "$f" k5 completed
+hat_check "$f" k7 completed
 lauf "$f" verteilen alpha zielsha
 pruefe "1 verteilen: Check trägt den Ziel-Stand" "zielsha" "$(cat "$f/ext-901")"
 pruefe "1 läuft und eigener Lauf an den fertigen, wartet an den übrigen mit Check" \
-  "POST k1 in_progress Baut mit Ziel-Branch;DISPATCH zweig1 1 k1 901 zielsha;POST k2 in_progress Baut mit Ziel-Branch;DISPATCH zweig2 2 k2 902 zielsha;POST k3 queued Baut mit Ziel-Branch;POST k5 queued Baut mit Ziel-Branch" \
+  "POST k1 in_progress Baut mit Ziel-Branch;DISPATCH zweig1 1 k1 901 zielsha;POST k2 in_progress Baut mit Ziel-Branch;DISPATCH zweig2 2 k2 902 zielsha;POST k3 queued Baut mit Ziel-Branch;POST k5 queued Baut mit Ziel-Branch;POST k7 queued Baut mit Ziel-Branch" \
   "$(log "$f")"
 
 # 1b — Der Branch kennt den Workflow noch nicht (kein Einzellauf möglich): Check rot mit Grund.
@@ -493,7 +496,8 @@ done
 form "F8 melden läuft auch nach rotem Kompilieren" 0 hat "$M" "if: .*!cancelled\(\)"
 pruefe "F13 melden liest Actions (ausstehender Push-Lauf)" 1 "$(rechte melden | grep -cx 'actions: read')"
 form "F9 Einschalten von Auto-Merge löst aus" 0 hat "$W" 'types: \[.*auto_merge_enabled'
-form "F9 Label löst aus" 0 hat "$W" 'types: \[.*labeled'
+# Ein Label macht nicht mehr fertig (LLH-1889): `labeled` löste nur unnötige Läufe aus.
+form "F9 kein Label-Ereignis" 1 hat "$W" 'types: \[.*labeled'
 form "F9 Einzellauf je PR möglich" 0 hat "$W" '^  workflow_dispatch:'
 # LLH-1889: ein abgebrochener Lauf hinterließ „Kompilieren“ und „Melden“ abgebrochen am PR (rot).
 # Ein neuer Anstoß ersetzt nur den wartenden Lauf.

@@ -8,8 +8,8 @@
 # zwar nur das Kompilieren (Backend mit allen Zielen, Frontend-Typprüfung, `check-all.sh --nur
 # baut`): wenige Minuten statt der vollen Suiten.
 #
-# WANN: Ein PR ist fertig wie für die zweite Stufe (`e2e.yml`): Auto-Merge an oder Label `e2e`,
-# kein Entwurf.
+# WANN: Ein PR ist fertig, wenn Auto-Merge an ist und er kein Entwurf ist; Labels zählen nicht
+# (LLH-1889, ADR zu leichten PR-Checks).
 #   - PR-Ereignis an einem fertigen PR: er rechnet gegen die Spitze des Ziel-Branches.
 #   - Push auf einen Kanal-Branch: `verteilen` setzt den Check an jedem fertigen PR auf „läuft“ und
 #     startet für ihn einen EIGENEN Lauf dieses Workflows auf seinem Branch (`workflow_dispatch`);
@@ -19,7 +19,7 @@
 #   Vorher fehlt der Check, und der PR ist nicht mergebar (Required Check im Ruleset 17017911).
 #
 # DER CHECK ENTSTEHT ÜBER DIE CHECKS-API, NICHT ALS JOB-NAME: Ein Push muss ihn an vielen
-# PR-Köpfen setzen, und ein übersprungener Job meldete seinen Check grün (Kopf von `e2e.yml`).
+# PR-Köpfen setzen, und ein übersprungener Job meldete seinen Check grün.
 # Er steht sofort auf „läuft“, damit kein altes Grün mergt, während gerechnet wird; bis
 # `verteilen` läuft, bleibt ein Restfenster (design.md, „alpha rot“ fängt es auf). `melden` schließt
 # ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand stehen. Ein überholter
@@ -50,7 +50,7 @@ name: Baut mit Ziel-Branch
 on:
   pull_request:
     branches: [main, beta, alpha]
-    types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled, labeled]
+    types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled]
   push:
     branches: [main, beta, alpha]
   # Der eigene Lauf je fertigem PR, gestartet von `verteilen` auf dem Branch des PRs.

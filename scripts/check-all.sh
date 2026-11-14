@@ -41,6 +41,9 @@ set -euo pipefail
 #                      Abzweig von REF (Vorgabe origin/alpha) brauchen — Commits, Index,
 #                      Arbeitsbaum und neue Dateien. Zuordnung: scripts/bereiche.sh.
 #   --auswahl          nur anzeigen, welche Schritte liefen, nichts fahren
+#   --ohne-e2e         die e2e-Suite (Schritt 7) aus jeder Auswahl nehmen. So fahren Agenten vor
+#                      dem PR: `--geaendert --ohne-e2e` (LLH-1889; e2e läuft auf alpha oder im
+#                      PR mit Label `voll`, scripts/AGENTS.md „Leichte PR-Prüfung“)
 # Unabhängig vom Bündel:
 #   --abbrechen      nach dem ersten roten Schritt keinen weiteren starten (Vorgabe:
 #                    alle fahren und am Ende einmal rot melden)
@@ -54,6 +57,7 @@ NUR="alle"
 ABBRECHEN=0
 GEAENDERT=""
 AUSWAHL=0
+OHNE_E2E=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --geaendert) GEAENDERT="origin/alpha"; shift ;;
@@ -63,6 +67,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     --auswahl) AUSWAHL=1; shift ;;
+    --ohne-e2e) OHNE_E2E=1; shift ;;
     --nur)
       NUR="${2:-}"
       [ -n "$NUR" ] || { echo "FEHLER: --nur braucht ein Bündel." >&2; exit 2; }
@@ -343,10 +348,8 @@ schritt_10() {
   # Der Autofix (LFH-1014) pusht mit einem Token, das auf `alpha` Bypass-Rechte hat; seine
   # Grenzen (nie Ziel-Branch, nur Fast-Forward, Schleifenbremse) stehen nur in diesem Test.
   "$ROOT/scripts/migrationen-autofix.test.sh"
-  # Zwei weitere Stellen entscheiden über offene PRs, ohne dass ein Mensch zusieht (LLH-1660):
-  # `nur-umnummeriert.sh` lässt nach einem Autofix die schweren Suiten aus, der Stau-Wächter
-  # kommentiert und pusht auf PR-Branches. Beide irren still, ihre Grenzen stehen nur im Test.
-  "$ROOT/scripts/nur-umnummeriert.test.sh"
+  # Der Stau-Wächter entscheidet über offene PRs, ohne dass ein Mensch zusieht (LLH-1660): er
+  # kommentiert und pusht auf PR-Branches. Er irrt still, seine Grenzen stehen nur im Test.
   "$ROOT/scripts/stau-waechter.test.sh"
   # Dann die Prüfung gegen `origin/alpha`, so frisch wie der letzte `fetch` — eine
   # Frühwarnung; durchgesetzt wird über den Workflow `migrationen.yml`. Ohne den Ref (flacher
@@ -360,7 +363,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Auswahl der Suiten, Baut mit Ziel-Branch, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Baut mit Ziel-Branch, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -373,14 +376,13 @@ schritt_11() {
   # Frist und Wiederholung der Netz-Schritte in den Workflows (LFH-1101): bricht die Frist einen
   # hängenden Versuch nicht ab, steht der Job wieder bis zu seinem Timeout.
   "$ROOT/scripts/wiederholen.test.sh"
-  # Die Bereichs-Erkennung (LFH-1115) entscheidet im PR, welche Suiten laufen: ein vergessener
-  # Querbezug ließe eine Suite still aus, deren Rot erst auf `alpha` auffiele.
+  # Die Bereichs-Erkennung (LFH-1115) entscheidet bei `--geaendert`, welche Suiten ein Agent vor
+  # dem PR lokal fährt: ein vergessener Querbezug ließe eine Suite still aus, deren Rot erst auf
+  # `alpha` auffiele.
   "$ROOT/scripts/bereiche.test.sh"
-  # Die Auswahl der Suiten in beiden Stufen der PR-CI (LLH-1662) baut darauf auf und übernimmt
-  # nach einer Umnummerierung Suiten vom Vorgänger: irrt sie, mergt Ungeprüftes.
-  "$ROOT/scripts/ci-auswahl.test.sh"
-  # Ob ein PR ohne e2e-Lauf mergen kann, entscheidet die Form von ci.yml und e2e.yml: ein Job-`if`
-  # an der falschen Stelle meldet einen Pflicht-Check leer grün, statt ihn fehlen zu lassen.
+  # Was ein PR prüft, wann ein Kanal-Lauf abbricht und dass der Release nie abbricht, entscheidet
+  # die Form von ci.yml und e2e.yml (LLH-1889): ein Fehler fiele erst am ersten ungeprüft
+  # gemergten PR oder am ersten Tag ohne Release auf.
   "$ROOT/scripts/ci-stufen.test.sh"
   # Der Check „Baut mit Ziel-Branch“ (LLH-1849): irrt die Auswahl, rechnet ein fertiger PR nicht
   # gegen den neuen Ziel-Branch und mergt mit veraltetem Grün; irrt die Form, liefe PR-Code mit
@@ -576,6 +578,17 @@ case "$NUR" in
     ;;
 esac
 
+if [ "$OHNE_E2E" = 1 ]; then
+  if [ "$NUR" = e2e ]; then
+    echo "FEHLER: --nur e2e und --ohne-e2e schließen sich aus." >&2
+    exit 2
+  fi
+  # shellcheck disable=SC2086 # Wortzerlegung: eine Schrittnummer je Zeile.
+  lauf="$(printf '%s\n' $lauf | grep -vx "$BUENDEL_e2e" | tr '\n' ' ')"
+  lauf="${lauf% }"
+  unset BINAER_BAUEN
+fi
+
 if [ "$AUSWAHL" = 1 ]; then
   echo "Schritte: $lauf"
   exit 0
@@ -591,6 +604,7 @@ if [ "$NUR" != alle ]; then
   echo "    Bündel '$NUR' (Schritte: $lauf von $SCHRITTE) ist ein TEILSTÜCK."
   echo "    Vor dem Merge gilt der volle Lauf ohne --nur."
 elif [ -n "$GEAENDERT" ]; then
-  echo "    Nach Bereichen seit $GEAENDERT (Schritte: $lauf von $SCHRITTE), wie die CI im PR."
+  ohne=""; [ "$OHNE_E2E" = 1 ] && ohne=", ohne e2e"
+  echo "    Nach Bereichen seit $GEAENDERT (Schritte: $lauf von $SCHRITTE)$ohne."
 fi
 exit "$gesamt"

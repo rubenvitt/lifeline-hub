@@ -18,7 +18,7 @@ export GITHUB_REPOSITORY=test/repo
 
 # ── Attrappe für gh ──────────────────────────────────────────────────────────────────
 # Zustand unter $STAU_FAKE: checks/<sha>.json, status/<sha>, kommentare.json (PR #7, die übrigen
-# PRs kommentare-<nr>.json), zeitleiste.json, pulls.json, laeufe.json (CI-Läufe auf alpha),
+# PRs kommentare-<nr>.json), pulls.json, laeufe.json (CI-Läufe auf alpha),
 # jobs/<lauf-id>.json, log.
 cat > "$ARBEIT/gh" <<'ATTRAPPE'
 #!/usr/bin/env bash
@@ -78,9 +78,6 @@ case "$methode $pfad" in
     [ ! -e "$F/jobs-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     id="${pfad#repos/test/repo/actions/runs/}"; id="${id%%/*}"
     if [ -f "$F/jobs/$id.json" ]; then cat "$F/jobs/$id.json"; else echo '{"jobs":[]}'; fi ;;
-  "GET repos/test/repo/issues/"*"/timeline"*)
-    [ ! -e "$F/zeitleiste-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
-    if [ -f "$F/zeitleiste.json" ]; then cat "$F/zeitleiste.json"; else echo '[]'; fi ;;
   "POST repos/test/repo/issues/"*"/comments")
     nr="${pfad#repos/test/repo/issues/}"; nr="${nr%%/*}"
     d="$(kdatei "$nr")"; [ -f "$d" ] || echo '[]' > "$d"
@@ -540,92 +537,8 @@ ci_gruen "$r"
 STAU_JETZT=$((UM_1005 + 3600)) lauf "$r" false false true # 11:05, fünf Minuten nach dem Ende
 pruefe "23 frisch grün: nichts" "" "$(log "$r")"
 
-echo "==> Stau-Wächter: Auto-Merge an, e2e fehlt (LLH-1662)"
-export STAU_JETZT="$UM_1200"
-
-# Erste Stufe grün, die zweite nie angelaufen: nur übersprungene Einträge unter den
-# unexpandierten Namen und eine übersprungene Auswahl.
-stufe_eins_gruen() {
-  printf '%s\n' \
-    'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
-    'Rust-Suite|completed|success|2026-11-12T10:00:05Z|2026-11-12T10:30:00Z' \
-    'e2e-Auswahl|completed|skipped|2026-11-12T10:00:01Z|2026-11-12T10:00:01Z' \
-    '${{ matrix.check }}|completed|skipped|2026-11-12T10:00:01Z|2026-11-12T10:00:01Z' \
-    'e2e ${{ matrix.shard }}/4|completed|skipped|2026-11-12T10:00:01Z|2026-11-12T10:00:01Z' | checks "$1"
-}
-automerge_um() { # <klon> <zeit>
-  printf '[{"event":"labeled","created_at":"2026-11-12T09:00:00Z"},{"event":"auto_merge_enabled","created_at":"%s"}]\n' \
-    "$2" > "$(fake "$1")/zeitleiste.json"
-}
-
-# 29 — Auto-Merge seit 10:30, um 12:00 noch kein e2e-Lauf: Hinweis, nicht „grün, nicht gemergt“.
-r="$(repo_neu ohnee2e)"
-aendere "$r" feature b.txt "feature"
-stufe_eins_gruen "$r"
-automerge_um "$r" 2026-11-12T10:30:00Z
-lauf "$r" false false true
-pruefe "29 Auto-Merge ohne e2e-Lauf: Hinweis" "POST ohne-e2e" "$(log "$r")"
-kommentar_enthaelt "29 Hinweis nennt den Handgriff" "$r" "Auto-Merge aus- und wieder einschalten"
-kommentar_enthaelt "29b Hinweis nennt den Fall mit Label" "$r" "Label \`e2e\`"
-pruefe "29 kein Push" "$(git -C "$ARBEIT/ohnee2e.git" rev-parse refs/heads/feature)" "$(kopf "$r")"
-
-# 30 — Gleicher Befund beim nächsten Lauf: nichts Neues.
-lauf "$r" false false true
-pruefe "30 gleicher Befund: kein zweiter Hinweis" "POST ohne-e2e" "$(log "$r")"
-
-# 31 — Die zweite Stufe läuft an: der Hinweis wird „behoben“.
-printf '%s\n' \
-  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
-  'e2e-Auswahl|completed|success|2026-11-12T12:01:00Z|2026-11-12T12:02:00Z' \
-  'e2e-Binary|in_progress||2026-11-12T12:02:00Z|' | checks "$r"
-lauf "$r" false false true
-pruefe "31 e2e läuft: behoben" "POST ohne-e2e PATCH behoben" "$(log "$r")"
-
-# 32 — Ohne Auto-Merge (auch mit Label e2e) wartet der PR auf den Menschen: kein Befund.
-r="$(repo_neu ohneautomerge)"
-aendere "$r" feature b.txt "feature"
-stufe_eins_gruen "$r"
-lauf "$r" false false false
-pruefe "32 ohne Auto-Merge: nichts" "" "$(log "$r")"
-
-# 33 — Auto-Merge erst um 11:50 eingeschaltet, auf einem Kopf von 10:00: abwarten.
-r="$(repo_neu frischautomerge)"
-aendere "$r" feature b.txt "feature"
-stufe_eins_gruen "$r"
-automerge_um "$r" 2026-11-12T11:50:00Z
-lauf "$r" false false true
-pruefe "33 Auto-Merge vor 10 min: nichts" "" "$(log "$r")"
-
-# 34 — Neuer Commit um 11:55 bei längst eingeschaltetem Auto-Merge: die Uhr läuft ab dem Kopf.
-r="$(repo_neu frischerkopf)"
-aendere "$r" feature b.txt "feature"
-printf '%s\n' \
-  'Schnellprüfungen|in_progress||2026-11-12T11:55:00Z|' | checks "$r"
-automerge_um "$r" 2026-11-12T09:30:00Z
-lauf "$r" false false true
-pruefe "34 Kopf vor 5 min: nichts" "" "$(log "$r")"
-
-# 35 — Zeitleiste nicht lesbar: die letzte Änderung am PR zählt (hier 11:55, also abwarten).
-r="$(repo_neu ohnezeitleiste)"
-aendere "$r" feature b.txt "feature"
-stufe_eins_gruen "$r"
-touch "$(fake "$r")/zeitleiste-kaputt"
-GEAENDERT=$((UM_1200 - 300)) lauf "$r" false false true
-pruefe "35 Zeitleiste kaputt, PR vor 5 min geändert: nichts" "" "$(log "$r")"
-GEAENDERT=$((UM_1200 - 3600)) lauf "$r" false false true
-pruefe "35b Zeitleiste kaputt, PR vor 60 min geändert: Hinweis" "POST ohne-e2e" "$(log "$r")"
-
-# 36 — Ein grüner e2e-Lauf zählt, auch wenn Auto-Merge danach wieder eingeschaltet wurde.
-r="$(repo_neu e2eda)"
-aendere "$r" feature b.txt "feature"
-ci_gruen "$r"
-automerge_um "$r" 2026-11-12T10:30:00Z
-echo pending > "$(fake "$r")/status/$(kopf "$r")"
-lauf "$r" false false true
-pruefe "36 e2e gelaufen: kein ohne-e2e" "" "$(log "$r")"
-
 # 37 — Je Name zählt der jüngste Check-Run (wie bei den Required Checks): ein abgebrochener
-# erster Lauf auf demselben Kopf (Auto-Merge aus und wieder an) hält „grün, nicht gemergt“ nicht
+# erster Lauf auf demselben Kopf (ein neuer Lauf brach ihn ab) hält „grün, nicht gemergt“ nicht
 # für immer zurück.
 r="$(repo_neu neuerlauf)"
 aendere "$r" feature b.txt "feature"
@@ -660,35 +573,19 @@ printf '%s\n' \
 lauf "$r" false false true
 pruefe "37b älterer offener neben jüngerem Grün: grün, nicht gemergt" "POST haengt" "$(log "$r")"
 
-# 38 — Nur abgebrochene e2e-Läufe auf dem Kopf (ein später eingereihtes „Auto-Merge aus“ brach
-# den Lauf ab): die Stufe fehlt.
-r="$(repo_neu nurabgebrochen)"
+# 64 — Ein Hinweis der früheren Art `ohne-e2e` (die zweite Stufe gibt es nicht mehr, LLH-1889)
+# steht noch am PR. Ohne Befund wird er wie jeder andere auf „behoben“ gesetzt.
+r="$(repo_neu altesohnee2e)"
 aendere "$r" feature b.txt "feature"
 printf '%s\n' \
   'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
-  'e2e-Auswahl|completed|success|2026-11-12T10:01:00Z|2026-11-12T10:02:00Z' \
-  'e2e-Binary|completed|cancelled|2026-11-12T10:02:00Z|2026-11-12T10:10:00Z' | checks "$r"
-automerge_um "$r" 2026-11-12T10:30:00Z
-lauf "$r" false false true
-pruefe "38 nur abgebrochen: Stufe fehlt" "POST ohne-e2e" "$(log "$r")"
-
-# 39 — Erst abgebrochen, dann läuft ein neuer Lauf: kein Befund.
-printf '%s\n' \
-  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
-  'e2e-Binary|completed|cancelled|2026-11-12T10:02:00Z|2026-11-12T10:10:00Z' \
-  'e2e-Binary|in_progress||2026-11-12T11:58:00Z|' | checks "$r"
-lauf "$r" false false true
-pruefe "39 neuer Lauf nach Abbruch: behoben" "POST ohne-e2e PATCH behoben" "$(log "$r")"
-
-# 40 — Die Auswahl der Stufe läuft gerade an (Binary und Anteile noch ohne Check-Run): kein Befund.
-r="$(repo_neu auswahllaeuft)"
-aendere "$r" feature b.txt "feature"
-printf '%s\n' \
-  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
-  'e2e-Auswahl|in_progress||2026-11-12T11:59:00Z|' | checks "$r"
-automerge_um "$r" 2026-11-12T10:30:00Z
-lauf "$r" false false true
-pruefe "40 Auswahl läuft: nichts" "" "$(log "$r")"
+  'Rust-Suite|completed|success|2026-11-12T10:00:05Z|2026-11-12T10:30:00Z' | checks "$r"
+echo pending > "$(fake "$r")/status/$(kopf "$r")"
+echo '[{"id": 400, "body": "<!-- stau-waechter:ohne-e2e:abc -->\ne2e-Stufe fehlt", "user": {"login": "github-actions[bot]"}}]' \
+  > "$(fake "$r")/kommentare.json"
+GEAENDERT=$((UM_1200 - 7200)) lauf "$r" false false true
+pruefe "64 alter Hinweis ohne-e2e wird behoben" "PATCH behoben" "$(log "$r")"
+pruefe "64 es bleibt bei einem Hinweis" 1 "$(kommentare "$r")"
 
 echo "==> Stau-Wächter: alpha rot (LLH-1849)"
 
@@ -1068,6 +965,34 @@ pruefe "49 Lauf läuft noch: kein Hinweis" "" "$(log "$r")"
 touch "$(fake "$r")/laeufe-kaputt"
 alpha_lauf "$r"
 pruefe "50 Läufe nicht lesbar: kein Schreibzugriff" "" "$(log "$r")"
+
+# 65 — Der jüngste abgeschlossene Lauf ist abgebrochen (ein neuer Push brach seine Tests ab), der
+# davor grün: alpha gilt nicht als rot, sondern als grün. Ein alter Hinweis wird „behoben“.
+r="$(repo_neu abbruchalpha)"
+zweig "$r" f11
+printf '%s\n' "9302|$(kopf "$r" alpha)|completed|cancelled|2026-11-12T10:40:00Z" \
+  "9301|$(kopf "$r" alpha)|completed|success|2026-11-12T10:00:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|cancelled' | jobs_von "$r" 9302
+printf '%s\n' '11|f11|false|false|ruben|' | prs "$r"
+printf '%s\n' 'Schnellprüfungen|completed|success|2026-11-12T10:40:00Z|2026-11-12T10:45:00Z' | checks_von "$r" f11
+echo '[{"id": 960, "body": "<!-- stau-waechter-alpha:wartet:abc -->\nalpha ist rot", "user": {"login": "github-actions[bot]"}}]' \
+  > "$(fake "$r")/kommentare-11.json"
+export STAU_JETZT="$UM_1035"
+alpha_lauf "$r"
+pruefe "65 abgebrochener jüngster Lauf, davor grün: alpha nicht rot" "PATCH#11 alpha-behoben" "$(log "$r")"
+
+# 65b — Abgebrochen, davor rot: es zählt der Lauf davor, alpha ist rot.
+r="$(repo_neu abbruchrot)"
+zweig "$r" f11
+alpha_merge "$r" 90
+printf '%s\n' "9403|$(kopf "$r" alpha)|completed|cancelled|2026-11-12T10:40:00Z" \
+  "9402|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" \
+  "9401|$(git -C "$r" rev-parse origin/alpha~1)|completed|success|2026-11-12T10:00:00Z" | laeufe "$r"
+printf '%s\n' 'Rust-Suite|failure' | jobs_von "$r" 9402
+printf '%s\n' '11|f11|false|false|ruben|' | prs "$r"
+touch "$(fake "$r")/label-alpha-rot"
+alpha_lauf "$r"
+pruefe "65b abgebrochen, davor rot: Auftrag an #11" 1 "$(zaehle "$r" 'POST#11 alpha-zustaendig')"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Stau-Wächter-Selbsttest." >&2

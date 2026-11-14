@@ -1,8 +1,8 @@
 # Coverage — Rust- und Frontend-Abdeckung für Codecov.
 #
-# EIN EIGENER WORKFLOW wegen der Nebenläufigkeitsgruppe: ci.yml bricht Kanal-Läufe bewusst
-# nicht ab, und ein langer Coverage-Job darin hielte jeden Folge-Push auf „pending" (die Gruppe
-# gibt erst frei, wenn der ganze Lauf endet). Hier darf abgebrochen werden, weil nichts daran
+# EIN EIGENER WORKFLOW: in ci.yml hängt der Release am selben Lauf, dessen Workflow-Gruppe auf
+# einem Kanal-Branch deshalb nie abbricht (nur die Testjobs brechen je Job ab, LLH-1889); ein
+# langer Coverage-Job darin verzögerte jeden Lauf. Hier darf abgebrochen werden, weil nichts daran
 # hängt — kein Release, kein Required Check; Codecov vergleicht dann gegen den letzten
 # gemessenen Vorfahren, was für eine informative Zahl genügt.
 #

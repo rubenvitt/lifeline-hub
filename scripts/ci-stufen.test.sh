@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Selbsttest für die Form der zweistufigen PR-CI (LLH-1662): `.github/workflows/ci.yml` und
-# `.github/workflows/e2e.yml`. Ob ein PR ohne e2e-Lauf mergen kann, entscheidet allein die Form
-# der Workflows: ein Job-`if` an der falschen Stelle meldet einen Pflicht-Check leer grün statt
-# ihn fehlen zu lassen, und das fiele erst am ersten ungeprüft gemergten PR auf. Regeln:
-# `scripts/AGENTS.md`, „Zwei Stufen im PR“; Herleitung in der Change `k133wmg6-zweistufige-ci`.
+# Selbsttest für die Form der leichten PR-Prüfung (LLH-1889, ADR „Ein PR prüft leicht“, ersetzt
+# die zwei Stufen von LLH-1662): `.github/workflows/ci.yml` und `.github/workflows/e2e.yml`. Was ein
+# PR prüft, wann ein Kanal-Lauf abbricht und dass der Release dabei nie abbricht, entscheidet
+# allein die Form der Workflows; ein Fehler fiele erst am ersten ungeprüft gemergten PR oder am
+# ersten Tag ohne Release auf. Regeln: `scripts/AGENTS.md`, „Leichte PR-Prüfung“.
 #
 #   scripts/ci-stufen.test.sh [<ci.yml> <e2e.yml>]   (Vorgabe: die Dateien des Repositories)
 #
 # Gelesen wird ohne YAML-Parser (keiner ist überall da, wo das Gate läuft): ein Job ist der Block
 # ab `  <id>:` unter `jobs:` bis zum nächsten Job, sein `if` die Zeile `    if:` samt tiefer
 # eingerückten Folgezeilen.
+
 set -euo pipefail
 
 SKRIPTE="$(cd "$(dirname "$0")" && pwd)"
@@ -55,120 +56,69 @@ enthaelt() { grep -qF -- "$2" <<< "$1"; }
 ohne_leerraum() { tr -d ' \n\t'; }
 gleich() { [ "$(ohne_leerraum <<< "$1")" = "$(ohne_leerraum <<< "$2")" ]; }
 
-# DIE ZWEI AUSDRÜCKE, die über Start und Abbruch der zweiten Stufe entscheiden, stehen hier im
-# Wortlaut (Leerraum zählt nicht). Eine Teilzeichenkette fängt keine logische Umkehrung (`&&` zu
-# `||`, eine gestrichene Klausel); wer einen Ausdruck ändert, ändert ihn hier mit (Regel:
-# `scripts/AGENTS.md`, „Zwei Stufen im PR“; Herleitung im design.md der Change
-# `k133wmg6-zweistufige-ci`).
-#   Fertig:  Auto-Merge an oder Label `e2e`, im Zustand NACH dem Ereignis.
-#   Start:   Push (Aufruf aus ci.yml); neuer Commit an einem fertigen PR; Auto-Merge an, wenn das
-#            Label fehlte; Label `e2e`, wenn Auto-Merge aus war.
-#   Gruppe:  gemeinsam für jeden Start und für das Zurücknehmen der letzten Markierung; ein
-#            Commit-Ereignis an einem nicht fertigen PR teilt sie NICHT (seine Nutzlast kann
-#            veraltet sein und bräche sonst einen gerade gestarteten Lauf ab).
-ERWARTET_START="$(cat << 'AUSDRUCK'
-${{ github.event_name != 'pull_request'
-  || (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
-      && (github.event.pull_request.auto_merge != null
-          || contains(github.event.pull_request.labels.*.name, 'e2e')))
-  || (github.event.action == 'auto_merge_enabled'
-      && !contains(github.event.pull_request.labels.*.name, 'e2e'))
-  || (github.event.action == 'labeled' && github.event.label.name == 'e2e'
-      && github.event.pull_request.auto_merge == null) }}
-AUSDRUCK
-)"
-ERWARTET_GRUPPE="$(cat << 'AUSDRUCK'
-${{ (github.event_name == 'pull_request' && (
-      (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
-       && (github.event.pull_request.auto_merge != null
-           || contains(github.event.pull_request.labels.*.name, 'e2e')))
-      || (github.event.action == 'auto_merge_enabled'
-          && !contains(github.event.pull_request.labels.*.name, 'e2e'))
-      || (github.event.action == 'labeled' && github.event.label.name == 'e2e'
-          && github.event.pull_request.auto_merge == null)
-      || ((github.event.action == 'auto_merge_disabled'
-           || (github.event.action == 'unlabeled' && github.event.label.name == 'e2e'))
-          && github.event.pull_request.auto_merge == null
-          && !contains(github.event.pull_request.labels.*.name, 'e2e'))))
-    && format('e2e-pr-{0}', github.event.pull_request.number)
-    || format('e2e-lauf-{0}', github.run_id) }}
-AUSDRUCK
-)"
-# Der Ausdruck nach `group:` (Block-Skalar `>-`) bis `cancel-in-progress:`.
-gruppe() {
-  awk '/^  group:/ { an = 1; sub(/^  group:[ ]*(>-)?/, ""); print; next }
-       an && /^  cancel-in-progress:/ { exit }
-       an { print }' "$1"
-}
 fehlt() { ! grep -qF -- "$2" <<< "$1"; }
+# Die Concurrency eines Jobs: Gruppe und Abbruch als „<gruppe>|<abbruch>“, leer ohne.
+job_gruppe() { # <datei> <id>
+  job "$1" "$2" | awk '
+    /^    concurrency:/ { im = 1; next }
+    im && /^      group:/ { sub(/^      group:[ ]*/, ""); g = $0; next }
+    im && /^      cancel-in-progress:/ { sub(/^      cancel-in-progress:[ ]*/, ""); c = $0; next }
+    im && !/^      / { im = 0 }
+    END { if (g != "" || c != "") print g "|" c }
+  '
+}
 
-echo "==> ci-stufen: e2e.yml"
-k="$(kopf "$E2E")"
-pruefe "e2e.yml lässt sich aus ci.yml aufrufen (workflow_call)" enthaelt "$k" "workflow_call:"
-for typ in opened synchronize reopened auto_merge_enabled auto_merge_disabled labeled unlabeled; do
-  pruefe "e2e.yml hört auf pull_request/$typ" enthaelt "$k" "$typ"
-done
-pruefe "Nebenläufigkeit: Gruppe im Wortlaut" gleich "$(gruppe "$E2E")" "$ERWARTET_GRUPPE"
-pruefe "Nebenläufigkeit: Abbruch nur im PR" enthaelt "$k" "cancel-in-progress: \${{ github.event_name == 'pull_request' }}"
+# Bedingung der schweren Jobs: Push auf einen Kanal-Branch oder Label `voll`.
+VOLL="github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll')"
+# Auf einem Kanal-Branch eine Gruppe je Branch, im PR je Lauf.
+JE_BRANCH="\${{ github.event_name == 'push' && github.ref || github.run_id }}"
 
-a="$(job "$E2E" aenderungen)"; a_if="$(job_if "$E2E" aenderungen)"
-pruefe "Auswahl heißt e2e-Auswahl" enthaelt "$a" "name: e2e-Auswahl"
-pruefe "Auswahl fragt ci-auswahl.sh zwei" enthaelt "$a" "scripts/ci-auswahl.sh zwei"
-pruefe "Start der Auswahl im Wortlaut" gleich "$a_if" "$ERWARTET_START"
-
-b="$(job "$E2E" binaer)"; b_if="$(job_if "$E2E" binaer)"
-pruefe "e2e-Binary heißt über eine Matrix (fehlt, wenn übersprungen)" enthaelt "$b" "name: \${{ matrix.check }}"
-pruefe "e2e-Binary: Matrix mit genau diesem Namen" enthaelt "$b" "check: [e2e-Binary]"
-pruefe "e2e-Binary hängt an der Auswahl" enthaelt "$b" "needs: aenderungen"
-pruefe "e2e-Binary läuft nur, wenn die Auswahl lief" enthaelt "$b_if" "needs.aenderungen.result != 'skipped'"
-pruefe "e2e-Binary: „betroffen“ steht nicht am Job (sonst fehlte er statt leer grün)" fehlt "$b_if" "outputs.e2e"
-pruefe "e2e-Binary: „betroffen“ steht an den Schritten" enthaelt "$b" "if: env.E2E != 'false'"
-
-e="$(job "$E2E" e2e)"; e_if="$(job_if "$E2E" e2e)"
-pruefe "e2e-Anteile heißen e2e k/4" enthaelt "$e" "name: e2e \${{ matrix.shard }}/4"
-pruefe "e2e-Anteile: vier" enthaelt "$e" "shard: [1, 2, 3, 4]"
-pruefe "e2e-Anteile laufen nur, wenn die Auswahl lief" enthaelt "$e_if" "needs.aenderungen.result != 'skipped'"
-pruefe "e2e-Anteile laufen nur nach grünem Binary" enthaelt "$e_if" "needs.binaer.result == 'success'"
-pruefe "e2e-Anteile: „betroffen“ steht nicht am Job" fehlt "$e_if" "outputs.e2e"
-pruefe "e2e-Anteile: „betroffen“ steht an den Schritten" enthaelt "$e" "if: env.E2E != 'false'"
-
-r="$(job "$E2E" berichte)"
-# Bei Push wartet der Release auf den Aufruf von e2e.yml, und ein Aufruf ist nur grün, wenn jeder
-# seiner Jobs grün ist: ein Aussetzer im Bericht (pnpm install, Checkout) hielte sonst einen
-# Release über grünen Suiten auf.
-pruefe "e2e-Bericht hält den Release nicht auf (continue-on-error am Job)" grep -qx "    continue-on-error: true" <<< "$r"
-
-echo "==> ci-stufen: ci.yml"
-# Ein Job oder Matrix-Eintrag dieses Namens, nicht ein Kommentar, der ihn erwähnt.
-pruefe "ci.yml hat keinen Job e2e-Binary" fehlt "$(grep -Ev '^[[:space:]]*#' "$CI")" "e2e-Binary"
-pruefe "ci.yml hat keine e2e-Anteile" fehlt "$(cat "$CI")" "name: e2e \${{ matrix.shard }}/4"
+echo "==> ci-stufen: ci.yml, Kopf"
 k="$(kopf "$CI")"
-pruefe "ci.yml startet nicht auf Auto-Merge (Abbruch des laufenden Laufs)" fehlt "$k" "auto_merge"
-pruefe "ci.yml startet nicht auf Labels" fehlt "$k" "labeled"
-a="$(job "$CI" aenderungen)"
-pruefe "ci.yml fragt ci-auswahl.sh eins" enthaelt "$a" "scripts/ci-auswahl.sh eins"
-c="$(job "$CI" e2e)"; c_if="$(job_if "$CI" e2e)"
-pruefe "ci.yml ruft e2e.yml auf" enthaelt "$c" "uses: ./.github/workflows/e2e.yml"
-pruefe "ci.yml ruft e2e.yml nur bei Push" enthaelt "$c_if" "github.event_name == 'push'"
-# Jobs mit Pflicht-Check laufen leer grün statt übersprungen: am Job nur `!cancelled()`, die
-# Bedingung an jedem Schritt. Ein übersprungener Check zeigt GitHub grün, Auto-Merge wartet aber
-# (#1283, #1336); bei einem Matrix-Job fehlte er ganz.
-for paar in rust:RUST frontend:FRONTEND; do
-  id="${paar%%:*}"; var="${paar#*:}"
-  b="$(job "$CI" "$id")"
-  pruefe "$id: am Job nur !cancelled()" gleich "$(job_if "$CI" "$id")" '${{ !cancelled() }}'
-  pruefe "$id: liest $var aus der Auswahl" \
-    enthaelt "$b" "$var: \${{ needs.aenderungen.outputs.$id }}"
-  # `|| true`: ohne Treffer endet `grep -c` mit 1, und `set -e` bräche den Test stumm ab.
-  schritte="$(grep -cE '^      - ' <<< "$b" || true)"
-  bedingt="$(grep -cE "^        if: .*env\.$var != 'false'" <<< "$b" || true)"
-  pruefe "$id: jeder Schritt trägt die Bedingung $var ($bedingt von $schritte)" \
-    test "$schritte" -gt 0 -a "$schritte" -eq "$bedingt"
+pruefe "PR-Lauf hört auf labeled (Label voll)" enthaelt "$k" "types: [opened, synchronize, reopened, labeled]"
+pruefe "kein Start auf Auto-Merge" fehlt "$k" "auto_merge"
+pruefe "Workflow-Gruppe: im PR je Ref, sonst je Lauf" \
+  enthaelt "$k" "group: ci-\${{ github.event_name == 'pull_request' && github.ref || github.run_id }}"
+pruefe "Workflow-Abbruch nur im PR" enthaelt "$k" "cancel-in-progress: \${{ github.event_name == 'pull_request' }}"
+
+echo "==> ci-stufen: ci.yml, Jobs"
+pruefe "schnell läuft immer (kein if: ein übersprungener jüngster Check zählte grün)" \
+  test -z "$(job_if "$CI" schnell)"
+pruefe "kein Job aenderungen mehr" test -z "$(job "$CI" aenderungen)"
+pruefe "keine Auswahl nach Bereichen in der CI" fehlt "$(cat "$CI" "$E2E")" "ci-auswahl.sh"
+for id in rust frontend e2e; do
+  pruefe "$id läuft nur bei Push oder Label voll" gleich "$(job_if "$CI" "$id")" "\${{ $VOLL }}"
 done
+pruefe "berichte läuft nur bei Push oder Label voll" gleich "$(job_if "$CI" berichte)" "\${{ !cancelled() && ($VOLL) }}"
+pruefe "rust: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$CI" rust)" "ci-rust-$JE_BRANCH|true"
+pruefe "frontend: Gruppe je Anteil und Branch mit Abbruch" \
+  gleich "$(job_gruppe "$CI" frontend)" "ci-frontend-\${{ matrix.shard }}-$JE_BRANCH|true"
+pruefe "e2e: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$CI" e2e)" "ci-e2e-$JE_BRANCH|true"
+pruefe "berichte: Gruppe je Branch mit Abbruch" gleich "$(job_gruppe "$CI" berichte)" "ci-berichte-$JE_BRANCH|true"
+pruefe "e2e ruft e2e.yml" enthaelt "$(job "$CI" e2e)" "uses: ./.github/workflows/e2e.yml"
+for id in rust frontend; do
+  pruefe "$id: keine Schritt-Bedingung aus der alten Auswahl" fehlt "$(job "$CI" "$id")" "!= 'false'"
+done
+
+echo "==> ci-stufen: Release"
 r="$(job "$CI" release)"
 for n in schnell rust frontend e2e; do
   pruefe "release wartet auf $n" grep -qE "^    needs: \[.*\b$n\b.*\]" <<< "$r"
 done
+pruefe "release nur bei Push" gleich "$(job_if "$CI" release)" "github.event_name == 'push'"
+# Nie abbrechen: ein Abbruch zwischen Versions-Commit und GitHub-Release hinterließe ein Tag ohne
+# Release (Kopf von ci.yml).
+pruefe "release: eigene Gruppe je Branch ohne Abbruch" \
+  gleich "$(job_gruppe "$CI" release)" "release-\${{ github.ref }}|false"
+
+echo "==> ci-stufen: e2e.yml"
+ke="$(kopf "$E2E")"
+pruefe "e2e.yml startet nur als Aufruf" gleich "$(awk '/^on:/ { im = 1; next } im && /^[^ ]/ { exit } im { print }' "$E2E")" "workflow_call:"
+pruefe "e2e.yml hat keine eigene Nebenläufigkeit (die steuert der Aufrufer)" fehlt "$ke" "concurrency:"
+pruefe "e2e.yml kennt das Label e2e nicht mehr" fehlt "$(grep -Ev '^[[:space:]]*#' "$E2E")" "'e2e'"
+pruefe "Binary heißt e2e-Binary" enthaelt "$(job "$E2E" binaer)" "name: e2e-Binary"
+pruefe "Anteile heißen e2e k/4" enthaelt "$(job "$E2E" e2e)" "name: e2e \${{ matrix.shard }}/4"
+pruefe "Anteile nur nach grünem Binary" enthaelt "$(job_if "$E2E" e2e)" "needs.binaer.result == 'success'"
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest ci-stufen." >&2

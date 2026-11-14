@@ -5,7 +5,7 @@
 #
 #   scripts/ziel-branch-build.sh verteilen <ziel-branch> <ziel-sha>
 #       Nach einem Push auf den Ziel-Branch, OHNE selbst zu kompilieren: Jeder fertige offene PR
-#       (Auto-Merge an oder Label `e2e`, kein Entwurf, kein Fork) bekommt den Check auf „läuft“
+#       (Auto-Merge an, kein Entwurf, kein Fork; Labels zählen nicht) bekommt den Check auf „läuft“
 #       und einen eigenen Lauf des Workflows auf seinem Branch (workflow_dispatch). Jeder übrige,
 #       der den Check trägt (auch ein Entwurf), bekommt ihn auf „wartet“.
 #   scripts/ziel-branch-build.sh auswahl <ziel-branch> <ziel-sha> <pr-nr>
@@ -44,8 +44,8 @@
 # ersetzter Lauf schließt keinen Check als abgebrochen (LLH-1889): am 14.11.2026 standen so zehn
 # PRs ohne Fehler rot, und Auto-Merge mergte nichts. Gerechnet wird nie im
 # Push-Lauf selbst: der hat den Cache-Bereich des Kanal-Branches, und PR-Code dort könnte einen
-# Cache anlegen, den der Release-Build liest. Der eigene Lauf auf dem PR-Branch hat dessen Bereich. Ein PR in Arbeit rechnet erst, wenn er fertig ist (wie die
-# zweite Stufe, LLH-1662); bis dahin fehlt oder wartet der Check, und er ist nicht mergebar.
+# Cache anlegen, den der Release-Build liest. Der eigene Lauf auf dem PR-Branch hat dessen Bereich. Ein PR in Arbeit rechnet erst, wenn er fertig ist (Auto-Merge an,
+# LLH-1889); bis dahin fehlt oder wartet der Check, und er ist nicht mergebar.
 #
 # Regeln: scripts/AGENTS.md, „Baut mit Ziel-Branch“. Spec: openspec/specs/pr-pruefstufen/.
 set -euo pipefail
@@ -78,7 +78,7 @@ check_status() { # <sha>
 pr_zeilen() { # <prs-json>
   jq -r --arg repo "$REPO" 'sort_by(.number)[]
       | [.number, .head.sha, .head.ref,
-         ((.auto_merge != null) or any((.labels // [])[]; .name == "e2e")),
+         (.auto_merge != null),
          (.draft == true), ((.head.repo.full_name // "") != $repo)] | @tsv' <<< "$1"
 }
 
@@ -93,7 +93,7 @@ warten() { # <nr> <kopf> <ziel> <ziel-sha>
     queued) echo "PR #$1: nicht fertig, wartet schon" >&2 ;;
     *)
       check_neu "$2" queued "Wartet: $3 hat sich bewegt" \
-        "\`$3\` steht jetzt auf $(kurz "$4"). Der Check rechnet neu, sobald der PR fertig ist (Auto-Merge an oder Label \`e2e\`, kein Entwurf)." > /dev/null \
+        "\`$3\` steht jetzt auf $(kurz "$4"). Der Check rechnet neu, sobald der PR fertig ist (Auto-Merge an, kein Entwurf)." > /dev/null \
         || return 1
       echo "PR #$1: nicht fertig, Check wartet" >&2 ;;
   esac

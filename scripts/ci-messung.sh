@@ -11,8 +11,9 @@
 #             MESSUNG_GH  Kommando für GitHub-Zugriffe (Vorgabe gh; der Selbsttest setzt eine Attrappe)
 #
 # WARUM: Die Grenze der CI ist die Zahl gleichzeitiger Jobs, nicht Geld. Die zweistufige PR-CI
-# (`e2e.yml`) soll Läufe und vor allem Jobs je PR senken; vorher und nachher werden mit demselben
-# Skript gemessen (Change `k133wmg6-zweistufige-ci`).
+# (`e2e.yml`, Change `k133wmg6-zweistufige-ci`) und danach die leichte PR-Prüfung (LLH-1889; seither
+# startet `e2e.yml` nur als Aufruf aus `ci.yml`, im PR nur mit Label `voll`) sollten Läufe und vor
+# allem Jobs je PR senken; vorher und nachher werden mit demselben Skript gemessen.
 #
 # GEZÄHLT: nur Läufe mit Ereignis `pull_request`, deren Start im Zeitraum liegt. Ein Job zählt als
 # gestartet, wenn er einen Runner hatte (`runner_name`; `started_at` setzt die API auch für Jobs,
