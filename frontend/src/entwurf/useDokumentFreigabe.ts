@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { Verlustschutz } from './useEntwurfVerlustschutz';
 
-interface DokumentFreigabeOptionen<W extends object> {
+interface DokumentFreigabeOptions<W extends object> {
   /** Das Formular der Seite; vor dem Dialog werden die Pflichtfelder geprüft. */
   form: { validateFields: () => Promise<W> };
   /** Der Verlustschutz der Seite: eine Pforte zum Speichern, sein Fehler und sein Lauf. */
@@ -18,7 +18,7 @@ interface DokumentFreigabeOptionen<W extends object> {
 
 /**
  * Speichern → Freigeben → Dialog eines gegliederten Dokuments (LLH-1689), gemeinsam für Befehl und
- * Lagebericht. Die Seite reicht `dialog` an den `FreigabeDialog` und ruft `bestaetigen` am Knopf
+ * Lagebericht. Die Seite reicht `dialog` an den `FreigabeDialog` und ruft `confirmFreigabe` am Knopf
  * „Freigeben“ und `speichern` im `onFinish` des Formulars.
  *
  * - **Speichern:** Ein Klick, ein PATCH. Der Klick blurrt zuerst das Feld, der Blur-Autosave ist
@@ -43,7 +43,7 @@ export function useDokumentFreigabe<W extends object>({
   gibFrei,
   erfolgText,
   onFreigegeben,
-}: DokumentFreigabeOptionen<W>) {
+}: DokumentFreigabeOptions<W>) {
   const { message } = App.useApp();
 
   const speichernMutation = useMutation({
@@ -61,7 +61,7 @@ export function useDokumentFreigabe<W extends object>({
     },
   });
 
-  const bestaetigen = async () => {
+  const confirmFreigabe = async () => {
     // Pflichtfelder vor dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
     let werte: W;
     try {
@@ -75,7 +75,7 @@ export function useDokumentFreigabe<W extends object>({
     setFreigabeWerte(werte);
   };
 
-  const ausfuehren = async () => {
+  const run = async () => {
     if (freigabeWerte === null) return;
     try {
       // Bei Erfolg quittiert der Verlustschutz selbst: sonst fragte der Browser beim Neuladen
@@ -97,22 +97,22 @@ export function useDokumentFreigabe<W extends object>({
   return {
     speichern: (werte: W) => speichernMutation.mutate(werte),
     /** Lauf des Knopfs „Entwurf speichern“ (nur für `loading` am Knopf, nie für einen Blocker). */
-    speichertKnopf: speichernMutation.isPending,
-    bestaetigen,
+    isSavePending: speichernMutation.isPending,
+    confirmFreigabe,
     /** Lauf der Freigabe selbst, für `loading` am Knopf „Freigeben“. */
-    gibtFrei: freigebenMutation.isPending,
+    isFreigabePending: freigebenMutation.isPending,
     /** Props für den `FreigabeDialog`, ohne `titel` und `warnung`. */
     dialog: {
       offen: freigabeWerte !== null,
       speicherFehler: schutz.speicherFehler,
       freigabeFehler: freigebenMutation.error,
       // `speichertGerade` deckt den Vorlauf ab, auch wenn der Klick sich an einen laufenden
-      // Blur-Autosave anhängt. Hier richtig und nicht die Falle von `speichertKnopf`: dieser
+      // Blur-Autosave anhängt. Hier richtig und nicht die Falle von `isSavePending`: dieser
       // Knopf existiert nur bei offenem Dialog, der Vorlauf ist genau der Vorgang, auf den der
       // Dialog wartet.
       laeuft: schutz.speichertGerade || freigebenMutation.isPending,
       onAbbrechen: () => setFreigabeWerte(null),
-      onFreigeben: () => void ausfuehren(),
+      onFreigeben: () => void run(),
     },
   };
 }

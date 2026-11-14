@@ -407,10 +407,14 @@ function LageberichtDetail() {
                       Knopf und benennt ihn zu „loading Entwurf speichern" um — bei
                       `speichertGerade` bei jedem stillen Autosave. Der Riegel gegen den
                       Doppel-PATCH liegt im Hook, nicht an diesem `loading`. */}
-                  <Button onClick={() => form.submit()} loading={freigabe.speichertKnopf}>
+                  <Button onClick={() => form.submit()} loading={freigabe.isSavePending}>
                     Entwurf speichern
                   </Button>
-                  <Button type="primary" onClick={freigabe.bestaetigen} loading={freigabe.gibtFrei}>
+                  <Button
+                    type="primary"
+                    onClick={freigabe.confirmFreigabe}
+                    loading={freigabe.isFreigabePending}
+                  >
                     Freigeben
                   </Button>
                 </>

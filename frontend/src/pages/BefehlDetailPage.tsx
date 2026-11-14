@@ -293,10 +293,14 @@ function BefehlDetail() {
                 zu „loading Entwurf speichern" um — bei `speichertGerade` bei jedem stillen
                 Autosave. Der Riegel gegen den Doppel-PATCH liegt im Hook, nicht an diesem
                 `loading`. */}
-            <Button onClick={() => form.submit()} loading={freigabe.speichertKnopf}>
+            <Button onClick={() => form.submit()} loading={freigabe.isSavePending}>
               Entwurf speichern
             </Button>
-            <Button type="primary" onClick={freigabe.bestaetigen} loading={freigabe.gibtFrei}>
+            <Button
+              type="primary"
+              onClick={freigabe.confirmFreigabe}
+              loading={freigabe.isFreigabePending}
+            >
               Freigeben
             </Button>
           </>
@@ -309,7 +313,7 @@ function BefehlDetail() {
     <div className="befehl-print-root" data-lfh="druckwurzel">
       <EntwurfNavigationSchutz
         ungespeichert={schutz.ungespeichert && istEntwurf && darfSchreiben}
-        // Eine Quelle: `speichertGerade` deckt Autosave und Knopf ab; `freigabe.speichertKnopf`
+        // Eine Quelle: `speichertGerade` deckt Autosave und Knopf ab; `freigabe.isSavePending`
         // daneben wäre eine zweite Wahrheit.
         speichert={schutz.speichertGerade}
         // Der Grund gehört in den Dialog: hinter seiner Maske ist die Seite unbedienbar, ein Alert

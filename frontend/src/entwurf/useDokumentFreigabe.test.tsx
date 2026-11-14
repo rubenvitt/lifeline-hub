@@ -13,7 +13,7 @@ import { useDokumentFreigabe } from './useDokumentFreigabe';
 
 type Werte = { titel: string };
 
-function aufbau(
+function setup(
   over: {
     validateFields?: () => Promise<Werte>;
     speichereJetzt?: (w: Werte) => Promise<void>;
@@ -41,14 +41,14 @@ function aufbau(
 
 describe('useDokumentFreigabe (LLH-1689)', () => {
   it('öffnet den Dialog erst mit gültigem Formular', async () => {
-    const { result } = aufbau({ validateFields: () => Promise.reject(new Error('Titel fehlt')) });
-    await act(() => result.current.bestaetigen());
+    const { result } = setup({ validateFields: () => Promise.reject(new Error('Titel fehlt')) });
+    await act(() => result.current.confirmFreigabe());
     expect(result.current.dialog.offen).toBe(false);
   });
 
   it('speichert vor der Freigabe die validierten Werte und schließt danach', async () => {
-    const { optionen, result } = aufbau();
-    await act(() => result.current.bestaetigen());
+    const { optionen, result } = setup();
+    await act(() => result.current.confirmFreigabe());
     expect(result.current.dialog.offen).toBe(true);
 
     await act(async () => result.current.dialog.onFreigeben());
@@ -62,10 +62,10 @@ describe('useDokumentFreigabe (LLH-1689)', () => {
   });
 
   it('bleibt offen und gibt nicht frei, wenn das Speichern scheitert', async () => {
-    const { optionen, result } = aufbau({
+    const { optionen, result } = setup({
       speichereJetzt: () => Promise.reject(new Error('409')),
     });
-    await act(() => result.current.bestaetigen());
+    await act(() => result.current.confirmFreigabe());
     await act(async () => result.current.dialog.onFreigeben());
     expect(result.current.dialog.offen).toBe(true);
     expect(optionen.gibFrei).not.toHaveBeenCalled();
@@ -73,8 +73,8 @@ describe('useDokumentFreigabe (LLH-1689)', () => {
 
   it('bleibt offen mit dem Grund, wenn die Freigabe abgelehnt wird; ein neuer Versuch räumt ihn', async () => {
     const grund = new Error('leer');
-    const { optionen, result } = aufbau({ gibFrei: () => Promise.reject(grund) });
-    await act(() => result.current.bestaetigen());
+    const { optionen, result } = setup({ gibFrei: () => Promise.reject(grund) });
+    await act(() => result.current.confirmFreigabe());
     await act(async () => result.current.dialog.onFreigeben());
     await waitFor(() => expect(result.current.dialog.freigabeFehler).toBe(grund));
     expect(result.current.dialog.offen).toBe(true);
@@ -82,12 +82,12 @@ describe('useDokumentFreigabe (LLH-1689)', () => {
 
     await act(async () => result.current.dialog.onAbbrechen());
     expect(result.current.dialog.offen).toBe(false);
-    await act(() => result.current.bestaetigen());
+    await act(() => result.current.confirmFreigabe());
     expect(result.current.dialog.freigabeFehler).toBeNull();
   });
 
   it('speichern ruft speichereJetzt mit den Werten des Formulars', async () => {
-    const { optionen, result } = aufbau();
+    const { optionen, result } = setup();
     act(() => result.current.speichern({ titel: 'Neu' }));
     await waitFor(() =>
       expect(optionen.schutz.speichereJetzt).toHaveBeenCalledWith({ titel: 'Neu' }),
