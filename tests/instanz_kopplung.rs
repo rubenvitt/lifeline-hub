@@ -1759,3 +1759,174 @@ async fn zurueckgespielt_elw_bekommt_den_schluessel_erneut() {
         Some("wartet_auf_bestaetigung")
     );
 }
+
+// ── Zurückgespielter Hub verliert Schlüssel (LLH-1871) ───────────────────────────────────────
+
+/// Der Hub spielt eine Sicherung von vor dem Schlüssel `credential_id` zurück: Er kennt ihn danach
+/// nicht mehr.
+async fn hub_verliert_schluessel(hub: &Instanz, credential_id: &str) {
+    let n = sqlx::query(
+        "DELETE FROM unterschrift_schluessel WHERE herkunft = 'lokal' AND credential_id = ?",
+    )
+    .bind(credential_id)
+    .execute(&hub.pool)
+    .await
+    .unwrap()
+    .rows_affected();
+    assert_eq!(n, 1);
+}
+
+fn zustand_hier(u: &Value, id: i64) -> String {
+    u["schluessel"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == id)
+        .unwrap()["zustand"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_verlorener_schluessel_gilt_am_elw_nicht_mehr() {
+    let (hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    let (s, v) = bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(gueltige_fremde(&uebersicht(&elw).await).len(), 2);
+
+    hub_verliert_schluessel(&hub, "b").await;
+    elw_meldet(&elw).await;
+    let u = uebersicht(&elw).await;
+    assert_eq!(zustand_hier(&u, id), "widerrufen", "{u}");
+    assert_eq!(gueltige_fremde(&u).len(), 1, "A gilt weiter");
+    assert!(
+        u["kopplungen"][0]["hinweis"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Unterschriftsschlüssel nicht mehr"),
+        "{u}"
+    );
+    let (grund, fingerabdruck): (Option<String>, Option<String>) = sqlx::query_as(
+        "SELECT json_extract(detail, '$.grund'), json_extract(detail, '$.fingerabdruck') \
+         FROM admin_audit WHERE aktion = 'unterschrift_widerrufen' AND akteur_id IS NULL",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert!(grund.unwrap_or_default().contains("nicht mehr"));
+    assert_eq!(fingerabdruck.as_deref(), Some(fp.as_str()));
+
+    // Eine weitere Meldung ändert nichts mehr und schreibt keine zweite Spur.
+    elw_meldet(&elw).await;
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM admin_audit WHERE aktion = 'unterschrift_widerrufen'",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 1);
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_wartender_schluessel_faellt_und_ist_nicht_mehr_zu_bestaetigen() {
+    let (hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    hub_verliert_schluessel(&hub, "b").await;
+    elw_meldet(&elw).await;
+    let u = uebersicht(&elw).await;
+    assert_eq!(zustand_hier(&u, id), "widerrufen", "{u}");
+    let (s, v) = bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await;
+    assert_ne!(s, StatusCode::OK, "{v}");
+    assert_eq!(zustand_hier(&uebersicht(&elw).await, id), "widerrufen");
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_zurueckgewiesener_schluessel_bleibt_zurueckgewiesen() {
+    let (hub, elw, id, _fp) = mit_wartendem_schluessel().await;
+    let pfad = format!("/api/admin/instanz/unterschrift/{id}/zurueckweisen");
+    let (s, v) = common::anfrage(&elw.app, "POST", &pfad, &elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    hub_verliert_schluessel(&hub, "b").await;
+    elw_meldet(&elw).await;
+    assert_eq!(zustand_hier(&uebersicht(&elw).await, id), "abgelehnt");
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_ablehnung_und_verlust_stehen_beide_an_der_kopplung() {
+    let (hub, elw, id, _fp) = mit_wartendem_schluessel().await;
+    hub_verliert_schluessel(&hub, "b").await;
+    // Dieselbe Antwort trägt einen Schlüssel, den der ELW verwirft. Eine eigene id: Die frei
+    // gewordene des verlorenen Schlüssels führte der Hub sonst wieder (LLH-1853).
+    sqlx::query(
+        "INSERT INTO unterschrift_schluessel (id, org_id, herkunft, benutzer_id, benutzer_name, \
+         credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, stand) \
+         VALUES (999, 1, 'lokal', 1, 'Mallory', 'boese', 'es256', ?, ?, ?, 'boese', 'X', 'gueltig', 99)",
+    )
+    .bind(SoftwarePasskey::new("boese", [9u8; 32]).oeffentlich())
+    .bind(RP)
+    .bind(ORIGIN)
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    elw_meldet(&elw).await;
+    let u = uebersicht(&elw).await;
+    assert_eq!(zustand_hier(&u, id), "widerrufen", "{u}");
+    let hinweis = u["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
+    assert!(hinweis.contains("abgelehnt"), "{hinweis}");
+    assert!(
+        hinweis.contains("1 Unterschriftsschlüssel nicht mehr"),
+        "{hinweis}"
+    );
+}
+
+/// Ein Widerruf, der erst mit der nächsten Seite der Nachlieferung kommt, ist kein verlorener
+/// Schlüssel: Solange die Nachlieferung ihr Budget füllt, geht kein Bestand.
+#[tokio::test]
+async fn widerruf_jenseits_der_ersten_seite_gilt_nicht_als_verloren() {
+    let max = lifeline_hub::auth::unterschrift::repo::LIEFERUNGEN_MAX as i64;
+    let (hub, elw, id, fp) = mit_wartendem_schluessel().await;
+    let (s, v) = bestaetigen(&elw, &elw.admin, id, &ende(&fp)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for n in 0..max + 5 {
+        sqlx::query(
+            "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, benutzer_name, \
+             credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, \
+             stand) VALUES (1, 'lokal', 1, 'x', ?, 'es256', 'AAAA', 'r', 'o', 'Stick', 'fp', \
+             'widerrufen', ?)",
+        )
+        .bind(format!("w-{n}"))
+        .bind(1000 + n)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+    }
+    sqlx::query(
+        "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
+         widerrufen_at = '2026-11-13 12:00:00', stand = 5000 WHERE credential_id = 'b'",
+    )
+    .execute(&hub.pool)
+    .await
+    .unwrap();
+    elw_meldet(&elw).await;
+    let u = uebersicht(&elw).await;
+    assert_eq!(
+        zustand_hier(&u, id),
+        "gueltig",
+        "erst die nächste Seite trägt den Widerruf"
+    );
+    elw_meldet(&elw).await;
+    let u = uebersicht(&elw).await;
+    assert_eq!(zustand_hier(&u, id), "widerrufen", "{u}");
+    let hinweis = u["kopplungen"][0]["hinweis"].as_str().unwrap_or_default();
+    assert!(!hinweis.contains("nicht mehr"), "{hinweis}");
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM admin_audit WHERE aktion = 'unterschrift_widerrufen'",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        n, 0,
+        "ein gelieferter Widerruf ist keiner wegen des Bestands"
+    );
+}
