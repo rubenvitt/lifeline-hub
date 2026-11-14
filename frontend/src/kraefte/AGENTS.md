@@ -191,7 +191,9 @@ Editor (`abloesung/schichtplan/SchichtplanEditor.tsx`, Change `y106s29r-blockpla
 Mutationen, Zug und Ablage, Block-Menü, Ansagen und Dialoge stehen nur dort;
 `abloesung/schichtplan/SchichtplanAnsicht.tsx` und `planung/PlanungSchichtplan.tsx` bauen nur den
 Adapter, und was beide verschieden machen, ist ein Feld des Adapters, keine Fallunterscheidung im
-Editor. Ohne Freigabe von Personal kommen
+Editor. Ebenso eine Helferliste (`abloesung/schichtplan/HelferListe.tsx`, D7): in der Planung ein
+Reiter, im Einsatz der Knopf „Helfer“ der Werkzeugzeile (Adapterfeld `alternative`); eine Antwort
+ist der Helfer, nicht der Plan. Ohne Freigabe von Personal kommen
 `personen` und `helfer` als `null`. Die Wechsel-Leiste (LLH-1555 Welle 3,
 `abloesung/schichtplan/SchichtplanWechselLeiste.tsx`) zeigt nur `wechsel` aus dem Plan
 (`abloesung::schichtplan::wechselpunkte`): Zeitpunkte, Einträge und Stand rechnet der Server, der

@@ -176,7 +176,7 @@ interface HelferListeProps {
   /** Die Helfer des Plans; `null` ohne Freigabe des Moduls Personal (Sperrhinweis statt Liste). */
   helfer: readonly SchichtplanHelfer[] | null;
   /** Blöcke des Plans: die Rückfrage beim Löschen nennt, aus wie vielen der Helfer fällt. */
-  bloecke: readonly { personen: readonly { helfer_id?: number | null }[] }[];
+  bloecke: readonly { personen?: readonly { helfer_id?: number | null }[] | null }[];
   /** Nur lesen: ohne Anlegen und Aktionen. */
   readOnly?: boolean;
   /** Grund der Sperre, wenn `helfer` `null` ist. Vorgabe: Modul Personal gesperrt. */
@@ -239,7 +239,7 @@ export default function HelferListe({
 
   const helfer = helferListe ?? [];
   const bloeckeMit = (h: SchichtplanHelfer) =>
-    bloecke.filter((b) => b.personen.some((p) => p.helfer_id === h.id)).length;
+    bloecke.filter((b) => (b.personen ?? []).some((p) => p.helfer_id === h.id)).length;
   const loeschAnzahl = zuLoeschen ? bloeckeMit(zuLoeschen) : 0;
 
   const organisationWerte = werteAus(helfer, (h) => h.organisation);

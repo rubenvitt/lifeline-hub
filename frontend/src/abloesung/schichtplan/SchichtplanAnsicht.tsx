@@ -10,27 +10,32 @@ import { listePersonal } from '../../api/personal';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import {
   aendereSchichtplanBlock,
+  aendereSchichtplanHelfer,
   erzeugeSchichten,
   fetchSchichtplan,
   legeSchichtplanBlockAn,
+  legeSchichtplanHelferAn,
   loescheSchichtplanBlock,
+  loescheSchichtplanHelfer,
 } from '../../api/schichtplan';
 import type {
   AbloesungVorgabe,
   QualiSollEintrag,
   Schichtplan,
   SchichtplanBlock,
+  SchichtplanHelfer,
 } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { datum, uhrzeit } from '../../anzeige/zeitDarstellung';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
-import { Segmentleiste, useRollen } from '../../components/instrument';
+import { SegmentUmschalter, Segmentleiste, useRollen } from '../../components/instrument';
 import { MODUL_PERSONAL_GESPERRT } from '../../components/nurAnsicht';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { formatRegelKurz } from '../schichtmodellText';
 import { useUhr } from '../useUhr';
 import GrenzwerteZeile from './GrenzwerteZeile';
+import HelferListe from './HelferListe';
 import { spanneAus, type SpannenWahl } from './raster';
 import SchichtplanEditor, { type SchichtplanEditorAdapter } from './SchichtplanEditor';
 import SchichtplanWechselDialog from './SchichtplanWechselDialog';
@@ -64,6 +69,12 @@ import { baueZeilen, personenOptionen, postenSchluessel, rasterBloecke } from '.
  * Hülle des gemeinsamen `SchichtplanEditor` (Change `y106s29r-blockplan-kern`, D6): hier stehen
  * nur Laden, Zeilen, Personen, Vorgaben, Zeitspanne, Grenzwerte, Wechsel-Teil und die Aufrufe der
  * API des Einsatzes; Mutationen, Zug und Ablage und die Dialoge trägt der Editor.
+ *
+ * Helfer (design.md D7, Spec `kraefte-schichtplan`, „Helfer des Plans bedienen“): der Knopf
+ * „Helfer“ in der Werkzeugzeile schaltet wie der Reiter einer Planung zwischen Plan und
+ * `HelferListe`. Ohne Personal liefert der Plan `helfer: null`, die Liste steht gesperrt; ohne
+ * Schreibrecht nur lesend. Eine Antwort ist der Helfer: er kommt sofort in den Plan im Cache
+ * (Seitenleiste, Blockdialog), danach lädt der Plan neu (Namen in den Blöcken).
  */
 
 interface SchichtplanAnsichtProps {
@@ -110,6 +121,7 @@ export default function SchichtplanAnsicht({
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useUhr().valueOf();
   const [spannenWahl, setSpannenWahl] = useState<SpannenWahl>('12h');
+  const [isHelferOpen, setHelferOpen] = useState(false);
   // Gewählter Zeitpunkt der Wechsel-Leiste; ein neuer Sprung wählt seinen.
   const [wechselGewaehlt, setWechselGewaehlt] = useState<number | null>(wechselSprung ?? null);
   useEffect(() => {
@@ -237,6 +249,20 @@ export default function SchichtplanAnsicht({
     !b.posten.aufgeloest &&
     (b.posten.art === 'pause' || (b.posten.art === 'uhs' && uhsFrei));
 
+  const planKey = einsatzKeys.schichtplan(einsatzId);
+  const setHelfer = (h: SchichtplanHelfer) =>
+    qc.setQueryData<Schichtplan>(planKey, (p) =>
+      p?.helfer
+        ? {
+            ...p,
+            helfer: p.helfer.some((x) => x.id === h.id)
+              ? p.helfer.map((x) => (x.id === h.id ? h : x))
+              : [...p.helfer, h],
+          }
+        : p,
+    );
+  const helferAnzahl = plan?.helfer?.length;
+
   const adapter: SchichtplanEditorAdapter<Schichtplan> = {
     dataLfh: 'schichtplan-ansicht',
     bloecke: plan?.bloecke ?? [],
@@ -265,7 +291,35 @@ export default function SchichtplanAnsicht({
     isErzeugenDisabled: !plan,
     beschriftung: 'Schichtplan',
     fehlerTitel: 'Schichtplan nicht geändert',
-    tools: werkzeuge,
+    tools: (
+      <>
+        <SegmentUmschalter
+          an={isHelferOpen}
+          onWechsel={setHelferOpen}
+          zugaenglicherName="Helfer"
+          label="Helfer"
+          zahl={helferAnzahl == null ? undefined : String(helferAnzahl)}
+        />
+        {werkzeuge}
+      </>
+    ),
+    alternative: isHelferOpen ? (
+      <HelferListe
+        dataLfh="schichtplan-helfer"
+        helfer={plan ? (plan.helfer ?? null) : personenGesperrt ? null : []}
+        bloecke={plan?.bloecke ?? []}
+        readOnly={!darfSchreiben}
+        api={{
+          create: (body) => legeSchichtplanHelferAn(einsatzId, body),
+          update: (helferId, body) => aendereSchichtplanHelfer(einsatzId, helferId, body),
+          delete: (helferId) => loescheSchichtplanHelfer(einsatzId, helferId),
+        }}
+        cache={{
+          set: setHelfer,
+          invalidate: () => qc.invalidateQueries({ queryKey: planKey }),
+        }}
+      />
+    ) : undefined,
     header: (
       <>
         {plan && (

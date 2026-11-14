@@ -117,6 +117,11 @@ export interface SchichtplanEditorAdapter<P> {
   tools?: ReactNode;
   /** Zeilen zwischen Werkzeugzeile und Zugfehler (Grenzwerte, Ladefehler). */
   header?: ReactNode;
+  /**
+   * Statt Wechsel-Leiste und Raster oder Liste (ein Reiter der Werkzeugzeile, etwa die Helfer im
+   * Einsatz, design.md D7); Werkzeugzeile, Kopfzeilen und Dialoge bleiben.
+   */
+  alternative?: ReactNode;
   /** Der Plan lädt noch: statt Raster oder Liste ein Spinner. */
   isLoading?: boolean;
   /** Liste auf dem Handschirm: Zeitformat (Vorgabe Uhrzeit) und alle Blöcke statt der nächsten. */
@@ -415,11 +420,14 @@ export default function SchichtplanEditor<P>({
           <SpeicherFehler fehler={zugFehler} titel={adapter.fehlerTitel} />
         </div>
       )}
-      {wechsel?.renderLeiste((blockId) => {
-        const b = blockVon(blockId);
-        return b && wechsel.canWechsel(b) ? () => oeffneWechsel(b) : undefined;
-      })}
-      {adapter.isLoading ? (
+      {adapter.alternative == null &&
+        wechsel?.renderLeiste((blockId) => {
+          const b = blockVon(blockId);
+          return b && wechsel.canWechsel(b) ? () => oeffneWechsel(b) : undefined;
+        })}
+      {adapter.alternative != null ? (
+        adapter.alternative
+      ) : adapter.isLoading ? (
         <Spin />
       ) : istSchmal ? (
         <SchichtplanSchleuse
