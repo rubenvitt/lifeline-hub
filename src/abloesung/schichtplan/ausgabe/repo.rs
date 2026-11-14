@@ -126,7 +126,13 @@ pub async fn planung(
     planung_id: i64,
     jetzt: &str,
 ) -> Result<AusgabePlan, AppError> {
-    let anzeige = crate::planung::repo::laden(pool, org_id, planung_id).await?;
+    let anzeige = crate::planung::repo::laden(
+        pool,
+        org_id,
+        planung_id,
+        crate::abloesung::schichtplan::plan_repo::utc(jetzt)?,
+    )
+    .await?;
     let mut conn = pool.acquire().await?;
     let stil = crate::planung::repo::zeitstil_org(&mut conn, org_id).await?;
     let quali = quali_namen(&mut conn, org_id).await?;

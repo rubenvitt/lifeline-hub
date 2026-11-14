@@ -649,6 +649,7 @@ async fn mark_uebernommen_tx(
         benutzer.org_id,
         planung_id,
         SchichtplanGrenzwerte::aus(max, ruhe),
+        crate::abloesung::schichtplan::plan_repo::utc(jetzt)?,
     )
     .await?;
     let json = serde_json::to_string(&kennzahlen)

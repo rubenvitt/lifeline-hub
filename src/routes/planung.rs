@@ -12,11 +12,10 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::abloesung::schichtplan::repo::{HelferEingabe, HelferPatch};
 use crate::abloesung::schichtplan::uebernahme::{Entscheidungen, ENTSCHEIDUNGEN_MAX};
 use crate::abloesung::schichtplan::{
-    zerlegung, PlanHelferAnzeige, PlanPerson, BLOCK_MIN_MINUTEN, HELFER_TELEFON_MAX,
-    HELFER_TEXT_MAX, MAX_DIENST_BEREICH, MIN_RUHE_BEREICH, NOTIZ_MAX, PLAN_PERSONEN_MAX,
+    zerlegung, PlanHelferAnzeige, PlanPerson, BLOCK_MIN_MINUTEN, MAX_DIENST_BEREICH,
+    MIN_RUHE_BEREICH, NOTIZ_MAX,
 };
 use crate::app::AppState;
 use crate::einsatz::Einsatzart;
@@ -34,7 +33,8 @@ use crate::planung::{
 };
 use crate::programmpunkt::{Programmpunkt, PROGRAMMPUNKT_BEZEICHNUNG_MAX};
 use crate::routes::abloesung_schichtplan::{
-    grenzwert, planzeit, qualifikationen, soll_anzahl, zeitraum,
+    grenzwert, personen, planzeit, soll_anzahl, zeitraum, HelferAendern, HelferAnlegen,
+    VersionParams,
 };
 use crate::routes::programmpunkt::{parse_zeitpunkt, NeuerProgrammpunkt, ProgrammpunktPatch};
 use crate::routes::support;
@@ -47,7 +47,13 @@ fn melde(state: &AppState, org_id: i64, planung_id: i64) {
 }
 
 async fn planung(state: &AppState, z: &PlanungsZugriff) -> Result<PlanungAnzeige, AppError> {
-    repo::laden(&state.pool, z.benutzer.org_id, z.planung_id).await
+    repo::laden(
+        &state.pool,
+        z.benutzer.org_id,
+        z.planung_id,
+        chrono::Utc::now(),
+    )
+    .await
 }
 
 /// GET /api/planungen/{id}/export — die Planung als Excel-Mappe (LLH-1557, design.md D5): wer
@@ -85,21 +91,13 @@ pub enum PersonEingabe {
     Helfer { helfer_id: i64 },
 }
 
-/// Personen eines Blocks: höchstens [`PLAN_PERSONEN_MAX`] vor dem Entdoppeln (400).
-fn personen(liste: Vec<PersonEingabe>) -> Result<Vec<PlanPerson>, AppError> {
-    if liste.len() > PLAN_PERSONEN_MAX {
-        return Err(AppError::Validation(format!(
-            "personen: höchstens {PLAN_PERSONEN_MAX} Personen"
-        )));
-    }
-    let personen: Vec<PlanPerson> = liste
-        .into_iter()
-        .map(|p| match p {
+impl From<PersonEingabe> for PlanPerson {
+    fn from(p: PersonEingabe) -> Self {
+        match p {
             PersonEingabe::Stamm { personal_id } => PlanPerson::Stamm(personal_id),
             PersonEingabe::Helfer { helfer_id } => PlanPerson::Helfer(helfer_id),
-        })
-        .collect();
-    Ok(crate::kraefte_disposition::dedupe(&personen, |p| *p))
+        }
+    }
 }
 
 fn schichtlaenge(wert: Option<Option<i64>>) -> Result<Option<Option<i64>>, AppError> {
@@ -187,7 +185,7 @@ pub async fn anlegen(
     melde(&state, benutzer.org_id, id);
     Ok((
         StatusCode::CREATED,
-        Json(repo::laden(&state.pool, benutzer.org_id, id).await?),
+        Json(repo::laden(&state.pool, benutzer.org_id, id, chrono::Utc::now()).await?),
     ))
 }
 
@@ -582,12 +580,6 @@ pub async fn block_aendern(
     Ok(Json(planung(&state, &z).await?))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct VersionParams {
-    #[serde(default)]
-    version: Option<i64>,
-}
-
 /// DELETE /api/planungen/{id}/bloecke/{bid}?version=… (409 bei veraltetem Stand).
 pub async fn block_loeschen(
     State(state): State<AppState>,
@@ -595,9 +587,7 @@ pub async fn block_loeschen(
     PfadParam((_id, bid)): PfadParam<(i64, i64)>,
     Query(params): Query<VersionParams>,
 ) -> Result<StatusCode, AppError> {
-    let version = params
-        .version
-        .ok_or_else(|| AppError::Validation("version fehlt".into()))?;
+    let version = params.version()?;
     repo::block_loeschen(&state.pool, z.benutzer.org_id, z.planung_id, bid, version).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(StatusCode::NO_CONTENT)
@@ -656,30 +646,13 @@ pub async fn erzeugen(
 // Helfer
 // ---------------------------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HelferAnlegen {
-    name: String,
-    #[serde(default)]
-    telefon: Option<String>,
-    #[serde(default)]
-    organisation: Option<String>,
-    #[serde(default)]
-    qualifikationen: Vec<i64>,
-}
-
 /// POST /api/planungen/{id}/helfer (201, der Helfer).
 pub async fn helfer_anlegen(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<HelferAnlegen>,
 ) -> Result<(StatusCode, Json<PlanHelferAnzeige>), AppError> {
-    let eingabe = HelferEingabe {
-        name: support::pflicht_max(&req.name, "name", HELFER_TEXT_MAX)?,
-        telefon: support::optional_max(req.telefon, "telefon", HELFER_TELEFON_MAX)?,
-        organisation: support::optional_max(req.organisation, "organisation", HELFER_TEXT_MAX)?,
-        qualifikationen: qualifikationen(&req.qualifikationen)?,
-    };
+    let eingabe = req.eingabe()?;
     let helfer = repo::helfer_anlegen(
         &state.pool,
         z.benutzer.org_id,
@@ -692,19 +665,6 @@ pub async fn helfer_anlegen(
     Ok((StatusCode::CREATED, Json(helfer)))
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct HelferAendern {
-    #[serde(default)]
-    name: Option<String>,
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    telefon: Option<Option<String>>,
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    organisation: Option<Option<String>>,
-    #[serde(default)]
-    qualifikationen: Option<Vec<i64>>,
-}
-
 /// PATCH /api/planungen/{id}/helfer/{hid}
 pub async fn helfer_aendern(
     State(state): State<AppState>,
@@ -712,16 +672,7 @@ pub async fn helfer_aendern(
     PfadParam((_id, hid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<HelferAendern>,
 ) -> Result<Json<PlanHelferAnzeige>, AppError> {
-    let patch = HelferPatch {
-        name: support::pflicht_max_tri(req.name.as_deref(), "name", HELFER_TEXT_MAX)?,
-        telefon: support::optional_max_tri(req.telefon, "telefon", HELFER_TELEFON_MAX)?,
-        organisation: support::optional_max_tri(req.organisation, "organisation", HELFER_TEXT_MAX)?,
-        qualifikationen: req
-            .qualifikationen
-            .as_deref()
-            .map(qualifikationen)
-            .transpose()?,
-    };
+    let patch = req.patch()?;
     let helfer =
         repo::helfer_aendern(&state.pool, z.benutzer.org_id, z.planung_id, hid, &patch).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);

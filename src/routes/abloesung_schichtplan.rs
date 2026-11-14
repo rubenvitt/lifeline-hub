@@ -110,15 +110,15 @@ pub(crate) fn zeitraum(von: &str, bis: &str) -> Result<(String, String), AppErro
     Ok((von, bis))
 }
 
-/// Personen eines Blocks von außen: höchstens [`PLAN_PERSONEN_MAX`] vor dem Entdoppeln (400),
-/// entdoppelt in ihrer Reihenfolge.
-fn personen(liste: Vec<PlanPersonEingabe>) -> Result<Vec<PlanPerson>, AppError> {
+/// Personen eines Blocks von außen (Schichtplan und Vorplanung, je mit ihrer Eingabeform):
+/// höchstens [`PLAN_PERSONEN_MAX`] vor dem Entdoppeln (400), entdoppelt in ihrer Reihenfolge.
+pub(crate) fn personen<T: Into<PlanPerson>>(liste: Vec<T>) -> Result<Vec<PlanPerson>, AppError> {
     if liste.len() > PLAN_PERSONEN_MAX {
         return Err(AppError::Validation(format!(
             "personen: höchstens {PLAN_PERSONEN_MAX} Personen"
         )));
     }
-    let personen: Vec<PlanPerson> = liste.into_iter().map(PlanPerson::from).collect();
+    let personen: Vec<PlanPerson> = liste.into_iter().map(Into::into).collect();
     Ok(crate::kraefte_disposition::dedupe(&personen, |p| *p))
 }
 
@@ -292,10 +292,19 @@ pub async fn block_aendern(
     Ok(Json(plan(&state, &ctx).await?))
 }
 
+/// `?version=…` beim Löschen eines Blocks (Schichtplan und Vorplanung).
 #[derive(Debug, Deserialize)]
 pub struct VersionParams {
     #[serde(default)]
     version: Option<i64>,
+}
+
+impl VersionParams {
+    /// Die Version; fehlt sie, 400.
+    pub(crate) fn version(&self) -> Result<i64, AppError> {
+        self.version
+            .ok_or_else(|| AppError::Validation("version fehlt".into()))
+    }
 }
 
 /// DELETE /api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}?version=… (409 bei
@@ -306,9 +315,7 @@ pub async fn block_loeschen(
     PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
     Query(params): Query<VersionParams>,
 ) -> Result<StatusCode, AppError> {
-    let version = params
-        .version
-        .ok_or_else(|| AppError::Validation("version fehlt".into()))?;
+    let version = params.version()?;
     let posten = repo::posten_von(&state.pool, ctx.einsatz.id, bid).await?;
     fordere_posten_modul(&state, &ctx, posten).await?;
     // Ein belegter Block nimmt mit dem Löschen Einteilungen weg: das verlangt Personal, geprüft
@@ -427,6 +434,7 @@ pub async fn grenzwerte_setzen(
     Ok(Json(plan(&state, &ctx).await?))
 }
 
+/// Ein neuer Helfer (Schichtplan und Vorplanung).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HelferAnlegen {
@@ -439,18 +447,29 @@ pub struct HelferAnlegen {
     qualifikationen: Vec<i64>,
 }
 
+impl HelferAnlegen {
+    /// Die Feldprüfungen (400).
+    pub(crate) fn eingabe(self) -> Result<HelferEingabe, AppError> {
+        Ok(HelferEingabe {
+            name: support::pflicht_max(&self.name, "name", HELFER_TEXT_MAX)?,
+            telefon: support::optional_max(self.telefon, "telefon", HELFER_TELEFON_MAX)?,
+            organisation: support::optional_max(
+                self.organisation,
+                "organisation",
+                HELFER_TEXT_MAX,
+            )?,
+            qualifikationen: qualifikationen(&self.qualifikationen)?,
+        })
+    }
+}
+
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/helfer
 pub async fn helfer_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     JsonBody(req): JsonBody<HelferAnlegen>,
 ) -> Result<(StatusCode, Json<PlanHelferAnzeige>), AppError> {
-    let eingabe = HelferEingabe {
-        name: support::pflicht_max(&req.name, "name", HELFER_TEXT_MAX)?,
-        telefon: support::optional_max(req.telefon, "telefon", HELFER_TELEFON_MAX)?,
-        organisation: support::optional_max(req.organisation, "organisation", HELFER_TEXT_MAX)?,
-        qualifikationen: qualifikationen(&req.qualifikationen)?,
-    };
+    let eingabe = req.eingabe()?;
     ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     let helfer =
         repo::helfer_anlegen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eingabe).await?;
@@ -458,6 +477,7 @@ pub async fn helfer_anlegen(
     Ok((StatusCode::CREATED, Json(helfer)))
 }
 
+/// Änderung eines Helfers (Schichtplan und Vorplanung).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HelferAendern {
@@ -471,6 +491,26 @@ pub struct HelferAendern {
     qualifikationen: Option<Vec<i64>>,
 }
 
+impl HelferAendern {
+    /// Die Feldprüfungen (400).
+    pub(crate) fn patch(self) -> Result<HelferPatch, AppError> {
+        Ok(HelferPatch {
+            name: support::pflicht_max_tri(self.name.as_deref(), "name", HELFER_TEXT_MAX)?,
+            telefon: support::optional_max_tri(self.telefon, "telefon", HELFER_TELEFON_MAX)?,
+            organisation: support::optional_max_tri(
+                self.organisation,
+                "organisation",
+                HELFER_TEXT_MAX,
+            )?,
+            qualifikationen: self
+                .qualifikationen
+                .as_deref()
+                .map(qualifikationen)
+                .transpose()?,
+        })
+    }
+}
+
 /// PATCH /api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid}
 pub async fn helfer_aendern(
     State(state): State<AppState>,
@@ -478,16 +518,7 @@ pub async fn helfer_aendern(
     PfadParam((_eid, hid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<HelferAendern>,
 ) -> Result<Json<PlanHelferAnzeige>, AppError> {
-    let patch = HelferPatch {
-        name: support::pflicht_max_tri(req.name.as_deref(), "name", HELFER_TEXT_MAX)?,
-        telefon: support::optional_max_tri(req.telefon, "telefon", HELFER_TELEFON_MAX)?,
-        organisation: support::optional_max_tri(req.organisation, "organisation", HELFER_TEXT_MAX)?,
-        qualifikationen: req
-            .qualifikationen
-            .as_deref()
-            .map(qualifikationen)
-            .transpose()?,
-    };
+    let patch = req.patch()?;
     ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     let helfer = repo::helfer_aendern(&state.pool, ctx.einsatz.id, hid, &patch).await?;
     publiziere(&state, ctx.einsatz.id, None);

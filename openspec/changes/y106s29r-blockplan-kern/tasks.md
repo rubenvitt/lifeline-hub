@@ -38,15 +38,15 @@ Beleg für Gleichverhalten.
 
 ## 3. Backend-Kern: Blöcke und Laden
 
-- [ ] 3.1 Personen prüfen und schreiben in den Kern legen; der Ad-hoc-Zweig hängt an `MIT_ADHOC`. Prüfen: Tests aus 1.1/1.2 grün.
-- [ ] 3.2 Block anlegen, ändern und löschen über den Kern. Posten-Prüfung, Insert, Überschneidung, Zeitzone und Löschprüfungen sind Methoden der Art (D2). Prüfen: `--test schichtplan`, `--test planung`, `--test schichtplan_wechsel`, `--test schichtplan_kopplung`.
-- [ ] 3.3 „Schichten erzeugen“: Die Konfliktschleife liegt im Kern. Teilung, ETB-Satz und Rückgabe bleiben je Seite. Prüfen: Tests zu „erzeugen“ beider Seiten.
-- [ ] 3.4 Laden: Das gemeinsame Grundgerüst baut eine neutrale Blockstruktur mit Prüfbefunden (D3). Die Planung bekommt `jetzt` übergeben. Prüfen:
+- [x] 3.1 Personen prüfen und schreiben in den Kern legen; der Ad-hoc-Zweig hängt an `MIT_ADHOC`. Prüfen: Tests aus 1.1/1.2 grün.
+- [x] 3.2 Block anlegen, ändern und löschen über den Kern. Posten-Prüfung, Insert, Überschneidung, Zeitzone und Löschprüfungen sind Methoden der Art (D2). Prüfen: `--test schichtplan`, `--test planung`, `--test schichtplan_wechsel`, `--test schichtplan_kopplung`.
+- [x] 3.3 „Schichten erzeugen“: Die Konfliktschleife liegt im Kern. Teilung, ETB-Satz und Rückgabe bleiben je Seite. Prüfen: Tests zu „erzeugen“ beider Seiten.
+- [x] 3.4 Laden: Das gemeinsame Grundgerüst baut eine neutrale Blockstruktur mit Prüfbefunden (D3). Die Planung bekommt `jetzt` übergeben. Prüfen:
   - `--test schichtplan`, `--test planung`
   - `src/planung/tests.rs`
   - `--test schichtplan_export`, `--test schichtplan_buendel`
   - `scripts/check-typ-codegen.sh` ohne Diff
-- [ ] 3.5 Die Routen teilen `HelferAnlegen`/`HelferAendern`, `VersionParams` und die Personen-Übersetzung (D5). Prüfen: `cargo test` der Routen-Tests beider Seiten und `scripts/check-typ-codegen.sh` ohne Diff.
+- [x] 3.5 Die Routen teilen `HelferAnlegen`/`HelferAendern`, `VersionParams` und die Personen-Übersetzung (D5). Prüfen: `cargo test` der Routen-Tests beider Seiten und `scripts/check-typ-codegen.sh` ohne Diff.
 
 ## 4. Frontend: ein Editor
 
