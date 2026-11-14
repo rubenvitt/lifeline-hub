@@ -347,6 +347,13 @@ Schlüssel registriert, ist der wartende nicht seiner. Ein zurückgewiesener Sch
 nie gültig, auch wenn die andere Installation ihn erneut liefert. Einen eigenen
 Unterschriftsschlüssel braucht man zum Bestätigen nicht.
 
+Hat die andere Installation alle Änderungen an Schlüsseln geschickt, nennt sie bei jeder Meldung
+die Schlüssel, die sie führt. Fehlt dort einer,
+etwa weil sie aus einer Sicherung zurückgespielt wurde, gilt er hier danach als widerrufen, auch
+ein wartender. An der Kopplung steht dann etwa „… führt 1 Unterschriftsschlüssel nicht mehr (aus einer
+Sicherung zurückgespielt?). Er gilt hier nicht mehr.“, und die Admin-Spur nennt den Widerruf
+mit der anderen Installation als Auslöser. Ein zurückgewiesener Schlüssel bleibt zurückgewiesen.
+
 Der letzte gültige Schlüssel einer gekoppelten Organisation lässt sich nicht einzeln widerrufen.
 Wird ein Admin-Konto deaktiviert oder herabgestuft, sind seine Schlüssel trotzdem widerrufen,
 auch der letzte: die Benutzerverwaltung fragt dann vorher nach und nennt die Kopplungen. Danach
@@ -382,6 +389,12 @@ des ELW auf ein am Hub gelöschtes Schichtmodell, bleibt es stehen, gehört dem 
 bearbeitbar. Was der Hub im selben Zug selbst nicht mehr verwendet, etwa ein Schichtmodell, das er
 erst aus seinen Vorlagen nimmt und dann löscht, löscht auch der ELW. Nach dem Widerruf gehören
 alle Zeilen dem ELW und sind wieder bearbeitbar.
+
+Führt der Hub eine Zeile nicht mehr, ohne dass eine Löschung kam, etwa weil er aus einer
+Sicherung zurückgespielt wurde, räumt der ELW sie genauso ab: gelöscht, außer Dienst genommen
+oder deaktiviert, ein deaktiviertes Konto samt seinen Sitzungen am ELW. Das geschieht, sobald der
+ELW alle Änderungen des Hubs hat, und an der Kopplung steht etwa „2 Zeilen, die … nicht mehr
+führt, wurden entfernt oder stillgelegt.“
 
 Eine Organisation bezieht Stammdaten aus genau einer Kopplung; eine weitere zeigt „Stammdaten
 dieser Org kommen schon aus einer anderen Kopplung.“
