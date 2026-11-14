@@ -44,6 +44,9 @@ const NACHLAUF_MS = 500;
 /** So lange darf der Start unter Last bis zu Endton und „SYNC“ brauchen. */
 const ENDSTAND_FRIST_MS = 30_000;
 
+/** Längstens so lange hält {@link stromNachVerbindeFreigeben} den Strom zurück. */
+const STROM_HALTEN_MS = 10_000;
+
 type Messpunkt = { t: number; hoehe: number; ton: string | null; sync: string | null };
 
 async function tonPruefungNachbilden(page: Page, ton: 'bereit' | 'blockiert') {
@@ -110,29 +113,88 @@ async function tonPruefungNachbilden(page: Page, ton: 'bereit' | 'blockiert') {
 
 /**
  * Hält jeden Aufbau des Einsatz-Stroms zurück, bis „VERBINDE“ neben dem Tonknopf im Bild stand
- * (LLH-1506). Danach läuft die Anfrage unverändert zum Server, der Aufbau bleibt echt. Ohne das
- * Zurückhalten öffnete der Strom auf einem schnellen Runner, bevor die Alarmzentrale im Kopf
- * stand, und die Messung sah den Wechsel „VERBINDE“ → „SYNC“ nie.
+ * (LLH-1506), höchstens {@link STROM_HALTEN_MS}. Danach öffnet die echte `EventSource` zum
+ * Server, der Aufbau bleibt echt. Ohne das Zurückhalten öffnete der Strom auf einem schnellen
+ * Runner, bevor die Alarmzentrale im Kopf stand, und die Messung sah den Wechsel
+ * „VERBINDE“ → „SYNC“ nie.
+ *
+ * Im Browser statt über `page.route`: Ein Routing schaltet in Playwright den HTTP-Cache ab
+ * („Enabling routing disables http cache“). Dann lud jedes der 30 `goto` alle rund 1340 Module
+ * des Vite-Servers neu, 9–32 s je Aufruf unter CI-Last, und der Test lief aus seiner Frist
+ * (Lauf 43575061389, `e2e 4/4`). Die Hülle bietet, was `src/live/liveVerbindung.ts` nutzt:
+ * `readyState`, `onopen`/`onerror`/`onmessage`, `add`/`removeEventListener`, `close`.
  */
 async function stromNachVerbindeFreigeben(page: Page, einsatzId: string) {
-  const pfad = `/api/einsaetze/${einsatzId}/live`;
-  await page.route(
-    (url) => url.pathname === pfad,
-    async (route) => {
-      try {
-        await page.waitForFunction(
-          () =>
-            (window as unknown as { __lfhKopf?: Messpunkt[] }).__lfhKopf?.some(
-              (p) => p.ton !== null && p.sync === 'verbinde',
-            ) ?? false,
-          undefined,
-          { timeout: 10_000 },
-        );
-      } catch {
-        // Seite schon weiter oder ohne Alarmzentrale: die Vorbedingung in `messe` meldet es.
+  await page.addInitScript(
+    ({ pfad, haltenMs }) => {
+      const Echt = window.EventSource;
+      type Hoerer = [string, EventListenerOrEventListenerObject, unknown];
+      class ZurueckgehalteneQuelle {
+        static readonly CONNECTING = 0;
+        static readonly OPEN = 1;
+        static readonly CLOSED = 2;
+        readonly CONNECTING = 0;
+        readonly OPEN = 1;
+        readonly CLOSED = 2;
+        onopen: ((e: Event) => unknown) | null = null;
+        onerror: ((e: Event) => unknown) | null = null;
+        onmessage: ((e: MessageEvent) => unknown) | null = null;
+        private echt: EventSource | null = null;
+        private zu = false;
+        private hoerer: Hoerer[] = [];
+        constructor(
+          readonly url: string,
+          private readonly init?: EventSourceInit,
+        ) {
+          const frist = performance.now() + haltenMs;
+          const pruefen = () => {
+            if (this.zu) return;
+            const kopf = (window as unknown as { __lfhKopf?: Messpunkt[] }).__lfhKopf ?? [];
+            const verbindeStand = kopf.some((p) => p.ton !== null && p.sync === 'verbinde');
+            if (verbindeStand || performance.now() >= frist) this.oeffnen();
+            else setTimeout(pruefen, 20);
+          };
+          pruefen();
+        }
+        get readyState() {
+          if (this.echt) return this.echt.readyState;
+          return this.zu ? 2 : 0;
+        }
+        get withCredentials() {
+          return this.init?.withCredentials ?? false;
+        }
+        addEventListener(typ: string, h: EventListenerOrEventListenerObject, o?: unknown) {
+          this.hoerer.push([typ, h, o]);
+          this.echt?.addEventListener(typ, h, o as AddEventListenerOptions);
+        }
+        removeEventListener(typ: string, h: EventListenerOrEventListenerObject, o?: unknown) {
+          this.hoerer = this.hoerer.filter(([t, x]) => t !== typ || x !== h);
+          this.echt?.removeEventListener(typ, h, o as EventListenerOptions);
+        }
+        close() {
+          this.zu = true;
+          this.echt?.close();
+        }
+        private oeffnen() {
+          const echt = new Echt(this.url, this.init);
+          this.echt = echt;
+          for (const [typ, h, o] of this.hoerer) {
+            echt.addEventListener(typ, h, o as AddEventListenerOptions);
+          }
+          echt.onopen = (e) => this.onopen?.(e);
+          echt.onerror = (e) => this.onerror?.(e);
+          echt.onmessage = (e) => this.onmessage?.(e);
+        }
       }
-      await route.continue().catch(() => undefined);
+      // Nur der Einsatz-Strom wartet; jede andere Quelle (Org-Strom) bleibt die echte.
+      window.EventSource = new Proxy(Echt, {
+        construct(ziel, [url, init]: [string | URL, EventSourceInit?]) {
+          if (new URL(String(url), location.href).pathname !== pfad) return new ziel(url, init);
+          return new ZurueckgehalteneQuelle(String(url), init) as unknown as EventSource;
+        },
+      });
     },
+    { pfad: `/api/einsaetze/${einsatzId}/live`, haltenMs: STROM_HALTEN_MS },
   );
 }
 
