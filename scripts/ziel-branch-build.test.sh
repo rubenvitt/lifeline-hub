@@ -13,6 +13,7 @@ ARBEIT="$(mktemp -d)"
 trap 'rm -rf "$ARBEIT"' EXIT
 fehler=0
 export GITHUB_REPOSITORY=test/repo
+export ZBB_WARTEN=0 # `melden` wartet bei „überholt“ nicht wirklich auf einen Nachfolger
 
 # ── Attrappe für gh ──────────────────────────────────────────────────────────────────
 # Zustand unter $ZBB_FAKE: pulls.json, pull-<nr>.json, ref-<branch> (Spitze), checks-<sha>.json,
@@ -327,14 +328,32 @@ pruefe "8 Konflikt: Check rot" "PATCH 901 failure" "$(log "$f")"
 pruefe "8 Konflikt als Grund" 1 "$(sed -n 2p "$f/text-901" | grep -c 'Konflikt')"
 
 # 9 — Der Ziel-Branch ist inzwischen weiter: das Ergebnis ist überholt, nicht grün. Der Check
-# bleibt auf „läuft“ (LLH-1889: abgebrochen zeigte den PR rot); das Ergebnis zum neuen Stand
-# schließt ihn.
+# bleibt auf „läuft“, sobald ein jüngerer Check am Kopf steht (LLH-1889: abgebrochen zeigte den PR
+# rot); GitHub wertet nur den jüngsten.
 f="$(neu zielweiter)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 echo neuerezielsha > "$f/ref-alpha"
+checks_auf "$f" k7 '901:in_progress' '950:in_progress'
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
-pruefe "9 Ziel-Branch weiter: überholt, Check läuft weiter" "PATCH 901 in_progress" "$(log "$f")"
+pruefe "9 Ziel-Branch weiter, Nachfolger da: Check läuft weiter" "PATCH 901 in_progress" "$(log "$f")"
 pruefe "9 überholt steht im Check" 1 "$(grep -c 'inzwischen steht einer davon weiter' "$f/text-901")"
+
+# 9c — Überholt, aber es erscheint kein jüngerer Check (der Merge war nur ein Release-Commit und
+# der Vergleich scheiterte, oder `verteilen` brach ab): nicht still „läuft“ für immer, sondern rot
+# mit dem Rat, neu zu starten (Review LLH-1889). ZBB_WARTEN=0: nur einmal nachsehen.
+f="$(neu ohnenachfolger)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo neuerezielsha > "$f/ref-alpha"
+checks_auf "$f" k7 '850:in_progress' '901:in_progress'
+lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
+pruefe "9c kein Nachfolger: rot" "PATCH 901 failure" "$(log "$f")"
+pruefe "9c Rat: neu starten" 1 "$(grep -c 'neu starten' "$f/text-901")"
+f="$(neu nachfolgerkaputt)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo neuerezielsha > "$f/ref-alpha"
+touch "$f/checkruns-kaputt"
+lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
+pruefe "9c Checks nicht lesbar: rot statt hängen" "PATCH 901 failure" "$(log "$f")"
 
 # 9b — alpha ist nur um einen Release-Commit weiter ([skip ci], startet keinen Lauf): das Ergebnis
 # gilt, sonst hinge der PR bis zum nächsten Merge.
@@ -345,45 +364,23 @@ echo '{"status":"ahead","commits":[{"commit":{"message":"chore(release): 1.0.0-a
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
 pruefe "9b nur Release-Commit dazu: Ergebnis gilt" "PATCH 901 success" "$(log "$f")"
 
-# 10 — Der PR hat einen neuen Kopf: überholt, der Check bleibt auf „läuft“.
+# 10 — Der PR hat einen neuen Kopf: überholt. Der Check steht am alten Kopf, den der PR nicht
+# mehr zeigt; er bleibt auf „läuft“, ohne auf einen Nachfolger zu warten.
 f="$(neu kopfweiter)"
 printf '%s\n' '7|k7neu|false|false|true|' | prs "$f"
 echo zielsha > "$f/ref-alpha"
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
 pruefe "10 PR-Kopf weiter: überholt, Check läuft weiter" "PATCH 901 in_progress" "$(log "$f")"
 
-# 10b — Auch mit älteren offenen Checks: ein überholtes Ergebnis schließt keinen davon.
-f="$(neu ueberholtaeltere)"
-printf '%s\n' '7|k7|false|false|true|' | prs "$f"
-echo neuerezielsha > "$f/ref-alpha"
-checks_auf "$f" k7 '850:in_progress' '901:in_progress'
-lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
-pruefe "10b überholt: kein älterer Check geschlossen" "PATCH 901 in_progress" "$(log "$f")"
-
-# 16 — Ein gültiges Ergebnis schließt jeden älteren offenen Check des Kopfes (verteilen, ein
-# ersetzter wartender Lauf, ein überholter Lauf) mit demselben Ergebnis. Ein jüngerer offener
-# (angelegt nach der Prüfung, zu einem neueren Stand) und ein abgeschlossener bleiben, wie sie sind.
-f="$(neu schliesstaeltere)"
+# 16 — Ein gültiges Ergebnis schließt nur den eigenen Check. Ältere offene bleiben offen: GitHub
+# wertet je Name den jüngsten (alle Checks-API-Runs liegen in einer Suite), sie zählen nicht mehr
+# (Review LLH-1889; das frühere Mitschließen fand sie ohne `filter=all` nie).
+f="$(neu aeltereoffen)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 echo zielsha > "$f/ref-alpha"
-checks_auf "$f" k7 '700:completed' '800:queued' '850:in_progress' '901:in_progress' '950:in_progress'
+checks_auf "$f" k7 '800:queued' '850:in_progress' '901:in_progress'
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
-pruefe "16 grün schließt die älteren offenen mit" "PATCH 901 success;PATCH 800 success;PATCH 850 success" "$(log "$f")"
-f="$(neu schliesstaeltererot)"
-printf '%s\n' '7|k7|false|false|true|' | prs "$f"
-echo zielsha > "$f/ref-alpha"
-checks_auf "$f" k7 '850:in_progress' '901:in_progress'
-lauf "$f" melden 7 k7 901 alpha zielsha rot "$ARBEIT/ausgabe-baut"
-pruefe "16 rot schließt die älteren offenen ebenso rot" "PATCH 901 failure;PATCH 850 failure" "$(log "$f")"
-
-# 16b — Die Checks des Kopfes sind nicht lesbar: der eigene ist trotzdem geschlossen, der Lauf
-# endet ohne Fehler (die älteren schließt der nächste Lauf).
-f="$(neu schliesstkaputt)"
-printf '%s\n' '7|k7|false|false|true|' | prs "$f"
-echo zielsha > "$f/ref-alpha"
-touch "$f/checkruns-kaputt"
-lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
-pruefe "16b Checks nicht lesbar: eigener grün" "PATCH 901 success" "$(log "$f")"
+pruefe "16 grün: nur der eigene Check" "PATCH 901 success" "$(log "$f")"
 
 # 11 — Kein Ergebnis (Kompilierlauf abgebrochen oder ohne Ausgabe): rot, nie grün.
 f="$(neu ohneergebnis)"

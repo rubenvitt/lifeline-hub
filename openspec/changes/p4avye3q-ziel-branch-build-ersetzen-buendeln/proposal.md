@@ -7,7 +7,7 @@ Am 14.11.2026 standen rund zehn fertige PRs rot und mergten nicht (LLH-1889). Di
 ## What Changes
 
 - Ein neuer Ziel-Stand bricht keinen laufenden Lauf mehr ab. Je PR rechnet höchstens ein Lauf, ein zweiter wartet, und ein später kommender ersetzt den wartenden. So bündeln sich mehrere Merges kurz hintereinander auf den jüngsten Stand.
-- Kein Lauf schließt mehr einen Check `Baut mit Ziel-Branch` als abgebrochen, weil er überholt oder übernommen wurde. Ein überholtes Ergebnis lässt den Check auf „läuft“, bis das Ergebnis zum neuen Stand ihn schließt. Ein gültiges Ergebnis schließt dabei auch die älteren offenen Checks desselben Kopfes.
+- Kein Lauf schließt mehr einen Check `Baut mit Ziel-Branch` als abgebrochen, weil er überholt oder übernommen wurde. Ein überholtes Ergebnis lässt den Check auf „läuft“, bis der jüngere Check zum neuen Stand ihn ablöst. Kommt binnen 5 Minuten keiner, wird er rot mit „neu starten“. Ist ein Stand auf dem Kopf schon gerechnet, rechnet er nicht noch einmal.
 - Auch die Push-Läufe (`verteilen`) brechen sich nicht mehr gegenseitig ab.
 - Der Stau-Wächter bekommt keine neue Befundart. Sein Selbsttest hält fest, dass ein laufender `Baut mit Ziel-Branch` „grün, nicht gemergt“ verhindert. Die Doku beschreibt den neuen Ablauf.
 - Nicht Teil dieser Change ist der gemeinsame Kompilierlauf für alle fertigen PRs (Punkt 3 der Aufgabe). Er wird in LLH-1890 abgewogen.

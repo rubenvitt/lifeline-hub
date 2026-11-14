@@ -22,14 +22,17 @@
 #   scripts/ziel-branch-build.sh melden <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> \
 #       <ergebnis> <ausgabe-datei>
 #       Schließt den Check <check-id>: ergebnis `gruen` → grün; `rot`, `konflikt`, `veraltet`,
-#       leer oder unbekannt → rot. Mit demselben Ergebnis schließt er jeden älteren (kleinere ID)
-#       noch offenen Check dieses Namens auf dem Kopf. Steht der PR-Kopf weiter oder der
+#       leer oder unbekannt → rot. Ältere offene Checks des Kopfes bleiben: GitHub wertet je Name
+#       den jüngsten. Steht der PR-Kopf weiter oder der
 #       Ziel-Branch um mehr als Release-Commits (die mit `[skip ci]` keinen Lauf starten) weiter,
-#       ist das Ergebnis überholt: der Check bleibt auf „läuft“, und das Ergebnis zum neuen Stand
-#       schließt ihn (LLH-1889: nie „abgebrochen“, das zeigt den PR rot).
+#       ist das Ergebnis überholt: der Check bleibt auf „läuft“, und ein jüngerer Check zum neuen
+#       Stand löst ihn ab (LLH-1889: nie „abgebrochen“, das zeigt den PR rot). Erscheint binnen
+#       ZBB_WARTEN Sekunden keiner, wird er rot mit dem Rat, neu zu starten.
 #   Exit 0 = gelaufen · 1 = an mindestens einem PR gescheitert (die übrigen sind bearbeitet) ·
 #   2 = Aufruf- oder Umgebungsfehler
 #   Umgebung: ZBB_GH  Kommando für GitHub-Zugriffe (Vorgabe gh; der Selbsttest setzt eine Attrappe)
+#             ZBB_WARTEN, ZBB_TAKT  Sekunden: wie lange und wie oft `melden` bei „überholt“ auf
+#                       einen jüngeren Check wartet (Vorgabe 300 und 20)
 #
 # WARUM: Die CI eines PRs prüft den Stand des Ziel-Branches beim letzten Push. Am 12.11.2026 waren
 # #1319 und #1315 einzeln grün und brachen `alpha` zusammen. Bewegt sich der Ziel-Branch, muss der
@@ -200,16 +203,39 @@ nur_release_weiter() { # <alt> <neu>
       and all(.commits[]; .commit.message | startswith("chore(release):"))' 2> /dev/null | grep -qx true
 }
 
+# Erscheint auf <kopf> ein jüngerer Check dieses Namens als <id>? Wartet bis zu ZBB_WARTEN Sekunden
+# (Vorgabe 300; `verteilen` braucht nach einem Merge eine knappe Minute, steht aber in einer
+# Warteschlange), sieht alle ZBB_TAKT Sekunden nach. Nicht lesbar zählt wie „noch keiner“.
+nachfolger_da() { # <kopf> <id>
+  local ende juengster
+  ende=$(( $(date +%s) + ${ZBB_WARTEN:-300} ))
+  while :; do
+    juengster="$(gh_api "$(check_runs_pfad "$1")" --jq '[.check_runs[].id] | max // 0' 2> /dev/null || echo 0)"
+    [ "${juengster:-0}" -gt "$2" ] && return 0
+    [ "$(date +%s)" -lt "$ende" ] || return 1
+    sleep "${ZBB_TAKT:-20}"
+  done
+}
+
 melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <ausgabe-datei>
   local nr="$1" kopf="$2" id="$3" ziel="$4" ziel_sha="$5" ergebnis="$6" datei="$7"
   local jetzt_kopf jetzt_ziel fazit titel text ausgabe=""
   jetzt_kopf="$(gh_api "repos/$REPO/pulls/$nr" --jq .head.sha)"
   jetzt_ziel="$(gh_api "repos/$REPO/git/ref/heads/$ziel" --jq .object.sha)"
   if [ "$jetzt_kopf" != "$kopf" ] || { [ "$jetzt_ziel" != "$ziel_sha" ] && ! nur_release_weiter "$ziel_sha" "$jetzt_ziel"; }; then
-    echo "PR #$nr: überholt (PR $(kurz "$jetzt_kopf"), $ziel $(kurz "$jetzt_ziel")), Check bleibt auf „läuft“" >&2
-    gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=in_progress \
-      -f "output[title]=Überholt, rechnet neu" \
-      -f "output[summary]=Gerechnet gegen PR $(kurz "$kopf") und \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter. Das Ergebnis zum neuen Stand meldet dessen eigener Lauf (ein neuer Commit am PR oder ein Merge auf \`$ziel\` startet ihn) und schließt dabei auch diesen Check." > /dev/null
+    # Am neuen Kopf zeigt der PR diesen Check nicht mehr. Bewegte sich nur der Ziel-Branch, löst
+    # ihn ein jüngerer Check ab (GitHub wertet je Name den jüngsten); kommt keiner, hinge der PR
+    # still auf „läuft“, also rot mit Rat (Review LLH-1889).
+    if [ "$jetzt_kopf" != "$kopf" ] || nachfolger_da "$kopf" "$id"; then
+      echo "PR #$nr: überholt (PR $(kurz "$jetzt_kopf"), $ziel $(kurz "$jetzt_ziel")), Check bleibt auf „läuft“" >&2
+      gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=in_progress \
+        -f "output[title]=Überholt, rechnet neu" \
+        -f "output[summary]=Gerechnet gegen PR $(kurz "$kopf") und \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter. Das Ergebnis zum neuen Stand meldet ein jüngerer Check dieses Namens." > /dev/null
+      return 0
+    fi
+    echo "PR #$nr: überholt, aber kein jüngerer Check erschienen → rot" >&2
+    schliessen "$id" failure "Überholt, kein neuer Lauf" \
+      "Gerechnet gegen \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter, aber kein neuer Lauf hat sich gemeldet. Den Lauf „$NAME“ neu starten oder einen Commit pushen." ""
     return 0
   fi
   [ -f "$datei" ] && ausgabe="$(tail -c 60000 "$datei")"
@@ -225,19 +251,6 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
   esac
   echo "PR #$nr: $ergebnis → $fazit" >&2
   schliessen "$id" "$fazit" "$titel" "$text" "$ausgabe"
-  # Ältere offene Checks des Kopfes (von `verteilen`, eines ersetzten wartenden oder eines
-  # überholten Laufs) gelten mit: sie rechneten gegen denselben oder einen älteren Stand. Ein
-  # jüngerer entstand nach der Prüfung oben zu einem neueren Stand und bleibt offen. Nicht lesbar:
-  # kein Abbruch, die älteren schließt der nächste Lauf.
-  local aeltere alt
-  aeltere="$(gh_api "repos/$REPO/commits/$kopf/check-runs?check_name=$(jq -rn --arg n "$NAME" '$n | @uri')&per_page=100" \
-    --paginate --jq '.check_runs[] | select(.status != "completed") | .id' 2> /dev/null)" \
-    || { echo "PR #$nr: ältere Checks nicht lesbar, bleiben offen" >&2; return 0; }
-  for alt in $(sort -n <<< "$aeltere"); do
-    [ "$alt" -lt "$id" ] || continue
-    echo "PR #$nr: älterer Check $alt → $fazit" >&2
-    schliessen "$alt" "$fazit" "$titel" "$text" "$ausgabe" || echo "PR #$nr: älterer Check $alt nicht geschlossen" >&2
-  done
 }
 
 schliessen() { # <check-id> <conclusion> <titel> <text> <ausgabe>

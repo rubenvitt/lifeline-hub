@@ -105,9 +105,12 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   frischen Check an. **Warteschlange statt Abbruch** (LLH-1889): je PR rechnet ein Lauf, einer
   wartet, ein neuer Anstoß ersetzt den wartenden (`cancel-in-progress: false`, auch bei neuem
   PR-Commit); so bündeln sich Merges auf den jüngsten Stand. **Kein Check und kein Job endet
-  abgebrochen, weil er überholt ist**: ein überholter Check bleibt auf „läuft“, und das gültige
-  Ergebnis schließt jeden älteren offenen Check des Kopfes mit (jüngere bleiben offen). Abgebrochen
-  hieß am PR rot, und am 14.11.2026 mergte so nichts mehr. Der Check entsteht über
+  abgebrochen, weil er überholt ist**: ein überholter Check bleibt auf „läuft“, bis ihn der
+  jüngere Check des nächsten Laufs ablöst (GitHub wertet je Name den jüngsten; alle Checks-API-Runs
+  liegen in einer Suite, ohne `filter=all` liefert die API nur ihn). Erscheint binnen 5 Minuten kein
+  jüngerer, wird er rot mit „neu starten“. Abgebrochen hieß am PR rot, und am 14.11.2026 mergte so
+  nichts mehr. Jeder Check trägt den gerechneten Ziel-Stand in `external_id`; ist ein Stand auf dem
+  Kopf schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen. Der Check entsteht über
   die Checks-API, nie als Job-Name (ein übersprungener Job meldete grün). **PR-Code läuft nie in
   einem Lauf auf einem Kanal-Branch** (dessen Cache-Bereich liest der Release-Build; Runtime-Token
   und `sudo` umgehen jedes `save-if`), nur im Job `kompilieren` eines PR- oder Einzellaufs: dort

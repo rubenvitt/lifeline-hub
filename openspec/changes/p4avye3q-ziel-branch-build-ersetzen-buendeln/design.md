@@ -32,7 +32,8 @@ Ein Lauf, der in der Warteschlange ersetzt wird, legt keine Jobs an (Lauf 436026
 
 **D2 Kein Check wird wegen Überholung geschlossen.** Ein überholtes Ergebnis lässt den eigenen Check `in_progress` und setzt nur den Text auf „Überholt“. Der Einzellauf legt weiter einen frischen Check an, schließt den von `verteilen` aber nicht mehr.
 
-**D3 Das gültige Ergebnis schließt alle älteren offenen Checks.** `melden` schließt nach der Prüfung „Kopf und Ziel noch aktuell“ den eigenen Check und jeden offenen Check dieses Namens auf dem Kopf, dessen ID kleiner ist. Check-IDs wachsen mit der Zeit. Ein Check, der erst nach der Aktualitätsprüfung angelegt wurde (`verteilen` zu einem neueren Stand), hat eine größere ID und bleibt offen. Damit ist auch der Fall gelöst, gegen den der Einzellauf bisher den frischen Check angelegt hat: Ein älterer verwaister Check stört nicht mehr, weil er geschlossen wird.
+**D3 Maßgeblich ist der jüngste Check, ein überholter wartet auf ihn.** Alle Runs der Checks-API liegen in einer Check-Suite, und GitHub wertet je Name den jüngsten. Gemessen am 14.11. an rund 45 PR-Köpfen: Gemergte PRs trugen ältere Runs, die noch auf `in_progress` standen. Ältere offene Checks stören also nicht und bleiben offen. Ein erster Entwurf schloss sie in `melden` mit. Ohne `filter=all` fand er sie aber nie (Review), und nötig ist das auch nicht. Ein überholter Check wartet bis zu 5 Minuten auf einen jüngeren. Erscheint keiner, etwa weil nur ein Release-Commit kam und der Vergleich scheiterte oder `verteilen` abbrach, wird er rot mit „neu starten“ (Rubens Wahl am 14.11.). Hat sich der PR-Kopf bewegt, wartet er nicht: Der Check steht am alten Kopf, den der PR nicht mehr zeigt.
+- *Alternative Stau-Wächter-Befund „hängt auf läuft“:* Mehr Code und eine spätere Meldung. Verworfen.
 - *Alternative: den Check von `verteilen` im Einzellauf wiederverwenden.* Geht nicht. Ein inzwischen abgeschlossener Check müsste wieder geöffnet werden, und ein jüngerer verwaister Check aus einem PR-Ereignis bliebe stehen.
 
 **D5 Ein schon gerechneter Stand rechnet nicht noch einmal** (Review). Der wartende Lauf liest die Spitze des Ziel-Branches erst bei seinem Start. Liegt ein Merge kurz vor diesem Start, rechnet er schon gegen den neuen Stand, bevor `verteilen` dafür dispatcht hat. Der Dispatch würde dann einen dritten Lauf gegen denselben Stand einreihen. Deshalb trägt jeder Check den gerechneten Ziel-Stand in `external_id`. Der Einzellauf übernimmt ein abgeschlossenes Ergebnis (grün oder rot) zu genau diesem Kopf und Stand in den Check von `verteilen` und rechnet nicht. Er bekommt dafür den Kopf mit, auf dem `verteilen` den Check angelegt hat. Hat der PR inzwischen einen neuen Kopf, übernimmt er nichts.
@@ -41,9 +42,9 @@ Ein Lauf, der in der Warteschlange ersetzt wird, legt keine Jobs an (Lauf 436026
 
 ## Risks / Trade-offs
 
-- [Ein Lauf hängt (Runner-Ausfall), sein Check bleibt auf „läuft“] → Wie bisher. Der nächste Anstoß (Commit, Merge, Auto-Merge an) legt einen jüngeren Check an, und dessen Ergebnis schließt den alten mit. Der Stau-Wächter meldet nichts Falsches, er wertet je Name den jüngsten Check.
+- [Ein Lauf hängt (Runner-Ausfall), sein Check bleibt auf „läuft“] → Wie bisher. Der nächste Anstoß (Commit, Merge, Auto-Merge an) legt einen jüngeren Check an, der ihn ablöst.
 - [Längere Wartezeit nach einer Merge-Serie, bis zu zwei Laufzeiten] → Gewollt, als Preis für „kein Rot“. Messen in LLH-1890.
-- [Gleichstand der IDs ist ausgeschlossen], weil IDs streng wachsen. Ein Lesefehler beim Auflisten der offenen Checks ist kein Abbruch: Der eigene Check wird trotzdem geschlossen, der Fehler steht im Log.
+- [Ältere Runs bleiben in der Liste mit `filter=all` auf `in_progress`] → Rein kosmetisch. Weder die PR-Ansicht noch der Required Check werten sie.
 
 ## Migration Plan
 
