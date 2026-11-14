@@ -1395,6 +1395,7 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
   const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(24);
   const LEISTE = '.etb-erfassung-sticky';
+  const ANHAENGE = ['a', 'b', 'c', 'd', 'e'];
   await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
   const knopf = page.locator('[data-lfh="etb-nach-oben"]');
 
@@ -1428,9 +1429,11 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
     ohne.kopf - 1,
   );
 
-  // Drei Anhänge: die Liste „Gewählte Anhänge“ hebt die Leiste.
+  // Fünf Anhänge: die Liste „Gewählte Anhänge“ hebt die Leiste. Seit der Feldzeile und dem stets
+  // freien Platz unter der jüngsten Zeile (kwc2yszv, Review S11) reichen drei nicht mehr, um den
+  // Knopf unter den Kopf zu schieben (gemessen: Leiste 259 px, Knopf oben 173 px, Kopf 145 px).
   await page.locator('[data-lfh="etb-anhang-eingabe"]').setInputFiles(
-    ['a', 'b', 'c'].map((n) => ({
+    ANHAENGE.map((n) => ({
       name: `Fax Leitstelle ${n}.pdf`,
       mimeType: 'application/pdf',
       buffer: Buffer.from('%PDF-1.4\n%%EOF\n'),
@@ -1438,7 +1441,7 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
   );
   await expect(
     page.getByRole('list', { name: 'Gewählte Anhänge' }).getByRole('listitem'),
-  ).toHaveCount(3);
+  ).toHaveCount(ANHAENGE.length);
   await expect
     .poll(async () => (await lage()).top, { message: 'die Leiste wächst, der Knopf rückt hoch' })
     .toBeLessThan(ohne.top - 40);
@@ -1451,7 +1454,7 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
   expect(mit.achse, 'die Zeitachse behält ihre Höhe').toBe(ohne.achse);
 
   // Anhänge wieder weg: der Knopf kommt zurück, frei unter dem Kopf.
-  for (const n of ['a', 'b', 'c']) {
+  for (const n of ANHAENGE) {
     await page.getByRole('button', { name: `Anhang Fax Leitstelle ${n}.pdf entfernen` }).click();
   }
   await expect(knopf).toBeVisible();

@@ -35,6 +35,18 @@ async function zumEtb(page: Page, einsatzId: number) {
   await expect(page.getByPlaceholder(/Inhalt/)).toBeVisible();
 }
 
+/**
+ * Eine Meldung braucht einen Absender (Spec `etb-absender-empfaenger`, „Vorbelegung neuer
+ * Einträge“: Von leer, Pflicht). Enter nimmt den Freitext-Eintrag und springt in den Inhalt.
+ */
+async function vonSetzen(page: Page, von: string) {
+  const feld = page.getByRole('combobox', { name: 'Von' });
+  await feld.fill(von);
+  await expect(page.getByTitle(`„${von}“ als Freitext übernehmen`)).toBeVisible();
+  await feld.press('Enter');
+  await expect(page.getByPlaceholder(/Inhalt/)).toBeFocused();
+}
+
 test('erfasst einen Eintrag mit Anhang und lädt ihn über die ETB-Route', async ({ page }) => {
   await page.setViewportSize(FUEKW);
   await anmelden(page);
@@ -51,6 +63,7 @@ test('erfasst einen Eintrag mit Anhang und lädt ihn über die ETB-Route', async
   const liste = page.getByRole('list', { name: 'Gewählte Anhänge' });
   await expect(liste).toContainText('Lagefoto Süd.jpg');
 
+  await vonSetzen(page, 'Florian Süd 1');
   const feld = page.getByPlaceholder(/Inhalt/);
   await feld.fill('Foto der Schadenstelle');
   await feld.press('Enter');
@@ -108,6 +121,7 @@ test('ohne Netz ist „Anhang" gesperrt, ein Text-Eintrag landet als ausstehend'
     // Kurzgrund am Knopf statt eines Satzes (LFH-1078).
     await expect(page.locator('[data-lfh="etb-anhang-grund"]')).toHaveText('offline');
 
+    await vonSetzen(page, 'Florian Süd 1');
     const feld = page.getByPlaceholder(/Inhalt/);
     await feld.fill('Funkmeldung ohne Netz');
     await feld.press('Enter');
