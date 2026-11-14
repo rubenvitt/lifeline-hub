@@ -66,7 +66,8 @@ pub async fn laden(
 /// Entscheidet einen Abgleich (`bestaetigt`/`verworfen`). Bei `bestaetigt` wird in
 /// DERSELBEN Transaktion die Vermisstmeldung `→ abgemeldet` gesetzt; der partielle
 /// Unique-Index erzwingt höchstens einen bestätigten Abgleich je Vermisstmeldung
-/// (Verletzung → `Conflict`). Voraussetzung (Handler): Abgleich-Status == `verdacht`.
+/// (Verletzung → `Conflict`). Nur aus `verdacht` heraus: ein schon entschiedener Abgleich
+/// endet mit `Conflict`, geprüft im UPDATE selbst (LLH-1686).
 pub async fn entscheide(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -91,7 +92,7 @@ pub async fn entscheide(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await;
-        let betroffen = match ergebnis {
+        let rows_affected = match ergebnis {
             Ok(r) => r.rows_affected(),
             Err(e) => {
                 // Partieller Unique-Index: bereits ein bestätigter Abgleich je Vermisstmeldung.
@@ -105,7 +106,7 @@ pub async fn entscheide(
                 return Err(e.into());
             }
         };
-        if betroffen == 0 {
+        if rows_affected == 0 {
             return Err(AppError::Conflict(
                 "Abgleich ist bereits entschieden".into(),
             ));
