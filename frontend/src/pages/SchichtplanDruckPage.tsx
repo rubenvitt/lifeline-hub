@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Breadcrumb, Button, Flex, Typography, theme } from 'antd';
+import { Breadcrumb, Button } from 'antd';
 import { listeAbloesungVorgaben } from '../api/abloesungen';
 import { ApiError } from '../api/client';
 import { listeEinheiten } from '../api/einheiten';
@@ -11,26 +11,14 @@ import { listeQualifikationen } from '../api/qualifikationen';
 import { einsatzKeys } from '../api/queryKeys';
 import { fetchSchichtplan } from '../api/schichtplan';
 import { ausEinsatzPlan } from '../abloesung/schichtplan/ausgabe/ausEinsatzPlan';
-import { aushaenge, zettel } from '../abloesung/schichtplan/ausgabe/ausgabePlan';
-import SchichtplanBlaetter, {
-  type BlattSicht,
-} from '../abloesung/schichtplan/ausgabe/SchichtplanBlaetter';
+import SchichtplanDruckInhalt from '../abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt';
 import { baueZeilen } from '../abloesung/schichtplan/schichtplanZeilen';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Segmentleiste } from '../components/instrument';
-import { Select } from '../components/Select';
-import { MODUL_PERSONAL_GESPERRT } from '../components/nurAnsicht';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
-import DruckKnopf from '../components/druck/DruckKnopf';
-import { teilwortSuche } from '../components/teilwortSuche';
 import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { useModulFreigabenStand } from '../einsatz/useSprungSperre';
-import {
-  abloesungPfad,
-  parseSchichtplanDruckAuswahl,
-  schichtplanDruckPfad,
-} from '../routing/deeplinks';
+import { abloesungPfad, schichtplanDruckPfad } from '../routing/deeplinks';
 
 /** Ein 403 einer Nachbarliste heißt „Modul gesperrt“: dann fehlt sie, statt den Druck zu sperren. */
 function ohneGesperrtesModul<T>(abruf: Promise<T>): Promise<T | undefined> {
@@ -52,15 +40,14 @@ function ohneGesperrtesModul<T>(abruf: Promise<T>): Promise<T | undefined> {
  * Druck): sonst stünde ein Blatt still ohne Abschnitt oder Qualifikation da.
  * Ohne Modul Personal liefert der Plan keine Namen: dann nur der Aushang mit der Besetzung als
  * Zahl.
+ *
+ * Wahl, Knöpfe, Hinweise und Blätter teilt die Seite mit der Vorplanung
+ * (`abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt.tsx`); hier stehen Rahmen und Laden.
  */
 export default function SchichtplanDruckPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const navigate = useNavigate();
-  const { token } = theme.useToken();
-  const [searchParams] = useSearchParams();
-  const suche = searchParams.toString();
-  const gewaehlt = useMemo(() => parseSchichtplanDruckAuswahl(new URLSearchParams(suche)), [suche]);
 
   // Einheiten und UHS nur abfragen, wenn ihr Modul frei ist. Sind die Freigaben unbekannt
   // (Abruf gescheitert), wird trotzdem gefragt; ein 403 heißt dann wie bei veralteten Freigaben:
@@ -115,21 +102,6 @@ export default function SchichtplanDruckPage() {
         : null,
     [daten],
   );
-  const qualiNamen = useMemo(
-    () => new Map((daten?.qualifikationen ?? []).map((q) => [q.id, q.label])),
-    [daten],
-  );
-  const ohneNamen = plan != null && plan.personen == null;
-  const sicht: BlattSicht = gewaehlt.sicht === 'person' && !ohneNamen ? 'person' : 'posten';
-  const optionen = useMemo(() => {
-    if (!plan) return [];
-    return sicht === 'posten'
-      ? aushaenge(plan).map((a) => ({ value: a.posten.schluessel, label: a.posten.titel }))
-      : zettel(plan).map((z) => ({ value: z.person.schluessel, label: z.person.name }));
-  }, [plan, sicht]);
-  const auswahl = optionen.some((o) => o.value === gewaehlt.auswahl) ? gewaehlt.auswahl : null;
-  const zuPfad = (s: BlattSicht, a: string | null) =>
-    navigate(schichtplanDruckPfad(einsatzId, { sicht: s, auswahl: a }), { replace: true });
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
@@ -142,103 +114,58 @@ export default function SchichtplanDruckPage() {
   }
   const einsatz = einsatzQuery.data;
   const zurueck = abloesungPfad(einsatzId, { ansicht: 'plan' });
-  const keinZugriff = error instanceof ApiError && error.status === 403;
-  const leer = optionen.length === 0;
 
   return (
-    <EinsatzSeite
-      titel="Schichtplan – Druckansicht"
-      breadcrumb={
-        <Breadcrumb
-          items={[
-            { title: <Link to="/einsaetze">Einsätze</Link> },
-            { title: einsatz.bezeichnung },
-            { title: <Link to={zurueck}>Ablösung</Link> },
-            { title: 'Schichtplan drucken' },
-          ]}
-        />
-      }
-      aktionen={
-        <>
-          <Button
-            href={zurueck}
-            onClick={(e) => {
-              if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-              e.preventDefault();
-              navigate(zurueck);
-            }}
-          >
-            Zurück zum Schichtplan
-          </Button>
-          {!keinZugriff && (
-            <Button onClick={() => void refetch()} disabled={isFetching || freigabenLaden}>
-              Neu laden
-            </Button>
-          )}
-          {!keinZugriff && <DruckKnopf typ="primary" gesperrt={!isSuccess || isFetching || leer} />}
-        </>
-      }
-    >
-      <Flex gap={token.marginSM} wrap align="center" style={{ marginBlockEnd: token.margin }}>
-        <Segmentleiste<BlattSicht>
-          beschriftung="Blätter"
-          wert={sicht}
-          onWechsel={(s) => zuPfad(s, null)}
-          optionen={[
-            { wert: 'posten', label: 'Je Posten' },
-            {
-              wert: 'person',
-              label: 'Je Person',
-              ...(ohneNamen ? { gesperrt: MODUL_PERSONAL_GESPERRT } : {}),
-            },
-          ]}
-          style={{ flex: 'none' }}
-        />
-        <Select
-          allowClear
-          showSearch={teilwortSuche}
-          aria-label="Blatt"
-          placeholder={sicht === 'posten' ? 'Alle Posten' : 'Alle Personen'}
-          value={auswahl ?? undefined}
-          onChange={(v?: string) => zuPfad(sicht, v ?? null)}
-          options={optionen}
-          disabled={leer}
-          style={{ minWidth: 240 }}
-        />
-      </Flex>
-      {keinZugriff ? (
-        <Alert type="info" showIcon title="Kein Zugriff auf den Schichtplan" />
-      ) : isError ? (
-        <Alert
-          type="error"
-          showIcon
-          title="Der Schichtplan konnte nicht geladen werden"
-          action={
-            <Button onClick={() => void refetch()} disabled={freigabenLaden}>
-              Erneut laden
-            </Button>
+    <SchichtplanDruckInhalt
+      plan={plan}
+      qualifikationen={daten?.qualifikationen}
+      geladenAt={daten?.geladenAt}
+      isSuccess={isSuccess}
+      isFetching={isFetching}
+      isError={isError}
+      error={error}
+      refetch={refetch}
+      isReloadBlocked={freigabenLaden}
+      druckPfad={(wahl) => schichtplanDruckPfad(einsatzId, wahl)}
+      texte={{
+        keinZugriff: 'Kein Zugriff auf den Schichtplan',
+        ladeFehler: 'Der Schichtplan konnte nicht geladen werden',
+        laedt: 'Schichtplan wird geladen …',
+        keineSchichten: 'Keine Schichten im Plan',
+      }}
+      einsatz={einsatz}
+      renderPage={({ actions, content }) => (
+        <EinsatzSeite
+          titel="Schichtplan – Druckansicht"
+          breadcrumb={
+            <Breadcrumb
+              items={[
+                { title: <Link to="/einsaetze">Einsätze</Link> },
+                { title: einsatz.bezeichnung },
+                { title: <Link to={zurueck}>Ablösung</Link> },
+                { title: 'Schichtplan drucken' },
+              ]}
+            />
           }
-        />
-      ) : !plan || !daten || isFetching ? (
-        <Typography.Text role="status" aria-live="polite">
-          Schichtplan wird geladen …
-        </Typography.Text>
-      ) : leer ? (
-        <Typography.Paragraph>
-          {sicht === 'posten' ? 'Keine Schichten im Plan' : 'Niemand eingeteilt'}
-        </Typography.Paragraph>
-      ) : (
-        <div data-lfh="druckwurzel">
-          <SchichtplanBlaetter
-            plan={plan}
-            sicht={sicht}
-            auswahl={auswahl}
-            einsatz={einsatz}
-            qualiNamen={qualiNamen}
-            geladenAt={daten.geladenAt}
-          />
-        </div>
+          aktionen={
+            <>
+              <Button
+                href={zurueck}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+                  e.preventDefault();
+                  navigate(zurueck);
+                }}
+              >
+                Zurück zum Schichtplan
+              </Button>
+              {actions}
+            </>
+          }
+        >
+          {content}
+        </EinsatzSeite>
       )}
-    </EinsatzSeite>
+    />
   );
 }

@@ -55,7 +55,7 @@ Beleg für Gleichverhalten.
   - `AbloesungPage.test.tsx` grün
   - `pnpm typecheck`, `pnpm lint`
 - [x] 4.2 `PlanungSchichtplan` zur Hülle machen. Prüfen: Testsatz aus 1.5, `PlanungPage.test.tsx`, `planungZeilen.test.ts`.
-- [ ] 4.3 Den gemeinsamen Druckinhalt nach `abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt.tsx` legen. Beide Druckseiten behalten ihre Hülle. Prüfen:
+- [x] 4.3 Den gemeinsamen Druckinhalt nach `abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt.tsx` legen. Beide Druckseiten behalten ihre Hülle. Prüfen:
   - `SchichtplanDruckPage.test.tsx`, `PlanungDruckPage.test.tsx`
   - e2e `schichtplan-druck.spec.ts`
 - [ ] 4.4 Verweise in `frontend/src/kraefte/AGENTS.md` und in den `quellen:` von `docs/anwender/` auf die neuen Pfade ziehen. Prüfen: `scripts/check-all.sh --nur schnell`.
