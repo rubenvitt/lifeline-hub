@@ -1124,3 +1124,195 @@ async fn neu_stempeln_hebt_gueltige_und_widerrufene_ueber_den_gemeldeten_stand()
         0
     );
 }
+
+// ── Bestand nach dem Zurückspielen (LLH-1871, Change `n2ge2224-reste-nach-restore-abraeumen`) ──
+
+async fn lokal(conn: &mut SqliteConnection, p: &SoftwarePasskey) -> i64 {
+    let schluessel = p.oeffentlich();
+    create_lokal(
+        conn,
+        &NeuerSchluessel {
+            org_id: 1,
+            benutzer_id: 1,
+            benutzer_name: "admin",
+            credential_id: &p.credential_id,
+            schluessel: &schluessel,
+            rp_id: RP,
+            origin: ORIGIN,
+            bezeichnung: "Stick",
+        },
+    )
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn bestand_nennt_nur_gueltige_lokale_schluessel() {
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let id_a = lokal(&mut conn, &a).await;
+    drop(conn);
+    // Ab jetzt wartet ein neuer lokaler Schlüssel auf Gegenzeichnung, und Fremde kommen dazu.
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::WirdGemeldet).await;
+    let mut conn = pool.acquire().await.unwrap();
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let id_b = lokal(&mut conn, &b).await;
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let id_c = lokal(&mut conn, &c).await;
+    sqlx::query("UPDATE unterschrift_schluessel SET zustand = 'gueltig' WHERE id = ?")
+        .bind(id_c)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    assert!(widerrufen(&mut conn, 1, id_c, JETZT).await.unwrap());
+    let ziel = Ziel {
+        kopplung_org_id: ko,
+        org_id: 1,
+        fremde_org_kennung: FREMDE_ORG,
+    };
+    let f = SoftwarePasskey::new("f", [4u8; 32]);
+    accept_lieferungen(
+        &mut conn,
+        &ziel,
+        &[lieferung(
+            id_a + 100,
+            &f,
+            UnterschriftSchluesselZustand::Gueltig,
+            1,
+        )],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(load_bestand(&mut conn, 1).await.unwrap(), Some(vec![id_a]));
+    assert!(id_b > id_a);
+}
+
+#[tokio::test]
+async fn bestand_ueber_der_grenze_ist_keiner() {
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    for i in 0..=BESTAND_MAX {
+        sqlx::query(
+            "INSERT INTO unterschrift_schluessel (org_id, herkunft, benutzer_id, benutzer_name, \
+             credential_id, alg, schluessel, rp_id, origin, bezeichnung, fingerabdruck, zustand, \
+             stand) VALUES (1, 'lokal', 1, 'admin', ?, 'es256', 'AAAA', 'rp', 'o', 'x', 'fp', \
+             'gueltig', ?)",
+        )
+        .bind(format!("cred{i}"))
+        .bind(i as i64 + 1)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    }
+    assert_eq!(load_bestand(&mut conn, 1).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn fehlende_im_bestand_werden_widerrufen_abgelehnte_bleiben() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let c = SoftwarePasskey::new("c", [3u8; 32]);
+    let d = SoftwarePasskey::new("d", [4u8; 32]);
+    let ziel = Ziel {
+        kopplung_org_id: ko,
+        org_id: 1,
+        fremde_org_kennung: FREMDE_ORG,
+    };
+    let mut conn = pool.acquire().await.unwrap();
+    accept_lieferungen(
+        &mut conn,
+        &ziel,
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    // b, c und d kommen gegengezeichnet nach und warten; c wird bestätigt, d zurückgewiesen.
+    for (id, p) in [(11, &b), (12, &c), (13, &d)] {
+        let neu = gegengezeichnet(
+            lieferung(id, p, UnterschriftSchluesselZustand::Gueltig, id),
+            &a,
+            FREMDE_ORG,
+        );
+        assert!(accept_lieferungen(&mut conn, &ziel, &[neu], false, JETZT)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+    let lokale_id = |fremde: i64| {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT id FROM unterschrift_schluessel WHERE herkunft = 'gegenueber' AND fremde_id = ?",
+        )
+        .bind(fremde)
+    };
+    let id_c = lokale_id(12).fetch_one(&mut *conn).await.unwrap();
+    let id_d = lokale_id(13).fetch_one(&mut *conn).await.unwrap();
+    assert!(confirm(&mut conn, 1, id_c, 1, JETZT).await.unwrap());
+    assert!(reject(&mut conn, 1, id_d, 1, JETZT).await.unwrap());
+    let staende_vorher: Vec<i64> =
+        sqlx::query_scalar("SELECT stand FROM unterschrift_schluessel ORDER BY id")
+            .fetch_all(&mut *conn)
+            .await
+            .unwrap();
+
+    // Der Hub führt nur noch a: b (wartend) und c (gültig) fallen, d bleibt abgelehnt.
+    let weg = revoke_fehlende(&mut conn, ko, &[10], JETZT).await.unwrap();
+    let mut namen: Vec<String> = weg.iter().map(|w| w.benutzer_name.clone()).collect();
+    namen.sort();
+    assert_eq!(namen, vec!["admin11", "admin12"]);
+    assert_eq!(zustand_von(&mut conn, 10).await, "gueltig");
+    assert_eq!(zustand_von(&mut conn, 11).await, "widerrufen");
+    assert_eq!(zustand_von(&mut conn, 12).await, "widerrufen");
+    assert_eq!(zustand_von(&mut conn, 13).await, "abgelehnt");
+    let staende_nachher: Vec<i64> =
+        sqlx::query_scalar("SELECT stand FROM unterschrift_schluessel ORDER BY id")
+            .fetch_all(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(staende_vorher, staende_nachher, "der Stand bleibt");
+    // Ein widerrufener kann nicht mehr bestätigt werden.
+    let id_b = lokale_id(11).fetch_one(&mut *conn).await.unwrap();
+    assert!(!confirm(&mut conn, 1, id_b, 1, JETZT).await.unwrap());
+
+    // Eine leere Liste: Der Hub führt keinen gültigen Schlüssel mehr.
+    let weg = revoke_fehlende(&mut conn, ko, &[], JETZT).await.unwrap();
+    assert_eq!(weg.len(), 1);
+    assert!(gueltige_fremde(&mut conn).await.is_empty());
+    assert!(revoke_fehlende(&mut conn, ko, &[], JETZT)
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn bestand_einer_anderen_zuordnung_beruehrt_diese_nicht() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let ziel = Ziel {
+        kopplung_org_id: ko,
+        org_id: 1,
+        fremde_org_kennung: FREMDE_ORG,
+    };
+    let mut conn = pool.acquire().await.unwrap();
+    accept_lieferungen(
+        &mut conn,
+        &ziel,
+        &[lieferung(10, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert!(revoke_fehlende(&mut conn, ko + 1, &[], JETZT)
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(zustand_von(&mut conn, 10).await, "gueltig");
+}

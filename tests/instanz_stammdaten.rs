@@ -1453,3 +1453,349 @@ async fn rueckschritt_bei_schluesseln_und_stammdaten_nennt_beide_stroeme() {
     let org: String = eine(&hub.pool, "SELECT name FROM organisation WHERE id = 1").await;
     assert!(!h.contains(&org), "{h:?}");
 }
+
+// ── Zurückgespielter Hub: Reste am ELW abräumen (LLH-1871) ───────────────────────────────────
+
+use lifeline_hub::instanz::stammdaten::bestand;
+
+/// Stand des Änderungslogs am Hub: der Stand einer Sicherung.
+async fn sicherung_log(hub: &Instanz) -> i64 {
+    eine(
+        &hub.pool,
+        "SELECT seq FROM sqlite_sequence WHERE name = 'stammdaten_aenderung'",
+    )
+    .await
+}
+
+/// Der Hub spielt die Sicherung vom Log-Stand `stand` zurück: `loeschen` entfernt, was danach
+/// angelegt wurde, ohne Spur im Log, und das Log zählt wieder ab dort.
+async fn hub_verliert(hub: &Instanz, stand: i64, loeschen: &[&str]) {
+    let mut conn = hub.pool.acquire().await.unwrap();
+    sqlx::query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    for sql in loeschen {
+        sqlx::query(sqlx::AssertSqlSafe(sql.to_string()))
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+    }
+    sqlx::query("DELETE FROM stammdaten_aenderung WHERE stand > ?")
+        .bind(stand)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE sqlite_sequence SET seq = ? WHERE name = 'stammdaten_aenderung'")
+        .bind(stand)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    sqlx::query("PRAGMA foreign_keys = ON")
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+}
+
+/// Die letzte Liste des Bestands, die der Hub an den ELW schickte (Sendebremse).
+async fn letzte_liste(hub: &Instanz) -> Option<(String, std::time::Instant)> {
+    let kennung = lifeline_hub::instanz::identitaet::load_or_create(&hub.pool)
+        .await
+        .unwrap()
+        .kennung;
+    let ko: i64 = eine(&hub.pool, "SELECT id FROM instanz_kopplung_org").await;
+    bestand::last_sent(&kennung, ko)
+}
+
+async fn anzahl(pool: &sqlx::SqlitePool, sql: &str) -> i64 {
+    eine(pool, sql).await
+}
+
+async fn stammdaten_hinweise(elw: &Instanz) -> Vec<String> {
+    serde_json::from_value(kopplung_elw(elw).await["org"]["stammdaten"]["hinweise"].clone())
+        .unwrap_or_default()
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_verlorenes_fahrzeug_verschwindet_am_elw() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Vorher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    melden(&elw).await;
+    let sicherung = sicherung_log(&hub).await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Verloren 1')",
+    )
+    .await;
+    melden(&elw).await;
+    lokale_id(&elw, "fahrzeug", "funkrufname", "Verloren 1").await;
+
+    hub_verliert(
+        &hub,
+        sicherung,
+        &["DELETE FROM fahrzeug WHERE funkrufname = 'Verloren 1'"],
+    )
+    .await;
+    // Das Netz aus LLH-1853 liefert die Org erst neu, die Liste folgt mit der nächsten Meldung.
+    melden(&elw).await;
+    melden(&elw).await;
+    assert_eq!(
+        anzahl(
+            &elw.pool,
+            "SELECT COUNT(*) FROM fahrzeug WHERE funkrufname = 'Verloren 1'"
+        )
+        .await,
+        0,
+        "die verlorene Zeile ist am ELW weg"
+    );
+    lokale_id(&elw, "fahrzeug", "funkrufname", "Vorher 1").await;
+    let hinweise = stammdaten_hinweise(&elw).await;
+    assert!(
+        hinweise.iter().any(|h| h.contains("nicht mehr führt")),
+        "{hinweise:?}"
+    );
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_verlorenes_material_im_einsatz_wird_stillgelegt() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    let sicherung = sicherung_log(&hub).await;
+    exec(
+        &hub.pool,
+        "INSERT INTO material (org_id, bezeichnung) VALUES (1, 'Decke')",
+    )
+    .await;
+    melden(&elw).await;
+    let decke = lokale_id(&elw, "material", "bezeichnung", "Decke").await;
+    let einsatz = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &elw.admin,
+        Some(&json!({"material_id": decke})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    hub_verliert(&hub, sicherung, &["DELETE FROM material"]).await;
+    melden(&elw).await;
+    melden(&elw).await;
+    assert_eq!(
+        eine::<String>(
+            &elw.pool,
+            &format!("SELECT dienststatus FROM material WHERE id = {decke}")
+        )
+        .await,
+        "ausser_dienst"
+    );
+    assert_eq!(
+        anzahl(
+            &elw.pool,
+            &format!(
+                "SELECT COUNT(*) FROM stammdaten_herkunft WHERE lokaler_schluessel = '{decke}' \
+                 AND art = 'material'"
+            )
+        )
+        .await,
+        0,
+        "die stillgelegte Zeile gehört jetzt dem ELW"
+    );
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_verlorenes_konto_wird_deaktiviert_und_seine_sitzung_endet() {
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    let sicherung = sicherung_log(&hub).await;
+    konto(&hub, "verlust").await;
+    melden(&elw).await;
+    let lokal = lokale_id(&elw, "benutzer", "benutzername", "verlust").await;
+    exec(
+        &elw.pool,
+        &format!(
+            "INSERT INTO session (token_hash, benutzer_id, expires_at, kennung) \
+             VALUES ('t-verlust', {lokal}, '2999-01-01 00:00:00', 'k')"
+        ),
+    )
+    .await;
+
+    hub_verliert(
+        &hub,
+        sicherung,
+        &["DELETE FROM benutzer WHERE benutzername = 'verlust'"],
+    )
+    .await;
+    melden(&elw).await;
+    melden(&elw).await;
+    assert_eq!(
+        anzahl(
+            &elw.pool,
+            &format!("SELECT aktiv FROM benutzer WHERE id = {lokal}")
+        )
+        .await,
+        0
+    );
+    assert_eq!(
+        anzahl(
+            &elw.pool,
+            &format!("SELECT COUNT(*) FROM session WHERE benutzer_id = {lokal}")
+        )
+        .await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn zurueckgespielt_hub_aendert_vor_der_meldung_und_raeumt_trotzdem_ab() {
+    let (hub, elw) = gekoppelt().await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Vorher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    let sicherung = sicherung_log(&hub).await;
+    for f in ["Verloren 1", "Verloren 2"] {
+        exec(
+            &hub.pool,
+            &format!("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, '{f}')"),
+        )
+        .await;
+    }
+    melden(&elw).await;
+    hub_verliert(
+        &hub,
+        sicherung,
+        &["DELETE FROM fahrzeug WHERE funkrufname LIKE 'Verloren %'"],
+    )
+    .await;
+    // Vor der Meldung legt der Hub ein Fahrzeug an. Es bekommt die id von „Verloren 1“: Diese
+    // Zeile führt der Hub also wieder, ihren neuen Inhalt liefert LLH-1853.
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Nachher 1')",
+    )
+    .await;
+    melden(&elw).await;
+    melden(&elw).await;
+    assert_eq!(
+        anzahl(
+            &elw.pool,
+            "SELECT COUNT(*) FROM fahrzeug WHERE funkrufname = 'Verloren 2'"
+        )
+        .await,
+        0,
+        "die verlorene Zeile ist abgeräumt"
+    );
+    // Keine Zeile, die der Hub führt, fehlt am ELW.
+    let gefuehrt: Vec<i64> = sqlx::query_scalar("SELECT id FROM fahrzeug WHERE org_id = 1")
+        .fetch_all(&hub.pool)
+        .await
+        .unwrap();
+    for id in gefuehrt {
+        assert_eq!(
+            anzahl(
+                &elw.pool,
+                &format!(
+                    "SELECT COUNT(*) FROM stammdaten_herkunft WHERE art = 'fahrzeug' \
+                     AND fremder_schluessel = '{id}'"
+                )
+            )
+            .await,
+            1,
+            "Fahrzeug {id} des Hubs"
+        );
+    }
+}
+
+#[tokio::test]
+async fn gleicher_bestand_schickt_keine_liste() {
+    let (hub, elw) = gekoppelt().await;
+    // Das Konto „admin“ des Hubs traf beim Koppeln auf das eigene des ELW und blieb draußen.
+    // Umbenannt geht es erneut hinaus und kommt an.
+    exec(
+        &hub.pool,
+        "UPDATE benutzer SET benutzername = 'hub-admin' WHERE benutzername = 'admin'",
+    )
+    .await;
+    exec(
+        &hub.pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Gleich 1')",
+    )
+    .await;
+    melden(&elw).await;
+    melden(&elw).await;
+    melden(&elw).await;
+    lokale_id(&elw, "benutzer", "benutzername", "hub-admin").await;
+    assert_eq!(letzte_liste(&hub).await, None);
+    assert!(
+        !stammdaten_hinweise(&elw)
+            .await
+            .iter()
+            .any(|h| h.contains("nicht mehr führt")),
+        "nichts abgeräumt"
+    );
+}
+
+#[tokio::test]
+async fn waehrend_der_nachlieferung_geht_keine_liste() {
+    let (hub, elw) = gekoppelt().await;
+    let werte: Vec<String> = (0..450).map(|i| format!("(1, 'Viele {i}')")).collect();
+    exec(
+        &hub.pool,
+        &format!(
+            "INSERT INTO fahrzeug (org_id, funkrufname) VALUES {}",
+            werte.join(", ")
+        ),
+    )
+    .await;
+    melden(&elw).await;
+    let erst = anzahl(
+        &elw.pool,
+        "SELECT COUNT(*) FROM fahrzeug WHERE funkrufname LIKE 'Viele %'",
+    )
+    .await;
+    assert!(erst < 450, "die Nachlieferung braucht mehrere Meldungen");
+    assert_eq!(letzte_liste(&hub).await, None);
+    let mut n = 0;
+    while anzahl(
+        &elw.pool,
+        "SELECT COUNT(*) FROM fahrzeug WHERE funkrufname LIKE 'Viele %'",
+    )
+    .await
+        < 450
+    {
+        assert_eq!(letzte_liste(&hub).await, None, "nach {n} Meldungen");
+        melden(&elw).await;
+        n += 1;
+        assert!(n < 10);
+    }
+}
+
+#[tokio::test]
+async fn bleibende_abweichung_schickt_die_liste_hoechstens_einmal_je_zehn_minuten() {
+    let (hub, elw) = gekoppelt().await;
+    // Das Konto „admin“ des Hubs bleibt am ELW draußen: eine bleibende Abweichung.
+    melden(&elw).await;
+    melden(&elw).await;
+    let erste = letzte_liste(&hub).await.expect("die Liste ging einmal");
+    melden(&elw).await;
+    melden(&elw).await;
+    assert_eq!(letzte_liste(&hub).await, Some(erste), "keine zweite Liste");
+    assert_eq!(
+        anzahl(
+            &elw.pool,
+            "SELECT COUNT(*) FROM benutzer WHERE benutzername = 'admin'"
+        )
+        .await,
+        1,
+        "das eigene Konto bleibt"
+    );
+}
