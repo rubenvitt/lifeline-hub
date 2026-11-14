@@ -66,7 +66,12 @@ import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useViewport } from '../components/useViewport';
 import ZumKopfKnopf from '../components/ZumKopfKnopf';
-import { LISTEN_MAX_SEITEN, kopfVerlassen } from '../components/listenFenster';
+import {
+  LISTEN_MAX_SEITEN,
+  kopfVerlassen,
+  useFensterAnfang,
+  useKopfBeimVerlassen,
+} from '../components/listenFenster';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
 import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -218,6 +223,15 @@ export default function MeldungenPage() {
       return true;
     });
   }, [abgeschlosseneQuery.data]);
+  // Position statt Fensterlänge (LLH-1687): vor dem Fenster liegen schon herausgefallene Einträge.
+  const abgeschlossenSchluessel = einsatzKeys.meldungenPhase(
+    einsatzId,
+    'abgeschlossen',
+    richtungsKey,
+  );
+  const vorFenster = useFensterAnfang(abgeschlosseneQuery.data, abgeschlossenSchluessel);
+  useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
+  const bisPosition = vorFenster + abgeschlossene.length;
   // Zwei Gruppen in der Offen-Ansicht: die erste Frage der Triage ist „was hat noch niemand
   // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung steht danach unter
   // einer neuen Normalmeldung; das ist gewollt. Innerhalb jeder Gruppe ordnet `vergleicheMeldung` —
@@ -712,7 +726,7 @@ export default function MeldungenPage() {
 
   const kennzahlen = kennzahlenQuery.data;
   const offenZahl = kennzahlen ? kennzahlen.unbearbeitet + kennzahlen.in_arbeit : offene.length;
-  const abgeschlossenZahl = kennzahlen?.erledigt ?? abgeschlossene.length;
+  const abgeschlossenZahl = kennzahlen?.erledigt ?? bisPosition;
   /*
    * Steht die Karte eines Grundes in der gezeigten Ansicht nicht (Ansicht gewechselt, Karte
    * gewandert), hätte er keinen Ort mehr: dann steht er im Seitenhinweis, schließbar. Solange die
@@ -937,7 +951,7 @@ export default function MeldungenPage() {
           )}
           {kopfVerlassen(abgeschlosseneQuery.data) && (
             <ZumKopfKnopf
-              schluessel={einsatzKeys.meldungenPhase(einsatzId, 'abgeschlossen', richtungsKey)}
+              schluessel={abgeschlossenSchluessel}
               ladeKopf={() => listeAbgeschlosseneMeldungen(einsatzId, richtungFilter)}
             />
           )}
@@ -951,7 +965,7 @@ export default function MeldungenPage() {
           {/* Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
               sagt, dass es keine gibt. */}
           {abgeschlosseneQuery.hasNextPage &&
-            (kennzahlen == null || abgeschlossene.length < kennzahlen.erledigt) && (
+            (kennzahlen == null || bisPosition < kennzahlen.erledigt) && (
               <div style={{ textAlign: 'center', marginTop: token.margin }}>
                 <Button
                   onClick={() => void abgeschlosseneQuery.fetchNextPage()}
@@ -960,7 +974,7 @@ export default function MeldungenPage() {
                   Ältere laden
                 </Button>
                 <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                  {bisPosition} von {abgeschlossenZahl} geladen
                 </div>
               </div>
             )}

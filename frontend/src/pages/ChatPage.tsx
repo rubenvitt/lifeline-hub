@@ -76,8 +76,6 @@ import { useUploadFortschritt } from '../components/useUploadFortschritt';
 import { anzahl } from '../anzeige/anzahl';
 import { modulName } from '../einsatz/modulRegistry';
 import { parseRouteId } from '../routing/deeplinks';
-import ZumKopfKnopf from '../components/ZumKopfKnopf';
-import { LISTEN_MAX_SEITEN, kopfVerlassen, zumKopf } from '../components/listenFenster';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -188,10 +186,6 @@ export default function ChatPage() {
     queryKey: einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId),
     queryFn: ({ pageParam }) => listeNachrichten(einsatzId, kanalId as number, pageParam),
     initialPageParam: undefined as number | undefined,
-    // Seitenfenster (LLH-1687, `components/listenFenster.ts`): eine neue Nachricht lädt höchstens
-    // so viele Seiten neu, wie im Fenster liegen. Fällt die neueste heraus, führt „Zu den
-    // neuesten springen“ unter dem Strom zurück.
-    maxPages: LISTEN_MAX_SEITEN,
     // Backend liefert je Seite id DESC (neueste zuerst); der Cursor für ältere
     // Nachrichten ist die kleinste (= letzte) id der zuletzt geladenen Seite.
     getNextPageParam: (letzteSeite) =>
@@ -200,13 +194,6 @@ export default function ChatPage() {
         : undefined,
     enabled: kanalId !== null,
   });
-  const chatKopfVerlassen = kopfVerlassen(nachrichtenQuery.data);
-  const chatZumKopf = () =>
-    kanalId === null
-      ? Promise.resolve(false)
-      : zumKopf(qc, einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId), () =>
-          listeNachrichten(einsatzId, kanalId),
-        );
 
   // Erst nach einem erfolgreichen Nachrichtenabruf markieren. Der Gelesen-Stand ist je Nachricht
   // und Benutzer persistent; ein späteres SSE-Update hebt `dataUpdatedAt` an und markiert den
@@ -218,9 +205,7 @@ export default function ChatPage() {
       kanalId === null ||
       ungelesenImAktivenKanal === 0 ||
       !nachrichtenQuery.isSuccess ||
-      nachrichtenQuery.dataUpdatedAt === 0 ||
-      // Ohne die neueste Seite im Fenster stehen die ungelesenen Nachrichten nicht im Bild.
-      chatKopfVerlassen
+      nachrichtenQuery.dataUpdatedAt === 0
     )
       return;
     let aktiv = true;
@@ -247,7 +232,6 @@ export default function ChatPage() {
     nachrichtenQuery.isSuccess,
     qc,
     ungelesenImAktivenKanal,
-    chatKopfVerlassen,
   ]);
 
   // Sachbezug-Picker/Anzeige: Listen je Typ nur laden, wenn der Dialog offen ist oder eine geladene
@@ -337,10 +321,7 @@ export default function ChatPage() {
         erwaehnungen,
       );
     },
-    onSuccess: async () => {
-      // Steht das Fenster tief im Verlauf, läge die eigene Nachricht außerhalb (LLH-1687): erst
-      // den Kopf holen, wie das ETB nach einem eigenen Eintrag.
-      if (chatKopfVerlassen && kanalId !== null) await chatZumKopf();
+    onSuccess: () => {
       invalidiereNachrichten(einsatzId);
       // Wer selbst absendet, will seinen Satz sehen, auch wenn er gerade weiter oben las. Der
       // Zähler unterscheidet die eigene Absendung vom Live-Ereignis und hängt bewusst nicht am
@@ -615,12 +596,6 @@ export default function ChatPage() {
             bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
             bezugInfo={bezugInfo}
           />
-          {chatKopfVerlassen && kanalId !== null && (
-            <ZumKopfKnopf
-              schluessel={einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId)}
-              ladeKopf={() => listeNachrichten(einsatzId, kanalId)}
-            />
-          )}
           {darfSchreiben && kanalId !== null && (
             <NachrichtEingabe
               onSenden={(t, d, e) =>

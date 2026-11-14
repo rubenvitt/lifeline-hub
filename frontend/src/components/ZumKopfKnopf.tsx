@@ -1,4 +1,4 @@
-import { Button, Flex, theme } from 'antd';
+import { Button, Flex, Typography, theme } from 'antd';
 import { useState } from 'react';
 import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { zumKopf } from './listenFenster';
@@ -8,27 +8,28 @@ interface ZumKopfKnopfProps {
   schluessel: QueryKey;
   /** Holt die neueste Seite (Kopf), wie die Abfrage sie ohne Cursor holt. */
   ladeKopf: () => Promise<unknown[]>;
-  /** Nach dem Ersetzen, etwa um ans Ende eines Funkprotokolls zu rollen. */
-  nachKopf?: () => void;
 }
 
 /**
  * Weg zurück zum Neuesten, sobald die neueste Seite aus dem Seitenfenster gefallen ist
- * (LLH-1687, `listenFenster.ts`). Die Seite zeigt ihn nur bei `kopfVerlassen(query.data)`, auf
- * der Seite der Liste, an der das Neueste steht.
+ * (LLH-1687, `listenFenster.ts`). Die Seite zeigt ihn nur bei `kopfVerlassen(query.data)`, über
+ * der Liste. Scheitert der Abruf, steht der Grund am Knopf, bis zum nächsten Versuch (kein Toast,
+ * `frontend/AGENTS.md`, „Rückwege und Fehler“); das Fenster bleibt dann, wie es ist.
  */
-export default function ZumKopfKnopf({ schluessel, ladeKopf, nachKopf }: ZumKopfKnopfProps) {
+export default function ZumKopfKnopf({ schluessel, ladeKopf }: ZumKopfKnopfProps) {
   const qc = useQueryClient();
   const { token } = theme.useToken();
   const [laeuft, setLaeuft] = useState(false);
+  const [gescheitert, setGescheitert] = useState(false);
   return (
-    <Flex justify="center" style={{ marginBlock: token.marginSM }}>
+    <Flex vertical align="center" gap={token.marginXXS} style={{ marginBlock: token.marginSM }}>
       <Button
         loading={laeuft}
         onClick={async () => {
           setLaeuft(true);
+          setGescheitert(false);
           try {
-            if (await zumKopf(qc, schluessel, ladeKopf)) nachKopf?.();
+            setGescheitert(!(await zumKopf(qc, schluessel, ladeKopf)));
           } finally {
             setLaeuft(false);
           }
@@ -36,6 +37,11 @@ export default function ZumKopfKnopf({ schluessel, ladeKopf, nachKopf }: ZumKopf
       >
         Zu den neuesten springen
       </Button>
+      {gescheitert && (
+        <Typography.Text type="danger" role="alert">
+          Die neuesten Einträge ließen sich nicht laden. Bitte erneut versuchen.
+        </Typography.Text>
+      )}
     </Flex>
   );
 }

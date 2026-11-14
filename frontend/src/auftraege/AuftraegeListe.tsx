@@ -49,7 +49,12 @@ import ListeDetail, { type ListeDetailGruppen } from '../components/ListeDetail'
 import { SeitenLeer } from '../components/SeitenZustand';
 import { SERVER_SUCHE_ENTPRELLUNG_MS } from '../components/Datensicht';
 import ZumKopfKnopf from '../components/ZumKopfKnopf';
-import { LISTEN_MAX_SEITEN, kopfVerlassen } from '../components/listenFenster';
+import {
+  LISTEN_MAX_SEITEN,
+  kopfVerlassen,
+  useFensterAnfang,
+  useKopfBeimVerlassen,
+} from '../components/listenFenster';
 
 /** Abgeschlossen nach der gemeinsamen Phasen-Semantik. */
 function istAuftragAbgeschlossen(a: Auftrag): boolean {
@@ -454,6 +459,17 @@ export default function AuftraegeListe({
   const kennzahlen = kennzahlenQuery.data;
   // Vor der ersten Lieferung keine Zahl: „Offen (0)“ wäre eine falsche Aussage über die Lage.
   const offenZahl = kennzahlen?.offen ?? (offeneQuery.data ? offene.length : null);
+  // Position statt Fensterlänge (LLH-1687): vor dem Fenster liegen schon herausgefallene Einträge.
+  const abgeschlossenSchluessel = einsatzKeys.auftraegePhase(
+    einsatzId,
+    'abgeschlossen',
+    richtungsKey,
+    empfaengerKey,
+    suche,
+  );
+  const vorFenster = useFensterAnfang(abgeschlosseneQuery.data, abgeschlossenSchluessel);
+  useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
+  const bisPosition = vorFenster + abgeschlossene.length;
   const abgeschlossenZahl =
     kennzahlen?.abgeschlossen ??
     // Ohne Kopf im Fenster ist die geladene Zahl nicht mehr die ganze Menge.
@@ -585,13 +601,7 @@ export default function AuftraegeListe({
 
       {!imOffenen && kopfVerlassen(abgeschlosseneQuery.data) && (
         <ZumKopfKnopf
-          schluessel={einsatzKeys.auftraegePhase(
-            einsatzId,
-            'abgeschlossen',
-            richtungsKey,
-            empfaengerKey,
-            suche,
-          )}
+          schluessel={abgeschlossenSchluessel}
           ladeKopf={() => listeAbgeschlosseneAuftraege(einsatzId, filter)}
         />
       )}
@@ -654,7 +664,7 @@ export default function AuftraegeListe({
           // sagt, dass es keine gibt.
           !imOffenen &&
           abgeschlosseneQuery.hasNextPage &&
-          (kennzahlen == null || abgeschlossene.length < kennzahlen.abgeschlossen) && (
+          (kennzahlen == null || bisPosition < kennzahlen.abgeschlossen) && (
             <div style={{ textAlign: 'center', marginTop: token.margin }}>
               <Button
                 onClick={() => void abgeschlosseneQuery.fetchNextPage()}
@@ -663,7 +673,7 @@ export default function AuftraegeListe({
                 Ältere laden
               </Button>
               <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                {abgeschlossene.length}
+                {bisPosition}
                 {abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`} geladen
               </div>
             </div>

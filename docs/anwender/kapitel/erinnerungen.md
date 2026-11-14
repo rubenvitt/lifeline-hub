@@ -2,7 +2,7 @@
 titel: Erinnerungen
 gruppen: [fuehrung]
 reihenfolge: 130
-quellen: [frontend/src/pages/ErinnerungenPage.tsx, frontend/src/erinnerung/ErinnerungFormular.tsx, frontend/src/erinnerung/ErinnerungKarte.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, src/routes/erinnerung.rs, src/erinnerung/repo.rs, src/erinnerung/scheduler.rs, src/erinnerung/faelligkeit.rs, src/erinnerung/mod.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/pages/ErinnerungenPage.tsx, frontend/src/erinnerung/ErinnerungFormular.tsx, frontend/src/erinnerung/ErinnerungKarte.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, src/routes/erinnerung.rs, src/erinnerung/repo.rs, src/erinnerung/scheduler.rs, src/erinnerung/faelligkeit.rs, src/erinnerung/mod.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
@@ -51,6 +51,10 @@ Häkchen „Werte behalten“ bleiben Empfänger und Intervall stehen.
 
 Beide Knöpfe wirken mit einem Klick; ein Hinweis bietet sechs Sekunden lang „Rückgängig“. Die
 Ansicht „Abgeschlossen“ zeigt, wann eine Erinnerung erledigt oder erübrigt wurde.
+
+Unter „Abgeschlossen“ holt „Ältere laden“ die nächsten Einträge. Die Liste behält höchstens
+500 Einträge; wer weiter zurückblättert, dem fallen die neuesten oben heraus. Dann führt
+„Zu den neuesten springen“ über der Liste zurück zum Anfang.
 
 Aus dem Überblick (Kapitel [Überblick](ueberblick.md)) springt ein Klick auf eine
 Erinnerung direkt zu ihr: Die Seite zeigt sie in ihrer Ansicht, rollt zu ihr und hebt sie mit einer

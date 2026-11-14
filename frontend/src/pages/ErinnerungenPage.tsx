@@ -33,7 +33,12 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import ZumKopfKnopf from '../components/ZumKopfKnopf';
-import { LISTEN_MAX_SEITEN, kopfVerlassen } from '../components/listenFenster';
+import {
+  LISTEN_MAX_SEITEN,
+  kopfVerlassen,
+  useFensterAnfang,
+  useKopfBeimVerlassen,
+} from '../components/listenFenster';
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -86,6 +91,11 @@ export default function ErinnerungenPage() {
       return true;
     });
   }, [abgeschlosseneQuery.data]);
+  // Position statt Fensterlänge (LLH-1687): vor dem Fenster liegen schon herausgefallene Einträge.
+  const abgeschlossenSchluessel = einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen');
+  const vorFenster = useFensterAnfang(abgeschlosseneQuery.data, abgeschlossenSchluessel);
+  useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
+  const bisPosition = vorFenster + abgeschlossene.length;
 
   /*
    * Sprung `?erinnerung=<id>` (LLH-1429, Spec `deeplink-hervorhebung`, `frontend/AGENTS.md`
@@ -225,7 +235,7 @@ export default function ErinnerungenPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const offene = offeneQuery.data ?? [];
   const offenZahl = kennzahlenQuery.data?.offen ?? offene.length;
-  const abgeschlossenZahl = kennzahlenQuery.data?.abgeschlossen ?? abgeschlossene.length;
+  const abgeschlossenZahl = kennzahlenQuery.data?.abgeschlossen ?? bisPosition;
 
   // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach faellig_at aufsteigend.
   const offeneGruppen: { gruppe: FaelligGruppe; erinnerungen: Erinnerung[] }[] = GRUPPE_ORDNUNG.map(
@@ -378,7 +388,7 @@ export default function ErinnerungenPage() {
         <>
           {kopfVerlassen(abgeschlosseneQuery.data) && (
             <ZumKopfKnopf
-              schluessel={einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen')}
+              schluessel={abgeschlossenSchluessel}
               ladeKopf={() => listeAbgeschlosseneErinnerungen(einsatzId)}
             />
           )}
@@ -394,8 +404,7 @@ export default function ErinnerungenPage() {
             />
           )}
           {abgeschlosseneQuery.hasNextPage &&
-            (kennzahlenQuery.data == null ||
-              abgeschlossene.length < kennzahlenQuery.data.abgeschlossen) && (
+            (kennzahlenQuery.data == null || bisPosition < kennzahlenQuery.data.abgeschlossen) && (
               <div style={{ textAlign: 'center', marginTop: token.margin }}>
                 <Button
                   onClick={() => void abgeschlosseneQuery.fetchNextPage()}
@@ -404,7 +413,7 @@ export default function ErinnerungenPage() {
                   Ältere laden
                 </Button>
                 <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                  {bisPosition} von {abgeschlossenZahl} geladen
                 </div>
               </div>
             )}

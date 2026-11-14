@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -196,6 +196,14 @@ describe('ErinnerungenPage', () => {
         quittiert_at: null,
         ist_faellig: false,
       })) as unknown as Erinnerung[];
+    // Die Vorgaben der Mocks gelten für die übrigen Tests der Datei (`clearAllMocks` setzt
+    // Implementierungen nicht zurück): am Ende wiederherstellen.
+    const listeVorher = vi.mocked(listeAbgeschlosseneErinnerungen).getMockImplementation();
+    const zahlenVorher = vi.mocked(ladeErinnerungKennzahlen).getMockImplementation();
+    onTestFinished(() => {
+      vi.mocked(listeAbgeschlosseneErinnerungen).mockImplementation(listeVorher!);
+      vi.mocked(ladeErinnerungKennzahlen).mockImplementation(zahlenVorher!);
+    });
     // Seite n beginnt bei 100·n; der Kopf (ohne Cursor) ist Seite 0.
     vi.mocked(listeAbgeschlosseneErinnerungen).mockImplementation(async (_e, cursor) => {
       if (!cursor) return seite(0, 100);
@@ -214,8 +222,10 @@ describe('ErinnerungenPage', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Ältere laden' }));
       expect(await screen.findByText(`Alt ${n * 100}`)).toBeInTheDocument();
     }
-    // Die sechste Seite schob die neueste aus dem Fenster.
+    // Die sechste Seite schob die neueste aus dem Fenster; gezählt wird die Position, nicht das
+    // Fenster.
     expect(screen.queryByText('Alt 0')).not.toBeInTheDocument();
+    expect(screen.getByText('600 von 1000 geladen')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Zu den neuesten springen' }));
     expect(await screen.findByText('Alt 0')).toBeInTheDocument();

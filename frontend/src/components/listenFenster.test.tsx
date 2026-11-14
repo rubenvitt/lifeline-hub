@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { QueryClient, QueryClientProvider, useInfiniteQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { LISTEN_MAX_SEITEN, kopfVerlassen, zumKopf } from './listenFenster';
+import {
+  LISTEN_MAX_SEITEN,
+  kopfVerlassen,
+  useFensterAnfang,
+  useKopfBeimVerlassen,
+  zumKopf,
+} from './listenFenster';
 
 /**
  * Seitenfenster der Listen ohne Cursor nach vorn (LLH-1687): ein Live-Ereignis nach tiefem
@@ -100,5 +107,61 @@ describe('listenFenster (LLH-1687)', () => {
   it('kopfVerlassen ist ohne Daten falsch', () => {
     expect(kopfVerlassen(undefined)).toBe(false);
     expect(kopfVerlassen({ pages: [], pageParams: [] })).toBe(false);
+  });
+
+  it('zumKopf holt noch einmal, wenn während des Abrufs ein Ereignis kam', async () => {
+    const { abruf, client, result } = aufbau();
+    await blaettere(result, 8);
+    abruf.mockClear();
+    await act(async () => {
+      await zumKopf(client, SCHLUESSEL, async () => {
+        // Das Live-Ereignis kommt, während der Kopf unterwegs ist.
+        void client.invalidateQueries({ queryKey: SCHLUESSEL });
+        return [0];
+      });
+    });
+    await waitFor(() => expect(abruf).toHaveBeenCalledWith(undefined));
+    expect(client.getQueryState(SCHLUESSEL)?.isInvalidated).toBe(false);
+  });
+
+  it('useFensterAnfang zählt die herausgefallenen Einträge vor dem Fenster', async () => {
+    const { client, result } = aufbau();
+    const anfang = renderHook(() =>
+      useFensterAnfang(
+        client.getQueryData<{ pages: number[][]; pageParams: unknown[] }>(SCHLUESSEL),
+        SCHLUESSEL,
+      ),
+    );
+    await blaettere(result, LISTEN_MAX_SEITEN - 1);
+    anfang.rerender();
+    expect(anfang.result.current).toBe(0);
+    await blaettere(result, 3);
+    anfang.rerender();
+    // Je Seite ein Eintrag: drei Seiten sind herausgefallen.
+    expect(anfang.result.current).toBe(3);
+  });
+
+  it('useKopfBeimVerlassen verwirft beim Verlassen ein Fenster ohne Kopf, eines mit Kopf nicht', async () => {
+    const { client, result } = aufbau();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    await blaettere(result, 2);
+    const mitKopf = renderHook(
+      () => {
+        const [aktiv, setAktiv] = useState(true);
+        useKopfBeimVerlassen(SCHLUESSEL, aktiv);
+        return setAktiv;
+      },
+      { wrapper },
+    );
+    act(() => mitKopf.result.current(false));
+    expect(client.getQueryData(SCHLUESSEL)).toBeDefined();
+
+    await blaettere(result, 6);
+    expect(kopfVerlassen(client.getQueryData(SCHLUESSEL))).toBe(true);
+    const ohneKopf = renderHook(() => useKopfBeimVerlassen(SCHLUESSEL, true), { wrapper });
+    ohneKopf.unmount();
+    expect(client.getQueryCache().find({ queryKey: SCHLUESSEL, exact: true })).toBeUndefined();
   });
 });
