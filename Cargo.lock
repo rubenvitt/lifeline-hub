@@ -3917,7 +3917,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "ed25519-dalek 3.0.0",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "hkdf 0.13.0",
  "hmac 0.13.0",
  "reqwest",
