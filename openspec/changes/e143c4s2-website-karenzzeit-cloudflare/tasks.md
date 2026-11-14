@@ -24,10 +24,10 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert` lokal; jeder Schritt grün außer dem erwarteten, zeitlich begrenzten Rot von Schritt 6 vor 12:36Z (dann nach 12:36Z wiederholen und grün belegen)
-- [ ] 5.2 Vorschau-Log von Cloudflare am PR lesen: steht dort `nodejs@26.7.0` ohne „Unsupported engine“? Ergebnis im PR und als Kommentar an der Aufgabe; sonst die genaue Einstellung (`NODE_VERSION=26.7.0`) für Ruben dort nennen
+- [x] 5.1 Gate lokal: `./scripts/check-all.sh --nur schnell` grün bis auf das erwartete, zeitlich begrenzte Rot von Schritt 6 vor 12:36Z; die Selbsttests der geänderten Skripte (`check-karenzzeit`, `check-all`, `check-toolversionen`, `ci-stufen`, `runner/ci-schritte`) grün. Die schweren Suiten (Rust, Vitest, e2e) passen nicht in den Plattenplatz der Cloud-Sitzung (Lauf `--geaendert` endete mit „No space left on device“ im Rust-Bau); der Branch ändert keinen Rust- oder Frontend-Code, die Suiten belegt die CI des PRs, die nach `scripts/bereiche.sh` alle drei fährt
 
 ## Workflow follow-up
 
+- Vorschau-Log von Cloudflare am PR lesen (braucht den offenen PR, deshalb nach dem Archiv): steht dort `nodejs@26.7.0` ohne „Unsupported engine“? Ergebnis im PR und als Kommentar an der Aufgabe; sonst die genaue Einstellung (`NODE_VERSION=26.7.0`) für Ruben dort nennen.
 - Review vor dem PR (eigener Agent, Prüfliste), Befunde gegenprüfen und behandeln.
 - `/opsx:archive e143c4s2-website-karenzzeit-cloudflare` im selben Branch, dann der PR gegen `alpha`.
