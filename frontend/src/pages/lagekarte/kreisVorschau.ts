@@ -206,6 +206,21 @@ function griffElement(art: 'kante' | 'mitte', kontext: GriffKontext, kennung: st
 }
 
 /**
+ * Griff von der Karte nehmen. maplibre meldet dabei die Zug-Hörer ab, ohne `dragend` zu feuern, und
+ * lässt den Zug stehen: `pointer-events: none` am Element und die Zugmerker `_isDragging`/`_state`
+ * (LLH-1857). Wer einen Griff mitten im Zug abnimmt (Esc verwirft die Mitte), beendet den Zug hier
+ * selbst, wie maplibres `_onUp`. Sonst ließe sich der Griff nach dem nächsten Anhängen nicht
+ * greifen, und mit stehendem `_isDragging` überspränge der nächste Druck die Klicktoleranz: ein
+ * Tipp mit Zittern würde zum Zug, und sein Klick auf der Karte versetzte die Mitte.
+ */
+function detach(m: maplibregl.Marker): void {
+  m.remove();
+  m.getElement().style.pointerEvents = 'auto';
+  m._isDragging = false;
+  m._state = 'inactive';
+}
+
+/**
  * Der Radius-Griff (D6): ein ziehbarer `maplibregl.Marker` wie die Bild-Griffe (`bildHandles.ts`),
  * Ziel mindestens 44 px. Ziehen meldet den Radius laufend (`fertig = false`) und am Ende einmal mit
  * `fertig = true`. Die Karte bleibt außerhalb des Griffs verschiebbar.
@@ -229,20 +244,20 @@ export function erzeugeKreisGriff(
   });
   let mitte: GeoPunkt | null = null;
   let radius: number | null = null;
-  let dran = false;
-  let mitteDran = false;
-  let ziehend = false;
-  let mitteZiehend = false;
+  let isAttached = false;
+  let isMitteAttached = false;
+  let isDragging = false;
+  let isMitteDragging = false;
   const mitteJetzt = (): GeoPunkt => {
     const ll = mittenMarker.getLngLat();
     return { lat: ll.lat, lon: ll.lng };
   };
   mittenMarker.on('dragstart', () => {
-    mitteZiehend = true;
+    isMitteDragging = true;
   });
   mittenMarker.on('drag', () => onMitte?.(mitteJetzt(), false));
   mittenMarker.on('dragend', () => {
-    mitteZiehend = false;
+    isMitteDragging = false;
     onMitte?.(mitteJetzt(), true);
   });
 
@@ -251,14 +266,14 @@ export function erzeugeKreisGriff(
     return mitte ? radiusAusGriff(mitte, { lat: ll.lat, lon: ll.lng }) : null;
   };
   marker.on('dragstart', () => {
-    ziehend = true;
+    isDragging = true;
   });
   marker.on('drag', () => {
     const r = radiusJetzt();
     if (r != null) onRadius(r, false);
   });
   marker.on('dragend', () => {
-    ziehend = false;
+    isDragging = false;
     const r = radiusJetzt();
     if (r != null) onRadius(r, true);
   });
@@ -266,14 +281,15 @@ export function erzeugeKreisGriff(
   const setMitte = () => {
     const steht = onMitte != null && mittenGriffSteht(mitte, radius);
     if (!steht || !mitte) {
-      if (mitteDran) mittenMarker.remove();
-      mitteDran = false;
+      if (isMitteAttached) detach(mittenMarker);
+      isMitteAttached = false;
+      isMitteDragging = false;
       return;
     }
-    if (!mitteZiehend) mittenMarker.setLngLat([mitte.lon, mitte.lat]);
-    if (!mitteDran) {
+    if (!isMitteDragging) mittenMarker.setLngLat([mitte.lon, mitte.lat]);
+    if (!isMitteAttached) {
       mittenMarker.addTo(map);
-      mitteDran = true;
+      isMitteAttached = true;
     }
   };
 
@@ -284,8 +300,9 @@ export function erzeugeKreisGriff(
       radius = radiusM;
       setMitte();
       if (!m) {
-        if (dran) marker.remove();
-        dran = false;
+        if (isAttached) detach(marker);
+        isAttached = false;
+        isDragging = false;
         return;
       }
       // Ergibt die Lage des Griffs schon den Radius, hat ihn ein Zug dorthin gelegt: er bleibt
@@ -293,20 +310,20 @@ export function erzeugeKreisGriff(
       // `dragend` bringt den zuletzt gezogenen Radius (LLH-1700).
       const stehtAufRadius = gleicheMitte && radiusJetzt() === radiusM;
       // Mitten im Zug setzt der Zeiger die Lage, nicht der gemeldete Radius.
-      if (!ziehend && !stehtAufRadius) {
+      if (!isDragging && !stehtAufRadius) {
         const p = griffLage(m, radiusM);
         marker.setLngLat([p.lon, p.lat]);
       }
-      if (!dran) {
+      if (!isAttached) {
         marker.addTo(map);
-        dran = true;
+        isAttached = true;
       }
     },
     zerstoeren() {
       marker.remove();
       mittenMarker.remove();
-      dran = false;
-      mitteDran = false;
+      isAttached = false;
+      isMitteAttached = false;
     },
   };
 }
