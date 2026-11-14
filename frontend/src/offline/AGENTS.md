@@ -52,7 +52,8 @@ draußen gelassen werden.
   Prefixe stehen in `LAGEBILD_OFFLINE`: die Marker für Karte und Dashboard, die Volltextliste für
   die Schadenseite.
 - **Das ETB nur in festen Ansichten** (LFH-939, D4, Entscheidung Ruben 06.10.2026): Ein
-  ETB-Key geht nur auf die Platte, wenn sein Filter allein `typ` und `limit` trägt
+  ETB-Key geht nur auf die Platte, wenn sein Filter allein `typ`, `limit` und den Schalter
+  `ohne_system` trägt (die Vorgabe-Ansicht blendet Systemeinträge aus, kwc2yszv D6)
   (`istFesteEtbAnsicht`, Positivliste), dazu Zähler und Lesemarke. Ergebnisse freier Eingaben
   (Volltext, Zeitraum, Einheit, Nummernsprung, Bezugssuche, Lageentwicklung) bleiben draußen
   und liegen nur `ETB_FREI_GC_MS` (5 min) im Speicher: `api/queryClient.ts` ergänzt dafür

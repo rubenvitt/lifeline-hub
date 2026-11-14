@@ -29,3 +29,16 @@ export async function systemBuendelAufklappen(page: Page) {
     await zu.first().click();
   }
 }
+
+/**
+ * Setzt das Feld Von der ETB-Erfassung über den Freitext-Eintrag der Vorschlagsliste: eine Meldung
+ * braucht einen Absender (Spec `etb-absender-empfaenger`, „Vorbelegung neuer Einträge“: Von leer,
+ * Pflicht). Enter übernimmt und springt in den Inhalt (Spec `etb-schnellerfassung-tastatur`).
+ */
+export async function etbVonSetzen(page: Page, von = 'Florian Süd 1') {
+  const feld = page.getByRole('combobox', { name: 'Von', exact: true });
+  await feld.fill(von);
+  await expect(page.getByTitle(`„${von}“ als Freitext übernehmen`)).toBeVisible();
+  await feld.press('Enter');
+  await expect(page.getByPlaceholder(/Inhalt/)).toBeFocused();
+}

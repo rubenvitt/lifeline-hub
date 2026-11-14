@@ -34,8 +34,12 @@ test('Login → Einsatz → Eintrag live in zweitem Client', async ({ browser })
   await b.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(b.getByPlaceholder('Inhalt …')).toBeVisible();
 
-  // A erfasst einen Eintrag.
+  // A erfasst eine Meldung; ihr Absender ist Pflicht (Spec `etb-absender-empfaenger`).
   const inhalt = `Live-Test ${Date.now()}`;
+  const von = a.getByRole('combobox', { name: 'Von' });
+  await von.fill('Florian Süd 1');
+  await expect(a.getByTitle('„Florian Süd 1“ als Freitext übernehmen')).toBeVisible();
+  await von.press('Enter');
   await a.getByPlaceholder('Inhalt …').fill(inhalt);
   await a.getByRole('button', { name: 'Erfassen', exact: true }).click();
 

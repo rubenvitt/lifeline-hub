@@ -1574,9 +1574,10 @@ const LAGEBILD_GLOBAL: ReadonlySet<unknown> = new Set<unknown>(LAGEBILD_OFFLINE.
  * Filterfelder, die eine FESTE ETB-Ansicht ergeben (LFH-939, design.md D4): Gesamtliste, je ein
  * Reiter je Typ, feste Ausschnitte (Überblick, Lage-Dashboard, Bezugswahl ohne Suche). Ihre Menge
  * ist begrenzt. Eine Positivliste statt einer Negativliste: ein neues Filterfeld landet nicht
- * still auf der Platte, es muss hier aufgenommen werden.
+ * still auf der Platte, es muss hier aufgenommen werden. `ohne_system` ist der Schalter der
+ * Vorgabe-Ansicht (Systemeinträge aus, kwc2yszv D6), keine freie Eingabe.
  */
-const ETB_FESTE_FILTERFELDER: ReadonlySet<string> = new Set(['typ', 'limit']);
+const ETB_FESTE_FILTERFELDER: ReadonlySet<string> = new Set(['typ', 'limit', 'ohne_system']);
 
 /**
  * Ist dieser ETB-Key eine feste Ansicht? Liste (`['etb', id, filter]`), Zähler

@@ -226,6 +226,15 @@ function etbFlaeche(einsatzId: string): Flaeche {
   return {
     pfad: `/einsaetze/${einsatzId}/etb`,
     anker: (page) => inMain(page).getByText('Lage ruhig, keine Besonderheiten').first(),
+    // Entwurfsreiter stehen erst ab dem zweiten Entwurf (kwc2yszv, Spec „Entwurfsreiter und
+    // Vorschau nur bei Bedarf“). Die Entwürfe bleiben über das Neuladen je Dichtestufe stehen.
+    vorbereiten: async (page) => {
+      const reiter = inMain(page).locator('.ant-tabs-tab');
+      if (!(await reiter.first().isVisible())) {
+        await inMain(page).getByRole('button', { name: '+ weiterer Entwurf' }).click();
+      }
+      await expect(reiter.first()).toBeVisible();
+    },
     ziele: [
       { sorte: 'ETB Erfassen', ziele: knopf('Erfassen'), mindestens: 1 },
       {

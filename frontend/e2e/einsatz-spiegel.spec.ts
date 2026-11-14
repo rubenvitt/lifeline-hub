@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { etbVonSetzen } from './etb-kern';
 import { DatabaseSync } from 'node:sqlite';
 import { FUEKW } from './fuehrungsorganisation-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
@@ -118,6 +119,7 @@ test('am Spiegel: Band, Bearbeiten gesperrt, ETB-Erfassung wird beantragt', asyn
   await page.keyboard.press('Escape');
 
   // Erfassen wird ein Antrag: als „beantragt“ in der Zeitachse, ohne laufende Nummer.
+  await etbVonSetzen(page);
   const feld = page.getByPlaceholder(/Inhalt/);
   await feld.click();
   await feld.pressSequentially('Sandsäcke am Deich angekommen');

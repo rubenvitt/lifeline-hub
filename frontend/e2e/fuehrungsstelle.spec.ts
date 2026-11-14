@@ -59,8 +59,10 @@ for (const breite of [1280, 390]) {
     await expect(page).toHaveURL(etbPfad(a));
     // Unter `md` startet die Erfassungsleiste eingeklappt (LFH-955): Feldzeile und Rufname-Abfrage
     // stehen erst, wenn der Fokus in ihr liegt.
+    // Fokus statt Klick: am leeren ETB steht die Leiste gleich unter dem Kopf, und der Hinweis
+    // „Aufgenommen in …“ aus dem Kontowechsel kann bei 390 px kurz darüber liegen.
     const insFeld = async () => {
-      if (breite < 768) await page.getByPlaceholder(/^Inhalt …/).click();
+      if (breite < 768) await page.getByPlaceholder(/^Inhalt …/).focus();
     };
     await insFeld();
     // An der Meldung trägt die eigene Stelle (Standard-Rufname), nicht die Führungsstelle.

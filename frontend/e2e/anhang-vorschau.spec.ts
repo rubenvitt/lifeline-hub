@@ -112,7 +112,11 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   expect(anfragen.filter((u) => /libheif|heicWorker|dekodiereHeic/.test(u))).toEqual([]);
 
   // ── 3 · HEIC, auf dem Gerät dekodiert ───────────────────────────────────────────────
+  // In komfortabler Dichte: dort trägt die Zeile das Vorschaubild. Die kompakte Spaltenzeile am
+  // Fükw zeigt Anhänge nur als Vermerk (kwc2yszv, Spec `etb-zeitachse-darstellung`).
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'komfortabel'));
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
   const heicKnopf = page.getByRole('button', { name: /^Vorschau: IMG_0001\.HEIC, Anhang zu Nr\./ });
   await expect(heicKnopf).toBeVisible({ timeout: 30_000 });
   const heicImg = heicKnopf.locator('img');
