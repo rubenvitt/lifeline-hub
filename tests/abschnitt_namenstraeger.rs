@@ -479,10 +479,11 @@ async fn zehn_versorgte_personen_melden_einzeln() {
     assert_eq!(person_ereignisse(&mut rx), erwartet);
 }
 
-/// Ist der neue Name gespeichert, meldet die Einheit ihre versorgten Personen auch dann, wenn ein
-/// späterer Schritt desselben PATCH mit 422 scheitert (Muster der Abschnitts-Route).
+/// Eine nicht zuordenbare Sprechgruppe scheitert am Einheit-PATCH, bevor etwas gespeichert ist
+/// (LLH-1692): der Name bleibt, und es gibt kein Ereignis für die versorgten Personen. Vorher
+/// stand der Name gespeichert, obwohl der Client 422 bekam.
 #[tokio::test]
-async fn einheit_meldet_versorgte_personen_auch_wenn_ein_spaeterer_schritt_scheitert() {
+async fn einheit_patch_mit_unbekannter_sprechgruppe_speichert_und_meldet_nichts() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
@@ -504,8 +505,8 @@ async fn einheit_meldet_versorgte_personen_auch_wenn_ein_spaeterer_schritt_schei
     let personen = format!("/api/einsaetze/{eid}/personen");
     assert_eq!(
         feld_in_liste(&app, &admin, &personen, p, "versorgende_einheit_name").await,
-        "Neu",
-        "Vorbedingung: der Name ist gespeichert"
+        "1. Zug",
+        "der Name darf nicht gespeichert sein"
     );
-    assert_eq!(person_ereignisse(&mut rx), vec![Some(p)]);
+    assert_eq!(person_ereignisse(&mut rx), Vec::<Option<i64>>::new());
 }
