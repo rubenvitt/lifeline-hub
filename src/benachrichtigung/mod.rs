@@ -58,7 +58,7 @@ wire_enum! {
 wire_enum! {
     /// Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
     /// fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0348_benachrichtigung_fuehrung_angefragt.sql`)
+    /// CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)
     /// spiegelt `ALLE`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, ToSchema)]
     pub enum BenachrichtigungArt {
