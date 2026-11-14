@@ -1,5 +1,5 @@
 ---
-id: ADR-0039
+id: ADR-0045
 titel: Ein privater Archiv-Schlüssel kommt nur für einen Aufruf an den Server und nie an einen Hub
 status: akzeptiert
 datum: 2026-11-13
@@ -12,7 +12,7 @@ herleitung:
   - LLH-1711 (Weg mit Ruben am 13.11.2026 abgestimmt)
 ---
 
-# ADR-0039: Ein privater Archiv-Schlüssel kommt nur für einen Aufruf an den Server und nie an einen Hub
+# ADR-0045: Ein privater Archiv-Schlüssel kommt nur für einen Aufruf an den Server und nie an einen Hub
 
 ## Regeln
 
