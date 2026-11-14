@@ -629,12 +629,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke",
-            post(routes::abloesung_schichtplan::block_anlegen),
+            post(routes::abloesung_schichtplan::create_block),
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}",
-            patch(routes::abloesung_schichtplan::block_aendern)
-                .delete(routes::abloesung_schichtplan::block_loeschen),
+            patch(routes::abloesung_schichtplan::update_block)
+                .delete(routes::abloesung_schichtplan::delete_block),
         )
         // Wechsel aus dem Plan an einer UHS und in der Pause (LLH-1555).
         .route(
@@ -652,11 +652,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/grenzwerte",
-            patch(routes::abloesung_schichtplan::grenzwerte_setzen),
+            patch(routes::abloesung_schichtplan::update_grenzwerte),
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/helfer",
-            post(routes::abloesung_schichtplan::helfer_anlegen),
+            post(routes::abloesung_schichtplan::create_helfer),
         )
         // Schichtplan als Excel-Mappe (LLH-1557): nur Lesen.
         .route(
@@ -677,8 +677,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid}",
-            patch(routes::abloesung_schichtplan::helfer_aendern)
-                .delete(routes::abloesung_schichtplan::helfer_loeschen),
+            patch(routes::abloesung_schichtplan::update_helfer)
+                .delete(routes::abloesung_schichtplan::delete_helfer),
         )
         .route(
             "/api/einsaetze/{id}/abloesungen/{aid}",
@@ -2213,17 +2213,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Vorplanung ohne Einsatz (LLH-1585): Planer der Organisation (`planung::zugriff`).
         .route(
             "/api/planungen",
-            get(routes::planung::liste).post(routes::planung::anlegen),
+            get(routes::planung::list).post(routes::planung::create),
         )
         .route(
             "/api/planungen/{id}",
-            get(routes::planung::lesen)
-                .patch(routes::planung::aendern)
-                .delete(routes::planung::loeschen),
+            get(routes::planung::load)
+                .patch(routes::planung::update)
+                .delete(routes::planung::delete),
         )
         .route(
             "/api/planungen/{id}/posten",
-            post(routes::planung::posten_anlegen),
+            post(routes::planung::create_posten),
         )
         // `reihenfolge` ist ein festes Segment neben `{pid}`.
         .route(
@@ -2232,15 +2232,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/planungen/{id}/posten/{pid}",
-            patch(routes::planung::posten_aendern).delete(routes::planung::posten_loeschen),
+            patch(routes::planung::update_posten).delete(routes::planung::delete_posten),
         )
         .route(
             "/api/planungen/{id}/bloecke",
-            post(routes::planung::block_anlegen),
+            post(routes::planung::create_block),
         )
         .route(
             "/api/planungen/{id}/bloecke/{bid}",
-            patch(routes::planung::block_aendern).delete(routes::planung::block_loeschen),
+            patch(routes::planung::update_block).delete(routes::planung::delete_block),
         )
         .route(
             "/api/planungen/{id}/erzeugen",
@@ -2249,21 +2249,21 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route("/api/planungen/{id}/export", get(routes::planung::export))
         .route(
             "/api/planungen/{id}/helfer",
-            post(routes::planung::helfer_anlegen),
+            post(routes::planung::create_helfer),
         )
         .route(
             "/api/planungen/{id}/helfer/{hid}",
-            patch(routes::planung::helfer_aendern).delete(routes::planung::helfer_loeschen),
+            patch(routes::planung::update_helfer).delete(routes::planung::delete_helfer),
         )
         // LLH-1583: Programmpunkte der Planung; die Übernahme bringt sie in den Einsatz.
         .route(
             "/api/planungen/{id}/programmpunkte",
-            post(routes::planung::programmpunkt_anlegen),
+            post(routes::planung::create_programmpunkt),
         )
         .route(
             "/api/planungen/{id}/programmpunkte/{pid}",
-            patch(routes::planung::programmpunkt_aendern)
-                .delete(routes::planung::programmpunkt_loeschen),
+            patch(routes::planung::update_programmpunkt)
+                .delete(routes::planung::delete_programmpunkt),
         )
         // LLH-1587: Übernahme in einen neuen oder laufenden Einsatz; `vorschau` schreibt nichts.
         .route(

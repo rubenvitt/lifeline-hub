@@ -1,31 +1,29 @@
 //! Datenbank der Vorplanung (design.md D3–D8). Schreibwege laufen je in EINER Transaktion
 //! (`write_retry!`): Planung, Posten, Überschneidung, Personen und Grenzen werden darin geprüft,
-//! wo auch geschrieben wird. Die Befunde rechnet `abloesung::schichtplan::pruefung` beim Lesen,
-//! ohne Ist.
+//! wo auch geschrieben wird. Blöcke, Personen und Helfer schreibt der Plan-Kern
+//! (`abloesung::schichtplan::plan_repo`) mit [`Vorplanung`]. Die Befunde rechnet
+//! `abloesung::schichtplan::pruefung` beim Lesen, ohne Ist.
 //!
 //! Für die Prüfung wird ein Posten der Planung auf den neutralen Schlüssel
 //! `Posten::Einheit(posten_id)` abgebildet und die Pause auf `Posten::Pause`: ohne Ist zählt die
 //! Art des Postens nur für die Pause (`Grundlage.mit_ist`).
 
-use std::collections::{BTreeMap, HashMap};
-
 use chrono::{DateTime, Duration, Utc};
-use sqlx::{SqliteConnection, SqlitePool};
+use sqlx::sqlite::SqliteRow;
+use sqlx::{Row, SqliteConnection, SqlitePool};
 
 use super::{
     kennzahlen, PlanungAnzeige, PlanungBlockAnzeige, PlanungKennzahlen, PlanungKopf,
     PlanungListeneintrag, PlanungPostenAnzeige, PlanungPostenArt, PlanungUebernahme,
     AUFBEWAHRUNG_TAGE, KENNZAHLEN_TAGE, PLANUNGEN_MAX, POSTEN_MAX, ZEITRAUM_MAX_TAGE,
 };
-use crate::abloesung::schichtplan::pruefung::{self, Block, Ergebnis, Grundlage, PersonStand};
-use crate::abloesung::schichtplan::repo::{HelferEingabe, HelferPatch};
-use crate::abloesung::schichtplan::zerlegung::{self, Teilung};
-use crate::abloesung::schichtplan::{
-    PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, Posten, SchichtplanGrenzwerte,
-    PLAN_BLOECKE_MAX, PLAN_HELFER_MAX, SOLL_ANZAHL_MAX,
+use crate::abloesung::schichtplan::plan_repo::{
+    self, utc, BlockKern, Planart, PostenQuery, PostenVorgabe,
 };
+use crate::abloesung::schichtplan::zerlegung::{self, Teilung};
+use crate::abloesung::schichtplan::{PlanPerson, Posten, SchichtplanGrenzwerte, SOLL_ANZAHL_MAX};
 use crate::einsatz::Einsatzart;
-use crate::error::{AppError, ZeilenArt, ZeilenGrund};
+use crate::error::AppError;
 use crate::personal::quali_soll::QualiSoll;
 use crate::uhs::UhsTyp;
 use crate::write_retry;
@@ -121,26 +119,137 @@ pub struct BlockEingabe {
     pub notiz: Option<String>,
 }
 
-/// Änderung eines Blocks. `posten: Some(None)` verschiebt in die Pause.
-#[derive(Debug, Clone, Default)]
-pub struct BlockPatch {
-    pub version: i64,
-    pub posten: Option<Option<i64>>,
-    pub von: Option<String>,
-    pub bis: Option<String>,
-    pub soll_anzahl: Option<Option<i64>>,
-    pub quali_soll: Option<Option<String>>,
-    pub personen: Option<Vec<PlanPerson>>,
-    pub notiz: Option<Option<String>>,
+impl BlockEingabe {
+    pub(crate) fn kern(&self) -> plan_repo::BlockEingabe<Option<i64>> {
+        plan_repo::BlockEingabe {
+            posten: self.posten_id,
+            von: self.von.clone(),
+            bis: self.bis.clone(),
+            soll_anzahl: self.soll_anzahl,
+            quali_soll: self.quali_soll.clone(),
+            personen: self.personen.clone(),
+            notiz: self.notiz.clone(),
+        }
+    }
 }
 
-fn utc(wert: &str) -> Result<DateTime<Utc>, AppError> {
-    zeit::parse_utc(wert)
-        .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{wert}'")))
+/// Änderung eines Blocks. `posten: Some(None)` verschiebt in die Pause.
+pub type BlockPatch = plan_repo::BlockPatch<Option<i64>>;
+
+/// Eine Planung als [`Planart`] des Kerns (`abloesung::schichtplan::plan_repo`): Posten sind die
+/// Posten der Planung (`None` = Pause), Personen nur Stamm-Personal und Helfer, Servertexte in der
+/// Zone der Organisation, jeder Schreibweg prüft zuerst den Schreibschutz.
+pub(crate) struct Vorplanung {
+    pub org_id: i64,
+    pub planung_id: i64,
+}
+
+impl Planart for Vorplanung {
+    type Posten = Option<i64>;
+    type BlockZeile = BlockZeile;
+
+    const SCHICHT: &'static str = "planung_schicht";
+    const PERSON: &'static str = "planung_schicht_person";
+    const PERSON_FK: &'static str = "schicht_id";
+    const HELFER: &'static str = "planung_helfer";
+    const SCOPE: &'static str = "planung_id";
+    const POSTEN_SPALTEN: &'static [&'static str] = &["posten_id"];
+    const SELECT_BLOECKE: &'static str = SELECT_BLOECKE;
+    // Helfer der Vorplanung tragen (noch) keine externe Kennung.
+    const HELFER_SPALTEN: &'static str =
+        "id, name, telefon, organisation, qualifikationen, NULL AS kennung, NULL AS herkunft";
+    const JE: &'static str = "Planung";
+    const ZU_DIESEM: &'static str = "dieser Planung";
+    // Ohne Ist: niemand ist im Einsatz; ein Helfer ist immer verfügbar.
+    const PERSONEN: &'static [(fn(i64) -> PlanPerson, &'static str)] = &[
+        (
+            PlanPerson::Stamm,
+            "SELECT pe.id, pe.name, \
+                    (SELECT json_group_array(pq.qualifikation_id) FROM personal_qualifikation pq \
+                      WHERE pq.personal_id = pe.id), \
+                    pe.dienststatus <> 'ausser_dienst', 0, NULL, NULL, 0 \
+             FROM personal pe \
+             WHERE pe.id IN (SELECT sp.personal_id FROM planung_schicht_person sp \
+                             JOIN planung_schicht s ON s.id = sp.schicht_id \
+                             WHERE s.planung_id = ? AND sp.personal_id IS NOT NULL)",
+        ),
+        (
+            PlanPerson::Helfer,
+            "SELECT id, name, qualifikationen, 1, 0, NULL, NULL, 0 FROM planung_helfer \
+             WHERE planung_id = ?",
+        ),
+    ];
+    const UEBER_EINHEIT: Option<&'static str> = None;
+    const MIT_ADHOC: bool = false;
+
+    fn id(&self) -> i64 {
+        self.planung_id
+    }
+
+    fn is_pause(posten: Option<i64>) -> bool {
+        posten.is_none()
+    }
+
+    fn posten_from_row(row: &SqliteRow) -> Result<Option<i64>, AppError> {
+        Ok(row.try_get("posten_id")?)
+    }
+
+    fn bind_posten(query: PostenQuery<'_>, posten: Option<i64>) -> PostenQuery<'_> {
+        query.bind(posten)
+    }
+
+    fn block_kern(z: &BlockZeile) -> Result<BlockKern<'_>, AppError> {
+        Ok(BlockKern {
+            id: z.id,
+            posten: z.posten_id.map_or(Posten::Pause, Posten::Einheit),
+            von: &z.von,
+            bis: &z.bis,
+            soll_anzahl: z.soll_anzahl,
+            quali_soll: z.quali_soll.as_ref(),
+            aufgeloest: z.aufgeloest,
+        })
+    }
+
+    async fn before_write_tx(&self, conn: &mut SqliteConnection) -> Result<i64, AppError> {
+        schreibbar_tx(conn, self.org_id, self.planung_id).await?;
+        Ok(self.org_id)
+    }
+
+    /// Liefert Soll-Vorgabe, Bezeichnung und Schichtlänge des Postens.
+    async fn check_posten_tx(
+        &self,
+        conn: &mut SqliteConnection,
+        posten: Option<i64>,
+    ) -> Result<PostenVorgabe, AppError> {
+        let Some(pid) = posten else {
+            return Ok(PostenVorgabe::default());
+        };
+        let zeile: Option<(Option<i64>, Option<String>, String, Option<i64>)> = sqlx::query_as(
+            "SELECT soll_anzahl, quali_soll, bezeichnung, schichtlaenge_min FROM planung_posten \
+             WHERE id = ? AND planung_id = ?",
+        )
+        .bind(pid)
+        .bind(self.planung_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let (soll_anzahl, quali_soll, bezeichnung, schichtlaenge) = zeile.ok_or_else(|| {
+            AppError::UnprocessableEntity("Der Posten gehört nicht zu dieser Planung".into())
+        })?;
+        Ok(PostenVorgabe {
+            soll_anzahl,
+            quali_soll,
+            bezeichnung: Some(bezeichnung),
+            schichtlaenge,
+        })
+    }
+
+    async fn zone_tx(&self, conn: &mut SqliteConnection) -> Result<Zeitstil, AppError> {
+        zeitstil_org(conn, self.org_id).await
+    }
 }
 
 /// Zeitraum einer Planung (400): Ende nach Beginn, höchstens [`ZEITRAUM_MAX_TAGE`] Tage.
-pub fn pruefe_zeitraum(von: &str, bis: &str) -> Result<(), AppError> {
+pub fn check_zeitraum(von: &str, bis: &str) -> Result<(), AppError> {
     let (a, b) = (utc(von)?, utc(bis)?);
     if b <= a {
         return Err(AppError::Validation(
@@ -169,23 +278,6 @@ pub fn loeschung_at(bis: &str) -> String {
         .unwrap_or_else(|| bis.to_string())
 }
 
-fn json_ids(json: Option<&str>) -> Vec<i64> {
-    json.and_then(|j| serde_json::from_str::<Vec<i64>>(j).ok())
-        .unwrap_or_default()
-}
-
-fn quals_json(ids: &[i64]) -> Option<String> {
-    (!ids.is_empty()).then(|| serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
-}
-
-/// Der Schlüssel eines Postens in der Prüfung (Modulkopf).
-fn posten_schluessel(posten_id: Option<i64>) -> Posten {
-    match posten_id {
-        Some(id) => Posten::Einheit(id),
-        None => Posten::Pause,
-    }
-}
-
 /// Zone und Darstellung der Organisation für Servertexte.
 pub(crate) async fn zeitstil_org(
     conn: &mut SqliteConnection,
@@ -201,13 +293,6 @@ pub(crate) async fn zeitstil_org(
         wirksame_zone(None, zone.as_deref()),
         wirksame_darstellung(None, darstellung.as_deref()),
     ))
-}
-
-fn zeitraum_text(stil: &Zeitstil, von: &str, bis: &str) -> String {
-    match (zeit::parse_utc(von), zeit::parse_utc(bis)) {
-        (Some(a), Some(b)) => stil.zeitraum(a, b),
-        _ => format!("{von}–{bis}"),
-    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -402,7 +487,7 @@ impl PostenZeile {
 }
 
 #[derive(sqlx::FromRow)]
-struct BlockZeile {
+pub(crate) struct BlockZeile {
     id: i64,
     version: i64,
     posten_id: Option<i64>,
@@ -411,204 +496,48 @@ struct BlockZeile {
     soll_anzahl: Option<i64>,
     quali_soll: Option<QualiSoll>,
     notiz: Option<String>,
+    /// Vorlage oder Fahrzeug des Postens ist nicht mehr verfügbar (wie `nicht_verfuegbar` am
+    /// Posten).
+    aufgeloest: bool,
 }
 
 const SELECT_BLOECKE: &str = concat!(
     "SELECT s.id, s.version, s.posten_id, s.von, s.bis, s.soll_anzahl, ",
     crate::personal::quali_soll::quali_soll_sql!("s.quali_soll"),
-    " AS quali_soll, s.notiz \
+    " AS quali_soll, s.notiz, \
+       (COALESCE(v.aktiv = 0, 0) OR COALESCE(f.dienststatus = 'ausser_dienst', 0)) AS aufgeloest \
      FROM planung_schicht s LEFT JOIN planung_posten p ON p.id = s.posten_id \
+     LEFT JOIN einheit_vorlage v ON v.id = p.einheit_vorlage_id \
+     LEFT JOIN fahrzeug f ON f.id = p.fahrzeug_id \
      WHERE s.planung_id = ? \
      ORDER BY s.posten_id IS NULL, COALESCE(p.sortier, 0), COALESCE(p.id, 0), s.von, s.id"
 );
 
-/// Name und Stand einer Person der Planung.
-struct PersonDaten {
-    name: String,
-    stand: PersonStand,
-}
-
-/// Blöcke, Personen und das Ergebnis der Prüfung einer Planung.
-struct Geprueft {
-    zeilen: Vec<BlockZeile>,
-    bloecke: Vec<Block>,
-    ergebnis: Ergebnis,
-    personen: BTreeMap<PlanPerson, PersonDaten>,
-}
-
-async fn pruefe_planung(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-    grenzwerte: SchichtplanGrenzwerte,
-    nicht_verfuegbar: &HashMap<i64, bool>,
-) -> Result<Geprueft, AppError> {
-    let zeilen: Vec<BlockZeile> = sqlx::query_as(SELECT_BLOECKE)
-        .bind(planung_id)
-        .fetch_all(&mut *conn)
-        .await?;
-    let zuordnung: Vec<(i64, Option<i64>, Option<i64>)> = sqlx::query_as(
-        "SELECT sp.schicht_id, sp.personal_id, sp.helfer_id FROM planung_schicht_person sp \
-         JOIN planung_schicht s ON s.id = sp.schicht_id \
-         WHERE s.planung_id = ? ORDER BY sp.rowid",
-    )
-    .bind(planung_id)
-    .fetch_all(&mut *conn)
-    .await?;
-    let mut je_block: HashMap<i64, Vec<PlanPerson>> = HashMap::new();
-    for (bid, stamm, helfer) in zuordnung {
-        if let Some(p) = PlanPerson::aus_spalten(stamm, None, helfer) {
-            je_block.entry(bid).or_default().push(p);
-        }
-    }
-    let personen = personen_daten(conn, planung_id).await?;
-    let katalog = crate::personal::qualifikation_repo::einschluesse(&mut *conn, org_id).await?;
-
-    let mut bloecke = Vec::with_capacity(zeilen.len());
-    for z in &zeilen {
-        bloecke.push(Block {
-            id: z.id,
-            posten: posten_schluessel(z.posten_id),
-            von: utc(&z.von)?,
-            bis: utc(&z.bis)?,
-            soll_anzahl: z.soll_anzahl,
-            quali_soll: z
-                .quali_soll
-                .as_ref()
-                .map(QualiSoll::anforderungen)
-                .unwrap_or_default(),
-            personen: je_block.remove(&z.id).unwrap_or_default(),
-            posten_aufgeloest: z
-                .posten_id
-                .is_some_and(|p| nicht_verfuegbar.get(&p).copied().unwrap_or(false)),
-        });
-    }
-    let staende: HashMap<PlanPerson, PersonStand> = personen
-        .iter()
-        .map(|(p, d)| (*p, d.stand.clone()))
-        .collect();
-    let ueber = HashMap::new();
-    let ergebnis = pruefung::pruefe(
-        &bloecke,
-        &Grundlage {
-            katalog: &katalog,
-            personen: &staende,
-            ueber_einheit: &ueber,
-            grenzwerte,
-            jetzt: Utc::now(),
-            mit_ist: false,
-        },
-    );
-    Ok(Geprueft {
-        zeilen,
-        bloecke,
-        ergebnis,
-        personen,
-    })
-}
-
-/// Name, Qualifikationen und Verfügbarkeit jeder Person der Planung.
-async fn personen_daten(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-) -> Result<BTreeMap<PlanPerson, PersonDaten>, AppError> {
-    let mut aus = BTreeMap::new();
-    let stamm: Vec<(i64, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT pe.id, pe.name, pe.dienststatus, \
-                (SELECT json_group_array(pq.qualifikation_id) FROM personal_qualifikation pq \
-                  WHERE pq.personal_id = pe.id) \
-         FROM personal pe \
-         WHERE pe.id IN (SELECT sp.personal_id FROM planung_schicht_person sp \
-                         JOIN planung_schicht s ON s.id = sp.schicht_id \
-                         WHERE s.planung_id = ? AND sp.personal_id IS NOT NULL)",
-    )
-    .bind(planung_id)
-    .fetch_all(&mut *conn)
-    .await?;
-    for (id, name, dienststatus, quals) in stamm {
-        aus.insert(
-            PlanPerson::Stamm(id),
-            PersonDaten {
-                name,
-                stand: PersonStand {
-                    qualifikationen: json_ids(quals.as_deref()),
-                    verfuegbar: dienststatus != "ausser_dienst",
-                    ..PersonStand::default()
-                },
-            },
-        );
-    }
-    for h in helfer_liste(conn, planung_id).await? {
-        aus.insert(
-            PlanPerson::Helfer(h.id),
-            PersonDaten {
-                name: h.name,
-                stand: PersonStand {
-                    qualifikationen: h.qualifikationen,
-                    ..PersonStand::default()
-                },
-            },
-        );
-    }
-    Ok(aus)
-}
-
-async fn helfer_liste(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-) -> Result<Vec<PlanHelferAnzeige>, AppError> {
-    let zeilen: Vec<(i64, String, Option<String>, Option<String>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT id, name, telefon, organisation, qualifikationen FROM planung_helfer \
-             WHERE planung_id = ? ORDER BY name COLLATE NOCASE, id",
-        )
-        .bind(planung_id)
-        .fetch_all(&mut *conn)
-        .await?;
-    Ok(zeilen
-        .into_iter()
-        .map(
-            |(id, name, telefon, organisation, quals)| PlanHelferAnzeige {
-                id,
-                name,
-                telefon,
-                organisation,
-                qualifikationen: json_ids(quals.as_deref()),
-                // Helfer der Vorplanung tragen (noch) keine externe Kennung.
-                kennung: None,
-                herkunft: None,
-            },
-        )
-        .collect())
-}
-
 /// Die ganze Planung mit Befunden und Kennzahlen. Fremd oder unbekannt → 404.
-pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<PlanungAnzeige, AppError> {
-    let mut conn = pool.acquire().await?;
-    laden_mit(&mut conn, org_id, id).await
-}
-
-async fn laden_mit(
-    conn: &mut SqliteConnection,
+pub async fn load(
+    pool: &SqlitePool,
     org_id: i64,
     id: i64,
+    jetzt: DateTime<Utc>,
 ) -> Result<PlanungAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    let conn = &mut *conn;
     let kopf = kopf_tx(conn, org_id, id).await?;
     let posten_zeilen: Vec<PostenZeile> = sqlx::query_as(SELECT_POSTEN)
         .bind(id)
         .fetch_all(&mut *conn)
         .await?;
-    let nicht_verfuegbar: HashMap<i64, bool> = posten_zeilen
-        .iter()
-        .map(|p| (p.id, p.nicht_verfuegbar))
-        .collect();
-    let g = pruefe_planung(conn, org_id, id, kopf.grenzwerte(), &nicht_verfuegbar).await?;
+    let plan = Vorplanung {
+        org_id,
+        planung_id: id,
+    };
+    let g = plan_repo::load_tx(conn, &plan, org_id, kopf.grenzwerte(), jetzt).await?;
     // Nach der Übernahme gelten die Kennzahlen von damals (Spec `vorplanung`).
     let kennzahlen = match parse_kennzahlen(kopf.uebernahme_kennzahlen.as_deref())? {
         Some(k) => k,
         None => kennzahlen(&g.bloecke, &g.ergebnis),
     };
-    let helfer = helfer_liste(conn, id).await?;
+    let helfer = plan_repo::load_helfer_tx(conn, &plan).await?;
     let programmpunkte = super::programm::liste_tx(conn, id).await?;
 
     let mut ergebnis_je_block = g.ergebnis.bloecke;
@@ -619,25 +548,7 @@ async fn laden_mit(
         .zip(g.bloecke)
         .map(|(z, b)| {
             let mut e = ergebnis_je_block.remove(&b.id).unwrap_or_default();
-            let liste = b
-                .personen
-                .iter()
-                .map(|p| {
-                    let daten = personen.get(p);
-                    PlanPersonAnzeige {
-                        art: p.art(),
-                        personal_id: matches!(p, PlanPerson::Stamm(_)).then(|| p.id()),
-                        einsatz_personal_id: None,
-                        helfer_id: matches!(p, PlanPerson::Helfer(_)).then(|| p.id()),
-                        name: daten.map(|d| d.name.clone()).unwrap_or_default(),
-                        qualifikationen: daten
-                            .map(|d| d.stand.qualifikationen.clone())
-                            .unwrap_or_default(),
-                        im_einsatz: false,
-                        befunde: e.personen.remove(p).unwrap_or_default(),
-                    }
-                })
-                .collect();
+            let liste = plan_repo::personen_anzeige(&b, &personen, &mut e);
             PlanungBlockAnzeige {
                 id: z.id,
                 version: z.version,
@@ -669,31 +580,25 @@ async fn laden_mit(
     })
 }
 
-/// Kennzahlen einer Planung aus derselben Prüfung wie [`laden`].
-pub(crate) async fn kennzahlen_von(
+/// Kennzahlen einer Planung aus derselben Prüfung wie [`load`].
+pub(crate) async fn load_kennzahlen(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
     grenzwerte: SchichtplanGrenzwerte,
+    jetzt: DateTime<Utc>,
 ) -> Result<PlanungKennzahlen, AppError> {
-    let nicht_verfuegbar: HashMap<i64, bool> = sqlx::query_as(
-        "SELECT p.id, (COALESCE(v.aktiv = 0, 0) OR COALESCE(f.dienststatus = 'ausser_dienst', 0)) \
-         FROM planung_posten p \
-         LEFT JOIN einheit_vorlage v ON v.id = p.einheit_vorlage_id \
-         LEFT JOIN fahrzeug f ON f.id = p.fahrzeug_id WHERE p.planung_id = ?",
-    )
-    .bind(id)
-    .fetch_all(&mut *conn)
-    .await?
-    .into_iter()
-    .collect();
-    let g = pruefe_planung(conn, org_id, id, grenzwerte, &nicht_verfuegbar).await?;
+    let plan = Vorplanung {
+        org_id,
+        planung_id: id,
+    };
+    let g = plan_repo::load_tx(conn, &plan, org_id, grenzwerte, jetzt).await?;
     Ok(kennzahlen(&g.bloecke, &g.ergebnis))
 }
 
 /// Die Planungen der Organisation: laufende und künftige zuerst, dann vergangene, je nach
 /// Beginn. Kennzahlen nur, wenn das Ende höchstens [`KENNZAHLEN_TAGE`] zurückliegt.
-pub async fn liste(
+pub async fn list(
     pool: &SqlitePool,
     org_id: i64,
     jetzt: DateTime<Utc>,
@@ -748,11 +653,12 @@ pub async fn liste(
         let kennzahlen = match parse_kennzahlen(z.uebernahme_kennzahlen.as_deref())? {
             Some(k) => Some(k),
             None if bis >= grenze => Some(
-                kennzahlen_von(
+                load_kennzahlen(
                     &mut conn,
                     org_id,
                     id,
                     SchichtplanGrenzwerte::aus(z.max_dienst_min, z.min_ruhe_min),
+                    jetzt,
                 )
                 .await?,
             ),
@@ -785,7 +691,7 @@ pub async fn liste(
 // Planung schreiben
 // ---------------------------------------------------------------------------------------------
 
-async fn pruefe_bezeichnung_frei_tx(
+async fn check_bezeichnung_frei_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     bezeichnung: &str,
@@ -809,19 +715,19 @@ async fn pruefe_bezeichnung_frei_tx(
 }
 
 /// Legt eine Planung an. Bezeichnung doppelt 409, mehr als [`PLANUNGEN_MAX`] 422.
-pub async fn anlegen(
+pub async fn create(
     pool: &SqlitePool,
     org_id: i64,
     benutzer_id: i64,
     e: &KopfEingabe,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
-        anlegen_tx(conn, org_id, benutzer_id, e).await
+        create_tx(conn, org_id, benutzer_id, e).await
     })
 }
 
-/// [`anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn anlegen_tx(
+/// [`create`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn create_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     benutzer_id: i64,
@@ -836,7 +742,7 @@ pub async fn anlegen_tx(
             "Höchstens {PLANUNGEN_MAX} Planungen je Organisation"
         )));
     }
-    pruefe_bezeichnung_frei_tx(conn, org_id, &e.bezeichnung, None).await?;
+    check_bezeichnung_frei_tx(conn, org_id, &e.bezeichnung, None).await?;
     Ok(sqlx::query_scalar(
         "INSERT INTO planung (org_id, bezeichnung, einsatzart, ort, ort_lat, ort_lon, von, \
             bis, max_dienst_min, min_ruhe_min, angelegt_von) \
@@ -858,7 +764,7 @@ pub async fn anlegen_tx(
 }
 
 /// Ändert den Kopf mit CAS über `version` (409). Ein Zeitraum über die Grenze ist 422.
-pub async fn aendern(
+pub async fn update(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
@@ -875,11 +781,11 @@ pub async fn aendern(
         }
         let bezeichnung = p.bezeichnung.clone().unwrap_or(k.bezeichnung);
         if p.bezeichnung.is_some() {
-            pruefe_bezeichnung_frei_tx(conn, org_id, &bezeichnung, Some(id)).await?;
+            check_bezeichnung_frei_tx(conn, org_id, &bezeichnung, Some(id)).await?;
         }
         let von = p.von.clone().unwrap_or(k.von);
         let bis = p.bis.clone().unwrap_or(k.bis);
-        pruefe_zeitraum(&von, &bis).map_err(als_422)?;
+        check_zeitraum(&von, &bis).map_err(als_422)?;
         let einsatzart = p
             .einsatzart
             .map(|a| a.as_str().to_string())
@@ -913,7 +819,7 @@ pub async fn aendern(
     })
 }
 
-async fn loeschen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+async fn delete_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     sqlx::query("DELETE FROM planung WHERE id = ?")
         .bind(id)
         .execute(&mut *conn)
@@ -927,10 +833,10 @@ async fn loeschen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppErro
 }
 
 /// Löscht eine Planung samt Posten, Blöcken und Helfern. Fremd oder unbekannt → 404.
-pub async fn loeschen(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
+pub async fn delete(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
         kopf_tx(conn, org_id, id).await?;
-        loeschen_tx(conn, id).await
+        delete_tx(conn, id).await
     })
 }
 
@@ -960,7 +866,7 @@ pub async fn purge_abgelaufene(
                     .fetch_one(&mut *conn)
                     .await?;
             if noch {
-                loeschen_tx(conn, id).await?;
+                delete_tx(conn, id).await?;
             }
             Ok(noch)
         });
@@ -1046,7 +952,7 @@ async fn herkunft_soll_tx(
     ))
 }
 
-async fn pruefe_posten_bezeichnung_tx(
+async fn check_posten_bezeichnung_tx(
     conn: &mut SqliteConnection,
     planung_id: i64,
     bezeichnung: &str,
@@ -1070,19 +976,19 @@ async fn pruefe_posten_bezeichnung_tx(
 }
 
 /// Legt einen Posten am Ende der Reihenfolge an. Liefert die Kennung.
-pub async fn posten_anlegen(
+pub async fn create_posten(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,
     e: &PostenEingabe,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
-        posten_anlegen_tx(conn, org_id, planung_id, e).await
+        create_posten_tx(conn, org_id, planung_id, e).await
     })
 }
 
-/// [`posten_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn posten_anlegen_tx(
+/// [`create_posten`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn create_posten_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     planung_id: i64,
@@ -1101,7 +1007,7 @@ pub async fn posten_anlegen_tx(
             "Höchstens {POSTEN_MAX} Posten je Planung"
         )));
     }
-    pruefe_posten_bezeichnung_tx(conn, planung_id, &e.bezeichnung, None).await?;
+    check_posten_bezeichnung_tx(conn, planung_id, &e.bezeichnung, None).await?;
     let (vorgabe_anzahl, vorgabe_quali) = herkunft_soll_tx(conn, org_id, e.herkunft).await?;
     let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
     let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
@@ -1133,7 +1039,7 @@ pub async fn posten_anlegen_tx(
 }
 
 /// Ändert einen Posten; bestehende Blöcke behalten ihr Soll (Kopie beim Anlegen).
-pub async fn posten_aendern(
+pub async fn update_posten(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,
@@ -1160,7 +1066,7 @@ pub async fn posten_aendern(
         .ok_or(AppError::NotFound)?;
         let (bezeichnung_alt, abschnitt_alt, laenge_alt, soll_alt, quali_alt) = stand;
         if let Some(b) = &p.bezeichnung {
-            pruefe_posten_bezeichnung_tx(conn, planung_id, b, Some(posten_id)).await?;
+            check_posten_bezeichnung_tx(conn, planung_id, b, Some(posten_id)).await?;
         }
         if let Some(q) = &p.quali_soll {
             crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, q.as_deref()).await?;
@@ -1183,7 +1089,7 @@ pub async fn posten_aendern(
 
 /// Löscht einen Posten samt seinen Blöcken. Haben die Blöcke Personen, nur mit `mit_bloecken`
 /// (422 sonst).
-pub async fn posten_loeschen(
+pub async fn delete_posten(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,
@@ -1265,391 +1171,17 @@ pub async fn reihenfolge(
 // Blöcke
 // ---------------------------------------------------------------------------------------------
 
-/// Der Posten gehört zur Planung (422 sonst). Liefert seine Soll-Vorgabe, Bezeichnung und
-/// Schichtlänge; die Pause hat keins davon.
-async fn posten_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    posten_id: Option<i64>,
-) -> Result<(Option<i64>, Option<String>, Option<String>, Option<i64>), AppError> {
-    let Some(pid) = posten_id else {
-        return Ok((None, None, None, None));
-    };
-    let zeile: Option<(Option<i64>, Option<String>, String, Option<i64>)> = sqlx::query_as(
-        "SELECT soll_anzahl, quali_soll, bezeichnung, schichtlaenge_min FROM planung_posten \
-         WHERE id = ? AND planung_id = ?",
-    )
-    .bind(pid)
-    .bind(planung_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let (anzahl, quali, bezeichnung, laenge) = zeile.ok_or_else(|| {
-        AppError::UnprocessableEntity("Der Posten gehört nicht zu dieser Planung".into())
-    })?;
-    Ok((anzahl, quali, Some(bezeichnung), laenge))
-}
-
-/// Alle Blöcke am Posten, die sich mit `[von, bis)` überschneiden (außer `ausser`), früheste
-/// zuerst; die Pause darf überlappen. Anlegen und Ändern nennen den ersten, „Schichten erzeugen“
-/// alle (LLH-1594).
-async fn ueberschneidungen_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    posten_id: Option<i64>,
-    von: &str,
-    bis: &str,
-    ausser: Option<i64>,
-) -> Result<Vec<(i64, String, String)>, AppError> {
-    let Some(pid) = posten_id else {
-        return Ok(Vec::new());
-    };
-    Ok(sqlx::query_as(
-        "SELECT id, von, bis FROM planung_schicht \
-         WHERE planung_id = ? AND posten_id = ? AND von < ? AND bis > ? AND id IS NOT ? \
-         ORDER BY von, id",
-    )
-    .bind(planung_id)
-    .bind(pid)
-    .bind(bis)
-    .bind(von)
-    .bind(ausser)
-    .fetch_all(&mut *conn)
-    .await?)
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn pruefe_frei_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-    posten_id: Option<i64>,
-    von: &str,
-    bis: &str,
-    ausser: Option<i64>,
-) -> Result<(), AppError> {
-    if let Some((_, a, b)) = ueberschneidungen_tx(conn, planung_id, posten_id, von, bis, ausser)
-        .await?
-        .into_iter()
-        .next()
-    {
-        let stil = zeitstil_org(conn, org_id).await?;
-        return Err(AppError::UnprocessableEntity(format!(
-            "Die Schicht überschneidet sich mit {}",
-            zeitraum_text(&stil, &a, &b)
-        )));
-    }
-    Ok(())
-}
-
-fn ids_json(personen: &[PlanPerson], stamm: bool) -> String {
-    let ids: Vec<i64> = personen
-        .iter()
-        .filter(|p| matches!(p, PlanPerson::Stamm(_)) == stamm)
-        .map(|p| p.id())
-        .collect();
-    serde_json::to_string(&ids).unwrap_or_else(|_| "[]".into())
-}
-
-/// Jede Person gehört zur Organisation bzw. ist ein Helfer der Planung (422 sonst). Eine
-/// Ad-hoc-Kraft gibt es ohne Einsatz nicht (der Handler lässt sie gar nicht zu).
-async fn pruefe_personen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-    personen: &[PlanPerson],
-) -> Result<(), AppError> {
-    if personen.is_empty() {
-        return Ok(());
-    }
-    if personen.iter().any(|p| matches!(p, PlanPerson::Einsatz(_))) {
-        return Err(AppError::UnprocessableEntity(
-            "Eine Planung kennt nur Stamm-Personal und Helfer".into(),
-        ));
-    }
-    let fremd_stamm: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM json_each(?1) j \
-         LEFT JOIN personal p ON p.id = j.value AND p.org_id = ?2 WHERE p.id IS NULL",
-    )
-    .bind(ids_json(personen, true))
-    .bind(org_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    if fremd_stamm > 0 {
-        return Err(AppError::UnprocessableEntity(
-            "Eine Person gehört nicht zur Organisation".into(),
-        ));
-    }
-    let fremd_helfer: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM json_each(?1) j \
-         LEFT JOIN planung_helfer h ON h.id = j.value AND h.planung_id = ?2 WHERE h.id IS NULL",
-    )
-    .bind(ids_json(personen, false))
-    .bind(planung_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    if fremd_helfer > 0 {
-        return Err(AppError::UnprocessableEntity(
-            "Ein Helfer gehört nicht zu dieser Planung".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Ersetzt die Personen eines Blocks (drei Anweisungen, unabhängig von der Zahl).
-async fn schreibe_personen_tx(
-    conn: &mut SqliteConnection,
-    bid: i64,
-    personen: &[PlanPerson],
-) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM planung_schicht_person WHERE schicht_id = ?")
-        .bind(bid)
-        .execute(&mut *conn)
-        .await?;
-    sqlx::query(
-        "INSERT INTO planung_schicht_person (schicht_id, personal_id) \
-         SELECT ?1, j.value FROM json_each(?2) j ORDER BY j.key",
-    )
-    .bind(bid)
-    .bind(ids_json(personen, true))
-    .execute(&mut *conn)
-    .await?;
-    sqlx::query(
-        "INSERT INTO planung_schicht_person (schicht_id, helfer_id) \
-         SELECT ?1, j.value FROM json_each(?2) j ORDER BY j.key",
-    )
-    .bind(bid)
-    .bind(ids_json(personen, false))
-    .execute(&mut *conn)
-    .await?;
-    Ok(())
-}
-
-async fn pruefe_anzahl_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    neu: usize,
-) -> Result<(), AppError> {
-    let bisher: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM planung_schicht WHERE planung_id = ?")
-            .bind(planung_id)
-            .fetch_one(&mut *conn)
-            .await?;
-    if bisher + neu as i64 > PLAN_BLOECKE_MAX {
-        return Err(AppError::UnprocessableEntity(format!(
-            "Höchstens {PLAN_BLOECKE_MAX} Schichten je Planung"
-        )));
-    }
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn insert_block_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    benutzer_id: i64,
-    posten_id: Option<i64>,
-    von: &str,
-    bis: &str,
-    soll_anzahl: Option<i64>,
-    quali_soll: Option<&str>,
-    notiz: Option<&str>,
-) -> Result<i64, AppError> {
-    Ok(sqlx::query_scalar(
-        "INSERT INTO planung_schicht (planung_id, posten_id, von, bis, soll_anzahl, quali_soll, \
-            notiz, angelegt_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-    )
-    .bind(planung_id)
-    .bind(posten_id)
-    .bind(von)
-    .bind(bis)
-    .bind(soll_anzahl)
-    .bind(quali_soll)
-    .bind(notiz)
-    .bind(benutzer_id)
-    .fetch_one(&mut *conn)
-    .await?)
-}
-
-fn pause_ohne_soll(
-    posten_id: Option<i64>,
-    soll: Option<i64>,
-    quali: Option<&str>,
-) -> Result<(), AppError> {
-    if posten_id.is_none() && (soll.is_some() || quali.is_some()) {
-        return Err(AppError::UnprocessableEntity(
-            "Die Pause hat kein Soll".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Legt einen Block an. Liefert die Kennung.
-pub async fn block_anlegen(
+/// Legt einen Block an (Kern `plan_repo::create_block_tx`). Liefert die Kennung.
+pub async fn create_block(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,
     benutzer_id: i64,
     e: &BlockEingabe,
 ) -> Result<i64, AppError> {
+    let plan = Vorplanung { org_id, planung_id };
     write_retry!(pool, |conn| {
-        block_anlegen_tx(conn, org_id, planung_id, benutzer_id, e).await
-    })
-}
-
-/// [`block_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn block_anlegen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-    benutzer_id: i64,
-    e: &BlockEingabe,
-) -> Result<i64, AppError> {
-    schreibbar_tx(conn, org_id, planung_id).await?;
-    let (vorgabe_anzahl, vorgabe_quali, _, _) = posten_tx(conn, planung_id, e.posten_id).await?;
-    pruefe_anzahl_tx(conn, planung_id, 1).await?;
-    let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
-    let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
-    pause_ohne_soll(e.posten_id, soll_anzahl, quali_soll.as_deref())?;
-    crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref()).await?;
-    pruefe_personen_tx(conn, org_id, planung_id, &e.personen).await?;
-    pruefe_frei_tx(conn, org_id, planung_id, e.posten_id, &e.von, &e.bis, None).await?;
-    let bid = insert_block_tx(
-        conn,
-        planung_id,
-        benutzer_id,
-        e.posten_id,
-        &e.von,
-        &e.bis,
-        soll_anzahl,
-        quali_soll.as_deref(),
-        e.notiz.as_deref(),
-    )
-    .await?;
-    schreibe_personen_tx(conn, bid, &e.personen).await?;
-    Ok(bid)
-}
-
-/// Ändert einen Block mit CAS über `version` (409). Verschieben in die Pause löscht das Soll.
-pub async fn block_aendern(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    bid: i64,
-    benutzer_id: i64,
-    p: &BlockPatch,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        schreibbar_tx(conn, org_id, planung_id).await?;
-        type Stand = (
-            i64,
-            Option<i64>,
-            String,
-            String,
-            Option<i64>,
-            Option<String>,
-            Option<String>,
-        );
-        let stand: Stand = sqlx::query_as(
-            "SELECT version, posten_id, von, bis, soll_anzahl, quali_soll, notiz \
-             FROM planung_schicht WHERE id = ? AND planung_id = ?",
-        )
-        .bind(bid)
-        .bind(planung_id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .ok_or(AppError::NotFound)?;
-        let (version, posten_alt, von_alt, bis_alt, soll_alt, quali_alt, notiz_alt) = stand;
-        if version != p.version {
-            return Err(AppError::Conflict(
-                "Die Schicht wurde zwischenzeitlich geändert".into(),
-            ));
-        }
-        let posten = p.posten.unwrap_or(posten_alt);
-        if posten != posten_alt {
-            posten_tx(conn, planung_id, posten).await?;
-        }
-        let von = p.von.clone().unwrap_or(von_alt);
-        let bis = p.bis.clone().unwrap_or(bis_alt);
-        zerlegung::pruefe_zeitraum(utc(&von)?, utc(&bis)?).map_err(als_422)?;
-        let (mut soll_anzahl, mut quali_soll) = (soll_alt, quali_alt);
-        if posten.is_none() && posten_alt.is_some() {
-            (soll_anzahl, quali_soll) = (None, None);
-        }
-        if let Some(neu) = p.soll_anzahl {
-            soll_anzahl = neu;
-        }
-        if let Some(neu) = &p.quali_soll {
-            quali_soll = neu.clone();
-        }
-        pause_ohne_soll(posten, soll_anzahl, quali_soll.as_deref())?;
-        if p.quali_soll.is_some() {
-            crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref())
-                .await?;
-        }
-        if let Some(personen) = &p.personen {
-            pruefe_personen_tx(conn, org_id, planung_id, personen).await?;
-        }
-        pruefe_frei_tx(conn, org_id, planung_id, posten, &von, &bis, Some(bid)).await?;
-        let notiz = match &p.notiz {
-            Some(n) => n.clone(),
-            None => notiz_alt,
-        };
-        sqlx::query(
-            "UPDATE planung_schicht SET posten_id = ?, von = ?, bis = ?, soll_anzahl = ?, \
-                quali_soll = ?, notiz = ?, version = version + 1, geaendert_at = ?, \
-                geaendert_von = ? WHERE id = ? AND version = ?",
-        )
-        .bind(posten)
-        .bind(&von)
-        .bind(&bis)
-        .bind(soll_anzahl)
-        .bind(&quali_soll)
-        .bind(&notiz)
-        .bind(jetzt)
-        .bind(benutzer_id)
-        .bind(bid)
-        .bind(version)
-        .execute(&mut *conn)
-        .await?;
-        if let Some(personen) = &p.personen {
-            schreibe_personen_tx(conn, bid, personen).await?;
-        }
-        Ok(())
-    })
-}
-
-/// Löscht einen Block mit CAS über `version` (409).
-pub async fn block_loeschen(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    bid: i64,
-    version: i64,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        schreibbar_tx(conn, org_id, planung_id).await?;
-        let stand: Option<i64> = sqlx::query_scalar(
-            "SELECT version FROM planung_schicht WHERE id = ? AND planung_id = ?",
-        )
-        .bind(bid)
-        .bind(planung_id)
-        .fetch_optional(&mut *conn)
-        .await?;
-        match stand {
-            None => return Err(AppError::NotFound),
-            Some(v) if v != version => {
-                return Err(AppError::Conflict(
-                    "Die Schicht wurde zwischenzeitlich geändert".into(),
-                ))
-            }
-            Some(_) => {}
-        }
-        sqlx::query("DELETE FROM planung_schicht WHERE id = ?")
-            .bind(bid)
-            .execute(&mut *conn)
-            .await?;
-        Ok(())
+        plan_repo::create_block_tx(conn, &plan, benutzer_id, &e.kern(), &zeit::jetzt()).await
     })
 }
 
@@ -1668,224 +1200,15 @@ pub async fn erzeugen(
 ) -> Result<Vec<i64>, AppError> {
     let (von_t, bis_t) = (utc(von)?, utc(bis)?);
     write_retry!(pool, |conn| {
-        schreibbar_tx(conn, org_id, planung_id).await?;
-        let (anzahl, quali, _, schichtlaenge) = posten_tx(conn, planung_id, posten_id).await?;
-        let laenge = laenge_minuten.or(schichtlaenge).ok_or_else(|| {
+        let plan = Vorplanung { org_id, planung_id };
+        plan.before_write_tx(conn).await?;
+        let vorgabe = plan.check_posten_tx(conn, posten_id).await?;
+        let laenge = laenge_minuten.or(vorgabe.schichtlaenge).ok_or_else(|| {
             AppError::UnprocessableEntity(
                 "Der Posten hat keine Schichtlänge; bitte eine Länge angeben".into(),
             )
         })?;
         let teile = zerlegung::zerlege(von_t, bis_t, &Teilung::Laenge(laenge))?;
-        pruefe_anzahl_tx(conn, planung_id, teile.len()).await?;
-
-        let mut konflikte: Vec<ZeilenGrund> = Vec::new();
-        let mut stil = None;
-        for (a, b) in &teile {
-            let (a, b) = (zeit::formatiere_utc(*a), zeit::formatiere_utc(*b));
-            for (id, x, y) in
-                ueberschneidungen_tx(conn, planung_id, posten_id, &a, &b, None).await?
-            {
-                if !konflikte.iter().any(|k| k.id == id) {
-                    if stil.is_none() {
-                        stil = Some(zeitstil_org(conn, org_id).await?);
-                    }
-                    let s = stil.as_ref().unwrap_or(&Zeitstil::VORGABE);
-                    konflikte.push(ZeilenGrund {
-                        art: ZeilenArt::Planschicht,
-                        id,
-                        grund: format!("überschneidet sich mit {}", zeitraum_text(s, &x, &y)),
-                    });
-                }
-            }
-        }
-        if !konflikte.is_empty() {
-            return Err(AppError::Zeilen {
-                meldung: "Erzeugte Schichten überschneiden sich mit bestehenden; nichts angelegt"
-                    .into(),
-                zeilen: konflikte,
-            });
-        }
-
-        let mut ids = Vec::with_capacity(teile.len());
-        for (a, b) in &teile {
-            ids.push(
-                insert_block_tx(
-                    conn,
-                    planung_id,
-                    benutzer_id,
-                    posten_id,
-                    &zeit::formatiere_utc(*a),
-                    &zeit::formatiere_utc(*b),
-                    anzahl,
-                    quali.as_deref(),
-                    None,
-                )
-                .await?,
-            );
-        }
-        Ok(ids)
-    })
-}
-
-// ---------------------------------------------------------------------------------------------
-// Helfer
-// ---------------------------------------------------------------------------------------------
-
-async fn pruefe_qualifikationen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    ids: &[i64],
-) -> Result<(), AppError> {
-    let fremd: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM json_each(?1) j \
-         LEFT JOIN qualifikation q ON q.id = j.value AND q.org_id = ?2 WHERE q.id IS NULL",
-    )
-    .bind(serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
-    .bind(org_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    if fremd > 0 {
-        return Err(AppError::UnprocessableEntity(
-            "Qualifikation gehört nicht zur Organisation".into(),
-        ));
-    }
-    Ok(())
-}
-
-async fn helfer_laden_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    hid: i64,
-) -> Result<PlanHelferAnzeige, AppError> {
-    let (id, name, telefon, organisation, quals): (
-        i64,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) = sqlx::query_as(
-        "SELECT id, name, telefon, organisation, qualifikationen FROM planung_helfer \
-         WHERE id = ? AND planung_id = ?",
-    )
-    .bind(hid)
-    .bind(planung_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    Ok(PlanHelferAnzeige {
-        id,
-        name,
-        telefon,
-        organisation,
-        qualifikationen: json_ids(quals.as_deref()),
-        kennung: None,
-        herkunft: None,
-    })
-}
-
-pub async fn helfer_anlegen(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    benutzer_id: i64,
-    e: &HelferEingabe,
-) -> Result<PlanHelferAnzeige, AppError> {
-    write_retry!(pool, |conn| {
-        helfer_anlegen_tx(conn, org_id, planung_id, benutzer_id, e).await
-    })
-}
-
-/// [`helfer_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn helfer_anlegen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-    benutzer_id: i64,
-    e: &HelferEingabe,
-) -> Result<PlanHelferAnzeige, AppError> {
-    schreibbar_tx(conn, org_id, planung_id).await?;
-    pruefe_qualifikationen_tx(conn, org_id, &e.qualifikationen).await?;
-    let bisher: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM planung_helfer WHERE planung_id = ?")
-            .bind(planung_id)
-            .fetch_one(&mut *conn)
-            .await?;
-    if bisher >= PLAN_HELFER_MAX {
-        return Err(AppError::UnprocessableEntity(format!(
-            "Höchstens {PLAN_HELFER_MAX} Helfer je Planung"
-        )));
-    }
-    let hid: i64 = sqlx::query_scalar(
-        "INSERT INTO planung_helfer (planung_id, name, telefon, organisation, \
-            qualifikationen, angelegt_von) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-    )
-    .bind(planung_id)
-    .bind(&e.name)
-    .bind(&e.telefon)
-    .bind(&e.organisation)
-    .bind(quals_json(&e.qualifikationen))
-    .bind(benutzer_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    helfer_laden_tx(conn, planung_id, hid).await
-}
-
-pub async fn helfer_aendern(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    hid: i64,
-    p: &HelferPatch,
-) -> Result<PlanHelferAnzeige, AppError> {
-    write_retry!(pool, |conn| {
-        schreibbar_tx(conn, org_id, planung_id).await?;
-        let mut h = helfer_laden_tx(conn, planung_id, hid).await?;
-        if let Some(ids) = &p.qualifikationen {
-            pruefe_qualifikationen_tx(conn, org_id, ids).await?;
-            h.qualifikationen = ids.clone();
-        }
-        if let Some(name) = &p.name {
-            h.name = name.clone();
-        }
-        if let Some(t) = &p.telefon {
-            h.telefon = t.clone();
-        }
-        if let Some(o) = &p.organisation {
-            h.organisation = o.clone();
-        }
-        sqlx::query(
-            "UPDATE planung_helfer SET name = ?, telefon = ?, organisation = ?, \
-                qualifikationen = ? WHERE id = ?",
-        )
-        .bind(&h.name)
-        .bind(&h.telefon)
-        .bind(&h.organisation)
-        .bind(quals_json(&h.qualifikationen))
-        .bind(hid)
-        .execute(&mut *conn)
-        .await?;
-        Ok(h)
-    })
-}
-
-/// Löscht einen Helfer und nimmt ihn aus allen Blöcken (CASCADE).
-pub async fn helfer_loeschen(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    hid: i64,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        schreibbar_tx(conn, org_id, planung_id).await?;
-        let geloescht = sqlx::query("DELETE FROM planung_helfer WHERE id = ? AND planung_id = ?")
-            .bind(hid)
-            .bind(planung_id)
-            .execute(&mut *conn)
-            .await?
-            .rows_affected();
-        if geloescht == 0 {
-            return Err(AppError::NotFound);
-        }
-        Ok(())
+        plan_repo::create_bloecke_tx(conn, &plan, benutzer_id, posten_id, &vorgabe, &teile).await
     })
 }

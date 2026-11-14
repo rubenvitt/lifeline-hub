@@ -5,7 +5,7 @@
 //! 1. [`bestand_tx`] liest, was der Einsatz und seine Organisation schon haben.
 //! 2. [`planen`] gleicht das Paket rein mit dem Bestand ab ([`super::abgleich`]) und rechnet je
 //!    Block, ob er neu, ergänzt oder unverändert ist. Fehler sperren das Übernehmen.
-//! 3. [`schreiben_tx`] schreibt eine fehlerfreie Planung, ohne zu committen.
+//! 3. [`write_tx`] schreibt eine fehlerfreie Planung, ohne zu committen.
 //!
 //! [`vorschau`] und [`uebernehmen`] laufen alle drei Schritte; das Übernehmen in EINER
 //! Transaktion, sodass Vorschau und Schreiben denselben Stand sehen. LLH-1561 (Vorplanung) legt
@@ -25,7 +25,8 @@ use super::{
     PersonEntscheidung, PersonZiel, PlanPaket, PostenEntscheidung, PostenZiel, QualiAngabe,
     Treffer, TrefferGrund, VorschauBlock, VorschauPerson, VorschauPosten, WahlEintrag,
 };
-use crate::abloesung::schichtplan::repo as plan_repo;
+use crate::abloesung::schichtplan::plan_repo;
+use crate::abloesung::schichtplan::repo::{grenzwerte, load_soll_vorgabe_tx, Einsatzplan};
 use crate::abloesung::schichtplan::{
     PlanPerson, Posten, SchichtplanGrenzwerte, PLAN_BLOECKE_MAX, PLAN_HELFER_MAX, PLAN_PERSONEN_MAX,
 };
@@ -127,7 +128,7 @@ pub async fn bestand_tx(
     org_id: i64,
 ) -> Result<Bestand, AppError> {
     let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
-    let grenzwerte = plan_repo::grenzwerte(&mut *conn, einsatz_id).await?;
+    let grenzwerte = grenzwerte(&mut *conn, einsatz_id).await?;
 
     let einheiten: Vec<(i64, String, Option<String>, Option<i64>)> = sqlx::query_as(
         "SELECT id, name, funkrufname, abschnitt_id FROM einsatz_einheit \
@@ -390,7 +391,7 @@ struct GeplanterBlock {
     zeile: Option<u32>,
 }
 
-/// Ergebnis von [`planen`]: Vorschau und, ohne Fehler, was [`schreiben_tx`] schreibt.
+/// Ergebnis von [`planen`]: Vorschau und, ohne Fehler, was [`write_tx`] schreibt.
 #[derive(Debug, Clone)]
 pub struct Planung {
     pub vorschau: ImportVorschau,
@@ -1569,7 +1570,7 @@ pub const ANLASS_DATEI: &str = "Schichtplan eingelesen";
 /// kein ETB. `anlass` beginnt den ETB-Eintrag ([`etb_text`]); der Aufrufer hält ihn in den
 /// ETB-Grenzen.
 #[allow(clippy::too_many_arguments)]
-pub async fn schreiben_tx(
+pub async fn write_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
@@ -1802,7 +1803,7 @@ pub async fn schreiben_tx(
                     Ziel::Fehler => continue,
                 };
                 let (vorgabe_anzahl, vorgabe_quali) =
-                    plan_repo::soll_vorgabe_tx(&mut *conn, posten).await?;
+                    load_soll_vorgabe_tx(&mut *conn, posten).await?;
                 let (soll, quali) = if posten == Posten::Pause {
                     (None, None)
                 } else if g.ohne_vorgabe {
@@ -1815,7 +1816,7 @@ pub async fn schreiben_tx(
                 };
                 let bid = plan_repo::insert_block_tx(
                     &mut *conn,
-                    einsatz_id,
+                    &Einsatzplan { einsatz_id },
                     benutzer_id,
                     posten,
                     &g.von,
@@ -1825,7 +1826,7 @@ pub async fn schreiben_tx(
                     g.notiz.as_deref(),
                 )
                 .await?;
-                plan_repo::schreibe_personen_tx(&mut *conn, bid, &neue).await?;
+                plan_repo::write_personen_tx::<Einsatzplan>(&mut *conn, bid, &neue).await?;
             }
             BlockZustand::Ergaenzt => {
                 let Some(bid) = g.block_id else { continue };
@@ -1835,7 +1836,7 @@ pub async fn schreiben_tx(
                         alle.push(p);
                     }
                 }
-                plan_repo::schreibe_personen_tx(&mut *conn, bid, &alle).await?;
+                plan_repo::write_personen_tx::<Einsatzplan>(&mut *conn, bid, &alle).await?;
                 sqlx::query(
                     "UPDATE einsatz_planschicht SET version = version + 1, geaendert_at = ?, \
                         geaendert_von = ? WHERE id = ?",
@@ -1987,7 +1988,7 @@ pub async fn uebernehmen(
     write_retry!(pool, |conn| {
         let bestand = bestand_tx(conn, einsatz_id, org_id).await?;
         let planung = planen(&bestand, paket, meldungen.to_vec(), entscheidungen, rechte)?;
-        schreiben_tx(
+        write_tx(
             conn,
             einsatz_id,
             org_id,

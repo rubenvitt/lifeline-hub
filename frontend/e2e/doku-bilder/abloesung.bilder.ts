@@ -30,6 +30,8 @@ import {
  *   vorgaben.png         frontend/src/pages/AbloesungPage.tsx (Paneel „Rhythmus je Abschnitt“)
  *   einsatz-vorgabe.png  frontend/src/pages/AbloesungPage.tsx (Paneel „Vorgabe des Einsatzes“),
  *                        frontend/src/abloesung/schichtmodellText.ts, frontend/src/abloesung/dauer.ts
+ *   helfer.png           frontend/src/abloesung/schichtplan/HelferListe.tsx, Knopf „Helfer“ in
+ *                        frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx
  *
  * Demo-Lücke (D3): die Demo-Daten tragen keine Schichten. Die Spec setzt am Abschnitt
  * „Sanitätsdienst“ die Vorgabe 6 h, bildet eine „2. Rettungsstaffel“ als Ablöser und beginnt drei
@@ -44,6 +46,8 @@ import {
  *
  * Besatzungswechsel (LLH-1150): die Spec disponiert zwei Kräfte ohne Einheit („Lena Brandt“,
  * „Tom Weber“), aus denen der Dialog die neue Besatzung wählt.
+ * Helfer des Schichtplans (Change `y106s29r-blockplan-kern`, D7): die Spec legt zwei Helfer anderer
+ * Organisationen an; Qualifikationen bleiben leer (keine festen Kennungen im Stamm).
  * Hinweise an der Karte (LLH-1131 Teil II): der geplante Ablöser wird vor seinem Eintreffen per
  * Nachtrag alarmiert und danach am neu angelegten „BR Sportplatz“ eingebucht (die Zeitachse lässt
  * das zweite Eintreffen aus); der Sanitätszug plant die Sanitätsgruppe UHS, die selbst eine
@@ -145,6 +149,12 @@ test.describe(KAPITEL, () => {
       for (const name of ['Lena Brandt', 'Tom Weber']) {
         await fuelle(api, 'post', `${basis}/personal`, { adhoc: { name } });
       }
+      for (const helfer of [
+        { name: 'Mia Beispiel', organisation: 'DRK OV Nord', telefon: '0151 2345678' },
+        { name: 'Jonas Keller', organisation: 'DLRG Musterstadt' },
+      ]) {
+        await fuelle(api, 'post', `${basis}/abloesungen/schichtplan/helfer`, helfer);
+      }
     } finally {
       await api.dispose();
     }
@@ -203,6 +213,21 @@ test.describe(KAPITEL, () => {
     const paneel = page.getByRole('region', { name: 'Vorgabe des Einsatzes' });
     await expect(paneel.getByText('12-h-Schicht Hochwasser')).toBeVisible();
     await fotografiere(paneel, KAPITEL, 'einsatz-vorgabe');
+  });
+
+  test('Helfer im Schichtplan', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/abloesung?ansicht=plan`);
+    await page
+      .locator('[data-lfh="schichtplan-werkzeugzeile"]')
+      .getByRole('button', { name: 'Helfer' })
+      .click();
+    const liste = page.locator('[data-lfh="schichtplan-helfer"]');
+    await expect(liste.getByText('Mia Beispiel')).toBeVisible();
+    await expect(liste.getByText('Jonas Keller')).toBeVisible();
+    await fotografiere(liste, KAPITEL, 'helfer');
   });
 
   test('Dialog „Schicht beginnen“', async ({ page }) => {

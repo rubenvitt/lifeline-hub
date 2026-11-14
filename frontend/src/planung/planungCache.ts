@@ -10,7 +10,7 @@ import type { Planung } from '../api/types';
  * Kopf, nicht Posten, Blöcke und Helfer. Der Abruf startet erst nach dem Einsetzen der Antwort und
  * bringt damit den letzten Stand, ein noch laufender älterer wird abgebrochen.
  */
-export function uebernimmPlanung(qc: QueryClient, p: Planung): void {
+export function applyPlanung(qc: QueryClient, p: Planung): void {
   qc.setQueryData(globalKeys.planung(p.kopf.id), p);
   void qc.invalidateQueries({ queryKey: globalKeys.planung(p.kopf.id), exact: true });
 }

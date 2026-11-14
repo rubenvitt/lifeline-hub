@@ -29,7 +29,7 @@ export function fetchSchichtplan(einsatzId: number): Promise<Schichtplan> {
 }
 
 /** Überschneidung am selben Posten (außer der Pause) ist 422. */
-export function legeSchichtplanBlockAn(
+export function createSchichtplanBlock(
   einsatzId: number,
   body: SchichtplanBlockBody,
 ): Promise<Schichtplan> {
@@ -37,7 +37,7 @@ export function legeSchichtplanBlockAn(
 }
 
 /** Auch Verschieben in eine andere Zeile (`posten`); veralteter Stand ist 409. */
-export function aendereSchichtplanBlock(
+export function updateSchichtplanBlock(
   einsatzId: number,
   blockId: number,
   body: SchichtplanBlockAendernBody,
@@ -45,7 +45,7 @@ export function aendereSchichtplanBlock(
   return apiSend<Schichtplan>(`${basis(einsatzId)}/bloecke/${blockId}`, 'PATCH', body);
 }
 
-export function loescheSchichtplanBlock(
+export function deleteSchichtplanBlock(
   einsatzId: number,
   blockId: number,
   version: number,
@@ -61,21 +61,21 @@ export function erzeugeSchichten(
   return apiSend<Schichtplan>(`${basis(einsatzId)}/erzeugen`, 'POST', body);
 }
 
-export function setzeSchichtplanGrenzwerte(
+export function updateSchichtplanGrenzwerte(
   einsatzId: number,
   body: SchichtplanGrenzwerteBody,
 ): Promise<Schichtplan> {
   return apiSend<Schichtplan>(`${basis(einsatzId)}/grenzwerte`, 'PATCH', body);
 }
 
-export function legeSchichtplanHelferAn(
+export function createSchichtplanHelfer(
   einsatzId: number,
   body: SchichtplanHelferBody,
 ): Promise<SchichtplanHelfer> {
   return apiSend<SchichtplanHelfer>(`${basis(einsatzId)}/helfer`, 'POST', body);
 }
 
-export function aendereSchichtplanHelfer(
+export function updateSchichtplanHelfer(
   einsatzId: number,
   helferId: number,
   body: SchichtplanHelferAendernBody,
@@ -84,7 +84,7 @@ export function aendereSchichtplanHelfer(
 }
 
 /** Nimmt den Helfer aus allen Blöcken. */
-export function loescheSchichtplanHelfer(einsatzId: number, helferId: number): Promise<void> {
+export function deleteSchichtplanHelfer(einsatzId: number, helferId: number): Promise<void> {
   return apiSend<void>(`${basis(einsatzId)}/helfer/${helferId}`, 'DELETE');
 }
 

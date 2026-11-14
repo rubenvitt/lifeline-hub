@@ -12,7 +12,7 @@ import type { AusgabePerson, AusgabePlan, AusgabePosten } from './ausgabePlan';
 
 /**
  * Der Schichtplan eines Einsatzes als Ausgabeplan (LLH-1557, design D1). Posten, Abschnitt und
- * Reihenfolge kommen aus den Zeilen der Ansicht (`baueZeilen`), damit Aushang und Raster dieselbe
+ * Reihenfolge kommen aus den Zeilen der Ansicht (`buildZeilen`), damit Aushang und Raster dieselbe
  * Folge haben. Helfer tragen Organisation und Telefon aus dem Plan; Stamm-Personal und Ad-hoc-Kräfte
  * nur den Namen. Die Vorplanung kommt über `ausPlanung.ts` in derselben Form herein.
  */

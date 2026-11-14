@@ -2,10 +2,17 @@ import { Alert, Button, Flex, Modal, Tabs } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import HelferListe from '../abloesung/schichtplan/HelferListe';
 import { ApiError } from '../api/client';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { tagUndUhrzeit } from '../anzeige/zeitDarstellung';
-import { ladePlanung, loeschePlanung } from '../api/planungen';
+import {
+  updatePlanungHelfer,
+  loadPlanung,
+  createPlanungHelfer,
+  deletePlanung,
+  deletePlanungHelfer,
+} from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import AdminPage from '../components/AdminPage';
 import { useRollen } from '../components/instrument';
@@ -21,7 +28,6 @@ import {
   type PlanungReiter,
 } from '../routing/deeplinks';
 import PlanungAblauf from './PlanungAblauf';
-import PlanungHelferListe from './PlanungHelferListe';
 import PlanungKopf from './PlanungKopf';
 import PlanungPostenListe from './PlanungPostenListe';
 import PlanungSchichtplan from './PlanungSchichtplan';
@@ -50,11 +56,11 @@ export default function PlanungPage() {
 
   const query = useQuery({
     queryKey: globalKeys.planung(planungId ?? 0),
-    queryFn: () => ladePlanung(planungId as number),
+    queryFn: () => loadPlanung(planungId as number),
     enabled: planungId != null,
   });
   const loeschenMut = useMutation({
-    mutationFn: () => loeschePlanung(planungId as number),
+    mutationFn: () => deletePlanung(planungId as number),
     onSuccess: () => {
       setLoeschenOffen(false);
       qc.removeQueries({ queryKey: globalKeys.planung(planungId as number) });
@@ -105,7 +111,22 @@ export default function PlanungPage() {
   const reiterInhalt: Record<PlanungReiter, ReactNode> = {
     plan: <PlanungSchichtplan planung={planung} readOnly={readOnly} />,
     posten: <PlanungPostenListe planung={planung} readOnly={readOnly} />,
-    helfer: <PlanungHelferListe planung={planung} readOnly={readOnly} />,
+    helfer: (
+      <HelferListe
+        dataLfh="planung-helfer"
+        helfer={planung.helfer}
+        bloecke={planung.bloecke}
+        readOnly={readOnly}
+        api={{
+          create: (body) => createPlanungHelfer(planung.kopf.id, body),
+          update: (helferId, body) => updatePlanungHelfer(planung.kopf.id, helferId, body),
+          delete: (helferId) => deletePlanungHelfer(planung.kopf.id, helferId),
+        }}
+        cache={{
+          invalidate: () => qc.invalidateQueries({ queryKey: globalKeys.planung(planung.kopf.id) }),
+        }}
+      />
+    ),
     ablauf: <PlanungAblauf planung={planung} readOnly={readOnly} />,
   };
 

@@ -8,6 +8,9 @@ use serde_json::{json, Value};
 mod common;
 use common::*;
 
+/// Der 409-Text einer offenen Pause, wortgleich (`abloesung::schichtplan::vollzug::PAUSE_OFFEN`).
+const PAUSE_OFFEN: &str = "Erst die Pause beenden oder ihren Beginn zurücknehmen";
+
 fn plan(e: i64) -> String {
     format!("/api/einsaetze/{e}/abloesungen/schichtplan")
 }
@@ -732,6 +735,7 @@ async fn offene_pause_leerer_status_und_fremde_kommende() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["error"], PAUSE_OFFEN, "Löschen: {v}");
     let markt = uhs_anlegen(&app, &admin, e, "Markt").await;
     let (s, v) = anfrage_json(
         &app,
@@ -742,6 +746,7 @@ async fn offene_pause_leerer_status_und_fremde_kommende() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["error"], PAUSE_OFFEN, "Ändern: {v}");
 
     // Ende: der leere Stand kommt zurück; Rücknahme des Endes setzt wieder „Pause“.
     let ende = vollziehen(&app, &admin, e, bid, json!({"art": "pause_ende"})).await;

@@ -186,7 +186,14 @@ als Art „Laut Plan“ ab und rechnet Bleibende, Übernahme und Folgeblock nie 
 (`doppelt`, `quali`, `dienst`, `verfuegbar`, `abweichung`) rechnet der Server beim Lesen
 (`abloesung::schichtplan::pruefung`); der Client zeigt sie nur und rechnet nichts nach. Jeder
 Schreibweg eines Blocks antwortet mit dem ganzen Plan (`api/schichtplan.ts`), Key
-`schichtplan` unter `abloesungen`, live über `abloesung`. Ohne Freigabe von Personal kommen
+`schichtplan` unter `abloesungen`, live über `abloesung`. Schichtplan und Vorplanung teilen einen
+Editor (`abloesung/schichtplan/SchichtplanEditor.tsx`, Change `y106s29r-blockplan-kern` D6):
+Mutationen, Zug und Ablage, Block-Menü, Ansagen und Dialoge stehen nur dort;
+`abloesung/schichtplan/SchichtplanAnsicht.tsx` und `planung/PlanungSchichtplan.tsx` bauen nur den
+Adapter, und was beide verschieden machen, ist ein Feld des Adapters, keine Fallunterscheidung im
+Editor. Ebenso eine Helferliste (`abloesung/schichtplan/HelferListe.tsx`, D7): in der Planung ein
+Reiter, im Einsatz der Knopf „Helfer“ der Werkzeugzeile (Adapterfeld `alternative`); eine Antwort
+ist der Helfer, nicht der Plan. Ohne Freigabe von Personal kommen
 `personen` und `helfer` als `null`. Die Wechsel-Leiste (LLH-1555 Welle 3,
 `abloesung/schichtplan/SchichtplanWechselLeiste.tsx`) zeigt nur `wechsel` aus dem Plan
 (`abloesung::schichtplan::wechselpunkte`): Zeitpunkte, Einträge und Stand rechnet der Server, der
@@ -205,7 +212,7 @@ Vorgabe). Die Vorgaben 12 h/8 h stehen dort als Spiegel des Servers, die Grenzen
 
 **Zeilen ohne Sprung** (LLH-1604, Spec `kraefte-schichtplan`, „Zeilen ohne Sprung“; Vorplanung
 ebenso): Raster und Handy-Liste stehen immer in `abloesung/schichtplan/SchichtplanSchleuse.tsx`,
-im Einsatz wie in `planung/PlanungSchichtplan.tsx`; keine zweite Schleuse. Die Bedingungen kommen
+gesetzt nur vom gemeinsamen `abloesung/schichtplan/SchichtplanEditor.tsx`; keine zweite Schleuse. Die Bedingungen kommen
 aus `components/useZuflussSchleuse.ts` (Fokus, Maus- oder Stiftzeiger); dazu `halten`, solange ein
 Zug läuft (`SchichtplanRaster`, `onZug`), eine Person gezogen wird oder ein Dialog offen ist. Was
 gezeigt wird, rechnet nur `zeilenSchleuse.ts`: neue Posten warten hinter dem Sammelbanner,
@@ -218,9 +225,9 @@ Wahl gehen bei Vorschau UND Übernehmen als Multipart an den Server, der jedes M
 abgleicht; der Client hält keinen Inhalt der Datei und rechnet keinen Abgleich nach. Jede Wahl
 fragt die Vorschau neu ab. Der Plan aus der Antwort des Übernehmens ersetzt den Cache. Der
 gemeinsame Kern mit der Vorplanung (LLH-1561) ist `abloesung::schichtplan::uebernahme`
-(`PlanPaket` → `bestand_tx` → `planen` → `schreiben_tx`); „In Einsatz übernehmen“ einer Planung
+(`PlanPaket` → `bestand_tx` → `planen` → `write_tx`); „In Einsatz übernehmen“ einer Planung
 (LLH-1587, `planung/PlanungUebernahmeDialog.tsx`, Server `planung::uebernahme`) baut nur das
 Paket und zeigt die Vorschau über dieselbe `ImportVorschauAnsicht`
 (`abloesung/schichtplan/ImportVorschauAnsicht.tsx`). Eine dritte Quelle bringt ebenfalls nur ihr
 Paket und keinen eigenen Abgleich oder eine eigene Vorschau mit. Der ETB-Eintrag nennt die Quelle
-über `anlass` von `schreiben_tx`.
+über `anlass` von `write_tx`.

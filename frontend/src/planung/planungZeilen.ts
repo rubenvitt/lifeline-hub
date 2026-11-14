@@ -27,7 +27,6 @@ import {
   type Spanne,
 } from '../abloesung/schichtplan/raster';
 import {
-  alsRasterBlock,
   OHNE_ABSCHNITT,
   PAUSE,
   personenOptionen,
@@ -107,10 +106,6 @@ export function schichtplanBloecke(planung: Planung | undefined): SchichtplanBlo
   if (!planung) return [];
   const namen = new Map(planung.posten.map((p) => [p.id, p.bezeichnung]));
   return planung.bloecke.map((b) => alsSchichtplanBlock(b, namen));
-}
-
-export function rasterBloeckeVon(bloecke: readonly SchichtplanBlock[]): RasterBlock[] {
-  return bloecke.map(alsRasterBlock);
 }
 
 // ── Bodies hinaus ────────────────────────────────────────────────────────────────────────────

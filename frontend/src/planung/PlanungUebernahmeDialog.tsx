@@ -26,7 +26,7 @@ import { EINSATZART_LABELS } from '../einsatz/einsatzart';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { abloesungPfad } from '../routing/deeplinks';
 import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
-import { uebernimmPlanung } from './planungCache';
+import { applyPlanung } from './planungCache';
 
 type ZielArt = 'neu' | 'einsatz';
 
@@ -107,7 +107,7 @@ export default function PlanungUebernahmeDialog({
       stand: number;
     }) => planungUebernehmen(planungId, { ziel: v.ziel, entscheidungen: v.wahl, stand: v.stand }),
     onSuccess: (r) => {
-      uebernimmPlanung(qc, r.planung);
+      applyPlanung(qc, r.planung);
       void qc.invalidateQueries({ queryKey: globalKeys.planungen(), exact: true });
       if (r.einsatz_neu) void qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       setErgebnis(r);

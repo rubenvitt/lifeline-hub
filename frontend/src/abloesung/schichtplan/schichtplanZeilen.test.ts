@@ -10,7 +10,7 @@ import type {
 import {
   alsRasterBlock,
   ampelVon,
-  baueZeilen,
+  buildZeilen,
   befundText,
   kopieBody,
   lueckeText,
@@ -64,7 +64,7 @@ describe('schichtplanZeilen (LLH-1554)', () => {
   });
 
   it('ordnet Zeilen nach Abschnitt der Gliederung, Einheiten vor UHS, Pause zuletzt', () => {
-    const zeilen = baueZeilen({
+    const zeilen = buildZeilen({
       einheiten: [
         einheit({ id: 1, name: 'RTW Süd', abschnitt_id: 8 }),
         einheit({ id: 2, name: 'RTW Nord', abschnitt_id: 7 }),
@@ -92,7 +92,7 @@ describe('schichtplanZeilen (LLH-1554)', () => {
   });
 
   it('ein aufgelöster Posten steht, solange er Blöcke trägt', () => {
-    const zeilen = baueZeilen({
+    const zeilen = buildZeilen({
       einheiten: [],
       uhs: [],
       abschnitte: ABSCHNITTE,

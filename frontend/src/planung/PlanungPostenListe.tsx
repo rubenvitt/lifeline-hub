@@ -2,10 +2,10 @@ import { Button, Modal, Space } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
-  aenderePlanungPosten,
-  legePlanungPostenAn,
-  loeschePlanungPosten,
-  setzePlanungPostenReihenfolge,
+  updatePlanungPosten,
+  createPlanungPosten,
+  deletePlanungPosten,
+  updatePlanungPostenReihenfolge,
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung, PlanungPosten } from '../api/types';
@@ -16,7 +16,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { qualiSollText } from '../kraefte/qualiSoll';
 import PlanungPostenDialog, { herkunftText, type PostenSpeichern } from './PlanungPostenDialog';
-import { uebernimmPlanung } from './planungCache';
+import { applyPlanung } from './planungCache';
 
 type Aktion = 'bearbeiten' | 'hoch' | 'runter' | 'loeschen';
 
@@ -54,21 +54,21 @@ export default function PlanungPostenListe({
   const [zuLoeschen, setZuLoeschen] = useState<PlanungPosten | null>(null);
   const posten = [...planung.posten].sort((a, b) => a.sortier - b.sortier);
 
-  const setzePlanung = (p: Planung) => uebernimmPlanung(qc, p);
+  const setzePlanung = (p: Planung) => applyPlanung(qc, p);
   const speichernMut = useMutation({
     mutationFn: (s: PostenSpeichern) =>
       s.art === 'anlegen'
-        ? legePlanungPostenAn(planungId, s.body)
-        : aenderePlanungPosten(planungId, s.postenId, s.body),
+        ? createPlanungPosten(planungId, s.body)
+        : updatePlanungPosten(planungId, s.postenId, s.body),
     onSuccess: setzePlanung,
   });
   const folgeMut = useMutation({
-    mutationFn: (ids: number[]) => setzePlanungPostenReihenfolge(planungId, ids),
+    mutationFn: (ids: number[]) => updatePlanungPostenReihenfolge(planungId, ids),
     onSuccess: setzePlanung,
   });
   const loeschenMut = useMutation({
     mutationFn: (v: { postenId: number; mitBloecken: boolean }) =>
-      loeschePlanungPosten(planungId, v.postenId, v.mitBloecken),
+      deletePlanungPosten(planungId, v.postenId, v.mitBloecken),
     onSuccess: () => {
       setZuLoeschen(null);
       void qc.invalidateQueries({ queryKey: globalKeys.planung(planungId) });
