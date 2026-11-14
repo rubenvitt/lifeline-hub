@@ -321,10 +321,24 @@ pub(crate) struct KopfZeile {
     uebernahme_kennzahlen: Option<String>,
 }
 
-const SELECT_KOPF: &str =
-    "SELECT id, version, stand, bezeichnung, einsatzart, ort, ort_lat, ort_lon, \
-     von, bis, max_dienst_min, min_ruhe_min, angelegt_at, uebernommen_at, uebernahme_einsatz, \
-     uebernahme_einsatznummer, uebernahme_kennzahlen FROM planung WHERE id = ? AND org_id = ?";
+/// Die Einsatznummer einer übernommenen Planung (LLH-1858): die, die der Einsatz jetzt trägt, denn
+/// ein Führungswechsel kann ihn umnummerieren (LLH-1703); erst ohne den Einsatz die bei der
+/// Übernahme gemerkte. Erwartet die Planung unter dem Alias `p`.
+macro_rules! uebernahme_einsatznummer {
+    () => {
+        "COALESCE((SELECT e.einsatznummer_intern FROM einsatz e \
+          WHERE e.id = p.uebernahme_einsatz AND e.org_id = p.org_id), \
+          p.uebernahme_einsatznummer) AS uebernahme_einsatznummer"
+    };
+}
+
+const SELECT_KOPF: &str = concat!(
+    "SELECT p.id, p.version, p.stand, p.bezeichnung, p.einsatzart, p.ort, p.ort_lat, p.ort_lon, \
+     p.von, p.bis, p.max_dienst_min, p.min_ruhe_min, p.angelegt_at, p.uebernommen_at, \
+     p.uebernahme_einsatz, ",
+    uebernahme_einsatznummer!(),
+    ", p.uebernahme_kennzahlen FROM planung p WHERE p.id = ? AND p.org_id = ?"
+);
 
 /// Die Übernahme aus den Spalten von 0304; fehlt, solange die Planung nicht übernommen ist.
 fn build_uebernahme(
@@ -621,16 +635,17 @@ pub async fn list(
         uebernahme_einsatznummer: Option<String>,
         uebernahme_kennzahlen: Option<String>,
     }
-    let zeilen: Vec<Zeile> = sqlx::query_as(
+    let zeilen: Vec<Zeile> = sqlx::query_as(concat!(
         "SELECT p.id, p.bezeichnung, p.einsatzart, p.ort, p.von, p.bis, p.max_dienst_min, \
                 p.min_ruhe_min, \
                 (SELECT COUNT(*) FROM planung_posten pp WHERE pp.planung_id = p.id) AS posten, \
                 (SELECT COUNT(*) FROM planung_schicht s WHERE s.planung_id = p.id) AS bloecke, \
-                p.uebernommen_at, p.uebernahme_einsatz, p.uebernahme_einsatznummer, \
-                p.uebernahme_kennzahlen \
+                p.uebernommen_at, p.uebernahme_einsatz, ",
+        uebernahme_einsatznummer!(),
+        ", p.uebernahme_kennzahlen \
          FROM planung p WHERE p.org_id = ? \
          ORDER BY p.bis < ?, p.von, p.id",
-    )
+    ))
     .bind(org_id)
     .bind(zeit::formatiere_utc(jetzt))
     .fetch_all(&mut *conn)

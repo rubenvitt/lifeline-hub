@@ -183,9 +183,10 @@ Zählung.
 Eine übernommene Planung ist schreibgeschützt: oben steht, wann und in welchen Einsatz sie ging,
 mit einem Link dorthin. Kopf, Posten, Helfer, Blöcke und Ablauf lassen sich nur noch ansehen, und eine
 zweite Übernahme gibt es nicht. „Soll“, „Ist“, „Offen“ und „Konflikte“ bleiben auf dem Stand der
-Übernahme, auch in der Liste, die „übernommen in …“ mit der Einsatznummer nennt. Löschen geht
+Übernahme, auch in der Liste, die „übernommen in …“ mit der Einsatznummer nennt. Bekommt der
+Einsatz später eine andere Nummer, etwa bei einem Führungswechsel, steht dort die neue. Löschen geht
 weiter, und die Löschfrist bleibt dieselbe. Wird der Einsatz später endgültig gelöscht, führt der
-Link ins Leere.
+Link ins Leere, und es bleibt die Nummer, die er bei der Übernahme trug.
 
 ### Aufbewahrung
 

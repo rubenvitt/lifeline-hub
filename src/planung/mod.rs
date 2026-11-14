@@ -120,7 +120,8 @@ pub struct PlanungUebernahme {
     pub at: String,
     /// Der Einsatz, in den sie ging. Er kann inzwischen gelöscht sein.
     pub einsatz_id: i64,
-    /// Seine Einsatznummer zum Zeitpunkt der Übernahme.
+    /// Seine Einsatznummer, wie er sie jetzt trägt (LLH-1858); ist er gelöscht, die zum Zeitpunkt
+    /// der Übernahme.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatznummer: Option<String>,
 }
