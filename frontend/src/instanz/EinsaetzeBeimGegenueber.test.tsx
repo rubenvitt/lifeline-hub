@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
 import { globalKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
+import { PANEEL_FEHLER_TITEL, PANEEL_NEULADEN } from '../components/instrument/PaneelZustand';
 import { EinsaetzeBeimGegenueber, fremdeNachladenAlle } from './EinsaetzeBeimGegenueber';
 import type { FuehrungAnzeige } from '../api/types';
 
@@ -71,16 +72,18 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
   });
 
   // LLH-1675: Ein Server- oder Leitungsfehler ist nicht der gewollte 404 bei Schalter aus; der
-  // Abschnitt fehlte sonst wortlos.
-  it('ein anderer Ladefehler steht mit „Erneut laden“ im Abschnitt', async () => {
+  // Abschnitt fehlte sonst wortlos. LLH-1861: im Bild von „Führung“ auf „Einsatzdaten“
+  // (`PaneelZustand`).
+  it('ein anderer Ladefehler steht als PaneelZustand mit „Erneut abrufen“ im Abschnitt', async () => {
     vi.mocked(loadFuehrungFremd)
       .mockRejectedValueOnce(new ApiError(500, 'Interner Fehler', { vomAnwendungsserver: true }))
       .mockResolvedValueOnce([akte]);
     renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />);
     expect(await screen.findByText('Einsätze beim Gegenüber')).toBeInTheDocument();
     const alert = await screen.findByRole('alert');
-    expect(within(alert).getByText('Akten des Gegenübers nicht abrufbar')).toBeInTheDocument();
-    await userEvent.click(within(alert).getByRole('button', { name: 'Erneut laden' }));
+    expect(alert).toHaveAttribute('data-lfh', 'paneel-fehler');
+    expect(within(alert).getByText(PANEEL_FEHLER_TITEL)).toBeInTheDocument();
+    await userEvent.click(within(alert).getByRole('button', { name: PANEEL_NEULADEN }));
     expect(await screen.findByText('E2026-0003 Stadtfest')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -101,7 +104,9 @@ describe('Einsätze beim Gegenüber (LLH-1491)', () => {
   it('ein 404 vom Gateway ist ein Ladefehler', async () => {
     vi.mocked(loadFuehrungFremd).mockRejectedValue(new ApiError(404, 'Not Found'));
     renderMitProviders(<EinsaetzeBeimGegenueber darfBedienen />);
-    expect(await screen.findByText('Akten des Gegenübers nicht abrufbar')).toBeInTheDocument();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveAttribute('data-lfh', 'paneel-fehler');
+    expect(within(alert).getByText(PANEEL_FEHLER_TITEL)).toBeInTheDocument();
   });
 
   it('scheitert ein Neuabruf, bleibt die Liste mit dem Hinweis auf den veralteten Stand', async () => {
