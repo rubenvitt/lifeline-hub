@@ -1,7 +1,7 @@
 -- LLH-1656 (Change z6ds0ed9-webhooks-outbox, design.md D8): Admin-Spur der Webhooks am
 -- Maschinenzugang. Neu im aktion-CHECK 'maschinenzugang_webhook_angelegt', '…_geaendert',
 -- '…_entfernt', '…_wieder_aufgenommen', '…_lan_erlaubt' und '…_lan_entzogen'. Rebuild nach Muster
--- 0340 (in einer Transaktion); die Liste übernimmt alles bis 0340.
+-- 0340 (in einer Transaktion); die Liste übernimmt alles bis 0346 (Löschersuchen, LLH-1712).
 CREATE TABLE admin_audit_neu (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     zeitpunkt        TEXT NOT NULL DEFAULT (datetime('now')),
@@ -27,7 +27,8 @@ CREATE TABLE admin_audit_neu (
                          'maschinenzugang_widerrufen', 'archiv_eingespielt',
                          'instanz_zertifikat_gewechselt', 'instanz_adresse_geaendert',
                          'einwurf_zugang_angelegt', 'einwurf_zugang_schluessel_gewechselt',
-                         'einwurf_zugang_widerrufen', 'maschinenzugang_webhook_angelegt',
+                         'einwurf_zugang_widerrufen', 'archiv_person_geschwaerzt',
+                         'archiv_durchsucht', 'maschinenzugang_webhook_angelegt',
                          'maschinenzugang_webhook_geaendert', 'maschinenzugang_webhook_entfernt',
                          'maschinenzugang_webhook_wieder_aufgenommen',
                          'maschinenzugang_webhook_lan_erlaubt',
