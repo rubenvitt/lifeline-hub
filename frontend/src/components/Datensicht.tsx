@@ -1169,8 +1169,8 @@ export default function Datensicht<T extends object, const K extends string>(
       [],
   );
   const aktiveSpaltenAus = aussen?.aus ?? eigeneSpaltenAus;
-  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Ohne Schalter bei der Seite bewusst
-  // unkontrolliert, weil kein Konsument diese Hälfte braucht.
+  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Von außen steuerbar nur über den
+  // Schalter bei der Seite (`spaltenSchalterAussen`), wie die ausgeblendeten.
   const [eigeneSpaltenAn, setSpaltenAn] = useState<readonly K[]>(
     () => (gedaechtnis?.spaltenStart?.an as readonly K[] | undefined) ?? [],
   );

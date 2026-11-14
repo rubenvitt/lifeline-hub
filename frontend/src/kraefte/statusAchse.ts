@@ -8,10 +8,6 @@ import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
  * VIER EIMER, NICHT DREI: `StatusKategorie` hat drei Werte, `status_kategorie` ist aber
  * nullable, und `null` ist der Normalfall einer frisch disponierten Kraft. `'ohne'` ist deshalb
  * ein Eimer, aber NICHT im Vertrag — die Abwesenheit eines Status, Rolle `neutral`.
- *
- * Jedes {@link AmpelFeld} trägt ein `etikett` (Kurztext, sichtbar) und einen `titel` (Volltext):
- * Farbe allein trägt keine Bedeutung (WCAG 1.4.1). Die Abkürzungen bleiben kurz, weil
- * `.lfh-etikett` versal und gesperrt setzt.
  */
 
 /** Statuskategorie ODER die Abwesenheit einer solchen. Vier Eimer, siehe Dateikopf. */

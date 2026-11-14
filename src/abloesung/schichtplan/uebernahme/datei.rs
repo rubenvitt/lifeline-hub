@@ -10,7 +10,7 @@
 //! steht als Fehler in den Meldungen; eine unlesbare Datei ist 400.
 
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 
 use chrono::{DateTime, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Utc};
 use chrono_tz::Tz;
