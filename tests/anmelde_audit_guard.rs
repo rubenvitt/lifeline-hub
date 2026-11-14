@@ -15,7 +15,7 @@
 //!
 //! Parst Quelltext zeilenweise, bewusst ohne `regex`-Dependency — dasselbe Vorgehen wie
 //! `tests/json_extractor_guard.rs`. Kommentarzeilen zählen nicht; ab `#[cfg(test)]` endet der
-//! Produktionscode einer Datei.
+//! Produktionscode einer Datei, und eine `tests.rs` (ausgelagertes Testmodul) zählt gar nicht.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -121,7 +121,11 @@ fn rs_dateien(verzeichnis: &Path, ziel: &mut Vec<PathBuf>) {
         let pfad = eintrag.path();
         if pfad.is_dir() {
             rs_dateien(&pfad, ziel);
-        } else if pfad.extension().is_some_and(|e| e == "rs") {
+        } else if pfad.extension().is_some_and(|e| e == "rs")
+            // Ein ausgelagertes Testmodul (`#[cfg(test)] mod tests;`, LLH-1685) ist ganz Testcode,
+            // wie alles ab `#[cfg(test)]` einer Datei.
+            && pfad.file_stem().is_none_or(|s| s != "tests")
+        {
             ziel.push(pfad);
         }
     }
