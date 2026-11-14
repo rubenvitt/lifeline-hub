@@ -66,33 +66,6 @@ MUST stattdessen ein Hinweis am PR stehen.
 - **WHEN** ein PR ohne CI-Lauf den Stand von `alpha` schon enthält
 - **THEN** wird nichts gepusht, und der PR trägt einen Hinweis, dass die CI fehlt
 
-### Requirement: Ein grüner PR mit Auto-Merge, der nicht mergt, steht als Hinweis am PR
-Sind alle Checks und Commit-Status auf dem Kopf-Commit eines konfliktfreien PRs seit einer
-Wartezeit grün und ist Auto-Merge eingeschaltet, der PR aber weiter offen, MUST am PR ein Hinweis
-stehen. Je Check-Name zählt dabei der jüngste Check-Run. Ohne eingeschaltetes Auto-Merge wartet
-der PR auf einen Menschen und bekommt keinen. Ist die zweite Stufe auf dem Kopf nicht gelaufen,
-gilt stattdessen der Hinweis, dass die e2e-Stufe fehlt.
-
-#### Scenario: Grün seit einer Stunde
-- **WHEN** alle Checks eines PRs seit mehr als 20 Minuten grün sind, Auto-Merge eingeschaltet ist und der PR offen ist
-- **THEN** trägt der PR einen Hinweis, dass er von Hand zu mergen ist
-
-#### Scenario: Ohne Auto-Merge
-- **WHEN** alle Checks eines PRs grün sind und Auto-Merge nicht eingeschaltet ist
-- **THEN** entsteht kein Hinweis
-
-#### Scenario: Ein Status steht noch aus
-- **WHEN** alle Check-Runs grün sind, ein Commit-Status aber noch aussteht oder rot ist
-- **THEN** entsteht kein Hinweis
-
-#### Scenario: Erster Lauf abgebrochen, zweiter grün
-- **WHEN** auf demselben Kopf-Commit ein e2e-Lauf abgebrochen wurde, ein späterer grün ist und seit mehr als 20 Minuten nichts mergt
-- **THEN** trägt der PR den Hinweis, dass er von Hand zu mergen ist
-
-#### Scenario: Grün, aber die zweite Stufe fehlt
-- **WHEN** alle vorhandenen Checks grün oder übersprungen sind, Auto-Merge an ist und die zweite Stufe nicht lief
-- **THEN** trägt der PR den Hinweis, dass die e2e-Stufe fehlt, nicht den Hinweis, ihn von Hand zu mergen
-
 ### Requirement: Der Wächter schreibt nur per Fast-Forward auf PR-Branches
 Der Wächter MUST ausschließlich auf den Kopf-Branch eines PRs schreiben, dessen Kopf in diesem
 Repository liegt. Er MUST nie auf `alpha`, `beta` oder `main` schreiben und MUST nur per
@@ -120,35 +93,13 @@ einen Hinweis schreiben. Ohne eingerichtete Release-App MUST er nur Hinweise sch
 - **WHEN** der Kopf-Commit ein Merge-Commit des Wächters ist und nach der Wartezeit keinen CI-Lauf trägt
 - **THEN** pusht der Wächter nicht erneut und schreibt einen Hinweis
 
-### Requirement: Ein PR mit Auto-Merge ohne e2e-Lauf steht als Hinweis am PR
-Ist an einem konfliktfreien PR Auto-Merge eingeschaltet und ist die zweite Stufe auf seinem
-Kopf-Commit nach einer Wartezeit nicht gelaufen, MUST am PR ein Hinweis stehen, der sagt, wie die
-Stufe neu angestoßen wird. Gelaufen ist sie, wenn der jüngste Check-Run eines ihrer Pflicht-Checks
-weder übersprungen noch abgebrochen ist oder ihre Auswahl gerade läuft. Der Wächter MUST dafür
-nichts pushen; für den Hinweis gelten die Regeln des Konflikt-Hinweises.
-
-#### Scenario: Zweite Stufe nie angelaufen
-- **WHEN** an einem PR seit mehr als 20 Minuten Auto-Merge eingeschaltet ist und sein Kopf-Commit nur übersprungene Einträge der zweiten Stufe trägt
-- **THEN** trägt der PR einen Hinweis, dass die e2e-Stufe fehlt, und wie sie neu startet, auch für den Fall, dass das Label `e2e` gesetzt ist
-
-#### Scenario: Zweite Stufe nur abgebrochen
-- **WHEN** an einem PR seit mehr als 20 Minuten Auto-Merge eingeschaltet ist und der jüngste Lauf jedes e2e-Pflicht-Checks auf dem Kopf abgebrochen ist
-- **THEN** trägt der PR denselben Hinweis
-
-#### Scenario: Zweite Stufe läuft
-- **WHEN** an einem PR Auto-Merge eingeschaltet ist und auf seinem Kopf-Commit die Auswahl der zweiten Stufe gerade läuft oder der jüngste Lauf eines e2e-Pflicht-Checks läuft oder weder übersprungen noch abgebrochen fertig ist
-- **THEN** entsteht kein Hinweis
-
-#### Scenario: PR in Arbeit
-- **WHEN** ein PR ohne Auto-Merge keinen e2e-Lauf trägt
-- **THEN** entsteht kein Hinweis, auch wenn er das Label `e2e` trägt
-
 ### Requirement: Der Zustand von alpha wird nach jedem CI-Lauf bewertet
 Nach jedem abgeschlossenen CI-Lauf auf `alpha`, stündlich und von Hand MUST der Wächter
 feststellen, ob `alpha` rot ist: im jüngsten abgeschlossenen CI-Lauf schlägt eine Prüfung fehl,
-ein Fehler allein beim Release zählt nicht. Läuft ein neu gestarteter Lauf oder sind seine Jobs
-nicht lesbar, MUST der Zustand als unbestimmt gelten. Als Ursache MUST er die zwischen letztem
-Grün und erstem Rot gemergten PRs nennen.
+ein Fehler allein beim Release zählt nicht. Ein abgebrochener Lauf (ein neuer Push hat seine
+Tests abgebrochen) MUST übersprungen werden; es zählt der Lauf davor. Läuft ein neu gestarteter
+Lauf oder sind seine Jobs nicht lesbar, MUST der Zustand als unbestimmt gelten. Als Ursache MUST
+er die zwischen letztem Grün und erstem Rot gemergten PRs nennen.
 
 #### Scenario: Zwei Merges brechen zusammen
 - **WHEN** nach einem grünen Lauf #1319 und #1315 gemergt werden und der nächste CI-Lauf auf `alpha` in der Rust-Suite fehlschlägt
@@ -160,6 +111,10 @@ Grün und erstem Rot gemergten PRs nennen.
 
 #### Scenario: Lauf noch nicht fertig
 - **WHEN** der jüngste CI-Lauf auf `alpha` noch läuft und der davor grün war
+- **THEN** gilt `alpha` nicht als rot
+
+#### Scenario: Abgebrochener Lauf
+- **WHEN** der jüngste abgeschlossene CI-Lauf auf `alpha` abgebrochen ist, weil ein neuer Push seine Tests abbrach, und der davor grün war
 - **THEN** gilt `alpha` nicht als rot
 
 #### Scenario: Roter Lauf wird neu gestartet
@@ -259,3 +214,29 @@ offen bleiben. Für den Push gilt „Der Wächter schreibt nur per Fast-Forward 
 #### Scenario: PR mit Konflikt nach dem Fix
 - **WHEN** `alpha` wieder grün ist und ein PR mit Hinweis mit `alpha` kollidiert
 - **THEN** wird nichts gepusht, und der PR trägt den Konflikt-Hinweis
+
+### Requirement: Ein grüner PR mit Auto-Merge, der nicht mergt, bekommt einen Hinweis
+Sind alle Checks und Commit-Status auf dem Kopf-Commit eines konfliktfreien PRs seit einer
+Wartezeit grün und ist Auto-Merge eingeschaltet, der PR aber weiter offen, MUST am PR ein Hinweis
+stehen. Je Check-Name zählt dabei der jüngste Check-Run. Ohne eingeschaltetes Auto-Merge wartet
+der PR auf einen Menschen und bekommt keinen.
+
+#### Scenario: Grün seit einer Stunde
+- **WHEN** alle Checks eines PRs seit mehr als 20 Minuten grün sind, Auto-Merge eingeschaltet ist und der PR offen ist
+- **THEN** trägt der PR einen Hinweis, dass er von Hand zu mergen ist
+
+#### Scenario: Ohne Auto-Merge
+- **WHEN** alle Checks eines PRs grün sind und Auto-Merge nicht eingeschaltet ist
+- **THEN** entsteht kein Hinweis
+
+#### Scenario: Ein Status steht noch aus
+- **WHEN** alle Check-Runs grün sind, ein Commit-Status aber noch aussteht oder rot ist
+- **THEN** entsteht kein Hinweis
+
+#### Scenario: Erster Lauf abgebrochen, zweiter grün
+- **WHEN** auf demselben Kopf-Commit ein Lauf eines Checks abgebrochen wurde, ein späterer grün ist und seit mehr als 20 Minuten nichts mergt
+- **THEN** trägt der PR den Hinweis, dass er von Hand zu mergen ist
+
+#### Scenario: Baut mit Ziel-Branch rechnet noch
+- **WHEN** alle übrigen Checks grün sind, Auto-Merge an ist und der jüngste `Baut mit Ziel-Branch` noch läuft
+- **THEN** entsteht kein Hinweis

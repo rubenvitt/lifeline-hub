@@ -9,7 +9,7 @@ gilt_fuer:
   - .github/workflows/e2e.yml
   - scripts/ci-stufen.test.sh
 herleitung:
-  - openspec/changes/p4avye3q-pr-checks-leicht/design.md
+  - openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md
   - Zunder LLH-1889 (Erweiterung vom 14.11.2026, Weg entschieden von Ruben)
 ---
 

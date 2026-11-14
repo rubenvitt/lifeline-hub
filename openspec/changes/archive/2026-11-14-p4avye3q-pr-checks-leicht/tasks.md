@@ -36,12 +36,12 @@
 
 ## 5. Regeln, Doku, Architektur
 
-- [ ] 5.1 `scripts/AGENTS.md`:
+- [x] 5.1 `scripts/AGENTS.md`:
   - „Zwei Stufen im PR“ und „Im PR laufen nur die betroffenen Suiten“ werden durch „Leichte PR-Prüfung“ ersetzt: PR nur Pflicht-Checks, `voll`, Kanal mit Abbruch, Release nie abbrechen, Ruleset-Liste.
   - Nachziehen: Stau-Wächter, Baut mit Ziel-Branch („fertig“), Umnummerierung, e2e-Shards.
   - Ebenso Wurzel-`AGENTS.md` (Gates), `frontend/e2e/AGENTS.md`, `README.md` (Gate), `.github/pull_request_template.md` („Geprüft“).
   - Prettier ist grün für `frontend/`.
-- [ ] 5.2 Skill `dev-zunder-ausfuehren`:
+- [x] 5.2 Skill `dev-zunder-ausfuehren`:
   - vor dem PR lokal `check-all.sh --geaendert --ohne-e2e`
   - Label `voll` statt `e2e`
   - „fertig“ heißt Auto-Merge an
@@ -52,7 +52,7 @@
 
 ## 6. Gesamtprüfung
 
-- [ ] 6.1 `./scripts/check-all.sh --nur schnell` lokal grün (enthält alle Selbsttests der Gate-Skripte und den Architektur-Wächter). Ein grep über das Repo (ohne Archive) findet `ci-auswahl`, `nur-umnummeriert`, das Label `e2e` als „fertig“ und die „zweite Stufe“ nur noch als Rückblick (ADR-0026, Kopfkommentare mit „früher“), nicht als geltende Regel.
+- [x] 6.1 `./scripts/check-all.sh --nur schnell` lokal grün (enthält alle Selbsttests der Gate-Skripte und den Architektur-Wächter). Ein grep über das Repo (ohne Archive) findet `ci-auswahl`, `nur-umnummeriert`, das Label `e2e` als „fertig“ und die „zweite Stufe“ nur noch als Rückblick (ADR-0026, Kopfkommentare mit „früher“), nicht als geltende Regel.
 
 ## Workflow follow-up
 

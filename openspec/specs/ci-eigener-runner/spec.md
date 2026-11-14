@@ -14,8 +14,8 @@ e2e-Shards auf Runnern mit diesem Label starten. Ist sie leer oder fehlt sie, MU
 bleiben auf `ubuntu-latest`.
 
 #### Scenario: Eigener Runner eingeschaltet
-- **WHEN** `E2E_RUNNER` den Wert `lifeline-e2e` hat und ein PR aus dem eigenen Repository einen
-  Lauf startet
+- **WHEN** `E2E_RUNNER` den Wert `lifeline-e2e` hat und ein PR aus dem eigenen Repository mit dem
+  Label `voll` einen Lauf startet
 - **THEN** laufen `e2e-Binary` und `e2e 1/4` bis `e2e 4/4` auf Runnern mit dem Label
   `lifeline-e2e`, die übrigen Jobs auf `ubuntu-latest`
 
@@ -48,9 +48,8 @@ Runner-Art ein Job lief. Beide Arten MUST dieselbe e2e-Suite über `scripts/chec
 mit denselben drei Browser-Projekten.
 
 #### Scenario: Required Checks
-- **WHEN** ein PR auf dem eigenen Runner geprüft wurde
-- **THEN** tragen seine Checks die Namen `e2e-Binary` und `e2e 1/4` bis `e2e 4/4`, und das
-  Ruleset erkennt sie ohne Änderung
+- **WHEN** ein Lauf auf `alpha` einmal auf dem eigenen Runner und einmal auf GitHub-Runnern geprüft wurde
+- **THEN** tragen die e2e-Checks beider Läufe dieselben Namen; Pflicht im Ruleset sind sie nicht mehr (`pr-pruefstufen`)
 
 ### Requirement: Ein Job auf dem eigenen Runner beginnt auf leerem Stand
 Jeder Job auf dem eigenen Runner MUST in einer frischen Umgebung beginnen, die kein vorheriger
