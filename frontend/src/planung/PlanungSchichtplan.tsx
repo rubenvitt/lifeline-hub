@@ -3,11 +3,11 @@ import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { listePersonal } from '../api/personal';
 import {
-  aenderePlanungBlock,
+  updatePlanungBlock,
   erzeugePlanungSchichten,
-  legePlanungBlockAn,
+  createPlanungBlock,
   loadPlanungMappe,
-  loeschePlanungBlock,
+  deletePlanungBlock,
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung } from '../api/types';
@@ -37,7 +37,7 @@ import {
   schichtplanBloecke,
   sollVorgaben,
 } from './planungZeilen';
-import { uebernimmPlanung } from './planungCache';
+import { applyPlanung } from './planungCache';
 
 /**
  * Reiter „Plan“ einer Planung (LLH-1586, Spec `vorplanung`): dasselbe Raster wie der
@@ -160,14 +160,14 @@ export default function PlanungSchichtplan({
     // Die Liste fürs Handy nennt den Tag: eine Planung reicht über mehrere.
     liste: { formatZeit: (ms) => tagUndUhrzeit(dayjs(ms), konventionen), alleBloecke: true },
     api: {
-      create: (body) => legePlanungBlockAn(planungId, blockBody(body)),
-      update: (blockId, body) => aenderePlanungBlock(planungId, blockId, blockAendernBody(body)),
-      delete: (b) => loeschePlanungBlock(planungId, b.id, b.version),
+      create: (body) => createPlanungBlock(planungId, blockBody(body)),
+      update: (blockId, body) => updatePlanungBlock(planungId, blockId, blockAendernBody(body)),
+      delete: (b) => deletePlanungBlock(planungId, b.id, b.version),
       erzeugen: (body) => erzeugePlanungSchichten(planungId, erzeugenBody(body)),
     },
     cache: {
       get: () => qc.getQueryData<Planung>(globalKeys.planung(planungId)),
-      set: (p) => uebernimmPlanung(qc, p),
+      set: (p) => applyPlanung(qc, p),
       invalidate: () => void qc.invalidateQueries({ queryKey: globalKeys.planung(planungId) }),
     },
     // Die Vorplanung kennt keinen Wechsel aus dem Plan.

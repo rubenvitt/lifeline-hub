@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  aenderePlanungProgrammpunkt,
-  legePlanungProgrammpunktAn,
-  loeschePlanungProgrammpunkt,
+  updatePlanungProgrammpunkt,
+  createPlanungProgrammpunkt,
+  deletePlanungProgrammpunkt,
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Planung } from '../api/types';
@@ -25,13 +25,13 @@ export default function PlanungAblauf({
   const id = planung.kopf.id;
   const auffrischen = () => qc.invalidateQueries({ queryKey: globalKeys.planung(id), exact: true });
   const schreiben: AblaufSchreiben = {
-    anlegen: (daten) => legePlanungProgrammpunktAn(id, daten).then(auffrischen),
+    anlegen: (daten) => createPlanungProgrammpunkt(id, daten).then(auffrischen),
     aendern: (punktId, daten) =>
-      aenderePlanungProgrammpunkt(id, punktId, daten).then((p) => {
+      updatePlanungProgrammpunkt(id, punktId, daten).then((p) => {
         void auffrischen();
         return p;
       }),
-    loeschen: (punktId) => loeschePlanungProgrammpunkt(id, punktId).then(auffrischen),
+    loeschen: (punktId) => deletePlanungProgrammpunkt(id, punktId).then(auffrischen),
   };
   const punkte = planung.programmpunkte;
   return (

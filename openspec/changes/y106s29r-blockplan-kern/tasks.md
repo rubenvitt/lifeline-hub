@@ -68,7 +68,7 @@ Beleg für Gleichverhalten.
 
 ## 6. Bezeichner nach LFH-1312
 
-- [ ] 6.1 Eigener `refactor`-Commit mit den Umbenennungen aus D8 in den Dateien der Gruppen 2–5, Namensfamilien je Datei zusammen. Wire-Namen, Routen, Ereignisse, `data-lfh` und TS-Aliase bleiben unverändert. Prüfen:
+- [x] 6.1 Eigener `refactor`-Commit mit den Umbenennungen aus D8 in den Dateien der Gruppen 2–5, Namensfamilien je Datei zusammen. Wire-Namen, Routen, Ereignisse, `data-lfh` und TS-Aliase bleiben unverändert. Prüfen:
   - `cargo test`
   - `pnpm typecheck`, `pnpm lint`
   - `scripts/check-typ-codegen.sh` ohne Diff

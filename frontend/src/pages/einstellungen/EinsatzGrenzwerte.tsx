@@ -2,7 +2,7 @@ import { App, Button, Flex, Typography } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
-import { fetchSchichtplan, setzeSchichtplanGrenzwerte } from '../../api/schichtplan';
+import { fetchSchichtplan, updateSchichtplanGrenzwerte } from '../../api/schichtplan';
 import type {
   Schichtplan,
   SchichtplanGrenzwerte,
@@ -69,7 +69,7 @@ export default function EinsatzGrenzwerte({ einsatzId, canWrite }: EinsatzGrenzw
   // Fehler über dem Paneel (`SeitenHinweise`, auch für Rückgängig aus dem Toast); der Fehler des
   // Dialogs steht im Dialog.
   const reset = useMutation({
-    mutationFn: ({ body }: ResetVariables) => setzeSchichtplanGrenzwerte(einsatzId, body),
+    mutationFn: ({ body }: ResetVariables) => updateSchichtplanGrenzwerte(einsatzId, body),
     onSuccess: (plan, { previous }) => {
       applyPlan(plan);
       if (!previous) {
@@ -82,7 +82,7 @@ export default function EinsatzGrenzwerte({ einsatzId, canWrite }: EinsatzGrenzw
     },
   });
   const update = useMutation({
-    mutationFn: (body: SchichtplanGrenzwerteBody) => setzeSchichtplanGrenzwerte(einsatzId, body),
+    mutationFn: (body: SchichtplanGrenzwerteBody) => updateSchichtplanGrenzwerte(einsatzId, body),
     onSuccess: (plan) => {
       applyPlan(plan);
       message.success('Dienst und Ruhe gespeichert');

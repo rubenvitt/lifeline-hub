@@ -148,7 +148,7 @@ impl Planart for Einsatzplan {
     }
 
     /// Einheit oder UHS des Einsatzes, nicht aufgelöst (422 sonst); liefert die Bezeichnung und
-    /// die Soll-Vorgabe ([`soll_vorgabe_tx`]).
+    /// die Soll-Vorgabe ([`load_soll_vorgabe_tx`]).
     async fn check_posten_tx(
         &self,
         conn: &mut SqliteConnection,
@@ -190,7 +190,7 @@ impl Planart for Einsatzplan {
                 }
             }
         };
-        let (soll_anzahl, quali_soll) = soll_vorgabe_tx(conn, posten).await?;
+        let (soll_anzahl, quali_soll) = load_soll_vorgabe_tx(conn, posten).await?;
         Ok(PostenVorgabe {
             soll_anzahl,
             quali_soll,
@@ -316,7 +316,7 @@ pub async fn grenzwerte(
 
 /// Der ganze Plan mit Befunden. `mit_personen = false` (ohne Freigabe des Moduls Personal):
 /// keine Namen, keine Helferliste, keine Befunde an Personen.
-pub async fn laden(
+pub async fn load(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
@@ -330,7 +330,7 @@ pub async fn laden(
     let jetzt = utc(jetzt)?;
     let g = plan_repo::load_tx(conn, &plan, org_id, grenzwerte, jetzt).await?;
     let helfer = plan_repo::load_helfer_tx(conn, &plan).await?;
-    let wechsel = wechselpunkte_laden(&mut *conn, einsatz_id, &g.bloecke, jetzt).await?;
+    let wechsel = load_wechselpunkte(&mut *conn, einsatz_id, &g.bloecke, jetzt).await?;
 
     let mut ergebnis_je_block = g.ergebnis.bloecke;
     let anzeige = g
@@ -376,7 +376,7 @@ pub async fn laden(
 
 /// Die Wechsel-Leiste (LLH-1555 Welle 3): lädt, was Ablösung und Wechsel aus dem Plan schon
 /// wissen, und rechnet die Wechselpunkte rein (`wechselpunkte::wechselpunkte`).
-async fn wechselpunkte_laden(
+async fn load_wechselpunkte(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     bloecke: &[Block],
@@ -440,7 +440,7 @@ async fn wechselpunkte_laden(
 }
 
 /// Der Posten eines Blocks (für die Modulprüfung im Handler). Fremd oder unbekannt → 404.
-pub async fn posten_von(pool: &SqlitePool, einsatz_id: i64, bid: i64) -> Result<Posten, AppError> {
+pub async fn load_posten(pool: &SqlitePool, einsatz_id: i64, bid: i64) -> Result<Posten, AppError> {
     let zeile: (String, Option<i64>, Option<i64>) = sqlx::query_as(
         "SELECT posten_art, einheit_id, uhs_id FROM einsatz_planschicht \
          WHERE id = ? AND einsatz_id = ?",
@@ -460,7 +460,7 @@ pub async fn posten_von(pool: &SqlitePool, einsatz_id: i64, bid: i64) -> Result<
 /// Soll-Vorgabe eines Postens (design.md D4): Einheit = Summe des wirksamen Solls F/UF/M und
 /// das wirksame Qualifikationssoll (eigen → Typ), UHS = ihre Soll-Anzahl und ihr
 /// Qualifikationssoll, Pause = keins. Eine Summe von 0 ist kein Soll, über 200 wird 200.
-pub(super) async fn soll_vorgabe_tx(
+pub(super) async fn load_soll_vorgabe_tx(
     conn: &mut SqliteConnection,
     posten: Posten,
 ) -> Result<(Option<i64>, Option<String>), AppError> {
@@ -559,7 +559,7 @@ pub async fn erzeugen(
 
 /// Setzt die Grenzwerte (Tri-State je Wert, `None` = unverändert, `Some(None)` = Vorgabe). Ein
 /// ETB-Systemsatz, wenn sich etwas ändert; sonst `None`.
-pub async fn grenzwerte_setzen(
+pub async fn update_grenzwerte(
     pool: &SqlitePool,
     einsatz_id: i64,
     benutzer_id: i64,

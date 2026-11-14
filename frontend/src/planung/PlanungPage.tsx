@@ -7,11 +7,11 @@ import { ApiError } from '../api/client';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { tagUndUhrzeit } from '../anzeige/zeitDarstellung';
 import {
-  aenderePlanungHelfer,
+  updatePlanungHelfer,
   ladePlanung,
-  legePlanungHelferAn,
-  loeschePlanung,
-  loeschePlanungHelfer,
+  createPlanungHelfer,
+  deletePlanung,
+  deletePlanungHelfer,
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import AdminPage from '../components/AdminPage';
@@ -60,7 +60,7 @@ export default function PlanungPage() {
     enabled: planungId != null,
   });
   const loeschenMut = useMutation({
-    mutationFn: () => loeschePlanung(planungId as number),
+    mutationFn: () => deletePlanung(planungId as number),
     onSuccess: () => {
       setLoeschenOffen(false);
       qc.removeQueries({ queryKey: globalKeys.planung(planungId as number) });
@@ -118,9 +118,9 @@ export default function PlanungPage() {
         bloecke={planung.bloecke}
         readOnly={readOnly}
         api={{
-          create: (body) => legePlanungHelferAn(planung.kopf.id, body),
-          update: (helferId, body) => aenderePlanungHelfer(planung.kopf.id, helferId, body),
-          delete: (helferId) => loeschePlanungHelfer(planung.kopf.id, helferId),
+          create: (body) => createPlanungHelfer(planung.kopf.id, body),
+          update: (helferId, body) => updatePlanungHelfer(planung.kopf.id, helferId, body),
+          delete: (helferId) => deletePlanungHelfer(planung.kopf.id, helferId),
         }}
         cache={{
           invalidate: () => qc.invalidateQueries({ queryKey: globalKeys.planung(planung.kopf.id) }),

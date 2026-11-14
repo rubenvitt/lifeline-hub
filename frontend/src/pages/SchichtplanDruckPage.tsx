@@ -12,7 +12,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { fetchSchichtplan } from '../api/schichtplan';
 import { ausEinsatzPlan } from '../abloesung/schichtplan/ausgabe/ausEinsatzPlan';
 import SchichtplanDruckInhalt from '../abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt';
-import { baueZeilen } from '../abloesung/schichtplan/schichtplanZeilen';
+import { buildZeilen } from '../abloesung/schichtplan/schichtplanZeilen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
@@ -91,7 +91,7 @@ export default function SchichtplanDruckPage() {
       daten
         ? ausEinsatzPlan(
             daten.plan,
-            baueZeilen({
+            buildZeilen({
               einheiten: daten.einheiten,
               uhs: daten.uhs,
               abschnitte: daten.vorgaben,

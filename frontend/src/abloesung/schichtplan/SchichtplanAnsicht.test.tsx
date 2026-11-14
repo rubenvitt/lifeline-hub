@@ -20,9 +20,9 @@ const api = vi.hoisted(() => ({
 vi.mock('../../api/schichtplan', async (orig) => ({
   ...(await orig<typeof import('../../api/schichtplan')>()),
   fetchSchichtplan: api.load,
-  legeSchichtplanBlockAn: api.create,
-  aendereSchichtplanBlock: api.update,
-  loescheSchichtplanBlock: api.delete,
+  createSchichtplanBlock: api.create,
+  updateSchichtplanBlock: api.update,
+  deleteSchichtplanBlock: api.delete,
   erzeugeSchichten: api.erzeugen,
 }));
 

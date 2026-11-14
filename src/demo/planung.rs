@@ -193,7 +193,7 @@ impl Ziel {
 
 /// Legt die Demo-Planung an oder benutzt eine gleichnamige mit. Liefert `(angelegt,
 /// mitbenutzt)` für den Bericht. Die Funktion committet nicht.
-pub async fn planung_importieren_tx(
+pub async fn import_planung_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     import_id: i64,
@@ -235,7 +235,7 @@ pub async fn planung_importieren_tx(
 
     // Geschrieben wird über die Wege der Routen (`planung::repo::*_tx`, Blöcke und Helfer über
     // `plan_repo::*_tx`), mit ihren Prüfungen.
-    let planung_id = repo::anlegen_tx(
+    let planung_id = repo::create_tx(
         conn,
         org_id,
         admin_id,
@@ -308,7 +308,7 @@ pub async fn planung_importieren_tx(
             PostenHerkunft::Fahrzeug(s) => repo::Herkunft::Fahrzeug(stamm.fahrzeug(s)?),
             PostenHerkunft::Uhs(t) => repo::Herkunft::Uhs(t),
         };
-        let posten_id = repo::posten_anlegen_tx(
+        let posten_id = repo::create_posten_tx(
             conn,
             org_id,
             planung_id,

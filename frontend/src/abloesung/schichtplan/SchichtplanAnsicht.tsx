@@ -9,14 +9,14 @@ import { listeUhs } from '../../api/einsatzUhs';
 import { listePersonal } from '../../api/personal';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import {
-  aendereSchichtplanBlock,
-  aendereSchichtplanHelfer,
+  updateSchichtplanBlock,
+  updateSchichtplanHelfer,
   erzeugeSchichten,
   fetchSchichtplan,
-  legeSchichtplanBlockAn,
-  legeSchichtplanHelferAn,
-  loescheSchichtplanBlock,
-  loescheSchichtplanHelfer,
+  createSchichtplanBlock,
+  createSchichtplanHelfer,
+  deleteSchichtplanBlock,
+  deleteSchichtplanHelfer,
 } from '../../api/schichtplan';
 import type {
   AbloesungVorgabe,
@@ -42,7 +42,7 @@ import SchichtplanWechselDialog from './SchichtplanWechselDialog';
 import SchichtplanWechselLeiste from './SchichtplanWechselLeiste';
 import {
   alsRasterBlock,
-  baueZeilen,
+  buildZeilen,
   personenOptionen,
   postenSchluessel,
 } from './schichtplanZeilen';
@@ -189,7 +189,7 @@ export default function SchichtplanAnsicht({
   const bloecke = useMemo(() => (plan?.bloecke ?? []).map(alsRasterBlock), [plan]);
   const zeilen = useMemo(
     () =>
-      baueZeilen({
+      buildZeilen({
         einheiten: einheitenFrei ? einheitenQuery.data : undefined,
         uhs: uhsFrei ? uhsQuery.data : undefined,
         abschnitte,
@@ -315,9 +315,9 @@ export default function SchichtplanAnsicht({
         bloecke={plan?.bloecke ?? []}
         readOnly={!darfSchreiben}
         api={{
-          create: (body) => legeSchichtplanHelferAn(einsatzId, body),
-          update: (helferId, body) => aendereSchichtplanHelfer(einsatzId, helferId, body),
-          delete: (helferId) => loescheSchichtplanHelfer(einsatzId, helferId),
+          create: (body) => createSchichtplanHelfer(einsatzId, body),
+          update: (helferId, body) => updateSchichtplanHelfer(einsatzId, helferId, body),
+          delete: (helferId) => deleteSchichtplanHelfer(einsatzId, helferId),
         }}
         cache={{
           set: setHelfer,
@@ -347,9 +347,9 @@ export default function SchichtplanAnsicht({
     ),
     isLoading: planQuery.isLoading,
     api: {
-      create: (body) => legeSchichtplanBlockAn(einsatzId, body),
-      update: (blockId, body) => aendereSchichtplanBlock(einsatzId, blockId, body),
-      delete: (b) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
+      create: (body) => createSchichtplanBlock(einsatzId, body),
+      update: (blockId, body) => updateSchichtplanBlock(einsatzId, blockId, body),
+      delete: (b) => deleteSchichtplanBlock(einsatzId, b.id, b.version),
       erzeugen: (body) => erzeugeSchichten(einsatzId, body),
     },
     cache: {

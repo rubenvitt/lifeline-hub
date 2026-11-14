@@ -102,7 +102,7 @@ pub async fn einsatz(
     sicht: Sicht,
     jetzt: &str,
 ) -> Result<AusgabePlan, AppError> {
-    let plan = plan_repo::laden(pool, einsatz.id, einsatz.org_id, true, jetzt).await?;
+    let plan = plan_repo::load(pool, einsatz.id, einsatz.org_id, true, jetzt).await?;
     let mut conn = pool.acquire().await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz.id).await?;
     let gliederung = gliederung(&mut conn, einsatz.id, sicht).await?;
@@ -126,7 +126,7 @@ pub async fn planung(
     planung_id: i64,
     jetzt: &str,
 ) -> Result<AusgabePlan, AppError> {
-    let anzeige = crate::planung::repo::laden(
+    let anzeige = crate::planung::repo::load(
         pool,
         org_id,
         planung_id,

@@ -3,7 +3,7 @@ import type { Dayjs } from 'dayjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { PLANUNG_BEZEICHNUNG_MAX, PLANUNG_ORT_MAX } from '../api/eingabegrenzen';
-import { legePlanungAn } from '../api/planungen';
+import { createPlanung } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import type { Einsatzart, PlanungBody } from '../api/types';
 import { ZeitraumEingabe, type Zeitraum } from '../anzeige/ZeitpunktEingabe';
@@ -14,7 +14,7 @@ import { mitVorgabe } from '../components/vorgabeText';
 import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
 import { planungPfad } from '../routing/deeplinks';
 import { zeitraumRegel } from './planungRegeln';
-import { uebernimmPlanung } from './planungCache';
+import { applyPlanung } from './planungCache';
 
 interface Werte {
   bezeichnung: string;
@@ -53,10 +53,10 @@ export default function PlanungAnlegenDialog({
       if (w.einsatzart) body.einsatzart = w.einsatzart;
       const ort = w.ort?.trim();
       if (ort) body.ort = ort;
-      return legePlanungAn(body);
+      return createPlanung(body);
     },
     onSuccess: (p) => {
-      uebernimmPlanung(qc, p);
+      applyPlanung(qc, p);
       void qc.invalidateQueries({ queryKey: globalKeys.planungen(), exact: true });
     },
   });

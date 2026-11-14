@@ -84,7 +84,7 @@ async fn fordere_posten_modul(
 
 async fn plan(state: &AppState, ctx: &EinsatzKontext) -> Result<SchichtplanAnzeige, AppError> {
     let mit = mit_personen(state, ctx).await?;
-    repo::laden(
+    repo::load(
         &state.pool,
         ctx.einsatz.id,
         ctx.einsatz.org_id,
@@ -240,7 +240,7 @@ pub struct BlockAnlegen {
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/bloecke — liefert den ganzen Plan.
-pub async fn block_anlegen(
+pub async fn create_block(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     JsonBody(req): JsonBody<BlockAnlegen>,
@@ -291,7 +291,7 @@ pub struct BlockAendern {
 
 /// PATCH /api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid} — Zeit, Posten (Verschieben
 /// in eine andere Zeile), Soll, Personen, Notiz; CAS über `version` (409).
-pub async fn block_aendern(
+pub async fn update_block(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
@@ -309,7 +309,7 @@ pub async fn block_aendern(
         personen: req.personen.map(personen).transpose()?,
         notiz: support::optional_max_tri(req.notiz, "notiz", NOTIZ_MAX)?,
     };
-    let bisher = repo::posten_von(&state.pool, ctx.einsatz.id, bid).await?;
+    let bisher = repo::load_posten(&state.pool, ctx.einsatz.id, bid).await?;
     fordere_posten_modul(&state, &ctx, bisher).await?;
     if let Some(neu) = patch.posten {
         fordere_posten_modul(&state, &ctx, neu).await?;
@@ -341,14 +341,14 @@ impl VersionParams {
 
 /// DELETE /api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}?version=… (409 bei
 /// veraltetem Stand). Einen belegten Block löscht nur, wer Personal darf (403).
-pub async fn block_loeschen(
+pub async fn delete_block(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
     Query(params): Query<VersionParams>,
 ) -> Result<StatusCode, AppError> {
     let version = params.version()?;
-    let posten = repo::posten_von(&state.pool, ctx.einsatz.id, bid).await?;
+    let posten = repo::load_posten(&state.pool, ctx.einsatz.id, bid).await?;
     fordere_posten_modul(&state, &ctx, posten).await?;
     // Ein belegter Block nimmt mit dem Löschen Einteilungen weg: das verlangt Personal, geprüft
     // in der Transaktion gegen den Stand von `version`.
@@ -412,7 +412,7 @@ pub struct Grenzwerte {
 
 /// PATCH /api/einsaetze/{id}/abloesungen/schichtplan/grenzwerte — Grenzwerte des
 /// Dienst-Befunds. Liefert den ganzen Plan (die Befunde ändern sich mit).
-pub async fn grenzwerte_setzen(
+pub async fn update_grenzwerte(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     JsonBody(req): JsonBody<Grenzwerte>,
@@ -423,7 +423,7 @@ pub async fn grenzwerte_setzen(
         MAX_DIENST_BEREICH,
     )?;
     let ruhe = grenzwert(req.min_ruhe_minuten, "min_ruhe_minuten", MIN_RUHE_BEREICH)?;
-    let etb_id = repo::grenzwerte_setzen(
+    let etb_id = repo::update_grenzwerte(
         &state.pool,
         ctx.einsatz.id,
         ctx.benutzer.id,
@@ -477,7 +477,7 @@ impl HelferAnlegen {
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/schichtplan/helfer
-pub async fn helfer_anlegen(
+pub async fn create_helfer(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     JsonBody(req): JsonBody<HelferAnlegen>,
@@ -527,7 +527,7 @@ impl HelferAendern {
 }
 
 /// PATCH /api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid}
-pub async fn helfer_aendern(
+pub async fn update_helfer(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     PfadParam((_eid, hid)): PfadParam<(i64, i64)>,
@@ -545,7 +545,7 @@ pub async fn helfer_aendern(
 
 /// DELETE /api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid} — nimmt den Helfer aus allen
 /// Blöcken.
-pub async fn helfer_loeschen(
+pub async fn delete_helfer(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
     PfadParam((_eid, hid)): PfadParam<(i64, i64)>,
@@ -592,7 +592,7 @@ pub async fn wechsel_vorlage(
     ctx: EinsatzLesezugriff<Abloesung>,
     PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<WechselVorlage>, AppError> {
-    let art = match repo::posten_von(&state.pool, ctx.einsatz.id, bid).await? {
+    let art = match repo::load_posten(&state.pool, ctx.einsatz.id, bid).await? {
         Posten::Uhs(_) => WechselArt::Uhs,
         _ => WechselArt::PauseBeginn,
     };
@@ -668,7 +668,7 @@ pub async fn wechsel_vollziehen(
 ) -> Result<(StatusCode, Json<PlanWechselAnzeige>), AppError> {
     let jetzt = jetzt();
     let eingabe = wechsel_eingabe(req, &jetzt)?;
-    repo::posten_von(&state.pool, ctx.einsatz.id, bid).await?;
+    repo::load_posten(&state.pool, ctx.einsatz.id, bid).await?;
     fordere_wechsel_module(&state, &ctx, eingabe.art()).await?;
     let (anzeige, wirkung) = vollzug::vollziehen(
         &state.pool,

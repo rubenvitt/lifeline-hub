@@ -80,11 +80,11 @@ vi.mock('../api/abloesungen', () => ({
 
 // Schichtplan (LLH-1554): Plan, UHS, Stamm-Personal und Qualifikationen der Ansicht „Schichtplan“.
 const fetchSchichtplan = vi.fn();
-const legeSchichtplanHelferAn = vi.fn();
+const createSchichtplanHelfer = vi.fn();
 vi.mock('../api/schichtplan', async (orig) => ({
   ...(await orig<typeof import('../api/schichtplan')>()),
   fetchSchichtplan: (...a: unknown[]) => fetchSchichtplan(...a),
-  legeSchichtplanHelferAn: (...a: unknown[]) => legeSchichtplanHelferAn(...a),
+  createSchichtplanHelfer: (...a: unknown[]) => createSchichtplanHelfer(...a),
 }));
 vi.mock('../api/einsatzUhs', async (orig) => ({
   ...(await orig<typeof import('../api/einsatzUhs')>()),
@@ -2077,7 +2077,7 @@ describe('AbloesungPage — Helfer im Schichtplan (Change y106s29r, Spec kraefte
       organisation: 'DRK OV Nord',
       qualifikationen: [5],
     };
-    legeSchichtplanHelferAn.mockImplementation(() => {
+    createSchichtplanHelfer.mockImplementation(() => {
       fetchSchichtplan.mockResolvedValue({ ...PLAN, helfer: [MIA] });
       return Promise.resolve(MIA);
     });
@@ -2091,7 +2091,7 @@ describe('AbloesungPage — Helfer im Schichtplan (Change y106s29r, Spec kraefte
     await waehle('Qualifikationen', 'Sanitäter');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Helfer anlegen' }));
     await waitFor(() =>
-      expect(legeSchichtplanHelferAn).toHaveBeenCalledWith(1, {
+      expect(createSchichtplanHelfer).toHaveBeenCalledWith(1, {
         name: 'Mia Beispiel',
         organisation: 'DRK OV Nord',
         qualifikationen: [5],

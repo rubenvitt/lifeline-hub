@@ -38,23 +38,23 @@ export function ladePlanung(id: number): Promise<Planung> {
 }
 
 /** Bezeichnung doppelt (ohne Groß und Klein) ist 409, Zeitraum über 14 Tage 400. */
-export function legePlanungAn(body: PlanungBody): Promise<Planung> {
+export function createPlanung(body: PlanungBody): Promise<Planung> {
   return apiSend<Planung>('/api/planungen', 'POST', body);
 }
 
-export function aenderePlanung(id: number, body: PlanungAendernBody): Promise<Planung> {
+export function updatePlanung(id: number, body: PlanungAendernBody): Promise<Planung> {
   return apiSend<Planung>(basis(id), 'PATCH', body);
 }
 
-export function loeschePlanung(id: number): Promise<void> {
+export function deletePlanung(id: number): Promise<void> {
   return apiSend<void>(basis(id), 'DELETE');
 }
 
-export function legePlanungPostenAn(id: number, body: PlanungPostenBody): Promise<Planung> {
+export function createPlanungPosten(id: number, body: PlanungPostenBody): Promise<Planung> {
   return apiSend<Planung>(`${basis(id)}/posten`, 'POST', body);
 }
 
-export function aenderePlanungPosten(
+export function updatePlanungPosten(
   id: number,
   postenId: number,
   body: PlanungPostenAendernBody,
@@ -63,7 +63,7 @@ export function aenderePlanungPosten(
 }
 
 /** Mit Personen in seinen Blöcken nur mit `mitBloecken` (422 sonst). */
-export function loeschePlanungPosten(
+export function deletePlanungPosten(
   id: number,
   postenId: number,
   mitBloecken: boolean,
@@ -73,17 +73,17 @@ export function loeschePlanungPosten(
 }
 
 /** Die ganze Reihenfolge, jeder Posten genau einmal (422 sonst). */
-export function setzePlanungPostenReihenfolge(id: number, postenIds: number[]): Promise<Planung> {
+export function updatePlanungPostenReihenfolge(id: number, postenIds: number[]): Promise<Planung> {
   return apiSend<Planung>(`${basis(id)}/posten/reihenfolge`, 'PUT', { posten_ids: postenIds });
 }
 
 /** Überschneidung am selben Posten (außer der Pause) ist 422. */
-export function legePlanungBlockAn(id: number, body: PlanungBlockBody): Promise<Planung> {
+export function createPlanungBlock(id: number, body: PlanungBlockBody): Promise<Planung> {
   return apiSend<Planung>(`${basis(id)}/bloecke`, 'POST', body);
 }
 
 /** Auch Verschieben an einen anderen Posten; veralteter Stand ist 409. */
-export function aenderePlanungBlock(
+export function updatePlanungBlock(
   id: number,
   blockId: number,
   body: PlanungBlockAendernBody,
@@ -91,7 +91,7 @@ export function aenderePlanungBlock(
   return apiSend<Planung>(`${basis(id)}/bloecke/${blockId}`, 'PATCH', body);
 }
 
-export function loeschePlanungBlock(id: number, blockId: number, version: number): Promise<void> {
+export function deletePlanungBlock(id: number, blockId: number, version: number): Promise<void> {
   return apiSend<void>(`${basis(id)}/bloecke/${blockId}?version=${version}`, 'DELETE');
 }
 
@@ -100,14 +100,14 @@ export function erzeugePlanungSchichten(id: number, body: PlanungErzeugenBody): 
   return apiSend<Planung>(`${basis(id)}/erzeugen`, 'POST', body);
 }
 
-export function legePlanungHelferAn(
+export function createPlanungHelfer(
   id: number,
   body: SchichtplanHelferBody,
 ): Promise<SchichtplanHelfer> {
   return apiSend<SchichtplanHelfer>(`${basis(id)}/helfer`, 'POST', body);
 }
 
-export function aenderePlanungHelfer(
+export function updatePlanungHelfer(
   id: number,
   helferId: number,
   body: SchichtplanHelferAendernBody,
@@ -116,7 +116,7 @@ export function aenderePlanungHelfer(
 }
 
 /** Nimmt den Helfer aus allen Blöcken. */
-export function loeschePlanungHelfer(id: number, helferId: number): Promise<void> {
+export function deletePlanungHelfer(id: number, helferId: number): Promise<void> {
   return apiSend<void>(`${basis(id)}/helfer/${helferId}`, 'DELETE');
 }
 
@@ -124,14 +124,14 @@ export function loeschePlanungHelfer(id: number, helferId: number): Promise<void
  * Programmpunkte der Planung (LLH-1583): dieselben Grenzen wie am Einsatz (höchstens 50, sonst
  * 422). Die Übernahme legt sie im Einsatz an; danach ist jeder Schreibweg 409.
  */
-export function legePlanungProgrammpunktAn(
+export function createPlanungProgrammpunkt(
   id: number,
   daten: ProgrammpunktEingabe,
 ): Promise<Programmpunkt> {
   return apiSend<Programmpunkt>(`${basis(id)}/programmpunkte`, 'POST', daten);
 }
 
-export function aenderePlanungProgrammpunkt(
+export function updatePlanungProgrammpunkt(
   id: number,
   punktId: number,
   daten: Partial<ProgrammpunktEingabe>,
@@ -139,7 +139,7 @@ export function aenderePlanungProgrammpunkt(
   return apiSend<Programmpunkt>(`${basis(id)}/programmpunkte/${punktId}`, 'PATCH', daten);
 }
 
-export function loeschePlanungProgrammpunkt(id: number, punktId: number): Promise<void> {
+export function deletePlanungProgrammpunkt(id: number, punktId: number): Promise<void> {
   return apiSend<void>(`${basis(id)}/programmpunkte/${punktId}`, 'DELETE');
 }
 

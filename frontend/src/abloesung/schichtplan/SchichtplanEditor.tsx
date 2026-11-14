@@ -352,21 +352,21 @@ export default function SchichtplanEditor<P>({
       ? anlegenMut.mutateAsync(s.body)
       : aendernMut.mutateAsync({ blockId: s.blockId, body: s.body });
 
-  const oeffneAnlegen = () => {
+  const openAnlegen = () => {
     anlegenMut.reset();
     setDialog({ art: 'anlegen' });
   };
-  const oeffneBlock = (blockId: number) => {
+  const openBlock = (blockId: number) => {
     aendernMut.reset();
     loeschenMut.reset();
     kopierenMut.reset();
     setDialog({ art: 'block', blockId });
   };
-  const oeffneErzeugen = () => {
+  const openErzeugen = () => {
     erzeugenMut.reset();
     setDialog({ art: 'erzeugen' });
   };
-  const oeffneWechsel = (b: SchichtplanBlock) => setDialog({ art: 'wechsel', blockId: b.id });
+  const openWechsel = (b: SchichtplanBlock) => setDialog({ art: 'wechsel', blockId: b.id });
   const dialogBlock = dialog?.art === 'block' ? blockVon(dialog.blockId) : null;
   // Kontextmenü eines Blocks (LLH-1600): „Als nächsten Block kopieren“ ohne Dialog, die Kopie
   // erscheint im Raster; ein Fehler steht über dem Raster wie bei einem Zug.
@@ -382,10 +382,10 @@ export default function SchichtplanEditor<P>({
   // Ohne Wechsel-Teil (Vorplanung) gibt es keinen Wechsel aus dem Plan.
   const blockMenue = useBlockMenue({
     blockVon,
-    onBearbeiten: oeffneBlock,
+    onBearbeiten: openBlock,
     onKopieren: kopiereStill,
     onLoeschen: (b) => zugSchreiben(menueLoeschenMut.mutateAsync(b)),
-    ...(wechsel ? { onWechsel: oeffneWechsel, wechselMoeglich: wechsel.canWechsel } : {}),
+    ...(wechsel ? { onWechsel: openWechsel, wechselMoeglich: wechsel.canWechsel } : {}),
     laeuft: menueKopierenMut.isPending || menueLoeschenMut.isPending,
   });
   const mitSeitenleiste = !istSchmal && canWrite;
@@ -400,9 +400,9 @@ export default function SchichtplanEditor<P>({
         style={{ marginBottom: token.margin }}
       >
         {!istSchmal && adapter.spanneSelect}
-        {canWrite && <Button onClick={oeffneAnlegen}>Block anlegen</Button>}
+        {canWrite && <Button onClick={openAnlegen}>Block anlegen</Button>}
         {canWrite && (
-          <Button onClick={oeffneErzeugen} disabled={adapter.isErzeugenDisabled}>
+          <Button onClick={openErzeugen} disabled={adapter.isErzeugenDisabled}>
             Schichten erzeugen
           </Button>
         )}
@@ -417,7 +417,7 @@ export default function SchichtplanEditor<P>({
       {adapter.alternative == null &&
         wechsel?.renderLeiste((blockId) => {
           const b = blockVon(blockId);
-          return b && wechsel.canWechsel(b) ? () => oeffneWechsel(b) : undefined;
+          return b && wechsel.canWechsel(b) ? () => openWechsel(b) : undefined;
         })}
       {adapter.alternative != null ? (
         adapter.alternative
@@ -436,7 +436,7 @@ export default function SchichtplanEditor<P>({
               bloecke={adapter.rasterBloecke}
               jetzt={jetzt}
               formatZeit={adapter.liste?.formatZeit ?? zeitText}
-              onOeffnen={oeffneBlock}
+              onOeffnen={openBlock}
               alleBloecke={adapter.liste?.alleBloecke}
             />
           )}
@@ -476,7 +476,7 @@ export default function SchichtplanEditor<P>({
                   onAnlegen={onAnlegen}
                   onAendern={onAendern}
                   onKopieren={onKopieren}
-                  onOeffnen={oeffneBlock}
+                  onOeffnen={openBlock}
                   personenZiel={mitSeitenleiste && !personenGesperrt}
                   beschriftung={adapter.beschriftung}
                   onZug={setZugLaeuft}
@@ -539,7 +539,7 @@ export default function SchichtplanEditor<P>({
           onKopieren={kopiereAlsNaechsten}
           kopierenLaeuft={kopierenMut.isPending}
           kopierFehler={kopierenMut.error}
-          onWechsel={dialogBlock && wechsel?.canWechsel(dialogBlock) ? oeffneWechsel : undefined}
+          onWechsel={dialogBlock && wechsel?.canWechsel(dialogBlock) ? openWechsel : undefined}
           onSchliessen={() => setDialog(null)}
         />
       )}

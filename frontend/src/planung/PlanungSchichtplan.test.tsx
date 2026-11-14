@@ -26,9 +26,9 @@ const api = vi.hoisted(() => ({
 vi.mock('../api/planungen', async (orig) => ({
   ...(await orig<typeof import('../api/planungen')>()),
   ladePlanung: api.load,
-  legePlanungBlockAn: api.create,
-  aenderePlanungBlock: api.update,
-  loeschePlanungBlock: api.delete,
+  createPlanungBlock: api.create,
+  updatePlanungBlock: api.update,
+  deletePlanungBlock: api.delete,
   erzeugePlanungSchichten: api.erzeugen,
 }));
 vi.mock('../api/personal', async (orig) => ({

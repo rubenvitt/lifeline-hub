@@ -57,7 +57,7 @@ fn plan(z: &PlanungsZugriff) -> Vorplanung {
 }
 
 async fn planung(state: &AppState, z: &PlanungsZugriff) -> Result<PlanungAnzeige, AppError> {
-    repo::laden(
+    repo::load(
         &state.pool,
         z.benutzer.org_id,
         z.planung_id,
@@ -157,14 +157,14 @@ pub struct PlanungAnlegen {
 }
 
 /// POST /api/planungen — legt eine Planung an (201, ganze Planung). Bezeichnung doppelt 409.
-pub async fn anlegen(
+pub async fn create(
     State(state): State<AppState>,
     Planer(benutzer): Planer,
     JsonBody(req): JsonBody<PlanungAnlegen>,
 ) -> Result<(StatusCode, Json<PlanungAnzeige>), AppError> {
     let von = planungszeit(&req.von, "Beginn")?;
     let bis = planungszeit(&req.bis, "Ende")?;
-    repo::pruefe_zeitraum(&von, &bis)?;
+    repo::check_zeitraum(&von, &bis)?;
     let eingabe = KopfEingabe {
         bezeichnung: support::pflicht_max(&req.bezeichnung, "bezeichnung", BEZEICHNUNG_MAX)?,
         einsatzart: match req.einsatzart.as_deref() {
@@ -191,11 +191,11 @@ pub async fn anlegen(
         )?
         .flatten(),
     };
-    let id = repo::anlegen(&state.pool, benutzer.org_id, benutzer.id, &eingabe).await?;
+    let id = repo::create(&state.pool, benutzer.org_id, benutzer.id, &eingabe).await?;
     melde(&state, benutzer.org_id, id);
     Ok((
         StatusCode::CREATED,
-        Json(repo::laden(&state.pool, benutzer.org_id, id, chrono::Utc::now()).await?),
+        Json(repo::load(&state.pool, benutzer.org_id, id, chrono::Utc::now()).await?),
     ))
 }
 
@@ -234,7 +234,7 @@ pub struct PlanungAendern {
 }
 
 /// PATCH /api/planungen/{id} — Kopf, CAS über `version` (409).
-pub async fn aendern(
+pub async fn update(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<PlanungAendern>,
@@ -253,7 +253,7 @@ pub async fn aendern(
         .map(|b| planungszeit(b, "Ende"))
         .transpose()?;
     if let (Some(v), Some(b)) = (&von, &bis) {
-        repo::pruefe_zeitraum(v, b)?;
+        repo::check_zeitraum(v, b)?;
     }
     let koordinate = match (req.ort_lat, req.ort_lon) {
         (None, None) => None,
@@ -278,7 +278,7 @@ pub async fn aendern(
         )?,
         min_ruhe: grenzwert(req.min_ruhe_minuten, "min_ruhe_minuten", MIN_RUHE_BEREICH)?,
     };
-    repo::aendern(
+    repo::update(
         &state.pool,
         z.benutzer.org_id,
         z.planung_id,
@@ -292,11 +292,11 @@ pub async fn aendern(
 }
 
 /// DELETE /api/planungen/{id} — samt Posten, Blöcken und Helfern (204).
-pub async fn loeschen(
+pub async fn delete(
     State(state): State<AppState>,
     z: PlanungsZugriff,
 ) -> Result<StatusCode, AppError> {
-    repo::loeschen(&state.pool, z.benutzer.org_id, z.planung_id).await?;
+    repo::delete(&state.pool, z.benutzer.org_id, z.planung_id).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -362,7 +362,7 @@ fn herkunft(req: &PostenAnlegen) -> Result<Herkunft, AppError> {
 
 /// POST /api/planungen/{id}/posten — am Ende der Reihenfolge (201, ganze Planung). Höchstens
 /// [`POSTEN_MAX`] je Planung (422), Bezeichnung in der Planung doppelt 409.
-pub async fn posten_anlegen(
+pub async fn create_posten(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<PostenAnlegen>,
@@ -375,7 +375,7 @@ pub async fn posten_anlegen(
         soll_anzahl: soll_anzahl(req.soll_anzahl)?,
         quali_soll: quali_soll::form_tri(req.quali_soll)?,
     };
-    repo::posten_anlegen(&state.pool, z.benutzer.org_id, z.planung_id, &eingabe).await?;
+    repo::create_posten(&state.pool, z.benutzer.org_id, z.planung_id, &eingabe).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok((StatusCode::CREATED, Json(planung(&state, &z).await?)))
 }
@@ -397,7 +397,7 @@ pub struct PostenAendern {
 
 /// PATCH /api/planungen/{id}/posten/{pid} — Bezeichnung, Abschnitt, Schichtlänge, Soll; die
 /// Herkunft bleibt. Bestehende Blöcke behalten ihr Soll.
-pub async fn posten_aendern(
+pub async fn update_posten(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,
@@ -414,7 +414,7 @@ pub async fn posten_aendern(
         soll_anzahl: soll_anzahl(req.soll_anzahl)?,
         quali_soll: quali_soll::form_tri(req.quali_soll)?,
     };
-    repo::posten_aendern(&state.pool, z.benutzer.org_id, z.planung_id, pid, &patch).await?;
+    repo::update_posten(&state.pool, z.benutzer.org_id, z.planung_id, pid, &patch).await?;
     melde(&state, z.benutzer.org_id, z.planung_id);
     Ok(Json(planung(&state, &z).await?))
 }
@@ -427,13 +427,13 @@ pub struct PostenLoeschenParams {
 
 /// DELETE /api/planungen/{id}/posten/{pid}?mit_bloecken=true — samt seinen Blöcken; sind darin
 /// Personen eingeteilt, nur mit `mit_bloecken` (422 sonst).
-pub async fn posten_loeschen(
+pub async fn delete_posten(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,
     Query(params): Query<PostenLoeschenParams>,
 ) -> Result<StatusCode, AppError> {
-    repo::posten_loeschen(
+    repo::delete_posten(
         &state.pool,
         z.benutzer.org_id,
         z.planung_id,
@@ -497,7 +497,7 @@ pub struct BlockAnlegen {
 }
 
 /// POST /api/planungen/{id}/bloecke — liefert die ganze Planung (201).
-pub async fn block_anlegen(
+pub async fn create_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<BlockAnlegen>,
@@ -512,7 +512,7 @@ pub async fn block_anlegen(
         personen: personen(req.personen)?,
         notiz: support::optional_max(req.notiz, "notiz", NOTIZ_MAX)?,
     };
-    repo::block_anlegen(
+    repo::create_block(
         &state.pool,
         z.benutzer.org_id,
         z.planung_id,
@@ -547,7 +547,7 @@ pub struct BlockAendern {
 }
 
 /// PATCH /api/planungen/{id}/bloecke/{bid} — CAS über `version` (409).
-pub async fn block_aendern(
+pub async fn update_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, bid)): PfadParam<(i64, i64)>,
@@ -574,7 +574,7 @@ pub async fn block_aendern(
 }
 
 /// DELETE /api/planungen/{id}/bloecke/{bid}?version=… (409 bei veraltetem Stand).
-pub async fn block_loeschen(
+pub async fn delete_block(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, bid)): PfadParam<(i64, i64)>,
@@ -630,7 +630,7 @@ pub async fn erzeugen(
 // ---------------------------------------------------------------------------------------------
 
 /// POST /api/planungen/{id}/helfer (201, der Helfer).
-pub async fn helfer_anlegen(
+pub async fn create_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<HelferAnlegen>,
@@ -644,7 +644,7 @@ pub async fn helfer_anlegen(
 }
 
 /// PATCH /api/planungen/{id}/helfer/{hid}
-pub async fn helfer_aendern(
+pub async fn update_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, hid)): PfadParam<(i64, i64)>,
@@ -659,7 +659,7 @@ pub async fn helfer_aendern(
 }
 
 /// DELETE /api/planungen/{id}/helfer/{hid} — nimmt den Helfer aus allen Blöcken.
-pub async fn helfer_loeschen(
+pub async fn delete_helfer(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, hid)): PfadParam<(i64, i64)>,
@@ -679,7 +679,7 @@ pub async fn helfer_loeschen(
 /// POST /api/planungen/{id}/programmpunkte (201, der Programmpunkt). Grenzen wie am Einsatz:
 /// Bezeichnung Pflicht und höchstens 100 Zeichen, Zeitpunkt im Jahresbereich (400), höchstens 50
 /// je Planung (422).
-pub async fn programmpunkt_anlegen(
+pub async fn create_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     JsonBody(req): JsonBody<NeuerProgrammpunkt>,
@@ -704,7 +704,7 @@ pub async fn programmpunkt_anlegen(
 }
 
 /// PATCH /api/planungen/{id}/programmpunkte/{pid} — Bezeichnung und/oder Zeitpunkt.
-pub async fn programmpunkt_aendern(
+pub async fn update_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,
@@ -734,7 +734,7 @@ pub async fn programmpunkt_aendern(
 }
 
 /// DELETE /api/planungen/{id}/programmpunkte/{pid} (204).
-pub async fn programmpunkt_loeschen(
+pub async fn delete_programmpunkt(
     State(state): State<AppState>,
     z: PlanungsZugriff,
     PfadParam((_id, pid)): PfadParam<(i64, i64)>,

@@ -249,7 +249,7 @@ impl Planart for Vorplanung {
 }
 
 /// Zeitraum einer Planung (400): Ende nach Beginn, höchstens [`ZEITRAUM_MAX_TAGE`] Tage.
-pub fn pruefe_zeitraum(von: &str, bis: &str) -> Result<(), AppError> {
+pub fn check_zeitraum(von: &str, bis: &str) -> Result<(), AppError> {
     let (a, b) = (utc(von)?, utc(bis)?);
     if b <= a {
         return Err(AppError::Validation(
@@ -514,7 +514,7 @@ const SELECT_BLOECKE: &str = concat!(
 );
 
 /// Die ganze Planung mit Befunden und Kennzahlen. Fremd oder unbekannt → 404.
-pub async fn laden(
+pub async fn load(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
@@ -580,8 +580,8 @@ pub async fn laden(
     })
 }
 
-/// Kennzahlen einer Planung aus derselben Prüfung wie [`laden`].
-pub(crate) async fn kennzahlen_von(
+/// Kennzahlen einer Planung aus derselben Prüfung wie [`load`].
+pub(crate) async fn load_kennzahlen(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
@@ -653,7 +653,7 @@ pub async fn liste(
         let kennzahlen = match parse_kennzahlen(z.uebernahme_kennzahlen.as_deref())? {
             Some(k) => Some(k),
             None if bis >= grenze => Some(
-                kennzahlen_von(
+                load_kennzahlen(
                     &mut conn,
                     org_id,
                     id,
@@ -691,7 +691,7 @@ pub async fn liste(
 // Planung schreiben
 // ---------------------------------------------------------------------------------------------
 
-async fn pruefe_bezeichnung_frei_tx(
+async fn check_bezeichnung_frei_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     bezeichnung: &str,
@@ -715,19 +715,19 @@ async fn pruefe_bezeichnung_frei_tx(
 }
 
 /// Legt eine Planung an. Bezeichnung doppelt 409, mehr als [`PLANUNGEN_MAX`] 422.
-pub async fn anlegen(
+pub async fn create(
     pool: &SqlitePool,
     org_id: i64,
     benutzer_id: i64,
     e: &KopfEingabe,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
-        anlegen_tx(conn, org_id, benutzer_id, e).await
+        create_tx(conn, org_id, benutzer_id, e).await
     })
 }
 
-/// [`anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn anlegen_tx(
+/// [`create`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn create_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     benutzer_id: i64,
@@ -742,7 +742,7 @@ pub async fn anlegen_tx(
             "Höchstens {PLANUNGEN_MAX} Planungen je Organisation"
         )));
     }
-    pruefe_bezeichnung_frei_tx(conn, org_id, &e.bezeichnung, None).await?;
+    check_bezeichnung_frei_tx(conn, org_id, &e.bezeichnung, None).await?;
     Ok(sqlx::query_scalar(
         "INSERT INTO planung (org_id, bezeichnung, einsatzart, ort, ort_lat, ort_lon, von, \
             bis, max_dienst_min, min_ruhe_min, angelegt_von) \
@@ -764,7 +764,7 @@ pub async fn anlegen_tx(
 }
 
 /// Ändert den Kopf mit CAS über `version` (409). Ein Zeitraum über die Grenze ist 422.
-pub async fn aendern(
+pub async fn update(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
@@ -781,11 +781,11 @@ pub async fn aendern(
         }
         let bezeichnung = p.bezeichnung.clone().unwrap_or(k.bezeichnung);
         if p.bezeichnung.is_some() {
-            pruefe_bezeichnung_frei_tx(conn, org_id, &bezeichnung, Some(id)).await?;
+            check_bezeichnung_frei_tx(conn, org_id, &bezeichnung, Some(id)).await?;
         }
         let von = p.von.clone().unwrap_or(k.von);
         let bis = p.bis.clone().unwrap_or(k.bis);
-        pruefe_zeitraum(&von, &bis).map_err(als_422)?;
+        check_zeitraum(&von, &bis).map_err(als_422)?;
         let einsatzart = p
             .einsatzart
             .map(|a| a.as_str().to_string())
@@ -819,7 +819,7 @@ pub async fn aendern(
     })
 }
 
-async fn loeschen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
+async fn delete_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     sqlx::query("DELETE FROM planung WHERE id = ?")
         .bind(id)
         .execute(&mut *conn)
@@ -833,10 +833,10 @@ async fn loeschen_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppErro
 }
 
 /// Löscht eine Planung samt Posten, Blöcken und Helfern. Fremd oder unbekannt → 404.
-pub async fn loeschen(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
+pub async fn delete(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
         kopf_tx(conn, org_id, id).await?;
-        loeschen_tx(conn, id).await
+        delete_tx(conn, id).await
     })
 }
 
@@ -866,7 +866,7 @@ pub async fn purge_abgelaufene(
                     .fetch_one(&mut *conn)
                     .await?;
             if noch {
-                loeschen_tx(conn, id).await?;
+                delete_tx(conn, id).await?;
             }
             Ok(noch)
         });
@@ -952,7 +952,7 @@ async fn herkunft_soll_tx(
     ))
 }
 
-async fn pruefe_posten_bezeichnung_tx(
+async fn check_posten_bezeichnung_tx(
     conn: &mut SqliteConnection,
     planung_id: i64,
     bezeichnung: &str,
@@ -976,19 +976,19 @@ async fn pruefe_posten_bezeichnung_tx(
 }
 
 /// Legt einen Posten am Ende der Reihenfolge an. Liefert die Kennung.
-pub async fn posten_anlegen(
+pub async fn create_posten(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,
     e: &PostenEingabe,
 ) -> Result<i64, AppError> {
     write_retry!(pool, |conn| {
-        posten_anlegen_tx(conn, org_id, planung_id, e).await
+        create_posten_tx(conn, org_id, planung_id, e).await
     })
 }
 
-/// [`posten_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn posten_anlegen_tx(
+/// [`create_posten`] in einer offenen Transaktion (auch für den Demo-Import).
+pub async fn create_posten_tx(
     conn: &mut SqliteConnection,
     org_id: i64,
     planung_id: i64,
@@ -1007,7 +1007,7 @@ pub async fn posten_anlegen_tx(
             "Höchstens {POSTEN_MAX} Posten je Planung"
         )));
     }
-    pruefe_posten_bezeichnung_tx(conn, planung_id, &e.bezeichnung, None).await?;
+    check_posten_bezeichnung_tx(conn, planung_id, &e.bezeichnung, None).await?;
     let (vorgabe_anzahl, vorgabe_quali) = herkunft_soll_tx(conn, org_id, e.herkunft).await?;
     let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
     let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
@@ -1039,7 +1039,7 @@ pub async fn posten_anlegen_tx(
 }
 
 /// Ändert einen Posten; bestehende Blöcke behalten ihr Soll (Kopie beim Anlegen).
-pub async fn posten_aendern(
+pub async fn update_posten(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,
@@ -1066,7 +1066,7 @@ pub async fn posten_aendern(
         .ok_or(AppError::NotFound)?;
         let (bezeichnung_alt, abschnitt_alt, laenge_alt, soll_alt, quali_alt) = stand;
         if let Some(b) = &p.bezeichnung {
-            pruefe_posten_bezeichnung_tx(conn, planung_id, b, Some(posten_id)).await?;
+            check_posten_bezeichnung_tx(conn, planung_id, b, Some(posten_id)).await?;
         }
         if let Some(q) = &p.quali_soll {
             crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, q.as_deref()).await?;
@@ -1089,7 +1089,7 @@ pub async fn posten_aendern(
 
 /// Löscht einen Posten samt seinen Blöcken. Haben die Blöcke Personen, nur mit `mit_bloecken`
 /// (422 sonst).
-pub async fn posten_loeschen(
+pub async fn delete_posten(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,
@@ -1172,7 +1172,7 @@ pub async fn reihenfolge(
 // ---------------------------------------------------------------------------------------------
 
 /// Legt einen Block an (Kern `plan_repo::create_block_tx`). Liefert die Kennung.
-pub async fn block_anlegen(
+pub async fn create_block(
     pool: &SqlitePool,
     org_id: i64,
     planung_id: i64,

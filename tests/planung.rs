@@ -1019,7 +1019,7 @@ async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
         personen: vec![lifeline_hub::abloesung::schichtplan::PlanPerson::Einsatz(1)],
         notiz: None,
     };
-    match lifeline_hub::planung::repo::block_anlegen(&pool, org, p, benutzer, &eingabe).await {
+    match lifeline_hub::planung::repo::create_block(&pool, org, p, benutzer, &eingabe).await {
         Err(lifeline_hub::error::AppError::UnprocessableEntity(m)) => {
             assert_eq!(m, "Eine Planung kennt nur Stamm-Personal und Helfer")
         }

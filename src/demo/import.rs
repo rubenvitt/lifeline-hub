@@ -161,7 +161,7 @@ pub async fn importieren_tx(
 
     // 5b. Demo-Planung ohne Einsatz (LLH-1585): sie teilt das eben angelegte Personal ein.
     if let Some(vorlage) = sz.planung {
-        let (angelegt, mitbenutzt) = super::planung::planung_importieren_tx(
+        let (angelegt, mitbenutzt) = super::planung::import_planung_tx(
             conn, org_id, import_id, admin_id, jetzt, vorlage, &stamm,
         )
         .await?;
