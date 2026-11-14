@@ -2,6 +2,13 @@ allowBuilds:
   esbuild: true
   msw: true
 
+# Karenzzeit für frisch veröffentlichte Pakete (LLH-1884): 1440 Minuten = 24 Stunden.
+# Ausdrücklich gesetzt, damit Gate und Cloudflare dieselbe Zahl lesen und ein pnpm-Update die
+# Vorgabe nicht still verschiebt. Geprüft wird sie an jedem PR (scripts/check-karenzzeit.sh,
+# Schritt 6). Nicht senken, um einen roten Lauf grün zu bekommen: der Lauf wird neu gestartet,
+# sobald das Paket alt genug ist.
+minimumReleaseAge: 1440
+
 # Eigene Bibliothek (github.com/rubenvitt/einsatzzeichen, npm per Trusted Publisher/OIDC):
 # die Karenzzeit für frisch veröffentlichte Versionen gilt ihr nicht, weil Hub und Bibliothek
 # im Gleichschritt veröffentlichen (LFH-505). Nur exakte Versionen, keine Scope-Freigabe.
