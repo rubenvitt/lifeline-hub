@@ -77,7 +77,7 @@ den Adapter `planung/planungZeilen.ts`.
 - Wortlaute: „je Einsatz/Planung“, „zu diesem Einsatz/dieser Planung“
 - `MIT_ADHOC`
 
-Dazu zwei Marker `Einsatzplan` und `Vorplanung`. SQL entsteht über `sqlx::AssertSqlSafe(format!(…))` wie in `vorlagendokument::repo`. Eingesetzt werden nur die Konstanten; Werte bleiben gebunden.
+Dazu zwei Marker. `Einsatzplan { einsatz_id }` steht im Einsatz-Repo, `Vorplanung { org_id, planung_id }` im Planungs-Repo. Die Methoden nehmen `&self`; so kennt der Kern keine der beiden Seiten. SQL entsteht über `sqlx::AssertSqlSafe(format!(…))` wie in `vorlagendokument::repo`. Eingesetzt werden nur die Konstanten; Werte bleiben gebunden.
 
 *Alternativen:*
 - Ein Struct mit Feldern als Wert: erlaubt einen Wert zur Laufzeit und damit falsche Kombinationen.
@@ -87,6 +87,8 @@ Dazu zwei Marker `Einsatzplan` und `Vorplanung`. SQL entsteht über `sqlx::Asser
 Den Ort `abloesung/schichtplan/` wählen wir, weil der Einsatz-Schichtplan die führende Seite ist und die Vorplanung schon `pruefung`/`zerlegung` von dort nutzt. Der Name `core` scheidet aus, er überdeckt die Crate.
 
 ### D2 Posten-Spalten und Seiten-Hooks bleiben Methoden der Art
+
+*Umgesetzt (14.11.2026):* Die Posten-SQL steht doch einmal im Kern. Sie läuft über die Konstante `POSTEN_SPALTEN` und die Art-Methoden `bind_posten`, `posten_from_row` und `is_pause`, die Vorlage unten bleibt nur als Skizze stehen. Einfügen, Überschneidung, Update-SQL und das Lesen des Stands gibt es so nur einmal. Die Überschneidungsabfrage vergleicht mit `IS ?` statt `= ?`; für Werte ungleich NULL ist das gleichwertig, denn die Pause kehrt vorher zurück. `PAUSE_OFFEN` prüft `check_update_tx` an der bisherigen Stelle. Das Nachziehen der Ablösung läuft über `after_write_tx`, Personen laden über die Konstanten `PERSONEN` und `UEBER_EINHEIT`. Die Schalter `MIT_ADHOC`/`MIT_IST` sind zu einem zusammengelegt.
 
 Die Posten-Spalten (drei gegen eine) passen nicht in Konstanten. Deshalb trägt der Trait je Art eigene Methoden:
 - `check_posten_tx` → liefert Soll-Vorgabe, Qualifikation und Länge
@@ -133,9 +135,11 @@ Die Request-DTOs sind nur `Deserialize` und liegen nicht im OpenAPI-Schema, desh
 - `PlanungHelferListe` wird `abloesung/schichtplan/HelferListe.tsx` mit Props für Helfer, Blöcke, Lese-/Sperrzustand, API und Cache-Übernahme.
 - Kennung und Herkunft zeigt die Liste nur lesend, wenn vorhanden.
 - Ohne Personal (`helfer: null`) steht ein Sperrhinweis statt der Liste.
-- Im Einsatz öffnet sie über die Werkzeugzeile des Schichtplans (Knopf „Helfer“, Seitenleiste), dieselbe Form wie in der Planung.
+- Im Einsatz steht ein Umschaltknopf „Helfer“ mit Zahl vorn in der Werkzeugzeile. Ist er gedrückt, zeigt der Editor die Helferliste statt Wechsel-Leiste und Raster (Adapterfeld `alternative`); das entspricht dem Reiter der Planung. `data-lfh="schichtplan-helfer"`.
 
 ### D8 LFH-1312 als eigener Commit am Ende
+
+*Stand nach dem Schlankheitspass:* Die Block- und Helferwege beider Repos, `schreibe_personen_tx` und `org_von` gibt es nicht mehr. Die Routen rufen die Kernfunktionen direkt (`create/update/delete_block_tx`, `create/update/delete_helfer_tx`). Umbenannt wird, was danach noch deklariert ist; die Liste unten ist die Ausgangslage.
 
 - Umbenennungen:
   - Rust: `laden→load`, `block_anlegen/aendern/loeschen→create/update/delete_block`, `helfer_*→create/update/delete_helfer`, `pruefe_*_tx→check_*_tx`, `schreibe_personen_tx→write_personen_tx`, `grenzwerte_setzen→update_grenzwerte`, `org_von→load_org_id`, `posten_von→load_posten`.
@@ -161,6 +165,7 @@ Die Request-DTOs sind nur `Deserialize` und liegen nicht im OpenAPI-Schema, desh
   - Meldung beim Erzeugen
   - Ansagen
 - **[Großer Diff]** → Aufgabengruppen sind je für sich grün und als eigene Commits geschnitten.
+- **[Zeilenziel verfehlt]** Ziel war −900 bis −1 100 Zeilen; erreicht sind nach dem Schlankheitspass (von Ruben freigegeben) etwa Backend −362 und Frontend −173 ohne die neue Helferliste. Der Rest liegt in Code, der je Seite bleiben muss: verschiedene Wire-DTOs mit ihrer Abbildung, Posten-Fehlercodes (Internal beim Laden, NotFound beim Schreiben), die Testform `planung::repo::BlockEingabe`, Teilung beim Erzeugen.
 
 ## Migration Plan
 
