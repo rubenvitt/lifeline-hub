@@ -47,7 +47,7 @@ ohne die Änderung rot ist, dann der Code. Pfade ohne Präfix relativ zu `fronte
 ## 7. Integration
 
 - [x] 7.1 Bilder des Anwenderkapitels neu erzeugen (`pnpm doku:bilder --grep einsatztagebuch`) und Design System neu erzeugen, falls ein vorgestellter Baustein geändert wurde (`pnpm design-system`). Nachweis: Bilder im Kapitel zeigen die neue Ansicht, `designSystem.guard.test.ts` grün.
-- [ ] 7.2 `./scripts/check-all.sh --geaendert` grün (in der Cloud-Sitzung ohne `mise`: Frontend-Suite, Typprüfung, Lint, Prettier und die betroffenen e2e-Specs einzeln, Verweis auf die CI des PRs).
+- [x] 7.2 `./scripts/check-all.sh --geaendert` grün (in der Cloud-Sitzung ohne `mise`: Frontend-Suite, Typprüfung, Lint, Prettier und die betroffenen e2e-Specs einzeln, Verweis auf die CI des PRs). Stand 14.11.2026 nach dem Merge von `alpha`: Bündel `schnell` grün, Vitest grün (1247 Dateien), Rust-Suiten `etb*` und `--lib etb` grün, betroffene e2e-Specs in Chromium grün bis auf die Download-Dateinamen (auf `alpha` in der Cloud-Sitzung genauso rot); die volle Rust-Suite sprengt dort den Plattenplatz und läuft in der CI.
 - [x] 7.3 Zeichenflächen des Entwurfs gegen die laufende App nachgestellt (Fükw Nacht und Tag, Tablet, Handschuh, Handy) und Bilder der Änderung aufgenommen.
 
 ## 8. Aus dem Review vor dem PR (13.11.2026)

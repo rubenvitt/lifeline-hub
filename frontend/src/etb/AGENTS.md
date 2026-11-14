@@ -98,7 +98,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `GET …/etb/zaehler`, `etb/repo.rs:filter_bedingung`, Parameter nur über
   `routes/etb.rs:filter_merkmale`; Parität `tests/etb_zaehler.rs`). Ein Bilanz-Paneel gibt es
   nicht mehr (kwc2yszv D7, Spec `etb-zaehler`, Herleitung
-  `openspec/changes/kwc2yszv-etb-neuentwurf/design.md`). Kopf (`kopfMeta`): ohne Filter „112
+  `openspec/changes/archive/2026-11-14-kwc2yszv-etb-neuentwurf/design.md`). Kopf (`kopfMeta`): ohne Filter „112
   Einträge · 300 Systemeinträge ausgeblendet“ (Handeinträge, `handeintraege`; die Zahl der
   ausgeblendeten aus derselben Zählung ohne Ausschluss und ohne Typ), mit Filter „7 Treffer“
   (`gesamt` der gefilterten Zählung); Einzahl bei 1; keine Tagesgrenze. Typ-Segmente
