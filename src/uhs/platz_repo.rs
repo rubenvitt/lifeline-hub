@@ -288,12 +288,19 @@ pub async fn setze_verfuegbarkeit(
 }
 
 /// Soft-Delete eines Platzes; blockt mit `Conflict`, wenn aktuell belegt.
+///
+/// Die Belegung zählt nur für Plätze der UHS im Pfad (LLH-1694): ein fremder Platz endet wie ein
+/// unbelegter mit 404 im Storno, sonst verriete 409 gegen 404 die Belegung fremder Plätze.
 pub async fn storniere(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<(), AppError> {
-    let belegt: Option<i64> =
-        sqlx::query_scalar("SELECT id FROM einsatz_person WHERE aktueller_platz_id = ? LIMIT 1")
-            .bind(id)
-            .fetch_optional(pool)
-            .await?;
+    let belegt: Option<i64> = sqlx::query_scalar(
+        "SELECT ep.id FROM einsatz_person ep \
+         JOIN uhs_platz p ON p.id = ep.aktueller_platz_id \
+         WHERE ep.aktueller_platz_id = ? AND p.uhs_id = ? LIMIT 1",
+    )
+    .bind(id)
+    .bind(uhs_id)
+    .fetch_optional(pool)
+    .await?;
     if belegt.is_some() {
         return Err(AppError::Conflict(
             "Platz ist aktuell belegt — Storno nicht möglich".into(),
@@ -650,6 +657,65 @@ mod tests {
         let err = storniere(&pool, u, p.id).await.unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
         let _ = b;
+    }
+
+    /// LLH-1694: Ein belegter Platz einer anderen UHS antwortet wie ein unbelegter mit 404. Sonst
+    /// verriete der Unterschied 409/404 die Belegung fremder Plätze.
+    #[tokio::test]
+    async fn storniere_fremden_belegten_platz_ist_404_nicht_409() {
+        let pool = test_pool().await;
+        let (b, e, u, _, pb) = setup(&pool).await;
+        let fremd = uhs_repo::anlegen(
+            &pool,
+            e,
+            b,
+            uhs_repo::NeueDaten {
+                lat: None,
+                lon: None,
+                typ: "behandlungsplatz",
+                bezeichnung: "BHP 51",
+                abschnitt_id: None,
+                standort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        let p = anlegen(
+            &pool,
+            fremd.id,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 1",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? WHERE id = ?",
+        )
+        .bind(fremd.id)
+        .bind(p.id)
+        .bind(pb)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let err = storniere(&pool, u, p.id).await.unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "fremder belegter Platz → 404, war {err:?}"
+        );
+        // Der fremde Platz bleibt unberührt.
+        let storniert: Option<String> =
+            sqlx::query_scalar("SELECT storniert_at FROM uhs_platz WHERE id = ?")
+                .bind(p.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(storniert.is_none());
     }
 
     #[tokio::test]
