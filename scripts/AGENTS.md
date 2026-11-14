@@ -112,7 +112,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   „neu starten“ (bei neuem PR-Kopf bleibt er ohne Frist stehen, der PR zeigt den alten Kopf nicht). Abgebrochen hieß am PR rot, und am 14.11.2026 mergte so
   nichts mehr. Jeder Check trägt den gerechneten Ziel-Stand in `external_id`; ist ein Stand auf dem
   Kopf schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen (nicht
-  bei einem Neustart des Laufs; „Kein Ergebnis“ trägt keinen Stand). Der Check entsteht über
+  bei einem Neustart des Laufs; „Kein Ergebnis“ trägt keinen Stand). Herleitung:
+  `openspec/changes/archive/2026-11-14-p4avye3q-ziel-branch-build-ersetzen-buendeln/design.md`. Der Check entsteht über
   die Checks-API, nie als Job-Name (ein übersprungener Job meldete grün). **PR-Code läuft nie in
   einem Lauf auf einem Kanal-Branch** (dessen Cache-Bereich liest der Release-Build; Runtime-Token
   und `sudo` umgehen jedes `save-if`), nur im Job `kompilieren` eines PR- oder Einzellaufs: dort

@@ -18,7 +18,7 @@
 
 ## 4. Gesamtprüfung
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert` ist lokal grün, die volle Suite belegt die CI des PRs.
+- [x] 4.1 `./scripts/check-all.sh` grün: Selbsttests (ziel-branch-build, stau-waechter, ci-stufen) lokal grün, die volle Suite belegt die CI des PRs (Lauf am PR gegen alpha).
 
 ## Workflow follow-up
 
