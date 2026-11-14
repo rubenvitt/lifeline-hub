@@ -103,8 +103,8 @@ async fn block(app: &axum::Router, cookie: &str, e: i64, posten: Value, personen
         "POST",
         &format!("{}/bloecke", plan(e)),
         cookie,
-        Some(&json!({"posten": posten, "von": "2026-11-14 18:00:00",
-                     "bis": "2026-11-14 22:00:00", "personen": personen})),
+        Some(&json!({"posten": posten, "von": "2099-11-14 18:00:00",
+                     "bis": "2099-11-14 22:00:00", "personen": personen})),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{p}");
@@ -225,7 +225,7 @@ async fn uhs_markt_um_1800() {
     let v = vorlage(&app, &admin, e, bid).await;
     assert_eq!(v["art"], "uhs", "{v}");
     assert_eq!(v["uhs"], "Markt");
-    assert_eq!(v["zeitpunkt"], "2026-11-14 18:00:00");
+    assert_eq!(v["zeitpunkt"], "2099-11-14 18:00:00");
     assert_eq!(namen(&v["kommen"]), ["Ben"]);
     assert!(v["kommen"][0]["einsatz_personal_id"].is_null());
     assert_eq!(namen(&v["gehen"]), ["Anna"]);
@@ -237,7 +237,7 @@ async fn uhs_markt_um_1800() {
         &admin,
         e,
         bid,
-        json!({"art": "uhs", "vollzogen_at": "2026-11-14 18:00:00",
+        json!({"art": "uhs", "vollzogen_at": "2099-11-14 18:00:00",
                "kommen": [{"art": "stamm", "personal_id": ben}], "gehen": [anna]}),
     )
     .await;
@@ -460,7 +460,7 @@ async fn pause_zurueck() {
     status_setzen(&app, &admin, e, ben, alarmiert).await;
     let v = vorlage(&app, &admin, e, bid).await;
     assert_eq!(v["art"], "pause_ende");
-    assert_eq!(v["zeitpunkt"], "2026-11-14 22:00:00");
+    assert_eq!(v["zeitpunkt"], "2099-11-14 22:00:00");
     assert_eq!(namen(&v["kommen"]), ["Anna"]);
     assert_eq!(v["kommen"][0]["status_zurueck"], "im Einsatz");
     assert_eq!(namen(&v["uebersprungen"]), ["Ben"]);
@@ -869,7 +869,7 @@ async fn weitergewechselt_behaelt_eintreffen() {
         &format!("{}/bloecke", plan(e)),
         &admin,
         Some(&json!({"posten": {"art": "uhs", "uhs_id": bahnhof},
-                     "von": "2026-11-14 22:00:00", "bis": "2026-11-15 02:00:00",
+                     "von": "2099-11-14 22:00:00", "bis": "2099-11-15 02:00:00",
                      "personen": [{"art": "stamm", "personal_id": ben}]})),
     )
     .await;
@@ -934,7 +934,7 @@ async fn zurueck_an_die_erste_uhs_behaelt_zuordnung() {
         &format!("{}/bloecke", plan(e)),
         &admin,
         Some(&json!({"posten": {"art": "uhs", "uhs_id": bahnhof},
-                     "von": "2026-11-14 22:00:00", "bis": "2026-11-15 02:00:00",
+                     "von": "2099-11-14 22:00:00", "bis": "2099-11-15 02:00:00",
                      "personen": [{"art": "stamm", "personal_id": ben}]})),
     )
     .await;
@@ -963,7 +963,7 @@ async fn zurueck_an_die_erste_uhs_behaelt_zuordnung() {
         &format!("{}/bloecke", plan(e)),
         &admin,
         Some(&json!({"posten": {"art": "uhs", "uhs_id": markt},
-                     "von": "2026-11-15 02:00:00", "bis": "2026-11-15 06:00:00",
+                     "von": "2099-11-15 02:00:00", "bis": "2099-11-15 06:00:00",
                      "personen": [{"art": "stamm", "personal_id": ben}]})),
     )
     .await;
