@@ -7,7 +7,7 @@ gilt_fuer:
   - src/public_api/webhook/**
   - src/routes/anbindungen_webhook.rs
 herleitung:
-  - openspec/changes/archive/2026-11-13-z6ds0ed9-webhooks-outbox/design.md
+  - openspec/changes/archive/2026-11-14-z6ds0ed9-webhooks-outbox/design.md
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---
 

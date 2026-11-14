@@ -136,8 +136,14 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
 
 ## 9. Abschluss
 
-- [ ] 9.1 `./scripts/check-all.sh` grün (bzw. `--geaendert` lokal, voller Lauf in der CI des
+- [x] 9.1 `./scripts/check-all.sh` grün (bzw. `--geaendert` lokal, voller Lauf in der CI des
   PRs). Verifizieren: Ausgabe des Laufs ohne roten Schritt.
+  Stand 14.11.2026 (Cloud-Sitzung, Platte reicht nicht für alle Rust-Testbinaries, keine
+  Browser für Firefox/WebKit): `--geaendert` mit den Schritten 1–3 und 8–16 grün; Rust-Lib-Suite
+  ganz (nach Korrektur von 0350, s. u.), dazu `public_api_webhook`, `enum_wire_kontrakt`,
+  `maschinenzugang`; Vitest ganz (drei Laufzeit-Ausreißer unter Last einzeln grün);
+  Advisories grün. Rust-Integrationstests im Übrigen und e2e laufen in der CI des PRs.
+  Der Lauf fand einen Merge-Bruch: 0350 hätte die Admin-Aktionen aus alpha 0346 gestrichen.
 
 ## Workflow follow-up
 

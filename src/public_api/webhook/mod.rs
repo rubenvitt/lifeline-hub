@@ -1,5 +1,6 @@
 //! Webhooks: signierte Zustellung der Ausgangsereignisse an Fremdsysteme (LLH-1656, Spec
-//! `webhook-zustellung`, Herleitung `openspec/changes/z6ds0ed9-webhooks-outbox/design.md`).
+//! `webhook-zustellung`, Herleitung
+//! `openspec/changes/archive/2026-11-14-z6ds0ed9-webhooks-outbox/design.md`).
 //!
 //! Der zweite Leser der Outbox `maschine_ereignis` (der erste ist der Abruf in
 //! [`super::events`]). **Dieses Modul schreibt nie in die Outbox** (ADR-0038); es liest die Zeilen

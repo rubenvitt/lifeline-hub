@@ -181,7 +181,7 @@ Spec `ereignis-abruf`, Herleitung
 Zweiter Leser der Outbox: `public_api::webhook`
 ([ADR-0046](../docs/architektur/entscheidungen/ADR-0046-webhooks-sind-mit-dem-instanzschluessel-signiert-und-gehen-nur-an-gepruefte-adressen.md),
 Spec `webhook-zustellung`, Herleitung
-`openspec/changes/archive/2026-11-13-z6ds0ed9-webhooks-outbox/design.md`):
+`openspec/changes/archive/2026-11-14-z6ds0ed9-webhooks-outbox/design.md`):
 - **Lesen wie der Abruf:** `events::naechstes` mit den gewählten Arten, geschnitten mit
   `events::sichtbare_arten` des Zugangs. Eine neue Ereignisart braucht deshalb nichts Eigenes für
   Webhooks; sie erscheint in der Auswahl, sobald `EventType` sie kennt (Frontend: `ART_TEXT`,
