@@ -8,6 +8,11 @@
 # Jobs, der auf dem Server `sudo` gerufen hätte. Rot wäre erst der erste echte Lauf geworden, und
 # die übersprungenen e2e-Shards hätten jeden PR gesperrt.
 #
+# Zweite Prüfung: Die Caches für Browser und .deb-Pakete (`ms-playwright`, `apt-playwright`) tragen
+# die Systemversion im Schlüssel (`steps.betriebssystem.outputs.kennung`). Playwright legt den
+# WebKit-Build jeder Ubuntu-Version unter demselben Verzeichnis ab; mit `runner.os` allein bekam das
+# Image ubuntu-26.04 den Build für 24.04, und WebKit startete in keinem Shard (Lauf 43535205929).
+#
 #   ci-schritte.test.sh [workflow-datei]    Vorgabe: .github/workflows/e2e.yml (seit LLH-1662
 #                                           stehen `binaer` und `e2e` dort, nicht in ci.yml)
 set -euo pipefail
@@ -34,8 +39,13 @@ schritte() {
   ' "$DATEI"
 }
 
+# Caches, deren Inhalt zu genau einer Ubuntu-Version gehört.
+SYSTEMCACHE='path: ~/\.cache/(ms|apt)-playwright'
+SYSTEMKENNUNG='steps.betriebssystem.outputs.kennung'
+
 fehler=0
 geprueft=0
+systemcaches=0
 while IFS=$'\037' read -r -d $'\036' job block; do
   if grep -Eq "$GEHOSTET" <<< "$block"; then
     geprueft=$((geprueft + 1))
@@ -47,11 +57,30 @@ while IFS=$'\037' read -r -d $'\036' job block; do
       fehler=1
     fi
   fi
+  if grep -Eq "$SYSTEMCACHE" <<< "$block"; then
+    systemcaches=$((systemcaches + 1))
+    kopf="$(sed -n '1s/^ *- //p' <<< "$block")"
+    while IFS= read -r zeile; do
+      case "$zeile" in
+        *cache-primary-key*) ;;
+        *"$SYSTEMKENNUNG"*) ;;
+        *)
+          echo "ROT  $job: $kopf — Schlüssel ohne Systemversion: ${zeile#"${zeile%%[![:space:]]*}"}" >&2
+          fehler=1
+          ;;
+      esac
+    done < <(grep -E '^[[:space:]]+(key|restore-keys):' <<< "$block")
+  fi
 done < <(schritte)
 
 # Ein Wächter, der nichts findet, prüft nichts: in beiden Jobs gibt es solche Schritte.
 if [ "$geprueft" -lt 5 ]; then
   echo "ROT  nur $geprueft betroffene Schritte gefunden — passt die Zerlegung noch zu $(basename "$DATEI")?" >&2
+  fehler=1
+fi
+# Beide Caches stehen im Job `e2e`; findet die Prüfung sie nicht, prüft sie nichts.
+if [ "$systemcaches" -lt 2 ]; then
+  echo "ROT  nur $systemcaches Caches für Browser und Systempakete gefunden — passt das Muster noch zu $(basename "$DATEI")?" >&2
   fehler=1
 fi
 exit "$fehler"
