@@ -206,6 +206,17 @@ function griffElement(art: 'kante' | 'mitte', kontext: GriffKontext, kennung: st
 }
 
 /**
+ * Griff von der Karte nehmen. maplibre meldet dabei die Zug-Hörer ab, ohne `dragend` zu feuern, und
+ * lässt das `pointer-events: none` aus dem Zug am Element stehen (LLH-1857): wer einen Griff mitten
+ * im Zug abnimmt (Esc verwirft die Mitte), beendet den Zug hier selbst, sonst bliebe der Griff beim
+ * nächsten Anhängen an der alten Zugstelle und ließe sich nicht greifen. `auto` wie maplibres `_onUp`.
+ */
+function haengeAb(m: maplibregl.Marker): void {
+  m.remove();
+  m.getElement().style.pointerEvents = 'auto';
+}
+
+/**
  * Der Radius-Griff (D6): ein ziehbarer `maplibregl.Marker` wie die Bild-Griffe (`bildHandles.ts`),
  * Ziel mindestens 44 px. Ziehen meldet den Radius laufend (`fertig = false`) und am Ende einmal mit
  * `fertig = true`. Die Karte bleibt außerhalb des Griffs verschiebbar.
@@ -266,8 +277,9 @@ export function erzeugeKreisGriff(
   const setMitte = () => {
     const steht = onMitte != null && mittenGriffSteht(mitte, radius);
     if (!steht || !mitte) {
-      if (mitteDran) mittenMarker.remove();
+      if (mitteDran) haengeAb(mittenMarker);
       mitteDran = false;
+      mitteZiehend = false;
       return;
     }
     if (!mitteZiehend) mittenMarker.setLngLat([mitte.lon, mitte.lat]);
@@ -284,8 +296,9 @@ export function erzeugeKreisGriff(
       radius = radiusM;
       setMitte();
       if (!m) {
-        if (dran) marker.remove();
+        if (dran) haengeAb(marker);
         dran = false;
+        ziehend = false;
         return;
       }
       // Ergibt die Lage des Griffs schon den Radius, hat ihn ein Zug dorthin gelegt: er bleibt
