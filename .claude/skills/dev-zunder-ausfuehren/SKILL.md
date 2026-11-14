@@ -284,12 +284,14 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   „Merge nachtragen“ oben). Abweichen nur, wenn der User im
   laufenden Task ausdrücklich etwas anderes sagt.
 - **Vor dem PR lokal testen** (LLH-1889, Regel: `scripts/AGENTS.md`, „Leichte PR-Prüfung“): Im PR
-  prüft die CI nur leicht (Schnellprüfungen, Migrationsnummern, Baut mit Ziel-Branch), die Suiten
+  prüft die CI nur leicht (Schnellprüfungen, Migrations- und ADR-Nummern, Baut mit Ziel-Branch), die Suiten
   laufen erst auf `alpha`. Deshalb fährst du vor dem PR `./scripts/check-all.sh --geaendert
   --ohne-e2e` (die Suiten, die dein Diff berührt, ohne e2e) und nennst das Ergebnis im PR unter
   „Geprüft“. Ist die Änderung riskant (UI-Abläufe, Backend-Verhalten, CI) und soll vor dem Merge
   auch e2e laufen, setzt du am eigenen PR das Label `voll`: dann fährt die CI alle Suiten, ohne
-  Pflicht. Das frühere Label `e2e` bedeutet nichts mehr.
+  Pflicht. Das frühere Label `e2e` bedeutet nichts mehr. Ist ein Lauf auf `alpha` rot und willst
+  du einen Job neu starten, nur am jüngsten Lauf: der Neustart eines älteren bricht die Tests des
+  jüngeren ab.
 - **„Baut mit Ziel-Branch“ rot** (Pflicht-Check an fertigen PRs, also mit Auto-Merge an, LLH-1849): Zusammen mit dem
   aktuellen `alpha` kompiliert der PR nicht, meist weil ein inzwischen gemergter PR etwas
   geändert hat, das dein PR noch alt benutzt. `alpha` in den Branch mergen (kein Rebase),

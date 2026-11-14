@@ -3,18 +3,18 @@
 ## ADDED Requirements
 
 ### Requirement: Ein PR prüft nur leicht
-Ein Push auf einen offenen Pull Request gegen `alpha`, `beta` oder `main` MUST die Schnellprüfungen starten. Ohne das Label `voll` MUST er weder die Rust-, die Frontend- noch die e2e-Suite starten. Pflicht für das Mergen MUST nur sein: `Schnellprüfungen`, `Migrationsnummern` und `Baut mit Ziel-Branch`.
+Ein Push auf einen offenen Pull Request gegen `alpha`, `beta` oder `main` MUST die Schnellprüfungen starten. Ohne das Label `voll` MUST er weder die Rust-, die Frontend- noch die e2e-Suite starten. Pflicht für das Mergen MUST nur sein: `Schnellprüfungen`, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch`.
 
 #### Scenario: PR ohne Label
 - **WHEN** auf einen PR ohne Label `voll` ein Commit gepusht wird, der Backend- und Frontend-Code ändert
 - **THEN** laufen die Schnellprüfungen, und kein Job fährt die Rust-, Frontend- oder e2e-Suite
 
 #### Scenario: Mergebar ohne Suiten
-- **WHEN** an einem PR mit Auto-Merge `Schnellprüfungen`, `Migrationsnummern` und `Baut mit Ziel-Branch` grün sind
+- **WHEN** an einem PR mit Auto-Merge `Schnellprüfungen`, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch` grün sind
 - **THEN** ist er mergebar, ohne dass eine schwere Suite auf ihm lief
 
 ### Requirement: Das Label `voll` fährt alle Suiten im PR
-Trägt ein PR das Label `voll`, MUST jeder Push auf ihn und das Setzen des Labels die Rust-, Frontend- und e2e-Suite ganz starten, ohne Auswahl nach geänderten Dateien. Ihre Ergebnisse MUST NOT Pflicht für das Mergen sein. Ein anderes Label MUST keine schwere Suite starten.
+Trägt ein PR das Label `voll`, MUST jeder Push auf ihn und das Setzen des Labels die Rust-, Frontend- und e2e-Suite ganz starten, ohne Auswahl nach geänderten Dateien. Ihre Ergebnisse MUST NOT Pflicht für das Mergen sein. Ein anderes Label MUST keine schwere Suite starten und keinen laufenden Lauf abbrechen.
 
 #### Scenario: Label gesetzt
 - **WHEN** ein PR das Label `voll` bekommt
@@ -25,8 +25,8 @@ Trägt ein PR das Label `voll`, MUST jeder Push auf ihn und das Setzen des Label
 - **THEN** ist der PR trotzdem mergebar, und die rote Suite steht sichtbar am PR
 
 #### Scenario: Anderes Label
-- **WHEN** ein PR ein anderes Label als `voll` bekommt
-- **THEN** startet keine schwere Suite
+- **WHEN** ein PR ein anderes Label als `voll` bekommt, auch während seine Suiten wegen `voll` laufen
+- **THEN** startet keine schwere Suite neu, und ein laufender Lauf läuft weiter
 
 ### Requirement: Ein PR ist fertig, wenn Auto-Merge an ist
 Ein offener PR MUST als fertig gelten, solange Auto-Merge eingeschaltet ist. Labels, Kommentare und Reviews MUST daran nichts ändern.

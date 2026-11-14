@@ -43,7 +43,7 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
 
 ## Geprüft
 
-<!-- Im PR prüft die CI nur leicht (Schnellprüfungen, Migrationsnummern, Baut mit
+<!-- Im PR prüft die CI nur leicht (Schnellprüfungen, Migrations- und ADR-Nummern, Baut mit
      Ziel-Branch); die Suiten laufen auf alpha. Der lokale Lauf ist die Untergrenze, nicht der
      Nachweis. Was wurde GEMESSEN statt angenommen? Bei UI-Änderungen: welcher Klickweg, welche
      Dichtestufe, welcher Browser? Riskanter Umbau: Label `voll` setzen. -->

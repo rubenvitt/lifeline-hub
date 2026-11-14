@@ -455,7 +455,7 @@ $lage
 
 Damit nicht mehrere Sitzungen denselben Fix bauen, ist genau ein PR beauftragt, und das ist dieser:
 
-1. Liegt der Fehler nicht im Code (Ausfall, wackliger Test), den fehlgeschlagenen Job neu starten. Ein grüner Lauf beendet den Befund.
+1. Liegt der Fehler nicht im Code (Ausfall, wackliger Test), den fehlgeschlagenen Job neu starten, aber nur am jüngsten Lauf auf \`alpha\`: der Neustart eines älteren bräche die Tests des jüngeren ab. Liegt schon ein neuerer Lauf vor, dessen Ergebnis abwarten. Ein grüner Lauf beendet den Befund.
 2. Sonst **sofort** einen PR von \`alpha\` mit dem Label \`$ALPHA_LABEL\` öffnen (als Entwurf genügt), nicht in diesem PR reparieren. Das Label belegt den Fix: die übrigen PRs erkennen ihn daran, und der Auftrag wandert nicht weiter. Erst dann den Fix bauen und abstimmen.
 
 Gibt es eine volle Stunde nach diesem Auftrag keinen PR mit dem Label, geht der Auftrag an den nächsten offenen PR." ;;

@@ -68,17 +68,22 @@ job_gruppe() { # <datei> <id>
   '
 }
 
-# Bedingung der schweren Jobs: Push auf einen Kanal-Branch oder Label `voll`.
-VOLL="github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll')"
+# Bedingung der schweren Jobs: Push auf einen Kanal-Branch oder Label `voll`, aber nicht bei einem
+# fremden Label an einem PR mit `voll` (das startete sonst alle Suiten neu, Review LLH-1889).
+VOLL="github.event_name == 'push' || (contains(github.event.pull_request.labels.*.name, 'voll') && (github.event.action != 'labeled' || github.event.label.name == 'voll'))"
+# Kopf ohne Kommentarzeilen: ein gleichlautender Kommentar darf keinen Schlüssel vortäuschen.
+kopf_code() { kopf "$1" | grep -Ev '^[[:space:]]*#'; }
 # Auf einem Kanal-Branch eine Gruppe je Branch, im PR je Lauf.
 JE_BRANCH="\${{ github.event_name == 'push' && github.ref || github.run_id }}"
 
 echo "==> ci-stufen: ci.yml, Kopf"
-k="$(kopf "$CI")"
+k="$(kopf_code "$CI")"
 pruefe "PR-Lauf hört auf labeled (Label voll)" enthaelt "$k" "types: [opened, synchronize, reopened, labeled]"
 pruefe "kein Start auf Auto-Merge" fehlt "$k" "auto_merge"
-pruefe "Workflow-Gruppe: im PR je Ref, sonst je Lauf" \
-  enthaelt "$k" "group: ci-\${{ github.event_name == 'pull_request' && github.ref || github.run_id }}"
+# Ein fremdes Label läuft in einer eigenen Gruppe: es bricht keinen laufenden Lauf ab (auch nicht die
+# Suiten eines `voll`-Laufs) und startet nur die Schnellprüfungen; Dependabot setzt mehrere Labels.
+pruefe "Workflow-Gruppe: im PR je Ref, bei Push und fremdem Label je Lauf" \
+  enthaelt "$k" "group: ci-\${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name != 'voll') && github.ref || github.run_id }}"
 pruefe "Workflow-Abbruch nur im PR" enthaelt "$k" "cancel-in-progress: \${{ github.event_name == 'pull_request' }}"
 
 echo "==> ci-stufen: ci.yml, Jobs"
@@ -112,9 +117,9 @@ pruefe "release: eigene Gruppe je Branch ohne Abbruch" \
   gleich "$(job_gruppe "$CI" release)" "release-\${{ github.ref }}|false"
 
 echo "==> ci-stufen: e2e.yml"
-ke="$(kopf "$E2E")"
 pruefe "e2e.yml startet nur als Aufruf" gleich "$(awk '/^on:/ { im = 1; next } im && /^[^ ]/ { exit } im { print }' "$E2E")" "workflow_call:"
-pruefe "e2e.yml hat keine eigene Nebenläufigkeit (die steuert der Aufrufer)" fehlt "$ke" "concurrency:"
+pruefe "e2e.yml hat keine eigene Nebenläufigkeit, auch an keinem Job (die steuert der Aufrufer)" \
+  fehlt "$(grep -Ev '^[[:space:]]*#' "$E2E")" "concurrency:"
 pruefe "e2e.yml kennt das Label e2e nicht mehr" fehlt "$(grep -Ev '^[[:space:]]*#' "$E2E")" "'e2e'"
 pruefe "Binary heißt e2e-Binary" enthaelt "$(job "$E2E" binaer)" "name: e2e-Binary"
 pruefe "Anteile heißen e2e k/4" enthaelt "$(job "$E2E" e2e)" "name: e2e \${{ matrix.shard }}/4"

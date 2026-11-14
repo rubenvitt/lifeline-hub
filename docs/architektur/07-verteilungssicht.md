@@ -162,7 +162,7 @@ flowchart LR
 ```
 
 Im PR prüft `ci.yml` jeden Push mit den Schnellprüfungen. Pflicht sind daneben nur
-`Migrationsnummern` (`migrationen.yml`) und `Baut mit Ziel-Branch` (`ziel-branch-build.yml`), das an
+`Migrationsnummern` und `ADR-Nummern` (`migrationen.yml`) und `Baut mit Ziel-Branch` (`ziel-branch-build.yml`), das an
 jedem PR mit eingeschaltetem Auto-Merge rechnet. Rust-, Frontend- und e2e-Suite fährt ein PR nur
 mit dem Label `voll`, ohne Pflicht. Auf `alpha`, `beta` und `main` läuft `ci.yml` bei jedem Push
 voll und ruft `e2e.yml` auf; ein neuer Push bricht die Testjobs des älteren Laufs ab, ein

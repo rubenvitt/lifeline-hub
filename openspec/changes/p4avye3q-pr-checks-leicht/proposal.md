@@ -6,7 +6,7 @@ Am 14.11.2026 trug ein einzelner PR 42 Check-Einträge. Jeder fertige PR fuhr Ru
 
 ## What Changes
 
-- **BREAKING (Ruleset):** Ein PR trägt als Pflicht nur noch `Schnellprüfungen`, `Migrationsnummern` und `Baut mit Ziel-Branch`. `Rust-Suite`, `Frontend-Suite 1/4`–`4/4`, `e2e-Binary` und `e2e 1/4`–`4/4` laufen im PR nicht mehr. Ruben trägt sie unmittelbar vor dem Merge aus dem Ruleset 17017911 aus.
+- **BREAKING (Ruleset):** Ein PR trägt als Pflicht nur noch `Schnellprüfungen`, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch`. `Rust-Suite`, `Frontend-Suite 1/4`–`4/4`, `e2e-Binary` und `e2e 1/4`–`4/4` laufen im PR nicht mehr. Ruben trägt sie unmittelbar vor dem Merge aus dem Ruleset 17017911 aus.
 - **Label `voll`:** Ein PR mit dem Label `voll` fährt alle Suiten ganz (Rust, Frontend, e2e), ohne Pflicht. Das Label `e2e` und die „zweite Stufe“ (LLH-1662) entfallen.
 - **Fertig heißt Auto-Merge an:** „Baut mit Ziel-Branch“ rechnet nur noch an PRs mit eingeschaltetem Auto-Merge. Labels zählen nicht.
 - **Kanal-Branches prüfen voll und brechen ab:** Ein Push auf `alpha`, `beta` oder `main` fährt alle Suiten. Ein neuer Push bricht die Testjobs des laufenden Laufs ab, der jüngste Lauf deckt alle früheren mit ab. Ein Release, der schon läuft, bricht nie ab. Ein Release entsteht nur aus einem Lauf, dessen Tests alle grün sind.

@@ -591,6 +591,7 @@ fi
 
 if [ "$AUSWAHL" = 1 ]; then
   echo "Schritte: $lauf"
+  [ "$OHNE_E2E" = 1 ] && echo "Ohne e2e: Schritt 7 ausgelassen (läuft auf alpha oder im PR mit Label voll)."
   exit 0
 fi
 
@@ -602,9 +603,12 @@ gesamt=0
 schritte_bericht || gesamt=$?
 if [ "$NUR" != alle ]; then
   echo "    Bündel '$NUR' (Schritte: $lauf von $SCHRITTE) ist ein TEILSTÜCK."
-  echo "    Vor dem Merge gilt der volle Lauf ohne --nur."
+  echo "    Der volle Lauf ist der ohne --nur; vor dem PR genügt --geaendert --ohne-e2e."
 elif [ -n "$GEAENDERT" ]; then
-  ohne=""; [ "$OHNE_E2E" = 1 ] && ohne=", ohne e2e"
-  echo "    Nach Bereichen seit $GEAENDERT (Schritte: $lauf von $SCHRITTE)$ohne."
+  echo "    Nach Bereichen seit $GEAENDERT (Schritte: $lauf von $SCHRITTE)."
+fi
+# Ein Lauf ohne e2e ist nie der volle, auch ohne --geaendert (Review LLH-1889).
+if [ "$OHNE_E2E" = 1 ]; then
+  echo "    Ohne e2e: Schritt 7 ausgelassen. Kein voller Lauf; e2e läuft auf alpha oder im PR mit Label 'voll'."
 fi
 exit "$gesamt"

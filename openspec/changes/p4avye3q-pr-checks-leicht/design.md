@@ -13,7 +13,7 @@ Den Anlass beschreibt proposal.md. Heute (Herleitung `openspec/changes/archive/2
 ## Goals / Non-Goals
 
 **Goals:**
-- Ein PR ohne Label kostet Schnellprüfungen, `Migrationsnummern` und `Baut mit Ziel-Branch`, sonst nichts.
+- Ein PR ohne Label kostet Schnellprüfungen, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch`, sonst nichts.
 - Auf Kanal-Branches bricht ein neuer Push die Tests des laufenden Laufs ab, ein laufender Release bricht nie ab.
 - Weniger bewegliche Teile: keine Auswahl nach Bereichen mehr in der CI, keine zweite Stufe.
 
@@ -27,7 +27,7 @@ Den Anlass beschreibt proposal.md. Heute (Herleitung `openspec/changes/archive/2
 **D1 Die schweren Jobs bleiben in `ci.yml` und bekommen ein Job-`if`: Push oder Label `voll`.** Seit sie keine Pflicht mehr sind, ist ein übersprungener Job unschädlich. Im PR stehen dann `Schnellprüfungen` und wenige übersprungene Einträge, keine Läufe.
 - *Alternative: eigener Workflow `voll.yml` mit wiederverwendbaren Suiten.* Bringt einen Verschiebe-Umbau mit sich und neue Check-Namen. Verworfen, der Gewinn wäre nur weniger übersprungene Einträge.
 
-**D2 `ci.yml` hört im PR auch auf `labeled`.** Bei jedem Label-Ereignis laufen die Schnellprüfungen neu, die schweren Jobs nur bei `voll`. Die Schnellprüfungen dürfen bei einem fremden Label nicht übersprungen werden: Ein übersprungener jüngster Check zählt als grün, auch über einem roten (Kopf von `e2e.yml`, heute). Ein fremdes Label kostet deshalb einen Schnelllauf von etwa 2 Minuten, und das ist hinnehmbar.
+**D2 `ci.yml` hört im PR auch auf `labeled`.** Bei jedem Label-Ereignis laufen die Schnellprüfungen neu, die schweren Jobs nur, wenn das gesetzte Label `voll` ist. Ein fremdes Label läuft in einer eigenen Gruppe (je Lauf) und bricht so keinen laufenden Lauf ab, auch nicht die Suiten eines `voll`-Laufs (Review). Das zählt auch für Dependabot, das mehrere Labels nacheinander setzt. Die Schnellprüfungen dürfen bei einem fremden Label nicht übersprungen werden: Ein übersprungener jüngster Check zählt als grün, auch über einem roten (Kopf von `e2e.yml`, heute). Ein fremdes Label kostet deshalb einen Schnelllauf von etwa 2 Minuten, und das ist hinnehmbar.
 
 **D3 Abbruch auf Kanal-Branches über Concurrency auf Job-Ebene.**
 - *Workflow-Ebene:* PR-Läufe teilen sich wie bisher eine Gruppe je Ref mit Abbruch. Ein Push-Lauf bekommt eine eigene Gruppe je Lauf, also keinen Abbruch auf Workflow-Ebene.
@@ -53,7 +53,7 @@ Den Anlass beschreibt proposal.md. Heute (Herleitung `openspec/changes/archive/2
 - Bei „alpha rot“ ist ein Lauf mit `conclusion = cancelled` schon heute „unklar“ und wird übersprungen. Der Selbsttest hält das ausdrücklich fest.
 
 **D8 Lokal vor dem PR.**
-- `check-all.sh` bekommt `--ohne-e2e`. Es nimmt den e2e-Schritt aus jeder Auswahl, auch aus `--geaendert`, und meldet ihn als übersprungen.
+- `check-all.sh` bekommt `--ohne-e2e`. Es nimmt den e2e-Schritt aus jeder Auswahl, auch aus `--geaendert`. `--auswahl` und die Schlusszeile sagen ausdrücklich „ohne e2e, kein voller Lauf“.
 - Der Skill `dev-zunder-ausfuehren` verlangt vor dem PR `./scripts/check-all.sh --geaendert --ohne-e2e`. Das Label `voll` nennt er für riskante Änderungen. Die PR-Vorlage zieht nach.
 
 **D9 Architektur.**
@@ -76,12 +76,13 @@ Den Anlass beschreibt proposal.md. Heute (Herleitung `openspec/changes/archive/2
   - Ändert Ruben das Ruleset zu früh, mergen PRs nach dem alten Workflow ohne Suiten. Das wäre harmlos, weil die Suiten auf `alpha` nachlaufen.
   - Ändert er es zu spät, hängen nach dem Merge alle PRs auf „Expected“ für die Suiten. Deshalb steht der Handgriff im PR als Merge-Bedingung.
 - **[Abgebrochene Läufe auf `alpha` zeigen in der Commit-Liste ein rotes Kreuz.]** Gewollt. Grün auf `alpha` heißt: Der jüngste vollständige Lauf ist grün.
+- **[Ein Neustart eines älteren Laufs bricht die Tests des jüngeren ab]** (Review). Ein neu gestarteter Job tritt in dieselbe Gruppe. Regel in `scripts/AGENTS.md`, im Skill und im Auftrag „alpha rot“: neu starten nur den jüngsten Lauf.
 - **[Ein PR mit `voll` und roter Suite ist mergebar.]** Gewollt (keine Pflicht). Die Suite steht sichtbar am PR.
 
 ## Migration Plan
 
 1. #1380 umsetzen, Review, archivieren.
-2. Ruben trägt im Ruleset 17017911 aus: `Rust-Suite`, `Frontend-Suite 1/4`–`4/4`, `e2e-Binary`, `e2e 1/4`–`4/4`. Pflicht bleiben `Schnellprüfungen`, `Migrationsnummern`, `Baut mit Ziel-Branch` und `ADR-Nummern` (unverändert).
+2. Ruben legt das Label `voll` an (es gibt es noch nicht) und löscht das Label `e2e`. Danach trägt er im Ruleset 17017911 aus: `Rust-Suite`, `Frontend-Suite 1/4`–`4/4`, `e2e-Binary`, `e2e 1/4`–`4/4`. Pflicht bleiben `Schnellprüfungen`, `Migrationsnummern`, `Baut mit Ziel-Branch` und `ADR-Nummern` (unverändert).
 3. Unmittelbar danach #1380 mergen. PR-Läufe lesen den Workflow aus dem Merge-Ref und gehen beim nächsten Ereignis auf den neuen Ablauf über. Ein Einzellauf von `Baut mit Ziel-Branch` liest ihn bis zum Hineinmergen von `alpha` vom PR-Branch.
 4. Beobachten: zwei Merges kurz hintereinander auf `alpha` (siehe Risiken).
 5. Zurückrollen: den Merge-Commit zurücknehmen und das Ruleset wiederherstellen (Liste oben).

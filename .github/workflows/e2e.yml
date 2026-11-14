@@ -4,7 +4,7 @@
 # ihn bei jedem Push auf `alpha`, `beta`, `main` und an einem PR mit dem Label `voll` auf
 # (`workflow_call`, `github.event_name` ist das Ereignis des Aufrufers). Die Checks heißen dann
 # `e2e / e2e-Binary`, `e2e / e2e 1/4` usw. Pflicht im Ruleset sind sie nicht: Im PR laufen nur
-# die Schnellprüfungen, `Migrationsnummern` und `Baut mit Ziel-Branch` (scripts/AGENTS.md,
+# die Schnellprüfungen, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch` (scripts/AGENTS.md,
 # „Leichte PR-Prüfung“). Die frühere zweite Stufe an fertigen PRs (LLH-1662, ADR-0026) ist
 # ersetzt; mit ihr fielen die Auslöser am PR, die Gruppenlogik und der Matrix-Trick weg, der
 # Pflicht-Checks fehlen ließ.

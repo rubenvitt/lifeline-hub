@@ -48,11 +48,11 @@
   - Kästchen „check-all.sh grün“ gilt mit dem lokalen Lauf als belegt
   - „Baut mit Ziel-Branch rot“ unverändert
   - Belegt durch einen grep, der das Label `e2e` und „Zwei Stufen“ unter `.claude/` nicht mehr findet.
-- [x] 5.3 Neue ADR (nächste freie Nummer über `origin/alpha`, `scripts/check-adr-nummern.sh`) „Ein PR prüft leicht, die Suiten laufen auf den Kanal-Branches“ mit `ersetzt: ADR-0026` und Prüfblock. ADR-0026 auf `status: ersetzt`, `ersetzt_durch`. ADR-0025 bekommt Pfadnachzüge in `gilt_fuer`/Prüfung. `docs/architektur/07-verteilungssicht.md` mit Diagramm, Text und `Stand`. Architektur-Wächter in `check-all.sh --nur schnell` grün.
+- [x] 5.3 Neue ADR (nächste freie Nummer über `origin/alpha`, `scripts/check-adr-nummern.sh`) „Ein PR prüft leicht, die Suiten laufen auf den Kanal-Branches“ mit `ersetzt: ADR-0026` und Prüfblock. ADR-0026 auf `status: ersetzt`, `ersetzt_durch`. ADR-0025 bleibt unverändert (Job-Id `aenderungen` bleibt in `e2e.yml`). `docs/architektur/07-verteilungssicht.md` mit Diagramm, Text und `Stand`. Architektur-Wächter in `check-all.sh --nur schnell` grün.
 
 ## 6. Gesamtprüfung
 
-- [ ] 6.1 `./scripts/check-all.sh --nur schnell` lokal grün (enthält alle Selbsttests der Gate-Skripte und den Architektur-Wächter). Ein grep über das Repo (ohne Archive) findet kein `ci-auswahl`, kein `nur-umnummeriert`, kein Label `e2e` als „fertig“ und keine „zweite Stufe“ mehr.
+- [ ] 6.1 `./scripts/check-all.sh --nur schnell` lokal grün (enthält alle Selbsttests der Gate-Skripte und den Architektur-Wächter). Ein grep über das Repo (ohne Archive) findet `ci-auswahl`, `nur-umnummeriert`, das Label `e2e` als „fertig“ und die „zweite Stufe“ nur noch als Rückblick (ADR-0026, Kopfkommentare mit „früher“), nicht als geltende Regel.
 
 ## Workflow follow-up
 

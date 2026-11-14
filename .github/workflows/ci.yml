@@ -8,7 +8,7 @@
 #
 # LEICHTE PR-PRÜFUNG (LLH-1889, ADR „Ein PR prüft leicht“, ersetzt die zwei Stufen von LLH-1662):
 # Im PR läuft nur der Job `schnell`. Pflicht im Ruleset 17017911 sind `Schnellprüfungen`,
-# `Migrationsnummern` (migrationen.yml) und `Baut mit Ziel-Branch` (ziel-branch-build.yml), sonst
+# `Migrationsnummern` und `ADR-Nummern` (migrationen.yml) und `Baut mit Ziel-Branch` (ziel-branch-build.yml), sonst
 # nichts. Rust-, Frontend- und e2e-Suite laufen bei jedem Push auf `alpha`, `beta`, `main` voll und
 # im PR nur mit dem Label `voll`, dort ohne Pflicht. Lokal fährt ein Agent vor dem PR
 # `check-all.sh --geaendert --ohne-e2e`. Eine Auswahl nach geänderten Dateien gibt es in der CI
@@ -16,7 +16,8 @@
 #
 # LABEL-EREIGNISSE: Der PR-Lauf hört auf `labeled`, damit `voll` sofort startet. Die
 # Schnellprüfungen laufen dabei bei JEDEM Label neu, nie übersprungen: ein übersprungener
-# jüngster Check zählte als grün, auch über einem roten.
+# jüngster Check zählte als grün, auch über einem roten. Ein fremdes Label startet keine Suite
+# und bricht keinen Lauf ab (eigene Gruppe, s. `concurrency`).
 #
 # ABBRUCH AUF KANAL-BRANCHES (LLH-1889): Ein neuer Push bricht die Testjobs des laufenden Laufs
 # ab, der jüngste Lauf deckt alle früheren mit ab. Das geschieht über Concurrency AUF JOB-EBENE
@@ -58,9 +59,11 @@ permissions:
 
 # Im PR eine Gruppe je Ref mit Abbruch. Auf einem Kanal-Branch eine Gruppe je Lauf: dort bricht
 # nicht der Workflow ab, sondern die Testjobs über ihre eigene Gruppe (s. Kopf), sonst träfe es
-# den Release mit.
+# den Release mit. Ein fremdes Label (nicht `voll`) läuft ebenfalls je Lauf: es bricht keinen
+# laufenden Lauf ab, auch nicht die Suiten eines `voll`-Laufs, und fährt nur die Schnellprüfungen
+# (Dependabot setzt mehrere Labels nacheinander).
 concurrency:
-  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  group: ci-${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name != 'voll') && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -150,7 +153,7 @@ jobs:
   rust:
     name: Rust-Suite
     # Bei Push auf einen Kanal-Branch und im PR mit Label `voll` (s. Kopf).
-    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll') }}
+    if: ${{ github.event_name == 'push' || (contains(github.event.pull_request.labels.*.name, 'voll') && (github.event.action != 'labeled' || github.event.label.name == 'voll')) }}
     # Auf einem Kanal-Branch bricht ein neuer Push diesen Job ab (s. Kopf); im PR je Lauf.
     concurrency:
       group: ci-rust-${{ github.event_name == 'push' && github.ref || github.run_id }}
@@ -197,7 +200,7 @@ jobs:
   # ── Frontend-Suite, auf vier Runner geteilt ─────────────────────────────────────────
   frontend:
     name: Frontend-Suite ${{ matrix.shard }}/4
-    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll') }}
+    if: ${{ github.event_name == 'push' || (contains(github.event.pull_request.labels.*.name, 'voll') && (github.event.action != 'labeled' || github.event.label.name == 'voll')) }}
     # Je Anteil eine Gruppe, sonst liefen die vier Anteile nacheinander.
     concurrency:
       group: ci-frontend-${{ matrix.shard }}-${{ github.event_name == 'push' && github.ref || github.run_id }}
@@ -248,7 +251,7 @@ jobs:
   # `e2e.yml`.
   e2e:
     name: e2e
-    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll') }}
+    if: ${{ github.event_name == 'push' || (contains(github.event.pull_request.labels.*.name, 'voll') && (github.event.action != 'labeled' || github.event.label.name == 'voll')) }}
     concurrency:
       group: ci-e2e-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: true
@@ -265,7 +268,7 @@ jobs:
     name: Testberichte zusammenführen
     needs: frontend
     # Ein Bericht über null Teilläufe hilft niemandem.
-    if: ${{ !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll')) }}
+    if: ${{ !cancelled() && (github.event_name == 'push' || (contains(github.event.pull_request.labels.*.name, 'voll') && (github.event.action != 'labeled' || github.event.label.name == 'voll'))) }}
     concurrency:
       group: ci-berichte-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: true

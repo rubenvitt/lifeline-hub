@@ -15,7 +15,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
 - **Leichte PR-Prüfung** (LLH-1889, ADR-0047; ersetzt die zwei Stufen von LLH-1662):
   - **Im PR** läuft nur der Job `schnell` aus `ci.yml`. Pflicht im Ruleset 17017911 sind
     `Schnellprüfungen`, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch`, sonst
-    nichts. Rust-, Frontend- und e2e-Suite laufen im PR nur mit dem **Label `voll`**, dann ganz
+    nichts. Ein fremdes Label startet nur die Schnellprüfungen neu, in eigener Gruppe, ohne einen
+    laufenden Lauf abzubrechen. Rust-, Frontend- und e2e-Suite laufen im PR nur mit dem **Label `voll`**, dann ganz
     und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label
     `e2e` bedeutet nichts mehr. „Fertig“ heißt Auto-Merge an (für „Baut mit Ziel-Branch“).
   - **Vor dem PR lokal:** `./scripts/check-all.sh --geaendert --ohne-e2e`. `scripts/bereiche.sh`
@@ -28,7 +29,9 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     `berichte`), der jüngste Lauf deckt alle früheren mit ab. Der **Release** hat eine eigene
     Gruppe ohne Abbruch: ein laufender Release endet nie mittendrin (Tag ohne Release), und ein
     Lauf mit abgebrochenen oder roten Tests released nicht (`needs`). Nie
-    `cancel-in-progress` für den ganzen Workflow auf einem Kanal-Branch.
+    `cancel-in-progress` für den ganzen Workflow auf einem Kanal-Branch. **Neu starten nur den
+    jüngsten Lauf** eines Kanal-Branches: ein neu gestarteter Job eines älteren Laufs tritt in
+    dieselbe Gruppe und bricht die Tests des jüngeren ab.
   - **Label-Ereignisse:** `ci.yml` hört im PR auf `labeled`; die Schnellprüfungen laufen dabei
     immer neu, nie übersprungen (ein übersprungener jüngster Check zählte grün). Auto-Merge-
     Ereignisse gehören nicht nach `ci.yml`.
