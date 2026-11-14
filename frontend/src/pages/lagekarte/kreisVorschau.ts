@@ -207,13 +207,17 @@ function griffElement(art: 'kante' | 'mitte', kontext: GriffKontext, kennung: st
 
 /**
  * Griff von der Karte nehmen. maplibre meldet dabei die Zug-Hörer ab, ohne `dragend` zu feuern, und
- * lässt das `pointer-events: none` aus dem Zug am Element stehen (LLH-1857): wer einen Griff mitten
- * im Zug abnimmt (Esc verwirft die Mitte), beendet den Zug hier selbst, sonst bliebe der Griff beim
- * nächsten Anhängen an der alten Zugstelle und ließe sich nicht greifen. `auto` wie maplibres `_onUp`.
+ * lässt den Zug stehen: `pointer-events: none` am Element und die Zugmerker `_isDragging`/`_state`
+ * (LLH-1857). Wer einen Griff mitten im Zug abnimmt (Esc verwirft die Mitte), beendet den Zug hier
+ * selbst, wie maplibres `_onUp`. Sonst ließe sich der Griff nach dem nächsten Anhängen nicht
+ * greifen, und mit stehendem `_isDragging` überspränge der nächste Druck die Klicktoleranz: ein
+ * Tipp mit Zittern würde zum Zug, und sein Klick auf der Karte versetzte die Mitte.
  */
-function haengeAb(m: maplibregl.Marker): void {
+function detach(m: maplibregl.Marker): void {
   m.remove();
   m.getElement().style.pointerEvents = 'auto';
+  m._isDragging = false;
+  m._state = 'inactive';
 }
 
 /**
@@ -277,7 +281,7 @@ export function erzeugeKreisGriff(
   const setMitte = () => {
     const steht = onMitte != null && mittenGriffSteht(mitte, radius);
     if (!steht || !mitte) {
-      if (mitteDran) haengeAb(mittenMarker);
+      if (mitteDran) detach(mittenMarker);
       mitteDran = false;
       mitteZiehend = false;
       return;
@@ -296,7 +300,7 @@ export function erzeugeKreisGriff(
       radius = radiusM;
       setMitte();
       if (!m) {
-        if (dran) haengeAb(marker);
+        if (dran) detach(marker);
         dran = false;
         ziehend = false;
         return;

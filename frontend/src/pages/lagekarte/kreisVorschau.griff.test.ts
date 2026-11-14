@@ -15,6 +15,9 @@ class FakeMarker {
   // Wie bei maplibre: ohne `setLngLat` hat ein Marker keine Lage.
   private lngLat: { lng: number; lat: number } | undefined;
   readonly element: HTMLElement;
+  // Zugmerker wie bei maplibre: `remove()` setzt sie nicht zurück, nur `_onUp`.
+  _isDragging = false;
+  _state: 'inactive' | 'pending' | 'active' = 'inactive';
   constructor(opts: { element: HTMLElement }) {
     this.element = opts.element;
     marker.set(opts.element.dataset.lfh ?? '?', this);
@@ -45,20 +48,30 @@ class FakeMarker {
     for (const f of this.listeners.get(ereignis) ?? []) f();
   }
   /** Zug beginnen wie maplibres `_onMove`: Zeiger durch den Griff hindurch, dann `dragstart`. */
-  beginneZug(ziel: { lat: number; lon: number }) {
+  startDrag(ziel: { lat: number; lon: number }) {
+    this._isDragging = true;
+    this._state = 'active';
     this.element.style.pointerEvents = 'none';
     this.fire('dragstart');
     this.setLngLat([ziel.lon, ziel.lat]);
     this.fire('drag');
   }
   /** Zug beenden wie maplibres `_onUp`. */
-  beendeZug() {
+  endDrag() {
+    this._isDragging = false;
+    this._state = 'inactive';
     this.element.style.pointerEvents = 'auto';
     this.fire('dragend');
   }
-  /** Greifbar: der Zeiger trifft das Element (maplibre schaltet es nur im Zug durchlässig). */
-  greifbar() {
-    return this.element.style.pointerEvents !== 'none';
+  /**
+   * Greifbar: der Zeiger trifft das Element (maplibre schaltet es nur im Zug durchlässig), und kein
+   * alter Zug steht noch. Sonst überspränge maplibre beim nächsten Druck die Klicktoleranz, und ein
+   * Tipp mit 1–2 px Zittern würde zum Zug, dessen Klick auf der Karte die Mitte versetzt.
+   */
+  isGrabbable() {
+    return (
+      this.element.style.pointerEvents !== 'none' && !this._isDragging && this._state === 'inactive'
+    );
   }
 }
 
@@ -86,8 +99,8 @@ function setup() {
   };
   /** Ein ganzer Zug des Griffs nach `ziel`; liefert den zuletzt gemeldeten Radius. */
   const ziehe = (ziel: GeoPunkt): number => {
-    rand.beginneZug(ziel);
-    rand.beendeZug();
+    rand.startDrag(ziel);
+    rand.endDrag();
     return onRadius.mock.lastCall![0];
   };
   return { griff, onRadius, lage, ziehe, rand };
@@ -182,46 +195,46 @@ describe('Esc mitten im Zug (LLH-1857)', () => {
   it('Randgriff: nach dem Abhängen im Zug steht er im Osten des neuen Kreises und ist greifbar', () => {
     const { griff, lage, rand } = setup();
     griff.set(MITTE, 300);
-    rand.beginneZug(noerdlich(MITTE, 220));
+    rand.startDrag(noerdlich(MITTE, 220));
 
     griff.set(null, null);
     griff.set(NEU, 300);
 
     expect(lage()).toEqual(griffLage(NEU, 300));
-    expect(rand.greifbar()).toBe(true);
+    expect(rand.isGrabbable()).toBe(true);
   });
 
   it('Randgriff: ein neuer Kreis ohne Radius setzt ihn auf die neue Mitte', () => {
     const { griff, lage, rand } = setup();
     griff.set(MITTE, null);
-    rand.beginneZug(noerdlich(MITTE, 220));
+    rand.startDrag(noerdlich(MITTE, 220));
 
     griff.set(null, null);
     griff.set(NEU, null);
 
     expect(lage()).toEqual(NEU);
-    expect(rand.greifbar()).toBe(true);
+    expect(rand.isGrabbable()).toBe(true);
   });
 
   it('Mittengriff: nach dem Abhängen im Zug steht er auf der neuen Mitte und ist greifbar', () => {
     const { griff } = setup();
     const mittenGriff = marker.get('kreisgriff-mitte')!;
     griff.set(MITTE, 300);
-    mittenGriff.beginneZug(noerdlich(MITTE, 120));
+    mittenGriff.startDrag(noerdlich(MITTE, 120));
 
     griff.set(null, null);
     griff.set(NEU, 300);
 
     const ll = mittenGriff.getLngLat()!;
     expect({ lat: ll.lat, lon: ll.lng }).toEqual(NEU);
-    expect(mittenGriff.greifbar()).toBe(true);
+    expect(mittenGriff.isGrabbable()).toBe(true);
   });
 
   it('Mittengriff: auch wenn nur der Radius wegfällt, endet der Zug mit dem Abhängen', () => {
     const { griff } = setup();
     const mittenGriff = marker.get('kreisgriff-mitte')!;
     griff.set(MITTE, 300);
-    mittenGriff.beginneZug(noerdlich(MITTE, 120));
+    mittenGriff.startDrag(noerdlich(MITTE, 120));
 
     // Ohne Radius steht kein Mittengriff (`mittenGriffSteht`).
     griff.set(MITTE, null);
@@ -229,6 +242,6 @@ describe('Esc mitten im Zug (LLH-1857)', () => {
 
     const ll = mittenGriff.getLngLat()!;
     expect({ lat: ll.lat, lon: ll.lng }).toEqual(NEU);
-    expect(mittenGriff.greifbar()).toBe(true);
+    expect(mittenGriff.isGrabbable()).toBe(true);
   });
 });
