@@ -170,15 +170,7 @@ pub async fn nach_client_id(
     einsatz_id: i64,
     client_id: &str,
 ) -> Result<Option<MassnahmeAnzeige>, AppError> {
-    Ok(
-        sqlx::query_as::<_, MassnahmeAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT_MASSNAHME} WHERE einsatz_id = ? AND client_id = ?"
-        )))
-        .bind(einsatz_id)
-        .bind(client_id)
-        .fetch_optional(executor)
-        .await?,
-    )
+    super::load_by_client_id(executor, SELECT_MASSNAHME, einsatz_id, client_id).await
 }
 
 async fn laden_tx(

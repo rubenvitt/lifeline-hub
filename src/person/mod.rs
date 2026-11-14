@@ -627,6 +627,27 @@ impl PersonAnzeige {
     }
 }
 
+/// Lädt eine Zeile eines Personen-Teils über ihre Client-Kennung (Offline-Idempotenz), mit dem
+/// SELECT der jeweiligen Tabelle (`SELECT_…` im Repo). Gemeinsam für Anlass, Maßnahme, Sichtung,
+/// Transport, Verbleib, Verlaufsnotiz und Verletzung (LLH-1690).
+pub(crate) async fn load_by_client_id<T>(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    select: &str,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<T>, crate::error::AppError>
+where
+    T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
+{
+    Ok(sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(format!(
+        "{select} WHERE einsatz_id = ? AND client_id = ?"
+    )))
+    .bind(einsatz_id)
+    .bind(client_id)
+    .fetch_optional(executor)
+    .await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

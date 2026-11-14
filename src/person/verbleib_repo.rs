@@ -267,15 +267,7 @@ pub async fn nach_client_id(
     einsatz_id: i64,
     client_id: &str,
 ) -> Result<Option<VerbleibAnzeige>, AppError> {
-    Ok(
-        sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND client_id = ?"
-        )))
-        .bind(einsatz_id)
-        .bind(client_id)
-        .fetch_optional(executor)
-        .await?,
-    )
+    super::load_by_client_id(executor, SELECT_VERBLEIB, einsatz_id, client_id).await
 }
 
 /// Wie [`laden`], auf einer offenen Verbindung (In-Tx-Reload).

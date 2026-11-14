@@ -88,15 +88,7 @@ pub async fn nach_client_id(
     einsatz_id: i64,
     client_id: &str,
 ) -> Result<Option<NotizAnzeige>, AppError> {
-    Ok(
-        sqlx::query_as::<_, NotizAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT_NOTIZ} WHERE einsatz_id = ? AND client_id = ?"
-        )))
-        .bind(einsatz_id)
-        .bind(client_id)
-        .fetch_optional(executor)
-        .await?,
-    )
+    super::load_by_client_id(executor, SELECT_NOTIZ, einsatz_id, client_id).await
 }
 
 /// Notizen einer Person (neueste zuerst).
