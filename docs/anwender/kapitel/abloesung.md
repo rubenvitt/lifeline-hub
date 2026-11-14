@@ -326,6 +326,9 @@ Stammdatensatz, die nur in diesem Plan stehen, etwa von einer anderen Organisati
 
 1. In der Ansicht „Schichtplan“ „Helfer“ wählen. Statt des Rasters steht die Liste der Helfer des
    Plans; die Zahl am Knopf nennt, wie viele es sind.
+
+   ![Helferliste des Schichtplans mit Mia Beispiel (DRK OV Nord) und Jonas Keller (DLRG Musterstadt)](../bilder/abloesung/helfer.png)
+
 2. „Helfer anlegen“ wählen, „Name“ eintragen, optional „Organisation“, „Telefon“ und
    „Qualifikationen“, und „Helfer anlegen“ wählen.
 3. „Bearbeiten“ und „Löschen“ stehen in der Zeile des Helfers. Ein gelöschter Helfer verschwindet
