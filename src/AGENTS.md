@@ -828,7 +828,9 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   für Einsatz oder genau eine Person (`aufbewahrung::antrag`, Tabelle `schwaerzung_antrag`), nur
   System-Admin der Einsatz-Org, nur abgeschlossen; 24 h zurücknehmbar, dann Vollzug in Phase A2
   des Purge-Laufs (`vollziehe_faellige`, zählt für den WAL-Rückschrieb). Kein Sofort-Auslöser
-  ohne diese 24 h.
+  ohne diese 24 h. Ausnahme: einen Personen-Antrag am archivierten Einsatz lassen `faellige` und
+  `vollziehen_ergebnis` offen (`IM_ARCHIV`); ihn vollzieht nur der Befehl `archiv loeschersuchen`
+  (s. „Archiv am Hub“).
 - **Geräte erfahren Schwärzung und Sperre über den Kopf** (LFH-996, Spec
   `lagebild-offline-lesen`): `EinsatzAnzeige.teilschwaerzungen` zählt vollzogene
   Personen-Anträge und geschwärzte Kategorien (`teilschwaerzungen_spalte!` und
@@ -846,7 +848,9 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
 - **Die Personensuche (`aufbewahrung::suche`) ist die einzige Archiv-Stelle, die Scrub-Spalten
   liest**: nur ganze Wörter bzw. ≥ 6 Ziffern, Antwort pseudonym, `no-store`, Suchtext nie
   geloggt, schreibt nichts (Guard `archiv_namensraum_nur_lesend_und_admin`, benannte
-  Nicht-GET-Menge).
+  Nicht-GET-Menge). Einzige Ausnahme ist der Befehl `archiv personen`
+  (`einsatz/archiv/personen.rs`, LLH-1712): dieselbe Suche im entschlüsselten Block, Namen nur
+  im Terminal, Admin-Spur `archiv_durchsucht` ohne Suchtext; nie eine Route.
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
   stehen) und `journal_size_limit` (LFH-928), und nach einer Schwärzung oder einem Sweep mit
@@ -891,8 +895,19 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   age-verschlüsselt an alle geprüften Schlüssel; dann `schwaerze_nach_archiv_tx` ohne Karenz.
   Eine neue Stammtabelle mit FK aus einer Einsatztabelle braucht einen Eintrag in `STAMM` (Guard
   `stamm_deckt_alle_verweise_und_spalten`). Abgelaufene Blöcke löscht Phase N mit ETB-Eintrag,
-  Phase D wartet auf den letzten; ein Löschersuchen an einem archivierten Einsatz geht nur ganz
-  und löscht alle Blöcke.
+  Phase D wartet auf den letzten. Ein Löschersuchen für den ganzen archivierten Einsatz löscht
+  alle Blöcke.
+- **Löschersuchen für eine Person im Archiv** (LLH-1712, `archiv/loeschersuchen.rs`, Befehl
+  `archiv loeschersuchen`, Spec `aufbewahrung-loeschersuchen`, Herleitung
+  `openspec/changes/archive/2026-11-13-xlrgl4du-loeschersuchen-person-im-archiv/design.md`): Der Server hat keinen privaten Archiv-Schlüssel, deshalb nie im
+  Purge-Lauf. Je Einsatz alle Blöcke entschlüsseln, migrieren, `scrubbe_person` je Antrag,
+  `VACUUM`, an die **heute geprüften** Schlüssel neu verschlüsseln; abgelegt wird in einer
+  Transaktion, die Anträge und `sha256` jeder Zeile gegen den Stand des Baus prüft (sonst nichts),
+  dann UPDATE je Zeile (Nummer und Frist bleiben), Kopien der alten `sha256` vormerken
+  (`kopien_vormerken_tx`, vor dem UPDATE: danach fände sie keiner mehr), Anträge mit ETB
+  (`antrag::im_archiv_vollzogen_tx`) und Admin-Spur `archiv_person_geschwaerzt`. Der neue
+  `sha256` sperrt alte Downloads über `hier_geloescht`. Zwischendateien eines Befehls tragen
+  einen Teil aus `bauen::BEFEHL_TEILE`, sonst räumt sie der laufende Server mitten im Befehl ab.
 - **Archiv einspielen** (LLH-1494, `archiv/einspielen.rs`, Befehl `archiv einspielen`): migriert
   die entschlüsselte Datei, schwärzt abgelaufene Kategorien nach und übernimmt den Einsatz über
   die Spiegel-Maschinerie (`liefern`/`uebernehmen`) mit einer Kopplung, die nur in der

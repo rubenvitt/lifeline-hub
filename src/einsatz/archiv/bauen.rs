@@ -282,14 +282,24 @@ fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
 /// Teil im Namen der Zwischendatei des Befehls `archiv einspielen` (`einspielen.rs`).
 pub(super) const TEIL_EINSPIELEN: &str = "einspielen";
 
-/// So alt muss die Zwischendatei eines Einspielens sein, bevor der Serverstart sie löscht: der
+/// Teil im Namen der Zwischendateien des Befehls `archiv loeschersuchen` (`loeschersuchen.rs`,
+/// LLH-1712); dahinter folgt die Nummer des Blocks.
+pub(super) const TEIL_LOESCHERSUCHEN: &str = "loeschersuchen";
+
+/// Teil im Namen der Zwischendatei des Befehls `archiv personen` (`personen.rs`, LLH-1712).
+pub(super) const TEIL_PERSONEN: &str = "personen";
+
+/// Teile der Befehle: sie laufen als eigener Prozess neben dem Server.
+const BEFEHL_TEILE: &[&str] = &[TEIL_EINSPIELEN, TEIL_LOESCHERSUCHEN, TEIL_PERSONEN];
+
+/// So alt muss die Zwischendatei eines Befehls sein, bevor der Purge-Lauf sie löscht: der
 /// Befehl läuft als eigener Prozess und kann gerade an ihr arbeiten.
 const EINSPIELEN_LIEGT_STUNDEN: u64 = 6;
 
 /// Löscht Zwischendateien, die ein abgebrochener Bau liegen ließ (`Drop` läuft bei einem
 /// Prozessabbruch nicht). Vor jedem Purge-Lauf, der als einziger Archive baut, also nie während
-/// eines Baus; die Datei eines Einspielens (eigener Prozess) erst nach
-/// [`EINSPIELEN_LIEGT_STUNDEN`].
+/// eines Baus; die Datei eines Befehls (eigener Prozess: einspielen, Löschersuchen, Suche) erst
+/// nach [`EINSPIELEN_LIEGT_STUNDEN`].
 pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     let verzeichnis = match verzeichnis(pool).await {
         Ok(v) => v,
@@ -304,7 +314,10 @@ pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     for eintrag in eintraege.flatten() {
         let name = eintrag.file_name();
         let name_s = name.to_string_lossy();
-        let einspielen = name_s.contains(&format!("-{TEIL_EINSPIELEN}-"));
+        // `-<teil>-…` bzw. `-<teil><block>-…`: die Datei eines Befehls (eigener Prozess).
+        let einspielen = BEFEHL_TEILE
+            .iter()
+            .any(|t| name_s.contains(&format!("-{t}")));
         let frisch = || {
             eintrag
                 .metadata()
@@ -676,19 +689,41 @@ pub async fn baue_block(
     sqlx::query("VACUUM").execute(&archiv).await?;
     archiv.close().await;
 
-    let empfaenger = crate::backup::verschluesselung::Empfaenger::neu(empfaenger.to_vec());
-    let abbruch = std::sync::atomic::AtomicBool::new(false);
-    let (ziel, ziel_datei) = zwischendatei(
+    let (ziel, groesse, sha256) = verschluesseln(
+        datei,
         &verzeichnis,
         einsatz_id,
         &format!("block{}-age", plan.block),
-    )?;
+        empfaenger,
+    )
+    .await?;
+    Ok(Block {
+        plan,
+        datei: ziel,
+        groesse,
+        sha256,
+    })
+}
+
+/// Verschlüsselt eine Klartext-Zwischendatei an `empfaenger` in eine neue Zwischendatei (Teil
+/// `teil`) und löscht den Klartext. Liefert die verschlüsselte Datei, ihre Größe und ihren
+/// SHA-256 (hex).
+pub(super) async fn verschluesseln(
+    klartext: Zwischendatei,
+    verzeichnis: &Path,
+    einsatz_id: i64,
+    teil: &str,
+    empfaenger: &[age::x25519::Recipient],
+) -> Result<(Zwischendatei, i64, String), AppError> {
+    let empfaenger = crate::backup::verschluesselung::Empfaenger::neu(empfaenger.to_vec());
+    let abbruch = std::sync::atomic::AtomicBool::new(false);
+    let (ziel, ziel_datei) = zwischendatei(verzeichnis, einsatz_id, teil)?;
     let ausgabe = Mitzaehlen {
         innen: std::io::BufWriter::new(ziel_datei),
         hash: Sha256::new(),
         laenge: 0,
     };
-    let pfad = datei.pfad().to_path_buf();
+    let pfad = klartext.pfad().to_path_buf();
     let fertig = tokio::task::spawn_blocking(move || {
         let mut fertig = crate::backup::verschluesselung::verschluessele_datei(
             &pfad,
@@ -702,17 +737,35 @@ pub async fn baue_block(
     .await
     .map_err(|e| AppError::Internal(format!("Archiv: Verschlüsselung: {e}")))?
     .map_err(|e| AppError::Internal(format!("Archiv: Verschlüsselung: {e}")))?;
-    drop(datei);
+    drop(klartext);
     let sha256 = fertig
         .hash
         .finalize()
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect();
-    Ok(Block {
-        plan,
-        datei: ziel,
-        groesse: fertig.laenge as i64,
-        sha256,
-    })
+    Ok((ziel, fertig.laenge as i64, sha256))
+}
+
+/// Entschlüsselt einen Block (`inhalt`) mit `schluessel` in eine neue Zwischendatei (Teil
+/// `teil`). Ein falscher Schlüssel ist 400 („passt nicht“); dann bleibt keine Datei liegen.
+pub(super) fn entschluesseln(
+    inhalt: &[u8],
+    schluessel: &crate::backup::verschluesselung::Schluessel,
+    verzeichnis: &Path,
+    einsatz_id: i64,
+    teil: &str,
+) -> Result<Zwischendatei, AppError> {
+    let (klar, handle) = zwischendatei(verzeichnis, einsatz_id, teil)?;
+    schluessel
+        .entschluessele(inhalt, std::io::BufWriter::new(handle))
+        .and_then(|mut w| {
+            std::io::Write::flush(&mut w)
+                .map_err(|e| AppError::Internal(format!("Archivblock schreiben: {e}")))
+        })
+        .map_err(|e| match e {
+            AppError::Validation(m) => AppError::Validation(format!("Archivblock: {m}")),
+            andere => andere,
+        })?;
+    Ok(klar)
 }
