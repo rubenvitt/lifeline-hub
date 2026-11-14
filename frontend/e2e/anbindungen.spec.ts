@@ -213,3 +213,53 @@ test('Anbindungen: eine Führungskraft liest nur, der Grund steht da', async ({ 
   await expect(page.getByText(/nur System-Admin/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Anbindung anlegen' })).toHaveCount(0);
 });
+
+/**
+ * Webhook einer Anbindung (LLH-1656, Spec `webhook-zustellung`): einrichten, ein Testereignis an
+ * ein Ziel senden, das nie antwortet (`.invalid` löst nicht auf, RFC 6761), den Fehlschlag im
+ * Verlauf sehen und wieder entfernen. Zustellung, Signatur und Rechte im Einzelnen prüfen
+ * `tests/public_api_webhook.rs` und `tests/anbindungen_webhook.rs`.
+ */
+test('Webhook einrichten, Testereignis senden, entfernen', async ({ page }) => {
+  await anmeldenAlsAdmin(page);
+  await page.goto('/admin/einstellungen/anbindungen');
+  await page.getByRole('button', { name: 'Anbindung anlegen' }).click();
+  const anlegen = page.getByRole('dialog', { name: 'Anbindung anlegen' });
+  await anlegen.getByRole('textbox', { name: 'Name' }).fill(`Einsatzbuch e2e ${Date.now()}`);
+  await anlegen.getByRole('checkbox', { name: /Einsätze lesen/ }).click();
+  await anlegen.getByRole('checkbox', { name: /Ereignisse abrufen/ }).click();
+  await anlegen.getByRole('button', { name: 'Anlegen und Code zeigen' }).click();
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  await expect(page).toHaveURL(/\/admin\/einstellungen\/anbindungen\/[0-9a-f-]{36}$/);
+
+  await page.getByRole('button', { name: 'Webhook einrichten' }).click();
+  const einrichten = page.getByRole('dialog', { name: 'Webhook einrichten' });
+  await einrichten
+    .getByRole('textbox', { name: 'Ziel-URL' })
+    .fill('https://empfaenger.invalid/hook');
+  await einrichten.getByRole('checkbox', { name: /Einsatz nicht mehr lesbar/ }).click();
+  await einrichten.getByRole('button', { name: 'Einrichten' }).click();
+
+  await expect(page.locator('[data-lfh="webhook-url"]')).toHaveText(
+    'https://empfaenger.invalid/hook',
+  );
+  // Der Code ist noch nicht eingelöst: der Webhook ruht.
+  await expect(page.locator('[data-lfh="webhook-zustand"]')).toHaveText(
+    'ruht: Code noch nicht eingelöst',
+  );
+
+  await page.getByRole('button', { name: 'Testereignis senden' }).click();
+  const test_ = page.locator('[data-lfh="webhook-test"]');
+  await expect(test_).toContainText('Testereignis:');
+  await expect(test_).not.toContainText('zugestellt');
+  const versuch = page.locator('[data-lfh="webhook-versuch"]').first();
+  await expect(versuch).toContainText('Test');
+
+  await page.getByRole('button', { name: /Weitere Aktionen zum Webhook/ }).click();
+  await page.getByRole('menuitem', { name: 'Webhook entfernen …' }).click();
+  await page
+    .getByRole('dialog', { name: 'Webhook entfernen?' })
+    .getByRole('button', { name: 'Entfernen' })
+    .click();
+  await expect(page.locator('[data-lfh="webhook-leer"]')).toBeVisible();
+});

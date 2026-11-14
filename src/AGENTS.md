@@ -176,6 +176,24 @@ Spec `ereignis-abruf`, Herleitung
 - **Der wartende Abruf** hält zwischen zwei Nachfragen keine Datenbankverbindung und nimmt seinen
   Platz aus `events::Warteraum`; die Route steht nicht in `zulassung::OHNE_ZULASSUNGSGRENZE`.
 
+## Backend — Webhooks (LLH-1656)
+
+Zweiter Leser der Outbox: `public_api::webhook`
+([ADR-0046](../docs/architektur/entscheidungen/ADR-0046-webhooks-sind-mit-dem-instanzschluessel-signiert-und-gehen-nur-an-gepruefte-adressen.md),
+Spec `webhook-zustellung`, Herleitung
+`openspec/changes/archive/2026-11-14-z6ds0ed9-webhooks-outbox/design.md`):
+- **Lesen wie der Abruf:** `events::naechstes` mit den gewählten Arten, geschnitten mit
+  `events::sichtbare_arten` des Zugangs. Eine neue Ereignisart braucht deshalb nichts Eigenes für
+  Webhooks; sie erscheint in der Auswahl, sobald `EventType` sie kennt (Frontend: `ART_TEXT`,
+  `ART_RECHT` in `frontend/src/api/anbindungen.ts`).
+- **Ausgehend nur über `webhook::ziel::client`:** kein zweiter Client für Webhooks, keine
+  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver).
+- **Der Lauf hält während der HTTP-Anfrage keine Datenbankverbindung**; das Ergebnis schreibt er
+  danach in einer Transaktion (`write_retry!`). Tests stellen über einen eigenen `Zusteller` zu;
+  Loopback ist für den echten Weg immer gesperrt, einen Schalter dafür gibt es nicht.
+- **Der CAS-Stand `geaendert_at` steigt streng** (`repo::neuer_stand`): die Zeit hat
+  Sekunden-Auflösung.
+
 ## Anhänge
 
 **ETB-Anhänge (LFH-117)** (`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`)
@@ -362,8 +380,10 @@ Spec `passwort-anmeldung`, Herleitung
   deaktivieren, reaktivieren, Rolle ändern, Zweitfaktor zurücksetzen, Anmeldeweg schalten. Auch
   ein zweiter Weg zur selben Wirkung (PATCH `bearbeiten`) schreibt; eine abgewiesene Aktion nicht.
 - Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Ausnahme „Archiv eingespielt“
-  (LLH-1494): `admin_audit::schreibe_ohne_akteur_tx` schreibt in der Transaktion der Übernahme,
-  ein Fehler bricht das Einspielen ab. Eine neue Aktion braucht eine
+  (LLH-1494, LLH-1711): `admin_audit::schreibe_ohne_akteur_tx` (Befehl) bzw. `schreibe_tx`
+  (Person über die Verwaltung, mit `peer_ip`) schreibt in der Transaktion, die das Einspielen
+  abschließt; ein Fehler bricht es ab, ein Einspielen, das vorher scheitert, hinterlässt nichts.
+  Die Log-Zeile kommt nach dem Commit vom Aufrufer. Eine neue Aktion braucht eine
   Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
 - Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
 - **Gelesen werden Anmelde- und Admin-Spur nur über `routes::zugangsprotokoll`** (LFH-1097,

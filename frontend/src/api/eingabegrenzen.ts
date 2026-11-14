@@ -4,7 +4,8 @@
  *
  * Jede Grenze steht als eigene Zeile „export const“, Name, „=“, Zahl (Unterstriche erlaubt),
  * Semikolon; der Spiegeltest liest die Datei zeilenweise mit einem Muster. Gezählt wird
- * wie beim Server in Unicode-Skalarwerten nach dem Trimmen (`components/zeichenGrenze.tsx`).
+ * wie beim Server in Unicode-Skalarwerten nach dem Trimmen (`components/zeichenGrenze.tsx`);
+ * Grenzen mit „in Bytes“ im Kommentar zählen UTF-8-Bytes (Archiv einspielen, LLH-1711).
  * Herleitung: design.md der Change `lfh-937-eingabegrenzen` (D6, D8).
  */
 
@@ -268,5 +269,13 @@ export const ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX = 100;
 export const ARCHIV_SCHLUESSEL_MAX = 10;
 /** Name einer Anbindung (Maschinenzugang eines Fremdsystems, LLH-1652). */
 export const ANBINDUNG_NAME_MAX = 80;
+/** Ziel-URL eines Webhooks (LLH-1656), `public_api::webhook::URL_MAX`. */
+export const WEBHOOK_URL_MAX = 2048;
 /** Anzeigename eines Kontos (LLH-1702); steht als Unterzeichner in der Erklärung einer Notübernahme. */
 export const ANZEIGENAME_MAX = 200;
+/** Größter Archivblock zum Einspielen in Bytes, 256 MiB (Spiegel `transfer::ARCHIV_BLOCK_MAX`, LLH-1711). */
+export const ARCHIV_BLOCK_MAX_BYTES = 268_435_456;
+/** Eingefügter oder gewählter privater Archiv-Schlüssel in Bytes (LLH-1711). */
+export const ARCHIV_PRIVATSCHLUESSEL_MAX = 65_536;
+/** Passphrase einer geschützten Schlüsseldatei in Bytes (LLH-1711). */
+export const ARCHIV_PASSPHRASE_MAX = 1_024;

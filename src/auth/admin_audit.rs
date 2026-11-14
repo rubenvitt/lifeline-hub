@@ -134,6 +134,19 @@ wire_enum! {
         EinwurfZugangSchluesselGewechselt => "einwurf_zugang_schluessel_gewechselt",
         /// Einwurf-Zugang widerrufen.
         EinwurfZugangWiderrufen => "einwurf_zugang_widerrufen",
+        /// Webhook an einem Maschinenzugang eingerichtet (LLH-1656, Migration
+        /// `*_admin_audit_webhook.sql`). Die Angaben nennen den Host des Ziels, nie den Pfad.
+        MaschinenzugangWebhookAngelegt => "maschinenzugang_webhook_angelegt",
+        /// Ziel oder Ereignisarten eines Webhooks geändert.
+        MaschinenzugangWebhookGeaendert => "maschinenzugang_webhook_geaendert",
+        /// Webhook entfernt.
+        MaschinenzugangWebhookEntfernt => "maschinenzugang_webhook_entfernt",
+        /// Ein angehaltener Webhook wurde wieder aufgenommen.
+        MaschinenzugangWebhookWiederAufgenommen => "maschinenzugang_webhook_wieder_aufgenommen",
+        /// Ziel im privaten Netz für einen Webhook bewusst erlaubt (LAN-Ausnahme).
+        MaschinenzugangWebhookLanErlaubt => "maschinenzugang_webhook_lan_erlaubt",
+        /// LAN-Ausnahme eines Webhooks zurückgenommen.
+        MaschinenzugangWebhookLanEntzogen => "maschinenzugang_webhook_lan_entzogen",
     }
 }
 
@@ -177,6 +190,7 @@ pub enum Ziel<'a> {
 ///   `scopes_vorher`, falls die Scopes wechselten.
 /// - `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder
 ///   sein Hash.
+/// - `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ZugangsAngaben {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -230,6 +244,9 @@ pub struct ZugangsAngaben {
     /// Maschinenzugang: Fingerabdruck des abgelösten Schlüssels beim Wechsel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fingerabdruck_vorher: Option<String>,
+    /// Webhook (LLH-1656): Host des Ziels. Nie die ganze URL, ihr Pfad kann ein Token tragen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 impl ZugangsAngaben {
@@ -356,6 +373,34 @@ pub async fn schreibe_ohne_akteur_tx(
     ziel: Ziel<'_>,
 ) -> Result<(), sqlx::Error> {
     einfuegen_ohne_akteur(conn, aktion, org_id, gegenstelle, ziel, None, None).await
+}
+
+/// Ein Eintrag mit handelnder Person in der Transaktion `conn` und mit Fehler: für einen
+/// Schreibweg, der ohne seinen Eintrag nicht gelten soll (Archiv einspielen über die Verwaltung,
+/// LLH-1711). Wie [`schreibe`] in der Org der Person, aber ohne eigene Log-Zeile: die Transaktion
+/// kann wiederholt werden, der Aufrufer protokolliert nach dem Commit.
+pub async fn schreibe_tx(
+    conn: &mut sqlx::SqliteConnection,
+    aktion: AdminAktion,
+    akteur: &Benutzer,
+    ziel: Ziel<'_>,
+    peer_ip: Option<IpAddr>,
+) -> Result<(), sqlx::Error> {
+    let (ziel_benutzer_id, ziel) = ziel_teile(ziel);
+    sqlx::query(
+        "INSERT INTO admin_audit (aktion, akteur_id, akteur_name, ziel_benutzer_id, ziel, detail, peer_ip, org_id)
+         VALUES (?, ?, ?, ?, ?, NULL, ?, ?)",
+    )
+    .bind(aktion.as_str())
+    .bind(akteur.id)
+    .bind(crate::auth::benutzername::fuer_protokoll(&akteur.benutzername))
+    .bind(ziel_benutzer_id)
+    .bind(crate::auth::benutzername::fuer_protokoll(ziel))
+    .bind(peer_ip.map(|ip| ip.to_string()))
+    .bind(akteur.org_id)
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 /// Konto (falls eines) und Text eines Ziels.

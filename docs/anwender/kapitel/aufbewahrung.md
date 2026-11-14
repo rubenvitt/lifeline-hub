@@ -2,7 +2,7 @@
 titel: Aufbewahrung
 gruppen: [administration]
 reihenfolge: 660
-quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/ArchivPersonAntragDialog.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/main.rs, src/config.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, src/einsatz/archiv/loeschersuchen.rs, src/einsatz/archiv/personen.rs, src/aufbewahrung/antrag.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs, src/instanz/fuehrung/loeschvermerk.rs]
+quellen: [frontend/src/aufbewahrung/FristPaneel.tsx, frontend/src/aufbewahrung/NachbereitungPaneel.tsx, frontend/src/aufbewahrung/fristModell.ts, frontend/src/aufbewahrung/KategorieFristen.tsx, frontend/src/aufbewahrung/kategorieText.ts, frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx, frontend/src/aufbewahrung/ArchivAktePage.tsx, frontend/src/aufbewahrung/ArchivPaneel.tsx, frontend/src/pages/einstellungen/ArchivSchluessel.tsx, frontend/src/aufbewahrung/Loeschersuchen.tsx, frontend/src/aufbewahrung/ArchivPersonAntragDialog.tsx, frontend/src/aufbewahrung/PersonensucheDialog.tsx, frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx, frontend/src/aufbewahrung/WiederherstellenDialog.tsx, frontend/src/pages/einstellungen/EinsatzAufbewahrung.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/KategorieVorgabenPaneel.tsx, src/routes/einsatz.rs, src/routes/aufbewahrung.rs, src/main.rs, src/config.rs, src/einsatz/retention.rs, src/einsatz/purge_scheduler.rs, src/einsatz/berechtigung.rs, src/einsatz/aufbewahrung_kategorie.rs, src/einsatz/schwaerzung_registry.rs, src/einsatz/nachbereitung.rs, src/einsatz/abraeumen.rs, src/einsatz/archiv.rs, src/einsatz/archiv/einspielen.rs, frontend/src/aufbewahrung/ArchivEinspielen.tsx, src/routes/archiv_einspielen.rs, src/instanz/repo.rs, src/einsatz/archiv/loeschersuchen.rs, src/einsatz/archiv/personen.rs, src/aufbewahrung/antrag.rs, src/org/archiv_empfaenger.rs, src/instanz/spiegel/lebensende.rs, src/instanz/fuehrung/loeschvermerk.rs]
 ---
 
 ## Überblick
@@ -93,10 +93,28 @@ Für System-Admins:
 
 Jeder Abruf steht im Zugangsprotokoll unter „Archiv heruntergeladen“.
 
-Zum Ansehen in Lifeline Hub spielt der Betrieb den Block per Befehl wieder ein (Handbuch Betrieb,
-„Archiv eines Einsatzes einspielen“). Der Einsatz steht dann bis zu 7 Tage lang in der
-Einsatzliste, nur lesbar, mit dem Band „Aus dem Archiv · bis …“ über jeder seiner Seiten, und
-verschwindet danach von selbst; endet eine Frist des Blocks früher, schon dann.
+Zum Ansehen in Lifeline Hub wird der Block wieder eingespielt, in der Verwaltung (nächster
+Ablauf) oder durch den Betrieb per Befehl (Handbuch Betrieb, „Archiv eines Einsatzes
+einspielen“).
+
+### Ein Archiv einspielen
+
+Für System-Admins, an einer Installation, bei der sich keine andere meldet:
+
+1. In der Verwaltung „Aufbewahrung“ öffnen und „Archiv einspielen“ wählen.
+2. Unter „Archivblock“ die heruntergeladene Datei `….sqlite.age` wählen.
+3. Unter „Privater Archiv-Schlüssel“ „Datei“ wählen und die Schlüsseldatei angeben, oder
+   „Eingefügt“ wählen und den Schlüssel `AGE-SECRET-KEY-1…` einfügen. Ist die Schlüsseldatei mit
+   einer Passphrase geschützt, diese unter „Passphrase der Schlüsseldatei“ angeben.
+
+   ![Dialog „Archiv einspielen“ mit Archivblock, Art des Schlüssels und Passphrase](../bilder/aufbewahrung/archiv-einspielen.png)
+
+4. „Einspielen“ wählen. Nach dem Hochladen steht „Wird eingespielt“; danach nennt die Übersicht
+   den Einsatz, bis wann er bleibt, und die Hinweise. „Einsatz öffnen“ führt hinein.
+
+Der Einsatz steht dann bis zu 7 Tage lang in der Einsatzliste, nur lesbar, mit dem Band „Aus dem
+Archiv · bis …“ über jeder seiner Seiten, und verschwindet danach von selbst; endet eine Frist
+des Blocks früher, schon dann.
 
 ### Abgeschlossene Einsätze überblicken
 
@@ -249,6 +267,21 @@ jeden ihrer Einsätze, sobald dessen Nachbereitung endet:
   privaten Archiv-Schlüssel; bis dahin bleibt der Antrag offen.
 - Die Skelett-Frist wartet, bis der letzte Block gelöscht ist.
 
+### Archiv einspielen
+
+- **Nur in die eigene Organisation**, und nur, wenn sie im Archiv denselben Namen trägt. Sonst
+  lehnt die App ab und nennt beide Namen. Ebenso abgelehnt werden ein Block, dessen
+  Aufbewahrung abgelaufen ist, ein Schlüssel, der nicht passt, und ein Block, den diese
+  Installation selbst schon gelöscht hat. Ist seit dem Download die Frist einer Datenkategorie
+  abgelaufen, wird sie vor dem Einspielen geschwärzt; der Hinweis nennt sie.
+- **Nicht am Hub:** Meldet sich eine andere Installation bei dieser, fehlt „Archiv einspielen“.
+  Der private Schlüssel gehört nicht an eine Installation, die aus dem Netz erreichbar ist.
+- **Der Schlüssel wird nicht gespeichert.** Er liegt nur für das Einspielen im Speicher des
+  Servers, nicht in der Datenbank, nicht auf der Platte und nicht im Zugangsprotokoll.
+- **Bis 256 MiB.** Einen größeren Block spielt der Betrieb per Befehl ein.
+- Das Einspielen hält den Server kurz auf; während eines laufenden Einsatzes besser nicht. Das
+  Zugangsprotokoll nennt es unter „Archiv eingespielt“ mit der Person.
+
 ### Fristen je Datenkategorie
 
 - **Behandlung**: Zustand, PAT-Nummer, benötigte Fachrichtung und Anlass der Hilfeleistung der
@@ -308,6 +341,8 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
   und nur für Einsätze der eigenen Organisation.
 - **Archiv-Schlüssel und Archiv-Download:** nur System-Admins der eigenen Organisation; jede
   Änderung und jeder Abruf steht im Zugangsprotokoll.
+- **Archiv einspielen:** nur System-Admins, in die eigene Organisation, und nicht an einer
+  Installation, bei der sich eine andere meldet.
 
 ## Grundlagen und Quellen
 

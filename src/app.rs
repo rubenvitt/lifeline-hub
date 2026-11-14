@@ -1,7 +1,7 @@
 use crate::karte::FachebenenState;
 use crate::live::LiveHub;
 use crate::routes;
-use crate::transfer::UPLOAD_BODY_MAX;
+use crate::transfer::{ARCHIV_BLOCK_BODY_MAX, UPLOAD_BODY_MAX};
 use axum::{
     extract::DefaultBodyLimit,
     response::IntoResponse,
@@ -1911,6 +1911,26 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/admin/anbindungen/{id}/widerrufen",
             post(routes::anbindungen::widerrufen),
         )
+        // LLH-1656: Webhook einer Anbindung. Zugestellt wird im Hintergrund
+        // (`public_api::webhook::lauf`).
+        .route(
+            "/api/admin/anbindungen/{id}/webhook",
+            post(routes::anbindungen_webhook::create)
+                .patch(routes::anbindungen_webhook::update)
+                .delete(routes::anbindungen_webhook::delete),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/webhook/wieder-aufnehmen",
+            post(routes::anbindungen_webhook::wieder_aufnehmen),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/webhook/test",
+            post(routes::anbindungen_webhook::test),
+        )
+        .route(
+            "/api/admin/anbindungen/{id}/webhook/versuche",
+            get(routes::anbindungen_webhook::versuche),
+        )
         // LLH-1654: Einwurf-Zugänge (Absender ohne Signatur, ADR-0023) verwalten. Die Einwürfe
         // selbst nimmt `public_api::einwurf` an.
         .route(
@@ -1933,6 +1953,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
         // (IP-Sperre wie die Gerätekopplung), Melden signiert (`instanz::extractor`).
+        // LLH-1711: Archivblock in der Verwaltung einspielen. Eigene Body-Grenze für Blöcke bis
+        // 256 MiB und die gemeinsame Upload-Grenze; dem Zeitbudget entzogen
+        // (`zulassung::OHNE_ZULASSUNGSGRENZE`).
+        .route(
+            "/api/admin/archiv/einspielen",
+            post(routes::archiv_einspielen::einspielen)
+                .layer(DefaultBodyLimit::max(ARCHIV_BLOCK_BODY_MAX))
+                .route_layer(upload_grenze.clone())
+                // Erst danach: die Verfügbarkeit trägt weder Body- noch Upload-Grenze.
+                .get(routes::archiv_einspielen::verfuegbarkeit),
+        )
         .route("/api/admin/instanz", get(routes::instanz::uebersicht))
         // LLH-1491: Führung der Einsätze beim Gegenüber (Akten ohne lokalen Einsatz).
         .route(

@@ -44,6 +44,8 @@ pub enum Zweck {
     Instanzkopplung,
     /// Kommando `lifeline-hub zugang …`: ein Fremdsystem bindet sich an einen Hub an (LLH-1652).
     Anbindung,
+    /// Zustellung signierter Ereignisse an Fremdsysteme per Webhook (LLH-1656).
+    Webhook,
 }
 
 impl Zweck {
@@ -59,6 +61,7 @@ impl Zweck {
             Zweck::WebPush => "WebPush",
             Zweck::Instanzkopplung => "Instanzkopplung",
             Zweck::Anbindung => "Anbindung",
+            Zweck::Webhook => "Webhook",
         }
     }
 }
@@ -159,6 +162,8 @@ mod tests {
             Zweck::Oidc,
             Zweck::WebPush,
             Zweck::Instanzkopplung,
+            Zweck::Anbindung,
+            Zweck::Webhook,
         ] {
             for kontakt in [None, Some("https://drk.example.org/kontakt")] {
                 let ua = kennung(zweck, kontakt);

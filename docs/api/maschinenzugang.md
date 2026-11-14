@@ -382,6 +382,102 @@ while True:
         time.sleep(int(warten))
 ```
 
+## Webhooks empfangen
+
+Statt selbst abzurufen, kann ein Fremdsystem sich die Ereignisse zustellen lassen. Ein Admin
+richtet dafür an der Anbindung einen **Webhook** ein (Seite „Anbindungen“, Ansicht der Anbindung,
+Paneel „Webhook“): Ziel-URL (nur `https`) und Ereignisarten. Je Anbindung gibt es höchstens einen.
+Zugestellt werden dieselben Ereignisse wie beim Abruf, nach denselben Rechten; der Zugang braucht
+`events:read`.
+
+**Eine Zustellung** ist ein `POST` an die Ziel-URL mit genau einem Ereignis als Body:
+
+```http
+POST /lifeline HTTP/1.1
+Content-Type: application/json
+Lifeline-Event-Id: 4712
+Lifeline-Signature: eyJhbGciOiJFZERTQSIsInR5cCI6ImxpZmVsaW5lLWV2ZW50K2p3dCIsImtpZCI6Ij…
+
+{"id":4712,"type":"einsatz.created","occurred_at":"2026-11-11 19:04:00","einsatz_id":7}
+```
+
+**Prüfen, bevor der Body gilt.** `Lifeline-Signature` ist ein kompaktes JWS:
+
+- Kopf: `alg` `EdDSA`, `typ` `lifeline-event+jwt`, `kid` die Instanzkennung.
+- Claims: `iss` (Instanzkennung), `aud` (Kennung des Webhooks, steht in der Ansicht unter
+  „Webhook-Kennung (aud)“), `iat`, `exp` (höchstens 300 s nach `iat`), `jti` (je Versuch neu),
+  `bh` (SHA-256 der empfangenen Bytes, Base64url).
+- Geprüft wird gegen den **Instanzschlüssel aus dem Einlösen**; `GET /api/v1/instanz/jwks.json`
+  hilft nur beim Schlüsselwechsel. Ein HMAC-Geheimnis gibt es nicht.
+- Wegen `aud` taugt eine Zustellung nur für diesen Webhook: Wer sie an einen anderen Empfänger
+  weiterreicht, fällt dort durch.
+
+Die Referenz-Clients prüfen das vollständig (`Credentials::verify_webhook` in Rust,
+`verifyWebhook` in TypeScript, `verify_webhook` in Python). Ein Empfänger in Node:
+
+```ts
+import { createServer } from 'node:http';
+import { verifyWebhook } from './machineClient';
+
+createServer(async (req, res) => {
+  const teile: Buffer[] = [];
+  for await (const t of req) teile.push(t as Buffer);
+  const body = new Uint8Array(Buffer.concat(teile));
+  try {
+    await verifyWebhook(
+      cred.instanz_public_key,
+      cred.instanz_id,
+      WEBHOOK_ID,
+      String(req.headers['lifeline-signature']),
+      body,
+      Math.floor(Date.now() / 1000),
+    );
+  } catch {
+    res.writeHead(401).end();
+    return;
+  }
+  const ereignis = JSON.parse(new TextDecoder().decode(body));
+  if (!schonGesehen(ereignis.id)) verarbeite(ereignis); // Entdoppeln über id
+  res.writeHead(204).end();
+}).listen(8443);
+```
+
+Dasselbe in Python:
+
+```python
+from machine_client import verify_webhook
+
+def empfange(kopf: str, body: bytes) -> dict:
+    verify_webhook(cred["instanz_public_key"], cred["instanz_id"], WEBHOOK_ID, kopf, body,
+                   int(time.time()))  # wirft ValueError mit dem Grund
+    return json.loads(body)
+```
+
+**Antwort und Wiederholung:**
+
+- Als Erfolg zählt jede `2xx`-Antwort; ihr Rumpf wird gelesen und verworfen. Weiterleitungen
+  (`3xx`) zählen als Fehlschlag, ihnen folgt die Instanz nie.
+- Nach einem Fehlschlag kommt **dasselbe Ereignis** erneut, nach 1, 2, 4 … Minuten, höchstens
+  alle 6 Stunden. Die folgenden Ereignisse warten so lange; die Reihenfolge bleibt.
+- Zugestellt wird **mindestens einmal**: Verarbeitet der Empfänger, antwortet aber zu spät
+  (Zeitlimit 15 s), kommt das Ereignis noch einmal. Entdoppeln über `id`.
+- Nach **24 Stunden ohne Erfolg** hält die Instanz den Webhook an; die Seite „Anbindungen“ zeigt
+  ihn als angehalten. Ein Admin nimmt ihn wieder auf. Liegt der Rückstand dann noch in der
+  Outbox (sieben Tage), kommt er der Reihe nach; sonst setzt der Webhook beim aktuellen Stand an,
+  und der Empfänger liest den Stand über `GET /api/v1/einsaetze` und `GET /api/v1/lage` neu.
+
+**Testereignis:** „Testereignis senden“ in der Ansicht schickt `{"type":"ping","occurred_at":"…"}`,
+gleich signiert, ohne `Lifeline-Event-Id`. Ein Empfänger, der unbekannte Arten überspringt und
+`2xx` antwortet, besteht ihn.
+
+**Erlaubte Ziele:** nur `https`, ohne Benutzername oder Passwort in der URL. Die Instanz löst den
+Namen selbst auf und verbindet sich nur mit geprüften Adressen; ein Proxy aus der Umgebung wird
+nicht genutzt. Gesperrt sind interne Adressen. Ein Ziel in einem privaten Netz (etwa im ELW) geht
+nur, wenn der Admin am Webhook „Ziel im lokalen Netz erlauben“ setzt; Rechner selbst, Link-Local
+(auch `169.254.169.254`) und Multicast bleiben auch dann gesperrt. Das Zertifikat des Ziels muss
+von einer Stelle stammen, der der Server vertraut; ein selbstsigniertes scheitert mit „Zertifikat
+des Ziels nicht anerkannt“.
+
 ## Fehler
 
 Fehler sind `{"error": "<Text>", "code": "<code>"}`. Vertrag ist `code`
@@ -494,12 +590,14 @@ ist. Eine leere Raumliste ist gültig und ergibt 0 Plätze.
   Seiten).
 - **Python:** [`clients/python/machine_client.py`](clients/python/machine_client.py), braucht
   `cryptography`. `redeem URL CODE`, `me DATEI`, `--selftest`.
+- Alle drei prüfen auch Webhook-Zustellungen („Webhooks empfangen“).
 
 ## Testvektoren
 
 [`machine-auth-testvektoren.json`](machine-auth-testvektoren.json): fester Code, feste Schlüssel,
 feste Zeit und `jti`. Ed25519 ist deterministisch; wer die Vektoren trifft, signiert wie der Server
-erwartet. Server, Rust-, TypeScript- und Python-Client werden im Sammel-Gate gegen diese Datei
+erwartet. Der Abschnitt `webhooks` enthält eine gültige Zustellung und je ungültigem Fall den
+Grund, den die Prüfung melden muss (`Signatur`, `Body`, `Ziel`, `Zeit`, `Typ`). Server, Rust-, TypeScript- und Python-Client werden im Sammel-Gate gegen diese Datei
 geprüft. Neu geschrieben wird sie mit
 
 ```sh
