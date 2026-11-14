@@ -24,31 +24,7 @@ wire_enum! {
         Meldung => "meldung",
         Auftrag => "auftrag",
     }
-}
-
-// Nullable Spalte (`bezug_typ`) — Type/Decode direkt auf dem Enum, statt
-// `#[sqlx(try_from = …)]` (Orphan-Rule auf `Option<Enum>`), gleiches Muster wie
-// `MeldeWeg` (`src/etb/mod.rs`); sqlx' Blanket-Impl für `Option<T>` bildet NULL →
-// `None` ab.
-impl<DB: sqlx::Database> sqlx::Type<DB> for BezugTyp
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for BezugTyp
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        BezugTyp::parse(s).ok_or_else(|| format!("Ungültiger BezugTyp: {s}").into())
-    }
+    sqlx = |s| format!("Ungültiger BezugTyp: {s}");
 }
 
 /// Öffentliche Darstellung eines Chat-Kanals.

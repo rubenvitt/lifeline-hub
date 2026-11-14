@@ -141,15 +141,7 @@ pub async fn nach_client_id(
     einsatz_id: i64,
     client_id: &str,
 ) -> Result<Option<SichtungAnzeige>, AppError> {
-    Ok(
-        sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT_SICHTUNG} WHERE einsatz_id = ? AND client_id = ?"
-        )))
-        .bind(einsatz_id)
-        .bind(client_id)
-        .fetch_optional(executor)
-        .await?,
-    )
+    super::load_by_client_id(executor, SELECT_SICHTUNG, einsatz_id, client_id).await
 }
 
 /// Die aktuelle Sichtungskategorie einer Person (Cache `aktuelle_sichtung`) auf der offenen

@@ -38,34 +38,7 @@ wire_enum! {
         Divers => "divers",
         Unbekannt => "unbekannt",
     }
-}
-
-// `geschlecht` ist eine nullable Spalte (`Option<String>`). `#[sqlx(try_from = "…")]`
-// scheitert hier an der Orphan-Rule (`TryFrom<Option<String>> for Option<Geschlecht>`
-// wäre ein fremder Trait auf einem fremden `Option<_>`). Stattdessen `Type`/`Decode`
-// direkt auf `Geschlecht` implementieren (sqlx-Referenzmuster für Custom-Enum-Spalten,
-// vgl. sqlx-Doku zu `Decode`): sqlx' Blanket-Impl für `Option<T>` liefert NULL → `None`
-// automatisch; ein ungültiger Nicht-NULL-Wert wird zum `Decode`-Fehler (→ 500 statt
-// stillem Fallback — Spalte ist DB-CHECK-geschützt, sollte nie ungültig sein).
-impl<DB: sqlx::Database> sqlx::Type<DB> for Geschlecht
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Geschlecht
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        Geschlecht::parse(s).ok_or_else(|| format!("Ungültiges Geschlecht: {s}").into())
-    }
+    sqlx = |s| format!("Ungültiges Geschlecht: {s}");
 }
 
 wire_enum! {
@@ -81,6 +54,7 @@ wire_enum! {
         Tot => "tot",
         Unverletzt => "unverletzt",
     }
+    sqlx = |s| format!("Ungültige Sichtungskategorie: {s}");
 }
 
 impl Sichtungskategorie {
@@ -97,31 +71,6 @@ impl Sichtungskategorie {
     }
 }
 
-// Nullable Spalte (`aktuelle_sichtung`) — gleiches Muster wie bei `Geschlecht` (s.o.):
-// `Type`/`Decode` direkt auf dem Enum, statt `#[sqlx(try_from = "Option<String>")]`
-// (Orphan-Rule).
-impl<DB: sqlx::Database> sqlx::Type<DB> for Sichtungskategorie
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Sichtungskategorie
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        Sichtungskategorie::parse(s)
-            .ok_or_else(|| format!("Ungültige Sichtungskategorie: {s}").into())
-    }
-}
-
 wire_enum! {
     /// Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
     /// `migrations/0025_person_verbleib.sql`, erweitert um `notunterkunft` in
@@ -135,6 +84,7 @@ wire_enum! {
         Verstorben => "verstorben",
         Notunterkunft => "notunterkunft",
     }
+    sqlx = |s| format!("Ungültige VerbleibArt: {s}");
 }
 
 impl VerbleibArt {
@@ -179,6 +129,7 @@ wire_enum! {
         /// Quittierte Übergabe eines Eigentransports am Ziel (LLH-1332, design.md D2).
         Uebergeben => "uebergeben",
     }
+    sqlx = |s| format!("Ungültiger VerbleibStatus: {s}");
 }
 
 wire_enum! {
@@ -191,27 +142,7 @@ wire_enum! {
         /// Ein Fahrzeug aus dem Einsatz fährt; der Patient bleibt bis zur Übergabe bei uns.
         Eigen => "eigen",
     }
-}
-
-impl<DB: sqlx::Database> sqlx::Type<DB> for TransportDurch
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TransportDurch
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        TransportDurch::parse(s).ok_or_else(|| format!("Ungültiges TransportDurch: {s}").into())
-    }
+    sqlx = |s| format!("Ungültiges TransportDurch: {s}");
 }
 
 wire_enum! {
@@ -227,6 +158,7 @@ wire_enum! {
         Sorgeberechtigte => "sorgeberechtigte",
         Polizei => "polizei",
     }
+    sqlx = |s| format!("Ungültiger Wert für EntlassenAn: {s}");
 }
 
 wire_enum! {
@@ -237,6 +169,7 @@ wire_enum! {
         Behandlung => "behandlung",
         Transport => "transport",
     }
+    sqlx = |s| format!("Ungültiger Wert für GegenRat: {s}");
 }
 
 wire_enum! {
@@ -247,36 +180,8 @@ wire_enum! {
         LiegtVor => "liegt_vor",
         Verweigert => "verweigert",
     }
+    sqlx = |s| format!("Ungültiger Wert für Unterschrift: {s}");
 }
-
-/// `Type`/`Decode` für nullable Katalogspalten des Verbleibs (Muster [`VerbleibStatus`]).
-macro_rules! text_spalte {
-    ($($name:ident),+) => {$(
-        impl<DB: sqlx::Database> sqlx::Type<DB> for $name
-        where
-            str: sqlx::Type<DB>,
-        {
-            fn type_info() -> DB::TypeInfo {
-                <str as sqlx::Type<DB>>::type_info()
-            }
-        }
-
-        impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for $name
-        where
-            &'r str: sqlx::Decode<'r, DB>,
-        {
-            fn decode(
-                value: <DB as sqlx::Database>::ValueRef<'r>,
-            ) -> Result<Self, sqlx::error::BoxDynError> {
-                let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-                $name::parse(s)
-                    .ok_or_else(|| format!(concat!("Ungültiger Wert für ", stringify!($name), ": {}"), s).into())
-            }
-        }
-    )+};
-}
-
-text_spalte!(EntlassenAn, GegenRat, Unterschrift);
 
 wire_enum! {
     /// Versorgungszustand einer Person (LLH-1332, design.md D3), abgeleitet aus dem jüngsten
@@ -408,56 +313,6 @@ pub fn verbleib_etb_sachverhalt(
     }
 }
 
-// `status` ist in `VerbleibAnzeige` eine nullable Spalte (`Option<String>`) —
-// gleiches Muster wie `Geschlecht`/`Sichtungskategorie` (s. o.): `Type`/`Decode`
-// direkt auf dem Enum, statt `#[sqlx(try_from = "…")]` (Orphan-Rule auf
-// `Option<Enum>`).
-impl<DB: sqlx::Database> sqlx::Type<DB> for VerbleibStatus
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for VerbleibStatus
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        VerbleibStatus::parse(s).ok_or_else(|| format!("Ungültiger VerbleibStatus: {s}").into())
-    }
-}
-
-// `art` ist in `VerbleibAnzeige` non-null, aber `VerbleibAnzeige` ist gemischt
-// (status ist nullable) → einheitlicher Decode-Mechanismus über direkte
-// `Type`/`Decode`-Impls für BEIDE Felder, statt `#[sqlx(try_from = "String")]`
-// nur für `art` (vgl. Tier-Cluster in `src/tier/mod.rs`).
-impl<DB: sqlx::Database> sqlx::Type<DB> for VerbleibArt
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for VerbleibArt
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        VerbleibArt::parse(s).ok_or_else(|| format!("Ungültige VerbleibArt: {s}").into())
-    }
-}
-
 wire_enum! {
     /// Kostform einer Person (LLH-1612, design.md D4). Die fünf Sonderkost-Werte tragen dieselben
     /// Schlüssel wie die Felder von [`crate::verpflegung::Sonderkost`] (Guard
@@ -478,28 +333,7 @@ wire_enum! {
              diaet_allergenarm, saeugling_kleinkind)"
         )
     };
-}
-
-// Nullable Spalte `einsatz_person.kostform` — gleiches Muster wie `VerbleibArt`.
-impl<DB: sqlx::Database> sqlx::Type<DB> for Kostform
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Kostform
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        Kostform::parse(s).ok_or_else(|| format!("Ungültige Kostform: {s}").into())
-    }
+    sqlx = |s| format!("Ungültige Kostform: {s}");
 }
 
 /// Höchstlänge der Unverträglichkeiten an der Person (LLH-1612, design.md D4).
@@ -791,6 +625,27 @@ impl PersonAnzeige {
         );
         self
     }
+}
+
+/// Lädt eine Zeile eines Personen-Teils über ihre Client-Kennung (Offline-Idempotenz), mit dem
+/// SELECT der jeweiligen Tabelle (`SELECT_…` im Repo). Gemeinsam für Anlass, Maßnahme, Sichtung,
+/// Transport, Verbleib, Verlaufsnotiz und Verletzung (LLH-1690).
+pub(crate) async fn load_by_client_id<T>(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    select: &str,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<T>, crate::error::AppError>
+where
+    T: for<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
+{
+    Ok(sqlx::query_as::<_, T>(sqlx::AssertSqlSafe(format!(
+        "{select} WHERE einsatz_id = ? AND client_id = ?"
+    )))
+    .bind(einsatz_id)
+    .bind(client_id)
+    .fetch_optional(executor)
+    .await?)
 }
 
 #[cfg(test)]

@@ -218,15 +218,7 @@ pub async fn nach_client_id(
     einsatz_id: i64,
     client_id: &str,
 ) -> Result<Option<TransportAnzeige>, AppError> {
-    Ok(
-        sqlx::query_as::<_, TransportAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT_TRANSPORT} WHERE einsatz_id = ? AND client_id = ?"
-        )))
-        .bind(einsatz_id)
-        .bind(client_id)
-        .fetch_optional(executor)
-        .await?,
-    )
+    super::load_by_client_id(executor, SELECT_TRANSPORT, einsatz_id, client_id).await
 }
 
 /// Lädt einen Stand auf einer offenen Verbindung; `NotFound`, falls nicht zum Einsatz.

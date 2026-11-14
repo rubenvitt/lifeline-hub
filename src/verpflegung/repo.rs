@@ -656,12 +656,6 @@ struct StelleKurz {
     storniert: bool,
 }
 
-/// IDs als JSON-Array für `json_each(?)`.
-fn ids_json(ids: &[i64]) -> Result<String, AppError> {
-    serde_json::to_string(ids)
-        .map_err(|e| AppError::Internal(format!("Stellen-Kennungen serialisieren: {e}")))
-}
-
 /// Die Stellen des Einsatzes unter `ids`, nach Bezeichnung — EINE Anweisung für die ganze Liste
 /// (`src/AGENTS.md`, „Eingabegrenzen“: ID-Listen mit einer von N unabhängigen Zahl von
 /// Anweisungen). Fremde und unbekannte Kennungen fehlen im Ergebnis.
@@ -680,7 +674,7 @@ async fn stellen_kurz_tx(
          ORDER BY bezeichnung, id",
     )
     .bind(einsatz_id)
-    .bind(ids_json(ids)?)
+    .bind(crate::kraefte_disposition::ids_json(ids))
     .fetch_all(&mut *conn)
     .await?)
 }
@@ -744,7 +738,7 @@ async fn replace_zuordnung_tx(
     zeitfenster_id: i64,
     ids: &[i64],
 ) -> Result<(), AppError> {
-    let ids = ids_json(ids)?;
+    let ids = crate::kraefte_disposition::ids_json(ids);
     sqlx::query(
         "DELETE FROM verpflegung_zeitfenster_stelle \
          WHERE zeitfenster_id = ? AND stelle_id NOT IN (SELECT value FROM json_each(?))",

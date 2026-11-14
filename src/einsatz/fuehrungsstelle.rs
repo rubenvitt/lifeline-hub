@@ -176,7 +176,7 @@ pub async fn pruefe_fahrzeuge(
         "SELECT id FROM einsatz_fahrzeug \
          WHERE id IN (SELECT value FROM json_each(?)) AND einsatz_id = ?",
     )
-    .bind(ids_json(ids)?)
+    .bind(crate::kraefte_disposition::ids_json(ids))
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
@@ -220,11 +220,6 @@ pub async fn is_einsatzleiter_tx(
     .fetch_optional(&mut *conn)
     .await?;
     Ok(treffer.is_some())
-}
-
-fn ids_json(ids: &[i64]) -> Result<String, AppError> {
-    serde_json::to_string(ids)
-        .map_err(|e| AppError::Internal(format!("Fahrzeug-ids serialisieren: {e}")))
 }
 
 /// Teiländerung: `None` = unverändert, `Some(None)` = leeren. Werte sind bereits getrimmt und
@@ -611,7 +606,7 @@ pub async fn patch_tx(
     if let Some(ids) = patch.fahrzeug_ids {
         // Zwei Anweisungen, unabhängig von der Länge der Liste (Muster
         // `sprechgruppe::repo::ersetzen_tx`).
-        let ids = ids_json(ids)?;
+        let ids = crate::kraefte_disposition::ids_json(ids);
         sqlx::query(
             "DELETE FROM einsatz_fuehrungsstelle_fahrzeug WHERE einsatz_id = ? \
                AND einsatz_fahrzeug_id NOT IN (SELECT value FROM json_each(?))",
