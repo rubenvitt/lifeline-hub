@@ -96,9 +96,11 @@ Für die Menschen, die die App im Einsatz bedienen, gibt es die Anwenderdokument
 ./scripts/check-all.sh
 ```
 
-Das ist die **eine** Durchsetzungsinstanz vor jedem Merge: Formatierung, Lint, Typ-Drift
-zwischen Backend und Frontend, Rust-Suite, Frontend-Suite, Abhängigkeits-Advisories und die
-Playwright-Suite. Dieselbe Datei fährt auch die CI — was hier grün ist, ist dort grün. Ein
+Das ist die **eine** Durchsetzungsinstanz: Formatierung, Lint, Typ-Drift zwischen Backend und
+Frontend, Rust-Suite, Frontend-Suite, Abhängigkeits-Advisories und die Playwright-Suite. Dieselbe
+Datei fährt auch die CI — was hier grün ist, ist dort grün. Im PR prüft die CI nur leicht; vor dem
+PR läuft lokal `./scripts/check-all.sh --geaendert --ohne-e2e`, die vollen Suiten laufen auf
+`alpha` (oder im PR mit Label `voll`). Ein
 roter Schritt hält die übrigen nicht auf; am Ende steht der Gesamtstatus je Schritt
 (`--abbrechen` bricht stattdessen beim ersten roten Schritt ab).
 

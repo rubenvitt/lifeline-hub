@@ -6,8 +6,8 @@
 #   frontend=true|false
 #   e2e=true|false
 # im Format von $GITHUB_OUTPUT. Die Schnellprüfungen laufen immer und stehen hier nicht.
-# `scripts/ci-auswahl.sh` (beide Stufen der PR-CI) und `check-all.sh --geaendert` fragen beide
-# dieses Skript; die Zuordnung steht nur hier.
+# `check-all.sh --geaendert` fragt dieses Skript (vor dem PR lokal, LLH-1889; die CI wählt seither
+# nicht mehr nach Bereichen); die Zuordnung steht nur hier.
 #
 # IM ZWEIFEL ALLES: Ein Pfad, den keine Regel kennt, fordert alle drei Suiten, ebenso eine leere
 # Liste. Gespart wird nur, wo eine Regel ausdrücklich sagt, dass eine Suite die Datei nicht sieht.

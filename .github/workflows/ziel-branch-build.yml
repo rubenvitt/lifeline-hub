@@ -8,8 +8,8 @@
 # zwar nur das Kompilieren (Backend mit allen Zielen, Frontend-Typprüfung, `check-all.sh --nur
 # baut`): wenige Minuten statt der vollen Suiten.
 #
-# WANN: Ein PR ist fertig wie für die zweite Stufe (`e2e.yml`): Auto-Merge an oder Label `e2e`,
-# kein Entwurf.
+# WANN: Ein PR ist fertig, wenn Auto-Merge an ist und er kein Entwurf ist; Labels zählen nicht
+# (LLH-1889, ADR zu leichten PR-Checks).
 #   - PR-Ereignis an einem fertigen PR: er rechnet gegen die Spitze des Ziel-Branches.
 #   - Push auf einen Kanal-Branch: `verteilen` setzt den Check an jedem fertigen PR auf „läuft“ und
 #     startet für ihn einen EIGENEN Lauf dieses Workflows auf seinem Branch (`workflow_dispatch`);
@@ -19,10 +19,14 @@
 #   Vorher fehlt der Check, und der PR ist nicht mergebar (Required Check im Ruleset 17017911).
 #
 # DER CHECK ENTSTEHT ÜBER DIE CHECKS-API, NICHT ALS JOB-NAME: Ein Push muss ihn an vielen
-# PR-Köpfen setzen, und ein übersprungener Job meldete seinen Check grün (Kopf von `e2e.yml`).
+# PR-Köpfen setzen, und ein übersprungener Job meldete seinen Check grün.
 # Er steht sofort auf „läuft“, damit kein altes Grün mergt, während gerechnet wird; bis
 # `verteilen` läuft, bleibt ein Restfenster (design.md, „alpha rot“ fängt es auf). `melden` schließt
-# ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand stehen.
+# ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand stehen. Ein überholter
+# Check bleibt auf „läuft“, nie abgebrochen: GitHub wertet je Name den jüngsten Check, und den legt
+# der nächste Lauf an. Hat sich nur der Ziel-Branch bewegt und kommt binnen 5 Minuten weder ein
+# jüngerer Check noch steht ein Push-Lauf aus, wird er rot mit „neu starten“. Bei neuem PR-Kopf
+# bleibt er ohne Frist stehen: der PR zeigt den alten Kopf nicht mehr.
 #
 # PR-CODE LÄUFT NIE IN EINEM LAUF AUF EINEM KANAL-BRANCH (LLH-1849, Review): Ein Push-Lauf hat
 # den Cache-Bereich von `alpha`, und Code darin (etwa ein `build.rs` aus einem Dependabot-PR)
@@ -46,7 +50,7 @@ name: Baut mit Ziel-Branch
 on:
   pull_request:
     branches: [main, beta, alpha]
-    types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled, labeled]
+    types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled]
   push:
     branches: [main, beta, alpha]
   # Der eigene Lauf je fertigem PR, gestartet von `verteilen` auf dem Branch des PRs.
@@ -61,13 +65,19 @@ on:
 permissions:
   contents: read
 
-# Je PR (Ereignis und Einzellauf teilen sich die Gruppe) bzw. je Kanal-Branch: ein neuer Kopf oder
-# ein neuer Stand macht den laufenden Lauf wertlos. Ein abgebrochener Lauf hinterlässt seinen
-# Check auf „läuft“; der neue Lauf legt in `vorbereiten` einen jüngeren an, auch der Einzellauf
-# (dessen Check von `verteilen` ist dann älter und wird als übernommen geschlossen).
+# Je PR (Ereignis und Einzellauf teilen sich die Gruppe) bzw. je Kanal-Branch eine Warteschlange
+# (LLH-1889): höchstens ein Lauf rechnet, einer wartet, und ein neuer Anstoß ersetzt den wartenden.
+# Mehrere Merges kurz hintereinander bündeln sich so auf den jüngsten Stand. Abgebrochen wird nie:
+# ein abgebrochener Lauf hinterließ „Kompilieren“ und „Melden“ abgebrochen am PR, also rot, ohne
+# Fehler (14.11.2026, zehn PRs). Ein ersetzter wartender Lauf legt keine Jobs an und zeigt nichts.
+# Auch ein neuer Commit am PR bricht nicht ab: ein Einzellauf zum neuen Kopf kann vor dem
+# PR-Ereignis starten und würde sonst rot abgebrochen. Den Check eines überholten Laufs lässt
+# `melden` auf „läuft“; der jüngere Check des neuen Laufs löst ihn ab. Ist ein Stand auf dem Kopf
+# schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen (nicht bei
+# einem Neustart des Einzellaufs).
 concurrency:
   group: ziel-branch-build-${{ github.event.pull_request.number || inputs.nr || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # Push auf einen Kanal-Branch: Checks setzen, je fertigem PR einen eigenen Lauf starten. Führt
@@ -126,6 +136,7 @@ jobs:
           PR_ZIEL: ${{ github.event.pull_request.base.ref }}
           E_NR: ${{ inputs.nr }}
           E_CHECK: ${{ inputs.check_id }}
+          E_KOPF: ${{ inputs.kopf }}
           E_ZIEL: ${{ inputs.ziel }}
         run: |
           # Gerechnet wird gegen die aktuelle Spitze des Ziel-Branches, auch im Einzellauf.
@@ -133,8 +144,10 @@ jobs:
           ziel_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$ziel" --jq .object.sha)"
           if [ "$EREIGNIS" = workflow_dispatch ]; then
             # Prüft PR und Ref (nie auf einem Kanal-Branch, nie für einen Fork) und legt einen
-            # frischen Check an; den von `verteilen` schließt es als übernommen.
-            liste="$(scripts/ziel-branch-build.sh einzellauf "$E_NR" "$GITHUB_REF_NAME" "$E_CHECK" "$ziel" "$ziel_sha")"
+            # frischen Check an (den von `verteilen` löst er ab). Ist der Stand auf dem Kopf schon
+            # gerechnet, übernimmt der Check von `verteilen` das Ergebnis, und nichts rechnet (nicht
+            # bei einem Neustart dieses Laufs).
+            liste="$(scripts/ziel-branch-build.sh einzellauf "$E_NR" "$GITHUB_REF_NAME" "$E_CHECK" "$E_KOPF" "$ziel" "$ziel_sha")"
           else
             liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha" "$PR_NR")"
           fi
@@ -261,10 +274,12 @@ jobs:
     if: ${{ !cancelled() && github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # actions: read — ob ein Push-Lauf (`verteilen`) noch aussteht, bevor ein überholter Check rot wird.
     permissions:
       contents: read
       pull-requests: read
       checks: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

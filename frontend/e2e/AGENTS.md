@@ -10,7 +10,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   übernehmenden Test fest. Herleitung:
   `openspec/changes/archive/2026-11-12-teqsdpas-e2e-testpyramide/design.md`.
 - **Layout-Gates laufen in jedem Lauf vollständig** (LLH-1665, D1): keine Auswahl der Seiten
-  nach dem Diff, im PR wie auf `alpha`. Gespart wird im Gate selbst.
+  nach dem Diff, auf `alpha` wie im PR mit Label `voll`. Gespart wird im Gate selbst.
 - **Angemeldet wird über die API** (LLH-1665): `anmeldenPerApi` aus `e2e/anmelde-kern.ts`, dahinter
   `anmelden`, `anmeldenAls`, `anmeldenAlsAdmin`, `wechsleZu…`. `{ startseite: false }`, wenn der
   nächste Schritt ohnehin ein `goto` ist. Das Formular füllen nur die Specs, die die Anmeldung

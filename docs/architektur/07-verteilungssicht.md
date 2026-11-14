@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 12.11.2026 (Einwurf-Zugang, LLH-1654).
+Stand: 14.11.2026 (leichte PR-Prüfung, LLH-1889).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA oder Desktop-App darauf zu. Einen
@@ -141,10 +141,12 @@ Diese ausgehenden Verbindungen hängen an Schaltern (Vorgaben aus `src/config.rs
 
 ```mermaid
 flowchart LR
-  PR["PR auf alpha"] -->|jeder Push| CI["ci.yml<br/>scripts/check-all.sh"]
-  PR -->|"fertig: Auto-Merge<br/>oder Label e2e"| E2E["e2e.yml<br/>e2e-Binary, e2e 1/4 bis 4/4"]
-  CI -->|Push: ruft auf| E2E
-  CI -->|Push| REL["release.yml<br/>Ruhefenster, semantic-release"]
+  PR["PR auf alpha"] -->|jeder Push| CIPR["ci.yml<br/>Schnellprüfungen,<br/>mit Label voll alle Suiten"]
+  PR -->|"fertig: Auto-Merge an"| ZB["ziel-branch-build.yml<br/>Baut mit Ziel-Branch"]
+  PR -->|Merge| CI["ci.yml auf alpha, beta, main<br/>alle Suiten, neuer Push<br/>bricht ältere Tests ab"]
+  CIPR -->|"Label voll: ruft auf"| E2E["e2e.yml<br/>e2e-Binary, e2e 1/4 bis 4/4"]
+  CI -->|ruft auf| E2E
+  CI -->|"Tests grün,<br/>nicht abgebrochen"| REL["release.yml<br/>Ruhefenster, semantic-release"]
   REL --> TAG["Tag, Versions-Commit,<br/>Release als Entwurf"]
   TAG --> ART["artefakte.yml"]
   ART --> B["bauen: 4 Binaries,<br/>karten-service, SBOM"]
@@ -159,10 +161,14 @@ flowchart LR
   F -->|alpha, beta| DA["desktop-alpha<br/>→ desktop-kanal"]
 ```
 
-Im PR prüft `ci.yml` jeden Push, die e2e-Suite in `e2e.yml` läuft erst, wenn der PR fertig
-markiert ist; bis dahin fehlen ihre Pflicht-Checks. Auf `alpha`, `beta` und `main` ruft `ci.yml`
-sie bei jedem Push auf, und der Release wartet darauf (Regel: `scripts/AGENTS.md`, „Zwei Stufen
-im PR“).
+Im PR prüft `ci.yml` jeden Push mit den Schnellprüfungen. Pflicht sind daneben nur
+`Migrationsnummern` und `ADR-Nummern` (`migrationen.yml`) und `Baut mit Ziel-Branch` (`ziel-branch-build.yml`), das an
+jedem PR mit eingeschaltetem Auto-Merge rechnet. Rust-, Frontend- und e2e-Suite fährt ein PR nur
+mit dem Label `voll`, ohne Pflicht. Auf `alpha`, `beta` und `main` läuft `ci.yml` bei jedem Push
+voll und ruft `e2e.yml` auf; ein neuer Push bricht die Testjobs des älteren Laufs ab, ein
+laufender Release bricht nie ab (`concurrency` der Jobs in `ci.yml`,
+[ADR-0047](entscheidungen/ADR-0047-ein-pr-prueft-leicht-die-suiten-laufen-auf-den-kanal-branches.md)).
+Brüche, die erst ein Test zeigt, fallen so auf `alpha` auf (11.2, R41).
 
 | Kanal | Branch | Version | Desktop-Update liest |
 | --- | --- | --- | --- |
@@ -172,7 +178,8 @@ im PR“).
 
 - Kanäle und Versionsquelle: `release.config.mjs`. `prepareCmd` setzt die Version in
   `Cargo.toml` und `frontend/package.json`; Server und Hülle erben sie aus `[workspace.package]`.
-  `release.yml` läuft nur nach grünem Gate bei einem Push (`ci.yml`, Job `release`).
+  `release.yml` läuft nur nach grünem und nicht abgebrochenem Gate bei einem Push (`ci.yml`,
+  Job `release`).
 - Ein Release erscheint erst, wenn alle Bau-, Abbild- und bei stabilen Tags auch Desktop-Jobs
   grün sind (Job `freigeben`, Kopf von `artefakte.yml`). Die Desktop-Pakete einer Alpha
   entstehen danach und halten nichts auf (Job `desktop-alpha` in `artefakte.yml`, `desktop.yml`).

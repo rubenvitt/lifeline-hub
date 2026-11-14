@@ -1,78 +1,33 @@
-# e2e — die zweite Stufe der PR-CI (LLH-1662) und die e2e-Suite der Kanal-Branches.
+# e2e — die e2e-Suite (Binary, vier Anteile, Bericht) als wiederverwendbarer Workflow.
 #
-# ZWEI STUFEN IM PR: `ci.yml` prüft jeden Push (Schnellprüfungen, Rust, Vitest). Die e2e-Suite
-# (e2e-Binary und die Anteile `e2e 1/4` bis `4/4`, rund eine Stunde und fünf Jobs) läuft erst,
-# wenn der PR als FERTIG markiert ist: Auto-Merge ist eingeschaltet oder das Label `e2e` ist
-# gesetzt. Beim Einschalten startet sie für den aktuellen Kopf-Commit, danach bei jedem weiteren
-# Push, solange eines davon gilt. Das Label holt e2e-Rückmeldung, ohne zu mergen.
+# WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS (LLH-1889, ADR „Ein PR prüft leicht“): `ci.yml` ruft
+# ihn bei jedem Push auf `alpha`, `beta`, `main` und an einem PR mit dem Label `voll` auf
+# (`workflow_call`, `github.event_name` ist das Ereignis des Aufrufers). Die Checks heißen dann
+# `e2e / e2e-Binary`, `e2e / e2e 1/4` usw. Pflicht im Ruleset sind sie nicht: Im PR laufen nur
+# die Schnellprüfungen, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch` (scripts/AGENTS.md,
+# „Leichte PR-Prüfung“). Die frühere zweite Stufe an fertigen PRs (LLH-1662, ADR-0026) ist
+# ersetzt; mit ihr fielen die Auslöser am PR, die Gruppenlogik und der Matrix-Trick weg, der
+# Pflicht-Checks fehlen ließ.
 #
-# DIE PFLICHT-CHECKS FEHLEN DAVOR, STATT LEER GRÜN ZU MELDEN: `e2e-Binary` und `e2e 1/4` bis
-# `4/4` sind Required Checks im Ruleset 17017911. Ein per Job-`if` übersprungener Matrix-Job meldet
-# sich unter seinem unexpandierten Namen (`e2e ${{ matrix.shard }}/4`), der gerenderte Name fehlt,
-# und der PR ist nicht mergebar; Auto-Merge wartet genau darauf. Deshalb ist auch das Binary eine
-# Matrix mit einem Eintrag, aus dem sein Name entsteht: ein übersprungener Job OHNE Matrix
-# erfüllte seinen Check. Ob ein Lauf startet, entscheidet allein das `if` der Auswahl
-# (`aenderungen`); `binaer` und `e2e` hängen an ihrem Ergebnis. „e2e betroffen“ steht wie bisher
-# an jedem Schritt: ein fertiger PR ohne e2e-relevante Änderung meldet leer grün.
-#
-# NEBENLÄUFIGKEIT: Ereignisse, die eine Stufe starten oder die letzte Fertig-Markierung
-# zurücknehmen, teilen sich eine Gruppe je PR und brechen einen laufenden Lauf ab; so beendet
-# „Auto-Merge aus“ einen laufenden e2e-Lauf, und ein neuer Commit an einem fertigen PR den Lauf
-# für den alten Kopf. Alles andere (ein fremdes Label, das Entfernen von `e2e` bei weiter
-# eingeschaltetem Auto-Merge, ein Commit an einem PR in Arbeit) läuft in einer eigenen Gruppe und
-# startet nichts.
-#
-# KANAL-BRANCHES: `ci.yml` ruft diesen Workflow bei jedem Push auf `alpha`, `beta`, `main` auf
-# (`workflow_call`, dort ist `github.event_name` = `push`), und der Release wartet darauf. Die
-# Checks heißen dann `e2e (Kanal) / e2e 1/4` usw. (Name des Aufruf-Jobs als Vorsilbe); auf
-# Kanal-Branches verlangt das Ruleset keine.
-#
-# Warum ein eigener Workflow und nicht mehr Ereignisse in `ci.yml`: das Einschalten von Auto-Merge
-# bräche dort den laufenden Lauf ab (eine Gruppe je Ref), und ein Lauf, der Rust und
-# Schnellprüfungen überspringt, meldete sie als jüngsten Check-Run `skipped`, also grün, auch über
-# einem roten.
+# ABBRUCH: Den steuert der Aufrufer. Auf einem Kanal-Branch trägt der Aufruf-Job in `ci.yml` eine
+# Gruppe je Branch mit `cancel-in-progress`: ein neuer Push bricht diesen Lauf ab.
 #
 # EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die Anteile laufen auf dem eigenen Server,
 # wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem Fork
-# stammt; die Wahl trifft `scripts/runner/select-runner.sh` in der Auswahl. Leer heißt GitHub. Dort
+# stammt; die Wahl trifft `scripts/runner/select-runner.sh` im Job `aenderungen`. Leer heißt GitHub. Dort
 # läuft jeder Job in einem frischen Container ohne `sudo` (`scripts/runner/README.md`); Schritte,
 # die `sudo` oder die Caches der gehosteten Runner brauchen, tragen deshalb
 # `runner.environment == 'github-hosted'` (Wächter: `scripts/runner/ci-schritte.test.sh`).
 #
-# Regeln: scripts/AGENTS.md, „Zwei Stufen im PR“. Formtest: scripts/ci-stufen.test.sh.
+# Regeln: scripts/AGENTS.md, „Leichte PR-Prüfung“. Formtest: scripts/ci-stufen.test.sh.
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in ci.yml.
 name: e2e
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, auto_merge_enabled, auto_merge_disabled, labeled, unlabeled]
   workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  # Gemeinsame Gruppe je PR für jeden Start (s. `if` der Auswahl) und für das Zurücknehmen der
-  # letzten Fertig-Markierung; sonst eine eigene je Lauf (s. Kopf). Ein neuer Commit an einem
-  # NICHT fertigen PR teilt sie nicht: die Nutzlast ist der Stand beim Ereignis, und ein Lauf, der
-  # nach dem Einschalten von Auto-Merge eingereiht wird, bräche sonst den gerade gestarteten ab
-  # (GitHub garantiert die Reihenfolge nicht). Formtest: scripts/ci-stufen.test.sh.
-  group: >-
-    ${{ (github.event_name == 'pull_request' && (
-          (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
-           && (github.event.pull_request.auto_merge != null
-               || contains(github.event.pull_request.labels.*.name, 'e2e')))
-          || (github.event.action == 'auto_merge_enabled'
-              && !contains(github.event.pull_request.labels.*.name, 'e2e'))
-          || (github.event.action == 'labeled' && github.event.label.name == 'e2e'
-              && github.event.pull_request.auto_merge == null)
-          || ((github.event.action == 'auto_merge_disabled'
-               || (github.event.action == 'unlabeled' && github.event.label.name == 'e2e'))
-              && github.event.pull_request.auto_merge == null
-              && !contains(github.event.pull_request.labels.*.name, 'e2e'))))
-        && format('e2e-pr-{0}', github.event.pull_request.number)
-        || format('e2e-lauf-{0}', github.run_id) }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -85,29 +40,15 @@ env:
   TZ: Europe/Berlin
 
 jobs:
-  # ── Startet die zweite Stufe, und braucht sie e2e? ──────────────────────────────────
-  # Das `if` ist die eine Stelle, die über den Start entscheidet: bei Push immer; im PR bei einem
-  # neuen Commit, wenn er fertig ist, und wenn eine Fertig-Markierung gesetzt wird, die vorher
-  # fehlte (sonst lief die Stufe schon). Es liest den Zustand NACH dem Ereignis.
+  # ── Wo laufen Binary und Anteile? ───────────────────────────────────────────────────
+  # Job-Id `aenderungen` wie in ADR-0025 (Regeltext), auch wenn er nur noch den Runner wählt.
   aenderungen:
-    name: e2e-Auswahl
-    if: >-
-      ${{ github.event_name != 'pull_request'
-        || (contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
-            && (github.event.pull_request.auto_merge != null
-                || contains(github.event.pull_request.labels.*.name, 'e2e')))
-        || (github.event.action == 'auto_merge_enabled'
-            && !contains(github.event.pull_request.labels.*.name, 'e2e'))
-        || (github.event.action == 'labeled' && github.event.label.name == 'e2e'
-            && github.event.pull_request.auto_merge == null) }}
+    name: e2e-Runner
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # `checks: read` für die Check-Runs des Vorgängers (Umnummerierung, `scripts/ci-auswahl.sh`).
     permissions:
       contents: read
-      checks: read
     outputs:
-      e2e: ${{ steps.bereiche.outputs.e2e }}
       runner: ${{ steps.runner.outputs.runner }}
     steps:
       # Bei `pull_request` ist HEAD der Merge-Commit, HEAD^1 die Spitze des Ziel-Branches. Auch bei
@@ -115,9 +56,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
-      # Wo `e2e-Binary` und die Anteile laufen (LLH-1666, Kopf). Vor der Bereichs-Erkennung:
-      # scheitert die, steht die Wahl schon fest. Scheitert diese, bleibt die Ausgabe leer, die
-      # Jobs fallen auf `ubuntu-latest` zurück, und die Bereichs-Erkennung läuft trotzdem.
+      # Wo `e2e-Binary` und die Anteile laufen (LLH-1666, Kopf). Scheitert die Wahl, bleibt die
+      # Ausgabe leer, und die Jobs fallen auf `ubuntu-latest` zurück.
       - name: Runner für die e2e-Jobs
         id: runner
         continue-on-error: true
@@ -140,38 +80,23 @@ jobs:
           runner="$("$weiche" "$EREIGNIS" "$KOPF_REPO" "$REPO" "$LABEL")"
           echo "runner=$runner" >> "$GITHUB_OUTPUT"
           echo "e2e-Jobs laufen auf: \`$runner\`" >> "$GITHUB_STEP_SUMMARY"
-      - name: Betroffene Suiten
-        id: bereiche
-        env:
-          CI_EREIGNIS: ${{ github.event_name }}
-          CI_KOPF: ${{ github.event.pull_request.head.sha }}
-          GH_TOKEN: ${{ github.token }}
-        run: ./scripts/ci-auswahl.sh zwei | tee -a "$GITHUB_OUTPUT"
 
   # ── Backend-Binary für die e2e-Anteile ──────────────────────────────────────────────
   # Eigener Job: so starten die Anteile nach dem Build statt nach Build PLUS Rust-Tests.
-  # Eine Matrix mit EINEM Eintrag, nur damit der Name fehlt, wenn die Stufe nicht startet (s. Kopf).
   binaer:
-    name: ${{ matrix.check }}
+    name: e2e-Binary
     needs: aenderungen
-    # Läuft auch, wenn die Auswahl rot ist: im Zweifel wird geprüft (leere Ausgabe = betroffen).
-    if: ${{ !cancelled() && needs.aenderungen.result != 'skipped' }}
-    env:
-      E2E: ${{ needs.aenderungen.outputs.e2e }}
+    # Läuft auch, wenn die Runner-Wahl rot ist: dann auf `ubuntu-latest`.
+    if: ${{ !cancelled() }}
     # Eigener Runner oder GitHub (LLH-1666, Kopf). Auf dem eigenen Runner bringt das Image nasm
     # und den Compiler-Cache mit; die Schritte mit `sudo` und `rust-cache` laufen nur gehostet.
     runs-on: ${{ needs.aenderungen.outputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 90
-    strategy:
-      matrix:
-        # DER NAME IST EIN PIN: Required Check im Ruleset 17017911.
-        check: [e2e-Binary]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.E2E != 'false'
       # Nur bei Bedarf aufräumen (s. Schnellprüfungen in ci.yml).
       - name: Plattenplatz schaffen (nur bei Bedarf)
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         run: |
           df -h /
           frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
@@ -184,24 +109,21 @@ jobs:
       # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
       # zum Job-Timeout fest (LFH-1101).
       - name: System-Werkzeuge für die nativen Crates
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         run: ./scripts/apt-pakete.sh nasm
       - name: Rust-Toolchain (stable)
-        if: env.E2E != 'false'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
       # Auf dem eigenen Runner hält `sccache` den Build warm (Volume, `scripts/runner/`); das
       # `target/` aus dem GitHub-Cache zu laden kostete dort mehr, als es spart.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         with:
           shared-key: rust-openssl-vendored
           save-if: false
           cache-on-failure: true
       - name: Debug-Binary bauen
-        if: env.E2E != 'false'
         run: cargo build --bin lifeline-hub
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: env.E2E != 'false'
         with:
           name: lifeline-hub-debug
           path: target/debug/lifeline-hub
@@ -211,10 +133,8 @@ jobs:
   e2e:
     name: e2e ${{ matrix.shard }}/4
     needs: [aenderungen, binaer]
-    # Ein rotes Binary lässt die Anteile aus, dann fehlen sie (s. Kopf).
-    if: ${{ !cancelled() && needs.aenderungen.result != 'skipped' && needs.binaer.result == 'success' }}
-    env:
-      E2E: ${{ needs.aenderungen.outputs.e2e }}
+    # Ein rotes Binary lässt die Anteile aus.
+    if: ${{ !cancelled() && needs.binaer.result == 'success' }}
     # Eigener Runner oder GitHub (LLH-1666, Kopf). Die Schritte für Systempakete und Browser-Cache
     # laufen nur gehostet; das Image des eigenen Runners bringt beides mit, ohne `sudo`.
     runs-on: ${{ needs.aenderungen.outputs.runner || 'ubuntu-latest' }}
@@ -229,32 +149,24 @@ jobs:
     strategy:
       # Ohne fail-fast: ein roter Shard darf den anderen drei nicht die Diagnose nehmen.
       fail-fast: false
-      # DIE SHARD-ZAHL IST EIN PIN: die gerenderten Jobnamen („… 1/4" bis „4/4") sind Required
-      # Status Checks im Ruleset 17017911. Eine andere Zahl änderte die Check-Namen, die alten
-      # reporteten nie mehr, und jeder PR hinge still auf „Expected". Nur zusammen mit dem
-      # Ruleset ändern.
+      # Die Shard-Zahl steht auch in `scripts/e2e-anteile.mjs` und im Bericht (vier Blobs).
       matrix:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.E2E != 'false'
       - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-        if: env.E2E != 'false'
         with:
           version: 2026.9.1
           cache: true
       - name: pnpm-Store-Pfad ermitteln
-        if: env.E2E != 'false'
         id: pnpm
         run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false'
         with:
           path: ${{ steps.pnpm.outputs.store }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
       - name: Frontend-Abhängigkeiten
-        if: env.E2E != 'false'
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
       # SYSTEM IM CACHE-SCHLÜSSEL: Playwright lädt je Ubuntu-Version einen eigenen WebKit-Build
       # (`webkit-ubuntu-24.04.zip`, `webkit-ubuntu-26.04.zip`), legt ihn aber unter demselben
@@ -263,7 +175,7 @@ jobs:
       # vorhanden, und jeder WebKit-Start scheiterte an `libicudata.so.74` (Lauf 43535205929,
       # alle vier Shards rot). Ebenso gehören die .deb-Pakete zu genau einer Version.
       - name: System für die Cache-Schlüssel
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         id: betriebssystem
         run: |
           . /etc/os-release
@@ -272,7 +184,7 @@ jobs:
       # Die Browserliste steht im Schlüssel: ein Eintrag aus der Zeit, als nur Chromium installiert
       # wurde, darf nicht als Treffer für alle drei gelten.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-firefox-webkit-${{ runner.os }}-${{ steps.betriebssystem.outputs.kennung }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
@@ -288,14 +200,14 @@ jobs:
       # erst am Ende eines GRÜNEN Jobs — ein roter oder abgebrochener Shard hinterließe nichts, und
       # der nächste Lauf stünde wieder am langsamen Mirror.
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         id: apt-cache
         with:
           path: ~/.cache/apt-playwright
           key: apt-playwright-${{ runner.os }}-${{ steps.betriebssystem.outputs.kennung }}-${{ runner.arch }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: apt-playwright-${{ runner.os }}-${{ steps.betriebssystem.outputs.kennung }}-${{ runner.arch }}-
       - name: Systempakete aus dem Cache bereitlegen
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         run: |
           mkdir -p ~/.cache/apt-playwright
           if compgen -G "$HOME/.cache/apt-playwright/*.deb" > /dev/null; then
@@ -315,7 +227,7 @@ jobs:
       # meist kommen sie aus dem Cache, daher 5 min je Versuch. So endet der Schritt auch im
       # schlimmsten Fall (3 × 15 + 3 × 5 min) mit eigenem Grund vor dem Job-Timeout von 75 min.
       - name: Playwright-Browser (Chromium, Firefox, WebKit)
-        if: env.E2E != 'false' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         run: |
           printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "30";' \
             'Acquire::https::Timeout "30";' 'DPkg::Lock::Timeout "120";' |
@@ -336,7 +248,7 @@ jobs:
       # Playwright-Version nicht zum Lockfile, lädt `install` die neuen Browser (ohne `sudo`, die
       # Systempakete ändern sich selten), und die Warnung erinnert an den Neubau des Images.
       - name: Playwright-Browser (eigener Runner)
-        if: env.E2E != 'false' && runner.environment != 'github-hosted'
+        if: runner.environment != 'github-hosted'
         run: |
           soll="$(mise exec -- node -p "require('./frontend/node_modules/@playwright/test/package.json').version")"
           if [ "${LIFELINE_RUNNER_PLAYWRIGHT:-}" != "$soll" ]; then
@@ -345,25 +257,21 @@ jobs:
           ./scripts/wiederholen.sh 3 300 -- \
             mise exec -- pnpm -C frontend exec playwright install chromium firefox webkit
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.E2E != 'false' && runner.environment == 'github-hosted' && steps.apt-cache.outputs.cache-hit != 'true'
+        if: runner.environment == 'github-hosted' && steps.apt-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/apt-playwright
           key: ${{ steps.apt-cache.outputs.cache-primary-key }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: env.E2E != 'false'
         with:
           name: lifeline-hub-debug
           path: bin
       # PFLICHT: upload-artifact zippt ohne Dateirechte, alles kommt als 644 zurück.
       # check-all.sh prüft das Bit und bräche sonst mit klarer Meldung ab.
       - name: Ausführbar machen
-        if: env.E2E != 'false'
         run: chmod +x bin/lifeline-hub
       - name: Runner-Größe
-        if: env.E2E != 'false'
         run: echo "Kerne $(nproc), Speicher $(free -h | awk '/^Mem:/ {print $2}')" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: e2e-Suite (Anteil ${{ matrix.shard }}/4)
-        if: env.E2E != 'false'
         env:
           PW_SHARD: ${{ matrix.shard }}/4
           # Erspart die Rust-Toolchain: ohne die Variable fragte die Playwright-Config
@@ -371,25 +279,21 @@ jobs:
           PW_BINAER: ${{ github.workspace }}/bin/lifeline-hub
         run: ./scripts/check-all.sh --nur e2e
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() && env.E2E != 'false' }}
+        if: ${{ !cancelled() }}
         with:
           name: playwright-blob-${{ matrix.shard }}
           path: frontend/blob-report
           retention-days: 1
 
   # ── Ein Bericht aus den Teilläufen ──────────────────────────────────────────────────
-  # KEIN Required Check — das sind die Anteile selbst: `playwright merge-reports` scheitert nur
-  # bei NULL Blobs, ein gestorbener Anteil ergäbe sonst einen grünen Teilbericht. Mit
-  # `!cancelled()`, weil man den Bericht gerade bei Rot braucht. `continue-on-error` am Job: bei
-  # Push wartet der Release auf den Aufruf dieses Workflows, und der ist nur grün, wenn jeder Job
-  # grün ist; ein Aussetzer im Bericht hielte sonst einen Release über grünen Suiten auf.
+  # Mit `!cancelled()`, weil man den Bericht gerade bei Rot braucht. `continue-on-error` am Job:
+  # bei Push wartet der Release auf den Aufruf dieses Workflows, und der ist nur grün, wenn jeder
+  # Job grün ist; ein Aussetzer im Bericht hielte sonst einen Release über grünen Suiten auf.
   berichte:
     name: e2e-Bericht
     continue-on-error: true
-    needs: [aenderungen, e2e]
-    if: >-
-      ${{ !cancelled() && needs.aenderungen.result != 'skipped'
-      && needs.aenderungen.outputs.e2e != 'false' }}
+    needs: e2e
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

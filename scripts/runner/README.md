@@ -106,8 +106,8 @@ der die Platte füllt, trifft dann nur die Runner, nicht den Host.
    nicht: ein Fork kann die Workflows unter `.github/` ändern und das Label selbst eintragen. Vor
    jeder Freigabe deshalb die Änderungen unter `.github/` lesen.
 2. **Einschalten.** Settings → Secrets and variables → Actions → Variables → `E2E_RUNNER` =
-   `lifeline-e2e` (derselbe Wert wie `RUNNER_LABEL`). Ein Probe-PR zeigt in der Zusammenfassung
-   des Jobs „Geänderte Bereiche“, wohin die e2e-Jobs gingen.
+   `lifeline-e2e` (derselbe Wert wie `RUNNER_LABEL`). Ein Probe-PR mit dem Label `voll` zeigt in der
+   Zusammenfassung des Jobs „e2e-Runner“, wohin die e2e-Jobs gingen.
 
 ## Betrieb
 
