@@ -48,7 +48,14 @@ case "$methode $pfad" in
   "GET repos/test/repo/commits/"*"/check-runs"*)
     [ ! -e "$F/checkruns-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     sha="${pfad#repos/test/repo/commits/}"; sha="${sha%%/*}"
-    if [ -f "$F/checks-$sha.json" ]; then aus < "$F/checks-$sha.json"; else echo '{"total_count":0,"check_runs":[]}' | aus; fi ;;
+    # Wie GitHub: ohne `filter=all` je Name nur der jüngste Run (alle Runs der Checks-API liegen in
+    # einer Suite; LLH-1889, Review: ohne das prüfte Fall 16 nichts).
+    if [ -f "$F/checks-$sha.json" ]; then
+      case "$pfad" in
+        *filter=all*) aus < "$F/checks-$sha.json" ;;
+        *) jq '.check_runs |= [group_by(.name)[] | max_by(.id)]' "$F/checks-$sha.json" | aus ;;
+      esac
+    else echo '{"total_count":0,"check_runs":[]}' | aus; fi ;;
   "POST repos/test/repo/actions/workflows/ziel-branch-build.yml/dispatches")
     [ ! -e "$F/dispatch-kaputt" ] || { echo "HTTP 422 Workflow does not have 'workflow_dispatch' trigger" >&2; exit 1; }
     [ ! -e "$F/dispatch-502" ] || { echo "HTTP 502 Bad Gateway" >&2; exit 1; }
@@ -61,11 +68,12 @@ case "$methode $pfad" in
     n=$(( $(cat "$F/naechste-id" 2> /dev/null || echo 900) + 1 )); echo "$n" > "$F/naechste-id"
     echo "POST ${feld[head_sha]} ${feld[status]} ${feld[name]}" >> "$F/log"
     printf '%s\n' "${feld[output_summary]:-}" > "$F/text-$n"
+    printf '%s\n' "${feld[external_id]:-}" > "$F/ext-$n"
     printf '{"id":%s}\n' "$n" | aus ;;
   "PATCH repos/test/repo/check-runs/"*)
     id="${pfad##*/}"
     echo "PATCH $id ${feld[conclusion]:-${feld[status]:-}}" >> "$F/log"
-    printf '%s\n%s\n' "${feld[output_summary]:-}" "${feld[output_text]:-}" > "$F/text-$id"
+    printf '%s\n%s\n%s\n' "${feld[output_title]:-}" "${feld[output_summary]:-}" "${feld[output_text]:-}" > "$F/text-$id"
     echo '{}' | aus ;;
   *) echo "Attrappe: unbekannter Aufruf '$methode $pfad'" >&2; exit 1 ;;
 esac
@@ -98,12 +106,17 @@ hat_check() { # <fake> <sha> <status>
   printf '{"total_count":1,"check_runs":[{"id":1,"name":"Baut mit Ziel-Branch","status":"%s"}]}\n' "$3" \
     > "$1/checks-$2.json"
 }
-# Mehrere Check-Runs „Baut mit Ziel-Branch“ auf <sha>, je Argument "<id>:<status>".
-checks_auf() { # <fake> <sha> <id:status>…
-  local f="$1" sha="$2" json='[]' e
+# Mehrere Check-Runs „Baut mit Ziel-Branch“ auf <sha>, je Argument
+# "<id>:<status>[:<conclusion>:<external_id>]" (external_id: der gerechnete Ziel-Stand).
+checks_auf() { # <fake> <sha> <id:status[:conclusion:external_id]>…
+  local f="$1" sha="$2" json='[]' e id st fz ext
   shift 2
   for e in "$@"; do
-    json="$(jq -c --argjson id "${e%%:*}" --arg st "${e#*:}" '. + [{id: $id, name: "Baut mit Ziel-Branch", status: $st}]' <<< "$json")"
+    IFS=: read -r id st fz ext <<< "$e"
+    json="$(jq -c --argjson id "$id" --arg st "$st" --arg fz "$fz" --arg ext "$ext" \
+      '. + [{id: $id, name: "Baut mit Ziel-Branch", status: $st,
+             conclusion: (if $fz == "" then null else $fz end), external_id: $ext,
+             output: {title: ("Titel " + ($id | tostring)), summary: ("Text " + ($id | tostring))}}]' <<< "$json")"
   done
   jq -n --argjson r "$json" '{total_count: ($r | length), check_runs: $r}' > "$f/checks-$sha.json"
 }
@@ -141,6 +154,7 @@ printf '%s\n' \
 hat_check "$f" k3 completed
 hat_check "$f" k5 completed
 lauf "$f" verteilen alpha zielsha
+pruefe "1 verteilen: Check trägt den Ziel-Stand" "zielsha" "$(cat "$f/ext-901")"
 pruefe "1 läuft und eigener Lauf an den fertigen, wartet an den übrigen mit Check" \
   "POST k1 in_progress Baut mit Ziel-Branch;DISPATCH zweig1 1 k1 901 zielsha;POST k2 in_progress Baut mit Ziel-Branch;DISPATCH zweig2 2 k2 902 zielsha;POST k3 queued Baut mit Ziel-Branch;POST k5 queued Baut mit Ziel-Branch" \
   "$(log "$f")"
@@ -227,15 +241,44 @@ echo "==> Baut mit Ziel-Branch: Einzellauf"
 # Ergebnis, wie jeden älteren offenen Check des Kopfes.
 f="$(neu einzel)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
-lauf "$f" einzellauf 7 zweig7 800 alpha zielsha
+lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
 pruefe "13 Einzellauf: frischer Check läuft, der alte bleibt offen" \
   "POST k7 in_progress Baut mit Ziel-Branch" "$(log "$f")"
 pruefe "13 Einzellauf rechnet den PR" "7:k7:901" "$(liste)"
 
+# 13b — Derselbe Ziel-Stand ist auf diesem Kopf schon gerechnet (der wartende Lauf las ihn, bevor
+# `verteilen` dafür dispatchte; LLH-1889, Review): kein dritter Lauf, der Check von `verteilen`
+# übernimmt das Ergebnis.
+f="$(neu einzelschongerechnet)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+checks_auf "$f" k7 '700:completed:failure:altersha' '850:completed:success:zielsha' '800:in_progress'
+lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
+pruefe "13b schon gerechnet: Ergebnis übernommen, nichts zu rechnen" "PATCH 800 success" "$(log "$f")"
+pruefe "13b schon gerechnet: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
+pruefe "13b Titel übernommen" "Titel 850" "$(head -1 "$f/text-800")"
+
+# 13c — Gerechnet nur gegen einen anderen Stand, oder abgebrochen: rechnen wie immer.
+f="$(neu einzelanderstand)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+checks_auf "$f" k7 '850:completed:success:altersha' '860:completed:cancelled:zielsha' '800:in_progress'
+lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
+pruefe "13c anderer Stand: rechnet" "POST k7 in_progress Baut mit Ziel-Branch" "$(log "$f")"
+
+# 13d — Der PR hat seit `verteilen` einen neuen Kopf: der Check von `verteilen` steht am alten Kopf
+# und bekommt kein fremdes Ergebnis; der neue Kopf rechnet.
+f="$(neu einzelneuerkopf)"
+printf '%s\n' '7|k7neu|false|false|true|' | prs "$f"
+checks_auf "$f" k7neu '850:completed:success:zielsha'
+lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
+pruefe "13d neuer Kopf: kein PATCH am alten Check" "" "$(grep '^PATCH' "$f/log" || true)"
+
+# 13e — Der neue Check trägt den gerechneten Stand (external_id), damit 13b ihn findet.
+pruefe "13e external_id ist der Ziel-Stand" "zielsha" "$(cat "$ARBEIT/einzel/ext-901")"
+
 # 14 — Einzellauf auf einem Kanal-Branch (von Hand ohne --ref gestartet): nie rechnen.
 f="$(neu einzelalpha)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
-lauf "$f" einzellauf 7 alpha 800 alpha zielsha
+lauf "$f" einzellauf 7 alpha 800 k7 alpha zielsha
 pruefe "14 Einzellauf auf alpha: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 
 # 14b — Auch wenn der Kopf-Branch des PRs selbst ein Kanal-Branch ist (PR alpha → main).
@@ -243,16 +286,16 @@ f="$(neu einzelkanal)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 jq '.[0].head.ref = "alpha"' "$f/pulls.json" > "$f/p.neu" && mv "$f/p.neu" "$f/pulls.json"
 jq '.head.ref = "alpha"' "$f/pull-7.json" > "$f/p.neu" && mv "$f/p.neu" "$f/pull-7.json"
-lauf "$f" einzellauf 7 alpha 800 alpha zielsha
+lauf "$f" einzellauf 7 alpha 800 k7 alpha zielsha
 pruefe "14b Kopf ist Kanal-Branch: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 f="$(neu einzel)"
 
 # 15 — Einzellauf auf einem fremden Branch oder für einen Fork: nie rechnen.
-lauf "$f" einzellauf 7 anderer-zweig 800 alpha zielsha
+lauf "$f" einzellauf 7 anderer-zweig 800 k7 alpha zielsha
 pruefe "15 Ref passt nicht zum PR: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 f="$(neu einzelfork)"
 printf '%s\n' '7|k7|false|true|true|' | prs "$f"
-lauf "$f" einzellauf 7 zweig7 800 alpha zielsha
+lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
 pruefe "15 Fork: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 
 echo "==> Baut mit Ziel-Branch: Meldung"
@@ -281,7 +324,7 @@ echo zielsha > "$f/ref-alpha"
 : > "$ARBEIT/ausgabe-baut"
 lauf "$f" melden 7 k7 901 alpha zielsha konflikt "$ARBEIT/ausgabe-baut"
 pruefe "8 Konflikt: Check rot" "PATCH 901 failure" "$(log "$f")"
-pruefe "8 Konflikt als Grund" 1 "$(grep -c 'Konflikt' "$f/text-901")"
+pruefe "8 Konflikt als Grund" 1 "$(sed -n 2p "$f/text-901" | grep -c 'Konflikt')"
 
 # 9 — Der Ziel-Branch ist inzwischen weiter: das Ergebnis ist überholt, nicht grün. Der Check
 # bleibt auf „läuft“ (LLH-1889: abgebrochen zeigte den PR rot); das Ergebnis zum neuen Stand

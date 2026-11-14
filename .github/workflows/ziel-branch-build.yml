@@ -131,6 +131,7 @@ jobs:
           PR_ZIEL: ${{ github.event.pull_request.base.ref }}
           E_NR: ${{ inputs.nr }}
           E_CHECK: ${{ inputs.check_id }}
+          E_KOPF: ${{ inputs.kopf }}
           E_ZIEL: ${{ inputs.ziel }}
         run: |
           # Gerechnet wird gegen die aktuelle Spitze des Ziel-Branches, auch im Einzellauf.
@@ -139,7 +140,7 @@ jobs:
           if [ "$EREIGNIS" = workflow_dispatch ]; then
             # Prüft PR und Ref (nie auf einem Kanal-Branch, nie für einen Fork) und legt einen
             # frischen Check an; den von `verteilen` lässt es offen, `melden` schließt ihn mit.
-            liste="$(scripts/ziel-branch-build.sh einzellauf "$E_NR" "$GITHUB_REF_NAME" "$E_CHECK" "$ziel" "$ziel_sha")"
+            liste="$(scripts/ziel-branch-build.sh einzellauf "$E_NR" "$GITHUB_REF_NAME" "$E_CHECK" "$E_KOPF" "$ziel" "$ziel_sha")"
           else
             liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha" "$PR_NR")"
           fi

@@ -12,11 +12,13 @@
 #       Bei einem PR-Ereignis: ist der PR fertig, Check auf „läuft“; sonst, wenn er den Check
 #       trägt, auf „wartet“. Gibt den PR als JSON aus, wenn er rechnet, sonst []:
 #       [{"nr": <nr>, "kopf": "<sha>", "check_id": <id>}]
-#   scripts/ziel-branch-build.sh einzellauf <pr-nr> <ref> <check-id> <ziel-branch> <ziel-sha>
+#   scripts/ziel-branch-build.sh einzellauf <pr-nr> <ref> <check-id> <kopf-sha> <ziel-branch> <ziel-sha>
 #       Im Einzellauf: rechnet nur, wenn <ref> der Kopf-Branch des PRs ist, der PR in diesem
 #       Repository liegt und <ref> kein Kanal-Branch ist (ein von Hand ohne --ref gestarteter Lauf
 #       liefe sonst auf alpha). Arbeitet dann wie `auswahl`: ein frischer Check. Den Check
-#       <check-id> von `verteilen` lässt er offen; ihn schließt `melden` mit dem Ergebnis.
+#       <check-id> von `verteilen` (auf <kopf-sha>) lässt er offen. Ist <ziel-sha> auf dem
+#       aktuellen Kopf schon gerechnet (der wartende Lauf las den Stand, bevor `verteilen` dafür
+#       dispatchte), rechnet er nicht noch einmal: <check-id> übernimmt das Ergebnis.
 #   scripts/ziel-branch-build.sh melden <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> \
 #       <ergebnis> <ausgabe-datei>
 #       Schließt den Check <check-id>: ergebnis `gruen` → grün; `rot`, `konflikt`, `veraltet`,
@@ -47,16 +49,23 @@ REPO="${GITHUB_REPOSITORY:-}"
 gh_api() { "${ZBB_GH:-gh}" api "$@"; }
 kurz() { printf '%s' "${1:0:8}"; }
 
-# Neuer Check-Run auf <sha> mit <status>; gibt seine ID aus.
-check_neu() { # <sha> <status> <titel> <text>
+# Neuer Check-Run auf <sha> mit <status>; gibt seine ID aus. <ziel-sha> kommt in `external_id`:
+# daran erkennt `einzellauf` einen Stand, der auf diesem Kopf schon gerechnet ist.
+check_neu() { # <sha> <status> <titel> <text> [<ziel-sha>]
   gh_api -X POST "repos/$REPO/check-runs" -f name="$NAME" -f head_sha="$1" -f status="$2" \
-    -f "output[title]=$3" -f "output[summary]=$4" --jq .id
+    -f external_id="${5:-}" -f "output[title]=$3" -f "output[summary]=$4" --jq .id
+}
+
+# Abfrage der Check-Runs dieses Namens auf <sha>. Ohne `filter=all` liefert GitHub je Check-Suite
+# nur den jüngsten, und alle Runs der Checks-API liegen in einer Suite.
+check_runs_pfad() { # <sha> [all]
+  printf 'repos/%s/commits/%s/check-runs?check_name=%s&per_page=100%s' "$REPO" "$1" \
+    "$(jq -rn --arg n "$NAME" '$n | @uri')" "${2:+&filter=$2}"
 }
 
 # Status des jüngsten Checks dieses Namens auf <sha>, leer, wenn es keinen gibt.
 check_status() { # <sha>
-  gh_api "repos/$REPO/commits/$1/check-runs?check_name=$(jq -rn --arg n "$NAME" '$n | @uri')&per_page=100" \
-    --jq '[.check_runs[]] | sort_by(.id) | last | .status // ""'
+  gh_api "$(check_runs_pfad "$1")" --jq '[.check_runs[]] | sort_by(.id) | last | .status // ""'
 }
 
 # Die offenen PRs als TSV: nr, kopf, kopf-branch, fertig, entwurf, fork.
@@ -92,7 +101,7 @@ verteilen() { # <ziel-branch> <ziel-sha>
     [ "$fork" = false ] || { echo "PR #$nr: Fork, kein Check" >&2; continue; }
     if [ "$fertig" = true ] && [ "$entwurf" = false ]; then
       id="$(check_neu "$kopf" in_progress "Rechnet gegen $ziel $(kurz "$ziel_sha")" \
-        "Der PR wird mit dem aktuellen Stand von \`$ziel\` zusammengeführt und kompiliert.")" \
+        "Der PR wird mit dem aktuellen Stand von \`$ziel\` zusammengeführt und kompiliert." "$ziel_sha")" \
         || { echo "::warning::PR #$nr: Check nicht gesetzt"; fehler=1; continue; }
       if antwort="$(gh_api -X POST "repos/$REPO/actions/workflows/ziel-branch-build.yml/dispatches" -f ref="$zweig" \
         -f "inputs[nr]=$nr" -f "inputs[kopf]=$kopf" -f "inputs[check_id]=$id" \
@@ -136,7 +145,7 @@ auswahl_aus() { # <ziel-branch> <ziel-sha> <prs-json mit einem PR>
       echo "PR #$nr: Fork, kein Check" >&2
     elif [ "$fertig" = true ] && [ "$entwurf" = false ]; then
       id="$(check_neu "$kopf" in_progress "Rechnet gegen $ziel $(kurz "$ziel_sha")" \
-        "Der PR wird mit dem aktuellen Stand von \`$ziel\` zusammengeführt und kompiliert.")"
+        "Der PR wird mit dem aktuellen Stand von \`$ziel\` zusammengeführt und kompiliert." "$ziel_sha")"
       echo "PR #$nr: fertig, rechnet (Check $id)" >&2
       liste="$(jq -c --argjson nr "$nr" --arg kopf "$kopf" --argjson id "$id" \
         '. + [{nr: $nr, kopf: $kopf, check_id: $id}]' <<< "$liste")"
@@ -147,8 +156,8 @@ auswahl_aus() { # <ziel-branch> <ziel-sha> <prs-json mit einem PR>
   printf '%s\n' "$liste"
 }
 
-einzellauf() { # <pr-nr> <ref> <check-id> <ziel-branch> <ziel-sha>
-  local nr="$1" ref="$2" alt_id="$3" ziel="$4" ziel_sha="$5" prs grund=""
+einzellauf() { # <pr-nr> <ref> <check-id> <kopf-sha> <ziel-branch> <ziel-sha>
+  local nr="$1" ref="$2" alt_id="$3" alt_kopf="$4" ziel="$5" ziel_sha="$6" prs grund="" kopf frueher
   prs="$(gh_api "repos/$REPO/pulls/$nr" --jq '[.]')"
   case " alpha beta main " in *" $ref "*) grund="läuft auf dem Kanal-Branch $ref" ;; esac
   if [ -z "$grund" ] && [ "$(jq -r '.[0].head.repo.full_name // ""' <<< "$prs")" != "$REPO" ]; then
@@ -162,7 +171,25 @@ einzellauf() { # <pr-nr> <ref> <check-id> <ziel-branch> <ziel-sha>
     printf '[]\n'
     return 0
   fi
-  echo "PR #$nr: Check $alt_id von verteilen bleibt offen, melden schließt ihn" >&2
+  kopf="$(jq -r '.[0].head.sha' <<< "$prs")"
+  if [ "$kopf" = "$alt_kopf" ]; then
+    # Schon gerechnet: ein abgeschlossenes Ergebnis (grün oder rot) zu genau diesem Stand. Nicht
+    # lesbar: rechnen wie immer.
+    # `gh --jq` kennt kein --arg; der Stand ist ein Commit-Hash und steht als JSON-String im Filter.
+    frueher="$(gh_api "$(check_runs_pfad "$kopf" all)" --paginate --jq \
+      ".check_runs[] | select(.status == \"completed\" and .external_id == $(jq -rn --arg z "$ziel_sha" '$z | @json')
+        and (.conclusion == \"success\" or .conclusion == \"failure\"))
+      | [.id, .conclusion, .output.title, .output.summary] | @json" 2> /dev/null \
+      | jq -s -c 'sort_by(.[0]) | last // empty' 2> /dev/null || true)"
+    if [ -n "$frueher" ] && gh_api -X PATCH "repos/$REPO/check-runs/$alt_id" -f status=completed \
+      -f conclusion="$(jq -r '.[1]' <<< "$frueher")" -f "output[title]=$(jq -r '.[2] // ""' <<< "$frueher")" \
+      -f "output[summary]=$(jq -r '.[3] // ""' <<< "$frueher") (Übernommen aus Check $(jq -r '.[0]' <<< "$frueher"), gerechnet gegen denselben Stand.)" > /dev/null; then
+      echo "PR #$nr: $(kurz "$ziel_sha") ist auf $(kurz "$kopf") schon gerechnet, Check $alt_id übernimmt das Ergebnis" >&2
+      printf '[]\n'
+      return 0
+    fi
+  fi
+  echo "PR #$nr: Check $alt_id von verteilen bleibt offen, ein frischer rechnet" >&2
   auswahl_aus "$ziel" "$ziel_sha" "$prs"
 }
 
@@ -224,7 +251,7 @@ aufruf() { sed -n '6,/^#   Umgebung/p' "$0" >&2; exit 2; }
 case "${1:-}" in
   verteilen) [ $# -eq 3 ] || aufruf; shift; verteilen "$@" ;;
   auswahl) [ $# -eq 4 ] || aufruf; shift; auswahl "$@" ;;
-  einzellauf) [ $# -eq 6 ] || aufruf; shift; einzellauf "$@" ;;
+  einzellauf) [ $# -eq 7 ] || aufruf; shift; einzellauf "$@" ;;
   melden) [ $# -eq 8 ] || aufruf; shift; melden "$@" ;;
   *) aufruf ;;
 esac
