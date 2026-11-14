@@ -995,22 +995,6 @@ pub fn lies_paket(bytes: &[u8], zone: Tz) -> Result<(PlanPaket, Vec<ImportMeldun
     Ok((paket, meldungen))
 }
 
-/// Bytes einer Datei aus einem Lesestrom, höchstens [`DATEI_MAX_BYTES`] (400 darüber).
-pub fn begrenzt_lesen(mut r: impl Read) -> Result<Vec<u8>, AppError> {
-    let mut puffer = Vec::new();
-    r.by_ref()
-        .take(DATEI_MAX_BYTES as u64 + 1)
-        .read_to_end(&mut puffer)
-        .map_err(|_| unlesbar("Datei"))?;
-    if puffer.len() > DATEI_MAX_BYTES {
-        return Err(AppError::Validation(format!(
-            "Die Datei ist größer als {} MB",
-            DATEI_MAX_BYTES / (1024 * 1024)
-        )));
-    }
-    Ok(puffer)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
