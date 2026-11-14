@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Typography } from 'antd';
+import { Button, Typography } from 'antd';
+import { ladeArchivEinspielenVerfuegbarkeit } from '../api/archivEinspielen';
 import { ladeAufbewahrung } from '../api/aufbewahrung';
 import { globalKeys } from '../api/queryKeys';
-import type { AufbewahrungEintrag } from '../api/types';
+import type { ArchivEingespielt, AufbewahrungEintrag } from '../api/types';
 import { adminAufbewahrungAktePfad, defaultAdminPfad } from '../admin/adminNav';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuth } from '../auth/AuthContext';
@@ -16,6 +18,8 @@ import { istAdmin } from '../einsatz/schreibrecht';
 import { aufbewahrungZustand } from '../theme/statusFarben';
 import { standVerworfen } from './archivAbruf';
 import { ZUSTAENDE, ZUSTAND_RANG } from './archivText';
+import { ArchivEingespieltErgebnis, ArchivEinspielenDialog } from './ArchivEinspielen';
+import { IconHochladen } from '../icons';
 
 /**
  * Aufbewahrungsübersicht der Verwaltung — `/admin/aufbewahrung`, nur System-Admin (sonst
@@ -206,12 +210,28 @@ export default function AufbewahrungUebersicht() {
   // über den Bestand — kein Leertext unter dem Fehler (LFH-756, Prinzip aus LFH-612).
   const eintraege = abfrage.isError && standVerworfen(abfrage.error) ? undefined : abfrage.data;
   const ohneStand = abfrage.isError && eintraege === undefined;
+  const einspielen = useQuery({
+    queryKey: globalKeys.archivEinspielen(),
+    queryFn: ladeArchivEinspielenVerfuegbarkeit,
+    enabled: admin,
+  });
+  const [einspielenOffen, setEinspielenOffen] = useState(false);
+  const [eingespielt, setEingespielt] = useState<ArchivEingespielt | null>(null);
 
   if (!authLaedt && !admin) return <Navigate to={defaultAdminPfad()} replace />;
 
   return (
     <AdminPage
       titel="Aufbewahrung"
+      aktionen={
+        // Ausgeblendet nur, wo der Server „nicht verfügbar“ sagt (Hub); scheitert die Abfrage,
+        // entscheidet der Server beim Einspielen (422).
+        (einspielen.data?.verfuegbar || einspielen.isError) && (
+          <Button type="primary" icon={<IconHochladen />} onClick={() => setEinspielenOffen(true)}>
+            Archiv einspielen
+          </Button>
+        )
+      }
       hinweis={
         ohneStand ? (
           <SeitenFehler
@@ -224,6 +244,12 @@ export default function AufbewahrungUebersicht() {
         ) : undefined
       }
     >
+      {eingespielt && (
+        <ArchivEingespieltErgebnis
+          ergebnis={eingespielt}
+          onSchliessen={() => setEingespielt(null)}
+        />
+      )}
       {!ohneStand && (
         <Datensicht
           bezeichnung="Aufbewahrung"
@@ -241,6 +267,11 @@ export default function AufbewahrungUebersicht() {
           }}
         />
       )}
+      <ArchivEinspielenDialog
+        offen={einspielenOffen}
+        onSchliessen={() => setEinspielenOffen(false)}
+        onEingespielt={setEingespielt}
+      />
     </AdminPage>
   );
 }

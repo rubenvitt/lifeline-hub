@@ -42,6 +42,15 @@ export type EinwurfZugangAnzeige = S['EinwurfZugangAnzeige'];
 export type EinwurfZugangSchluessel = S['EinwurfZugangSchluessel'];
 export type EinwurfTransport = S['EinwurfTransport'];
 export type ZugangZustand = S['ZugangZustand'];
+// Webhook einer Anbindung (LLH-1656).
+export type WebhookAnzeige = S['WebhookAnzeige'];
+export type WebhookLetzterFehler = S['WebhookLetzterFehler'];
+export type WebhookVersuch = S['WebhookVersuch'];
+export type WebhookTestErgebnis = S['WebhookTestErgebnis'];
+export type WebhookZustand = S['WebhookZustand'];
+export type WebhookFehler = S['WebhookFehler'];
+export type RuhtGrund = S['RuhtGrund'];
+export type EventType = S['EventType'];
 export type AblehnungGrund = S['AblehnungGrund'];
 // Lagebild für Externe (LLH-1496)
 export type LagebildStufe = S['LagebildStufe'];
@@ -1916,6 +1925,8 @@ export type ArchivAkte = S['ArchivAkteAnzeige'];
 // Archiv am Hub (LLH-1494): Block der Archivakte und Archiv-Schlüssel der Org.
 export type ArchivAngabe = S['ArchivAngabe'];
 export type ArchivEmpfaengerAnzeige = S['ArchivEmpfaengerAnzeige'];
+export type ArchivEingespielt = S['ArchivEingespieltAnzeige'];
+export type ArchivEinspielenVerfuegbarkeit = S['ArchivEinspielenVerfuegbarkeit'];
 export type NeuerArchivEmpfaenger = S['NeuerArchivEmpfaenger'];
 export type ArchivPerson = S['ArchivPersonAnzeige'];
 export type ArchivTier = S['ArchivTierAnzeige'];

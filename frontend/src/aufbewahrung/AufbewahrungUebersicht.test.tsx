@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { AufbewahrungEintrag, BenutzerAnzeige } from '../api/types';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { meHandler, server } from '../test/server';
@@ -14,6 +14,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import { kopfFilterWaehlen } from '../test/kopfFilter';
 import { ort, Ortsfuehler } from '../test/ortsfuehler';
+import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 
 /** Übersicht. */
 
@@ -323,5 +324,161 @@ describe('AufbewahrungUebersicht — gescheiterter Abruf (LFH-756)', () => {
     await client.invalidateQueries({ queryKey: globalKeys.aufbewahrung() });
     expect(await screen.findByText('Aufbewahrung nicht ladbar')).toBeInTheDocument();
     expect(screen.queryByText('E-2026-0007')).toBeNull();
+  });
+});
+
+describe('AufbewahrungUebersicht — Archiv einspielen (LLH-1711)', () => {
+  const BLOCK = new File(['age-block'], 'einsatz-E-2026-0007-block-1.sqlite.age');
+  const SCHLUESSEL = 'AGE-SECRET-KEY-1QQQQ';
+
+  /** Zeigt die Seite; `verfuegbar: 'fehler'` lässt die Verfügbarkeitsabfrage scheitern. */
+  function zeigeMitEinsatz(verfuegbar: boolean | 'fehler' = true) {
+    const abfrage = { gefragt: false };
+    server.use(
+      meHandler(ME_ADMIN),
+      http.get('/api/aufbewahrung', () => HttpResponse.json(EINTRAEGE)),
+      http.get('/api/admin/archiv/einspielen', () => {
+        abfrage.gefragt = true;
+        return verfuegbar === 'fehler'
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json({ verfuegbar });
+      }),
+    );
+    const { client } = renderMitProviders(
+      <Routes>
+        <Route path="/admin/aufbewahrung" element={<AufbewahrungUebersicht />} />
+        <Route path="/einsaetze/:einsatzId" element={<Ort />} />
+      </Routes>,
+      { route: '/admin/aufbewahrung' },
+    );
+    return { abfrage, client };
+  }
+
+  /** Öffnet den Dialog, wählt den Block und fügt den Schlüssel als Text ein. */
+  async function ausfuellen() {
+    await userEvent.click(await screen.findByRole('button', { name: 'Archiv einspielen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Archiv einspielen' });
+    await userEvent.upload(within(dialog).getByLabelText('Archivblock'), BLOCK);
+    // antd legt das Radio-Input unter seine Beschriftung (pointer-events: none).
+    await userEvent.click(within(dialog).getByText('Eingefügt'));
+    await userEvent.type(within(dialog).getByLabelText('Schlüssel'), SCHLUESSEL);
+    return dialog;
+  }
+
+  it('fehlt an einer Instanz, bei der sich eine andere meldet', async () => {
+    const { abfrage } = zeigeMitEinsatz(false);
+    await tabelle();
+    // Erst nach der Antwort ist die Abwesenheit ein Befund, vorher fehlte der Knopf ohnehin.
+    await waitFor(() => expect(abfrage.gefragt).toBe(true));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByRole('button', { name: 'Archiv einspielen' })).toBeNull();
+  });
+
+  it('bietet die Aktion an, wenn die Verfügbarkeit nicht abrufbar ist: der Server entscheidet', async () => {
+    zeigeMitEinsatz('fehler');
+    expect(await screen.findByRole('button', { name: 'Archiv einspielen' })).toBeInTheDocument();
+  });
+
+  it('zählt die Passphrase in Bytes wie der Server', async () => {
+    const anfragen = installiereXhrAttrappe();
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    zeigeMitEinsatz();
+    const dialog = await ausfuellen();
+    // 600 Umlaute sind 600 Zeichen, aber 1200 Bytes.
+    await userEvent.click(within(dialog).getByLabelText('Passphrase der Schlüsseldatei'));
+    await userEvent.paste('ä'.repeat(600));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
+    expect(await within(dialog).findByText('Passphrase zu lang')).toBeInTheDocument();
+    expect(anfragen).toHaveLength(0);
+  });
+
+  it('sperrt Abbrechen, solange eingespielt wird, und nennt eine Ablehnung „Nicht eingespielt“', async () => {
+    const anfragen = installiereXhrAttrappe();
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    zeigeMitEinsatz();
+    const dialog = await ausfuellen();
+    expect(within(dialog).getByLabelText('Passphrase der Schlüsseldatei')).toHaveAttribute(
+      'maxLength',
+      '1024',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
+    await waitFor(() => expect(anfragen).toHaveLength(1));
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    anfragen[0].uebertragen();
+    anfragen[0].antworten(400, { error: 'Die Aufbewahrung dieses Einsatzes ist abgelaufen' });
+    expect(await within(dialog).findByText('Nicht eingespielt')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Nicht abgelegt')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+  });
+
+  it('schickt Schlüssel und Block und behält bei einer Ablehnung die Eingaben', async () => {
+    const anfragen = installiereXhrAttrappe();
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    zeigeMitEinsatz();
+    const dialog = await ausfuellen();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
+    await waitFor(() => expect(anfragen).toHaveLength(1));
+    const fd = anfragen[0].body as FormData;
+    expect(anfragen[0].url).toBe('/api/admin/archiv/einspielen');
+    expect([...fd.keys()]).toEqual(['schluessel', 'block']);
+    expect(fd.get('schluessel')).toBe(SCHLUESSEL);
+    expect(fd.get('block')).toBe(BLOCK);
+
+    anfragen[0].uebertragen();
+    anfragen[0].antworten(400, { error: 'Der Schlüssel passt nicht zu dieser Sicherung' });
+    expect(await within(dialog).findByText(/Schlüssel passt nicht/)).toBeInTheDocument();
+    expect(within(dialog).getByText(BLOCK.name)).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Schlüssel')).toHaveValue(SCHLUESSEL);
+  });
+
+  it('zeigt nach dem Einspielen Einsatz, Frist in der Anzeigezeit und Hinweise und führt hinein', async () => {
+    const anfragen = installiereXhrAttrappe();
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    const seite = zeigeMitEinsatz();
+    const dialog = await ausfuellen();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Einspielen' }));
+    await waitFor(() => expect(anfragen).toHaveLength(1));
+    anfragen[0].uebertragen();
+    anfragen[0].antworten(200, {
+      einsatz_id: 77,
+      bezeichnung: 'Hochwasser Nord',
+      einsatznummer: 'E-2026-0007',
+      org_name: 'Test-Orga',
+      loeschen_at: '2026-11-15 18:00:00',
+      inhalte: 3,
+      hinweise: [
+        'Eine Frist des Blocks endet am 2026-11-15 18:00:00 (UTC); der Einsatz geht dann schon.',
+        'Vor dem Einspielen geschwärzt (Frist abgelaufen): personenauskunft',
+      ],
+      frist_endet_at: '2026-11-15 18:00:00',
+    });
+    const ergebnis = await screen.findByRole('region', { name: 'Eingespielt' });
+    // Der private Schlüssel bleibt nicht als Variable einer Mutation im Cache.
+    await waitFor(() =>
+      expect(
+        JSON.stringify(
+          seite.client
+            .getMutationCache()
+            .getAll()
+            .map((m) => m.state.variables),
+        ),
+      ).not.toContain(SCHLUESSEL),
+    );
+    expect(within(ergebnis).getByText(/E-2026-0007 · Hochwasser Nord/)).toBeInTheDocument();
+    const bis = zeitpunkt('2026-11-15 18:00:00', DEFAULT_KONVENTIONEN);
+    expect(ergebnis).toHaveTextContent(bis);
+    // Der Satz mit UTC-Zeit des Befehls steht nicht da; die Frist nennt die Anzeigezeit.
+    expect(ergebnis).not.toHaveTextContent('(UTC)');
+    expect(within(ergebnis).getByText(/geschwärzt.*personenauskunft/)).toBeInTheDocument();
+    await userEvent.click(within(ergebnis).getByRole('button', { name: 'Einsatz öffnen' }));
+    expect(await screen.findByLabelText('Ort')).toHaveTextContent('/einsaetze/77');
   });
 });

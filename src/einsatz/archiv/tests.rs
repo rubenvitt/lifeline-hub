@@ -508,21 +508,32 @@ async fn start_raeumt_liegengebliebene_zwischendateien_weg() {
     let einspielen_alt = dir
         .path()
         .join("lifeline-zwischen-archiv-0-einspielen-0b.sqlite");
+    // Ein Block, der gerade über die Verwaltung hochgeladen wird (LLH-1711), ebenso.
+    let hochgeladen_frisch = dir
+        .path()
+        .join("lifeline-zwischen-archiv-0-hochgeladen-0c.sqlite");
+    let hochgeladen_alt = dir
+        .path()
+        .join("lifeline-zwischen-archiv-0-hochgeladen-0d.sqlite");
     for p in [
         &liegen,
         &nachbar,
         &fremd,
         &einspielen_frisch,
         &einspielen_alt,
+        &hochgeladen_frisch,
+        &hochgeladen_alt,
     ] {
         std::fs::write(p, b"x").unwrap();
     }
-    std::fs::File::options()
-        .write(true)
-        .open(&einspielen_alt)
-        .unwrap()
-        .set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 3600))
-        .unwrap();
+    for alt in [&einspielen_alt, &hochgeladen_alt] {
+        std::fs::File::options()
+            .write(true)
+            .open(alt)
+            .unwrap()
+            .set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 3600))
+            .unwrap();
+    }
     zwischendateien_aufraeumen(&pool).await;
     assert!(!liegen.exists());
     assert!(!nachbar.exists());
@@ -532,6 +543,11 @@ async fn start_raeumt_liegengebliebene_zwischendateien_weg() {
         "ein laufendes Einspielen behält seine Datei"
     );
     assert!(!einspielen_alt.exists());
+    assert!(
+        hochgeladen_frisch.exists(),
+        "ein laufender Upload behält seine Datei"
+    );
+    assert!(!hochgeladen_alt.exists());
     assert!(dir.path().join("hub.sqlite").exists());
 }
 
