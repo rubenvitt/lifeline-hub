@@ -45,6 +45,7 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.instanzkopplung()).toEqual(['instanzkopplung']);
     // Archiv-Schlüssel der Org (LLH-1494), Verwaltung → Einstellungen.
     expect(globalKeys.orgArchivSchluessel()).toEqual(['org-archiv-schluessel']);
+    expect(globalKeys.archivEinspielen()).toEqual(['archiv-einspielen']);
     expect(globalKeys.instanzkopplungLetzteSchluessel()).toEqual([
       'instanzkopplung',
       'letzte-schluessel',

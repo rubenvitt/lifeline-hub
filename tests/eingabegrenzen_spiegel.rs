@@ -313,6 +313,19 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "UHS_SOLL_ANZAHL_MAX",
             usize::try_from(lifeline_hub::uhs::SOLL_ANZAHL_MAX).unwrap(),
         ),
+        // Archiv einspielen (LLH-1711): Block in Bytes, Schlüssel und Passphrase.
+        (
+            "ARCHIV_BLOCK_MAX_BYTES",
+            lifeline_hub::transfer::ARCHIV_BLOCK_MAX,
+        ),
+        (
+            "ARCHIV_PRIVATSCHLUESSEL_MAX",
+            lifeline_hub::routes::archiv_einspielen::PRIVATSCHLUESSEL_MAX,
+        ),
+        (
+            "ARCHIV_PASSPHRASE_MAX",
+            lifeline_hub::routes::archiv_einspielen::PASSPHRASE_MAX,
+        ),
     ])
 }
 

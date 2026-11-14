@@ -236,6 +236,8 @@ use utoipa::OpenApi;
         crate::routes::lagebild_extern::LagebildQuelle,
         crate::routes::lagebild_extern::LagebildEinsatz,
         crate::routes::instanz::InstanzUebersicht,
+        crate::routes::archiv_einspielen::ArchivEinspielenVerfuegbarkeit,
+        crate::routes::archiv_einspielen::ArchivEingespieltAnzeige,
         crate::routes::instanz::KopplungscodeAntwort,
         crate::routes::instanz::ElwVerlorenAntwort,
         crate::routes::instanz::UnterschriftRegistrierenStart,

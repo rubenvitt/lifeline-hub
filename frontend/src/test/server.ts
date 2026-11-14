@@ -233,6 +233,11 @@ export const server = setupServer(
     HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
   ),
   /**
+   * Archiv einspielen (LLH-1711): verfügbar als Default, wie an einer Installation ohne Kopplung,
+   * bei der sich eine andere meldet. Tests des Hubs überschreiben per `server.use()`.
+   */
+  http.get('/api/admin/archiv/einspielen', () => HttpResponse.json({ verfuegbar: true })),
+  /**
    * Datenträgerprüfung (LFH-1100): alles verschlüsselt als Default, damit die Verwaltung keine
    * Warnleiste zeigt. Tests der Warnung überschreiben per `server.use()`.
    */

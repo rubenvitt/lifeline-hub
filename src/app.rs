@@ -1,7 +1,7 @@
 use crate::karte::FachebenenState;
 use crate::live::LiveHub;
 use crate::routes;
-use crate::transfer::UPLOAD_BODY_MAX;
+use crate::transfer::{ARCHIV_BLOCK_BODY_MAX, UPLOAD_BODY_MAX};
 use axum::{
     extract::DefaultBodyLimit,
     response::IntoResponse,
@@ -1957,6 +1957,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1490: Instanzkopplung. Verwaltung nur für den Admin der Org; Einlösen öffentlich
         // (IP-Sperre wie die Gerätekopplung), Melden signiert (`instanz::extractor`).
+        // LLH-1711: Archivblock in der Verwaltung einspielen. Eigene Body-Grenze für Blöcke bis
+        // 256 MiB und die gemeinsame Upload-Grenze; dem Zeitbudget entzogen
+        // (`zulassung::OHNE_ZULASSUNGSGRENZE`).
+        .route(
+            "/api/admin/archiv/einspielen",
+            post(routes::archiv_einspielen::einspielen)
+                .layer(DefaultBodyLimit::max(ARCHIV_BLOCK_BODY_MAX))
+                .route_layer(upload_grenze.clone())
+                // Erst danach: die Verfügbarkeit trägt weder Body- noch Upload-Grenze.
+                .get(routes::archiv_einspielen::verfuegbarkeit),
+        )
         .route("/api/admin/instanz", get(routes::instanz::uebersicht))
         // LLH-1491: Führung der Einsätze beim Gegenüber (Akten ohne lokalen Einsatz).
         .route(

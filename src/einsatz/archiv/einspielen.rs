@@ -23,7 +23,8 @@
 //!   Vollzieht ein Löschersuchen später, geht eine eingespielte Kopie seiner Blöcke mit
 //!   (`archiv::alle_loeschen_tx`).
 //! - Bis die Inhalte geschrieben sind, ist der Einsatz nach [`FERTIG_MINUTEN`] fällig: bricht der
-//!   Befehl ab, räumt Phase R den halben Einsatz bald ab.
+//!   Befehl ab, räumt Phase R den halben Einsatz bald ab. Die Admin-Spur entsteht erst mit dem
+//!   Abschluss, in derselben Transaktion.
 
 use super::bauen;
 use crate::backup::verschluesselung::Schluessel;
@@ -52,8 +53,31 @@ pub const GEGENSTELLE: &str = "Archiv";
 /// der halbe Einsatz danach zum Abräumen fällig.
 pub const FERTIG_MINUTEN: i64 = 60;
 
-/// Wer einspielt, in der Admin-Spur.
+/// Wer einspielt, in der Admin-Spur, wenn es der Befehl ist.
 const BEFEHL: &str = "Befehl archiv einspielen";
+
+/// In welche Organisation eingespielt wird (LLH-1711, design.md D2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ziel {
+    /// Befehl ohne `--org`: die Org mit der ID des Archivs, wenn sie hier gleich heißt.
+    AusArchiv,
+    /// Befehl mit `--org`: diese Org, ohne Namensprüfung.
+    Org(i64),
+    /// Verwaltung: die Org der handelnden Person; sie muss so heißen wie die Org im Archiv.
+    EigeneOrg(i64),
+}
+
+/// Wer einspielt, für die Admin-Spur (LLH-1711, design.md D2).
+#[derive(Debug, Clone, Copy)]
+pub enum Akteur<'a> {
+    /// Der Befehl `archiv einspielen`: kein Konto, als Name [`BEFEHL`].
+    Befehl,
+    /// Ein System-Admin über die Verwaltung.
+    Person {
+        benutzer: &'a crate::auth::Benutzer,
+        peer_ip: Option<std::net::IpAddr>,
+    },
+}
 
 /// Name, an dem eine Stammdatenzeile der Datei als dieselbe hier gilt (zusammen mit ID und Org),
 /// je Stammdaten-Tabelle des Archivs außer Org und Konten ([`bauen::STAMM`]).
@@ -82,6 +106,9 @@ pub struct Eingespielt {
     pub inhalte: usize,
     /// Was nicht oder anders übernommen wurde.
     pub hinweise: Vec<String>,
+    /// Endet eine Frist des Blocks vor den 7 Tagen: wann (UTC). Dann geht der Einsatz zu diesem
+    /// Zeitpunkt, und ein Hinweis nennt ihn als Satz.
+    pub frist_endet_at: Option<String>,
 }
 
 /// Der Einsatz in der Datei.
@@ -117,31 +144,78 @@ fn datei_sha256(datei: &Path) -> Result<String, AppError> {
     Ok(hex(&hash.finalize()))
 }
 
-/// Spielt den Block `datei` mit `schluessel` ein, in die Org `org` (ohne Angabe: die Org des
-/// Einsatzes, wenn es sie hier gibt).
+/// Legt die Datei an, in die die Verwaltung einen hochgeladenen Block schreibt (LLH-1711,
+/// design.md D4): neben der Datenbank, nur für den Dienst lesbar, gelöscht beim Fallenlassen und
+/// nach einem Absturz vom Purge-Lauf, sobald sie alt ist.
+pub async fn ablage(pool: &SqlitePool) -> Result<(bauen::Zwischendatei, std::fs::File), AppError> {
+    bauen::zwischendatei(&bauen::verzeichnis(pool).await?, 0, bauen::TEIL_HOCHGELADEN)
+}
+
+/// Schreiber, der mit einem Fehler endet, sobald `abbruch` gesetzt ist: fällt das Einspielen
+/// (Abbruch des Browsers, Strg+C), hört das Entschlüsseln auf dem Blocking-Thread mit dem nächsten
+/// Block auf, statt den ganzen Block noch zu schreiben.
+struct Abbrechbar<W> {
+    innen: W,
+    abbruch: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl<W: std::io::Write> std::io::Write for Abbrechbar<W> {
+    fn write(&mut self, puffer: &[u8]) -> std::io::Result<usize> {
+        if self.abbruch.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(std::io::Error::other("Einspielen abgebrochen"));
+        }
+        self.innen.write(puffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.innen.flush()
+    }
+}
+
+/// Spielt den Block `datei` mit `schluessel` in die Org nach `ziel` ein; `akteur` steht in der
+/// Admin-Spur.
+///
+/// Hashen und Entschlüsseln laufen auf einem Blocking-Thread (bis 256 MiB aus der Verwaltung,
+/// LLH-1711): auf dem Async-Worker stünden sonst andere Anfragen. Der Schlüssel geht mit dorthin
+/// und wird dort fallen gelassen, sobald der Block entschlüsselt ist.
 pub async fn einspielen(
     pool: &SqlitePool,
     datei: &Path,
-    schluessel: &Schluessel,
-    org: Option<i64>,
+    schluessel: Schluessel,
+    ziel: Ziel,
+    akteur: Akteur<'_>,
     jetzt: DateTime<Utc>,
 ) -> Result<Eingespielt, AppError> {
     let jetzt_s = crate::zeit::formatiere_utc(jetzt);
-    let sha256 = datei_sha256(datei)?;
-    let (zwischen, handle) =
-        bauen::zwischendatei(&bauen::verzeichnis(pool).await?, 0, bauen::TEIL_EINSPIELEN)?;
-    schluessel
-        .entschluessele_datei(datei, std::io::BufWriter::new(handle))
-        .and_then(|mut w| {
-            std::io::Write::flush(&mut w)
-                .map_err(|e| AppError::Internal(format!("Archivblock schreiben: {e}")))
-        })
-        .map_err(|e| match e {
-            AppError::Validation(m) => AppError::Validation(format!("Archivblock: {m}")),
-            andere => andere,
-        })?;
+    let verzeichnis = bauen::verzeichnis(pool).await?;
+    let abbruch = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let _abbruch_bei_drop = crate::backup::verschluesselung::AbbruchBeiDrop(abbruch.clone());
+    let quelle = datei.to_path_buf();
+    let (sha256, zwischen) = tokio::task::spawn_blocking(move || {
+        let sha256 = datei_sha256(&quelle)?;
+        // Erst angelegt, dann beschrieben: scheitert etwas, löscht `Drop` die Teildatei.
+        let (zwischen, handle) = bauen::zwischendatei(&verzeichnis, 0, bauen::TEIL_EINSPIELEN)?;
+        let ausgabe = Abbrechbar {
+            innen: std::io::BufWriter::new(handle),
+            abbruch,
+        };
+        let entschluesselt = schluessel
+            .entschluessele_datei(&quelle, ausgabe)
+            .and_then(|mut w| {
+                std::io::Write::flush(&mut w)
+                    .map_err(|e| AppError::Internal(format!("Archivblock schreiben: {e}")))
+            })
+            .map_err(|e| match e {
+                AppError::Validation(m) => AppError::Validation(format!("Archivblock: {m}")),
+                andere => andere,
+            });
+        drop(schluessel);
+        entschluesselt.map(|_| (sha256, zwischen))
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Archivblock entschlüsseln: {e}")))??;
     let archiv = bauen::oeffnen(zwischen.pfad(), false).await?;
-    let ergebnis = einspielen_aus(pool, &archiv, &sha256, org, jetzt, &jetzt_s).await;
+    let ergebnis = einspielen_aus(pool, &archiv, &sha256, ziel, akteur, jetzt, &jetzt_s).await;
     archiv.close().await;
     drop(zwischen);
     ergebnis
@@ -151,7 +225,8 @@ async fn einspielen_aus(
     pool: &SqlitePool,
     archiv: &SqlitePool,
     sha256: &str,
-    org: Option<i64>,
+    ziel: Ziel,
+    akteur: Akteur<'_>,
     jetzt: DateTime<Utc>,
     jetzt_s: &str,
 ) -> Result<Eingespielt, AppError> {
@@ -173,16 +248,28 @@ async fn einspielen_aus(
         return Err(kein_block());
     }
     if let Some(bis) = kopf.retention_bis.as_deref().filter(|b| *b <= jetzt_s) {
-        return Err(AppError::Validation(format!(
-            "Die Aufbewahrung dieses Einsatzes endete am {bis} (UTC); er wird nicht mehr \
-             eingespielt."
-        )));
+        // Die Oberfläche zeigt Zeiten in der Anzeigezone (ADR-0012), eine Meldung trägt keine;
+        // der Befehl nennt sie in UTC.
+        return Err(AppError::Validation(
+            if matches!(ziel, Ziel::EigeneOrg(_)) {
+                "Die Aufbewahrung dieses Einsatzes ist abgelaufen; er wird nicht mehr eingespielt."
+                    .to_string()
+            } else {
+                format!(
+                    "Die Aufbewahrung dieses Einsatzes endete am {bis} (UTC); er wird nicht mehr \
+                 eingespielt."
+                )
+            },
+        ));
     }
 
     // Vorab für eine klare Meldung; die Übernahme prüft es in ihrer Transaktion erneut.
     hier_geloescht(&mut *pool.acquire().await?, &kopf, sha256).await?;
 
-    let ziel_org = org.unwrap_or(kopf.org_id);
+    let ziel_org = match ziel {
+        Ziel::AusArchiv => kopf.org_id,
+        Ziel::Org(id) | Ziel::EigeneOrg(id) => id,
+    };
     let org_name: String = sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
         .bind(ziel_org)
         .fetch_optional(pool)
@@ -193,7 +280,7 @@ async fn einspielen_aus(
                  angeben."
             ))
         })?;
-    if org.is_none() {
+    if !matches!(ziel, Ziel::Org(_)) {
         // Org-IDs vergibt jede Installation selbst: ohne --org nur in die Org gleichen Namens.
         let im_archiv: Option<String> =
             sqlx::query_scalar("SELECT name FROM organisation WHERE id = ?")
@@ -201,11 +288,15 @@ async fn einspielen_aus(
                 .fetch_optional(archiv)
                 .await?;
         if im_archiv.as_deref() != Some(org_name.as_str()) {
-            return Err(AppError::Validation(format!(
-                "Organisation {ziel_org} heißt hier „{org_name}“, im Archiv „{}“; mit --org die \
-                 Ziel-Organisation angeben.",
-                im_archiv.unwrap_or_default()
-            )));
+            let im_archiv = im_archiv.unwrap_or_default();
+            return Err(AppError::Validation(if ziel == Ziel::AusArchiv {
+                format!(
+                    "Organisation {ziel_org} heißt hier „{org_name}“, im Archiv „{im_archiv}“; \
+                     mit --org die Ziel-Organisation angeben."
+                )
+            } else {
+                format!("Der Block gehört zur Organisation „{im_archiv}“, nicht zu „{org_name}“.")
+            }));
         }
     }
 
@@ -229,6 +320,7 @@ async fn einspielen_aus(
         .filter(|f| f.as_str() > jetzt_s)
         .chain(kopf.retention_bis.clone())
         .fold(sieben_tage.clone(), |a, f| a.min(f));
+    let frist_endet_at = (loeschen_at < sieben_tage).then(|| loeschen_at.clone());
     if loeschen_at < sieben_tage {
         hinweise.push(format!(
             "Eine Frist des Blocks endet am {loeschen_at} (UTC); der Einsatz geht dann schon."
@@ -295,8 +387,15 @@ async fn einspielen_aus(
     };
     // Erst jetzt ist der Einsatz vollständig und bekommt seine Zeit; ist er schon zum Abräumen
     // vorgemerkt (Frist, Löschersuchen), bleibt es dabei.
+    // Die Spur gehört zum Abschluss, nicht zur Übernahme: scheitert das Einspielen danach (ein
+    // Inhalt passt nicht, der Einsatz wurde abgeräumt), steht kein „Archiv eingespielt“ für einen
+    // Einsatz, den es nicht gibt (LLH-1711, Review). Ohne die Spur gilt das Einspielen nicht.
+    let spur_ziel = crate::aufbewahrung::antrag::einsatz_kennung(
+        kopf.einsatznummer_intern.as_deref(),
+        einsatz_id,
+    );
     let gesetzt = crate::write_retry!(pool, |conn| {
-        Ok(sqlx::query(
+        let gesetzt = sqlx::query(
             "UPDATE einsatz_archiv_eingespielt SET loeschen_at = ?1 WHERE einsatz_id = ?2 \
              AND NOT EXISTS (SELECT 1 FROM einsatz_abraeumen WHERE einsatz_id = ?2)",
         )
@@ -304,7 +403,24 @@ async fn einspielen_aus(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?
-        .rows_affected())
+        .rows_affected();
+        if gesetzt > 0 {
+            let aktion = crate::auth::admin_audit::AdminAktion::ArchivEingespielt;
+            let ziel = crate::auth::admin_audit::Ziel::Archiv(&spur_ziel);
+            match akteur {
+                Akteur::Befehl => {
+                    crate::auth::admin_audit::schreibe_ohne_akteur_tx(
+                        conn, aktion, ziel_org, BEFEHL, ziel,
+                    )
+                    .await?;
+                }
+                Akteur::Person { benutzer, peer_ip } => {
+                    crate::auth::admin_audit::schreibe_tx(conn, aktion, benutzer, ziel, peer_ip)
+                        .await?;
+                }
+            }
+        }
+        Ok(gesetzt)
     })?;
     if gesetzt == 0 {
         return Err(AppError::Internal(
@@ -326,6 +442,7 @@ async fn einspielen_aus(
         loeschen_at,
         inhalte,
         hinweise,
+        frist_endet_at,
     })
 }
 
@@ -565,19 +682,6 @@ async fn uebernehmen_tx(
         "DELETE FROM einsatz_mitgliedschaft WHERE einsatz_id = ?1 \
          AND benutzer_id IN (SELECT benutzer_id FROM archiv_konto WHERE einsatz_id = ?1)",
         einsatz_id,
-    )
-    .await?;
-    // Die Spur gehört zur Übernahme: ohne sie gilt das Einspielen nicht.
-    let ziel = crate::aufbewahrung::antrag::einsatz_kennung(
-        kopf.einsatznummer_intern.as_deref(),
-        einsatz_id,
-    );
-    crate::auth::admin_audit::schreibe_ohne_akteur_tx(
-        conn,
-        crate::auth::admin_audit::AdminAktion::ArchivEingespielt,
-        ziel_org,
-        BEFEHL,
-        crate::auth::admin_audit::Ziel::Archiv(&ziel),
     )
     .await?;
     Ok((einsatz_id, hinweise))
