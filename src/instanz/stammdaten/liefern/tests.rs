@@ -530,3 +530,54 @@ async fn neu_stempeln_hebt_die_org_ueber_den_gemeldeten_stand() {
     let n = liefere(&pool, 5_000, 1_000).await;
     assert_eq!(n.zeilen.len(), vorher.len());
 }
+
+#[tokio::test]
+async fn hoechster_stand_je_org() {
+    let pool = pool_mit_org().await;
+    let mut conn = pool.acquire().await.unwrap();
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 1, &alle_arten())
+            .await
+            .unwrap(),
+        0
+    );
+    drop(conn);
+    exec(
+        &pool,
+        "INSERT INTO fahrzeug (id, org_id, funkrufname) VALUES (1, 1, 'A')",
+    )
+    .await;
+    exec(
+        &pool,
+        "INSERT INTO fahrzeug (id, org_id, funkrufname) VALUES (2, 2, 'B')",
+    )
+    .await;
+    let eins = stand(&pool, "fahrzeug", "1").await.unwrap();
+    let mut conn = pool.acquire().await.unwrap();
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 1, &alle_arten())
+            .await
+            .unwrap(),
+        eins
+    );
+    let zwei: i64 =
+        sqlx::query_scalar("SELECT MAX(stand) FROM stammdaten_aenderung WHERE org_id = 2")
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert!(zwei > eins);
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 2, &alle_arten())
+            .await
+            .unwrap(),
+        zwei
+    );
+    // Eine Art, die die Gegenseite nicht kennt, zählt nicht: sonst wäre sie nie auf Stand.
+    let nur_material: HashSet<StammdatenArt> = [StammdatenArt::Material].into_iter().collect();
+    assert_eq!(
+        load_hoechster_stand(&mut conn, 1, &nur_material)
+            .await
+            .unwrap(),
+        0
+    );
+}
