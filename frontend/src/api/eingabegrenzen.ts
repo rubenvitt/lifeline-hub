@@ -268,5 +268,7 @@ export const ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX = 100;
 export const ARCHIV_SCHLUESSEL_MAX = 10;
 /** Name einer Anbindung (Maschinenzugang eines Fremdsystems, LLH-1652). */
 export const ANBINDUNG_NAME_MAX = 80;
+/** Ziel-URL eines Webhooks (LLH-1656), `public_api::webhook::URL_MAX`. */
+export const WEBHOOK_URL_MAX = 2048;
 /** Anzeigename eines Kontos (LLH-1702); steht als Unterzeichner in der Erklärung einer Notübernahme. */
 export const ANZEIGENAME_MAX = 200;

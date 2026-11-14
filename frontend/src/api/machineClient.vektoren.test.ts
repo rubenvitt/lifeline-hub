@@ -13,6 +13,7 @@ import {
   prepareRedeem,
   signRequest,
   verifyResponse,
+  verifyWebhook,
   type Credentials,
 } from '../../../docs/api/clients/typescript/machineClient';
 
@@ -71,5 +72,22 @@ describe('Maschinenzugang: TypeScript-Client gegen die Testvektoren', () => {
       verifyResponse(cred, r.jws, 'andere', r.status, enc.encode(r.body), r.iat),
     ).rejects.toThrow('Bezug');
     expect(b64(parseB64(vektoren.client_public_key))).toBe(vektoren.client_public_key);
+  });
+
+  it('prüft Webhook-Zustellungen und meldet je ungültigem Fall den Grund (LLH-1656)', async () => {
+    const w = vektoren.webhooks;
+    for (const f of w.faelle) {
+      const pruefung = verifyWebhook(
+        vektoren.instanz_public_key,
+        vektoren.instanz_id,
+        f.webhook_id,
+        f.jws,
+        enc.encode(f.body),
+        f.now,
+      );
+      if (f.fehler == null)
+        await expect(pruefung, f.name).resolves.toMatchObject({ aud: w.webhook_id });
+      else await expect(pruefung, f.name).rejects.toThrow(f.fehler);
+    }
   });
 });

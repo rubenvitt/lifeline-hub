@@ -42,6 +42,15 @@ export type EinwurfZugangAnzeige = S['EinwurfZugangAnzeige'];
 export type EinwurfZugangSchluessel = S['EinwurfZugangSchluessel'];
 export type EinwurfTransport = S['EinwurfTransport'];
 export type ZugangZustand = S['ZugangZustand'];
+// Webhook einer Anbindung (LLH-1656).
+export type WebhookAnzeige = S['WebhookAnzeige'];
+export type WebhookLetzterFehler = S['WebhookLetzterFehler'];
+export type WebhookVersuch = S['WebhookVersuch'];
+export type WebhookTestErgebnis = S['WebhookTestErgebnis'];
+export type WebhookZustand = S['WebhookZustand'];
+export type WebhookFehler = S['WebhookFehler'];
+export type RuhtGrund = S['RuhtGrund'];
+export type EventType = S['EventType'];
 export type AblehnungGrund = S['AblehnungGrund'];
 // Lagebild für Externe (LLH-1496)
 export type LagebildStufe = S['LagebildStufe'];
