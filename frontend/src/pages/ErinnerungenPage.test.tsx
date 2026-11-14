@@ -222,10 +222,11 @@ describe('ErinnerungenPage', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Ältere laden' }));
       expect(await screen.findByText(`Alt ${n * 100}`)).toBeInTheDocument();
     }
-    // Die sechste Seite schob die neueste aus dem Fenster; gezählt wird die Position, nicht das
-    // Fenster.
+    // Die sechste Seite schob die neueste aus dem Fenster; ohne Kopf nennt die Zeile keine
+    // Gesamtzahl, die Fensterlänge wäre keine Position.
     expect(screen.queryByText('Alt 0')).not.toBeInTheDocument();
-    expect(screen.getByText('600 von 1000 geladen')).toBeInTheDocument();
+    expect(screen.getByText('500 geladen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ältere laden' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Zu den neuesten springen' }));
     expect(await screen.findByText('Alt 0')).toBeInTheDocument();

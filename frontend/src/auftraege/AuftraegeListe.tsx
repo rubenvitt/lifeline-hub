@@ -52,7 +52,6 @@ import ZumKopfKnopf from '../components/ZumKopfKnopf';
 import {
   LISTEN_MAX_SEITEN,
   kopfVerlassen,
-  useFensterAnfang,
   useKopfBeimVerlassen,
 } from '../components/listenFenster';
 
@@ -459,7 +458,8 @@ export default function AuftraegeListe({
   const kennzahlen = kennzahlenQuery.data;
   // Vor der ersten Lieferung keine Zahl: „Offen (0)“ wäre eine falsche Aussage über die Lage.
   const offenZahl = kennzahlen?.offen ?? (offeneQuery.data ? offene.length : null);
-  // Position statt Fensterlänge (LLH-1687): vor dem Fenster liegen schon herausgefallene Einträge.
+  // Ohne Kopf im Fenster (LLH-1687) ist die geladene Zahl keine Position mehr: dann endet „Ältere
+  // laden“ allein an `hasNextPage`, und die Zeile nennt keine Gesamtzahl.
   const abgeschlossenSchluessel = einsatzKeys.auftraegePhase(
     einsatzId,
     'abgeschlossen',
@@ -467,9 +467,8 @@ export default function AuftraegeListe({
     empfaengerKey,
     suche,
   );
-  const vorFenster = useFensterAnfang(abgeschlosseneQuery.data, abgeschlossenSchluessel);
+  const ohneKopf = kopfVerlassen(abgeschlosseneQuery.data);
   useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
-  const bisPosition = vorFenster + abgeschlossene.length;
   const abgeschlossenZahl =
     kennzahlen?.abgeschlossen ??
     // Ohne Kopf im Fenster ist die geladene Zahl nicht mehr die ganze Menge.
@@ -664,7 +663,7 @@ export default function AuftraegeListe({
           // sagt, dass es keine gibt.
           !imOffenen &&
           abgeschlosseneQuery.hasNextPage &&
-          (kennzahlen == null || bisPosition < kennzahlen.abgeschlossen) && (
+          (ohneKopf || kennzahlen == null || abgeschlossene.length < kennzahlen.abgeschlossen) && (
             <div style={{ textAlign: 'center', marginTop: token.margin }}>
               <Button
                 onClick={() => void abgeschlosseneQuery.fetchNextPage()}
@@ -673,8 +672,8 @@ export default function AuftraegeListe({
                 Ältere laden
               </Button>
               <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                {bisPosition}
-                {abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`} geladen
+                {abgeschlossene.length}
+                {!ohneKopf && abgeschlossenZahl != null && ` von ${abgeschlossenZahl}`} geladen
               </div>
             </div>
           )

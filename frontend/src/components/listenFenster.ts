@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { onlineManager, useQueryClient } from '@tanstack/react-query';
 import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 
 /**
@@ -29,15 +29,17 @@ export function kopfVerlassen(daten: InfiniteData<unknown, unknown> | undefined)
  * ersetzen: Scheitert der Abruf, bleibt das Fenster, wie es ist — kein `resetQueries`, das ließe
  * bei schlechtem Netz eine leere Liste zurück. Liefert, ob ersetzt wurde.
  *
- * Kam während des Abrufs ein Live-Ereignis, hat `cancelQueries` dessen Neuladen abgebrochen und den
- * Stand „ungültig“ wiederhergestellt; `setQueryData` erklärte ihn sonst für frisch, und der neue
- * Eintrag fehlte bis zum nächsten Ereignis. Dann wird der Kopf noch einmal geholt.
+ * Kam während des Abrufs ein Live-Ereignis, läuft dessen Neuladen noch (dann bricht `cancelQueries`
+ * es ab und lässt den Stand „ungültig“) oder ist schon fertig (dann hat sich der Datenstand
+ * geändert). In beiden Fällen könnte der Kopf älter sein als das Ereignis, `setQueryData` erklärte
+ * ihn aber für frisch: dann wird er noch einmal geholt.
  */
 export async function zumKopf<T>(
   qc: QueryClient,
   schluessel: QueryKey,
   ladeKopf: () => Promise<T[]>,
 ): Promise<boolean> {
+  const standVorher = qc.getQueryState(schluessel)?.dataUpdateCount;
   let kopf: T[];
   try {
     kopf = await ladeKopf();
@@ -45,7 +47,8 @@ export async function zumKopf<T>(
     return false;
   }
   await qc.cancelQueries({ queryKey: schluessel, exact: true });
-  const verpasst = qc.getQueryState(schluessel)?.isInvalidated === true;
+  const zustand = qc.getQueryState(schluessel);
+  const verpasst = zustand?.isInvalidated === true || zustand?.dataUpdateCount !== standVorher;
   qc.setQueryData<InfiniteData<T[], unknown>>(schluessel, {
     pages: [kopf],
     pageParams: [undefined],
@@ -55,42 +58,10 @@ export async function zumKopf<T>(
 }
 
 /**
- * Wie viele Einträge vor dem Fenster liegen, also schon herausgefallen sind. Damit zählen „X von Y
- * geladen“ und das Ende von „Ältere laden“ nach der Position in der Liste, nicht nach der Länge
- * des Fensters. Der Anfang jeder Seite wird beim ersten Erscheinen gemerkt (je Seitenparameter);
- * fällt die vorderste heraus, kennt die nächste ihren Anfang schon.
- */
-export function useFensterAnfang(
-  daten: InfiniteData<readonly unknown[], unknown> | undefined,
-  schluessel: QueryKey,
-): number {
-  const anfaenge = useRef<{ schluessel: string; je: Map<string, number> }>({
-    schluessel: '',
-    je: new Map(),
-  });
-  const s = JSON.stringify(schluessel);
-  if (anfaenge.current.schluessel !== s) anfaenge.current = { schluessel: s, je: new Map() };
-  if (daten == null || daten.pages.length === 0) return 0;
-  const je = anfaenge.current.je;
-  let vorige: number | null = null;
-  let erster = 0;
-  daten.pages.forEach((seite, i) => {
-    const param = JSON.stringify(daten.pageParams[i] ?? null);
-    let anfang = je.get(param);
-    if (anfang === undefined) {
-      anfang = daten.pageParams[i] === undefined ? 0 : (vorige ?? 0);
-      je.set(param, anfang);
-    }
-    if (i === 0) erster = anfang;
-    vorige = anfang + seite.length;
-  });
-  return erster;
-}
-
-/**
  * Verlässt jemand die Ansicht (anderer Reiter, andere Seite) mit einem Fenster ohne Kopf, wird es
  * verworfen: Beim Wiederkommen stünden sonst alte Einträge oben, als wären es die neuesten
- * (Review zu LLH-1687). Das nächste Öffnen holt frisch den Kopf.
+ * (Review zu LLH-1687). Das nächste Öffnen holt frisch den Kopf. Ohne Netz bleibt das Fenster:
+ * verworfen ließe es nur einen Ladekreis zurück, und der Knopf steht ohnehin über der Liste.
  */
 export function useKopfBeimVerlassen(schluessel: QueryKey, aktiv: boolean) {
   const qc = useQueryClient();
@@ -105,6 +76,7 @@ export function useKopfBeimVerlassen(schluessel: QueryKey, aktiv: boolean) {
     if (!aktiv) return;
     const key = aktuell.current;
     return () => {
+      if (!onlineManager.isOnline()) return;
       if (kopfVerlassen(qc.getQueryData(key))) qc.removeQueries({ queryKey: key, exact: true });
     };
   }, [qc, s, aktiv]);

@@ -36,8 +36,8 @@ import ZumKopfKnopf from '../components/ZumKopfKnopf';
 import {
   LISTEN_MAX_SEITEN,
   kopfVerlassen,
-  useFensterAnfang,
   useKopfBeimVerlassen,
+  zumKopf,
 } from '../components/listenFenster';
 
 export default function ErinnerungenPage() {
@@ -91,11 +91,11 @@ export default function ErinnerungenPage() {
       return true;
     });
   }, [abgeschlosseneQuery.data]);
-  // Position statt Fensterlänge (LLH-1687): vor dem Fenster liegen schon herausgefallene Einträge.
+  // Ohne Kopf im Fenster (LLH-1687) ist die geladene Zahl keine Position mehr: dann endet „Ältere
+  // laden“ allein an `hasNextPage`, und die Zeile nennt keine Gesamtzahl.
   const abgeschlossenSchluessel = einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen');
-  const vorFenster = useFensterAnfang(abgeschlosseneQuery.data, abgeschlossenSchluessel);
+  const ohneKopf = kopfVerlassen(abgeschlosseneQuery.data);
   useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
-  const bisPosition = vorFenster + abgeschlossene.length;
 
   /*
    * Sprung `?erinnerung=<id>` (LLH-1429, Spec `deeplink-hervorhebung`, `frontend/AGENTS.md`
@@ -122,11 +122,22 @@ export default function ErinnerungenPage() {
   const abgeschlosseneBereit = abgeschlosseneQuery.isFetched && !abgeschlosseneQuery.isFetching;
   useEffect(() => {
     if (sucheErinnerung == null || !abgeschlosseneBereit) return;
+    // Ohne Kopf im Fenster (LLH-1687) läge eine eben erledigte Erinnerung außerhalb: erst den Kopf
+    // holen, dann sucht der nächste Lauf darin. Scheitert der Abruf, endet die Suche still wie bei
+    // einer unbekannten Kennung.
+    if (ohneKopf) {
+      void zumKopf(qc, einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen'), () =>
+        listeAbgeschlosseneErinnerungen(einsatzId),
+      ).then((ersetzt) => {
+        if (!ersetzt) setSucheErinnerung(null);
+      });
+      return;
+    }
     if (abgeschlossene.some((e) => e.id === sucheErinnerung)) {
       springeZu(sucheErinnerung, 'abgeschlossen');
     }
     setSucheErinnerung(null);
-  }, [sucheErinnerung, abgeschlosseneBereit, abgeschlossene]);
+  }, [sucheErinnerung, abgeschlosseneBereit, abgeschlossene, ohneKopf, qc, einsatzId]);
   // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel oder den Daten).
   useEffect(() => {
     if (scrollZiel == null) return;
@@ -235,7 +246,7 @@ export default function ErinnerungenPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const offene = offeneQuery.data ?? [];
   const offenZahl = kennzahlenQuery.data?.offen ?? offene.length;
-  const abgeschlossenZahl = kennzahlenQuery.data?.abgeschlossen ?? bisPosition;
+  const abgeschlossenZahl = kennzahlenQuery.data?.abgeschlossen ?? abgeschlossene.length;
 
   // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach faellig_at aufsteigend.
   const offeneGruppen: { gruppe: FaelligGruppe; erinnerungen: Erinnerung[] }[] = GRUPPE_ORDNUNG.map(
@@ -404,7 +415,9 @@ export default function ErinnerungenPage() {
             />
           )}
           {abgeschlosseneQuery.hasNextPage &&
-            (kennzahlenQuery.data == null || bisPosition < kennzahlenQuery.data.abgeschlossen) && (
+            (ohneKopf ||
+              kennzahlenQuery.data == null ||
+              abgeschlossene.length < kennzahlenQuery.data.abgeschlossen) && (
               <div style={{ textAlign: 'center', marginTop: token.margin }}>
                 <Button
                   onClick={() => void abgeschlosseneQuery.fetchNextPage()}
@@ -413,7 +426,8 @@ export default function ErinnerungenPage() {
                   Ältere laden
                 </Button>
                 <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {bisPosition} von {abgeschlossenZahl} geladen
+                  {abgeschlossene.length}
+                  {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
                 </div>
               </div>
             )}

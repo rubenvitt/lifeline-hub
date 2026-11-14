@@ -1,15 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useState } from 'react';
-import { QueryClient, QueryClientProvider, useInfiniteQuery } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
 import {
-  LISTEN_MAX_SEITEN,
-  kopfVerlassen,
-  useFensterAnfang,
-  useKopfBeimVerlassen,
-  zumKopf,
-} from './listenFenster';
+  QueryClient,
+  QueryClientProvider,
+  onlineManager,
+  useInfiniteQuery,
+} from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { LISTEN_MAX_SEITEN, kopfVerlassen, useKopfBeimVerlassen, zumKopf } from './listenFenster';
 
 /**
  * Seitenfenster der Listen ohne Cursor nach vorn (LLH-1687): ein Live-Ereignis nach tiefem
@@ -124,21 +123,18 @@ describe('listenFenster (LLH-1687)', () => {
     expect(client.getQueryState(SCHLUESSEL)?.isInvalidated).toBe(false);
   });
 
-  it('useFensterAnfang zählt die herausgefallenen Einträge vor dem Fenster', async () => {
-    const { client, result } = aufbau();
-    const anfang = renderHook(() =>
-      useFensterAnfang(
-        client.getQueryData<{ pages: number[][]; pageParams: unknown[] }>(SCHLUESSEL),
-        SCHLUESSEL,
-      ),
-    );
-    await blaettere(result, LISTEN_MAX_SEITEN - 1);
-    anfang.rerender();
-    expect(anfang.result.current).toBe(0);
-    await blaettere(result, 3);
-    anfang.rerender();
-    // Je Seite ein Eintrag: drei Seiten sind herausgefallen.
-    expect(anfang.result.current).toBe(3);
+  it('zumKopf holt noch einmal, wenn das Neuladen des Ereignisses schon fertig war', async () => {
+    const { abruf, client, result } = aufbau();
+    await blaettere(result, 8);
+    abruf.mockClear();
+    await act(async () => {
+      await zumKopf(client, SCHLUESSEL, async () => {
+        // Ereignis und Neuladen des Fensters laufen ganz durch, bevor der Kopf zurückkommt.
+        await client.invalidateQueries({ queryKey: SCHLUESSEL });
+        return [0];
+      });
+    });
+    await waitFor(() => expect(abruf).toHaveBeenCalledWith(undefined));
   });
 
   it('useKopfBeimVerlassen verwirft beim Verlassen ein Fenster ohne Kopf, eines mit Kopf nicht', async () => {
@@ -163,5 +159,21 @@ describe('listenFenster (LLH-1687)', () => {
     const ohneKopf = renderHook(() => useKopfBeimVerlassen(SCHLUESSEL, true), { wrapper });
     ohneKopf.unmount();
     expect(client.getQueryCache().find({ queryKey: SCHLUESSEL, exact: true })).toBeUndefined();
+  });
+
+  it('useKopfBeimVerlassen verwirft ohne Netz nichts', async () => {
+    const { client, result } = aufbau();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    await blaettere(result, 6);
+    onlineManager.setOnline(false);
+    try {
+      const ohneKopf = renderHook(() => useKopfBeimVerlassen(SCHLUESSEL, true), { wrapper });
+      ohneKopf.unmount();
+      expect(kopfVerlassen(client.getQueryData(SCHLUESSEL))).toBe(true);
+    } finally {
+      onlineManager.setOnline(true);
+    }
   });
 });

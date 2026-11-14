@@ -69,7 +69,6 @@ import ZumKopfKnopf from '../components/ZumKopfKnopf';
 import {
   LISTEN_MAX_SEITEN,
   kopfVerlassen,
-  useFensterAnfang,
   useKopfBeimVerlassen,
 } from '../components/listenFenster';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
@@ -223,15 +222,15 @@ export default function MeldungenPage() {
       return true;
     });
   }, [abgeschlosseneQuery.data]);
-  // Position statt Fensterlänge (LLH-1687): vor dem Fenster liegen schon herausgefallene Einträge.
+  // Ohne Kopf im Fenster (LLH-1687) ist die geladene Zahl keine Position mehr: dann endet „Ältere
+  // laden“ allein an `hasNextPage`, und die Zeile nennt keine Gesamtzahl.
   const abgeschlossenSchluessel = einsatzKeys.meldungenPhase(
     einsatzId,
     'abgeschlossen',
     richtungsKey,
   );
-  const vorFenster = useFensterAnfang(abgeschlosseneQuery.data, abgeschlossenSchluessel);
+  const ohneKopf = kopfVerlassen(abgeschlosseneQuery.data);
   useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
-  const bisPosition = vorFenster + abgeschlossene.length;
   // Zwei Gruppen in der Offen-Ansicht: die erste Frage der Triage ist „was hat noch niemand
   // angefasst", nicht „was ist am dringendsten". Eine gesichtete Sofortmeldung steht danach unter
   // einer neuen Normalmeldung; das ist gewollt. Innerhalb jeder Gruppe ordnet `vergleicheMeldung` —
@@ -726,7 +725,7 @@ export default function MeldungenPage() {
 
   const kennzahlen = kennzahlenQuery.data;
   const offenZahl = kennzahlen ? kennzahlen.unbearbeitet + kennzahlen.in_arbeit : offene.length;
-  const abgeschlossenZahl = kennzahlen?.erledigt ?? bisPosition;
+  const abgeschlossenZahl = kennzahlen?.erledigt ?? abgeschlossene.length;
   /*
    * Steht die Karte eines Grundes in der gezeigten Ansicht nicht (Ansicht gewechselt, Karte
    * gewandert), hätte er keinen Ort mehr: dann steht er im Seitenhinweis, schließbar. Solange die
@@ -965,7 +964,7 @@ export default function MeldungenPage() {
           {/* Eine volle letzte Seite meldet noch eine Folgeseite; die Zahl der Abgeschlossenen
               sagt, dass es keine gibt. */}
           {abgeschlosseneQuery.hasNextPage &&
-            (kennzahlen == null || bisPosition < kennzahlen.erledigt) && (
+            (ohneKopf || kennzahlen == null || abgeschlossene.length < kennzahlen.erledigt) && (
               <div style={{ textAlign: 'center', marginTop: token.margin }}>
                 <Button
                   onClick={() => void abgeschlosseneQuery.fetchNextPage()}
@@ -974,7 +973,8 @@ export default function MeldungenPage() {
                   Ältere laden
                 </Button>
                 <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {bisPosition} von {abgeschlossenZahl} geladen
+                  {abgeschlossene.length}
+                  {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
                 </div>
               </div>
             )}
