@@ -5366,8 +5366,8 @@ async fn freie_nummer_bleibt_beim_fuehrungswechsel() {
 /// Widerspricht der ELW einer Notübernahme, fällt der Hub zum Spiegel zurück. Mit dem nächsten
 /// Kopf des ELW trägt der Einsatz dort wieder dessen Nummer (ein Spiegel ist von der
 /// Eindeutigkeit ausgenommen); der Systemeintrag zur Nummer ist eine Änderung, die der ELW nicht
-/// kennt, und liegt in der Bruchstelle. Dass diese Bruchstelle danach nicht geklärt wird, ist
-/// LLH-1854 und hier nicht geprüft.
+/// kennt, und liegt in der Bruchstelle. Der nächste Eintrag des ELW trägt dieselbe laufende Nummer
+/// und kommt trotzdem an (LLH-1854).
 #[tokio::test]
 async fn nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw() {
     let (hub, elw) = gekoppelt().await;
@@ -5415,6 +5415,185 @@ async fn nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw() {
     .await
     .unwrap();
     assert_eq!(gesichert, 1, "der Systemeintrag zur Nummer ist gesichert");
+    // LLH-1854: Der ELW kennt den Systemeintrag nicht, die Bruchstelle wird geklärt, und sein
+    // nächster Eintrag mit derselben laufenden Nummer kommt am Hub an.
+    let (s, v) = etb(&elw, e).await;
+    assert!(s.is_success(), "{v}");
+    for _ in 0..2 {
+        elw_meldet(&elw).await;
+    }
+    ist_geklaert(&hub, h).await;
+    assert_eq!(etb_zeilen(&hub, h).await, etb_zeilen(&elw, e).await);
+}
+
+// ── Bruchstelle nach einem Widerspruch (LLH-1854) ────────────────────────────────────────────
+
+/// Das ETB eines Einsatzes als (laufende Nummer, Typ, Inhalt).
+async fn etb_zeilen(i: &Instanz, einsatz: i64) -> Vec<(i64, String, String)> {
+    sqlx::query_as(
+        "SELECT lfd_nr, typ, inhalt FROM etb_eintrag WHERE einsatz_id = ? ORDER BY lfd_nr",
+    )
+    .bind(einsatz)
+    .fetch_all(&i.pool)
+    .await
+    .unwrap()
+}
+
+/// Der Spiegel hat keine offene Bruchstelle und keinen Hinweis mehr.
+async fn ist_geklaert(i: &Instanz, einsatz: i64) {
+    let (offen, hinweis): (bool, Option<String>) =
+        sqlx::query_as("SELECT bruch_offen, hinweis FROM einsatz_spiegel WHERE einsatz_id = ?")
+            .bind(einsatz)
+            .fetch_one(&i.pool)
+            .await
+            .unwrap();
+    assert!(!offen, "Bruchstelle geklärt");
+    assert_eq!(hinweis, None);
+}
+
+/// Notübernahme am Hub, Erfassung im ETB am Hub, Widerspruch des ELW: (Hub, ELW, Einsatz am ELW,
+/// Einsatz am Hub).
+async fn widerspruch_nach_erfassung_am_hub() -> (Instanz, Instanz, i64, i64) {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    assert!(!ist_spiegel(&hub, h).await, "der Hub führt");
+    einsatzleitung_am_spiegel(&hub, h, 1).await;
+    let (s, v) = post(
+        &hub,
+        &format!("/api/einsaetze/{h}/etb"),
+        json!({"von": "Hub", "an": "Hub", "typ": "meldung", "inhalt": "Erfasst am Hub",
+               "anhang_ids": [], "client_id": uuid::Uuid::new_v4().to_string()}),
+    )
+    .await;
+    assert!(s.is_success(), "{v}");
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    (hub, elw, e, h)
+}
+
+/// Der ELW hat den Einsatz nie gespiegelt und kennt keine Zeile, die der Hub während seiner
+/// Führung schrieb: Der Hub entfernt sie (ihr Inhalt bleibt in der Bruchstelle), und die Einträge
+/// des ELW kommen an, auch der mit derselben laufenden Nummer.
+#[tokio::test]
+async fn nach_widerspruch_klaert_der_hub_die_bruchstelle() {
+    let (hub, elw, e, h) = widerspruch_nach_erfassung_am_hub().await;
+    let (s, v) = etb(&elw, e).await;
+    assert!(s.is_success(), "{v}");
+    for _ in 0..3 {
+        elw_meldet(&elw).await;
+        assert_eq!(meldefehler(&elw).await, None);
+    }
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt wieder");
+    ist_geklaert(&hub, h).await;
+    let elw_etb = etb_zeilen(&elw, e).await;
+    assert!(
+        elw_etb
+            .iter()
+            .any(|(_, _, inhalt)| inhalt == "Lage erkundet"),
+        "{elw_etb:?}"
+    );
+    assert_eq!(etb_zeilen(&hub, h).await, elw_etb, "das ETB des ELW");
+    let gesichert: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT daten, entfernt FROM einsatz_bruchstelle WHERE einsatz_id = ? \
+         AND art = 'etb_eintrag'",
+    )
+    .bind(h)
+    .fetch_all(&hub.pool)
+    .await
+    .unwrap();
+    assert!(
+        gesichert
+            .iter()
+            .any(|(daten, entfernt)| *entfernt && daten.contains("Erfasst am Hub")),
+        "die Erfassung des Hubs steht in der Bruchstelle: {gesichert:?}"
+    );
+}
+
+/// Nach dem Rückfall steht der Spiegel am Hub bei 0: Der ELW liefert ihn neu, auch wenn er selbst
+/// seit dem Widerspruch nichts geändert hat.
+#[tokio::test]
+async fn nach_widerspruch_liefert_der_elw_den_spiegel_ohne_eigene_aenderung_neu() {
+    let (hub, elw, e, h) = widerspruch_nach_erfassung_am_hub().await;
+    for _ in 0..3 {
+        elw_meldet(&elw).await;
+    }
+    assert!(ist_spiegel(&hub, h).await);
+    let stand: i64 = sqlx::query_scalar("SELECT stand FROM einsatz_spiegel WHERE einsatz_id = ?")
+        .bind(h)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    assert!(stand > 0, "der Spiegel hat wieder einen Stand");
+    ist_geklaert(&hub, h).await;
+    assert_eq!(etb_zeilen(&hub, h).await, etb_zeilen(&elw, e).await);
+}
+
+/// Eine Zeile, die der Hub vom ELW bekam und während seiner Führung änderte, bleibt: Der ELW
+/// liefert sie, sie steht danach wieder mit seinem Inhalt am Hub, einmal.
+#[tokio::test]
+async fn nach_widerspruch_bleibt_eine_vom_elw_stammende_zeile() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let p = common::person_anlegen(&elw.app, &elw.admin, e, r#"{"name":"Vom ELW"}"#).await;
+    elw_meldet(&elw).await;
+    let akte = fremde(&hub).await[0]["id"].as_i64().unwrap();
+    hub_uebernimmt_mit_unterschrift(&hub, akte, "Probe").await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    einsatzleitung_am_spiegel(&hub, h, 1).await;
+    let ph: i64 = sqlx::query_scalar("SELECT id FROM einsatz_person WHERE einsatz_id = ?")
+        .bind(h)
+        .fetch_one(&hub.pool)
+        .await
+        .unwrap();
+    let (s, v) = common::anfrage_json(
+        &hub.app,
+        "PATCH",
+        &format!("/api/einsaetze/{h}/personen/{ph}"),
+        &hub.admin,
+        Some(&json!({"name": "Am Hub geändert"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/widersprechen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for _ in 0..3 {
+        elw_meldet(&elw).await;
+    }
+    ist_geklaert(&hub, h).await;
+    let namen: Vec<String> =
+        sqlx::query_scalar("SELECT name FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(h)
+            .fetch_all(&hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(namen, ["Vom ELW"], "Person {p} des ELW, einmal");
+    let entfernt: Vec<(String, bool)> = sqlx::query_as(
+        "SELECT schluessel, entfernt FROM einsatz_bruchstelle WHERE einsatz_id = ? \
+         AND art = 'einsatz_person'",
+    )
+    .bind(h)
+    .fetch_all(&hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        entfernt,
+        [(ph.to_string(), false)],
+        "die Person stammt vom ELW: geklärt, nicht entfernt"
+    );
 }
 
 // ── Größe der Erklärung (LLH-1702) ───────────────────────────────────────────────────────────

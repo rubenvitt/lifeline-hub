@@ -682,6 +682,27 @@ pub async fn abgleich_einmal(
                 .execute(&mut *conn)
                 .await?;
             }
+            // Ohne Lieferung in dieser Runde senkt nur ein kleinerer Stand das Ziel: Ein Spiegel,
+            // der nach einem Führungswechsel bei 0 neu beginnt (`fuehrung::werde_spiegel`), bekäme
+            // sonst erst wieder etwas, wenn diese Seite den Einsatz ändert (LLH-1854).
+            for s in antwort
+                .staende
+                .iter()
+                .filter(|s| !anfrage.lieferungen.iter().any(|l| l.kennung == s.kennung))
+            {
+                sqlx::query(
+                    "UPDATE spiegel_ziel SET stand = ? WHERE stand > ? \
+                     AND einsatz_id IN (SELECT id FROM einsatz WHERE kennung = ? AND spiegel = 0) \
+                     AND kopplung_org_id IN \
+                       (SELECT id FROM instanz_kopplung_org WHERE kopplung_id = ?)",
+                )
+                .bind(s.stand)
+                .bind(s.stand)
+                .bind(&s.kennung)
+                .bind(kopplung.id)
+                .execute(&mut *conn)
+                .await?;
+            }
             // Bruchstellen vor den Lieferungen klären (LLH-1641, E6).
             let geklaert = super::fuehrung::uebernimm_bruch_antworten(
                 conn,

@@ -473,8 +473,9 @@ pub async fn uebernimm_bruch_antworten(
 /// Verweis hängt, wird zurückgestellt (`geklaert = 2`): Erst laufen alle weiteren Seiten durch,
 /// denn der Verweis kann von einer späteren Zeile kommen; danach wird sie erneut gefragt. Die
 /// Antwort klärt die Zeilen bis `bis`; geschlossen wird die Bruchstelle erst, wenn weder eine
-/// ungeklärte noch eine zurückgestellte Zeile übrig ist. Kennt der Führer den Einsatz nicht als Spiegel dieser Kopplung (`kennt: false`),
-/// bleibt sie offen, bis ein Führer antwortet, der es kann.
+/// ungeklärte noch eine zurückgestellte Zeile übrig ist. Kennt der Führer den Einsatz nicht als
+/// Spiegel dieser Kopplung (`kennt: false`), kennt er keine Zeile in den Schlüsseln hier; welche
+/// er neu liefert, weiß dann nur der Spiegel selbst ([`nicht_vom_fuehrer`], LLH-1854).
 async fn uebernimm_bruch_antwort(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -492,14 +493,19 @@ async fn uebernimm_bruch_antwort(
     let Some(einsatz_id) = spiegel else {
         return Ok(None);
     };
-    if !a.kennt {
-        return Ok(None);
-    }
     // Bis wohin die Antwort klärt. Fehlt `bis`, gilt die Seite, die dieser Spiegel jetzt fragen
     // würde, nie mehr: Sonst schlösse eine Antwort ohne `bis` auch ungefragte Seiten.
     let bis = match &a.bis {
         Some(b) => Some(b.clone()),
         None => offene_bruch_fragen(conn, einsatz_id).await?.pop(),
+    };
+    let unbekannt: Vec<[String; 2]> = if a.kennt {
+        a.unbekannt.iter().take(BRUCH_MAX).cloned().collect()
+    } else {
+        match &bis {
+            Some(b) => nicht_vom_fuehrer(conn, einsatz_id, b).await?,
+            None => Vec::new(),
+        }
     };
     let schema = schema::schema(conn).await?;
     let mut uebrig: Vec<(String, String)> = Vec::new();
@@ -509,7 +515,7 @@ async fn uebernimm_bruch_antwort(
             .await?;
         // Kinder vor Eltern: spätere Zeilen zuerst.
         let mut ziele: Vec<(String, String)> = Vec::new();
-        for [art, schluessel] in a.unbekannt.iter().take(BRUCH_MAX) {
+        for [art, schluessel] in &unbekannt {
             let gesichert: bool = sqlx::query_scalar(
                 "SELECT EXISTS (SELECT 1 FROM einsatz_bruchstelle WHERE einsatz_id = ? AND art = ? \
                  AND schluessel = ? AND entfernt = 0)",
@@ -652,6 +658,33 @@ async fn uebernimm_bruch_antwort(
     // (LLH-1646).
     super::bruchstelle::ordne_folgen(conn, einsatz_id).await?;
     Ok(Some(einsatz_id))
+}
+
+/// Die offenen Zeilen der Bruchstelle bis `bis`, die der Führer nicht neu liefert, wenn er den
+/// Einsatz nie von hier gespiegelt hat (`kennt: false`, LLH-1854): alle, die hier entstanden
+/// sind. Eine Zeile mit Eintrag in `spiegel_herkunft` kam von einem Führer und hat dessen
+/// Schlüssel; er liefert sie mit seinem Inhalt neu, sie bleibt. Entfernt würde sie sonst auch
+/// dann, wenn seine Lieferung sie schon überschrieben hat, und fehlte danach.
+async fn nicht_vom_fuehrer(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    bis: &[String; 2],
+) -> Result<Vec<[String; 2]>, AppError> {
+    let zeilen: Vec<(String, String)> = sqlx::query_as(
+        "SELECT DISTINCT b.art, b.schluessel FROM einsatz_bruchstelle b \
+         WHERE b.einsatz_id = ? AND b.entfernt = 0 AND b.geklaert = 0 \
+         AND (b.art, b.schluessel) <= (?, ?) \
+         AND NOT EXISTS (SELECT 1 FROM spiegel_herkunft h WHERE h.einsatz_id = b.einsatz_id \
+           AND h.art = b.art AND h.lokaler_schluessel = b.schluessel) \
+         ORDER BY b.art, b.schluessel LIMIT ?",
+    )
+    .bind(einsatz_id)
+    .bind(&bis[0])
+    .bind(&bis[1])
+    .bind(BRUCH_MAX as i64)
+    .fetch_all(&mut *conn)
+    .await?;
+    Ok(zeilen.into_iter().map(|(a, s)| [a, s]).collect())
 }
 
 /// Räumt am Spiegel die Bruchstelle eines Einsatzes (LLH-1649): Der Führer hat geschwärzt, sein
