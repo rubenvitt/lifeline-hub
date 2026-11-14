@@ -6,7 +6,7 @@ Beleg für Gleichverhalten.
 
 ## 1. Gleichverhalten festschreiben (nur Tests)
 
-- [ ] 1.1 `tests/schichtplan.rs`: exakte Texte und Codes absichern, TDD-Vorgabe: gegen den heutigen Code grün. Zu prüfen:
+- [x] 1.1 `tests/schichtplan.rs`: exakte Texte und Codes absichern, TDD-Vorgabe: gegen den heutigen Code grün. Zu prüfen:
   - Überschneidung samt Zeitzone (Einsatz-Zone ≠ Org-Zone)
   - CAS-Text bei veralteter `version`
   - „Die Pause hat kein Soll“
@@ -15,14 +15,14 @@ Beleg für Gleichverhalten.
   - Ad-hoc-Text
   - „erzeugen“ ohne Länge und ohne Schichtmodell
   - `PAUSE_OFFEN` (409) und belegter Block ohne Personal (403) beim Löschen
-- [ ] 1.2 `tests/planung.rs`: dieselben Texte und Codes für die Planung. Dazu:
+- [x] 1.2 `tests/planung.rs`: dieselben Texte und Codes für die Planung. Dazu:
   - 422 „Eine Planung kennt nur Stamm-Personal und Helfer“
   - „Der Posten hat keine Schichtlänge …“
   - Zeitzone der Organisation im Überschneidungstext
   - `stand` steigt auf jedem Block- und Helferweg
   - 409 auf allen Block- und Helferwegen einer übernommenen Planung
-- [ ] 1.3 Reihenfolge je Seite in beiden Testdateien festschreiben: Einsatz nach Art, Einheitensortierung und Name; Planung nach Posten-Sortierung; Personen je Block in Einfügefolge. Gegen den heutigen Code grün.
-- [ ] 1.4 Höchstzahlen je Seite, mit Seed-SQL statt Schleife: „Höchstens 2000 Schichten je …“ und „Höchstens 500 Helfer je …“. Gegen den heutigen Code grün.
+- [x] 1.3 Reihenfolge je Seite in beiden Testdateien festschreiben: Einsatz nach Art, Einheitensortierung und Name; Planung nach Posten-Sortierung; Personen je Block in Einfügefolge. Gegen den heutigen Code grün.
+- [x] 1.4 Höchstzahlen je Seite, mit Seed-SQL statt Schleife: „Höchstens 2000 Schichten je …“ und „Höchstens 500 Helfer je …“. Gegen den heutigen Code grün.
 - [x] 1.5 Frontend: einen gemeinsamen Testsatz `abloesung/schichtplan/planEditor.cases.tsx` gegen beide Hüllen ausführen (`SchichtplanAnsicht.test.tsx`, `PlanungSchichtplan.test.tsx`). Abzudecken:
   - Zug ergibt den PATCH-Body
   - Kopie mit und ohne Personen

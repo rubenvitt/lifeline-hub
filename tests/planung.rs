@@ -760,3 +760,751 @@ async fn loeschfrist_90_tage_nach_dem_ende() {
     let (s, _) = anfrage(&app, "GET", &format!("{PFAD}/{}", ids[1]), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "innerhalb der Frist bleibt sie");
 }
+
+// ---------------------------------------------------------------------------------------------
+// Gleichverhalten vor dem gemeinsamen Kern (LLH-1684, Change `y106s29r-blockplan-kern`, tasks.md
+// 1.2, 1.3, 1.4): exakte Texte, Codes und Reihenfolgen der Vorplanung. Das Gegenstück des
+// Einsatz-Schichtplans steht in `tests/schichtplan.rs`.
+// ---------------------------------------------------------------------------------------------
+
+/// Der Fehlertext einer Antwort.
+fn fehlertext(json: &Value) -> &str {
+    json["error"]
+        .as_str()
+        .unwrap_or_else(|| panic!("ohne Fehlertext: {json}"))
+}
+
+/// Prüft Status und Fehlertext wortgleich.
+fn erwarte(antwort: (StatusCode, Value), status: StatusCode, text: &str) {
+    let (s, json) = antwort;
+    assert_eq!(s, status, "{json}");
+    assert_eq!(fehlertext(&json), text, "{json}");
+}
+
+/// Setzt Zone und Darstellung der Organisation auf Tokio „Datum und Uhrzeit“ (die Vorgabe wäre
+/// Berlin taktisch).
+async fn org_zeitstil_tokio(pool: &sqlx::SqlitePool, org: i64) {
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone, zeitdarstellung) \
+         VALUES (?, 'Asia/Tokyo', 'datum_uhrzeit') \
+         ON CONFLICT(org_id) DO UPDATE SET zeitzone = excluded.zeitzone, \
+            zeitdarstellung = excluded.zeitdarstellung",
+    )
+    .bind(org)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// Der Stand einer Planung (LLH-1610), nicht auf dem Draht.
+async fn stand(pool: &sqlx::SqlitePool, p: i64) -> i64 {
+    sqlx::query_scalar("SELECT stand FROM planung WHERE id = ?")
+        .bind(p)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// Überschneidung (Anlegen, Ändern, Erzeugen) nennt den Zeitraum in Zone und Darstellung der
+/// Organisation; der CAS-Text gilt für Ändern und Löschen.
+#[tokio::test]
+async fn ueberschneidung_nennt_die_zeit_der_organisation_und_cas_text_ist_wortgleich() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    org_zeitstil_tokio(&pool, org_von(&pool, "admin").await).await;
+    let p = planung(&app, &admin, "Stadtfest").await;
+    let streife = posten(
+        &app,
+        &admin,
+        p,
+        json!({"bezeichnung": "Streife", "art": "einheit"}),
+    )
+    .await;
+
+    let (s, plan) = block(
+        &app,
+        &admin,
+        p,
+        json!({"posten_id": streife, "von": "2027-03-13 10:00:00", "bis": "2027-03-13 13:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let erster = bloecke(&plan)[0]["id"].as_i64().unwrap();
+    // 10:00–13:00 UTC ist in Tokio 19:00–22:00; Berlin taktisch wäre „131100mrz27–1400“.
+    let text = "Die Schicht überschneidet sich mit 13.03.27 19:00–22:00";
+    erwarte(
+        block(
+            &app,
+            &admin,
+            p,
+            json!({"posten_id": streife, "von": "2027-03-13 12:00:00", "bis": "2027-03-13 14:00:00"}),
+        )
+        .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        text,
+    );
+
+    let (s, plan) = block(
+        &app,
+        &admin,
+        p,
+        json!({"posten_id": streife, "von": "2027-03-13 15:00:00", "bis": "2027-03-13 16:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let zweiter = bloecke(&plan)
+        .iter()
+        .find(|b| b["von"] == "2027-03-13 15:00:00")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let zweiter_pfad = format!("{PFAD}/{p}/bloecke/{zweiter}");
+    erwarte(
+        patch(
+            &app,
+            &admin,
+            &zweiter_pfad,
+            json!({"version": 1, "von": "2027-03-13 12:00:00", "bis": "2027-03-13 16:00:00"}),
+        )
+        .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        text,
+    );
+
+    let (s, json) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/erzeugen"),
+        json!({"posten_id": streife, "von": "2027-03-13 09:00:00",
+               "bis": "2027-03-13 11:00:00", "laenge_minuten": 60}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        fehlertext(&json),
+        "Erzeugte Schichten überschneiden sich mit bestehenden; nichts angelegt"
+    );
+    assert_eq!(
+        json["zeilen"],
+        json!([{"art": "planschicht", "id": erster,
+                "grund": "überschneidet sich mit 13.03.27 19:00–22:00"}])
+    );
+
+    let cas = "Die Schicht wurde zwischenzeitlich geändert";
+    erwarte(
+        patch(
+            &app,
+            &admin,
+            &zweiter_pfad,
+            json!({"version": 2, "notiz": "x"}),
+        )
+        .await,
+        StatusCode::CONFLICT,
+        cas,
+    );
+    erwarte(
+        anfrage(
+            &app,
+            "DELETE",
+            &format!("{zweiter_pfad}?version=2"),
+            &admin,
+            None,
+        )
+        .await,
+        StatusCode::CONFLICT,
+        cas,
+    );
+}
+
+/// Pause ohne Soll, Posten, Personen, Helfer und Qualifikationen: jeder 422 mit seinem Text; die
+/// Ad-hoc-Kraft scheitert über den Draht schon als 400, im Repo mit dem 422 der Planung.
+#[tokio::test]
+async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let org = org_von(&pool, "admin").await;
+    let p = planung(&app, &admin, "Stadtfest").await;
+    let andere = planung(&app, &admin, "Herbstmarkt").await;
+    let streife = posten(
+        &app,
+        &admin,
+        p,
+        json!({"bezeichnung": "Streife", "art": "einheit"}),
+    )
+    .await;
+    let fremder_posten = posten(
+        &app,
+        &admin,
+        andere,
+        json!({"bezeichnung": "Fremd", "art": "einheit"}),
+    )
+    .await;
+    let (fremd_org, _) = fremde_org_anlegen(&pool, "Andere", "fremd", "fremdpw12", "keine").await;
+    let fremde_person: i64 =
+        sqlx::query_scalar("INSERT INTO personal (org_id, name) VALUES (?, 'Fremd') RETURNING id")
+            .bind(fremd_org)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let fremde_quali: i64 = sqlx::query_scalar(
+        "INSERT INTO qualifikation (org_id, label) VALUES (?, 'Fremd') RETURNING id",
+    )
+    .bind(fremd_org)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (s, fremder_helfer) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{andere}/helfer"),
+        json!({"name": "Finn"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{fremder_helfer}");
+
+    let zeit = json!({"von": "2027-03-13 10:00:00", "bis": "2027-03-13 11:00:00"});
+    let mit = |felder: Value| {
+        let mut body = zeit.clone();
+        for (k, v) in felder.as_object().unwrap() {
+            body[k] = v.clone();
+        }
+        body
+    };
+    for (body, text) in [
+        (mit(json!({"soll_anzahl": 2})), "Die Pause hat kein Soll"),
+        (
+            mit(json!({"posten_id": fremder_posten})),
+            "Der Posten gehört nicht zu dieser Planung",
+        ),
+        (
+            mit(json!({"posten_id": streife,
+                       "quali_soll": [{"qualifikation_id": fremde_quali, "anzahl": 1}]})),
+            "Qualifikation im Soll gehört nicht zur Organisation",
+        ),
+        (
+            mit(json!({"personen": [{"art": "stamm", "personal_id": fremde_person}]})),
+            "Eine Person gehört nicht zur Organisation",
+        ),
+        (
+            mit(json!({"personen": [{"art": "helfer", "helfer_id": fremder_helfer["id"]}]})),
+            "Ein Helfer gehört nicht zu dieser Planung",
+        ),
+    ] {
+        erwarte(
+            block(&app, &admin, p, body).await,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            text,
+        );
+    }
+    let (s, json) = block(
+        &app,
+        &admin,
+        p,
+        mit(json!({"personen": [{"art": "einsatz", "einsatz_personal_id": 1}]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Ad-hoc über den Draht: {json}");
+
+    // Der 422 der Planung für eine Ad-hoc-Kraft, direkt im Repo (der Handler lässt sie nicht zu).
+    let benutzer: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let eingabe = lifeline_hub::planung::repo::BlockEingabe {
+        posten_id: None,
+        von: "2027-03-13 10:00:00".into(),
+        bis: "2027-03-13 11:00:00".into(),
+        soll_anzahl: None,
+        quali_soll: None,
+        personen: vec![lifeline_hub::abloesung::schichtplan::PlanPerson::Einsatz(1)],
+        notiz: None,
+    };
+    match lifeline_hub::planung::repo::block_anlegen(&pool, org, p, benutzer, &eingabe).await {
+        Err(lifeline_hub::error::AppError::UnprocessableEntity(m)) => {
+            assert_eq!(m, "Eine Planung kennt nur Stamm-Personal und Helfer")
+        }
+        anders => panic!("422 erwartet: {anders:?}"),
+    }
+
+    // Dieselben Texte beim Ändern.
+    let (s, plan) = block(&app, &admin, p, zeit.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let bid = bloecke(&plan)[0]["id"].as_i64().unwrap();
+    let block_pfad = format!("{PFAD}/{p}/bloecke/{bid}");
+    for (body, text) in [
+        (
+            json!({"version": 1, "soll_anzahl": 3}),
+            "Die Pause hat kein Soll",
+        ),
+        (
+            json!({"version": 1, "posten_id": fremder_posten}),
+            "Der Posten gehört nicht zu dieser Planung",
+        ),
+        (
+            json!({"version": 1, "posten_id": streife,
+                   "quali_soll": [{"qualifikation_id": fremde_quali, "anzahl": 1}]}),
+            "Qualifikation im Soll gehört nicht zur Organisation",
+        ),
+        (
+            json!({"version": 1, "personen": [{"art": "helfer", "helfer_id": fremder_helfer["id"]}]}),
+            "Ein Helfer gehört nicht zu dieser Planung",
+        ),
+    ] {
+        erwarte(
+            patch(&app, &admin, &block_pfad, body).await,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            text,
+        );
+    }
+
+    // Fremde Qualifikation am Helfer: beim Anlegen und beim Ändern.
+    let helfer = format!("{PFAD}/{p}/helfer");
+    let quali_text = "Qualifikation gehört nicht zur Organisation";
+    erwarte(
+        post(
+            &app,
+            &admin,
+            &helfer,
+            json!({"name": "Cem", "qualifikationen": [fremde_quali]}),
+        )
+        .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        quali_text,
+    );
+    let (s, cem) = post(&app, &admin, &helfer, json!({"name": "Cem"})).await;
+    assert_eq!(s, StatusCode::CREATED, "{cem}");
+    erwarte(
+        patch(
+            &app,
+            &admin,
+            &format!("{helfer}/{}", cem["id"]),
+            json!({"qualifikationen": [fremde_quali]}),
+        )
+        .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        quali_text,
+    );
+}
+
+/// „Schichten erzeugen“ ohne Länge: am Posten ohne Schichtlänge und in der Pause.
+#[tokio::test]
+async fn erzeugen_ohne_laenge_nennt_die_schichtlaenge_des_postens() {
+    let app = setup().await;
+    let admin = admin(&app).await;
+    let p = planung(&app, &admin, "Stadtfest").await;
+    let wache = posten(
+        &app,
+        &admin,
+        p,
+        json!({"bezeichnung": "Wache", "art": "einheit"}),
+    )
+    .await;
+    for posten_id in [json!(wache), Value::Null] {
+        erwarte(
+            post(
+                &app,
+                &admin,
+                &format!("{PFAD}/{p}/erzeugen"),
+                json!({"posten_id": posten_id, "von": "2027-03-13 11:00:00",
+                       "bis": "2027-03-13 23:00:00"}),
+            )
+            .await,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Der Posten hat keine Schichtlänge; bitte eine Länge angeben",
+        );
+    }
+}
+
+/// Prüft, ob der Stand seit `vorher` um eins gestiegen (`steigt`) oder gleich geblieben ist.
+async fn stand_pruefen(pool: &sqlx::SqlitePool, p: i64, vorher: &mut i64, steigt: bool, was: &str) {
+    let jetzt = stand(pool, p).await;
+    assert_eq!(jetzt, *vorher + i64::from(steigt), "{was}");
+    *vorher = jetzt;
+}
+
+/// Jeder wirksame Block- und Helferweg erhöht den Stand der Planung um eins; ein abgelehnter
+/// rollt ihn mit zurück.
+#[tokio::test]
+async fn stand_steigt_auf_jedem_block_und_helferweg() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let p = planung(&app, &admin, "Stadtfest").await;
+    let streife = posten(
+        &app,
+        &admin,
+        p,
+        json!({"bezeichnung": "Streife", "art": "einheit"}),
+    )
+    .await;
+
+    let mut vorher = stand(&pool, p).await;
+
+    let (s, plan) = block(
+        &app,
+        &admin,
+        p,
+        json!({"posten_id": streife, "von": "2027-03-13 10:00:00", "bis": "2027-03-13 11:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Block anlegen");
+    stand_pruefen(&pool, p, &mut vorher, true, "Block anlegen").await;
+    let bid = bloecke(&plan)[0]["id"].as_i64().unwrap();
+    let block_pfad = format!("{PFAD}/{p}/bloecke/{bid}");
+    let (s, _) = patch(
+        &app,
+        &admin,
+        &block_pfad,
+        json!({"version": 1, "notiz": "x"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Block ändern");
+    stand_pruefen(&pool, p, &mut vorher, true, "Block ändern").await;
+    let (s, _) = patch(
+        &app,
+        &admin,
+        &block_pfad,
+        json!({"version": 1, "notiz": "y"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "Block ändern, veraltet");
+    stand_pruefen(&pool, p, &mut vorher, false, "Block ändern, veraltet").await;
+    let (s, _) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/erzeugen"),
+        json!({"posten_id": streife, "von": "2027-03-13 12:00:00",
+               "bis": "2027-03-13 14:00:00", "laenge_minuten": 60}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Erzeugen");
+    stand_pruefen(&pool, p, &mut vorher, true, "Erzeugen").await;
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{block_pfad}?version=2"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Block löschen");
+    stand_pruefen(&pool, p, &mut vorher, true, "Block löschen").await;
+
+    let helfer = format!("{PFAD}/{p}/helfer");
+    let (s, cem) = post(&app, &admin, &helfer, json!({"name": "Cem"})).await;
+    assert_eq!(s, StatusCode::CREATED, "Helfer anlegen");
+    stand_pruefen(&pool, p, &mut vorher, true, "Helfer anlegen").await;
+    let helfer_pfad = format!("{helfer}/{}", cem["id"]);
+    let (s, _) = patch(&app, &admin, &helfer_pfad, json!({"telefon": "0170"})).await;
+    assert_eq!(s, StatusCode::OK, "Helfer ändern");
+    stand_pruefen(&pool, p, &mut vorher, true, "Helfer ändern").await;
+    let (s, _) = anfrage(&app, "DELETE", &helfer_pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Helfer löschen");
+    stand_pruefen(&pool, p, &mut vorher, true, "Helfer löschen").await;
+}
+
+/// Eine übernommene Planung ist auf jedem Block- und Helferweg schreibgeschützt (409), vor jeder
+/// anderen Prüfung.
+#[tokio::test]
+async fn uebernommene_planung_ist_auf_allen_block_und_helferwegen_409() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let p = planung(&app, &admin, "Stadtfest").await;
+    let streife = posten(
+        &app,
+        &admin,
+        p,
+        json!({"bezeichnung": "Streife", "art": "einheit", "schichtlaenge_minuten": 60}),
+    )
+    .await;
+    let (s, plan) = block(
+        &app,
+        &admin,
+        p,
+        json!({"posten_id": streife, "von": "2027-03-13 10:00:00", "bis": "2027-03-13 11:00:00"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let bid = bloecke(&plan)[0]["id"].as_i64().unwrap();
+    let (s, cem) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/helfer"),
+        json!({"name": "Cem"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{cem}");
+    sqlx::query("UPDATE planung SET uebernommen_at = '2027-03-12 10:00:00' WHERE id = ?")
+        .bind(p)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let stand_vorher = stand(&pool, p).await;
+
+    let text = "Die Planung ist in einen Einsatz übernommen und schreibgeschützt";
+    let block_pfad = format!("{PFAD}/{p}/bloecke/{bid}");
+    let helfer_pfad = format!("{PFAD}/{p}/helfer/{}", cem["id"]);
+    let wege: [(&str, String, Option<Value>); 7] = [
+        (
+            "POST",
+            format!("{PFAD}/{p}/bloecke"),
+            Some(json!({"posten_id": streife, "von": "2027-03-13 12:00:00",
+                        "bis": "2027-03-13 13:00:00"})),
+        ),
+        (
+            "PATCH",
+            block_pfad.clone(),
+            Some(json!({"version": 1, "notiz": "x"})),
+        ),
+        ("DELETE", format!("{block_pfad}?version=1"), None),
+        (
+            "POST",
+            format!("{PFAD}/{p}/erzeugen"),
+            Some(json!({"posten_id": streife, "von": "2027-03-13 14:00:00",
+                        "bis": "2027-03-13 16:00:00"})),
+        ),
+        (
+            "POST",
+            format!("{PFAD}/{p}/helfer"),
+            Some(json!({"name": "Dana"})),
+        ),
+        ("PATCH", helfer_pfad.clone(), Some(json!({"name": "Cemal"}))),
+        ("DELETE", helfer_pfad, None),
+    ];
+    for (methode, pfad, body) in wege {
+        let (s, json) = anfrage_json(&app, methode, &pfad, &admin, body.as_ref()).await;
+        assert_eq!(s, StatusCode::CONFLICT, "{methode} {pfad}: {json}");
+        assert_eq!(fehlertext(&json), text, "{methode} {pfad}");
+    }
+    // Auch vor der Prüfung des Blocks: ein unbekannter Block ist 409, nicht 404.
+    erwarte(
+        patch(
+            &app,
+            &admin,
+            &format!("{PFAD}/{p}/bloecke/999999"),
+            json!({"version": 1, "notiz": "x"}),
+        )
+        .await,
+        StatusCode::CONFLICT,
+        text,
+    );
+    assert_eq!(stand(&pool, p).await, stand_vorher, "nichts geschrieben");
+}
+
+/// Blöcke nach der Sortierung der Posten, die Pause zuletzt, je Posten nach Beginn. Personen je
+/// Block in Einfügefolge: erst Stamm-Personal, dann Helfer, je Art in der Reihenfolge der
+/// Eingabe.
+#[tokio::test]
+async fn reihenfolge_der_bloecke_und_personen_in_der_planung() {
+    let app = setup().await;
+    let admin = admin(&app).await;
+    let p = planung(&app, &admin, "Stadtfest").await;
+    let mut ids = Vec::new();
+    for name in ["A", "B", "C"] {
+        ids.push(
+            posten(
+                &app,
+                &admin,
+                p,
+                json!({"bezeichnung": name, "art": "einheit"}),
+            )
+            .await,
+        );
+    }
+    let (a, b, c) = (ids[0], ids[1], ids[2]);
+    let (s, json) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("{PFAD}/{p}/posten/reihenfolge"),
+        &admin,
+        Some(&json!({"posten_ids": [c, a, b]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+
+    let mut plan = Value::Null;
+    for (posten_id, stunde) in [
+        (Value::Null, 9),
+        (json!(b), 10),
+        (json!(a), 12),
+        (json!(c), 11),
+        (json!(a), 10),
+        (Value::Null, 8),
+        (json!(c), 10),
+    ] {
+        let (s, x) = block(
+            &app,
+            &admin,
+            p,
+            json!({"posten_id": posten_id,
+                   "von": format!("2027-03-13 {stunde:02}:00:00"),
+                   "bis": format!("2027-03-13 {:02}:00:00", stunde + 1)}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{x}");
+        plan = x;
+    }
+    let reihe = |plan: &Value| -> Vec<(Value, String)> {
+        bloecke(plan)
+            .iter()
+            .map(|x| {
+                (
+                    x["posten_id"].clone(),
+                    x["von"].as_str().unwrap()[11..16].to_string(),
+                )
+            })
+            .collect()
+    };
+    let erwartet: Vec<(Value, String)> = [
+        (json!(c), "10:00"),
+        (json!(c), "11:00"),
+        (json!(a), "10:00"),
+        (json!(a), "12:00"),
+        (json!(b), "10:00"),
+        (Value::Null, "08:00"),
+        (Value::Null, "09:00"),
+    ]
+    .into_iter()
+    .map(|(x, y)| (x, y.to_string()))
+    .collect();
+    assert_eq!(reihe(&plan), erwartet, "{plan}");
+    let (_, gelesen) = anfrage(&app, "GET", &format!("{PFAD}/{p}"), &admin, None).await;
+    assert_eq!(
+        reihe(&gelesen),
+        erwartet,
+        "GET wie die Antwort des Schreibwegs"
+    );
+
+    let ben = stammpersonal_anlegen(&app, &admin, "Ben").await;
+    let ada = stammpersonal_anlegen(&app, &admin, "Ada").await;
+    let (s, h) = post(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/helfer"),
+        json!({"name": "Cem"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{h}");
+    let cem = h["id"].as_i64().unwrap();
+    let personen_von = |plan: &Value| -> Vec<(String, i64)> {
+        bloecke(plan)
+            .iter()
+            .find(|x| x["von"] == "2027-03-13 15:00:00")
+            .unwrap()["personen"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| {
+                let art = x["art"].as_str().unwrap().to_string();
+                let schluessel = if art == "stamm" {
+                    "personal_id"
+                } else {
+                    "helfer_id"
+                };
+                (art, x[schluessel].as_i64().unwrap())
+            })
+            .collect()
+    };
+    let (s, plan) = block(
+        &app,
+        &admin,
+        p,
+        json!({"von": "2027-03-13 15:00:00", "bis": "2027-03-13 16:00:00",
+               "personen": [{"art": "helfer", "helfer_id": cem},
+                            {"art": "stamm", "personal_id": ben},
+                            {"art": "stamm", "personal_id": ada}]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{plan}");
+    let paar = |x: &str, id: i64| (x.to_string(), id);
+    assert_eq!(
+        personen_von(&plan),
+        vec![paar("stamm", ben), paar("stamm", ada), paar("helfer", cem)]
+    );
+    let bid = bloecke(&plan)
+        .iter()
+        .find(|x| x["von"] == "2027-03-13 15:00:00")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, plan) = patch(
+        &app,
+        &admin,
+        &format!("{PFAD}/{p}/bloecke/{bid}"),
+        json!({"version": 1,
+               "personen": [{"art": "stamm", "personal_id": ada},
+                            {"art": "helfer", "helfer_id": cem},
+                            {"art": "stamm", "personal_id": ben}]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{plan}");
+    assert_eq!(
+        personen_von(&plan),
+        vec![paar("stamm", ada), paar("stamm", ben), paar("helfer", cem)]
+    );
+}
+
+/// Höchstzahlen je Planung, mit Seed-SQL statt Schleife: 2000 Schichten (Anlegen und Erzeugen)
+/// und 500 Helfer.
+#[tokio::test]
+async fn hoechstzahlen_je_planung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let p = planung(&app, &admin, "Stadtfest").await;
+    let streife = posten(
+        &app,
+        &admin,
+        p,
+        json!({"bezeichnung": "Streife", "art": "einheit"}),
+    )
+    .await;
+    sqlx::query(
+        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1999) \
+         INSERT INTO planung_schicht (planung_id, von, bis) \
+         SELECT ?, '2027-03-13 10:00:00', '2027-03-13 11:00:00' FROM n",
+    )
+    .bind(p)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let schichten = "Höchstens 2000 Schichten je Planung";
+    erwarte(
+        post(
+            &app,
+            &admin,
+            &format!("{PFAD}/{p}/erzeugen"),
+            json!({"posten_id": streife, "von": "2027-03-13 14:00:00",
+                   "bis": "2027-03-13 16:00:00", "laenge_minuten": 60}),
+        )
+        .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        schichten,
+    );
+    let pause = json!({"von": "2027-03-13 12:00:00", "bis": "2027-03-13 13:00:00"});
+    let (s, json) = block(&app, &admin, p, pause.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "die 2000. Schicht geht: {json}");
+    erwarte(
+        block(&app, &admin, p, pause).await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        schichten,
+    );
+
+    sqlx::query(
+        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 500) \
+         INSERT INTO planung_helfer (planung_id, name) SELECT ?, 'Helfer ' || i FROM n",
+    )
+    .bind(p)
+    .execute(&pool)
+    .await
+    .unwrap();
+    erwarte(
+        post(
+            &app,
+            &admin,
+            &format!("{PFAD}/{p}/helfer"),
+            json!({"name": "Einer zu viel"}),
+        )
+        .await,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Höchstens 500 Helfer je Planung",
+    );
+}
