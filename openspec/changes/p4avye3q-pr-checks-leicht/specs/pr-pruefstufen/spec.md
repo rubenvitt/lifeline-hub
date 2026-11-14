@@ -14,7 +14,7 @@ Ein Push auf einen offenen Pull Request gegen `alpha`, `beta` oder `main` MUST d
 - **THEN** ist er mergebar, ohne dass eine schwere Suite auf ihm lief
 
 ### Requirement: Das Label `voll` fährt alle Suiten im PR
-Trägt ein PR das Label `voll`, MUST jeder Push auf ihn und das Setzen des Labels die Rust-, Frontend- und e2e-Suite ganz starten, ohne Auswahl nach geänderten Dateien. Ihre Ergebnisse MUST NOT Pflicht für das Mergen sein. Ein anderes Label MUST keine schwere Suite starten und keinen laufenden Lauf abbrechen.
+Trägt ein PR das Label `voll`, MUST jeder Push auf ihn und das Setzen des Labels die Rust-, Frontend- und e2e-Suite ganz starten, ohne Auswahl nach geänderten Dateien. Ihre Ergebnisse MUST NOT Pflicht für das Mergen sein. An einem PR ohne `voll` MUST ein anderes Label keine schwere Suite starten und keinen laufenden Lauf abbrechen. An einem PR mit `voll` MUST jedes Ereignis die Suiten neu starten, damit kein übersprungener Check eine rote Suite verdeckt.
 
 #### Scenario: Label gesetzt
 - **WHEN** ein PR das Label `voll` bekommt
@@ -25,8 +25,12 @@ Trägt ein PR das Label `voll`, MUST jeder Push auf ihn und das Setzen des Label
 - **THEN** ist der PR trotzdem mergebar, und die rote Suite steht sichtbar am PR
 
 #### Scenario: Anderes Label
-- **WHEN** ein PR ein anderes Label als `voll` bekommt, auch während seine Suiten wegen `voll` laufen
-- **THEN** startet keine schwere Suite neu, und ein laufender Lauf läuft weiter
+- **WHEN** ein PR ohne `voll` ein anderes Label bekommt
+- **THEN** startet keine schwere Suite, und ein laufender Lauf läuft weiter
+
+#### Scenario: Anderes Label an einem PR mit `voll`
+- **WHEN** ein PR mit `voll` und roter Rust-Suite ein weiteres Label bekommt
+- **THEN** laufen die Suiten neu, und die Rust-Suite steht danach wieder mit echtem Ergebnis am PR, nie als übersprungen
 
 ### Requirement: Ein PR ist fertig, wenn Auto-Merge an ist
 Ein offener PR MUST als fertig gelten, solange Auto-Merge eingeschaltet ist. Labels, Kommentare und Reviews MUST daran nichts ändern.

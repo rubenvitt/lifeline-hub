@@ -68,9 +68,10 @@ job_gruppe() { # <datei> <id>
   '
 }
 
-# Bedingung der schweren Jobs: Push auf einen Kanal-Branch oder Label `voll`, aber nicht bei einem
-# fremden Label an einem PR mit `voll` (das startete sonst alle Suiten neu, Review LLH-1889).
-VOLL="github.event_name == 'push' || (contains(github.event.pull_request.labels.*.name, 'voll') && (github.event.action != 'labeled' || github.event.label.name == 'voll'))"
+# Bedingung der schweren Jobs: Push auf einen Kanal-Branch oder ein PR mit Label `voll`, bei JEDEM
+# seiner Ereignisse, auch einem fremden Label: ein übersprungener gleichnamiger Check wäre der
+# jüngste und verdeckte eine rote Suite (Review LLH-1889).
+VOLL="github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll')"
 # Kopf ohne Kommentarzeilen: ein gleichlautender Kommentar darf keinen Schlüssel vortäuschen.
 kopf_code() { kopf "$1" | grep -Ev '^[[:space:]]*#'; }
 # Auf einem Kanal-Branch eine Gruppe je Branch, im PR je Lauf.
@@ -80,10 +81,11 @@ echo "==> ci-stufen: ci.yml, Kopf"
 k="$(kopf_code "$CI")"
 pruefe "PR-Lauf hört auf labeled (Label voll)" enthaelt "$k" "types: [opened, synchronize, reopened, labeled]"
 pruefe "kein Start auf Auto-Merge" fehlt "$k" "auto_merge"
-# Ein fremdes Label läuft in einer eigenen Gruppe: es bricht keinen laufenden Lauf ab (auch nicht die
-# Suiten eines `voll`-Laufs) und startet nur die Schnellprüfungen; Dependabot setzt mehrere Labels.
-pruefe "Workflow-Gruppe: im PR je Ref, bei Push und fremdem Label je Lauf" \
-  enthaelt "$k" "group: ci-\${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name != 'voll') && github.ref || github.run_id }}"
+# Ein fremdes Label an einem PR OHNE `voll` läuft in einer eigenen Gruppe: es bricht keinen
+# laufenden Lauf ab und startet nur die Schnellprüfungen (Dependabot setzt mehrere Labels). An
+# einem PR mit `voll` startet es in der Ref-Gruppe alles neu (s. VOLL).
+pruefe "Workflow-Gruppe: im PR je Ref, bei Push und fremdem Label ohne voll je Lauf" \
+  enthaelt "$k" "group: ci-\${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name != 'voll' && !contains(github.event.pull_request.labels.*.name, 'voll')) && github.ref || github.run_id }}"
 pruefe "Workflow-Abbruch nur im PR" enthaelt "$k" "cancel-in-progress: \${{ github.event_name == 'pull_request' }}"
 
 echo "==> ci-stufen: ci.yml, Jobs"
