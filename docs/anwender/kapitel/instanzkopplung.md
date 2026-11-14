@@ -560,6 +560,10 @@ Ein abgelehnter Antrag nennt den Grund, etwa:
 - „Konto am Führer unbekannt.“: das eigene Konto gibt es dort nicht;
 - „Kopplung widerrufen.“: die Kopplung wurde widerrufen, bevor der Antrag übernommen war.
 
+Gibt es die Person, Stelle oder Meldung schon am Spiegel nicht mehr, etwa weil die Seite noch
+einen alten Stand zeigte oder die Erfassung ohne Netz vorgemerkt war, entsteht gar kein Antrag:
+Die Erfassung wird gleich mit „Bezug nicht mehr vorhanden.“ abgewiesen.
+
 Abgelehnte Anträge verschwinden nach 30 Tagen.
 
 ### Anhänge
