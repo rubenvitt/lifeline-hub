@@ -785,6 +785,12 @@ fn serde_wire_gleich_as_str() {
     });
     // LLH-1497: Wire = DB-CHECK in 0336.
     enum_wire_as_str!(lifeline_hub::instanz::InstanzKopplungArt { Standard, VorOrt });
+    // LLH-1678: nur Wire (FuehrungGegenueber.wechsel), keine Spalte.
+    enum_wire_as_str!(lifeline_hub::instanz::Wechselregel {
+        NachRichtung,
+        Gleichrangig,
+        Gesperrt,
+    });
     enum_wire_as_str!(lifeline_hub::instanz::repo::InstanzZertifikatZustand {
         Bestaetigt,
         PasstNicht,
@@ -1689,6 +1695,7 @@ fn benachrichtigung_wire() {
         Unwetter => "unwetter",
         FuehrungUngueltig => "fuehrung_ungueltig",
         FuehrungUebernommen => "fuehrung_uebernommen",
+        FuehrungAngefragt => "fuehrung_angefragt",
     } in lifeline_hub::benachrichtigung::BenachrichtigungArt::ALLE);
     enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungBezugTyp {
         Einsatz => "einsatz",

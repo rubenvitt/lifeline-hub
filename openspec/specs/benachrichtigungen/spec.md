@@ -832,3 +832,14 @@ an einem eigenen (Anforderung „Verlauf der Benachrichtigungen“).
 #### Scenario: Hinweis am Hub nach 24 Stunden
 - **WHEN** Person A am Hub einen Hinweis zu einem Einsatz des ELW vor 25 Stunden erhalten und nie gelesen hat
 - **THEN** ist er aus ihrem Verlauf verschwunden
+
+### Requirement: Führung angefragt
+
+Fragt die Gegenstelle einer Direktkopplung die Führung eines Einsatzes an, den diese Instanz führt,
+SHALL die Einsatzleitung des Einsatzes einen Hinweis „Führung angefragt“ mit Sprung zu den
+Einsatzdaten mit dem Paneel „Führung“ erhalten. Dieselbe Anfrage MUST höchstens einen Hinweis auslösen, auch wenn sie mit
+mehreren Meldungen wiederkommt.
+
+#### Scenario: ELW 2 fragt an
+- **WHEN** ELW 1 einen Einsatz führt und ELW 2 über die Direktkopplung die Führung anfragt
+- **THEN** erhält die Einsatzleitung an ELW 1 einen Hinweis „Führung angefragt“, und die nächsten Meldungen derselben Anfrage lösen keinen weiteren aus

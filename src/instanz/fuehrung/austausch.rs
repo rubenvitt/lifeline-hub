@@ -19,7 +19,7 @@ use crate::auth::unterschrift::pruefen;
 use crate::auth::unterschrift::repo as unterschrift;
 use crate::error::AppError;
 use crate::instanz::repo::KopplungZeile;
-use crate::instanz::{InstanzKopplungArt, InstanzKopplungRichtung};
+use crate::instanz::{InstanzKopplungArt, InstanzKopplungRichtung, Wechselregel};
 use serde::{Deserialize, Serialize};
 use sqlx::SqliteConnection;
 
@@ -86,6 +86,16 @@ pub struct AkteMeldung {
     pub offen: bool,
     /// Stand der sendenden Seite.
     pub stand: i64,
+    /// Die führende Seite hat die Anfrage dieser Instanz abgelehnt (Direktkopplung, LLH-1678,
+    /// design.md D4). Optional auf der Leitung, Protokoll 3 kennt es nicht.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anfrage_abgelehnt: Option<String>,
+    /// Kennung der abgelehnten Anfrage: Die Ablehnung gilt genau ihr.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anfrage_abgelehnt_kennung: Option<String>,
+    /// Mit `anfrage`: die Kennung der Anfrage, ein Zufallswert (LLH-1678, design.md D4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anfrage_kennung: Option<String>,
 }
 
 /// Kürzt einen Text auf höchstens `max` Zeichen.
@@ -120,6 +130,9 @@ impl AkteMeldung {
             anfrage: a.anfrage_at.is_some(),
             offen: a.offen.is_some(),
             stand: a.stand,
+            anfrage_abgelehnt: a.anfrage_abgelehnt.clone(),
+            anfrage_abgelehnt_kennung: a.anfrage_abgelehnt_kennung.clone(),
+            anfrage_kennung: a.anfrage_at.as_ref().and(a.anfrage_kennung.clone()),
         }
     }
 
@@ -185,6 +198,9 @@ impl AkteMeldung {
                 .erklaerung
                 .as_deref()
                 .is_none_or(|e| e.len() <= ERKLAERUNG_MAX)
+            && self.anfrage_abgelehnt.as_deref().is_none_or(kurz)
+            && self.anfrage_abgelehnt_kennung.as_deref().is_none_or(kurz)
+            && self.anfrage_kennung.as_deref().is_none_or(kurz)
             && self.is_beweis_in_grenzen()
             && self.is_stand_plausibel()
             && self.bytes() <= bytes_max
@@ -283,6 +299,8 @@ pub enum Folge {
     Alarm { einsatz_id: i64 },
     /// Eine gültige Übernahme wartet auf die Einsatzleitung.
     Offen { einsatz_id: i64 },
+    /// Die Gegenstelle einer Direktkopplung fragt die Führung an (LLH-1678, design.md D4).
+    Anfrage { einsatz_id: i64 },
     /// Eintrag in der Admin-Spur der Org, ausgelöst vom Gegenüber.
     Spur {
         aktion: AdminAktion,
@@ -378,26 +396,51 @@ async fn folge_dem_absender(
 }
 
 /// Wie eine Akte mit höherer Epoche über eine Direktkopplung vor Ort behandelt wird (LLH-1497,
-/// Change `t10a7luh-elw-lan-direktkopplung`, design.md D4), gleich in welcher Richtung die
+/// Change `t10a7luh-elw-lan-direktkopplung`, design.md D4; mit der Regel `gleichrangig` LLH-1678,
+/// Change `gwcf2shk-fuehrungswechsel-vor-ort`, design.md D2), gleich in welcher Richtung die
 /// Kopplung läuft.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VorOrtEntscheid {
-    /// Die Führung wechselte zwischen den beiden Seiten: verwerfen, Hinweis an der Kopplung.
+    /// Die Führung wechselte zwischen den beiden Seiten, die Gegenstelle ist zu alt (`gesperrt`):
+    /// verwerfen, Hinweis an der Kopplung.
     Verwerfen,
-    /// Der bisherige Führer ist der Absender und bezeugt seine Abgabe an eine dritte Instanz oder
-    /// führt mit neuer Epoche weiter: annehmen, der Spiegel folgt.
+    /// Annehmen, der Spiegel folgt: Der bisherige Führer ist der Absender und gibt an mich oder
+    /// eine dritte Instanz ab oder führt mit neuer Epoche weiter.
     Annehmen,
+    /// Die Gegenstelle nimmt mir die Führung (`gleichrangig`): wie an der meldenden Seite nur mit
+    /// Beweis, dann offen bis zur Einsatzleitung, sonst verwerfen mit Alarm.
+    Pruefen,
+    /// Die Gegenstelle beantwortet meine eigene Übernahme mit Widerspruch oder Verwerfen
+    /// (`gleichrangig`, design.md D3): annehmen, mit Alarm, Spur und Hinweis.
+    Antwort,
     /// Weder noch (etwa von einer Dritten weitergereicht): nur zur Anzeige, nichts ändert sich.
     NurAnzeige,
 }
 
-/// Die Annahmeregel einer Direktkopplung als reine Funktion (Tabelle in design.md D4): `bisher`
-/// der Führer laut eigener Akte, `neu` der Führer der eingehenden Akte, `sender` und `ich` die
-/// beiden Seiten der Kopplung.
-pub fn entscheide_vor_ort(bisher: &str, neu: &str, sender: &str, ich: &str) -> VorOrtEntscheid {
+/// Die Annahmeregel einer Direktkopplung als reine Funktion (Tabelle in design.md D2 der Change
+/// `gwcf2shk-fuehrungswechsel-vor-ort`): `bisher` der Führer laut eigener Akte, `neu` der Führer der
+/// eingehenden Akte, `sender` und `ich` die beiden Seiten der Kopplung, `antwort` ob die Akte
+/// meine eigene Übernahme beantwortet ([`is_antwort_auf_meine_uebernahme`]).
+pub fn entscheide_vor_ort(
+    bisher: &str,
+    neu: &str,
+    sender: &str,
+    ich: &str,
+    regel: crate::instanz::Wechselregel,
+    antwort: bool,
+) -> VorOrtEntscheid {
     let seite = |k: &str| k == sender || k == ich;
+    let gleichrangig = regel == crate::instanz::Wechselregel::Gleichrangig;
     if seite(bisher) && seite(neu) && bisher != neu {
-        VorOrtEntscheid::Verwerfen
+        if !gleichrangig {
+            VorOrtEntscheid::Verwerfen
+        } else if bisher == sender {
+            VorOrtEntscheid::Annehmen
+        } else if antwort {
+            VorOrtEntscheid::Antwort
+        } else {
+            VorOrtEntscheid::Pruefen
+        }
     } else if bisher == sender {
         VorOrtEntscheid::Annehmen
     } else {
@@ -405,15 +448,59 @@ pub fn entscheide_vor_ort(bisher: &str, neu: &str, sender: &str, ich: &str) -> V
     }
 }
 
-/// Prüft den Beweis einer Notübernahme gegen mich (D6): Erklärung passt zur Akte, Unterschrift
-/// von einem gültigen Schlüssel meiner Org über genau diese Erklärung. Gilt bei Ankunft, bei jedem
-/// weiteren Eingang einer offenen Übernahme und beim Bestätigen (LLH-1671).
+/// Ob `m` meine eigene Übernahme beantwortet (design.md D3): Ich führe per Notübernahme gegen den
+/// Sender (meine Epoche, Erklärung mit dem Sender als bisherigem Führer), und der Sender führt nach
+/// Widerspruch oder Verwerfen mit der Epoche, die unmittelbar auf meine folgt. Beide rechnen die
+/// nächste Epoche nach der größten bekannten, und das ist meine.
+pub fn is_antwort_auf_meine_uebernahme(
+    a: &AkteZeile,
+    m: &AkteMeldung,
+    sender: &str,
+    ich: &str,
+) -> bool {
+    let meine = a.epoche();
+    matches!(
+        a.art(),
+        FuehrungWechselArt::Notuebernahme | FuehrungWechselArt::CodeAbgabe
+    ) && a.fuehrer_kennung == ich
+        && meine.instanz == ich
+        && a.erklaerung
+            .as_deref()
+            .and_then(NotuebernahmeErklaerung::parse)
+            .is_some_and(|e| e.fuehrer_alt == sender)
+        && m.fuehrer == sender
+        && matches!(
+            FuehrungWechselArt::parse(&m.art),
+            Some(FuehrungWechselArt::Widerspruch | FuehrungWechselArt::Verworfen)
+        )
+        && m.epoche == Epoche::neu(meine.zaehler + 1, sender)
+}
+
+/// Prüft den Beweis einer Notübernahme gegen den bisherigen Führer `gegen` (D6): Erklärung passt
+/// zur Akte, Unterschrift von einem gültigen Schlüssel meiner Org über genau diese Erklärung. Gilt
+/// bei Ankunft, bei jedem weiteren Eingang einer offenen Übernahme und beim Bestätigen (LLH-1671),
+/// `gegen` ist dann diese Instanz; am Hub, der einen Wechsel zwischen zwei ELW nachzieht, der
+/// bisherige Führer (LLH-1678, design.md D5).
 pub(super) async fn check_unterschrift(
     conn: &mut SqliteConnection,
-    ich: &Ich,
+    gegen: &str,
     org_id: i64,
     m: &AkteMeldung,
     alt: &Epoche,
+) -> Result<NotuebernahmeErklaerung, String> {
+    check_unterschrift_orgs(conn, gegen, org_id, m, alt, &[m.org.as_str()]).await
+}
+
+/// [`check_unterschrift`], wobei die Erklärung die Org unter einer der Kennungen `orgs` nennen
+/// darf: Am Hub, der eine Notübernahme vor Ort nachzieht, nennt sie die Org so, wie die beiden
+/// ELW sie untereinander kennen (LLH-1678, design.md D5).
+async fn check_unterschrift_orgs(
+    conn: &mut SqliteConnection,
+    gegen: &str,
+    org_id: i64,
+    m: &AkteMeldung,
+    alt: &Epoche,
+    orgs: &[&str],
 ) -> Result<NotuebernahmeErklaerung, String> {
     let text = m
         .erklaerung
@@ -421,10 +508,10 @@ pub(super) async fn check_unterschrift(
         .ok_or_else(|| "ohne Erklärung".to_string())?;
     let e = NotuebernahmeErklaerung::parse(text).ok_or_else(|| "Erklärung unlesbar".to_string())?;
     if e.einsatz != m.kennung
-        || e.org != m.org
+        || !orgs.contains(&e.org.as_str())
         || e.epoche_neu != m.epoche
         || e.fuehrer_neu != m.fuehrer
-        || !is_gegen_mich(&e, &ich.kennung)
+        || e.fuehrer_alt != gegen
         || &e.epoche_alt != alt
     {
         return Err("Erklärung passt nicht zur Übernahme".into());
@@ -439,6 +526,25 @@ pub(super) async fn check_unterschrift(
     pruefen::verify(text, assertion, &schluessel.pruef_schluessel())
         .map_err(|f| format!("Unterschrift ungültig: {f}"))?;
     Ok(e)
+}
+
+/// Die Kennungen, unter denen gekoppelte Instanzen die lokale Org `org_id` kennen: die eigene auf
+/// der Leitung (`leitung`) und die Org-Kennungen der meldenden Seiten, die ihr zugeordnet sind.
+async fn orgs_der_org(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    leitung: &str,
+) -> Result<Vec<String>, AppError> {
+    let mut aus: Vec<String> = sqlx::query_scalar(
+        "SELECT o.fremde_org_kennung FROM instanz_kopplung_org o \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE o.org_id = ? AND o.widerrufen_at IS NULL AND k.richtung = 'wird_gemeldet'",
+    )
+    .bind(org_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    aus.push(leitung.to_string());
+    Ok(aus)
 }
 
 /// Prüft den Code-Beweis gegen den Abgabeschlüssel der Akte (D8).
@@ -626,6 +732,209 @@ async fn fuehre_weiter(
     Ok(())
 }
 
+/// Nimmt die Antwort der Gegenstelle auf meine eigene Übernahme an (Widerspruch oder Verwerfen,
+/// LLH-1678, design.md D3): Die Gegenstelle führt wieder, mit Alarm an meine Einsatzleitung, Spur
+/// und Hinweis an der Kopplung.
+async fn nimm_antwort_an(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    kopplung: &KopplungZeile,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    bruch: &str,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let widerspruch = m.art == FuehrungWechselArt::Widerspruch.as_str();
+    let text = if widerspruch {
+        format!(
+            "{} hat der Notübernahme widersprochen",
+            kopplung.gegenueber_name
+        )
+    } else {
+        format!(
+            "{} hat die Übernahme als ungültig verworfen",
+            kopplung.gegenueber_name
+        )
+    };
+    uebernimm(a, m);
+    a.bruch_at = Some(bruch.to_string());
+    a.offen = None;
+    a.offen_bruch_at = None;
+    repo::save(conn, a, true).await?;
+    repo::add_verlauf(
+        conn,
+        a,
+        VerlaufNeu {
+            von_name: Some(&ich.name),
+            nach_name: &m.fuehrer_name,
+            grund: Some(&text),
+            bruch_at: Some(bruch),
+            ..VerlaufNeu::default()
+        },
+    )
+    .await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        aus.folgen.push(Folge::Kopf { einsatz_id });
+        aus.folgen.push(Folge::Alarm { einsatz_id });
+    }
+    aus.folgen.push(Folge::Spur {
+        aktion: if widerspruch {
+            AdminAktion::FuehrungWiderspruch
+        } else {
+            AdminAktion::FuehrungVerworfen
+        },
+        org_id: a.org_id,
+        grund: spur_text(a, &text),
+    });
+    aus.hinweis = Some(format!("{text} ({})", a.bezeichnung));
+    Ok(())
+}
+
+/// Prüft eine Übernahme gegen mich über eine Direktkopplung (`gleichrangig`, LLH-1678, design.md
+/// D2) wie an der meldenden Seite: mit gültiger Unterschrift offen halten, bis die Einsatzleitung
+/// entscheidet, sonst verwerfen und weiterführen. Einen verwahrten Einsatz gibt diese Instanz nicht
+/// mehr ab (LLH-1647, E4).
+#[allow(clippy::too_many_arguments)]
+async fn pruefe_vor_ort(
+    conn: &mut SqliteConnection,
+    ich: &Ich,
+    kopplung: &KopplungZeile,
+    org_id: i64,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    bruch: &str,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    if let Some(einsatz_id) = a.einsatz_id {
+        if crate::instanz::spiegel::lebensende::ist_verwahrt(conn, einsatz_id).await? {
+            aus.hinweis = Some(format!(
+                "{} beansprucht die Führung des verwahrten Einsatzes „{}“: abgelehnt",
+                kopplung.gegenueber_name, a.bezeichnung
+            ));
+            return Ok(());
+        }
+    }
+    let alt = a.epoche();
+    let bewiesen = check_unterschrift(conn, &ich.kennung, org_id, m, &alt)
+        .await
+        .map(|_| ());
+    match entscheide(InstanzKopplungRichtung::MeldetSich, bewiesen, false) {
+        Entscheid::OffenHalten => halte_offen(conn, a, m, bruch, aus).await,
+        Entscheid::Verwerfen(grund) => verwerfen(conn, ich, kopplung, a, m, &grund, aus).await,
+        Entscheid::Annehmen => {
+            unreachable!("die meldende Seite nimmt eine Übernahme nie gleich an")
+        }
+    }
+}
+
+/// Merkt sich die Anfrage der Gegenstelle einer Direktkopplung an einer Akte, die diese Instanz
+/// führt (LLH-1678, design.md D4): Die Einsatzleitung entscheidet, die Führung geht nicht von
+/// selbst. Eine Anfrage erkennt sie an ihrer Kennung (`anfrage_kennung`): Eine neue benachrichtigt
+/// einmal, die abgelehnte zählt nicht wieder. Wartet schon die Anfrage einer anderen Gegenstelle
+/// oder hat diese ihre Ablehnung noch nicht gesehen, bleibt das stehen, und die Kopplung nennt die
+/// zweite.
+async fn merke_anfrage_vor_ort(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+    a: &mut AkteZeile,
+    m: &AkteMeldung,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let sender = kopplung.gegenueber_kennung.as_str();
+    let (von, von_seit) = repo::load_anfrage_von(conn, a.id).await?;
+    if m.anfrage {
+        let abgelehnt = a.anfrage_abgelehnt.as_deref() == Some(sender)
+            && a.anfrage_abgelehnt_kennung == m.anfrage_kennung;
+        let schon = von.as_deref() == Some(sender) && von_seit == m.anfrage_kennung;
+        if abgelehnt || schon {
+            return Ok(());
+        }
+        let andere = |k: Option<&str>| k.is_some_and(|k| k != sender);
+        if andere(von.as_deref()) || andere(a.anfrage_abgelehnt.as_deref()) {
+            aus.hinweis = Some(format!(
+                "{} bittet ebenfalls um die Führung von „{}“; eine andere Anfrage wartet noch",
+                kopplung.gegenueber_name, a.bezeichnung
+            ));
+            return Ok(());
+        }
+        repo::save_anfrage_von(conn, a.id, Some(sender), m.anfrage_kennung.as_deref()).await?;
+        if a.anfrage_abgelehnt.as_deref() == Some(sender) {
+            a.anfrage_abgelehnt = None;
+            a.anfrage_abgelehnt_kennung = None;
+            repo::save(conn, a, false).await?;
+        }
+        if let Some(einsatz_id) = a.einsatz_id {
+            aus.folgen.push(Folge::Anfrage { einsatz_id });
+            aus.folgen.push(Folge::Kopf { einsatz_id });
+        }
+        return Ok(());
+    }
+    // Die Gegenstelle fragt nicht (mehr) an: ihre wartende Anfrage fällt weg, und eine Ablehnung
+    // hat sie gesehen.
+    if von.as_deref() == Some(sender) {
+        repo::save_anfrage_von(conn, a.id, None, None).await?;
+        if let Some(einsatz_id) = a.einsatz_id {
+            aus.folgen.push(Folge::Kopf { einsatz_id });
+        }
+    }
+    if a.anfrage_abgelehnt.as_deref() == Some(sender) {
+        a.anfrage_abgelehnt = None;
+        a.anfrage_abgelehnt_kennung = None;
+        repo::save(conn, a, false).await?;
+    }
+    Ok(())
+}
+
+/// Nimmt die Ablehnung meiner Anfrage durch die führende Gegenstelle an (LLH-1678, design.md D4):
+/// Die Anfrage ist zurückgenommen, die Akte zeigt „Anfrage abgelehnt“, bis ich neu anfrage oder
+/// die Führung wechselt.
+async fn nimm_ablehnung_an(
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+    a: &mut AkteZeile,
+    aus: &mut Eingang,
+) -> Result<(), AppError> {
+    let ich = repo::ich(conn).await?;
+    a.anfrage_at = None;
+    a.anfrage_abgelehnt = Some(ich.kennung.clone());
+    repo::save(conn, a, true).await?;
+    let grund = format!("{} hat die Anfrage abgelehnt", kopplung.gegenueber_name);
+    repo::add_verlauf(
+        conn,
+        a,
+        VerlaufNeu {
+            art: Some(FuehrungWechselArt::Anfrage),
+            von_name: Some(&kopplung.gegenueber_name),
+            nach_name: &kopplung.gegenueber_name,
+            grund: Some(&grund),
+            ..VerlaufNeu::default()
+        },
+    )
+    .await?;
+    if let Some(einsatz_id) = a.einsatz_id {
+        aus.folgen.push(Folge::Kopf { einsatz_id });
+    }
+    aus.hinweis = Some(format!(
+        "{} hat die Anfrage auf die Führung von „{}“ abgelehnt",
+        kopplung.gegenueber_name, a.bezeichnung
+    ));
+    Ok(())
+}
+
+/// Ob die Instanz `kennung` für die Org `org_id` eine gleichrangige Gegenstelle einer
+/// Direktkopplung ist (LLH-1678, design.md D2). Nur der genannte Führer zählt: Führt ein echter
+/// Dritter mit einer Epoche der Gegenstelle, bleibt es beim Offenhalten (Review vor dem PR).
+async fn is_gleichrangig_gekoppelt(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    kennung: &str,
+) -> Result<bool, AppError> {
+    Ok(repo::list_gegenueber(conn, org_id)
+        .await?
+        .iter()
+        .any(|g| g.wechsel == Wechselregel::Gleichrangig && g.kennung == kennung))
+}
+
 /// Ob eine offene Übernahme ein Konflikt ist (Change `faq7l7m4-zwei-elw-unterlegene-seite`,
 /// design.md D3): Die erreichte Seite nennt als Führer eine Instanz, die keiner der Hubs ist, bei
 /// denen sich diese Instanz für die Org meldet (`hubs`, [`repo::list_hubs`]; im Austausch der
@@ -792,7 +1101,7 @@ async fn check_offene(
             continue;
         }
         let alt = a.epoche();
-        if let Err(grund) = check_unterschrift(conn, ich, a.org_id, &m, &alt).await {
+        if let Err(grund) = check_unterschrift(conn, &ich.kennung, a.org_id, &m, &alt).await {
             verwerfen(conn, ich, kopplung, &mut a, &m, &grund, aus).await?;
         }
     }
@@ -876,7 +1185,12 @@ pub async fn apply_eingang(
     let bruch = zuletzt_gesehen
         .map(str::to_string)
         .unwrap_or_else(crate::zeit::jetzt);
-    if richtung == InstanzKopplungRichtung::MeldetSich {
+    // Regel des Führungswechsels zu diesem Gegenüber (LLH-1678, design.md D1): Über eine
+    // Direktkopplung mit Protokoll 4 ist jede Seite gegenüber der anderen wie die meldende Seite.
+    let regel = kopplung.wechselregel();
+    let gleichrangig = regel == Wechselregel::Gleichrangig;
+    let meldend = gleichrangig || richtung == InstanzKopplungRichtung::MeldetSich;
+    if meldend {
         check_offene(conn, &ich, kopplung, &orgs, &mut aus).await?;
     }
     let ablehnen = |m: &AkteMeldung, grund: &str| {
@@ -938,6 +1252,9 @@ pub async fn apply_eingang(
                 bruch_at: None,
                 stand: 0,
                 geaendert_at: String::new(),
+                anfrage_abgelehnt: None,
+                anfrage_abgelehnt_kennung: None,
+                anfrage_kennung: None,
             };
             repo::insert_fremd(conn, &mut a).await?;
             repo::add_verlauf(
@@ -958,7 +1275,12 @@ pub async fn apply_eingang(
         }
         let alt = a.epoche();
         let ich_fuehre = a.fuehrer_kennung == ich.kennung;
-        if richtung == InstanzKopplungRichtung::MeldetSich {
+        // Über eine Direktkopplung entscheidet `entscheide_vor_ort` (unten), nicht die Richtung:
+        // Die Gegenstelle ist dort kein Hub, und ein Dritter, den sie nennt, ist nur zur Anzeige
+        // (LLH-1678, design.md D2).
+        if richtung == InstanzKopplungRichtung::MeldetSich
+            && kopplung.art() == InstanzKopplungArt::Standard
+        {
             // Eine größere Epoche mit meiner Kennung, die ich nie vergeben habe, prüft der Zweig
             // `Greater` unten (Verwerfen); sie ist weder Konflikt noch Nachzug eines Dritten.
             let fremd_vergeben = !(m.epoche > alt && m.epoche.instanz == ich.kennung);
@@ -975,7 +1297,14 @@ pub async fn apply_eingang(
             // Einen eigenen Zweig zum Erlöschen braucht es nicht (D6): Nennt der Hub keinen Dritten
             // mehr, ersetzt die nächste Akte die gehaltene (halte_offen, D7), oder Verwerfen bzw.
             // Annahme unten räumen `offen` ab.
-            if ich_fuehre && fremd_vergeben && (dritter_fuehrt || dritte_epoche) {
+            // Nennt der Hub als Führer meine gleichrangige Gegenstelle vor Ort, ist sie kein
+            // Dritter: Über einen Wechsel zwischen uns beiden entscheidet
+            // allein die Direktkopplung, der Hub reicht ihn nur weiter (LLH-1678, design.md D2).
+            if ich_fuehre
+                && fremd_vergeben
+                && (dritter_fuehrt || dritte_epoche)
+                && !is_gleichrangig_gekoppelt(conn, a.org_id, &m.fuehrer).await?
+            {
                 // Läuft über die Annahmeregel (src/AGENTS.md); mit einem Dritten heißt sie offen
                 // halten.
                 debug_assert_eq!(
@@ -992,7 +1321,7 @@ pub async fn apply_eingang(
                 let von_sender = m.epoche.instanz == sender;
                 if m.epoche.instanz == ich.kennung {
                     // Eine Epoche, die ich nie vergeben habe: gefälscht oder veraltet.
-                    if richtung == InstanzKopplungRichtung::MeldetSich && nimmt_mir {
+                    if meldend && nimmt_mir {
                         verwerfen(
                             conn,
                             &ich,
@@ -1006,24 +1335,95 @@ pub async fn apply_eingang(
                     }
                     continue;
                 }
-                // Direktkopplung vor Ort (LLH-1497, D4): kein Führungswechsel zwischen den beiden
-                // Seiten, gleich in welcher Richtung; die Abgabe des bisherigen Führers an eine
+                // Direktkopplung vor Ort (LLH-1497, D4; LLH-1678, design.md D2), gleich in welcher
+                // Richtung: mit älterer Gegenstelle kein Führungswechsel zwischen den beiden Seiten,
+                // gleichrangig wie an der meldenden Seite; die Abgabe des bisherigen Führers an eine
                 // Dritte gilt, damit der Spiegel ihr folgt.
                 if kopplung.art() == InstanzKopplungArt::VorOrt {
-                    match entscheide_vor_ort(&a.fuehrer_kennung, &m.fuehrer, sender, &ich.kennung) {
+                    let antwort = is_antwort_auf_meine_uebernahme(&a, m, sender, &ich.kennung);
+                    match entscheide_vor_ort(
+                        &a.fuehrer_kennung,
+                        &m.fuehrer,
+                        sender,
+                        &ich.kennung,
+                        regel,
+                        antwort,
+                    ) {
                         VorOrtEntscheid::Verwerfen => {
                             aus.hinweis = Some(format!(
                                 "{} beansprucht die Führung von „{}“ über eine Direktkopplung: \
-                                 abgelehnt",
-                                kopplung.gegenueber_name, a.bezeichnung
+                                 abgelehnt ({})",
+                                kopplung.gegenueber_name,
+                                a.bezeichnung,
+                                crate::instanz::update_hinweis(&kopplung.gegenueber_name)
                             ));
                         }
                         VorOrtEntscheid::Annehmen => {
+                            if m.fuehrer == ich.kennung && !ich_fuehre {
+                                a.bruch_at = None;
+                            }
                             folge_dem_absender(conn, &mut a, m, &mut aus).await?;
+                        }
+                        VorOrtEntscheid::Antwort => {
+                            nimm_antwort_an(conn, &ich, kopplung, &mut a, m, &bruch, &mut aus)
+                                .await?;
+                        }
+                        VorOrtEntscheid::Pruefen => {
+                            pruefe_vor_ort(
+                                conn, &ich, kopplung, org_id, &mut a, m, &bruch, &mut aus,
+                            )
+                            .await?;
                         }
                         VorOrtEntscheid::NurAnzeige => {}
                     }
                     continue;
+                }
+                // Nachziehen an der erreichten Seite einer Standardkopplung (LLH-1678, design.md
+                // D5): Der bisherige Führer bezeugt seine Abgabe an eine dritte Instanz (a), oder
+                // der Absender hat sich die Führung von einer dritten Instanz mit einer
+                // Unterschrift geholt, die hier gilt (b). Sonst greifen die Ablehnungen unten.
+                if richtung == InstanzKopplungRichtung::WirdGemeldet {
+                    if a.fuehrer_kennung == sender
+                        && m.fuehrer != sender
+                        && m.fuehrer != ich.kennung
+                    {
+                        folge_dem_absender(conn, &mut a, m, &mut aus).await?;
+                        continue;
+                    }
+                    let beansprucht_von_dritten =
+                        m.fuehrer == sender && a.fuehrer_kennung != sender && !ich_fuehre;
+                    let bewiesen_gegen_dritten = if beansprucht_von_dritten {
+                        let orgs = orgs_der_org(conn, org_id, &m.org).await?;
+                        let orgs: Vec<&str> = orgs.iter().map(String::as_str).collect();
+                        check_unterschrift_orgs(conn, &a.fuehrer_kennung, org_id, m, &alt, &orgs)
+                            .await
+                            .is_ok()
+                    } else {
+                        false
+                    };
+                    if bewiesen_gegen_dritten {
+                        let von = a.fuehrer_name.clone();
+                        folge_dem_absender(conn, &mut a, m, &mut aus).await?;
+                        let text = format!(
+                            "Notübernahme durch {} gegen {von}: {}",
+                            kopplung.gegenueber_name,
+                            grund_der(m).as_deref().unwrap_or("ohne Grund")
+                        );
+                        aus.folgen.push(Folge::Spur {
+                            aktion: AdminAktion::FuehrungNotuebernahme,
+                            org_id: a.org_id,
+                            grund: spur_text(&a, &text),
+                        });
+                        aus.hinweis = Some(format!("{text} ({})", a.bezeichnung));
+                        continue;
+                    }
+                    if beansprucht_von_dritten {
+                        aus.hinweis = Some(format!(
+                            "{} beansprucht die Führung von „{}“, die bei {} liegt: abgelehnt",
+                            kopplung.gegenueber_name, a.bezeichnung, a.fuehrer_name
+                        ));
+                        continue;
+                    }
                 }
                 // Die erreichte Seite nimmt von der meldenden nur sie selbst oder sich als Führer
                 // an; die meldende sieht auch eine Übergabe an eine dritte Instanz (mehrere ELW an
@@ -1119,7 +1519,7 @@ pub async fn apply_eingang(
                         Err("Erklärung gegen eine andere Instanz".into())
                     }
                     InstanzKopplungRichtung::MeldetSich => {
-                        check_unterschrift(conn, &ich, org_id, m, &alt)
+                        check_unterschrift(conn, &ich.kennung, org_id, m, &alt)
                             .await
                             .map(|_| ())
                     }
@@ -1208,7 +1608,7 @@ pub async fn apply_eingang(
                 }
             }
             std::cmp::Ordering::Equal => {
-                if richtung == InstanzKopplungRichtung::MeldetSich
+                if meldend
                     && a.art() == FuehrungWechselArt::CodeAbgabe
                     && a.abgabe_schluessel.is_some()
                     && matches!(m.beweis, Some(FuehrungBeweis::Code { .. }))
@@ -1256,7 +1656,7 @@ pub async fn apply_eingang(
                     }
                     continue;
                 }
-                if richtung == InstanzKopplungRichtung::WirdGemeldet
+                if (richtung == InstanzKopplungRichtung::WirdGemeldet || gleichrangig)
                     && m.art == FuehrungWechselArt::Bestaetigt.as_str()
                     && a.art() == FuehrungWechselArt::Notuebernahme
                 {
@@ -1279,8 +1679,28 @@ pub async fn apply_eingang(
                 }
                 // Eine Anfrage gilt nur dem Stand, den sie sah (Review LLH-1491: ein alter
                 // Merker gäbe die Führung sonst ohne Menschen zurück).
-                if m.anfrage && ich_fuehre && richtung == InstanzKopplungRichtung::WirdGemeldet {
+                if m.anfrage
+                    && ich_fuehre
+                    && regel == Wechselregel::NachRichtung
+                    && richtung == InstanzKopplungRichtung::WirdGemeldet
+                {
                     erfuelle_anfrage(conn, &ich, kopplung, &mut a, &mut aus).await?;
+                    continue;
+                }
+                // Anfrage vor Ort (LLH-1678, design.md D4): Die Einsatzleitung entscheidet.
+                if gleichrangig && ich_fuehre && m.fuehrer == ich.kennung {
+                    merke_anfrage_vor_ort(conn, kopplung, &mut a, m, &mut aus).await?;
+                }
+                if gleichrangig
+                    && !ich_fuehre
+                    && m.fuehrer == sender
+                    && a.anfrage_at.is_some()
+                    && m.anfrage_abgelehnt.as_deref() == Some(ich.kennung.as_str())
+                    // Die Ablehnung gilt der Anfrage, die sie sah; eine neuere bleibt stehen.
+                    && (m.anfrage_abgelehnt_kennung.is_none()
+                        || m.anfrage_abgelehnt_kennung == a.anfrage_kennung)
+                {
+                    nimm_ablehnung_an(conn, kopplung, &mut a, &mut aus).await?;
                     continue;
                 }
                 if a.einsatz_id.is_none()
@@ -1302,7 +1722,7 @@ pub async fn apply_eingang(
             }
         }
     }
-    if richtung == InstanzKopplungRichtung::WirdGemeldet {
+    if richtung == InstanzKopplungRichtung::WirdGemeldet && regel == Wechselregel::NachRichtung {
         erfuelle_wartende(conn, &ich, kopplung, &mut aus).await?;
     }
     Ok(aus)
@@ -1338,11 +1758,13 @@ pub async fn run_folgen(pool: &sqlx::SqlitePool, kopplung: &KopplungZeile, folge
             Folge::Kopf { einsatz_id } => {
                 super::notify_wechsel(pool, &live, *einsatz_id).await;
             }
-            Folge::Alarm { einsatz_id } | Folge::Offen { einsatz_id } => {
-                let art = if matches!(f, Folge::Alarm { .. }) {
-                    BenachrichtigungArt::FuehrungUngueltig
-                } else {
-                    BenachrichtigungArt::FuehrungUebernommen
+            Folge::Alarm { einsatz_id }
+            | Folge::Offen { einsatz_id }
+            | Folge::Anfrage { einsatz_id } => {
+                let art = match f {
+                    Folge::Alarm { .. } => BenachrichtigungArt::FuehrungUngueltig,
+                    Folge::Anfrage { .. } => BenachrichtigungArt::FuehrungAngefragt,
+                    _ => BenachrichtigungArt::FuehrungUebernommen,
                 };
                 b::melden(
                     pool,
@@ -1692,6 +2114,9 @@ pub(crate) mod tests {
             bruch_at: None,
             stand: STAND_MAX,
             geaendert_at: String::new(),
+            anfrage_abgelehnt: None,
+            anfrage_abgelehnt_kennung: None,
+            anfrage_kennung: None,
         };
         let raus = AkteMeldung::aus(&zeile, &"\u{1}".repeat(88));
         assert!(
@@ -1741,6 +2166,9 @@ pub(crate) mod tests {
             bruch_at: None,
             stand: 7,
             geaendert_at: String::new(),
+            anfrage_abgelehnt: None,
+            anfrage_abgelehnt_kennung: None,
+            anfrage_kennung: None,
         };
         let m = AkteMeldung::aus(&zeile, "hub/1");
         assert_eq!(m.bezeichnung.chars().count(), TEXT_MAX);
@@ -1802,46 +2230,70 @@ pub(crate) mod tests {
         );
     }
 
-    /// Tabelle aus design.md D4 (LLH-1497): Zeilen je Fall, beide Richtungen sind dieselbe Regel.
+    /// Tabelle aus design.md D4 (LLH-1497), erweitert um die Regel `gleichrangig` (LLH-1678,
+    /// Change `gwcf2shk-fuehrungswechsel-vor-ort`, design.md D2): Zeilen je Fall, beide Richtungen
+    /// sind dieselbe Regel.
     #[test]
     fn annahmeregel_vor_ort_ueber_alle_zellen() {
+        use crate::instanz::Wechselregel::{Gesperrt, Gleichrangig};
         use VorOrtEntscheid::*;
         let (s, i, d) = ("sender", "ich", "dritte");
-        // Wechsel zwischen den beiden Seiten, in beide Richtungen.
+        for (regel, antwort) in [(Gesperrt, false), (Gesperrt, true)] {
+            // Wechsel zwischen den beiden Seiten, in beide Richtungen: gesperrt.
+            assert_eq!(
+                entscheide_vor_ort(i, s, s, i, regel, antwort),
+                Verwerfen,
+                "Sender nimmt mir die Führung"
+            );
+            assert_eq!(
+                entscheide_vor_ort(s, i, s, i, regel, antwort),
+                Verwerfen,
+                "Sender gibt sie mir"
+            );
+        }
+        // Gleichrangig: Abgabe an mich gilt, eine Übernahme gegen mich wird geprüft, die Antwort
+        // auf meine eigene Übernahme gilt.
         assert_eq!(
-            entscheide_vor_ort(i, s, s, i),
-            Verwerfen,
+            entscheide_vor_ort(s, i, s, i, Gleichrangig, false),
+            Annehmen,
+            "Sender gibt mir die Führung"
+        );
+        assert_eq!(
+            entscheide_vor_ort(i, s, s, i, Gleichrangig, false),
+            Pruefen,
             "Sender nimmt mir die Führung"
         );
         assert_eq!(
-            entscheide_vor_ort(s, i, s, i),
-            Verwerfen,
-            "Sender gibt sie mir"
+            entscheide_vor_ort(i, s, s, i, Gleichrangig, true),
+            Antwort,
+            "Sender beantwortet meine Übernahme"
         );
-        // Der bisherige Führer ist der Absender.
-        assert_eq!(
-            entscheide_vor_ort(s, d, s, i),
-            Annehmen,
-            "Abgabe an eine Dritte"
-        );
-        assert_eq!(
-            entscheide_vor_ort(s, s, s, i),
-            Annehmen,
-            "Sender führt weiter"
-        );
-        // Alles andere nur zur Anzeige.
-        assert_eq!(
-            entscheide_vor_ort(d, s, s, i),
-            NurAnzeige,
-            "Sender beansprucht von Dritter"
-        );
-        assert_eq!(entscheide_vor_ort(d, d, s, i), NurAnzeige);
-        assert_eq!(
-            entscheide_vor_ort(i, d, s, i),
-            NurAnzeige,
-            "meine Führung an eine Dritte"
-        );
-        assert_eq!(entscheide_vor_ort(i, i, s, i), NurAnzeige);
+        for regel in [Gesperrt, Gleichrangig] {
+            // Der bisherige Führer ist der Absender.
+            assert_eq!(
+                entscheide_vor_ort(s, d, s, i, regel, false),
+                Annehmen,
+                "Abgabe an eine Dritte"
+            );
+            assert_eq!(
+                entscheide_vor_ort(s, s, s, i, regel, false),
+                Annehmen,
+                "Sender führt weiter"
+            );
+            // Alles andere nur zur Anzeige.
+            assert_eq!(
+                entscheide_vor_ort(d, s, s, i, regel, false),
+                NurAnzeige,
+                "Sender beansprucht von Dritter"
+            );
+            assert_eq!(entscheide_vor_ort(d, d, s, i, regel, false), NurAnzeige);
+            assert_eq!(
+                entscheide_vor_ort(i, d, s, i, regel, false),
+                NurAnzeige,
+                "meine Führung an eine Dritte"
+            );
+            assert_eq!(entscheide_vor_ort(i, i, s, i, regel, false), NurAnzeige);
+        }
     }
 
     #[test]

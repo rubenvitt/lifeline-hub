@@ -27,6 +27,7 @@ const akte: FuehrungAnzeige = {
   fuehrend: false,
   art: 'angelegt',
   anfrage_offen: false,
+  anfrage_abgelehnt: false,
   verwahrt: false,
   gegenueber: [
     {
@@ -35,6 +36,7 @@ const akte: FuehrungAnzeige = {
       name: 'Hub Nord',
       richtung: 'meldet_sich',
       art: 'standard',
+      wechsel: 'nach_richtung',
     },
   ],
   fuehrer_richtung: 'meldet_sich',

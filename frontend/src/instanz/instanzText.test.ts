@@ -81,6 +81,14 @@ describe('instanzText', () => {
       'Letzte Meldung: nicht erreichbar: Zeitüberschreitung',
       'Unterschriftsschlüssel von X abgelehnt',
     ]);
+    // LLH-1678: Eine Gegenstelle vor Ort vor Protokoll 4 trägt keinen Führungswechsel.
+    expect(
+      kopplungHinweise(
+        kopplung({ art: 'vor_ort', gegenueber_name: 'ELW 2', gegenueber_protokoll: 3 }),
+      ),
+    ).toEqual(['Führungswechsel vor Ort erst nach Update von ELW 2']);
+    expect(kopplungHinweise(kopplung({ art: 'vor_ort', gegenueber_protokoll: 4 }))).toEqual([]);
+    expect(kopplungHinweise(kopplung({ art: 'vor_ort', gegenueber_protokoll: null }))).toEqual([]);
     expect(kopplungHinweise(kopplung({ protokoll: 'update_hier' }))).toEqual([
       'Update nötig: diese Instanz ist zu alt',
     ]);

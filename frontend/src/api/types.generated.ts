@@ -1371,11 +1371,11 @@ export interface components {
         /**
          * @description Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art
          *     fest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die
-         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0316_einsatz_fuehrung.sql`)
+         *     CHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)
          *     spiegelt `ALLE`.
          * @enum {string}
          */
-        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter" | "fuehrung_ungueltig" | "fuehrung_uebernommen";
+        BenachrichtigungArt: "sofortmeldung" | "sofortmeldung_eskaliert" | "auftrag_ueberfaellig" | "abloesung_faellig" | "erinnerung_faellig" | "abloesung_vorwarnung" | "abloesung_planung" | "abloesung_abloeser" | "auftrag_erteilt" | "auftrag_quittiert" | "auftrag_erledigt" | "befehl" | "lagebericht" | "meldung" | "rueckmeldung_ueberfaellig" | "lagebesprechung_vorher" | "lagebesprechung_faellig" | "nachforderung_status" | "gefahr" | "sichtung_eins" | "vermisstenmeldung" | "wieder_verfuegbar" | "chat_erwaehnung" | "einsatz_aufnahme" | "einsatz_neu" | "unwetter" | "fuehrung_ungueltig" | "fuehrung_uebernommen" | "fuehrung_angefragt";
         /**
          * @description Wozu eine Benachrichtigung gehört. Der Bezug bestimmt das Modul, das ein Empfänger sehen
          *     muss ([`BenachrichtigungBezugTyp::modul`]), den Sprungpfad und die Detailzeile ([`text`]).
@@ -3778,8 +3778,16 @@ export interface components {
              */
             zeichen_spec: string;
         };
+        /** @description Eine Gegenstelle vor Ort, die um die Führung bittet (LLH-1678, design.md D4). */
+        FuehrungAnfrageEingang: {
+            kennung: string;
+            name: string;
+        };
         /** @description Die Führung einer Akte samt Verlauf (Paneel „Führung“, Seite „Instanzkopplung“). */
         FuehrungAnzeige: {
+            /** @description Die führende Gegenstelle vor Ort hat die Anfrage dieser Instanz abgelehnt (LLH-1678). */
+            anfrage_abgelehnt: boolean;
+            anfrage_eingang?: components["schemas"]["FuehrungAnfrageEingang"] | null;
             /** @description Diese Instanz hat die Führung beim Gegenüber erbeten. */
             anfrage_offen: boolean;
             art: components["schemas"]["FuehrungWechselArt"];
@@ -3824,13 +3832,17 @@ export interface components {
          *     der Akte zugeordnet ist.
          */
         FuehrungGegenueber: {
-            /** @description Art der Kopplung (LLH-1497): über eine Direktkopplung `vor_ort` wechselt die Führung nicht. */
+            /** @description Art der Kopplung (LLH-1497). */
             art: components["schemas"]["InstanzKopplungArt"];
             kennung: string;
             /** Format: int64 */
             kopplung_id: number;
             name: string;
             richtung: components["schemas"]["InstanzKopplungRichtung"];
+            /** @description Nach welcher Regel die Führung zu diesem Gegenüber wechselt (LLH-1678, design.md D1). */
+            wechsel: components["schemas"]["Wechselregel"];
+            /** @description Bei `gesperrt`: warum (Gegenstelle braucht ein Update). */
+            wechsel_grund?: string | null;
         };
         /** @description Eine offene Übernahme gegen diese Instanz, wie die Oberfläche sie zeigt. */
         FuehrungOffen: {
@@ -9015,6 +9027,13 @@ export interface components {
             /** @description Beim Pausenende: der gemerkte Status, den sie zurückbekommt. */
             status_zurueck?: string | null;
         };
+        /**
+         * @description Nach welcher Regel die Führung zwischen dieser Instanz und einem Gegenüber wechselt
+         *     (LLH-1678, design.md D1). Jede Stelle, die einen Führungswechsel auslöst oder annimmt,
+         *     fragt sie über [`wechselregel`] ab.
+         * @enum {string}
+         */
+        Wechselregel: "nach_richtung" | "gleichrangig" | "gesperrt";
         /**
          * @description Die jüngste Messung von DWD-Wetterstationen nahe dem Einsatzort (LFH-864). Jeder Wert, den die Quelle
          *     nicht liefert, fehlt — er wird nie zu 0.

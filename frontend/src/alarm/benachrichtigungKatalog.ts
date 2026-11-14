@@ -155,6 +155,13 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
     org: false,
     einstellbar: true,
   },
+  // Die Gegenstelle einer Direktkopplung bittet um die Führung (LLH-1678).
+  fuehrung_angefragt: {
+    name: 'Führung angefragt',
+    stufe: 'hinweis',
+    org: false,
+    einstellbar: true,
+  },
 };
 
 /** Alle Arten in Katalogreihenfolge. */

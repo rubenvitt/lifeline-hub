@@ -1435,6 +1435,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::fuehrung::anfragen),
         )
         .route(
+            "/api/einsaetze/{id}/fuehrung/anfrage/ablehnen",
+            post(routes::fuehrung::anfrage_ablehnen),
+        )
+        .route(
             "/api/einsaetze/{id}/fuehrung/notuebernahme",
             post(routes::fuehrung::notuebernahme),
         )
@@ -1981,6 +1985,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/admin/instanz/fuehrung/{id}/anfragen",
             post(routes::fuehrung::admin_anfragen),
+        )
+        .route(
+            "/api/admin/instanz/fuehrung/{id}/anfrage/ablehnen",
+            post(routes::fuehrung::admin_anfrage_ablehnen),
         )
         .route(
             "/api/admin/instanz/fuehrung/{id}/notuebernahme",

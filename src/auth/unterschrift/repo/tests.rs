@@ -20,11 +20,20 @@ async fn pool_mit_admin() -> SqlitePool {
 
 /// Eine Kopplung, in der diese Instanz sich meldet, mit einer Org-Zuordnung; liefert deren id.
 async fn kopplung_org(pool: &SqlitePool, richtung: InstanzKopplungRichtung) -> i64 {
+    kopplung_org_mit(pool, "hub-kennung", richtung).await
+}
+
+/// Wie [`kopplung_org`], mit einer eigenen Gegenstelle `kennung`.
+async fn kopplung_org_mit(
+    pool: &SqlitePool,
+    kennung: &str,
+    richtung: InstanzKopplungRichtung,
+) -> i64 {
     let mut conn = pool.acquire().await.unwrap();
     let k = kopplung::create_or_renew_kopplung(
         &mut conn,
         &kopplung::Gegenueber {
-            kennung: "hub-kennung",
+            kennung,
             schluessel_b64: "AAAA",
             name: "Hub",
             softwarestand: "1",
@@ -61,6 +70,7 @@ fn lieferung(
         zustand,
         gegenzeichnung: None,
         stand,
+        aufnahme_org: None,
     }
 }
 
@@ -110,6 +120,7 @@ async fn grundstock_gilt_ohne_gegenzeichnung() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     let abgelehnt = accept_lieferungen(
@@ -142,6 +153,7 @@ async fn untergeschobener_schluessel_ohne_gegenzeichnung_wird_verworfen() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -214,6 +226,7 @@ async fn gegengezeichneter_schluessel_wird_angenommen_und_widerruf_uebernommen()
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -319,20 +332,22 @@ async fn lokaler_schluessel_gilt_ohne_kopplung_und_wartet_mit() {
         UnterschriftSchluesselZustand::WartetAufGegenzeichnung
     );
     // Wartende gehen nicht hinaus, nur der gültige.
-    let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
+    let (grund, _) = grundstock(&mut conn, 1, Weiter::NurLokal).await.unwrap();
     assert_eq!(grund.len(), 1);
-    assert!(nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX)
-        .await
-        .unwrap()
-        .iter()
-        .all(|l| l.credential_id == "a"));
+    assert!(
+        nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX, Weiter::NurLokal)
+            .await
+            .unwrap()
+            .iter()
+            .all(|l| l.credential_id == "a")
+    );
     // Nach dem Widerruf von a ist nichts mehr gültig; Nachlieferung trägt den Widerruf.
     assert!(widerrufen(&mut conn, 1, id_a, JETZT).await.unwrap());
     assert!(
         !widerrufen(&mut conn, 1, id_a, JETZT).await.unwrap(),
         "zweites Mal ohne Wirkung"
     );
-    let n = nachlieferung(&mut conn, 1, 1, LIEFERUNGEN_MAX)
+    let n = nachlieferung(&mut conn, 1, 1, LIEFERUNGEN_MAX, Weiter::NurLokal)
         .await
         .unwrap();
     assert_eq!(n.len(), 1);
@@ -349,6 +364,7 @@ async fn widerrufener_schluessel_lebt_unter_neuer_id_nicht_wieder_auf() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -405,6 +421,7 @@ async fn erklaerung_bindet_herkunft_und_rp_des_neuen_schluessels() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -437,6 +454,7 @@ async fn lieferung_ueber_der_grenze_wird_abgelehnt_und_ein_widerruf_derselben_id
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     let zu_viele: Vec<_> = (0..=LIEFERUNGEN_MAX as i64)
@@ -476,11 +494,11 @@ async fn grundstock_ueber_der_grenze_scheitert_statt_abzuschneiden() {
     for stand in 1..=LIEFERUNGEN_MAX as i64 {
         lokaler_gueltiger(&mut conn, stand).await;
     }
-    let (grund, _) = grundstock(&mut conn, 1).await.unwrap();
+    let (grund, _) = grundstock(&mut conn, 1, Weiter::NurLokal).await.unwrap();
     assert_eq!(grund.len(), LIEFERUNGEN_MAX);
     lokaler_gueltiger(&mut conn, LIEFERUNGEN_MAX as i64 + 1).await;
     assert!(matches!(
-        grundstock(&mut conn, 1).await,
+        grundstock(&mut conn, 1, Weiter::NurLokal).await,
         Err(AppError::Conflict(_))
     ));
 }
@@ -493,7 +511,7 @@ async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
     for stand in 1..=anzahl {
         lokaler_gueltiger(&mut conn, stand).await;
     }
-    let erste = nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX)
+    let erste = nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX, Weiter::NurLokal)
         .await
         .unwrap();
     assert_eq!(erste.len(), LIEFERUNGEN_MAX);
@@ -502,7 +520,7 @@ async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
         bis, LIEFERUNGEN_MAX as i64,
         "nach Stand sortiert, die ältesten zuerst"
     );
-    let rest = nachlieferung(&mut conn, 1, bis, LIEFERUNGEN_MAX)
+    let rest = nachlieferung(&mut conn, 1, bis, LIEFERUNGEN_MAX, Weiter::NurLokal)
         .await
         .unwrap();
     assert_eq!(
@@ -511,7 +529,10 @@ async fn nachlieferung_liefert_hoechstens_die_grenze_und_der_rest_folgt() {
         "der Rest folgt mit der nächsten Meldung"
     );
     assert_eq!(
-        nachlieferung(&mut conn, 1, 0, 3).await.unwrap().len(),
+        nachlieferung(&mut conn, 1, 0, 3, Weiter::NurLokal)
+            .await
+            .unwrap()
+            .len(),
         3,
         "das Restbudget der Antwort deckelt"
     );
@@ -590,6 +611,7 @@ async fn mit_wartendem_b(
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap().detach();
     accept_lieferungen(
@@ -617,6 +639,7 @@ fn ziel_zu(ko: i64) -> Ziel<'static> {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     }
 }
 
@@ -919,6 +942,426 @@ async fn zurueckgewiesener_schluessel_bleibt_es() {
     assert_eq!(zustand_von(&mut conn, 10).await, "widerrufen");
 }
 
+// ── Direktkopplung und ELW zum Hub (LLH-1678, design.md D6) ───────────────────────────────────
+
+async fn zustand_in(conn: &mut SqliteConnection, ko: i64, cred: &str) -> String {
+    sqlx::query_scalar(
+        "SELECT zustand FROM unterschrift_schluessel WHERE kopplung_org_id = ? AND credential_id = ?",
+    )
+    .bind(ko)
+    .bind(cred)
+    .fetch_one(&mut *conn)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn ein_widerruf_gilt_je_credential_ueber_alle_zuordnungen() {
+    let pool = pool_mit_admin().await;
+    let ko1 = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let ko2 = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::WirdGemeldet).await;
+    let ko3 = kopplung_org_mit(&pool, "elw-3", InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let gueltig = lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1);
+    accept_lieferungen(&mut conn, &ziel_zu(ko1), &[gueltig.clone()], true, JETZT)
+        .await
+        .unwrap();
+    accept_lieferungen(&mut conn, &ziel_zu(ko2), &[gueltig], true, JETZT)
+        .await
+        .unwrap();
+    // Der Hub widerruft den Schlüssel über die erste Zuordnung: auch die zweite Zeile fällt.
+    let widerruf = lieferung(7, &a, UnterschriftSchluesselZustand::Widerrufen, 2);
+    accept_lieferungen(&mut conn, &ziel_zu(ko1), &[widerruf], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(
+        zustand_in(&mut conn, ko1, &a.credential_id).await,
+        "widerrufen"
+    );
+    assert_eq!(
+        zustand_in(&mut conn, ko2, &a.credential_id).await,
+        "widerrufen"
+    );
+    // Unter neuer id über eine Zuordnung, die ihn nie hatte, lebt er nicht wieder auf.
+    let wieder = lieferung(99, &a, UnterschriftSchluesselZustand::Gueltig, 3);
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(ko3), &[wieder], true, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(ab[0].grund, "Schlüssel war widerrufen");
+}
+
+#[tokio::test]
+async fn uebernommene_gehen_ueber_eine_direktkopplung_weiter_nur_nicht_zurueck() {
+    let pool = pool_mit_admin().await;
+    let vom_hub = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let vor_ort = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::WirdGemeldet).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(vom_hub),
+        &[lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    let cred = |l: &[UnterschriftSchluesselLieferung]| {
+        l.iter()
+            .map(|l| l.credential_id.clone())
+            .collect::<Vec<_>>()
+    };
+    let weiter = nachlieferung(
+        &mut conn,
+        1,
+        0,
+        LIEFERUNGEN_MAX,
+        Weiter::AusserZuordnung(vor_ort),
+    )
+    .await
+    .unwrap();
+    assert_eq!(cred(&weiter), vec![a.credential_id.clone()]);
+    assert_eq!(weiter[0].aufnahme_org.as_deref(), Some(FREMDE_ORG));
+    assert!(weiter[0].stand > 0, "Stand in der Zählung dieser Instanz");
+    // Nicht zurück über dieselbe Zuordnung, nicht über eine Standardkopplung.
+    assert!(nachlieferung(
+        &mut conn,
+        1,
+        0,
+        LIEFERUNGEN_MAX,
+        Weiter::AusserZuordnung(vom_hub)
+    )
+    .await
+    .unwrap()
+    .is_empty());
+    assert!(
+        nachlieferung(&mut conn, 1, 0, LIEFERUNGEN_MAX, Weiter::NurLokal)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    let (grund, _) = grundstock(&mut conn, 1, Weiter::AusserZuordnung(vor_ort))
+        .await
+        .unwrap();
+    assert_eq!(cred(&grund), vec![a.credential_id.clone()]);
+    // Nach dem Widerruf geht auch der Widerruf weiter.
+    let bis = weiter[0].stand;
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(vom_hub),
+        &[lieferung(
+            7,
+            &a,
+            UnterschriftSchluesselZustand::Widerrufen,
+            2,
+        )],
+        false,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    let danach = nachlieferung(
+        &mut conn,
+        1,
+        bis,
+        LIEFERUNGEN_MAX,
+        Weiter::AusserZuordnung(vor_ort),
+    )
+    .await
+    .unwrap();
+    assert_eq!(danach.len(), 1);
+    assert_eq!(danach[0].zustand, UnterschriftSchluesselZustand::Widerrufen);
+}
+
+/// Der Bestand nennt über eine Direktkopplung dieselben Schlüssel wie die Nachlieferung: sonst
+/// widerriefe die Gegenstelle jeden weitergereichten als „nicht mehr geführt“ (LLH-1678 mit
+/// LLH-1871).
+#[tokio::test]
+async fn bestand_nennt_ueber_eine_direktkopplung_die_weitergereichten() {
+    let pool = pool_mit_admin().await;
+    let mut conn = pool.acquire().await.unwrap();
+    // Vor dem Koppeln gilt ein lokaler Schlüssel sofort.
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let id_lokal = lokal(&mut conn, &a).await;
+    drop(conn);
+    let vom_hub = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let vor_ort = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::WirdGemeldet).await;
+    let mut conn = pool.acquire().await.unwrap();
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(vom_hub),
+        &[lieferung(7, &b, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    let weiter = nachlieferung(
+        &mut conn,
+        1,
+        0,
+        LIEFERUNGEN_MAX,
+        Weiter::AusserZuordnung(vor_ort),
+    )
+    .await
+    .unwrap();
+    let mut geliefert: Vec<i64> = weiter.iter().map(|l| l.id).collect();
+    geliefert.sort();
+    assert_eq!(geliefert.len(), 2, "{weiter:?}");
+    assert!(geliefert.contains(&id_lokal));
+    assert_eq!(
+        load_bestand(&mut conn, 1, Weiter::AusserZuordnung(vor_ort))
+            .await
+            .unwrap(),
+        Some(geliefert)
+    );
+    // Zurück zum Hub und über eine Standardkopplung nur die lokalen.
+    assert_eq!(
+        load_bestand(&mut conn, 1, Weiter::AusserZuordnung(vom_hub))
+            .await
+            .unwrap(),
+        Some(vec![id_lokal])
+    );
+    assert_eq!(
+        load_bestand(&mut conn, 1, Weiter::NurLokal).await.unwrap(),
+        Some(vec![id_lokal])
+    );
+}
+
+#[tokio::test]
+async fn als_grundstock_gilt_nur_was_bis_zum_genannten_stand_reicht() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::WirdGemeldet).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let ab = accept_lieferungen_bis(
+        &mut conn,
+        &ziel_zu(ko),
+        &[
+            lieferung(1, &a, UnterschriftSchluesselZustand::Gueltig, 2),
+            lieferung(2, &b, UnterschriftSchluesselZustand::Gueltig, 5),
+        ],
+        Some(3),
+        GegenzeichnungPflicht::Pflicht,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(zustand_in(&mut conn, ko, &a.credential_id).await, "gueltig");
+    assert_eq!(
+        ab.len(),
+        1,
+        "der spätere ohne Gegenzeichnung wird verworfen"
+    );
+    assert_eq!(ab[0].grund, "ohne Gegenzeichnung");
+}
+
+#[tokio::test]
+async fn vom_elw_am_hub_wartet_jeder_schluessel_ohne_gegenzeichnung() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::WirdGemeldet).await;
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let ab = accept_lieferungen_bis(
+        &mut conn,
+        &ziel_zu(ko),
+        &[lieferung(1, &b, UnterschriftSchluesselZustand::Gueltig, 1)],
+        None,
+        GegenzeichnungPflicht::NurBestaetigung,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert!(ab.is_empty(), "{ab:?}");
+    assert_eq!(
+        zustand_in(&mut conn, ko, &b.credential_id).await,
+        "wartet_auf_bestaetigung"
+    );
+}
+
+// ── Befunde aus dem Review vor dem PR (LLH-1678) ──────────────────────────────────────────────
+
+#[tokio::test]
+async fn ein_widerruf_nimmt_die_credential_id_der_gespeicherten_zeile() {
+    let pool = pool_mit_admin().await;
+    let vom_hub = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let vor_ort = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::WirdGemeldet).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let x = SoftwarePasskey::new("x", [9u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    // A gilt über den Hub, X über die Direktkopplung (beide Grundstock).
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(vom_hub),
+        &[lieferung(1, &a, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(vor_ort),
+        &[lieferung(5, &x, UnterschriftSchluesselZustand::Gueltig, 1)],
+        true,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    // Die Gegenstelle widerruft ihre id 5, nennt aber die Credential-ID von A: X fällt, A bleibt.
+    let mut falsch = lieferung(5, &x, UnterschriftSchluesselZustand::Widerrufen, 2);
+    falsch.credential_id = a.credential_id.clone();
+    accept_lieferungen(&mut conn, &ziel_zu(vor_ort), &[falsch], false, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(
+        zustand_in(&mut conn, vom_hub, &a.credential_id).await,
+        "gueltig"
+    );
+    assert_eq!(
+        zustand_in(&mut conn, vor_ort, &x.credential_id).await,
+        "widerrufen"
+    );
+    // Eine Lieferung, die die Credential-ID von A mit anderem Schlüssel nennt, nimmt keiner an.
+    let y = SoftwarePasskey::new("y", [8u8; 32]);
+    let mut unterschoben = lieferung(6, &y, UnterschriftSchluesselZustand::Gueltig, 3);
+    unterschoben.credential_id = a.credential_id.clone();
+    let ab = accept_lieferungen_bis(
+        &mut conn,
+        &ziel_zu(vor_ort),
+        &[unterschoben],
+        None,
+        GegenzeichnungPflicht::NurBestaetigung,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(
+        ab[0].grund,
+        "Credential-ID steht hier für einen anderen Schlüssel"
+    );
+}
+
+#[tokio::test]
+async fn ein_echt_widerrufener_lebt_auch_nach_dem_ende_seiner_zuordnung_nicht_wieder_auf() {
+    let pool = pool_mit_admin().await;
+    let alt = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let neu = kopplung_org_mit(&pool, "elw-3", InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let gueltig = lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1);
+    accept_lieferungen(&mut conn, &ziel_zu(alt), &[gueltig.clone()], true, JETZT)
+        .await
+        .unwrap();
+    accept_lieferungen(
+        &mut conn,
+        &ziel_zu(alt),
+        &[lieferung(
+            7,
+            &a,
+            UnterschriftSchluesselZustand::Widerrufen,
+            2,
+        )],
+        false,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    fremde_der_zuordnung_widerrufen(&mut conn, alt, JETZT)
+        .await
+        .unwrap();
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(neu), &[gueltig], true, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(ab[0].grund, "Schlüssel war widerrufen");
+}
+
+#[tokio::test]
+async fn nach_dem_ende_einer_zuordnung_nimmt_ein_neues_koppeln_den_schluessel_wieder() {
+    let pool = pool_mit_admin().await;
+    let alt = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let neu = kopplung_org_mit(&pool, "elw-2", InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let gueltig = lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1);
+    accept_lieferungen(&mut conn, &ziel_zu(alt), &[gueltig.clone()], true, JETZT)
+        .await
+        .unwrap();
+    fremde_der_zuordnung_widerrufen(&mut conn, alt, JETZT)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE instanz_kopplung_org SET widerrufen_at = ? WHERE id = ?")
+        .bind(JETZT)
+        .bind(alt)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(neu), &[gueltig], true, JETZT)
+        .await
+        .unwrap();
+    assert!(ab.is_empty(), "{ab:?}");
+    assert_eq!(
+        zustand_in(&mut conn, neu, &a.credential_id).await,
+        "gueltig"
+    );
+}
+
+#[tokio::test]
+async fn ueberlange_felder_einer_lieferung_werden_abgelehnt() {
+    let pool = pool_mit_admin().await;
+    let ko = kopplung_org(&pool, InstanzKopplungRichtung::MeldetSich).await;
+    let a = SoftwarePasskey::new("a", [1u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    let mut lang = lieferung(7, &a, UnterschriftSchluesselZustand::Gueltig, 1);
+    lang.bezeichnung = "x".repeat(20 * 1024);
+    let ab = accept_lieferungen(&mut conn, &ziel_zu(ko), &[lang], true, JETZT)
+        .await
+        .unwrap();
+    assert_eq!(ab.len(), 1, "{ab:?}");
+    assert_eq!(ab[0].grund, "Felder über den Grenzen");
+}
+
+#[tokio::test]
+async fn schluessel_eines_elw_am_hub_gehen_nicht_weiter() {
+    let pool = pool_mit_admin().await;
+    // Diese Instanz ist der Hub: ein ELW meldet sich über eine Standardkopplung.
+    let vom_elw = kopplung_org(&pool, InstanzKopplungRichtung::WirdGemeldet).await;
+    let vor_ort = kopplung_org_mit(&pool, "elw-3", InstanzKopplungRichtung::WirdGemeldet).await;
+    let b = SoftwarePasskey::new("b", [2u8; 32]);
+    let mut conn = pool.acquire().await.unwrap();
+    accept_lieferungen_bis(
+        &mut conn,
+        &ziel_zu(vom_elw),
+        &[lieferung(1, &b, UnterschriftSchluesselZustand::Gueltig, 1)],
+        None,
+        GegenzeichnungPflicht::NurBestaetigung,
+        JETZT,
+    )
+    .await
+    .unwrap();
+    let id: i64 = sqlx::query_scalar("SELECT id FROM unterschrift_schluessel WHERE fremde_id = 1")
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+    assert!(confirm(&mut conn, 1, id, 1, JETZT).await.unwrap());
+    let weiter = nachlieferung(
+        &mut conn,
+        1,
+        0,
+        LIEFERUNGEN_MAX,
+        Weiter::AusserZuordnung(vor_ort),
+    )
+    .await
+    .unwrap();
+    assert!(weiter.is_empty(), "{weiter:?}");
+}
+
 #[tokio::test]
 async fn naechster_stand_folgt_der_uhr_und_zaehlt_darueber_weiter() {
     let pool = pool_mit_admin().await;
@@ -1170,6 +1613,7 @@ async fn bestand_nennt_nur_gueltige_lokale_schluessel() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let f = SoftwarePasskey::new("f", [4u8; 32]);
     accept_lieferungen(
@@ -1186,7 +1630,10 @@ async fn bestand_nennt_nur_gueltige_lokale_schluessel() {
     )
     .await
     .unwrap();
-    assert_eq!(load_bestand(&mut conn, 1).await.unwrap(), Some(vec![id_a]));
+    assert_eq!(
+        load_bestand(&mut conn, 1, Weiter::NurLokal).await.unwrap(),
+        Some(vec![id_a])
+    );
     assert!(id_b > id_a);
 }
 
@@ -1207,7 +1654,10 @@ async fn bestand_ueber_der_grenze_ist_keiner() {
         .await
         .unwrap();
     }
-    assert_eq!(load_bestand(&mut conn, 1).await.unwrap(), None);
+    assert_eq!(
+        load_bestand(&mut conn, 1, Weiter::NurLokal).await.unwrap(),
+        None
+    );
 }
 
 #[tokio::test]
@@ -1222,6 +1672,7 @@ async fn fehlende_im_bestand_werden_widerrufen_abgelehnte_bleiben() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(
@@ -1299,6 +1750,7 @@ async fn bestand_einer_anderen_zuordnung_beruehrt_diese_nicht() {
         kopplung_org_id: ko,
         org_id: 1,
         fremde_org_kennung: FREMDE_ORG,
+        vor_ort: false,
     };
     let mut conn = pool.acquire().await.unwrap();
     accept_lieferungen(

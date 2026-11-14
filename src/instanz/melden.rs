@@ -75,12 +75,26 @@ pub struct MeldenOrg {
     /// Stammdaten (die Org hat schon eine andere Quelle).
     #[serde(default)]
     pub stammdaten_stand: i64,
+    /// Direktkopplung: Unterschriftsschlüssel der meldenden Seite seit der Quittung der
+    /// erreichten Seite (LLH-1678, design.md D6). Leer an einer Standardkopplung.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unterschrift: Vec<UnterschriftSchluesselLieferung>,
+    /// Direktkopplung: bis zu diesem Stand gilt die erste Lieferung als Grundstock; die erreichte
+    /// Seite übernimmt den Wert nur einmal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unterschrift_grundstock_bis: Option<i64>,
     /// Prüfsumme der aus dieser Zuordnung übernommenen Zeilen (`stammdaten::bestand::checksum`,
     /// LLH-1871, design.md D3 der Change `n2ge2224-reste-nach-restore-abraeumen`); fehlt ohne
     /// Stammdaten aus dieser Zuordnung und vor LLH-1871.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stammdaten_checksum: Option<String>,
 }
+
+/// Byte-Budget der Unterschriftsschlüssel in einer Meldung (LLH-1678, design.md D6): neben den
+/// Führungsakten ([`fuehrung_austausch::MELDUNG_BYTES`]) muss alles in [`super::extractor::BODY_MAX`]
+/// passen (Test `groesste_anfrage_passt_in_die_grenze`). Was nicht passt, folgt mit der nächsten
+/// Meldung.
+pub const UNTERSCHRIFT_ANFRAGE_BYTES: usize = 12 * 1024;
 
 /// Body von `POST /api/instanz/melden`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,6 +148,10 @@ pub struct MeldenOrgAntwort {
     /// Bis zu diesem Stand darf die meldende Seite ihren Stammdaten-Stand setzen.
     #[serde(default)]
     pub stammdaten_bis: i64,
+    /// Direktkopplung: bis hierher hat die erreichte Seite die Schlüssel der meldenden Seite
+    /// übernommen (LLH-1678, design.md D6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unterschrift_quittung: Option<i64>,
     /// ids der gültigen Unterschriftsschlüssel der Org hier (LLH-1871, design.md D1): Was die
     /// meldende Seite aus dieser Zuordnung gültig hat und hier fehlt, gilt dort nicht mehr. Fehlt
     /// vor LLH-1871 und wenn der Bestand nicht mehr in die Antwort passt.
@@ -734,13 +752,55 @@ async fn melden_einmal_mit(
     // Höchster Stand, den diese Meldung abdeckt: Mehr darf das Gegenüber nicht quittieren
     // (LLH-1672); sonst fiele, was wegen `AKTEN_MAX` oder des Budgets hier blieb.
     let gesendet_hoechst = fuehrung_ausgang.bis.max(fuehrung_gesendet);
+    // Auch die meldende Seite liefert ihre Schlüssel (LLH-1678, design.md D6): über eine
+    // Direktkopplung samt den übernommenen, mit Grundstock; an den Hub nur die hier registrierten,
+    // dort warten sie auf die Bestätigung eines Admins.
+    let mut schluessel_aus: Vec<(Vec<UnterschriftSchluesselLieferung>, Option<i64>)> =
+        Vec::with_capacity(aktiv.len());
+    {
+        let vor_ort = kopplung.art() == super::InstanzKopplungArt::VorOrt;
+        let mut conn = pool.acquire().await?;
+        let mut bytes = UNTERSCHRIFT_ANFRAGE_BYTES;
+        for o in &aktiv {
+            let weiter = if vor_ort {
+                unterschrift::Weiter::AusserZuordnung(o.id)
+            } else {
+                unterschrift::Weiter::NurLokal
+            };
+            let mut lieferung = unterschrift::nachlieferung(
+                &mut conn,
+                o.org_id,
+                o.unterschrift_gesendet_bis,
+                unterschrift::LIEFERUNGEN_MAX,
+                weiter,
+            )
+            .await?;
+            let mut n = 0;
+            for l in &lieferung {
+                let b = serde_json::to_vec(l).map_or(usize::MAX, |v| v.len());
+                if b > bytes {
+                    break;
+                }
+                bytes -= b;
+                n += 1;
+            }
+            lieferung.truncate(n);
+            let bis = if vor_ort {
+                Some(unterschrift::load_hoechster_stand(&mut conn, o.org_id).await?)
+            } else {
+                None
+            };
+            schluessel_aus.push((lieferung, bis));
+        }
+    }
     let anfrage = MeldenAnfrage {
         name: super::name().to_string(),
         softwarestand: super::softwarestand().to_string(),
         protokoll: PROTOKOLL,
         orgs: aktiv
             .iter()
-            .map(|o| MeldenOrg {
+            .zip(schluessel_aus)
+            .map(|(o, (unterschrift, grundstock_bis))| MeldenOrg {
                 org: o.fremde_org_kennung.clone(),
                 unterschrift_stand: o.unterschrift_stand,
                 stammdaten_stand: if quellen.contains(&o.id) {
@@ -748,6 +808,8 @@ async fn melden_einmal_mit(
                 } else {
                     -1
                 },
+                unterschrift,
+                unterschrift_grundstock_bis: grundstock_bis,
                 stammdaten_checksum: checksums.get(&o.id).cloned(),
             })
             .collect(),
@@ -851,12 +913,32 @@ async fn melden_einmal_mit(
                 kopplung_org_id: o.id,
                 org_id: o.org_id,
                 fremde_org_kennung: &o.fremde_org_kennung,
+                vor_ort: kopplung.art() == super::InstanzKopplungArt::VorOrt,
+            };
+            if let Some(q) = oa.unterschrift_quittung {
+                repo::save_unterschrift_gesendet_bis(conn, o.id, q).await?;
+            }
+            // Über eine Direktkopplung wartet jeder nachgelieferte Schlüssel ohne Gegenzeichnung auf
+            // einen Admin hier: Die erreichte Seite reicht auch Schlüssel weiter, die bei ihr ohne
+            // Gegenzeichnung gelten (der erste eines Hubs), sie gingen sonst verloren (Review vor
+            // dem PR, design.md D6).
+            let pflicht = if ziel.vor_ort {
+                unterschrift::GegenzeichnungPflicht::NurBestaetigung
+            } else {
+                unterschrift::GegenzeichnungPflicht::Pflicht
             };
             // Die Bestände gelten nur für die Stände, die diese Meldung nannte (Review LLH-1871):
             // vor den Lieferungen lesen, die sie selbst heben.
             let staende_vorher = repo::load_staende(conn, o.id).await?;
-            for ab in unterschrift::accept_lieferungen(conn, &ziel, &oa.unterschrift, false, &jetzt)
-                .await?
+            for ab in unterschrift::accept_lieferungen_bis(
+                conn,
+                &ziel,
+                &oa.unterschrift,
+                None,
+                pflicht,
+                &jetzt,
+            )
+            .await?
             {
                 abgelehnt_alle.push((o.clone(), ab));
             }
@@ -1290,10 +1372,57 @@ pub async fn handle_meldung(
             }
             match aktiv {
                 Some(o) => {
+                    let vor_ort = kopplung.art() == super::InstanzKopplungArt::VorOrt;
+                    // Die Schlüssel der meldenden Seite übernehmen (LLH-1678, design.md D6): über
+                    // eine Direktkopplung ihre erste Lieferung bis `grundstock_bis` als Grundstock,
+                    // alles danach und alles vom ELW am Hub nur zur Bestätigung durch einen Admin.
+                    // Die Grenze des Grundstocks gilt ab der ersten Meldung, auch einer leeren:
+                    // Sonst würde ein später registrierter Schlüssel sie erst setzen und als
+                    // Grundstock gelten (Review vor dem PR).
+                    let grundstock_bis = match (vor_ort, mo.unterschrift_grundstock_bis) {
+                        (true, Some(bis)) => {
+                            Some(repo::save_unterschrift_grundstock_bis(conn, o.id, bis).await?)
+                        }
+                        (true, None) => o.unterschrift_grundstock_bis,
+                        (false, _) => None,
+                    };
+                    if !mo.unterschrift.is_empty() {
+                        // Die meldende Seite zeichnet ihre Schlüssel nicht gegen (ihre Org verteilt
+                        // dort nicht): nach dem Grundstock wartet jeder auf einen Admin hier, wie
+                        // die Schlüssel eines ELW am Hub.
+                        let (bis, pflicht) = (
+                            grundstock_bis,
+                            unterschrift::GegenzeichnungPflicht::NurBestaetigung,
+                        );
+                        let ziel = unterschrift::Ziel {
+                            kopplung_org_id: o.id,
+                            org_id: o.org_id,
+                            fremde_org_kennung: &o.fremde_org_kennung,
+                            vor_ort,
+                        };
+                        for ab in unterschrift::accept_lieferungen_bis(
+                            conn,
+                            &ziel,
+                            &mo.unterschrift,
+                            bis,
+                            pflicht,
+                            &jetzt,
+                        )
+                        .await?
+                        {
+                            tracing::warn!(
+                                fingerabdruck = %ab.fingerabdruck,
+                                grund = %ab.grund,
+                                "Unterschriftsschlüssel der meldenden Seite abgelehnt"
+                            );
+                        }
+                    }
+                    let quittung = Some(repo::load_unterschrift_stand(conn, o.id).await?);
                     // Rückschritt dieser Seite (LLH-1853, design.md D2 der Change
                     // `cz5332jn-unterschrift-stammdaten-nach-restore`): Die meldende Seite kennt
                     // einen Stand, den diese Seite nie vergeben hat. Dann gehen die Schlüssel der
-                    // Org erneut, über dem gemeldeten Stand.
+                    // Org erneut, über dem gemeldeten Stand. Der höchste vergebene Stand zählt die
+                    // weitergereichten Schlüssel einer Direktkopplung mit (LLH-1678).
                     if mo.unterschrift_stand
                         > unterschrift::load_hoechster_stand(conn, o.org_id).await?
                         && mo.unterschrift_stand <= fuehrung_austausch::STAND_RAISE_MAX
@@ -1309,9 +1438,19 @@ pub async fn handle_meldung(
                             erneut.push("Unterschriftsschlüssel");
                         }
                     }
-                    let lieferung =
-                        unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
-                            .await?;
+                    let weiter = if vor_ort {
+                        unterschrift::Weiter::AusserZuordnung(o.id)
+                    } else {
+                        unterschrift::Weiter::NurLokal
+                    };
+                    let lieferung = unterschrift::nachlieferung(
+                        conn,
+                        o.org_id,
+                        mo.unterschrift_stand,
+                        budget,
+                        weiter,
+                    )
+                    .await?;
                     // Füllte die Nachlieferung ihr Budget, kann mehr folgen: dann noch kein
                     // Bestand, sonst gälte ein Widerruf der nächsten Seite schon jetzt als „nicht
                     // mehr geführt“ (Review LLH-1871).
@@ -1327,7 +1466,7 @@ pub async fn handle_meldung(
                     // `n2ge2224-reste-nach-restore-abraeumen`): mit jeder Antwort, solange er über
                     // alle Orgs unter der Grenze bleibt; geht vom Budget ab wie die Lieferungen.
                     let unterschrift_bestand = if vollstaendig {
-                        unterschrift::load_bestand(conn, o.org_id)
+                        unterschrift::load_bestand(conn, o.org_id, weiter)
                             .await?
                             .filter(|ids| ids.len() <= bestand_rest)
                     } else {
@@ -1424,6 +1563,7 @@ pub async fn handle_meldung(
                         unterschrift: lieferung,
                         stammdaten: nach.zeilen,
                         stammdaten_bis: nach.bis.max(mo.stammdaten_stand),
+                        unterschrift_quittung: quittung,
                         unterschrift_bestand,
                         stammdaten_bestand: liste,
                     });
@@ -1438,6 +1578,7 @@ pub async fn handle_meldung(
                         unterschrift: Vec::new(),
                         stammdaten: Vec::new(),
                         stammdaten_bis: 0,
+                        unterschrift_quittung: None,
                         unterschrift_bestand: None,
                         stammdaten_bestand: None,
                     });
@@ -1581,6 +1722,8 @@ mod tests {
                     org: (*o).into(),
                     unterschrift_stand: i as i64,
                     stammdaten_stand: 0,
+                    unterschrift: Vec::new(),
+                    unterschrift_grundstock_bis: None,
                     stammdaten_checksum: None,
                 })
                 .collect(),
@@ -1650,6 +1793,7 @@ mod tests {
                     unterschrift: vec![lieferung.clone(); lieferungen],
                     stammdaten: Vec::new(),
                     stammdaten_bis: 0,
+                    unterschrift_quittung: None,
                     unterschrift_bestand: None,
                     stammdaten_bestand: None,
                 })
@@ -1798,11 +1942,13 @@ mod tests {
             zustand: UnterschriftSchluesselZustand::Gueltig,
             gegenzeichnung: None,
             stand: 3,
+            aufnahme_org: None,
         };
         let ziel = unterschrift::Ziel {
             kopplung_org_id: ko,
             org_id: 1,
             fremde_org_kennung: "hub-kennung/1",
+            vor_ort: false,
         };
         unterschrift::accept_lieferungen(&mut conn, &ziel, &[l], true, "2026-11-13 12:00:00")
             .await
@@ -1840,6 +1986,7 @@ mod tests {
             unterschrift: Vec::new(),
             stammdaten: Vec::new(),
             stammdaten_bis: 7,
+            unterschrift_quittung: None,
             unterschrift_bestand: Some(Vec::new()),
             stammdaten_bestand: Some(vec![StammdatenBestand {
                 art: "fahrzeug".into(),
@@ -1972,10 +2119,9 @@ mod tests {
         );
     }
 
-    /// Die größte zulässige Antwort muss in [`ANTWORT_MAX`] passen, sonst bliebe Melden bei vielen
-    /// Schlüsseln dauerhaft an einer unlesbaren Antwort hängen.
-    #[test]
-    fn groesste_antwort_passt_in_die_lesegrenze() {
+    /// Die größte Lieferung eines Unterschriftsschlüssels: jedes Feld so groß, wie es beim
+    /// Registrieren und Gegenzeichnen höchstens angenommen wird.
+    fn groesste_lieferung() -> UnterschriftSchluesselLieferung {
         // Jedes Feld so groß, wie es beim Registrieren und Gegenzeichnen höchstens angenommen
         // wird; Namen und Bezeichnung mit Umlauten (zwei Byte je Zeichen).
         use crate::auth::unterschrift::pruefen::{
@@ -1992,24 +2138,60 @@ mod tests {
             "origin": "o".repeat(261), "alg": "es256"
         }))
         .expect("Erklärung");
-        let lieferung: UnterschriftSchluesselLieferung =
-            serde_json::from_value(serde_json::json!({
-                "id": i64::MAX, "benutzer_name": name, "credential_id": cid,
-                "schluessel": "s".repeat(87), "alg": "es256", "rp_id": "r".repeat(253),
-                "origin": "o".repeat(261), "bezeichnung": bezeichnung,
-                "zustand": "widerrufen", "stand": i64::MAX,
-                "gegenzeichnung": {
-                    "erklaerung": erklaerung,
-                    "assertion": {
-                        "credential_id": cid,
-                        "authenticator_data": "a".repeat(AUTHENTICATOR_DATA_MAX),
-                        "client_data_json": "c".repeat(CLIENT_DATA_JSON_MAX),
-                        "signatur": "s".repeat(SIGNATUR_MAX)
-                    },
-                    "unterzeichner_credential_id": cid
-                }
-            }))
-            .expect("Lieferung");
+        serde_json::from_value(serde_json::json!({
+            "id": i64::MAX, "benutzer_name": name, "credential_id": cid,
+            "schluessel": "s".repeat(87), "alg": "es256", "rp_id": "r".repeat(253),
+            "origin": "o".repeat(261), "bezeichnung": bezeichnung,
+            "zustand": "widerrufen", "stand": i64::MAX,
+            "gegenzeichnung": {
+                "erklaerung": erklaerung,
+                "assertion": {
+                    "credential_id": cid,
+                    "authenticator_data": "a".repeat(AUTHENTICATOR_DATA_MAX),
+                    "client_data_json": "c".repeat(CLIENT_DATA_JSON_MAX),
+                    "signatur": "s".repeat(SIGNATUR_MAX)
+                },
+                "unterzeichner_credential_id": cid
+            }
+        }))
+        .expect("Lieferung")
+    }
+
+    /// Die meldende Seite liefert ihre Schlüssel in der Meldung (LLH-1678, design.md D6): Die
+    /// größte Lieferung passt allein ins Budget, sonst bliebe sie ewig hängen, und eine Meldung mit
+    /// vollen Akten und vollem Schlüsselbudget passt in die Körpergrenze.
+    #[test]
+    fn groesste_anfrage_passt_in_die_grenze() {
+        let lieferung = groesste_lieferung();
+        let eine = serde_json::to_vec(&lieferung).expect("JSON").len();
+        assert!(
+            eine <= UNTERSCHRIFT_ANFRAGE_BYTES,
+            "{eine} Byte je Schlüssel über {UNTERSCHRIFT_ANFRAGE_BYTES}"
+        );
+        let mut a = anfrage(&["k"; 4], &[]);
+        for o in &mut a.orgs {
+            o.org = "k".repeat(88);
+            o.unterschrift_grundstock_bis = Some(i64::MAX);
+        }
+        a.orgs[0].unterschrift = vec![lieferung; UNTERSCHRIFT_ANFRAGE_BYTES / eine];
+        let akte = fuehrung_austausch::tests::akte_mit_bytes(fuehrung_austausch::AKTE_BYTES);
+        let akte_bytes = serde_json::to_vec(&akte).expect("JSON").len();
+        a.fuehrung = vec![akte; fuehrung_austausch::MELDUNG_BYTES / akte_bytes];
+        a.age_empfaenger = Some("a".repeat(70));
+        a.tls_zertifikat = Some("f".repeat(64));
+        let groesse = serde_json::to_vec(&a).expect("JSON").len();
+        assert!(
+            groesse <= super::super::extractor::BODY_MAX,
+            "{groesse} Byte über {}",
+            super::super::extractor::BODY_MAX
+        );
+    }
+
+    /// Die größte zulässige Antwort muss in [`ANTWORT_MAX`] passen, sonst bliebe Melden bei vielen
+    /// Schlüsseln dauerhaft an einer unlesbaren Antwort hängen.
+    #[test]
+    fn groesste_antwort_passt_in_die_lesegrenze() {
+        let lieferung = groesste_lieferung();
         let mut a = antwort(ORGS_MAX, 0);
         for o in &mut a.orgs {
             o.org = "k".repeat(88);

@@ -3501,7 +3501,7 @@
       },
       "BenachrichtigungArt": {
         "type": "string",
-        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0316_einsatz_fuehrung.sql`)\nspiegelt `ALLE`.",
+        "description": "Der geschlossene Katalog der Benachrichtigungsarten (design.md D4). Die Stufe ist je Art\nfest ([`BenachrichtigungArt::stufe`]); wer sie ändern will, ändert die Spec. Die\nCHECK-Liste der jüngsten Migration der Tabelle (`migrations/0352_benachrichtigung_fuehrung_angefragt.sql`)\nspiegelt `ALLE`.",
         "enum": [
           "sofortmeldung",
           "sofortmeldung_eskaliert",
@@ -3530,7 +3530,8 @@
           "einsatz_neu",
           "unwetter",
           "fuehrung_ungueltig",
-          "fuehrung_uebernommen"
+          "fuehrung_uebernommen",
+          "fuehrung_angefragt"
         ]
       },
       "BenachrichtigungBezugTyp": {
@@ -9389,6 +9390,22 @@
           }
         }
       },
+      "FuehrungAnfrageEingang": {
+        "type": "object",
+        "description": "Eine Gegenstelle vor Ort, die um die Führung bittet (LLH-1678, design.md D4).",
+        "required": [
+          "kennung",
+          "name"
+        ],
+        "properties": {
+          "kennung": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "FuehrungAnzeige": {
         "type": "object",
         "description": "Die Führung einer Akte samt Verlauf (Paneel „Führung“, Seite „Instanzkopplung“).",
@@ -9403,11 +9420,27 @@
           "fuehrend",
           "art",
           "anfrage_offen",
+          "anfrage_abgelehnt",
           "verwahrt",
           "gegenueber",
           "verlauf"
         ],
         "properties": {
+          "anfrage_abgelehnt": {
+            "type": "boolean",
+            "description": "Die führende Gegenstelle vor Ort hat die Anfrage dieser Instanz abgelehnt (LLH-1678)."
+          },
+          "anfrage_eingang": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FuehrungAnfrageEingang",
+                "description": "Diese Instanz führt, und eine Gegenstelle vor Ort bittet um die Führung (LLH-1678)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "anfrage_offen": {
             "type": "boolean",
             "description": "Diese Instanz hat die Führung beim Gegenüber erbeten."
@@ -9539,12 +9572,13 @@
           "kennung",
           "name",
           "richtung",
-          "art"
+          "art",
+          "wechsel"
         ],
         "properties": {
           "art": {
             "$ref": "#/components/schemas/InstanzKopplungArt",
-            "description": "Art der Kopplung (LLH-1497): über eine Direktkopplung `vor_ort` wechselt die Führung nicht."
+            "description": "Art der Kopplung (LLH-1497)."
           },
           "kennung": {
             "type": "string"
@@ -9558,6 +9592,17 @@
           },
           "richtung": {
             "$ref": "#/components/schemas/InstanzKopplungRichtung"
+          },
+          "wechsel": {
+            "$ref": "#/components/schemas/Wechselregel",
+            "description": "Nach welcher Regel die Führung zu diesem Gegenüber wechselt (LLH-1678, design.md D1)."
+          },
+          "wechsel_grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bei `gesperrt`: warum (Gegenstelle braucht ein Update)."
           }
         }
       },
@@ -22892,6 +22937,15 @@
             "description": "Beim Pausenende: der gemerkte Status, den sie zurückbekommt."
           }
         }
+      },
+      "Wechselregel": {
+        "type": "string",
+        "description": "Nach welcher Regel die Führung zwischen dieser Instanz und einem Gegenüber wechselt\n(LLH-1678, design.md D1). Jede Stelle, die einen Führungswechsel auslöst oder annimmt,\nfragt sie über [`wechselregel`] ab.",
+        "enum": [
+          "nach_richtung",
+          "gleichrangig",
+          "gesperrt"
+        ]
       },
       "WetterAktuell": {
         "type": "object",
