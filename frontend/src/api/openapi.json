@@ -921,6 +921,8 @@
           "archiv_schluessel_entfernt",
           "archiv_heruntergeladen",
           "archiv_eingespielt",
+          "archiv_person_geschwaerzt",
+          "archiv_durchsucht",
           "maschinenzugang_angelegt",
           "maschinenzugang_code_ausgestellt",
           "maschinenzugang_schluessel_gebunden",
@@ -6682,9 +6684,14 @@
           "fuehrend",
           "bei",
           "epoche",
-          "offen"
+          "offen",
+          "beendet"
         ],
         "properties": {
+          "beendet": {
+            "type": "boolean",
+            "description": "Die Kopplung zur führenden Instanz ist beendet: ein Mensch kann die Führung zurückholen\n(LLH-1850, `repo::fuehrung_beendet_sql`)."
+          },
           "bei": {
             "type": "string",
             "description": "Name der führenden Instanz."
@@ -9371,6 +9378,13 @@
           "fuehrend": {
             "type": "boolean",
             "description": "Diese Instanz führt."
+          },
+          "fuehrer_beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der\nWiderruf der Zuordnung des Spiegels (UTC). Dann bietet das Paneel „Führung zurückholen“\n(LLH-1850)."
           },
           "fuehrer_kennung": {
             "type": "string"
@@ -23396,7 +23410,7 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.\n- `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder\n  sein Hash.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `archiv_person_geschwaerzt`, `archiv_durchsucht`: keine; Ziel ist der archivierte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.\n- `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder\n  sein Hash.",
         "properties": {
           "adresse": {
             "type": [

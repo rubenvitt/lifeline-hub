@@ -373,10 +373,14 @@ sequenceDiagram
   Stand und ohne fehlenden Anhang in einen eigenen Einsatz und quittiert `angenommen`; sonst
   `wartet` mit Grund, fehlende Anhänge sind dann angefordert. Erst `angenommen` merkt den
   Einsatz der meldenden Seite zum Abräumen vor (`src/einsatz/abraeumen.rs`, nach dem Commit).
-  `geloescht` meldet der Führer für genannte Kennungen aus seinem Löschprotokoll: im Pull in der
-  Antwort, im Push in der nächsten Anfrage, nachdem die erreichte Seite die Stände ihrer Spiegel
-  genannt hat (`src/instanz/spiegel/lebensende.rs`, `abgleich.rs`). Nachweis:
-  `tests/instanz_lebensende.rs`.
+  `geloescht` meldet der Führer für genannte Kennungen nur mit Beleg, wie für Akten ohne Spiegel
+  (unten): im Pull in der Antwort, im Push in der nächsten Anfrage, nachdem die erreichte Seite
+  die Stände ihrer Spiegel genannt hat (`src/instanz/spiegel/lebensende.rs`, `abgleich.rs`). Der
+  Spiegel endet nur, wenn er zu dieser Kopplung gehört und der Absender sein Führer ist: mit
+  Führung je Einsatz laut Akte, auch wenn die Kennung mit einer anderen Instanz beginnt (der
+  Führer hat den Einsatz übernommen), sonst nach dem Präfix (LLH-1852,
+  [ADR-0042](entscheidungen/ADR-0042-ein-spiegel-endet-nur-auf-meldung-seines-fuehrers-laut-akte.md)).
+  Nachweis: `tests/instanz_lebensende.rs`, `tests/instanz_fuehrung.rs`.
 - **Ende einer Akte ohne Spiegel** (LLH-1699,
   [ADR-0036](entscheidungen/ADR-0036-das-ende-eines-einsatzes-meldet-eine-instanz-nur-mit-beleg.md)):
   Wer bei eingeschalteter Führung eine Führungsakte ohne lokalen Einsatz hält, nennt ihre Kennung

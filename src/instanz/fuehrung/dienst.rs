@@ -371,6 +371,62 @@ pub async fn notuebernahme_gegen_erreichte(
     Ok(a)
 }
 
+/// Holt einen Spiegel zurück, dessen Führer nicht mehr gekoppelt ist (LLH-1850, Spec
+/// `instanz-fuehrung`, „Einen Spiegel ohne gekoppelte Führung holt ein Mensch zurück“): mit
+/// Grund, ohne Beweis, Bruchstelle ist der Widerruf der Zuordnung des Spiegels (Change
+/// `cdel60wv-fuehrung-rueckholen-nach-widerruf`, D3–D5). 409, solange der Führer zugeordnet ist
+/// oder wenn der Spiegel nicht über eine widerrufene Standard-Zuordnung zu ihm kam (nie gekoppelt,
+/// nur vor Ort, über einen Hub).
+pub async fn zurueckholen(
+    pool: &SqlitePool,
+    akte_id: i64,
+    grund: &str,
+    wer: &str,
+) -> Result<AkteZeile, AppError> {
+    let grund = check_grund(grund)?;
+    let a = crate::write_retry!(pool, |conn| {
+        let ich = repo::ich(conn).await?;
+        let mut a = repo::load(conn, akte_id).await?;
+        fordere_nicht_fuehrend(&a, &ich)?;
+        fordere_spiegel_hier(&a)?;
+        let Some(b) = repo::find_fuehrung_beendet(conn, a.id).await? else {
+            return Err(AppError::Conflict(
+                if repo::is_zugeordnet(conn, a.org_id, &a.fuehrer_kennung).await? {
+                    "Die führende Instanz ist noch gekoppelt."
+                } else {
+                    "Dieser Spiegel kam nicht über die beendete Kopplung zur führenden Instanz."
+                }
+                .into(),
+            ));
+        };
+        let e = repo::erklaerung_zurueck(
+            &a,
+            &ich,
+            &b.org_schluessel,
+            &grund,
+            &crate::auth::truncate_anzeigename(wer),
+        );
+        // Vor jeder Änderung an der Akte: ein 422 lässt die Führung, wo sie war (ADR-0037).
+        let text = erklaerung_text(&e)?;
+        repo::zurueckholen(
+            conn,
+            &mut a,
+            &ich,
+            repo::Rueckholung {
+                erklaerung: &e,
+                text,
+                wer: Some(wer),
+                bruch_at: b.widerrufen_at,
+            },
+        )
+        .await?;
+        Ok(a)
+    })?;
+    // Andere Kopplungen der Org (etwa ein zweiter ELW am Hub) erfahren den Wechsel.
+    anstossen(pool).await;
+    Ok(a)
+}
+
 /// Die Erklärung einer Notübernahme gegen die meldende Seite (D6), noch ohne Beweis. 409, wenn
 /// die Akte nicht von einer Seite geführt wird, die sich hier meldet.
 pub async fn build_erklaerung_gegen_meldende(
@@ -783,6 +839,11 @@ pub struct FuehrungAnzeige {
     /// wie eine Notübernahme geht (`wird_gemeldet` = mit Unterschrift oder Code).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fuehrer_richtung: Option<InstanzKopplungRichtung>,
+    /// Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der
+    /// Widerruf der Zuordnung des Spiegels (UTC). Dann bietet das Paneel „Führung zurückholen“
+    /// (LLH-1850).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fuehrer_beendet_at: Option<String>,
     pub verlauf: Vec<FuehrungVerlaufEintrag>,
 }
 
@@ -851,6 +912,12 @@ pub async fn anzeige(
             .iter()
             .find(|g| g.kennung == a.fuehrer_kennung)
             .map(|g| g.richtung),
+        fuehrer_beendet_at: match a.einsatz_id {
+            Some(_) => repo::find_fuehrung_beendet(conn, a.id)
+                .await?
+                .map(|b| b.widerrufen_at),
+            None => None,
+        },
         gegenueber,
         verlauf: repo::list_verlauf(conn, a.id).await?,
     })
@@ -936,5 +1003,178 @@ mod tests {
         let zeichen = (austausch::ERKLAERUNG_MAX - leer) / 6 + 1;
         assert!(erklaerung_text(&erklaerung_mit_grund("\u{1}".repeat(zeichen))).is_err());
         assert!(erklaerung_text(&erklaerung_mit_grund("g".repeat(zeichen))).is_ok());
+    }
+
+    // ── Zurückholen (LLH-1850) ─────────────────────────────────────────────────────────────
+
+    use crate::instanz::fuehrung::repo::tests::{spiegel_ohne_kopplung, widerrufen};
+
+    async fn ist_spiegel(pool: &SqlitePool, einsatz: i64) -> bool {
+        sqlx::query_scalar("SELECT spiegel FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    async fn akte(pool: &SqlitePool, id: i64) -> AkteZeile {
+        let mut conn = pool.acquire().await.unwrap();
+        repo::load(&mut conn, id).await.unwrap()
+    }
+
+    /// Spec „Zurückholen nach Widerruf ohne Schalter“: nächste Epoche, schreibbar, Erklärung ohne
+    /// Beweis gegen den Hub mit dem Grund des Menschen, Bruchstelle der Widerruf.
+    #[tokio::test]
+    async fn zurueckholen_fuehrt_mit_der_naechsten_epoche_und_dem_widerruf_als_bruchstelle() {
+        let pool = crate::db::test_pool().await;
+        let (e, id) = spiegel_ohne_kopplung(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let ich = repo::ich(&mut conn).await.unwrap();
+        let geladen = repo::load(&mut conn, id).await.unwrap();
+        let vorher = anzeige(&mut conn, &geladen).await.unwrap();
+        drop(conn);
+        assert_eq!(
+            vorher.fuehrer_beendet_at.as_deref(),
+            Some("2026-11-10 10:00:00")
+        );
+        assert_eq!(vorher.fuehrer_richtung, None);
+
+        let a = zurueckholen(&pool, id, "  Hub abgebaut ", "Erika Leitung")
+            .await
+            .unwrap();
+        assert_eq!(a.epoche(), Epoche::neu(4, &ich.kennung));
+        assert_eq!(a.fuehrer_kennung, ich.kennung);
+        assert_eq!(a.art(), FuehrungWechselArt::Notuebernahme);
+        assert_eq!(a.bruch_at.as_deref(), Some("2026-11-10 10:00:00"));
+        assert_eq!(a.beweis, None);
+        let e_text = NotuebernahmeErklaerung::parse(a.erklaerung.as_deref().unwrap()).unwrap();
+        assert_eq!(
+            (
+                e_text.fuehrer_alt.as_str(),
+                e_text.org.as_str(),
+                e_text.grund.as_str(),
+                e_text.unterzeichner.as_str(),
+                &e_text.epoche_alt
+            ),
+            (
+                "hub",
+                "hub/1",
+                "Hub abgebaut",
+                "Erika Leitung",
+                &Epoche::neu(3, "hub")
+            )
+        );
+        assert_eq!(akte(&pool, id).await, a, "so gespeichert");
+        assert!(
+            !ist_spiegel(&pool, e).await,
+            "der Einsatz ist wieder schreibbar"
+        );
+
+        let mut conn = pool.acquire().await.unwrap();
+        let danach = anzeige(&mut conn, &a).await.unwrap();
+        assert!(danach.fuehrend);
+        assert_eq!(danach.fuehrer_beendet_at, None);
+        let v = danach.verlauf.last().expect("Verlauf");
+        assert_eq!(
+            (
+                v.von_name.as_deref(),
+                v.wer.as_deref(),
+                v.grund.as_deref(),
+                v.bruch_at.as_deref()
+            ),
+            (
+                Some("Hub Nord"),
+                Some("Erika Leitung"),
+                Some("Hub abgebaut"),
+                Some("2026-11-10 10:00:00")
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn ohne_grund_ist_es_422_und_die_akte_bleibt() {
+        let pool = crate::db::test_pool().await;
+        let (e, id) = spiegel_ohne_kopplung(&pool).await;
+        let vorher = akte(&pool, id).await;
+        assert!(matches!(
+            zurueckholen(&pool, id, "  ", "Erika").await,
+            Err(AppError::UnprocessableEntity(m)) if m == "Ein Grund ist Pflicht."
+        ));
+        assert_eq!(akte(&pool, id).await, vorher);
+        assert!(ist_spiegel(&pool, e).await);
+    }
+
+    #[tokio::test]
+    async fn eine_zu_grosse_erklaerung_ist_422_und_die_akte_bleibt() {
+        let pool = crate::db::test_pool().await;
+        let (e, id) = spiegel_ohne_kopplung(&pool).await;
+        let vorher = akte(&pool, id).await;
+        let grund = "\u{1}".repeat(GRUND_MAX);
+        let wer = "\u{1}".repeat(crate::auth::ANZEIGENAME_MAX);
+        assert!(matches!(
+            zurueckholen(&pool, id, &grund, &wer).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert_eq!(akte(&pool, id).await, vorher);
+        assert!(ist_spiegel(&pool, e).await);
+    }
+
+    #[tokio::test]
+    async fn solange_der_fuehrer_zugeordnet_ist_ist_es_409() {
+        let pool = crate::db::test_pool().await;
+        crate::instanz::fuehrung::repo::tests::gekoppelt(&pool).await;
+        crate::instanz::fuehrung::save_schalter(&pool, true)
+            .await
+            .unwrap();
+        let e = crate::instanz::fuehrung::repo::tests::einsatz(&pool, "Beim Hub").await;
+        crate::instanz::fuehrung::repo::tests::ensure(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut a = repo::find_by_einsatz(&mut conn, e).await.unwrap().unwrap();
+        a.fuehrer_kennung = "hub".into();
+        a.fuehrer_name = "Hub Nord".into();
+        repo::save(&mut conn, &mut a, true).await.unwrap();
+        drop(conn);
+        assert!(matches!(
+            zurueckholen(&pool, a.id, "Grund", "Erika").await,
+            Err(AppError::Conflict(m)) if m == "Die führende Instanz ist noch gekoppelt."
+        ));
+        let mut conn = pool.acquire().await.unwrap();
+        let anz = anzeige(&mut conn, &a).await.unwrap();
+        assert_eq!(anz.fuehrer_beendet_at, None);
+        drop(conn);
+        // Mit Schalter widerrufen: das holt ohnehin zurück, danach führt diese Instanz.
+        widerrufen(&pool, "2026-11-10 10:00:00").await;
+        assert!(matches!(
+            zurueckholen(&pool, a.id, "Grund", "Erika").await,
+            Err(AppError::Conflict(m)) if m == "Diese Instanz führt bereits."
+        ));
+    }
+
+    #[tokio::test]
+    async fn ein_nie_ueber_standard_gekoppelter_fuehrer_ist_409() {
+        let pool = crate::db::test_pool().await;
+        let (_, id) = spiegel_ohne_kopplung(&pool).await;
+        sqlx::query("UPDATE instanz_kopplung SET art = 'vor_ort'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(matches!(
+            zurueckholen(&pool, id, "Grund", "Erika").await,
+            Err(AppError::Conflict(m))
+                if m == "Dieser Spiegel kam nicht über die beendete Kopplung zur führenden Instanz."
+        ));
+    }
+
+    /// Spec „Ohne Handlung bleibt der Spiegel“: Einschalten und erneutes Ausrichten ändern nichts.
+    #[tokio::test]
+    async fn ohne_menschen_bleibt_der_spiegel_auch_nach_erneutem_einschalten() {
+        let pool = crate::db::test_pool().await;
+        let (e, id) = spiegel_ohne_kopplung(&pool).await;
+        let vorher = akte(&pool, id).await;
+        crate::instanz::fuehrung::save_schalter(&pool, true)
+            .await
+            .unwrap();
+        assert!(ist_spiegel(&pool, e).await);
+        assert_eq!(akte(&pool, id).await, vorher);
     }
 }

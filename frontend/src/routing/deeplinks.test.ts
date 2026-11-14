@@ -843,6 +843,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('einsatzdatenPfad', () => {
     expect(einsatzdatenPfad(E)).toBe('/einsaetze/5/einsatzdaten');
+    expect(einsatzdatenPfad(E, { paneel: 'fuehrung' })).toBe(
+      '/einsaetze/5/einsatzdaten?paneel=fuehrung',
+    );
   });
 });
 

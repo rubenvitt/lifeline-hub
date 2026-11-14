@@ -56,6 +56,8 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   archiv_schluessel_entfernt: 'Archiv-Schlüssel entfernt',
   archiv_heruntergeladen: 'Archiv heruntergeladen',
   archiv_eingespielt: 'Archiv eingespielt',
+  archiv_person_geschwaerzt: 'Person im Archiv geschwärzt',
+  archiv_durchsucht: 'Archiv durchsucht',
   maschinenzugang_angelegt: 'Anbindung angelegt',
   maschinenzugang_code_ausgestellt: 'Anbindungscode ausgestellt',
   maschinenzugang_schluessel_gebunden: 'Schlüssel einer Anbindung gebunden',

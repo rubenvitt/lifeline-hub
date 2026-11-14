@@ -2,8 +2,11 @@
 //! design.md D3, D4).
 //!
 //! - **`geloescht`**: Der Führer hat den Einsatz nicht mehr; wer spiegelt, räumt ab
-//!   ([`crate::einsatz::abraeumen`]). Gemeldet nur für Kennungen, die das Gegenüber nennt und die
-//!   im eigenen Löschprotokoll stehen: eine aus einer Sicherung zurückgekehrte Instanz meldet nichts.
+//!   ([`crate::einsatz::abraeumen`]). Gemeldet nur für Kennungen, die das Gegenüber nennt und
+//!   deren Ende diese Instanz belegt ([`belegte_enden`]): eine aus einer Sicherung
+//!   zurückgekehrte Instanz meldet nichts. Abgeräumt wird ein Spiegel nur auf Meldung seines
+//!   Führers, laut Akte auch bei fremdem Präfix (LLH-1852, Change
+//!   `r11nl4cv-geloescht-fremdes-praefix`, ADR-0042).
 //!   - Pull (die erreichte Seite führt): die meldende Seite nennt ihre Stände in der Anfrage.
 //!   - Push (die meldende Seite führt): die erreichte Seite nennt die Stände ihrer Spiegel in der
 //!     Antwort, die meldende meldet `geloescht` in der nächsten Anfrage.
@@ -26,71 +29,44 @@ use crate::instanz::repo::{KopplungZeile, OrgZeile};
 use sqlx::SqliteConnection;
 use std::collections::HashSet;
 
-/// Ob diese Instanz den Einsatz mit der Kennung geführt und gelöscht hat: eigenes Präfix, kein
-/// Einsatz mit der Kennung mehr, die ID im Löschprotokoll.
-async fn ist_geloescht(
-    conn: &mut SqliteConnection,
-    eigene_kennung: &str,
-    kennung: &str,
-) -> Result<bool, AppError> {
-    let Some(id) = kennung
-        .strip_prefix(eigene_kennung)
-        .and_then(|r| r.strip_prefix('/'))
-        // `<id>` oder `<id>-<zufall>` (LLH-1641, E2).
-        .and_then(|r| r.split('-').next())
-        .and_then(|r| r.parse::<i64>().ok())
-    else {
-        return Ok(false);
-    };
-    Ok(sqlx::query_scalar(
-        "SELECT NOT EXISTS (SELECT 1 FROM einsatz WHERE kennung = ?1 OR id = ?2) \
-            AND EXISTS (SELECT 1 FROM aufbewahrung_loeschprotokoll WHERE einsatz_id = ?2)",
-    )
-    .bind(kennung)
-    .bind(id)
-    .fetch_one(&mut *conn)
-    .await?)
-}
-
-/// `geloescht` für jede genannte Kennung, deren Einsatz diese Instanz gelöscht hat.
+/// `geloescht` für jeden genannten Stand eines Spiegels, dessen Ende diese Instanz belegt
+/// (LLH-1852, D1): derselbe Beleg wie für Akten ohne Spiegel ([`belegte_enden`]), auch für
+/// Kennungen mit fremdem Präfix (der Einsatz war übernommen).
 pub async fn geloeschte(
     conn: &mut SqliteConnection,
+    kopplung_id: i64,
     eigene_kennung: &str,
     staende: &[EinsatzStand],
 ) -> Result<Vec<Lebensende>, AppError> {
-    let mut gesehen = HashSet::new();
-    let mut ergebnis = Vec::new();
-    for s in staende {
-        if ergebnis.len() >= EINSAETZE_MAX {
-            break;
-        }
-        if gesehen.insert(s.kennung.as_str())
-            && ist_geloescht(conn, eigene_kennung, &s.kennung).await?
-        {
-            ergebnis.push(Lebensende {
-                kennung: s.kennung.clone(),
-                art: LEBENSENDE_GELOESCHT.into(),
-                stand: 0,
-                kategorien: Vec::new(),
-            });
-        }
-    }
-    Ok(ergebnis)
+    let kennungen: Vec<String> = staende.iter().map(|s| s.kennung.clone()).collect();
+    belegte_enden(conn, kopplung_id, eigene_kennung, &kennungen).await
 }
 
 /// `geloescht` für jede genannte Akte ohne Spiegel, deren Ende diese Instanz belegt (LLH-1699,
-/// D4): mit einem Löschvermerk, oder für Löschungen von vor dem Vermerk mit eigenem Präfix und
-/// Löschprotokoll ([`is_altbestand_geloescht`]). In beiden Fällen nur, wenn hier weder
-/// Einsatz noch Akte mit der Kennung steht. Eine unbekannte Kennung wird übergangen: Eine aus
-/// einer Sicherung zurückgekehrte Instanz meldet nichts.
+/// D4; [`belegte_enden`]).
 pub async fn geloeschte_akten(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     eigene_kennung: &str,
     akten: &[String],
 ) -> Result<Vec<Lebensende>, AppError> {
+    belegte_enden(conn, kopplung_id, eigene_kennung, akten).await
+}
+
+/// `geloescht` für jede genannte Kennung, deren Ende diese Instanz belegt (ADR-0036, ADR-0042):
+/// mit einem Löschvermerk, oder für Löschungen von vor dem Vermerk mit eigenem Präfix und
+/// Löschprotokoll ([`is_altbestand_geloescht`]). In beiden Fällen nur, wenn hier weder Einsatz
+/// noch Akte mit der Kennung steht. Eine unbekannte Kennung wird übergangen: Eine aus einer
+/// Sicherung zurückgekehrte Instanz meldet nichts. Jede Kennung einmal, höchstens
+/// [`EINSAETZE_MAX`].
+async fn belegte_enden(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    eigene_kennung: &str,
+    genannt: &[String],
+) -> Result<Vec<Lebensende>, AppError> {
     let mut gesehen = HashSet::new();
-    let kennungen: Vec<String> = akten
+    let kennungen: Vec<String> = genannt
         .iter()
         .filter(|k| gesehen.insert(k.as_str()))
         .take(EINSAETZE_MAX)
@@ -218,20 +194,26 @@ async fn spiegel_der_kopplung(
     .await?)
 }
 
-/// Merkt die Spiegel dieser Kopplung zum Abräumen vor, deren Führer `geloescht` meldet. Liefert
-/// die vorgemerkten Einsätze; abgeräumt wird nach dem Commit.
+/// Merkt die Spiegel dieser Kopplung zum Abräumen vor, deren Führer `geloescht` meldet (LLH-1852,
+/// D2): Führer ist mit Schalter und Akte, wen die Akte nennt, sonst die Instanz des Präfixes
+/// ([`super::fuehrung::is_fuehrer_des_spiegels`]). Liefert die vorgemerkten Einsätze; abgeräumt
+/// wird nach dem Commit.
 pub async fn geloescht_uebernehmen(
     conn: &mut SqliteConnection,
     kopplung: &KopplungZeile,
     liste: &[Lebensende],
 ) -> Result<Vec<i64>, AppError> {
-    let praefix = format!("{}/", kopplung.gegenueber_kennung);
     let mut ids = Vec::new();
     for l in liste {
-        if l.art != LEBENSENDE_GELOESCHT || !l.kennung.starts_with(&praefix) {
+        if l.art != LEBENSENDE_GELOESCHT {
             continue;
         }
-        if let Some((id, _)) = spiegel_der_kopplung(conn, kopplung.id, &l.kennung).await? {
+        let Some((id, _)) = spiegel_der_kopplung(conn, kopplung.id, &l.kennung).await? else {
+            continue;
+        };
+        if super::fuehrung::is_fuehrer_des_spiegels(conn, &l.kennung, &kopplung.gegenueber_kennung)
+            .await?
+        {
             abraeumen::vormerken(
                 conn,
                 id,

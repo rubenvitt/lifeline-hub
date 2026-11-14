@@ -51,6 +51,14 @@ export function lehneAnfrageAb(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
   return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'anfrage/ablehnen'), 'POST');
 }
 
+/** Einen Spiegel zurückholen, dessen Führer nicht mehr gekoppelt ist (LLH-1850): nur mit Grund,
+ *  nur am lokalen Einsatz. */
+export function holeFuehrungZurueck(einsatzId: number, grund: string): Promise<FuehrungAnzeige> {
+  return apiSend<FuehrungAnzeige>(`/api/einsaetze/${einsatzId}/fuehrung/zurueckholen`, 'POST', {
+    grund,
+  });
+}
+
 /** Notübernahme gegen die erreichte Seite: nur mit Grund. */
 export function uebernimmFuehrung(ort: FuehrungOrt, grund: string): Promise<FuehrungAnzeige> {
   return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'notuebernahme'), 'POST', { grund });

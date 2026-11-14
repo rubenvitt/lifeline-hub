@@ -204,6 +204,31 @@ async fn run_notuebernahme(
     danach(state, &saved).await
 }
 
+async fn run_zurueckholen(
+    state: &AppState,
+    a: &AkteZeile,
+    b: &Benutzer,
+    grund: &str,
+    peer_ip: Option<IpAddr>,
+) -> Result<FuehrungAnzeige, AppError> {
+    let vorher = a.fuehrer_name.clone();
+    let saved = dienst::zurueckholen(&state.pool, a.id, grund, &b.anzeigename).await?;
+    let text = format!(
+        "Führung zurückgeholt von {vorher} (Kopplung beendet): {}",
+        grund.trim()
+    );
+    spur(
+        state,
+        AdminAktion::FuehrungNotuebernahme,
+        b,
+        &saved,
+        &text,
+        peer_ip,
+    )
+    .await;
+    danach(state, &saved).await
+}
+
 /// Unterschreiben darf nur ein Admin der Org der Akte (Spec `instanz-fuehrung`, „Unterschreiben
 /// MUST nur ein Admin der Org“, LLH-1705): Das Gegenüber prüft die Unterschrift gegen die
 /// Schlüssel dieser Org und verwürfe die Übernahme eines anderen erst, nachdem diese Instanz schon
@@ -501,6 +526,20 @@ pub async fn notuebernahme(
     let a = akte_des_einsatzes(&state, ctx.einsatz.id).await?;
     Ok(Json(
         run_notuebernahme(&state, &a, &ctx.benutzer, &body.grund, peer_ip).await?,
+    ))
+}
+
+/// POST /api/einsaetze/{id}/fuehrung/zurueckholen — einen Spiegel zurückholen, dessen Führer
+/// nicht mehr gekoppelt ist (LLH-1850), mit Grund und ohne Beweis.
+pub async fn zurueckholen(
+    State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
+    ctx: EinsatzFuehrungszugriff,
+    JsonBody(body): JsonBody<GrundBody>,
+) -> Result<Json<FuehrungAnzeige>, AppError> {
+    let a = akte_des_einsatzes(&state, ctx.einsatz.id).await?;
+    Ok(Json(
+        run_zurueckholen(&state, &a, &ctx.benutzer, &body.grund, peer_ip).await?,
     ))
 }
 
