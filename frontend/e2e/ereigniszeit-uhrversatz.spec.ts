@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { etbVonSetzen } from './etb-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
 /**
@@ -48,6 +49,7 @@ test('ETB-Eintrag eines vorgehenden Geräts trägt die Serverzeit und ist nicht 
   // Die Seite lädt online und misst dabei die Serveruhr an den echten Antworten.
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   const inhalt = `Pumpe läuft ${Date.now()}`;
+  await etbVonSetzen(page);
   const feld = page.getByPlaceholder('Inhalt …');
   await feld.fill(inhalt);
   const erfasstMs = Date.now();

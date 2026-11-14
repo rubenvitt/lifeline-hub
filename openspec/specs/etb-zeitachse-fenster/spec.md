@@ -91,11 +91,11 @@ im Fenster bleiben. Ohne Netz gilt dasselbe für die im Gerätespeicher liegende
 - **THEN** lädt die Zeitachse neuere Seiten nach, bis der Eintrag hervorgehoben im Bild steht
 
 ### Requirement: Keine Zahl des geladenen Fensters
-Kopfzahl und Bilanz der ETB-Seite MUST weiterhin aus der Serverzählung stammen. Die Zahl der
-geladenen Einträge oder Seiten SHALL nirgends als Menge des Tagebuchs erscheinen.
+Kopfzahl und Zahlen der Typ-Segmente der ETB-Seite MUST weiterhin aus der Serverzählung stammen. Die
+Zahl der geladenen Einträge oder Seiten SHALL nirgends als Menge des Tagebuchs erscheinen.
 
 #### Scenario: Tiefes Fenster
-- **WHEN** das Fenster 500 Einträge eines Tagebuchs mit 3 000 Einträgen hält
+- **WHEN** das Fenster 500 Einträge eines Tagebuchs mit 3 000 Handeinträgen hält und Systemeinträge ausgeblendet sind
 - **THEN** nennt der Kopf „3000 Einträge“
 
 ### Requirement: Rendern ohne erneutes Parsen

@@ -199,7 +199,11 @@ test('Eingangsband rückt über die ETB-Erfassung und die Aktionsleiste des Befe
     await expect
       .poll(() => klebtAmFuss(page, ETB_LEISTE), { message: 'Erfassung klebt' })
       .toBe(true);
-    await expect.poll(() => verdeckungen(page, ETB_LEISTE, erfassen)).toEqual([]);
+    // Unter `md` ist die Erfassung eingeklappt (Typ und Inhalt, kwc2yszv D9): „Erfassen“ steht erst
+    // mit dem Fokus. Ihr Ziel ist dann das Inhaltsfeld.
+    const inhaltSchmal = page.locator(ETB_LEISTE).getByPlaceholder(/Inhalt/);
+    await expect(erfassen).toHaveCount(0);
+    await expect.poll(() => verdeckungen(page, ETB_LEISTE, inhaltSchmal)).toEqual([]);
 
     // ── Befehlsentwurf, schmal: unter `lg` ist die Aktionsleiste unten verankert ─────────
     await oeffnenMitStrom(page, `/einsaetze/${einsatzId}/auftraege/befehle/${befehlId}`, einsatzId);
@@ -320,7 +324,8 @@ test('Eingangsband rückt im ETB auch über „Nach oben“ und das Sammelbanner
   expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
   // Mehr als im ersten Fall: hochgerollt soll noch mehr als eine Fensterhöhe darüber liegen.
-  await etbFuellen(page, einsatzId, 40);
+  // Die Spaltenzeile ab `lg` ist niedrig (kwc2yszv: ≤ 36 px je einzeiligem Eintrag), deshalb 80.
+  await etbFuellen(page, einsatzId, 80);
 
   const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zweiter Schirm');
   await mitgliedEintragen(page, String(einsatzId), konto.id, 'fuehrungspersonal');
@@ -333,7 +338,7 @@ test('Eingangsband rückt im ETB auch über „Nach oben“ und das Sammelbanner
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
 
     await oeffnenMitStrom(page, `/einsaetze/${einsatzId}/etb`, einsatzId);
-    await expect(page.getByText('Bandprobe 39:', { exact: false })).toBeVisible();
+    await expect(page.getByText('Bandprobe 79:', { exact: false })).toBeVisible();
     await expect
       .poll(() => klebtAmFuss(page, ETB_LEISTE), { message: 'Erfassung klebt' })
       .toBe(true);

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
-import { systemBuendelAufklappen } from './etb-kern';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Fahrzeug als eigene Einheit führen und Personal der Einheit übernehmen (LLH-1073 Teil II),
@@ -87,7 +87,7 @@ test('Fahrzeug als eigene Einheit führen: die Besatzung kommt mit, das Meldebil
   // Die Besatzung zählt in der Stärke der Einheit: ein Unterführer, eine Mannschaft.
   await expect(markiert).toContainText('0/1/1//2');
 
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   await expect(page.getByText(`Einheit «${funkrufname}» gebildet`, { exact: true })).toBeVisible();
   await expect(
@@ -141,7 +141,7 @@ test('Personal der Einheit übernehmen: vorgewählt bis zum Soll, danach zeigt d
   await expect(urteil).toContainText('Ist');
   await expect(urteil).toContainText('Soll');
 
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   await expect(
     page.getByText(

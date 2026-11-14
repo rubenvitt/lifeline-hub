@@ -19,7 +19,8 @@ import type { Breakpoint } from 'antd';
  ── Ein Satz Hörer für die ganze Seite (LFH-947) ───────────────────────────────────────
  * Die Abfragen leben in EINEM modulweiten Store (`useSyncExternalStore`): sieben Breiten aus
  * antds Schwellen (`theme.getDesignToken()`, dieselbe Karte wie `Grid.useBreakpoint`) und die
- * Zeigerfrage, also höchstens 8 Hörer, egal wie viele Zeilen fragen. Vorher hing jede
+ * Zeigerfrage, dazu drei Höhenfragen für `istNiedrigBei` (kwc2yszv), also höchstens 11 Hörer, egal wie
+ * viele Zeilen fragen. Vorher hing jede
  * Zeitachsenzeile 8 eigene an (`Grid.useBreakpoint` baut seinen Beobachter je Instanz). Der
  * Store hängt sich beim ersten Abonnenten an und beim letzten ab; der Snapshot ist ein
  * stabiles Objekt, das nur bei einer geänderten Antwort neu entsteht.
@@ -62,6 +63,24 @@ interface ViewportZustand {
   istSchmal: boolean;
   /** Primärer Zeiger ist grob (Finger/Handschuh) statt Maus/Stift. */
   istBeruehrung: boolean;
+  /**
+   * Ist das Fenster für die volle ETB-Erfassung dieser Dichte zu niedrig (Change
+   * `kwc2yszv-etb-neuentwurf`, design.md D9)? Gemessen an der Regel „Leiste höchstens halbe
+   * Fensterhöhe“: die volle Leiste ist kompakt rund 160, komfortabel 250, im Handschuh-Betrieb 356 px
+   * hoch. Die Dichte kommt als `controlHeight` (30/48/72).
+   */
+  istNiedrigBei: (controlHeight: number) => boolean;
+}
+
+/** Fensterhöhen, unter denen die volle ETB-Erfassung je Dichte über die halbe Höhe ragte. */
+export const NIEDRIG_UNTER = { kompakt: 320, komfortabel: 500, handschuh: 740 } as const;
+const NIEDRIG_ABFRAGEN = Object.values(NIEDRIG_UNTER).map((h) => `(max-height: ${h - 1}px)`);
+
+/** Die Schwelle zur Steuerhöhe einer Dichte. */
+export function niedrigSchwelle(controlHeight: number): number {
+  if (controlHeight >= 72) return NIEDRIG_UNTER.handschuh;
+  if (controlHeight >= 48) return NIEDRIG_UNTER.komfortabel;
+  return NIEDRIG_UNTER.kompakt;
 }
 
 /**
@@ -103,13 +122,19 @@ function breitenAbfragen(): Record<Breakpoint, string> {
 interface Momentaufnahme {
   screens: ScreensKarte;
   istBeruehrung: boolean;
+  /** Je Schwelle aus {@link NIEDRIG_UNTER}: liegt das Fenster darunter? */
+  niedrig: boolean[];
 }
 
 /**
  * Die Abfragen, gebaut beim ersten Fragen und gehalten, solange jemand abonniert. Eine
  * `MediaQueryList` antwortet über `matches` immer aktuell; Hörer hängen nur an Abonnenten.
  */
-let abfragen: { breiten: [Breakpoint, MediaQueryList][]; zeiger: MediaQueryList } | null = null;
+let abfragen: {
+  breiten: [Breakpoint, MediaQueryList][];
+  zeiger: MediaQueryList;
+  niedrig: MediaQueryList[];
+} | null = null;
 const abonnenten = new Set<() => void>();
 let letzte: Momentaufnahme | null = null;
 
@@ -120,6 +145,7 @@ function gebaut() {
       window.matchMedia(abfrage),
     ]),
     zeiger: window.matchMedia(ZEIGER_GROB),
+    niedrig: NIEDRIG_ABFRAGEN.map((abfrage) => window.matchMedia(abfrage)),
   };
   return abfragen;
 }
@@ -129,10 +155,11 @@ function benachrichtige() {
 }
 
 function abonniere(melde: () => void): () => void {
-  const { breiten, zeiger } = gebaut();
+  const { breiten, zeiger, niedrig } = gebaut();
   if (abonnenten.size === 0) {
     for (const [, mql] of breiten) mql.addEventListener('change', benachrichtige);
     zeiger.addEventListener('change', benachrichtige);
+    for (const mql of niedrig) mql.addEventListener('change', benachrichtige);
   }
   abonnenten.add(melde);
   return () => {
@@ -140,6 +167,7 @@ function abonniere(melde: () => void): () => void {
     if (abonnenten.size === 0) {
       for (const [, mql] of breiten) mql.removeEventListener('change', benachrichtige);
       zeiger.removeEventListener('change', benachrichtige);
+      for (const mql of niedrig) mql.removeEventListener('change', benachrichtige);
       // Ohne Abonnenten frisch bauen: die nächste Seite fragt die dann gültige Umgebung.
       abfragen = null;
     }
@@ -151,19 +179,21 @@ function abonniere(melde: () => void): () => void {
  * sind — `useSyncExternalStore` verlangt einen stabilen Snapshot.
  */
 function momentaufnahme(): Momentaufnahme {
-  const { breiten, zeiger } = gebaut();
+  const { breiten, zeiger, niedrig } = gebaut();
   const istBeruehrung = zeiger.matches;
+  const unter = niedrig.map((mql) => mql.matches);
   const vorher = letzte;
   if (
     vorher &&
     vorher.istBeruehrung === istBeruehrung &&
+    vorher.niedrig.every((w, i) => w === unter[i]) &&
     breiten.every(([punkt, mql]) => vorher.screens[punkt] === mql.matches)
   ) {
     return vorher;
   }
   const screens: ScreensKarte = {};
   for (const [punkt, mql] of breiten) screens[punkt] = mql.matches;
-  letzte = { screens, istBeruehrung };
+  letzte = { screens, istBeruehrung, niedrig: unter };
   return letzte;
 }
 
@@ -174,9 +204,12 @@ export function useViewport(): ViewportZustand {
   const aufnahme = useSyncExternalStore(abonniere, momentaufnahme);
   let zustand = zustaende.get(aufnahme);
   if (!zustand) {
-    const { screens, istBeruehrung } = aufnahme;
+    const { screens, istBeruehrung, niedrig } = aufnahme;
     const abBreite = (punkt: AbBreitePunkt) => abBreiteAus(screens, punkt);
-    zustand = { screens, abBreite, istSchmal: !abBreite('md'), istBeruehrung };
+    const schwellen = Object.values(NIEDRIG_UNTER) as number[];
+    const istNiedrigBei = (controlHeight: number) =>
+      niedrig[schwellen.indexOf(niedrigSchwelle(controlHeight))] === true;
+    zustand = { screens, abBreite, istSchmal: !abBreite('md'), istBeruehrung, istNiedrigBei };
     zustaende.set(aufnahme, zustand);
   }
   return zustand;

@@ -12,6 +12,7 @@ import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfEntfernen } from './en
 import EtbEntwurfsTabs, { entfernenStil } from './EtbEntwurfsTabs';
 import { benutzerFixture, einsatzFixture } from '../../test/fixtures';
 import { rufnameZugriff } from '../../test/standardRufname';
+import { waehle } from '../../test/auswahlListe';
 
 // Durchgereicht; ein Test lässt das Räumen nach dem Senden einmal scheitern.
 vi.mock('./entwurfStore', async (echt) => {
@@ -58,6 +59,41 @@ function MitSchalter(p: React.ComponentProps<typeof EtbEntwurfsTabs>) {
   return <EtbEntwurfsTabs {...p} werteBehalten={behalten} onWerteBehaltenChange={setBehalten} />;
 }
 
+/**
+ * Eine Meldung — der Typ jedes neuen Entwurfs — trägt als Vorgabe nur An = eigene Stelle; Von ist
+ * Pflicht (Change `kwc2yszv-etb-neuentwurf`, Spec `etb-absender-empfaenger`). Wer senden will,
+ * setzt Von über die Feldzeile; Enter übernimmt und springt in den Inhalt. Eingefügt statt
+ * getippt: jeder Tastendruck zeichnet die Erfassung neu (LFH-672).
+ */
+async function setzeVon(wert = 'Florian 3') {
+  const von = await screen.findByRole('combobox', { name: 'Von' });
+  await userEvent.clear(von);
+  await userEvent.paste(wert);
+  await userEvent.keyboard('{Enter}');
+}
+
+/** Der angezeigte Wert von Von oder An in der Feldzeile. */
+function feldWert(name: 'Von' | 'An') {
+  return (screen.getByRole('combobox', { name }) as HTMLInputElement).value;
+}
+
+/** Der gewählte Meldeweg der Feldzeile, leer ohne Wahl. */
+function meldewegWert() {
+  const auswahl = screen.getByRole('combobox', { name: 'Meldeweg' }).closest('.ant-select');
+  // Ohne Optionsstil steht die Wahl als Titel am Inhalt der Auswahl (`@rc-component/select`).
+  return auswahl?.querySelector('.ant-select-content')?.getAttribute('title') ?? '';
+}
+
+/**
+ * Legt einen weiteren Entwurf über die Fußzeile an: mit einem Entwurf gibt es kein Reiterband und
+ * also kein „+“ darin (Spec „Entwurfsreiter und Vorschau nur bei Bedarf“).
+ */
+async function weitererEntwurf() {
+  const vorher = screen.queryAllByRole('tab', { hidden: true }).length;
+  await userEvent.click(screen.getByRole('button', { name: '+ weiterer Entwurf' }));
+  await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(vorher + 1));
+}
+
 describe('EtbEntwurfsTabs', () => {
   it('LFH-894: der Standard-Rufname überlebt Absenden und Remount, ohne im Entwurf zu stehen', async () => {
     const p = props({
@@ -65,33 +101,45 @@ describe('EtbEntwurfsTabs', () => {
       werteBehalten: false,
     });
     const ersteAnsicht = renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByText('Von: ELW 1')).toBeInTheDocument();
+    await screen.findByPlaceholderText(/Inhalt/);
+    // Meldung: An trägt die eigene Stelle aus dem Standard, Von ist leer (Pflicht).
+    expect(feldWert('An')).toBe('ELW 1');
+    expect(feldWert('Von')).toBe('');
     // Die Führungsstelle belegt nichts mehr vor (design.md D3).
-    expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
+    expect(feldWert('An')).not.toBe('Florian Leitung');
+    await setzeVon();
+    // Enter im Feld Von springt in den Inhalt; eingefügt statt getippt (LFH-672).
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+    await userEvent.paste('Meldung');
+    await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
-      von: 'ELW 1',
+      von: 'Florian 3',
       an: 'ELW 1',
     });
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
+    expect(feldWert('An')).toBe('ELW 1');
     // Ein Entwurf nur mit dem Standard ist leer und wird nicht gespeichert (design.md D2).
     await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
     ersteAnsicht.unmount();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    expect(await screen.findByText('Von: ELW 1')).toBeInTheDocument();
-    expect(screen.getByText('An: ELW 1')).toBeInTheDocument();
+    await screen.findByPlaceholderText(/Inhalt/);
+    expect(feldWert('An')).toBe('ELW 1');
+    expect(feldWert('Von')).toBe('');
   });
 
   it('LFH-894: ein geänderter Standard erreicht einen offenen Entwurf', async () => {
     const p = props();
     const { rerender } = renderMitProviders(<EtbEntwurfsTabs {...p} />);
-    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Halb fertig');
-    expect(screen.getByText('An: ELW 1')).toBeInTheDocument();
+    // Lage: Von und An tragen beide die eigene Stelle als Vorgabe.
+    await userEvent.click(await screen.findByRole('radio', { name: 'Lage' }));
+    await userEvent.click(screen.getByPlaceholderText(/Inhalt/));
+    await userEvent.paste('Halb fertig');
+    expect(feldWert('Von')).toBe('ELW 1');
+    expect(feldWert('An')).toBe('ELW 1');
     rerender(<EtbEntwurfsTabs {...p} rufname={rufnameZugriff({ von: 'ELW 2', an: 'S2' })} />);
-    expect(await screen.findByText('Von: ELW 2')).toBeInTheDocument();
-    expect(screen.getByText('An: S2')).toBeInTheDocument();
+    await waitFor(() => expect(feldWert('Von')).toBe('ELW 2'));
+    expect(feldWert('An')).toBe('S2');
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Halb fertig');
   });
 
@@ -112,6 +160,7 @@ describe('EtbEntwurfsTabs', () => {
   it('entfernt den Entwurf nach erfolgreichem Absenden', async () => {
     const p = props();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    await setzeVon();
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Fertig{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
@@ -122,6 +171,7 @@ describe('EtbEntwurfsTabs', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon();
     await userEvent.type(feld, 'Fertig');
     vi.mocked(entwurfEntfernen).mockRejectedValueOnce(new Error('Speicher gesperrt'));
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -132,9 +182,10 @@ describe('EtbEntwurfsTabs', () => {
     expect(document.querySelector('[data-lfh="etb-ablehnung"]')).toBeNull();
     expect(screen.queryByText('Senden fehlgeschlagen')).toBeNull();
     // Der Grund steht an der Leiste, nicht an der Erfassung (LFH-1139), und der gesendete
-    // Entwurf ist zu: nur ein Reiter, und der ist leer.
+    // Entwurf ist zu: nur ein Reiter, und der ist leer. Mit einem Entwurf steht das Reiterband
+    // ausgeblendet (Spec „Entwurfsreiter und Vorschau nur bei Bedarf“).
     expect(await screen.findByText(ENTFERNEN_GESCHEITERT)).toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getAllByRole('tab', { hidden: true })).toHaveLength(1);
     warn.mockRestore();
   });
 
@@ -148,6 +199,7 @@ describe('EtbEntwurfsTabs', () => {
         <EtbEntwurfsTabs {...p} />
       </StrictMode>,
     );
+    await setzeVon();
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Fertig');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
@@ -172,6 +224,7 @@ describe('EtbEntwurfsTabs', () => {
         .mockRejectedValue(new Error('abgelehnt')),
     });
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    await setzeVon();
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Bleibt{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     // Entwurf wurde durch das Tippen persistiert und bleibt nach Reject erhalten.
@@ -194,32 +247,43 @@ describe('EtbEntwurfsTabs', () => {
   // useState läge, wäre danach weg.
   // -------------------------------------------------------------------------
 
-  async function setzeAnUndMeldeweg(feld: HTMLElement) {
-    await userEvent.type(feld, ' /an');
-    // An trägt schon den Standard-Rufnamen (Haken im Menü, Wert im Editor, LFH-894).
-    await userEvent.click(await screen.findByText('An ✓'));
-    // Eingefügt statt getippt (LFH-672, Begründung im Test unten); Enter bestätigt wie getippt.
-    await userEvent.clear(await screen.findByLabelText('An'));
+  /**
+   * Von, An und Meldeweg über die Feldzeile. An trägt schon den Standard-Rufnamen (LFH-894) und
+   * wird überschrieben. Eingefügt statt getippt (LFH-672, Begründung im Test unten); Enter
+   * übernimmt wie getippt und springt in den Inhalt, die Wahl des Meldewegs ebenso.
+   */
+  async function setzeVonAnUndMeldeweg() {
+    await setzeVon();
+    const an = screen.getByRole('combobox', { name: 'An' });
+    await userEvent.clear(an);
     await userEvent.paste('Florian 1');
     await userEvent.keyboard('{Enter}');
-    await userEvent.type(feld, ' /meldeweg');
-    await userEvent.click(await screen.findByText('Meldeweg'));
-    await userEvent.click(await screen.findByText('Funk'));
+    await waehle('Meldeweg', 'Funk');
   }
 
-  it('stellt „Nur protokollieren“ und „Werte behalten“ ab md ins Reiterband (LLH-1037 D12)', async () => {
+  it('ein Entwurf steht ohne Reiterband; ab dem zweiten stehen die Reiter (Spec „Entwurfsreiter und Vorschau nur bei Bedarf“)', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
-    // Im Band neben den Reitern, nicht in der Chip-Zeile: dort brach die Gruppe im
-    // Handschuh-Betrieb um, und die angepinnte Leiste wuchs um eine Kästchenhöhe.
-    for (const name of ['Nur protokollieren', 'Werte behalten']) {
-      const kaestchen = screen.getByRole('checkbox', { name });
-      expect(kaestchen.closest('.ant-tabs-nav'), name).not.toBeNull();
-      expect(kaestchen.closest('[data-lfh="etb-erfassung"]'), name).toBeNull();
+    // Genau ein Entwurf: kein Reiter, kein „+“ und kein × im Band — es ist ausgeblendet.
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Weiteren Entwurf anlegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Entwurf verwerfen' })).toBeNull();
+    expect(document.querySelector('.ant-tabs-nav')).toHaveStyle({ display: 'none' });
+    // Die Einstellungen stehen nicht mehr im Band, sondern in der Fußzeile der Erfassung.
+    for (const name of ['Auch in den Meldungseingang', 'Werte behalten']) {
+      const schalter = screen.getByRole('checkbox', { name });
+      expect(schalter.closest('.ant-tabs-nav'), name).toBeNull();
+      expect(schalter.closest('[data-lfh="etb-fusszeile"]'), name).not.toBeNull();
     }
+
+    await weitererEntwurf();
+    expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2);
+    expect(document.querySelector('.ant-tabs-nav')).not.toHaveStyle({ display: 'none' });
+    expect(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Entwurf verwerfen' })).toHaveLength(2);
   });
 
-  it('übernimmt An und Meldeweg in den nächsten Entwurf (Schalter an)', async () => {
+  it('übernimmt Von, An und Meldeweg in den nächsten Entwurf (Schalter an)', async () => {
     const p = props();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
@@ -228,14 +292,17 @@ describe('EtbEntwurfsTabs', () => {
 
     // Meldungstext EINGEFÜGT, nicht getippt: jeder Tastendruck zeichnet die Schnellerfassung neu
     // (~85 ms in jsdom); mit ~50 Tasten stand der Test bei 3,7 s und riss unter Last die 10 s
-    // (LFH-672). Getippt bleibt, was der Test prüft: die Slash-Befehle und das Absenden.
+    // (LFH-672). Getippt bleibt, was der Test prüft: die Felder und das Absenden.
     await userEvent.click(feld);
     await userEvent.paste('Erste Meldung');
-    await setzeAnUndMeldeweg(feld);
-    await userEvent.type(feld, '{Enter}');
+    await setzeVonAnUndMeldeweg();
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
 
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      inhalt: 'Erste Meldung',
+      von: 'Florian 3',
       an: 'Florian 1',
       meldeweg: 'funk',
     });
@@ -244,11 +311,12 @@ describe('EtbEntwurfsTabs', () => {
     // beim Schließen des Tabs unmountet worden und hat ihr Feld nie geleert.
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('');
-      expect(screen.getByText('An: Florian 1')).toBeInTheDocument();
-      expect(screen.getByText('Meldeweg: Funk')).toBeInTheDocument();
+      expect(feldWert('Von')).toBe('Florian 3');
+      expect(feldWert('An')).toBe('Florian 1');
+      expect(meldewegWert()).toBe('Funk');
     });
 
-    // Kein Geister-Entwurf: Die übernommenen Chips dürfen den gerade gelöschten Entwurf
+    // Kein Geister-Entwurf: Die übernommenen Werte dürfen den gerade gelöschten Entwurf
     // nicht wieder in den Speicher schreiben. Die Schnellerfassung setzt nach dem Erfassen
     // metadaten auf die Übernahme — träfe dieser Autosave noch den ALTEN Entwurf, wäre
     // `istLeer` wegen der gesetzten Metadaten falsch und der Entwurf käme leer zurück.
@@ -261,6 +329,7 @@ describe('EtbEntwurfsTabs', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(2));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[1][0]).toMatchObject({
       inhalt: 'Zweite Meldung',
+      von: 'Florian 3',
       an: 'Florian 1',
       meldeweg: 'funk',
     });
@@ -274,64 +343,82 @@ describe('EtbEntwurfsTabs', () => {
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
 
     await userEvent.type(feld, 'Erste Meldung');
-    await setzeAnUndMeldeweg(feld);
-    await userEvent.type(feld, '{Enter}');
+    await setzeVonAnUndMeldeweg();
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+    await userEvent.keyboard('{Enter}');
 
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      von: 'Florian 3',
       an: 'Florian 1',
       meldeweg: 'funk',
     });
 
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-    expect(screen.queryByText('An: Florian 1')).toBeNull();
-    expect(screen.queryByText('Meldeweg: Funk')).toBeNull();
+    expect(feldWert('Von')).toBe('');
+    expect(meldewegWert()).toBe('');
     // Verworfen wird der eigene Wert; An fällt auf den Standard-Rufnamen zurück (LFH-894).
-    expect(screen.getByText('An: ELW 1')).toBeInTheDocument();
+    expect(feldWert('An')).toBe('ELW 1');
     // Der Schalterzustand selbst überlebt den Remount ebenfalls.
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
-  it('behält mit „Werte behalten“ den Typ für den nächsten Entwurf, ohne Schalter Meldung (LLH-1112)', async () => {
-    const p = props();
-    renderMitProviders(<MitSchalter {...p} />);
-    const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await userEvent.type(feld, '/anordnung Abschnitt Nord räumen{Enter}');
+  /** Eine Anordnung hat Von = eigene Stelle, An ist Pflicht: der Test setzt es vorab. */
+  /**
+   * Der Fokus beim Laden (Meldung ohne Von: im Feld Von). Abgewartet, bevor der Test An leert:
+   * käme er danach, verließe er An, und das leere Feld fiele auf seine Vorgabe zurück.
+   */
+  async function startfokusInVon() {
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+  }
+
+  async function anordnungErfassen(p: ReturnType<typeof props>) {
+    const an = screen.getByRole('combobox', { name: 'An' });
+    await userEvent.clear(an);
+    await userEvent.paste('Abschnitt Nord');
+    await userEvent.keyboard('{Enter}');
+    // Der Typ über den getippten Slash-Befehl, der Rest eingefügt (LFH-672).
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '/anordnung ');
+    await userEvent.paste('Abschnitt Nord räumen');
+    await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
       typ: 'anordnung',
+      von: 'ELW 1',
+      an: 'Abschnitt Nord',
     });
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-    expect(
-      await screen.findByRole('button', { name: 'Eintragstyp Anordnung ändern' }),
-    ).toBeInTheDocument();
-    // Ein neuer Reiter über „+“ ist keine Übernahme: er beginnt als Meldung.
-    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
-    expect(
-      await screen.findByRole('button', { name: 'Eintragstyp Meldung ändern' }),
-    ).toBeInTheDocument();
+  }
+
+  it('behält mit „Werte behalten“ den Typ für den nächsten Entwurf, ohne Schalter Meldung (LLH-1112)', async () => {
+    const p = props();
+    renderMitProviders(<MitSchalter {...p} />);
+    await startfokusInVon();
+    await anordnungErfassen(p);
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Anordnung' })).toBeChecked());
+    // Ein neuer Entwurf über „+ weiterer Entwurf“ ist keine Übernahme: er beginnt als Meldung.
+    await weitererEntwurf();
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Meldung' })).toBeChecked());
   });
 
   it('beginnt ohne „Werte behalten“ nach einer Anordnung wieder als Meldung (LLH-1112)', async () => {
     const p = props();
     renderMitProviders(<MitSchalter {...p} />);
-    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await startfokusInVon();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
-    await userEvent.type(feld, '/anordnung Abschnitt Nord räumen{Enter}');
-    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
-    expect(
-      await screen.findByRole('button', { name: 'Eintragstyp Meldung ändern' }),
-    ).toBeInTheDocument();
+    await anordnungErfassen(p);
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Meldung' })).toBeChecked());
   });
 
-  it('öffnet über den +-Button einen zweiten Tab', async () => {
+  it('„+ weiterer Entwurf“ öffnet einen zweiten Reiter, das „+“ im Band einen dritten', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
+    await weitererEntwurf();
+    expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2);
     // Antd rendert auch die Remove-Buttons mit role="tab"; nur Tab-Btn-Elemente zählen.
     await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
     await waitFor(() =>
-      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
+      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(3),
     );
   });
 
@@ -346,14 +433,12 @@ describe('EtbEntwurfsTabs', () => {
   it('LFH-117: gewählte Dateien gehören ihrem Entwurf und überleben den Tabwechsel', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
-    const ersterTab = screen.getAllByRole('tab')[0];
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
     expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
-    await waitFor(() =>
-      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
-    );
+    await weitererEntwurf();
+    const ersterTab = screen.getAllByRole('tab')[0];
+    expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2);
     expect(screen.queryByRole('list', { name: 'Gewählte Anhänge' })).toBeNull();
 
     await userEvent.click(ersterTab);
@@ -375,18 +460,17 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto-c.jpg', { type: 'image/jpeg' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
-    await waitFor(() =>
-      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2),
-    );
+    await weitererEntwurf();
+    expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(2);
     // Den ersten Entwurf schliessen (antds Entfernen-Knopf je Tab).
     const entfernen = document.querySelectorAll<HTMLElement>('.ant-tabs-tab-remove');
     await userEvent.click(entfernen[0]);
     // Mit Datei fragt das × nach (LFH-957).
     const dialog = await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
+    // Ein Entwurf bleibt: das Band ist wieder ausgeblendet, sein Reiter zählt verborgen mit.
     await waitFor(() =>
-      expect(screen.getAllByRole('tab', { name: /Neuer Eintrag/ })).toHaveLength(1),
+      expect(screen.getAllByRole('tab', { hidden: true, name: /Neuer Eintrag/ })).toHaveLength(1),
     );
     expect(screen.queryByText(/foto-c\.jpg/)).toBeNull();
   });
@@ -432,23 +516,32 @@ describe('EtbEntwurfsTabs', () => {
     return document.querySelector('.ant-tabs-tab-active')?.getAttribute('data-node-key') ?? null;
   }
 
-  async function zweitenTabOeffnen() {
-    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
-    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
+  /**
+   * Zwei Entwürfe, der erste aktiv und mit Von. Der zweite entsteht vor dem Senden, damit beide
+   * Reiter von Anfang an stehen.
+   */
+  async function zweiEntwuerfe() {
+    await screen.findByPlaceholderText(/Inhalt/);
+    await weitererEntwurf();
+    const [ersterTab, zweiterTab] = screen.getAllByRole('tab');
+    await userEvent.click(ersterTab);
+    await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon();
+    return { ersterTab, zweiterTab };
   }
 
   it('LFH-117: ein Tabwechsel während des Sendens hebt die Sperre nicht auf — kein zweites Absenden', async () => {
     const upload = haengenderUpload();
     const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined);
     renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
-    await screen.findByPlaceholderText(/Inhalt/);
-    const ersterTab = screen.getAllByRole('tab')[0];
+    const { ersterTab, zweiterTab } = await zweiEntwuerfe();
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
     await screen.findByText('Lädt hoch (1/1) …');
 
     // Wegwechseln und zurück: die Schnellerfassung montiert neu, der Versand läuft noch.
-    await zweitenTabOeffnen();
+    await userEvent.click(zweiterTab);
+    await waitFor(() => expect(screen.queryByText('Lädt hoch (1/1) …')).toBeNull());
     await userEvent.click(ersterTab);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
     expect(feld).toHaveValue('Foto');
@@ -468,13 +561,13 @@ describe('EtbEntwurfsTabs', () => {
       .fn<(e: NeuerEintrag) => Promise<void>>()
       .mockImplementation(() => new Promise<void>(() => {}));
     renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
-    await screen.findByPlaceholderText(/Inhalt/);
-    const ersterTab = screen.getAllByRole('tab')[0];
+    const { ersterTab, zweiterTab } = await zweiEntwuerfe();
     const entwurfsId = aktiveEntwurfsId();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Meldung{Enter}');
     await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
 
-    await zweitenTabOeffnen();
+    await userEvent.click(zweiterTab);
+    await waitFor(() => expect(aktiveEntwurfsId()).not.toBe(entwurfsId));
     await userEvent.click(ersterTab);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
     expect(feld).toHaveAttribute('readonly');
@@ -487,11 +580,7 @@ describe('EtbEntwurfsTabs', () => {
   it('LFH-117: der sendende Entwurf lässt sich nicht schließen', async () => {
     const upload = haengenderUpload();
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await screen.findByPlaceholderText(/Inhalt/);
-    await zweitenTabOeffnen();
-    const [ersterTab, zweiterTab] = screen.getAllByRole('tab');
-    await userEvent.click(ersterTab);
-    await screen.findByPlaceholderText(/Inhalt/);
+    const { ersterTab, zweiterTab } = await zweiEntwuerfe();
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
     await screen.findByText('Lädt hoch (1/1) …');
@@ -502,19 +591,21 @@ describe('EtbEntwurfsTabs', () => {
     expect(knoten(zweiterTab).querySelector('.ant-tabs-tab-remove')).not.toBeNull();
 
     await act(async () => upload.freigeben());
-    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1));
+    // Gesendet und zu: ein Entwurf bleibt, das Band ist wieder ausgeblendet.
+    await waitFor(() => expect(screen.getAllByRole('tab', { hidden: true })).toHaveLength(1));
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
   });
 
   it('LFH-117: ein Upload-Fehler bleibt nach dem Tabwechsel mit Grund stehen', async () => {
     const upload = haengenderUpload();
     const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined);
     renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
-    await screen.findByPlaceholderText(/Inhalt/);
-    const ersterTab = screen.getAllByRole('tab')[0];
+    const { ersterTab, zweiterTab } = await zweiEntwuerfe();
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
     await screen.findByText('Lädt hoch (1/1) …');
-    await zweitenTabOeffnen();
+    await userEvent.click(zweiterTab);
+    await waitFor(() => expect(screen.queryByText('Lädt hoch (1/1) …')).toBeNull());
 
     await act(async () => upload.scheitern());
     await userEvent.click(ersterTab);
@@ -531,6 +622,7 @@ describe('EtbEntwurfsTabs', () => {
     const onSendetChange = vi.fn();
     renderMitProviders(<EtbEntwurfsTabs {...props({ onSendetChange })} />);
     await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon();
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Foto{Enter}');
     await waitFor(() => expect(onSendetChange).toHaveBeenLastCalledWith(true));
@@ -564,6 +656,8 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
     await screen.findByPlaceholderText(/Inhalt/);
     const erste = aktiveEntwurfsId();
+    // Mit „Werte behalten“ (Vorgabe in `props()`) trägt der Folgeentwurf das Von weiter.
+    await setzeVon();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Eins{Enter}');
     await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(aktiveEntwurfsId()).not.toBe(erste));
@@ -606,6 +700,7 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
     await screen.findByPlaceholderText(/Inhalt/);
     const alteId = aktiveEntwurfsId();
+    await setzeVon();
     await userEvent.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Wortlaut aus Tab 2{Enter}');
     await waitFor(() => expect(erfassen).toHaveBeenCalledTimes(1));
@@ -615,7 +710,7 @@ describe('EtbEntwurfsTabs', () => {
     expect(await screen.findByText(new RegExp(konflikt.slice(0, 40)))).toBeInTheDocument();
     await waitFor(() => expect(aktiveEntwurfsId()).not.toBe(alteId));
     const neueId = aktiveEntwurfsId();
-    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getAllByRole('tab', { hidden: true })).toHaveLength(1);
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Wortlaut aus Tab 2');
     expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto.jpg');
     await waitFor(async () =>
@@ -642,6 +737,7 @@ describe('EtbEntwurfsTabs', () => {
     renderMitProviders(<EtbEntwurfsTabs {...props({ erfassen })} />);
     await screen.findByPlaceholderText(/Inhalt/);
     const alteId = aktiveEntwurfsId();
+    await setzeVon();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Wortlaut aus Tab 2');
     await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(1));
     // Echte Platte, nur die Löschtransaktion bricht ab (Plattenfehler beim Entfernen).
@@ -680,6 +776,10 @@ describe('EtbEntwurfsTabs', () => {
  * Das × verwirft einen Entwurf endgültig (LFH-957): einen Papierkorb gibt es nicht, und einen
  * serverseitigen Rückweg auch nicht — also eine Rückfrage (`frontend/AGENTS.md`, LFH-363/LFH-343).
  * Entf auf dem Reiter läuft über denselben `onEdit` und damit durch dieselbe Rückfrage.
+ *
+ * Das × steht im Reiterband, und das gibt es erst ab dem zweiten Entwurf (Spec „Entwurfsreiter und
+ * Vorschau nur bei Bedarf“). Die Fälle legen deshalb erst einen zweiten Entwurf an und verwerfen
+ * ihn; ein einzelner Entwurf hat kein × (`ein Entwurf steht ohne Reiterband …`).
  */
 describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
   function dateiEingabe(): HTMLInputElement {
@@ -692,27 +792,40 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
     return screen.queryByRole('dialog', { name: 'Entwurf verwerfen?' });
   }
 
-  async function verwerfenKlicken(index = 0) {
+  /** Der zweite Entwurf, aktiv; der erste bleibt leer stehen. */
+  async function zweiterEntwurf() {
+    await screen.findByPlaceholderText(/Inhalt/);
+    await weitererEntwurf();
+    await waitFor(() =>
+      expect(screen.getAllByRole('tab')[1]).toHaveAttribute('aria-selected', 'true'),
+    );
+  }
+
+  async function verwerfenKlicken(index = 1) {
     await userEvent.click(screen.getAllByRole('button', { name: 'Entwurf verwerfen' })[index]);
   }
 
   it('fragt bei einem Entwurf mit Text nach, „Behalten“ lässt ihn stehen', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Pegel Mühlbach 3,20 m');
+    await zweiterEntwurf();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Pegel Mühlbach 3,20 m');
     await verwerfenKlicken();
     const dialog = await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Behalten' }));
     // antd schließt animiert; „zu“ heißt im jsdom: Ausblend-Zustand.
     await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
     expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Pegel Mühlbach 3,20 m');
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
     await waitFor(async () =>
-      expect((await entwuerfeLaden(ich.id, 7))[0]?.inhalt).toBe('Pegel Mühlbach 3,20 m'),
+      expect((await entwuerfeLaden(ich.id, 7)).map((e) => e.inhalt)).toEqual([
+        'Pegel Mühlbach 3,20 m',
+      ]),
     );
   });
 
   it('fragt auch bei einem Entwurf nach, der nur Dateien trägt', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await screen.findByPlaceholderText(/Inhalt/);
+    await zweiterEntwurf();
     await userEvent.upload(dateiEingabe(), new File(['x'], 'lagefoto.jpg', { type: 'image/jpeg' }));
     await verwerfenKlicken();
     expect(await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' })).toBeInTheDocument();
@@ -721,30 +834,32 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
 
   it('„Verwerfen“ entfernt Entwurf und Dateien', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Halb erfasst');
+    await zweiterEntwurf();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Halb erfasst');
     await userEvent.upload(dateiEingabe(), new File(['x'], 'lagefoto.jpg', { type: 'image/jpeg' }));
     await verwerfenKlicken();
     const dialog = await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Verwerfen' }));
-    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    // Der erste, leere Entwurf bleibt allein stehen, ohne Reiterband.
+    await waitFor(() => expect(screen.getAllByRole('tab', { hidden: true })).toHaveLength(1));
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('');
     expect(screen.queryByText(/lagefoto\.jpg/)).toBeNull();
     await waitFor(async () => expect(await entwuerfeLaden(ich.id, 7)).toHaveLength(0));
   });
 
   it('ein leerer Entwurf schließt ohne Rückfrage', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await screen.findByPlaceholderText(/Inhalt/);
-    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
-    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
-    await verwerfenKlicken(1);
-    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1));
+    await zweiterEntwurf();
+    await verwerfenKlicken();
+    await waitFor(() => expect(screen.getAllByRole('tab', { hidden: true })).toHaveLength(1));
     expect(rueckfrage()).toBeNull();
   });
 
   it('Entf auf dem Reiter läuft durch dieselbe Rückfrage', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Nicht weg');
-    const reiter = screen.getAllByRole('tab')[0];
+    await zweiterEntwurf();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Nicht weg');
+    const reiter = await screen.findByRole('tab', { name: /Nicht weg/ });
     act(() => reiter.focus());
     fireEvent.keyDown(reiter, { key: 'Delete', code: 'Delete' });
     expect(await screen.findByRole('dialog', { name: 'Entwurf verwerfen?' })).toBeInTheDocument();
@@ -753,14 +868,12 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
 
   it('LFH-1139: scheitert das Entfernen, schließt der Reiter und der Grund steht an der Leiste', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await screen.findByPlaceholderText(/Inhalt/);
-    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
-    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(2));
+    await zweiterEntwurf();
     vi.mocked(entwurfEntfernen).mockRejectedValueOnce(new Error('Speicher gesperrt'));
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await verwerfenKlicken(1);
+    await verwerfenKlicken();
 
-    await waitFor(() => expect(screen.getAllByRole('tab')).toHaveLength(1));
+    await waitFor(() => expect(screen.getAllByRole('tab', { hidden: true })).toHaveLength(1));
     const hinweis = (await screen.findByText(ENTFERNEN_GESCHEITERT)).closest('[role="alert"]');
     expect(hinweis).not.toBeNull();
     // Kein Toast (`frontend/AGENTS.md`, „Rückwege und Fehler“).
@@ -776,11 +889,11 @@ describe('Entwurf verwerfen — Rückfrage (LFH-957)', () => {
 
   it('die Knöpfe tragen deutsche Namen, kein „Add tab“ und kein „remove“', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
-    await screen.findByPlaceholderText(/Inhalt/);
+    await zweiterEntwurf();
     expect(
       screen.getAllByRole('button', { name: 'Weiteren Entwurf anlegen' }).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: 'Entwurf verwerfen' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Entwurf verwerfen' })).toHaveLength(2);
     expect(screen.queryAllByRole('button', { name: 'Add tab' })).toHaveLength(0);
     expect(screen.queryAllByRole('button', { name: 'remove' })).toHaveLength(0);
   });
@@ -813,5 +926,24 @@ describe('Entwurfstab schließen — Trefffläche (LFH-724)', () => {
       const stil = entfernenStil({ controlHeightSM });
       expect(stil.minHeight + 2 * stil.marginBlock, String(controlHeightSM)).toBe(0);
     }
+  });
+});
+
+describe('Werte behalten übernimmt nur Ausdrückliches (kwc2yszv, Review E2)', () => {
+  it('nach einer Lage aus der Vorgabe trägt eine folgende Meldung kein Von', async () => {
+    const p = props();
+    renderMitProviders(<EtbEntwurfsTabs {...p} />);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.click(screen.getByRole('radio', { name: 'Lage' }));
+    expect(feldWert('Von')).toBe('ELW 1');
+    await userEvent.click(feld);
+    await userEvent.paste('Lage ruhig');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    // Der Folgeentwurf ist wieder eine Lage (Werte behalten); als Meldung gilt die Vorgabe neu.
+    await userEvent.click(screen.getByRole('radio', { name: 'Meldung' }));
+    expect(feldWert('Von')).toBe('');
+    expect(feldWert('An')).toBe('ELW 1');
   });
 });

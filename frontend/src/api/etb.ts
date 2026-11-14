@@ -161,9 +161,17 @@ export function erteileAuftragAusEtb(
   return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/etb/${eintragId}/auftrag`, 'POST', daten);
 }
 
+/**
+ * Mit `ohneSystem` zählen Systemeinträge nicht als neu, wie die Vorgabe der Seite (Change
+ * `kwc2yszv-etb-neuentwurf`, Review S4).
+ */
+function lesemarkeAdresse(einsatzId: number, ohneSystem: boolean): string {
+  return `/api/einsaetze/${einsatzId}/etb/lesemarke${ohneSystem ? '?ohne_system=true' : ''}`;
+}
+
 /** Eigener Lesestand im Tagebuch: Marke, letzte Sichtung, fremde Einträge darüber. */
-export function ladeEtbLesemarke(einsatzId: number): Promise<EtbLesemarke> {
-  return apiGet<EtbLesemarke>(`/api/einsaetze/${einsatzId}/etb/lesemarke`);
+export function ladeEtbLesemarke(einsatzId: number, ohneSystem = false): Promise<EtbLesemarke> {
+  return apiGet<EtbLesemarke>(lesemarkeAdresse(einsatzId, ohneSystem));
 }
 
 /**
@@ -171,8 +179,12 @@ export function ladeEtbLesemarke(einsatzId: number): Promise<EtbLesemarke> {
  * Lesemarke: markiert wird, was das Banner angesagt hat, nicht was danach eintraf. Der Server
  * rückt nur vorwärts.
  */
-export function setzeEtbLesemarke(einsatzId: number, bisLfdNr: number): Promise<EtbLesemarke> {
-  return apiSend<EtbLesemarke>(`/api/einsaetze/${einsatzId}/etb/lesemarke`, 'POST', {
+export function setzeEtbLesemarke(
+  einsatzId: number,
+  bisLfdNr: number,
+  ohneSystem = false,
+): Promise<EtbLesemarke> {
+  return apiSend<EtbLesemarke>(lesemarkeAdresse(einsatzId, ohneSystem), 'POST', {
     bis_lfd_nr: bisLfdNr,
   });
 }

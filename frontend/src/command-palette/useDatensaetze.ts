@@ -89,7 +89,7 @@ export { etbNummerSchluessel } from './datensatzAbfrage';
  * {@link etbSuchSchluessel}).
  */
 function etbAnzahlSchluessel(einsatzId: number, q: string) {
-  return einsatzKeys.etbListe(einsatzId, { q, anzahl: true });
+  return einsatzKeys.etbListe(einsatzId, { q, anzahl: true, ohne_system: true });
 }
 
 /**
@@ -214,11 +214,12 @@ export function useDatensaetze({ einsatzId, modus, suche }: DatensatzAbruf): Dat
   });
   /**
    * Die Zahl hinter dem Sammeltreffer, an denselben Riegeln wie der Volltext; ohne `q` zählte die
-   * Route das ganze Tagebuch.
+   * Route das ganze Tagebuch. Ohne Systemeinträge wie die Seite, auf die der Treffer springt (ihre
+   * Vorgabe, kwc2yszv D6): sonst nennte er mehr, als dort steht (Review S5).
    */
   const etbAnzahlQuery = useQuery({
     queryKey: etbAnzahlSchluessel(id, rest),
-    queryFn: () => zaehleEtb(id, { q: rest }),
+    queryFn: () => zaehleEtb(id, { q: rest, ohne_system: true }),
     enabled: darfLaden('etbAnzahl') && zahl === null && etbVolltextMoeglich(rest),
     staleTime: FRISCH_MS,
     gcTime: ETB_SUCH_GC_MS,

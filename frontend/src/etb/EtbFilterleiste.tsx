@@ -10,7 +10,7 @@ import { abstand } from '../theme/tokens';
  * **Eine Leiste, zwei Gruppen.** Ab `md` stehen alle Filter hier, in dieser Ordnung: `vorn`
  * (Typ-Segmente und der Umschaltknopf „System“, beides Typfilter), dann `mitte` (Zeitraum,
  * Einheit) und zuletzt der Volltext, der den Rest nimmt. Die erste Gruppe bricht nicht in sich;
- * reicht die Breite nicht (Bilanzspalte, Modulpanel, dichtere Stufen), steht die zweite Gruppe unter der
+ * reicht die Breite nicht (Modulpanel, dichtere Stufen), steht die zweite Gruppe unter der
  * ersten. Unter `md` gibt die Seite kein `vorn` (der Typ rollt im Kopf) und klappt die Leiste
  * hinter „Filter (n)“.
  *

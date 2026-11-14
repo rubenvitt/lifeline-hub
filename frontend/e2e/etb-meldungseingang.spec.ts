@@ -6,8 +6,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Meldung und Lage aus dem ETB legen den Vorgang im Meldungseingang an (LLH-1037, Specs
  * `meldungseingang`, `etb-schnellerfassung-tastatur`). Ein über die Oberfläche erfasster Eintrag
  * vom Typ „Lage“ trägt danach „Meldung #n ↗“, der Verweis öffnet die Meldung hervorgehoben
- * (`data-hervorgehoben`, nicht die URL: `useQueryParamSelektion` räumt den Parameter). Mit „Nur
- * protokollieren“ entsteht keine Meldung; ohne Netz entsteht sie beim Abspielen.
+ * (`data-hervorgehoben`, nicht die URL: `useQueryParamSelektion` räumt den Parameter). Der Schalter
+ * „Auch in den Meldungseingang“ steht für eine Lage von außen an und für einen eigenen Vermerk (Von
+ * und An die eigene Stelle) aus (Change `kwc2yszv-etb-neuentwurf`, D4); ohne Meldung entsteht
+ * keine, ohne Netz entsteht sie beim Abspielen.
  */
 
 async function einsatzPerApi(page: Page, bezeichnung: string): Promise<number> {
@@ -27,10 +29,28 @@ async function zumEtb(page: Page, einsatzId: number) {
   await expect(page.getByPlaceholder(/Inhalt/)).toBeVisible();
 }
 
-async function lageErfassen(page: Page, inhalt: string) {
-  const feld = page.getByPlaceholder(/Inhalt/);
-  await feld.pressSequentially(`/lage ${inhalt}`);
-  await expect(page.getByRole('checkbox', { name: 'Nur protokollieren' })).toBeVisible();
+const SCHALTER = 'Auch in den Meldungseingang';
+
+/**
+ * Tippt eine Lage; mit `von` kommt sie von außen (Feld Von), sonst ist sie ein eigener Vermerk mit
+ * Von und An aus der Vorgabe.
+ */
+async function lageErfassen(page: Page, inhalt: string, von?: string) {
+  await page
+    .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+    .getByRole('radio', { name: 'Lage' })
+    .click();
+  if (von) {
+    const feld = page.getByRole('combobox', { name: 'Von' });
+    await feld.fill(von);
+    // Erst wenn die Liste steht: Enter nimmt dann den Freitext-Eintrag (Spec `stammdaten-feld`).
+    await expect(page.getByTitle(`„${von}“ als Freitext übernehmen`)).toBeVisible();
+    // Enter übernimmt und springt in den Inhalt (Spec `etb-schnellerfassung-tastatur`).
+    await feld.press('Enter');
+    await expect(page.getByPlaceholder(/Inhalt/)).toBeFocused();
+  }
+  await page.getByPlaceholder(/Inhalt/).pressSequentially(inhalt);
+  await expect(page.getByRole('checkbox', { name: SCHALTER })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -44,8 +64,8 @@ test('Lage aus dem ETB wird Lagemeldung, der Verweis öffnet sie hervorgehoben',
   const einsatz = await einsatzPerApi(page, `E2E ETB-Meldungseingang ${Date.now()}`);
   await zumEtb(page, einsatz);
 
-  await lageErfassen(page, 'Wasser im Keller sinkt');
-  await expect(page.getByRole('checkbox', { name: 'Nur protokollieren' })).not.toBeChecked();
+  await lageErfassen(page, 'Wasser im Keller sinkt', 'Abschnitt Nord');
+  await expect(page.getByRole('checkbox', { name: SCHALTER })).toBeChecked();
   await page.getByPlaceholder(/Inhalt/).press('Enter');
 
   const zeile = page
@@ -62,13 +82,12 @@ test('Lage aus dem ETB wird Lagemeldung, der Verweis öffnet sie hervorgehoben',
   await expect(page.locator('[data-hervorgehoben="true"]')).toContainText('Wasser im Keller sinkt');
 });
 
-test('mit „Nur protokollieren“ entsteht keine Meldung', async ({ page }) => {
-  const einsatz = await einsatzPerApi(page, `E2E ETB nur protokollieren ${Date.now()}`);
+test('ein eigener Vermerk legt keine Meldung an; der Schalter steht aus', async ({ page }) => {
+  const einsatz = await einsatzPerApi(page, `E2E ETB eigener Vermerk ${Date.now()}`);
   await zumEtb(page, einsatz);
 
   await lageErfassen(page, 'Mitschrift Lagebesprechung');
-  const schalter = page.getByRole('checkbox', { name: 'Nur protokollieren' });
-  await schalter.check();
+  await expect(page.getByRole('checkbox', { name: SCHALTER })).not.toBeChecked();
   await page.getByPlaceholder(/Inhalt/).press('Enter');
 
   const zeile = page
@@ -86,7 +105,7 @@ test('ohne Netz erfasste Lage wird beim Abspielen Lagemeldung', async ({ page, c
 
   await context.setOffline(true);
   try {
-    await lageErfassen(page, 'Deich hält, Pegel fällt');
+    await lageErfassen(page, 'Deich hält, Pegel fällt', 'Deichwache');
     await page.getByPlaceholder(/Inhalt/).press('Enter');
     await expect(page.locator('.etb-ausstehend')).toContainText('Deich hält, Pegel fällt');
   } finally {

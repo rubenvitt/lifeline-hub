@@ -24,6 +24,17 @@ async function einsatzAnlegenUndOeffnen(page: Page, name: string): Promise<strin
   return id;
 }
 
+/**
+ * Setzt das Feld Von: eine Meldung hat dort keine Vorgabe (Change `kwc2yszv-etb-neuentwurf`, Spec
+ * `etb-absender-empfaenger`). Enter übernimmt und springt in den Inhalt.
+ */
+async function vonSetzen(page: Page, von = 'Florian 3') {
+  const feld = page.getByRole('combobox', { name: 'Von' });
+  await feld.fill(von);
+  await feld.press('Enter');
+  await expect(page.getByPlaceholder('Inhalt …')).toBeFocused();
+}
+
 /** Steht ein Entwurf mit genau diesem Inhalt im Entwurfsspeicher (`etb/entwuerfe/entwurfStore.ts`)? */
 async function entwurfGesichert(page: Page, inhalt: string): Promise<boolean> {
   return page.evaluate(
@@ -66,6 +77,7 @@ test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Zeitachse, Entwurf-Tab wir
   // Eintrag erfassen. Während des Tippens spiegelt das Tab-Label den Inhalt (Autosave);
   // nach dem Absenden schließt der Tab und ein neuer leerer Tab ('Neuer Eintrag') wird aktiv.
   const inhalt = `Lagemeldung ${Date.now()}`;
+  await vonSetzen(page);
   await feld.fill(inhalt);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
@@ -93,11 +105,16 @@ test('ETB: „/zeit -10 Lage ruhig“ + Enter erfasst einen Nachtrag mit dem Res
   const feld = page.getByPlaceholder('Inhalt …');
   await expect(feld).toBeVisible();
   const inhalt = `Lage ruhig ${Date.now()}`;
+  await vonSetzen(page);
   await feld.pressSequentially(`/zeit -10 ${inhalt}`);
   await expect(feld).toHaveValue(inhalt);
-  // Kurz nach Mitternacht liegt „-10“ am Vortag, dann steht der Tag davor (`DDHHmm`).
-  await expect(page.getByText(/^Ereigniszeit: (\d{2})?\d{4}$/)).toBeVisible();
-  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  // Das Feld Zeit zeigt die Uhrzeit; kurz nach Mitternacht liegt „-10“ am Vortag, dann steht die
+  // DTG da. Der Knopf nennt den Nachtrag.
+  await expect(page.getByRole('textbox', { name: 'Zeit' })).toHaveValue(
+    /^(\d{4}|\d{6}[a-zä]{3}\d{2})$/,
+  );
+  await expect(page.getByText('Nachtrag · Ereignis vor 10 min')).toBeVisible();
+  await page.getByRole('button', { name: /^Erfassen als / }).click();
   await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
 
   const zeile = page
@@ -105,12 +122,13 @@ test('ETB: „/zeit -10 Lage ruhig“ + Enter erfasst einen Nachtrag mit dem Res
     .getByTestId('etb-ereigniszeile')
     .filter({ hasText: inhalt });
   await expect(zeile).toHaveCount(1);
-  await expect(zeile).toContainText('nachgetragen');
+  // Spaltenzeile: „Nachtrag · erfasst …“ in der Spalte Vermerk; sonst „⧖ nachgetragen um …“.
+  await expect(zeile).toContainText(/Nachtrag · erfasst|nachgetragen/);
 });
 
 /**
- * Typwort und Typ-Übernahme (LLH-1112): der Präfix nennt den Typ als Wort, und mit „Werte
- * behalten“ beginnt der nächste Entwurf im selben Typ.
+ * Typ-Übernahme (LLH-1112): das Segment „Typ des Eintrags“ zeigt den Typ, und mit „Werte behalten“
+ * beginnt der nächste Entwurf im selben Typ, mit demselben An.
  */
 test('ETB: mit „Werte behalten“ bleibt eine Folge von Anordnungen Anordnungen', async ({
   page,
@@ -121,10 +139,22 @@ test('ETB: mit „Werte behalten“ bleibt eine Folge von Anordnungen Anordnunge
   await expect(feld).toBeVisible();
   await page.getByRole('checkbox', { name: 'Werte behalten' }).check();
   await feld.pressSequentially('/anordnung Abschnitt Nord räumen');
-  await expect(page.getByRole('button', { name: 'Eintragstyp Anordnung ändern' })).toBeVisible();
+  const anordnung = page
+    .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+    .getByRole('radio', { name: 'Anordnung' });
+  await expect(anordnung).toBeChecked();
+  // Eine Anordnung braucht ein An; die Vorgabe trägt nur Von.
+  const an = page.getByRole('combobox', { name: 'An' });
+  await an.fill('EA Nord');
+  await an.press('Enter');
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
-  await expect(page.getByRole('button', { name: 'Eintragstyp Anordnung ändern' })).toBeVisible();
+  await expect(
+    page
+      .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+      .getByRole('radio', { name: 'Anordnung' }),
+  ).toBeChecked();
+  await expect(page.getByRole('combobox', { name: 'An' })).toHaveValue('EA Nord');
 });
 
 test('ETB-Entwurf-Autosave: getippter Entwurf überlebt einen Reload', async ({ page }) => {
@@ -237,7 +267,8 @@ test('ETB-Entwurf-Autosave: bereits gespeicherter Entwurf kommt nach dem Reload 
 /**
  * Das × verwirft einen Entwurf mit Inhalt erst nach der Rückfrage (LFH-957). Geklickt, nicht nur
  * gesehen (LFH-355): ein Knopf hinter einer Überdeckung bestünde ein `toBeVisible()`. Auch als
- * Führungspersonal, denn die Erfassung hängt an der Einsatzrolle (LFH-435).
+ * Führungspersonal, denn die Erfassung hängt an der Einsatzrolle (LFH-435). Reiter und × stehen erst
+ * ab dem zweiten Entwurf (Spec „Entwurfsreiter und Vorschau nur bei Bedarf“).
  */
 for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
   test(`ETB-Entwurf verwerfen (${rolle}): × fragt nach, „Behalten“ hält den Text, „Verwerfen“ nimmt ihn`, async ({
@@ -254,15 +285,25 @@ for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
     const inhalt = `Wasserstand Pegel Mühlbach ${Date.now()}`;
     await feld.fill(inhalt);
     await expect.poll(() => entwurfGesichert(page, inhalt)).toBe(true);
+    // Mit einem Entwurf kein Reiterband.
+    await expect(page.getByRole('tab')).toHaveCount(0);
+    await page.getByRole('button', { name: '+ weiterer Entwurf' }).click();
+    await expect(page.getByRole('tab')).toHaveCount(2);
+    const reiter = page.locator('.ant-tabs-tab').filter({ hasText: 'Wasserstand' });
+    await reiter.getByRole('tab').click();
+    await expect(feld).toHaveValue(inhalt);
 
     const dialog = page.getByRole('dialog', { name: 'Entwurf verwerfen?' });
-    await page.getByRole('button', { name: 'Entwurf verwerfen' }).click();
+    const kreuz = reiter.getByRole('button', { name: 'Entwurf verwerfen' });
+    await kreuz.click();
     await dialog.getByRole('button', { name: 'Behalten' }).click();
     await expect(dialog).toBeHidden();
     await expect(feld).toHaveValue(inhalt);
 
-    await page.getByRole('button', { name: 'Entwurf verwerfen' }).click();
+    await kreuz.click();
     await dialog.getByRole('button', { name: 'Verwerfen' }).click();
+    // Es bleibt der leere zweite Entwurf, ohne Reiterband.
+    await expect(page.getByRole('tab')).toHaveCount(0);
     await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
     await expect.poll(() => entwurfGesichert(page, inhalt)).toBe(false);
   });

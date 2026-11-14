@@ -119,11 +119,11 @@ describe('useViewport — ein Satz Hörer je Seite (LFH-947)', () => {
     );
   }
 
-  it('100 Zeitachseneinträge hängen höchstens 8 Hörer an, nach dem Aushängen keinen', () => {
+  it('100 Zeitachseneinträge hängen höchstens 11 Hörer an (Breiten, Zeiger, drei Höhen), nach dem Aushängen keinen', () => {
     const { unmount } = render(<Liste anzahl={100} />);
     expect(screen.getAllByTestId('zeile')).toHaveLength(100);
     expect(hoererAnzahl()).toBeGreaterThan(0);
-    expect(hoererAnzahl()).toBeLessThanOrEqual(8);
+    expect(hoererAnzahl()).toBeLessThanOrEqual(11);
     unmount();
     expect(hoererAnzahl()).toBe(0);
   });

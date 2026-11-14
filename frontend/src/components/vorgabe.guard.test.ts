@@ -46,16 +46,6 @@ interface Ausnahme {
  */
 const AUSNAHMEN: readonly Ausnahme[] = [
   {
-    pfad: '/src/etb/MetaChip.tsx',
-    text: "label: 'Standard-Rufname ändern'",
-    grund: 'Eigenname „Standard-Rufname“ (Specs etb-absender-empfaenger, fuehrungsfunktionen)',
-  },
-  {
-    pfad: '/src/etb/MetaChip.tsx',
-    text: "STANDARD_TITEL = 'Standard-Rufname:",
-    grund: 'Eigenname „Standard-Rufname“ (Specs etb-absender-empfaenger, fuehrungsfunktionen)',
-  },
-  {
     pfad: '/src/pages/lagekarte/AnsichtSwitcher.tsx',
     text: "label: 'Als Standard'",
     grund: 'Gehört zur „Standardansicht“ der Lagekarte (Spec betreuung-lagekarte)',

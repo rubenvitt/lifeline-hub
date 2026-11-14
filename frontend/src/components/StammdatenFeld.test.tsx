@@ -48,6 +48,8 @@ function MitWert({
   onWahl?: (w: unknown) => void;
   onEnter?: (t: string) => void;
   onEscape?: () => void;
+  onUebernahme?: (u: unknown) => void;
+  enterSendet?: boolean;
 }) {
   const [wert, setWert] = useState<StammdatenWert | string>(nurText ? '' : { text: '' });
   const setze = (w: StammdatenWert | string) => {
@@ -217,70 +219,328 @@ describe('StammdatenFeld', () => {
     });
   });
 
-  describe('Tastatur', () => {
-    /**
-     * Die Pfeil- und Entertaste der offenen Liste wertet rc-select über das alte `which` aus
-     * (`OptionList`), das `userEvent` nicht setzt: diese Tasten gehen per `fireEvent` mit
-     * `keyCode`/`which` (wie die Falle zu antds `Editable`, `frontend/AGENTS.md`). `fireEvent`
-     * liefert `false`, wenn die Taste verhindert ist — so sendet der Browser das Formular nicht.
-     */
-    it('↓ öffnet, ↓ markiert, Enter übernimmt den Vorschlag und verhindert das Absenden', async () => {
-      const onWahl = vi.fn();
-      const onEnter = vi.fn();
-      renderMitProviders(<MitWert quellen={[einsatz]} onWahl={onWahl} onEnter={onEnter} />);
-      await userEvent.click(feld());
-      await userEvent.keyboard('{Escape}');
-      expect(offeneListe()).toBeNull();
-      await userEvent.keyboard('{ArrowDown}');
-      await waitFor(() => expect(offeneListe()).not.toBeNull());
-      fireEvent.keyDown(feld(), { key: 'ArrowDown', keyCode: 40, which: 40 });
-      await waitFor(() =>
-        expect(offeneListe()?.querySelector('.ant-select-item-option-active')).toHaveAttribute(
-          'title',
-          'Florian 1',
-        ),
-      );
-      // Das Versprechen hinter `onActive` (rc-select `onActiveValue`) muss durch sein.
-      await Promise.resolve();
-      const durchgelassen = fireEvent.keyDown(feld(), { key: 'Enter', keyCode: 13, which: 13 });
-      expect(durchgelassen).toBe(false);
-      expect(onWahl).toHaveBeenCalledWith(expect.objectContaining({ wert: 'Florian 1' }));
-      expect(onEnter).not.toHaveBeenCalled();
-      expect(feld()).toHaveValue('Florian 1');
-    });
+  /**
+   * Tastaturregel (Spec `stammdaten-feld`, Anforderung „Tastatur“; design.md D5 der Change
+   * `kwc2yszv-etb-neuentwurf`): der oberste passende Vorschlag ist markiert, Enter und Tab nehmen
+   * ihn, Freitext trotz Treffer über den letzten Eintrag „„…“ als Freitext übernehmen“. Die Regel
+   * gilt im Modus mit Referenz wie im Modus `nurText` (ETB, Meldungsformular).
+   *
+   * Die Pfeiltasten der offenen Liste wertet rc-select über das alte `which` aus (`OptionList`), das
+   * `userEvent` nicht setzt: ↓/↑ in der offenen Liste gehen per `fireEvent` mit `keyCode`/`which`
+   * (wie die Falle zu antds `Editable`, `frontend/AGENTS.md`). Enter und Tab nimmt das Feld selbst
+   * (nach `key`); `userEvent` sendet bei nicht verhindertem Enter das Formular und bewegt bei nicht
+   * verhindertem Tab den Fokus wie der Browser.
+   */
+  describe.each([
+    ['mit Referenz', false],
+    ['nurText', true],
+  ] as const)('Tastatur (%s)', (_modus, nurText) => {
+    const textVon = (w: unknown) => (typeof w === 'string' ? w : (w as StammdatenWert).text);
+    const sanitaet: Vorschlagsquelle = {
+      id: 'einheitenEinsatz',
+      gruppe: 'einsatz',
+      eintraege: [
+        { label: 'Sanitätsgruppe UHS', wert: 'Sanitätsgruppe UHS' },
+        { label: 'Sanitätszug Musterstadt', wert: 'Sanitätszug Musterstadt' },
+      ],
+    };
 
-    it('Enter bei offener Liste ohne Markierung übernimmt den Freitext, schließt und sendet nicht', async () => {
-      const absenden = vi.fn((e: React.FormEvent) => e.preventDefault());
-      const onEnter = vi.fn();
-      renderMitProviders(
-        <form onSubmit={absenden}>
-          <MitWert quellen={[einsatz]} onEnter={onEnter} />
+    /** Feld mit Formular, Absende-Knopf und einem Folgefeld, wie in einer Erfassung. */
+    function Formular(props: Parameters<typeof MitWert>[0] & { absenden?: () => void }) {
+      const { absenden, ...rest } = props;
+      return (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            absenden?.();
+          }}
+        >
+          <MitWert nurText={nurText} {...rest} />
+          <input aria-label="Inhalt" />
           <button type="submit">Erfassen</button>
-        </form>,
+        </form>
+      );
+    }
+
+    const aktiverEintrag = () =>
+      offeneListe()?.querySelector('.ant-select-item-option-active')?.getAttribute('title');
+
+    it('Enter nach dem Tippen übernimmt den obersten Vorschlag, schließt und sendet nicht', async () => {
+      const absenden = vi.fn();
+      const onWert = vi.fn();
+      const onWahl = vi.fn();
+      renderMitProviders(
+        <Formular quellen={[einsatz]} absenden={absenden} onWert={onWert} onWahl={onWahl} />,
       );
       await userEvent.type(feld(), 'Flo');
-      await waitFor(() => expect(offeneListe()).not.toBeNull());
+      await waitFor(() => expect(aktiverEintrag()).toBe('Florian 1'));
       await userEvent.keyboard('{Enter}');
-      expect(onEnter).toHaveBeenCalledWith('Flo');
-      expect(feld()).toHaveValue('Flo');
+      expect(feld()).toHaveValue('Florian 1');
+      expect(textVon(onWert.mock.lastCall?.[0])).toBe('Florian 1');
+      expect(onWahl).toHaveBeenCalledWith(expect.objectContaining({ wert: 'Florian 1' }));
       expect(absenden).not.toHaveBeenCalled();
       await waitFor(() => expect(offeneListe()).toBeNull());
+      expect(marke()).toHaveTextContent('Im Einsatz');
       // Bei geschlossener Liste gilt die Erfassungs-Norm: Enter sendet.
       await userEvent.keyboard('{Enter}');
       expect(absenden).toHaveBeenCalledTimes(1);
       expect(offeneListe()).toBeNull();
     });
 
-    it('Escape schließt erst die Liste, danach meldet das Feld Escape weiter', async () => {
+    it('markiert den obersten passenden Vorschlag, auch wenn ein späterer mit dem Text beginnt', async () => {
+      const zugtrupp: Vorschlagsquelle = {
+        id: 'einheitenEinsatz',
+        gruppe: 'einsatz',
+        eintraege: [{ label: 'Zugtrupp Florian', wert: 'Zugtrupp Florian' }],
+      };
+      const florian: Vorschlagsquelle = {
+        id: 'funkrufnamenStammdaten',
+        gruppe: 'stammdaten',
+        eintraege: [{ label: 'Florian 1', wert: 'Florian 1' }],
+      };
+      renderMitProviders(<Formular quellen={[zugtrupp, florian]} />);
+      await userEvent.type(feld(), 'Flo');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Zugtrupp Florian'));
+      await userEvent.keyboard('{Enter}');
+      expect(feld()).toHaveValue('Zugtrupp Florian');
+    });
+
+    it('Tab nach dem Tippen übernimmt den obersten Vorschlag und springt ins nächste Feld', async () => {
+      const onWert = vi.fn();
+      renderMitProviders(<Formular quellen={[sanitaet]} onWert={onWert} />);
+      await userEvent.type(feld(), 'San');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Sanitätsgruppe UHS'));
+      await userEvent.tab();
+      expect(textVon(onWert.mock.lastCall?.[0])).toBe('Sanitätsgruppe UHS');
+      expect(feld()).toHaveValue('Sanitätsgruppe UHS');
+      expect(screen.getByRole('textbox', { name: 'Inhalt' })).toHaveFocus();
+      await waitFor(() => expect(offeneListe()).toBeNull());
+    });
+
+    it('Tab hält den Fokus nicht fest: rc-selects Tab-Griff (`which` 9) kommt nicht zum Zug', async () => {
+      const onWert = vi.fn();
+      renderMitProviders(<Formular quellen={[sanitaet]} onWert={onWert} />);
+      await userEvent.type(feld(), 'San');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Sanitätsgruppe UHS'));
+      await Promise.resolve();
+      // Wie der Browser: mit `which`. rc-select verhinderte sonst die Taste (`OptionList`, „Select
+      // (Tab / Enter)“), und der Fokus bliebe im Feld.
+      const durchgelassen = fireEvent.keyDown(feld(), { key: 'Tab', keyCode: 9, which: 9 });
+      expect(durchgelassen).toBe(true);
+      expect(textVon(onWert.mock.lastCall?.[0])).toBe('Sanitätsgruppe UHS');
+      // Auch Umschalt+Tab und Tab bei geschlossener Liste bleiben frei.
+      expect(fireEvent.keyDown(feld(), { key: 'Tab', keyCode: 9, which: 9, shiftKey: true })).toBe(
+        true,
+      );
+      expect(fireEvent.keyDown(feld(), { key: 'Tab', keyCode: 9, which: 9 })).toBe(true);
+    });
+
+    it('Umschalt+Tab verlässt das Feld rückwärts und lässt den getippten Text stehen', async () => {
+      renderMitProviders(
+        <>
+          <input aria-label="Davor" />
+          <Formular quellen={[sanitaet]} />
+        </>,
+      );
+      await userEvent.type(feld(), 'San');
+      await waitFor(() => expect(offeneListe()).not.toBeNull());
+      await userEvent.tab({ shift: true });
+      expect(screen.getByRole('textbox', { name: 'Davor' })).toHaveFocus();
+      expect(feld()).toHaveValue('San');
+    });
+
+    it('der letzte Eintrag nimmt den getippten Text als Freitext; er trägt „frei“', async () => {
+      const onWert = vi.fn();
+      const onWahl = vi.fn();
+      renderMitProviders(<Formular quellen={[einsatz]} onWert={onWert} onWahl={onWahl} />);
+      await userEvent.type(feld(), 'Flo');
+      await waitFor(() =>
+        expect(listenFolge()).toEqual([
+          '# Im Einsatz',
+          'Florian 1',
+          '„Flo“ als Freitext übernehmen',
+        ]),
+      );
+      await userEvent.click(
+        offeneListe()!.querySelector<HTMLElement>('[title="„Flo“ als Freitext übernehmen"]')!,
+      );
+      expect(feld()).toHaveValue('Flo');
+      expect(textVon(onWert.mock.lastCall?.[0])).toBe('Flo');
+      if (!nurText) expect(onWert).toHaveBeenLastCalledWith({ text: 'Flo' });
+      expect(onWahl).not.toHaveBeenCalled();
+      expect(marke()).toHaveTextContent('frei');
+      await waitFor(() => expect(offeneListe()).toBeNull());
+    });
+
+    it('der Freitext-Eintrag lässt sich per Tastatur wählen und nimmt den Text unverändert', async () => {
+      const absenden = vi.fn();
+      const onEnter = vi.fn();
+      renderMitProviders(<Formular quellen={[einsatz]} absenden={absenden} onEnter={onEnter} />);
+      await userEvent.type(feld(), 'Flo ');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Florian 1'));
+      fireEvent.keyDown(feld(), { key: 'ArrowDown', keyCode: 40, which: 40 });
+      await waitFor(() => expect(aktiverEintrag()).toBe('„Flo “ als Freitext übernehmen'));
+      // Das Versprechen hinter `onActive` (rc-select `onActiveValue`) muss durch sein.
+      await Promise.resolve();
+      await userEvent.keyboard('{Enter}');
+      expect(feld()).toHaveValue('Flo ');
+      expect(onEnter).toHaveBeenCalledWith('Flo ');
+      expect(absenden).not.toHaveBeenCalled();
+      expect(marke()).toHaveTextContent('frei');
+    });
+
+    it('kein Vorschlag passt: Enter übernimmt den getippten Text als freien Wert und sendet nicht', async () => {
+      const absenden = vi.fn();
+      const onEnter = vi.fn();
+      renderMitProviders(<Formular quellen={[einsatz]} absenden={absenden} onEnter={onEnter} />);
+      await userEvent.type(feld(), 'Abschnitt Nord');
+      await waitFor(() =>
+        expect(listenFolge()).toEqual(['„Abschnitt Nord“ als Freitext übernehmen']),
+      );
+      await userEvent.keyboard('{Enter}');
+      expect(feld()).toHaveValue('Abschnitt Nord');
+      expect(onEnter).toHaveBeenCalledWith('Abschnitt Nord');
+      expect(absenden).not.toHaveBeenCalled();
+      expect(marke()).toHaveTextContent('frei');
+      await waitFor(() => expect(offeneListe()).toBeNull());
+    });
+
+    it('kein Vorschlag passt: Tab und Verlassen behalten den getippten Text', async () => {
+      renderMitProviders(<Formular quellen={[einsatz]} />);
+      await userEvent.type(feld(), 'Abschnitt Nord');
+      await userEvent.tab();
+      expect(screen.getByRole('textbox', { name: 'Inhalt' })).toHaveFocus();
+      expect(feld()).toHaveValue('Abschnitt Nord');
+
+      await userEvent.clear(feld());
+      await userEvent.type(feld(), 'Abschnitt Süd');
+      await userEvent.click(screen.getByRole('textbox', { name: 'Inhalt' }));
+      expect(feld()).toHaveValue('Abschnitt Süd');
+      expect(marke()).toHaveTextContent('frei');
+    });
+
+    it('ein stehender Wert ohne passenden Vorschlag öffnet beim Klick keine Liste; Escape bricht ab', async () => {
       const onEscape = vi.fn();
-      renderMitProviders(<MitWert quellen={[einsatz]} onEscape={onEscape} />);
+      renderMitProviders(<MitWert nurText={nurText} quellen={[einsatz]} onEscape={onEscape} />);
+      await userEvent.type(feld(), 'Abschnitt Nord');
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() => expect(offeneListe()).toBeNull());
+      await userEvent.click(document.body);
+      // Wieder hinein, ohne zu tippen: nur der Freitext-Eintrag passte, eine Liste wäre Lärm.
+      await userEvent.click(feld());
+      expect(offeneListe()).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      expect(onEscape).toHaveBeenCalledTimes(1);
+      // Wer tippt, sieht den Eintrag wieder.
+      await userEvent.type(feld(), ' 2');
+      await waitFor(() =>
+        expect(listenFolge()).toEqual(['„Abschnitt Nord 2“ als Freitext übernehmen']),
+      );
+    });
+
+    it('ein Text, der genau einem Vorschlag gleicht, bekommt keinen Freitext-Eintrag', async () => {
+      renderMitProviders(<Formular quellen={[einsatz]} />);
+      await userEvent.type(feld(), 'Florian 1');
+      await waitFor(() => expect(listenFolge()).toEqual(['# Im Einsatz', 'Florian 1']));
+    });
+
+    it('Vorschlag per Tastatur: ↓, ↓ und Enter übernehmen den zweiten Vorschlag, nichts wird gesendet', async () => {
+      const absenden = vi.fn();
+      const onWahl = vi.fn();
+      renderMitProviders(<Formular quellen={[sanitaet]} absenden={absenden} onWahl={onWahl} />);
+      await userEvent.click(feld());
+      await userEvent.keyboard('{Escape}');
+      expect(offeneListe()).toBeNull();
+      await userEvent.keyboard('{ArrowDown}');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Sanitätsgruppe UHS'));
+      fireEvent.keyDown(feld(), { key: 'ArrowDown', keyCode: 40, which: 40 });
+      await waitFor(() => expect(aktiverEintrag()).toBe('Sanitätszug Musterstadt'));
+      await Promise.resolve();
+      const durchgelassen = fireEvent.keyDown(feld(), { key: 'Enter', keyCode: 13, which: 13 });
+      expect(durchgelassen).toBe(false);
+      expect(onWahl).toHaveBeenCalledWith(
+        expect.objectContaining({ wert: 'Sanitätszug Musterstadt' }),
+      );
+      expect(feld()).toHaveValue('Sanitätszug Musterstadt');
+      expect(absenden).not.toHaveBeenCalled();
+    });
+
+    it('Escape schließt erst die Liste und lässt den Text stehen, danach meldet das Feld Escape weiter', async () => {
+      const onEscape = vi.fn();
+      renderMitProviders(<MitWert nurText={nurText} quellen={[einsatz]} onEscape={onEscape} />);
       await userEvent.type(feld(), 'Flo');
       await waitFor(() => expect(offeneListe()).not.toBeNull());
       await userEvent.keyboard('{Escape}');
       expect(onEscape).not.toHaveBeenCalled();
+      expect(feld()).toHaveValue('Flo');
       await waitFor(() => expect(offeneListe()).toBeNull());
       await userEvent.keyboard('{Escape}');
       expect(onEscape).toHaveBeenCalledTimes(1);
+      expect(feld()).toHaveValue('Flo');
+    });
+
+    it('meldet jede Übernahme mit ihrem Weg (Enter, Tab, Klick)', async () => {
+      const onUebernahme = vi.fn();
+      renderMitProviders(<Formular quellen={[sanitaet]} onUebernahme={onUebernahme} />);
+      await userEvent.type(feld(), 'San');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Sanitätsgruppe UHS'));
+      await userEvent.keyboard('{Enter}');
+      expect(onUebernahme).toHaveBeenLastCalledWith({
+        text: 'Sanitätsgruppe UHS',
+        vorschlag: expect.objectContaining({ wert: 'Sanitätsgruppe UHS' }),
+        weg: 'enter',
+        ausListe: true,
+      });
+      // Enter bei geschlossener Liste meldet den stehenden Text.
+      await userEvent.keyboard('{Enter}');
+      expect(onUebernahme).toHaveBeenLastCalledWith({
+        text: 'Sanitätsgruppe UHS',
+        weg: 'enter',
+        ausListe: false,
+      });
+
+      await userEvent.clear(feld());
+      await userEvent.type(feld(), 'Zug');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Sanitätszug Musterstadt'));
+      await userEvent.click(
+        offeneListe()!.querySelector<HTMLElement>('[title="„Zug“ als Freitext übernehmen"]')!,
+      );
+      expect(onUebernahme).toHaveBeenLastCalledWith({ text: 'Zug', weg: 'klick', ausListe: true });
+
+      await userEvent.clear(feld());
+      await userEvent.type(feld(), 'San');
+      await waitFor(() => expect(aktiverEintrag()).toBe('Sanitätsgruppe UHS'));
+      await userEvent.tab();
+      expect(onUebernahme).toHaveBeenLastCalledWith({
+        text: 'Sanitätsgruppe UHS',
+        vorschlag: expect.objectContaining({ wert: 'Sanitätsgruppe UHS' }),
+        weg: 'tab',
+        ausListe: true,
+      });
+      expect(onUebernahme).toHaveBeenCalledTimes(4);
+    });
+
+    it('mit enterSendet={false} sendet auch Enter bei geschlossener Liste nicht', async () => {
+      const absenden = vi.fn();
+      const onUebernahme = vi.fn();
+      renderMitProviders(
+        <Formular
+          quellen={[einsatz]}
+          absenden={absenden}
+          enterSendet={false}
+          onUebernahme={onUebernahme}
+        />,
+      );
+      await userEvent.type(feld(), 'Flo{Enter}');
+      await waitFor(() => expect(offeneListe()).toBeNull());
+      await userEvent.keyboard('{Enter}');
+      expect(absenden).not.toHaveBeenCalled();
+      expect(onUebernahme).toHaveBeenCalledTimes(2);
+      expect(onUebernahme).toHaveBeenLastCalledWith({
+        text: 'Florian 1',
+        weg: 'enter',
+        ausListe: false,
+      });
     });
   });
 });
@@ -291,6 +551,53 @@ describe('StammdatenFeld', () => {
  * belegt am CSS, das antd im Theme der App erzeugt (wie die Vorschauen des Design Systems), weil
  * jsdom kein Layout misst (`frontend/AGENTS.md`, Erfassungs-Norm, letzter Punkt).
  */
+describe('StammdatenFeld — nichts übernehmen, was niemand gemeint hat (kwc2yszv, Review E1)', () => {
+  const zwoelf: Vorschlagsquelle = {
+    id: 'funkrufnamenEinsatz',
+    gruppe: 'einsatz',
+    eintraege: [{ label: 'Florian 12', wert: 'Florian 12' }],
+  };
+  const eins: Vorschlagsquelle = {
+    id: 'fahrzeugeStammdaten',
+    gruppe: 'stammdaten',
+    eintraege: [{ label: 'Florian 1', wert: 'Florian 1' }],
+  };
+
+  it('Enter nach exakt „Florian 1“ nimmt „Florian 1“, nicht den obersten „Florian 12“', async () => {
+    const onWert = vi.fn();
+    renderMitProviders(<MitWert nurText quellen={[zwoelf, eins]} onWert={onWert} />);
+    await userEvent.type(feld(), 'Florian 1');
+    await waitFor(() => expect(offeneListe()).not.toBeNull());
+    await userEvent.keyboard('{Enter}');
+    expect(feld()).toHaveValue('Florian 1');
+  });
+
+  it('Tab ohne Tippen nimmt keinen Vorschlag: ein stehender Wert bleibt', async () => {
+    function Stehend() {
+      const [wert, setWert] = useState('Flor');
+      return (
+        <>
+          <StammdatenFeld
+            nurText
+            aria-label="Absender"
+            quellen={[zwoelf, eins]}
+            value={wert}
+            onChange={setWert}
+          />
+          <input aria-label="danach" />
+        </>
+      );
+    }
+    renderMitProviders(<Stehend />);
+    // Ein Klick öffnet die Liste (rc-select öffnet beim Mausdruck); getippt ist nichts.
+    await userEvent.click(feld());
+    await waitFor(() => expect(offeneListe()).not.toBeNull());
+    await userEvent.tab();
+    expect(feld()).toHaveValue('Flor');
+    expect(screen.getByRole('textbox', { name: 'danach' })).toHaveFocus();
+  });
+});
+
 describe('StammdatenFeld — Trefflächen je Dichte', () => {
   it.each([
     ['kompakt', 30],

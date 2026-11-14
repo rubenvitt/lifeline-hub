@@ -427,6 +427,9 @@ describe('useDatensaetze — weitere Quellen und ETB-Zählung (LFH-619)', () => 
     const p = anzahlAdressen[0].searchParams;
     expect(p.get('q')).toBe('deich');
     expect(p.get('limit')).toBeNull();
+    // Ohne Systemeinträge wie das Ziel des Sprungs (`etbPfad` mit `q`, Vorgabe der Seite): die
+    // Zahl am Sammeltreffer ist, was die Seite dann zeigt (Review S5).
+    expect(p.get('ohne_system')).toBe('true');
     await waitFor(() => expect(result.current.etbAnzahl).toEqual({ anzahl: 31 }));
   });
 

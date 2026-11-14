@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import { FOTO_JPEG, MINI_JPEG } from './bildFixture';
-import { systemBuendelAufklappen } from './etb-kern';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
 /**
@@ -168,7 +168,7 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   await expect(zeilen.first()).toContainText('bereinigt');
 
   // Das ETB nennt Hinterlegen, keinen Dateinamen und keine Ansicht.
-  await page.goto(`/einsaetze/${e}/etb`);
+  await page.goto(etbMitSystem(e));
   await systemBuendelAufklappen(page);
   await expect(page.getByText('UHS BHP 50: Plan hinterlegt').first()).toBeVisible();
   await expect(page.getByText(/halle\.jpg/)).toHaveCount(0);

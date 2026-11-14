@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { waehleStehend } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
-import { systemBuendelAufklappen } from './etb-kern';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Fahrzeuge im Einsatz bearbeiten (LLH-1073 Teil I), Durchstich im Browser: die Einheit eines
@@ -72,7 +72,7 @@ test('Fahrzeug einer Einheit zuordnen: der Abschnitt folgt, das Meldebild zeigt 
   await expect(zeile.getByRole('button', { name: 'Einheit zu 83-1 bearbeiten' })).toHaveText(
     'Zug 1',
   );
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   await expect(
     page.getByText('Einheit «Zug 1»: Fahrzeug «83-1» zugeordnet, vorher «Staffel A»'),
@@ -101,7 +101,7 @@ test('Angaben eines Ad-hoc-Fahrzeugs ändern: die Zeile zeigt den neuen Namen, e
   await expect(region.getByText(neu, { exact: true })).toBeVisible();
   await expect(region.getByText(alt, { exact: true })).toHaveCount(0);
 
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   await expect(
     page.getByText(`Fahrzeug «${alt}»: Funkrufname «${alt}» → «${neu}», Typ «—» → «HLF 20»`),

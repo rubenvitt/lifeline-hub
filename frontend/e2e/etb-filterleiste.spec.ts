@@ -80,6 +80,96 @@ test('1440 × 900 kompakt: alle Filter in höchstens zwei Zeilen, Typ und System
   await expect(page.locator('[data-lfh="seitenkopf"] [data-lfh="segmentleiste"]')).toHaveCount(0);
 });
 
+/**
+ * An der Arbeitsposition (kwc2yszv D8, Spec `etb-filterleiste`): die Seite öffnet am Ende der
+ * Zeitachse über der Erfassung. Seitenkopf und Filterleiste kleben dann unter dem Rahmen, ein
+ * gesetzter Filter steht im Bild, und die Volltextsuche ist ohne Rollen bedienbar — nicht bloß
+ * sichtbar, sondern zuoberst an ihrer Stelle und angeklickt.
+ */
+test('1440 × 900 kompakt, am Ende der Zeitachse: Kopf und Filterleiste kleben, die Suche geht ohne Rollen', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await anmelden(page);
+  const id = await einsatzMitEintrag(page);
+  for (let n = 1; n <= 40; n += 1) {
+    const e = await page.request.post(`/api/einsaetze/${id}/etb`, {
+      data: { typ: 'meldung', inhalt: `Probe ${n}: Lage unverändert`, von: 'ELW 1', an: 'ILS' },
+    });
+    expect(e.ok(), await e.text()).toBeTruthy();
+  }
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
+  await page.goto(`/einsaetze/${id}/etb?typ=meldung`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+  const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+  await expect(zeitachse.getByText('Probe 40: Lage unverändert')).toBeAttached();
+  await expect(page.locator('.etb-erfassung-sticky').getByPlaceholder(/^Inhalt …/)).toBeVisible();
+  // An die Arbeitsposition: das Ende der Zeitachse über der Erfassung. Ausdrücklich gerollt, damit
+  // der Fall nicht am Zeitpunkt des Startlaufs (`useFunkprotokollLauf`) hängt.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(zeitachse.getByText('Probe 40: Lage unverändert')).toBeInViewport();
+  // Vorbedingung: die Seite steht am Ende, nicht oben — sonst stünde die Leiste trivial im Bild.
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+
+  const m = await page.evaluate(() => {
+    const rahmen =
+      parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
+      ) || 0;
+    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!.getBoundingClientRect();
+    const leiste = document.getElementById('etb-filterleiste')!.getBoundingClientRect();
+    const spaltenkopf = document.querySelector('[data-lfh="etb-spaltenkopf"]');
+    return {
+      rahmen,
+      kopfOben: kopf.top,
+      kopfUnten: kopf.bottom,
+      leisteOben: leiste.top,
+      leisteUnten: leiste.bottom,
+      spaltenkopfOben: spaltenkopf?.getBoundingClientRect().top ?? null,
+    };
+  });
+  expect(m.rahmen, 'Vorbedingung: der Rahmen klebt ab md').toBeGreaterThan(0);
+  expect(
+    Math.abs(m.kopfOben - m.rahmen),
+    `Seitenkopf unter dem Rahmen ${JSON.stringify(m)}`,
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(m.leisteOben - m.kopfUnten),
+    `Filterleiste unter dem Seitenkopf`,
+  ).toBeLessThanOrEqual(1);
+  // Der Spaltenkopf der Zeitachse klebt an `--etb-kopf-unterkante`, direkt unter der Leiste.
+  expect(m.spaltenkopfOben, 'Vorbedingung: der Spaltenkopf steht (kompakt ab lg)').not.toBeNull();
+  expect(
+    Math.abs(m.spaltenkopfOben! - m.leisteUnten),
+    'Spaltenkopf unter der Leiste',
+  ).toBeLessThanOrEqual(1);
+
+  // Der gesetzte Filter steht an der Arbeitsposition: das gewählte Segment ist im Bild.
+  await expect(
+    page.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' }).getByRole('radio', {
+      name: 'Meldung',
+    }),
+  ).toBeInViewport();
+  // Die Suche ist zuoberst an ihrer Stelle, nicht von der Zeitachse überdeckt — und bedienbar.
+  const suche = page.getByRole('searchbox', { name: 'Volltextsuche' });
+  await expect(suche).toBeInViewport();
+  const zuoberst = await suche.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const oben = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return oben === el || el.contains(oben);
+  });
+  expect(zuoberst, 'Volltextsuche zuoberst').toBe(true);
+  const vorher = await page.evaluate(() => window.scrollY);
+  // Mit der Maus an der Stelle, nicht `locator.click()`: das rollte das Ziel vorher selbst ins Bild.
+  const box = (await suche.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(suche).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY), 'Klick in die Suche rollt nicht').toBe(vorher);
+  await page.keyboard.type('Probe 7');
+  await expect(page).toHaveURL(/[?&]q=Probe(\+|%20)7/);
+});
+
 for (const modus of ['light', 'dark'] as const) {
   test(`${modus}: das Filterband hält Text- und Randkontrast`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });

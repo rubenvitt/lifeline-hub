@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { etbVonSetzen } from './etb-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
@@ -38,6 +39,7 @@ test('ETB-Deeplink ?eintrag= hebt den adressierten Eintrag im Browser hervor', a
   await page.goto(`/einsaetze/${eid}/etb`);
 
   const inhalt = `Smoke-Eintrag ${Date.now()}`;
+  await etbVonSetzen(page);
   await page.getByPlaceholder('Inhalt …').fill(inhalt);
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
 

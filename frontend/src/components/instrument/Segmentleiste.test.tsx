@@ -74,6 +74,32 @@ describe('Segmentleiste', () => {
     expect(punkt).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it('eine Zahl am Segment (ETB, kwc2yszv D7) steht sichtbar, der Name bleibt der Wortlaut', () => {
+    renderMitProviders(
+      <Segmentleiste
+        optionen={[
+          { wert: 'alle', label: 'Alle', zahl: 57 },
+          { wert: 'lage', label: 'Lage', zahl: 8, titel: 'Lagefeststellungen: 8' },
+          { wert: 'anordnung', label: 'Anordnung' },
+        ]}
+        wert="alle"
+        onWechsel={() => {}}
+        beschriftung="x"
+      />,
+    );
+    const lage = screen.getByRole('radio', { name: 'Lage' });
+    expect(lage).toHaveTextContent(/^Lage\s*8$/);
+    expect(lage.querySelector('[data-lfh="segment-zahl"]')).toHaveTextContent('8');
+    expect(lage).toHaveAttribute('title', 'Lagefeststellungen: 8');
+    expect(lage).toHaveAccessibleDescription('Lagefeststellungen: 8');
+    // Ohne Titel beschreibt die Zahl allein.
+    expect(screen.getByRole('radio', { name: 'Alle' })).toHaveAccessibleDescription('57');
+    // Ohne Zahl kein Zusatz.
+    const anordnung = screen.getByRole('radio', { name: 'Anordnung' });
+    expect(anordnung.querySelector('[data-lfh="segment-zahl"]')).toBeNull();
+    expect(anordnung).not.toHaveAttribute('title');
+  });
+
   it('naechsterIndex läuft im Kreis und kennt Pos1/Ende', () => {
     expect(naechsterIndex('ArrowRight', 2, 3)).toBe(0);
     expect(naechsterIndex('ArrowLeft', 0, 3)).toBe(2);
@@ -123,6 +149,20 @@ describe('Segmentleiste', () => {
     const online = screen.getByRole('radio', { name: 'Online' });
     expect(online).not.toHaveAttribute('aria-disabled');
     expect(online).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('das gewählte Segment trägt die Kante seiner Option, die übrigen keine (kwc2yszv)', () => {
+    const optionen: SegmentOption<string>[] = [
+      { wert: 'meldung', label: 'Meldung', punkt: 'rgb(22, 119, 255)', kante: 'rgb(22, 119, 255)' },
+      { wert: 'lage', label: 'Lage', punkt: 'rgb(19, 194, 194)', kante: 'rgb(19, 194, 194)' },
+    ];
+    renderMitProviders(
+      <Segmentleiste optionen={optionen} wert="lage" onWechsel={() => {}} beschriftung="Typ" />,
+    );
+    expect(screen.getByRole('radio', { name: 'Lage' }).style.boxShadow).toContain(
+      'rgb(19, 194, 194)',
+    );
+    expect(screen.getByRole('radio', { name: 'Meldung' }).style.boxShadow).toBe('');
   });
 
   it('volle Breite (LLH-1642): Leiste als Block, jede Zelle wächst gleich; ohne bleibt sie inline', () => {

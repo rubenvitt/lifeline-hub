@@ -38,6 +38,8 @@ Tastenkombination sichtbar sein. Der Knopf SHALL die gültigen Kürzel auf jeder
 `aria-keyshortcuts` nennen.
 Kein Platzhalter der ETB-Schnellerfassung MUST eine Taste, ein Kürzel oder das Wort „Befehle“
 enthalten.
+Weicht die Ereigniszeit von „jetzt“ ab, SHALL der Knopf sie nennen („Erfassen als 1912“); sein
+zugänglicher Name MUST die Zeit ebenfalls tragen.
 
 #### Scenario: Touch-Tablet quer
 - **WHEN** die Erfassung bei 1180 px Breite und grobem Zeiger steht
@@ -47,15 +49,20 @@ enthalten.
 - **WHEN** die Erfassung bei 390 px Breite leer steht
 - **THEN** lautet der Platzhalter „Inhalt …“
 
+#### Scenario: Nachtrag am Knopf
+- **WHEN** im Feld Zeit 1912 steht und es 1926 ist
+- **THEN** heißt der Knopf „Erfassen als 1912“
+
 ### Requirement: Kurzeingabe der Ereigniszeit
 Beginnt der Text der ETB-Schnellerfassung (nach einem etwaigen Typbefehl) mit `/zeit` und einer
 lesbaren Zeitangabe, SHALL die Erfassung daraus die Ereigniszeit setzen, nach denselben Regeln wie
-das Zeitfeld eines Ereignisses (`1420`, `14:20`, `101420`, `-15`). Der Rest der Zeile MUST als
-Inhalt stehen bleiben. Ist die Angabe unlesbar, bleibt sie Text, und das Feld nennt den Grund.
+das Zeitfeld eines Ereignisses (`1420`, `14:20`, `101420`, `-15`), und sie im Feld Zeit zeigen. Der
+Rest der Zeile MUST als Inhalt stehen bleiben. Ist die Angabe unlesbar, bleibt sie Text, und das
+Feld nennt den Grund.
 
 #### Scenario: Uhrzeit mit Inhalt
 - **WHEN** „/zeit 1420 Pumpe läuft“ getippt wird
-- **THEN** zeigt die Erfassung den Chip „Ereigniszeit“ mit 1420, und der Inhalt lautet „Pumpe läuft“
+- **THEN** zeigt das Feld Zeit 1420, und der Inhalt lautet „Pumpe läuft“
 
 #### Scenario: Relativ
 - **WHEN** um 14:31 Serverzeit „/zeit -10 Lage ruhig“ getippt und erfasst wird
@@ -63,31 +70,37 @@ Inhalt stehen bleiben. Ist die Angabe unlesbar, bleibt sie Text, und das Feld ne
 
 #### Scenario: Unlesbar
 - **WHEN** „/zeit 2590 Pumpe“ getippt wird
-- **THEN** wird kein Chip gesetzt, der Text bleibt stehen, und das Feld nennt den Grund
+- **THEN** bleibt das Feld Zeit bei „jetzt“, der Text bleibt stehen, und das Feld nennt den Grund
 
 ### Requirement: Keine Ereigniszeit in der Zukunft
 Liegt die Ereigniszeit eines ETB-Entwurfs mehr als 60 Sekunden nach jetzt (Serveruhr, soweit der
-Versatz bekannt ist), MUST die Erfassung das Senden verweigern, am Zeit-Chip den Grund „liegt in
+Versatz bekannt ist), MUST die Erfassung das Senden verweigern, am Feld Zeit den Grund „liegt in
 der Zukunft“ nennen und Text und Felder stehen lassen. Der Server begrenzt die Ereigniszeit
 weiterhin nicht.
 
 #### Scenario: Tippfehler in die Zukunft
-- **WHEN** um 14:20 Serverzeit eine Ereigniszeit 18:20 desselben Tages im Chip steht und „Erfassen“ gewählt wird
-- **THEN** entsteht kein Eintrag, der Chip nennt „liegt in der Zukunft“, und der Text bleibt
+- **WHEN** um 14:20 Serverzeit im Feld Zeit 18:20 desselben Tages steht und „Erfassen“ gewählt wird
+- **THEN** entsteht kein Eintrag, das Feld Zeit nennt „liegt in der Zukunft“, und der Text bleibt
 
 #### Scenario: Vorgemerkter Eintrag
 - **WHEN** ein offline vorgemerkter Eintrag mit vergangener Ereigniszeit später gesendet wird
 - **THEN** nimmt der Server ihn an
 
 ### Requirement: Typwort statt Slash-Präfix
-Der Typwähler der ETB-Erfassung SHALL das Typwort des gewählten Typs zeigen (z. B. „Meldung“,
-„Berichtigung“) mit einer Kante in der Typfarbe, nicht die Slash-Schreibweise. Sein zugänglicher
-Name MUST „Eintragstyp <Typwort> ändern“ lauten. Die Typwahl im Menü SHALL je Typ einen Farbpunkt
-tragen. Der Slash-Befehl am Zeilenanfang wechselt den Typ weiterhin.
+Die ETB-Erfassung SHALL den Typ als Auswahl aus vier Segmenten „Meldung“, „Anordnung“,
+„Entscheidung“ und „Lage“ zeigen, jedes mit einem Farbpunkt der Typfarbe; das gewählte trägt eine
+Kante in der Typfarbe und meldet sich über `aria-pressed` bzw. als gewählte Option der Gruppe. Die
+Gruppe MUST den zugänglichen Namen „Typ des Eintrags“ tragen. Die Slash-Schreibweise MUST nirgends
+als Beschriftung stehen. Der Slash-Befehl am Zeilenanfang wechselt den Typ weiterhin. Unter `md`
+SHALL ein Knopf mit Typwort und Pfeil die Auswahl öffnen.
 
 #### Scenario: Wechsel per Slash-Befehl
 - **WHEN** „/anordnung Abschnitt Nord räumen“ getippt wird
-- **THEN** zeigt der Typwähler „Anordnung“ mit der Kante der Anordnung, und sein Name lautet „Eintragstyp Anordnung ändern“
+- **THEN** ist das Segment „Anordnung“ gewählt und trägt die Kante der Anordnung
+
+#### Scenario: Wechsel per Klick
+- **WHEN** das Segment „Entscheidung“ gewählt wird
+- **THEN** ist der Typ „Entscheidung“, und Von und An folgen der Vorgabe des Typs, soweit sie nicht ausdrücklich gesetzt sind
 
 ### Requirement: Werte behalten nimmt den Typ mit
 Ist „Werte behalten“ an, SHALL der Folgeentwurf nach erfolgreichem Erfassen neben Von, An und
@@ -102,46 +115,65 @@ Meldeweg auch den Eintragstyp übernehmen. Ist der Schalter aus, MUST der Folgee
 - **WHEN** „Werte behalten“ aus ist und eine Anordnung erfasst wird
 - **THEN** beginnt der nächste Entwurf als Meldung
 
-### Requirement: Nur protokollieren
-Bei den Typen „Meldung“ und „Lage“ SHALL die ETB-Erfassung den Schalter „Nur protokollieren“
-zeigen, Vorgabe aus; aus heißt, der Eintrag legt den Vorgang im Meldungseingang an. Der Schalter
-MUST nach jedem erfolgreichen Erfassen wieder auf aus stehen, auch wenn „Werte behalten“ an ist,
-und MUST im Entwurf erhalten bleiben, bis dieser gesendet ist. Bei anderen Typen MUST er fehlen.
+### Requirement: Auch in den Meldungseingang
+Bei den Typen „Meldung“ und „Lage“ SHALL die ETB-Erfassung den Schalter „Auch in den
+Meldungseingang“ zeigen; an heißt, der Eintrag legt den Vorgang im Meldungseingang an. Vorgabe ist
+an, außer Von und An sind beide die eigene Stelle: dann ist die Vorgabe aus. Wechselt Von oder An,
+SHALL die Vorgabe neu gelten, solange der Schalter nicht von Hand gesetzt ist. Der Schalter MUST
+nach jedem erfolgreichen Erfassen wieder auf seiner Vorgabe stehen, auch wenn „Werte behalten“ an
+ist, und MUST im Entwurf erhalten bleiben, bis dieser gesendet ist. Bei anderen Typen MUST er
+fehlen.
 
 #### Scenario: Vorgabe
-- **WHEN** eine Person im ETB den Typ „Lage“ wählt
-- **THEN** steht „Nur protokollieren“ aus
+- **WHEN** eine Person mit eigener Stelle „ELW 1“ eine Meldung mit Von „Florian 3“ und An „ELW 1“ schreibt
+- **THEN** steht „Auch in den Meldungseingang“ an
+
+#### Scenario: Eigener Vermerk
+- **WHEN** eine Person mit eigener Stelle „ELW 1“ den Typ „Lage“ wählt und Von und An „ELW 1“ bleiben
+- **THEN** steht „Auch in den Meldungseingang“ aus, und das Erfassen legt keine Meldung an
 
 #### Scenario: Zurück nach dem Erfassen
-- **WHEN** „Werte behalten“ an ist und eine Person einen Eintrag vom Typ „Meldung“ mit „Nur protokollieren“ erfasst
-- **THEN** beginnt der nächste Entwurf als „Meldung“ mit „Nur protokollieren“ aus
+- **WHEN** „Werte behalten“ an ist und eine Person eine Meldung von „Florian 3“ mit dem Schalter von Hand aus erfasst
+- **THEN** beginnt der nächste Entwurf als Meldung von „Florian 3“ mit dem Schalter an
 
 #### Scenario: Anordnung
 - **WHEN** eine Person den Typ „Anordnung“ wählt
 - **THEN** fehlt der Schalter
 
-### Requirement: Einstellungen der Erfassung kosten keine Zeile
-Ab `md` SHALL „Nur protokollieren“ zusammen mit „Werte behalten“ rechts im Reiterband der
-Entwürfe stehen, abgesetzt von den Aktionen; unter `md` SHALL beides in der Hinweiszeile unter dem
-Feld stehen. Die Einstellungen MUST die angepinnte Erfassungsleiste nicht um eine Zeile erhöhen und
-MUST im Handschuh-Betrieb die Trefffläche der Dichtestufe halten.
+### Requirement: Einstellungen in der Fußzeile der Erfassung
+„Auch in den Meldungseingang“ und „Werte behalten“ SHALL in der Fußzeile unter dem Inhalt stehen,
+links, und „+ Veranlassung“, „Anhang“ (mit Büroklammer) und „+ weiterer Entwurf“ rechts in derselben Zeile. Die
+Erfassungsleiste MUST höchstens die Hälfte der Fensterhöhe belegen und MUST im Handschuh-Betrieb
+die Trefffläche der Dichtestufe halten. Unter `md` SHALL die Fußzeile waagerecht rollen statt
+umzubrechen. Ist das Fenster so niedrig, dass die volle Leiste mehr als die halbe Fensterhöhe
+belegte (kompakt unter 320 px, komfortabel unter 500 px, Handschuh-Betrieb unter 740 px), SHALL ab
+`md` die Feldzeile mit Typ-Knopf und die Fußzeile in einer einzigen, waagerecht rollenden Zeile über
+dem Inhalt stehen.
 
 #### Scenario: Fükw im Handschuh-Betrieb
-- **WHEN** die Erfassung bei 1366 × 768 im Handschuh-Betrieb mit Typ „Meldung“, Von und An steht
-- **THEN** stehen „Nur protokollieren“ und „Werte behalten“ neben dem Entwurfsreiter, und die Leiste ist so hoch wie ohne „Nur protokollieren“
+- **WHEN** die Erfassung bei 1366 × 768 im Handschuh-Betrieb mit Typ „Meldung“ steht
+- **THEN** stehen beide Schalter in der Fußzeile mit mindestens 72 px Trefffläche, und die Leiste belegt höchstens 384 px
 
-### Requirement: Nur protokollieren ohne Recht der Meldungen
-Ist das Modul Meldungen für die Person nicht freigegeben, SHALL der Schalter „Nur protokollieren“
-an und gesperrt stehen, den Grund nennen und der Eintrag nur protokolliert werden. Der Schalter MUST die
-Feldbreite der Erfassung (ab `md` mindestens 60 % der Zeile) in keinem Fall verringern.
+#### Scenario: Fükw im Browserfenster
+- **WHEN** die Erfassung in kompakter Dichte bei 1366 × 620 steht
+- **THEN** stehen Feldzeile mit Typ-Segmenten und Fußzeile wie gezeichnet, nicht einzeilig
+
+#### Scenario: Niedriges Fenster
+- **WHEN** die Erfassung bei 1366 × 520 im Handschuh-Betrieb steht
+- **THEN** stehen Typ, Zeit, Von, An, Weg und beide Schalter in einer rollenden Zeile über dem Inhalt, und beim Tabben durch die Zeitachse verschwindet keine Zeile hinter der Leiste
+
+### Requirement: Meldungseingang ohne Recht der Meldungen
+Ist das Modul Meldungen für die Person nicht freigegeben, SHALL der Schalter „Auch in den
+Meldungseingang“ aus und gesperrt stehen, den Grund nennen und der Eintrag nur protokolliert
+werden. Der Schalter MUST die Breite des Inhaltsfelds in keinem Fall verringern.
 
 #### Scenario: Ohne Recht für Meldungen
 - **WHEN** eine Person im ETB schreiben darf, das Modul Meldungen für sie aber gesperrt ist, und sie den Typ „Meldung“ wählt
-- **THEN** steht „Nur protokollieren“ an und gesperrt mit dem Grund „Modul Meldungen gesperrt“, und das Erfassen legt keine Meldung an
+- **THEN** steht „Auch in den Meldungseingang“ aus und gesperrt mit dem Grund „Modul Meldungen gesperrt“, und das Erfassen legt keine Meldung an
 
 #### Scenario: Feldbreite
 - **WHEN** der Typ „Lage“ gewählt ist und die Erfassung bei 1440 × 900 steht
-- **THEN** nimmt das Eingabefeld mindestens 60 % der Zeile ein
+- **THEN** ist das Inhaltsfeld so breit wie bei Typ „Anordnung“
 
 ### Requirement: Abgelehnt beim Abspielen, dann nur protokollieren
 Lehnt der Server einen ohne Netz vorgemerkten Eintrag ab, der in den Meldungseingang gehen sollte,
@@ -152,3 +184,79 @@ fehlen.
 #### Scenario: Freigabe inzwischen entzogen
 - **WHEN** ein vorgemerkter Eintrag vom Typ „Lage“ beim Abspielen mit „Modul Meldungen gesperrt“ abgelehnt wird und die Person „Nur protokollieren“ wählt
 - **THEN** entsteht der ETB-Eintrag ohne Meldung, und die abgelehnte Zeile verschwindet
+
+### Requirement: Feste Felder der Erfassung
+Die ETB-Erfassung SHALL über dem Inhalt eine Zeile mit festen, beschrifteten Feldern zeigen: Typ,
+Zeit, Von, An, Meldeweg. Ohne gesetzte Ereigniszeit zeigt Zeit „jetzt“. Tab MUST die Felder in dieser Ordnung durchlaufen
+und danach ins Inhaltsfeld springen. Ein Feld MUST seinen Wert behalten, wenn ein anderes Feld
+bearbeitet wird; ein Wert gilt, sobald das Feld verlassen wird. Die Veranlassung SHALL hinter dem
+Textknopf „+ Veranlassung“ liegen.
+
+#### Scenario: Funkspruch nachtragen
+- **WHEN** jemand den Typ „Meldung“ lässt, im Feld Zeit „1912“, im Feld Von „Sanitätszug Musterstadt“ setzt, den Meldeweg „Funk“ wählt und den Inhalt erfasst
+- **THEN** trägt der Eintrag 19:12, Von „Sanitätszug Musterstadt“, An die eigene Stelle und Meldeweg Funk
+
+#### Scenario: Reihenfolge per Tastatur
+- **WHEN** der Fokus im Feld Zeit steht und dreimal Tab gedrückt wird
+- **THEN** steht der Fokus im Feld Meldeweg, beim vierten Tab im Inhalt
+
+### Requirement: Feldzeile auf dem Handschirm
+Unter Breite `md` SHALL die Feldzeile Zeit und Meldeweg nebeneinander zeigen, darunter Von und An;
+der Typ steht als Knopf vor dem Inhalt. Tab MUST dort dieser Lesefolge folgen.
+
+#### Scenario: Tab auf dem Handschirm
+- **WHEN** die Erfassung bei 390 × 844 aufgeklappt ist und der Fokus im Feld Zeit steht
+- **THEN** führt Tab nach Meldeweg, dann Von, dann An
+
+### Requirement: Fokus im ersten leeren Pflichtfeld
+Beim Laden des ETB und nach jedem erfolgreichen Erfassen SHALL der Fokus im ersten leeren
+Pflichtfeld der Feldzeile stehen, sonst im Inhalt.
+
+#### Scenario: Fokus beim Laden
+- **WHEN** das ETB mit Typ „Meldung“ und leerem Von geladen wird
+- **THEN** steht der Fokus im Feld Von
+
+#### Scenario: Alles vorbelegt
+- **WHEN** das ETB mit Typ „Lage“ und gesetzter eigener Stelle geladen wird
+- **THEN** steht der Fokus im Inhalt
+
+### Requirement: Abweichende Ereigniszeit bleibt sichtbar
+Weicht die Ereigniszeit eines Entwurfs um mindestens eine Minute von „jetzt“ ab, SHALL das Feld Zeit
+in der Achtungsrolle stehen und die Fußzeile „Nachtrag · Ereignis vor n min“ nennen. Die
+Ereigniszeit MUST stehen bleiben, bis sie im Feld geändert, geleert oder der Eintrag gesendet ist;
+„Werte behalten“ übernimmt sie nie. Ein geleertes Feld Zeit SHALL wieder „jetzt“ gelten.
+
+#### Scenario: Nachtrag
+- **WHEN** um 19:26 im Feld Zeit 19:12 steht
+- **THEN** steht das Feld in der Achtungsrolle, und die Fußzeile nennt „Nachtrag · Ereignis vor 14 min“
+
+#### Scenario: Geleert
+- **WHEN** das Feld Zeit geleert und verlassen wird
+- **THEN** zeigt es wieder „jetzt“, und der Eintrag bekommt die Zeit des Erfassens
+
+### Requirement: Enter im Inhalt kennt keine offenen Editoren
+Enter im Inhaltsfeld MUST ausschließlich dem Tastaturvertrag der Zeigerart folgen. Kein Feld der
+Erfassung MUST Enter im Inhalt sperren oder einen Zeilenumbruch einfügen lassen, wo der Vertrag
+senden würde. Enter in einem Feld der Feldzeile SHALL dessen Wert übernehmen und in den Inhalt
+springen, ohne zu senden.
+
+#### Scenario: Nach dem Setzen der Zeit
+- **WHEN** bei feinem Zeiger im Feld Zeit „1420“ getippt, mit Tab in den Inhalt gewechselt, „Pumpe läuft“ getippt und Enter gedrückt wird
+- **THEN** entsteht der Eintrag mit 14:20, und der Inhalt enthält keinen Zeilenumbruch
+
+#### Scenario: Enter im Feld Von
+- **WHEN** im Feld Von ein Vorschlag mit Enter übernommen wird
+- **THEN** steht der Fokus im Inhalt, und nichts ist gesendet
+
+### Requirement: Entwurfsreiter und Vorschau nur bei Bedarf
+Die Reiter der Entwürfe SHALL erst erscheinen, wenn mehr als ein Entwurf besteht; „+ weiterer
+Entwurf“ legt einen weiteren an. „Vorschau“ SHALL nur angeboten werden, wenn der Inhalt
+Formatierung trägt (Markdown-Auszeichnung, Liste, Verweis).
+
+#### Scenario: Ein Entwurf
+- **WHEN** genau ein Entwurf besteht
+- **THEN** steht kein Reiterband über der Erfassung
+
+#### Scenario: Reiner Text
+- **WHEN** der Inhalt „Pumpe läuft“ lautet
+- **THEN** steht kein Knopf „Vorschau“

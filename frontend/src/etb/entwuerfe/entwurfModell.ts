@@ -19,8 +19,10 @@ export interface EtbEntwurf {
   veranlassung?: string;
   ereigniszeit?: string;
   /**
-   * „Nur protokollieren“ (LLH-1037): der Eintrag geht nicht in den Meldungseingang. Optional,
-   * fehlt im Bestand von vor LLH-1037 (= aus); kein Versionssprung (`offline/AGENTS.md`).
+   * Handwahl des Schalters „Auch in den Meldungseingang“ (LLH-1037, Change
+   * `kwc2yszv-etb-neuentwurf` D4), dreiwertig: `true` = von Hand aus, `false` = von Hand an,
+   * fehlt = Vorgabe (`auchInMeldungseingang` in `standardRufname.ts`). Der Schlüssel bleibt, kein
+   * Versionssprung (`offline/AGENTS.md`); ein alter Entwurf mit `true` bleibt „aus“.
    */
   nur_protokollieren?: boolean;
   erstellt_at: string;
@@ -32,7 +34,10 @@ export interface EntwurfWerte {
   inhalt: string;
   typ: EtbTyp;
   metadaten: MetadatenWerte;
-  /** „Nur protokollieren“ (LLH-1037); fehlt = aus. Kein Inhalt: zählt nicht für {@link istLeer}. */
+  /**
+   * Handwahl „Auch in den Meldungseingang“, dreiwertig wie {@link EtbEntwurf.nur_protokollieren}.
+   * Kein Inhalt: zählt nicht für {@link istLeer}.
+   */
   nurProtokollieren?: boolean;
 }
 
@@ -47,7 +52,7 @@ export function zuWerte(e: EtbEntwurf): EntwurfWerte {
       veranlassung: e.veranlassung,
       ereigniszeit: e.ereigniszeit ? dayjs.utc(e.ereigniszeit) : undefined,
     },
-    nurProtokollieren: e.nur_protokollieren ?? false,
+    nurProtokollieren: e.nur_protokollieren,
   };
 }
 
@@ -73,7 +78,7 @@ export function werteZuPatch(w: EntwurfWerte): EntwurfPatch {
     meldeweg: m.meldeweg || undefined,
     veranlassung: m.veranlassung || undefined,
     ereigniszeit: m.ereigniszeit ? m.ereigniszeit.utc().toISOString() : undefined,
-    nur_protokollieren: w.nurProtokollieren || undefined,
+    nur_protokollieren: w.nurProtokollieren,
   };
 }
 

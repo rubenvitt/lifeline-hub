@@ -1,22 +1,28 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { etbMitSystem } from './etb-kern';
 
 /**
- * Die Zeilenhöhe der ETB-Zeitachse in `kompakt` als Layout-Gate (LFH-958, Spec
- * `etb-zeitachse-darstellung`).
+ * Die Spaltenzeile der ETB-Zeitachse in `kompakt` als Layout-Gate (Change
+ * `kwc2yszv-etb-neuentwurf`, Spec `etb-zeitachse-darstellung`, „Spaltenzeile in kompakter
+ * Dichte“, Szenario „Einzeiliger Eintrag im Fükw“; vorher LFH-958 mit 56 px und 9 Einträgen).
  *
- * Ein einzeiliger Eintrag mit Verfasser samt Funktion („… · EL“) und Meldeweg ist höchstens
- * 56 px hoch: Verfasser und Weg stehen in der Metazeile, das Menü in der Kopfzeile. Bei
- * 1440 × 900 stehen zwischen Filter- und Erfassungsleiste mindestens 9 Einträge ganz im Bild.
- * Als Admin und als Beobachter (`e2e/AGENTS.md`, LFH-435): das Menü ⋮ hängt an der Rolle, beim
- * Beobachter fehlt die Erfassungsleiste.
+ * Ein einzeiliger Eintrag mit Von „Sanitätszug Musterstadt“, An „EL“ und Meldeweg Funk ist
+ * höchstens 36 px hoch; Von → An steht in mindestens 13 px Textschrift, kein Text der Zeile ist
+ * kleiner als 12 px. Der Verfasser samt Funktion („… · EL“) steht im Titel der Zeile, nicht in
+ * ihr. Bei 1440 × 900 stehen zwischen Filter- und Erfassungsleiste mindestens 14 Einträge ganz im
+ * Bild. Als Admin und als Beobachter (`e2e/AGENTS.md`, LFH-435): das Menü ⋮ hängt an der Rolle,
+ * beim Beobachter fehlt die Erfassungsleiste.
  */
 
 test.setTimeout(120_000);
 
-const HOECHSTENS = 56;
-const MINDESTENS_IM_BILD = 9;
+const HOECHSTENS = 36;
+const MINDESTENS_IM_BILD = 14;
 const ANZAHL = 30;
+/** Kleinste Schrift in einer Zeile, Von → An mindestens (Spec). */
+const KLEINSTE_SCHRIFT = 12;
+const VON_AN_SCHRIFT = 13;
 
 const BREITEN = [
   { width: 1440, height: 900 },
@@ -34,8 +40,8 @@ async function saeen(page: Page): Promise<string> {
       data: {
         typ: 'meldung',
         inhalt: `Pegel Messstelle ${n} unverändert`,
-        von: 'ELW 1',
-        an: 'Leitstelle',
+        von: 'Sanitätszug Musterstadt',
+        an: 'EL',
         meldeweg: 'funk',
       },
     });
@@ -54,9 +60,12 @@ async function misst(page: Page, einsatzId: string, rolle: string) {
     const zeilen = page.getByTestId('etb-ereigniszeile');
     await expect(zeilen).toHaveCount(ANZAHL);
     const erste = zeilen.first();
-    // Vorbedingung: Verfasser mit Funktion und Meldeweg stehen wirklich in der Zeile.
-    await expect(erste.locator('[data-lfh="verfasser"]')).toContainText('· EL');
-    await expect(erste).toContainText('Funk');
+    // Vorbedingung: die Spaltenzeile steht, mit Verfasser samt Funktion im Titel und Meldeweg.
+    await expect(erste).toHaveAttribute('data-lfh-form', 'spalten');
+    await expect(erste).toHaveAttribute('title', /·\sEL$/);
+    await expect(erste.locator('[data-lfh="etb-vonan"]')).toHaveText(
+      'Sanitätszug Musterstadt → EL · Funk',
+    );
 
     const hoehen = await zeilen.evaluateAll((alle) =>
       alle.slice(0, 10).map((z) => z.getBoundingClientRect().height),
@@ -64,6 +73,25 @@ async function misst(page: Page, einsatzId: string, rolle: string) {
     for (const h of hoehen) {
       expect(h, `${wo}: Zeilenhöhe`).toBeLessThanOrEqual(HOECHSTENS);
     }
+    const schrift = await erste.evaluate((zeile) => {
+      const mitText = [...zeile.querySelectorAll<HTMLElement>('*')].filter((el) =>
+        [...el.childNodes].some((k) => k.nodeType === 3 && k.textContent!.trim() !== ''),
+      );
+      const vonAn = zeile.querySelector<HTMLElement>('[data-lfh="etb-vonan"]')!;
+      return {
+        kleinste: Math.min(...mitText.map((el) => parseFloat(getComputedStyle(el).fontSize))),
+        vonAn: parseFloat(getComputedStyle(vonAn).fontSize),
+        vonAnFamilie: getComputedStyle(vonAn).fontFamily,
+        // Textschrift ist die des Inhalts; Mono trägt die Zeit.
+        textFamilie: getComputedStyle(zeile.querySelector('[data-lfh="etb-inhalt"]')!).fontFamily,
+        monoFamilie: getComputedStyle(zeile.querySelector('[data-lfh="zeitachse-zeit"]')!)
+          .fontFamily,
+      };
+    });
+    expect(schrift.kleinste, `${wo}: kleinste Schrift`).toBeGreaterThanOrEqual(KLEINSTE_SCHRIFT);
+    expect(schrift.vonAn, `${wo}: Von → An`).toBeGreaterThanOrEqual(VON_AN_SCHRIFT);
+    expect(schrift.vonAnFamilie, `${wo}: Von → An in Textschrift`).toBe(schrift.textFamilie);
+    expect(schrift.vonAnFamilie, `${wo}: Von → An nicht in Mono`).not.toBe(schrift.monoFamilie);
 
     if (breite.width !== 1440) continue;
     // Erst zählen, wenn die Erfassungsleiste steht: solange sie lädt, liegt ihre Oberkante
@@ -86,13 +114,13 @@ async function misst(page: Page, einsatzId: string, rolle: string) {
   }
 }
 
-test('kompakte Zeile: höchstens 56 px, mindestens 9 Einträge im Bild (Admin)', async ({ page }) => {
+test('Spaltenzeile: höchstens 36 px, mindestens 14 Einträge im Bild (Admin)', async ({ page }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await saeen(page);
   await misst(page, einsatzId, 'admin');
 });
 
-test('kompakte Zeile: höchstens 56 px, mindestens 9 Einträge im Bild (Beobachter)', async ({
+test('Spaltenzeile: höchstens 36 px, mindestens 14 Einträge im Bild (Beobachter)', async ({
   page,
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
@@ -107,8 +135,10 @@ test('kompakte Zeile: höchstens 56 px, mindestens 9 Einträge im Bild (Beobacht
 
 /**
  * Systemeinträge (LLH-1106): drei aufeinanderfolgende Systemeinträge stehen als EINE Bündelzeile,
- * die wie eine Zeile höchstens 56 px misst; aufgeklappt hält auch jede leise Zeile die Höhe.
- * Gesät über drei Gefahrengebiete (je ein Systemeintrag, wie `leisten-flaeche.spec.ts`).
+ * die wie eine Zeile höchstens 36 px misst; aufgeklappt hält auch jede leise Zeile die Höhe.
+ * Gesät über drei Gefahrengebiete (je ein Systemeintrag, wie `leisten-flaeche.spec.ts`). Die Seite
+ * öffnet mit `system=an`: so stehen die Systemeinträge auch dort, wo sie in der Vorgabe
+ * ausgeblendet sind (Spec, „Systemeinträge zeigen“).
  */
 test('Systemeinträge: drei stehen als eine Bündelzeile, aufgeklappt hält jede die Zeilenhöhe', async ({
   page,
@@ -140,7 +170,8 @@ test('Systemeinträge: drei stehen als eine Bündelzeile, aufgeklappt hält jede
   }
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
   await page.setViewportSize(BREITEN[0]);
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  // Systemeinträge sind in der Vorgabe aus (kwc2yszv D6).
+  await page.goto(etbMitSystem(einsatzId));
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
   const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
   const buendel = zeitachse.getByTestId('etb-buendelzeile');

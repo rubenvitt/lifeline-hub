@@ -36,7 +36,7 @@ beforeEach(() => {
     y += typeof arg === 'number' ? arg : (arg.top ?? 0);
   }) as typeof window.scrollBy;
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-    // Die Spalte endet bei `spalteUnten` im Dokument; darunter stünde noch die Bilanz.
+    // Die Spalte endet bei `spalteUnten` im Dokument; darunter stünde noch weiterer Inhalt (der Hook kennt ihn nicht).
     if ((this as HTMLElement).dataset?.testid === 'spalte') {
       return {
         top: -y,
@@ -164,7 +164,7 @@ describe('useFunkprotokollLauf (LLH-1149)', () => {
     expect(lauf!.amEnde).toBe(true);
   });
 
-  it('rollt mit `ende` nur bis die Spalte über der Erfassung endet, nicht in die Bilanz darunter', async () => {
+  it('rollt mit `ende` nur bis die Spalte über der Erfassung endet, nicht in Inhalt darunter', async () => {
     document.documentElement.style.setProperty('--test-fuss', '100px');
     try {
       let amEnde = true;
@@ -175,7 +175,7 @@ describe('useFunkprotokollLauf (LLH-1149)', () => {
       expect(y).toBe(800);
       await naechsterRahmen();
       expect(y).toBe(800);
-      // Wer weiter in die Bilanz rollt, gilt als am Ende und wird beim Mitlaufen nicht
+      // Wer weiter darunter rollt, gilt als am Ende und wird beim Mitlaufen nicht
       // zurückgezogen; die neue Zeile verlängert die Spalte, ihr Ende bleibt im Bild.
       bildlauf(1000);
       await naechsterRahmen();

@@ -24,7 +24,13 @@ describe('filterMerkmale (LLH-1071)', () => {
         },
         optionen,
       ),
-    ).toEqual(['Meldung', 'seit 1345', '„Deich“', 'Einheit ELW 1', 'ohne System']);
+    ).toEqual(['Meldung', 'seit 1345', '„Deich“', 'Einheit ELW 1']);
+  });
+
+  it('nennt den Ausschluss der Systemeinträge nicht: er ist die Vorgabe (kwc2yszv D6)', () => {
+    // Sonst stünde das Band „Gefiltert“ auf jeder frisch geöffneten Seite; wie viele ausgeblendet
+    // sind, nennt der Kopf.
+    expect(filterMerkmale({ ohne_system: true }, optionen)).toEqual([]);
   });
 
   it('nennt eine unbekannte Einheit ohne Kennung', () => {

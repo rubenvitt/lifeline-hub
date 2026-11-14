@@ -97,7 +97,7 @@ heißen, nicht „Meldungsstrom“.
 #### Scenario: Bilanz des ETB
 
 - **WHEN** das ETB zwei Einträge vom Typ „Lage“ zählt
-- **THEN** heißen sie in Bilanz und Lageentwicklung „Lagefeststellungen“, nicht „Lagemeldungen“
+- **THEN** heißen sie in der Lageentwicklung und im Titel ihres Typ-Segments „Lagefeststellungen“, nicht „Lagemeldungen“; das Segment selbst trägt das Typwort „Lage“
 
 #### Scenario: Paneel im Lagebild
 

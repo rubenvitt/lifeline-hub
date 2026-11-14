@@ -27,12 +27,12 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste
   unten direkt über der Erfassung, Stundengruppen aufsteigend, gepufferte ganz unten (abgelehnte
   zuletzt), ihre Hinweise unter der Zeitachse. Gekehrt wird nur in der Darstellung
-  (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Bilanz, Druck und Sprung behalten die
+  (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Druck und Sprung behalten die
   Serverordnung. Den Bildlauf am Dokument trägt `components/useFunkprotokollLauf.ts`: Öffnen am
   Ende (außer mit `?eintrag=`), Mitlaufen am Ende an der jüngsten Zeile, Anker beim Nachladen
   oben (`overflow-anchor: none`, eigene Korrektur). „Ende“ ist die Unterkante der
-  Zeitachsenspalte über der Erfassung (`ende`), nicht das Dokumentende: unter `xl` steht die
-  Bilanz darunter, um die Höhe der Erfassung abgesetzt. Eingefroren wird bei Fokus in der Achse ODER
+  Zeitachsenspalte über der Erfassung (`ende`), nicht das Dokumentende: darunter stehen die
+  Hinweise zu vorgemerkten Einträgen. Eingefroren wird bei Fokus in der Achse ODER
   nicht am Ende; das Sammelbanner steht unten über der Erfassung. Nach dem eigenen Eintrag rollt
   die Seite ans Ende. Die Lesemarke ist eine Trennlinie unter dem zuletzt gesichteten Eintrag,
   wenn er im ungefilterten Fenster steht (`lesemarkeImFenster`), sonst ein Banner mit „Zur Marke
@@ -42,15 +42,29 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `useNachObenPasst`): macht eine hohe Leiste (Anhangliste, Hinweise) den Platz zu knapp, steht er
   unsichtbar und ist kein Tab-Stopp. Lagemeldungen bleiben neueste zuerst.
   `KARTEN_EIGENBAU` ist leer (`datensicht.guard.test.ts` pinnt 0).
-- Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`); unter `xl` erst nach der ersten Liste, dann
-  stehend (Riegel `bilanzFrei`, nicht `isLoading`).
 - **Erfassung** hängt auf jeder Breite als `fuss` an der Wurzel von `EinsatzSeite`
   (`.etb-erfassung-sticky`; ≤ 50 % Fensterhöhe, oben voll sichtbar — `e2e/leisten-flaeche.spec.ts`,
   `fokus-verdeckung.spec.ts`). Fokusabstand per `scroll-margin-block-end`
   (`--lfh-etb-fokusabstand`, `components/fokusabstandUnten.ts`), **nicht** `scroll-padding`.
-  Unter `md`: Feld eigene Zeile (`Schnellerfassungszeile gestapelt`, im DOM zuerst), Feldzeile
-  rollt waagerecht, „Werte behalten" in der Hinweiszeile, Platzhalter „Inhalt …“, Fokus per
-  `preventScroll` (`MetaChip`, nicht `autoFocus`).
+  Unter `md`: Typ-Knopf vor dem Inhalt (auch eingeklappt, das Feld behält beim Aufklappen seinen
+  Platz im Baum), Feldzeile darüber gestapelt (Zeit und Weg nebeneinander, Von, An), Fußzeile
+  rollt waagerecht, „Erfassen“ steht fest an ihrem Ende, Platzhalter „Inhalt …“.
+- **Feldzeile statt Chips** (Change `kwc2yszv-etb-neuentwurf`, design.md D2, Spec
+  `etb-schnellerfassung-tastatur`, „Feste Felder der Erfassung“; `etb/EtbFeldzeile.tsx`): Typ
+  (`Segmentleiste` „Typ des Eintrags“ mit Punkt und Kante, unter `md` `TypKnopf`), Zeit
+  (`ZeitpunktEingabe kurzAnzeige kalenderOhneTabstopp`, leer = „jetzt · HHMM“), Von, An
+  (`StammdatenFeld`, Buchstabierhilfe ohne Tab-Stopp) und Weg, Tab in dieser Folge bis in den
+  Inhalt; „+ Veranlassung“ holt ein weiteres Feld. Jedes Feld schreibt direkt in `metadaten`, ein
+  Wert gilt beim Verlassen; es gibt keinen offenen Editor und damit keine Enter-Ausnahme im Inhalt
+  (LLH-1842, LLH-1865). Enter im Feld übernimmt und springt in den Inhalt. Fokus beim Laden und
+  nach dem Erfassen im ersten leeren Pflichtfeld (`fokusStart`), sonst im Inhalt; ein Pflicht- oder
+  Zeitgrund steht in der Fußzeile, das Feld ist `aria-invalid`, beschreibt sich per
+  `aria-describedby` und bekommt den Fokus. Eine Ereigniszeit ab einer Minute vor „jetzt“ ist ein
+  Nachtrag: Feld `status="warning"`, Fußzeile „Nachtrag · Ereignis vor n min“, Knopf „Erfassen als
+  HHMM“. Fußzeile (`fusszeileStil`): links Gründe, „Auch in den Meldungseingang“, „Werte behalten“,
+  rechts „+ Veranlassung“, „Anhang“, „+ weiterer Entwurf“, „Eigene Stelle ändern“ und bei Lage der
+  Sprung zum Lagebericht. Reiterband erst ab dem zweiten Entwurf, „Vorschau“ nur bei Formatierung
+  (`hatFormatierung`). Beim Senden sind alle Felder gesperrt, die Typ-Segmente mit Grund.
 - **Erfassung, Tastatur und Fläche** (LFH-955, Specs `etb-schnellerfassung-tastatur`,
   `einsatztauglichkeit-layout`; Herleitung D1–D5, auf die Code-Kommentare verweisen:
   `openspec/changes/archive/2026-10-05-lfh-955-etb-erfassung-beruehrung-handschirm/design.md`):
@@ -66,24 +80,39 @@ Ableitungen in `etb/zeitachseModell.ts`)
     Einsatzabschluss steht auf den Einsatzdaten, LFH-960), Typfilter einzeilig rollend im Kopf,
     Zeitraum, Einheit, Systemeinträge und Volltext hinter „Filter (n)“ (ein Filter von außen
     klappt sie auf). Die Leiste startet
-    eingeklappt (`EtbEntwurfsTabs einklappbar`, `Schnellerfassung eingeklappt`): kein Fokus beim
-    Mount, ohne Reiterband, Feld- und Hinweiszeile, solange der Fokus nicht in ihr liegt und genau
-    ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
+    eingeklappt (`EtbEntwurfsTabs einklappbar`, `Schnellerfassung eingeklappt`): eine Zeile aus
+    Typ-Knopf und Inhalt, kein Fokus beim Mount, ohne Reiterband, Feld- und Fußzeile, solange der
+    Fokus nicht in ihr liegt und genau ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
     (`LEISTEN_SCHWEBE`, `components/fokusInLeiste.ts`, auch für das Informationstelefon). Nachweis: zwei Einträge ganz im Bild auf
     390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
-  - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): der Präfix zeigt das Typwort in
-    der Typfarbe, die Zeile ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
+  - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): die Zeile des Inhalts trägt
+    ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
     (`Schnellerfassungszeile rahmenFarbe`); `/typ ` und danach
-    `/zeit <Angabe> ` setzen Typ und Ereigniszeit (`erkenneTypBefehl`, `erkenneZeitBefehl`,
-    gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`), der Rest bleibt
-    Inhalt; unlesbar bleibt der Text und die Hinweiszeile nennt den Grund. Eine Ereigniszeit über
-    60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und Warteschlange, Grund
-    am Chip); der Server begrenzt sie nicht. Ein Nachtrag über Mitternacht nennt die Erfassung mit
-    Tag (`nachtragText`).
-- **Kopfzahl und Bilanz zählt der Server über DENSELBEN Filter** (LFH-612, `GET …/etb/zaehler`,
-  `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität
-  `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
-  Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
+    `/zeit <Angabe> ` setzen Typ und Ereigniszeit in der Feldzeile (`erkenneTypBefehl`,
+    `erkenneZeitBefehl`, gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`),
+    der Rest bleibt Inhalt; unlesbar bleibt der Text und die Fußzeile nennt den Grund. Eine
+    Ereigniszeit über 60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und
+    Warteschlange, Grund am Feld Zeit); der Server begrenzt sie nicht. Ein Nachtrag über
+    Mitternacht nennt die Erfassung mit Tag (`nachtragText`).
+- **Kopfzahl und Typ-Segmente zählt der Server über DENSELBEN Filter** (LFH-612,
+  `GET …/etb/zaehler`, `etb/repo.rs:filter_bedingung`, Parameter nur über
+  `routes/etb.rs:filter_merkmale`; Parität `tests/etb_zaehler.rs`). Ein Bilanz-Paneel gibt es
+  nicht mehr (kwc2yszv D7, Spec `etb-zaehler`, Herleitung
+  `openspec/changes/archive/2026-11-14-kwc2yszv-etb-neuentwurf/design.md`). Kopf (`kopfMeta`): ohne Filter „112
+  Einträge · 300 Systemeinträge ausgeblendet“ (Handeinträge, `handeintraege`; die Zahl der
+  ausgeblendeten aus derselben Zählung ohne Ausschluss und ohne Typ), mit Filter „7 Treffer“
+  (`gesamt` der gefilterten Zählung); Einzahl bei 1; keine Tagesgrenze. Typ-Segmente
+  (`segmentZahl`, `segmentTitel`): `je_typ` der Zählung über den Filter OHNE Typ — ein Segment
+  nennt, was ein Wechsel zeigte —, „Alle“ die Handeinträge; die Zahl steht in Mono hinter dem
+  Wort (`SegmentOption.zahl`), der Name bleibt das Typwort, Titel und Beschreibung tragen die
+  Mehrzahl („Lagefeststellungen: 2“). Ohne Zählung steht **keine** Zahl da, nie die des geladenen
+  Fensters. Der Sendestatus des Puffers (`pufferZustand`) steht als EINE Marke im Kopf
+  (`etb/EtbSendestatus.tsx`): „alles übertragen“ mit Haken, sonst „n ausstehend“ bzw. „n
+  abgelehnt · m ausstehend“ als Knopf, der zur ersten abgelehnten, sonst zur ersten ausstehenden
+  Zeile rollt (`etb/vorgemerkteZeile.ts`); ab `md` vor „Drucken / als PDF“, darunter in der Aktionszeile hinter dem Typ (in der Meta-Zeile
+  bräche er mit der spät kommenden Zahl um); die Kopfzahl hält bis zur Zählung ihren Platz
+  (`metaPlatzhalter`).
+  Die Liste „Berichtigungen“ entfällt, der Typfilter „Berichtigung“ ersetzt sie.
 - **Eine Filterleiste** (LLH-1065/LLH-1080, Spec `etb-filterleiste`, Herleitung
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in
   `EtbFilterleiste` über der Zeitachse, in zwei Gruppen — Typ-Segmente und Umschaltknopf „System“
@@ -93,11 +122,30 @@ Ableitungen in `etb/zeitachseModell.ts`)
   sind Sprungwerte der Seite aus der URL. Der Zeitraum schreibt bei jeder Wahl ABSOLUTE,
   minutengenaue Grenzen (`anzeige/zeitfenster.ts`); „Seit letzter Lagebesprechung“ nur mit
   Freigabe `lagebesprechung` und abgehaltener Besprechung (`lagebesprechung/useLetzteLagebesprechung.ts`).
-- **Systemeinträge ausblenden** (LFH-958, Spec `etb-zeitachse-darstellung`): `ohne_system=true`
-  ist ein Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste,
-  `zaehler` und `anzahl` erben ihn zusammen. Zustand in der URL (`etbPfad`/`parseEtbFilter`),
-  nur `true` oder fehlend; neben `typ=system` fällt er weg (sonst 422, `filterZusammenfuehren`).
-  Ein `?eintrag=`, der unter dem Ausschluss nicht auftaucht, blendet wieder ein und sagt es.
+  **Kleben** (kwc2yszv D8, `etb/etbKopfKleben.ts`): ab `md` kleben Seitenkopf
+  (`EinsatzSeite kopfKlebt`) und Filterleiste unter dem Rahmen (`top: var(--lfh-rahmen-oben)` + gemessene Höhe
+  des Seitenkopfs), solange sie mit Rahmen und Spaltenkopf höchstens ein Drittel der Fensterhöhe
+  nehmen (`KLEBEN_HOECHSTENS`): sonst bliebe zwischen ihnen und der angepinnten Erfassung kein Platz
+  und ein getabbtes Ziel läge ganz verdeckt (`e2e/fokus-verdeckung.spec.ts`, 1366 × 520
+  Handschuh). Der Seitencontainer `[data-lfh="etb-seite"]` trägt `--etb-kopf-unterkante` (Rahmen +
+  Seitenkopf + Filterleiste); dort klebt der Spaltenkopf der Zeitachse
+  (`[data-lfh="etb-spaltenkopf"]`). Den Fokusabstand oben trägt `scroll-padding-block-start` am
+  Dokument (`index.css`, Marke `etb-kopf-klebt`), ausgesetzt bei Fokus in den Köpfen; „Nach oben“
+  rechnet die Köpfe mit (`useEtbKopfHoehe`). Nachweis `e2e/etb-filterleiste.spec.ts` („am Ende der
+  Zeitachse“).
+- **Systemeinträge sind in der Vorgabe aus** (LFH-958, kwc2yszv D6, Spec
+  `etb-zeitachse-darstellung`, „Systemeinträge zeigen“): am Server ist `ohne_system=true` ein
+  Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste, `zaehler`
+  und `anzahl` erben ihn zusammen. In der Adresse steht das Gegenteil: ohne Merkmal setzt
+  `parseEtbFilter` den Ausschluss, nur `system=an` blendet ein; ein alter Link mit
+  `ohne_system=true` gilt wie die Vorgabe, einer ohne Merkmal blendet jetzt ebenfalls aus. Neben
+  `typ=system` fällt der Ausschluss weg (sonst 422, `filterZusammenfuehren`). Einen Filter schreibt
+  nur `etbFilterPfad` (bzw. `etbDruckPfad`) in eine Adresse; `etbPfad` nimmt kein `ohne_system`
+  (Typ `never`), sonst fiele ein `system=an` still heraus. Der Ausschluss ist kein Filter
+  (`istGefiltert`): Kopf „Einträge“, kein Filterband, kein „ohne System“ unter den Merkmalen;
+  eingeblendet zählt er in „Filter (n)“. Ein `?eintrag=`, der unter dem Ausschluss ohne Typfilter
+  nicht auftaucht, blendet ein und sagt es (auch, wenn es ihn nicht gibt); unter einem Typfilter
+  räumt er still. e2e öffnet Systemeinträge über `etbMitSystem` (`e2e/AGENTS.md`).
 - **Systemeinträge leise und gebündelt** (LLH-1106, Spec `etb-zeitachse-darstellung`): ein
   Systemeintrag steht als `Zeitachseneintrag leise` (Text `gedaempft`, `textKlein`, ungekürzt,
   ohne Tönung); „System → System“ entfällt (`etb/systemKennung.ts` spiegelt
@@ -130,20 +178,42 @@ Ableitungen in `etb/zeitachseModell.ts`)
 - Jede Zeile trägt `data-lfh="datensicht-karte"` und die Zeilenklasse (`scrolleZurZeile`,
   `?eintrag=`). Ein neuer `KARTEN_EIGENBAU` wird gegen den Plan-Modus begründet (Titel, Status,
   ≤ 3 Sekundärfelder, eine Primäraktion, optional Menü `weitere`) und setzt Marke/Klasse selbst.
-- **Kontextmenü an Zeile und Chip** (LLH-1597, Spec `datensatz-aktionsmenue`, Herleitung
+- **Kontextmenü an der Zeile** (LLH-1597, Spec `datensatz-aktionsmenue`, Herleitung
   `openspec/changes/archive/2026-11-09-j161rpsm-kontextmenue-etb/design.md`): ⋮, Knöpfe der abgelehnten Zeile und
   Kontextmenü lesen EINE Liste (`etb/zeilenAktionen.ts`, `zeilenAktionen` + `fuehreZeilenWahlAus`);
   ein Hook und ein `KontextMenue` je Zeitachse, die gemerkte Zeile bekommt nur die stabile Fabrik.
-  Vorgemerkte Zeilen, Bündelzeilen und Zeilen ohne Einträge tragen keine Handler (Browsermenü).
+  Vorgemerkte Zeilen, Bündelzeilen und Zeilen ohne Handlungen tragen keine Handler (Browsermenü).
   Das Menü steht in der Wurzel der Zeitachse und friert sie beim Öffnen ein. Im ETB kein langer
-  Druck (`langerDruck: false`, Entscheidung Ruben 09.11.2026: Text am Tablet markierbar), auch am
-  `MetaChip`, dessen Menü dieselbe Liste wie sein ⋮ zeigt (gesperrt beim Senden).
-- ≥ 50 % Meldungstext im Fükw: `e2e/etb-chronologie.spec.ts`, gegen die **Contentbreite**.
-- **Kompakte Zeile** (LFH-958, `zeitachsenAufbau` in `components/instrument/Zeitachseneintrag.tsx`):
-  unter 48 px Bedienhöhe stehen Verfasser (einzeilig, Titel mit Volltext) und Weg in der
-  Kopfzeile. Ein Zeilenmenü geht über `menue`, das in `kompakt` am Ende der Kopfzeile steht;
-  `aktionen` sind Text-Knöpfe und bleiben rechts. Nachweis ≤ 56 px und ≥ 9 Einträge bei
-  1440 × 900: `e2e/etb-zeilenhoehe.spec.ts`.
+  Druck (`langerDruck: false`, Entscheidung Ruben 09.11.2026: Text am Tablet markierbar). Die
+  Felder der Erfassung behalten das Browsermenü.
+- **Spaltenzeile** (Change `kwc2yszv-etb-neuentwurf`, design.md D1, Spec
+  `etb-zeitachse-darstellung`): in kompakter Dichte ab `lg` steht eine Zeile in festen Spalten
+  Zeit · Nr. · Typ · Von → An · Inhalt · Vermerk · ⋮ (`etb/EtbSpaltenzeile.tsx`). Spaltenkopf
+  (`EtbSpaltenkopf`) und Zeile lesen dieselben Spuren (`ETB_SPALTEN_RASTER`, `etb/etbSpalten.ts`),
+  nie gemessen; Von → An und Vermerk hängen an der Breite der Zeitachse (Container
+  `etb-zeitachse`, `etb/etbSpaltenzeile.css`: ab 1100 px 210 und 124 px, darunter 13 % und 11 %).
+  Komfortabel, Handschuh und kompakt unter `lg` behalten `Zeitachseneintrag` (elf andere Nutzer,
+  für das ETB nicht umbauen); unter `md` gilt in jeder Dichte `etb/EtbHandschirmzeile.tsx`
+  (Kopfzeile, darunter der Text in voller Breite, Vermerke darunter). Die Form wählt nur
+  `etbZeilenform`.
+  - Von → An in Textschrift ≥ 13 px, Meldeweg gedämpft dahinter, zu lang mit Auslassung und dem
+    vollen Text als Titel; gleiche Seiten als „Vermerk <Stelle>“ (`vonAnAnzeige`, auch im
+    `Zeitachseneintrag`). Kein Text einer Zeile unter 12 px.
+  - Der Verfasser hat keine Spalte: Titel der Zeile und Zeilenmenü. Verweise und Marken kommen aus
+    EINER Liste (`etb/vermerke.ts`) für Spalte, Handschirm-Zeile, Menü und Titel; die Spalte endet
+    bei Überlauf mit „+n“, das sie unter dem Text aufklappt (`EtbVermerkSpalte`). ⋮ und
+    Kontextmenü zeigen dieselbe Liste (`zeilenMenue`): Handlungen, dann Vermerke (Sprung oder
+    Herunterladen, Marken gesperrt), dann „Verfasser: …“. Ob eine Zeile ein Kontextmenü trägt,
+    entscheiden nur die Handlungen. „SOFORT“ fehlt: ein Eintrag trägt keine Priorität.
+  - Lange Einträge stehen unter der Klemme (`etb/EtbInhalt.tsx`: drei Zeilen, ohne Absatzränder,
+    lang ist, was unter ihr herausragt), mit „mehr“/„weniger“; offen bei `?eintrag=` und bei
+    einem Treffer der Volltextsuche im Inhalt, im Druck nie (`@media print`).
+  - Der Spaltenkopf klebt unter `--etb-kopf-unterkante` (setzt die Seite: Unterkante von
+    Seitenkopf und Filterleiste), ohne sie unter `--lfh-rahmen-oben`.
+  - Nachweis: ≤ 36 px und ≥ 14 Einträge zwischen Filter- und Erfassungsleiste bei 1440 × 900
+    (`e2e/etb-zeilenhoehe.spec.ts`); ab 1200 px bekommt die Spalte Inhalt ≥ 45 % der
+    **Contentbreite** und ist die breiteste Spalte, bei 390 px nutzt der Text ≥ 330 px
+    (`e2e/etb-chronologie.spec.ts`).
 - **ETB-Entwürfe schreiben nur über `etb/entwuerfe/entwurfStore.ts`** (LFH-521): ein Neuladen
   bricht offene IndexedDB-Transaktionen ab, deshalb steht jeder Auftrag vor dem ersten `await`
   synchron im Vorlauf (`localStorage`, ein Schlüssel `lifeline-etb-entwuerfe-ausstehend:<id>` je
@@ -164,33 +234,38 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
 - **Von und An sind Pflicht für jeden neuen Eintrag** (LFH-894, Spec `etb-absender-empfaenger`):
   der Server lehnt einen Eintrag ohne eine Seite mit 400 ab (`routes/etb.rs::erfassen`), der
-  Client sendet ihn gar nicht erst (`fehlendeSeite`, vor Upload und Warteschlange). Bestehende
+  Client sendet ihn gar nicht erst (`fehlendeSeiten`, vor Upload und Warteschlange). Bestehende
   Einträge bleiben, Entwürfe dürfen unvollständig sein. Systemeinträge (`etb::repo::einfuegen`)
   tragen für eine fehlende Seite die feste Kennung `etb::SYSTEM_RUFNAME` („System“).
 - **Standard-Rufname je Person** im Präferenz-Fach (`etb_standard_rufname`, JSON `{von, an}`,
-  `etb/standardRufname.ts`, `etb/useStandardRufname.ts`). Er lebt **nie im Entwurf**:
-  `metadaten` hält nur Ausdrückliches, `wirksameMetadaten` setzt ihn erst beim Anzeigen und
-  Absenden ein. `@`, `/von`, `/an` überschreiben ihn für den einen Eintrag. Ohne Standard fragt
+  `etb/standardRufname.ts`, `etb/useStandardRufname.ts`); er ist die „eigene Stelle“. Er lebt
+  **nie im Entwurf**: `metadaten` hält nur Ausdrückliches, `wirksameMetadaten(metadaten, standard,
+typ)` setzt die **Vorgabe nach Typ** erst beim Anzeigen und Absenden ein (Change
+  `kwc2yszv-etb-neuentwurf`, D3; Spec `etb-absender-empfaenger`, „Vorbelegung neuer Einträge“):
+  Meldung An, Anordnung Von, Entscheidung und Lage beide; eine Berichtigung trägt Von, An und
+  Meldeweg des berichtigten Eintrags ausdrücklich und fällt für eine fehlende Seite auf die eigene
+  Stelle zurück. Ein Typwechsel ändert deshalb nur die Vorgabe. Ein Feld, das die Vorgabe zeigt,
+  trägt `data-vorgabe` und den Titel „Vorgabe: eigene Stelle“; wer es unverändert verlässt, setzt
+  nichts. `@` (bei Anordnung An, sonst Von), `/von`, `/an` überschreiben sie für den einen Eintrag. Ohne Standard fragt
   die Erfassung inline (`etb/RufnameAbfrage.tsx`, kein Modal), erst wenn das Fach gelesen ist;
   in der Berichtigung wird nicht gefragt.
 - **Von/An schlagen über `components/StammdatenFeld.tsx` vor** (LLH-1144, Spec `stammdaten-feld`):
-  Chip-Editor und Rufname-Abfrage im Modus `nurText` mit `useFunkrufnamenQuellen` (Einsatz,
-  Stammdaten, „Zuletzt verwendet“), **ohne** „In Stammdaten übernehmen“ (Höhenbudget der Leiste,
-  LFH-955). Enter nimmt den mit ↓/↑ markierten Vorschlag, sonst den Text; Escape schließt erst die
-  Liste, dann den Chip. Das `@`-Menü liest weiter `etb/funkrufnamen.ts` (dieselbe Abbildung).
+  die Felder Von und An und die Rufname-Abfrage im Modus `nurText` mit `useFunkrufnamenQuellen`
+  (Einsatz, Stammdaten, „Zuletzt verwendet“), **ohne** „In Stammdaten übernehmen“ (Höhenbudget der
+  Leiste, LFH-955). Tastatur nach der Spec `stammdaten-feld`; Escape im Feld verwirft nur den
+  getippten Text. Das `@`-Menü liest weiter `etb/funkrufnamen.ts` (dieselbe Abbildung).
 - **Meldung und Lage gehen in den Meldungseingang** (LLH-1037, Specs `meldungseingang`,
   `etb-schnellerfassung-tastatur`): bei diesen Typen (nicht in der Berichtigung) zeigt
-  `Schnellerfassung.tsx` den Schalter „Nur protokollieren“, Vorgabe aus; aus legt der Server
-  Eintrag und Meldung an (Typ „Lage“ → Art „Lagemeldung“, Typ „Meldung“ → Art „Sonstige“). Ab `md`
-  steht er mit „Werte behalten“ rechts im Reiterband der Entwürfe (`EtbEntwurfsTabs` reicht den
-  Platz als `einstellungenZiel`, die Schnellerfassung hängt die Gruppe per Portal hinein; ohne
-  Platz rechts in der Chip-Zeile), darunter in der Hinweiszeile. In der Chip-Zeile brach die
-  Gruppe im Handschuh-Betrieb auf dem Fükw um und hob die Leiste um eine Kästchenhöhe
-  (`fokus-verdeckung.spec.ts`, „Nach oben“ hinter dem Kopf). Er bricht weder die Feldbreite
-  (≥ 60 % ab `md`) noch die eingeklappte Handy-Leiste. Er springt nach jedem
-  Erfassen auf aus zurück, auch mit „Werte behalten“, und lebt im Entwurf (`nur_protokollieren`,
-  optional, kein Versionssprung). Ist das Modul Meldungen gesperrt (`useSprungSperre`), steht er
-  an und gesperrt mit dem Grund `MODUL_MELDUNGEN_GESPERRT`. Der Client sendet
+  `Schnellerfassung.tsx` in der Fußzeile den Schalter „Auch in den Meldungseingang“; an legt der
+  Server Eintrag und Meldung an (Typ „Lage“ → Art „Lagemeldung“, Typ „Meldung“ → Art „Sonstige“).
+  Vorgabe an, außer Von und An sind beide die eigene Stelle (`meldungseingangVorgabe`, Change
+  `kwc2yszv-etb-neuentwurf` D4, LLH-1757); die Vorgabe folgt Von und An, solange nicht von Hand
+  gesetzt. Die Handwahl lebt im Entwurf als `nur_protokollieren`, dreiwertig gelesen
+  (`auchInMeldungseingang`: fehlt = Vorgabe, `true` = aus, `false` = an; kein Versionssprung) und
+  springt nach jedem Erfassen auf die Vorgabe zurück, auch mit „Werte behalten“. Er bricht weder
+  die Feldbreite (≥ 60 % ab `md`) noch die eingeklappte Handy-Leiste. Ist das Modul Meldungen
+  gesperrt (`useSprungSperre`), steht er aus und gesperrt mit dem Grund
+  `MODUL_MELDUNGEN_GESPERRT`. Der Client sendet
   `in_meldungseingang` immer ausdrücklich, auch über die Warteschlange
   (`offline/useEtbErfassung.ts` reicht es durch). Eine beim Abspielen abgelehnte Zeile mit
   Kopplung bietet „Nur protokollieren“ an (`EtbZeitachse` → `EtbPage.abgelehntErneutSenden`, mit

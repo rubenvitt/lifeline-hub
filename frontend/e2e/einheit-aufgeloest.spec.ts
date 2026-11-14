@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { systemBuendelAufklappen } from './etb-kern';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 import { anmelden, einsatzAnlegen } from './trefflaeche-kern';
 
 /**
@@ -30,7 +30,7 @@ test('Sprung aus dem ETB-Eintrag der Auflösung in die lesende Ansicht', async (
   const aufloesen = await page.request.delete(`${basis}/einheiten/${einheitId}`);
   expect(aufloesen.ok(), await aufloesen.text()).toBe(true);
 
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
   const eintrag = zeitachse

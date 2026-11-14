@@ -73,6 +73,34 @@ describe('baueVorschlagsliste', () => {
   });
 });
 
+describe('baueVorschlagsliste — exakter Treffer zuerst (kwc2yszv, Review E1)', () => {
+  const zwoelf: Vorschlagsquelle = {
+    id: 'funkrufnamenEinsatz',
+    gruppe: 'einsatz',
+    eintraege: [{ label: 'Florian 12', wert: 'Florian 12' }],
+  };
+  const eins: Vorschlagsquelle = {
+    id: 'fahrzeugeStammdaten',
+    gruppe: 'stammdaten',
+    eintraege: [
+      { label: 'Florian 10', wert: 'Florian 10' },
+      { label: 'Florian 1', wert: 'Florian 1' },
+    ],
+  };
+
+  it('stellt den exakten Treffer samt Gruppe an den Anfang, ohne Groß-/Kleinschreibung', () => {
+    const liste = baueVorschlagsliste([zwoelf, eins], 'florian 1');
+    expect(liste.gruppen[0].gruppe).toBe('stammdaten');
+    expect(liste.gruppen[0].eintraege[0].wert).toBe('Florian 1');
+    expect(liste.gruppen[1].eintraege[0].wert).toBe('Florian 12');
+  });
+
+  it('ohne exakten Treffer bleibt die Folge der Gruppen', () => {
+    const liste = baueVorschlagsliste([zwoelf, eins], 'Flo');
+    expect(liste.gruppen.map((g) => g.gruppe)).toEqual(['einsatz', 'stammdaten']);
+  });
+});
+
 describe('herkunftDesWerts', () => {
   it('nennt für einen leeren Wert nichts', () => {
     expect(herkunftDesWerts({ text: '  ' }, [einsatz])).toBeNull();

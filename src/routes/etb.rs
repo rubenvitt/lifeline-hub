@@ -552,15 +552,24 @@ pub struct LesemarkeSetzen {
     pub bis_lfd_nr: i64,
 }
 
+/// Abfrage der Lesemarke: `ohne_system=true` zählt Systemeinträge nicht als neu (Review S4).
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct LesemarkeParams {
+    #[serde(default)]
+    pub ohne_system: bool,
+}
+
 /// GET /api/einsaetze/{id}/etb/lesemarke — der eigene Lesestand (LFH-611): Marke,
-/// Zeitpunkt der letzten Sichtung und die Zahl fremder Einträge darüber.
+/// Zeitpunkt der letzten Sichtung und die Zahl fremder Einträge darüber; mit
+/// `ohne_system=true` ohne Systemeinträge, wie die Vorgabe der Seite.
 pub async fn lesemarke(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Etb>,
+    Query(params): Query<LesemarkeParams>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     Ok(Json(
-        lesemarke::laden(&state.pool, einsatz_id, ctx.benutzer.id).await?,
+        lesemarke::laden(&state.pool, einsatz_id, ctx.benutzer.id, params.ohne_system).await?,
     ))
 }
 
@@ -572,6 +581,7 @@ pub async fn lesemarke(
 pub async fn lesemarke_setzen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Etb>,
+    Query(params): Query<LesemarkeParams>,
     JsonBody(req): JsonBody<LesemarkeSetzen>,
 ) -> Result<Json<EtbLesemarkeAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
@@ -591,7 +601,8 @@ pub async fn lesemarke_setzen(
         ));
     }
     lesemarke::setzen(&state.pool, einsatz_id, ctx.benutzer.id, req.bis_lfd_nr).await?;
+    // Die Antwort zählt wie der Abruf, mit demselben `ohne_system`.
     Ok(Json(
-        lesemarke::laden(&state.pool, einsatz_id, ctx.benutzer.id).await?,
+        lesemarke::laden(&state.pool, einsatz_id, ctx.benutzer.id, params.ohne_system).await?,
     ))
 }

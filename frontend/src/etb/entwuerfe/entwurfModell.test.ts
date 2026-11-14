@@ -76,15 +76,28 @@ describe('istLeer', () => {
   });
 });
 
-describe('„Nur protokollieren“ im Entwurf (LLH-1037)', () => {
-  it('reist hin und zurück; fehlt im Bestand = aus', () => {
-    expect(zuWerte(entwurf()).nurProtokollieren).toBe(false);
-    const w = zuWerte(entwurf({ typ: 'lage', nur_protokollieren: true }));
-    expect(w.nurProtokollieren).toBe(true);
-    expect(werteZuPatch(w).nur_protokollieren).toBe(true);
-    expect(werteZuPatch({ ...w, nurProtokollieren: false }).nur_protokollieren).toBeUndefined();
+describe('„Auch in den Meldungseingang“ im Entwurf (LLH-1037, kwc2yszv D4)', () => {
+  it('liest `nur_protokollieren` dreiwertig: fehlt = Vorgabe, true/false = Handwahl', () => {
+    expect(zuWerte(entwurf()).nurProtokollieren).toBeUndefined();
+    const aus = zuWerte(entwurf({ typ: 'lage', nur_protokollieren: true }));
+    expect(aus.nurProtokollieren).toBe(true);
+    expect(werteZuPatch(aus).nur_protokollieren).toBe(true);
+    const an = zuWerte(entwurf({ typ: 'lage', nur_protokollieren: false }));
+    expect(an.nurProtokollieren).toBe(false);
+    expect(werteZuPatch(an).nur_protokollieren).toBe(false);
+    expect(
+      werteZuPatch({ ...aus, nurProtokollieren: undefined }).nur_protokollieren,
+    ).toBeUndefined();
+  });
+  it('ein alter Entwurf mit `nur_protokollieren: true` bleibt eine Handwahl „aus“', () => {
+    expect(zuWerte(entwurf({ typ: 'meldung', nur_protokollieren: true })).nurProtokollieren).toBe(
+      true,
+    );
   });
   it('ein Entwurf nur mit gesetztem Schalter bleibt leer', () => {
     expect(istLeer({ inhalt: '', typ: 'lage', metadaten: {}, nurProtokollieren: true })).toBe(true);
+    expect(istLeer({ inhalt: '', typ: 'lage', metadaten: {}, nurProtokollieren: false })).toBe(
+      true,
+    );
   });
 });

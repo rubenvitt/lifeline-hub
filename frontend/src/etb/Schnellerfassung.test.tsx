@@ -1,22 +1,22 @@
 import { createRef } from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
+import { setzeViewportBreite, setzeViewportHoehe, setzeZeigerGrob } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
 import type { EtbBaustein, EtbEintragAnzeige } from '../api/types';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
-import Schnellerfassung, { chipZeileStil, rolleWaagerechtInsBild } from './Schnellerfassung';
+import Schnellerfassung, { fusszeileStil } from './Schnellerfassung';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { einsatzKeys } from '../api/queryKeys';
 import { ohneSicherenKontext } from '../test/ohneSicherenKontext';
 import { useLocation } from 'react-router';
 import { rufnameZugriff } from '../test/standardRufname';
-import { waehleMenueEintrag } from '../test/menue';
+import { waehle } from '../test/auswahlListe';
 import dayjs from 'dayjs';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { theme } from 'antd';
@@ -62,10 +62,35 @@ function original(): EtbEintragAnzeige {
   };
 }
 
+/**
+ * Eine Meldung trägt als Vorgabe nur An = eigene Stelle; Von ist Pflicht (Change
+ * `kwc2yszv-etb-neuentwurf`, Spec `etb-absender-empfaenger`). Die Grundfälle senden deshalb mit
+ * einem Entwurf, dessen Von gesetzt ist; die Fälle zu Von/An setzen ihre Werte selbst.
+ */
+const MIT_ABSENDER: EntwurfWerte = { inhalt: '', typ: 'meldung', metadaten: { von: 'Florian 3' } };
+
+/** Lage: Von und An tragen beide die eigene Stelle als Vorgabe. */
+const LAGE: EntwurfWerte = { inhalt: '', typ: 'lage', metadaten: {} };
+
+/** Der angezeigte Wert eines Felds der Feldzeile (Von, An: Vorschlagsfeld; Zeit: Textfeld). */
+function feldWert(name: 'Von' | 'An' | 'Zeit') {
+  const rolle = name === 'Zeit' ? 'textbox' : 'combobox';
+  return (screen.getByRole(rolle, { name }) as HTMLInputElement).value;
+}
+
+/** Setzt An über die Feldzeile; Enter übernimmt und springt in den Inhalt. */
+async function setzeAn(wert: string) {
+  const an = screen.getByRole('combobox', { name: 'An' });
+  await userEvent.clear(an);
+  await userEvent.type(an, `${wert}{Enter}`);
+}
+
 function props(over: Partial<React.ComponentProps<typeof Schnellerfassung>> = {}) {
   return {
     erfassen: vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue(undefined),
     berichtigungZu: null,
+    // Eine Berichtigung startet ohne Entwurf, mit den Werten des berichtigten Eintrags.
+    initialWerte: over.berichtigungZu ? undefined : MIT_ABSENDER,
     onBerichtigungAbbrechen: vi.fn(),
     bausteine: [] as EtbBaustein[],
     einsatz,
@@ -106,13 +131,13 @@ describe('TextAreaRef – Caret-Pfad', () => {
 describe('Schnellerfassung', () => {
   it('LFH-894: Von und An kommen aus dem Standard-Rufnamen, nicht aus der Führungsstelle', async () => {
     const p = props({
+      initialWerte: LAGE,
       einsatz: { ...einsatz, meine_fuehrungsstelle: 'Florian Leitung' },
       rufname: rufnameZugriff({ von: 'ELW 1', an: 'Einsatzleitung' }),
     });
     renderMitProviders(<Schnellerfassung {...p} />);
-    expect(screen.queryByText('An: Florian Leitung')).not.toBeInTheDocument();
-    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
-    expect(screen.getByText('An: Einsatzleitung')).toBeInTheDocument();
+    expect(feldWert('Von')).toBe('ELW 1');
+    expect(feldWert('An')).toBe('Einsatzleitung');
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lage ruhig{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
@@ -121,20 +146,16 @@ describe('Schnellerfassung', () => {
     });
   });
 
-  it('LFH-894: ein Entwurf mit eigenem An schlägt den Standard nur auf dieser Seite', () => {
+  it('LFH-894: ein Entwurf mit eigenem An schlägt die Vorgabe nur auf dieser Seite', () => {
     renderMitProviders(
       <Schnellerfassung
         {...props({
-          initialWerte: {
-            inhalt: 'Entwurf',
-            typ: 'meldung',
-            metadaten: { an: 'Eigener Empfänger' },
-          },
+          initialWerte: { inhalt: 'Entwurf', typ: 'lage', metadaten: { an: 'Eigener Empfänger' } },
         })}
       />,
     );
-    expect(screen.getByText('An: Eigener Empfänger')).toBeInTheDocument();
-    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
+    expect(feldWert('An')).toBe('Eigener Empfänger');
+    expect(feldWert('Von')).toBe('ELW 1');
   });
 
   it('Enter sendet typ=meldung mit Inhalt; Feld danach leer', async () => {
@@ -152,7 +173,8 @@ describe('Schnellerfassung', () => {
   it('LFH-762: rendert und erfasst ohne sicheren Kontext (Klartext-HTTP im LAN)', async () => {
     const zuruecknehmen = ohneSicherenKontext();
     try {
-      const p = props();
+      // Lage mit „Werte behalten“: beide Einträge tragen Von und An aus der Vorgabe.
+      const p = props({ initialWerte: LAGE, werteBehalten: true, onWerteBehaltenChange: vi.fn() });
       renderMitProviders(<Schnellerfassung {...p} />);
       const feld = screen.getByPlaceholderText(/Inhalt/);
       await userEvent.type(feld, 'Erste{Enter}');
@@ -410,68 +432,32 @@ describe('Schnellerfassung', () => {
     expect(p.erfassen).not.toHaveBeenCalled();
   });
 
-  it('+ Feld-Button öffnet das Felder-Menü und ein Feld ist wählbar', async () => {
+  it('ein Feld aus dem /-Menü holt den Fokus in dieses Feld der Feldzeile', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
-    await userEvent.click(screen.getByRole('button', { name: /Feld/ }));
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '/');
     await userEvent.click(await screen.findByText('Ereigniszeit'));
-    // Geprüft wird der Chip-Editor über sein `aria-label`, NICHT ein Text „Ereigniszeit": der
-    // Menüeintrag heißt genauso, ein `findByText` fände also auch dann etwas, wenn bloß das Menü
-    // stehenbliebe.
-    expect(await screen.findByLabelText('Ereigniszeit')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Zeit' })).toHaveFocus());
   });
 
-  it('schliesst das Menü nach der Auswahl — auch wenn es über den Feld-Button kam', async () => {
-    /**
-     * `waehleEintrag` muss das Menü selbst schließen: `entferneTriggerText` steigt bei
-     * `triggerStart < 0` (Öffnung über den Feld-Knopf) vor jedem Schließen aus, und das stehende
-     * Menü verdeckte den gerade geöffneten Chip-Editor.
-     *
-     * Beide Öffnungswege in EINEM Test — ein Test für nur einen Weg wäre entweder trivial grün
-     * oder ohne Kontrast.
-     */
+  it('schliesst das Menü nach der Auswahl', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     const nutzer = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-
-    // Weg 1 — über den Feld-Button.
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    expect(screen.getByTestId('slash-menu')).toBeInTheDocument();
-    await nutzer.click(await screen.findByText('Ereigniszeit'));
-    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
-
-    // Weg 2 — über „/" im Text.
     await nutzer.type(feld, '/');
     expect(await screen.findByTestId('slash-menu')).toBeInTheDocument();
     await nutzer.click(await screen.findByText('Von ✓'));
     await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
   });
 
-  it('der Feld-Knopf schliesst das Menü auch wieder', async () => {
-    // Der Knopf schaltet um. Der „Klick daneben"-Griff darf ihm nicht zuvorkommen:
-    // schlösse dieser zuerst, öffnete der Klick danach wieder — der Knopf könnte nie
-    // schliessen, und aus einem Umschalter würde ein Einschalter.
-    const p = props();
-    renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    const knopf = screen.getByRole('button', { name: /Feld/ });
-
-    await nutzer.click(knopf);
-    expect(screen.getByTestId('slash-menu')).toBeInTheDocument();
-    await nutzer.click(knopf);
-    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
-  });
-
   it('schliesst das Menü beim Klick daneben', async () => {
-    // Die zweite Hälfte von „schließt sich nicht": ohne Auswahl muss es einen Weg hinaus geben
-    // außer Escape oder einem zweiten Druck auf denselben Knopf.
+    // Ohne Auswahl muss es einen Weg hinaus geben außer Escape.
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     const nutzer = userEvent.setup();
-
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    expect(screen.getByTestId('slash-menu')).toBeInTheDocument();
+    await nutzer.type(screen.getByPlaceholderText(/Inhalt/), '/');
+    expect(await screen.findByTestId('slash-menu')).toBeInTheDocument();
     await nutzer.click(document.body);
     await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
   });
@@ -505,9 +491,10 @@ describe('Schnellerfassung', () => {
     // Bausteine dürfen NICHT erscheinen
     expect(screen.queryByText('Lagemeldung')).toBeNull();
     await userEvent.click(await screen.findByText('Von ✓'));
-    const chipInput = await screen.findByLabelText('Von');
-    await userEvent.clear(chipInput);
-    await userEvent.type(chipInput, 'Florian 2{Enter}');
+    const vonFeld = screen.getByRole('combobox', { name: 'Von' });
+    await waitFor(() => expect(vonFeld).toHaveFocus());
+    await userEvent.clear(vonFeld);
+    await userEvent.type(vonFeld, 'Florian 2{Enter}');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
@@ -601,12 +588,9 @@ describe('Schnellerfassung', () => {
     expect(
       screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
     ).not.toBeInTheDocument();
-    // Typ auf 'Lage' umstellen — über den Präfix, der den Typ als Befehl zeigt.
-    await waehleMenueEintrag(
-      screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }),
-      'Lage',
-    );
-    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
+    // Typ auf 'Lage' umstellen — über das Segment der Feldzeile.
+    await userEvent.click(screen.getByRole('radio', { name: 'Lage' }));
+    expect(screen.getByRole('radio', { name: 'Lage' })).toBeChecked();
     expect(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
     ).toBeInTheDocument();
@@ -623,10 +607,7 @@ describe('Schnellerfassung', () => {
         <Ort />
       </>,
     );
-    await waehleMenueEintrag(
-      screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }),
-      'Lage',
-    );
+    await userEvent.click(screen.getByRole('radio', { name: 'Lage' }));
     await userEvent.click(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
     );
@@ -644,11 +625,8 @@ describe('Schnellerfassung', () => {
     await waitFor(() =>
       expect(client.getQueryData(einsatzKeys.modulFreigaben(einsatz.id))).toBeDefined(),
     );
-    await waehleMenueEintrag(
-      screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }),
-      'Lage',
-    );
-    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'Lage' }));
+    expect(screen.getByRole('radio', { name: 'Lage' })).toBeChecked();
     expect(
       screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
     ).not.toBeInTheDocument();
@@ -741,11 +719,14 @@ describe('Schnellerfassung — Tastatur nach Zeigerart (LFH-955)', () => {
 });
 
 describe('Schnellerfassung – Wertübernahme', () => {
-  async function setzeTextfeld(feld: HTMLElement, trigger: string, label: string, wert: string) {
-    await userEvent.type(feld, ` /${trigger}`);
-    // Von/An trägt der Standard schon (Haken im Menü, Wert im Editor).
-    await userEvent.click(await screen.findByText(new RegExp(`^${label}( ✓)?$`)));
-    const eingabe = await screen.findByLabelText(label);
+  /** Setzt ein Feld der Feldzeile; Enter übernimmt und springt in den Inhalt. */
+  async function setzeTextfeld(trigger: 'von' | 'veranlassung', label: string, wert: string) {
+    if (trigger === 'veranlassung') {
+      await userEvent.click(screen.getByRole('button', { name: '+ Veranlassung' }));
+    }
+    const eingabe = await screen.findByRole(trigger === 'veranlassung' ? 'textbox' : 'combobox', {
+      name: label,
+    });
     await userEvent.clear(eingabe);
     await userEvent.type(eingabe, `${wert}{Enter}`);
   }
@@ -781,8 +762,8 @@ describe('Schnellerfassung – Wertübernahme', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage');
-    await setzeTextfeld(feld, 'von', 'Von', 'Florian 2');
-    await setzeTextfeld(feld, 'veranlassung', 'Veranlassung', 'Nachforderung');
+    await setzeTextfeld('von', 'Von', 'Florian 2');
+    await setzeTextfeld('veranlassung', 'Veranlassung', 'Nachforderung');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
@@ -791,8 +772,8 @@ describe('Schnellerfassung – Wertübernahme', () => {
     });
     expect(feld).toHaveValue('');
     // Von überlebt (Wiederholfeld), Veranlassung nicht (je Eintrag verschieden).
-    expect(await screen.findByText('Von: Florian 2')).toBeInTheDocument();
-    expect(screen.queryByText('Veranlassung: Nachforderung')).toBeNull();
+    await waitFor(() => expect(feldWert('Von')).toBe('Florian 2'));
+    expect(screen.queryByRole('textbox', { name: 'Veranlassung' })).toBeNull();
   });
 
   it('verwirft Von, wenn der Schalter aus ist', async () => {
@@ -800,13 +781,12 @@ describe('Schnellerfassung – Wertübernahme', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage');
-    await setzeTextfeld(feld, 'von', 'Von', 'Florian 2');
+    await setzeTextfeld('von', 'Von', 'Florian 2');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(feld).toHaveValue(''));
-    // Verworfen wird nur der eigene Wert; der Standard-Rufname steht wieder da (LFH-894).
-    expect(screen.queryByText('Von: Florian 2')).toBeNull();
-    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
+    // Verworfen wird der eigene Wert; eine Meldung hat für Von keine Vorgabe.
+    expect(feldWert('Von')).toBe('');
   });
 
   it('leert im Berichtigungsmodus alles, obwohl der Aufrufer den Schalter an hat', async () => {
@@ -818,13 +798,12 @@ describe('Schnellerfassung – Wertübernahme', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Korrektur');
-    await setzeTextfeld(feld, 'von', 'Von', 'Florian 2');
+    await setzeTextfeld('von', 'Von', 'Florian 2');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(feld).toHaveValue(''));
-    // Verworfen wird nur der eigene Wert; der Standard-Rufname steht wieder da (LFH-894).
-    expect(screen.queryByText('Von: Florian 2')).toBeNull();
-    expect(screen.getByText('Von: ELW 1')).toBeInTheDocument();
+    // Verworfen wird nur der eigene Wert; die eigene Stelle steht wieder da (LFH-894).
+    expect(feldWert('Von')).toBe('ELW 1');
   });
 });
 
@@ -863,29 +842,61 @@ describe('Schnellerfassung – Entwurf-Anbindung', () => {
 // ---------------------------------------------------------------------------
 
 describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
-  it('zeigt den gewählten Typ als Typwort im Präfix, die Zeile trägt seine Kante (LLH-1112)', () => {
+  it('zeigt den Typ als Segment „Typ des Eintrags“ mit Kante, die Zeile trägt sie auch (LLH-1112)', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
-    const praefix = document.querySelector('[data-lfh="schnellerfassung-praefix"]')!;
-    expect(praefix).toHaveTextContent(/^Meldung$/);
-    const knopf = screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' });
+    expect(screen.getByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeInTheDocument();
+    const meldung = screen.getByRole('radio', { name: 'Meldung' });
+    expect(meldung).toBeChecked();
     // Der Test rendert ohne Nachttheme: die Hellpalette gilt.
-    expect(knopf).toHaveStyle({ color: etbTypFarbe('meldung', theme.getDesignToken()).wort });
+    const kante = etbTypFarbe('meldung', theme.getDesignToken()).kante;
+    expect(meldung.style.boxShadow).toContain('2px');
+    expect(meldung.querySelector('[data-lfh="segment-punkt"]')).not.toBeNull();
     const zeile = document.querySelector<HTMLElement>('.lfh-schnellerfassung')!;
     expect(zeile.style.borderInlineStart).toContain('2px solid');
+    expect(kante).toBeTruthy();
+    // Keine Slash-Schreibweise als Beschriftung.
+    expect(document.querySelector('[data-lfh="etb-erfassung"]')!.textContent).not.toMatch(
+      /\/(meldung|anordnung|lage|entscheidung)/,
+    );
+  });
+
+  it('Wechsel per Klick: Typ Entscheidung, Von und An folgen der Vorgabe', async () => {
+    const p = props({ initialWerte: { inhalt: 'Rückzug', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(feldWert('Von')).toBe('');
+    expect(feldWert('An')).toBe('ELW 1');
+    await userEvent.click(screen.getByRole('radio', { name: 'Entscheidung' }));
+    expect(screen.getByRole('radio', { name: 'Entscheidung' })).toBeChecked();
+    expect(feldWert('Von')).toBe('ELW 1');
+    expect(feldWert('An')).toBe('ELW 1');
+  });
+
+  it('Typwechsel behält ein ausdrücklich gesetztes Von', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(feldWert('Von')).toBe('Florian 3');
+    await userEvent.click(screen.getByRole('radio', { name: 'Entscheidung' }));
+    expect(feldWert('Von')).toBe('Florian 3');
+    expect(feldWert('An')).toBe('ELW 1');
   });
 
   it('im Berichtigungsmodus steht „Berichtigung“ fest im Präfix, ohne Typwähler', () => {
     renderMitProviders(<Schnellerfassung {...props({ berichtigungZu: original() })} />);
     const praefix = document.querySelector('[data-lfh="schnellerfassung-praefix"]')!;
     expect(praefix).toHaveTextContent(/^Berichtigung$/);
-    expect(screen.queryByRole('button', { name: /Eintragstyp/ })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeNull();
   });
 
-  it('das Typmenü trägt je Typ einen Farbpunkt neben dem Wort', async () => {
+  it('unter md wählt ein Knopf mit Pfeil den Typ, das Menü trägt je Typ einen Farbpunkt', async () => {
+    setzeViewportBreite(390);
     renderMitProviders(<Schnellerfassung {...props()} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
+    expect(screen.queryByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeNull();
+    const knopf = screen.getByRole('button', { name: 'Typ des Eintrags: Meldung' });
+    expect(knopf).toHaveTextContent('Meldung ▾');
+    await userEvent.click(knopf);
     const eintrag = await screen.findByRole('menuitem', { name: 'Anordnung' });
     expect(eintrag.querySelector('[data-lfh="typ-punkt"]')).not.toBeNull();
+    await userEvent.click(eintrag);
+    expect(screen.getByRole('button', { name: 'Typ des Eintrags: Anordnung' })).toBeVisible();
   });
 
   it('/ am Zeilenanfang bietet die Typen an und setzt den gewählten Typ', async () => {
@@ -897,9 +908,11 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     expect(menue).toHaveTextContent('Typ');
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
-    // Der Befehlstext ist aus dem Feld verschwunden, der Typ steht im Präfix.
+    // Der Befehlstext ist aus dem Feld verschwunden, das Segment trägt den Typ.
     expect(feld).toHaveValue('');
-    expect(screen.getByRole('button', { name: 'Eintragstyp Anordnung ändern' })).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Anordnung' })).toBeChecked();
+    // Eine Anordnung braucht ein An; das Feld hat keine Vorgabe.
+    await setzeAn('EA-Süd');
     await userEvent.type(feld, 'Verbau halten{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
@@ -922,7 +935,7 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, '/lage Pegel steigt');
     expect(feld).toHaveValue('Pegel steigt');
-    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Lage' })).toBeChecked();
   });
 
   it('@ füllt bei einer Meldung den Absender aus den Funkrufnamen', async () => {
@@ -936,7 +949,7 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Lage ruhig @flo');
     await userEvent.click(await screen.findByText('Von: Florian 1'));
-    expect(await screen.findByText('Von: Florian 1', { selector: '*' })).toBeInTheDocument();
+    await waitFor(() => expect(feldWert('Von')).toBe('Florian 1'));
     // Der Auslösetext ist weg, der Satz davor bleibt.
     expect(feld).toHaveValue('Lage ruhig ');
     await userEvent.type(feld, '{Enter}');
@@ -975,91 +988,67 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
   });
 });
 
-describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
+describe('Schnellerfassung — Fußzeile (Spec „Einstellungen in der Fußzeile der Erfassung“)', () => {
   /**
-   * Unter `md` rollt die Zeile waagerecht, damit nicht jeder gesetzte Chip eine eigene Reihe
-   * kostet; die Pixel misst `e2e/leisten-flaeche.spec.ts`.
+   * Unter `md` rollt die Fußzeile waagerecht, damit nicht jeder Knopf eine eigene Reihe kostet;
+   * die Pixel misst `e2e/leisten-flaeche.spec.ts`.
    */
   it('unter md einzeilig mit waagerechtem Bildlauf, sonst umbrechend', () => {
-    expect(chipZeileStil(true, { marginXS: 4 })).toMatchObject({
+    expect(fusszeileStil(true, { marginXS: 4, marginSM: 8 })).toMatchObject({
       flexWrap: 'nowrap',
       overflowX: 'auto',
       minWidth: 0,
     });
-    const breit = chipZeileStil(false, { marginXS: 4 });
+    const breit = fusszeileStil(false, { marginXS: 4, marginSM: 8 });
     expect(breit.flexWrap).toBe('wrap');
     expect(breit.overflowX).toBeUndefined();
   });
 
-  /**
-   * In der einzeilig rollenden Chip-Zeile läge „Werte behalten" hinter dem Bildlauf. Unter `md`
-   * steht der Schalter deshalb in der Hinweiszeile der Erfassung (innerhalb von
-   * `[data-lfh="schnellerfassung"]`), ab `md` in der Chip-Zeile.
-   */
   it.each([
     [390, true],
     [1366, false],
-  ])('bei %i px steht „Werte behalten" in der Hinweiszeile: %s', (breite, inHinweiszeile) => {
-    setzeViewportBreite(breite);
-    renderMitProviders(
-      <Schnellerfassung {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })} />,
-    );
-    const schalter = screen.getByRole('checkbox', { name: /Werte behalten/ });
-    expect(schalter.closest('[data-lfh="schnellerfassung"]') != null).toBe(inHinweiszeile);
-    // Der Kästchen-Boden (`antdKaestchen`, LFH-907) ist in der Hinweiszeile aufgehoben: im
-    // Handschuh-Betrieb höbe er die Zeile von 36 auf 72 px, und die Leiste risse auf dem
-    // Handschirm den Deckel der halben Fensterhöhe (`e2e/leisten-flaeche.spec.ts`).
-    const label = schalter.closest<HTMLElement>('label.ant-checkbox-wrapper')!;
-    expect(label.style.minHeight).toBe(inHinweiszeile ? '0px' : '');
-  });
-
-  /**
-   * Ab `md` stehen die Einstellungen im Reiterband, wenn der Aufrufer einen Platz reicht
-   * (LLH-1037 D12): in der Chip-Zeile brach die Gruppe im Handschuh-Betrieb um, und die Leiste
-   * wuchs um eine Kästchenhöhe. Solange der Platz fehlt (`null`), stehen sie nirgends, statt kurz
-   * in der Chip-Zeile aufzublitzen; unter `md` bleibt die Hinweiszeile.
-   */
-  it.each([
-    [1366, 'ziel'],
-    [1366, 'noch-nicht'],
-    [390, 'ziel'],
-  ] as const)('bei %i px mit Platz im Reiterband (%s)', (breite, fall) => {
-    setzeViewportBreite(breite);
-    const ziel = document.createElement('div');
-    document.body.append(ziel);
-    onTestFinished(() => ziel.remove());
-    renderMitProviders(
-      <Schnellerfassung
-        {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })}
-        einstellungenZiel={fall === 'ziel' ? ziel : null}
-      />,
-    );
-    for (const name of ['Werte behalten', 'Nur protokollieren']) {
-      const kaestchen = screen.queryByRole('checkbox', { name });
-      if (breite < 768) {
-        // Unter `md` unverändert in der Hinweiszeile, ohne Kästchen-Boden.
-        expect(kaestchen?.closest('[data-lfh="schnellerfassung"]'), name).not.toBeNull();
-        expect(kaestchen != null && ziel.contains(kaestchen), name).toBe(false);
-      } else if (fall === 'ziel') {
-        expect(kaestchen != null && ziel.contains(kaestchen), name).toBe(true);
-        // Der Boden bleibt: dort ist die Trefffläche im Handschuh-Betrieb geprüft.
-        expect(kaestchen!.closest<HTMLElement>('label')!.style.minHeight, name).toBe('');
-      } else {
-        expect(kaestchen, name).toBeNull();
+  ])(
+    'bei %i px stehen beide Schalter in der Fußzeile, ohne Kästchen-Boden: %s',
+    (breite, ohneBoden) => {
+      setzeViewportBreite(breite);
+      renderMitProviders(
+        <Schnellerfassung {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })} />,
+      );
+      for (const name of ['Werte behalten', 'Auch in den Meldungseingang']) {
+        const schalter = screen.getByRole('checkbox', { name });
+        expect(schalter.closest('[data-lfh="etb-fusszeile"]'), name).not.toBeNull();
+        // Der Kästchen-Boden (`antdKaestchen`, LFH-907) ist nur in der rollenden Fußzeile des
+        // Handschirms aufgehoben; ab `md` hält er die Trefffläche im Handschuh-Betrieb.
+        const label = schalter.closest<HTMLElement>('label.ant-checkbox-wrapper')!;
+        expect(label.style.minHeight, name).toBe(ohneBoden ? '0px' : '');
       }
+    },
+  );
+
+  it('rechts stehen „+ Veranlassung“, „Anhang“ und „+ weiterer Entwurf“ als Textknöpfe', async () => {
+    const onWeitererEntwurf = vi.fn();
+    renderMitProviders(<Schnellerfassung {...props({ onWeitererEntwurf })} />);
+    const fuss = document.querySelector('[data-lfh="etb-fusszeile"]')!;
+    for (const name of ['+ Veranlassung', 'Anhang', '+ weiterer Entwurf']) {
+      expect(fuss.contains(screen.getByRole('button', { name })), name).toBe(true);
     }
+    await userEvent.click(screen.getByRole('button', { name: '+ weiterer Entwurf' }));
+    expect(onWeitererEntwurf).toHaveBeenCalledTimes(1);
+    // „+ Veranlassung“ holt das Feld in die Zeile und den Fokus hinein.
+    await userEvent.click(screen.getByRole('button', { name: '+ Veranlassung' }));
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Veranlassung' })).toHaveFocus(),
+    );
+    expect(screen.queryByRole('button', { name: '+ Veranlassung' })).toBeNull();
   });
 
-  it('holt einen Chip hinter dem rechten Rand waagerecht ins Bild, ohne das Dokument zu rollen', () => {
-    const zeile = document.createElement('div');
-    const ziel = document.createElement('input');
-    zeile.getBoundingClientRect = () => ({ left: 0, right: 300 }) as DOMRect;
-    ziel.getBoundingClientRect = () => ({ left: 280, right: 440 }) as DOMRect;
-    const rollen = vi.spyOn(window, 'scrollTo');
-    rolleWaagerechtInsBild(zeile, ziel);
-    expect(zeile.scrollLeft).toBe(140);
-    expect(rollen).not.toHaveBeenCalled();
-    rollen.mockRestore();
+  it('„Vorschau“ nur bei Formatierung im Inhalt', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe läuft');
+    expect(screen.queryByRole('button', { name: 'Vorschau' })).toBeNull();
+    await userEvent.type(feld, ' **jetzt**');
+    expect(screen.getByRole('button', { name: 'Vorschau' })).toBeInTheDocument();
   });
 });
 
@@ -1072,33 +1061,64 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     ).toBeInTheDocument();
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, 'Pegel steigt{Enter}');
-    expect(await screen.findByText('Von fehlt')).toBeVisible();
+    // Ohne Standard fehlt die Vorgabe für An; der Grund steht am Feld, der Fokus geht dorthin.
+    expect(await screen.findByText('Empfänger fehlt')).toBeVisible();
+    const an = screen.getByRole('combobox', { name: 'An' });
+    await waitFor(() => expect(an).toHaveFocus());
+    expect(an).toHaveAttribute('aria-invalid', 'true');
+    expect(an).toHaveAccessibleDescription('Empfänger fehlt');
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(feld).toHaveValue('Pegel steigt');
   });
 
-  it('ein fehlendes An hält auf, auch wenn Von per Eintrag gesetzt ist', async () => {
+  it('Kein Standard, kein Von: der Grund steht am Feld Von, das den Fokus hat', async () => {
+    const p = props({
+      rufname: rufnameZugriff(null),
+      initialWerte: { inhalt: 'Lage ruhig', typ: 'lage', metadaten: { an: 'ELW 1' } },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Absender fehlt')).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Lage ruhig');
+  });
+
+  it('fehlen beide Seiten, sind beide Felder markiert', async () => {
+    const p = props({
+      rufname: rufnameZugriff(null),
+      initialWerte: { inhalt: 'Lage ruhig', typ: 'lage', metadaten: {} },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Absender fehlt')).toBeVisible();
+    expect(screen.getByText('Empfänger fehlt')).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('combobox', { name: 'An' })).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('ein gesetztes An räumt seinen Grund', async () => {
     const p = props({
       rufname: rufnameZugriff(null),
       initialWerte: { inhalt: 'Lage', typ: 'meldung', metadaten: { von: 'Florian 1' } },
     });
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
-    expect(await screen.findByText(/^An fehlt/)).toBeInTheDocument();
+    expect(await screen.findByText('Empfänger fehlt')).toBeInTheDocument();
     expect(p.erfassen).not.toHaveBeenCalled();
-
-    // Der Weg steht am Hinweis als Knopf, nicht als Satz (LFH-1078): er öffnet den Feld-Editor.
-    await userEvent.click(screen.getByRole('button', { name: 'An setzen' }));
-    expect(await screen.findByLabelText('An')).toBeInTheDocument();
-    expect(screen.queryByText(/^An fehlt/)).toBeNull();
+    await setzeAn('ELW 2');
+    expect(screen.queryByText('Empfänger fehlt')).toBeNull();
   });
 
   it('übernimmt den Rufnamen aus der Abfrage über den Zugriff', async () => {
     const rufname = rufnameZugriff(null);
     renderMitProviders(<Schnellerfassung {...props({ rufname })} />);
+    // Das erste Enter nimmt den Freitext-Eintrag der offenen Liste, das zweite übernimmt
+    // (Spec `stammdaten-feld`, „Tastatur“).
     await userEvent.type(
       screen.getByRole('combobox', { name: 'Rufname für Von und An' }),
-      'ELW 1{Enter}',
+      'ELW 1{Enter}{Enter}',
     );
     await waitFor(() => expect(rufname.setze).toHaveBeenCalledWith('{"von":"ELW 1","an":"ELW 1"}'));
   });
@@ -1110,46 +1130,48 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
     expect(screen.queryByRole('group', { name: /Rufnamen/ })).toBeNull();
   });
 
-  it('kennzeichnet Chips aus dem Standard und bietet für sie kein Entfernen an', async () => {
+  it('kennzeichnet einen Wert aus der Vorgabe, ein eigener trägt keine Marke', () => {
     renderMitProviders(
       <Schnellerfassung
-        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: { an: 'S2' } } })}
+        {...props({ initialWerte: { inhalt: '', typ: 'lage', metadaten: { an: 'S2' } } })}
       />,
     );
-    const von = screen.getByText('Von: ELW 1').closest('[data-standard]');
-    expect(von).toHaveAttribute('data-standard', 'ja');
-    expect(von).toHaveAttribute('title', expect.stringMatching(/^Standard-Rufname/));
-    // Der eigene Wert dieses Eintrags ist kein Standard.
-    expect(screen.getByText('An: S2').closest('[data-standard]')).toBeNull();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
-    expect(
-      await screen.findByRole('menuitem', { name: 'Nur für diesen Eintrag ändern' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Standard-Rufname ändern' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /Entfernen/ })).toBeNull();
+    const von = document.querySelector('[data-lfh="etb-feld-von"]')!;
+    expect(von).toHaveAttribute('data-vorgabe', 'ja');
+    expect(von).toHaveAttribute('title', 'Vorgabe: eigene Stelle');
+    expect(document.querySelector('[data-lfh="etb-feld-an"]')).not.toHaveAttribute('data-vorgabe');
   });
 
-  it('„Standard-Rufname ändern“ im Chip-Menü öffnet die Abfrage mit Abbrechen', async () => {
+  it('„Eigene Stelle ändern“ öffnet die Abfrage mit Abbrechen', async () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
-    await waehleMenueEintrag(
-      screen.getByRole('button', { name: 'Aktionen zu An' }),
-      'Standard-Rufname ändern',
-    );
+    await userEvent.click(screen.getByRole('button', { name: 'Eigene Stelle ändern' }));
     const abfrage = screen.getByRole('group', { name: 'Dein Rufname für Von und An' });
     expect(abfrage).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(screen.queryByRole('group', { name: /Rufname/ })).toBeNull();
   });
 
-  it('in der Berichtigung bietet das Chip-Menü keinen Standardwechsel', async () => {
+  it('in der Berichtigung gibt es keinen Wechsel der eigenen Stelle', () => {
     renderMitProviders(<Schnellerfassung {...props({ berichtigungZu: original() })} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Von' }));
-    expect(
-      await screen.findByRole('menuitem', { name: 'Nur für diesen Eintrag ändern' }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Standard-Rufname ändern' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Eigene Stelle ändern' })).toBeNull();
+  });
+
+  it('eine Berichtigung trägt Von, An und Meldeweg des berichtigten Eintrags', async () => {
+    const p = props({
+      berichtigungZu: { ...original(), von: 'Rettungsstaffel', an: 'EL', meldeweg: 'funk' },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(feldWert('Von')).toBe('Rettungsstaffel');
+    expect(feldWert('An')).toBe('EL');
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'RTW 83-1{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'berichtigung',
+      von: 'Rettungsstaffel',
+      an: 'EL',
+      meldeweg: 'funk',
+    });
   });
 
   // Ohne offenes Chip-Menü: es holt sich per `autoFocus` den Fokus und riss unter CI-Last das
@@ -1168,7 +1190,11 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
   });
 
   it('@ überschreibt nur die eine Seite dieses Eintrags', async () => {
-    const p = props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() });
+    const p = props({
+      initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} },
+      werteBehalten: false,
+      onWerteBehaltenChange: vi.fn(),
+    });
     renderMitProviders(<Schnellerfassung {...p} />);
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, '/anordnung Sandsäcke @EA-Süd');
@@ -1180,8 +1206,8 @@ describe('Schnellerfassung – Standard-Rufname und Von/An-Pflicht (LFH-894)', (
       von: 'ELW 1',
       an: 'EA-Süd',
     });
-    // Der nächste Eintrag geht wieder an den Standard.
-    await waitFor(() => expect(screen.getByText('An: ELW 1')).toBeInTheDocument());
+    // Der nächste Eintrag beginnt wieder als Meldung: An ist die eigene Stelle.
+    await waitFor(() => expect(feldWert('An')).toBe('ELW 1'));
   });
 });
 
@@ -1232,7 +1258,7 @@ describe('Ereigniszeit eines vorgehenden Geräts (LFH-895)', () => {
         initialWerte: {
           inhalt: '',
           typ: 'meldung',
-          metadaten: { ereigniszeit: dayjs.utc('2026-10-04T09:30:00Z') },
+          metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-04T09:30:00Z') },
         },
       }),
     );
@@ -1263,7 +1289,7 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, '/zeit 1420 Pumpe läuft');
     expect(feld).toHaveValue('Pumpe läuft');
-    expect(screen.getByText('Ereigniszeit: 1420')).toBeInTheDocument();
+    expect(feldWert('Zeit')).toBe('1420');
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
@@ -1290,8 +1316,12 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, '/zeit 2590 Pumpe');
     expect(feld).toHaveValue('/zeit 2590 Pumpe');
-    expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
+    // Das Feld Zeit bleibt bei „jetzt“ und nennt den Grund.
+    expect(feldWert('Zeit')).toBe('');
     expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: .+/);
+    expect(screen.getByRole('textbox', { name: 'Zeit' })).toHaveAccessibleDescription(
+      expect.stringMatching(/^\/zeit: /),
+    );
   });
 
   it('greift nicht, wenn mitten in einer stehenden Angabe korrigiert wird', async () => {
@@ -1304,7 +1334,7 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
       initialSelectionEnd: 10,
     });
     expect(feld).toHaveValue('/zeit 259 Pumpe');
-    expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
+    expect(feldWert('Zeit')).toBe('');
   });
 
   it('räumt den Grund, wenn ein Baustein den Text ersetzt', async () => {
@@ -1318,13 +1348,13 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
     await waitFor(() => expect(screen.queryByText(/^\/zeit: /)).toBeNull());
   });
 
-  it('sendet keine Ereigniszeit in der Zukunft: Grund am Chip, Text bleibt', async () => {
+  it('sendet keine Ereigniszeit in der Zukunft: Grund am Feld Zeit, Fokus dort, Text bleibt', async () => {
     const p = props({
       initialWerte: {
         inhalt: '',
         typ: 'meldung',
         // 18:20 statt 14:20.
-        metadaten: { ereigniszeit: dayjs.utc('2026-10-17T16:20:00Z') },
+        metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-17T16:20:00Z') },
       },
     });
     renderMitProviders(<Schnellerfassung {...p} />);
@@ -1332,11 +1362,14 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
     await userEvent.type(feld, 'Pumpe läuft{Enter}');
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(feld).toHaveValue('Pumpe läuft');
-    const grund = await screen.findByText(/liegt in der Zukunft/);
-    expect(grund.closest('.ant-tag')).toHaveTextContent('Ereigniszeit: 1820');
+    expect(await screen.findByText('Zeit liegt in der Zukunft')).toBeVisible();
+    const zeit = screen.getByRole('textbox', { name: 'Zeit' });
+    await waitFor(() => expect(zeit).toHaveFocus());
+    expect(zeit).toHaveAttribute('aria-invalid', 'true');
+    expect(zeit).toHaveValue('1820');
   });
 
-  it('zeigt am Chip den Tag, wenn die Ereigniszeit nicht von heute ist', () => {
+  it('zeigt im Feld Zeit den Tag, wenn die Ereigniszeit nicht von heute ist', () => {
     renderMitProviders(
       <Schnellerfassung
         {...props({
@@ -1348,22 +1381,168 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
         })}
       />,
     );
-    expect(screen.getByText('Ereigniszeit: 162350')).toBeInTheDocument();
+    expect(feldWert('Zeit')).toBe('162350okt26');
+  });
+
+  it('Nachtrag: Feld in der Achtungsrolle, Fußzeile nennt den Abstand, der Knopf die Zeit', () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({
+          initialWerte: {
+            inhalt: 'Keller leergepumpt',
+            typ: 'meldung',
+            // 14:17 Berlin, es ist 14:31.
+            metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-17T12:17:00Z') },
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Nachtrag · Ereignis vor 14 min')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Zeit' }).closest('[data-nachtrag]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Erfassen als 1417' })).toBeInTheDocument();
+  });
+
+  it('ohne abweichende Zeit zeigt das Feld „jetzt“ mit der Uhrzeit, der Knopf heißt „Erfassen“', () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.getByRole('textbox', { name: 'Zeit' })).toHaveAttribute(
+      'placeholder',
+      'jetzt · 1431',
+    );
+    expect(screen.queryByText(/^Nachtrag ·/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
+  });
+
+  it('Funkspruch nachtragen: Zeit, Von und Weg über die Feldzeile, An aus der Vorgabe', async () => {
+    const p = props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const zeit = screen.getByRole('textbox', { name: 'Zeit' });
+    await userEvent.type(zeit, '1412');
+    await userEvent.tab();
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    expect(von).toHaveFocus();
+    await userEvent.type(von, 'Sanitätszug Musterstadt');
+    await userEvent.tab();
+    expect(screen.getByRole('combobox', { name: 'An' })).toHaveFocus();
+    await userEvent.tab();
+    expect(screen.getByRole('combobox', { name: 'Meldeweg' })).toHaveFocus();
+    await waehle('Meldeweg', 'Funk');
+    // Die Wahl springt in den Inhalt.
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Keller leer{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      ereigniszeit: '2026-10-17 12:12:00',
+      von: 'Sanitätszug Musterstadt',
+      an: 'ELW 1',
+      meldeweg: 'funk',
+    });
+  });
+
+  it('Reihenfolge per Tastatur: Zeit → Von → An → Meldeweg → Inhalt', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    screen.getByRole('textbox', { name: 'Zeit' }).focus();
+    await userEvent.tab();
+    await userEvent.tab();
+    await userEvent.tab();
+    expect(screen.getByRole('combobox', { name: 'Meldeweg' })).toHaveFocus();
+    await userEvent.tab();
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus();
+  });
+
+  it('Nach dem Setzen der Zeit: Enter im Feld springt in den Inhalt, Enter dort sendet ohne Umbruch (LLH-1865)', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Zeit' }), '1420{Enter}');
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await waitFor(() => expect(feld).toHaveFocus());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    await userEvent.keyboard('Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      ereigniszeit: '2026-10-17 12:20:00',
+      inhalt: 'Pumpe läuft',
+    });
+  });
+
+  it('Geleert: ein geleertes Feld Zeit gilt wieder „jetzt“', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const zeit = screen.getByRole('textbox', { name: 'Zeit' });
+    await userEvent.type(zeit, '1420');
+    await userEvent.tab();
+    expect(screen.getByText('Nachtrag · Ereignis vor 11 min')).toBeVisible();
+    await userEvent.clear(zeit);
+    await userEvent.tab();
+    expect(zeit).toHaveValue('');
+    expect(screen.queryByText(/^Nachtrag ·/)).toBeNull();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      ereigniszeit: '2026-10-17 12:31:00',
+    });
+  });
+
+  it('Enter im Feld Von übernimmt und springt in den Inhalt, ohne zu senden', async () => {
+    const p = props({ initialWerte: { inhalt: 'Pumpe läuft', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByRole('combobox', { name: 'Von' }), 'Florian 7{Enter}');
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feldWert('Von')).toBe('Florian 7');
   });
 });
 
-describe('Schnellerfassung — eingeklappt (LFH-955)', () => {
-  it('Einklappen schließt einen offenen Feld-Editor, Aufklappen holt ihn nicht zurück', async () => {
+describe('Schnellerfassung — Markieren beim Betreten', () => {
+  it('ein Tastendruck vor dem nächsten Bild wird nicht markiert und überschrieben', async () => {
+    const bilder: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      bilder.push(cb);
+      return bilder.length;
+    });
+    try {
+      const p = props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } });
+      renderMitProviders(<Schnellerfassung {...p} />);
+      const von = screen.getByRole('combobox', { name: 'Von' });
+      const user = userEvent.setup();
+      await user.click(von);
+      await user.keyboard('F');
+      // Erst jetzt kommt das Bild, das beim Betreten markieren wollte.
+      act(() => bilder.splice(0).forEach((cb) => cb(0)));
+      await user.keyboard('lorian 7');
+      expect(von).toHaveValue('Florian 7');
+    } finally {
+      raf.mockRestore();
+    }
+  });
+});
+
+describe('Schnellerfassung — eingeklappt (LFH-955, kwc2yszv 4.1)', () => {
+  it('unter md eingeklappt eine Zeile aus Typ-Knopf und Inhalt; aufgeklappt Felder und „Erfassen“', () => {
+    setzeViewportBreite(390);
+    const p = props();
+    const { rerender } = renderMitProviders(<Schnellerfassung {...p} eingeklappt />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    expect(screen.getByRole('button', { name: 'Typ des Eintrags: Meldung' })).toBeVisible();
+    expect(screen.queryByRole('combobox', { name: 'Von' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Zeit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Erfassen' })).toBeNull();
+    rerender(<Schnellerfassung {...p} eingeklappt={false} />);
+    // Das Feld behält seinen Platz im Baum (kein Neuaufbau, der Fokus bliebe).
+    expect(screen.getByPlaceholderText(/Inhalt/)).toBe(feld);
+    expect(screen.getByRole('textbox', { name: 'Zeit' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Meldeweg' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'An' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Erfassen' })).toBeVisible();
+  });
+
+  it('Einklappen schließt ein offenes /-Menü', async () => {
     const p = props();
     const { rerender } = renderMitProviders(<Schnellerfassung {...p} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Feld' }));
-    await userEvent.click(await screen.findByText(/^An( ✓)?$/));
-    expect(await screen.findByLabelText('An')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), '/');
+    expect(await screen.findByTestId('slash-menu')).toBeInTheDocument();
     rerender(<Schnellerfassung {...p} eingeklappt />);
-    expect(screen.queryByLabelText('An')).toBeNull();
-    rerender(<Schnellerfassung {...p} eingeklappt={false} />);
-    await screen.findByRole('button', { name: 'Feld' });
-    expect(screen.queryByLabelText('An')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
   });
 });
 
@@ -1385,9 +1564,32 @@ describe('Schnellerfassung – Startfokus', () => {
     await act(() => new Promise((r) => setTimeout(r, 50)));
   }
 
-  it('fokussiert das Inhaltsfeld, wenn kein anderes Feld den Fokus hält', async () => {
+  it('fokussiert das Inhaltsfeld, wenn kein anderes Feld den Fokus hält und alles vorbelegt ist', async () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+  });
+
+  it('Fokus beim Laden: Meldung mit leerem Von fokussiert das Feld Von', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } })}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+  });
+
+  it('Alles vorbelegt: Lage mit eigener Stelle fokussiert den Inhalt', async () => {
+    renderMitProviders(<Schnellerfassung {...props({ initialWerte: LAGE })} />);
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
+  });
+
+  it('nach dem Erfassen steht der Fokus wieder im ersten leeren Pflichtfeld', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe läuft{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    // Die nächste Meldung hat kein Von: dorthin.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
   });
 
   it('nimmt einem Eingabefeld außerhalb der Leiste den Fokus nicht', async () => {
@@ -1418,66 +1620,71 @@ describe('Schnellerfassung – Startfokus', () => {
 });
 
 // ---------------------------------------------------------------------------
-// „Nur protokollieren“ (LLH-1037, Spec `etb-schnellerfassung-tastatur`)
+// „Auch in den Meldungseingang“ (LLH-1037; Change `kwc2yszv-etb-neuentwurf`, D4)
 // ---------------------------------------------------------------------------
 
-describe('Nur protokollieren', () => {
+describe('Auch in den Meldungseingang', () => {
+  const NAME = 'Auch in den Meldungseingang';
   const gesendet = (p: ReturnType<typeof props>, n = 0) =>
     (p.erfassen as ReturnType<typeof vi.fn>).mock.calls[n][0] as NeuerEintrag;
 
-  /** Wählt erst, wenn das Typmenü seinen Fokus hat (`test/menue.ts`, LLH-1390). */
-  async function waehleTyp(von: string, nach: string) {
-    await waehleMenueEintrag(
-      screen.getByRole('button', { name: `Eintragstyp ${von} ändern` }),
-      nach,
-    );
-  }
-
-  it('steht bei „Meldung“ aus, und der Eintrag geht in den Meldungseingang', async () => {
+  it('Vorgabe: eine Meldung von außen steht an und geht in den Meldungseingang', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
-    expect(screen.getByRole('checkbox', { name: 'Nur protokollieren' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: NAME })).toBeChecked();
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Pegel steigt{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect(gesendet(p)).toMatchObject({ typ: 'meldung', in_meldungseingang: true });
   });
 
-  it('an: nur protokolliert; danach wieder aus, auch mit „Werte behalten“', async () => {
-    const p = props({ werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+  it('Eigener Vermerk: Lage mit Von und An der eigenen Stelle steht aus', async () => {
+    const p = props({ initialWerte: LAGE });
     renderMitProviders(<Schnellerfassung {...p} />);
-    await waehleTyp('Meldung', 'Lage');
-    const schalter = screen.getByRole('checkbox', { name: 'Nur protokollieren' });
-    await userEvent.click(schalter);
-    expect(schalter).toBeChecked();
-    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Mitschrift{Enter}');
+    expect(screen.getByRole('checkbox', { name: NAME })).not.toBeChecked();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lage ruhig{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect(gesendet(p)).toMatchObject({ typ: 'lage', in_meldungseingang: false });
-    // Der Typ bleibt (Werte behalten), der Schalter springt zurück.
-    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByRole('checkbox', { name: 'Nur protokollieren' })).not.toBeChecked(),
-    );
   });
 
-  it('fehlt bei „Anordnung“ und in der Berichtigung; gesendet wird ausdrücklich false', async () => {
+  it('wechselt Von, gilt die Vorgabe neu, solange nicht von Hand gesetzt', async () => {
+    renderMitProviders(<Schnellerfassung {...props({ initialWerte: LAGE })} />);
+    expect(screen.getByRole('checkbox', { name: NAME })).not.toBeChecked();
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.clear(von);
+    await userEvent.type(von, 'Florian 3{Enter}');
+    expect(screen.getByRole('checkbox', { name: NAME })).toBeChecked();
+  });
+
+  it('Zurück nach dem Erfassen: von Hand aus, danach wieder auf der Vorgabe, auch mit „Werte behalten“', async () => {
+    const p = props({ werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const schalter = screen.getByRole('checkbox', { name: NAME });
+    await userEvent.click(schalter);
+    expect(schalter).not.toBeChecked();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Mitschrift{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)).toMatchObject({ typ: 'meldung', in_meldungseingang: false });
+    // Von bleibt (Werte behalten), der Schalter springt auf die Vorgabe zurück.
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: NAME })).toBeChecked());
+    expect(feldWert('Von')).toBe('Florian 3');
+  });
+
+  it('Anordnung: der Schalter fehlt, gesendet wird ausdrücklich false; ebenso in der Berichtigung', async () => {
     const p = props();
     const { unmount } = renderMitProviders(<Schnellerfassung {...p} />);
-    await waehleTyp('Meldung', 'Anordnung');
-    expect(screen.queryByRole('checkbox', { name: 'Nur protokollieren' })).toBeNull();
-    const feld = screen.getByPlaceholderText(/Inhalt/);
-    await userEvent.type(feld, 'Abmarsch');
-    expect(feld).toHaveValue('Abmarsch');
-    await userEvent.keyboard('{Enter}');
+    await userEvent.click(screen.getByRole('radio', { name: 'Anordnung' }));
+    expect(screen.queryByRole('checkbox', { name: NAME })).toBeNull();
+    await setzeAn('EA-Süd');
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Abmarsch{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect(gesendet(p)).toMatchObject({ typ: 'anordnung', in_meldungseingang: false });
     unmount();
 
-    const b = props({ berichtigungZu: original() });
-    renderMitProviders(<Schnellerfassung {...b} />);
-    expect(screen.queryByRole('checkbox', { name: 'Nur protokollieren' })).toBeNull();
+    renderMitProviders(<Schnellerfassung {...props({ berichtigungZu: original() })} />);
+    expect(screen.queryByRole('checkbox', { name: NAME })).toBeNull();
   });
 
-  it('ohne Freigabe der Meldungen an und gesperrt mit Grund; sendet false', async () => {
+  it('ohne Freigabe der Meldungen aus und gesperrt mit Grund; sendet false', async () => {
     server.use(
       http.get('/api/einsaetze/:id/modul-freigaben', () =>
         HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
@@ -1488,8 +1695,8 @@ describe('Nur protokollieren', () => {
     await waitFor(() =>
       expect(client.getQueryData(einsatzKeys.modulFreigaben(einsatz.id))).toBeDefined(),
     );
-    const schalter = await screen.findByRole('checkbox', { name: 'Nur protokollieren' });
-    expect(schalter).toBeChecked();
+    const schalter = await screen.findByRole('checkbox', { name: NAME });
+    await waitFor(() => expect(schalter).not.toBeChecked());
     expect(schalter).toBeDisabled();
     expect(schalter).toHaveAccessibleDescription('Modul Meldungen gesperrt');
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lage ruhig{Enter}');
@@ -1497,41 +1704,34 @@ describe('Nur protokollieren', () => {
     expect(gesendet(p)).toMatchObject({ in_meldungseingang: false });
   });
 
-  it('lebt im Entwurf: Startwert aus dem Entwurf, Umlegen geht an den Aufrufer', async () => {
+  it('lebt im Entwurf: ein alter Entwurf mit `nurProtokollieren: true` bleibt aus, Umlegen geht an den Aufrufer', async () => {
     const onWerteChange = vi.fn();
     renderMitProviders(
       <Schnellerfassung
         {...props({
-          initialWerte: { inhalt: 'X', typ: 'lage', metadaten: {}, nurProtokollieren: true },
+          initialWerte: {
+            inhalt: 'X',
+            typ: 'meldung',
+            metadaten: { von: 'Florian 3' },
+            nurProtokollieren: true,
+          },
           onWerteChange,
         })}
       />,
     );
-    const schalter = screen.getByRole('checkbox', { name: 'Nur protokollieren' });
-    expect(schalter).toBeChecked();
+    const schalter = screen.getByRole('checkbox', { name: NAME });
+    expect(schalter).not.toBeChecked();
     await userEvent.click(schalter);
     expect(onWerteChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ typ: 'lage', nurProtokollieren: false }),
+      expect.objectContaining({ typ: 'meldung', nurProtokollieren: false }),
     );
-  });
-
-  it.each([
-    [390, true],
-    [1366, false],
-  ])('bei %i px steht er in der Hinweiszeile: %s', (breite, inHinweiszeile) => {
-    setzeViewportBreite(breite);
-    renderMitProviders(<Schnellerfassung {...props()} />);
-    const schalter = screen.getByRole('checkbox', { name: 'Nur protokollieren' });
-    expect(schalter.closest('[data-lfh="schnellerfassung"]') != null).toBe(inHinweiszeile);
-    const label = schalter.closest<HTMLElement>('label.ant-checkbox-wrapper')!;
-    expect(label.style.minHeight).toBe(inHinweiszeile ? '0px' : '');
   });
 });
 
 /**
  * LLH-1842: Eine getippte Ereigniszeit, die mit Tab oder Klick verlassen wurde, stand im Feld,
- * galt aber nicht. Öffnete man ein weiteres Feld oder sendete mit offenem Zeit-Editor, bekam der
- * Eintrag „jetzt“ (Spec `zeiteingabe`, „Verlassen übernimmt“).
+ * galt aber nicht. Mit der Feldzeile gilt ein Wert, sobald das Feld verlassen wird (Spec
+ * „Feste Felder der Erfassung“).
  */
 describe('Ereigniszeit bleibt nach dem Verlassen des Felds (LLH-1842)', () => {
   mitProzessZone('Europe/Berlin');
@@ -1548,166 +1748,227 @@ describe('Ereigniszeit bleibt nach dem Verlassen des Felds (LLH-1842)', () => {
     };
   });
 
-  /** Tippt den Inhalt, öffnet „+ Feld › Ereigniszeit“, tippt die Zeit und verlässt das Feld mit Tab. */
-  async function tippeZeitUndVerlasse(
-    nutzer: ReturnType<typeof userEvent.setup>,
-    eingabe = '1420',
-  ) {
-    await nutzer.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe läuft');
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    await nutzer.click(await screen.findByText('Ereigniszeit'));
-    const zeit = await screen.findByLabelText('Ereigniszeit');
-    await nutzer.clear(zeit);
-    await nutzer.type(zeit, eingabe);
-    await nutzer.tab();
-    // Der Editor bleibt derselbe Knoten und holt den Fokus nicht zurück: ein neu montierter
-    // fokussierte sich selbst, und Tab käme nie aus dem Feld.
-    expect(screen.getByLabelText('Ereigniszeit')).toBe(zeit);
-    expect(zeit).not.toHaveFocus();
-    return zeit;
-  }
-
-  it('ein weiteres Feld lässt die Zeit als Chip stehen, und der Eintrag trägt sie', async () => {
+  it('ein weiteres Feld lässt die Zeit stehen, und der Eintrag trägt sie', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    await tippeZeitUndVerlasse(nutzer);
-
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    await nutzer.click(await screen.findByText('Meldeweg'));
-    expect(await screen.findByText('Ereigniszeit: 1420')).toBeInTheDocument();
-
-    // Enter im Inhalt sendet nicht, solange ein Editor offen ist; der Knopf sendet.
-    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Zeit' }), '1420');
+    await userEvent.tab();
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.clear(von);
+    await userEvent.type(von, 'Florian 2');
+    await userEvent.tab();
+    expect(feldWert('Zeit')).toBe('1420');
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe läuft{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
-      inhalt: 'Pumpe läuft',
       ereigniszeit: '2026-10-17 12:20:00',
+      von: 'Florian 2',
     });
   });
 
-  it('Senden mit offenem Zeit-Editor sendet die getippte Zeit', async () => {
-    const p = props();
+  it('Senden mit dem Fokus im Feld Zeit sendet die getippte Zeit', async () => {
+    const p = props({ initialWerte: { ...MIT_ABSENDER, inhalt: 'Pumpe läuft' } });
     renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    await tippeZeitUndVerlasse(nutzer);
-    // Der Editor steht noch offen: verlassen, nicht mit Enter geschlossen.
-    expect(screen.getByLabelText('Ereigniszeit')).toBeInTheDocument();
-
-    // Enter im Inhalt sendet nicht, solange ein Editor offen ist; der Knopf sendet.
-    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Zeit' }), '1420');
+    await userEvent.click(screen.getByRole('button', { name: /^Erfassen/ }));
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
       ereigniszeit: '2026-10-17 12:20:00',
     });
   });
 
-  it('ein danach geleertes Feld nimmt die Zeit zurück: der Eintrag bekommt „jetzt“', async () => {
-    const p = props();
-    renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    const zeit = await tippeZeitUndVerlasse(nutzer);
-    await nutzer.clear(zeit);
-    await nutzer.tab();
-    expect(screen.getByLabelText('Ereigniszeit')).toHaveValue('');
+  it('ein unberührtes Feld Zeit setzt keine Ereigniszeit', async () => {
+    const onWerteChange = vi.fn();
+    renderMitProviders(<Schnellerfassung {...props({ onWerteChange })} />);
+    screen.getByRole('textbox', { name: 'Zeit' }).focus();
+    await userEvent.tab();
+    expect(feldWert('Zeit')).toBe('');
+    expect(onWerteChange).not.toHaveBeenCalled();
+  });
+});
 
-    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
-    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
-      ereigniszeit: '2026-10-17 12:31:00',
-    });
+describe('Buchstabierhilfe an Von und An (LFH-110)', () => {
+  it('steht an beiden Feldern, ohne die Tab-Folge zu unterbrechen', () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    for (const zu of ['Von', 'An']) {
+      const knopf = screen.getByRole('button', { name: `Buchstabierhilfe zu ${zu}` });
+      expect(knopf).toHaveAttribute('tabindex', '-1');
+    }
+  });
+});
+
+describe('Von und An folgen der Tastaturregel des Vorschlagsfelds (kwc2yszv, D5)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+    );
   });
 
-  it('ein gesetzter Chip, zum Bearbeiten geöffnet und geleert, behält seinen Editor', async () => {
-    const p = props({
-      initialWerte: {
-        inhalt: 'Pumpe läuft',
-        typ: 'meldung',
-        metadaten: { ereigniszeit: dayjs.utc('2026-10-17T12:20:00Z') },
-      },
-    });
-    renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    await nutzer.click(screen.getByText('Ereigniszeit: 1420'));
-    const zeit = await screen.findByLabelText('Ereigniszeit');
-    await nutzer.clear(zeit);
-    await nutzer.tab();
-    expect(screen.getByLabelText('Ereigniszeit')).toBe(zeit);
-
-    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
-    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
-    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
-      ereigniszeit: '2026-10-17 12:31:00',
-    });
+  it('Tab übernimmt den obersten Vorschlag und geht zum Feld An, nicht in den Inhalt', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } })}
+      />,
+    );
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(von, 'Flo');
+    await screen.findByTitle('„Flo“ als Freitext übernehmen');
+    await userEvent.tab();
+    expect(feldWert('Von')).toBe('Florian 1');
+    expect(screen.getByRole('combobox', { name: 'An' })).toHaveFocus();
   });
 
-  it('eine Zeit in der Zukunft sendet nicht, und der Chip nennt den Grund', async () => {
-    const p = props();
+  it('Enter übernimmt den obersten Vorschlag und springt in den Inhalt, ohne zu senden', async () => {
+    const p = props({ initialWerte: { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} } });
     renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    // 14:41 bei Serverzeit 14:31.
-    await tippeZeitUndVerlasse(nutzer, '+10');
-
-    await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
-    const grund = await screen.findByText(/liegt in der Zukunft/);
-    expect(grund.closest('.ant-tag')).toHaveTextContent('Ereigniszeit: 1441');
-    expect(screen.queryByLabelText('Ereigniszeit')).toBeNull();
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(von, 'Flo');
+    await screen.findByTitle('„Flo“ als Freitext übernehmen');
+    await userEvent.keyboard('{Enter}');
+    expect(feldWert('Von')).toBe('Florian 1');
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveFocus());
     expect(p.erfassen).not.toHaveBeenCalled();
   });
+});
 
-  it('„/zeit“ bei offenem Zeit-Editor schließt ihn: der Chip zeigt die neue Zeit', async () => {
-    const p = props();
-    renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    await nutzer.click(await screen.findByText('Ereigniszeit'));
-    await screen.findByLabelText('Ereigniszeit');
-
-    const inhalt = screen.getByPlaceholderText(/Inhalt/);
-    await nutzer.click(inhalt);
-    await nutzer.type(inhalt, '/zeit 1400 Pumpe');
-    expect(inhalt).toHaveValue('Pumpe');
-    expect(screen.getByText('Ereigniszeit: 1400')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Ereigniszeit')).toBeNull();
-    expect(inhalt).toHaveFocus();
+describe('Niedriges Fenster ab md: Felder und Einstellungen in einer rollenden Zeile', () => {
+  it('bei 1366 × 300 (kompakt) eine Zeile mit Typ-Knopf, Feldern und Schaltern, keine eigene Fußzeile', () => {
+    setzeViewportBreite(1366);
+    setzeViewportHoehe(300);
+    renderMitProviders(
+      <Schnellerfassung {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })} />,
+    );
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="etb-feldzeile"]')!;
+    expect(zeile.style.flexWrap).toBe('nowrap');
+    expect(zeile.style.overflowX).toBe('auto');
+    expect(screen.queryByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeNull();
+    expect(zeile.contains(screen.getByRole('button', { name: 'Typ des Eintrags: Meldung' }))).toBe(
+      true,
+    );
+    for (const name of ['Werte behalten', 'Auch in den Meldungseingang']) {
+      expect(zeile.contains(screen.getByRole('checkbox', { name })), name).toBe(true);
+    }
+    expect(document.querySelector('[data-lfh="etb-fusszeile"]')).toBeNull();
   });
 
-  it('die erneute Wahl des offenen Felds lässt den Editor an seinem Platz', async () => {
+  it('bei 1366 × 620 (Fükw im Browserfenster, kompakt) bleibt die Feldzeile mit Segmenten und Fußzeile', () => {
+    setzeViewportBreite(1366);
+    setzeViewportHoehe(620);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    expect(screen.getByRole('radiogroup', { name: 'Typ des Eintrags' })).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="etb-fusszeile"]')).not.toBeNull();
+  });
+});
+
+describe('Befunde aus dem Testnachzug (kwc2yszv)', () => {
+  it('„+ weiterer Entwurf“ bleibt beim Senden bedienbar (LFH-117)', async () => {
+    const onWeitererEntwurf = vi.fn();
     const p = props({
-      initialWerte: {
-        inhalt: '',
-        typ: 'meldung',
-        metadaten: { von: 'ELW 1', an: 'Leitstelle' },
-      },
+      onWeitererEntwurf,
+      erfassen: vi.fn<(e: NeuerEintrag) => Promise<void>>(() => new Promise(() => {})),
     });
     renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    const zeit = await tippeZeitUndVerlasse(nutzer);
-    const stehtNachAn = () =>
-      (screen.getByText(/^An:/).compareDocumentPosition(zeit) &
-        Node.DOCUMENT_POSITION_FOLLOWING) !==
-      0;
-    expect(stehtNachAn()).toBe(true);
-
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    await nutzer.click(await screen.findByText('Ereigniszeit ✓'));
-    expect(screen.getByLabelText('Ereigniszeit')).toBe(zeit);
-    expect(stehtNachAn()).toBe(true);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lange Sendung{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    const knopf = screen.getByRole('button', { name: '+ weiterer Entwurf' });
+    expect(knopf).toBeEnabled();
+    await userEvent.click(knopf);
+    expect(onWeitererEntwurf).toHaveBeenCalledTimes(1);
   });
 
-  it('ein geöffneter, unberührter Zeit-Editor setzt keine Ereigniszeit', async () => {
-    const p = props();
-    renderMitProviders(<Schnellerfassung {...p} />);
-    const nutzer = userEvent.setup();
-    await nutzer.type(screen.getByPlaceholderText(/Inhalt/), 'Pumpe läuft');
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    await nutzer.click(await screen.findByText('Ereigniszeit'));
-    await screen.findByLabelText('Ereigniszeit');
-    await nutzer.tab();
+  it('Von und An markieren beim Betreten ihren Wert: Tippen ersetzt die Vorgabe', async () => {
+    renderMitProviders(<Schnellerfassung {...props({ initialWerte: LAGE })} />);
+    const an = screen.getByRole('combobox', { name: 'An' }) as HTMLInputElement;
+    await userEvent.click(an);
+    await waitFor(() => expect(an.selectionEnd).toBe('ELW 1'.length));
+    expect(an.selectionStart).toBe(0);
+  });
 
-    await nutzer.click(screen.getByRole('button', { name: /Feld/ }));
-    await nutzer.click(await screen.findByText('Meldeweg'));
-    await waitFor(() => expect(screen.queryByLabelText('Ereigniszeit')).toBeNull());
-    expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
+  it('nennt das erste leere Pflichtfeld für Fokuswege von außen', () => {
+    const { unmount } = renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } })}
+      />,
+    );
+    const karte = document.querySelector('[data-lfh="etb-erfassung"]')!;
+    expect(karte).toHaveAttribute('data-startfeld', 'von');
+    unmount();
+    renderMitProviders(<Schnellerfassung {...props({ initialWerte: LAGE })} />);
+    expect(document.querySelector('[data-lfh="etb-erfassung"]')).not.toHaveAttribute(
+      'data-startfeld',
+    );
+  });
+});
+
+describe('Review der Erfassung (kwc2yszv E4–E7)', () => {
+  it('E4: scheitert das Präferenz-Fach, steht der Startfokus trotzdem', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ rufname: { ...rufnameZugriff(null), geladen: false, entschieden: true } })}
+      />,
+    );
+    // Von ist gesetzt, ohne Standard fehlt An: dorthin.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'An' })).toHaveFocus());
+  });
+
+  it('E5: der Pflichtgrund geht, sobald die Seite über die Vorgabe gefüllt ist', async () => {
+    const p = props({ initialWerte: { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Absender fehlt')).toBeVisible();
+    await userEvent.click(screen.getByRole('radio', { name: 'Anordnung' }));
+    expect(screen.queryByText('Absender fehlt')).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Von' })).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('E7: ein per Klick übernommener Freitext bleibt nach Escape stehen', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+    );
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ initialWerte: { inhalt: '', typ: 'meldung', metadaten: {} } })}
+      />,
+    );
+    const von = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(von, 'Flo');
+    await userEvent.click(await screen.findByTitle('„Flo“ als Freitext übernehmen'));
+    await userEvent.keyboard('{Escape}');
+    expect(feldWert('Von')).toBe('Flo');
+  });
+});
+
+describe('Review der Erfassung — Zukunft vor dem Senden (kwc2yszv E6)', () => {
+  mitProzessZone('Europe/Berlin');
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  it('eine Zeit in der Zukunft steht schon vor dem Senden am Feld Zeit', () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({
+          initialWerte: {
+            inhalt: 'Pumpe',
+            typ: 'meldung',
+            // 14:35 Berlin, es ist 14:31.
+            metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-17T12:35:00Z') },
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Zeit liegt in der Zukunft')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Zeit' })).toHaveAttribute('aria-invalid', 'true');
   });
 });

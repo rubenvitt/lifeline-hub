@@ -8,7 +8,24 @@ import { buchstabiere, type Buchstabiertafel } from './buchstabieren';
  * Textes (Funkrufname/Absender/Empfänger) in einem Popover — umschaltbar zwischen der
  * klassischen deutschen Tafel und NATO. Ändert nichts am Wert oder Speicherformat.
  */
-export default function BuchstabierHilfe({ text }: { text: string }) {
+export default function BuchstabierHilfe({
+  text,
+  zu,
+  ohneTabstopp = false,
+  disabled = false,
+}: {
+  text: string;
+  /** Wozu die Hilfe gehört („Von“), wenn mehrere nebeneinander stehen: im Namen des Knopfs. */
+  zu?: string;
+  /**
+   * Der Knopf liegt nicht in der Tab-Folge (ETB-Feldzeile: Tab läuft Zeit → Von → An → Meldeweg,
+   * Spec `etb-schnellerfassung-tastatur`). Maus und Finger erreichen ihn weiter.
+   */
+  ohneTabstopp?: boolean;
+  /** Gesperrt wie das Feld daneben (ETB: während des Sendens). */
+  disabled?: boolean;
+}) {
+  const name = zu ? `Buchstabierhilfe zu ${zu}` : 'Buchstabierhilfe';
   const [tafel, setTafel] = useState<Buchstabiertafel>('din5009');
   /**
    * Der Popover-Zustand liegt hier, damit der Tooltip von ihm weiß.
@@ -68,8 +85,14 @@ export default function BuchstabierHilfe({ text }: { text: string }) {
          und nähme ihm sein eigenes Zeigerverhalten.
 
          Kein `size`-Prop am Knopf: die Trefffläche kommt aus `controlHeight`. */}
-      <Tooltip title={tafelOffen ? '' : 'Buchstabierhilfe'}>
-        <Button type="text" aria-label="Buchstabierhilfe" icon={<IconLautsprecher />} />
+      <Tooltip title={tafelOffen ? '' : name}>
+        <Button
+          type="text"
+          aria-label={name}
+          tabIndex={ohneTabstopp ? -1 : undefined}
+          disabled={disabled}
+          icon={<IconLautsprecher />}
+        />
       </Tooltip>
     </Popover>
   );

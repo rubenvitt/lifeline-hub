@@ -3,7 +3,7 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 import { MINI_JPEG } from './bildFixture';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { systemBuendelAufklappen } from './etb-kern';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 import { ladeInDichte } from './trefflaeche-kern';
 
@@ -107,7 +107,7 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
   expect(download.suggestedFilename()).toBe('Müller_Hauswand.jpg');
 
   // ── 3 · Pseudonymer ETB-Nachweis ────────────────────────────────────────────────────
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   await expect(page.getByText('Schaden S-001: Foto abgelegt')).toBeVisible();
   await expect(page.getByText(/Hauswand/)).toHaveCount(0);

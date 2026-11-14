@@ -29,9 +29,12 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
   return String(id);
 }
 
-/** Genug Einträge, dass das ETB auf jeder Breite weit über 1500 px rollt. */
+/**
+ * Genug Einträge, dass das ETB auf jeder Breite weit über 1500 px rollt. Die Spaltenzeile ab `lg`
+ * ist niedriger als die alte Zeitachse (kwc2yszv: ≤ 36 px je einzeiligem Eintrag), deshalb 80.
+ */
 async function etbFuellen(page: Page, einsatzId: string) {
-  for (let i = 0; i < 40; i += 1) {
+  for (let i = 0; i < 80; i += 1) {
     const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: {
         typ: 'meldung',

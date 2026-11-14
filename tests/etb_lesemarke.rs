@@ -10,7 +10,9 @@ use axum::http::StatusCode;
 use serde_json::Value;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
+};
 
 fn marke_uri(einsatz: i64) -> String {
     format!("/api/einsaetze/{einsatz}/etb/lesemarke")
@@ -84,6 +86,38 @@ async fn ohne_marke_zaehlt_alles_fremde_und_traegt_keine_sichtung() {
     let obj = v.as_object().unwrap();
     assert!(!obj.contains_key("gesichtet_lfd_nr"), "{v:?}");
     assert!(!obj.contains_key("gesichtet_at"), "{v:?}");
+}
+
+/// Review S4 (Change `kwc2yszv-etb-neuentwurf`): blendet die Seite Systemeinträge aus, zählt die
+/// Lesemarke sie nicht — sonst meldete das Banner neue Einträge, die niemand sieht.
+#[tokio::test]
+async fn ohne_system_zaehlt_nur_handeintraege() {
+    let (app, admin, erika, einsatz) = aufbau().await;
+    // Jede neue Einheit schreibt einen Systemeintrag des Admins.
+    einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let alle = marke(&app, &erika, einsatz).await["neue_anzahl"]
+        .as_i64()
+        .unwrap();
+    assert!(alle > 0, "die Einheit schreibt einen Systemeintrag");
+    let ohne = |app: axum::Router, erika: String| async move {
+        let uri = format!("{}?ohne_system=true", marke_uri(einsatz));
+        let (status, v) = anfrage(&app, "GET", &uri, &erika, None).await;
+        assert_eq!(status, StatusCode::OK, "{v:?}");
+        v
+    };
+    let v = ohne(app.clone(), erika.clone()).await;
+    assert_eq!(v["neue_anzahl"].as_i64(), Some(0), "{v:?}");
+
+    let hoechste = meldung(&app, &admin, einsatz).await;
+    let v = ohne(app.clone(), erika.clone()).await;
+    assert_eq!(v["neue_anzahl"].as_i64(), Some(1), "{v:?}");
+    // „alle als gesichtet markieren“ schickt weiter die höchste Nummer überhaupt.
+    assert_eq!(v["hoechste_lfd_nr"].as_i64(), Some(hoechste), "{v:?}");
+    // Ohne Merkmal zählt die Route wie bisher alles Fremde.
+    assert_eq!(
+        marke(&app, &erika, einsatz).await["neue_anzahl"].as_i64(),
+        Some(alle + 1)
+    );
 }
 
 #[tokio::test]
