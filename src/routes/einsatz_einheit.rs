@@ -712,12 +712,19 @@ pub async fn update(
     if fuehrer_wechsel {
         einheit_repo::check_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
     }
-    // Ebenso die Sprechgruppen (LLH-1692): eine nicht zuordenbare ID scheitert mit 422, bevor
-    // `patche` etwas speichert.
+    // Ebenso die Sprechgruppen (LLH-1692): eine nicht zuordenbare ID (422) und das Paar mit
+    // einer gleichnamigen Einsatz-Sprechgruppe (409, LLH-1645) scheitern, bevor `patche` etwas
+    // speichert. Die Paarprüfung läuft in der Schreibtransaktion noch einmal (LLH-1650).
     if let Some(ids) = &sprechgruppe_ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(
             &state.pool,
             ctx.einsatz.org_id,
+            einsatz_id,
+            ids,
+        )
+        .await?;
+        crate::sprechgruppe::repo::pruefe_kein_lokales_paar(
+            &mut *state.pool.acquire().await?,
             einsatz_id,
             ids,
         )
@@ -743,17 +750,16 @@ pub async fn update(
         },
     )
     .await?;
-    // Die Personenzeile trägt Name und Abschnitt der versorgenden Einheit (LLH-1682). Sofort
-    // melden: `patche` hat gespeichert, ein späterer Schritt (Sprechgruppen) kann noch mit 422
-    // scheitern (Muster `routes::einsatzabschnitt::update`).
+    // Die Personenzeile trägt Name und Abschnitt der versorgenden Einheit (LLH-1682). Gleich
+    // nach `patche` melden, was gespeichert ist.
     if vorher.name != nachher.name || vorher.abschnitt_id != nachher.abschnitt_id {
         super::einsatz_person::sse_versorgte_personen(&state, einsatz_id, &[eid]).await;
     }
 
-    // Die übrigen Schritte schreiben je für sich. Scheitert einer doch noch (etwa 409 aus der
-    // Paarprüfung in der Schreibtransaktion der Sprechgruppen, LLH-1645), ist `patche` schon
-    // gespeichert: ETB und Live-Ereignis laufen trotzdem, der Fehler geht danach an den Client
-    // (LLH-1692, Muster `routes::einsatzabschnitt::update`).
+    // Die übrigen Schritte schreiben je für sich. Scheitert einer doch noch (ein Rennen mit der
+    // Prüfung oben, etwa eine gleichzeitig angelegte gleichnamige Einsatz-Sprechgruppe, oder 503),
+    // ist `patche` schon gespeichert: ETB und Live-Ereignis laufen trotzdem, der Fehler geht
+    // danach an den Client (LLH-1692).
     let rest: Result<(), AppError> = async {
         // Führer authoritativ setzen (Mitgliedschaft bereits geprüft) + ETB bei Änderung.
         if fuehrer_wechsel {

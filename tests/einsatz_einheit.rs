@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
-    rolle_setzen, setup, stammpersonal_disponieren, system_etb_anzahl, system_etb_inhalte,
+    rolle_setzen, setup, stammpersonal_disponieren, system_etb_anzahl,
 };
 
 #[tokio::test]
@@ -1111,11 +1111,11 @@ async fn patch_mit_unbekannter_sprechgruppe_schreibt_nichts() {
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
 }
 
-/// LLH-1692: Scheitert die Zuordnung erst in ihrer Schreibtransaktion (409, gleichnamige
-/// Einsatz-Sprechgruppe neben einer Katalog-Sprechgruppe, LLH-1645), steht die übrige Änderung
-/// schon gespeichert. Dann bleibt sie nicht undokumentiert: der Abschnittswechsel steht im ETB.
+/// LLH-1692: Auch das Paar aus Katalog- und gleichnamiger Einsatz-Sprechgruppe (409, LLH-1645)
+/// erkennt der PATCH vor dem ersten Schreiben: der Abschnitt bleibt, kein ETB-Eintrag. Die
+/// Prüfung in der Schreibtransaktion bleibt für das Rennen (LLH-1650).
 #[tokio::test]
-async fn spaet_scheiternde_sprechgruppen_zuordnung_dokumentiert_den_abschnittswechsel() {
+async fn sprechgruppen_paar_scheitert_vor_dem_abschnittswechsel() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -1149,6 +1149,7 @@ async fn spaet_scheiternde_sprechgruppen_zuordnung_dokumentiert_den_abschnittswe
     assert_eq!(s, StatusCode::CREATED);
     let aid = abschnitt["id"].as_i64().unwrap();
     let e = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
 
     let (s, json) = anfrage(
         &app,
@@ -1161,13 +1162,19 @@ async fn spaet_scheiternde_sprechgruppen_zuordnung_dokumentiert_den_abschnittswe
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{json:?}");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
     assert!(
-        system_etb_inhalte(&app, &admin, einsatz)
-            .await
-            .iter()
-            .any(|t| t == "Einheit «1. Zug»: Abschnitt «Nord» zugeordnet"),
-        "gespeicherter Abschnittswechsel ohne ETB-Eintrag"
+        eintrag(&liste, e)["abschnitt_id"].is_null(),
+        "patche lief vor der Paarprüfung"
     );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
 }
 
 /// Effektivzustands-Prüfung des Soll-Trios: EIN Feld patchen ist zulässig, weil der
