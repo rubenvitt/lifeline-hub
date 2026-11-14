@@ -207,7 +207,7 @@ pub async fn liste(
 
 /// Hängt an jede Schicht ihre Ablöser (Reihenfolge der Planung) und ihre Folgeschichten (nach
 /// ID). Je eine Abfrage für den ganzen Einsatz, unabhängig von der Zahl der Schichten.
-pub(super) async fn attach_listen(
+async fn attach_listen(
     pool: &SqlitePool,
     einsatz_id: i64,
     liste: &mut [AbloesungAnzeige],
@@ -323,7 +323,7 @@ pub(super) async fn attach_listen(
 
 /// Die geplanten Besatzungswechsel der laufenden Schichten eines Einsatzes (LLH-1319), je Schicht
 /// in der Reihenfolge der Planung, mit den Namen der Ziele. EINE Abfrage für den ganzen Einsatz.
-pub(super) async fn load_besatzung_plaene(
+async fn load_besatzung_plaene(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<HashMap<i64, Vec<AbloesungBesatzungPlan>>, AppError> {
@@ -410,7 +410,7 @@ pub(super) async fn load_gliederung(
 /// Hängt an jede laufende Schicht die Untereinheiten, die sie erben (nach Name, dann ID), die
 /// Warnungen zu ihrer geplanten ablösenden Einheit (LLH-1131) und an ihre Ablöser deren
 /// Untereinheiten (LLH-1509). Läuft nach [`attach_listen`].
-pub(super) async fn attach_erben(
+async fn attach_erben(
     pool: &SqlitePool,
     einsatz_id: i64,
     liste: &mut [AbloesungAnzeige],
@@ -461,7 +461,7 @@ pub(crate) async fn load_untereinheiten_tx(
 /// Die Planungswarnungen der laufenden Schichten in `liste` ([`planung_warnungen`]), gegen
 /// alle laufenden Schichten des Einsatzes: Einzelplanung und Ablöser-Liste. Ohne laufende Schicht
 /// in `liste` liest sie nichts.
-pub(super) async fn attach_warnungen(
+async fn attach_warnungen(
     pool: &SqlitePool,
     einsatz_id: i64,
     g: &Gliederung,

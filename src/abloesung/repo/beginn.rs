@@ -120,7 +120,7 @@ pub async fn beginnen(
 }
 
 /// Was der Beginn einer Schicht braucht — von Hand ([`beginnen`]) oder mit dem Eintreffen
-/// ([`super::kopplung`]).
+/// ([`crate::abloesung::kopplung`]).
 pub(crate) struct Start<'a> {
     pub einsatz_id: i64,
     pub benutzer_id: i64,

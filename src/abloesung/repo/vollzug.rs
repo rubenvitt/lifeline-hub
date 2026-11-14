@@ -118,7 +118,7 @@ pub(super) fn erben_von(g: &Gliederung, traeger: i64) -> Vec<i64> {
 
 /// Vollzug als Ablösung der ganzen Einheit (siehe [`vollziehen`]). Liefert die Folgeschichten,
 /// den ETB-Text und die Wirkung außerhalb der Ablösung.
-pub(super) async fn vollziehen_einheit_tx(
+async fn vollziehen_einheit_tx(
     conn: &mut SqliteConnection,
     v: &Vorgang<'_>,
     roh: &Roh,
@@ -410,7 +410,7 @@ pub(super) fn ende_art(verbleib: AbloesungVerbleib) -> crate::zeitachse::Zeitach
 /// keinem Raum mehr und wird übersprungen. Keine eigene Freigabe des Moduls
 /// Bereitstellungsräume: der Abruf ist Folge des Vollzugs. Liefert je Abruf einen Teilsatz für den
 /// einen ETB-Eintrag des Vollzugs (`abruf_tx` schreibt kein ETB).
-pub(super) async fn abloeser_ausruecken_tx(
+async fn abloeser_ausruecken_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -528,7 +528,7 @@ pub(super) async fn abloeser_ausruecken_tx(
 /// unbekannter Raum → 404, nicht aktiv oder storniert → 422, die abgelöste Einheit steht schon in
 /// einem Raum → 422. Liefert die Bezeichnung des Raums. `belege_tx` prüft beim Buchen noch
 /// einmal; so bricht jeder Fehler den ganzen Vollzug, nichts bleibt halb geschrieben.
-pub(super) async fn check_verbleib_raum_tx(
+async fn check_verbleib_raum_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     br_id: i64,
@@ -557,7 +557,7 @@ pub(super) async fn check_verbleib_raum_tx(
 
 /// Eintritt der abgelösten Einheit in den Raum ihres Verbleibs (LLH-1308, design.md D4) über
 /// `belege_tx`, nach [`check_verbleib_raum_tx`].
-pub(super) async fn verbleib_eintritt_tx(
+async fn verbleib_eintritt_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -770,7 +770,7 @@ pub(crate) async fn besatzung_ereignis_tx(
 /// Die neue Besatzung für den ETB-Text (LLH-1319): „«A» (Gruppe 1, Florian 1-44), «B»“; die
 /// Klammer nennt nur, was von der Vorgabe abweicht (eine andere Einheit als `selbst`, ein
 /// Fahrzeug). Ohne Person „keine“.
-pub(super) fn verteilung_text(neu: &[NeuePerson], selbst: i64) -> String {
+fn verteilung_text(neu: &[NeuePerson], selbst: i64) -> String {
     if neu.is_empty() {
         return "keine".into();
     }
@@ -813,7 +813,7 @@ pub(crate) fn personen_text<'a>(namen: impl Iterator<Item = &'a str>) -> String 
 /// mit seinem Namen, seiner Organisation und seinen Qualifikationen als Funktion; der Helfer bleibt
 /// im Plan und verweist auf sie. Jede neue Kraft bekommt die Zeitachse ihres Initialstatus wie bei
 /// der Disposition. Liefert je Eintrag das Ziel und ob die Kraft erst jetzt in den Einsatz kam.
-pub(super) async fn uebernehmen_tx(
+async fn uebernehmen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -951,7 +951,7 @@ pub(crate) async fn uebernehme_tx(
 /// Einheit, Fahrzeug und Führung, ohne Ereignis); `uebernahme` bringt Personen aus dem Plan erst
 /// in den Einsatz ([`uebernehmen_tx`]); `plan_block_id` muss der Folgeblock der Schicht sein und
 /// wird der Anker der Folgeschicht.
-pub(super) async fn vollziehen_besatzung_tx(
+async fn vollziehen_besatzung_tx(
     conn: &mut SqliteConnection,
     v: &Vorgang<'_>,
     roh: &Roh,

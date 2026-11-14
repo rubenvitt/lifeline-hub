@@ -477,7 +477,7 @@ pub(crate) async fn move_autostart_tx(
 /// Die laufende eigene Schicht der Einheit, die das Eintreffen `eintreffen_at` automatisch
 /// begonnen hat und an der sonst nichts hängt (Bedingungen an [`drop_autostart_tx`]): ID und
 /// Name der Einheit, `None` ohne eine.
-pub(super) async fn load_autostart_tx(
+async fn load_autostart_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,

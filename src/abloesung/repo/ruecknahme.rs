@@ -248,10 +248,7 @@ pub(super) async fn save_planung_tx(conn: &mut SqliteConnection, id: i64) -> Res
 /// Stellt bei der Rücknahme die vor dem Vollzug gesicherte Ablöser-Liste wieder her (LLH-1319),
 /// ohne inzwischen aufgelöste Einheiten, und räumt die Sicherung. Ohne Sicherung (Vollzug vor
 /// Migration 0264) bleibt die Liste des Vollzugs als Planung, wie bisher.
-pub(super) async fn restore_planung_tx(
-    conn: &mut SqliteConnection,
-    id: i64,
-) -> Result<(), AppError> {
+async fn restore_planung_tx(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     let gesichert: bool =
         sqlx::query_scalar("SELECT planung_gesichert FROM einsatz_abloesung WHERE id = ?")
             .bind(id)
@@ -286,7 +283,7 @@ pub(super) async fn restore_planung_tx(
 /// Eintritt in denselben Raum (Notiz „Ablösung zurückgenommen“). Hat sich seitdem etwas bewegt,
 /// bleibt der Raum, wie er ist. Die Reihe bleibt angehängt, wie ETB und Zeitachse. Danach fallen
 /// die Zeilen. Liefert je Buchung einen Teilsatz für die Berichtigung.
-pub(super) async fn buchungen_zuruecknehmen_tx(
+async fn buchungen_zuruecknehmen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
@@ -362,7 +359,7 @@ pub(super) async fn buchungen_zuruecknehmen_tx(
 /// (solange sie ohne Einheit und aktiv ist und die Einheit nicht aufgelöst), auf ihr Fahrzeug
 /// (solange sie auf keinem sitzt und es aktiv ist) und in ihre Führung (solange die Einheit
 /// keine hat). Danach fallen die Zeilen.
-pub(super) async fn zuruecknehmen_besatzung_tx(
+async fn zuruecknehmen_besatzung_tx(
     conn: &mut SqliteConnection,
     v: &Vorgang<'_>,
     einheit_id: i64,
@@ -495,7 +492,7 @@ pub(super) async fn zuruecknehmen_besatzung_tx(
 /// rechnet deren Regel inzwischen anders, gilt die neue Fälligkeit samt neuer Fristen. Sonst
 /// öffnet das die alte Fälligkeitsfrist, ohne eine schon erfolgte Auslösung zu wiederholen, und
 /// legt die Vorwarnung auf die aktuelle Vorwarnzeit — nur, solange sie noch vor uns liegt.
-pub(super) async fn restore_fristen_tx(
+async fn restore_fristen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,

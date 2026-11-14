@@ -548,19 +548,10 @@ pub async fn set_einsatz_vorgabe(
 
 /// Ein Schichtmodell im ETB: Regel und Vorwarnung („Rhythmus 12 h, Vorwarnung 30 min“), die
 /// Wechselzeiten in der Darstellung des Einsatzes.
-pub(super) fn modell_text(w: &Werte, darstellung: Zeitdarstellung) -> String {
+fn modell_text(w: &Werte, darstellung: Zeitdarstellung) -> String {
     format!(
         "{}, Vorwarnung {}",
         w.regel.text(darstellung),
         rhythmus_text(w.vorwarnung_minuten)
     )
-}
-
-/// Namen für ETB-Texte: „«A», «B»“.
-pub(super) fn namen_text(abloeser: &[Abloeser]) -> String {
-    abloeser
-        .iter()
-        .map(|a| format!("«{}»", a.name))
-        .collect::<Vec<_>>()
-        .join(", ")
 }

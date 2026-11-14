@@ -1,4 +1,5 @@
-//! Hilfen innerhalb der Transaktion: Einheit, Abschnitt, Ablöser, Besatzungsplan, Spiegel, Rohzeile.
+//! Hilfen innerhalb der Transaktion: Einheit, Abschnitt, Ablöser (auch ihr Namenstext),
+//! Besatzungsplan, Spiegel, Rohzeile.
 
 use super::*;
 
@@ -304,4 +305,13 @@ pub(super) async fn roh_tx(
 pub(super) fn faellig_oder_400(beginn_at: &str, rhythmus: i64) -> Result<String, AppError> {
     faelligkeit(beginn_at, rhythmus)
         .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{beginn_at}'")))
+}
+
+/// Namen für ETB-Texte: „«A», «B»“.
+pub(super) fn namen_text(abloeser: &[Abloeser]) -> String {
+    abloeser
+        .iter()
+        .map(|a| format!("«{}»", a.name))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
