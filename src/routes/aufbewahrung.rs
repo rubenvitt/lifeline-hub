@@ -27,6 +27,7 @@ use crate::aufbewahrung::{
 };
 use crate::auth::session::AdminUser;
 use crate::auth::Benutzer;
+use crate::einsatz::schwaerzung_person::PersonenArt;
 use crate::error::AppError;
 use crate::etb::EtbTyp;
 use crate::extract::{JsonBody, PfadParam};
@@ -181,12 +182,21 @@ pub async fn wiederherstellen(
 
 // ---------- Löschersuchen nach Art. 17 (LFH-751) ----------
 
-/// Ziel eines Antrags im Request: `art` ist `einsatz` oder eine Personenart, `id` fehlt beim
-/// Einsatz und ist bei einer Person Pflicht.
+/// Ziel eines Antrags im Request: `art` ist `einsatz` oder eine Personenart. Beim Einsatz fehlen
+/// `id` und `kennung`; eine Person nennt genau eines davon, die `kennung` (`R-042`, `EK-17`,
+/// `IT-5`) vor allem am archivierten Einsatz, dessen Oberfläche keine IDs kennt (LLH-1712).
 #[derive(Debug, Deserialize)]
 pub struct AntragZielEingabe {
     pub art: String,
     pub id: Option<i64>,
+    pub kennung: Option<String>,
+}
+
+/// Was die Formprüfung aus dem Ziel macht: fertig oder eine Person, deren Kennung noch aufgelöst
+/// wird.
+enum ZielAngabe {
+    Fertig(AntragZiel),
+    Kennung(PersonenArt, String),
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,10 +208,11 @@ pub struct NeuerSchwaerzungsantrag {
     pub bestaetigung: String,
 }
 
-/// Formprüfung des Ziels (400): bekannte Art, `id` genau bei einer Person. Ein Medienkontakt ist
-/// eine bekannte Zielart ohne Gegenstand mehr (422, i6k6mzed, design.md D4): das Modul Presse und
-/// Medienarbeit ist entfernt, alte Anträge mit diesem Ziel bleiben lesbar.
-fn ziel_aus(eingabe: &AntragZielEingabe) -> Result<AntragZiel, AppError> {
+/// Formprüfung des Ziels (400): bekannte Art, bei einer Person genau eines von `id` und
+/// `kennung`, beim Einsatz keines. Ein Medienkontakt ist eine bekannte Zielart ohne Gegenstand
+/// mehr (422, i6k6mzed, design.md D4): das Modul Presse und Medienarbeit ist entfernt, alte
+/// Anträge mit diesem Ziel bleiben lesbar.
+fn ziel_aus(eingabe: &AntragZielEingabe) -> Result<ZielAngabe, AppError> {
     let art = AntragZielArt::parse(eingabe.art.trim())
         .ok_or_else(|| AppError::Validation(format!("Unbekannte Zielart {}", eingabe.art)))?;
     if art == AntragZielArt::Medienkontakt {
@@ -210,15 +221,16 @@ fn ziel_aus(eingabe: &AntragZielEingabe) -> Result<AntragZiel, AppError> {
                 .into(),
         ));
     }
-    match (art.person(), eingabe.id) {
-        (None, None) => Ok(AntragZiel::Einsatz),
-        (None, Some(_)) => Err(AppError::Validation(
-            "Ein Einsatz-Antrag nennt keine ziel.id".into(),
+    match (art.person(), eingabe.id, eingabe.kennung.as_deref()) {
+        (None, None, None) => Ok(ZielAngabe::Fertig(AntragZiel::Einsatz)),
+        (None, _, _) => Err(AppError::Validation(
+            "Ein Einsatz-Antrag nennt weder ziel.id noch ziel.kennung".into(),
         )),
-        (Some(_), None) => Err(AppError::Validation(
-            "Ein Personen-Antrag braucht ziel.id".into(),
+        (Some(p), Some(id), None) => Ok(ZielAngabe::Fertig(AntragZiel::Person(p, id))),
+        (Some(p), None, Some(k)) => Ok(ZielAngabe::Kennung(p, k.to_string())),
+        (Some(_), _, _) => Err(AppError::Validation(
+            "Ein Personen-Antrag braucht genau eines von ziel.id und ziel.kennung".into(),
         )),
-        (Some(p), Some(id)) => Ok(AntragZiel::Person(p, id)),
     }
 }
 
@@ -249,6 +261,13 @@ pub async fn antrag_stellen(
     if req.bestaetigung.trim().is_empty() {
         return Err(AppError::Validation("bestaetigung fehlt".into()));
     }
+    let ziel = match ziel {
+        ZielAngabe::Fertig(z) => z,
+        ZielAngabe::Kennung(art, kennung) => AntragZiel::Person(
+            art,
+            antrag::person_aus_kennung(&state.pool, einsatz_id, art, &kennung).await?,
+        ),
+    };
     let jetzt = Utc::now();
     let id = antrag::stellen(
         &state.pool,

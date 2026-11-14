@@ -2,10 +2,18 @@ use serde_json::{json, Value};
 
 use super::*;
 
+/// Prüft eine Anfrage und rechnet mit den Werten dieser Organisation, ohne Einsatz.
+fn calculate_mit(
+    req: UnterkunftRequest,
+    org: &HashMap<String, f64>,
+) -> Result<UnterkunftResponse, ApiError> {
+    Ok(calculate(check_request(req)?, org, None))
+}
+
 /// Schickt einen Body durch Einlesen, Prüfung und Rechnung, ohne Werte einer Organisation.
 fn rechnen(body: Value) -> Result<UnterkunftResponse, ApiError> {
     let req: UnterkunftRequest = parse_body(body.to_string().as_bytes())?;
-    calculate(req, &HashMap::new())
+    calculate_mit(req, &HashMap::new())
 }
 
 /// Erwartet eine Ablehnung mit `code`, deren Text `feld` nennt.
@@ -52,8 +60,8 @@ fn ein_ungueltiges_feld_ist_400_und_nennt_das_feld() {
     use ErrorCode::InvalidField as F;
     // Unbekanntes Feld, auf jeder Ebene.
     let mut mit_einsatz = personen(json!(10));
-    mit_einsatz["einsatz_id"] = json!(7);
-    abgelehnt(mit_einsatz, F, "einsatz_id");
+    mit_einsatz["einsatz"] = json!(7);
+    abgelehnt(mit_einsatz, F, "einsatz");
     abgelehnt(
         json!({ "weg": "personen", "trennung": false, "personen": { "gesamt": 1, "kinder": 2 } }),
         F,
@@ -335,7 +343,7 @@ fn richtwerte_der_anfrage_gehen_vor_organisation_vor_basis() {
     let mut body = personen(json!(100));
     body["richtwerte"] = json!({ "wasser_je_person_l": 15 });
     let req: UnterkunftRequest = parse_body(body.to_string().as_bytes()).expect("lesbar");
-    let antwort = calculate(req, &org).expect("gültig");
+    let antwort = calculate_mit(req, &org).expect("gültig");
 
     assert_eq!(antwort.ergebnis.versorgung.wasser_l_tag, 1500);
     assert_eq!(antwort.ergebnis.schlafen.flaeche_m2, 500.0);
@@ -352,6 +360,183 @@ fn richtwerte_der_anfrage_gehen_vor_organisation_vor_basis() {
     assert_eq!(wert("wasser_je_person_l"), (15.0, RichtwertEbene::Anfrage));
     assert_eq!(wert("flaeche_je_person_m2"), (5.0, RichtwertEbene::Org));
     assert_eq!(wert("dusche_je_personen"), (20.0, RichtwertEbene::Basis));
+}
+
+/// LLH-1856: mit einem freigegebenen Einsatz gilt Anfrage vor Einsatz vor Organisation vor Basis.
+#[test]
+fn richtwerte_der_anfrage_gehen_vor_einsatz_vor_organisation_vor_basis() {
+    let org = HashMap::from([
+        ("flaeche_je_person_m2".to_string(), 5.0),
+        ("wasser_je_person_l".to_string(), 30.0),
+        ("dusche_je_personen".to_string(), 25.0),
+    ]);
+    let einsatz = HashMap::from([
+        ("wasser_je_person_l".to_string(), 40.0),
+        ("dusche_je_personen".to_string(), 15.0),
+        ("abgeschafft".to_string(), 1.0),
+    ]);
+    let mut body = personen(json!(100));
+    body["richtwerte"] = json!({ "dusche_je_personen": 10 });
+    let req: UnterkunftRequest = parse_body(body.to_string().as_bytes()).expect("lesbar");
+    let antwort = calculate(check_request(req).expect("gültig"), &org, Some(&einsatz));
+
+    assert_eq!(antwort.ergebnis.versorgung.wasser_l_tag, 4000);
+    assert_eq!(antwort.richtwerte.len(), unterkunft::basis().len());
+    let wert = |schluessel: &str| {
+        let r = antwort
+            .richtwerte
+            .iter()
+            .find(|r| r.schluessel == schluessel)
+            .expect("Schlüssel der Basis");
+        (r.wert, r.herkunft)
+    };
+    assert_eq!(wert("dusche_je_personen"), (10.0, RichtwertEbene::Anfrage));
+    assert_eq!(wert("wasser_je_person_l"), (40.0, RichtwertEbene::Einsatz));
+    assert_eq!(wert("flaeche_je_person_m2"), (5.0, RichtwertEbene::Org));
+    assert_eq!(
+        wert("zelt_abstand_m"),
+        (unterkunft_basis("zelt_abstand_m"), RichtwertEbene::Basis)
+    );
+}
+
+fn unterkunft_basis(schluessel: &str) -> f64 {
+    unterkunft::basis()
+        .iter()
+        .find(|b| b.schluessel == schluessel)
+        .expect("Schlüssel der Basis")
+        .wert
+}
+
+/// `einsatz_id` ist eine ganze Zahl; `null` gilt wie fehlend.
+#[test]
+fn einsatz_id_wird_streng_gelesen() {
+    use ErrorCode::InvalidField as F;
+    let mit = |id: Value| {
+        let mut body = personen(json!(10));
+        body["einsatz_id"] = id;
+        body
+    };
+    abgelehnt(mit(json!("7")), F, "einsatz_id");
+    abgelehnt(mit(json!(7.5)), F, "einsatz_id");
+    let gelesen = |body: Value| {
+        let req: UnterkunftRequest = parse_body(body.to_string().as_bytes()).expect("lesbar");
+        check_request(req).expect("gültig").einsatz_id
+    };
+    assert_eq!(gelesen(mit(json!(7))), Some(7));
+    assert_eq!(gelesen(mit(Value::Null)), None);
+    assert_eq!(gelesen(personen(json!(10))), None);
+}
+
+/// Die Abfrage `einsatz_id` der Auskunft: ganze Zahl, sonst 400 mit dem Namen.
+#[test]
+fn einsatz_id_der_abfrage_ist_eine_ganze_zahl() {
+    assert_eq!(parse_einsatz_id(None).unwrap(), None);
+    assert_eq!(parse_einsatz_id(Some("7")).unwrap(), Some(7));
+    for roh in ["abc", "", "7.5", "1e3"] {
+        let e = parse_einsatz_id(Some(roh)).expect_err(roh);
+        assert_eq!(e.code, ErrorCode::InvalidField, "{roh}");
+        assert!(e.message.contains("einsatz_id"), "{roh}: {}", e.message);
+    }
+}
+
+#[test]
+fn einsatz_werte_gibt_es_nur_mit_der_kategorie_der_stufe() {
+    use crate::instanz::spiegel::Freigabestufe;
+    assert!(is_einsatz_werte_vollstaendig(Some(Freigabestufe::Alles)));
+    assert!(
+        !is_einsatz_werte_vollstaendig(None),
+        "unbekannte Stufe liefert nichts"
+    );
+}
+
+mod einsatz_werte {
+    use super::*;
+    use crate::db;
+    use crate::public_api::scope::Scope;
+    use crate::public_api::{freigabe, zugang};
+
+    const JETZT: &str = "2026-11-13 10:00:00";
+
+    /// Zugang mit Freigabe für einen Einsatz, der `wasser_je_person_l` auf 40 setzt.
+    async fn aufbau() -> (sqlx::SqlitePool, String, i64) {
+        let pool = db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Test-Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut c = pool.acquire().await.unwrap();
+        let z = zugang::anlegen(
+            &mut c,
+            1,
+            "Planung",
+            &[Scope::EinsaetzeRead, Scope::RechnerUse],
+            None,
+            None,
+            JETZT,
+        )
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Stadtfest') RETURNING id",
+        )
+        .fetch_one(&mut *c)
+        .await
+        .unwrap();
+        let von: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leitung', 'leitung', 'x') RETURNING id",
+        )
+        .fetch_one(&mut *c)
+        .await
+        .unwrap();
+        repo::einsatz_setzen(&mut c, e, "wasser_je_person_l", Some(40.0), von)
+            .await
+            .unwrap();
+        freigabe::freigeben_tx(&mut c, &z, e, von).await.unwrap();
+        drop(c);
+        (pool, z, e)
+    }
+
+    #[tokio::test]
+    async fn freigegebener_einsatz_liefert_seine_werte() {
+        let (pool, z, e) = aufbau().await;
+        let werte = load_einsatz_werte(&pool, &z, 1, e).await.unwrap();
+        assert_eq!(werte.get("wasser_je_person_l"), Some(&40.0));
+    }
+
+    #[tokio::test]
+    async fn nicht_lesbarer_einsatz_ist_404() {
+        let (pool, z, e) = aufbau().await;
+        for (zugang_id, org_id, einsatz_id) in
+            [(z.as_str(), 1, e + 1), (z.as_str(), 2, e), ("x", 1, e)]
+        {
+            let fehler = load_einsatz_werte(&pool, zugang_id, org_id, einsatz_id)
+                .await
+                .expect_err("nicht lesbar");
+            assert_eq!(fehler.code, ErrorCode::NotFound);
+        }
+    }
+
+    /// Ein Spiegel, dessen Stufe die Werte des Einsatzes nicht liefert, ist für die Rechnung nicht
+    /// lesbar (design.md D2): sonst rechnete der Server still mit der Organisation.
+    #[tokio::test]
+    async fn spiegel_ohne_die_werte_des_einsatzes_ist_404() {
+        let (pool, z, e) = aufbau().await;
+        crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, e).await;
+        assert!(
+            load_einsatz_werte(&pool, &z, 1, e).await.is_ok(),
+            "Stufe `alles` liefert"
+        );
+        sqlx::query("UPDATE einsatz_spiegel SET freigabestufe = 'teilweise' WHERE einsatz_id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let fehler = load_einsatz_werte(&pool, &z, 1, e)
+            .await
+            .expect_err("unbekannte Stufe");
+        assert_eq!(fehler.code, ErrorCode::NotFound);
+    }
 }
 
 #[test]
@@ -393,7 +578,7 @@ fn das_einlesen_ist_streng_und_nennt_den_pfad() {
     #[track_caller]
     fn abgelehnt_roh(body: &str, feld: &str) {
         let e = parse_body::<UnterkunftRequest>(body.as_bytes())
-            .and_then(|req| calculate(req, &HashMap::new()))
+            .and_then(|req| calculate_mit(req, &HashMap::new()))
             .err()
             .unwrap_or_else(|| panic!("{body} wurde angenommen"));
         assert_eq!(e.code, ErrorCode::InvalidField, "{body} → {}", e.message);
@@ -469,7 +654,7 @@ fn das_einlesen_ist_streng_und_nennt_den_pfad() {
 fn die_antwort_traegt_keine_negative_null() {
     let text = |body: &str| {
         let req: UnterkunftRequest = parse_body(body.as_bytes()).expect("lesbar");
-        serde_json::to_string(&calculate(req, &HashMap::new()).expect("gültig")).unwrap()
+        serde_json::to_string(&calculate_mit(req, &HashMap::new()).expect("gültig")).unwrap()
     };
     for body in [
         r#"{"weg":"personen","trennung":false,"personen":{"gesamt":0}}"#,

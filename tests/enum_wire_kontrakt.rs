@@ -665,6 +665,8 @@ fn serde_wire_gleich_as_str() {
         ArchivSchluesselEntfernt,
         ArchivHeruntergeladen,
         ArchivEingespielt,
+        ArchivPersonGeschwaerzt,
+        ArchivDurchsucht,
         MaschinenzugangAngelegt,
         MaschinenzugangCodeAusgestellt,
         MaschinenzugangSchluesselGebunden,
@@ -721,6 +723,7 @@ fn serde_wire_gleich_as_str() {
     enum_wire!(lifeline_hub::public_api::rechner::RichtwertEbene {
         Basis => "basis",
         Org => "org",
+        Einsatz => "einsatz",
         Anfrage => "anfrage",
     });
     enum_wire!(lifeline_hub::public_api::scope::AblehnungGrund {

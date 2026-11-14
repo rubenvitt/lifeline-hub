@@ -13,6 +13,7 @@ import StatusTag from '../components/StatusTag';
 import { Paneel } from '../components/instrument';
 import { schwaerzungsantragStand } from '../theme/statusFarben';
 import { ZIEL_ART } from './archivText';
+import ArchivPersonAntragDialog from './ArchivPersonAntragDialog';
 import PersonensucheDialog from './PersonensucheDialog';
 import SchwaerzungsantragDialog, { type AntragZielWahl } from './SchwaerzungsantragDialog';
 
@@ -25,7 +26,9 @@ import SchwaerzungsantragDialog, { type AntragZielWahl } from './Schwaerzungsant
  * „Zurücknehmen“ an jedem offenen, noch nicht fälligen Antrag. Darüber die zwei Wege zu einem
  * neuen Antrag: „Person suchen und schwärzen“ und „Einsatz sofort schwärzen“. An einem
  * geschwärzten Einsatz fehlen beide (der Server lehnte mit 409 ab), bei einem offenen
- * Einsatz-Antrag fehlt der zweite.
+ * Einsatz-Antrag fehlt der zweite. An einem archivierten Einsatz (LLH-1712) heißen sie „Person
+ * per Kennung schwärzen“ und „Einsatz und Archiv löschen“; ein fälliger Personen-Antrag wartet
+ * dort auf den Befehl mit dem Archiv-Schlüssel.
  *
  * Die Rücknahme hat keine Rückfrage (LFH-363): sie ist umkehrbar, ein neuer Antrag ist jederzeit
  * möglich. Der Antrag selbst fragt zurück (`SchwaerzungsantragDialog`).
@@ -37,13 +40,29 @@ import SchwaerzungsantragDialog, { type AntragZielWahl } from './Schwaerzungsant
 
 const leer = '—';
 
-/** Welche Antragswege die Akte anbietet — rein, ohne Render prüfbar. */
-export function antragswege(akte: Pick<ArchivAkte, 'zustand'>): {
-  person: boolean;
-  einsatz: boolean;
-} {
-  if (akte.zustand === 'geschwaerzt') return { person: false, einsatz: false };
-  return { person: true, einsatz: akte.zustand !== 'schwaerzung_beantragt' };
+/** Welche Antragswege die Akte anbietet — rein, ohne Render prüfbar. Ein geschwärzter Einsatz
+ *  mit Archiv (`akte.archiv`) bietet beide an; ob ein Einsatz-Antrag offen ist, sagt dort die
+ *  Liste der Anträge, nicht der Zustand (LLH-1712). Ist sie noch nicht geladen oder gescheitert
+ *  (`undefined`), bleibt der Einsatz-Weg dort weg, statt erst am 409 des Servers zu scheitern. */
+export function antragswege(
+  akte: Pick<ArchivAkte, 'zustand'> & Partial<Pick<ArchivAkte, 'archiv'>>,
+  antraege?: Schwaerzungsantrag[],
+): { person: boolean; einsatz: boolean; archiv: boolean } {
+  const geschwaerzt = akte.zustand === 'geschwaerzt' || akte.zustand === 'loeschung_ausstehend';
+  if (geschwaerzt) {
+    if (!akte.archiv) return { person: false, einsatz: false, archiv: false };
+    const einsatzOffen =
+      antraege === undefined ||
+      antraege.some((a) => a.ziel_art === 'einsatz' && a.stand === 'offen');
+    return { person: true, einsatz: !einsatzOffen, archiv: true };
+  }
+  return { person: true, einsatz: akte.zustand !== 'schwaerzung_beantragt', archiv: false };
+}
+
+/** Ein fälliger Personen-Antrag am archivierten Einsatz: den vollzieht kein Purge-Lauf, sondern
+ *  der Befehl mit dem Archiv-Schlüssel. */
+function wartetAufBefehl(a: Schwaerzungsantrag, archiv: boolean): boolean {
+  return archiv && a.stand === 'offen' && a.ziel_art !== 'einsatz' && !a.zuruecknehmbar;
 }
 
 export default function Loeschersuchen({
@@ -57,13 +76,14 @@ export default function Loeschersuchen({
   const { token } = theme.useToken();
   const [sucheOffen, setSucheOffen] = useState(false);
   const [ziel, setZiel] = useState<AntragZielWahl | null>(null);
-  const wege = antragswege(akte);
+  const [kennungOffen, setKennungOffen] = useState(false);
   const einsatzKennung = akte.kopf.einsatznummer_intern ?? `#${akte.kopf.id}`;
 
   const abfrage = useQuery({
     queryKey: globalKeys.aufbewahrungAntraege(einsatzId),
     queryFn: () => ladeSchwaerzungsantraege(einsatzId),
   });
+  const wege = antragswege(akte, abfrage.data);
   const ruecknahme = useMutation({
     mutationFn: (antragId: number) => nimmSchwaerzungsantragZurueck(einsatzId, antragId),
     // Auch nach einer Ablehnung (409, z. B. Frist inzwischen abgelaufen) neu laden, sonst
@@ -131,6 +151,11 @@ export default function Loeschersuchen({
       width: 240,
       render: (_, a) => {
         if (a.vollzogen_at) return <ZeitAnzeige wert={a.vollzogen_at} />;
+        if (wartetAufBefehl(a, wege.archiv)) {
+          return (
+            <Typography.Text type="warning">wartet auf Befehl mit Archiv-Schlüssel</Typography.Text>
+          );
+        }
         if (a.zurueckgenommen_at) {
           return (
             <>
@@ -163,12 +188,15 @@ export default function Loeschersuchen({
   const aktionen =
     wege.person || wege.einsatz ? (
       <Space size="middle" wrap>
-        {wege.person && (
-          <Button onClick={() => setSucheOffen(true)}>Person suchen und schwärzen</Button>
-        )}
+        {wege.person &&
+          (wege.archiv ? (
+            <Button onClick={() => setKennungOffen(true)}>Person per Kennung schwärzen</Button>
+          ) : (
+            <Button onClick={() => setSucheOffen(true)}>Person suchen und schwärzen</Button>
+          ))}
         {wege.einsatz && (
           <Button danger onClick={() => setZiel({ art: 'einsatz', kennung: einsatzKennung })}>
-            Einsatz sofort schwärzen
+            {wege.archiv ? 'Einsatz und Archiv löschen' : 'Einsatz sofort schwärzen'}
           </Button>
         )}
       </Space>
@@ -211,6 +239,12 @@ export default function Loeschersuchen({
           </Typography.Paragraph>
         )}
       </div>
+      {kennungOffen && (
+        <ArchivPersonAntragDialog
+          einsatzId={einsatzId}
+          onSchliessen={() => setKennungOffen(false)}
+        />
+      )}
       {sucheOffen && (
         <PersonensucheDialog
           einsatzId={einsatzId}
@@ -225,6 +259,7 @@ export default function Loeschersuchen({
         <SchwaerzungsantragDialog
           einsatzId={einsatzId}
           ziel={ziel}
+          archiv={wege.archiv}
           onSchliessen={() => setZiel(null)}
         />
       )}

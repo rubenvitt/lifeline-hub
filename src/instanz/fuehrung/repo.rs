@@ -631,6 +631,162 @@ pub async fn verwahren(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<b
 /// Grund einer Führung, die der Widerruf einer Kopplung zurückholt.
 const GRUND_WIDERRUF: &str = "Kopplung widerrufen";
 
+/// SQL-Ausdruck „Führung beendet“ über die Akte mit dem Alias `ef` (LLH-1850, Change
+/// `cdel60wv-fuehrung-rueckholen-nach-widerruf`, D2): Der Einsatz liegt hier als Spiegel, und
+/// zwar über eine widerrufene Zuordnung einer Standardkopplung zu der Instanz, die die Akte als
+/// Führer nennt; eine geltende Zuordnung der Org zu ihr gibt es nicht. So bleibt ein Spiegel
+/// stehen, wenn der Widerruf bei ausgeschaltetem Schalter kam (LLH-1704); ein Mensch holt ihn
+/// zurück ([`zurueckholen`]). An die Zuordnung des Spiegels gebunden, damit eine alte, fremde
+/// Kopplung zum Führer nicht zählt, wenn der Einsatz über einen Hub kommt (Review LLH-1850). Den
+/// Verweis lässt `spiegel::fuehrung::richte_aus` dafür stehen. Der Einsatzkopf (`einsatz::repo`,
+/// `fuehrung_spalten!`) und [`find_fuehrung_beendet`] lesen denselben Ausdruck. Eine unbekannte
+/// Art zählt nicht (wie `KopplungZeile::art`: vor Ort).
+macro_rules! fuehrung_beendet_sql {
+    () => {
+        "(ef.fuehrer_kennung <> (SELECT kennung FROM instanz_identitaet) \
+          AND EXISTS (SELECT 1 FROM einsatz_spiegel bsp \
+              JOIN instanz_kopplung_org bo ON bo.id = bsp.kopplung_org_id \
+              JOIN instanz_kopplung bk ON bk.id = bo.kopplung_id \
+              WHERE bsp.einsatz_id = ef.einsatz_id AND bk.gegenueber_kennung = ef.fuehrer_kennung \
+              AND bo.widerrufen_at IS NOT NULL AND bk.art = 'standard') \
+          AND NOT EXISTS (SELECT 1 FROM instanz_kopplung_org bo \
+              JOIN instanz_kopplung bk ON bk.id = bo.kopplung_id \
+              WHERE bo.org_id = ef.org_id AND bk.gegenueber_kennung = ef.fuehrer_kennung \
+              AND bo.widerrufen_at IS NULL))"
+    };
+}
+pub(crate) use fuehrung_beendet_sql;
+
+/// Die beendete Kopplung zur Führung einer Akte ([`fuehrung_beendet_sql`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FuehrungBeendet {
+    /// Org-Schlüssel der widerrufenen Zuordnung des Spiegels, wie [`list_orgs_der_kopplung`] ihn
+    /// bildet; er steht in der Erklärung des Zurückholens.
+    pub org_schluessel: String,
+    /// Ihr Widerruf (UTC): die Bruchstelle des Zurückholens (D5).
+    pub widerrufen_at: String,
+}
+
+/// Die beendete Kopplung zur Führung der Akte `akte_id`, oder `None`, wenn die Akte diese Instanz
+/// nennt, ihr Führer noch zugeordnet ist oder der Einsatz nicht über eine widerrufene
+/// Standard-Zuordnung zu ihm gespiegelt wurde.
+pub async fn find_fuehrung_beendet(
+    conn: &mut SqliteConnection,
+    akte_id: i64,
+) -> Result<Option<FuehrungBeendet>, AppError> {
+    let zeile: Option<(String, String)> = sqlx::query_as(concat!(
+        "SELECT CASE WHEN k.richtung = 'meldet_sich' THEN o.fremde_org_kennung \
+                ELSE (SELECT kennung FROM instanz_identitaet) || '/' || o.org_id END, \
+                o.widerrufen_at \
+         FROM einsatz_fuehrung ef \
+         JOIN einsatz_spiegel sp ON sp.einsatz_id = ef.einsatz_id \
+         JOIN instanz_kopplung_org o ON o.id = sp.kopplung_org_id \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE ef.id = ? AND ",
+        fuehrung_beendet_sql!()
+    ))
+    .bind(akte_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(
+        zeile.map(|(org_schluessel, widerrufen_at)| FuehrungBeendet {
+            org_schluessel,
+            widerrufen_at,
+        }),
+    )
+}
+
+/// Ob die Org eine geltende Zuordnung zur Instanz `kennung` hat, gleich welcher Kopplung.
+pub async fn is_zugeordnet(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    kennung: &str,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE o.org_id = ? AND k.gegenueber_kennung = ? AND o.widerrufen_at IS NULL)",
+    )
+    .bind(org_id)
+    .bind(kennung)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Die Erklärung ohne Beweis, mit der diese Instanz eine Akte von ihrem Führer zurückholt (beim
+/// Widerruf oder durch einen Menschen, D3): Andere meldende Seiten sehen daran, dass sich die
+/// Übernahme nicht gegen sie richtet, und halten sie ohne Alarm offen (Change
+/// `d12cmcx1-hub-epoche-gegen-dritten`, D2).
+pub fn erklaerung_zurueck(
+    a: &AkteZeile,
+    ich: &Ich,
+    org_schluessel: &str,
+    grund: &str,
+    unterzeichner: &str,
+) -> super::erklaerung::NotuebernahmeErklaerung {
+    let alt = a.epoche();
+    super::erklaerung::NotuebernahmeErklaerung {
+        typ: super::erklaerung::TYP_NOTUEBERNAHME.into(),
+        einsatz: a.kennung.clone(),
+        org: org_schluessel.to_string(),
+        epoche_neu: Epoche::naechste([&alt], &ich.kennung),
+        epoche_alt: alt,
+        fuehrer_alt: a.fuehrer_kennung.clone(),
+        fuehrer_neu: ich.kennung.clone(),
+        grund: grund.to_string(),
+        zeitpunkt: crate::zeit::jetzt(),
+        unterzeichner: unterzeichner.to_string(),
+    }
+}
+
+/// Wie diese Instanz eine Akte zurückholt ([`zurueckholen`]).
+pub struct Rueckholung<'a> {
+    /// Aus [`erklaerung_zurueck`]; ihre neue Epoche gilt.
+    pub erklaerung: &'a super::erklaerung::NotuebernahmeErklaerung,
+    /// Der Text der Erklärung, wie er in die Akte geht.
+    pub text: String,
+    /// Wer zurückholt (Verlauf); `None` beim Widerruf.
+    pub wer: Option<&'a str>,
+    pub bruch_at: String,
+}
+
+/// Diese Instanz führt die Akte ab jetzt selbst (Art Notübernahme, Erklärung ohne Beweis), räumt
+/// Offenes ab, speichert (der Spiegel wird schreibbar) und schreibt den Verlauf. Gemeinsamer Weg
+/// von [`release_nach_widerruf`] und `dienst::zurueckholen` (LLH-1850, D3).
+pub async fn zurueckholen(
+    conn: &mut SqliteConnection,
+    a: &mut AkteZeile,
+    ich: &Ich,
+    r: Rueckholung<'_>,
+) -> Result<(), AppError> {
+    let von = a.fuehrer_name.clone();
+    a.set_epoche(&r.erklaerung.epoche_neu);
+    a.fuehrer_kennung = ich.kennung.clone();
+    a.fuehrer_name = ich.name.clone();
+    a.set_art(FuehrungWechselArt::Notuebernahme);
+    a.erklaerung = Some(r.text);
+    a.beweis = None;
+    a.offen = None;
+    a.offen_bruch_at = None;
+    a.abgabe_schluessel = None;
+    a.anfrage_at = None;
+    a.bruch_at = Some(r.bruch_at);
+    save(conn, a, true).await?;
+    add_verlauf(
+        conn,
+        a,
+        VerlaufNeu {
+            von_name: Some(&von),
+            nach_name: &ich.name,
+            wer: r.wer,
+            grund: Some(&r.erklaerung.grund),
+            bruch_at: a.bruch_at.as_deref(),
+            ..VerlaufNeu::default()
+        },
+    )
+    .await
+}
+
 /// Nach dem Widerruf einer Org-Zuordnung (hier oder vom Gegenüber): lokale Einsätze der Org, die
 /// dieses Gegenüber führt, holt diese Instanz mit der nächsten Epoche zurück. Sonst bliebe ein Einsatz
 /// gesperrt, ohne dass ihn jemand übergeben oder zurückholen kann (Review LLH-1491). Gibt die
@@ -638,9 +794,10 @@ const GRUND_WIDERRUF: &str = "Kopplung widerrufen";
 /// Ohne Schalter holt sie nichts zurück (LLH-1704): Die Führung ist dann eingefroren
 /// (`src/AGENTS.md`, „Backend — Instanzkopplung (LLH-1490)“; LLH-1641, E8). `save` richtete den
 /// Spiegel nicht aus, die Akte widerspräche dem Einsatz, und das nächste Einschalten machte ihn
-/// beim Start schreibbar; solche Einsätze bleiben Spiegel (Ausweg: LLH-1850). Offene Übernahmen
-/// verfallen auch ohne Schalter: Dort führt diese Instanz ohnehin, und nach dem Einschalten
-/// stünden sie als Konflikt da, dem niemand mehr widersprechen kann.
+/// beim Start schreibbar; solche Einsätze bleiben Spiegel, bis ein Mensch sie zurückholt
+/// (`dienst::zurueckholen`, LLH-1850, ADR-0043). Offene Übernahmen verfallen auch ohne Schalter:
+/// Dort führt diese Instanz ohnehin, und nach dem Einschalten stünden sie als Konflikt da, dem
+/// niemand mehr widersprechen kann.
 ///
 /// Akten ohne lokalen Einsatz, die dieses Gegenüber führt, löscht sie und vermerkt ihr Ende
 /// (LLH-1699, D5): Über das Gegenüber ist der Einsatz nicht mehr zu erreichen, und weitere
@@ -720,45 +877,17 @@ pub async fn release_nach_widerruf(
     let ich = ich(conn).await?;
     for id in ids {
         let mut a = load(conn, id).await?;
-        let von = a.fuehrer_name.clone();
-        let alt = a.epoche();
-        let neu = Epoche::naechste([&alt], &ich.kennung);
-        // Eine Erklärung ohne Beweis gegen das widerrufene Gegenüber: Andere meldende Seiten sehen
-        // daran, dass sich die Übernahme nicht gegen sie richtet, und halten sie ohne Alarm offen.
-        // Unterschrieben hat niemand (Change `d12cmcx1-hub-epoche-gegen-dritten`, D2).
-        let erklaerung = super::erklaerung::NotuebernahmeErklaerung {
-            typ: super::erklaerung::TYP_NOTUEBERNAHME.into(),
-            einsatz: a.kennung.clone(),
-            org: org_schluessel.to_string(),
-            epoche_alt: alt,
-            epoche_neu: neu.clone(),
-            fuehrer_alt: a.fuehrer_kennung.clone(),
-            fuehrer_neu: ich.kennung.clone(),
-            grund: GRUND_WIDERRUF.into(),
-            zeitpunkt: crate::zeit::jetzt(),
-            unterzeichner: String::new(),
-        };
-        a.set_epoche(&neu);
-        a.fuehrer_kennung = ich.kennung.clone();
-        a.fuehrer_name = ich.name.clone();
-        a.set_art(FuehrungWechselArt::Notuebernahme);
-        a.erklaerung = Some(erklaerung.to_text());
-        a.beweis = None;
-        a.offen = None;
-        a.offen_bruch_at = None;
-        a.abgabe_schluessel = None;
-        a.anfrage_at = None;
-        a.bruch_at = Some(crate::zeit::jetzt());
-        save(conn, &mut a, true).await?;
-        add_verlauf(
+        // Unterschrieben hat niemand.
+        let erklaerung = erklaerung_zurueck(&a, &ich, org_schluessel, GRUND_WIDERRUF, "");
+        zurueckholen(
             conn,
-            &a,
-            VerlaufNeu {
-                von_name: Some(&von),
-                nach_name: &ich.name,
-                grund: Some(GRUND_WIDERRUF),
-                bruch_at: a.bruch_at.as_deref(),
-                ..VerlaufNeu::default()
+            &mut a,
+            &ich,
+            Rueckholung {
+                text: erklaerung.to_text(),
+                erklaerung: &erklaerung,
+                wer: None,
+                bruch_at: crate::zeit::jetzt(),
             },
         )
         .await?;
@@ -1827,5 +1956,189 @@ pub(crate) mod tests {
         drop(conn);
         assert_eq!(akten(&pool).await.len(), 1);
         assert!(vermerke(&pool).await.is_empty());
+    }
+
+    // ── Führung beendet (LLH-1850) ──────────────────────────────────────────────────────────
+
+    /// Die Lage aus LLH-1850: Der Hub führt einen Einsatz, den diese Instanz spiegelt; bei
+    /// ausgeschaltetem Schalter wird die Zuordnung um 10:00 widerrufen, dann wird der Schalter
+    /// wieder eingeschaltet. Liefert Einsatz und Akte.
+    pub(crate) async fn spiegel_ohne_kopplung(pool: &sqlx::SqlitePool) -> (i64, i64) {
+        gekoppelt(pool).await;
+        super::super::save_schalter(pool, true).await.unwrap();
+        let e = einsatz(pool, "Beim Hub").await;
+        ensure(pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut a = find_by_einsatz(&mut conn, e).await.unwrap().unwrap();
+        a.set_epoche(&Epoche::neu(3, "hub"));
+        a.fuehrer_kennung = "hub".into();
+        a.fuehrer_name = "Hub Nord".into();
+        save(&mut conn, &mut a, true).await.unwrap();
+        drop(conn);
+        assert!(ist_spiegel(pool, e).await);
+        super::super::save_schalter(pool, false).await.unwrap();
+        widerrufen(pool, "2026-11-10 10:00:00").await;
+        super::super::save_schalter(pool, true).await.unwrap();
+        (e, a.id)
+    }
+
+    /// Widerruft alle geltenden Zuordnungen (durch das Gegenüber).
+    pub(crate) async fn widerrufen(pool: &sqlx::SqlitePool, at: &str) {
+        let mut conn = pool.acquire().await.unwrap();
+        let zeilen: Vec<i64> =
+            sqlx::query_scalar("SELECT id FROM instanz_kopplung_org WHERE widerrufen_at IS NULL")
+                .fetch_all(&mut *conn)
+                .await
+                .unwrap();
+        for z in zeilen {
+            crate::instanz::repo::org_widerrufen(&mut conn, z, None, at, true)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn beendet(pool: &sqlx::SqlitePool, akte: i64) -> Option<FuehrungBeendet> {
+        let mut conn = pool.acquire().await.unwrap();
+        find_fuehrung_beendet(&mut conn, akte).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn widerruf_ohne_schalter_hinterlaesst_eine_beendete_fuehrung_mit_dem_widerruf() {
+        let pool = crate::db::test_pool().await;
+        let (e, akte) = spiegel_ohne_kopplung(&pool).await;
+        assert!(
+            ist_spiegel(&pool, e).await,
+            "ohne Menschen bleibt der Spiegel"
+        );
+        assert_eq!(
+            beendet(&pool, akte).await,
+            Some(FuehrungBeendet {
+                org_schluessel: "hub/1".into(),
+                widerrufen_at: "2026-11-10 10:00:00".into(),
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn eine_geltende_zuordnung_ist_keine_beendete_fuehrung() {
+        let pool = crate::db::test_pool().await;
+        let (_, akte) = spiegel_ohne_kopplung(&pool).await;
+        // Neu gekoppelt: die alte Zuordnung bleibt widerrufen, eine neue gilt.
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (1, 1, 'hub/1', 'Hub-Org')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(beendet(&pool, akte).await, None);
+        let mut conn = pool.acquire().await.unwrap();
+        assert!(is_zugeordnet(&mut conn, 1, "hub").await.unwrap());
+        assert!(!is_zugeordnet(&mut conn, 1, "elw").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn eine_kopplung_vor_ort_ist_keine_beendete_fuehrung() {
+        let pool = crate::db::test_pool().await;
+        let (_, akte) = spiegel_ohne_kopplung(&pool).await;
+        sqlx::query("UPDATE instanz_kopplung SET art = 'vor_ort'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(beendet(&pool, akte).await, None);
+    }
+
+    #[tokio::test]
+    async fn ein_nie_gekoppelter_fuehrer_und_die_eigene_fuehrung_sind_nicht_beendet() {
+        let pool = crate::db::test_pool().await;
+        let (_, akte) = spiegel_ohne_kopplung(&pool).await;
+        let mut conn = pool.acquire().await.unwrap();
+        let mut a = load(&mut conn, akte).await.unwrap();
+        a.fuehrer_kennung = "elw-dritter".into();
+        save(&mut conn, &mut a, false).await.unwrap();
+        assert_eq!(find_fuehrung_beendet(&mut conn, akte).await.unwrap(), None);
+        a.fuehrer_kennung = ich(&mut conn).await.unwrap().kennung;
+        save(&mut conn, &mut a, false).await.unwrap();
+        assert_eq!(find_fuehrung_beendet(&mut conn, akte).await.unwrap(), None);
+    }
+
+    /// Review LLH-1850: Es zählt die Zuordnung, über die der Einsatz gespiegelt wurde, nicht eine
+    /// spätere zum selben Führer.
+    #[tokio::test]
+    async fn es_zaehlt_die_zuordnung_des_spiegels() {
+        let pool = crate::db::test_pool().await;
+        let (_, akte) = spiegel_ohne_kopplung(&pool).await;
+        // Erneut zugeordnet (mit anderem Schlüssel am Hub) und ohne Schalter wieder widerrufen.
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (1, 1, 'hub/7', 'Hub-Org')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        super::super::save_schalter(&pool, false).await.unwrap();
+        widerrufen(&pool, "2026-11-11 08:00:00").await;
+        super::super::save_schalter(&pool, true).await.unwrap();
+        assert_eq!(
+            beendet(&pool, akte).await,
+            Some(FuehrungBeendet {
+                org_schluessel: "hub/1".into(),
+                widerrufen_at: "2026-11-10 10:00:00".into(),
+            })
+        );
+    }
+
+    /// Review LLH-1850: Kommt der Spiegel über einen Hub (oder hängt er an keiner Zuordnung), zählt
+    /// eine alte, widerrufene Standardkopplung zum Führer nicht.
+    #[tokio::test]
+    async fn eine_fremde_alte_zuordnung_zum_fuehrer_zaehlt_nicht() {
+        let pool = crate::db::test_pool().await;
+        let (e, akte) = spiegel_ohne_kopplung(&pool).await;
+        sqlx::query("UPDATE einsatz_spiegel SET kopplung_org_id = NULL WHERE einsatz_id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(beendet(&pool, akte).await, None);
+        // Ein Hub, über den der Spiegel heute kommt: der Führer ist dort nicht zugeordnet.
+        sqlx::query(
+            "INSERT INTO instanz_kopplung (id, gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand) \
+             VALUES (2, 'hub2', 's2', 'Hub Süd', 'meldet_sich', 'http://127.0.0.1:2', 'aktiv')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let zeile: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (2, 1, 'hub2/1', 'Hub-Org') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_spiegel SET kopplung_org_id = ? WHERE einsatz_id = ?")
+            .bind(zeile)
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(beendet(&pool, akte).await, None);
+    }
+
+    /// Das Einschalten lässt die widerrufene Zuordnung am Spiegel stehen (Review LLH-1850): Sie
+    /// nennt die Gegenstelle im Hinweisband.
+    #[tokio::test]
+    async fn einschalten_laesst_die_widerrufene_zuordnung_am_spiegel() {
+        let pool = crate::db::test_pool().await;
+        let (e, _) = spiegel_ohne_kopplung(&pool).await;
+        let (ko, beendet_at): (Option<i64>, Option<String>) = sqlx::query_as(
+            "SELECT kopplung_org_id, beendet_at FROM einsatz_spiegel WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(ko.is_some(), "Verweis bleibt");
+        assert!(beendet_at.is_some(), "Abgleich beendet");
     }
 }
