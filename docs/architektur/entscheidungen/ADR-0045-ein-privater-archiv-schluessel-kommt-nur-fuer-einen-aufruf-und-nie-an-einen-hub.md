@@ -8,7 +8,7 @@ gilt_fuer:
   - src/einsatz/archiv/einspielen.rs
   - src/instanz/repo.rs
 herleitung:
-  - openspec/changes/archive/2026-11-13-yftpw99d-archiv-einspielen-verwaltung/design.md
+  - openspec/changes/archive/2026-11-14-yftpw99d-archiv-einspielen-verwaltung/design.md
   - LLH-1711 (Weg mit Ruben am 13.11.2026 abgestimmt)
 ---
 

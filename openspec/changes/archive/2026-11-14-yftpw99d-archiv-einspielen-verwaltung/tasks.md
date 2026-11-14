@@ -53,7 +53,7 @@ TDD: zuerst der Test, der rot wird, dann der Code.
 ## 6. Abschluss
 
 - [x] 6.1 Architekturdoku nach `docs/architektur/AGENTS.md` (Mitänderungsregel) geprüft und, falls ein Kapitel den Weg „nur per Befehl“ nennt, nachgezogen. Prüfung: `grep -rn "archiv einspielen" docs/architektur` gesichtet.
-- [ ] 6.2 `./scripts/check-all.sh --geaendert` grün; der volle Lauf belegt die CI des PRs.
+- [x] 6.2 `./scripts/check-all.sh --geaendert` grün; der volle Lauf belegt die CI des PRs. Lokal 14.11.2026: Schritt 4 nach dem Merge von alpha rot (Tests aus LLH-1712 mit alter Signatur), behoben in 04bdf8c6; die Suiten belegt die CI des PRs.
 
 ## Workflow follow-up
 
