@@ -1268,6 +1268,12 @@ pub async fn apply_eingang(
                 },
             )
             .await?;
+            // Hängt die neue Akte an einem Spiegel, der schon hier liegt, hat `richte_aus` ihn
+            // ausgerichtet, womöglich zum eigenen Einsatz mit neuer Nummer und ETB-Eintrag
+            // (LLH-1860): Kopf und Vollabgleich (`src/AGENTS.md`, `notify_wechsel`).
+            if let Some(einsatz_id) = a.einsatz_id {
+                aus.folgen.push(Folge::Kopf { einsatz_id });
+            }
             continue;
         };
         if a.org_id != org_id {
