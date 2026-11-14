@@ -2410,6 +2410,8 @@ enum Zurueckholen {
     Notuebernahme,
     /// Widerruf der Kopplung zu ELW 1 am Hub.
     Widerruf,
+    /// Widerruf bei ausgeschaltetem Schalter am Hub, danach „Führung zurückholen“ (LLH-1850).
+    Mensch,
 }
 
 /// Drei Instanzen, der Hub führt einen eigenen Einsatz mit (1, Hub), beide ELW kennen ihn. Mit
@@ -2449,21 +2451,15 @@ async fn hub_holt_von_elw1_zurueck(
             let akte = am_hub["id"].as_i64().unwrap();
             hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW 1 ohne Verbindung").await;
         }
-        Zurueckholen::Widerruf => {
-            let (_, u) =
-                common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
-            let id = u["kopplungen"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|k| k["gegenueber_kennung"] == elw1.kennung.as_str())
-                .unwrap()["id"]
-                .as_i64()
-                .unwrap();
+        Zurueckholen::Widerruf => kopplung_widerrufen(&hub, &elw1).await,
+        Zurueckholen::Mensch => {
+            schalter(&hub, false).await;
+            kopplung_widerrufen(&hub, &elw1).await;
+            schalter(&hub, true).await;
             let (s, v) = post(
                 &hub,
-                &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
-                json!({}),
+                &format!("/api/einsaetze/{h}/fuehrung/zurueckholen"),
+                json!({"grund": "ELW 1 abgebaut"}),
             )
             .await;
             assert_eq!(s, StatusCode::OK, "{v}");
@@ -2522,6 +2518,14 @@ async fn holt_der_hub_per_notuebernahme_gegen_elw_1_zurueck_haelt_elw_2_offen_oh
 #[tokio::test]
 async fn holt_der_hub_per_widerruf_von_elw_1_zurueck_haelt_elw_2_offen_ohne_alarm() {
     let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+}
+
+/// LLH-1850: Auch das Zurückholen durch einen Menschen trägt eine Erklärung ohne Beweis gegen
+/// ELW 1; ELW 2 hält sie ohne Alarm offen.
+#[tokio::test]
+async fn holt_der_hub_nach_widerruf_ohne_schalter_zurueck_haelt_elw_2_offen_ohne_alarm() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Mensch, true).await;
     haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
 }
 
@@ -6166,4 +6170,154 @@ async fn gleicher_hinweis_der_fuehrung_wie_vorher_bleibt_neben_dem_rueckschritt_
         h.contains("Führungsakten") && h.contains("Unterschriftsschlüssel"),
         "{h:?}"
     );
+}
+
+// ── Zurückholen ohne gekoppelte Führung (LLH-1850) ───────────────────────────────────────────
+
+async fn schalter(i: &Instanz, an: bool) {
+    lifeline_hub::instanz::fuehrung::save_schalter(&i.pool, an)
+        .await
+        .unwrap();
+}
+
+/// Der ELW übergibt seinen Einsatz an den Hub und hält ihn als Spiegel; bei ausgeschaltetem
+/// Schalter am ELW wird die Kopplung widerrufen, dann wird er wieder eingeschaltet. Die
+/// Einsatzleitung `leitung` (ohne Admin-Rolle) und das Führungspersonal `fuehrer` sind vorher
+/// angelegt. Ergebnis: (Hub, ELW, Einsatz am ELW).
+async fn spiegel_ohne_kopplung() -> (Instanz, Instanz, i64) {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let id = common::benutzer_anlegen(&elw.app, &elw.admin, "leitung", "keine").await;
+    common::funktion_setzen(&elw.app, &elw.admin, e, id, "einsatzleitung", None).await;
+    common::mitglied_mit_funktion(&elw.app, &elw.admin, e, "Fü", "fuehrer", "s2").await;
+    // Die Mitglieder sind Änderungen am Einsatz: übergeben wird erst abgeglichen.
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    schalter(&elw, false).await;
+    kopplung_widerrufen(&elw, &hub).await;
+    schalter(&elw, true).await;
+    (hub, elw, e)
+}
+
+async fn zurueckholen(i: &Instanz, cookie: &str, einsatz: i64, grund: &str) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fuehrung/zurueckholen"),
+        cookie,
+        Some(&json!({ "grund": grund })),
+    )
+    .await
+}
+
+/// Spec „Zurückholen nach Widerruf ohne Schalter“ und „Ohne Handlung bleibt der Spiegel“.
+#[tokio::test]
+async fn nach_widerruf_ohne_schalter_holt_die_einsatzleitung_den_spiegel_zurueck() {
+    let (hub, elw, e) = spiegel_ohne_kopplung().await;
+    assert!(ist_spiegel(&elw, e).await);
+    let (s, v) = etb(&elw, e).await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "gesperrt, der Abgleich ist beendet: {v}"
+    );
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(
+        f["fuehrer_kennung"], hub.kennung,
+        "ohne Menschen bleibt der Spiegel: {f}"
+    );
+    assert!(f["fuehrer_beendet_at"].is_string(), "{f}");
+    assert!(f["fuehrer_richtung"].is_null(), "{f}");
+    let (s, kopf) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(kopf["fuehrung"]["beendet"], true, "{kopf}");
+    assert_eq!(
+        kopf["spiegel"]["gegenstelle"], f["fuehrer_name"],
+        "das Band nennt die Gegenstelle, nicht „Gegenstelle“: {kopf}"
+    );
+    let widerruf = f["fuehrer_beendet_at"].clone();
+
+    let fuehrer = common::login_cookie(&elw.app, "fuehrer", "fuehrerpw1").await;
+    let (s, _) = zurueckholen(&elw, &fuehrer, e, "Hub abgebaut").await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Führungspersonal bedient die Führung nicht"
+    );
+    let leitung = common::login_cookie(&elw.app, "leitung", "leitungpw1").await;
+    let (s, v) = zurueckholen(&elw, &leitung, e, " ").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Ein Grund ist Pflicht.");
+
+    let (s, v) = zurueckholen(&elw, &leitung, e, "Hub abgebaut").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], true, "{v}");
+    assert_eq!(v["epoche"], 3, "{v}");
+    assert!(v["fuehrer_beendet_at"].is_null(), "{v}");
+    let letzter = v["verlauf"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(letzter["art"], "notuebernahme", "{letzter}");
+    assert_eq!(letzter["grund"], "Hub abgebaut", "{letzter}");
+    assert_eq!(letzter["bruch_at"], widerruf, "{letzter}");
+    assert!(letzter["wer"].is_string(), "{letzter}");
+    let (s, v) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED, "wieder schreibbar: {v}");
+    let (_, kopf) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert!(kopf["spiegel"].is_null(), "{kopf}");
+    assert_eq!(kopf["fuehrung"]["beendet"], false, "{kopf}");
+    let spur = spur_fuehrung(&elw.pool).await;
+    assert!(
+        spur.iter()
+            .any(|(aktion, person, grund)| aktion == "fuehrung_notuebernahme"
+                && *person
+                && grund.contains("Führung zurückgeholt von")
+                && grund.ends_with("(Kopplung beendet): Hub abgebaut")),
+        "{spur:?}"
+    );
+}
+
+/// Spec „Die Führung ist noch gekoppelt“: 409, und das Paneel bietet nichts zum Zurückholen.
+#[tokio::test]
+async fn solange_die_fuehrung_gekoppelt_ist_ist_zurueckholen_409() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let (s, _) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = zurueckholen(&elw, &elw.admin, e, "Probe").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["error"], "Die führende Instanz ist noch gekoppelt.");
+    assert!(fuehrung(&elw, e).await["fuehrer_beendet_at"].is_null());
+}
+
+/// Ohne Schalter antwortet die Route wie alle der Führung mit 404.
+#[tokio::test]
+async fn ohne_schalter_ist_zurueckholen_404() {
+    let (_hub, elw, e) = spiegel_ohne_kopplung().await;
+    schalter(&elw, false).await;
+    let (s, _) = zurueckholen(&elw, &elw.admin, e, "Probe").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 }

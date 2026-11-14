@@ -56,9 +56,16 @@ pub async fn richte_aus(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<
                 .bind(einsatz_id)
                 .execute(&mut *conn)
                 .await?;
-            } else if neu.is_none() && ko.is_some() {
+            } else if neu.is_none()
+                && ko.is_some()
+                && !is_widerrufen_zum_fuehrer(conn, &akte, ko).await?
+            {
                 // Die Führung ging an eine Instanz, die hier nicht gekoppelt ist (etwa über eine
                 // Direktkopplung bezeugt, LLH-1497): der Spiegel bleibt lesbar, der Abgleich endet.
+                // Hängt der Spiegel an einer widerrufenen Zuordnung zu eben dieser Instanz (Widerruf
+                // ohne Schalter, LLH-1704), bleibt der Verweis: Er nennt die Gegenstelle im
+                // Hinweisband und trägt das Zurückholen (LLH-1850, `repo::fuehrung_beendet_sql`);
+                // den Abgleich hat der Widerruf schon beendet.
                 sqlx::query(
                     "UPDATE einsatz_spiegel SET kopplung_org_id = NULL, beendet_at = ?, \
                      hinweis = 'Die führende Instanz ist hier nicht gekoppelt.' WHERE einsatz_id = ?",
@@ -85,6 +92,24 @@ pub async fn richte_alle_aus(conn: &mut SqliteConnection) -> Result<(), AppError
         richte_aus(conn, id).await?;
     }
     Ok(())
+}
+
+/// Ob die Zuordnung `ko` des Spiegels widerrufen ist und zur Kopplung mit dem Führer der Akte
+/// gehört (LLH-1850).
+async fn is_widerrufen_zum_fuehrer(
+    conn: &mut SqliteConnection,
+    akte: &AkteZeile,
+    ko: Option<i64>,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_kopplung_org o \
+         JOIN instanz_kopplung k ON k.id = o.kopplung_id \
+         WHERE o.id = ? AND o.widerrufen_at IS NOT NULL AND k.gegenueber_kennung = ?)",
+    )
+    .bind(ko)
+    .bind(&akte.fuehrer_kennung)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 /// Die Org-Zuordnung, über die der Führer der Akte den Einsatz liefert, wenn er ein Gegenüber ist.

@@ -217,6 +217,18 @@ Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, 
 2. „Übernahme bestätigen“ wählen, dann ist der Einsatz hier ein Spiegel; oder
    „Widersprechen“ wählen, dann führt diese Installation weiter.
 
+### Führung zurückholen
+
+Für die Einsatzleitung oder einen Admin der Organisation, an einem Spiegel, dessen führende
+Installation nicht mehr gekoppelt ist (Widerruf bei ausgeschalteter Führung je Einsatz, siehe
+„Widerruf“ unter Hintergrund).
+
+1. Im Hinweisband „Führung zurückholen“ wählen, oder auf „Einsatzdaten“ im Paneel „Führung“
+   „Führung zurückholen …“.
+2. Einen „Grund“ eintragen.
+3. „Führung zurückholen“ wählen. Diese Installation führt den Einsatz mit der nächsten Epoche,
+   das Hinweisband verschwindet, und der Einsatz ist wieder schreibbar.
+
 ## Hintergrund
 
 ### Wer sich bei wem meldet
@@ -258,10 +270,23 @@ steht der Widerruf der Kopplung, nicht jeder zurückgeholte Einsatz.
 
 Ist die Führung je Einsatz ausgeschaltet, wenn die Installation vom Widerruf erfährt, holt sie
 keinen Einsatz zurück, auch nicht, wenn die Führung später wieder eingeschaltet wird: Der Spiegel
-bleibt gesperrt, und das Paneel „Führung“ bietet nichts an, bis die Organisation erneut mit
-derselben Installation gekoppelt ist. Eine Übernahme, die noch auf Bestätigung wartete, verfällt
-auch dann. Die nie gespiegelten Einsätze der widerrufenen Installation bleiben in diesem Fall
-unter „Einsätze beim Gegenüber“ stehen.
+bleibt gesperrt, bis ihn ein Mensch zurückholt. Eine Übernahme, die noch auf Bestätigung wartete,
+verfällt auch dann. Die nie gespiegelten Einsätze der widerrufenen Installation bleiben in diesem
+Fall unter „Einsätze beim Gegenüber“ stehen.
+
+Ist die Führung wieder eingeschaltet, zeigt ein solcher Spiegel im Hinweisband „Kopplung zu …
+beendet“ statt „Abgleich beendet“, und das Paneel „Führung“ nennt die beendete Kopplung mit dem
+Zeitpunkt des Widerrufs. Zurückholen lässt er sich ohne Unterschrift oder Code (Ablauf „Führung
+zurückholen“), weil die andere Installation nicht mehr gekoppelt ist. Der Verlauf zeigt danach
+eine Notübernahme mit Grund und Namen, die Admin-Spur „Führung zurückgeholt von … (Kopplung
+beendet)“. Bruchstelle ist der Zeitpunkt des Widerrufs: Was die andere Installation danach
+geschrieben hat, kommt nicht mehr an. Solange die Organisation mit der führenden Installation
+gekoppelt ist, gibt es dieses Zurückholen nicht; dann gelten Anfrage und Notübernahme. Ebenso
+wenig für einen Spiegel, der über eine andere Installation kommt, etwa über den Hub: Dort führt
+die andere Installation weiter, auch wenn diese Organisation früher einmal selbst mit ihr
+gekoppelt war. Es ersetzt keine neue Kopplung: Wird die Organisation später wieder mit derselben Installation gekoppelt und
+hat diese den Einsatz inzwischen weitergeführt, führt sie ihn dort weiter, wie nach jedem
+Widerruf.
 
 ### Fingerabdruck und Sicherheit
 

@@ -6683,9 +6683,14 @@
           "fuehrend",
           "bei",
           "epoche",
-          "offen"
+          "offen",
+          "beendet"
         ],
         "properties": {
+          "beendet": {
+            "type": "boolean",
+            "description": "Die Kopplung zur führenden Instanz ist beendet: ein Mensch kann die Führung zurückholen\n(LLH-1850, `repo::fuehrung_beendet_sql`)."
+          },
           "bei": {
             "type": "string",
             "description": "Name der führenden Instanz."
@@ -9340,6 +9345,13 @@
           "fuehrend": {
             "type": "boolean",
             "description": "Diese Instanz führt."
+          },
+          "fuehrer_beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der\nWiderruf der Zuordnung des Spiegels (UTC). Dann bietet das Paneel „Führung zurückholen“\n(LLH-1850)."
           },
           "fuehrer_kennung": {
             "type": "string"

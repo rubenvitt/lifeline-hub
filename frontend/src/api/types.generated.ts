@@ -2652,6 +2652,11 @@ export interface components {
         };
         /** @description Die Führung im Einsatzkopf (`EinsatzAnzeige.fuehrung`): fehlt ohne Akte oder ohne Schalter. */
         EinsatzFuehrung: {
+            /**
+             * @description Die Kopplung zur führenden Instanz ist beendet: ein Mensch kann die Führung zurückholen
+             *     (LLH-1850, `repo::fuehrung_beendet_sql`).
+             */
+            beendet: boolean;
             /** @description Name der führenden Instanz. */
             bei: string;
             /** Format: int64 */
@@ -3750,6 +3755,12 @@ export interface components {
             epoche: number;
             /** @description Diese Instanz führt. */
             fuehrend: boolean;
+            /**
+             * @description Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der
+             *     Widerruf der Zuordnung des Spiegels (UTC). Dann bietet das Paneel „Führung zurückholen“
+             *     (LLH-1850).
+             */
+            fuehrer_beendet_at?: string | null;
             fuehrer_kennung: string;
             fuehrer_name: string;
             fuehrer_richtung?: components["schemas"]["InstanzKopplungRichtung"] | null;
