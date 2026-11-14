@@ -712,6 +712,17 @@ pub async fn update(
     if fuehrer_wechsel {
         einheit_repo::check_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
     }
+    // Ebenso die Sprechgruppen (LLH-1692): eine nicht zuordenbare ID scheitert mit 422, bevor
+    // `patche` etwas speichert.
+    if let Some(ids) = &sprechgruppe_ids {
+        crate::sprechgruppe::repo::pruefe_zuordenbar(
+            &state.pool,
+            ctx.einsatz.org_id,
+            einsatz_id,
+            ids,
+        )
+        .await?;
+    }
     let nachher = einheit_repo::patche(
         &state.pool,
         einsatz_id,
@@ -739,33 +750,43 @@ pub async fn update(
         super::einsatz_person::sse_versorgte_personen(&state, einsatz_id, &[eid]).await;
     }
 
-    // Führer authoritativ setzen (Mitgliedschaft bereits geprüft) + ETB bei Änderung.
-    if fuehrer_wechsel {
-        einheit_repo::setze_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
+    // Die übrigen Schritte schreiben je für sich. Scheitert einer doch noch (etwa 409 aus der
+    // Paarprüfung in der Schreibtransaktion der Sprechgruppen, LLH-1645), ist `patche` schon
+    // gespeichert: ETB und Live-Ereignis laufen trotzdem, der Fehler geht danach an den Client
+    // (LLH-1692, Muster `routes::einsatzabschnitt::update`).
+    let rest: Result<(), AppError> = async {
+        // Führer authoritativ setzen (Mitgliedschaft bereits geprüft) + ETB bei Änderung.
+        if fuehrer_wechsel {
+            einheit_repo::setze_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten())
+                .await?;
+        }
+        if let Some(ids) = &sprechgruppe_ids {
+            crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
+                &state.pool,
+                ctx.einsatz.org_id,
+                einsatz_id,
+                eid,
+                ids,
+            )
+            .await?;
+        }
+        if let Some(liste) = &neue_verbindungen {
+            verbindungen::ersetzen(
+                &state.pool,
+                einsatz_id,
+                verbindungen::Bezug::Einheit(eid),
+                liste,
+            )
+            .await?;
+        }
+        Ok(())
     }
-    if let Some(ids) = &sprechgruppe_ids {
-        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
-            &state.pool,
-            ctx.einsatz.org_id,
-            einsatz_id,
-            eid,
-            ids,
-        )
-        .await?;
-    }
-    if let Some(liste) = &neue_verbindungen {
-        verbindungen::ersetzen(
-            &state.pool,
-            einsatz_id,
-            verbindungen::Bezug::Einheit(eid),
-            liste,
-        )
-        .await?;
-    }
+    .await;
     // Endgültige Anzeige (inkl. neu aufgelöstem Führer-Namen, Sprechgruppen und Verbindungen).
     let final_anzeige = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
 
-    if fuehrer_wechsel {
+    // Nur ein wirklich gespeicherter Führerwechsel kommt ins ETB.
+    if fuehrer_wechsel && final_anzeige.fuehrer_id != vorher.fuehrer_id {
         let inhalt = match (&vorher.fuehrer_name, &final_anzeige.fuehrer_name) {
             (None, Some(neu)) => format!(
                 "Einheit «{}»: Einheitsführer «{}» gesetzt",
@@ -797,6 +818,7 @@ pub async fn update(
     if vorher.name != final_anzeige.name {
         super::einsatz_bereitstellungsraum::sse_br_der_einheit(&state, einsatz_id, eid).await;
     }
+    rest?;
     Ok(Json(final_anzeige))
 }
 

@@ -3,7 +3,7 @@ use axum::http::StatusCode;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, einsatz_anlegen_mit, login_cookie,
-    rolle_setzen, setup, stammpersonal_disponieren, system_etb_anzahl,
+    rolle_setzen, setup, stammpersonal_disponieren, system_etb_anzahl, system_etb_inhalte,
 };
 
 #[tokio::test]
@@ -1069,6 +1069,105 @@ async fn patch_ohne_sprechgruppe_ids_laesst_zuordnung_stehen_leeres_array_leert(
     )
     .await;
     assert!(json["sprechgruppen"].as_array().unwrap().is_empty());
+}
+
+/// LLH-1692: Eine nicht zuordenbare Sprechgruppe lehnt der PATCH ab, bevor er etwas schreibt.
+/// Vorher stand die übrige Änderung schon gespeichert, ohne ETB-Eintrag und ohne Live-Ereignis,
+/// und der Client bekam trotzdem 422.
+#[tokio::test]
+async fn patch_mit_unbekannter_sprechgruppe_schreibt_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let e = einheit_voll(&app, &admin, einsatz, sg).await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(r#"{"name":"Umbenannt","sortier":7,"sprechgruppe_ids":[987654]}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let json = eintrag(&liste, e);
+    assert_ne!(json["name"], "Umbenannt", "patche lief vor der Prüfung");
+    assert_ne!(json["sortier"], 7);
+    assert_eq!(
+        namen(&json["sprechgruppen"], "bezeichnung"),
+        vec!["100_T_LAGE"]
+    );
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+}
+
+/// LLH-1692: Scheitert die Zuordnung erst in ihrer Schreibtransaktion (409, gleichnamige
+/// Einsatz-Sprechgruppe neben einer Katalog-Sprechgruppe, LLH-1645), steht die übrige Änderung
+/// schon gespeichert. Dann bleibt sie nicht undokumentiert: der Abschnittswechsel steht im ETB.
+#[tokio::test]
+async fn spaet_scheiternde_sprechgruppen_zuordnung_dokumentiert_den_abschnittswechsel() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "412_F_DRK", "TMO", 10).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/sprechgruppen/{sg}/deaktivieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &admin,
+        Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, abschnitt) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        Some(r#"{"name":"Nord"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let aid = abschnitt["id"].as_i64().unwrap();
+    let e = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(&format!(
+            r#"{{"abschnitt_id":{aid},"sprechgruppe_ids":[{sg}]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json:?}");
+    assert!(
+        system_etb_inhalte(&app, &admin, einsatz)
+            .await
+            .iter()
+            .any(|t| t == "Einheit «1. Zug»: Abschnitt «Nord» zugeordnet"),
+        "gespeicherter Abschnittswechsel ohne ETB-Eintrag"
+    );
 }
 
 /// Effektivzustands-Prüfung des Soll-Trios: EIN Feld patchen ist zulässig, weil der
