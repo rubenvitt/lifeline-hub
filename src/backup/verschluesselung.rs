@@ -121,51 +121,94 @@ pub fn ist_verschluesselt(pfad: &Path) -> io::Result<bool> {
     Ok(kopf == AGE_KOPF)
 }
 
-/// Private Schlüssel für den Restore einer verschlüsselten Sicherung.
+/// Private Schlüssel für den Restore einer verschlüsselten Sicherung. `Send + Sync`, damit ein
+/// Request-Handler sie über ein `await` halten kann (Archiv einspielen, LLH-1711).
 pub struct Schluessel {
-    identitaeten: Vec<Box<dyn age::Identity>>,
+    identitaeten: Vec<Box<dyn age::Identity + Send + Sync>>,
 }
 
 impl Schluessel {
     /// Liest Identitäten aus dem Inhalt einer `age`-Identitätsdatei (`AGE-SECRET-KEY-1…`, wie sie
     /// `age-keygen` schreibt). Ist die Datei selbst mit einer Passphrase verschlüsselt
-    /// (`age -p`), fragt `passphrase` sie ab; sonst wird `passphrase` nie gerufen.
+    /// (`age -p`), fragt `passphrase` sie ab und entsperrt die Datei sofort; eine falsche
+    /// Passphrase scheitert also hier. Sonst wird `passphrase` nie gerufen.
     pub fn laden(
         inhalt: Vec<u8>,
         name: Option<String>,
         passphrase: impl FnOnce() -> io::Result<String>,
     ) -> Result<Self, AppError> {
-        if inhalt.starts_with(AGE_KOPF) {
-            let passphrase = passphrase().map_err(|e| {
-                AppError::Validation(format!("Passphrase der Identitätsdatei nicht lesbar: {e}"))
-            })?;
-            let identitaet = age::encrypted::Identity::from_buffer(
-                io::Cursor::new(inhalt),
-                name,
-                FestePassphrase(Arc::new(SecretString::from(
-                    passphrase.trim_end_matches(['\r', '\n']).to_owned(),
-                ))),
-                None,
-            )
-            .map_err(|e| AppError::Validation(format!("Identitätsdatei nicht lesbar: {e}")))?
-            .ok_or_else(|| {
-                AppError::Validation(
-                    "Identitätsdatei ist verschlüsselt, aber nicht mit einer Passphrase".into(),
-                )
-            })?;
-            return Ok(Self {
-                identitaeten: vec![Box::new(identitaet)],
-            });
-        }
+        Self::laden_aus(&inhalt, name, passphrase)
+    }
 
+    /// Wie [`Self::laden`], aber aus einem geliehenen Puffer: wer den Schlüssel geschützt im
+    /// Speicher hält (LLH-1711, design.md D4), legt so keine ungeschützte Kopie an. Der
+    /// entsperrte Inhalt einer geschützten Datei liegt nur in einem Puffer, der beim Fallenlassen
+    /// genullt wird.
+    pub fn laden_aus(
+        inhalt: &[u8],
+        name: Option<String>,
+        passphrase: impl FnOnce() -> io::Result<String>,
+    ) -> Result<Self, AppError> {
+        // Der Name nannte früher die Datei in Rückfragen von `age`; Rückfragen gibt es keine mehr.
+        let _ = name;
+        if !inhalt.starts_with(AGE_KOPF) {
+            return Self::aus_klartext(inhalt);
+        }
+        let passphrase = passphrase().map_err(|e| {
+            AppError::Validation(format!("Passphrase der Identitätsdatei nicht lesbar: {e}"))
+        })?;
+        Self::laden_geschuetzt(
+            inhalt,
+            Some(SecretString::from(
+                passphrase.trim_end_matches(['\r', '\n']).to_owned(),
+            )),
+        )
+    }
+
+    /// Wie [`Self::laden_aus`], mit der Passphrase schon als Geheimnis (Archiv einspielen über die
+    /// Verwaltung, LLH-1711): sie entsteht nie als gewöhnlicher `String`. Ohne Passphrase ist eine
+    /// geschützte Datei ein Fehler, eine Passphrase zu einer ungeschützten wird nicht gebraucht.
+    /// Entsperren kostet scrypt (Sekunden): auf einem Blocking-Thread rufen.
+    pub fn laden_geschuetzt(
+        inhalt: &[u8],
+        passphrase: Option<SecretString>,
+    ) -> Result<Self, AppError> {
+        if !inhalt.starts_with(AGE_KOPF) {
+            return Self::aus_klartext(inhalt);
+        }
+        let passphrase = passphrase.ok_or_else(|| {
+            AppError::Validation(
+                "Die Schlüsseldatei ist mit einer Passphrase geschützt; die Passphrase angeben."
+                    .into(),
+            )
+        })?;
+        let schloss = age::scrypt::Identity::new(passphrase);
+        let mut leser = age::Decryptor::new_buffered(inhalt)
+            .map_err(|e| AppError::Validation(format!("Identitätsdatei nicht lesbar: {e}")))?
+            .decrypt(std::iter::once(&schloss as &dyn age::Identity))
+            .map_err(|e| match e {
+                age::DecryptError::NoMatchingKeys => AppError::Validation(
+                    "Identitätsdatei ist verschlüsselt, aber nicht mit einer Passphrase".into(),
+                ),
+                _ => AppError::Validation(
+                    "Die Passphrase passt nicht zur Identitätsdatei, oder die Datei ist \
+                     beschädigt"
+                        .into(),
+                ),
+            })?;
+        let mut klar = age::secrecy::SecretBox::new(Box::new(Vec::with_capacity(inhalt.len())));
+        leser
+            .read_to_end(age::secrecy::ExposeSecretMut::expose_secret_mut(&mut klar))
+            .map_err(|e| AppError::Validation(format!("Identitätsdatei beschädigt: {e}")))?;
+        Self::aus_klartext(klar.expose_secret())
+    }
+
+    fn aus_klartext(inhalt: &[u8]) -> Result<Self, AppError> {
         let datei = age::IdentityFile::from_buffer(io::Cursor::new(inhalt))
             .map_err(|e| AppError::Validation(format!("Identitätsdatei nicht lesbar: {e}")))?;
-        let identitaeten: Vec<Box<dyn age::Identity>> = datei
+        let identitaeten = datei
             .into_identities()
-            .map_err(|e| AppError::Validation(format!("Identitätsdatei nicht lesbar: {e}")))?
-            .into_iter()
-            .map(|i| i as Box<dyn age::Identity>)
-            .collect();
+            .map_err(|e| AppError::Validation(format!("Identitätsdatei nicht lesbar: {e}")))?;
         if identitaeten.is_empty() {
             return Err(AppError::Validation(
                 "Identitätsdatei enthält keinen Schlüssel (AGE-SECRET-KEY-1…)".into(),
@@ -200,7 +243,11 @@ impl Schluessel {
             AppError::Validation(format!("Verschlüsselte Sicherung nicht lesbar: {e}"))
         })?;
         let mut leser = entschluesseler
-            .decrypt(self.identitaeten.iter().map(|i| i.as_ref()))
+            .decrypt(
+                self.identitaeten
+                    .iter()
+                    .map(|i| i.as_ref() as &dyn age::Identity),
+            )
             .map_err(|e| match e {
                 age::DecryptError::NoMatchingKeys => {
                     AppError::Validation("Der Schlüssel passt nicht zu dieser Sicherung".into())
@@ -215,27 +262,6 @@ impl Schluessel {
             ))
         })?;
         Ok(ausgabe)
-    }
-}
-
-/// Liefert der verschlüsselten Identitätsdatei die vorab gelesene Passphrase; Rückfragen gibt
-/// es keine.
-#[derive(Clone)]
-struct FestePassphrase(Arc<SecretString>);
-
-impl age::Callbacks for FestePassphrase {
-    fn display_message(&self, _: &str) {}
-
-    fn confirm(&self, _: &str, _: &str, _: Option<&str>) -> Option<bool> {
-        None
-    }
-
-    fn request_public_string(&self, _: &str) -> Option<String> {
-        None
-    }
-
-    fn request_passphrase(&self, _: &str) -> Option<SecretString> {
-        Some(SecretString::from(self.0.expose_secret().to_owned()))
     }
 }
 
@@ -375,10 +401,13 @@ pub(crate) mod tests {
         schreiber.write_all(&identitaet).unwrap();
         schreiber.finish().unwrap();
 
-        let falsch = Schluessel::laden(geschuetzt.clone(), None, || Ok("falsch\n".into()))
-            .unwrap()
-            .entschluessele_datei(&geheim, Vec::new());
-        assert!(falsch.is_err(), "eine falsche Passphrase entsperrt nichts");
+        // Seit LLH-1711 wird die Datei beim Laden entsperrt: eine falsche Passphrase scheitert
+        // dort, nicht erst am Block.
+        let falsch = Schluessel::laden(geschuetzt.clone(), None, || Ok("falsch\n".into()));
+        assert!(
+            matches!(falsch, Err(AppError::Validation(ref m)) if m.contains("Passphrase passt nicht")),
+            "eine falsche Passphrase entsperrt nichts"
+        );
 
         let schluessel = Schluessel::laden(geschuetzt, None, || Ok("geheim\n".into())).unwrap();
         assert_eq!(
@@ -387,6 +416,52 @@ pub(crate) mod tests {
                 .unwrap(),
             b"inhalt"
         );
+    }
+
+    /// LLH-1711, design.md D4: die Verwaltung leiht den Puffer, den sie geschützt hält.
+    #[test]
+    fn laden_aus_einem_geliehenen_puffer_mit_und_ohne_passphrase() {
+        let dir = tempfile::tempdir().unwrap();
+        let klartext = dir.path().join("klartext");
+        std::fs::write(&klartext, b"inhalt").unwrap();
+        let (empfaenger, identitaet) = schluesselpaar();
+        let geheim = dir.path().join("geheim.age");
+        std::fs::write(
+            &geheim,
+            verschluessele_datei(&klartext, Vec::new(), &empfaenger, &AtomicBool::new(false))
+                .unwrap(),
+        )
+        .unwrap();
+        let schluessel = Schluessel::laden_aus(&identitaet, None, keine_passphrase).unwrap();
+        assert_eq!(
+            schluessel
+                .entschluessele_datei(&geheim, Vec::new())
+                .unwrap(),
+            b"inhalt"
+        );
+
+        let mut passphrase = age::scrypt::Recipient::new(SecretString::from("geheim".to_owned()));
+        passphrase.set_work_factor(10);
+        let mut geschuetzt = Vec::new();
+        let mut schreiber =
+            age::Encryptor::with_recipients(std::iter::once(&passphrase as &dyn age::Recipient))
+                .unwrap()
+                .wrap_output(&mut geschuetzt)
+                .unwrap();
+        schreiber.write_all(&identitaet).unwrap();
+        schreiber.finish().unwrap();
+        let schluessel = Schluessel::laden_aus(&geschuetzt, None, || Ok("geheim".into())).unwrap();
+        assert_eq!(
+            schluessel
+                .entschluessele_datei(&geheim, Vec::new())
+                .unwrap(),
+            b"inhalt"
+        );
+        // Ohne Passphrase: abgelehnt, nicht entsperrt.
+        let ohne = Schluessel::laden_aus(&geschuetzt, None, || {
+            Err(io::Error::other("keine Passphrase angegeben"))
+        });
+        assert!(matches!(ohne, Err(AppError::Validation(_))));
     }
 
     #[test]

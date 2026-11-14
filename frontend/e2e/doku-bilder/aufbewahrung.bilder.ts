@@ -10,6 +10,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   uebersicht.png     frontend/src/aufbewahrung/AufbewahrungUebersicht.tsx
  *   loeschersuchen.png frontend/src/aufbewahrung/SchwaerzungsantragDialog.tsx,
  *                      frontend/src/aufbewahrung/Loeschersuchen.tsx
+ *   archiv-einspielen.png frontend/src/aufbewahrung/ArchivEinspielen.tsx
  *
  * Füllung (D3): die Demo-Daten tragen keinen abgeschlossenen Einsatz. Die Spec legt zwei kleine
  * Einsätze an und schließt sie ab, einen mit Frist, einen ohne. Der Demo-Einsatz bleibt
@@ -94,5 +95,24 @@ test.describe(KAPITEL, () => {
     await expect(dialog.getByRole('button', { name: 'Einsatz schwärzen lassen' })).toBeVisible();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'loeschersuchen');
+  });
+
+  test('Dialog „Archiv einspielen“', async ({ page }) => {
+    await anmelden(page);
+    await uhrAnhalten(page);
+    await page.goto('/admin/aufbewahrung');
+    await page.getByRole('button', { name: 'Archiv einspielen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Archiv einspielen' });
+    await dialog.getByLabel('Archivblock').setInputFiles({
+      name: 'einsatz-E-2026-0007-block-1.sqlite.age',
+      mimeType: 'application/octet-stream',
+      buffer: Buffer.from('age-encryption.org/v1'),
+    });
+    await dialog.getByText('Eingefügt').click();
+    await dialog.getByLabel('Schlüssel', { exact: true }).fill('AGE-SECRET-KEY-1BEISPIEL');
+    await expect(dialog.getByRole('button', { name: 'Einspielen' })).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await fotografiere(dialog, KAPITEL, 'archiv-einspielen');
   });
 });

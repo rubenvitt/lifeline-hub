@@ -636,6 +636,19 @@ pub async fn list_erreicht_aktiv(
     .await?)
 }
 
+/// Meldet sich bei dieser Instanz eine andere, angebahnt oder aktiv, für irgendeine Org? Dann ist
+/// sie erreichte Seite (ein Hub), und ein privater Archiv-Schlüssel hat hier nichts zu suchen
+/// (LLH-1711, design.md D3). Die Org-Zuordnungen eingespielter Archivblöcke stehen immer auf
+/// `widerrufen` und zählen nicht.
+pub async fn wird_erreicht(pool: &SqlitePool) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM instanz_kopplung WHERE richtung = 'wird_gemeldet' \
+         AND zustand IN ('angebahnt', 'aktiv'))",
+    )
+    .fetch_one(pool)
+    .await?)
+}
+
 /// Aktive Kopplungen, in denen diese Instanz sich meldet (Abgleich der Einsätze, LLH-1492).
 pub async fn list_meldend_aktiv(pool: &SqlitePool) -> Result<Vec<KopplungZeile>, AppError> {
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
@@ -1219,6 +1232,48 @@ fn to_anzeige(k: KopplungZeile, o: OrgZeile, konten_mit_geheimnis: i64) -> Insta
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn kopplung(pool: &SqlitePool, kennung: &str, richtung: &str, zustand: &str) {
+        let adresse = (richtung == "meldet_sich").then_some("https://hub.example");
+        sqlx::query(
+            "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand) VALUES (?, 'k', 'X', ?, ?, ?)",
+        )
+        .bind(kennung)
+        .bind(richtung)
+        .bind(adresse)
+        .bind(zustand)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    /// LLH-1711, design.md D3: nur eine angebahnte oder aktive Kopplung, in der sich eine andere
+    /// Instanz hier meldet, macht diese Instanz zur erreichten Seite.
+    #[tokio::test]
+    async fn erreicht_nur_mit_angebahnter_oder_aktiver_gemeldeter_kopplung() {
+        let pool = crate::db::test_pool().await;
+        assert!(!wird_erreicht(&pool).await.unwrap(), "ohne Kopplung");
+        kopplung(&pool, "a", "meldet_sich", "aktiv").await;
+        kopplung(&pool, "b", "wird_gemeldet", "widerrufen").await;
+        kopplung(&pool, "c", "wird_gemeldet", "vom_gegenueber_widerrufen").await;
+        // So legt das Einspielen eines Archivblocks seine Org-Zuordnung an.
+        kopplung(
+            &pool,
+            "archiv/0123456789abcdef",
+            "wird_gemeldet",
+            "widerrufen",
+        )
+        .await;
+        assert!(!wird_erreicht(&pool).await.unwrap());
+        kopplung(&pool, "d", "wird_gemeldet", "angebahnt").await;
+        assert!(wird_erreicht(&pool).await.unwrap(), "angebahnt");
+        sqlx::query("UPDATE instanz_kopplung SET zustand = 'aktiv' WHERE gegenueber_kennung = 'd'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(wird_erreicht(&pool).await.unwrap(), "aktiv");
+    }
 
     #[tokio::test]
     async fn wiederholung_wird_erkannt_und_abgelaufenes_geraeumt() {

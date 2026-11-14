@@ -380,8 +380,10 @@ Spec `passwort-anmeldung`, Herleitung
   deaktivieren, reaktivieren, Rolle ändern, Zweitfaktor zurücksetzen, Anmeldeweg schalten. Auch
   ein zweiter Weg zur selben Wirkung (PATCH `bearbeiten`) schreibt; eine abgewiesene Aktion nicht.
 - Der Eintrag schlägt nie nach außen durch (wie `audit::schreibe`). Ausnahme „Archiv eingespielt“
-  (LLH-1494): `admin_audit::schreibe_ohne_akteur_tx` schreibt in der Transaktion der Übernahme,
-  ein Fehler bricht das Einspielen ab. Eine neue Aktion braucht eine
+  (LLH-1494, LLH-1711): `admin_audit::schreibe_ohne_akteur_tx` (Befehl) bzw. `schreibe_tx`
+  (Person über die Verwaltung, mit `peer_ip`) schreibt in der Transaktion, die das Einspielen
+  abschließt; ein Fehler bricht es ab, ein Einspielen, das vorher scheitert, hinterlässt nichts.
+  Die Log-Zeile kommt nach dem Commit vom Aufrufer. Eine neue Aktion braucht eine
   Variante in `AdminAktion` und eine Migration für den CHECK; Nachweis `tests/admin_audit.rs`.
 - Frist 365 Tage (`admin_audit::AUFBEWAHRUNG_TAGE`), Purge-Lauf Phase C.
 - **Gelesen werden Anmelde- und Admin-Spur nur über `routes::zugangsprotokoll`** (LFH-1097,
