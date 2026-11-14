@@ -59,6 +59,8 @@ import { modulFreigabeAnzeige, useModulFreigabe } from '../einsatz/useModulFreig
 import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { infotelefonStatus } from '../theme/statusFarben';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+import ZumKopfKnopf from '../components/ZumKopfKnopf';
+import { LISTEN_MAX_SEITEN, kopfVerlassen, zumKopf } from '../components/listenFenster';
 
 /**
  * Informationstelefon (LFH-554, Spec `stab-infotelefon`): das Protokoll der Anrufe aus der
@@ -147,6 +149,10 @@ export default function InfotelefonPage() {
     queryFn: ({ pageParam }) =>
       loadAnrufe(einsatzId, { status: sicht === 'offen' ? 'offen' : undefined, vor: pageParam }),
     initialPageParam: undefined as AbschlussCursor | undefined,
+    // Seitenfenster (LLH-1687, `components/listenFenster.ts`): ein Live-Ereignis lädt höchstens
+    // so viele Seiten neu, wie im Fenster liegen. Fällt der Kopf heraus, führt „Zu den neuesten
+    // springen“ am Ende des Protokolls zurück.
+    maxPages: LISTEN_MAX_SEITEN,
     getNextPageParam: (letzte) =>
       letzte.length < ANRUFE_PAGE_SIZE ? undefined : anrufCursor(letzte[letzte.length - 1]),
     enabled: frei,
@@ -157,6 +163,9 @@ export default function InfotelefonPage() {
     enabled: frei,
   });
   const pages = anrufeQuery.data?.pages;
+  const ohneKopf = kopfVerlassen(anrufeQuery.data);
+  const anrufeSchluessel = einsatzKeys.infotelefonListe(einsatzId, sicht);
+  const ladeKopf = () => loadAnrufe(einsatzId, { status: sicht === 'offen' ? 'offen' : undefined });
   // Ein Live-Nachladen verschiebt die Seitengrenzen: kein Anruf darf doppelt stehen.
   const loaded = useMemo(() => {
     const gesehen = new Set<number>();
@@ -203,7 +212,12 @@ export default function InfotelefonPage() {
 
   const erfassenMutation = useMutation({
     mutationFn: (e: AnrufEingabe) => erfasseAnruf(einsatzId, e),
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      // Steht das Fenster tief im Protokoll, läge der neue Anruf außerhalb (LLH-1687): erst den
+      // Kopf holen, wie das ETB nach einem eigenen Eintrag.
+      if (ohneKopf && (await zumKopf(qc, anrufeSchluessel, ladeKopf))) kopfErreicht();
+      await invalidate();
+    },
   });
   const statusMutation = useMutation({
     mutationFn: (v: { id: number; status: InfotelefonStatus }) =>
@@ -233,10 +247,15 @@ export default function InfotelefonPage() {
   }, [hervorgehoben, isHervorgehobenLoaded]);
   const pageCount = pages?.length ?? 0;
   // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
+  // Ohne Kopf im Fenster (LLH-1687) steht nur Älteres im Bild, und die Seitenzählung hat sich mit
+  // dem Fenster verschoben: dann gilt alles Geladene als bekannt. Neue Anrufe kommen erst mit dem
+  // Kopf wieder ins Fenster, und der setzt die Schleuse zurück (`kopfErreicht`).
   const appendedIds = gefroren
-    ? (pages ?? [])
-        .slice(frozenPageCount)
-        .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
+    ? ohneKopf
+      ? (pages ?? []).map((page) => page.map((a) => a.id))
+      : (pages ?? [])
+          .slice(frozenPageCount)
+          .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
     : [];
   const frozenState = gefroren && extendEinfrierstand(gefroren, appendedIds.flat());
   const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, frozenState, benutzer?.id);
@@ -253,6 +272,12 @@ export default function InfotelefonPage() {
     aelteste: sichtbar.length > 0 ? String(sichtbar[sichtbar.length - 1].id) : undefined,
     ohneStartlauf: startMitAnruf,
   });
+  // Der Kopf steht wieder im Fenster (LLH-1687): Schleuse zurücksetzen, ans Ende wie beim Öffnen.
+  const kopfErreicht = () => {
+    setGefroren(null);
+    setAppendedPageIds(new Map());
+    zumEnde();
+  };
   // Hochgerollt friert ein wie Fokus in der Liste; zurück am Ende ohne Fokus taut auf.
   const [fokusDrin, setFokusDrin] = useState(false);
   const [gesehenAmEnde, setGesehenAmEnde] = useState(amEnde);
@@ -300,7 +325,7 @@ export default function InfotelefonPage() {
   );
   // Hält die Kennungen jeder nach dem Einfrieren angehängten Seite beim ersten Erscheinen fest.
   useEffect(() => {
-    if (gefroren == null || pages == null) return;
+    if (gefroren == null || pages == null || ohneKopf) return;
     const missing = pages
       .map((page, i) => [i, page] as const)
       .filter(([i]) => i >= frozenPageCount && !appendedPageIds.has(i));
@@ -315,7 +340,7 @@ export default function InfotelefonPage() {
           );
       return next;
     });
-  }, [gefroren, pages, frozenPageCount, appendedPageIds]);
+  }, [gefroren, pages, frozenPageCount, appendedPageIds, ohneKopf]);
   const zaehler = zaehlerQuery.data;
   const jeAnliegen = useMemo(
     () =>
@@ -565,6 +590,13 @@ export default function InfotelefonPage() {
                 </Zeitachseneintrag>
               ))}
             </ol>
+            {ohneKopf && (
+              <ZumKopfKnopf
+                schluessel={anrufeSchluessel}
+                ladeKopf={ladeKopf}
+                nachKopf={kopfErreicht}
+              />
+            )}
             {/* Überlagerung mit Nullhöhe am UNTEREN Rand: neue Anrufe kommen unten an, das Banner
                 klebt dort über der angepinnten Erfassung (ihre gemessene Höhe). */}
             <div

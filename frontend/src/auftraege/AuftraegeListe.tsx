@@ -48,6 +48,8 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import ListeDetail, { type ListeDetailGruppen } from '../components/ListeDetail';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { SERVER_SUCHE_ENTPRELLUNG_MS } from '../components/Datensicht';
+import ZumKopfKnopf from '../components/ZumKopfKnopf';
+import { LISTEN_MAX_SEITEN, kopfVerlassen } from '../components/listenFenster';
 
 /** Abgeschlossen nach der gemeinsamen Phasen-Semantik. */
 function istAuftragAbgeschlossen(a: Auftrag): boolean {
@@ -136,6 +138,9 @@ export default function AuftraegeListe({
     ),
     queryFn: ({ pageParam }) => listeAbgeschlosseneAuftraege(einsatzId, filter, pageParam),
     initialPageParam: undefined as AbschlussCursor | undefined,
+    // Seitenfenster (LLH-1687, `components/listenFenster.ts`): ein Live-Ereignis lädt höchstens
+    // so viele Seiten neu, wie im Fenster liegen.
+    maxPages: LISTEN_MAX_SEITEN,
     getNextPageParam: (letzte) =>
       letzte.length < AUFTRAEGE_SEITE
         ? undefined
@@ -451,7 +456,12 @@ export default function AuftraegeListe({
   const offenZahl = kennzahlen?.offen ?? (offeneQuery.data ? offene.length : null);
   const abgeschlossenZahl =
     kennzahlen?.abgeschlossen ??
-    (abgeschlosseneQuery.data && !abgeschlosseneQuery.hasNextPage ? abgeschlossene.length : null);
+    // Ohne Kopf im Fenster ist die geladene Zahl nicht mehr die ganze Menge.
+    (abgeschlosseneQuery.data &&
+    !abgeschlosseneQuery.hasNextPage &&
+    !kopfVerlassen(abgeschlosseneQuery.data)
+      ? abgeschlossene.length
+      : null);
 
   const abschnitte = (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }));
   const einheiten = (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }));
@@ -573,6 +583,18 @@ export default function AuftraegeListe({
         />
       </div>
 
+      {!imOffenen && kopfVerlassen(abgeschlosseneQuery.data) && (
+        <ZumKopfKnopf
+          schluessel={einsatzKeys.auftraegePhase(
+            einsatzId,
+            'abgeschlossen',
+            richtungsKey,
+            empfaengerKey,
+            suche,
+          )}
+          ladeKopf={() => listeAbgeschlosseneAuftraege(einsatzId, filter)}
+        />
+      )}
       <ListeDetail<Auftrag>
         bezeichnung={imOffenen ? 'Offene Aufträge' : 'Abgeschlossene Aufträge'}
         eintraege={imOffenen ? offene : abgeschlosseneEintraege}

@@ -65,6 +65,8 @@ import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useViewport } from '../components/useViewport';
+import ZumKopfKnopf from '../components/ZumKopfKnopf';
+import { LISTEN_MAX_SEITEN, kopfVerlassen } from '../components/listenFenster';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
 import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -186,13 +188,14 @@ export default function MeldungenPage() {
     queryFn: () => ladeMeldungKennzahlen(einsatzId, richtungFilter),
     placeholderData: (prev) => prev,
   });
-  // Kein Seitendeckel (D6): die Kette wächst nur, solange jemand tief in „Abgeschlossen" blättert.
-  // Ein Ereignis lädt nur die schon geladenen Seiten neu, die Cursor rechnet TanStack dabei aus den
-  // frischen Seiten nach.
+  // Seitenfenster (LLH-1687, `components/listenFenster.ts`): ein Ereignis lädt höchstens so viele
+  // Seiten neu, wie im Fenster liegen; die Cursor rechnet TanStack dabei aus den frischen Seiten
+  // nach. Fällt die neueste Seite heraus, führt „Zu den neuesten springen“ zurück.
   const abgeschlosseneQuery = useInfiniteQuery({
     queryKey: einsatzKeys.meldungenPhase(einsatzId, 'abgeschlossen', richtungsKey),
     queryFn: ({ pageParam }) => listeAbgeschlosseneMeldungen(einsatzId, richtungFilter, pageParam),
     initialPageParam: undefined as AbschlussCursor | undefined,
+    maxPages: LISTEN_MAX_SEITEN,
     getNextPageParam: (letzte) =>
       letzte.length < MELDUNGEN_SEITE ? undefined : abschlussCursor(letzte[letzte.length - 1]),
     enabled: ansicht === 'abgeschlossen',
@@ -931,6 +934,12 @@ export default function MeldungenPage() {
                 {...listenProps}
               />
             </div>
+          )}
+          {kopfVerlassen(abgeschlosseneQuery.data) && (
+            <ZumKopfKnopf
+              schluessel={einsatzKeys.meldungenPhase(einsatzId, 'abgeschlossen', richtungsKey)}
+              ladeKopf={() => listeAbgeschlosseneMeldungen(einsatzId, richtungFilter)}
+            />
           )}
           {abgeschlosseneQuery.isPending ? (
             <div style={{ textAlign: 'center', padding: token.paddingLG }}>

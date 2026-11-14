@@ -32,6 +32,8 @@ import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import ZumKopfKnopf from '../components/ZumKopfKnopf';
+import { LISTEN_MAX_SEITEN, kopfVerlassen } from '../components/listenFenster';
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -68,6 +70,9 @@ export default function ErinnerungenPage() {
     queryKey: einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen'),
     queryFn: ({ pageParam }) => listeAbgeschlosseneErinnerungen(einsatzId, pageParam),
     initialPageParam: undefined as AbschlussCursor | undefined,
+    // Seitenfenster (LLH-1687, `components/listenFenster.ts`): ein Live-Ereignis lädt höchstens
+    // so viele Seiten neu, wie im Fenster liegen.
+    maxPages: LISTEN_MAX_SEITEN,
     getNextPageParam: (letzte) =>
       letzte.length < ERINNERUNGEN_SEITE ? undefined : erinnerungCursor(letzte[letzte.length - 1]),
     // Auch für einen Sprung auf eine Erinnerung, die nicht unter den offenen steht.
@@ -371,6 +376,12 @@ export default function ErinnerungenPage() {
         )
       ) : (
         <>
+          {kopfVerlassen(abgeschlosseneQuery.data) && (
+            <ZumKopfKnopf
+              schluessel={einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen')}
+              ladeKopf={() => listeAbgeschlosseneErinnerungen(einsatzId)}
+            />
+          )}
           {abgeschlosseneQuery.isPending ? (
             <div style={{ textAlign: 'center', padding: token.paddingLG }}>
               <Spin />
