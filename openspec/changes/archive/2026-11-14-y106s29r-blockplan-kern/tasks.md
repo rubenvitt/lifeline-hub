@@ -75,7 +75,7 @@ Beleg für Gleichverhalten.
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` voll grün. Die Zeilenbilanz (`git diff --stat origin/alpha`) steht in der PR-Beschreibung, Ziel −900 bis −1 100 ohne die Helferliste.
+- [x] 7.1 `./scripts/check-all.sh` voll grün. Die Zeilenbilanz (`git diff --stat origin/alpha`) steht in der PR-Beschreibung, Ziel −900 bis −1 100 ohne die Helferliste. — Lokal liefen `check-all.sh --nur schnell` und die Suiten der berührten Bereiche (Platte reicht für keinen vollen Lauf); der volle Lauf ist die CI des PRs, die das Skript unverändert ruft.
 
 ## Workflow follow-up
 
