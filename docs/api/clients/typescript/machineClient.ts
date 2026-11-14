@@ -7,44 +7,48 @@
  * `frontend/src/api/machineClient.vektoren.test.ts`).
  */
 
-export const TYP_REQUEST = 'lifeline-machine+jwt';
-export const TYP_RESPONSE = 'lifeline-machine-response+jwt';
-export const RESPONSE_HEADER = 'Lifeline-Signature';
+export const TYP_REQUEST = "lifeline-machine+jwt";
+export const TYP_RESPONSE = "lifeline-machine-response+jwt";
+export const RESPONSE_HEADER = "Lifeline-Signature";
+/** `typ` der Signatur einer Webhook-Zustellung (LLH-1656); sie steht im selben Kopf. */
+export const TYP_EVENT = "lifeline-event+jwt";
+/** Höchste Lebensdauer der Signatur einer Webhook-Zustellung in Sekunden. */
+export const EVENT_LIFETIME_S = 300;
 export const LIFETIME_S = 60;
 export const CLOCK_TOLERANCE_S = 300;
-export const SALT = 'lifeline-machine-client/1';
+export const SALT = "lifeline-machine-client/1";
 
 /** Bytes auf einem gewöhnlichen `ArrayBuffer`, wie WebCrypto sie nimmt. */
 export type Bytes = Uint8Array<ArrayBuffer>;
 
-const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const enc = new TextEncoder();
 
 export function b64(bytes: Uint8Array): string {
-  let s = '';
+  let s = "";
   for (const b of bytes) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 export function parseB64(text: string): Bytes {
-  const s = atob(text.replace(/-/g, '+').replace(/_/g, '/'));
+  const s = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 }
 
 async function sha256B64(data: Bytes): Promise<string> {
-  return b64(new Uint8Array(await crypto.subtle.digest('SHA-256', data)));
+  return b64(new Uint8Array(await crypto.subtle.digest("SHA-256", data)));
 }
 
 /** Normalform: groß, ohne Leerzeichen und Bindestriche, O → 0, I/L → 1, genau 16 Zeichen. */
 export function normalizeCode(input: string): string {
-  let out = '';
+  let out = "";
   for (const roh of input.toUpperCase()) {
-    if (roh === ' ' || roh === '-') continue;
-    const c = roh === 'O' ? '0' : roh === 'I' || roh === 'L' ? '1' : roh;
-    if (!ALPHABET.includes(c)) throw new Error('Code hat ungültige Zeichen');
+    if (roh === " " || roh === "-") continue;
+    const c = roh === "O" ? "0" : roh === "I" || roh === "L" ? "1" : roh;
+    if (!ALPHABET.includes(c)) throw new Error("Code hat ungültige Zeichen");
     out += c;
   }
-  if (out.length !== 16) throw new Error('Code hat nicht 16 Zeichen');
+  if (out.length !== 16) throw new Error("Code hat nicht 16 Zeichen");
   return out;
 }
 
@@ -55,9 +59,20 @@ export interface CodeDerivation {
 }
 
 async function hkdf(code: string, info: string): Promise<Bytes> {
-  const key = await crypto.subtle.importKey('raw', enc.encode(code), 'HKDF', false, ['deriveBits']);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(code),
+    "HKDF",
+    false,
+    ["deriveBits"],
+  );
   const bits = await crypto.subtle.deriveBits(
-    { name: 'HKDF', hash: 'SHA-256', salt: enc.encode(SALT), info: enc.encode(info) },
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: enc.encode(SALT),
+      info: enc.encode(info),
+    },
     key,
     256,
   );
@@ -67,9 +82,9 @@ async function hkdf(code: string, info: string): Promise<Bytes> {
 export async function deriveCode(code: string): Promise<CodeDerivation> {
   const n = normalizeCode(code);
   return {
-    lookup: b64(await hkdf(n, 'suche')),
-    kRedeemer: await hkdf(n, 'einloeser'),
-    kIssuer: await hkdf(n, 'aussteller'),
+    lookup: b64(await hkdf(n, "suche")),
+    kRedeemer: await hkdf(n, "einloeser"),
+    kIssuer: await hkdf(n, "aussteller"),
   };
 }
 
@@ -91,8 +106,11 @@ function transcript(label: string, parts: string[]): Bytes {
   return out;
 }
 
-export function transcriptRedeemer(lookup: string, publicKeyB64: string): Bytes {
-  return transcript('machine-einloeser', [lookup, publicKeyB64]);
+export function transcriptRedeemer(
+  lookup: string,
+  publicKeyB64: string,
+): Bytes {
+  return transcript("machine-einloeser", [lookup, publicKeyB64]);
 }
 
 export function transcriptIssuer(
@@ -102,7 +120,7 @@ export function transcriptIssuer(
   instanzPublicKeyB64: string,
   zugangId: string,
 ): Bytes {
-  return transcript('machine-aussteller', [
+  return transcript("machine-aussteller", [
     lookup,
     publicKeyB64,
     instanzId,
@@ -112,15 +130,19 @@ export function transcriptIssuer(
 }
 
 async function hmacB64(key: Bytes, data: Bytes): Promise<string> {
-  const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, [
-    'sign',
-  ]);
-  return b64(new Uint8Array(await crypto.subtle.sign('HMAC', k, data)));
+  const k = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return b64(new Uint8Array(await crypto.subtle.sign("HMAC", k, data)));
 }
 
 export interface Jwk {
-  kty: 'OKP';
-  crv: 'Ed25519';
+  kty: "OKP";
+  crv: "Ed25519";
   x: string;
 }
 
@@ -148,9 +170,15 @@ export interface Credentials {
 }
 
 /** Neues Schlüsselpaar als Base64url (privat: 32 Bytes Seed, öffentlich: 32 Bytes). */
-export async function generateKey(): Promise<{ privateKey: string; publicKey: string }> {
-  const paar = (await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify'])) as CryptoKeyPair;
-  const jwk = await crypto.subtle.exportKey('jwk', paar.privateKey);
+export async function generateKey(): Promise<{
+  privateKey: string;
+  publicKey: string;
+}> {
+  const paar = (await crypto.subtle.generateKey("Ed25519", true, [
+    "sign",
+    "verify",
+  ])) as CryptoKeyPair;
+  const jwk = await crypto.subtle.exportKey("jwk", paar.privateKey);
   return { privateKey: jwk.d!, publicKey: jwk.x! };
 }
 
@@ -167,7 +195,7 @@ export async function prepareRedeem(
     derivation,
     request: {
       lookup: derivation.lookup,
-      public_key: { kty: 'OKP', crv: 'Ed25519', x: publicKeyB64 },
+      public_key: { kty: "OKP", crv: "Ed25519", x: publicKeyB64 },
       proof,
     },
   };
@@ -190,11 +218,12 @@ export async function finishRedeem(
       response.zugang_id,
     ),
   );
-  if (erwartet !== response.proof) throw new Error('Prüfwert der Instanz passt nicht');
+  if (erwartet !== response.proof)
+    throw new Error("Prüfwert der Instanz passt nicht");
   return {
     zugang_id: response.zugang_id,
     instanz_id: response.instanz_id,
-    base_url: baseUrl.replace(/\/+$/, ''),
+    base_url: baseUrl.replace(/\/+$/, ""),
     private_key: key.privateKey,
     public_key: key.publicKey,
     instanz_public_key: response.instanz_public_key.x,
@@ -213,7 +242,7 @@ export async function signRequest(
   now: number,
   jti: string,
 ): Promise<string> {
-  const header = { alg: 'EdDSA', typ: TYP_REQUEST, kid: cred.zugang_id };
+  const header = { alg: "EdDSA", typ: TYP_REQUEST, kid: cred.zugang_id };
   const claims = {
     iss: cred.zugang_id,
     aud: cred.instanz_id,
@@ -226,13 +255,15 @@ export async function signRequest(
   };
   const eingabe = `${b64(enc.encode(JSON.stringify(header)))}.${b64(enc.encode(JSON.stringify(claims)))}`;
   const key = await crypto.subtle.importKey(
-    'jwk',
-    { kty: 'OKP', crv: 'Ed25519', d: cred.private_key, x: cred.public_key },
-    'Ed25519',
+    "jwk",
+    { kty: "OKP", crv: "Ed25519", d: cred.private_key, x: cred.public_key },
+    "Ed25519",
     false,
-    ['sign'],
+    ["sign"],
   );
-  const sig = new Uint8Array(await crypto.subtle.sign('Ed25519', key, enc.encode(eingabe)));
+  const sig = new Uint8Array(
+    await crypto.subtle.sign("Ed25519", key, enc.encode(eingabe)),
+  );
   return `Machine ${eingabe}.${b64(sig)}`;
 }
 
@@ -245,28 +276,88 @@ export async function verifyResponse(
   body: Bytes,
   now: number,
 ): Promise<void> {
-  const [h, c, s] = token.split('.');
-  if (!h || !c || !s) throw new Error('Antwortsignatur unlesbar');
+  const [h, c, s] = token.split(".");
+  if (!h || !c || !s) throw new Error("Antwortsignatur unlesbar");
   const header = JSON.parse(new TextDecoder().decode(parseB64(h)));
-  if (header.alg !== 'EdDSA' || header.typ !== TYP_RESPONSE) throw new Error('Typ');
+  if (header.alg !== "EdDSA" || header.typ !== TYP_RESPONSE)
+    throw new Error("Typ");
   const key = await crypto.subtle.importKey(
-    'raw',
+    "raw",
     parseB64(cred.instanz_public_key),
-    'Ed25519',
+    "Ed25519",
     false,
-    ['verify'],
+    ["verify"],
   );
-  const ok = await crypto.subtle.verify('Ed25519', key, parseB64(s), enc.encode(`${h}.${c}`));
-  if (!ok) throw new Error('Signatur');
+  const ok = await crypto.subtle.verify(
+    "Ed25519",
+    key,
+    parseB64(s),
+    enc.encode(`${h}.${c}`),
+  );
+  if (!ok) throw new Error("Signatur");
   const claims = JSON.parse(new TextDecoder().decode(parseB64(c)));
-  if (claims.iss !== cred.instanz_id || claims.aud !== cred.zugang_id) throw new Error('Ziel');
-  if (claims.req !== requestJti) throw new Error('Bezug');
-  if (claims.status !== status) throw new Error('Status');
-  if (claims.bh !== (await sha256B64(body))) throw new Error('Body');
+  if (claims.iss !== cred.instanz_id || claims.aud !== cred.zugang_id)
+    throw new Error("Ziel");
+  if (claims.req !== requestJti) throw new Error("Bezug");
+  if (claims.status !== status) throw new Error("Status");
+  if (claims.bh !== (await sha256B64(body))) throw new Error("Body");
   const lebt =
     claims.exp > claims.iat &&
     claims.exp - claims.iat <= LIFETIME_S &&
     claims.iat <= now + CLOCK_TOLERANCE_S &&
     claims.exp >= now - CLOCK_TOLERANCE_S;
-  if (!lebt) throw new Error('Zeit');
+  if (!lebt) throw new Error("Zeit");
+}
+
+/**
+ * Prüft eine eingehende Webhook-Zustellung (LLH-1656): `token` ist der Kopf `Lifeline-Signature`,
+ * `body` die empfangenen Bytes, `webhookId` die Kennung des Webhooks von der Seite
+ * „Anbindungen“. Wirft mit dem Grund (`Typ`, `Signatur`, `Absender`, `Ziel`, `Body`, `Zeit`).
+ * Erst danach den Body parsen; doppelt zugestellte Ereignisse über `id` im Body erkennen.
+ */
+export async function verifyWebhook(
+  instanzPublicKey: string,
+  instanzId: string,
+  webhookId: string,
+  token: string,
+  body: Bytes,
+  now: number,
+): Promise<{
+  iss: string;
+  aud: string;
+  iat: number;
+  exp: number;
+  jti: string;
+  bh: string;
+}> {
+  const [h, c, s] = token.split(".");
+  if (!h || !c || !s) throw new Error("Webhook-Signatur unlesbar");
+  const header = JSON.parse(new TextDecoder().decode(parseB64(h)));
+  if (header.alg !== "EdDSA" || header.typ !== TYP_EVENT)
+    throw new Error("Typ");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    parseB64(instanzPublicKey),
+    "Ed25519",
+    false,
+    ["verify"],
+  );
+  const ok = await crypto.subtle.verify(
+    "Ed25519",
+    key,
+    parseB64(s),
+    enc.encode(`${h}.${c}`),
+  );
+  if (!ok) throw new Error("Signatur");
+  const claims = JSON.parse(new TextDecoder().decode(parseB64(c)));
+  if (claims.iss !== instanzId) throw new Error("Absender");
+  if (claims.aud !== webhookId) throw new Error("Ziel");
+  if (claims.bh !== (await sha256B64(body))) throw new Error("Body");
+  const lebt =
+    claims.exp > claims.iat &&
+    claims.exp - claims.iat <= EVENT_LIFETIME_S &&
+    claims.iat <= now + CLOCK_TOLERANCE_S &&
+    claims.exp >= now - CLOCK_TOLERANCE_S;
+  if (!lebt) throw new Error("Zeit");
+  return claims;
 }

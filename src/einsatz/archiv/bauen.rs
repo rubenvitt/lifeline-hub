@@ -282,6 +282,11 @@ fn privat_anlegen(pfad: &Path) -> Result<std::fs::File, AppError> {
 /// Teil im Namen der Zwischendatei des Befehls `archiv einspielen` (`einspielen.rs`).
 pub(super) const TEIL_EINSPIELEN: &str = "einspielen";
 
+/// Teil im Namen der Datei, in die die Verwaltung einen hochgeladenen Block schreibt (LLH-1711,
+/// design.md D4). Sie ist verschlüsselt, wird aber wie ein Einspielen erst alt gelöscht: ein
+/// großer Upload dauert.
+pub(super) const TEIL_HOCHGELADEN: &str = "hochgeladen";
+
 /// Teil im Namen der Zwischendateien des Befehls `archiv loeschersuchen` (`loeschersuchen.rs`,
 /// LLH-1712); dahinter folgt die Nummer des Blocks.
 pub(super) const TEIL_LOESCHERSUCHEN: &str = "loeschersuchen";
@@ -289,11 +294,18 @@ pub(super) const TEIL_LOESCHERSUCHEN: &str = "loeschersuchen";
 /// Teil im Namen der Zwischendatei des Befehls `archiv personen` (`personen.rs`, LLH-1712).
 pub(super) const TEIL_PERSONEN: &str = "personen";
 
-/// Teile der Befehle: sie laufen als eigener Prozess neben dem Server.
-const BEFEHL_TEILE: &[&str] = &[TEIL_EINSPIELEN, TEIL_LOESCHERSUCHEN, TEIL_PERSONEN];
+/// Teile der Befehle und des Uploads: sie laufen als eigener Prozess bzw. eigener Request neben
+/// dem Purge-Lauf.
+const BEFEHL_TEILE: &[&str] = &[
+    TEIL_EINSPIELEN,
+    TEIL_HOCHGELADEN,
+    TEIL_LOESCHERSUCHEN,
+    TEIL_PERSONEN,
+];
 
-/// So alt muss die Zwischendatei eines Befehls sein, bevor der Purge-Lauf sie löscht: der
-/// Befehl läuft als eigener Prozess und kann gerade an ihr arbeiten.
+/// So alt muss die Zwischendatei eines Befehls oder Uploads sein, bevor der Purge-Lauf sie
+/// löscht: der Befehl läuft als eigener Prozess, ein Upload als eigener Request, und beide
+/// können gerade an ihr arbeiten.
 const EINSPIELEN_LIEGT_STUNDEN: u64 = 6;
 
 /// Löscht Zwischendateien, die ein abgebrochener Bau liegen ließ (`Drop` läuft bei einem
@@ -314,7 +326,8 @@ pub async fn zwischendateien_aufraeumen(pool: &SqlitePool) {
     for eintrag in eintraege.flatten() {
         let name = eintrag.file_name();
         let name_s = name.to_string_lossy();
-        // `-<teil>-…` bzw. `-<teil><block>-…`: die Datei eines Befehls (eigener Prozess).
+        // `-<teil>-…` bzw. `-<teil><block>-…`: die Datei eines Befehls (eigener Prozess) oder
+        // eines Uploads (eigener Request).
         let einspielen = BEFEHL_TEILE
             .iter()
             .any(|t| name_s.contains(&format!("-{t}")));

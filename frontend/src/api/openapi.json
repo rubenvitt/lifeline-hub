@@ -930,7 +930,13 @@
           "maschinenzugang_widerrufen",
           "einwurf_zugang_angelegt",
           "einwurf_zugang_schluessel_gewechselt",
-          "einwurf_zugang_widerrufen"
+          "einwurf_zugang_widerrufen",
+          "maschinenzugang_webhook_angelegt",
+          "maschinenzugang_webhook_geaendert",
+          "maschinenzugang_webhook_entfernt",
+          "maschinenzugang_webhook_wieder_aufgenommen",
+          "maschinenzugang_webhook_lan_erlaubt",
+          "maschinenzugang_webhook_lan_entzogen"
         ]
       },
       "AdressatKategorie": {
@@ -1149,6 +1155,17 @@
             "items": {
               "$ref": "#/components/schemas/Scope"
             }
+          },
+          "webhook": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WebhookAnzeige",
+                "description": "Der Webhook des Zugangs, falls einer eingerichtet ist (LLH-1656)."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "widerrufen_at": {
             "type": [
@@ -1659,6 +1676,72 @@
               "null"
             ],
             "description": "Bis wann dieser Block gilt; `None` = so lange wie der Einsatz."
+          }
+        }
+      },
+      "ArchivEingespieltAnzeige": {
+        "type": "object",
+        "description": "Was eingespielt wurde (`POST /api/admin/archiv/einspielen`).",
+        "required": [
+          "einsatz_id",
+          "bezeichnung",
+          "org_name",
+          "loeschen_at",
+          "inhalte",
+          "hinweise"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatznummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "frist_endet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Endet eine Frist des Blocks vor den 7 Tagen: wann (UTC). Die Oberfläche zeigt ihn in der\nAnzeigezone; derselbe Zeitpunkt steht als Satz auch in `hinweise`."
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Was nicht oder anders übernommen wurde, als Sätze wie beim Befehl."
+          },
+          "inhalte": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Anhänge und Pläne, die mitkamen."
+          },
+          "loeschen_at": {
+            "type": "string",
+            "description": "Bis wann der Einsatz hier bleibt (UTC); danach räumt der Purge-Lauf ihn ab."
+          },
+          "org_name": {
+            "type": "string"
+          }
+        }
+      },
+      "ArchivEinspielenVerfuegbarkeit": {
+        "type": "object",
+        "description": "Antwort von `GET /api/admin/archiv/einspielen`.",
+        "required": [
+          "verfuegbar"
+        ],
+        "properties": {
+          "verfuegbar": {
+            "type": "boolean",
+            "description": "`false` an einer Instanz, bei der sich eine andere meldet (Hub): dort gehört kein privater\nArchiv-Schlüssel hin."
           }
         }
       },
@@ -8857,6 +8940,16 @@
             "description": "Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`)."
           }
         }
+      },
+      "EventType": {
+        "type": "string",
+        "description": "Art eines Ereignisses. Neue Arten kommen nur hinzu; ein Client überspringt unbekannte.",
+        "enum": [
+          "einsatz.created",
+          "einsatz.updated",
+          "einsatz.closed",
+          "lage.changed"
+        ]
       },
       "ExterneStelle": {
         "type": "object",
@@ -17846,6 +17939,16 @@
           }
         }
       },
+      "RuhtGrund": {
+        "type": "string",
+        "description": "Warum ein Webhook ruht: sein Zugang darf gerade nicht beliefert werden.",
+        "enum": [
+          "zugang_wartet",
+          "zugang_widerrufen",
+          "zugang_abgelaufen",
+          "ohne_events_read"
+        ]
+      },
       "Sachgebiet": {
         "type": "string",
         "description": "Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.\n\nDie Reihenfolge ist die der Anlage 2 und zugleich die Anzeigereihenfolge — sie ist\nTeil des Vertrags, nicht Dekoration (`ALLE` speist die sechs festen Zeilen).",
@@ -22378,6 +22481,244 @@
           }
         }
       },
+      "WebhookAnzeige": {
+        "type": "object",
+        "description": "Der Webhook einer Anbindung, wie die Verwaltung ihn zeigt.",
+        "required": [
+          "id",
+          "host",
+          "arten",
+          "lan_erlaubt",
+          "zustand",
+          "fehlversuche",
+          "angelegt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "angehalten_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "arten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventType"
+            }
+          },
+          "fehler_seit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erster Fehlschlag der laufenden Störung."
+          },
+          "fehlversuche": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string",
+            "description": "Optimistisches Lock für Änderungen."
+          },
+          "host": {
+            "type": "string",
+            "description": "Der Server des Ziels; sieht jeder, der die Anbindung sieht."
+          },
+          "id": {
+            "type": "string",
+            "description": "Kennung des Webhooks; zugleich `aud` jeder Signatur, gegen die der Empfänger prüft."
+          },
+          "lan_erlaubt": {
+            "type": "boolean"
+          },
+          "letzter_erfolg_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "letzter_fehler": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WebhookLetzterFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "naechster_versuch_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ruht_grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RuhtGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die ganze Ziel-URL; nur für den System-Admin, weil ihr Pfad ein Token tragen kann."
+          },
+          "verlust_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ereignisse gingen verloren, bevor sie zugestellt waren; der Empfänger muss den Stand über\ndie Leserouten neu lesen."
+          },
+          "zustand": {
+            "$ref": "#/components/schemas/WebhookZustand"
+          }
+        }
+      },
+      "WebhookFehler": {
+        "type": "string",
+        "description": "Warum ein Versuch scheiterte. Ein Code, nie Text des Ziels (Spec „Diagnose“).",
+        "enum": [
+          "status",
+          "weiterleitung",
+          "zeitueberschreitung",
+          "verbindung",
+          "tls",
+          "ziel_intern",
+          "dns",
+          "ziel_ungueltig"
+        ]
+      },
+      "WebhookLetzterFehler": {
+        "type": "object",
+        "description": "Der letzte Fehlschlag eines Webhooks.",
+        "required": [
+          "at",
+          "art"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/WebhookFehler"
+          },
+          "at": {
+            "type": "string"
+          },
+          "status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "HTTP-Status, falls das Ziel antwortete."
+          }
+        }
+      },
+      "WebhookTestErgebnis": {
+        "type": "object",
+        "description": "Ergebnis eines Testereignisses.",
+        "required": [
+          "erfolg",
+          "dauer_ms"
+        ],
+        "properties": {
+          "dauer_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfolg": {
+            "type": "boolean"
+          },
+          "fehler_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WebhookFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "WebhookVersuch": {
+        "type": "object",
+        "description": "Ein Zustellversuch im Verlauf. Der Rumpf der Antwort wird nie gespeichert.",
+        "required": [
+          "at",
+          "test",
+          "erfolg",
+          "dauer_ms"
+        ],
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "dauer_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ereignis_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nummer des Ereignisses; fehlt beim Testereignis."
+          },
+          "erfolg": {
+            "type": "boolean"
+          },
+          "fehler_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WebhookFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "test": {
+            "type": "boolean"
+          }
+        }
+      },
+      "WebhookZustand": {
+        "type": "string",
+        "description": "Zustand eines Webhooks, wie die Verwaltung ihn zeigt. `fehler` und `ruht` sind abgeleitet:\n`fehler` ist ein aktiver Webhook in einer Störung, `ruht` einer, dessen Zugang gerade\nnicht beliefert werden darf.",
+        "enum": [
+          "aktiv",
+          "fehler",
+          "angehalten",
+          "ruht"
+        ]
+      },
       "WechselArt": {
         "type": "string",
         "description": "Art eines Wechsels aus dem Plan (`einsatz_plan_wechsel.art`). Wire == `as_str()`.",
@@ -23356,7 +23697,7 @@
       },
       "ZugangsAngaben": {
         "type": "object",
-        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `archiv_person_geschwaerzt`, `archiv_durchsucht`: keine; Ziel ist der archivierte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.\n- `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder\n  sein Hash.",
+        "description": "Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in\n`admin_audit.detail` und geht strukturiert an die Verwaltung, die Rollen und Zeit nach ihren\nKonventionen beschriftet: Server und Frontend führen Rollennamen und Zeitformat so nur einmal.\nFlach statt je Aktion getaggt; welche Felder stehen, ergibt sich aus der Aktion:\n\n- `benutzer_angelegt`: `system_rolle`, `org_rolle`.\n- `rolle_geaendert`: je geänderter Rolle `…_vorher` und die neue.\n- `sitzung_beendet`: `geraet` (falls bekannt) und `angemeldet_at`.\n- `instanz_*`: `instanz_kennung`, `fingerabdruck`, `fremde_org`, bei der meldenden Seite `adresse`;\n  `instanz_elw_verloren` zusätzlich `anzahl` (Konten mit ungültig gemachten Geheimnissen).\n- `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel\n  des Blocks, durch Komma getrennt) und `block`.\n- `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.\n- `archiv_person_geschwaerzt`, `archiv_durchsucht`: keine; Ziel ist der archivierte Einsatz.\n- `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die\n  Gegenstelle.\n- `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich\n  `fingerabdruck` und beim Wechsel `fingerabdruck_vorher`; `_geaendert` zusätzlich\n  `scopes_vorher`, falls die Scopes wechselten.\n- `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder\n  sein Hash.\n- `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.",
         "properties": {
           "adresse": {
             "type": [
@@ -23422,6 +23763,13 @@
               "null"
             ],
             "description": "Warum ein Unterschriftsschlüssel verworfen wurde."
+          },
+          "host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Webhook (LLH-1656): Host des Ziels. Nie die ganze URL, ihr Pfad kann ein Token tragen."
           },
           "instanz_kennung": {
             "type": [

@@ -7,6 +7,7 @@
 //!    `POST /api/v1/zugang/redeem`. Der Code selbst geht nie über die Leitung.
 //! 3. [`finish_redeem`] prüft die Antwort und liefert die [`Credentials`] (Schlüsseldatei).
 //! 4. Jede Anfrage trägt `Authorization: Machine <jws>` aus [`Credentials::sign_request`].
+//! 5. Eine Webhook-Zustellung prüft [`Credentials::verify_webhook`] (LLH-1656).
 //!
 //! Absichtlich unabhängig vom Server implementiert: Die Testvektoren
 //! (`docs/api/machine-auth-testvektoren.json`) beweisen, dass eine zweite Implementierung nach
@@ -26,8 +27,12 @@ pub const TYP_REQUEST: &str = "lifeline-machine+jwt";
 pub const TYP_RESPONSE: &str = "lifeline-machine-response+jwt";
 /// Schema im Kopf `Authorization`.
 pub const SCHEME: &str = "Machine";
-/// Kopf, der die Antwortsignatur trägt.
+/// Kopf, der die Antwortsignatur trägt; ebenso die Signatur einer Webhook-Zustellung.
 pub const RESPONSE_HEADER: &str = "Lifeline-Signature";
+/// `typ` der Signatur einer Webhook-Zustellung (LLH-1656).
+pub const TYP_EVENT: &str = "lifeline-event+jwt";
+/// Höchste Lebensdauer der Signatur einer Webhook-Zustellung in Sekunden.
+pub const EVENT_LIFETIME_S: i64 = 300;
 
 /// Wert von `?karte=`, mit dem `GET /api/v1/lage` die Karte weglässt.
 pub const KARTE_NONE: &str = "none";
@@ -66,6 +71,9 @@ pub enum Error {
     Malformed,
     /// Signatur, Ziel, Bezug, Status, Body oder Zeit der Antwort passen nicht.
     InvalidResponse(&'static str),
+    /// Typ, Signatur, Absender, Ziel (`aud`), Body oder Zeit einer Webhook-Zustellung passen
+    /// nicht.
+    InvalidWebhook(&'static str),
     /// Fehler beim HTTP-Aufruf (Feature `http`).
     Http(String),
 }
@@ -77,6 +85,7 @@ impl std::fmt::Display for Error {
             Error::InvalidProof => f.write_str("Prüfwert der Instanz passt nicht"),
             Error::Malformed => f.write_str("Schlüssel oder Token unlesbar"),
             Error::InvalidResponse(w) => write!(f, "Antwortsignatur ungültig: {w}"),
+            Error::InvalidWebhook(w) => write!(f, "Webhook-Signatur ungültig: {w}"),
             Error::Http(e) => write!(f, "HTTP: {e}"),
         }
     }
@@ -351,6 +360,19 @@ pub struct ResponseClaims {
     pub bh: String,
 }
 
+/// Claims der Signatur einer Webhook-Zustellung (Kopf [`RESPONSE_HEADER`], `typ`
+/// [`TYP_EVENT`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WebhookClaims {
+    pub iss: String,
+    /// Kennung des Webhooks; die Seite „Anbindungen“ nennt sie.
+    pub aud: String,
+    pub iat: i64,
+    pub exp: i64,
+    pub jti: String,
+    pub bh: String,
+}
+
 fn sign_compact<C: Serialize>(key: &SigningKey, typ: &str, kid: &str, claims: &C) -> String {
     let header = Header {
         alg: "EdDSA".into(),
@@ -488,6 +510,83 @@ impl Credentials {
         }
         Ok(claims)
     }
+}
+
+impl Credentials {
+    /// Prüft eine eingehende Webhook-Zustellung (LLH-1656): `token` ist der Kopf
+    /// [`RESPONSE_HEADER`], `body` die empfangenen Bytes, `webhook_id` die Kennung des Webhooks
+    /// von der Seite „Anbindungen“. Geprüft werden Typ, Signatur gegen den Instanzschlüssel aus dem
+    /// Einlösen, Absender, Ziel, Body und Zeitfenster. Erst danach den Body parsen; doppelt
+    /// zugestellte Ereignisse über `id` im Body erkennen.
+    pub fn verify_webhook(
+        &self,
+        token: &str,
+        webhook_id: &str,
+        body: &[u8],
+        now: i64,
+    ) -> Result<WebhookClaims, Error> {
+        verify_webhook(
+            token,
+            &self.instanz_public_key,
+            &self.instanz_id,
+            webhook_id,
+            body,
+            now,
+        )
+    }
+}
+
+/// [`Credentials::verify_webhook`] ohne Schlüsseldatei: Instanzschlüssel (Base64url) und
+/// Instanzkennung kommen aus dem Einlösen.
+pub fn verify_webhook(
+    token: &str,
+    instanz_public_key: &str,
+    instanz_id: &str,
+    webhook_id: &str,
+    body: &[u8],
+    now: i64,
+) -> Result<WebhookClaims, Error> {
+    let key = Jwk::ed25519(
+        &parse_b64(instanz_public_key)
+            .and_then(|b| b.try_into().ok())
+            .ok_or(Error::Malformed)?,
+    )
+    .verifying_key()?;
+    let parts: Vec<&str> = token.split('.').collect();
+    let [h, c, s] = parts.as_slice() else {
+        return Err(Error::Malformed);
+    };
+    let header: Header = parse_b64(h)
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .ok_or(Error::Malformed)?;
+    if header.alg != "EdDSA" || header.typ != TYP_EVENT {
+        return Err(Error::InvalidWebhook("Typ"));
+    }
+    let sig: [u8; 64] = parse_b64(s)
+        .and_then(|b| b.try_into().ok())
+        .ok_or(Error::Malformed)?;
+    key.verify_strict(format!("{h}.{c}").as_bytes(), &Signature::from_bytes(&sig))
+        .map_err(|_| Error::InvalidWebhook("Signatur"))?;
+    let claims: WebhookClaims = parse_b64(c)
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .ok_or(Error::Malformed)?;
+    if claims.iss != instanz_id {
+        return Err(Error::InvalidWebhook("Absender"));
+    }
+    if claims.aud != webhook_id {
+        return Err(Error::InvalidWebhook("Ziel"));
+    }
+    if claims.bh != sha256_b64(body) {
+        return Err(Error::InvalidWebhook("Body"));
+    }
+    let lebt = claims.exp > claims.iat
+        && claims.exp.saturating_sub(claims.iat) <= EVENT_LIFETIME_S
+        && claims.iat <= now.saturating_add(CLOCK_TOLERANCE_S)
+        && claims.exp >= now.saturating_sub(CLOCK_TOLERANCE_S);
+    if !lebt {
+        return Err(Error::InvalidWebhook("Zeit"));
+    }
+    Ok(claims)
 }
 
 #[cfg(feature = "http")]

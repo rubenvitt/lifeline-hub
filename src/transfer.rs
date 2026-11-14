@@ -40,6 +40,13 @@ use tokio::time::{Instant, Sleep};
 /// 4 MiB einen Eintrag in der Ausnahmeliste und die Upload-Grenze.
 pub const UPLOAD_BODY_MAX: usize = 26 * 1024 * 1024;
 
+/// Größter Archivblock, den die Verwaltung annimmt (LLH-1711, design.md D5); größere spielt der
+/// Befehl `archiv einspielen` ein.
+pub const ARCHIV_BLOCK_MAX: usize = 256 * 1024 * 1024;
+
+/// Body-Grenze des Einspielens: der Block und Raum für Schlüssel, Passphrase und Multipart-Köpfe.
+pub const ARCHIV_BLOCK_BODY_MAX: usize = 256 * 1024 * 1024 + 128 * 1024;
+
 /// Plätze der gemeinsamen Upload-Grenze. Pi-tauglich: je Upload liegen bis zu vier Kopien der
 /// Datei im Speicher (Multipart-Puffer, Prüfung, sqlx- und SQLite-Kopie beim Binden), bei vier
 /// Plätzen also höchstens rund 400 MiB.

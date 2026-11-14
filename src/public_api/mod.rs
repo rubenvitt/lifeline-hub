@@ -19,6 +19,10 @@
 //! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
 //! [`einwurf`], die einzigen Routen ohne signierte Anfrage.
 //!
+//! Webhooks (LLH-1656, Spec `webhook-zustellung`): [`webhook`], der zweite Leser der Outbox, mit
+//! eigenem Hintergrundlauf. Er stellt zu und hat keine Route unter `/api/v1/`; eingerichtet wird
+//! er über die Verwaltung (`routes::anbindungen_webhook`).
+//!
 //! Fachrouten: Rechner Unterkunft und Zelte in [`rechner`] (LLH-1524, Spec
 //! `rechner-api-unterkunft`).
 //!
@@ -36,6 +40,7 @@ pub mod machine;
 pub mod rechner;
 pub mod routen;
 pub mod scope;
+pub mod webhook;
 pub mod zugang;
 
 use std::sync::OnceLock;

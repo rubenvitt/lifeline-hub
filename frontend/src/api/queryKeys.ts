@@ -1079,6 +1079,8 @@ export const GLOBAL_KEYS = {
   authProvider: 'auth-provider',
   // Anbindungen: Maschinenzugänge für Fremdsysteme (LLH-1652), Verwaltung.
   anbindungen: 'anbindungen',
+  // Verlauf der Zustellversuche des Webhooks einer Anbindung (LLH-1656).
+  anbindungWebhookVersuche: 'anbindung-webhook-versuche',
   // Einwurf-Zugänge für Absender ohne Signatur (LLH-1654), Verwaltung auf derselben Seite.
   einwurfZugaenge: 'einwurf-zugaenge',
   // Lagebild für Externe (LLH-1496): Abruf der Seite `/extern` mit dem Schlüssel aus dem Link.
@@ -1087,6 +1089,8 @@ export const GLOBAL_KEYS = {
   instanzkopplung: 'instanzkopplung',
   // Archiv-Schlüssel der Org (LLH-1494): Empfänger der Archive am Ende der Nachbereitung.
   orgArchivSchluessel: 'org-archiv-schluessel',
+  // Archiv einspielen (LLH-1711): ob diese Instanz Blöcke annimmt (nicht am Hub).
+  archivEinspielen: 'archiv-einspielen',
   // Herkunft der Stammdaten (LLH-1493): welche Zeilen vom Hub kommen; frisch mit `stammdaten`.
   stammdatenHerkunft: 'stammdaten-herkunft',
   // Präferenzen des ANGEMELDETEN Benutzers.
@@ -1206,12 +1210,15 @@ export const globalKeys = {
   orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
   authProvider: () => [GLOBAL_KEYS.authProvider] as const,
   anbindungen: () => [GLOBAL_KEYS.anbindungen] as const,
+  anbindungWebhookVersuche: (zugangId: string) =>
+    [GLOBAL_KEYS.anbindungWebhookVersuche, zugangId] as const,
   einwurfZugaenge: () => [GLOBAL_KEYS.einwurfZugaenge] as const,
   /** Abruf der Seite `/extern` (LLH-1496). Ohne den Schlüssel: der bleibt aus dem Cache. */
   lagebildExtern: () => [GLOBAL_KEYS.lagebildExtern] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
   stammdatenHerkunft: () => [GLOBAL_KEYS.stammdatenHerkunft] as const,
   orgArchivSchluessel: () => [GLOBAL_KEYS.orgArchivSchluessel] as const,
+  archivEinspielen: () => [GLOBAL_KEYS.archivEinspielen] as const,
   /**
    * Halter des letzten Unterschriftsschlüssels (LLH-1605), für die Warnung der Benutzerverwaltung.
    * Liegt unter dem Prefix `instanzkopplung`: wer die Kopplungen abgleicht, gleicht sie mit ab.
@@ -1403,6 +1410,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `anbindungen` (LLH-1652): Verwaltung der Maschinenzugänge; die eigene Änderung setzt die
  *   Antwort. Ablehnungen, „zuletzt genutzt“ und eine Freigabe am Einsatz (LLH-1638) zeigt der
  *   nächste Abruf, kein Ereignis je Anfrage eines Fremdsystems.
+ * - `anbindungWebhookVersuche` (LLH-1656): Verlauf der Zustellversuche; der Lauf im Hintergrund
+ *   meldet kein Ereignis je Versuch. Die Ansicht fragt im Takt der Liste nach.
  * - `einwurfZugaenge` (LLH-1654): Verwaltung der Einwurf-Zugänge; die eigene Änderung setzt die
  *   Antwort. „Zuletzt genutzt“ zeigt der nächste Abruf, kein Ereignis je Einwurf.
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
@@ -1410,6 +1419,8 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
  * - `orgArchivSchluessel` (LLH-1494): Verwaltung der Archiv-Schlüssel, nur der System-Admin;
  *   die eigene Änderung setzt die Antwort.
+ * - `archivEinspielen` (LLH-1711): ob die Instanz Archivblöcke annimmt; ändert sich nur mit einer
+ *   Kopplung, gelesen beim Öffnen der Aufbewahrung.
  * - `orgEinstellungen`, `orgModulEinstellungen`: enger Lesekreis; ein Modulwechsel wirkt auf den
  *   Rechte-Schnappschuss der Einsatz-Ströme und ist ein eigenes Thema.
  * - `benutzerEinstellungen`: Präferenzen des angemeldeten Benutzers, nur er schreibt sie.
@@ -1431,10 +1442,12 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.benutzer,
   GLOBAL_KEYS.authProvider,
   GLOBAL_KEYS.anbindungen,
+  GLOBAL_KEYS.anbindungWebhookVersuche,
   GLOBAL_KEYS.einwurfZugaenge,
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgArchivSchluessel,
+  GLOBAL_KEYS.archivEinspielen,
   GLOBAL_KEYS.orgEinstellungen,
   GLOBAL_KEYS.orgModulEinstellungen,
   GLOBAL_KEYS.benutzerEinstellungen,
