@@ -2,7 +2,9 @@
 #
 # JEDER Job ruft `scripts/check-all.sh` auf, keiner stellt sich seine Schritte selbst zusammen:
 # das Sammel-Gate bleibt die eine Wahrheit darüber, WAS geprüft wird; die Jobs entscheiden nur,
-# WO es läuft. Wer einen Schritt vermisst, ändert das Skript.
+# WO es läuft. Wer einen Schritt vermisst, ändert das Skript. Einzige Ausnahme: ein Schritt, der
+# nur nach einem Fehlschlag läuft und den Fehler erklärt, ohne etwas zu entscheiden (Karenzzeit
+# nach gescheitertem Frontend-Install, LLH-1884).
 #
 # Geteilt, weil die drei schweren Suiten (Rust, Vitest, Playwright) nicht voneinander abhängen;
 # der kritische Pfad ist die Rust-Suite allein. Sie bleibt EIN Job, weil Compile nur einen
