@@ -463,6 +463,11 @@ Herleitung in
     Einmalpasswort, Notfallbefehl `auth::notfall`); die Pflicht am Login regelt [ADR-0016](../docs/architektur/entscheidungen/ADR-0016-admins-einer-verteilenden-instanz-melden-sich-per-passkey-an.md).
   - **Systemrolle `admin` vom Hub nur an einer Instanz mit einer Org** (`uebernehmen`); sonst
     `keiner` mit Hinweis an der Kopplung.
+  - **Der Bestand ist, was die Lieferung als Zeile baut** (LLH-1871): Was in
+    `stammdaten::bestand::load` fehlt, räumt die meldende Seite ab. Eine neue Sonderregel in
+    `liefern::build_lieferung` oder `load_daten` gehört auch dorthin; Guard
+    `bestand::tests::bestand_ist_was_als_zeile_geliefert_wird`. Herleitung:
+    `openspec/changes/archive/2026-11-13-n2ge2224-reste-nach-restore-abraeumen/design.md`.
   - Nachweis: `tests/instanz_stammdaten.rs`, `tests/instanz_stammdaten_live.rs`.
 - **Spiegel und Anträge (LLH-1492)**, Specs `einsatz-spiegel` und `spiegel-antraege`,
   Entscheidung

@@ -223,6 +223,14 @@ dem Zurückspielen von selbst ab. Ein Eingriff ist nicht nötig, gleich ob die S
   den nächsten Meldungen, auch bei mehreren Kopplungen.
 - Akten, die ein zurückgespielter Hub mit der Sicherung verloren hat, schickt der ELW mit den
   nächsten Meldungen erneut. Das gilt auch, wenn der ELW während des Ausfalls weitergearbeitet hat.
+- Unterschriftsschlüssel und Stammdaten-Zeilen, die ein zurückgespielter Hub mit der Sicherung
+  verloren hat, räumt der ELW selbst ab (LLH-1871): Ein solcher Schlüssel gilt dort nach der
+  nächsten Meldung als widerrufen, eine solche Zeile wird gelöscht, außer Dienst genommen oder,
+  bei Konten, deaktiviert. Die Seite „Instanzkopplung“ am ELW nennt beides als Hinweis. Vergibt
+  der Hub die Nummer eines verlorenen Schlüssels oder einer verlorenen Zeile neu, bevor sich der
+  ELW meldet, räumt der ELW sie nicht ab: Der neue Inhalt ersetzt den alten mit der nächsten
+  Lieferung, und den alten Schlüssel führt der ELW dann als widerrufen (Abschnitt
+  „Unterschriftsschlüssel und Stammdaten“ unten).
 
 **Hinweis an der Kopplung.** Nach dem Zurückspielen erscheint auf der Seite „Instanzkopplung“ meist
 der Hinweis „… hat schon spätere Führungsakten quittiert, als diese Instanz vergeben hat (aus einer
@@ -245,7 +253,8 @@ ersetzt.
   Verbesserungen nur teilweise. Beide Seiten zu aktualisieren behebt das.
 
 Herleitung:
-`openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
+`openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md` und
+`openspec/changes/archive/2026-11-13-n2ge2224-reste-nach-restore-abraeumen/design.md`.
 
 #### Unterschriftsschlüssel und Stammdaten (LLH-1853)
 
@@ -267,21 +276,20 @@ dem Zurückspielen des Hubs ohne Eingriff weiter:
 
 **Grenzen:**
 
-- **Verlorene Einträge bleiben am ELW.** Schlüssel und Stammdaten, die der Hub nach der Sicherung
-  angelegt, schon an den ELW geliefert und dann mit der Sicherung verloren hat, bleiben am ELW
-  stehen. Ein solcher Schlüssel gilt dort weiter, bis der Hub seine Nummer neu vergibt (dann
-  widerruft ihn der ELW) oder die Org neu gekoppelt wird (Zunder LLH-1871).
+- **Verlorene Einträge** räumt der ELW selbst ab, siehe oben (LLH-1871). Die Liste der Stammdaten
+  geht erst, wenn der ELW alle Änderungen hat, also meist eine Meldung nach der vollen Lieferung.
 - **Die Uhr des Servers muss stimmen.** Geht sie nach und ändert der Hub vor der ersten Meldung
   mindestens so viel, wie verloren ging, kommt eine Änderung erst mit ihrer nächsten. Für
   Stammdaten hilft dann „Erneut abgleichen“ am ELW.
 - **VM-Snapshot mit laufendem Server.** Ohne Neustart springt der Zähler der Stammdaten nicht; es
   gilt dasselbe wie bei nachgehender Uhr. Nach einem Snapshot steht die Uhr außerdem oft kurz
   zurück. Stellt sie sich vor der nächsten Meldung des ELW über die verlorenen Stände, und folgt
-  noch eine Schlüsselaktion, erreicht ein Widerruf aus dieser Zeit den ELW nicht (Zunder LLH-1871).
-  Server nach einem Snapshot neu starten und den ELW sich melden lassen, bevor Schlüssel geändert
-  werden.
+  noch eine Schlüsselaktion, kommt ein Widerruf aus dieser Zeit am ELW erst über den Bestand der
+  Schlüssel an (LLH-1871), ein neuer Schlüssel gar nicht. Server nach einem Snapshot neu starten
+  und den ELW sich melden lassen, bevor Schlüssel geändert werden.
 - **Mehrere ELW.** Hatte ein zweiter ELW weiter übernommen als der zuerst meldende, kann er einzelne
-  der erneut geschickten Einträge verpassen (Zunder LLH-1871).
+  der erneut geschickten Änderungen verpassen. Was der Hub nicht mehr führt, räumt aber auch er ab
+  (LLH-1871).
 
 Herleitung: `openspec/changes/archive/2026-11-13-cz5332jn-unterschrift-stammdaten-nach-restore/design.md`.
 

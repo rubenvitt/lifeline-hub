@@ -494,6 +494,68 @@ pub async fn nachlieferung(
     Ok(zeilen.iter().map(SchluesselZeile::lieferung).collect())
 }
 
+/// Höchstzahl ids im Bestand je Org (`src/AGENTS.md`, Listen von außen); darüber geht keiner.
+pub const BESTAND_MAX: usize = 1024;
+
+/// Bestand beim Melden (LLH-1871, design.md D1 der Change
+/// `n2ge2224-reste-nach-restore-abraeumen`): die ids der gültigen lokalen Schlüssel der Org, aufsteigend.
+/// Was die Gegenseite von hier gültig hat und hier fehlt, gilt dort nicht mehr. `None` über
+/// [`BESTAND_MAX`].
+pub async fn load_bestand(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<Option<Vec<i64>>, AppError> {
+    let ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM unterschrift_schluessel WHERE org_id = ? AND herkunft = 'lokal' \
+         AND zustand = 'gueltig' ORDER BY id LIMIT ?",
+    )
+    .bind(org_id)
+    .bind(BESTAND_MAX as i64 + 1)
+    .fetch_all(&mut *conn)
+    .await?;
+    if ids.len() > BESTAND_MAX {
+        tracing::warn!(
+            org_id,
+            "Mehr gültige Unterschriftsschlüssel, als der Bestand trägt"
+        );
+        return Ok(None);
+    }
+    Ok(Some(ids))
+}
+
+/// Ein Schlüssel vom Gegenüber, den [`revoke_fehlende`] widerrufen hat.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct NichtGefuehrt {
+    pub benutzer_name: String,
+    pub fingerabdruck: String,
+}
+
+/// Widerruft jeden gültigen oder wartenden Schlüssel der Zuordnung, dessen id im Bestand des
+/// Gegenübers fehlt: Das Gegenüber führt ihn nicht mehr, etwa nach dem Zurückspielen einer
+/// Sicherung (LLH-1871, design.md D2). Ein abgelehnter bleibt es; der Stand bleibt.
+pub async fn revoke_fehlende(
+    conn: &mut SqliteConnection,
+    kopplung_org_id: i64,
+    bestand: &[i64],
+    jetzt: &str,
+) -> Result<Vec<NichtGefuehrt>, AppError> {
+    let liste = serde_json::to_string(bestand)
+        .map_err(|e| AppError::Internal(format!("Bestand nicht lesbar: {e}")))?;
+    Ok(sqlx::query_as(
+        "UPDATE unterschrift_schluessel SET zustand = 'widerrufen', \
+         widerrufen_at = COALESCE(widerrufen_at, ?) \
+         WHERE kopplung_org_id = ? AND herkunft = 'gegenueber' \
+         AND zustand IN ('gueltig', 'wartet_auf_bestaetigung') \
+         AND fremde_id NOT IN (SELECT value FROM json_each(?)) \
+         RETURNING benutzer_name, fingerabdruck",
+    )
+    .bind(jetzt)
+    .bind(kopplung_org_id)
+    .bind(liste)
+    .fetch_all(&mut *conn)
+    .await?)
+}
+
 /// Ein vom Gegenüber gelieferter Schlüssel, den diese Instanz verworfen hat.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Abgelehnt {
