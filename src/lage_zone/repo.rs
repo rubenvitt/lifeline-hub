@@ -259,106 +259,109 @@ pub async fn aktualisiere(
 
     // Gruppen-INSERT (Split/Neuanlage) und UPDATE laufen atomar, damit nie eine Gruppe ohne Zone
     // zurückbleibt.
-    let mut tx = pool.begin().await?;
-
-    // Gefahrengebiet-Zonen tragen IMMER eine Gruppe: `Some(None)` heißt nicht „NULL“, sondern „in
-    // eine neue eigene Gruppe abspalten“.
-    let ziel_gebiet: Option<i64> = if neuer_typ != "gefahrengebiet" {
-        None
-    } else {
-        match daten.gefahrengebiet_id {
-            Some(Some(zielid)) => Some(zielid),
-            Some(None) => Some(
-                crate::gefahr::repo::gebiet_anlegen(
-                    &mut *tx,
-                    einsatz_id,
-                    vorher.label.as_deref(),
-                    benutzer_id,
-                )
-                .await?,
-            ),
-            None => match alt_gebiet {
-                Some(g) => Some(g),
-                None => Some(
+    // BEGIN IMMEDIATE über `write_retry!` (LLH-1693): der Zweig „Bezirk setzen“ liest erst
+    // (`bezirk_lebt_tx`) und schreibt dann; unter deferred `BEGIN` scheiterte das Hochstufen bei
+    // einem fremden Schreiber sofort mit BUSY (503).
+    let ziel_gebiet = crate::write_retry!(pool, |conn| {
+        // Gefahrengebiet-Zonen tragen IMMER eine Gruppe: `Some(None)` heißt nicht „NULL“, sondern „in
+        // eine neue eigene Gruppe abspalten“.
+        let ziel_gebiet: Option<i64> = if neuer_typ != "gefahrengebiet" {
+            None
+        } else {
+            match daten.gefahrengebiet_id {
+                Some(Some(zielid)) => Some(zielid),
+                Some(None) => Some(
                     crate::gefahr::repo::gebiet_anlegen(
-                        &mut *tx,
+                        &mut *conn,
                         einsatz_id,
                         vorher.label.as_deref(),
                         benutzer_id,
                     )
                     .await?,
                 ),
-            },
+                None => match alt_gebiet {
+                    Some(g) => Some(g),
+                    None => Some(
+                        crate::gefahr::repo::gebiet_anlegen(
+                            &mut *conn,
+                            einsatz_id,
+                            vorher.label.as_deref(),
+                            benutzer_id,
+                        )
+                        .await?,
+                    ),
+                },
+            }
+        };
+
+        // Bezirks-Zuordnung: ein anderer Typ trägt nie einen Bezirk; sonst gewinnt der Patch; sonst
+        // bleibt der Bestand — und zwar aus der ZEILE (CASE im UPDATE), nicht aus dem vorab gelesenen
+        // `vorher`, weil ein paralleler Storno sie schon gelöst haben kann. Beim Setzen zusätzlich die
+        // Wache in derselben Transaktion.
+        let bezirk_weg = neuer_typ != "evakuierungsbezirk";
+        if !bezirk_weg {
+            if let Some(Some(b)) = daten.evakuierungsbezirk_id {
+                bezirk_lebt_tx(&mut *conn, einsatz_id, b).await?;
+            }
         }
-    };
 
-    // Bezirks-Zuordnung: ein anderer Typ trägt nie einen Bezirk; sonst gewinnt der Patch; sonst
-    // bleibt der Bestand — und zwar aus der ZEILE (CASE im UPDATE), nicht aus dem vorab gelesenen
-    // `vorher`, weil ein paralleler Storno sie schon gelöst haben kann. Beim Setzen zusätzlich die
-    // Wache in derselben Transaktion.
-    let bezirk_weg = neuer_typ != "evakuierungsbezirk";
-    if !bezirk_weg {
-        if let Some(Some(b)) = daten.evakuierungsbezirk_id {
-            bezirk_lebt_tx(&mut tx, einsatz_id, b).await?;
+        // Geometrie und Kreisangaben gehen zusammen: eine frei gesetzte Geometrie nullt den Kreis.
+        let (geometrie_neu, kreis_neu): (Option<&str>, Option<Kreis>) = match daten.geometrie {
+            None => (None, None),
+            Some(GeometriePatch::Frei(g)) => (Some(g), None),
+            Some(GeometriePatch::Kreis { geometrie, kreis }) => (Some(geometrie), Some(kreis)),
+        };
+
+        let betroffen = sqlx::query(
+            "UPDATE lage_zone SET \
+                typ   = CASE WHEN ? THEN ? ELSE typ END, \
+                label = CASE WHEN ? THEN ? ELSE label END, \
+                farbe = CASE WHEN ? THEN ? ELSE farbe END, \
+                notiz = CASE WHEN ? THEN ? ELSE notiz END, \
+                gefahrengebiet_id = ?, \
+                ansicht_id = CASE WHEN ? THEN ? ELSE ansicht_id END, \
+                evakuierungsbezirk_id = CASE WHEN ? THEN NULL WHEN ? THEN ? \
+                                             ELSE evakuierungsbezirk_id END, \
+                geometrie = CASE WHEN ? THEN ? ELSE geometrie END, \
+                kreis_mitte_lat = CASE WHEN ? THEN ? ELSE kreis_mitte_lat END, \
+                kreis_mitte_lon = CASE WHEN ? THEN ? ELSE kreis_mitte_lon END, \
+                kreis_radius_m = CASE WHEN ? THEN ? ELSE kreis_radius_m END, \
+                geaendert_at = datetime('now') \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(daten.typ.is_some())
+        .bind(daten.typ)
+        .bind(daten.label.is_some())
+        .bind(daten.label.flatten())
+        .bind(daten.farbe.is_some())
+        .bind(daten.farbe.flatten())
+        .bind(daten.notiz.is_some())
+        .bind(daten.notiz.flatten())
+        // `ziel_gebiet` enthält schon den Effektivwert, kein CASE nötig.
+        .bind(ziel_gebiet)
+        .bind(daten.ansicht_id.is_some())
+        .bind(daten.ansicht_id.flatten())
+        .bind(bezirk_weg)
+        .bind(daten.evakuierungsbezirk_id.is_some())
+        .bind(daten.evakuierungsbezirk_id.flatten())
+        .bind(geometrie_neu.is_some())
+        .bind(geometrie_neu)
+        .bind(daten.geometrie.is_some())
+        .bind(kreis_neu.map(|k| k.mitte_lat))
+        .bind(daten.geometrie.is_some())
+        .bind(kreis_neu.map(|k| k.mitte_lon))
+        .bind(daten.geometrie.is_some())
+        .bind(kreis_neu.map(|k| k.radius_m))
+        .bind(id)
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+        if betroffen == 0 {
+            return Err(AppError::NotFound);
         }
-    }
-
-    // Geometrie und Kreisangaben gehen zusammen: eine frei gesetzte Geometrie nullt den Kreis.
-    let (geometrie_neu, kreis_neu): (Option<&str>, Option<Kreis>) = match daten.geometrie {
-        None => (None, None),
-        Some(GeometriePatch::Frei(g)) => (Some(g), None),
-        Some(GeometriePatch::Kreis { geometrie, kreis }) => (Some(geometrie), Some(kreis)),
-    };
-
-    let betroffen = sqlx::query(
-        "UPDATE lage_zone SET \
-            typ   = CASE WHEN ? THEN ? ELSE typ END, \
-            label = CASE WHEN ? THEN ? ELSE label END, \
-            farbe = CASE WHEN ? THEN ? ELSE farbe END, \
-            notiz = CASE WHEN ? THEN ? ELSE notiz END, \
-            gefahrengebiet_id = ?, \
-            ansicht_id = CASE WHEN ? THEN ? ELSE ansicht_id END, \
-            evakuierungsbezirk_id = CASE WHEN ? THEN NULL WHEN ? THEN ? \
-                                         ELSE evakuierungsbezirk_id END, \
-            geometrie = CASE WHEN ? THEN ? ELSE geometrie END, \
-            kreis_mitte_lat = CASE WHEN ? THEN ? ELSE kreis_mitte_lat END, \
-            kreis_mitte_lon = CASE WHEN ? THEN ? ELSE kreis_mitte_lon END, \
-            kreis_radius_m = CASE WHEN ? THEN ? ELSE kreis_radius_m END, \
-            geaendert_at = datetime('now') \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.typ.is_some())
-    .bind(daten.typ)
-    .bind(daten.label.is_some())
-    .bind(daten.label.flatten())
-    .bind(daten.farbe.is_some())
-    .bind(daten.farbe.flatten())
-    .bind(daten.notiz.is_some())
-    .bind(daten.notiz.flatten())
-    // `ziel_gebiet` enthält schon den Effektivwert, kein CASE nötig.
-    .bind(ziel_gebiet)
-    .bind(daten.ansicht_id.is_some())
-    .bind(daten.ansicht_id.flatten())
-    .bind(bezirk_weg)
-    .bind(daten.evakuierungsbezirk_id.is_some())
-    .bind(daten.evakuierungsbezirk_id.flatten())
-    .bind(geometrie_neu.is_some())
-    .bind(geometrie_neu)
-    .bind(daten.geometrie.is_some())
-    .bind(kreis_neu.map(|k| k.mitte_lat))
-    .bind(daten.geometrie.is_some())
-    .bind(kreis_neu.map(|k| k.mitte_lon))
-    .bind(daten.geometrie.is_some())
-    .bind(kreis_neu.map(|k| k.radius_m))
-    .bind(id)
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    if betroffen == 0 {
-        return Err(AppError::NotFound);
-    }
-    tx.commit().await?;
+        Ok(ziel_gebiet)
+    })?;
 
     // Verlassene Gruppe aufräumen, falls sie jetzt leer ist (die Matrix kaskadiert mit).
     if alt_gebiet != ziel_gebiet {
@@ -805,6 +808,34 @@ mod tests {
         .unwrap();
         assert_eq!(n.evakuierungsbezirk_id, Some(b));
         assert_eq!(n.label.as_deref(), Some("Nordufer"));
+    }
+
+    /// LLH-1693: Den Bezirk setzen liest erst (Wache) und schreibt dann. Hält ein anderer Schreiber
+    /// gerade die Sperre, wartet das Setzen, statt mit BUSY (503) zu scheitern.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn bezirk_setzen_wartet_auf_einen_fremden_schreiber() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (einsatz, von) = setup(&pool).await;
+        let b = bezirk(&pool, einsatz, von, false).await;
+        let z = anlegen(&pool, einsatz, bezirksflaeche(von, None))
+            .await
+            .unwrap();
+
+        let halter = crate::tx::hold_write_lock(&pool, std::time::Duration::from_millis(300)).await;
+        let n = aktualisiere(
+            &pool,
+            einsatz,
+            z.id,
+            von,
+            ZonePatch {
+                evakuierungsbezirk_id: Some(Some(b)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        halter.await.unwrap();
+        assert_eq!(n.evakuierungsbezirk_id, Some(b));
     }
 
     #[tokio::test]

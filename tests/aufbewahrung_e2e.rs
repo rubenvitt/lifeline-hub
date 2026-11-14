@@ -271,7 +271,7 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "Funktion ad-hoc externer Kräfte über etb_text_erneut_disponiert, „Name (Funktion)“",
     },
     Ausnahme {
-        datei: "src/abloesung/repo.rs",
+        datei: "src/abloesung/repo/vollzug.rs",
         funktion: "vollziehen_besatzung_tx",
         spalte: "einsatz_personal.snap_name",
         gruppe: Gruppe::Einsatzkraft,

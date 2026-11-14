@@ -99,7 +99,7 @@ Vererbung). Kein Server-Anteil, solange Perioden und Erben im DTO stehen. Die An
 der Seite steht in der Adresse (LLH-1312, `abloesungPfad(…, { ansicht })`, Zustand wie beim
 Funkplan, „laufend“ ohne Parameter); ein Sprung von außen auf „Ohne Schicht“ nimmt diesen Pfad.
 **Herkunft des Beginns** (LLH-1312, `einsatz_abloesung.beginn_quelle` `hand | eintreffen |
-vollzug`): geschrieben nur in `abloesung::repo::create_schicht_tx` (Handweg, Autostart der
+vollzug`): geschrieben nur in `abloesung::repo::beginn::create_schicht_tx` (Handweg, Autostart der
 Kopplung, Folgeschicht des Vollzugs); eine übernommene Schicht behält ihren Wert, die Rücknahme
 ändert ihn nie, nur ein geänderter Beginn (`aendern`) macht aus `eintreffen` ein `hand`. Der Client
 leitet die Herkunft nicht aus Vorgänger oder Zeitachse ab; das Wort an der Karte bildet nur
@@ -130,7 +130,7 @@ gleich); die Seite nimmt `?schicht=` nach `useQueryParamSelektion` an.
 
 **Vollzug** (LLH-1132, Spec `kraefte-abloesung`): Die Liste der Ablöser ist die Wahrheit
 (höchstens `ABLOESER_MAX`, Spiegel `ABLOESUNG_ABLOESER_MAX`); `abloesende_einheit_id` ist ihr
-erster Eintrag: wer die Liste ändert, zieht ihn über `abloesung::repo::set_abloeser_tx` bzw.
+erster Eintrag: wer die Liste ändert, zieht ihn über `abloesung::repo::hilfen::set_abloeser_tx` bzw.
 `sync_spiegel_tx` nach (auch `drop_planungen_tx`), nie von Hand. Welcher Ablöser den Knoten bildet (kein Vorfahr in der Liste) und wer
 erbt, entscheidet der Server; der Client zeigt die Liste über `abloesung/abloeser.ts` und rechnet
 nichts nach. Wählbar ist jede andere Einheit ohne laufende Folgeschicht (`abloeserOptionen`);
@@ -156,7 +156,7 @@ LFH-635-Non-Goal „keine Personal-Ebene“ ist **nur hierfür** aufgehoben. Art
 an der Schicht (`einsatz_abloesung.art`, eine laufende trägt `einheit`); Einheit, Fahrzeug und
 Abschnitt bleiben, die Folgeschicht hängt an derselben Einheit. Wer ging und wer kam, steht nur in
 `einsatz_abloesung_besatzung` (Rolle `alt`/`neu` samt Vorher-Werten für die Rücknahme), geschrieben
-nur von `abloesung::repo::vollziehen_besatzung_tx`. Die alte Besatzung ist die Zuordnung
+nur von `abloesung::repo::vollzug::vollziehen_besatzung_tx`. Die alte Besatzung ist die Zuordnung
 `einsatz_personal.einheit_id` der Einheit und ihrer erbenden Untereinheiten beim Vollzug (dieselbe
 Menge wie der Fan-out der ganzen Einheit); sie verliert Einheit, Fahrzeug dieser Einheiten und
 Führung. Die Zeitachse bekommt nur Personen-Ereignisse (alt `abloesung`, neu `eintreffen`, Quelle
