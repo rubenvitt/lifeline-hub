@@ -664,7 +664,9 @@ async fn uebernimm_bruch_antwort(
 /// Einsatz nie von hier gespiegelt hat (`kennt: false`, LLH-1854): alle, die hier entstanden
 /// sind. Eine Zeile mit Eintrag in `spiegel_herkunft` kam von einem Führer und hat dessen
 /// Schlüssel; er liefert sie mit seinem Inhalt neu, sie bleibt. Entfernt würde sie sonst auch
-/// dann, wenn seine Lieferung sie schon überschrieben hat, und fehlte danach.
+/// dann, wenn seine Lieferung sie schon überschrieben hat, und fehlte danach. Lücke wie bei
+/// `kennt: true`: Eine hier gelöschte Zeile lässt ihre Herkunft stehen, und eine neue Zeile unter
+/// derselben ID gilt dann als die des Führers (LLH-1893).
 async fn nicht_vom_fuehrer(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
