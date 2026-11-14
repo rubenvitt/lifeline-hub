@@ -14,6 +14,8 @@ trap 'rm -rf "$ARBEIT"' EXIT
 fehler=0
 export GITHUB_REPOSITORY=test/repo
 export ZBB_WARTEN=0 # `melden` wartet bei „überholt“ nicht wirklich auf einen Nachfolger
+# Erster Versuch, auch wenn der Selbsttest in einer wiederholten CI läuft (Fall 13f setzt ihn selbst).
+export GITHUB_RUN_ATTEMPT=1
 
 # ── Attrappe für gh ──────────────────────────────────────────────────────────────────
 # Zustand unter $ZBB_FAKE: pulls.json, pull-<nr>.json, ref-<branch> (Spitze), checks-<sha>.json,
@@ -62,7 +64,13 @@ case "$methode $pfad" in
     [ ! -e "$F/dispatch-502" ] || { echo "HTTP 502 Bad Gateway" >&2; exit 1; }
     echo "DISPATCH ${feld[ref]} ${feld[inputs_nr]} ${feld[inputs_kopf]} ${feld[inputs_check_id]} ${feld[inputs_ziel_sha]}" >> "$F/log" ;;
   "GET repos/test/repo/actions/workflows/ziel-branch-build.yml/runs?"*)
-    if [ -f "$F/pushlaeufe.json" ]; then aus < "$F/pushlaeufe.json"; else echo '{"workflow_runs":[]}' | aus; fi ;;
+    # Nur die Push-Läufe auf alpha kommen aus pushlaeufe.json. Ohne diese Filter sähe `melden` den
+    # eigenen, laufenden Lauf, und ein überholter Check würde nie rot.
+    case "$pfad" in
+      *branch=alpha*event=push*)
+        if [ -f "$F/pushlaeufe.json" ]; then aus < "$F/pushlaeufe.json"; else echo '{"workflow_runs":[]}' | aus; fi ;;
+      *) echo '{"workflow_runs":[{"status":"in_progress","event":"workflow_dispatch"}]}' | aus ;;
+    esac ;;
   "GET repos/test/repo/compare/"*)
     if [ -f "$F/compare.json" ]; then aus < "$F/compare.json"; else
       echo '{"status":"ahead","commits":[{"commit":{"message":"feat: etwas"}}]}' | aus; fi ;;
@@ -263,6 +271,13 @@ pruefe "13b Titel übernommen" "Titel 850" "$(head -1 "$f/text-800")"
 pruefe "13b Fehlerausgabe übernommen" 1 "$(grep -c 'Ausgabe 850' "$f/text-800")"
 pruefe "13b Check trägt den Stand" "zielsha" "$(cat "$f/ext-800")"
 
+# 13g — „Kein Ergebnis“ wird nie übernommen, auch wenn der Stand daran hängen blieb.
+f="$(neu einzelkeinergebnis)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+checks_auf "$f" k7 '850:completed:failure:zielsha:Kein Ergebnis' '800:in_progress'
+lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
+pruefe "13g Kein Ergebnis: rechnet" "POST k7 in_progress Baut mit Ziel-Branch" "$(log "$f")"
+
 # 13f — Ein Neustart des Laufs (Versuch 2) übernimmt nichts: wer neu startet, will neu rechnen.
 f="$(neu einzelneustart)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
@@ -321,6 +336,9 @@ echo zielsha > "$f/ref-alpha"
 echo "alles kompiliert" > "$ARBEIT/ausgabe-baut"
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
 pruefe "6 grün: Check grün" "PATCH 901 success" "$(log "$f")"
+# Ein echtes Ergebnis trägt seinen Stand immer, auch wenn derselbe Check vorher „Kein Ergebnis“ war
+# („Re-run failed jobs“ meldet in den Check von `vorbereiten`).
+pruefe "6 grün: Check trägt den Stand" "zielsha" "$(cat "$f/ext-901" 2> /dev/null || echo fehlt)"
 
 # 7 — Rot: der Check wird rot und trägt die Fehlerausgabe.
 f="$(neu rot)"

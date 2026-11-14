@@ -73,7 +73,8 @@ permissions:
 # Auch ein neuer Commit am PR bricht nicht ab: ein Einzellauf zum neuen Kopf kann vor dem
 # PR-Ereignis starten und würde sonst rot abgebrochen. Den Check eines überholten Laufs lässt
 # `melden` auf „läuft“; der jüngere Check des neuen Laufs löst ihn ab. Ist ein Stand auf dem Kopf
-# schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen.
+# schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen (nicht bei
+# einem Neustart des Einzellaufs).
 concurrency:
   group: ziel-branch-build-${{ github.event.pull_request.number || inputs.nr || github.ref }}
   cancel-in-progress: false
@@ -144,7 +145,8 @@ jobs:
           if [ "$EREIGNIS" = workflow_dispatch ]; then
             # Prüft PR und Ref (nie auf einem Kanal-Branch, nie für einen Fork) und legt einen
             # frischen Check an (den von `verteilen` löst er ab). Ist der Stand auf dem Kopf schon
-            # gerechnet, übernimmt der Check von `verteilen` das Ergebnis, und nichts rechnet.
+            # gerechnet, übernimmt der Check von `verteilen` das Ergebnis, und nichts rechnet (nicht
+            # bei einem Neustart dieses Laufs).
             liste="$(scripts/ziel-branch-build.sh einzellauf "$E_NR" "$GITHUB_REF_NAME" "$E_CHECK" "$E_KOPF" "$ziel" "$ziel_sha")"
           else
             liste="$(scripts/ziel-branch-build.sh auswahl "$ziel" "$ziel_sha" "$PR_NR")"

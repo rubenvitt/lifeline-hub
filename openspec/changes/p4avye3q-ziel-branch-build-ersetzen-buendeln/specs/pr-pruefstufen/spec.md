@@ -25,7 +25,7 @@ Je PR MUST höchstens ein Lauf von `Baut mit Ziel-Branch` rechnen und höchstens
 
 #### Scenario: Stand schon gerechnet
 - **WHEN** ein wartender Lauf schon gegen den neuesten Stand gerechnet hat und der Anstoß zu genau diesem Stand erst danach kommt
-- **THEN** rechnet der PR nicht ein drittes Mal, und der Check zu diesem Anstoß übernimmt das vorhandene Ergebnis samt Fehlerausgabe. Ein Lauf ohne Ergebnis zählt nicht als gerechnet, und ein von Hand neu gestarteter Lauf rechnet immer.
+- **THEN** rechnet der PR nicht ein drittes Mal, und der Check zu diesem Anstoß übernimmt das vorhandene Ergebnis samt Fehlerausgabe. Ein Lauf ohne Ergebnis zählt nicht als gerechnet, und ein von Hand neu gestarteter Einzellauf rechnet immer.
 
 #### Scenario: Neuer Commit am PR während des Laufs
 - **WHEN** an einen rechnenden fertigen PR ein neuer Commit gepusht wird

@@ -18,7 +18,8 @@
 #       liefe sonst auf alpha). Arbeitet dann wie `auswahl`: ein frischer Check. Den Check
 #       <check-id> von `verteilen` (auf <kopf-sha>) lässt er offen. Ist <ziel-sha> auf dem
 #       aktuellen Kopf schon gerechnet (der wartende Lauf las den Stand, bevor `verteilen` dafür
-#       dispatchte), rechnet er nicht noch einmal: <check-id> übernimmt das Ergebnis.
+#       dispatchte), rechnet er nicht noch einmal: <check-id> übernimmt das Ergebnis. Nicht bei
+#       einem Neustart dieses Laufs (GITHUB_RUN_ATTEMPT > 1) und nie ein „Kein Ergebnis“.
 #   scripts/ziel-branch-build.sh melden <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> \
 #       <ergebnis> <ausgabe-datei>
 #       Schließt den Check <check-id>: ergebnis `gruen` → grün; `rot`, `konflikt`, `veraltet`,
@@ -184,7 +185,8 @@ einzellauf() { # <pr-nr> <ref> <check-id> <kopf-sha> <ziel-branch> <ziel-sha>
     # `gh --jq` kennt kein --arg; der Stand ist ein Commit-Hash und steht als JSON-String im Filter.
     frueher="$(gh_api "$(check_runs_pfad "$kopf" all)" --paginate --jq \
       ".check_runs[] | select(.status == \"completed\" and .external_id == $(jq -rn --arg z "$ziel_sha" '$z | @json')
-        and (.conclusion == \"success\" or .conclusion == \"failure\"))
+        and (.conclusion == \"success\" or .conclusion == \"failure\")
+        and .output.title != \"Kein Ergebnis\" and .output.title != \"Überholt, kein neuer Lauf\")
       | [.id, .conclusion, .output.title, .output.summary, .output.text] | @json" 2> /dev/null \
       | jq -s -c 'sort_by(.[0]) | last // empty' 2> /dev/null || true)"
     if [ -n "$frueher" ] && gh_api -X PATCH "repos/$REPO/check-runs/$alt_id" -f status=completed \
@@ -211,7 +213,7 @@ nur_release_weiter() { # <alt> <neu>
 # Erscheint auf <kopf> ein jüngerer Check dieses Namens als <id>? Wartet bis zu ZBB_WARTEN Sekunden
 # (Vorgabe 300; `verteilen` braucht nach einem Merge eine knappe Minute, steht aber in einer
 # Warteschlange), sieht alle ZBB_TAKT Sekunden nach. Nicht lesbar zählt wie „noch keiner“.
-nachfolger_da() { # <kopf> <id>
+has_nachfolger() { # <kopf> <id>
   local ende juengster
   ende=$(( $(date +%s) + ${ZBB_WARTEN:-300} ))
   while :; do
@@ -224,7 +226,7 @@ nachfolger_da() { # <kopf> <id>
 
 # Steht ein Push-Lauf dieses Workflows auf <ziel> noch aus (wartet auf einen Runner oder läuft)?
 # Dann bringt `verteilen` den Nachfolger noch. Nicht lesbar zählt wie „nein“.
-verteilen_offen() { # <ziel>
+has_pending_verteilen() { # <ziel>
   gh_api "repos/$REPO/actions/workflows/ziel-branch-build.yml/runs?branch=$1&event=push&per_page=10" \
     --jq 'any(.workflow_runs[]; .status != "completed")' 2> /dev/null | grep -qx true
 }
@@ -238,7 +240,7 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
     # Am neuen Kopf zeigt der PR diesen Check nicht mehr. Bewegte sich nur der Ziel-Branch, löst
     # ihn ein jüngerer Check ab (GitHub wertet je Name den jüngsten); kommt keiner, hinge der PR
     # still auf „läuft“, also rot mit Rat (Review LLH-1889).
-    if [ "$jetzt_kopf" != "$kopf" ] || nachfolger_da "$kopf" "$id" || verteilen_offen "$ziel"; then
+    if [ "$jetzt_kopf" != "$kopf" ] || has_nachfolger "$kopf" "$id" || has_pending_verteilen "$ziel"; then
       echo "PR #$nr: überholt (PR $(kurz "$jetzt_kopf"), $ziel $(kurz "$jetzt_ziel")), Check bleibt auf „läuft“" >&2
       gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=in_progress \
         -f "output[title]=Überholt, rechnet neu" \
@@ -247,7 +249,7 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
     fi
     echo "PR #$nr: überholt, aber kein jüngerer Check erschienen → rot" >&2
     schliessen "$id" failure "Überholt, kein neuer Lauf" \
-      "Gerechnet gegen \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter, aber kein neuer Lauf hat sich gemeldet. Den Lauf „$NAME“ neu starten oder einen Commit pushen." "" 1
+      "Gerechnet gegen \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter, aber kein neuer Lauf hat sich gemeldet. Den Lauf „$NAME“ neu starten oder einen Commit pushen." "" ""
     return 0
   fi
   [ -f "$datei" ] && ausgabe="$(tail -c 60000 "$datei")"
@@ -263,15 +265,16 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
   esac
   echo "PR #$nr: $ergebnis → $fazit" >&2
   # „Kein Ergebnis“ ist nicht gerechnet: ohne Stand, sonst übernähme ihn ein Neustart.
-  schliessen "$id" "$fazit" "$titel" "$text" "$ausgabe" "$([ "$titel" = "Kein Ergebnis" ] && echo 1 || echo 0)"
+  local stand="$ziel_sha"
+  [ "$titel" = "Kein Ergebnis" ] && stand=""
+  schliessen "$id" "$fazit" "$titel" "$text" "$ausgabe" "$stand"
 }
 
-# Mit <ohne-stand> = 1 verliert der Check seinen gerechneten Stand (`external_id`): ein Ergebnis, das
-# keins ist, soll `einzellauf` nie übernehmen.
-schliessen() { # <check-id> <conclusion> <titel> <text> <ausgabe> [<ohne-stand>]
-  local extra=()
-  [ "${6:-0}" = 1 ] && extra=(-f external_id=)
-  gh_api -X PATCH "repos/$REPO/check-runs/$1" -f status=completed -f conclusion="$2" "${extra[@]}" \
+# <stand> kommt in `external_id`, leer bei einem Ergebnis, das keins ist: das soll `einzellauf` nie
+# übernehmen. Immer gesetzt, denn „Re-run failed jobs“ meldet ein echtes Ergebnis in denselben
+# Check, der vorher „Kein Ergebnis“ ohne Stand war.
+schliessen() { # <check-id> <conclusion> <titel> <text> <ausgabe> <stand>
+  gh_api -X PATCH "repos/$REPO/check-runs/$1" -f status=completed -f conclusion="$2" -f external_id="$6" \
     -f "output[title]=$3" -f "output[summary]=$4" \
     -f "output[text]=${5:+$(printf '```\n%s\n```' "$5")}" > /dev/null
 }
