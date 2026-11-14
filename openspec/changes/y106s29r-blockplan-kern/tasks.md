@@ -23,7 +23,7 @@ Beleg für Gleichverhalten.
   - 409 auf allen Block- und Helferwegen einer übernommenen Planung
 - [ ] 1.3 Reihenfolge je Seite in beiden Testdateien festschreiben: Einsatz nach Art, Einheitensortierung und Name; Planung nach Posten-Sortierung; Personen je Block in Einfügefolge. Gegen den heutigen Code grün.
 - [ ] 1.4 Höchstzahlen je Seite, mit Seed-SQL statt Schleife: „Höchstens 2000 Schichten je …“ und „Höchstens 500 Helfer je …“. Gegen den heutigen Code grün.
-- [ ] 1.5 Frontend: einen gemeinsamen Testsatz `abloesung/schichtplan/planEditor.cases.tsx` gegen beide Hüllen ausführen (`SchichtplanAnsicht.test.tsx`, `PlanungSchichtplan.test.tsx`). Abzudecken:
+- [x] 1.5 Frontend: einen gemeinsamen Testsatz `abloesung/schichtplan/planEditor.cases.tsx` gegen beide Hüllen ausführen (`SchichtplanAnsicht.test.tsx`, `PlanungSchichtplan.test.tsx`). Abzudecken:
   - Zug ergibt den PATCH-Body
   - Kopie mit und ohne Personen
   - Löschen schließt nur den eigenen Dialog
