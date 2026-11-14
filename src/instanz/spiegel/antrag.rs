@@ -501,7 +501,9 @@ async fn beantragen(
         .and_then(Value::as_array)
         .is_some_and(|a| !a.is_empty())
     {
-        return Err(AppError::Validation(
+        // Das Feld ist für sich gültig; es scheitert am Zustand „Spiegel“, also 422
+        // (`src/AGENTS.md`, Statuscode-Konvention).
+        return Err(AppError::UnprocessableEntity(
             "Anhänge gehen an einem Spiegel nicht; ohne Anhang erneut erfassen.".into(),
         ));
     }
