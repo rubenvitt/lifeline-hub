@@ -13,9 +13,6 @@ export interface AntragKennung {
   zustand: string;
 }
 
-/** Wortlaut des Zustands an der Fachseite, neben „vorgemerkt“ der Warteschlange. */
-export const BEANTRAGT_WORT = 'beantragt';
-
 /**
  * Verweisfelder im Körper je Art, wie `BEANTRAGBAR` in `src/instanz/spiegel/antrag.rs` sie
  * übersetzt: der Server legt die Daten mit den Kennungen der führenden Instanz ab. Hier gelten sie

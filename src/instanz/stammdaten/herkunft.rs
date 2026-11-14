@@ -25,24 +25,6 @@ pub async fn find_lokal(
     .await?)
 }
 
-/// Ob eine lokale Zeile eine Herkunft hat („vom Hub“).
-pub async fn has_herkunft(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    art: StammdatenArt,
-    lokal: &str,
-) -> Result<bool, AppError> {
-    Ok(sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM stammdaten_herkunft \
-         WHERE org_id = ? AND art = ? AND lokaler_schluessel = ?)",
-    )
-    .bind(org_id)
-    .bind(art.as_str())
-    .bind(lokal)
-    .fetch_one(&mut *conn)
-    .await?)
-}
-
 /// Längste Ursprungskennung, die angenommen wird (`<instanzkennung>/<schlüssel>`, Kennung höchstens
 /// 64 Zeichen); eine längere ist eine Eingabe von außen ohne Sinn und gilt als nicht genannt.
 pub const URSPRUNG_MAX: usize = 160;

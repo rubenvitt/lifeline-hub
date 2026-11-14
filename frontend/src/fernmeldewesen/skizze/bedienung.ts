@@ -1,7 +1,7 @@
 import type { SkizzenBezug } from '../../api/fernmeldeskizzeVertrag';
 import type { Fernmeldenetz, NetzBaumKnoten, Rechtsquelle } from '../fernmeldeskizze';
 import { bedingungszeichenText } from '../skizzenZeichen';
-import { SCHRIFTFELD, stichSchluessel, stichleitungen } from './ebenen';
+import { SCHRIFTFELD, stichleitungen } from './ebenen';
 import { istKontextTaste } from '../../components/useKontextMenue';
 
 /**
@@ -238,12 +238,6 @@ export function verbindenZiele(
           }))
       : [];
   return [...schienen, ...stellen];
-}
-
-/** Die Stichleitung einer Stelle an einer Schiene, falls es sie gibt. */
-export function stichVon(netz: Fernmeldenetz, schiene: string, stelle: string): string | null {
-  const s = netz.schienen.find((x) => x.key === schiene);
-  return s?.teilnehmer.some((t) => t.element === stelle) ? stichSchluessel(schiene, stelle) : null;
 }
 
 const BEZUG_ART = {

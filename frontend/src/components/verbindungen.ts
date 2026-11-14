@@ -49,12 +49,6 @@ export function telefonVerbindungen(
   return (verbindungen ?? []).filter((v) => istTelefon(v.mittel));
 }
 
-/** „Mobil 0170 1234567 (nur tagsüber)“ — eine Verbindung als Text für Druck und Bericht. */
-export function verbindungText(v: Pick<KommunikationsVerbindung, 'mittel' | 'wert' | 'hinweis'>) {
-  const hinweis = v.hinweis?.trim();
-  return `${VERBINDUNGSMITTEL_LABEL[v.mittel]} ${v.wert}${hinweis ? ` (${hinweis})` : ''}`;
-}
-
 /** Gelesene Verbindungen als Eingabe der Ersatzliste (ohne id, leerer Hinweis entfällt). */
 export function alsEingabe(
   verbindungen: readonly KommunikationsVerbindung[] | null | undefined,

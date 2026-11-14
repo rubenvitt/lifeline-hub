@@ -4,18 +4,12 @@ import {
   KATEGORIE_WERTE,
   OHNE_STATUS,
   kategorieEtikett,
-  verteilungFelder,
 } from './statusAchse';
-import type { StatusVerteilung } from './kraeftebild';
 
 /**
  * Die EINE Statusachse der Kräfteseiten. Die Erwartungswerte sind HANDGESCHRIEBENE Literale,
  * sonst prüfte der Test die Konstante gegen sich selbst.
  */
-
-function verteilung(v: Partial<StatusVerteilung> = {}): StatusVerteilung {
-  return { verfuegbar: 0, gebunden: 0, nicht_verfuegbar: 0, ohne: 0, ...v };
-}
 
 describe('KATEGORIE_WERTE', () => {
   it('trägt VIER Eimer — den vierten für „kein Status"', () => {
@@ -53,48 +47,5 @@ describe('KATEGORIE_WERTE', () => {
 
   it('OHNE_STATUS ist neutral und trägt Text — Farbe allein wäre kein Kanal', () => {
     expect(OHNE_STATUS).toEqual({ rolle: 'neutral', label: 'ohne Status' });
-  });
-});
-
-describe('verteilungFelder', () => {
-  it('liefert VIER Felder in fester Folge, auch wenn drei davon 0 sind', () => {
-    /**
-     * Ausrichtung ist der Zweck einer Vergleichsspalte: nur Werte > 0 zu rendern ließe die Zahlen
-     * zweier Zeilen nicht fluchten.
-     */
-    const felder = verteilungFelder(verteilung({ verfuegbar: 7 }));
-    expect(felder.map((f) => f.etikett)).toEqual(['frei', 'geb.', 'n.v.', 'o.A.']);
-    expect(felder.map((f) => f.wert)).toEqual([7, 0, 0, 0]);
-  });
-
-  it('jedes Feld trägt den Volltext als Titel — die Abkürzung ist nur die Anzeige', () => {
-    expect(verteilungFelder(verteilung()).map((f) => f.titel)).toEqual([
-      'verfügbar',
-      'gebunden',
-      'nicht verfügbar',
-      'ohne Status',
-    ]);
-  });
-
-  it('eine 0 trägt KEINE Stufe', () => {
-    /** „0 nicht verfügbar" ist das Gegenteil einer Gefahr; Rot dafür wäre falsch. */
-    expect(verteilungFelder(verteilung()).map((f) => f.stufe)).toEqual([
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-    ]);
-  });
-
-  it('erst ein Wert > 0 bekommt die Stufe seiner Kategorie', () => {
-    const felder = verteilungFelder(
-      verteilung({ verfuegbar: 1, gebunden: 2, nicht_verfuegbar: 3, ohne: 4 }),
-    );
-    expect(felder.map((f) => f.stufe)).toEqual(['normal', 'achtung', 'alarm', undefined]);
-  });
-
-  it('verteilungFelder(null) ist leer', () => {
-    // `mittel`-Zeilen tragen `null` und bekommen keine Zählzeile.
-    expect(verteilungFelder(null)).toEqual([]);
   });
 });
