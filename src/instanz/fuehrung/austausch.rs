@@ -292,8 +292,8 @@ fn quittung_nach(bis: Option<i64>, m: &AkteMeldung) -> Option<i64> {
 /// Was nach dem Commit eines Austauschs zu tun ist.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Folge {
-    /// Die Führung eines lokalen Einsatzes hat sich geändert: Live-Ereignis `einsatz` und ein
-    /// Vollabgleich (`super::notify_wechsel`).
+    /// Die Führung eines lokalen Einsatzes hat sich geändert, oder seine erste Akte hängt jetzt an
+    /// ihm (LLH-1860): Live-Ereignis `einsatz` und ein Vollabgleich (`super::notify_wechsel`).
     Kopf { einsatz_id: i64 },
     /// Alarm „ungültige Übernahme“ an die Einsatzleitung.
     Alarm { einsatz_id: i64 },
