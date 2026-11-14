@@ -17439,7 +17439,7 @@
               "string",
               "null"
             ],
-            "description": "Seine Einsatznummer zum Zeitpunkt der Übernahme."
+            "description": "Seine Einsatznummer, wie er sie jetzt trägt (LLH-1858); ist er gelöscht, die zuletzt\ngetragene."
           }
         }
       },

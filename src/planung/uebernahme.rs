@@ -654,6 +654,9 @@ async fn mark_uebernommen_tx(
     .await?;
     let json = serde_json::to_string(&kennzahlen)
         .map_err(|e| AppError::Internal(format!("Kennzahlen der Übernahme: {e}")))?;
+    // Die Nummer von jetzt, nur als letzter Rückfall gemerkt: Kopf und Liste lesen die aktuelle
+    // des Einsatzes, nach seiner Löschung die aus dem Löschprotokoll (LLH-1858,
+    // `repo::uebernahme_einsatznummer!`). Der Kommentar in 0304 („zum Anzeigen“) ist überholt.
     let nummer: Option<String> =
         sqlx::query_scalar("SELECT einsatznummer_intern FROM einsatz WHERE id = ?")
             .bind(einsatz_id)

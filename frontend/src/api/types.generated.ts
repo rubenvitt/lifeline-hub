@@ -6979,7 +6979,10 @@ export interface components {
              * @description Der Einsatz, in den sie ging. Er kann inzwischen gelöscht sein.
              */
             einsatz_id: number;
-            /** @description Seine Einsatznummer zum Zeitpunkt der Übernahme. */
+            /**
+             * @description Seine Einsatznummer, wie er sie jetzt trägt (LLH-1858); ist er gelöscht, die zuletzt
+             *     getragene.
+             */
             einsatznummer?: string | null;
         };
         /**
