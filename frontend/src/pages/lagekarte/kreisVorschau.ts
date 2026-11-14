@@ -244,20 +244,20 @@ export function erzeugeKreisGriff(
   });
   let mitte: GeoPunkt | null = null;
   let radius: number | null = null;
-  let dran = false;
-  let mitteDran = false;
-  let ziehend = false;
-  let mitteZiehend = false;
+  let isAttached = false;
+  let isMitteAttached = false;
+  let isDragging = false;
+  let isMitteDragging = false;
   const mitteJetzt = (): GeoPunkt => {
     const ll = mittenMarker.getLngLat();
     return { lat: ll.lat, lon: ll.lng };
   };
   mittenMarker.on('dragstart', () => {
-    mitteZiehend = true;
+    isMitteDragging = true;
   });
   mittenMarker.on('drag', () => onMitte?.(mitteJetzt(), false));
   mittenMarker.on('dragend', () => {
-    mitteZiehend = false;
+    isMitteDragging = false;
     onMitte?.(mitteJetzt(), true);
   });
 
@@ -266,14 +266,14 @@ export function erzeugeKreisGriff(
     return mitte ? radiusAusGriff(mitte, { lat: ll.lat, lon: ll.lng }) : null;
   };
   marker.on('dragstart', () => {
-    ziehend = true;
+    isDragging = true;
   });
   marker.on('drag', () => {
     const r = radiusJetzt();
     if (r != null) onRadius(r, false);
   });
   marker.on('dragend', () => {
-    ziehend = false;
+    isDragging = false;
     const r = radiusJetzt();
     if (r != null) onRadius(r, true);
   });
@@ -281,15 +281,15 @@ export function erzeugeKreisGriff(
   const setMitte = () => {
     const steht = onMitte != null && mittenGriffSteht(mitte, radius);
     if (!steht || !mitte) {
-      if (mitteDran) detach(mittenMarker);
-      mitteDran = false;
-      mitteZiehend = false;
+      if (isMitteAttached) detach(mittenMarker);
+      isMitteAttached = false;
+      isMitteDragging = false;
       return;
     }
-    if (!mitteZiehend) mittenMarker.setLngLat([mitte.lon, mitte.lat]);
-    if (!mitteDran) {
+    if (!isMitteDragging) mittenMarker.setLngLat([mitte.lon, mitte.lat]);
+    if (!isMitteAttached) {
       mittenMarker.addTo(map);
-      mitteDran = true;
+      isMitteAttached = true;
     }
   };
 
@@ -300,9 +300,9 @@ export function erzeugeKreisGriff(
       radius = radiusM;
       setMitte();
       if (!m) {
-        if (dran) detach(marker);
-        dran = false;
-        ziehend = false;
+        if (isAttached) detach(marker);
+        isAttached = false;
+        isDragging = false;
         return;
       }
       // Ergibt die Lage des Griffs schon den Radius, hat ihn ein Zug dorthin gelegt: er bleibt
@@ -310,20 +310,20 @@ export function erzeugeKreisGriff(
       // `dragend` bringt den zuletzt gezogenen Radius (LLH-1700).
       const stehtAufRadius = gleicheMitte && radiusJetzt() === radiusM;
       // Mitten im Zug setzt der Zeiger die Lage, nicht der gemeldete Radius.
-      if (!ziehend && !stehtAufRadius) {
+      if (!isDragging && !stehtAufRadius) {
         const p = griffLage(m, radiusM);
         marker.setLngLat([p.lon, p.lat]);
       }
-      if (!dran) {
+      if (!isAttached) {
         marker.addTo(map);
-        dran = true;
+        isAttached = true;
       }
     },
     zerstoeren() {
       marker.remove();
       mittenMarker.remove();
-      dran = false;
-      mitteDran = false;
+      isAttached = false;
+      isMitteAttached = false;
     },
   };
 }

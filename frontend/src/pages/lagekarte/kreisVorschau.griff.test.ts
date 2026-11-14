@@ -98,12 +98,12 @@ function setup() {
     return { lat: ll.lat, lon: ll.lng };
   };
   /** Ein ganzer Zug des Griffs nach `ziel`; liefert den zuletzt gemeldeten Radius. */
-  const ziehe = (ziel: GeoPunkt): number => {
+  const dragTo = (ziel: GeoPunkt): number => {
     rand.startDrag(ziel);
     rand.endDrag();
     return onRadius.mock.lastCall![0];
   };
-  return { griff, onRadius, lage, ziehe, rand };
+  return { griff, onRadius, lage, dragTo, rand };
 }
 
 beforeEach(() => marker.clear());
@@ -116,11 +116,11 @@ describe('Radius-Griff nach dem Loslassen (LLH-1700)', () => {
   });
 
   it('bleibt unter dem Zeiger, wenn der gezogene Radius erst nach dem Loslassen ankommt', () => {
-    const { griff, onRadius, lage, ziehe } = setup();
+    const { griff, onRadius, lage, dragTo } = setup();
     griff.set(MITTE, 300);
     // Nach Nordwesten gezogen: weit weg von der Ost-Lage des neuen Kreises.
     const ziel = noerdlich(radiusPunkt(MITTE, -150), 180);
-    const radius = ziehe(ziel);
+    const radius = dragTo(ziel);
     expect(onRadius).toHaveBeenLastCalledWith(radius, true);
     expect(abstandM(ziel, griffLage(MITTE, radius))).toBeGreaterThan(200);
 
@@ -130,19 +130,19 @@ describe('Radius-Griff nach dem Loslassen (LLH-1700)', () => {
   });
 
   it('bleibt auch stehen, wenn derselbe Stand noch einmal kommt (gleiche Mitte, gleicher Radius)', () => {
-    const { griff, lage, ziehe } = setup();
+    const { griff, lage, dragTo } = setup();
     griff.set(MITTE, 300);
     const ziel = noerdlich(MITTE, 220);
-    const radius = ziehe(ziel);
+    const radius = dragTo(ziel);
     griff.set(MITTE, radius);
     griff.set(MITTE, radius);
     expect(lage()).toEqual(ziel);
   });
 
   it('geht mit einem anderen Radius (Zahl im Band, Schnellwahl) wieder in den Osten', () => {
-    const { griff, lage, ziehe } = setup();
+    const { griff, lage, dragTo } = setup();
     griff.set(MITTE, 300);
-    const radius = ziehe(noerdlich(MITTE, 220));
+    const radius = dragTo(noerdlich(MITTE, 220));
     griff.set(MITTE, radius);
 
     griff.set(MITTE, 500);
@@ -163,10 +163,10 @@ describe('Radius-Griff nach dem Loslassen (LLH-1700)', () => {
   });
 
   it('bleibt jenseits der Obergrenze unter dem Zeiger, der Radius ist gekappt', () => {
-    const { griff, lage, ziehe } = setup();
+    const { griff, lage, dragTo } = setup();
     griff.set(MITTE, 300);
     const ziel = noerdlich(MITTE, KREIS_RADIUS_M_MAX + 5_000);
-    expect(ziehe(ziel)).toBe(KREIS_RADIUS_M_MAX);
+    expect(dragTo(ziel)).toBe(KREIS_RADIUS_M_MAX);
 
     griff.set(MITTE, KREIS_RADIUS_M_MAX);
 
@@ -174,12 +174,12 @@ describe('Radius-Griff nach dem Loslassen (LLH-1700)', () => {
   });
 
   it('sitzt ohne Radius auf der Mitte und nach dem Abhängen wieder im Osten', () => {
-    const { griff, lage, ziehe } = setup();
+    const { griff, lage, dragTo } = setup();
     griff.set(MITTE, null);
     expect(lage()).toEqual(MITTE);
 
     griff.set(MITTE, 300);
-    const radius = ziehe(noerdlich(MITTE, 220));
+    const radius = dragTo(noerdlich(MITTE, 220));
     // Ohne Mitte hängt der Griff ab; ein neuer Kreis beginnt im Osten, nicht an der alten Lage.
     griff.set(null, null);
     griff.set(MITTE, radius);
