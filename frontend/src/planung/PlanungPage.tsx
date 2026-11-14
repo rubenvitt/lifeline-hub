@@ -2,10 +2,17 @@ import { Alert, Button, Flex, Modal, Tabs } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import HelferListe from '../abloesung/schichtplan/HelferListe';
 import { ApiError } from '../api/client';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { tagUndUhrzeit } from '../anzeige/zeitDarstellung';
-import { ladePlanung, loeschePlanung } from '../api/planungen';
+import {
+  aenderePlanungHelfer,
+  ladePlanung,
+  legePlanungHelferAn,
+  loeschePlanung,
+  loeschePlanungHelfer,
+} from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import AdminPage from '../components/AdminPage';
 import { useRollen } from '../components/instrument';
@@ -21,7 +28,6 @@ import {
   type PlanungReiter,
 } from '../routing/deeplinks';
 import PlanungAblauf from './PlanungAblauf';
-import PlanungHelferListe from './PlanungHelferListe';
 import PlanungKopf from './PlanungKopf';
 import PlanungPostenListe from './PlanungPostenListe';
 import PlanungSchichtplan from './PlanungSchichtplan';
@@ -105,7 +111,22 @@ export default function PlanungPage() {
   const reiterInhalt: Record<PlanungReiter, ReactNode> = {
     plan: <PlanungSchichtplan planung={planung} readOnly={readOnly} />,
     posten: <PlanungPostenListe planung={planung} readOnly={readOnly} />,
-    helfer: <PlanungHelferListe planung={planung} readOnly={readOnly} />,
+    helfer: (
+      <HelferListe
+        dataLfh="planung-helfer"
+        helfer={planung.helfer}
+        bloecke={planung.bloecke}
+        readOnly={readOnly}
+        api={{
+          create: (body) => legePlanungHelferAn(planung.kopf.id, body),
+          update: (helferId, body) => aenderePlanungHelfer(planung.kopf.id, helferId, body),
+          delete: (helferId) => loeschePlanungHelfer(planung.kopf.id, helferId),
+        }}
+        cache={{
+          invalidate: () => qc.invalidateQueries({ queryKey: globalKeys.planung(planung.kopf.id) }),
+        }}
+      />
+    ),
     ablauf: <PlanungAblauf planung={planung} readOnly={readOnly} />,
   };
 

@@ -62,7 +62,7 @@ Beleg für Gleichverhalten.
 
 ## 5. Helferliste im Einsatz
 
-- [ ] 5.1 `PlanungHelferListe` zu `abloesung/schichtplan/HelferListe.tsx` verallgemeinern (D7) und die Planung darauf umstellen. Prüfen: Helfer-Tests in `PlanungPage.test.tsx` unverändert grün.
+- [x] 5.1 `PlanungHelferListe` zu `abloesung/schichtplan/HelferListe.tsx` verallgemeinern (D7) und die Planung darauf umstellen. Prüfen: Helfer-Tests in `PlanungPage.test.tsx` unverändert grün.
 - [ ] 5.2 Die Helferliste im Schichtplan des Einsatzes einbinden: Knopf „Helfer“ in der Werkzeugzeile, Kennung und Herkunft nur lesend, Sperrhinweis ohne Personal, nur lesen ohne Schreibrecht. Neue Tests zu den drei Szenarien des Spec-Deltas in `AbloesungPage.test.tsx`.
 - [ ] 5.3 Anwenderdoku: im Schichtplan-Kapitel unter `docs/anwender/` den Abschnitt „Helfer“ ergänzen, `quellen:` nachziehen, Bild neu erzeugen (`pnpm doku:bilder --grep <kapitel>`). Prüfen: Doku-Wächter in `check-all.sh`.
 
