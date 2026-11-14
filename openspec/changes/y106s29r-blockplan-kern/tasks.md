@@ -58,7 +58,7 @@ Beleg für Gleichverhalten.
 - [x] 4.3 Den gemeinsamen Druckinhalt nach `abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt.tsx` legen. Beide Druckseiten behalten ihre Hülle. Prüfen:
   - `SchichtplanDruckPage.test.tsx`, `PlanungDruckPage.test.tsx`
   - e2e `schichtplan-druck.spec.ts`
-- [ ] 4.4 Verweise in `frontend/src/kraefte/AGENTS.md` und in den `quellen:` von `docs/anwender/` auf die neuen Pfade ziehen. Prüfen: `scripts/check-all.sh --nur schnell`.
+- [x] 4.4 Verweise in `frontend/src/kraefte/AGENTS.md` und in den `quellen:` von `docs/anwender/` auf die neuen Pfade ziehen. Prüfen: `scripts/check-all.sh --nur schnell`.
 
 ## 5. Helferliste im Einsatz
 
