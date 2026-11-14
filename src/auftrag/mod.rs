@@ -145,32 +145,7 @@ wire_enum! {
         Fahrzeug => "fahrzeug",
         Extern => "extern",
     }
-}
-
-// `empfaenger_typ` ist in `AuftragEmpfaengerAnzeige` non-null, aber für einen
-// einheitlichen Decode-Mechanismus über beide Enum-Felder dieses GEMISCHTEN DTOs
-// (das nullable `extern_kategorie: Option<AdressatKategorie>` daneben) direkt
-// `Type`/`Decode` implementieren (statt gemischt mit `#[sqlx(try_from = …)]`) —
-// gleiches Muster wie bei `TierAnzeige` (`src/tier/mod.rs`).
-impl<DB: sqlx::Database> sqlx::Type<DB> for EmpfaengerTyp
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for EmpfaengerTyp
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        EmpfaengerTyp::parse(s).ok_or_else(|| format!("Ungültiger EmpfaengerTyp: {s}").into())
-    }
+    sqlx = |s| format!("Ungültiger EmpfaengerTyp: {s}");
 }
 
 pub fn extern_kategorie_gueltig(k: &str) -> bool {

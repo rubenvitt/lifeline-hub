@@ -21,33 +21,7 @@ wire_enum! {
         Uebergeben => "uebergeben",
         Abgeschlossen => "abgeschlossen",
     }
-}
-
-// `status` ist in `SchadenAnzeige` non-null, aber für einen einheitlichen Decode-
-// Mechanismus über alle vier Schaden-Enums (statt gemischt `Type`/`Decode` +
-// `#[sqlx(try_from = "String")]`) direkt `Type`/`Decode` auf dem Enum
-// implementieren — gleiches Muster wie bei den nullable Feldern unten (vgl.
-// `TierStatus` in `src/tier/mod.rs`). sqlx' Blanket-Impl für `Option<T>` deckt
-// Nullability von `abschluss_grund` transparent ab.
-impl<DB: sqlx::Database> sqlx::Type<DB> for SchadenStatus
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for SchadenStatus
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        SchadenStatus::parse(s).ok_or_else(|| format!("Ungültiger SchadenStatus: {s}").into())
-    }
+    sqlx = |s| format!("Ungültiger SchadenStatus: {s}");
 }
 
 // ---------- Typ ----------
@@ -62,6 +36,7 @@ wire_enum! {
         Tierkadaver => "tierkadaver",
         Sonstige => "sonstige",
     }
+    sqlx = |s| format!("Ungültiger SchadenTyp: {s}");
 }
 
 impl SchadenTyp {
@@ -79,29 +54,6 @@ impl SchadenTyp {
     }
 }
 
-// `typ` ist in `SchadenAnzeige` non-null — gleiches einheitliches `Type`/`Decode`-
-// Muster wie `SchadenStatus` (s. o.).
-impl<DB: sqlx::Database> sqlx::Type<DB> for SchadenTyp
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for SchadenTyp
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        SchadenTyp::parse(s).ok_or_else(|| format!("Ungültiger SchadenTyp: {s}").into())
-    }
-}
-
 // ---------- Ausmaß ----------
 
 wire_enum! {
@@ -112,6 +64,7 @@ wire_enum! {
         Gross => "gross",
         Katastrophal => "katastrophal",
     }
+    sqlx = |s| format!("Ungültiges Ausmaß: {s}");
 }
 
 impl Ausmass {
@@ -127,29 +80,6 @@ impl Ausmass {
     }
 }
 
-// `ausmass` ist in `SchadenAnzeige` non-null — gleiches einheitliches `Type`/
-// `Decode`-Muster wie `SchadenStatus` (s. o.).
-impl<DB: sqlx::Database> sqlx::Type<DB> for Ausmass
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Ausmass
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        Ausmass::parse(s).ok_or_else(|| format!("Ungültiges Ausmaß: {s}").into())
-    }
-}
-
 // ---------- Schadensgrad ----------
 
 wire_enum! {
@@ -161,6 +91,7 @@ wire_enum! {
         Teilzerstoert => "teilzerstoert",
         Zerstoert => "zerstoert",
     }
+    sqlx = |s| format!("Ungültiger Schadensgrad: {s}");
 }
 
 impl Schadensgrad {
@@ -175,28 +106,6 @@ impl Schadensgrad {
     }
 }
 
-// Nullable Spalte (`schadensgrad`) — gleiches Muster wie `AbschlussGrund` (s. u.).
-impl<DB: sqlx::Database> sqlx::Type<DB> for Schadensgrad
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Schadensgrad
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        Schadensgrad::parse(s).ok_or_else(|| format!("Ungültiger Schadensgrad: {s}").into())
-    }
-}
-
 // ---------- Abschlussgrund ----------
 
 wire_enum! {
@@ -207,6 +116,7 @@ wire_enum! {
         KeinHandlungsbedarf => "kein_handlungsbedarf",
         Abgewiesen => "abgewiesen",
     }
+    sqlx = |s| format!("Ungültiger Abschlussgrund: {s}");
 }
 
 impl AbschlussGrund {
@@ -218,30 +128,6 @@ impl AbschlussGrund {
             AbschlussGrund::KeinHandlungsbedarf => "kein Handlungsbedarf",
             AbschlussGrund::Abgewiesen => "abgewiesen",
         }
-    }
-}
-
-// Nullable Spalte (`abschluss_grund`) — gleiches Muster wie bei `SchadenStatus`
-// (s. o.): `Type`/`Decode` direkt auf dem Enum, statt `#[sqlx(try_from = …)]`
-// (Orphan-Rule auf `Option<Enum>`).
-impl<DB: sqlx::Database> sqlx::Type<DB> for AbschlussGrund
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AbschlussGrund
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        AbschlussGrund::parse(s).ok_or_else(|| format!("Ungültiger Abschlussgrund: {s}").into())
     }
 }
 

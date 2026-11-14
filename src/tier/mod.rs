@@ -14,33 +14,7 @@ wire_enum! {
         Vermisst => "vermisst",
         Abgeschlossen => "abgeschlossen",
     }
-}
-
-// `status` ist in `TierAnzeige` non-null, aber für einen einheitlichen Decode-
-// Mechanismus über alle vier Tier-Enums (statt gemischt `Type`/`Decode` +
-// `#[sqlx(try_from = "String")]`) direkt `Type`/`Decode` auf dem Enum
-// implementieren — gleiches Muster wie bei den nullable Feldern unten (vgl.
-// `Geschlecht`/`Sichtungskategorie` in `src/person/mod.rs`). sqlx' Blanket-Impl
-// für `Option<T>` deckt Nullability der anderen drei Felder transparent ab.
-impl<DB: sqlx::Database> sqlx::Type<DB> for TierStatus
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TierStatus
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        TierStatus::parse(s).ok_or_else(|| format!("Ungültiger TierStatus: {s}").into())
-    }
+    sqlx = |s| format!("Ungültiger TierStatus: {s}");
 }
 
 wire_enum! {
@@ -56,6 +30,7 @@ wire_enum! {
         Wildtier => "wildtier",
         Sonstige => "sonstige",
     }
+    sqlx = |s| format!("Ungültige Spezies: {s}");
 }
 
 impl Spezies {
@@ -73,29 +48,6 @@ impl Spezies {
     }
 }
 
-// `spezies` ist in `TierAnzeige` non-null — gleiches einheitliches `Type`/
-// `Decode`-Muster wie `TierStatus` (s. o.).
-impl<DB: sqlx::Database> sqlx::Type<DB> for Spezies
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Spezies
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        Spezies::parse(s).ok_or_else(|| format!("Ungültige Spezies: {s}").into())
-    }
-}
-
 wire_enum! {
     /// Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -104,32 +56,7 @@ wire_enum! {
         Weiblich => "weiblich",
         Unbekannt => "unbekannt",
     }
-}
-
-// `geschlecht` ist eine nullable Spalte (`Option<String>`). `#[sqlx(try_from = …)]`
-// scheitert an der Orphan-Rule auf `Option<Enum>` (vgl. `Geschlecht` in
-// `src/person/mod.rs`) — stattdessen `Type`/`Decode` direkt auf dem Enum; sqlx'
-// Blanket-Impl für `Option<T>` liefert NULL → `None` automatisch, ein ungültiger
-// Nicht-NULL-Wert wird zum `Decode`-Fehler (Spalte ist DB-CHECK-geschützt).
-impl<DB: sqlx::Database> sqlx::Type<DB> for TierGeschlecht
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TierGeschlecht
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        TierGeschlecht::parse(s).ok_or_else(|| format!("Ungültiges TierGeschlecht: {s}").into())
-    }
+    sqlx = |s| format!("Ungültiges TierGeschlecht: {s}");
 }
 
 wire_enum! {
@@ -145,6 +72,7 @@ wire_enum! {
         Freilauf => "freilauf",
         Sonstiges => "sonstiges",
     }
+    sqlx = |s| format!("Ungültiger AbschlussGrund: {s}");
 }
 
 impl AbschlussGrund {
@@ -160,30 +88,6 @@ impl AbschlussGrund {
             AbschlussGrund::Freilauf => "freigelassen",
             AbschlussGrund::Sonstiges => "Sonstiges",
         }
-    }
-}
-
-// Nullable Spalte (`abschluss_grund`) — gleiches Muster wie bei `TierGeschlecht`
-// (s. o.): `Type`/`Decode` direkt auf dem Enum, statt `#[sqlx(try_from = …)]`
-// (Orphan-Rule auf `Option<Enum>`).
-impl<DB: sqlx::Database> sqlx::Type<DB> for AbschlussGrund
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AbschlussGrund
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        AbschlussGrund::parse(s).ok_or_else(|| format!("Ungültiger AbschlussGrund: {s}").into())
     }
 }
 
