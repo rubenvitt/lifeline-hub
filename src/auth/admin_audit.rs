@@ -134,6 +134,19 @@ wire_enum! {
         EinwurfZugangSchluesselGewechselt => "einwurf_zugang_schluessel_gewechselt",
         /// Einwurf-Zugang widerrufen.
         EinwurfZugangWiderrufen => "einwurf_zugang_widerrufen",
+        /// Webhook an einem Maschinenzugang eingerichtet (LLH-1656, Migration
+        /// `*_admin_audit_webhook.sql`). Die Angaben nennen den Host des Ziels, nie den Pfad.
+        MaschinenzugangWebhookAngelegt => "maschinenzugang_webhook_angelegt",
+        /// Ziel oder Ereignisarten eines Webhooks geändert.
+        MaschinenzugangWebhookGeaendert => "maschinenzugang_webhook_geaendert",
+        /// Webhook entfernt.
+        MaschinenzugangWebhookEntfernt => "maschinenzugang_webhook_entfernt",
+        /// Ein angehaltener Webhook wurde wieder aufgenommen.
+        MaschinenzugangWebhookWiederAufgenommen => "maschinenzugang_webhook_wieder_aufgenommen",
+        /// Ziel im privaten Netz für einen Webhook bewusst erlaubt (LAN-Ausnahme).
+        MaschinenzugangWebhookLanErlaubt => "maschinenzugang_webhook_lan_erlaubt",
+        /// LAN-Ausnahme eines Webhooks zurückgenommen.
+        MaschinenzugangWebhookLanEntzogen => "maschinenzugang_webhook_lan_entzogen",
     }
 }
 
@@ -177,6 +190,7 @@ pub enum Ziel<'a> {
 ///   `scopes_vorher`, falls die Scopes wechselten.
 /// - `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder
 ///   sein Hash.
+/// - `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ZugangsAngaben {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -230,6 +244,9 @@ pub struct ZugangsAngaben {
     /// Maschinenzugang: Fingerabdruck des abgelösten Schlüssels beim Wechsel.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fingerabdruck_vorher: Option<String>,
+    /// Webhook (LLH-1656): Host des Ziels. Nie die ganze URL, ihr Pfad kann ein Token tragen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
 }
 
 impl ZugangsAngaben {

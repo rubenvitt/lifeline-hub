@@ -176,6 +176,24 @@ Spec `ereignis-abruf`, Herleitung
 - **Der wartende Abruf** hält zwischen zwei Nachfragen keine Datenbankverbindung und nimmt seinen
   Platz aus `events::Warteraum`; die Route steht nicht in `zulassung::OHNE_ZULASSUNGSGRENZE`.
 
+## Backend — Webhooks (LLH-1656)
+
+Zweiter Leser der Outbox: `public_api::webhook`
+([ADR-0046](../docs/architektur/entscheidungen/ADR-0046-webhooks-sind-mit-dem-instanzschluessel-signiert-und-gehen-nur-an-gepruefte-adressen.md),
+Spec `webhook-zustellung`, Herleitung
+`openspec/changes/archive/2026-11-14-z6ds0ed9-webhooks-outbox/design.md`):
+- **Lesen wie der Abruf:** `events::naechstes` mit den gewählten Arten, geschnitten mit
+  `events::sichtbare_arten` des Zugangs. Eine neue Ereignisart braucht deshalb nichts Eigenes für
+  Webhooks; sie erscheint in der Auswahl, sobald `EventType` sie kennt (Frontend: `ART_TEXT`,
+  `ART_RECHT` in `frontend/src/api/anbindungen.ts`).
+- **Ausgehend nur über `webhook::ziel::client`:** kein zweiter Client für Webhooks, keine
+  Zustellung an einer Prüfung von `check_url` vorbei (IP-Literale umgehen den Resolver).
+- **Der Lauf hält während der HTTP-Anfrage keine Datenbankverbindung**; das Ergebnis schreibt er
+  danach in einer Transaktion (`write_retry!`). Tests stellen über einen eigenen `Zusteller` zu;
+  Loopback ist für den echten Weg immer gesperrt, einen Schalter dafür gibt es nicht.
+- **Der CAS-Stand `geaendert_at` steigt streng** (`repo::neuer_stand`): die Zeit hat
+  Sekunden-Auflösung.
+
 ## Anhänge
 
 **ETB-Anhänge (LFH-117)** (`docs/superpowers/specs/2026-09-24-lfh-117-pruefliste.md`)

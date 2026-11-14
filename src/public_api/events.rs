@@ -170,8 +170,9 @@ pub async fn hoechststand(pool: &SqlitePool) -> Result<i64, sqlx::Error> {
     Ok(stand(&mut conn).await?.head)
 }
 
-/// Die Arten, die ein Zugang mit diesen Scopes sieht.
-fn sichtbare_arten(scopes: &[Scope]) -> Vec<EventType> {
+/// Die Arten, die ein Zugang mit diesen Scopes sieht. Auch die Webhooks liefern nur diese
+/// (LLH-1656).
+pub fn sichtbare_arten(scopes: &[Scope]) -> Vec<EventType> {
     EventType::ALLE
         .into_iter()
         .filter(|art| scopes.contains(&art.scope()))
@@ -267,6 +268,106 @@ async fn lesen_ab(
     let antwort = seite(&mut tx, zugang_id, arten, after, stand.head).await?;
     tx.commit().await?;
     Ok(antwort)
+}
+
+/// Was der Webhook eines Zugangs als Nächstes zustellen soll (LLH-1656, design.md D2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Naechstes {
+    /// Das nächste fällige Ereignis nach dem Cursor.
+    Ereignis(Event),
+    /// Nichts fällig. `uebersprungen_bis`: die höchste Nummer eigener Zeilen nach dem Cursor, die
+    /// nicht zugestellt werden (Art nicht gewählt oder ohne Recht); der Webhook rückt darüber
+    /// hinweg (Spec `webhook-zustellung`, „Nicht gewählte Art“). `None`, wenn es keine gibt.
+    Leer { uebersprungen_bis: Option<i64> },
+    /// Das zuletzt fällige, nicht zugestellte Ereignis (`offen_id`) ist schon gelöscht. Der Webhook
+    /// setzt beim Höchststand `head` an.
+    Verloren { head: i64 },
+}
+
+/// Das nächste fällige Ereignis des Zugangs nach `after` unter den Arten `arten`, aus einem
+/// Schnappschuss wie [`lesen`]. `offen_id` ist das Ereignis, das beim letzten Blick fällig war und
+/// nicht zugestellt werden konnte: Liegt es unter der Löschgrenze, ist es verloren. Ein Cursor
+/// unter der Löschgrenze allein ist kein Verlust; gelesen wird ohnehin nur `id > after`.
+pub async fn naechstes(
+    pool: &SqlitePool,
+    zugang_id: &str,
+    arten: &[EventType],
+    after: i64,
+    offen_id: Option<i64>,
+) -> Result<Naechstes, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let stand = stand(&mut tx).await?;
+    if offen_id.is_some_and(|offen| offen <= stand.purged_until) {
+        return Ok(Naechstes::Verloren { head: stand.head });
+    }
+    if after >= stand.head {
+        return Ok(Naechstes::Leer {
+            uebersprungen_bis: None,
+        });
+    }
+    // Ohne gewählte Art ist jede eigene Zeile übersprungen.
+    if arten.is_empty() {
+        let bis = eigene_bis(&mut tx, zugang_id, after, stand.head).await?;
+        tx.commit().await?;
+        return Ok(Naechstes::Leer {
+            uebersprungen_bis: bis,
+        });
+    }
+    let mut abfrage = sqlx::QueryBuilder::new(
+        "SELECT id, type, occurred_at, einsatz_id FROM maschine_ereignis WHERE zugang_id = ",
+    );
+    abfrage.push_bind(zugang_id);
+    abfrage.push(" AND id > ").push_bind(after);
+    abfrage.push(" AND id <= ").push_bind(stand.head);
+    abfrage.push(" AND type IN (");
+    let mut liste = abfrage.separated(", ");
+    for art in arten {
+        liste.push_bind(art.as_str());
+    }
+    abfrage.push(") ORDER BY id LIMIT 1");
+    let zeile: Option<(i64, String, String, i64)> =
+        abfrage.build_query_as().fetch_optional(&mut *tx).await?;
+    let ereignis = zeile.and_then(|(id, art, occurred_at, einsatz_id)| {
+        // Der CHECK lässt nur bekannte Arten zu, und die Abfrage filtert auf sie.
+        Some(Event {
+            id,
+            event_type: EventType::parse(&art)?,
+            occurred_at,
+            einsatz_id,
+        })
+    });
+    let ergebnis = match ereignis {
+        Some(e) => Naechstes::Ereignis(e),
+        // Nichts Gewähltes bis `head`: alle eigenen Zeilen dazwischen sind übersprungen.
+        None => Naechstes::Leer {
+            uebersprungen_bis: eigene_bis(&mut tx, zugang_id, after, stand.head).await?,
+        },
+    };
+    tx.commit().await?;
+    Ok(ergebnis)
+}
+
+/// Die höchste Nummer einer Zeile des Zugangs in `(after, head]`, gleich welcher Art.
+async fn eigene_bis(
+    conn: &mut SqliteConnection,
+    zugang_id: &str,
+    after: i64,
+    head: i64,
+) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT MAX(id) FROM maschine_ereignis WHERE zugang_id = ? AND id > ? AND id <= ?",
+    )
+    .bind(zugang_id)
+    .bind(after)
+    .bind(head)
+    .fetch_one(&mut *conn)
+    .await
+}
+
+/// Höchststand und Löschgrenze der Outbox (Wiederaufnahme eines Webhooks, LLH-1656).
+pub async fn load_stand(conn: &mut SqliteConnection) -> Result<(i64, i64), sqlx::Error> {
+    let st = stand(conn).await?;
+    Ok((st.head, st.purged_until))
 }
 
 fn cursor_abgelaufen() -> ApiError {

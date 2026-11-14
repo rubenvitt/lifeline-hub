@@ -291,6 +291,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "ANBINDUNG_NAME_MAX",
             lifeline_hub::routes::anbindungen::NAME_MAX,
         ),
+        (
+            "WEBHOOK_URL_MAX",
+            lifeline_hub::public_api::webhook::URL_MAX,
+        ),
         ("LAGEBILD_EMPFAENGER_MAX", lagebild_extern::EMPFAENGER_MAX),
         (
             "ARCHIV_SCHLUESSEL_BEZEICHNUNG_MAX",
