@@ -292,8 +292,8 @@ fn quittung_nach(bis: Option<i64>, m: &AkteMeldung) -> Option<i64> {
 /// Was nach dem Commit eines Austauschs zu tun ist.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Folge {
-    /// Die Führung eines lokalen Einsatzes hat sich geändert: Live-Ereignis `einsatz` und ein
-    /// Vollabgleich (`super::notify_wechsel`).
+    /// Die Führung eines lokalen Einsatzes hat sich geändert, oder seine erste Akte hängt jetzt an
+    /// ihm (LLH-1860): Live-Ereignis `einsatz` und ein Vollabgleich (`super::notify_wechsel`).
     Kopf { einsatz_id: i64 },
     /// Alarm „ungültige Übernahme“ an die Einsatzleitung.
     Alarm { einsatz_id: i64 },
@@ -1268,6 +1268,12 @@ pub async fn apply_eingang(
                 },
             )
             .await?;
+            // Hängt die neue Akte an einem Spiegel, der schon hier liegt, hat `richte_aus` ihn
+            // ausgerichtet, womöglich zum eigenen Einsatz mit neuer Nummer und ETB-Eintrag
+            // (LLH-1860): Kopf und Vollabgleich (`src/AGENTS.md`, `notify_wechsel`).
+            if let Some(einsatz_id) = a.einsatz_id {
+                aus.folgen.push(Folge::Kopf { einsatz_id });
+            }
             continue;
         };
         if a.org_id != org_id {
