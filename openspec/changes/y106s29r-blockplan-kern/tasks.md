@@ -54,7 +54,7 @@ Beleg für Gleichverhalten.
   - Testsatz aus 1.5 grün
   - `AbloesungPage.test.tsx` grün
   - `pnpm typecheck`, `pnpm lint`
-- [ ] 4.2 `PlanungSchichtplan` zur Hülle machen. Prüfen: Testsatz aus 1.5, `PlanungPage.test.tsx`, `planungZeilen.test.ts`.
+- [x] 4.2 `PlanungSchichtplan` zur Hülle machen. Prüfen: Testsatz aus 1.5, `PlanungPage.test.tsx`, `planungZeilen.test.ts`.
 - [ ] 4.3 Den gemeinsamen Druckinhalt nach `abloesung/schichtplan/ausgabe/SchichtplanDruckInhalt.tsx` legen. Beide Druckseiten behalten ihre Hülle. Prüfen:
   - `SchichtplanDruckPage.test.tsx`, `PlanungDruckPage.test.tsx`
   - e2e `schichtplan-druck.spec.ts`
