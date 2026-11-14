@@ -35,7 +35,10 @@ describe('EinheitAufloesen', () => {
 
   const FOLGE_AUFLOESEN =
     /^Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden\.$/;
-  const FOLGE_STORNIEREN = /^Die Einheit erscheint danach in keiner Liste und keinem Nachweis\.$/;
+  // Stornieren läuft serverseitig wie das Auflösen ohne Spur (`aufloesen_tx`): Unter-Einheiten und
+  // gekoppelte Geräte sind keine Spur und enden mit (LLH-1881).
+  const FOLGE_STORNIEREN =
+    /^Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden, die Einheit wird gelöscht\.$/;
 
   it('Auflösen bestätigt: löst auf, storniert nicht', async () => {
     const user = userEvent.setup();
@@ -87,6 +90,29 @@ describe('EinheitAufloesen', () => {
     expect(meldung).toHaveTextContent('Nicht storniert');
     expect(meldung).toHaveTextContent(grund);
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it.each([
+    ['Einheit stornieren', 'Einheit auflösen', FOLGE_STORNIEREN],
+    ['Einheit auflösen', 'Einheit stornieren', FOLGE_AUFLOESEN],
+  ])('solange „%s“ läuft, ist „%s“ gesperrt', async (laufend, anderer, folge) => {
+    const user = userEvent.setup();
+    let fertig!: () => void;
+    const offen = () =>
+      new Promise<void>((resolve) => {
+        fertig = resolve;
+      });
+    if (laufend === 'Einheit stornieren') rendere(undefined, vi.fn(offen));
+    else rendere(vi.fn(offen));
+    expect(within(paneel()).getByRole('button', { name: anderer })).toBeEnabled();
+    await bestaetige(user, laufend, folge);
+    await waitFor(() =>
+      expect(within(paneel()).getByRole('button', { name: anderer })).toBeDisabled(),
+    );
+    fertig();
+    await waitFor(() =>
+      expect(within(paneel()).getByRole('button', { name: anderer })).toBeEnabled(),
+    );
   });
 
   it('ein neuer Versuch räumt die alte Ablehnung weg', async () => {

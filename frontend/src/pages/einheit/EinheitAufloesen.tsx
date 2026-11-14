@@ -73,7 +73,7 @@ export default function EinheitAufloesen({
         </Popconfirm>
         <Popconfirm
           title="Einheit stornieren?"
-          description="Die Einheit erscheint danach in keiner Liste und keinem Nachweis."
+          description="Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden, die Einheit wird gelöscht."
           okText="Einheit stornieren"
           okButtonProps={{ danger: true }}
           onConfirm={() => fuehreAus('stornieren')}

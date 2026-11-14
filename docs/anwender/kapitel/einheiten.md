@@ -189,8 +189,9 @@ Für Einsatzleitung und Führungspersonal, solange die Einheit noch keine Spur i
 1. Die Einheit öffnen.
 2. Im letzten Paneel „Einheit auflösen oder stornieren“ „Einheit stornieren“ wählen.
 3. Die Rückfrage „Einheit stornieren?“ mit „Einheit stornieren“ bestätigen. Die Einheit ist
-   gelöscht, sie steht weder in der Gliederung noch im Block „Aufgelöst“. Das Einsatztagebuch
-   vermerkt den Storno.
+   gelöscht, sie steht weder in der Gliederung noch im Block „Aufgelöst“. Unterstellte Einheiten
+   rücken eine Ebene hoch, und gekoppelte Geräte der Einheit enden. Das Einsatztagebuch vermerkt
+   den Storno.
 4. Hat die Einheit schon eine Spur, etwa Mitglieder, eine Zeitachse, einen Auftrag, eine Meldung
    oder einen Eintrag im Einsatztagebuch, der sie nennt, steht im Paneel „Nicht storniert“ mit dem
    Grund, etwa „Der Einheit gehört Personal an; die Einheit lässt sich nur auflösen“. Dann bleibt
@@ -430,7 +431,7 @@ Einsatz](rechte-im-einsatz.md)); das gilt auch für Übernehmen. Abweisen verlan
 Recht auf Fahrzeuge, weil es die Fahrzeuge entlässt. An der Meldung führt ohne Recht auf Einheiten
 nur ein Verweis zur Einheit. Ohne dieses Recht zeigt die Seite einer Einheit nur die Werte,
 leere als „—“, ohne Statuswahl, ohne Menü an den Personen, ohne Auswahlfelder, ohne Lösen und
-ohne das Paneel „Einheit auflösen“. Material zuordnen, lösen und ausgeben verlangt nicht das Recht
+ohne das Paneel „Einheit auflösen oder stornieren“. Material zuordnen, lösen und ausgeben verlangt nicht das Recht
 auf Einheiten, sondern Schreibrecht im Einsatz und die Freigabe des Moduls Material: der Ort gehört
 zum Material (Kapitel [Material](material.md)). Eine aufgelöste Einheit nimmt kein Material mehr
 an; „Material zuordnen …“ steht dort gesperrt mit „Einheit aufgelöst“, Lösen bleibt. Ohne Netz
