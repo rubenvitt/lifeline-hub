@@ -5422,7 +5422,7 @@ async fn nach_widerspruch_traegt_der_hub_spiegel_wieder_die_nummer_des_elw() {
     for _ in 0..2 {
         elw_meldet(&elw).await;
     }
-    ist_geklaert(&hub, h).await;
+    assert_geklaert(&hub, h).await;
     assert_eq!(etb_zeilen(&hub, h).await, etb_zeilen(&elw, e).await);
 }
 
@@ -5440,7 +5440,7 @@ async fn etb_zeilen(i: &Instanz, einsatz: i64) -> Vec<(i64, String, String)> {
 }
 
 /// Der Spiegel hat keine offene Bruchstelle und keinen Hinweis mehr.
-async fn ist_geklaert(i: &Instanz, einsatz: i64) {
+async fn assert_geklaert(i: &Instanz, einsatz: i64) {
     let (offen, hinweis): (bool, Option<String>) =
         sqlx::query_as("SELECT bruch_offen, hinweis FROM einsatz_spiegel WHERE einsatz_id = ?")
             .bind(einsatz)
@@ -5492,7 +5492,7 @@ async fn nach_widerspruch_klaert_der_hub_die_bruchstelle() {
         assert_eq!(meldefehler(&elw).await, None);
     }
     assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt wieder");
-    ist_geklaert(&hub, h).await;
+    assert_geklaert(&hub, h).await;
     let elw_etb = etb_zeilen(&elw, e).await;
     assert!(
         elw_etb
@@ -5532,7 +5532,7 @@ async fn nach_widerspruch_liefert_der_elw_den_spiegel_ohne_eigene_aenderung_neu(
         .await
         .unwrap();
     assert!(stand > 0, "der Spiegel hat wieder einen Stand");
-    ist_geklaert(&hub, h).await;
+    assert_geklaert(&hub, h).await;
     assert_eq!(etb_zeilen(&hub, h).await, etb_zeilen(&elw, e).await);
 }
 
@@ -5573,7 +5573,7 @@ async fn nach_widerspruch_bleibt_eine_vom_elw_stammende_zeile() {
     for _ in 0..3 {
         elw_meldet(&elw).await;
     }
-    ist_geklaert(&hub, h).await;
+    assert_geklaert(&hub, h).await;
     let namen: Vec<String> =
         sqlx::query_scalar("SELECT name FROM einsatz_person WHERE einsatz_id = ?")
             .bind(h)
