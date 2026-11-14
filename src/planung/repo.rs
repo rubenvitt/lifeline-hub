@@ -17,12 +17,15 @@ use super::{
     PlanungListeneintrag, PlanungPostenAnzeige, PlanungPostenArt, PlanungUebernahme,
     AUFBEWAHRUNG_TAGE, KENNZAHLEN_TAGE, PLANUNGEN_MAX, POSTEN_MAX, ZEITRAUM_MAX_TAGE,
 };
+use crate::abloesung::schichtplan::plan_repo::{
+    self, check_pause_ohne_soll, ids_json, json_ids, utc, zeitraum_text, HelferEingabe,
+    HelferPatch, Planart,
+};
 use crate::abloesung::schichtplan::pruefung::{self, Block, Ergebnis, Grundlage, PersonStand};
-use crate::abloesung::schichtplan::repo::{HelferEingabe, HelferPatch};
 use crate::abloesung::schichtplan::zerlegung::{self, Teilung};
 use crate::abloesung::schichtplan::{
-    PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, Posten, SchichtplanGrenzwerte,
-    PLAN_BLOECKE_MAX, PLAN_HELFER_MAX, SOLL_ANZAHL_MAX,
+    PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, PlanPersonArt, Posten, SchichtplanGrenzwerte,
+    SOLL_ANZAHL_MAX,
 };
 use crate::einsatz::Einsatzart;
 use crate::error::{AppError, ZeilenArt, ZeilenGrund};
@@ -134,9 +137,31 @@ pub struct BlockPatch {
     pub notiz: Option<Option<String>>,
 }
 
-fn utc(wert: &str) -> Result<DateTime<Utc>, AppError> {
-    zeit::parse_utc(wert)
-        .ok_or_else(|| AppError::Validation(format!("Ungültiger Zeitpunkt '{wert}'")))
+/// Eine Planung als [`Planart`] des Kerns (`abloesung::schichtplan::plan_repo`).
+pub(crate) struct Vorplanung {
+    pub org_id: i64,
+    pub planung_id: i64,
+}
+
+impl Planart for Vorplanung {
+    type Posten = Option<i64>;
+
+    const SCHICHT: &'static str = "planung_schicht";
+    const HELFER: &'static str = "planung_helfer";
+    const SCOPE: &'static str = "planung_id";
+    // Helfer der Vorplanung tragen (noch) keine externe Kennung.
+    const HELFER_SPALTEN: &'static str =
+        "id, name, telefon, organisation, qualifikationen, NULL AS kennung, NULL AS herkunft";
+    const JE: &'static str = "Planung";
+
+    fn id(&self) -> i64 {
+        self.planung_id
+    }
+
+    async fn before_write_tx(&self, conn: &mut SqliteConnection) -> Result<i64, AppError> {
+        schreibbar_tx(conn, self.org_id, self.planung_id).await?;
+        Ok(self.org_id)
+    }
 }
 
 /// Zeitraum einer Planung (400): Ende nach Beginn, höchstens [`ZEITRAUM_MAX_TAGE`] Tage.
@@ -169,15 +194,6 @@ pub fn loeschung_at(bis: &str) -> String {
         .unwrap_or_else(|| bis.to_string())
 }
 
-fn json_ids(json: Option<&str>) -> Vec<i64> {
-    json.and_then(|j| serde_json::from_str::<Vec<i64>>(j).ok())
-        .unwrap_or_default()
-}
-
-fn quals_json(ids: &[i64]) -> Option<String> {
-    (!ids.is_empty()).then(|| serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
-}
-
 /// Der Schlüssel eines Postens in der Prüfung (Modulkopf).
 fn posten_schluessel(posten_id: Option<i64>) -> Posten {
     match posten_id {
@@ -201,13 +217,6 @@ pub(crate) async fn zeitstil_org(
         wirksame_zone(None, zone.as_deref()),
         wirksame_darstellung(None, darstellung.as_deref()),
     ))
-}
-
-fn zeitraum_text(stil: &Zeitstil, von: &str, bis: &str) -> String {
-    match (zeit::parse_utc(von), zeit::parse_utc(bis)) {
-        (Some(a), Some(b)) => stil.zeitraum(a, b),
-        _ => format!("{von}–{bis}"),
-    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -461,7 +470,7 @@ async fn pruefe_planung(
             je_block.entry(bid).or_default().push(p);
         }
     }
-    let personen = personen_daten(conn, planung_id).await?;
+    let personen = personen_daten(conn, org_id, planung_id).await?;
     let katalog = crate::personal::qualifikation_repo::einschluesse(&mut *conn, org_id).await?;
 
     let mut bloecke = Vec::with_capacity(zeilen.len());
@@ -510,6 +519,7 @@ async fn pruefe_planung(
 /// Name, Qualifikationen und Verfügbarkeit jeder Person der Planung.
 async fn personen_daten(
     conn: &mut SqliteConnection,
+    org_id: i64,
     planung_id: i64,
 ) -> Result<BTreeMap<PlanPerson, PersonDaten>, AppError> {
     let mut aus = BTreeMap::new();
@@ -538,7 +548,7 @@ async fn personen_daten(
             },
         );
     }
-    for h in helfer_liste(conn, planung_id).await? {
+    for h in plan_repo::load_helfer_tx(conn, &Vorplanung { org_id, planung_id }).await? {
         aus.insert(
             PlanPerson::Helfer(h.id),
             PersonDaten {
@@ -551,35 +561,6 @@ async fn personen_daten(
         );
     }
     Ok(aus)
-}
-
-async fn helfer_liste(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-) -> Result<Vec<PlanHelferAnzeige>, AppError> {
-    let zeilen: Vec<(i64, String, Option<String>, Option<String>, Option<String>)> =
-        sqlx::query_as(
-            "SELECT id, name, telefon, organisation, qualifikationen FROM planung_helfer \
-             WHERE planung_id = ? ORDER BY name COLLATE NOCASE, id",
-        )
-        .bind(planung_id)
-        .fetch_all(&mut *conn)
-        .await?;
-    Ok(zeilen
-        .into_iter()
-        .map(
-            |(id, name, telefon, organisation, quals)| PlanHelferAnzeige {
-                id,
-                name,
-                telefon,
-                organisation,
-                qualifikationen: json_ids(quals.as_deref()),
-                // Helfer der Vorplanung tragen (noch) keine externe Kennung.
-                kennung: None,
-                herkunft: None,
-            },
-        )
-        .collect())
 }
 
 /// Die ganze Planung mit Befunden und Kennzahlen. Fremd oder unbekannt → 404.
@@ -608,7 +589,14 @@ async fn laden_mit(
         Some(k) => k,
         None => kennzahlen(&g.bloecke, &g.ergebnis),
     };
-    let helfer = helfer_liste(conn, id).await?;
+    let helfer = plan_repo::load_helfer_tx(
+        conn,
+        &Vorplanung {
+            org_id,
+            planung_id: id,
+        },
+    )
+    .await?;
     let programmpunkte = super::programm::liste_tx(conn, id).await?;
 
     let mut ergebnis_je_block = g.ergebnis.bloecke;
@@ -1341,15 +1329,6 @@ async fn pruefe_frei_tx(
     Ok(())
 }
 
-fn ids_json(personen: &[PlanPerson], stamm: bool) -> String {
-    let ids: Vec<i64> = personen
-        .iter()
-        .filter(|p| matches!(p, PlanPerson::Stamm(_)) == stamm)
-        .map(|p| p.id())
-        .collect();
-    serde_json::to_string(&ids).unwrap_or_else(|_| "[]".into())
-}
-
 /// Jede Person gehört zur Organisation bzw. ist ein Helfer der Planung (422 sonst). Eine
 /// Ad-hoc-Kraft gibt es ohne Einsatz nicht (der Handler lässt sie gar nicht zu).
 async fn pruefe_personen_tx(
@@ -1370,7 +1349,7 @@ async fn pruefe_personen_tx(
         "SELECT COUNT(*) FROM json_each(?1) j \
          LEFT JOIN personal p ON p.id = j.value AND p.org_id = ?2 WHERE p.id IS NULL",
     )
-    .bind(ids_json(personen, true))
+    .bind(ids_json(personen, PlanPersonArt::Stamm))
     .bind(org_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -1383,7 +1362,7 @@ async fn pruefe_personen_tx(
         "SELECT COUNT(*) FROM json_each(?1) j \
          LEFT JOIN planung_helfer h ON h.id = j.value AND h.planung_id = ?2 WHERE h.id IS NULL",
     )
-    .bind(ids_json(personen, false))
+    .bind(ids_json(personen, PlanPersonArt::Helfer))
     .bind(planung_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -1410,7 +1389,7 @@ async fn schreibe_personen_tx(
          SELECT ?1, j.value FROM json_each(?2) j ORDER BY j.key",
     )
     .bind(bid)
-    .bind(ids_json(personen, true))
+    .bind(ids_json(personen, PlanPersonArt::Stamm))
     .execute(&mut *conn)
     .await?;
     sqlx::query(
@@ -1418,27 +1397,9 @@ async fn schreibe_personen_tx(
          SELECT ?1, j.value FROM json_each(?2) j ORDER BY j.key",
     )
     .bind(bid)
-    .bind(ids_json(personen, false))
+    .bind(ids_json(personen, PlanPersonArt::Helfer))
     .execute(&mut *conn)
     .await?;
-    Ok(())
-}
-
-async fn pruefe_anzahl_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    neu: usize,
-) -> Result<(), AppError> {
-    let bisher: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM planung_schicht WHERE planung_id = ?")
-            .bind(planung_id)
-            .fetch_one(&mut *conn)
-            .await?;
-    if bisher + neu as i64 > PLAN_BLOECKE_MAX {
-        return Err(AppError::UnprocessableEntity(format!(
-            "Höchstens {PLAN_BLOECKE_MAX} Schichten je Planung"
-        )));
-    }
     Ok(())
 }
 
@@ -1470,19 +1431,6 @@ async fn insert_block_tx(
     .await?)
 }
 
-fn pause_ohne_soll(
-    posten_id: Option<i64>,
-    soll: Option<i64>,
-    quali: Option<&str>,
-) -> Result<(), AppError> {
-    if posten_id.is_none() && (soll.is_some() || quali.is_some()) {
-        return Err(AppError::UnprocessableEntity(
-            "Die Pause hat kein Soll".into(),
-        ));
-    }
-    Ok(())
-}
-
 /// Legt einen Block an. Liefert die Kennung.
 pub async fn block_anlegen(
     pool: &SqlitePool,
@@ -1506,10 +1454,10 @@ pub async fn block_anlegen_tx(
 ) -> Result<i64, AppError> {
     schreibbar_tx(conn, org_id, planung_id).await?;
     let (vorgabe_anzahl, vorgabe_quali, _, _) = posten_tx(conn, planung_id, e.posten_id).await?;
-    pruefe_anzahl_tx(conn, planung_id, 1).await?;
+    plan_repo::check_anzahl_tx(conn, &Vorplanung { org_id, planung_id }, 1).await?;
     let soll_anzahl = e.soll_anzahl.unwrap_or(vorgabe_anzahl);
     let quali_soll = e.quali_soll.clone().unwrap_or(vorgabe_quali);
-    pause_ohne_soll(e.posten_id, soll_anzahl, quali_soll.as_deref())?;
+    check_pause_ohne_soll(e.posten_id.is_none(), soll_anzahl, quali_soll.as_deref())?;
     crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref()).await?;
     pruefe_personen_tx(conn, org_id, planung_id, &e.personen).await?;
     pruefe_frei_tx(conn, org_id, planung_id, e.posten_id, &e.von, &e.bis, None).await?;
@@ -1582,7 +1530,7 @@ pub async fn block_aendern(
         if let Some(neu) = &p.quali_soll {
             quali_soll = neu.clone();
         }
-        pause_ohne_soll(posten, soll_anzahl, quali_soll.as_deref())?;
+        check_pause_ohne_soll(posten.is_none(), soll_anzahl, quali_soll.as_deref())?;
         if p.quali_soll.is_some() {
             crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref())
                 .await?;
@@ -1676,7 +1624,7 @@ pub async fn erzeugen(
             )
         })?;
         let teile = zerlegung::zerlege(von_t, bis_t, &Teilung::Laenge(laenge))?;
-        pruefe_anzahl_tx(conn, planung_id, teile.len()).await?;
+        plan_repo::check_anzahl_tx(conn, &Vorplanung { org_id, planung_id }, teile.len()).await?;
 
         let mut konflikte: Vec<ZeilenGrund> = Vec::new();
         let mut stil = None;
@@ -1731,58 +1679,6 @@ pub async fn erzeugen(
 // Helfer
 // ---------------------------------------------------------------------------------------------
 
-async fn pruefe_qualifikationen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    ids: &[i64],
-) -> Result<(), AppError> {
-    let fremd: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM json_each(?1) j \
-         LEFT JOIN qualifikation q ON q.id = j.value AND q.org_id = ?2 WHERE q.id IS NULL",
-    )
-    .bind(serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
-    .bind(org_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    if fremd > 0 {
-        return Err(AppError::UnprocessableEntity(
-            "Qualifikation gehört nicht zur Organisation".into(),
-        ));
-    }
-    Ok(())
-}
-
-async fn helfer_laden_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    hid: i64,
-) -> Result<PlanHelferAnzeige, AppError> {
-    let (id, name, telefon, organisation, quals): (
-        i64,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) = sqlx::query_as(
-        "SELECT id, name, telefon, organisation, qualifikationen FROM planung_helfer \
-         WHERE id = ? AND planung_id = ?",
-    )
-    .bind(hid)
-    .bind(planung_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    Ok(PlanHelferAnzeige {
-        id,
-        name,
-        telefon,
-        organisation,
-        qualifikationen: json_ids(quals.as_deref()),
-        kennung: None,
-        herkunft: None,
-    })
-}
-
 pub async fn helfer_anlegen(
     pool: &SqlitePool,
     org_id: i64,
@@ -1803,31 +1699,7 @@ pub async fn helfer_anlegen_tx(
     benutzer_id: i64,
     e: &HelferEingabe,
 ) -> Result<PlanHelferAnzeige, AppError> {
-    schreibbar_tx(conn, org_id, planung_id).await?;
-    pruefe_qualifikationen_tx(conn, org_id, &e.qualifikationen).await?;
-    let bisher: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM planung_helfer WHERE planung_id = ?")
-            .bind(planung_id)
-            .fetch_one(&mut *conn)
-            .await?;
-    if bisher >= PLAN_HELFER_MAX {
-        return Err(AppError::UnprocessableEntity(format!(
-            "Höchstens {PLAN_HELFER_MAX} Helfer je Planung"
-        )));
-    }
-    let hid: i64 = sqlx::query_scalar(
-        "INSERT INTO planung_helfer (planung_id, name, telefon, organisation, \
-            qualifikationen, angelegt_von) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-    )
-    .bind(planung_id)
-    .bind(&e.name)
-    .bind(&e.telefon)
-    .bind(&e.organisation)
-    .bind(quals_json(&e.qualifikationen))
-    .bind(benutzer_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    helfer_laden_tx(conn, planung_id, hid).await
+    plan_repo::create_helfer_tx(conn, &Vorplanung { org_id, planung_id }, benutzer_id, e).await
 }
 
 pub async fn helfer_aendern(
@@ -1838,33 +1710,7 @@ pub async fn helfer_aendern(
     p: &HelferPatch,
 ) -> Result<PlanHelferAnzeige, AppError> {
     write_retry!(pool, |conn| {
-        schreibbar_tx(conn, org_id, planung_id).await?;
-        let mut h = helfer_laden_tx(conn, planung_id, hid).await?;
-        if let Some(ids) = &p.qualifikationen {
-            pruefe_qualifikationen_tx(conn, org_id, ids).await?;
-            h.qualifikationen = ids.clone();
-        }
-        if let Some(name) = &p.name {
-            h.name = name.clone();
-        }
-        if let Some(t) = &p.telefon {
-            h.telefon = t.clone();
-        }
-        if let Some(o) = &p.organisation {
-            h.organisation = o.clone();
-        }
-        sqlx::query(
-            "UPDATE planung_helfer SET name = ?, telefon = ?, organisation = ?, \
-                qualifikationen = ? WHERE id = ?",
-        )
-        .bind(&h.name)
-        .bind(&h.telefon)
-        .bind(&h.organisation)
-        .bind(quals_json(&h.qualifikationen))
-        .bind(hid)
-        .execute(&mut *conn)
-        .await?;
-        Ok(h)
+        plan_repo::update_helfer_tx(conn, &Vorplanung { org_id, planung_id }, hid, p).await
     })
 }
 
@@ -1876,16 +1722,7 @@ pub async fn helfer_loeschen(
     hid: i64,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        schreibbar_tx(conn, org_id, planung_id).await?;
-        let geloescht = sqlx::query("DELETE FROM planung_helfer WHERE id = ? AND planung_id = ?")
-            .bind(hid)
-            .bind(planung_id)
-            .execute(&mut *conn)
-            .await?
-            .rows_affected();
-        if geloescht == 0 {
-            return Err(AppError::NotFound);
-        }
+        plan_repo::delete_helfer_tx(conn, &Vorplanung { org_id, planung_id }, hid).await?;
         Ok(())
     })
 }

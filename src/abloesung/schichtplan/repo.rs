@@ -6,19 +6,19 @@ use std::collections::{BTreeMap, HashMap};
 
 use sqlx::{SqliteConnection, SqlitePool};
 
+use super::plan_repo::{self, check_pause_ohne_soll, ids_json, json_ids, utc, Planart};
 use super::pruefung::{self, Block, Grundlage, Ist, PersonStand};
 use super::wechselpunkte;
 use super::zerlegung::{self, Teilung};
 use super::{
-    PlanBlockAnzeige, PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, PlanPostenAnzeige, Posten,
-    SchichtplanAnzeige, SchichtplanGrenzwerte, PLAN_BLOECKE_MAX, PLAN_HELFER_MAX, SOLL_ANZAHL_MAX,
+    PlanBlockAnzeige, PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, PlanPersonArt,
+    PlanPostenAnzeige, Posten, SchichtplanAnzeige, SchichtplanGrenzwerte, SOLL_ANZAHL_MAX,
 };
 use crate::abloesung::repo::{load_einsatz_vorgabe_tx, nachziehen_plan_tx};
 use crate::error::{AppError, ZeilenArt, ZeilenGrund};
 use crate::personal::quali_soll::QualiSoll;
 use crate::write_retry;
 use crate::zeit;
-use crate::zeitdarstellung::Zeitstil;
 
 /// Ein neuer Block, Felder schon geprüft (Handler). Zeiten im kanonischen Format.
 #[derive(Debug, Clone)]
@@ -48,30 +48,48 @@ pub struct BlockPatch {
     pub notiz: Option<Option<String>>,
 }
 
-/// Ein Helfer, Felder schon geprüft und getrimmt.
-#[derive(Debug, Clone)]
-pub struct HelferEingabe {
-    pub name: String,
-    pub telefon: Option<String>,
-    pub organisation: Option<String>,
-    pub qualifikationen: Vec<i64>,
+pub(super) use super::plan_repo::{quals_json, zeitraum_text};
+pub use super::plan_repo::{HelferEingabe, HelferPatch};
+
+/// Der Schichtplan eines Einsatzes als [`Planart`] des Kerns (`plan_repo`).
+pub(crate) struct Einsatzplan {
+    pub einsatz_id: i64,
 }
 
-/// Änderung eines Helfers. Fehlt = unverändert, `Some(None)` = leeren.
-#[derive(Debug, Clone, Default)]
-pub struct HelferPatch {
-    pub name: Option<String>,
-    pub telefon: Option<Option<String>>,
-    pub organisation: Option<Option<String>>,
-    pub qualifikationen: Option<Vec<i64>>,
-}
+impl Planart for Einsatzplan {
+    type Posten = Posten;
 
-fn ungueltige_zeit(wert: &str) -> AppError {
-    AppError::Validation(format!("Ungültiger Zeitpunkt '{wert}'"))
-}
+    const SCHICHT: &'static str = "einsatz_planschicht";
+    const HELFER: &'static str = "einsatz_plan_helfer";
+    const SCOPE: &'static str = "einsatz_id";
+    const HELFER_SPALTEN: &'static str =
+        "id, name, telefon, organisation, qualifikationen, kennung, herkunft";
+    const JE: &'static str = "Einsatz";
 
-fn utc(wert: &str) -> Result<chrono::DateTime<chrono::Utc>, AppError> {
-    zeit::parse_utc(wert).ok_or_else(|| ungueltige_zeit(wert))
+    fn id(&self) -> i64 {
+        self.einsatz_id
+    }
+
+    async fn before_write_tx(&self, conn: &mut SqliteConnection) -> Result<i64, AppError> {
+        org_von(conn, self.einsatz_id).await
+    }
+
+    async fn helfer_posten_tx(
+        &self,
+        conn: &mut SqliteConnection,
+        hid: i64,
+    ) -> Result<Vec<Posten>, AppError> {
+        let einheiten: Vec<i64> = sqlx::query_scalar(
+            "SELECT DISTINCT b.einheit_id FROM einsatz_planschicht_person p \
+             JOIN einsatz_planschicht b ON b.id = p.planschicht_id \
+             WHERE p.helfer_id = ? AND b.einsatz_id = ? AND b.einheit_id IS NOT NULL",
+        )
+        .bind(hid)
+        .bind(self.einsatz_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        Ok(einheiten.into_iter().map(Posten::Einheit).collect())
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -125,11 +143,6 @@ pub async fn grenzwerte(
     Ok(SchichtplanGrenzwerte::aus(max, ruhe))
 }
 
-pub(super) fn json_ids(json: Option<&str>) -> Vec<i64> {
-    json.and_then(|j| serde_json::from_str::<Vec<i64>>(j).ok())
-        .unwrap_or_default()
-}
-
 /// Name und Stand einer Person im Plan.
 struct PersonDaten {
     name: String,
@@ -178,14 +191,7 @@ async fn laden_mit(
     }
 
     let personen = personen_daten(conn, einsatz_id).await?;
-    let helfer: Vec<HelferZeile> = sqlx::query_as(
-        "SELECT id, name, telefon, organisation, qualifikationen, kennung, herkunft \
-         FROM einsatz_plan_helfer \
-         WHERE einsatz_id = ? ORDER BY name COLLATE NOCASE, id",
-    )
-    .bind(einsatz_id)
-    .fetch_all(&mut *conn)
-    .await?;
+    let helfer = plan_repo::load_helfer_tx(conn, &Einsatzplan { einsatz_id }).await?;
     // Nur bestehende Einheiten: beim Auflösen rückt die Unterstellung hoch, eine aufgelöste
     // Einheit trägt also niemanden mehr.
     let ueber: HashMap<i64, Option<i64>> = sqlx::query_as(
@@ -291,7 +297,7 @@ async fn laden_mit(
     Ok(SchichtplanAnzeige {
         grenzwerte,
         bloecke: anzeige,
-        helfer: mit_personen.then(|| helfer.into_iter().map(PlanHelferAnzeige::from).collect()),
+        helfer: mit_personen.then_some(helfer),
         wechsel,
         naechste_pruefung_at: ergebnis.naechste_pruefung.map(zeit::formatiere_utc),
     })
@@ -585,13 +591,6 @@ pub(super) async fn ueberschneidungen_tx(
     .await?)
 }
 
-pub(super) fn zeitraum_text(stil: &Zeitstil, von: &str, bis: &str) -> String {
-    match (zeit::parse_utc(von), zeit::parse_utc(bis)) {
-        (Some(a), Some(b)) => stil.zeitraum(a, b),
-        _ => format!("{von}–{bis}"),
-    }
-}
-
 async fn pruefe_frei_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -614,21 +613,6 @@ async fn pruefe_frei_tx(
     Ok(())
 }
 
-fn ids_json(personen: &[PlanPerson], art: fn(PlanPerson) -> Option<i64>) -> String {
-    let ids: Vec<i64> = personen.iter().filter_map(|p| art(*p)).collect();
-    serde_json::to_string(&ids).unwrap_or_else(|_| "[]".into())
-}
-
-fn stamm(p: PlanPerson) -> Option<i64> {
-    matches!(p, PlanPerson::Stamm(_)).then(|| p.id())
-}
-fn adhoc(p: PlanPerson) -> Option<i64> {
-    matches!(p, PlanPerson::Einsatz(_)).then(|| p.id())
-}
-fn helfer(p: PlanPerson) -> Option<i64> {
-    matches!(p, PlanPerson::Helfer(_)).then(|| p.id())
-}
-
 /// Jede Person gehört zur Organisation bzw. zum Einsatz (422 sonst); eine Abfrage je Art über
 /// `json_each` (`src/AGENTS.md`, „Eingabegrenzen“).
 pub(super) async fn pruefe_personen_tx(
@@ -644,7 +628,7 @@ pub(super) async fn pruefe_personen_tx(
         "SELECT COUNT(*) FROM json_each(?1) j \
          LEFT JOIN personal p ON p.id = j.value AND p.org_id = ?2 WHERE p.id IS NULL",
     )
-    .bind(ids_json(personen, stamm))
+    .bind(ids_json(personen, PlanPersonArt::Stamm))
     .bind(org_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -659,7 +643,7 @@ pub(super) async fn pruefe_personen_tx(
            ON ep.id = j.value AND ep.einsatz_id = ?2 AND ep.personal_id IS NULL \
          WHERE ep.id IS NULL",
     )
-    .bind(ids_json(personen, adhoc))
+    .bind(ids_json(personen, PlanPersonArt::Einsatz))
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -675,7 +659,7 @@ pub(super) async fn pruefe_personen_tx(
          LEFT JOIN einsatz_plan_helfer h ON h.id = j.value AND h.einsatz_id = ?2 \
          WHERE h.id IS NULL",
     )
-    .bind(ids_json(personen, helfer))
+    .bind(ids_json(personen, PlanPersonArt::Helfer))
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -698,9 +682,9 @@ pub(super) async fn schreibe_personen_tx(
         .execute(&mut *conn)
         .await?;
     for (spalte, art) in [
-        ("personal_id", stamm as fn(PlanPerson) -> Option<i64>),
-        ("einsatz_personal_id", adhoc),
-        ("helfer_id", helfer),
+        ("personal_id", PlanPersonArt::Stamm),
+        ("einsatz_personal_id", PlanPersonArt::Einsatz),
+        ("helfer_id", PlanPersonArt::Helfer),
     ] {
         let sql = match spalte {
             "personal_id" => {
@@ -772,24 +756,6 @@ pub(super) async fn org_von(conn: &mut SqliteConnection, einsatz_id: i64) -> Res
     )
 }
 
-async fn pruefe_anzahl_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    neu: usize,
-) -> Result<(), AppError> {
-    let bisher: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_planschicht WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?;
-    if bisher + neu as i64 > PLAN_BLOECKE_MAX {
-        return Err(AppError::UnprocessableEntity(format!(
-            "Höchstens {PLAN_BLOECKE_MAX} Schichten je Einsatz"
-        )));
-    }
-    Ok(())
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn insert_block_tx(
     conn: &mut SqliteConnection,
@@ -821,15 +787,6 @@ pub(super) async fn insert_block_tx(
     .await?)
 }
 
-fn pause_ohne_soll(posten: Posten, soll: Option<i64>, quali: Option<&str>) -> Result<(), AppError> {
-    if posten == Posten::Pause && (soll.is_some() || quali.is_some()) {
-        return Err(AppError::UnprocessableEntity(
-            "Die Pause hat kein Soll".into(),
-        ));
-    }
-    Ok(())
-}
-
 // ---------------------------------------------------------------------------------------------
 // Blöcke schreiben
 // ---------------------------------------------------------------------------------------------
@@ -851,11 +808,15 @@ pub async fn block_anlegen(
     write_retry!(pool, |conn| {
         let org_id = org_von(conn, einsatz_id).await?;
         pruefe_posten_tx(conn, einsatz_id, eingabe.posten).await?;
-        pruefe_anzahl_tx(conn, einsatz_id, 1).await?;
+        plan_repo::check_anzahl_tx(conn, &Einsatzplan { einsatz_id }, 1).await?;
         let (vorgabe_anzahl, vorgabe_quali) = soll_vorgabe_tx(conn, eingabe.posten).await?;
         let soll_anzahl = eingabe.soll_anzahl.unwrap_or(vorgabe_anzahl);
         let quali_soll = eingabe.quali_soll.clone().unwrap_or(vorgabe_quali);
-        pause_ohne_soll(eingabe.posten, soll_anzahl, quali_soll.as_deref())?;
+        check_pause_ohne_soll(
+            eingabe.posten == Posten::Pause,
+            soll_anzahl,
+            quali_soll.as_deref(),
+        )?;
         crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref()).await?;
         pruefe_personen_tx(conn, einsatz_id, org_id, &eingabe.personen).await?;
         pruefe_frei_tx(
@@ -953,7 +914,7 @@ pub async fn block_aendern(
         if let Some(neu) = &patch.quali_soll {
             quali_soll = neu.clone();
         }
-        pause_ohne_soll(posten, soll_anzahl, quali_soll.as_deref())?;
+        check_pause_ohne_soll(posten == Posten::Pause, soll_anzahl, quali_soll.as_deref())?;
         if patch.quali_soll.is_some() {
             crate::personal::quali_soll::pruefe_org(&mut *conn, org_id, quali_soll.as_deref())
                 .await?;
@@ -1091,7 +1052,7 @@ pub async fn erzeugen(
             }
         };
         let teile = zerlegung::zerlege(von_t, bis_t, &teilung)?;
-        pruefe_anzahl_tx(conn, einsatz_id, teile.len()).await?;
+        plan_repo::check_anzahl_tx(conn, &Einsatzplan { einsatz_id }, teile.len()).await?;
 
         let mut konflikte = Vec::new();
         for (a, b) in &teile {
@@ -1220,75 +1181,6 @@ pub async fn grenzwerte_setzen(
 // Helfer
 // ---------------------------------------------------------------------------------------------
 
-/// Jede Qualifikation gehört zur Organisation (422 sonst).
-pub(super) async fn pruefe_qualifikationen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    ids: &[i64],
-) -> Result<(), AppError> {
-    let fremd: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM json_each(?1) j \
-         LEFT JOIN qualifikation q ON q.id = j.value AND q.org_id = ?2 WHERE q.id IS NULL",
-    )
-    .bind(serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
-    .bind(org_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    if fremd > 0 {
-        return Err(AppError::UnprocessableEntity(
-            "Qualifikation gehört nicht zur Organisation".into(),
-        ));
-    }
-    Ok(())
-}
-
-pub(super) fn quals_json(ids: &[i64]) -> Option<String> {
-    (!ids.is_empty()).then(|| serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
-}
-
-/// Eine Zeile aus `einsatz_plan_helfer`.
-#[derive(sqlx::FromRow)]
-struct HelferZeile {
-    id: i64,
-    name: String,
-    telefon: Option<String>,
-    organisation: Option<String>,
-    qualifikationen: Option<String>,
-    kennung: Option<String>,
-    herkunft: Option<String>,
-}
-
-impl From<HelferZeile> for PlanHelferAnzeige {
-    fn from(z: HelferZeile) -> Self {
-        PlanHelferAnzeige {
-            id: z.id,
-            name: z.name,
-            telefon: z.telefon,
-            organisation: z.organisation,
-            qualifikationen: json_ids(z.qualifikationen.as_deref()),
-            kennung: z.kennung,
-            herkunft: z.herkunft,
-        }
-    }
-}
-
-async fn helfer_laden_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    hid: i64,
-) -> Result<PlanHelferAnzeige, AppError> {
-    let zeile: HelferZeile = sqlx::query_as(
-        "SELECT id, name, telefon, organisation, qualifikationen, kennung, herkunft \
-         FROM einsatz_plan_helfer WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(hid)
-    .bind(einsatz_id)
-    .fetch_optional(&mut *conn)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    Ok(zeile.into())
-}
-
 pub async fn helfer_anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -1296,31 +1188,7 @@ pub async fn helfer_anlegen(
     eingabe: &HelferEingabe,
 ) -> Result<PlanHelferAnzeige, AppError> {
     write_retry!(pool, |conn| {
-        let org_id = org_von(conn, einsatz_id).await?;
-        pruefe_qualifikationen_tx(conn, org_id, &eingabe.qualifikationen).await?;
-        let bisher: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_plan_helfer WHERE einsatz_id = ?")
-                .bind(einsatz_id)
-                .fetch_one(&mut *conn)
-                .await?;
-        if bisher >= PLAN_HELFER_MAX {
-            return Err(AppError::UnprocessableEntity(format!(
-                "Höchstens {PLAN_HELFER_MAX} Helfer je Einsatz"
-            )));
-        }
-        let hid: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_plan_helfer (einsatz_id, name, telefon, organisation, \
-                qualifikationen, angelegt_von) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
-        )
-        .bind(einsatz_id)
-        .bind(&eingabe.name)
-        .bind(&eingabe.telefon)
-        .bind(&eingabe.organisation)
-        .bind(quals_json(&eingabe.qualifikationen))
-        .bind(benutzer_id)
-        .fetch_one(&mut *conn)
-        .await?;
-        helfer_laden_tx(conn, einsatz_id, hid).await
+        plan_repo::create_helfer_tx(conn, &Einsatzplan { einsatz_id }, benutzer_id, eingabe).await
     })
 }
 
@@ -1331,33 +1199,7 @@ pub async fn helfer_aendern(
     patch: &HelferPatch,
 ) -> Result<PlanHelferAnzeige, AppError> {
     write_retry!(pool, |conn| {
-        let mut h = helfer_laden_tx(conn, einsatz_id, hid).await?;
-        if let Some(ids) = &patch.qualifikationen {
-            let org_id = org_von(conn, einsatz_id).await?;
-            pruefe_qualifikationen_tx(conn, org_id, ids).await?;
-            h.qualifikationen = ids.clone();
-        }
-        if let Some(name) = &patch.name {
-            h.name = name.clone();
-        }
-        if let Some(t) = &patch.telefon {
-            h.telefon = t.clone();
-        }
-        if let Some(o) = &patch.organisation {
-            h.organisation = o.clone();
-        }
-        sqlx::query(
-            "UPDATE einsatz_plan_helfer SET name = ?, telefon = ?, organisation = ?, \
-                qualifikationen = ? WHERE id = ?",
-        )
-        .bind(&h.name)
-        .bind(&h.telefon)
-        .bind(&h.organisation)
-        .bind(quals_json(&h.qualifikationen))
-        .bind(hid)
-        .execute(&mut *conn)
-        .await?;
-        Ok(h)
+        plan_repo::update_helfer_tx(conn, &Einsatzplan { einsatz_id }, hid, patch).await
     })
 }
 
@@ -1371,26 +1213,15 @@ pub async fn helfer_loeschen(
     jetzt: &str,
 ) -> Result<(), AppError> {
     write_retry!(pool, |conn| {
-        let einheiten: Vec<i64> = sqlx::query_scalar(
-            "SELECT DISTINCT b.einheit_id FROM einsatz_planschicht_person p \
-             JOIN einsatz_planschicht b ON b.id = p.planschicht_id \
-             WHERE p.helfer_id = ? AND b.einsatz_id = ? AND b.einheit_id IS NOT NULL",
+        let posten = plan_repo::delete_helfer_tx(conn, &Einsatzplan { einsatz_id }, hid).await?;
+        nachziehen_plan_tx(
+            conn,
+            einsatz_id,
+            &einheiten_von(&posten),
+            benutzer_id,
+            jetzt,
         )
-        .bind(hid)
-        .bind(einsatz_id)
-        .fetch_all(&mut *conn)
         .await?;
-        let geloescht =
-            sqlx::query("DELETE FROM einsatz_plan_helfer WHERE id = ? AND einsatz_id = ?")
-                .bind(hid)
-                .bind(einsatz_id)
-                .execute(&mut *conn)
-                .await?
-                .rows_affected();
-        if geloescht == 0 {
-            return Err(AppError::NotFound);
-        }
-        nachziehen_plan_tx(conn, einsatz_id, &einheiten, benutzer_id, jetzt).await?;
         Ok(())
     })
 }

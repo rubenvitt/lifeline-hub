@@ -33,8 +33,8 @@ Beleg für Gleichverhalten.
 
 ## 2. Backend-Kern: Hilfen und Helfer
 
-- [ ] 2.1 `src/abloesung/schichtplan/plan_repo.rs` anlegen: `trait Planart` mit Konstanten (D1) und Markern `Einsatzplan`/`Vorplanung`. Dazu die gemeinsamen Hilfen (`utc`, `json_ids` aus `PlanPerson`, `quals_json`, `zeitraum_text`, Qualifikations- und Anzahlprüfung, Pause ohne Soll). Beide Repos rufen nur noch diese. Prüfen: `cargo test --lib`, `--test schichtplan`, `--test planung`.
-- [ ] 2.2 Helferwege in den Kern legen: laden, anlegen, ändern, löschen, `_tx`-Varianten für die Demo. Kennung und Herkunft nur beim Einsatz. Nachziehen über `after_write_tx`, Schreibschutz über `before_write_tx`. Prüfen: `--test schichtplan`, `--test planung`, `--test planung_uebernahme`, `--test schichtplan_kopplung`, Demo-Seed-Test.
+- [x] 2.1 `src/abloesung/schichtplan/plan_repo.rs` anlegen: `trait Planart` mit Konstanten (D1) und Markern `Einsatzplan`/`Vorplanung`. Dazu die gemeinsamen Hilfen (`utc`, `json_ids` aus `PlanPerson`, `quals_json`, `zeitraum_text`, Qualifikations- und Anzahlprüfung, Pause ohne Soll). Beide Repos rufen nur noch diese. Prüfen: `cargo test --lib`, `--test schichtplan`, `--test planung`.
+- [x] 2.2 Helferwege in den Kern legen: laden, anlegen, ändern, löschen, `_tx`-Varianten für die Demo. Kennung und Herkunft nur beim Einsatz. Nachziehen über `after_write_tx`, Schreibschutz über `before_write_tx`. Prüfen: `--test schichtplan`, `--test planung`, `--test planung_uebernahme`, `--test schichtplan_kopplung`, Demo-Seed-Test.
 
 ## 3. Backend-Kern: Blöcke und Laden
 
