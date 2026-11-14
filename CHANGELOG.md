@@ -1,3 +1,52 @@
+## [1.0.0-alpha.192](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.191...v1.0.0-alpha.192) (2026-11-14)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Neue Migrationen legen die Tabellen für Ausgangsereignisse an Fremdsysteme samt Triggern an und erweitern das Zugangsprotokoll um neue Aktionen für das Archiv. Sie werden beim Start automatisch eingespielt.
+- **Öffentliche Schnittstelle, neue Routen:** `GET /api/v1/events` liefert Ereignisse für Fremdsysteme. `GET /api/v1/einsaetze` und `GET /api/v1/einsaetze/{id}` lesen freigegebene Einsätze.
+- **Recht „Einsätze lesen“ (`einsaetze:read`) braucht jetzt eine Freigabe:** Wie „Lage lesen“ wirkt es nur für Einsätze, die die Einsatzleitung für die Anbindung freigegeben hat. Solche Anbindungen erscheinen im Paneel „Anbindungen“ der Einsatzleitung. **Jede Änderung** an Rechten mit Einsatzbezug, ob hinzugefügt oder entzogen, beendet die Freigabe. Das wird im Einsatztagebuch vermerkt.
+- **Rechner-API Unterkunft:** Neuer optionaler Parameter `einsatz_id` im Body von `POST /api/v1/rechner/unterkunft` und als Abfrageparameter an `…/richtwerte`.
+- **Neue Kommandozeilenbefehle:** `archiv loeschersuchen` und `archiv personen` für Löschersuchen an archivierten Einsätzen (siehe „Aufbewahrung und Archiv“).
+
+### Anbindungen an Fremdsysteme
+
+- **Ereignisse abrufen:** Fremdsysteme können Änderungen an freigegebenen Einsätzen abrufen: Einsatz freigegeben, Einsatzkopf geändert, Einsatz beendet und Lage geändert. Der Abruf kann bis zu 25 Sekunden auf neue Ereignisse warten. Ereignisse werden sieben Tage aufbewahrt. Ist ein Cursor zu alt, meldet die Schnittstelle das, damit das Fremdsystem seinen Stand neu aufbauen kann.
+- **Einsätze lesen:** Fremdsysteme sehen die laufenden, für sie freigegebenen Einsätze mit dem Einsatzkopf: Nummer, Bezeichnung, Stichwort, Einsatzart, Leitstellennummer, Einsatzort, Koordinate und Beginn.
+- **Unterkunft mit Einsatz-Richtwerten:** Der Unterkunftsrechner kann mit den Richtwerten eines freigegebenen Einsatzes rechnen. Es gilt diese Rangfolge: Wert der Anfrage, dann Einsatz, dann Organisation, dann Basiswert. Für jeden nicht freigegebenen Einsatz antwortet die Schnittstelle mit „nicht gefunden“.
+- Anleitung für Fremdsysteme und Anwenderkapitel „Anbindungen“ sind entsprechend ergänzt.
+
+### Betroffene
+
+- **Spürbar weniger Datenverkehr bei großen Lagen:** Ändert sich eine Person, laden offene Personenlisten, die Personenauswahl und die Betroffenen je Betreuungsstelle nur noch diese eine Zeile nach. Bisher lud jede Ansicht die ganze Liste neu, bei 2 000 Personen rund 3 MB je Tab und Änderung.
+- Werden eine Einheit oder ein Abschnitt umbenannt, umgehängt oder aufgelöst, aktualisieren sich die Angaben bei den versorgten Personen sofort. Das gilt auch für Abruf aus dem Bereitstellungsraum und Abschnittsübergaben.
+- Ungespeicherte Änderungen in der Liste werden durch die Aktualisierung nicht überschrieben.
+
+### Aufträge und Befehle
+
+- Zwei gleichzeitige Vollzugsmeldungen zum selben Auftrag erzeugen keine doppelten Einträge im Einsatztagebuch mehr. Eine Rücknahme kann einen gleichzeitigen Vollzug nicht mehr überholen. Der zweite Versuch wird abgelehnt.
+
+### Lagekarte
+
+- Nach einem langen Ausfall der Internetverbindung ruft der Server jede Fachebene (DWD, NINA, PEGELONLINE, ODL, Hochwasser, Luftqualität) nur noch einmal ab, statt einmal je offener Lagekarte. Bisher blieben die Ebenen bei schmaler Leitung dauerhaft offline, solange Karten offen waren.
+- Ein fehlgeschlagener Abruf im Hintergrund sperrt eine Ebene nicht mehr bis zum Neustart.
+
+### Führung und Instanzkopplung
+
+- **Führung zurückholen ohne gekoppelte Führung:** Wurde eine Kopplung widerrufen, während die gekoppelte Führung ausgeschaltet war, blieb ein gespiegelter Einsatz bisher gesperrt. Einsatzleitung oder Admin der Einsatz-Organisation können ihn jetzt mit Angabe eines Grundes zurückholen. Paneel „Führung“ und Hinweisband zeigen die beendete Kopplung an und bieten das Zurückholen an.
+- Ein gespiegelter Einsatz endet nur noch, wenn sein Führer laut Akte das Ende meldet. Das gilt auch bei fremdem Präfix.
+- Ein gespiegelter Einsatz nimmt Lieferungen nur noch über eine Zuordnung seiner eigenen Organisation an. Bisher konnte er nach Widerruf und Neuzuordnung an eine andere Organisation umziehen, sodass Konten der alten Organisation einen Einsatz der neuen lesen konnten.
+- Im Dialog „Einsätze beim Gegenüber“ wird die gewählte Akte über ID und Kennung zugeordnet und am Server gegengeprüft. So kann kein anderer Einsatz mehr angezeigt oder bedient werden, wenn eine ID neu vergeben wurde. Liegt unter der Akte inzwischen ein anderer Einsatz, wird die Liste sofort neu geladen.
+- Widerruft das Gegenüber eine Kopplung, aktualisiert sich der Einsatzkopf in offenen Ansichten jetzt live.
+- **Zurückspielen einer Sicherung am Hub:** Neue Unterschriftsschlüssel, Widerrufe und geänderte Stammdaten erreichen den ELW danach wieder zuverlässig. Der ELW räumt Schlüssel und Stammdaten ab, die der Hub nicht mehr führt. Je nach Art werden sie gelöscht oder stillgelegt, oder das Konto wird samt Sitzungen deaktiviert. Ein Hinweis an der Kopplung zeigt, was erneut übertragen wurde. Grenzen und Ablauf beschreiben die Betriebsdoku und das Kapitel „Instanzkopplung“.
+
+### Aufbewahrung und Archiv
+
+- **Löschersuchen für eine Person an einem archivierten Einsatz:** In der Archivakte stehen jetzt „Person per Kennung schwärzen“ (z. B. R-042, EK-17, IT-5) und „Einsatz und Archiv löschen“ zur Verfügung. Ein fälliger Personen-Antrag zeigt „wartet auf Befehl mit Archiv-Schlüssel“. Zurücknehmen lässt er sich in den ersten 24 Stunden.
+- **Befehl `archiv loeschersuchen`:** Vollzieht fällige Löschersuchen mit dem Archiv-Schlüssel in allen Archivblöcken, eingrenzbar mit `--einsatz` oder `--org`. Ein Abbruch per Strg+C wirkt erst nach der laufenden Ablage. Ein Fehler an einem Einsatz hält die übrigen nicht auf.
+- **Befehl `archiv personen`:** Sucht Personen in einem Archivblock. Namen erscheinen nur im Terminal, die Admin-Spur hält die Suche ohne Suchtext fest.
+- Beide Befehle dürfen neben dem laufenden Server laufen. Das Zugangsprotokoll führt die neuen Aktionen „Person im Archiv geschwärzt“ und „Archiv durchsucht“.
+- Wird ein Einsatz abgeräumt, verschwindet er sofort aus offenen Einsatzlisten. Bisher endete ein Klick darauf in „nicht gefunden“.
+
 ## [1.0.0-alpha.191](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.190...v1.0.0-alpha.191) (2026-11-13)
 
 ### Wichtige Änderungen

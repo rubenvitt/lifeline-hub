@@ -27,6 +27,10 @@ pub const DECKEL_FACHEBENE: usize = 16 * 1024 * 1024;
 /// Normalfall.
 pub const DECKEL_OIDC: usize = 1024 * 1024;
 
+/// Antwort eines Webhook-Empfängers (LLH-1656): Sie wird nur gelesen, damit die Verbindung sauber
+/// endet, und dann verworfen. Mehr als eine kurze Quittung erwartet niemand.
+pub const DECKEL_WEBHOOK: usize = 16 * 1024;
+
 /// Fehler beim begrenzten Einlesen.
 #[derive(Debug)]
 pub enum LeseFehler {
