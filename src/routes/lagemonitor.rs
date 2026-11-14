@@ -433,13 +433,13 @@ pub(crate) fn karte_etag<T: Serialize>(karte: &T) -> String {
 }
 
 /// Eine gespeicherte GeoJSON-Geometrie; ein Feature wird auf seine Geometrie zurückgeführt, und
-/// die Geometrie auf [`geometrie_bereinigt`]. Kaputtes bleibt weg, statt die ganze Antwort
+/// die Geometrie auf [`sanitize_geometrie`]. Kaputtes bleibt weg, statt die ganze Antwort
 /// scheitern zu lassen.
 fn geometrie(roh: &str) -> Option<Value> {
     let wert: Value = serde_json::from_str(roh).ok()?;
     match wert.get("type").and_then(Value::as_str) {
-        Some("Feature") => geometrie_bereinigt(wert.get("geometry")?),
-        _ => geometrie_bereinigt(&wert),
+        Some("Feature") => sanitize_geometrie(wert.get("geometry")?),
+        _ => sanitize_geometrie(&wert),
     }
 }
 
@@ -447,7 +447,7 @@ fn geometrie(roh: &str) -> Option<Value> {
 /// `GeometryCollection` auf `type` und `geometries`). Die Zonen- und Abschnittsrouten speichern
 /// den gesendeten Text; ein Zusatzschlüssel darin (etwa eine Notiz) ginge sonst mit hinaus, ins
 /// Lagebild für Externe wie in die öffentliche API (LLH-1638, LLH-1867). Unbekanntes bleibt weg.
-fn geometrie_bereinigt(roh: &Value) -> Option<Value> {
+fn sanitize_geometrie(roh: &Value) -> Option<Value> {
     let typ = roh.get("type")?.as_str()?;
     match typ {
         "Point" | "MultiPoint" | "LineString" | "MultiLineString" | "Polygon" | "MultiPolygon" => {
@@ -459,7 +459,7 @@ fn geometrie_bereinigt(roh: &Value) -> Option<Value> {
                 .get("geometries")?
                 .as_array()?
                 .iter()
-                .filter_map(geometrie_bereinigt)
+                .filter_map(sanitize_geometrie)
                 .collect();
             Some(json!({ "type": typ, "geometries": geometries }))
         }
@@ -487,7 +487,7 @@ fn punkt(lat: f64, lon: f64) -> Value {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct KartenFeature {
     /// GeoJSON-Geometrie, aus [`load_karten_features`] nur mit `type` und `coordinates` (bzw.
-    /// `geometries`), siehe [`geometrie_bereinigt`].
+    /// `geometries`), siehe [`sanitize_geometrie`].
     pub geometrie: Value,
     pub art: KartenFeatureArt,
 }
@@ -898,7 +898,7 @@ mod tests {
             "properties": { "name": "Muster" },
         });
         let sauber = json!({ "type": "Polygon", "coordinates": polygon });
-        assert_eq!(geometrie_bereinigt(&roh), Some(sauber.clone()));
+        assert_eq!(sanitize_geometrie(&roh), Some(sauber.clone()));
         let feature =
             json!({ "type": "Feature", "properties": { "notiz": "Muster" }, "geometry": roh });
         assert_eq!(geometrie(&feature.to_string()), Some(sauber.clone()));
@@ -908,25 +908,25 @@ mod tests {
             "geometries": [roh, { "type": "Unbekannt", "coordinates": [1, 2] }],
         });
         assert_eq!(
-            geometrie_bereinigt(&sammlung),
+            sanitize_geometrie(&sammlung),
             Some(json!({ "type": "GeometryCollection", "geometries": [sauber] }))
         );
         // Text an Stelle einer Koordinate, ein verschachteltes Feature, ein unbekannter oder gar
         // kein Typ: bleibt weg.
         assert_eq!(
-            geometrie_bereinigt(&json!({ "type": "Point", "coordinates": [9.0, "Muster"] })),
+            sanitize_geometrie(&json!({ "type": "Point", "coordinates": [9.0, "Muster"] })),
             None
         );
         assert_eq!(
-            geometrie_bereinigt(&json!({ "type": "Feature", "geometry": roh })),
+            sanitize_geometrie(&json!({ "type": "Feature", "geometry": roh })),
             None
         );
         assert_eq!(
-            geometrie_bereinigt(&json!({ "type": "Kreis", "coordinates": [9.0, 52.0] })),
+            sanitize_geometrie(&json!({ "type": "Kreis", "coordinates": [9.0, 52.0] })),
             None
         );
         assert_eq!(
-            geometrie_bereinigt(&json!({ "coordinates": [9.0, 52.0] })),
+            sanitize_geometrie(&json!({ "coordinates": [9.0, 52.0] })),
             None
         );
     }
