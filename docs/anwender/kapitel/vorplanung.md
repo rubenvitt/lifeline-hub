@@ -186,7 +186,7 @@ zweite Übernahme gibt es nicht. „Soll“, „Ist“, „Offen“ und „Konfl
 Übernahme, auch in der Liste, die „übernommen in …“ mit der Einsatznummer nennt. Bekommt der
 Einsatz später eine andere Nummer, etwa bei einem Führungswechsel, steht dort die neue. Löschen geht
 weiter, und die Löschfrist bleibt dieselbe. Wird der Einsatz später endgültig gelöscht, führt der
-Link ins Leere, und es bleibt die Nummer, die er bei der Übernahme trug.
+Link ins Leere, und es bleibt die Nummer, die er zuletzt trug.
 
 ### Aufbewahrung
 

@@ -6980,8 +6980,8 @@ export interface components {
              */
             einsatz_id: number;
             /**
-             * @description Seine Einsatznummer, wie er sie jetzt trägt (LLH-1858); ist er gelöscht, die zum Zeitpunkt
-             *     der Übernahme.
+             * @description Seine Einsatznummer, wie er sie jetzt trägt (LLH-1858); ist er gelöscht, die zuletzt
+             *     getragene.
              */
             einsatznummer?: string | null;
         };

@@ -322,12 +322,17 @@ pub(crate) struct KopfZeile {
 }
 
 /// Die Einsatznummer einer übernommenen Planung (LLH-1858): die, die der Einsatz jetzt trägt, denn
-/// ein Führungswechsel kann ihn umnummerieren (LLH-1703); erst ohne den Einsatz die bei der
-/// Übernahme gemerkte. Erwartet die Planung unter dem Alias `p`.
+/// ein Führungswechsel kann ihn umnummerieren (LLH-1703). Ist er endgültig gelöscht, die zuletzt
+/// getragene aus dem Löschprotokoll: Umnummeriert wird nur, wenn die alte Nummer belegt ist, die
+/// bei der Übernahme gemerkte gehörte dann einem anderen Einsatz. Erst ohne beides (als Spiegel
+/// abgeräumt, dann trägt das Protokoll keine Nummer; Demo-Daten entfernt) die gemerkte. Einsatz-IDs
+/// werden nie wieder vergeben (`einsatz::repo`). Erwartet die Planung unter dem Alias `p`.
 macro_rules! uebernahme_einsatznummer {
     () => {
         "COALESCE((SELECT e.einsatznummer_intern FROM einsatz e \
           WHERE e.id = p.uebernahme_einsatz AND e.org_id = p.org_id), \
+          (SELECT l.einsatznummer_intern FROM aufbewahrung_loeschprotokoll l \
+          WHERE l.einsatz_id = p.uebernahme_einsatz AND l.org_id = p.org_id), \
           p.uebernahme_einsatznummer) AS uebernahme_einsatznummer"
     };
 }
