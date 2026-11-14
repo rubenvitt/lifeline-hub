@@ -460,16 +460,19 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
         );
       }
     }
-    ziele.push({
-      name: 'Einheit auflösen',
-      ziel: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
-        name: 'Einheit auflösen',
-        exact: true,
-      }),
-    });
+    for (const knopf of ['Einheit auflösen', 'Einheit stornieren']) {
+      ziele.push({
+        name: knopf,
+        ziel: zuordnungsKarte(page, 'Einheit auflösen oder stornieren').getByRole('button', {
+          name: knopf,
+          exact: true,
+        }),
+      });
+    }
     // 12 Angaben (LLH-1134: „Telefon und weitere Verbindungen“ statt Kommunikationsmittel und
-    // Erreichbarkeit), 7 Zuordnungsziele, „Personal der Einheit übernehmen“, „Einheit auflösen“.
-    expect(ziele).toHaveLength(21);
+    // Erreichbarkeit), 7 Zuordnungsziele, „Personal der Einheit übernehmen“, „Einheit auflösen“
+    // und „Einheit stornieren“ (LLH-1881).
+    expect(ziele).toHaveLength(22);
     let minimum = Infinity;
     const miss = async (name: string, ziel: Locator) => {
       const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);
@@ -589,18 +592,21 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
         const ziele: { name: string; ziel: Locator }[] = [];
         if (rolle === 'fuehrungspersonal') {
           for (const { name, huelle } of kopfFelder(page)) ziele.push({ name, ziel: huelle });
-          ziele.push({
-            name: 'Einheit auflösen',
-            ziel: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
-              name: 'Einheit auflösen',
-              exact: true,
-            }),
-          });
+          for (const knopf of ['Einheit auflösen', 'Einheit stornieren']) {
+            ziele.push({
+              name: knopf,
+              ziel: zuordnungsKarte(page, 'Einheit auflösen oder stornieren').getByRole('button', {
+                name: knopf,
+                exact: true,
+              }),
+            });
+          }
         }
         for (const { name, ziel } of gesperrt.ziele) ziele.push({ name, ziel });
-        // Beobachter: nur der Funkrufname. Führungspersonal: 12 Angaben, „Einheit auflösen“ und
-        // sechs Zuordnungsziele; „Person zuordnen …“ zählt als gesperrtes Ziel extra.
-        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 19);
+        // Beobachter: nur der Funkrufname. Führungspersonal: 12 Angaben, „Einheit auflösen“,
+        // „Einheit stornieren“ (LLH-1881) und sechs Zuordnungsziele; „Person zuordnen …“ zählt
+        // als gesperrtes Ziel extra.
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 20);
 
         let kleinsteZeile = Infinity;
         for (const { name, zeile } of gesperrt.zeilen) {

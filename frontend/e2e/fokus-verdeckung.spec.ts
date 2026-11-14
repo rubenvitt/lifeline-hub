@@ -699,13 +699,15 @@ async function einheitFokusBereit(page: Page, dichte: string) {
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
   await detailBereit(page);
   const ziele = kopfFelder(page).map(({ name, fokus }) => ({ name, fokus }));
-  ziele.push({
-    name: 'Einheit auflösen',
-    fokus: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
-      name: 'Einheit auflösen',
-      exact: true,
-    }),
-  });
+  for (const knopf of ['Einheit auflösen', 'Einheit stornieren']) {
+    ziele.push({
+      name: knopf,
+      fokus: zuordnungsKarte(page, 'Einheit auflösen oder stornieren').getByRole('button', {
+        name: knopf,
+        exact: true,
+      }),
+    });
+  }
   for (const { name, fokus } of zuordnungsZiele(page, namen).ziele) ziele.push({ name, fokus });
   for (const { name, fokus } of ziele) {
     await expect(fokus, name).toHaveCount(1);
@@ -809,19 +811,19 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
           rolle === 'fuehrungspersonal'
             ? [
                 ...kopfFelder(page).map(({ name, fokus }) => ({ name, fokus })),
-                {
-                  name: 'Einheit auflösen',
-                  fokus: zuordnungsKarte(page, 'Einheit auflösen').getByRole('button', {
-                    name: 'Einheit auflösen',
-                    exact: true,
-                  }),
-                },
+                ...['Einheit auflösen', 'Einheit stornieren'].map((knopf) => ({
+                  name: knopf,
+                  fokus: zuordnungsKarte(page, 'Einheit auflösen oder stornieren').getByRole(
+                    'button',
+                    { name: knopf, exact: true },
+                  ),
+                })),
               ]
             : [];
         for (const { name, fokus } of zuordnungTargetsGesperrt(page, namen, rolle).ziele) {
           ziele.push({ name, fokus });
         }
-        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 19);
+        expect(ziele).toHaveLength(rolle === 'beobachter' ? 1 : 20);
         for (const { name, fokus } of ziele) {
           await expect(fokus, name).toHaveCount(1);
           await fokus.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
