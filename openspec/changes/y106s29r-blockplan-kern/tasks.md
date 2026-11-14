@@ -50,7 +50,7 @@ Beleg für Gleichverhalten.
 
 ## 4. Frontend: ein Editor
 
-- [ ] 4.1 `abloesung/schichtplan/SchichtplanEditor.tsx` mit Adapter-Interface anlegen (D6) und `SchichtplanAnsicht` zur Hülle machen. Prüfen:
+- [x] 4.1 `abloesung/schichtplan/SchichtplanEditor.tsx` mit Adapter-Interface anlegen (D6) und `SchichtplanAnsicht` zur Hülle machen. Prüfen:
   - Testsatz aus 1.5 grün
   - `AbloesungPage.test.tsx` grün
   - `pnpm typecheck`, `pnpm lint`

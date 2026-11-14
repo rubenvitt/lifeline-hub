@@ -1,22 +1,12 @@
-import {
-  DndContext,
-  DragOverlay,
-  useSensor,
-  useSensors,
-  type Announcements,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core';
-import { Alert, App, Button, Flex, Spin } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Alert, Button } from 'antd';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { fetchEinsatzSchichtmodell } from '../../api/abloesungen';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listePersonal } from '../../api/personal';
-import { listeQualifikationen } from '../../api/qualifikationen';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import {
   aendereSchichtplanBlock,
@@ -30,43 +20,22 @@ import type {
   QualiSollEintrag,
   Schichtplan,
   SchichtplanBlock,
-  SchichtplanBlockAendernBody,
-  SchichtplanBlockBody,
-  SchichtplanErzeugenBody,
 } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { datum, uhrzeit } from '../../anzeige/zeitDarstellung';
-import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
+import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import { Segmentleiste, useRollen } from '../../components/instrument';
 import { MODUL_PERSONAL_GESPERRT } from '../../components/nurAnsicht';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { useViewport } from '../../components/useViewport';
-import { ZugPointerSensor } from '../../components/zugPointerSensor';
 import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { formatRegelKurz } from '../schichtmodellText';
 import { useUhr } from '../useUhr';
 import GrenzwerteZeile from './GrenzwerteZeile';
-import { spanneAus, type SpannenWahl, type ZugStand } from './raster';
-import SchichtenErzeugenDialog from './SchichtenErzeugenDialog';
-import { useBlockMenue } from './blockMenue';
-import SchichtplanBlockDialog, { type BlockSpeichern } from './SchichtplanBlockDialog';
-import SchichtplanListe from './SchichtplanListe';
-import SchichtplanPersonen, { type PersonZugDaten } from './SchichtplanPersonen';
-import SchichtplanRaster, { type BlockZielDaten } from './SchichtplanRaster';
-import SchichtplanSchleuse from './SchichtplanSchleuse';
+import { spanneAus, type SpannenWahl } from './raster';
+import SchichtplanEditor, { type SchichtplanEditorAdapter } from './SchichtplanEditor';
 import SchichtplanWechselDialog from './SchichtplanWechselDialog';
 import SchichtplanWechselLeiste from './SchichtplanWechselLeiste';
-import {
-  baueZeilen,
-  kopieBody,
-  mitPerson,
-  naechsterBlockBody,
-  personenOptionen,
-  postenEingabe,
-  postenSchluessel,
-  rasterBloecke,
-} from './schichtplanZeilen';
+import { baueZeilen, personenOptionen, postenSchluessel, rasterBloecke } from './schichtplanZeilen';
 
 /**
  * Ansicht „Schichtplan“ der Ablösung (`?ansicht=plan`, LLH-1554, Konzept LLH-1523 Abschnitt 6):
@@ -91,6 +60,10 @@ import {
  * LLH-1584: Strg/Alt beim Verschieben kopiert den Block (mit Personen, ohne Notiz), der Blockdialog
  * kopiert ihn als nächsten Block (ohne Personen) und öffnet die Kopie, „Schichten erzeugen“ füllt
  * einen Zeitraum am Posten (`SchichtenErzeugenDialog`).
+ *
+ * Hülle des gemeinsamen `SchichtplanEditor` (Change `y106s29r-blockplan-kern`, D6): hier stehen
+ * nur Laden, Zeilen, Personen, Vorgaben, Zeitspanne, Grenzwerte, Wechsel-Teil und die Aufrufe der
+ * API des Einsatzes; Mutationen, Zug und Ablage und die Dialoge trägt der Editor.
  */
 
 interface SchichtplanAnsichtProps {
@@ -115,37 +88,11 @@ interface SchichtplanAnsichtProps {
   onVollziehen?: (abloesungId: number) => void;
 }
 
-type Dialog =
-  | { art: 'anlegen'; vorbelegt?: { zeile?: string; von?: number; bis?: number } }
-  | { art: 'block'; blockId: number }
-  | { art: 'wechsel'; blockId: number }
-  | { art: 'erzeugen' };
-
 const SPANNEN: { wert: SpannenWahl; label: string }[] = [
   { wert: '6h', label: '6 h' },
   { wert: '12h', label: '12 h' },
   { wert: 'einsatz', label: 'Einsatz' },
 ];
-
-/** Ansagen an Hilfstechnik beim Ziehen einer Person (deutsch statt dnd-kits Vorgabe). */
-const personName = (d: unknown) => (d as PersonZugDaten | undefined)?.option.name ?? 'Person';
-const zielName = (d: unknown) => (d as BlockZielDaten | undefined)?.name;
-const ANSAGEN: Announcements = {
-  onDragStart: ({ active }) => `${personName(active.data.current)} gefasst.`,
-  onDragOver: ({ active, over }) => {
-    const z = zielName(over?.data.current);
-    return z
-      ? `${personName(active.data.current)} über Block ${z}.`
-      : `${personName(active.data.current)} über keinem Block.`;
-  },
-  onDragEnd: ({ active, over }) => {
-    const z = zielName(over?.data.current);
-    return z
-      ? `${personName(active.data.current)} in Block ${z} eingeteilt.`
-      : `${personName(active.data.current)} losgelassen, nichts geändert.`;
-  },
-  onDragCancel: ({ active }) => `Ziehen von ${personName(active.data.current)} abgebrochen.`,
-};
 
 export default function SchichtplanAnsicht({
   einsatzId,
@@ -159,29 +106,15 @@ export default function SchichtplanAnsicht({
   onVollziehen,
 }: SchichtplanAnsichtProps) {
   const qc = useQueryClient();
-  const { message } = App.useApp();
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
-  const { istSchmal, abBreite } = useViewport();
   const jetzt = useUhr().valueOf();
   const [spannenWahl, setSpannenWahl] = useState<SpannenWahl>('12h');
-  const [dialog, setDialog] = useState<Dialog | null>(null);
-  // Für Antworten, die nach einem Dialogwechsel eintreffen (Kopie als nächsten Block).
-  const dialogJetzt = useRef(dialog);
-  useEffect(() => {
-    dialogJetzt.current = dialog;
-  }, [dialog]);
-  const [gezogen, setGezogen] = useState<PersonZugDaten | null>(null);
   // Gewählter Zeitpunkt der Wechsel-Leiste; ein neuer Sprung wählt seinen.
   const [wechselGewaehlt, setWechselGewaehlt] = useState<number | null>(wechselSprung ?? null);
   useEffect(() => {
     if (wechselSprung != null) setWechselGewaehlt(wechselSprung);
   }, [wechselSprung, wechselSprungKennung]);
-  const [zugLaeuft, setZugLaeuft] = useState(false);
-  // Ein offenes Kontextmenü eines Blocks hält wie ein Zug (LLH-1600, Spec `datensatz-aktionsmenue`).
-  const [menueOffen, setMenueOffen] = useState(false);
-  // Die Zeilenschleuse hält auch ohne Fokus und Zeiger (LLH-1604, `SchichtplanSchleuse`).
-  const schleuseHalten = zugLaeuft || menueOffen || gezogen != null || dialog != null;
 
   const freigaben = useModulFreigaben(einsatzId);
   const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
@@ -212,10 +145,6 @@ export default function SchichtplanAnsicht({
     queryKey: globalKeys.personalListe('im-dienst'),
     queryFn: () => listePersonal(true),
     enabled: personalFrei && darfSchreiben,
-  });
-  const qualiQuery = useQuery({
-    queryKey: globalKeys.qualifikationen(),
-    queryFn: listeQualifikationen,
   });
   // Schichtmodell des Einsatzes: teilt „Schichten erzeugen“ ohne eigene Länge (LLH-1584).
   const einsatzVorgabeQuery = useQuery({
@@ -267,10 +196,6 @@ export default function SchichtplanAnsicht({
           : null,
     [personenGesperrt, darfSchreiben, einsatzPersonalQuery.data, stammQuery.data, plan],
   );
-  const qualiNamen = useMemo(
-    () => new Map((qualiQuery.data ?? []).map((q) => [q.id, q.label])),
-    [qualiQuery.data],
-  );
   const sollVorgabe = useMemo(() => {
     const m = new Map<string, number | null>();
     for (const e of einheitenQuery.data ?? [])
@@ -298,402 +223,106 @@ export default function SchichtplanAnsicht({
     [spannenWahl, jetzt, beginn, bloecke],
   );
 
-  // ── Schreiben ── Jede Antwort ist der ganze Plan; er ersetzt den Cache.
-  const setzePlan = (p: Schichtplan) => qc.setQueryData(einsatzKeys.schichtplan(einsatzId), p);
-  const anlegenMut = useMutation({
-    mutationFn: (body: SchichtplanBlockBody) => legeSchichtplanBlockAn(einsatzId, body),
-    onSuccess: setzePlan,
-  });
-  const aendernMut = useMutation({
-    mutationFn: (v: { blockId: number; body: SchichtplanBlockAendernBody }) =>
-      aendereSchichtplanBlock(einsatzId, v.blockId, v.body),
-    onSuccess: setzePlan,
-  });
-  // Eigene Mutation für die Kopie aus dem Dialog: ihr Fehler steht dort, nicht beim Speichern.
-  const kopierenMut = useMutation({
-    mutationFn: (body: SchichtplanBlockBody) => legeSchichtplanBlockAn(einsatzId, body),
-    onSuccess: setzePlan,
-  });
-  const erzeugenMut = useMutation({
-    mutationFn: (body: SchichtplanErzeugenBody) => erzeugeSchichten(einsatzId, body),
-    onSuccess: (p) => {
-      // Neu ist, was vorher nicht im Plan stand.
-      const vorher = new Set(
-        qc.getQueryData<Schichtplan>(einsatzKeys.schichtplan(einsatzId))?.bloecke.map((b) => b.id),
-      );
-      setzePlan(p);
-      const neu = p.bloecke.filter((b) => !vorher.has(b.id)).length;
-      message.success(neu === 1 ? '1 Schicht erzeugt' : `${neu} Schichten erzeugt`);
-    },
-  });
-  // Nur der Dialog des gelöschten Blocks schließt: ein Löschen aus dem Kontextmenü (LLH-1600)
-  // kehrt womöglich erst zurück, wenn schon der Dialog eines anderen Blocks offen ist.
-  const nachLoeschen = (_antwort: unknown, b: SchichtplanBlock) => {
-    setDialog((d) => (d != null && 'blockId' in d && d.blockId === b.id ? null : d));
-    void qc.invalidateQueries({ queryKey: einsatzKeys.schichtplan(einsatzId) });
-  };
-  const loeschenMut = useMutation({
-    mutationFn: (b: SchichtplanBlock) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
-    onSuccess: nachLoeschen,
-  });
-  // Kontextmenü (LLH-1600): eigene Mutationen, damit Lauf und Fehler eines stillen Kopierens oder
-  // Löschens nie im Dialog eines anderen Blocks stehen und `reset()` beim Öffnen eines Blocks die
-  // Sperre des Menüs nicht aufhebt. Fehler stehen über dem Raster (`zugSchreiben`).
-  const menueKopierenMut = useMutation({
-    mutationFn: (body: SchichtplanBlockBody) => legeSchichtplanBlockAn(einsatzId, body),
-    onSuccess: setzePlan,
-  });
-  const menueLoeschenMut = useMutation({
-    mutationFn: (b: SchichtplanBlock) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
-    onSuccess: nachLoeschen,
-  });
-  // Fehler eines Zugs im Raster (ohne offenen Dialog) stehen über dem Raster.
-  const [zugFehler, setZugFehler] = useState<unknown>(null);
-  const zugSchreiben = (p: Promise<unknown>) => {
-    setZugFehler(null);
-    p.catch((e: unknown) => setZugFehler(e));
-  };
-
-  const blockVon = (id: number) => plan?.bloecke.find((b) => b.id === id) ?? null;
-  const zeitText = (ms: number) => uhrzeit(dayjs(ms), konventionen);
+  // ── Adapter des Editors ── Jede Antwort ist der ganze Plan; er ersetzt den Cache.
   // Die Leiste reicht 36 h: ein Zeitpunkt an einem anderen Tag nennt sein Datum.
   const zeitpunktText = (ms: number) => {
     const u = uhrzeit(dayjs(ms), konventionen);
     const tag = datum(dayjs(ms), konventionen);
     return tag === datum(dayjs(jetzt), konventionen) ? u : `${tag} ${u}`;
   };
-  const markeText = (ms: number) => {
-    const u = uhrzeit(dayjs(ms), konventionen);
-    return /^00:?00$/.test(u) ? datum(dayjs(ms), konventionen) : u;
-  };
-
-  const onAnlegen = (zeile: string, von: number, bis: number) => {
-    const posten = postenEingabe(zeile);
-    if (!posten) return;
-    zugSchreiben(
-      anlegenMut.mutateAsync({
-        posten,
-        von: alsBackendZeit(dayjs(von)),
-        bis: alsBackendZeit(dayjs(bis)),
-      }),
-    );
-  };
-  const onAendern = (blockId: number, stand: ZugStand) => {
-    const block = blockVon(blockId);
-    const posten = postenEingabe(stand.zeile);
-    if (!block || !posten) return;
-    const body: SchichtplanBlockAendernBody = { version: block.version };
-    if (stand.zeile !== postenSchluessel(block.posten)) body.posten = posten;
-    const von = alsBackendZeit(dayjs(stand.von));
-    const bis = alsBackendZeit(dayjs(stand.bis));
-    if (von !== block.von) body.von = von;
-    if (bis !== block.bis) body.bis = bis;
-    zugSchreiben(aendernMut.mutateAsync({ blockId, body }));
-  };
-
-  const sensoren = useSensors(
-    useSensor(ZugPointerSensor, { activationConstraint: { distance: 5 } }),
-  );
-  // Strg/Alt-Zug: Kopie an Zeile und Zeit des Schattens, mit Personen (die Notiz bleibt).
-  const onKopieren = (blockId: number, stand: ZugStand) => {
-    const block = blockVon(blockId);
-    const posten = postenEingabe(stand.zeile);
-    if (!block || !posten) return;
-    zugSchreiben(
-      anlegenMut.mutateAsync(
-        kopieBody(
-          block,
-          {
-            posten,
-            von: alsBackendZeit(dayjs(stand.von)),
-            bis: alsBackendZeit(dayjs(stand.bis)),
-          },
-          !personenGesperrt,
-        ),
-      ),
-    );
-  };
-  // „Als nächsten Block kopieren“: danach zeigt der Dialog die Kopie.
-  const kopiereAlsNaechsten = (block: SchichtplanBlock) => {
-    const body = naechsterBlockBody(block);
-    if (!body) return;
-    // Die Kopie ist der neue Block; an der Pause kann schon einer mit gleichem Beginn stehen.
-    const vorher = new Set(plan?.bloecke.map((b) => b.id));
-    kopierenMut.mutate(body, {
-      onSuccess: (p) => {
-        const neu = p.bloecke.find(
-          (b) =>
-            !vorher.has(b.id) &&
-            postenSchluessel(b.posten) === postenSchluessel(block.posten) &&
-            b.von === body.von,
-        );
-        // Nur wenn der Dialog noch den Ausgangsblock zeigt; geschlossen oder gewechselt bleibt er.
-        const d = dialogJetzt.current;
-        if (!neu || d?.art !== 'block' || d.blockId !== block.id) return;
-        aendernMut.reset();
-        loeschenMut.reset();
-        kopierenMut.reset();
-        setDialog({ art: 'block', blockId: neu.id });
-      },
-    });
-  };
-
-  const onDragStart = (e: DragStartEvent) => {
-    setGezogen((e.active.data.current as PersonZugDaten | undefined) ?? null);
-  };
-  const onDragEnd = (e: DragEndEvent) => {
-    setGezogen(null);
-    const person = e.active.data.current as PersonZugDaten | undefined;
-    const ziel = e.over?.data.current as BlockZielDaten | undefined;
-    if (!person || !ziel) return;
-    const block = blockVon(ziel.blockId);
-    if (!block) return;
-    const personenNeu = mitPerson(block, person.option.eingabe);
-    if (!personenNeu) return;
-    zugSchreiben(
-      aendernMut.mutateAsync({
-        blockId: block.id,
-        body: { version: block.version, personen: personenNeu },
-      }),
-    );
-  };
-
-  const speichern = (s: BlockSpeichern) =>
-    s.art === 'anlegen'
-      ? anlegenMut.mutateAsync(s.body)
-      : aendernMut.mutateAsync({ blockId: s.blockId, body: s.body });
-
-  const oeffneAnlegen = () => {
-    anlegenMut.reset();
-    setDialog({ art: 'anlegen' });
-  };
-  const oeffneBlock = (blockId: number) => {
-    aendernMut.reset();
-    loeschenMut.reset();
-    kopierenMut.reset();
-    setDialog({ art: 'block', blockId });
-  };
-  const oeffneErzeugen = () => {
-    erzeugenMut.reset();
-    setDialog({ art: 'erzeugen' });
-  };
-  const dialogBlock = dialog?.art === 'block' ? blockVon(dialog.blockId) : null;
   // Wechsel aus dem Plan (LLH-1555): an der UHS mit Unfallhilfsstellen, immer mit Personal.
   const wechselMoeglich = (b: SchichtplanBlock) =>
     darfSchreiben &&
     personalFrei &&
     !b.posten.aufgeloest &&
     (b.posten.art === 'pause' || (b.posten.art === 'uhs' && uhsFrei));
-  // Kontextmenü eines Blocks (LLH-1600): „Als nächsten Block kopieren“ ohne Dialog, die Kopie
-  // erscheint im Raster; ein Fehler steht über dem Raster wie bei einem Zug.
-  const kopiereStill = (block: SchichtplanBlock) => {
-    const body = naechsterBlockBody(block);
-    if (!body) return;
-    zugSchreiben(
-      menueKopierenMut.mutateAsync(body).then(() => {
-        message.success('Block kopiert');
-      }),
-    );
-  };
-  const blockMenue = useBlockMenue({
-    blockVon,
-    onBearbeiten: oeffneBlock,
-    onKopieren: kopiereStill,
-    onLoeschen: (b) => zugSchreiben(menueLoeschenMut.mutateAsync(b)),
-    onWechsel: (b) => setDialog({ art: 'wechsel', blockId: b.id }),
-    wechselMoeglich,
-    laeuft: menueKopierenMut.isPending || menueLoeschenMut.isPending,
-  });
-  const mitSeitenleiste = !istSchmal && darfSchreiben;
 
-  return (
-    <div data-lfh="schichtplan-ansicht">
-      <Flex
-        gap={token.marginSM}
-        align="center"
-        wrap
-        data-lfh="schichtplan-werkzeugzeile"
-        style={{ marginBottom: token.margin }}
-      >
-        {!istSchmal && (
-          <Segmentleiste
-            beschriftung="Zeitspanne"
-            wert={spannenWahl}
-            onWechsel={setSpannenWahl}
-            optionen={SPANNEN}
-            style={{ flex: 'none' }}
+  const adapter: SchichtplanEditorAdapter<Schichtplan> = {
+    dataLfh: 'schichtplan-ansicht',
+    bloecke: plan?.bloecke ?? [],
+    rasterBloecke: bloecke,
+    getBloecke: (p) => p.bloecke,
+    zeilen,
+    zeilenBereit,
+    personen,
+    personenGesperrt,
+    sollVorgabe,
+    qualiVorgabe,
+    schichtmodell: schichtmodellKurz,
+    jetzt,
+    spanne,
+    spanneSelect: (
+      <Segmentleiste
+        beschriftung="Zeitspanne"
+        wert={spannenWahl}
+        onWechsel={setSpannenWahl}
+        optionen={SPANNEN}
+        style={{ flex: 'none' }}
+      />
+    ),
+    canWrite: darfSchreiben,
+    // Erst mit geladenem Plan: die Meldung zählt nur, was vorher nicht darin stand.
+    isErzeugenDisabled: !plan,
+    beschriftung: 'Schichtplan',
+    fehlerTitel: 'Schichtplan nicht geändert',
+    tools: werkzeuge,
+    header: (
+      <>
+        {plan && (
+          <GrenzwerteZeile
+            einsatzId={einsatzId}
+            grenzwerte={plan.grenzwerte}
+            canWrite={darfSchreiben}
           />
         )}
-        {darfSchreiben && <Button onClick={oeffneAnlegen}>Block anlegen</Button>}
-        {darfSchreiben && (
-          // Erst mit geladenem Plan: die Meldung zählt nur, was vorher nicht darin stand.
-          <Button onClick={oeffneErzeugen} disabled={!plan}>
-            Schichten erzeugen
-          </Button>
+        {planQuery.isError && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: token.marginSM }}
+            title="Schichtplan konnte nicht geladen werden"
+            action={<Button onClick={() => void planQuery.refetch()}>Erneut abrufen</Button>}
+          />
         )}
-        {werkzeuge}
-      </Flex>
-      {plan && (
-        <GrenzwerteZeile
-          einsatzId={einsatzId}
-          grenzwerte={plan.grenzwerte}
-          canWrite={darfSchreiben}
-        />
-      )}
-      {planQuery.isError && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: token.marginSM }}
-          title="Schichtplan konnte nicht geladen werden"
-          action={<Button onClick={() => void planQuery.refetch()}>Erneut abrufen</Button>}
-        />
-      )}
-      {zugFehler != null && (
-        <div style={{ marginBottom: token.marginSM }}>
-          <SpeicherFehler fehler={zugFehler} titel="Schichtplan nicht geändert" />
-        </div>
-      )}
-      {plan && (
-        <SchichtplanWechselLeiste
-          wechsel={plan.wechsel}
-          bloecke={plan.bloecke}
-          jetzt={jetzt}
-          formatZeit={zeitpunktText}
-          gewaehlt={wechselGewaehlt}
-          onWaehlen={setWechselGewaehlt}
-          wechselGriff={(blockId) => {
-            const b = blockVon(blockId);
-            return b && wechselMoeglich(b)
-              ? () => setDialog({ art: 'wechsel', blockId: b.id })
-              : undefined;
-          }}
-          onVollziehen={darfSchreiben ? onVollziehen : undefined}
-        />
-      )}
-      {planQuery.isLoading ? (
-        <Spin />
-      ) : istSchmal ? (
-        <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} bereit={zeilenBereit} schmal>
-          {(z) => (
-            <SchichtplanListe
-              zeilen={z}
-              bloecke={bloecke}
-              jetzt={jetzt}
-              formatZeit={zeitText}
-              onOeffnen={oeffneBlock}
-            />
-          )}
-        </SchichtplanSchleuse>
-      ) : (
-        <DndContext
-          sensors={sensoren}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onDragCancel={() => setGezogen(null)}
-          accessibility={{ announcements: ANSAGEN }}
-        >
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns:
-                mitSeitenleiste && abBreite('lg') ? 'minmax(0, 1fr) 240px' : 'minmax(0, 1fr)',
-              gap: token.marginSM,
-              alignItems: 'start',
-            }}
-          >
-            <SchichtplanSchleuse zeilen={zeilen} halten={schleuseHalten} bereit={zeilenBereit}>
-              {(z) => (
-                <SchichtplanRaster
-                  zeilen={z}
-                  bloecke={bloecke}
-                  spanne={spanne}
-                  jetzt={jetzt}
-                  darfSchreiben={darfSchreiben}
-                  zone={konventionen.zeitzone}
-                  formatMarke={markeText}
-                  formatZeit={zeitText}
-                  onAnlegen={onAnlegen}
-                  onAendern={onAendern}
-                  onKopieren={onKopieren}
-                  onOeffnen={oeffneBlock}
-                  personenZiel={mitSeitenleiste && !personenGesperrt}
-                  beschriftung="Schichtplan"
-                  onZug={setZugLaeuft}
-                  blockMenue={darfSchreiben ? blockMenue : undefined}
-                  onMenue={setMenueOffen}
-                />
-              )}
-            </SchichtplanSchleuse>
-            {mitSeitenleiste && (
-              <SchichtplanPersonen optionen={personen} gesperrt={personenGesperrt} />
-            )}
-          </div>
-          <DragOverlay>
-            {gezogen ? (
-              <div
-                style={{
-                  padding: token.paddingXS,
-                  background: rollen.auswahlFlaeche,
-                  border: `1px solid ${rollen.bedien}`,
-                  color: rollen.text,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {gezogen.option.name}
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      )}
-      {dialog?.art === 'erzeugen' && (
-        <SchichtenErzeugenDialog
-          zeilen={zeilen}
-          schichtmodell={schichtmodellKurz}
-          darfSchreiben={darfSchreiben}
-          laeuft={erzeugenMut.isPending}
-          speicherung={erzeugenMut}
-          onErzeugen={(body) => erzeugenMut.mutateAsync(body)}
-          onSchliessen={() => setDialog(null)}
-        />
-      )}
-      {dialog && (dialog.art === 'anlegen' || dialogBlock) && (
-        <SchichtplanBlockDialog
-          key={dialog.art === 'block' ? `b-${dialog.blockId}` : 'neu'}
-          block={dialogBlock}
-          vorbelegt={dialog.art === 'anlegen' ? dialog.vorbelegt : undefined}
-          zeilen={zeilen}
-          personen={personen}
-          personenGesperrt={personenGesperrt}
-          sollVorgabe={sollVorgabe}
-          qualiVorgabe={qualiVorgabe}
-          qualiNamen={qualiNamen}
-          darfSchreiben={darfSchreiben}
-          laeuft={anlegenMut.isPending || aendernMut.isPending}
-          speicherung={dialog.art === 'anlegen' ? anlegenMut : aendernMut}
-          loeschenLaeuft={loeschenMut.isPending}
-          loeschFehler={loeschenMut.error}
-          onSpeichern={speichern}
-          onLoeschen={(b) => loeschenMut.mutate(b)}
-          onKopieren={kopiereAlsNaechsten}
-          kopierenLaeuft={kopierenMut.isPending}
-          kopierFehler={kopierenMut.error}
-          onWechsel={
-            dialogBlock && wechselMoeglich(dialogBlock)
-              ? (b) => setDialog({ art: 'wechsel', blockId: b.id })
-              : undefined
-          }
-          onSchliessen={() => setDialog(null)}
-        />
-      )}
-      {dialog?.art === 'wechsel' && (
+      </>
+    ),
+    isLoading: planQuery.isLoading,
+    api: {
+      create: (body) => legeSchichtplanBlockAn(einsatzId, body),
+      update: (blockId, body) => aendereSchichtplanBlock(einsatzId, blockId, body),
+      delete: (b) => loescheSchichtplanBlock(einsatzId, b.id, b.version),
+      erzeugen: (body) => erzeugeSchichten(einsatzId, body),
+    },
+    cache: {
+      get: () => qc.getQueryData<Schichtplan>(einsatzKeys.schichtplan(einsatzId)),
+      set: (p) => qc.setQueryData(einsatzKeys.schichtplan(einsatzId), p),
+      invalidate: () => void qc.invalidateQueries({ queryKey: einsatzKeys.schichtplan(einsatzId) }),
+    },
+    wechsel: {
+      canWechsel: wechselMoeglich,
+      renderLeiste: (griff) =>
+        plan && (
+          <SchichtplanWechselLeiste
+            wechsel={plan.wechsel}
+            bloecke={plan.bloecke}
+            jetzt={jetzt}
+            formatZeit={zeitpunktText}
+            gewaehlt={wechselGewaehlt}
+            onWaehlen={setWechselGewaehlt}
+            wechselGriff={griff}
+            onVollziehen={darfSchreiben ? onVollziehen : undefined}
+          />
+        ),
+      renderDialog: (blockId, onSchliessen) => (
         <SchichtplanWechselDialog
-          key={`w-${dialog.blockId}`}
+          key={`w-${blockId}`}
           einsatzId={einsatzId}
-          blockId={dialog.blockId}
-          onSchliessen={() => setDialog(null)}
+          blockId={blockId}
+          onSchliessen={onSchliessen}
         />
-      )}
-    </div>
-  );
+      ),
+    },
+  };
+
+  return <SchichtplanEditor adapter={adapter} />;
 }
