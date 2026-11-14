@@ -1,19 +1,17 @@
-//! Datenbank des Schichtplans (LLH-1552, design.md D2–D7). Schreibwege laufen je in EINER
-//! Transaktion (`write_retry!`): Posten, Überschneidung, Personen und Grenzen werden darin
-//! geprüft, wo auch geschrieben wird. Die Befunde rechnet [`super::pruefung`] beim Lesen.
-use std::collections::{BTreeMap, HashMap};
+//! Datenbank des Schichtplans (LLH-1552, design.md D2–D7). Blöcke, Personen und Helfer schreibt
+//! der Plan-Kern ([`super::plan_repo`]) mit [`Einsatzplan`]; hier stehen dessen Abweichungen,
+//! das Laden samt Wechselpunkten, „Schichten erzeugen“ und die Grenzwerte. Schreibwege laufen je
+//! in EINER Transaktion (`write_retry!`). Die Befunde rechnet [`super::pruefung`] beim Lesen.
 
 use sqlx::sqlite::SqliteRow;
 use sqlx::{Row, SqliteConnection, SqlitePool};
 
-use super::plan_repo::{
-    self, json_ids, utc, BlockKern, PersonDaten, Planart, PostenQuery, PostenVorgabe,
-};
-use super::pruefung::{Block, Ist, PersonStand};
+use super::plan_repo::{self, utc, BlockKern, Planart, PostenQuery, PostenVorgabe};
+use super::pruefung::Block;
 use super::wechselpunkte;
 use super::zerlegung::{self, Teilung};
 use super::{
-    PlanBlockAnzeige, PlanHelferAnzeige, PlanPerson, PlanPostenAnzeige, Posten, SchichtplanAnzeige,
+    PlanBlockAnzeige, PlanPerson, PlanPostenAnzeige, Posten, SchichtplanAnzeige,
     SchichtplanGrenzwerte, SOLL_ANZAHL_MAX,
 };
 use crate::abloesung::repo::{load_einsatz_vorgabe_tx, nachziehen_plan_tx};
@@ -23,18 +21,9 @@ use crate::write_retry;
 use crate::zeit;
 use crate::zeitdarstellung::Zeitstil;
 
-/// Ein neuer Block, Felder schon geprüft (Handler). Zeiten im kanonischen Format.
-pub type BlockEingabe = plan_repo::BlockEingabe<Posten>;
-
-/// Änderung eines Blocks, Felder schon geprüft. Fehlt = unverändert.
-pub type BlockPatch = plan_repo::BlockPatch<Posten>;
-
-pub(super) use super::plan_repo::{quals_json, zeitraum_text};
-pub use super::plan_repo::{HelferEingabe, HelferPatch};
-
 /// Der Schichtplan eines Einsatzes als [`Planart`] des Kerns (`plan_repo`): Posten sind Einheit,
 /// UHS oder Pause des Einsatzes, Personen auch Ad-hoc-Kräfte, Servertexte in der Zone des
-/// Einsatzes.
+/// Einsatzes. Nach jedem Schreibweg an Blöcken zieht die Schicht der Einheit nach (LLH-1555).
 pub(crate) struct Einsatzplan {
     pub einsatz_id: i64,
 }
@@ -42,8 +31,6 @@ pub(crate) struct Einsatzplan {
 impl Planart for Einsatzplan {
     type Posten = Posten;
     type BlockZeile = BlockZeile;
-    /// Ob der Aufrufer Personal darf: sonst nur einen leeren Block (403).
-    type DeleteRecht = bool;
 
     const SCHICHT: &'static str = "einsatz_planschicht";
     const PERSON: &'static str = "einsatz_planschicht_person";
@@ -56,9 +43,54 @@ impl Planart for Einsatzplan {
         "id, name, telefon, organisation, qualifikationen, kennung, herkunft";
     const JE: &'static str = "Einsatz";
     const ZU_DIESEM: &'static str = "diesem Einsatz";
-    const MIT_ARTIKEL: &'static str = "Ein Einsatz";
+    // Ad-hoc-Kräfte zählen nur, solange sie nicht entlassen sind; ein übernommener Helfer
+    // (LLH-1555) ist als seine Kraft im Einsatz.
+    const PERSONEN: &'static [(fn(i64) -> PlanPerson, &'static str)] = &[
+        (
+            PlanPerson::Stamm,
+            "SELECT pe.id, pe.name, \
+                    (SELECT json_group_array(pq.qualifikation_id) FROM personal_qualifikation pq \
+                      WHERE pq.personal_id = pe.id), \
+                    pe.dienststatus <> 'ausser_dienst', ep.id IS NOT NULL, ep.einheit_id, \
+                    ep.uhs_id, COALESCE(ps.pause, 0) = 1 \
+             FROM personal pe \
+             LEFT JOIN einsatz_personal ep \
+               ON ep.personal_id = pe.id AND ep.einsatz_id = ?1 AND ep.beendet_at IS NULL \
+             LEFT JOIN personal_status ps ON ps.id = ep.status_id \
+             WHERE pe.id IN (SELECT pp.personal_id FROM einsatz_planschicht_person pp \
+                             JOIN einsatz_planschicht p ON p.id = pp.planschicht_id \
+                             WHERE p.einsatz_id = ?1 AND pp.personal_id IS NOT NULL)",
+        ),
+        (
+            PlanPerson::Einsatz,
+            "SELECT ep.id, ep.snap_name, NULL, ep.beendet_at IS NULL, ep.beendet_at IS NULL, \
+                    CASE WHEN ep.beendet_at IS NULL THEN ep.einheit_id END, \
+                    CASE WHEN ep.beendet_at IS NULL THEN ep.uhs_id END, \
+                    ep.beendet_at IS NULL AND COALESCE(ps.pause, 0) = 1 \
+             FROM einsatz_personal ep \
+             LEFT JOIN personal_status ps ON ps.id = ep.status_id \
+             WHERE ep.id IN (SELECT pp.einsatz_personal_id FROM einsatz_planschicht_person pp \
+                             JOIN einsatz_planschicht p ON p.id = pp.planschicht_id \
+                             WHERE p.einsatz_id = ?1 AND pp.einsatz_personal_id IS NOT NULL)",
+        ),
+        (
+            PlanPerson::Helfer,
+            "SELECT h.id, h.name, h.qualifikationen, 1, ep.id IS NOT NULL, ep.einheit_id, \
+                    ep.uhs_id, COALESCE(ps.pause, 0) = 1 \
+             FROM einsatz_plan_helfer h \
+             LEFT JOIN einsatz_personal ep \
+               ON ep.id = h.einsatz_personal_id AND ep.beendet_at IS NULL \
+             LEFT JOIN personal_status ps ON ps.id = ep.status_id \
+             WHERE h.einsatz_id = ?1",
+        ),
+    ];
+    // Nur bestehende Einheiten: beim Auflösen rückt die Unterstellung hoch, eine aufgelöste
+    // Einheit trägt also niemanden mehr.
+    const UEBER_EINHEIT: Option<&'static str> = Some(
+        "SELECT id, ueber_einheit_id FROM einsatz_einheit \
+         WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    );
     const MIT_ADHOC: bool = true;
-    const MIT_IST: bool = true;
 
     fn id(&self) -> i64 {
         self.einsatz_id
@@ -90,19 +122,74 @@ impl Planart for Einsatzplan {
             bis: &z.bis,
             soll_anzahl: z.soll_anzahl,
             quali_soll: z.quali_soll.as_ref(),
+            aufgeloest: z.aufgeloest,
         })
     }
 
     async fn before_write_tx(&self, conn: &mut SqliteConnection) -> Result<i64, AppError> {
-        org_von(conn, self.einsatz_id).await
+        Ok(
+            sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+                .bind(self.einsatz_id)
+                .fetch_one(&mut *conn)
+                .await?,
+        )
     }
 
+    /// Die Einheiten, deren laufende Schicht dem Block folgen kann: die seines Postens.
+    async fn after_write_tx(
+        &self,
+        conn: &mut SqliteConnection,
+        posten: &[Posten],
+        benutzer_id: i64,
+        jetzt: &str,
+    ) -> Result<(), AppError> {
+        let einheiten: Vec<i64> = posten.iter().filter_map(|p| p.einheit_id()).collect();
+        nachziehen_plan_tx(conn, self.einsatz_id, &einheiten, benutzer_id, jetzt).await
+    }
+
+    /// Einheit oder UHS des Einsatzes, nicht aufgelöst (422 sonst); liefert die Bezeichnung und
+    /// die Soll-Vorgabe ([`soll_vorgabe_tx`]).
     async fn check_posten_tx(
         &self,
         conn: &mut SqliteConnection,
         posten: Posten,
     ) -> Result<PostenVorgabe, AppError> {
-        let bezeichnung = pruefe_posten_tx(conn, self.einsatz_id, posten).await?;
+        let fehler = |text: &str| Err(AppError::UnprocessableEntity(text.into()));
+        let bezeichnung = match posten {
+            Posten::Pause => None,
+            Posten::Einheit(id) => {
+                let zeile: Option<(String, Option<String>)> = sqlx::query_as(
+                    "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+                )
+                .bind(id)
+                .bind(self.einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+                match zeile {
+                    None => return fehler("Die Einheit gehört nicht zu diesem Einsatz"),
+                    Some((_, Some(_))) => return fehler("Die Einheit ist aufgelöst"),
+                    Some((name, None)) => Some(name),
+                }
+            }
+            Posten::Uhs(id) => {
+                let zeile: Option<(String, String, Option<String>)> = sqlx::query_as(
+                    "SELECT bezeichnung, status, storniert_at FROM uhs WHERE id = ? AND einsatz_id = ?",
+                )
+                .bind(id)
+                .bind(self.einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+                match zeile {
+                    None => return fehler("Die UHS gehört nicht zu diesem Einsatz"),
+                    Some((_, status, storniert))
+                        if status == "aufgeloest" || storniert.is_some() =>
+                    {
+                        return fehler("Die UHS ist aufgelöst")
+                    }
+                    Some((name, _, _)) => Some(name),
+                }
+            }
+        };
         let (soll_anzahl, quali_soll) = soll_vorgabe_tx(conn, posten).await?;
         Ok(PostenVorgabe {
             soll_anzahl,
@@ -133,8 +220,8 @@ impl Planart for Einsatzplan {
         Ok(())
     }
 
-    /// Ohne Personal nur einen leeren Block (403); keine Pause, in der noch jemand pausiert
-    /// (409).
+    /// Ohne Personal nur einen leeren Block (403, geprüft im Stand von `version`); keine Pause,
+    /// in der noch jemand pausiert (409).
     async fn check_delete_tx(
         &self,
         conn: &mut SqliteConnection,
@@ -156,30 +243,6 @@ impl Planart for Einsatzplan {
             return Err(AppError::Conflict(super::vollzug::PAUSE_OFFEN.into()));
         }
         Ok(())
-    }
-
-    async fn load_personen_tx(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<BTreeMap<PlanPerson, PersonDaten>, AppError> {
-        personen_daten(conn, self.einsatz_id).await
-    }
-
-    /// Nur bestehende Einheiten: beim Auflösen rückt die Unterstellung hoch, eine aufgelöste
-    /// Einheit trägt also niemanden mehr.
-    async fn load_ueber_einheit_tx(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<HashMap<i64, Option<i64>>, AppError> {
-        Ok(sqlx::query_as(
-            "SELECT id, ueber_einheit_id FROM einsatz_einheit \
-             WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
-        )
-        .bind(self.einsatz_id)
-        .fetch_all(&mut *conn)
-        .await?
-        .into_iter()
-        .collect())
     }
 
     async fn helfer_posten_tx(
@@ -261,20 +324,11 @@ pub async fn laden(
     jetzt: &str,
 ) -> Result<SchichtplanAnzeige, AppError> {
     let mut conn = pool.acquire().await?;
-    laden_mit(&mut conn, einsatz_id, org_id, mit_personen, jetzt).await
-}
-
-async fn laden_mit(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    org_id: i64,
-    mit_personen: bool,
-    jetzt: &str,
-) -> Result<SchichtplanAnzeige, AppError> {
+    let conn = &mut *conn;
     let plan = Einsatzplan { einsatz_id };
     let grenzwerte = grenzwerte(&mut *conn, einsatz_id).await?;
     let jetzt = utc(jetzt)?;
-    let g = plan_repo::load_tx(conn, &plan, org_id, grenzwerte, jetzt, |z| z.aufgeloest).await?;
+    let g = plan_repo::load_tx(conn, &plan, org_id, grenzwerte, jetzt).await?;
     let helfer = plan_repo::load_helfer_tx(conn, &plan).await?;
     let wechsel = wechselpunkte_laden(&mut *conn, einsatz_id, &g.bloecke, jetzt).await?;
 
@@ -385,131 +439,6 @@ async fn wechselpunkte_laden(
     Ok(wechselpunkte::wechselpunkte(&grenzen, &stand, jetzt))
 }
 
-/// Name, Qualifikationen und Ist jeder Person, die im Plan steht.
-async fn personen_daten(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-) -> Result<BTreeMap<PlanPerson, PersonDaten>, AppError> {
-    let mut aus = BTreeMap::new();
-    type StammZeile = (
-        i64,
-        String,
-        String,
-        Option<String>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        bool,
-    );
-    let stamm: Vec<StammZeile> = sqlx::query_as(
-        "SELECT pe.id, pe.name, pe.dienststatus, \
-                (SELECT json_group_array(pq.qualifikation_id) FROM personal_qualifikation pq \
-                  WHERE pq.personal_id = pe.id), \
-                ep.id, ep.einheit_id, ep.uhs_id, COALESCE(ps.pause, 0) = 1 \
-         FROM personal pe \
-         LEFT JOIN einsatz_personal ep \
-           ON ep.personal_id = pe.id AND ep.einsatz_id = ?1 AND ep.beendet_at IS NULL \
-         LEFT JOIN personal_status ps ON ps.id = ep.status_id \
-         WHERE pe.id IN (SELECT pp.personal_id FROM einsatz_planschicht_person pp \
-                         JOIN einsatz_planschicht p ON p.id = pp.planschicht_id \
-                         WHERE p.einsatz_id = ?1 AND pp.personal_id IS NOT NULL)",
-    )
-    .bind(einsatz_id)
-    .fetch_all(&mut *conn)
-    .await?;
-    for (id, name, dienststatus, quals, ep, einheit_id, uhs_id, status) in stamm {
-        aus.insert(
-            PlanPerson::Stamm(id),
-            PersonDaten {
-                name,
-                stand: PersonStand {
-                    qualifikationen: json_ids(quals.as_deref()),
-                    verfuegbar: dienststatus != "ausser_dienst",
-                    ist: Ist {
-                        im_einsatz: ep.is_some(),
-                        einheit_id,
-                        uhs_id,
-                        pause: status,
-                    },
-                },
-            },
-        );
-    }
-
-    type EinsatzZeile = (i64, String, bool, Option<i64>, Option<i64>, bool);
-    let einsatz: Vec<EinsatzZeile> = sqlx::query_as(
-        "SELECT ep.id, ep.snap_name, ep.beendet_at IS NULL, ep.einheit_id, ep.uhs_id, \
-                COALESCE(ps.pause, 0) = 1 \
-         FROM einsatz_personal ep \
-         LEFT JOIN personal_status ps ON ps.id = ep.status_id \
-         WHERE ep.id IN (SELECT pp.einsatz_personal_id FROM einsatz_planschicht_person pp \
-                         JOIN einsatz_planschicht p ON p.id = pp.planschicht_id \
-                         WHERE p.einsatz_id = ?1 AND pp.einsatz_personal_id IS NOT NULL)",
-    )
-    .bind(einsatz_id)
-    .fetch_all(&mut *conn)
-    .await?;
-    for (id, name, aktiv, einheit_id, uhs_id, status) in einsatz {
-        aus.insert(
-            PlanPerson::Einsatz(id),
-            PersonDaten {
-                name,
-                stand: PersonStand {
-                    qualifikationen: Vec::new(),
-                    verfuegbar: aktiv,
-                    ist: Ist {
-                        im_einsatz: aktiv,
-                        einheit_id: einheit_id.filter(|_| aktiv),
-                        uhs_id: uhs_id.filter(|_| aktiv),
-                        pause: aktiv && status,
-                    },
-                },
-            },
-        );
-    }
-
-    // Ein übernommener Helfer (LLH-1555) ist als seine Kraft im Einsatz.
-    type HelferZeile = (
-        i64,
-        String,
-        Option<String>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        bool,
-    );
-    let helfer: Vec<HelferZeile> = sqlx::query_as(
-        "SELECT h.id, h.name, h.qualifikationen, ep.id, ep.einheit_id, ep.uhs_id, \
-                COALESCE(ps.pause, 0) = 1 \
-         FROM einsatz_plan_helfer h \
-         LEFT JOIN einsatz_personal ep ON ep.id = h.einsatz_personal_id AND ep.beendet_at IS NULL \
-         LEFT JOIN personal_status ps ON ps.id = ep.status_id \
-         WHERE h.einsatz_id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_all(&mut *conn)
-    .await?;
-    for (id, name, quals, ep, einheit_id, uhs_id, status) in helfer {
-        aus.insert(
-            PlanPerson::Helfer(id),
-            PersonDaten {
-                name,
-                stand: PersonStand {
-                    qualifikationen: json_ids(quals.as_deref()),
-                    ist: Ist {
-                        im_einsatz: ep.is_some(),
-                        einheit_id,
-                        uhs_id,
-                        pause: status,
-                    },
-                    ..PersonStand::default()
-                },
-            },
-        );
-    }
-    Ok(aus)
-}
-
 /// Der Posten eines Blocks (für die Modulprüfung im Handler). Fremd oder unbekannt → 404.
 pub async fn posten_von(pool: &SqlitePool, einsatz_id: i64, bid: i64) -> Result<Posten, AppError> {
     let zeile: (String, Option<i64>, Option<i64>) = sqlx::query_as(
@@ -527,64 +456,6 @@ pub async fn posten_von(pool: &SqlitePool, einsatz_id: i64, bid: i64) -> Result<
 // ---------------------------------------------------------------------------------------------
 // Prüfungen in der Transaktion
 // ---------------------------------------------------------------------------------------------
-
-/// Der Posten gehört zum Einsatz und besteht (422 sonst). Liefert seine Bezeichnung.
-pub(super) async fn pruefe_posten_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    posten: Posten,
-) -> Result<Option<String>, AppError> {
-    match posten {
-        Posten::Pause => Ok(None),
-        Posten::Einheit(id) => {
-            let zeile: Option<(String, Option<String>)> = sqlx::query_as(
-                "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(id)
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-            match zeile {
-                None => Err(AppError::UnprocessableEntity(
-                    "Die Einheit gehört nicht zu diesem Einsatz".into(),
-                )),
-                Some((_, Some(_))) => Err(AppError::UnprocessableEntity(
-                    "Die Einheit ist aufgelöst".into(),
-                )),
-                Some((name, None)) => Ok(Some(name)),
-            }
-        }
-        Posten::Uhs(id) => {
-            let zeile: Option<(String, String, Option<String>)> = sqlx::query_as(
-                "SELECT bezeichnung, status, storniert_at FROM uhs WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(id)
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-            match zeile {
-                None => Err(AppError::UnprocessableEntity(
-                    "Die UHS gehört nicht zu diesem Einsatz".into(),
-                )),
-                Some((_, status, storniert)) if status == "aufgeloest" || storniert.is_some() => {
-                    Err(AppError::UnprocessableEntity(
-                        "Die UHS ist aufgelöst".into(),
-                    ))
-                }
-                Some((name, _, _)) => Ok(Some(name)),
-            }
-        }
-    }
-}
-
-/// Ersetzt die Personen eines Blocks (Kern: `plan_repo::write_personen_tx`).
-pub(super) async fn schreibe_personen_tx(
-    conn: &mut SqliteConnection,
-    bid: i64,
-    personen: &[PlanPerson],
-) -> Result<(), AppError> {
-    plan_repo::write_personen_tx::<Einsatzplan>(conn, bid, personen).await
-}
 
 /// Soll-Vorgabe eines Postens (design.md D4): Einheit = Summe des wirksamen Solls F/UF/M und
 /// das wirksame Qualifikationssoll (eigen → Typ), UHS = ihre Soll-Anzahl und ihr
@@ -622,142 +493,6 @@ pub(super) async fn soll_vorgabe_tx(
     };
     let anzahl = anzahl.filter(|n| *n > 0).map(|n| n.min(SOLL_ANZAHL_MAX));
     Ok((anzahl, quali))
-}
-
-pub(super) async fn org_von(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<i64, AppError> {
-    Ok(
-        sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?,
-    )
-}
-
-/// Schreibt einen Block ohne Prüfung (Kern: `plan_repo::insert_block_tx`).
-#[allow(clippy::too_many_arguments)]
-pub(super) async fn insert_block_tx(
-    conn: &mut SqliteConnection,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    posten: Posten,
-    von: &str,
-    bis: &str,
-    soll_anzahl: Option<i64>,
-    quali_soll: Option<&str>,
-    notiz: Option<&str>,
-) -> Result<i64, AppError> {
-    plan_repo::insert_block_tx(
-        conn,
-        &Einsatzplan { einsatz_id },
-        benutzer_id,
-        posten,
-        von,
-        bis,
-        soll_anzahl,
-        quali_soll,
-        notiz,
-    )
-    .await
-}
-
-// ---------------------------------------------------------------------------------------------
-// Blöcke schreiben
-// ---------------------------------------------------------------------------------------------
-
-/// Die Einheiten, deren laufende Schicht dem Block folgen kann (LLH-1555): die seines Postens.
-fn einheiten_von(posten: &[Posten]) -> Vec<i64> {
-    posten.iter().filter_map(|p| p.einheit_id()).collect()
-}
-
-/// Legt einen Block an. Kein ETB (design.md D7); die Schicht der Einheit zieht nach (LLH-1555).
-/// Liefert die Kennung.
-pub async fn block_anlegen(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    eingabe: &BlockEingabe,
-    jetzt: &str,
-) -> Result<i64, AppError> {
-    write_retry!(pool, |conn| {
-        let bid =
-            plan_repo::create_block_tx(conn, &Einsatzplan { einsatz_id }, benutzer_id, eingabe)
-                .await?;
-        nachziehen_plan_tx(
-            conn,
-            einsatz_id,
-            &einheiten_von(&[eingabe.posten]),
-            benutzer_id,
-            jetzt,
-        )
-        .await?;
-        Ok(bid)
-    })
-}
-
-/// Ändert einen Block mit CAS über `version` (409). Verschieben in die Pause löscht das Soll;
-/// ein Soll an der Pause ist 422. Kein ETB.
-pub async fn block_aendern(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    bid: i64,
-    benutzer_id: i64,
-    patch: &BlockPatch,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        let posten = plan_repo::update_block_tx(
-            conn,
-            &Einsatzplan { einsatz_id },
-            bid,
-            benutzer_id,
-            patch,
-            jetzt,
-        )
-        .await?;
-        // Beide Zeilen: die, aus der der Block geht, und die, in die er kommt (LLH-1555).
-        nachziehen_plan_tx(
-            conn,
-            einsatz_id,
-            &einheiten_von(&posten),
-            benutzer_id,
-            jetzt,
-        )
-        .await?;
-        Ok(())
-    })
-}
-
-/// Löscht einen Block mit CAS über `version` (409). Ohne `darf_personen` (Freigabe Personal)
-/// nur einen leeren Block (403 sonst), geprüft im selben Stand. Kein ETB; die Schicht der
-/// Einheit zieht nach (LLH-1555).
-pub async fn block_loeschen(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    bid: i64,
-    benutzer_id: i64,
-    version: i64,
-    darf_personen: bool,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        let posten = plan_repo::delete_block_tx(
-            conn,
-            &Einsatzplan { einsatz_id },
-            bid,
-            version,
-            darf_personen,
-        )
-        .await?;
-        nachziehen_plan_tx(
-            conn,
-            einsatz_id,
-            &einheiten_von(&[posten]),
-            benutzer_id,
-            jetzt,
-        )
-        .await?;
-        Ok(())
-    })
 }
 
 /// Füllt `[von, bis)` an einem Posten mit Blöcken (design.md D6): alles oder nichts, ein
@@ -812,14 +547,8 @@ pub async fn erzeugen(
         );
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &inhalt).await?;
-        nachziehen_plan_tx(
-            conn,
-            einsatz_id,
-            &einheiten_von(&[posten]),
-            benutzer_id,
-            jetzt,
-        )
-        .await?;
+        plan.after_write_tx(conn, &[posten], benutzer_id, jetzt)
+            .await?;
         Ok((ids, etb_id))
     })
 }
@@ -873,54 +602,5 @@ pub async fn grenzwerte_setzen(
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &inhalt).await?;
         Ok(Some(etb_id))
-    })
-}
-
-// ---------------------------------------------------------------------------------------------
-// Helfer
-// ---------------------------------------------------------------------------------------------
-
-pub async fn helfer_anlegen(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    eingabe: &HelferEingabe,
-) -> Result<PlanHelferAnzeige, AppError> {
-    write_retry!(pool, |conn| {
-        plan_repo::create_helfer_tx(conn, &Einsatzplan { einsatz_id }, benutzer_id, eingabe).await
-    })
-}
-
-pub async fn helfer_aendern(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    hid: i64,
-    patch: &HelferPatch,
-) -> Result<PlanHelferAnzeige, AppError> {
-    write_retry!(pool, |conn| {
-        plan_repo::update_helfer_tx(conn, &Einsatzplan { einsatz_id }, hid, patch).await
-    })
-}
-
-/// Löscht einen Helfer und nimmt ihn aus allen Blöcken (CASCADE). Die Schichten der Einheiten,
-/// in deren Blöcken er stand, ziehen nach (ein Folgeblock kann dadurch leer werden, LLH-1555).
-pub async fn helfer_loeschen(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    hid: i64,
-    benutzer_id: i64,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        let posten = plan_repo::delete_helfer_tx(conn, &Einsatzplan { einsatz_id }, hid).await?;
-        nachziehen_plan_tx(
-            conn,
-            einsatz_id,
-            &einheiten_von(&posten),
-            benutzer_id,
-            jetzt,
-        )
-        .await?;
-        Ok(())
     })
 }

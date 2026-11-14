@@ -15,9 +15,10 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::abloesung::schichtplan::repo::{
+use crate::abloesung::schichtplan::plan_repo::{
     self, BlockEingabe, BlockPatch, HelferEingabe, HelferPatch,
 };
+use crate::abloesung::schichtplan::repo::{self, Einsatzplan};
 use crate::abloesung::schichtplan::uebernahme::{
     self, repo::Rechte, Entscheidungen, ImportErgebnis, ImportMeldung, ImportVorschau, PlanPaket,
     ENTSCHEIDUNGEN_MAX,
@@ -38,6 +39,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::personal::quali_soll::{self, QualiSollEingabe};
 use crate::routes::support;
+use crate::write_retry;
 use crate::zeit::jetzt;
 
 /// Nach einem wirksamen Schreibweg: ETB-Kurzruf (falls ein Satz entstand) und Listen-Refresh.
@@ -46,6 +48,13 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: Option<i64>) {
         state.live.publiziere(einsatz_id, etb_id);
     }
     super::abloesung::sse(state, einsatz_id);
+}
+
+/// Der Plan des Einsatzes als Art des Plan-Kerns (`plan_repo`).
+fn einsatzplan(ctx: &EinsatzKontext) -> Einsatzplan {
+    Einsatzplan {
+        einsatz_id: ctx.einsatz.id,
+    }
 }
 
 /// Ob der Benutzer die Personen des Plans sehen darf (Freigabe Personal).
@@ -108,6 +117,50 @@ pub(crate) fn zeitraum(von: &str, bis: &str) -> Result<(String, String), AppErro
     );
     zerlegung::pruefe_zeitraum(a, b)?;
     Ok((von, bis))
+}
+
+/// Beginn und Ende beim Ändern eines Blocks (400): beide wie [`zeitraum`], einer allein nur auf
+/// dem Raster (die Dauer prüft dann der Kern gegen den Stand).
+pub(crate) fn zeitraum_patch(
+    von: Option<&str>,
+    bis: Option<&str>,
+) -> Result<(Option<String>, Option<String>), AppError> {
+    Ok(match (von, bis) {
+        (Some(v), Some(b)) => {
+            let (v, b) = zeitraum(v, b)?;
+            (Some(v), Some(b))
+        }
+        (v, b) => (
+            v.map(|v| planzeit(v, "Beginn")).transpose()?,
+            b.map(|b| planzeit(b, "Ende")).transpose()?,
+        ),
+    })
+}
+
+/// Zeitraum und Länge für „Schichten erzeugen“ (400). Ein Zeitraum unter der Mindestlänge ergäbe
+/// einen zu kurzen Block; länger als 24 h darf er sein, er wird zerlegt.
+pub(crate) fn erzeugen_felder(
+    von: &str,
+    bis: &str,
+    laenge_minuten: Option<i64>,
+) -> Result<(String, String, Option<i64>), AppError> {
+    let von = planzeit(von, "Beginn")?;
+    let bis = planzeit(bis, "Ende")?;
+    let dauer = crate::zeit::parse_utc(&bis)
+        .zip(crate::zeit::parse_utc(&von))
+        .map(|(b, v)| (b - v).num_minutes());
+    if !dauer.is_some_and(|m| m >= BLOCK_MIN_MINUTEN) {
+        return Err(AppError::Validation(format!(
+            "Der Zeitraum dauert mindestens {BLOCK_MIN_MINUTEN} Minuten"
+        )));
+    }
+    let laenge = laenge_minuten.map(zerlegung::pruefe_laenge).transpose()?;
+    Ok((von, bis, laenge))
+}
+
+/// Die `version` eines Blocks beim Ändern und Löschen (400, wenn sie fehlt).
+pub(crate) fn version(wert: Option<i64>) -> Result<i64, AppError> {
+    wert.ok_or_else(|| AppError::Validation("version fehlt".into()))
 }
 
 /// Personen eines Blocks von außen (Schichtplan und Vorplanung, je mit ihrer Eingabeform):
@@ -207,14 +260,10 @@ pub async fn block_anlegen(
     if !eingabe.personen.is_empty() {
         ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     }
-    repo::block_anlegen(
-        &state.pool,
-        ctx.einsatz.id,
-        ctx.benutzer.id,
-        &eingabe,
-        &jetzt(),
-    )
-    .await?;
+    let (art, jetzt) = (einsatzplan(&ctx), jetzt());
+    write_retry!(&state.pool, |conn| {
+        plan_repo::create_block_tx(conn, &art, ctx.benutzer.id, &eingabe, &jetzt).await
+    })?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok((StatusCode::CREATED, Json(plan(&state, &ctx).await?)))
 }
@@ -248,19 +297,8 @@ pub async fn block_aendern(
     PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<BlockAendern>,
 ) -> Result<Json<SchichtplanAnzeige>, AppError> {
-    let version = req
-        .version
-        .ok_or_else(|| AppError::Validation("version fehlt".into()))?;
-    let (von, bis) = match (req.von.as_deref(), req.bis.as_deref()) {
-        (Some(v), Some(b)) => {
-            let (v, b) = zeitraum(v, b)?;
-            (Some(v), Some(b))
-        }
-        (v, b) => (
-            v.map(|v| planzeit(v, "Beginn")).transpose()?,
-            b.map(|b| planzeit(b, "Ende")).transpose()?,
-        ),
-    };
+    let version = version(req.version)?;
+    let (von, bis) = zeitraum_patch(req.von.as_deref(), req.bis.as_deref())?;
     let patch = BlockPatch {
         version,
         posten: req.posten.map(Posten::from),
@@ -279,15 +317,10 @@ pub async fn block_aendern(
     if patch.personen.is_some() {
         ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
     }
-    repo::block_aendern(
-        &state.pool,
-        ctx.einsatz.id,
-        bid,
-        ctx.benutzer.id,
-        &patch,
-        &jetzt(),
-    )
-    .await?;
+    let (art, jetzt) = (einsatzplan(&ctx), jetzt());
+    write_retry!(&state.pool, |conn| {
+        plan_repo::update_block_tx(conn, &art, bid, ctx.benutzer.id, &patch, &jetzt).await
+    })?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(Json(plan(&state, &ctx).await?))
 }
@@ -302,8 +335,7 @@ pub struct VersionParams {
 impl VersionParams {
     /// Die Version; fehlt sie, 400.
     pub(crate) fn version(&self) -> Result<i64, AppError> {
-        self.version
-            .ok_or_else(|| AppError::Validation("version fehlt".into()))
+        version(self.version)
     }
 }
 
@@ -321,16 +353,12 @@ pub async fn block_loeschen(
     // Ein belegter Block nimmt mit dem Löschen Einteilungen weg: das verlangt Personal, geprüft
     // in der Transaktion gegen den Stand von `version`.
     let darf_personen = mit_personen(&state, &ctx).await?;
-    repo::block_loeschen(
-        &state.pool,
-        ctx.einsatz.id,
-        bid,
-        ctx.benutzer.id,
-        version,
-        darf_personen,
-        &jetzt(),
-    )
-    .await?;
+    let (art, jetzt) = (einsatzplan(&ctx), jetzt());
+    let benutzer_id = ctx.benutzer.id;
+    write_retry!(&state.pool, |conn| {
+        plan_repo::delete_block_tx(conn, &art, bid, version, darf_personen, benutzer_id, &jetzt)
+            .await
+    })?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -354,22 +382,7 @@ pub async fn erzeugen(
     JsonBody(req): JsonBody<Erzeugen>,
 ) -> Result<(StatusCode, Json<SchichtplanAnzeige>), AppError> {
     let posten = Posten::from(req.posten);
-    let von = planzeit(&req.von, "Beginn")?;
-    let bis = planzeit(&req.bis, "Ende")?;
-    // Ein Zeitraum unter der Mindestlänge ergäbe einen zu kurzen Block; länger als 24 h darf er
-    // sein, er wird zerlegt.
-    let dauer = crate::zeit::parse_utc(&bis)
-        .zip(crate::zeit::parse_utc(&von))
-        .map(|(b, v)| (b - v).num_minutes());
-    if !dauer.is_some_and(|m| m >= BLOCK_MIN_MINUTEN) {
-        return Err(AppError::Validation(format!(
-            "Der Zeitraum dauert mindestens {BLOCK_MIN_MINUTEN} Minuten"
-        )));
-    }
-    let laenge = req
-        .laenge_minuten
-        .map(zerlegung::pruefe_laenge)
-        .transpose()?;
+    let (von, bis, laenge) = erzeugen_felder(&req.von, &req.bis, req.laenge_minuten)?;
     fordere_posten_modul(&state, &ctx, posten).await?;
     let (_ids, etb_id) = repo::erzeugen(
         &state.pool,
@@ -471,8 +484,10 @@ pub async fn helfer_anlegen(
 ) -> Result<(StatusCode, Json<PlanHelferAnzeige>), AppError> {
     let eingabe = req.eingabe()?;
     ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
-    let helfer =
-        repo::helfer_anlegen(&state.pool, ctx.einsatz.id, ctx.benutzer.id, &eingabe).await?;
+    let art = einsatzplan(&ctx);
+    let helfer = write_retry!(&state.pool, |conn| {
+        plan_repo::create_helfer_tx(conn, &art, ctx.benutzer.id, &eingabe).await
+    })?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok((StatusCode::CREATED, Json(helfer)))
 }
@@ -520,7 +535,10 @@ pub async fn helfer_aendern(
 ) -> Result<Json<PlanHelferAnzeige>, AppError> {
     let patch = req.patch()?;
     ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
-    let helfer = repo::helfer_aendern(&state.pool, ctx.einsatz.id, hid, &patch).await?;
+    let art = einsatzplan(&ctx);
+    let helfer = write_retry!(&state.pool, |conn| {
+        plan_repo::update_helfer_tx(conn, &art, hid, &patch).await
+    })?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(Json(helfer))
 }
@@ -533,7 +551,10 @@ pub async fn helfer_loeschen(
     PfadParam((_eid, hid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     ctx.fordere_zielmodul::<Personal>(&state.pool).await?;
-    repo::helfer_loeschen(&state.pool, ctx.einsatz.id, hid, ctx.benutzer.id, &jetzt()).await?;
+    let (art, jetzt) = (einsatzplan(&ctx), jetzt());
+    write_retry!(&state.pool, |conn| {
+        plan_repo::delete_helfer_tx(conn, &art, hid, ctx.benutzer.id, &jetzt).await
+    })?;
     publiziere(&state, ctx.einsatz.id, None);
     Ok(StatusCode::NO_CONTENT)
 }

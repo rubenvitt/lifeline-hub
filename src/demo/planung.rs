@@ -14,12 +14,12 @@ use sqlx::SqliteConnection;
 
 use super::stammdaten::StammdatenErgebnis;
 use super::DemoStammdatenArt;
-use crate::abloesung::schichtplan::repo::HelferEingabe;
+use crate::abloesung::schichtplan::plan_repo::{self, BlockEingabe, HelferEingabe};
 use crate::abloesung::schichtplan::zerlegung::{self, Teilung};
 use crate::abloesung::schichtplan::PlanPerson;
 use crate::einsatz::Einsatzart;
 use crate::error::AppError;
-use crate::planung::repo;
+use crate::planung::repo::{self, Vorplanung};
 use crate::uhs::UhsTyp;
 
 /// Woraus ein Posten der Demo-Planung bei der Übernahme wird.
@@ -157,8 +157,7 @@ fn quali_soll_json(
 
 /// Planung und Benutzer, unter denen die Blöcke der Demo-Planung entstehen.
 struct Ziel {
-    org_id: i64,
-    planung_id: i64,
+    plan: Vorplanung,
     admin_id: i64,
 }
 
@@ -176,22 +175,18 @@ impl Ziel {
         let personen = einteilung
             .remove(&(posten.map(|p| p.0), von.timestamp()))
             .unwrap_or_default();
-        repo::block_anlegen_tx(
-            conn,
-            self.org_id,
-            self.planung_id,
-            self.admin_id,
-            &repo::BlockEingabe {
-                posten_id: posten.map(|p| p.1),
-                von: crate::zeit::formatiere_utc(von),
-                bis: crate::zeit::formatiere_utc(bis),
-                soll_anzahl: None,
-                quali_soll: None,
-                personen,
-                notiz: None,
-            },
-        )
-        .await?;
+        let eingabe = BlockEingabe {
+            posten: posten.map(|p| p.1),
+            von: crate::zeit::formatiere_utc(von),
+            bis: crate::zeit::formatiere_utc(bis),
+            soll_anzahl: None,
+            quali_soll: None,
+            personen,
+            notiz: None,
+        };
+        // `jetzt` braucht der Kern nur zum Nachziehen; die Vorplanung zieht nichts nach.
+        let jetzt = crate::zeit::jetzt();
+        plan_repo::create_block_tx(conn, &self.plan, self.admin_id, &eingabe, &jetzt).await?;
         Ok(())
     }
 }
@@ -238,7 +233,8 @@ pub async fn planung_importieren_tx(
         }
     }
 
-    // Geschrieben wird über die Wege der Routen (`planung::repo::*_tx`), mit ihren Prüfungen.
+    // Geschrieben wird über die Wege der Routen (`planung::repo::*_tx`, Blöcke und Helfer über
+    // `plan_repo::*_tx`), mit ihren Prüfungen.
     let planung_id = repo::anlegen_tx(
         conn,
         org_id,
@@ -269,10 +265,9 @@ pub async fn planung_importieren_tx(
             .iter()
             .filter_map(|l| quali_ids.get(l).copied())
             .collect();
-        let neu = repo::helfer_anlegen_tx(
+        let neu = plan_repo::create_helfer_tx(
             conn,
-            org_id,
-            planung_id,
+            &Vorplanung { org_id, planung_id },
             admin_id,
             &HelferEingabe {
                 name: h.name.to_string(),
@@ -302,8 +297,7 @@ pub async fn planung_importieren_tx(
         einteilung.insert((e.posten, um(e.ab_stunde)?.timestamp()), personen);
     }
     let ziel = Ziel {
-        org_id,
-        planung_id,
+        plan: Vorplanung { org_id, planung_id },
         admin_id,
     };
 

@@ -8,6 +8,9 @@
 //! `vorlagendokument::repo`), Wortlaute als Konstanten, Abweichungen im Ablauf als Methoden. Die
 //! beiden Arten sind `abloesung::schichtplan::repo::Einsatzplan` und
 //! `planung::repo::Vorplanung`; sie tragen die Kennung ihres Plans.
+//!
+//! Die Schreibwege sind `_tx`-Funktionen (design.md D4): die Routen beider Pläne rahmen sie mit
+//! `write_retry!` in EINE Transaktion, Demo und Übernahme rufen sie in ihrer eigenen.
 
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
@@ -17,7 +20,7 @@ use sqlx::query::Query;
 use sqlx::sqlite::{SqliteArguments, SqliteRow};
 use sqlx::{Row, Sqlite, SqliteConnection};
 
-use super::pruefung::{self, Block, BlockErgebnis, Ergebnis, Grundlage, PersonStand};
+use super::pruefung::{self, Block, BlockErgebnis, Ergebnis, Grundlage, Ist, PersonStand};
 use super::{
     zerlegung, PlanHelferAnzeige, PlanPerson, PlanPersonAnzeige, PlanPersonArt, Posten,
     SchichtplanGrenzwerte, PLAN_BLOECKE_MAX, PLAN_HELFER_MAX,
@@ -39,8 +42,6 @@ pub(crate) trait Planart: Sync {
     type Posten: Copy + PartialEq + Send + Sync;
     /// Eine Zeile aus [`Self::SELECT_BLOECKE`].
     type BlockZeile: for<'r> sqlx::FromRow<'r, SqliteRow> + Send + Unpin;
-    /// Was der Aufrufer beim Löschen eines Blocks darf ([`Self::check_delete_tx`]).
-    type DeleteRecht: Copy + Send + Sync;
 
     /// Tabelle der Blöcke.
     const SCHICHT: &'static str;
@@ -65,12 +66,17 @@ pub(crate) trait Planart: Sync {
     const JE: &'static str;
     /// Der Plan im Dativ: „Ein Helfer gehört nicht zu {ZU_DIESEM}“.
     const ZU_DIESEM: &'static str;
-    /// Der Plan mit unbestimmtem Artikel: „{MIT_ARTIKEL} kennt nur Stamm-Personal und Helfer“.
-    const MIT_ARTIKEL: &'static str;
-    /// Ob der Plan Ad-hoc-Kräfte kennt (Spalte `einsatz_personal_id` in [`Self::PERSON`]).
+    /// Name und Stand jeder Person, die im Plan steht: je Art der Person eine Abfrage mit der
+    /// Kennung des Plans als Parameter und den Spalten Kennung, Name, Qualifikationen (JSON),
+    /// verfügbar, im Einsatz, Einheit, UHS und Pause (`pruefung::PersonStand`).
+    const PERSONEN: &'static [(fn(i64) -> PlanPerson, &'static str)];
+    /// Die Unterstellung der Einheiten für die Prüfung (`pruefung::Grundlage::ueber_einheit`):
+    /// Einheit und übergeordnete Einheit, ein Parameter, die Kennung des Plans. Ohne: keine.
+    const UEBER_EINHEIT: Option<&'static str>;
+    /// Ob der Plan zu einem Einsatz gehört: nur dann kennt er Ad-hoc-Kräfte (Spalte
+    /// `einsatz_personal_id` in [`Self::PERSON`]) und prüft gegen den Ist-Stand der Personen
+    /// (`pruefung::Grundlage::mit_ist`). Ohne ist der Plan die Vorplanung.
     const MIT_ADHOC: bool;
-    /// Ob die Prüfung den Ist-Stand der Personen kennt (`pruefung::Grundlage::mit_ist`).
-    const MIT_IST: bool;
 
     /// Die Kennung des Plans (Wert der Spalte [`Self::SCOPE`]).
     fn id(&self) -> i64;
@@ -120,31 +126,31 @@ pub(crate) trait Planart: Sync {
         async { Ok(()) }
     }
 
-    /// Beim Löschen eines Blocks nach dem CAS über `version`, vor dem Löschen.
+    /// Beim Löschen eines Blocks nach dem CAS über `version`, vor dem Löschen; `darf_personen`
+    /// sagt, ob der Aufrufer Personal darf. Vorgabe: nichts.
     fn check_delete_tx(
         &self,
-        conn: &mut SqliteConnection,
-        bid: i64,
-        recht: Self::DeleteRecht,
-    ) -> impl Future<Output = Result<(), AppError>> + Send;
-
-    /// Name und Stand jeder Person, die im Plan steht.
-    fn load_personen_tx(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> impl Future<Output = Result<BTreeMap<PlanPerson, PersonDaten>, AppError>> + Send;
-
-    /// Die Unterstellung der Einheiten für die Prüfung (`pruefung::Grundlage::ueber_einheit`).
-    /// Vorgabe: keine.
-    fn load_ueber_einheit_tx(
-        &self,
         _conn: &mut SqliteConnection,
-    ) -> impl Future<Output = Result<HashMap<i64, Option<i64>>, AppError>> + Send {
-        async { Ok(HashMap::new()) }
+        _bid: i64,
+        _darf_personen: bool,
+    ) -> impl Future<Output = Result<(), AppError>> + Send {
+        async { Ok(()) }
     }
 
-    /// Die Posten der Blöcke, in denen ein Helfer steht, bevor er gelöscht wird (der Einsatz zieht
-    /// danach die Schichten ihrer Einheiten nach). Vorgabe: keine.
+    /// Nach einem Schreibweg an Blöcken an diesen Posten, als Letztes in seiner Transaktion (der
+    /// Einsatz zieht die laufenden Schichten ihrer Einheiten nach, LLH-1555). Vorgabe: nichts.
+    fn after_write_tx(
+        &self,
+        _conn: &mut SqliteConnection,
+        _posten: &[Self::Posten],
+        _benutzer_id: i64,
+        _jetzt: &str,
+    ) -> impl Future<Output = Result<(), AppError>> + Send {
+        async { Ok(()) }
+    }
+
+    /// Die Posten der Blöcke, in denen ein Helfer steht, bevor er gelöscht wird (für
+    /// [`Self::after_write_tx`]). Vorgabe: keine.
     fn helfer_posten_tx(
         &self,
         _conn: &mut SqliteConnection,
@@ -174,6 +180,8 @@ pub(crate) struct BlockKern<'a> {
     pub bis: &'a str,
     pub soll_anzahl: Option<i64>,
     pub quali_soll: Option<&'a QualiSoll>,
+    /// Ob der Posten nicht mehr besteht.
+    pub aufgeloest: bool,
 }
 
 /// Name und Stand einer Person im Plan.
@@ -233,12 +241,12 @@ pub(crate) fn ids_json(personen: &[PlanPerson], art: PlanPersonArt) -> String {
         .filter(|p| p.art() == art)
         .map(|p| p.id())
         .collect();
-    serde_json::to_string(&ids).unwrap_or_else(|_| "[]".into())
+    crate::kraefte_disposition::ids_json(&ids)
 }
 
 /// Die Qualifikationen eines Helfers in gespeicherter Form; keine = `NULL`.
 pub(crate) fn quals_json(ids: &[i64]) -> Option<String> {
-    (!ids.is_empty()).then(|| serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
+    (!ids.is_empty()).then(|| crate::kraefte_disposition::ids_json(ids))
 }
 
 /// Ein Zeitraum für einen Servertext in der Zone des Plans.
@@ -259,7 +267,7 @@ pub(crate) async fn check_qualifikationen_tx(
         "SELECT COUNT(*) FROM json_each(?1) j \
          LEFT JOIN qualifikation q ON q.id = j.value AND q.org_id = ?2 WHERE q.id IS NULL",
     )
-    .bind(serde_json::to_string(ids).unwrap_or_else(|_| "[]".into()))
+    .bind(crate::kraefte_disposition::ids_json(ids))
     .bind(org_id)
     .fetch_one(&mut *conn)
     .await?;
@@ -271,21 +279,28 @@ pub(crate) async fn check_qualifikationen_tx(
     Ok(())
 }
 
-/// Höchstens [`PLAN_BLOECKE_MAX`] Blöcke je Plan, mit `neu` weiteren (422 sonst).
-pub(crate) async fn check_anzahl_tx<A: Planart>(
+/// Wie viele Zeilen der Tabelle ([`Planart::SCHICHT`] oder [`Planart::HELFER`]) der Plan hat.
+async fn count_tx<A: Planart>(
     conn: &mut SqliteConnection,
     plan: &A,
-    neu: usize,
-) -> Result<(), AppError> {
-    let bisher: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT COUNT(*) FROM {} WHERE {} = ?",
-        A::SCHICHT,
+    tabelle: &'static str,
+) -> Result<i64, AppError> {
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT COUNT(*) FROM {tabelle} WHERE {} = ?",
         A::SCOPE
     )))
     .bind(plan.id())
     .fetch_one(&mut *conn)
-    .await?;
-    if bisher + neu as i64 > PLAN_BLOECKE_MAX {
+    .await?)
+}
+
+/// Höchstens [`PLAN_BLOECKE_MAX`] Blöcke je Plan, mit `neu` weiteren (422 sonst).
+async fn check_anzahl_tx<A: Planart>(
+    conn: &mut SqliteConnection,
+    plan: &A,
+    neu: usize,
+) -> Result<(), AppError> {
+    if count_tx(conn, plan, A::SCHICHT).await? + neu as i64 > PLAN_BLOECKE_MAX {
         return Err(AppError::UnprocessableEntity(format!(
             "Höchstens {PLAN_BLOECKE_MAX} Schichten je {}",
             A::JE
@@ -403,15 +418,7 @@ pub(crate) async fn create_helfer_tx<A: Planart>(
 ) -> Result<PlanHelferAnzeige, AppError> {
     let org_id = plan.before_write_tx(conn).await?;
     check_qualifikationen_tx(conn, org_id, &eingabe.qualifikationen).await?;
-    let bisher: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT COUNT(*) FROM {} WHERE {} = ?",
-        A::HELFER,
-        A::SCOPE
-    )))
-    .bind(plan.id())
-    .fetch_one(&mut *conn)
-    .await?;
-    if bisher >= PLAN_HELFER_MAX {
+    if count_tx(conn, plan, A::HELFER).await? >= PLAN_HELFER_MAX {
         return Err(AppError::UnprocessableEntity(format!(
             "Höchstens {PLAN_HELFER_MAX} Helfer je {}",
             A::JE
@@ -447,15 +454,9 @@ pub(crate) async fn update_helfer_tx<A: Planart>(
         check_qualifikationen_tx(conn, org_id, ids).await?;
         h.qualifikationen = ids.clone();
     }
-    if let Some(name) = &patch.name {
-        h.name = name.clone();
-    }
-    if let Some(t) = &patch.telefon {
-        h.telefon = t.clone();
-    }
-    if let Some(o) = &patch.organisation {
-        h.organisation = o.clone();
-    }
+    h.name = patch.name.clone().unwrap_or(h.name);
+    h.telefon = patch.telefon.clone().unwrap_or(h.telefon);
+    h.organisation = patch.organisation.clone().unwrap_or(h.organisation);
     sqlx::query(sqlx::AssertSqlSafe(format!(
         "UPDATE {} SET name = ?, telefon = ?, organisation = ?, qualifikationen = ? WHERE id = ?",
         A::HELFER
@@ -471,12 +472,15 @@ pub(crate) async fn update_helfer_tx<A: Planart>(
 }
 
 /// Löscht einen Helfer und nimmt ihn aus allen Blöcken (CASCADE); fremd oder unbekannt 404.
-/// Liefert die Posten der Blöcke, in denen er stand ([`Planart::helfer_posten_tx`]).
+/// Die Posten der Blöcke, in denen er stand ([`Planart::helfer_posten_tx`]), ziehen nach (ein
+/// Folgeblock kann dadurch leer werden, LLH-1555).
 pub(crate) async fn delete_helfer_tx<A: Planart>(
     conn: &mut SqliteConnection,
     plan: &A,
     hid: i64,
-) -> Result<Vec<A::Posten>, AppError> {
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
     plan.before_write_tx(conn).await?;
     let posten = plan.helfer_posten_tx(conn, hid).await?;
     let geloescht = sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -492,7 +496,7 @@ pub(crate) async fn delete_helfer_tx<A: Planart>(
     if geloescht == 0 {
         return Err(AppError::NotFound);
     }
-    Ok(posten)
+    plan.after_write_tx(conn, &posten, benutzer_id, jetzt).await
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -512,10 +516,9 @@ pub(crate) async fn check_personen_tx<A: Planart>(
         return Ok(());
     }
     if !A::MIT_ADHOC && personen.iter().any(|p| p.art() == PlanPersonArt::Einsatz) {
-        return Err(AppError::UnprocessableEntity(format!(
-            "{} kennt nur Stamm-Personal und Helfer",
-            A::MIT_ARTIKEL
-        )));
+        return Err(AppError::UnprocessableEntity(
+            "Eine Planung kennt nur Stamm-Personal und Helfer".into(),
+        ));
     }
     let fremd_stamm: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM json_each(?1) j \
@@ -716,12 +719,13 @@ pub(crate) async fn insert_block_tx<A: Planart>(
 
 /// Legt einen Block an, nach den Prüfungen in dieser Reihenfolge: Plan schreibbar, Posten (422),
 /// Höchstzahl (422), Pause ohne Soll (422), Qualifikationssoll und Personen (422),
-/// Überschneidung (422). Liefert die Kennung.
+/// Überschneidung (422). Kein ETB. Liefert die Kennung.
 pub(crate) async fn create_block_tx<A: Planart>(
     conn: &mut SqliteConnection,
     plan: &A,
     benutzer_id: i64,
     eingabe: &BlockEingabe<A::Posten>,
+    jetzt: &str,
 ) -> Result<i64, AppError> {
     let org_id = plan.before_write_tx(conn).await?;
     let vorgabe = plan.check_posten_tx(conn, eingabe.posten).await?;
@@ -749,11 +753,13 @@ pub(crate) async fn create_block_tx<A: Planart>(
     )
     .await?;
     write_personen_tx::<A>(conn, bid, &eingabe.personen).await?;
+    plan.after_write_tx(conn, &[eingabe.posten], benutzer_id, jetzt)
+        .await?;
     Ok(bid)
 }
 
 /// Ändert einen Block mit CAS über `version` (409). Verschieben in die Pause löscht das Soll; ein
-/// Soll an der Pause ist 422. Liefert den Posten vorher und nachher.
+/// Soll an der Pause ist 422. Kein ETB.
 pub(crate) async fn update_block_tx<A: Planart>(
     conn: &mut SqliteConnection,
     plan: &A,
@@ -761,7 +767,7 @@ pub(crate) async fn update_block_tx<A: Planart>(
     benutzer_id: i64,
     patch: &BlockPatch<A::Posten>,
     jetzt: &str,
-) -> Result<[A::Posten; 2], AppError> {
+) -> Result<(), AppError> {
     let org_id = plan.before_write_tx(conn).await?;
     let stand = sqlx::query(sqlx::AssertSqlSafe(format!(
         "SELECT version, {}, von, bis, soll_anzahl, quali_soll, notiz FROM {} \
@@ -786,14 +792,8 @@ pub(crate) async fn update_block_tx<A: Planart>(
     if posten != posten_alt {
         plan.check_posten_tx(conn, posten).await?;
     }
-    let von: String = match &patch.von {
-        Some(v) => v.clone(),
-        None => stand.try_get("von")?,
-    };
-    let bis: String = match &patch.bis {
-        Some(b) => b.clone(),
-        None => stand.try_get("bis")?,
-    };
+    let von: String = patch.von.clone().map_or_else(|| stand.try_get("von"), Ok)?;
+    let bis: String = patch.bis.clone().map_or_else(|| stand.try_get("bis"), Ok)?;
     zerlegung::pruefe_zeitraum(utc(&von)?, utc(&bis)?).map_err(|e| match e {
         AppError::Validation(m) => AppError::UnprocessableEntity(m),
         andere => andere,
@@ -818,10 +818,10 @@ pub(crate) async fn update_block_tx<A: Planart>(
     }
     plan.check_update_tx(conn, bid, posten_alt, posten).await?;
     check_frei_tx(conn, plan, posten, &von, &bis, Some(bid)).await?;
-    let notiz: Option<String> = match &patch.notiz {
-        Some(n) => n.clone(),
-        None => stand.try_get("notiz")?,
-    };
+    let notiz: Option<String> = patch
+        .notiz
+        .clone()
+        .map_or_else(|| stand.try_get("notiz"), Ok)?;
     let sql = format!(
         "UPDATE {} SET {}, von = ?, bis = ?, soll_anzahl = ?, quali_soll = ?, notiz = ?, \
             version = version + 1, geaendert_at = ?, geaendert_von = ? \
@@ -844,18 +844,21 @@ pub(crate) async fn update_block_tx<A: Planart>(
     if let Some(personen) = &patch.personen {
         write_personen_tx::<A>(conn, bid, personen).await?;
     }
-    Ok([posten_alt, posten])
+    // Beide Posten: der, aus dem der Block geht, und der, in den er kommt (LLH-1555).
+    plan.after_write_tx(conn, &[posten_alt, posten], benutzer_id, jetzt)
+        .await
 }
 
-/// Löscht einen Block mit CAS über `version` (409); fremd oder unbekannt 404. Liefert seinen
-/// Posten.
+/// Löscht einen Block mit CAS über `version` (409); fremd oder unbekannt 404. Kein ETB.
 pub(crate) async fn delete_block_tx<A: Planart>(
     conn: &mut SqliteConnection,
     plan: &A,
     bid: i64,
     version: i64,
-    recht: A::DeleteRecht,
-) -> Result<A::Posten, AppError> {
+    darf_personen: bool,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
     plan.before_write_tx(conn).await?;
     let stand = sqlx::query(sqlx::AssertSqlSafe(format!(
         "SELECT version, {} FROM {} WHERE id = ? AND {} = ?",
@@ -874,7 +877,7 @@ pub(crate) async fn delete_block_tx<A: Planart>(
         ));
     }
     let posten = A::posten_from_row(&stand)?;
-    plan.check_delete_tx(conn, bid, recht).await?;
+    plan.check_delete_tx(conn, bid, darf_personen).await?;
     sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM {} WHERE id = ?",
         A::SCHICHT
@@ -882,7 +885,8 @@ pub(crate) async fn delete_block_tx<A: Planart>(
     .bind(bid)
     .execute(&mut *conn)
     .await?;
-    Ok(posten)
+    plan.after_write_tx(conn, &[posten], benutzer_id, jetzt)
+        .await
 }
 
 /// „Schichten erzeugen“ nach der Teilung durch die Seite: Höchstzahl (422), dann alle
@@ -957,14 +961,13 @@ pub(crate) struct Geladen<Z> {
 }
 
 /// Lädt die Blöcke des Plans, ihre Personen (in Einfügefolge) und prüft sie
-/// (`pruefung::pruefe`). `aufgeloest` sagt je Zeile, ob ihr Posten nicht mehr besteht.
+/// (`pruefung::pruefe`).
 pub(crate) async fn load_tx<A: Planart>(
     conn: &mut SqliteConnection,
     plan: &A,
     org_id: i64,
     grenzwerte: SchichtplanGrenzwerte,
     jetzt: DateTime<Utc>,
-    aufgeloest: impl Fn(&A::BlockZeile) -> bool,
 ) -> Result<Geladen<A::BlockZeile>, AppError> {
     let zeilen: Vec<A::BlockZeile> = sqlx::query_as(A::SELECT_BLOECKE)
         .bind(plan.id())
@@ -993,8 +996,16 @@ pub(crate) async fn load_tx<A: Planart>(
             je_block.entry(bid).or_default().push(p);
         }
     }
-    let personen = plan.load_personen_tx(conn).await?;
-    let ueber = plan.load_ueber_einheit_tx(conn).await?;
+    let personen = load_personen_tx(conn, plan).await?;
+    let ueber: HashMap<i64, Option<i64>> = match A::UEBER_EINHEIT {
+        Some(sql) => sqlx::query_as(sql)
+            .bind(plan.id())
+            .fetch_all(&mut *conn)
+            .await?
+            .into_iter()
+            .collect(),
+        None => HashMap::new(),
+    };
     let katalog = crate::personal::qualifikation_repo::einschluesse(&mut *conn, org_id).await?;
 
     let mut bloecke = Vec::with_capacity(zeilen.len());
@@ -1011,7 +1022,7 @@ pub(crate) async fn load_tx<A: Planart>(
                 .map(QualiSoll::anforderungen)
                 .unwrap_or_default(),
             personen: je_block.remove(&k.id).unwrap_or_default(),
-            posten_aufgeloest: aufgeloest(z),
+            posten_aufgeloest: k.aufgeloest,
         });
     }
     let staende: HashMap<PlanPerson, PersonStand> = personen
@@ -1026,7 +1037,7 @@ pub(crate) async fn load_tx<A: Planart>(
             ueber_einheit: &ueber,
             grenzwerte,
             jetzt,
-            mit_ist: A::MIT_IST,
+            mit_ist: A::MIT_ADHOC,
         },
     );
     Ok(Geladen {
@@ -1035,6 +1046,46 @@ pub(crate) async fn load_tx<A: Planart>(
         ergebnis,
         personen,
     })
+}
+
+/// Name und Stand jeder Person, die im Plan steht ([`Planart::PERSONEN`]).
+async fn load_personen_tx<A: Planart>(
+    conn: &mut SqliteConnection,
+    plan: &A,
+) -> Result<BTreeMap<PlanPerson, PersonDaten>, AppError> {
+    type Zeile = (
+        i64,
+        String,
+        Option<String>,
+        bool,
+        bool,
+        Option<i64>,
+        Option<i64>,
+        bool,
+    );
+    let mut aus = BTreeMap::new();
+    for (person, sql) in A::PERSONEN {
+        let zeilen: Vec<Zeile> = sqlx::query_as(*sql)
+            .bind(plan.id())
+            .fetch_all(&mut *conn)
+            .await?;
+        for (id, name, quals, verfuegbar, im_einsatz, einheit_id, uhs_id, pause) in zeilen {
+            let ist = Ist {
+                im_einsatz,
+                einheit_id,
+                uhs_id,
+                pause,
+            };
+            let qualifikationen = json_ids(quals.as_deref());
+            let stand = PersonStand {
+                qualifikationen,
+                verfuegbar,
+                ist,
+            };
+            aus.insert(person(id), PersonDaten { name, stand });
+        }
+    }
+    Ok(aus)
 }
 
 /// Die Personen eines Blocks für die Anzeige, mit ihren Befunden aus `ergebnis`.

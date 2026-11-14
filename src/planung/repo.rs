@@ -1,13 +1,12 @@
 //! Datenbank der Vorplanung (design.md D3–D8). Schreibwege laufen je in EINER Transaktion
 //! (`write_retry!`): Planung, Posten, Überschneidung, Personen und Grenzen werden darin geprüft,
-//! wo auch geschrieben wird. Die Befunde rechnet `abloesung::schichtplan::pruefung` beim Lesen,
-//! ohne Ist.
+//! wo auch geschrieben wird. Blöcke, Personen und Helfer schreibt der Plan-Kern
+//! (`abloesung::schichtplan::plan_repo`) mit [`Vorplanung`]. Die Befunde rechnet
+//! `abloesung::schichtplan::pruefung` beim Lesen, ohne Ist.
 //!
 //! Für die Prüfung wird ein Posten der Planung auf den neutralen Schlüssel
 //! `Posten::Einheit(posten_id)` abgebildet und die Pause auf `Posten::Pause`: ohne Ist zählt die
 //! Art des Postens nur für die Pause (`Grundlage.mit_ist`).
-
-use std::collections::{BTreeMap, HashMap};
 
 use chrono::{DateTime, Duration, Utc};
 use sqlx::sqlite::SqliteRow;
@@ -19,14 +18,10 @@ use super::{
     AUFBEWAHRUNG_TAGE, KENNZAHLEN_TAGE, PLANUNGEN_MAX, POSTEN_MAX, ZEITRAUM_MAX_TAGE,
 };
 use crate::abloesung::schichtplan::plan_repo::{
-    self, json_ids, utc, BlockKern, HelferEingabe, HelferPatch, PersonDaten, Planart, PostenQuery,
-    PostenVorgabe,
+    self, utc, BlockKern, Planart, PostenQuery, PostenVorgabe,
 };
-use crate::abloesung::schichtplan::pruefung::PersonStand;
 use crate::abloesung::schichtplan::zerlegung::{self, Teilung};
-use crate::abloesung::schichtplan::{
-    PlanHelferAnzeige, PlanPerson, Posten, SchichtplanGrenzwerte, SOLL_ANZAHL_MAX,
-};
+use crate::abloesung::schichtplan::{PlanPerson, Posten, SchichtplanGrenzwerte, SOLL_ANZAHL_MAX};
 use crate::einsatz::Einsatzart;
 use crate::error::AppError;
 use crate::personal::quali_soll::QualiSoll;
@@ -125,7 +120,7 @@ pub struct BlockEingabe {
 }
 
 impl BlockEingabe {
-    fn kern(&self) -> plan_repo::BlockEingabe<Option<i64>> {
+    pub(crate) fn kern(&self) -> plan_repo::BlockEingabe<Option<i64>> {
         plan_repo::BlockEingabe {
             posten: self.posten_id,
             von: self.von.clone(),
@@ -152,7 +147,6 @@ pub(crate) struct Vorplanung {
 impl Planart for Vorplanung {
     type Posten = Option<i64>;
     type BlockZeile = BlockZeile;
-    type DeleteRecht = ();
 
     const SCHICHT: &'static str = "planung_schicht";
     const PERSON: &'static str = "planung_schicht_person";
@@ -166,9 +160,27 @@ impl Planart for Vorplanung {
         "id, name, telefon, organisation, qualifikationen, NULL AS kennung, NULL AS herkunft";
     const JE: &'static str = "Planung";
     const ZU_DIESEM: &'static str = "dieser Planung";
-    const MIT_ARTIKEL: &'static str = "Eine Planung";
+    // Ohne Ist: niemand ist im Einsatz; ein Helfer ist immer verfügbar.
+    const PERSONEN: &'static [(fn(i64) -> PlanPerson, &'static str)] = &[
+        (
+            PlanPerson::Stamm,
+            "SELECT pe.id, pe.name, \
+                    (SELECT json_group_array(pq.qualifikation_id) FROM personal_qualifikation pq \
+                      WHERE pq.personal_id = pe.id), \
+                    pe.dienststatus <> 'ausser_dienst', 0, NULL, NULL, 0 \
+             FROM personal pe \
+             WHERE pe.id IN (SELECT sp.personal_id FROM planung_schicht_person sp \
+                             JOIN planung_schicht s ON s.id = sp.schicht_id \
+                             WHERE s.planung_id = ? AND sp.personal_id IS NOT NULL)",
+        ),
+        (
+            PlanPerson::Helfer,
+            "SELECT id, name, qualifikationen, 1, 0, NULL, NULL, 0 FROM planung_helfer \
+             WHERE planung_id = ?",
+        ),
+    ];
+    const UEBER_EINHEIT: Option<&'static str> = None;
     const MIT_ADHOC: bool = false;
-    const MIT_IST: bool = false;
 
     fn id(&self) -> i64 {
         self.planung_id
@@ -189,11 +201,12 @@ impl Planart for Vorplanung {
     fn block_kern(z: &BlockZeile) -> Result<BlockKern<'_>, AppError> {
         Ok(BlockKern {
             id: z.id,
-            posten: posten_schluessel(z.posten_id),
+            posten: z.posten_id.map_or(Posten::Pause, Posten::Einheit),
             von: &z.von,
             bis: &z.bis,
             soll_anzahl: z.soll_anzahl,
             quali_soll: z.quali_soll.as_ref(),
+            aufgeloest: z.aufgeloest,
         })
     }
 
@@ -202,32 +215,36 @@ impl Planart for Vorplanung {
         Ok(self.org_id)
     }
 
+    /// Liefert Soll-Vorgabe, Bezeichnung und Schichtlänge des Postens.
     async fn check_posten_tx(
         &self,
         conn: &mut SqliteConnection,
         posten: Option<i64>,
     ) -> Result<PostenVorgabe, AppError> {
-        posten_tx(conn, self.planung_id, posten).await
+        let Some(pid) = posten else {
+            return Ok(PostenVorgabe::default());
+        };
+        let zeile: Option<(Option<i64>, Option<String>, String, Option<i64>)> = sqlx::query_as(
+            "SELECT soll_anzahl, quali_soll, bezeichnung, schichtlaenge_min FROM planung_posten \
+             WHERE id = ? AND planung_id = ?",
+        )
+        .bind(pid)
+        .bind(self.planung_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let (soll_anzahl, quali_soll, bezeichnung, schichtlaenge) = zeile.ok_or_else(|| {
+            AppError::UnprocessableEntity("Der Posten gehört nicht zu dieser Planung".into())
+        })?;
+        Ok(PostenVorgabe {
+            soll_anzahl,
+            quali_soll,
+            bezeichnung: Some(bezeichnung),
+            schichtlaenge,
+        })
     }
 
     async fn zone_tx(&self, conn: &mut SqliteConnection) -> Result<Zeitstil, AppError> {
         zeitstil_org(conn, self.org_id).await
-    }
-
-    async fn check_delete_tx(
-        &self,
-        _conn: &mut SqliteConnection,
-        _bid: i64,
-        _recht: (),
-    ) -> Result<(), AppError> {
-        Ok(())
-    }
-
-    async fn load_personen_tx(
-        &self,
-        conn: &mut SqliteConnection,
-    ) -> Result<BTreeMap<PlanPerson, PersonDaten>, AppError> {
-        personen_daten(conn, self.org_id, self.planung_id).await
     }
 }
 
@@ -259,14 +276,6 @@ pub fn loeschung_at(bis: &str) -> String {
     zeit::parse_utc(bis)
         .map(|b| zeit::formatiere_utc(b + Duration::days(AUFBEWAHRUNG_TAGE)))
         .unwrap_or_else(|| bis.to_string())
-}
-
-/// Der Schlüssel eines Postens in der Prüfung (Modulkopf).
-fn posten_schluessel(posten_id: Option<i64>) -> Posten {
-    match posten_id {
-        Some(id) => Posten::Einheit(id),
-        None => Posten::Pause,
-    }
 }
 
 /// Zone und Darstellung der Organisation für Servertexte.
@@ -487,90 +496,22 @@ pub(crate) struct BlockZeile {
     soll_anzahl: Option<i64>,
     quali_soll: Option<QualiSoll>,
     notiz: Option<String>,
+    /// Vorlage oder Fahrzeug des Postens ist nicht mehr verfügbar (wie `nicht_verfuegbar` am
+    /// Posten).
+    aufgeloest: bool,
 }
 
 const SELECT_BLOECKE: &str = concat!(
     "SELECT s.id, s.version, s.posten_id, s.von, s.bis, s.soll_anzahl, ",
     crate::personal::quali_soll::quali_soll_sql!("s.quali_soll"),
-    " AS quali_soll, s.notiz \
+    " AS quali_soll, s.notiz, \
+       (COALESCE(v.aktiv = 0, 0) OR COALESCE(f.dienststatus = 'ausser_dienst', 0)) AS aufgeloest \
      FROM planung_schicht s LEFT JOIN planung_posten p ON p.id = s.posten_id \
+     LEFT JOIN einheit_vorlage v ON v.id = p.einheit_vorlage_id \
+     LEFT JOIN fahrzeug f ON f.id = p.fahrzeug_id \
      WHERE s.planung_id = ? \
      ORDER BY s.posten_id IS NULL, COALESCE(p.sortier, 0), COALESCE(p.id, 0), s.von, s.id"
 );
-
-/// Name, Qualifikationen und Verfügbarkeit jeder Person der Planung.
-async fn personen_daten(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-) -> Result<BTreeMap<PlanPerson, PersonDaten>, AppError> {
-    let mut aus = BTreeMap::new();
-    let stamm: Vec<(i64, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT pe.id, pe.name, pe.dienststatus, \
-                (SELECT json_group_array(pq.qualifikation_id) FROM personal_qualifikation pq \
-                  WHERE pq.personal_id = pe.id) \
-         FROM personal pe \
-         WHERE pe.id IN (SELECT sp.personal_id FROM planung_schicht_person sp \
-                         JOIN planung_schicht s ON s.id = sp.schicht_id \
-                         WHERE s.planung_id = ? AND sp.personal_id IS NOT NULL)",
-    )
-    .bind(planung_id)
-    .fetch_all(&mut *conn)
-    .await?;
-    for (id, name, dienststatus, quals) in stamm {
-        aus.insert(
-            PlanPerson::Stamm(id),
-            PersonDaten {
-                name,
-                stand: PersonStand {
-                    qualifikationen: json_ids(quals.as_deref()),
-                    verfuegbar: dienststatus != "ausser_dienst",
-                    ..PersonStand::default()
-                },
-            },
-        );
-    }
-    for h in plan_repo::load_helfer_tx(conn, &Vorplanung { org_id, planung_id }).await? {
-        aus.insert(
-            PlanPerson::Helfer(h.id),
-            PersonDaten {
-                name: h.name,
-                stand: PersonStand {
-                    qualifikationen: h.qualifikationen,
-                    ..PersonStand::default()
-                },
-            },
-        );
-    }
-    Ok(aus)
-}
-
-/// Die Blöcke einer Planung mit Personen und Befunden (Kern `plan_repo::load_tx`); ein Posten,
-/// dessen Vorlage oder Fahrzeug nicht mehr verfügbar ist, gilt als aufgelöst.
-async fn load_bloecke_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    id: i64,
-    grenzwerte: SchichtplanGrenzwerte,
-    nicht_verfuegbar: &HashMap<i64, bool>,
-    jetzt: DateTime<Utc>,
-) -> Result<plan_repo::Geladen<BlockZeile>, AppError> {
-    plan_repo::load_tx(
-        conn,
-        &Vorplanung {
-            org_id,
-            planung_id: id,
-        },
-        org_id,
-        grenzwerte,
-        jetzt,
-        |z: &BlockZeile| {
-            z.posten_id
-                .is_some_and(|p| nicht_verfuegbar.get(&p).copied().unwrap_or(false))
-        },
-    )
-    .await
-}
 
 /// Die ganze Planung mit Befunden und Kennzahlen. Fremd oder unbekannt → 404.
 pub async fn laden(
@@ -580,46 +521,23 @@ pub async fn laden(
     jetzt: DateTime<Utc>,
 ) -> Result<PlanungAnzeige, AppError> {
     let mut conn = pool.acquire().await?;
-    laden_mit(&mut conn, org_id, id, jetzt).await
-}
-
-async fn laden_mit(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    id: i64,
-    jetzt: DateTime<Utc>,
-) -> Result<PlanungAnzeige, AppError> {
+    let conn = &mut *conn;
     let kopf = kopf_tx(conn, org_id, id).await?;
     let posten_zeilen: Vec<PostenZeile> = sqlx::query_as(SELECT_POSTEN)
         .bind(id)
         .fetch_all(&mut *conn)
         .await?;
-    let nicht_verfuegbar: HashMap<i64, bool> = posten_zeilen
-        .iter()
-        .map(|p| (p.id, p.nicht_verfuegbar))
-        .collect();
-    let g = load_bloecke_tx(
-        conn,
+    let plan = Vorplanung {
         org_id,
-        id,
-        kopf.grenzwerte(),
-        &nicht_verfuegbar,
-        jetzt,
-    )
-    .await?;
+        planung_id: id,
+    };
+    let g = plan_repo::load_tx(conn, &plan, org_id, kopf.grenzwerte(), jetzt).await?;
     // Nach der Übernahme gelten die Kennzahlen von damals (Spec `vorplanung`).
     let kennzahlen = match parse_kennzahlen(kopf.uebernahme_kennzahlen.as_deref())? {
         Some(k) => k,
         None => kennzahlen(&g.bloecke, &g.ergebnis),
     };
-    let helfer = plan_repo::load_helfer_tx(
-        conn,
-        &Vorplanung {
-            org_id,
-            planung_id: id,
-        },
-    )
-    .await?;
+    let helfer = plan_repo::load_helfer_tx(conn, &plan).await?;
     let programmpunkte = super::programm::liste_tx(conn, id).await?;
 
     let mut ergebnis_je_block = g.ergebnis.bloecke;
@@ -670,18 +588,11 @@ pub(crate) async fn kennzahlen_von(
     grenzwerte: SchichtplanGrenzwerte,
     jetzt: DateTime<Utc>,
 ) -> Result<PlanungKennzahlen, AppError> {
-    let nicht_verfuegbar: HashMap<i64, bool> = sqlx::query_as(
-        "SELECT p.id, (COALESCE(v.aktiv = 0, 0) OR COALESCE(f.dienststatus = 'ausser_dienst', 0)) \
-         FROM planung_posten p \
-         LEFT JOIN einheit_vorlage v ON v.id = p.einheit_vorlage_id \
-         LEFT JOIN fahrzeug f ON f.id = p.fahrzeug_id WHERE p.planung_id = ?",
-    )
-    .bind(id)
-    .fetch_all(&mut *conn)
-    .await?
-    .into_iter()
-    .collect();
-    let g = load_bloecke_tx(conn, org_id, id, grenzwerte, &nicht_verfuegbar, jetzt).await?;
+    let plan = Vorplanung {
+        org_id,
+        planung_id: id,
+    };
+    let g = plan_repo::load_tx(conn, &plan, org_id, grenzwerte, jetzt).await?;
     Ok(kennzahlen(&g.bloecke, &g.ergebnis))
 }
 
@@ -1260,36 +1171,7 @@ pub async fn reihenfolge(
 // Blöcke
 // ---------------------------------------------------------------------------------------------
 
-/// Der Posten gehört zur Planung (422 sonst). Liefert seine Soll-Vorgabe, Bezeichnung und
-/// Schichtlänge; die Pause hat keins davon.
-async fn posten_tx(
-    conn: &mut SqliteConnection,
-    planung_id: i64,
-    posten_id: Option<i64>,
-) -> Result<PostenVorgabe, AppError> {
-    let Some(pid) = posten_id else {
-        return Ok(PostenVorgabe::default());
-    };
-    let zeile: Option<(Option<i64>, Option<String>, String, Option<i64>)> = sqlx::query_as(
-        "SELECT soll_anzahl, quali_soll, bezeichnung, schichtlaenge_min FROM planung_posten \
-         WHERE id = ? AND planung_id = ?",
-    )
-    .bind(pid)
-    .bind(planung_id)
-    .fetch_optional(&mut *conn)
-    .await?;
-    let (soll_anzahl, quali_soll, bezeichnung, schichtlaenge) = zeile.ok_or_else(|| {
-        AppError::UnprocessableEntity("Der Posten gehört nicht zu dieser Planung".into())
-    })?;
-    Ok(PostenVorgabe {
-        soll_anzahl,
-        quali_soll,
-        bezeichnung: Some(bezeichnung),
-        schichtlaenge,
-    })
-}
-
-/// Legt einen Block an. Liefert die Kennung.
+/// Legt einen Block an (Kern `plan_repo::create_block_tx`). Liefert die Kennung.
 pub async fn block_anlegen(
     pool: &SqlitePool,
     org_id: i64,
@@ -1297,64 +1179,9 @@ pub async fn block_anlegen(
     benutzer_id: i64,
     e: &BlockEingabe,
 ) -> Result<i64, AppError> {
+    let plan = Vorplanung { org_id, planung_id };
     write_retry!(pool, |conn| {
-        block_anlegen_tx(conn, org_id, planung_id, benutzer_id, e).await
-    })
-}
-
-/// [`block_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn block_anlegen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-    benutzer_id: i64,
-    e: &BlockEingabe,
-) -> Result<i64, AppError> {
-    plan_repo::create_block_tx(
-        conn,
-        &Vorplanung { org_id, planung_id },
-        benutzer_id,
-        &e.kern(),
-    )
-    .await
-}
-
-/// Ändert einen Block mit CAS über `version` (409). Verschieben in die Pause löscht das Soll.
-pub async fn block_aendern(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    bid: i64,
-    benutzer_id: i64,
-    p: &BlockPatch,
-    jetzt: &str,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        plan_repo::update_block_tx(
-            conn,
-            &Vorplanung { org_id, planung_id },
-            bid,
-            benutzer_id,
-            p,
-            jetzt,
-        )
-        .await?;
-        Ok(())
-    })
-}
-
-/// Löscht einen Block mit CAS über `version` (409).
-pub async fn block_loeschen(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    bid: i64,
-    version: i64,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        plan_repo::delete_block_tx(conn, &Vorplanung { org_id, planung_id }, bid, version, ())
-            .await?;
-        Ok(())
+        plan_repo::create_block_tx(conn, &plan, benutzer_id, &e.kern(), &zeit::jetzt()).await
     })
 }
 
@@ -1383,57 +1210,5 @@ pub async fn erzeugen(
         })?;
         let teile = zerlegung::zerlege(von_t, bis_t, &Teilung::Laenge(laenge))?;
         plan_repo::create_bloecke_tx(conn, &plan, benutzer_id, posten_id, &vorgabe, &teile).await
-    })
-}
-
-// ---------------------------------------------------------------------------------------------
-// Helfer
-// ---------------------------------------------------------------------------------------------
-
-pub async fn helfer_anlegen(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    benutzer_id: i64,
-    e: &HelferEingabe,
-) -> Result<PlanHelferAnzeige, AppError> {
-    write_retry!(pool, |conn| {
-        helfer_anlegen_tx(conn, org_id, planung_id, benutzer_id, e).await
-    })
-}
-
-/// [`helfer_anlegen`] in einer offenen Transaktion (auch für den Demo-Import).
-pub async fn helfer_anlegen_tx(
-    conn: &mut SqliteConnection,
-    org_id: i64,
-    planung_id: i64,
-    benutzer_id: i64,
-    e: &HelferEingabe,
-) -> Result<PlanHelferAnzeige, AppError> {
-    plan_repo::create_helfer_tx(conn, &Vorplanung { org_id, planung_id }, benutzer_id, e).await
-}
-
-pub async fn helfer_aendern(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    hid: i64,
-    p: &HelferPatch,
-) -> Result<PlanHelferAnzeige, AppError> {
-    write_retry!(pool, |conn| {
-        plan_repo::update_helfer_tx(conn, &Vorplanung { org_id, planung_id }, hid, p).await
-    })
-}
-
-/// Löscht einen Helfer und nimmt ihn aus allen Blöcken (CASCADE).
-pub async fn helfer_loeschen(
-    pool: &SqlitePool,
-    org_id: i64,
-    planung_id: i64,
-    hid: i64,
-) -> Result<(), AppError> {
-    write_retry!(pool, |conn| {
-        plan_repo::delete_helfer_tx(conn, &Vorplanung { org_id, planung_id }, hid).await?;
-        Ok(())
     })
 }
