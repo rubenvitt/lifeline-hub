@@ -18,9 +18,9 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   „Unsupported engine“ heißt, dass sie abweichen.
 - **Karenzzeit** (LLH-1884): pnpm lehnt beim Install Pakete ab, die jünger als 24 Stunden sind
   (`minimumReleaseAge: 1440` in `pnpm-workspace.yaml`), bei Cloudflare wie im Gate. Ein Bump mit
-  zu jungen Paketen ist deshalb schon im eigenen PR rot (Schritt 6 von `check-all.sh`, Regel in
-  `scripts/AGENTS.md`, „Karenzzeit“): warten und den Lauf neu starten, die Karenzzeit nicht
-  senken. Dependabot schlägt Versions-Updates erst nach einem Tag vor (`cooldown`).
+  zu jungen Paketen ist deshalb schon im eigenen PR rot (Schritt 6 von `check-all.sh`); was dann
+  zu tun ist, regelt `scripts/AGENTS.md`, „Karenzzeit“. Dependabot schlägt Versions-Updates erst
+  nach einem Tag vor (`cooldown`).
 - **Unbekannte Adressen und Cache:** `src/pages/404.astro` muss bleiben. Ohne `404.html`
   beantwortet Pages jede unbekannte Adresse mit der Startseite und Status 200, auch eine
   CSS-Adresse; ein Browser, der während eines Rollouts zu früh anfragt, hielte dieses HTML bis zu

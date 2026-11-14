@@ -130,7 +130,9 @@ pruefe "zu junges Paket im Wurzelpaket: rot" "1" "$rc"
 rc="$(lauf "$r" STUB_ZU_JUNG=website)"
 aus="$r/protokoll/ausgabe"
 pruefe "Meldung nennt das Paket" "ja" "$(enthaelt "$aus" 'mdast-util-to-hast@13.2.2')"
-pruefe "Meldung nennt das Lockfile" "ja" "$(enthaelt "$aus" 'website/pnpm-lock.yaml')"
+# Die Fortschrittszeile „→ website/pnpm-lock.yaml" steht in jedem Lauf; geprüft wird die
+# FEHLER-Zeile selbst.
+pruefe "Meldung nennt das Lockfile" "ja" "$(enthaelt "$aus" 'FEHLER: website/pnpm-lock.yaml führt')"
 pruefe "Meldung nennt den Zeitpunkt, ab dem es alt genug ist" "ja" \
   "$(enthaelt "$aus" '2026-11-14T12:35:32Z')"
 pruefe "Meldung sagt: Lauf neu starten" "ja" "$(enthaelt "$aus" 'neu starten')"

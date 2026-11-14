@@ -56,10 +56,17 @@ pnpm selbst entscheidet also, mit derselben Version und derselben Regel wie Clou
 
 **2. Die Meldung baut das Skript aus der pnpm-Ausgabe.** Es zeigt die Ausgabe von pnpm unverändert und
 setzt einen eigenen Block darüber: welches Lockfile, je Paket der Zeitpunkt, ab dem es alt genug ist
-(Veröffentlichung plus 24 h, ausgerechnet mit `node`, weil `date -d` auf macOS fehlt), dazu „Lauf danach
+(Veröffentlichung plus 24 h, ausgerechnet mit GNU-`date -d` und dem Rückfall auf BSD-`date -j -f`/`-r` für macOS; gelingt keines, steht nur „+ 1440 min“), dazu „Lauf danach
 neu starten; die Karenzzeit nicht lockern und keine Ausnahme eintragen“. Findet das Skript die Zeilen
 nicht (anderes pnpm-Format), bleibt es rot und zeigt nur die pnpm-Ausgabe. Die Meldung ist Zugabe, das
 Urteil kommt allein vom Exit-Code von pnpm.
+
+**2a. Frontend-Install in der CI** (Befund aus dem Review vor dem PR): Der Job „Schnellprüfungen“
+installiert das Frontend vor `check-all.sh`, und pnpm prüft die Karenzzeit dabei schon. Ein zu junges
+Frontend-Paket ließe Schritt 6 also nie zu Wort kommen. Ein Schritt `if: failure()` nach dem Install fährt
+dann `scripts/check-karenzzeit.sh` und gibt dieselbe Erklärung; der Job bleibt rot. Schritt 6 sammelt
+außerdem beide Exit-Codes (Advisories und Karenzzeit), damit ein Advisory einen Karenz-Verstoß nicht
+verdeckt.
 
 **3. Vorab-Prüfung der Einstellung.** Bevor pnpm läuft, prüft das Skript, dass jede der drei
 `pnpm-workspace.yaml` die Zeile `minimumReleaseAge: 1440` trägt. Fehlt sie, gilt wieder die Vorgabe der

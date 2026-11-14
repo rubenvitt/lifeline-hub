@@ -121,7 +121,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   `.prettierignore` des Bereichs. Kein `.git-blame-ignore-revs`.
 - **Node und pnpm stehen nur in `[tools]` von `mise.toml`** (LFH-773): Skripte rufen
   `mise exec -- …`, Workflows `jdx/mise-action` ohne `install_args`. `packageManager`,
-  `engines.node` und der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
+  `engines.node` (Wurzel, `frontend/`, `website/`), `website/.node-version` (Cloudflare Pages) und
+  der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
   prüft das und bricht an jedem harten `node@…`/`pnpm@…` in `scripts/`, `.github/`, README, Skills.
 - Das **OpenSpec-CLI** steht ebenfalls in `[tools]` (`npm:@fission-ai/openspec`), Aufruf
   `mise exec -- openspec …`; kein globales `npm i -g`. Das Gate ruft es nicht.
@@ -232,3 +233,5 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   derselben Regel, an der Cloudflare die Website baut. **Rot heißt warten:** die Meldung nennt,
   ab wann das Paket alt genug ist, danach den Lauf neu starten. Gilt auch für Sicherheits-Updates
   von Dependabot, die dessen `cooldown` umgehen. Selbsttest `scripts/check-karenzzeit.test.sh`.
+  Scheitert in der CI schon der Frontend-Install daran, fährt `ci.yml` das Skript direkt danach
+  (`if: failure()`), damit die Erklärung dasteht.

@@ -176,11 +176,15 @@ schritt_5() {
 
 schritt_6() {
   echo "==> [6/$SCHRITTE] Abhängigkeiten: Schwachstellen und Karenzzeit"
-  "$ROOT/scripts/check-deps.sh"
+  # Beide Prüfungen laufen, auch wenn die erste rot ist: sonst käme ein Karenz-Verstoß neben
+  # einem Advisory erst im nächsten Lauf ans Licht.
+  local rc=0
+  "$ROOT/scripts/check-deps.sh" || rc=$?
   # Kein Lockfile führt ein Paket, das jünger als die Karenzzeit ist (LLH-1884): Cloudflare baut
   # die Website mit dieser Regel, die PR-CI installiert sie aber nicht. Netzabhängig wie der
   # Advisory-Scan davor; ein Verstoß heilt mit der Zeit, der Lauf wird dann neu gestartet.
-  "$ROOT/scripts/check-karenzzeit.sh"
+  "$ROOT/scripts/check-karenzzeit.sh" || rc=$?
+  return "$rc"
 }
 
 # Stellt frontend/dist bereit — den Prod-Bundle für e2e/lagekarte-offline-precache.spec.ts

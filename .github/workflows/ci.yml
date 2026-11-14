@@ -155,7 +155,15 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
       - name: Frontend-Abhängigkeiten
+        id: frontend-install
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
+      # Scheitert der Install an der Karenzzeit (LLH-1884), kommen die Schnellprüfungen nicht
+      # mehr dran, und es stünde nur der rohe pnpm-Fehler da. Dieser Schritt läuft nur dann und
+      # erklärt den Verstoß wie Schritt 6 (Paket, ab wann alt genug, neu starten). Der Job bleibt
+      # rot; an der Karenzzeit ändert sich nichts.
+      - name: Karenzzeit erklären (nur nach gescheitertem Install)
+        if: failure() && steps.frontend-install.outcome == 'failure'
+        run: ./scripts/check-karenzzeit.sh
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: audit-cache
         with:
