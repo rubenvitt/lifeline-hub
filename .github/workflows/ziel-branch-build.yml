@@ -24,7 +24,9 @@
 # `verteilen` läuft, bleibt ein Restfenster (design.md, „alpha rot“ fängt es auf). `melden` schließt
 # ihn, aber nur, wenn PR-Kopf und Ziel-Branch noch auf dem gerechneten Stand stehen. Ein überholter
 # Check bleibt auf „läuft“, nie abgebrochen: GitHub wertet je Name den jüngsten Check, und den legt
-# der nächste Lauf an. Kommt binnen 5 Minuten keiner, wird er rot mit „neu starten“.
+# der nächste Lauf an. Hat sich nur der Ziel-Branch bewegt und kommt binnen 5 Minuten weder ein
+# jüngerer Check noch steht ein Push-Lauf aus, wird er rot mit „neu starten“. Bei neuem PR-Kopf
+# bleibt er ohne Frist stehen: der PR zeigt den alten Kopf nicht mehr.
 #
 # PR-CODE LÄUFT NIE IN EINEM LAUF AUF EINEM KANAL-BRANCH (LLH-1849, Review): Ein Push-Lauf hat
 # den Cache-Bereich von `alpha`, und Code darin (etwa ein `build.rs` aus einem Dependabot-PR)
@@ -270,10 +272,12 @@ jobs:
     if: ${{ !cancelled() && github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # actions: read — ob ein Push-Lauf (`verteilen`) noch aussteht, bevor ein überholter Check rot wird.
     permissions:
       contents: read
       pull-requests: read
       checks: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

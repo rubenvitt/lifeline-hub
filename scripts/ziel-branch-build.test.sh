@@ -61,6 +61,8 @@ case "$methode $pfad" in
     [ ! -e "$F/dispatch-kaputt" ] || { echo "HTTP 422 Workflow does not have 'workflow_dispatch' trigger" >&2; exit 1; }
     [ ! -e "$F/dispatch-502" ] || { echo "HTTP 502 Bad Gateway" >&2; exit 1; }
     echo "DISPATCH ${feld[ref]} ${feld[inputs_nr]} ${feld[inputs_kopf]} ${feld[inputs_check_id]} ${feld[inputs_ziel_sha]}" >> "$F/log" ;;
+  "GET repos/test/repo/actions/workflows/ziel-branch-build.yml/runs?"*)
+    if [ -f "$F/pushlaeufe.json" ]; then aus < "$F/pushlaeufe.json"; else echo '{"workflow_runs":[]}' | aus; fi ;;
   "GET repos/test/repo/compare/"*)
     if [ -f "$F/compare.json" ]; then aus < "$F/compare.json"; else
       echo '{"status":"ahead","commits":[{"commit":{"message":"feat: etwas"}}]}' | aus; fi ;;
@@ -74,6 +76,7 @@ case "$methode $pfad" in
   "PATCH repos/test/repo/check-runs/"*)
     id="${pfad##*/}"
     echo "PATCH $id ${feld[conclusion]:-${feld[status]:-}}" >> "$F/log"
+    [ -z "${feld[external_id]+x}" ] || printf '%s\n' "${feld[external_id]}" > "$F/ext-$id"
     printf '%s\n%s\n%s\n' "${feld[output_title]:-}" "${feld[output_summary]:-}" "${feld[output_text]:-}" > "$F/text-$id"
     echo '{}' | aus ;;
   *) echo "Attrappe: unbekannter Aufruf '$methode $pfad'" >&2; exit 1 ;;
@@ -108,16 +111,17 @@ hat_check() { # <fake> <sha> <status>
     > "$1/checks-$2.json"
 }
 # Mehrere Check-Runs „Baut mit Ziel-Branch“ auf <sha>, je Argument
-# "<id>:<status>[:<conclusion>:<external_id>]" (external_id: der gerechnete Ziel-Stand).
-checks_auf() { # <fake> <sha> <id:status[:conclusion:external_id]>…
-  local f="$1" sha="$2" json='[]' e id st fz ext
+# "<id>:<status>[:<conclusion>:<external_id>[:<titel>]]" (external_id: der gerechnete Ziel-Stand).
+checks_auf() { # <fake> <sha> <id:status[:conclusion:external_id[:titel]]>…
+  local f="$1" sha="$2" json='[]' e id st fz ext titel
   shift 2
   for e in "$@"; do
-    IFS=: read -r id st fz ext <<< "$e"
-    json="$(jq -c --argjson id "$id" --arg st "$st" --arg fz "$fz" --arg ext "$ext" \
+    IFS=: read -r id st fz ext titel <<< "$e"
+    json="$(jq -c --argjson id "$id" --arg st "$st" --arg fz "$fz" --arg ext "$ext" --arg titel "$titel" \
       '. + [{id: $id, name: "Baut mit Ziel-Branch", status: $st,
              conclusion: (if $fz == "" then null else $fz end), external_id: $ext,
-             output: {title: ("Titel " + ($id | tostring)), summary: ("Text " + ($id | tostring))}}]' <<< "$json")"
+             output: {title: (if $titel == "" then "Titel " + ($id | tostring) else $titel end),
+                      summary: ("Text " + ($id | tostring)), text: ("Ausgabe " + ($id | tostring))}}]' <<< "$json")"
   done
   jq -n --argjson r "$json" '{total_count: ($r | length), check_runs: $r}' > "$f/checks-$sha.json"
 }
@@ -238,8 +242,7 @@ pruefe "5 Fork: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 echo "==> Baut mit Ziel-Branch: Einzellauf"
 
 # 13 — Einzellauf auf dem Branch des PRs: ein frischer Check rechnet. Den von `verteilen` schließt
-# er NICHT als abgebrochen (LLH-1889: das zeigte den PR rot); ihn schließt `melden` mit dem
-# Ergebnis, wie jeden älteren offenen Check des Kopfes.
+# er NICHT als abgebrochen (LLH-1889: das zeigte den PR rot); der jüngere frische Check löst ihn ab.
 f="$(neu einzel)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
@@ -257,6 +260,15 @@ lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
 pruefe "13b schon gerechnet: Ergebnis übernommen, nichts zu rechnen" "PATCH 800 success" "$(log "$f")"
 pruefe "13b schon gerechnet: nichts zu rechnen" "[]" "$(jq -c . "$ARBEIT/ausgabe")"
 pruefe "13b Titel übernommen" "Titel 850" "$(head -1 "$f/text-800")"
+pruefe "13b Fehlerausgabe übernommen" 1 "$(grep -c 'Ausgabe 850' "$f/text-800")"
+pruefe "13b Check trägt den Stand" "zielsha" "$(cat "$f/ext-800")"
+
+# 13f — Ein Neustart des Laufs (Versuch 2) übernimmt nichts: wer neu startet, will neu rechnen.
+f="$(neu einzelneustart)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+checks_auf "$f" k7 '850:completed:failure:zielsha:Baut nicht mit alpha zielsha' '800:in_progress'
+GITHUB_RUN_ATTEMPT=2 lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
+pruefe "13f Neustart: rechnet" "POST k7 in_progress Baut mit Ziel-Branch" "$(log "$f")"
 
 # 13c — Gerechnet nur gegen einen anderen Stand, oder abgebrochen: rechnen wie immer.
 f="$(neu einzelanderstand)"
@@ -272,6 +284,7 @@ printf '%s\n' '7|k7neu|false|false|true|' | prs "$f"
 checks_auf "$f" k7neu '850:completed:success:zielsha'
 lauf "$f" einzellauf 7 zweig7 800 k7 alpha zielsha
 pruefe "13d neuer Kopf: kein PATCH am alten Check" "" "$(grep '^PATCH' "$f/log" || true)"
+pruefe "13d neuer Kopf: rechnet" "7:k7neu:901" "$(liste)"
 
 # 13e — Der neue Check trägt den gerechneten Stand (external_id), damit 13b ihn findet.
 pruefe "13e external_id ist der Ziel-Stand" "zielsha" "$(cat "$ARBEIT/einzel/ext-901")"
@@ -348,6 +361,17 @@ checks_auf "$f" k7 '850:in_progress' '901:in_progress'
 lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
 pruefe "9c kein Nachfolger: rot" "PATCH 901 failure" "$(log "$f")"
 pruefe "9c Rat: neu starten" 1 "$(grep -c 'neu starten' "$f/text-901")"
+pruefe "9c Stand gelöscht" "" "$(cat "$f/ext-901" 2> /dev/null || echo fehlt)"
+
+# 9d — Kein jüngerer Check, aber der Push-Lauf zum neuen Stand wartet noch auf einen Runner: nicht
+# rot, der Lauf bringt den Nachfolger (Review LLH-1889).
+f="$(neu verteilenwartet)"
+printf '%s\n' '7|k7|false|false|true|' | prs "$f"
+echo neuerezielsha > "$f/ref-alpha"
+checks_auf "$f" k7 '901:in_progress'
+echo '{"workflow_runs":[{"status":"queued"}]}' > "$f/pushlaeufe.json"
+lauf "$f" melden 7 k7 901 alpha zielsha gruen "$ARBEIT/ausgabe-baut"
+pruefe "9d verteilen wartet noch: Check läuft weiter" "PATCH 901 in_progress" "$(log "$f")"
 f="$(neu nachfolgerkaputt)"
 printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 echo neuerezielsha > "$f/ref-alpha"
@@ -388,6 +412,9 @@ printf '%s\n' '7|k7|false|false|true|' | prs "$f"
 echo zielsha > "$f/ref-alpha"
 lauf "$f" melden 7 k7 901 alpha zielsha "" "$ARBEIT/gibtsnicht"
 pruefe "11 ohne Ergebnis: rot" "PATCH 901 failure" "$(log "$f")"
+# Ohne Ergebnis ist der Stand nicht gerechnet: der Check verliert seinen Stand, sonst übernähme ihn
+# ein Neustart (Review LLH-1889).
+pruefe "11 ohne Ergebnis: Stand gelöscht" "" "$(cat "$f/ext-901" 2> /dev/null || echo fehlt)"
 
 # 12 — Ein unbekanntes Ergebnis wird nie grün.
 f="$(neu unbekannt)"
@@ -446,6 +473,7 @@ for j in verteilen vorbereiten melden; do
   form "F7 $j mergt nichts" 1 hat "$b" 'git merge'
 done
 form "F8 melden läuft auch nach rotem Kompilieren" 0 hat "$M" "if: .*!cancelled\(\)"
+pruefe "F13 melden liest Actions (ausstehender Push-Lauf)" 1 "$(rechte melden | grep -cx 'actions: read')"
 form "F9 Einschalten von Auto-Merge löst aus" 0 hat "$W" 'types: \[.*auto_merge_enabled'
 form "F9 Label löst aus" 0 hat "$W" 'types: \[.*labeled'
 form "F9 Einzellauf je PR möglich" 0 hat "$W" '^  workflow_dispatch:'

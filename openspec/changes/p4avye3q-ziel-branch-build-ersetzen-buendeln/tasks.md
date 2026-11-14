@@ -4,7 +4,7 @@
 
 - [x] 1.1 Selbsttest zuerst rot machen: In `scripts/ziel-branch-build.test.sh` erwarten die Fälle „überholt“ (9, 10) kein `PATCH … cancelled` mehr, sondern ein `PATCH <id> in_progress` mit dem Text „Überholt“. Der Fall Einzellauf (bisher `PATCH 800 cancelled;POST …`) erwartet nur noch den frischen `POST`. `scripts/ziel-branch-build.test.sh` ist rot.
 - [x] 1.2 Neue Fälle im Selbsttest. Die Attrappe liefert wie GitHub ohne `filter=all` nur den jüngsten Run je Name. Fall 9: überholt mit jüngerem Check, der Check läuft weiter. Fall 9c: ohne Nachfolger oder bei nicht lesbaren Checks wird er rot mit „neu starten“. Fall 16: ein gültiges Ergebnis schließt nur den eigenen. Fälle 13b–e: Ein schon gerechneter Stand (`external_id`) wird übernommen statt neu gerechnet. Die Fälle waren rot.
-- [x] 1.3 `einzellauf`: den „Übernommen“-PATCH entfernen. `melden`: bei „überholt“ nur Titel und Text setzen und den Status `in_progress` lassen. Nach gültigem Ergebnis alle offenen Checks des Namens mit kleinerer ID auf dem Kopf mit demselben Ergebnis schließen. Skriptkopf nachziehen. `scripts/ziel-branch-build.test.sh` ist grün.
+- [x] 1.3 `einzellauf`: den „Übernommen“-PATCH entfernen. `melden`: bei „überholt“ nur Titel und Text setzen und den Status `in_progress` lassen. Ein überholter Check wartet auf einen jüngeren Check oder einen ausstehenden Push-Lauf, sonst wird er rot mit „neu starten“. Der Einzellauf übernimmt ein schon gerechnetes Ergebnis (`external_id`), außer bei einem Neustart und bei „Kein Ergebnis“. Skriptkopf nachziehen. `scripts/ziel-branch-build.test.sh` ist grün.
 
 ## 2. Warteschlange (`.github/workflows/ziel-branch-build.yml`)
 

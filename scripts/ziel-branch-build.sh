@@ -26,8 +26,10 @@
 #       den jüngsten. Steht der PR-Kopf weiter oder der
 #       Ziel-Branch um mehr als Release-Commits (die mit `[skip ci]` keinen Lauf starten) weiter,
 #       ist das Ergebnis überholt: der Check bleibt auf „läuft“, und ein jüngerer Check zum neuen
-#       Stand löst ihn ab (LLH-1889: nie „abgebrochen“, das zeigt den PR rot). Erscheint binnen
-#       ZBB_WARTEN Sekunden keiner, wird er rot mit dem Rat, neu zu starten.
+#       Stand löst ihn ab (LLH-1889: nie „abgebrochen“, das zeigt den PR rot). Hat sich nur der
+#       Ziel-Branch bewegt und erscheint binnen ZBB_WARTEN Sekunden kein jüngerer Check, ohne dass
+#       ein Push-Lauf aussteht, wird er rot mit dem Rat, neu zu starten. Bei neuem PR-Kopf bleibt er
+#       ohne Frist stehen (der PR zeigt den alten Kopf nicht mehr).
 #   Exit 0 = gelaufen · 1 = an mindestens einem PR gescheitert (die übrigen sind bearbeitet) ·
 #   2 = Aufruf- oder Umgebungsfehler
 #   Umgebung: ZBB_GH  Kommando für GitHub-Zugriffe (Vorgabe gh; der Selbsttest setzt eine Attrappe)
@@ -175,18 +177,21 @@ einzellauf() { # <pr-nr> <ref> <check-id> <kopf-sha> <ziel-branch> <ziel-sha>
     return 0
   fi
   kopf="$(jq -r '.[0].head.sha' <<< "$prs")"
-  if [ "$kopf" = "$alt_kopf" ]; then
+  # Ein Neustart (Versuch > 1) soll neu rechnen, nicht übernehmen.
+  if [ "$kopf" = "$alt_kopf" ] && [ "${GITHUB_RUN_ATTEMPT:-1}" = 1 ]; then
     # Schon gerechnet: ein abgeschlossenes Ergebnis (grün oder rot) zu genau diesem Stand. Nicht
     # lesbar: rechnen wie immer.
     # `gh --jq` kennt kein --arg; der Stand ist ein Commit-Hash und steht als JSON-String im Filter.
     frueher="$(gh_api "$(check_runs_pfad "$kopf" all)" --paginate --jq \
       ".check_runs[] | select(.status == \"completed\" and .external_id == $(jq -rn --arg z "$ziel_sha" '$z | @json')
         and (.conclusion == \"success\" or .conclusion == \"failure\"))
-      | [.id, .conclusion, .output.title, .output.summary] | @json" 2> /dev/null \
+      | [.id, .conclusion, .output.title, .output.summary, .output.text] | @json" 2> /dev/null \
       | jq -s -c 'sort_by(.[0]) | last // empty' 2> /dev/null || true)"
     if [ -n "$frueher" ] && gh_api -X PATCH "repos/$REPO/check-runs/$alt_id" -f status=completed \
-      -f conclusion="$(jq -r '.[1]' <<< "$frueher")" -f "output[title]=$(jq -r '.[2] // ""' <<< "$frueher")" \
-      -f "output[summary]=$(jq -r '.[3] // ""' <<< "$frueher") (Übernommen aus Check $(jq -r '.[0]' <<< "$frueher"), gerechnet gegen denselben Stand.)" > /dev/null; then
+      -f external_id="$ziel_sha" -f conclusion="$(jq -r '.[1]' <<< "$frueher")" \
+      -f "output[title]=$(jq -r '.[2] // ""' <<< "$frueher")" \
+      -f "output[summary]=$(jq -r '.[3] // ""' <<< "$frueher") (Übernommen aus Check $(jq -r '.[0]' <<< "$frueher"), gerechnet gegen denselben Stand.)" \
+      -f "output[text]=$(jq -r '.[4] // ""' <<< "$frueher")" > /dev/null; then
       echo "PR #$nr: $(kurz "$ziel_sha") ist auf $(kurz "$kopf") schon gerechnet, Check $alt_id übernimmt das Ergebnis" >&2
       printf '[]\n'
       return 0
@@ -217,6 +222,13 @@ nachfolger_da() { # <kopf> <id>
   done
 }
 
+# Steht ein Push-Lauf dieses Workflows auf <ziel> noch aus (wartet auf einen Runner oder läuft)?
+# Dann bringt `verteilen` den Nachfolger noch. Nicht lesbar zählt wie „nein“.
+verteilen_offen() { # <ziel>
+  gh_api "repos/$REPO/actions/workflows/ziel-branch-build.yml/runs?branch=$1&event=push&per_page=10" \
+    --jq 'any(.workflow_runs[]; .status != "completed")' 2> /dev/null | grep -qx true
+}
+
 melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <ausgabe-datei>
   local nr="$1" kopf="$2" id="$3" ziel="$4" ziel_sha="$5" ergebnis="$6" datei="$7"
   local jetzt_kopf jetzt_ziel fazit titel text ausgabe=""
@@ -226,7 +238,7 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
     # Am neuen Kopf zeigt der PR diesen Check nicht mehr. Bewegte sich nur der Ziel-Branch, löst
     # ihn ein jüngerer Check ab (GitHub wertet je Name den jüngsten); kommt keiner, hinge der PR
     # still auf „läuft“, also rot mit Rat (Review LLH-1889).
-    if [ "$jetzt_kopf" != "$kopf" ] || nachfolger_da "$kopf" "$id"; then
+    if [ "$jetzt_kopf" != "$kopf" ] || nachfolger_da "$kopf" "$id" || verteilen_offen "$ziel"; then
       echo "PR #$nr: überholt (PR $(kurz "$jetzt_kopf"), $ziel $(kurz "$jetzt_ziel")), Check bleibt auf „läuft“" >&2
       gh_api -X PATCH "repos/$REPO/check-runs/$id" -f status=in_progress \
         -f "output[title]=Überholt, rechnet neu" \
@@ -235,7 +247,7 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
     fi
     echo "PR #$nr: überholt, aber kein jüngerer Check erschienen → rot" >&2
     schliessen "$id" failure "Überholt, kein neuer Lauf" \
-      "Gerechnet gegen \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter, aber kein neuer Lauf hat sich gemeldet. Den Lauf „$NAME“ neu starten oder einen Commit pushen." ""
+      "Gerechnet gegen \`$ziel\` $(kurz "$ziel_sha"); inzwischen steht einer davon weiter, aber kein neuer Lauf hat sich gemeldet. Den Lauf „$NAME“ neu starten oder einen Commit pushen." "" 1
     return 0
   fi
   [ -f "$datei" ] && ausgabe="$(tail -c 60000 "$datei")"
@@ -250,11 +262,16 @@ melden() { # <pr-nr> <kopf-sha> <check-id> <ziel-branch> <ziel-sha> <ergebnis> <
       text="Der Kompilierlauf hat kein Ergebnis geliefert (\`${ergebnis:-leer}\`). Der Check gilt als rot, bis ein Lauf grün meldet." ;;
   esac
   echo "PR #$nr: $ergebnis → $fazit" >&2
-  schliessen "$id" "$fazit" "$titel" "$text" "$ausgabe"
+  # „Kein Ergebnis“ ist nicht gerechnet: ohne Stand, sonst übernähme ihn ein Neustart.
+  schliessen "$id" "$fazit" "$titel" "$text" "$ausgabe" "$([ "$titel" = "Kein Ergebnis" ] && echo 1 || echo 0)"
 }
 
-schliessen() { # <check-id> <conclusion> <titel> <text> <ausgabe>
-  gh_api -X PATCH "repos/$REPO/check-runs/$1" -f status=completed -f conclusion="$2" \
+# Mit <ohne-stand> = 1 verliert der Check seinen gerechneten Stand (`external_id`): ein Ergebnis, das
+# keins ist, soll `einzellauf` nie übernehmen.
+schliessen() { # <check-id> <conclusion> <titel> <text> <ausgabe> [<ohne-stand>]
+  local extra=()
+  [ "${6:-0}" = 1 ] && extra=(-f external_id=)
+  gh_api -X PATCH "repos/$REPO/check-runs/$1" -f status=completed -f conclusion="$2" "${extra[@]}" \
     -f "output[title]=$3" -f "output[summary]=$4" \
     -f "output[text]=${5:+$(printf '```\n%s\n```' "$5")}" > /dev/null
 }
