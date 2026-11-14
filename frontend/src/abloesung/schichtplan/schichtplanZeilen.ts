@@ -3,7 +3,6 @@ import type {
   Einheit,
   EinsatzPersonal,
   Personal,
-  Schichtplan,
   SchichtplanBefund,
   SchichtplanBlock,
   SchichtplanBlockBody,
@@ -204,10 +203,6 @@ export function alsRasterBlock(block: SchichtplanBlock): RasterBlock {
     ampel,
     ampelWort: wort,
   };
-}
-
-export function rasterBloecke(plan: Schichtplan | undefined): RasterBlock[] {
-  return (plan?.bloecke ?? []).map(alsRasterBlock);
 }
 
 // ── Personen ─────────────────────────────────────────────────────────────────────────────────

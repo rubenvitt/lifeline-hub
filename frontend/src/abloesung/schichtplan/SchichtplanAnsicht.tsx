@@ -40,7 +40,12 @@ import { spanneAus, type SpannenWahl } from './raster';
 import SchichtplanEditor, { type SchichtplanEditorAdapter } from './SchichtplanEditor';
 import SchichtplanWechselDialog from './SchichtplanWechselDialog';
 import SchichtplanWechselLeiste from './SchichtplanWechselLeiste';
-import { baueZeilen, personenOptionen, postenSchluessel, rasterBloecke } from './schichtplanZeilen';
+import {
+  alsRasterBlock,
+  baueZeilen,
+  personenOptionen,
+  postenSchluessel,
+} from './schichtplanZeilen';
 
 /**
  * Ansicht „Schichtplan“ der Ablösung (`?ansicht=plan`, LLH-1554, Konzept LLH-1523 Abschnitt 6):
@@ -134,8 +139,9 @@ export default function SchichtplanAnsicht({
   const personalFrei = istKeyFreigegeben('personal', freigaben);
   const personenGesperrt = freigaben != null && !personalFrei ? MODUL_PERSONAL_GESPERRT : undefined;
 
+  const planKey = einsatzKeys.schichtplan(einsatzId);
   const planQuery = useQuery({
-    queryKey: einsatzKeys.schichtplan(einsatzId),
+    queryKey: planKey,
     queryFn: () => fetchSchichtplan(einsatzId),
   });
   const einheitenQuery = useQuery({
@@ -180,7 +186,7 @@ export default function SchichtplanAnsicht({
   }, [naechstePruefung, qc, einsatzId]);
 
   const plan = planQuery.data;
-  const bloecke = useMemo(() => rasterBloecke(plan), [plan]);
+  const bloecke = useMemo(() => (plan?.bloecke ?? []).map(alsRasterBlock), [plan]);
   const zeilen = useMemo(
     () =>
       baueZeilen({
@@ -249,7 +255,6 @@ export default function SchichtplanAnsicht({
     !b.posten.aufgeloest &&
     (b.posten.art === 'pause' || (b.posten.art === 'uhs' && uhsFrei));
 
-  const planKey = einsatzKeys.schichtplan(einsatzId);
   const setHelfer = (h: SchichtplanHelfer) =>
     qc.setQueryData<Schichtplan>(planKey, (p) =>
       p?.helfer
@@ -348,9 +353,9 @@ export default function SchichtplanAnsicht({
       erzeugen: (body) => erzeugeSchichten(einsatzId, body),
     },
     cache: {
-      get: () => qc.getQueryData<Schichtplan>(einsatzKeys.schichtplan(einsatzId)),
-      set: (p) => qc.setQueryData(einsatzKeys.schichtplan(einsatzId), p),
-      invalidate: () => void qc.invalidateQueries({ queryKey: einsatzKeys.schichtplan(einsatzId) }),
+      get: () => qc.getQueryData<Schichtplan>(planKey),
+      set: (p) => qc.setQueryData(planKey, p),
+      invalidate: () => void qc.invalidateQueries({ queryKey: planKey }),
     },
     wechsel: {
       canWechsel: wechselMoeglich,

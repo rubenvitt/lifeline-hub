@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Button } from 'antd';
 import { ApiError } from '../api/client';
 import { ladePlanung } from '../api/planungen';
 import { listeQualifikationen } from '../api/qualifikationen';
@@ -29,7 +28,6 @@ import { ausPlanung } from './ausPlanung';
 export default function PlanungDruckPage() {
   const { planungId: roh } = useParams();
   const planungId = parseRouteId(roh);
-  const navigate = useNavigate();
 
   const druckQuery = useQuery({
     queryKey: globalKeys.planungDruck(planungId ?? 0),
@@ -76,6 +74,7 @@ export default function PlanungDruckPage() {
       error={error}
       refetch={refetch}
       druckPfad={(wahl) => planungDruckPfad(planungId, wahl)}
+      zurueck={{ pfad: zurueck, label: 'Zurück zur Planung' }}
       texte={{
         keinZugriff: 'Kein Zugriff auf die Planung',
         ladeFehler: 'Die Planung konnte nicht geladen werden',
@@ -88,21 +87,7 @@ export default function PlanungDruckPage() {
         <AdminPage
           titel={bezeichnung ? `${bezeichnung} – Druckansicht` : 'Planung – Druckansicht'}
           pfad={pfad}
-          aktionen={
-            <>
-              <Button
-                href={zurueck}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                  e.preventDefault();
-                  navigate(zurueck);
-                }}
-              >
-                Zurück zur Planung
-              </Button>
-              {actions}
-            </>
-          }
+          aktionen={actions}
         >
           {content}
         </AdminPage>

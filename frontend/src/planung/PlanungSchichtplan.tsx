@@ -20,6 +20,7 @@ import { mappeDateiname } from '../abloesung/schichtplan/ausgabe/mappeDateiname'
 import SchichtplanEditor, {
   type SchichtplanEditorAdapter,
 } from '../abloesung/schichtplan/SchichtplanEditor';
+import { alsRasterBlock } from '../abloesung/schichtplan/schichtplanZeilen';
 import { useUhr } from '../abloesung/useUhr';
 import { planungDruckPfad } from '../routing/deeplinks';
 import {
@@ -33,7 +34,6 @@ import {
   planungTage,
   planungZeilen,
   qualiVorgaben,
-  rasterBloeckeVon,
   schichtplanBloecke,
   sollVorgaben,
 } from './planungZeilen';
@@ -79,7 +79,7 @@ export default function PlanungSchichtplan({
   });
 
   const sbloecke = useMemo(() => schichtplanBloecke(planung), [planung]);
-  const bloecke = useMemo(() => rasterBloeckeVon(sbloecke), [sbloecke]);
+  const bloecke = useMemo(() => sbloecke.map(alsRasterBlock), [sbloecke]);
   const zeilen = useMemo(() => planungZeilen(planung.posten), [planung.posten]);
   const personen = useMemo(
     () => (stammQuery.data ? planungPersonen(stammQuery.data, planung.helfer) : null),

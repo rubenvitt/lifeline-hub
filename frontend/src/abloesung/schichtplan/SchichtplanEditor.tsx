@@ -200,21 +200,20 @@ export default function SchichtplanEditor<P>({
     [qualiQuery.data],
   );
 
-  // ── Schreiben ── Jede Antwort ist der ganze Plan; `cache.set` übernimmt ihn.
-  const anlegenMut = useMutation({
+  // ── Schreiben ── Jede Antwort ist der ganze Plan; `cache.set` übernimmt ihn. Anlegen und
+  // Löschen laufen je als eigene Mutation für Dialog, Kopie und Kontextmenü, mit gleichen Optionen.
+  const anlegenOptionen = {
     mutationFn: (body: SchichtplanBlockBody) => api.create(body),
     onSuccess: cache.set,
-  });
+  };
+  const anlegenMut = useMutation(anlegenOptionen);
   const aendernMut = useMutation({
     mutationFn: (v: { blockId: number; body: SchichtplanBlockAendernBody }) =>
       api.update(v.blockId, v.body),
     onSuccess: cache.set,
   });
   // Eigene Mutation für die Kopie aus dem Dialog: ihr Fehler steht dort, nicht beim Speichern.
-  const kopierenMut = useMutation({
-    mutationFn: (body: SchichtplanBlockBody) => api.create(body),
-    onSuccess: cache.set,
-  });
+  const kopierenMut = useMutation(anlegenOptionen);
   const erzeugenMut = useMutation({
     mutationFn: (body: SchichtplanErzeugenBody) => api.erzeugen(body),
     onSuccess: (p) => {
@@ -232,21 +231,16 @@ export default function SchichtplanEditor<P>({
     setDialog((d) => (d != null && 'blockId' in d && d.blockId === b.id ? null : d));
     cache.invalidate();
   };
-  const loeschenMut = useMutation({
+  const loeschenOptionen = {
     mutationFn: (b: SchichtplanBlock) => api.delete(b),
     onSuccess: nachLoeschen,
-  });
+  };
+  const loeschenMut = useMutation(loeschenOptionen);
   // Kontextmenü (LLH-1600): eigene Mutationen, damit Lauf und Fehler eines stillen Kopierens oder
   // Löschens nie im Dialog eines anderen Blocks stehen und `reset()` beim Öffnen eines Blocks die
   // Sperre des Menüs nicht aufhebt. Fehler stehen über dem Raster (`zugSchreiben`).
-  const menueKopierenMut = useMutation({
-    mutationFn: (body: SchichtplanBlockBody) => api.create(body),
-    onSuccess: cache.set,
-  });
-  const menueLoeschenMut = useMutation({
-    mutationFn: (b: SchichtplanBlock) => api.delete(b),
-    onSuccess: nachLoeschen,
-  });
+  const menueKopierenMut = useMutation(anlegenOptionen);
+  const menueLoeschenMut = useMutation(loeschenOptionen);
   // Fehler eines Zugs im Raster (ohne offenen Dialog) stehen über dem Raster.
   const [zugFehler, setZugFehler] = useState<unknown>(null);
   const zugSchreiben = (p: Promise<unknown>) => {

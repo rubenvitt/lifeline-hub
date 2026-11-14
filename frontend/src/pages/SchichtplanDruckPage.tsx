@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Breadcrumb, Button } from 'antd';
+import { Breadcrumb } from 'antd';
 import { listeAbloesungVorgaben } from '../api/abloesungen';
 import { ApiError } from '../api/client';
 import { listeEinheiten } from '../api/einheiten';
@@ -47,7 +47,6 @@ function ohneGesperrtesModul<T>(abruf: Promise<T>): Promise<T | undefined> {
 export default function SchichtplanDruckPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const navigate = useNavigate();
 
   // Einheiten und UHS nur abfragen, wenn ihr Modul frei ist. Sind die Freigaben unbekannt
   // (Abruf gescheitert), wird trotzdem gefragt; ein 403 heißt dann wie bei veralteten Freigaben:
@@ -127,6 +126,7 @@ export default function SchichtplanDruckPage() {
       refetch={refetch}
       isReloadBlocked={freigabenLaden}
       druckPfad={(wahl) => schichtplanDruckPfad(einsatzId, wahl)}
+      zurueck={{ pfad: zurueck, label: 'Zurück zum Schichtplan' }}
       texte={{
         keinZugriff: 'Kein Zugriff auf den Schichtplan',
         ladeFehler: 'Der Schichtplan konnte nicht geladen werden',
@@ -147,21 +147,7 @@ export default function SchichtplanDruckPage() {
               ]}
             />
           }
-          aktionen={
-            <>
-              <Button
-                href={zurueck}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                  e.preventDefault();
-                  navigate(zurueck);
-                }}
-              >
-                Zurück zum Schichtplan
-              </Button>
-              {actions}
-            </>
-          }
+          aktionen={actions}
         >
           {content}
         </EinsatzSeite>

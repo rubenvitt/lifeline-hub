@@ -41,11 +41,13 @@ interface SchichtplanDruckInhaltProps {
   isReloadBlocked?: boolean;
   /** Pfad dieser Druckseite mit einer anderen Wahl. */
   druckPfad: (wahl: SchichtplanDruckAuswahl) => string;
+  /** Rücksprung vor „Neu laden“: Ziel und Beschriftung. */
+  zurueck: { pfad: string; label: string };
   texte: SchichtplanDruckTexte;
   /** Kopf der Blätter (`SchichtplanBlaetter`). */
   einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
   bezug?: string;
-  /** Die Hülle setzt die Teile in ihren Seitenrahmen; `actions` stehen hinter ihrem Rücksprung. */
+  /** Die Hülle setzt die Teile in ihren Seitenrahmen. */
   renderPage: (teile: { actions: ReactNode; content: ReactNode }) => ReactNode;
 }
 
@@ -68,6 +70,7 @@ export default function SchichtplanDruckInhalt({
   refetch,
   isReloadBlocked = false,
   druckPfad,
+  zurueck,
   texte,
   einsatz,
   bezug,
@@ -100,6 +103,16 @@ export default function SchichtplanDruckInhalt({
 
   const actions = (
     <>
+      <Button
+        href={zurueck.pfad}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          navigate(zurueck.pfad);
+        }}
+      >
+        {zurueck.label}
+      </Button>
       {!keinZugriff && (
         <Button onClick={() => void refetch()} disabled={isFetching || isReloadBlocked}>
           Neu laden
