@@ -194,13 +194,17 @@ for (const { dichte, soll } of STAFFEL) {
     // Inhaltsanker: die geseedete Einheit steht im Seitentitel.
     await expect(page.getByRole('heading', { name: EINHEIT, exact: true })).toBeVisible();
 
-    // Der Auslöser steht im Paneel „Einheit auflösen“; gescopt, weil die Blase einen gleichnamigen
-    // Bestätigungsknopf trägt.
-    const ausloeser = page
-      .getByRole('region', { name: 'Einheit auflösen' })
-      .getByRole('button', { name: 'Einheit auflösen', exact: true });
+    // Die Auslöser stehen im Paneel „Einheit auflösen oder stornieren“; gescopt, weil die Blase
+    // einen gleichnamigen Bestätigungsknopf trägt.
+    const paneelEnde = page.getByRole('region', { name: 'Einheit auflösen oder stornieren' });
+    const ausloeser = paneelEnde.getByRole('button', { name: 'Einheit auflösen', exact: true });
     // Der Auslöser hängt an `controlHeight`, die Blasenknöpfe an `controlHeightSM` — zwei Token.
     await haeltTreffflaeche(ausloeser, soll, 'Auslöser „Einheit auflösen"');
+    await haeltTreffflaeche(
+      paneelEnde.getByRole('button', { name: 'Einheit stornieren', exact: true }),
+      soll,
+      'Auslöser „Einheit stornieren"',
+    );
     await ausloeser.click();
 
     /**
@@ -430,7 +434,7 @@ for (const { dichte, soll } of STAFFEL) {
  * Einheit-Detailseite wie (c).
  *
  * Rollenabhängig ist hier nur (c): ohne Schreibrecht entfallen die Zeilenauslöser der Angaben
- * und das Paneel „Einheit auflösen“ samt Bestätigungsblase (LLH-1036, `EinheitDetailPage.tsx`,
+ * und das Paneel „Einheit auflösen oder stornieren“ samt Bestätigungsblase (LLH-1036, `EinheitDetailPage.tsx`,
  * `buildEinheitRechte`). Diese Ziele sind VERSTECKT, also als abwesend zugesichert statt still aus
  * der Messmenge gefallen. Was dem Beobachter bleibt, sind Modulzeilen und Kategorie-Ziele —
  * sie werden in der Stufe gemessen, damit die Messmenge nie leer ist.
@@ -470,8 +474,12 @@ for (const { dichte, soll } of STAFFEL) {
       'Vorbedingung: ohne Schreibrecht kein Auslöser „Einheit auflösen" — sonst misst der Test den Admin-Zweig',
     ).toHaveCount(0);
     await expect(
-      page.getByRole('region', { name: 'Einheit auflösen' }),
-      'Vorbedingung: ohne Schreibrecht kein Paneel „Einheit auflösen"',
+      page.getByRole('button', { name: 'Einheit stornieren', exact: true }),
+      'Vorbedingung: ohne Schreibrecht kein Auslöser „Einheit stornieren"',
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole('region', { name: 'Einheit auflösen oder stornieren' }),
+      'Vorbedingung: ohne Schreibrecht kein Paneel „Einheit auflösen oder stornieren"',
     ).toHaveCount(0);
     await expect(
       page.getByRole('main').getByRole('button', { name: /(bearbeiten|eintragen)$/ }),

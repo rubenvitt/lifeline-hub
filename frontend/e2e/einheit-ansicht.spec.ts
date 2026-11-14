@@ -288,8 +288,11 @@ for (const dichte of DICHTEN) {
       await expect(main.getByRole('button', { name: 'Aus Einheit lösen' })).toHaveCount(0);
       await expect(main.getByRole('button', { name: /(bearbeiten|eintragen)$/ })).toHaveCount(0);
       await expect(main.getByRole('button', { name: /^Status von / })).toHaveCount(0);
-      await expect(main.getByRole('region', { name: 'Einheit auflösen' })).toHaveCount(0);
+      await expect(
+        main.getByRole('region', { name: 'Einheit auflösen oder stornieren' }),
+      ).toHaveCount(0);
       await expect(main.getByRole('button', { name: 'Einheit auflösen' })).toHaveCount(0);
+      await expect(main.getByRole('button', { name: 'Einheit stornieren' })).toHaveCount(0);
     });
   });
 }

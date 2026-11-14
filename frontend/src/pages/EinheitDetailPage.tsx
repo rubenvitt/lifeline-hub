@@ -22,6 +22,7 @@ import {
   patchEinheitZeichen,
   patcheEinheit,
   setzeEinheitStatus,
+  storniereEinheit,
   storniereUebernahme,
   type EinheitPatch,
   type EinheitZeichenPatch,
@@ -343,18 +344,25 @@ function EinheitAnsicht({
     // Stand, der die Ablehnung erklärt.
     onError: () => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
   });
+  // Zurück zur Gliederung: die Einheit ist aufgelöst und steht nur noch im Block „Aufgelöst“
+  // (LLH-1079), oder sie ist gelöscht (ohne Spur aufgelöst oder storniert, LLH-1881). Aus dem Cache
+  // fällt sie sofort, sonst zeigte die Gliederung sie bis zum Neuladen noch als aktiv.
+  const zurGliederung = () => {
+    void navigate(einheitenPfad(einsatzId));
+    qc.setQueryData<Einheit[]>(einsatzKeys.einheiten(einsatzId), (alt) =>
+      alt?.filter((x) => x.id !== einheitId),
+    );
+    invalidate();
+  };
   const aufloesen = useMutation({
     mutationFn: () => loeseEinheitAuf(einsatzId, einheitId),
-    // Zurück zur Gliederung: die Einheit ist aufgelöst (oder ohne Spur gelöscht) und steht nur noch
-    // im Block „Aufgelöst“ (LLH-1079). Aus dem Cache fällt sie sofort, sonst zeigte die Gliederung
-    // sie bis zum Neuladen noch als aktiv.
-    onSuccess: () => {
-      void navigate(einheitenPfad(einsatzId));
-      qc.setQueryData<Einheit[]>(einsatzKeys.einheiten(einsatzId), (alt) =>
-        alt?.filter((x) => x.id !== einheitId),
-      );
-      invalidate();
-    },
+    onSuccess: zurGliederung,
+  });
+  // Storno einer Fehlanlage (LLH-1881): nur ohne Spur, sonst nennt der Server den Grund (422), der
+  // im Paneel steht.
+  const stornieren = useMutation({
+    mutationFn: () => storniereEinheit(einsatzId, einheitId),
+    onSuccess: zurGliederung,
   });
 
   // Storno einer Fehlübernahme (LLH-1388, D7): danach ins Board mit der hervorgehobenen Karte, wo
@@ -553,7 +561,12 @@ function EinheitAnsicht({
             </Button>
           </Paneel>
         )}
-        {rechte.canEditEinheit && <EinheitAufloesen onAufloesen={() => aufloesen.mutateAsync()} />}
+        {rechte.canEditEinheit && (
+          <EinheitAufloesen
+            onAufloesen={() => aufloesen.mutateAsync()}
+            onStornieren={() => stornieren.mutateAsync()}
+          />
+        )}
       </div>
     </EinsatzSeite>
   );

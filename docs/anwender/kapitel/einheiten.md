@@ -15,7 +15,7 @@ Soll-Stärke trägt die Führung ein.
 Das Modul zeigt die Gliederung aller Einheiten; jede Einheit hat eine eigene Seite mit den
 Paneelen „Kopfdaten“, „Fahrzeuge und Besatzung“, „Zeitachse“, „Material“, „Funk und
 Kommunikation“ und „Taktisches Zeichen“; für die Einsatzleitung „Gerät“ mit „Gerät koppeln“ für
-das Handy der Einheit (siehe [Einheit am Gerät](geraet-einheit.md)), zuletzt „Einheit auflösen“. „Fahrzeuge und Besatzung“
+das Handy der Einheit (siehe [Einheit am Gerät](geraet-einheit.md)), zuletzt „Einheit auflösen oder stornieren“. „Fahrzeuge und Besatzung“
 zeigt je Fahrzeug, wer darauf sitzt, und darunter, wer ohne Fahrzeug zur Einheit gehört. Jede
 Angabe wird an ihrem Wert geändert. Eine stehende Einheit wie ein Sanitätszug lässt sich in einem Zug aus ihrer
 Einheiten-Vorlage bilden, samt Untereinheiten, Fahrzeugen und Besatzung. Bilden, ändern und
@@ -174,13 +174,27 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
 Für Einsatzleitung und Führungspersonal:
 
 1. Die Einheit öffnen.
-2. Im letzten Paneel „Einheit auflösen“ „Einheit auflösen“ wählen.
+2. Im letzten Paneel „Einheit auflösen oder stornieren“ „Einheit auflösen“ wählen.
 3. Die Rückfrage „Einheit auflösen?“ mit „Einheit auflösen“ bestätigen. Die Mitglieder werden frei,
    unterstellte Einheiten rücken eine Ebene hoch, und gekoppelte Geräte der Einheit enden.
 4. Auf der Seite „Einheiten“ steht die aufgelöste Einheit unter der Gliederung im Block
    „Aufgelöst“ mit dem Zeitpunkt.
 
    ![Aufgeklappter Block „Aufgelöst (1)“ unter der Gliederung mit einer Einheit und dem Zeitpunkt der Auflösung](../bilder/einheiten/aufgeloest.png)
+
+### Eine versehentlich angelegte Einheit stornieren
+
+Für Einsatzleitung und Führungspersonal, solange die Einheit noch keine Spur im Einsatz hat:
+
+1. Die Einheit öffnen.
+2. Im letzten Paneel „Einheit auflösen oder stornieren“ „Einheit stornieren“ wählen.
+3. Die Rückfrage „Einheit stornieren?“ mit „Einheit stornieren“ bestätigen. Die Einheit ist
+   gelöscht, sie steht weder in der Gliederung noch im Block „Aufgelöst“. Das Einsatztagebuch
+   vermerkt den Storno.
+4. Hat die Einheit schon eine Spur, etwa Mitglieder, eine Zeitachse, einen Auftrag, eine Meldung
+   oder einen Eintrag im Einsatztagebuch, der sie nennt, steht im Paneel „Nicht storniert“ mit dem
+   Grund, etwa „Der Einheit gehört Personal an; die Einheit lässt sich nur auflösen“. Dann bleibt
+   nur „Einheit auflösen“.
 
 ### Eine aufgelöste Einheit nachlesen
 
@@ -330,9 +344,13 @@ gelöscht. Eine Einheit, an die Verpflegung ausgegeben wurde, bleibt als aufgel�
 die Ausgabe zurückgenommen ist; die Ausgabe nennt sie weiter. An einer aufgelösten Einheit lässt
 sich nichts mehr ändern.
 
+Stornieren nimmt eine versehentlich angelegte Einheit zurück. Es gelingt nur, solange sie keine
+dieser Spuren hat, und löscht sie dann; sonst nennt die App den ersten Grund. Anders als ein
+Auflösen ohne Spur steht im Einsatztagebuch „storniert“ statt „aufgelöst“.
+
 ### Einsatztagebuch
 
-Ins Einsatztagebuch schreibt die App selbst: das Bilden und Auflösen einer Einheit (der Eintrag
+Ins Einsatztagebuch schreibt die App selbst: das Bilden, Auflösen und Stornieren einer Einheit (der Eintrag
 der Auflösung verweist mit „Einheit «Name»“ auf ihre Seite, ebenso ein Auftrag auf jede Einheit,
 an die er geht), eine neue
 Abschnittszuordnung, einen Wechsel des Einheitsführers, einen Statuswechsel von Hand und jedes
@@ -406,7 +424,7 @@ aufgelöst, eine verknüpfte bleibt. Danach lässt sich die Rücknahme wieder w�
 
 ### Rechte und ohne Netz
 
-Lesen darf, wer das Modul Einheiten sieht. Bilden, ändern, zuordnen und auflösen dürfen
+Lesen darf, wer das Modul Einheiten sieht. Bilden, ändern, zuordnen, auflösen und stornieren dürfen
 Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im
 Einsatz](rechte-im-einsatz.md)); das gilt auch für Übernehmen. Abweisen verlangt zusätzlich das
 Recht auf Fahrzeuge, weil es die Fahrzeuge entlässt. An der Meldung führt ohne Recht auf Einheiten
