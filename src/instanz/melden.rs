@@ -864,7 +864,9 @@ async fn melden_einmal_mit(
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
-            fuehrung_folgen = eingang.folgen;
+            // Anhängen, nicht zuweisen (LLH-1855): Die Kopf-Folgen eines Widerrufs durch das
+            // Gegenüber stehen schon in der Liste.
+            fuehrung_folgen.extend(eingang.folgen);
         }
         repo::update_zustand_nach_orgs(
             conn,
@@ -1049,6 +1051,10 @@ pub async fn handle_meldung(
         // Die Nachlieferung teilt sich eine Grenze über alle Orgs; was nicht passt, folgt mit der
         // nächsten Meldung, weil der Stand je Org nur bis zum Gelieferten wandert.
         let mut budget = unterschrift::LIEFERUNGEN_MAX;
+        // Was nach einem Rückschritt dieser Seite erneut geht (LLH-1853, D2 und D4): ein Hinweis
+        // für alle Ströme, damit keiner den anderen überschreibt. Ohne Org-Namen: Eine Kopplung
+        // mit mehreren Orgs zeigt ihren Hinweis jeder davon.
+        let mut erneut: Vec<&str> = Vec::new();
         for mo in anfrage_orgs.iter().copied() {
             // Die jüngste Zuordnung mit dieser Kennung entscheidet.
             let zuordnung = alle.iter().rev().find(|o| kennung(o) == mo.org);
@@ -1060,6 +1066,25 @@ pub async fn handle_meldung(
             }
             match aktiv {
                 Some(o) => {
+                    // Rückschritt dieser Seite (LLH-1853, design.md D2 der Change
+                    // `cz5332jn-unterschrift-stammdaten-nach-restore`): Die meldende Seite kennt
+                    // einen Stand, den diese Seite nie vergeben hat. Dann gehen die Schlüssel der
+                    // Org erneut, über dem gemeldeten Stand.
+                    if mo.unterschrift_stand
+                        > unterschrift::load_hoechster_stand(conn, o.org_id).await?
+                        && mo.unterschrift_stand <= fuehrung_austausch::STAND_RAISE_MAX
+                        && unterschrift::renew_schluessel_stand_ueber(
+                            conn,
+                            o.org_id,
+                            mo.unterschrift_stand,
+                        )
+                        .await?
+                            > 0
+                    {
+                        if !erneut.contains(&"Unterschriftsschlüssel") {
+                            erneut.push("Unterschriftsschlüssel");
+                        }
+                    }
                     let lieferung =
                         unterschrift::nachlieferung(conn, o.org_id, mo.unterschrift_stand, budget)
                             .await?;
@@ -1076,6 +1101,20 @@ pub async fn handle_meldung(
                     {
                         liefern::Nachlieferung::default()
                     } else {
+                        // Rückschritt dieser Seite (LLH-1853, design.md D4): Die meldende Seite
+                        // kennt einen Log-Stand der Org, den diese Seite nie vergeben hat. Dann
+                        // geht die Org einmal ganz, über dem gemeldeten Stand.
+                        if mo.stammdaten_stand
+                            > liefern::load_hoechster_log_stand(conn, o.org_id).await?
+                            && mo.stammdaten_stand <= fuehrung_austausch::STAND_RAISE_MAX
+                            && liefern::renew_log_der_org(conn, o.org_id, mo.stammdaten_stand)
+                                .await?
+                                > 0
+                        {
+                            if !erneut.contains(&"Stammdaten") {
+                                erneut.push("Stammdaten");
+                            }
+                        }
                         liefern::nachlieferung(
                             conn,
                             o.org_id,
@@ -1119,6 +1158,19 @@ pub async fn handle_meldung(
             InstanzKopplungZustand::VomGegenueberWiderrufen,
         )
         .await?;
+        // Vor der Führung gesetzt: Was danach anders dasteht, hat diese Meldung geschrieben.
+        let rueckschritt_hinweis = (!erneut.is_empty()).then(|| {
+            format!(
+                "{} kennt schon spätere Stände, als diese Instanz vergeben hat (aus einer \
+                 Sicherung zurückgespielt?). Erneut an {} gehen: {}.",
+                kopplung.gegenueber_name,
+                kopplung.gegenueber_name,
+                erneut.join(", ")
+            )
+        });
+        if let Some(eigen) = &rueckschritt_hinweis {
+            repo::set_hinweis(conn, kopplung.id, eigen).await?;
+        }
         if fuehrung_an {
             // Führung je Einsatz (LLH-1491, D3, D7): erst übernehmen (eine Anfrage wird dabei
             // erfüllt), dann die eigenen Akten über der Quittung der meldenden Seite. Davor ein
@@ -1160,7 +1212,9 @@ pub async fn handle_meldung(
             if let Some(h) = &eingang.hinweis {
                 repo::set_hinweis(conn, kopplung.id, h).await?;
             }
-            fuehrung_folgen = eingang.folgen;
+            // Anhängen, nicht zuweisen (LLH-1855): Die Kopf-Folgen eines Widerrufs durch das
+            // Gegenüber stehen schon in der Liste.
+            fuehrung_folgen.extend(eingang.folgen);
             fuehrung_bis = if rueckschritt {
                 empfangen_vorher
             } else {
@@ -1175,6 +1229,15 @@ pub async fn handle_meldung(
                 fuehrung_austausch::ANTWORT_BYTES,
             )
             .await?;
+        }
+        // Hat die Führung in dieser Meldung einen Hinweis gesetzt, bleibt er dahinter stehen.
+        if let Some(eigen) = &rueckschritt_hinweis {
+            if let Some(h) = repo::load_hinweis(conn, kopplung.id)
+                .await?
+                .filter(|h| h != eigen)
+            {
+                repo::set_hinweis(conn, kopplung.id, &format!("{eigen} {h}")).await?;
+            }
         }
         Ok(orgs)
     })?;

@@ -505,7 +505,8 @@ pub async fn handle_abgleich(
         }
         // Pull: genannte Einsätze, die hier gelöscht sind; dazu genannte Akten ohne Spiegel,
         // deren Ende diese Instanz belegt (LLH-1699).
-        let mut geloescht = lebensende::geloeschte(conn, &eigen.kennung, &anfrage.staende).await?;
+        let mut geloescht =
+            lebensende::geloeschte(conn, kopplung.id, &eigen.kennung, &anfrage.staende).await?;
         let platz = EINSAETZE_MAX.saturating_sub(geloescht.len());
         geloescht.extend(
             lebensende::geloeschte_akten(conn, kopplung.id, &eigen.kennung, &anfrage.akten)
@@ -552,7 +553,7 @@ pub async fn handle_abgleich(
         })
     })?;
     melde_live(pool, &uebernommen).await;
-    lebensende::abraeumen_nach_commit(pool, &abzuraeumen).await;
+    lebensende::abraeumen_nach_commit(pool, Some(live), &abzuraeumen).await;
     super::hinweis::ausfuehren(pool, live, hinweis_folgen).await;
     Ok(antwort)
 }
@@ -734,7 +735,7 @@ pub async fn abgleich_einmal(
             let akten_geloescht =
                 lebensende::geloeschte_akten(conn, kopplung.id, &eigen.kennung, &antwort.akten)
                     .await?;
-            geloescht_offen = lebensende::geloeschte(conn, &eigen.kennung, &antwort.staende)
+            geloescht_offen = lebensende::geloeschte(conn, kopplung.id, &eigen.kennung, &antwort.staende)
                 .await?
                 .into_iter()
                 .chain(akten_geloescht)
@@ -744,7 +745,8 @@ pub async fn abgleich_einmal(
         })
         .map_err(fehler)?;
         melde_live(pool, &uebernommen).await;
-        lebensende::abraeumen_nach_commit(pool, &abzuraeumen).await;
+        lebensende::abraeumen_nach_commit(pool, crate::instanz::stammdaten::live(), &abzuraeumen)
+            .await;
         // Anträge an Einsätze, die hier geführt werden; die Quittungen gehen mit der nächsten
         // Anfrage hinaus.
         let mut ausgefuehrt = false;

@@ -69,6 +69,12 @@ export class ApiError extends Error {
    * 401 heißt dann „Schlüssel ungültig“, nicht „Sitzung abgelaufen“, und meldet nicht ab.
    */
   ohneSitzung: boolean;
+  /**
+   * Maschinenlesbarer Grund eines Fehlers, wenn der Server einen mitschickt, sonst `null`
+   * (LLH-1682): `nicht_in_liste` ({@link GRUND_NICHT_IN_LISTE}) unterscheidet den 404 der
+   * Zeilen-Route vom 404 einer unbekannten Route.
+   */
+  grund: string | null;
   constructor(
     status: number,
     message: string,
@@ -76,7 +82,13 @@ export class ApiError extends Error {
       vomAnwendungsserver = false,
       zeilen = [] as ZeilenGrund[],
       ohneSitzung = false,
-    }: { vomAnwendungsserver?: boolean; zeilen?: ZeilenGrund[]; ohneSitzung?: boolean } = {},
+      grund = null as string | null,
+    }: {
+      vomAnwendungsserver?: boolean;
+      zeilen?: ZeilenGrund[];
+      ohneSitzung?: boolean;
+      grund?: string | null;
+    } = {},
   ) {
     super(message);
     this.name = 'ApiError';
@@ -84,8 +96,13 @@ export class ApiError extends Error {
     this.vomAnwendungsserver = vomAnwendungsserver;
     this.zeilen = zeilen;
     this.ohneSitzung = ohneSitzung;
+    this.grund = grund;
   }
 }
+
+/** `grund` des 404 der Zeilen-Route: die Person steht in keiner Liste dieser Sitzung
+ *  (`src/error.rs`, `GRUND_NICHT_IN_LISTE`, LLH-1682). */
+export const GRUND_NICHT_IN_LISTE = 'nicht_in_liste';
 
 /** Jede Art des Wire-Enums `ZeilenArt`; der `Record` macht eine neue Art hier zur Pflicht. */
 const ZEILEN_ARTEN_JE: Readonly<Record<ZeilenArt, true>> = {
@@ -201,17 +218,19 @@ async function fehlerWerfen(res: Response, lese403: boolean): Promise<never> {
   let message = `Serverfehler (${res.status})`;
   let vomAnwendungsserver = false;
   let zeilen: ZeilenGrund[] = [];
+  let grund: string | null = null;
   try {
-    const body = (await res.json()) as { error?: unknown; zeilen?: unknown };
+    const body = (await res.json()) as { error?: unknown; zeilen?: unknown; grund?: unknown };
     if (typeof body.error === 'string') {
       message = body.error;
       vomAnwendungsserver = true;
       zeilen = leseZeilen(body.zeilen);
+      if (typeof body.grund === 'string') grund = body.grund;
     }
   } catch {
     // keine JSON-Antwort — generische Meldung beibehalten
   }
-  throw new ApiError(res.status, message, { vomAnwendungsserver, zeilen });
+  throw new ApiError(res.status, message, { vomAnwendungsserver, zeilen, grund });
 }
 
 /** Fetch wirft bei einem Leitungsfehler `TypeError`, bei Abbruch je nach Browser

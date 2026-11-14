@@ -65,11 +65,19 @@ export interface FuehrungMoeglich {
    *  `darfFuehrungUnterschreiben` (Admin der Einsatz-Org, LLH-1676, Spec `instanz-fuehrung`).
    *  Sonst bleibt der Code des Gegenübers. */
   unterschrift: boolean;
+  /** Die Kopplung zur führenden Instanz ist beendet, der Einsatz liegt hier als Spiegel: ein
+   *  Mensch holt die Führung mit Grund zurück (LLH-1850, Spec `instanz-fuehrung`). */
+  zurueckholen: boolean;
   /** Eine Übernahme gegen diese Instanz wartet auf Bestätigen oder Widersprechen. */
   entscheiden: boolean;
   /** Gegenüber vor Ort, mit denen die Führung hier wechseln würde, es aber nicht darf
    *  (LLH-1497): der Grund steht im Paneel. */
   vorOrt: string[];
+}
+
+/** Die Kopplung zur führenden Instanz ist beendet (LLH-1850): Paneel „Führung“ und Hinweisband. */
+export function kopplungBeendetText(name: string): string {
+  return `Kopplung zu ${name} beendet`;
 }
 
 /** Grund, warum zu einer Gegenstelle vor Ort keine Führung wechselt (wörtlich wie die 409). */
@@ -103,6 +111,7 @@ export function fuehrungMoeglich(
     notuebernahme: liegtHier && wechselZumFuehrer && f.fuehrer_richtung === 'meldet_sich',
     notuebernahmeMitBeweis: mitBeweis,
     unterschrift: mitBeweis && darfUnterschreiben,
+    zurueckholen: !f.fuehrend && liegtHier && f.fuehrer_beendet_at != null,
     entscheiden: f.offen != null,
     vorOrt,
   };

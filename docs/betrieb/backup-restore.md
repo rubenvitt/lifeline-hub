@@ -247,6 +247,44 @@ ersetzt.
 Herleitung:
 `openspec/changes/archive/2026-11-12-xi5ugyt8-fuehrung-stand-nach-restore/design.md`.
 
+#### Unterschriftsschlüssel und Stammdaten (LLH-1853)
+
+Auch die Unterschriftsschlüssel und die Stammdaten, die ein Hub an seine ELW verteilt, fließen nach
+dem Zurückspielen des Hubs ohne Eingriff weiter:
+
+- Schlüssel, die danach registriert, gegengezeichnet oder widerrufen werden, erreichen den ELW mit
+  den nächsten Meldungen. Ein Widerruf gilt dort also auch nach dem Zurückspielen.
+- Stammdaten, die danach am Hub geändert werden, erreichen den ELW mit den nächsten Meldungen. Dafür
+  hebt der Server beim Start den Zähler der Stammdaten-Änderungen auf die Uhrzeit.
+- Bekommt ein neuer Schlüssel am Hub dieselbe Nummer wie einer, der mit der Sicherung verloren
+  ging, führt der ELW den alten als widerrufen und den neuen als „wartet auf Bestätigung“.
+- Kennt der ELW schon Stände, die der zurückgespielte Hub nicht mehr hat, erkennt der Hub den
+  Rückstand an der nächsten Meldung und schickt die Schlüssel bzw. die Stammdaten der Org einmal
+  ganz. Das geschieht meist auch bei richtiger Uhr, solange am Hub seit dem Zurückspielen nichts
+  geändert wurde, und es fängt eine nachgehende Uhr ab. Die Kopplung zeigt dann „… kennt schon
+  spätere Stände, als diese Instanz vergeben hat (aus einer Sicherung zurückgespielt?). Erneut an …
+  gehen: Unterschriftsschlüssel, Stammdaten.“ Das ist kein Fehler.
+
+**Grenzen:**
+
+- **Verlorene Einträge bleiben am ELW.** Schlüssel und Stammdaten, die der Hub nach der Sicherung
+  angelegt, schon an den ELW geliefert und dann mit der Sicherung verloren hat, bleiben am ELW
+  stehen. Ein solcher Schlüssel gilt dort weiter, bis der Hub seine Nummer neu vergibt (dann
+  widerruft ihn der ELW) oder die Org neu gekoppelt wird (Zunder LLH-1871).
+- **Die Uhr des Servers muss stimmen.** Geht sie nach und ändert der Hub vor der ersten Meldung
+  mindestens so viel, wie verloren ging, kommt eine Änderung erst mit ihrer nächsten. Für
+  Stammdaten hilft dann „Erneut abgleichen“ am ELW.
+- **VM-Snapshot mit laufendem Server.** Ohne Neustart springt der Zähler der Stammdaten nicht; es
+  gilt dasselbe wie bei nachgehender Uhr. Nach einem Snapshot steht die Uhr außerdem oft kurz
+  zurück. Stellt sie sich vor der nächsten Meldung des ELW über die verlorenen Stände, und folgt
+  noch eine Schlüsselaktion, erreicht ein Widerruf aus dieser Zeit den ELW nicht (Zunder LLH-1871).
+  Server nach einem Snapshot neu starten und den ELW sich melden lassen, bevor Schlüssel geändert
+  werden.
+- **Mehrere ELW.** Hatte ein zweiter ELW weiter übernommen als der zuerst meldende, kann er einzelne
+  der erneut geschickten Einträge verpassen (Zunder LLH-1871).
+
+Herleitung: `openspec/changes/archive/2026-11-13-cz5332jn-unterschrift-stammdaten-nach-restore/design.md`.
+
 ## Archiv eines Einsatzes einspielen (LLH-1494)
 
 Ein Archivblock aus der Archivakte (`einsatz-…-block-<n>.sqlite.age`, siehe Anwenderdoku
@@ -323,6 +361,68 @@ während des Uploads in eine Datei `lifeline-zwischen-archiv-0-hochgeladen-…` 
 Datenbank; sie verschwindet mit dem Aufruf und nach einem Absturz wie die Zwischendatei des
 Befehls nach 6 Stunden. Kurz liegt der Block also zweimal auf der Platte, verschlüsselt und
 entschlüsselt.
+
+## Löschersuchen für eine Person im Archiv (LLH-1712)
+
+Ein Löschersuchen für **eine Person** an einem archivierten Einsatz stellt der Admin in der
+Archivakte, mit der Kennung der Person (`R-042`, `EK-17`, `IT-5`). Nach 24 Stunden vollzieht es
+nicht der Purge-Lauf: Der Server hat nur die öffentlichen Archiv-Schlüssel der Organisation und
+kann die Blöcke nicht öffnen. Bis zum Vollzug bleibt der Antrag offen, und die Archivakte zeigt
+„wartet auf Befehl mit Archiv-Schlüssel“. Vollzogen wird per Befehl auf dem Server, mit einem
+privaten Archiv-Schlüssel und mit der Version, mit der der Server läuft:
+
+```bash
+lifeline-hub --db-path /var/lib/lifeline/lifeline.db archiv loeschersuchen \
+             --identitaet archiv-schluessel.txt
+# nur einen Einsatz (ID aus der Adresse der Archivakte)
+lifeline-hub --db-path … archiv loeschersuchen --identitaet - --einsatz 751
+# nur die Einsätze einer Organisation (ein Schlüssel öffnet nur die Blöcke seiner Organisation)
+lifeline-hub --db-path … archiv loeschersuchen --identitaet … --org 2
+```
+
+- Jeder Block des Einsatzes wird entschlüsselt (Zwischendatei neben der Datenbank, wie beim
+  Einspielen), auf den Stand dieser Version gebracht und die Person darin so geschwärzt wie bei
+  einem Löschersuchen am Einsatz. Danach wird der Block an die **heute geprüften**
+  Archiv-Schlüssel der Organisation neu verschlüsselt. Ein inzwischen entfernter Schlüssel
+  öffnet ihn danach nicht mehr. Nummer und Frist der Blöcke bleiben, alle übrigen Inhalte auch.
+- Ersetzt werden die Blöcke erst, wenn alle gebaut sind, in einer Transaktion zusammen mit dem
+  Antrag, einem Eintrag im Einsatztagebuch (Aktenzeichen, Kennung, Zahl der Blöcke) und einem
+  Eintrag im Zugangsprotokoll („Person im Archiv geschwärzt“), alle ohne Namen. Passt der
+  Schlüssel nicht, hat die Organisation keinen geprüften Schlüssel mehr, hat ein zweiter Aufruf
+  den Antrag inzwischen vollzogen oder löscht der Purge-Lauf währenddessen einen abgelaufenen
+  Block, bleibt alles, wie es war. Der Befehl nennt das; ein späterer Aufruf baut neu.
+- **Alte Blöcke:** Ein vor dem Vollzug heruntergeladener Block lässt sich an dieser Installation
+  danach nicht mehr einspielen. Eine hier eingespielte Kopie eines alten Blocks geht mit dem
+  nächsten Purge-Lauf. Heruntergeladene Blöcke und Kopien an anderen Installationen erreicht der
+  Vollzug nicht; sie sind beim Löschersuchen von Hand mit zu löschen.
+- Führt die Installation mehrere Organisationen, gehört `--org` dazu: Ohne sie versucht der
+  Befehl auch die Einsätze der anderen, scheitert dort am Schlüssel und endet mit einem Fehler,
+  obwohl die eigenen vollzogen sind.
+- Strg+C oder SIGTERM während des Neubaus brechen ab: Am gerade bearbeiteten Einsatz ändert sich
+  nichts, und die Zwischendateien gehen mit; schon gemeldete Einsätze bleiben vollzogen. Kommt
+  das Signal während des Ablegens, läuft diese Transaktion zu Ende, und der Befehl hört danach
+  auf.
+- Der Befehl hält immer nur einen Block im Arbeitsspeicher, braucht aber Platz auf der Platte:
+  für den entschlüsselten Block zweimal (`VACUUM` legt eine Kopie an, im Temp-Verzeichnis und
+  als Journal neben der Datei), für alle neu verschlüsselten Blöcke des Einsatzes, und während
+  des Ablegens noch einmal so viel im Write-Ahead-Log der Datenbank, dazu die genullten Seiten der
+  alten Blöcke. Grob gerechnet: dreimal die Größe des Archivs des Einsatzes frei. Fehlt der Platz,
+  scheitert die Ablage und wird zurückgerollt; in der Zeit ist die Platte aber auch für den
+  laufenden Server voll.
+
+**Kennung finden.** Am archivierten Einsatz gibt es keine Namen mehr. Die Kennung zu einem Namen
+liefert die Suche im gültigen Block des Archivs:
+
+```bash
+lifeline-hub --db-path … archiv personen --einsatz 751 --identitaet archiv-schluessel.txt \
+             --suche "Mustermann"
+```
+
+Sie sucht wie die Personensuche der Archivakte (ganze Wörter des Namens, bei Kräften und Anrufen
+auch Rufnummern ab sechs Ziffern) und nennt je Treffer Kennung, Art, Erfassungszeit und Namen,
+nur im Terminal. Am Archiv ändert sie nichts. Das Zugangsprotokoll hält jede Suche unter „Archiv
+durchsucht“ fest, ohne den Suchtext. Der Suchtext steht aber in der Prozessliste und in der
+Shell-History; wer das vermeiden will, schaltet die History für den Aufruf ab.
 
 ## Sicherungen und Schwärzung (LFH-725)
 

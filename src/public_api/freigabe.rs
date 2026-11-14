@@ -170,6 +170,37 @@ pub async fn freigegebene_einsaetze(
         .await?)
 }
 
+/// Darf der Zugang diesen Einsatz lesen? Genau dann, wenn er wirksam für ihn freigegeben ist und
+/// zur Org des Zugangs gehört. Für Routen, deren Anfrage einen Einsatz nennt (`einsatz_id` der
+/// Rechner-API, LLH-1856): die Kennung wählt nur unter den freigegebenen aus, sie öffnet nichts
+/// (ADR-0035). Die Org wird mitgeprüft, denn ein fremder Einsatz wäre ein Datenabfluss.
+pub async fn is_lesbar(
+    conn: &mut SqliteConnection,
+    zugang_id: &str,
+    org_id: i64,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    if !freigegebene_einsaetze(conn, zugang_id)
+        .await?
+        .contains(&einsatz_id)
+    {
+        return Ok(false);
+    }
+    let einsatz_org: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    if einsatz_org != Some(org_id) {
+        tracing::error!(
+            zugang_id,
+            einsatz_id,
+            "Freigabe zeigt auf einen Einsatz einer anderen Organisation"
+        );
+        return Ok(false);
+    }
+    Ok(true)
+}
+
 /// Der gelesene Einsatz mit Bezeichnung, für die Seite „Anbindungen“.
 pub async fn gelesener_einsatz(
     conn: &mut SqliteConnection,
@@ -394,6 +425,68 @@ mod tests {
         freigeben_tx(&mut c, &z, e, von).await.unwrap();
         assert_eq!(delete_fuer_zugang_tx(&mut c, &z).await.unwrap(), Some(e));
         assert_eq!(delete_fuer_zugang_tx(&mut c, &z).await.unwrap(), None);
+    }
+
+    /// LLH-1856: lesbar ist genau der wirksam freigegebene Einsatz der eigenen Org.
+    #[tokio::test]
+    async fn lesbar_ist_nur_der_freigegebene_einsatz_der_eigenen_org() {
+        let pool = db::test_pool().await;
+        let z = neuer_zugang(&pool, "Planung", &[Scope::EinsaetzeRead, Scope::RechnerUse]).await;
+        let a = neuer_einsatz(&pool, "A").await;
+        let b = neuer_einsatz(&pool, "B").await;
+        let von = benutzer(&pool).await;
+        let mut c = pool.acquire().await.unwrap();
+
+        assert!(!is_lesbar(&mut c, &z, 1, a).await.unwrap(), "ohne Freigabe");
+        freigeben_tx(&mut c, &z, a, von).await.unwrap();
+        assert!(is_lesbar(&mut c, &z, 1, a).await.unwrap(), "freigegeben");
+        assert!(
+            !is_lesbar(&mut c, &z, 1, b).await.unwrap(),
+            "anderer Einsatz"
+        );
+        assert!(!is_lesbar(&mut c, &z, 1, 999).await.unwrap(), "unbekannt");
+        assert!(!is_lesbar(&mut c, &z, 2, a).await.unwrap(), "andere Org");
+        assert!(
+            !is_lesbar(&mut c, "fremd", 1, a).await.unwrap(),
+            "anderer Zugang"
+        );
+
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(a)
+            .execute(&mut *c)
+            .await
+            .unwrap();
+        assert!(!is_lesbar(&mut c, &z, 1, a).await.unwrap(), "abgeschlossen");
+
+        freigeben_tx(&mut c, &z, b, von).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = datetime('now') WHERE id = ?")
+            .bind(b)
+            .execute(&mut *c)
+            .await
+            .unwrap();
+        assert!(!is_lesbar(&mut c, &z, 1, b).await.unwrap(), "gelöscht");
+    }
+
+    /// Eine Freigabe, die auf einen Einsatz einer anderen Org zeigt, öffnet ihn nicht: kein
+    /// Schreibweg legt sie an, aber ein fremder Einsatz wäre ein Datenabfluss.
+    #[tokio::test]
+    async fn freigabe_auf_einen_fremden_einsatz_ist_nicht_lesbar() {
+        let pool = db::test_pool().await;
+        let z = neuer_zugang(&pool, "Planung", &[Scope::EinsaetzeRead]).await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (2, 'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let von = benutzer(&pool).await;
+        let mut c = pool.acquire().await.unwrap();
+        freigeben_tx(&mut c, &z, fremd, von).await.unwrap();
+        assert!(!is_lesbar(&mut c, &z, 1, fremd).await.unwrap());
     }
 
     async fn org_an_hub_koppeln(c: &mut SqliteConnection) -> i64 {

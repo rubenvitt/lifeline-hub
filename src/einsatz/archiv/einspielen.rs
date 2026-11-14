@@ -232,22 +232,7 @@ async fn einspielen_aus(
 ) -> Result<Eingespielt, AppError> {
     let kein_block =
         || AppError::Validation("Die Datei ist kein Archivblock eines Einsatzes.".into());
-    // Eine Datei, die keine SQLite-Datenbank ist, scheitert schon hier.
-    let tabellen: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
-    )
-    .fetch_one(archiv)
-    .await
-    .map_err(|_| kein_block())?;
-    if tabellen == 0 {
-        return Err(kein_block());
-    }
-    crate::db::migrate(archiv).await.map_err(|e| {
-        AppError::Validation(format!(
-            "Archivblock: Migration auf diese Version gescheitert ({e}). Stammt er von einer \
-             neueren Version, mit dieser einspielen."
-        ))
-    })?;
+    migrieren(archiv).await?;
     // Migrationen, die Tabellen neu bauen, schalten Fremdschlüssel am Ende wieder ein.
     sqlx::query("PRAGMA foreign_keys = OFF")
         .execute(archiv)
@@ -458,6 +443,30 @@ async fn einspielen_aus(
         inhalte,
         hinweise,
         frist_endet_at,
+    })
+}
+
+/// Bringt eine entschlüsselte Archivdatei auf den Stand dieser Version (auch für das
+/// Löschersuchen im Archiv, LLH-1712). Eine Datei, die kein Archivblock ist, und ein Block einer
+/// neueren Version sind 400.
+pub(super) async fn migrieren(archiv: &SqlitePool) -> Result<(), AppError> {
+    let kein_block =
+        || AppError::Validation("Die Datei ist kein Archivblock eines Einsatzes.".into());
+    // Eine Datei, die keine SQLite-Datenbank ist, scheitert schon hier.
+    let tabellen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
+    )
+    .fetch_one(archiv)
+    .await
+    .map_err(|_| kein_block())?;
+    if tabellen == 0 {
+        return Err(kein_block());
+    }
+    crate::db::migrate(archiv).await.map_err(|e| {
+        AppError::Validation(format!(
+            "Archivblock: Migration auf diese Version gescheitert ({e}). Stammt er von einer \
+             neueren Version, mit dieser einspielen."
+        ))
     })
 }
 
@@ -812,7 +821,8 @@ async fn sofort_abraeumen(pool: &SqlitePool, einsatz_id: i64) -> Result<(), AppE
     crate::write_retry!(pool, |conn| {
         abraeumen::vormerken(conn, einsatz_id, AbraeumArt::Spiegel, Some(GEGENSTELLE)).await
     })?;
-    abraeumen::ausfuehren(pool, einsatz_id).await?;
+    // Kein Server, kein Hub: das Einspielen läuft als Kommando (`main.rs`).
+    abraeumen::ausfuehren(pool, None, einsatz_id).await?;
     konten_aufraeumen(pool).await;
     Ok(())
 }

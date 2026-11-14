@@ -1960,7 +1960,8 @@ export type PersonTreffer = S['PersonTrefferAnzeige'];
 /** Body von `POST …/schwaerzungsantraege`. Kein Backend-Schema, FE-lokal. `ziel.id` fehlt beim
  *  Einsatz und ist bei einer Person Pflicht; `bestaetigung` ist die eingetippte Kennung. */
 export interface NeuerSchwaerzungsantrag {
-  ziel: { art: AntragZielArt; id?: number };
+  /** Eine Person per `id` oder per `kennung` (`R-042`, am archivierten Einsatz, LLH-1712). */
+  ziel: { art: AntragZielArt; id?: number; kennung?: string };
   aktenzeichen: string;
   bestaetigung: string;
 }

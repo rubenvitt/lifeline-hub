@@ -246,36 +246,53 @@ async fn geschwaerzter_einsatz_ist_409() {
     ));
 }
 
-/// Ein archivierter Einsatz (LLH-1494, K8): nur das Ersuchen für den ganzen Einsatz geht, und es
-/// löscht das Archiv.
-#[tokio::test]
-async fn archivierter_einsatz_nur_ganz_und_der_vollzug_loescht_das_archiv() {
-    let pool = crate::db::test_pool().await;
-    let b = testdaten::anlegen(&pool).await;
+/// Macht `e` zu einem archivierten Einsatz: geschwärzt, mit `bloecke` Attrappen-Blöcken.
+async fn archiviere_attrappe(pool: &SqlitePool, e: i64, bloecke: i64) {
     sqlx::query("UPDATE einsatz SET geloescht_at = ?1, geschwaerzt_at = ?1 WHERE id = ?2")
         .bind(T0)
-        .bind(b.e1)
-        .execute(&pool)
+        .bind(e)
+        .execute(pool)
         .await
         .unwrap();
-    for block in [1, 2] {
+    for block in 1..=bloecke {
         sqlx::query(
             "INSERT INTO einsatz_archiv (einsatz_id, block, empfaenger_fingerabdruecke, groesse, \
                 sha256, inhalt) VALUES (?, ?, '[]', 3, 'x', X'010203')",
         )
-        .bind(b.e1)
+        .bind(e)
         .bind(block)
-        .execute(&pool)
+        .execute(pool)
         .await
         .unwrap();
     }
-    let e = stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+}
+
+async fn archiv_bloecke(pool: &SqlitePool, e: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_archiv WHERE einsatz_id = ?")
+        .bind(e)
+        .fetch_one(pool)
         .await
-        .unwrap_err();
-    let AppError::Conflict(m) = e else {
-        panic!("{e:?}")
-    };
-    assert!(m.contains("archiviert"), "{m}");
+        .unwrap()
+}
+
+async fn ist_offen(pool: &SqlitePool, a: i64) -> bool {
+    sqlx::query_scalar(
+        "SELECT vollzogen_at IS NULL AND zurueckgenommen_at IS NULL \
+         FROM schwaerzung_antrag WHERE id = ?",
+    )
+    .bind(a)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Ein archivierter Einsatz (LLH-1494, K8): das Ersuchen für den ganzen Einsatz löscht das
+/// Archiv.
+#[tokio::test]
+async fn archivierter_einsatz_ganz_loescht_das_archiv() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    archiviere_attrappe(&pool, b.e1, 2).await;
 
     let a = stelle(&pool, &b, b.e1, AntragZiel::Einsatz, "E-2026-0751", T0)
         .await
@@ -283,18 +300,182 @@ async fn archivierter_einsatz_nur_ganz_und_der_vollzug_loescht_das_archiv() {
     assert!(vollziehen(&pool, a, t(T0) + Duration::hours(25))
         .await
         .unwrap());
-    let bloecke: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_archiv WHERE einsatz_id = ?")
-            .bind(b.e1)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(bloecke, 0);
+    assert_eq!(archiv_bloecke(&pool, b.e1).await, 0);
     let letzter = etb_texte(&pool, b.e1).await.pop().unwrap();
     assert!(
         letzter.contains("Archiv des Einsatzes (2 Blöcke)"),
         "{letzter}"
     );
+}
+
+/// LLH-1712: am archivierten Einsatz geht auch ein Personen-Antrag; der Purge-Lauf lässt ihn
+/// offen und die Blöcke unberührt (Vollzug per Befehl mit dem Archiv-Schlüssel).
+#[tokio::test]
+async fn archivierter_einsatz_person_bleibt_im_purge_offen() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    archiviere_attrappe(&pool, b.e1, 2).await;
+
+    let a = stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    let spaeter = t(T0) + Duration::hours(25);
+    assert!(!faellige(&pool, spaeter).await.unwrap().contains(&a));
+    assert!(!vollziehen(&pool, a, spaeter).await.unwrap());
+    assert!(ist_offen(&pool, a).await);
+    assert_eq!(archiv_bloecke(&pool, b.e1).await, 2);
+    let inhalt: Vec<u8> =
+        sqlx::query_scalar("SELECT inhalt FROM einsatz_archiv WHERE einsatz_id = ? AND block = 1")
+            .bind(b.e1)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(inhalt, vec![1, 2, 3]);
+}
+
+/// LLH-1712: nach den 24 Stunden nennt die Ablehnung der Rücknahme am Archiv den Befehl, nicht
+/// den Purge-Lauf.
+#[tokio::test]
+async fn archivierter_einsatz_ruecknahme_nach_24_stunden_nennt_den_befehl() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    archiviere_attrappe(&pool, b.e1, 1).await;
+    let a = stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    let e = zuruecknehmen(&pool, b.e1, a, b.admin, t(T0) + Duration::hours(25))
+        .await
+        .unwrap_err();
+    let AppError::Conflict(m) = e else {
+        panic!("{e:?}")
+    };
+    assert!(
+        m.contains("Archiv-Schlüssel") && !m.contains("Purge"),
+        "{m}"
+    );
+}
+
+/// LLH-1712: ist das Archiv inzwischen ganz abgelaufen, erledigt der Purge-Lauf den offenen
+/// Personen-Antrag wie an jedem geschwärzten Einsatz.
+#[tokio::test]
+async fn archiv_abgelaufen_erledigt_den_personen_antrag() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    archiviere_attrappe(&pool, b.e1, 1).await;
+    let a = stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM einsatz_archiv WHERE einsatz_id = ?")
+        .bind(b.e1)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let spaeter = t(T0) + Duration::hours(25);
+    assert!(faellige(&pool, spaeter).await.unwrap().contains(&a));
+    vollziehen(&pool, a, spaeter).await.unwrap();
+    assert!(!ist_offen(&pool, a).await);
+    let letzter = etb_texte(&pool, b.e1).await.pop().unwrap();
+    assert!(letzter.contains("bereits geschwärzt"), "{letzter}");
+}
+
+/// LLH-1712: eine Person lässt sich als Ziel per Kennung angeben.
+#[tokio::test]
+async fn person_per_kennung() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    let aufl = |art, k: String| {
+        let pool = pool.clone();
+        async move { person_aus_kennung(&pool, b.e1, art, &k).await }
+    };
+    assert_eq!(
+        aufl(PersonenArt::Betroffene, "R-001".into()).await.unwrap(),
+        b.p1
+    );
+    assert_eq!(
+        aufl(PersonenArt::Betroffene, "R-2".into()).await.unwrap(),
+        b.p2
+    );
+    assert_eq!(
+        aufl(PersonenArt::ExterneKraft, format!("EK-{}", b.k1))
+            .await
+            .unwrap(),
+        b.k1
+    );
+    assert_eq!(
+        aufl(PersonenArt::InfotelefonAnruf, format!("IT-{}", b.anruf1))
+            .await
+            .unwrap(),
+        b.anruf1
+    );
+    // Falsches Präfix oder keine Kennung: 400.
+    for (art, k) in [
+        (PersonenArt::Betroffene, format!("IT-{}", b.anruf1)),
+        (PersonenArt::ExterneKraft, "R-001".to_string()),
+        (PersonenArt::Betroffene, "R-".to_string()),
+        (PersonenArt::Betroffene, "R-abc".to_string()),
+        (PersonenArt::Betroffene, "".to_string()),
+    ] {
+        assert!(
+            matches!(aufl(art, k.clone()).await, Err(AppError::Validation(_))),
+            "{k}"
+        );
+    }
+    // Keine Person dieses Einsatzes: 404 (R-001 aus e2 gibt es in e1 als p1, R-099 nirgends).
+    assert!(matches!(
+        aufl(PersonenArt::Betroffene, "R-099".into()).await,
+        Err(AppError::NotFound)
+    ));
+    assert!(matches!(
+        aufl(PersonenArt::InfotelefonAnruf, "IT-999999".into()).await,
+        Err(AppError::NotFound)
+    ));
+    let fremd: i64 = sqlx::query_scalar(
+        "INSERT INTO infotelefon_anruf (einsatz_id, anliegen, status, rueckruf, eingang_at, \
+            angelegt_von_id) VALUES (?, 'hinweis', 'offen', '0151 1', '2026-01-01 00:00:00', ?) \
+         RETURNING id",
+    )
+    .bind(b.e2)
+    .bind(b.leitung)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(matches!(
+        aufl(PersonenArt::InfotelefonAnruf, format!("IT-{fremd}")).await,
+        Err(AppError::NotFound)
+    ));
+}
+
+/// LLH-1712: per Kennung gestellt, gilt der Antrag der Person dahinter.
+#[tokio::test]
+async fn archivierter_einsatz_antrag_per_kennung() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    archiviere_attrappe(&pool, b.e1, 1).await;
+    let id = person_aus_kennung(&pool, b.e1, PersonenArt::Betroffene, "R-002")
+        .await
+        .unwrap();
+    let a = stelle(&pool, &b, b.e1, betroffene(id), "R-002", T0)
+        .await
+        .unwrap();
+    let ziel: Option<i64> =
+        sqlx::query_scalar("SELECT ziel_id FROM schwaerzung_antrag WHERE id = ?")
+            .bind(a)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(ziel, Some(b.p2));
+}
+
+/// Ohne Archiv bleibt ein geschwärzter Einsatz für jeden Antrag gesperrt.
+#[tokio::test]
+async fn geschwaerzt_ohne_archiv_kein_personen_antrag() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    archiviere_attrappe(&pool, b.e1, 0).await;
+    assert!(matches!(
+        stelle(&pool, &b, b.e1, betroffene(b.p1), "R-001", T0).await,
+        Err(AppError::Conflict(_))
+    ));
 }
 
 #[test]

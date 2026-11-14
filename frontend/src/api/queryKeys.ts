@@ -433,8 +433,9 @@ export const EINSATZ_STREAM_EVENTS = {
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
 
-/** Listen, die ein Live-Ereignis zeilenweise abgleicht (`live/zeilenAbgleich.ts`, LFH-931). */
-export type ZeilenZiel = 'schaeden';
+/** Listen, die ein Live-Ereignis zeilenweise abgleicht (`live/zeilenAbgleich.ts`, LFH-931;
+ *  Personen seit LLH-1682). */
+export type ZeilenZiel = 'schaeden' | 'personen';
 
 /** Ein gezielter Abgleich: einen Key (samt Prefix-Match) oder eine Zeile einer Liste. */
 export type LiveAbgleich =
@@ -497,6 +498,20 @@ export const EINSATZ_STREAM_ZIELE: Partial<
       { art: 'zeile', ziel: 'schaeden', id: sid },
       key(einsatzKeys.schaedenGeschaedigtAlle(e)),
       key(einsatzKeys.schaedenKennzahlenAlle(e)),
+    ];
+  },
+  // LLH-1682: Liste, Auswahl und Betroffene je Stelle zeilenweise über die nicht protokollierte
+  // Zeilen-Route; die übrigen Abnehmer des Ereignisses wie bisher, die Anhänge nur dieser Person.
+  person: (p, e) => {
+    const pid = kennung(p, 'person_id');
+    if (pid === null) return null;
+    return [
+      { art: 'zeile', ziel: 'personen', id: pid },
+      key(einsatzKeys.modulZaehler(e)),
+      key(einsatzKeys.betreuung(e)),
+      key(einsatzKeys.personAnhaenge(e, pid)),
+      key(einsatzKeys.personenTransportmittel(e)),
+      key(einsatzKeys.registrierlisteAlle(e)),
     ];
   },
 };
@@ -696,6 +711,9 @@ export const einsatzKeys = {
    *  `person`-Ereignis und jede Personen-Mutation sie mit auffrischen. */
   personenDerStelle: (einsatzId: number, stelleId: number) =>
     [EINSATZ_KEYS.personen, einsatzId, 'stelle', stelleId] as const,
+  /** Prefix aller {@link einsatzKeys.personenDerStelle} eines Einsatzes (Zeilenabgleich, LLH-1682). */
+  personenDerStelleAlle: (einsatzId: number) =>
+    [EINSATZ_KEYS.personen, einsatzId, 'stelle'] as const,
   personenAuswahl: (einsatzId: number) => [EINSATZ_KEYS.personenAuswahl, einsatzId] as const,
   // personId nullbar: der Person-Detail-Drawer rendert ohne Auswahl (enabled-Guard).
   person: (einsatzId: number, personId: number | null) =>
