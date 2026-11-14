@@ -304,31 +304,37 @@ pub async fn setze_standard(
     id: i64,
     benutzer_id: i64,
 ) -> Result<Option<KartenAnsichtAnzeige>, AppError> {
-    let mut tx = pool.begin().await?;
-    let existiert: Option<i64> =
-        sqlx::query_scalar("SELECT id FROM karten_ansicht WHERE einsatz_id = ? AND id = ?")
+    // BEGIN IMMEDIATE über `write_retry!` (LLH-1693): erst lesen, dann schreiben scheiterte unter
+    // deferred `BEGIN` bei einem fremden Schreiber sofort mit BUSY (503).
+    let exists = crate::write_retry!(pool, |conn| {
+        let id_vorhanden: Option<i64> =
+            sqlx::query_scalar("SELECT id FROM karten_ansicht WHERE einsatz_id = ? AND id = ?")
+                .bind(einsatz_id)
+                .bind(id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        if id_vorhanden.is_none() {
+            return Ok(false); // nichts geschrieben
+        }
+        sqlx::query("UPDATE karten_ansicht SET ist_standard = 0 WHERE einsatz_id = ? AND id <> ?")
             .bind(einsatz_id)
             .bind(id)
-            .fetch_optional(&mut *tx)
+            .execute(&mut *conn)
             .await?;
-    if existiert.is_none() {
-        return Ok(None); // Rollback beim Drop
-    }
-    sqlx::query("UPDATE karten_ansicht SET ist_standard = 0 WHERE einsatz_id = ? AND id <> ?")
+        sqlx::query(
+            "UPDATE karten_ansicht SET ist_standard = 1, geaendert_at = datetime('now'), \
+                 geaendert_von = ? WHERE einsatz_id = ? AND id = ?",
+        )
+        .bind(benutzer_id)
         .bind(einsatz_id)
         .bind(id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
-    sqlx::query(
-        "UPDATE karten_ansicht SET ist_standard = 1, geaendert_at = datetime('now'), \
-             geaendert_von = ? WHERE einsatz_id = ? AND id = ?",
-    )
-    .bind(benutzer_id)
-    .bind(einsatz_id)
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
+        Ok(true)
+    })?;
+    if !exists {
+        return Ok(None);
+    }
     laden(pool, einsatz_id, id).await
 }
 
@@ -342,78 +348,81 @@ pub async fn loesche(
     id: i64,
     behandlung: ObjektBehandlung,
 ) -> Result<(), AppError> {
-    let mut tx = pool.begin().await?;
-    let ist_standard: Option<i64> = sqlx::query_scalar(
-        "SELECT ist_standard FROM karten_ansicht WHERE einsatz_id = ? AND id = ?",
-    )
-    .bind(einsatz_id)
-    .bind(id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let Some(ist_standard) = ist_standard else {
-        return Err(AppError::NotFound);
-    };
-    if ist_standard != 0 {
-        return Err(AppError::UnprocessableEntity(
-            "Die Standardansicht ist nicht löschbar".into(),
-        ));
-    }
-    let anzahl: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM karten_ansicht WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_one(&mut *tx)
-            .await?;
-    if anzahl <= 1 {
-        return Err(AppError::UnprocessableEntity(
-            "Die letzte verbleibende Ansicht ist nicht löschbar".into(),
-        ));
-    }
-
-    // Verwaiste Gefahrengebiet-Gruppen nach dem Commit aufräumen (nur beim Löschen).
-    let mut gruppen: Vec<i64> = Vec::new();
-    match behandlung {
-        ObjektBehandlung::Freigeben => {
-            for tabelle in ["freies_zeichen", "lage_zone", "karte_hintergrundbild"] {
-                sqlx::query(sqlx::AssertSqlSafe(format!(
-                    "UPDATE {tabelle} SET ansicht_id = NULL WHERE einsatz_id = ? AND ansicht_id = ?"
-                )))
-                .bind(einsatz_id)
-                .bind(id)
-                .execute(&mut *tx)
-                .await?;
-            }
-        }
-        ObjektBehandlung::Loeschen => {
-            // Zonen zuerst: RETURNING liefert die Gefahrengebiet-Gruppen für das Aufräumen.
-            gruppen = sqlx::query_scalar::<_, Option<i64>>(
-                "DELETE FROM lage_zone WHERE einsatz_id = ? AND ansicht_id = ? \
-                 RETURNING gefahrengebiet_id",
-            )
-            .bind(einsatz_id)
-            .bind(id)
-            .fetch_all(&mut *tx)
-            .await?
-            .into_iter()
-            .flatten()
-            .collect();
-            for tabelle in ["freies_zeichen", "karte_hintergrundbild"] {
-                sqlx::query(sqlx::AssertSqlSafe(format!(
-                    "DELETE FROM {tabelle} WHERE einsatz_id = ? AND ansicht_id = ?"
-                )))
-                .bind(einsatz_id)
-                .bind(id)
-                .execute(&mut *tx)
-                .await?;
-            }
-        }
-    }
-
-    sqlx::query("DELETE FROM karten_ansicht WHERE einsatz_id = ? AND id = ?")
+    // BEGIN IMMEDIATE über `write_retry!` (LLH-1693): erst lesen, dann schreiben scheiterte unter
+    // deferred `BEGIN` bei einem fremden Schreiber sofort mit BUSY (503).
+    let mut gruppen = crate::write_retry!(pool, |conn| {
+        let ist_standard: Option<i64> = sqlx::query_scalar(
+            "SELECT ist_standard FROM karten_ansicht WHERE einsatz_id = ? AND id = ?",
+        )
         .bind(einsatz_id)
         .bind(id)
-        .execute(&mut *tx)
+        .fetch_optional(&mut *conn)
         .await?;
-    tx.commit().await?;
+        let Some(ist_standard) = ist_standard else {
+            return Err(AppError::NotFound);
+        };
+        if ist_standard != 0 {
+            return Err(AppError::UnprocessableEntity(
+                "Die Standardansicht ist nicht löschbar".into(),
+            ));
+        }
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM karten_ansicht WHERE einsatz_id = ?")
+                .bind(einsatz_id)
+                .fetch_one(&mut *conn)
+                .await?;
+        if anzahl <= 1 {
+            return Err(AppError::UnprocessableEntity(
+                "Die letzte verbleibende Ansicht ist nicht löschbar".into(),
+            ));
+        }
+
+        // Verwaiste Gefahrengebiet-Gruppen nach dem Commit aufräumen (nur beim Löschen).
+        let mut gruppen: Vec<i64> = Vec::new();
+        match behandlung {
+            ObjektBehandlung::Freigeben => {
+                for tabelle in ["freies_zeichen", "lage_zone", "karte_hintergrundbild"] {
+                    sqlx::query(sqlx::AssertSqlSafe(format!(
+                        "UPDATE {tabelle} SET ansicht_id = NULL WHERE einsatz_id = ? AND ansicht_id = ?"
+                    )))
+                    .bind(einsatz_id)
+                    .bind(id)
+                    .execute(&mut *conn)
+                    .await?;
+                }
+            }
+            ObjektBehandlung::Loeschen => {
+                // Zonen zuerst: RETURNING liefert die Gefahrengebiet-Gruppen für das Aufräumen.
+                gruppen = sqlx::query_scalar::<_, Option<i64>>(
+                    "DELETE FROM lage_zone WHERE einsatz_id = ? AND ansicht_id = ? \
+                     RETURNING gefahrengebiet_id",
+                )
+                .bind(einsatz_id)
+                .bind(id)
+                .fetch_all(&mut *conn)
+                .await?
+                .into_iter()
+                .flatten()
+                .collect();
+                for tabelle in ["freies_zeichen", "karte_hintergrundbild"] {
+                    sqlx::query(sqlx::AssertSqlSafe(format!(
+                        "DELETE FROM {tabelle} WHERE einsatz_id = ? AND ansicht_id = ?"
+                    )))
+                    .bind(einsatz_id)
+                    .bind(id)
+                    .execute(&mut *conn)
+                    .await?;
+                }
+            }
+        }
+
+        sqlx::query("DELETE FROM karten_ansicht WHERE einsatz_id = ? AND id = ?")
+            .bind(einsatz_id)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+        Ok(gruppen)
+    })?;
 
     // Nach dem Commit, nicht unter dem Write-Lock: leer gewordene Gruppen aufräumen.
     gruppen.sort_unstable();
@@ -422,4 +431,84 @@ pub async fn loesche(
         crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(pool, g).await?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Org, Benutzer und Einsatz; liefert (einsatz, benutzer).
+    async fn setup(pool: &SqlitePool) -> (i64, i64) {
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        let benutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, benutzername, passwort_hash, anzeigename) \
+             VALUES (1, 'tester', 'x', 'Tester') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (einsatz, benutzer)
+    }
+
+    fn ansicht(name: &str) -> AnsichtNeu {
+        AnsichtNeu {
+            name: name.into(),
+            basemap_modus: None,
+            online_stil: None,
+            karten_theme: None,
+            layer_sichtbar: None,
+            fachebenen_sichtbar: None,
+            zentrum_lat: None,
+            zentrum_lon: None,
+            zoom: None,
+        }
+    }
+
+    /// LLH-1693: `setze_standard` liest (Existenz) und schreibt dann. Hält ein anderer Schreiber
+    /// gerade die Sperre, wartet es, statt mit BUSY (503) zu scheitern.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn setze_standard_wartet_auf_einen_fremden_schreiber() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (einsatz, benutzer) = setup(&pool).await;
+        let neu = anlegen(&pool, einsatz, &ansicht("Nord"), benutzer)
+            .await
+            .unwrap();
+
+        let halter = crate::tx::hold_write_lock(&pool, std::time::Duration::from_millis(300)).await;
+        let a = setze_standard(&pool, einsatz, neu.id, benutzer)
+            .await
+            .unwrap()
+            .expect("eigene Ansicht");
+        halter.await.unwrap();
+        assert!(a.ist_standard);
+    }
+
+    /// LLH-1693 (Review): `loesche` liest (Standard, Anzahl) und schreibt dann; es wartet ebenso.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn loesche_wartet_auf_einen_fremden_schreiber() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (einsatz, benutzer) = setup(&pool).await;
+        let erste = anlegen(&pool, einsatz, &ansicht("Nord"), benutzer)
+            .await
+            .unwrap();
+        anlegen(&pool, einsatz, &ansicht("Süd"), benutzer)
+            .await
+            .unwrap();
+
+        let halter = crate::tx::hold_write_lock(&pool, std::time::Duration::from_millis(300)).await;
+        loesche(&pool, einsatz, erste.id, ObjektBehandlung::Freigeben)
+            .await
+            .unwrap();
+        halter.await.unwrap();
+        assert!(laden(&pool, einsatz, erste.id).await.unwrap().is_none());
+    }
 }

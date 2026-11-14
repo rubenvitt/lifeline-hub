@@ -99,6 +99,34 @@ macro_rules! write_retry {
     }};
 }
 
+/// Testhilfe (LLH-1693): Ein fremder Schreiber hält die Schreibsperre für `dauer`. Die Sperre
+/// steht, wenn die Funktion zurückkehrt; danach committet er im Hintergrund. Eine Transaktion,
+/// die per deferred `BEGIN` erst liest und dann schreibt, scheitert in dieser Zeit sofort mit
+/// `SQLITE_BUSY`; eine unter `write_retry!` wartet und gelingt. Braucht den Datei-Pool
+/// (`db::test_pool_datei`) und eine Zeile `organisation` mit `id = 1`.
+#[cfg(test)]
+pub(crate) async fn hold_write_lock(
+    pool: &sqlx::SqlitePool,
+    dauer: Duration,
+) -> tokio::task::JoinHandle<()> {
+    let mut conn = pool.acquire().await.expect("Verbindung");
+    sqlx::query("BEGIN IMMEDIATE")
+        .execute(&mut *conn)
+        .await
+        .expect("Schreibsperre");
+    sqlx::query("UPDATE organisation SET name = name WHERE id = 1")
+        .execute(&mut *conn)
+        .await
+        .expect("Schreibzugriff unter der Sperre");
+    tokio::spawn(async move {
+        tokio::time::sleep(dauer).await;
+        sqlx::query("COMMIT")
+            .execute(&mut *conn)
+            .await
+            .expect("Sperre lösen");
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::error::AppError;

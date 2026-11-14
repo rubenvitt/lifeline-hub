@@ -145,38 +145,42 @@ pub async fn setzen(
 ) -> Result<MitEtbEintraegen, AppError> {
     let etb_startwert = super::einstellungen::etb_startwert(pool, einsatz_id).await?;
     let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
-    let mut tx = pool.begin().await?;
-    let zeile: Option<KopfZeile> = sqlx::query_as(
-        "SELECT status, geloescht_at, geschwaerzt_at, nachbereitung_bis, \
-                    EXISTS (SELECT 1 FROM einsatz_abraeumen a WHERE a.einsatz_id = einsatz.id) \
-             FROM einsatz WHERE id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let Some((status, geloescht_at, geschwaerzt_at, alt, abraeumen)) = zeile else {
-        return Err(AppError::NotFound);
-    };
-    if let Some(e) = sperre(
-        &status,
-        geloescht_at.as_deref(),
-        geschwaerzt_at.as_deref(),
-        abraeumen,
-    ) {
-        return Err(e);
-    }
-    let mut etb_eintrag_ids = Vec::new();
-    if alt.as_deref() != neu {
-        sqlx::query("UPDATE einsatz SET nachbereitung_bis = ? WHERE id = ?")
-            .bind(neu)
-            .bind(einsatz_id)
-            .execute(&mut *tx)
-            .await?;
-        let inhalt = audit(&stil, alt.as_deref(), neu);
-        etb_eintrag_ids
-            .push(etb_system(&mut tx, einsatz_id, erfasser_id, etb_startwert, &inhalt).await?);
-    }
-    tx.commit().await?;
+    // BEGIN IMMEDIATE über `write_retry!` (LLH-1693): erst den Kopf lesen, dann schreiben
+    // scheiterte unter deferred `BEGIN` bei einem fremden Schreiber sofort mit BUSY (503).
+    let etb_eintrag_ids = crate::write_retry!(pool, |conn| {
+        let zeile: Option<KopfZeile> = sqlx::query_as(
+            "SELECT status, geloescht_at, geschwaerzt_at, nachbereitung_bis, \
+                        EXISTS (SELECT 1 FROM einsatz_abraeumen a WHERE a.einsatz_id = einsatz.id) \
+                 FROM einsatz WHERE id = ?",
+        )
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        let Some((status, geloescht_at, geschwaerzt_at, alt, abraeumen)) = zeile else {
+            return Err(AppError::NotFound);
+        };
+        if let Some(e) = sperre(
+            &status,
+            geloescht_at.as_deref(),
+            geschwaerzt_at.as_deref(),
+            abraeumen,
+        ) {
+            return Err(e);
+        }
+        let mut etb_eintrag_ids = Vec::new();
+        if alt.as_deref() != neu {
+            sqlx::query("UPDATE einsatz SET nachbereitung_bis = ? WHERE id = ?")
+                .bind(neu)
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?;
+            let inhalt = audit(&stil, alt.as_deref(), neu);
+            etb_eintrag_ids.push(
+                etb_system(&mut *conn, einsatz_id, erfasser_id, etb_startwert, &inhalt).await?,
+            );
+        }
+        Ok(etb_eintrag_ids)
+    })?;
     Ok(MitEtbEintraegen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
@@ -298,6 +302,27 @@ mod tests {
             Some("2030-01-01 00:00:00")
         );
         assert!(etb_texte(&pool, e.id).await.is_empty());
+    }
+
+    /// LLH-1693: `setzen` liest den Kopf und schreibt dann. Hält ein anderer Schreiber gerade die
+    /// Sperre, wartet es, statt mit BUSY (503) zu scheitern.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn setzen_wartet_auf_einen_fremden_schreiber() {
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let leit = benutzer(&pool).await;
+        let e = test_anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, e.id, leit).await.unwrap();
+
+        let halter = crate::tx::hold_write_lock(&pool, std::time::Duration::from_millis(300)).await;
+        let r = setzen(&pool, e.id, leit, Some("2030-01-01 00:00:00"))
+            .await
+            .unwrap();
+        halter.await.unwrap();
+        assert_eq!(
+            r.einsatz.nachbereitung_bis.as_deref(),
+            Some("2030-01-01 00:00:00")
+        );
+        assert_eq!(r.etb_eintrag_ids.len(), 1);
     }
 
     #[tokio::test]
