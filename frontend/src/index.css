@@ -83,12 +83,6 @@ mark.lfh-fundstelle {
   border-top: 1px solid var(--lfh-linie-stark);
 }
 
-/* Ab `xl` endet die Leiste an der Zeitachsenspalte; den rechten Außenrand in Breite der
-   Bilanzspalte setzt die Seite inline, hier fällt nur die rechte Polsterung weg. */
-.etb-erfassung-sticky--neben-leiste {
-  padding-inline-end: 0;
-}
-
 /* Entwurfs-Reiter dicht an der Zeile, sonst drückte das Reiterband die Leiste unnötig hoch. */
 .etb-erfassung-sticky .ant-tabs-nav {
   margin-bottom: 8px;
@@ -242,6 +236,23 @@ main:has([data-lfh='zaehltasten']) {
 }
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
   scroll-padding-block-start: 0px;
+}
+
+/* ETB: Seitenkopf, Filterleiste und Spaltenkopf kleben unter dem Rahmen (kwc2yszv D8, WCAG
+   2.4.11). Der Fokusabstand oben wächst um ihre gemessene Höhe, damit ein getabbtes Ziel oder ein
+   Sprung nicht darunter landet; `scroll-padding` am Scrollport aus demselben Grund wie beim Rahmen.
+   Die Höhen setzt `etb/etbKopfKleben.ts`, nur solange die Köpfe kleben (Marke an der Leiste).
+   Steht der Fokus in den klebenden Köpfen selbst, gilt nur der Rahmen: sonst rollte jeder Tab durch
+   die Filterleiste die Seite (dieselbe Falle wie oben). Die Ausnahme für den Fokus im Rahmen
+   schlägt beide Regeln über die Spezifität. */
+:root:has([data-lfh='etb-kopf-klebt']) {
+  scroll-padding-block-start: calc(
+    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px) +
+      var(--lfh-etb-filterleiste-hoehe, 0px) + var(--lfh-etb-spaltenkopf-hoehe, 0px)
+  );
+}
+:root:has([data-lfh='etb-kopf-klebt'] :focus, [data-lfh='seitenkopf'] :focus) {
+  scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
 
 /* Ausgabeansicht der Verpflegung: Fokusabstand zur klebenden Kurzzeile mit Soll/ausgegeben/fehlt

@@ -47,30 +47,43 @@ import { lesemarkeLinie, lesemarkeText } from './lesemarkeModell';
 export default function EtbLesemarkeBanner({
   einsatzId,
   form = 'banner',
+  ohneSystem = false,
 }: {
   einsatzId: number;
   form?: 'banner' | 'linie';
+  /** Zählt ohne Systemeinträge, solange die Achse sie ausblendet (Review S4). */
+  ohneSystem?: boolean;
 }) {
-  return <LesemarkeBanner key={einsatzId} einsatzId={einsatzId} form={form} />;
+  return (
+    <LesemarkeBanner key={einsatzId} einsatzId={einsatzId} form={form} ohneSystem={ohneSystem} />
+  );
 }
 
 /** Derselbe Abruf wie im Banner — die Seite fragt ihn ab, um Linie oder Banner zu wählen. */
-export function useEtbLesemarke(einsatzId: number) {
+export function useEtbLesemarke(einsatzId: number, ohneSystem = false) {
   return useQuery({
-    queryKey: einsatzKeys.etbLesemarke(einsatzId),
-    queryFn: () => ladeEtbLesemarke(einsatzId),
+    queryKey: einsatzKeys.etbLesemarke(einsatzId, ohneSystem),
+    queryFn: () => ladeEtbLesemarke(einsatzId, ohneSystem),
   });
 }
 
-function LesemarkeBanner({ einsatzId, form }: { einsatzId: number; form: 'banner' | 'linie' }) {
+function LesemarkeBanner({
+  einsatzId,
+  form,
+  ohneSystem,
+}: {
+  einsatzId: number;
+  form: 'banner' | 'linie';
+  ohneSystem: boolean;
+}) {
   const { konventionen } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
   const qc = useQueryClient();
   const navigate = useNavigate();
 
-  const query = useEtbLesemarke(einsatzId);
+  const query = useEtbLesemarke(einsatzId, ohneSystem);
   const markieren = useMutation({
-    mutationFn: (bisLfdNr: number) => setzeEtbLesemarke(einsatzId, bisLfdNr),
+    mutationFn: (bisLfdNr: number) => setzeEtbLesemarke(einsatzId, bisLfdNr, ohneSystem),
     /*
      * Ein Abruf, der VOR dem Markieren losging, läse die alte Marke und käme nach der Antwort an
      * — `setQueryData` bricht ihn nicht ab, er überschriebe den neuen Stand. Deshalb erst
@@ -78,7 +91,7 @@ function LesemarkeBanner({ einsatzId, form }: { einsatzId: number; form: 'banner
      * abgebrochenen Abruf ausgelöst hatte, bis zum nächsten Ereignis.
      */
     onMutate: () => qc.cancelQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
-    onSuccess: (neu) => qc.setQueryData(einsatzKeys.etbLesemarke(einsatzId), neu),
+    onSuccess: (neu) => qc.setQueryData(einsatzKeys.etbLesemarke(einsatzId, ohneSystem), neu),
     onSettled: () => qc.invalidateQueries({ queryKey: einsatzKeys.etbLesemarke(einsatzId) }),
   });
 

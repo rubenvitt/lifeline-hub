@@ -96,11 +96,15 @@ test('ETB (LFH-373): die Erfassungsleiste belegt höchstens die halbe Fensterhö
         const feld = document
           .querySelector('.etb-erfassung-sticky textarea')!
           .getBoundingClientRect();
+        const praefix = document.querySelector(
+          '.etb-erfassung-sticky [data-lfh="schnellerfassung-praefix"]',
+        );
         return {
           leiste: l.height,
           unterkante: l.bottom,
           karte: karte.width,
           feld: feld.width,
+          typKnopf: praefix?.getBoundingClientRect().width ?? 0,
           fenster: window.innerHeight,
           breite: document.documentElement.scrollWidth,
           fensterBreite: window.innerWidth,
@@ -123,12 +127,14 @@ test('ETB (LFH-373): die Erfassungsleiste belegt höchstens die halbe Fensterhö
         m.fensterBreite,
       );
       if (flaeche.width < 768) {
-        // Unter `md` nutzt das Feld die volle Breite der Erfassungskarte; Spiel für Rahmen und
-        // Polsterung.
+        // Unter `md` steht eingeklappt eine Zeile aus Typ-Knopf und Inhalt (Change
+        // `kwc2yszv-etb-neuentwurf`, Aufgabe 4.1): das Feld nimmt den Rest der Karte; Spiel für
+        // Rahmen und Polsterung.
+        expect(m.typKnopf, `${lauf}: Typ-Knopf vor dem Inhalt`).toBeGreaterThan(0);
         expect(
           m.feld,
-          `${lauf}: Textfeld ${Math.round(m.feld)} px bei ${Math.round(m.karte)} px Karte`,
-        ).toBeGreaterThanOrEqual(m.karte - 40);
+          `${lauf}: Textfeld ${Math.round(m.feld)} px bei ${Math.round(m.karte)} px Karte und ${Math.round(m.typKnopf)} px Typ-Knopf`,
+        ).toBeGreaterThanOrEqual(m.karte - m.typKnopf - 40);
       }
     }
   }
@@ -137,18 +143,19 @@ test('ETB (LFH-373): die Erfassungsleiste belegt höchstens die halbe Fensterhö
 });
 
 /**
- * ETB: drei gesetzte Felder auf dem Handschirm im Handschuh-Betrieb — die Leiste bleibt ganz im
- * Bild und unter dem Deckel, nichts springt. Getragen von der einzeiligen, waagerecht rollenden
- * Chip-Zeile unter `md`, der Leiste als Fuß der Seitenwurzel und Fokus mit `preventScroll`.
- * Gemessen wird Geometrie, nicht CLS (jede Bewegung folgt einer Eingabe).
+ * ETB: Von, An und Weg auf dem Handschirm im Handschuh-Betrieb gesetzt — die aufgeklappte Leiste
+ * bleibt ganz im Bild und unter dem Deckel, nichts springt (LFH-373; Change
+ * `kwc2yszv-etb-neuentwurf`, Aufgabe 4.1). Die Felder stehen fest in der Feldzeile, ein Wert
+ * ändert die Höhe nicht; die Fußzeile rollt waagerecht. Gemessen wird Geometrie, nicht CLS (jede
+ * Bewegung folgt einer Eingabe).
  */
-test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem Deckel, nichts springt', async ({
+test('ETB (LFH-373): Von, An und Weg gesetzt — Leiste ganz im Bild und unter dem Deckel, nichts springt', async ({
   page,
 }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `Flaeche 373 Chip ${Date.now()}`);
+  const einsatzId = await einsatzAnlegen(page, `Flaeche 373 Felder ${Date.now()}`);
   for (let n = 1; n <= 12; n += 1) {
     const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: {
@@ -167,15 +174,14 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
   await expect(zeilen).toHaveCount(12);
   // Ruhezustand erst mit stehender Erfassung: die Zeitachse kann vor ihr fertig sein, dann
   // mäße „vorher" nur den Ladekreisel.
-  await expect(page.locator('.etb-erfassung-sticky').getByPlaceholder(/^Inhalt …/)).toBeVisible();
+  const leiste = page.locator('.etb-erfassung-sticky');
+  await expect(leiste.getByPlaceholder(/^Inhalt …/)).toBeVisible();
   await schriftenGeladen(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   // Unter `md` startet die Leiste eingeklappt (LFH-955, D4). Gemessen wird die aufgeklappte:
-  // erst der Fokus im Feld bringt „Feld“ und die Chip-Zeile.
-  await klickeWieEinMensch(page, page.locator('.etb-erfassung-sticky textarea'));
-  await expect(
-    page.locator('.etb-erfassung-sticky').getByRole('button', { name: 'Feld', exact: true }),
-  ).toBeVisible();
+  // erst der Fokus im Feld bringt die Feldzeile.
+  await klickeWieEinMensch(page, leiste.locator('textarea'));
+  await expect(leiste.getByRole('combobox', { name: 'Von' })).toBeVisible();
 
   const lageDerZeilen = () =>
     zeilen.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().y * 2) / 2));
@@ -192,39 +198,24 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
   );
   expect(reserve, 'Vorbedingung: die Seite hat eine Bildlaufreserve').toBeGreaterThan(200);
 
-  const leiste = page.locator('.etb-erfassung-sticky');
   for (const [feld, wert] of [
     ['Von', 'Florian Nord 1'],
     ['An', 'Einsatzleitung Süd'],
-    ['Veranlassung', 'Lage an die Leitstelle gemeldet'],
   ] as const) {
-    await klickeWieEinMensch(page, leiste.getByRole('button', { name: 'Feld', exact: true }));
-    // Von und An trägt schon der Standard-Rufname (LFH-894): Haken im Menü, Wert im Editor.
-    const option = page
-      .locator('[data-slash-menu]')
-      .getByRole('option', { name: new RegExp(`^${feld}( ✓)?$`) });
-    // Im Handschuh-Betrieb liegt eine Option im internen Bildlauf des Menüs. Gerollt wird NUR
-    // das Menü (`scrollTop`); `scrollIntoView` rollte auch die Seite.
-    await option.evaluate((el) => {
-      const menue = el.closest('[data-slash-menu]') as HTMLElement;
-      const m = menue.getBoundingClientRect();
-      const o = el.getBoundingClientRect();
-      if (o.bottom > m.bottom) menue.scrollTop += o.bottom - m.bottom;
-      if (o.top < m.top) menue.scrollTop -= m.top - o.top;
-    });
-    await klickeWieEinMensch(page, option);
-    // Die Anwendung fokussiert die Chip-Eingabe selbst; getippt wird per Tastatur, weil
-    // `fill()` ebenfalls vorab ins Bild rollt.
-    await expect(leiste.getByLabel(feld, { exact: true })).toBeFocused();
+    await klickeWieEinMensch(page, leiste.getByRole('combobox', { name: feld }));
+    // Getippt per Tastatur, weil `fill()` vorab ins Bild rollt. Enter übernimmt und springt in
+    // den Inhalt.
     await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.type(wert);
     await page.keyboard.press('Enter');
-    await expect(leiste.getByRole('button', { name: `Aktionen zu ${feld}` })).toBeVisible();
+    await expect(leiste.getByRole('combobox', { name: feld })).toHaveValue(wert);
   }
+  await klickeWieEinMensch(page, leiste.getByRole('combobox', { name: 'Meldeweg' }));
+  await klickeWieEinMensch(page, page.locator('.ant-select-item-option[title="Funk"]'));
 
-  const zeile = leiste.locator('[data-lfh="etb-erfassung"] > div').last();
-  const rollt = await zeile.evaluate((el) => el.scrollWidth > el.clientWidth);
-  expect(rollt, 'Vorbedingung: die Chips füllen die Zeile, sie rollt waagerecht').toBe(true);
+  const fuss = leiste.locator('[data-lfh="etb-fusszeile"]');
+  const rollt = await fuss.evaluate((el) => el.scrollWidth > el.clientWidth);
+  expect(rollt, 'Vorbedingung: die Fußzeile ist voll, sie rollt waagerecht').toBe(true);
 
   const kastenNachher = await leistenKasten();
   expect(
@@ -234,15 +225,14 @@ test('ETB (LFH-373): drei gesetzte Felder — Leiste ganz im Bild und unter dem 
   expect(await lageDerZeilen(), 'die Zeilen der Zeitachse stehen an derselben Stelle').toEqual(
     vorher,
   );
-  // 2 px Spiel: die Chips sind etwas höher als der Knopf „Feld". Ohne einzeilige Zeile kostete
-  // jeder Chip eine eigene Reihe.
+  // 2 px Spiel: ein gesetzter Wert ändert die Höhe einer festen Feldzeile nicht.
   expect(
     kastenNachher.hoehe - kastenVorher.hoehe,
-    `die Leiste wächst mit den Chips nicht (${Math.round(kastenVorher.hoehe)} → ${Math.round(kastenNachher.hoehe)} px)`,
+    `die Leiste wächst mit den Werten nicht (${Math.round(kastenVorher.hoehe)} → ${Math.round(kastenNachher.hoehe)} px)`,
   ).toBeLessThanOrEqual(2);
   expect(
     kastenNachher.hoehe,
-    `mit drei Chips unter dem Deckel (${Math.round(kastenNachher.hoehe)} px)`,
+    `aufgeklappt unter dem Deckel (${Math.round(kastenNachher.hoehe)} px)`,
   ).toBeLessThanOrEqual(kastenNachher.fenster * DECKEL);
   expect(kastenNachher.unterkante, 'ganz im Fenster').toBeLessThanOrEqual(
     kastenNachher.fenster + 0.5,
@@ -312,7 +302,8 @@ for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
     await page.setViewportSize({ width: 390, height: 844 });
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `Flaeche 955 Hand ${Date.now()}`);
-    for (let n = 1; n <= 6; n += 1) {
+    // Zehn Einträge: die Seite rollt auch ohne die frühere Bilanz unter der Zeitachse (kwc2yszv D7).
+    for (let n = 1; n <= 10; n += 1) {
       const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
         data: {
           typ: 'meldung',
@@ -328,7 +319,7 @@ for (const rolle of ['admin', 'fuehrungspersonal'] as const) {
     const zeilen = page
       .getByRole('region', { name: 'Einsatztagebuch' })
       .getByTestId('etb-ereigniszeile');
-    await expect(zeilen).toHaveCount(6);
+    await expect(zeilen).toHaveCount(10);
     await expect(page.locator('.etb-erfassung-sticky textarea')).toBeVisible();
     await schriftenGeladen(page);
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -660,10 +651,11 @@ test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Han
       pfad: `/einsaetze/${matrixId}/etb`,
       verzoegern: /\/api\/einsaetze\/\d+\/etb(\?|$|\/zaehler)/,
       anker: async () =>
-        // 8 gesäte Meldungen + 2 Systemeinträge der beiden angelegten Gefahrengebiete.
+        // 8 gesäte Meldungen; die 2 Systemeinträge der beiden angelegten Gefahrengebiete sind in
+        // der Vorgabe ausgeblendet (kwc2yszv D6).
         expect(
           page.getByRole('region', { name: 'Einsatztagebuch' }).getByTestId('etb-ereigniszeile'),
-        ).toHaveCount(10),
+        ).toHaveCount(8),
     },
     {
       name: 'Lagekarte',

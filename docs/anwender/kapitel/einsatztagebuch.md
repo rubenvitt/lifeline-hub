@@ -2,7 +2,7 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbFeldzeile.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md, frontend/src/etb/EtbSpaltenzeile.tsx, frontend/src/etb/EtbHandschirmzeile.tsx, frontend/src/etb/EtbVermerke.tsx, frontend/src/etb/vermerke.ts, frontend/src/etb/EtbInhalt.tsx, frontend/src/etb/etbSpalten.ts, frontend/src/etb/EtbSendestatus.tsx, frontend/src/etb/etbKopfKleben.ts, frontend/src/routing/deeplinks.ts]
 ---
 
 ## Überblick
@@ -27,93 +27,136 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
 
 1. Im Einsatz das Modul „ETB“ öffnen.
 
-   ![ETB beim Öffnen: Zeitachse mit den neuesten Einträgen unten über der Erfassungsleiste, rechts darüber „Nach oben“, Seitenleiste „Bilanz“ rechts](../bilder/einsatztagebuch/zeitachse.png)
+   ![ETB beim Öffnen: Seitenkopf mit der Zahl der Einträge und „alles übertragen“, Filterleiste mit der Zahl je Typ, Zeitachse in Spalten Zeit, Nr., Typ, Von → An, Inhalt und Vermerk, unten die Erfassungsleiste](../bilder/einsatztagebuch/zeitachse.png)
 
 2. Die Seite öffnet am Ende: der neueste Eintrag steht über der Erfassungsleiste. Nach oben
    rollen liest zurück; „Ältere laden“ über der Zeitachse holt frühere Einträge. Wer weiter als
    eine Bildschirmhöhe zurückgerollt ist, kommt rechts über der Erfassungsleiste mit „Nach oben“
    in einem Zug zum Anfang mit Filterleiste und „Ältere laden“.
-3. Sind seit dem letzten Besuch Einträge hinzugekommen, trennt eine Linie wie „Neu seit 1304 · 14
+3. In der Bediendichte „Kompakt“ auf einem breiten Bildschirm steht jeder Eintrag in einer Zeile
+   mit den Spalten „Zeit“, „Nr.“, „Typ“, „Von → An“, „Inhalt“ und „Vermerk“; der Spaltenkopf
+   bleibt beim Rollen stehen. Hinter „Von → An“ steht der Meldeweg, etwa „ELW 1 → EL · Funk“; ist
+   der Text länger als die Spalte, endet er mit „…“, und der volle Text erscheint beim Zeigen auf
+   die Spalte. Sind Von und An dieselbe Stelle, steht dort „Vermerk EL“ statt „EL → EL“.
+4. Verweise und Marken stehen in der Spalte „Vermerk“, etwa „Meldung #5 ↗“, „Nachtrag · erfasst
+   1926“, „berichtigt durch Nr. 231“, „berichtigt Nr. 230“ oder ein Anhang. Passen nicht alle
+   hinein, endet die Spalte mit „+2“: „+2“ zeigt alle unter dem Text, „zuklappen“ nimmt sie
+   zurück. Alle Vermerke nennt auch das Zeigen auf die Spalte und das Menü „Aktionen zu Eintrag
+   …“, aus dem ein Verweis sich öffnen und ein Anhang sich herunterladen lässt.
+5. Ein langer Eintrag, etwa ein Lagebericht, steht auf drei Zeilen; „mehr“ zeigt ihn ganz,
+   „weniger“ klappt ihn wieder zu. Ein Link auf den Eintrag und eine Volltextsuche, die in seinem
+   Text trifft, zeigen ihn ganz.
+6. Sind seit dem letzten Besuch Einträge hinzugekommen, trennt eine Linie wie „Neu seit 1304 · 14
    Einträge“ die gesichteten von den neuen. Liegt der zuletzt gesichtete Eintrag nicht im
    geladenen Teil oder ist ein Filter gesetzt, steht derselbe Hinweis über der Zeitachse, mit „Zur
    Marke springen“. „alle als gesichtet markieren“ setzt die Lesemarke auf den neuesten Eintrag.
-4. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
+   Ausgeblendete Systemeinträge zählen dabei nicht als neu.
+7. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
    läuft mit. Wer hochgerollt hat oder ein Menü in der Zeitachse offen hat, sieht stattdessen
    unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende.
 
-Die Seitenleiste „Bilanz“ zählt die Einträge nach Typ und nennt die jüngsten Berichtigungen; ist
-ein Filter gesetzt, heißt sie „Bilanz im Filter“. Einträge vom Typ „Lage“ zählt sie als
-„Lagefeststellungen“; „Lagemeldungen“ ist das eigene Modul der lagerelevanten Meldungen
-(Kapitel [Lagemeldungen](lagemeldungen.md)).
+Wer einen Eintrag geschrieben hat, erscheint beim Zeigen auf die Zeile und im Menü „Aktionen zu
+Eintrag …“ als „Verfasser: …“; die Zeile selbst bleibt einzeilig. Ein berichtigter Eintrag steht
+durchgestrichen da, lesbar wie zuvor. In den Bediendichten „Komfortabel“ und „Handschuh“ und auf
+mittelbreiten Bildschirmen stehen Verfasser und Meldeweg rechts im Eintrag und die Verweise unter
+dem Text, ein Nachtrag als „⧖ nachgetragen um …“. Auf dem Handy trägt jeder Eintrag oben eine
+Kopfzeile mit Zeit, Typ und Von → An, darunter den Text in voller Breite und darunter die Verweise.
+
+Der Seitenkopf nennt die Zahl der Einträge, etwa „57 Einträge · 171 Systemeinträge ausgeblendet“,
+und rechts den Sendestatus: „alles übertragen“, solange nichts aussteht. Die Zahl je Typ steht an
+den Typ-Segmenten der Filterleiste; der Titel eines Segments nennt die Mehrzahl, Einträge vom Typ
+„Lage“ etwa als „Lagefeststellungen“. „Lagemeldungen“ ist das eigene Modul der lagerelevanten
+Meldungen (Kapitel [Lagemeldungen](lagemeldungen.md)). Berichtigungen findet der Typfilter
+„Berichtigung“.
 
 ### Einen Eintrag erfassen
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Erfassungsleiste am Fuß der Seite den Text in das Feld „Inhalt …“ schreiben.
+1. In der Erfassungsleiste am Fuß der Seite die Felder über dem Inhalt prüfen. Sie stehen in der
+   Reihenfolge des Papier-ETB: Typ, Zeit, Von, An und Weg.
 
-   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“ und rechts daneben den Häkchen „Nur protokollieren“ und „Werte behalten“, Typ „Meldung“ mit Rahmen in der Typfarbe, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
+   ![Erfassungsleiste mit den Typen „Meldung“, „Anordnung“, „Entscheidung“ und „Lage“, den Feldern „Zeit“, „Von“, „An“ und „Weg“, darunter dem Inhalt mit „Erfassen“ und der Fußzeile mit „Auch in den Meldungseingang“ und „Werte behalten“](../bilder/einsatztagebuch/erfassung.png)
 
-2. Den Typ prüfen: Der Knopf links zeigt ihn als Wort, zum Beispiel „Meldung“, und die Leiste
-   trägt seine Farbe als Rahmen, links als Kante wie die Zeitachse (eine Anordnung etwa orange). Ein Klick darauf wechselt den Typ. Schneller
-   geht es mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
-3. „Von“ und „An“ prüfen. Beide sind mit dem persönlichen Standard-Rufnamen vorbelegt. Das Menü
-   eines Chips (auch per Rechtsklick auf den Chip) bietet „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“; ein „@“ im
-   Text setzt ebenfalls einen Rufnamen ein.
-4. „Erfassen“ wählen oder Enter drücken. Auf einem Touch-Gerät erfasst erst Strg+Enter (⌘+Enter
-   am Mac); Enter allein beginnt dort eine neue Zeile.
+2. Den Typ wählen: „Meldung“, „Anordnung“, „Entscheidung“ oder „Lage“. Das gewählte Feld und die
+   Leiste tragen die Farbe des Typs. Auf dem Handy steht der Typ als Knopf mit Pfeil vor dem Inhalt.
+   Schneller geht es mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
+3. „Von“ und „An“ prüfen. Der Typ belegt sie mit der eigenen Stelle vor (dem persönlichen
+   Standard-Rufnamen):
 
-Inhalt, „Von“ und „An“ sind Pflicht. Ist noch kein Standard-Rufname gesetzt, fragt die
-Erfassungsleiste zuerst danach. „Vorschau“ zeigt den Eintrag so, wie er in der Zeitachse
-erscheinen wird.
+   | Typ | Von | An |
+   | --- | --- | --- |
+   | Meldung | leer, auszufüllen | eigene Stelle |
+   | Anordnung | eigene Stelle | leer, auszufüllen |
+   | Entscheidung, Lage | eigene Stelle | eigene Stelle |
+
+   Ein anderer Wert gilt nur für diesen Eintrag. Ein „@“ im Text setzt einen Rufnamen ein: bei
+   einer Anordnung als „An“, sonst als „Von“.
+4. Den Inhalt in das Feld „Inhalt …“ schreiben und „Erfassen“ wählen oder Enter drücken. Auf einem
+   Touch-Gerät erfasst erst Strg+Enter (⌘+Enter am Mac); Enter allein beginnt dort eine neue Zeile.
+
+Beim Öffnen steht der Cursor im ersten leeren Pflichtfeld, bei einer Meldung also in „Von“, sonst
+im Inhalt; nach dem Erfassen ebenso. Inhalt, „Von“ und „An“ sind Pflicht: fehlt eine Seite, nennt
+die Fußzeile „Absender fehlt“ oder „Empfänger fehlt“, das Feld ist rot markiert und hat den Cursor;
+Text und Felder bleiben stehen. Ist noch kein Standard-Rufname gesetzt, fragt die Erfassungsleiste
+zuerst danach; „Eigene Stelle ändern“ in der Fußzeile ändert ihn. „Vorschau“ erscheint, sobald der
+Text Formatierung trägt (etwa **fett**, eine Liste oder einen Verweis), und zeigt ihn so, wie er in
+der Zeitachse erscheinen wird.
 
 ### Felder, Bausteine und Werte setzen
 
-1. In der Erfassungsleiste „+ Feld“ wählen oder einen Schrägstrich mitten im Text tippen.
-2. Ein Feld wählen: „Ereigniszeit“ (für einen Nachtrag), „Von“, „An“, „Meldeweg“ (Funk, Telefon,
-   Persönlich, Sonstige) oder „Veranlassung“. Darunter stehen die Textbausteine der Organisation.
-3. Den Wert eintragen und den Eintrag wie gewohnt erfassen. Schneller geht ein Nachtrag mit
-   „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ setzt die Ereigniszeit auf 14:20, „/zeit -10“
-   auf zehn Minuten vor jetzt; der Rest der Zeile bleibt der Inhalt. Erlaubt sind dieselben
-   Angaben wie im Zeitfeld (etwa „1420“, „14:20“, „101420“). Eine unlesbare Angabe bleibt als
-   Text stehen, und unter dem Feld steht der Grund. Eine Ereigniszeit in der Zukunft nimmt die
-   Erfassung nicht an: der Chip nennt „liegt in der Zukunft“, Text und Felder bleiben stehen.
-   Liegt die Ereigniszeit an einem anderen Tag, zeigt der Chip den Tag mit, etwa „162350“.
-4. Wer mehrere Einträge vom selben Absender hintereinander erfasst, setzt das Häkchen „Werte
-   behalten“: „Von“, „An“, „Meldeweg“ und der Typ bleiben dann nach dem Erfassen stehen, eine
-   Folge von Anordnungen bleibt also Anordnungen. Ohne Häkchen und in einem neuen Reiter über „+“
-   beginnt der nächste Eintrag als „Meldung“.
+1. Mit Tab von Feld zu Feld gehen: Zeit, Von, An, Weg und dann in den Inhalt. Ein Wert gilt, sobald
+   das Feld verlassen wird; Enter in einem Feld übernimmt ihn und springt in den Inhalt.
+2. „Zeit“ ist leer und zeigt „jetzt · 1926“, solange der Eintrag die Zeit des Erfassens bekommt. Für
+   einen Nachtrag die Uhrzeit eintragen, etwa „1912“. Erlaubt sind dieselben Angaben wie in jedem
+   Zeitfeld (etwa „1420“, „14:20“, „101420“, „-10“ für zehn Minuten vor jetzt). Weicht die Zeit ab,
+   wird das Feld gelb, die Fußzeile nennt „Nachtrag · Ereignis vor 14 min“ und der Knopf heißt
+   „Erfassen als 1912“. Ein geleertes Feld gilt wieder „jetzt“. Liegt die Zeit an einem anderen Tag,
+   zeigt das Feld den Tag mit, etwa „162350okt26“.
+3. Schneller geht ein Nachtrag mit „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ trägt 1420 in
+   „Zeit“ ein, der Rest der Zeile bleibt der Inhalt. Eine unlesbare Angabe bleibt als Text stehen,
+   und die Fußzeile nennt den Grund. Eine Zeit in der Zukunft nimmt die Erfassung nicht an: die
+   Fußzeile nennt „Zeit liegt in der Zukunft“, das Feld hat den Cursor, Text und Felder bleiben.
+4. „Weg“ ist der Meldeweg: Funk, Telefon, Persönlich oder Sonstige. „+ Veranlassung“ rechts in der
+   Fußzeile holt das Feld „Veranlassung“ in die Zeile. Ein Schrägstrich mitten im Text öffnet die
+   Liste der Felder und darunter die Textbausteine der Organisation.
+5. Wer mehrere Einträge vom selben Absender hintereinander erfasst, setzt das Häkchen „Werte
+   behalten“: „Von“, „An“, „Weg“ und der Typ bleiben dann nach dem Erfassen stehen, eine Folge von
+   Anordnungen bleibt also Anordnungen. Die Zeit bleibt nie stehen. Ohne Häkchen beginnt der nächste
+   Eintrag als „Meldung“.
 
-Beim Bearbeiten von „Von“ und „An“ schlägt das Feld Funkrufnamen vor: unter „Im Einsatz“ die
-disponierten Fahrzeuge, die Einheiten und die Sachgebiete, unter „Stammdaten“ die Fahrzeuge im
-Dienst und die externen Stellen, unter „Zuletzt verwendet“ die an diesem Gerät zuletzt
-übernommenen Werte; Demo-Daten stehen am Ende. Ein frei getippter Rufname bleibt erlaubt und
-trägt im Feld die Marke „frei“. Enter übernimmt den mit den Pfeiltasten markierten Vorschlag,
-sonst den getippten Text; Escape schließt erst die Liste, ein zweites Escape bricht ab.
+In „Von“ und „An“ schlägt das Feld Funkrufnamen vor: unter „Im Einsatz“ die disponierten
+Fahrzeuge, die Einheiten und die Sachgebiete, unter „Stammdaten“ die Fahrzeuge im Dienst und die
+externen Stellen, unter „Zuletzt verwendet“ die an diesem Gerät zuletzt übernommenen Werte;
+Demo-Daten stehen am Ende. Der oberste passende Vorschlag ist markiert; Enter und Tab übernehmen
+ihn. Einen frei getippten Rufnamen übernimmt der letzte Eintrag der Liste, „„Abschnitt Nord“ als
+Freitext übernehmen“; passt kein Vorschlag, gilt der Text. Er trägt im Feld die Marke „frei“.
+Escape schließt die Liste und lässt den Text stehen.
 
-Die Chips „Von“ und „An“ bieten eine Buchstabierhilfe mit den Tafeln „Deutsch“ und „NATO“. Bei
-Typ „Lage“ führt der Verweis „Als strukturierten Lagebericht erfassen →“ zu den Lageberichten
+Neben „Von“ und „An“ steht die Buchstabierhilfe mit den Tafeln „Deutsch“ und „NATO“. Bei Typ „Lage“
+führt „Als strukturierten Lagebericht erfassen →“ in der Fußzeile zu den Lageberichten
 ([Lageberichte](lageberichte.md)).
 
 ### Meldung und Lage gehen in den Meldungseingang
 
-Ein Eintrag vom Typ „Meldung“ oder „Lage“ legt beim Erfassen zugleich eine Meldung im
-Meldungseingang an: Typ „Lage“ als Lagemeldung, die auch auf der Seite Lagemeldungen steht, Typ
-„Meldung“ als Meldung der Art „Sonstige“. „Von“ wird Absender, „An“ Empfänger; Meldeweg, Inhalt
-und Ereigniszeit gehen mit. Der Eintrag trägt danach den Verweis „Meldung #12 ↗“, der die Meldung
-hervorgehoben öffnet ([Meldungen](meldungen.md)). Einen zweiten, automatischen Eintrag gibt es
-dafür nicht.
+Ein Eintrag vom Typ „Meldung“ oder „Lage“ kann zugleich eine Meldung im Meldungseingang anlegen:
+Typ „Lage“ als Lagemeldung, die auch auf der Seite Lagemeldungen steht, Typ „Meldung“ als Meldung
+der Art „Sonstige“. „Von“ wird Absender, „An“ Empfänger; Meldeweg, Inhalt und Ereigniszeit gehen
+mit. Der Eintrag trägt danach den Verweis „Meldung #12 ↗“, der die Meldung hervorgehoben öffnet
+([Meldungen](meldungen.md)). Einen zweiten, automatischen Eintrag gibt es dafür nicht.
 
-Für eine reine Mitschrift ohne Meldung:
+Das steuert das Häkchen „Auch in den Meldungseingang“ links in der Fußzeile:
 
-1. Bei Typ „Meldung“ oder „Lage“ das Häkchen „Nur protokollieren“ setzen. Es steht mit „Werte
-   behalten“ rechts neben dem Entwurfsreiter, auf einem schmalen Bildschirm unter dem Feld.
-2. Den Eintrag erfassen. Er steht nur im ETB.
+1. Bei Typ „Meldung“ oder „Lage“ steht es an, wenn der Eintrag von außen kommt. Sind „Von“ und „An“
+   beide die eigene Stelle (ein eigener Vermerk, etwa „Lage ruhig“), steht es aus.
+2. Für eine reine Mitschrift ohne Meldung das Häkchen entfernen, für einen eigenen Vermerk, der
+   doch in den Eingang soll, setzen.
+3. Den Eintrag erfassen.
 
-„Nur protokollieren“ gilt für einen Eintrag und ist danach wieder aus, auch mit „Werte behalten“;
-ein Entwurf merkt es sich bis zum Senden. Ist das Modul Meldungen für die Person gesperrt, ist das
-Häkchen gesetzt und nicht änderbar, daneben steht „Modul Meldungen gesperrt“: dann wird nur
-protokolliert. Bei den anderen Typen und in einer Berichtigung fehlt das Häkchen.
+Die Wahl gilt für einen Eintrag; danach steht das Häkchen wieder auf der Vorgabe, auch mit „Werte
+behalten“. Ein Entwurf merkt sie sich bis zum Senden. Ist das Modul Meldungen für die Person
+gesperrt, ist das Häkchen aus und nicht änderbar, daneben steht „Modul Meldungen gesperrt“: dann
+wird nur protokolliert. Bei den anderen Typen und in einer Berichtigung fehlt das Häkchen.
 
 ### Eine Datei anhängen
 
@@ -129,21 +172,26 @@ nennt den Grund.
 
 ### Mit mehreren Entwürfen arbeiten
 
-1. Über der Erfassungsleiste „+“ („Weiteren Entwurf anlegen“) wählen. Neben „Neuer Eintrag“
-   entsteht ein zweiter Reiter.
-2. Zwischen den Reitern wechseln; jeder behält Text, Felder und Anhänge.
+1. Rechts in der Fußzeile der Erfassungsleiste „+ weiterer Entwurf“ wählen. Über der Leiste
+   erscheinen die Reiter, etwa „Neuer Eintrag“ und der neue.
+2. Zwischen den Reitern wechseln; jeder behält Text, Felder und Anhänge. Mit nur einem Entwurf
+   stehen keine Reiter da.
 3. Einen Entwurf mit dem ✕ am Reiter verwerfen. Ein leerer Entwurf verschwindet sofort. Hat er
    Inhalt, warnt die Rückfrage „Entwurf verwerfen?“: „Text, Felder und Anhänge gehen verloren.“
    „Verwerfen“ bestätigt, „Behalten“ bricht ab.
 
 ### Einträge suchen und filtern
 
-Alle Filter stehen in einer Leiste direkt über der Zeitachse.
+Alle Filter stehen in einer Leiste direkt über der Zeitachse. Ist das Fenster hoch genug, bleibt
+sie mit dem Seitenkopf beim Rollen oben stehen; ein gesetzter Filter ist so auch am Ende der
+Zeitachse über der Erfassung zu sehen und zu ändern.
 
 1. Einen Typ wählen: „Alle“, „Meldung“, „Anordnung“, „Entscheidung“, „Lage“ oder „Berichtigung“.
-2. Mit dem Knopf „System“ die automatischen Systemeinträge aus- und einblenden; die Zahl daneben
-   nennt, wie viele es sind. Ausgeblendet steht dort „… ausgeblendet“ und der Punkt ist
-   gestrichen.
+   Jedes Segment trägt die Zahl seiner Einträge, „Alle“ die Summe ohne Systemeinträge. Ist ein
+   Zeitraum, eine Einheit oder eine Suche gesetzt, zählen die Segmente nur, was dazu passt.
+2. Systemeinträge sind beim Öffnen ausgeblendet. Der Knopf „System“ blendet sie ein und wieder
+   aus; die Zahl daneben nennt, wie viele es sind, ausgeblendet ist sein Punkt gestrichen. Der
+   Seitenkopf nennt dann, wie viele ausgeblendet sind, etwa „171 Systemeinträge ausgeblendet“.
 3. „Zeitraum“ öffnet eine Schnellwahl: „Letzte Stunde“, „Letzte 4 Stunden“, „Seit letzter
    Lagebesprechung“ (nur, wenn eine abgehalten ist) und „Heute“. Unter „Eigener Zeitraum“ lassen
    sich „von“ und „bis“ taktisch tippen („1400“, „171400“); „bis“ leer heißt bis jetzt. „Zeitraum
@@ -151,8 +199,10 @@ Alle Filter stehen in einer Leiste direkt über der Zeitachse.
    etwa „seit 1345“.
 4. Bei Bedarf eine Einheit wählen oder in die „Volltextsuche“ tippen.
 5. Solange ein Filter gesetzt ist, steht direkt über der Erfassung ein bernsteinfarbenes Band,
-   etwa „Gefiltert · 7 von 134 Einträgen sichtbar · Meldung · seit 1345“. „Filter zurücksetzen“
-   darin führt zur vollen Liste zurück.
+   etwa „Gefiltert · 7 von 134 Einträgen sichtbar · Meldung · seit 1345“, und der Seitenkopf
+   nennt „7 Treffer“. „Filter zurücksetzen“ darin führt zur vollen Liste zurück; die
+   Systemeinträge sind danach wieder ausgeblendet. Das Ausblenden der Systemeinträge allein gilt
+   nicht als Filter.
 
 Passt ein eben erfasster Eintrag nicht zum Filter, nennt das Band „Nr. … erfasst – außerhalb des
 Filters“; „anzeigen“ hebt den Filter auf und springt zum Eintrag. Unter „Seit letzter
@@ -163,9 +213,14 @@ um sie.
 Die Volltextsuche findet Wortanfänge in Inhalt, „Von“, „An“ und „Veranlassung“, ohne auf Groß-
 und Kleinschreibung zu achten; bei mehreren Wörtern müssen alle vorkommen. Der Filter steht in der
 Adresse der Seite und lässt sich als Link weitergeben; ein gewählter Zeitraum steht dort mit
-festen Uhrzeiten, ein Link zeigt also beim Empfänger dieselben Einträge. Auf schmalen Bildschirmen
+festen Uhrzeiten, ein Link zeigt also beim Empfänger dieselben Einträge, auch im Druck.
+Eingeblendete Systemeinträge stehen dort als „system=an“. Ein älterer Link ohne diese Angabe, der
+früher die Systemeinträge mitzeigte, zeigt sie nicht mehr; ein Link auf einen einzelnen
+Systemeintrag blendet sie selbst ein und meldet „Systemeinträge eingeblendet, um den Eintrag zu
+zeigen“. Auf schmalen Bildschirmen
 rollt der Typ einzeilig im Kopf, die übrigen Filter liegen hinter dem Knopf „Filter“, der die Zahl
-gesetzter Filter trägt.
+gesetzter Filter trägt (eingeblendete Systemeinträge zählen mit); dort klebt nichts, der Sendestatus
+steht neben dem Typ.
 
 ### Einen Eintrag berichtigen
 
@@ -178,12 +233,15 @@ Für Einsatzleitung und Führungspersonal:
 
 3. „Erfassen“ wählen. „Abbrechen“ verlässt den Modus ohne Eintrag.
 
-Der alte Eintrag trägt danach in seiner Kopfzeile die Marke „berichtigt“ und den Sprung „→ Nr. …“
-auf die jüngste Berichtigung; sein Text bleibt unverändert lesbar. Die Marke steht auch, wenn die
+Der alte Eintrag steht danach durchgestrichen da, sein Text bleibt lesbar. In der Spalte
+„Vermerk“ trägt er „berichtigt durch Nr. …“ als Sprung auf die Berichtigung; in den Bediendichten
+„Komfortabel“ und „Handschuh“ steht in seiner Kopfzeile die Marke „berichtigt“ mit dem Sprung
+„→ Nr. …“ auf die jüngste Berichtigung. Die Kennzeichnung steht auch, wenn die
 Berichtigung gerade nicht angezeigt ist, etwa unter dem Typfilter „Meldung“, und ebenso im
 Lagebild und im Überblick. In der Lageentwicklung eines Lagevortrags steht eine berichtigte
 Entscheidung mit dem Text „berichtigt → Nr. …“. Die Berichtigung
-zeigt „berichtigt Nr. …“ mit dem Verweis „Grundeintrag anzeigen ↗“. Auch eine Berichtigung lässt
+zeigt „berichtigt Nr. …“, in der Spalte „Vermerk“ als Sprung, sonst mit dem Verweis „Grundeintrag
+anzeigen ↗“. Auch eine Berichtigung lässt
 sich wieder berichtigen; die Erfassungsleiste nennt dann die Kette, etwa „Berichtigung zu Nr. 135
 (berichtigt Nr. 134)“.
 
@@ -221,8 +279,9 @@ erteilen (keine Berechtigung)“ da. Wie Aufträge weiterlaufen, beschreibt das 
 
 Das ETB ist ein Beleg. Ein Eintrag bleibt so, wie er erfasst wurde; die Korrektur steht als
 eigener, verknüpfter Eintrag daneben. Weicht die Ereigniszeit um mindestens eine Minute vom
-Eingang ab, zeigt der Eintrag „⧖ nachgetragen um …“; wurde er an einem anderen Tag erfasst als
-das Ereignis, steht der Tag dabei, etwa „⧖ nachgetragen 110020“.
+Eingang ab, zeigt der Eintrag in der Spalte „Vermerk“ „Nachtrag · erfasst …“ (in den
+Bediendichten „Komfortabel“ und „Handschuh“ „⧖ nachgetragen um …“); wurde er an einem anderen Tag
+erfasst als das Ereignis, steht der Tag dabei, etwa „Nachtrag · erfasst 110020“.
 
 ### Automatische Einträge
 
@@ -250,7 +309,9 @@ Verpflegung „241200sep26–1330“, steht sie in der Zeitdarstellung des Einsa
 Organisation, nicht in der Wahl an deinem Gerät: der Eintrag ist für alle derselbe. Ältere Einträge
 behalten die Schreibweise, mit der sie geschrieben wurden.
 
-Systemeinträge stehen leiser als Handeinträge: kleinere, gedämpfte Schrift, der Text ungekürzt.
+Systemeinträge sind beim Öffnen ausgeblendet; „System“ in der Filterleiste blendet sie ein
+(siehe „Einträge suchen und filtern“). Eingeblendet stehen sie leiser als Handeinträge: kleinere,
+gedämpfte Schrift, der Text ungekürzt.
 „System → System“ entfällt, eine bekannte Seite wie „System → ELW 1“ bleibt. Folgen drei oder mehr
 Systemeinträge innerhalb einer Stunde direkt aufeinander, fasst das ETB sie zu einer Zeile
 „3 Systemeinträge · 1301–1312 · anzeigen“ zusammen; „anzeigen“ klappt sie auf, „zuklappen“
@@ -271,22 +332,28 @@ Taucht der Entwurf nach dem Neuladen wieder auf, lässt er sich erneut verwerfen
 ### Ohne Netz
 
 Ohne Verbindung nimmt das ETB Einträge weiter an und merkt sie als „offline vorgemerkt“ vor. Sie
-gehen raus, sobald das Netz zurück ist. Lehnt der Server einen vorgemerkten Eintrag ab, steht er
+gehen raus, sobald das Netz zurück ist. Bis dahin nennt der Seitenkopf statt „alles übertragen“
+etwa „2 ausstehend“ (bei einer Ablehnung zuerst „1 abgelehnt“); ein Klick darauf springt zu den
+vorgemerkten Zeilen. Lehnt der Server einen vorgemerkten Eintrag ab, steht er
 mit „Erneut senden“ und „Verwerfen“ in der Zeitachse. Ein vorgemerkter Eintrag vom Typ „Meldung“
 oder „Lage“ legt seine Meldung erst beim Senden an; wird er abgelehnt, etwa weil das Modul
 Meldungen inzwischen gesperrt ist, bietet seine Zeile zusätzlich „Nur protokollieren“, und er geht
 ohne Meldung hinaus. Anhänge gehen nur mit Verbindung. Mehr dazu im
 Kapitel [Arbeiten ohne Netz](ohne-netz.md).
 
-### Rechtsklick auf Eintrag und Chip
+### Rechtsklick auf einen Eintrag
 
 Ein Rechtsklick auf einen Eintrag öffnet dasselbe Menü wie „Aktionen zu Eintrag …“, ebenso die
 Kontextmenü-Taste oder **Umschalt+F10**, wenn der Fokus im Eintrag steht. An einer abgelehnten
 Zeile stehen darin „Erneut senden“, „Nur protokollieren“ (wenn die Zeile es anbietet) und rot
-„Verwerfen“, das wie der Knopf ohne Rückfrage verwirft. Auf die Chips der Erfassung wirkt der
-Rechtsklick wie ihr Menü. Ein vorgemerkter Eintrag, ein Eintrag ohne Aktion, ein Verweis und
+„Verwerfen“, das wie der Knopf ohne Rückfrage verwirft. Ein vorgemerkter Eintrag, ein Eintrag ohne Aktion, ein Verweis und
 markierter Text behalten das Menü des Browsers. Am Tablet öffnet ein langer Druck im ETB kein
 Menü: Text bleibt markierbar, die Aktionen stehen im Menü „⋮“.
+
+Am Bildschirm mit Spalten nennt das Menü auch die Vermerke der Zeile. Ein Foto bietet dort
+„Vorschau: …“ für die Großansicht und, wer Originale laden darf, „Original (mit Standort): …
+herunterladen“, auch wenn die Spalte Vermerk kein Vorschaubild zeigt. Ist der Anhang auf einer
+gespiegelten Instanz noch nicht da, meldet das Herunterladen „wird geholt“.
 
 ### Abgeschlossener Einsatz
 

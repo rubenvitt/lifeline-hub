@@ -4388,14 +4388,17 @@ test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dic
     const ausloeser = zeitachse.getByRole('button', { name: /^Aktionen zu Eintrag \d+$/ });
     const zeile = await kurzeAchseHaelt(ausloeser, soll, `Zeilenauslöser (${dichte})`, 3);
 
-    // Slash-Menü über „Feld" (öffnet deterministisch „Felder"). Auf `[data-slash-menu]`
-    // eingegrenzt, weil die Kommandopalette ebenfalls `role="option"` rendert.
-    await page.getByRole('button', { name: 'Feld', exact: true }).click();
+    // Slash-Menü über „/“ im Inhalt (öffnet am Zeilenanfang Typen und Felder). Auf
+    // `[data-slash-menu]` eingegrenzt, weil die Kommandopalette ebenfalls `role="option"` rendert.
+    const inhalt = page.getByPlaceholder('Inhalt …');
+    await inhalt.fill('');
+    await inhalt.pressSequentially('/');
     const optionen = page.locator('[data-slash-menu] [role="option"]');
     const slash = await alleHaltenStufe(optionen, soll, `Slash-Option (${dichte})`, 5);
-    // Zu über denselben Knopf: Escape wirkt nur im Textfeld, der Fokus steht auf dem Knopf.
-    await page.getByRole('button', { name: 'Feld', exact: true }).click();
+    // Zu: Escape im Textfeld schließt das Menü; der Text geht wieder.
+    await inhalt.press('Escape');
     await expect(page.locator('[data-slash-menu]')).toHaveCount(0);
+    await inhalt.fill('');
 
     // Zeilenmenü: die Einträge sind das Ziel, das nach dem Öffnen getroffen wird.
     await ausloeser.first().click();

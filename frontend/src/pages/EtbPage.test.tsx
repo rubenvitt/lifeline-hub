@@ -105,6 +105,22 @@ async function waehleZeilenaktion(user: ReturnType<typeof userEvent.setup>, name
 }
 
 /**
+ * Eine Meldung — der Typ jedes neuen Entwurfs — trägt als Vorgabe nur An = eigene Stelle; Von ist
+ * Pflicht (Change `kwc2yszv-etb-neuentwurf`, Spec `etb-absender-empfaenger`). Wer senden will,
+ * setzt Von über die Feldzeile; Enter übernimmt und springt in den Inhalt. Eingefügt statt
+ * getippt: jeder Tastendruck zeichnet die Erfassung neu (LFH-672).
+ */
+async function setzeVon(user: ReturnType<typeof userEvent.setup>, wert = 'Florian 3') {
+  const von = await screen.findByRole('combobox', { name: 'Von' });
+  await user.clear(von);
+  await user.paste(wert);
+  await user.keyboard('{Enter}');
+}
+
+/** Die Feldzeile der Erfassung (Zeit, Von, An, Meldeweg) steht: die Leiste ist aufgeklappt. */
+const feldzeile = () => screen.queryByRole('textbox', { name: 'Zeit' });
+
+/**
  * Serverzählung für Kopf und Bilanz, bewusst unabhängig vom geladenen Fenster: der Kopf zeigt, was
  * der Server zählt.
  */
@@ -194,6 +210,27 @@ describe('EtbPage', () => {
     expect(
       banner.compareDocumentPosition(zeitachse) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it('die Lesemarke zählt wie die Achse: ohne Systemeinträge, solange sie ausgeblendet sind (Review S4)', async () => {
+    const abrufe: string[] = [];
+    const handler = [
+      http.get('/api/einsaetze/7/etb/lesemarke', ({ request }) => {
+        abrufe.push(new URL(request.url).search);
+        return HttpResponse.json({ neue_anzahl: 4, hoechste_lfd_nr: 1 });
+      }),
+    ];
+    const { unmount } = setup('/einsaetze/7/etb', handler);
+    await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    expect(abrufe.length).toBeGreaterThan(0);
+    expect(abrufe.every((s) => s === '?ohne_system=true')).toBe(true);
+    unmount();
+
+    abrufe.length = 0;
+    setup('/einsaetze/7/etb?system=an', handler);
+    await screen.findByText('4 Einträge, die Sie noch nicht gesichtet haben');
+    expect(abrufe.length).toBeGreaterThan(0);
+    expect(abrufe.every((s) => s === '')).toBe(true);
   });
 
   it('LLH-1149: steht die Marke im Fenster, ist sie eine Linie IN der Achse, unter Filter ein Banner', async () => {
@@ -342,10 +379,18 @@ describe('EtbPage', () => {
       'Florian Leitung',
     );
 
+    // Lage: Von und An tragen beide die eigene Stelle (Spec `etb-absender-empfaenger`); eine
+    // Meldung nähme den Standard nur für An.
+    await user.click(
+      within(screen.getByRole('radiogroup', { name: 'Typ des Eintrags' })).getByRole('radio', {
+        name: 'Lage',
+      }),
+    );
     // Ohne Rufname hält die Pflicht den Eintrag zurück; der Text bleibt stehen.
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await user.type(feld, 'Pegel steigt{Enter}');
-    expect(await screen.findByText(/Von fehlt/)).toBeInTheDocument();
+    expect(await screen.findByText('Absender fehlt')).toBeInTheDocument();
+    expect(screen.getByText('Empfänger fehlt')).toBeInTheDocument();
     expect(body).toBeNull();
     expect(feld).toHaveValue('Pegel steigt');
 
@@ -356,7 +401,8 @@ describe('EtbPage', () => {
     await waitFor(() =>
       expect(screen.queryByRole('group', { name: /Rufnamen/ })).not.toBeInTheDocument(),
     );
-    expect(screen.getByText('Von: Florian Leitung')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Von' })).toHaveValue('Florian Leitung');
+    expect(screen.getByRole('combobox', { name: 'An' })).toHaveValue('Florian Leitung');
 
     await user.type(screen.getByPlaceholderText(/Inhalt/), '{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
@@ -489,11 +535,13 @@ describe('EtbPage', () => {
         </Routes>
         <OrtSpy />
       </>,
-      { route: '/einsaetze/7/etb?eintrag=999' },
+      // Mit eingeblendeten Systemeinträgen: in der Vorgabe blendete der Sprung sie erst ein, weil
+      // das Ziel ein ausgeblendeter Systemeintrag sein könnte (kwc2yszv D6).
+      { route: '/einsaetze/7/etb?eintrag=999&system=an' },
     );
     await screen.findByText('Erste Meldung');
     // Param geräumt, kein Highlight — und keine Folge-Seite nachgeladen (Abbruchbedingung greift).
-    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?system=an$/));
     expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
     // Kein endloses Nachladen: keine before_lfd_nr-Folgeseite, weil hasNextPage=false.
     expect(folgeSeiten).toBe(0);
@@ -541,11 +589,12 @@ describe('EtbPage', () => {
     setup();
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.type(feld, 'Neuer Eintrag X{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.inhalt).toBe('Neuer Eintrag X');
-    // Von/An aus dem Standard-Rufnamen (LFH-894).
-    expect(body).toMatchObject({ von: 'ELW 1', an: 'ELW 1' });
+    // Von aus der Feldzeile, An aus dem Standard-Rufnamen (LFH-894; Vorgabe einer Meldung).
+    expect(body).toMatchObject({ von: 'Florian 3', an: 'ELW 1' });
   });
 
   it('entfernt den Entwurf auch bei Offline-Enqueue (Netzwerkfehler → eingereiht statt abgelehnt)', async () => {
@@ -556,6 +605,7 @@ describe('EtbPage', () => {
     setup();
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.type(feld, 'Offline-Eintrag{Enter}');
     await waitFor(async () => expect(await entwuerfeLaden(admin.id, 7)).toHaveLength(0));
   });
@@ -585,6 +635,7 @@ describe('EtbPage', () => {
     ]);
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.type(feld, '/langer');
     await user.click(await screen.findByText('Langer Baustein'));
     await waitFor(() => expect(feld).toHaveValue(langerText));
@@ -643,18 +694,20 @@ describe('EtbPage', () => {
       </AdresseSteht>,
       { route: '/einsaetze/7/etb?neu=1' },
     );
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Der Fokus steht im ersten leeren Pflichtfeld der Leiste: eine Meldung ohne Von (Spec „Fokus
+    // im ersten leeren Pflichtfeld“).
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull());
+    await waitFor(() => expect(feldzeile()).toBeNull());
 
     const zwei = { ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Zweite Meldung' };
     server.use(http.get('/api/einsaetze/7/etb', () => HttpResponse.json([zwei, eintrag])));
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.etb(7) }));
     expect(await screen.findByText('Zweite Meldung')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull();
+    expect(feldzeile()).toBeNull();
   });
 
   it('ein neuer Link ?neu=1 fokussiert die verlassene Leiste wieder (LLH-1558)', async () => {
@@ -670,15 +723,16 @@ describe('EtbPage', () => {
       </>,
       { route: '/einsaetze/7/etb?neu=1' },
     );
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Fokus im ersten leeren Pflichtfeld der Leiste: Von einer Meldung.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Feld' })).toBeNull());
+    await waitFor(() => expect(feldzeile()).toBeNull());
 
     await userEvent.click(screen.getByRole('link', { name: 'neuer-link' }));
-    await waitFor(() => expect(screen.getByPlaceholderText(/^Inhalt/)).toHaveFocus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
   });
 
@@ -1086,6 +1140,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     const wahl = screen.getByRole('combobox', { name: 'Nach Einheit filtern' });
     const feld = wahl.closest('.ant-select') as HTMLElement;
     await waitFor(() => expect(within(feld).getByText('1. Zug')).toBeInTheDocument());
+    // Erst den Fokus beim Laden abwarten (Meldung ohne Von: Feld Von). Er kommt einen Frame nach
+    // dem Mount der Erfassung und schlösse eine eben geöffnete Liste wieder.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
 
     await userEvent.click(wahl);
     const option = await screen.findByTitle('2. Zug');
@@ -1127,7 +1184,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     const zeile = container.querySelector('[data-zeile="eintrag-1"]')!;
     expect(zeile).toHaveAttribute('data-lfh-eintrag', 'zeitachse');
     expect(zeile).toHaveAttribute('data-typ', 'meldung');
-    expect(within(zeile as HTMLElement).getByText('Nr. 1')).toBeInTheDocument();
+    // In der Spaltenzeile (kompakt ab `lg`) steht die Zahl unter dem Kopf „Nr.“; „Nr. “ davor
+    // liest nur der Vorleser (`EtbSpaltenzeile`).
+    expect(zeile).toHaveTextContent('Nr. 1');
     expect(zeile.querySelector('[data-lfh="typwort"]')).toHaveTextContent('Meldung');
     expect(zeile.querySelector('[data-lfh="typkante"]')).not.toBeNull();
   });
@@ -1141,13 +1200,12 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(
       zeitachse.compareDocumentPosition(leiste) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // Die Hülle der Schnellerfassung trägt den Typ als Typwort im Präfix (nach dem Laden der
-    // Entwürfe, LLH-1112).
-    await waitFor(() =>
-      expect(leiste.querySelector('[data-lfh="schnellerfassung-praefix"]')).toHaveTextContent(
-        'Meldung',
-      ),
-    );
+    // Die Erfassung trägt den Typ als Segment „Typ des Eintrags“ in der Feldzeile (nach dem
+    // Laden der Entwürfe; LLH-1112, Change `kwc2yszv-etb-neuentwurf`, Aufgabe 3.1).
+    const typ = await within(leiste as HTMLElement).findByRole('radiogroup', {
+      name: 'Typ des Eintrags',
+    });
+    expect(within(typ).getByRole('radio', { name: 'Meldung' })).toBeChecked();
   });
 
   it('rollt nach einem angenommenen eigenen Eintrag ans Ende — nicht nach einer Ablehnung', async () => {
@@ -1175,6 +1233,7 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
       const user = userEvent.setup();
       const feld = await screen.findByPlaceholderText(/Inhalt/);
       await screen.findByText('Erste Meldung');
+      await setzeVon(user);
       aufrufe.length = 0;
       await user.type(feld, 'Wird abgelehnt{Enter}');
       await waitFor(() => expect(feld).toHaveValue('Wird abgelehnt'));
@@ -1208,104 +1267,175 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(screen.getByPlaceholderText(/Inhalt/)).toBe(feld);
     expect(feld).toHaveValue('Angefangener Eintrag');
   });
+});
 
-  /**
-   * Unter `xl` steht die Bilanz unter der Zeitachse. Stünde sie schon während des Ladens da,
-   * schöben die eintreffenden Zeilen sie weg (CLS). Sie erscheint deshalb erst, wenn die Liste
-   * steht; ab `xl` steht sie daneben und darf sofort.
-   */
-  it('zeigt die Bilanz unter xl erst, wenn die Liste steht', async () => {
-    setzeViewportBreite(800);
-    let freigeben: () => void = () => {};
-    const liste = new Promise<void>((r) => {
-      freigeben = r;
-    });
-    setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb', async () => {
-        await liste;
-        return HttpResponse.json([eintrag]);
-      }),
-    ]);
-    await screen.findByPlaceholderText(/Inhalt/);
-    expect(screen.queryByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeNull();
-    freigeben();
-    await screen.findByText('Erste Meldung');
-    expect(screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeInTheDocument();
-  });
-
-  /**
-   * Die Sperre gilt dem ersten Laden, nicht jedem: der Filter steckt im Query-Schlüssel, jeder neue
-   * Filter ist wieder `isLoading`. Hinge die Bilanz daran, verschwände sie unter `xl` bei jedem
-   * Typklick und beim Wiederverbinden nach einem Offline-Start.
-   */
-  it('behält die Bilanz unter xl beim Filterwechsel, während die neue Liste lädt', async () => {
-    setzeViewportBreite(800);
-    let freigeben: () => void = () => {};
-    const zweite = new Promise<void>((r) => {
-      freigeben = r;
-    });
-    setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb', async ({ request }) => {
-        if (new URL(request.url).searchParams.get('typ')) await zweite;
-        return HttpResponse.json([eintrag]);
-      }),
-    ]);
-    await screen.findByText('Erste Meldung');
-    const segmente = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
-    await userEvent.click(within(segmente).getByRole('radio', { name: 'Anordnung' }));
-    // Die neue Liste hängt noch — die Bilanz bleibt trotzdem stehen.
-    expect(screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeInTheDocument();
-    freigeben();
-  });
-
-  it('zeigt die Bilanz ab xl sofort, auch während die Liste lädt', async () => {
-    setzeViewportBreite(1366);
-    let freigeben: () => void = () => {};
-    const liste = new Promise<void>((r) => {
-      freigeben = r;
-    });
-    setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb', async () => {
-        await liste;
-        return HttpResponse.json([eintrag]);
-      }),
-    ]);
-    expect(
-      await screen.findByRole('complementary', { name: 'Bilanz des Tagebuchs' }),
-    ).toBeInTheDocument();
-    freigeben();
-    await screen.findByText('Erste Meldung');
-  });
-
-  it('zeigt die Bilanz aus der Serverzählung und den Puffer „übertragen"', async () => {
-    setzeViewportBreite(1366);
-    setup('/einsaetze/7/etb', [
-      zaehlung({ meldung: 218, anordnung: 96, entscheidung: 31, lage: 62, berichtigung: 5 }),
-    ]);
-    await screen.findByText('Erste Meldung');
-    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
-    // Geladen ist ein Eintrag; die Bilanz zählt trotzdem das ganze Tagebuch.
-    await waitFor(() =>
-      expect(leiste.querySelector('[data-typ="meldung"]')).toHaveTextContent('218'),
-    );
-    expect(within(leiste).getByRole('heading', { name: 'Bilanz' })).toBeInTheDocument();
-    expect(
-      within(leiste).getByRole('img', { name: 'Meldungen: 218 von 412 Einträgen' }),
-    ).toBeInTheDocument();
-    expect(within(leiste).getByText('Alle Einträge übertragen')).toBeInTheDocument();
-  });
-
-  it('zählt unter einem Filter die Treffer und nennt die Bilanz so', async () => {
-    setzeViewportBreite(1366);
-    const zaehlQueries: string[] = [];
-    setup('/einsaetze/7/etb?q=Deich', [
-      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
-        zaehlQueries.push(new URL(request.url).search);
+/**
+ * Spec `etb-zaehler`, „ETB-Kopf und Typ-Segmente zeigen die exakte Zahl“ (kwc2yszv D7): das
+ * Bilanz-Paneel entfällt; die Zahl je Typ steht am Typ-Segment, der Kopf nennt Einträge und
+ * ausgeblendete Systemeinträge, der Sendestatus steht als Marke im Kopf.
+ */
+describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', () => {
+  /** Zählung wie der Server: 412 Einträge, davon 300 Systemeinträge; der Ausschluss nimmt sie heraus. */
+  function zaehler412(zaehlQueries: string[] = []) {
+    return http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+      const p = new URL(request.url).searchParams;
+      zaehlQueries.push(p.toString());
+      const ohne = p.get('ohne_system') === 'true';
+      if (p.get('q') === 'Deich') {
         return HttpResponse.json({
           gesamt: 7,
           je_typ: {
-            meldung: 7,
+            meldung: 5,
             anordnung: 0,
+            lage: 2,
+            entscheidung: 0,
+            system: 0,
+            berichtigung: 0,
+          },
+        });
+      }
+      return HttpResponse.json({
+        gesamt: ohne ? 112 : 412,
+        je_typ: {
+          meldung: 80,
+          anordnung: 20,
+          lage: 2,
+          entscheidung: 9,
+          system: ohne ? 0 : 300,
+          berichtigung: 1,
+        },
+      });
+    });
+  }
+
+  const kopf = () => document.querySelector('[data-lfh="seitenkopf"]') as HTMLElement;
+  const segment = (name: string) =>
+    within(screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' })).getByRole(
+      'radio',
+      { name },
+    );
+
+  it('Kopf ohne Filter: Handeinträge und ausgeblendete Systemeinträge', async () => {
+    setzeViewportBreite(1440);
+    setup('/einsaetze/7/etb', [zaehler412()]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(kopf()).toHaveTextContent('112 Einträge · 300 Systemeinträge ausgeblendet'),
+    );
+    // Kein Paneel „Bilanz“ mehr (Spec: eine eigene Bilanz-Leiste MUST es nicht geben).
+    expect(screen.queryByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /^Bilanz/ })).toBeNull();
+  });
+
+  it('die Kopfzahl wartet auf die Systemzählung, statt zweimal umzubrechen (Review S3)', async () => {
+    setzeViewportBreite(1440);
+    let systemFreigeben: () => void = () => undefined;
+    const systemDa = new Promise<void>((r) => (systemFreigeben = r));
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb/zaehler', async ({ request }) => {
+        const ohne = new URL(request.url).searchParams.get('ohne_system') === 'true';
+        if (!ohne) await systemDa;
+        return HttpResponse.json({
+          gesamt: ohne ? 112 : 412,
+          je_typ: {
+            meldung: 80,
+            anordnung: 20,
+            lage: 2,
+            entscheidung: 9,
+            system: ohne ? 0 : 300,
+            berichtigung: 1,
+          },
+        });
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    // Die Handzählung ist da, die Systemzählung nicht: es steht noch der Platzhalter.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(kopf()).not.toHaveTextContent('112 Einträge');
+    systemFreigeben();
+    await waitFor(() =>
+      expect(kopf()).toHaveTextContent('112 Einträge · 300 Systemeinträge ausgeblendet'),
+    );
+  });
+
+  it('nennt im Kopf die Einzahl', async () => {
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+        const ohne = new URL(request.url).searchParams.get('ohne_system') === 'true';
+        return HttpResponse.json({
+          gesamt: ohne ? 1 : 2,
+          je_typ: {
+            meldung: 1,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: ohne ? 0 : 1,
+            berichtigung: 0,
+          },
+        });
+      }),
+    ]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(kopf()).toHaveTextContent('1 Eintrag · 1 Systemeintrag ausgeblendet'),
+    );
+  });
+
+  it('Kopf mit eingeblendeten Systemeinträgen nennt nur die Handeinträge', async () => {
+    setup('/einsaetze/7/etb?system=an', [zaehler412()]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() => expect(kopf()).toHaveTextContent('112 Einträge'));
+    expect(kopf()).not.toHaveTextContent('ausgeblendet');
+    expect(kopf()).not.toHaveTextContent('Treffer');
+  });
+
+  it('Typ-Segmente zeigen die Zahl aus je_typ, „Alle“ die Summe der Handeinträge', async () => {
+    setzeViewportBreite(1440);
+    setup('/einsaetze/7/etb', [zaehler412()]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() => expect(segment('Meldung')).toHaveTextContent('80'));
+    expect(segment('Alle')).toHaveTextContent('112');
+    expect(segment('Anordnung')).toHaveTextContent('20');
+    expect(segment('Entscheidung')).toHaveTextContent('9');
+    expect(segment('Berichtigung')).toHaveTextContent('1');
+    // Spec `bedien-wortlaut`, „Bilanz des ETB“: das Segment trägt das Typwort „Lage“, sein Titel
+    // nennt „Lagefeststellungen“, nie „Lagemeldungen“.
+    const lage = segment('Lage');
+    expect(lage).toHaveTextContent(/^Lage\s*2$/);
+    expect(lage).toHaveAttribute('title', 'Lagefeststellungen: 2');
+    expect(lage).toHaveAccessibleDescription('Lagefeststellungen: 2');
+    expect(document.body).not.toHaveTextContent('Lagemeldungen');
+  });
+
+  it('Kopf mit Filter: „7 Treffer“, und die Typ-Segmente summieren sich zu 7', async () => {
+    setzeViewportBreite(1440);
+    const zaehlQueries: string[] = [];
+    setup('/einsaetze/7/etb?q=Deich', [zaehler412(zaehlQueries)]);
+    await screen.findByText('Erste Meldung');
+    await waitFor(() => expect(kopf()).toHaveTextContent('7 Treffer'));
+    expect(kopf()).not.toHaveTextContent('ausgeblendet');
+    // Dieselben Filtermerkmale wie die Liste gehen an die Zählung.
+    expect(zaehlQueries.some((q) => new URLSearchParams(q).get('q') === 'Deich')).toBe(true);
+    await waitFor(() => expect(segment('Meldung')).toHaveTextContent('5'));
+    expect(segment('Lage')).toHaveTextContent('2');
+    expect(segment('Alle')).toHaveTextContent('7');
+    const summe = ['Meldung', 'Anordnung', 'Entscheidung', 'Lage', 'Berichtigung']
+      .map((n) => Number(segment(n).textContent?.match(/\d+$/)?.[0] ?? 0))
+      .reduce((a, b) => a + b, 0);
+    expect(summe).toBe(7);
+  });
+
+  it('unter einem Typfilter zählen die Segmente ohne den Typ, der Kopf die Treffer', async () => {
+    setzeViewportBreite(1440);
+    setup('/einsaetze/7/etb?typ=meldung', [
+      http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        const nurMeldung = p.get('typ') === 'meldung';
+        return HttpResponse.json({
+          gesamt: nurMeldung ? 80 : 100,
+          je_typ: {
+            meldung: 80,
+            anordnung: nurMeldung ? 0 : 20,
             lage: 0,
             entscheidung: 0,
             system: 0,
@@ -1315,51 +1445,77 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
       }),
     ]);
     await screen.findByText('Erste Meldung');
-    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
-    await waitFor(() => expect(kopf).toHaveTextContent('7 Treffer'));
-    // Dieselben Filtermerkmale wie die Liste gehen an die Zählung (daneben die ungefilterte
-    // Gesamtzahl des Filterbands, LLH-1071).
-    expect(zaehlQueries.some((q) => new URLSearchParams(q).get('q') === 'Deich')).toBe(true);
-    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
-    expect(within(leiste).getByRole('heading', { name: 'Bilanz im Filter' })).toBeInTheDocument();
+    await waitFor(() => expect(kopf()).toHaveTextContent('80 Treffer'));
+    // Ein anderes Segment nennt, was ein Wechsel zeigen würde — nicht 0.
+    await waitFor(() => expect(segment('Anordnung')).toHaveTextContent('20'));
+    expect(segment('Alle')).toHaveTextContent('100');
   });
 
-  it('behauptet ohne Zählung keine Gesamtzahl, die Liste bleibt bedienbar', async () => {
-    setzeViewportBreite(1366);
+  it('Zählung schlägt fehl: Kopf und Typ-Segmente zeigen keine Zahl, die Liste bleibt bedienbar', async () => {
+    setzeViewportBreite(1440);
     setup('/einsaetze/7/etb', [
       http.get('/api/einsaetze/7/etb/zaehler', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
     await screen.findByText('Erste Meldung');
-    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
-    expect(await within(leiste).findByText('Zählung nicht verfügbar.')).toBeInTheDocument();
-    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
-    expect(kopf).not.toHaveTextContent(/\d+ (Einträge|Eintrag|Treffer)/);
     // `findBy`: die Erfassung steht erst, wenn die Entwürfe aus der IndexedDB geladen sind; die
     // Zählung kann früher ankommen.
     expect(await screen.findByPlaceholderText(/Inhalt/)).toBeEnabled();
+    expect(kopf()).not.toHaveTextContent(/\d+ (Einträge|Eintrag|Treffer|Systemeint)/);
+    for (const name of ['Alle', 'Meldung', 'Anordnung', 'Entscheidung', 'Lage', 'Berichtigung']) {
+      expect(segment(name)).not.toHaveTextContent(/\d/);
+    }
+    expect(screen.getByRole('button', { name: 'Systemeinträge zeigen' })).not.toHaveTextContent(
+      /\d/,
+    );
+    // Bedienbar: ein Segment wählt weiter.
+    await userEvent.click(segment('Anordnung'));
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('typ=anordnung'));
   });
 
-  it('meldet einen offline gepufferten Eintrag im Puffer als ausstehend', async () => {
-    server.use(http.post('/api/einsaetze/7/etb', () => HttpResponse.error()));
+  it('Sendestatus: ohne Puffer steht „alles übertragen“ im Kopf', async () => {
+    setzeViewportBreite(1440);
     setup();
-    const user = userEvent.setup();
-    const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await user.type(feld, 'Offline-Eintrag{Enter}');
-    const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
-    await waitFor(() =>
-      expect(leiste.querySelector('[data-lfh="puffer"]')).toHaveAttribute(
-        'data-zustand',
-        'ausstehend',
-      ),
-    );
-    // Und der gepufferte Eintrag steht als eigene Zeile in der Zeitachse.
-    expect(await screen.findAllByText('Offline-Eintrag')).not.toHaveLength(0);
-    // Der Zustand in wenigen Wörtern, im Singular (LFH-1078).
-    expect(await screen.findByText('1 Eintrag offline vorgemerkt')).toBeInTheDocument();
-    expect(screen.queryByText(/sobald wieder Verbindung/)).toBeNull();
+    await screen.findByText('Erste Meldung');
+    const marke = kopf().querySelector('[data-lfh="sendestatus"]');
+    expect(marke).toHaveTextContent('alles übertragen');
+    expect(marke).toHaveAttribute('data-zustand', 'uebertragen');
   });
+
+  it('Vorgemerkte Einträge: „2 ausstehend“ statt „alles übertragen“, mit Sprung zu den Zeilen', async () => {
+    setzeViewportBreite(1440);
+    server.use(http.post('/api/einsaetze/7/etb', () => HttpResponse.error()));
+    const gerollt: Element[] = [];
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      gerollt.push(this);
+    };
+    try {
+      setup();
+      const user = userEvent.setup();
+      // Eine Meldung braucht ein Von (Change `kwc2yszv-etb-neuentwurf`).
+      await setzeVon(user);
+      await user.type(await screen.findByPlaceholderText(/Inhalt/), 'Erster offline{Enter}');
+      // Der Entwurf geht in die Warteschlange; die Leiste steht danach mit einem leeren Feld.
+      await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+      await setzeVon(user);
+      await user.type(screen.getByPlaceholderText(/Inhalt/), 'Zweiter offline{Enter}');
+      const knopf = await within(kopf()).findByRole('button', { name: /2 ausstehend/ });
+      expect(kopf()).not.toHaveTextContent('alles übertragen');
+      // Der gepufferte Eintrag steht als eigene Zeile in der Zeitachse.
+      expect(await screen.findAllByText('Erster offline')).not.toHaveLength(0);
+      gerollt.length = 0;
+      await user.click(knopf);
+      expect(gerollt.some((el) => el.getAttribute('data-zeile')?.startsWith('ausstehend-'))).toBe(
+        true,
+      );
+      // Der Zustand in wenigen Wörtern über der Erfassung bleibt (LFH-1078).
+      expect(await screen.findByText('2 Einträge offline vorgemerkt')).toBeInTheDocument();
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  }, 30_000);
 });
 
 describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
@@ -1374,7 +1530,9 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     const user = userEvent.setup();
     await screen.findByText('Erste Meldung');
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await user.type(feld, 'Zwei Fotos vom Deich');
+    // Eingefügt statt getippt: jeder Tastendruck zeichnet die Erfassung neu (LFH-672).
+    await user.click(feld);
+    await user.paste('Zwei Fotos vom Deich');
     await user.upload(dateiEingabe(), new File(['x'], 'foto-a.jpg', { type: 'image/jpeg' }));
     expect(screen.getByRole('list', { name: 'Gewählte Anhänge' })).toHaveTextContent('foto-a.jpg');
     await waitFor(async () =>
@@ -1445,6 +1603,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     const user = userEvent.setup();
     await screen.findByText('Erste Meldung');
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.upload(dateiEingabe(), new File(['x'], 'foto-d.jpg', { type: 'image/jpeg' }));
     await user.type(feld, 'Foto{Enter}');
     expect(await screen.findByText(/Speicher des Servers ist voll/)).toBeInTheDocument();
@@ -1505,6 +1664,7 @@ describe('EtbPage – Anhänge an der Erfassung (LFH-117, Review C1)', () => {
     const user = userEvent.setup();
     await screen.findByText('Erste Meldung');
     const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await setzeVon(user);
     await user.upload(dateiEingabe(), new File(['x'], 'foto.jpg', { type: 'image/jpeg' }));
     await user.type(feld, 'Foto{Enter}');
     await screen.findByText('Lädt hoch (1/1) …');
@@ -1547,7 +1707,11 @@ describe('EtbPage — Ablehnungen am Ort (LFH-1077)', () => {
     ]);
     const user = userEvent.setup();
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await user.type(feld, 'Wird abgelehnt{Enter}');
+    await setzeVon(user);
+    // Eingefügt statt getippt: jeder Tastendruck zeichnet die Erfassung neu (LFH-672).
+    await user.click(feld);
+    await user.paste('Wird abgelehnt');
+    await user.keyboard('{Enter}');
 
     const leiste = document.querySelector<HTMLElement>('.etb-erfassung-sticky')!;
     expect(await within(leiste).findByText(konflikt)).toBeInTheDocument();
@@ -1703,6 +1867,8 @@ describe('EtbPage — Einstieg in den Druck (LFH-22)', () => {
       typ: 'meldung',
       q: 'Damm',
       einheit_id: '5',
+      // Der Ausschluss der Seite reist ausdrücklich mit: ohne Merkmal druckte der Druck alles.
+      system: 'aus',
     });
   });
 
@@ -1853,7 +2019,9 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(within(k).queryByRole('link', { name: 'Drucken / als PDF' })).toBeNull();
     expect(within(k).queryByRole('button', { name: 'Einsatz abschließen' })).toBeNull();
     await weitereWaehlen('Drucken / als PDF');
-    await waitFor(() => expect(screen.getByTestId('ort-suche').textContent).toBe('?typ=meldung'));
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche').textContent).toBe('?typ=meldung&system=aus'),
+    );
   });
 
   it('auch die Einsatzleitung findet im Menü nur die Druckansicht (LFH-960)', async () => {
@@ -1896,6 +2064,44 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('Damm');
   });
 
+  it('der Sendestatus steht in der Aktionszeile, die Zahl hält ihren Platz, bevor sie kommt (kwc2yszv)', async () => {
+    // Läge der Sendestatus in der Meta-Zeile, bräche sie mit der spät kommenden Zahl um und schöbe
+    // die Zeitachse (`e2e/leisten-flaeche.spec.ts`, „Laden ohne Sprung“).
+    setzeViewportBreite(390);
+    let freigeben: () => void = () => {};
+    const zaehlung = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb/zaehler', async () => {
+        await zaehlung;
+        return HttpResponse.json({
+          gesamt: 1,
+          je_typ: {
+            meldung: 1,
+            anordnung: 0,
+            lage: 0,
+            entscheidung: 0,
+            system: 0,
+            berichtigung: 0,
+          },
+        });
+      }),
+    ]);
+    const aktionen = await kopf();
+    await screen.findByText('Erste Meldung');
+    const k = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(aktionen.querySelector('[data-lfh="sendestatus"]')).toHaveTextContent(
+      'alles übertragen',
+    );
+    expect(k.querySelector('.lfh-seitenkopf__meta [data-lfh="sendestatus"]')).toBeNull();
+    // Solange die Zählung aussteht, hält ein stummer Platzhalter die Breite der Zahl.
+    expect(k.querySelector('[data-lfh="meta-platzhalter"]')).toHaveTextContent(/Einträge/);
+    freigeben();
+    await waitFor(() => expect(k).toHaveTextContent('1 Eintrag'));
+    expect(k.querySelector('[data-lfh="meta-platzhalter"]')).toBeNull();
+  });
+
   it('der Typfilter steht einzeilig und rollt waagerecht', async () => {
     setzeViewportBreite(390);
     setup();
@@ -1912,21 +2118,25 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(screen.queryByRole('button', { name: /^Filter/ })).toBeNull();
   });
 
-  const feldKnopf = () => screen.queryByRole('button', { name: 'Feld' });
-
   it('die Erfassungsleiste startet eingeklappt, ohne Fokus, und klappt beim Fokus auf', async () => {
     setzeViewportBreite(390);
     setup();
     const feld = await screen.findByPlaceholderText(/^Inhalt/);
     await waitFor(() => expect(screen.getAllByText('Erste Meldung').length).toBeGreaterThan(0));
     expect(feld).not.toHaveFocus();
-    expect(feldKnopf()).toBeNull();
+    // Eingeklappt: eine Zeile aus Typ-Knopf und Inhalt, ohne Feldzeile und „Erfassen“.
+    expect(feldzeile()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Erfassen' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Typ des Eintrags: Meldung' })).toBeInTheDocument();
     expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).toHaveStyle({
       display: 'none',
     });
     act(() => feld.focus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
-    expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).not.toHaveStyle({
+    await waitFor(() => expect(feldzeile()).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Erfassen' })).toBeInTheDocument();
+    // Aufgeklappt bleibt das Reiterband weg: es gibt nur einen Entwurf (Spec „Entwurfsreiter
+    // und Vorschau nur bei Bedarf“).
+    expect(document.querySelector('.etb-erfassung-sticky .ant-tabs-nav')).toHaveStyle({
       display: 'none',
     });
   });
@@ -1936,16 +2146,16 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     setup();
     const feld = await screen.findByPlaceholderText(/^Inhalt/);
     act(() => feld.focus());
-    await screen.findByRole('button', { name: 'Feld' });
+    await waitFor(() => expect(feldzeile()).toBeInTheDocument());
     act(() => feld.blur());
-    await waitFor(() => expect(feldKnopf()).toBeNull());
+    await waitFor(() => expect(feldzeile()).toBeNull());
 
     act(() => feld.focus());
     await userEvent.type(feld, 'Pegel steigt');
     act(() => feld.blur());
     // Mit Inhalt bleibt alles stehen: gesetzte Felder wären sonst unsichtbar.
     await new Promise((r) => setTimeout(r, 50));
-    expect(feldKnopf()).toBeInTheDocument();
+    expect(feldzeile()).toBeInTheDocument();
   });
 
   it('ein Fokuswechsel in ein schwebendes Teil der Leiste klappt sie nicht zu', async () => {
@@ -1953,8 +2163,9 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     setup();
     const feld = await screen.findByPlaceholderText(/^Inhalt/);
     act(() => feld.focus());
-    await screen.findByRole('button', { name: 'Feld' });
-    // Die Typ-Auswahl und die Chip-Editoren hängt antd an `document.body`.
+    await waitFor(() => expect(feldzeile()).toBeInTheDocument());
+    // Das Typ-Menü und die Vorschlags- und Auswahllisten der Feldzeile hängt antd an
+    // `document.body`.
     const schwebe = document.createElement('div');
     schwebe.className = 'ant-select-dropdown';
     const ziel = document.createElement('button');
@@ -1966,7 +2177,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
         ziel.focus();
       });
       await new Promise((r) => setTimeout(r, 50));
-      expect(feldKnopf()).toBeInTheDocument();
+      expect(feldzeile()).toBeInTheDocument();
     } finally {
       schwebe.remove();
     }
@@ -1975,9 +2186,11 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
   it('?neu=1 fokussiert die Leiste auch unter md und klappt sie auf', async () => {
     setzeViewportBreite(390);
     setup('/einsaetze/7/etb?neu=1');
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
-    expect(await screen.findByRole('button', { name: 'Feld' })).toBeInTheDocument();
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Fokus im ersten leeren Pflichtfeld: Von einer Meldung (Spec „Fokus im ersten leeren
+    // Pflichtfeld“); die Leiste ist dabei aufgeklappt.
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
   });
 
   it('ein geleerter Filter lässt die offene Filterleiste stehen', async () => {
@@ -2023,12 +2236,14 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
     expect(screen.queryByPlaceholderText('Volltextsuche')).toBeNull();
   });
 
-  it('ab md ist die Leiste nie eingeklappt und das Feld hat den Fokus', async () => {
+  it('ab md ist die Leiste nie eingeklappt, der Fokus steht im ersten leeren Pflichtfeld', async () => {
     setzeViewportBreite(820);
     setup();
-    const feld = await screen.findByPlaceholderText(/^Inhalt/);
-    await waitFor(() => expect(feld).toHaveFocus());
-    expect(feldKnopf()).toBeInTheDocument();
+    await screen.findByPlaceholderText(/^Inhalt/);
+    // Meldung ohne Von: der Fokus steht im Feld Von (Spec „Fokus im ersten leeren Pflichtfeld“,
+    // Szenario „Fokus beim Laden“).
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Von' })).toHaveFocus());
+    expect(feldzeile()).toBeInTheDocument();
   });
 });
 
@@ -2036,11 +2251,15 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
  * Schalter „Systemeinträge zeigen“ (LFH-958): ein Filter wie die übrigen, Zustand in der URL,
  * Liste und Zählung über denselben Parameter.
  */
-describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
+/**
+ * Spec `etb-zeitachse-darstellung`, „Systemeinträge zeigen“ (kwc2yszv D6): Vorgabe aus; ohne
+ * Merkmal schickt die Seite `ohne_system=true`, eingeblendet steht `system=an` in der Adresse.
+ */
+describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
   it('steht ab md mit dem Typ in der Filterleiste, nicht im Seitenkopf (LLH-1065)', async () => {
     setzeViewportBreite(1366);
-    setup('/einsaetze/7/etb', server958());
-    await screen.findByText('Person erfasst');
+    setup('/einsaetze/7/etb', serverSystem());
+    await screen.findByText('Erste Meldung');
     const leiste = document.querySelector('[data-lfh="etb-filterleiste"]')!;
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     const typ = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
@@ -2059,18 +2278,30 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     typ: 'system',
     inhalt: 'Person erfasst',
   };
+  /** Drei weitere Systemeinträge derselben Stunde: sie stehen eingeblendet als Bündel (LLH-1106). */
+  const systemFolge = [3, 4, 5].map((n) => ({
+    ...eintrag,
+    id: n,
+    lfd_nr: n,
+    typ: 'system',
+    inhalt: `Abschnitt ${n} angelegt`,
+    // Pünktlich erfasst: ein Nachtrag bräche die Folge (LLH-1106).
+    ereigniszeit: `2026-05-23 10:0${n}:00`,
+    received_at: `2026-05-23 10:0${n}:00`,
+  }));
   const abrufe: string[] = [];
   const zaehlAbrufe: string[] = [];
 
-  function server958() {
+  function serverSystem({ folge = false }: { folge?: boolean } = {}) {
     abrufe.length = 0;
     zaehlAbrufe.length = 0;
+    const system = folge ? [...systemFolge].reverse() : [systemEintrag];
     return [
       http.get('/api/einsaetze/7/etb', ({ request }) => {
         const p = new URL(request.url).searchParams;
         abrufe.push(p.toString());
         return HttpResponse.json(
-          p.get('ohne_system') === 'true' ? [eintrag] : [systemEintrag, eintrag],
+          p.get('ohne_system') === 'true' ? [eintrag] : [...system, eintrag],
         );
       }),
       http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
@@ -2092,111 +2323,225 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     ];
   }
 
-  it('Ausschalten schreibt die URL, fragt Liste und Zählung damit ab und zählt Treffer', async () => {
+  it('Vorgabe: ohne Merkmal kein Systemeintrag, Knopf aus mit der Zahl als Beschreibung', async () => {
     setzeViewportBreite(1366);
-    setup('/einsaetze/7/etb', server958());
-    await screen.findByText('Person erfasst');
-    // Ein Umschaltknopf in Segment-Optik, kein Switch (LLH-1065).
+    setup('/einsaetze/7/etb', serverSystem());
+    await screen.findByText('Erste Meldung');
+    expect(screen.queryByText('Person erfasst')).toBeNull();
+    // Liste UND Zählung gehen mit dem Ausschluss an den Server.
+    expect(abrufe.length).toBeGreaterThan(0);
+    expect(abrufe.every((a) => new URLSearchParams(a).get('ohne_system') === 'true')).toBe(true);
+    expect(zaehlAbrufe.some((a) => new URLSearchParams(a).get('ohne_system') === 'true')).toBe(
+      true,
+    );
     const schalter = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
-    expect(schalter).toHaveAttribute('aria-pressed', 'true');
-    // Angeschaltet nennt er die Zahl der Systemeinträge aus der Serverzählung.
-    await waitFor(() => expect(schalter).toHaveTextContent('System98'));
-
-    await userEvent.click(schalter);
-    await waitFor(() =>
-      expect(screen.getByTestId('ort-suche')).toHaveTextContent('ohne_system=true'),
-    );
-    await waitFor(() => expect(screen.queryByText('Person erfasst')).toBeNull());
-    expect(screen.getByText('Erste Meldung')).toBeInTheDocument();
-    expect(abrufe.some((a) => a.includes('ohne_system=true'))).toBe(true);
-    expect(zaehlAbrufe.some((a) => a.includes('ohne_system=true'))).toBe(true);
+    expect(schalter).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(schalter).toHaveAccessibleDescription('98'));
+    expect(schalter).toHaveTextContent('System98');
+    // Die Vorgabe ist kein Filter: kein Band, der Kopf zählt Einträge, keine Treffer.
+    expect(document.querySelector('[data-lfh="filterhinweis"]')).toBeNull();
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
-    await waitFor(() => expect(kopf).toHaveTextContent('1 Treffer'));
-    // Ausgeschaltet nennt er, wie viele er ausblendet (Zählung ohne den Ausschluss).
-    const neu = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
-    expect(neu).toHaveAttribute('aria-pressed', 'false');
-    await waitFor(() => expect(neu).toHaveTextContent('98 ausgeblendet'));
-
-    await userEvent.click(neu);
     await waitFor(() =>
-      expect(screen.getByTestId('ort-suche')).not.toHaveTextContent('ohne_system'),
+      expect(kopf).toHaveTextContent('1 Eintrag · 98 Systemeinträge ausgeblendet'),
     );
-    expect(await screen.findByText('Person erfasst')).toBeInTheDocument();
   });
 
-  it('übersteht ein Neuladen: aus der URL gelesen, Schalter aus', async () => {
+  it('Einblenden: Systemeinträge stehen gebündelt in der Zeitachse, der Zustand in der Adresse', async () => {
     setzeViewportBreite(1366);
-    setup('/einsaetze/7/etb?ohne_system=true', server958());
+    setup('/einsaetze/7/etb', serverSystem({ folge: true }));
     await screen.findByText('Erste Meldung');
+    expect(document.querySelector('[data-testid="etb-buendelzeile"]')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Systemeinträge zeigen' }));
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?system=an$/));
+    const buendel = await screen.findByTestId('etb-buendelzeile');
+    expect(buendel).toHaveTextContent('3 Systemeinträge');
+    expect(screen.getByRole('button', { name: 'Systemeinträge zeigen' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(abrufe.some((a) => !new URLSearchParams(a).has('ohne_system'))).toBe(true);
+  });
+
+  it('Ausblenden: kein Systemeintrag mehr, der Kopf nennt die Zahl der ausgeblendeten', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb?system=an', serverSystem());
+    expect(await screen.findByText('Person erfasst')).toBeInTheDocument();
+    const schalter = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
+    expect(schalter).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(schalter);
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
+    await waitFor(() => expect(screen.queryByText('Person erfasst')).toBeNull());
+    expect(screen.getByText('Erste Meldung')).toBeInTheDocument();
+    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
+    await waitFor(() => expect(kopf).toHaveTextContent('98 Systemeinträge ausgeblendet'));
+  });
+
+  it('Neuladen: mit `system=an` bleiben sie eingeblendet', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb?system=an', serverSystem());
+    expect(await screen.findByText('Person erfasst')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Systemeinträge zeigen' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(abrufe.every((a) => !new URLSearchParams(a).has('ohne_system'))).toBe(true);
+  });
+
+  it('ein alter Link mit ohne_system=true gilt als Vorgabe', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb?ohne_system=true', serverSystem());
+    await screen.findByText('Erste Meldung');
+    expect(screen.queryByText('Person erfasst')).toBeNull();
     expect(screen.getByRole('button', { name: 'Systemeinträge zeigen' })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
-    expect(screen.queryByText('Person erfasst')).toBeNull();
-    expect(abrufe.every((a) => a.includes('ohne_system=true'))).toBe(true);
   });
 
-  it('ein Sprung auf einen ausgeblendeten Systemeintrag blendet ein und hebt hervor', async () => {
+  it('Sprung auf einen ausgeblendeten Eintrag: blendet ein, hebt hervor und sagt es', async () => {
     setzeViewportBreite(1366);
-    const { container } = setup('/einsaetze/7/etb?ohne_system=true&eintrag=2', server958());
+    const { container } = setup('/einsaetze/7/etb?eintrag=2', serverSystem());
     expect(
-      await screen.findByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
+      await screen.findByText('Systemeinträge eingeblendet, um den Eintrag zu zeigen'),
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(container.querySelector('[data-zeile="eintrag-2"]')).toHaveClass(
         'zeile-hervorgehoben',
       ),
     );
-    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+    // Der Sprungparameter ist geräumt, das Einblenden bleibt in der Adresse.
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?system=an$/));
     expect(screen.getByRole('button', { name: 'Systemeinträge zeigen' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
   });
 
-  it('unter einem Typfilter blendet ein vergeblicher Sprung nichts ein', async () => {
+  it('Sprung unter einem Typfilter: der Ausschluss bleibt, der Parameter geht ohne Hinweis', async () => {
     setzeViewportBreite(1366);
-    setup('/einsaetze/7/etb?typ=meldung&ohne_system=true&eintrag=2', server958());
+    setup('/einsaetze/7/etb?typ=meldung&eintrag=2', serverSystem());
     await screen.findByText('Erste Meldung');
     await waitFor(() =>
-      expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?typ=meldung&ohne_system=true$/),
+      expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?typ=meldung$/),
     );
-    expect(
-      screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
-    ).toBeNull();
+    expect(screen.queryByText('Systemeinträge eingeblendet, um den Eintrag zu zeigen')).toBeNull();
+    expect(abrufe.every((a) => new URLSearchParams(a).get('ohne_system') === 'true')).toBe(true);
   });
 
-  it('der Schalter heißt fest, die Zahl beschreibt ihn', async () => {
+  it('Zustand für Hilfsmittel: fester Name, aria-pressed, die Zahl als Beschreibung', async () => {
     setzeViewportBreite(1366);
-    setup('/einsaetze/7/etb', server958());
-    await screen.findByText('Person erfasst');
+    setup('/einsaetze/7/etb', serverSystem());
+    await screen.findByText('Erste Meldung');
     const schalter = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
+    expect(schalter).toHaveAttribute('aria-pressed', 'false');
     await waitFor(() => expect(schalter).toHaveAccessibleDescription('98'));
   });
 
   it('ein Sprung auf einen sichtbaren Eintrag behält den Ausschluss', async () => {
     setzeViewportBreite(1366);
-    const { container } = setup('/einsaetze/7/etb?ohne_system=true&eintrag=1', server958());
+    const { container } = setup('/einsaetze/7/etb?eintrag=1', serverSystem());
     await waitFor(() =>
       expect(container.querySelector('[data-zeile="eintrag-1"]')).toHaveClass(
         'zeile-hervorgehoben',
       ),
     );
-    // Der Sprungparameter ist geräumt, der Ausschluss bleibt.
-    await waitFor(() =>
-      expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^\?ohne_system=true$/),
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(/^$/));
+    expect(screen.queryByText('Systemeinträge eingeblendet, um den Eintrag zu zeigen')).toBeNull();
+    expect(screen.queryByText('Person erfasst')).toBeNull();
+  });
+
+  it('der Druck nimmt eingeblendete Systemeinträge mit', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb?system=an', serverSystem());
+    await screen.findByText('Person erfasst');
+    // Eingeblendet heißt für den Druck: kein Ausschluss, also gar kein Merkmal (Review S7).
+    expect(screen.getByRole('link', { name: 'Drucken / als PDF' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/etb/druck',
     );
-    expect(
-      screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
-    ).toBeNull();
+  });
+});
+
+/**
+ * Spec `etb-filterleiste`, „An der Arbeitsposition“ (kwc2yszv D8): Seitenkopf und Filterleiste
+ * kleben unter dem Rahmen, ein gesetzter Filter bleibt am Ende der Zeitachse sichtbar. Die
+ * Geometrie misst `e2e/etb-filterleiste.spec.ts`; hier der Aufbau.
+ */
+describe('EtbPage: Filterleiste klebt unter dem Seitenkopf (kwc2yszv)', () => {
+  const wurzelStil = () => document.documentElement.style;
+
+  it('ab md kleben Seitenkopf und Filterleiste, die Unterkante steht am Seitencontainer', async () => {
+    setzeViewportBreite(1440);
+    setup('/einsaetze/7/etb?q=Deich');
+    await screen.findByText('Erste Meldung');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    await waitFor(() => expect(kopf.style.position).toBe('sticky'));
+    expect(kopf.style.top).toContain('--lfh-rahmen-oben');
+    const leiste = document.getElementById('etb-filterleiste')!;
+    expect(leiste).toHaveAttribute('data-lfh', 'etb-kopf-klebt');
+    expect(leiste.style.position).toBe('sticky');
+    expect(leiste.style.top).toBe(
+      'calc(var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px))',
+    );
+    // Vertrag mit dem Spaltenkopf der Zeitachse: er klebt an `--etb-kopf-unterkante`.
+    const container = leiste.closest<HTMLElement>('[data-lfh="etb-seite"]')!;
+    expect(container.style.getPropertyValue('--etb-kopf-unterkante')).toBe(
+      'calc(var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px) + var(--lfh-etb-filterleiste-hoehe, 0px))',
+    );
+    // Die Zeitachse liegt darunter im Container.
+    expect(container.contains(screen.getByRole('region', { name: 'Einsatztagebuch' }))).toBe(true);
+    // Die gemessenen Höhen stehen am Dokument (Fokusabstand, `index.css`).
+    expect(wurzelStil().getPropertyValue('--lfh-etb-filterleiste-hoehe')).toMatch(/px$/);
+    expect(wurzelStil().getPropertyValue('--lfh-etb-seitenkopf-hoehe')).toMatch(/px$/);
+    // Der Filter ist an der Arbeitsposition löschbar: die Suche steht in der klebenden Leiste.
+    expect(leiste.contains(screen.getByPlaceholderText('Volltextsuche'))).toBe(true);
+  });
+
+  it('unter md klebt nichts, und am Dokument steht kein Abstand', async () => {
+    setzeViewportBreite(390);
+    setup();
+    await screen.findByText('Erste Meldung');
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(kopf.style.position).not.toBe('sticky');
+    expect(document.getElementById('etb-filterleiste')!.style.position).not.toBe('sticky');
+    expect(wurzelStil().getPropertyValue('--lfh-etb-filterleiste-hoehe')).toBe('');
+  });
+
+  it('klebt nicht, wenn die Köpfe mehr als ein Drittel der Fensterhöhe nähmen', async () => {
+    setzeViewportBreite(1440);
+    // jsdom legt nicht aus: jede Höhe gestellt auf 200 px, das Fenster ist 768 px hoch.
+    const hoehe = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(200);
+    try {
+      setup();
+      await screen.findByText('Erste Meldung');
+      await waitFor(() =>
+        expect(document.getElementById('etb-filterleiste')).not.toHaveAttribute(
+          'data-lfh',
+          'etb-kopf-klebt',
+        ),
+      );
+      const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+      expect(kopf.style.position).not.toBe('sticky');
+      expect(wurzelStil().getPropertyValue('--lfh-etb-filterleiste-hoehe')).toBe('');
+      // Die Leiste misst klebend und rollend gleich hoch (Review S1): ihr Abstand nach unten liegt
+      // in beiden Zuständen in ihr, sonst schaltete das Kleben an der Grenze hin und her.
+      expect(document.getElementById('etb-filterleiste')!.style.display).toBe('flow-root');
+    } finally {
+      hoehe.mockRestore();
+    }
   });
 });
 
 describe('EtbPage: Filterband (LLH-1071)', () => {
-  /** Zählung je Filter: ungefiltert 134, mit Typ 7. */
+  /**
+   * Zählung je Filter: ungefiltert 134, mit Typ 7. Der Ausschluss der Systemeinträge ist die
+   * Vorgabe, kein Filter (kwc2yszv D6).
+   */
   function zaehlerJeFilter() {
     return http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
-      const gefiltert = new URL(request.url).searchParams.size > 0;
+      const p = new URL(request.url).searchParams;
+      p.delete('ohne_system');
+      const gefiltert = p.size > 0;
       const gesamt = gefiltert ? 7 : 134;
       return HttpResponse.json({
         gesamt,
@@ -2215,7 +2560,6 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
   it.each([
     ['?typ=meldung', 'Meldung'],
     ['?q=Deich', '„Deich“'],
-    ['?ohne_system=true', 'ohne System'],
     ['?von=2026-05-23%2008%3A00%3A00', 'seit'],
     ['?einheit_id=3', 'eine Einheit'],
   ])('zeigt bei %s „Gefiltert · n von m“ über der Erfassung', async (suche, merkmal) => {
@@ -2258,7 +2602,9 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
     );
     setup('/einsaetze/7/etb?typ=meldung', [zaehlerJeFilter()]);
     const feld = await screen.findByPlaceholderText(/Inhalt/);
-    await userEvent.type(feld, 'Räumen{Enter}');
+    const user = userEvent.setup();
+    await setzeVon(user);
+    await user.type(feld, 'Räumen{Enter}');
     const band = () => document.querySelector('[data-lfh="filterhinweis"]') as HTMLElement;
     await waitFor(() =>
       expect(band()).toHaveTextContent(/Nr\. 135 erfasst – außerhalb des Filters · anzeigen/),

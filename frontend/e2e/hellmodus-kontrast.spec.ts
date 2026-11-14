@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { flaeche, kontrast, pruefe, randKontrast, verhaeltnis } from './kontrast-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { etbMitSystem } from './etb-kern';
 
 // Browsermessung des Tagmodus: ETB-Typwörter und -kanten (LLH-1320), Zeilentönungen, der leise
 // Systemeintrag, die Lückenmarke der Betroffenen und die Augenbraue (Tertiärtext `schwach`,
@@ -66,7 +67,8 @@ for (const modus of ['light', 'dark'] as const) {
     await post(page, `${basis}/personen`, { sichtung: 'sk2' });
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
 
-    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    // Mit Systemeinträgen: in der Vorgabe sind sie aus (kwc2yszv D6).
+    await page.goto(etbMitSystem(einsatzId));
     await page.mouse.move(0, 0);
     for (const typ of ['meldung', 'anordnung', 'entscheidung', 'lage', 'berichtigung', 'system']) {
       const wort = page
@@ -82,8 +84,10 @@ for (const modus of ['light', 'dark'] as const) {
     // 2 px gegen die Zeile selbst und gegen die Leiste, auf der sie steht (LLH-1320).
     await page.getByPlaceholder('Inhalt …').fill('/entscheidung Messung Kante');
     await expect(
-      page.getByRole('button', { name: 'Eintragstyp Entscheidung ändern' }),
-    ).toBeVisible();
+      page
+        .getByRole('radiogroup', { name: 'Typ des Eintrags' })
+        .getByRole('radio', { name: 'Entscheidung' }),
+    ).toBeChecked();
     await page.mouse.move(0, 0);
     const zeile = page.locator('.lfh-schnellerfassung[data-rahmen-farbe]');
     await expect(zeile).toHaveCount(1);

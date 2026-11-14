@@ -1,4 +1,4 @@
-//! ETB-Zählung gesamt und je Typ (LFH-612: „412 Einträge", Bilanz-Leiste).
+//! ETB-Zählung gesamt und je Typ (LFH-612: „412 Einträge", Zahlen an den Typ-Segmenten).
 //!
 //! Die tragende Zusicherung ist die **Parität mit der Liste**: der Kopf zeigt „n Treffer",
 //! und n muss genau die Menge sein, die `GET …/etb` mit denselben Filtern seitenweise

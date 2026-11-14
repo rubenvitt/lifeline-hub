@@ -1019,9 +1019,13 @@ export const einsatzKeys = {
   etb: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId] as const,
   etbListe: <F>(einsatzId: number, filter: F) => [EINSATZ_KEYS.etb, einsatzId, filter] as const,
   // Eigene Lesemarke als Sub-Key unter DEMSELBEN Prefix wie die Liste: jedes `etb`-Ereignis zieht
-  // die Zahl „neu seit Ihrer letzten Sichtung“ mit.
-  etbLesemarke: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId, 'lesemarke'] as const,
-  // Exakte Zählung unter demselben Prefix. Der Filter ist Teil des Keys: Kopf und Bilanz zählen
+  // die Zahl „neu seit Ihrer letzten Sichtung“ mit. Ohne Systemeinträge gezählt ist ein eigenes Fach
+  // darunter (Review S4); `etbLesemarke(id)` trifft als Präfix beide.
+  etbLesemarke: (einsatzId: number, ohneSystem = false) =>
+    ohneSystem
+      ? ([EINSATZ_KEYS.etb, einsatzId, 'lesemarke', 'ohne_system'] as const)
+      : ([EINSATZ_KEYS.etb, einsatzId, 'lesemarke'] as const),
+  // Exakte Zählung unter demselben Prefix. Der Filter ist Teil des Keys: Kopf und Typ-Segmente zählen
   // genau, was die Liste zeigt.
   etbZaehler: <F>(einsatzId: number, filter: F) =>
     [EINSATZ_KEYS.etb, einsatzId, 'zaehler', filter] as const,
@@ -1583,9 +1587,10 @@ const LAGEBILD_GLOBAL: ReadonlySet<unknown> = new Set<unknown>(LAGEBILD_OFFLINE.
  * Filterfelder, die eine FESTE ETB-Ansicht ergeben (LFH-939, design.md D4): Gesamtliste, je ein
  * Reiter je Typ, feste Ausschnitte (Überblick, Lage-Dashboard, Bezugswahl ohne Suche). Ihre Menge
  * ist begrenzt. Eine Positivliste statt einer Negativliste: ein neues Filterfeld landet nicht
- * still auf der Platte, es muss hier aufgenommen werden.
+ * still auf der Platte, es muss hier aufgenommen werden. `ohne_system` ist der Schalter der
+ * Vorgabe-Ansicht (Systemeinträge aus, kwc2yszv D6), keine freie Eingabe.
  */
-const ETB_FESTE_FILTERFELDER: ReadonlySet<string> = new Set(['typ', 'limit']);
+const ETB_FESTE_FILTERFELDER: ReadonlySet<string> = new Set(['typ', 'limit', 'ohne_system']);
 
 /**
  * Ist dieser ETB-Key eine feste Ansicht? Liste (`['etb', id, filter]`), Zähler

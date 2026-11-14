@@ -88,6 +88,16 @@ describe('istLagebildOfflineKey', () => {
     expect(istLagebildOfflineKey(einsatzKeys.etbZaehler(7, {}))).toBe(true);
     expect(istLagebildOfflineKey(einsatzKeys.etbZaehler(7, { typ: 'lage' }))).toBe(true);
     expect(istLagebildOfflineKey(einsatzKeys.etbLesemarke(7))).toBe(true);
+    // Die Vorgabe der Seite blendet Systemeinträge aus (kwc2yszv D6): ihr Ausschluss ist ein
+    // Schalter, keine freie Eingabe, und die Vorgabe-Ansicht muss ohne Netz lesbar bleiben.
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { ohne_system: true }))).toBe(true);
+    expect(
+      istLagebildOfflineKey(einsatzKeys.etbListe(7, { typ: 'meldung', ohne_system: true })),
+    ).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbZaehler(7, { ohne_system: true }))).toBe(true);
+    expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { ohne_system: true, q: 'x' }))).toBe(
+      false,
+    );
     // Frei: jede Eingabe der Person, auch im Zähler.
     expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { q: 'x' }))).toBe(false);
     expect(istLagebildOfflineKey(einsatzKeys.etbListe(7, { typ: 'meldung', q: 'x' }))).toBe(false);

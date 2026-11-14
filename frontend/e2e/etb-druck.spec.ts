@@ -123,9 +123,11 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   const gesamt = zaehler.gesamt as number;
   expect(gesamt, 'Vorbedingung: mehr als eine Serverseite (500)').toBeGreaterThan(500);
 
-  // ── Einstieg über das ETB, ungefiltert.
+  // ── Einstieg über das ETB, ungefiltert: mit eingeblendeten Systemeinträgen, die in der Vorgabe
+  // aus sind (kwc2yszv D6). Der Druck ohne Merkmal ist vollständig; nur der Ausschluss reist
+  // als `system=aus` mit (Review S7).
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(`/einsaetze/${einsatzId}/etb?system=an`);
   await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb/druck$`));
   const drucken = page.getByRole('button', { name: 'Drucken / als PDF' });
@@ -209,10 +211,11 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
     });
   }
 
-  // ── Gefilterter Druck: nur Meldungen; die Berichtigung liegt außerhalb der Auswahl.
+  // ── Gefilterter Druck: nur Meldungen; die Berichtigung liegt außerhalb der Auswahl. Die Seite
+  // blendet Systemeinträge in der Vorgabe aus und gibt das als `system=aus` mit (Review S7).
   await page.goto(`/einsaetze/${einsatzId}/etb?typ=meldung`);
   await page.getByRole('link', { name: 'Drucken / als PDF' }).click();
-  await expect(page).toHaveURL(new RegExp(`/etb/druck\\?typ=meldung$`));
+  await expect(page).toHaveURL(new RegExp(`/etb/druck\\?typ=meldung&system=aus$`));
   await expect(drucken).toBeEnabled({ timeout: 60_000 });
   await expect(kopf).toContainText('Typ: Meldung');
   await expect(zeile(page, saat.grund.lfd_nr)).toContainText(

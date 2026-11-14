@@ -1,4 +1,7 @@
-import { Button, Space } from 'antd';
+import { App, Button, Image, Space } from 'antd';
+import { grossansichtPfad, originalDateiname, originalPfad } from '../api/anhangFassung';
+import { ladeAnhangHerunter } from '../components/anhangHerunterladen';
+import { useSpiegelAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
 import {
   Fragment,
   memo,
@@ -8,10 +11,11 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FocusEvent,
   type ReactNode,
 } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import type { EtbEintragAnzeige, MeldeWeg } from '../api/types';
 import { HERVORGEHOBEN } from '../components/Datensicht';
 import { funkprotokollFolge } from '../components/useFunkprotokollLauf';
@@ -19,6 +23,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { KontextMenue, type KontextMenueOffen } from '../components/KontextMenue';
 import { useKontextMenue, type KontextHandler } from '../components/useKontextMenue';
 import { useAlsUntereLeiste } from '../components/untereLeiste';
+import { useViewport } from '../components/useViewport';
 import Markdown from '../components/Markdown';
 import Fundstellen from '../components/Fundstellen';
 import { fundstellen as fundstellenIn, suchphrasen } from '../components/volltextFundstellen';
@@ -45,18 +50,31 @@ import BerichtigtMarke from './BerichtigtMarke';
 import { berichtigtDurch } from './berichtigung';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import EtbDokumente, { type EtbDokument } from './EtbDokumente';
+import EtbHandschirmzeile from './EtbHandschirmzeile';
+import { EtbInhalt } from './EtbInhalt';
+import EtbSpaltenzeile, { EtbSpaltenkopf } from './EtbSpaltenzeile';
+import { EtbVermerkListe } from './EtbVermerke';
+import {
+  etbZeilenform,
+  vonAnAnzeige,
+  zeitSpalteBreite,
+  type EtbZeilenform,
+  type VonAnAnzeige,
+} from './etbSpalten';
+import { vermerkeVon, type Vermerk } from './vermerke';
 import { scrollNachOben, useNachObenPasst, useWeitGerollt } from './nachOben';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
-import { SYSTEM_RUFNAME } from './systemKennung';
 import { istNachgetragen } from './typFarben';
 import { verfasserText } from './verfasser';
 import {
   fuehreZeilenWahlAus,
   zeilenAktionen,
+  zeilenMenue,
   zeilenMenueName,
   type ZeilenAufrufe,
   type ZeilenRechte,
+  type ZeilenZusatz,
 } from './zeilenAktionen';
 import {
   type Berichtigungsindex,
@@ -92,6 +110,11 @@ interface Props {
    * Seite schaltet es unter `typ=system` ab, die Achse selbst unter einer Volltextsuche.
    */
   buendeln?: boolean;
+  /**
+   * Kleben Seitenkopf und Filterleiste (`etb/etbKopfKleben.ts`)? Nur dann klebt auch der
+   * Spaltenkopf: der Fokusabstand oben rechnet ihn nur dann ein (Review L4).
+   */
+  kopfKlebt?: boolean;
   /**
    * Zählt je Sprung über `?eintrag=` hoch (auch auf denselben Eintrag). Ein Sprung hebt das
    * Einfrieren auf: das Ziel könnte sonst hinter dem Sammelbanner stehen.
@@ -171,16 +194,51 @@ export const MELDEWEG_LABEL = Object.fromEntries(
   MELDEWEG_OPTIONEN.map((o) => [o.value, o.label]),
 ) as Record<MeldeWeg, string>;
 
+/**
+ * Von → An im gemeinsamen `Zeitachseneintrag`. Dieselbe Lesart wie die Spaltenzeile
+ * (`vonAnAnzeige`): „System → System“ fällt weg (LLH-1106), gleiche Seiten stehen als
+ * „Vermerk <Stelle>“ (Spec, „Eigener Vermerk statt Von → An“).
+ */
 function vonAn(von?: string | null, an?: string | null, begriff?: string): ReactNode {
-  if (!von && !an) return null;
-  // „System → System“ sagt nichts (LLH-1106); eine bekannte Seite bleibt stehen.
-  if (von === SYSTEM_RUFNAME && an === SYSTEM_RUFNAME) return null;
+  const anzeige = vonAnAnzeige(von, an);
+  if (anzeige == null) return null;
+  if (anzeige.art === 'vermerk') {
+    return (
+      <>
+        Vermerk <Fundstellen text={anzeige.stelle} begriff={begriff} />
+      </>
+    );
+  }
   return (
     <>
-      <Fundstellen text={von || '—'} begriff={begriff} /> →{' '}
-      <Fundstellen text={an || '—'} begriff={begriff} />
+      <Fundstellen text={anzeige.von || '—'} begriff={begriff} /> →{' '}
+      <Fundstellen text={anzeige.an || '—'} begriff={begriff} />
     </>
   );
+}
+
+/** Trifft die Volltextsuche den Inhalt? Dann steht ein langer Eintrag aufgeklappt (Spec). */
+function inhaltGetroffen(inhalt: string, begriff?: string): boolean {
+  if (!begriff) return false;
+  return fundstellenIn(inhalt, suchphrasen(begriff)).length > 0;
+}
+
+/**
+ * Was das Menü einer Zeile zusätzlich nennt (`ZeilenZusatz`): in der Spaltenzeile Vermerke und
+ * Verfasser, in der Handschirm-Zeile den Verfasser; der `Zeitachseneintrag` zeigt beides selbst.
+ * Rein, damit ⋮ und Kontextmenü dieselbe Liste bauen.
+ */
+function zeilenZusatz(
+  z: EtbZeile,
+  form: EtbZeilenform,
+  vermerke: () => readonly Vermerk[],
+  darfOriginal: boolean,
+): ZeilenZusatz | undefined {
+  if (z.art !== 'eintrag' || form === 'zeitachse') return undefined;
+  return {
+    verfasser: verfasserText(z.eintrag),
+    ...(form === 'spalten' ? { vermerke: vermerke(), darfOriginal } : {}),
+  };
 }
 
 /** Trifft die Volltextsuche die Veranlassung? Nur dann steht sie in der Hinweiszeile. */
@@ -255,6 +313,7 @@ export default function EtbZeitachse({
   highlightId,
   fundstellen,
   buendeln = true,
+  kopfKlebt = false,
   sprungMarke,
   eigeneBenutzerId,
   amEnde = true,
@@ -279,6 +338,15 @@ export default function EtbZeitachse({
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const darfOriginal = useDarfOriginalLaden(einsatzId);
+  const { istSchmal, abBreite } = useViewport();
+  // Welche Zeilenform (Change `kwc2yszv-etb-neuentwurf`, D1): Spalten in kompakter Dichte ab `lg`,
+  // Handschirm-Zeile unter `md`, sonst der gemeinsame `Zeitachseneintrag`.
+  const form = etbZeilenform({
+    schmal: istSchmal,
+    abLg: abBreite('lg'),
+    kompakt: zeitachsenAufbau(token) === 'zeile',
+  });
+  const navigate = useNavigate();
   const wurzel = useRef<HTMLDivElement>(null);
   const kopfIdBasis = useId();
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
@@ -440,7 +508,23 @@ export default function EtbZeitachse({
     onVerwerfen,
     onNurProtokollieren,
   });
+  // Auch `navigate` über die Ref: seine Identität folgt dem Pfad, die Aufrufer bleiben stabil.
+  const navigateRef = useRef(navigate);
+  // Downloads aus dem Zeilenmenü (Review L2): am Spiegel erst laden, das Ergebnis als Meldung.
+  const { message } = App.useApp();
+  const { spiegel } = useSpiegelAusCache(einsatzId);
+  const ladeOptionen = useRef({
+    spiegel,
+    melde: (art: 'info' | 'error', text: string) => void message[art](text),
+  });
+  // Großansicht eines Bild-Anhangs aus dem Zeilenmenü (Review L1); `null`: zu.
+  const [menueVorschau, setMenueVorschau] = useState<string | null>(null);
   useLayoutEffect(() => {
+    navigateRef.current = navigate;
+    ladeOptionen.current = {
+      spiegel,
+      melde: (art, text) => void message[art](text),
+    };
     handler.current = {
       onBerichtigen,
       onWiedervorlage,
@@ -460,6 +544,16 @@ export default function EtbZeitachse({
       // Immer gesetzt: ob der Weg angeboten wird, sagt `rechte` (aktuelle Prop). Ein beim
       // Einhängen eingefrorenes `undefined` stünde sonst als Eintrag ohne Wirkung da.
       nurProtokollieren: (p) => handler.current.onNurProtokollieren?.(p),
+      oeffne: (pfad) => navigateRef.current(pfad),
+      // Wie ein Klick auf den Verweis, am Spiegel mit „wird geholt“ als Meldung (Review L2).
+      herunterladen: (d) => void ladeAnhangHerunter(d.href, d.dateiname, ladeOptionen.current),
+      original: (d) =>
+        void ladeAnhangHerunter(
+          originalPfad(d.href),
+          originalDateiname(d.dateiname),
+          ladeOptionen.current,
+        ),
+      vorschau: (d) => setMenueVorschau(grossansichtPfad(d.href)),
     }),
     [],
   );
@@ -519,7 +613,26 @@ export default function EtbZeitachse({
     },
   });
   const kontextZeile = kontext == null ? undefined : sichtbarNachSchluessel.get(kontext.schluessel);
-  const kontextListe = kontextZeile == null ? [] : zeilenAktionen(kontextZeile, rechte);
+  // Ob das Menü offen bleibt, sagen die Handlungen; gezeigt wird dieselbe Liste wie am ⋮.
+  const kontextAktionen = kontextZeile == null ? [] : zeilenAktionen(kontextZeile, rechte);
+  const kontextZusatz =
+    kontextZeile == null
+      ? undefined
+      : zeilenZusatz(
+          kontextZeile,
+          form,
+          () =>
+            kontextZeile.art === 'eintrag'
+              ? vermerkeVon(kontextZeile.eintrag, {
+                  einsatzId,
+                  grundeintrag: index.grundeintrag(kontextZeile.eintrag),
+                  konventionen,
+                  dokumente: dokumente?.get(kontextZeile.eintrag.id),
+                })
+              : [],
+          darfOriginal,
+        );
+  const kontextListe = kontextZeile == null ? [] : zeilenMenue(kontextZeile, rechte, kontextZusatz);
   /*
    * Schließen taut auf, wenn der Fokus nicht in die Achse zurückkehrt. Auf `verlassen` ist dabei
    * kein Verlass: kam der Rechtsklick ohne Fokus in der Achse (Fokus auf `body`), fällt der Fokus
@@ -534,7 +647,7 @@ export default function EtbZeitachse({
   };
   // Verschwindet die Zeile oder verliert sie alle Einträge, schließt das Menü (abgeleiteter
   // Zustand wie in `Datensicht`).
-  if (kontext != null && kontextListe.length === 0) kontextZu(kontext);
+  if (kontext != null && kontextAktionen.length === 0) kontextZu(kontext);
   const kontextSchliessen = () => {
     if (kontext != null) kontextZu(kontext);
   };
@@ -567,6 +680,7 @@ export default function EtbZeitachse({
       aufrufe={aufrufe}
       kontext={kontextAusloeser}
       fehler={z.art === 'abgelehnt' ? (zeilenFehler?.(z.schluessel) ?? null) : null}
+      form={form}
     />
   );
 
@@ -626,6 +740,7 @@ export default function EtbZeitachse({
               return (
                 <Fragment key={p.schluessel}>
                   <EtbBuendelzeile
+                    form={form}
                     schluessel={p.schluessel}
                     anzahl={p.zeilen.length}
                     von={uhrzeit(p.zeilen[0].eintrag.ereigniszeit, konventionen)}
@@ -655,10 +770,22 @@ export default function EtbZeitachse({
       role="region"
       aria-label="Einsatztagebuch"
       data-lfh="etb-zeitachse"
+      data-lfh-form={form}
+      className={form === 'spalten' ? 'etb-zeitachse--spalten' : undefined}
       onFocus={betreten}
       onBlur={verlassen}
-      style={{ position: 'relative' }}
+      style={{
+        position: 'relative',
+        // Spuren der Spaltenzeile, die an Darstellung und Dichte hängen (`etb/etbSpalten.ts`).
+        ...(form === 'spalten'
+          ? ({
+              '--etb-spalte-zeit': `${zeitSpalteBreite(konventionen)}px`,
+              '--etb-spalte-menue': `${token.controlHeight}px`,
+            } as CSSProperties)
+          : {}),
+      }}
     >
+      {form === 'spalten' && sichtbar.length > 0 && <EtbSpaltenkopf klebt={kopfKlebt} />}
       {inhalt}
       {/* In der Wurzel: der Fokus im Menü (Portal) steigt im React-Baum zu `betreten` auf und
           hält die Achse wie jeder Fokus in ihr (D4). */}
@@ -667,8 +794,28 @@ export default function EtbZeitachse({
           offen={kontext?.offen ?? null}
           eintraege={kontextListe}
           zugaenglicherName={zeilenMenueName(kontextZeile)}
-          onWahl={(key) => fuehreZeilenWahlAus(kontextZeile, key, aufrufe)}
+          onWahl={(key) => fuehreZeilenWahlAus(kontextZeile, key, aufrufe, kontextZusatz)}
           onSchliessen={kontextSchliessen}
+        />
+      )}
+      {/* Großansicht aus dem Zeilenmenü (Review L1): dieselbe Überlagerung wie am Vorschaubild
+          (`AnhangVorschauGruppe`), ohne eigenes Bild im Fluss. */}
+      {menueVorschau != null && (
+        <Image.PreviewGroup
+          items={[menueVorschau]}
+          preview={{ open: true, onOpenChange: (offen) => !offen && setMenueVorschau(null) }}
+        />
+      )}
+      {/* Die Achse hält unten die Höhe von „Nach oben“ frei: in der Funkprotokoll-Ordnung steht er
+          fast immer, und rechts unten läge er sonst auf dem ⋮ der jüngsten Zeile (Review S11).
+          IMMER, nicht erst mit dem Knopf: der erscheint nach dem Sprung ans Ende, ein dann
+          wachsender Platz läge unter dem Bild und die Zeile bliebe verdeckt. Nur für den Knopf,
+          nicht für das Banner: das meldet Neues und darf kurz überdecken. */}
+      {sichtbar.length > 0 && (
+        <div
+          aria-hidden="true"
+          data-lfh="etb-nach-oben-platz"
+          style={{ height: token.controlHeight + token.marginXS }}
         />
       )}
       {/* Überlagerung mit Nullhöhe am UNTEREN Rand (LLH-1149): neue Einträge kommen unten an,
@@ -765,12 +912,19 @@ interface ZeilenProps {
   kontext: KontextFabrik;
   /** Grund eines gescheiterten „Erneut senden“; derselbe Wert, solange er steht (`memo`). */
   fehler: ZeilenGrund | null;
+  /** Zeilenform der Fläche (`etbZeilenform`), je Zeitachse gleich. */
+  form: EtbZeilenform;
 }
 
 /**
  * Eine Zeile der Zeitachse, gemerkt (LFH-947, Spec `etb-zeitachse-fenster`): sie bekommt nur
  * Werte, die sich je Zeile ändern, und stabile Aufrufer. Ein Rerender der Seite ohne geänderte
  * Einträge (Einsatzkopf, Einheiten, Fokus) rendert keine Zeile und parst kein Markdown.
+ *
+ * Drei Formen (`etbZeilenform`): die Spaltenzeile (kompakt ab `lg`), die Handschirm-Zeile (unter
+ * `md`) und sonst der gemeinsame `Zeitachseneintrag`. Alle drei tragen dieselben Marken
+ * (`data-lfh="datensicht-karte"`, Zeilenklasse, `data-zeile`), dieselbe Liste für ⋮ und
+ * Kontextmenü und denselben eingeklappten Inhalt.
  */
 const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
   z,
@@ -784,41 +938,92 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
   aufrufe,
   kontext,
   fehler,
+  form,
 }: ZeilenProps) {
   const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
-  // EINE Liste für ⋮, Knöpfe und Kontextmenü (LLH-1597, `etb/zeilenAktionen.ts`).
+  // EINE Liste für ⋮, Knöpfe und Kontextmenü (LLH-1597, `etb/zeilenAktionen.ts`); was die Zeile
+  // nicht zeigt (Vermerke, Verfasser), steht dahinter (`zeilenZusatz`).
   const liste = zeilenAktionen(z, rechte);
+  const e = z.art === 'eintrag' ? z.eintrag : null;
+  const vermerke = useMemo(
+    () =>
+      e == null || form === 'zeitachse'
+        ? []
+        : vermerkeVon(e, {
+            einsatzId,
+            grundeintrag: index.grundeintrag(e),
+            konventionen,
+            dokumente,
+          }),
+    [e, form, einsatzId, index, konventionen, dokumente],
+  );
+  const zusatz = zeilenZusatz(z, form, () => vermerke, darfOriginal);
+  const menueListe = zeilenMenue(z, rechte, zusatz);
 
-  function aktionen(): ReactNode {
-    if (z.art === 'abgelehnt') {
-      // Eine Entscheidung, kein Menü: das Verwerfen ist unumkehrbar, das erneute Senden
-      // der wahrscheinlichere Griff — beide stehen offen da, mit Abstand zum Roten.
-      return (
-        <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
-          {liste.map((a) => (
-            <Button
-              key={a.key}
-              danger={a.gefahr}
-              onClick={() => fuehreZeilenWahlAus(z, a.key, aufrufe)}
-            >
-              {a.label}
-            </Button>
-          ))}
-        </Space>
-      );
-    }
+  function knoepfe(): ReactNode {
+    // Eine Entscheidung, kein Menü: das Verwerfen ist unumkehrbar, das erneute Senden
+    // der wahrscheinlichere Griff — beide stehen offen da, mit Abstand zum Roten.
+    return (
+      <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
+        {liste.map((a) => (
+          <Button
+            key={a.key}
+            danger={a.gefahr}
+            onClick={() => fuehreZeilenWahlAus(z, a.key, aufrufe)}
+          >
+            {a.label}
+          </Button>
+        ))}
+      </Space>
+    );
+  }
+
+  function menue(): ReactNode {
     // Ausstehend hat keine Einträge (`zeilenAktionen`). Auch hier, nicht nur im Baustein:
     // `Zeitachseneintrag` zeigt seine Fußzeile, sobald `aktionen` nicht `null` ist.
-    if (z.art !== 'eintrag' || liste.length === 0) return null;
+    if (z.art !== 'eintrag' || menueListe.length === 0) return null;
     // Der Name trägt die laufende Nummer: n gleichnamige Knöpfe wären per Rolle nicht
     // auseinanderzuhalten.
     return (
       <MenueAusloeser
-        eintraege={liste}
+        eintraege={menueListe}
         zugaenglicherName={zeilenMenueName(z)}
-        onWahl={(key) => fuehreZeilenWahlAus(z, key, aufrufe)}
+        onWahl={(key) => fuehreZeilenWahlAus(z, key, aufrufe, zusatz)}
       />
+    );
+  }
+
+  /** Veranlassung, wenn die Volltextsuche sie trifft — sonst steht sie nicht in der Zeile. */
+  function veranlassung(eintrag: EtbEintragAnzeige): ReactNode {
+    // Die Veranlassung steht sonst nicht in der Zeile; trifft die Suche sie, sagt erst sie, warum
+    // der Eintrag dasteht (LFH-1056).
+    if (!veranlassungGetroffen(eintrag.veranlassung, fundstellen)) return null;
+    return (
+      <span key="veranlassung">
+        Veranlassung: <Fundstellen text={eintrag.veranlassung!} begriff={fundstellen} />
+      </span>
+    );
+  }
+
+  /** Anhänge und Dokumente vollständig (Vorschaubild, Original) — wo die Zeile Platz hat. */
+  function dateien(eintrag: EtbEintragAnzeige): ReactNode {
+    const doks = dokumente;
+    if (eintrag.anhaenge.length === 0 && !(doks && doks.length > 0)) return null;
+    return (
+      <>
+        {eintrag.anhaenge.length > 0 && (
+          <EtbAnhaenge eintrag={eintrag} einsatzId={einsatzId} darfOriginal={darfOriginal} />
+        )}
+        {doks && doks.length > 0 && (
+          <EtbDokumente
+            einsatzId={einsatzId}
+            lfdNr={eintrag.lfd_nr}
+            dokumente={doks}
+            darfOriginal={darfOriginal}
+          />
+        )}
+      </>
     );
   }
 
@@ -831,13 +1036,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
     const stil = verweisStil(token);
     return hinweisZeile(
       [
-        // Die Veranlassung steht sonst nicht in der Zeile; trifft die Suche sie, sagt erst sie, warum
-        // der Eintrag dasteht (LFH-1056).
-        veranlassungGetroffen(e.veranlassung, fundstellen) && (
-          <span key="veranlassung">
-            Veranlassung: <Fundstellen text={e.veranlassung!} begriff={fundstellen} />
-          </span>
-        ),
+        veranlassung(e),
         istNachgetragen(e.ereigniszeit, e.received_at) && (
           <span key="nachtrag">
             <span aria-hidden="true">⧖ </span>
@@ -898,7 +1097,8 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
    * `etb-zeitachse-darstellung`, „Berichtigt unabhängig vom Fenster“). Gelesen wird das Wire-Feld
    * `berichtigt_durch` — der Server liefert es unabhängig von Seite und Filter (Spec
    * `etb-berichtigung`); aus dem Fenster gebildet fehlte es genau unter dem Typfilter, unter dem
-   * man die falsche Meldung liest. Der Text bleibt, wie er ist: der Eintrag ist ein Beleg.
+   * man die falsche Meldung liest. Der Text bleibt lesbar (durchgestrichen): der Eintrag ist ein
+   * Beleg.
    */
   function kopfMeta(e: EtbEintragAnzeige): ReactNode {
     return (
@@ -908,108 +1108,206 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
     );
   }
 
-  function inhalt(): ReactNode {
-    // Die `etb-*`-Klassen tragen keine Regel (die Tönung macht der Baustein über `toenung`); sie
-    // bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
-    const klassen = [
-      z.art === 'eintrag' && z.eintrag.typ === 'berichtigung' ? 'etb-berichtigung' : '',
-      z.art === 'ausstehend' ? 'etb-ausstehend' : '',
-      z.art === 'abgelehnt' ? 'etb-abgelehnt' : '',
-      hervorgehoben ? HERVORGEHOBEN : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-    const gemeinsam = {
-      als: 'li' as const,
-      'data-lfh': 'datensicht-karte',
-      'data-testid': 'etb-ereigniszeile',
-      'data-zeile': z.schluessel,
-      className: klassen || undefined,
-      // Ohne Einträge keine Handler: das Browsermenü bleibt (vorgemerkt, Lesende).
-      ...(liste.length > 0 ? kontext<HTMLElement>(z.schluessel) : {}),
-      // Das Menü steht in `kompakt` in der Kopfzeile; die Entscheidung einer abgelehnten Zeile
-      // bleibt rechts (LFH-958, `Zeitachseneintrag`).
-      ...(z.art === 'abgelehnt' ? { aktionen: aktionen() } : { menue: aktionen() }),
-      // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
-      // Klassenregel käme dagegen nicht an.
-      style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
-    };
+  /** Sendezustand einer gepufferten Zeile als Chip. */
+  function pufferChip(): ReactNode {
+    if (z.art === 'eintrag') return null;
+    return z.art === 'ausstehend' ? (
+      // Ein Antrag am Spiegel (LLH-1492) steht wie ein vorgemerkter Eintrag.
+      <StatusChip ton="achtung" wort={z.puffer.antrag ? 'beantragt' : 'vorgemerkt'} />
+    ) : (
+      <StatusChip ton="alarm" wort="abgelehnt" />
+    );
+  }
 
-    if (z.art !== 'eintrag') {
-      const p = z.puffer;
+  /** Grund, Fehler und Anhangzahl einer gepufferten Zeile. */
+  function pufferHinweis(): ReactNode {
+    if (z.art === 'eintrag') return undefined;
+    const p = z.puffer;
+    return hinweisZeile(
+      [
+        // Ausstehend sagt der Chip „vorgemerkt“; ein Satz darunter wiederholte ihn (LFH-1078).
+        z.art === 'abgelehnt' ? `Vom Server abgelehnt: ${z.puffer.grund}` : null,
+        fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />,
+        // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit — die Zahl macht
+        // sichtbar, DASS sie mitgehen.
+        anhangZahl(p.eintrag.anhang_ids),
+      ],
+      token.marginXS,
+    );
+  }
+
+  // Die `etb-*`-Klassen tragen keine Regel (die Tönung macht der Baustein über `toenung`); sie
+  // bleiben als Sortenmarke für Tests und Sichtprüfung im DOM.
+  const klassen = [
+    z.art === 'eintrag' && z.eintrag.typ === 'berichtigung' ? 'etb-berichtigung' : '',
+    z.art === 'ausstehend' ? 'etb-ausstehend' : '',
+    z.art === 'abgelehnt' ? 'etb-abgelehnt' : '',
+    hervorgehoben ? HERVORGEHOBEN : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const marken = {
+    'data-lfh': 'datensicht-karte',
+    'data-testid': 'etb-ereigniszeile',
+    'data-zeile': z.schluessel,
+    className: klassen || undefined,
+    // Ohne Handlungen keine Handler: das Browsermenü bleibt (vorgemerkt, Lesende).
+    ...(liste.length > 0 ? kontext<HTMLLIElement>(z.schluessel) : {}),
+    // Die Hervorhebung als Rollenfläche: der Baustein setzt seinen Grund inline, eine
+    // Klassenregel käme dagegen nicht an.
+    style: hervorgehoben ? { background: rollen.bedienFlaeche } : undefined,
+  };
+
+  if (form !== 'zeitachse') {
+    const typ = e ? e.typ : z.art !== 'eintrag' ? z.puffer.eintrag.typ : 'meldung';
+    const quelle = e ?? (z.art !== 'eintrag' ? z.puffer.eintrag : null)!;
+    const anzeige: VonAnAnzeige = vonAnAnzeige(quelle.von, quelle.an);
+    const weg = quelle.meldeweg ? MELDEWEG_LABEL[quelle.meldeweg] : undefined;
+    // Ein Systemeintrag steht ungekürzt (Spec, „Systemeinträge leise“): leise, aber ganz.
+    const offenErzwungen =
+      e != null && (e.typ === 'system' || hervorgehoben || inhaltGetroffen(e.inhalt, fundstellen));
+    const inhaltKnoten = (
+      // Unter dem Stundenkopf (h2) — `#` im Eintrag wird h3 (LFH-621).
+      <Markdown variante="kompakt" unterEbene={2} fundstellen={e ? fundstellen : undefined}>
+        {quelle.inhalt}
+      </Markdown>
+    );
+    const gemeinsam = {
+      ...marken,
+      zeit: zeitKurz(
+        e ? e.ereigniszeit : z.art !== 'eintrag' ? z.puffer.erstellt_at : '',
+        konventionen,
+      ),
+      nr: e?.lfd_nr,
+      typ,
+      typwort: etbTyp[typ].label,
+      vonAn: anzeige,
+      weg,
+      fundstellen: e ? fundstellen : undefined,
+      inhalt: inhaltKnoten,
+      offenErzwungen,
+      berichtigt: e != null && berichtigtDurch(e).length > 0,
+      leise: e?.typ === 'system',
+      toenung:
+        z.art === 'abgelehnt'
+          ? ('problem' as const)
+          : e?.typ === 'berichtigung'
+            ? ('berichtigung' as const)
+            : undefined,
+      titel: e ? `Verfasser: ${verfasserText(e)}` : undefined,
+      menue: menue(),
+    };
+    const entscheidung = z.art === 'abgelehnt' ? knoepfe() : null;
+    if (form === 'spalten') {
+      const unter = e ? veranlassung(e) : pufferHinweis();
       return (
-        <Zeitachseneintrag
+        <EtbSpaltenzeile
           {...gemeinsam}
-          zeit={zeitKurz(p.erstellt_at, konventionen)}
-          // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der Sendezustand steht
-          // als Chip in der Meta-Zeile, NICHT in der inhaltsbreiten Nummernspalte — dort machte ein
-          // `nowrap`-Chip die Zeitspalte dieser Zeile breiter als die der Nachbarn.
-          typ={p.eintrag.typ}
-          typwort={etbTyp[p.eintrag.typ].label}
-          meta={
-            <span
-              style={{
-                display: 'inline-flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                gap: token.marginXS,
-              }}
-            >
-              {z.art === 'ausstehend' ? (
-                // Ein Antrag am Spiegel (LLH-1492) steht wie ein vorgemerkter Eintrag.
-                <StatusChip ton="achtung" wort={z.puffer.antrag ? 'beantragt' : 'vorgemerkt'} />
-              ) : (
-                <StatusChip ton="alarm" wort="abgelehnt" />
-              )}
-              {vonAn(p.eintrag.von, p.eintrag.an)}
-            </span>
+          vermerke={vermerke}
+          vermerkVor={pufferChip()}
+          vermerkeVoll={
+            e ? <EtbVermerkListe vermerke={vermerke} ohneDateien nach={dateien(e)} /> : undefined
           }
-          toenung={z.art === 'abgelehnt' ? 'problem' : undefined}
-          hinweis={hinweisZeile(
-            [
-              // Ausstehend sagt der Chip „vorgemerkt“ in der Meta-Zeile; ein Satz darunter
-              // wiederholte ihn (LFH-1078).
-              z.art === 'abgelehnt' ? `Vom Server abgelehnt: ${z.puffer.grund}` : null,
-              fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />,
-              // Die Dateien liegen schon auf dem Server und gehen per `anhang_ids` mit — die Zahl macht
-              // sichtbar, DASS sie mitgehen.
-              anhangZahl(p.eintrag.anhang_ids),
-            ],
-            token.marginXS,
-          )}
-          hinweisTon={z.art === 'abgelehnt' ? 'alarm' : 'schwach'}
-        >
-          <Markdown variante="kompakt" unterEbene={2}>
-            {p.eintrag.inhalt}
-          </Markdown>
-        </Zeitachseneintrag>
+          unterzeile={
+            unter != null || entscheidung != null ? (
+              <>
+                {unter}
+                {entscheidung}
+              </>
+            ) : undefined
+          }
+        />
       );
     }
+    return (
+      <EtbHandschirmzeile
+        {...gemeinsam}
+        meta={pufferChip()}
+        unten={
+          <>
+            {e ? veranlassung(e) : pufferHinweis()}
+            {e && <EtbVermerkListe vermerke={vermerke} ohneDateien nach={dateien(e)} />}
+            {entscheidung}
+          </>
+        }
+      />
+    );
+  }
 
-    const e = z.eintrag;
+  const gemeinsam = {
+    als: 'li' as const,
+    ...marken,
+    // Das Menü steht in `kompakt` in der Kopfzeile; die Entscheidung einer abgelehnten Zeile
+    // bleibt rechts (LFH-958, `Zeitachseneintrag`).
+    ...(z.art === 'abgelehnt' ? { aktionen: knoepfe() } : { menue: menue() }),
+  };
+
+  if (z.art !== 'eintrag') {
+    const p = z.puffer;
     return (
       <Zeitachseneintrag
         {...gemeinsam}
-        zeit={zeitKurz(e.ereigniszeit, konventionen)}
-        nr={`Nr. ${e.lfd_nr}`}
-        typ={e.typ}
-        typwort={etbTyp[e.typ].label}
-        meta={kopfMeta(e)}
-        toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
-        leise={e.typ === 'system'}
-        hinweis={eintragsHinweis(e)}
-        verfasser={verfasserText(e)}
-        weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
+        zeit={zeitKurz(p.erstellt_at, konventionen)}
+        // Keine Nummer, und das ist die Aussage: die vergibt erst der Server. Der Sendezustand steht
+        // als Chip in der Meta-Zeile, NICHT in der inhaltsbreiten Nummernspalte — dort machte ein
+        // `nowrap`-Chip die Zeitspalte dieser Zeile breiter als die der Nachbarn.
+        typ={p.eintrag.typ}
+        typwort={etbTyp[p.eintrag.typ].label}
+        meta={
+          <span
+            style={{
+              display: 'inline-flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: token.marginXS,
+            }}
+          >
+            {pufferChip()}
+            {vonAn(p.eintrag.von, p.eintrag.an)}
+          </span>
+        }
+        toenung={z.art === 'abgelehnt' ? 'problem' : undefined}
+        hinweis={pufferHinweis()}
+        hinweisTon={z.art === 'abgelehnt' ? 'alarm' : 'schwach'}
       >
-        {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
-        <Markdown variante="kompakt" unterEbene={2} fundstellen={fundstellen}>
-          {e.inhalt}
-        </Markdown>
+        <EtbInhalt offenErzwungen={false}>
+          <Markdown variante="kompakt" unterEbene={2}>
+            {p.eintrag.inhalt}
+          </Markdown>
+        </EtbInhalt>
       </Zeitachseneintrag>
     );
   }
 
-  return inhalt();
+  const ei = z.eintrag;
+  return (
+    <Zeitachseneintrag
+      {...gemeinsam}
+      zeit={zeitKurz(ei.ereigniszeit, konventionen)}
+      nr={`Nr. ${ei.lfd_nr}`}
+      typ={ei.typ}
+      typwort={etbTyp[ei.typ].label}
+      meta={kopfMeta(ei)}
+      toenung={ei.typ === 'berichtigung' ? 'berichtigung' : undefined}
+      leise={ei.typ === 'system'}
+      hinweis={eintragsHinweis(ei)}
+      verfasser={verfasserText(ei)}
+      weg={ei.meldeweg ? MELDEWEG_LABEL[ei.meldeweg] : undefined}
+    >
+      <EtbInhalt
+        offenErzwungen={
+          ei.typ === 'system' || hervorgehoben || inhaltGetroffen(ei.inhalt, fundstellen)
+        }
+      >
+        <div className={berichtigtDurch(ei).length > 0 ? 'etb-inhalt--berichtigt' : undefined}>
+          {/* Unter dem Stundenkopf (h2, s. u.) — `#` im Eintrag wird h3 (LFH-621). */}
+          <Markdown variante="kompakt" unterEbene={2} fundstellen={fundstellen}>
+            {ei.inhalt}
+          </Markdown>
+        </div>
+      </EtbInhalt>
+    </Zeitachseneintrag>
+  );
 });
 
 interface BuendelzeileProps {
@@ -1020,6 +1318,8 @@ interface BuendelzeileProps {
   bis: string;
   offen: boolean;
   onUmschalten: (schluessel: string) => void;
+  /** In der Spaltenzeile fluchtet die Bündelzeile mit den Spalten (`EtbSpaltenzeile`). */
+  form: EtbZeilenform;
 }
 
 /**
@@ -1036,6 +1336,7 @@ const EtbBuendelzeile = memo(function EtbBuendelzeile({
   bis,
   offen,
   onUmschalten,
+  form,
 }: BuendelzeileProps) {
   const { token } = useRollen();
   // In `kompakt` ragt der Knopf wie das Zeilenmenü in die Polsterung (`Zeitachseneintrag`): die
@@ -1043,37 +1344,56 @@ const EtbBuendelzeile = memo(function EtbBuendelzeile({
   // `etb-zeilenhoehe`). In den dichteren Stufen wächst sie mit, dort gibt es keine Höhengrenze.
   const ueberstand =
     zeitachsenAufbau(token) === 'zeile' ? Math.max(0, (token.controlHeight - 20) / 2) : 0;
+  const knopf = (
+    <button
+      type="button"
+      className="lfh-etb-buendel"
+      aria-expanded={offen}
+      onClick={() => onUmschalten(schluessel)}
+      style={{
+        ...verweisStil(token),
+        marginBlock: -ueberstand,
+        font: 'inherit',
+        color: 'inherit',
+        background: 'none',
+        border: 0,
+        padding: 0,
+        cursor: 'pointer',
+        textAlign: 'start',
+      }}
+    >
+      {anzahl} Systemeinträge <span aria-hidden="true">·</span> {von}–{bis}{' '}
+      <span aria-hidden="true">·</span> {offen ? 'zuklappen' : 'anzeigen'}
+    </button>
+  );
+  const marken = {
+    'data-lfh': 'etb-buendel',
+    'data-testid': 'etb-buendelzeile',
+    'data-zeile': schluessel,
+  };
+  if (form === 'spalten') {
+    return (
+      <EtbSpaltenzeile
+        {...marken}
+        zeit={von}
+        typ="system"
+        typwort={etbTyp.system.label}
+        vonAn={null}
+        inhalt={knopf}
+        leise
+      />
+    );
+  }
   return (
     <Zeitachseneintrag
       als="li"
-      data-lfh="etb-buendel"
-      data-testid="etb-buendelzeile"
-      data-zeile={schluessel}
+      {...marken}
       zeit={von}
       typ="system"
       typwort={etbTyp.system.label}
       leise
     >
-      <button
-        type="button"
-        className="lfh-etb-buendel"
-        aria-expanded={offen}
-        onClick={() => onUmschalten(schluessel)}
-        style={{
-          ...verweisStil(token),
-          marginBlock: -ueberstand,
-          font: 'inherit',
-          color: 'inherit',
-          background: 'none',
-          border: 0,
-          padding: 0,
-          cursor: 'pointer',
-          textAlign: 'start',
-        }}
-      >
-        {anzahl} Systemeinträge <span aria-hidden="true">·</span> {von}–{bis}{' '}
-        <span aria-hidden="true">·</span> {offen ? 'zuklappen' : 'anzeigen'}
-      </button>
+      {knopf}
     </Zeitachseneintrag>
   );
 });

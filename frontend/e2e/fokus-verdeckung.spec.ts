@@ -1283,8 +1283,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
     expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
     ids.push(((await eintrag.json()) as { id: number }).id);
   }
-  // Zwei Berichtigungen, damit die Bilanz Links trägt: unter `xl` steht sie unter der
-  // Zeitachse, und die Leiste klebt auch über ihr.
+  // Zwei Berichtigungen: ihre Zeilen tragen einen Rückverweis als weiteres Fokusziel.
   for (const ziel of ids.slice(0, 2)) {
     const b = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
       data: {
@@ -1318,22 +1317,6 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
       await ausloeser.evaluateAll((els) =>
         els.forEach((el) => el.setAttribute('data-e2e-fokus', el.getAttribute('aria-label')!)),
       );
-      // Unter `xl` die Links der Bilanz mit — sie stehen dann unter der Zeitachse.
-      const bilanzLinks = page
-        .getByRole('complementary', { name: 'Bilanz des Tagebuchs' })
-        .getByRole('link');
-      const mitBilanz = flaeche.width < 1200;
-      let bilanzZiele: string[] = [];
-      if (mitBilanz) {
-        await expect.poll(() => bilanzLinks.count()).toBeGreaterThanOrEqual(2);
-        bilanzZiele = await bilanzLinks.evaluateAll((els) =>
-          els.map((el, i) => {
-            const kennung = `bilanz ${i}`;
-            el.setAttribute('data-e2e-fokus', kennung);
-            return kennung;
-          }),
-        );
-      }
       const SCHRITTE = ZEILEN * 2 + 16;
       const { reserve, leiste } = await page.evaluate((sel) => {
         const l = document.querySelector(sel)!.getBoundingClientRect();
@@ -1354,9 +1337,6 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
         kern.besuchteZiele.length,
         `${lauf}: Vorbedingung — der Durchlauf muss die Zeitachse ablaufen`,
       ).toBeGreaterThanOrEqual(ANZAHL - 1);
-      for (const ziel of bilanzZiele) {
-        expect(kern.besuchteZiele, `${lauf}: Vorbedingung — ${ziel} besucht`).toContain(ziel);
-      }
 
       await page.evaluate(() => window.scrollTo(0, 0));
       await ausloeser.first().focus();
@@ -1370,7 +1350,7 @@ test('ETB (LFH-373): kein Zeilenauslöser verschwindet beim Tabben hinter der Er
         `${lauf}: kleinster freier Streifen Ziel ↔ Leiste ${streifen}px, Soll > 0`,
       ).toBeGreaterThan(0);
       gemessen.push(
-        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Ziele (davon Bilanz ${bilanzZiele.length}), Streifen ≥ ${Math.round(streifen)}px`,
+        `${lauf}: Leiste ${leiste}px, ${kern.besuchteZiele.length} Ziele, Streifen ≥ ${Math.round(streifen)}px`,
       );
     }
   }
@@ -1415,6 +1395,7 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
   const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
   await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(24);
   const LEISTE = '.etb-erfassung-sticky';
+  const ANHAENGE = ['a', 'b', 'c', 'd', 'e'];
   await expect(page.locator(LEISTE)).toHaveCSS('position', 'sticky');
   const knopf = page.locator('[data-lfh="etb-nach-oben"]');
 
@@ -1448,9 +1429,11 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
     ohne.kopf - 1,
   );
 
-  // Drei Anhänge: die Liste „Gewählte Anhänge“ hebt die Leiste.
+  // Fünf Anhänge: die Liste „Gewählte Anhänge“ hebt die Leiste. Seit der Feldzeile und dem stets
+  // freien Platz unter der jüngsten Zeile (kwc2yszv, Review S11) reichen drei nicht mehr, um den
+  // Knopf unter den Kopf zu schieben (gemessen: Leiste 259 px, Knopf oben 173 px, Kopf 145 px).
   await page.locator('[data-lfh="etb-anhang-eingabe"]').setInputFiles(
-    ['a', 'b', 'c'].map((n) => ({
+    ANHAENGE.map((n) => ({
       name: `Fax Leitstelle ${n}.pdf`,
       mimeType: 'application/pdf',
       buffer: Buffer.from('%PDF-1.4\n%%EOF\n'),
@@ -1458,7 +1441,7 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
   );
   await expect(
     page.getByRole('list', { name: 'Gewählte Anhänge' }).getByRole('listitem'),
-  ).toHaveCount(3);
+  ).toHaveCount(ANHAENGE.length);
   await expect
     .poll(async () => (await lage()).top, { message: 'die Leiste wächst, der Knopf rückt hoch' })
     .toBeLessThan(ohne.top - 40);
@@ -1471,7 +1454,7 @@ test('ETB (LLH-1386): „Nach oben“ verschwindet nie hinter dem klebenden Kopf
   expect(mit.achse, 'die Zeitachse behält ihre Höhe').toBe(ohne.achse);
 
   // Anhänge wieder weg: der Knopf kommt zurück, frei unter dem Kopf.
-  for (const n of ['a', 'b', 'c']) {
+  for (const n of ANHAENGE) {
     await page.getByRole('button', { name: `Anhang Fax Leitstelle ${n}.pdf entfernen` }).click();
   }
   await expect(knopf).toBeVisible();

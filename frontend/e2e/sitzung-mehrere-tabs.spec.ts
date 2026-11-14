@@ -7,6 +7,7 @@ import {
   type Route,
 } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { etbVonSetzen } from './etb-kern';
 import { kontoAnlegen } from './konto-anlegen';
 
 /*
@@ -232,6 +233,7 @@ test('(b) gleichzeitige Mutation aus dem veralteten Tab: 412, kein Eintrag, B bl
   const antwort = tab1.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().endsWith(`/api/einsaetze/${einsatzId}/etb`),
   );
+  await etbVonSetzen(tab1);
   await tab1.getByPlaceholder('Inhalt …').fill(inhalt);
   await tab1.getByRole('button', { name: 'Erfassen', exact: true }).click();
   expect((await antwort).status()).toBe(412);

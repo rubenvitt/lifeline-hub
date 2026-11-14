@@ -1,6 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
@@ -13,6 +13,14 @@ import EtbZeitachse, { gezeigteRaender } from './EtbZeitachse';
 import { LANGDRUCK_MS } from '../components/useKontextMenue';
 
 type ZeitachsenProps = ComponentProps<typeof EtbZeitachse>;
+
+/*
+ * Diese Datei prüft die Zeitachse in der Form des gemeinsamen `Zeitachseneintrag` (komfortabel,
+ * Handschuh, kompakt zwischen `md` und `lg`): 900 px, unter `lg`. Die Spaltenzeile (kompakt ab
+ * `lg`) und die Handschirm-Zeile (unter `md`) prüft `EtbSpaltenzeile.test.tsx`. Der globale
+ * `afterEach` setzt die Breite zurück.
+ */
+beforeEach(() => setzeViewportBreite(900));
 
 function renderZeitachse(
   props: Omit<Partial<ZeitachsenProps>, 'zeilen'> & {
@@ -1252,6 +1260,30 @@ describe('Nach oben', () => {
       rolle(0);
       vi.unstubAllGlobals();
       vi.useRealTimers();
+    }
+  });
+
+  it('hält unten seinen Platz frei: das ⋮ der jüngsten Zeile liegt nicht unter ihm (Review S11)', () => {
+    // Der Platz steht schon vor dem Knopf: erschiene er erst mit ihm (nach dem Sprung ans Ende),
+    // wüchse er unter dem Bild, und die jüngste Zeile bliebe verdeckt.
+    rolle(0);
+    const oben = renderZeitachse({ eintraege: [eintrag()] });
+    expect(screen.queryByRole('button', { name: 'Nach oben' })).toBeNull();
+    expect(oben.container.querySelector('[data-lfh="etb-nach-oben-platz"]')).not.toBeNull();
+    oben.unmount();
+    rolle(window.innerHeight + 1);
+    try {
+      const { container } = renderZeitachse({ eintraege: [eintrag()] });
+      expect(screen.getByRole('button', { name: 'Nach oben' })).toBeInTheDocument();
+      const platz = container.querySelector<HTMLElement>('[data-lfh="etb-nach-oben-platz"]');
+      expect(platz).not.toBeNull();
+      // Nach der letzten Zeile und vor der schwebenden Schale, so hoch wie Knopf und Abstand.
+      const zeile = container.querySelector('[data-zeile="eintrag-1"]')!;
+      expect(zeile.compareDocumentPosition(platz!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(platz!.nextElementSibling).toHaveAttribute('data-lfh', 'etb-schwebend');
+      expect(parseFloat(platz!.style.height)).toBeGreaterThanOrEqual(30);
+    } finally {
+      rolle(0);
     }
   });
 

@@ -1,4 +1,5 @@
 import { expect, request, test, type Page } from '@playwright/test';
+import { etbVonSetzen } from './etb-kern';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { anmeldenPerApi } from './anmelde-kern';
@@ -276,6 +277,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
 
     // Eine vorgemerkte Erfassung: offline absenden, sie liegt dann in der Queue.
     await page.context().setOffline(true);
+    await etbVonSetzen(page);
     const feld = page.getByRole('textbox', { name: /Inhalt/ }).first();
     await feld.fill('Offline-Probe in der Queue');
     await feld.press('Enter');
@@ -354,6 +356,7 @@ test.describe('Kaltstart ohne Server (LFH-780)', () => {
     await expect(app.getByText('Kaltstart-Probe vorher')).toBeVisible();
     await expect(app, 'Kaltstart ohne Server: nicht auf der Anmeldung').not.toHaveURL(/\/login/);
     await expect(app.getByText(/^Stand \d{4} · offline$/).first()).toBeVisible();
+    await etbVonSetzen(app);
     const feld = app.getByRole('textbox', { name: /Inhalt/ }).first();
     await feld.fill(inhalt);
     await feld.press('Enter');

@@ -31,15 +31,21 @@ Hilfstechnik verborgen sein.
 ### Requirement: Kein Auslöser ohne Aktion
 
 Bleibt nach Rechte- und Zustandsprüfung keine Aktion für das Menü übrig, SHALL kein Auslöser
-erscheinen, auch kein deaktivierter.
+erscheinen, auch kein deaktivierter. Ausgenommen ist das Zeilenmenü der ETB-Spalten- und
+Handschirm-Zeile: es trägt auch Angaben zum Eintrag (Vermerke, Verfasser), die in der Zeile keinen
+Platz haben, und steht deshalb auch ohne Aktion.
 
 #### Scenario: Gelöschte Nachricht
 - **WHEN** der Chat eine gelöschte Nachricht zeigt
 - **THEN** trägt sie keinen Aktionen-Auslöser
 
 #### Scenario: Ohne Schreibrecht
-- **WHEN** eine Person ohne Schreibrecht die ETB-Zeitachse öffnet und kein Eintrag eine Aktion für sie hat
+- **WHEN** eine Person ohne Schreibrecht die ETB-Zeitachse in komfortabler Dichte ab `md` öffnet und kein Eintrag eine Aktion für sie hat
 - **THEN** zeigt kein Eintrag einen Aktionen-Auslöser
+
+#### Scenario: Spaltenzeile für Lesende
+- **WHEN** eine Person ohne Schreibrecht die ETB-Zeitachse in kompakter Dichte ab `lg` öffnet
+- **THEN** trägt jede Zeile ein ⋮, das den Verfasser nennt und keine Aktion anbietet
 
 ### Requirement: Unumkehrbares steht rot hinter einem Trenner
 
@@ -205,9 +211,9 @@ verliert er alle Aktionen, MUST das Menü schließen.
 
 ### Requirement: Im Einsatztagebuch öffnet ein langer Druck kein Kontextmenü
 
-Im Einsatztagebuch (Einträge der Zeitachse und Chips der Erfassung) SHALL ein langer Druck am
-Touchgerät kein Kontextmenü öffnen, damit Text markierbar bleibt; das ⋮-Menü führt dort zu den
-Aktionen. Rechtsklick und Tasten MUST das Kontextmenü weiter öffnen.
+Im Einsatztagebuch (Einträge der Zeitachse) SHALL ein langer Druck am Touchgerät kein Kontextmenü
+öffnen, damit Text markierbar bleibt; das ⋮-Menü führt dort zu den Aktionen. Rechtsklick und Tasten
+MUST das Kontextmenü weiter öffnen.
 
 #### Scenario: Langer Druck im Einsatztagebuch
 - **WHEN** eine Person mit Schreibrecht am Tablet 600 ms auf den Text eines ETB-Eintrags drückt, ohne den Finger zu bewegen
@@ -260,24 +266,6 @@ trotzdem oder verliert er alle Aktionen, MUST das Menü schließen.
 #### Scenario: Neuer Eintrag während das Menü offen ist
 - **WHEN** das Kontextmenü eines Eintrags offen ist und ein anderer Platz einen Eintrag erfasst
 - **THEN** bleibt die Zeile an ihrer Stelle, und das Sammelbanner nennt den neuen Eintrag
-
-### Requirement: Chips der ETB-Erfassung tragen das Kontextmenü
-
-Ein Chip der ETB-Erfassung (Von, An, Zeit, Meldeweg) SHALL auf Rechtsklick und Tasten ein
-Kontextmenü mit den Einträgen seines ⋮-Menüs öffnen. Während der Eintrag sendet, MUST es die
-Einträge gesperrt zeigen. Ein Chip, der gerade bearbeitet wird, MUST das Browsermenü behalten.
-
-#### Scenario: Rechtsklick auf den Chip „An“
-- **WHEN** jemand auf den Chip „An: S2“ rechtsklickt
-- **THEN** öffnet ein Menü mit „Bearbeiten“, einem Trenner und rot „Entfernen“
-
-#### Scenario: Chip aus dem Standard-Rufnamen
-- **WHEN** der Chip „Von“ aus dem Standard-Rufnamen kommt und jemand auf ihn rechtsklickt
-- **THEN** stehen im Menü „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“, kein „Entfernen“
-
-#### Scenario: Während des Sendens
-- **WHEN** der Eintrag gerade sendet und jemand auf einen Chip rechtsklickt
-- **THEN** stehen die Einträge des Chips gesperrt im Menü
 
 ### Requirement: Eine Karte mit mehreren Knöpfen zeigt alle ihre Handlungen
 

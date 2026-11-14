@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { systemBuendelAufklappen } from './etb-kern';
+import { etbMitSystem, systemBuendelAufklappen } from './etb-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 import { ladeInDichte } from './trefflaeche-kern';
 
@@ -111,7 +111,7 @@ test('Reiter „Dateien“: ablegen, herunterladen, Zugriff im Protokoll, entfer
   await rueckfrage.getByRole('button', { name: 'Entfernen' }).click();
   await expect(anker).toHaveCount(0);
 
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.goto(etbMitSystem(einsatzId));
   await systemBuendelAufklappen(page);
   await expect(page.getByText('UHS BHP 50: Foto abgelegt')).toBeVisible();
   await expect(page.getByText('UHS BHP 50: Foto entfernt')).toBeVisible();

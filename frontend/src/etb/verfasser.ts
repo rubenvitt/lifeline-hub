@@ -8,8 +8,9 @@ import type { EtbEintragAnzeige } from '../api/types';
  * der Name; eine Funktion wird nicht erfunden.
  *
  * Zwischen „·" und Funktion steht ein GESCHÜTZTES Leerzeichen: wird die Zeile zu schmal,
- * bricht sie vor dem Punkt, nie zwischen Punkt und Kürzel. Die Zeitachse deckelt die
- * Verfasserbreite, damit der Meldungstext die halbe Sicht behält (`e2e/etb-chronologie.spec.ts`).
+ * bricht sie vor dem Punkt, nie zwischen Punkt und Kürzel. Der `Zeitachseneintrag` deckelt die
+ * Verfasserbreite, damit der Meldungstext Platz behält (`e2e/etb-chronologie.spec.ts`); die
+ * Spaltenzeile setzt den Verfasser in Titel und Zeilenmenü (`EtbSpaltenzeile`).
  */
 export function verfasserText(
   e: Pick<EtbEintragAnzeige, 'erfasser_name' | 'erfasser_funktion'>,

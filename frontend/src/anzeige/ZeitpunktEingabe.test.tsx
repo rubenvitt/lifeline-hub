@@ -73,6 +73,42 @@ describe('ZeitpunktEingabe — Anzeige als DTG in der Anzeigezone (Browser UTC)'
   });
 });
 
+describe('ZeitpunktEingabe — kurze Anzeige und Kalender ohne Tab-Stopp (kwc2yszv)', () => {
+  mitProzessZone('UTC');
+  uhrSteht('2026-03-16T18:26:00Z');
+
+  it('zeigt mit `kurzAnzeige` am heutigen Tag nur die Uhrzeit, an einem anderen die DTG', () => {
+    const { rerender } = render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          kurzAnzeige
+          aria-label="Zeit"
+          value={alsZeitpunkt('2026-03-16 18:12:00')}
+        />,
+      ),
+    );
+    expect(zeitFeld('Zeit')).toHaveValue('1912');
+    rerender(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          kurzAnzeige
+          aria-label="Zeit"
+          value={alsZeitpunkt('2026-03-15 18:12:00')}
+        />,
+      ),
+    );
+    expect(zeitFeld('Zeit')).toHaveValue('151912mrz26');
+  });
+
+  it('nimmt den Kalenderknopf mit `kalenderOhneTabstopp` aus der Tab-Folge, er bleibt klickbar', () => {
+    render(mitZone(BERLIN, <ZeitpunktEingabe kalenderOhneTabstopp aria-label="Zeit" />));
+    const knopf = screen.getByRole('button', { name: 'Kalender und Uhrzeit zu Zeit' });
+    expect(knopf).toHaveAttribute('tabindex', '-1');
+  });
+});
+
 describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
   mitProzessZone('UTC');
   // 2026-10-17 15:00 Berliner Zeit.

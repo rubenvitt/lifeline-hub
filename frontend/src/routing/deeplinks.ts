@@ -646,6 +646,9 @@ const ETB_TYP_ERLAUBT: Record<EtbTyp, true> = {
   berichtigung: true,
 };
 
+/** Wert des Merkmals `system` für eingeblendete Systemeinträge (kwc2yszv D6). */
+const SYSTEM_EINGEBLENDET = 'an';
+
 export function etbPfad(
   einsatzId: number,
   opts: {
@@ -658,8 +661,17 @@ export function etbPfad(
     bis?: string;
     /** „Betrifft Einheit" — der Knopf „ETB ↗" an der Einheit auf der Lagekarte. */
     einheit_id?: number;
-    /** Systemeinträge ausgeblendet (LFH-958). */
-    ohne_system?: true;
+    /**
+     * Systemeinträge eingeblendet (`system=an`, kwc2yszv D6). Ohne Merkmal sind sie
+     * ausgeblendet — die Vorgabe jeder Adresse, die nichts dazu sagt.
+     */
+    system?: true;
+    /**
+     * Nie hier: der Filter der Seite trägt den Ausschluss als `ohne_system`, die Adresse das
+     * Gegenteil. Wer einen Filter in eine Adresse schreibt, nimmt {@link etbFilterPfad}; sonst
+     * fiele ein eingeblendetes `system=an` still heraus.
+     */
+    ohne_system?: never;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'etb'), {
@@ -670,13 +682,44 @@ export function etbPfad(
     von: opts.von,
     bis: opts.bis,
     einheit_id: opts.einheit_id,
-    ohne_system: opts.ohne_system ? 'true' : undefined,
+    system: opts.system ? SYSTEM_EINGEBLENDET : undefined,
   });
 }
 
+/** Steht der Filter für eingeblendete Systemeinträge? Neben `typ=system` sagt die Adresse nichts. */
+function systemEingeblendet(filter: Pick<EtbFilterWerte, 'typ' | 'ohne_system'>): boolean {
+  return !filter.ohne_system && filter.typ !== 'system';
+}
+
 /**
- * Druckansicht des Tagebuchs mit derselben Filterachse wie {@link etbPfad}; eine Umkehr
- * ({@link parseEtbFilter}) für beide Adressen, damit genau die gezeigte Auswahl gedruckt wird.
+ * Der Filter der Seite als Adresse — die Umkehr von {@link parseEtbFilter}. Der Ausschluss der
+ * Systemeinträge ist die Vorgabe und steht nicht da; ohne ihn steht `system=an`.
+ */
+export function etbFilterPfad(
+  einsatzId: number,
+  filter: Pick<EtbFilterWerte, 'q' | 'typ' | 'von' | 'bis' | 'einheit_id' | 'ohne_system'>,
+  extra: { eintrag?: number } = {},
+): string {
+  return etbPfad(einsatzId, {
+    eintrag: extra.eintrag,
+    q: filter.q,
+    typ: filter.typ,
+    von: filter.von,
+    bis: filter.bis,
+    einheit_id: filter.einheit_id,
+    system: systemEingeblendet(filter) ? true : undefined,
+  });
+}
+
+/** Merkmal `system=aus` der Druckadresse: die Seite druckt ohne Systemeinträge (Review S7). */
+const SYSTEM_AUSGEBLENDET = 'aus';
+
+/**
+ * Druckansicht des Tagebuchs mit derselben Filterachse wie {@link etbPfad}, damit genau die
+ * gezeigte Auswahl gedruckt wird. Anders als die Seite ist ohne Merkmal NICHTS ausgeschlossen
+ * (Spec `etb-druck`, „Ungefiltert“: „vollständiges Tagebuch“; Regel der Druckansichten unten):
+ * die Seite übergibt ihren Ausschluss deshalb ausdrücklich als `system=aus`. Umkehr:
+ * {@link parseEtbDruckFilter}.
  */
 export function etbDruckPfad(
   einsatzId: number,
@@ -688,8 +731,20 @@ export function etbDruckPfad(
     von: filter.von,
     bis: filter.bis,
     einheit_id: filter.einheit_id,
-    ohne_system: filter.ohne_system ? 'true' : undefined,
+    system: filter.ohne_system ? SYSTEM_AUSGEBLENDET : undefined,
   });
+}
+
+/**
+ * Umkehr von {@link etbDruckPfad}: dieselbe Achse wie {@link parseEtbFilter}, aber ausgeschlossen
+ * wird nur auf `system=aus` (oder ein alter Link mit `ohne_system=true`) und nie neben
+ * `typ=system` (der Server wiese die Kombination mit 422 ab).
+ */
+export function parseEtbDruckFilter(params: URLSearchParams): EtbFilterWerte {
+  const { ohne_system: _vorgabe, ...werte } = parseEtbFilter(params);
+  void _vorgabe;
+  const aus = params.get('system') === SYSTEM_AUSGEBLENDET || params.get('ohne_system') === 'true';
+  return aus && werte.typ !== 'system' ? { ...werte, ohne_system: true } : werte;
 }
 
 /**
@@ -736,10 +791,11 @@ export function parseEtbFilter(params: URLSearchParams): EtbFilterWerte {
   // Wie `parseRouteId`: `abc` oder `0` ergäben am Server 400 bzw. einen Filter auf nichts.
   const einheit = parseRouteId(params.get('einheit_id') ?? undefined);
   if (einheit != null) werte.einheit_id = einheit;
-  // Nur `true`/`1` blendet aus (LFH-958). Neben `typ=system` fällt der Ausschluss weg: der
-  // Server wiese die Kombination mit 422 ab, und der gewählte Typ ist die engere Absicht.
-  const ohneSystem = params.get('ohne_system');
-  if ((ohneSystem === 'true' || ohneSystem === '1') && werte.typ !== 'system') {
+  // Systemeinträge sind in der Vorgabe aus (kwc2yszv D6): nur `system=an` blendet sie ein. Ein
+  // alter Link mit `ohne_system=true` gilt deshalb wie die Vorgabe, einer ohne Merkmal blendet
+  // jetzt ebenfalls aus. Neben `typ=system` fällt der Ausschluss weg: der Server wiese die
+  // Kombination mit 422 ab, und der gewählte Typ ist die engere Absicht.
+  if (params.get('system') !== SYSTEM_EINGEBLENDET && werte.typ !== 'system') {
     werte.ohne_system = true;
   }
   return werte;

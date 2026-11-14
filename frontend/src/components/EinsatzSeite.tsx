@@ -1,6 +1,13 @@
 import { IconChevronRechts } from '../icons';
 import { Button, ConfigProvider, Typography, theme } from 'antd';
-import { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import { flaeche, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
 // Seiten unter diesem Primitiv benutzen die `.lfh-*`-Klassen aus `sprache.css`. Alle Selektoren
@@ -25,6 +32,12 @@ const SEITENKOPF_HOEHE = 44;
 
 /** Haarlinie unter der Seitenkopfleiste; sie zählt zur Höhe (`boxSizing: 'border-box'`). */
 const SEITENKOPF_LINIE = 1;
+
+/**
+ * Stapelebene des klebenden Seitenkopfs (`kopfKlebt`): unter dem Rahmen (`RAHMEN_EBENE` 100), über
+ * der angepinnten ETB-Erfassung (20) und den Köpfen, die eine Seite darunter klebt.
+ */
+export const KOPF_KLEBT_EBENE = 30;
 
 /**
  * Stil der Seitenkopfleiste — rein und exportiert.
@@ -371,6 +384,14 @@ interface EinsatzSeiteProps {
   neueZeile?: () => void;
   /** Optionaler Hinweis unter dem Header (z. B. `RechteHinweis` „Nur Ansicht · Grund“). */
   hinweis?: ReactNode;
+  /**
+   * Der Seitenkopf klebt unter dem Rahmen (ETB, kwc2yszv D8): `position: sticky` unter
+   * `--lfh-rahmen-oben`, mit dem Seitengrund, über dem Inhalt. OB er klebt, entscheidet die Seite —
+   * sie misst über {@link EinsatzSeiteProps.kopfRef}, ob ihre klebenden Köpfe ins Fenster passen.
+   */
+  kopfKlebt?: boolean;
+  /** Callback-Ref auf die Seitenkopfleiste, zum Messen (`etb/etbKopfKleben.ts`). */
+  kopfRef?: (el: HTMLDivElement | null) => void;
   /** Letzter erfolgreicher Listenabruf (`query.dataUpdatedAt`). */
   dataUpdatedAt?: number;
   /**
@@ -446,6 +467,8 @@ export default function EinsatzSeite({
   weitere,
   neueZeile,
   hinweis,
+  kopfKlebt = false,
+  kopfRef,
   dataUpdatedAt,
   breite = 'voll',
   fensterInhalt,
@@ -458,6 +481,14 @@ export default function EinsatzSeite({
   const aktionenRef = useRef<HTMLDivElement>(null);
   // Stehende Alarme beginnen unter dem Seitenkopf, solange er im Bild ist (LFH-1112).
   const alarmKante = useAlarmKante<HTMLDivElement>();
+  // Eine Ref-Funktion für beide Abnehmer; stabil, sonst hängte React sie bei jedem Render um.
+  const kopfLeiste = useCallback(
+    (el: HTMLDivElement | null) => {
+      alarmKante(el);
+      kopfRef?.(el);
+    },
+    [alarmKante, kopfRef],
+  );
   const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
   const rahmenEinsatz = useEinsatzRahmen();
@@ -507,7 +538,23 @@ export default function EinsatzSeite({
        * den schmalen Schirm. `minWidth: 0` an beiden Kindern, weil ein Flex-Kind sonst nicht unter
        * seine Inhaltsbreite schrumpft.
        */}
-      <div ref={alarmKante} data-lfh="seitenkopf" style={seitenkopfStil(token, farben, true)}>
+      <div
+        ref={kopfLeiste}
+        data-lfh="seitenkopf"
+        style={
+          kopfKlebt
+            ? {
+                ...seitenkopfStil(token, farben, true),
+                // Unter dem klebenden Rahmen (`frontend/AGENTS.md`, Rahmen), über dem Inhalt samt
+                // klebender Filterleiste der Seite, mit Grund: darunter rollt die Zeitachse durch.
+                position: 'sticky',
+                top: 'var(--lfh-rahmen-oben, 0px)',
+                zIndex: KOPF_KLEBT_EBENE,
+                background: farben.grund,
+              }
+            : seitenkopfStil(token, farben, true)
+        }
+      >
         <div className="lfh-seitenkopf__titelblock" style={titelblockStil(token)}>
           {breadcrumb && (
             <Ortspfad farben={farben} className={ortspfadAbMd ? 'lfh-ortspfad--ab-md' : undefined}>

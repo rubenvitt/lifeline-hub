@@ -2,7 +2,7 @@
 titel: Arbeiten ohne Netz
 gruppen: [alle, fuehrung]
 reihenfolge: 20
-quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/alarm/EingaengeKnopf.tsx, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
+quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/alarm/EingaengeKnopf.tsx, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbSendestatus.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
 ---
 
 ## Überblick
@@ -26,11 +26,13 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 
 1. Wie mit Netz erfassen und speichern, etwa eine Meldung oder einen Eintrag im
    Einsatztagebuch.
-2. Die App merkt den Eintrag vor. Im Einsatztagebuch steht er oben mit „vorgemerkt“, darüber
-   „1 Eintrag offline vorgemerkt“; andere Erfassungen melden „Offline vorgemerkt …“, etwa
-   „Offline vorgemerkt: Meldung von …“. Die Betriebszeile zählt den Eintrag als „ausstehend“.
+2. Die App merkt den Eintrag vor. Im Einsatztagebuch steht er als jüngste Zeile unten in der
+   Zeitachse mit „vorgemerkt“, darunter über der Erfassung „1 Eintrag offline vorgemerkt“; der
+   Seitenkopf nennt „1 ausstehend“, ein Klick darauf rollt zu ihm. Andere Erfassungen melden
+   „Offline vorgemerkt …“, etwa „Offline vorgemerkt: Meldung von …“. Die Betriebszeile zählt den
+   Eintrag als „ausstehend“.
 
-   ![Einsatztagebuch ohne Netz: Betriebszeile „Offline — keine Verbindung zum Server.“ mit „1 ausstehend“, „OFFLINE“ in der Kopfzeile, „Stand · offline“ im Seitenkopf und der vorgemerkte Eintrag oben in der Zeitachse](../bilder/ohne-netz/etb-ohne-netz.png)
+   ![Einsatztagebuch ohne Netz: Betriebszeile „Offline — keine Verbindung zum Server.“ mit „1 ausstehend“, „OFFLINE“ in der Kopfzeile, „Stand · offline“ und „1 ausstehend“ im Seitenkopf, der vorgemerkte Eintrag unten in der Zeitachse und „1 Eintrag offline vorgemerkt“ über der Erfassung](../bilder/ohne-netz/etb-ohne-netz.png)
 
 3. Nichts weiter tun: Sobald wieder Netz da ist, geht der Eintrag von selbst hinaus.
 

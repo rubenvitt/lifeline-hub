@@ -2,7 +2,7 @@
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
 reihenfolge: 150
-quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx]
+quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx]
 ---
 
 ## Überblick
@@ -127,6 +127,11 @@ Nur die Hilfe druckt ohne Organisation.
 
 Die Tabelle zeigt die Einträge in der Reihenfolge ihrer Nummer mit Nr., Zeit, Typ, Von/An, Inhalt
 und Erfasser. Berichtigungen und Nachträge sind wie in der Zeitachse gekennzeichnet.
+
+Gedruckt wird, was die Zeitachse zeigt: Sind dort die Systemeinträge ausgeblendet, fehlen sie auch
+im Druck, und der Druckkopf nennt „ohne Systemeinträge“. Eine Druckansicht ohne Auswahl, etwa über
+einen gespeicherten Link, zeigt das vollständige Tagebuch samt Systemeinträgen; ihr Kopf nennt
+„vollständiges Tagebuch“.
 
 ### Rechte
 
