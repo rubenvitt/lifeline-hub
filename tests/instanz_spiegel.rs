@@ -1073,6 +1073,40 @@ async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
     assert!(antraege(&hub, s, &erika).await.is_empty(), "kein Antrag");
 }
 
+/// Eine Zeile, die am Spiegel steht, aber noch keine Herkunft hat, wartet (LLH-1864): So steht es
+/// nach dem Wechsel zum Spiegel, bis der neue Führer seine Abbildung geliefert hat
+/// (`fuehrung::werde_spiegel`, `Zeile.gegen`). Nicht „Bezug nicht mehr vorhanden.“.
+#[tokio::test]
+async fn eine_zeile_die_hier_steht_wartet_auf_ihre_herkunft() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    common::person_anlegen(&elw.app, &elw.admin, e, r#"{"name":"Max"}"#).await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let p = lokale_id(&hub, "einsatz_person", "einsatz_id", &s.to_string()).await;
+    exec(
+        &hub.pool,
+        &format!(
+            "DELETE FROM spiegel_herkunft WHERE einsatz_id = {s} AND art = 'einsatz_person' \
+             AND lokaler_schluessel = '{p}'"
+        ),
+    )
+    .await;
+
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/personen/{p}/sichtung"),
+        &erika,
+        Some(&json!({"kategorie": "sk2", "client_id": "da-1"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug noch nicht beim Führer.");
+}
+
 // ── Widerruf (D14) ───────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]

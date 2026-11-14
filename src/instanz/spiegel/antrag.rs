@@ -520,33 +520,57 @@ async fn beantragen(
 }
 
 /// Grund, wenn ein Verweis einer Erfassung auf eine Zeile zeigt, die der Führer (noch) nicht
-/// kennt und die in der Bruchstelle steht (sonst [`BEZUG_ENTFERNT`]): ein Zustand, also 422
-/// (`src/AGENTS.md`, Statuscode-Konvention). Die Bruchstelle meldet damit auch einen Bezug, der
-/// schon nachgereicht, aber noch nicht wieder hier ist; ihre Kette wartet dann
+/// kennt und die hier im Einsatz oder in der Bruchstelle steht (sonst [`BEZUG_ENTFERNT`]): ein
+/// Zustand, also 422 (`src/AGENTS.md`, Statuscode-Konvention). Die Bruchstelle meldet damit auch
+/// einen Bezug, der schon nachgereicht, aber noch nicht wieder hier ist; ihre Kette wartet dann
 /// (`bruchstelle::ketten_fortsetzen`), ein einzelnes Stellen meldet ihn.
 pub const BEZUG_WARTET: &str = "Bezug noch nicht beim Führer.";
 
 /// Grund, wenn ein Verweis auf eine Kennung zeigt, die es am Spiegel nirgends gibt, weder mit
-/// Herkunft noch in der Bruchstelle (LLH-1864): Der Führer hat die Zeile entfernt (der Spiegel
-/// mit ihr die Herkunft), oder sie war nie vergeben. Es kommt nichts mehr, also nicht
-/// [`BEZUG_WARTET`]; die Kette der Bruchstelle löst einen solchen Eintrag mit Grund. Derselbe
-/// Wortlaut, mit dem der Führer einen Antrag ablehnt, dessen Bezug beim Ausführen fehlt.
+/// Herkunft noch im Einsatz noch in der Bruchstelle (LLH-1864): Der Führer hat die Zeile entfernt
+/// (der Spiegel mit ihr die Herkunft), oder sie war nie vergeben. Es kommt nichts mehr, also
+/// nicht [`BEZUG_WARTET`]; die Kette der Bruchstelle löst einen solchen Eintrag mit Grund.
+/// Derselbe Wortlaut, mit dem der Führer einen Antrag ablehnt, dessen Bezug beim Ausführen fehlt.
 pub const BEZUG_ENTFERNT: &str = "Bezug nicht mehr vorhanden.";
 
-/// Der Fehler für einen Verweis ohne Herkunft: Steht die Zeile in der Bruchstelle, kann sie noch
-/// zurückkommen ([`BEZUG_WARTET`]); sonst gibt es sie nicht mehr ([`BEZUG_ENTFERNT`]).
+/// Der Fehler für einen Verweis ohne Herkunft: Steht die Zeile noch im Einsatz (nach dem Wechsel
+/// zum Spiegel, bis der neue Führer seine Abbildung geliefert hat, `Zeile.gegen`) oder in der
+/// Bruchstelle, kann sie noch beim Führer ankommen ([`BEZUG_WARTET`]); sonst gibt es sie nicht
+/// mehr ([`BEZUG_ENTFERNT`]).
 async fn ohne_herkunft(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     tabelle: &str,
     lokal: &str,
 ) -> Result<AppError, AppError> {
-    let grund = if super::bruchstelle::is_entfernt(conn, einsatz_id, tabelle, lokal).await? {
-        BEZUG_WARTET
-    } else {
-        BEZUG_ENTFERNT
-    };
+    let wartet = is_im_einsatz(&mut *conn, einsatz_id, tabelle, lokal).await?
+        || super::bruchstelle::is_entfernt(conn, einsatz_id, tabelle, lokal).await?;
+    let grund = if wartet { BEZUG_WARTET } else { BEZUG_ENTFERNT };
     Ok(AppError::UnprocessableEntity(grund.into()))
+}
+
+/// Ob die Zeile `lokal` in `tabelle` in diesem Einsatz steht. Nur in diesem: SQLite vergibt die
+/// Kennung einer gelöschten Zeile neu (wie `fuehrung::uebernimm_bruch_antwort`).
+async fn is_im_einsatz(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    tabelle: &str,
+    lokal: &str,
+) -> Result<bool, AppError> {
+    let schema = super::schema::schema(&mut *conn).await?;
+    let Some(t) = schema.tabelle(tabelle) else {
+        return Ok(false);
+    };
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT EXISTS (SELECT 1 FROM {} WHERE {} AND {} = ?)",
+        t.name,
+        t.schluessel.gleich(t.name),
+        super::art::einsatz_ausdruck(t.scoping, t.name)
+    )))
+    .bind(lokal)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 /// Legt eine Erfassung am Spiegel als Antrag ab, auf einer offenen Transaktion: Kern von
@@ -554,8 +578,8 @@ async fn ohne_herkunft(
 /// (`pfad`, ohne `id`) und Body auf die Kennungen des Führers ab, setzt die Erfassungszeit und
 /// legt den Antrag an. Gibt es zur `client_id` schon einen, kommt dieser zurück (`neu` = false).
 /// `client_id_vorgabe` setzt die `client_id` im Body, wo sie fehlt. Liefert `(id, zustand, neu)`.
-/// 422, wenn ein Verweis keine Herkunft hat: [`BEZUG_WARTET`], solange die Zeile in der
-/// Bruchstelle steht, sonst [`BEZUG_ENTFERNT`].
+/// 422, wenn ein Verweis keine Herkunft hat: [`BEZUG_WARTET`], solange die Zeile im Einsatz oder
+/// in der Bruchstelle steht, sonst [`BEZUG_ENTFERNT`].
 pub(super) async fn lege_an_tx(
     conn: &mut SqliteConnection,
     b: &Beantragbar,

@@ -831,8 +831,8 @@ enum Bezug {
 }
 
 /// Ob `schluessel` in `tabelle` als entfernte Zeile in der Bruchstelle steht, gleich in welchem
-/// Zustand (LLH-1864): Nur dann kann ein Verweis darauf ohne Herkunft noch auf etwas warten
-/// ([`antrag::lege_an_tx`]).
+/// Zustand (LLH-1864): Ein Verweis darauf ohne Herkunft wartet dann noch, wie einer auf eine
+/// Zeile, die hier im Einsatz steht ([`antrag::lege_an_tx`]).
 pub(super) async fn is_entfernt(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
