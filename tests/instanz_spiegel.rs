@@ -1007,6 +1007,106 @@ async fn ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_
     assert_eq!(st, StatusCode::UNAUTHORIZED);
 }
 
+/// Eine Kennung, die es am Spiegel nirgends gibt (der Führer hat die Zeile entfernt, oder sie
+/// war nie vergeben), wartet auf nichts: 422 mit eigenem Wortlaut statt „Bezug noch nicht beim
+/// Führer.“, im Pfad wie im Body, und es entsteht kein Antrag (LLH-1864).
+#[tokio::test]
+async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    let abschnitt: i64 = eine(
+        &elw.pool,
+        &format!(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES ({e}, 'Nord') RETURNING id"
+        ),
+    )
+    .await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let abschnitt_hub = lokale_id(&hub, "einsatzabschnitt", "einsatz_id", &s.to_string()).await;
+
+    // Der Führer löst den Abschnitt auf; der Spiegel entfernt ihn samt Herkunft.
+    exec(
+        &elw.pool,
+        &format!("DELETE FROM einsatzabschnitt WHERE id = {abschnitt}"),
+    )
+    .await;
+    etb_eintrag(&elw, e, "Danach").await;
+    abgleichen(&elw).await;
+    let am_hub: i64 = eine(
+        &hub.pool,
+        &format!("SELECT COUNT(*) FROM einsatzabschnitt WHERE id = {abschnitt_hub}"),
+    )
+    .await;
+    assert_eq!(am_hub, 0, "der Spiegel hat den Abschnitt entfernt");
+
+    // Ein Client mit altem Stand meldet an den Abschnitt (Body).
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/meldungen"),
+        &erika,
+        Some(
+            &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+                     "inhalt": "Lage Nord", "ereigniszeit": "2026-11-14 09:40:00",
+                     "abschnitt_id": abschnitt_hub, "client_id": "weg-1"}),
+        ),
+    )
+    .await;
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug nicht mehr vorhanden.");
+
+    // Eine Person, die es hier nie gab (Pfad).
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/personen/999999/sichtung"),
+        &erika,
+        Some(&json!({"kategorie": "sk2", "client_id": "weg-2"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug nicht mehr vorhanden.");
+
+    assert!(antraege(&hub, s, &erika).await.is_empty(), "kein Antrag");
+}
+
+/// Eine Zeile, die am Spiegel steht, aber noch keine Herkunft hat, wartet (LLH-1864): So steht es
+/// nach dem Wechsel zum Spiegel, bis der neue Führer seine Abbildung geliefert hat
+/// (`fuehrung::werde_spiegel`, `Zeile.gegen`). Nicht „Bezug nicht mehr vorhanden.“.
+#[tokio::test]
+async fn eine_zeile_die_hier_steht_wartet_auf_ihre_herkunft() {
+    let (hub, elw) = gekoppelt_gemeldet().await;
+    let (_, erika, erika_elw) = gemeinsames_konto(&hub, &elw, "erika").await;
+    let e = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    common::rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "fuehrungspersonal").await;
+    common::person_anlegen(&elw.app, &elw.admin, e, r#"{"name":"Max"}"#).await;
+    abgleichen(&elw).await;
+    let s = spiegel_von(&hub).await;
+    let p = lokale_id(&hub, "einsatz_person", "einsatz_id", &s.to_string()).await;
+    exec(
+        &hub.pool,
+        &format!(
+            "DELETE FROM spiegel_herkunft WHERE einsatz_id = {s} AND art = 'einsatz_person' \
+             AND lokaler_schluessel = '{p}'"
+        ),
+    )
+    .await;
+
+    let (st, v) = common::anfrage_json(
+        &hub.app,
+        "POST",
+        &format!("/api/einsaetze/{s}/personen/{p}/sichtung"),
+        &erika,
+        Some(&json!({"kategorie": "sk2", "client_id": "da-1"})),
+    )
+    .await;
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Bezug noch nicht beim Führer.");
+}
+
 // ── Widerruf (D14) ───────────────────────────────────────────────────────────────────────────
 
 #[tokio::test]
