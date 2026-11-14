@@ -39,13 +39,19 @@ schritte() {
   ' "$DATEI"
 }
 
-# Caches, deren Inhalt zu genau einer Ubuntu-Version gehört.
-SYSTEMCACHE='path: ~/\.cache/(ms|apt)-playwright'
+# Caches, deren Inhalt zu genau einer Ubuntu-Version gehört: ein `actions/cache`-Schritt, der einen
+# der beiden Pfade nennt, gleich in welcher Schreibweise von `path:`.
+SYSTEMCACHE='~/\.cache/(ms|apt)-playwright'
 SYSTEMKENNUNG='steps.betriebssystem.outputs.kennung'
+# Der Schritt, der die Kennung schreibt. Fehlt er, steht er hinter den Caches oder heißt anders,
+# setzt GitHub für den Ausdruck still einen leeren Text ein, und alle Versionen teilen den Eintrag.
+KENNUNGSSCHRITT='id: betriebssystem'
 
 fehler=0
 geprueft=0
-systemcaches=0
+ms_caches=0
+apt_caches=0
+kennung_job=""
 while IFS=$'\037' read -r -d $'\036' job block; do
   if grep -Eq "$GEHOSTET" <<< "$block"; then
     geprueft=$((geprueft + 1))
@@ -57,9 +63,17 @@ while IFS=$'\037' read -r -d $'\036' job block; do
       fehler=1
     fi
   fi
-  if grep -Eq "$SYSTEMCACHE" <<< "$block"; then
-    systemcaches=$((systemcaches + 1))
+  if grep -qF "$KENNUNGSSCHRITT" <<< "$block" && grep -qF 'kennung=' <<< "$block"; then
+    kennung_job="$job"
+  fi
+  if grep -q 'actions/cache' <<< "$block" && grep -Eq "$SYSTEMCACHE" <<< "$block"; then
+    grep -q 'ms-playwright' <<< "$block" && ms_caches=$((ms_caches + 1))
+    grep -q 'apt-playwright' <<< "$block" && apt_caches=$((apt_caches + 1))
     kopf="$(sed -n '1s/^ *- //p' <<< "$block")"
+    if [ "$kennung_job" != "$job" ]; then
+      echo "ROT  $job: $kopf — kein Schritt mit \`$KENNUNGSSCHRITT\` (schreibt \`kennung=\`) davor im selben Job" >&2
+      fehler=1
+    fi
     while IFS= read -r zeile; do
       case "$zeile" in
         *cache-primary-key*) ;;
@@ -78,9 +92,9 @@ if [ "$geprueft" -lt 5 ]; then
   echo "ROT  nur $geprueft betroffene Schritte gefunden — passt die Zerlegung noch zu $(basename "$DATEI")?" >&2
   fehler=1
 fi
-# Beide Caches stehen im Job `e2e`; findet die Prüfung sie nicht, prüft sie nichts.
-if [ "$systemcaches" -lt 2 ]; then
-  echo "ROT  nur $systemcaches Caches für Browser und Systempakete gefunden — passt das Muster noch zu $(basename "$DATEI")?" >&2
+# Beide Caches stehen im Job `e2e`; findet die Prüfung einen nicht, prüft sie ihn nicht.
+if [ "$ms_caches" -lt 1 ] || [ "$apt_caches" -lt 1 ]; then
+  echo "ROT  Caches gefunden: ms-playwright $ms_caches, apt-playwright $apt_caches — passt das Muster noch zu $(basename "$DATEI")?" >&2
   fehler=1
 fi
 exit "$fehler"
