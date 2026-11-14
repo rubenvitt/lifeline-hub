@@ -6,8 +6,9 @@ eigenen `target/` des Checkouts; Node und pnpm nur über `mise exec --`. Bezeich
 
 ## 1. Tabellen und Admin-Spur
 
-- [x] 1.1 Migration mit der nächsten Nummer über allen auf `origin/alpha` (voraussichtlich
-  0346): `maschine_webhook` und `maschine_webhook_versuch` (D1). Dazu die Einordnung, die der
+- [x] 1.1 Migration mit der nächsten Nummer über allen auf `origin/alpha` (zuerst
+  0346, vor dem Merge auf 0349 umgelegt): `maschine_webhook` und `maschine_webhook_versuch`
+  (D1). Dazu die Einordnung, die der
   Bestand für neue Tabellen verlangt (Schwärzungs-Registry, `spiegel::art`; Wächter zeigen sie).
   Verifizieren: `scripts/check-migrationen.sh`, `cargo test db::tests`, die Wächter für
   Schwärzung und Spiegel-Arten sind grün, und ein Test belegt `UNIQUE (zugang_id)` und das

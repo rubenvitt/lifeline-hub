@@ -1,5 +1,5 @@
 ---
-id: ADR-0039
+id: ADR-0046
 titel: Webhooks sind mit dem Instanzschlüssel signiert und gehen nur an geprüfte Adressen
 status: akzeptiert
 datum: 2026-11-13
@@ -11,7 +11,7 @@ herleitung:
   - docs/konzepte/2026-11-11-oeffentliche-api.md
 ---
 
-# ADR-0039: Webhooks sind mit dem Instanzschlüssel signiert und gehen nur an geprüfte Adressen
+# ADR-0046: Webhooks sind mit dem Instanzschlüssel signiert und gehen nur an geprüfte Adressen
 
 ## Regeln
 

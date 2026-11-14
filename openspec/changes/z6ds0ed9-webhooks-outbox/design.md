@@ -163,7 +163,7 @@ Je Takt:
    Recht, ein neues Ziel oder das Entfernen wirken ab dem nächsten Ereignis. Darf der Zugang nicht
    beliefert werden (nicht `aktiv`, abgelaufen, ohne `events:read`), ruht der Webhook: Über ein
    zuzustellendes Ereignis rückt der Cursor nicht vor, und `offen_id` wird gesetzt. Über nicht
-   gewählte Arten und ein gelöschtes Ereignis rückt er auch dann (ADR-0039).
+   gewählte Arten und ein gelöschtes Ereignis rückt er auch dann (ADR-0046).
 3. Je Webhook höchstens 50 Ereignisse nacheinander, dann der nächste Takt.
 4. Bis zu 8 Webhooks gleichzeitig (Semaphore über alle Takte), je Webhook streng nacheinander.
 5. Während der HTTP-Anfrage hält der Lauf keine Datenbankverbindung. Das Ergebnis schreibt er
@@ -373,7 +373,7 @@ Unter `/api/admin/anbindungen/{id}/webhook` in `routes::anbindungen` (Untermodul
 
 ## Migration Plan
 
-- Migrationen ab 0346, Nummer vor dem Merge gegen `origin/alpha` prüfen
+- Migrationen ab 0349 (zuerst 0346, vor dem Merge umgelegt), Nummer vor dem Merge gegen `origin/alpha` prüfen
   (`scripts/check-migrationen.sh`): Tabellen `maschine_webhook` und `maschine_webhook_versuch`,
   Neubau des `admin_audit`-CHECK.
 - Kein Datenumzug. Bestehende Zugänge haben keinen Webhook.
