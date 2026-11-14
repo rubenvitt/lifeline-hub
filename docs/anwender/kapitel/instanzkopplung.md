@@ -624,7 +624,7 @@ nächsten Abgleich, sobald die übernehmende Installation ihn endgültig löscht
 Einsatzliste: der Spiegel wird gelöscht). Stehen bleibt jeder Einsatz, den eine Gegenstelle
 mit einem älteren Stand gelöscht hat. Ist die Führung je Einsatz aus oder fehlt das Recht eines
 System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden, steht dort der Fehler mit
-„Erneut laden“.
+„Erneut abrufen“.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
