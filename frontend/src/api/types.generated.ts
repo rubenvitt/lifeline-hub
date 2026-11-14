@@ -411,7 +411,7 @@ export interface components {
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen" | "maschinenzugang_webhook_angelegt" | "maschinenzugang_webhook_geaendert" | "maschinenzugang_webhook_entfernt" | "maschinenzugang_webhook_wieder_aufgenommen" | "maschinenzugang_webhook_lan_erlaubt" | "maschinenzugang_webhook_lan_entzogen";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "archiv_person_geschwaerzt" | "archiv_durchsucht" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -491,7 +491,6 @@ export interface components {
             letzte_ablehnung?: components["schemas"]["AnbindungAblehnung"] | null;
             name: string;
             scopes: components["schemas"]["Scope"][];
-            webhook?: components["schemas"]["WebhookAnzeige"] | null;
             widerrufen_at?: string | null;
             /** @description Anzeigename des Admins, der widerrufen hat. */
             widerrufen_von_name?: string | null;
@@ -2653,6 +2652,11 @@ export interface components {
         };
         /** @description Die Führung im Einsatzkopf (`EinsatzAnzeige.fuehrung`): fehlt ohne Akte oder ohne Schalter. */
         EinsatzFuehrung: {
+            /**
+             * @description Die Kopplung zur führenden Instanz ist beendet: ein Mensch kann die Führung zurückholen
+             *     (LLH-1850, `repo::fuehrung_beendet_sql`).
+             */
+            beendet: boolean;
             /** @description Name der führenden Instanz. */
             bei: string;
             /** Format: int64 */
@@ -3564,11 +3568,6 @@ export interface components {
             /** @description Zeitpunkt der Meldung, UTC ohne Zonenkennung (`YYYY-MM-DD HH:MM:SS`). */
             zeitpunkt_at: string;
         };
-        /**
-         * @description Art eines Ereignisses. Neue Arten kommen nur hinzu; ein Client überspringt unbekannte.
-         * @enum {string}
-         */
-        EventType: "einsatz.created" | "einsatz.updated" | "einsatz.closed" | "lage.changed";
         /** @description Eine externe Stelle des Katalogs. */
         ExterneStelle: {
             aktiv: boolean;
@@ -3756,6 +3755,12 @@ export interface components {
             epoche: number;
             /** @description Diese Instanz führt. */
             fuehrend: boolean;
+            /**
+             * @description Die Kopplung zur führenden Instanz ist beendet, und der Einsatz liegt hier als Spiegel: der
+             *     Widerruf der Zuordnung des Spiegels (UTC). Dann bietet das Paneel „Führung zurückholen“
+             *     (LLH-1850).
+             */
+            fuehrer_beendet_at?: string | null;
             fuehrer_kennung: string;
             fuehrer_name: string;
             fuehrer_richtung?: components["schemas"]["InstanzKopplungRichtung"] | null;
@@ -7152,11 +7157,6 @@ export interface components {
             frist_min: number;
         };
         /**
-         * @description Warum ein Webhook ruht: sein Zugang darf gerade nicht beliefert werden.
-         * @enum {string}
-         */
-        RuhtGrund: "zugang_wartet" | "zugang_widerrufen" | "zugang_abgelaufen" | "ohne_events_read";
-        /**
          * @description Sachgebiet der Führungsorganisation (FwDV 100 Anlage 2). Wire == `as_str()`.
          *
          *     Die Reihenfolge ist die der Anlage 2 und zugleich die Anzeigereihenfolge — sie ist
@@ -8842,82 +8842,6 @@ export interface components {
             stumm: components["schemas"]["BenachrichtigungArt"][];
             ueber_hub?: components["schemas"]["PushUeberHub"] | null;
         };
-        /** @description Der Webhook einer Anbindung, wie die Verwaltung ihn zeigt. */
-        WebhookAnzeige: {
-            angehalten_at?: string | null;
-            angelegt_at: string;
-            arten: components["schemas"]["EventType"][];
-            /** @description Erster Fehlschlag der laufenden Störung. */
-            fehler_seit?: string | null;
-            /** Format: int64 */
-            fehlversuche: number;
-            /** @description Optimistisches Lock für Änderungen. */
-            geaendert_at: string;
-            /** @description Der Server des Ziels; sieht jeder, der die Anbindung sieht. */
-            host: string;
-            /** @description Kennung des Webhooks; zugleich `aud` jeder Signatur, gegen die der Empfänger prüft. */
-            id: string;
-            lan_erlaubt: boolean;
-            letzter_erfolg_at?: string | null;
-            letzter_fehler?: components["schemas"]["WebhookLetzterFehler"] | null;
-            naechster_versuch_at?: string | null;
-            ruht_grund?: components["schemas"]["RuhtGrund"] | null;
-            /** @description Die ganze Ziel-URL; nur für den System-Admin, weil ihr Pfad ein Token tragen kann. */
-            url?: string | null;
-            /**
-             * @description Ereignisse gingen verloren, bevor sie zugestellt waren; der Empfänger muss den Stand über
-             *     die Leserouten neu lesen.
-             */
-            verlust_at?: string | null;
-            zustand: components["schemas"]["WebhookZustand"];
-        };
-        /**
-         * @description Warum ein Versuch scheiterte. Ein Code, nie Text des Ziels (Spec „Diagnose“).
-         * @enum {string}
-         */
-        WebhookFehler: "status" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig";
-        /** @description Der letzte Fehlschlag eines Webhooks. */
-        WebhookLetzterFehler: {
-            art: components["schemas"]["WebhookFehler"];
-            at: string;
-            /**
-             * Format: int64
-             * @description HTTP-Status, falls das Ziel antwortete.
-             */
-            status?: number | null;
-        };
-        /** @description Ergebnis eines Testereignisses. */
-        WebhookTestErgebnis: {
-            /** Format: int64 */
-            dauer_ms: number;
-            erfolg: boolean;
-            fehler_art?: components["schemas"]["WebhookFehler"] | null;
-            /** Format: int64 */
-            status?: number | null;
-        };
-        /** @description Ein Zustellversuch im Verlauf. Der Rumpf der Antwort wird nie gespeichert. */
-        WebhookVersuch: {
-            at: string;
-            /** Format: int64 */
-            dauer_ms: number;
-            /**
-             * Format: int64
-             * @description Nummer des Ereignisses; fehlt beim Testereignis.
-             */
-            ereignis_id?: number | null;
-            erfolg: boolean;
-            fehler_art?: components["schemas"]["WebhookFehler"] | null;
-            /** Format: int64 */
-            status?: number | null;
-            test: boolean;
-        };
-        /**
-         * @description Zustand eines Webhooks, wie die Verwaltung ihn zeigt. `fehler` und `ruht` sind abgeleitet:
-         *     `fehler` ist ein aktiver Webhook in einer Störung, `ruht` einer, dessen Zugang gerade
-         *     nicht beliefert werden darf.
-         * @enum {string}
-         */
-        WebhookZustand: "aktiv" | "fehler" | "angehalten" | "ruht";
         /**
          * @description Art eines Wechsels aus dem Plan (`einsatz_plan_wechsel.art`). Wire == `as_str()`.
          * @enum {string}
@@ -9340,6 +9264,7 @@ export interface components {
          *     - `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel
          *       des Blocks, durch Komma getrennt) und `block`.
          *     - `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.
+         *     - `archiv_person_geschwaerzt`, `archiv_durchsucht`: keine; Ziel ist der archivierte Einsatz.
          *     - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
          *       Gegenstelle.
          *     - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich
@@ -9347,7 +9272,6 @@ export interface components {
          *       `scopes_vorher`, falls die Scopes wechselten.
          *     - `einwurf_zugang_*`: `zugang_id` und `scopes` (genau ein Zweck). Nie der Schlüssel oder
          *       sein Hash.
-         *     - `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.
          */
         ZugangsAngaben: {
             /** @description Adresse der Gegenstelle (nur auf der Seite, die sich meldet). */
@@ -9374,8 +9298,6 @@ export interface components {
             geraet?: string | null;
             /** @description Warum ein Unterschriftsschlüssel verworfen wurde. */
             grund?: string | null;
-            /** @description Webhook (LLH-1656): Host des Ziels. Nie die ganze URL, ihr Pfad kann ein Token tragen. */
-            host?: string | null;
             /** @description Instanzkopplung (LLH-1490): Kennung der Gegenstelle. */
             instanz_kennung?: string | null;
             org_rolle?: components["schemas"]["OrgRolle"] | null;

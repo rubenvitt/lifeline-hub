@@ -12,6 +12,7 @@ vi.mock('../api/fuehrung', () => ({
   bestaetigeUebernahme: vi.fn(),
   frageFuehrungAn: vi.fn(),
   gibFuehrungPerCodeAb: vi.fn(),
+  holeFuehrungZurueck: vi.fn(),
   uebergebeFuehrung: vi.fn(),
   uebernimmFuehrung: vi.fn(),
   uebernimmFuehrungMitCode: vi.fn(),
@@ -23,6 +24,7 @@ import {
   bestaetigeUebernahme,
   frageFuehrungAn,
   gibFuehrungPerCodeAb,
+  holeFuehrungZurueck,
   uebergebeFuehrung,
   uebernimmFuehrung,
   uebernimmFuehrungMitCode,
@@ -187,6 +189,63 @@ describe('FuehrungPaneel (LLH-1491)', () => {
     await waitFor(() =>
       expect(uebernimmFuehrung).toHaveBeenCalledWith({ einsatzId: 7 }, 'Hub weg'),
     );
+  });
+
+  describe('Zurückholen ohne gekoppelte Führung (LLH-1850)', () => {
+    const beendet = () =>
+      akte({
+        fuehrend: false,
+        fuehrer_name: 'Hub Nord',
+        fuehrer_kennung: 'k-hub',
+        gegenueber: [],
+        fuehrer_beendet_at: '2026-11-10 10:00:00',
+      });
+
+    it('nennt die beendete Kopplung und holt mit Grund zurück', async () => {
+      vi.mocked(holeFuehrungZurueck).mockResolvedValue(akte());
+      renderMitProviders(<FuehrungPaneel fuehrung={beendet()} darfBedienen />);
+      expect(screen.getByText(/^Kopplung zu Hub Nord beendet · /)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Notübernahme …' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Führung anfragen' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Führung zurückholen …' }));
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText('Führung von Hub Nord zurückholen')).toBeInTheDocument();
+      await userEvent.type(within(dialog).getByLabelText('Grund'), ' Hub abgebaut ');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Führung zurückholen' }));
+      await waitFor(() => expect(holeFuehrungZurueck).toHaveBeenCalledWith(7, 'Hub abgebaut'));
+    });
+
+    it('ohne Recht nur der Hinweis, kein Knopf', () => {
+      renderMitProviders(<FuehrungPaneel fuehrung={beendet()} darfBedienen={false} />);
+      expect(screen.getByText(/^Kopplung zu Hub Nord beendet · /)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Führung zurückholen …' })).toBeNull();
+    });
+
+    it('schließt den Dialog, wenn das Zurückholen nicht mehr geht (Review LLH-1850)', async () => {
+      const { rerender } = renderMitProviders(<FuehrungPaneel fuehrung={beendet()} darfBedienen />);
+      await userEvent.click(screen.getByRole('button', { name: 'Führung zurückholen …' }));
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+      rerender(
+        <FuehrungPaneel
+          fuehrung={akte({ fuehrend: true, fuehrer_name: 'ELW 1', epoche: 4 })}
+          darfBedienen
+        />,
+      );
+      await waitFor(() => expect(screen.queryByText('Führung von ELW 1 zurückholen')).toBeNull());
+      // Geschlossen: jsdom beendet die Ausblend-Animation von antd nicht, der Dialog steht im Abgang.
+      await waitFor(() =>
+        expect(document.querySelector('[role=dialog]')).toHaveClass('ant-zoom-leave'),
+      );
+    });
+
+    it('ohne Grund geht nichts hinaus', async () => {
+      renderMitProviders(<FuehrungPaneel fuehrung={beendet()} darfBedienen />);
+      await userEvent.click(screen.getByRole('button', { name: 'Führung zurückholen …' }));
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Führung zurückholen' }));
+      expect(await within(dialog).findByText('Grund angeben')).toBeInTheDocument();
+      expect(holeFuehrungZurueck).not.toHaveBeenCalled();
+    });
   });
 
   it('ein zu langer Grund bleibt stehen und sperrt das Absenden', async () => {

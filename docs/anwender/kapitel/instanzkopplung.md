@@ -217,6 +217,18 @@ Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, 
 2. „Übernahme bestätigen“ wählen, dann ist der Einsatz hier ein Spiegel; oder
    „Widersprechen“ wählen, dann führt diese Installation weiter.
 
+### Führung zurückholen
+
+Für die Einsatzleitung oder einen Admin der Organisation, an einem Spiegel, dessen führende
+Installation nicht mehr gekoppelt ist (Widerruf bei ausgeschalteter Führung je Einsatz, siehe
+„Widerruf“ unter Hintergrund).
+
+1. Im Hinweisband „Führung zurückholen“ wählen, oder auf „Einsatzdaten“ im Paneel „Führung“
+   „Führung zurückholen …“.
+2. Einen „Grund“ eintragen.
+3. „Führung zurückholen“ wählen. Diese Installation führt den Einsatz mit der nächsten Epoche,
+   das Hinweisband verschwindet, und der Einsatz ist wieder schreibbar.
+
 ## Hintergrund
 
 ### Wer sich bei wem meldet
@@ -258,10 +270,23 @@ steht der Widerruf der Kopplung, nicht jeder zurückgeholte Einsatz.
 
 Ist die Führung je Einsatz ausgeschaltet, wenn die Installation vom Widerruf erfährt, holt sie
 keinen Einsatz zurück, auch nicht, wenn die Führung später wieder eingeschaltet wird: Der Spiegel
-bleibt gesperrt, und das Paneel „Führung“ bietet nichts an, bis die Organisation erneut mit
-derselben Installation gekoppelt ist. Eine Übernahme, die noch auf Bestätigung wartete, verfällt
-auch dann. Die nie gespiegelten Einsätze der widerrufenen Installation bleiben in diesem Fall
-unter „Einsätze beim Gegenüber“ stehen.
+bleibt gesperrt, bis ihn ein Mensch zurückholt. Eine Übernahme, die noch auf Bestätigung wartete,
+verfällt auch dann. Die nie gespiegelten Einsätze der widerrufenen Installation bleiben in diesem
+Fall unter „Einsätze beim Gegenüber“ stehen.
+
+Ist die Führung wieder eingeschaltet, zeigt ein solcher Spiegel im Hinweisband „Kopplung zu …
+beendet“ statt „Abgleich beendet“, und das Paneel „Führung“ nennt die beendete Kopplung mit dem
+Zeitpunkt des Widerrufs. Zurückholen lässt er sich ohne Unterschrift oder Code (Ablauf „Führung
+zurückholen“), weil die andere Installation nicht mehr gekoppelt ist. Der Verlauf zeigt danach
+eine Notübernahme mit Grund und Namen, die Admin-Spur „Führung zurückgeholt von … (Kopplung
+beendet)“. Bruchstelle ist der Zeitpunkt des Widerrufs: Was die andere Installation danach
+geschrieben hat, kommt nicht mehr an. Solange die Organisation mit der führenden Installation
+gekoppelt ist, gibt es dieses Zurückholen nicht; dann gelten Anfrage und Notübernahme. Ebenso
+wenig für einen Spiegel, der über eine andere Installation kommt, etwa über den Hub: Dort führt
+die andere Installation weiter, auch wenn diese Organisation früher einmal selbst mit ihr
+gekoppelt war. Es ersetzt keine neue Kopplung: Wird die Organisation später wieder mit derselben Installation gekoppelt und
+hat diese den Einsatz inzwischen weitergeführt, führt sie ihn dort weiter, wie nach jedem
+Widerruf.
 
 ### Fingerabdruck und Sicherheit
 
@@ -505,7 +530,9 @@ in beiden Fällen abgelehnt mit „Kopplung widerrufen.“ Gelöscht wird ein Sp
 Ein zur Löschung vorgemerkter Einsatz ist auch am Spiegel gesperrt, eine Wiederherstellung
 hebt die Sperre auch dort auf, und eine Schwärzung kommt ebenso an. Löscht die Installation, die
 einen Einsatz führt, ihn endgültig, löscht die andere ihren Spiegel beim nächsten Abgleich; das
-Löschprotokoll dort nennt die Gegenstelle, aber keine Nummer.
+Löschprotokoll dort nennt die Gegenstelle, aber keine Nummer. Hat die führende Installation den
+Einsatz übernommen, gilt das nur, solange an der anderen die Führung je Einsatz eingeschaltet
+ist; sonst bleibt der Spiegel dort stehen.
 
 Nach dem Ende der Nachbereitung übergibt ein ELW seine eigenen Einsätze dem Hub zur Verwahrung:
 Der Spiegel am Hub wird dabei zu einem eigenen Einsatz des Hubs, und der ELW löscht seinen.
@@ -534,11 +561,12 @@ fallen die Einsätze heraus, die die widerrufene Installation führt. Ein nie ge
 Einsatz, den die führende Installation endgültig gelöscht hat, verschwindet mit dem nächsten
 Abgleich. Kennt eine Installation ihn nur über den Hub, etwa ein zweiter Einsatzleitwagen,
 verschwindet er dort einen Abgleich später; hängt die Organisation an zwei Hubs, bleibt er dort
-stehen. Stehen bleibt auch ein Einsatz, dessen Führung abgegeben wurde und den die übernehmende
-Installation löscht, und jeder Einsatz, den eine Gegenstelle mit einem älteren Stand gelöscht
-hat. Ist die Führung je Einsatz
-aus oder fehlt das Recht eines System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden,
-steht dort der Fehler mit „Erneut laden“.
+stehen. Ein eigener Einsatz, dessen Führung abgegeben wurde, verschwindet ebenso mit dem
+nächsten Abgleich, sobald die übernehmende Installation ihn endgültig löscht (auch aus der
+Einsatzliste: der Spiegel wird gelöscht). Stehen bleibt jeder Einsatz, den eine Gegenstelle
+mit einem älteren Stand gelöscht hat. Ist die Führung je Einsatz aus oder fehlt das Recht eines
+System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden, steht dort der Fehler mit
+„Erneut laden“.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an
@@ -651,3 +679,10 @@ Installation hat den Rückstand erkannt und schickt die Akten erneut, eingreifen
 die die andere Installation mit der Sicherung verloren hat, kommen mit den nächsten Meldungen
 wieder. Die Uhr des Servers muss dafür stimmen; die Grenzen nennt die Betriebsdoku
 (`docs/betrieb/backup-restore.md`, „Gekoppelte Instanz zurückspielen“).
+
+Dasselbe gilt für Unterschriftsschlüssel und Stammdaten: Was der Hub nach dem Zurückspielen
+registriert, widerruft oder ändert, erreicht den ELW mit den nächsten Meldungen. Erkennt der Hub
+dabei einen Rückstand, zeigt die Kopplung „… kennt schon spätere Stände …“ mit der Liste dessen, was
+erneut geht („Unterschriftsschlüssel“, „Stammdaten“), und schickt es einmal ganz. Ein
+Schlüssel, den der Hub mit der Sicherung verloren hat, gilt am ELW weiter, bis der Hub seine Nummer
+neu vergibt oder die Organisation neu gekoppelt wird.

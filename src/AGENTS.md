@@ -434,7 +434,8 @@ Herleitung in
     `openspec/changes/archive/2026-11-12-a36p545r-nummer-beim-fuehrungswechsel/design.md`.
   - Übergabe geht nur abgeglichen (`fordere_abgeglichen`), eine Anfrage wartet am Führer
     (`anfrage_von`), bis der Anfragende alles hat; eine Notübernahme nur an einem Einsatz, der
-    hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein.
+    hier als Spiegel liegt. Abgeschaltet friert der Schalter den Stand ein; einen Spiegel, dessen
+    Führung danach nicht mehr gekoppelt ist, holt nur ein Mensch zurück (ADR-0043, LLH-1850).
   - Die Bedienung der Führung zieht `EinsatzFuehrungszugriff`, nie ein Schreib-Gate. Eine
     eingehende Akte, die der meldenden Seite die Führung nimmt, läuft durch
     `austausch::entscheide`; wer daran dreht, hält die Tabelle in design.md D7 der Change
@@ -537,8 +538,14 @@ Herleitung in
     `/mnt/project-files/llh-1494/tkky2noy-archiv-nachbereitung/design.md` (D2–D7): Der Führer
     liefert einen abgeschlossenen Einsatz weiter, solange die Gegenseite einen niedrigeren Stand
     nennt, auch soft-gelöscht oder geschwärzt (`liefern::list_gefuehrt`). `geloescht` meldet
-    eine Seite nur für genannte Kennungen mit eigenem Präfix, deren ID im eigenen
-    Löschprotokoll steht (eine aus der Sicherung zurückgekehrte Instanz meldet nichts).
+    eine Seite für genannte Stände nur mit demselben Beleg wie für Akten ohne Spiegel (unten);
+    eine aus der Sicherung zurückgekehrte Instanz meldet nichts. **Einen Spiegel räumt
+    `geloescht` nur ab, wenn er zu dieser Kopplung gehört und der Absender sein Führer ist**
+    (`spiegel::fuehrung::is_fuehrer_des_spiegels`: mit Schalter und Akte allein die Akte, sonst
+    das Präfix; LLH-1852,
+    [ADR-0042](../docs/architektur/entscheidungen/ADR-0042-ein-spiegel-endet-nur-auf-meldung-seines-fuehrers-laut-akte.md),
+    Herleitung
+    `openspec/changes/archive/2026-11-13-r11nl4cv-geloescht-fremdes-praefix/design.md`).
     `verwahrt` geht nur von der meldenden Seite aus; die erreichte wandelt ihren Spiegel erst
     bei gleichem Stand und ohne fehlenden Anhang (`spiegel::lebensende::verwahrung_annehmen`),
     und erst ihre Quittung `angenommen` merkt den Einsatz der meldenden Seite zum Abräumen vor.
@@ -564,8 +571,10 @@ Herleitung in
     `fuehrung::repo::is_gegenueber_zustaendig` (der Führer der Akte; die meldende Seite auch ihr
     einziger Hub, solange der Führer nicht selbst ihr Gegenüber ist). Genannt wird nur, was
     `paket::is_kennung_nennbar` besteht (höchstens `KENNUNG_BYTES_MAX` Byte, druckbares ASCII);
-    die Akten gehen vom Paket-Budget ab (`abgleich::budget_fuer_zeilen`). Der Weg über die Stände bleibt, wie er ist (Spiegel mit fremdem Präfix:
-    LLH-1852). Nachweis: `tests/instanz_fuehrung.rs`, Abschnitt „Akten ohne Spiegel“.
+    die Akten gehen vom Paket-Budget ab (`abgleich::budget_fuer_zeilen`). Denselben Beleg nimmt
+    `lebensende::geloeschte` für die Stände von Spiegeln (LLH-1852). Nachweis:
+    `tests/instanz_fuehrung.rs`, Abschnitte „Akten ohne Spiegel“ und „Spiegel mit fremdem
+    Präfix“.
 - **Direktkopplung vor Ort (LLH-1497)**, Specs `instanz-kopplung`, `instanz-entdeckung`,
   [ADR-0029](../docs/architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
   Herleitung `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`:
@@ -846,7 +855,9 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   für Einsatz oder genau eine Person (`aufbewahrung::antrag`, Tabelle `schwaerzung_antrag`), nur
   System-Admin der Einsatz-Org, nur abgeschlossen; 24 h zurücknehmbar, dann Vollzug in Phase A2
   des Purge-Laufs (`vollziehe_faellige`, zählt für den WAL-Rückschrieb). Kein Sofort-Auslöser
-  ohne diese 24 h.
+  ohne diese 24 h. Ausnahme: einen Personen-Antrag am archivierten Einsatz lassen `faellige` und
+  `vollziehen_ergebnis` offen (`IM_ARCHIV`); ihn vollzieht nur der Befehl `archiv loeschersuchen`
+  (s. „Archiv am Hub“).
 - **Geräte erfahren Schwärzung und Sperre über den Kopf** (LFH-996, Spec
   `lagebild-offline-lesen`): `EinsatzAnzeige.teilschwaerzungen` zählt vollzogene
   Personen-Anträge und geschwärzte Kategorien (`teilschwaerzungen_spalte!` und
@@ -864,7 +875,9 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
 - **Die Personensuche (`aufbewahrung::suche`) ist die einzige Archiv-Stelle, die Scrub-Spalten
   liest**: nur ganze Wörter bzw. ≥ 6 Ziffern, Antwort pseudonym, `no-store`, Suchtext nie
   geloggt, schreibt nichts (Guard `archiv_namensraum_nur_lesend_und_admin`, benannte
-  Nicht-GET-Menge).
+  Nicht-GET-Menge). Einzige Ausnahme ist der Befehl `archiv personen`
+  (`einsatz/archiv/personen.rs`, LLH-1712): dieselbe Suche im entschlüsselten Block, Namen nur
+  im Terminal, Admin-Spur `archiv_durchsucht` ohne Suchtext; nie eine Route.
 - **Geschwärzt heißt physisch weg** (LFH-725, Spec `aufbewahrung`): `db::connect` setzt
   `secure_delete = ON` (nicht `FAST`: das lässt die Overflow-Seiten gelöschter Anhang-BLOBs
   stehen) und `journal_size_limit` (LFH-928), und nach einer Schwärzung oder einem Sweep mit
@@ -909,8 +922,19 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   age-verschlüsselt an alle geprüften Schlüssel; dann `schwaerze_nach_archiv_tx` ohne Karenz.
   Eine neue Stammtabelle mit FK aus einer Einsatztabelle braucht einen Eintrag in `STAMM` (Guard
   `stamm_deckt_alle_verweise_und_spalten`). Abgelaufene Blöcke löscht Phase N mit ETB-Eintrag,
-  Phase D wartet auf den letzten; ein Löschersuchen an einem archivierten Einsatz geht nur ganz
-  und löscht alle Blöcke.
+  Phase D wartet auf den letzten. Ein Löschersuchen für den ganzen archivierten Einsatz löscht
+  alle Blöcke.
+- **Löschersuchen für eine Person im Archiv** (LLH-1712, `archiv/loeschersuchen.rs`, Befehl
+  `archiv loeschersuchen`, Spec `aufbewahrung-loeschersuchen`, Herleitung
+  `openspec/changes/archive/2026-11-13-xlrgl4du-loeschersuchen-person-im-archiv/design.md`): Der Server hat keinen privaten Archiv-Schlüssel, deshalb nie im
+  Purge-Lauf. Je Einsatz alle Blöcke entschlüsseln, migrieren, `scrubbe_person` je Antrag,
+  `VACUUM`, an die **heute geprüften** Schlüssel neu verschlüsseln; abgelegt wird in einer
+  Transaktion, die Anträge und `sha256` jeder Zeile gegen den Stand des Baus prüft (sonst nichts),
+  dann UPDATE je Zeile (Nummer und Frist bleiben), Kopien der alten `sha256` vormerken
+  (`kopien_vormerken_tx`, vor dem UPDATE: danach fände sie keiner mehr), Anträge mit ETB
+  (`antrag::im_archiv_vollzogen_tx`) und Admin-Spur `archiv_person_geschwaerzt`. Der neue
+  `sha256` sperrt alte Downloads über `hier_geloescht`. Zwischendateien eines Befehls tragen
+  einen Teil aus `bauen::BEFEHL_TEILE`, sonst räumt sie der laufende Server mitten im Befehl ab.
 - **Archiv einspielen** (LLH-1494, `archiv/einspielen.rs`, Befehl `archiv einspielen`): migriert
   die entschlüsselte Datei, schwärzt abgelaufene Kategorien nach und übernimmt den Einsatz über
   die Spiegel-Maschinerie (`liefern`/`uebernehmen`) mit einer Kopplung, die nur in der

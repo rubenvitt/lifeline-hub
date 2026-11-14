@@ -8,6 +8,7 @@ mod common;
 use axum::http::StatusCode;
 use lifeline_hub::auth::unterschrift::pruefen::test_authenticator::SoftwarePasskey;
 use lifeline_hub::auth::unterschrift::repo as unterschrift;
+use lifeline_hub::instanz::fuehrung::repo::AKTE_GEWECHSELT;
 use serde_json::{json, Value};
 
 const RP: &str = "hub.example.org";
@@ -863,6 +864,221 @@ async fn akte_einer_anderen_org_ist_404() {
     let f = &fremde(&elw).await[0];
     assert_eq!(f["anfrage_offen"], false, "nichts hat die Akte verändert");
     assert_eq!(f["fuehrer_kennung"], hub.kennung);
+}
+
+// ── Gegenprobe über die Kennung (LLH-1862) ───────────────────────────────────────────────────
+//
+// `einsatz_fuehrung.id` ist `INTEGER PRIMARY KEY` ohne `AUTOINCREMENT`: SQLite vergibt die größte
+// ID nach dem Löschen neu. Die Tests ändern die Kennung unter der ID; das ist derselbe Zustand wie
+// Löschen und Neuanlage.
+
+/// Setzt unter `akte` einen anderen Einsatz, wie ihn eine Neuanlage unter der alten ID brächte.
+async fn anderer_einsatz_unter(i: &Instanz, akte: i64, kennung: &str) {
+    sqlx::query("UPDATE einsatz_fuehrung SET kennung = ? WHERE id = ?")
+        .bind(kennung)
+        .bind(akte)
+        .execute(&i.pool)
+        .await
+        .unwrap();
+}
+
+fn mit_kennung(pfad: &str, kennung: &str) -> String {
+    let q = form_urlencoded::Serializer::new(String::new())
+        .append_pair("kennung", kennung)
+        .finish();
+    format!("{pfad}?{q}")
+}
+
+/// Der Dialog „Führung …“ schickt die Kennung der Akte, die er zeigt. Liegt unter der ID
+/// inzwischen ein anderer Einsatz, lehnt jede Bedienroute mit 409 ab und ändert nichts; mit der
+/// passenden Kennung und ohne Kennung geht sie wie bisher.
+#[tokio::test]
+async fn bedienung_einer_akte_unter_neu_vergebener_id_ist_409() {
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let f = &fremde(&elw).await[0];
+    let akte = f["id"].as_i64().unwrap();
+    let gezeigt = f["kennung"].as_str().unwrap().to_string();
+    let neu = format!("{}/999", hub.kennung);
+    anderer_einsatz_unter(&elw, akte, &neu).await;
+
+    for (pfad, body) in [
+        ("uebergeben", json!({"an": hub.kennung})),
+        ("code", json!({"an": hub.kennung})),
+        ("anfragen", json!({})),
+        ("notuebernahme", json!({"grund": "Funkausfall"})),
+        ("notuebernahme/start", json!({"grund": "Funkausfall"})),
+        (
+            "notuebernahme/code",
+            json!({"grund": "Funkausfall", "code": "AAAA"}),
+        ),
+        ("bestaetigen", json!({})),
+        ("widersprechen", json!({})),
+    ] {
+        let (s, v) = post(
+            &elw,
+            &mit_kennung(
+                &format!("/api/admin/instanz/fuehrung/{akte}/{pfad}"),
+                &gezeigt,
+            ),
+            body,
+        )
+        .await;
+        // Der Text unterscheidet die Gegenprobe von den 409 der Regeln (Führung liegt beim
+        // Gegenüber, keine Übernahme wartet), die hier sonst auch anschlügen.
+        assert_eq!(s, StatusCode::CONFLICT, "{pfad}: {v}");
+        assert_eq!(v["error"], AKTE_GEWECHSELT, "{pfad}: {v}");
+    }
+    let f = &fremde(&elw).await[0];
+    assert_eq!(f["anfrage_offen"], false, "nichts angefragt");
+    assert_eq!(f["kennung"], neu.as_str());
+
+    let (s, v) = post(
+        &elw,
+        &mit_kennung(
+            &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+            &neu,
+        ),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "passende Kennung: {v}");
+    assert_eq!(v["anfrage_offen"], true);
+    let (s, v) = post(
+        &elw,
+        &format!("/api/admin/instanz/fuehrung/{akte}/anfragen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "ohne Kennung wie bisher: {v}");
+}
+
+/// Zwischen dem Laden in der Route und der Schreibtransaktion kann die Akte wechseln: Jeder Dienst
+/// prüft die Kennung in seiner Transaktion selbst, vor seinen Regeln.
+#[tokio::test]
+async fn dienst_prueft_die_kennung_in_seiner_transaktion() {
+    use lifeline_hub::error::AppError;
+    use lifeline_hub::instanz::fuehrung::dienst;
+    use lifeline_hub::instanz::fuehrung::erklaerung::{
+        FuehrungBeweis, NotuebernahmeErklaerung, TYP_NOTUEBERNAHME,
+    };
+    use lifeline_hub::instanz::fuehrung::repo::AkteRef;
+    use lifeline_hub::instanz::fuehrung::Epoche;
+
+    let (hub, elw) = gekoppelt().await;
+    common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let f = &fremde(&elw).await[0];
+    let akte = f["id"].as_i64().unwrap();
+    let gezeigt = f["kennung"].as_str().unwrap().to_string();
+    let r = AkteRef {
+        id: akte,
+        kennung: &gezeigt,
+    };
+    anderer_einsatz_unter(&elw, akte, &format!("{}/999", hub.kennung)).await;
+
+    let ist_gewechselt = |name: &str, r: Result<(), AppError>| match r {
+        Err(AppError::Conflict(t)) => assert_eq!(t, AKTE_GEWECHSELT, "{name}"),
+        anders => panic!("{name}: erwartet 409, war {anders:?}"),
+    };
+    let p = &elw.pool;
+    ist_gewechselt(
+        "uebergeben",
+        dienst::uebergeben(p, r, &hub.kennung, "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "code_abgeben",
+        dienst::code_abgeben(p, r, &hub.kennung, "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt("anfragen", dienst::anfragen(p, r).await.map(drop));
+    ist_gewechselt(
+        "notuebernahme_gegen_erreichte",
+        dienst::notuebernahme_gegen_erreichte(p, r, "Probe", "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "build_erklaerung_gegen_meldende",
+        dienst::build_erklaerung_gegen_meldende(p, r, "Probe", "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "notuebernahme_mit_code",
+        dienst::notuebernahme_mit_code(p, r, "Probe", "ABCD-EFGH-JKLM-NPQR", "Erika")
+            .await
+            .map(drop),
+    );
+    ist_gewechselt(
+        "bestaetigen",
+        dienst::bestaetigen(p, r, "Erika").await.map(drop),
+    );
+    ist_gewechselt(
+        "widersprechen",
+        dienst::widersprechen(p, r, "Erika").await.map(drop),
+    );
+    // Die Erklärung nennt die gezeigte Akte; Inhalt und Beweis zählen nicht, die Kennung scheitert
+    // vorher.
+    let e = NotuebernahmeErklaerung {
+        typ: TYP_NOTUEBERNAHME.into(),
+        einsatz: gezeigt.clone(),
+        org: "org".into(),
+        epoche_alt: Epoche::neu(1, &hub.kennung),
+        epoche_neu: Epoche::neu(2, &elw.kennung),
+        fuehrer_alt: hub.kennung.clone(),
+        fuehrer_neu: elw.kennung.clone(),
+        grund: "Probe".into(),
+        zeitpunkt: "2026-11-13 12:00:00".into(),
+        unterzeichner: "Erika".into(),
+    };
+    let beweis = FuehrungBeweis::Code {
+        pruefwert: "p".into(),
+    };
+    ist_gewechselt(
+        "notuebernahme_gegen_meldende",
+        dienst::notuebernahme_gegen_meldende(p, r, &e, &beweis, "Erika")
+            .await
+            .map(drop),
+    );
+    let f = &fremde(&elw).await[0];
+    assert_eq!(f["anfrage_offen"], false, "nichts angefragt: {f}");
+    assert_eq!(
+        f["fuehrer_kennung"], hub.kennung,
+        "Führung unverändert: {f}"
+    );
+}
+
+/// Eine Unterschrift gilt dem Einsatz ihrer Erklärung. Liegt unter der ID der Zeremonie beim
+/// Abschluss ein anderer Einsatz, übernimmt der Hub ihn nicht, auch wenn Epoche und Führer gleich
+/// sind.
+#[tokio::test]
+async fn unterschrift_fuer_einen_anderen_einsatz_unter_derselben_id_wird_abgelehnt() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, akte) = elw_einsatz(&hub, &elw).await;
+    let (s, start) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/start"),
+        json!({"grund": "Funkausfall"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{start}");
+    anderer_einsatz_unter(&hub, akte, &format!("{}/999", elw.kennung)).await;
+    let assertion = passkey().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
+    let (s, v) = post(
+        &hub,
+        &format!("/api/admin/instanz/fuehrung/{akte}/notuebernahme/abschluss"),
+        json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    let f = &fremde(&hub).await[0];
+    assert_eq!(f["fuehrend"], false, "der Hub hat nicht übernommen: {f}");
+    assert_eq!(f["fuehrer_kennung"], elw.kennung);
 }
 
 #[tokio::test]
@@ -2194,6 +2410,8 @@ enum Zurueckholen {
     Notuebernahme,
     /// Widerruf der Kopplung zu ELW 1 am Hub.
     Widerruf,
+    /// Widerruf bei ausgeschaltetem Schalter am Hub, danach „Führung zurückholen“ (LLH-1850).
+    Mensch,
 }
 
 /// Drei Instanzen, der Hub führt einen eigenen Einsatz mit (1, Hub), beide ELW kennen ihn. Mit
@@ -2233,21 +2451,15 @@ async fn hub_holt_von_elw1_zurueck(
             let akte = am_hub["id"].as_i64().unwrap();
             hub_uebernimmt_mit_unterschrift(&hub, akte, "ELW 1 ohne Verbindung").await;
         }
-        Zurueckholen::Widerruf => {
-            let (_, u) =
-                common::anfrage(&hub.app, "GET", "/api/admin/instanz", &hub.admin, None).await;
-            let id = u["kopplungen"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|k| k["gegenueber_kennung"] == elw1.kennung.as_str())
-                .unwrap()["id"]
-                .as_i64()
-                .unwrap();
+        Zurueckholen::Widerruf => kopplung_widerrufen(&hub, &elw1).await,
+        Zurueckholen::Mensch => {
+            schalter(&hub, false).await;
+            kopplung_widerrufen(&hub, &elw1).await;
+            schalter(&hub, true).await;
             let (s, v) = post(
                 &hub,
-                &format!("/api/admin/instanz/kopplungen/{id}/widerrufen"),
-                json!({}),
+                &format!("/api/einsaetze/{h}/fuehrung/zurueckholen"),
+                json!({"grund": "ELW 1 abgebaut"}),
             )
             .await;
             assert_eq!(s, StatusCode::OK, "{v}");
@@ -2306,6 +2518,14 @@ async fn holt_der_hub_per_notuebernahme_gegen_elw_1_zurueck_haelt_elw_2_offen_oh
 #[tokio::test]
 async fn holt_der_hub_per_widerruf_von_elw_1_zurueck_haelt_elw_2_offen_ohne_alarm() {
     let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Widerruf, true).await;
+    haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
+}
+
+/// LLH-1850: Auch das Zurückholen durch einen Menschen trägt eine Erklärung ohne Beweis gegen
+/// ELW 1; ELW 2 hält sie ohne Alarm offen.
+#[tokio::test]
+async fn holt_der_hub_nach_widerruf_ohne_schalter_zurueck_haelt_elw_2_offen_ohne_alarm() {
+    let (hub, elw2, h, e2) = hub_holt_von_elw1_zurueck(Zurueckholen::Mensch, true).await;
     haelt_den_hub_offen_ohne_alarm(&hub, &elw2, h, e2).await;
 }
 
@@ -5417,10 +5637,19 @@ async fn vollzug_gegen_die_meldende_seite_lehnt_eine_zu_grosse_erklaerung_selbst
     use lifeline_hub::error::AppError;
     use lifeline_hub::instanz::fuehrung::dienst;
     use lifeline_hub::instanz::fuehrung::erklaerung::FuehrungBeweis;
+    use lifeline_hub::instanz::fuehrung::repo::AkteRef;
 
     let (hub, elw) = gekoppelt().await;
     let (_, akte) = elw_einsatz(&hub, &elw).await;
-    let mut e = dienst::build_erklaerung_gegen_meldende(&hub.pool, akte, "Sonde", "Erika")
+    let kennung = fremde(&hub).await[0]["kennung"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let ref_ = AkteRef {
+        id: akte,
+        kennung: &kennung,
+    };
+    let mut e = dienst::build_erklaerung_gegen_meldende(&hub.pool, ref_, "Sonde", "Erika")
         .await
         .unwrap();
     e.grund = "g".repeat(ERKLAERUNG_BYTES);
@@ -5428,7 +5657,7 @@ async fn vollzug_gegen_die_meldende_seite_lehnt_eine_zu_grosse_erklaerung_selbst
 
     let ergebnis = dienst::notuebernahme_gegen_meldende(
         &hub.pool,
-        akte,
+        ref_,
         &e,
         &FuehrungBeweis::Code {
             pruefwert: "p".into(),
@@ -5488,7 +5717,7 @@ async fn endgueltig_loeschen(i: &Instanz, einsatz: i64) {
         .await
         .unwrap();
     tx.commit().await.unwrap();
-    assert!(abraeumen::ausfuehren(&i.pool, einsatz).await.unwrap());
+    assert!(abraeumen::ausfuehren(&i.pool, None, einsatz).await.unwrap());
 }
 
 /// Kennungen unter „Einsätze beim Gegenüber“ an einer Instanz.
@@ -5780,4 +6009,315 @@ async fn nach_neuer_kopplung_stehen_die_akten_wieder_und_bleiben() {
     abgleichen(&elw1).await;
     assert_eq!(beim_gegenueber(&elw2).await, vec![k1.clone()]);
     assert_eq!(beim_gegenueber(&hub).await, vec![k1]);
+}
+
+// ── Spiegel mit fremdem Präfix enden mit dem Einsatz beim Führer (LLH-1852) ──────────────────
+//
+// Change `r11nl4cv-geloescht-fremdes-praefix`: Der Führer belegt `geloescht` für den Stand eines
+// Spiegels wie für eine Akte (Vermerk, D1), und der Spiegel endet nur, wenn seine Akte den
+// Absender als Führer nennt (D2), gleich mit welcher Instanzkennung die Kennung beginnt.
+
+async fn kennung_am(i: &Instanz, einsatz: i64) -> String {
+    sqlx::query_scalar("SELECT kennung FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+/// Der ELW übergibt einen eigenen Einsatz an den Hub: (Einsatz am ELW, jetzt Spiegel; Einsatz am
+/// Hub; Kennung mit dem Präfix des ELW).
+async fn an_den_hub_uebergeben(hub: &Instanz, elw: &Instanz) -> (i64, i64, String) {
+    let (e, akte) = elw_einsatz(hub, elw).await;
+    abgleichen(elw).await;
+    let (s, v) = post(
+        elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(elw).await;
+    let h = einsatz_der_akte(hub, akte).await;
+    let k = kennung_am(elw, e).await;
+    assert!(ist_spiegel(elw, e).await, "der ELW spiegelt jetzt");
+    assert!(!ist_spiegel(hub, h).await, "der Hub führt");
+    assert!(k.starts_with(&format!("{}/", elw.kennung)), "{k}");
+    (e, h, k)
+}
+
+#[tokio::test]
+async fn loescht_der_hub_einen_uebernommenen_einsatz_raeumt_der_elw_seinen_spiegel_ab() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, h, k) = an_den_hub_uebergeben(&hub, &elw).await;
+
+    endgueltig_loeschen(&hub, h).await;
+    assert!(vermerkt(&hub, &k).await);
+    abgleichen(&elw).await;
+
+    assert!(
+        !hat_spiegel(&elw, &k).await,
+        "Pull: der Spiegel am ELW ist abgeräumt"
+    );
+    assert!(vermerkt(&elw, &k).await);
+}
+
+#[tokio::test]
+async fn ohne_beleg_meldet_der_hub_nichts_und_der_spiegel_bleibt() {
+    let (hub, elw) = gekoppelt().await;
+    let (_, h, k) = an_den_hub_uebergeben(&hub, &elw).await;
+
+    endgueltig_loeschen(&hub, h).await;
+    // Ohne Spur der Löschung, wie nach einer Sicherung: weder Vermerk noch Löschprotokoll. Bewusst
+    // ohne den Einsatz wiederherzustellen, damit allein der fehlende Beleg die Meldung verhindert
+    // (Einsatz oder Akte wieder da: `loeschvermerk::tests`, `lebensende::tests`).
+    for sql in [
+        "DELETE FROM fuehrung_loeschvermerk",
+        "DELETE FROM aufbewahrung_loeschprotokoll",
+    ] {
+        sqlx::query(sql).execute(&hub.pool).await.unwrap();
+    }
+    abgleichen(&elw).await;
+
+    assert!(hat_spiegel(&elw, &k).await, "ohne Beleg kein Abräumen");
+}
+
+#[tokio::test]
+async fn loescht_der_elw_einen_uebernommenen_einsatz_raeumt_der_hub_seinen_spiegel_ab() {
+    let (hub, elw) = gekoppelt().await;
+    let h = common::einsatz_anlegen(&hub.app, &hub.admin).await;
+    elw_meldet(&elw).await;
+    let (akte, e) = akte_und_einsatz(&elw).await;
+    let k = kennung_am(&elw, e).await;
+    notuebernahme_gegen_hub(&elw, akte).await;
+    elw_meldet(&elw).await;
+    assert!(ist_spiegel(&hub, h).await, "der Hub spiegelt jetzt");
+    assert!(k.starts_with(&format!("{}/", hub.kennung)), "{k}");
+
+    endgueltig_loeschen(&elw, e).await;
+    abgleichen(&elw).await;
+
+    assert!(
+        !hat_spiegel(&hub, &k).await,
+        "Push: der Spiegel am Hub ist abgeräumt"
+    );
+}
+
+#[tokio::test]
+async fn ein_elw_raeumt_am_hub_keinen_spiegel_ab_den_laut_akte_ein_anderer_fuehrt() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, akte) = elw_einsatz(&hub, &elw).await;
+    let h = einsatz_der_akte(&hub, akte).await;
+    let k = kennung_am(&elw, e).await;
+    assert!(ist_spiegel(&hub, h).await);
+    // Laut Akte am Hub führt inzwischen eine andere ELW; das Präfix nennt weiter den ELW.
+    sqlx::query("UPDATE einsatz_fuehrung SET fuehrer_kennung = 'andere-elw' WHERE id = ?")
+        .bind(akte)
+        .execute(&hub.pool)
+        .await
+        .unwrap();
+
+    endgueltig_loeschen(&elw, e).await;
+    abgleichen(&elw).await;
+
+    assert!(
+        hat_spiegel(&hub, &k).await,
+        "die Akte entscheidet, nicht das Präfix"
+    );
+}
+
+/// Der ELW kennt einen höheren Stand der Unterschriftsschlüssel, als der Hub je vergeben hat
+/// (LLH-1853, D2).
+async fn schluessel_staende_voraus(elw: &Instanz) {
+    sqlx::query("UPDATE instanz_kopplung_org SET unterschrift_stand = unterschrift_stand + 10000")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn rueckschritt_der_fuehrung_und_der_schluessel_stehen_beide_im_hinweis() {
+    let (hub, elw) = gekoppelt().await;
+    let e = jetzt_s() + 10_000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    schluessel_staende_voraus(&elw).await;
+    nur_melden(&elw).await;
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(
+        h.contains("Führungsakten") && h.contains("Unterschriftsschlüssel"),
+        "{h:?}"
+    );
+}
+
+#[tokio::test]
+async fn gleicher_hinweis_der_fuehrung_wie_vorher_bleibt_neben_dem_rueckschritt_stehen() {
+    let (hub, elw) = gekoppelt().await;
+    // Erster Rückschritt nur der Führung: Sein Hinweis steht danach an der Kopplung.
+    let e = jetzt_s() + 10_000;
+    zurueckspielen(&elw, 0, 0, e).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    nur_melden(&elw).await;
+    let vorher = hinweis(&hub).await.unwrap_or_default();
+    assert!(vorher.contains("Führungsakten"), "{vorher:?}");
+    // Zweiter Rückschritt: Die Führung schreibt denselben Text, dazu die Schlüssel.
+    zurueckspielen(&elw, 0, 0, e + 10_000).await;
+    zurueckspielen(&hub, 3, 3, 0).await;
+    schluessel_staende_voraus(&elw).await;
+    nur_melden(&elw).await;
+    let h = hinweis(&hub).await.unwrap_or_default();
+    assert!(
+        h.contains("Führungsakten") && h.contains("Unterschriftsschlüssel"),
+        "{h:?}"
+    );
+}
+
+// ── Zurückholen ohne gekoppelte Führung (LLH-1850) ───────────────────────────────────────────
+
+async fn schalter(i: &Instanz, an: bool) {
+    lifeline_hub::instanz::fuehrung::save_schalter(&i.pool, an)
+        .await
+        .unwrap();
+}
+
+/// Der ELW übergibt seinen Einsatz an den Hub und hält ihn als Spiegel; bei ausgeschaltetem
+/// Schalter am ELW wird die Kopplung widerrufen, dann wird er wieder eingeschaltet. Die
+/// Einsatzleitung `leitung` (ohne Admin-Rolle) und das Führungspersonal `fuehrer` sind vorher
+/// angelegt. Ergebnis: (Hub, ELW, Einsatz am ELW).
+async fn spiegel_ohne_kopplung() -> (Instanz, Instanz, i64) {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let id = common::benutzer_anlegen(&elw.app, &elw.admin, "leitung", "keine").await;
+    common::funktion_setzen(&elw.app, &elw.admin, e, id, "einsatzleitung", None).await;
+    common::mitglied_mit_funktion(&elw.app, &elw.admin, e, "Fü", "fuehrer", "s2").await;
+    // Die Mitglieder sind Änderungen am Einsatz: übergeben wird erst abgeglichen.
+    elw_meldet(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    schalter(&elw, false).await;
+    kopplung_widerrufen(&elw, &hub).await;
+    schalter(&elw, true).await;
+    (hub, elw, e)
+}
+
+async fn zurueckholen(i: &Instanz, cookie: &str, einsatz: i64, grund: &str) -> (StatusCode, Value) {
+    common::anfrage_json(
+        &i.app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fuehrung/zurueckholen"),
+        cookie,
+        Some(&json!({ "grund": grund })),
+    )
+    .await
+}
+
+/// Spec „Zurückholen nach Widerruf ohne Schalter“ und „Ohne Handlung bleibt der Spiegel“.
+#[tokio::test]
+async fn nach_widerruf_ohne_schalter_holt_die_einsatzleitung_den_spiegel_zurueck() {
+    let (hub, elw, e) = spiegel_ohne_kopplung().await;
+    assert!(ist_spiegel(&elw, e).await);
+    let (s, v) = etb(&elw, e).await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "gesperrt, der Abgleich ist beendet: {v}"
+    );
+    let f = fuehrung(&elw, e).await;
+    assert_eq!(
+        f["fuehrer_kennung"], hub.kennung,
+        "ohne Menschen bleibt der Spiegel: {f}"
+    );
+    assert!(f["fuehrer_beendet_at"].is_string(), "{f}");
+    assert!(f["fuehrer_richtung"].is_null(), "{f}");
+    let (s, kopf) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(kopf["fuehrung"]["beendet"], true, "{kopf}");
+    assert_eq!(
+        kopf["spiegel"]["gegenstelle"], f["fuehrer_name"],
+        "das Band nennt die Gegenstelle, nicht „Gegenstelle“: {kopf}"
+    );
+    let widerruf = f["fuehrer_beendet_at"].clone();
+
+    let fuehrer = common::login_cookie(&elw.app, "fuehrer", "fuehrerpw1").await;
+    let (s, _) = zurueckholen(&elw, &fuehrer, e, "Hub abgebaut").await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Führungspersonal bedient die Führung nicht"
+    );
+    let leitung = common::login_cookie(&elw.app, "leitung", "leitungpw1").await;
+    let (s, v) = zurueckholen(&elw, &leitung, e, " ").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Ein Grund ist Pflicht.");
+
+    let (s, v) = zurueckholen(&elw, &leitung, e, "Hub abgebaut").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["fuehrend"], true, "{v}");
+    assert_eq!(v["epoche"], 3, "{v}");
+    assert!(v["fuehrer_beendet_at"].is_null(), "{v}");
+    let letzter = v["verlauf"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!(letzter["art"], "notuebernahme", "{letzter}");
+    assert_eq!(letzter["grund"], "Hub abgebaut", "{letzter}");
+    assert_eq!(letzter["bruch_at"], widerruf, "{letzter}");
+    assert!(letzter["wer"].is_string(), "{letzter}");
+    let (s, v) = etb(&elw, e).await;
+    assert_eq!(s, StatusCode::CREATED, "wieder schreibbar: {v}");
+    let (_, kopf) = common::anfrage(
+        &elw.app,
+        "GET",
+        &format!("/api/einsaetze/{e}"),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert!(kopf["spiegel"].is_null(), "{kopf}");
+    assert_eq!(kopf["fuehrung"]["beendet"], false, "{kopf}");
+    let spur = spur_fuehrung(&elw.pool).await;
+    assert!(
+        spur.iter()
+            .any(|(aktion, person, grund)| aktion == "fuehrung_notuebernahme"
+                && *person
+                && grund.contains("Führung zurückgeholt von")
+                && grund.ends_with("(Kopplung beendet): Hub abgebaut")),
+        "{spur:?}"
+    );
+}
+
+/// Spec „Die Führung ist noch gekoppelt“: 409, und das Paneel bietet nichts zum Zurückholen.
+#[tokio::test]
+async fn solange_die_fuehrung_gekoppelt_ist_ist_zurueckholen_409() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let (s, _) = post(
+        &elw,
+        &format!("/api/einsaetze/{e}/fuehrung/uebergeben"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = zurueckholen(&elw, &elw.admin, e, "Probe").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["error"], "Die führende Instanz ist noch gekoppelt.");
+    assert!(fuehrung(&elw, e).await["fuehrer_beendet_at"].is_null());
+}
+
+/// Ohne Schalter antwortet die Route wie alle der Führung mit 404.
+#[tokio::test]
+async fn ohne_schalter_ist_zurueckholen_404() {
+    let (_hub, elw, e) = spiegel_ohne_kopplung().await;
+    schalter(&elw, false).await;
+    let (s, _) = zurueckholen(&elw, &elw.admin, e, "Probe").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 }

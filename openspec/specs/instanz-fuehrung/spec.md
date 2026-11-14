@@ -341,6 +341,60 @@ andere meldende Seiten die Übernahme als gegen eine dritte Instanz gerichtet er
 - **WHEN** „ELW 1“ einen Einsatz führt, „ELW 2“ dessen Akte über den Hub kennt, ohne zu führen, und der Admin am Hub die Org-Zuordnung von „ELW 1“ widerruft
 - **THEN** zeigt der Verlauf dieser Akte an „ELW 2“ nach der nächsten Meldung den Wechsel zum Hub mit dem Grund „Kopplung widerrufen“, ohne Unterzeichner
 
+### Requirement: Einen Spiegel ohne gekoppelte Führung holt ein Mensch zurück
+
+Nennt bei eingeschaltetem Schalter die Akte eines Spiegels eine Installation als Führer, über
+deren inzwischen widerrufene Zuordnung einer Standardkopplung der Einsatz gespiegelt wurde, und
+hat die Org keine geltende Zuordnung zu ihr, SHALL das Paneel „Führung“ „Führung zurückholen“ anbieten und das Hinweisband die beendete
+Kopplung nennen. Bedienen SHALL, wer an dieser Instanz die Führung bedient, mit Grund, ohne
+Unterschrift und ohne Code. Danach MUST diese Instanz den Einsatz mit der nächsten Epoche
+schreibbar führen; die Akte MUST eine Erklärung ohne Beweis gegen die alte Führung mit dem Grund
+tragen, Bruchstelle ist der Widerruf dieser Zuordnung, und Verlauf und Admin-Spur
+MUST den Wechsel mit Bediener festhalten.
+
+#### Scenario: Zurückholen nach Widerruf ohne Schalter
+- **WHEN** der Hub einen Einsatz mit Epoche (3, Hub) führt, den der ELW spiegelt, der Schalter am ELW aus ist, die Org-Zuordnung zum Hub um 10:00 widerrufen wird, der Schalter wieder eingeschaltet wird und die Einsatzleitung am ELW um 11:30 „Führung zurückholen“ mit dem Grund „Hub abgebaut“ bestätigt
+- **THEN** führt der ELW den Einsatz mit Epoche (4, ELW), das Hinweisband „Spiegel von Hub“ verschwindet, der Einsatz ist schreibbar, und der Verlauf zeigt eine Notübernahme von Hub mit dem Grund „Hub abgebaut“, dem Namen der Einsatzleitung und 10:00 als Bruchstelle
+
+#### Scenario: Das Hinweisband nennt die beendete Kopplung
+- **WHEN** die Einsatzleitung am ELW einen solchen Spiegel öffnet
+- **THEN** zeigt das Hinweisband „Spiegel von Hub“ mit „Kopplung zu Hub beendet“ und „Führung zurückholen“, das zum Paneel „Führung“ führt
+
+#### Scenario: Ohne Grund
+- **WHEN** die Einsatzleitung „Führung zurückholen“ ohne Grund absendet
+- **THEN** antwortet der Server mit 422 „Ein Grund ist Pflicht.“, und die Akte bleibt unverändert
+
+#### Scenario: Führungspersonal
+- **WHEN** ein Konto mit der Rolle Führungspersonal „Führung zurückholen“ auslöst
+- **THEN** antwortet der Server mit 403
+
+#### Scenario: Ein dritter ELW hält die Übernahme ohne Alarm offen
+- **WHEN** am Hub ein Einsatz, den „ELW 1“ führt, nach Widerruf ohne Schalter zurückgeholt wird und „ELW 2“, der die Akte über den Hub kennt, sich meldet
+- **THEN** sieht „ELW 2“ den Wechsel zum Hub ohne Alarm „Ungültige Übernahme der Führung“ und ohne Eintrag in seiner Admin-Spur
+
+### Requirement: Ohne einen Menschen bleibt ein Spiegel ohne gekoppelte Führung Spiegel
+
+Ein Spiegel, dessen Führung nicht mehr gekoppelt ist, MUST Spiegel bleiben, bis ein Mensch ihn
+zurückholt, auch über Neustart und Einschalten des Schalters hinweg. Ist die führende Installation
+noch gekoppelt oder kam der Spiegel nicht über eine widerrufene Standard-Zuordnung zu ihr, etwa
+über einen Hub, MUST der Server das Zurückholen mit 409 ablehnen.
+
+#### Scenario: Ohne Handlung bleibt der Spiegel
+- **WHEN** nach Widerruf ohne Schalter die Führung wieder eingeschaltet wird und der ELW neu startet
+- **THEN** bleibt der Einsatz Spiegel von Hub, und die Akte nennt weiter den Hub mit Epoche (3, Hub)
+
+#### Scenario: Die Führung ist noch gekoppelt
+- **WHEN** die Org-Zuordnung zum Hub gilt und jemand am ELW „Führung zurückholen“ aufruft
+- **THEN** antwortet der Server mit 409, und das Paneel bietet dafür nur Anfrage und Notübernahme an
+
+#### Scenario: Führer nie über eine Standardkopplung zugeordnet
+- **WHEN** die Akte eine Installation als Führer nennt, mit der die Org nur über eine Direktkopplung vor Ort oder gar nicht gekoppelt war
+- **THEN** bietet das Paneel „Führung zurückholen“ nicht an, und der Server antwortet auf den Aufruf mit 409
+
+#### Scenario: Der Spiegel kommt über einen Hub
+- **WHEN** „ELW 1“ einen Einsatz führt, den „ELW 2“ über den Hub kennt und spiegelt, und die Org an „ELW 2“ früher einmal über eine Standardkopplung mit „ELW 1“ gekoppelt war
+- **THEN** bietet „ELW 2“ „Führung zurückholen“ nicht an, und der Server antwortet auf den Aufruf mit 409
+
 ### Requirement: Eine Akte ohne Spiegel endet mit dem Einsatz beim Gegenüber
 
 Hält eine Instanz bei eingeschaltetem Schalter eine Führungsakte ohne lokalen Einsatz, SHALL sie
@@ -376,18 +430,28 @@ kennt, MUST weiter abgleichen können; die Akte bleibt dann stehen.
 ### Requirement: Gelöscht meldet eine Instanz nur mit Beleg
 
 Eine Instanz MUST eine genannte Kennung nur dann als gelöscht melden, wenn sie das Ende des
-Einsatzes festgehalten hat und weder einen Einsatz noch eine Akte mit dieser Kennung hält. Den
-Beleg SHALL sie festhalten, wenn sie einen Einsatz mit Kennung endgültig löscht oder zur
-Verwahrung abgibt und wenn sie eine Akte auf eine solche Meldung hin löscht. Eine Kennung, die
-sie nicht kennt, MUST sie übergehen.
+Einsatzes festgehalten hat und weder einen Einsatz noch eine Akte mit dieser Kennung hält. Das
+gilt gleich, ob das Gegenüber die Kennung als Stand eines Spiegels oder als Akte ohne Spiegel
+nennt, und unabhängig davon, mit welcher Instanzkennung sie beginnt. Den Beleg SHALL sie
+festhalten, wenn sie einen Einsatz mit Kennung endgültig löscht oder zur Verwahrung abgibt und
+wenn sie eine Akte auf eine solche Meldung hin löscht. Das Abräumen eines Spiegels nach der
+Nachbereitung MUST NOT als Beleg gelten. Eine Kennung, die sie nicht kennt, MUST sie übergehen.
 
 #### Scenario: Rückkehr aus einer Sicherung
 - **WHEN** der Hub aus einer Sicherung zurückkehrt, die einen Einsatz noch nicht kannte, und der ELW dessen Akte ohne Spiegel nennt
 - **THEN** meldet der Hub nichts, und die Akte bleibt am ELW stehen
 
+#### Scenario: Rückkehr aus einer Sicherung mit Spiegel
+- **WHEN** der Hub einen übernommenen Einsatz des ELW endgültig gelöscht hat, danach aus einer Sicherung von vor der Löschung zurückkehrt und der ELW den Stand seines Spiegels nennt
+- **THEN** meldet der Hub nichts, und der Spiegel bleibt am ELW stehen
+
 #### Scenario: Verwahrter Einsatz mit der Kennung des ELW
 - **WHEN** der Hub einen zur Verwahrung übernommenen Einsatz des ELW 1 endgültig löscht und ELW 2 dessen Akte ohne Spiegel nennt
 - **THEN** meldet der Hub ihn als gelöscht, obwohl die Kennung mit der des ELW 1 beginnt
+
+#### Scenario: Übernommener Einsatz mit der Kennung des ELW
+- **WHEN** der Hub einen Einsatz übernommen hat, dessen Kennung mit der des ELW beginnt, ihn endgültig löscht und der ELW den Stand seines Spiegels nennt
+- **THEN** meldet der Hub ihn als gelöscht
 
 #### Scenario: Die Akte kommt wieder
 - **WHEN** eine Instanz das Ende einer Kennung festgehalten hat und danach wieder eine Akte mit dieser Kennung bekommt
@@ -396,6 +460,10 @@ sie nicht kennt, MUST sie übergehen.
 #### Scenario: Spiegel nach der Nachbereitung abgeräumt
 - **WHEN** der ELW den Spiegel eines Einsatzes nach der Nachbereitung abräumt, den der Hub weiter hält
 - **THEN** hält der ELW kein Ende fest und meldet den Einsatz niemandem als gelöscht
+
+#### Scenario: Eigener Einsatz abgegeben und als Spiegel abgeräumt
+- **WHEN** der ELW die Führung eines eigenen Einsatzes an den Hub abgegeben hat, seinen Spiegel davon nach der Nachbereitung abräumt und ein Gegenüber danach den Stand dieser Kennung nennt
+- **THEN** meldet der ELW den Einsatz nicht als gelöscht, obwohl die Kennung mit seiner beginnt
 
 #### Scenario: Einsatz einer anderen Organisation
 - **WHEN** ein Gegenüber eine Kennung nennt, deren Einsatz hier gelöscht wurde, aber zu einer Org gehörte, die dieser Kopplung nicht zugeordnet ist
@@ -601,3 +669,31 @@ Notübernahme gegen die erreichte Seite, mit Unterschrift und mit Code.
 #### Scenario: Zu große Erklärung mit Code
 - **WHEN** jemand am Hub eine Notübernahme mit dem Code des Gegenübers erklärt und die Erklärung zu groß wäre
 - **THEN** antwortet der Server mit 422, und die Führung bleibt beim ELW
+
+### Requirement: Ein Spiegel endet nur auf Meldung seines Führers
+
+Eine Instanz MUST einen Spiegel auf die Meldung, der Einsatz sei gelöscht, nur abräumen, wenn
+der Spiegel zu der Kopplung gehört, über die die Meldung kommt, und der Absender sein Führer
+ist. Führer ist bei eingeschalteter Führung je Einsatz, wen die Akte des Einsatzes nennt, auch
+wenn die Kennung mit einer anderen Instanz beginnt. Ohne Schalter oder ohne Akte ist es die
+Instanz, mit deren Kennung die Kennung des Einsatzes beginnt.
+
+#### Scenario: Der Hub löscht einen übernommenen Einsatz
+- **WHEN** der Hub einen Einsatz des ELW übernommen hat, den der ELW seitdem als Spiegel hält, und der Hub ihn endgültig löscht
+- **THEN** räumt der ELW den Spiegel mit dem nächsten Abgleich ab
+
+#### Scenario: Der ELW löscht einen übernommenen Einsatz
+- **WHEN** der ELW einen Einsatz des Hubs übernommen hat, den der Hub seitdem als Spiegel hält, und der ELW ihn endgültig löscht
+- **THEN** räumt der Hub den Spiegel mit dem nächsten Abgleich des ELW ab
+
+#### Scenario: Ein ELW meldet den Einsatz eines anderen
+- **WHEN** der Hub einen Einsatz spiegelt, dessen Kennung mit der von „ELW 1“ beginnt, den laut Akte aber „ELW 2“ führt, und „ELW 1“ ihn als gelöscht meldet
+- **THEN** bleibt der Spiegel am Hub stehen
+
+#### Scenario: Die Akte nennt den Absender nicht
+- **WHEN** die Akte eines Spiegels am ELW den Hub als Führer nennt und eine andere Instanz, mit deren Kennung die Kennung des Einsatzes beginnt, ihn über eine eigene Kopplung als gelöscht meldet
+- **THEN** bleibt der Spiegel am ELW stehen
+
+#### Scenario: Ohne Führung je Einsatz
+- **WHEN** die Führung je Einsatz ausgeschaltet ist und der ELW einen eigenen Einsatz endgültig löscht, den der Hub spiegelt
+- **THEN** räumt der Hub den Spiegel mit dem nächsten Abgleich des ELW ab, wie bisher

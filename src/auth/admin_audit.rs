@@ -109,6 +109,12 @@ wire_enum! {
         ArchivHeruntergeladen => "archiv_heruntergeladen",
         /// Ein Archivblock wurde per Befehl eingespielt (LLH-1494, D10); ohne handelnde Person.
         ArchivEingespielt => "archiv_eingespielt",
+        /// Ein Löschersuchen für Personen in allen Blöcken eines Archivs vollzogen, per Befehl
+        /// mit dem Archiv-Schlüssel (LLH-1712); ohne handelnde Person, ohne Namen.
+        ArchivPersonGeschwaerzt => "archiv_person_geschwaerzt",
+        /// Im Archiv eines Einsatzes per Befehl nach einer Person gesucht (LLH-1712); ohne
+        /// handelnde Person, ohne Suchtext.
+        ArchivDurchsucht => "archiv_durchsucht",
         /// Maschinenzugang für ein Fremdsystem angelegt (LLH-1652, Migration
         /// `*_admin_audit_maschinenzugang.sql`). Der Code steht nie in der Spur.
         MaschinenzugangAngelegt => "maschinenzugang_angelegt",
@@ -176,6 +182,7 @@ pub enum Ziel<'a> {
 /// - `archiv_schluessel_*`: `fingerabdruck`; `archiv_heruntergeladen`: `fingerabdruck` (Schlüssel
 ///   des Blocks, durch Komma getrennt) und `block`.
 /// - `archiv_eingespielt`: keine; Ziel ist der eingespielte Einsatz.
+/// - `archiv_person_geschwaerzt`, `archiv_durchsucht`: keine; Ziel ist der archivierte Einsatz.
 /// - `unterschrift_*`: `fingerabdruck`; `unterschrift_abgelehnt` zusätzlich `grund` und die
 ///   Gegenstelle.
 /// - `maschinenzugang_*`: `zugang_id` und `scopes`; `_schluessel_gebunden` zusätzlich

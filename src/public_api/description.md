@@ -32,7 +32,9 @@ Einsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz 
 das höchstens einer. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null` und
 `GET /api/v1/einsaetze` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/einsaetze/{id}`
 antwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen
-Einsatz.
+Einsatz. Dieselbe Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes, wenn die Anfrage
+ihn mit `einsatz_id` nennt; jeder andere Einsatz ergibt `404 not_found`. Geben oder Nehmen von
+`rechner:use` beendet eine Freigabe nicht.
 
 ## Zeitpunkte
 
