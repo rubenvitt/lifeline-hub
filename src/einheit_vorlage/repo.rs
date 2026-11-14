@@ -72,10 +72,10 @@ fn map_name_conflict<T>(e: AppError) -> Result<T, AppError> {
     Err(e)
 }
 
-/// IDs als JSON-Array für `json_each(?)`.
-fn json_ids(ids: impl IntoIterator<Item = i64>) -> Result<String, AppError> {
-    serde_json::to_string(&ids.into_iter().collect::<Vec<i64>>())
-        .map_err(|e| AppError::Internal(format!("Vorlagen-ids serialisieren: {e}")))
+/// IDs als JSON-Array für `json_each(?)`, aus einem Iterator (die Serialisierung selbst liegt in
+/// [`crate::kraefte_disposition::ids_json`]).
+fn json_ids(ids: impl IntoIterator<Item = i64>) -> String {
+    crate::kraefte_disposition::ids_json(&ids.into_iter().collect::<Vec<i64>>())
 }
 
 // ── Baum ─────────────────────────────────────────────────────────────────────────────────────
@@ -262,7 +262,7 @@ async fn load_where(
 ) -> Result<Vec<EinheitVorlage>, AppError> {
     let (nur_aktive, ids) = match &selection {
         Selection::All(nur_aktive) => (*nur_aktive, None),
-        Selection::Ids(ids) => (false, Some(json_ids(ids.iter().copied())?)),
+        Selection::Ids(ids) => (false, Some(json_ids(ids.iter().copied()))),
     };
     let heads: Vec<HeadRow> = sqlx::query_as(concat!(
         "SELECT v.id, v.name, v.typ_id, t.label AS typ_label, v.ueber_vorlage_id, \
@@ -676,8 +676,7 @@ pub async fn update_tx(
             let teilbaum = edges.descendants(id);
             let innen: HashSet<i64> = teilbaum.iter().copied().collect();
             let ziel = edges.baum(ueber).into_iter().filter(|v| !innen.contains(v));
-            if let Some(doppelt) =
-                first_overlap(conn, &json_ids(teilbaum)?, &json_ids(ziel)?).await?
+            if let Some(doppelt) = first_overlap(conn, &json_ids(teilbaum), &json_ids(ziel)).await?
             {
                 return Err(AppError::UnprocessableEntity(format!(
                     "{doppelt} steht schon im Baum der übergeordneten Vorlage"
@@ -816,7 +815,7 @@ pub async fn replace_fahrzeuge_tx(
     ids: &[i64],
 ) -> Result<(), AppError> {
     let baum = other_tree_members(conn, org_id, vorlage_id).await?;
-    let ids_json = json_ids(ids.iter().copied())?;
+    let ids_json = json_ids(ids.iter().copied());
     let bekannt: Vec<(i64, String, bool)> = sqlx::query_as(
         "SELECT f.id, f.dienststatus, \
                 EXISTS(SELECT 1 FROM einheit_vorlage_fahrzeug x \
@@ -840,7 +839,7 @@ pub async fn replace_fahrzeuge_tx(
            AND x.fahrzeug_id IN (SELECT value FROM json_each(?2)) \
          ORDER BY f.funkrufname LIMIT 1",
     )
-    .bind(json_ids(baum)?)
+    .bind(json_ids(baum))
     .bind(&ids_json)
     .fetch_optional(&mut *conn)
     .await?;
@@ -906,7 +905,7 @@ pub async fn replace_personal_tx(
     entries: &[PersonalEntry],
 ) -> Result<(), AppError> {
     let baum = other_tree_members(conn, org_id, vorlage_id).await?;
-    let ids_json = json_ids(entries.iter().map(|e| e.personal_id))?;
+    let ids_json = json_ids(entries.iter().map(|e| e.personal_id));
     let bekannt: Vec<(i64, String, bool)> = sqlx::query_as(
         "SELECT p.id, p.dienststatus, \
                 EXISTS(SELECT 1 FROM einheit_vorlage_personal x \
@@ -947,7 +946,7 @@ pub async fn replace_personal_tx(
            AND x.personal_id IN (SELECT value FROM json_each(?2)) \
          ORDER BY p.name LIMIT 1",
     )
-    .bind(json_ids(baum)?)
+    .bind(json_ids(baum))
     .bind(&ids_json)
     .fetch_optional(&mut *conn)
     .await?;
@@ -1043,7 +1042,7 @@ pub async fn replace_material_tx(
     entries: &[MaterialEntry],
 ) -> Result<(), AppError> {
     let baum = other_tree_members(conn, org_id, vorlage_id).await?;
-    let ids_json = json_ids(entries.iter().map(|e| e.material_id))?;
+    let ids_json = json_ids(entries.iter().map(|e| e.material_id));
     let stamm: Vec<MaterialStamm> = sqlx::query_as(
         "SELECT m.id, m.bezeichnung, m.dienststatus, \
                 EXISTS(SELECT 1 FROM einheit_vorlage_material x \
@@ -1113,8 +1112,8 @@ pub async fn replace_material_tx(
            AND m.art = 'geraet' AND m.bestandsnummer IS NOT NULL \
          ORDER BY m.bezeichnung LIMIT 1",
     )
-    .bind(json_ids(baum)?)
-    .bind(json_ids(stuecke.iter().copied())?)
+    .bind(json_ids(baum))
+    .bind(json_ids(stuecke.iter().copied()))
     .fetch_optional(&mut *conn)
     .await?;
     if let Some((geraet, vorlage)) = doppelt {

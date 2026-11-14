@@ -41,9 +41,14 @@ export function gibFuehrungPerCodeAb(ort: FuehrungOrt, an: string): Promise<Fueh
   return apiSend<FuehrungCodeAntwort>(fuehrungPfad(ort, 'code'), 'POST', { an });
 }
 
-/** Die Führung beim Gegenüber erbitten (meldende Seite). */
+/** Die Führung beim Gegenüber erbitten (meldende Seite, vor Ort jede Seite). */
 export function frageFuehrungAn(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
   return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'anfragen'), 'POST');
+}
+
+/** Die Anfrage der Gegenstelle vor Ort ablehnen (LLH-1678); die Führung bleibt hier. */
+export function lehneAnfrageAb(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
+  return apiSend<FuehrungAnzeige>(fuehrungPfad(ort, 'anfrage/ablehnen'), 'POST');
 }
 
 /** Einen Spiegel zurückholen, dessen Führer nicht mehr gekoppelt ist (LLH-1850): nur mit Grund,

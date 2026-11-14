@@ -564,10 +564,8 @@ interface DatensichtProps<T extends object, K extends string> {
   /** Mehrzahl im Dativ für den `Filterhinweis` („12 von 48 Schäden sichtbar“); Vorgabe „Einträgen“. */
   mehrzahl?: string;
 
-  // Spaltensichtbarkeit — Voreinstellung ODER kontrolliert
+  // Spaltensichtbarkeit — Voreinstellung (gesteuert wird sie über `spaltenSchalterAussen`)
   spaltenAusVoreinstellung?: readonly NoInfer<K>[];
-  spaltenAus?: readonly NoInfer<K>[];
-  onSpaltenAus?: (schluessel: NoInfer<K>[]) => void;
   /**
    * Der Spaltenschalter steht bei der Seite, in ihrer eigenen Werkzeugzeile (LLH-1417, Vorbild
    * Meldebild): Zustand aus `useSpaltenSchalterZustand` (`components/SpaltenSchalter.tsx`), die Seite
@@ -575,7 +573,7 @@ interface DatensichtProps<T extends object, K extends string> {
    * zeichnet keinen eigenen Schalter, und der Fokus auf dem Schalter hält die Zeilenschleuse nicht.
    * Trüge die Werkzeugzeile der Sicht dann nur noch den Sammelbanner, entfällt sie: der Banner
    * schwebt als Pille über dem Tabellenkopf (LLH-1479), statt eine leere Standzeile zu halten. Schließt
-   * `spaltenAus`/`spaltenAusVoreinstellung` und die Spaltenwahl aus `gedaechtnis` aus.
+   * `spaltenAusVoreinstellung` und die Spaltenwahl aus `gedaechtnis` aus.
    */
   spaltenSchalterAussen?: SpaltenSchalterZustand<NoInfer<K>>;
 
@@ -1119,8 +1117,6 @@ export default function Datensicht<T extends object, const K extends string>(
     zufluss = 'sammelbanner',
     serverseitig,
     spaltenAusVoreinstellung,
-    spaltenAus,
-    onSpaltenAus,
     spaltenSchalterAussen: aussen,
     zeilenKlasse,
     onZeileKlick,
@@ -1172,9 +1168,9 @@ export default function Datensicht<T extends object, const K extends string>(
       spaltenAusVoreinstellung ??
       [],
   );
-  const aktiveSpaltenAus = aussen?.aus ?? spaltenAus ?? eigeneSpaltenAus;
-  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Ohne Schalter bei der Seite bewusst
-  // unkontrolliert, weil kein Konsument diese Hälfte braucht.
+  const aktiveSpaltenAus = aussen?.aus ?? eigeneSpaltenAus;
+  // Per Breite weggefallene, von Hand zurückgeholte Spalten. Von außen steuerbar nur über den
+  // Schalter bei der Seite (`spaltenSchalterAussen`), wie die ausgeblendeten.
   const [eigeneSpaltenAn, setSpaltenAn] = useState<readonly K[]>(
     () => (gedaechtnis?.spaltenStart?.an as readonly K[] | undefined) ?? [],
   );
@@ -1195,16 +1191,15 @@ export default function Datensicht<T extends object, const K extends string>(
   const meldeSpalten = gedaechtnis?.meldeSpalten;
   const setzeSpaltenAus = useCallback(
     (k: K[]) => {
-      if (spaltenAus === undefined) setEigeneSpaltenAus(k);
-      onSpaltenAus?.(k);
+      setEigeneSpaltenAus(k);
       meldeSpalten?.({ aus: k, an: spaltenAn });
       // Eine Spaltenumschaltung IST eine Benutzeraktion: blendet man eine gefilterte Spalte aus, wird
       // ihr Filter unwirksam, und die freigegebenen Zeilen sind die Antwort auf den Klick, kein
       // Zufluss. Ohne diesen Aufruf zählte die Schleuse sie als neu. Greift nur für den eingebauten
-      // Schalter (keine Seite nutzt den kontrollierten Weg).
+      // Schalter.
       nachBenutzeraktion();
     },
-    [spaltenAus, onSpaltenAus, nachBenutzeraktion, meldeSpalten, spaltenAn],
+    [nachBenutzeraktion, meldeSpalten, spaltenAn],
   );
   const setzeSpaltenAn = useCallback(
     (k: K[]) => {

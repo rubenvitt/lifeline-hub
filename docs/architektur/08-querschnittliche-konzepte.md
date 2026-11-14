@@ -278,12 +278,20 @@ am Spiegel auf einen Stellvertreter, der sich nie anmelden kann
 
 Je Einsatz einer gekoppelten Org führt genau eine Instanz (LLH-1491, Schalter
 `LIFELINE_FUEHRUNG`,
-[ADR-0033](entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md)). Jede andere
+[ADR-0044](entscheidungen/ADR-0044-ueber-eine-direktkopplung-gibt-keine-seite-ohne-beweis-und-einsatzleitung-ab.md)). Jede andere
 hält den Einsatz als Spiegel (LLH-1641): die Akte entscheidet, `einsatz.spiegel` folgt ihr, und
 nur der Schutz-Trigger des Spiegels sperrt, am Server wie in `schreibrecht.ts`. Am Spiegel wird
 beantragt. Eine Notübernahme gegen die Instanz, die sich meldet, trägt die
 Unterschrift eines Org-Admins oder einen Code, den sie selbst erzeugt hat, und gilt dort erst
 nach der Bestätigung eines Menschen (Ablauf 6.6c).
+
+Über eine Direktkopplung wechselt die Führung gleichrangig (LLH-1678, `instanz::wechselregel`): Jede
+Seite verhält sich gegenüber der anderen wie die Instanz, die sich meldet, gleich wer den Code
+eingelöst hat. Eine Notübernahme braucht dort immer einen Beweis, und eine Anfrage entscheidet die
+Einsatzleitung der führenden Seite. Dafür kennen beide Seiten die Unterschriftsschlüssel der
+anderen; ein ELW liefert seine dem Hub, wo sie auf die Bestätigung eines Admins warten. Der Hub
+zieht einen Wechsel zwischen zwei ELW nach, wenn der bisherige Führer ihn bezeugt oder eine
+Unterschrift ihn belegt, die am Hub gilt (Spec `instanz-fuehrung`).
 
 ## 8.18 Konfiguration über die Umgebung
 

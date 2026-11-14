@@ -421,7 +421,7 @@ Herleitung in
   Unterschrift noch als Gegenzeichnung; eine neue Prüfung (etwa die Notübernahme) fragt
   `gueltig` ab, nie „nicht widerrufen“.
 - **Führung je Einsatz (LLH-1491)**, Spec `instanz-fuehrung`,
-  [ADR-0033](../docs/architektur/entscheidungen/ADR-0033-eine-uebernahme-gegen-einen-dritten-haelt-die-meldende-seite-offen.md):
+  [ADR-0044](../docs/architektur/entscheidungen/ADR-0044-ueber-eine-direktkopplung-gibt-keine-seite-ohne-beweis-und-einsatzleitung-ab.md):
   - **Die Akte entscheidet, der Spiegel folgt (LLH-1641).** Gesperrt ist nur der Spiegel
     (Schutz-Trigger aus `instanz::spiegel::art`); eine eigene Führungssperre gibt es nicht mehr.
     `einsatz.spiegel` setzt bei einem Führungswechsel allein `instanz::spiegel::fuehrung`
@@ -445,6 +445,16 @@ Herleitung in
     `faq7l7m4-zwei-elw-unterlegene-seite`
     (`openspec/changes/archive/2026-11-12-faq7l7m4-zwei-elw-unterlegene-seite/design.md`) nach. Ist ein Dritter beteiligt (mehrere ELW an einem
     Hub), hält die meldende Seite offen; ob das ein Konflikt ist, sagt `austausch::ist_konflikt`.
+  - **Nach welcher Regel die Führung zu einem Gegenüber wechselt, sagt `instanz::wechselregel`**
+    (LLH-1678, Herleitung `openspec/changes/archive/2026-11-13-gwcf2shk-fuehrungswechsel-vor-ort/design.md`):
+    `nach_richtung` (Standardkopplung, Tabellen oben), `gleichrangig` (Direktkopplung, beide mit
+    Protokoll 4: jede Seite wie die meldende), `gesperrt` (Direktkopplung mit älterer Gegenstelle).
+    Über eine Direktkopplung entscheidet `austausch::entscheide_vor_ort` vor allen Zweigen der
+    Richtung; die Tabelle steht in design.md D2 der Change. Eine Anfrage vor Ort merkt sich der
+    Führer in `anfrage_von` und erfüllt sie nie selbst; `repo::save` löscht `anfrage_von` und
+    `anfrage_abgelehnt`, sobald die Epoche wechselt. Die erreichte Seite einer Standardkopplung
+    zieht einen Wechsel zwischen zwei Dritten nach, wenn der bisherige Führer ihn bezeugt oder eine
+    Notübernahme gegen ihn eine hier gültige Unterschrift trägt (design.md D5).
   - Der Schalter steht in `instanz_identitaet.fuehrung_an` (je Instanz, auch im Testprozess);
     `instanz::fuehrung::is_enabled`, nie ein prozessweiter Merker.
   - **Ein Stand kommt nur aus `fuehrung::repo::next_stand`** und folgt der Uhr
@@ -586,9 +596,16 @@ Herleitung in
   [ADR-0029](../docs/architektur/entscheidungen/ADR-0029-eine-direktkopplung-beglaubigt-das-tls-zertifikat-per-signierter-aussage.md),
   Herleitung `openspec/changes/archive/2026-11-12-t10a7luh-elw-lan-direktkopplung/design.md`:
   - **Was eine Kopplung trägt, fragt jede Stelle über `InstanzKopplungArt::traegt(Fluss)`**
-    (in SQL `k.art = 'standard'`). Eine neue Stelle, die Stammdaten, Geheimnisse, Verwahrung oder
-    einen Führungswechsel auslöst oder annimmt, prüft die Art und steht im Wächter
-    `instanz::art_tests::jeder_fluss_hat_seine_pruefstellen`.
+    (in SQL `k.art = 'standard'`). Eine neue Stelle, die Stammdaten, Geheimnisse oder Verwahrung
+    auslöst oder annimmt oder nach einem Widerruf die Führung zurückholt, prüft die Art und steht
+    im Wächter `instanz::art_tests::jeder_fluss_hat_seine_pruefstellen`; ein Führungswechsel fragt
+    stattdessen `instanz::wechselregel` (LLH-1678), auch dafür zählt der Wächter die Stellen.
+  - **Unterschriftsschlüssel fließen über eine Direktkopplung in beide Richtungen** (LLH-1678,
+    design.md D6): lokale und übernommene, ohne die der eigenen Zuordnung
+    (`unterschrift::Weiter`), die erste Lieferung der meldenden Seite bis
+    `unterschrift_grundstock_bis` als Grundstock. Ein ELW liefert dem Hub seine lokalen Schlüssel
+    ohne Gegenzeichnung (`GegenzeichnungPflicht::NurBestaetigung`); dort wartet jeder auf einen
+    Admin. Ein Widerruf gilt je Credential-ID für jede Zeile der Org.
   - **Über `vor_ort` gehen Nutzdaten nur über `zertifikat::client(pin)`**; ein Zertifikatswechsel
     läuft über `melden::send_signed_bis` (Bestätigung per `POST /api/instanz/zertifikat`). Kein
     eigener Client für eine Direktkopplung.
@@ -890,7 +907,7 @@ Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md
   stehen) und `journal_size_limit` (LFH-928), und nach einer Schwärzung oder einem Sweep mit
   Löschungen schreibt der Purge-Lauf den WAL per `db::wal_zurueckschreiben` zurück. Die Haupt-DB
   nur über `db::connect` öffnen. Netz:
-  `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler.rs`). Herleitung und
+  `schwaerzung_hinterlaesst_keine_altbytes` (`einsatz/purge_scheduler/tests.rs`). Herleitung und
   Messung: `openspec/changes/archive/2026-10-01-lfh-725-schwaerzung-physisch-ueberschreiben/design.md`.
 - **Fristen je Datenkategorie** (LFH-749, Spec `aufbewahrung-kategorien`): jede Scrub-Spalte
   trägt im Typ eine `Zuordnung` (Kategorie, Personenstamm, Einsatz); die Kategorie-Spalten pinnt

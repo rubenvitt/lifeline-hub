@@ -66,7 +66,8 @@ pub async fn laden(
 /// Entscheidet einen Abgleich (`bestaetigt`/`verworfen`). Bei `bestaetigt` wird in
 /// DERSELBEN Transaktion die Vermisstmeldung `→ abgemeldet` gesetzt; der partielle
 /// Unique-Index erzwingt höchstens einen bestätigten Abgleich je Vermisstmeldung
-/// (Verletzung → `Conflict`). Voraussetzung (Handler): Abgleich-Status == `verdacht`.
+/// (Verletzung → `Conflict`). Nur aus `verdacht` heraus: ein schon entschiedener Abgleich
+/// endet mit `Conflict`, geprüft im UPDATE selbst (LLH-1686).
 pub async fn entscheide(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -75,42 +76,55 @@ pub async fn entscheide(
     entschieden_von: i64,
 ) -> Result<AbgleichAnzeige, AppError> {
     let abgleich = laden(pool, einsatz_id, id).await?;
-    let mut tx = pool.begin().await?;
-    let ergebnis = sqlx::query(
-        "UPDATE person_abgleich SET status = ?, \
-            entschieden_at = strftime('%Y-%m-%d %H:%M:%S','now'), entschieden_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(entscheidung)
-    .bind(entschieden_von)
-    .bind(id)
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await;
-    if let Err(e) = ergebnis {
-        // Partieller Unique-Index: bereits ein bestätigter Abgleich je Vermisstmeldung.
-        if let sqlx::Error::Database(db) = &e {
-            if db.is_unique_violation() {
-                return Err(AppError::Conflict(
-                    "Für diese Vermisstmeldung ist bereits ein Abgleich bestätigt".into(),
-                ));
-            }
-        }
-        return Err(e.into());
-    }
-    if entscheidung == "bestaetigt" {
-        sqlx::query(
-            "UPDATE einsatz_person SET status = 'abgemeldet', \
-                geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
-             WHERE id = ? AND einsatz_id = ?",
+    // Die Bedingung `status = 'verdacht'` steht im UPDATE selbst (LLH-1686): Die Vorprüfung der
+    // Route sieht im Wettlauf noch den alten Stand, und zwei gleichzeitige Entscheidungen
+    // überschrieben einander sonst (bestätigt und abgemeldet, aber Abgleich `verworfen`). Die
+    // zweite trifft keine Zeile mehr und endet mit 409, ohne die Vermisstmeldung anzufassen.
+    crate::write_retry!(pool, |conn| {
+        let ergebnis = sqlx::query(
+            "UPDATE person_abgleich SET status = ?, \
+                entschieden_at = strftime('%Y-%m-%d %H:%M:%S','now'), entschieden_von = ? \
+             WHERE id = ? AND einsatz_id = ? AND status = 'verdacht'",
         )
+        .bind(entscheidung)
         .bind(entschieden_von)
-        .bind(abgleich.vermisst_person_id)
+        .bind(id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-    }
-    tx.commit().await?;
+        .execute(&mut *conn)
+        .await;
+        let rows_affected = match ergebnis {
+            Ok(r) => r.rows_affected(),
+            Err(e) => {
+                // Partieller Unique-Index: bereits ein bestätigter Abgleich je Vermisstmeldung.
+                if let sqlx::Error::Database(db) = &e {
+                    if db.is_unique_violation() {
+                        return Err(AppError::Conflict(
+                            "Für diese Vermisstmeldung ist bereits ein Abgleich bestätigt".into(),
+                        ));
+                    }
+                }
+                return Err(e.into());
+            }
+        };
+        if rows_affected == 0 {
+            return Err(AppError::Conflict(
+                "Abgleich ist bereits entschieden".into(),
+            ));
+        }
+        if entscheidung == "bestaetigt" {
+            sqlx::query(
+                "UPDATE einsatz_person SET status = 'abgemeldet', \
+                    geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
+                 WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(entschieden_von)
+            .bind(abgleich.vermisst_person_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+        }
+        Ok(())
+    })?;
     laden(pool, einsatz_id, id).await
 }
 
@@ -221,6 +235,46 @@ mod tests {
             matches!(err, AppError::Conflict(_)),
             "Unique-Index: nur ein bestätigter Abgleich je Vermisstmeldung"
         );
+    }
+
+    /// LLH-1686: Ein schon entschiedener Abgleich wird nicht überschrieben, auch wenn die
+    /// Vorprüfung der Route (Status `verdacht`) im Wettlauf noch den alten Stand sah. Verwerfen
+    /// nach Bestätigen: 409, der Abgleich bleibt bestätigt.
+    #[tokio::test]
+    async fn verwerfen_nach_bestaetigen_ist_konflikt_und_ueberschreibt_nicht() {
+        let pool = test_pool().await;
+        let (b, e, v, g, _) = setup(&pool).await;
+        let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        entscheide(&pool, e, a.id, "bestaetigt", b).await.unwrap();
+
+        let err = entscheide(&pool, e, a.id, "verworfen", b)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+        assert_eq!(
+            laden(&pool, e, a.id).await.unwrap().status,
+            AbgleichStatus::Bestaetigt
+        );
+        assert_eq!(status(&pool, v).await, "abgemeldet");
+    }
+
+    /// Umgekehrt: Bestätigen nach Verwerfen ist 409 und meldet die vermisste Person nicht ab.
+    #[tokio::test]
+    async fn bestaetigen_nach_verwerfen_ist_konflikt_und_meldet_nicht_ab() {
+        let pool = test_pool().await;
+        let (b, e, v, g, _) = setup(&pool).await;
+        let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        entscheide(&pool, e, a.id, "verworfen", b).await.unwrap();
+
+        let err = entscheide(&pool, e, a.id, "bestaetigt", b)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+        assert_eq!(
+            laden(&pool, e, a.id).await.unwrap().status,
+            AbgleichStatus::Verworfen
+        );
+        assert_eq!(status(&pool, v).await, "vermisst");
     }
 
     #[tokio::test]

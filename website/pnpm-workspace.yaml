@@ -4,3 +4,10 @@
 allowBuilds:
   esbuild: true
   sharp: false
+
+# Karenzzeit für frisch veröffentlichte Pakete (LLH-1884): 1440 Minuten = 24 Stunden.
+# Ausdrücklich gesetzt, damit Gate und Cloudflare dieselbe Zahl lesen und ein pnpm-Update die
+# Vorgabe nicht still verschiebt. Geprüft wird sie an jedem PR (scripts/check-karenzzeit.sh,
+# Schritt 6). Nicht senken, um einen roten Lauf grün zu bekommen: der Lauf wird neu gestartet,
+# sobald das Paket alt genug ist.
+minimumReleaseAge: 1440

@@ -27,9 +27,9 @@ use utoipa::ToSchema;
 
 /// Protokollversion dieser Instanz (design.md D5). Wer sie erhöht, hält die vorige im Code, bis
 /// die übernächste kommt; das Schema von Melden bleibt über alle Versionen nur additiv. 3 seit
-/// LLH-1497 ([`PROTOKOLL_VOR_ORT`]); Version 2 bleibt voll verständlich, die neuen Felder sind
-/// optional.
-pub const PROTOKOLL: u32 = 3;
+/// LLH-1497 ([`PROTOKOLL_VOR_ORT`]), 4 seit LLH-1678 ([`PROTOKOLL_FUEHRUNG_VOR_ORT`]); Version 3
+/// bleibt voll verständlich, die neuen Felder sind optional.
+pub const PROTOKOLL: u32 = 4;
 
 /// Ab dieser Protokollversion kennt eine Instanz den Abgleich der Einsätze (LLH-1492, design.md
 /// D6); mit einem älteren Gegenüber wird nicht gespiegelt.
@@ -114,7 +114,9 @@ pub enum Fluss {
     Geheimnisse,
     /// Übergabe eines abgeschlossenen Einsatzes zur Verwahrung.
     Verwahrung,
-    /// Übergabe, Anfrage, Notübernahme und Abgabecode zwischen den beiden Seiten.
+    /// Führungswechsel nach der Richtung (Hub-artig): die erreichte Seite nimmt ohne Beweis an und
+    /// erfüllt Anfragen selbst, der Widerruf holt die Führung zurück. Über eine Direktkopplung
+    /// wechselt die Führung stattdessen gleichrangig ([`Wechselregel`], LLH-1678).
     Fuehrungswechsel,
 }
 
@@ -137,6 +139,46 @@ impl InstanzKopplungArt {
 /// Ab dieser Protokollversion kennt eine Instanz die Direktkopplung vor Ort, das beglaubigte
 /// Zertifikat und die Ursprungskennung (LLH-1497, design.md D7).
 pub const PROTOKOLL_VOR_ORT: u32 = 3;
+
+/// Ab dieser Protokollversion wechselt die Führung über eine Direktkopplung gleichrangig
+/// (LLH-1678, Change `gwcf2shk-fuehrungswechsel-vor-ort`, design.md D1, D7).
+pub const PROTOKOLL_FUEHRUNG_VOR_ORT: u32 = 4;
+
+wire_enum! {
+    /// Nach welcher Regel die Führung zwischen dieser Instanz und einem Gegenüber wechselt
+    /// (LLH-1678, design.md D1). Jede Stelle, die einen Führungswechsel auslöst oder annimmt,
+    /// fragt sie über [`wechselregel`] ab.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Wechselregel {
+        /// Standardkopplung: die Richtung entscheidet (die erreichte Seite nimmt an, die meldende
+        /// prüft den Beweis und hält offen).
+        NachRichtung => "nach_richtung",
+        /// Direktkopplung, beide Seiten mit Protokoll 4: jede Seite verhält sich gegenüber der
+        /// anderen wie eine meldende Seite.
+        Gleichrangig => "gleichrangig",
+        /// Direktkopplung mit einer älteren Gegenstelle: kein Wechsel zwischen den beiden Seiten.
+        Gesperrt => "gesperrt",
+    }
+}
+
+/// Die Regel des Führungswechsels zu einem Gegenüber aus Art der Kopplung und der
+/// Protokollversion, die es zuletzt genannt hat (design.md D1).
+pub fn wechselregel(art: InstanzKopplungArt, gegenueber_protokoll: Option<i64>) -> Wechselregel {
+    match art {
+        InstanzKopplungArt::Standard => Wechselregel::NachRichtung,
+        InstanzKopplungArt::VorOrt
+            if gegenueber_protokoll.is_some_and(|p| p >= i64::from(PROTOKOLL_FUEHRUNG_VOR_ORT)) =>
+        {
+            Wechselregel::Gleichrangig
+        }
+        InstanzKopplungArt::VorOrt => Wechselregel::Gesperrt,
+    }
+}
+
+/// Grund, warum zu einer Gegenstelle vor Ort keine Führung wechselt (Regel `gesperrt`).
+pub fn update_hinweis(name: &str) -> String {
+    format!("{name} braucht ein Update für den Führungswechsel vor Ort.")
+}
 
 static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
@@ -186,6 +228,17 @@ mod tests {
                 veraltet: Seite::Eigen
             }
         );
+    }
+
+    #[test]
+    fn wechselregel_folgt_art_und_protokoll_der_gegenstelle() {
+        use InstanzKopplungArt::*;
+        assert_eq!(wechselregel(Standard, Some(2)), Wechselregel::NachRichtung);
+        assert_eq!(wechselregel(Standard, None), Wechselregel::NachRichtung);
+        assert_eq!(wechselregel(VorOrt, Some(4)), Wechselregel::Gleichrangig);
+        assert_eq!(wechselregel(VorOrt, Some(5)), Wechselregel::Gleichrangig);
+        assert_eq!(wechselregel(VorOrt, Some(3)), Wechselregel::Gesperrt);
+        assert_eq!(wechselregel(VorOrt, None), Wechselregel::Gesperrt);
     }
 
     #[test]
@@ -240,19 +293,22 @@ mod art_tests {
             // Verwahrung auch beim Archiv am Ende der Nachbereitung: es wartet nur auf eine
             // Standardkopplung, die verwahren kann.
             ("src/einsatz/archiv.rs", "k.art = 'standard'", 1),
-            // Führungswechsel: Bedienung (Übergabe, Code, Anfrage, Notübernahme) und Austausch.
-            (
-                "src/instanz/fuehrung/dienst.rs",
-                "Fluss::Fuehrungswechsel",
-                1,
-            ),
             // Kein Zurückholen nach dem Widerruf einer Direktkopplung.
             ("src/instanz/repo.rs", "Fluss::Fuehrungswechsel", 1),
-            // Beide Wege zum Gegenüber (zum Führer, zu einer genannten Instanz) fragen die Art ab.
+            // Führungswechsel nach der Wechselregel (LLH-1678, design.md D1): die Regel je
+            // Gegenüber, die Bedienung (beide Wege zum Gegenüber und die Rolle der Seite) und der
+            // Austausch der Akten.
+            (
+                "src/instanz/fuehrung/repo.rs",
+                "crate::instanz::wechselregel(",
+                1,
+            ),
+            ("src/instanz/fuehrung/dienst.rs", "match g.wechsel", 1),
             ("src/instanz/fuehrung/dienst.rs", "fordere_wechsel(&g)?", 2),
+            ("src/instanz/fuehrung/dienst.rs", "wie_meldend(&g)", 3),
             (
                 "src/instanz/fuehrung/austausch.rs",
-                "InstanzKopplungArt::VorOrt",
+                "kopplung.wechselregel()",
                 1,
             ),
         ];

@@ -89,7 +89,7 @@ describe('Benachrichtigungen einstellen (tasks.md 2.6)', () => {
     zeige();
     const hinweise = await screen.findByRole('region', { name: 'Hinweise' });
     const alle = await within(hinweise).findAllByRole('switch');
-    expect(alle).toHaveLength(21);
+    expect(alle).toHaveLength(22);
     for (const s of alle) expect(s).toBeChecked();
     expect(within(hinweise).getByRole('switch', { name: 'Neuer Auftrag' })).toBeInTheDocument();
     // Die Hinweise der Ablösung (LLH-1131) sind je für sich abschaltbar.

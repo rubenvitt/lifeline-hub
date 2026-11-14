@@ -384,7 +384,7 @@ pub async fn liste_fuer_einsatz(
 /// Prüft, ob alle `ids` zur `org_id` als Katalog-Eintrag (`einsatz_id IS NULL`)
 /// **oder** als einsatz-lokale Sprechgruppe mit genau diesem `einsatz_id` gehören.
 /// Jede ID, die diese Bedingung nicht erfüllt, ergibt `UnprocessableEntity`. Das Paar mit einer
-/// gleichnamigen Einsatz-Sprechgruppe (409) prüft erst die Schreibtransaktion
+/// gleichnamigen Einsatz-Sprechgruppe (409) prüft maßgeblich die Schreibtransaktion
 /// ([`zuordnen_tx`], [`ersetzen_tx`], LLH-1650): Vorab auf eigener Verbindung könnte eine
 /// gleichzeitig angelegte Einsatz-Sprechgruppe durchrutschen.
 pub(crate) async fn pruefe_zuordenbar(
@@ -403,7 +403,7 @@ pub(crate) async fn pruefe_zuordenbar(
          WHERE id IN (SELECT value FROM json_each(?)) AND org_id = ? \
            AND (einsatz_id IS NULL OR einsatz_id = ?)",
     )
-    .bind(ids_json(ids)?)
+    .bind(crate::kraefte_disposition::ids_json(ids))
     .bind(org_id)
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -418,9 +418,11 @@ pub(crate) async fn pruefe_zuordenbar(
 
 /// LLH-1645: Eine Katalog-Sprechgruppe, die der Einsatz noch nicht nutzt, darf kein Paar mit
 /// einer gleichnamigen Einsatz-Sprechgruppe stiften (etwa eine deaktivierte, die der Picker
-/// nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar. Nur in der
-/// Schreibtransaktion der Zuordnung aufrufen (LLH-1650): Unter BEGIN IMMEDIATE sieht sie eine
-/// gleichzeitig angelegte Einsatz-Sprechgruppe, oder deren Anlegen sieht danach die Nutzung.
+/// nicht zeigt, oder ein Paar aus dem Altbestand). Schon genutzte bleiben zuordenbar. Maßgeblich
+/// ist der Aufruf in der Schreibtransaktion der Zuordnung (LLH-1650): Unter BEGIN IMMEDIATE sieht
+/// sie eine gleichzeitig angelegte Einsatz-Sprechgruppe, oder deren Anlegen sieht danach die
+/// Nutzung. Ein Aufrufer, der vorher anderes schreibt, prüft zusätzlich vorab (Einheit-PATCH,
+/// LLH-1692), damit der vorhersehbare Fall nichts halb speichert.
 pub(crate) async fn pruefe_kein_lokales_paar(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
@@ -438,7 +440,7 @@ pub(crate) async fn pruefe_kein_lokales_paar(
          ORDER BY k.id LIMIT 1",
         nutzende_einsaetze("k.id")
     )))
-    .bind(ids_json(ids)?)
+    .bind(crate::kraefte_disposition::ids_json(ids))
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
@@ -448,12 +450,6 @@ pub(crate) async fn pruefe_kein_lokales_paar(
         )));
     }
     Ok(())
-}
-
-/// IDs als JSON-Array für `json_each(?)`.
-fn ids_json(ids: &[i64]) -> Result<String, AppError> {
-    serde_json::to_string(ids)
-        .map_err(|e| AppError::Internal(format!("Sprechgruppen-ids serialisieren: {e}")))
 }
 
 /// Wer eine Sprechgruppe trägt (Zuordnungen aus 0073 und 0145). Eine Zuordnung entsteht und
@@ -535,7 +531,7 @@ pub async fn ersetzen_tx(
 ) -> Result<(), AppError> {
     pruefe_kein_lokales_paar(conn, einsatz_id, ids).await?;
     let (tabelle, spalte, bezug) = ziel.ort();
-    let ids = ids_json(ids)?;
+    let ids = crate::kraefte_disposition::ids_json(ids);
     sqlx::query(sqlx::AssertSqlSafe(format!(
         "DELETE FROM {tabelle} WHERE {spalte} = ? \
            AND sprechgruppe_id NOT IN (SELECT value FROM json_each(?))"

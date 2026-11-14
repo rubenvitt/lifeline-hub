@@ -32,6 +32,13 @@ import { GewanderteGruende } from '../components/GewanderteGruende';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import ZumKopfKnopf from '../components/ZumKopfKnopf';
+import {
+  LISTEN_MAX_SEITEN,
+  kopfVerlassen,
+  useKopfBeimVerlassen,
+  zumKopf,
+} from '../components/listenFenster';
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -68,6 +75,9 @@ export default function ErinnerungenPage() {
     queryKey: einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen'),
     queryFn: ({ pageParam }) => listeAbgeschlosseneErinnerungen(einsatzId, pageParam),
     initialPageParam: undefined as AbschlussCursor | undefined,
+    // Seitenfenster (LLH-1687, `components/listenFenster.ts`): ein Live-Ereignis lädt höchstens
+    // so viele Seiten neu, wie im Fenster liegen.
+    maxPages: LISTEN_MAX_SEITEN,
     getNextPageParam: (letzte) =>
       letzte.length < ERINNERUNGEN_SEITE ? undefined : erinnerungCursor(letzte[letzte.length - 1]),
     // Auch für einen Sprung auf eine Erinnerung, die nicht unter den offenen steht.
@@ -81,6 +91,11 @@ export default function ErinnerungenPage() {
       return true;
     });
   }, [abgeschlosseneQuery.data]);
+  // Ohne Kopf im Fenster (LLH-1687) ist die geladene Zahl keine Position mehr: dann endet „Ältere
+  // laden“ allein an `hasNextPage`, und die Zeile nennt keine Gesamtzahl.
+  const abgeschlossenSchluessel = einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen');
+  const ohneKopf = kopfVerlassen(abgeschlosseneQuery.data);
+  useKopfBeimVerlassen(abgeschlossenSchluessel, ansicht === 'abgeschlossen');
 
   /*
    * Sprung `?erinnerung=<id>` (LLH-1429, Spec `deeplink-hervorhebung`, `frontend/AGENTS.md`
@@ -107,11 +122,22 @@ export default function ErinnerungenPage() {
   const abgeschlosseneBereit = abgeschlosseneQuery.isFetched && !abgeschlosseneQuery.isFetching;
   useEffect(() => {
     if (sucheErinnerung == null || !abgeschlosseneBereit) return;
+    // Ohne Kopf im Fenster (LLH-1687) läge eine eben erledigte Erinnerung außerhalb: erst den Kopf
+    // holen, dann sucht der nächste Lauf darin. Scheitert der Abruf, endet die Suche still wie bei
+    // einer unbekannten Kennung.
+    if (ohneKopf) {
+      void zumKopf(qc, einsatzKeys.erinnerungenPhase(einsatzId, 'abgeschlossen'), () =>
+        listeAbgeschlosseneErinnerungen(einsatzId),
+      ).then((ersetzt) => {
+        if (!ersetzt) setSucheErinnerung(null);
+      });
+      return;
+    }
     if (abgeschlossene.some((e) => e.id === sucheErinnerung)) {
       springeZu(sucheErinnerung, 'abgeschlossen');
     }
     setSucheErinnerung(null);
-  }, [sucheErinnerung, abgeschlosseneBereit, abgeschlossene]);
+  }, [sucheErinnerung, abgeschlosseneBereit, abgeschlossene, ohneKopf, qc, einsatzId]);
   // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel oder den Daten).
   useEffect(() => {
     if (scrollZiel == null) return;
@@ -371,6 +397,12 @@ export default function ErinnerungenPage() {
         )
       ) : (
         <>
+          {kopfVerlassen(abgeschlosseneQuery.data) && (
+            <ZumKopfKnopf
+              schluessel={abgeschlossenSchluessel}
+              ladeKopf={() => listeAbgeschlosseneErinnerungen(einsatzId)}
+            />
+          )}
           {abgeschlosseneQuery.isPending ? (
             <div style={{ textAlign: 'center', padding: token.paddingLG }}>
               <Spin />
@@ -383,7 +415,8 @@ export default function ErinnerungenPage() {
             />
           )}
           {abgeschlosseneQuery.hasNextPage &&
-            (kennzahlenQuery.data == null ||
+            (ohneKopf ||
+              kennzahlenQuery.data == null ||
               abgeschlossene.length < kennzahlenQuery.data.abgeschlossen) && (
               <div style={{ textAlign: 'center', marginTop: token.margin }}>
                 <Button
@@ -393,7 +426,8 @@ export default function ErinnerungenPage() {
                   Ältere laden
                 </Button>
                 <div style={{ marginTop: token.marginXS, color: token.colorTextSecondary }}>
-                  {abgeschlossene.length} von {abgeschlossenZahl} geladen
+                  {abgeschlossene.length}
+                  {!ohneKopf && ` von ${abgeschlossenZahl}`} geladen
                 </div>
               </div>
             )}

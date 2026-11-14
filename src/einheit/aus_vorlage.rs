@@ -25,7 +25,7 @@ use crate::einheit_vorlage::{
 use crate::error::{AppError, ZeilenArt, ZeilenGrund};
 use crate::fahrzeug::besatzung_repo;
 use crate::katalog::DIENSTSTATUS_IN_DIENST;
-use crate::kraefte_disposition::{self, Kontext, PersonalWahl, Regeln, Ziel};
+use crate::kraefte_disposition::{self, ids_json, Kontext, PersonalWahl, Regeln, Ziel};
 use crate::material::ort::{self as material_ort, MaterialOrt};
 use crate::material::{disposition_repo as material_repo, MaterialArt};
 use crate::staerke::{Staerke, StaerkePosition};
@@ -317,11 +317,6 @@ fn wirksame_menge(m: &EinheitVorlageMaterial) -> i64 {
     posten_mengen(m).iter().sum()
 }
 
-fn ids_json(ids: impl IntoIterator<Item = i64>) -> String {
-    serde_json::to_string(&ids.into_iter().collect::<Vec<i64>>())
-        .expect("Zahlenliste ist serialisierbar")
-}
-
 fn bezug(id: Option<i64>, name: Option<String>) -> Option<Bezug> {
     match (id, name) {
         (Some(id), Some(name)) => Some(Bezug { id, name }),
@@ -374,7 +369,7 @@ async fn load_fahrzeug_lagen_tx(
          LEFT JOIN einsatz_fahrzeug ef ON ef.fahrzeug_id = j.value AND ef.einsatz_id = ?3 \
          LEFT JOIN einsatz_einheit e ON e.id = ef.einheit_id AND e.aufgeloest_at IS NULL",
     )
-    .bind(ids_json(ids.iter().copied()))
+    .bind(ids_json(&ids))
     .bind(org_id)
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
@@ -435,7 +430,7 @@ async fn load_personal_lagen_tx(
          LEFT JOIN einsatz_einheit e ON e.id = ep.einheit_id AND e.aufgeloest_at IS NULL \
          LEFT JOIN einsatz_fahrzeug ef ON ef.id = ep.fahrzeug_id",
     ))
-    .bind(ids_json(ids.iter().copied()))
+    .bind(ids_json(&ids))
     .bind(org_id)
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
@@ -504,7 +499,7 @@ async fn load_material_zustaende_tx(
                AND material_id IN (SELECT value FROM json_each(?2))",
         )
         .bind(einsatz_id)
-        .bind(ids_json(stuecke))
+        .bind(ids_json(&stuecke))
         .fetch_all(&mut *conn)
         .await?
         .into_iter()

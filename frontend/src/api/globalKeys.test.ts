@@ -162,10 +162,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 48 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 49 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(48);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(48);
+    expect(werte).toHaveLength(49);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(49);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

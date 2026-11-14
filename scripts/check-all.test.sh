@@ -136,6 +136,28 @@ rc=0; "$CHECK_ALL" --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
 pruefe "11 voller Lauf wählt aus" 0 "$rc"
 fehlt "11 voller Lauf fährt den Kompilierschritt nicht mit" '^Schritte: .*\b17\b'
 
+# 12 — Schritt 6 fährt Advisory-Scan UND Karenz-Prüfung, auch wenn der Scan rot ist (LLH-1884):
+# sonst käme ein zu junges Paket neben einem Advisory erst im nächsten Lauf ans Licht. Gefahren
+# wird der echte Schritt aus check-all.sh gegen Attrappen der beiden Skripte.
+mkdir -p "$ARBEIT/s6/scripts"
+printf '#!/bin/sh\necho deps-rot; exit 1\n' > "$ARBEIT/s6/scripts/check-deps.sh"
+printf '#!/bin/sh\necho karenz-lief; exit 0\n' > "$ARBEIT/s6/scripts/check-karenzzeit.sh"
+chmod +x "$ARBEIT/s6/scripts/"*.sh
+schritt_6_def="$(sed -n '/^schritt_6() {/,/^}/p' "$CHECK_ALL")"
+rc=0; fahren "ROOT='$ARBEIT/s6'; $schritt_6_def" 0 6 || rc=$?
+pruefe "12 Schritt 6 bleibt rot, wenn der Advisory-Scan rot ist" 1 "$rc"
+enthaelt "12 Schritt 6 fährt die Karenz-Prüfung trotz rotem Scan" '^karenz-lief$'
+# Gegenrichtung: ein Karenz-Verstoß bei grünem Scan macht Schritt 6 rot; ein verschluckter
+# Exit-Code der Karenz-Prüfung bliebe sonst von Fall 12 unbemerkt.
+printf '#!/bin/sh\necho deps-gruen; exit 0\n' > "$ARBEIT/s6/scripts/check-deps.sh"
+printf '#!/bin/sh\necho karenz-rot; exit 1\n' > "$ARBEIT/s6/scripts/check-karenzzeit.sh"
+rc=0; fahren "ROOT='$ARBEIT/s6'; $schritt_6_def" 0 6 || rc=$?
+pruefe "12b Karenz-Verstoß bei grünem Scan macht Schritt 6 rot" 1 "$rc"
+printf '#!/bin/sh\necho deps-rot; exit 1\n' > "$ARBEIT/s6/scripts/check-deps.sh"
+rc=0; fahren "ROOT='$ARBEIT/s6'; $schritt_6_def" 0 6 || rc=$?
+pruefe "12c beide rot: Schritt 6 rot" 1 "$rc"
+enthaelt "12c beide rot: die Karenz-Prüfung lief" '^karenz-rot$'
+
 if [ "$fehler" -ne 0 ]; then
   echo "check-all.test.sh: ROT" >&2
   exit 1

@@ -13,11 +13,13 @@ fehler=0
 
 baum_neu() { # <name> → Pfad eines grünen Baums
   local b="$ARBEIT/$1"
-  mkdir -p "$b/frontend" "$b/.devcontainer" "$b/scripts" "$b/.github/workflows" "$b/.claude/skills/x"
+  mkdir -p "$b/frontend" "$b/website" "$b/.devcontainer" "$b/scripts" "$b/.github/workflows" "$b/.claude/skills/x"
   printf '[tools]\nnode = "26.7.0"\npnpm = "11.10.0"\n\n[tasks.clean]\nrun = "true"\n' > "$b/mise.toml"
-  for p in "$b/package.json" "$b/frontend/package.json"; do
+  for p in "$b/package.json" "$b/frontend/package.json" "$b/website/package.json"; do
     printf '{\n  "packageManager": "pnpm@11.10.0",\n  "engines": {\n    "node": "26.7.0"\n  }\n}\n' > "$p"
   done
+  # Cloudflare Pages liest Node nur aus dieser Datei, nicht aus `engines` (LLH-1884).
+  printf '26.7.0\n' > "$b/website/.node-version"
   cat > "$b/.devcontainer/devcontainer.json" <<'JSON'
 {
   // Kommentar mit "node:1" und // im Text
@@ -61,6 +63,11 @@ fall "install_args mit Zahl im Workflow" rot "echo '      install_args: node@26.
 fall "actions/setup-node im Workflow" rot "echo '  - uses: actions/setup-node@v5' >> .github/workflows/ci.yml"
 fall "harte Zahl in einem Skill" rot "echo 'mise exec pnpm@11.10.0 -- pnpm dev' >> .claude/skills/x/SKILL.md"
 fall "packageManager weicht ab" rot "sed -i.bak 's/pnpm@11.10.0/pnpm@11.9.0/' frontend/package.json"
+fall "Website: packageManager weicht ab" rot "sed -i.bak 's/pnpm@11.10.0/pnpm@11.9.0/' website/package.json"
+fall "Website: engines.node weicht ab" rot "sed -i.bak 's/\"26.7.0\"/\"26.6.0\"/' website/package.json"
+fall "Website: .node-version weicht ab (Cloudflare baute mit anderem Node)" rot "printf '22.23.4\\n' > website/.node-version"
+fall "Website: .node-version fehlt" rot "rm website/.node-version"
+fall "Website: .node-version mit führendem v" rot "printf 'v26.7.0\\n' > website/.node-version"
 fall "engines.node fehlt" rot "printf '{\"packageManager\": \"pnpm@11.10.0\"}\n' > package.json"
 fall "Devcontainer gleitend auf 26" rot "sed -i.bak 's/\"26.7.0\"/\"26\"/' .devcontainer/devcontainer.json"
 fall "mise.toml ohne [tools]" rot "printf '[tasks.clean]\nrun = \"true\"\n' > mise.toml"

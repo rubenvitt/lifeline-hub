@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
 import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -182,6 +182,59 @@ describe('ErinnerungenPage', () => {
     });
     expect(screen.queryByRole('button', { name: 'Ältere laden' })).not.toBeInTheDocument();
   });
+
+  it('hält höchstens fünf Seiten und führt über „Zu den neuesten springen“ zurück (LLH-1687)', async () => {
+    const seite = (von: number, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: 1000 - von - i,
+        einsatz_id: 1,
+        titel: `Alt ${von + i}`,
+        status: 'erledigt',
+        faellig_at: '2026-06-10 10:00:00',
+        erledigt_at: `2026-06-10 ${String(23 - Math.floor((von + i) / 60)).padStart(2, '0')}:${String(59 - ((von + i) % 60)).padStart(2, '0')}:00`,
+        erstellt_at: '2026-06-10 09:00:00',
+        quittiert_at: null,
+        ist_faellig: false,
+      })) as unknown as Erinnerung[];
+    // Die Vorgaben der Mocks gelten für die übrigen Tests der Datei (`clearAllMocks` setzt
+    // Implementierungen nicht zurück): am Ende wiederherstellen.
+    const listeVorher = vi.mocked(listeAbgeschlosseneErinnerungen).getMockImplementation();
+    const zahlenVorher = vi.mocked(ladeErinnerungKennzahlen).getMockImplementation();
+    onTestFinished(() => {
+      vi.mocked(listeAbgeschlosseneErinnerungen).mockImplementation(listeVorher!);
+      vi.mocked(ladeErinnerungKennzahlen).mockImplementation(zahlenVorher!);
+    });
+    // Seite n beginnt bei 100·n; der Kopf (ohne Cursor) ist Seite 0.
+    vi.mocked(listeAbgeschlosseneErinnerungen).mockImplementation(async (_e, cursor) => {
+      if (!cursor) return seite(0, 100);
+      return seite(1000 - cursor.id + 1, 100);
+    });
+    vi.mocked(ladeErinnerungKennzahlen).mockResolvedValue({ offen: 1, abgeschlossen: 1000 });
+    renderPage();
+    await screen.findByText('Lagemeldung');
+    fireEvent.click(await screen.findByText('Abgeschlossen (1000)'));
+    expect(await screen.findByText('Alt 0')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Zu den neuesten springen' }),
+    ).not.toBeInTheDocument();
+
+    for (let n = 1; n <= 5; n++) {
+      fireEvent.click(await screen.findByRole('button', { name: 'Ältere laden' }));
+      expect(await screen.findByText(`Alt ${n * 100}`)).toBeInTheDocument();
+    }
+    // Die sechste Seite schob die neueste aus dem Fenster; ohne Kopf nennt die Zeile keine
+    // Gesamtzahl, die Fensterlänge wäre keine Position.
+    expect(screen.queryByText('Alt 0')).not.toBeInTheDocument();
+    expect(screen.getByText('500 geladen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ältere laden' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zu den neuesten springen' }));
+    expect(await screen.findByText('Alt 0')).toBeInTheDocument();
+    expect(screen.queryByText('Alt 500')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Zu den neuesten springen' }),
+    ).not.toBeInTheDocument();
+  }, 60_000);
 
   /** Beide Abschluss-Aktionen schalten mit dem ersten Klick; der Rückweg steht im Toast. */
   it('erledigt mit einem Klick und nimmt es über den Rückgängig-Knopf zurück', async () => {

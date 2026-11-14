@@ -194,7 +194,7 @@ pub async fn code_ausstellen(
         }
         // Derselbe Grundstock wie beim Einlösen: zu viele Schlüssel scheitern hier mit Grund,
         // nicht erst an der anderen Instanz.
-        unterschrift::grundstock(&mut conn, admin.org_id).await?;
+        unterschrift::grundstock(&mut conn, admin.org_id, weiter_fuer(art, 0)).await?;
     }
     let i = identitaet::load_or_create(&state.pool)
         .await
@@ -430,7 +430,7 @@ async fn check_koppeln(
             &jetzt,
         )
         .await?;
-        repo::create_org_zuordnung(
+        let ko = repo::create_org_zuordnung(
             conn,
             kopplung_id,
             code.org_id,
@@ -440,7 +440,8 @@ async fn check_koppeln(
             false,
         )
         .await?;
-        let (lieferung, _) = unterschrift::grundstock(conn, code.org_id).await?;
+        let (lieferung, _) =
+            unterschrift::grundstock(conn, code.org_id, weiter_fuer(code.art, ko)).await?;
         Ok(Ok((code.org_id, lieferung, code.k_aussteller, code.art)))
     })?;
     let (org_id, unterschrift, k_aussteller, art) = match ergebnis {
@@ -584,6 +585,7 @@ pub async fn einloesen(
             kopplung_org_id: org_zeile,
             org_id: admin.org_id,
             fremde_org_kennung: &antwort.org.kennung,
+            vor_ort: art == InstanzKopplungArt::VorOrt,
         };
         let abgelehnt =
             unterschrift::accept_lieferungen(conn, &ziel, &antwort.unterschrift, true, &jetzt)
@@ -1776,4 +1778,13 @@ pub async fn unterschrift_widerrufen(
     Ok(Json(
         unterschrift::load_anzeige(&state.pool, admin.org_id, admin.id, id).await?,
     ))
+}
+
+/// Welche Unterschriftsschlüssel der Grundstock einer Kopplung der Art `art` trägt: über eine
+/// Direktkopplung auch die übernommenen, außer denen der Zuordnung `ko` (LLH-1678, design.md D6).
+fn weiter_fuer(art: InstanzKopplungArt, ko: i64) -> unterschrift::Weiter {
+    match art {
+        InstanzKopplungArt::VorOrt => unterschrift::Weiter::AusserZuordnung(ko),
+        InstanzKopplungArt::Standard => unterschrift::Weiter::NurLokal,
+    }
 }

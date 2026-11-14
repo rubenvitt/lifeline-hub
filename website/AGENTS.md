@@ -8,9 +8,19 @@ Gilt für `website/`, zusätzlich zur `AGENTS.md` der Wurzel. Eigenständiges As
   importiert, damit die Seite ohne die App baut. Kein Schritt in `scripts/check-all.sh`.
 - **Bereitstellung:** Cloudflare Pages, Projekt `lifeline-hub` (https://lifeline-hub.pages.dev),
   verbunden mit dem Repo, Produktions-Branch `alpha`. Stammverzeichnis `website`, Build-Befehl
-  `pnpm build`, Ausgabe `dist`; Cloudflare installiert selbst aus dem Lockfile. Node und pnpm
-  setzen dort die Umgebungsvariablen `NODE_VERSION` und `PNPM_VERSION`: wer `engines` oder
-  `packageManager` in `website/package.json` hebt, zieht beide im Pages-Projekt nach.
+  `pnpm build`, Ausgabe `dist`; Cloudflare installiert selbst aus dem Lockfile.
+- **Werkzeugversionen bei Cloudflare** (LLH-1884): dieselben wie im Gate, aus `mise.toml`. Node
+  liest Cloudflare aus `.node-version`, nicht aus `engines` (ohne Datei nahm es seine Vorgabe
+  22.x). `scripts/check-toolversionen.sh` prüft die Datei, `packageManager` und `engines.node`
+  gegen `mise.toml`. pnpm liest Cloudflare nur aus der Umgebungsvariable `PNPM_VERSION` im
+  Pages-Projekt, nicht aus `packageManager`: wer pnpm in `mise.toml` hebt, zieht sie dort nach.
+  Im Build-Log stehen beide Versionen („Detected the following tools …“); eine Warnung
+  „Unsupported engine“ heißt, dass sie abweichen.
+- **Karenzzeit** (LLH-1884): pnpm lehnt beim Install Pakete ab, die jünger als 24 Stunden sind
+  (`minimumReleaseAge: 1440` in `pnpm-workspace.yaml`), bei Cloudflare wie im Gate. Ein Bump mit
+  zu jungen Paketen ist deshalb schon im eigenen PR rot (Schritt 6 von `check-all.sh`); was dann
+  zu tun ist, regelt `scripts/AGENTS.md`, „Karenzzeit“. Dependabot schlägt Versions-Updates erst
+  nach einem Tag vor (`cooldown`).
 - **Unbekannte Adressen und Cache:** `src/pages/404.astro` muss bleiben. Ohne `404.html`
   beantwortet Pages jede unbekannte Adresse mit der Startseite und Status 200, auch eine
   CSS-Adresse; ein Browser, der während eines Rollouts zu früh anfragt, hielte dieses HTML bis zu

@@ -2,7 +2,7 @@
 //!
 //! Jede gespeicherte Akte richtet ihren Einsatz aus ([`save`] →
 //! `instanz::spiegel::fuehrung::richte_aus`, in der Transaktion des Wechsels): Führt eine andere
-//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0033).
+//! Instanz, ist er hier ein Spiegel, und nur der Spiegel sperrt (LLH-1641; ADR-0018, ADR-0044).
 
 use super::{Epoche, FuehrungWechselArt};
 use crate::error::AppError;
@@ -36,11 +36,19 @@ pub struct AkteZeile {
     pub bruch_at: Option<String>,
     pub stand: i64,
     pub geaendert_at: String,
+    /// Abgelehnte Anfrage vor Ort (LLH-1678, design.md D4): am Führer die Kennung der
+    /// Gegenstelle, deren Anfrage abgelehnt ist; am Anfragenden die eigene Kennung.
+    pub anfrage_abgelehnt: Option<String>,
+    /// Am Führer: die Kennung der abgelehnten Anfrage.
+    pub anfrage_abgelehnt_kennung: Option<String>,
+    /// Am Anfragenden: Kennung der laufenden Anfrage vor Ort (Zufallswert, LLH-1678, D4).
+    pub anfrage_kennung: Option<String>,
 }
 
 const SPALTEN: &str = "id, kennung, einsatz_id, org_id, nummer, bezeichnung, stichwort, status, \
      epoche_zaehler, epoche_instanz, fuehrer_kennung, fuehrer_name, art, erklaerung, beweis, \
-     offen, offen_bruch_at, abgabe_schluessel, anfrage_at, bruch_at, stand, geaendert_at";
+     offen, offen_bruch_at, abgabe_schluessel, anfrage_at, bruch_at, stand, geaendert_at, \
+     anfrage_abgelehnt, anfrage_abgelehnt_kennung, anfrage_kennung";
 
 impl AkteZeile {
     pub fn epoche(&self) -> Epoche {
@@ -328,18 +336,29 @@ pub async fn save(
         a.stand = next_stand(conn).await?;
     }
     a.geaendert_at = crate::zeit::jetzt();
-    sqlx::query(
-        "UPDATE einsatz_fuehrung SET nummer = ?, bezeichnung = ?, stichwort = ?, status = ?, \
-         epoche_zaehler = ?, epoche_instanz = ?, fuehrer_kennung = ?, fuehrer_name = ?, art = ?, \
-         erklaerung = ?, beweis = ?, offen = ?, offen_bruch_at = ?, abgabe_schluessel = ?, \
-         anfrage_at = ?, bruch_at = ?, stand = ?, geaendert_at = ? WHERE id = ?",
+    // Eine Anfrage gilt nur dem Stand, den sie sah (LLH-1673): Mit einer neuen Epoche fallen die
+    // wartende Anfrage (`anfrage_von`) und eine abgelehnte (`anfrage_abgelehnt`) weg (LLH-1678,
+    // design.md D4). Rechts stehen die alten Werte der Zeile.
+    (a.anfrage_abgelehnt, a.anfrage_abgelehnt_kennung) = sqlx::query_as(
+        "UPDATE einsatz_fuehrung SET \
+         anfrage_von = CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN anfrage_von END, \
+         anfrage_von_kennung = CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN anfrage_von_kennung END, \
+         anfrage_abgelehnt = CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN ?3 END, \
+         anfrage_abgelehnt_kennung = \
+             CASE WHEN epoche_zaehler = ?1 AND epoche_instanz = ?2 THEN ?21 END, \
+         nummer = ?4, bezeichnung = ?5, stichwort = ?6, status = ?7, \
+         epoche_zaehler = ?1, epoche_instanz = ?2, fuehrer_kennung = ?8, fuehrer_name = ?9, \
+         art = ?10, erklaerung = ?11, beweis = ?12, offen = ?13, offen_bruch_at = ?14, \
+         abgabe_schluessel = ?15, anfrage_at = ?16, bruch_at = ?17, stand = ?18, \
+         geaendert_at = ?19, anfrage_kennung = ?22 WHERE id = ?20 RETURNING anfrage_abgelehnt, anfrage_abgelehnt_kennung",
     )
+    .bind(a.epoche_zaehler)
+    .bind(&a.epoche_instanz)
+    .bind(&a.anfrage_abgelehnt)
     .bind(&a.nummer)
     .bind(&a.bezeichnung)
     .bind(&a.stichwort)
     .bind(&a.status)
-    .bind(a.epoche_zaehler)
-    .bind(&a.epoche_instanz)
     .bind(&a.fuehrer_kennung)
     .bind(&a.fuehrer_name)
     .bind(&a.art)
@@ -353,12 +372,48 @@ pub async fn save(
     .bind(a.stand)
     .bind(&a.geaendert_at)
     .bind(a.id)
-    .execute(&mut *conn)
+    .bind(&a.anfrage_abgelehnt_kennung)
+    .bind(&a.anfrage_kennung)
+    .fetch_one(&mut *conn)
     .await?;
     if let Some(einsatz_id) = a.einsatz_id {
         crate::instanz::spiegel::fuehrung::richte_aus(conn, einsatz_id).await?;
         refresh_nummer(conn, a).await?;
     }
+    Ok(())
+}
+
+/// Die wartende Anfrage einer Akte: Kennung der anfragenden Gegenstelle und, vor Ort, der
+/// Zeitpunkt der Anfrage dort (LLH-1641 E4; vor Ort LLH-1678, design.md D4).
+pub async fn load_anfrage_von(
+    conn: &mut SqliteConnection,
+    akte_id: i64,
+) -> Result<(Option<String>, Option<String>), AppError> {
+    Ok(
+        sqlx::query_as(
+            "SELECT anfrage_von, anfrage_von_kennung FROM einsatz_fuehrung WHERE id = ?",
+        )
+        .bind(akte_id)
+        .fetch_one(&mut *conn)
+        .await?,
+    )
+}
+
+/// Setzt oder löscht die wartende Anfrage vor Ort einer Akte, ohne neuen Stand.
+pub async fn save_anfrage_von(
+    conn: &mut SqliteConnection,
+    akte_id: i64,
+    von: Option<&str>,
+    seit: Option<&str>,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE einsatz_fuehrung SET anfrage_von = ?, anfrage_von_kennung = ? WHERE id = ?",
+    )
+    .bind(von)
+    .bind(seit)
+    .bind(akte_id)
+    .execute(&mut *conn)
+    .await?;
     Ok(())
 }
 
@@ -930,23 +985,37 @@ pub struct FuehrungGegenueber {
     pub kennung: String,
     pub name: String,
     pub richtung: InstanzKopplungRichtung,
-    /// Art der Kopplung (LLH-1497): über eine Direktkopplung `vor_ort` wechselt die Führung nicht.
+    /// Art der Kopplung (LLH-1497).
     pub art: crate::instanz::InstanzKopplungArt,
+    /// Nach welcher Regel die Führung zu diesem Gegenüber wechselt (LLH-1678, design.md D1).
+    pub wechsel: crate::instanz::Wechselregel,
+    /// Bei `gesperrt`: warum (Gegenstelle braucht ein Update).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wechsel_grund: Option<String>,
     /// Org-Schlüssel der Akte auf der Leitung (die Org der erreichten Seite).
     #[serde(skip)]
     pub org_schluessel: String,
 }
 
-/// Die Hubs einer Org: Gegenüber, bei denen sich diese Instanz meldet. Nur von ihnen kommt eine
-/// Akte, die eine offene Übernahme auslöst; ob sie ein Konflikt ist, misst
-/// `austausch::ist_konflikt` an ihnen.
+/// Die Hubs einer Org: Gegenüber, bei denen sich diese Instanz meldet, und gleichrangige
+/// Gegenstellen einer Direktkopplung (LLH-1678, design.md D1). Nur von ihnen kommt eine Akte, die
+/// eine offene Übernahme auslöst; ob sie ein Konflikt ist, misst `austausch::ist_konflikt` an
+/// ihnen.
 pub async fn list_hubs(conn: &mut SqliteConnection, org_id: i64) -> Result<Vec<String>, AppError> {
     Ok(list_gegenueber(conn, org_id)
         .await?
         .into_iter()
-        .filter(|g| g.richtung == InstanzKopplungRichtung::MeldetSich)
+        .filter(FuehrungGegenueber::is_hub)
         .map(|g| g.kennung)
         .collect())
+}
+
+impl FuehrungGegenueber {
+    /// Ob eine Übernahme durch dieses Gegenüber hier ein Mensch entscheidet (siehe [`list_hubs`]).
+    pub fn is_hub(&self) -> bool {
+        self.richtung == InstanzKopplungRichtung::MeldetSich
+            || self.wechsel == crate::instanz::Wechselregel::Gleichrangig
+    }
 }
 
 /// Die Gegenüber einer Org (aktive Kopplungen mit gültiger Zuordnung).
@@ -955,10 +1024,11 @@ pub async fn list_gegenueber(
     org_id: i64,
 ) -> Result<Vec<FuehrungGegenueber>, AppError> {
     let ich = ich(conn).await?;
-    let rows: Vec<(i64, String, String, String, String, String)> = sqlx::query_as(
+    #[allow(clippy::type_complexity)]
+    let rows: Vec<(i64, String, String, String, String, String, Option<i64>)> = sqlx::query_as(
         "SELECT k.id, k.gegenueber_kennung, k.gegenueber_name, k.richtung, \
                 CASE WHEN k.richtung = 'meldet_sich' THEN o.fremde_org_kennung \
-                     ELSE ? || '/' || o.org_id END, k.art \
+                     ELSE ? || '/' || o.org_id END, k.art, k.gegenueber_protokoll \
          FROM instanz_kopplung_org o JOIN instanz_kopplung k ON k.id = o.kopplung_id \
          WHERE o.org_id = ? AND o.widerrufen_at IS NULL AND k.zustand = 'aktiv' \
          ORDER BY k.id",
@@ -970,14 +1040,19 @@ pub async fn list_gegenueber(
     Ok(rows
         .into_iter()
         .filter_map(
-            |(kopplung_id, kennung, name, richtung, org_schluessel, art)| {
+            |(kopplung_id, kennung, name, richtung, org_schluessel, art, protokoll)| {
+                let art = crate::instanz::InstanzKopplungArt::parse(&art)
+                    .unwrap_or(crate::instanz::InstanzKopplungArt::VorOrt);
+                let wechsel = crate::instanz::wechselregel(art, protokoll);
                 Some(FuehrungGegenueber {
                     kopplung_id,
+                    richtung: InstanzKopplungRichtung::parse(&richtung)?,
+                    art,
+                    wechsel,
+                    wechsel_grund: (wechsel == crate::instanz::Wechselregel::Gesperrt)
+                        .then(|| crate::instanz::update_hinweis(&name)),
                     kennung,
                     name,
-                    richtung: InstanzKopplungRichtung::parse(&richtung)?,
-                    art: crate::instanz::InstanzKopplungArt::parse(&art)
-                        .unwrap_or(crate::instanz::InstanzKopplungArt::VorOrt),
                     org_schluessel,
                 })
             },
@@ -1425,6 +1500,9 @@ pub(crate) mod tests {
                 anfrage: false,
                 offen: false,
                 stand: 1,
+                anfrage_abgelehnt: None,
+                anfrage_abgelehnt_kennung: None,
+                anfrage_kennung: None,
             })
             .unwrap(),
         );
@@ -1630,6 +1708,9 @@ pub(crate) mod tests {
             bruch_at: None,
             stand: 0,
             geaendert_at: String::new(),
+            anfrage_abgelehnt: None,
+            anfrage_abgelehnt_kennung: None,
+            anfrage_kennung: None,
         };
         let mut conn = pool.acquire().await.unwrap();
         insert_fremd(&mut conn, &mut a).await.unwrap();
@@ -1824,6 +1905,8 @@ pub(crate) mod tests {
             name: kennung.into(),
             richtung,
             art: crate::instanz::InstanzKopplungArt::Standard,
+            wechsel: crate::instanz::Wechselregel::NachRichtung,
+            wechsel_grund: None,
             org_schluessel: String::new(),
         }
     }

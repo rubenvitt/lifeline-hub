@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/VersorgtVon.tsx, frontend/src/personen/Patientenkopf.tsx]
+quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/VersorgtVon.tsx, frontend/src/personen/Patientenkopf.tsx]
 ---
 
 ## Überblick
@@ -36,6 +36,10 @@ Führungspersonal, solange der Einsatz läuft (siehe [Rechte im Einsatz](rechte-
 
 Nach einem Stufenwechsel bietet ein Hinweis sechs Sekunden lang „Rückgängig“. Die Liste ordnet
 nach Priorität, dann eskalierte Meldungen zuerst, dann die neueste Ereigniszeit oben.
+
+Unter „Abgeschlossen“ holt „Ältere laden“ die nächsten Einträge. Die Liste behält höchstens
+500 Einträge; wer weiter zurückblättert, dem fallen die neuesten oben heraus. Dann führt
+„Zu den neuesten springen“ über der Liste zurück zum Anfang.
 
 ### Eine Meldung erfassen
 

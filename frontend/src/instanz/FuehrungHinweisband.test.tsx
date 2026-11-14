@@ -40,6 +40,7 @@ const akte: FuehrungAnzeige = {
   fuehrend: true,
   art: 'angelegt',
   anfrage_offen: false,
+  anfrage_abgelehnt: false,
   verwahrt: false,
   gegenueber: [],
   verlauf: [],

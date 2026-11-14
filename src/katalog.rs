@@ -52,6 +52,7 @@ wire_enum! {
         Gebunden => "gebunden",
         NichtVerfuegbar => "nicht_verfuegbar",
     }
+    sqlx = |s| format!("Ungültige StatusKategorie: {s}");
 }
 
 impl StatusKategorie {
@@ -62,33 +63,6 @@ impl StatusKategorie {
     pub fn wird_wieder_verfuegbar(vorher: Option<Self>, nachher: Option<Self>) -> bool {
         matches!(vorher, Some(Self::Gebunden | Self::NichtVerfuegbar))
             && nachher == Some(Self::Verfuegbar)
-    }
-}
-
-// `kategorie` kommt sowohl non-null vor (PersonalStatus/FahrzeugStatus — direkt
-// query_as'te DTOs) als auch nullable (EinsatzPersonalAnzeige/EinsatzFahrzeugAnzeige.
-// status_kategorie, LEFT JOIN). Einheitlich `Type`/`Decode` direkt auf dem Enum, statt
-// `#[sqlx(try_from = …)]` (scheitert an der Orphan-Rule auf `Option<Enum>`) — sqlx'
-// Blanket-Impl für `Option<T>` bildet NULL transparent auf `None` ab (gleiches Muster wie
-// `TierGeschlecht` in `src/tier/mod.rs`/`Geschlecht` in `src/person/mod.rs`).
-impl<DB: sqlx::Database> sqlx::Type<DB> for StatusKategorie
-where
-    str: sqlx::Type<DB>,
-{
-    fn type_info() -> DB::TypeInfo {
-        <str as sqlx::Type<DB>>::type_info()
-    }
-}
-
-impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for StatusKategorie
-where
-    &'r str: sqlx::Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as sqlx::Database>::ValueRef<'r>,
-    ) -> Result<Self, sqlx::error::BoxDynError> {
-        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        StatusKategorie::parse(s).ok_or_else(|| format!("Ungültige StatusKategorie: {s}").into())
     }
 }
 

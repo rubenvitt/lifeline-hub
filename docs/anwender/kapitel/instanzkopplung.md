@@ -76,8 +76,9 @@ Schadensort ohne Internet:
 
 ### Nachgelieferten Unterschriftsschlüssel bestätigen
 
-Für den System-Admin der Installation, die sich meldet (etwa im Einsatzleitwagen), wenn an der
-Kopplung „neuer Unterschriftsschlüssel wartet auf Bestätigung“ steht:
+Für den System-Admin, wenn an der Kopplung „neuer Unterschriftsschlüssel wartet auf Bestätigung“
+steht: am Einsatzleitwagen für einen Schlüssel vom Hub, am Hub für den Schlüssel eines
+Admins am Einsatzleitwagen.
 
 1. Im Paneel „Unterschriftsschlüssel“ im Menü des wartenden Schlüssels „Bestätigen …“ wählen.
 2. Den Inhaber anrufen und nach den letzten vier Zeichen seines Fingerabdrucks fragen. Der
@@ -178,7 +179,9 @@ Organisation, an der Installation, die den Einsatz führt.
 Ohne Verbindung zum Hub gibt die Installation, die sich meldet, die Führung per Code ab:
 „Führung per Code abgeben“, Rückfrage mit „Code erzeugen“ bestätigen und den Code, der nur
 einmal erscheint, per Funk oder Telefon durchgeben. Ab dem Code ist der Einsatz hier ein
-Spiegel, und der Verlauf zeigt „Abgabe per Code“.
+Spiegel, und der Verlauf zeigt „Abgabe per Code“. Über eine Direktkopplung vor Ort geben beide
+Installationen so ab; gibt es mehrere Ziele, nennt der Knopf das Ziel („Führung per Code an …
+abgeben“).
 
 ### Führung anfragen
 
@@ -191,7 +194,19 @@ etwa am ELW bei Ankunft.
 2. Im Paneel „Führung“ „Führung anfragen“ wählen. Hat diese Installation schon alles, führt sie
    mit der nächsten Meldung; sonst bleibt die Anfrage offen, bis der Abgleich nachgezogen hat.
    Wechselt die Führung vorher, etwa an eine andere Installation, verfällt die Anfrage; dann neu
-   anfragen.
+   anfragen. Über eine Direktkopplung vor Ort fragen beide Installationen an, und die führende
+   gibt nicht von selbst ab: Ihre Einsatzleitung entscheidet. Lehnt sie ab, steht im Paneel
+   „Anfrage abgelehnt“.
+
+### Anfrage vor Ort beantworten
+
+Für die Einsatzleitung oder einen Admin der Organisation an der Installation, die den Einsatz
+führt, wenn die Gegenstelle einer Direktkopplung die Führung anfragt.
+
+1. Die Benachrichtigung „Führung angefragt“ führt zum Paneel „Führung“ auf „Einsatzdaten“.
+   Dort steht „… bittet um die Führung“.
+2. „Übergeben“ wählen und die Rückfrage mit „Führung übergeben“ bestätigen, oder „Ablehnen“
+   wählen. Die andere Installation sieht die Ablehnung nach ihrer nächsten Meldung.
 
 ### Notübernahme
 
@@ -202,7 +217,8 @@ Knopf steht im Paneel „Führung“ auf „Einsatzdaten“ des Spiegels und, nu
 
 1. „Notübernahme …“ wählen.
 2. Einen „Grund“ eintragen, etwa „ELW ohne Verbindung seit 40 min“.
-3. Führt eine Installation, die sich hier meldet (der ELW), braucht es einen Beweis. Ein Admin
+3. Führt eine Installation, die sich hier meldet (der ELW), oder die Gegenstelle einer
+   Direktkopplung vor Ort, braucht es einen Beweis. Ein Admin
    wählt unter „Beweis“ „Eigene Unterschrift“ und bestätigt mit dem Unterschriftsschlüssel, oder
    „Code des Gegenübers“ und trägt den durchgegebenen Code ein. Die Einsatzleitung ohne
    Admin-Rolle trägt den Code unter „Code“ ein; unterschreiben kann sie nicht.
@@ -210,7 +226,8 @@ Knopf steht im Paneel „Führung“ auf „Einsatzdaten“ des Spiegels und, nu
 
 ### Übernahme bestätigen oder widersprechen
 
-Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, die sich meldet.
+Für die Einsatzleitung oder einen Admin der Organisation, an der Installation, die sich meldet,
+und an beiden Seiten einer Direktkopplung vor Ort.
 
 1. Unter der Kopfleiste des Einsatzes steht „Führung übernommen von …“ mit Zeit, Unterzeichner
    und Grund.
@@ -298,14 +315,35 @@ das Koppeln scheitert.
 ### Direktkopplung vor Ort
 
 Eine Kopplung mit „Code vor Ort“ verbindet zwei Installationen im selben Netz, ohne dass eine
-davon ein öffentlicher Server ist. Darüber gehen nur die Einsätze zum Mitlesen und die Anträge:
-Die eine Installation liest die Einsätze der anderen und beantragt dort Erfassungen, wie an
-jedem Spiegel. Nicht über eine Direktkopplung gehen:
+davon ein öffentlicher Server ist. Darüber gehen die Einsätze zum Mitlesen, die Anträge und die
+Führung: Die eine Installation liest die Einsätze der anderen und beantragt dort Erfassungen, wie
+an jedem Spiegel, und die Führung eines Einsatzes wechselt zwischen beiden. Nicht über eine
+Direktkopplung gehen:
 
-- die Führung eines Einsatzes (Übergabe, Anfrage, Notübernahme, Abgabe per Code); das Paneel
-  „Führung“ nennt den Grund,
 - Stammdaten und Passwörter; „Stammdaten erneut abgleichen“ und „ELW verloren“ fehlen dort,
 - die Verwahrung nach der Nachbereitung.
+
+Beim Wechsel der Führung sind beide Installationen gleichgestellt, gleich welche den Code
+eingelöst hat. Keine gibt still ab:
+
+- Eine Notübernahme braucht immer einen Beweis, die Unterschrift eines Admins oder den Code der
+  anderen Installation. Die übernehmende Installation führt sofort. Die andere schreibt weiter,
+  bis ihre Einsatzleitung „Übernahme bestätigen“ oder „Widersprechen“ wählt. Ohne gültigen Beweis
+  führt sie weiter und meldet „Ungültige Übernahme der Führung“.
+- Widerspricht sie, gibt die übernehmende Installation die Führung zurück und meldet ihrer
+  Einsatzleitung ebenfalls „Ungültige Übernahme der Führung“; an der Kopplung steht „… hat der
+  Notübernahme widersprochen“.
+- Eine Anfrage entscheidet die Einsatzleitung der führenden Installation.
+
+Spricht die andere Installation noch einen älteren Stand, wechselt die Führung nicht. Das Paneel
+„Führung“ und die Zeile der Kopplung nennen dann „… braucht ein Update für den Führungswechsel vor
+Ort“.
+
+Sind beide Installationen auch beim Hub gekoppelt, zieht der Hub den Wechsel nach: sobald die
+bisher führende Installation sich bei ihm meldet, oder sofort, wenn die Notübernahme die
+Unterschrift eines Admins trägt, dessen Schlüssel am Hub bestätigt ist. Ein Code allein genügt
+dem Hub nicht; an seiner Kopplung steht dann „… beansprucht die Führung …: abgelehnt“, bis die
+bisher führende Installation sich wieder meldet.
 
 Konten, Fahrzeuge und andere Stammdaten, die beide Installationen vom selben Hub haben, gelten
 als dieselben: Einsatzrollen und Fahrzeuge erscheinen im Spiegel richtig, und ein Antrag wird im
@@ -333,6 +371,13 @@ Ein Unterschriftsschlüssel ist ein Passkey nur zum Unterschreiben, nicht zur An
 Gekoppelte Installationen bekommen die Schlüssel der Organisation und nehmen einen neuen nur an,
 wenn ein ihnen bekannter ihn gegengezeichnet hat; sonst steht an der Kopplung ein Hinweis
 „abgelehnt“. Zwei Schlüssel je Organisation, damit einer verloren gehen darf.
+
+Über eine Direktkopplung vor Ort liefern beide Installationen einander ihre Schlüssel, auch die,
+die sie vom Hub haben; was mit der ersten Meldung kommt, gilt dort wie beim Koppeln sofort. Ein
+Einsatzleitwagen liefert dem Hub die Schlüssel, die an ihm registriert sind. Am Hub wartet jeder
+davon auf die Bestätigung eines Admins; erst dann zählt dort eine Unterschrift, die an diesem
+Einsatzleitwagen entstand. Ein widerrufener Schlüssel gilt an keiner Kopplung mehr, über welche
+er auch kam.
 
 Die Schlüssel, die beim Koppeln mitkommen, gelten sofort. Ein Schlüssel, der später nachkommt,
 wartet zuerst: an der Kopplung steht „1 neuer Unterschriftsschlüssel wartet auf Bestätigung“,

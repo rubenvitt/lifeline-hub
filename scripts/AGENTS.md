@@ -5,8 +5,8 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 ## Sammel-Gate (LFH-235/F17)
 
 `./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
-`check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` → `pnpm e2e` →
-`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` →
+`check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
+`release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` + `nur-umnummeriert.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-auswahl.test.sh` + `ci-stufen.test.sh` + `ziel-branch-build.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
@@ -121,7 +121,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   `.prettierignore` des Bereichs. Kein `.git-blame-ignore-revs`.
 - **Node und pnpm stehen nur in `[tools]` von `mise.toml`** (LFH-773): Skripte rufen
   `mise exec -- …`, Workflows `jdx/mise-action` ohne `install_args`. `packageManager`,
-  `engines.node` und der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
+  `engines.node` (Wurzel, `frontend/`, `website/`), `website/.node-version` (Cloudflare Pages) und
+  der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
   prüft das und bricht an jedem harten `node@…`/`pnpm@…` in `scripts/`, `.github/`, README, Skills.
 - Das **OpenSpec-CLI** steht ebenfalls in `[tools]` (`npm:@fission-ai/openspec`), Aufruf
   `mise exec -- openspec …`; kein globales `npm i -g`. Das Gate ruft es nicht.
@@ -224,3 +225,13 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   Verstoß). Overrides pflegen Bereich **und** Zielversion. Der Audit prüft das **Lockfile** in
   einem Wegwerf-Verzeichnis (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`; nie
   `node_modules`; Node/pnpm aus `mise.toml`), Selbsttest `scripts/check-deps.test.sh`.
+- **Karenzzeit** (LLH-1884, `scripts/check-karenzzeit.sh`, Schritt 6, Bündel `schnell`): kein
+  Lockfile (`website/`, `frontend/`, Wurzelpaket) führt ein Paket, das jünger als 24 Stunden ist.
+  `minimumReleaseAge: 1440` steht in jeder `pnpm-workspace.yaml` und wird nicht gesenkt; neue
+  Einträge in `minimumReleaseAgeExclude` nur für eigene Bibliotheken (LFH-505). Das Urteil fällt
+  pnpm selbst an einer Kopie wie beim Audit (`install --frozen-lockfile --lockfile-only`), mit
+  derselben Regel, an der Cloudflare die Website baut. **Rot heißt warten:** die Meldung nennt,
+  ab wann das Paket alt genug ist, danach den Lauf neu starten. Gilt auch für Sicherheits-Updates
+  von Dependabot, die dessen `cooldown` umgehen. Selbsttest `scripts/check-karenzzeit.test.sh`.
+  Scheitert in der CI schon der Frontend-Install daran, fährt `ci.yml` das Skript direkt danach
+  (`if: failure()`), damit die Erklärung dasteht.

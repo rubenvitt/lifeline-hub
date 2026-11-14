@@ -32,6 +32,12 @@ updates:
     groups:
       frontend-minor-und-patch:
         update-types: [minor, patch]
+    # Karenzzeit (LLH-1884): pnpm 11 lehnt Pakete ab, die jünger als 24 Stunden sind
+    # (`minimumReleaseAge` in der pnpm-workspace.yaml, geprüft in Schritt 6 von check-all.sh).
+    # Ein früherer Vorschlag wäre nur ein PR, der einen Tag lang rot steht. Sicherheits-Updates
+    # umgehen den cooldown; für sie meldet Schritt 6, ab wann der Lauf grün wird.
+    cooldown:
+      default-days: 1
     commit-message:
       prefix: 'chore(deps)'
     ignore:
@@ -60,6 +66,9 @@ updates:
     groups:
       release-werkzeug:
         patterns: ['*']
+    # Karenzzeit wie bei /frontend (LLH-1884).
+    cooldown:
+      default-days: 1
     commit-message:
       prefix: 'chore(deps)'
     ignore:
@@ -72,6 +81,27 @@ updates:
       # Der Pin fällt, wenn semantic-release seinen Writer auf 9 hebt — dann von Hand.
       - dependency-name: conventional-changelog-conventionalcommits
         update-types: [version-update:semver-major]
+
+  # Die Marketing-Seite (LFH-1111): eigenes package.json und Lockfile, gebaut von Cloudflare
+  # Pages mit derselben Karenzzeit wie das Gate. Bis LLH-1884 fehlte der Eintrag; Bumps kamen
+  # nur als Sicherheits-Updates, und einer davon brach am 13.11.2026 jeden Vorschau-Bau.
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      website-minor-und-patch:
+        update-types: [minor, patch]
+    # Karenzzeit wie bei /frontend (LLH-1884).
+    cooldown:
+      default-days: 1
+    commit-message:
+      prefix: 'chore(deps)'
+    ignore:
+      # pnpm kommt aus mise.toml (LFH-773), `packageManager` spiegelt nur die Zahl.
+      - dependency-name: pnpm
 
   # Die Actions sind per Commit-SHA gepinnt (siehe Kopf von ci.yml). Genau deshalb braucht es
   # diesen Eintrag: einen SHA hebt niemand von Hand an, und ohne Dependabot fröre die
