@@ -1882,8 +1882,13 @@ describe('Befunde aus dem Testnachzug (kwc2yszv)', () => {
     renderMitProviders(<Schnellerfassung {...props({ initialWerte: LAGE })} />);
     const an = screen.getByRole('combobox', { name: 'An' }) as HTMLInputElement;
     await userEvent.click(an);
-    await waitFor(() => expect(an.selectionEnd).toBe('ELW 1'.length));
-    expect(an.selectionStart).toBe(0);
+    // Markiert wird erst im nächsten Bild nach dem Fokus (`EtbFeldzeile`, `onFocus`). Gewartet wird
+    // auf die ganze Markierung: das Ende steht schon nach dem Klick auf 5 (Schreibmarke am Ende),
+    // ein Warten nur darauf wäre sofort erfüllt und prüfte den Anfang vor dem Bild.
+    await waitFor(() => {
+      expect(an.selectionStart).toBe(0);
+      expect(an.selectionEnd).toBe('ELW 1'.length);
+    });
   });
 
   it('nennt das erste leere Pflichtfeld für Fokuswege von außen', () => {
