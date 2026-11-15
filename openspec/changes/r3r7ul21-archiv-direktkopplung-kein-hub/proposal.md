@@ -19,8 +19,9 @@ Führungswechsel nach der Richtung, und sie macht die Instanz nicht öffentlich 
   die erreichte Seite ist, sperrt weiter, auch eine künftige Art.
 - Am Hub (Standardkopplung, in der sich ein ELW hier meldet) bleibt das Einspielen gesperrt;
   Statuscode, Zeitpunkt der Prüfung und das Ausblenden der Aktion bleiben, wie sie sind.
-- ADR-0045 nennt die Ausnahme in Regel und Prüfung; Anwender- und Betriebshandbuch beschreiben
-  die Sperre entsprechend.
+- ADR-0048 ersetzt ADR-0045 (eine akzeptierte ADR ändert sich nicht, `docs/architektur/AGENTS.md`)
+  und nennt die Ausnahme in Regel und Prüfung; Anwender- und Betriebshandbuch beschreiben die
+  Sperre entsprechend.
 
 ## Capabilities
 
@@ -40,4 +41,4 @@ _keine_
   Ablehnung und Verfügbarkeit und ändert sich nur im Text der Fehlermeldung, falls nötig.
 - Kein Frontend-Code: die Oberfläche fragt `GET /api/admin/archiv/einspielen` und folgt der
   Antwort. Keine API-, Schema- oder Migrationsänderung.
-- Doku: ADR-0045, `docs/anwender/kapitel/aufbewahrung.md`, `docs/betrieb/backup-restore.md`.
+- Doku: ADR-0048 (neu, ersetzt ADR-0045), `docs/anwender/kapitel/aufbewahrung.md`, `docs/betrieb/backup-restore.md`.

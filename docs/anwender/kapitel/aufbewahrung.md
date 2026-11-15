@@ -99,7 +99,9 @@ einspielen“).
 
 ### Ein Archiv einspielen
 
-Für System-Admins, an einer Installation, bei der sich keine andere meldet:
+Für System-Admins, an einer Installation, bei der sich keine andere meldet. Eine Direktkopplung
+vor Ort zählt dabei nicht: ein ELW, der einem zweiten ELW den Code ausgestellt hat, spielt weiter
+ein.
 
 1. In der Verwaltung „Aufbewahrung“ öffnen und „Archiv einspielen“ wählen.
 2. Unter „Archivblock“ die heruntergeladene Datei `….sqlite.age` wählen.
