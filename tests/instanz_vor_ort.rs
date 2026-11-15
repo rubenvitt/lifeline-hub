@@ -440,8 +440,14 @@ async fn archiv_einspielen_verfuegbar(i: &Instanz) -> bool {
 async fn eine_direktkopplung_vor_ort_sperrt_das_archiv_einspielen_nicht() {
     let (elw1, elw2) = vor_ort().await;
     assert_eq!(kopplungen(&elw1).await[0]["richtung"], "wird_gemeldet");
-    assert!(archiv_einspielen_verfuegbar(&elw1).await, "ausstellende Seite");
-    assert!(archiv_einspielen_verfuegbar(&elw2).await, "einlösende Seite");
+    assert!(
+        archiv_einspielen_verfuegbar(&elw1).await,
+        "ausstellende Seite"
+    );
+    assert!(
+        archiv_einspielen_verfuegbar(&elw2).await,
+        "einlösende Seite"
+    );
     // Gegenprobe: am Hub einer Standardkopplung bleibt es gesperrt.
     let (hub, elw) = gekoppelt().await;
     assert!(!archiv_einspielen_verfuegbar(&hub).await);
