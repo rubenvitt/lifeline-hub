@@ -11,7 +11,7 @@ import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
 import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
-import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD } from '../routing/deeplinks';
+import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD, hilfePfad } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
 import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
@@ -92,11 +92,17 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * Name, und an der Umbruchkante des Kopfs reichten 4 px Unterschied für eine zweite Kopfzeile:
  * Rail, Panel und Inhalt sprangen 52 px (CLS 0,556). Vorbild ist `WortPlatz` in `Kopfleiste.tsx`;
  * hier ist der längste Wortlaut nicht bekannt, deshalb eine feste Breite.
+ *
+ * `hilfeDaneben` (im Einsatz-Kopf, LLH-1731 D4/D5): ab `lg` öffnet „Hilfe“ in einem neuen Tab, in
+ * der Desktop-App in einem Nebenfenster, und der Einsatz bleibt im ersten Tab mit seinen Alarmen.
+ * Die Herkunft reist dann als `von` in der Adresse, weil ein neuer Tab den History-State nicht
+ * erbt. Darunter verdeckte ein zweiter Tab den Einsatz nur; dort bleibt es beim selben Tab.
  */
 export default function BenutzerMenu({
   funktion,
   hasFixedWidth = false,
-}: { funktion?: string | null; hasFixedWidth?: boolean } = {}) {
+  hilfeDaneben = false,
+}: { funktion?: string | null; hasFixedWidth?: boolean; hilfeDaneben?: boolean } = {}) {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -111,6 +117,8 @@ export default function BenutzerMenu({
   const isKnapp = useDichte().dichte === 'handschuh';
   // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
+  // Hilfe neben dem Einsatz erst ab `lg` (LLH-1731 D4): darunter Tablet und Handy.
+  const isHilfeImNeuenTab = hilfeDaneben && abBreite('lg');
   // Unter `md` (Handschirm) nimmt das Menü die Fensterbreite abzüglich 2 × 8 px Rand.
   const menueBreite = !abBreite('md')
     ? 'calc(100vw - 16px)'
@@ -277,7 +285,9 @@ export default function BenutzerMenu({
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') void abmelden();
-    else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });
+    else if (key === 'hilfe' && isHilfeImNeuenTab) {
+      window.open(hilfePfad({ von: location.pathname }), '_blank', 'noopener');
+    } else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });
     else if (key === 'neuigkeiten') navigate(NEUIGKEITEN_PFAD);
     else if (key === 'benachrichtigungen') navigate(BENACHRICHTIGUNGEN_PFAD);
   };

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { einsatzPerApi } from './einsatz-kern';
 
 /**
  * Hilfe (LFH-1096, Spec `anwenderdoku`): erreichbar vor der Anmeldung und aus dem Benutzermenü,
@@ -37,6 +38,32 @@ test('angemeldet: Hilfe aus dem Benutzermenü, Gruppe wählen, zurück in die Ap
   await expect(navi.getByText('Gerät verloren')).toBeVisible();
   await expect(navi.getByText('Arbeiten ohne Netz')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Zur App' }).click();
+  // Ohne offenen Einsatz in dieser Sitzung: zur Einsatzliste (LLH-1731).
+  await page.getByRole('button', { name: 'Zu den Einsätzen' }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
+});
+
+test('aus dem Einsatz am breiten Schirm: Hilfe im neuen Tab, Rückweg an die Stelle (LLH-1731)', async ({
+  page,
+}) => {
+  await anmeldenPerApi(page, ADMIN, PW);
+  const name = `Hilfe neben dem Einsatz ${Date.now()}`;
+  const einsatzId = await einsatzPerApi(page, name);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.getByRole('region', { name: 'Einsatztagebuch' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Benutzermenü' }).click();
+  const [hilfe] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.getByRole('menuitem', { name: 'Hilfe' }).click(),
+  ]);
+  await expect(hilfe.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
+  // Die Herkunft ist in den Verlauf gewandert, die Adresse trägt sie nicht mehr.
+  await expect(hilfe).toHaveURL(/\/hilfe$/);
+  // Der Einsatz bleibt im ersten Tab.
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
+
+  await hilfe.getByRole('button', { name: `Zurück zu ${name}` }).click();
+  await expect(hilfe).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
 });
