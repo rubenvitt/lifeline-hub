@@ -52,7 +52,7 @@ Keine.
 
 - Nur Frontend: `frontend/src/einsatz/` (`EinsatzLayout.tsx`, `IconRail.tsx`, `ModulPanel.tsx`,
   ein neuer Merker neben `zuletztModule.ts`), `frontend/src/theme/tokens.ts`
-  (`navDrawerBreite`), `frontend/src/live/LiveStatusBanner.tsx` bzw. `components/rahmenOben.ts`,
+  (`navDrawerBreite`, `navDrawerRand`, mit neu erzeugtem Design System),
   `frontend/src/geraet/GeraeteKopf.tsx`.
 - Browserspeicher: ein neuer Schlüssel je Person und Einsatz (`lfh:nav:kategorie-modul:…`). Er
   bekommt einen Eintrag in `GERAETESPEICHER` mit der Entscheidung „bleibt“, wie die übrigen

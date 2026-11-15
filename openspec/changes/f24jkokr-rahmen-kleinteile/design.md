@@ -45,7 +45,7 @@ Stand im Code:
 
 ### D1 Rail-Gedächtnis: eigener Merker, gefüllt bei jeder Ankunft
 
-Neue Datei `einsatz/kategorieModul.ts` nach dem Muster von `zuletztModule.ts`: Schlüssel
+Neue Datei `einsatz/kategorieModul.ts` nach dem Muster von `zuletztModule.ts` (Exporte `loadKategorieModul`, `saveKategorieModul`, `rueckkehrModul`): Schlüssel
 `lfh:nav:kategorie-modul:<benutzer>:<einsatz>`, Wert `{ [kategorie]: { key, at } }`, Frist
 `ZULETZT_FRIST_MS` (12 h), jeder Zugriff über `sicherLesen`/`sicherSchreiben`.
 
@@ -111,8 +111,13 @@ ist ein e2e-Maß bei 390 × 844 (342 px).
 Die reine Funktion `kopplungRestText(laeuftAbAt, jetzt)` liefert ab 60 min `noch N h` (ganze
 Stunden, abgerundet: lieber zu früh gewarnt), darunter `noch N min` (aufgerundet, mindestens 1).
 Nach dem Ende kommt `endet` (kurz, bis die Hülle auf „Kopplung beendet“ wechselt). Sichtbar steht
-„Kopplung noch 5 h“. `title` und `aria-label` lauten „Kopplung bis <zeitpunkt>“ mit `zeitpunkt` in
-der Konvention der Hülle, bald ergänzt um „Verlängern: Einsatzleitung“. Die Hervorhebung unter
+„Kopplung noch 5 h“. Der `title` lautet „Kopplung bis <zeitpunkt>“ mit `zeitpunkt` in der
+Konvention der Hülle, bald ergänzt um „Verlängern: Einsatzleitung“. Das `aria-label` nennt
+Restzeit und Endzeit: „Kopplung noch 5 Stunden, bis …“, bald „Kopplung endet bald, noch 40
+Minuten, bis …“, abgelaufen „Kopplung endet jetzt, bis …“. Minuten werden abgerundet wie die
+Stunden (Review: aufgerundet stand nach „1 h“ eine Minute lang „60 min“), mindestens 1.
+Die Endzeit steht nur noch im Hinweis; auf Touch-Geräten zeigt der Browser ihn nicht, dort bleibt
+die Restzeit. Die Hervorhebung unter
 einer Stunde bleibt (`kopplungEndetBald`). Takt: `useMinutenTakt` wie bisher.
 
 Verworfen: nur das Wort „Kopplung“ vor die DTG. Das bleibt für viele unlesbar. Immer Klartextzeit:

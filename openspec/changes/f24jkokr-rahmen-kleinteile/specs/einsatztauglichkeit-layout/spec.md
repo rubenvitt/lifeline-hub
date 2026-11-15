@@ -19,9 +19,10 @@ Sitzung öffnen.
 
 ### Requirement: Der Rail-Fuß bleibt im Fenster
 
-Ab `lg` MUST der Fuß der Rail („Menü“, „Einst.“) im Fenster stehen, auch wenn über der Kopfleiste
-oder zwischen Kopfleiste und Rail eine Zeile im Fluss steht, etwa die Betriebszeile mit dem
-Offline-Hinweis.
+Ab `lg` MUST die Spalte der Rail am unteren Fensterrand enden, auch wenn über der Kopfleiste oder
+zwischen Kopfleiste und Rail eine Zeile im Fluss steht, etwa die Betriebszeile mit dem
+Offline-Hinweis. Passen Kategorien und Fuß („Menü“, „Einst.“) in die Höhe, steht der Fuß damit im
+Fenster; sonst rollt die Spalte in sich, und der Fuß folgt den Kategorien.
 
 #### Scenario: Offline am Fükw
 

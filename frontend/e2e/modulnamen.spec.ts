@@ -17,7 +17,10 @@ async function einsatzAnlegen(page: Page): Promise<string> {
   return String(((await antwort.json()) as { id: number }).id);
 }
 
-/** Jede Beschreibung der offenen Liste steht ganz im Behälter, keine ragt waagerecht hinaus. */
+/**
+ * Jede Beschreibung der offenen Liste steht ganz im Behälter, keine ragt waagerecht hinaus, und
+ * keine ist abgeschnitten (LLH-1734: höchstens zwei Zeilen, dann „…“, Spec `modul-benennung`).
+ */
 async function beschreibungenImRahmen(rahmen: Locator, wo: string): Promise<number> {
   const masse = await rahmen.locator('[data-lfh="modul-beschreibung"]').evaluateAll((alle) =>
     alle.map((b) => {
@@ -28,6 +31,7 @@ async function beschreibungenImRahmen(rahmen: Locator, wo: string): Promise<numb
         rechts: kasten.right,
         knopfRechts: knopf.right,
         knopfScroll: b.closest('button')!.scrollWidth - b.closest('button')!.clientWidth,
+        abgeschnitten: b.scrollHeight > b.clientHeight || b.scrollWidth > b.clientWidth,
       };
     }),
   );
@@ -35,6 +39,7 @@ async function beschreibungenImRahmen(rahmen: Locator, wo: string): Promise<numb
     expect(m.text.length, `${wo}: Beschreibung nicht leer`).toBeGreaterThan(0);
     expect(m.rechts, `${wo}: „${m.text}“ im Knopf`).toBeLessThanOrEqual(m.knopfRechts + 0.5);
     expect(m.knopfScroll, `${wo}: „${m.text}“ ohne Überlauf`).toBeLessThanOrEqual(0);
+    expect(m.abgeschnitten, `${wo}: „${m.text}“ ohne Auslassung`).toBe(false);
   }
   return masse.length;
 }
