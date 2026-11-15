@@ -78,7 +78,11 @@ test('Einheit und Fahrzeug in der Zeile setzen, Ansicht, Fahrzeugseite und Melde
 
   // Fokus und Zeiger verlassen die Liste, dann wandert die Zeile in die Gruppe der Einheit.
   await page.mouse.move(0, 0);
-  await page.getByRole('link', { name: 'Kräfteübersicht' }).focus();
+  // Der Modulmenü-Eintrag, nicht der gleichnamige Verweis der Verdichtungszeile im Inhalt.
+  await page
+    .locator('[data-lfh="modul-panel"]')
+    .getByRole('link', { name: 'Kräfteübersicht' })
+    .focus();
   await expect(region.getByText(new RegExp(`1 ${EINHEIT}`))).toBeVisible();
   await expect(region.getByText(/nicht eingeteilt/)).toHaveCount(0);
 

@@ -34,8 +34,11 @@ function haeltTreffflaeche(wert: number, name: string) {
 
 const HANDSCHIRM = { width: 390, height: 844 };
 
-/** Erwartete Drawer-Breite als Literal — aus `theme/tokens` gelesen prüfte der Test sich selbst. */
-const DRAWER_BREITE = 280;
+/**
+ * Erwartete Drawer-Breite als Literal — aus `theme/tokens` gelesen prüfte der Test sich selbst.
+ * LLH-1734: 360 px, höchstens Fensterbreite minus 48 px, bei 390 px also 342.
+ */
+const DRAWER_BREITE = 342;
 
 async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
   await anmeldenPerApi(page, ADMIN, PW, optionen);
