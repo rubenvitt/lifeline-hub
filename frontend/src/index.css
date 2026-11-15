@@ -1,9 +1,23 @@
 /* Globaler Reset: ohne ihn bleibt `body { margin: 8px }` als weißer Rahmen stehen und
-   `min-height: 100vh` erzeugt äußere Scrollbars. */
+   `min-height: 100vh` erzeugt äußere Scrollbars. Die Textschrift steht hier und nicht nur an
+   antds `.ant-app`, sonst rechnen Portale an `document.body` (Eingangsband, Punktanker-Menü)
+   auf die Vorgabe des Browsers, eine Serifenschrift (LLH-1772, Wächter
+   `theme/schriftReset.guard.test.ts`). */
 html,
 body {
   margin: 0;
   padding: 0;
+  font-family: var(--lfh-schrift-text);
+}
+
+/* Native Bedienelemente erben die Schrift im Browser nicht und fielen sonst auf Arial bzw. die
+   Systemschrift in 13,33 px zurück (LLH-1772). Element-Spezifität (0,0,1): antds Klassenregeln
+   gewinnen weiter. */
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
 /* Kein Zoom wie in einer App (LLH-1328, `frontend/AGENTS.md`, Bedien-Leitlinie), Gegenstück zum
