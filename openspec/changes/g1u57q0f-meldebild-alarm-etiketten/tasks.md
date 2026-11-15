@@ -8,8 +8,8 @@
 ## 2. Meldebild
 
 - [x] 2.1 `KraefteuebersichtPage.tsx` `StatusSpalte`: je Grund ein `StatusChip ton="alarm"` mit `grundWort`, Zeitbasis die Seitenuhr (wie `rueckmeldungDerZeile`). Spalte „Rückmeldung“ färbt überfällig in Alarm über `RUECKMELDUNG_ROLLE`. Seitentest: Chips mit `data-rolle="alarm"` und Wortlaut, Uhrzeit überfällig in Alarm.
-- [ ] 2.2 Problemzeile nachts: `problemZeile` in `tokens.ts` und `--lfh-problem-zeile` in `rollen.css` (Nacht) anheben; Farbrollen-Gate und `kraefte-kontrast.spec.ts` grün; Druckregel in `kraefteuebersichtPrint.css` prüfen.
-- [ ] 2.3 Anwenderdoku `meldebild.md` (Gründe als rote Etiketten mit Dauer, überfällige Rückmeldung rot) und Bild über den Bildlauf erneuern; `mise exec -- openspec validate g1u57q0f-meldebild-alarm-etiketten --strict` grün.
+- [x] 2.2 Problemzeile nachts: `problemZeile` in `tokens.ts` und `--lfh-problem-zeile` in `rollen.css` (Nacht) anheben; Farbrollen-Gate und `kraefte-kontrast.spec.ts` grün; Druckregel in `kraefteuebersichtPrint.css` prüfen.
+- [x] 2.3 Anwenderdoku `meldebild.md` (Gründe als rote Etiketten mit Dauer, überfällige Rückmeldung rot) und Bild über den Bildlauf erneuern; `mise exec -- openspec validate g1u57q0f-meldebild-alarm-etiketten --strict` grün.
 
 ## Workflow follow-up
 

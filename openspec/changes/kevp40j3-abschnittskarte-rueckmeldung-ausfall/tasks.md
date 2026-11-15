@@ -17,7 +17,7 @@ Voraussetzung: Gruppe 1 der Change `g1u57q0f-meldebild-alarm-etiketten` ist umge
 ## 3. Regel und Doku
 
 - [x] 3.1 `frontend/AGENTS.md`, „Eine Heimat je Zahl“: Ausfall einer Einheit nur über die Gründe der Tönung des Meldebilds (`toenungsGruende`), Rückmeldung eines Abschnitts je Einheit. Prettier über `frontend/` grün.
-- [ ] 3.2 `docs/anwender/kapitel/ueberblick.md` Schritt 4 (Etiketten, „nicht verfügbar“, Lagezustand bleibt) und Bild über den Bildlauf erneuern; `mise exec -- openspec validate kevp40j3-abschnittskarte-rueckmeldung-ausfall --strict` grün.
+- [x] 3.2 `docs/anwender/kapitel/ueberblick.md` Schritt 4 (Etiketten, „nicht verfügbar“, Lagezustand bleibt) und Bild über den Bildlauf erneuern; `mise exec -- openspec validate kevp40j3-abschnittskarte-rueckmeldung-ausfall --strict` grün.
 
 ## Workflow follow-up
 

@@ -9,11 +9,11 @@
 
 - [x] 2.1 `erinnerung/erinnerungZustand.ts` mit Test zuerst: fällig per `ist_faellig` oder `faellig_at <= jetzt` → `{ wort: 'fällig', ton: 'achtung' }`, sonst `{ wort: 'bald', ton: null }`.
 - [x] 2.2 `markenBewertung` liest die Funktion für `art === 'erinnerung'` bei verstrichener Zeit; `OffeneVorgaengePaneel` nimmt Wort und Ton aus ihr. Tests in `ueberblickDaten.test.ts` (Erinnerung verstrichen → „fällig“/achtung; Auftrag verstrichen → „überfällig“/alarm unverändert).
-- [ ] 2.3 Folgeaufgabe per `zunder-task-anlegen`: Erinnerungskarte im Modul (alarm) mit Überblick angleichen. Betrifft `KommKarte`/`kartenKante` und Spec `deeplink-hervorhebung`. Link im PR.
+- [x] 2.3 Folgeaufgabe per `zunder-task-anlegen` (LLH-1911, https://zunder.rubeen.dev/#/aufgabe/wyfk3i0mw59mymnv1kvewg30): Erinnerungskarte im Modul (alarm) mit Überblick angleichen. Betrifft `KommKarte`/`kartenKante` und Spec `deeplink-hervorhebung`. Link im PR.
 
 ## 3. Doku
 
-- [ ] 3.1 `docs/anwender/kapitel/ueberblick.md`: Offene Vorgänge (Sofort/Dringend oben, Wörter) und Nächste Marken (Erinnerung „fällig“ in Gelb, „überfällig“ nur für Fristen); Bild des Überblicks über den Bildlauf erneuern, falls es eine Meldungsliste zeigt. Doku-Wächter grün; `mise exec -- openspec validate ro4s6p7l-ueberblick-dringlichkeit --strict` grün.
+- [x] 3.1 `docs/anwender/kapitel/ueberblick.md`: Offene Vorgänge (Sofort/Dringend oben, Wörter) und Nächste Marken (Erinnerung „fällig“ in Gelb, „überfällig“ nur für Fristen); Bild des Überblicks über den Bildlauf erneuern, falls es eine Meldungsliste zeigt. Doku-Wächter grün; `mise exec -- openspec validate ro4s6p7l-ueberblick-dringlichkeit --strict` grün.
 
 ## Workflow follow-up
 

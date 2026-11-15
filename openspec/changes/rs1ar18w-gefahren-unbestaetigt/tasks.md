@@ -15,7 +15,7 @@
 
 - [x] 3.1 e2e und Bildlauf auf den Wortlaut: `gefahren-druck.spec.ts` („Beurteilung unbestätigt“), `gate3-trefflaeche.spec.ts`, `trefflaeche-pruefflaechen.spec.ts`, `doku-bilder/gefahren.bilder.ts`, `doku-bilder/lagebild.bilder.ts`; `git grep "nicht beurteilt" frontend/e2e` trifft nur noch Abschnitts-Lagezustände.
 - [x] 3.2 Purpose der Hauptspec `openspec/specs/gefahrenmatrix/spec.md` auf „bestätigt … / unbestätigt“ nachziehen (die Delta trägt nur die Requirements); `mise exec -- openspec validate rs1ar18w-gefahren-unbestaetigt --strict` grün.
-- [ ] 3.3 Anwenderdoku `gefahren.md`, `lagebild.md`, `ueberblick.md`, `lageberichte.md` auf „unbestätigt“/„bestätigt“ (nicht `einsatzabschnitte.md`, dort ist der Lagezustand gemeint); betroffene Bilder über den Bildlauf neu erzeugen; Doku-Wächter (`check-all.sh`, Bündel der Anwenderdoku) grün.
+- [x] 3.3 Anwenderdoku `gefahren.md`, `lagebild.md`, `ueberblick.md`, `lageberichte.md` auf „unbestätigt“/„bestätigt“ (nicht `einsatzabschnitte.md`, dort ist der Lagezustand gemeint); betroffene Bilder über den Bildlauf neu erzeugen; Doku-Wächter (`check-all.sh`, Bündel der Anwenderdoku) grün.
 
 ## Workflow follow-up
 
