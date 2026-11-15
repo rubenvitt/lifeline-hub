@@ -1,7 +1,7 @@
 import { IconPfeilRunter } from '../../icons';
 import { Button } from 'antd';
 import type { CSSProperties, ReactNode, Ref } from 'react';
-import { useRollen, schriftGroesse, schriftStil } from './rollenwerte';
+import { useRollen, schriftStil } from './rollenwerte';
 
 /**
  * Sammelbanner — „12 neue Meldungen" statt eingeschobener Zeilen (Neuentwurf S4;
