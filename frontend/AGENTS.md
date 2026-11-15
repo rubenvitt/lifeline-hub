@@ -108,23 +108,39 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`einsatz/IconRail.tsx`, Kurzetikett `kurz`, voller Name als `aria-label`, Einstellungen per
   `fuss: true`) · Modulpanel (`einsatz/ModulPanel.tsx`) · Sprungpalette
   (`command-palette/CommandPalette.tsx`). Maße im Entwurf.
-  - **Stehenbleiben** (LFH-952, LLH-1728, Spec `einsatztauglichkeit-layout`): der Kopf klebt in
-    jeder Breite (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter;
-    unter `md` klebt die Betriebszeile bei Störung (offline, Live `lost`) über dem Kopf, denn dort
-    steht die Verbindung im Kopf nur als Symbol. Am Handy trägt der Einsatzkopf eine Zeile: Menü,
-    Einsatzname, Alarmzentrale (Ruhe als Glocke, Störung im Wort), Verbindung, Uhr (umbrechen darf
-    er nur in `handschuh` bei einer Störung im Wort der Alarmzentrale); Suche und
-    Benutzermenü stehen dort im Drawer „Navigation“. Der App-Rahmen lässt unter `md` die Wortmarke
-    weg, ihr Link liegt dann auf der Bildmarke. Herleitung:
-    `openspec/changes/ejt520so-handy-kopfleiste-fixiert/design.md`.
-    Der Fuß der Rail (Griff „Menü“, Einstellungen) klebt nicht: reicht die Höhe nicht, folgt er den
-    Kategorien, statt sie zu verdecken (LLH-1273, `e2e/gate3-trefflaeche.spec.ts` „Rail“).
+  - **Stehenbleiben** (LFH-952, zjt7c073, LLH-1728, Spec `einsatztauglichkeit-layout`): der Kopf
+    klebt in jeder Breite (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` Rail-Kategorien und
+    Modulpanel darunter; unter `md` klebt die Betriebszeile bei Störung (offline, Live `lost`) über
+    dem Kopf, denn dort steht die Verbindung im Kopf nur als Symbol. Am Handy trägt der Einsatzkopf
+    eine Zeile: Menü, Einsatzname, Alarmzentrale (Ruhe als Glocke, Störung im Wort), Verbindung,
+    Uhr (umbrechen darf er nur in `handschuh` bei einer Störung im Wort der Alarmzentrale); Suche
+    und Benutzermenü stehen dort im Drawer „Navigation“. Der App-Rahmen lässt unter `md` die
+    Wortmarke weg, ihr Link liegt dann auf der Bildmarke. Herleitung:
+    `openspec/changes/ejt520so-handy-kopfleiste-fixiert/design.md`. Der Fuß der Rail (Griff „Menü“,
+    Einstellungen) klebt nicht: reicht die Höhe nicht, folgt er den Kategorien, statt sie zu
+    verdecken (LLH-1273, `e2e/gate3-trefflaeche.spec.ts` „Rail“). Das Modulpanel ist eine Spalte
+    mit festem Kopf und Fuß „Einsatzdauer“, nur die Liste rollt in sich (`modul-panel-spalte`);
+    ihre Höhe ist gemessen (Oberkante im Fenster bis Fensterrand), und die Liste holt den aktiven
+    Eintrag ins Bild.
+  - **Der Seitenkopf klebt, wenn er passt** (zjt7c073 D3, `components/seitenkopfKleben.ts`): ab
+    `md` auf jeder `EinsatzSeite` und `AdminPage`, solange Kopf und Seitenkopf höchstens ein
+    Drittel der Fensterhöhe nehmen (`KLEBEN_HOECHSTENS`), nie in einem eigenen Scrollbereich
+    (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block).
+    `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die Leiste, nicht
+    Hinweis oder Beschreibung darunter.
+  - **Zwei Höhen** (zjt7c073 D2, `components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
+    ist der Kopf samt Betriebszeile und Übungsband (Ebene `kopf`), `--lfh-rahmen-oben`
+    (`useRahmenOben`) dazu der klebende Seitenkopf. Die Kopfhöhe nehmen nur, was neben dem Inhalt
+    klebt (Rail, Modulpanel, Verwaltungsmenü), der Seitenkopf selbst und die Klebe-Entscheidungen;
+    alles andere die Rahmenhöhe (Guard). Innerhalb der Ebene `kopf` stapelt sich der Rahmen nach
+    Rang (`RAHMEN_RANG`: Betriebszeile, Kopf, Übungsband; `useRahmenObenStapel`, LLH-1728,
+    ADR-0055): jede Quelle klebt unter denen mit kleinerem Rang.
   - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
     rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
-    nie gerechnet). Der Rahmen selbst stapelt sich nach Rang (`RAHMEN_RANG`: Betriebszeile,
-    Kopf, Übungsband; `useRahmenObenStapel`): jede Quelle klebt unter denen mit kleinerem Rang. Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
-    `components/rahmenOben.guard.test.ts`). Den Fokusabstand trägt `scroll-padding-block-start`
-    am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
+    nie gerechnet), also auch unter den klebenden Seitenkopf. Ausnahme nur mit Vermerk
+    `rahmen-oben: frei` und Grund (Guard `components/rahmenOben.guard.test.ts`). Den Fokusabstand
+    trägt `scroll-padding-block-start` am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen;
+    bei Fokus im Seitenkopf gilt nur die Kopfhöhe.
   - **Stehende Alarme liegen unter der Bedienkante** (LFH-1112, Spec
     `einsatztauglichkeit-layout`): unter Kommandoleiste und Seitenkopf, solange er im Bild ist,
     gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
@@ -141,7 +157,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (`druck/AGENTS.md`), in Text- und Bildtiteln als Präfix „ÜBUNG · “ (ADR-0053). Erkennbar ist sie
     an Form und Wort (schraffiertes Band, gefüllter Chip, immer „ÜBUNG“), nicht am Farbton: violett
     sind auch die ETB-Entscheidung, die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
-    Rahmenquellen (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
+    Quellen der Kopfhöhe, über einem klebenden Seitenkopf (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel } from '../theme/tokens';
 import ModulPanel, {
+  modulBeschreibungStil,
   modulListenStil,
   modulMarkeStil,
   modulZeilenStil,
@@ -434,6 +435,39 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
     expect(container.querySelector('[data-lfh="modul-panel-fuss"]')).toBeNull();
   });
 
+  /**
+   * zjt7c073 D4: Das Panel klebt wie die Rail als eine Spalte unter dem Kopf. Kopf und Fuß stehen
+   * fest, nur die Liste rollt in sich — so liegt kein Teil über einem anderen. Die Geometrie misst
+   * `e2e/rahmen-stehen-bleiben.spec.ts`.
+   */
+  it('klebt als Spalte unter dem Kopf; nur die Liste rollt, Kopf und Fuß stehen fest', () => {
+    const { container } = renderMitProviders(
+      <ModulPanel
+        einsatzId={7}
+        titel="Führung"
+        einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: null }}
+        module={module}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    const spalte = container.querySelector<HTMLElement>('[data-lfh="modul-panel-spalte"]')!;
+    expect(spalte.style.position).toBe('sticky');
+    expect(spalte.style.top).toBe('var(--lfh-kopf-oben, 0px)');
+    // Die Höhe ist gemessen (Review B2): vom Ort der Spalte im Fenster bis zum Fensterrand.
+    expect(spalte.style.height).toBe(`${window.innerHeight}px`);
+    expect(spalte.style.overflowY).not.toBe('auto');
+    const liste = spalte.querySelector<HTMLElement>('[data-lfh="modul-panel-liste"]')!;
+    expect(liste.style.overflowY).toBe('auto');
+    expect(liste.style.minHeight).toBe('0px');
+    const fuss = spalte.querySelector<HTMLElement>('[data-lfh="modul-panel-fuss"]')!;
+    // Der Fuß klebt nicht mehr am Fensterrand des Dokuments, er steht am Ende der Spalte.
+    expect(fuss.style.position).toBe('');
+    expect(fuss.style.flexShrink).toBe('0');
+    expect(liste.compareDocumentPosition(fuss) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('trägt Kopf-Augenbraue und Panelgrund aus den Nachtrollen (Vorgabe)', () => {
     const { container } = renderMitProviders(
       <ModulPanel
@@ -614,6 +648,20 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
     expect(etb).toHaveAttribute('title', 'Einsatztagebuch');
   });
 
+  /**
+   * LLH-1734 (Spec `modul-benennung`): im 208 px breiten Panel endete fast jede Beschreibung nach
+   * einer Zeile in „…“. Sie bricht jetzt auf höchstens zwei Zeilen um, erst danach die Auslassung.
+   * jsdom rechnet keinen Umbruch, deshalb am reinen Stil.
+   */
+  it('bricht die Beschreibung auf höchstens zwei Zeilen um, dann „…“', () => {
+    const stil = modulBeschreibungStil({ schwach: '#777' }, false);
+    expect(stil.whiteSpace).toBe('normal');
+    expect(stil.display).toBe('-webkit-box');
+    expect(stil.WebkitLineClamp).toBe(2);
+    expect(stil.WebkitBoxOrient).toBe('vertical');
+    expect(stil.overflow).toBe('hidden');
+  });
+
   it('lässt ein Modul ohne Beschreibung einzeilig, ohne leere Beschreibung', () => {
     renderMitProviders(
       <ModulPanel
@@ -721,6 +769,112 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
     zeige({ freigaben: freigaben({ fernmeldewesen: { sichtbar: false, zugriff: false } }) });
     for (const label of MARKEN) {
       expect(queryNavEintrag(new RegExp(`^${label}, springt zu`)), label).not.toBeInTheDocument();
+    }
+  });
+});
+
+/**
+ * Review zjt7c073 (B8): Die Liste rollt in sich. Der aktive Eintrag kommt ins Bild (auch nach
+ * einem Sprung über die Palette), und eine neue Kategorie beginnt oben, statt die Rollposition der
+ * vorigen zu erben. jsdom rechnet kein Layout: die Lage kommt aus einer Attrappe.
+ */
+describe('ModulPanel — aktiver Eintrag im Bild', () => {
+  function lageAttrappe(aktivOben: number) {
+    return vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const rect = (top: number, bottom: number) =>
+        ({
+          top,
+          bottom,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: bottom - top,
+          x: 0,
+          y: top,
+        }) as DOMRect;
+      if (this.dataset.lfh === 'modul-panel-liste') return rect(0, 100);
+      if (this.getAttribute('aria-current') === 'true') return rect(aktivOben, aktivOben + 30);
+      return rect(0, 0);
+    });
+  }
+
+  it('holt den aktiven Eintrag unter dem Rand ins Bild', () => {
+    const spion = lageAttrappe(150);
+    try {
+      const { container } = renderMitProviders(
+        <ModulPanel
+          einsatzId={7}
+          titel="Erfassung"
+          module={module}
+          freigaben={freigaben()}
+          aktiverModulKey="sach"
+          onModulKlick={() => {}}
+        />,
+      );
+      const liste = container.querySelector<HTMLElement>('[data-lfh="modul-panel-liste"]')!;
+      expect(liste.scrollTop).toBe(80);
+    } finally {
+      spion.mockRestore();
+    }
+  });
+
+  it('eine neue Kategorie beginnt oben', () => {
+    const spion = lageAttrappe(10);
+    try {
+      const props = { module, freigaben: freigaben(), onModulKlick: () => {} };
+      const { container, rerender } = renderMitProviders(
+        <ModulPanel einsatzId={7} titel="Erfassung" aktiverModulKey="etb" {...props} />,
+      );
+      const liste = container.querySelector<HTMLElement>('[data-lfh="modul-panel-liste"]')!;
+      liste.scrollTop = 50;
+      rerender(<ModulPanel einsatzId={7} titel="Lage" aktiverModulKey="etb" {...props} />);
+      expect(liste.scrollTop).toBe(0);
+    } finally {
+      spion.mockRestore();
+    }
+  });
+});
+
+/**
+ * Review zjt7c073 (B2): Stehen Bänder über dem Rahmen (Spiegel, Führungshinweis), beginnt die
+ * Spalte ungerollt tiefer als die Kopfleiste. Sie reicht dann trotzdem nur bis zum Fensterrand,
+ * sonst läge der Fuß „Einsatzdauer“ darunter.
+ */
+describe('ModulPanel — Spalte endet am Fensterrand', () => {
+  it('rechnet die Höhe von der Oberkante der Spalte im Fenster', () => {
+    const spion = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const top = this.dataset.lfh === 'modul-panel-spalte' ? 120 : 0;
+        return {
+          top,
+          bottom: top,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: 0,
+          x: 0,
+          y: top,
+        } as DOMRect;
+      });
+    try {
+      const { container } = renderMitProviders(
+        <ModulPanel
+          einsatzId={7}
+          titel="Erfassung"
+          einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: null }}
+          module={module}
+          freigaben={freigaben()}
+          aktiverModulKey={null}
+          onModulKlick={() => {}}
+        />,
+      );
+      const spalte = container.querySelector<HTMLElement>('[data-lfh="modul-panel-spalte"]')!;
+      expect(spalte.style.height).toBe(`${window.innerHeight - 120}px`);
+    } finally {
+      spion.mockRestore();
     }
   });
 });

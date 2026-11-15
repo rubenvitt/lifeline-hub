@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx]
 ---
 
 ## Überblick
@@ -78,15 +78,17 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
 ### Ein Modul öffnen
 
 1. Links eine Kategorie wählen: „Führung“, „Kräfte“, „Erfass.“ (Erfassung), „Lage“, „Komm.“
-   (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das erste Modul der
-   Kategorie und zeigt daneben ihre Module.
+   (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das Modul der
+   Kategorie, das in diesem Einsatz zuletzt offen war, beim ersten Mal in ihr erstes Modul, und
+   zeigt daneben ihre Module. Unter jedem Modul steht in bis zu zwei Zeilen, was es enthält.
 
    ![Geöffneter Einsatz: Kopfzeile mit Einsatzname, Suchen, Alarmzentrale, SYNC und Uhr; links die Kategorien, daneben die Module der Kategorie „Führung“, rechts der Überblick](../bilder/einsatz-oberflaeche/arbeitsflaeche.png)
 
 2. In der Modulliste das Modul wählen. Die Zahl neben einem Modul zählt dessen Inhalt, etwa
    Einträge im Einsatztagebuch, offene Aufträge oder ungelesene Nachrichten im Chat.
 3. Die Modulliste einklappen: unten in der Kategorienleiste „Menü“ wählen, oder ein zweites
-   Mal auf die offene Kategorie tippen. „Menü“ klappt sie wieder aus.
+   Mal auf die offene Kategorie tippen. „Menü“ klappt sie wieder aus. Eingeklappt bleibt sie
+   auch beim Sprung in eine andere Kategorie.
 
 Ein Modul lässt sich auch in einem neuen Tab öffnen, etwa für einen zweiten Bildschirm: mit
 **Strg+Klick** (am Mac **⌘+Klick**) oder der mittleren Maustaste auf das Modul, oder über „In
@@ -332,6 +334,12 @@ Berechtigung“ da. Was die eigene Rolle im Einsatz erlaubt, steht in
 [Rechte im Einsatz](rechte-im-einsatz.md).
 
 Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
+
+Auf langen Seiten rollt nur der Inhalt. Die Kopfzeile bleibt oben stehen, ab Tabletbreite auch
+der Kopf der Seite mit Titel und Knöpfen; auf breiten Bildschirmen auch die Kategorien und die
+Modulliste daneben. Hat eine Kategorie mehr Module, als ins Fenster passen, rollt die Modulliste
+für sich. In einem niedrigen Fenster rollt der Kopf der Seite mit, damit für den Inhalt Platz
+bleibt. Dasselbe gilt in der Verwaltung.
 
 Einige Einträge der Modulliste sind **Sprungmarken** in eine Ansicht eines Moduls. Sie stehen
 eingerückt mit einer feinen Linie direkt unter diesem Modul: „Entscheidungen“ unter „ETB“

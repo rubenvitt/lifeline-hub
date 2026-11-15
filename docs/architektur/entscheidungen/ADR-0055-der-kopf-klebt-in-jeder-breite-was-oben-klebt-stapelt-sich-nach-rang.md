@@ -1,5 +1,5 @@
 ---
-id: ADR-0054
+id: ADR-0055
 titel: Der Kopf klebt in jeder Breite, und was oben klebt, stapelt sich nach Rang
 status: akzeptiert
 datum: 2026-11-15
@@ -14,7 +14,7 @@ herleitung:
   - Zunder LLH-1728 (Inhalt der Handy-Zeile, Reichweite und Stapel abgestimmt mit Ruben am 15.11.2026)
 ---
 
-# ADR-0054: Der Kopf klebt in jeder Breite, und was oben klebt, stapelt sich nach Rang
+# ADR-0055: Der Kopf klebt in jeder Breite, und was oben klebt, stapelt sich nach Rang
 
 ## Regeln
 

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { leseRahmenOben } from '../rahmenOben';
+import { readRahmenOben } from '../rahmenOben';
 import { UebungsBand, UebungsMarke } from './Uebung';
 
 const UEBUNG = { einsatzart: 'uebung' as const };
@@ -75,16 +75,16 @@ describe('UebungsBand (LLH-1725, Spec `uebungsmarke`)', () => {
       const band = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]')!;
       expect(band.style.position).toBe('sticky');
       expect(band.style.top).toBe('0px');
-      expect(leseRahmenOben()).toBe(24);
+      expect(readRahmenOben()).toBe(24);
       unmount();
-      expect(leseRahmenOben()).toBe(0);
+      expect(readRahmenOben()).toBe(0);
     });
 
     it('nicht klebend steht es im Fluss und meldet keine Höhe (Gerätehülle, D7)', () => {
       render(<UebungsBand einsatz={UEBUNG} klebend={false} />);
       const band = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]')!;
       expect(band.style.position).toBe('');
-      expect(leseRahmenOben()).toBe(0);
+      expect(readRahmenOben()).toBe(0);
     });
   });
 });

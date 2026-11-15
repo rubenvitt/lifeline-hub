@@ -132,6 +132,10 @@ test.describe(KAPITEL, () => {
     ]) {
       await fuelle(page, 'post', `${pfad}/verletzungen`, verletzung);
     }
+    // Höher als der Fükw, damit der Patientenkopf samt Körperschema ohne Bildlauf ganz steht:
+    // sonst setzt Playwright die Aufnahme beim Scrollen zusammen, und die klebende Kopfleiste mit
+    // dem Übungsband läge quer im Bild (wie in `gefahren.bilder.ts`).
+    await page.setViewportSize({ width: 1440, height: 1400 });
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/personen/${person.id}`);
     const kopf = page.getByRole('region', { name: 'Patientenkopf' });

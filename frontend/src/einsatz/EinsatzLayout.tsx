@@ -8,7 +8,6 @@ import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../api/einsa
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  erstesFreigegebenesModul,
   freiesRueckwegModul,
   istModulAusblendbar,
   istModulGesperrt,
@@ -32,6 +31,7 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
+import { loadKategorieModul, rueckkehrModul, saveKategorieModul } from './kategorieModul';
 import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import { isUebung } from './einsatzart';
 import { NichtGefundenProvider } from './nichtGefundenContext';
@@ -57,7 +57,13 @@ import { useViewport } from '../components/useViewport';
 import { useDokumentTitel } from '../components/useDokumentTitel';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
-import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
+import {
+  farbenDunkel,
+  navDrawerBreite,
+  navDrawerRand,
+  rahmenFarben,
+  schrift,
+} from '../theme/tokens';
 import {
   einsaetzePfad,
   einsatzEinstellungenPfad,
@@ -309,6 +315,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       merkeLetztenOrt(benutzerId, { einsatzId, pfad: pathname });
     }
   }, [merkbar, benutzerId, einsatzId, pathname]);
+  // Das zuletzt besuchte Modul je Kategorie für den Rail-Sprung (LLH-1734, `kategorieModul.ts`):
+  // jede Ankunft zählt, unter derselben Bedingung wie der letzte Ort.
+  useEffect(() => {
+    if (merkbar && benutzerId != null && aktuellesModul) {
+      saveKategorieModul(benutzerId, einsatzId, aktuellesModul);
+    }
+  }, [merkbar, benutzerId, einsatzId, aktuellesModul]);
   const modulZaehler = useModulZaehler({ einsatzId, freigaben: modulFreigaben });
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
@@ -339,11 +352,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   }
 
   /**
-   * Rail-Klick im inline-Rahmen: SELBSTKLICK = UMKLAPPEN, FREMDKLICK = SPRUNG in das erste
-   * freigegebene Modul der Kategorie.
+   * Rail-Klick im inline-Rahmen: SELBSTKLICK = UMKLAPPEN, FREMDKLICK = SPRUNG in das zuletzt
+   * besuchte Modul der Kategorie, sonst das erste freigegebene (LLH-1734, `kategorieModul.ts`).
    * Nicht immer navigieren: der Angleich-Effekt höbe sonst das persistierte Zuklappen in
    * derselben Runde auf. Die Rail behält ihre Hervorhebung über
-   * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen.
+   * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen, auch gegen eine
+   * gemerkte Wahl „zu“.
    * Dieser Sprung wird NICHT gemerkt: sein Ziel hat niemand gewählt, und drei Rail-Klicks
    * überschrieben sonst die ganze „Zuletzt"-Liste. Gemerkt wird in `onModulKlick`.
    */
@@ -353,11 +367,21 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       return;
     }
     setOffeneKategorie(key);
-    // Öffnet das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem ersten Sprung am
-    // Tablet die Vorgabe „zu“ für immer weg.
-    setSprungOffen(true);
-    const ziel = erstesFreigegebenesModul(key, modulFreigaben);
+    const ziel = sprungZiel(key);
+    // Ohne Wahl öffnet der Sprung das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem
+    // ersten Sprung am Tablet die Vorgabe „zu“ für immer weg. Eine gemerkte Wahl gilt (LLH-1734),
+    // außer der Sprung hat kein Ziel: dann zeigt erst das offene Panel, was geschah.
+    setSprungOffen(navWahl === null || ziel === null);
     if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
+  }
+
+  /**
+   * Ziel eines Rail-Sprungs: das zuletzt besuchte Modul der Kategorie, sonst das erste
+   * freigegebene (LLH-1734). Eine Quelle für Klick und Adresse, damit beide dasselbe Modul treffen.
+   */
+  function sprungZiel(key: KategorieKey): ModulEintrag | null {
+    const gemerkt = benutzerId != null ? loadKategorieModul(benutzerId, einsatzId, key) : null;
+    return rueckkehrModul(key, gemerkt, modulFreigaben);
   }
 
   /**
@@ -366,7 +390,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
    * freigegebenes Modul keine Adresse; dann bleibt das Ziel ein Knopf, der nur aufklappt.
    */
   function kategoriePfad(key: KategorieKey): string | null {
-    const ziel = erstesFreigegebenesModul(key, modulFreigaben);
+    const ziel = sprungZiel(key);
     return ziel ? einsatzModulPfad(einsatzId, modulZielRoute(ziel)) : null;
   }
 
@@ -670,8 +694,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         <Drawer
           placement="left"
           title="Navigation"
-          // `size`, nicht `width` (in antd 6 abgekündigt).
-          size={navDrawerBreite}
+          // `size`, nicht `width` (in antd 6 abgekündigt); antd reicht den CSS-Ausdruck durch.
+          size={`min(${navDrawerBreite}px, calc(100vw - ${navDrawerRand}px))`}
           open={navOffen}
           onClose={() => setNavOffen(false)}
           focusable={{ focusTriggerAfterClose: !sucheAusDrawer }}
