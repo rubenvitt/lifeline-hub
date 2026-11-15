@@ -112,9 +112,12 @@ Mit dem Menschen abgestimmt:
 - `POST …/fahrzeuge/{ef}/entlassen` antwortet mit `{ fahrzeug, vorzustand }`. Der `vorzustand`
   enthält:
   - `entlassen_at`, das als Kennung dieses Entlassens dient;
-  - `status_id`, `status_seit`, `zuletzt_entlassen_at` von vorher;
-  - `einheit_id`, `br_id`, `fuehrungsstelle_id`;
+  - `zuletzt_entlassen_at` von vorher (Storno-Sperre);
+  - `einheit_id`, `br_id`, `fuehrungsstelle` (ja/nein, denn die Führungsstelle ist je Einsatz
+    eine Menge von Fahrzeugen);
   - `besatzung: [ep_id]`, `beladung: [em_id]`.
+  - Status und „Status seit“ stehen nicht darin: Das Entlassen lässt sie an der Zeile stehen, erst
+    `reaktivieren` überschrieb sie. Die Rücknahme fasst sie nicht an (beim Umsetzen festgestellt).
 - `entlassen_tx` füllt ihn aus dem, was es ohnehin liest. Der Client hält ihn, solange der
   Hinweis offen ist.
 - Neu: `POST …/fahrzeuge/{ef}/entlassen/zuruecknehmen` mit dem `vorzustand` als Body. Gate:
@@ -122,17 +125,17 @@ Mit dem Menschen abgestimmt:
   1. **Riegel:** `beendet_von` = Aufrufer, die Art ist „entlassen“, `beendet_at` =
      `entlassen_at` (sonst wurde inzwischen reaktiviert oder neu entlassen), höchstens zehn
      Minuten her. Sonst 409.
-  2. **Endzustand aufheben:** `beendet_*` = NULL. `status_id`, `status_seit` und
-     `zuletzt_entlassen_at` kommen aus dem Body. Der Status geht ohne `zeitachse::schreibe_tx`
-     und ohne „wieder verfügbar“ zurück, denn für die Einheit ist nichts geschehen. Die
-     `status_id` muss im Katalog der Organisation stehen, sonst 422.
+  2. **Endzustand aufheben:** `beendet_*` = NULL, `zuletzt_entlassen_at` aus dem Body (muss vor
+     `entlassen_at` liegen, sonst 422). Status und „Status seit“ bleiben, wie sie sind: keine
+     Zeitachse, kein „wieder verfügbar“.
   3. **Bindungen** einzeln, nur was noch frei ist:
      - Einheit: aktiv, und die Person hat Recht im Modul Einheiten (`fordere_zielmodul`, wie
        `update`).
      - Besatzung: aktiv und ohne Fahrzeug.
      - Raum: aktiv; Eintritt-Ereignis mit Notiz „Entlassung zurückgenommen“, Recht wie beim
        Eintragen.
-     - Führungsstelle: besteht und hat kein Fahrzeug.
+     - Führungsstelle: das Fahrzeug kommt wieder in ihre Menge (`INSERT OR IGNORE`); Schreibrecht
+       im Einsatz genügt wie beim Ändern der Führungsstelle.
      - Beladung: im Einsatz und ohne Ort, Recht im Modul Material.
      - Was ausfällt, landet in `ausgelassen: [{ art, bezeichnung, grund }]`.
   4. **ETB** „Entlassung zurückgenommen“, bei Auslassungen mit „ohne …“. **Live** wie beim

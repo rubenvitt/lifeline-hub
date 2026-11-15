@@ -13,12 +13,12 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 2. zjnw0rkj: Fahrzeug „Entlassen“ vollständig zurücknehmen
 
-- [ ] 2.1 Prüfen, dass `…/fahrzeuge/{ef}/entlassen` nicht zur öffentlichen API v1 gehört (`src/AGENTS.md`, `src/api_doc.rs`); Ergebnis im Commit nennen
-- [ ] 2.2 Repo: `entlassen_tx` liefert den Vorzustand (D5) inkl. `status_id`, `status_seit`, `zuletzt_entlassen_at`, `fuehrungsstelle_id`, `beladung`; Repo-Test in `src/fahrzeug/disposition_repo.rs` rot→grün
-- [ ] 2.3 Repo: `zuruecknehmen_tx` mit Riegel (Aufrufer, Art, `entlassen_at`, zehn Minuten), Status ohne Zeitachse, Bindungen nur frei, `ausgelassen`; Repo-Tests je Teil und je Auslassung (Spec `kraefte-entlassung`, „Rücknahme lässt Verändertes aus“, „Rücknahme nur direkt nach dem Entlassen“)
-- [ ] 2.4 Route `POST …/entlassen/zuruecknehmen` in `src/routes/einsatz_fahrzeug.rs` und `src/app.rs` (Gate `EinsatzSchreibzugriff<Fahrzeuge>`, `fordere_zielmodul` für Einheiten, Material, Raum), ETB „Entlassung zurückgenommen“, Live-Meldungen wie beim Entlassen; Antwort von `…/entlassen` als `{ fahrzeug, vorzustand }`; `src/api_doc.rs`
-- [ ] 2.5 Integrationstest in `tests/einsatz_fahrzeug.rs`: Szenario „Entlassen und Rückgängig“ vergleicht den Zustand vorher und nachher (Status, Status seit, Einheit, Besatzung, Raum, Führungsstelle, Beladung), dazu 409 nach Reaktivieren und für eine andere Person
-- [ ] 2.6 Typ-Codegen (`scripts/check-typ-codegen.sh`), `api/openapi.json` und `api/types.generated.ts` mitcommitten
+- [x] 2.1 Prüfen, dass `…/fahrzeuge/{ef}/entlassen` nicht zur öffentlichen API v1 gehört (`src/AGENTS.md`, `src/api_doc.rs`); Ergebnis im Commit nennen
+- [x] 2.2 Repo: `entlassen_tx` liefert den Vorzustand (D5) inkl. `status_id`, `status_seit`, `zuletzt_entlassen_at`, `fuehrungsstelle_id`, `beladung`; Repo-Test in `src/fahrzeug/disposition_repo.rs` rot→grün
+- [x] 2.3 Repo: `zuruecknehmen_tx` mit Riegel (Aufrufer, Art, `entlassen_at`, zehn Minuten), Status ohne Zeitachse, Bindungen nur frei, `ausgelassen`; Repo-Tests je Teil und je Auslassung (Spec `kraefte-entlassung`, „Rücknahme lässt Verändertes aus“, „Rücknahme nur direkt nach dem Entlassen“)
+- [x] 2.4 Route `POST …/entlassen/zuruecknehmen` in `src/routes/einsatz_fahrzeug.rs` und `src/app.rs` (Gate `EinsatzSchreibzugriff<Fahrzeuge>`, `fordere_zielmodul` für Einheiten, Material, Raum), ETB „Entlassung zurückgenommen“, Live-Meldungen wie beim Entlassen; Antwort von `…/entlassen` als `{ fahrzeug, vorzustand }`; `src/api_doc.rs`
+- [x] 2.5 Integrationstest in `tests/einsatz_fahrzeug.rs`: Szenario „Entlassen und Rückgängig“ vergleicht den Zustand vorher und nachher (Status, Status seit, Einheit, Besatzung, Raum, Führungsstelle, Beladung), dazu 409 nach Reaktivieren und für eine andere Person
+- [x] 2.6 Typ-Codegen (`scripts/check-typ-codegen.sh`), `api/openapi.json` und `api/types.generated.ts` mitcommitten
 - [ ] 2.7 Frontend: `api/einsatzFahrzeuge.ts` (`entlasseDisposition` mit Vorzustand, neue `nimmEntlassungZurueck`); `pages/FahrzeugePage.tsx`: Rückgängig ruft die Rücknahme mit dem gehaltenen Vorzustand, `ausgelassen` erscheint im `SeitenHinweis`; Kommentar an `entlassenMutation` berichtigen; Tests in `pages/FahrzeugePage.test.tsx` („Rückgängig nimmt die Entlassung zurück“, „nennt Ausgelassenes“) rot→grün
 - [ ] 2.8 Karte: kein `aktion` „Entlassen“, Menü der Karte beginnt mit „Entlassen“ (neutral), Status bleibt im Titel; Tests `:853`, `:1174` umschreiben; `e2e/gate1-ueberlauf.spec.ts` und `e2e/kraefte-schmal.spec.ts` nachziehen
 - [ ] 2.9 Doku: `docs/anwender/kapitel/fahrzeuge.md` (Entlassen und Rückgängig, Karte), Bilder-Spec und Bilder des Kapitels neu erzeugen

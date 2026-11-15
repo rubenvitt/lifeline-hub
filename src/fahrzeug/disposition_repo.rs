@@ -717,6 +717,24 @@ pub struct Entlassen {
     pub trug_fuehrungsstelle: bool,
     /// Beladung, die ohne Ort zurückbleibt (`einsatz_material.id`, LLH-1224 D13).
     pub material: Vec<i64>,
+    /// `zuletzt_entlassen_at` vor diesem Entlassen (Storno-Sperre), für die Rücknahme (LLH-1722).
+    pub zuletzt_entlassen_vorher: Option<String>,
+}
+
+impl Entlassen {
+    /// Der Vorzustand für die Rücknahme (LLH-1722, design.md D5); `entlassen_at` ist der
+    /// Zeitpunkt, den das Entlassen geschrieben hat.
+    pub fn vorzustand(&self, entlassen_at: &str) -> crate::fahrzeug::EntlassungVorzustand {
+        crate::fahrzeug::EntlassungVorzustand {
+            entlassen_at: entlassen_at.to_string(),
+            zuletzt_entlassen_at: self.zuletzt_entlassen_vorher.clone(),
+            einheit_id: self.einheit.as_ref().map(|(id, _)| *id),
+            br_id: self.br_id,
+            fuehrungsstelle: self.trug_fuehrungsstelle,
+            besatzung: self.besatzung.clone(),
+            beladung: self.material.clone(),
+        }
+    }
 }
 
 /// Entlässt ein Fahrzeug aus dem Einsatz (design.md D4): die Zeile bleibt mit Zeitpunkt und
@@ -741,6 +759,13 @@ pub async fn entlassen_tx(
     .fetch_optional(&mut *conn)
     .await?;
     let besatzung = super::besatzung_repo::load_besatzung_tx(conn, einsatz_id, ef_id).await?;
+    let zuletzt_entlassen_vorher: Option<String> = sqlx::query_scalar(
+        "SELECT zuletzt_entlassen_at FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
     let trug_fuehrungsstelle =
         crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
     let br_id =
@@ -783,6 +808,7 @@ pub async fn entlassen_tx(
         besatzung,
         trug_fuehrungsstelle,
         material,
+        zuletzt_entlassen_vorher,
     })
 }
 
@@ -1013,6 +1039,267 @@ pub async fn reaktivieren_tx(
     .execute(&mut *conn)
     .await?;
     Ok(())
+}
+
+// ── Rücknahme der Entlassung (LLH-1722, Spec `kraefte-entlassung`) ─────────────────────────
+
+/// Wie lange nach dem Entlassen die Rücknahme gelingt (design.md D5): deckt den Hinweis (6 s),
+/// Latenz und den Seitenhinweis; danach bleibt „Erneut disponieren“.
+pub const RUECKNAHME_FRIST_MINUTEN: i64 = 10;
+
+/// Welche Module die Person beschreiben darf, in die die Rücknahme zurückbindet (D5). Ein Teil
+/// ohne Recht bleibt aus und wird genannt.
+#[derive(Debug, Clone, Copy)]
+pub struct RuecknahmeRechte {
+    pub einheiten: bool,
+    pub material: bool,
+    pub bereitstellungsraeume: bool,
+}
+
+/// Was die Rücknahme zurückgebunden hat (für die Live-Meldungen) und was sie ausgelassen hat.
+#[derive(Debug, Clone, Default)]
+pub struct Ruecknahme {
+    pub einheit_id: Option<i64>,
+    pub br_id: Option<i64>,
+    pub fuehrungsstelle: bool,
+    pub besatzung: Vec<i64>,
+    pub beladung: Vec<i64>,
+    pub ausgelassen: Vec<crate::fahrzeug::RuecknahmeAusgelassen>,
+}
+
+fn ausgelassen(
+    bezeichnung: impl Into<String>,
+    grund: &str,
+) -> crate::fahrzeug::RuecknahmeAusgelassen {
+    crate::fahrzeug::RuecknahmeAusgelassen {
+        bezeichnung: bezeichnung.into(),
+        grund: grund.into(),
+    }
+}
+
+fn ruecknahme_conflict() -> AppError {
+    AppError::Conflict(
+        "Die Entlassung lässt sich nicht mehr zurücknehmen; das Fahrzeug lässt sich erneut \
+         disponieren"
+            .into(),
+    )
+}
+
+/// Nimmt das Entlassen eines Fahrzeugs zurück (design.md D5), in der Transaktion des Aufrufers.
+///
+/// Riegel: nur die entlassende Person, nur dieses Entlassen (`entlassen_at`), nur innerhalb von
+/// [`RUECKNAHME_FRIST_MINUTEN`]; sonst `Conflict`. Der Endzustand fällt, Status und „Status seit“
+/// bleiben (das Entlassen hat sie nicht angefasst), die Storno-Sperre kehrt auf ihren Wert
+/// zurück. Jede Bindung kommt nur zurück, wenn ihr Ziel frei ist und die Person das Recht des
+/// Moduls hat; sonst steht sie in `ausgelassen`. Keine Zeitachse (D5 von LLH-1079: Fahrzeuge
+/// wirken nur über ihre Einheit), keine Benachrichtigung.
+pub async fn zuruecknehmen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    vorzustand: &crate::fahrzeug::EntlassungVorzustand,
+    rechte: RuecknahmeRechte,
+) -> Result<Ruecknahme, AppError> {
+    let zeile: Option<(Option<String>, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT beendet_at, beendet_von, beendet_als FROM einsatz_fahrzeug \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let (beendet_at, beendet_von, beendet_als) = zeile.ok_or(AppError::NotFound)?;
+    let im_riegel = beendet_als.as_deref() == Some(BeendetAls::Entlassen.as_str())
+        && beendet_von == Some(benutzer_id)
+        && beendet_at.as_deref() == Some(vorzustand.entlassen_at.as_str())
+        && crate::zeit::plus_minuten(&vorzustand.entlassen_at, RUECKNAHME_FRIST_MINUTEN)
+            .is_some_and(|grenze| jetzt <= grenze.as_str());
+    if !im_riegel {
+        return Err(ruecknahme_conflict());
+    }
+    if vorzustand
+        .zuletzt_entlassen_at
+        .as_deref()
+        .is_some_and(|z| z >= vorzustand.entlassen_at.as_str())
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Das frühere Entlassen liegt nicht vor diesem".into(),
+        ));
+    }
+    let r = sqlx::query(
+        "UPDATE einsatz_fahrzeug SET beendet_at = NULL, beendet_von = NULL, beendet_als = NULL, \
+             zuletzt_entlassen_at = ? \
+         WHERE id = ? AND einsatz_id = ? AND beendet_at = ?",
+    )
+    .bind(&vorzustand.zuletzt_entlassen_at)
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .bind(&vorzustand.entlassen_at)
+    .execute(&mut *conn)
+    .await?;
+    if r.rows_affected() == 0 {
+        return Err(ruecknahme_conflict());
+    }
+
+    let mut ergebnis = Ruecknahme::default();
+    if let Some(einheit_id) = vorzustand.einheit_id {
+        let einheit: Option<(String, Option<String>)> = sqlx::query_as(
+            "SELECT name, aufgeloest_at FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(einheit_id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        match einheit {
+            None => {}
+            Some((name, _)) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
+                format!("Einheit «{name}»"),
+                "kein Schreibrecht im Modul Einheiten",
+            )),
+            Some((name, Some(_))) => ergebnis.ausgelassen.push(ausgelassen(
+                format!("Einheit «{name}»"),
+                "inzwischen aufgelöst",
+            )),
+            Some((_, None)) => {
+                sqlx::query(
+                    "UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?",
+                )
+                .bind(einheit_id)
+                .bind(ef_id)
+                .bind(einsatz_id)
+                .execute(&mut *conn)
+                .await?;
+                ergebnis.einheit_id = Some(einheit_id);
+            }
+        }
+    }
+    // Ein Fahrzeug in einer Einheit steht über sie im Raum, nie selbst (`belege_tx`, Regel 3).
+    if let (Some(br_id), None) = (vorzustand.br_id, ergebnis.einheit_id) {
+        let name: Option<String> = sqlx::query_scalar(
+            "SELECT bezeichnung FROM bereitstellungsraum WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(br_id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+        if let Some(name) = name {
+            if !rechte.bereitstellungsraeume {
+                ergebnis.ausgelassen.push(ausgelassen(
+                    name,
+                    "kein Schreibrecht im Modul Bereitstellungsräume",
+                ));
+            } else {
+                let buchung = belegung_repo::Buchung {
+                    art: crate::bereitstellungsraum::BrBelegungsArt::Eintritt,
+                    notiz: Some("Entlassung zurückgenommen"),
+                    client_id: None,
+                    zeitpunkt_at: None,
+                    von_br_id: None,
+                };
+                match belegung_repo::belege_tx(
+                    conn,
+                    einsatz_id,
+                    br_id,
+                    crate::bereitstellungsraum::ObjektTyp::Fahrzeug,
+                    ef_id,
+                    &buchung,
+                    benutzer_id,
+                )
+                .await
+                {
+                    Ok(_) => ergebnis.br_id = Some(br_id),
+                    Err(
+                        AppError::Conflict(_)
+                        | AppError::UnprocessableEntity(_)
+                        | AppError::NotFound,
+                    ) => ergebnis
+                        .ausgelassen
+                        .push(ausgelassen(name, "nimmt das Fahrzeug nicht mehr auf")),
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+    }
+    if vorzustand.fuehrungsstelle {
+        sqlx::query(
+            "INSERT OR IGNORE INTO einsatz_fuehrungsstelle_fahrzeug \
+               (einsatz_id, einsatz_fahrzeug_id) VALUES (?, ?)",
+        )
+        .bind(einsatz_id)
+        .bind(ef_id)
+        .execute(&mut *conn)
+        .await?;
+        ergebnis.fuehrungsstelle = true;
+    }
+    if !vorzustand.besatzung.is_empty() {
+        let ids = crate::kraefte_disposition::ids_json(&vorzustand.besatzung);
+        ergebnis.besatzung = sqlx::query_scalar(
+            "UPDATE einsatz_personal SET fahrzeug_id = ?1 \
+             WHERE einsatz_id = ?2 AND id IN (SELECT value FROM json_each(?3)) \
+               AND beendet_at IS NULL AND fahrzeug_id IS NULL RETURNING id",
+        )
+        .bind(ef_id)
+        .bind(einsatz_id)
+        .bind(&ids)
+        .fetch_all(&mut *conn)
+        .await?;
+        let fehlen: Vec<String> = sqlx::query_scalar(
+            "SELECT snap_name FROM einsatz_personal \
+             WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2)) \
+               AND (fahrzeug_id IS NOT ?3) ORDER BY id",
+        )
+        .bind(einsatz_id)
+        .bind(&ids)
+        .bind(ef_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        for name in fehlen {
+            ergebnis.ausgelassen.push(ausgelassen(
+                name,
+                "inzwischen auf einem anderen Fahrzeug oder nicht mehr im Einsatz",
+            ));
+        }
+    }
+    if !vorzustand.beladung.is_empty() {
+        let ids = crate::kraefte_disposition::ids_json(&vorzustand.beladung);
+        if !rechte.material {
+            ergebnis.ausgelassen.push(ausgelassen(
+                format!("Beladung ({} Posten)", vorzustand.beladung.len()),
+                "kein Schreibrecht im Modul Material",
+            ));
+        } else {
+            ergebnis.beladung = sqlx::query_scalar(
+                "UPDATE einsatz_material SET einsatz_fahrzeug_id = ?1 \
+                 WHERE einsatz_id = ?2 AND id IN (SELECT value FROM json_each(?3)) \
+                   AND beendet_at IS NULL AND einheit_id IS NULL AND einsatz_fahrzeug_id IS NULL \
+                   AND uhs_id IS NULL AND br_id IS NULL RETURNING id",
+            )
+            .bind(ef_id)
+            .bind(einsatz_id)
+            .bind(&ids)
+            .fetch_all(&mut *conn)
+            .await?;
+            let fehlen: Vec<String> = sqlx::query_scalar(
+                "SELECT snap_bezeichnung FROM einsatz_material \
+                 WHERE einsatz_id = ?1 AND id IN (SELECT value FROM json_each(?2)) \
+                   AND (einsatz_fahrzeug_id IS NOT ?3) ORDER BY id",
+            )
+            .bind(einsatz_id)
+            .bind(&ids)
+            .bind(ef_id)
+            .fetch_all(&mut *conn)
+            .await?;
+            for name in fehlen {
+                ergebnis.ausgelassen.push(ausgelassen(
+                    name,
+                    "inzwischen an einem anderen Ort oder nicht mehr im Einsatz",
+                ));
+            }
+        }
+    }
+    Ok(ergebnis)
 }
 
 #[cfg(test)]
@@ -2066,5 +2353,404 @@ mod tests {
             matches!(&e, AppError::Conflict(m) if m == "Das Fahrzeug ist bereits entlassen"),
             "{e:?}"
         );
+    }
+
+    // ── Rücknahme der Entlassung (LLH-1722, Spec `kraefte-entlassung`) ─────────────────────
+
+    const RUECK_JETZT: &str = "2099-01-01 00:05:00";
+
+    fn alle_rechte() -> RuecknahmeRechte {
+        RuecknahmeRechte {
+            einheiten: true,
+            material: true,
+            bereitstellungsraeume: true,
+        }
+    }
+
+    async fn nimm_zurueck(
+        pool: &SqlitePool,
+        einsatz: i64,
+        ef: i64,
+        benutzer: i64,
+        jetzt: &str,
+        vorzustand: &crate::fahrzeug::EntlassungVorzustand,
+        rechte: RuecknahmeRechte,
+    ) -> Result<Ruecknahme, AppError> {
+        let mut tx = pool.begin().await.unwrap();
+        let r = zuruecknehmen_tx(&mut tx, einsatz, ef, benutzer, jetzt, vorzustand, rechte).await?;
+        tx.commit().await.unwrap();
+        Ok(r)
+    }
+
+    /// Ein Fahrzeug auf einem eigenen Status, in einer Einheit, mit Besatzung, Führungsstelle
+    /// und einem geladenen Posten; liefert (einsatz, ef, einheit, ep, em, status_id).
+    async fn seed_voll(pool: &SqlitePool) -> (i64, i64, i64, i64, i64, i64) {
+        let (einsatz, ef) = seed_fahrzeug(pool).await;
+        let s2 = status_repo::anlegen(
+            pool,
+            1,
+            StatusDaten {
+                label: "frei über Funk",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: None,
+                fms_anker: Some(2),
+                sortier: 10,
+                zeitachse_marke: None,
+            },
+        )
+        .await
+        .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_fahrzeug SET einheit_id = ?, status_id = ?, \
+                 status_seit = '2098-12-31 23:15:00' WHERE id = ?",
+        )
+        .bind(einheit)
+        .bind(s2.id)
+        .bind(ef)
+        .execute(pool)
+        .await
+        .unwrap();
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, fahrzeug_id, einheit_id) \
+             VALUES (?, 'Anna Müller', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(ef)
+        .bind(einheit)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrungsstelle_fahrzeug (einsatz_id, einsatz_fahrzeug_id) \
+             VALUES (?, ?)",
+        )
+        .bind(einsatz)
+        .bind(ef)
+        .execute(pool)
+        .await
+        .unwrap();
+        let em: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, menge, \
+                einsatz_fahrzeug_id) VALUES (?, 'Stromerzeuger', 'geraet', 1, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(ef)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (einsatz, ef, einheit, ep, em, s2.id)
+    }
+
+    /// Die Momentaufnahme eines Fahrzeugs, die „im selben Zustand wie vorher“ ausmacht.
+    async fn stand(
+        pool: &SqlitePool,
+        ef: i64,
+    ) -> (
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+        Option<String>,
+        Option<String>,
+    ) {
+        sqlx::query_as(
+            "SELECT status_id, status_seit, einheit_id, aktueller_br_id, beendet_at, \
+                    zuletzt_entlassen_at FROM einsatz_fahrzeug WHERE id = ?",
+        )
+        .bind(ef)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn entlassen_liefert_den_vorzustand() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef, einheit, ep, em, _) = seed_voll(&pool).await;
+        let e = entlasse(&pool, einsatz, ef, 1).await.unwrap();
+        assert_eq!(
+            e.vorzustand(JETZT),
+            crate::fahrzeug::EntlassungVorzustand {
+                entlassen_at: JETZT.into(),
+                zuletzt_entlassen_at: None,
+                einheit_id: Some(einheit),
+                br_id: None,
+                fuehrungsstelle: true,
+                besatzung: vec![ep],
+                beladung: vec![em],
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef, _, ep, em, _) = seed_voll(&pool).await;
+        let vorher = stand(&pool, ef).await;
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        let r = nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        assert!(r.ausgelassen.is_empty(), "{:?}", r.ausgelassen);
+        assert_eq!(stand(&pool, ef).await, vorher);
+        let auf: Option<i64> =
+            sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
+                .bind(ep)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(auf, Some(ef));
+        let geladen: Option<i64> =
+            sqlx::query_scalar("SELECT einsatz_fahrzeug_id FROM einsatz_material WHERE id = ?")
+                .bind(em)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geladen, Some(ef));
+        assert!(crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(
+            &mut pool.acquire().await.unwrap(),
+            ef
+        )
+        .await
+        .unwrap());
+        // Ein zweites Rücknehmen trifft ein aktives Fahrzeug: 409.
+        assert!(matches!(
+            nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_bucht_den_raum_wieder_ein() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von, status) \
+             VALUES (?, 'BR Nord', 1, 1, 'aktiv') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET aktueller_br_id = ? WHERE id = ?")
+            .bind(br)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        let r = nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        assert_eq!(r.br_id, Some(br));
+        assert_eq!(stand(&pool, ef).await.3, Some(br));
+        let letzte: (String, Option<String>) = sqlx::query_as(
+            "SELECT art, notiz FROM br_belegung WHERE objekt_typ = 'fahrzeug' AND objekt_id = ? \
+             ORDER BY id DESC LIMIT 1",
+        )
+        .bind(ef)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            letzte,
+            ("eintritt".into(), Some("Entlassung zurückgenommen".into()))
+        );
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_laesst_veraendertes_aus_und_nennt_es() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef, einheit, ep, em, _) = seed_voll(&pool).await;
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        // Inzwischen: Einheit aufgelöst, Person auf einem anderen Fahrzeug, Posten an einer UHS.
+        let anderes: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, '83-2') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = ? WHERE id = ?")
+            .bind(anderes)
+            .bind(ep)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2099-01-01 00:01:00' WHERE id = ?",
+        )
+        .bind(einheit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_material SET beendet_at = '2099-01-01 00:02:00', beendet_als = 'entlassen' WHERE id = ?")
+            .bind(em)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let r = nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        let namen: Vec<&str> = r
+            .ausgelassen
+            .iter()
+            .map(|a| a.bezeichnung.as_str())
+            .collect();
+        assert_eq!(namen, ["Einheit «1. Zug»", "Anna Müller", "Stromerzeuger"]);
+        let s = stand(&pool, ef).await;
+        assert_eq!((s.2, s.4), (None, None), "aktiv, ohne Einheit");
+        let auf: Option<i64> =
+            sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
+                .bind(ep)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            auf,
+            Some(anderes),
+            "die Person bleibt, wo sie inzwischen sitzt"
+        );
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_ohne_recht_laesst_den_teil_aus() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef, _, _, em, _) = seed_voll(&pool).await;
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        let r = nimm_zurueck(
+            &pool,
+            einsatz,
+            ef,
+            1,
+            RUECK_JETZT,
+            &v,
+            RuecknahmeRechte {
+                einheiten: false,
+                material: false,
+                bereitstellungsraeume: true,
+            },
+        )
+        .await
+        .unwrap();
+        let gruende: Vec<&str> = r.ausgelassen.iter().map(|a| a.grund.as_str()).collect();
+        assert_eq!(
+            gruende,
+            [
+                "kein Schreibrecht im Modul Einheiten",
+                "kein Schreibrecht im Modul Material"
+            ]
+        );
+        assert_eq!(stand(&pool, ef).await.2, None);
+        let geladen: Option<i64> =
+            sqlx::query_scalar("SELECT einsatz_fahrzeug_id FROM einsatz_material WHERE id = ?")
+                .bind(em)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geladen, None);
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_nur_direkt_nach_dem_entlassen_und_nur_fuer_die_entlassende_person() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef, ..) = seed_voll(&pool).await;
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        // Andere Person.
+        assert!(matches!(
+            nimm_zurueck(&pool, einsatz, ef, 2, RUECK_JETZT, &v, alle_rechte())
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        // Nach zehn Minuten.
+        assert!(matches!(
+            nimm_zurueck(
+                &pool,
+                einsatz,
+                ef,
+                1,
+                "2099-01-01 00:10:01",
+                &v,
+                alle_rechte()
+            )
+            .await
+            .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        // Ein anderes Entlassen (andere Kennung).
+        let fremd = crate::fahrzeug::EntlassungVorzustand {
+            entlassen_at: "2098-12-31 23:59:00".into(),
+            ..v.clone()
+        };
+        assert!(matches!(
+            nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &fremd, alle_rechte())
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+        // Schon erneut disponiert.
+        let mut tx = pool.begin().await.unwrap();
+        reaktivieren_tx(&mut tx, einsatz, 1, ef, 1).await.unwrap();
+        tx.commit().await.unwrap();
+        assert!(matches!(
+            nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_stellt_die_storno_sperre_wieder_her() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let v = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        assert_eq!(stand(&pool, ef).await.5, None);
+        // Eine Kennung aus der Zukunft taugt nicht als früheres Entlassen: 422.
+        let v2 = entlasse(&pool, einsatz, ef, 1)
+            .await
+            .unwrap()
+            .vorzustand(JETZT);
+        let kaputt = crate::fahrzeug::EntlassungVorzustand {
+            zuletzt_entlassen_at: Some("2100-01-01 00:00:00".into()),
+            ..v2
+        };
+        assert!(matches!(
+            nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &kaputt, alle_rechte())
+                .await
+                .unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
     }
 }

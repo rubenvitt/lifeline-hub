@@ -27,7 +27,7 @@ pub mod repo;
 pub mod status_repo;
 
 use crate::staerke::Staerke;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 // Geteilte Konstanten und Validierung liegen in `crate::katalog` und werden hier re-exportiert.
@@ -221,9 +221,97 @@ pub struct EinsatzFahrzeugAnzeige {
     pub beendet_als: Option<String>,
 }
 
+/// Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung
+/// eines Fahrzeugs zurücknehmen“; `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D5).
+/// Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+/// zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct EntlassungVorzustand {
+    /// Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt.
+    pub entlassen_at: String,
+    /// `zuletzt_entlassen_at` vor diesem Entlassen (Storno-Sperre); `None` = nie entlassen.
+    #[serde(default)]
+    pub zuletzt_entlassen_at: Option<String>,
+    #[serde(default)]
+    pub einheit_id: Option<i64>,
+    #[serde(default)]
+    pub br_id: Option<i64>,
+    /// Trug das Fahrzeug die Führungsstelle?
+    #[serde(default)]
+    pub fuehrungsstelle: bool,
+    /// Besatzung (`einsatz_personal.id`).
+    #[serde(default)]
+    pub besatzung: Vec<i64>,
+    /// Beladung (`einsatz_material.id`).
+    #[serde(default)]
+    pub beladung: Vec<i64>,
+}
+
+/// Höchstzahl je Liste im Vorzustand einer Rücknahme (`src/AGENTS.md`, „Eingabegrenzen“): mehr
+/// Besatzung oder Beladung trägt kein Fahrzeug.
+pub const RUECKNAHME_LISTE_MAX: usize = 200;
+
+/// Antwort von `POST …/fahrzeuge/{ef_id}/entlassen` (LLH-1722).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EntlassungAntwort {
+    pub fahrzeug: EinsatzFahrzeugAnzeige,
+    pub vorzustand: EntlassungVorzustand,
+}
+
+/// Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct RuecknahmeAusgelassen {
+    /// Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“).
+    pub bezeichnung: String,
+    /// Warum („inzwischen aufgelöst“, „sitzt inzwischen auf einem anderen Fahrzeug“).
+    pub grund: String,
+}
+
+/// Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct EntlassungRuecknahmeAntwort {
+    pub fahrzeug: EinsatzFahrzeugAnzeige,
+    pub ausgelassen: Vec<RuecknahmeAusgelassen>,
+}
+
+/// System-ETB der Rücknahme (LLH-1722): nennt, was nicht zurückkam.
+pub fn etb_text_entlassung_zurueckgenommen(
+    funkrufname: &str,
+    ausgelassen: &[RuecknahmeAusgelassen],
+) -> String {
+    let text = format!("Fahrzeug «{funkrufname}»: Entlassung zurückgenommen");
+    if ausgelassen.is_empty() {
+        return text;
+    }
+    let ohne: Vec<String> = ausgelassen
+        .iter()
+        .map(|a| format!("{} ({})", a.bezeichnung, a.grund))
+        .collect();
+    format!("{text}, ohne {}", ohne.join(", "))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn etb_der_ruecknahme_nennt_was_fehlt() {
+        assert_eq!(
+            etb_text_entlassung_zurueckgenommen("83-1", &[]),
+            "Fahrzeug «83-1»: Entlassung zurückgenommen"
+        );
+        assert_eq!(
+            etb_text_entlassung_zurueckgenommen(
+                "83-1",
+                &[RuecknahmeAusgelassen {
+                    bezeichnung: "Anna Müller".into(),
+                    grund: "sitzt inzwischen auf einem anderen Fahrzeug".into(),
+                }]
+            ),
+            "Fahrzeug «83-1»: Entlassung zurückgenommen, ohne Anna Müller \
+             (sitzt inzwischen auf einem anderen Fahrzeug)"
+        );
+    }
 
     fn fahrzeug() -> Fahrzeug {
         Fahrzeug {
