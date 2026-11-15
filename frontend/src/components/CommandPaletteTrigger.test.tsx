@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
-import { setzeViewportBreite } from '../test/viewport';
+import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { dichten, rahmenFarben } from '../theme/tokens';
 import CommandPaletteTrigger, {
@@ -44,6 +44,30 @@ describe('CommandPaletteTrigger', () => {
     });
     // Nur, was funktioniert: keine Koordinatensuche versprochen (Neuentwurf-Text gekürzt).
     expect(SUCHFELD_TEXT).not.toMatch(/Koordinate/);
+  });
+
+  // LLH-1726 (Spec `kopfleiste`): am Touch-Gerät verspricht das Feld keine Taste. Das Kürzel
+  // wirkt mit angesteckter Tastatur weiter, deshalb bleibt `aria-keyshortcuts`.
+  it('zeigt bei grobem Zeiger kein Tastenkürzel, behält aber aria-keyshortcuts', () => {
+    setzeZeigerGrob(true);
+    zeige();
+    const knopf = screen.getByRole('button', { name: 'Suchen' });
+    expect(knopf).toHaveTextContent(SUCHFELD_TEXT);
+    expect(knopf.querySelector('kbd')).toBeNull();
+    expect(knopf).toHaveAttribute('aria-keyshortcuts', 'Control+K');
+  });
+
+  // LLH-1726: Wird die Suchzelle schmal, bleibt nur die Lupe (Container-Abfrage `kopfsuche` in
+  // `CommandPaletteTrigger.css`; jsdom rechnet sie nicht, die Wirkung misst
+  // `e2e/kopfleiste-einsatzname.spec.ts`). Hier die Verdrahtung: Text und Kürzel tragen die
+  // Klassen, die die Abfrage ausblendet, und die Lupe hält die Trefffläche als Mindestbreite.
+  it('trägt die Klassen, mit denen die schmale Suchzelle auf die Lupe schrumpft', () => {
+    zeige();
+    const knopf = screen.getByRole('button', { name: 'Suchen' });
+    expect(knopf).toHaveClass('kopf-suchfeld');
+    expect(screen.getByText(SUCHFELD_TEXT)).toHaveClass('kopf-suchfeld-text');
+    expect(screen.getByText('Strg+K', { selector: 'kbd' })).toHaveClass('kopf-suchfeld-text');
+    expect(knopf.style.minWidth).toBe('48px');
   });
 
   it('trägt als Suchfeld ZWEI Angaben über die Dichtestufen (LFH-365)', () => {

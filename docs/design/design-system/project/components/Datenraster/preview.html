@@ -681,26 +681,31 @@ mark.lfh-fundstelle {
 main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-end: var(--lfh-zaehltasten-fokusabstand, 0px);
 }
-:root:has([data-lfh='modul-panel'] :focus) {
-  scroll-padding-block-end: var(--lfh-modulpanel-fokusabstand, 0px);
-}
 :root .ant-modal-wrap:has([data-lfh='erfassung-fuss']) {
   scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
 }
 :root {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
+:root:has(
+  [data-lfh='seitenkopf'] :focus,
+  [data-lfh='rail-spalte'] :focus,
+  [data-lfh='modul-panel'] :focus,
+  [data-lfh='verwaltung-menue'] :focus
+) {
+  scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
+}
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
   scroll-padding-block-start: 0px;
 }
 :root:has([data-lfh='etb-kopf-klebt']) {
   scroll-padding-block-start: calc(
-    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px) +
-      var(--lfh-etb-filterleiste-hoehe, 0px) + var(--lfh-etb-spaltenkopf-hoehe, 0px)
+    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-filterleiste-hoehe, 0px) +
+      var(--lfh-etb-spaltenkopf-hoehe, 0px)
   );
 }
 :root:has([data-lfh='etb-kopf-klebt'] :focus, [data-lfh='seitenkopf'] :focus) {
-  scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
+  scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
 }
 :root:has([data-lfh='ausgabe-kurzzeile']) {
   scroll-padding-block-start: calc(

@@ -46,7 +46,8 @@ it('ein Tipp in „wird geprüft" ruft die Freischaltung und schaltet nicht stum
   const ton = screen.getByRole('button', {
     name: 'Ton wird geprüft – freischalten',
   });
-  expect(ton).toHaveTextContent('Ton wird geprüft');
+  // Die Prüfung ist keine Störung: nur das Icon, der Name nennt sie (LLH-1726).
+  expect(ton).toHaveTextContent(/^$/);
   const vorher = resume.mock.calls.length;
 
   await userEvent.click(ton);

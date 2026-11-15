@@ -106,21 +106,44 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`einsatz/IconRail.tsx`, Kurzetikett `kurz`, voller Name als `aria-label`, Einstellungen per
   `fuss: true`) · Modulpanel (`einsatz/ModulPanel.tsx`) · Sprungpalette
   (`command-palette/CommandPalette.tsx`). Maße im Entwurf.
-  - **Stehenbleiben, gestuft** (LFH-952, Spec `einsatztauglichkeit-layout`): ab `md` klebt der
-    Kopf (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter; unter
-    `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung (offline, Live `lost`).
-    Der Fuß der Rail (Griff „Menü“, Einstellungen) klebt nicht: reicht die Höhe nicht, folgt er den
-    Kategorien, statt sie zu verdecken (LLH-1273, `e2e/gate3-trefflaeche.spec.ts` „Rail“).
+  - **Stehenbleiben, gestuft** (LFH-952, zjt7c073, Spec `einsatztauglichkeit-layout`): ab `md`
+    klebt der Kopf (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` Rail-Kategorien und
+    Modulpanel darunter; unter `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung
+    (offline, Live `lost`). Der Fuß der Rail (Griff „Menü“, Einstellungen) klebt nicht: reicht
+    die Höhe nicht, folgt er den Kategorien, statt sie zu verdecken (LLH-1273,
+    `e2e/gate3-trefflaeche.spec.ts` „Rail“). Das Modulpanel ist eine Spalte mit festem Kopf und
+    Fuß „Einsatzdauer“, nur die Liste rollt in sich (`modul-panel-spalte`); ihre Höhe ist gemessen
+    (Oberkante im Fenster bis Fensterrand), und die Liste holt den aktiven Eintrag ins Bild.
+  - **Der Seitenkopf klebt, wenn er passt** (zjt7c073 D3, `components/seitenkopfKleben.ts`): ab
+    `md` auf jeder `EinsatzSeite` und `AdminPage`, solange Kopf und Seitenkopf höchstens ein
+    Drittel der Fensterhöhe nehmen (`KLEBEN_HOECHSTENS`), nie in einem eigenen Scrollbereich
+    (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block).
+    `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die Leiste, nicht
+    Hinweis oder Beschreibung darunter.
+  - **Zwei Höhen** (zjt7c073 D2, `components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
+    ist der Kopf samt Übungsband (Ebene `kopf`), `--lfh-rahmen-oben` (`useRahmenOben`) dazu der
+    klebende Seitenkopf. Die
+    Kopfhöhe nehmen nur, was neben dem Inhalt klebt (Rail, Modulpanel, Verwaltungsmenü), der
+    Seitenkopf selbst und die Klebe-Entscheidungen; alles andere die Rahmenhöhe (Guard).
   - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
     rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
-    nie gerechnet). Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
-    `components/rahmenOben.guard.test.ts`). Den Fokusabstand trägt `scroll-padding-block-start`
-    am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
+    nie gerechnet), also auch unter den klebenden Seitenkopf. Ausnahme nur mit Vermerk
+    `rahmen-oben: frei` und Grund (Guard `components/rahmenOben.guard.test.ts`). Den Fokusabstand
+    trägt `scroll-padding-block-start` am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen;
+    bei Fokus im Seitenkopf gilt nur die Kopfhöhe.
   - **Stehende Alarme liegen unter der Bedienkante** (LFH-1112, Spec
     `einsatztauglichkeit-layout`): unter Kommandoleiste und Seitenkopf, solange er im Bild ist,
     gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
     Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
     deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
+  - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
+    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
+    Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
+    nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht in jeder Breite nur als
+    Symbol, eine Störung ab `md` mit Wort (darunter trägt die Betriebszeile die Verbindung, die
+    gebündelte Alarmzentrale nennt die vorrangige Störung). Einziger Breitenhalter: der Platz von „Ton blockiert“ am
+    Glockenknopf, weil der Browser den Ton vor der ersten Geste ohne Zutun sperrt. Tastenhinweise
+    nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`.
   - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
     `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,
@@ -132,7 +155,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (`druck/AGENTS.md`), in Text- und Bildtiteln als Präfix „ÜBUNG · “ (ADR-0053). Erkennbar ist sie
     an Form und Wort (schraffiertes Band, gefüllter Chip, immer „ÜBUNG“), nicht am Farbton: violett
     sind auch die ETB-Entscheidung, die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
-    Rahmenquellen (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
+    Quellen der Kopfhöhe, über einem klebenden Seitenkopf (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
@@ -1092,7 +1115,7 @@ und `pages/personen/`.
   steht als Plakette über dem Zeichen (`alarm/EingaengeZahl.tsx`, nimmt keine Breite). Bündelt
   der Kopf die Alarmzentrale (`useKopfBuendelt`, Handschirm und Tablet mit Finger), trägt deren
   Ziel Zahl und Eintrag „Eingänge“, kein eigener Knopf: der Kopf hat dort keine 48 px übrig.
-  Ab `lg` gibt die Suchbasis die Breite des Knopfs her (`KOPF_SUCHE_FLEX`, Umbruchpunkt bleibt).
+  Ab `lg` gibt die Suche die Breite des Knopfs her (Raster aus Name und Suche, `kopfRasterSpalten`).
 
 ## Frontend — Keine Arbeitsplatzachse (LFH-456)
 

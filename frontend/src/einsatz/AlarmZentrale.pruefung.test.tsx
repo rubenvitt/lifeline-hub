@@ -120,11 +120,11 @@ describe('AlarmZentrale: ungeprüfter Tonstatus (LFH-637)', () => {
     expect(ton).toHaveAccessibleName('Ton wird geprüft – freischalten');
     tablet.unmount();
 
-    // Breite Bauform: das Wort steht, aber es nennt die Prüfung, nicht eine Störung.
+    // Breite Bauform: auch dort nur das Icon, der Name nennt die Prüfung (LLH-1726).
     setzeViewportBreite(1366);
     const breit = renderAlarm();
     ton = tonKnopf();
-    expect(ton).toHaveTextContent('Ton wird geprüft');
+    expect(ton).toHaveTextContent(/^$/);
     expect(ton).toHaveAccessibleName('Ton wird geprüft – freischalten');
     expect(ton).toHaveStyle({ color: rahmenFarben.gedaempft });
     breit.unmount();
