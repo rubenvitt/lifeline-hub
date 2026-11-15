@@ -114,7 +114,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `components/useDokumentTitel.ts`, aus dem Modulnamen der Registry („Seite · Einsatz ·
   lifeline-hub“); keine Seite setzt `document.title`. Der Einsatzstatus steht nie im h1, sondern
   als `EinsatzstatusMarke` neben dem Titel, nur bei nicht aktivem Einsatz (Rahmenkontext
-  `einsatz/EinsatzRahmenKontext.tsx`). Im Ortspfad kürzt unter `md` nur der mittlere Eintrag.
+  `einsatz/EinsatzRahmenKontext.tsx`). Im Ortspfad kürzt unter `md` nur der mittlere Eintrag; im
+  Einsatzrahmen steht unter `md` statt des Ortspfads nur der Rückweg „‹ <Eintrag>“ zum letzten
+  verlinkten Eintrag unterhalb des Einsatzes (`lfh-ortspfad--einsatz`, LLH-1728).
 - **Markdown** (`components/Markdown.tsx`, `MarkdownEditor`): Pflicht-Prop `unterEbene` (Ebene der
   nächsten Überschrift darüber, Boden `h6`, kein fester Versatz). Der optionale Bild-Renderer
   `bild` gehört nur der Hilfe (`docs/anwender/AGENTS.md`, „Bilder“).
@@ -130,14 +132,21 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (`einsatz/IconRail.tsx`, Kurzetikett `kurz`, voller Name als `aria-label`, Einstellungen per
   `fuss: true`) · Modulpanel (`einsatz/ModulPanel.tsx`) · Sprungpalette
   (`command-palette/CommandPalette.tsx`). Maße im Entwurf.
-  - **Stehenbleiben, gestuft** (LFH-952, Spec `einsatztauglichkeit-layout`): ab `md` klebt der
-    Kopf (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter; unter
-    `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung (offline, Live `lost`).
+  - **Stehenbleiben** (LFH-952, LLH-1728, Spec `einsatztauglichkeit-layout`): der Kopf klebt in
+    jeder Breite (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter;
+    unter `md` klebt die Betriebszeile bei Störung (offline, Live `lost`) über dem Kopf, denn dort
+    steht die Verbindung im Kopf nur als Symbol. Am Handy trägt der Einsatzkopf eine Zeile: Menü,
+    Einsatzname, Alarmzentrale (Ruhe als Glocke, Störung im Wort), Verbindung, Uhr (umbrechen darf
+    er nur in `handschuh` bei einer Störung im Wort der Alarmzentrale); Suche und
+    Benutzermenü stehen dort im Drawer „Navigation“. Der App-Rahmen lässt unter `md` die Wortmarke
+    weg, ihr Link liegt dann auf der Bildmarke. Herleitung:
+    `openspec/changes/ejt520so-handy-kopfleiste-fixiert/design.md`.
     Der Fuß der Rail (Griff „Menü“, Einstellungen) klebt nicht: reicht die Höhe nicht, folgt er den
     Kategorien, statt sie zu verdecken (LLH-1273, `e2e/gate3-trefflaeche.spec.ts` „Rail“).
   - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
     rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
-    nie gerechnet). Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
+    nie gerechnet). Der Rahmen selbst stapelt sich nach Rang (`RAHMEN_RANG`: Betriebszeile,
+    Kopf, Übungsband; `useRahmenObenStapel`): jede Quelle klebt unter denen mit kleinerem Rang. Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
     `components/rahmenOben.guard.test.ts`). Den Fokusabstand trägt `scroll-padding-block-start`
     am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
   - **Stehende Alarme liegen unter der Bedienkante** (LFH-1112, Spec

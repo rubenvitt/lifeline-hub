@@ -112,7 +112,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     jeder Breite (`RAHMEN_KLEBT`, `data-lfh="rahmen-kopf"`), ab `lg` die Rail-Kategorien darunter;
     unter `md` klebt die Betriebszeile bei Störung (offline, Live `lost`) über dem Kopf, denn dort
     steht die Verbindung im Kopf nur als Symbol. Am Handy trägt der Einsatzkopf eine Zeile: Menü,
-    Einsatzname, Alarmzentrale (Ruhe als Glocke, Störung im Wort), Verbindung, Uhr; Suche und
+    Einsatzname, Alarmzentrale (Ruhe als Glocke, Störung im Wort), Verbindung, Uhr (umbrechen darf
+    er nur in `handschuh` bei einer Störung im Wort der Alarmzentrale); Suche und
     Benutzermenü stehen dort im Drawer „Navigation“. Der App-Rahmen lässt unter `md` die Wortmarke
     weg, ihr Link liegt dann auf der Bildmarke. Herleitung:
     `openspec/changes/ejt520so-handy-kopfleiste-fixiert/design.md`.

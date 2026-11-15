@@ -254,7 +254,11 @@ test('Such-Trigger bleibt auf 390 px eine 48-px-Trefffläche, im Einsatz in der 
     'Such-Trefffläche im Drawer',
   ).toBeGreaterThanOrEqual(48);
   await imDrawer.click();
-  await expect(page.getByPlaceholder('Suchen: Module, Aktionen, Einstellungen …')).toBeVisible();
+  await expect(page.getByPlaceholder('Suchen: Module, Aktionen, Einstellungen …')).toBeFocused();
+  // Nach dem Schließen kehrt der Fokus auf den Griff zurück, nicht auf `body`: der Knopf im
+  // Drawer ist dann abgebaut (Review LLH-1728).
+  await page.keyboard.press('Escape');
+  await expect(kopf.getByRole('button', { name: 'Navigation öffnen' })).toBeFocused();
 });
 
 /**

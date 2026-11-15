@@ -137,7 +137,9 @@ test.describe('Orientierung (LFH-954)', () => {
     const rueckweg = sichtbar.getByRole('link');
     await expect(rueckweg).toHaveText('Betroffene');
     const zeichen = await rueckweg.evaluate((a) => getComputedStyle(a, '::before').content);
-    expect(zeichen, '„‹“ vor dem Rückweg').toBe('"‹"');
+    expect(zeichen, '„‹“ vor dem Rückweg').toContain('‹');
+    // Das Zeichen steht nicht im zugänglichen Namen (CSS-Ersatztext leer).
+    await expect(sichtbar.getByRole('link', { name: 'Betroffene', exact: true })).toBeVisible();
     await rueckweg.click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/personen(\\?.*)?$`));
   });

@@ -59,7 +59,8 @@ folgt auf „Anmelden“ (und gegebenenfalls den Code) noch ein Schritt:
 
 ### Abmelden
 
-1. Oben rechts das „Benutzermenü“ (Kachel mit den Initialen) öffnen.
+1. Oben rechts das „Benutzermenü“ (Kachel mit den Initialen) öffnen. Auf dem Handy steht es im
+   Einsatz unten in der Navigation („Navigation öffnen“ links oben).
 
    ![Geöffnetes Benutzermenü mit „Profil“, der Gruppe „Anzeige“, „Benachrichtigungen“, „Neuigkeiten“, „Hilfe“ und zuletzt „Abmelden“](../bilder/anmelden-abmelden/benutzermenue.png)
 

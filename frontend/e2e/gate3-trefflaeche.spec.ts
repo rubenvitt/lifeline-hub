@@ -222,8 +222,8 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
 // 12 px. antd setzt den Link auf `height: fontHeight` (20 px in jeder Stufe); den Boden trägt
 // `ortspfadStil` in `EinsatzSeite.tsx` mit der Regel in `EinsatzSeite.css`. Gemessen auf der
 // Druckansicht der Personenliste, weil ihr Pfad ZWEI Links trägt („Einsätze“ und „Betroffene“) und
-// nichts außer dem Einsatz gesät werden muss. Fükw und Handschirm, weil der Pfad unter `md` auf
-// eine eigene, nicht umbrechende Zeile mit Auslassung wechselt.
+// nichts außer dem Einsatz gesät werden muss. Fükw und Handschirm: unter `md` steht im Einsatz
+// nur der Rückweg „‹ Betroffene“ (LLH-1728, D6), und er hält dieselbe Staffel.
 
 /** Pfad-Links der Druckansicht: „Einsätze“ und das Modul; der Einsatzname ist Text. */
 const PFAD_LINKS = 2;
@@ -253,16 +253,17 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
 
       // Gescopt auf den Pfad, sonst zählten Rail- und Kopfzeilen-Links mit.
       const pfad = page.locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad');
-      const links = pfad.locator('.ant-breadcrumb-item a');
-      await expect(links).toHaveCount(PFAD_LINKS);
-      await expect(links.first()).toHaveText('Einsätze');
+      const links = pfad.locator('.ant-breadcrumb-item a:visible');
+      const anzahl = schirm === 'Handschirm' ? 1 : PFAD_LINKS;
+      await expect(links).toHaveCount(anzahl);
+      await expect(links.first()).toHaveText(schirm === 'Handschirm' ? 'Betroffene' : 'Einsätze');
       const kleinstes = await alleHaltenStufe(
         links,
         soll,
         `Pfad-Link (${schirm}, ${dichte})`,
-        PFAD_LINKS,
+        anzahl,
       );
-      for (let i = 0; i < PFAD_LINKS; i += 1) {
+      for (let i = 0; i < anzahl; i += 1) {
         await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT);
       }
 
@@ -979,16 +980,21 @@ test('Navigations-Drawer auf 390 px: Hamburger, Akkordeon-Kopf, Modulzeilen und 
       `Hamburger-Breite (${dichte}, gemessen ${griffBreite}px, Soll ≥ ${BODEN.mitA1Boden[dichte]})`,
     ).toBeGreaterThanOrEqual(BODEN.mitA1Boden[dichte] - SUBPIXEL);
 
-    // Unter `lg` bekommt der Suchzugang seine feste Trefffläche (`Math.max(48, …)`).
-    const suchen = await haeltStufe(
-      page.locator('.ant-layout-header').getByRole('button', { name: 'Suchen', exact: true }),
-      BODEN.mitA1Boden[dichte],
-      `Suchzugang schmal (${dichte})`,
-    );
-
     await hamburger.click();
     const drawer = page.getByRole('dialog');
     await expect(drawer).toBeVisible();
+    // Am Handy steht der Suchzugang in der Navigation (LLH-1728, D3), mit der festen Trefffläche
+    // des Griffs (`navGriffMass`, `Math.max(48, …)`); das Benutzermenü im Fuß hält die Staffel.
+    const suchen = await haeltStufe(
+      drawer.getByRole('button', { name: 'Suchen', exact: true }),
+      BODEN.mitA1Boden[dichte],
+      `Suchzugang schmal (${dichte})`,
+    );
+    await haeltStufe(
+      drawer.getByRole('button', { name: 'Benutzermenü' }),
+      BODEN.mitA1Boden[dichte],
+      `Benutzermenü in der Navigation (${dichte})`,
+    );
     const nav = drawer.getByRole('navigation', { name: 'Einsatz-Navigation' });
     await expect(nav).toBeVisible();
 
