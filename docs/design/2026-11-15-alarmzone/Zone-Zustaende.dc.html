@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Alarmzone Zustände</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-700.woff2") format("woff2");font-weight:700}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.b{width:1180px;height:900px;box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:22px;background:#08090b;color:#e8ebee;font-family:"LFH Archivo",system-ui,sans-serif;font-size:14px;line-height:20px;overflow:hidden}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.fall{display:flex;flex-direction:column;gap:6px}
+.lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#9aa2ab}
+.lab b{color:#e8ebee;font-weight:600;letter-spacing:0;text-transform:none;font-size:13px;margin-left:8px}
+.kopf{height:20px;background:#0c0e11;border:1px solid #22262b;border-bottom:0}
+.zone{display:flex;align-items:center;gap:12px;height:40px;box-sizing:border-box;padding:0 8px 0 0;border-bottom:1px solid #4a1c20;background:#1c0a0d;box-shadow:inset 4px 0 0 #ff6b6b}
+.zone.hw{background:#0d1620;border-bottom-color:#1d3a5c;box-shadow:inset 4px 0 0 #4d94d6}
+.zone .wort{margin-left:16px;font-size:11px;font-weight:700;letter-spacing:.14em;color:#ff6b6b;flex-shrink:0}
+.zone.hw .wort{color:#8ec2f0}
+.tit{font-weight:600;white-space:nowrap}
+.txt{color:#c6ccd2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.zt{color:#9aa2ab;font-size:13px}
+.pl{min-width:18px;height:18px;box-sizing:border-box;padding:0 5px;background:#ff6b6b;color:#08090b;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.kn{height:30px;box-sizing:border-box;padding:0 12px;border:1px solid #626a73;background:transparent;color:#e8ebee;font:inherit;font-size:13px;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.kn.pri{background:#4d94d6;border-color:#4d94d6;color:#08090b;font-weight:600}
+.kn.txt{border-color:transparent;color:#8ec2f0}
+.kn.x{width:30px;padding:0;justify-content:center;border-color:transparent;color:#9aa2ab}
+.trenn{width:1px;height:20px;background:#4a1c20;flex-shrink:0}
+.liste{border-bottom:1px solid #4a1c20;background:#140a0c}
+.zeile{display:flex;align-items:center;gap:12px;height:40px;box-sizing:border-box;padding:0 8px 0 20px;border-top:1px solid #2a1215}
+.inhalt{height:28px;background:#0f1215;border:1px solid #22262b;border-top:0;display:flex;align-items:center;padding:0 12px;color:#838b94;font-size:12px}
+.ruhe{height:28px;border:1px dashed #2e343a;display:flex;align-items:center;padding:0 12px;color:#9aa2ab;font-size:13px}
+</style>
+</helmet>
+<div class="b">
+  <div class="fall">
+    <div class="lab">1 · Ein Alarm<b>Absender und Anfang des Wortlauts stehen in der Zeile</b></div>
+    <div class="kopf"></div>
+    <section class="zone" aria-label="Alarme">
+      <span class="wort">ALARM</span>
+      <span class="tit">Sofortmeldung · Rettungsstaffel</span>
+      <span class="txt">Person unter Baum eingeklemmt, Zufahrt über Feldweg Nord, RTW benötigt</span>
+      <span class="zt mono">1921</span>
+      <button type="button" class="kn pri">Öffnen</button>
+      <button type="button" class="kn">Gelesen</button>
+      <button type="button" class="kn x" aria-label="Ausblenden, ohne zu quittieren"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </section>
+    <div class="inhalt">Seiteninhalt rückt um eine Zeile (40 px) nach unten, nichts liegt darüber</div>
+  </div>
+
+  <div class="fall">
+    <div class="lab">2 · Hinweis der Organisation<b>Blaue Kante statt roter, sonst gleich</b></div>
+    <div class="kopf"></div>
+    <section class="zone hw" aria-label="Alarme">
+      <span class="wort">HINWEIS</span>
+      <span class="tit">Neuer Einsatz</span>
+      <span class="txt">Brand Lagerhalle Nord · Musterstadt-Ost</span>
+      <span class="zt mono">1924</span>
+      <button type="button" class="kn pri">Öffnen</button>
+      <button type="button" class="kn">Gelesen</button>
+      <button type="button" class="kn x" aria-label="Ausblenden, ohne zu quittieren"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </section>
+  </div>
+
+  <div class="fall">
+    <div class="lab">3 · Unwetterwarnung<b>Kein „Gelesen“: dahinter steht keine Benachrichtigung</b></div>
+    <div class="kopf"></div>
+    <section class="zone" aria-label="Alarme">
+      <span class="wort">ALARM</span>
+      <span class="tit">Unwetterwarnung DWD · Stufe 3</span>
+      <span class="txt">Orkanartige Böen bis 110 km/h, Starkregen 40 l/m² · bis 2200</span>
+      <span class="zt mono">1918</span>
+      <button type="button" class="kn pri">Öffnen</button>
+      <button type="button" class="kn x" aria-label="Ausblenden"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </section>
+  </div>
+
+  <div class="fall">
+    <div class="lab">4 · Ab zwei gebündelt, aufgeklappt<b>Kopfzeile mit Zähler, darunter je Alarm eine Zeile; der Inhalt rückt mit</b></div>
+    <div class="kopf"></div>
+    <section class="zone" aria-label="Alarme">
+      <span class="wort">ALARM</span>
+      <span class="pl mono">3</span>
+      <span class="tit">3 Alarme</span>
+      <span class="txt">2 × Auftrag überfällig · 1 × Bestätigung ausstehend</span>
+      <span class="trenn"></span>
+      <button type="button" class="kn txt">Zuklappen <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 5l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
+      <button type="button" class="kn x" aria-label="Alle ausblenden, ohne zu quittieren"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    </section>
+    <div class="liste">
+      <div class="zeile"><span class="tit">Auftrag überfällig</span><span class="txt">Auftrag #12 an S2 · Frist 1910</span><span class="zt mono">1912</span><button type="button" class="kn pri">Öffnen</button><button type="button" class="kn">Gelesen</button><button type="button" class="kn x" aria-label="Ausblenden"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+      <div class="zeile"><span class="tit">Auftrag überfällig</span><span class="txt">Auftrag #11 an Florian 3 · Frist 1915</span><span class="zt mono">1916</span><button type="button" class="kn pri">Öffnen</button><button type="button" class="kn">Gelesen</button><button type="button" class="kn x" aria-label="Ausblenden"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+      <div class="zeile"><span class="tit">Bestätigung ausstehend · RTW 2</span><span class="txt">Patient ansprechbar, Verdacht Fraktur Unterschenkel, Transport ins Klinikum</span><span class="zt mono">1923</span><button type="button" class="kn pri">Öffnen</button><button type="button" class="kn">Gelesen</button><button type="button" class="kn x" aria-label="Ausblenden"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+    </div>
+  </div>
+
+  <div class="fall">
+    <div class="lab">5 · Alles ausgeblendet oder gelesen<b>Die Zone verschwindet; Ausgeblendetes steht unter „Eingänge → Neu“</b></div>
+    <div class="kopf"></div>
+    <div class="ruhe">keine Zone · der Inhalt rückt wieder unter den Kopf</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1180,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
