@@ -89,7 +89,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
   einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
-  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
+  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
+  (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
   `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
@@ -144,6 +145,15 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
     Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
     deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
+  - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
+    `openspec/changes/wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
+    kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Tab-Titel, Druck).
+    Entschieden wird nur über `istUebung` (`einsatz/einsatzart.ts`) aus der Einsatzart, nie aus dem
+    Namen. Gezeigt wird nur über `UebungsMarke`/`UebungsBand` (`components/instrument/Uebung.tsx`),
+    im Druck über den Druckkopf. Eine violette gefüllte Fläche (Rolle `uebung`) bedeutet nur Übung,
+    und das Wort „ÜBUNG“ steht immer dabei. Violette Kennfarben ohne Fläche (ETB-Typ „Entscheidung“,
+    KRITIS-Ebene, Gefahrenart Intoxikation) bleiben. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
+    Rahmenquellen (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**

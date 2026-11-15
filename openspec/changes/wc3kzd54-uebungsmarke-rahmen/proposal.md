@@ -12,7 +12,8 @@ jemand „ÜBUNG“ in den Namen getippt hat. So landen Übungsdaten im echten E
 
 ## What Changes
 
-- Neue Farbrolle **`uebung`** (Violett, Nacht und Tag). Keine andere Bedeutung nutzt diese Farbe.
+- Neue Farbrolle **`uebung`** (Violett, Nacht und Tag). Keine andere Bedeutung nutzt eine violette
+  Fläche; violette Kennfarben ohne Fläche (ETB-Entscheidung, KRITIS) bleiben.
   Die Marke trägt immer das Wort „ÜBUNG“, im Band zusätzlich eine Schrägschraffur. Die Farbe ist
   nie der einzige Hinweis.
 - **Einsatzrahmen:** ein durchgehendes Band „ÜBUNG“ über die volle Breite direkt unter der

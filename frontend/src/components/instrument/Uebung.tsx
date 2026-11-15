@@ -16,7 +16,7 @@ import { schriftStil, useRollen } from './rollenwerte';
  *
  * Beide entscheiden selbst über {@link istUebung} und rendern sonst nichts, auch keinen
  * Platzhalter: Aufrufer reichen den Einsatz durch und prüfen nicht. Das Wort steht immer dabei
- * (WCAG 1.4.1); die Farbe allein zeigt nichts an. Violett ist nur Übung (`uebungKontrast.test.ts`).
+ * (WCAG 1.4.1); die Farbe allein zeigt nichts an. Die violette Fläche ist nur Übung (`uebungKontrast.test.ts`).
  * Still: kein Ton, kein Blinken (`geraet/AGENTS.md`).
  */
 

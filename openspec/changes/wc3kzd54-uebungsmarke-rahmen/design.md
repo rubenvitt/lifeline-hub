@@ -21,7 +21,10 @@ Die Motivation steht in `proposal.md` unter „Why“. Ausgangslage im Code:
   (`bezeichnung`, `einsatznummer_intern`). `druck/druck.css` setzt `@page` mit einem Randfeld
   `@bottom-right` für die Seitenzählung, das nur Chromium zeichnet.
 - Farben: Gelb heißt Achtung oder Störung, Blau Bedienung oder Hinweis, Grün normal. Rot gehört
-  der Marke und bedient nichts. Violett ist frei.
+  der Marke und bedient nichts. Violett ist als Fläche und als Status frei. Als Kennfarbe ohne
+  Fläche kommt es vor: ETB-Typ „Entscheidung“ (Kante und Typwort), KRITIS-Ebene der Lagekarte und
+  Gefahrenart Intoxikation. Das war beim ersten Entwurf übersehen und ist bei der Umsetzung
+  aufgefallen.
 
 ## Goals / Non-Goals
 
@@ -203,4 +206,7 @@ ihn. Im `EinsatzSwitcher` steht die Marke im Eintrag vor der Bezeichnung. Die Ne
   Druckkopf der ersten Seite „ÜBUNG“. Das ist bekannt und steht so in der Spec. Ein lückenloser Weg
   wäre ein Wasserzeichen, das ist verworfen.
 - [Die Farbe kollidiert später mit einer neuen Rolle] → Die Rolle ist exklusiv. Die Regel in
-  `frontend/AGENTS.md` nennt Violett als „nur Übung“.
+  `frontend/AGENTS.md` nennt die violette Fläche als „nur Übung“.
+- [Violette Kennfarben gibt es schon (ETB-Entscheidung, KRITIS, Intoxikation)] → Sie tragen keine
+  gefüllte Fläche und kein Wort „ÜBUNG“. Die Übungsmarke unterscheidet sich durch Form (Band,
+  Schraffur, gefüllter Chip) und Wort, nicht durch den Farbton allein.

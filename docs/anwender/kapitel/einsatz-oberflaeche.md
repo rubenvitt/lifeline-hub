@@ -283,7 +283,7 @@ Hat ein Einsatz die Einsatzart „Übung“, ist das überall zu sehen, ohne den
 
 Entscheidend ist allein die Einsatzart, nicht der Name: Ein Einsatz „Übungsgelände Brand“ mit
 der Einsatzart „Realeinsatz“ trägt keine Marke. Ändern lässt sich die Einsatzart in den
-[Einsatzdaten](einsatzdaten.md). Violett steht in Lifeline Hub für nichts anderes.
+[Einsatzdaten](einsatzdaten.md). Eine violette Fläche mit „ÜBUNG“ steht in Lifeline Hub für nichts anderes.
 
 ### Hinweise auf der Einsatzliste
 

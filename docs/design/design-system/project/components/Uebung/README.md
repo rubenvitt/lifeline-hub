@@ -10,7 +10,7 @@ Baustein, an dem man eine Übung erkennt, ohne den Namen zu lesen. Zwei Formen:
 
 Beide entscheiden selbst über `istUebung` und rendern sonst nichts, auch keinen
 Platzhalter: Aufrufer reichen den Einsatz durch und prüfen nicht. Das Wort steht immer dabei
-(WCAG 1.4.1); die Farbe allein zeigt nichts an. Violett ist nur Übung (`uebungKontrast.test.ts`).
+(WCAG 1.4.1); die Farbe allein zeigt nichts an. Die violette Fläche ist nur Übung (`uebungKontrast.test.ts`).
 Still: kein Ton, kein Blinken (`geraet/AGENTS.md`).
 
 Quelle: `frontend/src/components/instrument/Uebung.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus

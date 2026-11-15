@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { kontrast } from '../test/farbmass';
-import { farbenDunkel, farbenHell, rahmenFarben } from './tokens';
+import {
+  etbTypFarbenDunkel,
+  etbTypFarbenHell,
+  farbenDunkel,
+  farbenHell,
+  rahmenFarben,
+} from './tokens';
 
 /**
  * Farbrolle `uebung` (LLH-1725, Spec `uebungsmarke`, design.md D2), GERECHNET statt behauptet.
@@ -14,9 +20,9 @@ const TEXTBODEN = 7;
 const UMRISSBODEN = 3;
 
 describe.each([
-  ['Tag', farbenHell],
-  ['Nacht', farbenDunkel],
-] as const)('Farbrolle uebung — %s', (_modus, farben) => {
+  ['Tag', farbenHell, etbTypFarbenHell],
+  ['Nacht', farbenDunkel, etbTypFarbenDunkel],
+] as const)('Farbrolle uebung — %s', (_modus, farben, etbTyp) => {
   it.each(['uebungFuellung', 'uebungSchraffur'] as const)('Wort auf %s', (rolle) => {
     expect(kontrast(farben.uebungText, farben[rolle])).toBeGreaterThanOrEqual(TEXTBODEN);
   });
@@ -38,8 +44,17 @@ describe.each([
     expect(umriss).toBeGreaterThanOrEqual(UMRISSBODEN);
   });
 
-  it('ist kein Ton einer anderen Bedeutung', () => {
-    const andere = [farben.bedien, farben.alarm, farben.achtung, farben.normal, farben.marke];
+  // Violette Kennfarben gibt es schon (ETB-Entscheidung, KRITIS-Ebene); die Übung teilt keinen Ton
+  // mit ihnen und hebt sich durch Fläche und Wort ab (design.md, Risiken).
+  it('teilt keinen Ton mit einer Status- oder ETB-Typfarbe', () => {
+    const andere = [
+      farben.bedien,
+      farben.alarm,
+      farben.achtung,
+      farben.normal,
+      farben.marke,
+      ...Object.values(etbTyp).flatMap((t) => [t.kante, t.wort]),
+    ];
     for (const ton of [farben.uebungFuellung, farben.uebungSchraffur, farben.uebungKante]) {
       expect(andere).not.toContain(ton);
     }
