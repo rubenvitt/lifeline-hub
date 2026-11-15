@@ -84,11 +84,11 @@ const ETIKETT_STIL: CSSProperties = {
 };
 
 /**
- * Der Vorlauf der Rail (LLH-1734, design.md D3 in `openspec/changes/f24jkokr-rahmen-kleinteile/`):
- * was im Fluss über ihr steht und nicht zum klebenden Rahmen zählt, also die Betriebszeile ab `md`,
- * das Spiegelband und die Warnung zu den Modulfreigaben. Gemessen als Abstand der `<nav>` vom
- * Dokumentanfang minus `--lfh-rahmen-oben`; die `<nav>` klebt nicht, ihr Abstand hängt also nicht
- * am Rollstand.
+ * Der Vorlauf der Rail (LLH-1734, design.md D3 in
+ * `openspec/changes/archive/2026-11-15-f24jkokr-rahmen-kleinteile/`): was im Fluss über ihr steht
+ * und nicht zum klebenden Rahmen zählt, also die Betriebszeile ab `md`, das Spiegelband und die
+ * Warnung zu den Modulfreigaben. Gemessen als Abstand der `<nav>` vom Dokumentanfang minus
+ * `--lfh-rahmen-oben`; die `<nav>` klebt nicht, ihr Abstand hängt also nicht am Rollstand.
  *
  * Neu gemessen, wenn sich `body` in der Größe ändert (eine Zeile erscheint oder verschwindet) oder
  * der Rahmen eine neue Höhe meldet; geschrieben im nächsten Bild, wie in `rahmenOben.ts` (LLH-1335).

@@ -55,7 +55,7 @@ Jede Aufgabe per TDD: erst der Test, der ohne die Änderung rot ist, dann der Co
       nachziehen, dazu `geraete-koppeln.md` falls nötig; Bilder beider Kapitel neu erzeugen
       (`pnpm doku:bilder e2e/doku-bilder/<kapitel>.bilder.ts`), Wächter
       `src/hilfe/anwenderdoku.guard.test.ts` grün.
-- [ ] 6.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die berührten e2e-Specs
+- [x] 6.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die berührten e2e-Specs
       (`rahmen-stehen-bleiben`, `modulnamen`, `rail-etikett`, `geraet-kopplung`) einzeln grün.
 
 ## Workflow follow-up

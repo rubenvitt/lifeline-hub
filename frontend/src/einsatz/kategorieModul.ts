@@ -1,8 +1,9 @@
 /**
  * Das zuletzt besuchte Modul je Kategorie, je Person und Einsatz (LLH-1734, Spec
- * `seiten-orientierung`, design.md D1 in `openspec/changes/f24jkokr-rahmen-kleinteile/`). Einziger
- * Leser ist der Rail-Sprung: ein Klick auf „Kräfte“ führt dorthin zurück, wo die Person in den
- * Kräften zuletzt war, nicht immer ins Meldebild.
+ * `seiten-orientierung`, design.md D1 in
+ * `openspec/changes/archive/2026-11-15-f24jkokr-rahmen-kleinteile/`). Einziger Leser ist der
+ * Rail-Sprung: ein Klick auf „Kräfte“ führt dorthin zurück, wo die Person in den Kräften zuletzt
+ * war, nicht immer ins Meldebild.
  *
  * Wie `letzterOrt.ts` zählt jede ANKUNFT, nicht nur die Wahl: gefragt ist „wo war ich in dieser
  * Kategorie“. Gemerkt wird nur der Modulschlüssel, nicht die Unterseite; ein Datensatz könnte

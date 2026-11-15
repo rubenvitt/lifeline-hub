@@ -52,15 +52,15 @@ Ausführung, nicht beim Anzeigen eines Ziels.
 ### Requirement: Ankünfte zeichnen nicht auf
 
 Das System MUST NOT ein Modul in „Zuletzt besucht" aufnehmen, wenn es angesteuert wurde, ohne
-dass jemand genau dieses Modul gewählt hat. Das betrifft den Rail-Sprung in das erste Modul
-einer Kategorie, den Einsatz-Switcher mit der Weiterleitung auf das Standardmodul, das Öffnen
-einer Adresse von außen (Lesezeichen, eingefügter Link, neuer Tab) und Querverweise innerhalb
-von Modulinhalten.
+dass jemand genau dieses Modul gewählt hat. Das betrifft den Rail-Sprung in ein Modul einer
+Kategorie (das zuletzt besuchte oder das erste), den Einsatz-Switcher mit der Weiterleitung auf
+das Standardmodul, das Öffnen einer Adresse von außen (Lesezeichen, eingefügter Link, neuer Tab)
+und Querverweise innerhalb von Modulinhalten.
 
 #### Scenario: Rail-Sprung
 
-- **WHEN** eine Person in der Rail eine andere Kategorie anklickt und dadurch in deren erstes
-  Modul geleitet wird
+- **WHEN** eine Person in der Rail eine andere Kategorie anklickt und dadurch in ein Modul
+  dieser Kategorie geleitet wird
 - **THEN** bleibt „Zuletzt besucht" unverändert, obwohl sich die Seite gewechselt hat
 
 #### Scenario: Einsatzwechsel
