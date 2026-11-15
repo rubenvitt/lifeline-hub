@@ -293,13 +293,17 @@ Berechtigung“ da. Was die eigene Rolle im Einsatz erlaubt, steht in
 
 Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
-Einige Einträge der Modulliste sind **Sprungmarken** in ein anderes Modul: „Entscheidungen“
-(Einsatztagebuch, nur Entscheidungen), „Patienten“ und „Vermisste“ (Betroffene), „FMS-Tableau“
-(Fahrzeuge) sowie unter „Fernmeldewesen“ (Kategorie „Kommunikation“) „Fernmeldeskizze“ und
-„Kommunikationsplan“. Das
+Einige Einträge der Modulliste sind **Sprungmarken** in eine Ansicht eines Moduls. Sie stehen
+eingerückt mit einer feinen Linie direkt unter diesem Modul: „Entscheidungen“ unter „ETB“
+(Kategorie „Erfassung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
+„FMS-Tableau“ unter „Fahrzeuge“, „Ohne Schicht“ unter „Ablösung“ sowie „Fernmeldeskizze“ und
+„Kommunikationsplan“ unter „Fernmeldewesen“ (Kategorie „Kommunikation“). Nach dem Sprung ist das
+Modul darüber hervorgehoben. Das
 „Informationstelefon“ ist keine Sprungmarke, sondern ein eigenes Modul der Kategorie
 „Kommunikation“.
-Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt.
+Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt; „Ohne
+Schicht“ ist außerdem gesperrt, wenn das Modul Einheiten gesperrt ist. Den vollen Namen einer
+gesperrten Marke zeigt der Hinweis beim Zeigen mit der Maus.
 
 Wer aus einem Einsatz ins Profil, in die Benachrichtigungen, die Neuigkeiten, die Hilfe oder die
 Verwaltung wechselt, findet dort „Zurück zu …“: Es führt an die zuletzt geöffnete Stelle des

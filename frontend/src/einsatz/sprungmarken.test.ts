@@ -68,7 +68,6 @@ describe('Sprungmarken (LFH-620)', () => {
       'einsatzdaten',
       'einsatzabschnitte',
       'auftraege',
-      '↗entscheidungen',
       'lagebesprechung',
       'dokumente',
     ]);
@@ -87,6 +86,7 @@ describe('Sprungmarken (LFH-620)', () => {
     expect(folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung'))).toEqual(
       [
         'etb',
+        '↗entscheidungen',
         'personen',
         '↗patienten',
         '↗vermisste',
@@ -135,8 +135,19 @@ describe('Sprungmarken (LFH-620)', () => {
   });
 
   it('hängt eine Marke ohne auffindbaren Anker ans Ende, statt sie zu verlieren', () => {
-    const module = moduleNachKategorie('fuehrung').filter((m) => m.key !== 'auftraege');
-    const zeilen = folge(module, sprungmarkenNachKategorie('fuehrung'));
+    const module = moduleNachKategorie('erfassung').filter((m) => m.key !== 'etb');
+    const zeilen = folge(module, sprungmarkenNachKategorie('erfassung'));
     expect(zeilen[zeilen.length - 1]).toBe('↗entscheidungen');
+  });
+
+  // Spec `modul-sprungmarken`, „Eine Sprungmarke steht unter ihrem Zielmodul“ (LLH-1733): sonst
+  // wechselte die Hervorhebung nach dem Sprung die Kategorie.
+  it('steht in der Kategorie ihres Zielmoduls, hinter dem Ziel oder einer Marke desselben Ziels', () => {
+    for (const marke of sprungmarken) {
+      const ziel = sprungZiel(marke);
+      expect(ziel?.kategorie, marke.key).toBe(marke.kategorie);
+      const anker = sprungmarken.find((m) => m.key === marke.nach);
+      expect(anker ? anker.zielModul : marke.nach, marke.key).toBe(marke.zielModul);
+    }
   });
 });
