@@ -19,9 +19,11 @@ herleitung:
 
 - MUST: Ob ein Einsatz eine Übung ist, entscheidet nur `isUebung` (`frontend/src/einsatz/einsatzart.ts`)
   aus der Einsatzart; Regel und Liste der Flächen: `frontend/AGENTS.md`, Rahmen, „Übung“.
-- MUST: Gezeigt wird eine Übung nur über `UebungsMarke`/`UebungsBand`
-  (`frontend/src/components/instrument/Uebung.tsx`), im Druck über den `Druckkopf`; immer mit dem
-  Wort „ÜBUNG“, nie über die Farbe allein.
+- MUST: Gezeigt wird eine Übung am Bildschirm nur über `UebungsMarke`/`UebungsBand`
+  (`frontend/src/components/instrument/Uebung.tsx`), auf Papier über den `Druckkopf`, `DruckUebung`
+  und das Randfeld der Seite `uebung` bzw. `X-uebung`, in Text- und Bildtiteln (Tab, Lageplan-PNG,
+  Schriftfeld der Fernmeldeskizze) als Präfix „ÜBUNG · “; immer mit dem Wort „ÜBUNG“, nie über die
+  Farbe allein. Liste der Flächen: `frontend/AGENTS.md`, Rahmen, „Übung“.
 - MUST NOT: Eine Fläche leitet die Übung aus Name, Stichwort oder Vorlage ab.
 - SHOULD: Neue Flächen, die einen Einsatz zeigen oder zur Wahl stellen, kennzeichnen eine Übung
   vom ersten Tag an.
@@ -33,7 +35,7 @@ verlange 'export function isUebung' frontend/src/einsatz/einsatzart.ts
 verlange 'export function UebungsBand' frontend/src/components/instrument/Uebung.tsx
 verlange 'export function UebungsMarke' frontend/src/components/instrument/Uebung.tsx
 verlange 'isUebung\(einsatz\)' frontend/src/components/druck/Druckkopf.tsx
-verbiete "einsatzart === 'uebung'" 'frontend/src/**/*.tsx'
+verbiete "einsatzart [!=]==? ?['\"]uebung|['\"]uebung['\"] [!=]==? ?[a-zA-Z_.?]*einsatzart|case ['\"]uebung['\"]" 'frontend/src/**/*.ts' 'frontend/src/**/*.tsx' ':!frontend/src/einsatz/einsatzart.ts' ':!frontend/src/**/*.test.ts' ':!frontend/src/**/*.test.tsx'
 ```
 
 ## Kontext

@@ -101,7 +101,7 @@ Die Sprungpalette SHALL einen Einsatz-Wechsel in eine Übung mit der Marke „Ü
 „Übung“ finden. Die Wahl „Laufender Einsatz“ beim Übernehmen einer Planung SHALL eine Übung mit der
 Marke zeigen. Das externe Lagebild SHALL eine Übung mit Band und Marke zeigen. Der Rückweg „Zurück
 zu …“ auf Ebene 1 SHALL bei einer Übung die Marke tragen. Der Bildkopf eines Lageplans als Anlage
-SHALL bei einer Übung mit „ÜBUNG“ beginnen.
+und der Titel im Schriftfeld der Fernmeldeskizze SHALL bei einer Übung mit „ÜBUNG“ beginnen.
 
 #### Scenario: Planung in eine Übung übernehmen
 

@@ -61,7 +61,8 @@ kein Konto und sieht nur dieses eine Lagebild; der Link öffnet nichts anderes i
 
 Die Stufe „Lagebild“ zeigt Bezeichnung, Stichwort, Einsatzart und Beginn des Einsatzes, die
 Betroffenen nach Sichtung, die Kräfte, die Unfallhilfsstellen mit Belegung und die Karte, also
-dasselbe wie ein [externer Lagemonitor](externe-lagemonitore.md). Unter „Lagemeldung“ steht die
+dasselbe wie ein [externer Lagemonitor](externe-lagemonitore.md). Ist der Einsatz eine Übung,
+steht oben ein violettes Band „ÜBUNG“ und vor der Bezeichnung die Marke „ÜBUNG“, in jeder Stufe. Unter „Lagemeldung“ steht die
 „Zusammenfassung“ des zuletzt freigegebenen Lageberichts (siehe [Lageberichte](lageberichte.md));
 ein Entwurf geht nicht hinaus. Die Zusammenfassung geht so hinaus, wie sie freigegeben ist: Namen
 gehören vor der Freigabe nicht hinein. Die Stufe „Öffentlich“ zeigt nur Bezeichnung, Stichwort,

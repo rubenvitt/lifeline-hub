@@ -201,6 +201,13 @@ der Option „Laufender Einsatz“ (`title` bleibt Text). Das externe Lagebild z
 Lageplan-PNG beginnt mit „ÜBUNG ·“. Verworfen: die Regel auf die zuerst aufgezählten Flächen
 einzuengen.
 
+Der Nach-Review dieser Behebungen fand noch: Die Suche im Feld „Laufender Einsatz“ filterte über
+`label`, das bei einer Übung kein Text mehr ist; sie sucht jetzt über `title`. Das Schriftfeld der
+Fernmeldeskizze beginnt bei einer Übung mit „ÜBUNG ·“, aus demselben Grund wie das Lageplan-PNG
+(das Bild geht als Anlage ohne Rahmen weiter). ADR-0052 nennt alle Wege der Kennzeichnung, und ihre
+Prüfung verbietet einen direkten Vergleich mit `'uebung'` auch in `.ts` und in beiden
+Schreibweisen.
+
 ### D10 Regel und Doku
 
 - `frontend/AGENTS.md`, Abschnitt „Rahmen“, neuer Spiegelstrich „Übung“: Die Kennzeichnung ist
