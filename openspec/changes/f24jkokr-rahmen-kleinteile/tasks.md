@@ -4,23 +4,23 @@ Jede Aufgabe per TDD: erst der Test, der ohne die Änderung rot ist, dann der Co
 
 ## 1. Rail-Gedächtnis (D1)
 
-- [ ] 1.1 `einsatz/kategorieModul.ts` anlegen (merken je Person, Einsatz und Kategorie, 12-h-Frist,
+- [x] 1.1 `einsatz/kategorieModul.ts` anlegen (merken je Person, Einsatz und Kategorie, 12-h-Frist,
       fremder Inhalt gilt als nichts gemerkt, nur über `sichererSpeicher`); Unit-Tests in
       `kategorieModul.test.ts` für Frist, Trennung nach Person und Einsatz und kaputten Inhalt sind
       grün.
-- [ ] 1.2 Reine Funktion `rueckkehrModul` (gemerkt, sonst erstes freigegebenes; gesperrt,
+- [x] 1.2 Reine Funktion `rueckkehrModul` (gemerkt, sonst erstes freigegebenes; gesperrt,
       ausgeblendet, fremde Kategorie oder unbekannter Schlüssel → erstes); Unit-Tests für jeden
       Zweig sind grün.
-- [ ] 1.3 `EinsatzLayout.tsx`: Ankunft unter `merkbar` merken, `onKategorieKlick` springt über
+- [x] 1.3 `EinsatzLayout.tsx`: Ankunft unter `merkbar` merken, `onKategorieKlick` springt über
       `rueckkehrModul`; Test in `EinsatzLayout.test.tsx` „Kräfte → Ablösung → Erfassung → Kräfte
       landet in Ablösung“ grün, und „Zuletzt besucht“ bleibt nach dem Rail-Sprung unverändert
       (bestehender Test grün).
-- [ ] 1.4 Eintrag `lfh:nav:kategorie-modul:<benutzer>:<einsatz>` in `GERAETESPEICHER`
+- [x] 1.4 Eintrag `lfh:nav:kategorie-modul:<benutzer>:<einsatz>` in `GERAETESPEICHER`
       (`offline/geraetRaeumung.ts`, `bleibt`); `geraetRaeumung.guard.test.ts` grün.
 
 ## 2. Panel-Wahl hält beim Rail-Sprung (D2)
 
-- [ ] 2.1 `sprungOffen` in `onKategorieKlick` nur ohne gemerkte Wahl; Test in
+- [x] 2.1 `sprungOffen` in `onKategorieKlick` nur ohne gemerkte Wahl; Test in
       `EinsatzLayout.test.tsx`: gemerkte Wahl „zu“, Fremdklick → Panel bleibt zu; ohne Wahl am
       Tablet quer öffnet es (bestehender Test grün).
 

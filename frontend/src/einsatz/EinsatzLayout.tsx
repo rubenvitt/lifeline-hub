@@ -7,7 +7,6 @@ import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../api/einsa
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  erstesFreigegebenesModul,
   freiesRueckwegModul,
   istModulAusblendbar,
   istModulGesperrt,
@@ -31,6 +30,7 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
+import { leseKategorieModul, merkeKategorieModul, rueckkehrModul } from './kategorieModul';
 import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
@@ -286,6 +286,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   useEffect(() => {
     if (merkbar && benutzerId != null) merkeLetztenOrt(benutzerId, { einsatzId, pfad: pathname });
   }, [merkbar, benutzerId, einsatzId, pathname]);
+  // Das zuletzt besuchte Modul je Kategorie für den Rail-Sprung (LLH-1734, `kategorieModul.ts`):
+  // jede Ankunft zählt, unter derselben Bedingung wie der letzte Ort.
+  useEffect(() => {
+    if (merkbar && benutzerId != null && aktuellesModul) {
+      merkeKategorieModul(benutzerId, einsatzId, aktuellesModul);
+    }
+  }, [merkbar, benutzerId, einsatzId, aktuellesModul]);
   const modulZaehler = useModulZaehler({ einsatzId, freigaben: modulFreigaben });
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
@@ -316,8 +323,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   }
 
   /**
-   * Rail-Klick im inline-Rahmen: SELBSTKLICK = UMKLAPPEN, FREMDKLICK = SPRUNG in das erste
-   * freigegebene Modul der Kategorie.
+   * Rail-Klick im inline-Rahmen: SELBSTKLICK = UMKLAPPEN, FREMDKLICK = SPRUNG in das zuletzt
+   * besuchte Modul der Kategorie, sonst das erste freigegebene (LLH-1734, `kategorieModul.ts`).
    * Nicht immer navigieren: der Angleich-Effekt höbe sonst das persistierte Zuklappen in
    * derselben Runde auf. Die Rail behält ihre Hervorhebung über
    * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen.
@@ -330,10 +337,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       return;
     }
     setOffeneKategorie(key);
-    // Öffnet das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem ersten Sprung am
-    // Tablet die Vorgabe „zu“ für immer weg.
-    setSprungOffen(true);
-    const ziel = erstesFreigegebenesModul(key, modulFreigaben);
+    // Ohne Wahl öffnet der Sprung das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem
+    // ersten Sprung am Tablet die Vorgabe „zu“ für immer weg. Eine gemerkte Wahl gilt (LLH-1734).
+    if (navWahl === null) setSprungOffen(true);
+    const gemerkt = benutzerId != null ? leseKategorieModul(benutzerId, einsatzId, key) : null;
+    const ziel = rueckkehrModul(key, gemerkt, modulFreigaben);
     if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
   }
 

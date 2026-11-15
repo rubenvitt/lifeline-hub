@@ -531,14 +531,26 @@ describe('EinsatzLayout', () => {
     expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
   });
 
-  it('klappt beim Wechsel auf eine andere Kategorie wieder auf, ohne die Wahl zu überschreiben', async () => {
+  /**
+   * LLH-1734 (Spec `einsatztauglichkeit-layout`, „Ein Rail-Sprung achtet die gemerkte Panel-Wahl“):
+   * vorher klappte der Sprung ein zugeklapptes Panel wieder auf. Beide Hälften: der Klick
+   * navigiert, und das Panel bleibt trotzdem zu.
+   */
+  it('lässt ein zugeklapptes Panel beim Wechsel auf eine andere Kategorie zu', async () => {
     localStorage.setItem(EINGEKLAPPT, '1');
+    setzeViewportBreite(XL);
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
 
     await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
 
-    expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+    expect(screen.queryByRole('button', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Menü ausklappen' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
     // Der Sprung ist keine Wahl (LFH-952, D5): gemerkt bleibt „zu“.
     expect(localStorage.getItem(EINGEKLAPPT)).toBe('1');
   });
@@ -756,6 +768,45 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // FALSCHEN Kategorie liefert, bestünde eine schwächere Form. Käme ein `verweistAuf`-Eintrag
     // dazu (er spränge in eine andere Kategorie), färbte sich dieser Test rot.
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+  });
+
+  /**
+   * LLH-1734 (Spec `seiten-orientierung`): der Rail-Sprung führt ins zuletzt besuchte Modul der
+   * Kategorie. Start in 'personen' (nicht das erste Modul von Erfassung) als Ankunft per Adresse:
+   * auch sie zählt. Vorher landete der Rückweg in 'etb'.
+   */
+  it('springt zurück ins zuletzt besuchte Modul der Kategorie', async () => {
+    localStorage.clear();
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen');
+    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
+    // Ankünfte füllen „Zuletzt besucht“ der Palette nicht (Spec `navigation-zuletzt-besucht`).
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
+  });
+
+  it('springt ins erste Modul, wenn das gemerkte inzwischen gesperrt ist', async () => {
+    localStorage.clear();
+    localStorage.setItem(
+      `lfh:nav:kategorie-modul:${admin.id}:7`,
+      JSON.stringify({ erfassung: { key: 'personen', at: Date.now() } }),
+    );
+    setup(
+      freigabenFixture({ personen: { zugriff: false } }),
+      {},
+      admin,
+      '/einsaetze/7/lage-dashboard',
+    );
+    await waitFor(() => expect(screen.getByText('Dashboard-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/etb'));
   });
 
   /**
