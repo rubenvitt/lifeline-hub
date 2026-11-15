@@ -32,7 +32,7 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
-import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
+import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import { isUebung } from './einsatzart';
 import { NichtGefundenProvider } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
@@ -610,16 +610,18 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
             <EinsatzRahmenProvider value={einsatz}>
-              <NichtGefundenProvider value={nichtGefunden}>
-                {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
+              {/* Auch während des Ladens: die Seite zeigt unter `md` nur den Rückweg (LLH-1728, D6). */}
+              <ImEinsatzRahmenProvider value>
+                <NichtGefundenProvider value={nichtGefunden}>
+                  {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
-                <UnwetterHinweis
-                  einsatzId={einsatzId}
-                  benutzer={benutzer}
-                  freigaben={modulFreigaben}
-                />
-                {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
+                  <UnwetterHinweis
+                    einsatzId={einsatzId}
+                    benutzer={benutzer}
+                    freigaben={modulFreigaben}
+                  />
+                  {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
                `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`):
                meldet der Server für das Modul der Route `zugriff: false`, steht der Hinweis an der
                Stelle der Seite — auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
@@ -627,23 +629,24 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                raus); Einsatzdaten und Einstellungen sind nie gesperrt und warten nicht. Ein
                gescheiterter oder pausierter Abruf (offline) sperrt nicht, dann bleibt der
                403-Zustand der Seite das Netz. */}
-                {aktuellesModul &&
-                istModulAusblendbar(aktuellesModul.key) &&
-                modulFreigabenQuery.isLoading ? (
-                  <div data-testid="modulwaechter-laedt">
-                    <SeitenSkeleton />
-                  </div>
-                ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
-                  <GesperrtesModul
-                    einsatzId={einsatzId}
-                    modul={aktuellesModul}
-                    freigaben={modulFreigaben!}
-                    darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
-                  />
-                ) : (
-                  <Outlet />
-                )}
-              </NichtGefundenProvider>
+                  {aktuellesModul &&
+                  istModulAusblendbar(aktuellesModul.key) &&
+                  modulFreigabenQuery.isLoading ? (
+                    <div data-testid="modulwaechter-laedt">
+                      <SeitenSkeleton />
+                    </div>
+                  ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
+                    <GesperrtesModul
+                      einsatzId={einsatzId}
+                      modul={aktuellesModul}
+                      freigaben={modulFreigaben!}
+                      darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
+                    />
+                  ) : (
+                    <Outlet />
+                  )}
+                </NichtGefundenProvider>
+              </ImEinsatzRahmenProvider>
             </EinsatzRahmenProvider>
           </EinsatzAnzeigeProvider>
         </Content>

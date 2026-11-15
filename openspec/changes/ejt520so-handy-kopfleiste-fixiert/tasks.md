@@ -37,10 +37,10 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 4. Ortspfad im Einsatz
 
-- [ ] 4.1 Rahmenkontext „im Einsatzrahmen“ (`einsatz/EinsatzRahmenKontext.tsx`), gesetzt in
+- [x] 4.1 Rahmenkontext „im Einsatzrahmen“ (`einsatz/EinsatzRahmenKontext.tsx`), gesetzt in
   `EinsatzLayout` auch während des Ladens; `EinsatzSeite` gibt dem Ortspfad dann die Klasse
   `lfh-ortspfad--einsatz` (D6). Test in `EinsatzSeite.test.tsx`: Klasse im Rahmen, nicht außerhalb.
-- [ ] 4.2 `components/EinsatzSeite.css`: unter `md` nur der letzte verlinkte Eintrag ab dem dritten,
+- [x] 4.2 `components/EinsatzSeite.css`: unter `md` nur der letzte verlinkte Eintrag ab dem dritten,
   mit „‹“ davor; sonst nichts (D6). `ortspfadAbMd` bleibt „gar nichts“.
 
 ## 5. e2e
