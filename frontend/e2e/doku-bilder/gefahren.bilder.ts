@@ -107,7 +107,7 @@ test.describe(KAPITEL, () => {
     await expect(beurteilung).toContainText('unbestätigt');
     await beurteilung.getByRole('button', { name: 'Beurteilung bestätigen' }).click();
     await expect(beurteilung.locator('[data-lfh="beurteilung-stand"]')).toContainText(
-      /^beurteilt /,
+      /^bestätigt /,
     );
   });
 
