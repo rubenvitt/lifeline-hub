@@ -9,15 +9,16 @@ import Markdown from '../components/Markdown';
 import { KennungsLink } from '../components/kennungsLink';
 import { useViewport } from '../components/useViewport';
 import {
-  Augenbraue,
   Balken,
   Datenfeld,
   Datenraster,
+  Feldetikett,
   Paneel,
   PaneelLink,
   PaneelZustand,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../components/instrument';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
@@ -141,7 +142,7 @@ function AktuellPaneel({
           <Datenfeld label="Zeitstand" mono>
             <ZeitAnzeige wert={bericht.zeitstand} />
           </Datenfeld>
-          <Datenfeld label="Freigegeben" mono>
+          <Datenfeld label="Freigegeben">
             {bericht.freigegeben_von_name ?? '—'}
             {bericht.freigegeben_at && (
               <>
@@ -153,9 +154,9 @@ function AktuellPaneel({
         </Datenraster>
         {kern && auszug && (
           <div data-lfh="lagebericht-auszug">
-            <Augenbraue als="div" style={{ marginBlockEnd: token.marginXXS }}>
+            <Feldetikett als="div" style={{ marginBlockEnd: token.marginXXS }}>
               {kern.label}
-            </Augenbraue>
+            </Feldetikett>
             {/* Unter dem Titel (h3) — `#` im Text wird h4. */}
             <Markdown variante="kompakt" unterEbene={3}>
               {auszug.gekuerzt ? `${auszug.text} …` : auszug.text}
@@ -215,7 +216,13 @@ function InArbeitPaneel({
                 >
                   {b.titel}
                 </KennungsLink>
-                <div style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+                <div
+                  style={{
+                    ...schriftStil('meta'),
+                    fontSize: schriftGroesse('fein'),
+                    color: rollen.gedaempft,
+                  }}
+                >
                   {`${vorlageLabel(b.vorlage)} · v${b.version} · `}
                   <ZeitAnzeige wert={b.zeitstand} />
                   {` · ${b.ersteller_name}`}
@@ -226,7 +233,8 @@ function InArbeitPaneel({
                     flexWrap: 'wrap',
                     alignItems: 'center',
                     columnGap: token.marginSM,
-                    ...zahlStil('fein'),
+                    ...schriftStil('meta'),
+                    fontSize: schriftGroesse('fein'),
                     color: rollen.text2,
                   }}
                 >

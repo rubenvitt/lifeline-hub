@@ -465,6 +465,7 @@ export function StelleBild({
             // Festbreitenschrift eines Rufnamens tragen die Unterscheidung.
             fill="currentColor"
             style={stelle.art === 'extern' || !stelle.rufname ? SCHRIFT_TEXT : SCHRIFT_MONO}
+            data-schrift={stelle.art === 'extern' || !stelle.rufname ? undefined : 'kennung'}
           >
             {rufZeilen.length === 1
               ? ruf

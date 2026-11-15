@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { StatusChip, useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { StatusChip, useRollen, schriftGroesse, schriftStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -60,7 +60,16 @@ export function AuftragZeit({ auftrag: a }: { auftrag: Auftrag }) {
   const { rollen } = useRollen();
   return (
     <>
-      <span style={{ display: 'block', ...zahlStil('fein'), color: rollen.schwach }}>erteilt</span>
+      <span
+        style={{
+          display: 'block',
+          ...schriftStil('meta'),
+          fontSize: schriftGroesse('fein'),
+          color: rollen.schwach,
+        }}
+      >
+        erteilt
+      </span>
       <span>
         <ZeitAnzeige wert={a.erteilt_at} rolle="kurz" />
       </span>
@@ -116,7 +125,14 @@ export function AuftragKopf({
           </Text>
         )}
         {a.frist_at && (
-          <Text type="secondary" style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+          <Text
+            type="secondary"
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.gedaempft,
+            }}
+          >
             Frist {zeitpunkt(a.frist_at)}
           </Text>
         )}

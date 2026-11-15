@@ -75,7 +75,7 @@ function AuftragListenKarte({
         <AuftragQuittungsstand auftrag={a} />
         {empfaenger !== '' && (
           <Text
-            style={{ fontSize: schriftGroesse('text'), color: rollen.text2, minWidth: 0 }}
+            style={{ fontSize: schriftGroesse('klein'), color: rollen.text2, minWidth: 0 }}
             ellipsis
           >
             {empfaenger}

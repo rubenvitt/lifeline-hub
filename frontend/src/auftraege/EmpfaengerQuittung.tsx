@@ -1,6 +1,6 @@
 import { Button, Flex, Popconfirm, Space, Typography } from 'antd';
 import { useMemo } from 'react';
-import { StatusChip, useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { StatusChip, useRollen, schriftGroesse, schriftStil } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
@@ -26,7 +26,12 @@ export function Quittungsstand({ anzahl, quittiert }: { anzahl: number; quittier
   return (
     <Text
       type="secondary"
-      style={{ ...zahlStil('fein'), color: rollen.gedaempft, whiteSpace: 'nowrap' }}
+      style={{
+        ...schriftStil('meta'),
+        fontSize: schriftGroesse('fein'),
+        color: rollen.gedaempft,
+        whiteSpace: 'nowrap',
+      }}
     >
       {anzahl} Empfänger · {quittiert}/{anzahl} quittiert
     </Text>

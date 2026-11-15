@@ -21,6 +21,7 @@ import {
   Segmentleiste,
   StatusChip,
   useRollen,
+  schriftStil,
   zahlStil,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
@@ -297,7 +298,7 @@ export default function NachforderungBoard({
       {sp.karten.length === 0 && sp.aeltere.length === 0 ? (
         <div
           data-lfh="board-spalte-leer"
-          style={{ ...zahlStil('klein'), color: rollen.schwach, padding: token.paddingXS }}
+          style={{ ...schriftStil('meta'), color: rollen.schwach, padding: token.paddingXS }}
         >
           keine
         </div>

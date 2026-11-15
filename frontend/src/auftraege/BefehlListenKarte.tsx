@@ -4,7 +4,7 @@ import type { BefehlKopf } from '../api/types';
 import KommKarte from '../kommunikation/KommKarte';
 import { BEFEHL_STATUS, StatusBadge } from '../kommunikation';
 import { AuswahlZiel, type AuswahlZielProps } from '../components/ListeDetail';
-import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { useRollen, schriftGroesse, schriftStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { befehlSchemaLabel } from './befehlTexte';
 import { Quittungsstand } from './EmpfaengerQuittung';
@@ -43,7 +43,14 @@ function BefehlListenKarte({
       hervorgehoben={hervorgehoben}
       zeit={
         <>
-          <span style={{ display: 'block', ...zahlStil('fein'), color: rollen.schwach }}>
+          <span
+            style={{
+              display: 'block',
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
+          >
             Stand
           </span>
           <span>
@@ -64,7 +71,16 @@ function BefehlListenKarte({
           {b.titel}
         </Text>
       </AuswahlZiel>
-      <Flex gap={8} wrap style={{ marginTop: 4, ...zahlStil('fein'), color: rollen.gedaempft }}>
+      <Flex
+        gap={8}
+        wrap
+        style={{
+          marginTop: 4,
+          ...schriftStil('meta'),
+          fontSize: schriftGroesse('fein'),
+          color: rollen.gedaempft,
+        }}
+      >
         <span>{b.ersteller_name}</span>
         {b.status === 'freigegeben' && b.freigegeben_at && (
           <span>
@@ -82,7 +98,7 @@ function BefehlListenKarte({
             />
           )}
           <Text
-            style={{ fontSize: schriftGroesse('text'), color: rollen.text2, minWidth: 0 }}
+            style={{ fontSize: schriftGroesse('klein'), color: rollen.text2, minWidth: 0 }}
             ellipsis
           >
             {verteiler.map((e) => e.snap_anzeige).join(', ')}

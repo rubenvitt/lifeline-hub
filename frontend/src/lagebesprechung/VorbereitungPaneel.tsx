@@ -9,7 +9,7 @@ import { legeLageberichtAn } from '../api/lageberichte';
 import type { EinsatzAnzeige, LagebesprechungStand, ModulFreigaben } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Paneel, PaneelZeile, useRollen, zahlStil } from '../components/instrument';
+import { Paneel, PaneelZeile, useRollen, schriftStil } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -195,7 +195,8 @@ export default function VorbereitungPaneel({
             <span
               data-teil="wert"
               style={{
-                ...zahlStil('text', 500),
+                ...schriftStil('text'),
+                fontWeight: 500,
                 textAlign: 'end',
                 overflowWrap: 'anywhere',
               }}

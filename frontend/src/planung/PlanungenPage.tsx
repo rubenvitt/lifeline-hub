@@ -21,7 +21,7 @@ import { useViewport } from '../components/useViewport';
 import { EINSATZART_LABELS } from '../einsatz/einsatzart';
 import { planungPfad } from '../routing/deeplinks';
 import PlanungAnlegenDialog from './PlanungAnlegenDialog';
-import { zahlStil } from '../components/instrument/rollenwerte';
+import { schriftStil, zahlStil } from '../components/instrument/rollenwerte';
 
 /** Ab so vielen Tagen vor dem Löschen nennt die Liste den Tag. */
 const LOESCHHINWEIS_TAGE = 14;
@@ -80,7 +80,11 @@ export default function PlanungenPage() {
                 style={{ display: 'block' }}
               >
                 übernommen in{' '}
-                <span style={zahlStil('klein')}>
+                <span
+                  style={
+                    p.uebernahme.einsatznummer != null ? zahlStil('klein') : schriftStil('meta')
+                  }
+                >
                   {p.uebernahme.einsatznummer ?? `Einsatz ${p.uebernahme.einsatz_id}`}
                 </span>
               </Typography.Text>

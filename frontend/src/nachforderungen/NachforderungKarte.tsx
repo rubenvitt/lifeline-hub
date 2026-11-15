@@ -19,7 +19,7 @@ import KommKarte from '../kommunikation/KommKarte';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import type { KartenAktion } from '../components/kartenKontext';
 import { useKartenKontext } from '../components/useKartenKontext';
-import { StatusChip, schriftGroesse, zahlStil } from '../components/instrument';
+import { StatusChip, schriftGroesse, schriftStil } from '../components/instrument';
 import type { Speicherung } from '../components/Erfassung';
 import { formatVor } from '../anzeige/abstand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -134,7 +134,7 @@ function UebernommenePosten({
         </Text>
       ))}
       {n.anzahl != null && (
-        <Text type="secondary" style={{ display: 'block', fontSize: schriftGroesse('text') }}>
+        <Text type="secondary" style={{ display: 'block', fontSize: schriftGroesse('klein') }}>
           übernommen {uebernommeneMenge(n, posten)} von {n.anzahl}
         </Text>
       )}
@@ -665,7 +665,7 @@ function NachforderungKarte({
         {jetzt != null && (
           <span
             data-lfh="nachforderung-alter"
-            style={{ ...zahlStil('klein'), color: rollen.gedaempft }}
+            style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
           >
             {formatVor(n.angefordert_at, jetzt)}
           </span>
@@ -686,7 +686,7 @@ function NachforderungKarte({
       )}
       <Text
         type="secondary"
-        style={{ display: 'block', fontSize: schriftGroesse('text'), marginBottom: 4 }}
+        style={{ display: 'block', fontSize: schriftGroesse('klein'), marginBottom: 4 }}
       >
         an {adressat}
       </Text>
@@ -717,7 +717,7 @@ function NachforderungKarte({
             <Text
               key={z.schluessel}
               type={z.ton === 'achtung' ? 'warning' : 'secondary'}
-              style={{ fontSize: schriftGroesse('text') }}
+              style={{ fontSize: schriftGroesse('klein') }}
             >
               {z.text}
             </Text>
@@ -728,7 +728,7 @@ function NachforderungKarte({
           <UebernommenePosten nachforderung={n} posten={posten} />
         ) : (
           n.material_ids.length > 0 && (
-            <Text type="secondary" style={{ fontSize: schriftGroesse('text') }}>
+            <Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
               {n.material_ids.length} Posten übernommen
             </Text>
           )

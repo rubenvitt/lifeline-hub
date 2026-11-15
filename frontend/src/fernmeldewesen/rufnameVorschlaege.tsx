@@ -121,7 +121,9 @@ function VorschlagLabel({ vorschlag }: { vorschlag: RufnameVorschlag }) {
   const { token, rollen } = useRollen();
   return (
     <span style={{ display: 'flex', alignItems: 'baseline', gap: token.marginXS, minWidth: 0 }}>
-      <span style={zahlStil('text')}>{vorschlag.funkrufname}</span>
+      <span data-schrift="kennung" style={zahlStil('text')}>
+        {vorschlag.funkrufname}
+      </span>
       {vorschlag.typ && <span style={{ color: rollen.text2 }}>{vorschlag.typ}</span>}
     </span>
   );

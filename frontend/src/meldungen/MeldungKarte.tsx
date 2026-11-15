@@ -17,7 +17,7 @@ import {
 } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { StatusChip, useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { StatusChip, useRollen, schriftGroesse, schriftStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -421,12 +421,26 @@ function MeldungKarte({
       </Text>
 
       <Flex align="center" gap={8} wrap style={{ marginTop: 8 }}>
-        <Text type="secondary" style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+        <Text
+          type="secondary"
+          style={{
+            ...schriftStil('meta'),
+            fontSize: schriftGroesse('fein'),
+            color: rollen.gedaempft,
+          }}
+        >
           {WEG_LABEL[m.meldeweg]} · {MELDUNGSART_LABEL[m.meldungsart]} · Ereignis:{' '}
           {zeitpunkt(m.ereigniszeit)}
         </Text>
         {ansicht === 'abgeschlossen' && m.erledigt_at && (
-          <Text type="secondary" style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+          <Text
+            type="secondary"
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.gedaempft,
+            }}
+          >
             Erledigt: {zeitpunkt(m.erledigt_at)}
           </Text>
         )}

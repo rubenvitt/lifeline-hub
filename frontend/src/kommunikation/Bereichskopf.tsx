@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import Datenstand from '../components/Datenstand';
-import { Augenbraue, useRollen, zahlStil } from '../components/instrument';
+import { Augenbraue, useRollen, schriftGroesse, schriftStil } from '../components/instrument';
 
 /**
  * Kopf eines Inhaltsbereichs UNTER dem Seitenkopf, etwa ein Reiter mit eigener Menge und
@@ -46,7 +46,15 @@ export default function Bereichskopf({
       >
         <Augenbraue als={ueberschrift}>{titel}</Augenbraue>
         {meta != null && (
-          <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>{meta}</span>
+          <span
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.gedaempft,
+            }}
+          >
+            {meta}
+          </span>
         )}
         {dataUpdatedAt != null && <Datenstand dataUpdatedAt={dataUpdatedAt} />}
       </div>
