@@ -303,10 +303,11 @@ Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder f
 
 Wer aus einem Einsatz ins Profil, in die Benachrichtigungen, die Neuigkeiten, die Hilfe oder die
 Verwaltung wechselt, findet dort „Zurück zu …“: Es führt an die zuletzt geöffnete Stelle des
-Einsatzes zurück, solange er läuft. Ist er abgeschlossen, führt die Hilfe stattdessen „Zu den
-Einsätzen“. Am breiten Schirm öffnet die Hilfe aus einem Einsatz in einem neuen Tab, in der
-Desktop-App in einem eigenen Fenster; der Einsatz bleibt im ersten Tab offen. Am Handy und am
-Tablet öffnet sie im selben Tab.
+Einsatzes zurück, solange er läuft; in der Hilfe an die Stelle, aus der sie geöffnet wurde, auch
+wenn man im Einsatz inzwischen weitergearbeitet hat. Ist der Einsatz abgeschlossen, führt die
+Hilfe stattdessen „Zu den Einsätzen“. Am breiten Schirm mit Maus öffnet die Hilfe aus einem
+Einsatz in einem neuen Tab, in der Desktop-App in einem eigenen Fenster; der Einsatz bleibt im
+ersten Tab offen. Am Handy und am Tablet öffnet sie im selben Tab.
 
 ### Wo das Kontextmenü gilt
 

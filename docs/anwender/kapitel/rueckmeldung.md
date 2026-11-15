@@ -17,8 +17,8 @@ rueckmeldung@lifeline-hub.de.
 ### Rückmeldung über das Formular
 
 1. Aus der Seite, um die es geht, das Benutzermenü öffnen und „Hilfe“ wählen. Am breiten Schirm
-   öffnet sie aus einem Einsatz in einem neuen Tab, in der Desktop-App in einem eigenen Fenster;
-   der Bereich der App reist mit.
+   mit Maus öffnet sie aus einem Einsatz in einem neuen Tab, in der Desktop-App in einem eigenen
+   Fenster, am Tablet im selben Tab; der Bereich der App reist in beiden Fällen mit.
 2. In der Übersicht der Hilfe unter „Fehler gefunden oder eine Idee?“ „Rückmeldung geben“ wählen.
    Das Formular öffnet sich in einem neuen Fenster des Browsers, in der Desktop-App im
    Standardbrowser des Rechners.
