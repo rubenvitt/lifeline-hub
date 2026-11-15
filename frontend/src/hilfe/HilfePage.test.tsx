@@ -291,6 +291,26 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
     expect(seiteVonAdresse()).toBe('/einsatz/:id/etb');
   });
 
+  // LLH-1731 D5: im neuen Tab reist die Herkunft als `von` in der Adresse.
+  it('übernimmt `von` aus der Adresse, entfernt ihn und behält die Gruppe', async () => {
+    zeige(`/hilfe?gruppe=administration&von=${encodeURIComponent('/einsatz/42/etb')}`);
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/hilfe\?gruppe=administration$/),
+    );
+    await waehle('Lesergruppe', 'Alle');
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^\/hilfe$/));
+    await userEvent.click(await screen.findByRole('button', { name: /Rückmeldung geben/ }));
+    expect(seiteVonAdresse()).toBe('/einsatz/:id/etb');
+    expect(String(oeffnen.mock.calls[0]![0])).not.toContain('42');
+  });
+
+  it('verwirft einen `von`, der keine Adresse der App ist', async () => {
+    zeige(`/hilfe?von=${encodeURIComponent('//fremd.example/einsatz/42/etb')}`);
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^\/hilfe$/));
+    await userEvent.click(await screen.findByRole('button', { name: /Rückmeldung geben/ }));
+    expect(seiteVonAdresse()).toBe('/hilfe');
+  });
+
   it('nach einer widerrufenen Kopplung (Browser lief als Gerät) fehlt „Rückmeldung geben“', async () => {
     merkeGeraet(true);
     let beantwortet = false;

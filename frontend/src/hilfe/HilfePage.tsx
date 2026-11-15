@@ -28,10 +28,15 @@ import './Hilfe.css';
 /** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`, HEIC-Decoder LFH-1000). */
 const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
 
+/** Ein Pfad dieser App: beginnt mit `/`, aber nicht mit `//` (das wäre eine fremde Adresse). */
+function isAppPfad(wert: unknown): wert is string {
+  return typeof wert === 'string' && wert.startsWith('/') && !wert.startsWith('//');
+}
+
 /** Der Pfad, aus dem das Benutzermenü die Hilfe geöffnet hat (`state.von`, LLH-1642 D5). */
 function parseHerkunft(state: unknown): string | undefined {
   const von = (state as { von?: unknown } | null)?.von;
-  return typeof von === 'string' && von.startsWith('/') ? von : undefined;
+  return isAppPfad(von) ? von : undefined;
 }
 
 /** Klein, ohne Umlaute und ß: „gerat“ findet „Gerät“. */
@@ -154,6 +159,23 @@ export default function HilfePage() {
   // Wechsel innerhalb der Hilfe tragen die Herkunft weiter, sonst meldete die Rückmeldung nach
   // einem Kapitelwechsel `/hilfe` statt des Bereichs, aus dem die Hilfe geöffnet wurde (D5).
   const herkunftState = location.state;
+
+  // Im neuen Tab reist die Herkunft als `von` in der Adresse (LLH-1731 D5): einmal in den
+  // History-State übernehmen und aus der Adresse nehmen, damit sie nicht in Lesezeichen und
+  // kopierten Links landet. Die übrigen Parameter (Gruppe) bleiben.
+  const vonInAdresse = params.get('von');
+  useEffect(() => {
+    if (vonInAdresse === null) return;
+    const rest = new URLSearchParams(params);
+    rest.delete('von');
+    const suche = rest.toString();
+    void navigate(
+      { pathname: location.pathname, search: suche ? `?${suche}` : '' },
+      { replace: true, state: isAppPfad(vonInAdresse) ? { von: vonInAdresse } : location.state },
+    );
+    // Nur der Parameter löst aus; Pfad, State und übrige Suche gelten zum selben Zeitpunkt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vonInAdresse]);
 
   // „/“ springt in die Suche, wie in der Doku der Website.
   useEffect(() => {
