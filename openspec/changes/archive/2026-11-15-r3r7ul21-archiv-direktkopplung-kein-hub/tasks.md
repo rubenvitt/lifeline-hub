@@ -14,7 +14,7 @@
 
 ## 3. Abschluss
 
-- [x] 3.1 `./scripts/check-all.sh --geaendert` grün (bzw. die Bündel der berührten Bereiche) — lokal grün: Bündel `schnell`, `cargo test --lib` (4417), `archiv_einspielen`, `instanz_vor_ort`, `instanz_hinweise`; die volle Workspace-Suite passte nicht auf die Platte der Cloud-Sitzung und läuft im PR mit Label `voll`
+- [x] 3.1 `./scripts/check-all.sh --geaendert` grün (bzw. die Bündel der berührten Bereiche) — lokal grün (nach Merge von alpha): Bündel `schnell`; Rust-Suite wie Schritt 4, wegen der Platte der Cloud-Sitzung in Paketen zu je 20 Testzielen (`--lib --bins` 4417, alle 257 Integrationsziele 3807, übrige Workspace-Crates 80); `lifeline-desktop` baut in der Sitzung nicht (GTK-Systembibliotheken fehlen, `src-tauri/` unberührt); Frontend: die vier Vitest-Dateien, die `docs/anwender/` lesen (30). Kein Label `voll` (ADR-0050)
 
 ## Workflow follow-up
 
