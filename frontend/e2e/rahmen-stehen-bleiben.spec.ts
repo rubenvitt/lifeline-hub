@@ -347,8 +347,9 @@ test('Modulpanel bleibt im ETB am Ende der Zeitachse stehen (1440 × 900)', asyn
   expect(Math.round((await spalte.boundingBox())!.y), 'Modulpanel hängt unter der Kopfleiste').toBe(
     Math.round(await unterkanteKopf(page)),
   );
-  // Kopf der Kategorie, jeder Eintrag und der Fuß stehen ganz im Bild.
-  await expect(spalte.getByText('Erfassung', { exact: true })).toBeInViewport({ ratio: 1 });
+  // Kopf der Kategorie, jeder Eintrag und der Fuß stehen ganz im Bild. Das ETB steht in der
+  // Führung (y3zh5ymv D10).
+  await expect(spalte.getByText('Führung', { exact: true })).toBeInViewport({ ratio: 1 });
   const eintraege = page.locator('[data-lfh="modul-panel-liste"] :is(a, button)');
   for (const eintrag of await eintraege.all()) await expect(eintrag).toBeInViewport({ ratio: 1 });
   await expect(page.locator('[data-lfh="modul-panel-fuss"]')).toBeInViewport({ ratio: 1 });
