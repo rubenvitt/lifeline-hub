@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 
 import { Button, Dropdown, Space, Table, Tooltip, Typography } from 'antd';
 import type { TableColumnsType, TableRef } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
-import { useRollen, zahlStil } from '../../components/instrument';
+import { schriftStil, useRollen } from '../../components/instrument';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { zellFlaechenStil } from './zellStil';
@@ -411,7 +411,9 @@ export default function GefahrenMatrix({
           {' · '}
           <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
         </Typography.Text>
-        {laedt && <Typography.Text style={zahlStil('text')}>Bewertungen laden …</Typography.Text>}
+        {laedt && (
+          <Typography.Text style={schriftStil('text')}>Bewertungen laden …</Typography.Text>
+        )}
       </div>
       <Table<ZeilenDaten>
         rowKey="typ"

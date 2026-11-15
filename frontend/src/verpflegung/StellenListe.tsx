@@ -14,7 +14,7 @@ import { useKontextMenue } from '../components/useKontextMenue';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
-import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { useRollen, schriftGroesse, schriftStil } from '../components/instrument';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { verpflegungsstelleStatus } from '../theme/statusFarben';
 import { laufendeZeitfensterDerStelle } from './stellenKern';
@@ -259,7 +259,10 @@ export default function StellenListe({
               <Flex key={zf.id} gap={token.marginXS} wrap align="baseline">
                 <span>{`${zf.bezeichnung} ${uhrzeitenText(zf, konventionen)}`}</span>
                 <span style={{ color: rollen.text2 }}>·</span>
-                <span style={zahlStil('text', 500)}>{`${ausgegeben} EP ausgegeben`}</span>
+                {/* „12 EP ausgegeben“ trägt ein Wort: Textschrift (LLH-1777). */}
+                <span style={{ ...schriftStil('text'), fontWeight: 500 }}>
+                  {`${ausgegeben} EP ausgegeben`}
+                </span>
               </Flex>
             ))
           )}

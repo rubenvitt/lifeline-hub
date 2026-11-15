@@ -27,6 +27,7 @@ import {
   PaneelZustand,
   Sammelbanner,
   Zeitachseneintrag,
+  schriftStil,
   useRollen,
   zahlStil,
 } from '../components/instrument';
@@ -638,7 +639,7 @@ function DauerZeile({
   if (dauern.gesamtMinuten != null) teile.push(`gesamt ${dauerText(dauern.gesamtMinuten)}`);
   if (teile.length === 0) return <span />;
   return (
-    <span data-lfh="kraft-dauer" style={{ ...zahlStil('klein'), color: rollen.text2 }}>
+    <span data-lfh="kraft-dauer" style={{ ...schriftStil('meta'), color: rollen.text2 }}>
       {teile.join(' · ')}
     </span>
   );

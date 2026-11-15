@@ -95,7 +95,7 @@ export default function EinheitAufgeloestAnsicht({
       </ul>
     );
   const fahrzeug = (f: LetztesFahrzeug) => (
-    <span style={zahlStil('text')}>
+    <span data-schrift="kennung" style={zahlStil('text')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: f.ef_id })}>
           {f.funkrufname}
@@ -193,7 +193,11 @@ export default function EinheitAufgeloestAnsicht({
             <Datenfeld label="Typ">{einheit.typ_label ?? '—'}</Datenfeld>
             <Datenfeld label="Abschnitt">{einheit.abschnitt_name ?? '—'}</Datenfeld>
             <Datenfeld label="Funkrufname" mono>
-              {einheit.funkrufname ?? '—'}
+              {einheit.funkrufname ? (
+                <span data-schrift="kennung">{einheit.funkrufname}</span>
+              ) : (
+                '—'
+              )}
             </Datenfeld>
             <Datenfeld label="Bemerkung" breit>
               {einheit.bemerkung ?? '—'}

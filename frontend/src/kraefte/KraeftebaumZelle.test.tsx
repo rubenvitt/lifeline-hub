@@ -162,11 +162,12 @@ describe('KraeftebaumZelle', () => {
     expect(screen.getByText('Material')).toBeInTheDocument();
     expect(screen.getByText('· 2 Posten')).toBeInTheDocument();
     expect(screen.getByText('· 1 Ausfall')).toBeInTheDocument();
-    // Zahlen immer Mono: Anzahl und Ausfall in der Zahlenschrift.
-    const mono = document.createElement('span');
-    mono.style.fontFamily = schrift.zahl;
+    // Zahl samt Zählwort trägt Wörter: Textschrift mit gleich breiten Ziffern (LLH-1777).
+    const textschrift = document.createElement('span');
+    textschrift.style.fontFamily = schrift.text;
     for (const text of ['· 2 Posten', '· 1 Ausfall']) {
-      expect(screen.getByText(text).style.fontFamily, text).toBe(mono.style.fontFamily);
+      expect(screen.getByText(text).style.fontFamily, text).toBe(textschrift.style.fontFamily);
+      expect(screen.getByText(text).style.fontVariantNumeric, text).toBe('tabular-nums');
     }
   });
 });

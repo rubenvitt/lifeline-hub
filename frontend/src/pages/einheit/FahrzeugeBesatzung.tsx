@@ -18,6 +18,7 @@ import {
   PaneelZustand,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
@@ -359,7 +360,7 @@ export default function FahrzeugeBesatzung({
 
   /** Name eines Fahrzeugs, als Sprung in die Fahrzeugzeile, wenn das Modul offen ist. */
   const renderFunkrufname = (efId: number, name: string) => (
-    <span style={zahlStil('text')}>
+    <span data-schrift="kennung" style={zahlStil('text')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: efId })}>{name}</KennungsLink>
       ) : (
@@ -471,7 +472,8 @@ export default function FahrzeugeBesatzung({
           {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
             <StatusTag darstellung={besatzungsUrteil[f.urteil]} />
           )}
-          <span style={zahlStil('klein')}>{besatzungText(f)}</span>
+          {/* „Ist 1/0/3//4 · Soll …“ trägt Wörter: Textschrift (LLH-1777). */}
+          <span style={schriftStil('meta')}>{besatzungText(f)}</span>
           {secondaryText([fremdText(f)])}
         </span>
         {renderFahrzeugActions(ef.id, { wahl: ef }, renderUebernehmen(ef))}
@@ -501,7 +503,13 @@ export default function FahrzeugeBesatzung({
           <div role="group" aria-label="Ohne Fahrzeug">
             <div style={rowStyle}>
               <Augenbraue style={{ fontSize: schriftGroesse('fein') }}>Ohne Fahrzeug</Augenbraue>
-              <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+              <span
+                style={{
+                  ...schriftStil('meta'),
+                  fontSize: schriftGroesse('fein'),
+                  color: rollen.gedaempft,
+                }}
+              >
                 · {kraefteText(ohne.length)}
               </span>
             </div>

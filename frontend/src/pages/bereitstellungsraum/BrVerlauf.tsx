@@ -129,7 +129,10 @@ function VerlaufZeile({ eintrag: e }: { eintrag: BrVerlaufEintrag }) {
         <ZeitAnzeige wert={e.zeitpunkt_at} rolle="kurz" />
       </span>
       <span>{verlaufText(e)}</span>
-      <span style={e.objekt_typ === 'fahrzeug' ? zahlStil('text') : undefined}>
+      <span
+        data-schrift={e.objekt_typ === 'fahrzeug' ? 'kennung' : undefined}
+        style={e.objekt_typ === 'fahrzeug' ? zahlStil('text') : undefined}
+      >
         {e.objekt_name}
       </span>
       {e.notiz && (

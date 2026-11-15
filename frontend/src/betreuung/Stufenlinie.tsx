@@ -1,6 +1,6 @@
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
-import { useRollen, zahlStil } from '../components/instrument';
+import { schriftGroesse, schriftStil, useRollen, zahlStil } from '../components/instrument';
 import { stufenGeometrie, type Stufe } from './standlinieKern';
 
 const BREITE = 600;
@@ -62,7 +62,12 @@ export default function Stufenlinie({
   const zeit = (s: Stufe) => zeitKurz(wire(s.t), konventionen);
   const erste = stufen[0];
   const letzte = stufen[stufen.length - 1];
-  const beschriftung = { ...zahlStil('fein'), color: rollen.schwach };
+  // Die Zeile trägt das Bezugswort („Soll …“): Textschrift, die Zeiten darin Mono (LLH-1777).
+  const beschriftung = {
+    ...schriftStil('meta'),
+    fontSize: schriftGroesse('fein'),
+    color: rollen.schwach,
+  };
 
   return (
     <figure
@@ -128,14 +133,14 @@ export default function Stufenlinie({
           marginTop: token.marginXXS,
         }}
       >
-        <span>{zeit(erste)}</span>
+        <span style={zahlStil('fein')}>{zeit(erste)}</span>
         {bezug && (
           <span>
             <span style={{ letterSpacing: 2 }}>- - </span>
             {bezug.text}
           </span>
         )}
-        <span>{zeit(letzte)}</span>
+        <span style={zahlStil('fein')}>{zeit(letzte)}</span>
       </figcaption>
     </figure>
   );

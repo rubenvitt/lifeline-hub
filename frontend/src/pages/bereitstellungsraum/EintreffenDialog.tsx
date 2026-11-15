@@ -426,7 +426,7 @@ export default function EintreffenDialog({
             {t.typ && <Typography.Text type="secondary">{t.typ}</Typography.Text>}
           </Space>
           {t.funkrufnamen.length > 0 && (
-            <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+            <span data-schrift="kennung" style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
               {t.funkrufnamen.join(' · ')}
             </span>
           )}
@@ -506,7 +506,7 @@ export default function EintreffenDialog({
             {t.ist_demo && <DemoMarke />}
           </Space>
           {t.fahrzeuge.length > 0 && (
-            <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+            <span data-schrift="kennung" style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
               {t.fahrzeuge.join(' · ')}
             </span>
           )}

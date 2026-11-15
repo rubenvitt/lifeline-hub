@@ -4,7 +4,13 @@ import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkUndTelefon from '../components/FunkUndTelefon';
 import StatusTag from '../components/StatusTag';
-import { Datenfeld, Datenraster, useRollen, zahlStil } from '../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  schriftGroesse,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { einheitStatusAnzeige } from './meldebildRaster';
@@ -58,7 +64,13 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
                   farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
                 />
                 {status.verteilung && (
-                  <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+                  <span
+                    style={{
+                      ...schriftStil('meta'),
+                      fontSize: schriftGroesse('fein'),
+                      color: rollen.gedaempft,
+                    }}
+                  >
                     {status.verteilung}
                   </span>
                 )}
@@ -67,7 +79,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
             {e.typ_label && <Datenfeld label="Typ">{e.typ_label}</Datenfeld>}
             {e.funkrufname && (
               <Datenfeld label="Funkrufname" mono>
-                {e.funkrufname}
+                <span data-schrift="kennung">{e.funkrufname}</span>
               </Datenfeld>
             )}
             <Datenfeld label="Ist-Stärke (F/UF/M//Σ)" mono>
@@ -85,9 +97,8 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
             )}
             {e.fuehrer_name && <Datenfeld label="Führer">{e.fuehrer_name}</Datenfeld>}
             {e.abschnitt_name && <Datenfeld label="Abschnitt">{e.abschnitt_name}</Datenfeld>}
-            <Datenfeld label="Zugeordnet" mono>
-              {mittelText(e)}
-            </Datenfeld>
+            {/* „2 Fahrzeuge · 5 Personal …“ trägt Wörter: Textschrift (LLH-1777). */}
+            <Datenfeld label="Zugeordnet">{mittelText(e)}</Datenfeld>
             {/* Funk und Telefon getrennt (LLH-1134); leere Zeilen entfallen in der Vorschau, der
                 Funkrufname steht oben schon als eigene Zeile. */}
             <FunkUndTelefon

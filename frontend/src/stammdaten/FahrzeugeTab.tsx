@@ -98,6 +98,7 @@ export default function FahrzeugeTab() {
         <Space size={4} wrap>
           <KennungsLink
             to={fahrzeugDetailPfad(f.id)}
+            data-schrift="kennung"
             style={{ ...zahlStil('text'), overflowWrap: 'anywhere' }}
           >
             {f.funkrufname}

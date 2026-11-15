@@ -8,7 +8,7 @@ import type { VerpflegungVorlage, Verpflegungsart } from '../api/types';
 import { listVerpflegungVorlagen, updateVerpflegungVorlage } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, zahlStil } from '../components/instrument';
+import { StatusChip, schriftStil, zahlStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -127,7 +127,7 @@ function VerpflegungsplanInhalt() {
           {m.folgetag && (
             <Typography.Text
               type="secondary"
-              style={{ ...zahlStil('klein'), marginInlineStart: 6 }}
+              style={{ ...schriftStil('meta'), marginInlineStart: 6 }}
             >
               +1 Tag
             </Typography.Text>

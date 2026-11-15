@@ -198,7 +198,11 @@ export function FahrzeugeSection({ vorlage, vorlagen, isAdmin }: SectionProps) {
               )
             }
           >
-            <KennungsLink to={fahrzeugDetailPfad(f.fahrzeug_id)} style={zahlStil('text')}>
+            <KennungsLink
+              to={fahrzeugDetailPfad(f.fahrzeug_id)}
+              data-schrift="kennung"
+              style={zahlStil('text')}
+            >
               {f.funkrufname}
             </KennungsLink>
             {f.fahrzeugtyp && <span>{f.fahrzeugtyp}</span>}

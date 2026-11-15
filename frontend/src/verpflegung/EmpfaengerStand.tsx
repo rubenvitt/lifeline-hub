@@ -2,7 +2,7 @@ import { Button } from 'antd';
 import { Fragment, useId, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AusgabeEingabe, VerpflegungEmpfaenger, VerpflegungZeitfenster } from '../api/types';
-import { Augenbraue, useRollen, zahlStil } from '../components/instrument';
+import { Augenbraue, schriftStil, useRollen, zahlStil } from '../components/instrument';
 import {
   betreuungsstellenVon,
   staerkeAnzeige,
@@ -91,7 +91,8 @@ export default function EmpfaengerStand({
     return null;
   const stand = verpflegungsstand(zeitfenster, empfaenger, ausstehend);
   const uhr = (s: string) => uhrzeit(s, konventionen);
-  const nebentext = { ...zahlStil('klein'), color: rollen.text2 };
+  // „ausstehend 3 EP“ trägt ein Wort: Textschrift (LLH-1777).
+  const nebentext = { ...schriftStil('meta'), color: rollen.text2 };
   const listeStil = { listStyle: 'none', margin: 0, padding: 0 } as const;
   const zeileStil = {
     display: 'flex',
@@ -122,7 +123,11 @@ export default function EmpfaengerStand({
           <Teile
             teile={[
               z.name,
-              z.funkrufname && <span style={zahlStil('text')}>{z.funkrufname}</span>,
+              z.funkrufname && (
+                <span data-schrift="kennung" style={zahlStil('text')}>
+                  {z.funkrufname}
+                </span>
+              ),
               staerkeAnzeige(z.einheit) && (
                 <span style={zahlStil('text')}>{staerkeAnzeige(z.einheit)}</span>
               ),
@@ -180,7 +185,11 @@ export default function EmpfaengerStand({
                 <Teile
                   teile={[
                     z.name,
-                    z.funkrufname && <span style={zahlStil('text')}>{z.funkrufname}</span>,
+                    z.funkrufname && (
+                      <span data-schrift="kennung" style={zahlStil('text')}>
+                        {z.funkrufname}
+                      </span>
+                    ),
                     z.ausgaben.length > 0 && (
                       <span key="m" style={zahlStil('text', 500)}>
                         {ausgabenText(z.ausgaben, uhr)}

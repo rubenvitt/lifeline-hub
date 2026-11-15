@@ -25,6 +25,7 @@ import {
   Kennzahlenband,
   Paneel,
   PaneelZustand,
+  schriftStil,
   useRollen,
   zahlStil,
 } from '../../components/instrument';
@@ -307,7 +308,8 @@ export default function RegistrierungPaneel({
         </Link>
         <span style={{ fontWeight: 600 }}>{name}</span>
         {istBezugsperson && <Typography.Text type="secondary">Bezugsperson</Typography.Text>}
-        {alterText(p, heute) && <span style={zahlStil('text')}>{alterText(p, heute)}</span>}
+        {/* „ca. 40 J.“ trägt Wörter: Textschrift (LLH-1777). */}
+        {alterText(p, heute) && <span style={schriftStil('text')}>{alterText(p, heute)}</span>}
         <Typography.Text type="secondary">
           {p.kostform ? KOSTFORM_WORT[p.kostform] : 'Kostform ohne Angabe'}
         </Typography.Text>

@@ -144,7 +144,14 @@ export default function ExterneStellenTab() {
       key: 'funkrufname',
       abBreite: 'lg',
       sorter: nachText((s: ExterneStelle) => s.funkrufname),
-      render: (f?: string) => (f ? <span style={zahlStil('klein', 500)}>{f}</span> : '—'),
+      render: (f?: string) =>
+        f ? (
+          <span data-schrift="kennung" style={zahlStil('klein', 500)}>
+            {f}
+          </span>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Aktiv',

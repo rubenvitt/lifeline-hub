@@ -10,7 +10,7 @@ import type {
   VerletzungSchwere,
 } from '../../api/types';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { Segmentleiste, useRollen, zahlStil } from '../../components/instrument';
+import { Segmentleiste, schriftStil, useRollen, zahlStil } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useViewport } from '../../components/useViewport';
 import BestaetigtVonFeld, { BESTAETIGT_FELD } from '../../geraet/BestaetigtVonFeld';
@@ -285,7 +285,7 @@ export default function Koerperschema({
                 onStern={(id) => !laeuft && setAuswahl({ art: 'stern', id })}
               />
               <figcaption
-                style={{ ...zahlStil('klein'), color: rollen.gedaempft, textAlign: 'center' }}
+                style={{ ...schriftStil('meta'), color: rollen.gedaempft, textAlign: 'center' }}
                 aria-hidden="true"
               >
                 {ansicht}

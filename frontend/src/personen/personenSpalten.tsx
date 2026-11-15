@@ -8,7 +8,7 @@ import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser'
 import { sprungGesperrtText } from '../components/Sprung';
 import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
-import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { useRollen, schriftGroesse, schriftStil, zahlStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { aktualisierePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
@@ -132,7 +132,14 @@ function PersonZelle({ p }: { p: Person }) {
         {p.kontamination === true && <StatusTag darstellung={kontamination} />}
       </span>
       {offen && (
-        <div data-lfh="luecke" style={{ ...zahlStil('fein'), color: rollen.achtungText }}>
+        <div
+          data-lfh="luecke"
+          style={{
+            ...schriftStil('meta'),
+            fontSize: schriftGroesse('fein'),
+            color: rollen.achtungText,
+          }}
+        >
           {offen}
         </div>
       )}

@@ -230,7 +230,8 @@ const stellenSpalten = (
     {
       key: 'belegt',
       title: 'belegt',
-      zahl: true,
+      // Keine Zahlspalte: die Zelle trägt Wörter („keine Meldung“, „namentlich …“); Mono nur an
+      // der Zahl selbst (LLH-1777).
       sortWert: (s) => s.belegung?.belegt,
       render: (_, s) => {
         const zusatz = namentlichTeile(namentlich?.get(s.id), s.belegung != null);
@@ -250,7 +251,7 @@ const stellenSpalten = (
         const stufe = auslastung(s.belegung.belegt, s.kapazitaet_personen);
         return (
           <Space wrap>
-            <span>{personenZahl(s.belegung.belegt)}</span>
+            <span style={zahlStil}>{personenZahl(s.belegung.belegt)}</span>
             {stufe && <StatusTag darstellung={stufe} />}
             {hinweis}
           </Space>

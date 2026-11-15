@@ -57,6 +57,7 @@ import {
   Kennzahlenband,
   Sammelbanner,
   sammelbannerKurz,
+  schriftStil,
   useRollen,
   zahlStil,
 } from '../../components/instrument';
@@ -515,7 +516,7 @@ export default function BrDetailPage() {
   /** „seit 1342 · 48 min“ an einer Zeile; ohne „seit“ keine Zeitangabe (keine Schätzung). */
   const seitAngabe = (seitAt: string | null | undefined) =>
     seitAt ? (
-      <span data-lfh="br-seit" style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+      <span data-lfh="br-seit" style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
         {seitText(zeitKurz(seitAt), wartezeitMinuten(seitAt, jetzt))}
       </span>
     ) : null;
@@ -673,7 +674,7 @@ export default function BrDetailPage() {
         />
       </span>
       {e.fahrzeuge.length > 0 && (
-        <span data-lfh="br-einheit-fahrzeuge" style={zahlStil('klein')}>
+        <span data-lfh="br-einheit-fahrzeuge" data-schrift="kennung" style={zahlStil('klein')}>
           {funkrufnamen(e.fahrzeuge)}
         </span>
       )}
@@ -681,7 +682,9 @@ export default function BrDetailPage() {
   );
   const fahrzeugAngaben = (f: BrFahrzeugKurz) => (
     <>
-      <span style={zahlStil('text')}>{f.funkrufname}</span>
+      <span data-schrift="kennung" style={zahlStil('text')}>
+        {f.funkrufname}
+      </span>
       {fahrzeugVon.get(f.id)?.fahrzeugtyp && <Tag>{fahrzeugVon.get(f.id)!.fahrzeugtyp}</Tag>}
     </>
   );
@@ -934,7 +937,7 @@ export default function BrDetailPage() {
                         <div data-lfh="br-abruf">
                           <Space wrap size={token.marginXS}>
                             <StatusTag darstellung={brAbgerufen} />
-                            <span style={zahlStil('klein')}>
+                            <span style={schriftStil('meta')}>
                               {abrufAngabe(zeitKurz(z.abruf.seit_at), z.abruf, mitEinheit(z))}
                             </span>
                           </Space>
@@ -1002,7 +1005,7 @@ export default function BrDetailPage() {
                       <Space wrap>
                         <span>{v.aktion.name}</span>
                         {v.aktion.daten.unangemeldet && <UnangemeldetMarke />}
-                        <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+                        <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
                           {v.antrag ? 'beantragt' : 'vorgemerkt'}{' '}
                           {zeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
                         </span>

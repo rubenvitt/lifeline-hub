@@ -11,6 +11,7 @@ import {
   Schnellerfassungszeile,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../components/instrument';
 import { formatKoordinate } from './koordinate';
@@ -106,18 +107,18 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
       );
     case 'entlassen':
       return (
-        <span style={{ ...zahlStil('klein'), color: rollen.bedien }} title="Verbleib">
+        <span style={{ ...schriftStil('meta'), color: rollen.bedien }} title="Verbleib">
           → entlassen
         </span>
       );
     case 'uhs': {
       const a = loeseUhsAuf(teil.suche, uhsListe);
       return 'uhs' in a ? (
-        <span style={{ ...zahlStil('klein'), color: rollen.bedien }}>
+        <span style={{ ...schriftStil('meta'), color: rollen.bedien }}>
           → UHS {a.uhs.bezeichnung}
         </span>
       ) : (
-        <span style={{ ...zahlStil('klein'), color: rollen.alarmText }} title={a.problem}>
+        <span style={{ ...schriftStil('meta'), color: rollen.alarmText }} title={a.problem}>
           {teil.text} ?
         </span>
       );
@@ -131,7 +132,11 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
     case 'unerkannt':
       return (
         <span
-          style={{ ...zahlStil('klein'), color: rollen.alarmText, textDecoration: 'line-through' }}
+          style={{
+            ...schriftStil('meta'),
+            color: rollen.alarmText,
+            textDecoration: 'line-through',
+          }}
           title={teil.grund}
         >
           {teil.text}

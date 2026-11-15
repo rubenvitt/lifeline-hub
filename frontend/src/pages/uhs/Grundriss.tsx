@@ -79,6 +79,7 @@ import {
   StatusChip,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../../components/instrument';
 import {
@@ -1117,7 +1118,8 @@ function UnterwegsSpalte({
               <Button
                 type="link"
                 style={{
-                  ...zahlStil('klein'),
+                  // „R-007 · Name“ trägt einen Namen: Textschrift (LLH-1777).
+                  ...schriftStil('textKlein'),
                   paddingInline: 0,
                   justifyContent: 'flex-start',
                   maxWidth: '100%',

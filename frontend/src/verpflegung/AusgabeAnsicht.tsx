@@ -40,6 +40,7 @@ import {
   useRollen,
   zahlFarbe,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
@@ -576,7 +577,12 @@ export default function AusgabeAnsicht() {
             <span
               role="status"
               data-lfh="ausgabe-offline"
-              style={{ ...zahlStil('klein', 500), color: rollen.text2, minHeight: 22 }}
+              style={{
+                ...schriftStil('meta'),
+                fontWeight: 500,
+                color: rollen.text2,
+                minHeight: 22,
+              }}
             >
               {online ? '' : 'Offline vorgemerkt'}
             </span>
@@ -651,7 +657,7 @@ export default function AusgabeAnsicht() {
                 <span
                   data-lfh="ausgabe-ausstehend"
                   style={{
-                    ...zahlStil('klein'),
+                    ...schriftStil('meta'),
                     color: rollen.text2,
                     marginInlineStart: token.marginXS,
                   }}
@@ -662,7 +668,7 @@ export default function AusgabeAnsicht() {
               <div
                 data-lfh="sammlung-sonderkost"
                 title={sammelSonderkost || undefined}
-                style={{ ...einzeilig, ...zahlStil('klein'), color: rollen.text2 }}
+                style={{ ...einzeilig, ...schriftStil('meta'), color: rollen.text2 }}
               >
                 {/* Leer ein geschütztes Leerzeichen: die Zeile behält ihre Höhe. */}
                 {sammelSonderkost || '\u00a0'}
@@ -860,7 +866,8 @@ export default function AusgabeAnsicht() {
                     </span>
                     <span
                       style={{
-                        ...zahlStil('klein', 500),
+                        ...schriftStil('meta'),
+                        fontWeight: 500,
                         display: 'inline-block',
                         minWidth: `${ziffern(zf.bedarf.sonderkost[k]) + 6}ch`,
                         marginInlineStart: '1ch',
@@ -1072,7 +1079,7 @@ export default function AusgabeAnsicht() {
           <div
             id={grundId}
             data-lfh="zaehltasten-grund"
-            style={{ ...zahlStil('klein'), color: rollen.text2, minHeight: 18 }}
+            style={{ ...schriftStil('meta'), color: rollen.text2, minHeight: 18 }}
           >
             {grundText}
           </div>

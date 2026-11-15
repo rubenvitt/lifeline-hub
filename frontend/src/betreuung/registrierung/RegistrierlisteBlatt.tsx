@@ -10,7 +10,7 @@ import {
   kostformBand,
   personName,
 } from './registrierKern';
-import { zahlStil } from '../../components/instrument/rollenwerte';
+import { schriftStil, zahlStil } from '../../components/instrument/rollenwerte';
 
 import './registrierlisteDruck.css';
 
@@ -60,7 +60,10 @@ export default function RegistrierlisteBlatt({
     <tr key={p.id}>
       <td style={{ ...zelle, ...mono }}>{registrierNummer('R', p.registrier_nr)}</td>
       <td style={zelle}>{personName(p)}</td>
-      <td style={{ ...zelle, ...mono }}>{alterText(p, heute)}</td>
+      {/* „ca. 40 J.“ trägt Wörter: Textschrift mit gleich breiten Ziffern (LLH-1777). */}
+      <td style={{ ...zelle, ...schriftStil('text'), whiteSpace: 'nowrap' }}>
+        {alterText(p, heute)}
+      </td>
       <td style={zelle}>{p.kostform ? KOSTFORM_WORT[p.kostform] : 'ohne Angabe'}</td>
       {hasUnvertraeglichkeiten && <td style={zelle}>{p.unvertraeglichkeiten ?? ''}</td>}
       <td style={{ ...zelle, borderInline: rand, borderBlockEnd: rand }} />

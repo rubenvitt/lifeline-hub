@@ -20,6 +20,7 @@ import {
   StatusChip,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../components/instrument';
 import { statusKategorie, type StatusDarstellung } from '../theme/statusFarben';
@@ -293,12 +294,20 @@ export default function FmsTableau({
                     }}
                   >
                     <span
+                      data-schrift="kennung"
                       style={{ ...zahlStil('text'), ...abgeschnitten, minWidth: 0 }}
                       title={ef.funkrufname}
                     >
                       {ef.funkrufname}
                     </span>
-                    <span style={{ ...zahlStil('fein'), ...gedaempft, flex: '0 0 auto' }}>
+                    <span
+                      style={{
+                        ...schriftStil('meta'),
+                        fontSize: schriftGroesse('fein'),
+                        ...gedaempft,
+                        flex: '0 0 auto',
+                      }}
+                    >
                       seit {seit}
                     </span>
                   </div>

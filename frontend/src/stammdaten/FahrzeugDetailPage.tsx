@@ -161,7 +161,9 @@ export default function FahrzeugDetailPage() {
         breite="schmal"
         titel={
           <Space size={8}>
-            <span style={zahlStil('text', 500)}>{fahrzeug.funkrufname}</span>
+            <span data-schrift="kennung" style={zahlStil('text', 500)}>
+              {fahrzeug.funkrufname}
+            </span>
             {fahrzeug.ist_demo && <DemoMarke />}
           </Space>
         }

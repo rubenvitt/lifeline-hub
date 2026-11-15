@@ -2,7 +2,13 @@ import type { ReactNode } from 'react';
 import { POSITION_KUERZEL, POSITION_LABELS } from '../api/personal';
 import { kraefteText } from '../anzeige/staerke';
 import { KennungsLink } from '../components/kennungsLink';
-import { Augenbraue, useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import {
+  Augenbraue,
+  useRollen,
+  schriftGroesse,
+  schriftStil,
+  zahlStil,
+} from '../components/instrument';
 import { einheitDetailPfad, fahrzeugePfad, personalPfad } from '../routing/deeplinks';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 import { fremdText } from './kraeftebaumKern';
@@ -20,7 +26,7 @@ import type { PersonAnzeige, RasterZeile } from './meldebildRaster';
  * | Fahrzeug    | Fahrzeugzeichen 22 px           | Funkrufname Mono        |
  * | Person      | Positionsmarke F/UF/M (+ „EF“)  | Name normal             |
  * | Gruppe      | —                               | Augenbraue (Versalien)  |
- * | Material    | Kurzwort „Mtl.“                 | Bezeichnung normal      |
+ * | Material    | Kurzwort „Mtl.“ (Textschrift)   | Bezeichnung normal      |
  *
  * Den Einzug zeichnet die `Datensicht` (eine Einzugsrechnung, LFH-977). `data-art` trägt die
  * Zeilenart für Druck-CSS und Prüfungen.
@@ -160,7 +166,9 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         z.fahrzeugTz ? <FahrzeugZeichen tz={z.fahrzeugTz} /> : null,
         <>
-          <span style={zahlStil('klein')}>{name(z.bezeichnung, ziel)}</span>
+          <span data-schrift="kennung" style={zahlStil('klein')}>
+            {name(z.bezeichnung, ziel)}
+          </span>
           {nebentext([z.zusatz, z.besatzung ? fremdText(z.besatzung) : null])}
         </>,
       );
@@ -192,12 +200,24 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
           }}
         >
           <Augenbraue style={{ fontSize: schriftGroesse('fein') }}>{z.bezeichnung}</Augenbraue>
-          {/* Zahlen in Mono (Regel „Zahlen immer Mono“), samt ihrem Zählwort. */}
-          <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>· {anzahl}</span>
+          {/* Zahl samt Zählwort („3 Posten“): Textschrift mit gleich breiten Ziffern (LLH-1777). */}
+          <span
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.gedaempft,
+            }}
+          >
+            · {anzahl}
+          </span>
           {ausfall && (
             <span
               data-lfh="kraeftebaum-ausfall"
-              style={{ ...zahlStil('fein'), color: rollen.alarmText }}
+              style={{
+                ...schriftStil('meta'),
+                fontSize: schriftGroesse('fein'),
+                color: rollen.alarmText,
+              }}
             >
               · {ausfall}
             </span>
@@ -209,7 +229,16 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
       return huelle(
         // Das Kürzel schrumpft nicht: im Druck ließ die Zellregel `overflow-wrap: anywhere` es
         // sonst als „Mtl“ über „.“ brechen (LFH-1007).
-        <span style={{ ...zahlStil('fein'), color: rollen.schwach, flexShrink: 0 }}>Mtl.</span>,
+        <span
+          style={{
+            ...schriftStil('meta'),
+            fontSize: schriftGroesse('fein'),
+            color: rollen.schwach,
+            flexShrink: 0,
+          }}
+        >
+          Mtl.
+        </span>,
         <>{z.bezeichnung}</>,
       );
   }

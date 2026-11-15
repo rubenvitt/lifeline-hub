@@ -15,7 +15,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { setzeMaterialStatus, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
-import { useRollen, zahlStil } from '../components/instrument';
+import { schriftStil, useRollen, zahlStil } from '../components/instrument';
 import { KennungsLink } from '../components/kennungsLink';
 import { MODUL_MATERIAL_GESPERRT } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
@@ -468,7 +468,7 @@ export default function MaterialAmOrt({
           {showKopfzahl && (
             <span
               data-testid="material-am-ort-kopf"
-              style={{ ...zahlStil('klein'), color: rollen.gedaempft }}
+              style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
             >
               {materialKopfzahl(posten)}
             </span>
@@ -532,8 +532,16 @@ export default function MaterialAmOrt({
             >
               <span>{p.bezeichnung}</span>
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
-              {/* Eine Zahl bricht nicht um. */}
-              <span style={{ ...zahlStil('text'), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
+              {/* Eine Zahl bricht nicht um. Die reine Menge in Mono, „30 von 50 übrig“ trägt Wörter
+                  und steht in der Textschrift (LLH-1777). */}
+              <span
+                style={{
+                  ...(/^\d+$/.test(mengeText(p)) ? zahlStil('text') : schriftStil('text')),
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {mengeText(p)}
+              </span>
               <span style={nurPlatz}>
                 {/* Gesperrt meldet die Statuswahl ihre Palettenebene ab. */}
                 <StatusWahl
