@@ -1,6 +1,6 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
-import { Segmentleiste, zahlStil } from '../../components/instrument';
+import { Segmentleiste, schriftStil } from '../../components/instrument';
 import type { GriffModus } from './bildGriffe';
 import { bandStil } from './KartenFuss';
 
@@ -115,7 +115,7 @@ export function ModusBedienung({
             />
             <Typography.Text>Weitere platzieren</Typography.Text>
             {modus.anzahl > 0 && (
-              <Typography.Text type="secondary" style={zahlStil('text')}>
+              <Typography.Text type="secondary" style={schriftStil('text')}>
                 {modus.anzahl} platziert
               </Typography.Text>
             )}

@@ -1,6 +1,6 @@
 import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
 import { Button, Card, Space, Typography } from 'antd';
-import { useRollen, zahlStil } from '../../components/instrument';
+import { schriftStil, useRollen } from '../../components/instrument';
 import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
 import EscKappe from './EscKappe';
@@ -69,7 +69,7 @@ export default function BearbeitenSteuerung(props: BearbeitenSteuerungProps) {
           }}
         >
           <Typography.Text strong>{props.titel}</Typography.Text>
-          <Typography.Text data-lfh="bearbeiten-punkte" style={zahlStil('text')}>
+          <Typography.Text data-lfh="bearbeiten-punkte" style={schriftStil('text')}>
             {props.punkte === 1 ? '1 Punkt' : `${grenzeText(props.punkte)} Punkte`}
           </Typography.Text>
         </div>

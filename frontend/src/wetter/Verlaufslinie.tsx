@@ -15,7 +15,7 @@
 import { useState, type PointerEvent } from 'react';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
-import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { useRollen, schriftGroesse, schriftStil, zahlStil } from '../components/instrument';
 import { wasserstandMeter, type TrendRichtung } from '../pegel/pegelKennzahl';
 
 /** Kleinste dargestellte Spanne in cm (Mindesthöhe der y-Achse). */
@@ -209,7 +209,7 @@ export default function Verlaufslinie({
                 y={prognoseY < 12 ? prognoseY + 10 : prognoseY - 3}
                 fill={rollen.gedaempft}
                 style={{
-                  fontFamily: zahlStil('fein').fontFamily,
+                  ...schriftStil('meta'),
                   fontSize: schriftGroesse('fein'),
                 }}
               >

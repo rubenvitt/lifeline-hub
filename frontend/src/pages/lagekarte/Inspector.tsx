@@ -23,6 +23,7 @@ import {
   tonVonRolle,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
   Feldetikett,
 } from '../../components/instrument';
@@ -157,7 +158,7 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
 }
 
 /**
- * Marker-Inspector im Paneel „Ausgewählt": Symbol-Kachel, Name, Mono-Unterzeile, Datenraster (nur
+ * Marker-Inspector im Paneel „Ausgewählt": Symbol-Kachel, Name, Unterzeile, Datenraster (nur
  * Felder mit Datenquelle, siehe `auswahlRaster`), bei einer Einheit die letzte Meldung, Ort und
  * Aktionen.
  */
@@ -252,7 +253,15 @@ export default function Inspector({
           >
             {letzte.text}
           </span>
-          <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>{letzte.meta}</span>
+          <span
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
+          >
+            {letzte.meta}
+          </span>
         </section>
       )}
       {marker.typ === 'lagemeldung' && marker.lageMeldung && !lageOffen && (
@@ -277,7 +286,7 @@ export default function Inspector({
       )}
       {!ohneOrt && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-          <Augenbraue>Koordinate</Augenbraue>
+          <Feldetikett>Koordinate</Feldetikett>
           {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
             der Tooltip mit dem vollen Wortlaut hängt an Hover/Fokus, und auf Touch muss das
             Sichtbare tragen. Die Koordinate darüber bleibt ungekürzt. */}

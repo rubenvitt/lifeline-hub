@@ -31,7 +31,9 @@ import {
   useRollen,
   type PaneelDatenzustand,
   schriftGroesse,
+  schriftStil,
   zahlStil,
+  Feldetikett,
 } from '../components/instrument';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { dwdWarnstufe } from '../theme/statusFarben';
@@ -185,7 +187,7 @@ function WarnungEintrag({
           {titelSchreibung(w.ereignis)}
         </b>
       </div>
-      <span style={{ ...zahlStil('klein'), color: rollen.text2 }}>
+      <span style={{ ...schriftStil('meta'), color: rollen.text2 }}>
         {warnZeitraum(w.beginn, w.ende, jetzt, konv)}
       </span>
       <span style={{ color: rollen.text2, fontSize: schriftGroesse('klein') }}>
@@ -214,7 +216,7 @@ function WarnungEintrag({
           {w.beschreibung?.trim() && <p style={{ margin: 0 }}>{w.beschreibung}</p>}
           {w.handlungsempfehlung?.trim() && (
             <p style={{ margin: 0 }}>
-              <Augenbraue>Handlungsempfehlung</Augenbraue>
+              <Feldetikett>Handlungsempfehlung</Feldetikett>
               <br />
               {w.handlungsempfehlung}
             </p>
@@ -397,11 +399,14 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
                       paddingBlock: token.paddingXS,
                       paddingInline: token.padding,
                       borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-                      ...zahlStil('klein'),
+                      ...schriftStil('meta'),
                       color: rollen.text2,
                     }}
                   >
-                    <time dateTime={s.zeitpunkt} style={{ color: rollen.text, minWidth: 40 }}>
+                    <time
+                      dateTime={s.zeitpunkt}
+                      style={{ ...zahlStil('klein'), color: rollen.text, minWidth: 40 }}
+                    >
                       {zeitKurz(s.zeitpunkt, konv)}
                     </time>
                     <span style={{ minWidth: 64 }}>{temperaturText(s.temperatur_c)}</span>

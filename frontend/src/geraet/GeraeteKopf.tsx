@@ -18,11 +18,11 @@ import { formatiereDatenstand } from '../components/Datenstand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
-import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { GeraeteMenue } from './GeraeteMenue';
 import { useStellenName } from './stellenName';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
+import { schriftStil } from '../components/instrument/rollenwerte';
 
 dayjs.extend(utc);
 
@@ -77,9 +77,7 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
       <span
         aria-hidden="true"
         style={{
-          fontFamily: schrift.zahl,
-          fontSize: schriftGroesse('klein'),
-          fontVariantNumeric: 'tabular-nums',
+          ...schriftStil('meta'),
           whiteSpace: 'nowrap',
           color: bald ? farbe : rahmenFarben.text,
           fontWeight: bald ? 600 : 400,
@@ -145,9 +143,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
             role="img"
             style={{
               ...kopfZelleStil(token),
-              fontFamily: schrift.zahl,
-              fontSize: schriftGroesse('klein'),
-              fontVariantNumeric: 'tabular-nums',
+              ...schriftStil('meta'),
               whiteSpace: 'nowrap',
               color: farbenDunkel.achtung,
             }}

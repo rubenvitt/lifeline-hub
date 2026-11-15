@@ -49,7 +49,10 @@ function EinheitZeile({
         <span>
           <strong>{e.name}</strong>
           {e.funkrufname && (
-            <span style={{ ...zahlStil('text'), color: rollen.gedaempft }}> · {e.funkrufname}</span>
+            <span data-schrift="kennung" style={{ ...zahlStil('text'), color: rollen.gedaempft }}>
+              {' '}
+              · {e.funkrufname}
+            </span>
           )}
           {zeigeAbschnitt && e.abschnitt_name && (
             <span style={{ color: rollen.gedaempft }}> · {e.abschnitt_name}</span>

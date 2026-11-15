@@ -392,7 +392,9 @@ function ObjektZeile({
         </>
       ) : eintrag.typ === 'fahrzeug' ? (
         // Funkrufnamen immer Mono (Gestaltungssprache).
-        <span style={zahlStil('text')}>{eintrag.label}</span>
+        <span data-schrift="kennung" style={zahlStil('text')}>
+          {eintrag.label}
+        </span>
       ) : (
         eintrag.label
       )}

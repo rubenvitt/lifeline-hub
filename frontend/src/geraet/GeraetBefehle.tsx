@@ -14,7 +14,7 @@ import BefehlLesefassung from '../auftraege/BefehlLesefassung';
 import EmpfaengerQuittung from '../auftraege/EmpfaengerQuittung';
 import { befehlSchemaLabel } from '../auftraege/befehlTexte';
 import { vorlage } from '../befehle/vorlagen';
-import { Augenbraue, useRollen, schriftGroesse, zahlStil } from '../components/instrument';
+import { Augenbraue, useRollen, schriftGroesse, schriftStil } from '../components/instrument';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import { useZeilenFehler, type ZeilenGrund } from '../components/useZeilenFehler';
 import KommKarte from '../kommunikation/KommKarte';
@@ -151,7 +151,14 @@ function BefehlKarte({
       unbearbeitet={hasEigenOffen}
       zeit={
         <>
-          <span style={{ display: 'block', ...zahlStil('fein'), color: rollen.schwach }}>
+          <span
+            style={{
+              display: 'block',
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
+          >
             Stand
           </span>
           <span>
@@ -170,7 +177,16 @@ function BefehlKarte({
         {b.titel}
       </Text>
       {b.freigegeben_at && (
-        <Flex gap={8} wrap style={{ marginTop: 4, ...zahlStil('fein'), color: rollen.gedaempft }}>
+        <Flex
+          gap={8}
+          wrap
+          style={{
+            marginTop: 4,
+            ...schriftStil('meta'),
+            fontSize: schriftGroesse('fein'),
+            color: rollen.gedaempft,
+          }}
+        >
           <span>
             freigegeben <ZeitAnzeige wert={b.freigegeben_at} rolle="kurz" />
             {b.freigegeben_von_name ? ` von ${b.freigegeben_von_name}` : ''}

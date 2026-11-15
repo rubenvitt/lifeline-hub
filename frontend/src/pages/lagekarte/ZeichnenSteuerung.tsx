@@ -1,6 +1,6 @@
 import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
 import { Button, Card, Space, Switch, Typography } from 'antd';
-import { useRollen, zahlStil } from '../../components/instrument';
+import { schriftStil, useRollen } from '../../components/instrument';
 import EscKappe from './EscKappe';
 import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
@@ -149,7 +149,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               }}
             >
               {!bestaetigen && props.punkte != null && (
-                <Typography.Text data-lfh="zeichnen-punkte" style={zahlStil('text')}>
+                <Typography.Text data-lfh="zeichnen-punkte" style={schriftStil('text')}>
                   {props.punkte === 1 ? '1 Punkt' : `${grenzeText(props.punkte)} Punkte`}
                 </Typography.Text>
               )}

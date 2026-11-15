@@ -1,5 +1,5 @@
 import { Button, Card, Space } from 'antd';
-import { Segmentleiste, useRollen, zahlStil } from '../../components/instrument';
+import { Segmentleiste, schriftStil, useRollen, zahlStil } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import EscKappe from './EscKappe';
 import { messErgebnis, type MessForm } from './messung';
@@ -58,7 +58,7 @@ export default function MessSteuerung(props: MessSteuerungProps) {
           {ergebnis.neben && (
             <span
               style={{
-                ...zahlStil('klein'),
+                ...schriftStil('meta'),
                 color: rollen.gedaempft,
                 marginInlineStart: token.marginSM,
               }}
