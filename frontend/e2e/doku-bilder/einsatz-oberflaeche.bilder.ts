@@ -76,7 +76,7 @@ test.describe(KAPITEL, () => {
     );
     await expect(page.getByRole('button', { name: 'Benachrichtigung erlaubt' })).toBeVisible();
     // Die Kennzahlen des Überblicks tragen Inhalt, bevor das Bild entsteht.
-    await expect(page.getByRole('button', { name: 'Einsatzdaten' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Einsatzdaten' })).toBeVisible();
     await fotografiere(page, KAPITEL, 'arbeitsflaeche');
 
     // Rail-Sprung: die Kategorie öffnet ihr erstes Modul.
