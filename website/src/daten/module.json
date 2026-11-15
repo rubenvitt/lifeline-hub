@@ -32,7 +32,7 @@
     "name": "Kräfte & Mittel",
     "module": [
       {
-        "name": "Meldebild",
+        "name": "Kräfteübersicht",
         "beschreibung": "Status, Stärke, Gliederung"
       },
       {

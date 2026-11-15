@@ -379,10 +379,24 @@ eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 Ohne Eingabe stehen oben die zuletzt ausgeführten Befehle und die zuletzt geöffneten Module.
 Mit Eingabe sucht die Palette in Modulen, Ansichten (den Sprungmarken der Modulliste, etwa
 „Kommunikationsplan“ oder „Vermisste“), Schnellaktionen („Person erfassen“, „ETB-Eintrag schreiben“,
-„Anruf erfassen“ …), laufenden Einsätzen, Einstellungen und, ab zwei Zeichen, in den Datensätzen des
-Einsatzes: Personen, Fahrzeuge, Personal, Einheiten, Einträge des Einsatztagebuchs und weitere.
+„Meldung erfassen“, „Auftrag erteilen“, „Nachforderung stellen“, „Fahrzeugstatus setzen“, „Anruf
+erfassen“ …), laufenden Einsätzen, Einstellungen, der „Hilfe“ und, ab zwei Zeichen, in den
+Datensätzen des Einsatzes: Personen, Fahrzeuge (auch über Fahrzeugtyp und Kennzeichen), Personal
+(auch über die Funktion), Einheiten, Einträge des Einsatztagebuchs und weitere.
 Module und Ansichten, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene
 Rolle schreiben darf.
+
+Ein Treffer braucht für jedes getippte Wort einen Wortanfang oder, ab drei Zeichen, einen Teil
+eines Wortes; „rtw“ findet also Fahrzeuge vom Typ RTW, aber nicht die Lagekarte. Umlaute und ihre
+Umschrift gelten gleich („kraefte“ findet „Kräfte“). Module sind auch unter gängigen Abkürzungen
+und früheren Namen zu finden, etwa „BHP“ für die Unfallhilfsstellen, „Tagebuch“ für das ETB und
+„Meldebild“ für die Kräfteübersicht.
+
+Die Schnellaktionen stehen nach eigener Nutzung geordnet: was eine Person am häufigsten
+ausführt, steht oben, bei Gleichstand gilt die feste Folge (Person, ETB-Eintrag, Meldung,
+Lagemeldung, Auftrag, Nachforderung, Fahrzeugstatus, dann die übrigen). Die Zählung gehört der
+Person, nicht dem Gerät, und gilt deshalb an jedem Rechner. Solange die Palette offen ist, bleibt
+die Folge stehen.
 
 „Koordinaten: …“ in der Palette stellt das Koordinatenformat für dieses Gerät ein. Es gilt vor
 der Vorgabe des Einsatzes und der Organisation, bis eine andere Wahl getroffen wird.

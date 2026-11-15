@@ -485,7 +485,8 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         kontext: kategorieKontext(m.kategorie),
         nebenzeile: m.beschreibung,
         icon: m.icon,
-        schlagworte: m.beschreibung ? [m.beschreibung] : undefined,
+        // Synonyme der Registry (y3zh5ymv D2) und die Beschreibung; sichtbar ist nur die Beschreibung.
+        schlagworte: [...(m.schlagworte ?? []), ...(m.beschreibung ? [m.beschreibung] : [])],
         ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(m.key)),
       });
     }

@@ -1065,7 +1065,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
     await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
     // Anker: die Seite ist fertig geladen.
-    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
 
     // (1) Umschalter: jedes Segment der Leiste (`role="radio"`) hält den Boden selbst.
     const leiste = page.locator('[data-lfh="meldebild-werkzeuge"] [data-lfh="segmentleiste"]');
@@ -1135,7 +1135,7 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
 
     // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (Auswahlzeile nicht
     // „0 von 0") — erst danach sagt eine Abwesenheit etwas.
-    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     await expect(
       page.locator('[data-lfh="meldebild-werkzeuge"]').getByText(/^[1-9]\d* von [1-9]\d* Kräften$/),
     ).toBeVisible();
@@ -1210,7 +1210,7 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
-    const link = page.getByRole('link', { name: 'Meldebild', exact: true });
+    const link = page.getByRole('link', { name: 'Kräfteübersicht', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);
@@ -1751,7 +1751,7 @@ const BAUMTABELLEN = [
   // 1. Zug über der 1. Gruppe; Abschnitt und Fahrzeug stehen in der Gliederung als Spalten.
   { modul: 'einheiten', bereich: 'Gliederung', knoepfe: 1, vergleich: 'inhalt' },
   // 1. Zug (Fahrzeug, 1. Gruppe) und „Ohne Einheit“ mit der freien Kraft, beide auf der Wurzel.
-  { modul: 'kraefteuebersicht', bereich: 'Meldebild', knoepfe: 2, vergleich: 'inhalt' },
+  { modul: 'kraefteuebersicht', bereich: 'Kräfteübersicht', knoepfe: 2, vergleich: 'inhalt' },
   // Abschnitt Nord und 1. Zug.
   { modul: 'fernmeldewesen', bereich: 'Funkplan', knoepfe: 2, vergleich: 'text' },
 ] as const;

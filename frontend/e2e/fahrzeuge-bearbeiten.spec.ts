@@ -60,7 +60,7 @@ test('Fahrzeug einer Einheit zuordnen: der Abschnitt folgt, das Meldebild zeigt 
 
   // Das Meldebild zeigt das Fahrzeug bei der Staffel.
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht?einheit=${staffel}`);
-  const meldebild = page.getByRole('region', { name: 'Meldebild' });
+  const meldebild = page.getByRole('region', { name: 'Kräfteübersicht' });
   const markiert = meldebild.locator('tr.zeile-hervorgehoben');
   await expect(markiert).toContainText('Staffel A');
   // Der Funkrufname steht in der Zeile der Staffel und als ihr Mittel darunter.

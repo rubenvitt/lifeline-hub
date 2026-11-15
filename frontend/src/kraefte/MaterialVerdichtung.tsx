@@ -2,6 +2,7 @@ import { Space } from 'antd';
 import { Link } from 'react-router';
 import type { EinsatzMaterial } from '../api/types';
 import { useRollen } from '../components/instrument';
+import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { verdichteMaterial } from './materialVerdichtungKern';
 import { verdichtungsLinkStil, verdichtungsTextfarbe } from './Verdichtungszeile';
@@ -60,7 +61,7 @@ export default function MaterialVerdichtung({
       </span>
       {!meldebildGesperrt && (
         <Link to={pfad} style={verdichtungsLinkStil(token)}>
-          Meldebild
+          {modulName('kraefteuebersicht')}
         </Link>
       )}
     </Space>

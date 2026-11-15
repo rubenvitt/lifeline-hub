@@ -36,7 +36,7 @@ Lücken in Auffindbarkeit, Benennung und Gliederung.
   (Begriff der Leitstelle). Löst LFH-965, Entscheidung D1, ab.
 - **Ein Einstieg für Meldungen (LLH-1802):** Die Meldungsseite und die Lagemeldungen öffnen ihr
   Formular über `?neu=1`. Die Heraufstufung einer Chat-Nachricht vom Typ „Meldung“ oder „Lage“
-  legt die Meldung im Meldungseingang mit an, außer bei „Nur protokollieren“, wie die
+  legt die Meldung im Meldungseingang mit an, solange „Auch in den Meldungseingang“ gewählt ist, wie die
   ETB-Schnellerfassung. Das Informationstelefon bleibt getrennt.
 - **Eine Gliederung (LLH-1805):** Das ETB wandert in die Kategorie „Führung“ (mit der Marke
   „Entscheidungen“). Die Kategorie „Erfassung“ heißt „Betroffene“. Die Hilfe gliedert ihre Kapitel

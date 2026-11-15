@@ -19,7 +19,7 @@ Gedruckt werden können unter anderem:
 - der Schichtplan als Aushang je Posten oder Schichtzettel je Person ([Ablösung](abloesung.md)),
 - das Blatt einer Person, als Druckansicht ([Betroffene und Sichtung](betroffene.md)),
 - Einsatzbefehle und Lageberichte,
-- Meldebild, Funkplan, Kommunikationsplan und das Organigramm der Einsatzabschnitte,
+- Kräfteübersicht, Funkplan, Kommunikationsplan und das Organigramm der Einsatzabschnitte,
 - der Ausschnitt der Lagekarte als Lageplan ([Lagekarte, Zeichnen und Messen](lagekarte.md)),
 - die Bewertung eines Gefahrengebiets mit ihren Erläuterungen ([Gefahren](gefahren.md)),
 - der Einsatzbericht („Einsatzbericht drucken“ in den Einsatzdaten),
@@ -82,11 +82,11 @@ Export sofort und meldet das an der Seite.
 ### Ein Dokument oder einen Plan drucken
 
 1. Den Einsatzbefehl, Lagebericht oder den Plan öffnen.
-2. „Drucken / als PDF“ wählen. Bei Dokumenten steht der Punkt im Kopf der Seite, bei Meldebild,
+2. „Drucken / als PDF“ wählen. Bei Dokumenten steht der Punkt im Kopf der Seite, bei Kräfteübersicht,
    Funkplan, Kommunikationsplan und Organigramm an der Ansicht selbst.
 3. Im Druckdialog des Browsers drucken oder als PDF speichern.
 
-Meldebild, Funkplan und Organigramm klappen zum Drucken alle Zweige auf.
+Kräfteübersicht, Funkplan und Organigramm klappen zum Drucken alle Zweige auf.
 
 ### Den Lageplan drucken
 

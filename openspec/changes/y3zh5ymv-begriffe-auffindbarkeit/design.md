@@ -142,7 +142,8 @@ Meldungsdaten optional mit und ruft im selben `write_retry!` nach dem Eintrag
 heraufgestuft“). Absender ist der Anzeigename der Person, die die Nachricht schrieb, Meldeweg
 `sonstige`, Ereigniszeit und Eingang die Zeit der Nachricht, Wortlaut der des Eintrags. Nach dem
 Commit `meldung::live_publikation_sicherstellen`. Der Dialog zeigt bei Typ Meldung oder Lage und
-freigegebenen Meldungen die Checkbox „Nur protokollieren“ (aus), sonst einen Hinweis. Die Regel kommt
+freigegebenen Meldungen die Checkbox „Auch in den Meldungseingang“ (vorgewählt, Wortlaut der
+ETB-Schnellerfassung), sonst einen Hinweis. Die Regel kommt
 in `src/AGENTS.md` neben „ETB → Meldung (LLH-1037)“.
 
 `?neu=1`: `meldungenPfad` und `lagemeldungenPfad` bekommen `neu`; beide Seiten öffnen das

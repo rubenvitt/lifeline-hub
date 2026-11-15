@@ -309,11 +309,11 @@ const zeile = (container: HTMLElement, schluessel: string) =>
   container.querySelector(`[data-row-key="${schluessel}"]`) as HTMLElement | null;
 
 describe('KraefteuebersichtPage — Seitenkopf', () => {
-  it('trägt den Titel „Meldebild" und die Stärke in BOS-Schreibweise als Mono-Meta', async () => {
+  it('trägt den Titel „Kräfteübersicht" und die Stärke in BOS-Schreibweise als Mono-Meta', async () => {
     mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
-    expect(await screen.findByRole('heading', { name: 'Meldebild' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Kräfteübersicht' })).toBeInTheDocument();
     expect(
       await (await seitenkopf()).findByText('1 Einheit · Stärke 0/0/1//1'),
     ).toBeInTheDocument();
@@ -1259,7 +1259,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
           abschnitte: [
             expect.objectContaining({
               schluessel: 'text',
-              text: expect.stringContaining('# Kräftemeldebild'),
+              text: expect.stringContaining('# Kräfteübersicht'),
             }),
           ],
         }),
@@ -1438,12 +1438,12 @@ describe('KraefteuebersichtPage — Druck', () => {
     return kopf!;
   }
 
-  it('trägt den gemeinsamen Druckkopf: „Meldebild", Einsatz, Stand als DTG, Umfang und druckende Person', async () => {
+  it('trägt den gemeinsamen Druckkopf: „Kräfteübersicht", Einsatz, Stand als DTG, Umfang und druckende Person', async () => {
     mitEinheit();
     setup();
     const kopf = await druckkopf();
     expect(within(kopf).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
-      'Meldebild',
+      'Kräfteübersicht',
     );
     expect(within(kopf).getByText('Testeinsatz')).toBeInTheDocument();
     // Der Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit.

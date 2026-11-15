@@ -187,7 +187,7 @@ Rufname der eigenen Führungsstelle, sobald sie in den Einsatzdaten erfasst sind
 Einsatzleiter mit „seit“, wie er in „Einsatzdaten“ festgelegt ist (siehe
 [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Ist keiner festgelegt, steht dort „Leitung
 nicht erfasst“; die Rolle Einsatzleitung im „Zugriff“ macht niemanden zum Einsatzleiter. An der
-Wurzel steht keine Stärke; die Gesamtstärke zeigt das Meldebild.
+Wurzel steht keine Stärke; die Gesamtstärke zeigt die Kräfteübersicht.
 
 Daneben steht der Kasten „Stab“, sobald ein Mitglied ein Sachgebiet S1 bis S6 führt. Er nennt je
 Sachgebiet die Namen der Mitglieder, die es tragen, mehrere alphabetisch; ein Sachgebiet ohne

@@ -64,7 +64,7 @@ Für Einsatzleitung und Führungspersonal:
    ![Seite „Einheit aus Vorlage bilden“ mit Name und Abschnitt, darunter Sanitätszug und Rettungsstaffel mit ihren Fahrzeugen, der Besatzung und dem Zustand je Zeile](../bilder/einheiten/vorlage-bilden.png)
 
 5. „Einheit bilden“ wählen. Neben dem Knopf steht, was entsteht, etwa „1 Zug, 1 Staffel,
-   3 Fahrzeuge, 2 Kräfte“, mit Material der Vorlage auch „2 Material“. Die App öffnet das Meldebild mit der neuen Einheit markiert, ihre
+   3 Fahrzeuge, 2 Kräfte“, mit Material der Vorlage auch „2 Material“. Die App öffnet die Kräfteübersicht mit der neuen Einheit markiert, ihre
    Untereinheiten und Fahrzeuge aufgeklappt.
 
 ### Angaben einer Einheit ändern
@@ -117,7 +117,7 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Paneel „Taktisches Zeichen“ mit geöffneter Zeile „Organisation“, gewähltem Eintrag und dem Zeichen daneben](../bilder/einheiten/zeichen.png)
 
-4. „Speichern“ wählen. Das große Zeichen im Kopf, das Meldebild und die Lagekarte zeigen das
+4. „Speichern“ wählen. Das große Zeichen im Kopf, die Kräfteübersicht und die Lagekarte zeigen das
    neue Zeichen.
 
 ### Personal und Fahrzeuge zuordnen
@@ -220,7 +220,7 @@ Für Einsatzleitung und Führungspersonal. Bucht ein Bereitstellungsraum eine Kr
 noch nicht kannte, entsteht eine Einheit mit „nicht übernommen“ (Kapitel
 [Bereitstellungsräume](bereitstellungsraeume.md)). Die Meldung dazu steht unter „Meldungen“.
 
-1. Die Einheit öffnen: in der Gliederung oder im Meldebild. Unter dem Kopf steht das Paneel
+1. Die Einheit öffnen: in der Gliederung oder in der Kräfteübersicht. Unter dem Kopf steht das Paneel
    „Übernahme“ mit „eingetroffen …“.
 2. „Übernehmen“ wählen, bei Bedarf „Abschnitt“ und „Über-Einheit“ wählen und mit „Übernehmen“
    bestätigen. Die Bestätigung lautet „… übernommen“; „nicht übernommen“ und das Paneel
@@ -248,7 +248,7 @@ einem Ort: an einer Einheit, auf einem Fahrzeug, an einer UHS oder in einem Bere
 „Material zuordnen …“ bietet Posten ohne Ort und Posten an anderen Orten an; ein Posten von einem
 anderen Ort wird ohne Rückfrage umgehängt, und das Einsatztagebuch nennt den alten und den neuen
 Ort. Material auf einem Fahrzeug der Einheit steht nicht im Paneel „Material“, sondern als
-„Beladung“ am Fahrzeug in der Fahrzeugliste und im [Meldebild](meldebild.md).
+„Beladung“ am Fahrzeug in der Fahrzeugliste und in der [Kräfteübersicht](meldebild.md).
 Die Einheit eines Fahrzeugs lässt sich auch in der Fahrzeugliste wählen; ein Wechsel hängt das
 Fahrzeug dabei aus seiner bisherigen Einheit um. Seine Besatzung aus der bisherigen oder ohne
 Einheit kommt mit, außer dem Einheitsführer der bisherigen Einheit. Ein Fahrzeug ohne Einheit lässt sich dort auch als
@@ -259,7 +259,7 @@ eigene Einheit führen; seine Besatzung ohne Einheit kommt dann mit (Kapitel
 
 Die Ist-Stärke zählt das zugeordnete Personal nach seiner Stärke-Position (Führer, Unterführer,
 Mannschaft), die im Modul Personal gesetzt wird. Eine Person ohne Stärke-Position zählt als
-Mannschaft, hier wie im Meldebild, an der UHS und im Einsatzbericht. Einheitsführer ist ein eigenes
+Mannschaft, hier wie in der Kräfteübersicht, an der UHS und im Einsatzbericht. Einheitsführer ist ein eigenes
 Merkmal: eine Person mit der Position „Führer“ ist dadurch noch nicht Einheitsführer. Je Einheit
 gibt es einen Einheitsführer, eine Person der Einheit; solange keiner gesetzt ist, steht im Kopf
 „Einheitsführer eintragen“. Die kumulierte Ist-Stärke rechnet alle unterstellten Einheiten mit ein.
@@ -269,19 +269,19 @@ jede Gruppe zeigt ihre eigene. Fehlt in einer Position (Führer, Unterführer od
 gegenüber dem Soll, steht darunter „unterbesetzt“, als Hinweis, nicht als Warnung; mehr Kräfte in
 einer Position gleichen eine fehlende nicht aus. Eine erfüllte Stärke trägt kein Zeichen.
 
-### Gliederung und Meldebild
+### Gliederung und Kräfteübersicht
 
-Die Gliederung zeigt dieselben Einheiten in derselben Ordnung wie das
-[Meldebild](meldebild.md): nach der Reihenfolge der Einsatzabschnitte, darin in der Reihenfolge, in
+Die Gliederung zeigt dieselben Einheiten in derselben Ordnung wie die
+[Kräfteübersicht](meldebild.md): nach der Reihenfolge der Einsatzabschnitte, darin in der Reihenfolge, in
 der die Einheiten gebildet wurden; unterstellte Einheiten unter ihrer Über-Einheit. Eine
 unterstellte Einheit ohne eigenen Abschnitt zeigt den Abschnitt ihrer Über-Einheit. Fahrzeuge,
-Personal und Material einer Einheit stehen im Meldebild und auf der Seite der Einheit, nicht in der
-Gliederung. Die Gesamtstärke aller Kräfte steht über der Tabelle, zusammen mit dem Weg ins
-Meldebild.
+Personal und Material einer Einheit stehen in der Kräfteübersicht und auf der Seite der Einheit, nicht in der
+Gliederung. Die Gesamtstärke aller Kräfte steht über der Tabelle, zusammen mit dem Weg in die
+Kräfteübersicht.
 
 ### Besatzung und Freigaben
 
-Die Besatzung (wer auf welchem Fahrzeug sitzt) ist dieselbe wie im [Meldebild](meldebild.md); sie
+Die Besatzung (wer auf welchem Fahrzeug sitzt) ist dieselbe wie in der [Kräfteübersicht](meldebild.md); sie
 wird auch in den Modulen Personal und Fahrzeuge gesetzt. Das Soll der Besatzung trägt das
 Fahrzeug. Eine Person auf einem Fahrzeug einer anderen Einheit steht in ihrer Einheit unter „Ohne
 Fahrzeug“ mit „fährt auf …“.
@@ -296,8 +296,8 @@ stehen die Posten der Einheit weiter im Paneel „Material“, „Material zuord
 
 ### Status und Zeitachse
 
-Der Status einer Einheit folgt ihren Fahrzeugen; ohne Fahrzeug wird er von Hand gesetzt, im
-Meldebild oder auf der Seite der Einheit. Das Paneel „Zeitachse“ zeigt Einsatzdauer und Ereignisse der Einheit (Kapitel [Meldebild
+Der Status einer Einheit folgt ihren Fahrzeugen; ohne Fahrzeug wird er von Hand gesetzt, in der
+Kräfteübersicht oder auf der Seite der Einheit. Das Paneel „Zeitachse“ zeigt Einsatzdauer und Ereignisse der Einheit (Kapitel [Kräfteübersicht
 und Kräfte-Zeitachse](meldebild.md)).
 
 Wechselt der Status einer Einheit ohne Fahrzeug von Hand aus gebunden oder nicht verfügbar in
@@ -314,7 +314,7 @@ der Grund steht darunter.
 
 ### Unangemeldete Einheiten
 
-„nicht übernommen“ steht an der Einheit in der Gliederung, im Meldebild, im Kopf ihrer Seite und
+„nicht übernommen“ steht an der Einheit in der Gliederung, in der Kräfteübersicht, im Kopf ihrer Seite und
 in der Belegung des Bereitstellungsraums, bis sie übernommen oder abgewiesen ist. Bis dahin lässt
 sich die Einheit wie jede andere bearbeiten. Übernehmen bestätigt die Meldung des Eintreffens und
 schreibt einen Eintrag ins Einsatztagebuch, mit Abschnitt und Über-Einheit, falls gewählt. Abweisen ist endgültig: wie beim Auflösen bleibt die Einheit mit Zeitachse
@@ -405,7 +405,7 @@ mit mehr als 20 Einheiten lässt sich nicht bilden.
 
 Ohne Freigabe des Moduls Fahrzeuge, Personal oder Material fehlen dessen Zeilen; über dem Baum
 steht „Fahrzeuge gesperrt“, „Personal gesperrt“ bzw. „Material gesperrt“, und gebildet werden nur
-die Einheiten mit dem, was freigegeben ist. Ohne Freigabe des Meldebilds öffnet die App nach dem Bilden die Seite der neuen
+die Einheiten mit dem, was freigegeben ist. Ohne Freigabe der Kräfteübersicht öffnet die App nach dem Bilden die Seite der neuen
 Einheit. Ins Einsatztagebuch schreibt die App einen Eintrag für die ganze Bildung, mit Untereinheiten,
 Fahrzeugen, Kräften, Material und wer woher umgehängt wurde.
 

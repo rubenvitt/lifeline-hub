@@ -137,6 +137,25 @@ const beendet: EinsatzAnzeige = {
   status: 'abgeschlossen',
 };
 
+/** Spec `sprungpalette`, „Module sind über Synonyme auffindbar“ (y3zh5ymv D2). */
+describe('baueBefehle — Synonyme der Module', () => {
+  it.each([
+    ['meldebild', 'modul:kraefteuebersicht'],
+    ['stärke', 'modul:kraefteuebersicht'],
+    ['kraefte', 'modul:kraefteuebersicht'],
+    ['tagebuch', 'modul:etb'],
+    ['bhp', 'modul:unfallhilfsstellen'],
+    ['rtw', 'modul:fahrzeuge'],
+  ])('„%s“ findet %s', (q, id) => {
+    const treffer = ordneTreffer(filtereBefehle(baueBefehle(kontext()), q), q).map((x) => x.id);
+    expect(treffer).toContain(id);
+  });
+  it('zeigt ein Synonym nicht unter dem Modul', () => {
+    const modul = baueBefehle(kontext()).find((x) => x.id === 'modul:kraefteuebersicht')!;
+    expect(modul.nebenzeile).not.toMatch(/Meldebild/);
+  });
+});
+
 describe('baueBefehle — Schnellaktionen', () => {
   /** Spec `sprungpalette`, „Schnellaktionen nach Nutzung geordnet“ (y3zh5ymv D5). */
   describe('Ordnung nach Nutzung', () => {

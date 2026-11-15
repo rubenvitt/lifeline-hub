@@ -385,7 +385,7 @@ Verlauf wird nicht gedruckt, solange er zugeklappt ist; ein aufgeklappter Verlau
 
 Material liegt an genau einem Ort (Kapitel [Material](material.md)); ein Posten von einem anderen
 Ort wird ohne Rückfrage umgehängt, und das Einsatztagebuch nennt den alten und den neuen Ort.
-Material in einem Bereitstellungsraum steht nicht im [Meldebild](meldebild.md). Zuordnen, Lösen
+Material in einem Bereitstellungsraum steht nicht in der [Kräfteübersicht](meldebild.md). Zuordnen, Lösen
 und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; ohne die
 Freigabe fehlt die Sektion „Material“. Am gekoppelten Tablet eines Raums fehlt sie ebenso.
 

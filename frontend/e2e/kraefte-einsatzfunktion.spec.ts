@@ -50,7 +50,7 @@ test('Einsatzfunktion setzen: Meldebild nennt sie vor der Qualifikation, das ETB
   await expect(region.getByText('Notfallsanitäterin')).toBeVisible();
 
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-  const bereich = page.getByRole('region', { name: 'Meldebild' });
+  const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
   await expect(bereich.locator(`tr[data-row-key="eh-${einheitId}"]`)).toBeVisible();
   await page.getByRole('radio', { name: 'alles', exact: true }).click();
   const zeile = bereich.locator(`tr[data-row-key="ep-${epId}"]`);

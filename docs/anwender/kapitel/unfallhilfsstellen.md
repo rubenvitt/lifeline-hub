@@ -243,8 +243,8 @@ dem Materialstamm disponiert das Modul Material. Ein Statuswechsel an der Stelle
 in der Materialliste und steht ebenso im Einsatztagebuch. Zugeordnet und erfasst wird an einer
 geplanten oder aktiven Stelle; an einer aufgelösten stehen „Material zuordnen …“ und „Material
 erfassen“ gesperrt mit „UHS aufgelöst“, Material, das schon dort liegt, lässt sich weiter lösen
-und im Status ändern. Material an einer Unfallhilfsstelle steht nicht im
-[Meldebild](meldebild.md). Zuordnen, Erfassen, Status, Lösen und Ausgeben verlangen Schreibrecht im
+und im Status ändern. Material an einer Unfallhilfsstelle steht nicht in der
+[Kräfteübersicht](meldebild.md). Zuordnen, Erfassen, Status, Lösen und Ausgeben verlangen Schreibrecht im
 Einsatz und die Freigabe des Moduls Material; ohne die Freigabe stehen die Posten lesbar da, der
 Status ist keine Bedienung, und „Material zuordnen …“ und „Material erfassen“ stehen gesperrt mit
 „Modul Material gesperrt“. „Fehlmenge melden“ steht nur mit Schreibrecht und der Freigabe des

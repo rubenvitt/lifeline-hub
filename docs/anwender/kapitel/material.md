@@ -23,7 +23,7 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
 
 1. Unter „Kräfte & Mittel“ „Material“ öffnen.
 2. Die Zeile über der Liste zählt die Posten: „einsatzbereit“, „im Einsatz“ und „Ausfall“.
-   „Meldebild“ führt ins Meldebild.
+   „Kräfteübersicht“ führt in die Kräfteübersicht.
 
    ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 Betreuungsgruppe · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
 
@@ -286,9 +286,9 @@ vorher zugleich Einheit «Staffel A»“.
 Die Zeile über der Liste zählt Posten, nicht Mengen, und immer die ganze Liste, auch wenn ein Filter
 gesetzt ist. „Ausfall“ fasst defekt, verbraucht, Desinfektion nötig und aufgebraucht zusammen; ein
 teilweise ausgegebenes Verbrauchsgut zählt nach seinem Status. Nur die Ausfall-Zahl ist
-farbig, und nur, wenn sie über null liegt. Im Meldebild nennt die Zeile einer Einheit den Ausfall
-ihres Materials nach derselben Regel; die Zahl der Kräfte im Meldebild zählt nur Personal und
-Fahrzeuge (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
+farbig, und nur, wenn sie über null liegt. In der Kräfteübersicht nennt die Zeile einer Einheit den Ausfall
+ihres Materials nach derselben Regel; die Zahl der Kräfte in der Kräfteübersicht zählt nur Personal und
+Fahrzeuge (Kapitel [Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)).
 
 ### Mehrere Posten derselben Art
 
@@ -325,8 +325,8 @@ jede Organisation; „verbraucht“ und „Desinfektion nötig“ gibt es nur f�
 ### Aus dem Einsatz nehmen und Stornieren
 
 Aus dem Einsatz nehmen ist der Normalweg: Der Posten verlässt seinen Ort. In
-Auswahllisten, im Meldebild und in der UHS zählt er nicht mehr; der Block „Aus dem Einsatz
-genommen“ unter der Liste führt ihn weiter, ebenso das Meldebild und seine Übernahme in einen
+Auswahllisten, in der Kräfteübersicht und in der UHS zählt er nicht mehr; der Block „Aus dem Einsatz
+genommen“ unter der Liste führt ihn weiter, ebenso die Kräfteübersicht und ihre Übernahme in einen
 Lagebericht. Erneut disponiert, steht er wieder in der Liste, mit
 derselben Menge und demselben Status, aber ohne Ort. „Material disponieren“
 legt dagegen immer eine neue Zeile an.

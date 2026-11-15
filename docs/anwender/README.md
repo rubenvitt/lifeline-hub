@@ -39,7 +39,7 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Lage | [Wetter und Pegel](kapitel/wetter-pegel.md) | Führung |
 | Lage | [Lagemeldungen](kapitel/lagemeldungen.md) | Führung |
 | Lage | [Lageberichte](kapitel/lageberichte.md) | Führung |
-| Kräfte | [Meldebild und Kräfte-Zeitachse](kapitel/meldebild.md) | Führung |
+| Kräfte | [Kräfteübersicht und Kräfte-Zeitachse](kapitel/meldebild.md) | Führung |
 | Kräfte | [Einheiten](kapitel/einheiten.md) | Führung |
 | Kräfte | [Personal](kapitel/personal.md) | Führung |
 | Kräfte | [Fahrzeuge und FMS](kapitel/fahrzeuge.md) | Führung |

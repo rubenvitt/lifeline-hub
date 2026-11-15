@@ -713,7 +713,7 @@ mitlaufenden Untereinheiten und deren Personen „Entlassung“ statt „Ablösu
 an Einheiten, die gerade im Einsatz sind; ohne offenen Einsatzabschnitt bleibt ihre Zeitachse, wie sie
 ist. Diese Ereignisse
 lassen sich nicht
-von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
+von Hand streichen (Kapitel [Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
 Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben). Wird die Zeit
 des Eintreffens berichtigt, wandert eine mit ihm begonnene Schicht mit; wurde ihr Beginn von Hand
 geändert, bleibt er, wo er war.
@@ -773,9 +773,9 @@ und 8 h. Über dem Raster steht, welche Werte gelten, etwa „Höchstdienst 12 h
 Mindestruhe 8 h (Vorgabe)“. Geändert werden sie in den Einstellungen des Einsatzes, Reiter
 „Ablösung“, unter „Dienst und Ruhe“ (Kapitel
 [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Wer sie ändern darf, kommt
-über „ändern“ neben der Zeile dorthin. Mit denselben Werten stuft das Meldebild die Kräfte ein,
+über „ändern“ neben der Zeile dorthin. Mit denselben Werten stuft die Kräfteübersicht die Kräfte ein,
 die tatsächlich im Einsatz sind („zu lang“, „Ruhe zu kurz“, Kapitel
-[Meldebild und Kräfte-Zeitachse](meldebild.md)).
+[Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)).
 
 In der Zeile eines Postens liegen Blöcke nicht übereinander; ein Zug, der einen anderen Block
 überdecken würde, wird nicht übernommen. In der Pause dürfen Blöcke gleichzeitig laufen. Ein

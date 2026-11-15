@@ -1,7 +1,7 @@
 import { Space } from 'antd';
 import { Fragment } from 'react';
 import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
-import { freigabeVon } from '../einsatz/modulRegistry';
+import { freigabeVon, modulName } from '../einsatz/modulRegistry';
 import { MODUL_FAHRZEUGE_GESPERRT, MODUL_PERSONAL_GESPERRT } from '../components/nurAnsicht';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -145,10 +145,10 @@ export default function Verdichtungszeile({
           </span>
         </>
       )}
-      {/* Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`. */}
+      {/* Der Linktext ist der Name des Moduls (`modulName`); die Route bleibt `kraefteuebersicht`. */}
       {!meldebildGesperrt && (
         <Link to={pfad} style={verdichtungsLinkStil(token)}>
-          Meldebild
+          {modulName('kraefteuebersicht')}
         </Link>
       )}
     </Space>

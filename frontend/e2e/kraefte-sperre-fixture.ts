@@ -148,12 +148,12 @@ function meldebildZiele(berichtGesperrt: boolean) {
 function verdichtungsLink(page: Page): SperrZiel {
   const link = page
     .locator('[data-lfh="verdichtungszeile"]')
-    .getByRole('link', { name: 'Meldebild', exact: true });
-  return { name: 'Verdichtungszeile „Meldebild“', ziel: link, fokus: link };
+    .getByRole('link', { name: 'Kräfteübersicht', exact: true });
+  return { name: 'Verdichtungszeile „Kräfteübersicht“', ziel: link, fokus: link };
 }
 
 const meldebild = (grund: (page: Page) => Locator, berichtGesperrt: boolean): SperrSeite => ({
-  name: 'Meldebild',
+  name: 'Kräfteübersicht',
   pfad: (s) => `/einsaetze/${s.einsatzId}/kraefteuebersicht`,
   grund,
   ziele: meldebildZiele(berichtGesperrt),

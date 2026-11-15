@@ -80,7 +80,7 @@ test('Personal disponieren: drei Personen in einem Absenden in Einheit und auf F
     name: string;
   }[];
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-  const bereich = page.getByRole('region', { name: 'Meldebild' });
+  const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
   const zeile = (key: string) => bereich.locator(`tr[data-row-key="${key}"]`);
   await expect(zeile(`eh-${einheitId}`)).toBeVisible();
   await page.getByRole('radio', { name: 'alles', exact: true }).click();
@@ -123,7 +123,7 @@ test('Fahrzeuge disponieren: zwei Fahrzeuge in einem Absenden in eine Einheit', 
   }[];
   expect(efs).toHaveLength(2);
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-  const bereich = page.getByRole('region', { name: 'Meldebild' });
+  const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
   await expect(bereich.locator(`tr[data-row-key="eh-${einheitId}"]`)).toBeVisible();
   await page.getByRole('radio', { name: 'alles', exact: true }).click();
   for (const ef of efs) {

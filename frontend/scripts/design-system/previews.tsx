@@ -306,7 +306,7 @@ function DashboardBeispiel() {
         kennung="fms"
         zustand="daten"
         meta="29 Einheiten"
-        sprung={{ label: 'Meldebild', onKlick: nichts }}
+        sprung={{ label: 'Kräfteübersicht', onKlick: nichts }}
         leerText="Keine Einheiten im Einsatz."
         gesperrtText="Modul Einheiten nicht freigegeben."
         onNeuladen={nichts}

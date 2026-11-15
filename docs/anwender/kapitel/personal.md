@@ -22,7 +22,7 @@ Führungspersonal.
 ### Die Personalliste lesen
 
 1. Unter „Kräfte & Mittel“ „Personal“ öffnen. Über der Liste steht die Stärke mit der Verteilung der
-   Kräfte, daneben der Sprung ins „Meldebild“.
+   Kräfte, daneben der Sprung in die „Kräfteübersicht“.
 2. Die Liste ist nach Einheit gruppiert. Zuerst steht „nicht eingeteilt“, danach die Einheiten in
    der Folge des Kräftebaums; eine unterstellte Einheit trägt ihren Pfad, etwa „Zug 1 › Staffel A“.
    Über der Tabelle steht je Gruppe die Zahl der Personen, etwa „1 nicht eingeteilt · 4
@@ -130,7 +130,7 @@ Für Einsatzleitung und Führungspersonal:
 
 3. Unter „Einteilung“ stehen alle Angaben des Einsatzes, dazu die Unfallhilfsstelle; ändern wie in
    der Liste. Führt die Person ihre Einheit, steht neben der Einheit die Marke „Einheitsführer“.
-   „Meldebild“ und „Einheit“ springen in diese Module.
+   „Kräfteübersicht“ und „Einheit“ springen in diese Module.
 4. Über „Personal“ in der Brotkrume zurück zur Liste; die Zeile der Person ist dort hervorgehoben.
 
 ### Angaben einer Ad-hoc-Person berichtigen
@@ -148,13 +148,13 @@ Verwaltung im Personalstamm („im Stamm ändern“).
 
 1. In der Liste „Einsatzdauer“ lesen, die „Ruhe“ unter „Spalten“ einblenden. „zu lang“ oder „Ruhe
    zu kurz“ neben der Einsatzdauer heißt, dass die Person die Grenzwerte des Schichtplans reißt;
-   die Begründung steht beim Zeigen auf die Zelle (Kapitel [Meldebild und
+   die Begründung steht beim Zeigen auf die Zelle (Kapitel [Kräfteübersicht und
    Kräfte-Zeitachse](meldebild.md)).
 2. Für die Einzelheiten die Ansicht der Person öffnen und zum Paneel „Zeitachse“ gehen.
 
    ![Paneel „Zeitachse“ von Lena Beispiel mit „Ruhe 40 min · gesamt 4 h 00“, Eintreffen und Entlassung](../bilder/personal/zeitachse-person.png)
 
-3. Fehlt ein Ereignis, mit „Nachtragen“ ergänzen (Kapitel [Meldebild und
+3. Fehlt ein Ereignis, mit „Nachtragen“ ergänzen (Kapitel [Kräfteübersicht und
    Kräfte-Zeitachse](meldebild.md)).
 
 ### Eine Person entlassen oder stornieren
@@ -210,7 +210,7 @@ Einsatztagebuch mit dem Vermerk „berichtigt nach Entlassung“, die Berichtigu
 „(nach Entlassung)“. Eine offene Einsatzperiode entsteht dabei nie: Die App lehnt einen Nachtrag
 ab, der eine Periode beginnen würde, etwa ein Eintreffen nach der Entlassung, und ebenso die
 Streichung der Entlassung, mit der die letzte Periode endet. Eine ganz fehlende Periode trägt
-„Periode nachtragen“ mit Beginn und Entlassung in einem Schritt nach (Kapitel [Meldebild und
+„Periode nachtragen“ mit Beginn und Entlassung in einem Schritt nach (Kapitel [Kräfteübersicht und
 Kräfte-Zeitachse](meldebild.md)). Die Berichtigung einer Zeit lehnt sie ab, wenn danach eine
 Periode offen stünde, etwa eine Entlassung vor dem Eintreffen. Eine Streichung oder Berichtigung an
 ihrer früheren Einheit berührt die Zeitachse der entlassenen Person nicht. Steht eine entlassene Person aus
@@ -230,7 +230,7 @@ Sprechfunker, Fahrer), dann die Qualifikationen der Organisation. Ein eigener Te
 Zeichen lang sein, eine Bemerkung bis zu 2 000.
 
 Wo eine Person mit nur einer Angabe steht, nennt die App die Einsatzfunktion, ohne sie die
-Qualifikation: im Meldebild und seiner Übernahme in einen Lagebericht, im Block „Entlassen“, in
+Qualifikation: in der Kräfteübersicht und ihrer Übernahme in einen Lagebericht, im Block „Entlassen“, in
 der Anlage „Personal je Kopf“ des Einsatzberichts, in den Personenauswahlen von Einsatzleitung,
 Schäden und UHS, bei „Bestätigt von“ am UHS-Gerät, unter dem Namen einer auf der
 Lagekarte gewählten Person und im Einsatztagebuch. Die Vorschau in der Sprungpalette und die Leiste
@@ -256,7 +256,7 @@ Später ändert die Liste oder die Ansicht der Person Einheit und Fahrzeug einze
 Wege wie die Module [Einheiten](einheiten.md) und [Fahrzeuge und FMS](fahrzeuge.md). Eine neue
 Einheit löst die bisherige ab; ein Fahrzeug ebenso. Einheit und Fahrzeug bleiben dabei
 unabhängig: Wechselt eine Person die Einheit, bleibt sie auf ihrem Fahrzeug. Fährt sie auf dem
-Fahrzeug einer anderen Einheit, steht daneben „andere Einheit“; das Meldebild zeigt sie unter
+Fahrzeug einer anderen Einheit, steht daneben „andere Einheit“; die Kräfteübersicht zeigt sie unter
 „Ohne Fahrzeug“ ihrer Einheit mit „fährt auf …“. Mitfahrer sind so sichtbar, aber erlaubt.
 
 Wechselt eine Person die Einheit, nennt das Einsatztagebuch die alte und die neue Einheit, etwa
@@ -275,8 +275,8 @@ Führungsfunktion als Mitglied des Einsatzes bleibt (siehe [Rechte im Einsatz](r
 War sie Einheitsführer oder Leiter eines Einsatzabschnitts, ist diese Stelle danach leer. Ihre
 Zeitachse bleibt, mit offener Periode endet sie mit einer „Entlassung“ (Herkunft „aus dem Einsatz
 entlassen“). In Stärke, Statusband, Lagemonitor und Auswahllisten zählt sie nicht mehr. Im Nachweis
-bleibt sie: im Block „Entlassen“ unter der Personalliste und im Meldebild, in der Übernahme des
-Meldebilds in einen Lagebericht, in „insgesamt eingesetzt“ und in der Anlage „Personal je Kopf“ des
+bleibt sie: im Block „Entlassen“ unter der Personalliste und in der Kräfteübersicht, in der Übernahme der
+Kräfteübersicht in einen Lagebericht, in „insgesamt eingesetzt“ und in der Anlage „Personal je Kopf“ des
 Einsatzberichts. Erneut disponiert, steht sie wieder in der Liste; ihre Zeitachse läuft weiter,
 ihre Bindungen kommen nicht zurück.
 

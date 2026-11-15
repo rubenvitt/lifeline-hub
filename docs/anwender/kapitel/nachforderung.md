@@ -388,7 +388,7 @@ Nachforderungen, davon 2 unterwegs“), in den „Offenen Vorgängen“ des
 zurückgezogene zählen nicht. Die Zahlen in den Spaltenköpfen zählen die Karten, die das Board gerade zeigt, also auch
 innerhalb eines Filters „Für Stelle“.
 
-Das [Meldebild](meldebild.md) zeigt im Statusband unter „Zulauf“, was zugesagt oder unterwegs ist,
+Die [Kräfteübersicht](meldebild.md) zeigt im Statusband unter „Zulauf“, was zugesagt oder unterwegs ist,
 je Art mit dem erwarteten Eintreffen, und die angeforderten Arten ohne Beitrag zur Zahl. Der Zulauf
 zählt dort nicht in die Stärke.
 

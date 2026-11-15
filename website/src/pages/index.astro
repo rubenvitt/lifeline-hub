@@ -17,7 +17,7 @@ const leitsaetze = [
   {
     titel: 'Ohne Netz',
     kennung: 'OFFLINE',
-    text: 'Die Lagekarte liest ihre Kacheln aus einer lokalen Datei. ETB, Meldebild, Betroffene und Aufträge bleiben lesbar, neue Einträge werden vorgemerkt und nachgereicht.',
+    text: 'Die Lagekarte liest ihre Kacheln aus einer lokalen Datei. ETB, Kräfteübersicht, Betroffene und Aufträge bleiben lesbar, neue Einträge werden vorgemerkt und nachgereicht.',
   },
   {
     titel: 'Nach Führungslogik',
@@ -42,7 +42,7 @@ const leitsaetze = [
   {
     titel: 'Auf Papier',
     kennung: 'DRUCK',
-    text: 'ETB, Meldebild, Funkplan, Fernmeldeskizze und Führungsorganisation drucken mit Kopf und Seitenzählung, direkt aus dem Browser.',
+    text: 'ETB, Kräfteübersicht, Funkplan, Fernmeldeskizze und Führungsorganisation drucken mit Kopf und Seitenzählung, direkt aus dem Browser.',
   },
   {
     titel: 'Zugriff geschützt',
@@ -66,7 +66,7 @@ const meldebild = [
 
 <Grundriss
   titel="Lifeline Hub · Führungsunterstützung für Einsatzlagen"
-  beschreibung="Einsatztagebuch, Lagekarte, Meldebild, Betroffene und Aufträge in einer Anwendung, die weiterarbeitet, wenn das Netz ausfällt."
+  beschreibung="Einsatztagebuch, Lagekarte, Kräfteübersicht, Betroffene und Aufträge in einer Anwendung, die weiterarbeitet, wenn das Netz ausfällt."
 >
   <!-- ── Einstieg ────────────────────────────────────────────────────────── -->
   <section class="einstieg" aria-labelledby="titel">
@@ -75,7 +75,7 @@ const meldebild = [
         <Augenbraue ton="marke" mono>Führungsunterstützung · Bevölkerungsschutz</Augenbraue>
         <h1 id="titel">Die Lage im Blick. Auch wenn das Netz fehlt.</h1>
         <p class="einleitung">
-          Lifeline Hub bündelt Einsatztagebuch, Lagekarte, Meldebild, Betroffenen- und
+          Lifeline Hub bündelt Einsatztagebuch, Lagekarte, Kräfteübersicht, Betroffenen- und
           Schadenserfassung, Meldungen und Aufträge in einer Anwendung. Sie arbeitet weiter, wenn
           das Netz ausfällt, folgt der Führungslogik vom Einsatztagebuch bis zur
           Führungsorganisation und bleibt mit Handschuhen bedienbar.
@@ -235,7 +235,7 @@ const meldebild = [
       </div>
     </div>
     <div data-dichte-vorschau data-dichte="kompakt">
-      <Paneel titel="Meldebild" meta="Beispiel">
+      <Paneel titel="Kräfteübersicht" meta="Beispiel">
         <ul class="meldebild">
           {
             meldebild.map((zeile) => (

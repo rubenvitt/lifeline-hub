@@ -81,6 +81,21 @@ describe('modulName (LFH-965)', () => {
 });
 
 describe('modulRegistry', () => {
+  /** Synonyme für die Sprungpalette (y3zh5ymv D2, Spec `sprungpalette`). */
+  it('Schlagworte sind Wörter und wiederholen nicht den Namen', () => {
+    for (const m of modulRegistry) {
+      for (const w of m.schlagworte ?? []) {
+        expect(w.trim(), m.key).toBe(w);
+        expect(w.length, m.key).toBeGreaterThan(1);
+        expect(w.toLocaleLowerCase('de'), m.key).not.toBe(m.label.toLocaleLowerCase('de'));
+      }
+    }
+  });
+  it('der frühere Name „Meldebild“ trifft die Kräfteübersicht weiter', () => {
+    expect(modulRegistry.find((m) => m.key === 'kraefteuebersicht')?.schlagworte).toContain(
+      'Meldebild',
+    );
+  });
   it('führt das Informationstelefon als eigenes Modul der Kommunikation (i6k6mzed, design.md D3)', () => {
     expect(modulRegistry.find((m) => m.key === 'infotelefon')).toMatchObject({
       kategorie: 'kommunikation',
@@ -219,7 +234,7 @@ describe('modulRegistry', () => {
     ]);
     const kraefte = moduleNachKategorie('kraefte');
     expect(kraefte[0].key).toBe('kraefteuebersicht');
-    expect(kraefte[0].label).toBe('Meldebild');
+    expect(kraefte[0].label).toBe('Kräfteübersicht');
     // Route bleibt — Deeplinks und gespeicherte Standard-Module tragen weiter.
     expect(kraefte[0].route).toBe('kraefteuebersicht');
     expect(moduleNachKategorie('lage').map((m) => m.key)).not.toContain('kraefteuebersicht');
