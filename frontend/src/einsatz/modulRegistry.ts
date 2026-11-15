@@ -135,11 +135,15 @@ export const kategorien: Kategorie[] = [
     icon: { umriss: IconLkw, gefuellt: IconLkwGefuellt },
   },
   {
+    // Die Kategorie der Betroffenen (y3zh5ymv D10, bis dahin „Erfassung“ samt ETB). „& Schäden“
+    // wie „Kräfte & Mittel“: allein „Betroffene“ hieße sie wie ihr erstes Modul, und zwei Ziele
+    // trügen in der Navigation denselben Namen. Der Schlüssel bleibt `erfassung`: an ihm hängt das
+    // gemerkte Modul je Kategorie im Browserspeicher.
     key: 'erfassung',
-    label: 'Erfassung',
-    // Kurzform wie „Komm.“/„Einst.“: „ERFASSUNG“ ist in 9 px Versalien breiter als die 60-px-Rail
-    // (LFH-644). Die Sperrung bleibt Token, keine Ausnahme je Etikett.
-    kurz: 'Erfass.',
+    label: 'Betroffene & Schäden',
+    // Kurzform wie „Komm.“/„Einst.“: „BETROFFENE“ ist in 9 px Versalien breiter als die 60-px-Rail
+    // (LFH-644, gemessen in `e2e/rail-etikett.spec.ts`). Die Sperrung bleibt Token.
+    kurz: 'Betroff.',
     icon: { umriss: IconKlemmbrett, gefuellt: IconKlemmbrettGefuellt },
   },
   {
@@ -174,6 +178,18 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'ueberblick',
     status: 'fertig',
     beschreibung: 'Kennzahlen, Fristen, Entscheidungen',
+  },
+  // ETB als Führungsmittel direkt hinter dem Überblick (y3zh5ymv D10; bis dahin unter Erfassung).
+  {
+    key: 'etb',
+    kategorie: 'fuehrung',
+    label: 'ETB',
+    icon: IconKlemmbrett,
+    route: 'etb',
+    status: 'fertig',
+    beschreibung: 'Einsatztagebuch',
+    zaehlerQuelle: 'etb',
+    schlagworte: ['Tagebuch', 'Einsatztagebuch'],
   },
   {
     key: 'einsatzdaten',
@@ -324,17 +340,6 @@ export const modulRegistry: ModulEintrag[] = [
     zaehlerQuelle: 'abloesung',
   },
   // Erfassung
-  {
-    key: 'etb',
-    kategorie: 'erfassung',
-    label: 'ETB',
-    icon: IconKlemmbrett,
-    route: 'etb',
-    status: 'fertig',
-    beschreibung: 'Einsatztagebuch',
-    zaehlerQuelle: 'etb',
-    schlagworte: ['Tagebuch', 'Einsatztagebuch'],
-  },
   {
     key: 'personen',
     kategorie: 'erfassung',

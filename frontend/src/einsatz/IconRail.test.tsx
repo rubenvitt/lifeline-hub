@@ -165,7 +165,7 @@ describe('IconRail', () => {
     renderMitProviders(
       <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={onKlick} />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Betroffene & Schäden' }));
     expect(onKlick).toHaveBeenCalledWith('erfassung');
   });
 
@@ -266,7 +266,7 @@ describe('IconRail · Griff des Modulmenüs (LFH-952)', () => {
 
   it('die offene Kategorie trägt aria-expanded, die anderen nicht', () => {
     rail(false);
-    expect(screen.getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Betroffene & Schäden' })).toHaveAttribute(
       'aria-expanded',
       'false',
     );
@@ -291,7 +291,7 @@ describe('IconRail · Griff des Modulmenüs (LFH-952)', () => {
 describe('IconRail · Kategorien als Links (LLH-1732)', () => {
   const pfade: Partial<Record<string, string>> = {
     fuehrung: '/einsaetze/7/ueberblick',
-    erfassung: '/einsaetze/7/etb',
+    erfassung: '/einsaetze/7/personen',
   };
   function rail(onKategorieKlick = vi.fn()) {
     renderMitProviders(
@@ -319,7 +319,7 @@ describe('IconRail · Kategorien als Links (LLH-1732)', () => {
 
   it('behält an der offenen Kategorie aria-current, aria-expanded und aria-controls', () => {
     rail();
-    const erfassung = screen.getByRole('link', { name: 'Erfassung' });
+    const erfassung = screen.getByRole('link', { name: 'Betroffene & Schäden' });
     expect(erfassung).toHaveAttribute('aria-current', 'true');
     expect(erfassung).toHaveAttribute('aria-expanded', 'true');
     expect(erfassung).toHaveAttribute('aria-controls', 'modul-panel');

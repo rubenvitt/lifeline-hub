@@ -24,17 +24,21 @@ Einsatzdaten MUST bleiben; er meint den gemeldeten Sachverhalt der Leitstelle.
 
 ### Requirement: Die Kategorie der Betroffenen
 Die Kategorie, die Betroffene, Unfallhilfsstellen, Evakuierung, Betreuung, Tiere und Schäden
-führt, SHALL „Betroffene“ heißen. Ihr Etikett in der Rail MUST in die Rail passen, ohne
-abzuschneiden.
+führt, SHALL „Betroffene & Schäden“ heißen, damit sie nicht wie ihr Modul „Betroffene“ heißt. Ihr
+Etikett in der Rail MUST in die Rail passen, ohne abzuschneiden.
 
 #### Scenario: Rail
 - **WHEN** eine Person die Rail am Fükw sieht
-- **THEN** trägt die dritte Kategorie das Etikett „Betroffene“ oder eine Kurzform davon, vollständig sichtbar, und ihr zugänglicher Name lautet „Betroffene“
+- **THEN** trägt die dritte Kategorie das Etikett „Betroffene“ oder eine Kurzform davon, vollständig sichtbar, und ihr zugänglicher Name lautet „Betroffene & Schäden“
+
+#### Scenario: Kein doppelter Name
+- **WHEN** eine Person die Kategorie „Betroffene & Schäden“ öffnet
+- **THEN** heißt in der Navigation nur das Modul „Betroffene“, die Kategorie trägt einen anderen Namen
 
 ### Requirement: Die Hilfe gliedert wie die Navigation
 Die Bereiche der Anwenderhilfe SHALL den Kategorien der Navigation folgen, in derselben
-Reihenfolge und mit denselben Namen: Einstieg, Führung, Kräfte & Mittel, Betroffene, Lage,
-Kommunikation, Einstellungen und Verwaltung, Gekoppelte Geräte. Das Kapitel eines Moduls MUST
+Reihenfolge und mit denselben Namen: Einstieg, Führung, Kräfte & Mittel, Betroffene & Schäden,
+Lage, Kommunikation, Einstellungen und Verwaltung, Gekoppelte Geräte. Das Kapitel eines Moduls MUST
 im Bereich der Kategorie seines Moduls stehen. Kapitel ohne eigenes Modul MUST einem Bereich
 zugeordnet sein.
 

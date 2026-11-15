@@ -41,16 +41,16 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`, Ru
 
 ## 5. LLH-1805 (o10xacs8) Eine Gliederung (D10, D11)
 
-- [ ] 5.1 ETB nach `fuehrung` hinter „Überblick“, Kategorie `erfassung` heißt „Betroffene“, Kurzetikett nach Messung; `MODUL_KEYS` in `src/einsatz/modul.rs` gleich geordnet. Prüfung: `modulRegistry.test.ts`, `IconRail.test.tsx`, Rust-Test der Reihenfolge, `e2e/rail-etikett.spec.ts` grün
-- [ ] 5.2 Gemerktes Modul, das nicht mehr zur Kategorie gehört, wird ignoriert. Prüfung: Test von `kategorieModul.ts` (für `erfassung` gemerktes `etb` → erstes freigegebenes Modul von Betroffene)
-- [ ] 5.3 Marke „Entscheidungen“ steht unter ETB in Führung. Prüfung: `ModulAkkordeon.test.tsx`/`ModulPanel.test.tsx` und `sprungmarken`-Tests nach den Szenarien von `modul-sprungmarken`
-- [ ] 5.4 `BEREICHE` neu, `reihenfolge` aller Kapitel neu vergeben, README, `website/src/daten/bereiche.ts`. Prüfung: Hilfe-Tests (`hilfe/*.test.ts*`), Website-Wächter grün
-- [ ] 5.5 Wächter `hilfe/bereiche.guard.test.ts` (Tabelle Modul → Kapitel, jedes Registry-Modul hat eine Zeile, Bereich gleich Kategorie). Prüfung: grün; Mutationsprobe (Modul in andere Kategorie verschoben → rot)
+- [ ] 5.1 ETB nach `fuehrung` hinter „Überblick“, Kategorie `erfassung` heißt „Betroffene & Schäden“, Kurzetikett „Betroff.“ nach Messung; `MODUL_KEYS` in `src/einsatz/modul.rs` gleich geordnet. Prüfung: `modulRegistry.test.ts`, `IconRail.test.tsx`, Rust-Test der Reihenfolge, `e2e/rail-etikett.spec.ts` grün
+- [x] 5.2 Gemerktes Modul, das nicht mehr zur Kategorie gehört, wird ignoriert. Prüfung: Test von `kategorieModul.ts` (für `erfassung` gemerktes `etb` → erstes freigegebenes Modul von Betroffene & Schäden)
+- [x] 5.3 Marke „Entscheidungen“ steht unter ETB in Führung. Prüfung: `ModulAkkordeon.test.tsx`/`ModulPanel.test.tsx` und `sprungmarken`-Tests nach den Szenarien von `modul-sprungmarken`
+- [x] 5.4 `BEREICHE` neu, `reihenfolge` aller Kapitel neu vergeben, README, `website/src/daten/bereiche.ts`. Prüfung: Hilfe-Tests (`hilfe/*.test.ts*`), Website-Wächter grün
+- [x] 5.5 Wächter `hilfe/bereiche.guard.test.ts` (Tabelle Modul → Kapitel, jedes Registry-Modul hat eine Zeile, Bereich gleich Kategorie). Prüfung: grün; Mutationsprobe (Modul in andere Kategorie verschoben → rot)
 - [ ] 5.6 `docs/anwender/AGENTS.md` (Kapitelpakete, Hilfe in der App), Kapitel `einsatz-oberflaeche.md` und Bild der Rail neu, übrige Tests und e2e mit Kategorie „Erfassung“ nachziehen. Prüfung: `grep -rn "Erfassung\b" frontend/src frontend/e2e --include=*.ts*` zeigt nur fachliche Verwendungen, betroffene e2e grün
 
 ## 6. Gesamtprüfung
 
-- [ ] 6.1 Im Browser gegen die Demo-Lage: „rtw“, „kraefte“, „funk“, „hilfe“ in der Palette; „Meldung erfassen“ öffnet das Formular; Chat-Nachricht als Meldung heraufstufen → steht in Meldungen; Rail mit „Betroffene“, ETB unter Führung; Hilfe-Bereiche. Prüfung: Bilder für PR und Meldung
+- [ ] 6.1 Im Browser gegen die Demo-Lage: „rtw“, „kraefte“, „funk“, „hilfe“ in der Palette; „Meldung erfassen“ öffnet das Formular; Chat-Nachricht als Meldung heraufstufen → steht in Meldungen; Rail mit „Betroffene & Schäden“, ETB unter Führung; Hilfe-Bereiche. Prüfung: Bilder für PR und Meldung
 - [ ] 6.2 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün. Prüfung: Gesamtstatus aus dem Lauf
 
 ## Workflow follow-up

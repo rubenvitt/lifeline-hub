@@ -56,7 +56,7 @@ for (const breite of [1280, 390]) {
       await page.getByRole('button', { name: 'Navigation öffnen', exact: true }).click();
     // Im Drawer ist die Kategorie ein Klappkopf, in der Rail ein Link auf ihr erstes Modul (LLH-1732).
     await page
-      .getByRole(breite < 992 ? 'button' : 'link', { name: 'Erfassung', exact: true })
+      .getByRole(breite < 992 ? 'button' : 'link', { name: 'Führung', exact: true })
       .click();
     await page.getByRole('link', { name: 'ETB', exact: true }).click();
     await expect(page).toHaveURL(etbPfad(a));

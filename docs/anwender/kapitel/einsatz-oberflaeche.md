@@ -77,8 +77,9 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
 
 ### Ein Modul öffnen
 
-1. Links eine Kategorie wählen: „Führung“, „Kräfte“, „Erfass.“ (Erfassung), „Lage“, „Komm.“
-   (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das Modul der
+1. Links eine Kategorie wählen: „Führung“, „Kräfte“ (Kräfte & Mittel), „Betroff.“ (Betroffene &
+   Schäden), „Lage“, „Komm.“ (Kommunikation) oder unten „Einst.“ (Einstellungen). Das ETB steht
+   unter „Führung“, direkt hinter dem Überblick. Die App springt in das Modul der
    Kategorie, das in diesem Einsatz zuletzt offen war, beim ersten Mal in ihr erstes Modul, und
    zeigt daneben ihre Module. Unter jedem Modul steht in bis zu zwei Zeilen, was es enthält.
 
@@ -327,7 +328,7 @@ Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
 Einige Einträge der Modulliste sind **Sprungmarken** in eine Ansicht eines Moduls. Sie stehen
 eingerückt mit einer feinen Linie direkt unter diesem Modul: „Entscheidungen“ unter „ETB“
-(Kategorie „Erfassung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
+(Kategorie „Führung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
 „FMS-Tableau“ unter „Fahrzeuge“, „Ohne Schicht“ unter „Ablösung“ sowie „Fernmeldeskizze“ und
 „Kommunikationsplan“ unter „Fernmeldewesen“ (Kategorie „Kommunikation“). Nach dem Sprung ist das
 Modul darüber hervorgehoben. Das

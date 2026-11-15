@@ -34,13 +34,13 @@ führen.
 
 #### Scenario: Zurück in die Kräfte
 
-- **WHEN** eine Person in Kräfte das Modul Ablösung öffnet, dann in Betroffene wechselt und wieder
+- **WHEN** eine Person in Kräfte das Modul Ablösung öffnet, dann in Betroffene & Schäden wechselt und wieder
   auf Kräfte klickt
 - **THEN** steht sie in Ablösung, nicht im ersten Modul der Kategorie
 
 #### Scenario: Ankunft über die Sprungpalette
 
-- **WHEN** eine Person über die Sprungpalette Ablösung öffnet, in Betroffene wechselt und dann auf
+- **WHEN** eine Person über die Sprungpalette Ablösung öffnet, in Betroffene & Schäden wechselt und dann auf
   Kräfte klickt
 - **THEN** steht sie in Ablösung
 
@@ -58,9 +58,9 @@ führen.
 
 #### Scenario: Gemerktes Modul in eine andere Kategorie gewandert
 
-- **WHEN** für die Kategorie Betroffene noch das ETB gemerkt ist, das jetzt zu Führung gehört, und
-  die Person auf Betroffene klickt
-- **THEN** steht sie im ersten freigegebenen Modul der Kategorie Betroffene
+- **WHEN** für die Kategorie Betroffene & Schäden noch das ETB gemerkt ist, das jetzt zu Führung gehört, und
+  die Person auf Betroffene & Schäden klickt
+- **THEN** steht sie im ersten freigegebenen Modul der Kategorie Betroffene & Schäden
 
 #### Scenario: Anderer Einsatz, andere Person
 

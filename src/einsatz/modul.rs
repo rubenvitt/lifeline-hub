@@ -10,14 +10,16 @@
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
 pub const MODUL_KEYS: [&str; 34] = [
-    // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
+    // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben;
+    // y3zh5ymv D10: das ETB als Führungsmittel direkt dahinter)
     "ueberblick",
+    "etb",
     "einsatzdaten",
     "einsatzabschnitte",
     "auftraege",
     "lagebesprechung",
     "dokumente",
-    // Kräfte & Mittel (Meldebild = `kraefteuebersicht`, bis 21.09.2026 unter Lage)
+    // Kräfte & Mittel (Kräfteübersicht = `kraefteuebersicht`, bis 21.09.2026 unter Lage)
     "kraefteuebersicht",
     "einheiten",
     "personal",
@@ -27,8 +29,7 @@ pub const MODUL_KEYS: [&str; 34] = [
     "bereitstellungsraeume",
     "nachforderungen",
     "abloesung",
-    // Erfassung
-    "etb",
+    // Betroffene (Schlüssel der Kategorie im Frontend: `erfassung`)
     "personen",
     "unfallhilfsstellen",
     // LLH-1034: Räumung (Bezirke, Stand evakuiert) als eigenes Modul vor der Betreuung.

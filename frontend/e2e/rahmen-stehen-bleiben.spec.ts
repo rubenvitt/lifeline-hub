@@ -96,7 +96,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
       if (b.rail) {
         const kopfUnten = (await kopf.boundingBox())!;
         const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('link', {
-          name: 'Erfassung',
+          name: 'Führung',
         });
         await expect(etb).toBeInViewport();
         const r = (await etb.boundingBox())!;

@@ -1,7 +1,7 @@
 ---
 titel: Chat
 gruppen: [alle]
-reihenfolge: 70
+reihenfolge: 500
 quellen: [frontend/src/pages/ChatPage.tsx, frontend/src/chat/KanalListe.tsx, frontend/src/chat/KanalAnlegenDialog.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/chat/NachrichtEingabe.tsx, frontend/src/chat/erwaehnung.ts, frontend/src/chat/HeraufstufenModal.tsx, frontend/src/chat/HeraufstufenAuftragModal.tsx, frontend/src/chat/BezugDialog.tsx, frontend/src/chat/BearbeitenModal.tsx, frontend/src/chat/bezug.ts, frontend/src/einsatz/useModulZaehler.ts, frontend/src/components/nurAnsicht.ts, src/routes/chat.rs, src/chat/, src/benachrichtigung/]
 ---
 

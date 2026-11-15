@@ -8,7 +8,7 @@ Fükw und am Tablet und im Navigations-Drawer.
 
 #### Scenario: Entscheidungen unter ETB
 - **WHEN** jemand mit Freigabe des ETB die Kategorie „Führung“ öffnet
-- **THEN** folgt auf „ETB“ unmittelbar die Marke „Entscheidungen“, und die Kategorie „Betroffene“
+- **THEN** folgt auf „ETB“ unmittelbar die Marke „Entscheidungen“, und die Kategorie „Betroffene & Schäden“
   führt weder „ETB“ noch „Entscheidungen“
 
 #### Scenario: Hervorhebung bleibt in der Kategorie
@@ -17,5 +17,5 @@ Fükw und am Tablet und im Navigations-Drawer.
   offen, und „ETB“ ist dort als aktuelle Seite hervorgehoben
 
 #### Scenario: Marken desselben Ziels
-- **WHEN** jemand mit Freigabe der Betroffenen die Kategorie „Betroffene“ öffnet
+- **WHEN** jemand mit Freigabe der Betroffenen die Kategorie „Betroffene & Schäden“ öffnet
 - **THEN** folgen auf das Modul „Betroffene“ unmittelbar „Patienten“ und „Vermisste“

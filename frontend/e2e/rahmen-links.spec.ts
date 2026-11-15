@@ -18,13 +18,14 @@ test('Strg-Klick und Mittelklick öffnen Modul und Kategorie in einem neuen Tab'
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(page.getByRole('heading', { level: 1, name: 'ETB' })).toBeVisible();
 
+  // Das ETB steht in der Führung (y3zh5ymv D10); deren Panel ist auf /etb offen.
   const panel = page.locator('[data-lfh="modul-panel"]');
-  const betroffene = panel.getByRole('link', { name: /^Betroffene(,|$)/ });
+  const betroffene = panel.getByRole('link', { name: /^Einsatzdaten(,|$)/ });
   const [tabModul] = await Promise.all([
     context.waitForEvent('page'),
     betroffene.click({ modifiers: ['ControlOrMeta'] }),
   ]);
-  await expect(tabModul).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
+  await expect(tabModul).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einsatzdaten$`));
 
   const rail = page.getByRole('navigation', { name: 'Kategorien' });
   const [tabKategorie] = await Promise.all([
@@ -35,13 +36,13 @@ test('Strg-Klick und Mittelklick öffnen Modul und Kategorie in einem neuen Tab'
 
   // Der Ausgangstab bleibt im ETB, und die Rail bleibt auf seiner Kategorie.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
-  await expect(rail.getByRole('link', { name: 'Erfassung', exact: true })).toHaveAttribute(
+  await expect(rail.getByRole('link', { name: 'Führung', exact: true })).toHaveAttribute(
     'aria-current',
     'true',
   );
 
   // Gegenprobe: der einfache Klick bleibt im Tab.
   await betroffene.click();
-  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einsatzdaten$`));
   expect(context.pages()).toHaveLength(3);
 });

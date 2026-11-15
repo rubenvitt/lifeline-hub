@@ -45,14 +45,14 @@ describe('ModulAkkordeon', () => {
     const kopfzeilen = kategorien.map((k) => screen.getByRole('button', { name: k.label }));
     expect(kopfzeilen).toHaveLength(kategorien.length);
     expect(screen.getAllByRole('button', { expanded: true })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Betroffene & Schäden' })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
 
     // Module stehen nur unter der offenen Kategorie, als Links (LLH-1732); die Kopfzeilen bleiben
     // Knöpfe, sie klappen nur.
-    expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Betroffene' })).toBeInTheDocument();
     expect(queryNavEintrag('Lagekarte')).not.toBeInTheDocument();
   });
 
@@ -73,17 +73,17 @@ describe('ModulAkkordeon', () => {
   it('zeigt ohne offene Kategorie nur die Kopfzeilen', () => {
     zeige({ offeneKategorie: null });
     expect(screen.queryAllByRole('button', { expanded: true })).toHaveLength(0);
-    expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
+    expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument();
   });
 
   it('reicht Sperre und Ausblendung der Modulliste durch (LFH-132/LFH-669)', () => {
     zeige({
       freigaben: freigabenFixture({
-        etb: { zugriff: false },
+        schaeden: { zugriff: false },
         tiere: { sichtbar: false, zugriff: false },
       }),
     });
-    expect(screen.getByRole('button', { name: 'ETB' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Schäden' })).toBeDisabled();
     expect(queryNavEintrag('Tiere')).not.toBeInTheDocument();
   });
 

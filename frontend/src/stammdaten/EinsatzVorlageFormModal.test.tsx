@@ -84,13 +84,22 @@ describe('EinsatzVorlageFormModal (LLH-1375)', () => {
     expect(alle).toHaveLength(modulRegistry.length);
     for (const k of alle) expect(k).toBeChecked();
     // Je Kategorie eine benannte Gruppe.
-    for (const kategorie of ['Führung', 'Kräfte & Mittel', 'Erfassung', 'Lage', 'Kommunikation']) {
+    for (const kategorie of [
+      'Führung',
+      'Kräfte & Mittel',
+      'Betroffene & Schäden',
+      'Lage',
+      'Kommunikation',
+    ]) {
       expect(within(dialog).getByRole('group', { name: kategorie })).toBeInTheDocument();
     }
     expect(
-      within(within(dialog).getByRole('group', { name: 'Erfassung' })).getByRole('checkbox', {
-        name: 'Unfallhilfsstellen',
-      }),
+      within(within(dialog).getByRole('group', { name: 'Betroffene & Schäden' })).getByRole(
+        'checkbox',
+        {
+          name: 'Unfallhilfsstellen',
+        },
+      ),
     ).toBeInTheDocument();
   });
 

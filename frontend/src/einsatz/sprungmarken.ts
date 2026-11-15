@@ -108,10 +108,10 @@ const FERNMELDEWESEN_MARKEN: Sprungmarke[] = [
 
 export const sprungmarken: Sprungmarke[] = [
   {
-    // In der Erfassung direkt unter dem ETB (LLH-1733): in der Führung wechselte die Hervorhebung
-    // nach dem Sprung die Kategorie.
+    // Direkt unter dem ETB, in dessen Kategorie (LLH-1733; seit y3zh5ymv D10 ist das „Führung“):
+    // in einer anderen wechselte die Hervorhebung nach dem Sprung die Kategorie.
     key: 'entscheidungen',
-    kategorie: 'erfassung',
+    kategorie: 'fuehrung',
     label: 'Entscheidungen',
     zielModul: 'etb',
     nach: 'etb',

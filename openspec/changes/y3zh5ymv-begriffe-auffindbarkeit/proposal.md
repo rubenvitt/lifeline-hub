@@ -39,7 +39,7 @@ Lücken in Auffindbarkeit, Benennung und Gliederung.
   legt die Meldung im Meldungseingang mit an, solange „Auch in den Meldungseingang“ gewählt ist, wie die
   ETB-Schnellerfassung. Das Informationstelefon bleibt getrennt.
 - **Eine Gliederung (LLH-1805):** Das ETB wandert in die Kategorie „Führung“ (mit der Marke
-  „Entscheidungen“). Die Kategorie „Erfassung“ heißt „Betroffene“. Die Hilfe gliedert ihre Kapitel
+  „Entscheidungen“). Die Kategorie „Erfassung“ heißt „Betroffene & Schäden“. Die Hilfe gliedert ihre Kapitel
   nach den Kategorien der App; ein Wächter hält beide gleich.
 
 ## Capabilities
@@ -53,10 +53,10 @@ Keine.
 - `sprungpalette`: Trefferregel, Synonyme, Datensatz-Merkmale, neue Schnellaktionen, Reihenfolge
   nach Nutzung, Hilfe in der Palette.
 - `modul-benennung`: „Kräfteübersicht“ statt „Meldebild“, ETB in „Führung“, Kategorie
-  „Betroffene“, Hilfe gliedert wie die Navigation.
+  „Betroffene & Schäden“, Hilfe gliedert wie die Navigation.
 - `modul-sprungmarken`: „Entscheidungen“ steht mit dem ETB in „Führung“.
 - `meldungseingang`: Chat-Heraufstufung legt die Meldung an; `?neu=1` öffnet das Formular.
-- `seiten-orientierung`: Kategoriename „Betroffene“ und Seitenname „Kräfteübersicht“ in den
+- `seiten-orientierung`: Kategoriename „Betroffene & Schäden“ und Seitenname „Kräfteübersicht“ in den
   Szenarien.
 - `druck-dokumente`: Druckkopf nennt „Kräfteübersicht“.
 - `fuehrungsorganisation`: Knopf „Aus Kräfteübersicht und Führungsorganisation übernehmen“.

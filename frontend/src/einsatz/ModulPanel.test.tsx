@@ -806,12 +806,12 @@ describe('ModulListe — Einträge als Links (LLH-1732)', () => {
     const onSprungKlick = vi.fn();
     const { unmount } = renderMitProviders(
       <ModulPanel
-        titel="Erfassung"
+        titel="Führung"
         einsatzId={7}
         module={[
           basis({
             key: 'etb',
-            kategorie: 'erfassung',
+            kategorie: 'fuehrung',
             label: 'ETB',
             route: 'etb',
             status: 'fertig',
@@ -820,7 +820,7 @@ describe('ModulListe — Einträge als Links (LLH-1732)', () => {
         freigaben={freigaben()}
         aktiverModulKey={null}
         onModulKlick={() => {}}
-        sprungmarken={sprungmarkenNachKategorie('erfassung')}
+        sprungmarken={sprungmarkenNachKategorie('fuehrung')}
         onSprungKlick={onSprungKlick}
       />,
     );
@@ -833,12 +833,12 @@ describe('ModulListe — Einträge als Links (LLH-1732)', () => {
     unmount();
     renderMitProviders(
       <ModulPanel
-        titel="Erfassung"
+        titel="Führung"
         einsatzId={7}
         module={[
           basis({
             key: 'etb',
-            kategorie: 'erfassung',
+            kategorie: 'fuehrung',
             label: 'ETB',
             route: 'etb',
             status: 'fertig',
@@ -847,7 +847,7 @@ describe('ModulListe — Einträge als Links (LLH-1732)', () => {
         freigaben={freigaben({ etb: { zugriff: false } })}
         aktiverModulKey={null}
         onModulKlick={() => {}}
-        sprungmarken={sprungmarkenNachKategorie('erfassung')}
+        sprungmarken={sprungmarkenNachKategorie('fuehrung')}
       />,
     );
     expect(screen.getByRole('button', { name: /^Entscheidungen, springt zu/ })).toBeDisabled();

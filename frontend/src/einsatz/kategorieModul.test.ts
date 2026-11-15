@@ -29,9 +29,9 @@ describe('kategorieModul: gemerktes Modul je Kategorie', () => {
   it('merkt je Kategorie das zuletzt besuchte Modul', () => {
     saveKategorieModul(A, 1, modul('kraefteuebersicht'));
     saveKategorieModul(A, 1, modul('abloesung'));
-    saveKategorieModul(A, 1, modul('etb'));
+    saveKategorieModul(A, 1, modul('schaeden'));
     expect(loadKategorieModul(A, 1, 'kraefte')).toBe('abloesung');
-    expect(loadKategorieModul(A, 1, 'erfassung')).toBe('etb');
+    expect(loadKategorieModul(A, 1, 'erfassung')).toBe('schaeden');
   });
 
   it('trennt Personen und Einsätze', () => {
@@ -50,10 +50,10 @@ describe('kategorieModul: gemerktes Modul je Kategorie', () => {
   it('hält einen abgelaufenen Eintrag nicht auf, wenn eine andere Kategorie geschrieben wird', () => {
     const t0 = 1_000_000;
     saveKategorieModul(A, 1, modul('abloesung'), t0);
-    saveKategorieModul(A, 1, modul('etb'), t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE);
+    saveKategorieModul(A, 1, modul('schaeden'), t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE);
     expect(loadKategorieModul(A, 1, 'kraefte', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBeNull();
     expect(loadKategorieModul(A, 1, 'erfassung', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBe(
-      'etb',
+      'schaeden',
     );
   });
 
@@ -88,6 +88,14 @@ describe('rueckkehrModul: wohin der Rail-Sprung führt', () => {
   it('führt bei ausgeblendetem gemerktem Modul ins erste freigegebene', () => {
     const freigaben = freigabenFixture({ abloesung: { sichtbar: false } });
     expect(rueckkehrModul('kraefte', 'abloesung', freigaben)?.key).toBe('kraefteuebersicht');
+  });
+
+  /**
+   * Spec `seiten-orientierung`, „Gemerktes Modul in eine andere Kategorie gewandert“ (y3zh5ymv
+   * D10): vor dem Umzug ins ETB nach „Führung“ stand es unter dem Schlüssel `erfassung` im Speicher.
+   */
+  it('nimmt ein gemerktes Modul nicht, das inzwischen in einer anderen Kategorie steht', () => {
+    expect(rueckkehrModul('erfassung', 'etb', alleFrei)?.key).toBe('personen');
   });
 
   it('nimmt kein Modul einer anderen Kategorie und keinen unbekannten Schlüssel', () => {

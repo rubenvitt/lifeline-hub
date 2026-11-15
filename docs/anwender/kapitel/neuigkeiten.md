@@ -1,7 +1,7 @@
 ---
 titel: Neuigkeiten
 gruppen: [alle]
-reihenfolge: 80
+reihenfolge: 70
 quellen: [src/versionsstand/, src/routes/versionsstand.rs, frontend/src/neuigkeiten/, frontend/scripts/changelog-zerlegen.mjs]
 ---
 

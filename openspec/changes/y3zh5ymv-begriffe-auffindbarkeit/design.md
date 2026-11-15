@@ -158,22 +158,25 @@ Meldebild und Führungsorganisation“): ein RENAMED neben einem MODIFIED birgt 
 Risiko (wie ysjiv1n3). Rund 20 weitere Specs nennen das Modul in der Prosa „Meldebild“. Sie
 bekommen eine Folgeaufgabe statt eines Deltas, das keine Anforderung ändert.
 
-### D10 ETB in „Führung“, Kategorie „Betroffene“ (LLH-1805)
+### D10 ETB in „Führung“, Kategorie „Betroffene & Schäden“ (LLH-1805)
 
 ETB bekommt `kategorie: 'fuehrung'` und steht direkt hinter „Überblick“; die Marke
 „Entscheidungen“ folgt ihm, weil eine Marke in der Kategorie ihres Ziels steht. `MODUL_KEYS` in
 `src/einsatz/modul.rs` zieht die Reihenfolge nach. Die Kategorie mit dem Schlüssel `erfassung`
-heißt „Betroffene“; der Schlüssel bleibt, damit `lfh:nav:kategorie-modul` gültig bleibt. Das
-Kurzetikett ist „Betroffene“, wenn es laut `e2e/rail-etikett.spec.ts` passt, sonst „Betroff.“.
+heißt „Betroffene & Schäden“; der Schlüssel bleibt, damit `lfh:nav:kategorie-modul` gültig
+bleibt. Das Kurzetikett ist „Betroff.“: „BETROFFENE“ ist in 9 px Versalien breiter als die Rail
+(gemessen in `e2e/rail-etikett.spec.ts`).
 Ein für `erfassung` gemerktes ETB wird ignoriert, weil es nicht mehr zur Kategorie gehört (neues
 Szenario in `seiten-orientierung`).
 
-Dass Kategorie und Modul beide „Betroffene“ heißen, ist hingenommen: die Hilfe nennt den Bereich
-heute schon so, und am Checkpoint ist er gewählt.
+Am Checkpoint war „Betroffene“ gewählt. Beim Bauen zeigte sich, dass Kategorie und Modul dann
+gleich hießen: zwei Ziele mit demselben Namen in Rail und Modulpanel, für Screenreader nicht zu
+unterscheiden. Am 15.11.2026 entschieden: „Betroffene & Schäden“, nach dem Muster „Kräfte &
+Mittel“.
 
 ### D11 Hilfe folgt den Kategorien
 
-`BEREICHE` wird: Einstieg, Führung, Kräfte & Mittel, Betroffene, Lage, Kommunikation,
+`BEREICHE` wird: Einstieg, Führung, Kräfte & Mittel, Betroffene & Schäden, Lage, Kommunikation,
 Einstellungen und Verwaltung, Gekoppelte Geräte. Jedes Kapitel bekommt eine neue `reihenfolge`
 in seinem Block, innerhalb des Blocks in der Folge der Registry. Kapitel ohne Modul: Drucken und
 Export → Führung, Vorplanung → Kräfte & Mittel, Neuigkeiten und Rückmeldung → Einstieg; Chat kommt
@@ -198,5 +201,5 @@ Umsortierung in der App ohne die Hilfe wird rot. `docs/anwender/AGENTS.md` (Kapi
   „Betreuung“ und „Betroffene“). Gewollt: das sind echte Wortbestandteile, keine Buchstabenfolge.
 - **Hilfe-Bilder:** Die Kräfteübersicht und die Rail (Kapitel Oberfläche) müssen neu aufgenommen
   werden; das braucht einen Backend-Build und den Bildlauf.
-- **Rail-Etikett:** Passt „Betroffene“ nicht, bleibt eine Kurzform. Das ist ein Rest des
+- **Rail-Etikett:** „Betroffene“ passt nicht, es bleibt die Kurzform „Betroff.“. Das ist ein Rest des
   Befunds „ERFASS.“, aber mit einem Wort, das man erkennt.
