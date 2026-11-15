@@ -8,6 +8,7 @@ import { modulRegistry, type ModulEintrag } from './modulRegistry';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import type { ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
+import { queryNavEintrag } from './navEintragTest';
 
 /**
  * Freigaben wie vom Server (LFH-669). Die Liste unten trägt eigene Schlüssel (`sach`, `geheim`),
@@ -111,7 +112,7 @@ describe('ModulPanel', () => {
       />,
     );
     expect(screen.getByRole('link', { name: /ETB/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Sachschäden/ })).not.toBeInTheDocument();
+    expect(queryNavEintrag(/Sachschäden/)).not.toBeInTheDocument();
   });
 
   it('zeigt Module ungesperrt, solange die Freigaben unbekannt sind (LFH-669, D3)', () => {
@@ -472,7 +473,7 @@ describe('ModulListe — Sprungmarken', () => {
     const { unmount } = zeige({
       freigaben: freigabenFixture({ etb: { sichtbar: false, zugriff: false } }),
     });
-    expect(screen.queryByRole('link', { name: /Entscheidungen/ })).not.toBeInTheDocument();
+    expect(queryNavEintrag(/Entscheidungen/)).not.toBeInTheDocument();
     unmount();
     // Gegenprobe: ein ausgeblendeter ANKER nimmt die Marke nicht mit.
     zeige({ freigaben: freigabenFixture({ auftraege: { sichtbar: false, zugriff: false } }) });
@@ -657,7 +658,7 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
     const knoepfe = screen.getAllByRole('link').map((b) => b.textContent);
     const modul = knoepfe.findIndex((t) => t?.startsWith('Fernmeldewesen'));
     expect(knoepfe[modul + 3]).toMatch(/^Informationstelefon/);
-    expect(screen.queryByRole('link', { name: /^Informationstelefon, springt zu/ })).toBeNull();
+    expect(queryNavEintrag(/^Informationstelefon, springt zu/)).toBeNull();
   });
 
   it('bleiben bei ausgeblendetem Informationstelefon stehen', () => {
@@ -673,10 +674,7 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
   it('fehlen mit ausgeblendetem Fernmeldewesen', () => {
     zeige({ freigaben: freigaben({ fernmeldewesen: { sichtbar: false, zugriff: false } }) });
     for (const label of MARKEN) {
-      expect(
-        screen.queryByRole('link', { name: new RegExp(`^${label}, springt zu`) }),
-        label,
-      ).not.toBeInTheDocument();
+      expect(queryNavEintrag(new RegExp(`^${label}, springt zu`)), label).not.toBeInTheDocument();
     }
   });
 });

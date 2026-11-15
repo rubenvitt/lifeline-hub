@@ -20,6 +20,7 @@ import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixtures';
 import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
+import { queryNavEintrag } from './navEintragTest';
 
 vi.mock('./useModulZaehler', () => ({
   useModulZaehler: () => ({}),
@@ -267,7 +268,7 @@ describe('EinsatzLayout', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Betroffene' })).toBeInTheDocument();
     expect(screen.queryByText('Zuletzt')).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Lagekarte' })).toBeNull();
+    expect(queryNavEintrag('Lagekarte')).toBeNull();
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
@@ -277,9 +278,7 @@ describe('EinsatzLayout', () => {
     // Erst der Panel-Anker, dann die Abwesenheit ABWARTEN: bis die Freigaben ankommen, steht
     // „Personen" offen da (LFH-788). Der ETB-Inhalt allein sagt darüber nichts.
     expect(await screen.findByRole('link', { name: 'ETB' })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.queryByRole('link', { name: 'Betroffene' })).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument());
   });
 
   it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
@@ -513,7 +512,7 @@ describe('EinsatzLayout', () => {
 
     await userEvent.click(await screen.findByRole('link', { name: 'Erfassung' }));
 
-    expect(screen.queryByRole('link', { name: 'ETB' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     // Die Rail bleibt auf der Kategorie — sonst wäre „zugeklappt" von „keine Kategorie aktiv"
     // nicht zu unterscheiden.
     expect(await screen.findByRole('link', { name: 'Erfassung' })).toHaveAttribute(
@@ -528,7 +527,7 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'ETB' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
   });
 
   it('klappt beim Wechsel auf eine andere Kategorie wieder auf, ohne die Wahl zu überschreiben', async () => {
@@ -552,7 +551,7 @@ describe('EinsatzLayout', () => {
     it('1024 ohne Wahl: Panel zu, Griff „Menü ausklappen“ mit aria-expanded false', async () => {
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-      expect(screen.queryByRole('link', { name: 'ETB' })).not.toBeInTheDocument();
+      expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Menü ausklappen' })).toHaveAttribute(
         'aria-expanded',
         'false',
@@ -592,7 +591,7 @@ describe('EinsatzLayout', () => {
       setzeViewportBreite(XL);
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-      expect(screen.queryByRole('link', { name: 'ETB' })).not.toBeInTheDocument();
+      expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     });
 
     it('der Rail-Sprung öffnet am Tablet, schreibt aber keine Wahl', async () => {
@@ -618,7 +617,7 @@ describe('EinsatzLayout', () => {
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       expect(screen.getByRole('button', { name: 'Navigation öffnen' })).toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: 'Kategorien' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: 'ETB' })).not.toBeInTheDocument();
+      expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     });
 
     it('öffnet die Navigation im Drawer', async () => {
@@ -789,7 +788,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     expect(pfad()).toBe(vorher);
     // Panel zugeklappt: ein Erfassung-Modul wie „Personen" steht nicht mehr im Baum
     // (dieselbe Abfrage wie im Bestandstest zum gemerkten Einklapp-Zustand oben).
-    expect(screen.queryByRole('link', { name: 'Betroffene' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument();
   });
 
   /**

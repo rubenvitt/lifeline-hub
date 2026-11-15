@@ -6,6 +6,7 @@ import ModulAkkordeon, { akkordeonKopfStil } from './ModulAkkordeon';
 import { kategorien } from './modulRegistry';
 import { freigabenFixture } from '../test/fixtures';
 import { dichten, farbenDunkel } from '../theme/tokens';
+import { queryNavEintrag } from './navEintragTest';
 
 function zeige(props: Partial<React.ComponentProps<typeof ModulAkkordeon>> = {}) {
   return renderMitProviders(
@@ -52,7 +53,7 @@ describe('ModulAkkordeon', () => {
     // Module stehen nur unter der offenen Kategorie, als Links (LLH-1732); die Kopfzeilen bleiben
     // Knöpfe, sie klappen nur.
     expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('Lagekarte')).not.toBeInTheDocument();
   });
 
   it('meldet den Klick auf eine Kopfzeile mit ihrem Kategorie-Schlüssel', async () => {
@@ -72,7 +73,7 @@ describe('ModulAkkordeon', () => {
   it('zeigt ohne offene Kategorie nur die Kopfzeilen', () => {
     zeige({ offeneKategorie: null });
     expect(screen.queryAllByRole('button', { expanded: true })).toHaveLength(0);
-    expect(screen.queryByRole('link', { name: 'ETB' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
   });
 
   it('reicht Sperre und Ausblendung der Modulliste durch (LFH-132/LFH-669)', () => {
@@ -83,7 +84,7 @@ describe('ModulAkkordeon', () => {
       }),
     });
     expect(screen.getByRole('button', { name: 'ETB' })).toBeDisabled();
-    expect(screen.queryByRole('link', { name: 'Tiere' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('Tiere')).not.toBeInTheDocument();
   });
 
   it('bleibt in der Breite fluide — der Drawer gibt sie vor, nicht das Akkordeon', () => {
