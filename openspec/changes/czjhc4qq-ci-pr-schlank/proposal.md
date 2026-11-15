@@ -9,8 +9,9 @@ Zunder: LLH-1894 (https://zunder.rubeen.dev/#/aufgabe/czjhc4qqnxtn7qwgs8nnjoz7) 
 Am Abend des 14.11.2026 bekam `Migrationsnummern` im Ruleset von `alpha` beim Austragen der Suiten
 die Quelle „GitHub Actions“. Der Status wird über die Status-API gesetzt und zählt mit diesem Pin
 nicht: Alle grünen PRs standen über Nacht auf `blocked`, der Stau-Wächter meldete nur „Grün, aber
-nicht gemergt“, und aufgefallen ist es erst am nächsten Morgen. Dazu trägt jeder PR ohne `voll`
-sieben übersprungene Einträge von Jobs, die nur bei einem Push auf einen Kanal-Branch laufen.
+nicht gemergt“, und aufgefallen ist es erst am nächsten Morgen. Dazu trägt ein nicht fertiger PR
+ohne `voll` neun übersprungene Einträge; sieben davon gehören zu Jobs, die sonst nur bei einem Push
+auf einen Kanal-Branch laufen, zwei (`Kompilieren`, `Melden`) zum Pflicht-Check.
 Ruben wünscht eine kleinere CI am PR und will einen Fehler im Ruleset sofort bemerken.
 
 ## What Changes
@@ -29,7 +30,8 @@ Ruben wünscht eine kleinere CI am PR und will einen Fehler im Ruleset sofort be
     Der Job heißt weiter `Schnellprüfungen`, die Pflicht-Check-Namen bleiben.
   - `Verteilen` (Baut mit Ziel-Branch) und `Offene PRs neu bewerten` (Migrationsnummern) ziehen in
     eigene Workflows, die nur bei einem Push laufen.
-  - Am PR ohne `voll` bleibt genau ein übersprungener Eintrag der eigenen CI: der Aufruf der Suiten.
+  - Am PR ohne `voll` bleibt aus `pr.yml` genau ein übersprungener Eintrag: der Aufruf der Suiten.
+    `Kompilieren` und `Melden` des Pflicht-Checks bleiben an einem nicht fertigen PR übersprungen.
 - **ADR:** Eine neue ADR ersetzt ADR-0047, weil sich deren Regeln auf Jobs in `ci.yml` beziehen.
 
 ## Capabilities

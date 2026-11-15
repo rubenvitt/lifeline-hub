@@ -4,8 +4,9 @@
 Sind alle Checks und Commit-Status auf dem Kopf-Commit eines konfliktfreien PRs seit einer
 Wartezeit grün und ist Auto-Merge eingeschaltet, der PR aber weiter offen, MUST am PR ein Hinweis
 stehen. Je Check-Name zählt dabei der jüngste Check-Run. Ohne eingeschaltetes Auto-Merge wartet
-der PR auf einen Menschen und bekommt keinen. Weicht das Ruleset des Ziel-Branches von den
-Pflicht-Checks ab, MUST der Hinweis die Abweichung als wahrscheinliche Ursache nennen.
+der PR auf einen Menschen und bekommt keinen. Zielt der PR auf `alpha` und weicht dessen Ruleset
+von den Pflicht-Checks ab, MUST der Hinweis die Abweichung als wahrscheinliche Ursache nennen; ist
+sie behoben, MUST er sie nicht mehr nennen.
 
 #### Scenario: Grün seit einer Stunde
 - **WHEN** alle Checks eines PRs seit mehr als 20 Minuten grün sind, Auto-Merge eingeschaltet ist und der PR offen ist
@@ -30,6 +31,10 @@ Pflicht-Checks ab, MUST der Hinweis die Abweichung als wahrscheinliche Ursache n
 #### Scenario: Quelle im Ruleset
 - **WHEN** ein PR grün ist, Auto-Merge an ist, nicht mergt und im Ruleset `Migrationsnummern` die Quelle „GitHub Actions“ trägt
 - **THEN** nennt der Hinweis diese Quelle als Ursache und rät, sie auf „Any source“ zu stellen
+
+#### Scenario: Ursache behoben
+- **WHEN** ein Hinweis die Quelle an `Migrationsnummern` als Ursache nennt, das Ruleset repariert wird und der PR weiter nicht mergt
+- **THEN** steht ein neuer Hinweis ohne diese Ursache am PR
 
 #### Scenario: Ruleset nicht lesbar
 - **WHEN** ein PR grün ist, nicht mergt und die Regeln des Ziel-Branches nicht lesbar sind

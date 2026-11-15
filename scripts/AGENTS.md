@@ -246,5 +246,5 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   derselben Regel, an der Cloudflare die Website baut. **Rot heißt warten:** die Meldung nennt,
   ab wann das Paket alt genug ist, danach den Lauf neu starten. Gilt auch für Sicherheits-Updates
   von Dependabot, die dessen `cooldown` umgehen. Selbsttest `scripts/check-karenzzeit.test.sh`.
-  Scheitert in der CI schon der Frontend-Install daran, fährt `ci.yml` das Skript direkt danach
-  (`if: failure()`), damit die Erklärung dasteht.
+  Scheitert in der CI schon der Frontend-Install daran, fährt der Job `schnell` (`pr.yml` und
+  `ci.yml`) das Skript direkt danach (`if: failure()`), damit die Erklärung dasteht.

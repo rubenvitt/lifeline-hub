@@ -79,7 +79,8 @@ jobs:
           BASIS: ${{ github.event.pull_request.base.ref }}
           KOPF: ${{ github.event.pull_request.head.sha }}
           # Aus einem Fork hat der Token keine Schreibrechte; der Status kommt dann mit dem
-          # nächsten Push auf den Ziel-Branch (Job unten), bis dahin steht der PR auf „Expected".
+          # nächsten Push auf den Ziel-Branch (`migrationen-kanal.yml`), bis dahin steht der PR auf
+          # „Expected".
           STATUS_SETZEN: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |

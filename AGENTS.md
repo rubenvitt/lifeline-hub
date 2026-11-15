@@ -181,8 +181,9 @@ oder im PR mit Label `voll` (LLH-1889; Schritte und Bündel im Skriptkopf, Mecha
   Kommentar: sqlx prüft die Checksumme der ganzen Datei, jede bestehende DB bräche mit
   `VersionMismatch`. Ein überholter Kommentar wird im Code berichtigt, der die Spalte schreibt.
 - `scripts/check-migrationen.sh` (gegen `origin/alpha`, vorher `git fetch`), Umlegen mit
-  `--umnummerieren`. Durchgesetzt über `.github/workflows/migrationen.yml` (Required Check
-  `Migrationsnummern` im Ruleset 17017911; fehlt er, warnt der Push-Lauf auf `alpha`); Netz
+  `--umnummerieren`. Durchgesetzt über `.github/workflows/migrationen.yml` und
+  `migrationen-kanal.yml` (Required Check `Migrationsnummern`; `ruleset.yml` wird rot, wenn er im
+  Ruleset von `alpha` fehlt oder eine Quelle trägt); Netz
   `db::tests::migrationsnummern_sind_eindeutig`.
 - **Autofix nur auf dem PR-Branch** (LFH-1014): ein reiner Nummernkonflikt wird per Bot-Commit
   umgelegt (`scripts/migrationen-autofix.sh`), nie auf `alpha`. Danach vor dem nächsten Push

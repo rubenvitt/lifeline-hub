@@ -5,6 +5,7 @@ status: akzeptiert
 datum: 2026-11-12
 gilt_fuer:
   - .github/workflows/ziel-branch-build.yml
+  - .github/workflows/ziel-branch-verteilen.yml
   - .github/workflows/stau-waechter.yml
   - scripts/ziel-branch-build.sh
   - scripts/stau-waechter.sh

@@ -7,7 +7,9 @@ Motivation: proposal.md, „Why“. Stand vor der Change:
 - `ci.yml` hört auf `pull_request` und `push`. Im PR ohne `voll` legt es fünf übersprungene Jobs
   an (Rust-, Frontend-, e2e-Suite, Testberichte, Release), weil jeder Job mit falschem `if` als
   übersprungener Eintrag erscheint. `ziel-branch-build.yml` (`Verteilen`) und `migrationen.yml`
-  (`Offene PRs neu bewerten`) bringen je einen weiteren mit.
+  (`Offene PRs neu bewerten`) bringen je einen weiteren mit. Dazu kommen an einem PR, der noch
+  nicht fertig ist, `Kompilieren` und `Melden` aus `ziel-branch-build.yml` (sie rechnen erst mit
+  Auto-Merge); die gehören zum Pflicht-Check und bleiben (s. Non-Goals). Zusammen neun.
 - Pflicht im Ruleset 17017911 sind `Schnellprüfungen` (Job in `ci.yml`), `Migrationsnummern` und
   `ADR-Nummern` (Commit-Status aus `migrationen.yml`) und `Baut mit Ziel-Branch` (Check-Run über
   die Checks-API). Ein Commit-Status zählt nicht, wenn das Ruleset ihn an eine App bindet.
@@ -20,7 +22,8 @@ Motivation: proposal.md, „Why“. Stand vor der Change:
 ## Goals / Non-Goals
 
 **Goals:**
-- Am PR ohne `voll` aus der eigenen CI genau ein übersprungener Eintrag (statt sieben).
+- Am PR ohne `voll` keine Jobs der Kanal-Branches mehr und aus `pr.yml` genau ein übersprungener
+  Eintrag; an einem nicht fertigen PR also drei statt neun (dazu `Kompilieren` und `Melden`).
 - Release, Abbruch je Job auf `alpha` und `voll` verhalten sich wie vorher.
 - Ruleset-Abweichung wird binnen Minuten nach einem Push auf `alpha` (sonst binnen sechs Stunden)
   rot, ohne dass Ruben sie suchen muss.
@@ -29,6 +32,9 @@ Motivation: proposal.md, „Why“. Stand vor der Change:
 - Kein gemeinsamer Lauf aller PRs (LLH-1890).
 - Keine Änderung der Pflicht-Checks selbst und kein Eingriff ins Ruleset.
 - Rulesets von `beta` und `main` bleiben ungeprüft (dort wird nicht per PR gearbeitet).
+- `Kompilieren` und `Melden` bleiben getrennte Jobs, die an einem nicht fertigen PR übersprungen
+  erscheinen: `kompilieren` führt PR-Code nur lesend aus, `melden` schreibt den Check
+  (ADR-0030). Sie zusammenzulegen oder leer laufen zu lassen, kostete die Trennung bzw. Runner.
 
 ## Decisions
 
@@ -86,10 +92,15 @@ einen anderen Zweck, und ein rotes „Migrationsnummern“ führte auf die falsc
 
 ### D5: Stau-Wächter
 
-Beim Befund `haengt` holt er die Regeln des Ziel-Branches einmal je Lauf über `gh_api` und reicht
-sie an `ruleset-pruefen.sh`. Bei Abweichung bekommt der Hinweis einen Absatz „Wahrscheinliche
-Ursache“ mit den Zeilen des Skripts. Die Kennung des Hinweises bleibt die des Befunds, damit kein
-neuer Kommentar entsteht, nur weil das Ruleset lesbar wurde. Nicht lesbar: Hinweis wie bisher.
+Beim Befund `haengt` an einem PR auf `alpha` holt er die Regeln von `alpha` einmal je Lauf über
+`gh_api` und reicht sie an `ruleset-pruefen.sh` (die Pflichtliste gilt nur dort). Bei Abweichung
+bekommt der Hinweis einen Absatz „Wahrscheinliche Ursache“ mit den Zeilen des Skripts. Die
+gefundene Abweichung geht in die Kennung des Hinweises ein: taucht sie auf oder ist sie behoben,
+wird der Hinweis neu geschrieben (Review: sonst bekäme ein schon stehender Hinweis die Ursache nie
+und behielte eine veraltete). Ohne Abweichung oder ohne lesbares Ruleset bleibt die Kennung die
+des Befunds, ein Aussetzer der API schreibt einen Hinweis ohne Ursache nicht neu. Verworfen: den
+Text per PATCH nachziehen; der Hinweis nennt die Minuten seit dem Grün, sein Text ändert sich also
+in jedem Lauf.
 
 ### D6: Neue ADR statt ADR-0047
 
@@ -113,6 +124,13 @@ je Ereignis, Pflichtliste in `ruleset-pruefen.sh`.
 - [Laufende PR-Branches kennen `pr.yml` nicht] → Ein PR, der vor dem Merge abzweigt, fährt noch das
   alte `ci.yml` aus seinem Merge-Ref; `pull_request` liest den Workflow aus dem Merge mit dem
   Ziel-Branch, also gilt ab dem Merge für jeden PR-Lauf der neue Stand.
+
+- [Übergang: Einzelläufe auf alten PR-Branches] → Ein Einzellauf von `Baut mit Ziel-Branch` läuft
+  mit Workflow und Skript seines PR-Branches. Ein Branch, der vor dem Merge abzweigte, fragt in
+  `has_pending_verteilen` noch die Push-Läufe von `ziel-branch-build.yml`, die es nicht mehr gibt.
+  Folge: Ein überholter Check wird dort nach 5 Minuten rot („neu starten“), auch wenn ein
+  Verteilen-Lauf noch aussteht; der nächste Check löst ihn ab. Hingenommen, bis die offenen PRs
+  `alpha` hineingemergt haben (Review vor dem PR).
 
 ## Migration Plan
 

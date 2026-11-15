@@ -114,6 +114,10 @@ lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR" "$GUT_BAUT"
 pruefe_code "Quelle in einem zweiten Ruleset ist rot" 1
 enthaelt "nennt den Status aus dem zweiten" "ADR-Nummern"
 
+lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR")" "$(regel true "$GUT_ADR" "$GUT_BAUT")")"
+pruefe_code "strict nur im zweiten Ruleset ist rot" 1
+enthaelt "nennt die Einstellung aus dem zweiten" "up to date"
+
 echo "==> ruleset-pruefen: nicht lesbar"
 lauf 'kein json'
 pruefe_code "kaputtes JSON" 2
@@ -121,6 +125,10 @@ lauf '{"message":"Not Found"}'
 pruefe_code "Fehlerantwort statt Regeln" 2
 lauf ''
 pruefe_code "leere Antwort" 2
+lauf '[{"type":"required_status_checks","parameters":{"required_status_checks":["Schnellprüfungen"]}}]'
+pruefe_code "Pflicht-Checks in falscher Form" 2
+lauf '[{"type":"required_status_checks","parameters":"kaputt"}]'
+pruefe_code "Parameter in falscher Form" 2
 
 echo "==> ruleset-pruefen: Liste"
 code=0

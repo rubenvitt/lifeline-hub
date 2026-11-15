@@ -530,10 +530,29 @@ kommentar_enthaelt "19b Hinweis nennt die Ursache" "$r" "Wahrscheinliche Ursache
 kommentar_enthaelt "19b Hinweis nennt den Status" "$r" '`Migrationsnummern`'
 kommentar_enthaelt "19b Hinweis nennt die Abhilfe" "$r" "Any source"
 pruefe "19b Regeln von alpha gelesen" "RULES alpha" "$(cat "$(fake "$r")/abfragen" 2> /dev/null)"
-# Derselbe Befund im nächsten Lauf, Ruleset inzwischen repariert: kein zweiter Kommentar.
+# Derselbe Lauf noch einmal: nichts Neues.
+lauf "$r" false false true
+pruefe "19b gleicher Befund mit gleicher Ursache schreibt nichts" "POST haengt" "$(log "$r")"
+# Ruleset inzwischen repariert, der PR mergt trotzdem nicht: der Hinweis nennt die alte Ursache
+# nicht mehr (Review LLH-1894: eine veraltete Ursache führte auf die falsche Spur).
 regeln "$r" ""
 lauf "$r" false false true
-pruefe "19b gleicher Befund schreibt nichts, auch wenn sich das Ruleset ändert" "POST haengt" "$(log "$r")"
+pruefe "19b Ruleset repariert: Hinweis neu, ohne Ursache" "POST haengt DELETE POST haengt" "$(log "$r")"
+pruefe "19b ohne Ursache" 0 "$(kommentar "$r" | grep -c 'Wahrscheinliche Ursache' || true)"
+
+# 19f — Ein Hinweis ohne Ursache steht schon (alter Wächter oder Ruleset nicht lesbar), dann wird
+# die Abweichung lesbar: der Hinweis wird mit Ursache neu geschrieben (Review LLH-1894).
+r="$(repo_neu haengtspaet)"
+aendere "$r" feature b.txt "feature"
+ci_gruen "$r"
+lauf "$r" false false true
+pruefe "19f Hinweis ohne Ursache" "POST haengt" "$(log "$r")"
+lauf "$r" false false true
+pruefe "19f Ruleset weiter nicht lesbar: nichts Neues" "POST haengt" "$(log "$r")"
+regeln "$r" 15368
+lauf "$r" false false true
+pruefe "19f Ursache wird lesbar: Hinweis neu" "POST haengt DELETE POST haengt" "$(log "$r")"
+kommentar_enthaelt "19f jetzt mit Ursache" "$r" "Wahrscheinliche Ursache"
 
 # 19c — Ruleset in Ordnung: der Hinweis wie bisher, ohne Ursache.
 r="$(repo_neu haengtgut)"

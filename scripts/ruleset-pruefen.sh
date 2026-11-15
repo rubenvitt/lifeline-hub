@@ -41,10 +41,16 @@ if ! regeln="$(jq -c 'if type != "array" then error("keine Liste") else . end
   echo "Die Regeln von alpha sind nicht lesbar: ${antwort:0:200}"
   exit 2
 fi
-# Je Pflicht-Check im Ruleset eine Zeile <context>\t<integration_id oder ->.
-eintraege="$(jq -r '.[] | .parameters.required_status_checks[]?
-  | [.context, (.integration_id // "-" | tostring)] | @tsv' <<< "$regeln")"
-strict="$(jq -r 'any(.[]; .parameters.strict_required_status_checks_policy == true)' <<< "$regeln")"
+# Je Pflicht-Check im Ruleset eine Zeile <context>\t<integration_id oder ->. Eine Regel in
+# unerwarteter Form ist „nicht lesbar“ (Exit 2), nie ein Abbruch mit dem Exit von jq.
+if ! eintraege="$(jq -r '.[] | .parameters.required_status_checks // []
+    | if type != "array" then error("keine Liste") else .[] end
+    | if type != "object" or (.context | type) != "string" then error("kein Eintrag") else . end
+    | [.context, (.integration_id // "-" | tostring)] | @tsv' <<< "$regeln" 2> /dev/null)" \
+  || ! strict="$(jq -r 'any(.[]; .parameters.strict_required_status_checks_policy == true)' <<< "$regeln" 2> /dev/null)"; then
+  echo "Die Regeln von alpha sind nicht lesbar (unerwartete Form): ${antwort:0:200}"
+  exit 2
+fi
 
 art_von() { # <name> → status | check | leer
   local p

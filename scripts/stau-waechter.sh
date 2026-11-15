@@ -350,10 +350,12 @@ So geht es weiter: einen neuen Commit pushen, etwa \`$basis\` in den Branch merg
     && [ $(( $(jetzt) - ende )) -ge "$WARTEZEIT" ] \
     && [ "$(gh_api "repos/$REPO/commits/$k/status" | jq -r '.state // ""')" = success ]; then
     sag "Befund: seit $(( ($(jetzt) - ende) / 60 )) min grün, Auto-Merge an, nicht gemergt"
-    # Die Kennung hängt nicht an der Ursache: wird das Ruleset lesbar oder repariert, entsteht
-    # kein neuer Kommentar zum selben Befund.
+    # Eine gefundene Ursache gehört zur Kennung: taucht sie auf oder ist sie behoben, wird der
+    # Hinweis neu geschrieben, damit er nie eine fehlende oder veraltete Ursache zeigt (Review
+    # LLH-1894). Ohne Abweichung oder ohne lesbares Ruleset ist die Kennung die des Befunds; ein
+    # Aussetzer der API schreibt einen Hinweis ohne Ursache also nicht neu.
     ruleset_ursache "$basis"
-    hinweis_setzen "$nr" haengt "$(kennung "haengt $k")" "**Grün, aber nicht gemergt** (Stau-Wächter)
+    hinweis_setzen "$nr" haengt "$(kennung "haengt $k${RULESET_ABSATZ:+ $RULESET_ABSATZ}")" "**Grün, aber nicht gemergt** (Stau-Wächter)
 
 Alle Checks auf \`$(kurz "$k")\` sind seit $(( ($(jetzt) - ende) / 60 )) Minuten grün, Auto-Merge ist eingeschaltet, gemergt wurde trotzdem nicht.
 

@@ -5,11 +5,7 @@ status: akzeptiert
 datum: 2026-11-15
 ersetzt: ADR-0047
 gilt_fuer:
-  - .github/workflows/ci.yml
-  - .github/workflows/pr.yml
-  - .github/workflows/suiten.yml
-  - .github/workflows/e2e.yml
-  - .github/workflows/ruleset.yml
+  - .github/workflows/*.yml
   - scripts/ci-stufen.test.sh
   - scripts/ruleset-pruefen.sh
 herleitung:
@@ -56,6 +52,8 @@ verlange 'uses: \./\.github/workflows/suiten\.yml' .github/workflows/ci.yml .git
 verbiete '^[^#]*auto_merge' .github/workflows/ci.yml .github/workflows/pr.yml
 verbiete 'ci-auswahl|nur-umnummeriert' .github/workflows/ci.yml .github/workflows/pr.yml .github/workflows/suiten.yml
 verbiete '^  workflow_run:' .github/workflows/ci.yml .github/workflows/release.yml
+# Kein Workflow hört auf PR und Push zugleich.
+for f in .github/workflows/*.yml; do grep -q '^  pull_request:' "$f" && grep -q '^  push:' "$f" && exit 1; done
 # Das Ruleset wird gegen die Liste geprüft.
 verlange 'scripts/ruleset-pruefen\.sh' .github/workflows/ruleset.yml
 # Der Job `release` bricht nie ab.
@@ -67,14 +65,15 @@ awk '/^  release:/ { j = 1; next } /^  [A-Za-z0-9_-]+:/ { j = 0 }
 ## Kontext
 
 ADR-0047 machte den PR leicht, ließ aber Push-Jobs und Suiten als übersprungene Einträge an jedem
-PR stehen (sieben an einem PR ohne `voll`), weil ein Job mit falschem `if` trotzdem erscheint.
+PR stehen (neun an einem nicht fertigen PR ohne `voll`), weil ein Job mit falschem `if`
+trotzdem erscheint.
 Am 14.11.2026 bekam `Migrationsnummern` im Ruleset beim Austragen der Suiten eine Quelle; der
 Status zählte nicht mehr, und alle grünen PRs hingen über Nacht, ohne dass ein Check rot war.
 
 ## Konsequenzen
 
-Ein PR ohne `voll` zeigt aus der eigenen CI einen übersprungenen Eintrag (den Aufruf der
-Suiten). Auf `alpha` heißen die Suiten-Jobs `Suiten / …`. `schnell` steht doppelt und wird per
+Ein nicht fertiger PR ohne `voll` zeigt drei übersprungene Einträge: den Aufruf der Suiten und
+`Kompilieren`/`Melden` des Pflicht-Checks (ADR-0030). Auf `alpha` heißen die Suiten-Jobs `Suiten / …`. `schnell` steht doppelt und wird per
 Formtest gleich gehalten. Ein Fehler im Ruleset macht binnen Minuten nach dem nächsten Push auf
 `alpha`, sonst binnen sechs Stunden, einen Lauf rot, und der Stau-Wächter nennt ihn am hängenden
 PR.
