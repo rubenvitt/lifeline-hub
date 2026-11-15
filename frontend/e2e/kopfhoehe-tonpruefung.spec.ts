@@ -254,9 +254,10 @@ async function messe(page: Page, einsatzId: string, breite: number, ton: 'bereit
 
 /**
  * LLH-1869: Ein Test je Ton und Rolle, jeder mit allen {@link BREITEN}. Zusammen liefen beide
- * Rollen 30 Seitenaufrufe in einem Test und kamen unter CI-Last bis an 600 s; geteilt braucht
- * jeder rund 110 s (gemessen an vier `alpha`-Läufen nach 7f36953b: 187–223 s je Ton für beide
- * Rollen), und eine langsame Rolle reißt die andere nicht mehr mit.
+ * Rollen 30 Seitenaufrufe in einem Test und kamen unter CI-Last bis an 600 s. Nach 7f36953b
+ * brauchte ein Ton für beide Rollen 187–223 s (vier `alpha`-Läufe); geteilt braucht jeder Test
+ * lokal mit einem Worker 1,3 min (15.11.2026), und eine langsame Rolle reißt die andere nicht
+ * mehr mit.
  */
 const TEST_FRIST_MS = 300_000;
 
