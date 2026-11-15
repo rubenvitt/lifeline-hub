@@ -43,14 +43,14 @@ interface Props {
    * Nach oben: so viele px oben am Fenster sind belegt (klebender Rahmen und Köpfe, LLH-1847). Das
    * Menü wird nie höher als der Platz darüber, sonst läge sein Anfang unter dem Rahmen.
    */
-  obenFrei?: number;
+  topInset?: number;
 }
 
 /** Höhe des Menüs, wenn Platz ist. */
-const MENUE_HOEHE = 280;
+const MENU_MAX_HEIGHT = 280;
 /** Abstand zum Anker (`marginBottom`) und Luft unter dem Rahmen. */
-const ABSTAND = 4;
-const LUFT = 8;
+const GAP = 4;
+const MARGIN = 8;
 
 const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   {
@@ -63,7 +63,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
     typenAnbieten = false,
     einheiten = null,
     richtung = 'unten',
-    obenFrei = 0,
+    topInset = 0,
   },
   ref,
 ) {
@@ -88,35 +88,35 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
 
   useEffect(() => setAktiv(0), [filter, offen]);
 
-  const liste = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   // Nach oben nie höher als der Platz bis unter den Rahmen (LLH-1847): auf einem niedrigen Fenster
   // lag der Anfang des Menüs (Typen) sonst unter Kopf und Übungsband. Gemessen beim Öffnen und mit
   // jeder Fenstergröße; wenigstens zwei Zeilen bleiben, der Rest rollt.
-  const [hoehe, setHoehe] = useState(MENUE_HOEHE);
-  const mindestens = token.controlHeight * 2;
+  const [height, setHeight] = useState(MENU_MAX_HEIGHT);
+  const minMenuHeight = token.controlHeight * 2;
   useLayoutEffect(() => {
     if (!offen || richtung !== 'oben') return;
-    const messen = () => {
-      const anker = liste.current?.parentElement;
-      if (!anker) return;
-      const platz = anker.getBoundingClientRect().top - ABSTAND - obenFrei - LUFT;
-      setHoehe(Math.max(mindestens, Math.min(MENUE_HOEHE, Math.floor(platz))));
+    const measure = () => {
+      const anchor = listRef.current?.parentElement;
+      if (!anchor) return;
+      const space = anchor.getBoundingClientRect().top - GAP - topInset - MARGIN;
+      setHeight(Math.max(minMenuHeight, Math.min(MENU_MAX_HEIGHT, Math.floor(space))));
     };
-    messen();
-    window.addEventListener('resize', messen);
-    window.addEventListener('scroll', messen, { passive: true });
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, { passive: true });
     return () => {
-      window.removeEventListener('resize', messen);
-      window.removeEventListener('scroll', messen);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure);
     };
-  }, [offen, richtung, obenFrei, mindestens]);
+  }, [offen, richtung, topInset, minMenuHeight]);
 
   // Die gewählte Zeile bleibt im Bild (LLH-1847): das Menü rollt ab rund acht Zeilen (im
   // Handschuh-Betrieb ab drei), und die Pfeiltasten wanderten sonst unsichtbar weiter. `nearest`
   // rollt nur so weit wie nötig und lässt die Seite dahinter stehen.
   useEffect(() => {
     if (!offen) return;
-    liste.current?.querySelector('[role="option"][aria-selected="true"]')?.scrollIntoView?.({
+    listRef.current?.querySelector('[role="option"][aria-selected="true"]')?.scrollIntoView?.({
       block: 'nearest',
     });
   }, [aktiv, offen]);
@@ -234,7 +234,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
 
   return (
     <div
-      ref={liste}
+      ref={listRef}
       data-testid="slash-menu"
       // Eigenes Attribut statt des Testids: der Aufrufer nimmt das Menü vom
       // „Klick daneben schliesst"-Griff aus, und dafür darf er sich nicht auf
@@ -250,7 +250,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
         border: `1px solid ${token.colorBorderSecondary}`,
         borderRadius: token.borderRadiusLG,
         boxShadow: token.boxShadowSecondary,
-        maxHeight: richtung === 'oben' ? hoehe : MENUE_HOEHE,
+        maxHeight: richtung === 'oben' ? height : MENU_MAX_HEIGHT,
         overflow: 'auto',
       }}
     >

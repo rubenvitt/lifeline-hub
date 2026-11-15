@@ -139,7 +139,7 @@ export interface ZeitpunktEingabeProps {
    * Wahl, Escape). Für Formulare, die dann nicht senden wollen (ETB, LLH-1866); ohne ihn gilt die
    * Spec `zeiteingabe` unverändert: gesendet wird der geltende Wert.
    */
-  onVerworfen?: (grund: string | null) => void;
+  onDiscard?: (grund: string | null) => void;
   /** Ereignis (Vergangenheit) oder Frist (Zukunft): wohin eine Uhrzeit ohne Tag fällt. */
   art?: ZeitArt;
   /** Tage nach „heute“ (Kalender der Anzeigezone) sind nicht wählbar; ohne `art` = Ereignis. */
@@ -192,7 +192,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     defaultValue,
     onChange,
     onOk,
-    onVerworfen,
+    onDiscard,
     art,
     keineZukunftstage,
     schnellwahl,
@@ -229,15 +229,15 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   /** Getippter Text; `null` = es wird nicht getippt, das Feld zeigt den Wert. */
   const [text, setText] = useState<string | null>(null);
   /** Grund einer verworfenen Eingabe, bis erneut getippt wird. */
-  const [verworfen, setVerworfenIntern] = useState<string | null>(null);
+  const [verworfen, setVerworfenState] = useState<string | null>(null);
   // Gemeldet wird im Ereignis selbst, nicht in einem Effekt: das Verwerfen geschieht beim Verlassen
   // (`mousedown` auf einen Knopf), und dessen `click` muss den Grund schon kennen (LLH-1866).
-  const verworfenGemeldet = useRef<string | null>(null);
+  const verworfenReported = useRef<string | null>(null);
   function setVerworfen(grund: string | null) {
-    setVerworfenIntern(grund);
-    if (verworfenGemeldet.current === grund) return;
-    verworfenGemeldet.current = grund;
-    onVerworfen?.(grund);
+    setVerworfenState(grund);
+    if (verworfenReported.current === grund) return;
+    verworfenReported.current = grund;
+    onDiscard?.(grund);
   }
   const [offenIntern, setOffenIntern] = useState(false);
   const offen = open ?? offenIntern;
@@ -247,14 +247,14 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   const feldRef = useRef<InputRef | null>(null);
   // Ein neuer Wert von außen (etwa `/zeit` im ETB) ersetzt, was verworfen wurde: der Grund gilt
   // dann nicht mehr (Review B2 zu LLH-1866). Der eigene Weg über `melde` räumt ihn schon selbst.
-  const wertSchluessel = wert ? wert.valueOf() : null;
-  const vorigerWert = useRef(wertSchluessel);
+  const wertKey = wert ? wert.valueOf() : null;
+  const prevWert = useRef(wertKey);
   useEffect(() => {
-    if (vorigerWert.current === wertSchluessel) return;
-    vorigerWert.current = wertSchluessel;
-    if (verworfenGemeldet.current != null) setVerworfen(null);
+    if (prevWert.current === wertKey) return;
+    prevWert.current = wertKey;
+    if (verworfenReported.current != null) setVerworfen(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `setVerworfen` meldet nur weiter
-  }, [wertSchluessel]);
+  }, [wertKey]);
   // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
   // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten, React ruft die Ref dabei mit
   // `null` und dem neuen Handle), und eine fokussierende Ref wie die des ETB-Chips

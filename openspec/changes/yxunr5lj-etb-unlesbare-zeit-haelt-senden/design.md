@@ -34,7 +34,7 @@ Motivation: `proposal.md`, „Why“. Stand im Code:
 
 ### D1 · Das Zeitfeld meldet eine verworfene Eingabe über einen eigenen Rückruf
 
-`ZeitpunktEingabe` bekommt den optionalen Prop `onVerworfen?: (grund: string | null) => void`. Er
+`ZeitpunktEingabe` bekommt den optionalen Prop `onDiscard?: (grund: string | null) => void`. Er
 läuft, wenn sich der Grund einer verworfenen Eingabe ändert: mit dem Grund beim Verwerfen im
 `onBlur`, mit `null`, sobald der Grund weicht (erneutes Tippen, Wahl im Kalender,
 Schnellwahl, Escape während des Tippens). Die ETB-Erfassung führt ihn als Zustand
@@ -124,4 +124,4 @@ dabei auf `null`, damit kein Grund aus dem anderen Entwurf hängen bleibt.
 - [Wer einen Grund sieht und trotzdem „jetzt“ will, muss das Feld leeren oder dort Enter bzw. Escape
   drücken] → Das Kapitel nennt den Ausweg (D1a).
 - [Neuer Prop an einem gemeinsamen Bauteil] → optional, ohne Wirkung ohne Aufrufer; ein Test sichert,
-  dass ein Formular ohne `onVerworfen` wie bisher den unveränderten Wert sendet.
+  dass ein Formular ohne `onDiscard` wie bisher den unveränderten Wert sendet.

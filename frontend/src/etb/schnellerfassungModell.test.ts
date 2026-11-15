@@ -268,8 +268,10 @@ describe('erkenneZeitBefehl (LLH-1088)', () => {
   });
 
   it('nennt, wo die Angabe im Text steht, auch unlesbar (LLH-1866: dort hin mit dem Cursor)', () => {
-    expect(erkenneZeitBefehl('/zeit 2590 Pumpe', o)).toMatchObject({ angabe: { von: 6, bis: 10 } });
-    expect(erkenneZeitBefehl('/zeit  14:20 x', o)).toMatchObject({ angabe: { von: 7, bis: 12 } });
+    expect(erkenneZeitBefehl('/zeit 2590 Pumpe', o)).toMatchObject({
+      angabe: { start: 6, end: 10 },
+    });
+    expect(erkenneZeitBefehl('/zeit  14:20 x', o)).toMatchObject({ angabe: { start: 7, end: 12 } });
   });
 
   it('greift erst nach dem Leerzeichen hinter der Angabe und nur am Textanfang', () => {

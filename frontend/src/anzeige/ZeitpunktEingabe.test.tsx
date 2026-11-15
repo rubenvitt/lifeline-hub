@@ -295,50 +295,50 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
     expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-10-16 12:30:00');
   });
 
-  it('meldet eine beim Verlassen verworfene Eingabe über onVerworfen, bis erneut getippt wird (LLH-1866)', async () => {
-    const onVerworfen = vi.fn();
+  it('meldet eine beim Verlassen verworfene Eingabe über onDiscard, bis erneut getippt wird (LLH-1866)', async () => {
+    const onDiscard = vi.fn();
     const user = userEvent.setup();
     render(
       mitZone(
         BERLIN,
         <>
-          <ZeitpunktEingabe aria-label="Zeit" onVerworfen={onVerworfen} />
+          <ZeitpunktEingabe aria-label="Zeit" onDiscard={onDiscard} />
           <button type="button">daneben</button>
         </>,
       ),
     );
     await user.type(zeitFeld('Zeit'), '14:3x');
-    expect(onVerworfen).not.toHaveBeenCalledWith(expect.any(String));
+    expect(onDiscard).not.toHaveBeenCalledWith(expect.any(String));
     await user.click(screen.getByRole('button', { name: 'daneben' }));
-    expect(onVerworfen).toHaveBeenLastCalledWith('nicht lesbar');
+    expect(onDiscard).toHaveBeenLastCalledWith('nicht lesbar');
     // Erneutes Tippen nimmt den Grund zurück.
     await user.type(zeitFeld('Zeit'), '1');
-    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+    expect(onDiscard).toHaveBeenLastCalledWith(null);
   });
 
   it.each([
     ['Enter auf den gezeigten Wert', '{Enter}', false],
     ['Escape ohne Tippen', '{Escape}', true],
   ])('%s nimmt den gemeldeten Grund zurück (LLH-1866)', async (_name, taste, verbraucht) => {
-    const onVerworfen = vi.fn();
+    const onDiscard = vi.fn();
     const onKeyDown = vi.fn();
     const user = userEvent.setup();
     render(
       mitZone(
         BERLIN,
         <>
-          <ZeitpunktEingabe aria-label="Zeit" onVerworfen={onVerworfen} onKeyDown={onKeyDown} />
+          <ZeitpunktEingabe aria-label="Zeit" onDiscard={onDiscard} onKeyDown={onKeyDown} />
           <button type="button">daneben</button>
         </>,
       ),
     );
     await user.type(zeitFeld('Zeit'), '14:3x');
     await user.click(screen.getByRole('button', { name: 'daneben' }));
-    expect(onVerworfen).toHaveBeenLastCalledWith('nicht lesbar');
+    expect(onDiscard).toHaveBeenLastCalledWith('nicht lesbar');
     await user.click(zeitFeld('Zeit'));
     onKeyDown.mockClear();
     await user.keyboard(taste);
-    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+    expect(onDiscard).toHaveBeenLastCalledWith(null);
     expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument();
     expect(zeitFeld('Zeit')).toHaveValue('');
     // Escape gehört dann dem Feld: ein Dialog drumherum bleibt offen.
@@ -346,36 +346,36 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
   });
 
   it('ein neuer Wert von außen nimmt den gemeldeten Grund zurück (Review B2)', async () => {
-    const onVerworfen = vi.fn();
+    const onDiscard = vi.fn();
     const user = userEvent.setup();
     const feld = (wert: Dayjs | null | undefined) =>
       mitZone(
         BERLIN,
         <>
-          <ZeitpunktEingabe aria-label="Zeit" value={wert} onVerworfen={onVerworfen} />
+          <ZeitpunktEingabe aria-label="Zeit" value={wert} onDiscard={onDiscard} />
           <button type="button">daneben</button>
         </>,
       );
     const { rerender } = render(feld(null));
     await user.type(zeitFeld('Zeit'), '14:3x');
     await user.click(screen.getByRole('button', { name: 'daneben' }));
-    expect(onVerworfen).toHaveBeenLastCalledWith('nicht lesbar');
+    expect(onDiscard).toHaveBeenLastCalledWith('nicht lesbar');
     rerender(feld(alsZeitpunkt('2026-10-16 12:30:00')));
-    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+    expect(onDiscard).toHaveBeenLastCalledWith(null);
     expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument();
     expect(zeitFeld('Zeit')).toHaveValue('161430okt26');
   });
 
   it('eine Wahl im Kalender nimmt den gemeldeten Grund zurück (LLH-1866)', async () => {
-    const onVerworfen = vi.fn();
+    const onDiscard = vi.fn();
     const user = userEvent.setup();
-    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onVerworfen={onVerworfen} />));
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onDiscard={onDiscard} />));
     await user.type(zeitFeld('Zeit'), '2460');
     await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
-    expect(onVerworfen).toHaveBeenLastCalledWith('Uhrzeit gibt es nicht');
+    expect(onDiscard).toHaveBeenLastCalledWith('Uhrzeit gibt es nicht');
     const k = await kalender();
     await user.click(within(k).getByRole('button', { name: 'Übernehmen' }));
-    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+    expect(onDiscard).toHaveBeenLastCalledWith(null);
   });
 
   it('Leeren meldet keinen Zeitpunkt; mit allowClear={false} ist es unlesbar', async () => {

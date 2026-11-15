@@ -55,13 +55,13 @@ export function originalZugaenglicherName(kennung: string): string {
 }
 
 /** Ob der Anhang ein Bild ist — nur dort unterscheiden sich Original und bereinigte Fassung. */
-export function istBildMime(mime: string | null | undefined): boolean {
+export function isBildMime(mime: string | null | undefined): boolean {
   return mime?.startsWith('image/') ?? false;
 }
 
 /**
  * Formate, für die der Server ein Vorschaubild erzeugt (LFH-759). Spiegel der Formatwahl in
- * `src/anhang/vorschau/`; HEIC/HEIF dekodiert die App selbst ({@link istHeicMime}).
+ * `src/anhang/vorschau/`; HEIC/HEIF dekodiert die App selbst ({@link isHeicMime}).
  */
 const SERVER_VORSCHAU_MIME = new Set([
   'image/jpeg',
@@ -72,18 +72,18 @@ const SERVER_VORSCHAU_MIME = new Set([
 ]);
 
 /** Ob der Server für diesen Anhang ein Vorschaubild liefert. */
-export function hatServerVorschau(mime: string | null | undefined): boolean {
+export function hasServerVorschau(mime: string | null | undefined): boolean {
   return mime != null && SERVER_VORSCHAU_MIME.has(mime);
 }
 
 /** Ob der Anhang ein HEIC/HEIF-Foto ist, das die App auf dem Gerät dekodiert (LFH-759). */
-export function istHeicMime(mime: string | null | undefined): boolean {
+export function isHeicMime(mime: string | null | undefined): boolean {
   return mime === 'image/heic' || mime === 'image/heif';
 }
 
 /** Ob es für diesen Anhang überhaupt eine Vorschau gibt (vom Server oder auf dem Gerät). */
-export function hatVorschau(mime: string | null | undefined): boolean {
-  return hatServerVorschau(mime) || istHeicMime(mime);
+export function hasVorschau(mime: string | null | undefined): boolean {
+  return hasServerVorschau(mime) || isHeicMime(mime);
 }
 
 /**

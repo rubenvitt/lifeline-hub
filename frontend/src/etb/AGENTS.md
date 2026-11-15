@@ -94,7 +94,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
     Ereigniszeit über 60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und
     Warteschlange, Grund am Feld Zeit); der Server begrenzt sie nicht. Ebenso wenig sendet eine
     unlesbare Zeit (LLH-1866): ein unlesbares `/zeit` oder eine im Feld Zeit verworfene Eingabe
-    (`ZeitpunktEingabe onVerworfen`, gemeldet im Ereignis, nicht im Effekt, weil `blur` und
+    (`ZeitpunktEingabe onDiscard`, gemeldet im Ereignis, nicht im Effekt, weil `blur` und
     `click` desselben Klicks aufeinander folgen); Prüfung in `absenden` vor der Zukunft, der
     Cursor geht dorthin, wo der Fehler steht. Der Grund eines `/zeit` wird aus dem Text abgeleitet,
     nie gespeichert; ein lesbares, beim Tippen nicht übernommenes `/zeit` übernimmt der Klick erst

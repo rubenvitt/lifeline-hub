@@ -134,7 +134,7 @@ describe('SlashMenu', () => {
     [150, 100, '64px'], // kaum Platz: zwei Zeilen (2 × controlHeight) bleiben
   ])(
     'nach oben: Höhe bis unter den Rahmen begrenzt (Anker %i, frei %i → %s, LLH-1847)',
-    (ankerOben, obenFrei, hoehe) => {
+    (ankerOben, topInset, hoehe) => {
       renderMitProviders(
         <div data-testid="anker" style={{ position: 'relative' }}>
           <SlashMenu
@@ -143,7 +143,7 @@ describe('SlashMenu', () => {
             bausteine={bausteine}
             gesetzteFelder={[]}
             richtung="oben"
-            obenFrei={obenFrei}
+            topInset={topInset}
             onWahl={vi.fn()}
             onSchliessen={vi.fn()}
           />

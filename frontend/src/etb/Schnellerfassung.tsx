@@ -51,7 +51,7 @@ import {
   type MetadatenWerte,
   type MetaFeld,
   type SlashEintrag,
-  type Bereich,
+  type TextRange,
   laengenVerstoss,
   erkenneZeitBefehl,
   zukunftsVerstoss,
@@ -329,7 +329,7 @@ export default function Schnellerfassung({
   const menuRef = useRef<SlashMenuHandle>(null);
   // Was oben am Fenster klebt (Rahmen samt Übungsband, ETB-Köpfe): darüber geht das „/“-Menü nicht
   // hinaus (LLH-1847).
-  const menueObenFrei = useRahmenOben() + useEtbKopfHoehe();
+  const menuTopInset = useRahmenOben() + useEtbKopfHoehe();
   // Die Felder der Feldzeile, für Fokus (erstes leeres Pflichtfeld, Grund am Feld) und `/`-Menü.
   const zeitRef = useRef<InputRef>(null);
   const vonRef = useRef<ParteiRef>(null);
@@ -399,12 +399,12 @@ export default function Schnellerfassung({
   const [zeitVerworfen, setZeitVerworfenState] = useState<string | null>(null);
   const zeitVerworfenRef = useRef<string | null>(null);
   /** Ein Sendeversuch wurde wegen unlesbarer Zeit angehalten; die Fußzeile nennt den Grund. */
-  const [unlesbarAngehalten, setUnlesbarAngehalten] = useState(false);
+  const [isUnlesbarHalted, setIsUnlesbarHalted] = useState(false);
   /**
    * Fassung des Felds Zeit: steigt, wenn `/zeit` eine Zeit übernimmt. Das Feld hängt dann neu ein
    * und vergisst einen Grund aus einer verworfenen Eingabe, auch bei gleichem Wert (Nach-Review 3).
    */
-  const [zeitFeldFassung, setZeitFeldFassung] = useState(0);
+  const [zeitFeldKey, setZeitFeldKey] = useState(0);
   const { zone: anzeigeZone } = useZeitEingabe();
   /**
    * Unlesbare Angabe hinter `/zeit` (LLH-1088): abgeleitet aus dem Text, nicht gespeichert, damit
@@ -412,19 +412,19 @@ export default function Schnellerfassung({
    */
   const zeitImInhalt = erkenneZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
   const zeitBefehlGrund = zeitImInhalt && !zeitImInhalt.ok ? zeitImInhalt.grund : null;
-  function setzeZeitVerworfen(grund: string | null) {
+  function handleZeitDiscard(grund: string | null) {
     zeitVerworfenRef.current = grund;
     setZeitVerworfenState(grund);
     // Ist kein Grund mehr übrig, endet der Halt: ein späterer Grund meldet sich dann wieder nur
     // höflich beim Tippen, nicht als Alarm (Review B3).
-    if (grund == null && zeitBefehlGrund == null) setUnlesbarAngehalten(false);
+    if (grund == null && zeitBefehlGrund == null) setIsUnlesbarHalted(false);
   }
   /** `/zeit` hat eine lesbare Zeit gesetzt: ins Feld damit, ein alter Grund dort ist überholt. */
-  function uebernimmZeitAusText(zeitpunkt: Dayjs) {
+  function applyZeitFromText(zeitpunkt: Dayjs) {
     setMetadaten((m) => ({ ...m, ereigniszeit: zeitpunkt }));
     setZukunftsGrund(null);
-    setzeZeitVerworfen(null);
-    setZeitFeldFassung((n) => n + 1);
+    handleZeitDiscard(null);
+    setZeitFeldKey((n) => n + 1);
   }
   const { konventionen } = useAnzeigeKonventionen();
   const [menuOffen, setMenuOffen] = useState(false);
@@ -551,11 +551,11 @@ export default function Schnellerfassung({
   }
 
   /** Cursor in den Inhalt, den Abschnitt markiert: dort steht ein Fehler (LLH-1866). */
-  function markiereImText(bereich: Bereich) {
+  function selectInText(range: TextRange) {
     requestAnimationFrame(() => {
       const feld = textRef.current?.resizableTextArea?.textArea;
       feld?.focus();
-      feld?.setSelectionRange(bereich.von, bereich.bis);
+      feld?.setSelectionRange(range.start, range.end);
     });
   }
 
@@ -617,11 +617,11 @@ export default function Schnellerfassung({
     const ausloesen =
       zeit != null && (befehl != null || caretImRest === zeit.ende || !inhalt.startsWith('/zeit'));
     if (zeit?.ok && ausloesen) {
-      uebernimmZeitAusText(zeit.zeitpunkt);
+      applyZeitFromText(zeit.zeitpunkt);
       text = zeit.rest;
     }
     // Bleibt kein Grund, endet ein Halt (Review B3); der Grund selbst folgt dem Text.
-    if (!(zeit && !zeit.ok) && zeitVerworfenRef.current == null) setUnlesbarAngehalten(false);
+    if (!(zeit && !zeit.ok) && zeitVerworfenRef.current == null) setIsUnlesbarHalted(false);
     if (befehl || (zeit?.ok && ausloesen)) {
       setInhalt(text);
       aktualisiereTrigger(text, text.length);
@@ -687,7 +687,7 @@ export default function Schnellerfassung({
   function bausteinEinsetzen(felder: BausteinFelder) {
     if (sendet) return;
     setInhalt(felder.inhalt);
-    if (zeitVerworfenRef.current == null) setUnlesbarAngehalten(false);
+    if (zeitVerworfenRef.current == null) setIsUnlesbarHalted(false);
     setMetadaten((m) => ({
       ...m,
       ...(felder.meldeweg ? { meldeweg: felder.meldeweg } : {}),
@@ -782,7 +782,7 @@ export default function Schnellerfassung({
     // Feld und sendet noch nicht. Erst der nächste sendet, mit Nachtrag am Knopf (Review B1,
     // Nach-Review 2 und 4 zu LLH-1866; Spec „Abweichende Ereigniszeit bleibt sichtbar“).
     if (zeitImInhalt?.ok) {
-      uebernimmZeitAusText(zeitImInhalt.zeitpunkt);
+      applyZeitFromText(zeitImInhalt.zeitpunkt);
       setInhalt(zeitImInhalt.rest);
       fokusInsFeld();
       return;
@@ -807,16 +807,16 @@ export default function Schnellerfassung({
     // Eintrag ließe sich nur noch berichtigen. Der Grund steht in der Fußzeile, der Cursor dort,
     // wo der Fehler steht: auf der Angabe im Text bzw. im Feld Zeit.
     if (zeitImInhalt && !zeitImInhalt.ok) {
-      setUnlesbarAngehalten(true);
-      markiereImText(zeitImInhalt.angabe);
+      setIsUnlesbarHalted(true);
+      selectInText(zeitImInhalt.angabe);
       return;
     }
     if (zeitVerworfenRef.current != null) {
-      setUnlesbarAngehalten(true);
+      setIsUnlesbarHalted(true);
       fokusFeld('ereigniszeit');
       return;
     }
-    setUnlesbarAngehalten(false);
+    setIsUnlesbarHalted(false);
     // Ereigniszeit in der Zukunft (LLH-1088, Spec „Keine Ereigniszeit in der Zukunft“): ebenso
     // VOR Upload und Warteschlange, nach der Serveruhr. Der Grund steht am Feld Zeit, der Fokus
     // geht dorthin; Text und Felder bleiben.
@@ -937,7 +937,7 @@ export default function Schnellerfassung({
   const zukunftJetzt = zukunftsGrund ?? zukunftsVerstoss(metadaten, jetzt);
   // Der Halt zeigt den Grund, solange er besteht; ist er behoben, verschwindet auch die Meldung.
   // Der Ort steht dabei: ein Fehler im Text wird dort berichtigt, nicht im Feld.
-  const unlesbarGrund = !unlesbarAngehalten
+  const unlesbarGrund = !isUnlesbarHalted
     ? null
     : zeitBefehlGrund != null
       ? `/zeit im Text: ${zeitBefehlGrund}`
@@ -1271,8 +1271,8 @@ export default function Schnellerfassung({
             pflichtId={(seite) => `${pflichtGrundId}-${seite}`}
             zeitGrund={unlesbarGrund ?? zukunftJetzt ?? zeitBefehlGrund}
             zeitGrundId={zeitGrundId}
-            onZeitVerworfen={setzeZeitVerworfen}
-            zeitFeldFassung={zeitFeldFassung}
+            onZeitDiscard={handleZeitDiscard}
+            zeitFeldKey={zeitFeldKey}
             nachtrag={nachtragMin != null}
             veranlassungOffen={veranlassungOffen}
             onVeranlassungSchliessen={() => setVeranlassungOffen(false)}
@@ -1347,7 +1347,7 @@ export default function Schnellerfassung({
           typenAnbieten={typenAnbieten}
           einheiten={einheitenTreffer}
           richtung="oben"
-          obenFrei={menueObenFrei}
+          topInset={menuTopInset}
           onWahl={waehleEintrag}
           onSchliessen={() => setMenuOffen(false)}
         />

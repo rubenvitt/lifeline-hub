@@ -5,10 +5,10 @@ TDD: erst der Test, der ohne die Änderung rot ist.
 
 ## 1. Zeitfeld meldet eine verworfene Eingabe (D1)
 
-- [x] 1.1 `anzeige/ZeitpunktEingabe.tsx`: optionaler Prop `onVerworfen(grund | null)`, aufgerufen beim
+- [x] 1.1 `anzeige/ZeitpunktEingabe.tsx`: optionaler Prop `onDiscard(grund | null)`, aufgerufen beim
   Verwerfen im `onBlur` und mit `null`, sobald der Grund weicht (Tippen, Wahl, Escape). Prüfen:
   Tests in `ZeitpunktEingabe.test.tsx` für Verwerfen, erneutes Tippen und Kalenderwahl; ein Test
-  belegt, dass ein Formular ohne `onVerworfen` wie bisher den unveränderten Wert sendet
+  belegt, dass ein Formular ohne `onDiscard` wie bisher den unveränderten Wert sendet
   (Spec `zeiteingabe`, „Verlassen mit unlesbarer Eingabe“).
 
 - [x] 1.2 Enter auf den gezeigten Wert und Escape ohne Tippen nehmen den Grund zurück (D1a), Escape
@@ -16,7 +16,7 @@ TDD: erst der Test, der ohne die Änderung rot ist.
 
 ## 2. ETB hält das Senden an (D1–D4)
 
-- [x] 2.1 `etb/EtbFeldzeile.tsx` reicht `onVerworfen` des Felds Zeit durch; `etb/Schnellerfassung.tsx`
+- [x] 2.1 `etb/EtbFeldzeile.tsx` reicht `onDiscard` des Felds Zeit durch; `etb/Schnellerfassung.tsx`
   führt `zeitVerworfen` und setzt es beim Entwurfswechsel zurück. Prüfen: Test in
   `Schnellerfassung.test.tsx`, dass ein Wechsel des Entwurfs keinen Grund mitnimmt.
 - [x] 2.2 `absenden()` hält an, wenn `zeitVerworfen` oder `zeitBefehlGrund` gesetzt ist, nach

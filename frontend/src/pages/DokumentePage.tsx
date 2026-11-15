@@ -8,7 +8,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { dokumentDownloadPfad, entferneDokument, listeDokumente } from '../api/dokumente';
 import type { Dokument } from '../api/types';
 import { darfImEinsatzSchreiben, darfOriginalLaden } from '../einsatz/schreibrecht';
-import { istBildMime, originalPfad } from '../api/anhangFassung';
+import { isBildMime, originalPfad } from '../api/anhangFassung';
 import { useAuth } from '../auth/AuthContext';
 import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
@@ -111,7 +111,7 @@ const dokumentSpalten = (
             dateiname={d.dateiname}
             text={d.titel}
             originalHref={
-              darfOriginal && istBildMime(d.mime)
+              darfOriginal && isBildMime(d.mime)
                 ? originalPfad(dokumentDownloadPfad(einsatzId, d.id))
                 : undefined
             }

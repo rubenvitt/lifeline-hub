@@ -5,7 +5,7 @@
  * Liste und wählen über dieselbe Funktion. So steht kein Weg nur an einem Ort.
  */
 import type { EtbEintragAnzeige } from '../api/types';
-import { ORIGINAL_TEXT, hatVorschau, istBildMime } from '../api/anhangFassung';
+import { ORIGINAL_TEXT, hasVorschau, isBildMime } from '../api/anhangFassung';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import type { AbgelehnterEintrag } from '../offline/queue';
@@ -121,10 +121,10 @@ function vermerkEintraege(v: Vermerk, darfOriginal: boolean): MenueEintrag<strin
   if (d == null) return [eintrag];
   return [
     eintrag,
-    ...(hatVorschau(d.mime)
+    ...(hasVorschau(d.mime)
       ? [{ key: `${VORSCHAU}${v.schluessel}`, label: `Vorschau: ${d.dateiname}` }]
       : []),
-    ...(darfOriginal && istBildMime(d.mime)
+    ...(darfOriginal && isBildMime(d.mime)
       ? [
           {
             key: `${ORIGINAL}${v.schluessel}`,
