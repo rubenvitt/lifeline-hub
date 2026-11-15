@@ -528,9 +528,10 @@ pub async fn ablehnung_festhalten(
     Ok(())
 }
 
-/// Meldet sich diese Instanz für die Org bei einem Hub (aktive Kopplung, meldende Seite, Org
-/// zugeordnet)? Dann nimmt sie für die Org keine Fremdsysteme an (Konzept D8, design.md D10).
-/// Liefert Name und Adresse des Hubs.
+/// Meldet sich diese Instanz für die Org bei einem Hub (aktive Standardkopplung, meldende Seite,
+/// Org zugeordnet)? Dann nimmt sie für die Org keine Fremdsysteme an (Konzept D8, design.md D10).
+/// Eine Direktkopplung vor Ort mit einem zweiten ELW ist kein Hub und zählt nicht (LLH-1868,
+/// Specs `maschinenzugang` und `einwurf-zugang`). Liefert Name und Adresse des Hubs.
 pub async fn hub_fuer_org(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -538,7 +539,7 @@ pub async fn hub_fuer_org(
     Ok(sqlx::query_as(
         "SELECT k.gegenueber_name, k.gegenueber_adresse FROM instanz_kopplung k \
          JOIN instanz_kopplung_org o ON o.kopplung_id = k.id \
-         WHERE k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' \
+         WHERE k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' AND k.art = 'standard' \
            AND o.org_id = ? AND o.widerrufen_at IS NULL \
          ORDER BY k.id LIMIT 1",
     )
