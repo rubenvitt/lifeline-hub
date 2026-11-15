@@ -22,6 +22,9 @@ herleitung:
   zurücknehmen) und folgt deren Verb, Ort und Sicherung; die Tabelle steht in `frontend/AGENTS.md`,
   „Beenden: Verb, Ort und Sicherung je Art“.
 - MUST NOT: „Entlassen“ oder „Aus dem Einsatz nehmen“ als Hauptaktion (`aktion`) einer Karte.
+- MUST NOT: „Stornieren“ als sichtbarer Knopf im Kopf oder als Hauptaktion; es steht im letzten
+  Abschnitt oder im ⋮. Die Prüfung fängt Hauptaktion und einzeiligen Knopf, einen mehrzeiligen
+  Kopfknopf fängt nur der Review.
 - MUST NOT: ein Rückgängig-Hinweis, dessen Rückweg nicht den Zustand vor der Handlung herstellt,
   außer bei den in `frontend/AGENTS.md` benannten Lücken.
 - MUST: Im ⋮-Menü steht nur Unumkehrbares rot (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich
@@ -34,7 +37,8 @@ herleitung:
 ## Prüfung
 
 ```sh
-verbiete "etikett: '(Entlassen|Aus dem Einsatz nehmen)'" 'frontend/src/pages/**/*Page.tsx'
+verbiete "etikett: '(Entlassen|Aus dem Einsatz nehmen|Stornieren)'" 'frontend/src/pages/**/*Page.tsx'
+verbiete '<Button[^>]*>Stornieren</Button>' 'frontend/src/pages/**/*.tsx'
 verlange 'BeendenAbschnitt' frontend/src/pages/einheit/EinheitAufloesen.tsx
 verlange 'BeendenAbschnitt' frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx
 verlange 'useHoldGeloest' frontend/src/kraefte/MaterialAmOrt.tsx
