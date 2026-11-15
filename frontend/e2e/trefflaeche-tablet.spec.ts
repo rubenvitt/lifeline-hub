@@ -82,7 +82,7 @@ async function seedeEinheit(page: Page, einsatzId: string): Promise<string> {
  * („Einheiten, 1 Einheit"); der Anfang bleibt exakt, sonst träfe „Einheiten" auch eine andere Zeile.
  */
 function modulZeile(panel: Locator, modul: string): Locator {
-  return panel.getByRole('button', { name: new RegExp(`^${modul}(, .+)?$`) });
+  return panel.getByRole('link', { name: new RegExp(`^${modul}(, .+)?$`) });
 }
 
 /**
@@ -180,7 +180,7 @@ for (const { dichte, soll } of STAFFEL) {
     const rail = page.getByRole('navigation', { name: 'Kategorien' });
     for (const kategorie of ['Führung', 'Lage']) {
       const breite = await haeltTreffflaeche(
-        rail.getByRole('button', { name: kategorie, exact: true }),
+        rail.getByRole('link', { name: kategorie, exact: true }),
         soll,
         `Kategorie-Ziel „${kategorie}"`,
       );
@@ -360,7 +360,7 @@ for (const { dichte, soll } of STAFFEL) {
     // Kategorie-Köpfe tragen `aria-expanded`, Modulknöpfe nicht — das trennt beide ohne
     // Strukturselektor. Mindestmengen: sechs Kategorien, fünf Module in „Kräfte & Mittel".
     const koepfe = nav.locator('button[aria-expanded]');
-    const module = nav.locator('button:not([aria-expanded])');
+    const module = nav.locator('a, button:not([aria-expanded])');
     expect(await koepfe.count(), 'mindestens sechs Akkordeon-Köpfe').toBeGreaterThanOrEqual(6);
     expect(await module.count(), 'mindestens fünf Modulzeilen').toBeGreaterThanOrEqual(5);
     for (const [menge, name] of [
@@ -501,7 +501,7 @@ for (const { dichte, soll } of STAFFEL) {
     const rail = page.getByRole('navigation', { name: 'Kategorien' });
     for (const kategorie of ['Führung', 'Lage']) {
       const breite = await haeltTreffflaeche(
-        rail.getByRole('button', { name: kategorie, exact: true }),
+        rail.getByRole('link', { name: kategorie, exact: true }),
         soll,
         `Kategorie-Ziel „${kategorie}" (Beobachter)`,
       );

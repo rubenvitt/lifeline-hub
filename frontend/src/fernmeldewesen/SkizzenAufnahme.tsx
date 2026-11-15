@@ -19,6 +19,8 @@ export interface SkizzenBild {
 interface Props {
   einsatzId: number;
   einsatzbezeichnung: string;
+  /** Der Einsatz ist eine Übung: das Schriftfeld des Bilds trägt „ÜBUNG“ (LLH-1725). */
+  uebung?: boolean;
   onBild: (bild: SkizzenBild) => void;
   /** Ein Text ist ein Grund aus den Quellen, alles andere ein Fehler beim Zeichnen. */
   onFehler: (fehler: unknown) => void;
@@ -35,6 +37,7 @@ interface Props {
 export default function SkizzenAufnahme({
   einsatzId,
   einsatzbezeichnung,
+  uebung = false,
   onBild,
   onFehler,
 }: Props) {
@@ -117,6 +120,7 @@ export default function SkizzenAufnahme({
       <Zeichnung
         netz={netz}
         einsatzbezeichnung={einsatzbezeichnung}
+        uebung={uebung}
         standAt={standAt}
         onBild={onBild}
         onFehler={onFehler}
@@ -129,12 +133,14 @@ export default function SkizzenAufnahme({
 function Zeichnung({
   netz,
   einsatzbezeichnung,
+  uebung,
   standAt,
   onBild,
   onFehler,
 }: {
   netz: Fernmeldenetz;
   einsatzbezeichnung: string;
+  uebung: boolean;
   standAt: string;
   onBild: (bild: SkizzenBild) => void;
   onFehler: (fehler: unknown) => void;
@@ -187,6 +193,7 @@ function Zeichnung({
         netz={netz}
         aktionen={null}
         einsatzbezeichnung={einsatzbezeichnung}
+        uebung={uebung}
         druckt
       />
     </div>

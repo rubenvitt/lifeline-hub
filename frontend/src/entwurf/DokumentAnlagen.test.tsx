@@ -65,13 +65,14 @@ const anlage = (nummer: number): DokumentAnlage => ({
   abgelegt_at: '2026-10-08 12:15:01',
 });
 
-function zeige(schreibt: boolean) {
+function zeige(schreibt: boolean, einsatzart?: 'uebung' | 'realeinsatz') {
   return renderMitProviders(
     <DokumentAnlagen
       dokument="befehle"
       einsatzId={3}
       dokumentId={7}
       einsatzbezeichnung="Hochwasser"
+      einsatzart={einsatzart}
       schreibt={schreibt}
       ohneDruckKlasse="befehl-no-print"
     />,
@@ -148,6 +149,19 @@ describe('DokumentAnlagen (LFH-1028)', () => {
     expect(
       container.querySelector('.befehl-no-print [data-lfh="dokument-anlage-zeile"]'),
     ).not.toBeNull();
+  });
+
+  it('das Blatt einer Übung trägt „ÜBUNG“ im Titel, ein Realeinsatz nicht (LLH-1725)', async () => {
+    vi.mocked(anlagenApi.listeDokumentAnlagen).mockResolvedValue([anlage(1)]);
+    const { container, unmount } = zeige(false, 'uebung');
+    await screen.findByRole('link', { name: 'Anlage 1: Fernmeldeskizze herunterladen' });
+    const titel = container.querySelector('[data-lfh="druck-anlage"] h2')!;
+    expect(titel.querySelector('[data-lfh="druck-uebung"]')).toHaveTextContent('ÜBUNG');
+    unmount();
+
+    const real = zeige(false, 'realeinsatz');
+    await screen.findByRole('link', { name: 'Anlage 1: Fernmeldeskizze herunterladen' });
+    expect(real.container.querySelector('[data-lfh="druck-uebung"]')).toBeNull();
   });
 
   it('entfernt im Entwurf erst nach der Rückfrage', async () => {

@@ -49,6 +49,17 @@
   .lageplan-blatt {
     page: lageplan;
   }
+
+  /* Übung (LLH-1725): dieselbe Seite mit Randfeld „ÜBUNG“; gewählt wird sie in `druck/druck.css`. */
+  @page lageplan-uebung {
+    size: A4 landscape;
+    @top-center {
+      content: 'ÜBUNG';
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+  }
 }
 
 .lageplan-figur {

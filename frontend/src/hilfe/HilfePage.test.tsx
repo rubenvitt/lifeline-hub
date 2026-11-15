@@ -7,6 +7,7 @@ import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { merkeRouten } from '../rueckmeldung/adresse';
 import { merkeGeraet } from '../geraet/geraetMarke';
+import { merkeLetztenOrt } from '../einsatz/letzterOrt';
 import { waehle } from '../test/auswahlListe';
 import { renderMitProviders } from '../test/utils';
 import HilfePage from './HilfePage';
@@ -127,7 +128,8 @@ describe('HilfePage', () => {
     expect(abgefragt).toBe(false);
   });
 
-  it('führt angemeldete Personen zurück in die App', async () => {
+  /** Angemeldete Person (id 1) und ihre Einsatzliste. */
+  function angemeldet(einsaetze: unknown[] = []) {
     server.use(
       http.get('/api/auth/me', () =>
         HttpResponse.json({
@@ -139,10 +141,68 @@ describe('HilfePage', () => {
           org_id: 1,
         }),
       ),
+      http.get('/api/einsaetze', () => HttpResponse.json(einsaetze)),
     );
-    zeige('/hilfe');
-    await userEvent.click(await screen.findByRole('button', { name: 'Zur App' }));
-    expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze');
+  }
+  const aktiv = { id: 5, bezeichnung: 'Starkregen Nord', status: 'aktiv' };
+
+  describe('Rückweg angemeldeter Personen (LLH-1731)', () => {
+    beforeEach(() => localStorage.clear());
+
+    it('ohne gemerkten Einsatz „Zu den Einsätzen“ zur Einsatzliste', async () => {
+      angemeldet([aktiv]);
+      zeige('/hilfe');
+      await userEvent.click(await screen.findByRole('button', { name: 'Zu den Einsätzen' }));
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze');
+      expect(screen.queryByRole('button', { name: 'Zur App' })).toBeNull();
+    });
+
+    it('bei abgeschlossenem Einsatz „Zu den Einsätzen“', async () => {
+      merkeLetztenOrt(1, { einsatzId: 5, pfad: '/einsaetze/5/etb' });
+      angemeldet([{ ...aktiv, status: 'abgeschlossen' }]);
+      zeige('/hilfe');
+      expect(await screen.findByRole('button', { name: 'Zu den Einsätzen' })).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole('button', { name: /^Zurück zu/ })).toBeNull();
+    });
+
+    it('„Zurück zu <Einsatz>“ an die gemerkte Stelle, auch nach einem Kapitelwechsel', async () => {
+      merkeLetztenOrt(1, { einsatzId: 5, pfad: '/einsaetze/5/etb' });
+      angemeldet([aktiv]);
+      zeige('/hilfe');
+      await screen.findByRole('button', { name: 'Zurück zu Starkregen Nord' });
+      const navi = screen.getByRole('navigation', { name: 'Kapitel' });
+      await userEvent.click(within(navi).getByRole('link', { name: KAPITEL[1].titel }));
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(`/hilfe/${KAPITEL[1].slug}`),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Starkregen Nord' }));
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/5/etb');
+    });
+
+    // Review B5 (Entscheidung 15.11.2026): der Rückweg ist je Besuch der Hilfe fest. Arbeitet die
+    // Person im ersten Tab weiter, ändert ein Kapitelwechsel in der Hilfe ihn nicht.
+    it('bleibt je Besuch fest, auch wenn ein anderer Tab inzwischen einen Ort merkt', async () => {
+      merkeLetztenOrt(1, { einsatzId: 5, pfad: '/einsaetze/5/etb' });
+      angemeldet([aktiv, { id: 6, bezeichnung: 'Sturm Süd', status: 'aktiv' }]);
+      zeige('/hilfe');
+      await screen.findByRole('button', { name: 'Zurück zu Starkregen Nord' });
+      // Der erste Tab wechselt in einen anderen Einsatz.
+      merkeLetztenOrt(1, { einsatzId: 6, pfad: '/einsaetze/6/lagekarte' });
+      const navi = screen.getByRole('navigation', { name: 'Kapitel' });
+      await userEvent.click(within(navi).getByRole('link', { name: KAPITEL[1].titel }));
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(`/hilfe/${KAPITEL[1].slug}`),
+      );
+      await userEvent.click(within(navi).getByRole('link', { name: KAPITEL[2].titel }));
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(`/hilfe/${KAPITEL[2].slug}`),
+      );
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole('button', { name: 'Zurück zu Sturm Süd' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Starkregen Nord' }));
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/5/etb');
+    });
   });
 });
 
@@ -253,6 +313,26 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: /Rückmeldung geben/ }));
     expect(seiteVonAdresse()).toBe('/einsatz/:id/etb');
+  });
+
+  // LLH-1731 D5: im neuen Tab reist die Herkunft als `von` in der Adresse.
+  it('übernimmt `von` aus der Adresse, entfernt ihn und behält die Gruppe', async () => {
+    zeige(`/hilfe?gruppe=administration&von=${encodeURIComponent('/einsatz/42/etb')}`);
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent(/^\/hilfe\?gruppe=administration$/),
+    );
+    await waehle('Lesergruppe', 'Alle');
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^\/hilfe$/));
+    await userEvent.click(await screen.findByRole('button', { name: /Rückmeldung geben/ }));
+    expect(seiteVonAdresse()).toBe('/einsatz/:id/etb');
+    expect(String(oeffnen.mock.calls[0]![0])).not.toContain('42');
+  });
+
+  it('verwirft einen `von`, der keine Adresse der App ist', async () => {
+    zeige(`/hilfe?von=${encodeURIComponent('//fremd.example/einsatz/42/etb')}`);
+    await waitFor(() => expect(screen.getByTestId('ort')).toHaveTextContent(/^\/hilfe$/));
+    await userEvent.click(await screen.findByRole('button', { name: /Rückmeldung geben/ }));
+    expect(seiteVonAdresse()).toBe('/hilfe');
   });
 
   it('nach einer widerrufenen Kopplung (Browser lief als Gerät) fehlt „Rückmeldung geben“', async () => {

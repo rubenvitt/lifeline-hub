@@ -19,6 +19,12 @@ import { HELLIGKEIT_BODEN_WARNUNG, type Helligkeit } from '../theme/helligkeit';
 export const ANZEIGE_GRUPPE = 'benutzermenue-anzeige';
 
 /**
+ * Höchstbreite der Leisten auf einer Seite (LLH-1730): fünf Helligkeitsstufen im Handschuh-Betrieb
+ * brauchen 440 px (LLH-1642 D12), am Desktop liefen sie sonst über die ganze Seite.
+ */
+export const ANZEIGE_LEISTEN_BREITE = 480;
+
+/**
  * Tasten, die eine Leiste selbst bedient (Segmentleiste: Pfeile, Pos1, Ende; Knopf: Enter,
  * Leertaste). Sie gehen NICHT an das Menü weiter: `rc-menu` zöge sonst den Menüfokus mit, und
  * Enter auf dem Menü schlösse es.
@@ -56,8 +62,13 @@ const DICHTE: SegmentOption<Dichte>[] = DICHTE_OPTIONEN.map((o) => ({
  * stehen — endet die Warnung, gilt sie wieder.
  *
  * Angebunden über `useThemeMode`/`useDichte`/`useHelligkeit`, NICHT über die Kommandopalette.
+ *
+ * AUCH AUSSERHALB DES MENÜS (LLH-1730): im Reiter „Anzeige“ der Einsatz-Einstellungen und im
+ * Profil. Dort trägt der Paneeltitel die Überschrift (`hasTitel={false}`); die Gruppe heißt für
+ * Hilfstechnik weiter „Anzeige“. Das Abfangen der Tasten schadet dort nicht: die Leisten bedienen
+ * dieselben Tasten selbst. Alle Orte lesen dieselben Hooks und zeigen denselben Wert.
  */
-export default function AnzeigeLeisten() {
+export default function AnzeigeLeisten({ hasTitel = true }: { hasTitel?: boolean } = {}) {
   const { token } = theme.useToken();
   const titelId = useId();
   const hinweisId = useId();
@@ -103,7 +114,8 @@ export default function AnzeigeLeisten() {
   return (
     <div
       role="group"
-      aria-labelledby={titelId}
+      aria-labelledby={hasTitel ? titelId : undefined}
+      aria-label={hasTitel ? undefined : 'Anzeige'}
       data-lfh={ANZEIGE_GRUPPE}
       onKeyDown={handleKeyDown}
       style={{
@@ -114,7 +126,7 @@ export default function AnzeigeLeisten() {
         color: token.colorText,
       }}
     >
-      <Augenbraue id={titelId}>Anzeige</Augenbraue>
+      {hasTitel && <Augenbraue id={titelId}>Anzeige</Augenbraue>}
       {renderLeiste(
         'Darstellung',
         <Segmentleiste

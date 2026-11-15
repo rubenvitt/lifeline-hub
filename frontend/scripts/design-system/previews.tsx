@@ -59,6 +59,8 @@ import {
   StatusChip,
   StatusZelle,
   StromPaneel,
+  UebungsBand,
+  UebungsMarke,
   VerteilungsPaneel,
   Zeitachseneintrag,
   useRollen,
@@ -1123,6 +1125,22 @@ export const PREVIEWS: readonly PreviewSpec[] = [
       }
       for (const knopf of ausloeser) await act(async () => knopf.click());
     },
+  },
+  {
+    name: 'Uebung',
+    title: 'Übungsmarke: Band und Marke',
+    group: 'Status',
+    height: 236,
+    source: 'components/instrument/Uebung.tsx',
+    content: () => (
+      <div className="ds-stapel">
+        <UebungsBand einsatz={{ einsatzart: 'uebung' }} />
+        <div className="ds-reihe">
+          <UebungsMarke einsatz={{ einsatzart: 'uebung' }} />
+          <span>Starkregen Nord</span>
+        </div>
+      </div>
+    ),
   },
   {
     name: 'Sichtung',

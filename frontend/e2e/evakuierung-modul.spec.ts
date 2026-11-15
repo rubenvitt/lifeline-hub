@@ -51,10 +51,10 @@ test('alter Bezirkslink unter Betreuung führt auf die Detailseite des Bezirks',
   await expect(page.getByRole('group', { name: 'Räumung in Zahlen' })).toBeVisible();
 
   // Modulpanel: „Evakuierung" mit dem Zähler der aktiven Bezirke, direkt über „Betreuung".
-  const evakuierung = page.getByRole('button', {
+  const evakuierung = page.getByRole('link', {
     name: 'Evakuierung, 2 aktive Evakuierungsbezirke',
   });
-  const betreuung = page.getByRole('button', { name: /^Betreuung(,|$)/ });
+  const betreuung = page.getByRole('link', { name: /^Betreuung(,|$)/ });
   await expect(evakuierung).toBeVisible();
   await expect(betreuung).toBeVisible();
   const oben = (await evakuierung.boundingBox())!.y;

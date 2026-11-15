@@ -34,6 +34,8 @@ const RAHMEN = [
   'einsatz/EinsatzLayout.tsx',
   'components/AppLayout.tsx',
   'live/LiveStatusBanner.tsx',
+  // Das Übungsband klebt selbst unter den übrigen Quellen und ist Quelle der Höhe (LLH-1725, D4).
+  'components/instrument/Uebung.tsx',
 ];
 
 /** Zeilen vor und nach einem `sticky`, in denen sein `top` steht. */

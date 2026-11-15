@@ -2,7 +2,7 @@
 titel: Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/fernmeldewesen/funkplan.ts, frontend/src/fernmeldewesen/luecken.ts, frontend/src/fernmeldewesen/sprechgruppenplan.ts, frontend/src/fernmeldewesen/FernmeldeskizzeBild.tsx, frontend/src/fernmeldewesen/skizze/, frontend/src/fernmeldewesen/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/fernmeldewesen/KommunikationsplanDialoge.tsx, frontend/src/fernmeldewesen/kommunikationsplan.ts, frontend/src/einsatz/fuehrungsstelle.ts, frontend/src/einsatz/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/fernmeldewesen.rs, src/fernmeldewesen/kommunikation.rs, src/fernmeldewesen/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/fernmeldewesen/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/fuehrung/besetzungAusMitgliedern.ts]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/fernmeldewesen/funkplan.ts, frontend/src/fernmeldewesen/luecken.ts, frontend/src/fernmeldewesen/sprechgruppenplan.ts, frontend/src/fernmeldewesen/FernmeldeskizzeBild.tsx, frontend/src/fernmeldewesen/skizze/, frontend/src/fernmeldewesen/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/fernmeldewesen/KommunikationsplanDialoge.tsx, frontend/src/fernmeldewesen/kommunikationsplan.ts, frontend/src/einsatz/fuehrungsstelle.ts, frontend/src/einsatz/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/fernmeldewesen.rs, src/fernmeldewesen/kommunikation.rs, src/fernmeldewesen/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/fernmeldewesen/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/fuehrung/besetzungAusMitgliedern.ts, frontend/src/fernmeldewesen/skizze/schriftfeld.ts]
 ---
 
 ## Überblick
@@ -128,7 +128,8 @@ Personal, Sprechgruppen und der eigenen Führungsstelle (siehe
 „Leiter/Führer“ der dort festgelegte Einsatzleiter, sonst „—“. Ordnet die Skizze einer Stelle eine
 Sprechgruppe zu, schreibt sie das in den Datensatz der Stelle; Funkplan und Skizze zeigen danach
 dasselbe. Die Skizze speichert selbst nur Lage, Komponenten, Verbindungen, Bereiche und das
-Schriftfeld. Externe Stellen der Skizze sind die des Kommunikationsplans.
+Schriftfeld. Externe Stellen der Skizze sind die des Kommunikationsplans. Bei einer Übung beginnt
+der Titel im Schriftfeld mit „ÜBUNG ·“, auf dem Schirm, im Druck und im Bild als Anlage.
 
 Trägt die eigene Führungsstelle eine Bezeichnung, etwa „ELW 2 Musterstadt“, steht sie im Funkplan
 neben „Führungsstelle“ und in der Skizze als eigene Zeile unter „Einsatzleitung“.

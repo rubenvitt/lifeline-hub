@@ -2,7 +2,7 @@
 titel: Gerät bedienen
 gruppen: [geraete]
 reihenfolge: 710
-quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/live/useEinsatzLiveStream.ts, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/offline/fruehereKopplung.ts, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/live/useEinsatzLiveStream.ts, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/offline/fruehereKopplung.ts, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs, frontend/src/components/instrument/Uebung.tsx]
 ---
 
 ## Überblick
@@ -47,6 +47,10 @@ der Einsatzleitung einen neuen geben.“
 In der letzten Stunde vor dem Ende zählt die Restzeit in Minuten („Kopplung noch 40 min“) und ist
 hervorgehoben; verlängern kann nur die Einsatzleitung. Ohne Netz zeigt die Kopfzeile zusätzlich, von wann die angezeigten Daten sind
 („Stand …“).
+
+Gehört das Gerät zu einer Übung, steht unter der Kopfzeile ein violettes Band „ÜBUNG“. Steht dort
+„Einsatzart nicht geladen“, konnte das Gerät den Einsatz nicht abrufen; es versucht es alle
+30 Sekunden erneut. Bis dahin ist offen, ob es eine Übung ist.
 
 ### Darstellung, Bediendichte und Helligkeit einstellen
 

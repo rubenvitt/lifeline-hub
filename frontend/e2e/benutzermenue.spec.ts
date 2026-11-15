@@ -1,13 +1,24 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
-import { offenesMenue, oeffneMenue } from './menue-kern';
-import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { offenesMenue, oeffneAbmeldenRueckfrage, oeffneMenue } from './menue-kern';
+import {
+  anmeldenAlsAdmin,
+  benachrichtigungenQuittieren,
+  benutzerAnlegen,
+  mitgliedEintragen,
+  wechsleZu,
+  wechsleZuRolle,
+} from './rollen-kern';
 
 /**
  * Das entschlackte Benutzermenü (LLH-1642, Spec `benutzermenue`): Platz am Handy, Tastatur in der
  * Gruppe „Anzeige“ im echten Browser und der zweite Weg zu den Benachrichtigungen aus den
  * Eingängen. Die Reihenfolge und die Leisten selbst prüft `BenutzerMenu.test.tsx`; hier, was
  * jsdom nicht rechnet: Lage im Fenster, `rc-menu`/`rc-dropdown` mit echten Tasten.
+ *
+ * LLH-1730: „Abmelden“ steht zuletzt und fragt zurück (Fokus nach der Einblendung auf
+ * „Abbrechen“, jsdom rechnet die Animation nicht); die Leisten stehen auch im Reiter „Anzeige“ der
+ * Einsatz-Einstellungen.
  */
 
 const HANDY = { width: 390, height: 844 };
@@ -68,7 +79,7 @@ for (const nutzer of NUTZER) {
     await pruefeKopf(menue, nutzer, benutzername);
     const gerollt = await menue.evaluate((m) => m.scrollTop);
     expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
-    for (const name of ['Profil', 'Abmelden', 'Benachrichtigungen', 'Neuigkeiten', 'Hilfe']) {
+    for (const name of ['Profil', 'Benachrichtigungen', 'Neuigkeiten', 'Hilfe', 'Abmelden']) {
       await expect(menue.getByRole('menuitem', { name: new RegExp(`^${name}`) })).toBeInViewport({
         ratio: 1,
       });
@@ -81,9 +92,7 @@ for (const nutzer of NUTZER) {
     await expect(page.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
   });
 
-  test(`Handy, Handschuh, ${nutzer}: Abmelden und alle drei Leisten im Fenster`, async ({
-    page,
-  }) => {
+  test(`Handy, Handschuh, ${nutzer}: Profil und alle drei Leisten im Fenster`, async ({ page }) => {
     await dichte(page, 'handschuh');
     const benutzername = await anmelden(page, nutzer);
     await page.setViewportSize(HANDY);
@@ -93,7 +102,7 @@ for (const nutzer of NUTZER) {
     const menue = await oeffneMenue(page, ausloeser(page));
     await pruefeKopf(menue, nutzer, benutzername);
     expect(await menue.evaluate((m) => m.scrollTop), 'Vorbedingung: ungerollt').toBe(0);
-    await expect(menue.getByRole('menuitem', { name: 'Abmelden' })).toBeInViewport({ ratio: 1 });
+    await expect(menue.getByRole('menuitem', { name: 'Profil' })).toBeInViewport({ ratio: 1 });
     const helligkeit = menue.getByRole('radiogroup', { name: 'Helligkeit in %' });
     await expect(helligkeit).toBeInViewport({ ratio: 1 });
     // Bedienbar: eine Stufe wählen, das Menü bleibt offen und zeigt sie.
@@ -104,8 +113,104 @@ for (const nutzer of NUTZER) {
       'true',
     );
     await expect(offenesMenue(page)).toHaveCount(1);
+    // „Abmelden“ steht zuletzt und ist durch Rollen erreichbar (LLH-1730); „Abbrechen“ lässt die
+    // Person angemeldet. Per ↵ auf dem fokussierten „Abbrechen“: am Handy liegt eine
+    // Info-Benachrichtigung des Rollenwechsels zeitweise über dem Dialogfuß und finge den Klick.
+    const rueckfrage = await oeffneAbmeldenRueckfrage(page, menue);
+    await page.keyboard.press('Enter');
+    await expect(rueckfrage).toBeHidden();
+    await expect(page).toHaveURL(/\/einsaetze/);
   });
 }
+
+/**
+ * Die Rückfrage im echten Browser (LLH-1730, design.md D3): nach der Einblendung steht der Fokus
+ * auf „Abbrechen“, ein ↵ meldet also nicht ab; bestätigt führt sie zur Anmeldung. Aus dem Menü und
+ * aus der Sprungpalette.
+ */
+test('Rückfrage aus dem Menü: Fokus auf „Abbrechen“, Bestätigen meldet ab', async ({ page }) => {
+  await anmeldenAlsAdmin(page, { startseite: false });
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await page.goto('/einsaetze');
+  const menue = await oeffneMenue(page, ausloeser(page));
+  // Wartet die Einblendung ab und sichert den Fokus auf „Abbrechen“ zu.
+  const rueckfrage = await oeffneAbmeldenRueckfrage(page, menue);
+  await page.keyboard.press('Enter');
+  await expect(rueckfrage).toBeHidden();
+  await expect(page).toHaveURL(/\/einsaetze/);
+
+  await oeffneAbmeldenRueckfrage(page, await oeffneMenue(page, ausloeser(page)));
+  await rueckfrage.getByRole('button', { name: 'Abmelden', exact: true }).click();
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test('Rückfrage aus der Sprungpalette: ↵ schließt die Palette, ↵ in der Rückfrage bricht ab', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page, { startseite: false });
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto('/einsaetze');
+  await expect(page.getByRole('heading', { level: 1, name: 'Einsätze' })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+k');
+  const suche = page.getByRole('combobox');
+  await suche.fill('Abmelden');
+  await expect(page.getByRole('option', { name: /Abmelden/ }).first()).toBeVisible();
+  await page.keyboard.press('Enter');
+  const rueckfrage = page.getByRole('dialog', { name: 'Abmelden?' });
+  await expect(rueckfrage.getByRole('button', { name: 'Abbrechen' })).toBeFocused();
+  await expect(suche).toBeHidden();
+  await page.keyboard.press('Enter');
+  await expect(rueckfrage).toBeHidden();
+  await expect(page).toHaveURL(/\/einsaetze/);
+});
+
+/**
+ * Reiter „Anzeige“ der Einsatz-Einstellungen (LLH-1730, Szenario „Ohne Recht und im
+ * abgeschlossenen Einsatz“): ein Beobachter im abgeschlossenen Einsatz, am Handy im
+ * Handschuh-Betrieb. Die fünf Helligkeitsstufen stehen in einer Zeile, ohne über die Leiste zu
+ * ragen, und eine Wahl wirkt. Der Rollenzweig ist Vorbedingung (`e2e/AGENTS.md`): „Allgemein“
+ * zeigt diesem Nutzer „Nur Ansicht“, „Anzeige“ nicht.
+ */
+test('Reiter „Anzeige“ am Handy im Handschuh-Betrieb, als Beobachter im abgeschlossenen Einsatz', async ({
+  page,
+}) => {
+  await dichte(page, 'handschuh');
+  await anmeldenAlsAdmin(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `Anzeige Beobachter ${Date.now()}`);
+  const konto = await benutzerAnlegen(page, 'beobachter');
+  await mitgliedEintragen(page, einsatzId, konto.id, 'beobachter');
+  const zu = await page.request.post(`/api/einsaetze/${einsatzId}/abschliessen`);
+  expect(zu.ok(), await zu.text()).toBe(true);
+  await benachrichtigungenQuittieren(konto);
+  await wechsleZu(page, konto);
+  await page.setViewportSize(HANDY);
+
+  // Gegenprobe des Rollenzweigs mit demselben Locator: „Allgemein“ ist für ihn gesperrt.
+  const rechteHinweis = page.locator('[data-lfh="rechte-hinweis"]');
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/allgemein`);
+  await expect(rechteHinweis).toBeVisible();
+  await page.getByRole('tab', { name: 'Anzeige' }).click();
+  await expect(page.getByRole('tab', { name: 'Anzeige', selected: true })).toBeVisible();
+  await expect(rechteHinweis).toHaveCount(0);
+  const helligkeit = page.getByRole('radiogroup', { name: 'Helligkeit in %' });
+  const mass = await helligkeit.evaluate((leiste) => {
+    const l = leiste.getBoundingClientRect();
+    const k = [...leiste.querySelectorAll('button')].map((b) => b.getBoundingClientRect());
+    return {
+      links: l.left,
+      rechts: l.right,
+      knoepfe: k.map((r) => ({ l: r.left, r: r.right, o: r.top })),
+    };
+  });
+  expect(mass.knoepfe).toHaveLength(5);
+  for (const k of mass.knoepfe) {
+    expect(k.o).toBeCloseTo(mass.knoepfe[0]!.o, 0);
+    expect(k.l).toBeGreaterThanOrEqual(mass.links);
+    expect(k.r).toBeLessThanOrEqual(mass.rechts);
+  }
+  await helligkeit.getByRole('radio', { name: '60 %' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-helligkeit', '60');
+});
 
 /**
  * D12: fünf Helligkeitsstufen im Handschuh-Betrieb in einer Zeile, nicht überlappend, nicht über

@@ -57,16 +57,16 @@ async function railZumEtb(page: Page, schmal: boolean) {
     const nav = page.getByRole('dialog').getByRole('navigation', { name: 'Einsatz-Navigation' });
     const kopf = nav.getByRole('button', { name: 'Erfassung' });
     if ((await kopf.getAttribute('aria-expanded')) !== 'true') await kopf.click();
-    await nav.getByRole('button', { name: /^ETB(,|$)/ }).click();
+    await nav.getByRole('link', { name: /^ETB(,|$)/ }).click();
   } else {
     await page
       .getByRole('navigation', { name: 'Kategorien' })
-      .getByRole('button', { name: 'Erfassung' })
+      .getByRole('link', { name: 'Erfassung' })
       .click();
     // Der Rail-Sprung führt auf das erste Modul der Kategorie; der Klick im Panel macht das Ziel
     // unabhängig von der Reihenfolge.
     await page
-      .getByRole('button', { name: /^ETB(,|$)/ })
+      .getByRole('link', { name: /^ETB(,|$)/ })
       .first()
       .click();
   }

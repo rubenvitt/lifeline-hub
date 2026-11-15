@@ -143,9 +143,26 @@ describe('druck.css — Aufbau', () => {
     expect(seitenRegeln.map((r) => r.kontext.join(' > ')).sort()).toEqual([
       '@media print > @page',
       '@media print > @page > @bottom-right',
+      '@media print > @page uebung > @top-center',
     ]);
     const eigen = seitenRegeln.find((r) => letztes(r.kontext) === '@page')!;
     expect(eigen.koerper).toMatch(/^margin:\s*15mm;?$/);
+  });
+
+  /**
+   * Übung (LLH-1725, Spec `druck-dokumente`, D8): die benannte Seite „uebung“ trägt am oberen Rand
+   * genau das feste Wort, keinen freien Text. Sie gilt nur für eine Wurzel, deren Druckkopf eine
+   * Übung meldet; jeder andere Ausdruck bleibt auf der unbenannten Seite.
+   */
+  it('die benannte Seite „uebung“ trägt nur das feste Wort und hängt an der Wurzel einer Übung', () => {
+    const randfeld = regeln.find(
+      (r) => r.kontext.join(' > ') === '@media print > @page uebung > @top-center',
+    )!;
+    expect(randfeld.koerper).toMatch(/^content: 'ÜBUNG';/);
+    const zuweisung = regeln.filter((r) => /page:\s*uebung/.test(r.koerper));
+    expect(zuweisung.map((r) => r.selektor)).toEqual([
+      `${WURZEL}:has([data-lfh='druckkopf'][data-uebung])`,
+    ]);
   });
 
   it('fasst `visibility` nirgends an — unsichtbare Knoten belegen weiter Platz', () => {

@@ -101,6 +101,22 @@ afterEach(() => {
 });
 
 describe('LagebildExternPage', () => {
+  it('kennzeichnet eine Übung mit Band und Marke, einen Realeinsatz nicht (LLH-1725)', async () => {
+    const a = antwort();
+    bereit({ ...a, einsatz: { ...a.einsatz, einsatzart: 'uebung' } });
+    const { unmount } = oeffne('#llh_lb_GEHEIM');
+    expect(await screen.findByText('Hochwasser Ilmenau')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toHaveTextContent('Übung');
+    expect(document.querySelector('[data-lfh="uebung-marke"]')).not.toBeNull();
+    unmount();
+
+    bereit(antwort());
+    oeffne('#llh_lb_GEHEIM');
+    expect(await screen.findByText('Hochwasser Ilmenau')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+    expect(document.querySelector('[data-lfh="uebung-marke"]')).toBeNull();
+  });
+
   it('ruft mit dem Schlüssel aus dem Fragment ab und zeigt Zahlen, Karte und Lagemeldung', async () => {
     const anfragen = bereit(antwort());
     oeffne('#llh_lb_GEHEIM');

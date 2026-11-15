@@ -8,8 +8,15 @@ import { globalKeys } from '../api/queryKeys';
 import type { LagebildEinsatz, LagebildExtern } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
-import { Kennzahl, Kennzahlenband, Paneel, useRollen } from '../components/instrument';
-import { EINSATZART_LABELS } from '../einsatz/einsatzart';
+import {
+  Kennzahl,
+  Kennzahlenband,
+  Paneel,
+  UebungsBand,
+  UebungsMarke,
+  useRollen,
+} from '../components/instrument';
+import { EINSATZART_LABELS, isUebung } from '../einsatz/einsatzart';
 import { spiegelStand } from '../einsatz/spiegel/spiegelText';
 import LagemonitorKarte from '../geraet/LagemonitorKarte';
 import { Bildmarke } from '../marke/Bildmarke';
@@ -195,8 +202,14 @@ export default function LagebildExternPage() {
 
   return rahmen(
     <>
+      {/* Übung (LLH-1725, Spec `uebungsmarke`): gerade Außenstehende sollen eine Übung nicht für
+          einen Ernstfall halten. Das Band klebt beim Rollen oben, die Marke steht vor dem Namen. */}
+      <UebungsBand einsatz={e} />
       <header style={{ display: 'grid', gap: token.marginXXS }}>
         <Typography.Title level={1} style={{ margin: 0, fontSize: 24 }} data-lfh="extern-titel">
+          {isUebung(e) && (
+            <UebungsMarke einsatz={e} style={{ marginInlineEnd: 8, verticalAlign: 'middle' }} />
+          )}
           {e.bezeichnung}
         </Typography.Title>
         <span style={{ color: rollen.gedaempft }}>

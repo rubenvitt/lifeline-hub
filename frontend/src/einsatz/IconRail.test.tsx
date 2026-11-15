@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { theme } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
@@ -280,5 +280,67 @@ describe('IconRail · Griff des Modulmenüs (LFH-952)', () => {
     expect(
       screen.queryByRole('button', { name: /^Menü (ein|aus)klappen$/ }),
     ).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * LLH-1732: eine Kategorie mit Ziel ist ein Link auf ihr erstes freigegebenes Modul, damit
+ * Strg/⌘+Klick und Mittelklick einen neuen Tab öffnen. Der einfache Klick bleibt beim Rahmen
+ * (Sprung oder Umklappen); `fireEvent`, weil nur dessen Rückgabe `preventDefault` zeigt.
+ */
+describe('IconRail · Kategorien als Links (LLH-1732)', () => {
+  const pfade: Partial<Record<string, string>> = {
+    fuehrung: '/einsaetze/7/ueberblick',
+    erfassung: '/einsaetze/7/etb',
+  };
+  function rail(onKategorieKlick = vi.fn()) {
+    renderMitProviders(
+      <IconRail
+        kategorien={kategorien}
+        aktiveKategorie="erfassung"
+        onKategorieKlick={onKategorieKlick}
+        kategoriePfad={(key) => pfade[key] ?? null}
+        panel={{ offen: true, onUmschalten: () => {} }}
+      />,
+    );
+    return onKategorieKlick;
+  }
+
+  it('führt eine Kategorie mit Ziel als Link, ohne Ziel bleibt sie Knopf', () => {
+    rail();
+    expect(screen.getByRole('link', { name: 'Führung' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/ueberblick',
+    );
+    // Ohne freigegebenes Modul gibt es keine Adresse: der Klick klappt nur auf.
+    expect(screen.getByRole('button', { name: 'Lage' })).not.toHaveAttribute('href');
+    expect(screen.queryByRole('link', { name: 'Lage' })).not.toBeInTheDocument();
+  });
+
+  it('behält an der offenen Kategorie aria-current, aria-expanded und aria-controls', () => {
+    rail();
+    const erfassung = screen.getByRole('link', { name: 'Erfassung' });
+    expect(erfassung).toHaveAttribute('aria-current', 'true');
+    expect(erfassung).toHaveAttribute('aria-expanded', 'true');
+    expect(erfassung).toHaveAttribute('aria-controls', 'modul-panel');
+  });
+
+  it('übernimmt den einfachen Klick, Strg/⌘/Umschalt bleiben beim Browser', () => {
+    const onKategorieKlick = rail();
+    const fuehrung = screen.getByRole('link', { name: 'Führung' });
+    for (const taste of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }]) {
+      expect(fireEvent.click(fuehrung, taste), JSON.stringify(taste)).toBe(true);
+    }
+    expect(onKategorieKlick).not.toHaveBeenCalled();
+    expect(fireEvent.click(fuehrung)).toBe(false);
+    expect(onKategorieKlick).toHaveBeenCalledWith('fuehrung');
+  });
+
+  it('hält die sechs Ziele in einer Landmarke, Links und Knöpfe zusammen', () => {
+    rail();
+    const nav = screen.getByRole('navigation', { name: 'Kategorien' });
+    // Sechs Kategorien plus der Griff „Menü“.
+    expect(nav.querySelectorAll('a, button')).toHaveLength(7);
+    expect(nav.querySelectorAll('a')).toHaveLength(2);
   });
 });

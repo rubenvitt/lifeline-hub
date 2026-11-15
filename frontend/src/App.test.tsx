@@ -10,7 +10,9 @@ import { appRouten } from './App';
 import { http, HttpResponse } from 'msw';
 import { meHandler, server } from './test/server';
 import { SITZUNG_ABGELAUFEN } from './auth/sitzungsEvent';
-import { adminFixture } from './test/fixtures';
+import { adminFixture, freigabenFixture } from './test/fixtures';
+import { freiesRueckwegModul, modulZielRoute } from './einsatz/modulRegistry';
+import { leseLetztenOrt } from './einsatz/letzterOrt';
 import { setzeViewportBreite } from './test/viewport';
 
 /**
@@ -313,6 +315,77 @@ describe('App-Routing', () => {
     renderApp('/einsaetze/7/gefahren');
     // Matrix-eigene Gefahrentyp-Zeile beweist: GefahrenPage rendert (kein Redirect, kein Stub).
     expect((await screen.findAllByText('Brand'))[0]).toBeInTheDocument();
+  });
+
+  /**
+   * Unbekannte Adresse im Einsatz (LLH-1729): sie bleibt im Einsatzrahmen stehen und sagt „Seite
+   * nicht gefunden“, statt still auf die Einsatzliste zu fallen. Drei Formen: unbekanntes Segment,
+   * unbekannter Unterpfad eines Moduls, Registry-Schlüssel statt Route (`gefahrenzonen`).
+   */
+  describe('unbekannte Adresse im Einsatz (LLH-1729)', () => {
+    function einsatzServer() {
+      server.use(
+        meHandler(admin),
+        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      );
+    }
+
+    it.each(['/einsaetze/7/gibtsnicht', '/einsaetze/7/etb/quatsch', '/einsaetze/7/gefahrenzonen'])(
+      '%s bleibt im Einsatz und sagt „Seite nicht gefunden“',
+      async (pfad) => {
+        einsatzServer();
+        const { router } = renderApp(pfad);
+        expect(
+          await screen.findByRole('heading', { level: 1, name: 'Seite nicht gefunden' }),
+        ).toBeInTheDocument();
+        // Die Adresse steht da, damit sich ein Tippfehler erkennen lässt, und bleibt in der Leiste.
+        expect(screen.getByText(pfad)).toBeInTheDocument();
+        expect(router.state.location.pathname).toBe(pfad);
+        // Der Einsatzrahmen steht: der Name des Einsatzes im Kopf.
+        expect((await screen.findAllByText('Hochwasser Nord')).length).toBeGreaterThan(0);
+      },
+    );
+
+    it('der Rückweg führt in den Überblick', async () => {
+      einsatzServer();
+      const { router } = renderApp('/einsaetze/7/gibtsnicht');
+      await userEvent.click(await screen.findByRole('button', { name: 'Überblick öffnen' }));
+      await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
+    });
+
+    it('ist der Überblick gesperrt, führt der Rückweg ins erste freie Modul', async () => {
+      einsatzServer();
+      server.use(
+        http.get('/api/einsaetze/7/modul-freigaben', () =>
+          HttpResponse.json(freigabenFixture({ ueberblick: { zugriff: false } })),
+        ),
+      );
+      // Das Ziel aus derselben Auflösung wie der Modulwächter, ohne Standardmodul: Beschriftung
+      // UND Ziel müssen ihm folgen, sonst führte ein richtig beschrifteter Knopf in die Sperre.
+      const ziel = freiesRueckwegModul(freigabenFixture({ ueberblick: { zugriff: false } }));
+      expect(ziel.key).not.toBe('ueberblick');
+      const { router } = renderApp('/einsaetze/7/gibtsnicht');
+      await userEvent.click(await screen.findByRole('button', { name: `${ziel.label} öffnen` }));
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe(`/einsaetze/7/${modulZielRoute(ziel)}`),
+      );
+    });
+
+    it('merkt die unbekannte Adresse nicht als letzten Ort, die nächste gültige schon', async () => {
+      einsatzServer();
+      const { router } = renderApp('/einsaetze/7/gibtsnicht');
+      await screen.findByRole('heading', { level: 1, name: 'Seite nicht gefunden' });
+      // Freigaben angekommen: der Knopf steht erst danach, also hätte der Rahmen jetzt gemerkt.
+      await screen.findByRole('button', { name: 'Überblick öffnen' });
+      expect(leseLetztenOrt(admin.id)).toBeNull();
+      await act(async () => {
+        await router.navigate('/einsaetze/7/ueberblick');
+      });
+      await waitFor(() =>
+        expect(leseLetztenOrt(admin.id)).toEqual({ einsatzId: 7, pfad: '/einsaetze/7/ueberblick' }),
+      );
+    });
   });
 
   /**

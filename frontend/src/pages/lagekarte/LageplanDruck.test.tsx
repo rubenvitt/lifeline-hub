@@ -109,6 +109,17 @@ describe('LageplanDruck', () => {
     ).toBe('3 2');
   });
 
+  it('trägt bei einer Übung „ÜBUNG“ im Druckkopf, sonst nicht (LLH-1725)', () => {
+    const { unmount } = renderMitProviders(<LageplanDruck blatt={blatt()} />);
+    expect(document.querySelector('[data-lfh="druckkopf-uebung"]')).toBeNull();
+    unmount();
+    const b = blatt();
+    renderMitProviders(
+      <LageplanDruck blatt={{ ...b, einsatz: { ...b.einsatz, einsatzart: 'uebung' } }} />,
+    );
+    expect(document.querySelector('[data-lfh="druckkopf-uebung"]')).not.toBeNull();
+  });
+
   it('ohne Maßstabsangabe keine Leiste und kein Verhältnis, ohne Veraltetes kein Hinweis', () => {
     const b = blatt();
     renderMitProviders(

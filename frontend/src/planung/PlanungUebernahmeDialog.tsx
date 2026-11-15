@@ -19,10 +19,10 @@ import {
   LEERE_WAHL,
   zaehlungMarken,
 } from '../abloesung/schichtplan/ImportVorschauAnsicht';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { Segmentleiste, UebungsMarke, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { EINSATZART_LABELS } from '../einsatz/einsatzart';
+import { EINSATZART_LABELS, isUebung } from '../einsatz/einsatzart';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { abloesungPfad } from '../routing/deeplinks';
 import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
@@ -262,14 +262,32 @@ export default function PlanungUebernahmeDialog({
               ) : (
                 <Select<number>
                   aria-label="Laufender Einsatz"
+                  // Gesucht wird im Text (`title`): das `label` einer Übung trägt die Marke und ist
+                  // kein Text mehr (LLH-1725).
+                  showSearch={{ optionFilterProp: 'title' }}
                   placeholder="Einsatz wählen"
                   value={einsatzId ?? undefined}
                   onChange={(id) => changeZiel('einsatz', null, id)}
                   disabled={laeuft}
-                  options={laufende.map((e) => ({
-                    value: e.id,
-                    label: [e.einsatznummer_intern, e.bezeichnung].filter(Boolean).join(' · '),
-                  }))}
+                  options={laufende.map((e) => {
+                    const text = [e.einsatznummer_intern, e.bezeichnung]
+                      .filter(Boolean)
+                      .join(' · ');
+                    // Eine Übung trägt die Übungsmarke (LLH-1725): hier schreibt man Daten in
+                    // den gewählten Einsatz, eine Verwechslung landete im falschen.
+                    return {
+                      value: e.id,
+                      title: text,
+                      label: isUebung(e) ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <UebungsMarke einsatz={e} />
+                          {text}
+                        </span>
+                      ) : (
+                        text
+                      ),
+                    };
+                  })}
                   style={{ flex: '1 1 14rem', minWidth: 0 }}
                 />
               )}

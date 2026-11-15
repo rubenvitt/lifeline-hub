@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { abmeldenUeberMenue } from './menue-kern';
 
 /**
  * Der Rahmen bleibt beim Rollen erreichbar (LFH-952, Spec `einsatztauglichkeit-layout`,
@@ -22,8 +23,14 @@ const BREITEN = [
   { width: 1440, height: 900, kopfKlebt: true, rail: true },
 ] as const;
 
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+async function einsatzAnlegen(
+  page: Page,
+  name: string,
+  einsatzart?: 'uebung' | 'realeinsatz',
+): Promise<string> {
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: name, ...(einsatzart ? { einsatzart } : {}) },
+  });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);
   const { id } = (await antwort.json()) as { id: number };
   return String(id);
@@ -83,12 +90,12 @@ for (const rolle of ['admin', 'beobachter'] as const) {
       expect(Math.round(await oben(page, '[data-lfh="rahmen-kopf"]')), 'Kopf steht oben').toBe(0);
       // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): das Benutzermenü öffnet.
       await page.getByRole('button', { name: 'Benutzermenü' }).click();
-      await expect(page.getByRole('menuitem', { name: 'Abmelden' })).toBeInViewport();
+      await expect(page.getByRole('menuitem', { name: 'Profil' })).toBeInViewport();
       await page.keyboard.press('Escape');
 
       if (b.rail) {
         const kopfUnten = (await kopf.boundingBox())!;
-        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('button', {
+        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('link', {
           name: 'Erfassung',
         });
         await expect(etb).toBeInViewport();
@@ -99,7 +106,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
         // Bedienbar: der Sprung aus der gerollten Seite führt in die Kategorie.
         const lage = page
           .getByRole('navigation', { name: 'Kategorien' })
-          .getByRole('button', { name: 'Lage', exact: true });
+          .getByRole('link', { name: 'Lage', exact: true });
         await lage.click();
         await expect(lage).toHaveAttribute('aria-current', 'true');
         await expect(page).not.toHaveURL(/\/etb$/);
@@ -133,10 +140,10 @@ test('1366 × 520, handschuh, gerollt: auch die letzte Kategorie ist erreichbar'
   );
 
   const rail = page.getByRole('navigation', { name: 'Kategorien' });
-  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
+  const letzte = rail.locator('[data-lfh="rail-haupt"] :is(a, button)').last();
   const name = (await letzte.getAttribute('aria-label'))!;
   await letzte.click();
-  await expect(rail.getByRole('button', { name, exact: true })).toHaveAttribute(
+  await expect(rail.getByRole('link', { name, exact: true })).toHaveAttribute(
     'aria-current',
     'true',
   );
@@ -188,7 +195,7 @@ test('1366 × 768 offline, oben: „Einst.“ am Rail-Fuß bleibt im Fenster', a
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   const einstellungen = page
     .getByRole('navigation', { name: 'Kategorien' })
-    .getByRole('button', { name: 'Einstellungen', exact: true });
+    .getByRole('link', { name: 'Einstellungen', exact: true });
   await expect(einstellungen).toBeVisible();
   await context.setOffline(true);
   try {
@@ -216,7 +223,10 @@ for (const b of [
   { width: 390, height: 844 },
   { width: 1180, height: 820 },
 ]) {
-  test(`${b.width} px, handschuh: Abmelden ohne Rollen im Benutzermenü`, async ({ page }) => {
+  // LLH-1730: „Abmelden“ steht zuletzt und darf im Handschuh-Betrieb erst durch Rollen ins Bild
+  // kommen; erreichbar und bedienbar bleibt es (Spec `einsatztauglichkeit-layout`, „Benutzermenü:
+  // Einsatzfunktion im Kopf“, Szenario „Schichtwechsel am Handy im Handschuh-Betrieb“).
+  test(`${b.width} px, handschuh: Abmelden im Benutzermenü erreichbar`, async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, `Rahmen Abmelden ${b.width} ${Date.now()}`);
@@ -224,14 +234,7 @@ for (const b of [
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
-    await page.getByRole('button', { name: 'Benutzermenü' }).click();
-    const abmelden = page.getByRole('menuitem', { name: 'Abmelden' });
-    // Ohne Rollen: Abmelden steht oben im Menü, das Menü ist dafür nicht gerollt worden.
-    const gerollt = await page.locator('.ant-dropdown-menu').evaluate((m) => m.scrollTop);
-    expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
-    await expect(abmelden).toBeInViewport();
-    await abmelden.click();
-    await expect(page).toHaveURL(/\/login/);
+    await abmeldenUeberMenue(page);
   });
 }
 
@@ -294,4 +297,84 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
   expect(Math.round(t.y), 'Tabellenkopf bündig unter dem Rahmen').toBe(
     Math.round(kopf.y + kopf.height),
   );
+});
+
+/**
+ * Übungsband (LLH-1725, Spec `uebungsmarke`, „Das Übungsband bleibt beim Rollen stehen“; D4 in
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): es klebt in JEDER Breite, ab `md`
+ * direkt unter dem Kopf, unter `md` an der Fensterkante bzw. unter der gestörten Betriebszeile.
+ * `--lfh-rahmen-oben` endet an seiner Unterkante: daran hängt jeder stehende Tabellenkopf (Guard
+ * `rahmenOben.guard.test.ts`), also liegt keiner hinter dem Band.
+ *
+ * Mutationsprobe (15.11.2026, Chromium): klebt das Band mit `top: 0` statt unter den übrigen
+ * Quellen, rot bei 820/1180/1440 („Band bündig unter dem Kopf“) und offline bei 390; die Probe bei
+ * 390 ohne Störung bleibt zu Recht grün.
+ */
+async function rahmenOben(page: Page): Promise<number> {
+  return page.evaluate(() =>
+    Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
+    ),
+  );
+}
+
+for (const b of BREITEN) {
+  test(`${b.width} px, Übung: das Band steht nach dem Rollen unter dem Kopf`, async ({ page }) => {
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page, `Rahmen Übung ${b.width} ${Date.now()}`, 'uebung');
+    await etbFuellen(page, einsatzId);
+    await page.setViewportSize({ width: b.width, height: b.height });
+    await etbGerollt(page, einsatzId);
+
+    const band = page.locator('[data-lfh="uebung-band"]');
+    await expect(band).toContainText('Übung');
+    await expect(band).toHaveCSS('position', 'sticky');
+    await expect(band).toBeInViewport();
+    const r = (await band.boundingBox())!;
+    if (b.kopfKlebt) {
+      const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+      expect(Math.round(r.y), 'Band bündig unter dem Kopf').toBe(Math.round(kopf.y + kopf.height));
+    } else {
+      expect(Math.round(r.y), 'Band an der Fensterkante, der Kopf ist weggerollt').toBe(0);
+    }
+    await expect
+      .poll(async () => Math.round(await rahmenOben(page)), 'Rahmenkante unter dem Band')
+      .toBe(Math.round(r.y + r.height));
+  });
+}
+
+test('390 px, Übung, offline: Betriebszeile und Band stehen übereinander', async ({
+  page,
+  context,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Übung offline ${Date.now()}`, 'uebung');
+  await etbFuellen(page, einsatzId);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await etbGerollt(page, einsatzId);
+  await context.setOffline(true);
+  try {
+    const zeile = page.locator('[data-lfh="betriebszeile"]');
+    await expect(zeile).toContainText('Offline');
+    await expect(zeile).toBeInViewport();
+    const z = (await zeile.boundingBox())!;
+    expect(Math.round(z.y)).toBe(0);
+    const band = page.locator('[data-lfh="uebung-band"]');
+    await expect
+      .poll(async () => Math.round((await band.boundingBox())!.y), 'Band unter der Betriebszeile')
+      .toBe(Math.round(z.y + z.height));
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
+test('Realeinsatz: kein Band, die Rahmenkante bleibt am Kopf (Gegenprobe)', async ({ page }) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen real ${Date.now()}`, 'realeinsatz');
+  await etbFuellen(page, einsatzId);
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await etbGerollt(page, einsatzId);
+  await expect(page.locator('[data-lfh="uebung-band"]')).toHaveCount(0);
+  const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+  expect(Math.round(await rahmenOben(page))).toBe(Math.round(kopf.height));
 });

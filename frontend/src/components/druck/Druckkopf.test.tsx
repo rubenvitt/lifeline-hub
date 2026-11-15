@@ -76,6 +76,40 @@ describe('Druckkopf', () => {
     expect(screen.getByRole('heading', { level: 1, hidden: true }).textContent).toBe('Meldebild');
   });
 
+  it('trägt bei einer Übung „ÜBUNG“ neben dem Einsatz und markiert sich fürs Randfeld (LLH-1725)', async () => {
+    mitOrganisation();
+    renderMitProviders(
+      <Druckkopf
+        dokumentart="Einsatztagebuch"
+        einsatz={{ bezeichnung: 'Starkregen Nord', einsatzart: 'uebung' }}
+        sichtbarkeit="immer"
+      />,
+    );
+    await screen.findByText('DRK Kreisverband Musterstadt');
+    const k = kopf();
+    const block = k.querySelector('[data-lfh="druckkopf-uebung"]');
+    expect(block).not.toBeNull();
+    expect(block).toHaveTextContent('ÜBUNG');
+    // Kein Hintergrund als Träger: auf Papier druckt der Browser ihn nicht (Rahmen und Wort tragen).
+    expect((block as HTMLElement).style.backgroundColor).toBe('');
+    // `druck/druck.css` legt die Wurzel über `:has()` auf die benannte Seite „uebung“.
+    expect(k).toHaveAttribute('data-uebung');
+  });
+
+  it.each([
+    ['Realeinsatz', { bezeichnung: 'Brand Mühle', einsatzart: 'realeinsatz' as const }],
+    ['ohne Art (Planung ohne Angabe)', { bezeichnung: 'Stadtfest' }],
+  ])('trägt bei %s nirgends „ÜBUNG“', async (_fall, einsatz) => {
+    mitOrganisation();
+    renderMitProviders(
+      <Druckkopf dokumentart="Meldebild" einsatz={einsatz} sichtbarkeit="immer" />,
+    );
+    await screen.findByText('DRK Kreisverband Musterstadt');
+    expect(kopf().querySelector('[data-lfh="druckkopf-uebung"]')).toBeNull();
+    expect(kopf()).not.toHaveAttribute('data-uebung');
+    expect(kopf()).not.toHaveTextContent('ÜBUNG');
+  });
+
   it('nennt den Druckzeitpunkt in der Anzeigezone, nicht in UTC oder Ortszeit der Maschine', async () => {
     mitOrganisation();
     // Nur `Date` fälschen: `findBy*` hängt an echten Timern.

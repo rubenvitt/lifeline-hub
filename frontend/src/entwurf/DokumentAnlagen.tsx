@@ -19,6 +19,9 @@ import { IconMuelleimer } from '../icons';
 import { useOhneVerbindung } from '../offline/verbindung';
 import SkizzenAufnahme, { type SkizzenBild } from '../fernmeldewesen/SkizzenAufnahme';
 import { useModulFreigabe } from '../einsatz/useModulFreigabe';
+import { DruckUebung } from '../components/druck/Druckkopf';
+import type { Einsatzart } from '../api/types';
+import { isUebung } from '../einsatz/einsatzart';
 import './dokumentAnlagen.css';
 
 /** Höchstzahl je Dokument, wie `MAX_ANLAGEN` im Server (`vorlagendokument/anlage.rs`). */
@@ -37,6 +40,8 @@ interface Props {
   einsatzId: number;
   dokumentId: number;
   einsatzbezeichnung: string;
+  /** Einsatzart des Einsatzes: eine Übung trägt „ÜBUNG“ im Titel jedes Anlageblatts (LLH-1725). */
+  einsatzart?: Einsatzart | null;
   /** Entwurf und Schreibrecht: Anlagen anfügen und entfernen. */
   schreibt: boolean;
   /** Klasse der Seite für Bedienung, die nicht aufs Papier gehört. */
@@ -57,9 +62,11 @@ export default function DokumentAnlagen({
   einsatzId,
   dokumentId,
   einsatzbezeichnung,
+  einsatzart,
   schreibt,
   ohneDruckKlasse,
 }: Props) {
+  const uebung = isUebung({ einsatzart });
   const { message } = App.useApp();
   const { token } = useRollen();
   const qc = useQueryClient();
@@ -146,6 +153,7 @@ export default function DokumentAnlagen({
     <SkizzenAufnahme
       einsatzId={einsatzId}
       einsatzbezeichnung={einsatzbezeichnung}
+      uebung={uebung}
       onBild={(bild) => {
         setNimmtAuf(false);
         ablegen.mutate(bild);
@@ -252,6 +260,9 @@ export default function DokumentAnlagen({
             <div data-lfh="titelblock">
               <Typography.Title level={2}>
                 {anlageName(a)}, Stand <ZeitAnzeige wert={a.stand_at} />
+                {/* Das Blatt hat keinen Druckkopf; ohne Marke sähe eine abgetrennte Anlage einer
+                    Übung aus wie die eines Realeinsatzes (LLH-1725). */}
+                {uebung && <DruckUebung />}
               </Typography.Title>
               <img src={pfad(a)} alt={anlageName(a)} />
             </div>

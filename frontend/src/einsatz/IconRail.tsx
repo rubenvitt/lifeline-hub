@@ -5,11 +5,19 @@ import { railBreite } from '../components/Kopfleiste';
 import { leseRahmenOben, useRahmenOben } from '../components/rahmenOben';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
+import { handleLinkKlick } from '../routing/linkModifier';
 
 interface Props {
   kategorien: Kategorie[];
   aktiveKategorie: KategorieKey | null;
+  /** Einfacher Klick auf eine Kategorie; Strg/⌘/Umschalt/Mittelklick behält der Browser. */
   onKategorieKlick: (key: KategorieKey) => void;
+  /**
+   * Adresse des Ziels einer Kategorie, das erste freigegebene Modul (LLH-1732). Mit Adresse ist
+   * das Ziel ein `<a href>`, damit Strg/⌘+Klick einen neuen Tab öffnet; ohne (kein freigegebenes
+   * Modul, oder der Aufrufer reicht keine Adressen) bleibt es ein Knopf.
+   */
+  kategoriePfad?: (key: KategorieKey) => string | null;
   /**
    * Das Modulpanel neben der Rail (LFH-952, D5): trägt den Griff „Menü“ im Fuß und
    * `aria-expanded` an der offenen Kategorie. Ohne (Drawer-Zweig) kein Griff.
@@ -46,6 +54,9 @@ export function railZielStil(
 ): CSSProperties {
   return {
     width: '100%',
+    boxSizing: 'border-box',
+    // Das Ziel ist ein `<a href>` oder ein `<button>` (LLH-1732); beide sehen gleich aus.
+    textDecoration: 'none',
     minHeight: Math.max(RAIL_ZEILE, token.controlHeight),
     padding: `${token.paddingXS}px 2px`,
     border: 'none',
@@ -129,34 +140,55 @@ function useVorlauf(): [(el: HTMLElement | null) => void, number] {
  * „Einstellungen" (`fuss`) steht abgesetzt unten. Es bleiben SECHS Kategorie-Ziele in EINER
  * Landmarke; steht ein Modulpanel daneben, kommt im Fuß der Griff „Menü“ dazu (LFH-952).
  */
-export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
+export default function IconRail({
+  kategorien,
+  aktiveKategorie,
+  onKategorieKlick,
+  kategoriePfad,
+  panel,
+}: Props) {
   const { token } = theme.useToken();
   const [navRef, vorlauf] = useVorlauf();
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
     const Icon = aktiv ? k.icon.gefuellt : k.icon.umriss;
-    return (
-      <button
-        key={k.key}
-        type="button"
-        aria-label={k.label}
-        title={k.label === k.kurz ? undefined : k.label}
-        aria-current={aktiv ? 'true' : undefined}
-        // Der Selbstklick klappt das Panel um (LFH-952): die offene Kategorie sagt, ob es steht.
-        aria-expanded={aktiv && panel ? panel.offen : undefined}
-        aria-controls={aktiv && panel?.offen ? MODUL_PANEL_ID : undefined}
-        onClick={() => onKategorieKlick(k.key)}
-        style={railZielStil(token, { aktiv })}
-      >
+    const zielProps = {
+      'aria-label': k.label,
+      title: k.label === k.kurz ? undefined : k.label,
+      'aria-current': aktiv ? ('true' as const) : undefined,
+      // Der Selbstklick klappt das Panel um (LFH-952): die offene Kategorie sagt, ob es steht.
+      'aria-expanded': aktiv && panel ? panel.offen : undefined,
+      'aria-controls': aktiv && panel?.offen ? MODUL_PANEL_ID : undefined,
+      style: railZielStil(token, { aktiv }),
+    };
+    const inhalt = (
+      <>
         {/* `flexShrink: 0`, sonst gibt das Icon statt des Etiketts nach. `aria-hidden`: der Name steht
-           am Knopf. */}
+           am Ziel. */}
         <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
           <Icon size={20} />
         </span>
         <span aria-hidden="true" data-lfh="rail-etikett" style={ETIKETT_STIL}>
           {k.kurz}
         </span>
+      </>
+    );
+    const pfad = kategoriePfad?.(k.key) ?? null;
+    // Mit Adresse ein Link (LLH-1732): Strg/⌘+Klick legt das Modul in einen neuen Tab. Der einfache
+    // Klick bleibt Sprung bzw. Umklappen, auch an der offenen Kategorie.
+    return pfad ? (
+      <a
+        key={k.key}
+        href={pfad}
+        onClick={(e) => handleLinkKlick(e, () => onKategorieKlick(k.key))}
+        {...zielProps}
+      >
+        {inhalt}
+      </a>
+    ) : (
+      <button key={k.key} type="button" onClick={() => onKategorieKlick(k.key)} {...zielProps}>
+        {inhalt}
       </button>
     );
   };

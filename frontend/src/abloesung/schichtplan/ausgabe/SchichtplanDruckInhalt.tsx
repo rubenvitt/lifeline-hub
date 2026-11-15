@@ -14,6 +14,7 @@ import {
 } from '../../../routing/deeplinks';
 import { aushaenge, zettel, type AusgabePlan } from './ausgabePlan';
 import SchichtplanBlaetter, { type BlattSicht } from './SchichtplanBlaetter';
+import type { DruckEinsatz } from '../../../components/druck/Druckkopf';
 
 /** Die Wortlaute einer Druckseite, je Plan („der Schichtplan“, „die Planung“). */
 export interface SchichtplanDruckTexte {
@@ -45,7 +46,7 @@ interface SchichtplanDruckInhaltProps {
   zurueck: { pfad: string; label: string };
   texte: SchichtplanDruckTexte;
   /** Kopf der Blätter (`SchichtplanBlaetter`). */
-  einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
+  einsatz: DruckEinsatz;
   bezug?: string;
   /** Die Hülle setzt die Teile in ihren Seitenrahmen. */
   renderPage: (teile: { actions: ReactNode; content: ReactNode }) => ReactNode;
