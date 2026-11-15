@@ -6,7 +6,17 @@ import {
   IconPerson,
   IconPosteingang,
 } from '../icons';
-import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
+import {
+  Avatar,
+  Button,
+  Dropdown,
+  Space,
+  Tag,
+  Typography,
+  theme,
+  type DropdownProps,
+  type MenuProps,
+} from 'antd';
 import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
@@ -104,6 +114,13 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * im Kopf. Dann ist er eine volle Zeile mit Kachel und Name (oder Funktion) in den Farben der
  * Fläche, nicht des dunklen Rahmens, und das Menü öffnet nach oben. Das Menü selbst bleibt gleich.
  */
+/**
+ * Aus der Navigation darf das Menü seitlich ins Fenster rücken (`shiftX`, LLH-1728). antds Typ
+ * `AdjustOverflow` kennt `shiftX` nicht, `getOverflowOptions` (`antd/es/_util/placements`)
+ * übernimmt es aber aus jedem Objekt; e2e `rahmen-stehen-bleiben` belegt die Lage im Fenster.
+ */
+const INS_FENSTER = { adjustY: 1, shiftX: true } as unknown as DropdownProps['autoAdjustOverflow'];
+
 export default function BenutzerMenu({
   funktion,
   hasFixedWidth = false,
@@ -303,7 +320,7 @@ export default function BenutzerMenu({
         placement={inNavigation ? 'topLeft' : 'bottomRight'}
         // Aus der Navigation ist das Menü breiter als der Platz rechts vom Auslöser: es rückt in
         // das Fenster, statt rechts abgeschnitten zu stehen (LLH-1728).
-        {...(inNavigation ? { autoAdjustOverflow: { shiftX: true, adjustY: true } } : {})}
+        {...(inNavigation ? { autoAdjustOverflow: INS_FENSTER } : {})}
       >
         <Button
           type="text"

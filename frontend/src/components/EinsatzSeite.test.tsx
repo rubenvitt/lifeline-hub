@@ -654,7 +654,9 @@ describe('EinsatzSeite · Ortspfad im Einsatzrahmen (LLH-1728, D6)', () => {
   it('im Einsatzrahmen trägt der Ortspfad die Klasse für den Rückweg unter md', () => {
     renderMitProviders(
       <ImEinsatzRahmenProvider value>
-        <EinsatzSeite titel="Person" breadcrumb={pfad} />
+        <EinsatzSeite titel="Person" breadcrumb={pfad}>
+          <div />
+        </EinsatzSeite>
       </ImEinsatzRahmenProvider>,
     );
     expect(klasse()).toContain('lfh-ortspfad--einsatz');
@@ -664,7 +666,9 @@ describe('EinsatzSeite · Ortspfad im Einsatzrahmen (LLH-1728, D6)', () => {
     renderMitProviders(
       <ImEinsatzRahmenProvider value>
         <EinsatzRahmenProvider value={undefined}>
-          <EinsatzSeite titel="Person" breadcrumb={pfad} />
+          <EinsatzSeite titel="Person" breadcrumb={pfad}>
+            <div />
+          </EinsatzSeite>
         </EinsatzRahmenProvider>
       </ImEinsatzRahmenProvider>,
     );
@@ -672,14 +676,20 @@ describe('EinsatzSeite · Ortspfad im Einsatzrahmen (LLH-1728, D6)', () => {
   });
 
   it('außerhalb des Einsatzrahmens bleibt der Ortspfad ohne die Klasse', () => {
-    renderMitProviders(<EinsatzSeite titel="Profil" breadcrumb={pfad} />);
+    renderMitProviders(
+      <EinsatzSeite titel="Profil" breadcrumb={pfad}>
+        <div />
+      </EinsatzSeite>,
+    );
     expect(klasse()).not.toContain('lfh-ortspfad--einsatz');
   });
 
   it('`ortspfadAbMd` geht vor: unter md gar nichts', () => {
     renderMitProviders(
       <ImEinsatzRahmenProvider value>
-        <EinsatzSeite titel="Lagekarte" breadcrumb={pfad} ortspfadAbMd />
+        <EinsatzSeite titel="Lagekarte" breadcrumb={pfad} ortspfadAbMd>
+          <div />
+        </EinsatzSeite>
       </ImEinsatzRahmenProvider>,
     );
     expect(klasse()).toContain('lfh-ortspfad--ab-md');
