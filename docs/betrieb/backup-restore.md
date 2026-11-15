@@ -355,7 +355,8 @@ Ablauf wie beim Befehl, mit denselben Ablehnungen und Hinweisen. Es gibt drei Un
 - **Nicht an einem Hub.** Meldet sich eine andere Instanz bei dieser (eine Kopplung, angebahnt
   oder aktiv, für irgendeine Organisation), fehlt die Funktion, und der Server lehnt mit 422 ab,
   bevor er Block oder Schlüssel liest. Ein privater Archiv-Schlüssel gehört nicht an eine
-  öffentlich erreichbare Installation. Widerrufene Kopplungen sperren nicht.
+  öffentlich erreichbare Installation. Widerrufene Kopplungen sperren nicht, eine Direktkopplung
+  vor Ort auch nicht (ADR-0051).
 - **Bis 256 MiB.** Ein größerer Block ist 413; ihn spielt der Befehl ein. Das Einspielen zählt zur
   Grenze gleichzeitiger Uploads (vier) und läuft im Request: Entschlüsseln, Migrieren und
   Übernehmen eines großen Blocks dauern. Ein vorgeschalteter Reverse-Proxy braucht dafür einen

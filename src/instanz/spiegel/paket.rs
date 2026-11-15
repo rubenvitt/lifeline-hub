@@ -178,8 +178,10 @@ pub struct EinsatzStand {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BruchAntwort {
     pub kennung: String,
-    /// Der Führer kann die Frage beantworten (er bekam den Einsatz als Spiegel dieser Kopplung);
-    /// sonst bleibt die Bruchstelle stehen und nichts wird entfernt.
+    /// Der Führer kann die Frage beantworten (er bekam den Einsatz als Spiegel dieser Kopplung).
+    /// Sonst kennt er keine Zeile in den Schlüsseln des Spiegels, und `unbekannt` bleibt leer: Der
+    /// Spiegel entfernt dann bis `bis` alles, was nicht über `spiegel_herkunft` von einem Führer
+    /// stammt (`fuehrung::nicht_vom_fuehrer`, LLH-1854).
     pub kennt: bool,
     /// Die gefragten Zeilen, die der Führer nicht kennt.
     #[serde(default)]

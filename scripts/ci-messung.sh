@@ -2,8 +2,8 @@
 # LLH-1662: Was kostet die PR-CI? Läufe und Jobs je PR-Branch über einen Zeitraum.
 #
 #   scripts/ci-messung.sh --von <zeit> --bis <zeit> [--workflow <datei>]…
-#       <zeit> als ISO 8601 in UTC (2026-11-12T00:00:00Z). Vorgabe für --workflow: ci.yml und
-#       e2e.yml. Gibt eine Markdown-Tabelle aus: je Kopf-Branch Läufe, davon abgebrochen, rot,
+#       <zeit> als ISO 8601 in UTC (2026-11-12T00:00:00Z). Vorgabe für --workflow: pr.yml,
+#       ci.yml und e2e.yml. Gibt eine Markdown-Tabelle aus: je Kopf-Branch Läufe, davon abgebrochen, rot,
 #       grün, laufend, gestartete Jobs, Job-Minuten und Läufe ohne gestarteten Job, darunter die
 #       Summe.
 #   Exit 2 = Aufruf- oder Umgebungsfehler
@@ -13,7 +13,8 @@
 # WARUM: Die Grenze der CI ist die Zahl gleichzeitiger Jobs, nicht Geld. Die zweistufige PR-CI
 # (`e2e.yml`, Change `k133wmg6-zweistufige-ci`) und danach die leichte PR-Prüfung (LLH-1889; seither
 # startet `e2e.yml` nur als Aufruf aus `ci.yml`, im PR nur mit Label `voll`) sollten Läufe und vor
-# allem Jobs je PR senken; vorher und nachher werden mit demselben Skript gemessen.
+# allem Jobs je PR senken; vorher und nachher werden mit demselben Skript gemessen. Seit LLH-1896
+# laufen die PR-Läufe in `pr.yml` (die Suiten darin als Aufruf, ohne eigene Läufe).
 #
 # GEZÄHLT: nur Läufe mit Ereignis `pull_request`, deren Start im Zeitraum liegt. Ein Job zählt als
 # gestartet, wenn er einen Runner hatte (`runner_name`; `started_at` setzt die API auch für Jobs,
@@ -21,7 +22,8 @@
 # auch einen Runner und zählt mit. Job-Minuten nur von fertigen Jobs. Ein fertiger Lauf, dessen
 # Jobs alle keinen Runner hatten (`e2e.yml` an einem nicht fertigen PR), zählt nur in der Spalte
 # „ohne Job“, nicht als Lauf; ein Lauf ganz ohne Jobs (`startup_failure`) zählt nach seinem
-# Abschluss. Nur `e2e.yml` darf in der Vorgabe fehlen (404, vor der Zweiteilung), mit Hinweis.
+# Abschluss. Nur `e2e.yml` (vor der Zweiteilung) und `pr.yml` (vor LLH-1896) dürfen in der
+# Vorgabe fehlen (404), mit Hinweis.
 # Jeder andere Abruffehler, ein ausdrücklich genannter Workflow, den es nicht gibt, und eine
 # Liste, die GitHub abschneidet (höchstens 1000 Läufe mit diesen Filtern), brechen mit Exit 2 ab:
 # eine Tabelle, der still Läufe fehlen, belegte im Vergleich einen Rückgang, den es nicht gab.
@@ -43,7 +45,7 @@ done
 [ -n "${GITHUB_REPOSITORY:-}" ] || { echo "FEHLER: GITHUB_REPOSITORY ist nicht gesetzt." >&2; exit 2; }
 command -v jq > /dev/null || { echo "FEHLER: jq fehlt." >&2; exit 2; }
 vorgabe=0
-[ "${#workflows[@]}" -gt 0 ] || { workflows=(ci.yml e2e.yml); vorgabe=1; }
+[ "${#workflows[@]}" -gt 0 ] || { workflows=(pr.yml ci.yml e2e.yml); vorgabe=1; }
 
 gh_api() { "${MESSUNG_GH:-gh}" api "$@"; }
 REPO="$GITHUB_REPOSITORY"
@@ -55,7 +57,7 @@ trap 'rm -rf "$tmp"' EXIT
 for wf in "${workflows[@]}"; do
   if ! gh_api "repos/$REPO/actions/workflows/$wf/runs?event=pull_request&created=$von..$bis&per_page=100" \
     --paginate > "$tmp/seiten" 2> "$tmp/fehler"; then
-    if [ "$vorgabe" = 1 ] && [ "$wf" = e2e.yml ] && grep -q '404' "$tmp/fehler"; then
+    if [ "$vorgabe" = 1 ] && { [ "$wf" = e2e.yml ] || [ "$wf" = pr.yml ]; } && grep -q '404' "$tmp/fehler"; then
       echo "Hinweis: $wf gibt es im Repository (noch) nicht, wird ausgelassen." >&2
       continue
     fi

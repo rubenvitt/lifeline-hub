@@ -391,6 +391,111 @@ async fn in_laufenden_einsatz_helfer_mit_herkunft_und_bestehende_einheit() {
     assert_eq!(helfer["herkunft"], "vorplanung", "{plan}");
 }
 
+/// LLH-1858: Ein umnummerierter Einsatz wird endgültig gelöscht. Seine alte Nummer kann inzwischen
+/// ein anderer tragen (umnummeriert wird nur, wenn sie belegt ist), also nennt die Planung die
+/// zuletzt getragene aus dem Löschprotokoll (wie `einsatz::abraeumen` es schreibt), nicht die von
+/// der Übernahme.
+#[tokio::test]
+async fn nach_dem_loeschen_nennt_die_planung_die_nummer_aus_dem_loeschprotokoll() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let (p, _) = kleine_planung(&app, &admin, "Konzert").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Konzert").await;
+    let (s, ergebnis) = uebernehmen(
+        &app,
+        &admin,
+        p,
+        json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{ergebnis}");
+    for sql in [
+        "UPDATE einsatz SET einsatznummer_intern = 'E-2099-0042' WHERE id = ?1",
+        "INSERT INTO aufbewahrung_loeschprotokoll (org_id, einsatz_id, art, einsatznummer_intern, \
+            nummer_jahr, nummer_lfd, abgeschlossen_at, geschwaerzt_at, geloescht_at) \
+         SELECT org_id, id, 'verwahrt', einsatznummer_intern, nummer_jahr, nummer_lfd, \
+            abgeschlossen_at, geschwaerzt_at, '2027-04-01 00:00:00' FROM einsatz WHERE id = ?1",
+        "DELETE FROM einsatz WHERE id = ?1",
+    ] {
+        sqlx::query(sql).bind(einsatz).execute(&pool).await.unwrap();
+    }
+    let kopf = get(&app, &admin, &format!("{PFAD}/{p}")).await;
+    assert_eq!(
+        kopf["kopf"]["uebernahme"]["einsatznummer"], "E-2099-0042",
+        "Kopf: zuletzt getragene Nummer"
+    );
+    let liste = get(&app, &admin, PFAD).await;
+    let eintrag = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == p)
+        .unwrap();
+    assert_eq!(
+        eintrag["uebernahme"]["einsatznummer"], "E-2099-0042",
+        "Liste: zuletzt getragene Nummer"
+    );
+}
+
+/// LLH-1858: Bekommt der Einsatz nach der Übernahme eine neue Nummer (Führungswechsel, LLH-1703),
+/// zeigen Kopf und Liste die neue; ist der Einsatz ohne Nummer im Löschprotokoll gelöscht (als
+/// Spiegel abgeräumt, Demo-Daten entfernt), die bei der Übernahme gemerkte.
+#[tokio::test]
+async fn uebernommene_planung_zeigt_die_aktuelle_einsatznummer() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = admin(&app).await;
+    let (p, _) = kleine_planung(&app, &admin, "Konzert").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Konzert").await;
+    let (s, ergebnis) = uebernehmen(
+        &app,
+        &admin,
+        p,
+        json!({"ziel": {"art": "einsatz", "einsatz_id": einsatz}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{ergebnis}");
+    let gemerkt = ergebnis["planung"]["kopf"]["uebernahme"]["einsatznummer"].clone();
+    assert!(gemerkt.is_string(), "{ergebnis}");
+
+    let nummer = |kopf: Value, liste: Value| {
+        let eintrag = liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["id"] == p)
+            .unwrap()
+            .clone();
+        (
+            kopf["kopf"]["uebernahme"]["einsatznummer"].clone(),
+            eintrag["uebernahme"]["einsatznummer"].clone(),
+        )
+    };
+
+    sqlx::query("UPDATE einsatz SET einsatznummer_intern = 'E-2099-0042' WHERE id = ?")
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (kopf, liste) = nummer(
+        get(&app, &admin, &format!("{PFAD}/{p}")).await,
+        get(&app, &admin, PFAD).await,
+    );
+    assert_eq!(kopf, "E-2099-0042", "Kopf zeigt die neue Nummer");
+    assert_eq!(liste, "E-2099-0042", "Liste zeigt die neue Nummer");
+
+    sqlx::query("DELETE FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (kopf, liste) = nummer(
+        get(&app, &admin, &format!("{PFAD}/{p}")).await,
+        get(&app, &admin, PFAD).await,
+    );
+    assert_eq!(kopf, gemerkt, "ohne Einsatz die gemerkte Nummer");
+    assert_eq!(liste, gemerkt, "ohne Einsatz die gemerkte Nummer");
+}
+
 #[tokio::test]
 async fn ziel_und_rechte() {
     let (app, pool) = setup_mit_pool().await;

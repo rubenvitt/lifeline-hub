@@ -1,0 +1,54 @@
+# Ruleset (LLH-1895): prüft die Pflicht-Checks im Ruleset von `alpha` gegen die Liste in
+# `scripts/ruleset-pruefen.sh` und wird bei jeder Abweichung ROT. Ein roter Lauf schickt eine Mail;
+# genau das ist der Zweck.
+#
+# WARUM: Am 14.11.2026 bekam `Migrationsnummern` beim Austragen der Suiten die Quelle „GitHub
+# Actions“. Der Commit-Status zählte nicht mehr, alle grünen PRs hingen über Nacht, und kein Check
+# war rot. Geprüft wird nach jedem Push auf `alpha` (ein Ruleset-Handgriff geht meist mit einem
+# Merge einher) und alle sechs Stunden (ein Handgriff ohne Merge).
+#
+# Liest nur: die Regeln eines Branches gibt die API mit `contents: read` heraus. Kein PR-Code, kein
+# Checkout eines PRs. Den Hinweis am hängenden PR schreibt der Stau-Wächter (`stau-waechter.sh`).
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
+name: Ruleset
+
+on:
+  push:
+    branches: [alpha]
+  schedule:
+    # Krumme Minute: zur vollen Stunde stauen sich die Zeitpläne bei GitHub.
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ruleset
+  cancel-in-progress: true
+
+jobs:
+  pruefen:
+    name: Pflicht-Checks im Ruleset
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Ruleset von alpha prüfen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          code=0
+          gh api "repos/$GITHUB_REPOSITORY/rules/branches/alpha" > regeln.json || code=$?
+          [ "$code" = 0 ] || { echo "::error::Die Regeln von alpha sind nicht lesbar (gh api, Exit $code)."; exit 1; }
+          code=0
+          scripts/ruleset-pruefen.sh < regeln.json > befund.txt || code=$?
+          cat befund.txt
+          if [ "$code" != 0 ]; then
+            { echo "### Ruleset von alpha weicht ab"; echo; sed 's/^/- /' befund.txt; } >> "$GITHUB_STEP_SUMMARY"
+            while IFS= read -r zeile; do echo "::error::$zeile"; done < befund.txt
+            exit 1
+          fi

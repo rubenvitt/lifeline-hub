@@ -699,11 +699,13 @@ pub async fn list_erreicht_aktiv(
 /// Meldet sich bei dieser Instanz eine andere, angebahnt oder aktiv, für irgendeine Org? Dann ist
 /// sie erreichte Seite (ein Hub), und ein privater Archiv-Schlüssel hat hier nichts zu suchen
 /// (LLH-1711, design.md D3). Die Org-Zuordnungen eingespielter Archivblöcke stehen immer auf
-/// `widerrufen` und zählen nicht.
+/// `widerrufen` und zählen nicht. Eine Direktkopplung vor Ort zählt auch nicht (LLH-1888): sie
+/// macht die ausstellende Seite nicht zum Hub. Ausgenommen ist nur `vor_ort`, damit eine künftige
+/// Art erst einmal sperrt (Change `r3r7ul21-archiv-direktkopplung-kein-hub`, design.md D1).
 pub async fn wird_erreicht(pool: &SqlitePool) -> Result<bool, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM instanz_kopplung WHERE richtung = 'wird_gemeldet' \
-         AND zustand IN ('angebahnt', 'aktiv'))",
+         AND zustand IN ('angebahnt', 'aktiv') AND art <> 'vor_ort')",
     )
     .fetch_one(pool)
     .await?)
@@ -1333,6 +1335,22 @@ mod tests {
             .await
             .unwrap();
         assert!(wird_erreicht(&pool).await.unwrap(), "aktiv");
+    }
+
+    /// LLH-1888: Die ausstellende Seite einer Direktkopplung vor Ort führt ihre Zeile als
+    /// `wird_gemeldet`. Sie ist dadurch kein Hub; jede andere Art sperrt weiter.
+    #[tokio::test]
+    async fn eine_direktkopplung_vor_ort_macht_keinen_hub() {
+        let pool = crate::db::test_pool().await;
+        kopplung(&pool, "elw-2", "wird_gemeldet", "angebahnt").await;
+        kopplung(&pool, "elw-3", "wird_gemeldet", "aktiv").await;
+        sqlx::query("UPDATE instanz_kopplung SET art = 'vor_ort'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!wird_erreicht(&pool).await.unwrap(), "nur vor Ort");
+        kopplung(&pool, "elw-4", "wird_gemeldet", "aktiv").await;
+        assert!(wird_erreicht(&pool).await.unwrap(), "Standard daneben");
     }
 
     #[tokio::test]

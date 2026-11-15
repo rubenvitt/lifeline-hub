@@ -1,0 +1,151 @@
+# PR-Prüfung — was an einem offenen Pull Request läuft.
+#
+# JEDER Job ruft `scripts/check-all.sh` auf, keiner stellt sich seine Schritte selbst zusammen:
+# das Sammel-Gate bleibt die eine Wahrheit darüber, WAS geprüft wird; die Jobs entscheiden nur,
+# WO es läuft. Wer einen Schritt vermisst, ändert das Skript. Einzige Ausnahme: ein Schritt, der
+# nur nach einem Fehlschlag läuft und den Fehler erklärt, ohne etwas zu entscheiden (Karenzzeit
+# nach gescheitertem Frontend-Install, LLH-1884).
+#
+# EIN WORKFLOW JE EREIGNIS (LLH-1896, ADR „Ein Workflow je Ereignis“): `ci.yml` läuft nur bei einem
+# Push auf einen Kanal-Branch, `pr.yml` nur an einem PR. Ein Job mit falschem `if` erschiene am PR
+# als übersprungener Eintrag; was nur bei Push läuft, steht deshalb in einem Workflow, den ein PR
+# gar nicht startet. Die Suiten stehen einmal in `suiten.yml`. Der Job `schnell` steht in beiden
+# Workflows WORTGLEICH (der Pflicht-Check `Schnellprüfungen` darf keinen Präfix eines aufgerufenen
+# Workflows tragen); `scripts/ci-stufen.test.sh` vergleicht beide Blöcke. Wer ihn ändert, ändert
+# beide.
+#
+# LEICHTE PR-PRÜFUNG (LLH-1889): Pflicht im Ruleset von `alpha` sind die Checks in der Liste von
+# `scripts/ruleset-pruefen.sh`, sonst nichts; `ruleset.yml` prüft das Ruleset dagegen. Rust-,
+# Frontend- und e2e-Suite laufen bei jedem Push auf `alpha`, `beta`, `main` voll und im PR nur mit
+# dem Label `voll`, dort ohne Pflicht. Lokal fährt ein Agent vor dem PR
+# `check-all.sh --geaendert --ohne-e2e`. Eine Auswahl nach geänderten Dateien gibt es in der CI
+# nicht.
+#
+# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Anteile laufen auf dem eigenen
+# Server, wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem
+# Fork stammt. Die Jobs und die Runner-Wahl stehen in `e2e.yml` (Kopf dort).
+#
+# Coverage steht in coverage.yml: ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar): ein kompromittierter,
+# verschobener Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot hält die
+# Pins aktuell.
+#
+# LABEL-EREIGNISSE: Der PR-Lauf hört auf `labeled`, damit `voll` sofort startet. Die
+# Schnellprüfungen laufen dabei bei JEDEM Label neu, nie übersprungen: ein übersprungener
+# jüngster Check zählte als grün, auch über einem roten. Aus demselben Grund laufen an einem PR mit
+# `voll` bei jedem Ereignis alle Suiten; an einem PR ohne `voll` startet ein fremdes Label keine
+# Suite und bricht keinen Lauf ab (eigene Gruppe, s. `concurrency`). Am PR ohne `voll` steht damit
+# genau ein übersprungener Eintrag dieses Workflows: der Aufruf der Suiten.
+name: PR-Prüfung
+
+on:
+  pull_request:
+    # `labeled` für das Label `voll` (s. Kopf); Auto-Merge-Ereignisse gehören nicht hierher.
+    types: [opened, synchronize, reopened, labeled]
+
+# Least privilege: das Gate liest nur.
+permissions:
+  contents: read
+
+# Eine Gruppe je Ref mit Abbruch: ein neuer Push ersetzt den laufenden Lauf. Ein fremdes Label an
+# einem PR OHNE `voll` läuft je Lauf: es bricht keinen laufenden Lauf ab und fährt nur die
+# Schnellprüfungen (Dependabot setzt mehrere Labels nacheinander). An einem PR MIT `voll` startet
+# jedes Ereignis in der Ref-Gruppe alle Suiten neu: ein übersprungener gleichnamiger Check wäre
+# sonst der jüngste und verdeckte eine rote Suite.
+concurrency:
+  group: pr-${{ !(github.event.action == 'labeled' && github.event.label.name != 'voll' && !contains(github.event.pull_request.labels.*.name, 'voll')) && github.ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Die Debuginfo-Stufe (Zeilentabellen, keine für Abhängigkeiten) steht in Cargo.toml,
+  # [profile.dev] (LFH-845), und gilt lokal wie hier.
+  # Parallelität nach den Kernen des Runners (LLH-1664; der Schritt „Runner-Größe“ in den
+  # Suiten nennt Kerne und Speicher). Vitest 2 Dateien zugleich statt einer (lokale Vorgabe in
+  # check-all.sh bleibt 1). Die Playwright-Worker stehen in `e2e.yml`. Messwerte vorher/nachher an
+  # der Aufgabe LLH-1664.
+  VITEST_WORKERS: 2
+  # Der Runner läuft in UTC. check-all.sh setzt die Zone selbst; hier steht sie für alles
+  # außerhalb des Skripts.
+  TZ: Europe/Berlin
+
+jobs:
+  # ── Die billigen Prüfungen, in einem Job und zuerst ──────────────────────────────────
+  # Damit ein Formatierungsfehler nicht erst nach einer Viertelstunde Testlauf auffällt.
+  schnell:
+    name: Schnellprüfungen
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Nur bei Bedarf: das Aufräumen kostete auf dem kritischen Pfad über eine Minute, und die
+      # heutigen Runner haben genug Platz. Die Schwelle hält den Weg für knappe Images offen.
+      - name: Plattenplatz schaffen (nur bei Bedarf)
+        run: |
+          df -h /
+          frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
+          if [ "$frei_gb" -ge 40 ]; then
+            echo "Genug Platz (${frei_gb} GB frei) — kein Aufräumen nötig."
+            exit 0
+          fi
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY/CodeQL"
+          df -h /
+      # Über das Skript, nie `apt-get` direkt: ein hängender Spiegel hielt den Schritt sonst bis
+      # zum Job-Timeout fest (LFH-1101).
+      - name: System-Werkzeuge für die nativen Crates
+        run: ./scripts/apt-pakete.sh nasm
+      - name: Rust-Toolchain (stable)
+        run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # shared-key statt key: sonst hängt rust-cache die Job-ID an, jeder Job hätte einen
+          # eigenen mehrere GB großen Eintrag (GitHub deckelt bei 10 GB je Repository).
+          # `save-if: false` überall außer im Rust-Job: EINER pflegt den Eintrag.
+          shared-key: rust-openssl-vendored
+          save-if: false
+          cache-on-failure: true
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+        with:
+          version: 2026.9.1
+          cache: true
+      - name: pnpm-Store-Pfad ermitteln
+        id: pnpm
+        run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - name: Frontend-Abhängigkeiten
+        id: frontend-install
+        run: mise exec -- pnpm -C frontend install --frozen-lockfile
+      # Scheitert der Install an der Karenzzeit (LLH-1884), kommen die Schnellprüfungen nicht
+      # mehr dran, und es stünde nur der rohe pnpm-Fehler da. Dieser Schritt läuft nur dann und
+      # erklärt den Verstoß wie Schritt 6 (Paket, ab wann alt genug, neu starten). Der Job bleibt
+      # rot; an der Karenzzeit ändert sich nichts.
+      - name: Karenzzeit erklären (nur nach gescheitertem Install)
+        if: failure() && steps.frontend-install.outcome == 'failure'
+        run: ./scripts/check-karenzzeit.sh
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: audit-cache
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: cargo-audit-0.22.2-${{ runner.os }}
+      - name: cargo-audit
+        if: steps.audit-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --locked --version 0.22.2
+      - name: Schnellprüfungen
+        run: ./scripts/check-all.sh --nur schnell
+
+  # ── Suiten nur mit Label `voll`, ohne Pflicht (`suiten.yml`) ────────────────────────────
+  # Bei JEDEM Ereignis an einem PR mit `voll`, auch einem fremden Label: ein übersprungener
+  # gleichnamiger Check wäre der jüngste und verdeckte eine rote Suite (Review LLH-1889).
+  suiten:
+    name: Suiten (voll)
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'voll') }}
+    uses: ./.github/workflows/suiten.yml
+    # `checks: read` braucht `e2e.yml` (Runner-Wahl).
+    permissions:
+      contents: read
+      checks: read

@@ -72,9 +72,9 @@ pub struct ArchivEingespieltAnzeige {
 async fn fordere_keinen_hub(state: &AppState) -> Result<(), AppError> {
     if crate::instanz::repo::wird_erreicht(&state.pool).await? {
         return Err(AppError::UnprocessableEntity(
-            "An dieser Installation meldet sich eine andere Instanz: ein privater \
-             Archiv-Schlüssel gehört nicht hierher. Den Block an einer Installation ohne solche \
-             Kopplung einspielen."
+            "An dieser Installation meldet sich eine andere Instanz (eine Direktkopplung vor \
+             Ort zählt nicht): ein privater Archiv-Schlüssel gehört nicht hierher. Den Block an \
+             einer Installation ohne solche Kopplung einspielen."
                 .into(),
         ));
     }

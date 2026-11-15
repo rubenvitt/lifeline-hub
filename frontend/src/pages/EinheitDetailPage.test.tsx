@@ -273,7 +273,7 @@ const PANEELE = [
   'Funk',
   'Telefon und weitere Verbindungen',
   'Taktisches Zeichen',
-  'Einheit auflösen',
+  'Einheit auflösen oder stornieren',
 ];
 
 describe('EinheitDetailPage · die Route selbst', () => {
@@ -316,7 +316,7 @@ describe('EinheitDetailPage · die Route selbst', () => {
   it('die Paneele stehen in der Folge aus D2', async () => {
     server.use(...handlers());
     rendere();
-    await screen.findByRole('region', { name: 'Einheit auflösen' });
+    await screen.findByRole('region', { name: 'Einheit auflösen oder stornieren' });
     const titel = screen
       .getAllByRole('region')
       .map((r) => r.querySelector('h2')?.textContent ?? '')
@@ -408,7 +408,7 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Einheit auflösen oder stornieren' })).toBeNull();
   });
 
   it('vor dem Festhalten aufgelöst: der Satz „nicht festgehalten“ statt Besatzung und Material', async () => {
@@ -783,7 +783,7 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
     expect(screen.queryByRole('button', { name: /^Status von / })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Aus Einheit lösen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Aktionen zu Person/ })).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Einheit auflösen oder stornieren' })).toBeNull();
     expect(screen.queryByText('Person zuordnen …')).toBeNull();
     expect(screen.queryByText('Fahrzeug zuordnen …')).toBeNull();
     expect(screen.queryByText('Material zuordnen …')).toBeNull();
@@ -801,7 +801,9 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
     expect(screen.getByRole('button', { name: 'Aktionen zu Person Max Mustermann' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Aus Einheit lösen' })).toBeInTheDocument();
     expect(screen.getByText('Person zuordnen …')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Einheit auflösen' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: 'Einheit auflösen oder stornieren' }),
+    ).toBeInTheDocument();
   });
 
   it('Modul Einheiten gesperrt: auch mit Schreibrecht keine Stifte und kein Auflösen (D6)', async () => {
@@ -812,7 +814,7 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
     );
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
     await waitFor(() =>
-      expect(screen.queryByRole('region', { name: 'Einheit auflösen' })).toBeNull(),
+      expect(screen.queryByRole('region', { name: 'Einheit auflösen oder stornieren' })).toBeNull(),
     );
     expect(screen.queryAllByRole('button', { name: /bearbeiten$/ })).toHaveLength(0);
   });
@@ -879,7 +881,9 @@ describe('EinheitDetailPage · Auflösen (D12)', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     );
-    const aufloesen = await screen.findByRole('region', { name: 'Einheit auflösen' });
+    const aufloesen = await screen.findByRole('region', {
+      name: 'Einheit auflösen oder stornieren',
+    });
     await userEvent.click(within(aufloesen).getByRole('button', { name: 'Einheit auflösen' }));
     const blase = await screen.findByRole('tooltip');
     await userEvent.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
@@ -888,19 +892,68 @@ describe('EinheitDetailPage · Auflösen (D12)', () => {
     expect(await screen.findByText('Gliederung')).toBeInTheDocument();
   });
 
-  it('abgelehnt: der Grund steht im Paneel „Einheit auflösen“, kein Toast', async () => {
+  it('abgelehnt: der Grund steht im Paneel „Einheit auflösen oder stornieren“, kein Toast', async () => {
     zeige(
       http.delete('/api/einsaetze/1/einheiten/10', () =>
         HttpResponse.json({ error: 'Einheit ist disponiert' }, { status: 409 }),
       ),
     );
-    const aufloesen = await screen.findByRole('region', { name: 'Einheit auflösen' });
+    const aufloesen = await screen.findByRole('region', {
+      name: 'Einheit auflösen oder stornieren',
+    });
     await userEvent.click(within(aufloesen).getByRole('button', { name: 'Einheit auflösen' }));
     const blase = await screen.findByRole('tooltip');
     await userEvent.click(within(blase).getByRole('button', { name: 'Einheit auflösen' }));
 
     expect(await within(aufloesen).findByRole('alert')).toHaveTextContent('Einheit ist disponiert');
     expect(within(paneel('Kopfdaten')).queryByRole('alert')).toBeNull();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+});
+
+/** Stornieren einer Fehlanlage (LLH-1881): derselbe Ort und Rückweg wie das Auflösen. */
+describe('EinheitDetailPage · Stornieren (LLH-1881)', () => {
+  async function storniere() {
+    const p = await screen.findByRole('region', { name: 'Einheit auflösen oder stornieren' });
+    await userEvent.click(within(p).getByRole('button', { name: 'Einheit stornieren' }));
+    const blase = await screen.findByRole('tooltip');
+    await userEvent.click(within(blase).getByRole('button', { name: 'Einheit stornieren' }));
+    return p;
+  }
+
+  it('storniert über den eigenen Weg und führt zurück zur Gliederung', async () => {
+    let storniert = false;
+    let geloescht = false;
+    zeige(
+      http.post('/api/einsaetze/1/einheiten/10/stornieren', () => {
+        storniert = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.delete('/api/einsaetze/1/einheiten/10', () => {
+        geloescht = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    await storniere();
+
+    await waitFor(() => expect(storniert).toBe(true));
+    expect(geloescht).toBe(false);
+    expect(await screen.findByText('Gliederung')).toBeInTheDocument();
+  });
+
+  it('abgelehnt: der Grund des Servers steht im Paneel, die Seite bleibt, kein Toast', async () => {
+    const grund = 'Der Einheit gehört Personal an; die Einheit lässt sich nur auflösen';
+    zeige(
+      http.post('/api/einsaetze/1/einheiten/10/stornieren', () =>
+        HttpResponse.json({ error: grund }, { status: 422 }),
+      ),
+    );
+    const p = await storniere();
+
+    const meldung = await within(p).findByRole('alert');
+    expect(meldung).toHaveTextContent('Nicht storniert');
+    expect(meldung).toHaveTextContent(grund);
+    expect(screen.getByRole('heading', { name: '1. Zug', level: 1 })).toBeInTheDocument();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 });
@@ -1331,7 +1384,7 @@ describe('EinheitDetailPage · Übernahme stornieren (LLH-1388)', () => {
 
   it('ohne Herkunft kein Paneel', async () => {
     zeige(aus(null));
-    await screen.findByRole('region', { name: 'Einheit auflösen' });
+    await screen.findByRole('region', { name: 'Einheit auflösen oder stornieren' });
     expect(screen.queryByRole('region', { name: 'Übernahme stornieren' })).toBeNull();
   });
 
@@ -1342,7 +1395,7 @@ describe('EinheitDetailPage · Übernahme stornieren (LLH-1388)', () => {
         HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
       ),
     );
-    await screen.findByRole('region', { name: 'Einheit auflösen' });
+    await screen.findByRole('region', { name: 'Einheit auflösen oder stornieren' });
     expect(screen.queryByRole('region', { name: 'Übernahme stornieren' })).toBeNull();
   });
 

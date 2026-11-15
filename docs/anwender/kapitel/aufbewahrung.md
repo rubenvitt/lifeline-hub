@@ -99,7 +99,9 @@ einspielen“).
 
 ### Ein Archiv einspielen
 
-Für System-Admins, an einer Installation, bei der sich keine andere meldet:
+Für System-Admins, an einer Installation, bei der sich keine andere meldet. Eine Direktkopplung
+vor Ort zählt dabei nicht: ein ELW, der einem zweiten ELW den Code ausgestellt hat, spielt weiter
+ein.
 
 1. In der Verwaltung „Aufbewahrung“ öffnen und „Archiv einspielen“ wählen.
 2. Unter „Archivblock“ die heruntergeladene Datei `….sqlite.age` wählen.
@@ -274,8 +276,8 @@ jeden ihrer Einsätze, sobald dessen Nachbereitung endet:
   Aufbewahrung abgelaufen ist, ein Schlüssel, der nicht passt, und ein Block, den diese
   Installation selbst schon gelöscht hat. Ist seit dem Download die Frist einer Datenkategorie
   abgelaufen, wird sie vor dem Einspielen geschwärzt; der Hinweis nennt sie.
-- **Nicht am Hub:** Meldet sich eine andere Installation bei dieser, fehlt „Archiv einspielen“.
-  Der private Schlüssel gehört nicht an eine Installation, die aus dem Netz erreichbar ist.
+- **Nicht am Hub:** Meldet sich eine andere Installation bei dieser, fehlt „Archiv einspielen“;
+  eine Direktkopplung vor Ort zählt nicht. Der private Schlüssel gehört nicht an eine Installation, die aus dem Netz erreichbar ist.
 - **Der Schlüssel wird nicht gespeichert.** Er liegt nur für das Einspielen im Speicher des
   Servers, nicht in der Datenbank, nicht auf der Platte und nicht im Zugangsprotokoll.
 - **Bis 256 MiB.** Einen größeren Block spielt der Betrieb per Befehl ein.
@@ -342,7 +344,7 @@ darunter bleiben. Daher lautet der Vorschlag für die Personenauskunft 0 Tage.
 - **Archiv-Schlüssel und Archiv-Download:** nur System-Admins der eigenen Organisation; jede
   Änderung und jeder Abruf steht im Zugangsprotokoll.
 - **Archiv einspielen:** nur System-Admins, in die eigene Organisation, und nicht an einer
-  Installation, bei der sich eine andere meldet.
+  Installation, bei der sich eine andere meldet (eine Direktkopplung vor Ort zählt nicht).
 
 ## Grundlagen und Quellen
 
