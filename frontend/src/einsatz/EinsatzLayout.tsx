@@ -243,12 +243,18 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const [sprungOffen, setSprungOffen] = useState(false);
   const panelEingeklappt = sprungOffen ? false : panelZu(navWahl, weit);
   const [navOffen, setNavOffen] = useState(false);
-  // „Suchen“ im Drawer (LLH-1728, D3): vor dem Öffnen der Palette steht der Fokus auf dem Griff,
-  // sonst merkte sie sich den Knopf im Drawer als Rückkehrziel, den `destroyOnHidden` abbaut, und
-  // der Fokus fiele nach dem Schließen auf `body`. Der schließende Drawer holt den Fokus dann
-  // nicht zurück: er zöge ihn hinter die offene Palette.
+  // „Suchen“ im Drawer (LLH-1728, D3): die Palette gibt beim Schließen keinen Fokus zurück (sie
+  // wird ausgehängt), und der Knopf im Drawer ist dann abgebaut (`destroyOnHidden`). Ist die
+  // Palette wieder zu und der Fokus verwaist, geht er auf den Griff (Muster `useFokusRueckgabe`).
+  // Der schließende Drawer holt ihn vorher nicht zurück: er zöge ihn hinter die offene Palette.
   const [sucheAusDrawer, setSucheAusDrawer] = useState(false);
   const navGriff = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!sucheAusDrawer || palette.offen) return;
+    const aktiv = document.activeElement;
+    if (aktiv === document.body || aktiv === null) navGriff.current?.focus();
+    setSucheAusDrawer(false);
+  }, [sucheAusDrawer, palette.offen]);
 
   // Panel an die aktuelle Modul-Kategorie angleichen (auch nach dem Default-Redirect).
   useEffect(() => {
@@ -441,10 +447,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                   color: rahmenFarben.text,
                 }}
                 icon={<IconMenue size={22} />}
-                onClick={() => {
-                  setSucheAusDrawer(false);
-                  setNavOffen(true);
-                }}
+                onClick={() => setNavOffen(true)}
               />
             </div>
           )}
@@ -688,7 +691,6 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               icon={<IconLupe size={20} />}
               onClick={() => {
                 setSucheAusDrawer(true);
-                navGriff.current?.focus();
                 setNavOffen(false);
                 palette.oeffne();
               }}
