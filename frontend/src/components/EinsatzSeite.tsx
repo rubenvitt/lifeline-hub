@@ -477,8 +477,10 @@ export default function EinsatzSeite({
   const aktionenRef = useRef<HTMLDivElement>(null);
   // Stehende Alarme beginnen unter dem Seitenkopf, solange er im Bild ist (LFH-1112).
   const alarmKante = useAlarmKante<HTMLDivElement>();
-  // Klebt der Seitenkopf, zählt er zum Rahmen über dem Inhalt (zjt7c073 D2/D3).
-  const kleben = useSeitenkopfKleben<HTMLDivElement>(kopfKlebt);
+  // Klebt der Seitenkopf, zählt er zum Rahmen über dem Inhalt (zjt7c073 D2/D3). Mit
+  // `fensterInhalt` steckt er in `FensterRahmen` in einem eigenen Wrapper, der sein Containing
+  // Block ist: kleben kann er dort nicht, also meldet er sich auch nicht als Rahmenquelle.
+  const kleben = useSeitenkopfKleben<HTMLDivElement>(fensterInhalt != null ? false : kopfKlebt);
   const klebeRef = kleben.ref;
   // Eine Ref-Funktion für alle Abnehmer; stabil, sonst hängte React sie bei jedem Render um.
   const kopfLeiste = useCallback(

@@ -328,7 +328,9 @@ test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1
     .getByRole('button', { name: 'Kräfte & Mittel', exact: true })
     .click();
   await expect(page).not.toHaveURL(/\/etb$/);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  // Vorbedingung: die Seite ist WIRKLICH gerollt, mindestens um die Kopfhöhe; sonst stünden Kopf
+  // und Fuß des Panels auch ohne `sticky` im Fenster.
+  await ansEnde(page, await unterkanteKopf(page));
 
   const liste = page.locator('[data-lfh="modul-panel-liste"]');
   const ueberhang = await liste.evaluate((el) => el.scrollHeight - el.clientHeight);

@@ -16,6 +16,7 @@ import {
 } from './adminNav';
 import { useDemoDatenStatus } from './useDemoDaten';
 import DatentraegerWarnung, { useDatentraeger } from './DatentraegerWarnung';
+import { bringIntoView } from '../components/bringIntoView';
 
 const { Sider, Content } = Layout;
 
@@ -50,18 +51,6 @@ function markierterKey(keys: string[], aktiv: string): string | undefined {
       (beste, k) => (beste && beste.length >= k.length ? beste : k),
       undefined,
     );
-}
-
-/**
- * Hält den markierten Eintrag im eigenen Bildlauf der Seitenleiste sichtbar (LFH-980), wie
- * `scrollIntoView({ block: 'nearest' })`, aber NUR im Container: `scrollIntoView` rollte auch das
- * Fenster, und die Seite spränge beim Routenwechsel.
- */
-export function holeInsBild(container: HTMLElement, eintrag: HTMLElement): void {
-  const rahmen = container.getBoundingClientRect();
-  const ziel = eintrag.getBoundingClientRect();
-  if (ziel.top < rahmen.top) container.scrollTop -= rahmen.top - ziel.top;
-  else if (ziel.bottom > rahmen.bottom) container.scrollTop += ziel.bottom - rahmen.bottom;
 }
 
 /**
@@ -154,7 +143,7 @@ export default function AdminLayout() {
     if (!breit) return;
     const menue = menueRef.current;
     const eintrag = menue?.querySelector<HTMLElement>('.ant-menu-item-selected');
-    if (menue && eintrag) holeInsBild(menue, eintrag);
+    if (menue && eintrag) bringIntoView(menue, eintrag);
   }, [breit, pathname, laedt, demoFreigeschaltet, oben]);
 
   if (laedt) {

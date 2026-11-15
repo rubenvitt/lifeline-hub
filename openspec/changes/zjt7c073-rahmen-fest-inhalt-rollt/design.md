@@ -94,6 +94,10 @@ wie in `rahmenOben.ts` (Layout-Effekt vor dem ersten Bild, danach `ResizeObserve
 `resize`, ein Bild später geschrieben, LLH-1335). Die Höhe ändert sich nicht dadurch, dass er
 klebt; ein Hin- und Herspringen an der Grenze ist deshalb ausgeschlossen.
 
+Mit `fensterInhalt` (Chat, UHS-Detail) klebt er nicht: dort steckt die Leiste in `FensterRahmen`
+in einem eigenen Wrapper, der ihr Containing Block ist, und sie meldete sich sonst als Rahmenquelle,
+obwohl sie wegrollt (Review).
+
 Es klebt nur die Seitenkopfleiste (Ortspfad, Titel, Meta, Aktionen), nicht `hinweis`,
 `beschreibung` oder `bereiche` darunter. Stil: `top: var(--lfh-kopf-oben)`, Seitengrund, Ebene
 `KOPF_KLEBT_EBENE` (30, unter dem Rahmen, über Inhalt und Tabellenköpfen).
@@ -110,6 +114,13 @@ ETB reicht seine eigene, strengere Entscheidung durch (D5).
 Das Panel bekommt die Form der Rail-Spalte: eine innere Spalte mit `position: sticky`,
 `top: var(--lfh-kopf-oben)`, `height: calc(100dvh - var(--lfh-kopf-oben))`. Darin Kopf (fest),
 Liste (`flex: 1`, `min-height: 0`, rollt in sich) und Fuß „Einsatzdauer“ (fest am Ende).
+
+Nachtrag aus dem Review: Stehen Bänder über dem Rahmen (Spiegel, Führungshinweis), beginnt die
+Spalte ungerollt tiefer, und mit der festen Höhe läge der Fuß unter dem Fensterrand. Die Höhe wird
+deshalb gemessen: von der Oberkante der Spalte im Fenster bis zum Fensterrand, bei Bildlauf,
+Fenstergröße und Änderung der Seitenhöhe, direkt am Element. Die Liste holt den aktiven Eintrag
+ins Bild und beginnt bei einer neuen Kategorie oben (`components/bringIntoView.ts`, wie das
+Verwaltungsmenü).
 
 - Kopf und Fuß bleiben so immer im Bild, und kein Teil liegt über einem anderen: die Liste ist der
   einzige Bereich, der rollt. Der Fokus in der Liste rollt nur die Liste, deren Ränder die Kanten

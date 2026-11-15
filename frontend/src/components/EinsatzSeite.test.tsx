@@ -670,3 +670,22 @@ describe('EinsatzSeite — klebender Seitenkopf', () => {
     expect(kopf.style.position).toBe('');
   });
 });
+
+/**
+ * Review zjt7c073 (B4): Mit `fensterInhalt` steckt die Leiste in `FensterRahmen` in einem eigenen
+ * Wrapper, der ihr Containing Block ist; kleben kann sie dort nicht. Sie meldet sich dann auch
+ * nicht als Rahmenquelle, sonst lägen Fokusabstand und Alarmkante um ihre Höhe zu tief.
+ */
+describe('EinsatzSeite — Arbeitsfläche bis zum Fensterende', () => {
+  it('der Seitenkopf klebt nicht und zählt nicht zur Rahmenhöhe', async () => {
+    const { leseRahmenOben } = await import('./rahmenOben');
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="UHS" fensterInhalt={{ inhalt: <div>Grundriss</div> }}>
+        {null}
+      </EinsatzSeite>,
+    );
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(kopf.style.position).toBe('');
+    expect(leseRahmenOben()).toBe(0);
+  });
+});

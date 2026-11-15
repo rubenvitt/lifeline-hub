@@ -8,8 +8,9 @@ Ab `md` MUST die Kopfleiste beim Rollen am oberen Fensterrand stehen bleiben, ab
 Kategorie-Symbole der Rail und das offene Modulpanel samt Fuß „Einsatzdauer“. Ab `md` MUST der
 Seitenkopf einer Einsatz- oder Verwaltungsseite unter der Kopfleiste stehen bleiben, solange
 Kopfleiste und Seitenkopf zusammen höchstens ein Drittel der Fensterhöhe nehmen; sonst rollt er
-mit. Unter `md` MUST die Kopfleiste mitrollen und die Betriebszeile oben stehen bleiben, solange
-sie eine Verbindungsstörung meldet. Jedes oben klebende Element MUST unter dem klebenden Rahmen
+mit. Im ETB kleben Seitenkopf, Filterleiste und Spaltenkopf nur gemeinsam, solange alle drei mit
+der Kopfleiste in dieses Drittel passen (Spec `etb-filterleiste`). Unter `md` MUST die Kopfleiste
+mitrollen und die Betriebszeile oben stehen bleiben, solange sie eine Verbindungsstörung meldet. Jedes oben klebende Element MUST unter dem klebenden Rahmen
 stehen, nicht hinter ihm; im Inhalt zählt ein klebender Seitenkopf zum Rahmen.
 
 #### Scenario: Langes Rollen im ETB ab Tablet
@@ -39,6 +40,10 @@ stehen, nicht hinter ihm; im Inhalt zählt ein klebender Seitenkopf zum Rahmen.
 #### Scenario: Tabellenkopf unter dem Rahmen
 - **WHEN** eine Seite mit stehendem Tabellenkopf ab `md` so weit gerollt ist, dass der Tabellenkopf klebt
 - **THEN** liegt seine Oberkante an der Unterkante des klebenden Seitenkopfs, oder an der Unterkante der Kopfleiste, wenn der Seitenkopf mitrollt, nicht darüber
+
+#### Scenario: Niedriges Fenster im ETB
+- **WHEN** das ETB gerollt ist und Kopfleiste und Seitenkopf zwar ins Drittel der Fensterhöhe passen, mit Filterleiste und Spaltenkopf aber nicht mehr
+- **THEN** rollen Seitenkopf, Filterleiste und Spaltenkopf gemeinsam mit, und die Kopfleiste bleibt stehen
 
 #### Scenario: Fokus unter dem klebenden Seitenkopf
 - **WHEN** der Fokus auf einer gerollten Seite mit klebendem Seitenkopf bei 1440 × 900 mit Shift+Tab rückwärts durch die Ziele des Inhalts läuft

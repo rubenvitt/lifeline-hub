@@ -1,5 +1,5 @@
 import { IconExternPfeil, IconSchloss, IconSchraubenschluessel } from '../icons';
-import { useId, type CSSProperties } from 'react';
+import { useId, useLayoutEffect, useRef, type CSSProperties, type RefObject } from 'react';
 import { theme } from 'antd';
 import {
   istModulGesperrt,
@@ -20,6 +20,8 @@ import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
 import { MODUL_PANEL_ID } from './IconRail';
+import { bringIntoView } from '../components/bringIntoView';
+import { abonniereRahmenOben } from '../components/rahmenOben';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -307,6 +309,44 @@ export function ModulListe({
 }
 
 /**
+ * Hält die klebende Spalte genau so hoch wie den Platz von ihrer Oberkante im Fenster bis zum
+ * Fensterrand (zjt7c073, Review B2). Geklebt ist das `100dvh` minus Kopfhöhe; ungerollt beginnt die
+ * Spalte aber tiefer, sobald Bänder über dem Rahmen stehen (Spiegel, Führungshinweis, Betriebszeile
+ * ab `md`), und mit der festen Höhe läge der Fuß „Einsatzdauer“ unter dem Fensterrand. Gemessen bei
+ * Bildlauf, Fenstergröße, Änderung der Rahmenhöhe und der Seitenhöhe (ein Band erscheint), höchstens
+ * einmal je Bild; geschrieben direkt am Element, ohne neues Rendern. Die feste Höhe bleibt als Stil
+ * für das erste Bild und ohne Messung.
+ */
+function useFitToWindow(ref: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    let frame = 0;
+    const fit = () => {
+      frame = 0;
+      const top = Math.max(0, el.getBoundingClientRect().top);
+      el.style.height = `${Math.max(0, window.innerHeight - top)}px`;
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(fit);
+    };
+    fit();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    observer?.observe(document.body);
+    const unsubscribe = abonniereRahmenOben(schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      observer?.disconnect();
+      unsubscribe();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [ref]);
+}
+
+/**
  * Liste der Module einer Kategorie im inline-Rahmen, 208 px auf `paneel`. Kopf 42 px mit
  * Augenbraue; Fuß „Einsatzdauer" in Mono, live je Minute (abgeschlossen: bis
  * `abgeschlossen_at`). Ohne geladenen Einsatz oder lesbaren Beginn entfällt der Fuß.
@@ -324,6 +364,23 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const jetzt = useMinutenTakt();
   const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
   const linie = `1px solid ${farben.linie}`;
+  // Die Liste rollt in sich (zjt7c073, Review B8): eine neue Kategorie beginnt oben, statt die
+  // Rollposition der vorigen zu erben, und der aktive Eintrag kommt ins Bild, auch nach einem
+  // Sprung über die Palette. Nur im Container, nie im Fenster (`bringIntoView`).
+  const listRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
+  useFitToWindow(columnRef);
+  const prevTitel = useRef(titel);
+  useLayoutEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+    if (prevTitel.current !== titel) {
+      container.scrollTop = 0;
+      prevTitel.current = titel;
+    }
+    const eintrag = container.querySelector<HTMLElement>('[aria-current="true"]');
+    if (eintrag) bringIntoView(container, eintrag);
+  }, [titel, liste.aktiverModulKey]);
   return (
     <div
       // Testanker für den e2e-Trefflächennachweis. Der inline-Rahmen hat als einziger
@@ -341,6 +398,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
       }}
     >
       <div
+        ref={columnRef}
         data-lfh="modul-panel-spalte"
         style={{
           position: 'sticky',
@@ -363,6 +421,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
           <span style={augenbraueStil(farben.schwach)}>{titel}</span>
         </div>
         <div
+          ref={listRef}
           data-lfh="modul-panel-liste"
           style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}
         >

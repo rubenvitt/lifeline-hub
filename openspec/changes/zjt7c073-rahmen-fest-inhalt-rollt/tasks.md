@@ -19,7 +19,7 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (Test zuerst rot)
 - [x] 3.1 Hook für die Entscheidung (ab `md`, nur im Dokument-Bildlauf, Drittel-Regel) samt reiner Funktion; `KLEBEN_HOECHSTENS` an einen gemeinsamen Ort ziehen. Nachweis: Unit-Tests der reinen Funktion (Grenze genau ein Drittel, darüber, unter `md`, eigener Scrollbereich)
 - [x] 3.2 `components/EinsatzSeite.tsx`: Seitenkopfleiste klebt nach dem Hook oder nach `kopfKlebt` von außen, `top: var(--lfh-kopf-oben)`, meldet sich als Quelle der Ebene `seitenkopf`. Nachweis: Unit-Test „klebt ab md“, „klebt nicht mit `kopfKlebt={false}`“; `EinsatzSeite.test.tsx` grün
 - [x] 3.3 `components/AdminPage.tsx`: derselbe Hook für die Seitenkopfleiste. Nachweis: Unit-Test in `AdminPage.test.tsx` (bzw. neu)
-- [ ] 3.4 `index.css`: Fokus im Seitenkopf setzt `scroll-padding-block-start` auf `var(--lfh-kopf-oben)`; ETB-Ausnahme ebenso. Nachweis: e2e-Szenario „Fokus unter dem klebenden Seitenkopf“ (Gruppe 5)
+- [x] 3.4 `index.css`: Fokus im Seitenkopf setzt `scroll-padding-block-start` auf `var(--lfh-kopf-oben)`; ETB-Ausnahme ebenso. Nachweis: e2e-Szenario „Fokus unter dem klebenden Seitenkopf“ (Gruppe 5)
 
 ## 4. ETB auf der allgemeinen Mechanik (D5)
 
