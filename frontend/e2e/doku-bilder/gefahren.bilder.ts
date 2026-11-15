@@ -18,9 +18,9 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *
  * Die Demo bewertet je Gefahrengebiet nur eine Zelle; für ein lesbares Bild ergänzt der Lauf
  * einige Bewertungen der „Überflutung Unterstadt“ über die API. Für `gefahren.png` bestätigt er
- * die Beurteilung des „Hangrutsch Kirchberg“, damit die Liste beide Zusätze zeigt („1 Gefahr ·
- * …“ und „nicht beurteilt“, LLH-1102); die „Überflutung Unterstadt“ bleibt für den Ablauf
- * „Beurteilung bestätigen“ offen.
+ * die Beurteilung des „Hangrutsch Kirchberg“, damit die Liste beide Formen zeigt („1 Gefahr ·
+ * …“ und das Etikett „… · unbestätigt“, LLH-1102, LLH-1745); die „Überflutung Unterstadt“ bleibt
+ * für den Ablauf „Beurteilung bestätigen“ offen.
  */
 
 const KAPITEL = 'gefahren';
@@ -104,7 +104,7 @@ test.describe(KAPITEL, () => {
     // Ohne Bild: der Ablauf ist nachgeklickt, die Ansicht zeigt schon `gefahren.png`.
     await oeffneGefahren(page);
     const beurteilung = page.locator('[data-lfh="gefahrengebiet-beurteilung"]');
-    await expect(beurteilung).toContainText('nicht beurteilt');
+    await expect(beurteilung).toContainText('unbestätigt');
     await beurteilung.getByRole('button', { name: 'Beurteilung bestätigen' }).click();
     await expect(beurteilung.locator('[data-lfh="beurteilung-stand"]')).toContainText(
       /^beurteilt /,

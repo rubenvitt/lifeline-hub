@@ -129,7 +129,7 @@ test('das Blatt trägt Matrix, schwarze Marke und die Erläuterungen in der Folg
   await expect(wurzel.locator('[data-lfh="druckkopf"]')).toContainText(
     'Gefahrenbewertung – Überflutung Unterstadt',
   );
-  await expect(wurzel.locator('[data-lfh="druckkopf"]')).toContainText('nicht beurteilt');
+  await expect(wurzel.locator('[data-lfh="druckkopf"]')).toContainText('unbestätigt');
 
   const blatt = await page.evaluate(() => {
     const w = document.querySelector('[data-lfh="druckwurzel"]')!;

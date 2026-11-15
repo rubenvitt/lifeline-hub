@@ -180,8 +180,8 @@ describe('Kennzahlen', () => {
     );
   });
 
-  /** LLH-1090: „keine“ ist die Vorgabe jeder Zelle; ungeprüft heißt „nicht beurteilt“. */
-  it('Warnstufe: zählt die nicht beurteilten Gebiete, die Notiz nennt sie vor dem Pegel', () => {
+  /** LLH-1090: „keine“ ist die Vorgabe jeder Zelle; ungeprüft heißt „unbestätigt“. */
+  it('Warnstufe: zählt die unbestätigten Gebiete, die Notiz nennt sie vor dem Pegel', () => {
     const g = (beurteilt: boolean) =>
       ({
         hoechste_warnstufe: 'keine',
@@ -189,9 +189,9 @@ describe('Kennzahlen', () => {
       }) as unknown as Gefahrengebiet;
     expect(warnstufeKennzahlVon([g(false), g(true), g(false)]).nichtBeurteilt).toBe(2);
     expect(warnstufeKennzahlVon([]).nichtBeurteilt).toBe(0);
-    expect(warnstufeNotiz(0, null, 2)).toBe('0 Gefahrengebiete mit Warnstufe · 2 nicht beurteilt');
+    expect(warnstufeNotiz(0, null, 2)).toBe('0 Gefahrengebiete mit Warnstufe · 2 unbestätigt');
     expect(warnstufeNotiz(1, 'Pegel 6,84 m steigend', 1)).toBe(
-      '1 Gefahrengebiet mit Warnstufe · 1 nicht beurteilt · Pegel 6,84 m steigend',
+      '1 Gefahrengebiet mit Warnstufe · 1 unbestätigt · Pegel 6,84 m steigend',
     );
     expect(warnstufeNotiz(1, null, 0)).toBe('1 Gefahrengebiet mit Warnstufe');
   });

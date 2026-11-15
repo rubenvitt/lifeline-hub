@@ -67,7 +67,7 @@ import {
   meldungsStand,
 } from '../lage-dashboard/fuehrungsZahlen';
 import { einsatzdauerKennzahl } from '../lage-dashboard/lagebild';
-import { NICHT_BEURTEILT } from '../gefahren/beurteilung';
+import { UNBESTAETIGT } from '../gefahren/beurteilung';
 import { pegelAbfrage } from '../../api/pegel';
 import { wetterAbfrage } from '../../api/wetter';
 import { unwetterLage } from '../../wetter/unwetter';
@@ -596,7 +596,7 @@ export default function UeberblickPage() {
 
   // ── Seitenkopf: Warnstufe wie im Lagebild (Dashboard-Baukasten, LLH-1140) ── Sie ist keine
   // Kennzahl: der Hinweis steht nur bei Ton achtung/alarm. Was die Kennzahl außerdem trug, steht
-  // daneben: nicht beurteilte Gebiete (LLH-1090, Offenes sieht nicht wie Entwarnung aus) und die
+  // daneben: unbestätigte Gebiete (LLH-1090, Offenes sieht nicht wie Entwarnung aus) und die
   // Pegel-Notiz (LFH-606).
   const warnTon =
     zWarnstufe === 'daten' && (warnstufe.ton === 'alarm' || warnstufe.ton === 'achtung')
@@ -604,7 +604,7 @@ export default function UeberblickPage() {
       : null;
   const nichtBeurteilt =
     zWarnstufe === 'daten' && warnstufe.nichtBeurteilt > 0
-      ? `${warnstufe.nichtBeurteilt} ${NICHT_BEURTEILT}`
+      ? `${warnstufe.nichtBeurteilt} ${UNBESTAETIGT}`
       : null;
   const kopfLage =
     warnTon || nichtBeurteilt || pegelNotiz ? (

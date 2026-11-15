@@ -19,7 +19,7 @@ Modulen selbst.
 
 1. Im Bereich „Führung“ „Überblick“ öffnen.
 2. Im Seitenkopf neben dem Datenstand lesen: Ab „Warnstufe mittel“ steht dort die höchste
-   Warnstufe der Gefahrengebiete, daneben, wie viele Gebiete „nicht beurteilt“ sind, und der
+   Warnstufe der Gefahrengebiete, daneben, wie viele Gebiete „unbestätigt“ sind, und der
    Stand eines festgelegten Pegels.
 3. Im Kennzahlenband die sechs Zahlen lesen: „Betroffene“ mit dem Zuwachs der letzten 60 Minuten,
    „Kräfte im Einsatz“ in der Stärke F/UF/M//Σ, „Offene Aufträge“, „Meldungen offen“, die Zahl der
@@ -62,8 +62,8 @@ Modulen selbst.
 
 - **Kräfte im Einsatz** zählt nur das Personal, nicht Fahrzeuge oder Material.
 - **Warnstufe** ist die höchste Stufe aller Gefahrengebiete; sie steht wie im Lagebild im
-  Seitenkopf, nur ab „mittel“, und daneben, falls es welche gibt, wie viele Gebiete „nicht
-  beurteilt“ sind (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort auch sein
+  Seitenkopf, nur ab „mittel“, und daneben, falls es welche gibt, wie viele Gebiete
+  „unbestätigt“ sind (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort auch sein
   Stand (Kapitel [Wetter und Pegel](wetter-pegel.md)).
 - **Meldungen offen** nennt dieselbe Zahl wie das Modul „Meldungen“, darunter die neuen; ist eine
   Bestätigung überfällig, steht die Zahl in Rot.

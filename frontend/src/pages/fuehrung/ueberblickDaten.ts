@@ -66,7 +66,7 @@ import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/un
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
-import { NICHT_BEURTEILT, istBeurteilt } from '../gefahren/beurteilung';
+import { UNBESTAETIGT, istBeurteilt } from '../gefahren/beurteilung';
 
 dayjs.extend(utc);
 
@@ -157,9 +157,9 @@ export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennza
 }
 
 /**
- * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die nicht beurteilten Gebiete
+ * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die unbestätigten Gebiete
  * (LLH-1090, nur wenn es welche gibt) und die Pegel-Notiz (`pegelNotizKurz`). Angehängt statt
- * ersetzt: die Gebietszahl begründet den Wert, „nicht beurteilt“ schränkt ihn ein, der Pegel ist
+ * ersetzt: die Gebietszahl begründet den Wert, „unbestätigt“ schränkt ihn ein, der Pegel ist
  * die Lage daneben. Ohne festgelegten Pegel (`null`) fehlt er.
  */
 export function warnstufeNotiz(
@@ -171,7 +171,7 @@ export function warnstufeNotiz(
     anzahlAktiv === 1
       ? '1 Gefahrengebiet mit Warnstufe'
       : `${anzahlAktiv} Gefahrengebiete mit Warnstufe`;
-  const offen = nichtBeurteilt > 0 ? `${nichtBeurteilt} ${NICHT_BEURTEILT}` : null;
+  const offen = nichtBeurteilt > 0 ? `${nichtBeurteilt} ${UNBESTAETIGT}` : null;
   return [gebiete, offen, pegelNotiz].filter(Boolean).join(' · ');
 }
 

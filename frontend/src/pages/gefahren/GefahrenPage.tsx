@@ -24,7 +24,7 @@ import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import GefahrenBeurteilung from './GefahrenBeurteilung';
 import { beurteilungText, istBeurteilt } from './beurteilung';
-import { gebietAussage } from './gebietAussage';
+import { gebietAussage, gebietEtikett } from './gebietAussage';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
@@ -120,7 +120,7 @@ export default function GefahrenPage() {
   });
   // Die Matrix jedes beurteilten Gebiets für den Zusatz der Gebietszeile („3 Gefahren · hoch“,
   // LLH-1102). Derselbe Schlüssel wie Lagebild und Matrix oben: Cache geteilt, das Live-Ereignis
-  // `gefahr` invalidiert alle. Ein nicht beurteiltes Gebiet heißt „nicht beurteilt“ und braucht
+  // `gefahr` invalidiert alle. Ein unbestätigtes Gebiet trägt „unbestätigt“ im Etikett und braucht
   // keinen Abruf.
   const gebietsMatrizen = useQueries({
     queries: gebiete.map((g) => ({
@@ -278,10 +278,11 @@ export default function GefahrenPage() {
               <Space wrap>
                 {/* Etikett über `StatusTag`, nicht `color`-Prop: für einen Nicht-Preset rechnet
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
-                <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
+                {/* Stufe und Vorläufigkeit in EINEM Etikett: „hoch · unbestätigt“ (LLH-1745). */}
+                <StatusTag darstellung={gebietEtikett(g)} />
                 <span>{gefahrengebietName(g.label, g.id)}</span>
-                {/* Was im Gebiet los ist (LLH-1102): „3 Gefahren · hoch“, offen „nicht beurteilt“
-                    (LLH-1090) — hier wählt man, was zu tun ist. Die Zonenzahl steht am Sprung zur
+                {/* Was im Gebiet los ist (LLH-1102): „3 Gefahren · hoch“; unbestätigt trägt es das
+                    Etikett der Stufe (LLH-1745) — hier wählt man, was zu tun ist. Die Zonenzahl steht am Sprung zur
                     Karte. Ohne geladene Matrix kein Zusatz statt einer erfundenen Zahl. */}
                 {aussagen[i] != null && (
                   <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>

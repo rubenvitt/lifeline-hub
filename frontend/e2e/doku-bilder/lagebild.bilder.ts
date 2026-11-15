@@ -55,9 +55,9 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/lage-dashboard`);
     await expect(page.locator('[data-lfh="wetter-kopfmarke"]')).toContainText('Dauerregen');
     await expect(page.locator('[data-lfh="gefahrenzeile"]').first()).toBeVisible();
-    // Die Demo-Gebiete sind nicht beurteilt: der Fuß des Paneels nennt sie.
+    // Die Demo-Gebiete sind unbestätigt: der Fuß des Paneels nennt sie.
     await expect(page.locator('[data-lfh="gefahren-beurteilung"]')).toContainText(
-      'nicht beurteilt',
+      'unbestätigt',
     );
     await expect(page.locator('[data-sichtung]').first()).toBeVisible();
     await expect(page.getByRole('list', { name: 'Jüngste Einträge' })).toBeVisible();

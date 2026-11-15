@@ -423,7 +423,7 @@ describe('UeberblickPage', () => {
     // „hoch“ ist Alarm (`warnstufeKennzahl`), wie im Lagebild.
     expect(hinweis).toHaveAttribute('data-ton', 'alarm');
     expect(kopfLage()!.querySelector('[data-lfh="warnstufe-offen"]')).toHaveTextContent(
-      '1 nicht beurteilt',
+      '1 unbestätigt',
     );
     // Ohne festgelegten Pegel keine Pegel-Angabe.
     expect(kopfLage()).not.toHaveTextContent(/Pegel/);

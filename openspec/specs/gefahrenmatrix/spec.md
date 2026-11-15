@@ -3,9 +3,10 @@
 ## Purpose
 Darstellung der Gefahrenmatrix eines Gefahrengebiets (Gefahr × Schutzobjekt) und die Beurteilung
 des Gebiets. Eine Zelle ohne Bewertung zeigt die Vorgabe „keine“. Ob jemand die Matrix angesehen
-hat, zeigt die Beurteilung am Gebiet: „beurteilt <DTG> · <Name>“ oder „nicht beurteilt“. Das
-schreibt die Entscheidung fort, dass eine offene Beurteilung nicht wie eine Entwarnung aussehen
-darf: diese Aussage trägt jetzt „nicht beurteilt“ am Gebiet, nicht mehr eine leere Zelle.
+hat, zeigt die Beurteilung am Gebiet: „bestätigt <DTG> · <Name>“ oder „unbestätigt“ (LLH-1745;
+vorher „beurteilt“/„nicht beurteilt“, das sich neben einer Stufe wie „hoch“ als Widerspruch las).
+Das schreibt die Entscheidung fort, dass eine offene Beurteilung nicht wie eine Entwarnung aussehen
+darf: diese Aussage trägt jetzt „unbestätigt“ am Gebiet, nicht mehr eine leere Zelle.
 Verdichtet (LLH-1102): die ganze Zelle ist das Bedienziel, die Zeilen stehen alphabetisch, und
 die Gebietsliste nennt Gefahren und höchste Stufe.
 
