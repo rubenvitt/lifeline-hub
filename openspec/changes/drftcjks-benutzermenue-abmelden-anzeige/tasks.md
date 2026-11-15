@@ -33,9 +33,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/drftcjksxrh0vazqkadyuegy (LLH-1730)
 
 ## 7. e2e und Bildlauf
 
-- [ ] 7.1 Helfer in `e2e/menue-kern.ts`: Abmelden über das Benutzermenü samt Rückfrage; alle Specs und Bilder-Specs umstellen, die „Abmelden“ im Menü klicken (`benutzermenue`, `rahmen-stehen-bleiben`, `dichte-ableitung`, `lagebild-offline`, `geraet-raeumung`, `doku-bilder/anmelden-abmelden` u. a.; Abschluss per `grep` nach `'Abmelden'` in `frontend/e2e`)
-- [ ] 7.2 e2e `benutzermenue.spec.ts`: 390 × 844 `komfortabel` alle Einträge bis „Abmelden“ im Fenster; `handschuh` Profil und drei Leisten ohne Rollen, Abmelden nach Rollen erreichbar, Rückfrage mit Abbrechen und Bestätigen; Palette „Abmelden“ öffnet die Rückfrage; Reiter „Anzeige“ wählt Handschuh (gezielter Lauf grün, chromium)
-- [ ] 7.3 Bildlauf: betroffene Bilder des Benutzermenüs neu (`doku-bilder/anmelden-abmelden.bilder.ts`, `einsatz-oberflaeche.bilder.ts`), Bild der Rückfrage und des Reiters „Anzeige“ dort, wo die Kapitel sie zeigen (Lauf grün, Bilder geprüft)
+- [x] 7.1 Helfer in `e2e/menue-kern.ts`: Abmelden über das Benutzermenü samt Rückfrage; alle Specs und Bilder-Specs umstellen, die „Abmelden“ im Menü klicken (`benutzermenue`, `rahmen-stehen-bleiben`, `dichte-ableitung`, `lagebild-offline`, `geraet-raeumung`, `doku-bilder/anmelden-abmelden` u. a.; Abschluss per `grep` nach `'Abmelden'` in `frontend/e2e`)
+- [x] 7.2 e2e `benutzermenue.spec.ts`: 390 × 844 `komfortabel` alle Einträge bis „Abmelden“ im Fenster; `handschuh` Profil und drei Leisten ohne Rollen, Abmelden nach Rollen erreichbar, Rückfrage mit Abbrechen und Bestätigen; Palette „Abmelden“ öffnet die Rückfrage; Reiter „Anzeige“ wählt Handschuh (gezielter Lauf grün, chromium)
+- [x] 7.3 Bildlauf: betroffene Bilder des Benutzermenüs neu (`doku-bilder/anmelden-abmelden.bilder.ts`, `einsatz-oberflaeche.bilder.ts`), Bild der Rückfrage und des Reiters „Anzeige“ dort, wo die Kapitel sie zeigen (Lauf grün, Bilder geprüft)
 
 ## 8. Anwenderdoku (Mitänderungsregel)
 
