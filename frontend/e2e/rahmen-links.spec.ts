@@ -12,42 +12,92 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * `page`-Ereignis: ein nativ per Strg- oder Mittelklick geöffneter Tab schließt seine Navigation
  * mitunter ab, bevor Playwright ihn eingerichtet hat. Dann meldet Playwright ihn gar nicht
  * (`waitForEvent('page')` läuft ab) oder hält eine längst fertige Navigation für ausstehend, und
- * jedes `expect` auf den Tab wartet vergeblich auf „navigation to finish“. Der Browser hatte den
- * Tab mit der richtigen Adresse in jedem dieser Fälle offen (gemessen 15.11.2026, CDP-Protokoll und
- * `Target.getTargets`; ohne diesen Weg auf `alpha` etwa jeder zweite Lauf rot). Nur Chromium.
+ * jedes `expect` auf den Tab wartet vergeblich auf „navigation to finish“ (gemessen 15.11.2026; auf
+ * `alpha` etwa jeder zweite Lauf rot). Nur Chromium.
+ *
+ * Die Adresse allein belegt keinen fertigen Tab: Chromium meldet die angeforderte Adresse schon
+ * während der Navigation und behält sie nach einem Fehlschlag. Fertig ist der Tab erst, wenn die
+ * App darin den Titel des Einsatzrahmens gesetzt hat („Modul · Einsatz · lifeline-hub“,
+ * `useDokumentTitel`); den liest der Test aus demselben `Target.getTargets`.
  */
-async function offeneTabs(browser: Browser): Promise<string[]> {
+interface Tab {
+  id: string;
+  kontext: string;
+  pfad: string;
+  titel: string;
+}
+
+async function offeneTabs(browser: Browser): Promise<Tab[]> {
   const cdp = await browser.newBrowserCDPSession();
   try {
     const { targetInfos } = (await cdp.send('Target.getTargets')) as {
-      targetInfos: { type: string; url: string }[];
+      targetInfos: {
+        targetId: string;
+        browserContextId: string;
+        type: string;
+        url: string;
+        title: string;
+      }[];
     };
-    // Ein Tab im Aufbau trägt noch keine Adresse (`''` oder `about:blank`).
     return targetInfos
-      .filter((t) => t.type === 'page' && t.url.startsWith('http'))
-      .map((t) => new URL(t.url).pathname);
+      .filter((t) => t.type === 'page')
+      .map((t) => ({
+        id: t.targetId,
+        kontext: t.browserContextId,
+        // Ein Tab im Aufbau trägt noch keine Adresse (`''` oder `about:blank`).
+        pfad: t.url.startsWith('http') ? new URL(t.url).pathname : t.url,
+        titel: t.title,
+      }));
   } finally {
     await cdp.detach();
   }
 }
+
 test('Strg-Klick und Mittelklick öffnen Modul und Kategorie in einem neuen Tab', async ({
   page,
   browser,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await anmeldenAlsAdmin(page, { startseite: false });
-  const einsatzId = await einsatzPerApi(page, `E2E Rahmen-Links ${Date.now()}`);
+  const bezeichnung = `E2E Rahmen-Links ${Date.now()}`;
+  const einsatzId = await einsatzPerApi(page, bezeichnung);
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(page.getByRole('heading', { level: 1, name: 'ETB' })).toBeVisible();
+
+  const vorher = await offeneTabs(browser);
+  const ausgang = vorher.find((t) => t.pfad === `/einsaetze/${einsatzId}/etb`);
+  expect(ausgang, 'Ausgangstab im Browser gefunden').toBeDefined();
+  const bekannt = new Set(vorher.map((t) => t.id));
+  const rahmenTitel = ` · ${bezeichnung} · lifeline-hub`;
+
+  /** Neue Tabs dieses Kontexts, die auf `pfad` stehen und den Einsatzrahmen fertig gezeigt haben. */
+  async function neueFertigeTabs(pfad: string): Promise<number> {
+    return (await offeneTabs(browser)).filter(
+      (t) =>
+        !bekannt.has(t.id) &&
+        t.kontext === ausgang!.kontext &&
+        t.pfad === pfad &&
+        t.titel.endsWith(rahmenTitel) &&
+        t.titel.length > rahmenTitel.length,
+    ).length;
+  }
 
   const panel = page.locator('[data-lfh="modul-panel"]');
   const betroffene = panel.getByRole('link', { name: /^Betroffene(,|$)/ });
   await betroffene.click({ modifiers: ['ControlOrMeta'] });
-  await expect.poll(() => offeneTabs(browser)).toContain(`/einsaetze/${einsatzId}/personen`);
+  await expect
+    .poll(() => neueFertigeTabs(`/einsaetze/${einsatzId}/personen`), {
+      message: 'Strg-Klick öffnet Betroffene in einem neuen Tab',
+    })
+    .toBe(1);
 
   const rail = page.getByRole('navigation', { name: 'Kategorien' });
   await rail.getByRole('link', { name: 'Lage', exact: true }).click({ button: 'middle' });
-  await expect.poll(() => offeneTabs(browser)).toContain(`/einsaetze/${einsatzId}/lage-dashboard`);
+  await expect
+    .poll(() => neueFertigeTabs(`/einsaetze/${einsatzId}/lage-dashboard`), {
+      message: 'Mittelklick öffnet die Kategorie Lage in einem neuen Tab',
+    })
+    .toBe(1);
 
   // Der Ausgangstab bleibt im ETB, und die Rail bleibt auf seiner Kategorie.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
@@ -59,9 +109,9 @@ test('Strg-Klick und Mittelklick öffnen Modul und Kategorie in einem neuen Tab'
   // Gegenprobe: der einfache Klick bleibt im Tab.
   await betroffene.click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
-  // Drei Tabs dieses Einsatzes: Ausgangstab, Modul, Kategorie.
-  const eigene = (await offeneTabs(browser)).filter((p) =>
-    p.startsWith(`/einsaetze/${einsatzId}/`),
-  );
-  expect(eigene).toHaveLength(3);
+  // Genau drei Tabs in diesem Kontext: Ausgangstab, Modul, Kategorie — kein weiterer, auch kein
+  // leerer.
+  const imKontext = async () =>
+    (await offeneTabs(browser)).filter((t) => t.kontext === ausgang!.kontext).length;
+  await expect.poll(imKontext).toBe(3);
 });
