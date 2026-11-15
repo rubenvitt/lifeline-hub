@@ -95,7 +95,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 8. Abschluss
 
-- [ ] 8.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Ergebnis im PR unter „Geprüft“).
+- [x] 8.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Ergebnis im PR unter „Geprüft“).
 - [ ] 8.2 Bilder der Änderung (Rahmen Nacht/Tag, Handy gerollt, Liste, Wechsler, Gerät,
   Lagemonitor, Druck) für PR und Meldung aufgenommen.
 
