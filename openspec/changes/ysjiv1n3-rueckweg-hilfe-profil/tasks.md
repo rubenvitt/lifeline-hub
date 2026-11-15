@@ -5,10 +5,10 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`.
 
 ## 1. Ein Rückweg für Ebene 1 (D1, D2)
 
-- [ ] 1.1 `einsatz/einsatzRueckweg.ts` mit `useEinsatzRueckweg(benutzerId, aktiv)` aus der Logik von `useEbene1Ort` in `components/AppLayout.tsx` ziehen; `AppLayout` ruft ihn auf, ohne Verhalten zu ändern. Prüfung: neuer `einsatzRueckweg.test.tsx` (aktiv gelistet → „Zurück zu <Name>“ an den gemerkten Pfad; abgeschlossen, nicht gelistet, nichts gemerkt, `aktiv` falsch → kein Rückweg, keine Abfrage der Liste ohne gemerkten Ort) grün, `components/AdminPage.test.tsx` und die Tests von `AppLayout` unverändert grün
-- [ ] 1.2 `ebene1Seite` kennt `neuigkeiten` (Titel und Ort „Neuigkeiten“). Prüfung: Fall im Test von `ebene1Seite` grün; Tab-Titel „Neuigkeiten · lifeline-hub“
-- [ ] 1.3 `NeuigkeitenPage` über `AdminPage titel="Neuigkeiten"`, Breite 900 px wie bisher. Prüfung: `NeuigkeitenPage.test.tsx` (h1 „Neuigkeiten“ bleibt, mit gestelltem `Ebene1OrtKontext` stehen „Einsätze › Neuigkeiten“ und „Zurück zu <Einsatz>“) und `Benutzermenue.neuigkeiten.test.tsx` grün
-- [ ] 1.4 `docs/anwender/kapitel/einsatz-oberflaeche.md` (Absatz „Zurück zu …“): nennt Profil, Benachrichtigungen, Neuigkeiten, Verwaltung und die Hilfe. Prüfung: `hilfe/anwenderdoku.guard.test.ts` grün
+- [x] 1.1 `einsatz/einsatzRueckweg.ts` mit `useEinsatzRueckweg(benutzerId, aktiv)` aus der Logik von `useEbene1Ort` in `components/AppLayout.tsx` ziehen; `AppLayout` ruft ihn auf, ohne Verhalten zu ändern. Prüfung: neuer `einsatzRueckweg.test.tsx` (aktiv gelistet → „Zurück zu <Name>“ an den gemerkten Pfad; abgeschlossen, nicht gelistet, nichts gemerkt, `aktiv` falsch → kein Rückweg, keine Abfrage der Liste ohne gemerkten Ort) grün, `components/AdminPage.test.tsx` und die Tests von `AppLayout` unverändert grün
+- [x] 1.2 `ebene1Seite` kennt `neuigkeiten` (Titel und Ort „Neuigkeiten“). Prüfung: Fall im Test von `ebene1Seite` grün; Tab-Titel „Neuigkeiten · lifeline-hub“
+- [x] 1.3 `NeuigkeitenPage` über `AdminPage titel="Neuigkeiten"`, Breite 900 px wie bisher. Prüfung: `NeuigkeitenPage.test.tsx` (h1 „Neuigkeiten“ bleibt, mit gestelltem `Ebene1OrtKontext` stehen „Einsätze › Neuigkeiten“ und „Zurück zu <Einsatz>“) und `Benutzermenue.neuigkeiten.test.tsx` grün
+- [x] 1.4 `docs/anwender/kapitel/einsatz-oberflaeche.md` (Absatz „Zurück zu …“): nennt Profil, Benachrichtigungen, Neuigkeiten, Verwaltung und die Hilfe. Prüfung: `hilfe/anwenderdoku.guard.test.ts` grün
 
 ## 2. Rückweg der Hilfe (D3)
 

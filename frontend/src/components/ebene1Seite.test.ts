@@ -17,6 +17,10 @@ describe('ebene1Seite', () => {
     });
   });
 
+  it('Neuigkeiten (LLH-1731)', () => {
+    expect(ebene1Seite('/neuigkeiten')).toEqual({ titel: ['Neuigkeiten'], ort: ['Neuigkeiten'] });
+  });
+
   it('Verwaltung: Sektion aus der Admin-Registry, auch auf Detailadressen', () => {
     expect(ebene1Seite('/admin/stammdaten/fahrzeuge')).toEqual({
       titel: ['Fahrzeuge', 'Verwaltung'],
