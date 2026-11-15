@@ -19,6 +19,17 @@
     page: dokument-anlage;
   }
 
+  /* Übung (LLH-1725): dieselbe Seite mit Randfeld „ÜBUNG“; gewählt wird sie in `druck/druck.css`. */
+  @page dokument-anlage-uebung {
+    size: A4 landscape;
+    @top-center {
+      content: 'ÜBUNG';
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+  }
+
   /* Nutzhöhe A4 quer bei 15 mm Rand: 180 mm; davon die Überschrift. Das Bild bleibt inline:
      als Block schob Chromium es auf der benannten Seite hinter die Überschrift auf ein eigenes
      Blatt, gleich wie klein es war (e2e `dokument-anlage-druck.spec.ts`). */

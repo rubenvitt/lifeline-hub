@@ -54,8 +54,11 @@ for (const breite of [1280, 390]) {
     // (für den Admin gesetzt in `globale-vorbereitung.ts`).
     if (breite < 992)
       await page.getByRole('button', { name: 'Navigation öffnen', exact: true }).click();
-    await page.getByRole('button', { name: 'Erfassung', exact: true }).click();
-    await page.getByRole('button', { name: 'ETB', exact: true }).click();
+    // Im Drawer ist die Kategorie ein Klappkopf, in der Rail ein Link auf ihr erstes Modul (LLH-1732).
+    await page
+      .getByRole(breite < 992 ? 'button' : 'link', { name: 'Erfassung', exact: true })
+      .click();
+    await page.getByRole('link', { name: 'ETB', exact: true }).click();
     await expect(page).toHaveURL(etbPfad(a));
     // Unter `md` startet die Erfassungsleiste eingeklappt (LFH-955): Feldzeile und Rufname-Abfrage
     // stehen erst, wenn der Fokus in ihr liegt.

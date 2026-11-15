@@ -128,6 +128,10 @@
   --lfh-luecke-zeile: #faf3da;
   --lfh-problem-zeile: #f8eded;
   --lfh-zeichen-platte: transparent;
+  --lfh-uebung-fuellung: #6d28d9;
+  --lfh-uebung-schraffur: #5b21b6;
+  --lfh-uebung-text: #ffffff;
+  --lfh-uebung-kante: #a78bfa;
   --lfh-etb-meldung-kante: #1677ff;
   --lfh-etb-meldung-wort: #0a47a6;
   --lfh-etb-anordnung-kante: #b35600;
@@ -242,6 +246,10 @@
   --lfh-luecke-zeile: #161305;
   --lfh-problem-zeile: #130f0f;
   --lfh-zeichen-platte: #c9ced4;
+  --lfh-uebung-fuellung: #6d28d9;
+  --lfh-uebung-schraffur: #5b21b6;
+  --lfh-uebung-text: #ffffff;
+  --lfh-uebung-kante: #a78bfa;
   --lfh-etb-meldung-kante: #1677ff;
   --lfh-etb-meldung-wort: #5c9dff;
   --lfh-etb-anordnung-kante: #d46b08;
@@ -673,26 +681,31 @@ mark.lfh-fundstelle {
 main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-end: var(--lfh-zaehltasten-fokusabstand, 0px);
 }
-:root:has([data-lfh='modul-panel'] :focus) {
-  scroll-padding-block-end: var(--lfh-modulpanel-fokusabstand, 0px);
-}
 :root .ant-modal-wrap:has([data-lfh='erfassung-fuss']) {
   scroll-padding-block-end: var(--lfh-erfassung-fokusabstand, 0px);
 }
 :root {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
+:root:has(
+  [data-lfh='seitenkopf'] :focus,
+  [data-lfh='rail-spalte'] :focus,
+  [data-lfh='modul-panel'] :focus,
+  [data-lfh='verwaltung-menue'] :focus
+) {
+  scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
+}
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
   scroll-padding-block-start: 0px;
 }
 :root:has([data-lfh='etb-kopf-klebt']) {
   scroll-padding-block-start: calc(
-    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px) +
-      var(--lfh-etb-filterleiste-hoehe, 0px) + var(--lfh-etb-spaltenkopf-hoehe, 0px)
+    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-filterleiste-hoehe, 0px) +
+      var(--lfh-etb-spaltenkopf-hoehe, 0px)
   );
 }
 :root:has([data-lfh='etb-kopf-klebt'] :focus, [data-lfh='seitenkopf'] :focus) {
-  scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
+  scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
 }
 :root:has([data-lfh='ausgabe-kurzzeile']) {
   scroll-padding-block-start: calc(

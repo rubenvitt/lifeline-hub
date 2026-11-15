@@ -2,7 +2,7 @@
 titel: Profil und Sicherheit
 gruppen: [alle]
 reihenfolge: 60
-quellen: [frontend/src/pages/ProfilPage.tsx, frontend/src/anzeige/ZeitdarstellungGeraetWahl.tsx, frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/PasswortAendernDialog.tsx, frontend/src/auth/TotpPasswortDialog.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/api/auth.ts, frontend/src/pages/LoginPage.tsx, src/routes/auth.rs, src/routes/sitzung.rs, src/routes/benutzer.rs, src/auth/session.rs, src/auth/totp/, src/auth/geraet_bezeichnung.rs]
+quellen: [frontend/src/pages/ProfilPage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/anzeige/ZeitdarstellungGeraetWahl.tsx, frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/PasswortAendernDialog.tsx, frontend/src/auth/TotpPasswortDialog.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/api/auth.ts, frontend/src/pages/LoginPage.tsx, src/routes/auth.rs, src/routes/sitzung.rs, src/routes/benutzer.rs, src/auth/session.rs, src/auth/totp/, src/auth/geraet_bezeichnung.rs]
 ---
 
 ## Überblick
@@ -21,6 +21,14 @@ Betrieb der Instanz anbietet.
 2. Unter „Konto“ stehen Anzeigename, Benutzername, Systemrolle und Organisation.
 
    ![Profilseite mit den Abschnitten „Konto“, „Sicherheit“ mit Passwort und zweitem Faktor sowie „Anmeldungen“](../bilder/profil-sicherheit/profil.png)
+
+### Darstellung, Bediendichte und Helligkeit dieses Geräts wählen
+
+1. Im Profil unter „Darstellung auf diesem Gerät“ in den Leisten „Darstellung“, „Bediendichte“
+   und „Helligkeit in %“ den Wert wählen. Jede Wahl gilt sofort.
+
+Es sind dieselben Leisten wie im Benutzermenü unter „Anzeige“; was gilt, beschreibt das Kapitel
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md).
 
 ### Die Zeitdarstellung dieses Geräts wählen
 

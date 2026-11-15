@@ -2,7 +2,7 @@
 titel: Gerät bedienen
 gruppen: [geraete]
 reihenfolge: 710
-quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/live/useEinsatzLiveStream.ts, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/offline/fruehereKopplung.ts, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/KoppelnPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/live/useEinsatzLiveStream.ts, frontend/src/geraet/GeraeteKopf.tsx, frontend/src/geraet/GeraeteMenue.tsx, frontend/src/theme/dichte.ts, frontend/src/theme/darstellungOptionen.ts, frontend/src/geraet/KopplungBeendetPage.tsx, frontend/src/offline/fruehereKopplung.ts, frontend/src/hilfe/HilfePage.tsx, src/geraet/mod.rs, frontend/src/components/instrument/Uebung.tsx]
 ---
 
 ## Überblick
@@ -39,13 +39,18 @@ der Einsatzleitung einen neuen geben.“
 ### Kopfzeile lesen
 
 1. Links stehen die Stelle (bei Ansichten ohne Stelle die Ansicht) und die Gerätebezeichnung.
-2. Rechts folgen das Ende der Kopplung („bis …“), die Verbindung, die Uhr und das Gerätemenü.
+2. Rechts folgen die Restzeit der Kopplung („Kopplung noch 5 h“), die Verbindung, die Uhr und das
+   Gerätemenü. Die genaue Endzeit zeigt der Hinweis beim Darüberfahren mit der Maus.
 
-   ![Kopfzeile eines UHS-Tablets mit Stelle, Gerät, hervorgehobenem „endet …“, Verbindung, Uhr und Gerätemenü](../bilder/geraet-bedienen/kopfzeile.png)
+   ![Kopfzeile eines UHS-Tablets mit Stelle, Gerät, hervorgehobener Restzeit „Kopplung noch … min“, Verbindung, Uhr und Gerätemenü](../bilder/geraet-bedienen/kopfzeile.png)
 
-In der letzten Stunde vor dem Ende steht „endet …“ hervorgehoben; verlängern kann nur die
-Einsatzleitung. Ohne Netz zeigt die Kopfzeile zusätzlich, von wann die angezeigten Daten sind
+In der letzten Stunde vor dem Ende zählt die Restzeit in Minuten („Kopplung noch 40 min“) und ist
+hervorgehoben; verlängern kann nur die Einsatzleitung. Ohne Netz zeigt die Kopfzeile zusätzlich, von wann die angezeigten Daten sind
 („Stand …“).
+
+Gehört das Gerät zu einer Übung, steht unter der Kopfzeile ein violettes Band „ÜBUNG“. Steht dort
+„Einsatzart nicht geladen“, konnte das Gerät den Einsatz nicht abrufen; es versucht es alle
+30 Sekunden erneut. Bis dahin ist offen, ob es eine Übung ist.
 
 ### Darstellung, Bediendichte und Helligkeit einstellen
 

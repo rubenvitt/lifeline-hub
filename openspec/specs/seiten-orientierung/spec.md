@@ -3,8 +3,9 @@
 ## Purpose
 Legt fest, wie eine Person jederzeit erkennt, in welchem Einsatz und auf welcher Seite sie ist
 und wie sie dorthin zurückkommt: Tab-Titel, Ortspfad, Einsatzstatus im Seitenkopf,
-Einsatzwechsler und Rückweg von Profil und Verwaltung. Herleitung:
-`openspec/changes/archive/2026-10-07-lfh-954-orientierung/design.md`.
+Einsatzwechsler und Rückweg von Profil, Benachrichtigungen, Neuigkeiten, Verwaltung und Hilfe.
+Herleitung: `openspec/changes/archive/2026-10-07-lfh-954-orientierung/design.md`, für Hilfe und
+Neuigkeiten `openspec/changes/archive/2026-11-15-ysjiv1n3-rueckweg-hilfe-profil/design.md`.
 
 ## Requirements
 
@@ -36,6 +37,22 @@ zurückkehren.
 
 - **WHEN** eine Person `/admin/stammdaten/fahrzeuge` öffnet
 - **THEN** lautet der Tab-Titel „Fahrzeuge · Verwaltung · lifeline-hub“
+
+### Requirement: Tab-Titel einer Übung beginnt mit „ÜBUNG“
+
+Ist der Einsatz eine Übung (Einsatzart „Übung“), SHALL der Tab-Titel jeder Route des
+Einsatzrahmens mit „ÜBUNG · “ beginnen, vor einer Zählung ungelesener Eingänge.
+
+#### Scenario: ETB in einer Übung
+
+- **WHEN** eine Person `/einsaetze/5/etb` des Einsatzes „Starkregen Nord“ mit der Einsatzart
+  „Übung“ öffnet
+- **THEN** lautet der Tab-Titel „ÜBUNG · ETB · Starkregen Nord · lifeline-hub“
+
+#### Scenario: Übung mit ungelesenen Eingängen
+
+- **WHEN** in derselben Übung drei Eingänge ungelesen sind
+- **THEN** lautet der Tab-Titel „ÜBUNG · (3) ETB · Starkregen Nord · lifeline-hub“
 
 ### Requirement: Ortspfad nennt den Einsatz und kürzt nur ihn
 
@@ -109,7 +126,8 @@ werden.
 
 ### Requirement: Rückweg von Profil und Verwaltung
 
-Auf `/profil` und `/admin/*` SHALL ein Ortspfad stehen („Einsätze › Profil“ bzw. „Einsätze ›
+Auf `/profil`, `/benachrichtigungen`, `/neuigkeiten` und `/admin/*` SHALL ein Ortspfad stehen
+(„Einsätze › Profil“, „Einsätze › Benachrichtigungen“, „Einsätze › Neuigkeiten“ bzw. „Einsätze ›
 Verwaltung ›“). Ist der gemerkte Einsatz aktiv und für die Person sichtbar, SHALL dort ein Knopf
 „Zurück zu <Einsatz>“ an den gemerkten Pfad führen. Der Kopflink „Verwaltung“ SHALL im
 Verwaltungsbereich `aria-current="page"` tragen und seinen Zustand nicht nur über die Farbe zeigen.
@@ -123,3 +141,79 @@ Verwaltungsbereich `aria-current="page"` tragen und seinen Zustand nicht nur üb
 
 - **WHEN** der gemerkte Einsatz abgeschlossen ist
 - **THEN** steht auf Profil kein Rückweg-Knopf
+
+#### Scenario: Neuigkeiten aus der Lagekarte
+
+- **WHEN** eine Person aus der Lagekarte eines aktiven Einsatzes über das Benutzermenü die Neuigkeiten öffnet
+- **THEN** steht über dem Titel „Einsätze › Neuigkeiten“
+- **AND** führt „Zurück zu <Einsatz>“ sie zurück in die Lagekarte desselben Einsatzes
+
+#### Scenario: Benachrichtigungen aus den Eingängen
+
+- **WHEN** eine Person in einem aktiven Einsatz in der Klappfläche „Eingänge“ „Benachrichtigungen einstellen“ wählt
+- **THEN** führt „Zurück zu <Einsatz>“ auf der Seite „Benachrichtigungen“ an die Stelle zurück, an der sie war
+
+### Requirement: Rückweg aus der Hilfe
+
+Der Kopf der Hilfe SHALL genau einen Rückweg tragen: in der Sitzung eines gekoppelten Geräts
+„Zum Gerät“, ohne Anmeldung „Zur Anmeldung“, angemeldet „Zurück zu <Einsatz>“ an den gemerkten
+Pfad unter derselben Bedingung wie auf Profil, sonst „Zu den Einsätzen“ zur Einsatzliste. Ein
+Wechsel zwischen Kapiteln MUST den Rückweg nicht ändern.
+
+#### Scenario: Hilfe aus dem ETB
+
+- **WHEN** eine Person in einem aktiven Einsatz aus dem ETB die Hilfe öffnet, ein Kapitel liest und „Zurück zu <Einsatz>“ wählt
+- **THEN** steht sie wieder im ETB desselben Einsatzes
+
+#### Scenario: Hilfe ohne aktiven Einsatz
+
+- **WHEN** eine angemeldete Person die Hilfe öffnet und ihr gemerkter Einsatz abgeschlossen ist oder es keinen gemerkten Einsatz gibt
+- **THEN** trägt der Kopf der Hilfe „Zu den Einsätzen“, und der Knopf führt zur Einsatzliste
+
+#### Scenario: Gekoppeltes Gerät
+
+- **WHEN** die Hilfe in der Sitzung eines gekoppelten Geräts geöffnet ist
+- **THEN** trägt ihr Kopf „Zum Gerät“ und keinen Rückweg in einen Einsatz
+
+### Requirement: Die Rail führt zurück ins zuletzt besuchte Modul der Kategorie
+
+Ein Klick auf eine andere Kategorie der Rail SHALL in das Modul dieser Kategorie führen, in dem
+die Person im selben Einsatz zuletzt war, jede Ankunft gezählt. Gemerkt wird je Person und Einsatz
+für zwölf Stunden. Ohne gültigen Eintrag oder wenn das gemerkte Modul gesperrt oder ausgeblendet
+ist, MUST der Klick ins erste freigegebene Modul der Kategorie führen.
+
+#### Scenario: Zurück in die Kräfte
+
+- **WHEN** eine Person in Kräfte das Modul Ablösung öffnet, dann in Erfassung wechselt und wieder
+  auf Kräfte klickt
+- **THEN** steht sie in Ablösung, nicht im ersten Modul der Kategorie
+
+#### Scenario: Ankunft über die Sprungpalette
+
+- **WHEN** eine Person über die Sprungpalette Ablösung öffnet, in Erfassung wechselt und dann auf
+  Kräfte klickt
+- **THEN** steht sie in Ablösung
+
+#### Scenario: Erster Besuch der Kategorie
+
+- **WHEN** eine Person in diesem Einsatz noch in keinem Modul der Kategorie Kräfte war und auf
+  Kräfte klickt
+- **THEN** steht sie im ersten freigegebenen Modul der Kategorie
+
+#### Scenario: Gemerktes Modul inzwischen gesperrt
+
+- **WHEN** das zuletzt besuchte Modul einer Kategorie für die Person gesperrt worden ist und sie
+  auf die Kategorie klickt
+- **THEN** steht sie im ersten freigegebenen Modul der Kategorie
+
+#### Scenario: Anderer Einsatz, andere Person
+
+- **WHEN** eine Person in Einsatz A in Ablösung war und in Einsatz B auf Kräfte klickt, oder eine
+  andere Person am selben Gerät in Einsatz A auf Kräfte klickt
+- **THEN** führt der Klick ins erste freigegebene Modul der Kategorie
+
+#### Scenario: Eintrag älter als zwölf Stunden
+
+- **WHEN** der letzte Besuch in Ablösung mehr als zwölf Stunden zurückliegt und die Person auf
+  Kräfte klickt
+- **THEN** steht sie im ersten freigegebenen Modul der Kategorie

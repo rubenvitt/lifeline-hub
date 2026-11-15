@@ -17,17 +17,23 @@ async function einsatzAnlegen(page: Page): Promise<string> {
   return String(((await antwort.json()) as { id: number }).id);
 }
 
-/** Jede Beschreibung der offenen Liste steht ganz im Behälter, keine ragt waagerecht hinaus. */
+/**
+ * Jede Beschreibung der offenen Liste steht ganz im Behälter, keine ragt waagerecht hinaus, und
+ * keine ist abgeschnitten (LLH-1734: höchstens zwei Zeilen, dann „…“, Spec `modul-benennung`).
+ */
 async function beschreibungenImRahmen(rahmen: Locator, wo: string): Promise<number> {
   const masse = await rahmen.locator('[data-lfh="modul-beschreibung"]').evaluateAll((alle) =>
     alle.map((b) => {
-      const knopf = b.closest('button')!.getBoundingClientRect();
+      // Freie Zeilen sind Links, gesperrte Knöpfe (LLH-1732).
+      const zeile = b.closest('a, button')!;
+      const knopf = zeile.getBoundingClientRect();
       const kasten = b.getBoundingClientRect();
       return {
         text: b.textContent ?? '',
         rechts: kasten.right,
         knopfRechts: knopf.right,
-        knopfScroll: b.closest('button')!.scrollWidth - b.closest('button')!.clientWidth,
+        knopfScroll: zeile.scrollWidth - zeile.clientWidth,
+        abgeschnitten: b.scrollHeight > b.clientHeight || b.scrollWidth > b.clientWidth,
       };
     }),
   );
@@ -35,6 +41,7 @@ async function beschreibungenImRahmen(rahmen: Locator, wo: string): Promise<numb
     expect(m.text.length, `${wo}: Beschreibung nicht leer`).toBeGreaterThan(0);
     expect(m.rechts, `${wo}: „${m.text}“ im Knopf`).toBeLessThanOrEqual(m.knopfRechts + 0.5);
     expect(m.knopfScroll, `${wo}: „${m.text}“ ohne Überlauf`).toBeLessThanOrEqual(0);
+    expect(m.abgeschnitten, `${wo}: „${m.text}“ ohne Auslassung`).toBe(false);
   }
   return masse.length;
 }
@@ -72,7 +79,7 @@ for (const breite of [
     // Der zugängliche Name bleibt der Modulname, die Beschreibung beschreibt.
     const lageKopf = nav.getByRole('button', { name: 'Lage', exact: true });
     if ((await lageKopf.getAttribute('aria-expanded')) !== 'true') await lageKopf.click();
-    const lagebild = nav.getByRole('button', { name: 'Lagebild', exact: true });
+    const lagebild = nav.getByRole('link', { name: 'Lagebild', exact: true });
     await expect(lagebild).toHaveAccessibleDescription('Lage in Zahlen, jüngste ETB-Einträge');
     await lagebild.click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lage-dashboard`));
@@ -112,9 +119,48 @@ test('1366 × 768: die Kräfte stehen mit Beschreibung ganz im Modulpanel', asyn
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
   const panel = page.locator('#modul-panel');
   await expect(panel).toBeVisible();
-  const zeilen = panel.locator('button:has([data-lfh="modul-beschreibung"])');
+  const zeilen = panel.locator(':is(a, button):has([data-lfh="modul-beschreibung"])');
   // Neun Kräfte-Module (mit Nachforderungen), jedes mit Beschreibung.
   await expect(zeilen).toHaveCount(9);
   await beschreibungenImRahmen(panel, '1366 px, Kräfte');
   await expect(zeilen.last()).toBeInViewport({ ratio: 1 });
+});
+
+/**
+ * LLH-1734 (Spec `modul-benennung`, `einsatztauglichkeit-layout`): einzeilig endete im 208 px
+ * breiten Panel fast jede Beschreibung in „…“, und der Handy-Drawer war fest 280 px breit. Jetzt
+ * bricht die Beschreibung auf zwei Zeilen um, und der Drawer nutzt bis zu 360 px.
+ */
+test('1440 px: die Beschreibungen der Führung stehen ohne Auslassung im Modulpanel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page);
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  const panel = page.locator('#modul-panel');
+  await expect(panel).toBeVisible();
+  // Vorbedingung: die Zeile aus der Meldung steht da (einzeilig: „Kennzahlen, Fristen, Entschei…“).
+  await expect(
+    panel.getByRole('link', { name: 'Überblick' }).locator('[data-lfh="modul-beschreibung"]'),
+  ).toHaveText('Kennzahlen, Fristen, Entscheidungen');
+  const abgeschnitten = await panel
+    .locator('[data-lfh="modul-beschreibung"]')
+    .evaluateAll((alle) =>
+      alle
+        .filter((b) => b.scrollHeight > b.clientHeight || b.scrollWidth > b.clientWidth)
+        .map((b) => b.textContent),
+    );
+  expect(abgeschnitten, 'keine Beschreibung abgeschnitten').toEqual([]);
+});
+
+test('390 × 844: der Navigations-Drawer ist 342 px breit', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+  const drawer = page.locator('.ant-drawer-content-wrapper');
+  await expect(drawer).toBeVisible();
+  await expect.poll(async () => Math.round((await drawer.boundingBox())?.width ?? 0)).toBe(342);
 });

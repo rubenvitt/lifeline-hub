@@ -1,6 +1,7 @@
 /**
  * Die zuletzt offene Adresse im Einsatzrahmen, je Person (LFH-954, Spec `seiten-orientierung`,
- * design.md D5). Einziger Leser ist der Rückweg auf Profil und Verwaltung („Zurück zu <Einsatz>“).
+ * design.md D5). Einziger Leser ist `einsatzRueckweg.ts`, der Rückweg „Zurück zu <Einsatz>“ auf
+ * den Seiten der Ebene 1 und in der Hilfe (LLH-1731).
  *
  * Anders als `zuletztModule.ts` zählt hier auch die Ankunft: gefragt ist „wo war ich“, nicht „was
  * habe ich gewählt“. Gemerkt wird die volle Adresse samt Suche, damit der Rückweg an dieselbe

@@ -122,6 +122,23 @@ describe('AdminPage · Ortspfad und Rückweg (LFH-954)', () => {
     expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/5/etb?eintrag=3');
   });
 
+  it('der Rückweg in eine Übung trägt die Übungsmarke (LLH-1725)', () => {
+    renderMitProviders(
+      <Ebene1OrtProvider
+        value={{
+          ort: ['Profil'],
+          rueckweg: { label: 'Zurück zu Starkregen Nord', pfad: '/einsaetze/5/etb', uebung: true },
+        }}
+      >
+        <AdminPage titel="Profil">
+          <div>x</div>
+        </AdminPage>
+      </Ebene1OrtProvider>,
+    );
+    const zurueck = screen.getByRole('link', { name: /Zurück zu Starkregen Nord/ });
+    expect(zurueck.querySelector('[data-lfh="uebung-marke"]')).toHaveTextContent('Übung');
+  });
+
   it('ohne aktiven Einsatz nur der Pfad', () => {
     renderMitProviders(
       <Ebene1OrtProvider value={{ ort: ['Profil'] }}>
@@ -132,5 +149,19 @@ describe('AdminPage · Ortspfad und Rückweg (LFH-954)', () => {
     );
     expect(screen.getByRole('link', { name: 'Einsätze' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Zurück zu/ })).toBeNull();
+  });
+});
+
+/**
+ * Auch in der Verwaltung klebt der Seitenkopf unter der Kopfleiste (zjt7c073 D3, Wahl vom
+ * 15.11.2026); wann genau, prüft `seitenkopfKleben.test.tsx`.
+ */
+describe('AdminPage · klebender Seitenkopf', () => {
+  it('klebt ab md unter der Kopfleiste, mit Seitengrund', () => {
+    const { container } = renderMitProviders(<AdminPage titel="Benutzer">Inhalt</AdminPage>);
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(kopf.style.position).toBe('sticky');
+    expect(kopf.style.top).toBe('var(--lfh-kopf-oben, 0px)');
+    expect(kopf.style.background).not.toBe('');
   });
 });

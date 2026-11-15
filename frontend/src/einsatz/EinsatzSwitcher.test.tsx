@@ -42,6 +42,24 @@ function setup() {
 }
 
 describe('EinsatzSwitcher', () => {
+  it('kennzeichnet eine Übung in der Liste mit der Übungsmarke (LLH-1725)', async () => {
+    server.use(
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json([
+          einsatz({ id: 7, bezeichnung: 'Hochwasser', einsatzart: 'realeinsatz' }),
+          einsatz({ id: 8, bezeichnung: 'Starkregen Nord', einsatzart: 'uebung' }),
+        ]),
+      ),
+    );
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: /Hochwasser/ }));
+    const menue = await screen.findByRole('menu');
+    const uebung = within(menue).getByRole('menuitem', { name: /Starkregen Nord/ });
+    expect(uebung.querySelector('[data-lfh="uebung-marke"]')).not.toBeNull();
+    const real = within(menue).getByRole('menuitem', { name: /Hochwasser/ });
+    expect(real.querySelector('[data-lfh="uebung-marke"]')).toBeNull();
+  });
+
   it('zeigt nur aktive Einsaetze plus Aktionen', async () => {
     server.use(
       http.get('/api/einsaetze', () =>

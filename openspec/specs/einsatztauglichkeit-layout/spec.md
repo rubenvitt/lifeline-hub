@@ -336,13 +336,33 @@ Boden von zwei Zeilen ohne Kürzung.
 ### Requirement: Der Rahmen bleibt beim Rollen erreichbar
 
 Ab `md` MUST die Kopfleiste beim Rollen am oberen Fensterrand stehen bleiben, ab `lg` auch die
-Kategorie-Symbole der Rail. Unter `md` MUST die Kopfleiste mitrollen und die Betriebszeile oben
-stehen bleiben, solange sie eine Verbindungsstörung meldet. Jedes oben klebende Element MUST
-unter dem klebenden Rahmen stehen, nicht hinter ihm.
+Kategorie-Symbole der Rail und das offene Modulpanel samt Fuß „Einsatzdauer“. Ab `md` MUST der
+Seitenkopf einer Einsatz- oder Verwaltungsseite unter der Kopfleiste stehen bleiben, solange
+Kopfleiste und Seitenkopf zusammen höchstens ein Drittel der Fensterhöhe nehmen; sonst rollt er
+mit. Im ETB kleben Seitenkopf, Filterleiste und Spaltenkopf nur gemeinsam, solange alle drei mit
+der Kopfleiste in dieses Drittel passen (Spec `etb-filterleiste`). Unter `md` MUST die Kopfleiste
+mitrollen und die Betriebszeile oben stehen bleiben, solange sie eine Verbindungsstörung meldet. Jedes oben klebende Element MUST unter dem klebenden Rahmen
+stehen, nicht hinter ihm; im Inhalt zählt ein klebender Seitenkopf zum Rahmen.
 
 #### Scenario: Langes Rollen im ETB ab Tablet
 - **WHEN** das ETB bei 820, 1180 und 1440 px Breite auf 1500 px gerollt ist
 - **THEN** steht die Kopfleiste mit `position: sticky` bei `top ≥ 0` im Fenster, und ab 1180 px stehen die Kategorie-Symbole der Rail im Fenster
+
+#### Scenario: Modulpanel bleibt beim Rollen stehen
+- **WHEN** das ETB bei 1440 × 900 mit offenem Modulpanel geöffnet wird und damit ans Ende der Zeitachse gerollt ist
+- **THEN** stehen Kopf des Modulpanels, alle Moduleinträge der Kategorie und der Fuß „Einsatzdauer“ im Fenster unter der Kopfleiste, und ein Klick auf einen Moduleintrag wechselt das Modul, ohne vorher zu rollen
+
+#### Scenario: Modulpanel länger als das Fenster
+- **WHEN** das Modulpanel bei 1366 × 520 im Handschuh-Betrieb mehr Einträge hat, als unter der Kopfleiste Platz finden, und die Seite gerollt ist
+- **THEN** rollt das Panel in sich, sein Kopf steht im Fenster, und jeder Eintrag sowie der Fuß „Einsatzdauer“ sind per Wischen oder Tab erreichbar, ohne dass ein Teil des Panels einen anderen verdeckt
+
+#### Scenario: Seitenkopf bleibt auf langen Seiten stehen
+- **WHEN** das ETB, das Modul „Personal“, die Einstellungen des Einsatzes oder eine Verwaltungsseite bei 1180 × 820 oder 1440 × 900 bis ans Ende gerollt ist
+- **THEN** steht der Seitenkopf mit Titel und Seitenaktionen direkt unter der Kopfleiste im Fenster, und seine Aktionen lassen sich ohne Rollen bedienen
+
+#### Scenario: Niedriges Fenster
+- **WHEN** eine Einsatzseite bei 1366 × 520 im Handschuh-Betrieb gerollt ist und Kopfleiste und Seitenkopf zusammen mehr als ein Drittel der Fensterhöhe nähmen
+- **THEN** rollt der Seitenkopf mit dem Inhalt, und die Kopfleiste bleibt stehen wie bisher
 
 #### Scenario: Offline auf dem Handy
 - **WHEN** das ETB bei 390 × 844 auf 1500 px gerollt ist und das Gerät das Netz verliert
@@ -350,7 +370,15 @@ unter dem klebenden Rahmen stehen, nicht hinter ihm.
 
 #### Scenario: Tabellenkopf unter dem Rahmen
 - **WHEN** eine Seite mit stehendem Tabellenkopf ab `md` so weit gerollt ist, dass der Tabellenkopf klebt
-- **THEN** liegt seine Oberkante an der Unterkante der Kopfleiste, nicht darüber
+- **THEN** liegt seine Oberkante an der Unterkante des klebenden Seitenkopfs, oder an der Unterkante der Kopfleiste, wenn der Seitenkopf mitrollt, nicht darüber
+
+#### Scenario: Niedriges Fenster im ETB
+- **WHEN** das ETB gerollt ist und Kopfleiste und Seitenkopf zwar ins Drittel der Fensterhöhe passen, mit Filterleiste und Spaltenkopf aber nicht mehr
+- **THEN** rollen Seitenkopf, Filterleiste und Spaltenkopf gemeinsam mit, und die Kopfleiste bleibt stehen
+
+#### Scenario: Fokus unter dem klebenden Seitenkopf
+- **WHEN** der Fokus auf einer gerollten Seite mit klebendem Seitenkopf bei 1440 × 900 mit Shift+Tab rückwärts durch die Ziele des Inhalts läuft
+- **THEN** liegt jedes fokussierte Ziel ganz unter dem Seitenkopf, nicht dahinter, und ein Fokus in den Seitenaktionen rollt die Seite nicht
 
 ### Requirement: Das Modulpanel lässt am Tablet quer Platz
 
@@ -366,19 +394,23 @@ eine gemerkte Wahl MUST auf jeder Breite gelten. Das Panel MUST einen sichtbaren
 - **WHEN** der Überblick bei 1180 px mit offenem Modulpanel steht
 - **THEN** beginnt der Stärkeblock jeder Abschnittszeile auf der Höhe des Abschnittsnamens
 
-### Requirement: Benutzermenü: Abmelden ohne Rollen
+### Requirement: Benutzermenü: Einsatzfunktion im Kopf
 
-Im Benutzermenü MUST „Profil“ und „Abmelden“ direkt nach dem Kopf stehen, vor den
-Umschaltgruppen, und auf 390 × 844 und 1180 × 820 in jeder Dichtestufe ohne Rollen sichtbar und
-anklickbar sein. Der Menükopf MUST die eigene Einsatzfunktion nennen, wenn es eine gibt, auf
-jeder Breite.
+Der Kopf des Benutzermenüs MUST die eigene Einsatzfunktion nennen, wenn es eine gibt, auf jeder
+Breite. Wo „Profil“ und „Abmelden“ im Menü stehen und was davon am Handy ohne Rollen sichtbar
+ist, regelt die Fähigkeit `benutzermenue`; „Abmelden“ MUST auf 390 × 844 und 1180 × 820 in jeder
+Dichtestufe im Menü erreichbar sein, im Handschuh-Betrieb am Handy auch erst durch Rollen.
 
 #### Scenario: Schichtwechsel am Handy im Handschuh-Betrieb
 - **WHEN** das Benutzermenü bei 390 × 844 in `handschuh` geöffnet wird
-- **THEN** liegt „Abmelden“ ohne Rollen im Fenster, und ein Klick darauf meldet ab
+- **THEN** ist „Abmelden“ im Menü erreichbar, gegebenenfalls durch Rollen, und meldet nach der Rückfrage ab
 
 #### Scenario: Funktion auf dem Tablet
 - **WHEN** das Benutzermenü im Einsatz unter `xl` geöffnet wird und die Person eine Funktion hat
+- **THEN** nennt der Menükopf die Funktion
+
+#### Scenario: Funktion am Handy
+- **WHEN** das Benutzermenü im Einsatz bei 390 × 844 geöffnet wird und die Person eine Funktion hat
 - **THEN** nennt der Menükopf die Funktion
 
 ### Requirement: Der Seitenkopf bündelt Nebenwege unter md
@@ -474,3 +506,42 @@ in dieser Frist oder scheitern sie, MUST die App trotzdem rendern, in der Ersatz
 #### Scenario: Schriften kommen nicht
 - **WHEN** die Schriftabrufe nicht innerhalb von 300 ms antworten oder scheitern
 - **THEN** rendert die App trotzdem, und der Text steht in der Ersatzschrift
+
+### Requirement: Ein Rail-Sprung achtet die gemerkte Panel-Wahl
+
+Hat eine Person das Modulpanel zugeklappt, MUST es nach einem Klick auf eine andere Kategorie der
+Rail zugeklappt bleiben. Ohne gemerkte Wahl SHALL ein solcher Klick das Panel für die laufende
+Sitzung öffnen.
+
+#### Scenario: Zugeklappt bleibt zu
+
+- **WHEN** eine Person bei 1440 px das Modulpanel mit „Menü“ zuklappt und dann in der Rail auf
+  eine andere Kategorie klickt
+- **THEN** wechselt die Seite in ein Modul dieser Kategorie, und das Modulpanel bleibt zugeklappt
+
+#### Scenario: Tablet quer ohne Wahl
+
+- **WHEN** eine Person bei 1180 px ohne gemerkte Wahl in der Rail auf eine andere Kategorie klickt
+- **THEN** steht das Modulpanel dieser Kategorie offen
+
+### Requirement: Der Rail-Fuß bleibt im Fenster
+
+Ab `lg` MUST die Spalte der Rail am unteren Fensterrand enden, auch wenn über der Kopfleiste oder
+zwischen Kopfleiste und Rail eine Zeile im Fluss steht, etwa die Betriebszeile mit dem
+Offline-Hinweis. Passen Kategorien und Fuß („Menü“, „Einst.“) in die Höhe, steht der Fuß damit im
+Fenster; sonst rollt die Spalte in sich, und der Fuß folgt den Kategorien.
+
+#### Scenario: Offline am Fükw
+
+- **WHEN** ein Einsatz bei 1366 × 768 oben steht und das Gerät das Netz verliert
+- **THEN** liegt die Unterkante von „Einst.“ am oder über dem unteren Fensterrand
+
+### Requirement: Der Navigations-Drawer nutzt die Breite des Handys
+
+Unter `lg` MUST der Navigations-Drawer 360 px breit sein, höchstens aber die Fensterbreite minus
+48 px, damit rechts ein Streifen zum Schließen bleibt.
+
+#### Scenario: Handy
+
+- **WHEN** eine Person bei 390 × 844 die Navigation öffnet
+- **THEN** ist der Drawer 342 px breit

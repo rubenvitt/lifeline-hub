@@ -31,7 +31,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
     setHelligkeit: vi.fn(),
     setKoordinaten: vi.fn(),
     setZeitdarstellung: vi.fn(),
-    logout: vi.fn(),
+    abmelden: vi.fn(),
     ...over,
   };
 }
@@ -339,6 +339,15 @@ describe('baueBefehle — Einsatz-Wechsel', () => {
     expect(b.some((x) => x.id === 'einsatz:8')).toBe(false);
     b.find((x) => x.id === 'einsatz:7')!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/7');
+  });
+
+  it('kennzeichnet eine Übung und findet sie über „Übung“ (LLH-1725)', () => {
+    const uebung: EinsatzAnzeige = { ...aktiverEinsatz, id: 9, einsatzart: 'uebung' };
+    const b = baueBefehle(kontext({ einsaetze: [aktiverEinsatz, uebung] }));
+    const zeile = b.find((x) => x.id === 'einsatz:9')!;
+    expect(zeile.uebung).toBe(true);
+    expect(zeile.schlagworte).toContain('Übung');
+    expect(b.find((x) => x.id === 'einsatz:7')!.uebung).toBeUndefined();
   });
 });
 
@@ -823,15 +832,15 @@ describe('baueBefehle — was ins Gedächtnis kommt', () => {
    * Abmelden gehört NICHT ins Gedächtnis: als oberste, vorausgewählte Zeile beendete
    * `Strg/⌘+K` + Enter die Sitzung. Ausgeführt wird es weiterhin.
    */
-  it('meldet das Ausführen von Abmelden NICHT, führt ihn aber aus', () => {
+  it('meldet das Ausführen von Abmelden NICHT, öffnet aber die Rückfrage (LLH-1730)', () => {
     const merkeBefehl = vi.fn();
-    const logout = vi.fn();
+    const abmelden = vi.fn();
 
-    baueBefehle({ ...kontext({ logout }), merkeBefehl })
+    baueBefehle({ ...kontext({ abmelden }), merkeBefehl })
       .find((x) => x.id === 'nav:abmelden')!
       .ausfuehren();
 
-    expect(logout).toHaveBeenCalledTimes(1);
+    expect(abmelden).toHaveBeenCalledTimes(1);
     expect(merkeBefehl).not.toHaveBeenCalled();
   });
 

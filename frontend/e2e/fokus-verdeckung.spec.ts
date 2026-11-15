@@ -988,20 +988,20 @@ for (const { dichte, boden, abstand } of [
 
 /**
  * Selbstbeweis an einem echten klebenden Knoten der Route: seit LLH-1036 gibt es die
- * Speicherleiste nicht mehr, also steht die Probe hinter dem Fuß des Modulpanels
- * (`[data-lfh="modul-panel-fuss"]`, `sticky; bottom: 0`).
+ * Speicherleiste nicht mehr, also steht die Probe hinter der klebenden Spalte des Modulpanels
+ * (`[data-lfh="modul-panel-spalte"]`, `sticky` unter dem Kopf, zjt7c073 D4), auf Höhe ihres Fußes.
  */
 test('Einheit Selbstbeweis: ein Fokusziel hinter einem echten sticky Knoten wird erkannt', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1366, height: 520 });
   await einheitFokusBereit(page, 'handschuh');
-  const fuss = page.locator('[data-lfh="modul-panel-fuss"]');
-  await expect(fuss).toHaveCSS('position', 'sticky');
-  await expect(fuss).toBeInViewport();
-  await fuss.evaluate((el) => {
+  const spalte = page.locator('[data-lfh="modul-panel-spalte"]');
+  await expect(spalte).toHaveCSS('position', 'sticky');
+  await expect(page.locator('[data-lfh="modul-panel-fuss"]')).toBeInViewport();
+  await spalte.evaluate((el) => {
     el.classList.add('e2e-einheit-verdecker');
-    const r = el.getBoundingClientRect();
+    const r = el.querySelector('[data-lfh="modul-panel-fuss"]')!.getBoundingClientRect();
     const probe = document.createElement('button');
     probe.id = 'e2e-fussprobe';
     probe.textContent = 'Fußprobe';
@@ -1014,7 +1014,7 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter einem echten sticky Knoten wird
       height: '20px',
       zIndex: '0',
     });
-    // Geschwister, kein Kind des Fußes: Vorfahren des Fokusziels sind keine Verdecker.
+    // Geschwister, kein Kind der Spalte: Vorfahren des Fokusziels sind keine Verdecker.
     el.before(probe);
     const start = document.createElement('button');
     start.id = 'e2e-probenstart';
@@ -1041,11 +1041,13 @@ test('Einheit Selbstbeweis: ein Fokusziel hinter einem echten sticky Knoten wird
 });
 
 /**
- * Der klebende Fuß des Modulpanels (Einsatzdauer, `sticky; bottom: 0`) verdeckt kein Ziel der
- * Liste darüber. Deterministisch statt per Tabulatordurchlauf, der die Lage nur zufällig
- * trifft: die Seite wird je Schritt anders gescrollt und das Ziel frisch fokussiert.
+ * Der Fuß des Modulpanels (Einsatzdauer) verdeckt kein Ziel der Liste darüber. Seit zjt7c073 D4
+ * steht er fest am Ende der klebenden Spalte, und nur die Liste rollt in sich: ein Eintrag unter
+ * ihm ist abgeschnitten, der Fokus muss die Liste rollen, bis er ganz über dem Fuß steht.
+ * Deterministisch statt per Tabulatordurchlauf, der die Lage nur zufällig trifft: Seite und
+ * Liste werden je Schritt zurückgesetzt und das Ziel frisch fokussiert.
  */
-test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modul (1366 × 520, handschuh)', async ({
+test('Modulpanel: der Einsatzdauer-Fuß verdeckt kein fokussiertes Modul (1366 × 520, handschuh)', async ({
   page,
 }) => {
   await anmelden(page);
@@ -1057,8 +1059,8 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
   await detailBereit(page);
   const panel = page.locator('[data-lfh="modul-panel"]');
   const fuss = panel.locator('[data-lfh="modul-panel-fuss"]');
-  await expect(fuss).toHaveCSS('position', 'sticky');
-  const ziel = panel.getByRole('button', { name: /^Bereitstellungsräume/ });
+  await expect(panel.locator('[data-lfh="modul-panel-spalte"]')).toHaveCSS('position', 'sticky');
+  const ziel = panel.getByRole('link', { name: /^Bereitstellungsräume/ });
   await expect(ziel).toHaveCount(1);
   const befunde: string[] = [];
   let unterDemFussGestartet = 0;
@@ -1066,6 +1068,7 @@ test('Modulpanel: der klebende Einsatzdauer-Fuß verdeckt kein fokussiertes Modu
     await page.evaluate((wert) => {
       (document.activeElement as HTMLElement | null)?.blur();
       window.scrollTo(0, wert);
+      document.querySelector('[data-lfh="modul-panel-liste"]')?.scrollTo(0, 0);
     }, y);
     // Nur Lagen, in denen das Ziel VOR dem Fokus den Fuß berührt, prüfen überhaupt etwas.
     const vorher = await ziel.evaluate(
@@ -1117,14 +1120,14 @@ test('Rail (LLH-1241, LLH-1273): kein Kategorie-Ziel liegt unter dem Fuß, auch 
   expect(await spalte.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
   await expect(fuss).not.toHaveCSS('position', 'sticky');
 
-  const kategorien = await rail.locator('[data-lfh="rail-haupt"] button').all();
+  const kategorien = await rail.locator('[data-lfh="rail-haupt"] :is(a, button)').all();
   const namen: string[] = [];
   for (const k of kategorien) {
     const name = (await k.getAttribute('aria-label'))!;
     namen.push(name);
     await k.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
   }
-  const fussZiele = fuss.locator('button');
+  const fussZiele = fuss.locator('a, button');
   const zieleImFuss = await fussZiele.count();
   for (let i = 0; i < zieleImFuss; i += 1) {
     await fussZiele.nth(i).evaluate((el) => el.setAttribute('data-e2e-fuss', 'ja'));
@@ -1136,7 +1139,7 @@ test('Rail (LLH-1241, LLH-1273): kein Kategorie-Ziel liegt unter dem Fuß, auch 
   const ueberlappungJetzt = () =>
     rail.evaluate((nav) => {
       const fussOben = nav.querySelector('[data-lfh="rail-fuss"]')!.getBoundingClientRect().top;
-      return [...nav.querySelectorAll<HTMLElement>('[data-lfh="rail-haupt"] button')]
+      return [...nav.querySelectorAll<HTMLElement>('[data-lfh="rail-haupt"] :is(a, button)')]
         .map((b) => ({
           name: b.getAttribute('aria-label'),
           ueber: b.getBoundingClientRect().bottom - fussOben,

@@ -1,14 +1,23 @@
-import type { CSSProperties } from 'react';
+import { useLayoutEffect, useState, type CSSProperties } from 'react';
 import { theme } from 'antd';
 import { IconSeitenleisteAuf, IconSeitenleisteZu } from '../icons';
 import { railBreite } from '../components/Kopfleiste';
+import { readKopfOben, useKopfOben } from '../components/rahmenOben';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
+import { handleLinkKlick } from '../routing/linkModifier';
 
 interface Props {
   kategorien: Kategorie[];
   aktiveKategorie: KategorieKey | null;
+  /** Einfacher Klick auf eine Kategorie; Strg/⌘/Umschalt/Mittelklick behält der Browser. */
   onKategorieKlick: (key: KategorieKey) => void;
+  /**
+   * Adresse des Ziels einer Kategorie, das erste freigegebene Modul (LLH-1732). Mit Adresse ist
+   * das Ziel ein `<a href>`, damit Strg/⌘+Klick einen neuen Tab öffnet; ohne (kein freigegebenes
+   * Modul, oder der Aufrufer reicht keine Adressen) bleibt es ein Knopf.
+   */
+  kategoriePfad?: (key: KategorieKey) => string | null;
   /**
    * Das Modulpanel neben der Rail (LFH-952, D5): trägt den Griff „Menü“ im Fuß und
    * `aria-expanded` an der offenen Kategorie. Ohne (Drawer-Zweig) kein Griff.
@@ -45,6 +54,9 @@ export function railZielStil(
 ): CSSProperties {
   return {
     width: '100%',
+    boxSizing: 'border-box',
+    // Das Ziel ist ein `<a href>` oder ein `<button>` (LLH-1732); beide sehen gleich aus.
+    textDecoration: 'none',
     minHeight: Math.max(RAIL_ZEILE, token.controlHeight),
     padding: `${token.paddingXS}px 2px`,
     border: 'none',
@@ -83,6 +95,45 @@ const ETIKETT_STIL: CSSProperties = {
 };
 
 /**
+ * Der Vorlauf der Rail (LLH-1734, design.md D3 in
+ * `openspec/changes/archive/2026-11-15-f24jkokr-rahmen-kleinteile/`): was im Fluss über ihr steht
+ * und nicht zum klebenden Rahmen zählt, also die Betriebszeile ab `md`, das Spiegelband und die
+ * Warnung zu den Modulfreigaben. Gemessen als Abstand der `<nav>` vom Dokumentanfang minus
+ * `--lfh-kopf-oben` (nicht die Rahmenhöhe: ein klebender Seitenkopf steht neben der Rail, nicht
+ * über ihr, zjt7c073 D2); die `<nav>` klebt nicht, ihr Abstand hängt also nicht am Rollstand.
+ *
+ * Neu gemessen, wenn sich `body` in der Größe ändert (eine Zeile erscheint oder verschwindet) oder
+ * der Rahmen eine neue Höhe meldet; geschrieben im nächsten Bild, wie in `rahmenOben.ts` (LLH-1335).
+ */
+function useVorlauf(): [(el: HTMLElement | null) => void, number] {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [vorlauf, setVorlauf] = useState(0);
+  const kopfOben = useKopfOben();
+  useLayoutEffect(() => {
+    if (!el) return;
+    const measure = () => {
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setVorlauf(Math.max(0, Math.round(top - readKopfOben())));
+    };
+    measure();
+    let pending = 0;
+    const observer = new ResizeObserver(() => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        measure();
+      });
+    });
+    observer.observe(document.body);
+    return () => {
+      observer.disconnect();
+      if (pending) cancelAnimationFrame(pending);
+    };
+  }, [el, kopfOben]);
+  return [setEl, vorlauf];
+}
+
+/**
  * Schmale vertikale Kategorie-Rail, 60 px.
  *
  * Das Etikett steht SICHTBAR, nicht im Tooltip: auf dem Führungs-Tablet gibt es kein Hover. Es
@@ -90,33 +141,55 @@ const ETIKETT_STIL: CSSProperties = {
  * „Einstellungen" (`fuss`) steht abgesetzt unten. Es bleiben SECHS Kategorie-Ziele in EINER
  * Landmarke; steht ein Modulpanel daneben, kommt im Fuß der Griff „Menü“ dazu (LFH-952).
  */
-export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
+export default function IconRail({
+  kategorien,
+  aktiveKategorie,
+  onKategorieKlick,
+  kategoriePfad,
+  panel,
+}: Props) {
   const { token } = theme.useToken();
+  const [navRef, vorlauf] = useVorlauf();
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
     const Icon = aktiv ? k.icon.gefuellt : k.icon.umriss;
-    return (
-      <button
-        key={k.key}
-        type="button"
-        aria-label={k.label}
-        title={k.label === k.kurz ? undefined : k.label}
-        aria-current={aktiv ? 'true' : undefined}
-        // Der Selbstklick klappt das Panel um (LFH-952): die offene Kategorie sagt, ob es steht.
-        aria-expanded={aktiv && panel ? panel.offen : undefined}
-        aria-controls={aktiv && panel?.offen ? MODUL_PANEL_ID : undefined}
-        onClick={() => onKategorieKlick(k.key)}
-        style={railZielStil(token, { aktiv })}
-      >
+    const zielProps = {
+      'aria-label': k.label,
+      title: k.label === k.kurz ? undefined : k.label,
+      'aria-current': aktiv ? ('true' as const) : undefined,
+      // Der Selbstklick klappt das Panel um (LFH-952): die offene Kategorie sagt, ob es steht.
+      'aria-expanded': aktiv && panel ? panel.offen : undefined,
+      'aria-controls': aktiv && panel?.offen ? MODUL_PANEL_ID : undefined,
+      style: railZielStil(token, { aktiv }),
+    };
+    const inhalt = (
+      <>
         {/* `flexShrink: 0`, sonst gibt das Icon statt des Etiketts nach. `aria-hidden`: der Name steht
-           am Knopf. */}
+           am Ziel. */}
         <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
           <Icon size={20} />
         </span>
         <span aria-hidden="true" data-lfh="rail-etikett" style={ETIKETT_STIL}>
           {k.kurz}
         </span>
+      </>
+    );
+    const pfad = kategoriePfad?.(k.key) ?? null;
+    // Mit Adresse ein Link (LLH-1732): Strg/⌘+Klick legt das Modul in einen neuen Tab. Der einfache
+    // Klick bleibt Sprung bzw. Umklappen, auch an der offenen Kategorie.
+    return pfad ? (
+      <a
+        key={k.key}
+        href={pfad}
+        onClick={(e) => handleLinkKlick(e, () => onKategorieKlick(k.key))}
+        {...zielProps}
+      >
+        {inhalt}
+      </a>
+    ) : (
+      <button key={k.key} type="button" onClick={() => onKategorieKlick(k.key)} {...zielProps}>
+        {inhalt}
       </button>
     );
   };
@@ -126,8 +199,10 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
 
   return (
     <nav
+      ref={navRef}
       aria-label="Kategorien"
       style={{
+        ['--lfh-rail-vorlauf' as string]: `${vorlauf}px`,
         display: 'flex',
         flexDirection: 'column',
         background: rahmenFarben.grund,
@@ -144,15 +219,17 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
          klebende Teile (Kategorien oben, Fuß unten) überlappten bei geringer Höhe in `handschuh`,
          und keiner rollte die verdeckte Kategorie frei. Reicht die Höhe nicht, rollt die Spalte in
          sich, und der Fuß folgt den Kategorien (LLH-1273): die Kategorien stehen zuerst im Bild,
-         nichts liegt unter einem klebenden Teil. Steht über dem Kopf eine Zeile im Fluss
-         (Betriebszeile ab `md`), endet die Spalte um ihre Höhe unter dem Fensterrand, bis die Seite
-         so weit gerollt ist. */}
+         nichts liegt unter einem klebenden Teil. Was im Fluss über der Rail steht (Betriebszeile ab
+         `md`), zieht die Spalte als Vorlauf ab (LLH-1734), sonst lag der Fuß bei Rollstand 0 um
+         dessen Höhe unter dem Fensterrand. Gerollt bleibt darunter ein Streifen im Grund der Rail.
+         Sie hängt an der Kopfhöhe (`--lfh-kopf-oben`), nicht an der Rahmenhöhe: die zählt den
+         klebenden Seitenkopf mit, und die Rail spränge um ihn nach unten (zjt7c073 D2). */}
       <div
         data-lfh="rail-spalte"
         style={{
           position: 'sticky',
-          top: 'var(--lfh-rahmen-oben, 0px)',
-          height: 'calc(100dvh - var(--lfh-rahmen-oben, 0px))',
+          top: 'var(--lfh-kopf-oben, 0px)',
+          height: 'calc(100dvh - var(--lfh-kopf-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',

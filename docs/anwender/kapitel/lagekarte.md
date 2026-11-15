@@ -208,7 +208,8 @@ nicht geladen sind, bleiben leere Fläche. In einem früheren Lagestand trägt d
 Stand.
 
 Die Anlage ist ein PNG mit Kopf, Karte, Maßstab, Nordpfeil und Legende und steht im Lagebericht
-oder Befehl als „Lageplan“ unter den Anlagen (Kapitel [Lageberichte](lageberichte.md)).
+oder Befehl als „Lageplan“ unter den Anlagen. Bei einer Übung beginnt der Kopf des Bilds mit
+„ÜBUNG ·“ (Kapitel [Lageberichte](lageberichte.md)).
 Anhängen braucht das Schreibrecht im Einsatz und eine Verbindung; angeboten werden nur Entwürfe
 der Module, die die eigene Rolle sieht. Fehlt etwas davon, steht „Als Anlage an …“ gesperrt und
 nennt den Grund.

@@ -133,6 +133,8 @@ export interface FernmeldeskizzeBildProps {
   netz: Fernmeldenetz;
   aktionen: SkizzenAktionen | null;
   einsatzbezeichnung: string;
+  /** Der Einsatz ist eine Übung: das Schriftfeld trägt „ÜBUNG“ (LLH-1725). */
+  uebung?: boolean;
   gewaehlt?: string | null;
   onWahl?: (key: string | null) => void;
   druckFormat?: Druckformat;
@@ -194,6 +196,7 @@ function Skizze({
   netz,
   aktionen,
   einsatzbezeichnung,
+  uebung = false,
   gewaehlt: gewaehltVonAussen,
   onWahl,
   druckFormat = DRUCKFORMAT_VORGABE,
@@ -284,11 +287,15 @@ function Skizze({
   const block = useMemo(
     () =>
       schriftfeldBlock(
-        schriftfeldAngaben(angezeigt.schriftfeld, einsatzbezeichnung, angezeigt.stand, (z) =>
-          zeitpunkt(z, konventionen),
+        schriftfeldAngaben(
+          angezeigt.schriftfeld,
+          einsatzbezeichnung,
+          angezeigt.stand,
+          (z) => zeitpunkt(z, konventionen),
+          uebung,
         ),
       ),
-    [angezeigt.schriftfeld, angezeigt.stand, einsatzbezeichnung, konventionen],
+    [angezeigt.schriftfeld, angezeigt.stand, einsatzbezeichnung, konventionen, uebung],
   );
   const { inhalt, schriftfeld } = useMemo(
     () => flaechenAusdehnung(layout, angezeigt.bereiche, block),

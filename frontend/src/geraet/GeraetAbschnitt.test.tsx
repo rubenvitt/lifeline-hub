@@ -26,6 +26,7 @@ import { isEigenerEmpfaenger } from './GeraetAuftraegePage';
 import { abschnittsZonen, flaechenRahmen } from './GeraetAbschnittKarte';
 import { navigationZeigt } from './GeraeteLayout';
 import { spieleAlarmTon } from '../alarm/alarmTon';
+import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
 
 // Ob ein gekoppeltes Gerät einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -180,6 +181,74 @@ afterEach(() => {
   vi.mocked(spieleAlarmTon).mockClear();
   FakeEventSource.zuruecksetzen();
   localStorage.clear();
+});
+
+describe('Gerätehülle — Übung (LLH-1725, Spec `uebungsmarke`)', () => {
+  it('zeigt bei einer Übung das Band direkt unter dem Gerätekopf, ohne zu kleben', async () => {
+    stelleBereit();
+    server.use(
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json(
+          einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal', einsatzart: 'uebung' }),
+        ),
+      ),
+    );
+    renderApp('/geraet');
+    const band = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(band).toHaveTextContent('Übung');
+    expect(document.querySelector('[data-lfh="geraet-kopf"]')!.nextElementSibling).toBe(band);
+    // Die Hülle hat feste Höhe und rollt nur innen: das Band klebt nicht und meldet keine Höhe,
+    // sonst säßen stehende Tabellenköpfe im Gerät zu tief (design.md D7).
+    expect(band.style.position).toBe('');
+  });
+
+  it('scheitert der Einsatzkopf, steht „Einsatzart nicht geladen“ statt still nichts', async () => {
+    stelleBereit();
+    server.use(http.get('/api/einsaetze/7', () => new HttpResponse(null, { status: 503 })));
+    renderApp('/geraet');
+    expect(await screen.findByText('Einsatzart nicht geladen')).toBeVisible();
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
+
+  it('lädt den Einsatzkopf nach 30 s nach und zeigt dann das Band (LLH-1725)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      stelleBereit();
+      let abrufe = 0;
+      server.use(
+        http.get('/api/einsaetze/7', () => {
+          abrufe += 1;
+          return abrufe === 1
+            ? new HttpResponse(null, { status: 503 })
+            : HttpResponse.json(
+                einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal', einsatzart: 'uebung' }),
+              );
+        }),
+      );
+      renderApp('/geraet');
+      expect(await screen.findByText('Einsatzart nicht geladen')).toBeVisible();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(EINSATZKOPF_REFETCH_MS);
+      });
+      await waitFor(() =>
+        expect(document.querySelector('[data-lfh="uebung-band"]')).not.toBeNull(),
+      );
+      expect(screen.queryByText('Einsatzart nicht geladen')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('beim Realeinsatz steht kein Band (Gegenprobe)', async () => {
+    stelleBereit();
+    renderApp('/geraet');
+    expect(await screen.findByRole('heading', { level: 1, name: 'EA Nord' })).toBeVisible();
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
 });
 
 describe('Abschnittsgerät — Startseite und Navigation', () => {

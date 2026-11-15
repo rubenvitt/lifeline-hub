@@ -30,6 +30,7 @@ import {
 import { Vorschau } from './Vorschau';
 import Fundstellen from '../components/Fundstellen';
 import { palettenZeilenStil, schliessKnopfMass, vorschauZielStil } from './zeilenStil';
+import { UebungsMarke } from '../components/instrument';
 
 /**
  * Frist der Meldung nach außen, Wert und Bauform wie in `etb/EtbFilterleiste.tsx`; ein zweiter
@@ -509,6 +510,12 @@ export function CommandPalette({
           }}
         >
           <span style={einzeilig}>
+            {/* Übung (LLH-1725): Marke vor dem Namen; `aria-hidden`, der Name bleibt das Label. */}
+            {b.uebung && (
+              <span aria-hidden="true" style={{ marginInlineEnd: 6 }}>
+                <UebungsMarke einsatz={{ einsatzart: 'uebung' }} />
+              </span>
+            )}
             <Fundstellen text={b.label} begriff={b.fundstellen?.begriff} ab={b.fundstellen?.ab} />
           </span>
           {b.nebenzeile && (

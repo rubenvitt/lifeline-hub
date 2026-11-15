@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from 'react';
-import { abonniereRahmenOben, leseRahmenOben } from './rahmenOben';
+import { abonniereRahmenOben, readRahmenOben } from './rahmenOben';
 
 /**
  * Oberkante der stehenden Alarme (LFH-1112, `frontend/AGENTS.md`, Rahmen; Spec
@@ -37,7 +37,7 @@ function schreiben(): void {
   const unterkanten = [...quellen].map((el) => el.getBoundingClientRect().bottom);
   document.documentElement.style.setProperty(
     ALARM_OBEN_VAR,
-    `${alarmOben(unterkanten, leseRahmenOben())}px`,
+    `${alarmOben(unterkanten, readRahmenOben())}px`,
   );
 }
 

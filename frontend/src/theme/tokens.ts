@@ -158,6 +158,17 @@ export interface Farbrollen {
    *  tragen keine Platte (LFH-833): nachts zeichnet sie das Render-Theme `dark` der Bibliothek
    *  selbst hell (`zeichen/zeichenTheme.ts`, LLH-1141). */
   zeichenPlatte: string;
+  /** Übung (LLH-1725, Spec `uebungsmarke`): Grund von Band und Marke. Erkennbar ist die Übung an Form und Wort, nicht am Farbton
+   *  (violett sind auch ETB-Entscheidung und Abschnittsflächen der Lagekarte); die Töne
+   *  in beiden Modi gleich, weil das Band am Rahmen hängt, der in beiden Modi dunkel ist. Das
+   *  Wort hält den Tagesboden 7 : 1 auf Füllung und Schraffur (`uebungKontrast.test.ts`). */
+  uebungFuellung: string;
+  /** Zweiter Streifenton der Schrägschraffur im Band — dunkler als die Füllung. */
+  uebungSchraffur: string;
+  /** Das Wort „ÜBUNG“ auf Füllung und Schraffur. */
+  uebungText: string;
+  /** Umriss von Band und Marke gegen dunkle Flächen (≥ 3 : 1); gegen helle trägt ihn die Füllung. */
+  uebungKante: string;
 }
 
 /**
@@ -266,6 +277,10 @@ export const farbenHell: Farbrollen = {
   lueckeZeile: '#faf3da',
   problemZeile: '#f8eded',
   zeichenPlatte: 'transparent',
+  uebungFuellung: '#6d28d9',
+  uebungSchraffur: '#5b21b6',
+  uebungText: '#ffffff',
+  uebungKante: '#a78bfa',
 };
 
 /**
@@ -351,6 +366,10 @@ export const farbenDunkel: Farbrollen = {
   lueckeZeile: '#161305',
   problemZeile: '#130f0f',
   zeichenPlatte: '#c9ced4',
+  uebungFuellung: '#6d28d9',
+  uebungSchraffur: '#5b21b6',
+  uebungText: '#ffffff',
+  uebungKante: '#a78bfa',
 };
 
 /**
@@ -673,11 +692,15 @@ export const seitenrinne = {
 } as const;
 
 /**
- * Breite des Navigations-Drawers, der den Einsatz-Rahmen unter antds `lg`-Schwelle ersetzt.
- * Viewport-Achse wie die Seitenrinne. Das Maß trägt, weil der Drawer ein flaches Akkordeon in
- * einer Spalte zeigt statt Rail plus Modulspalte.
+ * Breite des Navigations-Drawers, der den Einsatz-Rahmen unter antds `lg`-Schwelle ersetzt, höchstens
+ * aber die Fensterbreite minus {@link navDrawerRand}. Viewport-Achse wie die Seitenrinne. Das Maß
+ * trägt, weil der Drawer ein flaches Akkordeon in einer Spalte zeigt statt Rail plus Modulspalte;
+ * fest 280 px ließen am Handy 232 px für die Modulbeschreibungen (LLH-1734).
  */
-export const navDrawerBreite = 280;
+export const navDrawerBreite = 360;
+
+/** Streifen rechts neben dem Navigations-Drawer, der frei bleibt, damit man ihn antippen und schließen kann. */
+export const navDrawerRand = 48;
 
 /** Formrollen. Radius 0 ist eine Entscheidung: die Kachel trägt der Umrissrahmen, nicht eine
  *  weiche Ecke. `zeilenhoehe`/`schriftgroesse` sind Dichte und zeigen auf `dichten.kompakt`;

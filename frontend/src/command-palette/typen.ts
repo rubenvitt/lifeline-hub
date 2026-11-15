@@ -55,6 +55,11 @@ export interface Befehl {
    */
   nebenzeile?: string;
   /**
+   * Der Treffer ist ein Einsatz mit der Art „Übung“ (LLH-1725, `frontend/AGENTS.md`, Rahmen,
+   * „Übung“): die Zeile zeigt die Übungsmarke vor dem Label. Darstellung, kein Name.
+   */
+  uebung?: true;
+  /**
    * Fundstellen der Volltextsuche im Label markieren (LFH-1056): `begriff` ist der Suchbegriff,
    * vor `ab` steht, was der Server nicht durchsucht hat (die Nummer). Nur Darstellung; Name und
    * Gedächtnis hängen weiter am reinen `label`.
@@ -200,7 +205,8 @@ export interface BefehlKontext {
   setKoordinaten: (f: Koordinatenformat) => void;
   /** Zeitdarstellung dieses Geräts (LLH-1053); `null` folgt wieder Einsatz und Organisation. */
   setZeitdarstellung: (z: Zeitdarstellung | null) => void;
-  logout: () => void;
+  /** Öffnet die Rückfrage zum Abmelden (LLH-1730); erst ihre Bestätigung beendet die Sitzung. */
+  abmelden: () => void;
   tastaturAktionen?: TastaturAktionen;
   userAgent?: string;
 }

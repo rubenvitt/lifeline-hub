@@ -1,5 +1,12 @@
 import { IconMenue } from '../icons';
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -7,7 +14,6 @@ import { ladeEinsatz, ladeEinstellungen, ladeModulFreigaben } from '../api/einsa
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
-  erstesFreigegebenesModul,
   freiesRueckwegModul,
   istModulAusblendbar,
   istModulGesperrt,
@@ -20,7 +26,7 @@ import {
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
-import { StatusChip } from '../components/instrument';
+import { StatusChip, UebungsBand, UebungsMarke } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
 import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
@@ -31,7 +37,10 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
+import { loadKategorieModul, rueckkehrModul, saveKategorieModul } from './kategorieModul';
 import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
+import { isUebung } from './einsatzart';
+import { NichtGefundenProvider } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
@@ -54,7 +63,13 @@ import { useViewport } from '../components/useViewport';
 import { useDokumentTitel } from '../components/useDokumentTitel';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
-import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
+import {
+  farbenDunkel,
+  navDrawerBreite,
+  navDrawerRand,
+  rahmenFarben,
+  schrift,
+} from '../theme/tokens';
 import {
   einsaetzePfad,
   einsatzEinstellungenPfad,
@@ -328,7 +343,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // ungelesenen Eingänge, auch am App-Badge (LLH-1062, LLH-1143 D8): dieselbe Zahl wie am Knopf
   // „Eingänge“, so steht ein stiller Eingang im Hintergrund-Tab und an der installierten App.
   const ungelesen = useUngeleseneEingaenge(einsatzId);
-  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], ungelesen);
+  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], ungelesen, {
+    uebung: isUebung(einsatz),
+  });
   useEffect(() => setzeAppBadge(ungelesen), [ungelesen]);
   useEffect(() => () => setzeAppBadge(0), []);
   // Der letzte Ort für den Rückweg von Profil und Verwaltung (LFH-954, `letzterOrt.ts`): jede
@@ -341,9 +358,21 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Solange die Freigaben laden, ist die Sperre unbekannt (wie beim Modulwächter unten).
   const merkbar =
     benutzerId != null && !einsatzQuery.isError && !modulFreigabenQuery.isLoading && !gesperrt;
+  // Eine unbekannte Adresse (LLH-1729) wird ebenso wenig gemerkt: die Auffangseite meldet sich
+  // über diese Marke, sonst führte der Rückweg auf „Seite nicht gefunden“.
+  const nichtGefunden = useRef(false);
   useEffect(() => {
-    if (merkbar && benutzerId != null) merkeLetztenOrt(benutzerId, { einsatzId, pfad: pathname });
+    if (merkbar && benutzerId != null && !nichtGefunden.current) {
+      merkeLetztenOrt(benutzerId, { einsatzId, pfad: pathname });
+    }
   }, [merkbar, benutzerId, einsatzId, pathname]);
+  // Das zuletzt besuchte Modul je Kategorie für den Rail-Sprung (LLH-1734, `kategorieModul.ts`):
+  // jede Ankunft zählt, unter derselben Bedingung wie der letzte Ort.
+  useEffect(() => {
+    if (merkbar && benutzerId != null && aktuellesModul) {
+      saveKategorieModul(benutzerId, einsatzId, aktuellesModul);
+    }
+  }, [merkbar, benutzerId, einsatzId, aktuellesModul]);
   const modulZaehler = useModulZaehler({ einsatzId, freigaben: modulFreigaben });
   // Warnsperre des Helligkeitsreglers (LFH-397): nur dieser Rahmen steht für den ganzen
   // Einsatz, deshalb meldet er die Warnung. Verlässt man den Einsatz, baut er ab und nimmt
@@ -374,11 +403,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   }
 
   /**
-   * Rail-Klick im inline-Rahmen: SELBSTKLICK = UMKLAPPEN, FREMDKLICK = SPRUNG in das erste
-   * freigegebene Modul der Kategorie.
+   * Rail-Klick im inline-Rahmen: SELBSTKLICK = UMKLAPPEN, FREMDKLICK = SPRUNG in das zuletzt
+   * besuchte Modul der Kategorie, sonst das erste freigegebene (LLH-1734, `kategorieModul.ts`).
    * Nicht immer navigieren: der Angleich-Effekt höbe sonst das persistierte Zuklappen in
    * derselben Runde auf. Die Rail behält ihre Hervorhebung über
-   * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen.
+   * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen, auch gegen eine
+   * gemerkte Wahl „zu“.
    * Dieser Sprung wird NICHT gemerkt: sein Ziel hat niemand gewählt, und drei Rail-Klicks
    * überschrieben sonst die ganze „Zuletzt"-Liste. Gemerkt wird in `onModulKlick`.
    */
@@ -388,11 +418,31 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       return;
     }
     setOffeneKategorie(key);
-    // Öffnet das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem ersten Sprung am
-    // Tablet die Vorgabe „zu“ für immer weg.
-    setSprungOffen(true);
-    const ziel = erstesFreigegebenesModul(key, modulFreigaben);
+    const ziel = sprungZiel(key);
+    // Ohne Wahl öffnet der Sprung das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem
+    // ersten Sprung am Tablet die Vorgabe „zu“ für immer weg. Eine gemerkte Wahl gilt (LLH-1734),
+    // außer der Sprung hat kein Ziel: dann zeigt erst das offene Panel, was geschah.
+    setSprungOffen(navWahl === null || ziel === null);
     if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
+  }
+
+  /**
+   * Ziel eines Rail-Sprungs: das zuletzt besuchte Modul der Kategorie, sonst das erste
+   * freigegebene (LLH-1734). Eine Quelle für Klick und Adresse, damit beide dasselbe Modul treffen.
+   */
+  function sprungZiel(key: KategorieKey): ModulEintrag | null {
+    const gemerkt = benutzerId != null ? loadKategorieModul(benutzerId, einsatzId, key) : null;
+    return rueckkehrModul(key, gemerkt, modulFreigaben);
+  }
+
+  /**
+   * Adresse eines Rail-Ziels (LLH-1732): dasselbe Modul, in das {@link onKategorieKlick} springt,
+   * damit Strg/⌘+Klick im neuen Tab dort landet, wo der einfache Klick hier landete. Ohne
+   * freigegebenes Modul keine Adresse; dann bleibt das Ziel ein Knopf, der nur aufklappt.
+   */
+  function kategoriePfad(key: KategorieKey): string | null {
+    const ziel = sprungZiel(key);
+    return ziel ? einsatzModulPfad(einsatzId, modulZielRoute(ziel)) : null;
   }
 
   /** Griff „Menü“ und Selbstklick: die einzigen Wege, die eine Wahl schreiben (LFH-952). */
@@ -519,6 +569,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                   <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
                 </span>
               )}
+              {/* Übung (LLH-1725, D5): ab `md` vor dem Namen; darunter trägt das klebende Band.
+                Fester Teil der Namensgruppe, kürzt nie (LLH-1726). */}
+              {mittel && <UebungsMarke einsatz={einsatz} />}
               <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
                 {einsatzQuery.isLoading ? (
                   <span
@@ -590,10 +643,13 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
           >
             {/* Das Etikett hält seine Breite: die Funktion kommt erst mit dem Einsatz (LLH-1272). */}
-            <BenutzerMenu funktion={einsatz?.meine_funktion} hasFixedWidth />
+            <BenutzerMenu funktion={einsatz?.meine_funktion} hasFixedWidth hilfeDaneben />
           </div>
         </KopfRechts>
       </Header>
+      {/* Übung (LLH-1725, Spec `uebungsmarke`, D4): direkt unter dem Kopf, klebt in jeder Breite
+         unter den übrigen Rahmenquellen. Beim Realeinsatz steht nichts, auch kein Platzhalter. */}
+      <UebungsBand einsatz={einsatz} />
       {/* Warnung, keine Sackgasse: ohne Freigaben fällt `istModulSichtbar` nach OFFEN, jedes
          ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller
          Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der
@@ -626,6 +682,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             kategorien={kategorien}
             aktiveKategorie={offeneKategorie ?? aktiveKategorie}
             onKategorieKlick={onKategorieKlick}
+            kategoriePfad={kategoriePfad}
             panel={
               offeneKategorie
                 ? { offen: !panelEingeklappt, onUmschalten: panelUmschalten }
@@ -635,6 +692,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         )}
         {breit && offeneKategorie && !panelEingeklappt && (
           <ModulPanel
+            einsatzId={einsatzId}
             titel={kategorien.find((k) => k.key === offeneKategorie)!.label}
             einsatz={einsatz}
             module={moduleNachKategorie(offeneKategorie)}
@@ -649,15 +707,16 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
             <EinsatzRahmenProvider value={einsatz}>
-              {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
+              <NichtGefundenProvider value={nichtGefunden}>
+                {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
-              <UnwetterHinweis
-                einsatzId={einsatzId}
-                benutzer={benutzer}
-                freigaben={modulFreigaben}
-              />
-              {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
+                <UnwetterHinweis
+                  einsatzId={einsatzId}
+                  benutzer={benutzer}
+                  freigaben={modulFreigaben}
+                />
+                {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
                `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`):
                meldet der Server für das Modul der Route `zugriff: false`, steht der Hinweis an der
                Stelle der Seite — auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
@@ -665,22 +724,23 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                raus); Einsatzdaten und Einstellungen sind nie gesperrt und warten nicht. Ein
                gescheiterter oder pausierter Abruf (offline) sperrt nicht, dann bleibt der
                403-Zustand der Seite das Netz. */}
-              {aktuellesModul &&
-              istModulAusblendbar(aktuellesModul.key) &&
-              modulFreigabenQuery.isLoading ? (
-                <div data-testid="modulwaechter-laedt">
-                  <SeitenSkeleton />
-                </div>
-              ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
-                <GesperrtesModul
-                  einsatzId={einsatzId}
-                  modul={aktuellesModul}
-                  freigaben={modulFreigaben!}
-                  darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
-                />
-              ) : (
-                <Outlet />
-              )}
+                {aktuellesModul &&
+                istModulAusblendbar(aktuellesModul.key) &&
+                modulFreigabenQuery.isLoading ? (
+                  <div data-testid="modulwaechter-laedt">
+                    <SeitenSkeleton />
+                  </div>
+                ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
+                  <GesperrtesModul
+                    einsatzId={einsatzId}
+                    modul={aktuellesModul}
+                    freigaben={modulFreigaben!}
+                    darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
+                  />
+                ) : (
+                  <Outlet />
+                )}
+              </NichtGefundenProvider>
             </EinsatzRahmenProvider>
           </EinsatzAnzeigeProvider>
         </Content>
@@ -691,8 +751,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         <Drawer
           placement="left"
           title="Navigation"
-          // `size`, nicht `width` (in antd 6 abgekündigt).
-          size={navDrawerBreite}
+          // `size`, nicht `width` (in antd 6 abgekündigt); antd reicht den CSS-Ausdruck durch.
+          size={`min(${navDrawerBreite}px, calc(100vw - ${navDrawerRand}px))`}
           open={navOffen}
           onClose={() => setNavOffen(false)}
           destroyOnHidden
@@ -700,6 +760,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           styles={{ close: { minWidth: navGriffMass(token), minHeight: navGriffMass(token) } }}
         >
           <ModulAkkordeon
+            einsatzId={einsatzId}
             kategorien={kategorien}
             offeneKategorie={offeneKategorie}
             aktiverModulKey={aktuellesModul?.key ?? null}

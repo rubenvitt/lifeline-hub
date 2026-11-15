@@ -37,7 +37,7 @@ function wrapper(route: string) {
 
 describe('useBefehle', () => {
   it('liefert Modul-Befehle im Einsatz-Kontext', async () => {
-    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
       wrapper: wrapper('/einsaetze/5/etb'),
     });
     await waitFor(() => expect(result.current.some((b) => b.id === 'modul:etb')).toBe(true));
@@ -50,7 +50,7 @@ describe('useBefehle', () => {
     vi.mocked(ladeModulFreigaben).mockResolvedValueOnce(
       freigabenFixture({ schaeden: { zugriff: false } }),
     );
-    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
       wrapper: wrapper('/einsaetze/5/etb'),
     });
     await waitFor(() => expect(result.current.some((b) => b.id === 'modul:personen')).toBe(true));
@@ -59,7 +59,7 @@ describe('useBefehle', () => {
     expect(result.current.some((b) => b.id === 'aktion:schaeden')).toBe(false);
   });
   it('liefert keine Modul-Befehle außerhalb eines Einsatzes', () => {
-    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
       wrapper: wrapper('/profil'),
     });
     expect(result.current.some((b) => b.gruppe === 'module')).toBe(false);
@@ -74,7 +74,7 @@ describe('useBefehle', () => {
     localStorage.clear();
     merkeModulBesuch(ICH, 5, 'personen');
     merkeModulBesuch(ICH, 5, 'etb');
-    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
       wrapper: wrapper('/einsaetze/5/etb'),
     });
 
@@ -93,7 +93,7 @@ describe('useBefehle', () => {
     localStorage.clear();
     merkeModulBesuch(ICH + 1, 5, 'lagekarte');
     merkeModulBesuch(ICH, 5, 'personen');
-    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn()), {
+    const { result } = renderHook(() => useBefehle(undefined, undefined, vi.fn(), vi.fn()), {
       wrapper: wrapper('/einsaetze/5/etb'),
     });
 
@@ -108,7 +108,7 @@ describe('useBefehle', () => {
    */
   it('reicht die Öffnungsart bis zum übergebenen navigate durch', async () => {
     const navigate = vi.fn();
-    const { result } = renderHook(() => useBefehle(undefined, undefined, navigate), {
+    const { result } = renderHook(() => useBefehle(undefined, undefined, navigate, vi.fn()), {
       wrapper: wrapper('/einsaetze/5/etb'),
     });
     await waitFor(() => expect(result.current.some((b) => b.id === 'modul:personen')).toBe(true));
@@ -121,7 +121,7 @@ describe('useBefehle', () => {
 
   it('reicht die aktiven Tastaturaktionen als sichtbare Befehle durch', () => {
     const speichern = vi.fn();
-    const { result } = renderHook(() => useBefehle({ speichern }, undefined, vi.fn()), {
+    const { result } = renderHook(() => useBefehle({ speichern }, undefined, vi.fn(), vi.fn()), {
       wrapper: wrapper('/profil'),
     });
 

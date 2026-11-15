@@ -73,6 +73,7 @@ import EinsatzUnterkunft from './pages/einstellungen/EinsatzUnterkunft';
 import EinsatzBenachrichtigungen from './pages/einstellungen/EinsatzBenachrichtigungen';
 import EinsatzGeraete from './pages/einstellungen/EinsatzGeraete';
 import EinsatzZugriff from './pages/einstellungen/EinsatzZugriff';
+import EinsatzAnzeige from './pages/einstellungen/EinsatzAnzeige';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
@@ -131,6 +132,7 @@ import {
 } from './admin/adminNav';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
+import SeiteNichtGefunden from './einsatz/SeiteNichtGefunden';
 import ModulRedirect from './einsatz/ModulRedirect';
 import AltpfadWeiterleitung from './einsatz/AltpfadWeiterleitung';
 import ModulStub from './einsatz/ModulStub';
@@ -243,6 +245,7 @@ const EINSTELLUNGEN_ROUTEN = (
     <Route path="benachrichtigungen" element={<EinsatzBenachrichtigungen />} />
     <Route path="geraete" element={<EinsatzGeraete />} />
     <Route path="zugriff" element={<EinsatzZugriff />} />
+    <Route path="anzeige" element={<EinsatzAnzeige />} />
     {/* Unbekanntes Segment → erste Sektion, statt ein leeres `<Outlet>` unter markiertem Reiter. */}
     <Route path="*" element={<Navigate to={`../${EINSTELLUNGEN_SEKTIONEN[0].key}`} replace />} />
   </>
@@ -533,6 +536,9 @@ export const appRouten = createRoutesFromElements(
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
           {/* Detailseite eines Evakuierungsbezirks; gegatet über das Segment `evakuierung`. */}
           <Route path="evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />
+          {/* Unbekannte Adresse im Einsatz (LLH-1729): bleibt im Rahmen und sagt „Seite nicht
+              gefunden“, statt bis zur globalen Auffangroute auf die Einsatzliste durchzufallen. */}
+          <Route path="*" element={<SeiteNichtGefunden />} />
         </Route>
       </Route>
     </Route>

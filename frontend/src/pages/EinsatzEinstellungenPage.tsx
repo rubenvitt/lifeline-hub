@@ -185,10 +185,11 @@ export default function EinsatzEinstellungenPage() {
       // Reine Formularseite: ausdrücklich die schmale Lesebreite.
       breite="schmal"
       // Abgeschlossen ist alles eingefroren außer der Aufbewahrungsfrist: dort stünde „Nur Ansicht“
-      // falsch, die Sektion nennt den Grund am gesperrten Feld selbst. Bedingt statt `sichtbar`:
-      // ein gesetzter `hinweis` reserviert in `EinsatzSeite` auch leer seinen Abstand.
+      // falsch, die Sektion nennt den Grund am gesperrten Feld selbst. Ebenso nicht in „Anzeige“
+      // (LLH-1730): die Wahl gilt dem Gerät, nicht dem Einsatz. Bedingt statt `sichtbar`: ein
+      // gesetzter `hinweis` reserviert in `EinsatzSeite` auch leer seinen Abstand.
       hinweis={
-        !daten.istAktiv && aktiv !== 'aufbewahrung' ? (
+        !daten.istAktiv && aktiv !== 'aufbewahrung' && aktiv !== 'anzeige' ? (
           <RechteHinweis sichtbar text={daten.rechteGrund(EINSATZ_ABGESCHLOSSEN)} />
         ) : undefined
       }

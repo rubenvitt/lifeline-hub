@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, anmeldenAls, benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
+import { abmeldenUeberMenue } from './menue-kern';
 
 /*
  * LFH-767 — Gerätedaten beim Abmelden (Spec `geraetedaten-raeumung`).
@@ -69,9 +70,7 @@ test('Abmelden löscht den Entwurf; die nächste Person sieht ihn nicht', async 
   const inhalt = `Entwurf vor dem Abmelden ${Date.now()}`;
   await entwurfSchreiben(page, einsatzId, inhalt);
 
-  await page.getByRole('button', { name: 'Benutzermenü' }).click();
-  await page.getByRole('menuitem', { name: 'Abmelden' }).click();
-  await expect(page).toHaveURL(/\/login/);
+  await abmeldenUeberMenue(page);
   await expect.poll(() => entwurfAufPlatte(page, inhalt), { timeout: 10_000 }).toBe(false);
 
   await anmeldenAls(page, zweite.benutzername, zweite.passwort);

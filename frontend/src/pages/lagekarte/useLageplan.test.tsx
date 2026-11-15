@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import type { KartenHandle } from './Kartenflaeche';
 import { KARTE_NICHT_DARSTELLBAR } from './kartenGrafik';
-import { KARTENBILD_FEHLT, KeinKartenbild, useLageplan, type LageplanQuellen } from './useLageplan';
+import {
+  KARTENBILD_FEHLT,
+  KeinKartenbild,
+  anlagenTitel,
+  useLageplan,
+  type LageplanQuellen,
+} from './useLageplan';
 
 /**
  * Grund eines Lageplans ohne Bild (LLH-1353): kann die Kartenfläche nicht zeichnen (Gerät ohne
@@ -78,5 +84,20 @@ describe('useLageplan ohne Kartenbild (LLH-1353)', () => {
   it('Anlage mit Karte, aber ohne Bild: „Kartenbild nicht aufgenommen“', async () => {
     const { result } = zeige(true);
     await expect(result.current.erstelleAnlage()).rejects.toThrow(KARTENBILD_FEHLT);
+  });
+});
+
+describe('anlagenTitel (LLH-1725)', () => {
+  it('nennt eine Übung vorn im Bildkopf der Anlage, einen Realeinsatz nicht', () => {
+    expect(
+      anlagenTitel({
+        bezeichnung: 'Starkregen Nord',
+        einsatznummer_intern: '2026-014',
+        einsatzart: 'uebung',
+      }),
+    ).toBe('ÜBUNG · Lageplan · Starkregen Nord (2026-014)');
+    expect(anlagenTitel({ bezeichnung: 'Brand Mühle', einsatzart: 'realeinsatz' })).toBe(
+      'Lageplan · Brand Mühle',
+    );
   });
 });

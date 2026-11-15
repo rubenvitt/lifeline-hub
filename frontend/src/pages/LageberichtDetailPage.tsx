@@ -537,6 +537,7 @@ function LageberichtDetail() {
           einsatzId={einsatzId}
           dokumentId={berichtId}
           einsatzbezeichnung={einsatz.bezeichnung}
+          einsatzart={einsatz.einsatzart}
           schreibt={schreibtEntwurf}
           ohneDruckKlasse="lagebericht-no-print"
         />
