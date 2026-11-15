@@ -67,10 +67,12 @@ Der Knopf hält seine Breite nicht fest: er steht rechts im Kopf, nichts rückt 
 
 `EinsatzLayout` gibt `BenutzerMenu` die neue Prop `hilfeDaneben` (der Rahmen weiß, dass er der
 Einsatz ist; ein Pfadvergleich im Menü wäre eine zweite Wahrheit). Das Menü öffnet die Hilfe
-neben dem Einsatz, wenn `hilfeDaneben` gesetzt ist und `abBreite('lg')` gilt, sonst navigiert es
-wie bisher. Schwelle `lg`, weil darunter Tablets und Handys liegen, auf denen ein zweiter Tab
-den Einsatz verdeckt statt daneben zu stehen; die Frage stellt `useViewport`
-(`useViewport.guard.test.ts`).
+neben dem Einsatz, wenn `hilfeDaneben` gesetzt ist, `abBreite('lg')` gilt und der Zeiger fein ist
+(`!istBeruehrung`), sonst navigiert es wie bisher. Unter `lg` liegen Handy und Tablet hochkant,
+mit grobem Zeiger das Führungs-Tablet quer (1024–1280 px, über `lg`); auf beiden verdeckte ein
+zweiter Tab den Einsatz, statt daneben zu stehen. Die Breite allein trennt das Tablet nicht vom
+Fükw (Review B1); die Fragen stellt `useViewport` (`useViewport.guard.test.ts`). Ein 2-in-1 mit
+Tastatur meldet einen feinen Zeiger und bekommt den neuen Tab wie ein Laptop.
 
 Verworfen: jedes Öffnen in einem neuen Tab (Handy und installierte App verlören den Rückweg);
 Strg+Klick als einziger Weg (unauffindbar, das Menü ist kein Link).

@@ -18,7 +18,7 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`.
 
 - [x] 3.1 `hilfePfad` nimmt optional `von` als Suchparameter. Prüfung: Fall in `routing/deeplinks.test.ts` grün (mit und ohne `gruppe`)
 - [x] 3.2 `HilfePage` übernimmt einen gültigen `von` aus der Adresse in den History-State und ersetzt die Adresse ohne ihn; ein ungültiger (`//…`, `https:…`) wird verworfen. Prüfung: `HilfePage.test.tsx` (Adresse danach ohne `von`, `gruppe` bleibt; „Rückmeldung geben“ nach Kapitelwechsel trägt das Muster der Herkunft; ungültiger `von` → Muster der Hilfe)
-- [x] 3.3 `BenutzerMenu` mit Prop `hilfeDaneben`, gesetzt von `EinsatzLayout`: ab `lg` `window.open(hilfePfad({ von }), '_blank', 'noopener')`, sonst `navigate` wie bisher. Prüfung: Test des Benutzermenüs (im Einsatz breit → `window.open` mit Ziel und Merkmalen, keine Navigation; im Einsatz schmal und ohne `hilfeDaneben` breit → Navigation im selben Tab mit `state.von`)
+- [x] 3.3 `BenutzerMenu` mit Prop `hilfeDaneben`, gesetzt von `EinsatzLayout`: ab `lg` mit feinem Zeiger `window.open(hilfePfad({ von }), '_blank', 'noopener')`, sonst `navigate` wie bisher. Prüfung: Test des Benutzermenüs (im Einsatz breit → `window.open` mit Ziel und Merkmalen, keine Navigation; im Einsatz schmal, am Tablet mit grobem Zeiger bei 1024 px und ohne `hilfeDaneben` breit → Navigation im selben Tab mit `state.von`; Kante 991/992 px)
 - [x] 3.4 `docs/anwender/kapitel/rueckmeldung.md` und, falls die Hilfe dort beschrieben ist, `einsatz-oberflaeche.md`: Hilfe öffnet am breiten Schirm aus dem Einsatz in einem neuen Tab. Prüfung: `hilfe/anwenderdoku.guard.test.ts` grün; Bilder der Kapitel nur neu, wenn eine Bilder-Spec die Hilfe oder Neuigkeiten zeigt (`grep` im Kopf der Bilder-Specs)
 
 ## 4. Gesamtprüfung

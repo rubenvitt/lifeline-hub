@@ -93,10 +93,11 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * Rail, Panel und Inhalt sprangen 52 px (CLS 0,556). Vorbild ist `WortPlatz` in `Kopfleiste.tsx`;
  * hier ist der längste Wortlaut nicht bekannt, deshalb eine feste Breite.
  *
- * `hilfeDaneben` (im Einsatz-Kopf, LLH-1731 D4/D5): ab `lg` öffnet „Hilfe“ in einem neuen Tab, in
+ * `hilfeDaneben` (im Einsatz-Kopf, LLH-1731 D4/D5): ab `lg` mit Maus öffnet „Hilfe“ in einem neuen Tab, in
  * der Desktop-App in einem Nebenfenster, und der Einsatz bleibt im ersten Tab mit seinen Alarmen.
  * Die Herkunft reist dann als `von` in der Adresse, weil ein neuer Tab den History-State nicht
- * erbt. Darunter verdeckte ein zweiter Tab den Einsatz nur; dort bleibt es beim selben Tab.
+ * erbt. Am Handy und am Tablet verdeckte ein zweiter Tab den Einsatz nur; dort bleibt es beim selben
+ * Tab.
  */
 export default function BenutzerMenu({
   funktion,
@@ -111,14 +112,16 @@ export default function BenutzerMenu({
   const { token } = theme.useToken();
   // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die Hook-Reihenfolge, sobald
   // der Benutzer eintrifft.
-  const { abBreite } = useViewport();
+  const { abBreite, istBeruehrung } = useViewport();
   // Handschuh (design.md D11): Kopf knapper, Profil und Abmelden nebeneinander — sonst läge am
   // Handy unter dem zweizeiligen App-Kopf die Leiste „Helligkeit“ unter dem Rand.
   const isKnapp = useDichte().dichte === 'handschuh';
   // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
-  // Hilfe neben dem Einsatz erst ab `lg` (LLH-1731 D4): darunter Tablet und Handy.
-  const isHilfeImNeuenTab = hilfeDaneben && abBreite('lg');
+  // Hilfe neben dem Einsatz nur am breiten Schirm mit Maus (LLH-1731 D4): unter `lg` Handy und
+  // Tablet hochkant, mit grobem Zeiger das Führungs-Tablet quer (1024–1280 px). Dort verdeckte ein
+  // zweiter Tab den Einsatz nur. Die Zeigerart, nicht die Breite, erkennt das Tablet (`useViewport`).
+  const isHilfeImNeuenTab = hilfeDaneben && abBreite('lg') && !istBeruehrung;
   // Unter `md` (Handschirm) nimmt das Menü die Fensterbreite abzüglich 2 × 8 px Rand.
   const menueBreite = !abBreite('md')
     ? 'calc(100vw - 16px)'

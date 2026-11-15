@@ -4,11 +4,11 @@
 
 ### Requirement: Hilfe aus dem Einsatz neben dem Einsatz
 
-Wird „Hilfe“ im Benutzermenü auf einer Seite des Einsatzrahmens ab der Breite `lg` gewählt, SHALL
-die Hilfe in einem neuen Tab öffnen, in der Desktop-App in einem Nebenfenster; der Einsatz MUST im
-bisherigen Tab an derselben Stelle bleiben. Unter `lg` und außerhalb des Einsatzrahmens SHALL die
-Hilfe im selben Tab öffnen. Der Rückmeldeweg der Hilfe MUST in beiden Fällen den Bereich nennen,
-aus dem sie geöffnet wurde.
+Wird „Hilfe“ im Benutzermenü auf einer Seite des Einsatzrahmens ab der Breite `lg` mit feinem
+Zeiger gewählt, SHALL die Hilfe in einem neuen Tab öffnen, in der Desktop-App in einem
+Nebenfenster; der Einsatz MUST im bisherigen Tab an derselben Stelle bleiben. Unter `lg`, mit
+grobem Zeiger (Tablet) und außerhalb des Einsatzrahmens SHALL die Hilfe im selben Tab öffnen.
+Der Rückmeldeweg der Hilfe MUST in beiden Fällen den Bereich nennen, aus dem sie geöffnet wurde.
 
 #### Scenario: Hilfe am Fükw-Rechner
 
@@ -19,6 +19,11 @@ aus dem sie geöffnet wurde.
 #### Scenario: Hilfe am Handy
 
 - **WHEN** eine Person bei 390 × 844 im ETB eines Einsatzes im Benutzermenü „Hilfe“ wählt
+- **THEN** öffnet die Hilfe im selben Tab mit „Zurück zu <Einsatz>“
+
+#### Scenario: Hilfe am Führungs-Tablet
+
+- **WHEN** eine Person an einem Tablet mit Finger bei 1180 × 820 im ETB eines Einsatzes im Benutzermenü „Hilfe“ wählt
 - **THEN** öffnet die Hilfe im selben Tab mit „Zurück zu <Einsatz>“
 
 #### Scenario: Hilfe außerhalb des Einsatzes

@@ -25,7 +25,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { setzeViewportBreite } from '../test/viewport';
+import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import { ThemeModeProvider, useWarnsperre } from '../theme/ThemeModeProvider';
 import BenutzerMenu from './BenutzerMenu';
 import { adminFixture } from '../test/fixtures';
@@ -605,6 +605,46 @@ describe('BenutzerMenu — Hilfe neben dem Einsatz (LLH-1731)', () => {
       expect(screen.getByTestId('ort')).toHaveTextContent('/hilfe von /einsaetze/42/etb'),
     );
     expect(oeffnen).not.toHaveBeenCalled();
+  });
+
+  // Führungs-Tablet (1024–1280 px, Finger): ein zweiter Tab verdeckte dort den Einsatz (Review B1).
+  it('im Einsatz am Tablet mit Finger (1024 px, grober Zeiger): selber Tab', async () => {
+    setzeViewportBreite(1024);
+    setzeZeigerGrob(true);
+    zeigeIm('/einsaetze/42/etb', true);
+    await oeffne();
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Hilfe' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent('/hilfe von /einsaetze/42/etb'),
+    );
+    expect(oeffnen).not.toHaveBeenCalled();
+  });
+
+  it('im Einsatz bei 1024 px mit Maus: neuer Tab', async () => {
+    setzeViewportBreite(1024);
+    setzeZeigerGrob(false);
+    zeigeIm('/einsaetze/42/etb', true);
+    await oeffne();
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Hilfe' }));
+    expect(oeffnen).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [991, false],
+    [992, true],
+  ])('an der Kante zu lg (%i px, Maus): neuer Tab = %s', async (breite, isNeuerTab) => {
+    setzeViewportBreite(breite);
+    setzeZeigerGrob(false);
+    zeigeIm('/einsaetze/42/etb', true);
+    await oeffne();
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Hilfe' }));
+    if (isNeuerTab) expect(oeffnen).toHaveBeenCalledTimes(1);
+    else {
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent('/hilfe von /einsaetze/42/etb'),
+      );
+      expect(oeffnen).not.toHaveBeenCalled();
+    }
   });
 
   it('außerhalb des Einsatzes ab lg: selber Tab', async () => {
