@@ -22,6 +22,11 @@ export interface AbmeldenRueckfrage {
  * DER FOKUS STEHT AUF „ABBRECHEN“ (D3): aus der Palette kommt die Rückfrage per ↵; stünde der
  * Fokus auf „Abmelden“, beendete ein zweites ↵ die Sitzung doch.
  *
+ * LÄUFT DIE ABMELDUNG, IST NICHTS MEHR ZURÜCKZUNEHMEN (Review vor dem PR): `logout()` gibt die
+ * Sitzung schon vor der Serverantwort auf und meldet danach lokal ab, auch ohne Antwort. „Abbrechen“,
+ * Escape, Schließknopf und Maske sind deshalb gesperrt, solange sie läuft; ein Schließen täuschte
+ * eine zurückgenommene Abmeldung vor.
+ *
  * `logout()` liefert `false`, wenn die Sitzung inzwischen einem anderen Benutzer gehört (412,
  * LFH-387): dann bleibt der Tab stehen und zeigt den Benutzerkonflikt.
  */
@@ -54,7 +59,10 @@ export function AbmeldenRueckfrageDialog({
       okText="Abmelden"
       cancelText="Abbrechen"
       okButtonProps={{ danger: true, loading: isLaeuft }}
-      cancelButtonProps={{ id: abbrechenId }}
+      cancelButtonProps={{ id: abbrechenId, disabled: isLaeuft }}
+      closable={!isLaeuft}
+      keyboard={!isLaeuft}
+      mask={{ closable: !isLaeuft }}
       // Nach dem Öffnen, nicht per `autoFocus`: rc-dialog zieht den Fokus beim Öffnen auf seine
       // Fläche, ohne Animation auch nach einem `autoFocus` am Knopf.
       afterOpenChange={(isNowOpen) => {

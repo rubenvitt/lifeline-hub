@@ -128,7 +128,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [offen, setOffen] = useState(false);
   // Ein gekoppeltes Gerät hat keine Sprungpalette (LFH-892, Spec `feldgeraet-bedienung`): ihre
   // Sprünge führten in Module, die seine Ansicht nicht liest.
-  const ohnePalette = useAuthOptional()?.geraet != null;
+  const auth = useAuthOptional();
+  const ohnePalette = auth?.geraet != null;
+  const benutzerId = auth?.benutzer?.id ?? null;
   /**
    * Das Befehls-Gedächtnis hängt HIER und nicht in `PaletteHost`: der Provider ist app-weit
    * montiert, der Stand ist beim ersten `Strg/⌘+K` meist schon da, und der Schreib-Callback
@@ -139,9 +141,17 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
    * Rückfrage zum Abmelden (LLH-1730, Spec `sprungpalette`): HIER und nicht in `PaletteHost`, weil
    * die Palette beim Ausführen schließt und abgehängt wird. Eingehängt nur, solange sie offen ist:
    * der Dialog liest `useAuth`, und der Provider rendert auch ohne `AuthProvider`.
+   *
+   * GEBUNDEN AN DIE PERSON, DIE FRAGT (Review vor dem PR): der Provider umschließt auch `/login`.
+   * Endet die Sitzung auf anderem Weg (zweiter Tab, 401), stünde die Rückfrage sonst über der
+   * Anmeldung, und ihre Bestätigung räumte erneut, beim Sitzungsende etwa die ETB-Entwürfe, die
+   * dieses gerade erhalten soll. Gilt die Sitzung nicht mehr derselben Person, hängt sie aus.
    */
-  const [isAbmeldenOffen, setAbmeldenOffen] = useState(false);
-  const openAbmelden = useCallback(() => setAbmeldenOffen(true), []);
+  const [abmeldenFuer, setAbmeldenFuer] = useState<number | null>(null);
+  // Zurückgesetzt im Render, nicht erst im Effekt: meldet sich dieselbe Person im Tab neu an,
+  // stünde die alte Rückfrage sonst wieder da.
+  if (abmeldenFuer != null && abmeldenFuer !== benutzerId) setAbmeldenFuer(null);
+  const openAbmelden = useCallback(() => setAbmeldenFuer(benutzerId), [benutzerId]);
   const ebenenRef = useRef(new Map<symbol, TastaturEbene>());
   // Ketten statt einzelner Ebenen: eine Werkzeugleiste kennt „Filter zurücksetzen“, die Seite
   // darüber „Neue Zeile“. Beide Refs halten die Kette von TIEF nach FLACH; leer heißt „keine
@@ -305,8 +315,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           abmelden={openAbmelden}
         />
       )}
-      {isAbmeldenOffen && (
-        <AbmeldenRueckfrageDialog isOpen onClose={() => setAbmeldenOffen(false)} />
+      {abmeldenFuer != null && abmeldenFuer === benutzerId && (
+        <AbmeldenRueckfrageDialog isOpen onClose={() => setAbmeldenFuer(null)} />
       )}
     </PaletteContext.Provider>
   );

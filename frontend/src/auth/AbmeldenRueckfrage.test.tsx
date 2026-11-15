@@ -91,6 +91,38 @@ describe('Rückfrage vor dem Abmelden', () => {
     expect(zaehler.abgemeldet()).toBe(0);
   });
 
+  it('während die Abmeldung läuft, lässt sich die Rückfrage nicht mehr schließen (Review)', async () => {
+    let freigeben: () => void = () => {};
+    server.use(
+      meHandler(adminFixture()),
+      http.post(
+        '/api/auth/logout',
+        () =>
+          new Promise<Response>((resolve) => {
+            freigeben = () => resolve(new HttpResponse(null, { status: 204 }));
+          }),
+      ),
+    );
+    renderMitProviders(
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <Routes>
+          <Route path="/login" element={<div>Anmeldeseite</div>} />
+          <Route path="*" element={<Ausloeser />} />
+        </Routes>
+      </ConfigProvider>,
+    );
+    const dialog = await oeffne();
+    await userEvent.click(screen.getByRole('button', { name: 'Abmelden' }));
+    // Der Aufruf hängt: „Abbrechen“ ist gesperrt, Escape und Schließknopf wirken nicht.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled());
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('button', { name: /close|schließen/i })).toBeNull();
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Abmelden?' })).toBeInTheDocument();
+    freigeben();
+    expect(await screen.findByText('Anmeldeseite')).toBeInTheDocument();
+  });
+
   it('bleibt stehen, wenn der Server das Abmelden mit 412 ablehnt (LFH-387)', async () => {
     const zaehler = zeige(412);
     await oeffne();

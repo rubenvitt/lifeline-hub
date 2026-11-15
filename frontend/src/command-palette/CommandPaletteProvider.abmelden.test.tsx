@@ -4,7 +4,7 @@
  * „Abbrechen“ (design.md D3): ein zweites ↵ beendet die Sitzung nicht.
  */
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider } from 'antd';
 import { Route, Routes } from 'react-router';
@@ -13,6 +13,17 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { adminFixture } from '../test/fixtures';
 import { CommandPaletteProvider } from './CommandPaletteProvider';
+import { useAuth } from '../auth/AuthContext';
+
+/** Ein anderer Abmeldeweg (wie ein zweiter Tab oder die Sitzungswache): lokal, ohne Rückfrage. */
+function AndererWeg() {
+  const { abmeldenLokal } = useAuth();
+  return (
+    <button type="button" onClick={() => abmeldenLokal('sitzungsende')}>
+      anderswo abmelden
+    </button>
+  );
+}
 
 function zeige() {
   let abgemeldet = 0;
@@ -29,7 +40,15 @@ function zeige() {
       <CommandPaletteProvider>
         <Routes>
           <Route path="/login" element={<div>Anmeldeseite</div>} />
-          <Route path="*" element={<div>App-Inhalt</div>} />
+          <Route
+            path="*"
+            element={
+              <>
+                <div>App-Inhalt</div>
+                <AndererWeg />
+              </>
+            }
+          />
         </Routes>
       </CommandPaletteProvider>
     </ConfigProvider>,
@@ -70,5 +89,15 @@ describe('Sprungpalette — Abmelden', () => {
     await u.click(within(dialog).getByRole('button', { name: 'Abmelden' }));
     expect(await screen.findByText('Anmeldeseite')).toBeInTheDocument();
     expect(zaehler.abgemeldet()).toBe(1);
+  });
+
+  it('endet die Sitzung auf anderem Weg, verschwindet die Rückfrage (Review)', async () => {
+    const zaehler = zeige();
+    await waehleAbmeldenInPalette();
+    await screen.findByRole('dialog', { name: 'Abmelden?' });
+    // Die Maske deckt den Knopf ab; der andere Weg kommt hier stellvertretend für Tab oder 401.
+    fireEvent.click(screen.getByRole('button', { name: 'anderswo abmelden' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Abmelden?' })).toBeNull());
+    expect(zaehler.abgemeldet()).toBe(0);
   });
 });
