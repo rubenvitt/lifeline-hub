@@ -6,10 +6,12 @@ import ModulAkkordeon, { akkordeonKopfStil } from './ModulAkkordeon';
 import { kategorien } from './modulRegistry';
 import { freigabenFixture } from '../test/fixtures';
 import { dichten, farbenDunkel } from '../theme/tokens';
+import { queryNavEintrag } from './navEintragTest';
 
 function zeige(props: Partial<React.ComponentProps<typeof ModulAkkordeon>> = {}) {
   return renderMitProviders(
     <ModulAkkordeon
+      einsatzId={1}
       kategorien={kategorien}
       offeneKategorie="erfassung"
       aktiverModulKey="etb"
@@ -27,7 +29,7 @@ describe('ModulAkkordeon', () => {
       zaehler: { chat: { wert: 3, beschreibung: '3 ungelesene Chat-Nachrichten' } },
     });
     expect(
-      screen.getByRole('button', { name: 'Chat, 3 ungelesene Chat-Nachrichten' }),
+      screen.getByRole('link', { name: 'Chat, 3 ungelesene Chat-Nachrichten' }),
     ).toBeInTheDocument();
   });
 
@@ -48,9 +50,10 @@ describe('ModulAkkordeon', () => {
       'true',
     );
 
-    // Module stehen nur unter der offenen Kategorie.
-    expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    // Module stehen nur unter der offenen Kategorie, als Links (LLH-1732); die Kopfzeilen bleiben
+    // Knöpfe, sie klappen nur.
+    expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument();
+    expect(queryNavEintrag('Lagekarte')).not.toBeInTheDocument();
   });
 
   it('meldet den Klick auf eine Kopfzeile mit ihrem Kategorie-Schlüssel', async () => {
@@ -63,14 +66,14 @@ describe('ModulAkkordeon', () => {
   it('meldet den Klick auf ein Modul mit dem Registry-Eintrag', async () => {
     const onModulKlick = vi.fn();
     zeige({ onModulKlick });
-    await userEvent.click(screen.getByRole('button', { name: 'Betroffene' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Betroffene' }));
     expect(onModulKlick).toHaveBeenCalledWith(expect.objectContaining({ key: 'personen' }));
   });
 
   it('zeigt ohne offene Kategorie nur die Kopfzeilen', () => {
     zeige({ offeneKategorie: null });
     expect(screen.queryAllByRole('button', { expanded: true })).toHaveLength(0);
-    expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
   });
 
   it('reicht Sperre und Ausblendung der Modulliste durch (LFH-132/LFH-669)', () => {
@@ -81,7 +84,7 @@ describe('ModulAkkordeon', () => {
       }),
     });
     expect(screen.getByRole('button', { name: 'ETB' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Tiere' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('Tiere')).not.toBeInTheDocument();
   });
 
   it('bleibt in der Breite fluide — der Drawer gibt sie vor, nicht das Akkordeon', () => {
@@ -142,7 +145,7 @@ describe('ModulAkkordeon · Sprungmarken', () => {
       aktiverModulKey: 'chat',
       freigaben: freigabenFixture(),
     });
-    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const knoepfe = screen.getAllByRole('link').map((b) => b.textContent);
     const modul = knoepfe.findIndex((t) => t?.startsWith('Fernmeldewesen'));
     expect(modul).toBeGreaterThanOrEqual(0);
     expect(knoepfe.slice(modul + 1, modul + 3)).toEqual(['Fernmeldeskizze', 'Kommunikationsplan']);

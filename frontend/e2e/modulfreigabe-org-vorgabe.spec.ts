@@ -112,7 +112,9 @@ const MODUL = 'nachforderungen';
 
 /** Der Eintrag „Nachforderungen“ im Modul-Panel der Kategorie Kräfte & Mittel (LLH-1078). */
 function nachforderungImPanel(page: Page) {
-  return page.getByRole('button', { name: /^Nachforderungen(,|$)/ });
+  // Frei ein Link, gesperrt ein Knopf (LLH-1732); hier zählt nur, ob die Zeile steht.
+  const name = /^Nachforderungen(,|$)/;
+  return page.getByRole('link', { name }).or(page.getByRole('button', { name }));
 }
 
 /** Eine Seite der Kategorie Kräfte & Mittel: dort steht das Modul im Panel. */

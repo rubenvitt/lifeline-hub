@@ -88,7 +88,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
 
       if (b.rail) {
         const kopfUnten = (await kopf.boundingBox())!;
-        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('button', {
+        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('link', {
           name: 'Erfassung',
         });
         await expect(etb).toBeInViewport();
@@ -99,7 +99,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
         // Bedienbar: der Sprung aus der gerollten Seite führt in die Kategorie.
         const lage = page
           .getByRole('navigation', { name: 'Kategorien' })
-          .getByRole('button', { name: 'Lage', exact: true });
+          .getByRole('link', { name: 'Lage', exact: true });
         await lage.click();
         await expect(lage).toHaveAttribute('aria-current', 'true');
         await expect(page).not.toHaveURL(/\/etb$/);
@@ -133,10 +133,10 @@ test('1366 × 520, handschuh, gerollt: auch die letzte Kategorie ist erreichbar'
   );
 
   const rail = page.getByRole('navigation', { name: 'Kategorien' });
-  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
+  const letzte = rail.locator('[data-lfh="rail-haupt"] :is(a, button)').last();
   const name = (await letzte.getAttribute('aria-label'))!;
   await letzte.click();
-  await expect(rail.getByRole('button', { name, exact: true })).toHaveAttribute(
+  await expect(rail.getByRole('link', { name, exact: true })).toHaveAttribute(
     'aria-current',
     'true',
   );

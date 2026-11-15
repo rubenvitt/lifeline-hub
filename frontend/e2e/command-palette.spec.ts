@@ -150,7 +150,7 @@ test('legt sich über den mobilen Navigations-Drawer, ESC schließt nur die Pale
 
   // … und bleibt bedienbar: die echte Modulnavigation reagiert weiter.
   await navDrawer.getByRole('button', { name: 'Lage' }).click();
-  await navDrawer.getByRole('button', { name: 'Lagekarte' }).click();
+  await navDrawer.getByRole('link', { name: 'Lagekarte' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/lagekarte`));
 });
 

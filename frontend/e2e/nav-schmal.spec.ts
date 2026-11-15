@@ -174,7 +174,7 @@ test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', 
   expect(drawerKasten.width).toBeLessThan(HANDSCHIRM.width);
 
   // Modulklick navigiert UND schließt den Drawer.
-  await drawer.getByRole('button', { name: 'Betroffene', exact: true }).click();
+  await drawer.getByRole('link', { name: 'Betroffene', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen`));
   await expect(drawer).toHaveCount(0);
 });

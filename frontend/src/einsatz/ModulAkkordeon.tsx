@@ -27,6 +27,8 @@ import type { ModulZaehlerMap } from './useModulZaehler';
  * Landmarken machten jede Abfrage mehrdeutig.
  */
 interface Props {
+  /** Der Einsatz, in dessen Module die Links der Modulliste führen (LLH-1732). */
+  einsatzId: number;
   kategorien: Kategorie[];
   offeneKategorie: KategorieKey | null;
   aktiverModulKey: string | null;
@@ -85,6 +87,7 @@ export function akkordeonKopfStil(
 }
 
 export default function ModulAkkordeon({
+  einsatzId,
   kategorien,
   offeneKategorie,
   aktiverModulKey,
@@ -119,6 +122,7 @@ export default function ModulAkkordeon({
             {offen && (
               <div style={{ background: farben.paneel }}>
                 <ModulListe
+                  einsatzId={einsatzId}
                   module={moduleNachKategorie(k.key)}
                   freigaben={freigaben}
                   aktiverModulKey={aktiverModulKey}

@@ -343,6 +343,16 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
   }
 
+  /**
+   * Adresse eines Rail-Ziels (LLH-1732): dasselbe Modul, in das {@link onKategorieKlick} springt,
+   * damit Strg/⌘+Klick im neuen Tab dort landet, wo der einfache Klick hier landete. Ohne
+   * freigegebenes Modul keine Adresse; dann bleibt das Ziel ein Knopf, der nur aufklappt.
+   */
+  function kategoriePfad(key: KategorieKey): string | null {
+    const ziel = erstesFreigegebenesModul(key, modulFreigaben);
+    return ziel ? einsatzModulPfad(einsatzId, modulZielRoute(ziel)) : null;
+  }
+
   /** Griff „Menü“ und Selbstklick: die einzigen Wege, die eine Wahl schreiben (LFH-952). */
   function panelUmschalten() {
     const wahl: NavWahl = panelEingeklappt ? 'offen' : 'zu';
@@ -561,6 +571,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             kategorien={kategorien}
             aktiveKategorie={offeneKategorie ?? aktiveKategorie}
             onKategorieKlick={onKategorieKlick}
+            kategoriePfad={kategoriePfad}
             panel={
               offeneKategorie
                 ? { offen: !panelEingeklappt, onUmschalten: panelUmschalten }
@@ -570,6 +581,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         )}
         {breit && offeneKategorie && !panelEingeklappt && (
           <ModulPanel
+            einsatzId={einsatzId}
             titel={kategorien.find((k) => k.key === offeneKategorie)!.label}
             einsatz={einsatz}
             module={moduleNachKategorie(offeneKategorie)}
@@ -637,6 +649,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           styles={{ close: { minWidth: navGriffMass(token), minHeight: navGriffMass(token) } }}
         >
           <ModulAkkordeon
+            einsatzId={einsatzId}
             kategorien={kategorien}
             offeneKategorie={offeneKategorie}
             aktiverModulKey={aktuellesModul?.key ?? null}

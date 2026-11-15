@@ -87,6 +87,11 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
 3. Die Modulliste einklappen: unten in der Kategorienleiste „Menü“ wählen, oder ein zweites
    Mal auf die offene Kategorie tippen. „Menü“ klappt sie wieder aus.
 
+Ein Modul lässt sich auch in einem neuen Tab öffnen, etwa für einen zweiten Bildschirm: mit
+**Strg+Klick** (am Mac **⌘+Klick**) oder der mittleren Maustaste auf das Modul, oder über „In
+neuem Tab öffnen“ im Menü der rechten Maustaste. Eine Kategorie öffnet so ihr erstes Modul.
+Gesperrte Module öffnen sich auf keinem dieser Wege.
+
 Auf schmalen Schirmen (Tablet hochkant, Telefon) stehen Kategorien und Module hinter
 „Navigation öffnen“ links oben.
 
