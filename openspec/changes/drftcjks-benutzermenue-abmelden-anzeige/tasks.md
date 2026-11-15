@@ -39,12 +39,12 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/drftcjksxrh0vazqkadyuegy (LLH-1730)
 
 ## 8. Anwenderdoku (Mitänderungsregel)
 
-- [ ] 8.1 `docs/anwender/kapitel/anmelden-abmelden.md`: Abmelden am Menüende mit Rückfrage, auch aus der Sprungpalette
-- [ ] 8.2 `docs/anwender/kapitel/einsatz-oberflaeche.md` (Aufzählung des Benutzermenüs, Darstellung: drei Orte), `docs/anwender/kapitel/einsatz-einstellungen.md` (Reiter „Anzeige“), `docs/anwender/kapitel/profil-sicherheit.md` (Paneel „Darstellung auf diesem Gerät“); `quellen:` der Kapitel nachziehen; Doku-Wächter grün
+- [x] 8.1 `docs/anwender/kapitel/anmelden-abmelden.md`: Abmelden am Menüende mit Rückfrage, auch aus der Sprungpalette
+- [x] 8.2 `docs/anwender/kapitel/einsatz-oberflaeche.md` (Aufzählung des Benutzermenüs, Darstellung: drei Orte), `docs/anwender/kapitel/einsatz-einstellungen.md` (Reiter „Anzeige“), `docs/anwender/kapitel/profil-sicherheit.md` (Paneel „Darstellung auf diesem Gerät“); `quellen:` der Kapitel nachziehen; Doku-Wächter grün
 
 ## 9. Abschluss
 
-- [ ] 9.1 `grep` nach Kommentaren und Texten mit „Profil und Abmelden“, „direkt unter dem Kopf“, „Abmelden ohne Rollen“ in `frontend/src`, `frontend/e2e`, `docs/` und `.claude/`; Verweise auf die umbenannte Anforderung nachziehen
+- [x] 9.1 `grep` nach Kommentaren und Texten mit „Profil und Abmelden“, „direkt unter dem Kopf“, „Abmelden ohne Rollen“ in `frontend/src`, `frontend/e2e`, `docs/` und `.claude/`; Verweise auf die umbenannte Anforderung nachziehen
 - [ ] 9.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis im PR unter „Geprüft“
 
 ## Workflow follow-up

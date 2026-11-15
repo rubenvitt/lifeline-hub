@@ -86,3 +86,16 @@ export async function waehleAnzeige(
   await page.keyboard.press('Escape');
   await expect(offenesMenue(page)).toHaveCount(0);
 }
+
+/**
+ * Abmelden über das Benutzermenü samt Rückfrage (LLH-1730, Spec `benutzermenue`): „Abmelden“ steht
+ * zuletzt und rollt im Handschuh-Betrieb am Handy erst ins Bild (`klickeEintrag`), die Rückfrage
+ * wird bestätigt. Ein gemeinsamer Weg für alle Specs, die über die Oberfläche abmelden.
+ */
+export async function abmeldenUeberMenue(page: Page): Promise<void> {
+  const menue = await oeffneMenue(page, page.getByRole('button', { name: 'Benutzermenü' }));
+  await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden', exact: true }));
+  const rueckfrage = page.getByRole('dialog', { name: 'Abmelden?' });
+  await rueckfrage.getByRole('button', { name: 'Abmelden', exact: true }).click();
+  await expect(page).toHaveURL(/\/login/);
+}

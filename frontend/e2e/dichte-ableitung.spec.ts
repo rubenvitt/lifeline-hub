@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { klickeEintrag, oeffneMenue, waehleAnzeige } from './menue-kern';
+import { abmeldenUeberMenue, waehleAnzeige } from './menue-kern';
 import { anmeldenAlsAdmin, anmeldenAls, benutzerAnlegen } from './rollen-kern';
 
 /**
@@ -90,10 +90,8 @@ test('die Wahl gehört zum Gerät, nicht zur Person', async ({ page }) => {
   await waehleAnzeige(page, trigger, 'Bediendichte', 'Handschuh');
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
-  // Abmelden über den Bedienweg, den eine Person am geteilten Tablet nimmt.
-  const menue = await oeffneMenue(page, trigger);
-  await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden' }));
-  await expect(page).toHaveURL(/\/login/);
+  // Abmelden über den Bedienweg, den eine Person am geteilten Tablet nimmt, samt Rückfrage.
+  await abmeldenUeberMenue(page);
   await stehtAuf(page, 'handschuh');
 
   await anmeldenAls(page, zweite.benutzername, zweite.passwort);
