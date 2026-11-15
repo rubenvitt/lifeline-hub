@@ -1,5 +1,5 @@
 ---
-id: ADR-0052
+id: ADR-0053
 titel: Der Rahmen klebt im Dokument und misst zwei Höhen, statt einen eigenen Rollbereich zu haben
 status: akzeptiert
 datum: 2026-11-15
@@ -17,7 +17,7 @@ herleitung:
   - Zunder LLH-1727 (Weg abgestimmt mit Ruben am 15.11.2026)
 ---
 
-# ADR-0052: Der Rahmen klebt im Dokument und misst zwei Höhen, statt einen eigenen Rollbereich zu haben
+# ADR-0053: Der Rahmen klebt im Dokument und misst zwei Höhen, statt einen eigenen Rollbereich zu haben
 
 ## Regeln
 
