@@ -137,6 +137,27 @@ export function modulMarkeStil(farben: Pick<Farbrollen, 'bedien'>, aktiv: boolea
 }
 
 /**
+ * Führungslinie einer Sprungmarke (LLH-1733, Spec `modul-sprungmarken`): 1 px in `linie`, in der
+ * Spalte der Modulmarke, damit die Marke als eingerückte Unteransicht des Moduls darüber liest
+ * und nicht als Link nach außen. `stretch` mit negativem Block-Rand zieht sie durch die
+ * Polsterung, so bilden Marken untereinander eine durchgehende Linie; der Rand nach rechts ist
+ * der Einzug des Etiketts.
+ */
+export function sprungLinieStil(
+  token: { paddingSM: number; padding: number },
+  farben: Pick<Farbrollen, 'linie'>,
+): CSSProperties {
+  return {
+    width: 1,
+    alignSelf: 'stretch',
+    marginBlock: -token.paddingSM,
+    marginInlineEnd: token.padding,
+    flexShrink: 0,
+    background: farben.linie,
+  };
+}
+
+/**
  * Stil der Knopfspalte, rein und exportiert. Die Zeilen stehen ohne Zwischenraum; Luft nur oben
  * und unten aus `token.marginXS`.
  */
@@ -199,23 +220,30 @@ export function ModulListe({
               data-lfh="modul-sprungmarke"
               disabled={gesperrt}
               title={gesperrt ? KEINE_BERECHTIGUNG : marke.hinweis}
-              // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen", wer vorliest, soll vorher
-              // wissen, dass er im ETB landet.
+              // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen“ unter dem ETB, wer
+              // vorliest, soll vorher wissen, dass er dort landet.
               aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
               onClick={() => !gesperrt && onSprungKlick?.(marke)}
               style={modulZeilenStil(token, farben, { aktiv: false, gesperrt, mindestTrefflaeche })}
             >
-              <span aria-hidden="true" style={modulMarkeStil(farben, false)} />
-              <span style={{ minWidth: 0, flex: 1 }}>{marke.label}</span>
-              {/* Dasselbe Icon wie am `verweistAuf`-Eintrag; Dekoration in `aria-hidden`-Hülle. */}
-              {!gesperrt && (
-                <span
-                  aria-hidden
-                  style={{ display: 'inline-flex', flexShrink: 0, color: farben.schwach }}
-                >
-                  <IconExternPfeil />
-                </span>
-              )}
+              {/* Eingerückte Unteransicht statt Pfeil (LLH-1733): die Linie steht an der Stelle der
+                 Modulmarke, eine Marke wird nie aktiv. */}
+              <span
+                aria-hidden="true"
+                data-lfh="sprung-linie"
+                style={sprungLinieStil(token, farben)}
+              />
+              <span
+                style={{
+                  minWidth: 0,
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {marke.label}
+              </span>
               {gesperrt && (
                 <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
                   <IconSchloss />

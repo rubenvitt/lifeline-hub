@@ -8,8 +8,8 @@
 
 ## 2. Unteransicht im Menü (D2–D4)
 
-- [ ] 2.1 Test in `frontend/src/einsatz/ModulPanel.test.tsx`: eine Markenzeile trägt kein Pfeil-Symbol, gesperrt das Schloss, und `sprungZeilenStil` liefert Einzug und Linie in `linie` bei gleicher Mindesthöhe wie `modulZeilenStil` (auch mit `mindestTrefflaeche`); erst rot
-- [ ] 2.2 `ModulPanel.tsx`: `sprungZeilenStil` und die neue Markenzeile ohne `IconExternPfeil`, Kommentar zum zugänglichen Namen ohne Pfeil; Test aus 2.1 grün, bestehende Tests der Datei grün
+- [x] 2.1 Test in `frontend/src/einsatz/ModulPanel.test.tsx`: eine Markenzeile trägt kein Pfeil-Symbol, aber die Führungslinie, gesperrt das Schloss, und `sprungLinieStil` liefert Linie in `linie` über die ganze Zeilenhöhe und den Einzug aus der Staffel; erst rot
+- [x] 2.2 `ModulPanel.tsx`: `sprungLinieStil` und die neue Markenzeile ohne `IconExternPfeil`, Kommentar zum zugänglichen Namen ohne Pfeil; Test aus 2.1 grün, bestehende Tests der Datei grün
 - [ ] 2.3 `frontend/e2e/nav-schmal.spec.ts`: gesperrte Marke „Entscheidungen“ in der Kategorie Erfassung prüfen (ETB als gesperrte Zeile), Spec lokal grün gegen ein frisch gebautes Backend
 
 ## 3. Regeln und Doku

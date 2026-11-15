@@ -32,14 +32,13 @@ Verworfen: in Führung lassen und nur die Optik ändern — der Kategoriesprung,
 bemängelt, bliebe. Damit die Regel hält, prüft ein Test für jede Marke, dass ihre `kategorie`
 die ihres Zielmoduls ist; eine künftige Marke in fremder Kategorie wird rot.
 
-**D2 Einzug mit Führungslinie.** Die Markenzeile bekommt einen eigenen reinen Stil
-(`sprungZeilenStil`, exportiert und prüfbar wie `modulZeilenStil`): Einzug um `token.padding`
-links und eine 1-px-Linie in `farben.linie` am linken Rand des eingerückten Bereichs, getragen
-von der Zeile selbst (`borderInlineStart` an einem inneren Kasten), damit aufeinanderfolgende
-Marken eine durchgehende Linie bilden. Trefffläche, Schriftgröße und Sperrfarbe bleiben wie bei
-der Modulzeile (`minHeight` aus `controlHeight` und `mindestTrefflaeche`). Der transparente
-Markenplatzhalter (`modulMarkeStil`) entfällt in der Markenzeile: eine Marke wird nie aktiv, und
-die Linie steht an seiner Stelle. Verworfen: nur einrücken ohne Linie (am 15.11.2026 abgewogen;
+**D2 Einzug mit Führungslinie.** Die Markenzeile behält `modulZeilenStil` (Trefffläche aus
+`controlHeight` und `mindestTrefflaeche`, Schriftgröße, Sperrfarbe) und trägt an der Stelle der
+Modulmarke eine 1-px-Linie in `farben.linie` mit eigenem reinem Stil (`sprungLinieStil`,
+exportiert und prüfbar wie `modulMarkeStil`). Die Linie streckt sich mit negativem Block-Rand
+durch die Polsterung der Zeile, damit aufeinanderfolgende Marken eine durchgehende Linie bilden;
+ihr Rand nach rechts (`token.padding`) ist der Einzug des Etiketts. Der transparente
+Markenplatzhalter (`modulMarkeStil`) entfällt in der Markenzeile: eine Marke wird nie aktiv. Verworfen: nur einrücken ohne Linie (am 15.11.2026 abgewogen;
 die Linie bindet die Marke sichtbar an ihr Modul).
 
 **D3 Kein Pfeil, Schloss bleibt.** `IconExternPfeil` fällt aus der Markenzeile. Das Schloss
