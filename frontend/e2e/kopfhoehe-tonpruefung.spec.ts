@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
 
 /**
  * LLH-1158: Zwei Wörter im Kopf wechseln beim Start ohne Zutun, die Tonprüfung („Ton wird
@@ -268,8 +268,9 @@ test.describe('LLH-1158/LLH-1232 Kopfhöhe über Tonprüfung und Verbindungsaufb
       }) => {
         test.setTimeout(TEST_FRIST_MS);
         await tonPruefungNachbilden(page, ton);
-        await anmeldenAlsAdmin(page);
-        const einsatzId = await einsatzAnlegen(
+        // Der Dialog ist hier nicht Prüfgegenstand: Anlage über die API, erste Ladung ist `messe`.
+        await anmeldenAlsAdmin(page, { startseite: false });
+        const einsatzId = await einsatzPerApi(
           page,
           `LFH-460 Hochwasser Abschnitt Nordwest ${Date.now()}`,
         );
