@@ -162,8 +162,8 @@ Vor dem PR `./scripts/check-all.sh --geaendert --ohne-e2e`; die vollen Suiten la
 oder im PR mit Label `voll` (LLH-1889; Schritte und Bündel im Skriptkopf, Mechanik in
 `scripts/AGENTS.md`, „Leichte PR-Prüfung“).
 
-- **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
-  gehören ins Skript.
+- **Das Skript ist die Wahrheit**; die Workflows (`ci.yml`, `pr.yml`, `suiten.yml`) rufen es
+  unverändert. Neue Schritte gehören ins Skript.
 - **Ein rot geborenes Gate wird abgeschaltet statt befolgt** — erst sweepen, dann scharf schalten
   (deshalb nicht im Gate: `cargo clippy -D warnings`).
 - **Kein `| tail` um Gate-Kommandos.** Testgüte belegen Mutationsproben, nicht Abdeckung.

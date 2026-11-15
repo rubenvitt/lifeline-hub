@@ -7,15 +7,25 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` (voller Lauf; vor dem PR genügt `--geaendert --ohne-e2e`, s. „Leichte PR-Prüfung“): `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ziel-branch-build.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ziel-branch-build.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) für den Check „Baut mit
 Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
-- **Leichte PR-Prüfung** (LLH-1889, ADR-0047; ersetzt die zwei Stufen von LLH-1662):
-  - **Im PR** läuft nur der Job `schnell` aus `ci.yml`. Pflicht im Ruleset 17017911 sind
-    `Schnellprüfungen`, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch`, sonst
-    nichts. Ein fremdes Label startet an einem PR ohne `voll` nur die Schnellprüfungen neu, in
+- **Leichte PR-Prüfung** (LLH-1889/LLH-1896, ADR-0048; ersetzt die zwei Stufen von LLH-1662):
+  - **Ein Workflow je Ereignis:** `pr.yml` läuft nur am PR, `ci.yml` nur bei Push auf `alpha`,
+    `beta`, `main`; was nur bei Push läuft (`ziel-branch-verteilen.yml`,
+    `migrationen-kanal.yml`, `ruleset.yml`), hat keinen PR-Auslöser. Ein Job mit falschem `if`
+    stünde sonst als übersprungener Eintrag an jedem PR. Die Suiten stehen einmal in
+    `suiten.yml` (am Commit `Suiten / …`); ein Pflicht-Check-Job darf dort nicht stehen, weil er
+    sonst den Präfix trägt. Deshalb steht `schnell` in `ci.yml` und `pr.yml` **wortgleich**: wer
+    ihn ändert, ändert beide (`ci-stufen.test.sh` vergleicht).
+  - **Pflicht-Checks:** genau die Liste in `scripts/ruleset-pruefen.sh`, sonst nichts; dort mit
+    Art (`status` aus der Status-API: im Ruleset ohne Quelle; `check`: ohne Quelle oder GitHub
+    Actions). `ruleset.yml` prüft das Ruleset von `alpha` nach jedem Push, alle sechs Stunden und
+    auf Anstoß dagegen und wird bei Abweichung rot (LLH-1895). Wer eine Pflicht ändert, ändert
+    Liste und Ruleset zusammen.
+  - **Im PR** läuft `schnell` aus `pr.yml`. Ein fremdes Label startet an einem PR ohne `voll` nur die Schnellprüfungen neu, in
     eigener Gruppe, ohne einen laufenden Lauf abzubrechen; an einem PR mit `voll` startet es alle
     Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend- und e2e-Suite laufen im PR nur mit dem **Label `voll`**, dann ganz
     und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label
@@ -33,13 +43,16 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     `cancel-in-progress` für den ganzen Workflow auf einem Kanal-Branch. **Neu starten nur den
     jüngsten Lauf** eines Kanal-Branches: ein neu gestarteter Job eines älteren Laufs tritt in
     dieselbe Gruppe und bricht die Tests des jüngeren ab.
-  - **Label-Ereignisse:** `ci.yml` hört im PR auf `labeled`; die Schnellprüfungen laufen dabei
+  - **Label-Ereignisse:** `pr.yml` hört auf `labeled`; die Schnellprüfungen laufen dabei
     immer neu, nie übersprungen (ein übersprungener jüngster Check zählte grün). Auto-Merge-
-    Ereignisse gehören nicht nach `ci.yml`.
-  - `e2e.yml` ist nur noch `workflow_call` (Binary, Anteile, Bericht, Runner-Wahl).
+    Ereignisse gehören nicht nach `pr.yml`.
+  - `suiten.yml` und `e2e.yml` sind nur `workflow_call` (`suiten.yml` ruft `e2e.yml`: Binary,
+    Anteile, Bericht, Runner-Wahl). Der Release wartet auf den ganzen Aufruf; der Vitest-Bericht
+    darin scheitert, ohne ihn rot zu machen (`continue-on-error`).
   - Die Form hält `scripts/ci-stufen.test.sh` (Schritt 11) fest.
   - Folge: Testbrüche landen auf `alpha` und gehen über „alpha rot“ (Stau-Wächter, unten).
-  - Herleitung: `openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md`.
+  - Herleitung: `openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md`,
+    `openspec/changes/archive/2026-11-15-czjhc4qq-ci-pr-schlank/design.md`.
 - **Stau-Wächter** (LLH-1660, `scripts/stau-waechter.sh`, `.github/workflows/stau-waechter.yml`:
   Push auf einen Ziel-Branch, stündlich, von Hand): bewertet jeden offenen PR, der kein Entwurf
   ist. Was er tut und warum, steht im Skriptkopf; die Grenzen belegt `stau-waechter.test.sh`.
@@ -52,11 +65,13 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Fast-Forward auf genau den bewerteten Kopf (Push mit Lease), kein zweiter Versuch auf einem Wächter-Merge (Trailer
     `Stau-Waechter`; gilt nur hier, „alpha rot“ hat seine eigene Bremse). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
   - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand. Je
-    Name zählt wie bei den Required Checks der jüngste Check-Run. Hinweise einer Art, die es
+    Name zählt wie bei den Required Checks der jüngste Check-Run. Weicht das Ruleset von `alpha`
+    von der Pflichtliste ab (`ruleset-pruefen.sh`), nennt der Hinweis das als wahrscheinliche
+    Ursache (LLH-1895). Hinweise einer Art, die es
     nicht mehr gibt (`ohne-e2e`, bis LLH-1889), gehen ohne Befund auf „behoben“.
   - **alpha rot** (LLH-1849; zusätzlich ausgelöst, wenn ein CI-Lauf auf `alpha` fertig ist):
     schlägt im jüngsten abgeschlossenen Push-Lauf von `ci.yml` auf `alpha` ein Job außer dem
-    Release fehl (dessen Jobs heißen „Release / …“), ist **höchstens ein** offener PR zuständig:
+    Release fehl (dessen Jobs heißen „Release / …“, die der Suiten „Suiten / …“), ist **höchstens ein** offener PR zuständig:
     der mit Label `alpha-rot` (bei mehreren die kleinste Nummer, die übrigen `doppelt`; ein
     Entwurf mit Label zählt), sonst ein PR ohne Entwurf, Fork und Dependabot. Der Auftrag haftet
     eine volle Stunde ab seinem Hinweis an diesem PR und geht erst dann an den nächsten (größere
@@ -84,7 +99,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
 - **Baut mit Ziel-Branch** (LLH-1849, `.github/workflows/ziel-branch-build.yml`,
   `scripts/ziel-branch-build.sh`): Pflicht-Check an einem fertigen PR (Auto-Merge an, kein
   Entwurf; Labels zählen nicht): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert
-  (`check-all.sh --nur baut`). Nach jedem Push auf einen Kanal-Branch setzt `verteilen` den Check
+  (`check-all.sh --nur baut`). Nach jedem Push auf einen Kanal-Branch setzt `verteilen` (eigener
+  Workflow `ziel-branch-verteilen.yml`, LLH-1896; `has_pending_verteilen` fragt dessen Läufe) den Check
   jedes fertigen PRs auf „läuft“ und startet **je PR einen eigenen Lauf auf dessen Branch**
   (`workflow_dispatch`); ein nicht fertiger mit Check (auch ein Entwurf) bekommt „wartet“, ein
   Branch ohne den Workflow einen roten Check mit „`alpha` hineinmergen“. Der Einzellauf rechnet

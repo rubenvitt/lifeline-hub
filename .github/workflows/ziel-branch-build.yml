@@ -42,7 +42,7 @@
 #     ohne Cache);
 #   - das Ergebnis geht als Artefakt an `melden`, das es nur als Text liest.
 # In einem Lauf eines PRs (Ereignis oder Einzellauf) stammen Workflow und Skripte aus dem PR
-# selbst, wie bei `ci.yml`: ein PR bestimmt dort seine eigenen Checks, das ist keine neue Grenze.
+# selbst, wie bei `pr.yml`: ein PR bestimmt dort seine eigenen Checks, das ist keine neue Grenze.
 # Die Form hält `scripts/ziel-branch-build.test.sh` fest; Verteilen, Auswahl und Meldung stehen in
 # `scripts/ziel-branch-build.sh`.
 #

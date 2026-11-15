@@ -76,7 +76,7 @@ ALPHA_LABEL="alpha-rot"
 TRAILER_SCHLUESSEL="Stau-Waechter"
 TRAILER_WERT="LLH-1660"
 WARTEZEIT=1200 # Sekunden, bis ein fehlender CI-Lauf oder ein ausbleibender Merge als Befund gilt
-CI_CHECK="Schnellprüfungen" # läuft in ci.yml bei jedem PR-Lauf, unabhängig von den Bereichen
+CI_CHECK="Schnellprüfungen" # läuft in pr.yml bei jedem PR-Lauf, unabhängig von den Bereichen
 ZIEL_BRANCHES=" alpha beta main "
 
 NUR_ZEIGEN=0
