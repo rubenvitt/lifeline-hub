@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router';
 import dayjs from 'dayjs';
+import { erinnerungZustand } from '../../erinnerung/erinnerungZustand';
 import type { Abloesung, Auftrag, Erinnerung, Meldung, Nachforderung } from '../../api/types';
 import { formatVor } from '../../anzeige/abstand';
 import { leereUhrzeit, zeitKurz } from '../../anzeige/zeitDarstellung';
@@ -44,6 +45,7 @@ import {
   erinnerungFuerMich,
   listenStand,
   meldungFuerMich,
+  meldungsStufe,
   nachSicht,
   nachforderungFuerMich,
   vorgangsAbloesungen,
@@ -314,12 +316,19 @@ export default function OffeneVorgaengePaneel({
                     .filter(Boolean)
                     .join(' · '),
                 )}
+                {/* Ein Wortplatz, Vorrang statt zweitem Etikett (LLH-1740): die Zeile bleibt so
+                    breit wie bisher. SOFORT trägt die Alarmfarbe, aber keine Kante — eine frische
+                    Sofortmeldung ist ein Signal, noch kein Versäumnis. */}
                 {alarm
                   ? wort('Bestätigung überfällig', 'alarm')
-                  : wort(
-                      (MELDUNG_STATUS[m.status]?.label ?? m.status).toLowerCase(),
-                      m.status === 'neu' ? 'achtung' : null,
-                    )}
+                  : meldungsStufe(m) === 1
+                    ? wort('SOFORT', 'alarm')
+                    : meldungsStufe(m) === 2
+                      ? wort('DRINGEND', 'achtung')
+                      : wort(
+                          (MELDUNG_STATUS[m.status]?.label ?? m.status).toLowerCase(),
+                          m.status === 'neu' ? 'achtung' : null,
+                        )}
               </Link>
             );
           },
@@ -421,17 +430,21 @@ export default function OffeneVorgaengePaneel({
           schluessel: (e) => e.id,
           sprung: { ziel: erinnerungenPfad(einsatzId), name: 'Erinnerungen' },
           onNeuladen: neuladen(erinnerungen),
-          zeile: (e) => (
-            <Link
-              to={erinnerungenPfad(einsatzId, { erinnerung: e.id })}
-              data-lfh="vorgang-erinnerung"
-              style={zeile}
-            >
-              {zeit(kurz(e.faellig_at))}
-              {text(e.titel, e.empfaenger_anzeige ? `an ${e.empfaenger_anzeige}` : null)}
-              {e.ist_faellig ? wort('fällig', 'achtung') : wort('bald', null)}
-            </Link>
-          ),
+          zeile: (e) => {
+            const zustand = erinnerungZustand(e, jetzt);
+            return (
+              <Link
+                to={erinnerungenPfad(einsatzId, { erinnerung: e.id })}
+                data-lfh="vorgang-erinnerung"
+                style={zeile}
+              >
+                {zeit(kurz(e.faellig_at))}
+                {text(e.titel, e.empfaenger_anzeige ? `an ${e.empfaenger_anzeige}` : null)}
+                {/* Wort und Ton aus derselben Stelle wie die Marke (LLH-1749). */}
+                {wort(zustand.wort, zustand.ton)}
+              </Link>
+            );
+          },
         })}
         {abschnitt({
           titel: 'Ablösungen',

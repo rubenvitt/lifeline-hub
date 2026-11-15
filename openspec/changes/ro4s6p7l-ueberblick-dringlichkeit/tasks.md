@@ -2,13 +2,13 @@
 
 ## 1. LLH-1740 (w744ma23): Sofort und Dringend ab Eingang zuoberst
 
-- [ ] 1.1 `offeneVorgaenge.ts`: `meldungsStufe(m)` und neue Folge in `vorgangsMeldungen` (alarmiert → sofort → dringend → übrige; Sofort/Dringend neueste zuerst). Zuerst Tests in `offeneVorgaenge.test.ts` (rot): Sofort vor drei älteren neuen, zwei Sofort neueste zuerst, alarmierte Normalmeldung vor Sofort, Dringend vor Normal, Art Sofortmeldung ohne Prio sofort zählt als Sofort; dann grün.
-- [ ] 1.2 `OffeneVorgaengePaneel.tsx`: Wortplatz der Meldungszeile mit Vorrang „Bestätigung überfällig“ → „SOFORT“ → „DRINGEND“ → Statuswort, Ton über `prioTon`, Alarmkante unverändert nur bei `istAlarmiert`. Seitentest in `UeberblickPage.test.tsx`: nach Neuabruf mit frischer Sofortmeldung steht sie an Stelle 1 mit „SOFORT“ und ohne `data-alarm`.
+- [x] 1.1 `offeneVorgaenge.ts`: `meldungsStufe(m)` und neue Folge in `vorgangsMeldungen` (alarmiert → sofort → dringend → übrige; Sofort/Dringend neueste zuerst). Zuerst Tests in `offeneVorgaenge.test.ts` (rot): Sofort vor drei älteren neuen, zwei Sofort neueste zuerst, alarmierte Normalmeldung vor Sofort, Dringend vor Normal, Art Sofortmeldung ohne Prio sofort zählt als Sofort; dann grün.
+- [x] 1.2 `OffeneVorgaengePaneel.tsx`: Wortplatz der Meldungszeile mit Vorrang „Bestätigung überfällig“ → „SOFORT“ → „DRINGEND“ → Statuswort, Ton über `prioTon`, Alarmkante unverändert nur bei `istAlarmiert`. Seitentest in `UeberblickPage.test.tsx`: nach Neuabruf mit frischer Sofortmeldung steht sie an Stelle 1 mit „SOFORT“ und ohne `data-alarm`.
 
 ## 2. LLH-1749 (vy3t2c4k): eine fällige Erinnerung, ein Wort
 
-- [ ] 2.1 `erinnerung/erinnerungZustand.ts` mit Test zuerst: fällig per `ist_faellig` oder `faellig_at <= jetzt` → `{ wort: 'fällig', ton: 'achtung' }`, sonst `{ wort: 'bald', ton: null }`.
-- [ ] 2.2 `markenBewertung` liest die Funktion für `art === 'erinnerung'` bei verstrichener Zeit; `OffeneVorgaengePaneel` nimmt Wort und Ton aus ihr. Tests in `ueberblickDaten.test.ts` (Erinnerung verstrichen → „fällig“/achtung; Auftrag verstrichen → „überfällig“/alarm unverändert).
+- [x] 2.1 `erinnerung/erinnerungZustand.ts` mit Test zuerst: fällig per `ist_faellig` oder `faellig_at <= jetzt` → `{ wort: 'fällig', ton: 'achtung' }`, sonst `{ wort: 'bald', ton: null }`.
+- [x] 2.2 `markenBewertung` liest die Funktion für `art === 'erinnerung'` bei verstrichener Zeit; `OffeneVorgaengePaneel` nimmt Wort und Ton aus ihr. Tests in `ueberblickDaten.test.ts` (Erinnerung verstrichen → „fällig“/achtung; Auftrag verstrichen → „überfällig“/alarm unverändert).
 - [ ] 2.3 Folgeaufgabe per `zunder-task-anlegen`: Erinnerungskarte im Modul (alarm) mit Überblick angleichen. Betrifft `KommKarte`/`kartenKante` und Spec `deeplink-hervorhebung`. Link im PR.
 
 ## 3. Doku

@@ -93,7 +93,10 @@ Erinnerungen und Ablösungen. Die Zahl jedes Abschnitts ist dieselbe wie im Modu
 - **Ablösungen**: die überfälligen und die bald fälligen Schichten.
 
 Jeder Abschnitt zeigt höchstens drei Einträge, das Überfällige zuerst; ein überfälliger Eintrag
-trägt dazu einen roten Rand links und das Wort „überfällig“. Ein Klick auf einen Eintrag öffnet
+trägt dazu einen roten Rand links und das Wort „überfällig“. Bei den Meldungen folgen danach die
+Sofortmeldungen mit dem roten Wort „SOFORT“ und die dringenden mit dem gelben Wort „DRINGEND“, je
+die zuletzt eingegangene zuerst, und zwar ab Eingang, nicht erst, wenn die Bestätigung überfällig
+ist. Eine fällige Erinnerung heißt „fällig“ in Gelb, hier und in den Nächsten Marken. Ein Klick auf einen Eintrag öffnet
 ihn im Modul, hervorgehoben. Alle weiteren erreicht „alle ↗“. Steht „keine“, gibt es nichts Offenes. Steht „ohne Netz nicht geladen“, war
 die Liste ohne Verbindung noch nie geladen; das heißt nicht, dass nichts offen ist.
 
@@ -111,7 +114,9 @@ Die Marken kommen aus sieben Quellen: Aufträge mit Frist, offene Erinnerungen, 
 Lagebesprechung, der erwartete Höchststand an einem maßgeblichen Pegel, fällige Ablösungen, der
 Beginn angekündigter Unwetterwarnungen der Stufen schwer und extrem und die Programmpunkte der
 Veranstaltung aus dem Paneel „Ablauf“ der [Einsatzdaten](einsatzdaten.md). Eine verstrichene Frist
-steht als „überfällig“ ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben.
+steht als „überfällig“ in Rot ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben. Eine
+Erinnerung ist ein Wecker, keine Frist: verstrichen heißt sie „fällig“ in Gelb, wie im Abschnitt
+„Erinnerungen“ der Offenen Vorgänge.
 Pegelprognose, Unwetterbeginn und Programmpunkte sind keine Fristen: Verstrichen fallen sie
 heraus. Pegelprognose und Unwetterbeginn sind unter 30 Minuten ebenso hervorgehoben, Programmpunkte
 nie. Es stehen höchstens sechs Marken da, der Rest als „+… weitere“. Ein

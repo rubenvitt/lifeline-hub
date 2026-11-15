@@ -89,6 +89,50 @@ describe('Folge je Abschnitt (LLH-1145)', () => {
     expect(liste.map((m) => m.id)).toEqual([3, 4, 2, 1]);
   });
 
+  describe('Meldungen nach Priorität (LLH-1740)', () => {
+    it('eine frische Sofortmeldung steht vor drei älteren neuen Meldungen', () => {
+      const liste = vorgangsMeldungen([
+        meldung({ id: 1, status: 'neu', eingang_at: um(10, 0) }),
+        meldung({ id: 2, status: 'neu', eingang_at: um(10, 30) }),
+        meldung({ id: 3, status: 'neu', eingang_at: um(11, 0) }),
+        meldung({ id: 4, status: 'neu', prioritaet: 'sofort', eingang_at: um(11, 58) }),
+      ]);
+      expect(liste.map((m) => m.id)).toEqual([4, 1, 2, 3]);
+    });
+
+    it('Art Sofortmeldung zählt als Sofort, auch ohne Priorität sofort', () => {
+      const liste = vorgangsMeldungen([
+        meldung({ id: 1, status: 'neu', eingang_at: um(10, 0) }),
+        meldung({ id: 2, meldungsart: 'sofortmeldung', eingang_at: um(11, 58) }),
+      ]);
+      expect(liste.map((m) => m.id)).toEqual([2, 1]);
+    });
+
+    it('zwei Sofortmeldungen: die zuletzt eingegangene zuerst', () => {
+      const liste = vorgangsMeldungen([
+        meldung({ id: 1, prioritaet: 'sofort', eingang_at: um(11, 0) }),
+        meldung({ id: 2, prioritaet: 'sofort', eingang_at: um(11, 50) }),
+      ]);
+      expect(liste.map((m) => m.id)).toEqual([2, 1]);
+    });
+
+    it('überfällige Bestätigung vor Sofort vor Dringend vor den übrigen', () => {
+      const liste = vorgangsMeldungen([
+        meldung({ id: 1, status: 'neu', eingang_at: um(9, 0) }),
+        meldung({ id: 2, prioritaet: 'dringend', eingang_at: um(11, 0) }),
+        meldung({ id: 3, prioritaet: 'dringend', eingang_at: um(11, 30) }),
+        meldung({ id: 4, prioritaet: 'sofort', eingang_at: um(11, 55) }),
+        meldung({
+          id: 5,
+          bestaetigung_pflicht: true,
+          ist_ueberfaellig: true,
+          eingang_at: um(10, 0),
+        }),
+      ]);
+      expect(liste.map((m) => m.id)).toEqual([5, 4, 3, 2, 1]);
+    });
+  });
+
   it('Nachforderungen: überfällig → Bedarfszeit → älteste; abgeschlossene fehlen', () => {
     const liste = vorgangsNachforderungen(
       [

@@ -306,6 +306,24 @@ describe('Nächste Marken', () => {
     expect(markenBewertung(JETZT.add(20, 'second'), JETZT).wort).toBe('in < 1 min');
   });
 
+  it('eine verstrichene Erinnerung heißt „fällig“ in Achtung wie im Abschnitt Erinnerungen (LLH-1749)', () => {
+    expect(markenBewertung(JETZT.subtract(5, 'minute'), JETZT, 'erinnerung')).toEqual({
+      ton: 'achtung',
+      wort: 'fällig',
+    });
+    expect(markenBewertung(JETZT, JETZT, 'erinnerung')).toEqual({ ton: 'achtung', wort: 'fällig' });
+    // Ein Auftrag mit verpasster Frist bleibt „überfällig“ in Alarm.
+    expect(markenBewertung(JETZT.subtract(5, 'minute'), JETZT, 'auftrag')).toEqual({
+      ton: 'alarm',
+      wort: 'überfällig',
+    });
+    // Vor der Fälligkeit wie jede Frist.
+    expect(markenBewertung(JETZT.add(10, 'minute'), JETZT, 'erinnerung')).toEqual({
+      ton: 'achtung',
+      wort: 'in 10 min',
+    });
+  });
+
   /**
    * LFH-859: derselbe überfällige Termin trägt auf der Stab-Seite und in der Fristenliste denselben
    * Ton und dasselbe Wort. Verglichen werden die beiden Ergebnisse MITEINANDER, nicht mit

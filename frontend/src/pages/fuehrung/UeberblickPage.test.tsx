@@ -844,6 +844,54 @@ describe('UeberblickPage', () => {
     expect(zeilen[0]).toHaveTextContent('Bestätigung überfällig');
   });
 
+  it('Offene Vorgänge · Meldungen: eine frische Sofortmeldung steht zuoberst mit „SOFORT“, ohne Alarmkante (LLH-1740)', async () => {
+    const meldung = (over: Record<string, unknown>) => ({
+      einsatz_id: 1,
+      inhalt: 'Meldung',
+      status: 'gesichtet',
+      ist_offen: true,
+      bestaetigung_pflicht: false,
+      ist_bestaetigt: false,
+      ist_ueberfaellig: false,
+      eskaliert: false,
+      eingang_at: vor(30),
+      erfasst_von_id: 1,
+      empfaenger_funktion: null,
+      ...over,
+    });
+    stelleBereit({
+      ...volleDaten,
+      meldungen: [
+        meldung({ id: 61, inhalt: 'Neu alt', status: 'neu', eingang_at: vor(40) }),
+        meldung({ id: 62, inhalt: 'Neu mittel', status: 'neu', eingang_at: vor(30) }),
+        meldung({ id: 63, inhalt: 'Neu jung', status: 'neu', eingang_at: vor(20) }),
+        meldung({
+          id: 64,
+          inhalt: 'Zwei Personen eingeschlossen',
+          status: 'neu',
+          prioritaet: 'sofort',
+          eingang_at: vor(1),
+        }),
+        meldung({ id: 65, inhalt: 'Pumpe fällt aus', prioritaet: 'dringend', eingang_at: vor(3) }),
+      ],
+    });
+    rendern();
+    await waitFor(() => vorgaenge());
+    const m = abschnitt('Meldungen');
+    await within(m).findAllByRole('link', { name: /eingeschlossen/ });
+    const alle = within(m)
+      .getAllByRole('link')
+      .filter((l) => l.dataset.lfh === 'vorgang-meldung');
+    expect(alle.map((z) => z.getAttribute('href'))).toEqual([
+      '/einsaetze/1/meldungen?meldung=64',
+      '/einsaetze/1/meldungen?meldung=65',
+      '/einsaetze/1/meldungen?meldung=61',
+    ]);
+    expect(alle[0]).toHaveTextContent('SOFORT');
+    expect(alle[0]).not.toHaveAttribute('data-alarm');
+    expect(alle[1]).toHaveTextContent('DRINGEND');
+  });
+
   it('Offene Vorgänge · Erinnerungen und Ablösungen: fällige und baldige, Zahl aus ihrer Quelle', async () => {
     const schicht = (id: number, faellig_at: string) => ({
       id,

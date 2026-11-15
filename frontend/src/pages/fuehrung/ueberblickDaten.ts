@@ -61,6 +61,7 @@ import {
   lagebesprechungUeberfaellig,
 } from '../../lagebesprechung/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
+import { ERINNERUNG_FAELLIG } from '../../erinnerung/erinnerungZustand';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
@@ -596,7 +597,8 @@ interface MarkenAuswahl {
  * Ton und Wort einer Frist: überfällig `alarm`, unter {@link KNAPP_MINUTEN} `achtung`, sonst
  * `neutral`. Ausnahme ist die überfällige Lagebesprechung: sie liest Ton und Wort aus
  * `lagebesprechungUeberfaellig`, damit die Seite Lagebesprechung und diese Liste denselben Termin
- * gleich zeigen (LFH-859, `lagebesprechung/AGENTS.md`). Ein Programmpunkt ist keine Frist und
+ * gleich zeigen (LFH-859, `lagebesprechung/AGENTS.md`). Ebenso eine verstrichene Erinnerung: sie
+ * heißt „fällig“ in Achtung wie im Abschnitt „Erinnerungen“ (`erinnerungZustand`, LLH-1749). Ein Programmpunkt ist keine Frist und
  * bleibt immer `neutral` (LLH-1570, Spec `ablaufplan`: Marke ohne Alarm).
  */
 export function markenBewertung(
@@ -609,6 +611,9 @@ export function markenBewertung(
     if (ueberfaellig) return { ton: ueberfaellig.rolle, wort: ueberfaellig.label };
   }
   const abstand = zeit.valueOf() - jetzt.valueOf();
+  if (abstand <= 0 && art === 'erinnerung') {
+    return { ton: ERINNERUNG_FAELLIG.ton, wort: ERINNERUNG_FAELLIG.wort };
+  }
   if (abstand <= 0) return { ton: 'alarm', wort: 'überfällig' };
   const minuten = Math.floor(abstand / 60_000);
   const wort = abstandText(minuten);
