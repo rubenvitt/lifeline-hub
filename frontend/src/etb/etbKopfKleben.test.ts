@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { KLEBEN_HOECHSTENS } from '../components/seitenkopfKleben';
 import {
   ETB_FILTERLEISTE_HOEHE,
+  ETB_FILTERLEISTE_OBEN,
   ETB_KOPF_UNTERKANTE_WERT,
-  ETB_SEITENKOPF_HOEHE,
-  KLEBEN_HOECHSTENS,
   kopfKlebtImFenster,
 } from './etbKopfKleben';
 
 describe('Kleben der ETB-Köpfe (kwc2yszv D8)', () => {
-  it('klebt am Fükw: Rahmen, Seitenkopf, Filterleiste und Spaltenkopf nehmen ein Fünftel', () => {
+  it('klebt am Fükw: Kopfleiste, Seitenkopf, Filterleiste und Spaltenkopf nehmen ein Fünftel', () => {
     // 1440 × 900 kompakt: Kopfleiste 52, Seitenkopf 44, Filterleiste 60, Spaltenkopf 26.
     expect(
       kopfKlebtImFenster({
-        rahmen: 52,
+        kopf: 52,
         seitenkopf: 44,
         filterleiste: 60,
         spaltenkopf: 26,
@@ -27,7 +27,7 @@ describe('Kleben der ETB-Köpfe (kwc2yszv D8)', () => {
     expect(KLEBEN_HOECHSTENS).toBeCloseTo(1 / 3);
     expect(
       kopfKlebtImFenster({
-        rahmen: 72,
+        kopf: 72,
         seitenkopf: 72,
         filterleiste: 170,
         spaltenkopf: 0,
@@ -39,7 +39,7 @@ describe('Kleben der ETB-Köpfe (kwc2yszv D8)', () => {
   it('die Grenze gilt einschließlich', () => {
     expect(
       kopfKlebtImFenster({
-        rahmen: 0,
+        kopf: 0,
         seitenkopf: 100,
         filterleiste: 200,
         spaltenkopf: 0,
@@ -48,7 +48,7 @@ describe('Kleben der ETB-Köpfe (kwc2yszv D8)', () => {
     ).toBe(true);
     expect(
       kopfKlebtImFenster({
-        rahmen: 1,
+        kopf: 1,
         seitenkopf: 100,
         filterleiste: 200,
         spaltenkopf: 0,
@@ -57,9 +57,14 @@ describe('Kleben der ETB-Köpfe (kwc2yszv D8)', () => {
     ).toBe(false);
   });
 
-  it('die Unterkante für den Spaltenkopf rechnet Rahmen, Seitenkopf und Filterleiste', () => {
+  /**
+   * zjt7c073 D5: Der klebende Seitenkopf zählt zur Rahmenhöhe (`components/rahmenOben.ts`), die
+   * ETB-Köpfe rechnen ihn nicht noch einmal dazu.
+   */
+  it('Filterleiste und Spaltenkopf hängen unter der Rahmenhöhe, die den Seitenkopf schon zählt', () => {
+    expect(ETB_FILTERLEISTE_OBEN).toBe('var(--lfh-rahmen-oben, 0px)');
     expect(ETB_KOPF_UNTERKANTE_WERT).toBe(
-      `calc(var(--lfh-rahmen-oben, 0px) + var(${ETB_SEITENKOPF_HOEHE}, 0px) + var(${ETB_FILTERLEISTE_HOEHE}, 0px))`,
+      `calc(var(--lfh-rahmen-oben, 0px) + var(${ETB_FILTERLEISTE_HOEHE}, 0px))`,
     );
   });
 });

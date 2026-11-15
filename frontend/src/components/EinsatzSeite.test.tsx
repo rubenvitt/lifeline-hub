@@ -644,3 +644,48 @@ describe('EinsatzSeite · Orientierung (LFH-954)', () => {
     expect(regel![1]).toMatch(/flex-shrink:\s*0/);
   });
 });
+
+/**
+ * Der Seitenkopf klebt unter der Kopfleiste (zjt7c073 D3). Wann genau, prüft
+ * `seitenkopfKleben.test.tsx`; hier, dass die Seite die Entscheidung trägt und eine Vorgabe von
+ * außen (ETB) gilt. Die Geometrie misst `e2e/rahmen-stehen-bleiben.spec.ts`.
+ */
+describe('EinsatzSeite — klebender Seitenkopf', () => {
+  it('klebt ab md unter der Kopfleiste, mit Seitengrund über dem Inhalt', () => {
+    const { container } = renderMitProviders(<EinsatzSeite titel="Personal">Inhalt</EinsatzSeite>);
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(kopf.style.position).toBe('sticky');
+    expect(kopf.style.top).toBe('var(--lfh-kopf-oben, 0px)');
+    expect(kopf.style.zIndex).toBe('30');
+    expect(kopf.style.background).not.toBe('');
+  });
+
+  it('klebt nicht, wenn die Seite es ausdrücklich abschaltet (Gegenprobe)', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="ETB" kopfKlebt={false}>
+        Inhalt
+      </EinsatzSeite>,
+    );
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(kopf.style.position).toBe('');
+  });
+});
+
+/**
+ * Review zjt7c073 (B4): Mit `fensterInhalt` steckt die Leiste in `FensterRahmen` in einem eigenen
+ * Wrapper, der ihr Containing Block ist; kleben kann sie dort nicht. Sie meldet sich dann auch
+ * nicht als Rahmenquelle, sonst lägen Fokusabstand und Alarmkante um ihre Höhe zu tief.
+ */
+describe('EinsatzSeite — Arbeitsfläche bis zum Fensterende', () => {
+  it('der Seitenkopf klebt nicht und zählt nicht zur Rahmenhöhe', async () => {
+    const { readRahmenOben } = await import('./rahmenOben');
+    const { container } = renderMitProviders(
+      <EinsatzSeite titel="UHS" fensterInhalt={{ inhalt: <div>Grundriss</div> }}>
+        {null}
+      </EinsatzSeite>,
+    );
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(kopf.style.position).toBe('');
+    expect(readRahmenOben()).toBe(0);
+  });
+});

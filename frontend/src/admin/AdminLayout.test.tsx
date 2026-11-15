@@ -6,7 +6,8 @@ import { http, HttpResponse } from 'msw';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
-import AdminLayout, { holeInsBild, seitenleistenStil } from './AdminLayout';
+import AdminLayout, { seitenleistenStil } from './AdminLayout';
+import { bringIntoView } from '../components/bringIntoView';
 import { adminBenutzerPfad, defaultAdminPfad, ersteSektionPfad } from './adminNav';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige } from '../api/types';
@@ -274,7 +275,7 @@ describe('AdminLayout — klebende Seitenleiste', () => {
     // Unter dem klebenden Kopf, nicht an der Fensterkante (LFH-952).
     expect(menue).toEqual({
       position: 'sticky',
-      top: 'var(--lfh-rahmen-oben, 0px)',
+      top: 'var(--lfh-kopf-oben, 0px)',
       maxHeight: rest,
       overflowY: 'auto',
     });
@@ -297,24 +298,24 @@ describe('AdminLayout — klebende Seitenleiste', () => {
     return el;
   }
 
-  it('holeInsBild: ein Eintrag unter dem Rand wird bis an den Rand gerollt, nicht weiter', () => {
+  it('bringIntoView: ein Eintrag unter dem Rand wird bis an den Rand gerollt, nicht weiter', () => {
     const rahmen = attrappe(100, 500);
     rahmen.scrollTop = 0;
-    holeInsBild(rahmen, attrappe(600, 664));
+    bringIntoView(rahmen, attrappe(600, 664));
     expect(rahmen.scrollTop).toBe(164);
   });
 
-  it('holeInsBild: ein Eintrag über dem Rand wird nach oben geholt', () => {
+  it('bringIntoView: ein Eintrag über dem Rand wird nach oben geholt', () => {
     const rahmen = attrappe(100, 500);
     rahmen.scrollTop = 300;
-    holeInsBild(rahmen, attrappe(40, 104));
+    bringIntoView(rahmen, attrappe(40, 104));
     expect(rahmen.scrollTop).toBe(240);
   });
 
-  it('holeInsBild: ein sichtbarer Eintrag bleibt, wo er ist', () => {
+  it('bringIntoView: ein sichtbarer Eintrag bleibt, wo er ist', () => {
     const rahmen = attrappe(100, 500);
     rahmen.scrollTop = 50;
-    holeInsBild(rahmen, attrappe(200, 264));
+    bringIntoView(rahmen, attrappe(200, 264));
     expect(rahmen.scrollTop).toBe(50);
   });
 });
