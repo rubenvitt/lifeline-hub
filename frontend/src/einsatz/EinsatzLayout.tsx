@@ -1,4 +1,5 @@
-import { IconMenue } from '../icons';
+import { IconLupe, IconMenue } from '../icons';
+import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
@@ -36,7 +37,7 @@ import { isUebung } from './einsatzart';
 import { NichtGefundenProvider } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
-import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
+import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import { useAlarmKante } from '../components/alarmOben';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import {
@@ -199,6 +200,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const aktiveKategorie: KategorieKey | null = aktuellesModul?.kategorie ?? null;
 
   const { abBreite } = useViewport();
+  const palette = useCommandPalette();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
   // Ab `xl` trägt der Kopf alle Wörter; darunter (Führungs-Tablet) stehen Ruhezustände nur als
@@ -213,11 +215,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Unter `md` rücken die Zellen zusammen, sonst bräche die rechte Gruppe auf 390 px in eine
   // dritte Zeile.
   const zellToken = mittel ? token : { padding: token.paddingXS };
-  // Ab `md` bleibt der Kopf beim Rollen stehen (LFH-952, `frontend/AGENTS.md`, Rahmen); seine
-  // gemessene Höhe ist `--lfh-rahmen-oben`, unter der alles hängt, was selbst oben klebt.
-  const kopfRef = useRahmenObenQuelle<HTMLElement>(mittel);
-  // Der Kopf ist auch Bedienkante der stehenden Alarme, in jeder Breite: unter `md` rollt er,
-  // steht beim Seitenbeginn aber im Bild (LFH-1112, `components/alarmOben.ts`).
+  // Der Kopf bleibt beim Rollen stehen, in jeder Breite (LFH-952, LLH-1728, `frontend/AGENTS.md`,
+  // Rahmen); seine gemessene Höhe zählt zu `--lfh-rahmen-oben`, unter der alles hängt, was selbst
+  // oben klebt. Unter `md` hängt er sich unter die gestörte Betriebszeile (Rang, design.md D2).
+  const { ref: kopfRef, oben: kopfOben } = useRahmenObenStapel<HTMLElement>(true, RAHMEN_RANG.kopf);
+  // Der Kopf ist auch Bedienkante der stehenden Alarme (LFH-1112, `components/alarmOben.ts`).
   const alarmKante = useAlarmKante<HTMLElement>();
   const kopfRefs = useCallback(
     (el: HTMLElement | null) => {
@@ -400,7 +402,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       <Header
         ref={kopfRefs}
         data-lfh="rahmen-kopf"
-        style={mittel ? { ...KOPF_STIL, ...RAHMEN_KLEBT } : KOPF_STIL}
+        style={{ ...KOPF_STIL, ...RAHMEN_KLEBT, top: kopfOben }}
       >
         {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Bei Platzmangel
            bricht die rechte Gruppe um; die linke wächst stärker als die Suche, damit der Name erst
@@ -530,18 +532,22 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             ruheOhneWort={!startWoerter}
             haeltStartPlatz={startWoerter}
           />
-          {mittel && <Uhr />}
-          {!breit && (
+          {/* Am Handy ist die Uhr die letzte Zelle; Suche und Benutzermenü stehen dort in der
+              Navigation (LLH-1728, D3), sonst bliebe der Kopf zweizeilig. */}
+          <Uhr zelle={zellToken} trenner={mittel ? 'ende' : 'keiner'} />
+          {mittel && !breit && (
             <div style={kopfZelleStil(zellToken)}>
               <CommandPaletteTrigger />
             </div>
           )}
-          <div
-            style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
-          >
-            {/* Das Etikett hält seine Breite: die Funktion kommt erst mit dem Einsatz (LLH-1272). */}
-            <BenutzerMenu funktion={einsatz?.meine_funktion} hasFixedWidth hilfeDaneben />
-          </div>
+          {mittel && (
+            <div
+              style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
+            >
+              {/* Das Etikett hält seine Breite: die Funktion kommt erst mit dem Einsatz (LLH-1272). */}
+              <BenutzerMenu funktion={einsatz?.meine_funktion} hasFixedWidth hilfeDaneben />
+            </div>
+          )}
         </KopfRechts>
       </Header>
       {/* Übung (LLH-1725, Spec `uebungsmarke`, D4): direkt unter dem Kopf, klebt in jeder Breite
@@ -655,7 +661,30 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           destroyOnHidden
           // Der Schließer folgt der Staffel wie der Hamburger, der ihn öffnet (LFH-384).
           styles={{ close: { minWidth: navGriffMass(token), minHeight: navGriffMass(token) } }}
+          // Am Handy trägt die Navigation auch, was im Kopf keinen Platz hat (LLH-1728, D3).
+          footer={
+            mittel ? undefined : (
+              <BenutzerMenu funktion={einsatz?.meine_funktion} hilfeDaneben inNavigation />
+            )
+          }
         >
+          {!mittel && (
+            <Button
+              block
+              icon={<IconLupe size={20} />}
+              onClick={() => {
+                setNavOffen(false);
+                palette.oeffne();
+              }}
+              style={{
+                height: token.controlHeight,
+                justifyContent: 'flex-start',
+                marginBlockEnd: token.marginSM,
+              }}
+            >
+              Suchen
+            </Button>
+          )}
           <ModulAkkordeon
             einsatzId={einsatzId}
             kategorien={kategorien}

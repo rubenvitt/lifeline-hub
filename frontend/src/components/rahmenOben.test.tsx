@@ -13,6 +13,8 @@ import {
   useRahmenObenFuer,
   useRahmenObenQuelle,
   useRahmenObenStapel,
+  RAHMEN_RANG,
+  type RahmenRang,
 } from './rahmenOben';
 
 function Quelle({ hoehe, aktiv, name }: { hoehe: number; aktiv: boolean; name: string }) {
@@ -198,11 +200,21 @@ describe('rahmenOben', () => {
 });
 
 /** Eine Quelle, die selbst unter den übrigen klebt (Übungsband, LLH-1725, design.md D4). */
-function Stapel({ hoehe, aktiv = true }: { hoehe: number; aktiv?: boolean }) {
-  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv);
+function Stapel({
+  hoehe,
+  aktiv = true,
+  rang = RAHMEN_RANG.uebungsband,
+  name = 'stapel',
+}: {
+  hoehe: number;
+  aktiv?: boolean;
+  rang?: RahmenRang;
+  name?: string;
+}) {
+  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv, rang);
   return (
     <div
-      data-testid="stapel"
+      data-testid={name}
       data-oben={oben}
       ref={(el) => {
         if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: hoehe });
@@ -225,7 +237,7 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
     expect(variable()).toBe('76px');
   });
 
-  it('ohne andere Quelle klebt es an der Fensterkante (Handy, Kopf rollt)', () => {
+  it('ohne andere Quelle klebt es an der Fensterkante', () => {
     render(<Stapel hoehe={24} />);
     expect(screen.getByTestId('stapel').dataset.oben).toBe('0');
     expect(leseRahmenOben()).toBe(24);
@@ -258,5 +270,60 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
     );
     expect(screen.getByTestId('stapel').dataset.oben).toBe('52');
     expect(leseRahmenOben()).toBe(52);
+  });
+});
+
+describe('Stapel nach Rang (LLH-1728, design.md D2)', () => {
+  it('jede Quelle klebt unter denen mit kleinerem Rang: Betriebszeile, Kopf, Band', () => {
+    render(
+      <>
+        <Stapel hoehe={40} rang={RAHMEN_RANG.betriebszeile} name="zeile" />
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    expect(screen.getByTestId('zeile').dataset.oben).toBe('0');
+    expect(screen.getByTestId('kopf').dataset.oben).toBe('40');
+    expect(screen.getByTestId('band').dataset.oben).toBe('92');
+    expect(leseRahmenOben()).toBe(116);
+    expect(variable()).toBe('116px');
+  });
+
+  it('ohne gestörte Betriebszeile steht der Kopf an der Fensterkante und das Band darunter', () => {
+    const { rerender } = render(
+      <>
+        <Stapel hoehe={40} rang={RAHMEN_RANG.betriebszeile} name="zeile" />
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    rerender(
+      <>
+        <Stapel hoehe={40} rang={RAHMEN_RANG.betriebszeile} name="zeile" aktiv={false} />
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    expect(screen.getByTestId('kopf').dataset.oben).toBe('0');
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(leseRahmenOben()).toBe(76);
+  });
+
+  it('die eigene Höhe verschiebt weder das eigene oben noch das der Quellen darüber', () => {
+    const { rerender } = render(
+      <>
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    rerender(
+      <>
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={48} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    // Die Höhe wird im Layout-Effekt gemessen; ein neuer Wert kommt erst mit dem nächsten Einhängen.
+    expect(screen.getByTestId('kopf').dataset.oben).toBe('0');
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
   });
 });

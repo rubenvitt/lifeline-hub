@@ -376,8 +376,9 @@ export default function AlarmZentrale({
     // Zeile trägt EINEN Zustand: sind beide auffällig, steht der Benachrichtigungs-Zustand nur im
     // Menü (`desktopHinweis`).
     //
-    // Auf dem Tablet steht der Ruhezustand wie in der breiten Bauform nur als Icon (LFH-637), eine
-    // Störung mit Wort.
+    // Der Ruhezustand steht wie in der breiten Bauform nur als Icon (LFH-637), eine Störung mit
+    // Wort; seit LLH-1728 (D4) auch am Handy, damit der Kopf dort einzeilig bleibt. Der zugängliche
+    // Name nennt den Zustand immer.
     //
     // Zwei Einträge verstoßen nicht gegen „ab drei bündeln": hier bündelt die Breite bzw. der
     // Finger, nicht die Bequemlichkeit. Der Preis: Stummschalten kostet zwei Tipper.
@@ -438,7 +439,7 @@ export default function AlarmZentrale({
               flexShrink: 0,
             }}
           >
-            {istSchmal || sammelAuffaellig ? (
+            {sammelAuffaellig ? (
               <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
             ) : null}
           </Button>

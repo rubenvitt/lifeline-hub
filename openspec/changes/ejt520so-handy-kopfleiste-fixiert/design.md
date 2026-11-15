@@ -97,7 +97,9 @@ Namen in `handschuh` weniger als seine Mindest-Trefffläche (siehe Risiken).
 ### D5 App-Rahmen am Handy: Wortmarke weg, Rest bleibt
 
 `AppLayout` hat keinen Drawer; Suche und Benutzermenü bleiben dort im Kopf. Unter `md` entfällt
-die Wortmarke „lifeline-hub“ (die Bildmarke bleibt), die Uhr kommt dazu. Damit ist der Kopf in
+die Wortmarke „lifeline-hub“, die Uhr kommt dazu. Die Wortmarke ist dort der Link zur
+Einsatzliste; ihn übernimmt unter `md` die Bildmarke (Name „lifeline-hub“, gleiches Ziel), sonst
+fehlte aus Verwaltung, Planungen und Profil am Handy der Weg zurück. Damit ist der Kopf in
 `kompakt` und `komfortabel` einzeilig; in `handschuh` darf er umbrechen und klebt dann
 zweizeilig.
 

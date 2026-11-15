@@ -650,16 +650,17 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(screen.getAllByRole('button', { name: /^Alarmzentrale:/ })).toHaveLength(1);
   });
 
-  it('bei erlaubtem Desktop und gutem Ton nennt die Marke den Ton', async () => {
+  it('bei erlaubtem Desktop und gutem Ton steht die Glocke allein, der Name nennt den Ton (LLH-1728, D4)', async () => {
     // Deckt `|| desktop === 'erlaubt'` ab: auch im unauffälligen Fall nennt die Marke einen
-    // Zustand statt eines Sammelworts.
+    // Zustand statt eines Sammelworts, aber nur im zugänglichen Namen. Sichtbar steht das Wort nur
+    // bei Störung, wie am Tablet (LFH-637): sonst bliebe der Handy-Kopf zweizeilig.
     stubAudioReady();
     stubNotification('granted');
     setzeViewportBreite(390);
     renderAlarm();
 
-    const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+    const ziel = await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' });
+    expect(ziel).not.toHaveTextContent('Ton bereit');
   });
 
   it('ist der Desktop abschaltbar, ist sein Menüeintrag bedienbar und fordert die Berechtigung an', async () => {
@@ -789,8 +790,7 @@ describe('AlarmZentrale: Ton-Icon ohne Marker im Ruhezustand (LFH-513)', () => {
     setzeViewportBreite(390);
     renderAlarm();
 
-    const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+    const ziel = await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' });
     expect(marker(ziel)).toHaveLength(0);
 
     await userEvent.click(ziel);
@@ -1023,7 +1023,16 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
     stubAudioReady();
     stubNotification(permission);
     const { container } = renderAlarm();
-    await waitFor(() => expect(container.textContent).toMatch(/Ton bereit|Benachrichtigung/));
+    // Am Handy steht der Ruhezustand nur im Namen (LLH-1728, D4); gewartet wird deshalb auf Text
+    // ODER Namen.
+    await waitFor(() =>
+      expect(
+        `${container.textContent} ${screen
+          .getAllByRole('button')
+          .map((k) => k.getAttribute('aria-label') ?? '')
+          .join(' ')}`,
+      ).toMatch(/Ton bereit|Benachrichtigung/),
+    );
     expect(container.textContent).not.toMatch(/Desktop/);
     for (const knopf of screen.getAllByRole('button')) {
       expect(knopf.getAttribute('aria-label') ?? '').not.toMatch(/Desktop/);
@@ -1042,12 +1051,14 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
   });
 
   it('auf dem Handschirm nennt die Marke bei abgeschalteter Benachrichtigung den Ton', async () => {
+    // Im Namen; sichtbar steht der Ruhezustand am Handy nur als Glocke (LLH-1728, D4).
     setzeViewportBreite(390);
     stubAudioReady();
     stubNotification('default');
     renderAlarm();
-    const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+    expect(
+      await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' }),
+    ).toBeInTheDocument();
   });
 });
 
