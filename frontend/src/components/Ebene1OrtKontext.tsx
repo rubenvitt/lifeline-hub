@@ -8,7 +8,8 @@ export interface Ebene1OrtWert {
   /** Ortspfad hinter „Einsätze ›“, z. B. `['Verwaltung', 'Fahrzeuge']`; der letzte ist die Seite. */
   ort: string[];
   /** Nur, wenn der zuletzt offene Einsatz der Person noch aktiv ist. */
-  rueckweg?: { label: string; pfad: string };
+  /** `uebung`: der Einsatz ist eine Übung, der Knopf trägt die Übungsmarke (LLH-1725). */
+  rueckweg?: { label: string; pfad: string; uebung?: boolean };
 }
 
 const Ebene1OrtKontext = createContext<Ebene1OrtWert | undefined>(undefined);

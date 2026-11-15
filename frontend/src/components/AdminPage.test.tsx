@@ -122,6 +122,23 @@ describe('AdminPage · Ortspfad und Rückweg (LFH-954)', () => {
     expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/5/etb?eintrag=3');
   });
 
+  it('der Rückweg in eine Übung trägt die Übungsmarke (LLH-1725)', () => {
+    renderMitProviders(
+      <Ebene1OrtProvider
+        value={{
+          ort: ['Profil'],
+          rueckweg: { label: 'Zurück zu Starkregen Nord', pfad: '/einsaetze/5/etb', uebung: true },
+        }}
+      >
+        <AdminPage titel="Profil">
+          <div>x</div>
+        </AdminPage>
+      </Ebene1OrtProvider>,
+    );
+    const zurueck = screen.getByRole('link', { name: /Zurück zu Starkregen Nord/ });
+    expect(zurueck.querySelector('[data-lfh="uebung-marke"]')).toHaveTextContent('Übung');
+  });
+
   it('ohne aktiven Einsatz nur der Pfad', () => {
     renderMitProviders(
       <Ebene1OrtProvider value={{ ort: ['Profil'] }}>

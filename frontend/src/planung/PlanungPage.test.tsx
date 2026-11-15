@@ -587,6 +587,7 @@ describe('PlanungPage (LLH-1586)', () => {
               org_id: 1,
               bezeichnung: 'Konzert',
               einsatznummer_intern: 'E-2027-0007',
+              einsatzart: 'uebung',
               status: 'aktiv',
               meine_rolle: 'einsatzleitung',
             },
@@ -630,6 +631,12 @@ describe('PlanungPage (LLH-1586)', () => {
       expect(within(dialog).getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
       await oeffne('Laufender Einsatz');
       expect(optionenVon('Laufender Einsatz')).toEqual(['E-2027-0007 · Konzert']);
+      // Eine Übung trägt in der Auswahl die Übungsmarke (LLH-1725).
+      expect(
+        document
+          .querySelector('.ant-select-item-option[title="E-2027-0007 · Konzert"]')!
+          .querySelector('[data-lfh="uebung-marke"]'),
+      ).not.toBeNull();
       await waehle('Laufender Einsatz', 'E-2027-0007 · Konzert');
       await waitFor(() =>
         expect(anfragen[anfragen.length - 1]).toEqual({

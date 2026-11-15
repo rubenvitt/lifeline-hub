@@ -108,3 +108,27 @@ describe('CommandPalette · Bedienziel-Boden des Vorschau-Ziels', () => {
     expect(ziel).toHaveStyle({ minWidth: '4343px', padding: '3px 4px' });
   });
 });
+
+describe('CommandPalette · Übungsmarke (LLH-1725)', () => {
+  it('zeigt die Marke vor dem Namen einer Übung, nicht im zugänglichen Namen', () => {
+    renderMitProviders(
+      <CommandPalette
+        befehle={[
+          {
+            id: 'einsatz:9',
+            gruppe: 'einsaetze',
+            label: 'Starkregen Nord',
+            uebung: true,
+            ausfuehren: () => {},
+          },
+          { id: 'einsatz:7', gruppe: 'einsaetze', label: 'Brand Mühle', ausfuehren: () => {} },
+        ]}
+        schliesse={() => {}}
+      />,
+    );
+    const uebung = screen.getByRole('option', { name: 'Starkregen Nord' });
+    expect(uebung.querySelector('[data-lfh="uebung-marke"]')).toHaveTextContent('Übung');
+    const real = screen.getByRole('option', { name: 'Brand Mühle' });
+    expect(real.querySelector('[data-lfh="uebung-marke"]')).toBeNull();
+  });
+});

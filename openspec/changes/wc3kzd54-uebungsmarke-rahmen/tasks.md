@@ -90,7 +90,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
   „ÜBUNG“; CSS-Tests und `etb-druck`/Anlagen-Test grün.
 - [x] 9.5 Gerätehülle und Lagemonitor laden den Einsatzkopf ohne Daten alle 30 s nach und zeigen nach
   einem Fehler „Einsatzart nicht geladen“ (Gerät unter dem Kopf, Monitor in der Statusleiste); Tests.
-- [ ] 9.6 Marke zusätzlich in Sprungpalette (Einsatz-Wechsel), Planungsübernahme („Laufender
+- [x] 9.6 Marke zusätzlich in Sprungpalette (Einsatz-Wechsel), Planungsübernahme („Laufender
   Einsatz“), externem Lagebild, „Zurück zu …“ (Ebene 1) und im Bildkopf des Lageplan-PNG; je ein Test.
 
 ## 8. Abschluss

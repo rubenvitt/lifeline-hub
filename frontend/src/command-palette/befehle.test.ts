@@ -340,6 +340,15 @@ describe('baueBefehle — Einsatz-Wechsel', () => {
     b.find((x) => x.id === 'einsatz:7')!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/7');
   });
+
+  it('kennzeichnet eine Übung und findet sie über „Übung“ (LLH-1725)', () => {
+    const uebung: EinsatzAnzeige = { ...aktiverEinsatz, id: 9, einsatzart: 'uebung' };
+    const b = baueBefehle(kontext({ einsaetze: [aktiverEinsatz, uebung] }));
+    const zeile = b.find((x) => x.id === 'einsatz:9')!;
+    expect(zeile.uebung).toBe(true);
+    expect(zeile.schlagworte).toContain('Übung');
+    expect(b.find((x) => x.id === 'einsatz:7')!.uebung).toBeUndefined();
+  });
 });
 
 describe('baueBefehle — Schnelleinstellungen', () => {

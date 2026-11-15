@@ -95,6 +95,24 @@ Einsatzwechsler SHALL jede Übung in seiner Liste mit der Marke „ÜBUNG“ zei
 - **WHEN** eine Person den Einsatzwechsler öffnet und darin eine Übung steht
 - **THEN** trägt deren Eintrag die Marke „ÜBUNG“
 
+### Requirement: Weitere Flächen, die einen Einsatz zeigen oder zur Wahl stellen
+
+Die Sprungpalette SHALL einen Einsatz-Wechsel in eine Übung mit der Marke „ÜBUNG“ zeigen und über
+„Übung“ finden. Die Wahl „Laufender Einsatz“ beim Übernehmen einer Planung SHALL eine Übung mit der
+Marke zeigen. Das externe Lagebild SHALL eine Übung mit Band und Marke zeigen. Der Rückweg „Zurück
+zu …“ auf Ebene 1 SHALL bei einer Übung die Marke tragen. Der Bildkopf eines Lageplans als Anlage
+SHALL bei einer Übung mit „ÜBUNG“ beginnen.
+
+#### Scenario: Planung in eine Übung übernehmen
+
+- **WHEN** eine Person eine Planung in einen laufenden Einsatz übernimmt und eine Übung zur Wahl steht
+- **THEN** trägt diese Option die Marke „ÜBUNG“
+
+#### Scenario: Externes Lagebild einer Übung
+
+- **WHEN** Dritte das externe Lagebild einer Übung öffnen
+- **THEN** steht oben das Band „ÜBUNG“ und vor dem Namen die Marke
+
 ### Requirement: Gekoppeltes Gerät und Lagemonitor
 
 Ein gekoppeltes Gerät, das einer Übung zugeordnet ist, SHALL in jeder Funktionsansicht direkt unter

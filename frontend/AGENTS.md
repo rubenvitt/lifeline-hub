@@ -123,7 +123,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
     `openspec/changes/wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
-    kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Tab-Titel, Druck).
+    kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,
+    Planungsübernahme, externes Lagebild, „Zurück zu …“, Tab-Titel, Druck, Lageplan-Anlage).
     Entschieden wird nur über `istUebung` (`einsatz/einsatzart.ts`) aus der Einsatzart, nie aus dem
     Namen. Gezeigt wird nur über `UebungsMarke`/`UebungsBand` (`components/instrument/Uebung.tsx`),
     im Druck über den Druckkopf. Erkennbar ist sie an Form und Wort (schraffiertes Band, gefüllter

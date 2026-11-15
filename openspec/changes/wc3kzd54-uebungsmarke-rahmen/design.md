@@ -191,6 +191,16 @@ In `EinsaetzePage` ersetzt `UebungsMarke` bei einer Übung den grauen `Tag`, and
 ihn. Im `EinsatzSwitcher` steht die Marke im Eintrag vor der Bezeichnung. Die Nebenzeile
 (Nummer · Ort) bleibt wie in der Spec `seiten-orientierung`.
 
+### D9a Weitere Flächen (aus dem Review vor dem PR, abgestimmt 15.11.2026)
+
+Der Review fand Flächen, die einen Einsatz zeigen oder zur Wahl stellen, ohne Kennzeichnung. Alle
+bekommen sie: Die Sprungpalette zeigt die Marke vor dem Label (`Befehl.uebung`, `aria-hidden`, der
+Name bleibt das Label) und findet eine Übung über „Übung“. Die Planungsübernahme zeigt die Marke in
+der Option „Laufender Einsatz“ (`title` bleibt Text). Das externe Lagebild zeigt Band und Marke.
+„Zurück zu …“ auf Ebene 1 trägt die Marke (`Ebene1Ort.rueckweg.uebung`). Der Bildkopf des
+Lageplan-PNG beginnt mit „ÜBUNG ·“. Verworfen: die Regel auf die zuerst aufgezählten Flächen
+einzuengen.
+
 ### D10 Regel und Doku
 
 - `frontend/AGENTS.md`, Abschnitt „Rahmen“, neuer Spiegelstrich „Übung“: Die Kennzeichnung ist
