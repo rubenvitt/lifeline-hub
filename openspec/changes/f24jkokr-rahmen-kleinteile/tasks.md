@@ -50,7 +50,7 @@ Jede Aufgabe per TDD: erst der Test, der ohne die Änderung rot ist, dann der Co
 
 ## 6. Doku und Abschluss
 
-- [ ] 6.1 `docs/anwender/kapitel/einsatz-oberflaeche.md` („Ein Modul öffnen“: zuletzt besuchtes
+- [x] 6.1 `docs/anwender/kapitel/einsatz-oberflaeche.md` („Ein Modul öffnen“: zuletzt besuchtes
       Modul, Panel bleibt zu) und `geraet-bedienen.md` („Kopfzeile lesen“: „Kopplung noch …“)
       nachziehen, dazu `geraete-koppeln.md` falls nötig; Bilder beider Kapitel neu erzeugen
       (`pnpm doku:bilder e2e/doku-bilder/<kapitel>.bilder.ts`), Wächter
