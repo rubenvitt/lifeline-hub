@@ -560,6 +560,10 @@ Ein abgelehnter Antrag nennt den Grund, etwa:
 - „Konto am Führer unbekannt.“: das eigene Konto gibt es dort nicht;
 - „Kopplung widerrufen.“: die Kopplung wurde widerrufen, bevor der Antrag übernommen war.
 
+Gibt es die Person, Stelle oder Meldung schon am Spiegel nicht mehr, etwa weil die Seite noch
+einen alten Stand zeigte oder die Erfassung ohne Netz vorgemerkt war, entsteht gar kein Antrag:
+Die Erfassung wird gleich mit „Bezug nicht mehr vorhanden.“ abgewiesen.
+
 Abgelehnte Anträge verschwinden nach 30 Tagen.
 
 ### Anhänge
@@ -624,7 +628,7 @@ nächsten Abgleich, sobald die übernehmende Installation ihn endgültig löscht
 Einsatzliste: der Spiegel wird gelöscht). Stehen bleibt jeder Einsatz, den eine Gegenstelle
 mit einem älteren Stand gelöscht hat. Ist die Führung je Einsatz aus oder fehlt das Recht eines
 System-Admins, fehlt das Paneel; lässt es sich sonst nicht laden, steht dort der Fehler mit
-„Erneut laden“.
+„Erneut abrufen“.
 
 Jeder Einsatz einer gekoppelten Organisation hat genau eine führende Installation. Nur sie
 schreibt den Einsatz; an der anderen ist er ein Spiegel mit dem Hinweisband „Spiegel von …“, an

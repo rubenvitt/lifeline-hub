@@ -444,7 +444,10 @@ sequenceDiagram
 - Nach dem Wechsel liefert der neue Führer; der Kopf jeder Zeile trägt im Feld `gegen` den
   Schlüssel des Empfängers, damit Zeilen beider Seiten zusammenfinden. Was die abgelöste Seite
   nach der Bruchstelle schrieb, fragt sie beim Führer nach (`EinsatzStand.bruch`); was er nicht
-  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`. Zeilen, die aufeinander zeigen,
+  kennt, entfernt sie und sichert es in `einsatz_bruchstelle`. Hat der Führer den Einsatz nie von
+  ihr gespiegelt (Widerspruch gegen eine Notübernahme), antwortet er `kennt: false`; dann entfernt
+  sie alles, was nicht über `spiegel_herkunft` vom Führer stammt (`fuehrung::nicht_vom_fuehrer`,
+  LLH-1854). Zeilen, die aufeinander zeigen,
   ordnet sie je Erfassung (`folge_von`); ETB-Einträge und Meldungen stellt sie auf Wunsch als
   Antrag mit der ursprünglichen `client_id` nach (`instanz::spiegel::bruchstelle`, LLH-1646), so
   kommen sie beim Führer genau einmal an. Eine Ablehnung öffnet die Erfassung wieder, eine
