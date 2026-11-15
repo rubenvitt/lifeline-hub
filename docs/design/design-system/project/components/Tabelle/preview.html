@@ -743,7 +743,12 @@ main:has([data-lfh='zaehltasten']) {
 :root {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
-:root:has([data-lfh='seitenkopf'] :focus) {
+:root:has(
+  [data-lfh='seitenkopf'] :focus,
+  [data-lfh='rail-spalte'] :focus,
+  [data-lfh='modul-panel'] :focus,
+  [data-lfh='verwaltung-menue'] :focus
+) {
   scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
 }
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {

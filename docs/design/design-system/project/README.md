@@ -134,11 +134,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (offline, Live `lost`). Der Fuß der Rail (Griff „Menü“, Einstellungen) klebt nicht: reicht
     die Höhe nicht, folgt er den Kategorien, statt sie zu verdecken (LLH-1273,
     `e2e/gate3-trefflaeche.spec.ts` „Rail“). Das Modulpanel ist eine Spalte mit festem Kopf und
-    Fuß „Einsatzdauer“, nur die Liste rollt in sich (`modul-panel-spalte`).
+    Fuß „Einsatzdauer“, nur die Liste rollt in sich (`modul-panel-spalte`); ihre Höhe ist gemessen
+    (Oberkante im Fenster bis Fensterrand), und die Liste holt den aktiven Eintrag ins Bild.
   - **Der Seitenkopf klebt, wenn er passt** (zjt7c073 D3, `components/seitenkopfKleben.ts`): ab
     `md` auf jeder `EinsatzSeite` und `AdminPage`, solange Kopf und Seitenkopf höchstens ein
     Drittel der Fensterhöhe nehmen (`KLEBEN_HOECHSTENS`), nie in einem eigenen Scrollbereich
-    (Gerätehülle). `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die
+    (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block). `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die
     Leiste, nicht Hinweis oder Beschreibung darunter.
   - **Zwei Höhen** (zjt7c073 D2, `components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
     ist nur der Kopf, `--lfh-rahmen-oben` (`useRahmenOben`) dazu der klebende Seitenkopf. Die

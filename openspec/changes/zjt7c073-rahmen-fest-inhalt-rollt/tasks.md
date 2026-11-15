@@ -38,7 +38,7 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (Test zuerst rot)
 
 ## 7. Gates
 
-- [ ] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün. Nachweis: Ausgabe im PR unter „Geprüft“
+- [x] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün. Nachweis: Ausgabe im PR unter „Geprüft“
 
 ## Workflow follow-up
 
