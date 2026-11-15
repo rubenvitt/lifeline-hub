@@ -127,6 +127,38 @@ describe('SlashMenu', () => {
     }
   });
 
+  it.each([
+    // Oberkante des Ankers, frei oben (Rahmen + klebende Köpfe), erwartete Höhe.
+    [800, 100, '280px'], // genug Platz: die Vorgabe
+    [300, 100, '188px'], // 300 − 4 Abstand − 100 Rahmen − 8 Luft
+    [150, 100, '64px'], // kaum Platz: zwei Zeilen (2 × controlHeight) bleiben
+  ])(
+    'nach oben: Höhe bis unter den Rahmen begrenzt (Anker %i, frei %i → %s, LLH-1847)',
+    (ankerOben, obenFrei, hoehe) => {
+      renderMitProviders(
+        <div data-testid="anker" style={{ position: 'relative' }}>
+          <SlashMenu
+            offen
+            filter=""
+            bausteine={bausteine}
+            gesetzteFelder={[]}
+            richtung="oben"
+            obenFrei={obenFrei}
+            onWahl={vi.fn()}
+            onSchliessen={vi.fn()}
+          />
+        </div>,
+        // Gemessen wird beim Öffnen; jsdom kennt keine Lage, also die des Ankers vorgeben.
+      );
+      const anker = screen.getByTestId('anker');
+      anker.getBoundingClientRect = () => ({ top: ankerOben }) as DOMRect;
+      act(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+      expect(screen.getByTestId('slash-menu').style.maxHeight).toBe(hoehe);
+    },
+  );
+
   it('stellt Typen als ERSTE Sektion voran, wenn der Aufrufer sie anbietet (Neuentwurf S4)', () => {
     const onWahl = vi.fn();
     const ref = createRef<SlashMenuHandle>();

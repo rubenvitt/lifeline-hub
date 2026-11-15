@@ -29,6 +29,8 @@ import {
 } from '../stammdaten/vorschlagsquellen';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
+import { useRahmenOben } from '../components/rahmenOben';
+import { useEtbKopfHoehe } from './etbKopfKleben';
 import RufnameAbfrage from './RufnameAbfrage';
 import { auchInMeldungseingang, ausStandard, wirksameMetadaten } from './standardRufname';
 import type { StandardRufnameZugriff } from './useStandardRufname';
@@ -323,6 +325,9 @@ export default function Schnellerfassung({
   /** Eigener Schlüssel ohne Aufrufer-id: stabil über Fehlversuche, neu nach jedem Erfolg. */
   const eigeneClientId = useRef<string>(neueClientId());
   const menuRef = useRef<SlashMenuHandle>(null);
+  // Was oben am Fenster klebt (Rahmen samt Übungsband, ETB-Köpfe): darüber geht das „/“-Menü nicht
+  // hinaus (LLH-1847).
+  const menueObenFrei = useRahmenOben() + useEtbKopfHoehe();
   // Die Felder der Feldzeile, für Fokus (erstes leeres Pflichtfeld, Grund am Feld) und `/`-Menü.
   const zeitRef = useRef<InputRef>(null);
   const vonRef = useRef<ParteiRef>(null);
@@ -1288,6 +1293,7 @@ export default function Schnellerfassung({
           typenAnbieten={typenAnbieten}
           einheiten={einheitenTreffer}
           richtung="oben"
+          obenFrei={menueObenFrei}
           onWahl={waehleEintrag}
           onSchliessen={() => setMenuOffen(false)}
         />

@@ -1,5 +1,13 @@
 import { Typography, theme } from 'antd';
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { EtbBaustein } from '../api/types';
 import { filterSlashEintraege, type MetaFeld, type SlashEintrag } from './schnellerfassungModell';
 
@@ -31,7 +39,18 @@ interface Props {
    * dort aus dem Fenster.
    */
   richtung?: 'unten' | 'oben';
+  /**
+   * Nach oben: so viele px oben am Fenster sind belegt (klebender Rahmen und Köpfe, LLH-1847). Das
+   * Menü wird nie höher als der Platz darüber, sonst läge sein Anfang unter dem Rahmen.
+   */
+  obenFrei?: number;
 }
+
+/** Höhe des Menüs, wenn Platz ist. */
+const MENUE_HOEHE = 280;
+/** Abstand zum Anker (`marginBottom`) und Luft unter dem Rahmen. */
+const ABSTAND = 4;
+const LUFT = 8;
 
 const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   {
@@ -44,6 +63,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
     typenAnbieten = false,
     einheiten = null,
     richtung = 'unten',
+    obenFrei = 0,
   },
   ref,
 ) {
@@ -68,10 +88,32 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
 
   useEffect(() => setAktiv(0), [filter, offen]);
 
+  const liste = useRef<HTMLDivElement>(null);
+  // Nach oben nie höher als der Platz bis unter den Rahmen (LLH-1847): auf einem niedrigen Fenster
+  // lag der Anfang des Menüs (Typen) sonst unter Kopf und Übungsband. Gemessen beim Öffnen und mit
+  // jeder Fenstergröße; wenigstens zwei Zeilen bleiben, der Rest rollt.
+  const [hoehe, setHoehe] = useState(MENUE_HOEHE);
+  const mindestens = token.controlHeight * 2;
+  useLayoutEffect(() => {
+    if (!offen || richtung !== 'oben') return;
+    const messen = () => {
+      const anker = liste.current?.parentElement;
+      if (!anker) return;
+      const platz = anker.getBoundingClientRect().top - ABSTAND - obenFrei - LUFT;
+      setHoehe(Math.max(mindestens, Math.min(MENUE_HOEHE, Math.floor(platz))));
+    };
+    messen();
+    window.addEventListener('resize', messen);
+    window.addEventListener('scroll', messen, { passive: true });
+    return () => {
+      window.removeEventListener('resize', messen);
+      window.removeEventListener('scroll', messen);
+    };
+  }, [offen, richtung, obenFrei, mindestens]);
+
   // Die gewählte Zeile bleibt im Bild (LLH-1847): das Menü rollt ab rund acht Zeilen (im
   // Handschuh-Betrieb ab drei), und die Pfeiltasten wanderten sonst unsichtbar weiter. `nearest`
   // rollt nur so weit wie nötig und lässt die Seite dahinter stehen.
-  const liste = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!offen) return;
     liste.current?.querySelector('[role="option"][aria-selected="true"]')?.scrollIntoView?.({
@@ -208,7 +250,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
         border: `1px solid ${token.colorBorderSecondary}`,
         borderRadius: token.borderRadiusLG,
         boxShadow: token.boxShadowSecondary,
-        maxHeight: 280,
+        maxHeight: richtung === 'oben' ? hoehe : MENUE_HOEHE,
         overflow: 'auto',
       }}
     >
