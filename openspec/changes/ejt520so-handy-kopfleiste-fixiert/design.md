@@ -91,6 +91,11 @@ Ruhezustand steht die Glocke allein; ihr zugänglicher Name nennt den Zustand we
 die Regel „blockiert oder stumm nie nur als Symbol“ und gibt dem Einsatznamen die Breite von
 „Ton bereit“ zurück. Es löst nebenbei den Befund aus LLH-1726, dass die Zählmarke am Handy das
 „T“ überdeckt.
+**Nachtrag nach dem Merge von LLH-1726:** Dort hält die Glocke auch im Ruhezustand die Breite
+von „Ton blockiert“ frei, damit der Kopf nicht springt, wenn der Browser den Ton vor der ersten
+Geste sperrt. Am Handy gilt das nicht (Spec `kopfleiste`, Delta hier): der Platz kostete in
+`handschuh` die eine Zeile dauerhaft. Dort bricht der Kopf nur um, solange „Ton blockiert“ steht,
+wie am Freigabe-Checkpoint als Grenzfall abgestimmt. Ab `md` bleibt der Platz.
 *Alternative:* das Wort behalten und den Namen härter kürzen. Verworfen: Gemessen bliebe dem
 Namen in `handschuh` weniger als seine Mindest-Trefffläche (siehe Risiken).
 

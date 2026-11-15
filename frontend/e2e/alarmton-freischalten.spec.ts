@@ -134,7 +134,8 @@ test('Fükw 1440: ohne Geste „Ton blockiert", ein Klick irgendwo schaltet frei
     .first()
     .click({ position: { x: 5, y: 5 } });
   const bereit = alarm.getByRole('button', { name: 'Ton bereit – stummschalten' });
-  await expect(bereit).toHaveText('Ton bereit');
+  // „Ton bereit“ ist keine Störung: nur die Glocke, der Name nennt den Zustand (LLH-1726).
+  await expect(bereit).toHaveText('');
   await expect(bereit).toHaveAttribute('aria-pressed', 'false');
 });
 
@@ -150,7 +151,8 @@ test('Fükw 1440: ein Klick auf die gesperrte Glocke schaltet frei und nicht stu
     .getByRole('button', { name: 'Ton blockiert – freischalten' })
     .click({ timeout: NACH_DER_FRIST });
   const bereit = alarm.getByRole('button', { name: 'Ton bereit – stummschalten' });
-  await expect(bereit).toHaveText('Ton bereit');
+  // „Ton bereit“ ist keine Störung: nur die Glocke, der Name nennt den Zustand (LLH-1726).
+  await expect(bereit).toHaveText('');
   await expect(bereit).toHaveAttribute('aria-pressed', 'false');
   expect(await tab.evaluate(() => localStorage.getItem('lfh:alarm:mute'))).not.toBe('1');
 });
@@ -212,9 +214,10 @@ test.describe('Führungs-Tablet mit Finger', () => {
 });
 
 /**
- * Mit Maus stehen zwischen `md` und `xl` zwei Knöpfe; eine Störung trägt ihr Wort auf jeder
- * Breite, ab `xl` jeder Zustand. Die längsten Wörter zugleich dürfen die Kopfzeile nicht
- * umbrechen — der Umbruch bei 1024 px war der Anlass von LFH-637.
+ * Mit Maus stehen ab `md` zwei Knöpfe; eine Störung trägt ihr Wort auf jeder Breite, ein Zustand
+ * ohne Handlungsbedarf („nicht verfügbar“) nur sein Zeichen (LLH-1726). Die längsten Wörter
+ * zugleich dürfen die Kopfzeile nicht umbrechen — der Umbruch bei 1024 px war der Anlass von
+ * LFH-637.
  */
 test.describe('Fükw mit Maus: die längsten Zustandswörter in einer Kopfzeile', () => {
   const faelle = [
@@ -249,7 +252,7 @@ test.describe('Fükw mit Maus: die längsten Zustandswörter in einer Kopfzeile'
             name: `Benachrichtigung ${benachrichtigung}`,
             exact: true,
           }),
-        ).toHaveText(`Benachrichtigung ${benachrichtigung}`);
+        ).toHaveText(benachrichtigung === 'blockiert' ? 'Benachrichtigung blockiert' : '');
         await kopfIstEinzeilig(tab, `${rolle} ${breite} px`);
         await tab.close();
       }

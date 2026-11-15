@@ -51,6 +51,8 @@ am Handy klebt es damit über einem Kopf, der fehlt.
   unter dem klebenden Kopf statt an der Fensterkante.
 - `seiten-orientierung`: „Ortspfad nennt den Einsatz und kürzt nur ihn“ — im Einsatzrahmen steht
   der Ortspfad erst ab `md`.
+- `kopfleiste` (aus LLH-1726): „Der Alarmton hält den Platz seines Störungsworts“ — nur ab `md`;
+  am Handy kostete der freigehaltene Platz die eine Zeile.
 
 ## Impact
 

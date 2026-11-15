@@ -100,7 +100,11 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     geste.erlaubt = true;
     await userEvent.click(ton);
 
-    await waitFor(() => expect(screen.getByText('Ton bereit')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Ton bereit – stummschalten' }),
+      ).toBeInTheDocument(),
+    );
     expect(istAlarmGemutet()).toBe(false);
     expect(screen.getByRole('button', { name: 'Ton bereit – stummschalten' })).toHaveAttribute(
       'aria-pressed',
@@ -120,7 +124,9 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     act(() => {
       fireEvent.pointerDown(ton);
     });
-    await waitFor(() => expect(ton).toHaveTextContent('Ton bereit'));
+    await waitFor(() => expect(ton).toHaveAccessibleName('Ton bereit – stummschalten'));
+    // Der Ruhezustand steht nur als Icon (LLH-1726).
+    expect(ton).toHaveTextContent(/^$/);
     fireEvent.pointerUp(ton);
     fireEvent.click(ton);
     await waitFor(() => expect(ton).toHaveAccessibleName('Ton bereit – stummschalten'));
@@ -136,7 +142,9 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     });
     geste.erlaubt = true;
     await userEvent.dblClick(ton);
-    await waitFor(() => expect(ton).toHaveTextContent('Ton bereit'));
+    await waitFor(() => expect(ton).toHaveAccessibleName('Ton bereit – stummschalten'));
+    // Der Ruhezustand steht nur als Icon (LLH-1726).
+    expect(ton).toHaveTextContent(/^$/);
     expect(istAlarmGemutet()).toBe(false);
 
     // Jenseits der Doppelklickzeit (500 ms) ist ein Klick auf „bereit" wieder das Stummschalten.
@@ -157,7 +165,11 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
       fireEvent.pointerDown(document.body);
     });
 
-    await waitFor(() => expect(screen.getByText('Ton bereit')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Ton bereit – stummschalten' }),
+      ).toBeInTheDocument(),
+    );
     expect(ctx.resume.mock.calls.length).toBeGreaterThan(vorher);
     expect(istAlarmGemutet()).toBe(false);
   });
@@ -166,7 +178,9 @@ describe('AlarmZentrale: gesperrter Alarmton (LFH-950)', () => {
     const ctx = stubGesperrtesAudio();
     geste.erlaubt = true;
     renderAlarm();
-    expect(await screen.findByText('Ton bereit')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Ton bereit – stummschalten' }),
+    ).toBeInTheDocument();
     const vorher = ctx.resume.mock.calls.length;
     act(() => {
       fireEvent.pointerDown(document.body);

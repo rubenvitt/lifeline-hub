@@ -1,6 +1,13 @@
 import { IconLupe, IconMenue } from '../icons';
 import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -39,12 +46,12 @@ import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import { useAlarmKante } from '../components/alarmOben';
-import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
+import CommandPaletteTrigger, { suchTrefflaeche } from '../components/CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
-  KOPF_NAME_FLEX,
   KOPF_NAME_FLEX_SCHMAL,
-  KOPF_SUCHE_FLEX,
+  kopfNameSucheFlex,
+  kopfRasterSpalten,
   KopfRechts,
   Markenzelle,
   SyncAnzeige,
@@ -81,7 +88,7 @@ import { einsatzKennung } from './einsatzKennung';
 import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import SpiegelBand from './spiegel/SpiegelBand';
 import { useAktiveWarnung } from './useAktiveWarnung';
-import { useDichte, useWarnsperre } from '../theme/ThemeModeProvider';
+import { useWarnsperre } from '../theme/ThemeModeProvider';
 
 const { Header, Content } = Layout;
 
@@ -123,20 +130,80 @@ const KOPF_STIL = {
 } as const;
 
 /**
- * Der Einsatzname bekommt die Restbreite — und nur die. `flexBasis: 0` und `minWidth: 0` sind
- * tragend: sonst schöbe ein langer Name die Zellen rechts hinaus. Die Ellipsis sitzt im
- * `EinsatzSwitcher` (ein antd-Knopf kürzt ohne eigenes `overflow` nicht).
+ * Die Zelle der Einsatzkennung wächst in die Restbreite. `flexBasis: auto` (LLH-1726): ihre
+ * Eigenbreite zählt den ganzen Namen, damit das Raster ab `lg` ihn ungekürzt stellen kann;
+ * `minWidth: 0` lässt sie trotzdem schrumpfen, statt die Zellen rechts hinauszuschieben. Die
+ * Ellipsis sitzt im `EinsatzSwitcher` (ein antd-Knopf kürzt ohne eigenes `overflow` nicht).
  */
-const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
+const REST_STIL = { flex: '1 1 auto', minWidth: 0 } as const;
 
 /**
  * Die Zelle des Einsatznamens: Restbreite wie {@link REST_STIL}, aber nie unter der Trefffläche
- * des Wechslers (`controlHeight`, LFH-1126). `contain: inline-size` nimmt den Namen aus der
- * Eigenbreite: die Namensgruppe zählt für ihren Boden (`minWidth: 'min-content'`) nur die
- * Trefffläche, nicht den ganzen Namen, und ein langer Name kürzt weiter mit Ellipsis.
+ * des Wechslers (`controlHeight`, LFH-1126). Die Namensgruppe zählt für ihren Boden
+ * (`minWidth: 'min-content'`) nur diese Trefffläche, weil der Name für die Messung an jeder
+ * Stelle bricht (`EinsatzSwitcher`); vorher nahm `contain: inline-size` den Namen ganz aus der
+ * Eigenbreite, und er bekam nur, was die Wachstumsquote übrig ließ (LLH-1726).
  */
 function nameZelleStil(token: { controlHeight: number }): CSSProperties {
-  return { ...REST_STIL, minWidth: token.controlHeight, contain: 'inline-size' };
+  return { ...REST_STIL, minWidth: token.controlHeight };
+}
+
+/**
+ * Ab `lg` das Raster aus Namensgruppe und Suche (LLH-1726, Spec `kopfleiste`, design.md D2): die
+ * Namensspalte bekommt ihre Eigenbreite, bevor die Suche mehr als ihre Lupe bekommt. Als EIN
+ * Flex-Element nimmt es am Umbruch des Kopfs teil (`kopfNameSucheFlex`). Unter `lg`
+ * gibt es keine Suchzelle, die Namensgruppe steht dann selbst im Kopf (`display: contents`).
+ */
+function NameUndSuche({
+  breit,
+  flex,
+  spalten,
+  children,
+}: {
+  breit: boolean;
+  flex: string;
+  spalten: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-lfh="kopf-name-suche"
+      // Unter `lg` nur `display: contents`: die Namensgruppe steht dann selbst im Kopf. Der
+      // Behälter bleibt trotzdem im Baum, sonst hinge ein Wechsel über `lg` (Tablet drehen) den
+      // Wechsler neu ein, und offenes Menü und Fokus gingen verloren (Review LLH-1726).
+      style={
+        breit
+          ? {
+              display: 'grid',
+              gridTemplateColumns: spalten,
+              alignItems: 'stretch',
+              flex,
+              minWidth: 'min-content',
+            }
+          : { display: 'contents' }
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Wie lange die Suche höchstens auf den Einsatznamen wartet (siehe {@link useSucheWartet}). */
+const SUCHE_WARTET_MS = 1000;
+
+/**
+ * Ob die Suchzelle noch unsichtbar auf den Einsatznamen wartet: solange er lädt, höchstens
+ * {@link SUCHE_WARTET_MS}. Ein schneller Start zeigt sie gleich an ihrem Platz (kein Sprung), ein
+ * langsamer nimmt den Sprung in Kauf, statt den Weg aus dem Einsatz zu verbergen.
+ */
+function useSucheWartet(laedt: boolean): boolean {
+  const [abgelaufen, setAbgelaufen] = useState(false);
+  useEffect(() => {
+    if (!laedt) return;
+    const uhr = window.setTimeout(() => setAbgelaufen(true), SUCHE_WARTET_MS);
+    return () => window.clearTimeout(uhr);
+  }, [laedt]);
+  return laedt && !abgelaufen;
 }
 
 const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
@@ -209,14 +276,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const palette = useCommandPalette();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
-  // Ab `xl` trägt der Kopf alle Wörter; darunter (Führungs-Tablet) stehen Ruhezustände nur als
-  // Icon, damit er einzeilig bleibt.
+  // Ab `xl` steht das Modulpanel ohne Wahl offen (`panelZu`).
   const weit = abBreite('xl');
-  // In `handschuh` trägt der Kopf Ton- und Sync-Wort auch unter `xl`, mit dem Startplatz aus
-  // LLH-1158 (LLH-1232). Dort ist er bei 1100 und ab 1200 px ohnehin zweizeilig; nur dazwischen
-  // wurde er im Ruhezustand einzeilig und sprang beim Start zwischen einer und zwei Zeilen.
-  const { dichte } = useDichte();
-  const startWoerter = weit || dichte === 'handschuh';
   const { token } = theme.useToken();
   // Unter `md` rücken die Zellen zusammen, sonst bräche die rechte Gruppe auf 390 px in eine
   // dritte Zeile.
@@ -277,6 +338,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const einsatz = einsatzQuery.data;
+  // Die Suche wartet auf den Namen, höchstens eine Sekunde (LLH-1726, Suchzelle unten): lädt der
+  // Einsatz länger (Wiederholungen), steht sie trotzdem, denn unter `xxl` führt sonst nichts im Kopf
+  // aus dem Einsatz.
+  const sucheWartet = useSucheWartet(einsatzQuery.isLoading);
 
   // Modulfreigaben des Servers für die Navigation (LFH-669); derselbe Key wie in jeder Seite,
   // die Daten eines fremden Moduls lädt.
@@ -440,112 +505,131 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         data-lfh="rahmen-kopf"
         style={{ ...KOPF_STIL, ...RAHMEN_KLEBT, top: kopfOben }}
       >
-        {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Bei Platzmangel
-           bricht die rechte Gruppe um; die linke wächst stärker als die Suche, damit der Name erst
-           spät kürzt. */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'stretch',
-            flex: breit ? KOPF_NAME_FLEX : KOPF_NAME_FLEX_SCHMAL,
-            // Boden = fester Teil plus Trefffläche des Namens (LFH-1126). Ab diesem Maß zählt der
-            // Umbruch (`flexWrap`), statt dass die Gruppe schrumpft und der Wechsler über die
-            // Suche läuft: in `handschuh` ist der feste Teil breiter als die Basis vorsieht.
-            minWidth: 'min-content',
-          }}
+        {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Ab `lg` liegt
+           sie mit der Suche in einem Raster, das dem Namen Vorrang gibt (LLH-1726). Bei Platzmangel
+           bricht die rechte Gruppe um. */}
+        <NameUndSuche
+          breit={breit}
+          flex={kopfNameSucheFlex(token)}
+          spalten={kopfRasterSpalten(suchTrefflaeche(token))}
         >
-          {breit ? (
-            <Markenzelle />
-          ) : (
-            <div style={kopfZelleStil({ padding: 0 })}>
-              <Button
-                type="text"
-                ref={navGriff}
-                aria-label="Navigation öffnen"
-                // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
-                // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.
-                style={{
-                  width: navGriffMass(token),
-                  height: navGriffMass(token),
-                  flexShrink: 0,
-                  color: rahmenFarben.text,
-                }}
-                icon={<IconMenue size={22} />}
-                onClick={() => setNavOffen(true)}
-              />
-            </div>
-          )}
-          <div style={{ ...kopfZelleStil(zellToken), ...REST_STIL }}>
-            {breit && (
-              <>
-                <Wortmarke />
-                <span
-                  aria-hidden="true"
-                  style={{ width: 1, height: 18, flexShrink: 0, background: rahmenFarben.linie }}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'stretch',
+              ...(breit ? {} : { flex: KOPF_NAME_FLEX_SCHMAL }),
+              // Boden = fester Teil plus Trefffläche des Namens (LFH-1126). Ab diesem Maß zählt der
+              // Umbruch (`flexWrap`), statt dass die Gruppe schrumpft und der Wechsler über die
+              // Suche läuft: in `handschuh` ist der feste Teil breiter als die Basis vorsieht.
+              minWidth: 'min-content',
+            }}
+          >
+            {breit ? (
+              <Markenzelle />
+            ) : (
+              <div style={{ ...kopfZelleStil({ padding: 0 }), flexShrink: 0 }}>
+                <Button
+                  type="text"
+                  ref={navGriff}
+                  aria-label="Navigation öffnen"
+                  // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
+                  // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.
+                  style={{
+                    width: navGriffMass(token),
+                    height: navGriffMass(token),
+                    flexShrink: 0,
+                    color: rahmenFarben.text,
+                  }}
+                  icon={<IconMenue size={22} />}
+                  onClick={() => setNavOffen(true)}
                 />
-              </>
+              </div>
             )}
-            {/* Solange der Einsatz lädt, hält ein leerer Platz die Breite des Statuspunkts und
+            <div style={{ ...kopfZelleStil(zellToken), ...REST_STIL }}>
+              {/* Die Wortmarke erst ab `xxl` (LLH-1726, Spec `app-marke`): darunter gehört ihr Platz
+                dem Namen, zur Einsatzliste führt „Alle Einsätze …“ im Wechsler. */}
+              {abBreite('xxl') && (
+                <>
+                  <Wortmarke />
+                  <span
+                    aria-hidden="true"
+                    style={{ width: 1, height: 18, flexShrink: 0, background: rahmenFarben.linie }}
+                  />
+                </>
+              )}
+              {/* Solange der Einsatz lädt, hält ein leerer Platz die Breite des Statuspunkts und
                 die Spinnerzelle die Höhe des Umschalters: Name und Punkt erscheinen dann, ohne
                 den Kopf zu verschieben (LFH-883). Auf 390 px fiel dieser Sprung sonst in
                 dasselbe Bild wie der Ortspfad der Seite und hob dessen Seiten-CLS auf 0,02. */}
-            {einsatz ? (
-              <StatusPunkt status={einsatz.status} />
-            ) : (
-              einsatzQuery.isLoading && <span aria-hidden="true" style={STATUSPUNKT_PLATZ} />
-            )}
-            {mittel && einsatzKennung(einsatz) && (
-              <span data-lfh="kopf-einsatznummer" style={EINSATZNUMMER_STIL}>
-                {einsatzKennung(einsatz)}
-              </span>
-            )}
-            {mittel && !einsatz && einsatzQuery.isLoading && (
-              <span aria-hidden="true" style={{ ...EINSATZNUMMER_STIL, visibility: 'hidden' }}>
-                {EINSATZNUMMER_PLATZHALTER}
-              </span>
-            )}
-            {/* Führung je Einsatz (LLH-1491): nur, wenn eine andere Instanz führt. Dann ist hier
+              {einsatz ? (
+                <StatusPunkt status={einsatz.status} />
+              ) : (
+                einsatzQuery.isLoading && <span aria-hidden="true" style={STATUSPUNKT_PLATZ} />
+              )}
+              {mittel && einsatzKennung(einsatz) && (
+                <span data-lfh="kopf-einsatznummer" style={EINSATZNUMMER_STIL}>
+                  {einsatzKennung(einsatz)}
+                </span>
+              )}
+              {mittel && !einsatz && einsatzQuery.isLoading && (
+                <span aria-hidden="true" style={{ ...EINSATZNUMMER_STIL, visibility: 'hidden' }}>
+                  {EINSATZNUMMER_PLATZHALTER}
+                </span>
+              )}
+              {/* Führung je Einsatz (LLH-1491): nur, wenn eine andere Instanz führt. Dann ist hier
                 alles nur zu lesen: `achtung` mit Wort. Führt diese Instanz, zeigt den Stand das
                 Paneel „Führung“ auf Einsatzdaten; der Kopf bleibt dem Einsatznamen. */}
-            {mittel && einsatz?.fuehrung && !einsatz.fuehrung.fuehrend && (
-              <span data-lfh="kopf-fuehrung">
-                <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
-              </span>
-            )}
-            {/* Übung (LLH-1725, D5): ab `md` vor dem Namen; darunter trägt das klebende Band. */}
-            {mittel && <UebungsMarke einsatz={einsatz} />}
-            <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
-              {einsatzQuery.isLoading ? (
-                <span
-                  style={{ display: 'flex', alignItems: 'center', minHeight: token.controlHeight }}
-                >
-                  <Spin />
+              {mittel && einsatz?.fuehrung && !einsatz.fuehrung.fuehrend && (
+                <span data-lfh="kopf-fuehrung">
+                  <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
                 </span>
-              ) : (
-                <EinsatzSwitcher
-                  aktuellId={einsatzId}
-                  aktuellName={einsatz?.bezeichnung ?? 'Einsatz'}
-                />
               )}
+              {/* Übung (LLH-1725, D5): ab `md` vor dem Namen; darunter trägt das klebende Band.
+                Fester Teil der Namensgruppe, kürzt nie (LLH-1726). */}
+              {mittel && <UebungsMarke einsatz={einsatz} />}
+              <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
+                {einsatzQuery.isLoading ? (
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      minHeight: token.controlHeight,
+                    }}
+                  >
+                    <Spin />
+                  </span>
+                ) : (
+                  <EinsatzSwitcher
+                    aktuellId={einsatzId}
+                    aktuellName={einsatz?.bezeichnung ?? 'Einsatz'}
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
-        {/* SUCHZELLE ab `lg`: das Suchfeld als Auslöser der Palette. Sie trägt die Kopf-Polsterung
-           (`kopfpolsterung.guard.test.ts` zählt genau diese Stelle). */}
-        {breit && (
-          <div
-            data-lfh="kopf-suche"
-            style={{
-              flex: KOPF_SUCHE_FLEX,
-              minWidth: 0,
-              display: 'flex',
-              alignItems: 'center',
-              paddingInline: 'var(--lfh-kopf-polsterung)',
-            }}
-          >
-            <CommandPaletteTrigger />
-          </div>
-        )}
+          {/* SUCHZELLE ab `lg`: das Suchfeld als Auslöser der Palette. Sie trägt die Kopf-Polsterung
+           (`kopfpolsterung.guard.test.ts` zählt genau diese Stelle). Als Größen-Container
+           `kopfsuche`: ist sie schmal, bleibt vom Feld nur die Lupe (`CommandPaletteTrigger.css`).
+           Unsichtbar, solange der Einsatz lädt, höchstens eine Sekunde (LLH-1726, `useSucheWartet`): mit dem Namen nimmt die Namensspalte ihre
+           Eigenbreite, und die Suche rückte sonst nach rechts (CLS 0,0103 an der Umbruchkante). So
+           erscheint sie gleich an ihrem Platz; ein Element, das erst sichtbar wird, verschiebt nichts. */}
+          {breit && (
+            <div
+              data-lfh="kopf-suche"
+              style={{
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                paddingInline: 'var(--lfh-kopf-polsterung)',
+                containerType: 'inline-size',
+                containerName: 'kopfsuche',
+                ...(sucheWartet ? { visibility: 'hidden' as const } : {}),
+              }}
+            >
+              <CommandPaletteTrigger />
+            </div>
+          )}
+        </NameUndSuche>
         {/* RECHTE GRUPPE: Zellen mit Haarlinien. Die Alarmzentrale steht in EIGENER Zelle — sie ZEIGT
            einen Zustand — auf JEDER Breite und nennt ihn im Text: „blockiert" oder „stumm" darf im
            Einsatz nicht nur über ein Icon laufen. */}
@@ -563,12 +647,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               />
             </EinsatzAnzeigeProvider>
           </div>
-          <SyncAnzeige
-            liveErwartet
-            kompakt={!mittel}
-            ruheOhneWort={!startWoerter}
-            haeltStartPlatz={startWoerter}
-          />
+          <SyncAnzeige liveErwartet kompakt={!mittel} />
           {/* Am Handy ist die Uhr die letzte Zelle; Suche und Benutzermenü stehen dort in der
               Navigation (LLH-1728, D3), sonst bliebe der Kopf zweizeilig. */}
           <Uhr zelle={zellToken} trenner={mittel ? 'ende' : 'keiner'} />

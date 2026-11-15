@@ -28,6 +28,11 @@ function nebenzeile(e: EinsatzAnzeige): string | null {
  * DER NAME KÜRZT, statt die Kopfzeile zu schieben (LFH-329): ein antd-Knopf kürzt ohne eigenes
  * `overflow` nicht. Der volle Name bleibt am `title` lesbar und bleibt TEXTINHALT — in einem
  * `aria-label` kippte der zugängliche Name, an dem Tests und die Kommandopalette hängen.
+ *
+ * DER NAME HAT VORRANG (LLH-1726, Spec `kopfleiste`): 16 px in jeder Dichte, und der Kopf gibt ihm
+ * seine Eigenbreite, bevor die Suche mehr als ihre Lupe bekommt (Raster in `EinsatzLayout`). Dafür
+ * misst der Text zweierlei: als Eigenbreite den ganzen Namen in einer Zeile, als Mindestbreite ein
+ * Zeichen (`overflow-wrap: anywhere`). Sichtbar bleibt eine Zeile mit „…“ (`line-clamp: 1`).
  */
 export default function EinsatzSwitcher({
   aktuellId,
@@ -98,7 +103,7 @@ export default function EinsatzSwitcher({
         style={{
           color: farbenDunkel.text2,
           fontWeight: 500,
-          fontSize: 13,
+          fontSize: 16,
           maxWidth: '100%',
           // Auch ein kurzer Name wie „A“ hält den Handschuh-Boden (LFH-460).
           minWidth: token.controlHeight,
@@ -107,7 +112,18 @@ export default function EinsatzSwitcher({
           gap: 6,
         }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span
+          style={{
+            display: '-webkit-box',
+            WebkitBoxOrient: 'vertical',
+            WebkitLineClamp: 1,
+            overflow: 'hidden',
+            // antds Knopf setzt `nowrap`; ohne Umbruch wäre die Mindestbreite der ganze Name.
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            textAlign: 'start',
+          }}
+        >
           {aktuellName}
         </span>
         {/* Eigenes Geschwister und nicht schrumpfend: der Pfeil ist das Signal
