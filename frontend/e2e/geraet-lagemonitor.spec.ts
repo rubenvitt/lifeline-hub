@@ -60,8 +60,10 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   // Der Anstieg der Sofortmeldungen kommt spätestens mit dem Abruftakt (30 s).
   test.setTimeout(150_000);
   await anmeldenAlsAdmin(page);
+  // Eine Übung (LLH-1725): die Marke steht in der Statusleiste, und die Kachelung muss sie tragen.
   const einsatz = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Monitor ${Date.now()}`,
+    einsatzart: 'uebung',
   });
   const e = einsatz.id;
   const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
@@ -265,6 +267,14 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
       '2Sofortmeldungen offen',
     );
     await passtGanz();
+
+    // Übungsmarke in der Statusleiste, ≥ 28 px, ohne Band oben (LLH-1725, Spec `uebungsmarke`).
+    const marke = monitor.locator('[data-lfh="monitor-statusleiste"] [data-lfh="uebung-marke"]');
+    await expect(marke).toHaveText('Übung');
+    expect(
+      await marke.locator('span').evaluate((w) => parseFloat(getComputedStyle(w).fontSize)),
+    ).toBeGreaterThanOrEqual(28);
+    await expect(monitor.locator('[data-lfh="uebung-band"]')).toHaveCount(0);
 
     // Großbild-Größen: Kennzahlen ab 72 px, Text ab 28 px.
     const groessen = await monitor
