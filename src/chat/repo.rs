@@ -660,6 +660,10 @@ pub const ANHANG_NICHT_AN_NACHRICHT: &str = "Anhang gehört nicht zur Nachricht"
 /// die als Kopie an den Eintrag gehen (`etb::repo::anhaenge_kopieren_tx`). Die Chat-Datei
 /// selbst bleibt am Chat. Eine ID, die nicht an der Nachricht hängt, ergibt 400, und nichts
 /// wird geschrieben. Die 409-Guards (heraufgestuft, gelöscht) gehen vor.
+///
+/// `meldung` (y3zh5ymv D8): legt im selben Commit die Meldung zum Eintrag an
+/// (`meldung::repo::anlegen_zu_etb_tx`, beidseitiger Backlink, kein Auto-ETB). Ohne `client_id`:
+/// eine zweite Heraufstufung sperrt schon der Guard oben. Liefert (ETB-`id`, Meldungs-`id`).
 #[allow(clippy::too_many_arguments)]
 pub async fn heraufstufen_zu_etb(
     pool: &SqlitePool,
@@ -670,9 +674,10 @@ pub async fn heraufstufen_zu_etb(
     inhalt: &str,
     ereigniszeit: &str,
     anhang_ids: &[i64],
-) -> Result<i64, AppError> {
+    meldung: Option<&crate::meldung::repo::MeldungDaten<'_>>,
+) -> Result<(i64, Option<i64>), AppError> {
     let etb_startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
-    let etb_id = crate::write_retry!(pool, |conn| {
+    let ergebnis = crate::write_retry!(pool, |conn| {
         // Guard: schon heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
         let zustand: Option<(Option<i64>, Option<String>)> =
             sqlx::query_as("SELECT etb_eintrag_id, geloescht_at FROM chat_nachricht WHERE id = ?")
@@ -726,6 +731,20 @@ pub async fn heraufstufen_zu_etb(
         )
         .await?;
         crate::etb::repo::anhaenge_kopieren_tx(&mut *conn, einsatz_id, etb_id, anhang_ids).await?;
+        let meldung_id = match meldung {
+            Some(daten) => Some(
+                crate::meldung::repo::anlegen_zu_etb_tx(
+                    &mut *conn,
+                    einsatz_id,
+                    heraufstufer_id,
+                    None,
+                    etb_id,
+                    daten,
+                )
+                .await?,
+            ),
+            None => None,
+        };
 
         sqlx::query("UPDATE chat_nachricht SET etb_eintrag_id = ? WHERE id = ?")
             .bind(etb_id)
@@ -733,9 +752,9 @@ pub async fn heraufstufen_zu_etb(
             .execute(&mut *conn)
             .await?;
 
-        Ok(etb_id)
+        Ok((etb_id, meldung_id))
     })?;
-    Ok(etb_id)
+    Ok(ergebnis)
 }
 
 /// Stuft eine Chat-Nachricht zu einem Auftrag herauf (LFH-101) — in EINEM Commit:
@@ -1203,9 +1222,11 @@ mod tests {
             "Deich instabil",
             &m.erstellt_at,
             &[],
+            None,
         )
         .await
-        .unwrap();
+        .unwrap()
+        .0;
 
         // ETB-Eintrag existiert mit dem Text und der Ereigniszeit der Nachricht (Snapshot).
         let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
@@ -1243,6 +1264,7 @@ mod tests {
             "x",
             &m.erstellt_at,
             &[],
+            None,
         )
         .await
         .unwrap();
@@ -1256,6 +1278,7 @@ mod tests {
             "x",
             &m.erstellt_at,
             &[],
+            None,
         )
         .await;
         assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
@@ -1305,9 +1328,11 @@ mod tests {
             "Deich",
             &m.erstellt_at,
             &[foto],
+            None,
         )
         .await
-        .unwrap();
+        .unwrap()
+        .0;
 
         let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
         assert_eq!(etb.anhaenge.len(), 1, "nur die gewählte Datei");
@@ -1337,9 +1362,11 @@ mod tests {
             "Deich",
             &m.erstellt_at,
             &[],
+            None,
         )
         .await
-        .unwrap();
+        .unwrap()
+        .0;
 
         let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
         assert!(etb.anhaenge.is_empty());
@@ -1372,6 +1399,7 @@ mod tests {
             "Deich",
             &m.erstellt_at,
             &[eigen, fremd],
+            None,
         )
         .await
         .unwrap_err();
@@ -1418,6 +1446,7 @@ mod tests {
             "x",
             &m.erstellt_at,
             &[9999],
+            None,
         )
         .await
         .unwrap_err();

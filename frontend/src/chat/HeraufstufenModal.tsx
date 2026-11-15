@@ -20,15 +20,31 @@ interface FormWerte {
   typ: EtbTyp;
   inhalt: string;
   anhang_ids: number[];
+  in_meldungseingang: boolean;
 }
+
+/** ETB-Typen, die eine Meldung im Meldungseingang mit anlegen können (y3zh5ymv D8). */
+const MIT_MELDUNG: readonly EtbTyp[] = ['meldung', 'lage'];
 
 interface Props {
   offen: boolean;
   nachricht: ChatNachricht | null;
   senden: boolean;
+  /**
+   * Ist das Modul Meldungen für die Person frei? Nur dann bietet der Dialog an, die Meldung im
+   * Meldungseingang mit anzulegen; sonst sagt er, dass nur ins ETB übernommen wird (Spec
+   * `meldungseingang`, „Die Chat-Heraufstufung in den Meldungseingang verlangt das Recht der
+   * Meldungen“).
+   */
+  meldungenFrei: boolean;
   onAbbrechen: () => void;
   /** Heraufstufen. Muss bei Ablehnung ablehnen (`mutateAsync`), sonst leert die Hülle. */
-  onHeraufstufen: (typ: EtbTyp, inhalt: string, anhangIds: number[]) => Promise<unknown>;
+  onHeraufstufen: (
+    typ: EtbTyp,
+    inhalt: string,
+    anhangIds: number[],
+    inMeldungseingang: boolean,
+  ) => Promise<unknown>;
   /**
    * Die Speicher-Mutation (LFH-1077), an die Erfassungshülle durchgereicht: ihr Grund steht im
    * Dialog, bis zum nächsten Absenden; Öffnen und Abbrechen räumen ihn.
@@ -49,11 +65,15 @@ export default function HeraufstufenModal({
   offen,
   nachricht,
   senden,
+  meldungenFrei,
   onAbbrechen,
   onHeraufstufen,
   speicherung,
 }: Props) {
   const [form] = Form.useForm<FormWerte>();
+  // Vor dem ersten Setzen liefert `useWatch` nichts; vorbelegt ist „Meldung“ (unten).
+  const typ = Form.useWatch('typ', form) ?? 'meldung';
+  const mitMeldung = MIT_MELDUNG.includes(typ);
   const anhaenge = [...(nachricht?.anhaenge ?? [])].sort((a, b) => a.id - b.id);
   const gewaehlt = Form.useWatch('anhang_ids', form) ?? [];
   const voll = gewaehlt.length >= ETB_ANHAENGE_MAX;
@@ -64,6 +84,7 @@ export default function HeraufstufenModal({
     form.setFieldsValue({
       typ: 'meldung',
       inhalt: nachricht.inhalt ?? '',
+      in_meldungseingang: true,
       anhang_ids: [...nachricht.anhaenge]
         .map((a) => a.id)
         .sort((a, b) => a - b)
@@ -81,13 +102,32 @@ export default function HeraufstufenModal({
       speicherung={speicherung}
       speicherFehlerTitel="Nicht heraufgestuft"
       speicherFehlerFallback="Heraufstufen fehlgeschlagen"
-      onErfassen={(w) => onHeraufstufen(w.typ, w.inhalt.trim(), w.anhang_ids ?? [])}
+      onErfassen={(w) =>
+        onHeraufstufen(
+          w.typ,
+          w.inhalt.trim(),
+          w.anhang_ids ?? [],
+          // Wie die ETB-Schnellerfassung (LLH-1037): „Auch in den Meldungseingang“ ist vorgewählt,
+          // gilt aber nur bei Meldung/Lage und freigegebenen Meldungen.
+          meldungenFrei && MIT_MELDUNG.includes(w.typ) && w.in_meldungseingang !== false,
+        )
+      }
       onFertig={onAbbrechen}
       onAbbrechen={onAbbrechen}
     >
       <Form.Item label="ETB-Typ" name="typ" rules={[{ required: true }]}>
         <Select options={TYP_OPTIONEN} />
       </Form.Item>
+      {mitMeldung && meldungenFrei && (
+        <Form.Item name="in_meldungseingang" valuePropName="checked">
+          <Checkbox>Auch in den Meldungseingang</Checkbox>
+        </Form.Item>
+      )}
+      {mitMeldung && !meldungenFrei && (
+        <Typography.Paragraph type="secondary">
+          Nur ins ETB: Modul Meldungen gesperrt
+        </Typography.Paragraph>
+      )}
       <Form.Item
         label="Text"
         name="inhalt"

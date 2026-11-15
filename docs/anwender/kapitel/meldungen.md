@@ -45,7 +45,8 @@ Unter „Abgeschlossen“ holt „Ältere laden“ die nächsten Einträge. Die 
 
 Für Einsatzleitung und Führungspersonal:
 
-1. „Meldung erfassen“ wählen. Das Formular „Neue Meldung erfassen“ öffnet sich über der Liste.
+1. „Meldung erfassen“ wählen, hier oder als Schnellaktion der Sprungpalette. Das Formular „Neue
+   Meldung erfassen“ öffnet sich über der Liste.
 2. Für eine eilige Meldung „Sofortmeldung“ wählen; das setzt Meldungsart und Priorität auf
    „Sofort“ und schaltet die Bestätigung ein. „Lagemeldung an übergeordnete Stelle“ belegt die
    Meldungsart „Lagemeldung“ und die Richtung „Extern“ vor.
@@ -289,7 +290,9 @@ Umgekehrt legt ein im ETB erfasster Eintrag vom Typ „Meldung“ oder „Lage�
 als Art „Sonstige“ beziehungsweise „Lagemeldung“, mit „Von“ als Absender und „An“ als Empfänger.
 Sie steht im Meldungseingang wie jede erfasste Meldung und bekommt keinen zweiten ETB-Eintrag. Ohne
 das Häkchen „Auch in den Meldungseingang“ entsteht keine Meldung; es steht aus, wenn „Von“ und „An“
-beide die eigene Stelle sind (Kapitel [Einsatztagebuch](einsatztagebuch.md)).
+beide die eigene Stelle sind (Kapitel [Einsatztagebuch](einsatztagebuch.md)). Dasselbe gilt für
+eine Chat-Nachricht, die als „Meldung“ oder „Lage“ ins ETB übernommen wird; Absender ist dann, wer
+sie geschrieben hat (Kapitel [Chat](chat.md)).
 
 Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12 in die Lage
 übernommen“; eine erneute Übernahme schreibt keinen, eine Lagemeldung ebenfalls nicht. Einträge
