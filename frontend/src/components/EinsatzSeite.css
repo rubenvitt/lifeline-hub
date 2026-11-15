@@ -114,7 +114,8 @@
     ol
     > li:nth-child(n + 5):not(:last-child):has(a):not(:has(~ li:not(:last-child) a))
     a::before {
-    content: '‹';
+    /* Leerer Ersatztext: das Zeichen gehört nicht in den Namen des Links. */
+    content: '‹' / '';
     margin-inline-end: 4px;
   }
 }

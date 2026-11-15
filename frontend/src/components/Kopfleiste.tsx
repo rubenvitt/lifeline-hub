@@ -124,8 +124,14 @@ export function Markenzelle({ alsLink = false }: { alsLink?: boolean }) {
   };
   const marke = <Bildmarke hoehe={MARKENZELLE_BILDMARKE_HOEHE} linienFarbe={rahmenFarben.text} />;
   if (alsLink) {
+    // Als Bedienziel hält die Zelle den Boden der Staffel (72 px in `handschuh`, Gate 1).
     return (
-      <Link to={einsaetzePfad()} aria-label="lifeline-hub" data-lfh="kopf-marke" style={stil}>
+      <Link
+        to={einsaetzePfad()}
+        aria-label="lifeline-hub"
+        data-lfh="kopf-marke"
+        style={{ ...stil, minHeight: Math.max(KOPF_HOEHE, token.controlHeight) }}
+      >
         {marke}
       </Link>
     );

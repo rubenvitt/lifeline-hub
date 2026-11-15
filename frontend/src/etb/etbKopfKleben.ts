@@ -20,7 +20,8 @@ import { useRahmenOben } from '../components/rahmenOben';
  * Fenster der Zeitachse keinen Platz, ein getabbtes Ziel läge ganz verdeckt (WCAG 2.4.11,
  * `e2e/fokus-verdeckung.spec.ts`, 1366 × 520 im Handschuh-Betrieb). Die Köpfe kleben deshalb nur,
  * solange sie mit dem Rahmen höchstens {@link KLEBEN_HOECHSTENS} der Fensterhöhe nehmen; sonst
- * rollen sie mit wie bisher. Unter `md` klebt nichts (wie der Rahmen, LFH-952).
+ * rollen sie mit wie bisher. Unter `md` klebt von den Seitenköpfen nichts: dort bleibt die Höhe der
+ * Zeitachse; der Rahmen darüber klebt auch dort (LLH-1728), seine Höhe steht in `--lfh-rahmen-oben`.
  */
 
 /** Höhe des klebenden Seitenkopfs (`EinsatzSeite kopfKlebt`). */

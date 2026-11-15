@@ -9,7 +9,7 @@ import {
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
-import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenQuelle } from '../components/rahmenOben';
+import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import { useViewport } from '../components/useViewport';
 import { anzahl } from '../anzeige/anzahl';
 import {
@@ -104,8 +104,11 @@ export default function LiveStatusBanner({
 
   const stoerung = !istOnline || status === 'lost';
   const klebt = klebend && !mittel && stoerung;
-  // Rang 0: über dem Kopf, der am Handy jetzt auch klebt (LLH-1728, design.md D2).
-  const zeileRef = useRahmenObenQuelle<HTMLDivElement>(klebt, undefined, RAHMEN_RANG.betriebszeile);
+  // Rang 0: über dem Kopf, der am Handy jetzt auch klebt (LLH-1728, design.md D2, ADR-0054).
+  const { ref: zeileRef, oben: zeileOben } = useRahmenObenStapel<HTMLDivElement>(
+    klebt,
+    RAHMEN_RANG.betriebszeile,
+  );
 
   const quelle =
     antragQuelle.laden && antragQuelle.id != null ? (
@@ -210,7 +213,11 @@ export default function LiveStatusBanner({
     <>
       {quelle}
       {bannerSichtbar && (
-        <div ref={zeileRef} data-lfh="betriebszeile" style={klebt ? RAHMEN_KLEBT : undefined}>
+        <div
+          ref={zeileRef}
+          data-lfh="betriebszeile"
+          style={klebt ? { ...RAHMEN_KLEBT, top: zeileOben } : undefined}
+        >
           <Alert
             type={typ}
             showIcon

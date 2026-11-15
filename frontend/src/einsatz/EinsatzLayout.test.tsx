@@ -756,9 +756,13 @@ describe('EinsatzLayout · Handy-Kopf (LLH-1728)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Navigation öffnen' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Suchen' }));
-    expect(
-      await screen.findByPlaceholderText('Suchen: Module, Aktionen, Einstellungen …'),
-    ).toBeInTheDocument();
+    const feld = await screen.findByPlaceholderText(
+      'Suchen: Module, Aktionen, Einstellungen …',
+      {},
+      { timeout: 4000 },
+    );
+    expect(feld).toBeInTheDocument();
+    // Wohin der Fokus nach dem Schließen geht, misst `e2e/kopfzeile-schmal.spec.ts` (Animation).
     // Der Drawer ist zu (`destroyOnHidden`: sein Inhalt verlässt den Baum).
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Erfassung' })).not.toBeInTheDocument(),

@@ -23,7 +23,8 @@ herleitung:
 - MUST: Jede klebende Quelle des Rahmens meldet sich mit einem Rang aus `RAHMEN_RANG`
   (`frontend/src/components/rahmenOben.ts`) und nimmt ihr `top` aus `useRahmenObenStapel`, nie
   aus einer gerechneten Höhe.
-- MUST NOT: Eine Quelle des Rahmens klebt mit `top: 0`, ohne den kleinsten Rang zu tragen.
+- MUST NOT: Eine Quelle des Rahmens übernimmt `top: 0` aus `RAHMEN_KLEBT`, ohne es durch das `oben`
+  aus dem Stapel zu ersetzen, auch nicht beim kleinsten Rang.
 - SHOULD: Ein neues Element, das selbst oben klebt, hängt sich unter `--lfh-rahmen-oben`, statt
   einen eigenen Rang zu bekommen.
 
@@ -35,6 +36,7 @@ verlange 'RAHMEN_RANG\.kopf' frontend/src/components/AppLayout.tsx
 verlange 'RAHMEN_RANG\.betriebszeile' frontend/src/live/LiveStatusBanner.tsx
 verlange 'RAHMEN_RANG\.uebungsband' frontend/src/components/instrument/Uebung.tsx
 verbiete 'mittel \? \{ \.\.\.KOPF_STIL, \.\.\.RAHMEN_KLEBT \}' frontend/src/einsatz/EinsatzLayout.tsx frontend/src/components/AppLayout.tsx
+verbiete 'useRahmenObenQuelle' frontend/src/einsatz/EinsatzLayout.tsx frontend/src/components/AppLayout.tsx frontend/src/live/LiveStatusBanner.tsx frontend/src/components/instrument/Uebung.tsx
 ```
 
 ## Kontext

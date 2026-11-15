@@ -243,6 +243,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const [sprungOffen, setSprungOffen] = useState(false);
   const panelEingeklappt = sprungOffen ? false : panelZu(navWahl, weit);
   const [navOffen, setNavOffen] = useState(false);
+  // „Suchen“ im Drawer (LLH-1728, D3): vor dem Öffnen der Palette steht der Fokus auf dem Griff,
+  // sonst merkte sie sich den Knopf im Drawer als Rückkehrziel, den `destroyOnHidden` abbaut, und
+  // der Fokus fiele nach dem Schließen auf `body`. Der schließende Drawer holt den Fokus dann
+  // nicht zurück: er zöge ihn hinter die offene Palette.
+  const [sucheAusDrawer, setSucheAusDrawer] = useState(false);
+  const navGriff = useRef<HTMLButtonElement>(null);
 
   // Panel an die aktuelle Modul-Kategorie angleichen (auch nach dem Default-Redirect).
   useEffect(() => {
@@ -424,6 +430,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             <div style={kopfZelleStil({ padding: 0 })}>
               <Button
                 type="text"
+                ref={navGriff}
                 aria-label="Navigation öffnen"
                 // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
                 // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.
@@ -434,7 +441,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                   color: rahmenFarben.text,
                 }}
                 icon={<IconMenue size={22} />}
-                onClick={() => setNavOffen(true)}
+                onClick={() => {
+                  setSucheAusDrawer(false);
+                  setNavOffen(true);
+                }}
               />
             </div>
           )}
@@ -661,6 +671,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           size={navDrawerBreite}
           open={navOffen}
           onClose={() => setNavOffen(false)}
+          focusable={{ focusTriggerAfterClose: !sucheAusDrawer }}
           destroyOnHidden
           // Der Schließer folgt der Staffel wie der Hamburger, der ihn öffnet (LFH-384).
           styles={{ close: { minWidth: navGriffMass(token), minHeight: navGriffMass(token) } }}
@@ -676,6 +687,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               block
               icon={<IconLupe size={20} />}
               onClick={() => {
+                setSucheAusDrawer(true);
+                navGriff.current?.focus();
                 setNavOffen(false);
                 palette.oeffne();
               }}

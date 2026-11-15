@@ -18,6 +18,7 @@ import {
   Uhr,
 } from './Kopfleiste';
 import { MemoryRouter } from 'react-router';
+import { ConfigProvider } from 'antd';
 
 const LEER = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
 
@@ -205,6 +206,18 @@ describe('Handy-Kopf (LLH-1728)', () => {
     expect(zelle).toHaveAttribute('href', '/einsaetze');
     expect(zelle).toHaveAttribute('aria-label', 'lifeline-hub');
     expect(zelle).not.toHaveAttribute('aria-hidden');
+  });
+
+  it('als Link hält die Markenzelle den Boden der Dichte-Staffel', () => {
+    const { container } = render(
+      <ConfigProvider theme={{ token: { controlHeight: 72 } }}>
+        <MemoryRouter>
+          <Markenzelle alsLink />
+        </MemoryRouter>
+      </ConfigProvider>,
+    );
+    const zelle = container.querySelector<HTMLElement>('[data-lfh="kopf-marke"]')!;
+    expect(zelle.style.minHeight).toBe('72px');
   });
 
   it('die Uhr nimmt die Zellpolsterung des Handy-Kopfs', () => {
