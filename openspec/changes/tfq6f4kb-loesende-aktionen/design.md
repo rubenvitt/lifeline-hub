@@ -159,14 +159,14 @@ dürfte, und das nur am eigenen, eben entlassenen Fahrzeug.
 ### D6 Einheit-Detail: Rücknahme mit Vorbedingung
 
 - **Fahrzeug:** Rückgängig ruft den vorhandenen `PUT …/einheiten/{eid}/fahrzeug/{ef}` mit der
-  neuen Vorbedingung `?nur_wenn_frei=true`. Steht das Fahrzeug inzwischen in einer anderen
+  neuen Vorbedingung `?nur_wenn_frei=1`. Steht das Fahrzeug inzwischen in einer anderen
   Einheit, antwortet der Server mit 409 und nennt die Einheit. Ohne den Parameter bleibt das
   heutige Verhalten (Umhängen beim bewussten Zuordnen).
-- **Person:** Ebenso `PUT …/einheiten/{eid}/personal/{ep}?nur_wenn_frei=true`, erweitert um
-  `als_fuehrer=true`. Damit kommen Mitgliedschaft und Führerrolle in einer Transaktion zurück.
-  Ist der Führerplatz inzwischen besetzt, bleibt die Person Mitglied, und die Antwort nennt das.
-  - Löst „Aus Einheit lösen“ auch das Fahrzeug der Person (prüfen in `mitglied_repo.rs`), kommt
-    `fahrzeug_id=<ef>` dazu.
+- **Person:** Ebenso `PUT …/einheiten/{eid}/personal/{ep}?nur_wenn_frei=1`, erweitert um
+  `als_fuehrer=1`. Damit kommen Mitgliedschaft und Führerrolle in einer Transaktion zurück. Hat
+  die Einheit inzwischen einen anderen Führer, ist es 409, und nichts bleibt geschrieben: kein
+  halbes Rückgängig. Beim Umsetzen festgestellt:
+  - „Aus Einheit lösen“ lässt das Fahrzeug der Person stehen, ein Parameter dafür ist nicht nötig.
   - „Vom Fahrzeug lösen“ nimmt der vorhandene Besatzungs-PUT zurück.
 - Der Grund einer Ablehnung steht im Seitenhinweis der Einheit, weil die Zeile dann schon
   wegfallen kann (Regel „Speicherfehler an die Seite“).

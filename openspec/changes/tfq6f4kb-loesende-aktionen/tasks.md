@@ -25,8 +25,8 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 3. d9x8cge8: „Aus Einheit lösen“ mit Rückweg, Zeile hält ihre Stelle
 
-- [ ] 3.1 Backend: `PUT …/einheiten/{eid}/fahrzeug/{ef}` mit `?nur_wenn_frei=true` antwortet 409 mit der Einheit, wenn das Fahrzeug in einer anderen steht; ohne Parameter unverändert; Test in `tests/einsatz_einheit.rs` rot→grün
-- [ ] 3.2 Backend: `PUT …/einheiten/{eid}/personal/{ep}` mit `?nur_wenn_frei=true&als_fuehrer=true` (und `fahrzeug_id`, falls das Lösen das Fahrzeug der Person löst — in `mitglied_repo.rs` prüfen) stellt Mitgliedschaft, Fahrzeug und Führerrolle in einer Transaktion her; besetzter Führerplatz wird genannt; Tests rot→grün; Typ-Codegen falls Antwort sich ändert
+- [x] 3.1 Backend: `PUT …/einheiten/{eid}/fahrzeug/{ef}` mit `?nur_wenn_frei=true` antwortet 409 mit der Einheit, wenn das Fahrzeug in einer anderen steht; ohne Parameter unverändert; Test in `tests/einsatz_einheit.rs` rot→grün
+- [x] 3.2 Backend: `PUT …/einheiten/{eid}/personal/{ep}` mit `?nur_wenn_frei=true&als_fuehrer=true` (und `fahrzeug_id`, falls das Lösen das Fahrzeug der Person löst — in `mitglied_repo.rs` prüfen) stellt Mitgliedschaft, Fahrzeug und Führerrolle in einer Transaktion her; besetzter Führerplatz wird genannt; Tests rot→grün; Typ-Codegen falls Antwort sich ändert
 - [ ] 3.3 `pages/einheit/einheitAnsichtKern.ts`: Fahrzeug-Menü-Builder mit „Aus Einheit lösen“ (neutral, nur mit Schreibrecht Einheiten); Personen-Lösen-Einträge neutral; Tests in `einheitAnsichtKern.test.ts` rot→grün
 - [ ] 3.4 `pages/einheit/FahrzeugeBesatzung.tsx`: roter Zeilenknopf weg (Baum- und flacher Zweig), ⋮ mit Zeilenkennung, Kontextmenü am Namensteil (Spec `datensatz-aktionsmenue`, Zeilen mit Reglern); gehaltene Zeile „Gelöst · Rückgängig“ über `useHoldGeloest` mit gedämpfter Besatzung; Toast; Rückgängig mit `nur_wenn_frei`, Ablehnung im Seitenhinweis; Tests in `FahrzeugeBesatzung.test.tsx` und `EinheitDetailPage.test.tsx` (Doppeltipp löst ein Fahrzeug, Rückgängig in der Zeile, 409 nennt die andere Einheit) rot→grün
 - [ ] 3.5 Personen: Rückgängig-Hinweis nach „Aus Einheit lösen“ und „Vom Fahrzeug lösen“, inkl. Führerrolle; Test rot→grün

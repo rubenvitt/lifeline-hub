@@ -2771,3 +2771,150 @@ async fn person_umhaengen_beendet_die_fuehrung() {
 
 /// Die Ereignisse, die ein Einheitswechsel einer Person auslöst (LLH-1262).
 const PERSON_ZIELE: &[(&str, &str)] = &[("einheit", "einheit_id"), ("personal", "personal_id")];
+
+/// LLH-1722 (Spec `einheit-ansicht`, „Lösen in der Einheit zurücknehmen“): das Rückgängig nach
+/// „Aus Einheit lösen“ schickt `?nur_wenn_frei=1`. Steht das Fahrzeug inzwischen in einer anderen
+/// Einheit, antwortet der Server 409 und nennt sie, statt es ihr still wegzunehmen; ohne den
+/// Parameter bleibt das Umhängen beim bewussten Zuordnen.
+#[tokio::test]
+async fn fahrzeug_zuruecknehmen_nur_wenn_frei() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let b = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, a, ef).await;
+    let pfad = |e: i64, q: &str| format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}{q}");
+
+    // Gelöst und frei: das Rückgängig gelingt.
+    assert_eq!(
+        anfrage(&app, "DELETE", &pfad(a, ""), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let (s, j) = anfrage(&app, "PUT", &pfad(a, "?nur_wenn_frei=1"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{j}");
+
+    // Gelöst, inzwischen in Zug 2: das Rückgängig scheitert und nennt die Einheit.
+    assert_eq!(
+        anfrage(&app, "DELETE", &pfad(a, ""), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    fahrzeug_zuordnen(&app, &admin, einsatz, b, ef).await;
+    let (s, j) = anfrage(&app, "PUT", &pfad(a, "?nur_wenn_frei=1"), &admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(j["error"], "83-1 steht inzwischen in Einheit «Zug 2»");
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        None,
+    )
+    .await;
+    let fz = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["id"] == ef)
+        .unwrap();
+    assert_eq!(fz["einheit_id"], b, "bleibt in Zug 2");
+
+    // Ohne den Parameter: bewusstes Umhängen wie bisher.
+    let (s, _) = anfrage(&app, "PUT", &pfad(a, ""), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+}
+
+/// LLH-1722: Rückgängig nach „Aus Einheit lösen“ beim Einheitsführer stellt Mitgliedschaft und
+/// Führung in einem Schritt her (`?nur_wenn_frei=1&als_fuehrer=1`); hat die Einheit inzwischen
+/// einen anderen Führer, ist es 409 und nichts geschrieben.
+#[tokio::test]
+async fn personal_zuruecknehmen_als_fuehrer() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let a = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let b = einheit_bilden(&app, &admin, einsatz, "Zug 2").await;
+    let anna = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
+    let paul = stammpersonal_disponieren(&app, &admin, einsatz, "Paul").await;
+    personal_zuordnen(&app, &admin, einsatz, a, anna).await;
+    personal_zuordnen(&app, &admin, einsatz, a, paul).await;
+    let einheit_pfad = format!("/api/einsaetze/{einsatz}/einheiten/{a}");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &einheit_pfad,
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{anna}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let pfad =
+        |ep: i64, q: &str| format!("/api/einsaetze/{einsatz}/einheiten/{a}/personal/{ep}{q}");
+    let fuehrer = || async {
+        let (_, l) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/einheiten"),
+            &admin,
+            None,
+        )
+        .await;
+        eintrag(&l, a)["fuehrer_id"].clone()
+    };
+
+    assert_eq!(
+        anfrage(&app, "DELETE", &pfad(anna, ""), &admin, None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(fuehrer().await.is_null());
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &pfad(anna, "?nur_wenn_frei=1&als_fuehrer=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{j}");
+    assert_eq!(fuehrer().await, anna);
+
+    // Wieder gelöst, inzwischen führt Paul: 409, Anna bleibt draußen.
+    assert_eq!(
+        anfrage(&app, "DELETE", &pfad(anna, ""), &admin, None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &einheit_pfad,
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{paul}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &pfad(anna, "?nur_wenn_frei=1&als_fuehrer=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(
+        j["error"],
+        "Zug 1 hat inzwischen einen anderen Einheitsführer"
+    );
+    assert_eq!(fuehrer().await, paul);
+
+    // Inzwischen in Zug 2: 409 mit der Einheit.
+    personal_zuordnen(&app, &admin, einsatz, b, anna).await;
+    let (s, j) = anfrage(&app, "PUT", &pfad(anna, "?nur_wenn_frei=1"), &admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j}");
+    assert_eq!(j["error"], "Anna steht inzwischen in Einheit «Zug 2»");
+}

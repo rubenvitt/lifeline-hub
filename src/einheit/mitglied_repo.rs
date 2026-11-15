@@ -296,6 +296,97 @@ pub async fn freigeben_fahrzeug_tx(
     Ok(name)
 }
 
+/// Vorbedingung des Rückgängig nach „Aus Einheit lösen“ (LLH-1722, Spec `einheit-ansicht`,
+/// „Lösen in der Einheit zurücknehmen“): steht das Fahrzeug inzwischen in einer anderen Einheit,
+/// `Conflict` mit ihrem Namen, statt es ihr still zu nehmen. Ohne Einheit oder schon in dieser
+/// Einheit ist es frei. Ein unbekanntes Fahrzeug meldet [`zuordnen_fahrzeug_tx`].
+pub async fn require_fahrzeug_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_id: i64,
+) -> Result<(), AppError> {
+    let anderswo: Option<(String, String)> = sqlx::query_as(
+        "SELECT COALESCE(f.funkrufname, ef.snap_funkrufname), e.name \
+         FROM einsatz_fahrzeug ef \
+         JOIN einsatz_einheit e ON e.id = ef.einheit_id \
+         LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE ef.id = ? AND ef.einsatz_id = ? AND ef.einheit_id <> ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match anderswo {
+        Some((name, einheit)) => Err(AppError::Conflict(format!(
+            "{name} steht inzwischen in Einheit «{einheit}»"
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// Wie [`require_fahrzeug_frei_tx`] für eine Person (LLH-1722).
+pub async fn require_personal_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
+    let anderswo: Option<(String, String)> = sqlx::query_as(
+        "SELECT p.snap_name, e.name FROM einsatz_personal p \
+         JOIN einsatz_einheit e ON e.id = p.einheit_id \
+         WHERE p.id = ? AND p.einsatz_id = ? AND p.einheit_id <> ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    match anderswo {
+        Some((name, einheit)) => Err(AppError::Conflict(format!(
+            "{name} steht inzwischen in Einheit «{einheit}»"
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// Setzt die Person nach dem Rückgängig wieder als Führer ein (LLH-1722), nur wenn die Einheit
+/// keinen hat; sonst `Conflict` (der Aufrufer bricht die Transaktion ab, nichts bleibt
+/// geschrieben). Ist sie es schon, schreibt es nichts.
+pub async fn set_fuehrer_wenn_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
+    let (name, fuehrer): (String, Option<i64>) = sqlx::query_as(
+        "SELECT name, fuehrer_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    match fuehrer {
+        Some(id) if id == ep_id => Ok(()),
+        Some(_) => Err(AppError::Conflict(format!(
+            "{name} hat inzwischen einen anderen Einheitsführer"
+        ))),
+        None => {
+            sqlx::query(
+                "UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(ep_id)
+            .bind(einheit_id)
+            .bind(einsatz_id)
+            .execute(&mut *conn)
+            .await?;
+            Ok(())
+        }
+    }
+}
+
 /// Meldung des 422, wenn beim Bilden einer Einheit nicht jedes Fahrzeug frei ist (LLH-1073 D9).
 pub const MELDUNG_FAHRZEUGE_NICHT_FREI: &str = "Nicht alle Fahrzeuge lassen sich zuordnen";
 
