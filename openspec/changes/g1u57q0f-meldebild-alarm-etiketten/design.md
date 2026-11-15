@@ -23,7 +23,7 @@ kein neuer Baustein im Dashboard-Baukasten (das Etikett ist `StatusChip`).
 ## Decisions
 
 1. **Strukturierte Gründe.** `toenungsGruende` liefert
-   `TonungsGrund = { art: 'ausfall' | 'ausfall_material' | 'rueckmeldung_ueberfaellig' |
+   `ToenungsGrund = { art: 'ausfall' | 'ausfall_material' | 'rueckmeldung_ueberfaellig' |
    'rueckmeldung_keine'; anzahl?: number; seitMin?: number }`. Der Wortlaut kommt aus einer reinen
    Funktion `grundWort(grund)` in `kraefte/` (neben `meldebildRaster.ts`). Die Dauer kommt aus
    `jetzt − faellig_at` (`rueckmeldungUeberfaelligSeit(r, jetzt)` in `rueckmeldung.ts`, ganze

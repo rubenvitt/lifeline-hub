@@ -3,7 +3,7 @@
 ## 1. Gemeinsame Bausteine (auch für LLH-1739)
 
 - [x] 1.1 `meldungen/rueckmeldung.ts`: `RUECKMELDUNG_ROLLE.ueberfaellig = 'alarm'`, Kopfkommentar nachziehen; `rueckmeldungUeberfaelligSeit(r, jetzt)` (Minuten seit `faellig_at`, ≥ 0, `null` ohne Rückmeldung). Tests in `rueckmeldung.test.ts` zuerst (rot), dann grün.
-- [x] 1.2 Strukturierte Gründe: `toenungsGruende` liefert `TonungsGrund[]` mit `seitMin` aus 1.1; `grundWort(grund)` liefert „1 Ausfall“, „1 Ausfall Material“, „Rückm. überfällig seit 47 min“, „keine Rückm.“ (Dauer über `dauerText`). Tests in `meldebildRaster.test.ts` (bestehende Fälle auf die Struktur umstellen, neu: Dauer 47 min und 125 min → „2 h 05 min“).
+- [x] 1.2 Strukturierte Gründe: `toenungsGruende` liefert `ToenungsGrund[]` mit `seitMin` aus 1.1; `grundWort(grund)` liefert „1 Ausfall“, „1 Ausfall Material“, „Rückm. überfällig seit 47 min“, „keine Rückm.“ (Dauer über `dauerText`). Tests in `meldebildRaster.test.ts` (bestehende Fälle auf die Struktur umstellen, neu: Dauer 47 min und 125 min → „2 h 05 min“).
 
 ## 2. Meldebild
 

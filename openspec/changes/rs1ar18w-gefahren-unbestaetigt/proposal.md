@@ -36,6 +36,10 @@ Lage aus der Entfernung liest, kann nicht sagen, ob „hoch“ gilt.
   Requirements „Beurteilung je Gefahrengebiet“, „Lagebild und Überblick nennen nicht beurteilte
   Gebiete“ und „Die Gebietsliste sagt, was im Gebiet los ist“; die Gebietsliste führt Stufe und
   Zusatz in einem Etikett zusammen.
+- `sprungpalette`: Szenario „Gefahrengebiet mit bewerteten Gefahren“ nennt die Beurteilung mit dem
+  neuen Wortlaut (die Vorschau liest dieselbe Quelle). Nachgetragen nach dem Review vor dem PR.
+- `lagevortrag-uebernahme`: Requirement „Gefahren je Gebiet in der Gefahren-/Schadenlage“ schreibt
+  „(unbestätigt)“ statt „nicht beurteilt“. Nachgetragen nach dem Review vor dem PR.
 
 ## Impact
 

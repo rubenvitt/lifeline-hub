@@ -28,7 +28,7 @@ Zählweise der Stärken (LLH-1744, Welle 3).
    jeder Einheit des Teilbaums (`einheitenRueckmeldung`, `null` solange unbekannt) und den
    summierten Ausfall (`ausfallMittel`, `ausfallMaterial`). Das Urteil über die Rückmeldung hängt
    an der Uhr. Deshalb rechnet eine reine Funktion `abschnittGruende(zeile, jetzt)` →
-   `TonungsGrund[]` im Render (Muster `rueckmeldungDerZeile`): Ausfall, überfällige Einheiten mit
+   `ToenungsGrund[]` im Render (Muster `rueckmeldungDerZeile`): Ausfall, überfällige Einheiten mit
    längster Dauer, Einheiten ohne Rückmeldung. Ohne feststehende Rückmeldungen kein
    Rückmeldungsgrund.
    *Verworfen:* nur die jüngste Rückmeldung beurteilen. Billig, verdeckt aber genau den

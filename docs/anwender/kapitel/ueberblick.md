@@ -2,7 +2,7 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 200
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/erinnerung/erinnerungZustand.ts, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
 ---
 
 ## Überblick
@@ -114,9 +114,10 @@ Die Marken kommen aus sieben Quellen: Aufträge mit Frist, offene Erinnerungen, 
 Lagebesprechung, der erwartete Höchststand an einem maßgeblichen Pegel, fällige Ablösungen, der
 Beginn angekündigter Unwetterwarnungen der Stufen schwer und extrem und die Programmpunkte der
 Veranstaltung aus dem Paneel „Ablauf“ der [Einsatzdaten](einsatzdaten.md). Eine verstrichene Frist
-steht als „überfällig“ in Rot ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben. Eine
-Erinnerung ist ein Wecker, keine Frist: verstrichen heißt sie „fällig“ in Gelb, wie im Abschnitt
-„Erinnerungen“ der Offenen Vorgänge.
+steht als „überfällig“ in Rot ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben.
+Zwei Ausnahmen: Eine Erinnerung ist ein Wecker, keine Frist; verstrichen heißt sie „fällig“ in
+Gelb, wie im Abschnitt „Erinnerungen“ der Offenen Vorgänge. Eine verstrichene Lagebesprechung
+steht wie auf der Seite Lagebesprechung als „jetzt fällig“ bzw. „seit … überfällig“ in Gelb.
 Pegelprognose, Unwetterbeginn und Programmpunkte sind keine Fristen: Verstrichen fallen sie
 heraus. Pegelprognose und Unwetterbeginn sind unter 30 Minuten ebenso hervorgehoben, Programmpunkte
 nie. Es stehen höchstens sechs Marken da, der Rest als „+… weitere“. Ein
