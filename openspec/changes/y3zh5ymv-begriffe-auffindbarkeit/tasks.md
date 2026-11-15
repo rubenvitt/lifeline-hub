@@ -29,7 +29,7 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`, Ru
 - [ ] 3.3 e2e-Locatoren auf „Kräfteübersicht“ (Dateinamen bleiben) und `design-system/previews.tsx`. Prüfung: `mise exec -- pnpm exec playwright test e2e/meldebild-*.spec.ts e2e/lageberichte-anlegen.spec.ts e2e/command-palette.spec.ts` grün
 - [ ] 3.4 Doku: Kapitel `meldebild.md` (Titel „Kräfteübersicht und Kräfte-Zeitachse“, Text), Verweise in den übrigen Kapiteln, README, `docs/architektur/01`, `10`, `12-glossar.md`; Website `module.json`, `index.astro`; Bilder neu (`pnpm doku:bilder --grep meldebild`). Prüfung: `hilfe/anwenderdoku.guard.test.ts`, `websiteModule.guard.test.ts` grün
 - [x] 3.5 `frontend/AGENTS.md`: Regel zur Modulstruktur (Kräfteübersicht, früherer Name als Synonym), Abschnitt zu Modul-Schlagworten. Prüfung: Prettier grün, `scripts/adr-fuer.sh frontend/src/einsatz/modulRegistry.ts` nennt keine widersprechende Entscheidung
-- [ ] 3.6 Folgeaufgabe für die Spec-Prosa (D9) über `zunder-task-anlegen`. Prüfung: Link der Aufgabe im PR
+- [x] 3.6 Folgeaufgabe für die Spec-Prosa (D9) über `zunder-task-anlegen`. Prüfung: Link der Aufgabe im PR
 
 ## 4. LLH-1802 (enadu4z2) Chat-Heraufstufung mit Meldung (D8)
 
