@@ -16,7 +16,8 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 
 ### Erkennen, ob Netz da ist
 
-1. Auf die Kopfzeile achten: Ohne Netz steht rechts „OFFLINE“ statt „SYNC“.
+1. Auf die Kopfzeile achten: Ohne Netz steht rechts „OFFLINE“ neben einem roten Funkzeichen;
+   mit Netz steht dort nur das grüne Funkzeichen.
 2. Auf den Seitenkopf achten: Dort steht „Stand HH:MM · offline“, die Uhrzeit der letzten
    Verbindung.
 3. Auf die Betriebszeile ganz oben achten: Sie meldet „Offline — keine Verbindung zum Server.“

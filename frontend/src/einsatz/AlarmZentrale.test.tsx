@@ -353,7 +353,9 @@ describe('AlarmZentrale', () => {
   it('globaler Mute-Toggle persistiert in localStorage', async () => {
     stubAudioReady();
     renderAlarm();
-    expect(await screen.findByText('Ton bereit')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Ton bereit – stummschalten' }),
+    ).toBeInTheDocument();
     expect(istAlarmGemutet()).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: 'Ton bereit – stummschalten' }));
     expect(istAlarmGemutet()).toBe(true);
@@ -365,12 +367,13 @@ describe('AlarmZentrale', () => {
   it('zeigt den Benachrichtigungs-Status dauerhaft und aktiviert aus der User-Geste', async () => {
     const NotificationMock = stubNotification('default');
     renderAlarm();
+    // „aus“ und „erlaubt“ verlangen nichts: nur das Icon, der Name nennt den Zustand (LLH-1726).
     const aus = screen.getByRole('button', { name: 'Benachrichtigung aus – aktivieren' });
-    expect(aus).toHaveTextContent('Benachrichtigung aus');
+    expect(aus).toHaveTextContent(/^$/);
     await userEvent.click(aus);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Benachrichtigung erlaubt' })).toHaveTextContent(
-        'Benachrichtigung erlaubt',
+        /^$/,
       );
     });
     expect(NotificationMock.requestPermission).toHaveBeenCalledOnce();
@@ -384,15 +387,36 @@ describe('AlarmZentrale', () => {
     expect(knopf).toHaveStyle({ color: farbenDunkel.achtung });
   });
 
-  it.each(['default', 'granted', 'denied', 'unsupported'] as const)(
-    'Benachrichtigung %s: der sichtbare Zustand steht wortgleich vorn im Namen (WCAG 2.5.3)',
-    (permission) => {
+  it.each([1024, 1366])(
+    'Benachrichtigung blockiert bei %i px: das Wort steht wortgleich vorn im Namen (WCAG 2.5.3)',
+    (px) => {
+      setzeViewportBreite(px);
+      stubNotification('denied');
+      renderAlarm();
+      const knopf = screen.getByRole('button', { name: /^Benachrichtigung / });
+      expect(knopf.textContent).toBe('Benachrichtigung blockiert');
+      expect(knopf.getAttribute('aria-label')!.startsWith(knopf.textContent!)).toBe(true);
+      setzeViewportBreite(VIEWPORT_STANDARD);
+    },
+  );
+
+  // LLH-1726 (Spec `kopfleiste`): Ruhezustände stehen in jeder Breite nur als Icon. Mutationsprobe:
+  // die alte Weiche `knapp && !desktopAuffaellig` zurück → 1366 wird rot.
+  it.each([
+    [1366, 'default'],
+    [1366, 'granted'],
+    [1366, 'unsupported'],
+    [1024, 'granted'],
+  ] as const)(
+    'Benachrichtigung bei %i px und %s: nur das Icon, der Name nennt den Zustand',
+    (px, permission) => {
+      setzeViewportBreite(px);
       if (permission === 'unsupported') Reflect.deleteProperty(window, 'Notification');
       else stubNotification(permission);
       renderAlarm();
       const knopf = screen.getByRole('button', { name: /^Benachrichtigung / });
-      expect(knopf.textContent).toMatch(/^Benachrichtigung /);
-      expect(knopf.getAttribute('aria-label')!.startsWith(knopf.textContent!)).toBe(true);
+      expect(knopf).toHaveTextContent(/^$/);
+      setzeViewportBreite(VIEWPORT_STANDARD);
     },
   );
 
@@ -659,7 +683,9 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     renderAlarm();
 
     const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+    await waitFor(() => expect(ziel).toHaveAccessibleName('Alarmzentrale: Ton bereit'));
+    // Der Ruhezustand steht auch am Handy nur als Icon (LLH-1726).
+    expect(ziel).toHaveTextContent(/^$/);
   });
 
   it('ist der Desktop abschaltbar, ist sein Menüeintrag bedienbar und fordert die Berechtigung an', async () => {
@@ -790,7 +816,7 @@ describe('AlarmZentrale: Ton-Icon ohne Marker im Ruhezustand (LFH-513)', () => {
     renderAlarm();
 
     const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+    await waitFor(() => expect(ziel).toHaveAccessibleName('Alarmzentrale: Ton bereit'));
     expect(marker(ziel)).toHaveLength(0);
 
     await userEvent.click(ziel);
@@ -804,81 +830,80 @@ describe('AlarmZentrale: Ton-Icon ohne Marker im Ruhezustand (LFH-513)', () => {
 });
 
 /**
- * LLH-1158: Ab `xl` hält das Ton-Wort die Breite seines längsten Wortlauts. Den Platz trägt
- * erzeugter Inhalt aus `data-platz` (`components/Kopfleiste.css`); ob er die Breite wirklich
- * hält, misst `e2e/kopfhoehe-tonpruefung.spec.ts`. Hier nur die Verdrahtung: jeder Zustand nennt
- * denselben Platz, und der Text des Knopfs bleibt das sichtbare Wort.
+ * LLH-1726 (Spec `kopfleiste`): Der Ton trägt sein Wort genau bei Störung, in jeder Breite und
+ * Dichte. Vorher stand „Ton bereit“ ab `xl` und in `handschuh` und hielt die Breite von „Ton wird
+ * geprüft“ (LLH-1158, LLH-1232); den Platz bezahlte der Einsatzname.
  */
-describe('AlarmZentrale: das Ton-Wort hält seinen Platz (LLH-1158)', () => {
-  afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
-
-  it('1366 px: „Ton bereit“ und „Ton stumm“ stehen im Platz von „Ton wird geprüft“', async () => {
-    setzeViewportBreite(1366);
-    stubAudioReady();
-    stubNotification('default');
-    renderAlarm();
-
-    const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
-    await waitFor(() => expect(bereit).toHaveAttribute('aria-pressed', 'false'));
-    const wort = bereit.querySelector('.kopf-wort-platz');
-    expect(wort).toHaveAttribute('data-platz', 'Ton wird geprüft');
-    expect(bereit.textContent).toBe('Ton bereit');
-
-    await userEvent.click(bereit);
-    const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
-    expect(stumm.querySelector('.kopf-wort-platz')).toHaveAttribute(
-      'data-platz',
-      'Ton wird geprüft',
-    );
-    expect(stumm.textContent).toBe('Ton stumm');
+describe('AlarmZentrale: das Ton-Wort steht genau bei Störung (LLH-1726)', () => {
+  afterEach(() => {
+    setzeViewportBreite(VIEWPORT_STANDARD);
+    localStorage.removeItem('lifeline-hub.dichte');
   });
 
-  it('1024 px: eine Störung steht ohne Platz, die Prüfung zeigt dort kein Wort (LFH-637)', async () => {
-    setzeViewportBreite(1024);
-    stubAudioReady();
-    stubNotification('default');
-    renderAlarm();
+  it.each([1024, 1366, 1920])(
+    '%i px: „Ton bereit“ nur als Icon, „Ton stumm“ mit Wort',
+    async (px) => {
+      setzeViewportBreite(px);
+      stubAudioReady();
+      stubNotification('default');
+      renderAlarm();
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Ton bereit – stummschalten' }),
-    );
-    const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
-    expect(stumm.querySelector('.kopf-wort-platz')).toHaveAttribute('data-platz', '');
-  });
+      const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+      await waitFor(() => expect(bereit).toHaveAttribute('aria-pressed', 'false'));
+      expect(bereit.textContent).toBe('');
 
-  // LLH-1232: In `handschuh` ist der Kopf unter `xl` ohnehin zweizeilig; das Wort mit Platz hält
-  // ihn über Prüfung, „Ton bereit“ und „Ton blockiert“ gleich hoch.
-  it('1140 px in handschuh: auch der Ruhezustand steht mit Wort im Platz (LLH-1232)', async () => {
+      await userEvent.click(bereit);
+      const stumm = screen.getByRole('button', { name: 'Ton stumm – einschalten' });
+      expect(stumm.textContent).toBe('Ton stumm');
+    },
+  );
+
+  // Nachentscheid 15.11.2026: Vor der ersten Bediengeste sperrt der Browser den Ton, nach der Frist
+  // erscheint ohne Zutun „Ton blockiert“. Damit der Kopf dann nicht springt (Spec
+  // `einsatztauglichkeit-layout`), hält das Ton-Wort die Breite von „Ton blockiert“, auch leer.
+  // Den Platz trägt erzeugter Inhalt (`AlarmZentrale.css`); ob er hält, misst
+  // `e2e/kopfhoehe-tonpruefung.spec.ts`.
+  it.each([1024, 1366, 390])(
+    '%i px: das Ton-Wort hält den Platz von „Ton blockiert“',
+    async (px) => {
+      setzeViewportBreite(px);
+      stubAudioReady();
+      stubNotification('granted');
+      renderAlarm();
+      const knopf =
+        px < 768
+          ? await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' })
+          : await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+      await waitFor(() => expect(knopf.querySelector('.ton-wort-platz')).not.toBeNull());
+      const platz = knopf.querySelector('.ton-wort-platz')!;
+      expect(platz).toHaveAttribute('data-platz', 'Ton blockiert');
+      expect(platz).toHaveAttribute('aria-hidden', 'true');
+      expect(knopf.textContent).toBe('');
+    },
+  );
+
+  it('1140 px in handschuh: auch dort der Ruhezustand ohne Wort', async () => {
     setzeViewportBreite(1140);
     localStorage.setItem('lifeline-hub.dichte', 'handschuh');
     stubAudioReady();
     stubNotification('default');
-    try {
-      render(
-        <ThemeModeProvider>
-          <AntApp>
-            <MemoryRouter initialEntries={['/einsaetze/1/meldungen']}>
-              <Routes>
-                <Route path="/einsaetze/:id/*" element={<AlarmTestRoute mitSteuerung={false} />} />
-              </Routes>
-            </MemoryRouter>
-          </AntApp>
-        </ThemeModeProvider>,
-      );
+    render(
+      <ThemeModeProvider>
+        <AntApp>
+          <MemoryRouter initialEntries={['/einsaetze/1/meldungen']}>
+            <Routes>
+              <Route path="/einsaetze/:id/*" element={<AlarmTestRoute mitSteuerung={false} />} />
+            </Routes>
+          </MemoryRouter>
+        </AntApp>
+      </ThemeModeProvider>,
+    );
 
-      const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
-      expect(bereit.querySelector('.kopf-wort-platz')).toHaveAttribute(
-        'data-platz',
-        'Ton wird geprüft',
-      );
-      expect(bereit.textContent).toBe('Ton bereit');
-      // Die Benachrichtigung wechselt beim Start nicht von selbst und bleibt Icon (LFH-637).
-      expect(
-        screen.getByRole('button', { name: 'Benachrichtigung aus – aktivieren' }).textContent,
-      ).toBe('');
-    } finally {
-      localStorage.removeItem('lifeline-hub.dichte');
-    }
+    const bereit = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+    expect(bereit.textContent).toBe('');
+    expect(
+      screen.getByRole('button', { name: 'Benachrichtigung aus – aktivieren' }).textContent,
+    ).toBe('');
   });
 });
 
@@ -1023,7 +1048,7 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
     stubAudioReady();
     stubNotification(permission);
     const { container } = renderAlarm();
-    await waitFor(() => expect(container.textContent).toMatch(/Ton bereit|Benachrichtigung/));
+    await screen.findByRole('button', { name: /Ton|Alarmzentrale/ });
     expect(container.textContent).not.toMatch(/Desktop/);
     for (const knopf of screen.getAllByRole('button')) {
       expect(knopf.getAttribute('aria-label') ?? '').not.toMatch(/Desktop/);
@@ -1036,7 +1061,8 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
     Reflect.deleteProperty(window, 'Notification');
     renderAlarm();
     const knopf = screen.getByRole('button', { name: 'Benachrichtigung nicht verfügbar' });
-    expect(knopf).toHaveTextContent('Benachrichtigung nicht verfügbar');
+    // Keine Störung: nur das Icon (LLH-1726), der Name nennt den Zustand.
+    expect(knopf).toHaveTextContent(/^$/);
     expect(knopf).toHaveStyle({ color: rahmenFarben.gedaempft });
     expect(knopf).toHaveAttribute('aria-disabled', 'true');
   });
@@ -1047,7 +1073,7 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
     stubNotification('default');
     renderAlarm();
     const ziel = await screen.findByRole('button', { name: /^Alarmzentrale:/ });
-    await waitFor(() => expect(ziel).toHaveTextContent('Ton bereit'));
+    await waitFor(() => expect(ziel).toHaveAccessibleName('Alarmzentrale: Ton bereit'));
   });
 });
 

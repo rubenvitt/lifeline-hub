@@ -44,8 +44,8 @@ export function useWeitGerollt(): boolean {
 export const GANZ_FREI_AB = 0.98;
 
 /**
- * Passt der Knopf ganz zwischen den klebenden Kopf oben (`--lfh-rahmen-oben`, dazu Seitenkopf und
- * Filterleiste des ETB, wenn sie kleben, kwc2yszv D8) und die Erfassungsleiste unten (LLH-1386)?
+ * Passt der Knopf ganz zwischen den klebenden Kopf oben (`--lfh-rahmen-oben` samt klebendem
+ * Seitenkopf, dazu Filterleiste und Spaltenkopf des ETB, wenn sie kleben, kwc2yszv D8) und die Erfassungsleiste unten (LLH-1386)?
  * Die Überlagerung der Zeitachse hängt über der Leiste und
  * stapelt nach oben: ist die Leiste hoch (Hinweise, Anhangliste, Berichtigungswarnung) und das
  * Fenster niedrig, rutscht „Nach oben“ ganz hinter den Kopf und bliebe dort ein Tab-Stopp, den
@@ -57,7 +57,8 @@ export const GANZ_FREI_AB = 0.98;
  * ohne eigene Zuhörer. Ohne ihn (jsdom) gilt der Knopf als frei.
  */
 export function useNachObenPasst(): [boolean, (el: HTMLElement | null) => void] {
-  // Kleben Seitenkopf und Filterleiste des ETB mit (kwc2yszv D8), gehören sie zum Kopf.
+  // Kleben Filterleiste und Spaltenkopf des ETB mit (kwc2yszv D8), gehören sie zum Kopf; den
+  // Seitenkopf zählt die Rahmenhöhe schon (zjt7c073 D5).
   const rahmenOben = useRahmenOben() + useEtbKopfHoehe();
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [passt, setPasst] = useState(true);

@@ -1,5 +1,6 @@
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
-import { useRahmenOben } from '../components/rahmenOben';
+import { useKopfOben } from '../components/rahmenOben';
+import { KLEBEN_HOECHSTENS } from '../components/seitenkopfKleben';
 
 /**
  * Seitenkopf, Filterleiste und Spaltenkopf des ETB kleben unter dem Rahmen (kwc2yszv D8, Spec
@@ -8,38 +9,39 @@ import { useRahmenOben } from '../components/rahmenOben';
  * Ende der Zeitachse, über der Erfassung — sichtbar und löschbar.
  *
  * GEMESSEN wie der Rahmen (`components/rahmenOben.ts`): Seitenkopf und Filterleiste brechen mit
- * Breite und Dichte um. Die Höhen stehen als CSS-Variablen am `<html>`, solange die Köpfe kleben:
- *  - `top` der Filterleiste: Rahmen + Seitenkopf,
- *  - {@link ETB_KOPF_UNTERKANTE} am Seitencontainer: Rahmen + Seitenkopf + Filterleiste — dort
- *    klebt der Spaltenkopf der Zeitachse (`top: var(--etb-kopf-unterkante, var(--lfh-rahmen-oben,
+ * Breite und Dichte um. Den klebenden Seitenkopf zählt die Rahmenhöhe `--lfh-rahmen-oben` schon mit
+ * (zjt7c073 D2/D5: `EinsatzSeite` meldet ihn, `components/seitenkopfKleben.ts`). Die übrigen Höhen
+ * stehen als CSS-Variablen am `<html>`, solange die Köpfe kleben:
+ *  - `top` der Filterleiste: die Rahmenhöhe,
+ *  - {@link ETB_KOPF_UNTERKANTE} am Seitencontainer: Rahmen + Filterleiste — dort klebt der
+ *    Spaltenkopf der Zeitachse (`top: var(--etb-kopf-unterkante, var(--lfh-rahmen-oben,
  *    0px))`, Vertrag mit `etb/EtbSpaltenzeile.tsx`),
  *  - der Fokusabstand oben (`scroll-padding-block-start`, `index.css`): dazu der Spaltenkopf, den
  *    die Seite unter `[data-lfh="etb-spaltenkopf"]` findet.
  *
  * NUR, WENN ES PASST: oben klebend und unten die angepinnte Erfassung ließen auf einem niedrigen
  * Fenster der Zeitachse keinen Platz, ein getabbtes Ziel läge ganz verdeckt (WCAG 2.4.11,
- * `e2e/fokus-verdeckung.spec.ts`, 1366 × 520 im Handschuh-Betrieb). Die Köpfe kleben deshalb nur,
- * solange sie mit dem Rahmen höchstens {@link KLEBEN_HOECHSTENS} der Fensterhöhe nehmen; sonst
- * rollen sie mit wie bisher. Unter `md` klebt nichts (wie der Rahmen, LFH-952).
+ * `e2e/fokus-verdeckung.spec.ts`, 1366 × 520 im Handschuh-Betrieb). Die Köpfe kleben deshalb nur
+ * gemeinsam, solange sie mit der Kopfleiste höchstens {@link KLEBEN_HOECHSTENS} der Fensterhöhe
+ * nehmen; sonst rollen sie mit wie bisher. Die Seite reicht die Entscheidung als `kopfKlebt` an
+ * `EinsatzSeite`. Gerechnet wird mit der Kopfhöhe, nicht mit der Rahmenhöhe: in die geht der
+ * klebende Seitenkopf selbst ein, und die Entscheidung schaltete sich an der Grenze im Wechsel an
+ * und ab. Unter `md` klebt nichts (wie der Rahmen, LFH-952).
  */
 
-/** Höhe des klebenden Seitenkopfs (`EinsatzSeite kopfKlebt`). */
-export const ETB_SEITENKOPF_HOEHE = '--lfh-etb-seitenkopf-hoehe';
 /** Höhe der klebenden Filterleiste samt ihrem Abstand nach unten. */
 export const ETB_FILTERLEISTE_HOEHE = '--lfh-etb-filterleiste-hoehe';
 /** Höhe des Spaltenkopfs der Zeitachse, nur für den Fokusabstand. */
 export const ETB_SPALTENKOPF_HOEHE = '--lfh-etb-spaltenkopf-hoehe';
 /** Unterkante von Seitenkopf und Filterleiste, gesetzt am Seitencontainer des ETB. */
 export const ETB_KOPF_UNTERKANTE = '--etb-kopf-unterkante';
-export const ETB_KOPF_UNTERKANTE_WERT = `calc(var(--lfh-rahmen-oben, 0px) + var(${ETB_SEITENKOPF_HOEHE}, 0px) + var(${ETB_FILTERLEISTE_HOEHE}, 0px))`;
-/** `top` der klebenden Filterleiste: unter Rahmen und Seitenkopf. */
-export const ETB_FILTERLEISTE_OBEN = `calc(var(--lfh-rahmen-oben, 0px) + var(${ETB_SEITENKOPF_HOEHE}, 0px))`;
-
-/** Höchstens dieser Anteil der Fensterhöhe darf oben kleben (Rahmen eingerechnet). */
-export const KLEBEN_HOECHSTENS = 1 / 3;
+export const ETB_KOPF_UNTERKANTE_WERT = `calc(var(--lfh-rahmen-oben, 0px) + var(${ETB_FILTERLEISTE_HOEHE}, 0px))`;
+/** `top` der klebenden Filterleiste: unter Kopfleiste und Seitenkopf (beide in der Rahmenhöhe). */
+export const ETB_FILTERLEISTE_OBEN = 'var(--lfh-rahmen-oben, 0px)';
 
 interface Hoehen {
-  rahmen: number;
+  /** Die Kopfleiste (`useKopfOben`), ohne den Seitenkopf. */
+  kopf: number;
   seitenkopf: number;
   filterleiste: number;
   spaltenkopf: number;
@@ -48,11 +50,12 @@ interface Hoehen {
 
 /** Passen die klebenden Köpfe ins Fenster? Rein und exportiert. */
 export function kopfKlebtImFenster(h: Hoehen): boolean {
-  return h.rahmen + h.seitenkopf + h.filterleiste + h.spaltenkopf <= h.fenster * KLEBEN_HOECHSTENS;
+  return h.kopf + h.seitenkopf + h.filterleiste + h.spaltenkopf <= h.fenster * KLEBEN_HOECHSTENS;
 }
 
-// Die Summe der klebenden ETB-Köpfe unter dem Rahmen, für Messungen außerhalb der Seite
-// („Nach oben“, `etb/nachOben.ts`). 0, solange nichts klebt.
+// Die Summe der klebenden ETB-Köpfe unter dem Rahmen, ohne den Seitenkopf (den zählt die
+// Rahmenhöhe), für Messungen außerhalb der Seite („Nach oben“, `etb/nachOben.ts`). 0, solange
+// nichts klebt.
 let kopfSumme = 0;
 const hoerer = new Set<() => void>();
 function setzeKopfSumme(neu: number) {
@@ -61,7 +64,7 @@ function setzeKopfSumme(neu: number) {
   for (const h of hoerer) h();
 }
 
-/** Höhe der klebenden ETB-Köpfe unter dem Rahmen in px; 0, wenn sie nicht kleben. */
+/** Höhe von Filterleiste und Spaltenkopf unter dem Rahmen in px; 0, wenn sie nicht kleben. */
 export function useEtbKopfHoehe(): number {
   return useSyncExternalStore(
     (h) => {
@@ -81,7 +84,7 @@ const GEMESSEN_NULL = { seitenkopf: 0, filterleiste: 0, spaltenkopf: 0 };
  * neue. Gemessen im Layout-Effekt, danach ein Bild später je `ResizeObserver` und Fenstergröße.
  */
 export function useEtbKopfKleben(aktiv: boolean) {
-  const rahmen = useRahmenOben();
+  const kopf = useKopfOben();
   const [seitenkopf, setSeitenkopf] = useState<HTMLElement | null>(null);
   const [filterleiste, setFilterleiste] = useState<HTMLElement | null>(null);
   const [zeitachse, setZeitachse] = useState<HTMLElement | null>(null);
@@ -129,18 +132,16 @@ export function useEtbKopfKleben(aktiv: boolean) {
     };
   }, [aktiv, seitenkopf, filterleiste, zeitachse]);
 
-  const klebt = aktiv && kopfKlebtImFenster({ rahmen, fenster, ...gemessen });
+  const klebt = aktiv && kopfKlebtImFenster({ kopf, fenster, ...gemessen });
 
   useLayoutEffect(() => {
     if (!klebt) return undefined;
     const stil = document.documentElement.style;
-    stil.setProperty(ETB_SEITENKOPF_HOEHE, `${gemessen.seitenkopf}px`);
     stil.setProperty(ETB_FILTERLEISTE_HOEHE, `${gemessen.filterleiste}px`);
     stil.setProperty(ETB_SPALTENKOPF_HOEHE, `${gemessen.spaltenkopf}px`);
-    setzeKopfSumme(gemessen.seitenkopf + gemessen.filterleiste + gemessen.spaltenkopf);
+    setzeKopfSumme(gemessen.filterleiste + gemessen.spaltenkopf);
     return () => {
       // Das Wurzelelement überlebt die Route: ohne Aufräumen trüge jede folgende Seite den Abstand.
-      stil.removeProperty(ETB_SEITENKOPF_HOEHE);
       stil.removeProperty(ETB_FILTERLEISTE_HOEHE);
       stil.removeProperty(ETB_SPALTENKOPF_HOEHE);
       setzeKopfSumme(0);

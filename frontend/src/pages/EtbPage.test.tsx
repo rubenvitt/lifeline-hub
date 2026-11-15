@@ -2476,23 +2476,21 @@ describe('EtbPage: Filterleiste klebt unter dem Seitenkopf (kwc2yszv)', () => {
     await screen.findByText('Erste Meldung');
     const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
     await waitFor(() => expect(kopf.style.position).toBe('sticky'));
-    expect(kopf.style.top).toContain('--lfh-rahmen-oben');
+    // Der Seitenkopf hängt unter der Kopfleiste und zählt selbst zur Rahmenhöhe (zjt7c073 D2/D5).
+    expect(kopf.style.top).toBe('var(--lfh-kopf-oben, 0px)');
     const leiste = document.getElementById('etb-filterleiste')!;
     expect(leiste).toHaveAttribute('data-lfh', 'etb-kopf-klebt');
     expect(leiste.style.position).toBe('sticky');
-    expect(leiste.style.top).toBe(
-      'calc(var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px))',
-    );
+    expect(leiste.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
     // Vertrag mit dem Spaltenkopf der Zeitachse: er klebt an `--etb-kopf-unterkante`.
     const container = leiste.closest<HTMLElement>('[data-lfh="etb-seite"]')!;
     expect(container.style.getPropertyValue('--etb-kopf-unterkante')).toBe(
-      'calc(var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px) + var(--lfh-etb-filterleiste-hoehe, 0px))',
+      'calc(var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-filterleiste-hoehe, 0px))',
     );
     // Die Zeitachse liegt darunter im Container.
     expect(container.contains(screen.getByRole('region', { name: 'Einsatztagebuch' }))).toBe(true);
     // Die gemessenen Höhen stehen am Dokument (Fokusabstand, `index.css`).
     expect(wurzelStil().getPropertyValue('--lfh-etb-filterleiste-hoehe')).toMatch(/px$/);
-    expect(wurzelStil().getPropertyValue('--lfh-etb-seitenkopf-hoehe')).toMatch(/px$/);
     // Der Filter ist an der Arbeitsposition löschbar: die Suche steht in der klebenden Leiste.
     expect(leiste.contains(screen.getByPlaceholderText('Volltextsuche'))).toBe(true);
   });
