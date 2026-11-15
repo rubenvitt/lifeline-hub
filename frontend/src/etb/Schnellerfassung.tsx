@@ -386,6 +386,19 @@ export default function Schnellerfassung({
   const [zeitBefehlGrund, setZeitBefehlGrund] = useState<string | null>(null);
   /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
   const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
+  /**
+   * Grund, den das Feld Zeit für eine beim Verlassen verworfene, unlesbare Eingabe nennt (LLH-1866).
+   * Zusätzlich als Ref: das Verwerfen geschieht beim `mousedown` auf „Erfassen“, und `absenden`
+   * im `click` desselben Klicks soll es sicher sehen.
+   */
+  const [zeitVerworfen, setZeitVerworfenState] = useState<string | null>(null);
+  const zeitVerworfenRef = useRef<string | null>(null);
+  /** Ein Sendeversuch wurde wegen unlesbarer Zeit angehalten; die Fußzeile nennt den Grund. */
+  const [unlesbarAngehalten, setUnlesbarAngehalten] = useState(false);
+  function setzeZeitVerworfen(grund: string | null) {
+    zeitVerworfenRef.current = grund;
+    setZeitVerworfenState(grund);
+  }
   const { zone: anzeigeZone } = useZeitEingabe();
   const { konventionen } = useAnzeigeKonventionen();
   const [menuOffen, setMenuOffen] = useState(false);
@@ -744,6 +757,15 @@ export default function Schnellerfassung({
     const zuLang = laengenVerstoss(inhalt, wirksam);
     setLaengenHinweis(zuLang);
     if (zuLang) return;
+    // Unlesbare Zeit (LLH-1866, Spec „Unlesbare Zeit hält das Senden an“): eine im Feld Zeit
+    // verworfene Eingabe oder ein unlesbares `/zeit` im Text. Gesendet würde sonst „jetzt“, und der
+    // Eintrag ließe sich nur noch berichtigen. Grund am Feld und in der Fußzeile, Fokus ins Feld.
+    if (zeitVerworfenRef.current != null || zeitBefehlGrund != null) {
+      setUnlesbarAngehalten(true);
+      fokusFeld('ereigniszeit');
+      return;
+    }
+    setUnlesbarAngehalten(false);
     // Ereigniszeit in der Zukunft (LLH-1088, Spec „Keine Ereigniszeit in der Zukunft“): ebenso
     // VOR Upload und Warteschlange, nach der Serveruhr. Der Grund steht am Feld Zeit, der Fokus
     // geht dorthin; Text und Felder bleiben.
@@ -862,6 +884,8 @@ export default function Schnellerfassung({
   // Eine Zeit in der Zukunft zeigt ihren Grund schon vor dem Senden (Review E6); `zukunftsGrund`
   // bleibt der Stand des letzten Sendeversuchs.
   const zukunftJetzt = zukunftsGrund ?? zukunftsVerstoss(metadaten, jetzt);
+  // Der Halt zeigt den Grund, solange er besteht; ist er behoben, verschwindet auch die Meldung.
+  const unlesbarGrund = unlesbarAngehalten ? (zeitVerworfen ?? zeitBefehlGrund) : null;
   const nachtragMin = zukunftJetzt ? null : nachtragMinuten(metadaten.ereigniszeit, jetzt);
   // Heute nur die Uhrzeit, sonst mit Tag, in der Darstellung der Person (`anzeige/zeitDarstellung.ts`).
   const zeitAmKnopf =
@@ -958,7 +982,18 @@ export default function Schnellerfassung({
           <span>Zeit {zukunftJetzt}</span>
         </span>
       )}
-      {zeitBefehlGrund && !zukunftJetzt && (
+      {unlesbarGrund && !zukunftJetzt && (
+        <span
+          id={zeitGrundId}
+          role="alert"
+          data-lfh="etb-zeit-grund"
+          style={grundStil(rollen.alarmText)}
+        >
+          <IconWarndreieck />
+          <span>Zeit nicht übernommen: {unlesbarGrund}</span>
+        </span>
+      )}
+      {zeitBefehlGrund && !zukunftJetzt && !unlesbarGrund && (
         // Höflich, nicht `alert`: der Grund erscheint beim Tippen, nicht beim Absenden, und
         // unterbräche sonst die Eingabe am Vorleser.
         <span
@@ -1176,8 +1211,9 @@ export default function Schnellerfassung({
             onFertig={fokusInsFeld}
             pflicht={pflichtSichtbar}
             pflichtId={(seite) => `${pflichtGrundId}-${seite}`}
-            zeitGrund={zukunftJetzt ?? zeitBefehlGrund}
+            zeitGrund={zukunftJetzt ?? unlesbarGrund ?? zeitBefehlGrund}
             zeitGrundId={zeitGrundId}
+            onZeitVerworfen={setzeZeitVerworfen}
             nachtrag={nachtragMin != null}
             veranlassungOffen={veranlassungOffen}
             onVeranlassungSchliessen={() => setVeranlassungOffen(false)}

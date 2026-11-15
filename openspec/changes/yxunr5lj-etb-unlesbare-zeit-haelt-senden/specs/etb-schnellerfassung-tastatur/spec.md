@@ -17,7 +17,12 @@ gehen; Text, Felder und Anhänge bleiben. Andere Formulare behalten die Spec `ze
 - **THEN** entsteht kein Eintrag, und das Feld Zeit nennt „Uhrzeit gibt es nicht“
 
 #### Scenario: Geleertes Feld gibt das Senden frei
-- **WHEN** nach einem solchen Halt das Feld Zeit geleert und „Erfassen“ gewählt wird
+- **WHEN** das Feld Zeit 1420 zeigte, nach einem solchen Halt geleert und „Erfassen“ gewählt wird
+- **THEN** entsteht der Eintrag mit der Zeit des Erfassens
+
+#### Scenario: Enter oder Escape im Feld bestätigt „jetzt“
+- **WHEN** das Feld Zeit leer war, „14:3x“ getippt, „Erfassen“ gewählt und angehalten wurde, und
+  danach im Feld Zeit Enter oder Escape gedrückt und „Erfassen“ gewählt wird
 - **THEN** entsteht der Eintrag mit der Zeit des Erfassens
 
 #### Scenario: Lesbare Zeit gibt das Senden frei

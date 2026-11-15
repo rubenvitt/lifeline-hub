@@ -133,6 +133,12 @@ export interface ZeitpunktEingabeProps {
   onChange?: (zeitpunkt: Dayjs | null) => void;
   /** Ausdrücklich übernommen: Enter, Schnellwahl oder „Übernehmen“ im Kalender (nicht Verlassen). */
   onOk?: (zeitpunkt: Dayjs | null) => void;
+  /**
+   * Grund einer beim Verlassen verworfenen, unlesbaren Eingabe; `null`, sobald er weicht (Tippen,
+   * Wahl, Escape). Für Formulare, die dann nicht senden wollen (ETB, LLH-1866); ohne ihn gilt die
+   * Spec `zeiteingabe` unverändert: gesendet wird der geltende Wert.
+   */
+  onVerworfen?: (grund: string | null) => void;
   /** Ereignis (Vergangenheit) oder Frist (Zukunft): wohin eine Uhrzeit ohne Tag fällt. */
   art?: ZeitArt;
   /** Tage nach „heute“ (Kalender der Anzeigezone) sind nicht wählbar; ohne `art` = Ereignis. */
@@ -185,6 +191,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     defaultValue,
     onChange,
     onOk,
+    onVerworfen,
     art,
     keineZukunftstage,
     schnellwahl,
@@ -221,7 +228,16 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   /** Getippter Text; `null` = es wird nicht getippt, das Feld zeigt den Wert. */
   const [text, setText] = useState<string | null>(null);
   /** Grund einer verworfenen Eingabe, bis erneut getippt wird. */
-  const [verworfen, setVerworfen] = useState<string | null>(null);
+  const [verworfen, setVerworfenIntern] = useState<string | null>(null);
+  // Gemeldet wird im Ereignis selbst, nicht in einem Effekt: das Verwerfen geschieht beim Verlassen
+  // (`mousedown` auf einen Knopf), und dessen `click` muss den Grund schon kennen (LLH-1866).
+  const verworfenGemeldet = useRef<string | null>(null);
+  function setVerworfen(grund: string | null) {
+    setVerworfenIntern(grund);
+    if (verworfenGemeldet.current === grund) return;
+    verworfenGemeldet.current = grund;
+    onVerworfen?.(grund);
+  }
   const [offenIntern, setOffenIntern] = useState(false);
   const offen = open ?? offenIntern;
   const hinweisId = useId();
@@ -279,7 +295,10 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   /** Den getippten Text übernehmen; `false`, wenn er nicht lesbar ist. */
   function uebernimmText(): Dayjs | null | false {
     if (!deutung) {
+      // Der gezeigte Wert wird ausdrücklich bestätigt: ein Grund einer früher verworfenen Eingabe
+      // gilt nicht mehr (LLH-1866, D1a).
       setText(null);
+      setVerworfen(null);
       return wert ?? null;
     }
     if (!deutung.ok || leerVerboten) return false;
@@ -397,6 +416,11 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
             // weiter, wie es Escape dort immer tut.
             e.preventDefault();
             setText(null);
+            setVerworfen(null);
+          } else if (e.key === 'Escape' && verworfen !== null) {
+            // Ohne Tippen nimmt Escape den Grund der verworfenen Eingabe zurück (LLH-1866, D1a); der
+            // Tastendruck gehört dann dem Feld, wie oben.
+            e.preventDefault();
             setVerworfen(null);
           }
           onKeyDown?.(e);

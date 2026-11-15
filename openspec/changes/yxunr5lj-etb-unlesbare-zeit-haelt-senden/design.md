@@ -46,6 +46,18 @@ Schnellwahl, Escape während des Tippens). Die ETB-Erfassung führt ihn als Zust
   steht nach dem Verwerfen sichtbar am Feld; eine Regel, die ihn beim nächsten Klick ignoriert,
   sendet trotz sichtbarem Fehler. Der Halt gilt deshalb, solange das Feld den Grund nennt.
 
+### D1a · Enter und Escape im Feld nehmen den Grund zurück (Nachtrag beim Umsetzen, Ruben 15.11.2026)
+
+War das Feld leer („jetzt“), steht es nach dem Verwerfen wieder leer da; „Feld leeren“ geht dann
+nicht. Deshalb nimmt `ZeitpunktEingabe` den Grund auch zurück, wenn im Feld Enter auf den gezeigten
+Wert gedrückt wird (ausdrückliche Übernahme, wie `onOk` sie schon kennt) oder Escape, ohne dass
+getippt wird (die verworfene Eingabe ist ohnehin zurückgenommen). Escape wird dabei verbraucht
+(`preventDefault`), schließt also keinen Dialog. Gilt für jedes Zeitfeld; ohne Grund ändert sich
+nichts.
+
+- *Verworfen:* nur Kalender oder neues Tippen. Die Kalenderwahl „jetzt“ setzt eine feste Uhrzeit,
+  und ein Eintrag hieße dann „Nachtrag“, obwohl „jetzt“ gemeint war.
+
 ### D2 · Unlesbares `/zeit` hält ebenfalls an
 
 `absenden()` hält auch an, solange `zeitBefehlGrund` gesetzt ist. Heute geht ein solcher Eintrag mit
@@ -82,7 +94,7 @@ dabei auf `null`, damit kein Grund aus dem anderen Entwurf hängen bleibt.
 - [Reihenfolge `blur` → `click` ist Browserverhalten] → Test in jsdom mit `fireEvent.blur` und
   `click` hintereinander, dazu ein e2e-Schritt im echten Browser (Klick auf „Erfassen“ direkt aus
   dem Feld Zeit).
-- [Wer einen Grund sieht und trotzdem „jetzt“ will, muss das Feld leeren] → Das Kapitel nennt den
-  Ausweg; der Platzhalter „jetzt · 1926“ zeigt, was ein leeres Feld bedeutet.
+- [Wer einen Grund sieht und trotzdem „jetzt“ will, muss das Feld leeren oder dort Enter bzw. Escape
+  drücken] → Das Kapitel nennt den Ausweg (D1a).
 - [Neuer Prop an einem gemeinsamen Bauteil] → optional, ohne Wirkung ohne Aufrufer; ein Test sichert,
   dass ein Formular ohne `onVerworfen` wie bisher den unveränderten Wert sendet.

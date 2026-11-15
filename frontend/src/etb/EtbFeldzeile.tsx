@@ -260,9 +260,11 @@ export interface EtbFeldzeileProps {
   /** Fehlende Pflichtseiten nach einem Sendeversuch, mit der Kennung ihres Grunds. */
   pflicht: ('von' | 'an')[];
   pflichtId: (feld: 'von' | 'an') => string;
-  /** Grund am Feld Zeit (Zukunft, unlesbares `/zeit`) und seine Kennung. */
+  /** Grund am Feld Zeit (Zukunft, unlesbares `/zeit`, angehaltenes Senden) und seine Kennung. */
   zeitGrund: string | null;
   zeitGrundId: string;
+  /** Das Feld Zeit hat eine unlesbare Eingabe verworfen (Grund) oder nicht mehr (`null`), LLH-1866. */
+  onZeitVerworfen?: (grund: string | null) => void;
   /** Die Ereigniszeit weicht ab (Nachtrag): Feld in der Achtungsrolle. */
   nachtrag: boolean;
   veranlassungOffen: boolean;
@@ -292,6 +294,7 @@ export default function EtbFeldzeile({
   pflichtId,
   zeitGrund,
   zeitGrundId,
+  onZeitVerworfen,
   nachtrag,
   veranlassungOffen,
   onVeranlassungSchliessen,
@@ -326,6 +329,7 @@ export default function EtbFeldzeile({
         value={metadaten.ereigniszeit ?? null}
         onChange={(v: Dayjs | null) => onFeld('ereigniszeit', v ?? undefined)}
         onOk={() => onFertig()}
+        onVerworfen={onZeitVerworfen}
       />
     </Beschriftet>
   );

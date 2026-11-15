@@ -112,10 +112,15 @@ der Zeitachse erscheinen wird.
    Zeitfeld (etwa „1420“, „14:20“, „101420“, „-10“ für zehn Minuten vor jetzt). Weicht die Zeit ab,
    wird das Feld gelb, die Fußzeile nennt „Nachtrag · Ereignis vor 14 min“ und der Knopf heißt
    „Erfassen als 1912“. Ein geleertes Feld gilt wieder „jetzt“. Liegt die Zeit an einem anderen Tag,
-   zeigt das Feld den Tag mit, etwa „162350okt26“.
+   zeigt das Feld den Tag mit, etwa „162350okt26“. Eine unlesbare Zeit, etwa „14:3x“, übernimmt das
+   Feld nicht: es zeigt wieder den alten Wert und nennt den Grund, und die Erfassung sendet nicht,
+   bis die Zeit stimmt. Dann steht in der Fußzeile „Zeit nicht übernommen“, und das Feld hat den
+   Cursor. Eine lesbare Zeit eintippen oder, für „jetzt“, das Feld leeren bzw. darin Enter oder
+   Escape drücken.
 3. Schneller geht ein Nachtrag mit „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ trägt 1420 in
    „Zeit“ ein, der Rest der Zeile bleibt der Inhalt. Eine unlesbare Angabe bleibt als Text stehen,
-   und die Fußzeile nennt den Grund. Eine Zeit in der Zukunft nimmt die Erfassung nicht an: die
+   die Fußzeile nennt den Grund, und die Erfassung sendet nicht, bis die Angabe lesbar oder der
+   Befehl aus dem Text gelöscht ist. Eine Zeit in der Zukunft nimmt die Erfassung nicht an: die
    Fußzeile nennt „Zeit liegt in der Zukunft“, das Feld hat den Cursor, Text und Felder bleiben.
 4. „Weg“ ist der Meldeweg: Funk, Telefon, Persönlich oder Sonstige. „+ Veranlassung“ rechts in der
    Fußzeile holt das Feld „Veranlassung“ in die Zeile. Ein Schrägstrich mitten im Text öffnet die
@@ -352,7 +357,9 @@ Menü: Text bleibt markierbar, die Aktionen stehen im Menü „⋮“.
 
 Am Bildschirm mit Spalten nennt das Menü auch die Vermerke der Zeile. Ein Foto bietet dort
 „Vorschau: …“ für die Großansicht und, wer Originale laden darf, „Original (mit Standort): …
-herunterladen“, auch wenn die Spalte Vermerk kein Vorschaubild zeigt. Ist der Anhang auf einer
+herunterladen“, auch wenn die Spalte Vermerk kein Vorschaubild zeigt. Das gilt auch für ein
+HEIC-Foto vom iPhone: das Gerät wandelt es für die Großansicht um, bis dahin dreht sich ein
+Ladezeichen. Ist der Anhang auf einer
 gespiegelten Instanz noch nicht da, meldet das Herunterladen „wird geholt“.
 
 ### Abgeschlossener Einsatz

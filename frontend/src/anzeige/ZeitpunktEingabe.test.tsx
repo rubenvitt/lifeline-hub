@@ -295,6 +295,68 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
     expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-10-16 12:30:00');
   });
 
+  it('meldet eine beim Verlassen verworfene Eingabe über onVerworfen, bis erneut getippt wird (LLH-1866)', async () => {
+    const onVerworfen = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <>
+          <ZeitpunktEingabe aria-label="Zeit" onVerworfen={onVerworfen} />
+          <button type="button">daneben</button>
+        </>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), '14:3x');
+    expect(onVerworfen).not.toHaveBeenCalledWith(expect.any(String));
+    await user.click(screen.getByRole('button', { name: 'daneben' }));
+    expect(onVerworfen).toHaveBeenLastCalledWith('nicht lesbar');
+    // Erneutes Tippen nimmt den Grund zurück.
+    await user.type(zeitFeld('Zeit'), '1');
+    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+  });
+
+  it.each([
+    ['Enter auf den gezeigten Wert', '{Enter}', false],
+    ['Escape ohne Tippen', '{Escape}', true],
+  ])('%s nimmt den gemeldeten Grund zurück (LLH-1866)', async (_name, taste, verbraucht) => {
+    const onVerworfen = vi.fn();
+    const onKeyDown = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <>
+          <ZeitpunktEingabe aria-label="Zeit" onVerworfen={onVerworfen} onKeyDown={onKeyDown} />
+          <button type="button">daneben</button>
+        </>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), '14:3x');
+    await user.click(screen.getByRole('button', { name: 'daneben' }));
+    expect(onVerworfen).toHaveBeenLastCalledWith('nicht lesbar');
+    await user.click(zeitFeld('Zeit'));
+    onKeyDown.mockClear();
+    await user.keyboard(taste);
+    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument();
+    expect(zeitFeld('Zeit')).toHaveValue('');
+    // Escape gehört dann dem Feld: ein Dialog drumherum bleibt offen.
+    expect(onKeyDown.mock.lastCall![0].defaultPrevented).toBe(verbraucht);
+  });
+
+  it('eine Wahl im Kalender nimmt den gemeldeten Grund zurück (LLH-1866)', async () => {
+    const onVerworfen = vi.fn();
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onVerworfen={onVerworfen} />));
+    await user.type(zeitFeld('Zeit'), '2460');
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    expect(onVerworfen).toHaveBeenLastCalledWith('Uhrzeit gibt es nicht');
+    const k = await kalender();
+    await user.click(within(k).getByRole('button', { name: 'Übernehmen' }));
+    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+  });
+
   it('Leeren meldet keinen Zeitpunkt; mit allowClear={false} ist es unlesbar', async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();

@@ -1,5 +1,5 @@
 import { createRef } from 'react';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setzeViewportBreite, setzeViewportHoehe, setzeZeigerGrob } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
@@ -1975,5 +1975,161 @@ describe('Review der Erfassung — Zukunft vor dem Senden (kwc2yszv E6)', () => 
     );
     expect(screen.getByText('Zeit liegt in der Zukunft')).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Zeit' })).toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+/**
+ * LLH-1866 (Change `yxunr5lj-etb-unlesbare-zeit-haelt-senden`, Spec `etb-schnellerfassung-tastatur`,
+ * „Unlesbare Zeit hält das Senden an“): Meldet das Feld Zeit eine verworfene, unlesbare Eingabe
+ * oder steht ein unlesbares `/zeit` im Text, sendet die Erfassung nicht.
+ */
+describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
+  mitProzessZone('Europe/Berlin');
+  // 14:31 Berlin.
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  const zeitFeld = () => screen.getByRole('textbox', { name: 'Zeit' });
+  const inhaltFeld = () => screen.getByPlaceholderText(/Inhalt/);
+  const erfassenKnopf = () => screen.getByRole('button', { name: /^Erfassen/ });
+
+  /** Inhalt „Pumpe läuft“, im Feld Zeit „14:3x“, dann direkt „Erfassen“: angehalten. */
+  async function unlesbarDirektErfasst(p: ReturnType<typeof props>) {
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), 'Pumpe läuft');
+    await userEvent.type(zeitFeld(), '14:3x');
+    await userEvent.click(erfassenKnopf());
+  }
+
+  it('„14:3x“ und direkt „Erfassen“: kein Eintrag, Grund am Feld, Fokus dort, Text bleibt', async () => {
+    const p = props();
+    await unlesbarDirektErfasst(p);
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(inhaltFeld()).toHaveValue('Pumpe läuft');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Zeit nicht übernommen: nicht lesbar',
+    );
+    await waitFor(() => expect(zeitFeld()).toHaveFocus());
+    expect(zeitFeld()).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('Enter im Inhalt nach einer verworfenen Zeit sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(zeitFeld(), '2460');
+    await userEvent.click(inhaltFeld());
+    await userEvent.type(inhaltFeld(), 'Pumpe läuft{Enter}');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(inhaltFeld()).toHaveValue('Pumpe läuft');
+    expect(screen.getAllByText(/Uhrzeit gibt es nicht/).length).toBeGreaterThan(0);
+  });
+
+  it('ein geleertes Feld gibt das Senden frei, mit der Zeit des Erfassens', async () => {
+    const p = props({
+      initialWerte: {
+        ...MIT_ABSENDER,
+        metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-17T12:20:00Z') },
+      },
+    });
+    await unlesbarDirektErfasst(p);
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feldWert('Zeit')).toBe('1420');
+    await userEvent.clear(zeitFeld());
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    // „jetzt“: die Zeit des Erfassens nach der Serveruhr, 14:31 Berlin.
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0].ereigniszeit).toBe(
+      '2026-10-17 12:31:00',
+    );
+  });
+
+  it.each(['{Enter}', '{Escape}'])(
+    'war das Feld leer, bestätigt %s im Feld „jetzt“ (D1a)',
+    async (taste) => {
+      const p = props();
+      await unlesbarDirektErfasst(p);
+      await waitFor(() => expect(zeitFeld()).toHaveFocus());
+      await userEvent.keyboard(taste);
+      expect(screen.queryByText(/Zeit nicht übernommen/)).toBeNull();
+      await userEvent.click(erfassenKnopf());
+      await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+      expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0].ereigniszeit).toBe(
+        '2026-10-17 12:31:00',
+      );
+    },
+  );
+
+  it('eine lesbare Zeit gibt das Senden frei', async () => {
+    const p = props();
+    await unlesbarDirektErfasst(p);
+    await userEvent.type(zeitFeld(), '1430');
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      inhalt: 'Pumpe läuft',
+      ereigniszeit: '2026-10-17 12:30:00',
+    });
+  });
+
+  it('eine Wahl im Kalender gibt das Senden frei', async () => {
+    const p = props();
+    await unlesbarDirektErfasst(p);
+    await userEvent.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await screen.findByRole('dialog', { name: /Tag/ });
+    await userEvent.click(within(k).getByRole('button', { name: 'Übernehmen' }));
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('ein unlesbares „/zeit“ hält an; berichtigt oder gelöscht geht es', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
+    await userEvent.click(erfassenKnopf());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(inhaltFeld()).toHaveValue('/zeit 2590 Pumpe');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^Zeit nicht übernommen: /);
+    await waitFor(() => expect(zeitFeld()).toHaveFocus());
+
+    await userEvent.clear(inhaltFeld());
+    await userEvent.type(inhaltFeld(), '/zeit 1430 Pumpe');
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      inhalt: 'Pumpe',
+      ereigniszeit: '2026-10-17 12:30:00',
+    });
+  });
+
+  it('ohne den Befehl im Text geht es mit der Zeit des Erfassens', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
+    await userEvent.clear(inhaltFeld());
+    await userEvent.type(inhaltFeld(), 'Pumpe');
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+  });
+
+  it('ein anderer Entwurf übernimmt keinen Grund', async () => {
+    const p = props();
+    const { rerender } = renderMitProviders(<Schnellerfassung key="a" {...p} />);
+    await userEvent.type(inhaltFeld(), 'Pumpe läuft');
+    await userEvent.type(zeitFeld(), '14:3x');
+    await userEvent.click(erfassenKnopf());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    // Der Entwurfsreiter hängt die Erfassung je Entwurf neu ein (`EtbEntwurfsTabs`, `key`).
+    rerender(<Schnellerfassung key="b" {...p} />);
+    await userEvent.type(inhaltFeld(), 'Lage ruhig');
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 });
