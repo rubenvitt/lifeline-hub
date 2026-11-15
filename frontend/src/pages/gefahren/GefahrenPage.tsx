@@ -18,7 +18,7 @@ import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad } from '../../routing/deeplinks';
 import { useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
-import { warnstufeFlaeche, warnstufeKarte } from '../../theme/statusFarben';
+import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';

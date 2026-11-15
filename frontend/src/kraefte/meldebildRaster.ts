@@ -665,7 +665,7 @@ export function istRueckmeldungProblem(r: RueckmeldungAnzeige | null | undefined
  * Meldebild und Überblick (Abschnittskarte, LLH-1739) dasselbe Wort aus {@link grundWort} lesen
  * und die Dauer mit der Seitenuhr wächst.
  */
-export type TonungsGrund =
+export type ToenungsGrund =
   | { art: 'ausfall'; anzahl: number }
   | { art: 'ausfall_material'; anzahl: number }
   /** `einheiten`: nur in der Abschnittskarte des Überblicks, wenn mehrere Einheiten betroffen sind;
@@ -678,14 +678,15 @@ export type TonungsGrund =
  * Material“, „Rückm. überfällig seit 47 min“, „keine Rückm.“. Jeder Grund steht als Etikett in
  * der Alarmrolle (Spec `kraeftebaum`, „Grund einer Problemzeile als Alarm-Etikett“).
  */
-export function grundWort(g: TonungsGrund): string {
+export function grundWort(g: ToenungsGrund): string {
   switch (g.art) {
     case 'ausfall':
       return `${g.anzahl} Ausfall`;
     case 'ausfall_material':
       return `${g.anzahl} Ausfall Material`;
     case 'rueckmeldung_ueberfaellig': {
-      const seit = g.seitMin == null ? null : dauerText(g.seitMin);
+      // In der ersten Minute „< 1 min“ wie bei Fristen („in < 1 min“), nie „0 min“.
+      const seit = g.seitMin == null ? null : g.seitMin < 1 ? '< 1 min' : dauerText(g.seitMin);
       if ((g.einheiten ?? 1) > 1) {
         const kopf = `${g.einheiten} Einh. Rückm. überfällig`;
         return seit ? `${kopf}, längste seit ${seit}` : kopf;
@@ -707,8 +708,8 @@ export function grundWort(g: TonungsGrund): string {
 export function toenungsGruende(
   z: RasterZeile,
   r: RueckmeldungAnzeige | null | undefined,
-): TonungsGrund[] {
-  const gruende: TonungsGrund[] = [];
+): ToenungsGrund[] {
+  const gruende: ToenungsGrund[] = [];
   const ausfall = z.verteilung?.ausfall ?? 0;
   if (ausfall > 0 && z.einheitStatus?.kategorie !== 'nicht_verfuegbar') {
     gruende.push({ art: 'ausfall', anzahl: ausfall });

@@ -52,8 +52,9 @@ import {
 import {
   baueMeldebildRaster,
   einheitZeilen,
+  OHNE_EINHEIT_SCHLUESSEL,
   toenungsGruende,
-  type TonungsGrund,
+  type ToenungsGrund,
 } from '../../kraefte/meldebildRaster';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import {
@@ -61,7 +62,7 @@ import {
   lagebesprechungUeberfaellig,
 } from '../../lagebesprechung/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
-import { ERINNERUNG_FAELLIG } from '../../erinnerung/erinnerungZustand';
+import { ERINNERUNG_FAELLIG, erinnerungZustand } from '../../erinnerung/erinnerungZustand';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
@@ -361,8 +362,11 @@ function zaehleImTeilbaum(zeile: MeldebildZeile): {
   einheiten: number;
   abschnittIds: number[];
   einheitIds: number[];
+  /** Hängt die Sammelzeile „Ohne Einheit“ (Mittel ohne Einheit) in diesem Teilbaum? */
+  ohneEinheit: boolean;
 } {
   let einheiten = 0;
+  let ohneEinheit = zeile.art === 'einheit' && zeile.key.startsWith(OHNE_EINHEIT_KEY_PREFIX);
   const abschnittIds: number[] = [];
   const einheitIds: number[] = [];
   const id = abschnittIdAusKey(zeile.key);
@@ -375,8 +379,9 @@ function zaehleImTeilbaum(zeile: MeldebildZeile): {
     einheiten += k.einheiten;
     abschnittIds.push(...k.abschnittIds);
     einheitIds.push(...k.einheitIds);
+    ohneEinheit ||= k.ohneEinheit;
   }
-  return { einheiten, abschnittIds, einheitIds };
+  return { einheiten, abschnittIds, einheitIds, ohneEinheit };
 }
 
 /** Einheiten nach der Kategorie ihres Status — „gemischt" zählt mit, wenn die Kategorie gemeinsam ist. */
@@ -422,7 +427,11 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const zeilen: AbschnittZeile[] = baum.map((knoten) => {
     const id = abschnittIdAusKey(knoten.key);
     const abschnitt = id != null ? abschnittNachId.get(id) : undefined;
-    const { einheiten, abschnittIds, einheitIds } = zaehleImTeilbaum(knoten);
+    const { einheiten, abschnittIds, einheitIds, ohneEinheit } = zaehleImTeilbaum(knoten);
+    // Mittel ohne Einheit zählen wie im Meldebild mit (dort die Zeile „Ohne Einheit“).
+    const ausfallIds: (number | typeof OHNE_EINHEIT)[] = ohneEinheit
+      ? [...einheitIds, OHNE_EINHEIT]
+      : einheitIds;
     const teilbaum = new Set(abschnittIds);
     const anTeilbaum =
       teilbaum.size === 0
@@ -468,8 +477,14 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
           ? letzteImTeilbaum(r.rueckmeldungen, teilbaum, new Set(einheitIds))
           : null,
       einheitenRueckmeldung: rueckJe ? einheitIds.map((eid) => rueckJe.get(eid) ?? null) : null,
-      ausfallMittel: einheitIds.reduce((n, eid) => n + (ausfallJe.get(eid)?.mittel ?? 0), 0),
-      ausfallMaterial: einheitIds.reduce((n, eid) => n + (ausfallJe.get(eid)?.material ?? 0), 0),
+      ausfallMittel: ausfallIds.reduce<number>(
+        (n, eid) => n + (ausfallJe.get(eid)?.mittel ?? 0),
+        0,
+      ),
+      ausfallMaterial: ausfallIds.reduce<number>(
+        (n, eid) => n + (ausfallJe.get(eid)?.material ?? 0),
+        0,
+      ),
     };
   });
 
@@ -482,23 +497,30 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   });
 }
 
+/** Schlüssel der Meldebild-Zeile „Ohne Einheit“ in {@link ausfallJeEinheit}. */
+const OHNE_EINHEIT = 'ohne-einheit';
+
 /**
  * Ausfall je Einheit aus dem Meldebild selbst (LLH-1739): dieselben Gründe der Tönung, die dort in
- * der Statusspalte stehen. Jede Einheit zählt nur ihre eigenen Mittel (Spec `kraeftebaum`), die
- * Summe über einen Teilbaum zählt also keine Kraft doppelt.
+ * der Statusspalte stehen, auch die der Sammelzeile „Ohne Einheit“ (unter {@link OHNE_EINHEIT}).
+ * Jede Einheit zählt nur ihre eigenen Mittel (Spec `kraeftebaum`), die Summe über einen Teilbaum
+ * zählt also keine Kraft doppelt.
  */
-function ausfallJeEinheit(r: AbschnittRohdaten): Map<number, { mittel: number; material: number }> {
+function ausfallJeEinheit(
+  r: AbschnittRohdaten,
+): Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }> {
   const raster = baueMeldebildRaster({ ...r, statusKatalog: [], auftraege: [] });
-  const je = new Map<number, { mittel: number; material: number }>();
+  const je = new Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }>();
   for (const z of einheitZeilen(raster)) {
-    if (z.einheitId == null) continue;
+    const schluessel = z.einheitId ?? (z.key === OHNE_EINHEIT_SCHLUESSEL ? OHNE_EINHEIT : null);
+    if (schluessel == null) continue;
     let mittel = 0;
     let material = 0;
     for (const g of toenungsGruende(z, null)) {
       if (g.art === 'ausfall') mittel += g.anzahl;
       if (g.art === 'ausfall_material') material += g.anzahl;
     }
-    je.set(z.einheitId, { mittel, material });
+    je.set(schluessel, { mittel, material });
   }
   return je;
 }
@@ -509,8 +531,8 @@ function ausfallJeEinheit(r: AbschnittRohdaten): Map<number, { mittel: number; m
  * Dauer) und Einheiten ohne jede Rückmeldung. Gerechnet zur Seitenuhr `jetzt`, nicht im Memo der
  * Zeilen; ohne feststehende Rückmeldungen kein Rückmeldungsgrund. Wortlaut: `grundWort`.
  */
-export function abschnittGruende(zeile: AbschnittZeile, jetzt: Dayjs): TonungsGrund[] {
-  const gruende: TonungsGrund[] = [];
+export function abschnittGruende(zeile: AbschnittZeile, jetzt: Dayjs): ToenungsGrund[] {
+  const gruende: ToenungsGrund[] = [];
   if (zeile.ausfallMittel > 0) gruende.push({ art: 'ausfall', anzahl: zeile.ausfallMittel });
   if (zeile.ausfallMaterial > 0) {
     gruende.push({ art: 'ausfall_material', anzahl: zeile.ausfallMaterial });
@@ -605,13 +627,15 @@ export function markenBewertung(
   zeit: Dayjs,
   jetzt: Dayjs,
   art?: MarkenArt,
+  /** Nur Erinnerung: fällig nach `erinnerungZustand` (Server oder Uhr). */
+  erinnerungFaellig = false,
 ): { ton: MarkenTon; wort: string } {
   if (art === 'lagebesprechung') {
     const ueberfaellig = lagebesprechungUeberfaellig(zeit, jetzt);
     if (ueberfaellig) return { ton: ueberfaellig.rolle, wort: ueberfaellig.label };
   }
   const abstand = zeit.valueOf() - jetzt.valueOf();
-  if (abstand <= 0 && art === 'erinnerung') {
+  if (art === 'erinnerung' && (erinnerungFaellig || abstand <= 0)) {
     return { ton: ERINNERUNG_FAELLIG.ton, wort: ERINNERUNG_FAELLIG.wort };
   }
   if (abstand <= 0) return { ton: 'alarm', wort: 'überfällig' };
@@ -658,7 +682,16 @@ export function naechsteMarken(
   }[] = [],
   programm: readonly Programmpunkt[] = [],
 ): MarkenAuswahl {
-  const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
+  const roh: {
+    key: string;
+    art: MarkenArt;
+    id: number | null;
+    zeit: string;
+    text: string;
+    /** Nur Erinnerung: der Server meldet sie fällig (`ist_faellig`), auch wenn die Uhr des Geräts
+     *  nachgeht — dieselbe Regel wie der Abschnitt „Erinnerungen“ (`erinnerungZustand`). */
+    faellig?: boolean;
+  }[] = [];
   for (const a of auftraege) {
     if (istOffen(a) && zeitpunkt(a.frist_at)) {
       roh.push({
@@ -685,6 +718,7 @@ export function naechsteMarken(
         id: e.id,
         zeit: e.faellig_at,
         text: e.titel,
+        faellig: erinnerungZustand(e, jetzt.valueOf()).wort === ERINNERUNG_FAELLIG.wort,
       });
     }
   }
@@ -736,9 +770,9 @@ export function naechsteMarken(
   const sortiert = roh.sort(
     (a, b) => (ms(a.zeit) ?? 0) - (ms(b.zeit) ?? 0) || a.key.localeCompare(b.key),
   );
-  const marken = sortiert.slice(0, MARKEN_MAX).map((m) => ({
+  const marken = sortiert.slice(0, MARKEN_MAX).map(({ faellig, ...m }) => ({
     ...m,
-    ...markenBewertung(zeitpunkt(m.zeit)!, jetzt, m.art),
+    ...markenBewertung(zeitpunkt(m.zeit)!, jetzt, m.art, faellig),
   }));
   return { marken, weitere: Math.max(0, sortiert.length - MARKEN_MAX) };
 }

@@ -312,6 +312,11 @@ describe('Nächste Marken', () => {
       wort: 'fällig',
     });
     expect(markenBewertung(JETZT, JETZT, 'erinnerung')).toEqual({ ton: 'achtung', wort: 'fällig' });
+    // Meldet der Server sie fällig, gilt das auch, wenn die Uhr des Geräts nachgeht (Review).
+    expect(markenBewertung(JETZT.add(1, 'minute'), JETZT, 'erinnerung', true)).toEqual({
+      ton: 'achtung',
+      wort: 'fällig',
+    });
     // Ein Auftrag mit verpasster Frist bleibt „überfällig“ in Alarm.
     expect(markenBewertung(JETZT.subtract(5, 'minute'), JETZT, 'auftrag')).toEqual({
       ton: 'alarm',
@@ -356,6 +361,26 @@ describe('Nächste Marken', () => {
     ]);
     const knapp = naechsteMarken([], [], nach(20), JETZT).marken[0];
     expect([knapp.ton, knapp.wort]).toEqual(['achtung', 'in 20 min']);
+  });
+
+  it('eine Erinnerung, die der Server fällig meldet, heißt auch in der Marke „fällig“ (Review)', () => {
+    const r = naechsteMarken(
+      [],
+      [
+        {
+          id: 7,
+          faellig_at: nach(1),
+          ist_faellig: true,
+          status: 'offen',
+          titel: 'Rückruf Leitstelle',
+        } as unknown as Erinnerung,
+      ],
+      null,
+      JETZT,
+    );
+    expect(r.marken.map((m) => [m.text, m.ton, m.wort])).toEqual([
+      ['Rückruf Leitstelle', 'achtung', 'fällig'],
+    ]);
   });
 
   it('mischt Auftragsfristen, offene Erinnerungen und Lagebesprechung, aufsteigend', () => {
@@ -807,6 +832,19 @@ describe('abschnittGruende — Rückmeldung und Ausfall wie das Meldebild (LLH-1
       { art: 'ausfall', anzahl: 1 },
       { art: 'ausfall_material', anzahl: 1 },
     ]);
+  });
+
+  it('Mittel ohne Einheit: die Karte „Ohne Abschnitt“ nennt ihren Ausfall wie das Meldebild (Review)', () => {
+    const ohne = abschnittZeilen({
+      abschnitte,
+      einheiten,
+      personal: [...personalListe, personal(8, null, 'mannschaft', 'nicht_verfuegbar')],
+      fahrzeuge: [],
+      material: [],
+      auftraege: [],
+    }).find((z) => z.abschnittId == null)!;
+    expect(ohne).toBeDefined();
+    expect(abschnittGruende(ohne, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
   });
 
   it('ohne geladene Rückmeldungen kein Rückmeldungsgrund — nie ein erfundenes „keine“', () => {

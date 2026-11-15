@@ -70,7 +70,7 @@ import {
   rueckmeldungDerZeile,
   toenungsGruende,
   grundWort,
-  type TonungsGrund,
+  type ToenungsGrund,
   type RasterZeile,
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
@@ -468,7 +468,7 @@ function StatusSpalte({
 }: {
   zeile: RasterZeile;
   handStatus: StatusKontext['handStatus'];
-  gruende: readonly TonungsGrund[];
+  gruende: readonly ToenungsGrund[];
   /**
    * Grund eines abgelehnten Handstatus (LFH-1077). Steht unabhängig vom Auslöser: nach einer
    * Ablehnung nimmt der Refetch ihn oft weg, weil die Einheit inzwischen ein Fahrzeug führt.

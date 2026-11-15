@@ -920,6 +920,15 @@ describe('Rückmeldung je Rasterzeile', () => {
     expect(gruende('eh-3').map(grundWort)).toEqual(['keine Rückm.']);
   });
 
+  it('in der ersten Minute „seit < 1 min“, nie „seit 0 min“ (Review)', () => {
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 0 })).toBe(
+      'Rückm. überfällig seit < 1 min',
+    );
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 0, einheiten: 2 })).toBe(
+      '2 Einh. Rückm. überfällig, längste seit < 1 min',
+    );
+  });
+
   it('fasst mehrere Einheiten eines Abschnitts zusammen (LLH-1739)', () => {
     expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 47, einheiten: 1 })).toBe(
       'Rückm. überfällig seit 47 min',
