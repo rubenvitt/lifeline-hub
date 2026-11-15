@@ -74,7 +74,7 @@ Scope und Entwurf beantworten der Workflow und OpenSpec, aber **nie beide diesel
 
 1. **Parent-Task + Subtasks laden** (`get_task` des Zunder-Connectors; liefert den Baum der
    Unteraufgaben und den Fortschritt immer mit). Pro (Sub)Task ziehen: `id` und `<kurz>` (erste
-   8 Hex-Zeichen), Titel/Beschreibung, **aktueller Status**, `branch`/`pr_url`/`plan`,
+   8 Zeichen der ID), Titel/Beschreibung, **aktueller Status**, `branch`/`pr_url`/`plan`,
    Abhängigkeiten.
 2. **Statuskontext bilden:** Wo steht jeder (Sub)Task auf der Spur? (Spur und Regeln:
    `dev-zunder-ausfuehren`, „Board-Status mitführen“.) Das bestimmt, wo der Lauf einsteigt —
@@ -132,7 +132,7 @@ Plan-Workflow „je Subtask“ gibt es nicht mehr, denn die `tasks.md` der Chang
 **Schnittstelle Scope-Map → Proposal:**
 
 - **Name:** `<kurz>-<slug>`, z. B. `a1b2c3d4-status-filter-einheiten` (`<kurz>` = erste 8
-  Hex-Zeichen der UUID).
+  Zeichen der ID).
 - **Eingabe:** Der Map-Eintrag geht als Argument an `/opsx:propose`: Zusammenfassung, Files,
   Entwurfsgründe und die am Phase-1-Checkpoint beantworteten Fragen. `/opsx:propose` nimmt ihn
   als Ausgangspunkt und liest die Stellen trotzdem selbst.
@@ -228,7 +228,7 @@ nur, was der Orchestrator anders macht.
   Parent erst auf `done`, wenn alle Subtasks es sind (`progress` aus `get_task`). Danach
   `release_task` für jede reservierte Aufgabe.
 - Commit-Body und PR-Beschreibung tragen je (Sub)Task die Zeile
-  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>`.
+  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<id>`.
 - **Bilder der Änderung** je Subtask in PR und Meldung (Regel und Technik:
   `dev-zunder-ausfuehren`, „Bilder der Änderung“).
 - **Eine** Abschlussmeldung an den Menschen für den ganzen Task — Inhalt/Form und der

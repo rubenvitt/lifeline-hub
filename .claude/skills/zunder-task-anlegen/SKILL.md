@@ -28,8 +28,9 @@ Sobald etwas auftaucht, das nicht jetzt erledigt wird, aber nicht verloren gehen
 
 `create_task` des Zunder-Connectors mit:
 
-- `location`: `{"kind":"project","id":"aafceb07-f9e9-5e8b-8ffe-a38afadd7067"}` (fix — nicht
-  nach der Stelle fragen; ohne `location` landet die Aufgabe in der Inbox)
+- `location`: `{"kind":"project","id":"<ID des Dev-Projekts>"}`, die ID steht in `AGENTS.md`,
+  Abschnitt „Zunder“ (fix — nicht nach der Stelle fragen; ohne `location` landet die Aufgabe in
+  der Inbox)
 - `title`: kurzer, konkreter Titel auf Deutsch; BOS-/Fachsprache statt generischer Dev-Begriffe
 - `description`: strukturiert (siehe unten), Markdown
 - `type`: `bug` für Defekte, `feature` für Funktionales, sonst `aufgabe`

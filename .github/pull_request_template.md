@@ -8,11 +8,11 @@ Das Schlüsselwort muss englisch bleiben, „Schließt“ erkennt GitHub nicht. 
 -->
 
 <!--
-Vollständiger Link auf die Aufgabe, mit UUID. Eine Integration liest die Zeile nicht: sie ist
+Vollständiger Link auf die Aufgabe, mit ihrer ID. Eine Integration liest die Zeile nicht: sie ist
 für Menschen. Die Gegenrichtung trägt die Aufgabe selbst (`pr_url`, gesetzt von
 `dev-zunder-ausfuehren`), ebenso den Status — `review` bei offenem PR, `done` nach dem Merge.
 
-Branch `<typ>/<kurz>-<slug>` mit den ersten 8 Hex-Zeichen der UUID; Commit-Bodys tragen dieselbe
+Branch `<typ>/<kurz>-<slug>` mit den ersten 8 Zeichen der ID; Commit-Bodys tragen dieselbe
 `Zunder:`-Zeile. Ältere PRs nennen `#LFH-<n>` aus der ClickUp-Zeit, die bleiben gültig.
 Konvention: `AGENTS.md`, Abschnitt „Zunder“.
 -->
