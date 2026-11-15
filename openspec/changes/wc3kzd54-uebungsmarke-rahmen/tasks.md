@@ -85,7 +85,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
   Exklusivität des Farbtons; Regel, Doku, Kommentare und design.md nachziehen.
 - [x] 9.3 Test, dass das Gerätband (`klebend={false}`) keine Rahmenhöhe meldet und das klebende sie
   meldet (gestubbte `offsetHeight`); Mutationsprobe am Hook-Argument rot.
-- [ ] 9.4 Druck: benannte Seiten `lageplan`, `dokument-anlage`, `fernmeldeskizze-a3/-a4` erhalten
+- [x] 9.4 Druck: benannte Seiten `lageplan`, `dokument-anlage`, `fernmeldeskizze-a3/-a4` erhalten
   bei einer Übung eine Variante mit Randfeld „ÜBUNG“; der Titel jedes Anlageblatts einer Übung trägt
   „ÜBUNG“; CSS-Tests und `etb-druck`/Anlagen-Test grün.
 - [ ] 9.5 Gerätehülle und Lagemonitor laden den Einsatzkopf ohne Daten alle 30 s nach und zeigen nach

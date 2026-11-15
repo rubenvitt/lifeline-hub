@@ -41,6 +41,25 @@
     page: uebung;
   }
 
+  /* Blätter mit eigener benannter Seite (Format) bekommen in einer Übung deren Variante mit
+     demselben Randfeld; die Varianten stehen bei ihren Blättern (Wächter
+     `druck/uebungSeiten.guard.test.ts`). */
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .dokument-anlage-blatt {
+    page: dokument-anlage-uebung;
+  }
+
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .lageplan-blatt {
+    page: lageplan-uebung;
+  }
+
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .lfh-skizze-druck-a3 {
+    page: fernmeldeskizze-a3-uebung;
+  }
+
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .lfh-skizze-druck-a4 {
+    page: fernmeldeskizze-a4-uebung;
+  }
+
   @page uebung {
     @top-center {
       content: 'ÜBUNG';

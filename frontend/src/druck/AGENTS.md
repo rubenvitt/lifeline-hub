@@ -30,8 +30,10 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 - **Übung im Druck** (LLH-1725, Regel: `frontend/AGENTS.md`, Rahmen, „Übung“): der Druckkopf zeigt
   „ÜBUNG“, sobald sein `einsatz` (`DruckEinsatz`) die Einsatzart `uebung` trägt. Wer ihn aufruft,
   reicht `einsatzart` mit durch. `druck.css` setzt eine solche Wurzel auf die benannte Seite
-  `uebung` mit Randfeld je Blatt (Chromium); eine Wurzel mit eigener benannter Seite (Lageplan,
-  Anlagen) behält ihre, dort trägt der Kopf allein die Übung.
+  `uebung` mit Randfeld je Blatt (Chromium). Ein Blatt mit eigener benannter Seite `X` braucht eine
+  Variante `X-uebung` mit demselben Format und Randfeld bei seinem Blatt; die Wahl steht in
+  `druck.css` (Wächter `druck/uebungSeiten.guard.test.ts`). Ein Blatt ohne Druckkopf trägt
+  `DruckUebung` im Titel (Bild-Anlage).
 - **Ohne Organisation druckt nur die Hilfe** (LFH-1096): `DruckKnopf ohneOrganisation` wartet
   nicht auf Kopf und Logo und fragt `/api/organisation` gar nicht (die Hilfe ist ohne Anmeldung
   offen). Jedes Druckstück einer Organisation oder eines Einsatzes bleibt beim Druckkopf. Die

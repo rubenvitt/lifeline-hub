@@ -16,7 +16,9 @@ sichtbar sein.
 Gehört das Druckstück zu einer Übung (Einsatzart „Übung“), SHALL der Druckkopf das Wort „ÜBUNG“
 deutlich neben der Einsatzbezeichnung tragen, auch im Schwarz-Weiß-Druck ohne Hintergrundfarben
 lesbar. Wo der Browser Randfelder der Druckseite unterstützt, SHALL zusätzlich jede Seite am oberen
-Rand „ÜBUNG“ tragen. Ein Druckstück eines Realeinsatzes SHALL nirgends „ÜBUNG“ tragen.
+Rand „ÜBUNG“ tragen, auch ein Blatt in eigenem Format (Bild-Anlage, Lageplan, Fernmeldeskizze). Ein
+Blatt ohne eigenen Druckkopf (Bild-Anlage) SHALL „ÜBUNG“ in seinem Titel tragen. Ein Druckstück
+eines Realeinsatzes SHALL nirgends „ÜBUNG“ tragen.
 
 #### Scenario: Meldebild mit Auswahl
 
@@ -60,6 +62,12 @@ Rand „ÜBUNG“ tragen. Ein Druckstück eines Realeinsatzes SHALL nirgends „
 
 - **WHEN** der Schichtplan, der Lageplan der Lagekarte oder eine Planung einer Übung gedruckt wird
 - **THEN** trägt der Druckkopf „ÜBUNG“
+
+#### Scenario: Bild-Anlage an einem Lagebericht einer Übung
+
+- **WHEN** ein Lagebericht einer Übung mit einer Bild-Anlage gedruckt wird
+- **THEN** trägt der Titel des Anlageblatts „ÜBUNG“
+- **AND** in Chromium trägt auch das Anlageblatt (A4 quer) am oberen Rand „ÜBUNG“
 
 #### Scenario: Realeinsatz
 

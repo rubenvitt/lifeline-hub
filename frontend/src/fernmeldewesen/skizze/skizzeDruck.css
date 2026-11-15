@@ -15,6 +15,27 @@
     size: A4 landscape;
   }
 
+  /* Übung (LLH-1725): dieselben Seiten mit Randfeld „ÜBUNG“; gewählt werden sie in `druck/druck.css`. */
+  @page fernmeldeskizze-a3-uebung {
+    size: A3 landscape;
+    @top-center {
+      content: 'ÜBUNG';
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+  }
+
+  @page fernmeldeskizze-a4-uebung {
+    size: A4 landscape;
+    @top-center {
+      content: 'ÜBUNG';
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+  }
+
   /* Die Skizze steht direkt unter dem Druckkopf, die Lücken folgen ihr: über der Skizze ließen Kopf
      (45 mm) und Lücken (89 mm) auf A3 quer 122 mm, auf A4 quer 35 mm, und die Skizze rutschte ganz
      auf die zweite Seite (LFH-893 4.3, e2e `fernmeldeskizze-druck.spec.ts`). */

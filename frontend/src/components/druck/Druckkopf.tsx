@@ -26,6 +26,30 @@ export interface DruckEinsatz {
   einsatzart?: Einsatzart | null;
 }
 
+/**
+ * „ÜBUNG“ auf Papier (LLH-1725): ein umrandeter Block, Rahmen und Wort tragen ihn, kein Hintergrund
+ * (den druckt der Browser ohne `print-color-adjust` nicht). Im Druckkopf und im Titel eines Blatts
+ * ohne Druckkopf (Bild-Anlage).
+ */
+export function DruckUebung({ 'data-lfh': lfh = 'druck-uebung' }: { 'data-lfh'?: string }) {
+  const { token } = theme.useToken();
+  return (
+    <span
+      data-lfh={lfh}
+      style={{
+        display: 'inline-block',
+        marginInlineStart: token.marginXS,
+        paddingInline: token.paddingXS,
+        border: '2px solid currentColor',
+        fontWeight: 700,
+        letterSpacing: '0.14em',
+      }}
+    >
+      ÜBUNG
+    </span>
+  );
+}
+
 interface DruckkopfProps {
   /** Art des Dokuments: „Befehl", „Lagebericht", „Meldebild", „Einsatztagebuch". */
   dokumentart: string;
@@ -108,20 +132,7 @@ export default function Druckkopf({
       // `print-color-adjust` nicht, und das Papier ist hell.
       wert: uebung ? (
         <>
-          {name}{' '}
-          <span
-            data-lfh="druckkopf-uebung"
-            style={{
-              display: 'inline-block',
-              marginInlineStart: token.marginXS,
-              paddingInline: token.paddingXS,
-              border: '2px solid currentColor',
-              fontWeight: 700,
-              letterSpacing: '0.14em',
-            }}
-          >
-            ÜBUNG
-          </span>
+          {name} <DruckUebung data-lfh="druckkopf-uebung" />
         </>
       ) : (
         name

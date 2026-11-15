@@ -156,9 +156,14 @@ Text ≥ 28 px“. Kein Ton, keine Animation (`geraet/AGENTS.md`).
   `print-color-adjust: exact`, und das Papier ist hell (Spec „Papier ist hell“).
 - Jede Seite: Der Druckkopf trägt bei einer Übung `data-uebung`, und `druck.css` ordnet der Wurzel
   darüber (`[data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung])`) die benannte Seite
-  `page: uebung` zu. So muss keine der 15 Wurzeln selbst etwas setzen. Eine Wurzel, deren Blatt
-  eine eigene benannte Seite trägt (Lageplan A4 quer, Anlagen), behält diese für ihren Inhalt, ohne
-  Leerseite (im Chromium-PDF geprüft). Dort trägt nur der Druckkopf die Übung. `@page uebung` erbt Rand und Zählung und setzt
+  `page: uebung` zu. So muss keine der 15 Wurzeln selbst etwas setzen. Ein Blatt mit eigener
+  benannter Seite (Bild-Anlage und Lageplan A4 quer, Fernmeldeskizze A3/A4 quer) überschreibt das
+  für seine Seiten. Deshalb hat jede solche Seite `X` eine Variante `X-uebung` mit demselben Format
+  und Randfeld, und `druck.css` wählt sie unter einer Wurzel mit Übungskopf (Wächter
+  `druck/uebungSeiten.guard.test.ts`; im Chromium-PDF geprüft: Querformat und Randfeld, keine
+  Leerseite). Ein Anlageblatt hat keinen Druckkopf; es trägt „ÜBUNG“ im Titel (`DruckUebung`), damit
+  es auch in Firefox und Safari und vom Bericht getrennt eindeutig bleibt. Beides kam aus dem Review
+  vor dem PR; der erste Stand ließ diese Blätter ohne Randfeld. `@page uebung` erbt Rand und Zählung und setzt
   `@top-center { content: 'ÜBUNG' }`. Das ist eine feste Zeichenkette, also keine Escape-Fläche wie
   beim freien Text, den der Kommentar dort ausschließt. Chromium zeichnet das Randfeld. Firefox und
   WebKit zeichnen keine Randfelder, dort steht „ÜBUNG“ im Druckkopf der ersten Seite. Das ist

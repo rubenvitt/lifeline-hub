@@ -120,9 +120,10 @@ dazu „Gedruckt von“ und „Gedruckt am“. Die Fußzeile „Seite … von �
 Chromium-Browser (Chrome, Edge).
 
 Gehört das Druckstück zu einer Übung, steht neben dem Einsatz ein umrandetes „ÜBUNG“, auch
-schwarz-weiß lesbar. Chrome und Edge drucken „ÜBUNG“ zusätzlich oben auf jede Seite, Firefox
-und Safari nur im Druckkopf der ersten Seite. Schichtplan, Lageplan und eine geplante Übung
-tragen die Marke ebenso.
+schwarz-weiß lesbar. Chrome und Edge drucken „ÜBUNG“ zusätzlich oben auf jede Seite, auch auf
+Blätter im Querformat. Firefox und Safari zeigen es im Druckkopf der ersten Seite. Ein Anlageblatt
+(Bild an Lagebericht oder Befehl) trägt „ÜBUNG“ in seinem Titel, in jedem Browser. Schichtplan,
+Lageplan und eine geplante Übung tragen die Marke ebenso.
 
 Gedruckt wird erst, wenn die Organisation geladen ist. Gelingt das nicht, steht am Knopf
 „Organisation nicht geladen“ mit „Erneut laden“. Ein Logo, das nicht lädt, fällt im Druck weg.
