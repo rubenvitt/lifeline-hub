@@ -53,17 +53,18 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 6. Druck
 
-- [ ] 6.1 `components/druck/Druckkopf.tsx`: Prop um `einsatzart?` weiten, „ÜBUNG“-Block neben der
+- [x] 6.1 `components/druck/Druckkopf.tsx`: Prop um `einsatzart?` weiten, „ÜBUNG“-Block neben der
   Bezeichnung (D8); Test im Druckkopf-Test: Block bei Übung, keiner bei Realeinsatz.
-- [ ] 6.2 Druckwurzel trägt bei Übung `data-uebung`; `druck/druck.css` mit `page: uebung` und
-  `@page uebung { @top-center }` (D8); Prettier und Stylelint grün, Wächter der Druckmechanik grün.
-- [ ] 6.3 Schichtplan (`abloesung/schichtplan/ausgabe/SchichtplanBlaetter.tsx`), Lageplan
+- [x] 6.2 Der Druckkopf trägt bei Übung `data-uebung`, `druck/druck.css` setzt die Wurzel über
+  `:has()` auf `page: uebung` mit `@page uebung { @top-center }` (D8); Prettier grün,
+  `druck/druck.test.ts` grün.
+- [x] 6.3 Schichtplan (`abloesung/schichtplan/ausgabe/SchichtplanBlaetter.tsx`), Lageplan
   (`pages/lagekarte/useLageplan.ts`), Planung (`planung/PlanungDruckPage.tsx`) und Einsatzbericht
   (`einsatzStand`) reichen die Art durch; `tsc` grün, je ein Test, dass der Kopf einer Übung
   „ÜBUNG“ trägt.
 - [ ] 6.4 e2e: `frontend/e2e/etb-druck.spec.ts` um eine Übung erweitern (Druckkopf trägt „ÜBUNG“,
   in Chromium das Randfeld laut erzeugtem PDF-Text); lokal in Chromium grün.
-- [ ] 6.5 Satz mit Verweis in `frontend/src/druck/AGENTS.md` (D10).
+- [x] 6.5 Satz mit Verweis in `frontend/src/druck/AGENTS.md` (D10).
 
 ## 7. Regel und Anwenderdoku
 

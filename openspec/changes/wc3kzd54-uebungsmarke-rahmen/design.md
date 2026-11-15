@@ -150,8 +150,11 @@ Text ≥ 28 px“. Kein Ton, keine Animation (`geraet/AGENTS.md`).
   Bei `istUebung` steht neben der Einsatzbezeichnung „ÜBUNG“ als umrandeter Block: 2 pt Rahmen,
   fett, Versalien. Gefüllte Hintergründe druckt der Browser nicht ohne
   `print-color-adjust: exact`, und das Papier ist hell (Spec „Papier ist hell“).
-- Jede Seite: Die Druckwurzel trägt bei einer Übung `data-uebung`. `druck.css` ordnet einer solchen
-  Wurzel die benannte Seite `page: uebung` zu. `@page uebung` erbt Rand und Zählung und setzt
+- Jede Seite: Der Druckkopf trägt bei einer Übung `data-uebung`, und `druck.css` ordnet der Wurzel
+  darüber (`[data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung])`) die benannte Seite
+  `page: uebung` zu. So muss keine der 15 Wurzeln selbst etwas setzen. Eine Wurzel, deren Blatt
+  eine eigene benannte Seite trägt (Lageplan A4 quer, Anlagen), behält diese für ihren Inhalt, ohne
+  Leerseite (im Chromium-PDF geprüft). Dort trägt nur der Druckkopf die Übung. `@page uebung` erbt Rand und Zählung und setzt
   `@top-center { content: 'ÜBUNG' }`. Das ist eine feste Zeichenkette, also keine Escape-Fläche wie
   beim freien Text, den der Kommentar dort ausschließt. Chromium zeichnet das Randfeld. Firefox und
   WebKit zeichnen keine Randfelder, dort steht „ÜBUNG“ im Druckkopf der ersten Seite. Das ist

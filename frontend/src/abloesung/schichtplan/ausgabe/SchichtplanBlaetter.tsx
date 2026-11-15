@@ -3,7 +3,7 @@ import { useMemo, type ReactNode } from 'react';
 import dayjs from 'dayjs';
 import { useAnzeigeKonventionen } from '../../../anzeige/AnzeigeKonventionenContext';
 import { datum, inZone, uhrzeit, zeitpunkt } from '../../../anzeige/zeitDarstellung';
-import Druckkopf from '../../../components/druck/Druckkopf';
+import Druckkopf, { type DruckEinsatz } from '../../../components/druck/Druckkopf';
 import DruckTabelle, { type DruckSpalte } from '../../../druck/DruckTabelle';
 import { formatDauer } from '../../dauer';
 import {
@@ -28,7 +28,7 @@ interface Props {
   /** Schlüssel eines Postens bzw. einer Person; `null` = alle Blätter. */
   auswahl: string | null;
   /** Für den Druckkopf: der Einsatz oder die Planung. */
-  einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
+  einsatz: DruckEinsatz;
   /** Etikett im Druckkopf; Vorgabe „Einsatz“, bei einer Vorplanung „Planung“. */
   bezug?: string;
   /** Bezeichnungen der Qualifikationen im Katalog der Organisation. */

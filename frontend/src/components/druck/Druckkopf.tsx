@@ -7,6 +7,8 @@ import { globalKeys } from '../../api/queryKeys';
 import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
+import type { Einsatzart } from '../../api/types';
+import { istUebung } from '../../einsatz/einsatzart';
 
 /** Eine Angabe unter dem Titel: „Stand", „Auswahl" o. Ä. — vom Aufrufer geliefert. */
 interface DruckkopfZeile {
@@ -14,12 +16,22 @@ interface DruckkopfZeile {
   wert: ReactNode;
 }
 
+/**
+ * Der Einsatz (oder die Planung) im Druckkopf. `einsatzart` trägt die Übungsmarke (LLH-1725); wer
+ * sie nicht kennt, lässt sie weg, dann steht keine Marke.
+ */
+export interface DruckEinsatz {
+  bezeichnung: string;
+  einsatznummer_intern?: string | null;
+  einsatzart?: Einsatzart | null;
+}
+
 interface DruckkopfProps {
   /** Art des Dokuments: „Befehl", „Lagebericht", „Meldebild", „Einsatztagebuch". */
   dokumentart: string;
   /** Titel des Dokuments, falls es einen eigenen hat (Befehl, Lagebericht). */
   titel?: string;
-  einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
+  einsatz: DruckEinsatz;
   /** Etikett der Zeile zu `einsatz`; „Planung“ für eine Vorplanung ohne Einsatz (LLH-1593). */
   bezug?: string;
   /** Stand bzw. gedruckte Auswahl — die Seite weiß, was ihren Stand ausmacht. */
@@ -86,10 +98,34 @@ export default function Druckkopf({
   }, []);
 
   const nummer = einsatz.einsatznummer_intern?.trim();
+  const uebung = istUebung(einsatz);
+  const name = nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung;
   const angaben: DruckkopfZeile[] = [
     {
       etikett: bezug,
-      wert: nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung,
+      // Übung (LLH-1725, Spec `druck-dokumente`, D8): ein umrandeter Block neben dem Namen. Rahmen
+      // und Wort tragen ihn, kein Hintergrund: den druckt der Browser ohne
+      // `print-color-adjust` nicht, und das Papier ist hell.
+      wert: uebung ? (
+        <>
+          {name}{' '}
+          <span
+            data-lfh="druckkopf-uebung"
+            style={{
+              display: 'inline-block',
+              marginInlineStart: token.marginXS,
+              paddingInline: token.paddingXS,
+              border: '2px solid currentColor',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+            }}
+          >
+            ÜBUNG
+          </span>
+        </>
+      ) : (
+        name
+      ),
     },
     ...zeilen,
     // Die DRUCKENDE Person, nicht die Urheberin: „Erstellt von" läse sich als Urheberschaft. Zwei
@@ -101,6 +137,8 @@ export default function Druckkopf({
   return (
     <header
       data-lfh="druckkopf"
+      // Markiert die Wurzel für die benannte Seite „uebung“ mit Randfeld je Blatt (`druck/druck.css`).
+      data-uebung={uebung ? '' : undefined}
       className={sichtbarkeit === 'druck' ? 'druckkopf druckkopf--nur-druck' : 'druckkopf'}
       // Am Schirm ist der Kopf bei `druck` per CSS weg; `aria-hidden` sagt dasselbe dem
       // Zugänglichkeitsbaum, auch wo kein CSS geladen ist (jsdom). Auf Papier gibt es keinen

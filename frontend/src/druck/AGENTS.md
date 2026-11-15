@@ -27,6 +27,11 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Live-Strom zurück, LFH-1105), schließt es den Strom in derselben Aufgabe und öffnet ihn danach
   neu (`pausiereLiveStroeme`, Vollabgleich). `components/druck/useDruckModus.ts`
   schaltet, was CSS nicht kann (`beforeprint`/`afterprint`).
+- **Übung im Druck** (LLH-1725, Regel: `frontend/AGENTS.md`, Rahmen, „Übung“): der Druckkopf zeigt
+  „ÜBUNG“, sobald sein `einsatz` (`DruckEinsatz`) die Einsatzart `uebung` trägt. Wer ihn aufruft,
+  reicht `einsatzart` mit durch. `druck.css` setzt eine solche Wurzel auf die benannte Seite
+  `uebung` mit Randfeld je Blatt (Chromium); eine Wurzel mit eigener benannter Seite (Lageplan,
+  Anlagen) behält ihre, dort trägt der Kopf allein die Übung.
 - **Ohne Organisation druckt nur die Hilfe** (LFH-1096): `DruckKnopf ohneOrganisation` wartet
   nicht auf Kopf und Logo und fragt `/api/organisation` gar nicht (die Hilfe ist ohne Anmeldung
   offen). Jedes Druckstück einer Organisation oder eines Einsatzes bleibt beim Druckkopf. Die

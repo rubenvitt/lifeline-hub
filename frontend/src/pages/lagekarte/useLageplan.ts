@@ -7,10 +7,11 @@ import { lageplanLegende, type LageplanLegende, type LegendenQuellen } from './l
 import { setzeKartenbild, setzeLageplanAnlage } from './lageplanBild';
 import type { BeginneKartenHandlung } from './useKartenFehler';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
+import type { DruckEinsatz } from '../../components/druck/Druckkopf';
 
 /** Was der Kopf des Lageplans nennt; die Seite weiß es, der Hook liest es erst bei der Aufnahme. */
 export interface LageplanKopf {
-  einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
+  einsatz: DruckEinsatz;
   /** Name der aktiven Kartenansicht; `null` ohne gespeicherte Ansicht. */
   ansicht: string | null;
   /** Kartengrundlage, wie sie die Segmentleiste nennt. */
