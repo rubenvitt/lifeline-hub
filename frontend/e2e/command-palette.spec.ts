@@ -500,12 +500,16 @@ for (const viewport of [
         await zumModul(page, id, 'etb');
         await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
 
-        // Am Handy steht „Suchen“ im Einsatz in der Navigation (LLH-1728, D3).
-        await page.locator('header').getByRole('button', { name: 'Navigation öffnen' }).tap();
-        await page
-          .locator('.ant-drawer-open')
-          .getByRole('button', { name: 'Suchen', exact: true })
-          .tap();
+        // Am Handy steht „Suchen“ im Einsatz in der Navigation (LLH-1728, D3), ab `md` im Kopf.
+        if (viewport.width < 768) {
+          await page.locator('header').getByRole('button', { name: 'Navigation öffnen' }).tap();
+          await page
+            .locator('.ant-drawer-open')
+            .getByRole('button', { name: 'Suchen', exact: true })
+            .tap();
+        } else {
+          await page.getByRole('button', { name: 'Suchen', exact: true }).tap();
+        }
         await expect(paletteInput(page)).toBeVisible();
         const modal = page.locator('.ant-modal');
         const zu = page.getByRole('button', { name: 'Sprungpalette schließen' });
