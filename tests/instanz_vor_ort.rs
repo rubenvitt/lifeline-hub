@@ -421,6 +421,33 @@ async fn vor_ort_macht_die_org_nicht_verteilend_und_kennt_kein_elw_verloren() {
     assert!(is_org_verteilend(&hub.pool, 1).await.unwrap());
 }
 
+async fn archiv_einspielen_verfuegbar(i: &Instanz) -> bool {
+    let (s, v) = common::anfrage(
+        &i.app,
+        "GET",
+        "/api/admin/archiv/einspielen",
+        &i.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v["verfuegbar"].as_bool().unwrap()
+}
+
+/// LLH-1888 (Spec `aufbewahrung-archiv`, „Direktkopplung vor Ort“): Wer einem zweiten ELW den
+/// Code ausgestellt hat, ist kein Hub und spielt weiter Archive ein; die einlösende Seite ebenso.
+#[tokio::test]
+async fn eine_direktkopplung_vor_ort_sperrt_das_archiv_einspielen_nicht() {
+    let (elw1, elw2) = vor_ort().await;
+    assert_eq!(kopplungen(&elw1).await[0]["richtung"], "wird_gemeldet");
+    assert!(archiv_einspielen_verfuegbar(&elw1).await, "ausstellende Seite");
+    assert!(archiv_einspielen_verfuegbar(&elw2).await, "einlösende Seite");
+    // Gegenprobe: am Hub einer Standardkopplung bleibt es gesperrt.
+    let (hub, elw) = gekoppelt().await;
+    assert!(!archiv_einspielen_verfuegbar(&hub).await);
+    assert!(archiv_einspielen_verfuegbar(&elw).await);
+}
+
 async fn abschliessen_und_nachbereitung_vorbei(i: &Instanz, einsatz: i64) {
     let (s, v) = common::anfrage(
         &i.app,

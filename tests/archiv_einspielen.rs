@@ -541,6 +541,36 @@ async fn nur_admins_und_nicht_am_hub() {
     }
 }
 
+/// LLH-1888 (Spec `aufbewahrung-archiv`, „Direktkopplung vor Ort“ und „Hub mit zusätzlicher
+/// Direktkopplung“): eine Direktkopplung vor Ort sperrt nicht, eine Standardkopplung daneben schon.
+#[tokio::test]
+async fn eine_direktkopplung_vor_ort_sperrt_nicht_ein_hub_daneben_schon() {
+    let u = umgebung().await;
+    let schluessel = u.schluessel_text();
+    let felder: [Feld<'_>; 2] = [
+        ("schluessel", None, schluessel.as_bytes()),
+        ("block", Some("b"), &u.block),
+    ];
+    kopplung(&u.pool, "elw-2", "wird_gemeldet", "angebahnt").await;
+    kopplung(&u.pool, "elw-3", "wird_gemeldet", "aktiv").await;
+    sqlx::query("UPDATE instanz_kopplung SET art = 'vor_ort'")
+        .execute(&u.pool)
+        .await
+        .unwrap();
+    let (_, v) = anfrage(&u.app, "GET", PFAD, &u.admin, None).await;
+    assert_eq!(v["verfuegbar"], true, "{v}");
+    let (s, v) = hochladen(&u.app, &u.admin, &felder).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(eingespielt(&u.pool).await, 1);
+
+    kopplung(&u.pool, "elw-4", "wird_gemeldet", "aktiv").await;
+    let (_, v) = anfrage(&u.app, "GET", PFAD, &u.admin, None).await;
+    assert_eq!(v["verfuegbar"], false, "{v}");
+    let (s, v) = hochladen(&u.app, &u.admin, &felder).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(eingespielt(&u.pool).await, 1);
+}
+
 /// Alle Textspalten aller Tabellen und alle Dateien im Datenverzeichnis enthalten `geheim` nicht.
 async fn nirgends(pool: &SqlitePool, dir: &Path, geheim: &str) {
     let tabellen: Vec<String> = sqlx::query_scalar(
