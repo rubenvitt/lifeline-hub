@@ -270,10 +270,13 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
  * („Modulpanel …“), ohne `SEITENKOPF_KLEBT` rot („Seitenkopf …“, Tabellenkopf oben).
  */
 
-/** Rollt ans Seitenende und prüft die Vorbedingung: die Seite ist WIRKLICH gerollt. */
-async function ansEnde(page: Page) {
+/**
+ * Rollt ans Seitenende und prüft die Vorbedingung: die Seite ist WIRKLICH gerollt, mindestens um
+ * `mindestens` px (Vorgabe 200).
+ */
+async function ansEnde(page: Page, mindestens = 200) {
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(mindestens);
 }
 
 async function unterkanteKopf(page: Page): Promise<number> {
@@ -322,7 +325,7 @@ test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1
   // Die Kategorie mit den meisten Einträgen (Kräfte, neun Module).
   await page
     .getByRole('navigation', { name: 'Kategorien' })
-    .getByRole('button', { name: 'Kräfte', exact: true })
+    .getByRole('button', { name: 'Kräfte & Mittel', exact: true })
     .click();
   await expect(page).not.toHaveURL(/\/etb$/);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -330,7 +333,7 @@ test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1
   const liste = page.locator('[data-lfh="modul-panel-liste"]');
   const ueberhang = await liste.evaluate((el) => el.scrollHeight - el.clientHeight);
   expect(ueberhang, 'Vorbedingung: die Einträge passen nicht ins Fenster').toBeGreaterThan(0);
-  const kopfZeile = page.locator('[data-lfh="modul-panel-spalte"]').getByText('Kräfte', {
+  const kopfZeile = page.locator('[data-lfh="modul-panel-spalte"]').getByText('Kräfte & Mittel', {
     exact: true,
   });
   const fuss = page.locator('[data-lfh="modul-panel-fuss"]');
@@ -351,6 +354,14 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, `Rahmen Seitenkopf ${ziel} ${Date.now()}`);
     if (ziel === 'etb') await etbFuellen(page, einsatzId);
+    if (ziel === 'personal') {
+      for (let i = 0; i < 30; i += 1) {
+        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+          data: { adhoc: { name: `Seitenkopf Kraft ${i}`, funktion: 'Helfer' } },
+        });
+        expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);
+      }
+    }
     if (ziel === 'verwaltung') {
       const lauf = Date.now();
       for (let i = 0; i < 20; i += 1) {
@@ -374,7 +385,13 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
     );
     const seitenkopf = page.locator('[data-lfh="seitenkopf"]');
     await expect(seitenkopf.getByRole('heading', { level: 1 })).toBeVisible();
-    await ansEnde(page);
+    // Vorbedingung: so weit gerollt, dass ein mitrollender Seitenkopf ganz hinter der Kopfleiste
+    // läge. Gemessen vor dem Rollen, in Dokumentkoordinaten.
+    const seitenkopfUnten = await seitenkopf.evaluate(
+      (el) => el.getBoundingClientRect().bottom + window.scrollY,
+    );
+    const kopfHoehe = await unterkanteKopf(page);
+    await ansEnde(page, seitenkopfUnten - kopfHoehe);
 
     await expect(seitenkopf).toHaveCSS('position', 'sticky');
     expect(Math.round((await seitenkopf.boundingBox())!.y), 'Seitenkopf unter der Kopfleiste').toBe(
