@@ -50,7 +50,7 @@ der ohne die Änderung rot ist.
 
 ## 4. Bestehende Prüfungen nachziehen
 
-- [ ] 4.1 e2e-Specs an „Symbol im Ruhezustand“ anpassen, nicht abschalten:
+- [x] 4.1 e2e-Specs an „Symbol im Ruhezustand“ anpassen, nicht abschalten:
   `kopfhoehe-tonpruefung`, `kopfzeile-start-cls`, `kopfzeile-schmal`, `gate1-ueberlauf`,
   `gate3-trefflaeche`, `alarmton-freischalten`, `orientierung`, Hilfen in `lauf-kern.ts` und
   `doku-bilder/kern.ts`; die betroffenen Specs lokal in Chromium grün.
