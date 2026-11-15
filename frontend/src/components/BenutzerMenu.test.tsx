@@ -179,30 +179,33 @@ describe('BenutzerMenu — unter lg', () => {
 });
 
 /**
- * LFH-952 (U89), LLH-1642: Profil und Abmelden stehen DIREKT unter dem Kopf, vor der Gruppe
- * „Anzeige“; danach Benachrichtigungen, Neuigkeiten, Hilfe. Rückmeldung und Lizenzen stehen auf
- * der Hilfe-Seite (Spec `benutzermenue`). Die Lage im Fenster misst
- * `e2e/rahmen-stehen-bleiben.spec.ts`, hier die Reihenfolge.
+ * LLH-1730 (Spec `benutzermenue`): „Profil“ direkt unter dem Kopf, danach die Gruppe „Anzeige“,
+ * Benachrichtigungen, Neuigkeiten, Hilfe und als LETZTER Eintrag „Abmelden“. Rückmeldung und
+ * Lizenzen stehen auf der Hilfe-Seite. Die Lage im Fenster misst `e2e/benutzermenue.spec.ts`, hier
+ * die Reihenfolge.
  */
-describe('BenutzerMenu — Aufbau (LFH-952, LLH-1642)', () => {
+describe('BenutzerMenu — Aufbau (LLH-1642, LLH-1730)', () => {
   beforeEach(() => setzeViewportBreite(390));
 
-  it('Einträge in Reihenfolge, die Gruppe „Anzeige“ zwischen Abmelden und Benachrichtigungen', async () => {
+  it('Einträge in Reihenfolge, „Anzeige“ nach Profil, „Abmelden“ zuletzt', async () => {
     zeige();
     await oeffne();
     const eintraege = await screen.findAllByRole('menuitem');
     expect(eintraege.map((e) => e.textContent)).toEqual([
       'Profil',
-      'Abmelden',
       'Benachrichtigungen',
       'Neuigkeiten',
       'Hilfe',
+      'Abmelden',
     ]);
     const anzeige = screen.getByRole('group', { name: 'Anzeige' });
     const vor = (a: Element, b: Element) =>
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    expect(vor(eintraege[1]!, anzeige)).toBe(true);
-    expect(vor(anzeige, eintraege[2]!)).toBe(true);
+    expect(vor(eintraege[0]!, anzeige)).toBe(true);
+    expect(vor(anzeige, eintraege[1]!)).toBe(true);
+    // Rot steht nur „Abmelden“.
+    const rot = eintraege.filter((e) => e.classList.contains('ant-dropdown-menu-item-danger'));
+    expect(rot.map((e) => e.textContent)).toEqual(['Abmelden']);
   });
 
   it.each([
@@ -267,35 +270,33 @@ describe('BenutzerMenu — Aufbau (LFH-952, LLH-1642)', () => {
   });
 
   /*
-   * D11 (LLH-1642): im Handschuh-Betrieb ist der App-Kopf am Handy zweizeilig; damit die drei
-   * Leisten ohne Rollen ins Fenster passen, stehen Profil und Abmelden nebeneinander und der Kopf
-   * rückt zusammen. Die Lage im Fenster misst `e2e/benutzermenue.spec.ts`; hier die Form, mit der
-   * Gegenprobe `komfortabel` (dieselbe Abfrage, untereinander).
+   * LLH-1730 löst D11 (LLH-1642) ab: „Profil“ und „Abmelden“ stehen in KEINER Dichte mehr
+   * nebeneinander, Profil hat die volle Zeile. Der knappe Kopf im Handschuh-Betrieb bleibt (Rollen
+   * neben dem Namen, Benutzername und Version in einer Zeile), Gegenprobe `komfortabel`.
    */
   it.each([
     ['handschuh', true],
     ['komfortabel', false],
-  ])(
-    'Dichte %s: Profil und Abmelden nebeneinander = %s, beide wählbar',
-    async (dichte, nebeneinander) => {
-      localStorage.setItem('lifeline-hub.dichte', dichte);
-      zeige();
-      await oeffne();
-      const profil = await screen.findByRole('menuitem', { name: 'Profil' });
-      const abmelden = screen.getByRole('menuitem', { name: 'Abmelden' });
-      for (const eintrag of [profil, abmelden]) {
-        expect(eintrag.style.display).toBe(nebeneinander ? 'inline-flex' : '');
-        expect(eintrag.style.width).toBe(nebeneinander ? 'calc(50% - 4px)' : '');
-      }
-      const kopf = screen.getByTestId('benutzermenue-kopf');
-      // Knapper Kopf: Benutzername und Version in einer Zeile.
-      expect(kopf.textContent).toContain(`@${benutzer.benutzername}`);
-      expect(
-        within(kopf).queryByText(`@${benutzer.benutzername} · Version ${__APP_VERSION__}`),
-      ).toEqual(nebeneinander ? expect.anything() : null);
-      expect(within(kopf).getAllByText(new RegExp(`Version ${__APP_VERSION__}`))).toHaveLength(1);
-    },
-  );
+  ])('Dichte %s: Profil hat die volle Zeile, knapper Kopf = %s', async (dichte, knapp) => {
+    localStorage.setItem('lifeline-hub.dichte', dichte);
+    zeige();
+    await oeffne();
+    const profil = await screen.findByRole('menuitem', { name: 'Profil' });
+    const abmelden = screen.getByRole('menuitem', { name: 'Abmelden' });
+    for (const eintrag of [profil, abmelden]) {
+      expect(eintrag.style.display).toBe('');
+      expect(eintrag.style.width).toBe('');
+    }
+    const eintraege = screen.getAllByRole('menuitem');
+    expect(eintraege.indexOf(abmelden)).toBe(eintraege.length - 1);
+    expect(eintraege.indexOf(profil)).toBe(0);
+    const kopf = screen.getByTestId('benutzermenue-kopf');
+    expect(kopf.textContent).toContain(`@${benutzer.benutzername}`);
+    expect(
+      within(kopf).queryByText(`@${benutzer.benutzername} · Version ${__APP_VERSION__}`),
+    ).toEqual(knapp ? expect.anything() : null);
+    expect(within(kopf).getAllByText(new RegExp(`Version ${__APP_VERSION__}`))).toHaveLength(1);
+  });
 
   it('der Menükopf nennt die Funktion auch unter xl', async () => {
     setzeViewportBreite(1024);
@@ -320,19 +321,24 @@ describe('BenutzerMenu — Aufbau (LFH-952, LLH-1642)', () => {
   });
 });
 
-/** LFH-387: „Abmelden“ aus einem veralteten Tab beendet keine fremde Sitzung und verlässt die
- *  Seite nicht — der Server lehnt mit 412 ab, der Tab zeigt den Benutzerkonflikt. */
+/**
+ * „Abmelden“ fragt zurück (LLH-1730, Spec `benutzermenue`); erst die Bestätigung beendet die
+ * Sitzung. LFH-387: aus einem veralteten Tab beendet es keine fremde Sitzung und verlässt die Seite
+ * nicht — der Server lehnt mit 412 ab, der Tab zeigt den Benutzerkonflikt.
+ */
 describe('Abmelden', () => {
   function zeigeMitAnmeldeseite(logoutStatus: number) {
+    let abgemeldet = 0;
     server.use(
       meHandler(benutzer),
-      http.post('/api/auth/logout', () =>
-        logoutStatus === 204
+      http.post('/api/auth/logout', () => {
+        abgemeldet += 1;
+        return logoutStatus === 204
           ? new HttpResponse(null, { status: 204 })
-          : HttpResponse.json({ error: 'fremd' }, { status: logoutStatus }),
-      ),
+          : HttpResponse.json({ error: 'fremd' }, { status: logoutStatus });
+      }),
     );
-    return renderMitProviders(
+    renderMitProviders(
       <ThemeModeProvider>
         <Routes>
           <Route path="/login" element={<div>Anmeldeseite</div>} />
@@ -340,20 +346,36 @@ describe('Abmelden', () => {
         </Routes>
       </ThemeModeProvider>,
     );
+    return { abgemeldet: () => abgemeldet };
   }
 
-  it('führt nach dem Abmelden zur Anmeldeseite', async () => {
-    zeigeMitAnmeldeseite(204);
+  async function waehleAbmelden() {
     await oeffne();
     await userEvent.click(await screen.findByRole('menuitem', { name: /Abmelden/ }));
+    return screen.findByRole('dialog', { name: 'Abmelden?' });
+  }
+
+  it('ein Klick auf „Abmelden“ öffnet die Rückfrage und meldet noch nicht ab', async () => {
+    const zaehler = zeigeMitAnmeldeseite(204);
+    const dialog = await waehleAbmelden();
+    expect(within(dialog).getByRole('button', { name: 'Abmelden' })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(zaehler.abgemeldet()).toBe(0);
+    expect(screen.queryByText('Anmeldeseite')).not.toBeInTheDocument();
+  });
+
+  it('führt nach der Bestätigung zur Anmeldeseite', async () => {
+    zeigeMitAnmeldeseite(204);
+    const dialog = await waehleAbmelden();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abmelden' }));
     expect(await screen.findByText('Anmeldeseite')).toBeInTheDocument();
   });
 
   it('bleibt stehen, wenn der Server das Abmelden mit 412 ablehnt', async () => {
-    zeigeMitAnmeldeseite(412);
-    await oeffne();
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Abmelden/ }));
-    await waitFor(() => expect(screen.queryByText('Anmeldeseite')).not.toBeInTheDocument());
+    const zaehler = zeigeMitAnmeldeseite(412);
+    const dialog = await waehleAbmelden();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abmelden' }));
+    await waitFor(() => expect(zaehler.abgemeldet()).toBe(1));
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.queryByText('Anmeldeseite')).not.toBeInTheDocument();
     expect(await trigger()).toBeInTheDocument();

@@ -13,6 +13,7 @@ import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand'
 import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
 import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD, hilfePfad } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
+import { useAbmeldenRueckfrage } from '../auth/AbmeldenRueckfrage';
 import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
@@ -70,10 +71,10 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
 
 /**
  * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit Rollen-Übersicht und
- * Funktion, darunter sofort Profil und Abmelden, danach die Gruppe „Anzeige“ (LFH-952, LLH-1642),
- * Benachrichtigungen, Neuigkeiten und Hilfe (Spec `benutzermenue`; Rückmeldung und Lizenzen stehen
- * auf der Hilfe-Seite). Holt sich Benutzer und Logout selbst, damit es in beiden Layout-Ebenen
- * gleich nutzbar ist.
+ * Funktion, darunter Profil, die Gruppe „Anzeige“ (LLH-1642), Benachrichtigungen, Neuigkeiten,
+ * Hilfe und als letzter Eintrag Abmelden mit Rückfrage (LLH-1730, Spec `benutzermenue`; Rückmeldung
+ * und Lizenzen stehen auf der Hilfe-Seite). Holt sich Benutzer und Rückfrage selbst, damit es in
+ * beiden Layout-Ebenen gleich nutzbar ist.
  *
  * DIE INITIALEN STEHEN NEUTRAL: eine 24-px-Kachel auf `flaeche3`. Rot ist im Rahmen genau
  * zweimal vergeben (Quadrat der Bildmarke, aktive Rail-Marke). Neben der Kachel steht ab `xl` die
@@ -104,7 +105,8 @@ export default function BenutzerMenu({
   hasFixedWidth = false,
   hilfeDaneben = false,
 }: { funktion?: string | null; hasFixedWidth?: boolean; hilfeDaneben?: boolean } = {}) {
-  const { benutzer, logout } = useAuth();
+  const { benutzer } = useAuth();
+  const abmelden = useAbmeldenRueckfrage();
   const navigate = useNavigate();
   const location = useLocation();
   const { data: versionsstand } = useVersionsstand();
@@ -113,8 +115,8 @@ export default function BenutzerMenu({
   // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die Hook-Reihenfolge, sobald
   // der Benutzer eintrifft.
   const { abBreite, istBeruehrung } = useViewport();
-  // Handschuh (design.md D11): Kopf knapper, Profil und Abmelden nebeneinander — sonst läge am
-  // Handy unter dem zweizeiligen App-Kopf die Leiste „Helligkeit“ unter dem Rand.
+  // Handschuh (LLH-1642 D11): Kopf knapper — sonst läge am Handy unter dem zweizeiligen App-Kopf
+  // die Leiste „Helligkeit“ unter dem Rand. Profil und Abmelden nebeneinander entfällt mit LLH-1730.
   const isKnapp = useDichte().dichte === 'handschuh';
   // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
@@ -131,12 +133,6 @@ export default function BenutzerMenu({
 
   if (!benutzer) return null;
 
-  async function abmelden() {
-    // `false`: die Sitzung gehört inzwischen einem anderen Benutzer (412, LFH-387) — der Server
-    // hat sie nicht beendet, dieser Tab bleibt stehen und zeigt den Benutzerkonflikt.
-    if (await logout()) navigate('/login', { replace: true });
-  }
-
   const rollenTags = [];
   if (benutzer.system_rolle === 'admin') {
     rollenTags.push(
@@ -152,16 +148,6 @@ export default function BenutzerMenu({
       </Tag>,
     );
   }
-
-  // Zwei `menuitem`s je halbe Breite: Rollen, Tastatur und `onClick` bleiben unverändert (D11).
-  const halbeZeile = isKnapp
-    ? {
-        display: 'inline-flex',
-        width: 'calc(50% - 4px)',
-        boxSizing: 'border-box' as const,
-        verticalAlign: 'top',
-      }
-    : undefined;
 
   const items: MenuProps['items'] = [
     {
@@ -236,12 +222,10 @@ export default function BenutzerMenu({
         </div>
       ),
     },
-    // DIREKT UNTER DEM KOPF (LFH-952, U89): in `komfortabel` war das Menü 920 px hoch, am Handy
-    // sichtbar 702 px — ganz unten lagen Profil und Abmelden unter dem Rand, beim Schichtwechsel
-    // am geteilten Gerät. Rot steht durch den Trenner darunter abgesetzt.
-    { type: 'divider' },
-    { key: 'profil', icon: <IconPerson />, label: 'Profil', style: halbeZeile },
-    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true, style: halbeZeile },
+    // KEIN TRENNER ZWISCHEN KOPF UND PROFIL (LLH-1730, design.md D1): der Trenner vor „Abmelden“
+    // kostete am Handy in `komfortabel` die letzten 5 px, „Abmelden“ ragte unter den Rand. Der Kopf
+    // ist als Gruppe ohnehin abgesetzt.
+    { key: 'profil', icon: <IconPerson />, label: 'Profil' },
     // AUF JEDER BREITE (LFH-392, LLH-1642): die Kopfzeile ist die Aktionsreihe, eine Einstellung
     // gehört dort nicht hinein. Wer das an eine Breite hängt, nimmt allen drei Achsen ihren
     // einzigen sichtbaren Bedienweg mit aktivem Wert — die Palette zeigt keinen
@@ -283,11 +267,17 @@ export default function BenutzerMenu({
     // auf der Hilfe-Seite; die Hilfe bekommt den Pfad mit, aus dem sie geöffnet wurde, damit die
     // Rückmeldung dort den Bereich der App vorbefüllt (design.md D5).
     { key: 'hilfe', icon: <IconDokumente />, label: 'Hilfe' },
+    // ZULETZT, DURCH EINEN TRENNER ABGESETZT (LLH-1730, Spec `benutzermenue`): direkt unter
+    // „Profil“ (LFH-952) lag es im Griff, und ein Klick beendete die Sitzung sofort. Jetzt steht es
+    // am Ende, wo man es sucht, und fragt zurück. Seit LLH-1642 passt das Menü am Handy in
+    // `komfortabel` ganz ins Fenster; im Handschuh-Betrieb rollt es bis hierher.
+    { type: 'divider' },
+    { key: 'abmelden', icon: <IconAbmelden />, label: 'Abmelden', danger: true },
   ];
 
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
-    else if (key === 'abmelden') void abmelden();
+    else if (key === 'abmelden') abmelden.open();
     else if (key === 'hilfe' && isHilfeImNeuenTab) {
       window.open(hilfePfad({ von: location.pathname }), '_blank', 'noopener');
     } else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });
@@ -296,71 +286,74 @@ export default function BenutzerMenu({
   };
 
   return (
-    <Dropdown
-      menu={{ items, onClick, onKeyDown: handleMenuKeyDown, style: { width: menueBreite } }}
-      trigger={['click']}
-      placement="bottomRight"
-    >
-      <Button
-        type="text"
-        aria-label="Benutzermenü"
-        style={{
-          height: Math.max(40, token.controlHeight),
-          minWidth: token.controlHeight,
-          padding: `0 ${token.paddingXS}px`,
-          color: rahmenFarben.gedaempft,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 9,
-        }}
+    <>
+      <Dropdown
+        menu={{ items, onClick, onKeyDown: handleMenuKeyDown, style: { width: menueBreite } }}
+        trigger={['click']}
+        placement="bottomRight"
       >
-        {/* Initialen-Kachel 24 px, quadratisch. Kein antd-`Avatar`: der färbt über
-            `colorTextLightSolid`, der Kopf ist aber in beiden Modi dunkel — die Kachel liest die
-            Nachtrollen wie der übrige Rahmen. */}
-        <span
+        <Button
+          type="text"
+          aria-label="Benutzermenü"
           style={{
-            width: 24,
-            height: 24,
-            flexShrink: 0,
+            height: Math.max(40, token.controlHeight),
+            minWidth: token.controlHeight,
+            padding: `0 ${token.paddingXS}px`,
+            color: rahmenFarben.gedaempft,
             display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            background: rahmenFarben.aktiv,
-            color: farbenDunkel.text2,
-            fontFamily: schrift.zahl,
-            fontSize: 10,
+            gap: 9,
           }}
         >
-          {initialen(benutzer.anzeigename)}
-        </span>
-        {/* Unter `xl` bleibt die Kachel allein; der Name steht in der Kopfgruppe des Dropdowns, das
+          {/* Initialen-Kachel 24 px, quadratisch. Kein antd-`Avatar`: der färbt über
+            `colorTextLightSolid`, der Kopf ist aber in beiden Modi dunkel — die Kachel liest die
+            Nachtrollen wie der übrige Rahmen. */}
+          <span
+            style={{
+              width: 24,
+              height: 24,
+              flexShrink: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: rahmenFarben.aktiv,
+              color: farbenDunkel.text2,
+              fontFamily: schrift.zahl,
+              fontSize: 10,
+            }}
+          >
+            {initialen(benutzer.anzeigename)}
+          </span>
+          {/* Unter `xl` bleibt die Kachel allein; der Name steht in der Kopfgruppe des Dropdowns, das
             `aria-label` benennt den Trigger. Höhe und Mindestbreite folgen der Dichte; 40 px sind nur
             der kompakte Höhenboden (LFH-460). */}
-        {breit && (
-          <>
-            <span
-              title={hasFixedWidth ? (funktion ?? benutzer.anzeigename) : undefined}
-              style={{
-                // `inline-block`: antd hüllt die Kinder des Knopfs in ein Inline-`span`, eine
-                // Breite griffe sonst nicht. Mit `overflow: hidden` läge seine Grundlinie an der
-                // Unterkante; `middle` hält den Text auf der Höhe des Pfeils.
-                display: 'inline-block',
-                verticalAlign: 'middle',
-                width: hasFixedWidth ? ETIKETT_PLATZ : undefined,
-                maxWidth: hasFixedWidth ? ETIKETT_PLATZ : ETIKETT_DECKEL,
-                textAlign: 'start',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontSize: 12,
-              }}
-            >
-              {funktion ?? benutzer.anzeigename}
-            </span>
-            <IconChevronRunter style={{ fontSize: 10, opacity: 0.65 }} />
-          </>
-        )}
-      </Button>
-    </Dropdown>
+          {breit && (
+            <>
+              <span
+                title={hasFixedWidth ? (funktion ?? benutzer.anzeigename) : undefined}
+                style={{
+                  // `inline-block`: antd hüllt die Kinder des Knopfs in ein Inline-`span`, eine
+                  // Breite griffe sonst nicht. Mit `overflow: hidden` läge seine Grundlinie an der
+                  // Unterkante; `middle` hält den Text auf der Höhe des Pfeils.
+                  display: 'inline-block',
+                  verticalAlign: 'middle',
+                  width: hasFixedWidth ? ETIKETT_PLATZ : undefined,
+                  maxWidth: hasFixedWidth ? ETIKETT_PLATZ : ETIKETT_DECKEL,
+                  textAlign: 'start',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontSize: 12,
+                }}
+              >
+                {funktion ?? benutzer.anzeigename}
+              </span>
+              <IconChevronRunter style={{ fontSize: 10, opacity: 0.65 }} />
+            </>
+          )}
+        </Button>
+      </Dropdown>
+      {abmelden.dialog}
+    </>
   );
 }

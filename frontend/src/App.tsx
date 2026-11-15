@@ -73,6 +73,7 @@ import EinsatzUnterkunft from './pages/einstellungen/EinsatzUnterkunft';
 import EinsatzBenachrichtigungen from './pages/einstellungen/EinsatzBenachrichtigungen';
 import EinsatzGeraete from './pages/einstellungen/EinsatzGeraete';
 import EinsatzZugriff from './pages/einstellungen/EinsatzZugriff';
+import EinsatzAnzeige from './pages/einstellungen/EinsatzAnzeige';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
@@ -244,6 +245,7 @@ const EINSTELLUNGEN_ROUTEN = (
     <Route path="benachrichtigungen" element={<EinsatzBenachrichtigungen />} />
     <Route path="geraete" element={<EinsatzGeraete />} />
     <Route path="zugriff" element={<EinsatzZugriff />} />
+    <Route path="anzeige" element={<EinsatzAnzeige />} />
     {/* Unbekanntes Segment → erste Sektion, statt ein leeres `<Outlet>` unter markiertem Reiter. */}
     <Route path="*" element={<Navigate to={`../${EINSTELLUNGEN_SEKTIONEN[0].key}`} replace />} />
   </>
