@@ -30,17 +30,28 @@ function leiste(): HTMLElement | null {
 
 function Probe({
   eingaenge,
+  ungelesen,
   ausblenden = vi.fn(),
 }: {
   eingaenge: number;
+  ungelesen?: number;
   ausblenden?: () => void;
 }) {
   return (
     <>
       <input aria-label="Wortlaut" />
-      <HandyLeiste einsatzId={1} eingaenge={eingaenge} eingaengeAusblenden={ausblenden} />
+      <HandyLeiste
+        einsatzId={1}
+        eingaenge={eingaenge}
+        ungelesen={ungelesen}
+        eingaengeAusblenden={ausblenden}
+      />
     </>
   );
+}
+
+function hinweis(schluessel: string): ZonenEintrag {
+  return { ...alarm(schluessel, 'Neuer Einsatz'), stufe: 'hinweis' };
 }
 
 afterEach(() => setzeViewportBreite(VIEWPORT_STANDARD));
@@ -149,5 +160,38 @@ describe('HandyLeiste (LLH-1738)', () => {
       kasten.mockRestore();
       delete (document.documentElement as { clientHeight?: number }).clientHeight;
     }
+  });
+
+  it('nennt die Zahl des Verlaufs, nicht nur das Neue (eine Zahl für Eingänge)', () => {
+    setzeViewportBreite(390);
+    render(<Probe eingaenge={1} ungelesen={4} />);
+    expect(leiste()).toHaveTextContent('4 Eingänge');
+  });
+
+  it('ohne Neues steht sie auch bei ungelesenen Eingängen nicht', () => {
+    setzeViewportBreite(390);
+    render(<Probe eingaenge={0} ungelesen={4} />);
+    expect(leiste()).toBeNull();
+  });
+
+  it('ein Hinweis der Organisation ist kein Alarm: „1 Hinweis“, nicht rot, klappt beim Tippen ein', () => {
+    setzeViewportBreite(390);
+    render(<Probe eingaenge={0} />);
+    act(() => zoneSetzen(BESITZER, [hinweis('b-7')]));
+    const l = leiste()!;
+    expect(l).toHaveTextContent('1 Hinweis');
+    expect(l).not.toHaveTextContent('Alarm');
+    expect(l.dataset.alarm).toBe('nein');
+    act(() => screen.getByLabelText('Wortlaut').focus());
+    expect(leiste()).toBeNull();
+  });
+
+  it('Alarm und Hinweis: beide gezählt, rot wegen des Alarms', () => {
+    setzeViewportBreite(390);
+    render(<Probe eingaenge={2} />);
+    act(() => zoneSetzen(BESITZER, [hinweis('b-7'), alarm('b-8')]));
+    const l = leiste()!;
+    expect(l).toHaveTextContent('1 Alarm · 1 Hinweis · 2 Eingänge');
+    expect(l.dataset.alarm).toBe('ja');
   });
 });

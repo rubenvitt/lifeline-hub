@@ -152,6 +152,13 @@ test.describe('Alarmzone verdeckt nichts', () => {
       .toBeCloseTo(kopf.y + kopf.height, 0);
     await kommandoleisteKlickbar(page);
 
+    // Tab durch die Zone rollt die Seite nicht (Fokusabstand ausgesetzt wie im Kopf).
+    const vorher = await page.evaluate(() => window.scrollY);
+    await page.locator(ZONE).getByRole('button').first().focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => window.scrollY), 'Tab durch die Zone rollt').toBe(vorher);
+
     // Rückwärts getabbt liegt kein Ziel des Inhalts vollständig hinter Kopf oder Zone.
     const zone = await box(page.locator(ZONE));
     for (let i = 0; i < 8; i++) {
@@ -231,5 +238,26 @@ test.describe('Alarmzone verdeckt nichts', () => {
     const hoehe = page.viewportSize()!.height;
     expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(hoehe);
     expect(bandBox.y + bandBox.height).toBeGreaterThan(hoehe - 80);
+  });
+
+  test('Handy 390: ein Alarm steht in der Leiste unten und bleibt beim Tippen als eine Zeile (LLH-1738)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await anmelden(page);
+    const einsatzId = await seede(page, 1);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    const leiste = page.locator('[data-lfh="handy-leiste"]');
+    await expect(leiste).toContainText('1 Alarm', { timeout: 75_000 });
+    // Oben steht keine Zone; die Leiste trägt den Alarm.
+    await expect(page.locator(ZONE)).toHaveCount(0);
+    await page
+      .locator('.etb-erfassung-sticky')
+      .getByPlaceholder(/Inhalt/)
+      .focus();
+    await expect(leiste).toBeVisible();
+    await expect(leiste).toContainText('1 Alarm');
+    expect((await box(leiste)).height).toBeLessThanOrEqual(48);
   });
 });

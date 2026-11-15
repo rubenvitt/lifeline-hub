@@ -72,7 +72,7 @@ Unteraufgaben: LLH-1735 `p1voqfck`, LLH-1736 `ftf3qelu`, LLH-1737 `mdbfi43h`, LL
 - [x] 4.1 `useFokusInEingabe` (D5, auf Basis von `istEingabefeld`) mit Unit-Test: wahr bei Fokus
   in Eingabe, Textfeld und contenteditable, falsch nach `focusout`. Vitest grün.
 - [x] 4.2 `alarm/HandyLeiste.tsx` (statt des Eingangsbands unter `md`, gleicher Ausweichweg): Leiste von 48 px „‹n› Alarm · ‹m› Eingänge ›“ aus
-  Speicher und `useBenachrichtigungVerlauf`, weicht unteren Leisten aus wie das Band, klappt bei
+  Speicher und der Zahl des Verlaufs (`eingaengeUngelesen`, nach dem Review), weicht unteren Leisten aus wie das Band, klappt bei
   Fokus ein, mit Alarm eine Zeile mit dem jüngsten Alarm (Entwurf `Handy-Leiste.dc.html`,
   `Handy-Tippen.dc.html`). `AlarmZone` rendert im Einsatz unter `md` nichts. Tests in
   `alarm/HandyLeiste.test.tsx` für die drei Zustände. Vitest grün.
@@ -86,9 +86,27 @@ Unteraufgaben: LLH-1735 `p1voqfck`, LLH-1736 `ftf3qelu`, LLH-1737 `mdbfi43h`, LL
   Einklappen); Karte „Eingänge“ im Design System neu erzeugt. Doku-Wächter und
   `designSystem.guard.test.ts` grün.
 
-## 5. Abschluss
+## 5. Befunde aus dem Review vor dem PR
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die berührten e2e-Specs
+- [x] 5.1 Org-Hinweise zählen in Leiste, Blatt und Bündelzähler als „Hinweis“, nicht als Alarm; nur
+  Alarme halten die Leiste beim Tippen (`HandyLeiste.test.tsx`, `AlarmZone.test.tsx`,
+  `EingaengeKnopf.test.tsx`).
+- [x] 5.2 Die Leiste nennt die Zahl des Verlaufs (Entscheidung 15.11.2026); das Blatt heißt
+  „Alarme und Eingänge“; der Verlauf merkt sich nur gefundenen Inhalt und fragt beim nächsten
+  Öffnen neu.
+- [x] 5.3 Der Fokus bleibt beim Auf- und Zuklappen und beim Gehen einer Zeile in der Zone; ein
+  Fokus in der Zone setzt den Fokusabstand aus (`index.css`, e2e „Tab durch die Zone rollt nicht“).
+- [x] 5.4 Specs `kraefte-abloesung`, `lage-wetter-pegel`, `web-push` und die übrigen
+  Anforderungen von `benachrichtigungen` sprechen von der Alarmzone; Verlauf nur unter „Neu“,
+  duplizierter Tab als bekannte Ausnahme.
+- [x] 5.5 Bildlauf `wetter-pegel.bilder.ts` auf die Zone umgestellt, Kapitel Wetter und Pegel und
+  Meldungen nachgezogen, Kommentare und Verweise auf `HandyLeiste.tsx` und die Zone.
+- [x] 5.6 e2e „Handy 390: ein Alarm bleibt beim Tippen als eine Zeile“ in
+  `alarm-verdeckung.spec.ts`.
+
+## 6. Abschluss
+
+- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die berührten e2e-Specs
   (`alarm-verdeckung`, `eingangsband-ausweichen`, `eingangshinweis`, `sofortmeldung-hinweis`,
   `abloesung-kontrast`, `leisten-flaeche`, `fokus-verdeckung`) lokal grün.
 

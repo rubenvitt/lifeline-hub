@@ -149,7 +149,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     antds `notification` (`AntApp` trägt kein `notification`-Prop). Die Zone ist eine
     Rahmenquelle unter dem Übungsband (`useRahmenObenStapel` mit `RANG_ALARMZONE`), schiebt den
     Inhalt und liegt auf `RAHMEN_EBENE` unter Drawer und Dialogen. Ab zwei Einträgen bündelt sie.
-    Im Einsatz unter `md` trägt die Leiste am Handschirm die Alarme (`alarm/Eingangsband.tsx`).
+    Im Einsatz unter `md` trägt die Leiste am Handschirm die Alarme (`alarm/HandyLeiste.tsx`).
     ✕ blendet aus (`blendeAus`, sessionStorage je Tab), quittiert wird nur mit „Öffnen“ und
     „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
     Nachweis `e2e/alarm-verdeckung.spec.ts`.

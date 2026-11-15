@@ -89,7 +89,7 @@ export function quittiereNachNutzer(id: number, ort?: QuittierOrt): void {
 }
 
 /**
- * {@link quittiereNachNutzer} für die Zentrale eines Einsatzes (LLH-1477): Verlauf, Toasts und
+ * {@link quittiereNachNutzer} für die Zentrale eines Einsatzes (LLH-1477): Verlauf, Alarmzone und
  * Eingangsband merken ohne Netz vor. `null` (Org-Zentrale) oder ohne Benutzer: nur online.
  */
 export function useQuittiereNachNutzer(einsatzId: number | null): (id: number) => void {
@@ -186,7 +186,7 @@ function eintragVon(
 /**
  * Gehört die Benachrichtigung in den Eingangshinweis? Jeder Eingang des Einsatzes (Stufe
  * `hinweis`, LLH-1143 D7; bis dahin nur die Art `meldung`, LLH-1062). Org-Arten betreffen keinen
- * offenen Einsatz und bleiben Toasts.
+ * offenen Einsatz und stehen in der Alarmzone.
  */
 function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'stufe'>): boolean {
   return e.stufe === 'hinweis' && !istOrgArt(e.art);
@@ -224,7 +224,7 @@ function eingangVon(
 /**
  * Benachrichtigungen in einer Zentrale (design.md D5). Hört auf das Live-Ereignis (über
  * `live/benachrichtigungListener.ts`), holt den Text (`GET /api/benachrichtigungen/{id}`), zeigt
- * den Toast im gemeinsamen Budget und spielt den Ton der Stufe; das Quittier-Ereignis nimmt ihn
+ * den Eintrag in der Alarmzone (LLH-1735) und spielt den Ton der Stufe; das Quittier-Ereignis nimmt ihn
  * weg. Eine fremde oder aufgeräumte Benachrichtigung (4xx) bleibt still.
  *
  * Nachreichen beim Mount (Öffnen eines Einsatzes, Org-Layout) und auf Bitte des Stroms (`lagged`,
@@ -234,7 +234,7 @@ function eingangVon(
  * `einsatzId` `null` ist die Org-Zentrale: nur Org-Arten.
  *
  * Eingänge des Einsatzes (Stufe `hinweis`) gehen ins Eingangsband (`eingang`, LLH-1062,
- * LLH-1143 D7), nicht ins Toast-Budget; ihr Ton ist gedrosselt. Die Toasts tragen Alarme und
+ * LLH-1143 D7), nicht in die Alarmzone; ihr Ton ist gedrosselt. Die Zone trägt Alarme und
  * Org-Arten. Ohne `eingang` (Org-Zentrale) gibt es keine Einsatz-Eingänge. Die Stufe `still`
  * steht nur im Verlauf.
  */
@@ -274,7 +274,7 @@ export function useBenachrichtigungen(
       // Die Push-Meldung (LLH-1223) steht unabhängig davon, welche Zentrale sie zeigen würde.
       if (e.quittiert) void schliessePushMeldungen(e.benachrichtigung_id);
       if (!passt(e, einsatzId)) return;
-      // Stufe still (LLH-1143, design.md D2): steht nur im Verlauf, kein Toast, kein Ton.
+      // Stufe still (LLH-1143, design.md D2): steht nur im Verlauf, kein Eintrag, kein Ton.
       if (e.stufe === 'still') return;
       const id = e.benachrichtigung_id;
       if (e.quittiert) {

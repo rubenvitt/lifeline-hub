@@ -16,7 +16,7 @@ import Eingangsband from './Eingangsband';
  * Eingangshinweis (LLH-1062, Spec `benachrichtigungen`, „Eingangshinweis“, design.md E7): EIN
  * gebündelter, stehender Hinweis für alle Eingänge eines Einsatzes (Stufe `hinweis`, seit
  * LLH-1143; vorher nur die Art `meldung`). Er steht im Eingangsband unten (`Eingangsband.tsx`,
- * LLH-1143 D7), getrennt von den drei Toastplätzen der Zentrale (`useAlarmToasts.tsx`), und
+ * LLH-1143 D7), getrennt von der Alarmzone (`AlarmZone.tsx`, LLH-1735), und
  * verbraucht deren Budget nicht: ein Eingang ist Information, kein Alarm (`frontend/AGENTS.md`,
  * Layout und Live).
  *
@@ -200,7 +200,7 @@ export function useEingangshinweis(
       desktopAusstehend: null,
       desktop: null,
     }),
-    // Je Einsatz ein eigener Zustand (wie der Scope der Toasts).
+    // Je Einsatz ein eigener Zustand (wie der Scope der Alarmzone).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [einsatzId],
   );

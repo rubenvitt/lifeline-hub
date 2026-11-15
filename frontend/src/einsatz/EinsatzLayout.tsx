@@ -539,7 +539,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       <UebungsBand einsatz={einsatz} />
       {/* Alarmzone (LLH-1735, Spec `benachrichtigungen`, „Alarmzone verdeckt nichts“): direkt unter
          Kopf und Übungsband, klebt darunter und schiebt den Inhalt. Unter `md` trägt die Leiste am
-         Handschirm die Alarme (`alarm/Eingangsband.tsx`). */}
+         Handschirm die Alarme (`alarm/HandyLeiste.tsx`). */}
       <AlarmZone nurAbMd />
       {/* Warnung, keine Sackgasse: ohne Freigaben fällt `istModulSichtbar` nach OFFEN, jedes
          ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller

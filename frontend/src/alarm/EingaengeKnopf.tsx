@@ -1,5 +1,5 @@
 import { Button, Drawer, Popover, Switch, theme } from 'antd';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
@@ -43,9 +43,16 @@ function istNeu(a: BenachrichtigungAnzeige): boolean {
  * einer fälligen Erinnerung ihr Titel (`erinnerungInhalt.ts`), wie Alarmzone und Eingangsband.
  * Nur für Neues: „Früher“ kann 200 Einträge lang sein, und dort ist alles schon gelesen.
  */
+/**
+ * Zählt das Öffnen von Klappfläche bzw. Blatt: bei jedem Öffnen holt der Verlauf fehlenden Inhalt
+ * neu. Ein Zähler, kein Wahrheitswert: antd zeichnet die geschlossene Fläche nicht neu.
+ */
+const VerlaufOffen = createContext(0);
+
 function useVerlaufInhalt(a: BenachrichtigungAnzeige): VerlaufInhalt {
   const qc = useQueryClient();
   const neu = istNeu(a);
+  const oeffnung = useContext(VerlaufOffen);
   const [inhalt, setInhalt] = useState(() => verlaufInhalt.get(a.id) ?? null);
   useEffect(() => {
     if (!neu || verlaufInhalt.has(a.id)) return;
@@ -56,13 +63,15 @@ function useVerlaufInhalt(a: BenachrichtigungAnzeige): VerlaufInhalt {
         : titel
           ? { titel: `${a.titel}: ${titel}`, detail: a.detail }
           : null;
-      verlaufInhalt.set(a.id, wert);
+      // Nur ein Inhalt wird gemerkt: lief die Frist ab oder fehlte das Netz, holt das nächste
+      // Öffnen neu (Review vor dem PR). Eine Art ohne Inhalt fragt ohnehin nicht nach.
+      if (wert) verlaufInhalt.set(a.id, wert);
       if (aktiv) setInhalt(wert);
     });
     return () => {
       aktiv = false;
     };
-  }, [a, neu, qc]);
+  }, [a, neu, oeffnung, qc]);
   return inhalt ?? { titel: a.titel, detail: a.detail };
 }
 
@@ -340,10 +349,18 @@ function AlarmAbschnitt({ schliessen }: { schliessen: () => void }) {
   // Ab `md` steht die Alarmzone oben; das Blatt (Tablet mit Finger) wiederholt sie nicht.
   const { istSchmal } = useViewport();
   if (!istSchmal || eintraege.length === 0) return null;
+  // Hinweise der Organisation sind keine Alarme (Review vor dem PR): eigenes Wort, eigene Farbe.
+  const alarme = eintraege.filter((e) => e.stufe === 'alarm').length;
+  const hinweise = eintraege.length - alarme;
   return (
     <section aria-label="Alarme" style={{ marginBlockEnd: token.marginSM }}>
-      <Augenbraue als="h2" style={{ color: rollen.alarmText }}>
-        {eintraege.length === 1 ? 'Alarm' : `${eintraege.length} Alarme`}
+      <Augenbraue als="h2" style={{ color: alarme > 0 ? rollen.alarmText : rollen.bedienText }}>
+        {[
+          alarme > 0 ? (alarme === 1 ? 'Alarm' : `${alarme} Alarme`) : null,
+          hinweise > 0 ? (hinweise === 1 ? 'Hinweis' : `${hinweise} Hinweise`) : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
       </Augenbraue>
       {[...eintraege].reverse().map((e) => (
         <div
@@ -355,7 +372,7 @@ function AlarmAbschnitt({ schliessen }: { schliessen: () => void }) {
             gap: token.paddingXXS,
             marginBlockStart: token.paddingXS,
             padding: `${token.paddingXS}px ${token.paddingSM}px`,
-            background: rollen.alarmFlaeche,
+            background: e.stufe === 'alarm' ? rollen.alarmFlaeche : rollen.bedienFlaeche,
             boxShadow: `inset 4px 0 0 ${e.stufe === 'alarm' ? rollen.alarm : rollen.bedien}`,
           }}
         >
@@ -406,7 +423,12 @@ function AlarmAbschnitt({ schliessen }: { schliessen: () => void }) {
 export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
   const { token } = theme.useToken();
   const buendelt = useKopfBuendelt();
+  const { istSchmal } = useViewport();
   const [offen, setOffen] = useState(false);
+  const [oeffnung, setOeffnung] = useState(0);
+  useEffect(() => {
+    if (offen) setOeffnung((n) => n + 1);
+  }, [offen]);
   useVerlaufAbgleich(einsatzId);
   const ungelesen = useBenachrichtigungVerlauf(einsatzId).data?.ungelesen ?? 0;
 
@@ -421,7 +443,11 @@ export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
   }, [einsatzId]);
 
   const schliessen = () => setOffen(false);
-  const paneel = <VerlaufPaneel einsatzId={einsatzId} schliessen={schliessen} />;
+  const paneel = (
+    <VerlaufOffen.Provider value={oeffnung}>
+      <VerlaufPaneel einsatzId={einsatzId} schliessen={schliessen} />
+    </VerlaufOffen.Provider>
+  );
 
   if (buendelt) {
     return (
@@ -430,7 +456,8 @@ export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
         onClose={schliessen}
         placement="bottom"
         size="auto"
-        title={null}
+        // Am Handschirm trägt das Blatt auch die Alarme (LLH-1738): sein Name sagt es.
+        title={istSchmal ? 'Alarme und Eingänge' : null}
         closable
         styles={{ body: { paddingBlock: token.paddingSM } }}
       >

@@ -95,20 +95,27 @@ erledigt sich auch „der Sprung quittiert nur sein Ziel“, denn es gibt keinen
 
 ### D4 Ausblenden: eigenes Gedächtnis in sessionStorage
 
-`benachrichtigungGedaechtnis.ts` bekommt die Menge `ausgeblendet` (Schlüssel des Eintrags, also
-`b-<id>` bzw. `unwetter-…`), gespiegelt in `sessionStorage` unter einem eigenen Schlüssel mit
-try/catch (Regel „Browserspeicher“ in `frontend/AGENTS.md`). Ein Schlüssel kommt hinein mit ✕ und
-geht hinaus, sobald die Benachrichtigung quittiert ist. Wirkung:
+`benachrichtigungGedaechtnis.ts` bekommt die Menge `ausgeblendet` (Kennungen der
+Benachrichtigungen), gespiegelt in `sessionStorage` unter `lfh:alarm:ausgeblendet` mit try/catch
+(Regel „Browserspeicher“ in `frontend/AGENTS.md`, Eintrag in `GERAETESPEICHER`, geräumt bei jedem
+Ausgang). Eine Kennung kommt hinein mit ✕ (`blendeAus`) und geht hinaus, sobald die
+Benachrichtigung quittiert ist (`vergissAusgeblendet`). Eine Unwetterwarnung hat keine Kennung und
+wird nicht gemerkt; ihr eigenes Gedächtnis meldet dieselbe Warnung ohnehin nur einmal. Wirkung:
 
 - `melde` und das Nachreichen in `useBenachrichtigungen.ts` überspringen ausgeblendete Einträge
   (`unbekannt` prüft zusätzlich `ausgeblendet`).
-- `erledigt(schluessel, art)` unterscheidet `'gelesen'` (quittiert), `'ausgeblendet'` (merkt
-  sich, quittiert nicht) und `'weg'` (Abbau, Ersatz der Unwetterwarnung).
+- `abgang(schluessel, wie)` in `useAlarmToasts` unterscheidet `'gelesen'` (quittiert),
+  `'ausgeblendet'` (merkt sich, quittiert nicht) und `'weg'` (Quittier-Ereignis, Ersatz der
+  Unwetterwarnung).
 - Das ✕ am Eingangsband blendet die stehenden Einträge des Bandes aus; die Zahl am Knopf
   „Eingänge“ bleibt.
 - Die OS-Meldung im Tab geht beim Ausblenden mit zu wie heute. Push-Meldungen anderer Geräte
   bleiben, sie schließen nur beim Quittieren.
 
+- *Bekannte Ausnahme* (Entscheidung Ruben, 15.11.2026, nach dem Review): Browser kopieren
+  `sessionStorage` beim Duplizieren eines Tabs. Ein duplizierter Tab übernimmt deshalb das
+  Ausblenden; der Alarm bleibt im Verlauf unter „Neu“. Ein Abgleich über eine Tab-Kennung wäre
+  genauer, lohnt den Aufwand aber nicht.
 - *Verworfen:* nur im Speicher merken. Nach dem Neuladen käme jeder ausgeblendete Alarm zurück.
 - *Verworfen:* `ausgeblendet_at` am Server. Das gilt geräteübergreifend, berührt Backend und
   `frontend/AGENTS.md` „ein Gelesen-Zustand“ und war nicht gewünscht.
@@ -117,10 +124,12 @@ geht hinaus, sobald die Benachrichtigung quittiert ist. Wirkung:
 
 Unter `md` zeichnet die Zentrale im Einsatz statt des Eingangsbands die Leiste
 `alarm/HandyLeiste.tsx` (48 px, Portal, `fixed` unten wie das Band, derselbe Ausweichweg
-`useBandAbstand`). Sie nennt die Einträge, die das Band ab `md` zeigte (`bandAnzahl` aus
-`useEingangshinweis`), und die Alarme aus dem Speicher (D1). Die Zahl am Knopf „Eingänge“ bleibt
-die eine Zahl des Verlaufs; die Leiste zählt, was neu eingegangen und nicht ausgeblendet ist.
-Stehen nur Eingänge an, trägt sie ✕ (Ausblenden wie am Band).
+`useBandAbstand`; die sichtbare Leiste ist eine eigene Komponente, damit der Hook ab ihrem
+Einhängen misst). Sie erscheint, sobald etwas neu eingeht (`bandAnzahl` aus `useEingangshinweis`)
+oder ein Eintrag in der Zone steht, und nennt die eine Zahl des Verlaufs wie Kopf und Tab-Titel
+(`eingaengeUngelesen`, Entscheidung Ruben 15.11.2026: „Eine Zahl für Eingänge“). Alarme und
+Hinweise der Organisation zählt sie getrennt; nur ein Alarm färbt sie rot und hält sie beim
+Tippen. Ohne Alarm trägt sie ✕ (Eingänge und Hinweise ausblenden wie am Band).
 `AlarmZone` rendert im Einsatz unter `md` nichts. Ein Tipp sendet `EINGAENGE_OEFFNEN_EVENT`, und
 das vorhandene Blatt von unten in `EingaengeKnopf` bekommt oben den Abschnitt „Alarm“ aus dem
 Speicher (mit „Öffnen“, „Gelesen“, ✕) und heißt dann „Alarme und Eingänge“.
@@ -141,8 +150,9 @@ Ein Lader `alarm/erinnerungInhalt.ts` nach dem Muster von `meldungInhalt.ts`: Be
 `einsatzKeys.erinnerungenPhase(id, 'offen')` (Frist `INHALT_FRIST_MS`) die offene Liste und nimmt
 den `titel` der Erinnerung. Ein gefüllter Cache antwortet sofort. Titel im Hinweis: „Erinnerung
 fällig: ‹Titel›“. Ohne Antwort in der Frist bleibt der Text des Servers. Der Verlauf
-(`EingaengeKnopf`) nutzt dieselben Lader für Meldung und Erinnerung je sichtbarem Eintrag, damit
-er dasselbe nennt wie Band und Alarm.
+(`EingaengeKnopf`) nutzt dieselben Lader für Meldung und Erinnerung, aber nur unter „Neu“
+(Entscheidung Ruben 15.11.2026): „Früher“ ist gelesen und kann 200 Einträge lang sein. Er merkt
+sich nur einen gefundenen Inhalt; scheitert ein Abruf, fragt das nächste Öffnen neu.
 
 - *Verworfen:* ein Einzel-GET am Backend. Er brächte E3 und Codegen mit, während die offene Liste
   schon im Cache von Überblick und Erinnerungsseite liegt.

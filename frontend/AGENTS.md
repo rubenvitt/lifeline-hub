@@ -124,7 +124,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     antds `notification` (`AntApp` trägt kein `notification`-Prop). Die Zone ist eine
     Rahmenquelle unter dem Übungsband (`useRahmenObenStapel` mit `RANG_ALARMZONE`), schiebt den
     Inhalt und liegt auf `RAHMEN_EBENE` unter Drawer und Dialogen. Ab zwei Einträgen bündelt sie.
-    Im Einsatz unter `md` trägt die Leiste am Handschirm die Alarme (`alarm/Eingangsband.tsx`).
+    Im Einsatz unter `md` trägt die Leiste am Handschirm die Alarme (`alarm/HandyLeiste.tsx`).
     ✕ blendet aus (`blendeAus`, sessionStorage je Tab), quittiert wird nur mit „Öffnen“ und
     „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
     Nachweis `e2e/alarm-verdeckung.spec.ts`.
@@ -1094,7 +1094,8 @@ und `pages/personen/`.
   Sammelbanner ihn trägt. Kein eigener Zeitgeber. e2e-Greifer: `[data-lfh="eingangsband"]`.
 - **Eine Zahl für Eingänge** (LLH-1143, Spec `benachrichtigungen`, „Ungelesene Eingänge im
   Tab-Titel“): Knopf „Eingänge“ (`alarm/EingaengeKnopf.tsx`, Zelle `kopf-alarm`), Tab-Titel und
-  App-Badge lesen denselben Verlauf (`alarm/useBenachrichtigungVerlauf.ts`, ein Key, ein Abruf);
+  App-Badge und die Leiste am Handschirm (`alarm/HandyLeiste.tsx`, LLH-1738) lesen denselben
+  Verlauf (`alarm/useBenachrichtigungVerlauf.ts`, ein Key, ein Abruf);
   abgeglichen wird er nur im Knopf (`useVerlaufAbgleich`). Keine zweite Zahl daneben. Die Zahl
   steht als Plakette über dem Zeichen (`alarm/EingaengeZahl.tsx`, nimmt keine Breite). Bündelt
   der Kopf die Alarmzentrale (`useKopfBuendelt`, Handschirm und Tablet mit Finger), trägt deren

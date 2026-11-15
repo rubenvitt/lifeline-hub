@@ -220,12 +220,17 @@ main:has([data-lfh='zaehltasten']) {
    `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`). Die Höhe misst
    `components/rahmenOben.ts`; ohne klebenden Rahmen ist sie 0.
    Die Ausnahme per `:has` hält den Abstand aus, solange der Fokus IM Rahmen steht — sonst rollte
-   jeder Tab durch den Kopf die Seite (dieselbe Falle wie die ETB-Leiste unten, LFH-373). Der
+   jeder Tab durch den Kopf die Seite (dieselbe Falle wie die ETB-Leiste unten, LFH-373). Die
+   Alarmzone (LLH-1735) klebt mit im Rahmen und gehört deshalb dazu. Der
    Browser rechnet den Stil mit dem neuen Fokus, bevor er das Ziel ins Bild rollt. */
 :root {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
-:root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
+:root:has(
+  [data-lfh='rahmen-kopf'] :focus,
+  [data-lfh='betriebszeile'] :focus,
+  [data-lfh='alarmzone'] :focus
+) {
   scroll-padding-block-start: 0px;
 }
 

@@ -751,7 +751,11 @@ main:has([data-lfh='zaehltasten']) {
 :root {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
-:root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
+:root:has(
+  [data-lfh='rahmen-kopf'] :focus,
+  [data-lfh='betriebszeile'] :focus,
+  [data-lfh='alarmzone'] :focus
+) {
   scroll-padding-block-start: 0px;
 }
 :root:has([data-lfh='etb-kopf-klebt']) {

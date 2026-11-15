@@ -27,8 +27,7 @@ Stufe, Titel, Gegenstand, Uhrzeit und seine Handlungen.
 Das Schließkreuz an einem Eintrag der Alarmzone, an der gebündelten Zone und am Eingangsband SHALL
 nur ausblenden: Die Benachrichtigung MUST unquittiert bleiben und MUST im Verlauf „Eingänge“ unter
 „Neu“ stehen. Ein ausgeblendeter Eintrag MUST in diesem Tab weg bleiben, auch nach dem Neuladen und
-beim Nachreichen, bis der Tab geschlossen wird; andere Tabs und Geräte zeigen ihn weiter.
-Quittiert wird mit „Öffnen“ (mit Sprung) und „Gelesen“ (ohne Sprung).
+beim Nachreichen, bis der Tab geschlossen wird; andere Tabs und Geräte zeigen ihn weiter. Quittiert wird mit „Öffnen“ und „Gelesen“.
 
 #### Scenario: Alarm wegräumen
 - **WHEN** Person A den Alarm „Auftrag überfällig“ mit ✕ ausblendet
@@ -37,6 +36,10 @@ Quittiert wird mit „Öffnen“ (mit Sprung) und „Gelesen“ (ohne Sprung).
 #### Scenario: Neuladen nach dem Ausblenden
 - **WHEN** Person A einen Alarm ausgeblendet hat und den Tab neu lädt
 - **THEN** erscheint er in diesem Tab nicht wieder; in einem anderen Tab desselben Nutzers steht er weiter
+
+#### Scenario: Duplizierter Tab
+- **WHEN** Person A einen Tab dupliziert, in dem sie einen Alarm ausgeblendet hat
+- **THEN** übernimmt der neue Tab das Ausblenden (bekannte Ausnahme, Entscheidung 15.11.2026)
 
 #### Scenario: Gelesen
 - **WHEN** Person A an einem Alarm „Gelesen“ wählt
@@ -48,10 +51,10 @@ Quittiert wird mit „Öffnen“ (mit Sprung) und „Gelesen“ (ohne Sprung).
 
 ### Requirement: Eine Leiste am Handschirm
 
-Unter `md` SHALL im Einsatz statt Alarmzone und Eingangsband eine Leiste von höchstens 48 px über
-dem unteren Rand stehen, die anstehende Alarme und ungelesene Eingänge mit ihrer Zahl nennt („1
-Alarm · 3 Eingänge“). Ein Tipp MUST das Blatt „Alarme und Eingänge“ von unten öffnen, mit den
-Handlungen jedes Eintrags. Steht der Fokus in einem Eingabefeld, MUST die Leiste einklappen; steht
+Unter `md` SHALL im Einsatz statt Alarmzone und Eingangsband eine Leiste von höchstens 48 px unten
+stehen, sobald ein Eintrag der Zone ansteht oder ein Eingang neu eingeht. Sie nennt Alarme,
+Hinweise und die Zahl der ungelesenen Eingänge wie der Knopf „Eingänge“. Ein Tipp MUST das Blatt
+„Alarme und Eingänge“ von unten öffnen. Steht der Fokus in einem Eingabefeld, MUST die Leiste einklappen; steht
 ein Alarm an, MUST sie stattdessen als eine Zeile mit diesem Alarm stehen bleiben.
 
 #### Scenario: Leiste im ETB
@@ -70,18 +73,126 @@ ein Alarm an, MUST sie stattdessen als eine Zeile mit diesem Alarm stehen bleibe
 - **WHEN** Person A auf die Leiste tippt
 - **THEN** öffnet sich von unten das Blatt „Alarme und Eingänge“, oben die Alarme mit „Öffnen“, „Gelesen“ und ✕, darunter die Eingänge
 
+#### Scenario: Hinweis der Organisation am Handschirm
+- **WHEN** im Einsatz bei 390 × 844 der Hinweis „Neuer Einsatz“ eingeht
+- **THEN** nennt die Leiste „1 Hinweis“, nicht „Alarm“, und klappt beim Tippen ein
+
 ### Requirement: Der Verlauf nennt den Inhalt einer Meldung
 
-Ein Eintrag im Verlauf „Eingänge“, der eine Meldung betrifft (Sofortmeldung, Eskalation, neue
-Meldung, Übernahme in die Lage), SHALL wie Alarm und Eingangsband Absender und Anfang des Wortlauts
-nennen, geholt über die Abfrage der Meldung. Antwortet sie nicht rechtzeitig, MUST der Eintrag mit
-dem Text der Benachrichtigung stehen.
+Ein ungelesener Eintrag im Verlauf „Eingänge“ (unter „Neu“), der eine Meldung betrifft
+(Sofortmeldung, Eskalation, neue Meldung, Übernahme in die Lage), SHALL wie Alarm und Eingangsband
+Absender und Anfang des Wortlauts nennen, geholt über die Abfrage der Meldung; eine fällige
+Erinnerung ihren Titel. Antwortet die Abfrage nicht rechtzeitig, MUST der Eintrag mit dem Text der
+Benachrichtigung stehen, und das nächste Öffnen MUST erneut fragen. Unter „Früher“ steht der Text
+der Benachrichtigung.
 
 #### Scenario: Eskalation im Verlauf
-- **WHEN** Person A den Verlauf öffnet und darin „Bestätigung ausstehend“ zur Sofortmeldung von RTW 2 steht
+- **WHEN** Person A den Verlauf öffnet und darin „Bestätigung ausstehend“ zur Sofortmeldung von RTW 2 unter „Neu“ steht
 - **THEN** lautet der Eintrag „Bestätigung ausstehend · RTW 2“ mit dem Anfang des Wortlauts
 
+#### Scenario: Meldung erst später abrufbar
+- **WHEN** die Abfrage der Meldung beim ersten Öffnen scheitert und beim nächsten Öffnen antwortet
+- **THEN** nennt der Eintrag beim nächsten Öffnen Absender und Wortlaut
+
 ## MODIFIED Requirements
+
+### Requirement: Benachrichtigungen ohne sensible Nutzlast
+
+Das Live-Ereignis einer Benachrichtigung SHALL nur Kennungen tragen (Benachrichtigung, Einsatz,
+Art, Stufe, Bezugsobjekt). Den anzuzeigenden Text MUST das Frontend über eine Abfrage holen, die
+nur dem Empfänger antwortet.
+
+#### Scenario: Toast-Text
+- **WHEN** eine Benachrichtigung „Auftrag #12 an S4“ zugestellt wird
+- **THEN** enthält das Live-Ereignis keinen Auftragstext, und der Eintrag in der Alarmzone zeigt den Text aus der Abfrage
+
+#### Scenario: Fremde Abfrage
+- **WHEN** Person B die Benachrichtigung von Person A per Kennung abfragt
+- **THEN** antwortet der Server mit 404
+
+### Requirement: Ablösung und Unwetter bleiben, wie sie sind
+
+Ablösung (Vorwarnung als Hinweis, Fälligkeit als Alarm, an alle mit dem Modul Ablösung) SHALL ihr
+bisheriges Verhalten behalten; Schichten, die laut Schichtplan zum selben Zeitpunkt fällig sind,
+MUST sich je Zeitpunkt einmal melden (Spec `kraefte-schichtplan`, „Ein Hinweis je Zeitpunkt“).
+Unwetter (an alle im Einsatz mit dem Modul Wetter & Pegel, im
+Browser erkannt) SHALL ab der amtlichen Warnstufe rot (Unwetter, auch extremes Unwetter) ein Alarm
+sein: lauter Ton, Eintrag in der Alarmzone, OS-Meldung bei verdecktem Tab, nicht abschaltbar (Katalog LLH-1142 E1,
+LLH-1425). Geringere Warnstufen MUST NOT benachrichtigen. Beide unterliegen dem gemeinsamen Budget
+der Benachrichtigungen.
+
+#### Scenario: Ablösung fällig
+- **WHEN** eine Schicht fällig wird
+- **THEN** erhalten alle mit dem Modul Ablösung einen Alarm „Ablösung fällig“ wie bisher
+
+#### Scenario: Unwetterwarnung rot
+- **WHEN** für den Einsatzort eine neue amtliche Unwetterwarnung (Stufe rot) gilt und Person A die Unwetterwarnung früher abgeschaltet hatte
+- **THEN** spielt bei A der laute Ton und ein Alarm „Unwetterwarnung“ erscheint mit Sprung zu Wetter & Pegel
+
+#### Scenario: Markantes Wetter
+- **WHEN** für den Einsatzort nur eine Warnung vor markantem Wetter (orange) gilt
+- **THEN** erhält niemand eine Benachrichtigung; die Warnung steht auf der Seite Wetter & Pegel
+
+### Requirement: Sichten räumt den Hinweis bei allen
+
+Geht eine Meldung aus dem Status Neu heraus (Sichten, Bestätigen, In Bearbeitung, Erledigt), SHALL
+der Server ihre offenen Hinweise „Neue Meldung“ für alle Empfänger quittieren; ihre Einträge und
+OS-Meldungen MUST auf allen Verbindungen verschwinden. Ebenso MUST die Kenntnisnahme einer
+Lagemeldung die Hinweise „In die Lage übernommen“ zu ihr quittieren. Ein Alarm MUST davon
+unberührt bleiben.
+
+#### Scenario: Gesichtet in einem anderen Tab
+- **WHEN** Person C eine dringende Meldung sichtet, zu der A und B einen Hinweis haben
+- **THEN** ist der Hinweis bei A und B quittiert und verschwindet in jedem ihrer Tabs
+
+#### Scenario: Kenntnisnahme räumt die Übernahme
+- **WHEN** eine übernommene Lagemeldung als gesehen gekennzeichnet wird
+- **THEN** sind die Hinweise „In die Lage übernommen“ zu ihr quittiert
+
+#### Scenario: Sofortalarm bleibt
+- **WHEN** eine Sofortmeldung auf In Bearbeitung gesetzt wird
+- **THEN** bleiben ihre Alarme offen, bis jeder sie selbst quittiert
+
+### Requirement: Kategorien je Nutzer abschaltbar
+
+Jeder Nutzer SHALL die Benachrichtigungen der Stufe Hinweis je Art abschalten können; die
+Einstellung MUST auf dem Server liegen und auf allen seinen Geräten gelten. Benachrichtigungen der
+Stufe Alarm MUST NOT abschaltbar sein. Eine abgeschaltete Art bleibt in Zählern und Listen sichtbar.
+
+#### Scenario: Gefahren abgeschaltet
+- **WHEN** Person A die Art „Neue Gefahr“ abschaltet und eine Gefahr eingetragen wird
+- **THEN** erhält A weder Ton noch Eintrag noch OS-Meldung, auf keinem Gerät
+
+#### Scenario: Alarm nicht abschaltbar
+- **WHEN** Person A ihre Benachrichtigungs-Einstellungen öffnet
+- **THEN** stehen Sofortmeldung, überfälliger Auftrag, fällige Ablösung, Vermisstenmeldung und Unwetterwarnung als immer an, ohne Schalter
+
+### Requirement: Native Meldung in der Desktop-App
+
+In der Desktop-App SHALL eine Benachrichtigung bei verdecktem oder minimiertem Fenster als native
+Meldung des Betriebssystems erscheinen. Ein Klick darauf MUST das Fenster nach vorn holen; dort
+steht der Eintrag der Benachrichtigung in der Alarmzone mit seinem Sprung zum Bezug bereit.
+
+#### Scenario: Fenster minimiert
+- **WHEN** die Desktop-App minimiert ist und ein Alarm eintrifft
+- **THEN** erscheint eine native Meldung, und ein Klick holt das Fenster nach vorn, wo der Eintrag mit „Öffnen“ in der Alarmzone steht
+
+### Requirement: Gekoppelte Geräte bleiben still
+
+Gekoppelte Geräte SHALL keine Benachrichtigungen erhalten und MUST NOT einen Ton spielen. Einzige Ausnahme ist das Gerät der Ansicht Einheit (LLH-1579): Es SHALL kurz vibrieren, wenn ein neuer Auftrag an die eigene Einheit eingeht, und spielt auch dann keinen Ton. Andere Ereignisse, auch Aufträge an andere Empfänger, lösen keine Vibration aus.
+
+#### Scenario: Gerät mit Modul Meldungen
+- **WHEN** eine Sofortmeldung eingeht und ein gekoppeltes Gerät der Ansicht Einsatzabschnitt den Einsatz zeigt
+- **THEN** spielt das Gerät keinen Ton
+
+#### Scenario: Einheitengerät bei neuem Auftrag
+- **WHEN** die Einsatzleitung einen Auftrag an die Einheit erteilt, an die ein Gerät der Ansicht Einheit gekoppelt ist
+- **THEN** vibriert das Gerät einmal kurz
+- **AND** spielt keinen Ton und zeigt keinen Eintrag in der Alarmzone
+
+#### Scenario: Einheitengerät beim Öffnen
+- **WHEN** das Einheitengerät startet oder neu lädt und bereits offene Aufträge an die Einheit bestehen
+- **THEN** vibriert es nicht
 
 ### Requirement: Drei Stufen
 

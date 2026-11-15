@@ -1,5 +1,5 @@
 import { Button } from 'antd';
-import type { CSSProperties, ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { schriftStil, useRollen } from '../components/instrument/rollenwerte';
 import { RAHMEN_EBENE, RANG_ALARMZONE, useRahmenObenStapel } from '../components/rahmenOben';
 import { useViewport } from '../components/useViewport';
@@ -28,7 +28,36 @@ export default function AlarmZone({ nurAbMd = false }: { nurAbMd?: boolean }) {
   const { token, rollen } = useRollen();
   const sichtbar = eintraege.length > 0 && !(nurAbMd && istSchmal);
   const { ref, oben } = useRahmenObenStapel<HTMLElement>(sichtbar, RANG_ALARMZONE);
+  const wurzel = useRef<HTMLElement | null>(null);
+  const wurzelRef = useCallback(
+    (el: HTMLElement | null) => {
+      wurzel.current = el;
+      ref(el);
+    },
+    [ref],
+  );
+  // Fokus nach einem Umbau der Zone (Review vor dem PR): Auf- und Zuklappen tauschen den Zweig mit
+  // dem fokussierten Knopf aus, „Gelesen“ und ✕ nehmen seine Zeile weg. Ohne Führung stünde der
+  // Fokus danach auf dem Dokument, und der nächste Tab begänne oben.
+  const fokusNach = useRef<'zuklappen' | 'weitere' | 'zone' | null>(null);
+  useEffect(() => {
+    const ziel = fokusNach.current;
+    if (!ziel) return;
+    fokusNach.current = null;
+    const zone = wurzel.current;
+    if (!zone) return;
+    const knopf =
+      zone.querySelector<HTMLElement>(`[data-fokus="${ziel}"]`) ??
+      zone.querySelector<HTMLElement>('button');
+    knopf?.focus();
+  }, [eintraege, aufgeklappt]);
   if (!sichtbar) return null;
+
+  /** Ein Eintrag geht; stand der Fokus in der Zone, bleibt er dort. */
+  const mitFokus = (handlung: () => void) => () => {
+    if (wurzel.current?.contains(document.activeElement)) fokusNach.current = 'zone';
+    handlung();
+  };
 
   const juengster = eintraege[eintraege.length - 1];
   const gebuendelt = eintraege.length >= 2;
@@ -48,7 +77,7 @@ export default function AlarmZone({ nurAbMd = false }: { nurAbMd?: boolean }) {
 
   return (
     <section
-      ref={ref}
+      ref={wurzelRef}
       aria-label="Alarme"
       data-lfh="alarmzone"
       data-anzahl={eintraege.length}
@@ -74,7 +103,11 @@ export default function AlarmZone({ nurAbMd = false }: { nurAbMd?: boolean }) {
             gebuendelt ? (
               <Button
                 type="link"
-                onClick={() => zoneAufklappen(true)}
+                data-fokus="weitere"
+                onClick={() => {
+                  fokusNach.current = 'zuklappen';
+                  zoneAufklappen(true);
+                }}
                 icon={<IconChevronRunter />}
                 iconPlacement="end"
               >
@@ -82,7 +115,8 @@ export default function AlarmZone({ nurAbMd = false }: { nurAbMd?: boolean }) {
               </Button>
             ) : null
           }
-          zaehler={gebuendelt ? eintraege.length : undefined}
+          zaehler={gebuendelt ? { zahl: eintraege.length, alarm } : undefined}
+          mitFokus={mitFokus}
         />
       ) : (
         <>
@@ -94,7 +128,11 @@ export default function AlarmZone({ nurAbMd = false }: { nurAbMd?: boolean }) {
             <span style={textStil(rollen)}>{zaehlung(eintraege)}</span>
             <Button
               type="link"
-              onClick={() => zoneAufklappen(false)}
+              data-fokus="zuklappen"
+              onClick={() => {
+                fokusNach.current = 'weitere';
+                zoneAufklappen(false);
+              }}
               icon={<IconChevronHoch />}
               iconPlacement="end"
             >
@@ -120,6 +158,7 @@ export default function AlarmZone({ nurAbMd = false }: { nurAbMd?: boolean }) {
                 paddingInlineStart: `calc(var(--lfh-seiten-polsterung) + ${token.padding}px)`,
               }}
               mitWort={false}
+              mitFokus={mitFokus}
             />
           ))}
         </>
@@ -174,30 +213,32 @@ function Zeile({
   zusatz,
   zaehler,
   mitWort = true,
+  mitFokus,
 }: {
   eintrag: ZonenEintrag;
   stil: CSSProperties;
   rollen: Farbrollen;
   zusatz?: ReactNode;
-  zaehler?: number;
+  zaehler?: { zahl: number; alarm: boolean };
   mitWort?: boolean;
+  mitFokus: (handlung: () => void) => () => void;
 }) {
   return (
     <div data-lfh="alarm-eintrag" data-schluessel={eintrag.schluessel} style={stil}>
       {mitWort && <Wort stufe={eintrag.stufe === 'alarm' ? 'alarm' : 'hinweis'} rollen={rollen} />}
       {zaehler != null && (
         <span
-          aria-label={`${zaehler} Alarme`}
+          aria-label={`${zaehler.zahl} ${zaehler.alarm ? 'Alarme' : 'Hinweise'}`}
           style={{
             fontFamily: schrift.zahl,
             fontVariantNumeric: 'tabular-nums',
             fontWeight: 700,
             paddingInline: 5,
-            background: rollen.alarm,
+            background: zaehler.alarm ? rollen.alarm : rollen.bedien,
             color: rollen.aufBedien,
           }}
         >
-          {zaehler}
+          {zaehler.zahl}
         </span>
       )}
       <span role="status" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -212,13 +253,13 @@ function Zeile({
         <Button type="primary" onClick={eintrag.oeffnen}>
           Öffnen
         </Button>
-        {eintrag.gelesen && <Button onClick={eintrag.gelesen}>Gelesen</Button>}
+        {eintrag.gelesen && <Button onClick={mitFokus(eintrag.gelesen)}>Gelesen</Button>}
         {zusatz}
         <Button
           type="text"
           aria-label="Ausblenden, ohne zu quittieren"
           icon={<IconKreuz />}
-          onClick={eintrag.ausblenden}
+          onClick={mitFokus(eintrag.ausblenden)}
         />
       </span>
     </div>

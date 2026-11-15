@@ -120,15 +120,17 @@ const DOPPELKLICK_MS = 500;
  * Einsatzweite Benachrichtigungszentrale (design.md D5): zeigt die Benachrichtigungen des
  * Servers (`alarm/useBenachrichtigungen.ts`), darunter seit LLH-1209 auch Sofortmeldung,
  * überfälliger Auftrag, fällige Erinnerung und Ablösung, sowie `lfh:unwetter-alarm` (vom Rahmen,
- * `wetter/useUnwetterHinweis.ts`; die Wetterwarnung erkennt der Browser selbst). Alle teilen EIN Budget nicht selbst-schließender Toasts mit
- * Deeplink zur Quelle (`alarm/useAlarmToasts.tsx`), optional eine OS-Meldung bei Hintergrund-Tab.
- * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
- * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438).
- * Toasts über `App.useApp().notification` (kein statischer Import, sonst Kontext-Leak in Tests).
+ * `wetter/useUnwetterHinweis.ts`; die Wetterwarnung erkennt der Browser selbst). Alle stehen in
+ * der einen Alarmzone (`alarm/useAlarmToasts.tsx` → `alarm/alarmZoneSpeicher.ts`, gezeichnet von
+ * `alarm/AlarmZone.tsx` im Rahmen, LLH-1735) mit Deeplink zur Quelle, optional eine OS-Meldung bei
+ * Hintergrund-Tab. EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im
+ * Layout-Kopf montiert, wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon
+ * geprüft herein (LFH-438).
  *
- * Neben dem Budget steht der Eingangshinweis (`alarm/useEingangshinweis.tsx`, LLH-1062): alle
- * Eingänge des Einsatzes gebündelt im Eingangsband unten (LLH-1143 D7), die Toasts tragen nur
- * Alarme. `darfSichten` ist das Schreibrecht im Einsatz; ohne es fehlt dort „Sichten“.
+ * Neben der Zone steht der Eingangshinweis (`alarm/useEingangshinweis.tsx`, LLH-1062): alle
+ * Eingänge des Einsatzes gebündelt im Eingangsband unten (LLH-1143 D7), die Zone trägt nur
+ * Alarme und Org-Hinweise. Am Handschirm tragen beide die Leiste `alarm/HandyLeiste.tsx`
+ * (LLH-1738). `darfSichten` ist das Schreibrecht im Einsatz; ohne es fehlt dort „Sichten“.
  */
 export default function AlarmZentrale({
   einsatzId,
@@ -147,7 +149,7 @@ export default function AlarmZentrale({
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
   const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
-  // Das gemeinsame Budget (`alarm/useAlarmToasts.tsx`): Benachrichtigungen und Unwetter teilen es.
+  // Die eine Alarmzone (`alarm/useAlarmToasts.tsx`): Benachrichtigungen und Unwetter teilen sie.
   // Ohne Netz vorgemerkt (LLH-1477): Öffnen und Schließen quittieren auch dann.
   const quittiereNachNutzer = useQuittiereNachNutzer(einsatzId);
   const toasts = useAlarmToasts(einsatzId, quittiereNachNutzer);
@@ -181,7 +183,7 @@ export default function AlarmZentrale({
   }, []);
 
   // Browser-Einstellungen können außerhalb der App geändert werden; beim Zurückkehren in den Tab
-  // wird der Zustand neu gelesen. Ist der Tab wieder sichtbar, tragen die Toasts die Alarme, und
+  // wird der Zustand neu gelesen. Ist der Tab wieder sichtbar, trägt die Alarmzone die Alarme, und
   // die OS-Meldungen dieses Tabs werden geschlossen (LFH-951): sonst häuften sich erledigte
   // Alarme im Benachrichtigungs-Center.
   useEffect(() => {
@@ -214,7 +216,7 @@ export default function AlarmZentrale({
       const schluessel = `unwetter-${paar}-${++zaehlerRef.current}`;
       const vorher = unwetterRef.current?.einsatzId === einsatzId ? unwetterRef.current : null;
       if (vorher && toasts.istSichtbar(vorher.schluessel)) toasts.entferne(vorher.schluessel);
-      // Die OS-Meldung zieht mit dem Toast gleich (LFH-951): die neue ersetzt die ältere, auch
+      // Die OS-Meldung zieht mit dem Eintrag gleich (LFH-951): die neue ersetzt die ältere, auch
       // wenn das Paar ein anderes ist. Dasselbe Paar ersetzt sie schon über den `tag`.
       const tag = `${einsatzId}-unwetter-${paar}`;
       if (vorher && vorher.tag !== tag) schliesseDesktopAlarm(vorher.tag);
@@ -306,6 +308,7 @@ export default function AlarmZentrale({
     <HandyLeiste
       einsatzId={einsatzId}
       eingaenge={bandAnzahl}
+      ungelesen={eingaengeUngelesen}
       eingaengeAusblenden={bandAusblenden}
     />
   ) : (

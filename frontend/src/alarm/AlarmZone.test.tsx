@@ -141,4 +141,36 @@ describe('AlarmZone (LLH-1735)', () => {
     setze(eintrag('b-40'));
     expect(zone()).toBeInTheDocument();
   });
+
+  it('der Zähler der gebündelten Zone nennt Hinweise als Hinweise, nicht als Alarme', () => {
+    render(<AlarmZone />);
+    setze(
+      eintrag('b-1', { stufe: 'hinweis', titel: 'Neuer Einsatz', name: 'Neuer Einsatz' }),
+      eintrag('b-2', { stufe: 'hinweis', titel: 'Neuer Einsatz', name: 'Neuer Einsatz' }),
+    );
+    expect(within(zone()).getByLabelText('2 Hinweise')).toBeInTheDocument();
+    expect(within(zone()).queryByLabelText('2 Alarme')).toBeNull();
+  });
+
+  it('Fokus folgt beim Auf- und Zuklappen und beim Gehen einer Zeile', async () => {
+    const a = eintrag('b-1');
+    const b = eintrag('b-2', { beschreibung: 'Auftrag #11' });
+    const c = eintrag('b-3', { beschreibung: 'Auftrag #10' });
+    // „Gelesen“ an b nimmt b aus der Zone, wie es `useAlarmToasts` tut.
+    b.gelesen = vi.fn(() => zoneSetzen(BESITZER, [a, c]));
+    render(<AlarmZone />);
+    setze(a, b, c);
+    await userEvent.click(within(zone()).getByRole('button', { name: '+ 2 weitere' }));
+    expect(document.activeElement).toBe(within(zone()).getByRole('button', { name: 'Zuklappen' }));
+    const zeileB = [...zone().querySelectorAll<HTMLElement>('[data-lfh="alarm-eintrag"]')].find(
+      (z) => z.dataset.schluessel === 'b-2',
+    )!;
+    await userEvent.click(within(zeileB).getByRole('button', { name: 'Gelesen' }));
+    // Die Zeile ist weg; der Fokus steht wieder in der Zone, nicht auf dem Dokument.
+    expect(zone().contains(document.activeElement)).toBe(true);
+    await userEvent.click(within(zone()).getByRole('button', { name: 'Zuklappen' }));
+    expect(document.activeElement).toBe(
+      within(zone()).getByRole('button', { name: '+ 1 weitere' }),
+    );
+  });
 });

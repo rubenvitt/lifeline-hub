@@ -44,9 +44,10 @@ Eine neue Unwetterwarnung meldet die App von selbst als Alarm.
 
 ### Auf eine Unwetterwarnung reagieren
 
-1. Erscheint rechts oben der Alarm „Unwetterwarnung“ mit Ereignis und Zeitraum, „Öffnen“ wählen.
+1. Erscheint in der Alarmzone unter der Kopfzeile (auf dem Handy in der Leiste unten) der Alarm
+   „Unwetterwarnung“ mit Ereignis und Zeitraum, „Öffnen“ wählen.
 
-   ![Hinweis „Unwetterwarnung“ zu Heftigem Starkregen mit dem Knopf „Öffnen“](../bilder/wetter-pegel/unwetter-hinweis.png)
+   ![Alarm „Unwetterwarnung“ zu Heftigem Starkregen in der Alarmzone mit dem Knopf „Öffnen“](../bilder/wetter-pegel/unwetter-hinweis.png)
 
 2. „Wetter & Pegel“ öffnet sich; die Warnung steht unter „Warnungen (DWD)“.
 
