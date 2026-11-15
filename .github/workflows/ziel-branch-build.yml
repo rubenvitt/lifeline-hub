@@ -139,11 +139,12 @@ jobs:
   kompilieren:
     name: Kompilieren
     needs: vorbereiten
-    # Nie in einem Lauf auf einem Kanal-Branch (ein Einzellauf ohne --ref): der hat den
-    # Cache-Bereich des Kanal-Branches (Kopf). `einzellauf` prüft das schon, dies ist die zweite
-    # Sperre. Einen Push-Auslöser hat dieser Workflow nicht (`verteilen` läuft eigens).
+    # Nie im Push-Lauf und nie in einem Lauf auf einem Kanal-Branch (ein Einzellauf ohne --ref):
+    # die haben den Cache-Bereich des Kanal-Branches (Kopf). `einzellauf` prüft das schon, dies ist
+    # die zweite Sperre. Einen Push-Auslöser hat dieser Workflow seit LLH-1896 nicht mehr
+    # (`verteilen` läuft eigens); die Bedingung bleibt als Sperre, falls einer zurückkommt (ADR-0030).
     if: >-
-      ${{ needs.vorbereiten.outputs.rechnen == 'true'
+      ${{ github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true'
           && !contains(fromJSON('["main", "beta", "alpha"]'), github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -249,7 +250,7 @@ jobs:
   melden:
     name: Melden
     needs: [vorbereiten, kompilieren]
-    if: ${{ !cancelled() && needs.vorbereiten.outputs.rechnen == 'true' }}
+    if: ${{ !cancelled() && github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # actions: read — ob ein Push-Lauf (`ziel-branch-verteilen.yml`) noch aussteht, bevor ein überholter Check rot wird.

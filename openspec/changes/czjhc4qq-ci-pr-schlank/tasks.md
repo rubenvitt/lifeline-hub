@@ -16,7 +16,7 @@
 
 ## 3. Doku und Regeln
 
-- [ ] 3.1 Neue ADR (nächste freie Nummer über `origin/alpha`) mit `ersetzt: ADR-0047` und Prüfblock; ADR-0047 auf `status: ersetzt`, `ersetzt_durch`; Architektur-Wächter in `check-all.sh --nur schnell` grün
+- [x] 3.1 Neue ADR (nächste freie Nummer über `origin/alpha`) mit `ersetzt: ADR-0047` und Prüfblock; ADR-0047 auf `status: ersetzt`, `ersetzt_durch`; Architektur-Wächter in `check-all.sh --nur schnell` grün
 - [ ] 3.2 `scripts/AGENTS.md` („Leichte PR-Prüfung“: Workflow je Ereignis, Pflichtliste in `ruleset-pruefen.sh`, Ruleset-Lauf), Kapitel 7 (Diagramm und Text, `Stand`), README und Kommentare, die `ci.yml` als PR-Workflow nennen, nachziehen; ein grep über das Repo (ohne Archive) findet keine Stelle mehr, die `ci.yml` im PR laufen lässt
 
 ## 4. Gesamtprüfung

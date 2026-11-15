@@ -105,7 +105,9 @@ pruefe "ziel-branch-build.yml ohne push (Verteilen läuft eigens)" nur_ausloeser
 pruefe "ziel-branch-verteilen.yml hört nur auf push" nur_ausloeser "$ZBV" "push "
 pruefe "migrationen.yml hört nur auf pull_request" nur_ausloeser "$MIG" "pull_request "
 pruefe "migrationen-kanal.yml hört nur auf push" nur_ausloeser "$MIGK" "push "
-for datei in "$PR" "$ZBB" "$MIG"; do
+# Ein `if` auf `push` hieße: der Job erwartet ein Ereignis, das dieser Workflow nicht hat.
+# `ziel-branch-build.yml` behält `!= 'push'` bewusst als zweite Sperre (ADR-0030).
+for datei in "$PR" "$MIG"; do
   for id in $(job_ids "$datei"); do
     pruefe "$(basename "$datei"): Job $id fragt nicht nach push" fehlt "$(job_if "$datei" "$id")" "'push'"
   done

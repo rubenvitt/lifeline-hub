@@ -487,6 +487,8 @@ form "F5 Checkout in kompilieren ohne Zugangsdaten" 0 hat "$K" 'persist-credenti
 pruefe "F6 das Token sieht in kompilieren nur der Fetch" 1 "$(anzahl "$K" 'github.token')"
 form "F12 kompilieren läuft nie auf einem Kanal-Branch" 0 hat "$K" 'contains\(fromJSON\(.\["main", "beta", "alpha"\].\), github.ref_name\)'
 form "F12 der Einzellauf prüft PR und Ref" 0 hat "$(job vorbereiten)" 'ziel-branch-build.sh einzellauf'
+form "F11 kompilieren läuft nie im Push-Lauf" 0 hat "$K" "github.event_name != 'push' && needs.vorbereiten"
+form "F11 melden läuft nie im Push-Lauf" 0 hat "$M" "if: .*github.event_name != 'push'"
 # LLH-1896: verteilen läuft in ziel-branch-verteilen.yml; dieser Workflow hat keinen Push-Auslöser.
 form "F11 kein Push-Auslöser" 1 hat "$W" '^  push:'
 form "F11 verteilen steht nicht hier" 1 hat "$W" '^  verteilen:'
