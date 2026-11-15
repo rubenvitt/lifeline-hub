@@ -140,6 +140,7 @@ export function eingangTitel(
 
 /** Was das Band gerade zeigt; `null`: kein Band. */
 type BandAnsicht = {
+  anzahl: number;
   titel: string;
   inhalt: ReactNode;
   aktion: { text: string; beiKlick: () => void };
@@ -169,7 +170,14 @@ export function useEingangshinweis(
   einsatzId: number,
   quittiere: (id: number) => void,
   darfSichten: boolean,
-): { hinweis: Eingangshinweis; band: ReactNode } {
+): {
+  hinweis: Eingangshinweis;
+  band: ReactNode;
+  /** Einträge, die das Band zeigt; am Handschirm nennt sie die Leiste (LLH-1738). */
+  bandAnzahl: number;
+  /** ✕ des Bands: blendet seine Einträge aus, ohne zu quittieren. */
+  bandAusblenden: () => void;
+} {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [ansicht, setAnsicht] = useState<BandAnsicht | null>(null);
@@ -318,6 +326,7 @@ export function useEingangshinweis(
 
     const weitere = zeilen.length - EINGANG_ZEILEN;
     setAnsicht({
+      anzahl: zeilen.length,
       titel: eingangTitel(zeilen),
       inhalt: (
         <>
@@ -469,5 +478,6 @@ export function useEingangshinweis(
       {ansicht.inhalt}
     </Eingangsband>
   ) : null;
-  return { hinweis, band };
+  const bandAusblenden = useCallback(() => ansicht?.beiSchliessen(), [ansicht]);
+  return { hinweis, band, bandAnzahl: ansicht?.anzahl ?? 0, bandAusblenden };
 }

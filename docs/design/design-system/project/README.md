@@ -36,6 +36,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **Zeitdarstellung (taktisch und Datum mit Uhrzeit)** (`components/Zeitdarstellung/`, Gruppe Daten)
 - **Zeiteingabe (Wert mit Schnellwahl, leer, unlesbar)** (`components/Zeiteingabe/`, Gruppe Formular)
 - **Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)** (`components/Ortsfeld/`, Gruppe Formular)
+- **Alarmzone (gebündelt, aufgeklappt)** (`components/Alarmzone/`, Gruppe Rückmeldung)
 - **Eingänge (Knopf im Kopf und Eingangsband)** (`components/Eingaenge/`, Gruppe Rückmeldung)
 - **SichtungsWahl (BBK-Flächen, ohne und mit Wahl)** (`components/SichtungsWahl/`, Gruppe Fach)
 - **Körperschema (Lesen)** (`components/Koerperschema/`, Gruppe Fach)
@@ -99,7 +100,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   und `components/FunkUndTelefon.tsx` (Verbindungen) · `components/InlineAngabe.tsx` ·
   `components/tabellenFilter.tsx` (Filterchips und Kopfmarke; Träger `KatalogTabelle`,
   `Datensicht`; Sortieren und Filtern in der Bedien-Leitlinie) · `alarm/EingaengeKnopf.tsx` und
-  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `personen/SichtungsWahl.tsx` ·
+  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `alarm/AlarmZone.tsx` (Alarmzone,
+  Rahmen) · `personen/SichtungsWahl.tsx` ·
   `personen/koerperschema/Koerperschema.tsx` · `zeichen/EinsatzZeichen.tsx` (taktische Zeichen,
   am Schirm mit `useZeichenTheme`, LLH-1409). Jeder hat eine Karte im Design System.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
@@ -140,11 +142,17 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     nie gerechnet). Ausnahme nur mit Vermerk `rahmen-oben: frei` und Grund (Guard
     `components/rahmenOben.guard.test.ts`). Den Fokusabstand trägt `scroll-padding-block-start`
     am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
-  - **Stehende Alarme liegen unter der Bedienkante** (LFH-1112, Spec
-    `einsatztauglichkeit-layout`): unter Kommandoleiste und Seitenkopf, solange er im Bild ist,
-    gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
-    Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
-    deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
+  - **Alarme stehen in der Alarmzone, nie über dem Inhalt** (LLH-1735, Spec
+    `benachrichtigungen`, „Alarmzone verdeckt nichts“, Herleitung
+    `openspec/changes/zu9ptja2-alarmzone/design.md`; löst LFH-1112 ab): Alarme, Org-Hinweise und
+    die Unwetterwarnung zeichnet `alarm/AlarmZone.tsx` direkt unter Kopf und Übungsband, nie
+    antds `notification` (`AntApp` trägt kein `notification`-Prop). Die Zone ist eine
+    Rahmenquelle unter dem Übungsband (`useRahmenObenStapel` mit `RANG_ALARMZONE`), schiebt den
+    Inhalt und liegt auf `RAHMEN_EBENE` unter Drawer und Dialogen. Ab zwei Einträgen bündelt sie.
+    Im Einsatz unter `md` trägt die Leiste am Handschirm die Alarme (`alarm/Eingangsband.tsx`).
+    ✕ blendet aus (`blendeAus`, sessionStorage je Tab), quittiert wird nur mit „Öffnen“ und
+    „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
+    Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
     `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,

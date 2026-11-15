@@ -33,10 +33,25 @@ const bekannt = new Map<number, BenachrichtigungAnzeige>();
  * Zentrale über die Meldung selbst. Ohne Eintrag 404, dann bleibt der Text des Servers.
  */
 const meldungen = new Map<number, { absender: string; inhalt: string }>();
+/**
+ * Was `GET /api/einsaetze/{e}/erinnerungen` liefert (LLH-1737): den Titel einer fälligen
+ * Erinnerung holt die Zentrale aus der offenen Liste. Ohne Eintrag bleibt der Text des Servers.
+ */
+const offeneErinnerungen = new Map<number, string>();
 beforeEach(() => {
   bekannt.clear();
   meldungen.clear();
+  offeneErinnerungen.clear();
   server.use(
+    http.get('/api/einsaetze/:einsatzId/erinnerungen', ({ params }) =>
+      HttpResponse.json(
+        [...offeneErinnerungen].map(([id, titel]) => ({
+          id,
+          einsatz_id: Number(params.einsatzId),
+          titel,
+        })),
+      ),
+    ),
     http.get('/api/benachrichtigungen/:id', ({ params }) => {
       const b = bekannt.get(Number(params.id));
       return b
@@ -327,20 +342,30 @@ describe('AlarmZentrale', () => {
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=3');
   });
 
-  it('zeigt eine fällige Erinnerung im Eingangsband, ohne Detailzeile (LLH-1143)', async () => {
+  it('zeigt eine fällige Erinnerung mit ihrem Titel im Eingangsband (LLH-1143, LLH-1737)', async () => {
+    offeneErinnerungen.set(5, 'Pegel prüfen');
     renderAlarm();
     erinnerungFaellig(5);
-    await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
-    // Ein Eingang, kein Alarm: das Band, kein Toast.
+    await waitFor(() =>
+      expect(screen.getByText('Erinnerung fällig: Pegel prüfen')).toBeInTheDocument(),
+    );
+    // Ein Eingang, kein Alarm: das Band, nicht die Alarmzone.
     const band = screen
-      .getByText('Erinnerung fällig')
+      .getByText('Erinnerung fällig: Pegel prüfen')
       .closest<HTMLElement>('[data-lfh="eingangsband"]')!;
     expect(band).not.toBeNull();
     expect(zonenZahl()).toBe(0);
     // LFH-1078: der Titel sagt alles, kein Bittsatz darunter.
-    expect(screen.getAllByText('Erinnerung fällig')).toHaveLength(1);
+    expect(screen.getAllByText(/^Erinnerung fällig/)).toHaveLength(1);
     await userEvent.click(within(band).getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
+  });
+
+  it('ohne Titel der Erinnerung bleibt der Text des Servers (LLH-1737)', async () => {
+    renderAlarm();
+    erinnerungFaellig(6);
+    await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
+    expect(screen.queryByText(/^Erinnerung fällig:/)).not.toBeInTheDocument();
   });
 
   it('zeigt einen überfälligen Auftrag und springt zum Auftrag', async () => {

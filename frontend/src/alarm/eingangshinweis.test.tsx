@@ -472,15 +472,29 @@ describe('Eingangshinweis (LLH-1062)', () => {
     expect(s.quittiert).toEqual([]);
   });
 
-  it('auf schmalen Schirmen steht das Band über die ganze Breite, ab md rechts', async () => {
+  it('auf schmalen Schirmen trägt die Leiste den Eingang: über die Breite, 48 px (LLH-1738)', async () => {
     const a = auftragEingang(2201, 31);
     serverMit([a], {});
     setzeViewportBreite(390);
     renderZentrale();
     live(a);
-    const schmal = await waitFor(() => hinweis('Neuer Auftrag'));
-    expect(schmal.style.insetInlineStart).not.toBe('auto');
-    expect(schmal.style.position).toBe('fixed');
+    const leiste = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="handy-leiste"]');
+      if (!el) throw new Error('keine Leiste');
+      return el;
+    });
+    expect(leiste).toHaveTextContent('1 Eingang');
+    expect(leiste.style.position).toBe('fixed');
+    expect(leiste.style.height).toBe('48px');
+    expect(document.querySelector('[data-lfh="eingangsband"]')).toBeNull();
+    // ✕ blendet den Eingang aus; die Leiste geht.
+    await userEvent.click(
+      within(leiste).getByRole('button', { name: 'Ausblenden, ohne zu quittieren' }),
+    );
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="handy-leiste"]')).not.toBeInTheDocument(),
+    );
+    expect(istAusgeblendet(2201)).toBe(true);
   });
 });
 

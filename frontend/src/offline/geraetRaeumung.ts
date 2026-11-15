@@ -9,7 +9,7 @@
  *
  * Einziger Aufrufer ist der `AuthProvider` (`auth/AuthContext.tsx`), wie beim Lagebild.
  */
-import { ausgeblendetRaeumen } from '../alarm/benachrichtigungGedaechtnis';
+import { ausgeblendetRaeumen, verlaufInhalt } from '../alarm/benachrichtigungGedaechtnis';
 import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
 import { listenGedaechtnisRaeumen } from '../components/listenGedaechtnis';
@@ -274,6 +274,8 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     ortCache: ortCacheRaeumen,
     erfassungsSitzung: erfassungsSitzungRaeumen,
     alarmAusgeblendet: ausgeblendetRaeumen,
+    // Absender, Wortlaut und Titel der Eingänge im Speicher des Tabs (LLH-1737), kein Speicherort.
+    verlaufInhalt: () => verlaufInhalt.clear(),
     listenGedaechtnis: listenGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
     stammdatenfeldZuletzt: zuletztRaeumen,

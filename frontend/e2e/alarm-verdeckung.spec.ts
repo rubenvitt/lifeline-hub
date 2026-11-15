@@ -3,35 +3,29 @@ import { anmelden, einsatzAnlegen, post } from './fuehrungsorganisation-kern';
 import { benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /**
- * Stehende Alarme verdecken keine Bedienkante (LFH-1112, Spec `einsatztauglichkeit-layout`).
- * Die AlarmZentrale zeigt Alarme als stehende Benachrichtigung oben rechts. Vorher lag sie
- * dort über dem rechten Ende von Kommandoleiste und Seitenkopf; bei 1366 px war „Schicht
- * beginnen“ ganz verdeckt.
+ * Alarmzone verdeckt nichts (LLH-1735, Spec `benachrichtigungen`, „Alarmzone verdeckt nichts“;
+ * Spec `einsatztauglichkeit-layout`, „Kein Fokusziel vollständig verdeckt“). Vorher standen
+ * Alarme als antd-Notification oben rechts über Seitenaktionen, dem Navigations-Drawer und
+ * Dialogen (LFH-1112, LLH-1716). Jetzt steht die Zone im Rahmen unter dem Kopf, schiebt den
+ * Inhalt und liegt unter Drawer und Dialog.
  *
  * GESÄT: überfällige Schichten. Der Erinnerungs-Scheduler meldet sie im nächsten Takt (30 s)
- * über den echten Weg (Live-Strom → AlarmZentrale), kein synthetisches Ereignis.
+ * über den echten Weg (Live-Strom → AlarmZentrale → Alarmzone), kein synthetisches Ereignis.
  *
  * GEPRÜFT mit Treffer-Prüfung (`frontend/e2e/AGENTS.md`: `toBeVisible` belegt keine
  * Klickbarkeit): „Schicht beginnen“ mit echtem Klick, jedes Bedienelement der Kommandoleiste
- * probehalber (`trial`, dieselbe Prüfung, ob nichts darüber liegt, ohne Menüs zu öffnen). Dazu
- * die Lage: jeder Alarm beginnt unter Kommandoleiste und Seitenkopf, gerollt unter der Leiste.
+ * probehalber (`trial`). Dazu die Lage: die Zone beginnt unter dem Kopf, der Seitenkopf unter
+ * der Zone; gerollt klebt sie unter dem Kopf; über ihr liegen Dialog und Drawer.
  *
- * Mutationsproben (beide gefahren): die Regel `--notification-top` in `src/index.css` entfernen
- * → beide Tests rot („Alarm beginnt bei 18, Bedienkante 97“); dazu die Lageprüfung aussetzen →
- * rot an der Treffer-Prüfung (Ton- und Benachrichtigungsknopf der Kommandoleiste verdeckt).
- *
- * Dazu das Eingangsband (LLH-1143, design.md D7): ein Eingang neben drei stehenden Alarmen
- * verdrängt keinen (antds `maxCount` 3 zählte eine Notification mit) und liegt nicht über ihnen.
- * Mutationsprobe (gefahren): der Eingangshinweis als `notification.info` (Stand vor LLH-1143) →
- * rot; dort standen nach dem Eingang nur noch zwei der drei Alarme neben ihm.
+ * Mutationsproben (gefahren): `position: sticky` an der Zone entfernen → rot an „gerollt klebt
+ * sie“; `zIndex` der Zone über 1000 → rot an „Dialog liegt über der Zone“.
  */
 
 const KOPF = '[data-lfh="rahmen-kopf"]';
 const SEITENKOPF = '[data-lfh="seitenkopf"]';
-const ALARM = '.ant-notification-notice:not(.ant-notification-fade-leave)';
+const ZONE = '[data-lfh="alarmzone"]';
+const EINTRAG = '[data-lfh="alarm-eintrag"]';
 const BAND = '[data-lfh="eingangsband"]';
-/** Abstand der Alarme zur Bedienkante (`ALARM_ABSTAND` in `components/alarmOben.ts`). */
-const ABSTAND = 8;
 
 async function seede(page: Page, anzahl: number): Promise<string> {
   const einsatzId = await einsatzAnlegen(page, `E2E Alarmverdeckung ${Date.now()}`);
@@ -47,30 +41,22 @@ async function seede(page: Page, anzahl: number): Promise<string> {
   return einsatzId;
 }
 
-async function unterkante(ort: Locator): Promise<number> {
-  const box = await ort.boundingBox();
-  expect(box, 'Element ohne Box').not.toBeNull();
-  return box!.y + box!.height;
+async function box(ort: Locator) {
+  const b = await ort.boundingBox();
+  expect(b, 'Element ohne Box').not.toBeNull();
+  return b!;
 }
 
-/** Oberkante des obersten stehenden Alarms (die DOM-Folge ist nicht die Bildfolge). */
-async function obersterAlarm(page: Page): Promise<number> {
-  const oben = await page
-    .locator(ALARM)
-    .evaluateAll((alarme) => alarme.map((a) => a.getBoundingClientRect().y));
-  return Math.min(...oben);
+async function zonenZahl(page: Page): Promise<number> {
+  return Number((await page.locator(ZONE).getAttribute('data-anzahl')) ?? 0);
 }
 
-/** Jeder stehende Alarm beginnt unter `kante` (+ Abstand), auf den halben Pixel. */
-async function alarmeUnter(page: Page, kante: number) {
-  const alarme = page.locator(ALARM);
-  for (const alarm of await alarme.all()) {
-    const box = await alarm.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.y, `Alarm beginnt bei ${box!.y}, Bedienkante ${kante}`).toBeGreaterThanOrEqual(
-      kante + ABSTAND - 0.5,
-    );
-  }
+/** Was in der Mitte der Zone obenauf liegt, gehört nicht zur Zone. */
+async function zoneVerdeckt(page: Page): Promise<boolean> {
+  return page.locator(ZONE).evaluate((zone) => {
+    const r = zone.getBoundingClientRect();
+    return !zone.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+  });
 }
 
 /**
@@ -98,29 +84,30 @@ async function kommandoleisteKlickbar(page: Page) {
 }
 
 async function pruefe(page: Page, anzahl: number) {
-  await expect(page.locator(ALARM)).toHaveCount(anzahl, { timeout: 75_000 });
-  await expect(page.locator(ALARM).first()).toBeVisible();
-  const kante = Math.max(
-    await unterkante(page.locator(KOPF)),
-    await unterkante(page.locator(SEITENKOPF)),
-  );
-  await alarmeUnter(page, kante);
+  await expect(page.locator(ZONE)).toHaveAttribute('data-anzahl', String(anzahl), {
+    timeout: 75_000,
+  });
+  // Die Zone steht unter dem Kopf, der Seitenkopf darunter: sie schiebt, statt zu verdecken.
+  const kopf = await box(page.locator(KOPF));
+  const zone = await box(page.locator(ZONE));
+  const seitenkopf = await box(page.locator(SEITENKOPF));
+  expect(zone.y).toBeGreaterThanOrEqual(kopf.y + kopf.height - 0.5);
+  expect(seitenkopf.y).toBeGreaterThanOrEqual(zone.y + zone.height - 0.5);
   await kommandoleisteKlickbar(page);
 
-  // Die Hauptaktion des Seitenkopfs mit echtem Klick: der Dialog öffnet sich.
+  // Die Hauptaktion des Seitenkopfs mit echtem Klick; der Dialog liegt über der Zone.
   await page.getByRole('button', { name: 'Schicht beginnen', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
+  expect(await zoneVerdeckt(page), 'Dialog liegt über der Zone').toBe(true);
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 }
 
-test.describe('Stehende Alarme unter der Bedienkante', () => {
+test.describe('Alarmzone verdeckt nichts', () => {
   test.setTimeout(150_000);
 
-  test('Desktop 1366: ein Alarm, Kopfknopf und Kommandoleiste erreichbar, Alarm quittierbar', async ({
-    page,
-  }) => {
+  test('Desktop 1366: ein Alarm, Seitenaktion frei, „Gelesen“ quittiert', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmelden(page);
     const einsatzId = await seede(page, 1);
@@ -129,13 +116,15 @@ test.describe('Stehende Alarme unter der Bedienkante', () => {
 
     await pruefe(page, 1);
 
-    // Der Alarm bleibt bedienbar: „Schließen“ quittiert ihn.
-    const alarm = page.locator(ALARM);
-    await alarm.getByRole('button', { name: 'Schließen', exact: true }).click();
-    await expect(alarm).toHaveCount(0);
+    // „Gelesen“ quittiert, die Seite bleibt, die Zone geht.
+    await page.locator(EINTRAG).getByRole('button', { name: 'Gelesen', exact: true }).click();
+    await expect(page.locator(ZONE)).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/abloesung$`));
   });
 
-  test('Tablet 820: drei Alarme, gerollt unter der Leiste, „Öffnen“ wirkt', async ({ page }) => {
+  test('Tablet 820: drei Alarme gebündelt, gerollt unter dem Kopf, Drawer darüber, „Öffnen“ wirkt', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 820, height: 1180 });
     await anmelden(page);
     const einsatzId = await seede(page, 3);
@@ -143,23 +132,52 @@ test.describe('Stehende Alarme unter der Bedienkante', () => {
     await expect(page.getByRole('article', { name: 'Schicht Florian Alarm 3' })).toBeVisible();
 
     await pruefe(page, 3);
+    // Ab zwei gebündelt: eine Zeile mit dem jüngsten.
+    await expect(page.locator(EINTRAG)).toHaveCount(1);
+    await expect(page.getByRole('button', { name: '+ 2 weitere', exact: true })).toBeVisible();
 
-    // Gerollt: der Seitenkopf ist aus dem Bild, die Alarme rücken unter die klebende Leiste.
+    // Der Navigations-Drawer liegt über der Zone.
+    await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+    await expect(page.locator('.ant-drawer-open')).toBeVisible();
+    expect(await zoneVerdeckt(page), 'Drawer liegt über der Zone').toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.ant-drawer-open')).toHaveCount(0);
+
+    // Gerollt: die Zone klebt unter dem Kopf.
     await page.setViewportSize({ width: 820, height: 600 });
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    const kopfUnten = await unterkante(page.locator(KOPF));
+    const kopf = await box(page.locator(KOPF));
     await expect
-      .poll(async () => unterkante(page.locator(SEITENKOPF)), {
-        message: 'Seitenkopf rollt unter die Leiste',
-      })
-      .toBeLessThanOrEqual(kopfUnten);
-    await expect.poll(async () => obersterAlarm(page)).toBeCloseTo(kopfUnten + ABSTAND, 0);
+      .poll(async () => (await box(page.locator(ZONE))).y, { message: 'Zone klebt unter dem Kopf' })
+      .toBeCloseTo(kopf.y + kopf.height, 0);
     await kommandoleisteKlickbar(page);
 
-    // „Öffnen“ führt zur Ablösung und quittiert den Alarm.
-    const erster = page.locator(ALARM).first();
-    await erster.getByRole('button', { name: 'Öffnen', exact: true }).click();
-    await expect(page.locator(ALARM)).toHaveCount(2);
+    // Rückwärts getabbt liegt kein Ziel des Inhalts vollständig hinter Kopf oder Zone.
+    const zone = await box(page.locator(ZONE));
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press('Shift+Tab');
+      const ziel = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || el === document.body) return null;
+        if (el.closest('[data-lfh="rahmen-kopf"], [data-lfh="alarmzone"]')) return null;
+        const r = el.getBoundingClientRect();
+        return { unten: r.y + r.height, name: el.getAttribute('aria-label') ?? el.textContent };
+      });
+      if (!ziel) continue;
+      expect(ziel.unten, `„${ziel.name}“ liegt hinter der Zone`).toBeGreaterThan(
+        zone.y + zone.height,
+      );
+    }
+
+    // Aufgeklappt springt „Öffnen“ und quittiert nur seinen Alarm.
+    await page.getByRole('button', { name: '+ 2 weitere', exact: true }).click();
+    await expect(page.locator(EINTRAG)).toHaveCount(3);
+    await page
+      .locator(EINTRAG)
+      .first()
+      .getByRole('button', { name: 'Öffnen', exact: true })
+      .click();
+    await expect.poll(() => zonenZahl(page)).toBe(2);
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/abloesung`));
   });
 
@@ -174,7 +192,7 @@ test.describe('Stehende Alarme unter der Bedienkante', () => {
     await mitgliedEintragen(page, einsatzId, konto.id, 'fuehrungspersonal');
     await page.goto(`/einsaetze/${einsatzId}/abloesung`);
     await expect(page.getByRole('article', { name: 'Schicht Florian Alarm 3' })).toBeVisible();
-    await expect(page.locator(ALARM)).toHaveCount(3, { timeout: 75_000 });
+    await expect(page.locator(ZONE)).toHaveAttribute('data-anzahl', '3', { timeout: 75_000 });
 
     const zweiter = await request.newContext({ baseURL: test.info().project.use.baseURL });
     try {
@@ -198,24 +216,16 @@ test.describe('Stehende Alarme unter der Bedienkante', () => {
 
     const band = page.locator(BAND);
     await expect(band).toBeVisible({ timeout: 20_000 });
-    // Kein Alarm verdrängt, keiner gebündelt.
-    await expect(page.locator(ALARM)).toHaveCount(3);
-    const bandBox = (await band.boundingBox())!;
-    for (const alarm of await page.locator(ALARM).all()) {
-      const a = (await alarm.boundingBox())!;
-      const ueberlappt =
-        a.x < bandBox.x + bandBox.width &&
-        bandBox.x < a.x + a.width &&
-        a.y < bandBox.y + bandBox.height &&
-        bandBox.y < a.y + a.height;
-      expect(ueberlappt, 'Eingangsband liegt über einem Alarm').toBe(false);
-    }
-    // Die Alarme bleiben unter der Bedienkante, die Kommandoleiste bedienbar.
-    const kante = Math.max(
-      await unterkante(page.locator(KOPF)),
-      await unterkante(page.locator(SEITENKOPF)),
-    );
-    await alarmeUnter(page, kante);
+    // Der Eingang steht nicht in der Zone, und das Band liegt nicht über ihr.
+    expect(await zonenZahl(page)).toBe(3);
+    const bandBox = await box(band);
+    const z = await box(page.locator(ZONE));
+    const ueberlappt =
+      z.x < bandBox.x + bandBox.width &&
+      bandBox.x < z.x + z.width &&
+      z.y < bandBox.y + bandBox.height &&
+      bandBox.y < z.y + z.height;
+    expect(ueberlappt, 'Eingangsband liegt über der Alarmzone').toBe(false);
     await kommandoleisteKlickbar(page);
     // Das Band unten im Bild, mit Abstand zum Rand.
     const hoehe = page.viewportSize()!.height;

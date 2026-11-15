@@ -119,8 +119,8 @@ schwer oder extrem (rot und darüber) am Einsatzort, mit dem Alarmton, auf jeder
 Einsatzes und, wenn Benachrichtigungen erlaubt sind, auch im verdeckten Tab. Je Person und Einsatz
 meldet die App dieselbe Warnung nur einmal. Wie jeder Alarm lässt er sich unter
 „Benachrichtigungen“ nicht abschalten (Kapitel
-[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Kommen viele Alarme zugleich, fasst
-die App sie wie alle Benachrichtigungen zu einem Sammeltoast zusammen. Warnungen geringer und
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Kommen mehrere Alarme zugleich, bündelt
+die Alarmzone sie wie alle Benachrichtigungen; eine neuere Unwetterwarnung ersetzt die ältere. Warnungen geringer und
 mäßiger Stufe lösen nichts aus. Der
 Beginn einer angekündigten Unwetterwarnung steht zudem im Überblick unter „Nächste Marken“. Jede
 geltende oder angekündigte Warnung, gleich welcher Stufe, steht außerdem still als Marke im

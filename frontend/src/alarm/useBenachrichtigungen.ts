@@ -37,6 +37,7 @@ import {
   quittiert,
   vergissAusgeblendet,
 } from './benachrichtigungGedaechtnis';
+import { ladeErinnerungTitel } from './erinnerungInhalt';
 import { ladeMeldungInhalt, type MeldungInhalt } from './meldungInhalt';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
 import { markVerlaufQuittiert } from './useBenachrichtigungVerlauf';
@@ -145,7 +146,18 @@ function ersatzAnzeige(e: BenachrichtigungEreignis): BenachrichtigungAnzeige {
 }
 
 /**
- * Der Toast einer Benachrichtigung. `inhalt` (LLH-1052, `meldungInhalt.ts`) ersetzt Titel und
+ * Der Titel einer fälligen Erinnerung (LLH-1737, `erinnerungInhalt.ts`) hinter dem Titel des
+ * Servers: „Erinnerung fällig: Pegel prüfen“. Ohne Titel bleibt der Text des Servers.
+ */
+function mitErinnerungTitel(
+  a: BenachrichtigungAnzeige,
+  titel: string | null,
+): BenachrichtigungAnzeige {
+  return titel ? { ...a, titel: `${a.titel}: ${titel}` } : a;
+}
+
+/**
+ * Der Eintrag einer Benachrichtigung in der Alarmzone. `inhalt` (LLH-1052, `meldungInhalt.ts`) ersetzt Titel und
  * Detailzeile des Servers durch Absender und Wortlautanfang der Meldung; was fehlt, bleibt beim
  * Server.
  */
@@ -236,6 +248,9 @@ export function useBenachrichtigungen(
   konvRef.current = useAnzeigeKonventionen().konventionen;
   const benutzerIdRef = useRef<number | undefined>(undefined);
   benutzerIdRef.current = useAuthOptional()?.benutzer?.id;
+  // Für den Titel einer Erinnerung aus dem Cache (LLH-1737); optional wie in den Tests.
+  const qcRef = useRef<QueryClient | undefined>(undefined);
+  qcRef.current = useContext(QueryClientContext);
 
   useEffect(() => {
     let aktiv = true;
@@ -273,8 +288,10 @@ export function useBenachrichtigungen(
       }
       if (!unbekannt(id)) return;
       inArbeit.add(id);
-      // Der Inhalt der Meldung (LLH-1052) kommt parallel und mit eigener Frist; er wirft nie.
+      // Der Inhalt der Meldung (LLH-1052) und der Titel einer Erinnerung (LLH-1737) kommen
+      // parallel und mit eigener Frist; sie werfen nie.
       const inhaltZusage = ladeMeldungInhalt(e);
+      const erinnerungZusage = ladeErinnerungTitel(e, qcRef.current);
       let anzeige: BenachrichtigungAnzeige;
       let inhalt: MeldungInhalt | null;
       try {
@@ -285,6 +302,7 @@ export function useBenachrichtigungen(
           anzeige = ersatzAnzeige(e);
         }
         inhalt = await inhaltZusage;
+        anzeige = mitErinnerungTitel(anzeige, await erinnerungZusage);
       } finally {
         inArbeit.delete(id);
       }
@@ -330,12 +348,17 @@ export function useBenachrichtigungen(
           const offen = [...liste]
             .reverse()
             .filter((a) => !a.quittiert_at && passt(a, einsatzId) && unbekannt(a.id));
-          // Die Inhalte (LLH-1052) zusammen holen, je mit Frist: ein Abruf je offenem Alarm.
-          const inhalte = await Promise.all(offen.map((a) => ladeMeldungInhalt(a)));
+          // Die Inhalte (LLH-1052) zusammen holen, je mit Frist: ein Abruf je offenem Alarm. Die
+          // Titel der Erinnerungen (LLH-1737) teilen sich über den Cache einen Abruf.
+          const [inhalte, erinnerungTitel] = await Promise.all([
+            Promise.all(offen.map((a) => ladeMeldungInhalt(a))),
+            Promise.all(offen.map((a) => ladeErinnerungTitel(a, qcRef.current))),
+          ]);
           if (!aktiv) return;
           let ton = false;
           let eingangNeu = false;
-          for (const [i, a] of offen.entries()) {
+          for (const [i, roh] of offen.entries()) {
+            const a = mitErinnerungTitel(roh, erinnerungTitel[i]);
             // Während der Inhalte kann sie live gekommen oder quittiert worden sein.
             if (!unbekannt(a.id)) continue;
             const wiederholt = gezeigt.has(a.id);

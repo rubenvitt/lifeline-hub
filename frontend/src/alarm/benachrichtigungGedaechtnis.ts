@@ -12,6 +12,14 @@ export const inArbeit = new Set<number>();
 /** Schon einmal gezeigt: kommt sie nach einem Layoutwechsel wieder, dann ohne Ton. */
 export const gezeigt = new Set<number>();
 
+/** Was der Verlauf „Eingänge“ zu einer Benachrichtigung zeigt (LLH-1737). */
+export type VerlaufInhalt = { titel: string; detail?: string | null };
+/**
+ * Inhalt je Benachrichtigung für den Verlauf (`EingaengeKnopf.tsx`): ein erneutes Öffnen holt ihn
+ * nicht noch einmal. `null`: geholt, aber ohne Inhalt.
+ */
+export const verlaufInhalt = new Map<number, VerlaufInhalt | null>();
+
 /**
  * Speicherort der ausgeblendeten Benachrichtigungen (`GERAETESPEICHER`, `jeder-ausgang`). Je Tab
  * und bis der Tab schließt: `sessionStorage` überlebt das Neuladen, nicht den nächsten Tab.
@@ -83,5 +91,6 @@ export function benachrichtigungenZuruecksetzenFuerTests(): void {
   quittiert.clear();
   inArbeit.clear();
   gezeigt.clear();
+  verlaufInhalt.clear();
   ausgeblendetRaeumen();
 }

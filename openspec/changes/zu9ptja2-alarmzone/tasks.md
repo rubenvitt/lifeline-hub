@@ -37,12 +37,12 @@ Unteraufgaben: LLH-1735 `p1voqfck`, LLH-1736 `ftf3qelu`, LLH-1737 `mdbfi43h`, LL
   `rahmenOben.guard.test.ts` kennt die Zone. Tests in `einsatz/AlarmZentrale.test.tsx` und
   `alarm/OrgBenachrichtigungen.test.tsx` von `.ant-notification` auf die Zone umgestellt. Vitest
   und `pnpm lint` grün.
-- [ ] 2.3 e2e: `frontend/e2e/alarm-verdeckung.spec.ts` neu (1440 × 900 und 820 × 1180): drei
+- [x] 2.3 e2e: `frontend/e2e/alarm-verdeckung.spec.ts` neu (1440 × 900 und 820 × 1180): drei
   Alarme, „Auftrag erteilen“ klickbar, Zone unter einem geöffneten Dialog und dem
   Navigations-Drawer, gerollt klebt sie unter dem Kopf. Dazu Fokus-Szenario „Rückwärts unter der
   Alarmzone“. Greifer in `sofortmeldung-hinweis`, `abloesung-kontrast` (räumt über „Gelesen“ ab)
   und `eingangshinweis` umgestellt. Lokal grün.
-- [ ] 2.4 Regeln und Doku: `frontend/AGENTS.md` (Rahmen: LFH-1112 ersetzt durch die Alarmzone;
+- [x] 2.4 Regeln und Doku: `frontend/AGENTS.md` (Rahmen: LFH-1112 ersetzt durch die Alarmzone;
   Layout und Live: Ausnahme der Zone von „springen nicht“; „Ein Eingang ist Information“: Zone
   statt Toastplätze; Baustein `alarm/AlarmZone.tsx` in der Liste).
   `docs/anwender/kapitel/einsatz-oberflaeche.md` (Ablauf „Auf eine Benachrichtigung reagieren“,
@@ -52,37 +52,37 @@ Unteraufgaben: LLH-1735 `p1voqfck`, LLH-1736 `ftf3qelu`, LLH-1737 `mdbfi43h`, LL
 
 ## 3. Das „Was“ im Hinweis (LLH-1737 `mdbfi43h`)
 
-- [ ] 3.1 `alarm/erinnerungInhalt.ts` (D6): Titel einer fälligen Erinnerung aus
+- [x] 3.1 `alarm/erinnerungInhalt.ts` (D6): Titel einer fälligen Erinnerung aus
   `einsatzKeys.erinnerungenPhase(id, 'offen')` per `fetchQuery`, Frist `INHALT_FRIST_MS`. Unit-Test:
   gefüllter Cache antwortet ohne Abruf, Frist abgelaufen ergibt `null`, eine unbekannte ID ergibt
   `null`. Vitest grün.
-- [ ] 3.2 `alarm/useBenachrichtigungen.ts` (`eintragVon`, `eingangVon`): „Erinnerung fällig:
+- [x] 3.2 `alarm/useBenachrichtigungen.ts` (`eintragVon`, `eingangVon`): „Erinnerung fällig:
   ‹Titel›“ in Band, Zone und Leiste. `einsatz/AlarmZentrale.test.tsx` „zeigt eine fällige
   Erinnerung im Eingangsband“ zeigt jetzt den Titel, ohne Antwort den Text des Servers. Vitest
   grün.
-- [ ] 3.3 Verlauf (`alarm/EingaengeKnopf.tsx`): Einträge zu Meldung und Erinnerung nennen
+- [x] 3.3 Verlauf (`alarm/EingaengeKnopf.tsx`): Einträge zu Meldung und Erinnerung nennen
   denselben Inhalt wie Band und Alarm (Spec „Der Verlauf nennt den Inhalt einer Meldung“).
   Test in `alarm/EingaengeKnopf.test.tsx`: „Bestätigung ausstehend · RTW 2“ mit Wortlaut. Vitest
   grün.
-- [ ] 3.4 Doku `docs/anwender/kapitel/erinnerungen.md` („Erinnerung fällig: ‹Titel›“). Doku-Wächter
+- [x] 3.4 Doku `docs/anwender/kapitel/erinnerungen.md` („Erinnerung fällig: ‹Titel›“). Doku-Wächter
   grün.
 
 ## 4. Handy-Leiste (LLH-1738 `wuyzp84s`)
 
-- [ ] 4.1 `useFokusInEingabe` (D5, auf Basis von `istEingabefeld`) mit Unit-Test: wahr bei Fokus
+- [x] 4.1 `useFokusInEingabe` (D5, auf Basis von `istEingabefeld`) mit Unit-Test: wahr bei Fokus
   in Eingabe, Textfeld und contenteditable, falsch nach `focusout`. Vitest grün.
-- [ ] 4.2 `alarm/Eingangsband.tsx` unter `md`: Leiste von 48 px „‹n› Alarm · ‹m› Eingänge ›“ aus
+- [x] 4.2 `alarm/HandyLeiste.tsx` (statt des Eingangsbands unter `md`, gleicher Ausweichweg): Leiste von 48 px „‹n› Alarm · ‹m› Eingänge ›“ aus
   Speicher und `useBenachrichtigungVerlauf`, weicht unteren Leisten aus wie das Band, klappt bei
   Fokus ein, mit Alarm eine Zeile mit dem jüngsten Alarm (Entwurf `Handy-Leiste.dc.html`,
   `Handy-Tippen.dc.html`). `AlarmZone` rendert im Einsatz unter `md` nichts. Tests in
-  `alarm/Eingangsband.test.tsx` für die drei Zustände. Vitest grün.
-- [ ] 4.3 Blatt „Alarme und Eingänge“ (`alarm/EingaengeKnopf.tsx`, Entwurf `Handy-Blatt.dc.html`):
+  `alarm/HandyLeiste.test.tsx` für die drei Zustände. Vitest grün.
+- [x] 4.3 Blatt „Alarme und Eingänge“ (`alarm/EingaengeKnopf.tsx`, Entwurf `Handy-Blatt.dc.html`):
   Ein Tipp auf die Leiste öffnet es über `EINGAENGE_OEFFNEN_EVENT`, oben der Abschnitt „Alarm“
   mit „Öffnen“, „Gelesen“ und ✕. Test in `alarm/EingaengeKnopf.test.tsx`. Vitest grün.
 - [ ] 4.4 e2e bei 390 × 844: `eingangsband-ausweichen.spec.ts` (Leiste über der ETB-Erfassung,
   höchstens 48 px, zwei Einträge der Zeitachse darüber), Tippen klappt ein, mit Alarm bleibt eine
   Zeile; Navigations-Drawer liegt über der Leiste. `leisten-flaeche.spec.ts` grün. Lokal grün.
-- [ ] 4.5 Doku: `docs/anwender/kapitel/einsatz-oberflaeche.md`, Abschnitt Handy (Leiste, Blatt,
+- [x] 4.5 Doku: `docs/anwender/kapitel/einsatz-oberflaeche.md`, Abschnitt Handy (Leiste, Blatt,
   Einklappen); Karte „Eingänge“ im Design System neu erzeugt. Doku-Wächter und
   `designSystem.guard.test.ts` grün.
 

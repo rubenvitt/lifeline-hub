@@ -36,7 +36,12 @@ import { anmeldenAlsAdmin, benutzerAnlegen, mitgliedEintragen } from './rollen-k
  * Bänder des Kartenfußes der Lagekarte.
  */
 
-const BAND = '[data-lfh="eingangsband"]';
+/**
+ * Ab `md` das Eingangsband, unter `md` die Leiste am Handschirm (LLH-1738): je Breite steht genau
+ * eins, beide weichen unteren Leisten auf demselben Weg aus.
+ */
+const BAND = '[data-lfh="eingangsband"], [data-lfh="handy-leiste"]';
+const HANDY_LEISTE = '[data-lfh="handy-leiste"]';
 const ETB_LEISTE = '.etb-erfassung-sticky';
 const BEFEHL_LEISTE = '[data-lfh="befehl-aktionen"]';
 const BEDIENELEMENTE = 'button, textarea, input, [role="button"], [role="combobox"], a[href]';
@@ -189,13 +194,17 @@ test('Eingangsband rückt über die ETB-Erfassung und die Aktionsleiste des Befe
     // Der Klick geht an die Leiste, nicht ans Band (`toBeVisible()` ist kein Beleg, e2e/AGENTS.md).
     await erfassen.click({ trial: true });
 
-    // ── ETB, schmal: das Band über die volle Breite ──────────────────────────────────────
+    // ── ETB, schmal: die Leiste am Handschirm über die volle Breite, 48 px (LLH-1738) ────
     await page.setViewportSize({ width: 390, height: 844 });
+    const handyLeiste = page.locator(HANDY_LEISTE);
+    await expect(handyLeiste).toBeVisible();
+    await expect(handyLeiste).toContainText('1 Eingang');
     await expect
-      .poll(async () => (await band.boundingBox())?.width ?? 0, {
-        message: 'unter `md` steht das Band über die volle Breite',
+      .poll(async () => (await handyLeiste.boundingBox())?.width ?? 0, {
+        message: 'unter `md` steht die Leiste über die volle Breite',
       })
       .toBeGreaterThan(300);
+    expect((await handyLeiste.boundingBox())!.height).toBeLessThanOrEqual(48);
     await expect
       .poll(() => klebtAmFuss(page, ETB_LEISTE), { message: 'Erfassung klebt' })
       .toBe(true);
@@ -204,6 +213,36 @@ test('Eingangsband rückt über die ETB-Erfassung und die Aktionsleiste des Befe
     const inhaltSchmal = page.locator(ETB_LEISTE).getByPlaceholder(/Inhalt/);
     await expect(erfassen).toHaveCount(0);
     await expect.poll(() => verdeckungen(page, ETB_LEISTE, inhaltSchmal)).toEqual([]);
+    // Ganz oben stehen weiter zwei Einträge der Zeitachse ganz über der Leiste.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect
+      .poll(() =>
+        page.evaluate((sel) => {
+          const oben = document.querySelector(sel)!.getBoundingClientRect().top;
+          return [...document.querySelectorAll('[data-testid="etb-ereigniszeile"]')]
+            .map((z) => z.getBoundingClientRect())
+            .filter((z) => z.top >= 0 && z.bottom <= oben + 0.5).length;
+        }, HANDY_LEISTE),
+      )
+      .toBeGreaterThanOrEqual(2);
+    // Beim Tippen klappt die Leiste ein (ohne Alarm) und kommt danach wieder.
+    await inhaltSchmal.focus();
+    await expect(handyLeiste).toHaveCount(0);
+    await fokusLoesen(page);
+    await expect(handyLeiste).toBeVisible();
+    // Der Navigations-Drawer liegt über der Leiste.
+    await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+    await expect(page.locator('.ant-drawer-open')).toBeVisible();
+    await expect
+      .poll(() =>
+        handyLeiste.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          return !el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+        }),
+      )
+      .toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.ant-drawer-open')).toHaveCount(0);
 
     // ── Befehlsentwurf, schmal: unter `lg` ist die Aktionsleiste unten verankert ─────────
     await oeffnenMitStrom(page, `/einsaetze/${einsatzId}/auftraege/befehle/${befehlId}`, einsatzId);

@@ -29,6 +29,7 @@ import { useBenachrichtigungen, useQuittiereNachNutzer } from '../alarm/useBenac
 import { useEingangshinweis } from '../alarm/useEingangshinweis';
 import { eingaengeName, oeffneEingaenge, useKopfBuendelt } from '../alarm/eingaenge';
 import EingaengeZahl from '../alarm/EingaengeZahl';
+import HandyLeiste from '../alarm/HandyLeiste';
 import { wetterPegelPfad } from '../routing/deeplinks';
 import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
@@ -150,11 +151,12 @@ export default function AlarmZentrale({
   // Ohne Netz vorgemerkt (LLH-1477): Öffnen und Schließen quittieren auch dann.
   const quittiereNachNutzer = useQuittiereNachNutzer(einsatzId);
   const toasts = useAlarmToasts(einsatzId, quittiereNachNutzer);
-  const { hinweis: eingang, band: eingangsband } = useEingangshinweis(
-    einsatzId,
-    quittiereNachNutzer,
-    darfSichten,
-  );
+  const {
+    hinweis: eingang,
+    band,
+    bandAnzahl,
+    bandAusblenden,
+  } = useEingangshinweis(einsatzId, quittiereNachNutzer, darfSichten);
   useBenachrichtigungen(einsatzId, toasts, eingang);
   // Jede Unwetter-Auslösung bekommt einen eigenen Schlüssel.
   const zaehlerRef = useRef(0);
@@ -299,6 +301,16 @@ export default function AlarmZentrale({
   const { dichte } = useDichte();
   // Dieselbe Bedingung wie der Knopf „Eingänge“ (`alarm/eingaenge.ts`).
   const buendeln = useKopfBuendelt();
+  // Am Handschirm tragen Alarme und Eingänge eine Leiste unten statt Zone und Band (LLH-1738, D5).
+  const eingangsband = istSchmal ? (
+    <HandyLeiste
+      einsatzId={einsatzId}
+      eingaenge={bandAnzahl}
+      eingaengeAusblenden={bandAusblenden}
+    />
+  ) : (
+    band
+  );
 
   const desktopAktivieren = () => {
     fordereDesktopPermission((p) => setPermission(p));

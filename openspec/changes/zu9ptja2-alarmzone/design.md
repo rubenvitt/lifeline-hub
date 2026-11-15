@@ -115,9 +115,12 @@ geht hinaus, sobald die Benachrichtigung quittiert ist. Wirkung:
 
 ### D5 Am Handschirm eine Leiste; die Zone steht dort nicht
 
-Unter `md` zeichnet `Eingangsband` im Einsatz die Leiste (48 px, Portal, `fixed` unten wie heute,
-derselbe Ausweichweg `useBandAbstand`). Sie liest die Zahl der ungelesenen Eingänge aus
-`useBenachrichtigungVerlauf` („Eine Zahl für Eingänge“) und die Alarme aus dem Speicher (D1).
+Unter `md` zeichnet die Zentrale im Einsatz statt des Eingangsbands die Leiste
+`alarm/HandyLeiste.tsx` (48 px, Portal, `fixed` unten wie das Band, derselbe Ausweichweg
+`useBandAbstand`). Sie nennt die Einträge, die das Band ab `md` zeigte (`bandAnzahl` aus
+`useEingangshinweis`), und die Alarme aus dem Speicher (D1). Die Zahl am Knopf „Eingänge“ bleibt
+die eine Zahl des Verlaufs; die Leiste zählt, was neu eingegangen und nicht ausgeblendet ist.
+Stehen nur Eingänge an, trägt sie ✕ (Ausblenden wie am Band).
 `AlarmZone` rendert im Einsatz unter `md` nichts. Ein Tipp sendet `EINGAENGE_OEFFNEN_EVENT`, und
 das vorhandene Blatt von unten in `EingaengeKnopf` bekommt oben den Abschnitt „Alarm“ aus dem
 Speicher (mit „Öffnen“, „Gelesen“, ✕) und heißt dann „Alarme und Eingänge“.
