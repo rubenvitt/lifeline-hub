@@ -313,7 +313,17 @@ export default function HilfePage() {
         </div>
         <div className="hilfe-kopf__aktionen">
           <DruckKnopf ohneOrganisation gesperrt={gezeigt.length === 0} />
-          <Button onClick={() => void navigate(rueckweg.pfad)}>{rueckweg.label}</Button>
+          {/* Ein langer Einsatzname kürzt, statt die Hilfe bei 390 px quer zu sprengen (Muster von
+              `RueckwegKnopf` in `AdminPage`, LLH-1731): `maxWidth` am Knopf, Auslassung innen. */}
+          <Button
+            title={rueckweg.label}
+            style={{ maxWidth: '100%' }}
+            onClick={() => void navigate(rueckweg.pfad)}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {rueckweg.label}
+            </span>
+          </Button>
         </div>
       </header>
 

@@ -67,3 +67,28 @@ test('aus dem Einsatz am breiten Schirm: Hilfe im neuen Tab, Rückweg an die Ste
   await hilfe.getByRole('button', { name: `Zurück zu ${name}` }).click();
   await expect(hilfe).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
 });
+
+test('am Handy: ein langer Einsatzname im Rückweg sprengt die Hilfe nicht quer (LLH-1731)', async ({
+  page,
+}) => {
+  await anmeldenPerApi(page, ADMIN, PW);
+  const name = `Unwetter mit Starkregen und Überflutung im gesamten Kreisgebiet Süd ${Date.now()}`;
+  const einsatzId = await einsatzPerApi(page, name);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.getByRole('region', { name: 'Einsatztagebuch' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Benutzermenü' }).click();
+  await page.getByRole('menuitem', { name: 'Hilfe' }).click();
+  const zurueck = page.getByRole('button', { name: `Zurück zu ${name}` });
+  await expect(zurueck).toBeVisible();
+  // Gekürzt statt quer: die Seite rollt nicht waagerecht, der volle Name steht im `title`.
+  const breiten = await page.evaluate(() => ({
+    inhalt: document.documentElement.scrollWidth,
+    fenster: window.innerWidth,
+  }));
+  expect(breiten.inhalt).toBeLessThanOrEqual(breiten.fenster);
+  await expect(zurueck).toHaveAttribute('title', `Zurück zu ${name}`);
+  await zurueck.click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
+});
