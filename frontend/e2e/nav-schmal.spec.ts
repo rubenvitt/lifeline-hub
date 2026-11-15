@@ -255,12 +255,19 @@ async function beobachterMitSperre(page: Page, name: string): Promise<string> {
   return einsatzId;
 }
 
-/** Vorbedingung: der Sperrzweig steht — beide Zeilen gesperrt, mit Grund. */
+/**
+ * Vorbedingung: der Sperrzweig steht — beide Zeilen gesperrt, mit Grund. Die Marke nennt im
+ * Titel zusätzlich ihren Namen (LLH-1733): im schmalen Panel kann er gekürzt sein.
+ */
 async function sperrzweigSteht(ort: Locator) {
-  for (const name of [GESPERRT_ZEILE, GESPERRT_SPRUNG]) {
+  const titel = [
+    [GESPERRT_ZEILE, 'Keine Berechtigung'],
+    [GESPERRT_SPRUNG, 'Entscheidungen · Keine Berechtigung'],
+  ] as const;
+  for (const [name, grund] of titel) {
     const zeile = ort.getByRole('button', { name, exact: true });
     await expect(zeile, `Vorbedingung: „${name}" gesperrt`).toBeDisabled();
-    await expect(zeile).toHaveAttribute('title', 'Keine Berechtigung');
+    await expect(zeile).toHaveAttribute('title', grund);
   }
 }
 

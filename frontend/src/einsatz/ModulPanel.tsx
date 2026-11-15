@@ -31,6 +31,13 @@ const PANEL_KOPF = 42;
 /** Aktive Modulmarke: 2 × 16 px in `bedien`. Markermaß. */
 const MARKE = { breite: 2, hoehe: 16 } as const;
 
+/**
+ * Einzug des Etiketts einer Sprungmarke hinter ihrer Linie. Markermaß, bewusst NICHT aus der
+ * Dichte: mit `padding` (bis 26 px) kürzte das 208-px-Panel gesperrte Namen schon in komfortabel
+ * („Kommunikationsp…“, Review LLH-1733).
+ */
+const SPRUNG_EINZUG = 10;
+
 interface ListeProps {
   module: ModulEintrag[];
   /** Modulfreigaben des Servers (LFH-669); steuern Sichtbarkeit und Sperre. */
@@ -141,17 +148,17 @@ export function modulMarkeStil(farben: Pick<Farbrollen, 'bedien'>, aktiv: boolea
  * Spalte der Modulmarke, damit die Marke als eingerückte Unteransicht des Moduls darüber liest
  * und nicht als Link nach außen. `stretch` mit negativem Block-Rand zieht sie durch die
  * Polsterung, so bilden Marken untereinander eine durchgehende Linie; der Rand nach rechts ist
- * der Einzug des Etiketts.
+ * der feste Einzug des Etiketts ({@link SPRUNG_EINZUG}).
  */
 export function sprungLinieStil(
-  token: { paddingSM: number; padding: number },
+  token: { paddingSM: number },
   farben: Pick<Farbrollen, 'linie'>,
 ): CSSProperties {
   return {
     width: 1,
     alignSelf: 'stretch',
     marginBlock: -token.paddingSM,
-    marginInlineEnd: token.padding,
+    marginInlineEnd: SPRUNG_EINZUG,
     flexShrink: 0,
     background: farben.linie,
   };
@@ -219,7 +226,9 @@ export function ModulListe({
               type="button"
               data-lfh="modul-sprungmarke"
               disabled={gesperrt}
-              title={gesperrt ? KEINE_BERECHTIGUNG : marke.hinweis}
+              // Gesperrt mit Namen: im schmalen Panel kann das Etikett gekürzt sein, und der Titel ist
+              // dann die einzige Stelle, an der er ganz steht (LLH-1733).
+              title={gesperrt ? `${marke.label} · ${KEINE_BERECHTIGUNG}` : marke.hinweis}
               // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen“ unter dem ETB, wer
               // vorliest, soll vorher wissen, dass er dort landet.
               aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
