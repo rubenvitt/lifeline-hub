@@ -83,7 +83,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 - [x] 9.2 Violett-Aussagen berichtigen (Abschnittsflächen und Führungscluster der Lagekarte sind
   ebenfalls violett gefüllt): Spec `uebungsmarke` verlangt Unterscheidung durch Form und Wort statt
   Exklusivität des Farbtons; Regel, Doku, Kommentare und design.md nachziehen.
-- [ ] 9.3 Test, dass das Gerätband (`klebend={false}`) keine Rahmenhöhe meldet und das klebende sie
+- [x] 9.3 Test, dass das Gerätband (`klebend={false}`) keine Rahmenhöhe meldet und das klebende sie
   meldet (gestubbte `offsetHeight`); Mutationsprobe am Hook-Argument rot.
 - [ ] 9.4 Druck: benannte Seiten `lageplan`, `dokument-anlage`, `fernmeldeskizze-a3/-a4` erhalten
   bei einer Übung eine Variante mit Randfeld „ÜBUNG“; der Titel jedes Anlageblatts einer Übung trägt

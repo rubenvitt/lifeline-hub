@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { leseRahmenOben } from '../rahmenOben';
 import { UebungsBand, UebungsMarke } from './Uebung';
 
@@ -45,13 +45,33 @@ describe('UebungsBand (LLH-1725, Spec `uebungsmarke`)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('klebt und meldet sich als Quelle des Rahmens', () => {
-    render(<UebungsBand einsatz={UEBUNG} />);
-    const band = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]')!;
-    expect(band.style.position).toBe('sticky');
-    expect(band.style.top).toBe('0px');
-    // jsdom misst 0 px Höhe; dass das Band sich meldet, belegt rahmenOben.test.tsx, das gerenderte
-    // Kleben e2e/rahmen-stehen-bleiben.spec.ts.
-    expect(leseRahmenOben()).toBe(0);
+  /**
+   * jsdom misst keine Höhe: `offsetHeight` am Prototyp gestubbt, damit „meldet sich“ und „meldet
+   * sich nicht“ unterscheidbar sind. Das gerenderte Kleben misst e2e/rahmen-stehen-bleiben.spec.ts.
+   */
+  describe('als Quelle des Rahmens', () => {
+    beforeEach(() => {
+      vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(24);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('klebt und meldet seine Höhe (Einsatzrahmen)', () => {
+      const { unmount } = render(<UebungsBand einsatz={UEBUNG} />);
+      const band = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]')!;
+      expect(band.style.position).toBe('sticky');
+      expect(band.style.top).toBe('0px');
+      expect(leseRahmenOben()).toBe(24);
+      unmount();
+      expect(leseRahmenOben()).toBe(0);
+    });
+
+    it('nicht klebend steht es im Fluss und meldet keine Höhe (Gerätehülle, D7)', () => {
+      render(<UebungsBand einsatz={UEBUNG} klebend={false} />);
+      const band = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]')!;
+      expect(band.style.position).toBe('');
+      expect(leseRahmenOben()).toBe(0);
+    });
   });
 });
