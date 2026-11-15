@@ -266,8 +266,9 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   nachziehen. Nicht
   „nach dem Merge“: das braucht einen zweiten PR, und der bleibt aus (am 30.09.2026 lagen zwölf
   umgesetzte Changes aktiv). Schritt 13 von `check-all.sh` (`scripts/check-openspec-archiv.sh`)
-  macht eine abgehakte, nicht archivierte Change rot. Kästchen, die erst die CI des PRs belegt
-  („`check-all.sh` grün“), werden mit Verweis auf diesen Lauf abgehakt, nicht offen gelassen.
+  macht eine abgehakte, nicht archivierte Change rot. Kästchen wie „`check-all.sh` grün“ belegt
+  der lokale Lauf `./scripts/check-all.sh --geaendert --ohne-e2e` (unten); was erst die CI des PRs
+  zeigt, wird mit Verweis auf diesen Lauf abgehakt, nicht offen gelassen.
 - **Bilder der Änderung** in PR-Beschreibung und Meldung an den Menschen (Abschnitt „Bilder der
   Änderung“ unten)
 - Commit-Body und PR-Beschreibung tragen die Zeile
@@ -282,11 +283,16 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   `review`, erst der gemergte PR führt auf `done` (wer ihn zuerst gemergt sieht, setzt ihn;
   „Merge nachtragen“ oben). Abweichen nur, wenn der User im
   laufenden Task ausdrücklich etwas anderes sagt.
-- **e2e läuft im PR erst, wenn er fertig ist** (Auto-Merge an oder Label `e2e`; Regel:
-  `scripts/AGENTS.md`, „Zwei Stufen im PR“). Braucht die Änderung e2e-Rückmeldung, bevor der
-  Mensch Auto-Merge einschaltet (UI, Abläufe, Backend-Verhalten), setzt du am eigenen PR das Label
-  `e2e`, oder du fährst vorher lokal `./scripts/check-all.sh --geaendert`.
-- **„Baut mit Ziel-Branch“ rot** (Pflicht-Check an fertigen PRs, LLH-1849): Zusammen mit dem
+- **Vor dem PR lokal testen** (LLH-1889, Regel: `scripts/AGENTS.md`, „Leichte PR-Prüfung“): Im PR
+  prüft die CI nur leicht (Schnellprüfungen, Migrations- und ADR-Nummern, Baut mit Ziel-Branch), die Suiten
+  laufen erst auf `alpha`. Deshalb fährst du vor dem PR `./scripts/check-all.sh --geaendert
+  --ohne-e2e` (die Suiten, die dein Diff berührt, ohne e2e) und nennst das Ergebnis im PR unter
+  „Geprüft“. Ist die Änderung riskant (UI-Abläufe, Backend-Verhalten, CI) und soll vor dem Merge
+  auch e2e laufen, setzt du am eigenen PR das Label `voll`: dann fährt die CI alle Suiten, ohne
+  Pflicht. Das frühere Label `e2e` bedeutet nichts mehr. Ist ein Lauf auf `alpha` rot und willst
+  du einen Job neu starten, nur am jüngsten Lauf: der Neustart eines älteren bricht die Tests des
+  jüngeren ab.
+- **„Baut mit Ziel-Branch“ rot** (Pflicht-Check an fertigen PRs, also mit Auto-Merge an, LLH-1849): Zusammen mit dem
   aktuellen `alpha` kompiliert der PR nicht, meist weil ein inzwischen gemergter PR etwas
   geändert hat, das dein PR noch alt benutzt. `alpha` in den Branch mergen (kein Rebase),
   anpassen, pushen. Die Fehlerausgabe steht im Check.

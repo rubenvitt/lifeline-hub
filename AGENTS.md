@@ -158,8 +158,9 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
 
 ## Qualitäts-Gates — ein Kommando (LFH-235/F17)
 
-`./scripts/check-all.sh` vor dem Merge (Schritte und Bündel im Skriptkopf, Mechanik in
-`scripts/AGENTS.md`).
+Vor dem PR `./scripts/check-all.sh --geaendert --ohne-e2e`; die vollen Suiten laufen auf `alpha`
+oder im PR mit Label `voll` (LLH-1889; Schritte und Bündel im Skriptkopf, Mechanik in
+`scripts/AGENTS.md`, „Leichte PR-Prüfung“).
 
 - **Das Skript ist die Wahrheit**; `.github/workflows/ci.yml` ruft es unverändert. Neue Schritte
   gehören ins Skript.

@@ -6,45 +6,38 @@
 # nur nach einem Fehlschlag läuft und den Fehler erklärt, ohne etwas zu entscheiden (Karenzzeit
 # nach gescheitertem Frontend-Install, LLH-1884).
 #
+# LEICHTE PR-PRÜFUNG (LLH-1889, ADR „Ein PR prüft leicht“, ersetzt die zwei Stufen von LLH-1662):
+# Im PR läuft nur der Job `schnell`. Pflicht im Ruleset 17017911 sind `Schnellprüfungen`,
+# `Migrationsnummern` und `ADR-Nummern` (migrationen.yml) und `Baut mit Ziel-Branch` (ziel-branch-build.yml), sonst
+# nichts. Rust-, Frontend- und e2e-Suite laufen bei jedem Push auf `alpha`, `beta`, `main` voll und
+# im PR nur mit dem Label `voll`, dort ohne Pflicht. Lokal fährt ein Agent vor dem PR
+# `check-all.sh --geaendert --ohne-e2e`. Eine Auswahl nach geänderten Dateien gibt es in der CI
+# nicht mehr.
+#
+# LABEL-EREIGNISSE: Der PR-Lauf hört auf `labeled`, damit `voll` sofort startet. Die
+# Schnellprüfungen laufen dabei bei JEDEM Label neu, nie übersprungen: ein übersprungener
+# jüngster Check zählte als grün, auch über einem roten. Aus demselben Grund laufen an einem PR mit
+# `voll` bei jedem Ereignis alle Suiten; an einem PR ohne `voll` startet ein fremdes Label keine
+# Suite und bricht keinen Lauf ab (eigene Gruppe, s. `concurrency`).
+#
+# ABBRUCH AUF KANAL-BRANCHES (LLH-1889): Ein neuer Push bricht die Testjobs des laufenden Laufs
+# ab, der jüngste Lauf deckt alle früheren mit ab. Das geschieht über Concurrency AUF JOB-EBENE
+# (`rust`, `frontend` je Anteil, `e2e`, `berichte`), nicht für den ganzen Workflow: der Release-Job
+# hängt am selben Lauf, und ein Abbruch zwischen Versions-Commit und GitHub-Release hinterließe
+# ein Tag ohne Release. Der Release hat eine eigene Gruppe ohne Abbruch; seine `needs` lassen ihn
+# entfallen, wenn ein Testjob abgebrochen oder rot ist. Im PR bricht wie bisher ein neuer Lauf den
+# alten als Ganzes ab.
+#
 # Geteilt, weil die drei schweren Suiten (Rust, Vitest, Playwright) nicht voneinander abhängen;
 # der kritische Pfad ist die Rust-Suite allein. Sie bleibt EIN Job, weil Compile nur einen
 # kleinen Teil ihrer Laufzeit ausmacht und jeder Shard ihn erneut zahlte. Vitest teilt nach
 # Dateizahl.
 #
-# ZWEI STUFEN IM PR (LLH-1662): Dieser Workflow ist die erste Stufe und prüft jeden Push. Die
-# e2e-Suite steht in `e2e.yml` und läuft im PR erst, wenn er fertig markiert ist (Auto-Merge an
-# oder Label `e2e`); bis dahin fehlen ihre Pflicht-Checks. Bei einem Push auf einen Kanal-Branch
-# ruft der Job `e2e` hier denselben Workflow auf, und der Release wartet darauf. Kopf von
-# `e2e.yml`. Weitere Ereignistypen gehören NICHT hierher: das Einschalten von Auto-Merge bräche
-# den laufenden Lauf ab (eine Gruppe je Ref).
-#
-# NUR DIE BETROFFENEN SUITEN (LFH-1111, LFH-1115): Der Job `aenderungen` fragt
-# `scripts/ci-auswahl.sh`, das die geänderten Dateien eines PRs `scripts/bereiche.sh` vorlegt;
-# die Zuordnung samt Querbezügen steht nur dort. Eine nicht gebrauchte Suite läuft leer durch;
-# die Schnellprüfungen laufen immer. Leer heißt GRÜN, nicht fehlend: die Shard-Namen sind
-# Required Checks im Ruleset 17017911, und ein per Job-`if` übersprungener Matrix-Job meldet sich
-# unter seinem unexpandierten Namen („Frontend-Suite ${{ matrix.shard }}/4"), die Pflicht-Checks
-# hingen auf „Expected". Deshalb tragen die Jobs mit Pflicht-Check die Bedingung an jedem
-# Schritt, nicht am Job. Das gilt auch für die Rust-Suite ohne Matrix: ihr übersprungener Check
-# zeigt GitHub zwar grün, Auto-Merge wartet aber trotzdem (reine Doku- und Website-PRs, #1283 und
-# #1336, mussten von Hand gemergt werden). Nur Jobs ohne Pflicht-Check tragen die Bedingung am
-# Job. Die zweite Stufe nutzt das Fehlen umgekehrt, damit ihre Checks fehlen (Kopf von `e2e.yml`).
-# Im Zweifel wird geprüft: Nur ein ausdrückliches `false` spart, ein roter `aenderungen`-Job
-# lässt alles laufen. Push-Läufe auf Kanal-Branches prüfen immer voll.
-#
-# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Shards laufen auf dem eigenen
+# EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die e2e-Anteile laufen auf dem eigenen
 # Server, wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem
-# Fork stammt. Die Jobs und die Runner-Wahl stehen seit LLH-1662 in `e2e.yml` (Kopf dort); dieser
-# Workflow ruft ihn bei Push auf.
+# Fork stammt. Die Jobs und die Runner-Wahl stehen in `e2e.yml` (Kopf dort).
 #
-# NUR UMNUMMERIERT (LLH-1660, je Suite seit LLH-1662): Benennt der Migrations-Autofix nur
-# Migrationen um, übernimmt der neue Kopf jede Suite, die am Commit davor grün war
-# (`scripts/ci-auswahl.sh`, `scripts/nur-umnummeriert.sh`). Schnellprüfungen,
-# `Migrationsnummern` und die Rust-Suite laufen immer: sie prüft die umnummerierte Migration
-# zusammen mit der, die auf dem Ziel-Branch dazukam.
-#
-# Coverage steht in coverage.yml: dieser Lauf wird auf einem Kanal-Branch nicht abgebrochen,
-# ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
+# Coverage steht in coverage.yml: ein langer Coverage-Job hielte jeden Folge-Push auf „pending".
 #
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar): ein kompromittierter,
 # verschobener Upstream-Tag liefe sonst mit den Rechten dieses Workflows. Dependabot hält die
@@ -53,6 +46,8 @@ name: CI
 
 on:
   pull_request:
+    # `labeled` für das Label `voll` (s. Kopf); Auto-Merge-Ereignisse gehören nicht hierher.
+    types: [opened, synchronize, reopened, labeled]
   push:
     # `alpha` ist der Default-Branch, `main` die Freigabe; `beta` steht als Zwischenstufe
     # bereit und wird beim Anlegen sofort geprüft.
@@ -63,11 +58,14 @@ on:
 permissions:
   contents: read
 
+# Im PR eine Gruppe je Ref mit Abbruch. Auf einem Kanal-Branch eine Gruppe je Lauf: dort bricht
+# nicht der Workflow ab, sondern die Testjobs über ihre eigene Gruppe (s. Kopf), sonst träfe es
+# den Release mit. Ein fremdes Label an einem PR OHNE `voll` läuft ebenfalls je Lauf: es bricht
+# keinen laufenden Lauf ab und fährt nur die Schnellprüfungen (Dependabot setzt mehrere Labels
+# nacheinander). An einem PR MIT `voll` startet jedes Ereignis in der Ref-Gruppe alle Suiten neu:
+# ein übersprungener gleichnamiger Check wäre sonst der jüngste und verdeckte eine rote Suite.
 concurrency:
-  group: ci-${{ github.ref }}
-  # NUR Pull-Request-Läufe abbrechen: auf einem Kanal-Branch hängt der Release-Job am selben
-  # Lauf, und ein Abbruch zwischen Versions-Commit und GitHub-Release hinterließe ein Tag ohne
-  # Release (und ohne Artefakte, die release.yml erst nach dem Entwurf startet).
+  group: ci-${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name != 'voll' && !contains(github.event.pull_request.labels.*.name, 'voll')) && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -84,32 +82,6 @@ env:
   TZ: Europe/Berlin
 
 jobs:
-  # ── Welche Suiten braucht dieser Lauf? (LFH-1111/1115, s. Kopf) ─────────────────────
-  aenderungen:
-    name: Geänderte Bereiche
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # `checks: read` für die Check-Runs des Vorgängers (Umnummerierung, `scripts/ci-auswahl.sh`).
-    permissions:
-      contents: read
-      checks: read
-    outputs:
-      rust: ${{ steps.bereiche.outputs.rust }}
-      frontend: ${{ steps.bereiche.outputs.frontend }}
-    steps:
-      # Bei `pull_request` ist HEAD der Merge-Commit, HEAD^1 die Spitze des Ziel-Branches: zwei
-      # Commits Tiefe reichen für den Vergleich. Bei Push prüft das Skript ohnehin voll.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 2
-      - name: Betroffene Suiten
-        id: bereiche
-        env:
-          CI_EREIGNIS: ${{ github.event_name }}
-          CI_KOPF: ${{ github.event.pull_request.head.sha }}
-          GH_TOKEN: ${{ github.token }}
-        run: ./scripts/ci-auswahl.sh eins | tee -a "$GITHUB_OUTPUT"
-
   # ── Die billigen Prüfungen, in einem Job und zuerst ──────────────────────────────────
   # Damit ein Formatierungsfehler nicht erst nach einer Viertelstunde Testlauf auffällt.
   schnell:
@@ -182,20 +154,18 @@ jobs:
   # einziger den geteilten Cargo-Cache (save-if: true, die Vorgabe).
   rust:
     name: Rust-Suite
-    needs: aenderungen
-    # Am Job nur `!cancelled()`, die Bedingung `RUST` steht an jedem Schritt (s. Kopf): der
-    # Pflicht-Check `Rust-Suite` läuft leer grün durch statt übersprungen zu werden.
-    if: ${{ !cancelled() }}
-    env:
-      RUST: ${{ needs.aenderungen.outputs.rust }}
+    # Bei Push auf einen Kanal-Branch und im PR mit Label `voll` (s. Kopf).
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll') }}
+    # Auf einem Kanal-Branch bricht ein neuer Push diesen Job ab (s. Kopf); im PR je Lauf.
+    concurrency:
+      group: ci-rust-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.RUST != 'false'
       # Nur bei Bedarf aufräumen (s. Schnellprüfungen).
       - name: Plattenplatz schaffen (nur bei Bedarf)
-        if: env.RUST != 'false'
         run: |
           df -h /
           frei_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
@@ -208,7 +178,6 @@ jobs:
       # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): Schritt 4 testet
       # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
       - name: System-Werkzeuge für die nativen Crates
-        if: env.RUST != 'false'
         # Die WebKit-Pakete sind groß: bei tröpfelndem Spiegel reichen 300 s je Versuch nicht
         # (LLH-1420). Was ein abgebrochener Versuch schon geladen hat, bleibt im apt-Cache liegen.
         env:
@@ -218,101 +187,93 @@ jobs:
           libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
           librsvg2-dev libayatana-appindicator3-dev
       - name: Rust-Toolchain (stable)
-        if: env.RUST != 'false'
         run: rustup toolchain install stable --profile minimal --no-self-update && rustup default stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        if: env.RUST != 'false'
         with:
           shared-key: rust-openssl-vendored
           cache-on-failure: true
       - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-        if: env.RUST != 'false'
         with:
           version: 2026.9.1
           cache: true
       - name: Rust-Suite
-        if: env.RUST != 'false'
         run: ./scripts/check-all.sh --nur rust
 
   # ── Frontend-Suite, auf vier Runner geteilt ─────────────────────────────────────────
   frontend:
     name: Frontend-Suite ${{ matrix.shard }}/4
-    needs: aenderungen
-    # Am Job nur `!cancelled()`, die Bedingung `FRONTEND` steht an jedem Schritt (s. Kopf).
-    if: ${{ !cancelled() }}
-    env:
-      FRONTEND: ${{ needs.aenderungen.outputs.frontend }}
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll') }}
+    # Je Anteil eine Gruppe, sonst liefen die vier Anteile nacheinander.
+    concurrency:
+      group: ci-frontend-${{ matrix.shard }}-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
       # Ohne fail-fast: ein roter Shard darf den anderen drei nicht die Diagnose nehmen.
       fail-fast: false
-      # DIE SHARD-ZAHL IST EIN PIN: die gerenderten Jobnamen („… 1/4" bis „4/4") sind Required
-      # Status Checks im Ruleset 17017911. Eine andere Zahl änderte die Check-Namen, die alten
-      # reporteten nie mehr, und jeder PR hinge still auf „Expected". Nur zusammen mit dem
-      # Ruleset ändern.
+      # Die Shard-Zahl steht auch im Bericht (vier Blobs, Job `berichte`).
       matrix:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: env.FRONTEND != 'false'
       # Kein Rust, kein Chromium, kein Plattenplatz-Schritt — dieser Job braucht nur Node.
       - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
-        if: env.FRONTEND != 'false'
         with:
           version: 2026.9.1
           cache: true
       - name: pnpm-Store-Pfad ermitteln
-        if: env.FRONTEND != 'false'
         id: pnpm
         run: echo "store=$(mise exec -- pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: env.FRONTEND != 'false'
         with:
           path: ${{ steps.pnpm.outputs.store }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
       - name: Frontend-Abhängigkeiten
-        if: env.FRONTEND != 'false'
         run: mise exec -- pnpm -C frontend install --frozen-lockfile
       - name: Runner-Größe
-        if: env.FRONTEND != 'false'
         run: echo "Kerne $(nproc), Speicher $(free -h | awk '/^Mem:/ {print $2}')" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Frontend-Suite (Anteil ${{ matrix.shard }}/4)
-        if: env.FRONTEND != 'false'
         env:
           VITEST_SHARD: ${{ matrix.shard }}/4
         run: ./scripts/check-all.sh --nur frontend
       # Vitest legt die Blobs unter frontend/.vitest/blob/ ab. include-hidden-files ist
       # Pflicht, weil das Verzeichnis mit einem Punkt beginnt.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ !cancelled() && env.FRONTEND != 'false' }}
+        if: ${{ !cancelled() }}
         with:
           name: vitest-blob-${{ matrix.shard }}
           path: frontend/.vitest/blob/*
           include-hidden-files: true
           retention-days: 1
 
-  # ── e2e-Suite der Kanal-Branches ────────────────────────────────────────────────────
-  # Im PR startet `e2e.yml` selbst (zweite Stufe, s. Kopf). Hier nur bei Push, damit der Release
-  # auf sie wartet. Der Name trägt keinen Pflicht-Check: ein übersprungener Aufruf erfüllt nichts.
+  # ── e2e-Suite ───────────────────────────────────────────────────────────────────────
+  # Bei Push (der Release wartet darauf) und im PR mit Label `voll`. Jobs und Runner-Wahl in
+  # `e2e.yml`.
   e2e:
-    name: e2e (Kanal)
-    if: github.event_name == 'push'
+    name: e2e
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll') }}
+    concurrency:
+      group: ci-e2e-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: true
     uses: ./.github/workflows/e2e.yml
     permissions:
       contents: read
       checks: read
 
   # ── Ein Bericht aus den Vitest-Teilläufen ───────────────────────────────────────────
-  # KEINE Required Checks — das sind die Shard-Jobs selbst: die Merge-Werkzeuge scheitern
-  # nur bei NULL Blobs, ein gestorbener Shard ergäbe sonst einen grünen Teilbericht. Mit
-  # `!cancelled()`, weil man den Bericht gerade bei Rot braucht. Den e2e-Bericht baut `e2e.yml`.
+  # Die Merge-Werkzeuge scheitern nur bei NULL Blobs, ein gestorbener Shard ergäbe sonst einen
+  # grünen Teilbericht. Mit `!cancelled()`, weil man den Bericht gerade bei Rot braucht. Den
+  # e2e-Bericht baut `e2e.yml`.
   berichte:
     name: Testberichte zusammenführen
-    needs: [aenderungen, frontend]
+    needs: frontend
     # Ein Bericht über null Teilläufe hilft niemandem.
-    if: ${{ !cancelled() && needs.aenderungen.outputs.frontend != 'false' }}
+    if: ${{ !cancelled() && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'voll')) }}
+    concurrency:
+      group: ci-berichte-${{ github.event_name == 'push' && github.ref || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -356,16 +317,23 @@ jobs:
   # Suite. Auf `berichte` wird bewusst NICHT gewartet: der läuft
   # mit `!cancelled()` und wäre auch bei roten Shards grün.
   #
+  # Ein abgebrochener Testjob (ein neuer Push kam, s. Kopf) lässt den Release dieses Laufs
+  # entfallen: das Standard-`if` verlangt Erfolg aller `needs`.
+  #
   # EIN AUFRUF IST KEIN RELEASE: mit dem Ruhefenster (`scripts/release-ruhefenster.sh`) tritt
   # der Job zurück, wenn auf dem Kanal ein neuerer Commit liegt. Ein übersprungener
-  # Release-Job ist der Normalfall. Push-Läufe desselben Kanals stehen in EINER
-  # Nebenläufigkeitsgruppe; ein wartender Release hält also den nächsten Lauf auf — wer das
-  # Fenster deutlich vergrößert, gibt dem Release eine eigene Gruppe.
+  # Release-Job ist der Normalfall.
+  #
+  # EIGENE GRUPPE OHNE ABBRUCH: ein laufender Release läuft immer zu Ende; ein wartender wird
+  # höchstens durch einen jüngeren ersetzt. Nie `cancel-in-progress: true` hier (s. Kopf).
   release:
     name: Release
     needs: [schnell, rust, frontend, e2e]
     # Nur bei einem Push auf einen Kanal-Branch, nicht bei jedem grünen PR-Lauf.
     if: github.event_name == 'push'
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
     uses: ./.github/workflows/release.yml
     # `actions: write`: release.yml startet artefakte.yml per workflow_dispatch (LFH-1054).
     # `id-token: write`: Claude meldet sich für die Release-Notizen per GitHub-OIDC an.

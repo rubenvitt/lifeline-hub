@@ -1,3 +1,96 @@
+## [1.0.0-alpha.193](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.192...v1.0.0-alpha.193) (2026-11-14)
+
+### Wichtige Änderungen
+
+- **Datenbank:** Neue Migrationen für Webhooks, den Führungswechsel vor Ort und die neue Benachrichtigung „Führung angefragt“. Beim ersten Start einer bestehenden Datenbank werden sie automatisch eingespielt.
+- **Instanzkopplung, Protokoll 4:** Der Führungswechsel über die Direktkopplung braucht Protokoll 4. Erst alle beteiligten Instanzen auf Protokoll 3 bringen, danach auf 4 umstellen. Eine Gegenstelle mit älterem Stand zeigt einen Hinweis zum Update.
+- **Einsatztagebuch, geändertes Verhalten:**
+  - Systemeinträge sind jetzt standardmäßig ausgeblendet. Über die Filterleiste lassen sie sich einblenden.
+  - Bei einer Meldung ist „Von“ jetzt ein Pflichtfeld.
+  - Das Bilanz-Paneel entfällt. Die Zahlen stehen jetzt an den Typ-Segmenten und im Seitenkopf.
+- **ETB-Druckadressen:** Eine Druckadresse ohne Auswahl druckt wieder das vollständige Tagebuch. Ältere Links, die Systemeinträge ausschließen, funktionieren weiter.
+- **Neue Schnittstellen:** Webhooks für angebundene Fremdsysteme und das Einspielen von Archivblöcken über die Verwaltung (Details unter „Verwaltung“).
+
+### Einsatztagebuch
+
+- **Neue Erfassung mit festen Feldern:**
+  - Typ, Zeit, Von, An, Meldeweg und „+ Veranlassung“ stehen in einer Feldzeile und ersetzen Chips und Einzeleditoren.
+  - Von und An werden je nach Typ vorbelegt. Bei einer Meldung ist An die eigene Stelle, bei einer Anordnung ist es Von.
+  - Enter in einem Feld springt in den Inhalt. Der Fokus startet im ersten leeren Pflichtfeld.
+  - Gründe für fehlende oder ungültige Angaben stehen direkt am Feld, auch eine Zeit in der Zukunft schon vor dem Senden.
+- **Fußzeile der Erfassung:**
+  - „Auch in den Meldungseingang“ ist voreingestellt, außer beim eigenen Vermerk.
+  - „Werte behalten“ übernimmt nur ausdrücklich eingegebene Werte.
+  - Reiter für Entwürfe erscheinen erst ab dem zweiten Entwurf.
+- **Platzsparend:** Auf niedrigen Bildschirmen, etwa 1366 × 768 im Führungskraftwagen, wird die Erfassung abhängig von der Darstellungsdichte einzeilig. Auf dem Handy ist sie eingeklappt.
+- **Neue Leseansicht in Spalten:**
+  - Spalten Zeit, Nr., Typ, Von → An, Inhalt und Vermerk, mit klebendem Spaltenkopf. Es passen deutlich mehr Einträge auf den Bildschirm.
+  - Lange Einträge werden auf drei Zeilen gekürzt und lassen sich mit „mehr“ aufklappen.
+  - Berichtigte Inhalte sind durchgestrichen.
+  - Auf dem Handy gibt es eine eigene, gut lesbare Zeilenform.
+- **Anhänge:** Bild-Anhänge sind über das Zeilenmenü erreichbar, als Vorschau und für Berechtigte auch als Original mit Standort.
+- **Filter und Seitenkopf:**
+  - Filterleiste und Seitenkopf bleiben beim Rollen stehen.
+  - Der Kopf nennt die Anzahl der Einträge und der ausgeblendeten Systemeinträge.
+  - Der Sendestatus vorgemerkter Einträge springt zu den betroffenen Zeilen.
+- **Lesemarke und Sprungpalette:** Die Lesemarke und die Trefferzahl in der Sprungpalette zählen ausgeblendete Systemeinträge nicht mit.
+- **Ohne Netz:** Die Standardansicht bleibt auch ohne Netz lesbar. Vorgemerkte Einträge stehen als jüngste Zeile unten.
+- **Behoben:**
+  - Ein schneller erster Tastendruck beim Betreten von Von oder An ging verloren.
+  - „Nach oben“ verdeckte das Menü der jüngsten Zeile.
+
+### Eingabe mit Vorschlägen
+
+- Enter und Tab übernehmen den obersten passenden Vorschlag. Ein exakter Treffer steht immer ganz oben.
+- Freitext wird über einen eigenen Listeneintrag „… als Freitext übernehmen“ gewählt.
+- Tab ohne vorheriges Tippen überschreibt keinen bestehenden Wert mehr.
+
+### Meldungen, Aufträge und Erinnerungen
+
+- Die Listen abgeschlossener Meldungen, Aufträge und Erinnerungen halten nur noch einen begrenzten Seitenausschnitt. Live-Aktualisierungen bleiben dadurch auch bei langen Einsätzen schnell.
+- Mit „Zu den neuesten springen“ geht es zurück an den Anfang der Liste.
+
+### Führung und Instanzkopplung
+
+- **Führungswechsel vor Ort:** Zwei Einsatzleitwagen können die Führung über die Direktkopplung gleichrangig wechseln, ohne Umweg über den Hub.
+  - Möglich sind Übergabe, Abgabecode, Anfrage und Notübernahme. Eine Übernahme gilt nur mit Beweis.
+  - Eine Anfrage entscheidet die Einsatzleitung mit „Übergeben“ oder „Ablehnen“. Dazu kommt die neue Benachrichtigung „Führung angefragt“.
+  - Der Hub zieht einen Wechsel zwischen zwei Einsatzleitwagen nach.
+  - Unterschriftsschlüssel werden in beide Richtungen weitergereicht. Ein Widerruf gilt je Schlüssel.
+  - Gibt es mehrere Ziele, nennt der Knopf „Führung per Code … abgeben“ das jeweilige Ziel.
+- **Behoben:** Wird eine neue Führungsakte an einen vorhandenen Spiegel gehängt, erfahren offene Bildschirme jetzt davon und werden vollständig abgeglichen.
+
+### Kräfte und Mittel
+
+- **Schichtplan:** Im Schichtplan des Einsatzes gibt es jetzt eine Helferliste. Sie ist über den Knopf „Helfer“ erreichbar und funktioniert wie in der Vorplanung. Ohne Personal ist sie gesperrt, ohne Schreibrecht nur lesbar.
+- **Einheiten:** Eine Änderung mit nicht zuordenbaren Sprechgruppen wird jetzt abgelehnt, bevor etwas gespeichert ist. Vorher blieben Teiländerungen ohne Tagebucheintrag zurück.
+
+### Betroffene und Unfallhilfsstellen
+
+- **Personenabgleich:** Zwei gleichzeitige Entscheidungen überschreiben sich nicht mehr. Die zweite wird mit einem Konflikt abgewiesen.
+- **Unfallhilfsstellen:** Beim Stornieren und Reservieren von Plätzen ist von außen nicht mehr erkennbar, ob ein fremder Platz belegt ist.
+
+### Verwaltung
+
+- **Archiv einspielen:**
+  - System-Admins können einen Archivblock direkt in der Verwaltung unter „Aufbewahrung“ in die eigene Organisation einspielen.
+  - Der Schlüssel kann als Datei oder als Text übergeben werden, optional mit Passphrase. Er wird nicht gespeichert.
+  - Das Ergebnis nennt Einsatz, Frist und Inhalte und führt direkt in den Einsatz.
+  - Das Einspielen ist nicht am Hub möglich und auf 256 MiB begrenzt. Für größere Archive bleibt der Befehl.
+  - Der Vorgang wird mit Person in der Admin-Spur festgehalten.
+- **Webhooks:**
+  - An jeder Anbindung lässt sich ein Webhook einrichten. Ereignisse werden signiert und der Reihe nach an das Fremdsystem zugestellt.
+  - Schlägt die Zustellung fehl, wird sie wiederholt, mit Abständen von 1 Minute bis 6 Stunden. Nach 24 Stunden ohne Erfolg wird der Webhook angehalten. Beim Wiederaufnehmen wird nachgeliefert.
+  - Es gibt ein Testereignis und einen Verlauf der letzten Versuche.
+  - Adressen im lokalen Netz sind nur mit ausdrücklicher Ausnahme erlaubt.
+  - Nur der System-Admin sieht die vollständige Ziel-URL.
+  - Die Referenz-Clients für Rust, TypeScript und Python können die Signatur prüfen.
+
+### Betrieb und Installation
+
+- Mehrere Speichervorgänge warten bei kurz belegter Datenbank jetzt ab, statt mit Fehler 503 abzubrechen. Betroffen sind Lage-Zonen, das Festlegen und Löschen von Kartenansichten und die Nachbereitung.
+- Für das Einspielen großer Archive hinter einem Reverse-Proxy beschreibt die Betriebsdokumentation das nötige Lese-Zeitlimit.
+
 ## [1.0.0-alpha.192](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.191...v1.0.0-alpha.192) (2026-11-14)
 
 ### Wichtige Änderungen

@@ -135,6 +135,21 @@ enthaelt "10 Bündel baut fährt nur den Kompilierschritt" '^Schritte: 17$'
 rc=0; "$CHECK_ALL" --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
 pruefe "11 voller Lauf wählt aus" 0 "$rc"
 fehlt "11 voller Lauf fährt den Kompilierschritt nicht mit" '^Schritte: .*\b17\b'
+enthaelt "11 voller Lauf fährt die e2e-Suite" '^Schritte: .*\b7\b'
+
+# 13 — `--ohne-e2e` (LLH-1889): Agenten fahren vor dem PR die betroffenen Suiten lokal, aber ohne
+# e2e; die läuft auf alpha. Fehlte die Option, liefe lokal eine Stunde Playwright mit.
+rc=0; "$CHECK_ALL" --ohne-e2e --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+pruefe "13 --ohne-e2e ist bekannt" 0 "$rc"
+fehlt "13 --ohne-e2e lässt Schritt 7 aus" '^Schritte: .*\b7\b'
+enthaelt "13 --ohne-e2e fährt den Rest" '^Schritte: 1 2 3 4 5 6 8 '
+# Ein Lauf ohne e2e darf nicht wie ein voller aussehen (Review LLH-1889): die Auswahl sagt es.
+enthaelt "13 --ohne-e2e sagt, dass Schritt 7 fehlt" '^Ohne e2e: Schritt 7 ausgelassen'
+rc=0; "$CHECK_ALL" --geaendert=HEAD --ohne-e2e --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+pruefe "13 --ohne-e2e geht mit --geaendert" 0 "$rc"
+fehlt "13 --geaendert --ohne-e2e lässt Schritt 7 aus" '^Schritte: .*\b7\b'
+rc=0; "$CHECK_ALL" --nur e2e --ohne-e2e --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+pruefe "13 --nur e2e mit --ohne-e2e ist ein Widerspruch" 2 "$rc"
 
 # 12 — Schritt 6 fährt Advisory-Scan UND Karenz-Prüfung, auch wenn der Scan rot ist (LLH-1884):
 # sonst käme ein zu junges Paket neben einem Advisory erst im nächsten Lauf ans Licht. Gefahren
