@@ -287,9 +287,9 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
   prüft die CI nur leicht (Schnellprüfungen, Migrations- und ADR-Nummern), die Suiten
   laufen erst auf `alpha`. Deshalb fährst du vor dem PR `./scripts/check-all.sh --geaendert
   --ohne-e2e` (die Suiten, die dein Diff berührt, ohne e2e) und nennst das Ergebnis im PR unter
-  „Geprüft“. Ist die Änderung riskant (UI-Abläufe, Backend-Verhalten, CI) und soll vor dem Merge
-  auch e2e laufen, setzt du am eigenen PR das Label `voll`: dann fährt die CI alle Suiten, ohne
-  Pflicht. Das frühere Label `e2e` bedeutet nichts mehr. Ist ein Lauf auf `alpha` rot und willst
+  „Geprüft“. Das Label `voll` (alle Suiten im PR, ohne Pflicht) setzt du nur nach den Kriterien
+  in `scripts/AGENTS.md`, „Leichte PR-Prüfung“, „Wann `voll`“: selten, nicht weil eine Änderung
+  riskant scheint. Das frühere Label `e2e` bedeutet nichts mehr. Ist ein Lauf auf `alpha` rot und willst
   du einen Job neu starten, nur am jüngsten Lauf: der Neustart eines älteren bricht die Tests des
   jüngeren ab.
 - **Mit `alpha` zusammen bauen** (seit LLH-1899 kein Pflicht-Check mehr): Liegt dein PR länger

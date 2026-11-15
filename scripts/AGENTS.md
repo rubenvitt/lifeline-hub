@@ -30,6 +30,13 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend- und e2e-Suite laufen im PR nur mit dem **Label `voll`**, dann ganz
     und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label
     `e2e` bedeutet nichts mehr.
+  - **Wann `voll`** (LLH-1898, ADR-0050), selten und nur, wenn mindestens eines zutrifft:
+    (1) der PR ändert, **wie die Suiten selbst laufen**: `suiten.yml`, `e2e.yml`,
+    `scripts/runner/`, `frontend/playwright*.config.ts`, `frontend/vite.config.ts` (Vitest);
+    (2) der Mensch verlangt es ausdrücklich. **Kein Grund** sind „riskant“, Backend-Verhalten,
+    UI-Abläufe, Migrationen oder CI-Änderungen außerhalb der Suiten: dafür lokal
+    `--geaendert --ohne-e2e`, bei UI-Abläufen dazu gezielt die betroffene e2e-Spec; den Rest
+    fängt „alpha rot“.
   - **Vor dem PR lokal:** `./scripts/check-all.sh --geaendert --ohne-e2e`. `scripts/bereiche.sh`
     ordnet jede geänderte Datei den Suiten Rust, Frontend und e2e zu (**im Zweifel alles**; ein
     Querbezug aus einem fremden Bereich braucht eine Regel dort, `bereiche.test.sh` sucht
