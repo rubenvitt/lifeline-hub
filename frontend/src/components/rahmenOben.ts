@@ -45,7 +45,7 @@ function neuRechnen(): void {
   for (const h of hoerer) h();
 }
 
-/** Hört auf Änderungen der Summe, außerhalb von React (`alarmOben.ts`). */
+/** Hört auf Änderungen der Summe, außerhalb von React. */
 export function abonniereRahmenOben(h: () => void): () => void {
   hoerer.add(h);
   return () => hoerer.delete(h);
@@ -88,7 +88,7 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
     // der IconRail, `calc(100dvh - var(--lfh-rahmen-oben))`), und Vorfahren, die der Fensterrahmen
     // beobachtet, wüchsen noch in derselben Auslieferungsrunde. Beim Live-Wechsel der Dichte
     // meldete der Browser dann „ResizeObserver loop completed with undelivered notifications“
-    // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen` und `alarmOben`.
+    // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen`.
     let geplant = 0;
     const beobachter = new ResizeObserver(() => {
       if (geplant) return;
@@ -108,26 +108,45 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
   return setEl;
 }
 
+/** Rang einer gewöhnlichen Quelle (Kopf, Betriebszeile): sie klebt an der Fensterkante. */
+const RANG_RAHMEN = 0;
+/** Rang des Übungsbands (LLH-1725): direkt unter dem Rahmen. */
+export const RANG_UEBUNG = 1;
+/** Rang der Alarmzone (LLH-1735, design.md D2 in `openspec/changes/zu9ptja2-alarmzone/`): unter
+ *  dem Übungsband. */
+export const RANG_ALARMZONE = 2;
+
+const raenge = new Map<symbol, number>();
+
+/** Summe der Quellen mit kleinerem Rang: das `top` einer Quelle dieses Rangs. */
+function summeUnter(rang: number): number {
+  let wert = 0;
+  for (const [schluessel, hoehe] of anteile)
+    if ((raenge.get(schluessel) ?? RANG_RAHMEN) < rang) wert += hoehe;
+  return wert;
+}
+
 /**
  * Eine klebende Quelle, die selbst UNTER den übrigen klebt: das Übungsband (LLH-1725, design.md
- * D4 in `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`). Es meldet seine Höhe wie jede Quelle
- * (`ref`), und `oben` ist die Summe OHNE seinen eigenen Anteil, also sein `top`: ab `md` die
- * Kopfhöhe, unter `md` die gestörte Betriebszeile oder 0. Keine Rückkopplung: die eigene Höhe
- * hängt nicht vom eigenen `top` ab. Die Reihenfolge im DOM muss dazu passen — das Element steht
- * nach allen anderen Quellen.
+ * D4 in `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`) und darunter die
+ * Alarmzone (LLH-1735). Sie meldet ihre Höhe wie jede Quelle (`ref`), und `oben` ist die Summe der
+ * Quellen mit kleinerem `rang`, also ihr `top`: ab `md` die Kopfhöhe (beim Übungsband), unter `md`
+ * die gestörte Betriebszeile oder 0. Keine Rückkopplung: die eigene Höhe hängt nicht vom eigenen
+ * `top` ab. Die Reihenfolge im DOM muss zum Rang passen.
  */
 export function useRahmenObenStapel<T extends HTMLElement>(
   aktiv: boolean,
+  rang: number = RANG_UEBUNG,
 ): { ref: (el: T | null) => void; oben: number } {
   const [schluessel] = useState(() => Symbol('rahmen-oben-stapel'));
+  raenge.set(schluessel, rang);
   const ref = useRahmenObenQuelle<T>(aktiv, schluessel);
-  const summe = useRahmenOben();
-  const eigen = useSyncExternalStore(
+  const oben = useSyncExternalStore(
     abonniereRahmenOben,
-    () => anteile.get(schluessel) ?? 0,
+    () => summeUnter(rang),
     () => 0,
   );
-  return { ref, oben: Math.max(0, summe - eigen) };
+  return { ref, oben };
 }
 
 /**

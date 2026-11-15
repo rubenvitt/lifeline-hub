@@ -19,7 +19,6 @@ import FensterRahmen from './FensterRahmen';
 import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
 import { useModusFarben } from './rahmenStil';
-import { useAlarmKante } from './alarmOben';
 import StatusTag from './StatusTag';
 import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
@@ -479,16 +478,8 @@ export default function EinsatzSeite({
   const { token } = theme.useToken();
   const farben = useModusFarben();
   const aktionenRef = useRef<HTMLDivElement>(null);
-  // Stehende Alarme beginnen unter dem Seitenkopf, solange er im Bild ist (LFH-1112).
-  const alarmKante = useAlarmKante<HTMLDivElement>();
-  // Eine Ref-Funktion für beide Abnehmer; stabil, sonst hängte React sie bei jedem Render um.
-  const kopfLeiste = useCallback(
-    (el: HTMLDivElement | null) => {
-      alarmKante(el);
-      kopfRef?.(el);
-    },
-    [alarmKante, kopfRef],
-  );
+  // Stabil, sonst hängte React die Ref bei jedem Render um.
+  const kopfLeiste = useCallback((el: HTMLDivElement | null) => kopfRef?.(el), [kopfRef]);
   const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
   const rahmenEinsatz = useEinsatzRahmen();

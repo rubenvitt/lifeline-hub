@@ -27,11 +27,16 @@ import {
   BENACHRICHTIGUNG_ARTEN,
   ersatzPfad,
   istOrgArt,
-  sammelGruppeVon,
   toastSchluessel,
   zielVon,
 } from './benachrichtigungKatalog';
-import { gezeigt, inArbeit, quittiert } from './benachrichtigungGedaechtnis';
+import {
+  gezeigt,
+  inArbeit,
+  istAusgeblendet,
+  quittiert,
+  vergissAusgeblendet,
+} from './benachrichtigungGedaechtnis';
 import { ladeMeldungInhalt, type MeldungInhalt } from './meldungInhalt';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
 import { markVerlaufQuittiert } from './useBenachrichtigungVerlauf';
@@ -63,6 +68,7 @@ export interface QuittierOrt {
 export function quittiereNachNutzer(id: number, ort?: QuittierOrt): void {
   if (quittiert.has(id)) return;
   quittiert.add(id);
+  vergissAusgeblendet(id);
   void schliessePushMeldungen(id);
   if (!ort) {
     quittiereBenachrichtigung(id).catch(() => quittiert.delete(id));
@@ -157,8 +163,6 @@ function eintragVon(
     beschreibung,
     beschreibungVoll: anfang ? (opts.inhalt?.wortlaut ?? undefined) : undefined,
     pfad: a.pfad,
-    ziel: zielVon(a),
-    gruppe: sammelGruppeVon(a.art),
     name: BENACHRICHTIGUNG_ARTEN[a.art]?.name ?? a.titel,
     stufe: a.stufe,
     benachrichtigungId: a.id,
@@ -241,8 +245,13 @@ export function useBenachrichtigungen(
       return zeitKurz(a.erstellt_at, konvRef.current) || null;
     };
 
+    // Ausgeblendet (LLH-1736): kommt in diesem Tab nicht wieder, bis sie quittiert ist.
     const unbekannt = (id: number) =>
-      !quittiert.has(id) && !inArbeit.has(id) && !toasts.zeigt(id) && !eingang?.zeigt(id);
+      !quittiert.has(id) &&
+      !istAusgeblendet(id) &&
+      !inArbeit.has(id) &&
+      !toasts.zeigt(id) &&
+      !eingang?.zeigt(id);
 
     const beiEreignis = async (ev: Event) => {
       const e = (ev as CustomEvent<BenachrichtigungEreignis>).detail;
@@ -255,6 +264,7 @@ export function useBenachrichtigungen(
       const id = e.benachrichtigung_id;
       if (e.quittiert) {
         quittiert.add(id);
+        vergissAusgeblendet(id);
         toasts.entferneBenachrichtigung(id);
         eingang?.entferneBenachrichtigung(id);
         // „Alle gelesen“ (LLH-1143 D4): ein Ereignis für alle Eingänge bis dahin, nie für Alarme.

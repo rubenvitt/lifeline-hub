@@ -7,6 +7,7 @@ import { server } from './server';
 import { lagebildLoeschenPlatte } from '../offline/lagebildSpeicher';
 import { verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
 import { benachrichtigungenZuruecksetzenFuerTests } from '../alarm/benachrichtigungGedaechtnis';
+import { zoneZuruecksetzenFuerTests } from '../alarm/alarmZoneSpeicher';
 import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import { setzeMasseZurueck } from './elementMasse';
 import { installiereCssVariablenFilter } from './antdCssVariablen';
@@ -149,6 +150,8 @@ afterEach(() => {
   verbindungZuruecksetzenFuerTests();
   // Gezeigte und quittierte Benachrichtigungen merkt sich das Modul für den ganzen Tab.
   benachrichtigungenZuruecksetzenFuerTests();
+  // Die Alarmzone ist ein Speicher je Tab (LLH-1735).
+  zoneZuruecksetzenFuerTests();
 });
 afterAll(() => server.close());
 

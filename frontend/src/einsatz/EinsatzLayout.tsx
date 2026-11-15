@@ -1,5 +1,5 @@
 import { IconMenue } from '../icons';
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -37,7 +37,7 @@ import { NichtGefundenProvider } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
-import { useAlarmKante } from '../components/alarmOben';
+import AlarmZone from '../alarm/AlarmZone';
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
@@ -216,16 +216,6 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Ab `md` bleibt der Kopf beim Rollen stehen (LFH-952, `frontend/AGENTS.md`, Rahmen); seine
   // gemessene Höhe ist `--lfh-rahmen-oben`, unter der alles hängt, was selbst oben klebt.
   const kopfRef = useRahmenObenQuelle<HTMLElement>(mittel);
-  // Der Kopf ist auch Bedienkante der stehenden Alarme, in jeder Breite: unter `md` rollt er,
-  // steht beim Seitenbeginn aber im Bild (LFH-1112, `components/alarmOben.ts`).
-  const alarmKante = useAlarmKante<HTMLElement>();
-  const kopfRefs = useCallback(
-    (el: HTMLElement | null) => {
-      kopfRef(el);
-      alarmKante(el);
-    },
-    [kopfRef, alarmKante],
-  );
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
@@ -398,7 +388,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header
-        ref={kopfRefs}
+        ref={kopfRef}
         data-lfh="rahmen-kopf"
         style={mittel ? { ...KOPF_STIL, ...RAHMEN_KLEBT } : KOPF_STIL}
       >
@@ -547,6 +537,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       {/* Übung (LLH-1725, Spec `uebungsmarke`, D4): direkt unter dem Kopf, klebt in jeder Breite
          unter den übrigen Rahmenquellen. Beim Realeinsatz steht nichts, auch kein Platzhalter. */}
       <UebungsBand einsatz={einsatz} />
+      {/* Alarmzone (LLH-1735, Spec `benachrichtigungen`, „Alarmzone verdeckt nichts“): direkt unter
+         Kopf und Übungsband, klebt darunter und schiebt den Inhalt. Unter `md` trägt die Leiste am
+         Handschirm die Alarme (`alarm/Eingangsband.tsx`). */}
+      <AlarmZone nurAbMd />
       {/* Warnung, keine Sackgasse: ohne Freigaben fällt `istModulSichtbar` nach OFFEN, jedes
          ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller
          Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der

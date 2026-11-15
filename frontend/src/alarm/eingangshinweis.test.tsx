@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { istAusgeblendet } from './benachrichtigungGedaechtnis';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { http, HttpResponse } from 'msw';
@@ -10,6 +11,7 @@ import type {
   BenachrichtigungEreignis,
   MeldungStatus,
 } from '../api/types';
+import AlarmZone from './AlarmZone';
 import AlarmZentrale from '../einsatz/AlarmZentrale';
 import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener';
 import { server } from '../test/server';
@@ -124,6 +126,7 @@ function Rahmen({ darfSichten }: { darfSichten: boolean }) {
         Zur Karte
       </button>
       <input aria-label="Wortlaut" />
+      <AlarmZone />
       <AlarmZentrale einsatzId={einsatzId} darfSichten={darfSichten} />
       <output data-testid="route">
         {location.pathname}
@@ -134,9 +137,8 @@ function Rahmen({ darfSichten }: { darfSichten: boolean }) {
 }
 
 function renderZentrale({ start = '/einsaetze/1/lagekarte', darfSichten = true } = {}) {
-  // Dieselbe Toast-Grenze wie `main.tsx`: der Eingang darf dort keinen Alarm verdrängen.
   return render(
-    <AntApp notification={{ maxCount: 3 }}>
+    <AntApp>
       <MemoryRouter initialEntries={[start]}>
         <Routes>
           <Route path="/einsaetze/:id/*" element={<Rahmen darfSichten={darfSichten} />} />
@@ -153,9 +155,10 @@ function hinweis(titel: string | RegExp): HTMLElement {
   return el;
 }
 
-/** Die Toasts der Zentrale (antd-Notifications). */
-function toasts(): NodeListOf<HTMLElement> {
-  return document.querySelectorAll<HTMLElement>('.ant-notification-notice');
+/** Die Einträge der Alarmzone (LLH-1735), gebündelt oder nicht. */
+function toasts(): { length: number } {
+  const zone = document.querySelector<HTMLElement>('[data-lfh="alarmzone"]');
+  return { length: Number(zone?.dataset.anzahl ?? 0) };
 }
 
 async function warteBisWeg(titel: string | RegExp) {
@@ -305,7 +308,7 @@ describe('Eingangshinweis (LLH-1062)', () => {
     expect(within(n).queryByRole('button', { name: /Sichten/ })).not.toBeInTheDocument();
   });
 
-  it('✕ quittiert alle Einträge für den Nutzer', async () => {
+  it('✕ blendet die Einträge aus, ohne zu quittieren; die Zahl der Eingänge bleibt (LLH-1736)', async () => {
     const eins = eingang(1401, 101);
     const zwei = eingang(1402, 102, 'lage_uebernahme');
     const s = serverMit([eins, zwei], {
@@ -317,8 +320,15 @@ describe('Eingangshinweis (LLH-1062)', () => {
     live(zwei);
     const n = await waitFor(() => hinweis('2 neue Meldungen'));
     expect(within(n).getByText(/in die Lage übernommen/)).toBeInTheDocument();
-    await userEvent.click(within(n).getByRole('button', { name: /close|schließen/i }));
-    await waitFor(() => expect([...s.quittiert].sort()).toEqual([1401, 1402]));
+    await userEvent.click(
+      within(n).getByRole('button', { name: 'Ausblenden, ohne zu quittieren' }),
+    );
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="eingangsband"]')).not.toBeInTheDocument(),
+    );
+    expect(s.quittiert).toEqual([]);
+    expect(istAusgeblendet(1401)).toBe(true);
+    expect(istAusgeblendet(1402)).toBe(true);
   });
 
   it('Übernahme in die Lage allein: „Öffnen“ springt zu den Lagemeldungen und quittiert', async () => {
@@ -384,14 +394,12 @@ describe('Eingangshinweis (LLH-1062)', () => {
     serverMit([...alarme, b], { 141: { absender: 'UHS Ost', inhalt: 'Ruhig' } });
     renderZentrale();
     for (const a of alarme) live(a);
-    for (const n of [1, 2, 3]) await screen.findByText(`Auftrag ${n} überfällig`);
+    await waitFor(() => expect(toasts()).toHaveLength(3));
     live(b);
     expect(await screen.findByText('Neue Meldung · UHS Ost')).toBeInTheDocument();
-    // Alle drei Alarme stehen weiter einzeln, kein Sammeltoast, keiner verdrängt (`maxCount` 3).
-    for (const n of [1, 2, 3])
-      expect(screen.getByText(`Auftrag ${n} überfällig`)).toBeInTheDocument();
+    // Die Zone trägt weiter alle drei Alarme, der Eingang steht nicht darin (LLH-1735).
     expect(toasts()).toHaveLength(3);
-    expect(screen.queryByText(/weitere/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ 2 weitere' })).toBeInTheDocument();
   });
 
   it('ein neuer Auftrag ist ein Eingang: Band statt Toast, „Öffnen“ springt und quittiert', async () => {

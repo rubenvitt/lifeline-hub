@@ -5,6 +5,7 @@ import { setzeMeldungStatus } from '../api/meldungen';
 import type { BenachrichtigungArt, BenachrichtigungBezugTyp } from '../api/types';
 import { einsatzModulPfad, meldungenPfad } from '../routing/deeplinks';
 import { spieleAlarmTon } from './alarmTon';
+import { blendeAus } from './benachrichtigungGedaechtnis';
 import { type AlarmZiel, ZIEL_SPRUENGE, zielPfad } from './benachrichtigungKatalog';
 import { type DesktopMeldung, schliesseDesktopMeldung, zeigeDesktopAlarm } from './desktopAlarm';
 import { oeffneEingaenge } from './eingaenge';
@@ -23,8 +24,9 @@ import Eingangsband from './Eingangsband';
  * - Steht der Fokus in einem Eingabefeld, wartet er bis zum Verlassen des Feldes.
  * - Auf der eigenen Seite (Meldungen bzw. Lagemeldungen) zeigt er deren Einträge nicht; dort
  *   trägt das Sammelbanner die Neuen.
- * - ✕ und der Sprung quittieren für den Nutzer, „Sichten“ setzt die Meldung auf Gesichtet; dann
- *   räumt der Server den Hinweis bei allen Empfängern (Quittier-Ereignis).
+ * - Der Sprung quittiert für den Nutzer, „Sichten“ setzt die Meldung auf Gesichtet; dann räumt
+ *   der Server den Hinweis bei allen Empfängern (Quittier-Ereignis). ✕ blendet nur aus (LLH-1736,
+ *   `benachrichtigungGedaechtnis.ts`): in diesem Tab kommen die Einträge nicht wieder.
  * - Sammelt er Eingänge verschiedener Module, öffnet „Ansehen“ den Verlauf am Knopf „Eingänge“
  *   (`EingaengeKnopf.tsx`) und quittiert nichts: gelesen ist erst, was jemand öffnet.
  * - „Alle gelesen“ auf einem anderen Gerät (`entferneBis`) räumt alles bis zur gemeldeten Kennung.
@@ -342,9 +344,16 @@ export function useEingangshinweis(
           allesErledigt(true);
         },
       },
+      // ✕ blendet aus, ohne zu quittieren (LLH-1736): die Zahl am Knopf „Eingänge“ bleibt, der
+      // Verlauf nennt sie unter „Neu“. Zurückgehaltene und auf ihrer Seite verborgene bleiben.
       beiSchliessen: () => {
+        if (!zustand.aktiv) return;
+        for (const e of sichtbar) {
+          blendeAus(e.benachrichtigungId);
+          zustand.eintraege.delete(e.benachrichtigungId);
+        }
+        desktopSchliessen();
         schliessen();
-        allesErledigt(true);
       },
     });
 

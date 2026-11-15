@@ -6,32 +6,32 @@ Unteraufgaben: LLH-1735 `p1voqfck`, LLH-1736 `ftf3qelu`, LLH-1737 `mdbfi43h`, LL
 
 ## 1. Speicher und Ausblenden (LLH-1736 `ftf3qelu`, Grundlage für LLH-1735)
 
-- [ ] 1.1 `alarm/benachrichtigungGedaechtnis.ts`: Menge `ausgeblendet`, gespiegelt in
+- [x] 1.1 `alarm/benachrichtigungGedaechtnis.ts`: Menge `ausgeblendet`, gespiegelt in
   `sessionStorage` mit try/catch (D4), Zurücksetzen in `test/setup.ts`. Unit-Test: Eintrag
   übersteht ein simuliertes Neuladen (Modul neu laden), ein Quittieren entfernt ihn, und ein
   werfender Speicher bricht nichts. Vitest grün.
-- [ ] 1.2 `alarm/alarmZoneSpeicher.ts` (D1): Einträge je Tab über `useSyncExternalStore`, mit
+- [x] 1.2 `alarm/alarmZoneSpeicher.ts` (D1): Einträge je Tab über `useSyncExternalStore`, mit
   Aufgeklappt-Zustand. `alarm/useAlarmToasts.tsx` schreibt hinein statt in `notification`, und
   `erledigt` unterscheidet `gelesen` / `ausgeblendet` / `weg` (D4). Tests in
   `alarm/benachrichtigungen.test.tsx` umstellen: ✕ quittiert nicht und merkt aus, „Öffnen“ und
   „Gelesen“ quittieren, Abbau und Einsatzwechsel ohne Quittung, OS-Meldung geht mit. Vitest grün.
-- [ ] 1.3 `alarm/useBenachrichtigungen.ts`: Nachreichen und `melde` überspringen Ausgeblendetes,
+- [x] 1.3 `alarm/useBenachrichtigungen.ts`: Nachreichen und `melde` überspringen Ausgeblendetes,
   ein Quittier-Ereignis vom Server räumt es aus dem Gedächtnis. Test „Ausgeblendet und
   nachgereicht“ aus der Spec. Vitest grün.
-- [ ] 1.4 Eingangsband: ✕ blendet die stehenden Einträge aus statt zu quittieren
+- [x] 1.4 Eingangsband: ✕ blendet die stehenden Einträge aus statt zu quittieren
   (`alarm/useEingangshinweis.tsx`, `beiSchliessen`); `alarm/eingangshinweis.test.tsx` und
   `alarm/quittierenOffline.test.tsx` angepasst; die Zahl am Knopf „Eingänge“ bleibt. Vitest grün.
 
 ## 2. Alarmzone (LLH-1735 `p1voqfck`)
 
-- [ ] 2.1 `alarm/AlarmZone.tsx` (D1–D3, Entwurf `Main.dc.html`, `Zone-Zustaende.dc.html`): eine
+- [x] 2.1 `alarm/AlarmZone.tsx` (D1–D3, Entwurf `Main.dc.html`, `Zone-Zustaende.dc.html`): eine
   Zeile je Eintrag mit Stufe, Titel, Gegenstand, Zeit, „Öffnen“, „Gelesen“ (nicht bei Unwetter)
   und ✕ (`aria-label` „Ausblenden, ohne zu quittieren“). Ab zwei gebündelt „+ n weitere“,
   aufgeklappt Kopfzeile mit Zahl und Arten. Greifer `data-lfh="alarmzone"` /
   `data-lfh="alarm-eintrag"`. Rahmenquelle über `useRahmenObenStapel` auf `RAHMEN_EBENE`. Farben
   nur über Rollen. Unit-Test `alarm/AlarmZone.test.tsx`: Zustände 1–5 des Entwurfs, Bündeln ab
   zwei, „Gelesen“ an einer Zeile quittiert nur diese. Vitest grün.
-- [ ] 2.2 Einhängen: `einsatz/EinsatzLayout.tsx` direkt nach `UebungsBand`, ab `md`;
+- [x] 2.2 Einhängen: `einsatz/EinsatzLayout.tsx` direkt nach `UebungsBand`, ab `md`;
   `components/AppLayout.tsx` nach dem `Header`, in jeder Breite (D5). `components/alarmOben.ts`
   mit Test, `--notification-top` in `index.css` und `maxCount` in `main.tsx` entfernen;
   `rahmenOben.guard.test.ts` kennt die Zone. Tests in `einsatz/AlarmZentrale.test.tsx` und

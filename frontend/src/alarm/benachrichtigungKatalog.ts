@@ -324,69 +324,10 @@ export function zielVon(e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ'>):
 }
 
 /**
- * Toast-Schlüssel einer Benachrichtigung: ihre Kennung. Dieselbe Benachrichtigung erscheint so
- * nie zweimal (Replay, Nachreichen); zwei Benachrichtigungen zum selben Bezug sind zwei Toasts.
+ * Schlüssel einer Benachrichtigung in der Alarmzone: ihre Kennung. Dieselbe Benachrichtigung
+ * erscheint so nie zweimal (Replay, Nachreichen); zwei Benachrichtigungen zum selben Bezug sind
+ * zwei Einträge.
  */
 export function toastSchluessel(e: Pick<BenachrichtigungEreignis, 'benachrichtigung_id'>): string {
   return `b-${e.benachrichtigung_id}`;
-}
-
-/**
- * Gruppe für den Titel des Sammeltoasts. Die Gruppen der bestehenden Alarme tragen ihren eigenen
- * Titel („3 weitere Sofortmeldungen“); die drei Fristen einer Schicht (Planungshinweis,
- * Vorwarnung, Fälligkeit) fallen in eine Gruppe. Die Hinweise zur ablösenden Einheit bleiben eine
- * eigene Art.
- */
-export type SammelGruppe =
-  'sofort' | 'auftrag-ueberfaellig' | 'erinnerung' | 'abloesung' | 'unwetter' | BenachrichtigungArt;
-
-export function sammelGruppeVon(art: BenachrichtigungArt): SammelGruppe {
-  if (art === 'sofortmeldung') return 'sofort';
-  if (art === 'auftrag_ueberfaellig') return 'auftrag-ueberfaellig';
-  if (art === 'erinnerung_faellig') return 'erinnerung';
-  if (
-    art === 'abloesung_faellig' ||
-    art === 'abloesung_vorwarnung' ||
-    art === 'abloesung_planung'
-  ) {
-    return 'abloesung';
-  }
-  return art;
-}
-
-const GRUPPEN_TITEL: Partial<Record<SammelGruppe, string>> = {
-  sofort: 'Sofortmeldungen',
-  'auftrag-ueberfaellig': 'überfällige Aufträge',
-  erinnerung: 'fällige Erinnerungen',
-  abloesung: 'Ablösungen',
-};
-
-/**
- * Titel des Sammeltoasts: Zahl und Art, das Ziel steht am Knopf (LFH-1078). Eine einzige Gruppe
- * der bestehenden Alarme behält ihren Titel; sonst „Alarme“, sobald einer dabei ist, und
- * „Hinweise“, wenn alle Hinweise sind.
- */
-export function sammelTitel(
-  eintraege: readonly { gruppe: SammelGruppe; stufe: BenachrichtigungStufe }[],
-): string {
-  const anzahl = eintraege.length;
-  const gruppen = new Set(eintraege.map((e) => e.gruppe));
-  if (gruppen.size === 1) {
-    const titel = GRUPPEN_TITEL[[...gruppen][0]];
-    if (titel) return `${anzahl} weitere ${titel}`;
-  }
-  return eintraege.some((e) => e.stufe === 'alarm')
-    ? `${anzahl} weitere Alarme`
-    : `${anzahl} weitere Hinweise`;
-}
-
-/**
- * Zählzeilen des Sammeltoasts, je Name eine („2 × Neuer Auftrag“), in der Reihenfolge des ersten
- * Auftretens. Leer bei nur einer Art: dann sagt der Titel schon alles.
- */
-export function sammelZeilen(eintraege: readonly { name: string }[]): string[] {
-  const zaehler = new Map<string, number>();
-  for (const e of eintraege) zaehler.set(e.name, (zaehler.get(e.name) ?? 0) + 1);
-  if (zaehler.size < 2) return [];
-  return [...zaehler].map(([name, n]) => `${n} × ${name}`);
 }

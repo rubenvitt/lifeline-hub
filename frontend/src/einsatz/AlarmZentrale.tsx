@@ -211,7 +211,7 @@ export default function AlarmZentrale({
       const paar = detail.schluessel ?? 'ohne';
       const schluessel = `unwetter-${paar}-${++zaehlerRef.current}`;
       const vorher = unwetterRef.current?.einsatzId === einsatzId ? unwetterRef.current : null;
-      if (vorher && toasts.istEinzeln(vorher.schluessel)) toasts.entferne(vorher.schluessel);
+      if (vorher && toasts.istSichtbar(vorher.schluessel)) toasts.entferne(vorher.schluessel);
       // Die OS-Meldung zieht mit dem Toast gleich (LFH-951): die neue ersetzt die ältere, auch
       // wenn das Paar ein anderes ist. Dasselbe Paar ersetzt sie schon über den `tag`.
       const tag = `${einsatzId}-unwetter-${paar}`;
@@ -223,8 +223,6 @@ export default function AlarmZentrale({
         titel: detail.titel ?? 'Unwetterwarnung',
         beschreibung: detail.beschreibung ?? 'Unwetterwarnung für den Einsatzort',
         pfad: wetterPegelPfad(einsatzId),
-        ziel: 'wetter-pegel',
-        gruppe: 'unwetter',
         name: 'Unwetterwarnung',
         stufe: 'alarm',
         desktop: { tag },
