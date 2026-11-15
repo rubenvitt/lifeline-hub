@@ -158,8 +158,8 @@ export interface Farbrollen {
    *  tragen keine Platte (LFH-833): nachts zeichnet sie das Render-Theme `dark` der Bibliothek
    *  selbst hell (`zeichen/zeichenTheme.ts`, LLH-1141). */
   zeichenPlatte: string;
-  /** Übung (LLH-1725, Spec `uebungsmarke`): Grund von Band und Marke. Eine violette Fläche ist NUR Übung (violette Kennfarben wie
-   *  die ETB-Entscheidung tragen keine Fläche) und
+  /** Übung (LLH-1725, Spec `uebungsmarke`): Grund von Band und Marke. Erkennbar ist die Übung an Form und Wort, nicht am Farbton
+   *  (violett sind auch ETB-Entscheidung und Abschnittsflächen der Lagekarte); die Töne
    *  in beiden Modi gleich, weil das Band am Rahmen hängt, der in beiden Modi dunkel ist. Das
    *  Wort hält den Tagesboden 7 : 1 auf Füllung und Schraffur (`uebungKontrast.test.ts`). */
   uebungFuellung: string;

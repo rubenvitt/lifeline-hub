@@ -126,9 +126,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Tab-Titel, Druck).
     Entschieden wird nur über `istUebung` (`einsatz/einsatzart.ts`) aus der Einsatzart, nie aus dem
     Namen. Gezeigt wird nur über `UebungsMarke`/`UebungsBand` (`components/instrument/Uebung.tsx`),
-    im Druck über den Druckkopf. Eine violette gefüllte Fläche (Rolle `uebung`) bedeutet nur Übung,
-    und das Wort „ÜBUNG“ steht immer dabei. Violette Kennfarben ohne Fläche (ETB-Typ „Entscheidung“,
-    KRITIS-Ebene, Gefahrenart Intoxikation) bleiben. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
+    im Druck über den Druckkopf. Erkennbar ist sie an Form und Wort (schraffiertes Band, gefüllter
+    Chip, immer „ÜBUNG“), nicht am Farbton: Violett (Rolle `uebung`) tragen auch die ETB-Entscheidung,
+    die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
     Rahmenquellen (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.

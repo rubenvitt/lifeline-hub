@@ -11,8 +11,9 @@ Realeinsatz zu unterscheiden sein. Diese Fähigkeit legt fest, woran man sie erk
 
 Das System SHALL einen Einsatz genau dann als Übung kennzeichnen, wenn seine Einsatzart „Übung“
 ist. Name, Stichwort oder Vorlage SHALL dabei keine Rolle spielen. Jede Kennzeichnung SHALL das
-Wort „ÜBUNG“ tragen, die Farbe allein MUST NOT die Übung anzeigen. Die Farbe der Kennzeichnung
-MUST keiner anderen Bedeutung zugeordnet sein.
+Wort „ÜBUNG“ tragen, die Farbe allein MUST NOT die Übung anzeigen. Die Kennzeichnung MUST sich
+durch Form und Wort von jeder anderen Darstellung unterscheiden, und ihre Farbtöne MUST NOT einer
+Status- oder ETB-Typfarbe gleichen.
 
 #### Scenario: Übung mit neutralem Namen
 

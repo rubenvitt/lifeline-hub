@@ -21,10 +21,11 @@ Die Motivation steht in `proposal.md` unter „Why“. Ausgangslage im Code:
   (`bezeichnung`, `einsatznummer_intern`). `druck/druck.css` setzt `@page` mit einem Randfeld
   `@bottom-right` für die Seitenzählung, das nur Chromium zeichnet.
 - Farben: Gelb heißt Achtung oder Störung, Blau Bedienung oder Hinweis, Grün normal. Rot gehört
-  der Marke und bedient nichts. Violett ist als Fläche und als Status frei. Als Kennfarbe ohne
-  Fläche kommt es vor: ETB-Typ „Entscheidung“ (Kante und Typwort), KRITIS-Ebene der Lagekarte und
-  Gefahrenart Intoxikation. Das war beim ersten Entwurf übersehen und ist bei der Umsetzung
-  aufgefallen.
+  der Marke und bedient nichts. Violett ist keine Statusfarbe, aber nicht frei: ETB-Typ
+  „Entscheidung“ (Kante und Typwort), Abschnittsflächen (gefüllt, 15 %) und Führungscluster der
+  Lagekarte, KRITIS-Fachebene und der Anlass Intoxikation im Lagebild Sanitätsdienst. Der erste
+  Entwurf hielt Violett für frei; Umsetzung und Review haben das berichtigt. Die Übung
+  unterscheidet sich deshalb durch Form und Wort, nicht durch den Farbton.
 
 ## Goals / Non-Goals
 
@@ -205,8 +206,7 @@ ihn. Im `EinsatzSwitcher` steht die Marke im Eintrag vor der Bezeichnung. Die Ne
 - [Die Randfeld-Kennzeichnung fehlt in Firefox und Safari ab Seite 2] → Dort trägt nur der
   Druckkopf der ersten Seite „ÜBUNG“. Das ist bekannt und steht so in der Spec. Ein lückenloser Weg
   wäre ein Wasserzeichen, das ist verworfen.
-- [Die Farbe kollidiert später mit einer neuen Rolle] → Die Rolle ist exklusiv. Die Regel in
-  `frontend/AGENTS.md` nennt die violette Fläche als „nur Übung“.
-- [Violette Kennfarben gibt es schon (ETB-Entscheidung, KRITIS, Intoxikation)] → Sie tragen keine
-  gefüllte Fläche und kein Wort „ÜBUNG“. Die Übungsmarke unterscheidet sich durch Form (Band,
-  Schraffur, gefüllter Chip) und Wort, nicht durch den Farbton allein.
+- [Violett ist auch anderswo belegt (ETB-Entscheidung, Abschnittsflächen, Cluster, KRITIS)] →
+  Die Übung trägt immer das Wort und eine eigene Form (schraffiertes Band, gefüllter Chip mit
+  Kante); `uebungKontrast.test.ts` hält fest, dass sie keinen Ton mit Status- oder ETB-Typfarben
+  teilt.

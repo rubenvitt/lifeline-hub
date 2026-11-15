@@ -76,6 +76,23 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
   `einsatz-oberflaeche` und die Gerätekapitel); was in der Sitzung nicht läuft, als Folgeaufgabe auf
   dem Board und im PR genannt.
 
+## 9. Folgen aus dem Review vor dem PR (abgestimmt 15.11.2026)
+
+- [x] 9.1 ADR für die Entscheidung (E1): `docs/architektur/entscheidungen/ADR-<n>-…` mit Regeln und
+  Prüfung zu `istUebung`, Baustein und Rolle; `scripts/check-architektur.sh` bzw. der ADR-Wächter grün.
+- [x] 9.2 Violett-Aussagen berichtigen (Abschnittsflächen und Führungscluster der Lagekarte sind
+  ebenfalls violett gefüllt): Spec `uebungsmarke` verlangt Unterscheidung durch Form und Wort statt
+  Exklusivität des Farbtons; Regel, Doku, Kommentare und design.md nachziehen.
+- [ ] 9.3 Test, dass das Gerätband (`klebend={false}`) keine Rahmenhöhe meldet und das klebende sie
+  meldet (gestubbte `offsetHeight`); Mutationsprobe am Hook-Argument rot.
+- [ ] 9.4 Druck: benannte Seiten `lageplan`, `dokument-anlage`, `fernmeldeskizze-a3/-a4` erhalten
+  bei einer Übung eine Variante mit Randfeld „ÜBUNG“; der Titel jedes Anlageblatts einer Übung trägt
+  „ÜBUNG“; CSS-Tests und `etb-druck`/Anlagen-Test grün.
+- [ ] 9.5 Gerätehülle und Lagemonitor laden den Einsatzkopf ohne Daten alle 30 s nach und zeigen nach
+  einem Fehler „Einsatzart nicht geladen“ (Gerät unter dem Kopf, Monitor in der Statusleiste); Tests.
+- [ ] 9.6 Marke zusätzlich in Sprungpalette (Einsatz-Wechsel), Planungsübernahme („Laufender
+  Einsatz“), externem Lagebild, „Zurück zu …“ (Ebene 1) und im Bildkopf des Lageplan-PNG; je ein Test.
+
 ## 8. Abschluss
 
 - [ ] 8.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Ergebnis im PR unter „Geprüft“).
