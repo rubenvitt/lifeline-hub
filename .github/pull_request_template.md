@@ -49,6 +49,7 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
      Dichtestufe, welcher Browser? Label `voll` nur nach `scripts/AGENTS.md`, „Wann `voll`“. -->
 
 - [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün
+- [ ] Bei UI-Abläufen: die betroffene e2e-Spec lokal grün (Kommando: `scripts/AGENTS.md`, „Wann `voll`“)
 - [ ] Bei Backend-Typänderungen: `openapi.json` + `types.generated.ts` mitcommittet
 - [ ] Bei neuer/umgebauter Seite: Prüfliste Einsatztauglichkeit ausgefüllt (15 Kriterien)
 - [ ] Anwenderdoku (`docs/anwender/`) nachgezogen oder nicht betroffen, Bilder neu erzeugt

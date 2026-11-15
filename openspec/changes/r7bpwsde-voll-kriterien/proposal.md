@@ -13,9 +13,10 @@ sollte ganz strikte Kriterien geben, wann `voll` dran kommt, und das soll die Se
 ## What Changes
 
 - `voll` setzt ein Agent nur noch, wenn **mindestens eines** zutrifft:
-  1. Der PR ändert, **wie die Suiten selbst laufen**: `suiten.yml`, `e2e.yml`, `scripts/runner/`,
-     die Konfiguration von Playwright (`frontend/playwright*.config.ts`) oder Vitest
-     (`frontend/vite*.config.ts`, `frontend/vitest*.config.ts`).
+  1. Der PR ändert eine Stelle der abschließenden Liste: `suiten.yml`, `e2e.yml`, den Job
+     `suiten` in `pr.yml`/`ci.yml`, `scripts/runner/`, `frontend/playwright.config.ts` oder den
+     Block `test:` in `frontend/vite.config.ts`. Gate-Skript und e2e-Unterbau: das betroffene
+     Bündel lokal ganz.
   2. Der Mensch verlangt es ausdrücklich.
 - Ausdrücklich **kein** Grund: „riskant“, Backend-Verhalten, UI-Abläufe, Migrationen, CI-Änderungen
   außerhalb der Suiten. Dafür gilt lokal `check-all.sh --geaendert --ohne-e2e`, bei UI-Abläufen

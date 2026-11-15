@@ -18,7 +18,9 @@ Mensch). Kein Ersatz für die e2e-Suite im PR.
 Nur was die Suiten selbst verändert, lässt sich lokal nicht belegen: Workflows der Suiten, Runner,
 Test-Konfiguration. Alles andere fährt ein Agent lokal (`--geaendert --ohne-e2e`, gezielt die
 betroffene e2e-Spec) oder fängt `alpha` („alpha rot“). Verworfen: eine Liste riskanter Bereiche
-(Migrationen, Auth, Live-Kanal); sie wüchse und brächte das Ermessen zurück.
+(Migrationen, Auth, Live-Kanal); sie wüchse und brächte das Ermessen zurück. Die Liste der Orte
+ist abschließend (Review: sonst bliebe bei Grenzfällen Ermessen). Gate-Skript und e2e-Unterbau
+stehen bewusst nicht darauf: sie laufen lokal mit dem betroffenen Bündel (`--nur e2e` usw.).
 
 ### D2: Eine Stelle, Verweise sonst
 Die Regel steht in `scripts/AGENTS.md`. Skill und PR-Vorlage nennen sie nur mit Verweis, damit sie
