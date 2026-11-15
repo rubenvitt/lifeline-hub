@@ -197,6 +197,18 @@ export function visibleBesatzungRows(
   };
 }
 
+/**
+ * Die sichtbaren Zeilen samt der gehaltenen Fahrzeuge (LLH-1722): eine gelöste Fahrzeugzeile steht
+ * noch da, also gehört ein Grund an ihr nicht in den Seitenhinweis, sonst stünde er doppelt.
+ */
+export function mitGehaltenenFahrzeugen(
+  sichtbar: VisibleBesatzungRows,
+  gehalten: ReadonlyMap<number, string>,
+): VisibleBesatzungRows {
+  if (gehalten.size === 0) return sichtbar;
+  return { ...sichtbar, fahrzeuge: new Map([...sichtbar.fahrzeuge, ...gehalten]) };
+}
+
 // ── Zuordnen aus Einsatz und Stamm (D7, D8) ───────────────────────────────────
 
 /**

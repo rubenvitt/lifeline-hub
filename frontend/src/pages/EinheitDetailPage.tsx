@@ -2,7 +2,7 @@ import { App, Breadcrumb, Button } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Paneel, useRollen } from '../components/instrument';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
@@ -49,6 +49,7 @@ import {
 import {
   buildBesatzungMittel,
   buildEinheitRechte,
+  mitGehaltenenFahrzeugen,
   visibleBesatzungRows,
 } from './einheit/einheitAnsichtKern';
 import EinheitKopf from './einheit/EinheitKopf';
@@ -258,10 +259,14 @@ function EinheitAnsicht({
     besatzungFahrzeuge,
     rechte,
   );
+  // Gelöste Fahrzeuge, deren Zeile das Paneel noch hält (LLH-1722): ihr Grund steht an ihr.
+  const [gehalteneFahrzeuge, setGehalteneFahrzeuge] = useState<ReadonlyMap<number, string>>(
+    () => new Map(),
+  );
   const besatzungErrors = useBesatzungErrors(
     rechte.hasBesatzung && besatzungListState === 'laden'
       ? null
-      : visibleBesatzungRows(aktuell, besatzungMittel),
+      : mitGehaltenenFahrzeugen(visibleBesatzungRows(aktuell, besatzungMittel), gehalteneFahrzeuge),
   );
 
   // Die Vorgabe der Organisation füllt ein Zeichen ohne eigene Organisation, wie auf der Karte.
@@ -480,6 +485,7 @@ function EinheitAnsicht({
           }}
           onSetFuehrer={setFuehrer}
           errors={besatzungErrors}
+          onGehalten={setGehalteneFahrzeuge}
         >
           {/* Erst mit den Freigaben: die Auswahl fragt den Stamm nur mit Freigabe ab, und ein
               Feld, das kurz offen und dann gesperrt stünde, spränge unter dem Zeiger. */}

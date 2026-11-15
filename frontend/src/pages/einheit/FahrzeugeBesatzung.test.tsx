@@ -7,9 +7,14 @@ import { renderMitProviders } from '../../test/utils';
 import { eintraegeVon, erwarteBrowsermenue, oeffneKontextmenue } from '../../test/kontextmenue';
 import { freigabenFixture } from '../../test/fixtures';
 import { warteAufMenueFokus } from '../../test/menue';
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
 import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, ModulFreigaben } from '../../api/types';
-import { buildBesatzungMittel, buildEinheitRechte } from './einheitAnsichtKern';
+import {
+  buildBesatzungMittel,
+  buildEinheitRechte,
+  mitGehaltenenFahrzeugen,
+  visibleBesatzungRows,
+} from './einheitAnsichtKern';
 import FahrzeugeBesatzung from './FahrzeugeBesatzung';
 import { useBesatzungErrors } from './useBesatzungErrors';
 
@@ -601,7 +606,11 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
     await userEvent.click(marke);
     await userEvent.click(marke);
     expect(aufrufe).toEqual(['DELETE 30']);
-    expect(document.querySelectorAll('.ant-dropdown:not(.ant-dropdown-hidden)')).toHaveLength(0);
+    // Das Menü, das gelöst hat, schließt (sein Trigger bleibt unsichtbar stehen, darum steht es in
+    // jsdom im Ausblenden); die Marke öffnet keines.
+    expect(
+      document.querySelectorAll('.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave)'),
+    ).toHaveLength(0);
   });
 
   it('„Rückgängig“ in der Zeile ordnet mit `nur_wenn_frei` wieder zu', async () => {
@@ -644,6 +653,77 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
     expect(
       await within(gruppe('Fahrzeug 83-1')).findByText('83-1 steht inzwischen in Einheit «Gr 2»'),
     ).toHaveAttribute('data-fehler');
+  });
+
+  /** Wie die Seite: hält die Gründe gegen die sichtbaren Zeilen samt der gehaltenen. */
+  function Seite({ e, fahrzeuge }: { e: Einheit; fahrzeuge: readonly EinsatzFahrzeug[] }) {
+    const rechte = buildEinheitRechte(true, freigabenFixture());
+    const mittel = buildBesatzungMittel(e, [e, GAST], PERSONAL, fahrzeuge, rechte);
+    const [gehalten, setGehalten] = useState<ReadonlyMap<number, string>>(() => new Map());
+    const errors = useBesatzungErrors(
+      mitGehaltenenFahrzeugen(visibleBesatzungRows(e, mittel), gehalten),
+    );
+    return (
+      <>
+        <output data-testid="seitenhinweis">{errors.orphaned.length}</output>
+        <FahrzeugeBesatzung
+          einsatzId={1}
+          einheit={e}
+          mittel={mittel}
+          personal={PERSONAL}
+          rechte={rechte}
+          listState="daten"
+          onSetFuehrer={() => Promise.resolve()}
+          errors={errors}
+          onGehalten={setGehalten}
+        />
+      </>
+    );
+  }
+
+  it('fällt 83-1 aus der Quelle, hält seine Zeile die Stelle, und ein abgelehntes Rückgängig steht einmal', async () => {
+    mitschnitt();
+    server.use(http.get('/api/fahrzeug-status', () => HttpResponse.json(KATALOG)));
+    const reihenfolge = () =>
+      screen.getAllByRole('group', { name: /^Fahrzeug / }).map((g) => g.getAttribute('aria-label'));
+    const { rerender } = renderMitProviders(<Seite e={einheit()} fahrzeuge={FAHRZEUGE} />);
+    await screen.findByRole('group', { name: 'Fahrzeug 83-1' });
+    const vorher = reihenfolge();
+    await userEvent.click(within(await oeffneFahrzeugMenue('83-1')).getByText('Aus Einheit lösen'));
+    await within(gruppe('Fahrzeug 83-1')).findByRole('button', { name: '83-1 gelöst' });
+
+    // Die Quelle zeigt 83-1 nicht mehr: es hängt an keiner Einheit, seine Besatzung bleibt in ihr.
+    const ohne83_1 = einheit({
+      fahrzeug_mitglieder: einheit().fahrzeug_mitglieder.filter((m) => m.ef_id !== 30),
+    });
+    const fahrzeugeOhne = FAHRZEUGE.map((f) => (f.id === 30 ? { ...f, einheit_id: null } : f));
+    rerender(<Seite e={ohne83_1} fahrzeuge={fahrzeugeOhne} />);
+    expect(reihenfolge()).toEqual(vorher);
+    const zeile = gruppe('Fahrzeug 83-1');
+    expect(zeile).toHaveAttribute('data-geloest');
+    expect(namenIn(zeile)).toEqual(['Anna Führer', 'Clara Unter', 'Bernd Mann']);
+    // Besatzungsangabe, Statuswahl und Übernehmen stehen unsichtbar an ihrem Platz: die Höhe bleibt.
+    expect(zeile.querySelector('[data-lfh="einheit-besatzung"]')).not.toBeNull();
+    expect(
+      within(zeile).getByText('Personal der Einheit übernehmen').closest('span[style]'),
+    ).toHaveStyle({ visibility: 'hidden' });
+    // Die Besatzung steht nicht zusätzlich unter „Ohne Fahrzeug“.
+    const ohne = screen.queryByRole('group', { name: 'Ohne Fahrzeug' });
+    expect(ohne == null ? [] : namenIn(ohne)).not.toContain('Anna Führer');
+
+    server.use(
+      http.put('/api/einsaetze/1/einheiten/10/fahrzeug/30', () =>
+        HttpResponse.json({ error: '83-1 steht inzwischen in Einheit «Gr 2»' }, { status: 409 }),
+      ),
+    );
+    await userEvent.click(
+      within(zeile).getByRole('button', { name: 'Rückgängig: 83-1 zurück in die Einheit' }),
+    );
+    expect(
+      await within(zeile).findByText('83-1 steht inzwischen in Einheit «Gr 2»'),
+    ).toHaveAttribute('data-fehler');
+    expect(screen.getAllByText('83-1 steht inzwischen in Einheit «Gr 2»')).toHaveLength(1);
+    expect(screen.getByTestId('seitenhinweis')).toHaveTextContent('0');
   });
 
   it('nach „Aus Einheit lösen“ einer Person: Rückgängig ordnet zu, beim Einheitsführer samt Führung', async () => {
