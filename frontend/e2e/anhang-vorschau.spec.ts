@@ -78,7 +78,7 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Vorschau ${Date.now()}`);
   const schadenId = await schadenMitFoto(page, einsatzId);
-  const heicNr = await etbEintragMitHeic(page, einsatzId);
+  await etbEintragMitHeic(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   // ── 1 · Vorschaubild vom Server ─────────────────────────────────────────────────────
@@ -131,23 +131,6 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   ]);
   expect(hoehe, 'Drehung aus irot angewendet: hochkant').toBeGreaterThan(breite);
 
-  // ── 4 · HEIC in der kompakten Spaltenzeile: Vorschau über das Zeilenmenü (LLH-1887) ──
-  // Dort steht der Anhang nur als Vermerk; die Großansicht dekodiert das Gerät, nie das Original.
-  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
-  await page.getByRole('button', { name: `Aktionen zu Eintrag ${heicNr}`, exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Vorschau: IMG_0001.HEIC' }).click();
-  const menueAnsicht = page.locator('.ant-image-preview');
-  await expect(menueAnsicht).toBeVisible({ timeout: 30_000 });
-  const menueGross = menueAnsicht.locator('img.ant-image-preview-img');
-  await expect(menueGross).toHaveAttribute('src', /^blob:/);
-  await expect
-    .poll(() => menueGross.evaluate((i: HTMLImageElement) => i.naturalWidth))
-    .toBeGreaterThan(0);
-  await page.keyboard.press('Escape');
-  await expect(menueAnsicht).toBeHidden();
-
   // Glue und WASM kommen als eigene Dateien vom festen Pfad, austauschbar (LGPL, LFH-1000).
   for (const datei of ['libheif.js', 'libheif.wasm']) {
     expect(
@@ -155,5 +138,40 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
       `${datei} kam erst jetzt, vom festen Pfad`,
     ).toBe(true);
   }
+  expect(anfragen.filter((u) => u.includes('fassung=original'))).toEqual([]);
+});
+
+/**
+ * HEIC in der kompakten Spaltenzeile (LLH-1887): dort steht der Anhang nur als Vermerk, die
+ * Großansicht kommt über das Zeilenmenü und dekodiert das Gerät, nie das Original. Ein eigener
+ * Test: im Test oben wären es zu viele volle Ladungen in einem Browserkontext, Chromium bricht
+ * dann die Modulabrufe des Dev-Servers ab (`net::ERR_INSUFFICIENT_RESOURCES`, LLH-1614).
+ */
+test('HEIC in der kompakten Spaltenzeile: Großansicht über das Zeilenmenü, nie das Original', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  const anfragen: string[] = [];
+  page.on('request', (r) => anfragen.push(r.url()));
+
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Vorschau kompakt ${Date.now()}`);
+  const nr = await etbEintragMitHeic(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+  await page.getByRole('button', { name: `Aktionen zu Eintrag ${nr}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Vorschau: IMG_0001.HEIC' }).click();
+  const ansicht = page.locator('.ant-image-preview');
+  await expect(ansicht).toBeVisible({ timeout: 30_000 });
+  const gross = ansicht.locator('img.ant-image-preview-img');
+  await expect(gross).toHaveAttribute('src', /^blob:/);
+  await expect
+    .poll(() => gross.evaluate((i: HTMLImageElement) => i.naturalWidth))
+    .toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
+  await expect(ansicht).toBeHidden();
   expect(anfragen.filter((u) => u.includes('fassung=original'))).toEqual([]);
 });
