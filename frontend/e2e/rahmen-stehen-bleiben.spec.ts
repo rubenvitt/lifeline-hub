@@ -275,8 +275,15 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
  * `mindestens` px (Vorgabe 200).
  */
 async function ansEnde(page: Page, mindestens = 200) {
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(mindestens);
+  // Wiederholt gerollt: lädt der Inhalt noch, wächst die Seite nach dem ersten Rollen weiter.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        return window.scrollY;
+      }),
+    )
+    .toBeGreaterThan(mindestens);
 }
 
 async function unterkanteKopf(page: Page): Promise<number> {
@@ -479,4 +486,39 @@ test('Fokus rückwärts unter dem klebenden Seitenkopf, Fokus im Seitenkopf roll
   await seitenkopf.locator('button, a[href]').first().focus();
   await page.waitForTimeout(100);
   expect(await page.evaluate(() => window.scrollY)).toBe(vorher);
+});
+
+/**
+ * Review zjt7c073 (B3): Rail, Modulpanel und Verwaltungsmenü kleben an der Kopfhöhe, der
+ * Fokusabstand am Dokument zählt aber den klebenden Seitenkopf mit. Ohne Ausnahme rollte ein
+ * Fokus auf die oberste Kategorie die Seite um die Seitenkopfhöhe zurück (gemessen 1349 → 1305),
+ * obwohl das Ziel klebt und an seinem Platz blieb.
+ */
+test('Fokus in der klebenden Rail rollt die Seite nicht (1440 × 900)', async ({ page }) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Rail-Fokus ${Date.now()}`);
+  for (let i = 0; i < 30; i += 1) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+      data: { adhoc: { name: `Rail-Fokus Kraft ${i}`, funktion: 'Helfer' } },
+    });
+    expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  await expect(
+    page.locator('[data-lfh="seitenkopf"]').getByRole('heading', { level: 1 }),
+  ).toBeVisible();
+  await ansEnde(page);
+  // Vorbedingung: der Seitenkopf klebt, die Rahmenhöhe ist größer als die Kopfhöhe.
+  await expect(page.locator('[data-lfh="seitenkopf"]')).toHaveCSS('position', 'sticky');
+  const vorher = await page.evaluate(() => window.scrollY);
+  const rail = page.locator('[data-lfh="rail-spalte"] button').first();
+  await rail.focus();
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.scrollY), 'Fokus auf „Führung“').toBe(vorher);
+  // Auch per Tastatur, rückwärts vom zweiten Ziel der Rail.
+  await page.locator('[data-lfh="rail-spalte"] button').nth(1).focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(rail).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY), 'Shift+Tab auf „Führung“').toBe(vorher);
 });

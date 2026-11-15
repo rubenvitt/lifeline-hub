@@ -224,8 +224,16 @@ main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
 /* Der klebende Seitenkopf zählt zur Rahmenhöhe (zjt7c073 D2/D6); steht der Fokus in ihm selbst,
-   gilt nur die Kopfleiste darüber, sonst rollte jeder Tab durch die Seitenaktionen die Seite. */
-:root:has([data-lfh='seitenkopf'] :focus) {
+   gilt nur die Kopfleiste darüber, sonst rollte jeder Tab durch die Seitenaktionen die Seite.
+   Dasselbe für alles, was neben dem Inhalt an der Kopfhöhe klebt (Rail, Modulpanel,
+   Verwaltungsmenü): ein Fokus auf ihr oberstes Ziel rollte die Seite sonst um die Seitenkopfhöhe
+   zurück, obwohl das Ziel klebt (Review B3, `e2e/rahmen-stehen-bleiben.spec.ts`). */
+:root:has(
+  [data-lfh='seitenkopf'] :focus,
+  [data-lfh='rail-spalte'] :focus,
+  [data-lfh='modul-panel'] :focus,
+  [data-lfh='verwaltung-menue'] :focus
+) {
   scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
 }
 :root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
