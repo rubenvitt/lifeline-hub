@@ -45,7 +45,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/drftcjksxrh0vazqkadyuegy (LLH-1730)
 ## 9. Abschluss
 
 - [x] 9.1 `grep` nach Kommentaren und Texten mit „Profil und Abmelden“, „direkt unter dem Kopf“, „Abmelden ohne Rollen“ in `frontend/src`, `frontend/e2e`, `docs/` und `.claude/`; Verweise auf die umbenannte Anforderung nachziehen
-- [ ] 9.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis im PR unter „Geprüft“
+- [x] 9.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis im PR unter „Geprüft“
 
 ## Workflow follow-up
 
