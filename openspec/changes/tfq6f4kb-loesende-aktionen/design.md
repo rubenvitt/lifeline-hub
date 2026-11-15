@@ -54,8 +54,8 @@ Siehe proposal.md, „Why“. Der Scope vom 15.11.2026 hat ergeben:
 |---|---|---|---|
 | Zuordnung lösen | „Aus <Ziel> lösen“ / „Vom <Ziel> lösen“; „Abziehen“, „Austragen“ bleiben | ⋮ der Zeile; sichtbarer Knopf nur als einzige Handlung der Zeile | ohne Rückfrage, Rückgängig; fällt der Datensatz aus der Ansicht, hält die Zeile „Gelöst · Rückgängig“ |
 | Kraft entlassen | „Entlassen“, Material „Aus dem Einsatz nehmen“ | Liste: ⋮; Detail: letzter Abschnitt „Aus dem Einsatz“; nie Hauptaktion einer Karte | Rückgängig nur bei vollständigem Rückweg, sonst Rückfrage (Ausnahme bis zu den Folgeaufgaben: Personal, Material) |
-| Gebilde beenden | „Auflösen“ (endgültig), „Schließen“ (umkehrbar) | Auflösen: letzter Abschnitt der Detailseite, ohne Detailseite rot im ⋮; Schließen: Statusschritt im Kopf | Auflösen: Rückfrage mit Folgesatz; Schließen: Rückgängig |
-| Fehlanlage | „Stornieren“ | immer ⋮, rot hinter dem Trenner (Detailseite: ⋮ des Kopfs) | Rückfrage im Dialog |
+| Gebilde beenden | „Auflösen“ (endgültig), „Schließen“ (umkehrbar) | Auflösen: letzter Abschnitt der Detailseite; auf einer Fensterseite (UHS) oder ohne Detailseite rot im ⋮; Schließen: Statusschritt im Kopf | Auflösen: Rückfrage mit Folgesatz; Schließen: Rückgängig |
+| Fehlanlage | „Stornieren“ | dort, wo „Auflösen“ steht (letzter Abschnitt bei Einheit und BR, ⋮ des Kopfs bei der UHS); sonst ⋮, rot hinter dem Trenner (Detailseite: ⋮ des Kopfs); nie ein Kopfknopf | Rückfrage |
 | Eigene Buchung | „Zurücknehmen“ („Zurückziehen“, „Aufheben“ bleiben Fachwörter) | Zeile oder ⋮ | Rückfrage; Grund nur, wo das Fach ihn verlangt |
 
 **Warum nach Art statt nach Modul:** Die Sicherung folgt aus der Umkehrbarkeit, der Ort aus der
@@ -94,6 +94,20 @@ Beim Evakuierungsbezirk wandert „Bearbeiten“ ins ⋮, bei der UHS fällt „
 Symptom, und bei 1024 px liefe der Kopf über.
 
 ### D4 Auflösen als letzter Abschnitt
+
+**Nachgeschärft beim Umsetzen (Abstimmung 15.11.2026):** Die Einheit führt „Stornieren“ seit
+LLH-1881 im selben Abschnitt wie „Auflösen“. Daraus wurde die Regel: Endgültiges steht gebündelt.
+Wo eine Seite den Abschnitt „… auflösen oder stornieren“ hat (Einheit, BR), steht
+„Stornieren“ dort. Sonst steht es im ⋮ des Kopfs (Tier, Schaden, Person, Betreuung, Bezirk). Den
+Abschnitt trägt ein geteilter Baustein (`components/BeendenAbschnitt.tsx`), die Einheit nutzt ihn
+mit.
+
+**Ausnahme Fensterseite (beim Umsetzen festgestellt):** Die UHS ist eine Fensterseite, ihre
+Arbeitsfläche (Grundriss, Reiter) füllt das Fenster. Ein Test hält fest, dass unter der
+Arbeitsfläche nichts hängt. Für sie stehen „Auflösen“ und „Stornieren“ deshalb rot im ⋮ des Kopfs,
+mit einer Rückfrage im Dialog. Ein belegtes „Auflösen“ steht dort gesperrt, der Grund im Eintrag.
+Damit fällt auch die Breitenreserve des alten Knopfs (LLH-1627): Der Kopf wächst nicht mehr mit
+der Belegung.
 
 UHS und Bereitstellungsraum übernehmen das Muster der Einheit („Einheit auflösen“, Spec
 `einheit-ansicht`) und des Einsatzabschlusses (LFH-960): ein letzter Abschnitt mit rotem Knopf,

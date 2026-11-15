@@ -21,5 +21,5 @@ prüfen; bekannte Altstellen MAY in einer Schuldliste stehen, die nur schrumpfen
 
 #### Scenario: Bereitstellungsraum stornieren
 
-- **WHEN** ein geplanter Bereitstellungsraum über das ⋮ seines Kopfs storniert werden soll
-- **THEN** fragt ein Dialog nach, dessen roter Bestätigungsknopf „BR stornieren“ heißt
+- **WHEN** ein geplanter Bereitstellungsraum im letzten Abschnitt seiner Seite storniert werden soll
+- **THEN** heißt der rote Bestätigungsknopf der Rückfrage „BR stornieren“, und kein „Stornieren“ steht im Kopf

@@ -63,13 +63,21 @@ davor herstellt, sonst MUST es eine Rückfrage zeigen.
 
 Das endgültige Beenden eines Gebildes (Einheit, UHS, Bereitstellungsraum, Abschnitt,
 Verpflegungsstelle) SHALL „Auflösen“ heißen. Auf einer Detailseite MUST es als letzter Abschnitt
-mit rotem Knopf stehen, sonst rot hinter dem Trenner im ⋮. Es MUST erst nach einer Rückfrage
-wirken, die die Folge in einem Satz nennt. Ein umkehrbares Beenden SHALL „Schließen“ heißen und
-einen Rückgängig-Hinweis zeigen.
+mit rotem Knopf stehen; füllt ihre Arbeitsfläche das Fenster (UHS) oder fehlt eine Detailseite,
+rot hinter dem Trenner im ⋮. Es MUST erst nach einer Rückfrage wirken, die die Folge in einem Satz
+nennt. Ein umkehrbares Beenden SHALL „Schließen“ heißen und einen Rückgängig-Hinweis zeigen.
+
+#### Scenario: Bereitstellungsraum auflösen
+- **WHEN** jemand mit Schreibrecht die Detailseite eines leeren, aktiven Bereitstellungsraums öffnet
+- **THEN** steht „BR auflösen“ im letzten Abschnitt der Seite und nicht im Kopf, und erst die Rückfrage mit „BR auflösen“ löst ihn auf
 
 #### Scenario: UHS auflösen
-- **WHEN** jemand mit Schreibrecht die Detailseite einer leeren UHS öffnet
-- **THEN** steht „UHS auflösen“ im letzten Abschnitt der Seite und nicht im Kopf, und erst die Rückfrage mit „UHS auflösen“ löst sie auf
+- **WHEN** jemand mit Schreibrecht eine leere, aktive UHS öffnet
+- **THEN** steht im Kopf kein roter Knopf, das ⋮ des Kopfs führt „Auflösen“ rot, und erst die Rückfrage mit „Unfallhilfsstelle auflösen“ löst sie auf
+
+#### Scenario: Belegte UHS
+- **WHEN** an der UHS noch zwei Personen sind
+- **THEN** steht im ⋮ „Auflösen · noch 2 Personen“ gesperrt
 
 #### Scenario: Leere Betreuungsstelle schließen
 - **WHEN** jemand an einer Betreuungsstelle ohne Belegung „Schließen“ wählt
@@ -81,13 +89,18 @@ einen Rückgängig-Hinweis zeigen.
 
 ### Requirement: Eine Fehlanlage stornieren
 
-„Stornieren“ MUST rot hinter dem Trenner im ⋮ des Datensatzes stehen, auf einer Detailseite im ⋮
-des Kopfs, und MUST NOT als sichtbarer Knopf stehen. Es MUST erst nach einer Rückfrage im Dialog
-wirken, deren Bestätigung die Handlung nennt.
+„Stornieren“ MUST rot stehen und erst nach einer Rückfrage wirken, deren Bestätigung die Handlung
+nennt. Es MUST dort stehen, wo „Auflösen“ steht (letzter Abschnitt oder ⋮ des Kopfs); ohne
+„Auflösen“ hinter dem Trenner im ⋮ des Datensatzes, auf einer Detailseite im ⋮ des Kopfs. Es MUST
+NOT als Knopf im Kopf stehen.
 
 #### Scenario: Geplanten Bereitstellungsraum stornieren
 - **WHEN** jemand die Detailseite eines geplanten Bereitstellungsraums öffnet
-- **THEN** steht im Kopf kein Knopf „Stornieren“, und das ⋮ des Kopfs führt „Stornieren“ rot, dessen Rückfrage mit „BR stornieren“ bestätigt
+- **THEN** steht im Kopf kein Knopf „Stornieren“, der letzte Abschnitt führt „BR stornieren“ rot, und erst die Rückfrage mit „BR stornieren“ storniert ihn
+
+#### Scenario: Ein Tier stornieren
+- **WHEN** jemand die Detailseite eines Tiers öffnet
+- **THEN** steht „Stornieren“ rot im ⋮ des Kopfs, und eine Rückfrage im Dialog fragt nach
 
 ### Requirement: Höchstens zwei Handlungen im Kopf einer Detailseite
 

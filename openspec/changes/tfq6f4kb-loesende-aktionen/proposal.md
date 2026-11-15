@@ -21,8 +21,8 @@ Regeln, die sich bei der Farbe widersprechen.
   (Zuordnung lösen, Kraft entlassen, Gebilde auflösen oder schließen, Fehlanlage stornieren,
   eigene Buchung zurücknehmen), je mit Verb, Ort und Sicherung. Im ⋮-Menü steht nur
   Endgültiges rot. Der Kopf zeigt höchstens zwei Handlungen, der Rest liegt im ⋮.
-- **Beenden in allen Modulen nachziehen**: Stornieren immer im ⋮, Auflösen als letzter
-  Abschnitt einer Detailseite, Schließen einer Betreuungsstelle mit Rückgängig, Lösen mit
+- **Beenden in allen Modulen nachziehen**: Auflösen und Stornieren im letzten Abschnitt einer
+  Detailseite, sonst Stornieren im ⋮, Schließen einer Betreuungsstelle mit Rückgängig, Lösen mit
   gehaltener Zeile „Gelöst · Rückgängig“. Bearbeiten (UHS und Bereitstellungsraum in die
   Ansicht) und Anlegen (Drawer, eingeklappte Formulare) ziehen Folgeaufgaben nach.
 - **Fahrzeug „Entlassen“ vollständig zurücknehmen** (`zjnw0rkj`): Ein neuer Schreibweg stellt
@@ -51,8 +51,8 @@ Regeln, die sich bei der Farbe widersprechen.
 - `einheit-ansicht`: Fahrzeuge bekommen ein Menü, das Lösen hat einen Rückweg, die gelöste Zeile
   hält ihre Stelle, und Lösen-Einträge stehen neutral.
 - `material-am-ort`: Die gehaltene Zeile trägt „Rückgängig“ selbst, nicht nur im Hinweis.
-- `bedien-wortlaut`: Das Szenario „Bereitstellungsraum stornieren“ fragt im Dialog aus dem ⋮
-  nach, statt am sichtbaren Knopf.
+- `bedien-wortlaut`: Im Szenario „Bereitstellungsraum stornieren“ steht „Stornieren“ im letzten
+  Abschnitt statt im Kopf.
 
 Die Ortsregeln für UHS, Bereitstellungsraum und Betreuungsstelle (Auflösen als letzter Abschnitt,
 Stornieren im ⋮, Schließen mit Rückgängig) trägt `bedien-muster`. Die Specs dieser Module legen

@@ -35,8 +35,9 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 4. fx4335q2: Beenden und Kopf in den übrigen Modulen nachziehen
 
-- [ ] 4.1 Bereitstellungsraum (`pages/bereitstellungsraum/BrDetailPage.tsx`): „Stornieren“ aus dem sichtbaren Kopf ins ⋮ des Kopfs mit Dialog „BR stornieren“; „Auflösen“ als letzter Abschnitt mit Rückfrage; Kopf ≤ 2 Knöpfe; Tests rot→grün; `components/rueckfrage.guard.test.ts` grün
-- [ ] 4.2 UHS (`pages/uhs/UhsDetailPage.tsx`): „Auflösen“ als letzter Abschnitt (Sperre „noch n Personen“ bleibt), Kopf „Patient aufnehmen“ + „Bearbeiten“ ohne `BreiteHalten`-Reserve für Auflösen; Tests rot→grün
+- [x] 4.0 Geteilter Baustein `components/BeendenAbschnitt.tsx` (letzter Abschnitt „… auflösen oder stornieren“, je Rückfrage mit Folgesatz und benanntem Knopf, Sperre mit Grund, Ablehnung im Abschnitt) aus `pages/einheit/EinheitAufloesen.tsx`; die Einheit nutzt ihn, ihre Tests bleiben grün
+- [x] 4.1 Bereitstellungsraum (`pages/bereitstellungsraum/BrDetailPage.tsx`): „Auflösen“ und „Stornieren“ aus dem Kopf in den letzten Abschnitt „Bereitstellungsraum auflösen oder stornieren“; Kopf ≤ 2 Knöpfe; Tests rot→grün; `components/rueckfrage.guard.test.ts` grün
+- [x] 4.2 UHS (`pages/uhs/UhsDetailPage.tsx`, Fensterseite): „Auflösen“ aus dem roten Kopfknopf ins ⋮ des Kopfs neben „Stornieren“, belegt gesperrt mit Grund im Eintrag, Rückfrage im Dialog; Kopf „Patient aufnehmen“ + „Bearbeiten“ + ⋮; e2e-Anker in `e2e/uhs-grundriss-menue-belegung.spec.ts` nachziehen; Tests rot→grün
 - [ ] 4.3 Evakuierungsbezirk (`pages/EvakuierungsbezirkPage.tsx`): „Bearbeiten“ ins ⋮ des Kopfs, Kopf ≤ 2 Knöpfe; Test „Kopf in einer Zeile bei 1180 px“ (e2e) rot→grün
 - [ ] 4.4 Betreuungsstelle (`pages/BetreuungsstelleDetailPage.tsx`): „Schließen“ ohne Belegung zeigt Rückgängig (zurück auf `in_betrieb`), mit Leermeldung nicht; Kopf ≤ 2 Knöpfe prüfen; Tests rot→grün
 - [ ] 4.5 Verpflegungsstelle (`verpflegung/StellenListe.tsx`): Ellipse an „Auflösen …“/„Stornieren …“ entfernen; Test nachziehen

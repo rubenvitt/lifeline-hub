@@ -1,15 +1,4 @@
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Flex,
-  Popconfirm,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Space, Spin, Tag, Typography } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
@@ -48,6 +37,7 @@ import KraefteOhneBrSidebar, {
   brObjektSchluessel,
   freieKraefteOhneBr,
 } from './KraefteOhneBrSidebar';
+import BeendenAbschnitt from '../../components/BeendenAbschnitt';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import SektionHeader from '../../components/SektionHeader';
 import {
@@ -326,13 +316,18 @@ export default function BrDetailPage() {
     },
   });
 
-  const stornoMut = useMutation({
-    mutationFn: () => storniereBr(einsatzId, brId),
-    onSuccess: () => {
-      message.success('BR storniert');
-      invalidate();
-    },
-  });
+  // Auflösen und Stornieren stehen im letzten Abschnitt (LLH-1722, `components/BeendenAbschnitt.tsx`):
+  // dort steht auch ihre Ablehnung, nicht im Seitenhinweis.
+  const loeseAuf = async () => {
+    await setzeBrStatus(einsatzId, brId, 'aufgeloest');
+    message.success('BR aufgelöst');
+    invalidate();
+  };
+  const storniere = async () => {
+    await storniereBr(einsatzId, brId);
+    message.success('BR storniert');
+    invalidate();
+  };
 
   const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
   // „Eintreffen buchen“ (LLH-1075, design.md D14): am Gerät nur mit `br-eintreffen`.
@@ -395,35 +390,22 @@ export default function BrDetailPage() {
       zeilen.melde(brObjektSchluessel(z.objekt_typ, z.objekt_id), e, 'Zurücknehmen fehlgeschlagen'),
   });
 
-  // Status und Storno teilen sich den Seitenhinweis: die zuletzt begonnene Handlung zählt, ihr
-  // Start räumt den Grund der anderen. Eine laufende bleibt unberührt.
-  const kopfFehler = statusMut.error ?? stornoMut.error;
-  const raeume = (andere: typeof statusMut | typeof stornoMut) => {
-    if (!andere.isPending && andere.error != null) andere.reset();
-  };
-  const setzeStatus = (status: BrStatus) => {
-    raeume(stornoMut);
-    statusMut.mutate(status);
-  };
-  const storniere = () => {
-    raeume(statusMut);
-    stornoMut.mutate();
-  };
+  // Der Statusschritt im Kopf („In Betrieb nehmen“) meldet im Seitenhinweis.
+  const kopfFehler = statusMut.error;
+  const setzeStatus = (status: BrStatus) => statusMut.mutate(status);
 
   // Die Route hat keinen `key`: der Umschalter behält diese Seite. Die Gründe des vorigen Raums
   // gehören nicht an den nächsten. `reset` und `leere` sind stabil, der Effekt läuft mit `brId`.
   const { reset: statusReset } = statusMut;
-  const { reset: stornoReset } = stornoMut;
   const { leere: leereZeilen } = zeilen;
   useEffect(() => {
     statusReset();
-    stornoReset();
     leereZeilen();
     setBearbeitenOffen(false);
     setEintreffenOffen(false);
     setAbrufZiel(null);
     setVerlegenZiel(null);
-  }, [brId, statusReset, stornoReset, leereZeilen]);
+  }, [brId, statusReset, leereZeilen]);
 
   // Ungültige BR-ID → zurück zur Liste (nach allen Hooks).
   if (!idGueltig) {
@@ -718,12 +700,8 @@ export default function BrDetailPage() {
           <Flex vertical gap={token.marginSM}>
             <SeitenHinweise
               fehler={kopfFehler}
-              fehlerTitel={statusMut.error != null ? 'Status nicht geändert' : 'Nicht storniert'}
-              fehlerFallback={
-                statusMut.error != null
-                  ? 'Statuswechsel fehlgeschlagen'
-                  : 'Stornieren fehlgeschlagen'
-              }
+              fehlerTitel="Status nicht geändert"
+              fehlerFallback="Statuswechsel fehlgeschlagen"
             />
             {ohneZeile.map((k) => {
               const g = zeilen.grund(k);
@@ -784,40 +762,6 @@ export default function BrDetailPage() {
                 </Typography.Text>
               )}
             </>
-          )}
-          {/* Belegt, lehnt der Server das Auflösen ab (409): der Knopf ist dann gesperrt, der
-              Grund steht in wenigen Wörtern daneben, nicht als Satz in der Rückfrage (LFH-1078). */}
-          {verwalten && !schreibgeschuetzt && br.status === 'aktiv' && belegt > 0 && (
-            <>
-              <Button danger disabled>
-                Auflösen
-              </Button>
-              <Typography.Text type="secondary">noch {belegt} belegt</Typography.Text>
-            </>
-          )}
-          {verwalten && !schreibgeschuetzt && br.status === 'aktiv' && belegt === 0 && (
-            <Popconfirm
-              title="BR auflösen?"
-              okText="BR auflösen"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => setzeStatus('aufgeloest')}
-            >
-              <Button danger loading={statusMut.isPending}>
-                Auflösen
-              </Button>
-            </Popconfirm>
-          )}
-          {verwalten && darfImEinsatzSchreiben(einsatz) && br.status === 'geplant' && (
-            <Popconfirm
-              title="BR stornieren?"
-              okText="BR stornieren"
-              okButtonProps={{ danger: true }}
-              onConfirm={storniere}
-            >
-              <Button danger loading={stornoMut.isPending}>
-                Stornieren
-              </Button>
-            </Popconfirm>
           )}
         </Space>
       }
@@ -1116,6 +1060,45 @@ export default function BrDetailPage() {
           onClose={() => setVerlegenZiel(null)}
         />
       )}
+      {/* Endgültiges steht gebündelt im letzten Abschnitt (LLH-1722, `frontend/AGENTS.md`, „Beenden:
+          Verb, Ort und Sicherung je Art“): aktiv „BR auflösen“ (belegt gesperrt, der Grund daneben,
+          LFH-1078), geplant „BR stornieren“. `key`: ein anderer Raum räumt eine alte Ablehnung. */}
+      {verwalten &&
+        ((!schreibgeschuetzt && br.status === 'aktiv') ||
+          (darfImEinsatzSchreiben(einsatz) &&
+            br.status === 'geplant' &&
+            br.storniert_at == null)) && (
+          <BeendenAbschnitt
+            key={br.id}
+            titel="Bereitstellungsraum auflösen oder stornieren"
+            schritte={
+              br.status === 'aktiv'
+                ? [
+                    {
+                      key: 'aufloesen',
+                      knopf: 'BR auflösen',
+                      frage: 'BR auflösen?',
+                      folge: 'Der Raum nimmt keine Kräfte mehr auf und bleibt im Nachweis.',
+                      sperre: belegt > 0 ? `noch ${belegt} belegt` : null,
+                      fehlerTitel: 'Nicht aufgelöst',
+                      fehlerFallback: 'Auflösen fehlgeschlagen',
+                      ausfuehren: loeseAuf,
+                    },
+                  ]
+                : [
+                    {
+                      key: 'stornieren',
+                      knopf: 'BR stornieren',
+                      frage: 'BR stornieren?',
+                      folge: 'Der geplante Raum war eine Fehlanlage und fällt aus jeder Auswahl.',
+                      fehlerTitel: 'Nicht storniert',
+                      fehlerFallback: 'Stornieren fehlgeschlagen',
+                      ausfuehren: storniere,
+                    },
+                  ]
+            }
+          />
+        )}
       {verwalten && (
         <BrBearbeitenModal
           einsatzId={einsatzId}

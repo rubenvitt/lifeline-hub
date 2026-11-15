@@ -61,15 +61,31 @@ function aktuellerPfad() {
   return screen.getByTestId('pfad').textContent;
 }
 
-/** Stornieren steht im Menü des Kopfs (drei Datensatz-Aktionen, LLH-1407); öffnet die Rückfrage. */
-async function stornierenWaehlen(bezeichnung = 'UHS Nord') {
+/** Öffnet das ⋮ des Kopfs und liefert das offene Menü. */
+async function kopfMenue(bezeichnung = 'UHS Nord') {
   await userEvent.click(
     await screen.findByRole('button', { name: `Weitere Aktionen zu ${bezeichnung}` }),
   );
-  const menu = document.querySelector<HTMLElement>(
+  return document.querySelector<HTMLElement>(
     '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
   )!;
-  await userEvent.click(within(menu).getByRole('menuitem', { name: 'Stornieren' }));
+}
+
+/** Stornieren steht im Menü des Kopfs (drei Datensatz-Aktionen, LLH-1407); öffnet die Rückfrage. */
+async function stornierenWaehlen(bezeichnung = 'UHS Nord') {
+  await userEvent.click(
+    within(await kopfMenue(bezeichnung)).getByRole('menuitem', { name: 'Stornieren' }),
+  );
+}
+
+/**
+ * Auflösen steht seit LLH-1722 ebenso rot im Menü des Kopfs: die UHS ist eine Fensterseite, unter
+ * der Arbeitsfläche hängt kein Abschnitt. Öffnet die Rückfrage.
+ */
+async function aufloesenWaehlen(bezeichnung = 'UHS Nord') {
+  await userEvent.click(
+    within(await kopfMenue(bezeichnung)).getByRole('menuitem', { name: 'Auflösen' }),
+  );
 }
 
 function renderBei(route: string) {
@@ -382,7 +398,7 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
     } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    await aufloesenWaehlen();
     expect(await screen.findByText('Unfallhilfsstelle auflösen?')).toBeInTheDocument();
     expect(screen.queryByText('UHS auflösen?')).not.toBeInTheDocument();
   });
@@ -529,8 +545,14 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     ] as unknown as Person[]);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    const knopf = await screen.findByRole('button', { name: 'Auflösen (noch 2 Personen)' });
-    expect(knopf).toBeDisabled();
+    // Der Grund steht im Eintrag (LFH-1078), der Eintrag ist gesperrt (LLH-1722).
+    await screen.findByText('UHS Nord');
+    await waitFor(async () => {
+      const menu = await kopfMenue();
+      expect(
+        within(menu).getByRole('menuitem', { name: 'Auflösen · noch 2 Personen' }),
+      ).toHaveAttribute('aria-disabled', 'true');
+    });
     expect(screen.queryByText(/Nur möglich, wenn/)).not.toBeInTheDocument();
   });
 
@@ -539,20 +561,26 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    expect(await screen.findByRole('button', { name: 'Auflösen' })).toBeEnabled();
+    const menu = await kopfMenue();
+    expect(within(menu).getByRole('menuitem', { name: 'Auflösen' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
-  it('frei hält der Knopf schon die Breite der gesperrten Form (LLH-1627)', async () => {
+  it('kein roter Knopf im Kopf: „Patient aufnehmen“, „Bearbeiten“ und das ⋮ (LLH-1722)', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
     vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    const knopf = await screen.findByRole('button', { name: 'Auflösen' });
-    // Die Reserve steht stumm im Knopf: das Ablegen des ersten Patienten macht ihn nicht breiter,
-    // und ein knapper Kopf bricht nicht nachträglich um (Sprungtest in
-    // `e2e/uhs-grundriss-menue-belegung.spec.ts`).
-    const reserve = within(knopf).getByText('Auflösen (noch 00 Personen)');
-    expect(reserve).toHaveAttribute('aria-hidden', 'true');
+    await screen.findByRole('button', { name: 'Weitere Aktionen zu UHS Nord' });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(
+      within(kopf)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label') ?? b.textContent),
+    ).toEqual(['Patient aufnehmen', 'Bearbeiten', 'Weitere Aktionen zu UHS Nord']);
+    expect(kopf.querySelector('.ant-btn-dangerous')).toBeNull();
   });
 });
 
@@ -624,7 +652,7 @@ describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     vi.mocked(setzeUhsStatus).mockClear();
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
+    await aufloesenWaehlen();
     const ok = await screen.findByRole('button', { name: 'Unfallhilfsstelle auflösen' });
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();

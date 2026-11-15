@@ -83,8 +83,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
   `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion
-  ihren Wortlaut mit den Daten („Auflösen (noch 2 Personen)“), hält `components/BreiteHalten.tsx`
-  die Breite der breitesten Form (LLH-1627). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
+  ihren Wortlaut mit den Daten (früher „Auflösen (noch 2 Personen)“, seit LLH-1722 im ⋮), hält
+  `components/BreiteHalten.tsx` die Breite der breitesten Form (LLH-1627). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
   `flaeche.seiteBreit` fällt beim Umbau.
 - **Orientierung** (LFH-954, Spec `seiten-orientierung`): den Tab-Titel setzen nur die Rahmen über
   `components/useDokumentTitel.ts`, aus dem Modulnamen der Registry („Seite · Einsatz ·
@@ -680,13 +680,13 @@ anwendbar), „nicht geprüft" ist keins.
   `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D1): eine Handlung, die einen Datensatz
   beendet, gehört zu genau einer Art, und die Art bestimmt alles:
 
-  | Art             | Verb                                                                               | Ort                                                                                                                           | Sicherung                                                                                                                              |
-  | --------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-  | Zuordnung lösen | „Aus <Ziel> lösen“, „Vom <Ziel> lösen“; „Abziehen“ (UHS), „Austragen“ (BR) bleiben | ⋮ der Zeile; sichtbarer Knopf nur als einzige Handlung der Zeile                                                              | ohne Rückfrage, Rückgängig; fällt der Datensatz aus der Ansicht, hält die Zeile „Gelöst · Rückgängig“ (`components/useHoldGeloest.ts`) |
-  | Kraft entlassen | „Entlassen“, Material „Aus dem Einsatz nehmen“                                     | Liste: ⋮; Detail: letzter Abschnitt „Aus dem Einsatz“; **nie Hauptaktion einer Karte**                                        | Rückgängig nur, wenn der Rückweg den Zustand davor herstellt, sonst Rückfrage                                                          |
-  | Gebilde beenden | „Auflösen“ (endgültig), „Schließen“ (umkehrbar)                                    | Auflösen: letzter Abschnitt der Detailseite (Vorbild `EinheitAufloesen`), ohne Detailseite rot im ⋮; Schließen: Statusschritt | Auflösen: Rückfrage mit Folgesatz und benanntem Knopf; Schließen: Rückgängig                                                           |
-  | Fehlanlage      | „Stornieren“                                                                       | immer ⋮, rot hinter dem Trenner (Detailseite: ⋮ des Kopfs), nie ein sichtbarer Knopf                                          | Rückfrage im Dialog                                                                                                                    |
-  | Eigene Buchung  | „Zurücknehmen“ („Zurückziehen“, „Aufheben“ bleiben Fachwörter)                     | Zeile oder ⋮                                                                                                                  | Rückfrage, Grund nur, wo das Fach ihn verlangt                                                                                         |
+  | Art             | Verb                                                                               | Ort                                                                                                                                                                                                | Sicherung                                                                                                                              |
+  | --------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+  | Zuordnung lösen | „Aus <Ziel> lösen“, „Vom <Ziel> lösen“; „Abziehen“ (UHS), „Austragen“ (BR) bleiben | ⋮ der Zeile; sichtbarer Knopf nur als einzige Handlung der Zeile                                                                                                                                   | ohne Rückfrage, Rückgängig; fällt der Datensatz aus der Ansicht, hält die Zeile „Gelöst · Rückgängig“ (`components/useHoldGeloest.ts`) |
+  | Kraft entlassen | „Entlassen“, Material „Aus dem Einsatz nehmen“                                     | Liste: ⋮; Detail: letzter Abschnitt „Aus dem Einsatz“; **nie Hauptaktion einer Karte**                                                                                                             | Rückgängig nur, wenn der Rückweg den Zustand davor herstellt, sonst Rückfrage                                                          |
+  | Gebilde beenden | „Auflösen“ (endgültig), „Schließen“ (umkehrbar)                                    | Auflösen: letzter Abschnitt der Detailseite (Vorbild `EinheitAufloesen`, `components/BeendenAbschnitt.tsx`); auf einer Fensterseite (UHS) oder ohne Detailseite rot im ⋮; Schließen: Statusschritt | Auflösen: Rückfrage mit Folgesatz und benanntem Knopf; Schließen: Rückgängig                                                           |
+  | Fehlanlage      | „Stornieren“                                                                       | dort, wo „Auflösen“ steht (letzter Abschnitt bei Einheit und BR, ⋮ des Kopfs bei der UHS); sonst ⋮, rot hinter dem Trenner (Detailseite: ⋮ des Kopfs); nie ein Kopfknopf                           | Rückfrage                                                                                                                              |
+  | Eigene Buchung  | „Zurücknehmen“ („Zurückziehen“, „Aufheben“ bleiben Fachwörter)                     | Zeile oder ⋮                                                                                                                                                                                       | Rückfrage, Grund nur, wo das Fach ihn verlangt                                                                                         |
 
   In der gehaltenen Zeile steht „Gelöst“ träge an der Stelle des Auslösers, der gelöst hat,
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
@@ -729,7 +729,7 @@ anwendbar), „nicht geprüft" ist keins.
   **Höchstens zwei Handlungen als Knopf im Kopf einer Detailseite** (LLH-1722, Spec
   `bedien-muster`): die Primäraktion und eine zweite, ein Statusschritt vor „Bearbeiten“; alles
   Weitere (Stornieren, Bearbeiten an zweiter Stelle, Rückwege) steht im ⋮ des Kopfs. So steht der
-  Kopf ab `lg` in der Zeile des Titels, statt unter ihn umzubrechen. Auflösen steht nicht im Kopf.
+  Kopf ab `lg` in der Zeile des Titels, statt unter ihn umzubrechen. Auflösen steht nie als Knopf im Kopf.
 - **Ein Anker in der Zeile bedient den Klick allein** (Riegel `closest('a')` in `Datensicht`);
   mit `titel.ziel` erzeugt das `render` keinen Anker.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET**; Speichern gehört ins `<form>`.
