@@ -1,7 +1,7 @@
 # Baut mit Ziel-Branch (LLH-1849) — Pflicht-Check: ein fertiger PR kompiliert zusammen mit dem
 # AKTUELLEN Stand seines Ziel-Branches.
 #
-# WARUM: `ci.yml` prüft einen PR gegen den Stand des Ziel-Branches beim letzten Push. Am 12.11.2026
+# WARUM: `pr.yml` prüft einen PR gegen den Stand des Ziel-Branches beim letzten Push. Am 12.11.2026
 # waren #1319 (neuer Parameter) und #1315 (Test mit alter Signatur) einzeln grün und brachen
 # `alpha` zusammen. Eine Merge Queue gibt es für Repositories eines Benutzerkontos nicht. Dieser
 # Workflow rechnet deshalb bei jeder Bewegung des Ziel-Branches für jeden fertigen PR neu, und
@@ -11,8 +11,10 @@
 # WANN: Ein PR ist fertig, wenn Auto-Merge an ist und er kein Entwurf ist; Labels zählen nicht
 # (LLH-1889, ADR zu leichten PR-Checks).
 #   - PR-Ereignis an einem fertigen PR: er rechnet gegen die Spitze des Ziel-Branches.
-#   - Push auf einen Kanal-Branch: `verteilen` setzt den Check an jedem fertigen PR auf „läuft“ und
-#     startet für ihn einen EIGENEN Lauf dieses Workflows auf seinem Branch (`workflow_dispatch`);
+#   - Push auf einen Kanal-Branch: `verteilen` (eigener Workflow `ziel-branch-verteilen.yml`, damit
+#     ein PR ihn nicht als übersprungenen Eintrag trägt, LLH-1896) setzt den Check an jedem fertigen
+#     PR auf „läuft“ und startet für ihn einen EIGENEN Lauf dieses Workflows auf seinem Branch
+#     (`workflow_dispatch`);
 #     ein nicht fertiger, der den Check trägt, bekommt ihn auf „wartet“ und rechnet, sobald er
 #     fertig wird. Release-Commits (`[skip ci]`) starten keinen Push-Lauf; `melden` lässt ein
 #     Ergebnis gelten, wenn der Ziel-Branch nur um solche weiter ist.
@@ -32,8 +34,8 @@
 # den Cache-Bereich von `alpha`, und Code darin (etwa ein `build.rs` aus einem Dependabot-PR)
 # könnte über das Runtime-Token des Runners Cache-Einträge anlegen, die der Release-Build liest;
 # `save-if: false` und Co. verhindern nur, dass der eigene Code speichert. Deshalb kompiliert der
-# Push-Lauf nichts, und `kompilieren` läuft nur bei PR-Ereignis und Einzellauf, im Bereich des PRs
-# wie in `ci.yml`. Auch dort:
+# Push-Lauf (`ziel-branch-verteilen.yml`) nichts, und `kompilieren` läuft nur bei PR-Ereignis und
+# Einzellauf, im Bereich des PRs wie in `pr.yml`. Auch dort:
 #   - nur `contents: read`, keine Secrets; der Checkout legt keine Zugangsdaten ab, das Token
 #     bekommt nur der `git fetch` des PR-Kopfes als Umgebung seines Schritts;
 #   - kein Cache wird gespeichert (rust-cache `save-if: false`, nur `actions/cache/restore`, mise
@@ -51,9 +53,8 @@ on:
   pull_request:
     branches: [main, beta, alpha]
     types: [opened, synchronize, reopened, ready_for_review, auto_merge_enabled]
-  push:
-    branches: [main, beta, alpha]
-  # Der eigene Lauf je fertigem PR, gestartet von `verteilen` auf dem Branch des PRs.
+  # Der eigene Lauf je fertigem PR, gestartet von `verteilen` (ziel-branch-verteilen.yml) auf dem
+  # Branch des PRs.
   workflow_dispatch:
     inputs:
       nr: { description: 'PR-Nummer', required: true, type: string }
@@ -65,8 +66,7 @@ on:
 permissions:
   contents: read
 
-# Je PR (Ereignis und Einzellauf teilen sich die Gruppe) bzw. je Kanal-Branch eine Warteschlange
-# (LLH-1889): höchstens ein Lauf rechnet, einer wartet, und ein neuer Anstoß ersetzt den wartenden.
+# Je PR (Ereignis und Einzellauf teilen sich die Gruppe) eine Warteschlange (LLH-1889): höchstens ein Lauf rechnet, einer wartet, und ein neuer Anstoß ersetzt den wartenden.
 # Mehrere Merges kurz hintereinander bündeln sich so auf den jüngsten Stand. Abgebrochen wird nie:
 # ein abgebrochener Lauf hinterließ „Kompilieren“ und „Melden“ abgebrochen am PR, also rot, ohne
 # Fehler (14.11.2026, zehn PRs). Ein ersetzter wartender Lauf legt keine Jobs an und zeigt nichts.
@@ -76,32 +76,10 @@ permissions:
 # schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen (nicht bei
 # einem Neustart des Einzellaufs).
 concurrency:
-  group: ziel-branch-build-${{ github.event.pull_request.number || inputs.nr || github.ref }}
+  group: ziel-branch-build-${{ github.event.pull_request.number || inputs.nr }}
   cancel-in-progress: false
 
 jobs:
-  # Push auf einen Kanal-Branch: Checks setzen, je fertigem PR einen eigenen Lauf starten. Führt
-  # keinen PR-Code aus und kompiliert nichts.
-  verteilen:
-    name: Verteilen
-    if: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: read
-      checks: write
-      # workflow_dispatch auf den PR-Branches (GITHUB_TOKEN darf das, und es startet einen Lauf).
-      actions: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Checks setzen, Läufe der fertigen PRs starten
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: scripts/ziel-branch-build.sh verteilen "$GITHUB_REF_NAME" "$GITHUB_SHA"
-
   # PR-Ereignis oder Einzellauf: welcher PR, welcher Check, gegen welchen Stand.
   vorbereiten:
     name: Vorbereiten
@@ -161,11 +139,11 @@ jobs:
   kompilieren:
     name: Kompilieren
     needs: vorbereiten
-    # Nie im Push-Lauf und nie in einem Lauf auf einem Kanal-Branch (ein Einzellauf ohne --ref):
-    # die haben den Cache-Bereich des Kanal-Branches (Kopf). `einzellauf` prüft das schon, dies ist
-    # die zweite Sperre.
+    # Nie in einem Lauf auf einem Kanal-Branch (ein Einzellauf ohne --ref): der hat den
+    # Cache-Bereich des Kanal-Branches (Kopf). `einzellauf` prüft das schon, dies ist die zweite
+    # Sperre. Einen Push-Auslöser hat dieser Workflow nicht (`verteilen` läuft eigens).
     if: >-
-      ${{ github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true'
+      ${{ needs.vorbereiten.outputs.rechnen == 'true'
           && !contains(fromJSON('["main", "beta", "alpha"]'), github.ref_name) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -271,10 +249,10 @@ jobs:
   melden:
     name: Melden
     needs: [vorbereiten, kompilieren]
-    if: ${{ !cancelled() && github.event_name != 'push' && needs.vorbereiten.outputs.rechnen == 'true' }}
+    if: ${{ !cancelled() && needs.vorbereiten.outputs.rechnen == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # actions: read — ob ein Push-Lauf (`verteilen`) noch aussteht, bevor ein überholter Check rot wird.
+    # actions: read — ob ein Push-Lauf (`ziel-branch-verteilen.yml`) noch aussteht, bevor ein überholter Check rot wird.
     permissions:
       contents: read
       pull-requests: read

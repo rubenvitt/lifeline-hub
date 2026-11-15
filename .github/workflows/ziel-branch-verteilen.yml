@@ -1,0 +1,52 @@
+# Baut mit Ziel-Branch (Verteilen, LLH-1849/LLH-1896): bei jedem Push auf einen Kanal-Branch den
+# Pflicht-Check `Baut mit Ziel-Branch` an jedem offenen PR gegen diesen Branch neu anstoßen.
+#
+# Fertige PRs (Auto-Merge an, kein Entwurf) bekommen den Check auf „läuft“ und einen EIGENEN Lauf
+# von `ziel-branch-build.yml` auf ihrem Branch (`workflow_dispatch`); ein nicht fertiger, der den
+# Check trägt, bekommt ihn auf „wartet“. Mechanik und Begründung: Kopf von `ziel-branch-build.yml`
+# und `scripts/ziel-branch-build.sh`.
+#
+# EIGENER WORKFLOW (LLH-1896): Stand der Job in `ziel-branch-build.yml`, trug jeder PR ihn als
+# übersprungenen Eintrag. `has_pending_verteilen` in `ziel-branch-build.sh` fragt die Läufe DIESES
+# Workflows ab; wer ihn umbenennt, zieht die Datei dort nach.
+#
+# Führt keinen PR-Code aus und kompiliert nichts: dieser Lauf hat den Cache-Bereich des
+# Kanal-Branches (Kopf von `ziel-branch-build.yml`, „PR-Code läuft nie …“).
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
+name: Baut mit Ziel-Branch (Verteilen)
+
+on:
+  push:
+    branches: [main, beta, alpha]
+
+permissions:
+  contents: read
+
+# Je Kanal-Branch eine Warteschlange ohne Abbruch (LLH-1889): höchstens ein Lauf verteilt, einer
+# wartet, ein neuer Push ersetzt den wartenden. Abgebrochen wird nie: ein abgebrochener Lauf
+# hinterließe Checks auf „läuft“ ohne Lauf dahinter.
+concurrency:
+  group: ziel-branch-verteilen-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Checks setzen, je fertigem PR einen eigenen Lauf starten.
+  verteilen:
+    name: Verteilen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+      # workflow_dispatch auf den PR-Branches (GITHUB_TOKEN darf das, und es startet einen Lauf).
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Checks setzen, Läufe der fertigen PRs starten
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ziel-branch-build.sh verteilen "$GITHUB_REF_NAME" "$GITHUB_SHA"
