@@ -521,6 +521,34 @@ describe('EinsatzLayout', () => {
   });
 
   /**
+   * LLH-1726: Der Name nimmt mit dem Laden seine Eigenbreite, und die Suche daneben rückte dabei
+   * nach rechts (CLS 0,0103 an der Umbruchkante, `e2e/rahmen-cls-dichte.spec.ts`). Solange der
+   * Einsatz lädt, ist die Suchzelle deshalb unsichtbar: sie erscheint gleich an ihrem Platz, und
+   * ein Element, das erst sichtbar wird, verschiebt nichts.
+   */
+  it('hält die Suchzelle unsichtbar, solange der Einsatz lädt', async () => {
+    let freigeben: () => void = () => {};
+    const geladen = new Promise<void>((r) => (freigeben = r));
+    setup();
+    server.use(
+      http.get('/api/einsaetze/7', async () => {
+        await geladen;
+        return HttpResponse.json(einsatz);
+      }),
+    );
+    // Über das Attribut, nicht über die Rolle: unsichtbar hat die Suche keinen zugänglichen Namen.
+    const zelle = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="kopf-suche"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(zelle.style.visibility).toBe('hidden');
+    freigeben();
+    await screen.findByRole('button', { name: /Hochwasser Nord/ });
+    await waitFor(() => expect(zelle.style.visibility).toBe(''));
+  });
+
+  /**
    * Der gemerkte Einklapp-Zustand ist ein EIGENES Boolean neben `offeneKategorie`: die Rail
    * behält ihre Hervorhebung (WELCHE Kategorie), das Panel verschwindet (OB offen), und der
    * Angleich-Effekt fasst das Flag nicht an.

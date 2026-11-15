@@ -513,7 +513,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           </div>
           {/* SUCHZELLE ab `lg`: das Suchfeld als Auslöser der Palette. Sie trägt die Kopf-Polsterung
            (`kopfpolsterung.guard.test.ts` zählt genau diese Stelle). Als Größen-Container
-           `kopfsuche`: ist sie schmal, bleibt vom Feld nur die Lupe (`CommandPaletteTrigger.css`). */}
+           `kopfsuche`: ist sie schmal, bleibt vom Feld nur die Lupe (`CommandPaletteTrigger.css`).
+           Unsichtbar, solange der Einsatz lädt (LLH-1726): mit dem Namen nimmt die Namensspalte ihre
+           Eigenbreite, und die Suche rückte sonst nach rechts (CLS 0,0103 an der Umbruchkante). So
+           erscheint sie gleich an ihrem Platz; ein Element, das erst sichtbar wird, verschiebt nichts. */}
           {breit && (
             <div
               data-lfh="kopf-suche"
@@ -524,6 +527,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 paddingInline: 'var(--lfh-kopf-polsterung)',
                 containerType: 'inline-size',
                 containerName: 'kopfsuche',
+                ...(einsatzQuery.isLoading ? { visibility: 'hidden' as const } : {}),
               }}
             >
               <CommandPaletteTrigger />
