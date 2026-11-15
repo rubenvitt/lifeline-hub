@@ -19,7 +19,6 @@ import type { ModulZaehlerMap } from './useModulZaehler';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
-import { useFussFokusabstand } from './fussFokusabstand';
 import { MODUL_PANEL_ID } from './IconRail';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
@@ -311,6 +310,13 @@ export function ModulListe({
  * Liste der Module einer Kategorie im inline-Rahmen, 208 px auf `paneel`. Kopf 42 px mit
  * Augenbraue; Fuß „Einsatzdauer" in Mono, live je Minute (abgeschlossen: bis
  * `abgeschlossen_at`). Ohne geladenen Einsatz oder lesbaren Beginn entfällt der Fuß.
+ *
+ * Klebt wie die Rail als EINE Spalte unter dem Kopf (zjt7c073 D4, `frontend/AGENTS.md`, Rahmen):
+ * Kopf und Fuß stehen fest, nur die Liste dazwischen rollt in sich. So bleibt die Kategorie auch
+ * am Ende einer langen Seite im Bild (das ETB öffnet dort), und kein Teil liegt über einem
+ * anderen: ein getabbter Eintrag rollt nur die Liste, deren Ränder die Kanten von Kopf und Fuß
+ * sind. Die Spalte hängt an der Kopfhöhe, nicht an der Rahmenhöhe, die den klebenden Seitenkopf
+ * mitzählt (D2).
  */
 export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const { token } = theme.useToken();
@@ -318,7 +324,6 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const jetzt = useMinutenTakt();
   const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
   const linie = `1px solid ${farben.linie}`;
-  const { fussRef } = useFussFokusabstand();
   return (
     <div
       // Testanker für den e2e-Trefflächennachweis. Der inline-Rahmen hat als einziger
@@ -330,58 +335,67 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
       style={{
         width: PANEL_BREITE,
         flex: `0 0 ${PANEL_BREITE}px`,
-        display: 'flex',
-        flexDirection: 'column',
         background: farben.paneel,
         borderInlineEnd: linie,
         boxSizing: 'border-box',
       }}
     >
       <div
+        data-lfh="modul-panel-spalte"
         style={{
-          minHeight: PANEL_KOPF,
+          position: 'sticky',
+          top: 'var(--lfh-kopf-oben, 0px)',
+          height: 'calc(100dvh - var(--lfh-kopf-oben, 0px))',
           display: 'flex',
-          alignItems: 'center',
-          paddingInline: token.padding,
-          borderBottom: linie,
+          flexDirection: 'column',
         }}
       >
-        <span style={augenbraueStil(farben.schwach)}>{titel}</span>
-      </div>
-      <ModulListe {...liste} />
-      {dauer && (
-        // `sticky; bottom: 0`: die Seite scrollt im Dokument, der Fuß hängt so am Fensterrand statt
-        // am Seitenende. Den Fokusabstand über ihm hält `index.css` per
-        // `scroll-padding` am Dokument, solange der Fokus im Panel steht (`fussFokusabstand`).
         <div
-          ref={fussRef}
-          data-lfh="modul-panel-fuss"
           style={{
-            marginTop: 'auto',
-            position: 'sticky',
-            bottom: 0,
-            background: farben.paneel,
-            borderTop: linie,
-            padding: `${token.paddingSM}px ${token.padding}px`,
+            minHeight: PANEL_KOPF,
+            flexShrink: 0,
             display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
+            alignItems: 'center',
+            paddingInline: token.padding,
+            borderBottom: linie,
           }}
         >
-          <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>
-          <span
+          <span style={augenbraueStil(farben.schwach)}>{titel}</span>
+        </div>
+        <div
+          data-lfh="modul-panel-liste"
+          style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}
+        >
+          <ModulListe {...liste} />
+        </div>
+        {dauer && (
+          <div
+            data-lfh="modul-panel-fuss"
             style={{
-              fontFamily: schrift.zahl,
-              fontSize: 18,
-              fontWeight: 500,
-              fontVariantNumeric: 'tabular-nums',
-              color: farben.text,
+              flexShrink: 0,
+              background: farben.paneel,
+              borderTop: linie,
+              padding: `${token.paddingSM}px ${token.padding}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
             }}
           >
-            {dauer}
-          </span>
-        </div>
-      )}
+            <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>
+            <span
+              style={{
+                fontFamily: schrift.zahl,
+                fontSize: 18,
+                fontWeight: 500,
+                fontVariantNumeric: 'tabular-nums',
+                color: farben.text,
+              }}
+            >
+              {dauer}
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

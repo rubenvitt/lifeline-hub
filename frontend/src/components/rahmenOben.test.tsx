@@ -7,8 +7,11 @@ import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCallback, useRef } from 'react';
 import {
+  KOPF_OBEN_VAR,
   RAHMEN_OBEN_VAR,
+  leseKopfOben,
   leseRahmenOben,
+  useKopfOben,
   useRahmenOben,
   useRahmenObenFuer,
   useRahmenObenQuelle,
@@ -138,6 +141,68 @@ describe('rahmenOben', () => {
     expect(screen.getByTestId('dokument').textContent).toBe('52');
     expect(screen.getByTestId('drawer').textContent).toBe('0');
     expect(screen.getByTestId('modal').textContent).toBe('0');
+  });
+
+  /**
+   * Zwei Höhen (zjt7c073 D2): der klebende Seitenkopf zählt zum Rahmen über dem Inhalt, nicht aber
+   * zur Kopfhöhe, an der Rail, Modulpanel und Verwaltungsmenü hängen.
+   */
+  describe('Ebene Seitenkopf', () => {
+    function SeitenkopfQuelle({ hoehe, aktiv }: { hoehe: number; aktiv: boolean }) {
+      const ref = useRahmenObenQuelle<HTMLDivElement>(aktiv, 'seitenkopf');
+      return (
+        <div
+          ref={(el) => {
+            if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: hoehe });
+            ref(el);
+          }}
+        />
+      );
+    }
+    function KopfAnzeige() {
+      return <span data-testid="kopf-anzeige">{useKopfOben()}</span>;
+    }
+    afterEach(() => {
+      document.documentElement.style.removeProperty(KOPF_OBEN_VAR);
+    });
+
+    it('der Seitenkopf zählt zum Rahmen, nicht zum Kopf', () => {
+      render(
+        <>
+          <Quelle hoehe={52} aktiv name="kopf" />
+          <SeitenkopfQuelle hoehe={45} aktiv />
+          <KopfAnzeige />
+          <Anzeige />
+        </>,
+      );
+      expect(leseRahmenOben()).toBe(97);
+      expect(variable()).toBe('97px');
+      expect(leseKopfOben()).toBe(52);
+      expect(document.documentElement.style.getPropertyValue(KOPF_OBEN_VAR)).toBe('52px');
+      expect(screen.getByTestId('kopf-anzeige').textContent).toBe('52');
+      expect(screen.getByTestId('anzeige').textContent).toBe('97');
+    });
+
+    it('rollt der Seitenkopf mit (inaktiv), sind Rahmen und Kopf gleich hoch', () => {
+      const { rerender } = render(
+        <>
+          <Quelle hoehe={52} aktiv name="kopf" />
+          <SeitenkopfQuelle hoehe={45} aktiv />
+        </>,
+      );
+      rerender(
+        <>
+          <Quelle hoehe={52} aktiv name="kopf" />
+          <SeitenkopfQuelle hoehe={45} aktiv={false} />
+        </>,
+      );
+      expect(leseRahmenOben()).toBe(52);
+      expect(leseKopfOben()).toBe(52);
+      rerender(<></>);
+      expect(leseRahmenOben()).toBe(0);
+      expect(leseKopfOben()).toBe(0);
+      expect(document.documentElement.style.getPropertyValue(KOPF_OBEN_VAR)).toBe('0px');
+    });
   });
 
   /**

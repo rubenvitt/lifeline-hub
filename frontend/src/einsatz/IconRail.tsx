@@ -146,13 +146,15 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
          sich, und der Fuß folgt den Kategorien (LLH-1273): die Kategorien stehen zuerst im Bild,
          nichts liegt unter einem klebenden Teil. Steht über dem Kopf eine Zeile im Fluss
          (Betriebszeile ab `md`), endet die Spalte um ihre Höhe unter dem Fensterrand, bis die Seite
-         so weit gerollt ist. */}
+         so weit gerollt ist. Sie hängt an der Kopfhöhe (`--lfh-kopf-oben`), nicht an der
+         Rahmenhöhe: die zählt den klebenden Seitenkopf mit, und die Rail spränge um ihn nach unten
+         (zjt7c073 D2). */}
       <div
         data-lfh="rail-spalte"
         style={{
           position: 'sticky',
-          top: 'var(--lfh-rahmen-oben, 0px)',
-          height: 'calc(100dvh - var(--lfh-rahmen-oben, 0px))',
+          top: 'var(--lfh-kopf-oben, 0px)',
+          height: 'calc(100dvh - var(--lfh-kopf-oben, 0px))',
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',

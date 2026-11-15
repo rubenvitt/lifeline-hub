@@ -11,7 +11,9 @@
  *
  * ── Was geprüft wird ────────────────────────────────────────────────────────────
  *  1. Jedes `position: sticky` (TS-Objekt oder CSS) mit einem `top` in seiner Nähe nennt
- *     `--lfh-rahmen-oben` in demselben Fenster.
+ *     `--lfh-rahmen-oben` in demselben Fenster; nur die Dateien in {@link KOPF_HOEHE_ERLAUBT}
+ *     dürfen stattdessen die Kopfhöhe `--lfh-kopf-oben` nennen (zjt7c073 D2), und keine andere
+ *     Datei nennt die Kopfhöhe überhaupt.
  *  2. Jede antd-Tabelle mit `sticky`-Prop setzt `offsetHeader`.
  * Ausgenommen sind der Rahmen selbst ({@link RAHMEN}) und Stellen mit dem Vermerk
  * `rahmen-oben: frei` samt Grund (etwa ein Element, das in einem eigenen Scrollcontainer klebt).
@@ -40,6 +42,23 @@ const RAHMEN = [
 const FENSTER = 4;
 
 const VERMERK = 'rahmen-oben: frei';
+
+/**
+ * Wer statt der Rahmenhöhe die Kopfhöhe (`--lfh-kopf-oben`, `useKopfOben`) nehmen darf
+ * (zjt7c073 D2): was NEBEN dem Inhalt klebt (Rail, Modulpanel, Verwaltungsmenü) und der Seitenkopf
+ * selbst, der sonst unter sich hinge; dazu die Entscheidung des ETB, ob seine Köpfe kleben (sie
+ * rechnet ohne den Seitenkopf, der in die Rahmenhöhe eingeht). Jeder klebende Inhalt nimmt
+ * `--lfh-rahmen-oben`, sonst läge er hinter dem klebenden Seitenkopf.
+ */
+const KOPF_HOEHE_ERLAUBT = [
+  'components/rahmenOben.ts',
+  'components/seitenkopfKleben.ts',
+  'einsatz/IconRail.tsx',
+  'einsatz/ModulPanel.tsx',
+  'admin/AdminLayout.tsx',
+  'etb/etbKopfKleben.ts',
+  'index.css',
+];
 
 function dateien(verzeichnis: string): string[] {
   const aus: string[] = [];
@@ -71,7 +90,20 @@ function klebendOhneRahmen(datei: string, text: string): Fund[] {
     const fenster = zeilen.slice(Math.max(0, i - FENSTER), i + FENSTER + 1).join('\n');
     if (!/(^|[\s{,])top:/m.test(fenster)) return;
     if (fenster.includes('--lfh-rahmen-oben') || fenster.includes(VERMERK)) return;
+    if (fenster.includes('--lfh-kopf-oben') && KOPF_HOEHE_ERLAUBT.includes(datei)) return;
     funde.push({ datei, zeile: i + 1, text: zeile.trim() });
+  });
+  return funde;
+}
+
+/** Die Kopfhöhe außerhalb von {@link KOPF_HOEHE_ERLAUBT}. */
+function kopfHoeheAusserhalb(datei: string, text: string): Fund[] {
+  if (KOPF_HOEHE_ERLAUBT.includes(datei)) return [];
+  const funde: Fund[] = [];
+  text.split('\n').forEach((zeile, i) => {
+    if (/--lfh-kopf-oben|\buseKopfOben\b|\bleseKopfOben\b|\bKOPF_OBEN_VAR\b/.test(zeile)) {
+      funde.push({ datei, zeile: i + 1, text: zeile.trim() });
+    }
   });
   return funde;
 }
@@ -101,6 +133,15 @@ describe('Rahmen-Guard (LFH-952)', () => {
     expect(klebendOhneRahmen('x.tsx', gut)).toHaveLength(0);
     const unten = "<div style={{ position: 'sticky', bottom: 0 }} />";
     expect(klebendOhneRahmen('x.tsx', unten)).toHaveLength(0);
+    // Die Kopfhöhe (zjt7c073 D2) gilt nur in den Spalten neben dem Inhalt und im Seitenkopf.
+    const kopf = "<div style={{ position: 'sticky', top: 'var(--lfh-kopf-oben, 0px)' }} />";
+    expect(klebendOhneRahmen('x.tsx', kopf)).toHaveLength(1);
+    expect(klebendOhneRahmen('einsatz/ModulPanel.tsx', kopf)).toHaveLength(0);
+    expect(kopfHoeheAusserhalb('x.tsx', "top: 'var(--lfh-kopf-oben)'")).toHaveLength(1);
+    expect(kopfHoeheAusserhalb('x.tsx', 'const h = useKopfOben();')).toHaveLength(1);
+    expect(kopfHoeheAusserhalb('einsatz/IconRail.tsx', "top: 'var(--lfh-kopf-oben)'")).toHaveLength(
+      0,
+    );
     expect(tabelleOhneVersatz('x.tsx', '<Table\n  sticky\n/>')).toHaveLength(1);
     expect(tabelleOhneVersatz('x.tsx', '<Table\n  sticky={!druckt}\n/>')).toHaveLength(1);
     expect(
@@ -110,7 +151,14 @@ describe('Rahmen-Guard (LFH-952)', () => {
 
   it('jede Rahmen-Datei gibt es noch (sonst wäre die Ausnahme tot)', () => {
     const vorhanden = new Set(QUELLEN.map((q) => q.datei));
-    for (const datei of RAHMEN) expect(vorhanden.has(datei), datei).toBe(true);
+    for (const datei of [...RAHMEN, ...KOPF_HOEHE_ERLAUBT]) {
+      expect(vorhanden.has(datei), datei).toBe(true);
+    }
+  });
+
+  it('die Kopfhöhe nimmt nur, was neben dem Inhalt oder im Seitenkopf klebt', () => {
+    const funde = QUELLEN.flatMap(({ datei, text }) => kopfHoeheAusserhalb(datei, text));
+    expect(funde.map((f) => `${f.datei}:${f.zeile} ${f.text}`)).toEqual([]);
   });
 
   it('kein klebendes Element unter `src/` hängt an der Fensterkante statt unter dem Rahmen', () => {

@@ -74,7 +74,8 @@ export function holeInsBild(container: HTMLElement, eintrag: HTMLElement): void 
  * · das Menü klebt oben, ist höchstens `rest` hoch und scrollt in sich, es trägt zur Seitenhöhe
  *   nie mehr bei als die Verwaltung selbst. Es klebt unter dem Kopf, nicht an der Fensterkante
  *   (LFH-952, `frontend/AGENTS.md`, Rahmen); `rest` ist dort nie größer als der Platz darunter,
- *   weil `oben` die Kopfhöhe schon enthält.
+ *   weil `oben` die Kopfhöhe schon enthält. Es hängt an der Kopfhöhe (`--lfh-kopf-oben`), nicht an
+ *   der Rahmenhöhe, die den klebenden Seitenkopf mitzählt (zjt7c073 D2).
  */
 export function seitenleistenStil(oben: number): {
   verwaltung: CSSProperties;
@@ -85,7 +86,7 @@ export function seitenleistenStil(oben: number): {
     verwaltung: { minHeight: rest },
     menue: {
       position: 'sticky',
-      top: 'var(--lfh-rahmen-oben, 0px)',
+      top: 'var(--lfh-kopf-oben, 0px)',
       maxHeight: rest,
       overflowY: 'auto',
     },

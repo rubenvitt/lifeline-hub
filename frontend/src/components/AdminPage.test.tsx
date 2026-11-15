@@ -134,3 +134,17 @@ describe('AdminPage · Ortspfad und Rückweg (LFH-954)', () => {
     expect(screen.queryByRole('link', { name: /^Zurück zu/ })).toBeNull();
   });
 });
+
+/**
+ * Auch in der Verwaltung klebt der Seitenkopf unter der Kopfleiste (zjt7c073 D3, Wahl vom
+ * 15.11.2026); wann genau, prüft `seitenkopfKleben.test.tsx`.
+ */
+describe('AdminPage · klebender Seitenkopf', () => {
+  it('klebt ab md unter der Kopfleiste, mit Seitengrund', () => {
+    const { container } = renderMitProviders(<AdminPage titel="Benutzer">Inhalt</AdminPage>);
+    const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+    expect(kopf.style.position).toBe('sticky');
+    expect(kopf.style.top).toBe('var(--lfh-kopf-oben, 0px)');
+    expect(kopf.style.background).not.toBe('');
+  });
+});

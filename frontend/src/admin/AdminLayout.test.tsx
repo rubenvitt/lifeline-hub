@@ -274,7 +274,7 @@ describe('AdminLayout — klebende Seitenleiste', () => {
     // Unter dem klebenden Kopf, nicht an der Fensterkante (LFH-952).
     expect(menue).toEqual({
       position: 'sticky',
-      top: 'var(--lfh-rahmen-oben, 0px)',
+      top: 'var(--lfh-kopf-oben, 0px)',
       maxHeight: rest,
       overflowY: 'auto',
     });

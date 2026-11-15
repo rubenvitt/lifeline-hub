@@ -377,6 +377,37 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
     expect(container.querySelector('[data-lfh="modul-panel-fuss"]')).toBeNull();
   });
 
+  /**
+   * zjt7c073 D4: Das Panel klebt wie die Rail als eine Spalte unter dem Kopf. Kopf und Fuß stehen
+   * fest, nur die Liste rollt in sich — so liegt kein Teil über einem anderen. Die Geometrie misst
+   * `e2e/rahmen-stehen-bleiben.spec.ts`.
+   */
+  it('klebt als Spalte unter dem Kopf; nur die Liste rollt, Kopf und Fuß stehen fest', () => {
+    const { container } = renderMitProviders(
+      <ModulPanel
+        titel="Führung"
+        einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: null }}
+        module={module}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    const spalte = container.querySelector<HTMLElement>('[data-lfh="modul-panel-spalte"]')!;
+    expect(spalte.style.position).toBe('sticky');
+    expect(spalte.style.top).toBe('var(--lfh-kopf-oben, 0px)');
+    expect(spalte.style.height).toBe('calc(100dvh - var(--lfh-kopf-oben, 0px))');
+    expect(spalte.style.overflowY).not.toBe('auto');
+    const liste = spalte.querySelector<HTMLElement>('[data-lfh="modul-panel-liste"]')!;
+    expect(liste.style.overflowY).toBe('auto');
+    expect(liste.style.minHeight).toBe('0px');
+    const fuss = spalte.querySelector<HTMLElement>('[data-lfh="modul-panel-fuss"]')!;
+    // Der Fuß klebt nicht mehr am Fensterrand des Dokuments, er steht am Ende der Spalte.
+    expect(fuss.style.position).toBe('');
+    expect(fuss.style.flexShrink).toBe('0');
+    expect(liste.compareDocumentPosition(fuss) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('trägt Kopf-Augenbraue und Panelgrund aus den Nachtrollen (Vorgabe)', () => {
     const { container } = renderMitProviders(
       <ModulPanel

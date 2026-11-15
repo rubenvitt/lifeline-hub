@@ -3,8 +3,16 @@ import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 /**
  * Die Höhe dessen, was am oberen Fensterrand klebt (LFH-952, `frontend/AGENTS.md`, Rahmen):
  * ab `md` die Kopfleiste, unter `md` die Betriebszeile, solange sie eine Verbindungsstörung
- * meldet. Herleitung: D2 in
+ * meldet, und darunter ab `md` der klebende Seitenkopf. Herleitung: D2 in
  * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`.
+ *
+ * ZWEI HÖHEN (zjt7c073 D2): die Quellen gehören zur Ebene `kopf` (Kopfleiste, Betriebszeile) oder
+ * `seitenkopf` (der klebende Seitenkopf von `EinsatzSeite`/`AdminPage`).
+ *  - {@link RAHMEN_OBEN_VAR} / {@link useRahmenOben}: beide Ebenen, also alles, was über dem
+ *    Inhalt klebt. Daran hängt sich jeder klebende Inhalt (Tabellenkopf, Filterleiste, Fokusabstand).
+ *  - {@link KOPF_OBEN_VAR} / {@link useKopfOben}: nur die Ebene `kopf`. Daran hängt, was NEBEN dem
+ *    Inhalt oder IM Seitenkopf klebt (Rail, Modulpanel, Verwaltungsmenü, der Seitenkopf selbst),
+ *    sonst sprängen diese um den Seitenkopf nach unten.
  *
  * GEMESSEN, nicht aus Tokens gerechnet: der Kopf bricht auf schmalen Schirmen um (LFH-460) und
  * wächst mit der Dichte-Staffel. Jede Quelle meldet ihre Höhe, die Summe steht
@@ -15,6 +23,12 @@ import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
  * (Guard `rahmenOben.guard.test.ts`).
  */
 export const RAHMEN_OBEN_VAR = '--lfh-rahmen-oben';
+
+/** Nur die Ebene `kopf` (Kopfleiste, Betriebszeile) — für Rail, Modulpanel, Verwaltungsmenü, Seitenkopf. */
+export const KOPF_OBEN_VAR = '--lfh-kopf-oben';
+
+/** Zu welcher Höhe eine Quelle zählt (siehe Dateikopf). */
+export type RahmenEbene = 'kopf' | 'seitenkopf';
 
 /**
  * Stapelebene des klebenden Rahmens: über dem Inhalt samt angepinnter ETB-Leiste (20) und den
@@ -32,52 +46,73 @@ export const RAHMEN_KLEBT = { position: 'sticky', top: 0, zIndex: RAHMEN_EBENE }
 /** antds Hüllen mit eigenem Scrollbereich, in denen der Dokument-Rahmen nicht gilt. */
 const EIGENER_SCROLLBEREICH = '.ant-drawer-body, .ant-modal-wrap';
 
-const anteile = new Map<symbol, number>();
+const anteile = new Map<symbol, { ebene: RahmenEbene; hoehe: number }>();
 const hoerer = new Set<() => void>();
 let summe = 0;
+let kopfSumme = 0;
 
 function neuRechnen(): void {
   let neu = 0;
-  for (const wert of anteile.values()) neu += wert;
-  document.documentElement.style.setProperty(RAHMEN_OBEN_VAR, `${neu}px`);
-  if (neu === summe) return;
+  let neuKopf = 0;
+  for (const { ebene, hoehe } of anteile.values()) {
+    neu += hoehe;
+    if (ebene === 'kopf') neuKopf += hoehe;
+  }
+  const stil = document.documentElement.style;
+  stil.setProperty(RAHMEN_OBEN_VAR, `${neu}px`);
+  stil.setProperty(KOPF_OBEN_VAR, `${neuKopf}px`);
+  if (neu === summe && neuKopf === kopfSumme) return;
   summe = neu;
+  kopfSumme = neuKopf;
   for (const h of hoerer) h();
 }
 
-/** Hört auf Änderungen der Summe, außerhalb von React (`alarmOben.ts`). */
+/** Hört auf Änderungen beider Summen, außerhalb von React (`alarmOben.ts`). */
 export function abonniereRahmenOben(h: () => void): () => void {
   hoerer.add(h);
   return () => hoerer.delete(h);
 }
 
-/** Die aktuelle Summe in px — rein lesend, für Aufrufer außerhalb von React. */
+/** Die aktuelle Summe beider Ebenen in px — rein lesend, für Aufrufer außerhalb von React. */
 export function leseRahmenOben(): number {
   return summe;
 }
 
-/** Die Summe in px; rendert neu, sobald sie sich ändert. */
+/** Die aktuelle Summe der Ebene `kopf` in px — rein lesend. */
+export function leseKopfOben(): number {
+  return kopfSumme;
+}
+
+/** Die Summe beider Ebenen in px; rendert neu, sobald sie sich ändert. */
 export function useRahmenOben(): number {
   return useSyncExternalStore(abonniereRahmenOben, leseRahmenOben, leseRahmenOben);
 }
 
+/** Die Summe der Ebene `kopf` in px; rendert neu, sobald sie sich ändert. */
+export function useKopfOben(): number {
+  return useSyncExternalStore(abonniereRahmenOben, leseKopfOben, leseKopfOben);
+}
+
 /**
- * Meldet ein Element als klebende Quelle, solange `aktiv` gilt; das Ergebnis ist der Callback-Ref
- * dafür. Callback-Ref statt `useRef`: tauscht React das Element (der Rahmen hängt nach einem
- * Fehlerausstieg neu ein), beobachtet der Effekt das neue — mit einem `RefObject` in den
- * Abhängigkeiten bliebe er am alten hängen (dieselbe Falle wie `einsatz/fussFokusabstand.ts`).
+ * Meldet ein Element als klebende Quelle der Ebene `ebene`, solange `aktiv` gilt; das Ergebnis ist
+ * der Callback-Ref dafür. Callback-Ref statt `useRef`: tauscht React das Element (der Rahmen hängt
+ * nach einem Fehlerausstieg neu ein), beobachtet der Effekt das neue — mit einem `RefObject` in den
+ * Abhängigkeiten bliebe er am alten hängen.
  *
  * Die erste Messung läuft in `useLayoutEffect`, also vor dem ersten Bild: sonst säße ein stehender
  * Tabellenkopf ein Bild lang unter dem Kopf. Danach hält ein `ResizeObserver` den Wert (Umbruch,
  * Dichtewechsel), geschrieben im nächsten Bild.
  */
-export function useRahmenObenQuelle<T extends HTMLElement>(aktiv: boolean): (el: T | null) => void {
+export function useRahmenObenQuelle<T extends HTMLElement>(
+  aktiv: boolean,
+  ebene: RahmenEbene = 'kopf',
+): (el: T | null) => void {
   const [el, setEl] = useState<T | null>(null);
   useLayoutEffect(() => {
     if (!aktiv || !el) return;
     const schluessel = Symbol('rahmen-oben');
     const messen = () => {
-      anteile.set(schluessel, el.offsetHeight);
+      anteile.set(schluessel, { ebene, hoehe: el.offsetHeight });
       neuRechnen();
     };
     messen();
@@ -101,7 +136,7 @@ export function useRahmenObenQuelle<T extends HTMLElement>(aktiv: boolean): (el:
       anteile.delete(schluessel);
       neuRechnen();
     };
-  }, [el, aktiv]);
+  }, [el, aktiv, ebene]);
   return setEl;
 }
 
