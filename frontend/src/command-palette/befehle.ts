@@ -1,6 +1,7 @@
 import {
   IconAbmelden,
   IconDokument,
+  IconDokumente,
   IconGlobus,
   IconHandStopp,
   IconListe,
@@ -33,6 +34,7 @@ import {
   einsatzModulPfad,
   einsatzPfad,
   etbPfad,
+  hilfePfad,
   infotelefonPfad,
   lagekartePfad,
   personenPfad,
@@ -560,6 +562,16 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     label: 'Profil',
     icon: IconPerson,
     ...sprungZu('/profil', k.navigate),
+  });
+  // Die Anwenderhilfe (Spec `sprungpalette`, „Die Hilfe steht in der Palette“): für jeden, auch
+  // ohne Einsatz. Das Icon ist das des Benutzermenüs.
+  befehle.push({
+    id: 'nav:hilfe',
+    gruppe: 'navigation',
+    label: 'Hilfe',
+    icon: IconDokumente,
+    schlagworte: ['Anleitung', 'Dokumentation', 'Handbuch'],
+    ...sprungZu(hilfePfad(), k.navigate),
   });
   // Verwaltungsbereich und Stammdaten hängen am AdminLayout-Gate `darfVerwaltung`, wie Topbar und
   // Route.

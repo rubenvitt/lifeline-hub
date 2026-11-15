@@ -6,11 +6,11 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`, Ru
 
 ## 1. LLH-1804 (y1we3nsc) Treffer der Sprungpalette (D1, D6)
 
-- [ ] 1.1 Normalisierung und Abgleich in `command-palette/fuzzy.ts` (`normalisiere`, Wortanfang oder Teilwort ab drei Zeichen, jedes Suchwort muss treffen, Stufen 0–3, Score 0/0,5). Prüfung: `fuzzy.test.ts` mit Fällen „rtw“ trifft „Lagekarte“/„Gefahrengebiet zeichnen“/„Benutzerverwaltung“ nicht, „funk“ trifft „Dunkel“ nicht, „kraefte“ = „Kräfte“, „hilfsstelle“ trifft „Unfallhilfsstellen“, „neuer etb“ trifft das Schlagwort, „ea“ (2 Zeichen) nur am Wortanfang
-- [ ] 1.2 `textStufe` mit derselben Normalisierung; `fuse.js` aus `fuzzy.ts` und `frontend/package.json` entfernen, Lockfile nachziehen. Prüfung: `grep -rn "fuse" frontend/src` leer, `datensaetze.test.ts` und `fuzzy.test.ts` grün
-- [ ] 1.3 Gepinnte Ranglisten in `befehle.test.ts`, `CommandPalette*.test.tsx`, `CommandPaletteProvider*.test.tsx` nur dort anpassen, wo das neue Verhalten es verlangt; die Spec-Szenarien „Funk findet den Funkplan“, „Schlagwort ohne Namensteil“, „Bestehende Marke“, „Alte Beschriftung findet“ bleiben grün. Prüfung: Vitest über `command-palette/` grün
-- [ ] 1.4 Datensatz-Merkmale (D3): `merkmale` je Quelle in `datensaetze.ts`, Fahrzeug `fahrzeugtyp`/`kennzeichen`, Personal `funktion`/`einsatzfunktion`, Hinweis mit dem getroffenen Merkmal. Prüfung: `datensaetze.test.ts` („rtw“ → Fahrzeug mit Hinweis „RTW“, Kennzeichen-Anfang, „gruppenf“ → Person)
-- [ ] 1.5 Navigationszeile „Hilfe“ (`hilfePfad()`, auch ohne Einsatz). Prüfung: `befehle.test.ts` („hilfe“ → „Hilfe“ vor „Unfallhilfsstelle anlegen“, auch außerhalb eines Einsatzes)
+- [x] 1.1 Normalisierung und Abgleich in `command-palette/fuzzy.ts` (`normalisiere`, Wortanfang oder Teilwort ab drei Zeichen, jedes Suchwort muss treffen, Stufen 0–3, Score 0/0,5). Prüfung: `fuzzy.test.ts` mit Fällen „rtw“ trifft „Lagekarte“/„Gefahrengebiet zeichnen“/„Benutzerverwaltung“ nicht, „funk“ trifft „Dunkel“ nicht, „kraefte“ = „Kräfte“, „hilfsstelle“ trifft „Unfallhilfsstellen“, „neuer etb“ trifft das Schlagwort, „ea“ (2 Zeichen) nur am Wortanfang
+- [x] 1.2 `textStufe` mit derselben Normalisierung; `fuse.js` aus `fuzzy.ts` und `frontend/package.json` entfernen, Lockfile nachziehen. Prüfung: `grep -rn "fuse" frontend/src` leer, `datensaetze.test.ts` und `fuzzy.test.ts` grün
+- [x] 1.3 Gepinnte Ranglisten in `befehle.test.ts`, `CommandPalette*.test.tsx`, `CommandPaletteProvider*.test.tsx` nur dort anpassen, wo das neue Verhalten es verlangt; die Spec-Szenarien „Funk findet den Funkplan“, „Schlagwort ohne Namensteil“, „Bestehende Marke“, „Alte Beschriftung findet“ bleiben grün. Prüfung: Vitest über `command-palette/` grün
+- [x] 1.4 Datensatz-Merkmale (D3): `merkmale` je Quelle in `datensaetze.ts`, Fahrzeug `fahrzeugtyp`/`kennzeichen`, Personal `funktion`/`einsatzfunktion`, Hinweis mit dem getroffenen Merkmal. Prüfung: `datensaetze.test.ts` („rtw“ → Fahrzeug mit Hinweis „RTW“, Kennzeichen-Anfang, „gruppenf“ → Person)
+- [x] 1.5 Navigationszeile „Hilfe“ (`hilfePfad()`, auch ohne Einsatz). Prüfung: `befehle.test.ts` („hilfe“ → „Hilfe“ vor „Unfallhilfsstelle anlegen“, auch außerhalb eines Einsatzes)
 
 ## 2. LLH-1804 (y1we3nsc) Neue Schnellaktionen und Zählung (D4, D5)
 

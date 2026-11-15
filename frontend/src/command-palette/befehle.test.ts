@@ -109,6 +109,19 @@ describe('baueBefehle — Navigation/Berechtigung', () => {
     expect(b.some((x) => x.id === 'nav:stammdaten')).toBe(false);
     expect(b.some((x) => x.id === 'nav:planungen')).toBe(false);
   });
+  /** Spec `sprungpalette`, „Die Hilfe steht in der Palette“. */
+  it('führt „Hilfe“ als ersten Treffer zu „hilfe“, auch ohne Einsatz', () => {
+    for (const k of [kontext(), kontext({ einsatzId: null, benutzer: sichter })]) {
+      const b = baueBefehle(k);
+      const treffer = ordneTreffer(filtereBefehle(b, 'hilfe'), 'hilfe');
+      expect(treffer[0]?.id).toBe('nav:hilfe');
+    }
+    const k = kontext();
+    baueBefehle(k)
+      .find((x) => x.id === 'nav:hilfe')!
+      .ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/hilfe');
+  });
   it('bietet immer Abmelden + Alle Einsätze', () => {
     const b = baueBefehle(kontext({ einsatzId: null, benutzer: sichter }));
     expect(b.some((x) => x.id === 'nav:abmelden')).toBe(true);

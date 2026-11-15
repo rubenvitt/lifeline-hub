@@ -148,6 +148,60 @@ describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/fahrzeuge?fahrzeug=7');
   });
 
+  /** Spec `sprungpalette`, „Fahrzeuge und Personal über ihre Merkmale“. */
+  describe('Merkmale', () => {
+    const rtw = fahrzeug({
+      id: 8,
+      funkrufname: 'Rotkreuz Uelzen 83/1',
+      fahrzeugtyp: 'RTW',
+      kennzeichen: 'UE-RK 831',
+    });
+
+    it('findet ein Fahrzeug über den Fahrzeugtyp und zeigt ihn an', () => {
+      const t = baueDatensatzTreffer(kontext({ suche: 'rtw', quellen: { fahrzeuge: [rtw] } }));
+      expect(ids(t)).toEqual(['datensatz:fahrzeuge:8']);
+      expect(t[0].befehl.label).toBe('Rotkreuz Uelzen 83/1 · RTW');
+    });
+
+    it('findet ein Fahrzeug über den Anfang des Kennzeichens', () => {
+      const t = baueDatensatzTreffer(kontext({ suche: 'ue-rk', quellen: { fahrzeuge: [rtw] } }));
+      expect(ids(t)).toEqual(['datensatz:fahrzeuge:8']);
+      expect(t[0].befehl.label).toBe('Rotkreuz Uelzen 83/1 · UE-RK 831');
+    });
+
+    it('zeigt kein Merkmal, wenn schon der Funkrufname trifft', () => {
+      const t = baueDatensatzTreffer(kontext({ suche: 'rotkreuz', quellen: { fahrzeuge: [rtw] } }));
+      expect(t[0].befehl.label).toBe('Rotkreuz Uelzen 83/1');
+    });
+
+    it('findet Personal über Funktion und Einsatzfunktion', () => {
+      const quellen = {
+        personal: [
+          personal({ id: 4, name: 'Weber', funktion: 'Gruppenführer' }),
+          personal({ id: 5, name: 'Schulz', einsatzfunktion: 'Melder' }),
+        ],
+      };
+      const gf = baueDatensatzTreffer(kontext({ suche: 'gruppenf', quellen }));
+      expect(ids(gf)).toEqual(['datensatz:personal:4']);
+      expect(gf[0].befehl.label).toBe('Weber · Gruppenführer');
+      expect(ids(baueDatensatzTreffer(kontext({ suche: 'melder', quellen })))).toEqual([
+        'datensatz:personal:5',
+      ]);
+    });
+
+    it('setzt Umschrift und Umlaut gleich', () => {
+      const quellen = {
+        personal: [personal({ id: 4, name: 'Müller', funktion: 'Gruppenführer' })],
+      };
+      expect(ids(baueDatensatzTreffer(kontext({ suche: 'mueller', quellen })))).toEqual([
+        'datensatz:personal:4',
+      ]);
+      expect(ids(baueDatensatzTreffer(kontext({ suche: 'gruppenfuehrer', quellen })))).toEqual([
+        'datensatz:personal:4',
+      ]);
+    });
+  });
+
   it('findet einen ETB-Eintrag über die lfd. Nr. und navigiert auf etbPfad', () => {
     const k = kontext({ suche: '99', quellen: { etbNummer: [etb({ id: 12, lfd_nr: 99 })] } });
     const t = baueDatensatzTreffer(k);
