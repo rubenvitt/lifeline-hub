@@ -345,6 +345,27 @@ describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
     expect(onKeyDown.mock.lastCall![0].defaultPrevented).toBe(verbraucht);
   });
 
+  it('ein neuer Wert von außen nimmt den gemeldeten Grund zurück (Review B2)', async () => {
+    const onVerworfen = vi.fn();
+    const user = userEvent.setup();
+    const feld = (wert: Dayjs | null | undefined) =>
+      mitZone(
+        BERLIN,
+        <>
+          <ZeitpunktEingabe aria-label="Zeit" value={wert} onVerworfen={onVerworfen} />
+          <button type="button">daneben</button>
+        </>,
+      );
+    const { rerender } = render(feld(null));
+    await user.type(zeitFeld('Zeit'), '14:3x');
+    await user.click(screen.getByRole('button', { name: 'daneben' }));
+    expect(onVerworfen).toHaveBeenLastCalledWith('nicht lesbar');
+    rerender(feld(alsZeitpunkt('2026-10-16 12:30:00')));
+    expect(onVerworfen).toHaveBeenLastCalledWith(null);
+    expect(screen.queryByText('nicht lesbar')).not.toBeInTheDocument();
+    expect(zeitFeld('Zeit')).toHaveValue('161430okt26');
+  });
+
   it('eine Wahl im Kalender nimmt den gemeldeten Grund zurück (LLH-1866)', async () => {
     const onVerworfen = vi.fn();
     const user = userEvent.setup();

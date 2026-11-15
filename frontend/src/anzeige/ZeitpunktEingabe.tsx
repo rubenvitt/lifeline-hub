@@ -21,6 +21,7 @@
 import { Button, Input, Popover, Space, theme, type InputRef } from 'antd';
 import type { Dayjs } from 'dayjs';
 import {
+  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -244,6 +245,16 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   /** Name des Felds für den Kalender-Knopf: mehrere Zeitfelder stehen oft nebeneinander. */
   const feldName = ariaLabel;
   const feldRef = useRef<InputRef | null>(null);
+  // Ein neuer Wert von außen (etwa `/zeit` im ETB) ersetzt, was verworfen wurde: der Grund gilt
+  // dann nicht mehr (Review B2 zu LLH-1866). Der eigene Weg über `melde` räumt ihn schon selbst.
+  const wertSchluessel = wert ? wert.valueOf() : null;
+  const vorigerWert = useRef(wertSchluessel);
+  useEffect(() => {
+    if (vorigerWert.current === wertSchluessel) return;
+    vorigerWert.current = wertSchluessel;
+    if (verworfenGemeldet.current != null) setVerworfen(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `setVerworfen` meldet nur weiter
+  }, [wertSchluessel]);
   // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
   // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten, React ruft die Ref dabei mit
   // `null` und dem neuen Handle), und eine fokussierende Ref wie die des ETB-Chips

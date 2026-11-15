@@ -403,6 +403,13 @@ export default function Schnellerfassung({
   function setzeZeitVerworfen(grund: string | null) {
     zeitVerworfenRef.current = grund;
     setZeitVerworfenState(grund);
+    // Ist kein Grund mehr übrig, endet der Halt: ein späterer Grund meldet sich dann wieder nur
+    // höflich beim Tippen, nicht als Alarm (Review B3).
+    if (grund == null && zeitBefehlGrund == null) setUnlesbarAngehalten(false);
+  }
+  function setzeZeitBefehlGrund(grund: string | null) {
+    setZeitBefehlGrund(grund);
+    if (grund == null && zeitVerworfenRef.current == null) setUnlesbarAngehalten(false);
   }
   const { zone: anzeigeZone } = useZeitEingabe();
   const { konventionen } = useAnzeigeKonventionen();
@@ -591,7 +598,7 @@ export default function Schnellerfassung({
       setZukunftsGrund(null);
       text = zeit.rest;
     }
-    setZeitBefehlGrund(zeit && !zeit.ok ? zeit.grund : null);
+    setzeZeitBefehlGrund(zeit && !zeit.ok ? zeit.grund : null);
     if (befehl || (zeit?.ok && ausloesen)) {
       setInhalt(text);
       aktualisiereTrigger(text, text.length);
@@ -657,7 +664,7 @@ export default function Schnellerfassung({
   function bausteinEinsetzen(felder: BausteinFelder) {
     if (sendet) return;
     setInhalt(felder.inhalt);
-    setZeitBefehlGrund(null);
+    setzeZeitBefehlGrund(null);
     setMetadaten((m) => ({
       ...m,
       ...(felder.meldeweg ? { meldeweg: felder.meldeweg } : {}),
@@ -747,9 +754,19 @@ export default function Schnellerfassung({
 
   async function absenden() {
     if (sendet || inhalt.trim() === '') return;
+    // `/zeit` am Textanfang gilt beim Senden, auch wenn er beim Tippen nicht übernommen wurde
+    // (berichtigt mitten in der Angabe, LLH-1088 löst dort bewusst nicht aus): lesbar wird er
+    // übernommen, unlesbar hält er an (Review B1 zu LLH-1866). Sonst ginge der Befehl als Text mit
+    // „jetzt“ hinaus.
+    const zeitImText = erkenneZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
+    const inhaltSenden = zeitImText?.ok ? zeitImText.rest : inhalt;
+    const wirksamSenden = zeitImText?.ok
+      ? { ...wirksam, ereigniszeit: zeitImText.zeitpunkt }
+      : wirksam;
+    if (inhaltSenden.trim() === '') return;
     // Von/An-Pflicht (LFH-894, D7): VOR Upload und Warteschlange. Text, Felder und Anhänge
     // bleiben stehen; der Grund steht am Feld, der Fokus geht dorthin (Spec „Pflicht im Client“).
-    const fehlen = fehlendeSeiten(wirksam);
+    const fehlen = fehlendeSeiten(wirksamSenden);
     setPflicht(fehlen);
     if (fehlen.length > 0) {
       fokusFeld(fehlen[0]);
@@ -759,13 +776,13 @@ export default function Schnellerfassung({
     // Das Feld kürzt nie (Zähler „zu lang“), und ein Baustein oder Slash-Befehl setzt Text von außen;
     // ein zu langer Eintrag läge sonst bis zum Abgleich in der Offline-Queue und käme abgelehnt
     // zurück. Der Text bleibt im Feld.
-    const zuLang = laengenVerstoss(inhalt, wirksam);
+    const zuLang = laengenVerstoss(inhaltSenden, wirksamSenden);
     setLaengenHinweis(zuLang);
     if (zuLang) return;
     // Unlesbare Zeit (LLH-1866, Spec „Unlesbare Zeit hält das Senden an“): eine im Feld Zeit
     // verworfene Eingabe oder ein unlesbares `/zeit` im Text. Gesendet würde sonst „jetzt“, und der
     // Eintrag ließe sich nur noch berichtigen. Grund am Feld und in der Fußzeile, Fokus ins Feld.
-    if (zeitVerworfenRef.current != null || zeitBefehlGrund != null) {
+    if (zeitVerworfenRef.current != null || (zeitImText != null && !zeitImText.ok)) {
       setUnlesbarAngehalten(true);
       fokusFeld('ereigniszeit');
       return;
@@ -774,7 +791,7 @@ export default function Schnellerfassung({
     // Ereigniszeit in der Zukunft (LLH-1088, Spec „Keine Ereigniszeit in der Zukunft“): ebenso
     // VOR Upload und Warteschlange, nach der Serveruhr. Der Grund steht am Feld Zeit, der Fokus
     // geht dorthin; Text und Felder bleiben.
-    const zukunft = zukunftsVerstoss(wirksam, serverJetzt());
+    const zukunft = zukunftsVerstoss(wirksamSenden, serverJetzt());
     setZukunftsGrund(zukunft);
     if (zukunft) {
       fokusFeld('ereigniszeit');
@@ -804,9 +821,9 @@ export default function Schnellerfassung({
       if (anhangIds == null) return;
       const eintrag: NeuerEintrag = {
         ...baueEintrag({
-          inhalt,
+          inhalt: inhaltSenden,
           typ,
-          metadaten: wirksam,
+          metadaten: wirksamSenden,
           berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
           jetztIso,
         }),

@@ -2119,6 +2119,55 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
+  it('ein an Ort und Stelle berichtigtes „/zeit“ geht mit der berichtigten Zeit hinaus (Review B1)', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
+    await userEvent.click(erfassenKnopf());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    // „2590“ markieren und überschreiben: der Cursor steht danach vor dem Leerzeichen, der Befehl
+    // wird beim Tippen nicht übernommen (LLH-1088), wohl aber beim Senden.
+    await userEvent.type(inhaltFeld(), '1430', {
+      initialSelectionStart: 6,
+      initialSelectionEnd: 10,
+    });
+    expect(inhaltFeld()).toHaveValue('/zeit 1430 Pumpe');
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      inhalt: 'Pumpe',
+      ereigniszeit: '2026-10-17 12:30:00',
+    });
+  });
+
+  it('ein lesbares „/zeit“ nach einer verworfenen Eingabe im Feld gibt das Senden frei (Review B2)', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(zeitFeld(), '14:3x');
+    await userEvent.click(inhaltFeld());
+    await userEvent.type(inhaltFeld(), '/zeit 1430 Pumpe');
+    expect(feldWert('Zeit')).toBe('1430');
+    expect(zeitFeld()).not.toHaveAttribute('aria-invalid');
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      inhalt: 'Pumpe',
+      ereigniszeit: '2026-10-17 12:30:00',
+    });
+  });
+
+  it('nach einem behobenen Halt meldet ein neuer Grund beim Tippen nur höflich (Review B3)', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
+    await userEvent.click(erfassenKnopf());
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^Zeit nicht übernommen/);
+    await userEvent.clear(inhaltFeld());
+    await userEvent.type(inhaltFeld(), '/zeit 2590 ');
+    expect(screen.queryByText(/Zeit nicht übernommen/)).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: /);
+  });
+
   it('ein anderer Entwurf übernimmt keinen Grund', async () => {
     const p = props();
     const { rerender } = renderMitProviders(<Schnellerfassung key="a" {...p} />);
