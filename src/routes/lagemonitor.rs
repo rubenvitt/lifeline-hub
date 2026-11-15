@@ -432,14 +432,47 @@ pub(crate) fn karte_etag<T: Serialize>(karte: &T) -> String {
     crate::anhang::repo::sha256_hex(text.as_bytes())[..16].to_string()
 }
 
-/// Eine gespeicherte GeoJSON-Geometrie; ein Feature wird auf seine Geometrie zurückgeführt.
-/// Kaputtes bleibt weg, statt die ganze Antwort scheitern zu lassen.
+/// Eine gespeicherte GeoJSON-Geometrie; ein Feature wird auf seine Geometrie zurückgeführt, und
+/// die Geometrie auf [`sanitize_geometrie`]. Kaputtes bleibt weg, statt die ganze Antwort
+/// scheitern zu lassen.
 fn geometrie(roh: &str) -> Option<Value> {
     let wert: Value = serde_json::from_str(roh).ok()?;
     match wert.get("type").and_then(Value::as_str) {
-        Some("Feature") => wert.get("geometry").cloned(),
-        Some(_) => Some(wert),
-        None => None,
+        Some("Feature") => sanitize_geometrie(wert.get("geometry")?),
+        _ => sanitize_geometrie(&wert),
+    }
+}
+
+/// Führt eine gespeicherte GeoJSON-Geometrie auf `type` und `coordinates` zurück (bei einer
+/// `GeometryCollection` auf `type` und `geometries`). Die Zonen- und Abschnittsrouten speichern
+/// den gesendeten Text; ein Zusatzschlüssel darin (etwa eine Notiz) ginge sonst mit hinaus, ins
+/// Lagebild für Externe wie in die öffentliche API (LLH-1638, LLH-1867). Unbekanntes bleibt weg.
+fn sanitize_geometrie(roh: &Value) -> Option<Value> {
+    let typ = roh.get("type")?.as_str()?;
+    match typ {
+        "Point" | "MultiPoint" | "LineString" | "MultiLineString" | "Polygon" | "MultiPolygon" => {
+            let coordinates = roh.get("coordinates")?;
+            is_zahlenfeld(coordinates).then(|| json!({ "type": typ, "coordinates": coordinates }))
+        }
+        "GeometryCollection" => {
+            let geometries: Vec<Value> = roh
+                .get("geometries")?
+                .as_array()?
+                .iter()
+                .filter_map(sanitize_geometrie)
+                .collect();
+            Some(json!({ "type": typ, "geometries": geometries }))
+        }
+        _ => None,
+    }
+}
+
+/// Besteht der Wert nur aus Zahlen und Listen davon? So tragen Koordinaten keinen Text.
+fn is_zahlenfeld(wert: &Value) -> bool {
+    match wert {
+        Value::Number(_) => true,
+        Value::Array(teile) => teile.iter().all(is_zahlenfeld),
+        _ => false,
     }
 }
 
@@ -453,7 +486,8 @@ fn punkt(lat: f64, lon: f64) -> Value {
 /// wenn jemand es ausdrücklich aufnimmt.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct KartenFeature {
-    /// GeoJSON-Geometrie.
+    /// GeoJSON-Geometrie, aus [`load_karten_features`] nur mit `type` und `coordinates` (bzw.
+    /// `geometries`), siehe [`sanitize_geometrie`].
     pub geometrie: Value,
     pub art: KartenFeatureArt,
 }
@@ -805,6 +839,23 @@ mod tests {
         assert_eq!(serde_json::to_string(&karte).unwrap(), KARTE_LAGEBILD);
     }
 
+    /// Gespeicherte Geometrien sind der Text des Aufrufers (LLH-1867): ein Zusatzschlüssel in
+    /// einer Zone oder Abschnittsfläche, auch in der Geometrie eines Features, geht nicht in die
+    /// Karte des Lagebilds für Externe. Sie ist Byte für Byte die Karte ohne Zusatzschlüssel.
+    #[tokio::test]
+    async fn karte_traegt_keine_zusatzschluessel_einer_geometrie() {
+        let (pool, kopf, mut verdichtet) = karten_fall().await;
+        let ring = "[[[9,52],[9.1,52],[9,52.1],[9,52]]]";
+        verdichtet.zonen[0].geometrie = format!(
+            r#"{{"type":"Feature","properties":{{"notiz":"Muster"}},"geometry":{{"type":"Polygon","coordinates":{ring},"notiz":"Herr Muster gestürzt"}}}}"#
+        );
+        verdichtet.abschnitte[0].flaeche_geojson = format!(
+            r#"{{"type":"Polygon","coordinates":{ring},"bbox":[9,52,9.1,52.1],"properties":{{"name":"Muster"}}}}"#
+        );
+        let karte = build_karte(&pool, &kopf, &verdichtet).await.unwrap();
+        assert_eq!(serde_json::to_string(&karte).unwrap(), KARTE_LAGEBILD);
+    }
+
     #[tokio::test]
     async fn karten_features_tragen_jede_art_einmal() {
         let (pool, kopf, verdichtet) = karten_fall().await;
@@ -833,6 +884,51 @@ mod tests {
         assert_eq!(geometrie(&f).unwrap()["type"], "Polygon");
         assert!(geometrie("kein json").is_none());
         assert!(geometrie("{}").is_none());
+    }
+
+    /// Nur `type` und Koordinaten gehen hinaus, kein Zusatzschlüssel und kein Text an Stelle
+    /// einer Zahl (LLH-1638, LLH-1867).
+    #[test]
+    fn geometrie_traegt_nur_typ_und_koordinaten() {
+        let polygon = json!([[[9.0, 52.0], [9.1, 52.0], [9.0, 52.1], [9.0, 52.0]]]);
+        let roh = json!({
+            "type": "Polygon",
+            "coordinates": polygon,
+            "notiz": "Herr Muster gestürzt",
+            "properties": { "name": "Muster" },
+        });
+        let sauber = json!({ "type": "Polygon", "coordinates": polygon });
+        assert_eq!(sanitize_geometrie(&roh), Some(sauber.clone()));
+        let feature =
+            json!({ "type": "Feature", "properties": { "notiz": "Muster" }, "geometry": roh });
+        assert_eq!(geometrie(&feature.to_string()), Some(sauber.clone()));
+        let sammlung = json!({
+            "type": "GeometryCollection",
+            "titel": "Muster",
+            "geometries": [roh, { "type": "Unbekannt", "coordinates": [1, 2] }],
+        });
+        assert_eq!(
+            sanitize_geometrie(&sammlung),
+            Some(json!({ "type": "GeometryCollection", "geometries": [sauber] }))
+        );
+        // Text an Stelle einer Koordinate, ein verschachteltes Feature, ein unbekannter oder gar
+        // kein Typ: bleibt weg.
+        assert_eq!(
+            sanitize_geometrie(&json!({ "type": "Point", "coordinates": [9.0, "Muster"] })),
+            None
+        );
+        assert_eq!(
+            sanitize_geometrie(&json!({ "type": "Feature", "geometry": roh })),
+            None
+        );
+        assert_eq!(
+            sanitize_geometrie(&json!({ "type": "Kreis", "coordinates": [9.0, 52.0] })),
+            None
+        );
+        assert_eq!(
+            sanitize_geometrie(&json!({ "coordinates": [9.0, 52.0] })),
+            None
+        );
     }
 
     #[test]
