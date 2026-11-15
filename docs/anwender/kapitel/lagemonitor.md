@@ -56,7 +56,8 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
 7. Steigt die Zahl der offenen Sofortmeldungen oder die Zahl in SK I, ist sie eine Minute lang
    farbig hinterlegt, und oben in der Kachel steht „Neue Sofortmeldung“ bzw. „Neu in SK I“.
 8. Die Statusleiste nennt Einsatz, Gerät, Verbindung („live“, „verbinde …“, „getrennt“), den
-   Stand der Daten mit Alter und die Uhr.
+   Stand der Daten mit Alter und die Uhr. Bei einer Übung steht vor dem Einsatz die violette
+   Marke „ÜBUNG“.
 
 ### Gerätemenü öffnen
 

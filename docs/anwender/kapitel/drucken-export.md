@@ -119,6 +119,11 @@ Der Druckkopf trägt Name und Logo der Organisation, die Dokumentart (etwa „Ei
 dazu „Gedruckt von“ und „Gedruckt am“. Die Fußzeile „Seite … von …“ druckt nur ein
 Chromium-Browser (Chrome, Edge).
 
+Gehört das Druckstück zu einer Übung, steht neben dem Einsatz ein umrandetes „ÜBUNG“, auch
+schwarz-weiß lesbar. Chrome und Edge drucken „ÜBUNG“ zusätzlich oben auf jede Seite, Firefox
+und Safari nur im Druckkopf der ersten Seite. Schichtplan, Lageplan und eine geplante Übung
+tragen die Marke ebenso.
+
 Gedruckt wird erst, wenn die Organisation geladen ist. Gelingt das nicht, steht am Knopf
 „Organisation nicht geladen“ mit „Erneut laden“. Ein Logo, das nicht lädt, fällt im Druck weg.
 Nur die Hilfe druckt ohne Organisation.

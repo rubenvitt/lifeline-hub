@@ -68,8 +68,9 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 7. Regel und Anwenderdoku
 
-- [ ] 7.1 `frontend/AGENTS.md`, Abschnitt „Rahmen“: Spiegelstrich „Übung“ (D10); Prettier grün.
-- [ ] 7.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Band und Marke beschreiben;
+- [x] 7.1 `frontend/AGENTS.md`, Abschnitt „Rahmen“: Spiegelstrich „Übung“ (D10); Prettier grün.
+- [x] 7.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Band und Marke beschreiben, dazu je ein
+  Satz in `drucken-export.md`, `geraet-bedienen.md` und `lagemonitor.md`;
   `hilfe/anwenderdoku.guard.test.ts` grün.
 - [ ] 7.3 Bilder der Anwenderdoku mit Einsatzrahmen neu erzeugen (`pnpm doku:bilder`, mindestens
   `einsatz-oberflaeche` und die Gerätekapitel); was in der Sitzung nicht läuft, als Folgeaufgabe auf
