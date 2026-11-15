@@ -2911,6 +2911,74 @@ async fn personal_zuruecknehmen_als_fuehrer() {
         "Zug 1 hat inzwischen einen anderen Einheitsführer"
     );
     assert_eq!(fuehrer().await, paul);
+    let einheit_von = |ep: i64| {
+        let app = &app;
+        let admin = &admin;
+        async move {
+            let (_, l) = anfrage(
+                app,
+                "GET",
+                &format!("/api/einsaetze/{einsatz}/personal"),
+                admin,
+                None,
+            )
+            .await;
+            l.as_array()
+                .unwrap()
+                .iter()
+                .find(|p| p["id"] == ep)
+                .unwrap()["einheit_id"]
+                .clone()
+        }
+    };
+    assert!(
+        einheit_von(anna).await.is_null(),
+        "nichts bleibt geschrieben"
+    );
+
+    // Inzwischen ohne Führung wieder Mitglied: das Rückgängig setzt nur die Führung, mit
+    // eigenem ETB-Eintrag.
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &einheit_pfad,
+        &admin,
+        Some(r#"{"fuehrer_id":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    personal_zuordnen(&app, &admin, einsatz, a, anna).await;
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &pfad(anna, "?nur_wenn_frei=1&als_fuehrer=1"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{j}");
+    assert_eq!(fuehrer().await, anna);
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let gesetzt = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["inhalt"] == "Einheit «Zug 1»: Einheitsführer «Anna» gesetzt")
+        .count();
+    assert_eq!(gesetzt, 2, "PATCH am Anfang und dieses Rückgängig: {etb}");
+    assert_eq!(
+        anfrage(&app, "DELETE", &pfad(anna, ""), &admin, None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
 
     // Inzwischen in Zug 2: 409 mit der Einheit.
     personal_zuordnen(&app, &admin, einsatz, b, anna).await;

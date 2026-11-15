@@ -6,7 +6,8 @@
 
 „Rückgängig“ nach dem Entlassen eines Fahrzeugs SHALL das Fahrzeug in einer Transaktion in den
 Zustand davor zurücknehmen: aktiv, mit Status und „Status seit“, Einheit, Besatzung,
-Bereitstellungsraum, Führungsstelle und Beladung. Die Rücknahme MUST einen ETB-Eintrag
+Bereitstellungsraum, Führungsstelle und Beladung. Nur der Storno MUST danach gesperrt bleiben,
+denn das Fahrzeug war im Einsatz. Die Rücknahme MUST einen ETB-Eintrag
 „Entlassung zurückgenommen“ schreiben, MUST keine Benachrichtigung „wieder verfügbar“ auslösen und
 MUST dieselben Live-Meldungen senden wie das Entlassen.
 
@@ -17,6 +18,10 @@ MUST dieselben Live-Meldungen senden wie das Entlassen.
 #### Scenario: Führungsstelle
 - **WHEN** ein Fahrzeug, das die Führungsstelle trägt, entlassen und zurückgenommen wird
 - **THEN** trägt es die Führungsstelle wieder
+
+#### Scenario: Storno nach der Rücknahme
+- **WHEN** ein Fahrzeug kurz nach dem Disponieren entlassen und zurückgenommen wird und danach jemand es stornieren will
+- **THEN** lehnt der Server den Storno ab, auch wenn der Body der Rücknahme etwas anderes behauptet
 
 ### Requirement: Rücknahme lässt Verändertes aus
 

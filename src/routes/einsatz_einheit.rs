@@ -1151,9 +1151,8 @@ pub async fn personal_zuordnen(
             mitglied_repo::require_personal_frei_tx(conn, einsatz_id, eid, ep_id).await?;
         }
         let z = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
-        if als_fuehrer {
-            mitglied_repo::set_fuehrer_wenn_frei_tx(conn, einsatz_id, eid, ep_id).await?;
-        }
+        let fuehrer_gesetzt = als_fuehrer
+            && mitglied_repo::set_fuehrer_wenn_frei_tx(conn, einsatz_id, eid, ep_id).await?;
         if z.is_changed {
             let fuehrung: Vec<&str> = z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
             let text = crate::einheit::etb_text_personal_eingeteilt(
@@ -1167,6 +1166,12 @@ pub async fn personal_zuordnen(
             } else {
                 text
             };
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        } else if fuehrer_gesetzt {
+            // Die Person stand schon wieder in der Einheit; die Führung braucht ihren eigenen
+            // Eintrag, wie beim Führerwechsel über PATCH.
+            let text = format!("Einheit «{}»: Einheitsführer «{}» gesetzt", einheit, z.name);
             crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                 .await?;
         }

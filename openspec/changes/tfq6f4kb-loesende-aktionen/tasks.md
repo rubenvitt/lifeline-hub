@@ -14,7 +14,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 ## 2. zjnw0rkj: Fahrzeug „Entlassen“ vollständig zurücknehmen
 
 - [x] 2.1 Prüfen, dass `…/fahrzeuge/{ef}/entlassen` nicht zur öffentlichen API v1 gehört (`src/AGENTS.md`, `src/api_doc.rs`); Ergebnis im Commit nennen
-- [x] 2.2 Repo: `entlassen_tx` liefert den Vorzustand (D5) inkl. `status_id`, `status_seit`, `zuletzt_entlassen_at`, `fuehrungsstelle_id`, `beladung`; Repo-Test in `src/fahrzeug/disposition_repo.rs` rot→grün
+- [x] 2.2 Repo: `entlassen_tx` liefert den Vorzustand (D5) inkl. `status_id`, `status_seit`, `fuehrungsstelle_id`, `beladung`; Repo-Test in `src/fahrzeug/disposition_repo.rs` rot→grün
 - [x] 2.3 Repo: `zuruecknehmen_tx` mit Riegel (Aufrufer, Art, `entlassen_at`, zehn Minuten), Status ohne Zeitachse, Bindungen nur frei, `ausgelassen`; Repo-Tests je Teil und je Auslassung (Spec `kraefte-entlassung`, „Rücknahme lässt Verändertes aus“, „Rücknahme nur direkt nach dem Entlassen“)
 - [x] 2.4 Route `POST …/entlassen/zuruecknehmen` in `src/routes/einsatz_fahrzeug.rs` und `src/app.rs` (Gate `EinsatzSchreibzugriff<Fahrzeuge>`, `fordere_zielmodul` für Einheiten, Material, Raum), ETB „Entlassung zurückgenommen“, Live-Meldungen wie beim Entlassen; Antwort von `…/entlassen` als `{ fahrzeug, vorzustand }`; `src/api_doc.rs`
 - [x] 2.5 Integrationstest in `tests/einsatz_fahrzeug.rs`: Szenario „Entlassen und Rückgängig“ vergleicht den Zustand vorher und nachher (Status, Status seit, Einheit, Besatzung, Raum, Führungsstelle, Beladung), dazu 409 nach Reaktivieren und für eine andere Person

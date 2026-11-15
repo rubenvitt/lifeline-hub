@@ -225,13 +225,12 @@ pub struct EinsatzFahrzeugAnzeige {
 /// eines Fahrzeugs zurücknehmen“; `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D5).
 /// Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
 /// zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
+/// Die Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom
+/// Client zu übernehmen.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EntlassungVorzustand {
     /// Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt.
     pub entlassen_at: String,
-    /// `zuletzt_entlassen_at` vor diesem Entlassen (Storno-Sperre); `None` = nie entlassen.
-    #[serde(default)]
-    pub zuletzt_entlassen_at: Option<String>,
     #[serde(default)]
     pub einheit_id: Option<i64>,
     #[serde(default)]

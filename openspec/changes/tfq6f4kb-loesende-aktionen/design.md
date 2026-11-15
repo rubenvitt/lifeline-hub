@@ -126,7 +126,6 @@ Mit dem Menschen abgestimmt:
 - `POST …/fahrzeuge/{ef}/entlassen` antwortet mit `{ fahrzeug, vorzustand }`. Der `vorzustand`
   enthält:
   - `entlassen_at`, das als Kennung dieses Entlassens dient;
-  - `zuletzt_entlassen_at` von vorher (Storno-Sperre);
   - `einheit_id`, `br_id`, `fuehrungsstelle` (ja/nein, denn die Führungsstelle ist je Einsatz
     eine Menge von Fahrzeugen);
   - `besatzung: [ep_id]`, `beladung: [em_id]`.
@@ -139,9 +138,11 @@ Mit dem Menschen abgestimmt:
   1. **Riegel:** `beendet_von` = Aufrufer, die Art ist „entlassen“, `beendet_at` =
      `entlassen_at` (sonst wurde inzwischen reaktiviert oder neu entlassen), höchstens zehn
      Minuten her. Sonst 409.
-  2. **Endzustand aufheben:** `beendet_*` = NULL, `zuletzt_entlassen_at` aus dem Body (muss vor
-     `entlassen_at` liegen, sonst 422). Status und „Status seit“ bleiben, wie sie sind: keine
-     Zeitachse, kein „wieder verfügbar“.
+  2. **Endzustand aufheben:** `beendet_*` = NULL. Status und „Status seit“ bleiben, wie sie
+     sind: keine Zeitachse, kein „wieder verfügbar“. Die Storno-Sperre (`zuletzt_entlassen_at`)
+     bleibt auf diesem Entlassen stehen: Wer einmal entlassen war, war im Einsatz. Ihr Wert davor
+     käme nur vom Client, und ein gefälschtes `null` höbe die Sperre auf (Review vor dem PR;
+     anfangs stand der Wert im Vorzustand).
   3. **Bindungen** einzeln, nur was noch frei ist:
      - Einheit: aktiv, und die Person hat Recht im Modul Einheiten (`fordere_zielmodul`, wie
        `update`).

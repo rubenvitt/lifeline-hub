@@ -8225,7 +8225,7 @@
       },
       "EntlassungVorzustand": {
         "type": "object",
-        "description": "Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung\neines Fahrzeugs zurücknehmen“; `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D5).\nKommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.",
+        "description": "Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung\neines Fahrzeugs zurücknehmen“; `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D5).\nKommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.\nDie Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom\nClient zu übernehmen.",
         "required": [
           "entlassen_at"
         ],
@@ -8267,13 +8267,6 @@
           "fuehrungsstelle": {
             "type": "boolean",
             "description": "Trug das Fahrzeug die Führungsstelle?"
-          },
-          "zuletzt_entlassen_at": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "`zuletzt_entlassen_at` vor diesem Entlassen (Storno-Sperre); `None` = nie entlassen."
           }
         }
       },

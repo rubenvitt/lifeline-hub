@@ -353,13 +353,13 @@ pub async fn require_personal_frei_tx(
 
 /// Setzt die Person nach dem Rückgängig wieder als Führer ein (LLH-1722), nur wenn die Einheit
 /// keinen hat; sonst `Conflict` (der Aufrufer bricht die Transaktion ab, nichts bleibt
-/// geschrieben). Ist sie es schon, schreibt es nichts.
+/// geschrieben). Ist sie es schon, schreibt es nichts. `true`, wenn es die Führung gesetzt hat.
 pub async fn set_fuehrer_wenn_frei_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ep_id: i64,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
     let (name, fuehrer): (String, Option<i64>) = sqlx::query_as(
         "SELECT name, fuehrer_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
     )
@@ -369,7 +369,7 @@ pub async fn set_fuehrer_wenn_frei_tx(
     .await?
     .ok_or(AppError::NotFound)?;
     match fuehrer {
-        Some(id) if id == ep_id => Ok(()),
+        Some(id) if id == ep_id => Ok(false),
         Some(_) => Err(AppError::Conflict(format!(
             "{name} hat inzwischen einen anderen Einheitsführer"
         ))),
@@ -382,7 +382,7 @@ pub async fn set_fuehrer_wenn_frei_tx(
             .bind(einsatz_id)
             .execute(&mut *conn)
             .await?;
-            Ok(())
+            Ok(true)
         }
     }
 }

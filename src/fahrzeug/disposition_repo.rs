@@ -717,8 +717,6 @@ pub struct Entlassen {
     pub trug_fuehrungsstelle: bool,
     /// Beladung, die ohne Ort zurückbleibt (`einsatz_material.id`, LLH-1224 D13).
     pub material: Vec<i64>,
-    /// `zuletzt_entlassen_at` vor diesem Entlassen (Storno-Sperre), für die Rücknahme (LLH-1722).
-    pub zuletzt_entlassen_vorher: Option<String>,
 }
 
 impl Entlassen {
@@ -727,7 +725,6 @@ impl Entlassen {
     pub fn vorzustand(&self, entlassen_at: &str) -> crate::fahrzeug::EntlassungVorzustand {
         crate::fahrzeug::EntlassungVorzustand {
             entlassen_at: entlassen_at.to_string(),
-            zuletzt_entlassen_at: self.zuletzt_entlassen_vorher.clone(),
             einheit_id: self.einheit.as_ref().map(|(id, _)| *id),
             br_id: self.br_id,
             fuehrungsstelle: self.trug_fuehrungsstelle,
@@ -759,13 +756,6 @@ pub async fn entlassen_tx(
     .fetch_optional(&mut *conn)
     .await?;
     let besatzung = super::besatzung_repo::load_besatzung_tx(conn, einsatz_id, ef_id).await?;
-    let zuletzt_entlassen_vorher: Option<String> = sqlx::query_scalar(
-        "SELECT zuletzt_entlassen_at FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(ef_id)
-    .bind(einsatz_id)
-    .fetch_one(&mut *conn)
-    .await?;
     let trug_fuehrungsstelle =
         crate::einsatz::fuehrungsstelle::traegt_fahrzeug_tx(conn, ef_id).await?;
     let br_id =
@@ -808,7 +798,6 @@ pub async fn entlassen_tx(
         besatzung,
         trug_fuehrungsstelle,
         material,
-        zuletzt_entlassen_vorher,
     })
 }
 
@@ -1089,8 +1078,9 @@ fn ruecknahme_conflict() -> AppError {
 ///
 /// Riegel: nur die entlassende Person, nur dieses Entlassen (`entlassen_at`), nur innerhalb von
 /// [`RUECKNAHME_FRIST_MINUTEN`]; sonst `Conflict`. Der Endzustand fällt, Status und „Status seit“
-/// bleiben (das Entlassen hat sie nicht angefasst), die Storno-Sperre kehrt auf ihren Wert
-/// zurück. Jede Bindung kommt nur zurück, wenn ihr Ziel frei ist und die Person das Recht des
+/// bleiben (das Entlassen hat sie nicht angefasst). Die Storno-Sperre (`zuletzt_entlassen_at`)
+/// bleibt auf diesem Entlassen stehen: wer einmal entlassen war, war im Einsatz, und ihr Wert
+/// davor käme nur ungeprüft vom Client (Review vor dem PR). Jede Bindung kommt nur zurück, wenn ihr Ziel frei ist und die Person das Recht des
 /// Moduls hat; sonst steht sie in `ausgelassen`. Keine Zeitachse (D5 von LLH-1079: Fahrzeuge
 /// wirken nur über ihre Einheit), keine Benachrichtigung.
 pub async fn zuruecknehmen_tx(
@@ -1119,21 +1109,10 @@ pub async fn zuruecknehmen_tx(
     if !im_riegel {
         return Err(ruecknahme_conflict());
     }
-    if vorzustand
-        .zuletzt_entlassen_at
-        .as_deref()
-        .is_some_and(|z| z >= vorzustand.entlassen_at.as_str())
-    {
-        return Err(AppError::UnprocessableEntity(
-            "Das frühere Entlassen liegt nicht vor diesem".into(),
-        ));
-    }
     let r = sqlx::query(
-        "UPDATE einsatz_fahrzeug SET beendet_at = NULL, beendet_von = NULL, beendet_als = NULL, \
-             zuletzt_entlassen_at = ? \
+        "UPDATE einsatz_fahrzeug SET beendet_at = NULL, beendet_von = NULL, beendet_als = NULL \
          WHERE id = ? AND einsatz_id = ? AND beendet_at = ?",
     )
-    .bind(&vorzustand.zuletzt_entlassen_at)
     .bind(ef_id)
     .bind(einsatz_id)
     .bind(&vorzustand.entlassen_at)
@@ -1153,7 +1132,11 @@ pub async fn zuruecknehmen_tx(
         .fetch_optional(&mut *conn)
         .await?;
         match einheit {
-            None => {}
+            // Spurlos aufgelöst und darum gelöscht (`einheit::repo::aufloesen_tx`): den Namen
+            // kennt niemand mehr, die Lücke steht trotzdem in der Antwort.
+            None => ergebnis
+                .ausgelassen
+                .push(ausgelassen("Einheit", "inzwischen aufgelöst")),
             Some((name, _)) if !rechte.einheiten => ergebnis.ausgelassen.push(ausgelassen(
                 format!("Einheit «{name}»"),
                 "kein Schreibrecht im Modul Einheiten",
@@ -1220,6 +1203,10 @@ pub async fn zuruecknehmen_tx(
                     Err(e) => return Err(e),
                 }
             }
+        } else {
+            ergebnis
+                .ausgelassen
+                .push(ausgelassen("Bereitstellungsraum", "nicht mehr vorhanden"));
         }
     }
     if vorzustand.fuehrungsstelle {
@@ -2479,7 +2466,6 @@ mod tests {
             e.vorzustand(JETZT),
             crate::fahrzeug::EntlassungVorzustand {
                 entlassen_at: JETZT.into(),
-                zuletzt_entlassen_at: None,
                 einheit_id: Some(einheit),
                 br_id: None,
                 fuehrungsstelle: true,
@@ -2502,7 +2488,12 @@ mod tests {
             .await
             .unwrap();
         assert!(r.ausgelassen.is_empty(), "{:?}", r.ausgelassen);
-        assert_eq!(stand(&pool, ef).await, vorher);
+        let nachher = stand(&pool, ef).await;
+        assert_eq!(
+            (&nachher.0, &nachher.1, nachher.2, nachher.3, &nachher.4),
+            (&vorher.0, &vorher.1, vorher.2, vorher.3, &vorher.4)
+        );
+        assert_eq!(nachher.5.as_deref(), Some(JETZT), "Storno-Sperre bleibt");
         let auf: Option<i64> =
             sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
                 .bind(ep)
@@ -2726,7 +2717,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ruecknahme_stellt_die_storno_sperre_wieder_her() {
+    async fn ruecknahme_laesst_die_storno_sperre_stehen() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ef) = seed_fahrzeug(&pool).await;
         let v = entlasse(&pool, einsatz, ef, 1)
@@ -2736,21 +2727,38 @@ mod tests {
         nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
             .await
             .unwrap();
-        assert_eq!(stand(&pool, ef).await.5, None);
-        // Eine Kennung aus der Zukunft taugt nicht als früheres Entlassen: 422.
-        let v2 = entlasse(&pool, einsatz, ef, 1)
+        // Wer einmal entlassen war, war im Einsatz; der Body kann die Sperre nicht aufheben,
+        // auch nicht mit einem gefälschten `"zuletzt_entlassen_at": null`.
+        assert_eq!(stand(&pool, ef).await.5.as_deref(), Some(JETZT));
+        let hindernis =
+            find_storno_hindernis_tx(&mut pool.acquire().await.unwrap(), einsatz, ef, RUECK_JETZT)
+                .await
+                .unwrap();
+        assert!(hindernis.is_some(), "Storno bleibt gesperrt");
+    }
+
+    #[tokio::test]
+    async fn ruecknahme_nennt_eine_geloeschte_einheit() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let v = entlasse(&pool, einsatz, ef, 1)
             .await
             .unwrap()
             .vorzustand(JETZT);
-        let kaputt = crate::fahrzeug::EntlassungVorzustand {
-            zuletzt_entlassen_at: Some("2100-01-01 00:00:00".into()),
-            ..v2
+        // Spurlos aufgelöst: `aufloesen_tx` löscht die Zeile, die Kennung trifft nichts mehr.
+        let v = crate::fahrzeug::EntlassungVorzustand {
+            einheit_id: Some(i64::MAX),
+            ..v
         };
-        assert!(matches!(
-            nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &kaputt, alle_rechte())
-                .await
-                .unwrap_err(),
-            AppError::UnprocessableEntity(_)
-        ));
+        let r = nimm_zurueck(&pool, einsatz, ef, 1, RUECK_JETZT, &v, alle_rechte())
+            .await
+            .unwrap();
+        assert_eq!(
+            r.ausgelassen,
+            [crate::fahrzeug::RuecknahmeAusgelassen {
+                bezeichnung: "Einheit".into(),
+                grund: "inzwischen aufgelöst".into(),
+            }]
+        );
     }
 }

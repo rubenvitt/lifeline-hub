@@ -3276,6 +3276,8 @@ export interface components {
          *     eines Fahrzeugs zurücknehmen“; `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D5).
          *     Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
          *     zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
+         *     Die Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom
+         *     Client zu übernehmen.
          */
         EntlassungVorzustand: {
             /** @description Beladung (`einsatz_material.id`). */
@@ -3290,8 +3292,6 @@ export interface components {
             entlassen_at: string;
             /** @description Trug das Fahrzeug die Führungsstelle? */
             fuehrungsstelle?: boolean;
-            /** @description `zuletzt_entlassen_at` vor diesem Entlassen (Storno-Sperre); `None` = nie entlassen. */
-            zuletzt_entlassen_at?: string | null;
         };
         /**
          * @description Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
