@@ -17,13 +17,12 @@ set -euo pipefail
 
 # ── DIE PFLICHTLISTE, die einzige Stelle im Repository ───────────────────────────────────────
 # <name>|<art>. Art `status`: Commit-Status über die Status-API (`migrationen.yml`); MUSS im
-# Ruleset ohne Quelle stehen. Art `check`: Check-Run eines Jobs oder über die Checks-API mit dem
-# Token von GitHub Actions; ohne Quelle oder mit GitHub Actions.
+# Ruleset ohne Quelle stehen. Art `check`: Check-Run eines Jobs (Token von GitHub Actions); ohne
+# Quelle oder mit GitHub Actions. `Baut mit Ziel-Branch` ist seit LLH-1899 abgeschafft.
 PFLICHT=(
   "Schnellprüfungen|check"
   "Migrationsnummern|status"
   "ADR-Nummern|status"
-  "Baut mit Ziel-Branch|check"
 )
 # App-ID von GitHub Actions: die Quelle, die ein Check-Run mit `GITHUB_TOKEN` trägt.
 GITHUB_ACTIONS_APP=15368

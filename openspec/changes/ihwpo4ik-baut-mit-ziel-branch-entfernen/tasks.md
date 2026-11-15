@@ -2,13 +2,13 @@
 
 ## 1. Pflichtliste und Wächter
 
-- [ ] 1.1 `ruleset-pruefen.test.sh` auf drei Pflicht-Checks umstellen (`Baut mit Ziel-Branch` als überzählig erwartet) und rot sehen; dann die Liste in `scripts/ruleset-pruefen.sh` kürzen, bis der Selbsttest grün ist
-- [ ] 1.2 `stau-waechter.test.sh`: Regeln-Attrappe ohne `Baut mit Ziel-Branch`, die Fälle 37b (Check rechnet noch) auf einen beliebigen laufenden Check umstellen; Selbsttest grün
+- [x] 1.1 `ruleset-pruefen.test.sh` auf drei Pflicht-Checks umstellen (`Baut mit Ziel-Branch` als überzählig erwartet) und rot sehen; dann die Liste in `scripts/ruleset-pruefen.sh` kürzen, bis der Selbsttest grün ist
+- [x] 1.2 `stau-waechter.test.sh`: Regeln-Attrappe ohne `Baut mit Ziel-Branch`, die Fälle 37b (Check rechnet noch) auf einen beliebigen laufenden Check umstellen; Selbsttest grün
 
 ## 2. Workflows und Skript entfernen
 
-- [ ] 2.1 `ci-stufen.test.sh` zuerst auf „`ziel-branch-build.yml` und `ziel-branch-verteilen.yml` gibt es nicht“ umstellen und rot sehen; dann beide Workflows, `scripts/ziel-branch-build.sh` und `scripts/ziel-branch-build.test.sh` löschen und den Aufruf in `check-all.sh` (Schritt 11) entfernen; `ci-stufen`, `check-all.test.sh` grün
-- [ ] 2.2 Kommentare in `check-all.sh` (Kopf `--nur baut`, Schritt 17) und `check-all.test.sh` ohne Bezug auf den Check; Selbsttest grün
+- [x] 2.1 `ci-stufen.test.sh` zuerst auf „`ziel-branch-build.yml` und `ziel-branch-verteilen.yml` gibt es nicht“ umstellen und rot sehen; dann beide Workflows, `scripts/ziel-branch-build.sh` und `scripts/ziel-branch-build.test.sh` löschen und den Aufruf in `check-all.sh` (Schritt 11) entfernen; `ci-stufen`, `check-all.test.sh` grün
+- [x] 2.2 Kommentare in `check-all.sh` (Kopf `--nur baut`, Schritt 17) und `check-all.test.sh` ohne Bezug auf den Check; Selbsttest grün
 
 ## 3. Doku und Regeln
 
