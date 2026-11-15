@@ -699,6 +699,14 @@ describe('EinsatzLayout', () => {
       );
     });
 
+    // LLH-1726: Der Name trägt seine Eigenbreite als Basis und drückt auf seine Nachbarn. Die
+    // Zelle des Griffs schrumpft deshalb nie, sonst lag der Name 2 px über dem Griff (Gate 1, 390 px).
+    it('die Zelle des Griffs schrumpft nicht unter den Griff', async () => {
+      setup();
+      const griff = await screen.findByRole('button', { name: 'Navigation öffnen' });
+      expect(griff.parentElement!.style.flexShrink).toBe('0');
+    });
+
     it('hält Hamburger und Schließen-Knopf auf der A1-Trefffläche', async () => {
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());

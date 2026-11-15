@@ -118,10 +118,12 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
             expect.soft(messung.dokument, kontext).toBeLessThanOrEqual(messung.viewport);
             expect.soft(messung.kopfInhalt, kontext).toBeLessThanOrEqual(messung.kopfBreite);
             expect.soft(messung.kopfInhaltHoehe, kontext).toBeLessThanOrEqual(messung.kopfHoehe);
+            // Im Einsatz seit LLH-1726 ohne Wortmarke (erst ab `xxl`): Name, Suchen, Alarmzentrale
+            // (bei Finger mit den Eingängen gebündelt), Benutzer — wie die Einsatzliste vier.
             expect(
               messung.ziele.length,
               `${kontext}: tatsächlich Bedienziele messen`,
-            ).toBeGreaterThanOrEqual(mitVerwaltung ? (route === '/einsaetze' ? 4 : 5) : 3);
+            ).toBeGreaterThanOrEqual(mitVerwaltung ? 4 : 3);
             for (const ziel of messung.ziele) {
               const name = `${kontext}: ${ziel.name}`;
               expect.soft(ziel.x, name).toBeGreaterThanOrEqual(0);

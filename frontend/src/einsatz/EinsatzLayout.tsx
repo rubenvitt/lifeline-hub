@@ -435,7 +435,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             {breit ? (
               <Markenzelle />
             ) : (
-              <div style={kopfZelleStil({ padding: 0 })}>
+              <div style={{ ...kopfZelleStil({ padding: 0 }), flexShrink: 0 }}>
                 <Button
                   type="text"
                   aria-label="Navigation öffnen"
