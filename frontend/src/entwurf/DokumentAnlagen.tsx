@@ -153,6 +153,7 @@ export default function DokumentAnlagen({
     <SkizzenAufnahme
       einsatzId={einsatzId}
       einsatzbezeichnung={einsatzbezeichnung}
+      uebung={uebung}
       onBild={(bild) => {
         setNimmtAuf(false);
         ablegen.mutate(bild);

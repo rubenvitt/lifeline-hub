@@ -76,6 +76,7 @@ import { modulName } from '../einsatz/modulRegistry';
 import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import './funkplanPrint.css';
+import { isUebung } from '../einsatz/einsatzart';
 
 /**
  * Funkplan des Sachgebiets S6 (FwDV 100 Anlage 5, LFH-548): eine schreibgeschützte, aus dem
@@ -523,6 +524,7 @@ function SkizzenBereich({
   netz,
   aktionen,
   einsatzbezeichnung,
+  uebung,
   gewaehlt,
   onWahl,
   druckFormat,
@@ -535,6 +537,7 @@ function SkizzenBereich({
   netz: Fernmeldenetz;
   aktionen: SkizzenAktionen | null;
   einsatzbezeichnung: string;
+  uebung: boolean;
   gewaehlt: string | null;
   onWahl: (key: string | null) => void;
   druckFormat: Druckformat;
@@ -557,6 +560,7 @@ function SkizzenBereich({
       netz={netz}
       aktionen={aktionen}
       einsatzbezeichnung={einsatzbezeichnung}
+      uebung={uebung}
       gewaehlt={gewaehlt}
       onWahl={onWahl}
       druckFormat={druckFormat}
@@ -1125,6 +1129,7 @@ export default function FunkplanPage() {
               netz={netz}
               aktionen={aktionen}
               einsatzbezeichnung={einsatz.bezeichnung}
+              uebung={isUebung(einsatz)}
               gewaehlt={gewaehlt}
               onWahl={setGewaehlt}
               druckFormat={druckFormat}

@@ -40,11 +40,15 @@ export function schriftfeldAngaben(
   einsatzbezeichnung: string,
   stand: string | null,
   dtg: (zeit: string) => string,
+  /** Der Einsatz ist eine Übung: „ÜBUNG · “ vor dem Titel (LLH-1725). Das Bild geht als Anlage
+   *  ohne Rahmen und Druckkopf weiter. */
+  uebung = false,
 ): SchriftfeldAngaben {
   const herausgeber = sf?.herausgeber?.trim() || einsatzbezeichnung;
+  const titel = (uebung ? 'ÜBUNG · ' : '') + schriftfeldTitel(einsatzbezeichnung);
   if (!sf) {
     return {
-      titel: schriftfeldTitel(einsatzbezeichnung),
+      titel,
       vermerk: null,
       zeilen: [
         { etikett: 'Herausgeber', wert: herausgeber },
@@ -56,7 +60,7 @@ export function schriftfeldAngaben(
   }
   const gez = [sf.gez_name?.trim() || null, sf.gez_at ? dtg(sf.gez_at) : null].filter(Boolean);
   return {
-    titel: schriftfeldTitel(einsatzbezeichnung),
+    titel,
     vermerk: sf.vs_vermerk === 'vs_nfd' ? VS_NFD : null,
     zeilen: [
       { etikett: 'Herausgeber', wert: herausgeber },
