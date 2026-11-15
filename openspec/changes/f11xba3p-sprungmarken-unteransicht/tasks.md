@@ -16,7 +16,7 @@
 
 - [x] 3.1 `frontend/AGENTS.md`, „Sprungmarken sind keine Module“: Marke steht in der Kategorie ihres Zielmoduls, eingerückt mit Linie, ohne Pfeil; Prettier über `frontend/` grün
 - [x] 3.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Absatz zu Sprungmarken (Entscheidungen unter ETB in Erfassung, eingerückt unter ihrem Modul); Wächter `src/hilfe/anwenderdoku.guard.test.ts` grün
-- [ ] 3.3 Bilder der Kapitel neu erzeugen, deren Bilder-Spec ein Modulmenü mit einer Marke fotografiert (mindestens `einsatz-oberflaeche`, `arbeitsflaeche`), und committen; Wächter grün
+- [x] 3.3 Bilder der Kapitel neu erzeugen, deren Bilder-Spec ein Modulmenü mit einer Marke fotografiert (mindestens `einsatz-oberflaeche`, `arbeitsflaeche`), und committen; Wächter grün
 
 ## 4. Prüfen
 
