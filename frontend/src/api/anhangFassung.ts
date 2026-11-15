@@ -81,6 +81,11 @@ export function istHeicMime(mime: string | null | undefined): boolean {
   return mime === 'image/heic' || mime === 'image/heif';
 }
 
+/** Ob es für diesen Anhang überhaupt eine Vorschau gibt (vom Server oder auf dem Gerät). */
+export function hatVorschau(mime: string | null | undefined): boolean {
+  return hatServerVorschau(mime) || istHeicMime(mime);
+}
+
 /**
  * Einsatz-ID aus einer Anhang-Download-Adresse (`/api/einsaetze/{id}/…`); alle vier Wege
  * beginnen so. Für den Query-Key der HEIC-Vorschau, damit ein Rechteentzug ihn mit räumt.

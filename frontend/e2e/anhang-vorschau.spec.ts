@@ -41,7 +41,7 @@ async function schadenMitFoto(page: Page, einsatzId: string): Promise<number> {
   return schadenId;
 }
 
-async function etbEintragMitHeic(page: Page, einsatzId: string) {
+async function etbEintragMitHeic(page: Page, einsatzId: string): Promise<number> {
   const anhang = await page.request.post(`/api/einsaetze/${einsatzId}/etb/anhaenge`, {
     multipart: { datei: { name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: HEIC } },
   });
@@ -57,6 +57,7 @@ async function etbEintragMitHeic(page: Page, einsatzId: string) {
     },
   });
   expect(eintrag.status(), await eintrag.text()).toBe(201);
+  return (await eintrag.json()).lfd_nr as number;
 }
 
 /** Wartet, bis das Bild wirklich dekodiert ist, und liefert seine natürlichen Maße. */
@@ -77,7 +78,7 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Vorschau ${Date.now()}`);
   const schadenId = await schadenMitFoto(page, einsatzId);
-  await etbEintragMitHeic(page, einsatzId);
+  const heicNr = await etbEintragMitHeic(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   // ── 1 · Vorschaubild vom Server ─────────────────────────────────────────────────────
@@ -129,6 +130,23 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
     i.naturalHeight,
   ]);
   expect(hoehe, 'Drehung aus irot angewendet: hochkant').toBeGreaterThan(breite);
+
+  // ── 4 · HEIC in der kompakten Spaltenzeile: Vorschau über das Zeilenmenü (LLH-1887) ──
+  // Dort steht der Anhang nur als Vermerk; die Großansicht dekodiert das Gerät, nie das Original.
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+  await page.getByRole('button', { name: `Aktionen zu Eintrag ${heicNr}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Vorschau: IMG_0001.HEIC' }).click();
+  const menueAnsicht = page.locator('.ant-image-preview');
+  await expect(menueAnsicht).toBeVisible({ timeout: 30_000 });
+  const menueGross = menueAnsicht.locator('img.ant-image-preview-img');
+  await expect(menueGross).toHaveAttribute('src', /^blob:/);
+  await expect
+    .poll(() => menueGross.evaluate((i: HTMLImageElement) => i.naturalWidth))
+    .toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
+  await expect(menueAnsicht).toBeHidden();
 
   // Glue und WASM kommen als eigene Dateien vom festen Pfad, austauschbar (LGPL, LFH-1000).
   for (const datei of ['libheif.js', 'libheif.wasm']) {
