@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { Image, Spin } from 'antd';
+import { Image, Modal, Spin } from 'antd';
 import { QueryClientContext, useQuery } from '@tanstack/react-query';
 import { useRollen } from './instrument/rollenwerte';
 import {
@@ -157,8 +157,10 @@ export function AnhangGrossansicht({
   melde: (text: string) => void;
 }) {
   const heic = istHeicMime(mime);
-  const ergebnis = useHeicVorschau(href, heic);
-  const fehlgeschlagen = heic && ergebnis != null && 'fehler' in ergebnis;
+  const { ergebnis, laedt } = useHeicVorschau(href, heic);
+  // Ein Fehler im Cache zählt erst, wenn der neue Versuch durch ist: beim Öffnen liefert die Abfrage
+  // ihn sofort und dekodiert im Hintergrund neu, etwa wieder mit Netz (Review B6).
+  const fehlgeschlagen = heic && !laedt && ergebnis != null && 'fehler' in ergebnis;
   // Die Rückrufe über eine Ref: der Effekt soll genau einmal je Fehlschlag laufen, nicht mit
   // jeder neuen Funktionsidentität des Aufrufers.
   const rueckrufe = useRef({ onSchliessen, melde });
@@ -175,7 +177,13 @@ export function AnhangGrossansicht({
       ? ergebnis.gross
       : null;
   if (gross == null) {
-    return fehlgeschlagen ? null : <Spin fullscreen aria-label={`${dateiname} wird umgewandelt`} />;
+    // Ein schließbarer Dialog, keine Vollbildmaske: Dekodieren kann dauern (Datei, Decoder, andere
+    // Kacheln vor ihm), ohne Netz hält die Abfrage an. Escape und das Kreuz führen zurück (Review B7).
+    return fehlgeschlagen ? null : (
+      <Modal open title={dateiname} footer={null} centered onCancel={onSchliessen}>
+        <Spin /> <span>wird umgewandelt …</span>
+      </Modal>
+    );
   }
   return (
     <Image.PreviewGroup
@@ -293,17 +301,15 @@ function useEinmalSichtbar(ref: RefObject<HTMLElement | null>): boolean {
 }
 
 /**
- * HEIC/HEIF (design.md D8): die bereinigte Fassung wird erst geladen und auf dem Gerät
- * dekodiert, wenn die Kachel sichtbar wird; der Decoder (Worker + WASM) kommt erst dann per
- * `import()`. Fehler bleiben still (Platzhalter), sie gehen nicht an den globalen Handler.
- */
-/**
  * HEIC/HEIF auf dem Gerät dekodieren (LFH-759), im Query-Cache je Anhang: Kachel und Großansicht
  * aus dem ETB-Zeilenmenü (LLH-1887) teilen sich das Ergebnis. `aktiv` hält die Arbeit zurück, bis
  * jemand das Bild sehen will. Der Decoder kommt nur über `import()`.
  */
-export function useHeicVorschau(href: string, aktiv: boolean): HeicErgebnis | undefined {
-  return useQuery({
+export function useHeicVorschau(
+  href: string,
+  aktiv: boolean,
+): { ergebnis: HeicErgebnis | undefined; laedt: boolean } {
+  const abfrage = useQuery({
     queryKey: einsatzKeys.anhangHeicVorschau(einsatzIdAusPfad(href) ?? 0, href),
     queryFn: async (): Promise<HeicErgebnis> => {
       try {
@@ -316,18 +322,24 @@ export function useHeicVorschau(href: string, aktiv: boolean): HeicErgebnis | un
     },
     enabled: aktiv,
     // Ein Ergebnis gilt für immer (ein Anhang ändert sich nie), ein Fehler nicht: beim nächsten
-    // Einblenden, etwa wieder mit Netz, versucht es die Kachel neu.
+    // Einblenden oder Öffnen, etwa wieder mit Netz, wird neu dekodiert.
     staleTime: (q) => (q.state.data != null && !('fehler' in q.state.data) ? Infinity : 0),
     gcTime: 5 * 60_000,
     retry: false,
-  }).data;
+  });
+  return { ergebnis: abfrage.data, laedt: abfrage.isFetching };
 }
 
+/**
+ * HEIC/HEIF (design.md D8): die bereinigte Fassung wird erst geladen und auf dem Gerät
+ * dekodiert, wenn die Kachel sichtbar wird; der Decoder (Worker + WASM) kommt erst dann per
+ * `import()`. Fehler bleiben still (Platzhalter), sie gehen nicht an den globalen Handler.
+ */
 function HeicKachel(props: Props) {
   const { kachel } = useKachelStil();
   const platz = useRef<HTMLSpanElement>(null);
   const sichtbar = useEinmalSichtbar(platz);
-  const daten = useHeicVorschau(props.href, sichtbar);
+  const daten = useHeicVorschau(props.href, sichtbar).ergebnis;
   if (daten == null) {
     return <span ref={platz} data-lfh="anhang-vorschau-laedt" aria-hidden="true" style={kachel} />;
   }

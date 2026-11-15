@@ -5,7 +5,12 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { dichten } from '../theme/tokens';
-import AnhangVorschau, { AnhangVorschauGruppe, vorschauKachelStil } from './AnhangVorschau';
+import { useState } from 'react';
+import AnhangVorschau, {
+  AnhangGrossansicht,
+  AnhangVorschauGruppe,
+  vorschauKachelStil,
+} from './AnhangVorschau';
 
 // Der HEIC-Decoder (Worker + WASM) ist hier eine Attrappe; `geladen` zählt, ob das Modul
 // überhaupt importiert wurde (es soll nur bei einem HEIC nachgeladen werden).
@@ -264,5 +269,72 @@ describe('AnhangVorschau — HEIC auf dem Gerät (LFH-759)', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(heic.geladen).toBe(vorher);
     expect(heic.dekodiere).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Großansicht ohne Vorschaubild im Fluss (ETB-Zeilenmenü, LLH-1887): ein HEIC dekodiert das Gerät.
+ * Die Hülle öffnet und schließt sie wie das Zeilenmenü, im selben Query-Cache.
+ */
+describe('AnhangGrossansicht — HEIC aus dem Zeilenmenü (LLH-1887)', () => {
+  const ETB = '/api/einsaetze/5/etb/40/anhaenge/9';
+  beforeEach(() => {
+    let n = 0;
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:gross-${++n}`);
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    heic.dekodiere.mockReset();
+  });
+
+  function Huelle({ melde }: { melde: (t: string) => void }) {
+    const [offen, setOffen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOffen(true)}>
+          Vorschau öffnen
+        </button>
+        {offen && (
+          <AnhangGrossansicht
+            href={ETB}
+            mime="image/heic"
+            dateiname="IMG.HEIC"
+            onSchliessen={() => setOffen(false)}
+            melde={melde}
+          />
+        )}
+      </>
+    );
+  }
+
+  it('ein zweiter Versuch nach einem Fehlschlag dekodiert neu und zeigt das Bild (B6)', async () => {
+    const melde = vi.fn();
+    const user = userEvent.setup();
+    heic.dekodiere
+      .mockRejectedValueOnce(new Error('ohne Netz'))
+      .mockResolvedValue({ klein: new Blob(['k']), gross: new Blob(['g']) });
+    renderMitProviders(<Huelle melde={melde} />);
+    await user.click(screen.getByRole('button', { name: 'Vorschau öffnen' }));
+    await waitFor(() => expect(melde).toHaveBeenCalledWith('IMG.HEIC: keine Vorschau möglich'));
+    await user.click(screen.getByRole('button', { name: 'Vorschau öffnen' }));
+    // `gross` ist die zweite Object-URL des gelungenen Versuchs (klein, dann gross).
+    await waitFor(() => expect(document.querySelector('img[src="blob:gross-2"]')).not.toBeNull());
+    expect(melde).toHaveBeenCalledTimes(1);
+  });
+
+  it('während der Dekodierung schließt Escape oder das Kreuz (B7)', async () => {
+    const user = userEvent.setup();
+    heic.dekodiere.mockReturnValue(new Promise(() => {}));
+    renderMitProviders(<Huelle melde={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'Vorschau öffnen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'IMG.HEIC' });
+    expect(dialog).toHaveTextContent('wird umgewandelt');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    // Wieder bedienbar: der Knopf dahinter lässt sich klicken.
+    await user.click(screen.getByRole('button', { name: 'Vorschau öffnen' }));
+    await user.click(await screen.findByRole('button', { name: /schlie|close/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });
