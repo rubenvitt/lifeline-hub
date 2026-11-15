@@ -18,7 +18,9 @@ anzuhalten.
   sendet die ETB-Erfassung nicht, weder über „Erfassen“ noch über Enter im Inhalt. Der Grund steht
   am Feld und in der Fußzeile, der Fokus geht ins Feld Zeit, Text, Felder und Anhänge bleiben.
 - **Auch ein unlesbares `/zeit` im Text hält an** (Szenario „Unlesbar“ der Kurzeingabe): Heute
-  geht der Eintrag dann mit „jetzt“ und dem Befehl im Inhalt hinaus. Dieselbe Regel, ein Weg.
+  geht der Eintrag dann mit „jetzt“ und dem Befehl im Inhalt hinaus. Dieselbe Regel, ein Weg; der
+  Cursor markiert dann die Angabe im Text. Ein mitten im Text berichtigtes `/zeit` übernimmt der
+  erste Klick sichtbar ins Feld, der zweite sendet (design.md D2a).
 - **Weiter geht es** durch eine lesbare Zeit, ein geleertes Feld (dann gilt „jetzt“) oder eine Wahl
   im Kalender; bei `/zeit` durch eine lesbare Angabe oder das Entfernen des
   Befehls.

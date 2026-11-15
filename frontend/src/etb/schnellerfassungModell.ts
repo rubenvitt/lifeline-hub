@@ -265,17 +265,26 @@ export function erkenneZeitBefehl(
   text: string,
   optionen: { zone: string | null | undefined; jetzt: dayjs.Dayjs },
 ):
-  | { ok: true; zeitpunkt: dayjs.Dayjs; rest: string; ende: number }
-  | { ok: false; grund: string; ende: number }
+  | { ok: true; zeitpunkt: dayjs.Dayjs; rest: string; ende: number; angabe: Bereich }
+  | { ok: false; grund: string; ende: number; angabe: Bereich }
   | null {
-  const treffer = /^\/zeit\s+(\S+)\s/.exec(text);
+  const treffer = /^\/zeit(\s+)(\S+)\s/.exec(text);
   if (!treffer) return null;
   // `ende`: wo der Befehl endet — der Aufrufer löst nur aus, wenn genau dort getippt wurde.
   const ende = treffer[0].length;
-  const deutung = deuteZeit(treffer[1], { ...optionen, art: 'ereignis' });
-  if (!deutung.ok) return { ok: false, grund: deutung.grund, ende };
+  // `angabe`: wo die Zeitangabe steht — dorthin geht der Cursor, wenn sie unlesbar ist (LLH-1866).
+  const von = '/zeit'.length + treffer[1].length;
+  const angabe = { von, bis: von + treffer[2].length };
+  const deutung = deuteZeit(treffer[2], { ...optionen, art: 'ereignis' });
+  if (!deutung.ok) return { ok: false, grund: deutung.grund, ende, angabe };
   if (deutung.zeitpunkt == null) return null;
-  return { ok: true, zeitpunkt: deutung.zeitpunkt, rest: text.slice(ende), ende };
+  return { ok: true, zeitpunkt: deutung.zeitpunkt, rest: text.slice(ende), ende, angabe };
+}
+
+/** Ein Abschnitt im Text, halboffen: `von` einschließlich, `bis` ausschließlich. */
+export interface Bereich {
+  von: number;
+  bis: number;
 }
 
 /**

@@ -2089,15 +2089,18 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
-  it('ein unlesbares „/zeit“ hält an; berichtigt oder gelöscht geht es', async () => {
+  it('ein unlesbares „/zeit“ hält an, der Cursor markiert die Angabe im Text; berichtigt geht es', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
     await userEvent.click(erfassenKnopf());
     expect(p.erfassen).not.toHaveBeenCalled();
     expect(inhaltFeld()).toHaveValue('/zeit 2590 Pumpe');
-    expect(await screen.findByRole('alert')).toHaveTextContent(/^Zeit nicht übernommen: /);
-    await waitFor(() => expect(zeitFeld()).toHaveFocus());
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^\/zeit im Text: /);
+    // Der Fehler steht im Text, also der Cursor auch: „2590“ ist markiert und wird überschrieben.
+    await waitFor(() => expect(inhaltFeld()).toHaveFocus());
+    const feld = inhaltFeld() as HTMLTextAreaElement;
+    expect([feld.selectionStart, feld.selectionEnd]).toEqual([6, 10]);
 
     await userEvent.clear(inhaltFeld());
     await userEvent.type(inhaltFeld(), '/zeit 1430 Pumpe');
@@ -2107,6 +2110,15 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
       inhalt: 'Pumpe',
       ereigniszeit: '2026-10-17 12:30:00',
     });
+  });
+
+  it('ein Entwurf mit unlesbarem „/zeit“ nennt den Grund auch nach dem Einhängen (Nach-Review 1)', async () => {
+    const p = props({ initialWerte: { ...MIT_ABSENDER, inhalt: '/zeit 2590 Pumpe' } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: /);
+    await userEvent.click(erfassenKnopf());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^\/zeit im Text: /);
   });
 
   it('ohne den Befehl im Text geht es mit der Zeit des Erfassens', async () => {
@@ -2119,25 +2131,63 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
-  it('ein an Ort und Stelle berichtigtes „/zeit“ geht mit der berichtigten Zeit hinaus (Review B1)', async () => {
+  it('ein an Ort und Stelle berichtigtes „/zeit“ übernimmt der erste Klick sichtbar, der zweite sendet (Review B1, Nach-Review 4)', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
     await userEvent.click(erfassenKnopf());
     expect(p.erfassen).not.toHaveBeenCalled();
     // „2590“ markieren und überschreiben: der Cursor steht danach vor dem Leerzeichen, der Befehl
-    // wird beim Tippen nicht übernommen (LLH-1088), wohl aber beim Senden.
+    // wird beim Tippen nicht übernommen (LLH-1088), wohl aber beim nächsten Klick.
     await userEvent.type(inhaltFeld(), '1430', {
       initialSelectionStart: 6,
       initialSelectionEnd: 10,
     });
     expect(inhaltFeld()).toHaveValue('/zeit 1430 Pumpe');
     await userEvent.click(erfassenKnopf());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    // Jetzt sichtbar: Zeit im Feld, Nachtrag am Knopf, der Befehl ist aus dem Text.
+    expect(feldWert('Zeit')).toBe('1430');
+    expect(inhaltFeld()).toHaveValue('Pumpe');
+    expect(erfassenKnopf()).toHaveTextContent('Erfassen als 1430');
+    await waitFor(() => expect(inhaltFeld()).toHaveFocus());
+    await userEvent.click(erfassenKnopf());
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
       inhalt: 'Pumpe',
       ereigniszeit: '2026-10-17 12:30:00',
     });
+  });
+
+  it('ein berichtigtes „/zeit“ ohne Rest übernimmt die Zeit und wartet auf den Inhalt (Nach-Review 2)', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), '/zeit 2590 ');
+    await userEvent.type(inhaltFeld(), '1430', {
+      initialSelectionStart: 6,
+      initialSelectionEnd: 10,
+    });
+    await userEvent.click(erfassenKnopf());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feldWert('Zeit')).toBe('1430');
+    expect(inhaltFeld()).toHaveValue('');
+    await waitFor(() => expect(inhaltFeld()).toHaveFocus());
+  });
+
+  it('ein lesbares „/zeit“ mit derselben Zeit hebt einen Grund im Feld auf (Nach-Review 3)', async () => {
+    const p = props({
+      initialWerte: {
+        ...MIT_ABSENDER,
+        metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-17T12:30:00Z') },
+      },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(zeitFeld(), '14:3x');
+    await userEvent.click(inhaltFeld());
+    await userEvent.type(inhaltFeld(), '/zeit 1430 Pumpe');
+    expect(zeitFeld()).not.toHaveAttribute('aria-invalid');
+    await userEvent.click(erfassenKnopf());
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
   });
 
   it('ein lesbares „/zeit“ nach einer verworfenen Eingabe im Feld gibt das Senden frei (Review B2)', async () => {
@@ -2161,10 +2211,10 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
     await userEvent.click(erfassenKnopf());
-    expect(await screen.findByRole('alert')).toHaveTextContent(/^Zeit nicht übernommen/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^\/zeit im Text: /);
     await userEvent.clear(inhaltFeld());
     await userEvent.type(inhaltFeld(), '/zeit 2590 ');
-    expect(screen.queryByText(/Zeit nicht übernommen/)).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: /);
   });
 

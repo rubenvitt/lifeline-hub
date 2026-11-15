@@ -265,6 +265,8 @@ export interface EtbFeldzeileProps {
   zeitGrundId: string;
   /** Das Feld Zeit hat eine unlesbare Eingabe verworfen (Grund) oder nicht mehr (`null`), LLH-1866. */
   onZeitVerworfen?: (grund: string | null) => void;
+  /** Steigt, wenn das Feld Zeit neu einhängen soll (eine Zeit aus `/zeit`, LLH-1866). */
+  zeitFeldFassung?: number;
   /** Die Ereigniszeit weicht ab (Nachtrag): Feld in der Achtungsrolle. */
   nachtrag: boolean;
   veranlassungOffen: boolean;
@@ -295,6 +297,7 @@ export default function EtbFeldzeile({
   zeitGrund,
   zeitGrundId,
   onZeitVerworfen,
+  zeitFeldFassung = 0,
   nachtrag,
   veranlassungOffen,
   onVeranlassungSchliessen,
@@ -313,6 +316,7 @@ export default function EtbFeldzeile({
   const zeit = (
     <Beschriftet label="Zeit" schmal={schmal}>
       <ZeitpunktEingabe
+        key={zeitFeldFassung}
         art="ereignis"
         kurzAnzeige
         kalenderOhneTabstopp

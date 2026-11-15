@@ -3,8 +3,9 @@
 ### Requirement: Unlesbare Zeit hält das Senden an
 Meldet das Feld Zeit der ETB-Erfassung eine unlesbare Eingabe, auch eine beim Verlassen verworfene,
 oder eine unlesbare Angabe hinter `/zeit`, MUST die Erfassung das Senden verweigern, über
-„Erfassen“ wie über Enter im Inhalt. Der Grund MUST am Feld Zeit stehen, der Fokus ins Feld Zeit
-gehen; Text, Felder und Anhänge bleiben. Andere Formulare behalten die Spec `zeiteingabe`.
+„Erfassen“ wie über Enter im Inhalt. Der Grund MUST in der Fußzeile stehen und den Ort nennen, der
+Fokus MUST dorthin gehen, wo der Fehler steht: ins Feld Zeit bzw. auf die markierte Angabe im Text.
+Text, Felder und Anhänge bleiben. Andere Formulare behalten die Spec `zeiteingabe`.
 
 #### Scenario: Unlesbar getippt und direkt erfasst
 - **WHEN** im Feld Zeit „14:3x“ getippt und direkt „Erfassen“ geklickt wird
@@ -34,10 +35,20 @@ gehen; Text, Felder und Anhänge bleiben. Andere Formulare behalten die Spec `ze
   gewählt wird
 - **THEN** entsteht der Eintrag mit der gewählten Zeit
 
+#### Scenario: Unlesbares `/zeit` markiert die Angabe
+- **WHEN** „/zeit 2590 Pumpe“ getippt und „Erfassen“ gewählt wird
+- **THEN** entsteht kein Eintrag, die Fußzeile nennt „/zeit im Text: …“, und im Inhalt ist „2590“
+  markiert
+
 #### Scenario: Korrigiertes `/zeit` gibt das Senden frei
-- **WHEN** „/zeit 2590 Pumpe“ zu „/zeit 1430 Pumpe“ berichtigt oder der Befehl gelöscht und
+- **WHEN** „/zeit 2590 Pumpe“ neu als „/zeit 1430 Pumpe“ getippt oder der Befehl gelöscht und
   „Erfassen“ gewählt wird
 - **THEN** entsteht der Eintrag, mit 14:30 bzw. der Zeit des Erfassens
+
+#### Scenario: Mitten im Text berichtigtes `/zeit` wird erst sichtbar
+- **WHEN** in „/zeit 2590 Pumpe“ nur „2590“ durch „1430“ ersetzt und „Erfassen“ gewählt wird
+- **THEN** entsteht noch kein Eintrag; das Feld Zeit zeigt 1430, der Inhalt lautet „Pumpe“, der
+  Knopf heißt „Erfassen als 1430“, und ein weiteres „Erfassen“ sendet mit 14:30
 
 #### Scenario: Anderes Formular unverändert
 - **WHEN** in einem Zeitfeld außerhalb der ETB-Erfassung „14:3x“ getippt und danach „Speichern“

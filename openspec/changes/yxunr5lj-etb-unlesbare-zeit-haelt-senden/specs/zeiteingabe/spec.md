@@ -6,7 +6,7 @@ nicht still korrigiert werden. Das Feld MUST den Grund in wenigen Wörtern sicht
 Enter MUST dann nicht absenden. Verlässt die Person das Feld, MUST es wieder den geltenden Wert
 zeigen und den Grund weiter nennen, bis erneut getippt, eine Zeit gewählt, der Wert von außen
 geändert oder im Feld Enter bzw. Escape gedrückt wird; Enter und Escape behalten dabei den
-gezeigten Wert, und Escape gilt dann dem Feld.
+gezeigten Wert.
 
 #### Scenario: Uhrzeit gibt es nicht
 - **WHEN** „2460“ eingegeben und Enter gedrückt wird

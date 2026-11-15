@@ -95,8 +95,11 @@ Ableitungen in `etb/zeitachseModell.ts`)
     Warteschlange, Grund am Feld Zeit); der Server begrenzt sie nicht. Ebenso wenig sendet eine
     unlesbare Zeit (LLH-1866): ein unlesbares `/zeit` oder eine im Feld Zeit verworfene Eingabe
     (`ZeitpunktEingabe onVerworfen`, gemeldet im Ereignis, nicht im Effekt, weil `blur` und
-    `click` desselben Klicks aufeinander folgen); Prüfung in `absenden` vor der Zukunft. Andere
-    Formulare senden nach Spec `zeiteingabe` den alten Wert. Ein Nachtrag über
+    `click` desselben Klicks aufeinander folgen); Prüfung in `absenden` vor der Zukunft, der
+    Cursor geht dorthin, wo der Fehler steht. Der Grund eines `/zeit` wird aus dem Text abgeleitet,
+    nie gespeichert; ein lesbares, beim Tippen nicht übernommenes `/zeit` übernimmt der Klick erst
+    sichtbar ins Feld (D2a der Change `yxunr5lj`). Andere Formulare senden nach Spec `zeiteingabe`
+    den alten Wert. Ein Nachtrag über
     Mitternacht nennt die Erfassung mit Tag (`nachtragText`).
 - **Kopfzahl und Typ-Segmente zählt der Server über DENSELBEN Filter** (LFH-612,
   `GET …/etb/zaehler`, `etb/repo.rs:filter_bedingung`, Parameter nur über

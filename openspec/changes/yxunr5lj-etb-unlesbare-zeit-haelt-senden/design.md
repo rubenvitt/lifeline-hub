@@ -73,25 +73,37 @@ Form. Am Feld steht der Grund schon (`zeitGrund`), die Regel wird also nur durch
 - *Verworfen:* `/zeit` beim alten Verhalten lassen. Zwei Wege zur Ereigniszeit mit verschiedenen
   Regeln für denselben Fehler wären schwer zu erklären und zu prüfen.
 
-### D2a · `/zeit` gilt beim Senden (Review B1)
+### D2a · `/zeit` beim Senden: erst sichtbar, dann senden (Review B1, Nach-Review, Ruben 15.11.2026)
 
-Wer „/zeit 2590 Pumpe“ an Ort und Stelle zu „/zeit 1430 Pumpe“ berichtigt, steht mit dem Cursor
-mitten in der Angabe; dort löst die Kurzeingabe beim Tippen bewusst nicht aus (LLH-1088). Damit
-der Befehl nicht als Text mit „jetzt“ hinausgeht, liest `absenden()` den Textanfang noch einmal:
-lesbar übernimmt es Zeit und Rest, unlesbar hält es an. Die Hinweiszeile beim Tippen bleibt.
+Der Grund eines unlesbaren `/zeit` wird aus dem Text abgeleitet, nicht gespeichert; so kennt ihn
+auch ein neu eingehängter Entwurf. `absenden()` liest den Textanfang:
+
+- **unlesbar:** Halt mit „/zeit im Text: …“, der Cursor markiert die Angabe im Text (Entscheidung
+  Ruben: der Fehler steht im Text, also auch der Cursor; eine Zeit im Feld ersetzt den Befehl
+  nicht, das änderte den Text ohne sichtbaren Schritt).
+- **lesbar, beim Tippen nicht übernommen** (mitten in der Angabe berichtigt, dort löst LLH-1088
+  bewusst nicht aus): der Klick übernimmt die Zeit ins Feld, nimmt den Befehl aus dem Text und
+  sendet noch nicht. So steht der Nachtrag vor dem Senden am Knopf (Spec „Abweichende Ereigniszeit
+  bleibt sichtbar“); der nächste Klick sendet.
+- Wird eine Zeit aus `/zeit` übernommen, hängt das Feld Zeit neu ein und vergisst einen Grund aus
+  einer verworfenen Eingabe, auch bei gleichem Wert.
+
+*Verworfen:* direkt mit der Zeit aus dem Text senden (erste Fassung). Dann ging ein Nachtrag
+hinaus, den vorher weder Feld noch Knopf zeigten, und ein Befehl ohne Rest tat beim Klick nichts.
 
 ### D3 · Stelle in der Prüfkette und Anzeige
 
 Die neue Prüfung steht in `absenden()` direkt vor der Zukunftsprüfung, also nach Von/An-Pflicht und
-Zeichengrenzen und vor Upload und Warteschlange. Fehlen Von oder An, geht der Fokus dorthin wie
-bisher; erst danach zur Zeit. Bei einem Halt:
+Zeichengrenzen und vor Upload und Warteschlange (die Übernahme eines lesbaren `/zeit` aus D2a steht
+davor). Fehlen Von oder An, geht der Fokus dorthin wie bisher; erst danach zur Zeit. Bei einem Halt:
 
 - Grund in der Fußzeile als `role="alert"` mit `data-lfh="etb-zeit-grund"` und dem Wortlaut
-  „Zeit nicht übernommen: <Grund>“, an derselben Stelle wie „Zeit liegt in der Zukunft“. Die
+  „Zeit nicht übernommen: <Grund>“ bzw. „/zeit im Text: <Grund>“, an derselben Stelle wie „Zeit
+  liegt in der Zukunft“. Die
   höfliche Hinweiszeile „/zeit: …“ beim Tippen bleibt.
 - `zeitGrund` an `EtbFeldzeile` nimmt den verworfenen Grund mit auf, das Feld steht in der
   Fehlerrolle (`aria-invalid`, `status="error"`), wie bei der Zukunft.
-- Fokus über `fokusFeld('ereigniszeit')`.
+- Fokus über `fokusFeld('ereigniszeit')`, bei `/zeit` auf die markierte Angabe im Text.
 - Der Halt endet, sobald kein Grund mehr besteht; ein späterer Grund meldet sich wieder nur höflich
   beim Tippen (Review B3).
 - Der Sendeknopf bleibt bedienbar: ein ausgegrauter Knopf ohne Grund wäre schlechter als ein Klick,

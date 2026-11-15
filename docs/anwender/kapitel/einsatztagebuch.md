@@ -120,7 +120,9 @@ der Zeitachse erscheinen wird.
 3. Schneller geht ein Nachtrag mit „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ trägt 1420 in
    „Zeit“ ein, der Rest der Zeile bleibt der Inhalt. Eine unlesbare Angabe bleibt als Text stehen,
    die Fußzeile nennt den Grund, und die Erfassung sendet nicht, bis die Angabe lesbar oder der
-   Befehl aus dem Text gelöscht ist. Eine Zeit in der Zukunft nimmt die Erfassung nicht an: die
+   Befehl aus dem Text gelöscht ist: „Erfassen“ markiert dann die Angabe im Text, Tippen
+   überschreibt sie. Wer eine Angabe mitten im Text berichtigt, sieht die Zeit nach „Erfassen“ erst
+   im Feld „Zeit“ und am Knopf; ein zweites „Erfassen“ sendet. Eine Zeit in der Zukunft nimmt die Erfassung nicht an: die
    Fußzeile nennt „Zeit liegt in der Zukunft“, das Feld hat den Cursor, Text und Felder bleiben.
 4. „Weg“ ist der Meldeweg: Funk, Telefon, Persönlich oder Sonstige. „+ Veranlassung“ rechts in der
    Fußzeile holt das Feld „Veranlassung“ in die Zeile. Ein Schrägstrich mitten im Text öffnet die
