@@ -24,7 +24,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { serverJetzt } from '../offline/serveruhr';
 import { EINSATZ_ROLLE_LABELS } from '../einsatz/einsatzRolle';
-import { EINSATZART_LABELS, EINSATZART_OPTIONEN } from '../einsatz/einsatzart';
+import { EINSATZART_LABELS, EINSATZART_OPTIONEN, isUebung } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { Select } from '../components/Select';
@@ -43,7 +43,7 @@ import { einsatzStatus } from '../theme/statusFarben';
 // Ausfall wäre in keinem Test sichtbar.
 import '../theme/sprache.css';
 import './EinsaetzePage.css';
-import { monoStil, Sammelbanner, useRollen } from '../components/instrument';
+import { monoStil, Sammelbanner, UebungsMarke, useRollen } from '../components/instrument';
 import {
   flachZufluss,
   useZuflussSchleuse,
@@ -462,7 +462,13 @@ function EinsaetzeInhalt() {
         <div className="lfh-einsatzkachel__leib">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXS }}>
             <StatusTag darstellung={einsatzStatus[e.status]} />
-            <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
+            {/* Eine Übung trägt die Übungsmarke statt des neutralen Tags (LLH-1725, Spec
+                `uebungsmarke`); die übrigen Arten bleiben grau. */}
+            {isUebung(e) ? (
+              <UebungsMarke einsatz={e} />
+            ) : (
+              <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>
+            )}
             {/* Mit Kontext: allein gelesen hielte man „Einsatzleitung“ für eine Eigenschaft des
                 Einsatzes, nicht für die eigene Rolle (LFH-946). */}
             {e.meine_rolle && <Tag>Deine Rolle: {EINSATZ_ROLLE_LABELS[e.meine_rolle]}</Tag>}

@@ -12,12 +12,13 @@ import { useModusFarben } from './rahmenStil';
 import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useEbene1Ort } from './Ebene1OrtKontext';
 import { einsaetzePfad } from '../routing/deeplinks';
+import { UebungsMarke } from './instrument';
 
 /**
  * „Zurück zu <Einsatz>“ (LFH-954, design.md D5): sekundär, damit „genau eine Primäraktion“ die der
  * Seite bleibt. Link mit Knopfgestalt wie die Nebenwege: Strg/⌘+Klick öffnet einen Tab.
  */
-function RueckwegKnopf({ label, pfad }: { label: string; pfad: string }) {
+function RueckwegKnopf({ label, pfad, uebung }: { label: string; pfad: string; uebung?: boolean }) {
   const navigate = useNavigate();
   return (
     <Button
@@ -32,6 +33,8 @@ function RueckwegKnopf({ label, pfad }: { label: string; pfad: string }) {
         navigate(pfad);
       }}
     >
+      {/* Der Rückweg in eine Übung trägt die Übungsmarke (LLH-1725). */}
+      {uebung && <UebungsMarke einsatz={{ einsatzart: 'uebung' }} />}
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {label}
       </span>

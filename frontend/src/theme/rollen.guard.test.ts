@@ -129,6 +129,10 @@ const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
   lueckeZeile: '--lfh-luecke-zeile',
   problemZeile: '--lfh-problem-zeile',
   zeichenPlatte: '--lfh-zeichen-platte',
+  uebungFuellung: '--lfh-uebung-fuellung',
+  uebungSchraffur: '--lfh-uebung-schraffur',
+  uebungText: '--lfh-uebung-text',
+  uebungKante: '--lfh-uebung-kante',
 };
 
 /** ETB-Typ → die zwei Properties (Kante, Typwort). Exhaustiv über {@link EtbTypTon}:

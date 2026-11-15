@@ -6,7 +6,7 @@ import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
  * meldet, und darunter ab `md` der klebende Seitenkopf. Herleitung: D2 in
  * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`.
  *
- * ZWEI HÖHEN (zjt7c073 D2): die Quellen gehören zur Ebene `kopf` (Kopfleiste, Betriebszeile) oder
+ * ZWEI HÖHEN (zjt7c073 D2): die Quellen gehören zur Ebene `kopf` (Kopfleiste, Betriebszeile, Übungsband) oder
  * `seitenkopf` (der klebende Seitenkopf von `EinsatzSeite`/`AdminPage`).
  *  - {@link RAHMEN_OBEN_VAR} / {@link useRahmenOben}: beide Ebenen, also alles, was über dem
  *    Inhalt klebt. Daran hängt sich jeder klebende Inhalt (Tabellenkopf, Filterleiste, Fokusabstand).
@@ -24,7 +24,7 @@ import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
  */
 export const RAHMEN_OBEN_VAR = '--lfh-rahmen-oben';
 
-/** Nur die Ebene `kopf` (Kopfleiste, Betriebszeile) — für Rail, Modulpanel, Verwaltungsmenü, Seitenkopf. */
+/** Nur die Ebene `kopf` (Kopfleiste, Betriebszeile, Übungsband) — für Rail, Modulpanel, Verwaltungsmenü, Seitenkopf. */
 export const KOPF_OBEN_VAR = '--lfh-kopf-oben';
 
 /** Zu welcher Höhe eine Quelle zählt (siehe Dateikopf). */
@@ -97,7 +97,8 @@ export function useKopfOben(): number {
  * Meldet ein Element als klebende Quelle der Ebene `ebene`, solange `aktiv` gilt; das Ergebnis ist
  * der Callback-Ref dafür. Callback-Ref statt `useRef`: tauscht React das Element (der Rahmen hängt
  * nach einem Fehlerausstieg neu ein), beobachtet der Effekt das neue — mit einem `RefObject` in den
- * Abhängigkeiten bliebe er am alten hängen.
+ * Abhängigkeiten bliebe er am alten hängen. `eigenerSchluessel` braucht nur
+ * {@link useRahmenObenStapel}, das den eigenen Anteil wieder abzieht.
  *
  * Die erste Messung läuft in `useLayoutEffect`, also vor dem ersten Bild: sonst säße ein stehender
  * Tabellenkopf ein Bild lang unter dem Kopf. Danach hält ein `ResizeObserver` den Wert (Umbruch,
@@ -106,11 +107,12 @@ export function useKopfOben(): number {
 export function useRahmenObenQuelle<T extends HTMLElement>(
   aktiv: boolean,
   ebene: RahmenEbene = 'kopf',
+  eigenerSchluessel?: symbol,
 ): (el: T | null) => void {
   const [el, setEl] = useState<T | null>(null);
   useLayoutEffect(() => {
     if (!aktiv || !el) return;
-    const key = Symbol('rahmen-oben');
+    const key = eigenerSchluessel ?? Symbol('rahmen-oben');
     const measure = () => {
       anteile.set(key, { ebene, hoehe: el.offsetHeight });
       recompute();
@@ -136,8 +138,33 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
       anteile.delete(key);
       recompute();
     };
-  }, [el, aktiv, ebene]);
+  }, [el, aktiv, ebene, eigenerSchluessel]);
   return setEl;
+}
+
+/**
+ * Eine klebende Quelle, die selbst UNTER den übrigen klebt: das Übungsband (LLH-1725, design.md
+ * D4 in `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`). Es meldet seine Höhe wie jede Quelle
+ * (`ref`), und `oben` ist die Summe OHNE seinen eigenen Anteil, also sein `top`: ab `md` die
+ * Kopfhöhe, unter `md` die gestörte Betriebszeile oder 0. Keine Rückkopplung: die eigene Höhe
+ * hängt nicht vom eigenen `top` ab. Die Reihenfolge im DOM muss dazu passen — das Element steht
+ * nach allen anderen Quellen.
+ */
+export function useRahmenObenStapel<T extends HTMLElement>(
+  aktiv: boolean,
+): { ref: (el: T | null) => void; oben: number } {
+  const [schluessel] = useState(() => Symbol('rahmen-oben-stapel'));
+  // Das Band gehört zur Ebene `kopf`: Rail, Modulpanel und Seitenkopf hängen sich unter es. Sein
+  // `top` ist die Kopfhöhe ohne den eigenen Anteil; der klebende Seitenkopf steht darunter und
+  // zählt nicht mit (zjt7c073 D2).
+  const ref = useRahmenObenQuelle<T>(aktiv, 'kopf', schluessel);
+  const summe = useKopfOben();
+  const eigen = useSyncExternalStore(
+    abonniereRahmenOben,
+    () => anteile.get(schluessel)?.hoehe ?? 0,
+    () => 0,
+  );
+  return { ref, oben: Math.max(0, summe - eigen) };
 }
 
 /**

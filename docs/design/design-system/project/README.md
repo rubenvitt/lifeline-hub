@@ -23,6 +23,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
 - **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
 - **Verbindungen (Funk und Telefon getrennt; Liste offen)** (`components/Verbindungen/`, Gruppe Bedienung)
+- **Übungsmarke: Band und Marke** (`components/Uebung/`, Gruppe Status)
 - **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
 - **BearbeitbaresPaneel (offen und gesperrt)** (`components/BearbeitbaresPaneel/`, Gruppe Formular)
 - **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
@@ -88,7 +89,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
   einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
-  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
+  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
+  (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
   `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
@@ -139,10 +141,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   - **Der Seitenkopf klebt, wenn er passt** (zjt7c073 D3, `components/seitenkopfKleben.ts`): ab
     `md` auf jeder `EinsatzSeite` und `AdminPage`, solange Kopf und Seitenkopf höchstens ein
     Drittel der Fensterhöhe nehmen (`KLEBEN_HOECHSTENS`), nie in einem eigenen Scrollbereich
-    (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block). `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die
-    Leiste, nicht Hinweis oder Beschreibung darunter.
+    (Gerätehülle) und nie mit `fensterInhalt` (dort ist `FensterRahmen` sein Containing Block).
+    `kopfKlebt` setzt die Entscheidung von außen (nur das ETB). Es klebt nur die Leiste, nicht
+    Hinweis oder Beschreibung darunter.
   - **Zwei Höhen** (zjt7c073 D2, `components/rahmenOben.ts`): `--lfh-kopf-oben` (`useKopfOben`)
-    ist nur der Kopf, `--lfh-rahmen-oben` (`useRahmenOben`) dazu der klebende Seitenkopf. Die
+    ist der Kopf samt Übungsband (Ebene `kopf`), `--lfh-rahmen-oben` (`useRahmenOben`) dazu der
+    klebende Seitenkopf. Die
     Kopfhöhe nehmen nur, was neben dem Inhalt klebt (Rail, Modulpanel, Verwaltungsmenü), der
     Seitenkopf selbst und die Klebe-Entscheidungen; alles andere die Rahmenhöhe (Guard).
   - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
@@ -156,6 +160,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
     Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
     deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
+  - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
+    `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
+    kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,
+    Planungsübernahme, externes Lagebild, „Zurück zu …“, Tab-Titel, Druck, Lageplan-Anlage,
+    Fernmeldeskizze).
+    Entschieden wird nur über `isUebung` (`einsatz/einsatzart.ts`) aus der Einsatzart, nie aus dem
+    Namen. Gezeigt wird am Bildschirm nur über `UebungsMarke`/`UebungsBand`
+    (`components/instrument/Uebung.tsx`), auf Papier über Druckkopf, `DruckUebung` und Randfeld
+    (`druck/AGENTS.md`), in Text- und Bildtiteln als Präfix „ÜBUNG · “ (ADR-0053). Erkennbar ist sie
+    an Form und Wort (schraffiertes Band, gefüllter Chip, immer „ÜBUNG“), nicht am Farbton: violett
+    sind auch die ETB-Entscheidung, die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
+    Quellen der Kopfhöhe, über einem klebenden Seitenkopf (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**

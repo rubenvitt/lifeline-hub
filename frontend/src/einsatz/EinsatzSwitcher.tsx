@@ -8,6 +8,8 @@ import { einsatzPfad } from '../routing/deeplinks';
 import { farbenDunkel } from '../theme/tokens';
 import type { EinsatzAnzeige } from '../api/types';
 import { einsatzKennung } from './einsatzKennung';
+import { isUebung } from './einsatzart';
+import { UebungsMarke } from '../components/instrument';
 import { useModusFarben } from '../components/rahmenStil';
 
 /** Nebenzeile eines Eintrags: Einsatznummer und Ort, soweit vorhanden (LFH-954). */
@@ -51,17 +53,26 @@ export default function EinsatzSwitcher({
   const items: MenuProps['items'] = [
     ...aktive.map((e) => {
       const neben = nebenzeile(e);
+      // Eine Übung trägt die Übungsmarke vor dem Namen (LLH-1725, Spec `uebungsmarke`).
+      const name = isUebung(e) ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <UebungsMarke einsatz={e} />
+          <span>{e.bezeichnung}</span>
+        </span>
+      ) : (
+        e.bezeichnung
+      );
       return {
         key: `einsatz-${e.id}`,
         label: neben ? (
           <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
-            <span>{e.bezeichnung}</span>
+            <span>{name}</span>
             <span data-lfh="wechsler-nebenzeile" style={{ fontSize: 12, color: farben.gedaempft }}>
               {neben}
             </span>
           </span>
         ) : (
-          e.bezeichnung
+          name
         ),
       };
     }),

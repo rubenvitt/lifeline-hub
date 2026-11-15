@@ -32,6 +32,43 @@
     }
   }
 
+  /* Übung (LLH-1725, Spec `druck-dokumente`, D8 in `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`):
+     meldet der Druckkopf eine Übung (`data-uebung`), läuft die Wurzel auf der benannten Seite
+     „uebung“. Die erbt Rand und Zählung der unbenannten und trägt oben auf JEDER Seite das feste
+     Wort — keine Zeichenkette aus Daten. Randfelder zeichnet nur Chromium; Firefox und WebKit
+     zeigen die Übung im Druckkopf der ersten Seite. */
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) {
+    page: uebung;
+  }
+
+  /* Blätter mit eigener benannter Seite (Format) bekommen in einer Übung deren Variante mit
+     demselben Randfeld; die Varianten stehen bei ihren Blättern (Wächter
+     `druck/uebungSeiten.guard.test.ts`). */
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .dokument-anlage-blatt {
+    page: dokument-anlage-uebung;
+  }
+
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .lageplan-blatt {
+    page: lageplan-uebung;
+  }
+
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .lfh-skizze-druck-a3 {
+    page: fernmeldeskizze-a3-uebung;
+  }
+
+  [data-lfh='druckwurzel']:has([data-lfh='druckkopf'][data-uebung]) .lfh-skizze-druck-a4 {
+    page: fernmeldeskizze-a4-uebung;
+  }
+
+  @page uebung {
+    @top-center {
+      content: 'ÜBUNG';
+      font-size: 11pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+  }
+
   /* Alles, was weder Wurzel noch Vorfahr noch Nachfahr der Wurzel ist, belegt keinen Platz. */
   body:has([data-lfh='druckwurzel'])
     *:not(:has([data-lfh='druckwurzel'])):not([data-lfh='druckwurzel']):not(

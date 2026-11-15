@@ -90,3 +90,15 @@ describe('Umbruch', () => {
     expect(lang.hoehe % 8).toBe(0);
   });
 });
+
+describe('schriftfeldAngaben · Übung (LLH-1725)', () => {
+  it('stellt bei einer Übung „ÜBUNG · “ vor den Titel, sonst nicht', () => {
+    expect(schriftfeldAngaben(null, 'Starkregen Nord', null, dtg, true).titel).toBe(
+      'ÜBUNG · Taktische Fernmeldeskizze für den Einsatz ‚Starkregen Nord‘',
+    );
+    expect(schriftfeldAngaben(LEER, 'Starkregen Nord', null, dtg, true).titel).toMatch(/^ÜBUNG · /);
+    expect(schriftfeldAngaben(LEER, 'Brand Mühle', null, dtg).titel).toBe(
+      'Taktische Fernmeldeskizze für den Einsatz ‚Brand Mühle‘',
+    );
+  });
+});

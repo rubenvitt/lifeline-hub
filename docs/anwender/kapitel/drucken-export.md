@@ -2,7 +2,7 @@
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
 reihenfolge: 150
-quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx]
+quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css]
 ---
 
 ## Überblick
@@ -118,6 +118,12 @@ Der Druckkopf trägt Name und Logo der Organisation, die Dokumentart (etwa „Ei
 „Betroffenenliste“ oder „Auftrag“ mit der Kennung), den Einsatz mit Nummer und je nach Druckstück Auswahl, Umfang und Stand,
 dazu „Gedruckt von“ und „Gedruckt am“. Die Fußzeile „Seite … von …“ druckt nur ein
 Chromium-Browser (Chrome, Edge).
+
+Gehört das Druckstück zu einer Übung, steht neben dem Einsatz ein umrandetes „ÜBUNG“, auch
+schwarz-weiß lesbar. Chrome und Edge drucken „ÜBUNG“ zusätzlich oben auf jede Seite, auch auf
+Blätter im Querformat. Firefox und Safari zeigen es im Druckkopf der ersten Seite. Ein Anlageblatt
+(Bild an Lagebericht oder Befehl) trägt „ÜBUNG“ in seinem Titel, in jedem Browser. Schichtplan,
+Lageplan und eine geplante Übung tragen die Marke ebenso.
 
 Gedruckt wird erst, wenn die Organisation geladen ist. Gelingt das nicht, steht am Knopf
 „Organisation nicht geladen“ mit „Erneut laden“. Ein Logo, das nicht lädt, fällt im Druck weg.

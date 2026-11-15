@@ -21,6 +21,37 @@ async fn letzte_aktion(pool: &sqlx::SqlitePool) -> (String, String, Option<Strin
         .unwrap()
 }
 
+/// Koppelt die Org des Admins als meldende Seite (aktiv) mit der Art `art` (`standard` = Hub,
+/// `vor_ort` = Direktkopplung mit einem zweiten ELW) und liefert die Kopplung.
+async fn org_koppeln(pool: &sqlx::SqlitePool, kennung: &str, name: &str, art: &str) -> i64 {
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(pool)
+        .await
+        .unwrap();
+    let k: i64 = sqlx::query_scalar(
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
+         richtung, gegenueber_adresse, zustand, art) VALUES (?, 'X', ?, 'meldet_sich', \
+         'https://hub.example', 'aktiv', ?) RETURNING id",
+    )
+    .bind(kennung)
+    .bind(name)
+    .bind(art)
+    .fetch_one(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
+         VALUES (?, ?, ?, 'Kreis')",
+    )
+    .bind(k)
+    .bind(org)
+    .bind(format!("{kennung}/1"))
+    .execute(pool)
+    .await
+    .unwrap();
+    k
+}
+
 #[tokio::test]
 async fn anlegen_zeigt_den_code_einmal_und_schreibt_die_admin_spur() {
     let (app, pool) = setup_mit_pool().await;
@@ -261,27 +292,7 @@ async fn am_gekoppelten_elw_ist_anlegen_gesperrt() {
     .await;
     let id = v["zugang"]["id"].as_str().unwrap().to_string();
 
-    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let kopplung: i64 = sqlx::query_scalar(
-        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
-         richtung, gegenueber_adresse, zustand) VALUES ('hub-1', 'X', 'Hub Kreis', 'meldet_sich', \
-         'https://hub.example', 'aktiv') RETURNING id",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
-         VALUES (?, ?, 'hub-1/1', 'Kreis')",
-    )
-    .bind(kopplung)
-    .bind(org)
-    .execute(&pool)
-    .await
-    .unwrap();
+    org_koppeln(&pool, "hub-1", "Hub Kreis", "standard").await;
 
     let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     let grund = liste["gesperrt_grund"].as_str().unwrap();
@@ -954,27 +965,7 @@ async fn gekoppelter_elw_lehnt_vorhandene_zugaenge_ab() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let ip = "198.51.100.110";
     let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(13), ip).await;
-    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let k: i64 = sqlx::query_scalar(
-        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
-         richtung, gegenueber_adresse, zustand) VALUES ('hub-2', 'X', 'Hub', 'meldet_sich', \
-         'https://hub.example', 'aktiv') RETURNING id",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
-         VALUES (?, ?, 'hub-2/1', 'Kreis')",
-    )
-    .bind(k)
-    .bind(org)
-    .execute(&pool)
-    .await
-    .unwrap();
+    org_koppeln(&pool, "hub-2", "Hub", "standard").await;
     assert_eq!(
         signiert(&app, &cred, "GET", "/api/v1/me", jetzt(), "g1", ip)
             .await
@@ -983,6 +974,34 @@ async fn gekoppelter_elw_lehnt_vorhandene_zugaenge_ab() {
     );
     let z = zugang_zeile(&app, &admin, &cred.zugang_id).await;
     assert_eq!(z["letzte_ablehnung"]["grund"], "instanz_gekoppelt");
+}
+
+/// LLH-1868: Eine Direktkopplung vor Ort mit einem zweiten ELW ist kein Hub; der ELW nimmt
+/// Fremdsysteme weiter selbst an.
+#[tokio::test]
+async fn direktkopplung_vor_ort_sperrt_keine_anbindungen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let ip = "198.51.100.111";
+    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(14), ip).await;
+    org_koppeln(&pool, "elw-2", "ELW 2", "vor_ort").await;
+
+    assert_eq!(
+        signiert(&app, &cred, "GET", "/api/v1/me", jetzt(), "v1", ip)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let (s, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(liste["gesperrt_grund"].is_null(), "{liste}");
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "neu", "scopes": ["lage:read"] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
 }
 
 /// Kommando und Referenz-Client gegen einen echten Server (6.3): einlösen, Schlüsseldatei
@@ -1194,27 +1213,7 @@ async fn einloesen_am_gekoppelten_elw_laesst_den_code_offen_und_nennt_den_grund(
     .await;
     let id = v["zugang"]["id"].as_str().unwrap().to_string();
     let code = v["code"].as_str().unwrap().to_string();
-    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let k: i64 = sqlx::query_scalar(
-        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
-         richtung, gegenueber_adresse, zustand) VALUES ('hub-3', 'X', 'Hub', 'meldet_sich', \
-         'https://hub.example', 'aktiv') RETURNING id",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, fremde_org_name) \
-         VALUES (?, ?, 'hub-3/1', 'Kreis')",
-    )
-    .bind(k)
-    .bind(org)
-    .execute(&pool)
-    .await
-    .unwrap();
+    let k = org_koppeln(&pool, "hub-3", "Hub", "standard").await;
     let ip = "198.51.100.130";
     assert_eq!(
         einloesen(&app, &code, &schluessel(70), ip).await.0,
