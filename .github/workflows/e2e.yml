@@ -1,16 +1,16 @@
 # e2e — die e2e-Suite (Binary, vier Anteile, Bericht) als wiederverwendbarer Workflow.
 #
-# WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS (LLH-1889, ADR „Ein PR prüft leicht“): `ci.yml` ruft
-# ihn bei jedem Push auf `alpha`, `beta`, `main` und an einem PR mit dem Label `voll` auf
-# (`workflow_call`, `github.event_name` ist das Ereignis des Aufrufers). Die Checks heißen dann
-# `e2e / e2e-Binary`, `e2e / e2e 1/4` usw. Pflicht im Ruleset sind sie nicht: Im PR laufen nur
-# die Schnellprüfungen, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch` (scripts/AGENTS.md,
-# „Leichte PR-Prüfung“). Die frühere zweite Stufe an fertigen PRs (LLH-1662, ADR-0026) ist
+# WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS (LLH-1889/LLH-1896, ADR „Ein Workflow je Ereignis“):
+# `suiten.yml` ruft ihn auf, und den rufen `ci.yml` bei jedem Push auf `alpha`, `beta`, `main` und
+# `pr.yml` an einem PR mit dem Label `voll` (`workflow_call`, `github.event_name` ist das Ereignis
+# des obersten Aufrufers). Die Checks heißen dann `Suiten / e2e / e2e-Binary`,
+# `Suiten (voll) / e2e / e2e 1/4` usw. Pflicht im Ruleset sind sie nicht (Liste in
+# `scripts/ruleset-pruefen.sh`, scripts/AGENTS.md, „Leichte PR-Prüfung“). Die frühere zweite Stufe an fertigen PRs (LLH-1662, ADR-0026) ist
 # ersetzt; mit ihr fielen die Auslöser am PR, die Gruppenlogik und der Matrix-Trick weg, der
 # Pflicht-Checks fehlen ließ.
 #
-# ABBRUCH: Den steuert der Aufrufer. Auf einem Kanal-Branch trägt der Aufruf-Job in `ci.yml` eine
-# Gruppe je Branch mit `cancel-in-progress`: ein neuer Push bricht diesen Lauf ab.
+# ABBRUCH: Den steuert der Aufrufer. Auf einem Kanal-Branch trägt der Aufruf-Job in `suiten.yml`
+# eine Gruppe je Branch mit `cancel-in-progress`: ein neuer Push bricht diesen Lauf ab.
 #
 # EIGENER RUNNER (LLH-1666, ADR-0025): `e2e-Binary` und die Anteile laufen auf dem eigenen Server,
 # wenn die Repo-Variable `E2E_RUNNER` ein Runner-Label nennt und der Lauf nicht aus einem Fork

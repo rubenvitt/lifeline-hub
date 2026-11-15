@@ -76,7 +76,7 @@ ALPHA_LABEL="alpha-rot"
 TRAILER_SCHLUESSEL="Stau-Waechter"
 TRAILER_WERT="LLH-1660"
 WARTEZEIT=1200 # Sekunden, bis ein fehlender CI-Lauf oder ein ausbleibender Merge als Befund gilt
-CI_CHECK="Schnellprüfungen" # läuft in ci.yml bei jedem PR-Lauf, unabhängig von den Bereichen
+CI_CHECK="Schnellprüfungen" # läuft in pr.yml bei jedem PR-Lauf, unabhängig von den Bereichen
 ZIEL_BRANCHES=" alpha beta main "
 
 NUR_ZEIGEN=0
@@ -86,6 +86,7 @@ REPO="${GITHUB_REPOSITORY:-}"
 
 git() { command git -c core.quotePath=false "$@"; }
 gh_api() { "${STAU_GH:-gh}" api "$@"; }
+SKRIPTE="$(cd "$(dirname "$0")" && pwd)"
 jetzt() { printf '%s\n' "${STAU_JETZT:-$(date +%s)}"; }
 kurz() { printf '%s' "${1:0:8}"; }
 sag() { printf '    %s\n' "$*"; }
@@ -126,6 +127,55 @@ check_kennzahlen() { # <sha>
             then 1 else 0 end),
           (if any($juengste[]; .status != "completed") then 1 else 0 end)
         ] | map(tostring) | join(" ")'
+}
+
+# Abweichungen im Ruleset von <basis> als Absatz für den Hinweis (LLH-1895). Am 14.11.2026 hingen
+# alle grünen PRs, weil `Migrationsnummern` im Ruleset eine Quelle trug; der Hinweis sagte nur
+# „grün, aber nicht gemergt“. Geprüft wird nur `alpha` (die Pflichtliste in `ruleset-pruefen.sh`
+# gilt dort). Setzt RULESET_STAND (`ok`, `abweichung`, `unlesbar`; `ok` auch für andere Branches)
+# und RULESET_ABSATZ (nur bei `abweichung`); je Lauf und Branch einmal gelesen. Nicht in `$( )`
+# aufrufen: die Zwischenablage ginge in der Subshell verloren.
+RULESET_GELESEN="" RULESET_ABSATZ="" RULESET_STAND=ok
+ruleset_ursache() { # <basis>
+  local regeln befund code=0
+  [ "$1" = alpha ] || { RULESET_ABSATZ="" RULESET_STAND=ok; return 0; }
+  if [ "$RULESET_GELESEN" != "$1" ]; then
+    RULESET_GELESEN="$1" RULESET_ABSATZ="" RULESET_STAND=unlesbar
+    if regeln="$(gh_api "repos/$REPO/rules/branches/$1" 2> /dev/null)"; then
+      befund="$(printf '%s' "$regeln" | "$SKRIPTE/ruleset-pruefen.sh")" || code=$?
+      case "$code" in
+        0) RULESET_STAND=ok ;;
+        1)
+          RULESET_STAND=abweichung
+          RULESET_ABSATZ="**Wahrscheinliche Ursache:** Das Ruleset von \`$1\` weicht von den Pflicht-Checks ab (\`scripts/ruleset-pruefen.sh\`):
+
+$(printf '%s\n' "$befund" | sed 's/^/- /')
+
+" ;;
+      esac
+    fi
+  fi
+}
+
+# Kennung des Befunds `haengt` an <nr> für <kopf>: 16 Zeichen für den Befund, bei einer Abweichung
+# im Ruleset 16 weitere für sie. Taucht die Abweichung auf oder ist sie behoben, ändert sich die
+# Kennung, und der Hinweis wird neu geschrieben (nie eine fehlende oder veraltete Ursache). Ist das
+# Ruleset nicht lesbar, gilt ein stehender Hinweis zum selben Kopf weiter, mit oder ohne Ursache:
+# ein Aussetzer der API schreibt nichts neu, sonst bekäme jeder hängende PR zwei Kommentare.
+haengt_kennung() { # <nr> <kopf>
+  local befund alt alt_art="" alt_kenn=""
+  befund="$(kennung "haengt $2")"
+  case "$RULESET_STAND" in
+    abweichung) printf '%s%s' "$befund" "$(kennung "$RULESET_ABSATZ")" ;;
+    unlesbar)
+      if alt="$(hinweis_lesen "$1")" && [ -n "$alt" ]; then read -r _ alt_art alt_kenn _ <<< "$alt"; fi
+      if [ "$alt_art" = haengt ] && [ "${alt_kenn:0:16}" = "$befund" ]; then
+        printf '%s' "$alt_kenn"
+      else
+        printf '%s' "$befund"
+      fi ;;
+    *) printf '%s' "$befund" ;;
+  esac
 }
 
 # ── Hinweis am PR ───────────────────────────────────────────────────────────────────
@@ -324,11 +374,13 @@ So geht es weiter: einen neuen Commit pushen, etwa \`$basis\` in den Branch merg
     && [ $(( $(jetzt) - ende )) -ge "$WARTEZEIT" ] \
     && [ "$(gh_api "repos/$REPO/commits/$k/status" | jq -r '.state // ""')" = success ]; then
     sag "Befund: seit $(( ($(jetzt) - ende) / 60 )) min grün, Auto-Merge an, nicht gemergt"
-    hinweis_setzen "$nr" haengt "$(kennung "haengt $k")" "**Grün, aber nicht gemergt** (Stau-Wächter)
+    # Die Ursache aus dem Ruleset gehört zur Kennung (`haengt_kennung`).
+    ruleset_ursache "$basis"
+    hinweis_setzen "$nr" haengt "$(haengt_kennung "$nr" "$k")" "**Grün, aber nicht gemergt** (Stau-Wächter)
 
 Alle Checks auf \`$(kurz "$k")\` sind seit $(( ($(jetzt) - ende) / 60 )) Minuten grün, Auto-Merge ist eingeschaltet, gemergt wurde trotzdem nicht.
 
-So geht es weiter: den PR von Hand mergen, oder Auto-Merge aus- und wieder einschalten."
+${RULESET_ABSATZ}So geht es weiter: den PR von Hand mergen, oder Auto-Merge aus- und wieder einschalten."
     return 0
   fi
 

@@ -1,0 +1,140 @@
+# Migrationsnummern (Kanal): bewertet nach jedem Push auf einen Kanal-Branch jeden offenen PR
+# dagegen neu und setzt die Commit-Status `Migrationsnummern` und `ADR-Nummern` auf seinen Kopf;
+# ein PR, der nur wegen der Nummer rot ist, wird per Autofix umnummeriert.
+#
+# Begründung, Status statt Check-Run und Autofix: Kopf von `migrationen.yml` (der PR-Auslöser).
+# EIGENER WORKFLOW (LLH-1896): Stand der Job dort, trug jeder PR ihn als übersprungenen Eintrag.
+# Ob die beiden Status im Ruleset Pflicht sind, prüft seit LLH-1895 `ruleset.yml`.
+#
+# Das Skript kommt hier vom Ziel-Branch selbst, nicht aus dem PR; es führt keinen PR-Code aus.
+#
+# Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
+name: Migrationsnummern (Kanal)
+
+on:
+  push:
+    branches: [main, beta, alpha]
+
+permissions:
+  contents: read
+
+# Je Ziel-Branch zählt nur der jüngste Lauf: er bewertet alle offenen PRs gegen den neuesten Stand.
+concurrency:
+  group: migrationen-kanal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offene-prs:
+    name: Offene PRs neu bewerten
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write # Autofix-Kommentar, siehe Job `pr` in migrationen.yml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Jeden offenen PR gegen diesen Branch prüfen
+        id: pruefen
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASIS: ${{ github.ref_name }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Das Skript kommt hier vom Ziel-Branch selbst, nicht aus dem PR.
+          git fetch --no-tags origin "+refs/heads/$BASIS:refs/remotes/origin/$BASIS"
+          gh pr list --repo "$GITHUB_REPOSITORY" --base "$BASIS" --state open --limit 200 \
+            --json number,headRefName,isCrossRepository \
+            --jq '.[] | "\(.number) \(.headRefName) \(.isCrossRepository)"' > prs.txt
+          echo "Offene PRs gegen $BASIS: $(wc -l < prs.txt)"
+          rot=0
+          adr_rot=0
+          : > reparieren.txt
+          while read -r nr branch fremd; do
+            # Ein PR, der zwischen Liste und Abruf geschlossen wurde, bricht die Runde nicht ab.
+            git fetch --no-tags --quiet origin "+refs/pull/$nr/head:refs/remotes/pr/$nr" || {
+              echo "::warning::PR #$nr: Kopf nicht abrufbar, übersprungen"; continue; }
+            kopf="$(git rev-parse "refs/remotes/pr/$nr")"
+            echo "::group::PR #$nr ($kopf)"
+            code=0
+            scripts/check-migrationen.sh "origin/$BASIS" "$kopf" || code=$?
+            echo "::endgroup::"
+            case "$code" in
+              0) state=success; text="Neue Migrationen liegen über $BASIS." ;;
+              1) state=failure; text="Migrationsnummer kollidiert oder ist eingeschoben (gegen $BASIS)."
+                 rot=$((rot + 1)); echo "::warning::PR #$nr: Migrationsnummer gegen $BASIS verletzt"
+                 # Nur PRs aus diesem Repository: in einen Fork kann der Autofix nicht pushen.
+                 [ "$fremd" = false ] && echo "$nr $branch $kopf" >> reparieren.txt ;;
+              *) state=error; text="Prüfung nicht möglich, siehe Lauf."
+                 rot=$((rot + 1)); echo "::warning::PR #$nr: Prüfung nicht möglich (Exit $code)" ;;
+            esac
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
+              -f state="$state" -f context=Migrationsnummern \
+              -f description="$text" -f target_url="$LAUF" > /dev/null
+            # Zweiter Status, gleiche Runde (LLH-1660, s. Kopf). Ohne Autofix.
+            code=0
+            scripts/check-adr-nummern.sh "origin/$BASIS" "$kopf" || code=$?
+            case "$code" in
+              0) state=success; text="Neue ADRs tragen freie Nummern (gegen $BASIS)." ;;
+              1) state=failure; text="ADR-Nummer ist auf $BASIS schon vergeben, bitte umnummerieren."
+                 adr_rot=$((adr_rot + 1)); echo "::warning::PR #$nr: ADR-Nummer gegen $BASIS vergeben" ;;
+              *) state=error; text="Prüfung nicht möglich, siehe Lauf."
+                 adr_rot=$((adr_rot + 1)); echo "::warning::PR #$nr: ADR-Prüfung nicht möglich (Exit $code)" ;;
+            esac
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
+              -f state="$state" -f context=ADR-Nummern \
+              -f description="$text" -f target_url="$LAUF" > /dev/null
+          done < prs.txt
+          echo "PRs mit rotem Status \`ADR-Nummern\`: $adr_rot" >> "$GITHUB_STEP_SUMMARY"
+          # Der Lauf selbst bleibt grün: rot ist der PR, nicht der Ziel-Branch. Die Zahl steht
+          # in der Zusammenfassung, damit ein Blick auf den Push-Lauf reicht.
+          echo "PRs mit rotem Status \`Migrationsnummern\`: $rot" >> "$GITHUB_STEP_SUMMARY"
+          echo "reparieren=$(wc -l < reparieren.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        if: steps.pruefen.outputs.reparieren != '0' && vars.RELEASE_APP_CLIENT_ID != ''
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Rote PRs umnummerieren
+        if: steps.app-token.outputs.token != ''
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ github.token }}
+          # Wie im PR-Job: ohne den Reset pushte der Header des Checkouts statt der App.
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: http.https://github.com/.extraheader
+          GIT_CONFIG_VALUE_0: ""
+          BASIS: ${{ github.ref_name }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git remote set-url --push origin \
+            "https://x-access-token:$APP_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          id="$(GH_TOKEN="$APP_TOKEN" gh api "users/$APP_SLUG%5Bbot%5D" --jq .id)"
+          git config --global user.name "$APP_SLUG[bot]"
+          git config --global user.email "$id+$APP_SLUG[bot]@users.noreply.github.com"
+          umnummeriert=0
+          while read -r nr branch kopf; do
+            echo "::group::Autofix PR #$nr ($branch)"
+            code=0
+            AUTOFIX_BERICHT="$RUNNER_TEMP/bericht-$nr.md" \
+              scripts/migrationen-autofix.sh "origin/$BASIS" "$branch" "$kopf" || code=$?
+            echo "::endgroup::"
+            if [ "$code" = 0 ]; then
+              umnummeriert=$((umnummeriert + 1))
+              gh api "repos/$GITHUB_REPOSITORY/issues/$nr/comments" \
+                -F body=@"$RUNNER_TEMP/bericht-$nr.md" > /dev/null \
+                || echo "::warning::Kommentar an #$nr nicht möglich."
+              gh api "repos/$GITHUB_REPOSITORY/statuses/$kopf" \
+                -f state=failure -f context=Migrationsnummern \
+                -f description="Umnummeriert per Autofix, neuer Commit folgt." \
+                -f target_url="$LAUF" > /dev/null
+            else
+              echo "::warning::PR #$nr: Autofix nicht angewendet (Exit $code)"
+            fi
+          done < reparieren.txt
+          echo "Per Autofix umnummeriert: $umnummeriert" >> "$GITHUB_STEP_SUMMARY"

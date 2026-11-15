@@ -1,9 +1,10 @@
 ---
 id: ADR-0047
 titel: Ein PR prüft leicht, die Suiten laufen auf den Kanal-Branches
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-14
 ersetzt: ADR-0026
+ersetzt_durch: ADR-0048
 gilt_fuer:
   - .github/workflows/ci.yml
   - .github/workflows/e2e.yml

@@ -363,7 +363,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Baut mit Ziel-Branch, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Ruleset-Pflicht-Checks, Baut mit Ziel-Branch, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849, LLH-1895)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -380,10 +380,13 @@ schritt_11() {
   # dem PR lokal fährt: ein vergessener Querbezug ließe eine Suite still aus, deren Rot erst auf
   # `alpha` auffiele.
   "$ROOT/scripts/bereiche.test.sh"
-  # Was ein PR prüft, wann ein Kanal-Lauf abbricht und dass der Release nie abbricht, entscheidet
-  # die Form von ci.yml und e2e.yml (LLH-1889): ein Fehler fiele erst am ersten ungeprüft
-  # gemergten PR oder am ersten Tag ohne Release auf.
+  # Was ein PR prüft, was nur auf einem Kanal-Branch läuft, wann ein Kanal-Lauf abbricht und dass
+  # der Release nie abbricht, entscheidet die Form der Workflows (LLH-1889/LLH-1896): ein Fehler
+  # fiele erst am ersten ungeprüft gemergten PR oder am ersten Tag ohne Release auf.
   "$ROOT/scripts/ci-stufen.test.sh"
+  # Die Pflicht-Checks im Ruleset (LLH-1895): übersieht die Prüfung eine Quelle an einem Status,
+  # hängen wieder alle PRs über Nacht; meldet sie Unsinn, mailt jeder Lauf grundlos.
+  "$ROOT/scripts/ruleset-pruefen.test.sh"
   # Der Check „Baut mit Ziel-Branch“ (LLH-1849): irrt die Auswahl, rechnet ein fertiger PR nicht
   # gegen den neuen Ziel-Branch und mergt mit veraltetem Grün; irrt die Form, liefe PR-Code mit
   # Schreibrecht oder schriebe einen Cache, den `alpha` liest.

@@ -63,9 +63,10 @@ case "$methode $pfad" in
     [ ! -e "$F/dispatch-kaputt" ] || { echo "HTTP 422 Workflow does not have 'workflow_dispatch' trigger" >&2; exit 1; }
     [ ! -e "$F/dispatch-502" ] || { echo "HTTP 502 Bad Gateway" >&2; exit 1; }
     echo "DISPATCH ${feld[ref]} ${feld[inputs_nr]} ${feld[inputs_kopf]} ${feld[inputs_check_id]} ${feld[inputs_ziel_sha]}" >> "$F/log" ;;
-  "GET repos/test/repo/actions/workflows/ziel-branch-build.yml/runs?"*)
+  "GET repos/test/repo/actions/workflows/ziel-branch-verteilen.yml/runs?"*)
     # Nur die Push-Läufe auf alpha kommen aus pushlaeufe.json. Ohne diese Filter sähe `melden` den
-    # eigenen, laufenden Lauf, und ein überholter Check würde nie rot.
+    # eigenen, laufenden Lauf, und ein überholter Check würde nie rot. Gefragt wird der Workflow,
+    # der verteilt (LLH-1896), nicht der eigene: der hat keinen Push-Lauf mehr.
     case "$pfad" in
       *branch=alpha*event=push*)
         if [ -f "$F/pushlaeufe.json" ]; then aus < "$F/pushlaeufe.json"; else echo '{"workflow_runs":[]}' | aus; fi ;;
@@ -450,14 +451,16 @@ echo "==> Baut mit Ziel-Branch: Form des Workflows"
 # `melden`, fiele erst auf, wenn es jemand ausnutzt. Gelesen ohne YAML-Parser wie in
 # scripts/ci-stufen.test.sh: ein Job ist der Block ab `  <id>:` bis zum nächsten Job.
 WF="${ZBB_WORKFLOW:-$(cd "$(dirname "$0")/.." && pwd)/.github/workflows/ziel-branch-build.yml}"
-job() { # <id>
-  awk -v id="$1" '
+WFV="${ZBV_WORKFLOW:-$(dirname "$WF")/ziel-branch-verteilen.yml}"
+job_in() { # <datei> <id>
+  awk -v id="$2" '
     /^jobs:/ { in_jobs = 1; next }
     in_jobs && /^[^ #]/ { in_jobs = 0 }
     in_jobs && /^  [A-Za-z0-9_-]+:[ ]*$/ { aktiv = ($0 == "  " id ":"); next }
     in_jobs && aktiv { print }
-  ' "$WF"
+  ' "$1"
 }
+job() { job_in "$WF" "$1"; } # <id>
 # Der `permissions:`-Block eines Jobs, eine Zeile je Recht.
 rechte() { job "$1" | awk '/^    permissions:/ { p = 1; next } p && /^      [a-z-]+:/ { gsub(/^ +/, ""); print; next } p { p = 0 }'; }
 form() { # <name> <0|1 erwartet> <bedingung …>
@@ -482,13 +485,18 @@ pruefe "F4 jede mise-Action in kompilieren ohne Cache" 0 \
   "$(schritte_mit "$K" 'jdx/mise-action@' | grep -vc 'cache: false' || true)"
 form "F5 Checkout in kompilieren ohne Zugangsdaten" 0 hat "$K" 'persist-credentials: false'
 pruefe "F6 das Token sieht in kompilieren nur der Fetch" 1 "$(anzahl "$K" 'github.token')"
-form "F11 kompilieren läuft nie im Push-Lauf" 0 hat "$K" "github.event_name != 'push' && needs.vorbereiten"
 form "F12 kompilieren läuft nie auf einem Kanal-Branch" 0 hat "$K" 'contains\(fromJSON\(.\["main", "beta", "alpha"\].\), github.ref_name\)'
 form "F12 der Einzellauf prüft PR und Ref" 0 hat "$(job vorbereiten)" 'ziel-branch-build.sh einzellauf'
+form "F11 kompilieren läuft nie im Push-Lauf" 0 hat "$K" "github.event_name != 'push' && needs.vorbereiten"
 form "F11 melden läuft nie im Push-Lauf" 0 hat "$M" "if: .*github.event_name != 'push'"
-form "F11 verteilen läuft nur im Push-Lauf" 0 hat "$V" "if: \\$\\{\\{ github.event_name == 'push' \\}\\}"
+# LLH-1896: verteilen läuft in ziel-branch-verteilen.yml; dieser Workflow hat keinen Push-Auslöser.
+form "F11 kein Push-Auslöser" 1 hat "$W" '^  push:'
+form "F11 verteilen steht nicht hier" 1 hat "$W" '^  verteilen:'
+V="$(job_in "$WFV" verteilen)"
+form "F11 verteilen steht in ziel-branch-verteilen.yml" 0 hat "$V" 'ziel-branch-build\.sh verteilen'
+form "F11 ziel-branch-verteilen.yml hört nur auf Push" 0 hat "$(cat "$WFV")" '^  push:'
 for j in verteilen vorbereiten melden; do
-  b="$(job "$j")"
+  if [ "$j" = verteilen ]; then b="$V"; else b="$(job "$j")"; fi
   form "F7 $j kompiliert nichts" 1 hat "$b" 'check-all\.sh'
   form "F7 $j holt keinen PR-Kopf" 1 hat "$b" 'refs/pull/'
   form "F7 $j mergt nichts" 1 hat "$b" 'git merge'

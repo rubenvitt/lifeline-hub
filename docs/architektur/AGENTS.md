@@ -72,8 +72,8 @@ Vorlage `entscheidungen/VORLAGE.md`. Geschrieben für Agenten, die sie vor einer
 - **Nummer:** die nächste freie auf dem Ziel-Branch, vorher `git fetch origin alpha` und einen
   Blick auf offene PRs (`scripts/adr-fuer.sh --alle` zeigt den eigenen Stand). Durchgesetzt
   über den Commit-Status `ADR-Nummern` (`scripts/check-adr-nummern.sh`,
-  `.github/workflows/migrationen.yml`): er wird für jeden offenen PR neu gesetzt, wenn sich der
-  Ziel-Branch bewegt. Ist er rot, nummeriert der PR um (Dateiname, `id`, Verweise); einen
+  `.github/workflows/migrationen.yml`, beim Push `migrationen-kanal.yml`): er wird für jeden
+  offenen PR neu gesetzt, wenn sich der Ziel-Branch bewegt. Ist er rot, nummeriert der PR um (Dateiname, `id`, Verweise); einen
   Autofix gibt es nicht.
 - **Kapitel 9 listet die ADRs nicht** (LLH-1660): jede Zeile dort kollidierte mit jedem anderen
   PR, der eine ADR anlegt. Das Verzeichnis ist der Ordner, `scripts/adr-fuer.sh --alle` und die

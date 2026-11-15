@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # LLH-1849: Auswahl und Meldung des Pflicht-Checks „Baut mit Ziel-Branch“. Kompiliert selbst
 # nichts und führt keinen PR-Code aus: das tut der Job `kompilieren` in
-# .github/workflows/ziel-branch-build.yml, ohne Schreibrechte.
+# .github/workflows/ziel-branch-build.yml, ohne Schreibrechte; `verteilen` aus
+# .github/workflows/ziel-branch-verteilen.yml.
 #
 #   scripts/ziel-branch-build.sh verteilen <ziel-branch> <ziel-sha>
 #       Nach einem Push auf den Ziel-Branch, OHNE selbst zu kompilieren: Jeder fertige offene PR
@@ -224,10 +225,11 @@ has_nachfolger() { # <kopf> <id>
   done
 }
 
-# Steht ein Push-Lauf dieses Workflows auf <ziel> noch aus (wartet auf einen Runner oder läuft)?
-# Dann bringt `verteilen` den Nachfolger noch. Nicht lesbar zählt wie „nein“.
+# Steht ein Lauf von `verteilen` auf <ziel> noch aus (wartet auf einen Runner oder läuft)? Dann
+# bringt er den Nachfolger noch. `verteilen` hat einen eigenen Workflow (LLH-1896), damit ein PR
+# ihn nicht als übersprungenen Eintrag trägt. Nicht lesbar zählt wie „nein“.
 has_pending_verteilen() { # <ziel>
-  gh_api "repos/$REPO/actions/workflows/ziel-branch-build.yml/runs?branch=$1&event=push&per_page=10" \
+  gh_api "repos/$REPO/actions/workflows/ziel-branch-verteilen.yml/runs?branch=$1&event=push&per_page=10" \
     --jq 'any(.workflow_runs[]; .status != "completed")' 2> /dev/null | grep -qx true
 }
 

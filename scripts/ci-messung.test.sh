@@ -114,8 +114,10 @@ pruefe "1 Branch a: Läufe, abgebrochen, rot, grün, laufend, Jobs, Job-Minuten,
 pruefe "2 Branch b: laufender Lauf, laufender Job, ein Lauf ohne Job" \
   "| b | 3 | 0 | 2 | 0 | 1 | 2 | 5 | 1 |" "$(zeile b)"
 pruefe "3 Summe" "| Summe (2 PRs) | 6 | 1 | 2 | 2 | 1 | 10 | 365 | 1 |" "$(zeile 'Summe (2 PRs)')"
-pruefe "4 Zeitraum steht in der Abfrage" 2 "$(grep -c 'created=2026-11-12T00:00:00Z\.\.2026-11-13T00:00:00Z' "$ARBEIT/fake/log")"
-pruefe "5 nur PR-Läufe" 2 "$(grep -c 'event=pull_request' "$ARBEIT/fake/log")"
+# Gefragt werden pr.yml (seit LLH-1896, hier noch ohne Läufe: 404), ci.yml und e2e.yml.
+pruefe "4 Zeitraum steht in der Abfrage" 3 "$(grep -c 'created=2026-11-12T00:00:00Z\.\.2026-11-13T00:00:00Z' "$ARBEIT/fake/log")"
+pruefe "5 nur PR-Läufe" 3 "$(grep -c 'event=pull_request' "$ARBEIT/fake/log")"
+pruefe "5b pr.yml gehört zur Vorgabe" 1 "$(grep -c 'workflows/pr.yml/runs' "$ARBEIT/fake/log")"
 
 # Vor der Zweiteilung gibt es e2e.yml nicht: die Messung läuft mit ci.yml allein weiter.
 mv "$ARBEIT/fake/laeufe-e2e.yml.json" "$ARBEIT/fake/weg.json"
@@ -151,6 +153,14 @@ sed -i.alt 's/"total_count":4/"total_count":1500/' "$ARBEIT/fake/laeufe-ci.yml.j
 pruefe "9 abgeschnittene Liste: Umgebungsfehler" 2 "$(exit_von messen)"
 mv "$ARBEIT/fake/voll.json" "$ARBEIT/fake/laeufe-ci.yml.json"
 pruefe "9b vollständige Liste wieder: gelaufen" 0 "$(exit_von messen)"
+
+# 10 — Seit LLH-1896 laufen die PR-Läufe in pr.yml: sie zählen in der Vorgabe mit (Branch c).
+printf '{"total_count":1,"workflow_runs":[%s]}\n' "$(lauf_json 8 c completed success)" > "$ARBEIT/fake/laeufe-pr.yml.json"
+printf '{"jobs":[%s]}\n' "$(job_json Schnellprüfungen success 2026-11-12T17:00:00Z 2026-11-12T17:06:00Z)" > "$ARBEIT/fake/jobs-8.json"
+aus="$(messen 2> "$ARBEIT/fehler")"
+pruefe "10 pr.yml zählt mit" "| c | 1 | 0 | 0 | 1 | 0 | 1 | 6 | 0 |" "$(zeile c)"
+pruefe "10b Summe über drei PRs" "| Summe (3 PRs) | 7 | 1 | 2 | 3 | 1 | 11 | 371 | 1 |" "$(zeile 'Summe (3 PRs)')"
+# Vor LLH-1896 gibt es pr.yml nicht: in der Vorgabe ausgelassen, mit Hinweis (Fall 1–3 oben).
 
 if [ "$fehler" -gt 0 ]; then
   echo "==> FEHLER: $fehler Fall/Fälle im Selbsttest ci-messung." >&2
