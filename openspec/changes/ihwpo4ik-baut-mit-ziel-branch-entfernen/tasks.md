@@ -12,8 +12,8 @@
 
 ## 3. Doku und Regeln
 
-- [ ] 3.1 Neue ADR mit `ersetzt: ADR-0030` (übernimmt „alpha rot“), ADR-0030 auf `ersetzt`; Architektur-Wächter grün
-- [ ] 3.2 `scripts/AGENTS.md` (Abschnitt „Baut mit Ziel-Branch“ entfernen, Pflichtliste), Skill `dev-zunder-ausfuehren` („Baut mit Ziel-Branch rot“, Pflicht-Checks), Kapitel 7 (Diagramm, Text, `Stand`) und 11 (R41, R42) nachziehen; ein grep über das Repo (ohne Archive und `docs/superpowers/`) findet `Baut mit Ziel-Branch` nur noch als Rückblick
+- [x] 3.1 Neue ADR mit `ersetzt: ADR-0030` (übernimmt „alpha rot“), ADR-0030 auf `ersetzt`; Architektur-Wächter grün
+- [x] 3.2 `scripts/AGENTS.md` (Abschnitt „Baut mit Ziel-Branch“ entfernen, Pflichtliste), Skill `dev-zunder-ausfuehren` („Baut mit Ziel-Branch rot“, Pflicht-Checks), Kapitel 7 (Diagramm, Text, `Stand`) und 11 (R41, R42) nachziehen; ein grep über das Repo (ohne Archive und `docs/superpowers/`) findet `Baut mit Ziel-Branch` nur noch als Rückblick
 
 ## 4. Gesamtprüfung
 

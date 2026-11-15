@@ -7,15 +7,15 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` (voller Lauf; vor dem PR genügt `--geaendert --ohne-e2e`, s. „Leichte PR-Prüfung“): `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ziel-branch-build.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
-Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) für den Check „Baut mit
-Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
+Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) als schneller lokaler
+Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
 - **Leichte PR-Prüfung** (LLH-1889/LLH-1896, ADR-0048; ersetzt die zwei Stufen von LLH-1662):
   - **Ein Workflow je Ereignis:** `pr.yml` läuft nur am PR, `ci.yml` nur bei Push auf `alpha`,
-    `beta`, `main`; was nur bei Push läuft (`ziel-branch-verteilen.yml`,
-    `migrationen-kanal.yml`, `ruleset.yml`), hat keinen PR-Auslöser. Ein Job mit falschem `if`
+    `beta`, `main`; was nur bei Push läuft (`migrationen-kanal.yml`, `ruleset.yml`), hat keinen
+    PR-Auslöser. Ein Job mit falschem `if`
     stünde sonst als übersprungener Eintrag an jedem PR. Die Suiten stehen einmal in
     `suiten.yml` (am Commit `Suiten / …`); ein Pflicht-Check-Job darf dort nicht stehen, weil er
     sonst den Präfix trägt. Deshalb steht `schnell` in `ci.yml` und `pr.yml` **wortgleich**: wer
@@ -29,7 +29,7 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     eigener Gruppe, ohne einen laufenden Lauf abzubrechen; an einem PR mit `voll` startet es alle
     Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend- und e2e-Suite laufen im PR nur mit dem **Label `voll`**, dann ganz
     und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label
-    `e2e` bedeutet nichts mehr. „Fertig“ heißt Auto-Merge an (für „Baut mit Ziel-Branch“).
+    `e2e` bedeutet nichts mehr.
   - **Vor dem PR lokal:** `./scripts/check-all.sh --geaendert --ohne-e2e`. `scripts/bereiche.sh`
     ordnet jede geänderte Datei den Suiten Rust, Frontend und e2e zu (**im Zweifel alles**; ein
     Querbezug aus einem fremden Bereich braucht eine Regel dort, `bereiche.test.sh` sucht
@@ -94,37 +94,13 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     auch lokal: `GITHUB_REPOSITORY=<owner>/<repo> scripts/stau-waechter.sh --nur-zeigen alle`
     (oder `alpha` für nur diesen Befund).
   - Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`, für
-    „alpha rot“ und „Baut mit Ziel-Branch“
-    `openspec/changes/archive/2026-11-12-g10eo9co-alpha-rot-schutz/design.md`.
-- **Baut mit Ziel-Branch** (LLH-1849, `.github/workflows/ziel-branch-build.yml`,
-  `scripts/ziel-branch-build.sh`): Pflicht-Check an einem fertigen PR (Auto-Merge an, kein
-  Entwurf; Labels zählen nicht): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert
-  (`check-all.sh --nur baut`). Nach jedem Push auf einen Kanal-Branch setzt `verteilen` (eigener
-  Workflow `ziel-branch-verteilen.yml`, LLH-1896; `has_pending_verteilen` fragt dessen Läufe) den Check
-  jedes fertigen PRs auf „läuft“ und startet **je PR einen eigenen Lauf auf dessen Branch**
-  (`workflow_dispatch`); ein nicht fertiger mit Check (auch ein Entwurf) bekommt „wartet“, ein
-  Branch ohne den Workflow einen roten Check mit „`alpha` hineinmergen“. Der Einzellauf rechnet
-  nur auf dem Kopf-Branch eines PRs dieses Repositorys, nie auf einem Kanal-Branch, und legt einen
-  frischen Check an. **Warteschlange statt Abbruch** (LLH-1889): je PR rechnet ein Lauf, einer
-  wartet, ein neuer Anstoß ersetzt den wartenden (`cancel-in-progress: false`, auch bei neuem
-  PR-Commit); so bündeln sich Merges auf den jüngsten Stand. **Kein Check und kein Job endet
-  abgebrochen, weil er überholt ist**: ein überholter Check bleibt auf „läuft“, bis ihn der
-  jüngere Check des nächsten Laufs ablöst (GitHub wertet je Name den jüngsten; alle Checks-API-Runs
-  liegen in einer Suite, ohne `filter=all` liefert die API nur ihn). Hat sich nur der Ziel-Branch bewegt
-  und erscheint binnen 5 Minuten kein jüngerer, ohne dass ein Push-Lauf aussteht, wird er rot mit
-  „neu starten“ (bei neuem PR-Kopf bleibt er ohne Frist stehen, der PR zeigt den alten Kopf nicht). Abgebrochen hieß am PR rot, und am 14.11.2026 mergte so
-  nichts mehr. Jeder Check trägt den gerechneten Ziel-Stand in `external_id`; ist ein Stand auf dem
-  Kopf schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen (nicht
-  bei einem Neustart des Laufs; „Kein Ergebnis“ trägt keinen Stand). Herleitung:
-  `openspec/changes/archive/2026-11-14-p4avye3q-ziel-branch-build-ersetzen-buendeln/design.md`. Der Check entsteht über
-  die Checks-API, nie als Job-Name (ein übersprungener Job meldete grün). **PR-Code läuft nie in
-  einem Lauf auf einem Kanal-Branch** (dessen Cache-Bereich liest der Release-Build; Runtime-Token
-  und `sudo` umgehen jedes `save-if`), nur im Job `kompilieren` eines PR- oder Einzellaufs: dort
-  `contents: read`, keine Secrets, kein gespeicherter Zugang, kein gespeicherter Cache. Ein
-  Ergebnis gilt, wenn der Ziel-Branch inzwischen nur um Release-Commits (`[skip ci]`) weiter ist.
-  Bis `verteilen` läuft, bleibt ein Restfenster mit altem Grün; was durchrutscht, fängt „alpha
-  rot“. Die Form hält `scripts/ziel-branch-build.test.sh` (Schritt 11) fest; wer den Workflow
-  ändert, zieht ihn mit.
+    „alpha rot“ `openspec/changes/archive/2026-11-12-g10eo9co-alpha-rot-schutz/design.md`.
+- **Kein Pflicht-Check „Baut mit Ziel-Branch“** (LLH-1899, ADR-0049, ersetzt LLH-1849): Nach einem
+  Merge auf einen Kanal-Branch rechnet kein Workflow die offenen PRs neu. Kompilieren zwei einzeln
+  grüne PRs zusammen nicht, wird `alpha` rot, und „alpha rot“ (Stau-Wächter, oben) bestimmt einen
+  Zuständigen. Lokal prüft `check-all.sh --nur baut` nach einem Merge von `alpha` schnell, ob ein
+  Stand übersetzt. Herleitung:
+  `openspec/changes/archive/2026-11-15-ihwpo4ik-baut-mit-ziel-branch-entfernen/design.md`.
 - **Ein roter Schritt hält die folgenden nicht auf** (LFH-386, `scripts/lib/schritte.sh`): alle
   laufen, am Ende Gesamtstatus je Schritt und EIN Exit-Code; `--abbrechen` ist das Opt-in für
   den schnellen Abbruch. Schritte laufen als eigenes Kommando in einer Subshell mit `set -e`,
