@@ -271,7 +271,7 @@ Bereitstellungsraum, Betreuung).
 im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
 Kopfs). Anlegen geht über das `ErfassungsModal`; eine eigene Seite nur bei einem Ablauf oder mehr
 als ~5 Pflichtfeldern (Patient, Einheit aus Vorlage); ein eingeklapptes Formular nur bei
-Serienerfassung neben einer Liste; **kein Drawer zum Anlegen**. Altstellen mit Folgeaufgabe: UHS
+Serienerfassung neben einer Liste; **kein Drawer zum Anlegen**. Altstellen mit Folgeaufgabe (LLH-1920, LLH-1921): UHS
 und Bereitstellungsraum bearbeiten im Modal und legen im Drawer an (`UhsBearbeitenModal`,
 `BrBearbeitenModal`, `UhsAnlegenDrawer`, `BrAnlegenDrawer`); die eingeklappten Formulare von
 Nachforderung, Meldungen, Lagemeldungen und Erinnerungen sind auf Serienerfassung zu prüfen.
@@ -691,11 +691,11 @@ anwendbar), „nicht geprüft" ist keins.
   In der gehaltenen Zeile steht „Gelöst“ träge an der Stelle des Auslösers, der gelöst hat,
   „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
   Rückweg. **Bekannte Lücke:** Personal-Entlassen und Material „Aus dem Einsatz nehmen“ machen beim
-  Rückgängig nur die Kraft wieder aktiv, ohne ihre Bindungen; bis zu ihren Folgeaufgaben bleibt das
+  Rückgängig nur die Kraft wieder aktiv, ohne ihre Bindungen; bis zu ihren Folgeaufgaben (LLH-1922, LLH-1923) bleibt das
   so, ohne Rückfrage. Das Fahrzeug nimmt vollständig zurück (`…/entlassen/zuruecknehmen`).
   Ebenso noch ohne Rückgängig: „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der
   Person; und das Rückgängig von Material am Ort, Besatzung und UHS-Kraft prüft noch nicht, ob der
-  Datensatz inzwischen anders gebunden ist (Folgeaufgaben).
+  Datensatz inzwischen anders gebunden ist (LLH-1924).
 
 - **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
   `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,

@@ -46,7 +46,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 5. Folgeaufgaben und Integration
 
-- [ ] 5.1 Folgeaufgaben über `zunder-task-anlegen` am Parent: UHS/BR in der Ansicht bearbeiten; Anlegen vereinheitlichen; Personal-Entlassen vollständig zurücknehmen; Material „Aus dem Einsatz nehmen“ vollständig zurücknehmen; Rückgängig mit Vorbedingung (Material am Ort, Besatzung, UHS-Kraft); Rückgängig für „Austragen“ (BR, UHS an der Person). Links in `frontend/AGENTS.md`-Altstellenliste und im PR
+- [x] 5.1 Folgeaufgaben über `zunder-task-anlegen` am Parent: UHS/BR in der Ansicht bearbeiten; Anlegen vereinheitlichen; Personal-Entlassen vollständig zurücknehmen; Material „Aus dem Einsatz nehmen“ vollständig zurücknehmen; Rückgängig mit Vorbedingung (Material am Ort, Besatzung, UHS-Kraft); Rückgängig für „Austragen“ (BR, UHS an der Person). Links in `frontend/AGENTS.md`-Altstellenliste und im PR
 - [ ] 5.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
 ## Workflow follow-up
