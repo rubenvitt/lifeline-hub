@@ -30,12 +30,11 @@ stehen, wenn es die einzige Handlung der Zeile ist. „Abziehen“ (UHS) und „
 
 ### Requirement: Eine gelöste Zeile hält ihre Stelle
 
-Fällt ein selbst gelöster Datensatz durch das Lösen aus der Ansicht, MUST seine Zeile an ihrer
-Stelle und in ihrer Höhe als „Gelöst“ mit einem Knopf „Rückgängig“ stehen bleiben, bis Zeiger und
-Fokus den Bereich verlassen haben und seit dem letzten Tipp darin einige Sekunden vergangen sind.
-Die übrigen Teile der Zeile MUST dabei ihren Platz behalten. An der Stelle des Auslösers, der
-gelöst hat, MUST dann nichts auslösen. Wandert der Datensatz nur innerhalb der Ansicht oder löst
-eine Person über ihr ⋮ aus der Einheit, genügt der Hinweis.
+Fällt ein selbst gelöster Datensatz durch das Lösen aus der Ansicht, MUST seine Zeile mit allen
+Teilen an Stelle und Höhe als „Gelöst“ mit „Rückgängig“ stehen bleiben, bis Zeiger und Fokus den
+Bereich verlassen haben und einige Sekunden vergangen sind. An der Stelle des Auslösers MUST dann
+nichts auslösen. Wandert der Datensatz nur in der Ansicht oder löst eine Person über ihr ⋮ aus der
+Einheit, genügt der Hinweis.
 
 #### Scenario: Zwei schnelle Tipps lösen ein Fahrzeug
 - **WHEN** jemand im Einheit-Detail mit den Fahrzeugen 83-1 und 83-2 „Aus Einheit lösen“ für 83-1 wählt und danach zweimal schnell an dieselbe Stelle tippt
