@@ -19,7 +19,7 @@ function zahlText(n: number, eins: string, mehr: string): string {
 
 /**
  * Leiste am Handschirm (LLH-1738, Spec `benachrichtigungen`, „Eine Leiste am Handschirm“,
- * design.md D5 in `openspec/changes/zu9ptja2-alarmzone/`, Entwurf
+ * design.md D5 in `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`, Entwurf
  * `docs/design/2026-11-15-alarmzone/Handy-Leiste.dc.html`): unter `md` tragen Alarme und Eingänge
  * im Einsatz statt Alarmzone oben und Eingangsband unten diese eine Zeile von 48 px, „1 Alarm ·
  * 3 Eingänge ›“. Sie erscheint, sobald etwas neu eingeht oder in der Zone steht, und nennt bei den

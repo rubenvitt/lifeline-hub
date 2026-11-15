@@ -3,7 +3,7 @@ import type { BenachrichtigungStufe } from '../api/types';
 
 /**
  * Was die Alarmzone zeigt (LLH-1735, Spec `benachrichtigungen`, „Alarmzone verdeckt nichts“,
- * design.md D1 in `openspec/changes/zu9ptja2-alarmzone/`): die Einträge der Zentrale dieses Tabs,
+ * design.md D1 in `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`): die Einträge der Zentrale dieses Tabs,
  * älteste zuerst. Geschrieben von `useAlarmToasts`, gelesen von `AlarmZone` (oben ab `md`) und der
  * Leiste am Handschirm (`HandyLeiste`). Ein Speicher je Tab genügt, denn je Tab lebt genau eine
  * Zentrale (Einsatz- oder Org-Rahmen). Beim Wechsel zwischen beiden räumt nur, wer zuletzt

@@ -11,7 +11,7 @@ https://claude.ai/artifact/8HGwL9bGqJcXg7p2TtWiXj (Artifact-Typ „Design“, De
 Hub“, aus der erzeugten Kopie unter `docs/design/design-system/project/`). Die Schriften lädt der
 Canvas aus `ds/lifeline-hub/`; im Repo fallen die Flächen auf die Systemschrift zurück. Der
 Lösungsweg wurde am 15.11.2026 mit Ruben abgestimmt (Phase-1-Checkpoint), die Change dazu ist
-`openspec/changes/zu9ptja2-alarmzone/`.
+`openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`.
 
 | Datei                    | Zeichenfläche                                                   | Dichte      |
 | ------------------------ | --------------------------------------------------------------- | ----------- |

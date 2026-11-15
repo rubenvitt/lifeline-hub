@@ -106,7 +106,7 @@ Unteraufgaben: LLH-1735 `p1voqfck`, LLH-1736 `ftf3qelu`, LLH-1737 `mdbfi43h`, LL
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die berührten e2e-Specs
+- [x] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die berührten e2e-Specs
   (`alarm-verdeckung`, `eingangsband-ausweichen`, `eingangshinweis`, `sofortmeldung-hinweis`,
   `abloesung-kontrast`, `leisten-flaeche`, `fokus-verdeckung`) lokal grün.
 

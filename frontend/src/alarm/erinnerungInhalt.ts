@@ -6,7 +6,7 @@ import { INHALT_FRIST_MS } from './meldungInhalt';
 
 /**
  * Titel einer fälligen Erinnerung im Hinweis (LLH-1737, Spec `benachrichtigungen`, „Fällige
- * Erinnerung erreicht ihre Empfänger“, design.md D6 in `openspec/changes/zu9ptja2-alarmzone/`).
+ * Erinnerung erreicht ihre Empfänger“, design.md D6 in `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`).
  *
  * Der Titel ist ein Scrub-Wert: der Server nennt ihn weder im Live-Ereignis noch im Text der
  * Benachrichtigung (`src/benachrichtigung/text.rs`). Einen Einzelabruf gibt es nicht; der Client

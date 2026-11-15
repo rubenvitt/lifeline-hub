@@ -144,7 +144,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen.
   - **Alarme stehen in der Alarmzone, nie über dem Inhalt** (LLH-1735, Spec
     `benachrichtigungen`, „Alarmzone verdeckt nichts“, Herleitung
-    `openspec/changes/zu9ptja2-alarmzone/design.md`; löst LFH-1112 ab): Alarme, Org-Hinweise und
+    `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/design.md`; löst LFH-1112 ab): Alarme, Org-Hinweise und
     die Unwetterwarnung zeichnet `alarm/AlarmZone.tsx` direkt unter Kopf und Übungsband, nie
     antds `notification` (`AntApp` trägt kein `notification`-Prop). Die Zone ist eine
     Rahmenquelle unter dem Übungsband (`useRahmenObenStapel` mit `RANG_ALARMZONE`), schiebt den

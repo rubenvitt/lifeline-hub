@@ -112,7 +112,7 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
 const RANG_RAHMEN = 0;
 /** Rang des Übungsbands (LLH-1725): direkt unter dem Rahmen. */
 export const RANG_UEBUNG = 1;
-/** Rang der Alarmzone (LLH-1735, design.md D2 in `openspec/changes/zu9ptja2-alarmzone/`): unter
+/** Rang der Alarmzone (LLH-1735, design.md D2 in `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`): unter
  *  dem Übungsband. */
 export const RANG_ALARMZONE = 2;
 

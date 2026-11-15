@@ -110,7 +110,7 @@ verdeckter Tab und ein Push zur selben Benachrichtigung MUST NOT zwei OS-Meldung
 
 #### Scenario: App im Vordergrund
 - **WHEN** ein Push eintrifft, während ein Tab der App fokussiert ist
-- **THEN** bleibt keine OS-Meldung stehen, und der Tab zeigt den Toast
+- **THEN** bleibt keine OS-Meldung stehen, und der Tab zeigt den Eintrag in der Alarmzone
 
 ### Requirement: Inhalt der Meldung nur auf Wunsch
 

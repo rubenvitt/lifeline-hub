@@ -72,7 +72,7 @@ export interface AlarmToasts {
 
 /**
  * Die Einträge der Alarmzone einer Zentrale (LLH-1735/LLH-1736, design.md D1 in
- * `openspec/changes/zu9ptja2-alarmzone/`): Benachrichtigungen und Unwetterhinweise teilen die eine
+ * `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`): Benachrichtigungen und Unwetterhinweise teilen die eine
  * Zone, ein Schlüssel ist ein Eintrag. Gezeichnet wird nicht hier, sondern in `AlarmZone` (oben)
  * und in der Leiste am Handschirm; beide lesen `alarmZoneSpeicher`.
  *
