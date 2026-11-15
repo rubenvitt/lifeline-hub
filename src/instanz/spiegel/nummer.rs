@@ -10,7 +10,7 @@ use crate::error::AppError;
 use sqlx::SqliteConnection;
 
 /// Vergibt eine eigene Nummer, wenn die des Spiegels in seiner Org schon ein eigener Einsatz oder
-/// das Löschprotokoll trägt. Liefert (alt, neu) bei einer Umnummerierung. Läuft unter dem Merker.
+/// das Löschprotokoll trägt oder sie an der Grenze der laufenden Nummer liegt. Liefert (alt, neu) bei einer Umnummerierung. Läuft unter dem Merker.
 /// Ein Einsatz ohne Nummer (Altbestand) stößt an keine Eindeutigkeit und bleibt, wie er ist.
 pub(super) async fn ensure_freie_nummer(
     conn: &mut SqliteConnection,
@@ -42,7 +42,12 @@ pub(super) async fn ensure_freie_nummer(
     .bind(lfd)
     .fetch_one(&mut *conn)
     .await?;
-    if !belegt {
+    // Eine Nummer an der Grenze behält er nicht, auch wenn sie frei ist: Die nächste Anlage zählte
+    // sonst über die Grenze, und jede Gegenstelle übernähme die eigenen Nummern des Jahres leer
+    // (LLH-1859, Spec `einsatznummer`, „Die freie Nummer bleibt in der Grenze“).
+    let an_der_grenze =
+        lfd.is_some_and(|l| l.saturating_add(1) >= *crate::einsatz::nummer::LFD_GRENZEN.end());
+    if !belegt && !an_der_grenze {
         return Ok(None);
     }
     let (praefix, zeitzone): (Option<String>, Option<String>) = sqlx::query_as(
@@ -61,19 +66,15 @@ pub(super) async fn ensure_freie_nummer(
     };
     // Über allen Einsätzen des Jahres, auch Spiegeln, und dem Löschprotokoll: anders als die
     // Anlage (`einsatz::repo::anlegen_tx` zählt nur eigene), damit die neue Nummer keinem Spiegel
-    // gleicht, der später selbst eigen werden kann und dann wieder umnummeriert würde.
-    let max_lfd: Option<i64> = sqlx::query_scalar(
-        "SELECT MAX(lfd) FROM ( \
-             SELECT nummer_lfd AS lfd FROM einsatz WHERE org_id = ?1 AND nummer_jahr = ?2 \
-             UNION ALL \
-             SELECT nummer_lfd FROM aufbewahrung_loeschprotokoll \
-             WHERE org_id = ?1 AND nummer_jahr = ?2)",
-    )
-    .bind(org_id)
-    .bind(jahr)
-    .fetch_one(&mut *conn)
-    .await?;
-    let mut neu_lfd = max_lfd.unwrap_or(0) + 1;
+    // gleicht, der später selbst eigen werden kann und dann wieder umnummeriert würde. Läge die
+    // neue Nummer wegen eines Spiegels an oder über der Grenze, zählen nur die eigenen (LLH-1859, Spec
+    // `einsatznummer`, „Die freie Nummer bleibt in der Grenze“): Sonst trüge jeder eigene Einsatz
+    // des Jahres danach eine Nummer, die jede Gegenstelle leer übernimmt.
+    let mut max_lfd = load_max_lfd(conn, org_id, jahr, true).await?;
+    if max_lfd.is_some_and(|m| m.saturating_add(1) >= *crate::einsatz::nummer::LFD_GRENZEN.end()) {
+        max_lfd = load_max_lfd(conn, org_id, jahr, false).await?;
+    }
+    let mut neu_lfd = crate::einsatz::repo::naechste_lfd(max_lfd.unwrap_or(0))?;
     let neu = loop {
         let kandidat = crate::einsatz::nummer::formatiere(
             praefix.as_deref(),
@@ -92,7 +93,7 @@ pub(super) async fn ensure_freie_nummer(
         if !vergeben {
             break kandidat;
         }
-        neu_lfd += 1;
+        neu_lfd = crate::einsatz::repo::naechste_lfd(neu_lfd)?;
     };
     sqlx::query(
         "UPDATE einsatz SET einsatznummer_intern = ?, nummer_jahr = ?, nummer_lfd = ? WHERE id = ?",
@@ -104,6 +105,29 @@ pub(super) async fn ensure_freie_nummer(
     .execute(&mut *conn)
     .await?;
     Ok(Some((nummer, neu)))
+}
+
+/// Höchste laufende Nummer des Jahres in der Org, über dem Löschprotokoll und den eigenen
+/// Einsätzen, mit `mit_spiegeln` auch über den Spiegeln.
+async fn load_max_lfd(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    jahr: i64,
+    mit_spiegeln: bool,
+) -> Result<Option<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT MAX(lfd) FROM ( \
+             SELECT nummer_lfd AS lfd FROM einsatz \
+             WHERE org_id = ?1 AND nummer_jahr = ?2 AND (?3 OR spiegel = 0) \
+             UNION ALL \
+             SELECT nummer_lfd FROM aufbewahrung_loeschprotokoll \
+             WHERE org_id = ?1 AND nummer_jahr = ?2)",
+    )
+    .bind(org_id)
+    .bind(jahr)
+    .bind(mit_spiegeln)
+    .fetch_one(&mut *conn)
+    .await?)
 }
 
 #[cfg(test)]
@@ -276,6 +300,133 @@ mod tests {
             stand(&pool, id).await,
             (Some("E-2026-0007".into()), false, 0)
         );
+    }
+
+    /// Spec `einsatznummer`, „Die freie Nummer bleibt in der Grenze“ (LLH-1859): Ein fremder
+    /// Spiegel an oder über der Grenze hebt die freie Nummer nicht über sie; sie zählt dann nur über
+    /// den eigenen Einsätzen und dem Löschprotokoll.
+    #[tokio::test]
+    async fn ein_fremder_spiegel_an_der_grenze_hebt_die_freie_nummer_nicht() {
+        for fremd in [999_998, 999_999, i64::MAX] {
+            let pool = pool().await;
+            eigener_einsatz(&pool, 1).await;
+            fremder_spiegel(&pool, fremd).await;
+            let id = spiegel_mit_eigener_akte(&pool, Some(1)).await;
+            richte_aus(&pool, id).await;
+            assert_eq!(
+                stand(&pool, id).await,
+                (Some("E-2026-0002".into()), false, 0),
+                "fremder Spiegel mit {fremd}"
+            );
+        }
+    }
+
+    /// Spec `einsatznummer`, „Die freie Nummer bleibt in der Grenze“ (LLH-1859): Eine eigene
+    /// Nummer an der Grenze behält ein Spiegel nicht, auch wenn sie frei ist; sonst zählte die
+    /// nächste Anlage über die Grenze. Knapp darunter bleibt sie.
+    #[tokio::test]
+    async fn eine_freie_nummer_an_der_grenze_wird_neu_vergeben() {
+        for (lfd, erwartet) in [
+            (999_998, "E-2026-0002"),
+            (999_999, "E-2026-0002"),
+            (999_997, "E-2026-999997"),
+        ] {
+            let pool = pool().await;
+            eigener_einsatz(&pool, 1).await;
+            let id = spiegel_mit_eigener_akte(&pool, Some(lfd)).await;
+            richte_aus(&pool, id).await;
+            assert_eq!(
+                stand(&pool, id).await,
+                (Some(erwartet.into()), false, 0),
+                "Spiegel mit {lfd}"
+            );
+        }
+    }
+
+    /// Spec `einsatznummer`, „Die Vergabe läuft nicht über“ (LLH-1859): Ist die nächste Nummer
+    /// nicht darstellbar, auch nach dem Ausweichen vor einem vergebenen Text, scheitert der
+    /// Übergang mit 422 statt Panik oder Umlauf.
+    #[tokio::test]
+    async fn ueber_dem_hoechstwert_scheitert_der_uebergang_mit_422() {
+        let pool = pool().await;
+        eigener_einsatz(&pool, 1).await;
+        // Bestand: ein eigener Einsatz knapp unter dem Höchstwert und der Text des Höchstwerts
+        // ohne Zahlen. So trifft das Ausweichen in der Schleife den Überlauf.
+        eigener_einsatz(&pool, i64::MAX - 1).await;
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) \
+             VALUES (1, 'Handwert', 'E-2026-9223372036854775807')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let id = spiegel_mit_eigener_akte(&pool, Some(1)).await;
+        let mut tx = pool.begin().await.unwrap();
+        let ergebnis = super::super::fuehrung::richte_aus(&mut tx, id).await;
+        assert!(
+            matches!(
+                ergebnis,
+                Err(crate::error::AppError::UnprocessableEntity(_))
+            ),
+            "{ergebnis:?}"
+        );
+        drop(tx);
+        let negativ: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE nummer_lfd < 0")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(negativ, 0);
+        assert_eq!(
+            stand(&pool, id).await,
+            (Some("E-2026-0001".into()), true, 0),
+            "der Spiegel bleibt, wie er war"
+        );
+    }
+
+    /// Spec `einsatznummer`, „Der Spiegel wird später eigen“ (LLH-1859): Ein Spiegel, dessen Zahlen
+    /// an der Grenze leer übernommen wurden, wird eigen, und die nächste Anlage zählt ohne ihn.
+    #[tokio::test]
+    async fn ein_spiegel_mit_geleerten_zahlen_wird_eigen_und_zaehlt_nicht_mit() {
+        let pool = pool().await;
+        eigener_einsatz(&pool, 1).await;
+        let id = spiegel_mit_eigener_akte(&pool, Some(5)).await;
+        crate::einsatz::spiegel_filter::unter_merker(
+            &pool,
+            "UPDATE einsatz SET nummer_jahr = NULL, nummer_lfd = NULL WHERE id = ?",
+            &[id],
+        )
+        .await;
+        richte_aus(&pool, id).await;
+        assert_eq!(
+            stand(&pool, id).await,
+            (Some("E-2026-0005".into()), false, 0)
+        );
+        let erika: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Erika', 'erika', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let jetzt = chrono::DateTime::parse_from_rfc3339("2026-06-01T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let neu = crate::einsatz::repo::anlegen_zum(
+            &pool,
+            crate::einsatz::repo::NeuerEinsatzDaten {
+                bezeichnung: "Neu",
+                stichwort: None,
+                einsatzart: None,
+                begonnen_at: None,
+                ort: Default::default(),
+                vorlage_id: None,
+            },
+            erika,
+            jetzt,
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.einsatznummer_intern.as_deref(), Some("E-2026-0002"));
     }
 
     /// Altbestand ohne Einsatznummer (Spec `einsatznummer`, „Bestand“) stößt an keine
