@@ -23,7 +23,7 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`.
 
 ## 4. Gesamtprüfung
 
-- [ ] 4.1 Im Browser gegen die Demo-Lage: aus dem ETB bei 1440 × 900 öffnet „Hilfe“ einen zweiten Tab, der erste bleibt im ETB; bei 390 × 844 im selben Tab mit „Zurück zu <Einsatz>“ zurück ins ETB; Neuigkeiten und Profil führen zurück an die Stelle. Prüfung: Bilder für PR und Meldung
+- [x] 4.1 Im Browser gegen die Demo-Lage: aus dem ETB bei 1440 × 900 öffnet „Hilfe“ einen zweiten Tab, der erste bleibt im ETB; bei 390 × 844 im selben Tab mit „Zurück zu <Einsatz>“ zurück ins ETB; Neuigkeiten und Profil führen zurück an die Stelle. Prüfung: Bilder für PR und Meldung
 - [ ] 4.2 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün. Prüfung: Gesamtstatus aus dem Lauf
 
 ## Workflow follow-up
