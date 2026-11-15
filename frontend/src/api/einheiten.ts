@@ -239,16 +239,50 @@ export function storniereEinheit(einsatzId: number, eid: number): Promise<void> 
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/stornieren`, 'POST');
 }
 
-export function ordnePersonalZu(einsatzId: number, eid: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/personal/${epId}`, 'PUT');
+/**
+ * Vorbedingungen des Rückgängig nach „Aus Einheit lösen“ (LLH-1722, Spec `einheit-ansicht`):
+ * `nurWennFrei` lehnt mit 409 ab, statt den Datensatz einer anderen Einheit still zu nehmen;
+ * `alsFuehrer` setzt eine Person in derselben Transaktion wieder als Einheitsführer ein.
+ */
+export interface ZuruecknahmeOptionen {
+  nurWennFrei?: boolean;
+  alsFuehrer?: boolean;
+}
+
+function zuruecknahmeQuery(o: ZuruecknahmeOptionen = {}): string {
+  const q = new URLSearchParams();
+  if (o.nurWennFrei) q.set('nur_wenn_frei', '1');
+  if (o.alsFuehrer) q.set('als_fuehrer', '1');
+  const text = q.toString();
+  return text ? `?${text}` : '';
+}
+
+export function ordnePersonalZu(
+  einsatzId: number,
+  eid: number,
+  epId: number,
+  optionen?: ZuruecknahmeOptionen,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/personal/${epId}${zuruecknahmeQuery(optionen)}`,
+    'PUT',
+  );
 }
 
 export function gibPersonalFrei(einsatzId: number, eid: number, epId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/personal/${epId}`, 'DELETE');
 }
 
-export function ordneFahrzeugZu(einsatzId: number, eid: number, efId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/fahrzeug/${efId}`, 'PUT');
+export function ordneFahrzeugZu(
+  einsatzId: number,
+  eid: number,
+  efId: number,
+  optionen?: Pick<ZuruecknahmeOptionen, 'nurWennFrei'>,
+): Promise<void> {
+  return apiSend<void>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/fahrzeug/${efId}${zuruecknahmeQuery(optionen)}`,
+    'PUT',
+  );
 }
 
 export function gibFahrzeugFrei(einsatzId: number, eid: number, efId: number): Promise<void> {

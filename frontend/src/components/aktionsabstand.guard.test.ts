@@ -91,9 +91,6 @@ const MIT_NACHBARSCHAFT = [
   // „Übernehmen“ neben dem roten „Abweisen“, in der Einheit-Ansicht und an der Meldung.
   'pages/einheit/EinheitUebernahme.tsx',
   // ── Fahrzeugzeile der Einheit-Ansicht (LLH-1036 Teil II, LLH-1268) ───────
-  // Die FMS-`StatusWahl` neben dem roten „Aus Einheit lösen“. Die Personen tragen ihre Aktionen
-  // im Menü (rot hinter dem Trenner).
-  'pages/einheit/FahrzeugeBesatzung.tsx',
   // ── Offline-Wiederherstellung (LFH-746) ───────────────────────────────────
   // „Verwerfen" (`danger`) neben „Erneut versuchen" und, bei einem ETB-Eintrag mit Anhängen,
   // „Ohne Anhänge senden" — eine Reihe je abgelehnter Karte.

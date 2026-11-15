@@ -13,6 +13,7 @@ import {
   buildBesatzungMittel,
   buildEinheitRechte,
   buildFahrzeugZuordnenGroups,
+  buildFahrzeugMenuItems,
   buildPersonMenuItems,
   buildPersonZuordnenGroups,
   collectNachfahren,
@@ -444,5 +445,17 @@ describe('visibleBesatzungRows', () => {
       buildBesatzungMittel(leer, [leer], personal, fahrzeuge, rechte),
     );
     expect(rows.personen.size + rows.fahrzeuge.size).toBe(0);
+  });
+});
+
+describe('buildFahrzeugMenuItems (LLH-1722)', () => {
+  it('mit Schreibrecht in Einheiten: neutral „Aus Einheit lösen“', () => {
+    expect(
+      buildFahrzeugMenuItems({ canEditEinheit: true }).map((e) => [e.key, e.label, !!e.gefahr]),
+    ).toEqual([['aus-einheit', 'Aus Einheit lösen', false]]);
+  });
+
+  it('ohne Schreibrecht in Einheiten: kein Eintrag, also kein Auslöser', () => {
+    expect(buildFahrzeugMenuItems({ canEditEinheit: false })).toEqual([]);
   });
 });

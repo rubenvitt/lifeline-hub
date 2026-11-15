@@ -1,10 +1,16 @@
-import { Button, Space, Typography } from 'antd';
+import { App, Button, Space, Typography } from 'antd';
 import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
-import { gibFahrzeugFrei, gibPersonalFrei } from '../../api/einheiten';
+import {
+  gibFahrzeugFrei,
+  gibPersonalFrei,
+  ordneFahrzeugZu,
+  ordnePersonalZu,
+} from '../../api/einheiten';
 import {
   gibBesatzungFrei,
+  ordneBesatzungZu,
   updateDisposition,
   zuordnenBesatzungMenge,
 } from '../../api/einsatzFahrzeuge';
@@ -23,6 +29,7 @@ import { KennungsLink } from '../../components/kennungsLink';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
 import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
+import { useHoldGeloest } from '../../components/useHoldGeloest';
 import { RechteHinweis, ZeilenFehler } from '../../components/SpeicherHinweis';
 import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
@@ -31,6 +38,7 @@ import BesatzungUebernehmenDialog from '../../kraefte/BesatzungUebernehmenDialog
 import { besatzungKandidaten, besatzungVorschlag } from '../../kraefte/besatzungVorschlag';
 import { FahrzeugZeichen } from '../../kraefte/EinheitZeichen';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
+import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { fmsStatusOptionen } from '../../kraefte/fmsTableauKern';
 import {
   besatzungText,
@@ -48,9 +56,11 @@ import { einsatzkraftPfad, fahrzeugePfad } from '../../routing/deeplinks';
 import { besatzungsUrteil, statusKategorie } from '../../theme/statusFarben';
 import {
   besatzungGrund,
+  buildFahrzeugMenuItems,
   buildPersonMenuItems,
   hasNoMitglieder,
   type EinheitRechte,
+  type FahrzeugMenuKey,
   type PersonMenuKey,
 } from './einheitAnsichtKern';
 import type { BesatzungErrors } from './useBesatzungErrors';
@@ -67,7 +77,11 @@ import type { BesatzungErrors } from './useBesatzungErrors';
  * gesperrt“, ohne Besatzungswege, ohne FMS-Wahl und ohne Link ins gesperrte Modul.
  *
  * Was bedienbar ist, sagt allein {@link EinheitRechte}. Lösen ist umkehrbar und wirkt ohne
- * Rückfrage (Regel „Destruktiv ist nicht gleich destruktiv“); jeder Grund steht an seiner Zeile
+ * Rückfrage, mit einem Rückgängig-Hinweis (LLH-1722, `frontend/AGENTS.md`, „Beenden: Verb, Ort und
+ * Sicherung je Art“): „Aus Einheit lösen“ eines Fahrzeugs steht in seinem ⋮, die gelöste Zeile hält
+ * ihre Stelle als „Gelöst · Rückgängig“ samt gedämpfter Besatzung (`useHoldGeloest`), und das
+ * Rückgängig nimmt das Fahrzeug keiner anderen Einheit still weg (`nur_wenn_frei`). Personen lösen
+ * über ihr ⋮; ihr Rückgängig steht im Hinweis, beim Einheitsführer samt Führung. Jeder Grund steht an seiner Zeile
  * (`useZeilenFehler`, Schlüssel `ep_id` bzw. `ef_id`), kein Toast. Die Gründe hält die Seite
  * (`errors`, `useBesatzungErrors`): ist die Zeile nach der Antwort weg, steht ihr Grund im
  * Seitenhinweis (LLH-1269).
@@ -129,6 +143,17 @@ const fromBaum = (x: PersonImBaum): PersonRow => ({
   faehrtAuf: x.faehrtAuf,
 });
 
+/**
+ * Ein Fahrzeug der Einheit, aus dem Kern (mit Besatzung) oder flach aus dem DTO. Der Halte-
+ * Baustein merkt sich den ganzen Eintrag, damit die gehaltene Zeile auch ohne Quelle zeichnet.
+ */
+interface FahrzeugEintrag {
+  id: number;
+  funkrufname: string;
+  baum: FahrzeugImBaum | null;
+  flach: Einheit['fahrzeug_mitglieder'][number] | null;
+}
+
 const fromMitglied = (m: Einheit['personal_mitglieder'][number]): PersonRow => ({
   epId: m.ep_id,
   name: m.name,
@@ -152,6 +177,7 @@ export default function FahrzeugeBesatzung({
   children,
 }: FahrzeugeBesatzungProps) {
   const qc = useQueryClient();
+  const { message } = App.useApp();
   const { token, rollen } = useRollen();
   const einheitId = einheit.id;
   const reason = besatzungGrund(rechte);
@@ -212,12 +238,30 @@ export default function FahrzeugeBesatzung({
     end: () => markPending(`f${efId}`, false),
   });
 
-  const personalLoesen = useMutation({
-    mutationFn: (epId: number) => gibPersonalFrei(einsatzId, einheitId, epId),
-    onMutate: (epId) => trackPerson(epId).start(),
+  /*
+   * Rückwege (LLH-1722): jede Rücknahme hat ihren Grund an der Zeile, an der sie gelöst wurde; ist
+   * die Zeile weg, trägt ihn die Seite in den Seitenhinweis (`useBesatzungErrors`).
+   */
+  const personZurueck = useMutation({
+    mutationFn: (p: PersonRow) =>
+      ordnePersonalZu(einsatzId, einheitId, p.epId, {
+        nurWennFrei: true,
+        alsFuehrer: p.isFuehrer,
+      }),
+    onMutate: (p) => trackPerson(p.epId).start(),
     onSuccess: invalidate,
-    onError: (e, epId) => personErrors.melde(epId, e, 'Lösen fehlgeschlagen'),
-    onSettled: (_d, _e, epId) => trackPerson(epId).end(),
+    onError: (e, p) => personErrors.melde(p.epId, e, 'Nicht zurückgenommen'),
+    onSettled: (_d, _e, p) => trackPerson(p.epId).end(),
+  });
+  const personalLoesen = useMutation({
+    mutationFn: (p: PersonRow) => gibPersonalFrei(einsatzId, einheitId, p.epId),
+    onMutate: (p) => trackPerson(p.epId).start(),
+    onSuccess: (_d, p) => {
+      invalidate();
+      zeigeRueckgaengig(message, `${p.name} aus Einheit gelöst`, () => personZurueck.mutate(p));
+    },
+    onError: (e, p) => personErrors.melde(p.epId, e, 'Lösen fehlgeschlagen'),
+    onSettled: (_d, _e, p) => trackPerson(p.epId).end(),
   });
   const besatzungZuordnen = useMutation({
     mutationFn: (v: { efId: number; epId: number }) =>
@@ -235,19 +279,49 @@ export default function FahrzeugeBesatzung({
     },
     onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
   });
-  const besatzungLoesen = useMutation({
-    mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
+  const besatzungZurueck = useMutation({
+    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
     onMutate: (v) => trackPerson(v.epId).start(),
     onSuccess: invalidate,
+    onError: (e, v) => personErrors.melde(v.epId, e, 'Nicht zurückgenommen'),
+    onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
+  });
+  const besatzungLoesen = useMutation({
+    mutationFn: (v: { efId: number; epId: number; name: string }) =>
+      gibBesatzungFrei(einsatzId, v.efId, v.epId),
+    onMutate: (v) => trackPerson(v.epId).start(),
+    onSuccess: (_d, v) => {
+      invalidate();
+      zeigeRueckgaengig(message, `${v.name} vom Fahrzeug gelöst`, () =>
+        besatzungZurueck.mutate({ efId: v.efId, epId: v.epId }),
+      );
+    },
     onError: (e, v) => personErrors.melde(v.epId, e, 'Lösen fehlgeschlagen'),
     onSettled: (_d, _e, v) => trackPerson(v.epId).end(),
   });
+  const fahrzeugZurueck = useMutation({
+    mutationFn: (f: FahrzeugEintrag) =>
+      ordneFahrzeugZu(einsatzId, einheitId, f.id, { nurWennFrei: true }),
+    onMutate: (f) => trackFahrzeug(f.id).start(),
+    onSuccess: (_d, f) => {
+      halten.release(f.id);
+      invalidate();
+    },
+    onError: (e, f) => fahrzeugErrors.melde(f.id, e, 'Nicht zurückgenommen'),
+    onSettled: (_d, _e, f) => trackFahrzeug(f.id).end(),
+  });
   const fahrzeugLoesen = useMutation({
-    mutationFn: (efId: number) => gibFahrzeugFrei(einsatzId, einheitId, efId),
-    onMutate: (efId) => trackFahrzeug(efId).start(),
-    onSuccess: invalidate,
-    onError: (e, efId) => fahrzeugErrors.melde(efId, e, 'Lösen fehlgeschlagen'),
-    onSettled: (_d, _e, efId) => trackFahrzeug(efId).end(),
+    mutationFn: (f: FahrzeugEintrag) => gibFahrzeugFrei(einsatzId, einheitId, f.id),
+    onMutate: (f) => trackFahrzeug(f.id).start(),
+    onSuccess: (_d, f) => {
+      halten.add(f);
+      invalidate();
+      zeigeRueckgaengig(message, `${f.funkrufname} aus Einheit gelöst`, () =>
+        fahrzeugZurueck.mutate(f),
+      );
+    },
+    onError: (e, f) => fahrzeugErrors.melde(f.id, e, 'Lösen fehlgeschlagen'),
+    onSettled: (_d, _e, f) => trackFahrzeug(f.id).end(),
   });
   const fmsStatus = useMutation({
     mutationFn: (v: { efId: number; statusId: number }) =>
@@ -266,9 +340,11 @@ export default function FahrzeugeBesatzung({
         .catch((e: unknown) => personErrors.melde(p.epId, e, 'Einheitsführer nicht gesetzt'))
         .finally(row.end);
     } else if (key === 'aus-einheit') {
-      personalLoesen.mutate(p.epId);
+      personalLoesen.mutate(p);
     } else if (key === 'vom-fahrzeug') {
-      if (p.fahrzeugId != null) besatzungLoesen.mutate({ efId: p.fahrzeugId, epId: p.epId });
+      if (p.fahrzeugId != null) {
+        besatzungLoesen.mutate({ efId: p.fahrzeugId, epId: p.epId, name: p.name });
+      }
     } else {
       besatzungZuordnen.mutate({ efId: Number(key.slice('auf:'.length)), epId: p.epId });
     }
@@ -305,6 +381,38 @@ export default function FahrzeugeBesatzung({
     schluessel: (p) => p.epId,
   });
 
+  // Die Fahrzeuge der Einheit, wie die Quelle sie zeigt; die gelösten hält `useHoldGeloest` an
+  // ihrer Stelle (LLH-1722, Spec `bedien-muster`, „Eine gelöste Zeile hält ihre Stelle“).
+  const fahrzeugEintraege: FahrzeugEintrag[] = mittel
+    ? mittel.fahrzeuge.map((f) => ({
+        id: f.fahrzeug.id,
+        funkrufname: f.fahrzeug.funkrufname,
+        baum: f,
+        flach: null,
+      }))
+    : einheit.fahrzeug_mitglieder.map((m) => ({
+        id: m.ef_id,
+        funkrufname: m.funkrufname,
+        baum: null,
+        flach: m,
+      }));
+  const halten = useHoldGeloest(fahrzeugEintraege, `${einsatzId}:${einheitId}`);
+  const gehaltenIds = new Set(halten.rows.filter((r) => r.isGeloest).map((r) => r.p.id));
+
+  /** Aktionen eines Fahrzeugs, EINE Quelle für ⋮ und Kontextmenü (LLH-1722). */
+  const fahrzeugMenue: WeitereAktionen<FahrzeugEintrag> = {
+    eintraege: () => buildFahrzeugMenuItems({ canEditEinheit: rechte.canEditEinheit }),
+    zugaenglicherName: (f) => `Aktionen zu Fahrzeug ${f.funkrufname}`,
+    laeuft: (f) => pending.has(`f${f.id}`),
+    onWahl: (key, f) => {
+      if ((key as FahrzeugMenuKey) === 'aus-einheit') fahrzeugLoesen.mutate(f);
+    },
+  };
+  const kontextFahrzeug = useZeilenMenueKontext(fahrzeugMenue, {
+    finde: (k) => fahrzeugEintraege.find((f) => f.id === k),
+    schluessel: (f) => f.id,
+  });
+
   /** Der Grund unter einer Zeile, über die ganze Breite. */
   const errorRow = (g: ZeilenGrund | null) =>
     g && (
@@ -332,8 +440,14 @@ export default function FahrzeugeBesatzung({
     return text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
   };
 
-  const renderPersonRow = (p: PersonRow) => (
-    <div key={p.epId} data-lfh="einheit-person" style={rowStyle} {...kontext.ausloeser(p)}>
+  /** `gedaempft`: unter einer gehaltenen Fahrzeugzeile, ohne Bedienung (LLH-1722). */
+  const renderPersonRow = (p: PersonRow, gedaempft = false) => (
+    <div
+      key={p.epId}
+      data-lfh="einheit-person"
+      style={gedaempft ? { ...rowStyle, color: rollen.gedaempft } : rowStyle}
+      {...(gedaempft ? {} : kontext.ausloeser(p))}
+    >
       <span style={{ display: 'inline-flex', gap: token.marginXXS }}>
         <PositionsMarken
           person={{ position: p.position, isFuehrer: p.isFuehrer, faehrtAuf: p.faehrtAuf }}
@@ -347,10 +461,12 @@ export default function FahrzeugeBesatzung({
         )}
       </span>
       {secondaryText([p.funktion, p.faehrtAuf ? `fährt auf ${p.faehrtAuf}` : null])}
-      <span style={{ marginInlineStart: 'auto' }}>
-        <ZeilenMenueAusloeser menue={personMenue} zeile={p} />
-      </span>
-      {errorRow(personErrors.grund(p.epId))}
+      {!gedaempft && (
+        <span style={{ marginInlineStart: 'auto' }}>
+          <ZeilenMenueAusloeser menue={personMenue} zeile={p} />
+        </span>
+      )}
+      {!gedaempft && errorRow(personErrors.grund(p.epId))}
     </div>
   );
 
@@ -398,16 +514,15 @@ export default function FahrzeugeBesatzung({
   };
 
   /**
-   * Rechts: Status, „Personal der Einheit übernehmen“ und rot „Aus Einheit lösen“, abgesetzt
-   * (`size="middle"`). Im Baum ist der Status die FMS-Wahl, flach aus dem DTO nur das Wort. Die
-   * Wahl steht im Quelltext in derselben Reihe wie der rote Knopf, damit der Abstands-Wächter sie
-   * sieht (`components/aktionsabstand.guard.test.ts`, LLH-1268).
+   * Rechts: Status, „Personal der Einheit übernehmen“ und das ⋮ mit „Aus Einheit lösen“ (LLH-1722).
+   * Im Baum ist der Status die FMS-Wahl, flach aus dem DTO nur das Wort.
    */
   const renderFahrzeugActions = (
-    efId: number,
+    f: FahrzeugEintrag,
     status: { wahl: FahrzeugImBaum['fahrzeug'] } | { wort: ReactNode },
     uebernehmen?: ReactNode,
   ) => {
+    const efId = f.id;
     // Gesperrt ist nur die eigene Zeile: eine Wahl an einem anderen Fahrzeug geht hinaus.
     const isPending = pending.has(`f${efId}`);
     return (
@@ -432,29 +547,84 @@ export default function FahrzeugeBesatzung({
           status.wort
         )}
         {uebernehmen}
-        {rechte.canEditEinheit && (
-          <Button danger loading={isPending} onClick={() => fahrzeugLoesen.mutate(efId)}>
-            Aus Einheit lösen
-          </Button>
-        )}
+        <ZeilenMenueAusloeser menue={fahrzeugMenue} zeile={f} />
       </Space>
     );
   };
 
-  const renderFahrzeugRow = (f: FahrzeugImBaum) => {
+  /** Das taktische Zeichen eines Fahrzeugs, aus dem Kern oder flach aus dem DTO. */
+  const renderZeichen = (f: FahrzeugEintrag) => {
+    const ef = f.baum?.fahrzeug;
+    return (
+      <FahrzeugZeichen
+        tz={{
+          fahrzeugtyp: ef?.fahrzeugtyp ?? f.flach?.fahrzeugtyp ?? null,
+          traegerorganisation: ef?.traegerorganisation ?? null,
+          opta: ef?.opta ?? null,
+          fachaufgabe: ef?.tz_fachaufgabe ?? null,
+          organisation: ef?.tz_organisation ?? null,
+        }}
+      />
+    );
+  };
+
+  /**
+   * Die gehaltene Zeile eines gelösten Fahrzeugs (LLH-1722): gedämpft, „Gelöst“ träge an der
+   * Stelle des ⋮, das gelöst hat, „Rückgängig“ davor; ein zweiter Tipp an dieselbe Stelle trifft
+   * die Marke, nie das nächste Fahrzeug. Die Besatzung bleibt gedämpft darunter, sonst wanderte sie
+   * nach „Ohne Fahrzeug“, und die Höhe spränge trotzdem.
+   */
+  const renderGehaltenesFahrzeug = (f: FahrzeugEintrag, alsGruppe: boolean) => (
+    <div
+      key={f.id}
+      {...(alsGruppe ? { role: 'group', 'aria-label': `Fahrzeug ${f.funkrufname}` } : {})}
+      data-geloest
+    >
+      <div data-lfh="einheit-fahrzeug" style={{ ...rowStyle, color: rollen.gedaempft }}>
+        {renderZeichen(f)}
+        <span style={monoStil(13)}>{f.funkrufname}</span>
+        {secondaryText([f.baum?.fahrzeug.fahrzeugtyp ?? f.flach?.fahrzeugtyp])}
+        <Space size="middle" wrap style={{ marginInlineStart: 'auto' }}>
+          {rechte.canEditEinheit && (
+            <Button
+              aria-label={`Rückgängig: ${f.funkrufname} zurück in die Einheit`}
+              loading={pending.has(`f${f.id}`)}
+              onClick={() => {
+                if (!fahrzeugZurueck.isPending) fahrzeugZurueck.mutate(f);
+              }}
+            >
+              Rückgängig
+            </Button>
+          )}
+          <Button
+            type="text"
+            aria-label={`${f.funkrufname} gelöst`}
+            aria-disabled
+            style={{ color: rollen.gedaempft, cursor: 'default' }}
+          >
+            Gelöst
+          </Button>
+        </Space>
+        {errorRow(fahrzeugErrors.grund(f.id))}
+      </div>
+      {f.baum && f.baum.besatzung.length > 0 && (
+        <div style={{ paddingInlineStart: token.paddingLG }}>
+          {f.baum.besatzung.map((x) => renderPersonRow(fromBaum(x), true))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderFahrzeugRow = (eintrag: FahrzeugEintrag, f: FahrzeugImBaum) => {
     const ef = f.fahrzeug;
     return (
       <div data-lfh="einheit-fahrzeug" style={rowStyle}>
-        <FahrzeugZeichen
-          tz={{
-            fahrzeugtyp: ef.fahrzeugtyp ?? null,
-            traegerorganisation: ef.traegerorganisation ?? null,
-            opta: ef.opta ?? null,
-            fachaufgabe: ef.tz_fachaufgabe ?? null,
-            organisation: ef.tz_organisation ?? null,
-          }}
-        />
-        {renderFunkrufname(ef.id, ef.funkrufname)}
+        {renderZeichen(eintrag)}
+        {/* Eine Zeile mit Reglern trägt das Kontextmenü nur an ihrer Bezeichnung (Spec
+            `datensatz-aktionsmenue`). */}
+        <span {...kontextFahrzeug.ausloeser(eintrag)}>
+          {renderFunkrufname(ef.id, ef.funkrufname)}
+        </span>
         {secondaryText([ef.fahrzeugtyp])}
         <span
           data-lfh="einheit-besatzung"
@@ -471,7 +641,7 @@ export default function FahrzeugeBesatzung({
           <span style={monoStil(12)}>{besatzungText(f)}</span>
           {secondaryText([fremdText(f)])}
         </span>
-        {renderFahrzeugActions(ef.id, { wahl: ef }, renderUebernehmen(ef))}
+        {renderFahrzeugActions(eintrag, { wahl: ef }, renderUebernehmen(ef))}
         {errorRow(fahrzeugErrors.grund(ef.id))}
       </div>
     );
@@ -480,20 +650,29 @@ export default function FahrzeugeBesatzung({
   /** Personen unter einem Fahrzeug bzw. unter „Ohne Fahrzeug“: eingerückt. */
   const indented = (personen: readonly PersonRow[]) =>
     personen.length > 0 && (
-      <div style={{ paddingInlineStart: token.paddingLG }}>{personen.map(renderPersonRow)}</div>
+      <div style={{ paddingInlineStart: token.paddingLG }}>
+        {personen.map((p) => renderPersonRow(p))}
+      </div>
     );
 
   let content: ReactNode;
   if (mittel) {
-    const ohne = mittel.ohneFahrzeug.map(fromBaum);
+    // Wer auf einem gehaltenen Fahrzeug sitzt, steht gedämpft unter ihm, nicht unter „Ohne Fahrzeug“.
+    const ohne = mittel.ohneFahrzeug
+      .filter((x) => x.person.fahrzeug_id == null || !gehaltenIds.has(x.person.fahrzeug_id))
+      .map(fromBaum);
     content = (
       <>
-        {mittel.fahrzeuge.map((f) => (
-          <div key={f.fahrzeug.id} role="group" aria-label={`Fahrzeug ${f.fahrzeug.funkrufname}`}>
-            {renderFahrzeugRow(f)}
-            {indented(f.besatzung.map(fromBaum))}
-          </div>
-        ))}
+        {halten.rows.map(({ p: eintrag, isGeloest }) =>
+          isGeloest || eintrag.baum == null ? (
+            renderGehaltenesFahrzeug(eintrag, true)
+          ) : (
+            <div key={eintrag.id} role="group" aria-label={`Fahrzeug ${eintrag.funkrufname}`}>
+              {renderFahrzeugRow(eintrag, eintrag.baum)}
+              {indented(eintrag.baum.besatzung.map(fromBaum))}
+            </div>
+          ),
+        )}
         {needsOhneFahrzeugKnoten(mittel) ? (
           <div role="group" aria-label="Ohne Fahrzeug">
             <div style={rowStyle}>
@@ -505,7 +684,7 @@ export default function FahrzeugeBesatzung({
             {indented(ohne)}
           </div>
         ) : (
-          ohne.map(renderPersonRow)
+          ohne.map((p) => renderPersonRow(p))
         )}
       </>
     );
@@ -513,37 +692,35 @@ export default function FahrzeugeBesatzung({
     // Flach aus dem DTO (D5): Fahrzeuge mit Status als Wort, dann die Mitglieder.
     content = (
       <>
-        {einheit.fahrzeug_mitglieder.map((m) => (
-          <div key={m.ef_id} data-lfh="einheit-fahrzeug" style={rowStyle}>
-            <FahrzeugZeichen
-              tz={{
-                fahrzeugtyp: m.fahrzeugtyp ?? null,
-                traegerorganisation: null,
-                opta: null,
-                fachaufgabe: null,
-                organisation: null,
-              }}
-            />
-            {renderFunkrufname(m.ef_id, m.funkrufname)}
-            {secondaryText([m.fahrzeugtyp])}
-            {renderFahrzeugActions(m.ef_id, {
-              wort: (
-                <StatusTag
-                  darstellung={
-                    m.status
-                      ? {
-                          ...statusKategorie[m.status.kategorie],
-                          label: fmsEtikett(m.status.label, m.status.fms_anker),
-                        }
-                      : { rolle: 'neutral', label: 'kein Status' }
-                  }
-                  farbe={m.status?.farbe ?? null}
-                />
-              ),
-            })}
-            {errorRow(fahrzeugErrors.grund(m.ef_id))}
-          </div>
-        ))}
+        {halten.rows.map(({ p: eintrag, isGeloest }) => {
+          const m = eintrag.flach;
+          if (isGeloest || m == null) return renderGehaltenesFahrzeug(eintrag, false);
+          return (
+            <div key={m.ef_id} data-lfh="einheit-fahrzeug" style={rowStyle}>
+              {renderZeichen(eintrag)}
+              <span {...kontextFahrzeug.ausloeser(eintrag)}>
+                {renderFunkrufname(m.ef_id, m.funkrufname)}
+              </span>
+              {secondaryText([m.fahrzeugtyp])}
+              {renderFahrzeugActions(eintrag, {
+                wort: (
+                  <StatusTag
+                    darstellung={
+                      m.status
+                        ? {
+                            ...statusKategorie[m.status.kategorie],
+                            label: fmsEtikett(m.status.label, m.status.fms_anker),
+                          }
+                        : { rolle: 'neutral', label: 'kein Status' }
+                    }
+                    farbe={m.status?.farbe ?? null}
+                  />
+                ),
+              })}
+              {errorRow(fahrzeugErrors.grund(m.ef_id))}
+            </div>
+          );
+        })}
         {einheit.personal_mitglieder.map((m) => renderPersonRow(fromMitglied(m)))}
       </>
     );
@@ -570,12 +747,14 @@ export default function FahrzeugeBesatzung({
           {null}
         </PaneelZustand>
       )}
-      {rechte.hasBesatzung && listState === 'laden' ? null : hasNoMitglieder(einheit) ? (
+      {rechte.hasBesatzung && listState === 'laden' ? null : hasNoMitglieder(einheit) &&
+        halten.rows.length === 0 ? (
         <span style={{ color: rollen.gedaempft }}>—</span>
       ) : (
-        content
+        <div {...halten.rootProps}>{content}</div>
       )}
       {kontext.menue}
+      {kontextFahrzeug.menue}
       {children}
       {canBesatzung && personal && (
         <BesatzungUebernehmenDialog

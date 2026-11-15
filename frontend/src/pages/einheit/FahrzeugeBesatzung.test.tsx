@@ -198,6 +198,22 @@ async function oeffneMenue(name: string) {
     return offen[offen.length - 1];
   });
 }
+/** Öffnet das ⋮ eines Fahrzeugs (LLH-1722) und liefert das offene Menü. */
+async function oeffneFahrzeugMenue(funkrufname: string) {
+  await userEvent.click(
+    within(fahrzeugZeile(funkrufname)).getByRole('button', {
+      name: `Aktionen zu Fahrzeug ${funkrufname}`,
+    }),
+  );
+  await warteAufMenueFokus();
+  return waitFor(() => {
+    const offen = document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(offen.length).toBeGreaterThan(0);
+    return offen[offen.length - 1];
+  });
+}
 /** Wählt am Status eines Fahrzeugs einen Eintrag, im zuletzt geöffneten Menü. */
 async function waehleStatus(funkrufname: string, eintrag: string) {
   await userEvent.click(
@@ -459,16 +475,18 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
     await waitFor(() => expect(bodies).toEqual([{ status_id: 103 }]));
   });
 
-  it('„Aus Einheit lösen“ rot an der Zeile, der Grund steht dort', async () => {
+  it('„Aus Einheit lösen“ steht neutral im ⋮ des Fahrzeugs, kein roter Knopf; der Grund steht an der Zeile (LLH-1722)', async () => {
     server.use(
       http.delete('/api/einsaetze/1/einheiten/10/fahrzeug/30', () =>
         HttpResponse.json({ error: 'Fahrzeug ist gebunden' }, { status: 409 }),
       ),
     );
     zeige();
-    const knopf = within(fahrzeugZeile('83-1')).getByRole('button', { name: 'Aus Einheit lösen' });
-    expect(knopf).toHaveClass('ant-btn-dangerous');
-    await userEvent.click(knopf);
+    expect(within(paneel()).queryByRole('button', { name: 'Aus Einheit lösen' })).toBeNull();
+    const menue = await oeffneFahrzeugMenue('83-1');
+    expect(eintraege(menue)).toEqual(['Aus Einheit lösen']);
+    expect(within(menue).queryByRole('separator')).toBeNull();
+    await userEvent.click(within(menue).getByText('Aus Einheit lösen'));
     expect(await within(fahrzeugZeile('83-1')).findByText('Fahrzeug ist gebunden')).toHaveAttribute(
       'data-fehler',
     );
@@ -510,7 +528,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
     await waitFor(() => expect(aufrufe).toEqual(['30:{"status_id":103}', '31:{"status_id":103}']));
   });
 
-  it('„Aus Einheit lösen“ lädt bis zur Antwort, nur an seiner Zeile', async () => {
+  it('„Aus Einheit lösen“ lädt bis zur Antwort am ⋮, nur an seiner Zeile', async () => {
     server.use(
       http.delete('/api/einsaetze/1/einheiten/10/fahrzeug/30', async () => {
         await delay('infinite');
@@ -518,18 +536,156 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
       }),
     );
     zeige();
-    await userEvent.click(
-      within(fahrzeugZeile('83-1')).getByRole('button', { name: 'Aus Einheit lösen' }),
-    );
-    // Ladend trägt der Knopf das Symbol „loading“ im Namen.
+    await userEvent.click(within(await oeffneFahrzeugMenue('83-1')).getByText('Aus Einheit lösen'));
     await waitFor(() =>
       expect(
-        within(fahrzeugZeile('83-1')).getByRole('button', { name: /Aus Einheit lösen$/ }),
+        within(fahrzeugZeile('83-1')).getByRole('button', { name: /Aktionen zu Fahrzeug 83-1/ }),
       ).toHaveClass('ant-btn-loading'),
     );
     expect(
-      within(fahrzeugZeile('83-2')).getByRole('button', { name: 'Aus Einheit lösen' }),
+      within(fahrzeugZeile('83-2')).getByRole('button', { name: 'Aktionen zu Fahrzeug 83-2' }),
     ).not.toHaveClass('ant-btn-loading');
+  });
+});
+
+/**
+ * Rückweg und gehaltene Zeile (LLH-1722, Spec `einheit-ansicht`, „Lösen in der Einheit
+ * zurücknehmen“; `bedien-muster`, „Eine gelöste Zeile hält ihre Stelle“): die Zeile des gelösten
+ * Fahrzeugs bleibt als „Gelöst · Rückgängig“ stehen, die Besatzung gedämpft darunter; der
+ * nächste Tipp an derselben Stelle trifft die träge Marke, nicht das nächste Fahrzeug.
+ */
+describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
+  function mitschnitt() {
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete('/api/einsaetze/1/einheiten/10/fahrzeug/:efId', ({ params }) => {
+        aufrufe.push(`DELETE ${params.efId}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.put('/api/einsaetze/1/einheiten/10/fahrzeug/:efId', ({ params, request }) => {
+        aufrufe.push(`PUT ${params.efId}${new URL(request.url).search}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    return aufrufe;
+  }
+
+  it('die gelöste Zeile steht als „Gelöst“ mit „Rückgängig“, die Besatzung gedämpft darunter', async () => {
+    mitschnitt();
+    zeige();
+    await userEvent.click(within(await oeffneFahrzeugMenue('83-1')).getByText('Aus Einheit lösen'));
+    const marke = await within(gruppe('Fahrzeug 83-1')).findByRole('button', {
+      name: '83-1 gelöst',
+    });
+    expect(marke).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      within(gruppe('Fahrzeug 83-1')).getByRole('button', {
+        name: 'Rückgängig: 83-1 zurück in die Einheit',
+      }),
+    ).toBeInTheDocument();
+    // Die Besatzung steht weiter unter dem Platzhalter, ohne Menüs.
+    expect(namenIn(gruppe('Fahrzeug 83-1'))).toEqual(['Anna Führer', 'Clara Unter', 'Bernd Mann']);
+    expect(
+      within(gruppe('Fahrzeug 83-1')).queryAllByRole('button', { name: /^Aktionen zu Person/ }),
+    ).toHaveLength(0);
+    expect(await screen.findByText('83-1 aus Einheit gelöst')).toBeInTheDocument();
+  });
+
+  it('zwei Tipps an der Stelle des ⋮ lösen nur ein Fahrzeug', async () => {
+    const aufrufe = mitschnitt();
+    zeige();
+    await userEvent.click(within(await oeffneFahrzeugMenue('83-1')).getByText('Aus Einheit lösen'));
+    const marke = await within(gruppe('Fahrzeug 83-1')).findByRole('button', {
+      name: '83-1 gelöst',
+    });
+    await userEvent.click(marke);
+    await userEvent.click(marke);
+    expect(aufrufe).toEqual(['DELETE 30']);
+    expect(document.querySelectorAll('.ant-dropdown:not(.ant-dropdown-hidden)')).toHaveLength(0);
+  });
+
+  it('„Rückgängig“ in der Zeile ordnet mit `nur_wenn_frei` wieder zu', async () => {
+    const aufrufe = mitschnitt();
+    zeige();
+    await userEvent.click(within(await oeffneFahrzeugMenue('83-1')).getByText('Aus Einheit lösen'));
+    await userEvent.click(
+      await within(gruppe('Fahrzeug 83-1')).findByRole('button', {
+        name: 'Rückgängig: 83-1 zurück in die Einheit',
+      }),
+    );
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 30', 'PUT 30?nur_wenn_frei=1']));
+  });
+
+  it('„Rückgängig“ im Hinweis geht denselben Weg', async () => {
+    const aufrufe = mitschnitt();
+    zeige();
+    await userEvent.click(within(await oeffneFahrzeugMenue('83-1')).getByText('Aus Einheit lösen'));
+    const hinweis = (await screen.findByText('83-1 aus Einheit gelöst')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 30', 'PUT 30?nur_wenn_frei=1']));
+  });
+
+  it('steht das Fahrzeug inzwischen in einer anderen Einheit, steht der Grund an der gehaltenen Zeile', async () => {
+    mitschnitt();
+    server.use(
+      http.put('/api/einsaetze/1/einheiten/10/fahrzeug/30', () =>
+        HttpResponse.json({ error: '83-1 steht inzwischen in Einheit «Gr 2»' }, { status: 409 }),
+      ),
+    );
+    zeige();
+    await userEvent.click(within(await oeffneFahrzeugMenue('83-1')).getByText('Aus Einheit lösen'));
+    await userEvent.click(
+      await within(gruppe('Fahrzeug 83-1')).findByRole('button', {
+        name: 'Rückgängig: 83-1 zurück in die Einheit',
+      }),
+    );
+    expect(
+      await within(gruppe('Fahrzeug 83-1')).findByText('83-1 steht inzwischen in Einheit «Gr 2»'),
+    ).toHaveAttribute('data-fehler');
+  });
+
+  it('nach „Aus Einheit lösen“ einer Person: Rückgängig ordnet zu, beim Einheitsführer samt Führung', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete(
+        '/api/einsaetze/1/einheiten/10/personal/:epId',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+      http.put('/api/einsaetze/1/einheiten/10/personal/:epId', ({ params, request }) => {
+        aufrufe.push(`PUT ${params.epId}${new URL(request.url).search}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    zeige();
+    await userEvent.click(within(await oeffneMenue('Anna Führer')).getByText('Aus Einheit lösen'));
+    const hinweis = (await screen.findByText('Anna Führer aus Einheit gelöst')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['PUT 1?nur_wenn_frei=1&als_fuehrer=1']));
+  });
+
+  it('nach „Vom Fahrzeug lösen“: Rückgängig setzt die Person wieder auf ihr Fahrzeug', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete(
+        '/api/einsaetze/1/fahrzeuge/30/besatzung/3',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+      http.put('/api/einsaetze/1/fahrzeuge/:efId/besatzung/:epId', ({ params }) => {
+        aufrufe.push(`PUT ${params.efId}/${params.epId}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    zeige();
+    await userEvent.click(within(await oeffneMenue('Clara Unter')).getByText('Vom Fahrzeug lösen'));
+    const hinweis = (await screen.findByText('Clara Unter vom Fahrzeug gelöst')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['PUT 30/3']));
   });
 });
 
@@ -668,6 +824,9 @@ describe('FahrzeugeBesatzung · ohne Schreibrecht (D14)', () => {
       0,
     );
     expect(within(paneel()).queryByRole('button', { name: 'Aus Einheit lösen' })).toBeNull();
+    expect(
+      within(paneel()).queryAllByRole('button', { name: /^Aktionen zu Fahrzeug/ }),
+    ).toHaveLength(0);
     expect(
       within(paneel()).queryByRole('button', { name: 'Personal der Einheit übernehmen' }),
     ).toBeNull();

@@ -366,6 +366,21 @@ export function buildPersonMenuItems(
   return items;
 }
 
+/** Das einzige Menü eines Fahrzeugs der Einheit (LLH-1722). */
+export type FahrzeugMenuKey = 'aus-einheit';
+
+/**
+ * Die Einträge des Menüs eines Fahrzeugs (LLH-1722, Spec `einheit-ansicht`, „Aktionen je Fahrzeug
+ * über ein Menü“): neutral „Aus Einheit lösen“, nur mit Schreibrecht im Modul Einheiten. Es steht
+ * im ⋮ statt als roter Knopf in der Zeile: sonst rückte nach dem Lösen der Knopf der nächsten Zeile
+ * unter den Finger. FMS-Wahl und „Personal der Einheit übernehmen“ bleiben an der Zeile.
+ */
+export function buildFahrzeugMenuItems(
+  rechte: Pick<EinheitRechte, 'canEditEinheit'>,
+): MenueEintrag<FahrzeugMenuKey>[] {
+  return rechte.canEditEinheit ? [{ key: 'aus-einheit', label: 'Aus Einheit lösen' }] : [];
+}
+
 // ── Aufgelöste Einheit (LLH-1266) ─────────────────────────────────────────────
 
 /** Ein Fahrzeug der letzten Besetzung mit den Personen, die auf ihm saßen. */
