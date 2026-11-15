@@ -95,10 +95,12 @@ einen anderen Zweck, und ein rotes „Migrationsnummern“ führte auf die falsc
 Beim Befund `haengt` an einem PR auf `alpha` holt er die Regeln von `alpha` einmal je Lauf über
 `gh_api` und reicht sie an `ruleset-pruefen.sh` (die Pflichtliste gilt nur dort). Bei Abweichung
 bekommt der Hinweis einen Absatz „Wahrscheinliche Ursache“ mit den Zeilen des Skripts. Die
-gefundene Abweichung geht in die Kennung des Hinweises ein: taucht sie auf oder ist sie behoben,
-wird der Hinweis neu geschrieben (Review: sonst bekäme ein schon stehender Hinweis die Ursache nie
-und behielte eine veraltete). Ohne Abweichung oder ohne lesbares Ruleset bleibt die Kennung die
-des Befunds, ein Aussetzer der API schreibt einen Hinweis ohne Ursache nicht neu. Verworfen: den
+Kennung des Hinweises ist zweigeteilt: 16 Zeichen für den Befund, bei einer Abweichung 16 weitere
+für sie. Taucht sie auf oder ist sie behoben, wird der Hinweis neu geschrieben (Review: sonst
+bekäme ein schon stehender Hinweis die Ursache nie und behielte eine veraltete). Ist das Ruleset
+nicht lesbar, gilt ein stehender Hinweis zum selben Kopf weiter, mit oder ohne Ursache: ein
+Aussetzer der API schreibt nichts neu (Review des Fix-Commits: sonst zwei neue Kommentare an
+jedem hängenden PR). Verworfen: den
 Text per PATCH nachziehen; der Hinweis nennt die Minuten seit dem Grün, sein Text ändert sich also
 in jedem Lauf.
 

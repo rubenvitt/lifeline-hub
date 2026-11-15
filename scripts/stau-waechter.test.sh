@@ -533,6 +533,15 @@ pruefe "19b Regeln von alpha gelesen" "RULES alpha" "$(cat "$(fake "$r")/abfrage
 # Derselbe Lauf noch einmal: nichts Neues.
 lauf "$r" false false true
 pruefe "19b gleicher Befund mit gleicher Ursache schreibt nichts" "POST haengt" "$(log "$r")"
+# Ein Aussetzer der API (Regeln kurz nicht lesbar) lässt den Hinweis mit Ursache stehen: sonst
+# bekäme jeder hängende PR zwei neue Kommentare (Review des Fix-Commits).
+mv "$(fake "$r")/regeln.json" "$(fake "$r")/regeln.weg"
+lauf "$r" false false true
+pruefe "19g Ruleset kurz nicht lesbar: Hinweis mit Ursache bleibt" "POST haengt" "$(log "$r")"
+kommentar_enthaelt "19g Ursache steht weiter" "$r" "Wahrscheinliche Ursache"
+mv "$(fake "$r")/regeln.weg" "$(fake "$r")/regeln.json"
+lauf "$r" false false true
+pruefe "19g wieder lesbar: nichts Neues" "POST haengt" "$(log "$r")"
 # Ruleset inzwischen repariert, der PR mergt trotzdem nicht: der Hinweis nennt die alte Ursache
 # nicht mehr (Review LLH-1894: eine veraltete Ursache führte auf die falsche Spur).
 regeln "$r" ""

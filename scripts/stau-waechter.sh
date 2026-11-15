@@ -129,29 +129,53 @@ check_kennzahlen() { # <sha>
         ] | map(tostring) | join(" ")'
 }
 
-# Abweichungen im Ruleset von <basis> als Absatz für den Hinweis, leer ohne (LLH-1895). Am 14.11.2026
-# hingen alle grünen PRs, weil `Migrationsnummern` im Ruleset eine Quelle trug; der Hinweis sagte
-# nur „grün, aber nicht gemergt“. Geprüft wird nur `alpha` (die Pflichtliste in
-# `ruleset-pruefen.sh` gilt dort). Nicht lesbar heißt: kein Absatz, der Hinweis bleibt wie bisher.
-# Setzt RULESET_ABSATZ; je Lauf und Branch einmal gelesen. Nicht in `$( )` aufrufen: die
-# Zwischenablage ginge in der Subshell verloren.
-RULESET_GELESEN="" RULESET_ABSATZ=""
+# Abweichungen im Ruleset von <basis> als Absatz für den Hinweis (LLH-1895). Am 14.11.2026 hingen
+# alle grünen PRs, weil `Migrationsnummern` im Ruleset eine Quelle trug; der Hinweis sagte nur
+# „grün, aber nicht gemergt“. Geprüft wird nur `alpha` (die Pflichtliste in `ruleset-pruefen.sh`
+# gilt dort). Setzt RULESET_STAND (`ok`, `abweichung`, `unlesbar`; `ok` auch für andere Branches)
+# und RULESET_ABSATZ (nur bei `abweichung`); je Lauf und Branch einmal gelesen. Nicht in `$( )`
+# aufrufen: die Zwischenablage ginge in der Subshell verloren.
+RULESET_GELESEN="" RULESET_ABSATZ="" RULESET_STAND=ok
 ruleset_ursache() { # <basis>
   local regeln befund code=0
-  [ "$1" = alpha ] || { RULESET_ABSATZ=""; return 0; }
+  [ "$1" = alpha ] || { RULESET_ABSATZ="" RULESET_STAND=ok; return 0; }
   if [ "$RULESET_GELESEN" != "$1" ]; then
-    RULESET_GELESEN="$1" RULESET_ABSATZ=""
+    RULESET_GELESEN="$1" RULESET_ABSATZ="" RULESET_STAND=unlesbar
     if regeln="$(gh_api "repos/$REPO/rules/branches/$1" 2> /dev/null)"; then
       befund="$(printf '%s' "$regeln" | "$SKRIPTE/ruleset-pruefen.sh")" || code=$?
-      if [ "$code" = 1 ]; then
-        RULESET_ABSATZ="**Wahrscheinliche Ursache:** Das Ruleset von \`$1\` weicht von den Pflicht-Checks ab (\`scripts/ruleset-pruefen.sh\`):
+      case "$code" in
+        0) RULESET_STAND=ok ;;
+        1)
+          RULESET_STAND=abweichung
+          RULESET_ABSATZ="**Wahrscheinliche Ursache:** Das Ruleset von \`$1\` weicht von den Pflicht-Checks ab (\`scripts/ruleset-pruefen.sh\`):
 
 $(printf '%s\n' "$befund" | sed 's/^/- /')
 
-"
-      fi
+" ;;
+      esac
     fi
   fi
+}
+
+# Kennung des Befunds `haengt` an <nr> für <kopf>: 16 Zeichen für den Befund, bei einer Abweichung
+# im Ruleset 16 weitere für sie. Taucht die Abweichung auf oder ist sie behoben, ändert sich die
+# Kennung, und der Hinweis wird neu geschrieben (nie eine fehlende oder veraltete Ursache). Ist das
+# Ruleset nicht lesbar, gilt ein stehender Hinweis zum selben Kopf weiter, mit oder ohne Ursache:
+# ein Aussetzer der API schreibt nichts neu, sonst bekäme jeder hängende PR zwei Kommentare.
+haengt_kennung() { # <nr> <kopf>
+  local befund alt alt_art="" alt_kenn=""
+  befund="$(kennung "haengt $2")"
+  case "$RULESET_STAND" in
+    abweichung) printf '%s%s' "$befund" "$(kennung "$RULESET_ABSATZ")" ;;
+    unlesbar)
+      if alt="$(hinweis_lesen "$1")" && [ -n "$alt" ]; then read -r _ alt_art alt_kenn _ <<< "$alt"; fi
+      if [ "$alt_art" = haengt ] && [ "${alt_kenn:0:16}" = "$befund" ]; then
+        printf '%s' "$alt_kenn"
+      else
+        printf '%s' "$befund"
+      fi ;;
+    *) printf '%s' "$befund" ;;
+  esac
 }
 
 # ── Hinweis am PR ───────────────────────────────────────────────────────────────────
@@ -350,12 +374,9 @@ So geht es weiter: einen neuen Commit pushen, etwa \`$basis\` in den Branch merg
     && [ $(( $(jetzt) - ende )) -ge "$WARTEZEIT" ] \
     && [ "$(gh_api "repos/$REPO/commits/$k/status" | jq -r '.state // ""')" = success ]; then
     sag "Befund: seit $(( ($(jetzt) - ende) / 60 )) min grün, Auto-Merge an, nicht gemergt"
-    # Eine gefundene Ursache gehört zur Kennung: taucht sie auf oder ist sie behoben, wird der
-    # Hinweis neu geschrieben, damit er nie eine fehlende oder veraltete Ursache zeigt (Review
-    # LLH-1894). Ohne Abweichung oder ohne lesbares Ruleset ist die Kennung die des Befunds; ein
-    # Aussetzer der API schreibt einen Hinweis ohne Ursache also nicht neu.
+    # Die Ursache aus dem Ruleset gehört zur Kennung (`haengt_kennung`).
     ruleset_ursache "$basis"
-    hinweis_setzen "$nr" haengt "$(kennung "haengt $k${RULESET_ABSATZ:+ $RULESET_ABSATZ}")" "**Grün, aber nicht gemergt** (Stau-Wächter)
+    hinweis_setzen "$nr" haengt "$(haengt_kennung "$nr" "$k")" "**Grün, aber nicht gemergt** (Stau-Wächter)
 
 Alle Checks auf \`$(kurz "$k")\` sind seit $(( ($(jetzt) - ende) / 60 )) Minuten grün, Auto-Merge ist eingeschaltet, gemergt wurde trotzdem nicht.
 

@@ -21,7 +21,7 @@
 
 ## 4. Gesamtprüfung
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün; die Form der Workflows mit `actionlint`, falls verfügbar, sonst per Formtest belegt
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün; die Form der Workflows mit `actionlint`, falls verfügbar, sonst per Formtest belegt (lokal `--nur schnell` grün, `actionlint` nicht verfügbar: Form per YAML-Parse und `ci-stufen.test.sh`; Rust- und Frontend-Suite fährt die CI des PRs mit Label `voll`, der Diff ändert keinen Rust- oder Frontend-Code)
 
 ## Workflow follow-up
 

@@ -10,8 +10,8 @@ Am Abend des 14.11.2026 bekam `Migrationsnummern` im Ruleset von `alpha` beim Au
 die Quelle „GitHub Actions“. Der Status wird über die Status-API gesetzt und zählt mit diesem Pin
 nicht: Alle grünen PRs standen über Nacht auf `blocked`, der Stau-Wächter meldete nur „Grün, aber
 nicht gemergt“, und aufgefallen ist es erst am nächsten Morgen. Dazu trägt ein nicht fertiger PR
-ohne `voll` neun übersprungene Einträge; sieben davon gehören zu Jobs, die sonst nur bei einem Push
-auf einen Kanal-Branch laufen, zwei (`Kompilieren`, `Melden`) zum Pflicht-Check.
+ohne `voll` neun übersprungene Einträge; sieben davon stammen aus Jobs, die am PR ohne `voll` nie
+laufen (drei davon nur bei Push), zwei (`Kompilieren`, `Melden`) gehören zum Pflicht-Check.
 Ruben wünscht eine kleinere CI am PR und will einen Fehler im Ruleset sofort bemerken.
 
 ## What Changes

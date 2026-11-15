@@ -52,8 +52,9 @@ verlange 'uses: \./\.github/workflows/suiten\.yml' .github/workflows/ci.yml .git
 verbiete '^[^#]*auto_merge' .github/workflows/ci.yml .github/workflows/pr.yml
 verbiete 'ci-auswahl|nur-umnummeriert' .github/workflows/ci.yml .github/workflows/pr.yml .github/workflows/suiten.yml
 verbiete '^  workflow_run:' .github/workflows/ci.yml .github/workflows/release.yml
-# Kein Workflow hört auf PR und Push zugleich.
-for f in .github/workflows/*.yml; do grep -q '^  pull_request:' "$f" && grep -q '^  push:' "$f" && exit 1; done
+# Kein Workflow hört auf PR und Push zugleich; `on:` nur in Blockform (sonst sähe das keiner).
+verbiete '^on:[[:space:]]*[^[:space:]#]' '.github/workflows/*.yml'
+for f in .github/workflows/*.yml; do grep -q '^  pull_request:' "$f" && grep -q '^  push:' "$f" && { echo "PR und Push: $f"; exit 1; }; done
 # Das Ruleset wird gegen die Liste geprüft.
 verlange 'scripts/ruleset-pruefen\.sh' .github/workflows/ruleset.yml
 # Der Job `release` bricht nie ab.
@@ -72,8 +73,8 @@ Status zählte nicht mehr, und alle grünen PRs hingen über Nacht, ohne dass ei
 
 ## Konsequenzen
 
-Ein nicht fertiger PR ohne `voll` zeigt drei übersprungene Einträge: den Aufruf der Suiten und
-`Kompilieren`/`Melden` des Pflicht-Checks (ADR-0030). Auf `alpha` heißen die Suiten-Jobs `Suiten / …`. `schnell` steht doppelt und wird per
+Ein nicht fertiger PR dieses Repositorys ohne `voll` zeigt drei übersprungene Einträge: den
+Aufruf der Suiten und `Kompilieren`/`Melden` des Pflicht-Checks (ADR-0030). Auf `alpha` heißen die Suiten-Jobs `Suiten / …`. `schnell` steht doppelt und wird per
 Formtest gleich gehalten. Ein Fehler im Ruleset macht binnen Minuten nach dem nächsten Push auf
 `alpha`, sonst binnen sechs Stunden, einen Lauf rot, und der Stau-Wächter nennt ihn am hängenden
 PR.
