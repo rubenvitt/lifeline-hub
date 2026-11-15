@@ -182,6 +182,37 @@ afterEach(() => {
   localStorage.clear();
 });
 
+describe('Gerätehülle — Übung (LLH-1725, Spec `uebungsmarke`)', () => {
+  it('zeigt bei einer Übung das Band direkt unter dem Gerätekopf, ohne zu kleben', async () => {
+    stelleBereit();
+    server.use(
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json(
+          einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal', einsatzart: 'uebung' }),
+        ),
+      ),
+    );
+    renderApp('/geraet');
+    const band = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(band).toHaveTextContent('Übung');
+    expect(document.querySelector('[data-lfh="geraet-kopf"]')!.nextElementSibling).toBe(band);
+    // Die Hülle hat feste Höhe und rollt nur innen: das Band klebt nicht und meldet keine Höhe,
+    // sonst säßen stehende Tabellenköpfe im Gerät zu tief (design.md D7).
+    expect(band.style.position).toBe('');
+  });
+
+  it('beim Realeinsatz steht kein Band (Gegenprobe)', async () => {
+    stelleBereit();
+    renderApp('/geraet');
+    expect(await screen.findByRole('heading', { level: 1, name: 'EA Nord' })).toBeVisible();
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
+});
+
 describe('Abschnittsgerät — Startseite und Navigation', () => {
   it('beginnt mit dem eigenen Abschnitt und seinen Einheiten, der eigene zuerst', async () => {
     stelleBereit();

@@ -132,7 +132,9 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   geführten Abfrage der Stelle (Verpflegungsstelle aus `GET …/verpflegung`), `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
   einer Umbenennung nicht neu (LLH-1155). Auch Seitenkopf und Meldungsabsender lesen dort. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
   `Math.max(56, controlHeight)`. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
-  Handschuh-Stufe wählt das Gerätemenü.
+  Handschuh-Stufe wählt das Gerätemenü. Eine Übung zeigt das Übungsband direkt unter dem Kopf, im
+  Fluss und nicht klebend, der Lagemonitor die Marke in der Statusleiste (Regel: `frontend/AGENTS.md`,
+  Rahmen, „Übung“).
 - **Lagemonitor (Großbild):** feste Kachelung ohne Bildlauf bei 1920 × 1080, Kacheln und Karte
   ohne Bedienung; Kennzahlen mindestens 72 px, jeder Text mindestens 28 px; keine Namen und keine
   Personenkennungen, auch nicht in der Serverantwort (der Einsatzkopf kommt ohne Sachverhalt,

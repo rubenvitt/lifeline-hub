@@ -170,6 +170,41 @@ describe('Lagemonitor — Großbild', () => {
     expect(await screen.findByText('Stadtfest')).toBeInTheDocument();
   });
 
+  it('eine Übung trägt in der Statusleiste die Übungsmarke in mindestens 28 px (LLH-1725)', async () => {
+    bereit();
+    server.use(
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json(
+          einsatzFixture({
+            id: 7,
+            bezeichnung: 'Stadtfest',
+            meine_rolle: 'beobachter',
+            einsatzart: 'uebung',
+          }),
+        ),
+      ),
+    );
+    renderApp('/geraet/7/monitor');
+    expect(await screen.findByText('Stadtfest')).toBeInTheDocument();
+    const leiste = document.querySelector('[data-lfh="monitor-statusleiste"]')!;
+    const marke = await waitFor(() => {
+      const el = leiste.querySelector<HTMLElement>('[data-lfh="uebung-marke"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    const wort = within(marke).getByText('Übung');
+    expect(parseInt(wort.style.fontSize, 10)).toBeGreaterThanOrEqual(28);
+    // Kein Band oben: die Kachelung bleibt (design.md D7).
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
+
+  it('ein Realeinsatz trägt keine Übungsmarke (Gegenprobe)', async () => {
+    bereit();
+    renderApp('/geraet/7/monitor');
+    expect(await screen.findByText('Stadtfest')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="uebung-marke"]')).toBeNull();
+  });
+
   it('Kennzahlen sind mindestens 72 px, jeder Text mindestens 28 px', async () => {
     bereit();
     renderApp('/geraet/7/monitor');

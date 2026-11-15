@@ -45,11 +45,11 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 5. Gerät und Lagemonitor
 
-- [ ] 5.1 `geraet/GeraeteLayout.tsx`: `UebungsBand` nach `GeraeteKopf` (D7); Test in der Testdatei
+- [x] 5.1 `geraet/GeraeteLayout.tsx`: `UebungsBand` nach `GeraeteKopf` (D7); Test in der Testdatei
   der Gerätehülle: Band bei Übung, keins bei Realeinsatz.
 - [ ] 5.2 `geraet/LagemonitorPage.tsx`: `UebungsMarke groesse="monitor"` in der Statusleiste (D7);
   Vitest grün, `frontend/e2e/geraet-lagemonitor.spec.ts` lokal grün (ohne Bildlauf, Texte ≥ 28 px).
-- [ ] 5.3 Satz mit Verweis in `frontend/src/geraet/AGENTS.md` (D10).
+- [x] 5.3 Satz mit Verweis in `frontend/src/geraet/AGENTS.md` (D10).
 
 ## 6. Druck
 

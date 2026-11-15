@@ -74,11 +74,17 @@ export function UebungsMarke({
 /** Schriftgröße des Worts im Band: eine Stufe über dem Lauftext, damit es aus dem Augenwinkel trägt. */
 const BAND_SCHRIFT = 13;
 
-export function UebungsBand({ einsatz }: { einsatz: MitArt }) {
+/**
+ * `klebend` (Vorgabe): das Band klebt im Dokument-Scroll unter den übrigen Rahmenquellen und meldet
+ * seine Höhe (Einsatzrahmen, D4). `false` in einer Hülle fester Höhe, die nur innen rollt
+ * (Gerätehülle, D7): dort steht es im Fluss, und eine gemeldete Höhe versetzte stehende
+ * Tabellenköpfe im inneren Scrollbereich.
+ */
+export function UebungsBand({ einsatz, klebend = true }: { einsatz: MitArt; klebend?: boolean }) {
   const aktiv = istUebung(einsatz);
   const { rollen } = useRollen();
-  // Die Quelle meldet sich nur bei einer Übung; sonst klebt nichts und die Summe bleibt, wie sie war.
-  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv);
+  // Die Quelle meldet sich nur bei einer klebenden Übung; sonst bleibt die Summe, wie sie war.
+  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv && klebend);
   if (!aktiv) return null;
   return (
     <div
@@ -86,9 +92,8 @@ export function UebungsBand({ einsatz }: { einsatz: MitArt }) {
       data-lfh="uebung-band"
       // Kein `role`: das Band ist Kennzeichnung, keine Meldung; Vorleser lesen das Wort im Fluss.
       style={{
-        position: 'sticky',
-        top: oben,
-        zIndex: RAHMEN_EBENE,
+        ...(klebend ? { position: 'sticky' as const, top: oben, zIndex: RAHMEN_EBENE } : {}),
+        flexShrink: 0,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

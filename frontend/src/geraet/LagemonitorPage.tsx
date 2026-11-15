@@ -17,12 +17,13 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { ladeLagemonitor } from '../api/lagemonitor';
 import { einsatzKeys } from '../api/queryKeys';
 import type {
+  EinsatzAnzeige,
   GeraetAnzeige,
   LagemonitorAnzeige,
   LagemonitorSanitaetsdienst,
   Programmpunkt,
 } from '../api/types';
-import { useRollen } from '../components/instrument';
+import { UebungsMarke, useRollen } from '../components/instrument';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
@@ -560,12 +561,14 @@ const VERBINDUNG_TEXT = {
 
 function Statusleiste({
   geraet,
+  einsatz,
   einsatzName,
   standMs,
   jetzt,
   onMenue,
 }: {
   geraet: GeraetAnzeige;
+  einsatz: EinsatzAnzeige | undefined;
   einsatzName: string | undefined;
   standMs: number;
   jetzt: number;
@@ -604,6 +607,9 @@ function Statusleiste({
         touchAction: 'none',
       }}
     >
+      {/* Übung (LLH-1725, D7): die Marke vor dem Namen, ≥ 28 px; kein Band oben, die Kachelung
+          für 1920 × 1080 bleibt. Still, wie alles am Gerät. */}
+      <UebungsMarke einsatz={einsatz} groesse="monitor" />
       <strong
         style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
       >
@@ -824,6 +830,7 @@ export default function LagemonitorPage() {
       )}
       <Statusleiste
         geraet={geraet}
+        einsatz={einsatz}
         einsatzName={einsatz?.bezeichnung}
         standMs={lageQuery.dataUpdatedAt}
         jetzt={jetzt}

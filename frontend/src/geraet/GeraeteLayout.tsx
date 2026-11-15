@@ -23,6 +23,7 @@ import {
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import SpiegelBand from '../einsatz/spiegel/SpiegelBand';
+import { UebungsBand } from '../components/instrument';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import {
   EinsatzPfadeProvider,
@@ -495,7 +496,8 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   // Einzige Ausnahme von „Geräte bleiben still“: das Einheitengerät vibriert kurz bei einem neuen
   // Auftrag an die eigene Einheit (LLH-1579, Spec `benachrichtigungen`).
   useAuftragsVibration(geraet);
-  // Am Spiegel (LLH-1492) auch am Gerät das Hinweisband: Herkunft, Stand, eigene Anträge.
+  // Am Spiegel (LLH-1492) auch am Gerät das Hinweisband: Herkunft, Stand, eigene Anträge. Dieselbe
+  // Abfrage trägt die Übungsmarke (LLH-1725).
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(geraet.einsatz_id),
     queryFn: () => ladeEinsatz(geraet.einsatz_id),
@@ -508,6 +510,9 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
         style={{ display: 'flex', flexDirection: 'column', height: '100dvh' }}
       >
         <GeraeteKopf geraet={geraet} />
+        {/* Übung (LLH-1725, D7): direkt unter dem Kopf. Die Hülle hat feste Höhe und rollt nur in
+            `main`, also steht das Band im Fluss und klebt nicht. */}
+        <UebungsBand einsatz={einsatzQuery.data} klebend={false} />
         <LiveStatusBanner benutzerId={benutzer?.id} geraet />
         <SpiegelBand einsatz={einsatzQuery.data} />
         <main

@@ -135,7 +135,11 @@ Das Präfix bleibt so auch im gekürzten Tab vorn stehen. Nur der Einsatzrahmen 
 ### D7 Gerät und Lagemonitor
 
 `GeraeteHuelle` rendert `UebungsBand` mit dem Einsatz aus seiner Query direkt nach `GeraeteKopf`
-(vor `LiveStatusBanner` und `SpiegelBand`), mit derselben Klebemechanik wie D4. Der Lagemonitor
+(vor `LiveStatusBanner` und `SpiegelBand`), mit `klebend={false}`. Die Hülle hat feste Höhe
+(`100dvh`) und rollt nur in `main`, Kopf und Band stehen also ohnehin. Würde das Band sich als
+Rahmenquelle melden, säßen stehende Tabellenköpfe im inneren Scrollbereich um seine Höhe zu tief.
+Der erste Entwurf sah hier dieselbe Klebemechanik wie in D4 vor; erst bei der Umsetzung zeigte
+sich, dass die Hülle selbst nicht rollt. Der Lagemonitor
 hat keinen Kopf: `UebungsMarke groesse="monitor"` steht in der Statusleiste vor dem Einsatznamen.
 Die Kachelung bleibt unverändert, `geraet-lagemonitor.spec.ts` prüft weiter „ohne Bildlauf, jeder
 Text ≥ 28 px“. Kein Ton, keine Animation (`geraet/AGENTS.md`).
