@@ -20,8 +20,8 @@
 
 ## 4. Prüfen
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
-- [ ] 4.2 Bilder der Änderung (vorher/nachher: Führung, Erfassung, Kräfte, gesperrte Marke) für PR und Meldung aufgenommen
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 4.2 Bilder der Änderung (vorher/nachher: Führung, Erfassung, Kräfte, gesperrte Marke) für PR und Meldung aufgenommen
 
 ## Workflow follow-up
 
