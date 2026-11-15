@@ -129,6 +129,27 @@ describe('PlanungDruckPage (LLH-1593)', () => {
     expect(within(erstes).getByText('1 offen')).toBeInTheDocument();
   });
 
+  it('ein Sanitätsdienst trägt kein „ÜBUNG“ im Druckkopf (LLH-1725, Gegenprobe)', async () => {
+    setup();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled(),
+    );
+    expect(document.querySelector('[data-lfh="druckkopf-uebung"]')).toBeNull();
+  });
+
+  it('eine geplante Übung trägt „ÜBUNG“ in jedem Druckkopf (LLH-1725)', async () => {
+    setup();
+    // Nach `setup`, damit dieser Handler vorgeht; der Abruf startet erst nach dem Rendern.
+    server.use(
+      http.get('/api/planungen/5', () =>
+        HttpResponse.json({ ...PLANUNG, kopf: { ...PLANUNG.kopf, einsatzart: 'uebung' } }),
+      ),
+    );
+    await waitFor(() =>
+      expect(document.querySelectorAll('[data-lfh="druckkopf-uebung"]')).toHaveLength(2),
+    );
+  });
+
   it('Zettel je Person mit der Pause, Auswahl in der Adresse', async () => {
     setup(planungDruckPfad(5, { sicht: 'person' }));
     expect(

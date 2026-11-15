@@ -107,7 +107,8 @@ Planung“ führt zur Planung zurück.
 2. Das Ziel wählen: „Neuer Einsatz“, wahlweise mit einer Einsatz-Vorlage, oder „Laufender
    Einsatz“ und darunter den Einsatz. Ein neuer Einsatz trägt Bezeichnung, Einsatzart und Ort der
    Planung, beginnt mit der Übernahme und wird von der Person geleitet, die übernimmt. Zur Wahl
-   stehen nur laufende Einsätze, in denen man schreiben darf.
+   stehen nur laufende Einsätze, in denen man schreiben darf; eine Übung trägt dort die violette
+   Marke „ÜBUNG“.
 3. Die Vorschau zeigt, was entsteht („1 Einheit neu“, „4 Schichten neu“ …), je Posten und Person
    das Ziel mit „Gefunden“, „Unsicher“ oder „Neu“ und darunter Fehler und Hinweise. Über die
    Auswahl einer Zeile lässt sich ein Posten einer anderen Einheit oder UHS zuordnen oder neu

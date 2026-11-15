@@ -1291,3 +1291,68 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
     expect(await screen.findByTestId('rahmen-einsatz')).toHaveTextContent('Hochwasser Nord');
   });
 });
+
+/**
+ * Übungsmarke im Rahmen (LLH-1725, Spec `uebungsmarke`, design.md D4–D6 in
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`). Das Kleben im Browser misst
+ * `e2e/rahmen-stehen-bleiben.spec.ts`.
+ */
+describe('EinsatzLayout · Übung (LLH-1725)', () => {
+  /** Derselbe Rahmen, aber der Einsatz ist eine Übung (Handler nach `setup`, er geht vor). */
+  function setupUebung(route?: string) {
+    const ergebnis = setup(freigabenFixture(), {}, admin, route);
+    server.use(
+      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+    );
+    return ergebnis;
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    setzeViewportBreite(XL);
+    document.title = 'lifeline-hub';
+  });
+
+  it('zeigt bei einer Übung das Band unter dem Kopf und die Marke vor dem Namen', async () => {
+    setupUebung();
+    const band = await waitFor(() => {
+      const el = document.querySelector('[data-lfh="uebung-band"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(band).toHaveTextContent('Übung');
+    // Direkt nach dem Kopf: kein Hinweisband dazwischen.
+    expect(screen.getByRole('banner').nextElementSibling).toBe(band);
+    const kopf = screen.getByRole('banner');
+    expect(kopf.querySelector('[data-lfh="uebung-marke"]')).not.toBeNull();
+  });
+
+  it('das Band klebt auch unter md, wo der Kopf mitrollt', async () => {
+    setzeViewportBreite(390);
+    setupUebung();
+    const band = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="uebung-band"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(band.style.position).toBe('sticky');
+    // Unter md keine Kopfmarke: das Band trägt die Kennzeichnung (D5).
+    expect(screen.getByRole('banner').querySelector('[data-lfh="uebung-marke"]')).toBeNull();
+  });
+
+  it('beim Realeinsatz stehen weder Band noch Marke (Gegenprobe)', async () => {
+    setup();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument(),
+    );
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+    expect(document.querySelector('[data-lfh="uebung-marke"]')).toBeNull();
+  });
+
+  it('der Tab-Titel einer Übung beginnt mit „ÜBUNG ·“', async () => {
+    setupUebung();
+    await waitFor(() =>
+      expect(document.title).toBe('ÜBUNG · ETB · Hochwasser Nord · lifeline-hub'),
+    );
+  });
+});

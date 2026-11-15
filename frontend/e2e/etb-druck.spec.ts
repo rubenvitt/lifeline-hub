@@ -371,3 +371,51 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
     });
   }
 });
+
+/**
+ * Übung im Druck (LLH-1725, Spec `druck-dokumente`, „Gemeinsamer Druckkopf“; D8 in
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): der Druckkopf trägt „ÜBUNG“ in allen
+ * drei Engines; das Randfeld je Seite zeichnet nur Chromium, belegt am erzeugten PDF.
+ * Mutationsprobe (15.11.2026): ohne `page: uebung` in `druck.css` rot an Seite 2.
+ */
+test('ETB-Druck einer Übung: „ÜBUNG“ im Druckkopf, in Chromium auf jeder Seite', async ({
+  page,
+  browserName,
+}) => {
+  await anmelden(page, { startseite: false });
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E ETB-Druck Übung ${Date.now()}`, einsatzart: 'uebung' },
+  });
+  expect(antwort.ok(), await antwort.text()).toBe(true);
+  const einsatzId = String(((await antwort.json()) as { id: number }).id);
+  // Genug Zeilen für mehr als eine Seite: erst dann sagt „jede Seite“ etwas.
+  for (let i = 0; i < 60; i += 1) {
+    await erfasse(page, einsatzId, {
+      typ: 'meldung',
+      von: 'Florian 1',
+      an: 'ELW',
+      inhalt: `Übungsmeldung ${i}: Lage im Abschnitt unverändert, Kräfte bleiben vor Ort.`,
+    });
+  }
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/etb/druck`);
+  await expect(page.getByRole('button', { name: 'Drucken / als PDF' })).toBeEnabled({
+    timeout: 60_000,
+  });
+  // Am Bildschirm zeigt die ETB-Druckansicht ihren Kopf (`sichtbarkeit="immer"`).
+  await expect(page.locator('[data-lfh="druckkopf-uebung"]')).toHaveText('ÜBUNG');
+
+  if (browserName === 'chromium') {
+    const auszug = await pdfAuszug(await page.pdf({ format: 'A4' }));
+    expect(auszug.length, 'Vorbedingung: mehr als eine Seite').toBeGreaterThan(1);
+    for (const [i, seite] of auszug.entries()) {
+      // Die Sperrung (`letter-spacing`) legt jeden Buchstaben einzeln ins PDF: „Ü B U N G“.
+      expect(seite.text.replace(/\s+/g, ''), `Seite ${i + 1} trägt „ÜBUNG“`).toContain('ÜBUNG');
+    }
+    test.info().annotations.push({
+      type: 'messwert',
+      description: `ETB-Druck Übung: PDF ${auszug.length} Seiten, jede mit „ÜBUNG“`,
+    });
+  }
+});

@@ -273,7 +273,9 @@ describe('AppLayout · Orientierung (LFH-954)', () => {
       <div>
         <span data-testid="ort">{ort?.ort.join(' › ') ?? '—'}</span>
         <span data-testid="rueckweg">
-          {ort?.rueckweg ? `${ort.rueckweg.label} → ${ort.rueckweg.pfad}` : '—'}
+          {ort?.rueckweg
+            ? `${ort.rueckweg.label} → ${ort.rueckweg.pfad}${ort.rueckweg.uebung ? ' (Übung)' : ''}`
+            : '—'}
         </span>
       </div>
     );
@@ -325,6 +327,16 @@ describe('AppLayout · Orientierung (LFH-954)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('rueckweg')).toHaveTextContent(
         'Zurück zu Starkregen Nord → /einsaetze/5/etb?eintrag=3',
+      ),
+    );
+  });
+
+  it('der Rückweg in eine Übung trägt die Kennzeichnung (LLH-1725)', async () => {
+    merkeLetztenOrt(admin.id, { einsatzId: 5, pfad: '/einsaetze/5/etb' });
+    setupAn('/profil', [{ ...aktiv, einsatzart: 'uebung' }]);
+    await waitFor(() =>
+      expect(screen.getByTestId('rueckweg')).toHaveTextContent(
+        'Zurück zu Starkregen Nord → /einsaetze/5/etb (Übung)',
       ),
     );
   });

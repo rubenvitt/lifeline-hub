@@ -104,6 +104,14 @@ const blaetter = () =>
   Array.from(document.querySelectorAll<HTMLElement>('[data-lfh="druck-kapitel"]'));
 
 describe('SchichtplanBlaetter (LLH-1557)', () => {
+  it('trägt bei einer Übung in jedem Druckkopf „ÜBUNG“ (LLH-1725)', () => {
+    zeigen({ einsatz: { ...EINSATZ, einsatzart: 'uebung' } });
+    expect(blaetter()).toHaveLength(2);
+    for (const blatt of blaetter()) {
+      expect(blatt.querySelector('[data-lfh="druckkopf-uebung"]')).not.toBeNull();
+    }
+  });
+
   it('Aushang je Posten: ein Kapitel mit Druckkopf je Posten, keine Pause', () => {
     zeigen();
     expect(blaetter().map((b) => b.dataset.blatt)).toEqual(['uhs:9', 'einheit:4']);

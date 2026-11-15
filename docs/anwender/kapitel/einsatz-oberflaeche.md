@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx]
 ---
 
 ## Überblick
@@ -25,7 +25,8 @@ die Lifeline Hub bedienen.
    oben in der Kopfzeile dorthin.
 2. Die Kachel des Einsatzes wählen. Sie nennt Status, Einsatzart, die eigene Rolle („Deine
    Rolle: …“), den Einsatzleiter („EL …“, sonst „EL nicht erfasst“) und, soweit erfasst, Ort,
-   Einsatznummer, Beginn („seit …“) und Stichwort.
+   Einsatznummer, Beginn („seit …“) und Stichwort. Eine Übung trägt statt der grauen Einsatzart
+   die violette Marke „ÜBUNG“.
 
    ![Einsatzliste unter der Kopfzeile: die Kachel „Neuer Einsatz“ und die Kachel eines laufenden Übungseinsatzes mit „Deine Rolle: Einsatzleitung“ und „EL nicht erfasst“](../bilder/einsatz-oberflaeche/einsatzliste.png)
 
@@ -275,6 +276,27 @@ keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 Über der Kopfzeile erscheint bei Bedarf die **Betriebszeile**: bei Störungen der Verbindung, bei
 vorgemerkten oder abgelehnten Einträgen und mit „Neue Version verfügbar.“, wenn eine neue
 Fassung der App bereitliegt. „Jetzt neu laden“ lädt sie.
+
+### Übung oder Realeinsatz
+
+Hat ein Einsatz die Einsatzart „Übung“, ist das überall zu sehen, ohne den Namen zu lesen:
+
+- Unter der Kopfzeile steht ein violettes, schräg gestreiftes Band „ÜBUNG“ über die volle Breite,
+  in jedem Modul. Es bleibt beim Rollen stehen, auch auf dem Handy, wo die Kopfzeile selbst
+  mitrollt.
+- Ab Tabletbreite steht in der Kopfzeile vor dem Namen die Marke „ÜBUNG“.
+- Der Titel des Browser-Tabs beginnt mit „ÜBUNG ·“.
+- In der Einsatzliste, im Einsatzwechsel, in der Sprungpalette und auf „Zurück zu …“ in Profil
+  und Verwaltung trägt eine Übung dieselbe Marke. Die Sprungpalette findet Übungen auch über das
+  Wort „Übung“.
+- Gedruckt steht „ÜBUNG“ im Druckkopf (siehe [Drucken und Export](drucken-export.md)), als
+  Bild-Anlage im Kopf des Bilds.
+
+Entscheidend ist allein die Einsatzart, nicht der Name: Ein Einsatz „Übungsgelände Brand“ mit
+der Einsatzart „Realeinsatz“ trägt keine Marke. Ändern lässt sich die Einsatzart in den
+[Einsatzdaten](einsatzdaten.md). Erkennbar ist eine Übung immer am Wort „ÜBUNG“ auf dem
+gestreiften Band oder der Marke; Violett allein heißt nichts, auch Entscheidungen im
+Einsatztagebuch und Abschnitte auf der Lagekarte sind violett.
 
 ### Hinweise auf der Einsatzliste
 

@@ -23,8 +23,14 @@ const BREITEN = [
   { width: 1440, height: 900, kopfKlebt: true, rail: true },
 ] as const;
 
-async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+async function einsatzAnlegen(
+  page: Page,
+  name: string,
+  einsatzart?: 'uebung' | 'realeinsatz',
+): Promise<string> {
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: name, ...(einsatzart ? { einsatzart } : {}) },
+  });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);
   const { id } = (await antwort.json()) as { id: number };
   return String(id);
@@ -252,4 +258,84 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
   expect(Math.round(t.y), 'Tabellenkopf bündig unter dem Rahmen').toBe(
     Math.round(kopf.y + kopf.height),
   );
+});
+
+/**
+ * Übungsband (LLH-1725, Spec `uebungsmarke`, „Das Übungsband bleibt beim Rollen stehen“; D4 in
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): es klebt in JEDER Breite, ab `md`
+ * direkt unter dem Kopf, unter `md` an der Fensterkante bzw. unter der gestörten Betriebszeile.
+ * `--lfh-rahmen-oben` endet an seiner Unterkante: daran hängt jeder stehende Tabellenkopf (Guard
+ * `rahmenOben.guard.test.ts`), also liegt keiner hinter dem Band.
+ *
+ * Mutationsprobe (15.11.2026, Chromium): klebt das Band mit `top: 0` statt unter den übrigen
+ * Quellen, rot bei 820/1180/1440 („Band bündig unter dem Kopf“) und offline bei 390; die Probe bei
+ * 390 ohne Störung bleibt zu Recht grün.
+ */
+async function rahmenOben(page: Page): Promise<number> {
+  return page.evaluate(() =>
+    Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
+    ),
+  );
+}
+
+for (const b of BREITEN) {
+  test(`${b.width} px, Übung: das Band steht nach dem Rollen unter dem Kopf`, async ({ page }) => {
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page, `Rahmen Übung ${b.width} ${Date.now()}`, 'uebung');
+    await etbFuellen(page, einsatzId);
+    await page.setViewportSize({ width: b.width, height: b.height });
+    await etbGerollt(page, einsatzId);
+
+    const band = page.locator('[data-lfh="uebung-band"]');
+    await expect(band).toContainText('Übung');
+    await expect(band).toHaveCSS('position', 'sticky');
+    await expect(band).toBeInViewport();
+    const r = (await band.boundingBox())!;
+    if (b.kopfKlebt) {
+      const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+      expect(Math.round(r.y), 'Band bündig unter dem Kopf').toBe(Math.round(kopf.y + kopf.height));
+    } else {
+      expect(Math.round(r.y), 'Band an der Fensterkante, der Kopf ist weggerollt').toBe(0);
+    }
+    await expect
+      .poll(async () => Math.round(await rahmenOben(page)), 'Rahmenkante unter dem Band')
+      .toBe(Math.round(r.y + r.height));
+  });
+}
+
+test('390 px, Übung, offline: Betriebszeile und Band stehen übereinander', async ({
+  page,
+  context,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Übung offline ${Date.now()}`, 'uebung');
+  await etbFuellen(page, einsatzId);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await etbGerollt(page, einsatzId);
+  await context.setOffline(true);
+  try {
+    const zeile = page.locator('[data-lfh="betriebszeile"]');
+    await expect(zeile).toContainText('Offline');
+    await expect(zeile).toBeInViewport();
+    const z = (await zeile.boundingBox())!;
+    expect(Math.round(z.y)).toBe(0);
+    const band = page.locator('[data-lfh="uebung-band"]');
+    await expect
+      .poll(async () => Math.round((await band.boundingBox())!.y), 'Band unter der Betriebszeile')
+      .toBe(Math.round(z.y + z.height));
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
+test('Realeinsatz: kein Band, die Rahmenkante bleibt am Kopf (Gegenprobe)', async ({ page }) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen real ${Date.now()}`, 'realeinsatz');
+  await etbFuellen(page, einsatzId);
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await etbGerollt(page, einsatzId);
+  await expect(page.locator('[data-lfh="uebung-band"]')).toHaveCount(0);
+  const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+  expect(Math.round(await rahmenOben(page))).toBe(Math.round(kopf.height));
 });

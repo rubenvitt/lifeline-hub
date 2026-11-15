@@ -450,11 +450,27 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   });
 
   it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
-    mockEinsaetze([e({ einsatzart: 'uebung' })]);
+    mockEinsaetze([e({ einsatzart: 'sanitaetsdienst' })]);
     render();
     // Die Map trägt eine Beschriftung statt des Wire-Werts (Vertrag in `theme/statusFarben.ts`).
     expect(await screen.findByText('Aktiv')).toBeInTheDocument();
-    expect(screen.getByText('Übung')).toBeInTheDocument();
+    expect(screen.getByText('Sanitätsdienst')).toBeInTheDocument();
+  });
+
+  it('eine Übung trägt die Übungsmarke statt des neutralen Tags, der Realeinsatz den Tag (LLH-1725)', async () => {
+    mockEinsaetze([
+      e({ id: 1, bezeichnung: 'Starkregen Nord', einsatzart: 'uebung' }),
+      e({ id: 2, bezeichnung: 'Brand Mühle', einsatzart: 'realeinsatz' }),
+    ]);
+    const { container } = render();
+    expect(await screen.findByText('Starkregen Nord')).toBeInTheDocument();
+    const marken = container.querySelectorAll('[data-lfh="uebung-marke"]');
+    expect(marken).toHaveLength(1);
+    expect(marken[0]).toHaveTextContent('Übung');
+    expect(marken[0].closest('.lfh-einsatzkachel')).toHaveTextContent('Starkregen Nord');
+    // Kein zweites „Übung“ als grauer Tag daneben.
+    expect(screen.getAllByText('Übung')).toHaveLength(1);
+    expect(screen.getByText('Realeinsatz')).toBeInTheDocument();
   });
 
   it('die Karte nennt die eigene Rolle in Klartext und mit Kontext, nie den Rohwert', async () => {

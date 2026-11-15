@@ -7,10 +7,12 @@ import { lageplanLegende, type LageplanLegende, type LegendenQuellen } from './l
 import { setzeKartenbild, setzeLageplanAnlage } from './lageplanBild';
 import type { BeginneKartenHandlung } from './useKartenFehler';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
+import type { DruckEinsatz } from '../../components/druck/Druckkopf';
+import { isUebung } from '../../einsatz/einsatzart';
 
 /** Was der Kopf des Lageplans nennt; die Seite weiß es, der Hook liest es erst bei der Aufnahme. */
 export interface LageplanKopf {
-  einsatz: { bezeichnung: string; einsatznummer_intern?: string | null };
+  einsatz: DruckEinsatz;
   /** Name der aktiven Kartenansicht; `null` ohne gespeicherte Ansicht. */
   ansicht: string | null;
   /** Kartengrundlage, wie sie die Segmentleiste nennt. */
@@ -52,10 +54,15 @@ function kopfZeilen(kopf: LageplanKopf, stand: string, dtg: (iso: string) => str
   ];
 }
 
-/** „Lageplan · Hochwasser Musterstadt (2026-014)“ — der Titel im Bild der Anlage. */
+/**
+ * „Lageplan · Hochwasser Musterstadt (2026-014)“ — der Titel im Bild der Anlage. Eine Übung steht
+ * vorn („ÜBUNG · Lageplan · …“, LLH-1725): das Bild wird heruntergeladen und weitergegeben, ohne
+ * Rahmen und ohne Druckkopf.
+ */
 export function anlagenTitel(einsatz: LageplanKopf['einsatz']): string {
   const nummer = einsatz.einsatznummer_intern ? ` (${einsatz.einsatznummer_intern})` : '';
-  return `Lageplan · ${einsatz.bezeichnung}${nummer}`;
+  const titel = `Lageplan · ${einsatz.bezeichnung}${nummer}`;
+  return isUebung(einsatz) ? `ÜBUNG · ${titel}` : titel;
 }
 
 function vorladen(url: string): Promise<void> {

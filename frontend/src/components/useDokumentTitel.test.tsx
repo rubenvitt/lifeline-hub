@@ -22,6 +22,23 @@ describe('dokumentTitel', () => {
   });
 });
 
+describe('dokumentTitel · Übung (LLH-1725, Spec `seiten-orientierung`)', () => {
+  it('stellt „ÜBUNG · “ vor alles, auch vor die Zahl', () => {
+    expect(dokumentTitel(['ETB', 'Starkregen Nord'], undefined, { uebung: true })).toBe(
+      'ÜBUNG · ETB · Starkregen Nord · lifeline-hub',
+    );
+    expect(dokumentTitel(['ETB', 'Starkregen Nord'], 3, { uebung: true })).toBe(
+      'ÜBUNG · (3) ETB · Starkregen Nord · lifeline-hub',
+    );
+  });
+
+  it('ohne Übung bleibt der Titel unverändert', () => {
+    expect(dokumentTitel(['ETB', 'Starkregen Nord'], 3, { uebung: false })).toBe(
+      '(3) ETB · Starkregen Nord · lifeline-hub',
+    );
+  });
+});
+
 describe('useDokumentTitel', () => {
   beforeEach(() => {
     document.title = 'lifeline-hub';

@@ -3,11 +3,14 @@ import { useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
+import { isUebung } from './einsatzart';
 import { leseLetztenOrt, type LetzterOrt } from './letzterOrt';
 
 export interface EinsatzRueckweg {
   label: string;
   pfad: string;
+  /** Der Einsatz ist eine Übung: der Knopf trägt die Übungsmarke (LLH-1725). */
+  uebung?: boolean;
 }
 
 /**
@@ -49,6 +52,10 @@ export function useEinsatzRueckweg(
   if (!letzter) return undefined;
   const einsatz = einsaetze?.find((e) => e.id === letzter.einsatzId);
   return einsatz && einsatz.status === 'aktiv'
-    ? { label: `Zurück zu ${einsatz.bezeichnung}`, pfad: letzter.pfad }
+    ? {
+        label: `Zurück zu ${einsatz.bezeichnung}`,
+        pfad: letzter.pfad,
+        ...(isUebung(einsatz) ? { uebung: true } : {}),
+      }
     : undefined;
 }

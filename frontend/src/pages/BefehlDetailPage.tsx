@@ -483,6 +483,7 @@ function BefehlDetail() {
           einsatzId={einsatzId}
           dokumentId={befehlId}
           einsatzbezeichnung={einsatz.bezeichnung}
+          einsatzart={einsatz.einsatzart}
           schreibt={istEntwurf && darfSchreiben}
           ohneDruckKlasse="befehl-no-print"
         />

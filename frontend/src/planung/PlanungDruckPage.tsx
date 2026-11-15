@@ -81,7 +81,11 @@ export default function PlanungDruckPage() {
         laedt: 'Planung wird geladen …',
         keineSchichten: 'Keine Schichten in der Planung',
       }}
-      einsatz={{ bezeichnung: daten?.planung.kopf.bezeichnung ?? '' }}
+      einsatz={{
+        bezeichnung: daten?.planung.kopf.bezeichnung ?? '',
+        // Eine geplante Übung trägt im Druckkopf „ÜBUNG“ (LLH-1725).
+        einsatzart: daten?.planung.kopf.einsatzart,
+      }}
       bezug="Planung"
       renderPage={({ actions, content }) => (
         <AdminPage

@@ -20,6 +20,7 @@ import {
 } from './LagemonitorPage';
 import { monitorAusschnitt } from './LagemonitorKarte';
 import { spieleAlarmTon } from '../alarm/alarmTon';
+import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
 
 // Ob der Monitor einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -168,6 +169,83 @@ describe('Lagemonitor — Großbild', () => {
     expect(betroffene.closest('main')!.style.pointerEvents).toBe('none');
     // Der Einsatz kommt mit einem eigenen Abruf, unabhängig vom Lagebild.
     expect(await screen.findByText('Stadtfest')).toBeInTheDocument();
+  });
+
+  it('eine Übung trägt in der Statusleiste die Übungsmarke in mindestens 28 px (LLH-1725)', async () => {
+    bereit();
+    server.use(
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json(
+          einsatzFixture({
+            id: 7,
+            bezeichnung: 'Stadtfest',
+            meine_rolle: 'beobachter',
+            einsatzart: 'uebung',
+          }),
+        ),
+      ),
+    );
+    renderApp('/geraet/7/monitor');
+    expect(await screen.findByText('Stadtfest')).toBeInTheDocument();
+    const leiste = document.querySelector('[data-lfh="monitor-statusleiste"]')!;
+    const marke = await waitFor(() => {
+      const el = leiste.querySelector<HTMLElement>('[data-lfh="uebung-marke"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    const wort = within(marke).getByText('Übung');
+    expect(parseInt(wort.style.fontSize, 10)).toBeGreaterThanOrEqual(28);
+    // Kein Band oben: die Kachelung bleibt (design.md D7).
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
+
+  it('scheitert der Einsatzkopf, nennt die Statusleiste „Einsatzart nicht geladen“ (LLH-1725)', async () => {
+    bereit();
+    server.use(http.get('/api/einsaetze/7', () => new HttpResponse(null, { status: 503 })));
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    const leiste = document.querySelector<HTMLElement>('[data-lfh="monitor-statusleiste"]')!;
+    expect(await within(leiste).findByText('Einsatzart nicht geladen')).toBeInTheDocument();
+  });
+
+  it('lädt den Einsatzkopf nach 30 s nach und zeigt dann die Marke (LLH-1725)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    let abrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/7', () => {
+        abrufe += 1;
+        return abrufe === 1
+          ? new HttpResponse(null, { status: 503 })
+          : HttpResponse.json(
+              einsatzFixture({
+                id: 7,
+                bezeichnung: 'Stadtfest',
+                meine_rolle: 'beobachter',
+                einsatzart: 'uebung',
+              }),
+            );
+      }),
+    );
+    renderApp('/geraet/7/monitor');
+    const leiste = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="monitor-statusleiste"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(await within(leiste).findByText('Einsatzart nicht geladen')).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(EINSATZKOPF_REFETCH_MS);
+    });
+    await waitFor(() => expect(leiste.querySelector('[data-lfh="uebung-marke"]')).not.toBeNull());
+    expect(within(leiste).queryByText('Einsatzart nicht geladen')).toBeNull();
+  });
+
+  it('ein Realeinsatz trägt keine Übungsmarke (Gegenprobe)', async () => {
+    bereit();
+    renderApp('/geraet/7/monitor');
+    expect(await screen.findByText('Stadtfest')).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="uebung-marke"]')).toBeNull();
   });
 
   it('Kennzahlen sind mindestens 72 px, jeder Text mindestens 28 px', async () => {
