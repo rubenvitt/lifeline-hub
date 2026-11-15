@@ -38,8 +38,9 @@ Modulmarke eine 1-px-Linie in `farben.linie` mit eigenem reinem Stil (`sprungLin
 exportiert und prüfbar wie `modulMarkeStil`). Die Linie streckt sich mit negativem Block-Rand
 durch die Polsterung der Zeile, damit aufeinanderfolgende Marken eine durchgehende Linie bilden;
 ihr Rand nach rechts (`token.padding`) ist der Einzug des Etiketts. Der transparente
-Markenplatzhalter (`modulMarkeStil`) entfällt in der Markenzeile: eine Marke wird nie aktiv. Verworfen: nur einrücken ohne Linie (am 15.11.2026 abgewogen;
-die Linie bindet die Marke sichtbar an ihr Modul).
+Markenplatzhalter (`modulMarkeStil`) entfällt in der Markenzeile: eine Marke wird nie aktiv.
+Verworfen: nur einrücken ohne Linie (am 15.11.2026 abgewogen; die Linie bindet die Marke
+sichtbar an ihr Modul).
 
 **D3 Kein Pfeil, Schloss bleibt.** `IconExternPfeil` fällt aus der Markenzeile. Das Schloss
 bei Sperre bleibt als zweiter Kanal neben `disabled`. Der zugängliche Name bleibt „<Marke>,

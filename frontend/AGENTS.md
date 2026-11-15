@@ -442,7 +442,10 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 **Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`): Entscheidungen = ETB
 `?typ=entscheidung`, Patienten = Personen im Sichtungsboard (`ansicht=raster`), Vermisste = Personen
 `?filter=vermisst`. Kein Registry-Eintrag, kein `verweistAuf`; Marke erbt Sichtbarkeit/Sperre,
-nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`;
+nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`. Eine Marke steht
+in der Kategorie ihres Zielmoduls direkt hinter ihm oder einer Marke desselben Ziels (Entscheidungen
+unter ETB in der Erfassung) und erscheint als eingerückte Unteransicht mit Führungslinie, ohne
+Pfeil-Symbol (LLH-1733, `sprungmarken.test.ts` hält die Kategorie);
 `parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
 Fernmeldeskizze und Kommunikationsplan sind Marken
 hinter „Fernmeldewesen“ (Ziel `fernmeldewesen`, LLH-1180), eine Marke „Funkplan“ gibt es nicht. Gesperrt
