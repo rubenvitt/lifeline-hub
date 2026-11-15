@@ -136,7 +136,7 @@ function nameZelleStil(token: { controlHeight: number }): CSSProperties {
  * Ab `lg` das Raster aus Namensgruppe und Suche (LLH-1726, Spec `kopfleiste`, design.md D2): die
  * Namensspalte bekommt ihre Eigenbreite, bevor die Suche mehr als ihre Lupe bekommt. Als EIN
  * Flex-Element nimmt es am Umbruch des Kopfs teil (`kopfNameSucheFlex`). Unter `lg`
- * gibt es keine Suchzelle, die Namensgruppe steht dann selbst im Kopf.
+ * gibt es keine Suchzelle, die Namensgruppe steht dann selbst im Kopf (`display: contents`).
  */
 function NameUndSuche({
   breit,
@@ -149,21 +149,45 @@ function NameUndSuche({
   spalten: string;
   children: ReactNode;
 }) {
-  if (!breit) return <>{children}</>;
   return (
     <div
       data-lfh="kopf-name-suche"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: spalten,
-        alignItems: 'stretch',
-        flex,
-        minWidth: 'min-content',
-      }}
+      // Unter `lg` nur `display: contents`: die Namensgruppe steht dann selbst im Kopf. Der
+      // Behälter bleibt trotzdem im Baum, sonst hinge ein Wechsel über `lg` (Tablet drehen) den
+      // Wechsler neu ein, und offenes Menü und Fokus gingen verloren (Review LLH-1726).
+      style={
+        breit
+          ? {
+              display: 'grid',
+              gridTemplateColumns: spalten,
+              alignItems: 'stretch',
+              flex,
+              minWidth: 'min-content',
+            }
+          : { display: 'contents' }
+      }
     >
       {children}
     </div>
   );
+}
+
+/** Wie lange die Suche höchstens auf den Einsatznamen wartet (siehe {@link useSucheWartet}). */
+const SUCHE_WARTET_MS = 1000;
+
+/**
+ * Ob die Suchzelle noch unsichtbar auf den Einsatznamen wartet: solange er lädt, höchstens
+ * {@link SUCHE_WARTET_MS}. Ein schneller Start zeigt sie gleich an ihrem Platz (kein Sprung), ein
+ * langsamer nimmt den Sprung in Kauf, statt den Weg aus dem Einsatz zu verbergen.
+ */
+function useSucheWartet(laedt: boolean): boolean {
+  const [abgelaufen, setAbgelaufen] = useState(false);
+  useEffect(() => {
+    if (!laedt) return;
+    const uhr = window.setTimeout(() => setAbgelaufen(true), SUCHE_WARTET_MS);
+    return () => window.clearTimeout(uhr);
+  }, [laedt]);
+  return laedt && !abgelaufen;
 }
 
 const STATUSPUNKT_PLATZ = { width: 6, height: 6, flexShrink: 0 } as const;
@@ -285,6 +309,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const einsatz = einsatzQuery.data;
+  // Die Suche wartet auf den Namen, höchstens eine Sekunde (LLH-1726, Suchzelle unten): lädt der
+  // Einsatz länger (Wiederholungen), steht sie trotzdem, denn unter `xxl` führt sonst nichts im Kopf
+  // aus dem Einsatz.
+  const sucheWartet = useSucheWartet(einsatzQuery.isLoading);
 
   // Modulfreigaben des Servers für die Navigation (LFH-669); derselbe Key wie in jeder Seite,
   // die Daten eines fremden Moduls lädt.
@@ -514,7 +542,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           {/* SUCHZELLE ab `lg`: das Suchfeld als Auslöser der Palette. Sie trägt die Kopf-Polsterung
            (`kopfpolsterung.guard.test.ts` zählt genau diese Stelle). Als Größen-Container
            `kopfsuche`: ist sie schmal, bleibt vom Feld nur die Lupe (`CommandPaletteTrigger.css`).
-           Unsichtbar, solange der Einsatz lädt (LLH-1726): mit dem Namen nimmt die Namensspalte ihre
+           Unsichtbar, solange der Einsatz lädt, höchstens eine Sekunde (LLH-1726, `useSucheWartet`): mit dem Namen nimmt die Namensspalte ihre
            Eigenbreite, und die Suche rückte sonst nach rechts (CLS 0,0103 an der Umbruchkante). So
            erscheint sie gleich an ihrem Platz; ein Element, das erst sichtbar wird, verschiebt nichts. */}
           {breit && (
@@ -527,7 +555,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 paddingInline: 'var(--lfh-kopf-polsterung)',
                 containerType: 'inline-size',
                 containerName: 'kopfsuche',
-                ...(einsatzQuery.isLoading ? { visibility: 'hidden' as const } : {}),
+                ...(sucheWartet ? { visibility: 'hidden' as const } : {}),
               }}
             >
               <CommandPaletteTrigger />

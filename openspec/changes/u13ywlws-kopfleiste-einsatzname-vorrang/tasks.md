@@ -19,7 +19,9 @@ der ohne die Änderung rot ist.
   blockiert“ mit Wort.
 - [x] 1.4 `WortPlatz` und `components/Kopfleiste.css` entfernen, `startWoerter` im Layout
   entfernen, Verweis im Kommentar von `components/BenutzerMenu.tsx` berichtigen; `tsc` und
-  ESLint grün, `grep -rn "WortPlatz\|kopf-wort-platz" frontend/` leer.
+  ESLint grün, `grep -rn "WortPlatz\|kopf-wort-platz" frontend/` leer. — Nachentscheid 15.11.2026:
+  ein eigener `WortPlatz` für das Ton-Wort lebt wieder in `einsatz/AlarmZentrale.tsx` (Klasse
+  `ton-wort-platz`); der Baustein in `Kopfleiste.tsx` bleibt entfernt.
 
 ## 2. Name vor Suche (D2, D3, D4)
 

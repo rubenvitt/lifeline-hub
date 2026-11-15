@@ -58,11 +58,13 @@ ihre e2e-Messung an der Umbruchkante (`kopfzeile-start-cls.spec.ts`) läuft weit
 *Alternative:* Wörter erst ab `xxl` zeigen. Verworfen: wieder eine Breitenweiche, und das Wort
 „Ton bereit“ sagt nichts, was das Symbol nicht sagt.
 
-*Preis:* „VERBINDE“ und „SYNC“ unterscheiden sich als Symbol nur in der Farbe (gelb/grün), „Ton
-wird geprüft“ und „Ton bereit“ gar nicht. Beides ist keine Störung und dauert Sekunden; Tooltip
-und Name nennen den Zustand (WCAG 1.4.1 gilt für Information, die gebraucht wird; reißt der
-Aufbau ab, steht „GETRENNT“ als Wort, und die Tonprüfung endet spätestens nach
-`ALARM_TON_FRIST_MS` in „Ton blockiert“).
+*Preis:* Der Aufbau beim Start (`idle`) und „SYNC“ unterscheiden sich als Symbol nur in der Farbe
+(gelb/grün), „Ton wird geprüft“ und „Ton bereit“ gar nicht. Beides ist keine Störung und dauert
+Sekunden; Tooltip und Name nennen den Zustand, und die Tonprüfung endet spätestens nach
+`ALARM_TON_FRIST_MS` in „Ton blockiert“. Den Wiederaufbau mitten in der Sitzung (`connecting`,
+erst nach der Schonfrist, bei Netzfehlern endlos) trennt der Review vom Start: er heißt
+„wiederaufbau“, trägt „VERBINDE“ als Wort und steht vor „WARTET“; beim Start steht „WARTET“ vor
+dem wortlosen Aufbau.
 
 ### D2 Name vor Suche: Raster statt Wachstumsquote
 

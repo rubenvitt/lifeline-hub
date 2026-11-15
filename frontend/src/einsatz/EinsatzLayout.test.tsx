@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import { skipToken, useQuery } from '@tanstack/react-query';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { setzeViewportBreite } from '../test/viewport';
+import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout, { navGriffMass } from './EinsatzLayout';
@@ -526,6 +526,36 @@ describe('EinsatzLayout', () => {
    * Einsatz lädt, ist die Suchzelle deshalb unsichtbar: sie erscheint gleich an ihrem Platz, und
    * ein Element, das erst sichtbar wird, verschiebt nichts.
    */
+  // Review LLH-1726: Ein Wechsel über `lg` (Tablet drehen) darf den Wechsler nicht neu einhängen,
+  // sonst gehen offenes Menü und Fokus verloren. Der Behälter des Rasters bleibt deshalb stehen und
+  // ist unter `lg` nur `display: contents`.
+  it('hängt den Einsatz-Wechsler beim Wechsel über lg nicht neu ein', async () => {
+    setup();
+    const vorher = await screen.findByRole('button', { name: /Hochwasser Nord/ });
+    act(() => void sendeBreitenAenderung(820));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Navigation öffnen' })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBe(vorher);
+    act(() => void sendeBreitenAenderung(1024));
+    // Zurück ab `lg`: die Markenzelle steht wieder statt des Griffs.
+    await waitFor(() => expect(document.querySelector('[data-lfh="kopf-marke"]')).not.toBeNull());
+    expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBe(vorher);
+  });
+
+  // Review LLH-1726: Lädt der Einsatz lange (Wiederholungen), führt sonst nichts aus dem Kopf.
+  it('zeigt die Suchzelle nach einer Sekunde auch dann, wenn der Einsatz noch lädt', async () => {
+    setup();
+    server.use(http.get('/api/einsaetze/7', () => new Promise<never>(() => {})));
+    const zelle = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="kopf-suche"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(zelle.style.visibility).toBe('hidden');
+    await waitFor(() => expect(zelle.style.visibility).toBe(''), { timeout: 2500 });
+  });
+
   it('hält die Suchzelle unsichtbar, solange der Einsatz lädt', async () => {
     let freigeben: () => void = () => {};
     const geladen = new Promise<void>((r) => (freigeben = r));

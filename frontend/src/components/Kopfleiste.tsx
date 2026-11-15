@@ -225,7 +225,14 @@ export function Uhr() {
  * erwartet" — auf der Einsatzliste läuft kein SSE-Strom.
  */
 type SyncZustand =
-  'verbunden' | 'verbinde' | 'getrennt' | 'offline' | 'ausstehend' | 'abgelehnt' | 'ruhe';
+  | 'verbunden'
+  | 'verbinde'
+  | 'wiederaufbau'
+  | 'getrennt'
+  | 'offline'
+  | 'ausstehend'
+  | 'abgelehnt'
+  | 'ruhe';
 
 /**
  * Leitet den Zustand ab — REIN und exportiert, damit die Rangfolge ohne Rendern prüfbar ist.
@@ -235,7 +242,10 @@ type SyncZustand =
  * verlangen eine Handlung), ausstehende danach (sie gehen von selbst hinaus).
  *
  * `idle` ist der Zustand VOR dem ersten Verbindungsversuch — im Einsatz „verbinde", nie
- * „getrennt", sonst meldete jeder Kaltstart Alarm.
+ * „getrennt", sonst meldete jeder Kaltstart Alarm. `connecting` meldet `live/liveVerbindung.ts`
+ * dagegen erst nach der Schonfrist eines Wiederaufbaus mitten in der Sitzung, und bei Netzfehlern
+ * endlos: „wiederaufbau“ ist eine Störung mit Wort (Review LLH-1726), und vorgemerkte Aktionen
+ * stehen beim Start vor dem wortlosen Aufbau.
  */
 export function syncZustand(eingabe: {
   online: boolean;
@@ -247,8 +257,9 @@ export function syncZustand(eingabe: {
   if (!online) return 'offline';
   if (queue.abgelehnt > 0) return 'abgelehnt';
   if (liveErwartet && live === 'lost') return 'getrennt';
-  if (liveErwartet && (live === 'connecting' || live === 'idle')) return 'verbinde';
+  if (liveErwartet && live === 'connecting') return 'wiederaufbau';
   if (queue.ausstehend > 0) return 'ausstehend';
+  if (liveErwartet && live === 'idle') return 'verbinde';
   if (liveErwartet && live === 'open') return 'verbunden';
   return 'ruhe';
 }
@@ -277,6 +288,12 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
   verbinde: {
     wort: 'VERBINDE',
     satz: () => 'Live-Verbindung wird aufgebaut',
+    farbe: farbenDunkel.achtung,
+    getrennt: false,
+  },
+  wiederaufbau: {
+    wort: 'VERBINDE',
+    satz: () => 'Live-Verbindung wird wiederhergestellt',
     farbe: farbenDunkel.achtung,
     getrennt: false,
   },
@@ -318,10 +335,10 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * die Zelle nur bei Netzverlust oder offener Queue.
  *
  * WORT GENAU BEI STÖRUNG (LLH-1726, Spec `kopfleiste`): Die stehende Verbindung und ihr Aufbau
- * stehen in jeder Breite nur als Icon, der Aufbau in `achtung`. Beide verlangen nichts, und der
+ * beim Start stehen in jeder Breite nur als Icon, der Aufbau in `achtung`. Beide verlangen nichts, und der
  * Aufbau beim Start wechselte sonst ohne Zutun die Breite des Kopfs (vorher hielt ein Platzhalter
- * dafür dauerhaft die Breite von „VERBINDE“, LLH-1158). Jede Störung (WARTET, GETRENNT, OFFLINE,
- * PRÜFEN) trägt ihr Wort — Farbe allein wäre ein Kanal (WCAG 1.4.1). Den Zustand nennen in jedem
+ * dafür dauerhaft die Breite von „VERBINDE“, LLH-1158). Jede Störung (VERBINDE beim Wiederaufbau,
+ * WARTET, GETRENNT, OFFLINE, PRÜFEN) trägt ihr Wort — Farbe allein wäre ein Kanal (WCAG 1.4.1). Den Zustand nennen in jedem
  * Fall `aria-label` und `title`.
  *
  * `kompakt` (unter `md`): nur Icon, auch bei Störung; das Wort steht in der Betriebszeile.

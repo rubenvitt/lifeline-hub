@@ -32,9 +32,8 @@ MUST der Name mit „…“ kürzen. Ein gekürzter Name MUST ganz im Titel des 
 Benachrichtigung, Alarmton und Live-Verbindung SHALL in der Kopfleiste des Einsatzes einen
 Zustand ohne Handlungsbedarf nur als Symbol zeigen, in jeder Breite und Dichte: Benachrichtigung
 „erlaubt“, „aus“, „nicht verfügbar“, Ton „bereit“, „wird geprüft“, Verbindung „steht“, „wird
-aufgebaut“. Zugänglicher Name und Tooltip MUST den Zustand nennen. Ein Zustand, der sich beim
-Start ohne Zutun einstellt, MUST die Breite der Kopfleiste nicht ändern; der Alarmton hält dafür
-auch im Ruhezustand die Breite von „Ton blockiert“ frei.
+beim Start aufgebaut“. Zugänglicher Name und Tooltip MUST den Zustand nennen. Ein Zustand, der
+sich beim Start ohne Zutun einstellt, MUST die Breite der Kopfleiste nicht ändern.
 
 #### Scenario: Alles in Ordnung
 - **WHEN** ein Einsatz bei 1440 × 900 geöffnet ist, Benachrichtigungen erlaubt sind, der Ton bereit ist und die Live-Verbindung steht
@@ -44,6 +43,12 @@ auch im Ruhezustand die Breite von „Ton blockiert“ frei.
 - **WHEN** ein Einsatz geladen wird und Tonprüfung und Verbindungsaufbau ohne Störung enden
 - **THEN** erscheint in der Kopfleiste kein Wort „Ton wird geprüft“ oder „VERBINDE“, und die Kopfleiste ändert dabei weder Breite noch Zeilenzahl
 
+### Requirement: Der Alarmton hält den Platz seines Störungsworts
+
+Der Alarmton SHALL in der Kopfleiste auch im Ruhezustand die Breite des Worts „Ton blockiert“
+freihalten. Der Browser sperrt den Ton vor der ersten Bediengeste ohne Zutun, und das Wort
+erscheint dann nach der Prüffrist.
+
 #### Scenario: Ton beim Start gesperrt
 - **WHEN** ein Einsatz in `handschuh` zwischen 1100 und 1440 px mit Maus geladen wird und der Browser den Ton bis zur ersten Bediengeste sperrt
 - **THEN** erscheint nach der Frist „Ton blockiert“, und die Kopfleiste behält dabei ihre Zeilenzahl
@@ -52,16 +57,31 @@ auch im Ruhezustand die Breite von „Ton blockiert“ frei.
 
 Eine Störung von Benachrichtigung, Alarmton oder Live-Verbindung MUST in der Kopfleiste des
 Einsatzes ab `md` ihr Wort neben dem Symbol zeigen: „Ton stumm“, „Ton blockiert“,
-„Benachrichtigung blockiert“, „GETRENNT“, „OFFLINE“, „WARTET“ und „PRÜFEN“. Unter `md` trägt die
-Betriebszeile die Verbindungsstörung, die Alarmzentrale nennt ihre Störung im gebündelten Knopf.
+„Benachrichtigung blockiert“, „VERBINDE“ (Wiederaufbau mitten in der Sitzung), „GETRENNT“,
+„OFFLINE“, „WARTET“ und „PRÜFEN“. Unter `md` trägt die Betriebszeile die Verbindungsstörung.
+Gebündelt nennt die Alarmzentrale nur die vorrangige Störung als Wort (Requirement unten).
 
 #### Scenario: Ton blockiert
 - **WHEN** der Browser den Alarmton blockiert
 - **THEN** steht neben der durchgestrichenen Glocke das Wort „Ton blockiert“ in der Farbe `achtung`
 
+#### Scenario: Wiederaufbau dauert an
+- **WHEN** die Live-Verbindung mitten in der Sitzung abreißt und der Browser sie länger als die Schonfrist neu aufbaut
+- **THEN** steht „VERBINDE“ als Wort neben dem gelben Symbol
+
 #### Scenario: Verbindung verloren
 - **WHEN** die Live-Verbindung abreißt
 - **THEN** steht „GETRENNT“ als Wort neben dem Symbol
+
+### Requirement: Die gebündelte Alarmzentrale nennt die vorrangige Störung
+
+Bündelt der Kopf die Alarmzentrale zu einem Knopf (Handy, Tablet mit Finger unter `xl`), SHALL
+dieser die vorrangige Störung als Wort nennen, den Ton vor der Benachrichtigung; die übrige
+Störung MUST im Menü des Knopfs stehen.
+
+#### Scenario: Zwei Störungen am Tablet mit Finger
+- **WHEN** am Tablet mit Finger bei 1024 px der Ton stumm und die Benachrichtigung blockiert ist
+- **THEN** nennt der Knopf „Ton stumm“, und sein Menü nennt die blockierte Benachrichtigung
 
 ### Requirement: Tastenhinweise im Suchfeld nur bei feinem Zeiger
 

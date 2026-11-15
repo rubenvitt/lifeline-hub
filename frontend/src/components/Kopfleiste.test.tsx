@@ -40,6 +40,24 @@ describe('syncZustand — Rangfolge der SYNC-Anzeige', () => {
     expect(syncZustand({ ...basis, live: 'lost' })).toBe('getrennt');
   });
 
+  // Review LLH-1726: `connecting` meldet die Verbindung erst nach der Schonfrist, mitten in der
+  // Sitzung, und bei Netzfehlern endlos. Das ist eine Störung mit Wort, nicht der Start (`idle`).
+  it('trennt den Wiederaufbau (`connecting`) vom Start (`idle`)', () => {
+    expect(syncZustand({ ...basis, live: 'connecting' })).toBe('wiederaufbau');
+    expect(SYNC_DARSTELLUNG.wiederaufbau).toMatchObject({
+      wort: 'VERBINDE',
+      farbe: farbenDunkel.achtung,
+    });
+    expect(SYNC_DARSTELLUNG.wiederaufbau.satz(LEER)).toBe('Live-Verbindung wird wiederhergestellt');
+    expect(syncZeigtWort('wiederaufbau', false)).toBe(true);
+  });
+
+  it('nennt beim Start vorgemerkte Aktionen statt des wortlosen Aufbaus', () => {
+    expect(syncZustand({ ...basis, live: 'idle', queue: { ...LEER, ausstehend: 2 } })).toBe(
+      'ausstehend',
+    );
+  });
+
   it('meldet ausstehende Aktionen erst nach stehender Verbindung', () => {
     expect(syncZustand({ ...basis, queue: { ...LEER, ausstehend: 3 } })).toBe('ausstehend');
   });
