@@ -114,7 +114,11 @@ export default function SprechgruppenAngabe({
     <InlineAngabe<number[]>
       etikett="Sprechgruppen"
       wert={ids}
-      anzeige={<span style={zahlStil('text')}>{sprechgruppenText(sprechgruppen)}</span>}
+      anzeige={
+        <span data-schrift="kennung" style={zahlStil('text')}>
+          {sprechgruppenText(sprechgruppen)}
+        </span>
+      }
       leer={(w) => w.length === 0}
       gleich={isSameIds}
       darfSchreiben={darfSchreiben}

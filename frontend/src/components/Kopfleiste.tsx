@@ -14,7 +14,7 @@ import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
-import { schriftGroesse } from './instrument/rollenwerte';
+import { schriftGroesse, schriftStil } from './instrument/rollenwerte';
 
 import './Kopfleiste.css';
 
@@ -173,9 +173,9 @@ export function formatiereUhr(ms: number): string {
 }
 
 /**
- * Die Uhr der Kommandoleiste (Mono 14/500). Browserzeit, nicht die Anzeigezone eines Einsatzes:
- * der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider` und steht auch auf der Einsatzliste.
- * Eine Uhr, die je Route die Zone wechselt, wäre schlimmer.
+ * Die Uhr der Kommandoleiste (Rolle `uhr`: Mono, Stufe `titel`, 500; LLH-1773). Browserzeit,
+ * nicht die Anzeigezone eines Einsatzes: der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider`
+ * und steht auch auf der Einsatzliste. Eine Uhr, die je Route die Zone wechselt, wäre schlimmer.
  */
 export function Uhr() {
   const { token } = theme.useToken();
@@ -187,11 +187,7 @@ export function Uhr() {
         dateTime={dayjs(jetzt).format('HH:mm')}
         aria-label={`Uhrzeit ${text}`}
         style={{
-          fontFamily: schrift.zahl,
-          fontSize: schriftGroesse('text'),
-          fontWeight: 500,
-          letterSpacing: '0.04em',
-          fontVariantNumeric: 'tabular-nums',
+          ...schriftStil('uhr'),
           color: rahmenFarben.text,
         }}
       >
@@ -379,7 +375,8 @@ export function SyncAnzeige({
         <WortPlatz
           platz={haeltStartPlatz ? SYNC_DARSTELLUNG.verbinde.wort : ''}
           style={{
-            fontFamily: schrift.zahl,
+            // Ein Zustandswort, keine Zahl: Textschrift (LLH-1777, Mono-Grenze).
+            ...schriftStil('meta'),
             fontSize: schriftGroesse('fein'),
             // Verbunden bleibt das Wort gedämpft wie im Entwurf — das grüne Icon trägt den
             // Zustand. Jede Störung färbt auch das Wort: dann soll es auffallen.

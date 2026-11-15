@@ -23,7 +23,7 @@ import type { UnterEbene } from './Markdown';
 import { Select } from './Select';
 import StatusTag from './StatusTag';
 import StatusWahl, { type StatusBedienung } from './StatusWahl';
-import Augenbraue from './instrument/Augenbraue';
+import Feldetikett from './instrument/Feldetikett';
 import Filterhinweis from './instrument/Filterhinweis';
 import { rollenwerte, zahlStil } from './instrument/rollenwerte';
 import { zielEinzug } from './instrument/zielEinzug';
@@ -2584,8 +2584,8 @@ export default function Datensicht<T extends object, const K extends string>(
                     data-lfh="datensicht-feld"
                     style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}
                   >
-                    {/* Feldetikett als Augenbraue, Versalien per CSS; der Wortlaut im DOM bleibt. */}
-                    <Augenbraue>{etikettVon(spalte) ?? spalte.key}</Augenbraue>
+                    {/* Benennt den Wert darunter: Feldetikett, gemischt geschrieben (LLH-1776). */}
+                    <Feldetikett>{etikettVon(spalte) ?? spalte.key}</Feldetikett>
                     <span style={spalte.zahl ? zahlStil('text') : undefined}>
                       {zelle(spalte, zeile, index)}
                     </span>

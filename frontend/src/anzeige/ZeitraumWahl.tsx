@@ -13,7 +13,7 @@ import {
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { useViewport } from '../components/useViewport';
 import { serverJetzt } from '../offline/serveruhr';
-import { zahlStil } from '../components/instrument/rollenwerte';
+import { schriftStil } from '../components/instrument/rollenwerte';
 
 /** Was eine Wahl in den Filter schreibt: beide Grenzen, geleerte als `undefined`. */
 export interface ZeitraumGrenzen {
@@ -158,7 +158,8 @@ export default function ZeitraumWahl({ von, bis, letzteLb, onWahl, kennung }: Pr
         aria-label={von || bis ? `Zeitraum ${beschriftung}` : 'Zeitraum'}
         data-lfh={kennung}
       >
-        <span style={von || bis ? zahlStil('text') : undefined}>{beschriftung}</span>
+        {/* „seit LB 14:32“ trägt Wörter: Textschrift mit gleich breiten Ziffern (LLH-1777). */}
+        <span style={von || bis ? schriftStil('text') : undefined}>{beschriftung}</span>
       </Button>
     </Popover>
   );

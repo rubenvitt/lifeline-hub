@@ -62,8 +62,9 @@ export function gemeinsamerDatenstand(...zeitstempel: Array<number | undefined>)
 }
 
 /**
- * Kompakte, wiederverwendbare Datenfrische-Anzeige für Seiten- und Sektionsköpfe, als Mono-Meta
- * (`schriftskala.meta`, 11 px): eine Uhrzeit ist eine Zahl.
+ * Kompakte, wiederverwendbare Datenfrische-Anzeige für Seiten- und Sektionsköpfe, als Meta
+ * (`schriftskala.meta`, Stufe `klein`): „Stand 14:32“ trägt ein Wort, steht also in der Textschrift
+ * mit gleich breiten Ziffern (LLH-1777, Mono-Grenze).
  */
 const STIL = {
   fontFamily: schrift[schriftskala.meta.familie],

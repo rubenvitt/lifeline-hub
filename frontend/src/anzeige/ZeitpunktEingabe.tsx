@@ -32,7 +32,7 @@ import {
   type RefObject,
   type Ref,
 } from 'react';
-import { useRollen, zahlStil } from '../components/instrument';
+import { schriftStil, useRollen, zahlStil } from '../components/instrument';
 import { useViewport, type AbBreitePunkt } from '../components/useViewport';
 import { IconKalender } from '../icons';
 import { serverJetzt } from '../offline/serveruhr';
@@ -316,7 +316,8 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
       id={hinweisId}
       aria-live="polite"
       style={{
-        ...(grund ? {} : zahlStil('klein')),
+        // „= 14.03. 14:32 · morgen“ trägt ein Wort: Textschrift (LLH-1777, Mono-Grenze).
+        ...(grund ? {} : schriftStil('meta')),
         color: grund ? rollen.alarmText : rollen.gedaempft,
       }}
     >
@@ -369,7 +370,9 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         value={text ?? anzeige}
         prefix={
           z.zonenHinweis ? (
-            <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>{z.zonenHinweis}</span>
+            <span data-schrift="kennung" style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+              {z.zonenHinweis}
+            </span>
           ) : undefined
         }
         suffix={suffix}

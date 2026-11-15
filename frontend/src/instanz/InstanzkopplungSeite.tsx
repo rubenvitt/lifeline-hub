@@ -15,7 +15,14 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconKreuz, IconPlus } from '../icons';
 import AdminPage from '../components/AdminPage';
-import { Datenfeld, Datenraster, Paneel, useRollen, zahlStil } from '../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  Paneel,
+  schriftStil,
+  useRollen,
+  zahlStil,
+} from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import KopierbarerText from '../components/KopierbarerText';
@@ -381,7 +388,10 @@ export default function InstanzkopplungSeite() {
                           >
                             {kopplungZustandZeile(k, zeit)}
                           </div>
-                          <div style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+                          <div
+                            data-schrift="kennung"
+                            style={{ ...zahlStil('klein'), color: rollen.gedaempft }}
+                          >
                             {k.gegenueber_fingerabdruck}
                             {k.gegenueber_adresse ? ` · ${k.gegenueber_adresse}` : ''}
                           </div>
@@ -945,7 +955,8 @@ function ImNetzGefunden({
                 <ListenEintragMeta
                   title={<span data-lfh="instanz-im-netz-name">{g.name || g.kennung}</span>}
                   description={
-                    <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+                    // „· Protokoll 2 · schon gekoppelt“: Wörter, also Textschrift (LLH-1777).
+                    <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
                       {gefundenZeile(g)}
                     </span>
                   }

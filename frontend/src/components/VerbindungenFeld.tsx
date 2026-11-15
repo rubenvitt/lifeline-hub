@@ -48,7 +48,9 @@ export function VerbindungenListe({
       {verbindungen.map((v, i) => {
         const verweis = verbindungsVerweis(v.mittel, v.wert);
         const wert = (
-          <span style={{ ...zahlStil('text'), overflowWrap: 'anywhere' }}>{v.wert}</span>
+          <span data-schrift="kennung" style={{ ...zahlStil('text'), overflowWrap: 'anywhere' }}>
+            {v.wert}
+          </span>
         );
         return (
           <Flex key={`${i}-${v.mittel}-${v.wert}`} wrap align="baseline" gap={token.marginXS}>

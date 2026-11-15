@@ -789,7 +789,7 @@ export function CommandPalette({
             {sucheAktiv && flach.map((b) => optionsZeile(b))}
             {gruppen.map((x) => (
               <div key={x.gruppe} role="group" aria-label={GRUPPEN_LABEL[x.gruppe]}>
-                {/* Gruppen-Augenbraue (10/600/.14em, Versalien) — `schriftskala.augenbraue`. */}
+                {/* Gruppen-Augenbraue (fein/600/.08em, Versalien) — `schriftskala.augenbraue`. */}
                 <div
                   style={{
                     ...augenbraueStil(farben.schwach),

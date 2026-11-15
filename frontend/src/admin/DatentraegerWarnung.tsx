@@ -96,7 +96,12 @@ export default function DatentraegerWarnung() {
               }}
             >
               <span>{ORT[o.art]}</span>
-              <span style={{ ...zahlStil('klein'), overflowWrap: 'anywhere' }}>{o.pfad}</span>
+              <span
+                data-schrift="kennung"
+                style={{ ...zahlStil('klein'), overflowWrap: 'anywhere' }}
+              >
+                {o.pfad}
+              </span>
               <StatusChip
                 ton={o.wert === 'unverschluesselt' ? 'alarm' : 'achtung'}
                 wort={o.wert === 'unverschluesselt' ? 'unverschlüsselt' : 'unbekannt'}
