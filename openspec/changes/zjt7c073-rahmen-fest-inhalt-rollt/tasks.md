@@ -33,8 +33,8 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (Test zuerst rot)
 
 ## 6. Regeln und Design System
 
-- [ ] 6.1 `frontend/AGENTS.md` Abschnitt Rahmen („Stehenbleiben, gestuft“, „Wer oben klebt“, Seitenkopf-Spiegelstrich bei den Bausteinen) auf zwei Höhen, klebendes Modulpanel und klebenden Seitenkopf umstellen. Nachweis: Prettier grün
-- [ ] 6.2 `mise exec -- pnpm -C frontend design-system` laufen lassen (README trägt den Rahmen-Abschnitt), Erzeugtes mitcommitten. Nachweis: Wächter `designSystem.guard.test.ts` grün
+- [x] 6.1 `frontend/AGENTS.md` Abschnitt Rahmen („Stehenbleiben, gestuft“, „Wer oben klebt“, Seitenkopf-Spiegelstrich bei den Bausteinen) auf zwei Höhen, klebendes Modulpanel und klebenden Seitenkopf umstellen. Nachweis: Prettier grün
+- [x] 6.2 `mise exec -- pnpm -C frontend design-system` laufen lassen (README trägt den Rahmen-Abschnitt), Erzeugtes mitcommitten. Nachweis: Wächter `designSystem.guard.test.ts` grün
 
 ## 7. Gates
 
