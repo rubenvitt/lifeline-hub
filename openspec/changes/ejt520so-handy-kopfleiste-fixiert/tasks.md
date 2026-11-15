@@ -60,13 +60,14 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 6. Regeln und Doku
 
-- [ ] 6.1 `frontend/AGENTS.md`, „Stehenbleiben, gestuft“ und „Wer oben klebt“: Kopf in jeder
+- [x] 6.1 `frontend/AGENTS.md`, „Stehenbleiben, gestuft“ und „Wer oben klebt“: Kopf in jeder
   Breite, Ränge, Betriebszeile darüber; Ortspfad im Einsatz unter `md`; Code-Kommentare mit
   „unter `md` rollt der Kopf“ nachziehen (`git grep`). Prettier grün.
-- [ ] 6.2 ADR (nächste freie Nummer auf `alpha`): „Der Kopf klebt in jeder Breite, was oben klebt,
+- [x] 6.2 ADR (nächste freie Nummer auf `alpha`): „Der Kopf klebt in jeder Breite, was oben klebt,
   stapelt sich nach Rang“, mit Prüfung; `scripts/check-adr*.sh` bzw. Gate grün.
-- [ ] 6.3 Anwenderdoku „Einsatz-Oberfläche“: Handy-Kopf, Suche und Benutzermenü in der Navigation;
-  betroffene Bilder neu erzeugt (Regeln in `docs/anwender/AGENTS.md`), Wächter grün.
+- [x] 6.3 Anwenderdoku „Einsatz-Oberfläche“: Handy-Kopf, Suche und Benutzermenü in der Navigation;
+  betroffene Bilder neu erzeugt (Regeln in `docs/anwender/AGENTS.md`), Wächter grün. Keine
+  Bilder-Spec nimmt den Handy-Kontext auf, ab `md` ändert sich nichts: kein Bild betroffen.
 
 ## 7. Abschluss
 

@@ -108,8 +108,42 @@ export async function oeffneAbmeldenRueckfrage(page: Page, menue: Locator): Prom
  * wird bestätigt. Ein gemeinsamer Weg für alle Specs, die über die Oberfläche abmelden.
  */
 export async function abmeldenUeberMenue(page: Page): Promise<void> {
-  const menue = await oeffneMenue(page, page.getByRole('button', { name: 'Benutzermenü' }));
+  const menue = await oeffneMenue(page, await benutzermenueAusloeser(page));
   const rueckfrage = await oeffneAbmeldenRueckfrage(page, menue);
   await rueckfrage.getByRole('button', { name: 'Abmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
+}
+
+/**
+ * Der Auslöser des Benutzermenüs: im Kopf, am Handy im Einsatz im Fuß der Navigation (LLH-1728,
+ * design.md D3). Trägt der Kopf ihn nicht, öffnet der Helfer dafür die Navigation. Ab `md` und im
+ * App-Rahmen bleibt er im Kopf, dann wird nichts geöffnet.
+ */
+export async function benutzermenueAusloeser(page: Page): Promise<Locator> {
+  const kopf = page.locator('[data-lfh="rahmen-kopf"]');
+  const imKopf = kopf.getByRole('button', { name: 'Benutzermenü' });
+  const griff = kopf.getByRole('button', { name: 'Navigation öffnen' });
+  await expect(imKopf.or(griff).first()).toBeVisible();
+  if (await imKopf.isVisible()) return imKopf;
+  await griff.click();
+  const knopf = page.locator('.ant-drawer-open').getByRole('button', { name: 'Benutzermenü' });
+  await expect(knopf).toBeVisible();
+  return knopf;
+}
+
+/**
+ * Öffnet die Sprungpalette über die Oberfläche: im Kopf über „Suchen“, am Handy im Einsatz über
+ * „Suchen“ in der Navigation (LLH-1728, D3).
+ */
+export async function oeffneSucheUeberOberflaeche(page: Page): Promise<void> {
+  const kopf = page.locator('[data-lfh="rahmen-kopf"]');
+  const imKopf = kopf.getByRole('button', { name: 'Suchen' });
+  const griff = kopf.getByRole('button', { name: 'Navigation öffnen' });
+  await expect(imKopf.or(griff).first()).toBeVisible();
+  if (await imKopf.isVisible()) {
+    await imKopf.click();
+    return;
+  }
+  await griff.click();
+  await page.locator('.ant-drawer-open').getByRole('button', { name: 'Suchen' }).click();
 }

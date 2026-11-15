@@ -174,9 +174,9 @@ describe('LiveStatusBanner — globale Betriebszeile', () => {
 });
 
 /**
- * LFH-952 (D1): unter `md` rollt der Kopf mit; dann klebt die Betriebszeile, solange sie eine
- * Verbindungsstörung meldet (offline oder Live-Verbindung `lost`). Ab `md` trägt die SYNC-Zelle
- * im klebenden Kopf die Störung, und die Zeile rollt.
+ * LFH-952 (D1), LLH-1728 (D2): unter `md` klebt die Betriebszeile über dem dort ebenfalls
+ * klebenden Kopf, solange sie eine Verbindungsstörung meldet (offline oder Live-Verbindung
+ * `lost`). Ab `md` trägt die SYNC-Zelle im klebenden Kopf die Störung, und die Zeile rollt.
  */
 describe('LiveStatusBanner — klebt bei Störung am Handy (LFH-952)', () => {
   function zeile() {

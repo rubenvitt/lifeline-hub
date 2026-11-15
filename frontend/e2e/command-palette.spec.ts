@@ -68,7 +68,9 @@ test('öffnet auf 390 px per sichtbarem Trigger, fokussiert die Palette und navi
   await page.setViewportSize(SCHMAL);
   await zumModul(page, id, 'etb');
 
-  const trigger = page.getByRole('button', { name: 'Suchen' });
+  // Am Handy steht „Suchen“ im Einsatz in der Navigation (LLH-1728, D3).
+  await page.locator('header').getByRole('button', { name: 'Navigation öffnen' }).click();
+  const trigger = page.locator('.ant-drawer-open').getByRole('button', { name: 'Suchen' });
   const kasten = (await trigger.boundingBox())!;
   expect(
     Math.min(kasten.width, kasten.height),

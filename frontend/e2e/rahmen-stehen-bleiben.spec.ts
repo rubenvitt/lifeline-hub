@@ -1,12 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
-import { abmeldenUeberMenue } from './menue-kern';
+import { abmeldenUeberMenue, benutzermenueAusloeser } from './menue-kern';
 
 /**
- * Der Rahmen bleibt beim Rollen erreichbar (LFH-952, Spec `einsatztauglichkeit-layout`,
- * `frontend/AGENTS.md`, Rahmen). Gestuft: ab `md` klebt der Kopf, ab `lg` die Rail-Kategorien
- * darunter; unter `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung. jsdom rechnet
- * kein Layout, deshalb im Browser.
+ * Der Rahmen bleibt beim Rollen erreichbar (LFH-952, LLH-1728, Spec `einsatztauglichkeit-layout`,
+ * `frontend/AGENTS.md`, Rahmen). Der Kopf klebt in jeder Breite, ab `lg` auch die Rail-Kategorien
+ * darunter; unter `md` klebt die gestörte Betriebszeile über dem Kopf (Rang, design.md D2 in
+ * `openspec/changes/ejt520so-handy-kopfleiste-fixiert/`). jsdom rechnet kein Layout, deshalb im
+ * Browser.
  *
  * Jede Messung hat ihre Vorbedingung (die Seite ist WIRKLICH gerollt), sonst stünde der Kopf auch
  * ohne `sticky` oben. Die Layout-Messung läuft als Admin und als Beobachter (`e2e/AGENTS.md`).
@@ -17,10 +18,10 @@ import { abmeldenUeberMenue } from './menue-kern';
  */
 
 const BREITEN = [
-  { width: 390, height: 844, kopfKlebt: false, rail: false },
-  { width: 820, height: 1180, kopfKlebt: true, rail: false },
-  { width: 1180, height: 820, kopfKlebt: true, rail: true },
-  { width: 1440, height: 900, kopfKlebt: true, rail: true },
+  { width: 390, height: 844, handy: true, rail: false },
+  { width: 820, height: 1180, handy: false, rail: false },
+  { width: 1180, height: 820, handy: false, rail: true },
+  { width: 1440, height: 900, handy: false, rail: true },
 ] as const;
 
 async function einsatzAnlegen(
@@ -81,15 +82,11 @@ for (const rolle of ['admin', 'beobachter'] as const) {
       await expect(page.getByPlaceholder('Inhalt …')).toHaveCount(rolle === 'beobachter' ? 0 : 1);
 
       const kopf = page.locator('[data-lfh="rahmen-kopf"]');
-      if (!b.kopfKlebt) {
-        // Unter `md` rollt der Kopf mit (Gegenprobe): am Handy wäre er zu teuer.
-        expect(await oben(page, '[data-lfh="rahmen-kopf"]')).toBeLessThan(0);
-        return;
-      }
       await expect(kopf).toHaveCSS('position', 'sticky');
       expect(Math.round(await oben(page, '[data-lfh="rahmen-kopf"]')), 'Kopf steht oben').toBe(0);
-      // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): das Benutzermenü öffnet.
-      await page.getByRole('button', { name: 'Benutzermenü' }).click();
+      // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): das Benutzermenü öffnet, am Handy aus der
+      // Navigation (LLH-1728, D3).
+      await (await benutzermenueAusloeser(page)).click();
       await expect(page.getByRole('menuitem', { name: 'Profil' })).toBeInViewport();
       await page.keyboard.press('Escape');
 
@@ -162,17 +159,26 @@ for (const b of BREITEN) {
     await etbGerollt(page, einsatzId);
     await context.setOffline(true);
     try {
-      if (b.kopfKlebt) {
+      if (!b.handy) {
         // Ab `md` trägt die SYNC-Zelle im klebenden Kopf die Störung als Wort.
         await expect(
           page.locator('[data-lfh="rahmen-kopf"]').getByText('OFFLINE', { exact: true }),
         ).toBeInViewport();
       } else {
+        // Am Handy steht die Verbindung im Kopf nur als Symbol: die Betriebszeile nennt die
+        // Störung und klebt über dem Kopf (LLH-1728, D2).
         const zeile = page.locator('[data-lfh="betriebszeile"]');
         await expect(zeile).toContainText('Offline');
         await expect(zeile).toHaveCSS('position', 'sticky');
         await expect(zeile).toBeInViewport();
-        expect(Math.round(await oben(page, '[data-lfh="betriebszeile"]'))).toBe(0);
+        const z = (await zeile.boundingBox())!;
+        expect(Math.round(z.y)).toBe(0);
+        await expect
+          .poll(
+            async () => Math.round(await oben(page, '[data-lfh="rahmen-kopf"]')),
+            'Kopf direkt unter der Betriebszeile',
+          )
+          .toBe(Math.round(z.y + z.height));
       }
     } finally {
       await context.setOffline(false);
@@ -262,8 +268,8 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
 
 /**
  * Übungsband (LLH-1725, Spec `uebungsmarke`, „Das Übungsband bleibt beim Rollen stehen“; D4 in
- * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): es klebt in JEDER Breite, ab `md`
- * direkt unter dem Kopf, unter `md` an der Fensterkante bzw. unter der gestörten Betriebszeile.
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): es klebt in JEDER Breite, direkt
+ * unter dem Kopf, der seit LLH-1728 auch am Handy klebt; dort gestört unter Betriebszeile und Kopf.
  * `--lfh-rahmen-oben` endet an seiner Unterkante: daran hängt jeder stehende Tabellenkopf (Guard
  * `rahmenOben.guard.test.ts`), also liegt keiner hinter dem Band.
  *
@@ -292,19 +298,15 @@ for (const b of BREITEN) {
     await expect(band).toHaveCSS('position', 'sticky');
     await expect(band).toBeInViewport();
     const r = (await band.boundingBox())!;
-    if (b.kopfKlebt) {
-      const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
-      expect(Math.round(r.y), 'Band bündig unter dem Kopf').toBe(Math.round(kopf.y + kopf.height));
-    } else {
-      expect(Math.round(r.y), 'Band an der Fensterkante, der Kopf ist weggerollt').toBe(0);
-    }
+    const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+    expect(Math.round(r.y), 'Band bündig unter dem Kopf').toBe(Math.round(kopf.y + kopf.height));
     await expect
       .poll(async () => Math.round(await rahmenOben(page)), 'Rahmenkante unter dem Band')
       .toBe(Math.round(r.y + r.height));
   });
 }
 
-test('390 px, Übung, offline: Betriebszeile und Band stehen übereinander', async ({
+test('390 px, Übung, offline: Betriebszeile, Kopf und Band stehen übereinander', async ({
   page,
   context,
 }) => {
@@ -320,10 +322,15 @@ test('390 px, Übung, offline: Betriebszeile und Band stehen übereinander', asy
     await expect(zeile).toBeInViewport();
     const z = (await zeile.boundingBox())!;
     expect(Math.round(z.y)).toBe(0);
+    const kopf = page.locator('[data-lfh="rahmen-kopf"]');
+    await expect
+      .poll(async () => Math.round((await kopf.boundingBox())!.y), 'Kopf unter der Betriebszeile')
+      .toBe(Math.round(z.y + z.height));
+    const k = (await kopf.boundingBox())!;
     const band = page.locator('[data-lfh="uebung-band"]');
     await expect
-      .poll(async () => Math.round((await band.boundingBox())!.y), 'Band unter der Betriebszeile')
-      .toBe(Math.round(z.y + z.height));
+      .poll(async () => Math.round((await band.boundingBox())!.y), 'Band unter dem Kopf')
+      .toBe(Math.round(k.y + k.height));
   } finally {
     await context.setOffline(false);
   }
@@ -339,3 +346,83 @@ test('Realeinsatz: kein Band, die Rahmenkante bleibt am Kopf (Gegenprobe)', asyn
   const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
   expect(Math.round(await rahmenOben(page))).toBe(Math.round(kopf.height));
 });
+
+/**
+ * Eine Zeile am Handy (LLH-1728, Spec `einsatztauglichkeit-layout`, „Langes Rollen im ETB am
+ * Handy“): Menü, Name, Alarm, Verbindung und Uhr stehen nach dem Rollen in einer Zeile ganz im
+ * Fenster, in jeder Dichtestufe; Suche und Benutzermenü stehen nicht im Kopf (D3).
+ */
+for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+  test(`390 px, ${dichte}: der Kopf klebt einzeilig mit Uhr`, async ({ page }) => {
+    // Ruhezustand der Alarmzentrale: Ton bereit, Benachrichtigung erlaubt (wie `kopfzeile-schmal`).
+    await page.addInitScript((d) => {
+      localStorage.setItem('lifeline-hub.dichte', d);
+      class Erlaubt {
+        static permission = 'granted';
+        static requestPermission = async () => 'granted';
+      }
+      Object.defineProperty(window, 'Notification', { value: Erlaubt, configurable: true });
+      const AC = window.AudioContext;
+      if (AC) {
+        Object.defineProperty(AC.prototype, 'state', { configurable: true, get: () => 'running' });
+        AC.prototype.resume = () => Promise.resolve();
+      }
+    }, dichte);
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page, `Rahmen Zeile ${dichte} ${Date.now()}`);
+    await etbFuellen(page, einsatzId);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await etbGerollt(page, einsatzId);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+
+    const kopf = page.locator('[data-lfh="rahmen-kopf"]');
+    await expect(kopf).toHaveCSS('position', 'sticky');
+    const ziele = [
+      kopf.getByRole('button', { name: 'Navigation öffnen' }),
+      kopf.locator('[data-lfh="kopf-einsatzname"]'),
+      kopf.getByRole('button', { name: /^Alarmzentrale:/ }),
+      kopf.locator('[data-lfh="kopf-sync"]'),
+      kopf.locator('[data-lfh="kopf-uhr"]'),
+    ];
+    const k = (await kopf.boundingBox())!;
+    expect(Math.round(k.y), 'Kopf steht oben').toBe(0);
+    let hoehe = 0;
+    for (const ziel of ziele) {
+      await expect(ziel).toBeInViewport({ ratio: 1 });
+      const r = (await ziel.boundingBox())!;
+      hoehe = Math.max(hoehe, r.height);
+      // Einzeilig: jedes Ziel liegt in derselben Zeile wie der Griff „Menü“.
+      expect(r.y - k.y, 'in der ersten Zeile').toBeLessThan(r.height);
+    }
+    expect(k.height, 'eine Zeile hoch').toBeLessThanOrEqual(hoehe + 2);
+    await expect(kopf.getByRole('button', { name: 'Suchen' })).toHaveCount(0);
+    await expect(kopf.getByRole('button', { name: 'Benutzermenü' })).toHaveCount(0);
+  });
+}
+
+for (const dichte of ['kompakt', 'komfortabel'] as const) {
+  test(`390 px, ${dichte}: die Einsatzliste behält den Kopf einzeilig mit Uhr`, async ({
+    page,
+  }) => {
+    await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+    await anmeldenAlsAdmin(page);
+    // Genug Einsätze, dass die Liste rollt.
+    for (let i = 0; i < 25; i += 1) await einsatzAnlegen(page, `Rahmen Liste ${i} ${Date.now()}`);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/einsaetze');
+    const kopf = page.locator('[data-lfh="rahmen-kopf"]');
+    await expect(kopf.locator('[data-lfh="kopf-uhr"]')).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 1000));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(500);
+    await expect(kopf).toHaveCSS('position', 'sticky');
+    const k = (await kopf.boundingBox())!;
+    expect(Math.round(k.y)).toBe(0);
+    const uhr = (await kopf.locator('[data-lfh="kopf-uhr"]').boundingBox())!;
+    expect(k.height, 'eine Zeile hoch').toBeLessThanOrEqual(uhr.height + 2);
+    // Die Bildmarke führt zur Einsatzliste, wo die Wortmarke der Uhr weicht (D5).
+    await expect(kopf.getByRole('link', { name: 'lifeline-hub' })).toHaveAttribute(
+      'href',
+      '/einsaetze',
+    );
+  });
+}

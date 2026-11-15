@@ -3,7 +3,7 @@
  * klebenden Rahmen.
  *
  * ── Warum ───────────────────────────────────────────────────────────────────────
- * Ab `md` klebt der Kopf am oberen Fensterrand, unter `md` im Störungsfall die Betriebszeile.
+ * Der Kopf klebt am oberen Fensterrand, unter `md` im Störungsfall die Betriebszeile darüber.
  * Ein weiteres Element mit `position: sticky; top: 0` im Dokument-Scroll klebte an derselben
  * Kante und läge unter dem Rahmen (der höher gestapelt ist): ein stehender Tabellenkopf, ein
  * Sammelbanner, eine Seitenleiste wären still verdeckt. Die Kante darunter ist

@@ -98,7 +98,8 @@ Auf schmalen Schirmen (Tablet hochkant, Telefon) stehen Kategorien und Module hi
 
 ### Mit der Sprungpalette springen
 
-1. **Strg+K** drücken (am Mac **⌘K**) oder in der Kopfzeile „Suchen“ wählen.
+1. **Strg+K** drücken (am Mac **⌘K**) oder in der Kopfzeile „Suchen“ wählen. Auf dem Handy steht
+   „Suchen“ im Einsatz oben in der Navigation („Navigation öffnen“ links oben).
 2. Einige Buchstaben tippen, etwa den Namen eines Moduls, eines Fahrzeugs oder einer Person.
 
    ![Sprungpalette mit der Eingabe „betr“, oben die Treffer „Betreuung“ und „Betroffene“, unten die Tastenhinweise](../bilder/einsatz-oberflaeche/sprungpalette.png)
@@ -122,7 +123,8 @@ Touch stehen diese Filter als Knöpfe am unteren Rand der Palette.
 
 ### Darstellung, Bediendichte und Helligkeit einstellen
 
-1. Oben rechts das „Benutzermenü“ öffnen. Unter „Anzeige“ stehen drei Leisten.
+1. Oben rechts das „Benutzermenü“ öffnen (auf dem Handy im Einsatz: unten in der Navigation).
+   Unter „Anzeige“ stehen drei Leisten.
 2. In der Leiste „Darstellung“ „Hell“, „Dunkel“ oder „System“ wählen.
 3. In der Leiste „Bediendichte“ „Kompakt“, „Komfortabel“ oder „Handschuh“ wählen.
 4. In der Leiste „Helligkeit in %“ eine Stufe von „100“ bis „20“ wählen.
@@ -273,17 +275,24 @@ Wort. Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eing�
 Knopf. Außerhalb eines Einsatzes führt „Verwaltung“ in die Verwaltung der Organisation. Wer dort
 keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 
+Die Kopfzeile bleibt beim Rollen oben stehen, auf jedem Gerät. Auf dem Handy trägt sie im Einsatz
+eine Zeile: „Navigation öffnen“, Statuspunkt und Name, Alarmzentrale, Verbindung und Uhr. „Suchen“
+steht dort oben in der Navigation, das Benutzermenü unten in der Navigation. Über einer Seite
+steht am Handy kein Ortspfad, den Einsatz nennt die Kopfzeile; auf einer Detailseite führt
+„‹ Personen“ (oder die jeweilige Liste) zurück. Außerhalb eines Einsatzes führt am Handy das
+Zeichen links oben zur Einsatzliste.
+
 Über der Kopfzeile erscheint bei Bedarf die **Betriebszeile**: bei Störungen der Verbindung, bei
 vorgemerkten oder abgelehnten Einträgen und mit „Neue Version verfügbar.“, wenn eine neue
-Fassung der App bereitliegt. „Jetzt neu laden“ lädt sie.
+Fassung der App bereitliegt. „Jetzt neu laden“ lädt sie. Auf dem Handy bleibt sie bei einer
+Störung der Verbindung über der Kopfzeile stehen.
 
 ### Übung oder Realeinsatz
 
 Hat ein Einsatz die Einsatzart „Übung“, ist das überall zu sehen, ohne den Namen zu lesen:
 
 - Unter der Kopfzeile steht ein violettes, schräg gestreiftes Band „ÜBUNG“ über die volle Breite,
-  in jedem Modul. Es bleibt beim Rollen stehen, auch auf dem Handy, wo die Kopfzeile selbst
-  mitrollt.
+  in jedem Modul. Es bleibt beim Rollen unter der Kopfzeile stehen.
 - Ab Tabletbreite steht in der Kopfzeile vor dem Namen die Marke „ÜBUNG“.
 - Der Titel des Browser-Tabs beginnt mit „ÜBUNG ·“.
 - In der Einsatzliste, im Einsatzwechsel, in der Sprungpalette und auf „Zurück zu …“ in Profil

@@ -679,8 +679,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 setNavOffen(false);
                 palette.oeffne();
               }}
+              // Dieselbe Trefffläche wie der Griff „Menü“ (A1, LFH-384), wie vorher im Kopf.
               style={{
-                height: token.controlHeight,
+                height: navGriffMass(token),
                 justifyContent: 'flex-start',
                 marginBlockEnd: token.marginSM,
               }}
