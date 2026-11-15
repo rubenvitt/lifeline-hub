@@ -79,7 +79,7 @@ Unteraufgaben: LLH-1735 `p1voqfck`, LLH-1736 `ftf3qelu`, LLH-1737 `mdbfi43h`, LL
 - [x] 4.3 Blatt „Alarme und Eingänge“ (`alarm/EingaengeKnopf.tsx`, Entwurf `Handy-Blatt.dc.html`):
   Ein Tipp auf die Leiste öffnet es über `EINGAENGE_OEFFNEN_EVENT`, oben der Abschnitt „Alarm“
   mit „Öffnen“, „Gelesen“ und ✕. Test in `alarm/EingaengeKnopf.test.tsx`. Vitest grün.
-- [ ] 4.4 e2e bei 390 × 844: `eingangsband-ausweichen.spec.ts` (Leiste über der ETB-Erfassung,
+- [x] 4.4 e2e bei 390 × 844: `eingangsband-ausweichen.spec.ts` (Leiste über der ETB-Erfassung,
   höchstens 48 px, zwei Einträge der Zeitachse darüber), Tippen klappt ein, mit Alarm bleibt eine
   Zeile; Navigations-Drawer liegt über der Leiste. `leisten-flaeche.spec.ts` grün. Lokal grün.
 - [x] 4.5 Doku: `docs/anwender/kapitel/einsatz-oberflaeche.md`, Abschnitt Handy (Leiste, Blatt,
