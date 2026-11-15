@@ -1,5 +1,5 @@
 ---
-id: ADR-0052
+id: ADR-0053
 titel: Eine Übung erkennt man an Band und Marke aus der Einsatzart, nie am Namen
 status: akzeptiert
 datum: 2026-11-15
@@ -13,7 +13,7 @@ herleitung:
   - Zunder LLH-1725 (Farbe, Platz, Gerät und Druck abgestimmt mit Ruben am 15.11.2026)
 ---
 
-# ADR-0052: Eine Übung erkennt man an Band und Marke aus der Einsatzart, nie am Namen
+# ADR-0053: Eine Übung erkennt man an Band und Marke aus der Einsatzart, nie am Namen
 
 ## Regeln
 

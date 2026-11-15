@@ -153,7 +153,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Entschieden wird nur über `isUebung` (`einsatz/einsatzart.ts`) aus der Einsatzart, nie aus dem
     Namen. Gezeigt wird am Bildschirm nur über `UebungsMarke`/`UebungsBand`
     (`components/instrument/Uebung.tsx`), auf Papier über Druckkopf, `DruckUebung` und Randfeld
-    (`druck/AGENTS.md`), in Text- und Bildtiteln als Präfix „ÜBUNG · “ (ADR-0052). Erkennbar ist sie
+    (`druck/AGENTS.md`), in Text- und Bildtiteln als Präfix „ÜBUNG · “ (ADR-0053). Erkennbar ist sie
     an Form und Wort (schraffiertes Band, gefüllter Chip, immer „ÜBUNG“), nicht am Farbton: violett
     sind auch die ETB-Entscheidung, die Abschnittsflächen und das Führungscluster der Lagekarte. Das Band steht direkt unter dem Kopf und klebt in jeder Breite unter den übrigen
     Rahmenquellen (`useRahmenObenStapel`). In einer Hülle fester Höhe (Gerät) klebt es nicht.
