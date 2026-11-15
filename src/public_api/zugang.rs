@@ -859,6 +859,56 @@ mod tests {
         assert_eq!((jti, abruf, code), (1, 1, 0));
     }
 
+    /// Legt eine aktive, meldende Kopplung der Art `art` an und ordnet ihr die Org zu.
+    async fn koppeln(pool: &SqlitePool, org: i64, kennung: &str, name: &str, art: &str) {
+        let k: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand, art) \
+             VALUES (?, 'X', ?, 'meldet_sich', 'https://gegenueber.example', 'aktiv', ?) \
+             RETURNING id",
+        )
+        .bind(kennung)
+        .bind(name)
+        .bind(art)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (?, ?, ?, 'Kreis')",
+        )
+        .bind(k)
+        .bind(org)
+        .bind(format!("{kennung}/1"))
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn nur_eine_standardkopplung_macht_den_hub_zustaendig() {
+        let pool = db::test_pool().await;
+        let (_, org) = neuer_zugang(&pool).await;
+        let hub = |pool: SqlitePool| async move {
+            let mut c = pool.acquire().await.unwrap();
+            hub_fuer_org(&mut c, org).await.unwrap().map(|(name, _)| name)
+        };
+
+        koppeln(&pool, org, "elw-2", "ELW 2", "vor_ort").await;
+        assert_eq!(
+            hub(pool.clone()).await,
+            None,
+            "eine Direktkopplung vor Ort ist kein Hub"
+        );
+
+        koppeln(&pool, org, "hub-1", "Hub Kreis", "standard").await;
+        assert_eq!(
+            hub(pool.clone()).await.as_deref(),
+            Some("Hub Kreis"),
+            "neben der Direktkopplung nennt die Abfrage den Hub"
+        );
+    }
+
     #[test]
     fn ablehnungen_schreiben_aus_einem_vorrat() {
         let mut t = std::collections::HashMap::new();

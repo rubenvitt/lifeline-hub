@@ -148,16 +148,19 @@ async fn spur(pool: &sqlx::SqlitePool) -> Vec<(String, String, Option<String>)> 
     .unwrap()
 }
 
-async fn org_koppeln(pool: &sqlx::SqlitePool) {
+/// Koppelt die Org des Admins als meldende Seite (aktiv) mit der Art `art` (`standard` = Hub,
+/// `vor_ort` = Direktkopplung mit einem zweiten ELW).
+async fn org_koppeln(pool: &sqlx::SqlitePool, art: &str) {
     let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
         .fetch_one(pool)
         .await
         .unwrap();
     let kopplung: i64 = sqlx::query_scalar(
         "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, gegenueber_name, \
-         richtung, gegenueber_adresse, zustand) VALUES ('hub-ew', 'X', 'Hub Kreis', 'meldet_sich', \
-         'https://hub.example', 'aktiv') RETURNING id",
+         richtung, gegenueber_adresse, zustand, art) VALUES ('hub-ew', 'X', 'Hub Kreis', 'meldet_sich', \
+         'https://hub.example', 'aktiv', ?) RETURNING id",
     )
+    .bind(art)
     .fetch_one(pool)
     .await
     .unwrap();
@@ -388,7 +391,7 @@ async fn gekoppelter_elw_nimmt_keine_einwuerfe_an() {
     let (app, pool, admin) = setup().await;
     let (id, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
     let (zweiter, _) = zugang(&app, &admin, "FE2", "alarmmeldungen:write").await;
-    org_koppeln(&pool).await;
+    org_koppeln(&pool, "standard").await;
 
     let (s, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
@@ -427,6 +430,41 @@ async fn gekoppelter_elw_nimmt_keine_einwuerfe_an() {
         &app,
         "POST",
         &format!("{LISTE}/{zweiter}/widerrufen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+/// LLH-1868: Eine Direktkopplung vor Ort mit einem zweiten ELW ist kein Hub; der ELW nimmt
+/// Einwürfe weiter selbst an.
+#[tokio::test]
+async fn direktkopplung_vor_ort_sperrt_keine_einwuerfe() {
+    let (app, pool, admin) = setup().await;
+    let (id, schluessel) = zugang(&app, &admin, "BOSWatch", "alarmmeldungen:write").await;
+    org_koppeln(&pool, "vor_ort").await;
+
+    let antwort = einwerfen(&app, &schluessel, "alarmmeldung?text=a").await;
+    assert_eq!(antwort.status, StatusCode::NO_CONTENT);
+    assert_eq!(anzahl(&pool, "alarmmeldung").await, 1);
+
+    let (s, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(liste["gesperrt_grund"].is_null(), "{liste}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        LISTE,
+        &admin,
+        Some(&json!({ "name": "neu", "scope": "alarmmeldungen:write" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{LISTE}/{id}/schluessel"),
         &admin,
         None,
     )

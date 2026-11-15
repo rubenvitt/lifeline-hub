@@ -293,6 +293,9 @@ mod art_tests {
             // Verwahrung auch beim Archiv am Ende der Nachbereitung: es wartet nur auf eine
             // Standardkopplung, die verwahren kann.
             ("src/einsatz/archiv.rs", "k.art = 'standard'", 1),
+            // Kein Fluss, aber dieselbe Frage (LLH-1868): Fremdsysteme sperrt nur ein Hub, eine
+            // Direktkopplung vor Ort nicht (Specs `maschinenzugang`, `einwurf-zugang`).
+            ("src/public_api/zugang.rs", "k.art = 'standard'", 1),
             // Kein Zurückholen nach dem Widerruf einer Direktkopplung.
             ("src/instanz/repo.rs", "Fluss::Fuehrungswechsel", 1),
             // Führungswechsel nach der Wechselregel (LLH-1678, design.md D1): die Regel je
