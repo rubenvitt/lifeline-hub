@@ -66,7 +66,7 @@ test.describe(KAPITEL, () => {
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/ueberblick`));
     await expect(page.getByRole('heading', { level: 1, name: 'Überblick' })).toBeVisible();
     const kategorien = page.getByRole('navigation', { name: 'Kategorien' });
-    await expect(kategorien.getByRole('button', { name: 'Führung' })).toHaveAttribute(
+    await expect(kategorien.getByRole('link', { name: 'Führung' })).toHaveAttribute(
       'aria-current',
       'true',
     );
@@ -80,7 +80,7 @@ test.describe(KAPITEL, () => {
     await fotografiere(page, KAPITEL, 'arbeitsflaeche');
 
     // Rail-Sprung: die Kategorie öffnet ihr erstes Modul.
-    await kategorien.getByRole('button', { name: 'Kommunikation' }).click();
+    await kategorien.getByRole('link', { name: 'Kommunikation' }).click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/chat`));
     // „Menü“ klappt die Modulliste ein und wieder aus.
     await kategorien.getByRole('button', { name: 'Menü einklappen' }).click();
