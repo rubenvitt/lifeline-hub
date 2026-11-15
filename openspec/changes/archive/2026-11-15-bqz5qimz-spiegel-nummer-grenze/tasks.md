@@ -24,7 +24,7 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `cargo test` für die berührten Module und `./scripts/check-all.sh --geaendert --ohne-e2e` grün (bzw. Verweis auf den CI-Lauf des PRs)
+- [x] 5.1 Verifiziert am 15.11.2026: `check-all.sh --nur schnell` und `--nur frontend` grün, `cargo test --lib` (4429 grün) und die Integrationstests der Kopplung, des Spiegels und der Einsatzanlage (324 grün); der volle `--geaendert`-Lauf passte nicht ins Plattenkontingent der Cloud-Sitzung, die Suiten laufen auf alpha
 
 ## Workflow follow-up
 

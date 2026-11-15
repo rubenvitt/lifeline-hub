@@ -42,7 +42,8 @@ pub enum GelieferteZahlen {
 
 /// Prüft Jahr und laufende Nummer, die eine gekoppelte Instanz im Kopf ihres Einsatzes liefert.
 /// Sie gilt für diese Zahlen nicht als vertrauenswürdig: Sie gehen in die Nummernvergabe dieser
-/// Instanz ein (design.md D1/D2 der Change `bqz5qimz-spiegel-nummer-grenze`).
+/// Instanz ein (ADR-0052; D1/D2 in
+/// `openspec/changes/archive/2026-11-15-bqz5qimz-spiegel-nummer-grenze/design.md`).
 pub fn check_gelieferte_zahlen(
     jahr: &serde_json::Value,
     lfd: &serde_json::Value,
