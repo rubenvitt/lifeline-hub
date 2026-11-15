@@ -310,13 +310,14 @@ der Adresse.
 ### Am ELW
 
 Meldet sich die Instanz für die Organisation bei einem Hub, nimmt sie keine Fremdsysteme an. Die
-Seite nennt dann den Hub; Anbindungen und Einwurf-Zugänge werden dort angelegt. Eine
-Direktkopplung vor Ort mit einem zweiten ELW zählt dabei nicht: Ohne Hub nimmt jeder der beiden
-ELW seine Fremdsysteme selbst an. Bestehende
-Anbindungen bleiben stehen und gelten wieder, sobald die Kopplung endet; solange nennt ihre Zeile
-keinen Einsatz. Eine Freigabe aus der Zeit davor ruht (siehe
+Seite nennt dann den Hub; Anbindungen und Einwurf-Zugänge werden dort angelegt. Bestehende
+Anbindungen bleiben stehen und gelten wieder, sobald die Kopplung mit dem Hub endet; solange nennt
+ihre Zeile keinen Einsatz. Eine Freigabe aus der Zeit davor ruht (siehe
 [Externe Lagemonitore](externe-lagemonitore.md)). Bestehende Einwurf-Zugänge lassen sich weiter
 widerrufen, ihre Einwürfe werden abgelehnt.
+
+Eine Direktkopplung vor Ort mit einem zweiten ELW sperrt nichts davon: Ohne Hub nimmt jeder der
+beiden ELW seine Fremdsysteme selbst an.
 
 ### Schlüssel und Code
 
