@@ -204,11 +204,12 @@ async function messe(page: Page, einsatzId: string, breite: number, ton: 'bereit
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
   const alarm = page.locator('header [data-lfh="kopf-alarm"]');
-  // Vorbedingung: die breite Bauform mit zwei Knöpfen, der Ton nennt seinen Endzustand im Wort.
+  // Vorbedingung: die breite Bauform mit zwei Knöpfen. Ein Wort trägt nur die Störung
+  // („Ton blockiert“), „Ton bereit“ steht als Glocke (LLH-1726).
   const tonKnopf = alarm.getByRole('button', {
     name: ton === 'bereit' ? 'Ton bereit – stummschalten' : 'Ton blockiert – freischalten',
   });
-  await expect(tonKnopf).toHaveText(`Ton ${ton}`, { timeout: 10_000 });
+  await expect(tonKnopf).toHaveText(ton === 'bereit' ? '' : 'Ton blockiert', { timeout: 10_000 });
   await expect(alarm.getByRole('button', { name: /^Alarmzentrale:/ })).toHaveCount(0);
   // Auf den Endstand warten statt auf ein festes Fenster: Ton im Endwort und die Verbindung steht.
   const endTon = ton === 'bereit' ? 'Ton bereit – stummschalten' : 'Ton blockiert – freischalten';
