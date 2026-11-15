@@ -73,7 +73,7 @@ pub(super) async fn ensure_freie_nummer(
     .bind(jahr)
     .fetch_one(&mut *conn)
     .await?;
-    let mut neu_lfd = max_lfd.unwrap_or(0) + 1;
+    let mut neu_lfd = crate::einsatz::repo::naechste_lfd(max_lfd.unwrap_or(0))?;
     let neu = loop {
         let kandidat = crate::einsatz::nummer::formatiere(
             praefix.as_deref(),
@@ -92,7 +92,7 @@ pub(super) async fn ensure_freie_nummer(
         if !vergeben {
             break kandidat;
         }
-        neu_lfd += 1;
+        neu_lfd = crate::einsatz::repo::naechste_lfd(neu_lfd)?;
     };
     sqlx::query(
         "UPDATE einsatz SET einsatznummer_intern = ?, nummer_jahr = ?, nummer_lfd = ? WHERE id = ?",
@@ -276,6 +276,82 @@ mod tests {
             stand(&pool, id).await,
             (Some("E-2026-0007".into()), false, 0)
         );
+    }
+
+    /// Spec `einsatznummer`, „Die Vergabe läuft nicht über“ (LLH-1859): Trägt ein fremder Spiegel
+    /// den Höchstwert, scheitert der Übergang mit 422 statt Panik oder Umlauf.
+    #[tokio::test]
+    async fn ueber_dem_hoechstwert_scheitert_der_uebergang_mit_422() {
+        let pool = pool().await;
+        eigener_einsatz(&pool, 1).await;
+        fremder_spiegel(&pool, i64::MAX).await;
+        let id = spiegel_mit_eigener_akte(&pool, Some(1)).await;
+        let mut tx = pool.begin().await.unwrap();
+        let ergebnis = super::super::fuehrung::richte_aus(&mut tx, id).await;
+        assert!(
+            matches!(
+                ergebnis,
+                Err(crate::error::AppError::UnprocessableEntity(_))
+            ),
+            "{ergebnis:?}"
+        );
+        drop(tx);
+        let negativ: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE nummer_lfd < 0")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(negativ, 0);
+        assert_eq!(
+            stand(&pool, id).await,
+            (Some("E-2026-0001".into()), true, 0),
+            "der Spiegel bleibt, wie er war"
+        );
+    }
+
+    /// Spec `einsatznummer`, „Der Spiegel wird später eigen“ (LLH-1859): Ein Spiegel, dessen Zahlen
+    /// an der Grenze leer übernommen wurden, wird eigen, und die nächste Anlage zählt ohne ihn.
+    #[tokio::test]
+    async fn ein_spiegel_mit_geleerten_zahlen_wird_eigen_und_zaehlt_nicht_mit() {
+        let pool = pool().await;
+        eigener_einsatz(&pool, 1).await;
+        let id = spiegel_mit_eigener_akte(&pool, Some(5)).await;
+        crate::einsatz::spiegel_filter::unter_merker(
+            &pool,
+            "UPDATE einsatz SET nummer_jahr = NULL, nummer_lfd = NULL WHERE id = ?",
+            &[id],
+        )
+        .await;
+        richte_aus(&pool, id).await;
+        assert_eq!(
+            stand(&pool, id).await,
+            (Some("E-2026-0005".into()), false, 0)
+        );
+        let erika: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Erika', 'erika', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let jetzt = chrono::DateTime::parse_from_rfc3339("2026-06-01T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let neu = crate::einsatz::repo::anlegen_zum(
+            &pool,
+            crate::einsatz::repo::NeuerEinsatzDaten {
+                bezeichnung: "Neu",
+                stichwort: None,
+                einsatzart: None,
+                begonnen_at: None,
+                ort: Default::default(),
+                vorlage_id: None,
+            },
+            erika,
+            jetzt,
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.einsatznummer_intern.as_deref(), Some("E-2026-0002"));
     }
 
     /// Altbestand ohne Einsatznummer (Spec `einsatznummer`, „Bestand“) stößt an keine

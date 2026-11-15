@@ -89,8 +89,20 @@ async fn etb(pool: &SqlitePool, einsatz: i64, lfd: i64, konto: i64) -> i64 {
     .await
 }
 
-/// Ein Abgleich mit höchstens `zeilen` Zeilen; liefert die Zahl der Lieferungen.
+/// Ein Abgleich mit höchstens `zeilen` Zeilen; liefert die Zahl der Lieferungen. Ein Hinweis der
+/// Übernahme ist ein Fehler.
 async fn abgleichen(f: &SqlitePool, s: &SqlitePool, zeilen: usize) -> usize {
+    let (anzahl, hinweise) = abgleichen_mit_hinweisen(f, s, zeilen).await;
+    assert!(hinweise.is_empty(), "{hinweise:?}");
+    anzahl
+}
+
+/// Wie [`abgleichen`], liefert aber die Hinweise der Übernahme, statt an ihnen zu scheitern.
+async fn abgleichen_mit_hinweisen(
+    f: &SqlitePool,
+    s: &SqlitePool,
+    zeilen: usize,
+) -> (usize, Vec<String>) {
     let staende: Vec<(String, i64)> =
         sqlx::query_as("SELECT fremde_kennung, stand FROM einsatz_spiegel")
             .fetch_all(s)
@@ -126,9 +138,10 @@ async fn abgleichen(f: &SqlitePool, s: &SqlitePool, zeilen: usize) -> usize {
         meldend: false,
         vor_ort: false,
     };
+    let mut hinweise = Vec::new();
     for l in &lieferungen {
         let erg = uebernehmen::uebernehmen(&mut sc, &e, l).await.unwrap();
-        assert!(erg.hinweise.is_empty(), "{:?}", erg.hinweise);
+        hinweise.extend(erg.hinweise);
         let _ = EinsatzStand {
             kennung: l.kennung.clone(),
             stand: erg.stand,
@@ -136,7 +149,7 @@ async fn abgleichen(f: &SqlitePool, s: &SqlitePool, zeilen: usize) -> usize {
         };
     }
     sc.commit().await.unwrap();
-    lieferungen.len()
+    (lieferungen.len(), hinweise)
 }
 
 #[tokio::test]
@@ -802,6 +815,92 @@ async fn ein_spiegel_bekommt_nie_die_id_eines_entfernten_demo_einsatzes() {
     )
     .await;
     assert_eq!(herkunft, "41");
+}
+
+/// Ein Einsatz des Führers mit der Nummer `E-2026-0001` und den Zahlen `jahr`/`lfd`, dazu ein
+/// Eintrag im Einsatztagebuch als übrige Lieferung.
+async fn fuehrer_einsatz(f: &SqlitePool, jahr: i64, lfd: i64) -> i64 {
+    let erika = konto(f, "Erika").await;
+    let id: i64 = eine(
+        f,
+        &format!(
+            "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern, nummer_jahr, \
+             nummer_lfd) VALUES (1, 'Hochwasser', 'E-2026-0001', {jahr}, {lfd}) RETURNING id"
+        ),
+    )
+    .await;
+    etb(f, id, 1, erika).await;
+    id
+}
+
+/// (Nummerntext, Jahr, laufende Nummer, ETB-Einträge) des Spiegels.
+async fn spiegel_nummer(s: &SqlitePool) -> (Option<String>, Option<i64>, Option<i64>, i64) {
+    sqlx::query_as(
+        "SELECT e.einsatznummer_intern, e.nummer_jahr, e.nummer_lfd, \
+         (SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = e.id) \
+         FROM einsatz e JOIN einsatz_spiegel s ON s.einsatz_id = e.id",
+    )
+    .fetch_one(s)
+    .await
+    .unwrap()
+}
+
+/// Spec `einsatznummer`, „Die Zahlen eines Spiegels liegen in festen Grenzen“ (LLH-1859): Eine
+/// laufende Nummer nahe am Höchstwert kommt leer an, Text und übrige Zeilen kommen trotzdem.
+#[tokio::test]
+async fn eine_laufende_nummer_ausserhalb_der_grenze_kommt_leer_mit_hinweis_an() {
+    let (f, s) = zwei_seiten().await;
+    let id = fuehrer_einsatz(&f, 2026, i64::MAX).await;
+    let mut hinweise = Vec::new();
+    loop {
+        let (anzahl, h) = abgleichen_mit_hinweisen(&f, &s, 120).await;
+        hinweise.extend(h);
+        if anzahl == 0 {
+            break;
+        }
+    }
+    assert_eq!(
+        spiegel_nummer(&s).await,
+        (Some("E-2026-0001".into()), None, None, 1)
+    );
+    assert!(
+        hinweise.iter().any(|h| h.contains("Einsatznummer")),
+        "{hinweise:?}"
+    );
+    // Auch eine spätere Fassung des Kopfs (Aktualisierung des Spiegels) kommt nicht durch.
+    exec(
+        &f,
+        &format!("UPDATE einsatz SET bezeichnung = 'Hochwasser Nord' WHERE id = {id}"),
+    )
+    .await;
+    let (_, h) = abgleichen_mit_hinweisen(&f, &s, 120).await;
+    assert!(h.iter().any(|h| h.contains("Einsatznummer")), "{h:?}");
+    assert_eq!(
+        spiegel_nummer(&s).await,
+        (Some("E-2026-0001".into()), None, None, 1)
+    );
+}
+
+#[tokio::test]
+async fn ein_unplausibles_jahr_kommt_leer_an() {
+    let (f, s) = zwei_seiten().await;
+    fuehrer_einsatz(&f, 99999, 3).await;
+    let (_, hinweise) = abgleichen_mit_hinweisen(&f, &s, 120).await;
+    assert_eq!(hinweise.len(), 1, "{hinweise:?}");
+    let (_, jahr, lfd, _) = spiegel_nummer(&s).await;
+    assert_eq!((jahr, lfd), (None, None));
+}
+
+/// Gültige Zahlen kommen unverändert und ohne Hinweis an (`abgleichen` scheitert an jedem).
+#[tokio::test]
+async fn gueltige_zahlen_kommen_unveraendert_an() {
+    let (f, s) = zwei_seiten().await;
+    fuehrer_einsatz(&f, 2026, 12).await;
+    while abgleichen(&f, &s, 120).await > 0 {}
+    assert_eq!(
+        spiegel_nummer(&s).await,
+        (Some("E-2026-0001".into()), Some(2026), Some(12), 1)
+    );
 }
 
 #[tokio::test]

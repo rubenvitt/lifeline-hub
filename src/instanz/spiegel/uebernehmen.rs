@@ -239,7 +239,17 @@ async fn uebernehme_zeilen(
         .find(|z| z.art == "einsatz" && !z.geloescht && !z.zu_gross)
     {
         let t = schema.tabelle("einsatz").expect("einsatz ist gespiegelt");
-        let id = kopf_uebernehmen(conn, t, e, l, kopf, einsatz_id, &konten).await?;
+        let id = kopf_uebernehmen(
+            conn,
+            t,
+            e,
+            l,
+            kopf,
+            einsatz_id,
+            &konten,
+            &mut ergebnis.hinweise,
+        )
+        .await?;
         einsatz_id = Some(id);
         ergebnis.kategorien.insert(t.kategorie);
         ergebnis
@@ -500,6 +510,7 @@ async fn kopf_uebernehmen(
     kopf: &Zeile,
     vorhanden: Option<i64>,
     konten: &HashMap<i64, &KontoAngabe>,
+    hinweise: &mut Vec<String>,
 ) -> Result<i64, AppError> {
     let Some(Value::Object(daten)) = &kopf.daten else {
         return Err(AppError::Internal("Kopf ohne Daten".into()));
@@ -520,6 +531,9 @@ async fn kopf_uebernehmen(
     };
     werte.retain(|(s, _)| s != "id" && s != "kennung");
     werte.push(("kennung".into(), Value::from(l.kennung.clone())));
+    if let Some(hinweis) = begrenze_nummer(&mut werte) {
+        hinweise.push(hinweis);
+    }
     if let Some(id) = vorhanden {
         // Ein Führer, der nie geschwärzt hat, überschreibt die eigene Marke nicht: Hat diese Seite
         // während einer Trennung selbst geschwärzt, ist ihre Bruchstelle schon geschwärzt
@@ -565,6 +579,32 @@ async fn kopf_uebernehmen(
     super::fuehrung::verknuepfe_akte(conn, id, &l.kennung).await?;
     merke_schwaerzung_marke(conn, id).await?;
     Ok(id)
+}
+
+/// Jahr und laufende Nummer des Kopfs gehen in die Nummernvergabe dieser Instanz ein; eine
+/// gekoppelte Instanz gilt für sie nicht als vertrauenswürdig (LLH-1859, Spec `einsatznummer`,
+/// „Die Zahlen eines Spiegels liegen in festen Grenzen“). Außerhalb der Grenzen werden beide leer,
+/// der Nummerntext bleibt; geliefert wird dann der Hinweis für den Spiegel.
+fn begrenze_nummer(werte: &mut Vec<(String, Value)>) -> Option<String> {
+    use crate::einsatz::nummer::{check_gelieferte_zahlen, GelieferteZahlen};
+    let wert = |werte: &[(String, Value)], spalte: &str| {
+        werte
+            .iter()
+            .find(|(s, _)| s == spalte)
+            .map_or(Value::Null, |(_, v)| v.clone())
+    };
+    let jahr = wert(werte, "nummer_jahr");
+    let lfd = wert(werte, "nummer_lfd");
+    if check_gelieferte_zahlen(&jahr, &lfd) != GelieferteZahlen::Ungueltig {
+        return None;
+    }
+    werte.retain(|(s, _)| s != "nummer_jahr" && s != "nummer_lfd");
+    werte.push(("nummer_jahr".into(), Value::Null));
+    werte.push(("nummer_lfd".into(), Value::Null));
+    Some(format!(
+        "Einsatznummer der Gegenstelle außerhalb der Grenzen (Jahr {jahr}, laufende Nummer \
+         {lfd}); Jahr und laufende Nummer nicht übernommen."
+    ))
 }
 
 /// Merkt die Schwärzungsmarke am Kopf des Einsatzes (LLH-1649); `true`, wenn sie hier neu ist.
