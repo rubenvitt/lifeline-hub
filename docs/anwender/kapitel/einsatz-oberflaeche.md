@@ -301,7 +301,9 @@ eingerückt mit einer feinen Linie direkt unter diesem Modul: „Entscheidungen�
 Modul darüber hervorgehoben. Das
 „Informationstelefon“ ist keine Sprungmarke, sondern ein eigenes Modul der Kategorie
 „Kommunikation“.
-Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt.
+Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt; „Ohne
+Schicht“ ist außerdem gesperrt, wenn das Modul Einheiten gesperrt ist. Den vollen Namen einer
+gesperrten Marke zeigt der Hinweis beim Zeigen mit der Maus.
 
 Wer aus einem Einsatz ins Profil oder in die Verwaltung wechselt, findet dort „Zurück zu …“: Es
 führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft.
