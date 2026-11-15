@@ -19,9 +19,7 @@ export const EINSATZART_LABELS: Record<Einsatzart, string> = {
  * Stichwort oder Vorlage. Ohne Einsatz (lädt noch) oder ohne Art ist sie falsch; dann steht auch
  * kein Platzhalter, der bei einem Realeinsatz ein leerer Streifen wäre.
  */
-export function istUebung(
-  einsatz: { einsatzart?: Einsatzart | null } | null | undefined,
-): boolean {
+export function isUebung(einsatz: { einsatzart?: Einsatzart | null } | null | undefined): boolean {
   return einsatz?.einsatzart === 'uebung';
 }
 

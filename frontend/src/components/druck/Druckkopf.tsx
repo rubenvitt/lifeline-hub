@@ -8,7 +8,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import type { Einsatzart } from '../../api/types';
-import { istUebung } from '../../einsatz/einsatzart';
+import { isUebung } from '../../einsatz/einsatzart';
 
 /** Eine Angabe unter dem Titel: „Stand", „Auswahl" o. Ä. — vom Aufrufer geliefert. */
 interface DruckkopfZeile {
@@ -122,7 +122,7 @@ export default function Druckkopf({
   }, []);
 
   const nummer = einsatz.einsatznummer_intern?.trim();
-  const uebung = istUebung(einsatz);
+  const uebung = isUebung(einsatz);
   const name = nummer ? `${einsatz.bezeichnung} (${nummer})` : einsatz.bezeichnung;
   const angaben: DruckkopfZeile[] = [
     {

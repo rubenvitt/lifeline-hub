@@ -5,7 +5,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 1. Quelle und Farbrolle
 
-- [x] 1.1 `istUebung` in `einsatz/einsatzart.ts` (D1) mit Test `einsatzart.test.ts`: wahr nur bei
+- [x] 1.1 `isUebung` in `einsatz/einsatzart.ts` (D1) mit Test `einsatzart.test.ts`: wahr nur bei
   `uebung`, falsch bei den drei anderen Arten, bei `null` und bei `undefined`; Vitest grün.
 - [x] 1.2 Rollen `uebungFuellung`, `uebungSchraffur`, `uebungText`, `uebungKante` in `theme/tokens.ts`
   (Nacht/Tag) und `theme/rollen.css` (D2); neuer Test `theme/uebungKontrast.test.ts` mit den
@@ -79,7 +79,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 ## 9. Folgen aus dem Review vor dem PR (abgestimmt 15.11.2026)
 
 - [x] 9.1 ADR für die Entscheidung (E1): `docs/architektur/entscheidungen/ADR-<n>-…` mit Regeln und
-  Prüfung zu `istUebung`, Baustein und Rolle; `scripts/check-architektur.sh` bzw. der ADR-Wächter grün.
+  Prüfung zu `isUebung`, Baustein und Rolle; `scripts/check-architektur.sh` bzw. der ADR-Wächter grün.
 - [x] 9.2 Violett-Aussagen berichtigen (Abschnittsflächen und Führungscluster der Lagekarte sind
   ebenfalls violett gefüllt): Spec `uebungsmarke` verlangt Unterscheidung durch Form und Wort statt
   Exklusivität des Farbtons; Regel, Doku, Kommentare und design.md nachziehen.

@@ -17,7 +17,7 @@ herleitung:
 
 ## Regeln
 
-- MUST: Ob ein Einsatz eine Übung ist, entscheidet nur `istUebung` (`frontend/src/einsatz/einsatzart.ts`)
+- MUST: Ob ein Einsatz eine Übung ist, entscheidet nur `isUebung` (`frontend/src/einsatz/einsatzart.ts`)
   aus der Einsatzart; Regel und Liste der Flächen: `frontend/AGENTS.md`, Rahmen, „Übung“.
 - MUST: Gezeigt wird eine Übung nur über `UebungsMarke`/`UebungsBand`
   (`frontend/src/components/instrument/Uebung.tsx`), im Druck über den `Druckkopf`; immer mit dem
@@ -29,10 +29,10 @@ herleitung:
 ## Prüfung
 
 ```sh
-verlange 'export function istUebung' frontend/src/einsatz/einsatzart.ts
+verlange 'export function isUebung' frontend/src/einsatz/einsatzart.ts
 verlange 'export function UebungsBand' frontend/src/components/instrument/Uebung.tsx
 verlange 'export function UebungsMarke' frontend/src/components/instrument/Uebung.tsx
-verlange 'istUebung\(einsatz\)' frontend/src/components/druck/Druckkopf.tsx
+verlange 'isUebung\(einsatz\)' frontend/src/components/druck/Druckkopf.tsx
 verbiete "einsatzart === 'uebung'" 'frontend/src/**/*.tsx'
 ```
 

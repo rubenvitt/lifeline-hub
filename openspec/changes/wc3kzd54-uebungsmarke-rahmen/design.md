@@ -31,7 +31,7 @@ Die Motivation steht in `proposal.md` unter „Why“. Ausgangslage im Code:
 
 **Goals:**
 
-- Genau eine Entscheidung (`istUebung`) und genau ein Baustein für die Kennzeichnung. Neue Orte
+- Genau eine Entscheidung (`isUebung`) und genau ein Baustein für die Kennzeichnung. Neue Orte
   bauen nichts Eigenes.
 - Das Band steht in jeder Breite und Dichte und verdeckt nichts, was heute klebt.
 - Der Druck ist auch schwarz-weiß und ohne Hintergrundfarben eindeutig.
@@ -49,9 +49,9 @@ Die Motivation steht in `proposal.md` unter „Why“. Ausgangslage im Code:
 
 ## Decisions
 
-### D1 Eine Quelle: `istUebung` in `einsatz/einsatzart.ts`
+### D1 Eine Quelle: `isUebung` in `einsatz/einsatzart.ts`
 
-`istUebung(einsatz: { einsatzart: Einsatzart } | null | undefined): boolean`, wahr genau bei
+`isUebung(einsatz: { einsatzart: Einsatzart } | null | undefined): boolean`, wahr genau bei
 `'uebung'`. Rahmen, Gerät, Liste, Wechsler, Tab-Titel und Druckkopf fragen nur diese Funktion.
 Lädt der Einsatz noch, ist sie falsch, und es steht kein Platzhalter. Ein Platzhalter wäre bei
 Realeinsätzen ein leerer Streifen.
@@ -96,7 +96,7 @@ Bedienelementen). Beide hat der Mensch am 15.11.2026 verworfen.
   sagte nichts, was das Wort nicht schon sagt, und hätte am Handy umgebrochen. Die Höhe ist eine
   Textzeile mit knapper Polsterung, etwa 24 px, und wächst nicht mit der Trefffläche. Das Band
   bedient nichts. `data-lfh="uebung-band"`.
-- Gibt `istUebung` falsch, rendern beide `null`. Aufrufer übergeben den Einsatz und prüfen nicht
+- Gibt `isUebung` falsch, rendern beide `null`. Aufrufer übergeben den Einsatz und prüfen nicht
   selbst.
 - Der Baustein kommt in die Liste der Bausteine in `frontend/AGENTS.md` und bekommt eine Karte in
   `PREVIEWS` (Nacht und Tag).
@@ -151,14 +151,14 @@ Text ≥ 28 px“. Kein Ton, keine Animation (`geraet/AGENTS.md`).
 Anders als der Einsatzrahmen haben Gerätehülle und Lagemonitor keinen Fehlerzweig für den
 Einsatzkopf: Scheitert sein erster Abruf (Server startet neu, 502/503), liefe die Ansicht still wie
 bei einem Realeinsatz weiter. Beide laden den Kopf deshalb alle 30 s nach, solange er fehlt
-(`EINSATZKOPF_NACHLADEN_MS`), und nennen nach einem Fehler „Einsatzart nicht geladen“ (neutral unter
+(`EINSATZKOPF_REFETCH_MS`), und nennen nach einem Fehler „Einsatzart nicht geladen“ (neutral unter
 dem Kopf bzw. in der Statusleiste). Verworfen: die Einsatzart über `/me` mitzuliefern
 (`GeraetAnzeige`); das hätte das Backend berührt. Aus dem Review vor dem PR, abgestimmt 15.11.2026.
 
 ### D8 Druck: Kopfzeile plus Randfeld in Chromium
 
 - `Druckkopf` weitet seinen Prop auf `einsatz: { bezeichnung; einsatznummer_intern?; einsatzart? }`.
-  Bei `istUebung` steht neben der Einsatzbezeichnung „ÜBUNG“ als umrandeter Block: 2 pt Rahmen,
+  Bei `isUebung` steht neben der Einsatzbezeichnung „ÜBUNG“ als umrandeter Block: 2 pt Rahmen,
   fett, Versalien. Gefüllte Hintergründe druckt der Browser nicht ohne
   `print-color-adjust: exact`, und das Papier ist hell (Spec „Papier ist hell“).
 - Jede Seite: Der Druckkopf trägt bei einer Übung `data-uebung`, und `druck.css` ordnet der Wurzel
@@ -205,7 +205,7 @@ einzuengen.
 
 - `frontend/AGENTS.md`, Abschnitt „Rahmen“, neuer Spiegelstrich „Übung“: Die Kennzeichnung ist
   Pflicht jeder Fläche, die einen Einsatz zeigt (Rahmen, Gerät, Liste, Wechsler, Tab, Druck).
-  Entschieden wird nur über `istUebung`, gezeigt nur über `UebungsMarke` bzw. `UebungsBand`. Das
+  Entschieden wird nur über `isUebung`, gezeigt nur über `UebungsMarke` bzw. `UebungsBand`. Das
   Band klebt nach D4. Dazu der Eintrag in der Bausteinliste.
 - `frontend/src/geraet/AGENTS.md` und `frontend/src/druck/AGENTS.md`: je ein Satz mit Verweis auf
   diese Regel. Die Regel selbst steht nur einmal.

@@ -22,7 +22,7 @@ import {
 import { Segmentleiste, UebungsMarke, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { EINSATZART_LABELS, istUebung } from '../einsatz/einsatzart';
+import { EINSATZART_LABELS, isUebung } from '../einsatz/einsatzart';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { abloesungPfad } from '../routing/deeplinks';
 import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
@@ -275,7 +275,7 @@ export default function PlanungUebernahmeDialog({
                     return {
                       value: e.id,
                       title: text,
-                      label: istUebung(e) ? (
+                      label: isUebung(e) ? (
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                           <UebungsMarke einsatz={e} />
                           {text}

@@ -32,7 +32,7 @@ import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersis
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
 import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
-import { istUebung } from './einsatzart';
+import { isUebung } from './einsatzart';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
@@ -272,7 +272,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // „Eingänge“, so steht ein stiller Eingang im Hintergrund-Tab und an der installierten App.
   const ungelesen = useUngeleseneEingaenge(einsatzId);
   useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], ungelesen, {
-    uebung: istUebung(einsatz),
+    uebung: isUebung(einsatz),
   });
   useEffect(() => setzeAppBadge(ungelesen), [ungelesen]);
   useEffect(() => () => setzeAppBadge(0), []);

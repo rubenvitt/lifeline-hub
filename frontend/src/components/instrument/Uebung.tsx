@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Einsatzart } from '../../api/types';
-import { istUebung } from '../../einsatz/einsatzart';
+import { isUebung } from '../../einsatz/einsatzart';
 import type { Farbrollen } from '../../theme/tokens';
 import { RAHMEN_EBENE, useRahmenObenStapel } from '../rahmenOben';
 import { schriftStil, useRollen } from './rollenwerte';
@@ -14,7 +14,7 @@ import { schriftStil, useRollen } from './rollenwerte';
  * - {@link UebungsBand}: Band über die volle Breite unter dem Kopf (Einsatzrahmen, Gerätehülle),
  *   schräg schraffiert, klebt in jeder Breite.
  *
- * Beide entscheiden selbst über {@link istUebung} und rendern sonst nichts, auch keinen
+ * Beide entscheiden selbst über {@link isUebung} und rendern sonst nichts, auch keinen
  * Platzhalter: Aufrufer reichen den Einsatz durch und prüfen nicht. Das Wort steht immer dabei
  * (WCAG 1.4.1); die Farbe allein zeigt nichts an. Erkennbar an Form und Wort, nicht am Farbton allein
  * (Violett tragen auch ETB-Entscheidung und Abschnittsflächen der Lagekarte).
@@ -50,7 +50,7 @@ export function UebungsMarke({
   style?: CSSProperties;
 }) {
   const { rollen } = useRollen();
-  if (!istUebung(einsatz)) return null;
+  if (!isUebung(einsatz)) return null;
   const px = MARKE_SCHRIFT[groesse];
   return (
     <span
@@ -76,7 +76,7 @@ export function UebungsMarke({
 export const UNBEKANNT = 'Einsatzart nicht geladen';
 
 /** Takt, in dem eine Hülle ohne Einsatzkopf ihn erneut lädt (Gerät, Lagemonitor). */
-export const EINSATZKOPF_NACHLADEN_MS = 30_000;
+export const EINSATZKOPF_REFETCH_MS = 30_000;
 
 /** Schriftgröße des Worts im Band: eine Stufe über dem Lauftext, damit es aus dem Augenwinkel trägt. */
 const BAND_SCHRIFT = 13;
@@ -100,7 +100,7 @@ export function UebungsBand({
   klebend?: boolean;
   unbekannt?: boolean;
 }) {
-  const aktiv = istUebung(einsatz);
+  const aktiv = isUebung(einsatz);
   const { rollen } = useRollen();
   // Die Quelle meldet sich nur bei einer klebenden Übung; sonst bleibt die Summe, wie sie war.
   const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv && klebend);

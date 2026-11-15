@@ -24,7 +24,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { serverJetzt } from '../offline/serveruhr';
 import { EINSATZ_ROLLE_LABELS } from '../einsatz/einsatzRolle';
-import { EINSATZART_LABELS, EINSATZART_OPTIONEN, istUebung } from '../einsatz/einsatzart';
+import { EINSATZART_LABELS, EINSATZART_OPTIONEN, isUebung } from '../einsatz/einsatzart';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { Select } from '../components/Select';
@@ -464,7 +464,7 @@ function EinsaetzeInhalt() {
             <StatusTag darstellung={einsatzStatus[e.status]} />
             {/* Eine Übung trägt die Übungsmarke statt des neutralen Tags (LLH-1725, Spec
                 `uebungsmarke`); die übrigen Arten bleiben grau. */}
-            {istUebung(e) ? (
+            {isUebung(e) ? (
               <UebungsMarke einsatz={e} />
             ) : (
               <Tag>{EINSATZART_LABELS[e.einsatzart]}</Tag>

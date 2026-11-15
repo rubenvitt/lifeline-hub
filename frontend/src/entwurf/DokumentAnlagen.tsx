@@ -21,7 +21,7 @@ import SkizzenAufnahme, { type SkizzenBild } from '../fernmeldewesen/SkizzenAufn
 import { useModulFreigabe } from '../einsatz/useModulFreigabe';
 import { DruckUebung } from '../components/druck/Druckkopf';
 import type { Einsatzart } from '../api/types';
-import { istUebung } from '../einsatz/einsatzart';
+import { isUebung } from '../einsatz/einsatzart';
 import './dokumentAnlagen.css';
 
 /** Höchstzahl je Dokument, wie `MAX_ANLAGEN` im Server (`vorlagendokument/anlage.rs`). */
@@ -66,7 +66,7 @@ export default function DokumentAnlagen({
   schreibt,
   ohneDruckKlasse,
 }: Props) {
-  const uebung = istUebung({ einsatzart });
+  const uebung = isUebung({ einsatzart });
   const { message } = App.useApp();
   const { token } = useRollen();
   const qc = useQueryClient();

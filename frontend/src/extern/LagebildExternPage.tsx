@@ -16,7 +16,7 @@ import {
   UebungsMarke,
   useRollen,
 } from '../components/instrument';
-import { EINSATZART_LABELS, istUebung } from '../einsatz/einsatzart';
+import { EINSATZART_LABELS, isUebung } from '../einsatz/einsatzart';
 import { spiegelStand } from '../einsatz/spiegel/spiegelText';
 import LagemonitorKarte from '../geraet/LagemonitorKarte';
 import { Bildmarke } from '../marke/Bildmarke';
@@ -207,7 +207,7 @@ export default function LagebildExternPage() {
       <UebungsBand einsatz={e} />
       <header style={{ display: 'grid', gap: token.marginXXS }}>
         <Typography.Title level={1} style={{ margin: 0, fontSize: 24 }} data-lfh="extern-titel">
-          {istUebung(e) && (
+          {isUebung(e) && (
             <UebungsMarke einsatz={e} style={{ marginInlineEnd: 8, verticalAlign: 'middle' }} />
           )}
           {e.bezeichnung}

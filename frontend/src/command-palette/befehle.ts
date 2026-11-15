@@ -48,7 +48,7 @@ import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
 import type { Koordinatenformat, Zeitdarstellung } from '../api/types';
-import { istUebung } from '../einsatz/einsatzart';
+import { isUebung } from '../einsatz/einsatzart';
 
 /** Kontext einer Moduloption: der volle Kategoriename. */
 function kategorieKontext(key: KategorieKey): string | undefined {
@@ -487,8 +487,8 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       label: e.bezeichnung,
       icon: IconListe,
       // Eine Übung trägt die Marke und ist über „Übung“ zu finden (LLH-1725).
-      ...(istUebung(e) ? { uebung: true as const } : {}),
-      schlagworte: [...(e.stichwort ? [e.stichwort] : []), ...(istUebung(e) ? ['Übung'] : [])],
+      ...(isUebung(e) ? { uebung: true as const } : {}),
+      schlagworte: [...(e.stichwort ? [e.stichwort] : []), ...(isUebung(e) ? ['Übung'] : [])],
       ...sprungZu(einsatzPfad(e.id), k.navigate),
     });
   }

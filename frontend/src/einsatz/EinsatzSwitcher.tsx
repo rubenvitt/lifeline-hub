@@ -8,7 +8,7 @@ import { einsatzPfad } from '../routing/deeplinks';
 import { farbenDunkel } from '../theme/tokens';
 import type { EinsatzAnzeige } from '../api/types';
 import { einsatzKennung } from './einsatzKennung';
-import { istUebung } from './einsatzart';
+import { isUebung } from './einsatzart';
 import { UebungsMarke } from '../components/instrument';
 import { useModusFarben } from '../components/rahmenStil';
 
@@ -54,7 +54,7 @@ export default function EinsatzSwitcher({
     ...aktive.map((e) => {
       const neben = nebenzeile(e);
       // Eine Übung trägt die Übungsmarke vor dem Namen (LLH-1725, Spec `uebungsmarke`).
-      const name = istUebung(e) ? (
+      const name = isUebung(e) ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <UebungsMarke einsatz={e} />
           <span>{e.bezeichnung}</span>

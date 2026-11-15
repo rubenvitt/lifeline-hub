@@ -27,7 +27,7 @@ jemand „ÜBUNG“ in den Namen getippt hat. So landen Übungsdaten im echten E
   zusätzlich am Rand jedes Blatts. Schichtplan, Lageplan und Planung reichen die Einsatzart dafür
   durch.
 - **Regel** in `frontend/AGENTS.md`: Die Übung zu kennzeichnen ist Pflicht des Rahmens.
-  Entschieden wird an genau einer Stelle (`istUebung`) und gezeigt mit genau einem Baustein.
+  Entschieden wird an genau einer Stelle (`isUebung`) und gezeigt mit genau einem Baustein.
 - Unverändert bleiben die Namenskonvention „ÜBUNG – …“ der Demo-Daten, der Strg+P-Druck normaler
   Seiten und das Backend.
 

@@ -8,7 +8,7 @@ const UEBUNG = 'ÜBUNG';
 
 /** Kennzeichen, die nicht Teil des Ortes sind. */
 export interface DokumentTitelMarken {
-  /** Der Einsatz ist eine Übung (`istUebung`); nur der Einsatzrahmen setzt es. */
+  /** Der Einsatz ist eine Übung (`isUebung`); nur der Einsatzrahmen setzt es. */
   uebung?: boolean;
 }
 

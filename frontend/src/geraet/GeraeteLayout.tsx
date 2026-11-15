@@ -23,7 +23,7 @@ import {
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import SpiegelBand from '../einsatz/spiegel/SpiegelBand';
-import { EINSATZKOPF_NACHLADEN_MS, UebungsBand } from '../components/instrument';
+import { EINSATZKOPF_REFETCH_MS, UebungsBand } from '../components/instrument';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import {
   EinsatzPfadeProvider,
@@ -503,7 +503,7 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
     queryFn: () => ladeEinsatz(geraet.einsatz_id),
     // Ohne Kopf keine Übungsmarke: bis er da ist, alle 30 s nachfragen (LLH-1725). Ein gescheiterter
     // Abruf (Server startet neu, 502/503) wiederholt `retry` nicht, und der Strom fragt ihn nicht ab.
-    refetchInterval: (q) => (q.state.data ? false : EINSATZKOPF_NACHLADEN_MS),
+    refetchInterval: (q) => (q.state.data ? false : EINSATZKOPF_REFETCH_MS),
   });
   const pfade = geraet.ansicht === 'betreuungsstelle' ? GERAET_BETREUUNG_PFADE : GERAET_PFADE;
   return (

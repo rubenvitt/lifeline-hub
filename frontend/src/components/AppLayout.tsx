@@ -27,7 +27,7 @@ import { useDokumentTitel } from './useDokumentTitel';
 import { ebene1Seite } from './ebene1Seite';
 import { planungenPfad } from '../routing/deeplinks';
 import { Ebene1OrtProvider, type Ebene1OrtWert } from './Ebene1OrtKontext';
-import { istUebung } from '../einsatz/einsatzart';
+import { isUebung } from '../einsatz/einsatzart';
 
 const { Header, Content } = Layout;
 
@@ -167,7 +167,7 @@ function useEbene1Ort(pathname: string, benutzerId: number | undefined): Ebene1O
         ? {
             label: `Zurück zu ${einsatz.bezeichnung}`,
             pfad: letzter.pfad,
-            ...(istUebung(einsatz) ? { uebung: true } : {}),
+            ...(isUebung(einsatz) ? { uebung: true } : {}),
           }
         : undefined,
   };

@@ -24,7 +24,7 @@ import type {
   Programmpunkt,
 } from '../api/types';
 import {
-  EINSATZKOPF_NACHLADEN_MS,
+  EINSATZKOPF_REFETCH_MS,
   UNBEKANNT,
   UebungsMarke,
   useRollen,
@@ -744,7 +744,7 @@ export default function LagemonitorPage() {
     queryFn: () => ladeEinsatz(einsatzId),
     enabled: geraet != null,
     // Ohne Kopf keine Übungsmarke: bis er da ist, nachfragen (LLH-1725, wie die Gerätehülle).
-    refetchInterval: (q) => (q.state.data ? false : EINSATZKOPF_NACHLADEN_MS),
+    refetchInterval: (q) => (q.state.data ? false : EINSATZKOPF_REFETCH_MS),
   });
   const lageQuery = useQuery({
     queryKey: einsatzKeys.lagemonitor(einsatzId),
