@@ -364,6 +364,17 @@ describe('ModulPanel · Dichte', () => {
   it('traegt den Steuer-Radius, nicht die weiche Ecke', () => {
     expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).borderRadius).toBe(0);
   });
+
+  // LLH-1732: die freie Zeile ist ein Link und erbte die App-Schrift samt Zeilenhöhe, die gesperrte
+  // ein Knopf mit der Systemschrift des Browsers. Beide tragen deshalb die Schrift der App
+  // (Archivo, Entwurf) und die Zeilenhöhe `normal`, die die Zeile vorher als Knopf hatte.
+  it('gibt Link und Knopf dieselbe Schrift: Archivo der App, Zeilenhöhe wie bisher', () => {
+    for (const gesperrt of [false, true]) {
+      const stil = modulZeilenStil(tokenFuer('kompakt'), farben, { ...frei, gesperrt });
+      expect(stil.fontFamily).toBe('inherit');
+      expect(stil.lineHeight).toBe('normal');
+    }
+  });
 });
 
 describe('ModulPanel · Einsatzdauer im Fuß', () => {

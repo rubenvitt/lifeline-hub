@@ -91,8 +91,12 @@ export function modulZeilenStil(
   return {
     display: 'flex',
     boxSizing: 'border-box',
-    // Die freie Zeile ist ein `<a href>` (LLH-1732), die gesperrte ein `<button>`: beide sehen
-    // gleich aus, der Link ohne Unterstrich.
+    // Die freie Zeile ist ein `<a href>` (LLH-1732), die gesperrte ein `<button>`. Ein Link erbt
+    // Schrift und Zeilenhöhe der App, ein Knopf nimmt die Systemschrift des Browsers. Beide
+    // bekommen deshalb die Schrift der App (Archivo, Entwurf) und die Zeilenhöhe `normal`, die die
+    // Zeile als Knopf hatte; so wächst sie nicht. Der Link ohne Unterstrich.
+    fontFamily: 'inherit',
+    lineHeight: 'normal',
     textDecoration: 'none',
     alignItems: 'center',
     gap: token.marginSM,
