@@ -890,7 +890,7 @@ mod tests {
     async fn nur_eine_standardkopplung_macht_den_hub_zustaendig() {
         let pool = db::test_pool().await;
         let (_, org) = neuer_zugang(&pool).await;
-        let hub = |pool: SqlitePool| async move {
+        let hub = |pool: SqlitePool, org: i64| async move {
             let mut c = pool.acquire().await.unwrap();
             hub_fuer_org(&mut c, org)
                 .await
@@ -900,16 +900,28 @@ mod tests {
 
         koppeln(&pool, org, "elw-2", "ELW 2", "vor_ort").await;
         assert_eq!(
-            hub(pool.clone()).await,
+            hub(pool.clone(), org).await,
             None,
             "eine Direktkopplung vor Ort ist kein Hub"
         );
 
         koppeln(&pool, org, "hub-1", "Hub Kreis", "standard").await;
         assert_eq!(
-            hub(pool.clone()).await.as_deref(),
+            hub(pool.clone(), org).await.as_deref(),
             Some("Hub Kreis"),
             "neben der Direktkopplung nennt die Abfrage den Hub"
+        );
+
+        // Eine zweite Org nur mit Standardkopplung: der Hub, ohne Direktkopplung daneben.
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Zweite Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        koppeln(&pool, 2, "hub-2", "Hub Nord", "standard").await;
+        assert_eq!(
+            hub(pool.clone(), 2).await.as_deref(),
+            Some("Hub Nord"),
+            "eine Standardkopplung allein macht den Hub zuständig"
         );
     }
 
