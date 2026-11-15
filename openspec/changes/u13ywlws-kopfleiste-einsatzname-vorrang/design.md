@@ -134,6 +134,12 @@ nachgezogen.
 
 ## Risks / Trade-offs
 
+- [Weitere Startwörter aus verzögerten Lesungen] → Review vor dem PR: „WARTET n“/„PRÜFEN“ (die
+  Offline-Warteschlange wird nach dem ersten Bild gelesen) und auf Android „Benachrichtigung
+  blockiert“ (der Service Worker bestätigt die Berechtigung nach dem Mount) können an der Kante
+  springen. Beides ist älter als diese Change. Entscheid 15.11.2026: Spec eng auf Tonprüfung und
+  Verbindungsaufbau, Folgeaufgabe LLH-1910 (Zustand vor dem ersten Bild kennen).
+
 - [Raster und Umbruch greifen ineinander] → e2e-Spec misst Namensbreite und Zeilenzahl bei 1280
   `kompakt`, 1180 `handschuh`, 1024 `komfortabel`; `gate1-ueberlauf` bleibt grün.
 - [`-webkit-line-clamp` mit Bruch an beliebiger Stelle] → Sichtbar ist eine Zeile mit „…“ wie

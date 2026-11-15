@@ -32,8 +32,9 @@ MUST der Name mit „…“ kürzen. Ein gekürzter Name MUST ganz im Titel des 
 Benachrichtigung, Alarmton und Live-Verbindung SHALL in der Kopfleiste des Einsatzes einen
 Zustand ohne Handlungsbedarf nur als Symbol zeigen, in jeder Breite und Dichte: Benachrichtigung
 „erlaubt“, „aus“, „nicht verfügbar“, Ton „bereit“, „wird geprüft“, Verbindung „steht“, „wird
-beim Start aufgebaut“. Zugänglicher Name und Tooltip MUST den Zustand nennen. Ein Zustand, der
-sich beim Start ohne Zutun einstellt, MUST die Breite der Kopfleiste nicht ändern.
+beim Start aufgebaut“. Zugänglicher Name und Tooltip MUST den Zustand nennen. Tonprüfung und
+Verbindungsaufbau beim Start MUST die Breite der Kopfleiste nicht ändern (Offline-Warteschlange
+und Android-Berechtigung: Folgeaufgabe LLH-1910).
 
 #### Scenario: Alles in Ordnung
 - **WHEN** ein Einsatz bei 1440 × 900 geöffnet ist, Benachrichtigungen erlaubt sind, der Ton bereit ist und die Live-Verbindung steht
