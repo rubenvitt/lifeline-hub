@@ -21,11 +21,13 @@ Motivation: `proposal.md`, „Why“. Stand im Code:
 **Goals:**
 
 - Ein Grund, ein Weg: Der Halt bei unlesbarer Zeit sitzt in derselben Prüfkette wie die Zukunft.
-- `ZeitpunktEingabe` ändert für bestehende Aufrufer kein Verhalten.
+- `ZeitpunktEingabe` ändert für bestehende Aufrufer nur, wie der Grund einer verworfenen Eingabe
+  weicht (D1a); der gesendete Wert bleibt derselbe.
 
 **Non-Goals:**
 
-- Keine Änderung der Spec `zeiteingabe` und keiner anderen Formulare.
+- Kein Halt in anderen Formularen: Sie senden weiter den geltenden Wert (Spec `zeiteingabe`).
+  Deren Anforderung „Unlesbare Eingabe wird nicht übernommen“ ändert sich nur um D1a.
 - Keine Prüfung am Server: unlesbarer Text kommt dort nie an.
 
 ## Decisions
@@ -52,8 +54,12 @@ War das Feld leer („jetzt“), steht es nach dem Verwerfen wieder leer da; „
 nicht. Deshalb nimmt `ZeitpunktEingabe` den Grund auch zurück, wenn im Feld Enter auf den gezeigten
 Wert gedrückt wird (ausdrückliche Übernahme, wie `onOk` sie schon kennt) oder Escape, ohne dass
 getippt wird (die verworfene Eingabe ist ohnehin zurückgenommen). Escape wird dabei verbraucht
-(`preventDefault`), schließt also keinen Dialog. Gilt für jedes Zeitfeld; ohne Grund ändert sich
-nichts.
+(`preventDefault`): Escape-Handler der App, die `defaultPrevented` lesen, reagieren dann nicht;
+antd-Dialoge schließen trotzdem (`@rc-component/portal` hört auf `window`). Gilt für jedes Zeitfeld,
+deshalb ein MODIFIED-Delta zur Spec `zeiteingabe`; ohne Grund ändert sich nichts.
+
+Ebenso weicht der Grund, wenn sich der Wert von außen ändert (ein lesbares `/zeit` im ETB setzt
+ihn): die verworfene Eingabe ist dann überholt (Review B2).
 
 - *Verworfen:* nur Kalender oder neues Tippen. Die Kalenderwahl „jetzt“ setzt eine feste Uhrzeit,
   und ein Eintrag hieße dann „Nachtrag“, obwohl „jetzt“ gemeint war.
@@ -67,6 +73,13 @@ Form. Am Feld steht der Grund schon (`zeitGrund`), die Regel wird also nur durch
 - *Verworfen:* `/zeit` beim alten Verhalten lassen. Zwei Wege zur Ereigniszeit mit verschiedenen
   Regeln für denselben Fehler wären schwer zu erklären und zu prüfen.
 
+### D2a · `/zeit` gilt beim Senden (Review B1)
+
+Wer „/zeit 2590 Pumpe“ an Ort und Stelle zu „/zeit 1430 Pumpe“ berichtigt, steht mit dem Cursor
+mitten in der Angabe; dort löst die Kurzeingabe beim Tippen bewusst nicht aus (LLH-1088). Damit
+der Befehl nicht als Text mit „jetzt“ hinausgeht, liest `absenden()` den Textanfang noch einmal:
+lesbar übernimmt es Zeit und Rest, unlesbar hält es an. Die Hinweiszeile beim Tippen bleibt.
+
 ### D3 · Stelle in der Prüfkette und Anzeige
 
 Die neue Prüfung steht in `absenden()` direkt vor der Zukunftsprüfung, also nach Von/An-Pflicht und
@@ -79,6 +92,8 @@ bisher; erst danach zur Zeit. Bei einem Halt:
 - `zeitGrund` an `EtbFeldzeile` nimmt den verworfenen Grund mit auf, das Feld steht in der
   Fehlerrolle (`aria-invalid`, `status="error"`), wie bei der Zukunft.
 - Fokus über `fokusFeld('ereigniszeit')`.
+- Der Halt endet, sobald kein Grund mehr besteht; ein späterer Grund meldet sich wieder nur höflich
+  beim Tippen (Review B3).
 - Der Sendeknopf bleibt bedienbar: ein ausgegrauter Knopf ohne Grund wäre schlechter als ein Klick,
   der den Grund zeigt (gleiche Abwägung wie bei Von/An, LFH-894).
 

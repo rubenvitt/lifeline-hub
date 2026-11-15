@@ -35,12 +35,14 @@ Keine.
 
 - `etb-schnellerfassung-tastatur`: neue Anforderung „Unlesbare Zeit hält das Senden an“;
   „Kurzeingabe der Ereigniszeit“ ergänzt im Szenario „Unlesbar“, dass nicht gesendet wird.
+- `zeiteingabe`: „Unlesbare Eingabe wird nicht übernommen“ — der Grund weicht auch mit Enter oder
+  Escape im Feld (für jedes Zeitfeld, Nachtrag beim Umsetzen, design.md D1a).
 
 ## Impact
 
 - Frontend: `etb/Schnellerfassung.tsx` (Sendeweg, Fußzeile), `etb/EtbFeldzeile.tsx` (Feld Zeit),
-  `anzeige/ZeitpunktEingabe.tsx` (meldet eine verworfene Eingabe nach außen, ohne eigenes
-  Verhalten zu ändern).
+  `anzeige/ZeitpunktEingabe.tsx` (meldet eine verworfene Eingabe nach außen; Enter und Escape
+  nehmen ihren Grund zurück).
 - Doku: Kapitel `docs/anwender/kapitel/einsatztagebuch.md`, Abschnitt „Felder, Bausteine und Werte
-  setzen“.
+  setzen“, und `einsatz-oberflaeche.md`, „Wie Zeitfelder Zeiten lesen“.
 - Kein Backend, keine Migration, keine Typänderung.
