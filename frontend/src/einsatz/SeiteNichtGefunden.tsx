@@ -5,7 +5,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
-import { useNichtGefundenMelden } from './nichtGefundenMarke';
+import { useMarkNichtGefunden } from './nichtGefundenContext';
 import { freiesRueckwegModul, modulZielRoute, modulZuRoute, redirectZiel } from './modulRegistry';
 
 /**
@@ -22,12 +22,12 @@ import { freiesRueckwegModul, modulZielRoute, modulZuRoute, redirectZiel } from 
  * (`freiesRueckwegModul` ohne das Standardmodul des Einsatzes, anders als Modulwächter und
  * `ModulStub`: der Auftrag nennt den Überblick). Bis die Freigaben geladen sind, steht kein Knopf,
  * sonst wechselte sein Ziel unter dem Finger. Die Adresse merkt der Rahmen nicht als letzten Ort
- * (`nichtGefundenMarke.ts`).
+ * (`nichtGefundenContext.ts`).
  */
 export default function SeiteNichtGefunden() {
   const einsatzId = parseRouteId(useParams().id);
   const { pathname } = useLocation();
-  useNichtGefundenMelden();
+  useMarkNichtGefunden();
   const freigabenQ = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId ?? 0),
     queryFn: () => ladeModulFreigaben(einsatzId!),
