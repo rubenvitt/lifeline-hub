@@ -65,13 +65,13 @@ der ohne die Änderung rot ist.
 - [x] 5.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Weg zur Einsatzliste über „Alle Einsätze
   …“, Alarmzentrale und Verbindung als Symbol mit Wort bei Störung, Absatz „Auf schmalen
   Schirmen …“ und Satz „Benachrichtigung erlaubt“ berichtigt; `hilfe/anwenderdoku.guard.test.ts` grün.
-- [ ] 5.3 Bilder des Kapitels neu erzeugen (`pnpm doku:bilder e2e/doku-bilder/einsatz-oberflaeche.bilder.ts`)
+- [x] 5.3 Bilder des Kapitels neu erzeugen (`pnpm doku:bilder e2e/doku-bilder/einsatz-oberflaeche.bilder.ts`)
   und committen; was nicht läuft, als Folgeaufgabe auf dem Board und im PR genannt.
 
 ## 6. Abschluss
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Ergebnis im PR unter „Geprüft“).
-- [ ] 6.2 Bilder der Änderung vorher/nachher (1280 `kompakt`, 1180 `handschuh`, Handy mit Plakette,
+- [x] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Ergebnis im PR unter „Geprüft“).
+- [x] 6.2 Bilder der Änderung vorher/nachher (1280 `kompakt`, 1180 `handschuh`, Handy mit Plakette,
   Tablet mit Finger) für PR und Meldung aufgenommen.
 
 ## Workflow follow-up

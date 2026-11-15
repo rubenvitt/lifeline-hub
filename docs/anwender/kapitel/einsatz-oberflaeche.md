@@ -81,7 +81,7 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
    (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das erste Modul der
    Kategorie und zeigt daneben ihre Module.
 
-   ![Geöffneter Einsatz: Kopfzeile mit Einsatzname, Suchen, Alarmzentrale, SYNC und Uhr; links die Kategorien, daneben die Module der Kategorie „Führung“, rechts der Überblick](../bilder/einsatz-oberflaeche/arbeitsflaeche.png)
+   ![Geöffneter Einsatz: Kopfzeile mit Einsatzname, Suchen, Alarmzentrale, Verbindungszeichen und Uhr; links die Kategorien, daneben die Module der Kategorie „Führung“, rechts der Überblick](../bilder/einsatz-oberflaeche/arbeitsflaeche.png)
 
 2. In der Modulliste das Modul wählen. Die Zahl neben einem Modul zählt dessen Inhalt, etwa
    Einträge im Einsatztagebuch, offene Aufträge oder ungelesene Nachrichten im Chat.
