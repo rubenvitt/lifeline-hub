@@ -381,7 +381,7 @@ fn hinweise_fortschreiben(
     neu: &[String],
     erledigt: &[String],
 ) -> Option<String> {
-    let ist_erledigt = |zeile: &str| erledigt.iter().any(|g| zeile.starts_with(g.as_str()));
+    let is_erledigt = |zeile: &str| erledigt.iter().any(|g| zeile.starts_with(g.as_str()));
     let is_haftend = |zeile: &str| {
         (zeile.starts_with("Zeile ") && zeile.contains(" ist zu groß"))
             || zeile.starts_with(uebernehmen::NUMMER_HINWEIS)
@@ -395,7 +395,7 @@ fn hinweise_fortschreiben(
     for z in alte
         .iter()
         .copied()
-        .filter(|z| !ist_erledigt(z))
+        .filter(|z| !is_erledigt(z))
         .chain(neu.iter().map(String::as_str))
         .filter(|z| is_haftend(z))
     {
