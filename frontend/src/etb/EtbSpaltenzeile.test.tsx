@@ -14,6 +14,7 @@ import { baueZeilen, type EtbZeile } from './etbZeile';
 import EtbZeitachse from './EtbZeitachse';
 import { passendeVermerke } from './EtbVermerke';
 import { ETB_SPALTEN_RASTER } from './etbSpalten';
+import { groessenstufen } from '../theme/tokens';
 
 /**
  * Leseansicht des ETB (Change `kwc2yszv-etb-neuentwurf`, Spec `etb-zeitachse-darstellung`):
@@ -124,7 +125,7 @@ const punkte = (menue: HTMLElement) =>
 beforeEach(() => setzeViewportBreite(1440));
 
 describe('Spaltenzeile in kompakter Dichte', () => {
-  it('Einzeiliger Eintrag im Fükw: feste Spalten, Von → An in 13 px Textschrift, nichts unter 12 px', () => {
+  it('Einzeiliger Eintrag im Fükw: feste Spalten, Von → An in der Stufe text, nichts unter 12 px', () => {
     const { container } = renderZeitachse({ eintraege: [eintrag()] });
     const z = zeileVon(container, 'eintrag-1');
     expect(z).toHaveAttribute('data-lfh-form', 'spalten');
@@ -134,7 +135,7 @@ describe('Spaltenzeile in kompakter Dichte', () => {
     expect(nr).toHaveTextContent('Nr. 1');
     expect(typ).toHaveTextContent('Meldung');
     expect(vonAn).toHaveTextContent('Sanitätszug Musterstadt → EL · Funk');
-    expect(vonAn.style.fontSize).toBe('13px');
+    expect(vonAn.style.fontSize).toBe('var(--lfh-groesse-text)');
     // Textschrift, nicht Mono: keine Schriftfamilie der Zahlen an der Zelle.
     expect(vonAn.style.fontFamily).toBe('');
     expect(inhalt).toHaveTextContent('Einsatzleitwagen am Marktplatz');
@@ -142,7 +143,11 @@ describe('Spaltenzeile in kompakter Dichte', () => {
     expect(within(menue).getByRole('button', { name: 'Aktionen zu Eintrag 1' })).toBeVisible();
     // Kein Text der Zeile unter 12 px.
     for (const el of [z, ...z.querySelectorAll<HTMLElement>('*')]) {
-      const groesse = Number.parseFloat(el.style.fontSize);
+      // Stufen der Skala stehen als Variable am Element (LLH-1775): in Pixel der Stufe umrechnen.
+      const stufe = /--lfh-groesse-(\w+)/.exec(el.style.fontSize)?.[1];
+      const groesse = stufe
+        ? groessenstufen[stufe as keyof typeof groessenstufen]
+        : Number.parseFloat(el.style.fontSize);
       if (Number.isFinite(groesse))
         expect(groesse, el.outerHTML.slice(0, 80)).toBeGreaterThanOrEqual(12);
     }
