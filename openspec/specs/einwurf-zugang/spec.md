@@ -412,10 +412,10 @@ vertrauten Proxy kennt und den Schalter nicht gesetzt hat: Dann lehnt sie jeden 
 
 ### Requirement: Ein gekoppelter ELW nimmt keine Einwürfe an
 
-Meldet sich eine Instanz für eine Org bei einer anderen Instanz (aktive Kopplung, meldende
-Seite), SHALL sie für diese Org keine Einwurf-Zugänge anlegen, keinen Schlüssel wechseln und
+Meldet sich eine Instanz für eine Org bei einem Hub (aktive Standardkopplung, meldende Seite, Org
+zugeordnet), SHALL sie für diese Org keine Einwurf-Zugänge anlegen, keinen Schlüssel wechseln und
 keinen Einwurf eines Zugangs dieser Org annehmen. Das Paneel MUST den Grund nennen. Widerrufen
-bleibt möglich.
+bleibt möglich. Eine Direktkopplung vor Ort mit einem zweiten ELW MUST NOT sperren.
 
 #### Scenario: Anlegen am ELW
 - **WHEN** ein Admin an einem ELW, der sich für seine Org bei einem Hub meldet, einen Einwurf-Zugang anlegen will
@@ -424,3 +424,11 @@ bleibt möglich.
 #### Scenario: Einwurf am ELW
 - **WHEN** ein Zugang angelegt wurde, bevor die Org gekoppelt wurde, und danach ein Einwurf kommt
 - **THEN** antwortet der Server mit 401 und speichert nichts
+
+#### Scenario: Direktkopplung vor Ort sperrt nicht
+- **WHEN** ein ELW sich für seine Org nur per Direktkopplung vor Ort bei einem zweiten ELW meldet und ein Einwurf eines Zugangs der Org kommt
+- **THEN** nimmt der Server ihn an, das Paneel nennt keinen Sperrgrund, und ein Admin kann Einwurf-Zugänge anlegen und Schlüssel wechseln
+
+#### Scenario: Hub und Direktkopplung zugleich
+- **WHEN** ein ELW sich für seine Org per Direktkopplung vor Ort bei einem zweiten ELW und per Standardkopplung bei einem Hub meldet
+- **THEN** bleibt die Sperre, und das Paneel nennt den Hub, nicht den zweiten ELW

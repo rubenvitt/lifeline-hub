@@ -18,7 +18,7 @@
 
 ## 4. Integration
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (in der Cloud-Sitzung wegen des Platzkontingents in Teilen: Bündel `schnell` und `frontend`, Schritt 15 einzeln, Schritt 4 in Stapeln; nur die Desktop-Hülle ließ sich mangels GTK nicht bauen, sie ist nicht im Diff)
 
 ## Workflow follow-up
 
