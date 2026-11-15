@@ -501,7 +501,8 @@ die ihn führt; am Hub kann deshalb ein eigener Einsatz dieselbe Nummer tragen w
 Wechselt die Führung und hat die übernehmende Installation die Nummer schon selbst vergeben,
 bekommt der übernommene Einsatz dort eine neue Nummer, die über allen ihren Einsätzen des Jahres
 liegt, auch über den Spiegeln; nur wenn ein Spiegel die Zählung an die Grenze von 999.999 bringen
-würde, zählt sie allein über den eigenen Einsätzen. Sein Einsatztagebuch nennt dann „Neue Einsatznummer …, bisher …“. Die abgebende
+würde, zählt sie allein über den eigenen Einsätzen. Eine Nummer an dieser Grenze behält ein
+übernommener Einsatz nie, auch wenn sie frei ist. Sein Einsatztagebuch nennt dann „Neue Einsatznummer …, bisher …“. Die abgebende
 Installation zeigt die neue Nummer, sobald sie den Einsatz als Spiegel hält, bei einer
 Notübernahme mit Unterschrift also erst nach dem Bestätigen. Übergibt die neue Installation die
 Führung später zurück, bleibt die neue Nummer, solange sie dort frei ist. Widerspricht der ELW

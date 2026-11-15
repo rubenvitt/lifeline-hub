@@ -10,7 +10,7 @@ use crate::error::AppError;
 use sqlx::SqliteConnection;
 
 /// Vergibt eine eigene Nummer, wenn die des Spiegels in seiner Org schon ein eigener Einsatz oder
-/// das Löschprotokoll trägt. Liefert (alt, neu) bei einer Umnummerierung. Läuft unter dem Merker.
+/// das Löschprotokoll trägt oder sie an der Grenze der laufenden Nummer liegt. Liefert (alt, neu) bei einer Umnummerierung. Läuft unter dem Merker.
 /// Ein Einsatz ohne Nummer (Altbestand) stößt an keine Eindeutigkeit und bleibt, wie er ist.
 pub(super) async fn ensure_freie_nummer(
     conn: &mut SqliteConnection,
@@ -42,7 +42,12 @@ pub(super) async fn ensure_freie_nummer(
     .bind(lfd)
     .fetch_one(&mut *conn)
     .await?;
-    if !belegt {
+    // Eine Nummer an der Grenze behält er nicht, auch wenn sie frei ist: Die nächste Anlage zählte
+    // sonst über die Grenze, und jede Gegenstelle übernähme die eigenen Nummern des Jahres leer
+    // (LLH-1859, Spec `einsatznummer`, „Die freie Nummer bleibt in der Grenze“).
+    let an_der_grenze =
+        lfd.is_some_and(|l| l.saturating_add(1) >= *crate::einsatz::nummer::LFD_GRENZEN.end());
+    if !belegt && !an_der_grenze {
         return Ok(None);
     }
     let (praefix, zeitzone): (Option<String>, Option<String>) = sqlx::query_as(
@@ -312,6 +317,28 @@ mod tests {
                 stand(&pool, id).await,
                 (Some("E-2026-0002".into()), false, 0),
                 "fremder Spiegel mit {fremd}"
+            );
+        }
+    }
+
+    /// Spec `einsatznummer`, „Die freie Nummer bleibt in der Grenze“ (LLH-1859): Eine eigene
+    /// Nummer an der Grenze behält ein Spiegel nicht, auch wenn sie frei ist; sonst zählte die
+    /// nächste Anlage über die Grenze. Knapp darunter bleibt sie.
+    #[tokio::test]
+    async fn eine_freie_nummer_an_der_grenze_wird_neu_vergeben() {
+        for (lfd, erwartet) in [
+            (999_998, "E-2026-0002"),
+            (999_999, "E-2026-0002"),
+            (999_997, "E-2026-999997"),
+        ] {
+            let pool = pool().await;
+            eigener_einsatz(&pool, 1).await;
+            let id = spiegel_mit_eigener_akte(&pool, Some(lfd)).await;
+            richte_aus(&pool, id).await;
+            assert_eq!(
+                stand(&pool, id).await,
+                (Some(erwartet.into()), false, 0),
+                "Spiegel mit {lfd}"
             );
         }
     }

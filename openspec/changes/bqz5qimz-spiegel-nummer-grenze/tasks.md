@@ -19,6 +19,7 @@
 - [x] 4.1 Hinweis zur Einsatznummer haftet bis zur nächsten Übernahme des Kopfs (`abgleich::build_hinweis`); Test `der_hinweis_zur_einsatznummer_bleibt_bis_der_kopf_kommt`, rot ohne die Haftung
 - [x] 4.2 Freie Nummer zählt nur eigene, wenn ein Spiegel die Zählung an die Grenze hebt (D5); Test `ein_fremder_spiegel_an_der_grenze_hebt_die_freie_nummer_nicht`, rot ohne den Rückfall
 - [x] 4.3 Ausweichschleifen beider Vergaben am Höchstwert getestet (`ausweichen_ueber_den_hoechstwert_ist_422`, `ueber_dem_hoechstwert_scheitert_der_uebergang_mit_422`), rot mit `+= 1`
+- [x] 4.5 Eine freie Spiegelnummer an der Grenze wird beim Eigenwerden neu vergeben (zweiter Review); Test `eine_freie_nummer_an_der_grenze_wird_neu_vergeben`, rot vorher
 - [x] 4.4 ADR-0052 „Eine gekoppelte Instanz ist für die Zahlen ihres Einsatzkopfs nicht vertrauenswürdig“ und ein Satz im Anwenderkapitel Instanzkopplung; `scripts/check-architektur.sh` und `scripts/check-adr-nummern.sh origin/alpha` grün
 
 ## 5. Abschluss

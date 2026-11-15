@@ -50,11 +50,17 @@ eine negative oder umgelaufene Nummer vergeben.
 ### Requirement: Die freie Nummer bleibt in der Grenze
 Läge die laufende Nummer über allen Einsätzen des Jahres, Spiegel eingeschlossen, an oder über der
 Grenze für die Zahlen eines Spiegels, SHALL das System die freie Nummer beim Übergang vom Spiegel
-zum eigenen Einsatz nur über den eigenen Einsätzen und dem Löschprotokoll zählen.
+zum eigenen Einsatz nur über den eigenen Einsätzen und dem Löschprotokoll zählen. Läge schon die
+behaltene Nummer des Spiegels plus eins an oder über dieser Grenze, MUST das System sie wie eine
+belegte Nummer neu vergeben.
 
 #### Scenario: Ein fremder Spiegel an der Grenze
 - **WHEN** der Hub den eigenen Einsatz `E-2026-0001` hat, einen Spiegel mit der laufenden Nummer 999999 hält und ein Spiegel mit der Nummer `E-2026-0001` zum eigenen Einsatz wird
 - **THEN** trägt der übernommene Einsatz am Hub `E-2026-0002`
+
+#### Scenario: Eine freie Nummer an der Grenze
+- **WHEN** der Hub den eigenen Einsatz `E-2026-0001` hat und ein Spiegel mit der laufenden Nummer 999998, die am Hub frei ist, zum eigenen Einsatz wird
+- **THEN** trägt der übernommene Einsatz am Hub `E-2026-0002`, und sein Einsatztagebuch nennt die neue und die bisherige Nummer
 
 ## MODIFIED Requirements
 
@@ -64,7 +70,8 @@ er zum eigenen Einsatz (Führungswechsel jeder Art, Verwahrung) und ist seine Nu
 Organisation dieser Instanz schon vergeben, SHALL das System ihm eine neue Nummer geben: die
 laufende Nummer über allen Einsätzen des Jahres, die die Instanz kennt, auch ihren Spiegeln, außer
 nach „Die freie Nummer bleibt in der Grenze“. Der
-Übergang MUST NOT an der Eindeutigkeit scheitern. Ist die Nummer frei, MUST sie bleiben.
+Übergang MUST NOT an der Eindeutigkeit scheitern. Ist die Nummer frei, MUST sie bleiben, außer
+nach „Die freie Nummer bleibt in der Grenze“.
 
 #### Scenario: Notübernahme bei gleicher Nummer
 - **WHEN** der Hub die eigenen Einsätze `E-2026-0001` und `E-2026-0002` hat, den Einsatz `E-2026-0001` des ELW spiegelt und ein Admin am Hub die Notübernahme vollzieht

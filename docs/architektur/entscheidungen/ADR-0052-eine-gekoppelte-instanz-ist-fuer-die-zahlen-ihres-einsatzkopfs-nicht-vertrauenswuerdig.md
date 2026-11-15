@@ -25,6 +25,8 @@ herleitung:
 - MUST: Eine neu vergebene freie Nummer beim Übergang vom Spiegel zum eigenen Einsatz liegt unter
   `LFD_GRENZEN.end()`, solange die eigenen Einsätze es tun; dafür zählt sie notfalls nur über
   den eigenen Einsätzen (Spec `einsatznummer`, „Die freie Nummer bleibt in der Grenze“).
+- MUST NOT: Ein Spiegel behält beim Eigenwerden eine laufende Nummer, die plus eins an oder über
+  `LFD_GRENZEN.end()` läge, auch wenn sie frei ist.
 
 ## Prüfung
 

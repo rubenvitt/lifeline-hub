@@ -88,6 +88,13 @@ Einsätzen und dem Löschprotokoll, wie die Anlage. An der Grenze selbst, nicht 
 eigene Nummer 999.999 brächte die nächste Anlage auf 1.000.000. Eine Nummer, die so einem Spiegel gleicht, ist erlaubt (Spiegel
 sind von der Eindeutigkeit ausgenommen); gleiche Texte fängt die Ausweichschleife ab.
 
+Ebenso behält ein Spiegel seine eigene Nummer nicht, wenn sie plus eins an der Grenze läge, auch
+wenn sie frei ist (zweiter Review, abgestimmt 15.11.2026): Sonst zählte die nächste Anlage von
+dort weiter. Er wird wie bei einer Doppelung umnummeriert, mit Eintrag im Einsatztagebuch. Knapp
+darunter bleibt ein Rest (999.990 lässt noch neun eigene Anlagen zu); verworfen wurde, dass die
+Anlage Werte an der Grenze ganz übergeht, weil die Vergabe dann nicht mehr „Maximum plus eins“
+wäre.
+
 Verworfen: eine freie Nummer über der Grenze mit 422 ablehnen (ein Führungswechsel mit belegter
 Nummer scheiterte dann im ganzen Jahr) und hinnehmen.
 
