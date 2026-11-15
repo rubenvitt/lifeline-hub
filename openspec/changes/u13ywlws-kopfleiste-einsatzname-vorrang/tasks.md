@@ -54,13 +54,13 @@ der ohne die Änderung rot ist.
   `kopfhoehe-tonpruefung`, `kopfzeile-start-cls`, `kopfzeile-schmal`, `gate1-ueberlauf`,
   `gate3-trefflaeche`, `alarmton-freischalten`, `orientierung`, Hilfen in `lauf-kern.ts` und
   `doku-bilder/kern.ts`; die betroffenen Specs lokal in Chromium grün.
-- [ ] 4.2 Design System neu erzeugen, falls der Wächter es verlangt
+- [x] 4.2 Design System neu erzeugen, falls der Wächter es verlangt
   (`mise exec -- pnpm -C frontend design-system`, `designSystem.guard.test.ts` grün).
 
 ## 5. Regel und Anwenderdoku
 
-- [ ] 5.1 `frontend/AGENTS.md`, Abschnitt „Rahmen“: Spiegelstrich „Kopfleiste“ (D7); Prettier grün.
-- [ ] 5.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Weg zur Einsatzliste über „Alle Einsätze
+- [x] 5.1 `frontend/AGENTS.md`, Abschnitt „Rahmen“: Spiegelstrich „Kopfleiste“ (D7); Prettier grün.
+- [x] 5.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Weg zur Einsatzliste über „Alle Einsätze
   …“, Alarmzentrale und Verbindung als Symbol mit Wort bei Störung, Absatz „Auf schmalen
   Schirmen …“ und Satz „Benachrichtigung erlaubt“ berichtigt; `hilfe/anwenderdoku.guard.test.ts` grün.
 - [ ] 5.3 Bilder des Kapitels neu erzeugen (`pnpm doku:bilder e2e/doku-bilder/einsatz-oberflaeche.bilder.ts`)

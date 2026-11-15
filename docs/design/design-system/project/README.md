@@ -143,6 +143,13 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
     Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
     deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
+  - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
+    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
+    Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
+    nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht nur als Symbol, ein Wort genau
+    bei Störung, in jeder Breite. Einziger Breitenhalter: der Platz von „Ton blockiert“ am
+    Glockenknopf, weil der Browser den Ton vor der ersten Geste ohne Zutun sperrt. Tastenhinweise
+    nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
