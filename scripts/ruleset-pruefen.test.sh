@@ -99,7 +99,8 @@ pruefe_code "überzählige alte Suite ist rot" 1
 enthaelt "nennt die überzählige" "e2e 1/4"
 lauf "$(antwort '{"type":"deletion","ruleset_id":1}')"
 pruefe_code "ohne jede Pflicht ist rot" 1
-enthaelt "nennt alle als fehlend" "Schnellprüfungen"
+enthaelt "nennt die erste als fehlend" "Schnellprüfungen"
+enthaelt "nennt auch die letzte als fehlend" "ADR-Nummern"
 
 # Seit LLH-1899 ist `Baut mit Ziel-Branch` abgeschafft: steht er noch im Ruleset, hinge jeder PR.
 lauf "$(antwort "$(regel false "$GUT_SCHNELL" "$GUT_MIGR" "$GUT_ADR" "$(eintrag 'Baut mit Ziel-Branch')")")"

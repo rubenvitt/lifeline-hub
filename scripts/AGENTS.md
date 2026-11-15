@@ -96,7 +96,8 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   - Herleitung: `openspec/changes/archive/2026-11-12-p31gqvln-merge-stau/design.md`, für
     „alpha rot“ `openspec/changes/archive/2026-11-12-g10eo9co-alpha-rot-schutz/design.md`.
 - **Kein Pflicht-Check „Baut mit Ziel-Branch“** (LLH-1899, ADR-0049, ersetzt LLH-1849): Nach einem
-  Merge auf einen Kanal-Branch rechnet kein Workflow die offenen PRs neu. Kompilieren zwei einzeln
+  Merge auf einen Kanal-Branch kompiliert kein Workflow die offenen PRs neu (die Migrations- und
+  ADR-Nummern bewertet `migrationen-kanal.yml` weiter neu). Kompilieren zwei einzeln
   grüne PRs zusammen nicht, wird `alpha` rot, und „alpha rot“ (Stau-Wächter, oben) bestimmt einen
   Zuständigen. Lokal prüft `check-all.sh --nur baut` nach einem Merge von `alpha` schnell, ob ein
   Stand übersetzt. Herleitung:

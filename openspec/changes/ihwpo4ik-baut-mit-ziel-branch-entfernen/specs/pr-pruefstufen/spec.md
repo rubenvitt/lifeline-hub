@@ -26,6 +26,15 @@ Ein Ereignis an einem PR MUST keinen Job anlegen, der nur bei einem Push auf ein
 - **WHEN** ein PR auf `alpha` gemergt wird
 - **THEN** laufen auf dem Merge-Commit weiter Schnellprüfungen, alle Suiten, und das Neubewerten der Migrationsnummern
 
+## ADDED Requirements
+
+### Requirement: PR-Code läuft nie auf einer Kanal-Ref
+Code aus einem PR MUST nie in einem Lauf ausgeführt werden, dessen Ref ein Kanal-Branch ist (`alpha`, `beta`, `main`). Ein Lauf, der nach einem Push auf einen Kanal-Branch offene PRs bewertet, MUST seine Skripte vom Kanal-Branch nehmen und MUST keinen Code aus dem PR ausführen.
+
+#### Scenario: Offene PRs nach einem Merge bewerten
+- **WHEN** nach einem Merge auf `alpha` die Migrations- und ADR-Nummern der offenen PRs neu bewertet werden
+- **THEN** stammen die prüfenden Skripte von `alpha`, und kein Code aus einem PR läuft im Bereich von `alpha`
+
 ## REMOVED Requirements
 
 ### Requirement: Ein fertiger PR muss mit dem aktuellen Ziel-Branch bauen

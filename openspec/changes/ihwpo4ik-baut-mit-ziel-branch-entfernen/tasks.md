@@ -17,7 +17,7 @@
 
 ## 4. Gesamtprüfung
 
-- [ ] 4.1 `./scripts/check-all.sh --nur schnell` lokal grün
+- [x] 4.1 `./scripts/check-all.sh --nur schnell` lokal grün (12 Schritte grün; nach den Review-Behebungen Selbsttests und Architektur-Wächter erneut grün)
 
 ## Workflow follow-up
 

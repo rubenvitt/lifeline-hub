@@ -62,7 +62,7 @@ art_von() { # <name> → status | check | leer
 befunde=()
 gesehen=$'\n'
 [ "$strict" != true ] \
-  || befunde+=("„Require branches to be up to date before merging“ ist an: jeder PR müsste vor dem Merge auf dem Stand des Ziel-Branches sein (ADR-0030). Im Ruleset ausschalten.")
+  || befunde+=("„Require branches to be up to date before merging“ ist an: jeder PR müsste vor dem Merge auf dem Stand des Ziel-Branches sein, also nach jedem Merge neu prüfen (Kopf von migrationen.yml). Im Ruleset ausschalten.")
 while IFS=$'\t' read -r name quelle; do
   [ -n "$name" ] || continue
   [ "$quelle" != - ] || quelle=""

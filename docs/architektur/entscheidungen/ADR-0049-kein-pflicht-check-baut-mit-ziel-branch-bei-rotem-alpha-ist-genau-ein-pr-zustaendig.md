@@ -5,7 +5,7 @@ status: akzeptiert
 datum: 2026-11-15
 ersetzt: ADR-0030
 gilt_fuer:
-  - .github/workflows/stau-waechter.yml
+  - .github/workflows/*.yml
   - scripts/stau-waechter.sh
   - scripts/ruleset-pruefen.sh
 herleitung:
@@ -18,8 +18,11 @@ herleitung:
 
 ## Regeln
 
-- MUST NOT: Ein Workflow rechnet nach einem Push auf einen Kanal-Branch die offenen PRs neu
-  (keine Kette von Kompilierläufen je Merge). Pflicht-Checks: Liste in `scripts/ruleset-pruefen.sh`.
+- MUST NOT: Ein Workflow kompiliert nach einem Push auf einen Kanal-Branch die offenen PRs neu
+  (kein Kompilierlauf je offenem PR). Pflicht-Checks: Liste in `scripts/ruleset-pruefen.sh`.
+- MUST NOT: Code aus einem PR läuft in einem Lauf, dessen Ref ein Kanal-Branch ist.
+- MUST: Aus ADR-0048 entfallen „Fertig heißt Auto-Merge an“ und die Zählung mit `Kompilieren`/
+  `Melden`; Auto-Merge liest nur noch der Stau-Wächter („Grün, aber nicht gemergt“).
 - MUST: Bruchstellen zweier einzeln grüner PRs, beim Kompilieren wie im Test, fängt der Befund
   „alpha rot“ des Stau-Wächters (`scripts/AGENTS.md`, „Stau-Wächter“).
 - MUST: Bei rotem `alpha` bekommt höchstens ein offener PR den Auftrag zum Fix; er haftet eine
