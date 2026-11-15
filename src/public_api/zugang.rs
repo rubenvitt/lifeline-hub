@@ -528,9 +528,10 @@ pub async fn ablehnung_festhalten(
     Ok(())
 }
 
-/// Meldet sich diese Instanz für die Org bei einem Hub (aktive Kopplung, meldende Seite, Org
-/// zugeordnet)? Dann nimmt sie für die Org keine Fremdsysteme an (Konzept D8, design.md D10).
-/// Liefert Name und Adresse des Hubs.
+/// Meldet sich diese Instanz für die Org bei einem Hub (aktive Standardkopplung, meldende Seite,
+/// Org zugeordnet)? Dann nimmt sie für die Org keine Fremdsysteme an (Konzept D8, design.md D10).
+/// Eine Direktkopplung vor Ort mit einem zweiten ELW ist kein Hub und zählt nicht (LLH-1868,
+/// Specs `maschinenzugang` und `einwurf-zugang`). Liefert Name und Adresse des Hubs.
 pub async fn hub_fuer_org(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -538,7 +539,7 @@ pub async fn hub_fuer_org(
     Ok(sqlx::query_as(
         "SELECT k.gegenueber_name, k.gegenueber_adresse FROM instanz_kopplung k \
          JOIN instanz_kopplung_org o ON o.kopplung_id = k.id \
-         WHERE k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' \
+         WHERE k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' AND k.art = 'standard' \
            AND o.org_id = ? AND o.widerrufen_at IS NULL \
          ORDER BY k.id LIMIT 1",
     )
@@ -857,6 +858,71 @@ mod tests {
             .await
             .unwrap();
         assert_eq!((jti, abruf, code), (1, 1, 0));
+    }
+
+    /// Legt eine aktive, meldende Kopplung der Art `art` an und ordnet ihr die Org zu.
+    async fn koppeln(pool: &SqlitePool, org: i64, kennung: &str, name: &str, art: &str) {
+        let k: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand, art) \
+             VALUES (?, 'X', ?, 'meldet_sich', 'https://gegenueber.example', 'aktiv', ?) \
+             RETURNING id",
+        )
+        .bind(kennung)
+        .bind(name)
+        .bind(art)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (?, ?, ?, 'Kreis')",
+        )
+        .bind(k)
+        .bind(org)
+        .bind(format!("{kennung}/1"))
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn nur_eine_standardkopplung_macht_den_hub_zustaendig() {
+        let pool = db::test_pool().await;
+        let (_, org) = neuer_zugang(&pool).await;
+        let hub = |pool: SqlitePool, org: i64| async move {
+            let mut c = pool.acquire().await.unwrap();
+            hub_fuer_org(&mut c, org)
+                .await
+                .unwrap()
+                .map(|(name, _)| name)
+        };
+
+        koppeln(&pool, org, "elw-2", "ELW 2", "vor_ort").await;
+        assert_eq!(
+            hub(pool.clone(), org).await,
+            None,
+            "eine Direktkopplung vor Ort ist kein Hub"
+        );
+
+        koppeln(&pool, org, "hub-1", "Hub Kreis", "standard").await;
+        assert_eq!(
+            hub(pool.clone(), org).await.as_deref(),
+            Some("Hub Kreis"),
+            "neben der Direktkopplung nennt die Abfrage den Hub"
+        );
+
+        // Eine zweite Org nur mit Standardkopplung: der Hub, ohne Direktkopplung daneben.
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Zweite Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        koppeln(&pool, 2, "hub-2", "Hub Nord", "standard").await;
+        assert_eq!(
+            hub(pool.clone(), 2).await.as_deref(),
+            Some("Hub Nord"),
+            "eine Standardkopplung allein macht den Hub zuständig"
+        );
     }
 
     #[test]
