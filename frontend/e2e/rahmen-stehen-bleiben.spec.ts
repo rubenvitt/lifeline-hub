@@ -15,6 +15,9 @@ import { abmeldenUeberMenue, benutzermenueAusloeser } from './menue-kern';
  * Mutationsprobe (06.10.2026, Chromium): ohne `RAHMEN_KLEBT` am Kopf und an der Betriebszeile
  * rot bei 820/1180/1440 als Admin und als Beobachter, offline auf allen vier Breiten (ab `md` liegt
  * das Wort OFFLINE mit dem Kopf außerhalb des Bildes); die Gegenprobe bei 390 bleibt grün.
+ * Mutationsprobe LLH-1728 (15.11.2026, Chromium): klebt der Einsatzkopf unter `md` wieder nicht,
+ * rot bei 390 px als Admin und Beobachter, offline, in der Übung (auch offline) und die
+ * einzeilige Zeile in allen drei Dichten; die Einsatzliste (App-Rahmen) bleibt zu Recht grün.
  */
 
 const BREITEN = [
@@ -412,8 +415,16 @@ for (const dichte of ['kompakt', 'komfortabel'] as const) {
     await page.goto('/einsaetze');
     const kopf = page.locator('[data-lfh="rahmen-kopf"]');
     await expect(kopf.locator('[data-lfh="kopf-uhr"]')).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 1000));
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThanOrEqual(500);
+    // Erst rollen, wenn die Liste steht: sonst ist das Dokument noch kurz.
+    await expect(page.getByText('Rahmen Liste 24', { exact: false }).first()).toBeAttached();
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          window.scrollTo(0, 1000);
+          return window.scrollY;
+        }),
+      )
+      .toBeGreaterThanOrEqual(500);
     await expect(kopf).toHaveCSS('position', 'sticky');
     const k = (await kopf.boundingBox())!;
     expect(Math.round(k.y)).toBe(0);
