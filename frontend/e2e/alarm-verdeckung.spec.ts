@@ -53,6 +53,12 @@ async function unterkante(ort: Locator): Promise<number> {
   return box!.y + box!.height;
 }
 
+async function oberkante(ort: Locator): Promise<number> {
+  const box = await ort.boundingBox();
+  expect(box, 'Element ohne Box').not.toBeNull();
+  return box!.y;
+}
+
 /** Oberkante des obersten stehenden Alarms (die DOM-Folge ist nicht die Bildfolge). */
 async function obersterAlarm(page: Page): Promise<number> {
   const oben = await page
@@ -144,16 +150,20 @@ test.describe('Stehende Alarme unter der Bedienkante', () => {
 
     await pruefe(page, 3);
 
-    // Gerollt: der Seitenkopf ist aus dem Bild, die Alarme rücken unter die klebende Leiste.
+    // Gerollt: der Seitenkopf klebt unter der Leiste (zjt7c073, er passt ins Drittel der
+    // Fensterhöhe) und zählt zum Rahmen; die Alarme stehen unter ihm, nicht über seinen Aktionen.
     await page.setViewportSize({ width: 820, height: 600 });
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     const kopfUnten = await unterkante(page.locator(KOPF));
+    await expect(page.locator(SEITENKOPF)).toHaveCSS('position', 'sticky');
     await expect
-      .poll(async () => unterkante(page.locator(SEITENKOPF)), {
-        message: 'Seitenkopf rollt unter die Leiste',
+      .poll(async () => oberkante(page.locator(SEITENKOPF)), {
+        message: 'Seitenkopf klebt unter der Leiste',
       })
-      .toBeLessThanOrEqual(kopfUnten);
-    await expect.poll(async () => obersterAlarm(page)).toBeCloseTo(kopfUnten + ABSTAND, 0);
+      .toBeCloseTo(kopfUnten, 0);
+    const seitenkopfUnten = await unterkante(page.locator(SEITENKOPF));
+    await expect.poll(async () => obersterAlarm(page)).toBeCloseTo(seitenkopfUnten + ABSTAND, 0);
     await kommandoleisteKlickbar(page);
 
     // „Öffnen“ führt zur Ablösung und quittiert den Alarm.

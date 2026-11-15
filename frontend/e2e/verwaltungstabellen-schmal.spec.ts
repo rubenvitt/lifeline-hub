@@ -458,9 +458,10 @@ test.describe('Seitenleiste der Verwaltung', () => {
     await page.evaluate((z) => window.scrollTo(0, z), reserve);
     const menue = page.locator('[data-lfh="verwaltung-menue"]');
     const box = (await menue.boundingBox())!;
-    // Ab `md` klebt der Kopf (LFH-952); das Menü hängt sich unter ihn (`frontend/AGENTS.md`, Rahmen).
+    // Ab `md` klebt der Kopf (LFH-952); das Menü hängt sich unter ihn, an die Kopfhöhe, nicht an die
+    // Rahmenhöhe samt klebendem Seitenkopf (zjt7c073 D2, `frontend/AGENTS.md`, Rahmen).
     const rahmenOben = await page.evaluate(() =>
-      parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben')),
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--lfh-kopf-oben')),
     );
     expect(rahmenOben, 'Vorbedingung: der Kopf klebt').toBeGreaterThan(0);
     expect(

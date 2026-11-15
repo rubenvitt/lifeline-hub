@@ -7,8 +7,11 @@ import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCallback, useRef } from 'react';
 import {
+  KOPF_OBEN_VAR,
   RAHMEN_OBEN_VAR,
-  leseRahmenOben,
+  readKopfOben,
+  readRahmenOben,
+  useKopfOben,
   useRahmenOben,
   useRahmenObenFuer,
   useRahmenObenQuelle,
@@ -53,7 +56,7 @@ afterEach(() => {
 describe('rahmenOben', () => {
   it('ohne klebendes Element ist die Höhe 0', () => {
     render(<Anzeige />);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
     expect(screen.getByTestId('anzeige').textContent).toBe('0');
   });
 
@@ -64,14 +67,14 @@ describe('rahmenOben', () => {
         <Anzeige />
       </>,
     );
-    expect(leseRahmenOben()).toBe(52);
+    expect(readRahmenOben()).toBe(52);
     expect(variable()).toBe('52px');
     expect(screen.getByTestId('anzeige').textContent).toBe('52');
   });
 
   it('eine inaktive Quelle zählt nicht (Gegenprobe zur aktiven)', () => {
     render(<Quelle hoehe={52} aktiv={false} name="kopf" />);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
   });
 
   it('zwei aktive Quellen addieren sich, das Aushängen nimmt den Anteil wieder weg', () => {
@@ -81,19 +84,19 @@ describe('rahmenOben', () => {
         <Quelle hoehe={40} aktiv name="zeile" />
       </>,
     );
-    expect(leseRahmenOben()).toBe(92);
+    expect(readRahmenOben()).toBe(92);
     rerender(<Quelle hoehe={52} aktiv name="kopf" />);
-    expect(leseRahmenOben()).toBe(52);
+    expect(readRahmenOben()).toBe(52);
     rerender(<></>);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
     expect(variable()).toBe('0px');
   });
 
   it('ein getauschtes Element unter derselben Quelle wird neu gemessen (Fehlerausstieg)', () => {
     const { rerender } = render(<Tausch variante="alt" />);
-    expect(leseRahmenOben()).toBe(52);
+    expect(readRahmenOben()).toBe(52);
     rerender(<Tausch variante="neu" />);
-    expect(leseRahmenOben()).toBe(73);
+    expect(readRahmenOben()).toBe(73);
   });
 
   it('wird eine Quelle inaktiv, fällt ihr Anteil weg, und die Anzeige folgt', () => {
@@ -139,6 +142,68 @@ describe('rahmenOben', () => {
     expect(screen.getByTestId('dokument').textContent).toBe('52');
     expect(screen.getByTestId('drawer').textContent).toBe('0');
     expect(screen.getByTestId('modal').textContent).toBe('0');
+  });
+
+  /**
+   * Zwei Höhen (zjt7c073 D2): der klebende Seitenkopf zählt zum Rahmen über dem Inhalt, nicht aber
+   * zur Kopfhöhe, an der Rail, Modulpanel und Verwaltungsmenü hängen.
+   */
+  describe('Ebene Seitenkopf', () => {
+    function SeitenkopfQuelle({ hoehe, aktiv }: { hoehe: number; aktiv: boolean }) {
+      const ref = useRahmenObenQuelle<HTMLDivElement>(aktiv, 'seitenkopf');
+      return (
+        <div
+          ref={(el) => {
+            if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: hoehe });
+            ref(el);
+          }}
+        />
+      );
+    }
+    function KopfAnzeige() {
+      return <span data-testid="kopf-anzeige">{useKopfOben()}</span>;
+    }
+    afterEach(() => {
+      document.documentElement.style.removeProperty(KOPF_OBEN_VAR);
+    });
+
+    it('der Seitenkopf zählt zum Rahmen, nicht zum Kopf', () => {
+      render(
+        <>
+          <Quelle hoehe={52} aktiv name="kopf" />
+          <SeitenkopfQuelle hoehe={45} aktiv />
+          <KopfAnzeige />
+          <Anzeige />
+        </>,
+      );
+      expect(readRahmenOben()).toBe(97);
+      expect(variable()).toBe('97px');
+      expect(readKopfOben()).toBe(52);
+      expect(document.documentElement.style.getPropertyValue(KOPF_OBEN_VAR)).toBe('52px');
+      expect(screen.getByTestId('kopf-anzeige').textContent).toBe('52');
+      expect(screen.getByTestId('anzeige').textContent).toBe('97');
+    });
+
+    it('rollt der Seitenkopf mit (inaktiv), sind Rahmen und Kopf gleich hoch', () => {
+      const { rerender } = render(
+        <>
+          <Quelle hoehe={52} aktiv name="kopf" />
+          <SeitenkopfQuelle hoehe={45} aktiv />
+        </>,
+      );
+      rerender(
+        <>
+          <Quelle hoehe={52} aktiv name="kopf" />
+          <SeitenkopfQuelle hoehe={45} aktiv={false} />
+        </>,
+      );
+      expect(readRahmenOben()).toBe(52);
+      expect(readKopfOben()).toBe(52);
+      rerender(<></>);
+      expect(readRahmenOben()).toBe(0);
+      expect(readKopfOben()).toBe(0);
+      expect(document.documentElement.style.getPropertyValue(KOPF_OBEN_VAR)).toBe('0px');
+    });
   });
 
   /**
@@ -190,7 +255,7 @@ describe('rahmenOben', () => {
       expect(bilder).toHaveLength(1);
       act(() => bilder[0](0));
       expect(variable()).toBe('53px');
-      expect(leseRahmenOben()).toBe(53);
+      expect(readRahmenOben()).toBe(53);
     } finally {
       vi.unstubAllGlobals();
     }
@@ -221,14 +286,42 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
       </>,
     );
     expect(screen.getByTestId('stapel').dataset.oben).toBe('52');
-    expect(leseRahmenOben()).toBe(76);
+    expect(readRahmenOben()).toBe(76);
     expect(variable()).toBe('76px');
+  });
+
+  /**
+   * zjt7c073 D2: Das Band gehört zur Kopfhöhe (Rail, Modulpanel und Seitenkopf hängen sich darunter);
+   * ein klebender Seitenkopf darunter verschiebt es nicht.
+   */
+  it('zählt zur Kopfhöhe und steht über einem klebenden Seitenkopf', () => {
+    function SeitenkopfQuelle() {
+      const ref = useRahmenObenQuelle<HTMLDivElement>(true, 'seitenkopf');
+      return (
+        <div
+          ref={(el) => {
+            if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: 45 });
+            ref(el);
+          }}
+        />
+      );
+    }
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Stapel hoehe={24} />
+        <SeitenkopfQuelle />
+      </>,
+    );
+    expect(screen.getByTestId('stapel').dataset.oben).toBe('52');
+    expect(readKopfOben()).toBe(76);
+    expect(readRahmenOben()).toBe(121);
   });
 
   it('ohne andere Quelle klebt es an der Fensterkante (Handy, Kopf rollt)', () => {
     render(<Stapel hoehe={24} />);
     expect(screen.getByTestId('stapel').dataset.oben).toBe('0');
-    expect(leseRahmenOben()).toBe(24);
+    expect(readRahmenOben()).toBe(24);
   });
 
   it('folgt einer anderen Quelle, die dazukommt oder geht, ohne sich selbst zu zählen', () => {
@@ -246,7 +339,7 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
       </>,
     );
     expect(screen.getByTestId('stapel').dataset.oben).toBe('40');
-    expect(leseRahmenOben()).toBe(64);
+    expect(readRahmenOben()).toBe(64);
   });
 
   it('inaktiv zählt es nicht und klebt unter dem Rest', () => {
@@ -257,6 +350,6 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
       </>,
     );
     expect(screen.getByTestId('stapel').dataset.oben).toBe('52');
-    expect(leseRahmenOben()).toBe(52);
+    expect(readRahmenOben()).toBe(52);
   });
 });

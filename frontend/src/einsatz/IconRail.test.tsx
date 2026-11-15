@@ -141,10 +141,10 @@ describe('IconRail', () => {
     // EINE klebende Spalte, nicht zwei klebende Teile: die überlappten bei geringer Höhe.
     const spalte = nav.querySelector<HTMLElement>('[data-lfh="rail-spalte"]')!;
     expect(spalte.style.position).toBe('sticky');
-    expect(spalte.style.top).toBe('var(--lfh-rahmen-oben, 0px)');
+    expect(spalte.style.top).toBe('var(--lfh-kopf-oben, 0px)');
     // Abzüglich des Vorlaufs: was im Fluss über der Rail steht (LLH-1734).
     expect(spalte.style.height).toBe(
-      'calc(100dvh - var(--lfh-rahmen-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
+      'calc(100dvh - var(--lfh-kopf-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
     );
     expect(spalte.style.overflowY).toBe('auto');
     const haupt = spalte.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
