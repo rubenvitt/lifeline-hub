@@ -186,9 +186,11 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
 Für Einsatzleitung und Führungspersonal, wenn ein Fahrzeug den Einsatz verlässt:
 
 1. In der Zeile des Fahrzeugs „Weitere Aktionen“ öffnen und „Entlassen“ wählen, auf dem Handy
-   „Entlassen“ auf der Karte. Eine Rückfrage gibt es nicht.
+   ebenso im Menü der Karte. Eine Rückfrage gibt es nicht.
 2. Das Fahrzeug verlässt die Liste und das FMS-Tableau. Der Hinweis unten bietet einige Sekunden
-   lang „Rückgängig“.
+   lang „Rückgängig“: Es holt das Fahrzeug mit Status, Einheit, Besatzung, Bereitstellungsraum,
+   Führungsstelle und Beladung zurück. Was inzwischen anders gebunden ist, nennt ein Hinweis über
+   der Liste.
 3. Unter der Liste „Entlassen“ aufklappen. Dort stehen alle entlassenen Fahrzeuge mit Typ und
    Zeitpunkt.
 
@@ -312,9 +314,16 @@ Bereitstellungsraum; seine Besatzung bleibt als Personal im Einsatz, nur ohne Fa
 Beladung bleibt im Einsatz zurück, ohne Ort; das Einsatztagebuch nennt, wie viele Posten. Aufträge
 nennen es weiter als Empfänger. In Stärke, Statusband, Lagemonitor, Lagekarte und Auswahllisten
 zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter, ebenso das Meldebild
-und seine Übernahme in einen Lagebericht. Erneut disponiert,
-steht es wieder in der Liste, mit dem Anfangsstatus wie beim Disponieren; Besatzung, Einheit und
-Bereitstellungsraum kommen nicht zurück.
+und seine Übernahme in einen Lagebericht.
+
+„Rückgängig“ direkt nach dem Entlassen nimmt es zurück, als wäre nichts geschehen: derselbe Status
+seit derselben Zeit, dieselbe Einheit, Besatzung, Führungsstelle und Beladung, ein Wiedereintritt in
+den Bereitstellungsraum. Was inzwischen anders gebunden ist (eine Person sitzt auf einem anderen
+Fahrzeug, die Einheit ist aufgelöst, ein Posten liegt woanders) oder wofür das Recht im Modul
+fehlt, bleibt aus; der Hinweis über der Liste und das Einsatztagebuch nennen es. Das gelingt nur
+der Person, die entlassen hat, und nur in den ersten zehn Minuten. Danach führt nur „Erneut
+disponieren“ zurück: Das Fahrzeug steht wieder in der Liste, mit dem Anfangsstatus wie beim
+Disponieren; Besatzung, Einheit und Bereitstellungsraum kommen dabei nicht zurück.
 
 Stornieren korrigiert eine Fehldisposition und lässt keine Spur. Es geht nur in den ersten 15
 Minuten nach der Disposition und nur, solange das Fahrzeug noch nichts im Einsatz hat: keinen
@@ -331,7 +340,8 @@ Bereitstellungsraum belegen lehnt die App ab.
 
 Disponieren, jeder Statuswechsel, das Zuordnen und Lösen der Besatzung, das Zuordnen zu einer
 Einheit, das Ändern der Angaben eines Ad-hoc-Fahrzeugs (ein Eintrag, der jede Änderung mit altem
-und neuem Wert nennt), das Entlassen, das erneute Disponieren und das Stornieren stehen im
+und neuem Wert nennt), das Entlassen, seine Rücknahme („Entlassung zurückgenommen“, mit dem, was
+ausblieb), das erneute Disponieren und das Stornieren stehen im
 Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
 Einheit und Funkrufnamen. Ebenso steht „Personal der Einheit übernehmen“ als ein Eintrag mit Zahl
 und Namen der Kräfte. Ein Fahrzeug als eigene Einheit zu führen schreibt drei Einträge: die

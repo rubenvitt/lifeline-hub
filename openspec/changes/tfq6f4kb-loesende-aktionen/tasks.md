@@ -19,9 +19,9 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 - [x] 2.4 Route `POST …/entlassen/zuruecknehmen` in `src/routes/einsatz_fahrzeug.rs` und `src/app.rs` (Gate `EinsatzSchreibzugriff<Fahrzeuge>`, `fordere_zielmodul` für Einheiten, Material, Raum), ETB „Entlassung zurückgenommen“, Live-Meldungen wie beim Entlassen; Antwort von `…/entlassen` als `{ fahrzeug, vorzustand }`; `src/api_doc.rs`
 - [x] 2.5 Integrationstest in `tests/einsatz_fahrzeug.rs`: Szenario „Entlassen und Rückgängig“ vergleicht den Zustand vorher und nachher (Status, Status seit, Einheit, Besatzung, Raum, Führungsstelle, Beladung), dazu 409 nach Reaktivieren und für eine andere Person
 - [x] 2.6 Typ-Codegen (`scripts/check-typ-codegen.sh`), `api/openapi.json` und `api/types.generated.ts` mitcommitten
-- [ ] 2.7 Frontend: `api/einsatzFahrzeuge.ts` (`entlasseDisposition` mit Vorzustand, neue `nimmEntlassungZurueck`); `pages/FahrzeugePage.tsx`: Rückgängig ruft die Rücknahme mit dem gehaltenen Vorzustand, `ausgelassen` erscheint im `SeitenHinweis`; Kommentar an `entlassenMutation` berichtigen; Tests in `pages/FahrzeugePage.test.tsx` („Rückgängig nimmt die Entlassung zurück“, „nennt Ausgelassenes“) rot→grün
-- [ ] 2.8 Karte: kein `aktion` „Entlassen“, Menü der Karte beginnt mit „Entlassen“ (neutral), Status bleibt im Titel; Tests `:853`, `:1174` umschreiben; `e2e/gate1-ueberlauf.spec.ts` und `e2e/kraefte-schmal.spec.ts` nachziehen
-- [ ] 2.9 Doku: `docs/anwender/kapitel/fahrzeuge.md` (Entlassen und Rückgängig, Karte), Bilder-Spec und Bilder des Kapitels neu erzeugen
+- [x] 2.7 Frontend: `api/einsatzFahrzeuge.ts` (`entlasseDisposition` mit Vorzustand, neue `nimmEntlassungZurueck`); `pages/FahrzeugePage.tsx`: Rückgängig ruft die Rücknahme mit dem gehaltenen Vorzustand, `ausgelassen` erscheint im `SeitenHinweis`; Kommentar an `entlassenMutation` berichtigen; Tests in `pages/FahrzeugePage.test.tsx` („Rückgängig nimmt die Entlassung zurück“, „nennt Ausgelassenes“) rot→grün
+- [x] 2.8 Karte: kein `aktion` „Entlassen“, Menü der Karte beginnt mit „Entlassen“ (neutral), Status bleibt im Titel; Tests `:853`, `:1174` umschreiben; `e2e/gate1-ueberlauf.spec.ts` und `e2e/kraefte-schmal.spec.ts` nachziehen
+- [x] 2.9 Doku: `docs/anwender/kapitel/fahrzeuge.md` (Entlassen und Rückgängig, Karte), Bilder-Spec und Bilder des Kapitels neu erzeugen
 
 ## 3. d9x8cge8: „Aus Einheit lösen“ mit Rückweg, Zeile hält ihre Stelle
 

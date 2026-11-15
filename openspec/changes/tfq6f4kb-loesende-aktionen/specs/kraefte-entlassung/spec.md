@@ -21,8 +21,7 @@ MUST dieselben Live-Meldungen senden wie das Entlassen.
 ### Requirement: Rücknahme lässt Verändertes aus
 
 Was seit dem Entlassen anders gebunden ist oder nicht mehr besteht (Einheit aufgelöst, Person auf
-einem anderen Fahrzeug oder entlassen, Raum nicht mehr aktiv, Posten an einem anderen Ort, eine
-andere Führungsstelle), MUST die Rücknahme auslassen und in ihrer Antwort nennen; der Hinweis MUST
+einem anderen Fahrzeug oder entlassen, Raum nicht mehr aktiv, Posten an einem anderen Ort), MUST die Rücknahme auslassen und in ihrer Antwort nennen; der Hinweis MUST
 es in Worten zeigen. Ebenso MUST sie einen Teil auslassen und nennen, für dessen Modul der
 Person das Schreibrecht fehlt.
 

@@ -8,6 +8,7 @@ import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import FahrzeugePage from './FahrzeugePage';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { waehleMenueEintrag } from '../test/menue';
 
 /**
  * Abgelehnte Speichervorgänge der Fahrzeugseite stehen am Ort der Handlung (LFH-1077,
@@ -222,8 +223,10 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
       'Status abgelehnt',
     );
 
-    await userEvent.click(
-      within(karte('Florian 2')).getByRole('button', { name: 'Florian 2 entlassen' }),
+    // Entlassen steht seit LLH-1722 im Menü der Karte, nicht als Primäraktion.
+    await waehleMenueEintrag(
+      within(karte('Florian 2')).getByRole('button', { name: 'Weitere Aktionen zu Florian 2' }),
+      'Entlassen',
     );
     expect(await within(karte('Florian 2')).findByRole('alert')).toHaveTextContent(
       'Das Fahrzeug ist storniert',
