@@ -1180,6 +1180,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'benachrichtigungen',
       'geraete',
       'zugriff',
+      'anzeige',
     ]);
     expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
       einsatzEinstellungenPfad(E),

@@ -1494,7 +1494,8 @@ export type EinstellungenSektion =
   | 'unterkunft'
   | 'benachrichtigungen'
   | 'geraete'
-  | 'zugriff';
+  | 'zugriff'
+  | 'anzeige';
 
 /**
  * Sektionen in Bedienreihenfolge — EINE Wahrheit für Tab-Band, Routentabelle und das Ziel des
@@ -1524,6 +1525,9 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   // Mitglieder und Rollen (LFH-1170): von den Einsatzdaten hierher, dieselbe Rechtegrenze wie
   // die Gerätekopplung.
   { key: 'zugriff', label: 'Zugriff' },
+  // Darstellung, Bediendichte, Helligkeit dieses Geräts (LLH-1730): dort, wo man Einstellungen
+  // sucht. Keine Einstellung des Einsatzes, deshalb ohne Recht und zuletzt.
+  { key: 'anzeige', label: 'Anzeige' },
 ];
 
 /**

@@ -19,17 +19,17 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/drftcjksxrh0vazqkadyuegy (LLH-1730)
 
 ## 4. Anzeige-Leisten außerhalb des Menüs (D5)
 
-- [ ] 4.1 `components/AnzeigeLeisten.tsx`: Überschrift abschaltbar bei erhaltenem zugänglichem Gruppennamen, Höchstbreite für Seiten; Unit-Test: ohne Überschrift heißt die Gruppe weiter „Anzeige“, die Leisten wirken sofort (rot, dann grün)
+- [x] 4.1 `components/AnzeigeLeisten.tsx`: Überschrift abschaltbar bei erhaltenem zugänglichem Gruppennamen, Höchstbreite für Seiten; Unit-Test: ohne Überschrift heißt die Gruppe weiter „Anzeige“, die Leisten wirken sofort (rot, dann grün)
 
 ## 5. Reiter „Anzeige“ in den Einsatz-Einstellungen (D4)
 
-- [ ] 5.1 Test zuerst (`pages/EinsatzEinstellungenPage.test.tsx` o. ä.): Reiter „Anzeige“ ist der letzte, „Allgemein“ bleibt erstes Redirect-Ziel; Wahl „Handschuh“ setzt die Dichte; Beobachter im abgeschlossenen Einsatz bedient alle Leisten ohne Rechtehinweis (rot, dann grün)
-- [ ] 5.2 Sektion `anzeige` in `EINSTELLUNGEN_SEKTIONEN` und `EinstellungenSektion` (`routing/deeplinks.ts`), Route in `App.tsx`, Sektion unter `pages/einstellungen/` mit Paneel „Anzeige auf diesem Gerät“ und Hinweissatz; Rechtehinweis in `pages/EinsatzEinstellungenPage.tsx` für `anzeige` aus; Tests aus 5.1 grün, ebenso Wächter über Sektionen und Routen
+- [x] 5.1 Test zuerst (`pages/EinsatzEinstellungenPage.test.tsx` o. ä.): Reiter „Anzeige“ ist der letzte, „Allgemein“ bleibt erstes Redirect-Ziel; Wahl „Handschuh“ setzt die Dichte; Beobachter im abgeschlossenen Einsatz bedient alle Leisten ohne Rechtehinweis (rot, dann grün)
+- [x] 5.2 Sektion `anzeige` in `EINSTELLUNGEN_SEKTIONEN` und `EinstellungenSektion` (`routing/deeplinks.ts`), Route in `App.tsx`, Sektion unter `pages/einstellungen/` mit Paneel „Anzeige auf diesem Gerät“ und Hinweissatz; Rechtehinweis in `pages/EinsatzEinstellungenPage.tsx` für `anzeige` aus; Tests aus 5.1 grün, ebenso Wächter über Sektionen und Routen
 
 ## 6. Profil (D6)
 
-- [ ] 6.1 Test zuerst (`pages/ProfilPage.test.tsx`): Paneel „Darstellung auf diesem Gerät“ trägt die drei Leisten mit dem aktiven Wert, die Zeitdarstellung bleibt darunter (rot, dann grün)
-- [ ] 6.2 Leisten in `pages/ProfilPage.tsx` einbauen; Test aus 6.1 grün
+- [x] 6.1 Test zuerst (`pages/ProfilPage.test.tsx`): Paneel „Darstellung auf diesem Gerät“ trägt die drei Leisten mit dem aktiven Wert, die Zeitdarstellung bleibt darunter (rot, dann grün)
+- [x] 6.2 Leisten in `pages/ProfilPage.tsx` einbauen; Test aus 6.1 grün
 
 ## 7. e2e und Bildlauf
 

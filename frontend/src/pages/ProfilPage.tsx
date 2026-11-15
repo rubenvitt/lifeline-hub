@@ -32,6 +32,7 @@ import {
 import TotpPasswortDialog from '../auth/TotpPasswortDialog';
 import { huelleAnmeldungImBrowser, huelleSperrtPasskey } from '../huelle/faehigkeiten';
 import ZeitdarstellungGeraetWahl from '../anzeige/ZeitdarstellungGeraetWahl';
+import AnzeigeLeisten, { ANZEIGE_LEISTEN_BREITE } from '../components/AnzeigeLeisten';
 
 interface TotpCodeWerte {
   code: string;
@@ -205,9 +206,21 @@ export default function ProfilPage() {
           </Datenraster>
         </Paneel>
 
-        {/* Gerätewahl der Zeitdarstellung (LLH-1053, E3), wie das Koordinatensystem am Gerät. */}
+        {/* Darstellung, Bediendichte und Helligkeit (LLH-1730): dieselben Leisten wie im
+            Benutzermenü, hier auch außerhalb eines Einsatzes zu finden. Darunter die Gerätewahl der
+            Zeitdarstellung (LLH-1053, E3), wie das Koordinatensystem am Gerät. */}
         <Paneel titel="Darstellung auf diesem Gerät" koerperPolster>
-          <ZeitdarstellungGeraetWahl />
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: token.marginLG,
+              maxWidth: ANZEIGE_LEISTEN_BREITE,
+            }}
+          >
+            <AnzeigeLeisten hasTitel={false} />
+            <ZeitdarstellungGeraetWahl />
+          </div>
         </Paneel>
 
         <Paneel titel="Sicherheit" koerperPolster>

@@ -122,6 +122,27 @@ describe('ProfilPage — Kopfdaten (LFH-345)', () => {
     expect(await screen.findByText('Sicherheit')).toBeInTheDocument();
   });
 
+  it('trägt Darstellung, Bediendichte und Helligkeit vor der Zeitdarstellung (LLH-1730)', async () => {
+    setup();
+    const titel = await screen.findByRole('heading', { name: 'Darstellung auf diesem Gerät' });
+    const paneel = titel.closest('section') ?? titel.parentElement!.parentElement!;
+    const gruppe = within(paneel).getByRole('group', { name: 'Anzeige' });
+    // Der aktive Wert ist ausgewählt (Vorgabe ohne gespeicherte Wahl: Helligkeit 100 %).
+    expect(
+      within(within(gruppe).getByRole('radiogroup', { name: 'Helligkeit in %' })).getByRole(
+        'radio',
+        { name: '100 %' },
+      ),
+    ).toBeChecked();
+    for (const name of ['Darstellung', 'Bediendichte']) {
+      expect(within(gruppe).getByRole('radiogroup', { name })).toBeInTheDocument();
+    }
+    const zeit = within(paneel).getByRole('radiogroup', {
+      name: 'Zeitdarstellung auf diesem Gerät',
+    });
+    expect(gruppe.compareDocumentPosition(zeit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('bietet die Zeitdarstellung dieses Geräts an (LLH-1053)', async () => {
     setup();
     expect(await screen.findByText('Darstellung auf diesem Gerät')).toBeInTheDocument();
