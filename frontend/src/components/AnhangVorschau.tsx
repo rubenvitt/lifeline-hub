@@ -157,25 +157,19 @@ export function AnhangGrossansicht({
   melde: (text: string) => void;
 }) {
   const heic = istHeicMime(mime);
-  const { ergebnis, laedt, ohneNetz } = useHeicVorschau(href, heic);
-  const hatBild = ergebnis != null && !('fehler' in ergebnis);
+  const { ergebnis, laedt } = useHeicVorschau(href, heic);
   // Ein Fehler im Cache zählt erst, wenn der neue Versuch durch ist: beim Öffnen liefert die Abfrage
-  // ihn sofort und dekodiert im Hintergrund neu, etwa wieder mit Netz (Review B6). Ohne Netz und
-  // ohne Bild wartet sie dagegen nur: das wird gesagt, statt endlos „wird umgewandelt“ (Nach-Review 5).
-  const wartetAufNetz = heic && ohneNetz && !hatBild;
-  const fehlgeschlagen =
-    heic && !wartetAufNetz && !laedt && ergebnis != null && 'fehler' in ergebnis;
+  // ihn sofort und dekodiert im Hintergrund neu, etwa wieder mit Netz (Review B6).
+  const fehlgeschlagen = heic && !laedt && ergebnis != null && 'fehler' in ergebnis;
   // Die Rückrufe über eine Ref: der Effekt soll genau einmal je Fehlschlag laufen, nicht mit
   // jeder neuen Funktionsidentität des Aufrufers.
   const rueckrufe = useRef({ onSchliessen, melde });
   rueckrufe.current = { onSchliessen, melde };
   useEffect(() => {
-    if (!fehlgeschlagen && !wartetAufNetz) return;
-    rueckrufe.current.melde(
-      `${dateiname}: ${wartetAufNetz ? 'ohne Netz keine Vorschau' : 'keine Vorschau möglich'}`,
-    );
+    if (!fehlgeschlagen) return;
+    rueckrufe.current.melde(`${dateiname}: keine Vorschau möglich`);
     rueckrufe.current.onSchliessen();
-  }, [fehlgeschlagen, wartetAufNetz, dateiname]);
+  }, [fehlgeschlagen, dateiname]);
 
   const gross = !heic
     ? grossansichtPfad(href)
@@ -184,8 +178,8 @@ export function AnhangGrossansicht({
       : null;
   if (gross == null) {
     // Ein schließbarer Dialog, keine Vollbildmaske: Dekodieren kann dauern (Datei, Decoder, andere
-    // Kacheln vor ihm), ohne Netz hält die Abfrage an. Escape und das Kreuz führen zurück (Review B7).
-    return fehlgeschlagen || wartetAufNetz ? null : (
+    // Kacheln vor ihm). Escape und das Kreuz führen zurück (Review B7).
+    return fehlgeschlagen ? null : (
       <Modal open title={dateiname} footer={null} centered onCancel={onSchliessen}>
         <Spin /> <span>wird umgewandelt …</span>
       </Modal>
@@ -314,7 +308,7 @@ function useEinmalSichtbar(ref: RefObject<HTMLElement | null>): boolean {
 export function useHeicVorschau(
   href: string,
   aktiv: boolean,
-): { ergebnis: HeicErgebnis | undefined; laedt: boolean; ohneNetz: boolean } {
+): { ergebnis: HeicErgebnis | undefined; laedt: boolean } {
   const abfrage = useQuery({
     queryKey: einsatzKeys.anhangHeicVorschau(einsatzIdAusPfad(href) ?? 0, href),
     queryFn: async (): Promise<HeicErgebnis> => {
@@ -332,13 +326,12 @@ export function useHeicVorschau(
     staleTime: (q) => (q.state.data != null && !('fehler' in q.state.data) ? Infinity : 0),
     gcTime: 5 * 60_000,
     retry: false,
+    // Im Einsatz-LAN ohne Internet meldet der Browser womöglich „offline“, der eigene Server ist
+    // aber da (wie Druck und Instanzkopplung, Review LLH-1497). Mit der Vorgabe `online` pausierte
+    // die Abfrage dann endlos; so versucht sie es, und scheitert sie, steht der Platzhalter da.
+    networkMode: 'always',
   });
-  // `paused`: ohne Netz hält TanStack die Abfrage an, statt sie scheitern zu lassen.
-  return {
-    ergebnis: abfrage.data,
-    laedt: abfrage.isFetching,
-    ohneNetz: abfrage.fetchStatus === 'paused',
-  };
+  return { ergebnis: abfrage.data, laedt: abfrage.isFetching };
 }
 
 /**

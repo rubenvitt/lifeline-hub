@@ -2218,6 +2218,22 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: /);
   });
 
+  it('hält ein unlesbares „/zeit“ an, nennt die Fußzeile diesen Grund, nicht eine alte Zukunftszeit (Review 3, B1)', async () => {
+    const p = props({
+      initialWerte: {
+        ...MIT_ABSENDER,
+        // 18:20, es ist 14:31: das Feld steht schon in der Zukunft.
+        metadaten: { von: 'Florian 3', ereigniszeit: dayjs.utc('2026-10-17T16:20:00Z') },
+      },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
+    await userEvent.click(erfassenKnopf());
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/^\/zeit im Text: /);
+    expect(screen.queryByText('Zeit liegt in der Zukunft')).toBeNull();
+  });
+
   it('ein anderer Entwurf übernimmt keinen Grund', async () => {
     const p = props();
     const { rerender } = renderMitProviders(<Schnellerfassung key="a" {...p} />);

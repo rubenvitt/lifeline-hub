@@ -1029,18 +1029,9 @@ export default function Schnellerfassung({
           <span>{FEHLT[seite]}</span>
         </span>
       ))}
-      {zukunftJetzt && (
-        <span
-          id={zeitGrundId}
-          role="alert"
-          data-lfh="etb-zeit-grund"
-          style={grundStil(rollen.alarmText)}
-        >
-          <IconWarndreieck />
-          <span>Zeit {zukunftJetzt}</span>
-        </span>
-      )}
-      {unlesbarGrund && !zukunftJetzt && (
+      {/* EIN Grund zur Zeit, und zwar der, an dem der Halt hängt: `absenden` prüft die unlesbare
+          Zeit vor der Zukunft (Review 3, B1). Alle tragen dieselbe `id`, also nur einer im Bild. */}
+      {unlesbarGrund ? (
         <span
           id={zeitGrundId}
           role="alert"
@@ -1050,8 +1041,17 @@ export default function Schnellerfassung({
           <IconWarndreieck />
           <span>{unlesbarGrund}</span>
         </span>
-      )}
-      {zeitBefehlGrund && !zukunftJetzt && !unlesbarGrund && (
+      ) : zukunftJetzt ? (
+        <span
+          id={zeitGrundId}
+          role="alert"
+          data-lfh="etb-zeit-grund"
+          style={grundStil(rollen.alarmText)}
+        >
+          <IconWarndreieck />
+          <span>Zeit {zukunftJetzt}</span>
+        </span>
+      ) : zeitBefehlGrund ? (
         // Höflich, nicht `alert`: der Grund erscheint beim Tippen, nicht beim Absenden, und
         // unterbräche sonst die Eingabe am Vorleser.
         <span
@@ -1063,7 +1063,7 @@ export default function Schnellerfassung({
           <IconWarndreieck />
           <span>/zeit: {zeitBefehlGrund}</span>
         </span>
-      )}
+      ) : null}
       {nachtragMin != null && (
         <span data-lfh="etb-nachtrag-hinweis" style={grundStil(rollen.achtungText)}>
           {nachtragHinweis(nachtragMin)}
@@ -1269,7 +1269,7 @@ export default function Schnellerfassung({
             onFertig={fokusInsFeld}
             pflicht={pflichtSichtbar}
             pflichtId={(seite) => `${pflichtGrundId}-${seite}`}
-            zeitGrund={zukunftJetzt ?? unlesbarGrund ?? zeitBefehlGrund}
+            zeitGrund={unlesbarGrund ?? zukunftJetzt ?? zeitBefehlGrund}
             zeitGrundId={zeitGrundId}
             onZeitVerworfen={setzeZeitVerworfen}
             zeitFeldFassung={zeitFeldFassung}
