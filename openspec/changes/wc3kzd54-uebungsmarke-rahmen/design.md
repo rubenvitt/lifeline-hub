@@ -87,10 +87,11 @@ Bedienelementen). Beide hat der Mensch am 15.11.2026 verworfen.
   Lagemonitor verwendet und ist `role="status"`-frei (statisch), mit `aria-label`
   „Übung“ nur dort, wo das Wort sonst nicht vorgelesen würde.
 - `UebungsBand` ist das Band über die volle Breite: Schrägschraffur aus `uebungFuellung` und
-  `uebungSchraffur` (`repeating-linear-gradient` 45°), darin mittig das Wort „ÜBUNG“ und klein
-  „Übungseinsatz, kein Realeinsatz“ ab `md`. Die Höhe entspricht einer Zeile der Augenbraue mit
-  knapper Polsterung, etwa 24 px, und wächst mit der Schriftskala, nicht mit der Trefffläche. Das
-  Band bedient nichts. `data-lfh="uebung-band"`.
+  `uebungSchraffur` (`repeating-linear-gradient` 135°), darin mittig nur das Wort „ÜBUNG“
+  (13 px, fett, gesperrt). Ein Zusatz wie „kein Realeinsatz“ ist bei der Umsetzung entfallen: Er
+  sagte nichts, was das Wort nicht schon sagt, und hätte am Handy umgebrochen. Die Höhe ist eine
+  Textzeile mit knapper Polsterung, etwa 24 px, und wächst nicht mit der Trefffläche. Das Band
+  bedient nichts. `data-lfh="uebung-band"`.
 - Gibt `istUebung` falsch, rendern beide `null`. Aufrufer übergeben den Einsatz und prüfen nicht
   selbst.
 - Der Baustein kommt in die Liste der Bausteine in `frontend/AGENTS.md` und bekommt eine Karte in
@@ -110,7 +111,7 @@ Quellen, und meldet seine eigene Höhe als Quelle (`useRahmenObenQuelle`). Darau
 - Unter `md`: Der Kopf rollt weg, das Band klebt bei 0 bzw. unter der gestörten Betriebszeile, und
   `--lfh-rahmen-oben` ist Band plus gegebenenfalls Betriebszeile.
 
-`rahmenOben.ts` bekommt dafür `useRahmenObenOhneSich`. Es liefert die Summe ohne die eigene Quelle
+`rahmenOben.ts` bekommt dafür `useRahmenObenStapel`. Es liefert die Summe ohne die eigene Quelle
 und rechnet nicht selbst, damit Umbruch und Dichte weiter gemessen werden. Der Guard
 `rahmenOben.guard.test.ts` kennt das Band als Rahmenteil. `alarmOben.ts` misst die Bedienkante
 schon über die Summe und braucht keine Änderung, das prüft `alarm-verdeckung.spec.ts`.
@@ -185,7 +186,7 @@ ihn. Im `EinsatzSwitcher` steht die Marke im Eintrag vor der Bezeichnung. Die Ne
   Die Höhe folgt der Schrift und nicht der Trefffläche und bleibt damit auch in `handschuh`
   schmal.
 - [Zwei klebende Quellen übereinander können sich gegenseitig messen und schwingen] →
-  `useRahmenObenOhneSich` liest nur die übrigen Anteile. Die eigene Höhe hängt nicht vom eigenen
+  `useRahmenObenStapel` liest nur die übrigen Anteile. Die eigene Höhe hängt nicht vom eigenen
   `top` ab, also gibt es keine Rückkopplung. Ein Unit-Test belegt das.
 - [Neuer Bildlauf in vielen Doku-Kapiteln, weil der Demo-Einsatz eine Übung ist] → Die Bilder
   werden im selben Branch neu erzeugt. Scheitert der volle Bildlauf in der Cloud-Sitzung (Zeit,

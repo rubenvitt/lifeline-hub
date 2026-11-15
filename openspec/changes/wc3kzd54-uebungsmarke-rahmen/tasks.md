@@ -14,17 +14,17 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 2. Baustein
 
-- [ ] 2.1 `components/instrument/Uebung.tsx` mit `UebungsMarke` (inkl. `groesse="monitor"`) und
+- [x] 2.1 `components/instrument/Uebung.tsx` mit `UebungsMarke` (inkl. `groesse="monitor"`) und
   `UebungsBand` (D3), Export über `components/instrument/index.ts`; Test `Uebung.test.tsx`: Wort
   „ÜBUNG“ steht, `null` bei Realeinsatz und ladendem Einsatz, Band trägt `data-lfh="uebung-band"`,
   Monitor-Marke ≥ 28 px.
-- [ ] 2.2 Karte in `frontend/scripts/design-system/previews.tsx` (Nacht und Tag), Eintrag in der
+- [x] 2.2 Karte in `frontend/scripts/design-system/previews.tsx` (Nacht und Tag), Eintrag in der
   Bausteinliste von `frontend/AGENTS.md`; `mise exec -- pnpm -C frontend design-system` gelaufen,
   `designSystem.guard.test.ts` grün.
 
 ## 3. Einsatzrahmen
 
-- [ ] 3.1 `components/rahmenOben.ts`: `useRahmenObenOhneSich` (D4) mit Unit-Test (Summe ohne eigene
+- [x] 3.1 `components/rahmenOben.ts`: `useRahmenObenStapel` (D4) mit Unit-Test (Summe ohne eigene
   Quelle, keine Rückkopplung bei Höhenänderung); `rahmenOben.guard.test.ts` kennt das Band.
 - [ ] 3.2 `einsatz/EinsatzLayout.tsx`: `UebungsBand` direkt nach dem Kopf, klebt in jeder Breite
   (D4); Kopfmarke ab `md` vor dem Einsatznamen (D5); Test in der Layout-Testdatei: Band und Marke

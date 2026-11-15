@@ -71,11 +71,14 @@ export function useRahmenOben(): number {
  * Tabellenkopf ein Bild lang unter dem Kopf. Danach hält ein `ResizeObserver` den Wert (Umbruch,
  * Dichtewechsel), geschrieben im nächsten Bild.
  */
-export function useRahmenObenQuelle<T extends HTMLElement>(aktiv: boolean): (el: T | null) => void {
+export function useRahmenObenQuelle<T extends HTMLElement>(
+  aktiv: boolean,
+  eigenerSchluessel?: symbol,
+): (el: T | null) => void {
   const [el, setEl] = useState<T | null>(null);
   useLayoutEffect(() => {
     if (!aktiv || !el) return;
-    const schluessel = Symbol('rahmen-oben');
+    const schluessel = eigenerSchluessel ?? Symbol('rahmen-oben');
     const messen = () => {
       anteile.set(schluessel, el.offsetHeight);
       neuRechnen();
@@ -101,8 +104,30 @@ export function useRahmenObenQuelle<T extends HTMLElement>(aktiv: boolean): (el:
       anteile.delete(schluessel);
       neuRechnen();
     };
-  }, [el, aktiv]);
+  }, [el, aktiv, eigenerSchluessel]);
   return setEl;
+}
+
+/**
+ * Eine klebende Quelle, die selbst UNTER den übrigen klebt: das Übungsband (LLH-1725, design.md
+ * D4 in `openspec/changes/wc3kzd54-uebungsmarke-rahmen/`). Es meldet seine Höhe wie jede Quelle
+ * (`ref`), und `oben` ist die Summe OHNE seinen eigenen Anteil, also sein `top`: ab `md` die
+ * Kopfhöhe, unter `md` die gestörte Betriebszeile oder 0. Keine Rückkopplung: die eigene Höhe
+ * hängt nicht vom eigenen `top` ab. Die Reihenfolge im DOM muss dazu passen — das Element steht
+ * nach allen anderen Quellen.
+ */
+export function useRahmenObenStapel<T extends HTMLElement>(
+  aktiv: boolean,
+): { ref: (el: T | null) => void; oben: number } {
+  const [schluessel] = useState(() => Symbol('rahmen-oben-stapel'));
+  const ref = useRahmenObenQuelle<T>(aktiv, schluessel);
+  const summe = useRahmenOben();
+  const eigen = useSyncExternalStore(
+    abonniereRahmenOben,
+    () => anteile.get(schluessel) ?? 0,
+    () => 0,
+  );
+  return { ref, oben: Math.max(0, summe - eigen) };
 }
 
 /**
