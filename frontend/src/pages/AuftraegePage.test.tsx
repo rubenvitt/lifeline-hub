@@ -237,6 +237,35 @@ describe('AuftraegePage', () => {
     listeAuftraege.mockResolvedValue([auftrag()]);
   });
 
+  /** Schnellaktion „Auftrag erteilen“ der Sprungpalette (Spec `sprungpalette`). Paar mit der Gegenaussage. */
+  it('?neu=1 öffnet den Dialog „Auftrag erteilen“ und räumt den Parameter', async () => {
+    renderPage('/einsaetze/1/auftraege?neu=1');
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText('Auftrag erteilen', { selector: '.ant-modal-title' }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('loc-search')).toHaveTextContent(/^$/));
+  });
+
+  it('ohne ?neu=1 bleibt der Dialog zu', async () => {
+    renderPage();
+    await geladen();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('?neu=1 öffnet für Beobachter nichts, räumt aber den Parameter', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    renderPage('/einsaetze/1/auftraege?neu=1');
+    await geladen();
+    await waitFor(() => expect(screen.getByTestId('loc-search')).toHaveTextContent(/^$/));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('zeigt Aufträge mit Quittierungs-Stand', async () => {
     renderPage();
     await geladen();

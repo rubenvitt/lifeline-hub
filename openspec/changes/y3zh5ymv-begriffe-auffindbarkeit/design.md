@@ -107,8 +107,8 @@ verwirft die Antwort, wie dort begründet. Lesen räumt auf: unbekannte Ids fall
 deckeln bei 9999, und der Wert bleibt unter 2000 Zeichen.
 
 `baueBefehle` sortiert die Tabelle vor dem Aufbau stabil nach Anzahl absteigend, bei Gleichstand
-nach der festen Folge (Person, ETB, Meldung, Auftrag, Nachforderung, Fahrzeugstatus, Rest in
-bisheriger Folge). Damit gilt die Folge in der Startansicht und als Gleichstandsachse der Suche.
+nach der festen Folge (Person, ETB, Meldung, Lagemeldung, Auftrag, Nachforderung, Fahrzeugstatus,
+Rest in bisheriger Folge). Die feste Folge ist die Reihenfolge der Tabelle. Damit gilt die Folge in der Startansicht und als Gleichstandsachse der Suche.
 Während die Palette offen ist, ändert sich nichts: gezählt wird erst nach `schliesse()`.
 
 Verworfen: feste Folge ohne Messung (Empfehlung am Checkpoint, der Mensch wählte die Messung) und

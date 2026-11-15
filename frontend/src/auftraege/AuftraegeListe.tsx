@@ -71,9 +71,17 @@ export default function AuftraegeListe({
   einsatzId,
   darfSchreiben,
   onSeitenFehler,
+  erteilenAngefordert = false,
+  onErteilenAngenommen,
 }: {
   einsatzId: number;
   darfSchreiben: boolean;
+  /**
+   * Die Seite hat „Auftrag erteilen“ über die Adresse angefordert (`?neu=1`, Schnellaktion der
+   * Sprungpalette). Die Liste öffnet den Dialog und quittiert mit `onErteilenAngenommen`.
+   */
+  erteilenAngefordert?: boolean;
+  onErteilenAngenommen?: () => void;
   /**
    * Grund einer abgelehnten Rücknahme für den Hinweis der Seite, `null` räumt ihn. Rückgängig kommt
    * aus dem Toast, die Karte ist dann oft nicht mehr zu sehen (`frontend/AGENTS.md`, „Rückwege und
@@ -529,6 +537,11 @@ export default function AuftraegeListe({
     if (!anlegenMutation.isPending && anlegenMutation.error != null) anlegenMutation.reset();
     setErteilenOffen(true);
   };
+  useEffect(() => {
+    if (!erteilenAngefordert) return;
+    if (darfSchreiben) setErteilenOffen(true);
+    onErteilenAngenommen?.();
+  }, [erteilenAngefordert, darfSchreiben, onErteilenAngenommen]);
 
   return (
     <>

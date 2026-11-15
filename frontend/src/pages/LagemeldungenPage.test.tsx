@@ -500,6 +500,25 @@ describe('LagemeldungenPage', () => {
       expect(listeLageMeldungen.mock.calls.length).toBeGreaterThan(1);
     });
 
+    /** Schnellaktion „Lagemeldung erfassen“ (Spec `meldungseingang`, Adresse mit `?neu=1`). */
+    it('?neu=1 öffnet das Formular mit der Art Lagemeldung und räumt den Parameter', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      renderPage('/einsaetze/1/lagemeldungen?neu=1');
+      expect(
+        await screen.findByRole('region', { name: 'Lagemeldung erfassen' }),
+      ).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+    });
+
+    it('?neu=1 öffnet ohne Modul Meldungen nichts, räumt aber den Parameter', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      ladeModulFreigaben.mockResolvedValue({ meldungen: { sichtbar: true, zugriff: false } });
+      renderPage('/einsaetze/1/lagemeldungen?neu=1');
+      expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+      expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull();
+    });
+
     it('ohne Schreibrecht: Nur Ansicht mit Grund, kein Erfassen', async () => {
       renderPage();
       await screen.findByText('Brücke gesperrt');

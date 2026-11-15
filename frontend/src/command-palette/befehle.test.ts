@@ -145,9 +145,16 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(person).toBeDefined();
     person!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/personen?neu=1');
+    // Ohne gezählte Ausführungen die feste Folge (Spec `sprungpalette`, „Schnellaktionen nach
+    // Nutzung geordnet“).
     expect(b.map((x) => x.id).filter((id) => id.startsWith('aktion:'))).toEqual([
       'aktion:personen',
       'aktion:etb',
+      'aktion:meldung-erfassen',
+      'aktion:lagemeldung-erfassen',
+      'aktion:auftrag-erteilen',
+      'aktion:nachforderung-stellen',
+      'aktion:fahrzeugstatus',
       'aktion:unfallhilfsstellen',
       'aktion:schaeden',
       'aktion:stab',
@@ -170,6 +177,11 @@ describe('baueBefehle — Schnellaktionen', () => {
     for (const [id, ziel] of [
       ['aktion:personen', '/einsaetze/5/personen?neu=1'],
       ['aktion:etb', '/einsaetze/5/etb?neu=1'],
+      ['aktion:meldung-erfassen', '/einsaetze/5/meldungen?neu=1'],
+      ['aktion:lagemeldung-erfassen', '/einsaetze/5/lagemeldungen?neu=1'],
+      ['aktion:auftrag-erteilen', '/einsaetze/5/auftraege?neu=1'],
+      ['aktion:nachforderung-stellen', '/einsaetze/5/nachforderungen?neu=1'],
+      ['aktion:fahrzeugstatus', '/einsaetze/5/fahrzeuge?ansicht=tableau'],
       ['aktion:unfallhilfsstellen', '/einsaetze/5/unfallhilfsstellen/liste?neu=1'],
       ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
       ['aktion:stab', '/einsaetze/5/lagebesprechung?neu=1'],
@@ -182,6 +194,38 @@ describe('baueBefehle — Schnellaktionen', () => {
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);
+    }
+  });
+  /** Spec `sprungpalette`, „Meldung, Auftrag, Nachforderung und Fahrzeugstatus aus der Palette“. */
+  it.each([
+    ['aktion:meldung-erfassen', 'Meldung erfassen', 'meldungen'],
+    ['aktion:lagemeldung-erfassen', 'Lagemeldung erfassen', 'lagemeldungen'],
+    ['aktion:auftrag-erteilen', 'Auftrag erteilen', 'auftraege'],
+    ['aktion:nachforderung-stellen', 'Nachforderung stellen', 'nachforderungen'],
+    ['aktion:fahrzeugstatus', 'Fahrzeugstatus setzen', 'fahrzeuge'],
+  ] as const)('führt „%s“ mit Beschriftung und Trägermodul', (id, label, modulKey) => {
+    const m = modulRegistry.find((x) => x.key === modulKey)!;
+    const zeile = baueBefehle(kontext()).find((x) => x.id === id)!;
+    expect(zeile).toMatchObject({ label, kontext: m.label, icon: m.icon });
+    const ohneTraeger = freigabenFixture({ [modulKey]: { zugriff: false } });
+    expect(baueBefehle(kontext({ freigaben: ohneTraeger })).some((x) => x.id === id)).toBe(false);
+  });
+  it('verlangt für „Lagemeldung erfassen“ auch die Freigabe der Meldungen', () => {
+    const freigaben = freigabenFixture({ meldungen: { zugriff: false } });
+    const ids = baueBefehle(kontext({ freigaben })).map((x) => x.id);
+    expect(ids).not.toContain('aktion:lagemeldung-erfassen');
+    expect(ids).not.toContain('aktion:meldung-erfassen');
+    expect(ids).toContain('modul:lagemeldungen');
+  });
+  it('findet die neuen Zeilen über ihre Wörter als ersten Treffer', () => {
+    const b = baueBefehle(kontext());
+    for (const [q, id] of [
+      ['meldung erfassen', 'aktion:meldung-erfassen'],
+      ['auftrag erteilen', 'aktion:auftrag-erteilen'],
+      ['nachforderung stellen', 'aktion:nachforderung-stellen'],
+      ['fahrzeugstatus', 'aktion:fahrzeugstatus'],
+    ] as const) {
+      expect(ordneTreffer(filtereBefehle(b, q), q)[0]?.id, q).toBe(id);
     }
   });
   /**

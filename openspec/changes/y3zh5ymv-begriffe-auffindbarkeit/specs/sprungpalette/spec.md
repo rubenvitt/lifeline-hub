@@ -106,8 +106,8 @@ Freigabe der Meldungen verlangen. Die Erfassungen MUST das Formular ihres Moduls
 ### Requirement: Schnellaktionen nach Nutzung geordnet
 Die Palette SHALL ihre Schnellaktionen je Benutzer danach ordnen, wie oft er sie ausgeführt hat,
 die häufigste zuerst. Bei gleicher Zahl MUST die feste Folge gelten: Person erfassen,
-ETB-Eintrag schreiben, Meldung erfassen, Auftrag erteilen, Nachforderung stellen,
-Fahrzeugstatus setzen, dann die übrigen in ihrer bisherigen Folge. Die Zahlen MUST am Benutzer
+ETB-Eintrag schreiben, Meldung erfassen, Lagemeldung erfassen, Auftrag erteilen, Nachforderung
+stellen, Fahrzeugstatus setzen, dann die übrigen in ihrer bisherigen Folge. Die Zahlen MUST am Benutzer
 auf dem Server liegen, nicht im Browser. Während die Palette offen ist, MUST die Folge stehen
 bleiben.
 

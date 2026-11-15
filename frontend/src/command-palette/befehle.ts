@@ -33,10 +33,15 @@ import {
   einsatzberichtPfad,
   einsatzModulPfad,
   einsatzPfad,
+  auftraegePfad,
   etbPfad,
+  fahrzeugePfad,
   hilfePfad,
   infotelefonPfad,
   lagekartePfad,
+  lagemeldungenPfad,
+  meldungenPfad,
+  nachforderungenPfad,
   personenPfad,
   planungenPfad,
   schaedenPfad,
@@ -58,7 +63,11 @@ function kategorieKontext(key: KategorieKey): string | undefined {
 }
 
 /** Suchparameter, über den die Zielseite einer Schnellaktion den Auftrag liest. */
-export type SchnellaktionParameter = 'neu' | 'zeichnen';
+/**
+ * Der Auftrag, den die Zielseite liest: `neu` (Erfassung), `zeichnen` (Zeichenmodus der Lagekarte),
+ * `ansicht` (eine Ansicht des Moduls, y3zh5ymv D4).
+ */
+export type SchnellaktionParameter = 'neu' | 'zeichnen' | 'ansicht';
 
 /**
  * Die Ziele stehen als **Builder** aus `routing/deeplinks.ts` in der Tabelle, nicht als
@@ -71,9 +80,11 @@ export type SchnellaktionParameter = 'neu' | 'zeichnen';
  * `?neu=1`-Leser auf der Matrix. So bleibt die Regel „Ziel unter dem Modulpfad des Trägers“
  * unverändert, und die Zeile hängt an der Freigabe der Karte, auf der gezeichnet wird.
  *
- * DIE REIHENFOLGE IST EINE ERFASSUNGSHÄUFIGKEIT, bewusst nicht die Registry-Reihenfolge (die ist
- * die Navigations-Rangfolge); sonst sortierte eine Umsortierung der Navigation still die Palette
- * um. Der `toEqual`-Pin in `befehle.test.ts` ist Absicht.
+ * DIE REIHENFOLGE DER TABELLE IST DIE FESTE FOLGE, der Rückfall der gemessenen Ordnung
+ * (Spec `sprungpalette`, „Schnellaktionen nach Nutzung geordnet“, y3zh5ymv D5): ohne gezählte
+ * Ausführungen und bei Gleichstand gilt sie. Bewusst nicht die Registry-Reihenfolge (die ist die
+ * Navigations-Rangfolge); sonst sortierte eine Umsortierung der Navigation still die Palette um.
+ * Der `toEqual`-Pin in `befehle.test.ts` ist Absicht.
  *
  * Exportiert für `schnellaktionen.guard.test.ts` (Trägermodul, Ziel, Deckung gegen die Seiten,
  * die den Parameter des Eintrags lesen). Die Tabelle bleibt hier statt in der `modulRegistry`, die frei von
@@ -101,6 +112,11 @@ export const SCHNELLAKTIONEN: {
    * Schreibrecht im Einsatz.
    */
   recht?: 'leitung';
+  /**
+   * Ein weiteres Modul, dessen Freigabe die Zeile braucht (y3zh5ymv D4): „Lagemeldung erfassen“
+   * schreibt eine Meldung, die Seite Lagemeldungen zeigt ohne die Meldungen nur „Nur Ansicht“.
+   */
+  braucht?: string;
 }[] = [
   {
     modulKey: 'personen',
@@ -114,7 +130,54 @@ export const SCHNELLAKTIONEN: {
     parameter: 'neu',
     pfad: (id) => etbPfad(id, { neu: true }),
     label: 'ETB-Eintrag schreiben',
-    schlagworte: ['tagebuch', 'meldung', 'eintrag', 'Neuer ETB-Eintrag'],
+    schlagworte: ['tagebuch', 'eintrag', 'Neuer ETB-Eintrag'],
+  },
+  // Neu in y3zh5ymv (D4), mit `kennung`. Leser: `pages/MeldungenPage.tsx`,
+  // `pages/LagemeldungenPage.tsx`, `pages/AuftraegePage.tsx`, `pages/NachforderungenPage.tsx`,
+  // `pages/FahrzeugePage.tsx` (`ansicht`).
+  {
+    modulKey: 'meldungen',
+    parameter: 'neu',
+    kennung: 'meldung-erfassen',
+    pfad: (id) => meldungenPfad(id, { neu: true }),
+    label: 'Meldung erfassen',
+    schlagworte: ['meldung', 'eingang', 'Neue Meldung'],
+  },
+  {
+    modulKey: 'lagemeldungen',
+    parameter: 'neu',
+    kennung: 'lagemeldung-erfassen',
+    pfad: (id) => lagemeldungenPfad(id, { neu: true }),
+    label: 'Lagemeldung erfassen',
+    schlagworte: ['lage', 'lagerelevant', 'Neue Lagemeldung'],
+    braucht: 'meldungen',
+  },
+  {
+    modulKey: 'auftraege',
+    parameter: 'neu',
+    kennung: 'auftrag-erteilen',
+    pfad: (id) => auftraegePfad(id, { neu: true }),
+    label: 'Auftrag erteilen',
+    schlagworte: ['auftrag', 'befehl', 'anweisung', 'Neuer Auftrag'],
+  },
+  {
+    modulKey: 'nachforderungen',
+    parameter: 'neu',
+    kennung: 'nachforderung-stellen',
+    pfad: (id) => nachforderungenPfad(id, { neu: true }),
+    label: 'Nachforderung stellen',
+    schlagworte: ['nachforderung', 'anforderung', 'nachfordern', 'Neue Nachforderung'],
+  },
+  {
+    // Ein Sprung ins FMS-Tableau, keine Erfassung: der Status wird dort je Fahrzeug gesetzt. Die
+    // Ansicht „FMS-Tableau“ steht daneben in „Ansichten“; diese Zeile folgt Objekt + Verb und zählt
+    // in der Ordnung nach Nutzung mit (y3zh5ymv D4).
+    modulKey: 'fahrzeuge',
+    parameter: 'ansicht',
+    kennung: 'fahrzeugstatus',
+    pfad: (id) => fahrzeugePfad(id, { ansicht: 'tableau' }),
+    label: 'Fahrzeugstatus setzen',
+    schlagworte: ['fms', 'status', 'fahrzeug', 'tableau'],
   },
   {
     modulKey: 'unfallhilfsstellen',
@@ -131,8 +194,7 @@ export const SCHNELLAKTIONEN: {
     schlagworte: ['schaden', 'objekt', 'Neuen Schaden erfassen'],
   },
   {
-    // Ans ENDE: eine Lagebesprechung fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden.
-    // Leser: `pages/LagebesprechungPage.tsx`. Träger seit LLH-1111 das eigene Modul; `kennung`
+    // Eine Lagebesprechung fällt seltener an als Person, ETB-Eintrag, UHS oder Schaden. Leser: `pages/LagebesprechungPage.tsx`. Träger seit LLH-1111 das eigene Modul; `kennung`
     // hält die Bestands-Id `aktion:stab`, damit „Zuletzt ausgeführt“ die Zeile behält.
     modulKey: 'lagebesprechung',
     kennung: 'stab',
@@ -142,14 +204,14 @@ export const SCHNELLAKTIONEN: {
     schlagworte: ['lagebesprechung', 'entschluss', 'stab', 'führungsvorgang'],
   },
   {
-    // Ans ENDE: eine neue Zeile ordnet die Bestandszeilen nicht um. Leser: `pages/DokumentePage.tsx`.
+    // Leser: `pages/DokumentePage.tsx`.
     modulKey: 'dokumente',
     parameter: 'neu',
     pfad: (id) => dokumentePfad(id, { neu: true }),
     label: 'Dokument ablegen',
     schlagworte: ['datei', 'hochladen', 'foto', 'lageplan', 'formular'],
   },
-  // Ans ENDE (LFH-506), untereinander nach Erfassungshäufigkeit. Leser: `pages/TierePage.tsx`,
+  // LFH-506, untereinander nach Erfassungshäufigkeit. Leser: `pages/TierePage.tsx`,
   // `pages/bereitstellungsraum/BereitstellungsraeumePage.tsx` (Listenroute, nicht der bare
   // Modulpfad), `pages/EinsatzabschnittePage.tsx`.
   {
@@ -186,8 +248,7 @@ export const SCHNELLAKTIONEN: {
     ],
   },
   {
-    // Ans ENDE (LFH-825): eine neue Zeile ordnet die Bestandszeilen nicht um. Leser:
-    // `pages/LagekartePage.tsx` (`searchParams.get('zeichnen')`).
+    // LFH-825. Leser: `pages/LagekartePage.tsx` (`searchParams.get('zeichnen')`).
     modulKey: 'lagekarte',
     parameter: 'zeichnen',
     kennung: 'lagekarte-gefahrengebiet',
@@ -196,7 +257,7 @@ export const SCHNELLAKTIONEN: {
     schlagworte: ['gefahr', 'gefahrenbereich', 'gefahrenzone', 'zone', 'skizze', 'lagekarte'],
   },
   {
-    // Ans ENDE (LFH-1170): Mitglieder aufnehmen ist einer der ersten Schritte eines Einsatzes,
+    // LFH-1170: Mitglieder aufnehmen ist einer der ersten Schritte eines Einsatzes,
     // die Sektion „Zugriff“ liegt aber in den Einstellungen. Leser:
     // `pages/EinsatzEinstellungenPage.tsx` (der Guard ordnet über den Dateinamen zu), weitergereicht
     // an die Sektion.
@@ -211,7 +272,7 @@ export const SCHNELLAKTIONEN: {
     recht: 'leitung',
   },
   {
-    // Ans ENDE (LLH-1127): ein Bürgeranruf geht ein, die Erfassung soll in einem Griff offen sein.
+    // LLH-1127: ein Bürgeranruf geht ein, die Erfassung soll in einem Griff offen sein.
     // Träger ist das eigene Modul Informationstelefon (i6k6mzed, design.md D3). Leser:
     // `pages/InfotelefonPage.tsx`.
     modulKey: 'infotelefon',
@@ -464,6 +525,10 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
         if (a.recht === 'leitung' && !k.darfEinsatzLeiten) continue;
         const m = modulRegistry.find((x) => x.key === a.modulKey);
         if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
+        if (a.braucht) {
+          const zusatz = modulRegistry.find((x) => x.key === a.braucht);
+          if (!zusatz || !istModulFreigegeben(zusatz, k.freigaben)) continue;
+        }
         const ziel = a.pfad(k.einsatzId);
         befehle.push({
           id: `aktion:${a.kennung ?? a.modulKey}`,
