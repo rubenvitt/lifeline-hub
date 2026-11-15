@@ -2,7 +2,7 @@
 id: ADR-0045
 titel: Ein privater Archiv-Schlüssel kommt nur für einen Aufruf an den Server und nie an einen Hub
 status: ersetzt
-ersetzt_durch: ADR-0048
+ersetzt_durch: ADR-0049
 datum: 2026-11-13
 gilt_fuer:
   - src/routes/archiv_einspielen.rs

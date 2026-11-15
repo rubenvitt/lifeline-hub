@@ -3,14 +3,14 @@
 ### Requirement: Kein Einspielen an einer erreichten Instanz
 
 Das Einspielen über die Verwaltung SHALL nur an einer Instanz bestehen, bei der sich keine andere
-meldet. Hat die Instanz eine angebahnte oder aktive Kopplung, in der sie die erreichte Seite ist,
+meldet; eine Direktkopplung vor Ort zählt dabei nicht. Hat die Instanz eine angebahnte oder aktive Kopplung, in der sie die erreichte Seite ist,
 egal für welche Organisation, MUST der Server mit 422 ablehnen. Er MUST das tun, bevor er
 Block oder Schlüssel liest, und die Oberfläche MUST die Aktion dann nicht anbieten. Eine
 widerrufene Kopplung sperrt nicht. Eine Direktkopplung vor Ort MUST NOT sperren, gleich in
 welcher Richtung; jede andere Art einer Kopplung sperrt.
 
 #### Scenario: Hub
-- **WHEN** eine andere Instanz an dieser Instanz gekoppelt ist und sich hier meldet
+- **WHEN** eine andere Instanz an dieser Instanz über eine Standardkopplung gekoppelt ist und sich hier meldet
 - **THEN** antwortet das Hochladen mit 422
 - **AND** fehlt die Aktion „Archiv einspielen“ in der Verwaltung
 

@@ -1,5 +1,5 @@
 ---
-id: ADR-0048
+id: ADR-0049
 titel: Ein privater Archiv-Schlüssel kommt nur für einen Aufruf an den Server und nie an einen Hub; eine Direktkopplung vor Ort macht keinen Hub
 status: akzeptiert
 datum: 2026-11-15
@@ -14,7 +14,7 @@ herleitung:
   - LLH-1711 (Weg mit Ruben am 13.11.2026 abgestimmt), LLH-1888 (am 14.11.2026 abgestimmt)
 ---
 
-# ADR-0048: Ein privater Archiv-Schlüssel kommt nur für einen Aufruf an den Server und nie an einen Hub; eine Direktkopplung vor Ort macht keinen Hub
+# ADR-0049: Ein privater Archiv-Schlüssel kommt nur für einen Aufruf an den Server und nie an einen Hub; eine Direktkopplung vor Ort macht keinen Hub
 
 ## Regeln
 
