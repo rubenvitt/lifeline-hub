@@ -10,7 +10,7 @@ gilt_fuer:
   - frontend/src/live/LiveStatusBanner.tsx
   - frontend/src/components/instrument/Uebung.tsx
 herleitung:
-  - openspec/changes/ejt520so-handy-kopfleiste-fixiert/design.md
+  - openspec/changes/archive/2026-11-15-ejt520so-handy-kopfleiste-fixiert/design.md
   - Zunder LLH-1728 (Inhalt der Handy-Zeile, Reichweite und Stapel abgestimmt mit Ruben am 15.11.2026)
 ---
 

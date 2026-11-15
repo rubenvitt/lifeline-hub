@@ -6,7 +6,7 @@ import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
  * Verbindungsstörung meldet, darunter in einer Übung das Übungsband und ab `md` der klebende
  * Seitenkopf. Herleitung: D2 in
  * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`, D2 in
- * `openspec/changes/ejt520so-handy-kopfleiste-fixiert/design.md` (Ränge).
+ * `openspec/changes/archive/2026-11-15-ejt520so-handy-kopfleiste-fixiert/design.md` (Ränge).
  *
  * ZWEI HÖHEN (zjt7c073 D2): die Quellen gehören zur Ebene `kopf` (Kopfleiste, Betriebszeile, Übungsband) oder
  * `seitenkopf` (der klebende Seitenkopf von `EinsatzSeite`/`AdminPage`).

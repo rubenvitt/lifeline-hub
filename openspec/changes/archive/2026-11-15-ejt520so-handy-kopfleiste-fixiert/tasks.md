@@ -45,17 +45,17 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 5. e2e
 
-- [ ] 5.1 `e2e/rahmen-stehen-bleiben.spec.ts`: 390 px klebt der Kopf (Gegenprobe umkehren), in
+- [x] 5.1 `e2e/rahmen-stehen-bleiben.spec.ts`: 390 px klebt der Kopf (Gegenprobe umkehren), in
   allen drei Dichten einzeilig mit Menü, Name, Alarm, Verbindung und Uhr im Fenster; offline:
   Betriebszeile oben, Kopf darunter; Übung: Band unter dem Kopf, offline Betriebszeile · Kopf ·
   Band; Einsatzliste bei 390 px klebt einzeilig in `kompakt` und `komfortabel`.
-- [ ] 5.2 `e2e/kopfzeile-schmal.spec.ts`: Wechsler hält bei 390 px in `handschuh` 72 px, kein Ziel
+- [x] 5.2 `e2e/kopfzeile-schmal.spec.ts`: Wechsler hält bei 390 px in `handschuh` 72 px, kein Ziel
   überdeckt ein anderes (mit Uhr in der Zeile).
-- [ ] 5.3 Specs, die das Benutzermenü oder die Suche am Handy über den Kopf öffnen
+- [x] 5.3 Specs, die das Benutzermenü oder die Suche am Handy über den Kopf öffnen
   (`benutzermenue`, `hilfe`, `fokus-verdeckung`, `gate1-ueberlauf`, `gate3-trefflaeche`,
   `trefflaeche-pruefflaechen`, `orientierung`, `lagekarte-smoke`): erst die Navigation öffnen,
   gemeinsamer Helfer; die betroffenen Specs grün.
-- [ ] 5.4 `e2e/orientierung.spec.ts`: bei 390 px kein Ortspfad auf den Einsatzdaten, auf einer
+- [x] 5.4 `e2e/orientierung.spec.ts`: bei 390 px kein Ortspfad auf den Einsatzdaten, auf einer
   Personen-Detailseite nur „‹ Betroffene“, der zur Liste führt; bei 820 px der volle Pfad.
 
 ## 6. Regeln und Doku
@@ -71,9 +71,9 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die e2e-Specs aus 5 lokal in
+- [x] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; die e2e-Specs aus 5 lokal in
   Chromium grün.
-- [ ] 7.2 Review vor dem PR (frischer Agent), bestätigte Befunde behandelt.
+- [x] 7.2 Review vor dem PR (frischer Agent), bestätigte Befunde behandelt.
 
 ## Workflow follow-up
 

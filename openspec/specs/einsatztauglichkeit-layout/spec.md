@@ -335,18 +335,33 @@ Boden von zwei Zeilen ohne Kürzung.
 
 ### Requirement: Der Rahmen bleibt beim Rollen erreichbar
 
-Ab `md` MUST die Kopfleiste beim Rollen am oberen Fensterrand stehen bleiben, ab `lg` auch die
-Kategorie-Symbole der Rail und das offene Modulpanel samt Fuß „Einsatzdauer“. Ab `md` MUST der
-Seitenkopf einer Einsatz- oder Verwaltungsseite unter der Kopfleiste stehen bleiben, solange
-Kopfleiste und Seitenkopf zusammen höchstens ein Drittel der Fensterhöhe nehmen; sonst rollt er
-mit. Im ETB kleben Seitenkopf, Filterleiste und Spaltenkopf nur gemeinsam, solange alle drei mit
-der Kopfleiste in dieses Drittel passen (Spec `etb-filterleiste`). Unter `md` MUST die Kopfleiste
-mitrollen und die Betriebszeile oben stehen bleiben, solange sie eine Verbindungsstörung meldet. Jedes oben klebende Element MUST unter dem klebenden Rahmen
-stehen, nicht hinter ihm; im Inhalt zählt ein klebender Seitenkopf zum Rahmen.
+Die Kopfleiste MUST in jeder Breite beim Rollen am oberen Fensterrand stehen bleiben, ab `lg`
+auch die Kategorie-Symbole der Rail und das offene Modulpanel samt Fuß „Einsatzdauer“. Unter `md`
+MUST die Kopfleiste im Einsatz einzeilig sein und Menü, Einsatzname, Alarmzentrale, Verbindung
+und Uhr tragen; nur in `handschuh` darf eine Störung im Wort der Alarmzentrale sie umbrechen.
+Meldet die Betriebszeile unter `md` eine Verbindungsstörung, MUST sie über der Kopfleiste stehen
+bleiben. Ab `md` MUST der Seitenkopf einer Einsatz- oder Verwaltungsseite unter der Kopfleiste
+stehen bleiben, solange Kopfleiste und Seitenkopf zusammen höchstens ein Drittel der Fensterhöhe
+nehmen; sonst rollt er mit. Im ETB kleben Seitenkopf, Filterleiste und Spaltenkopf nur gemeinsam,
+solange alle drei mit der Kopfleiste in dieses Drittel passen (Spec `etb-filterleiste`). Jedes
+oben klebende Element MUST unter dem klebenden Rahmen stehen, nicht hinter ihm; im Inhalt zählt
+ein klebender Seitenkopf zum Rahmen.
 
 #### Scenario: Langes Rollen im ETB ab Tablet
 - **WHEN** das ETB bei 820, 1180 und 1440 px Breite auf 1500 px gerollt ist
 - **THEN** steht die Kopfleiste mit `position: sticky` bei `top ≥ 0` im Fenster, und ab 1180 px stehen die Kategorie-Symbole der Rail im Fenster
+
+#### Scenario: Langes Rollen im ETB am Handy
+- **WHEN** das ETB bei 390 × 844 in `kompakt`, `komfortabel` und `handschuh` bei ruhiger Alarmzentrale auf 1500 px gerollt ist
+- **THEN** steht die Kopfleiste einzeilig am oberen Fensterrand, und Menü, Einsatzname, Alarmzentrale, Verbindung und Uhr liegen ganz im Fenster
+
+#### Scenario: Gestörte Alarmzentrale am Handy
+- **WHEN** der Ton am Handy blockiert ist
+- **THEN** nennt die Alarmzentrale „Ton blockiert“ im Kopf, in `kompakt` und `komfortabel` bleibt die Kopfleiste einzeilig, und der Einsatzname behält seine Mindest-Trefffläche
+
+#### Scenario: Einsatzliste am Handy
+- **WHEN** die Einsatzliste bei 390 × 844 in `kompakt` und `komfortabel` auf 1000 px gerollt ist
+- **THEN** steht die Kopfleiste einzeilig mit der Uhr am oberen Fensterrand
 
 #### Scenario: Modulpanel bleibt beim Rollen stehen
 - **WHEN** das ETB bei 1440 × 900 mit offenem Modulpanel geöffnet wird und damit ans Ende der Zeitachse gerollt ist
@@ -366,10 +381,10 @@ stehen, nicht hinter ihm; im Inhalt zählt ein klebender Seitenkopf zum Rahmen.
 
 #### Scenario: Offline auf dem Handy
 - **WHEN** das ETB bei 390 × 844 auf 1500 px gerollt ist und das Gerät das Netz verliert
-- **THEN** steht die Betriebszeile mit dem Offline-Hinweis am oberen Fensterrand
+- **THEN** steht die Betriebszeile mit dem Offline-Hinweis am oberen Fensterrand und die Kopfleiste direkt darunter, keine verdeckt die andere
 
 #### Scenario: Tabellenkopf unter dem Rahmen
-- **WHEN** eine Seite mit stehendem Tabellenkopf ab `md` so weit gerollt ist, dass der Tabellenkopf klebt
+- **WHEN** eine Seite mit stehendem Tabellenkopf in irgendeiner Breite so weit gerollt ist, dass der Tabellenkopf klebt
 - **THEN** liegt seine Oberkante an der Unterkante des klebenden Seitenkopfs, oder an der Unterkante der Kopfleiste, wenn der Seitenkopf mitrollt, nicht darüber
 
 #### Scenario: Niedriges Fenster im ETB
@@ -545,3 +560,22 @@ Unter `lg` MUST der Navigations-Drawer 360 px breit sein, höchstens aber die Fe
 
 - **WHEN** eine Person bei 390 × 844 die Navigation öffnet
 - **THEN** ist der Drawer 342 px breit
+
+### Requirement: Suche und Benutzermenü am Handy in der Navigation
+
+Unter `md` SHALL der Kopf im Einsatz weder das Suchfeld der Sprungpalette noch den Auslöser des
+Benutzermenüs tragen. Beide MUST in der Navigation stehen, die der Knopf „Menü“ öffnet: „Suchen“
+oben, es öffnet die Sprungpalette; der Auslöser des Benutzermenüs unten, mit unverändertem Menü.
+Ab `md` SHALL beides im Kopf bleiben.
+
+#### Scenario: Suchen am Handy
+- **WHEN** eine Person im Einsatz bei 390 × 844 die Navigation öffnet und „Suchen“ antippt
+- **THEN** schließt die Navigation, und die Sprungpalette ist offen
+
+#### Scenario: Benutzermenü am Handy
+- **WHEN** eine Person im Einsatz bei 390 × 844 die Navigation öffnet und den Auslöser des Benutzermenüs antippt
+- **THEN** öffnet das Benutzermenü mit denselben Einträgen wie ab `md`, bis einschließlich „Abmelden“
+
+#### Scenario: Ab Tablet unverändert
+- **WHEN** ein Einsatz bei 820 px Breite geöffnet ist
+- **THEN** stehen Suche und Benutzermenü im Kopf

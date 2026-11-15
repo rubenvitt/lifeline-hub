@@ -7,7 +7,7 @@ import { abmeldenUeberMenue, benutzermenueAusloeser } from './menue-kern';
  * `frontend/AGENTS.md`, Rahmen). Der Kopf klebt in jeder Breite, ab `lg` auch die Rail-Kategorien
  * und das Modulpanel darunter, ab `md` der Seitenkopf, wenn er ins Drittel passt (zjt7c073); unter
  * `md` klebt die gestörte Betriebszeile über dem Kopf (Rang, design.md D2 in
- * `openspec/changes/ejt520so-handy-kopfleiste-fixiert/`). jsdom rechnet kein Layout, deshalb im
+ * `openspec/changes/archive/2026-11-15-ejt520so-handy-kopfleiste-fixiert/`). jsdom rechnet kein Layout, deshalb im
  * Browser.
  *
  * Jede Messung hat ihre Vorbedingung (die Seite ist WIRKLICH gerollt), sonst stünde der Kopf auch

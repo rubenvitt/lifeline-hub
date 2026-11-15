@@ -116,7 +116,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Uhr (umbrechen darf er nur in `handschuh` bei einer Störung im Wort der Alarmzentrale); Suche
     und Benutzermenü stehen dort im Drawer „Navigation“. Der App-Rahmen lässt unter `md` die
     Wortmarke weg, ihr Link liegt dann auf der Bildmarke. Herleitung:
-    `openspec/changes/ejt520so-handy-kopfleiste-fixiert/design.md`. Der Fuß der Rail (Griff „Menü“,
+    `openspec/changes/archive/2026-11-15-ejt520so-handy-kopfleiste-fixiert/design.md`. Der Fuß der Rail (Griff „Menü“,
     Einstellungen) klebt nicht: reicht die Höhe nicht, folgt er den Kategorien, statt sie zu
     verdecken (LLH-1273, `e2e/gate3-trefflaeche.spec.ts` „Rail“). Das Modulpanel ist eine Spalte
     mit festem Kopf und Fuß „Einsatzdauer“, nur die Liste rollt in sich (`modul-panel-spalte`);
