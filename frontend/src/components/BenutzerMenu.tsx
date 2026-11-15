@@ -90,8 +90,8 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * `hasFixedWidth` (im Einsatz-Kopf, LLH-1272): das Etikett hält die Breite {@link ETIKETT_PLATZ},
  * statt sich nach dem Text zu richten. Die Funktion kommt erst mit dem Einsatz, davor steht der
  * Name, und an der Umbruchkante des Kopfs reichten 4 px Unterschied für eine zweite Kopfzeile:
- * Rail, Panel und Inhalt sprangen 52 px (CLS 0,556). Vorbild ist `WortPlatz` in `Kopfleiste.tsx`;
- * hier ist der längste Wortlaut nicht bekannt, deshalb eine feste Breite.
+ * Rail, Panel und Inhalt sprangen 52 px (CLS 0,556). Der längste Wortlaut ist nicht bekannt,
+ * deshalb eine feste Breite.
  */
 export default function BenutzerMenu({
   funktion,

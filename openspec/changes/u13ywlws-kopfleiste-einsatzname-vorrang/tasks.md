@@ -5,19 +5,19 @@ der ohne die Änderung rot ist.
 
 ## 1. Wort genau bei Störung (D1)
 
-- [ ] 1.1 `SyncAnzeige` (`components/Kopfleiste.tsx`): Wort nur für `getrennt`, `offline`,
+- [x] 1.1 `SyncAnzeige` (`components/Kopfleiste.tsx`): Wort nur für `getrennt`, `offline`,
   `ausstehend`, `abgelehnt`; `verbunden` und `verbinde` als Symbol (`verbinde` in `achtung`), Name
   und `title` unverändert. `syncZeigtWort` und Props `ruheOhneWort`/`haeltStartPlatz` entfallen,
   Aufrufer in `einsatz/EinsatzLayout.tsx` und `components/AppLayout.tsx` nachgezogen.
   `components/Kopfleiste.test.tsx` deckt alle sechs Zustände ab und ist grün.
-- [ ] 1.2 `einsatz/AlarmZentrale.tsx`, breite Bauform: Benachrichtigung mit Wort nur bei
+- [x] 1.2 `einsatz/AlarmZentrale.tsx`, breite Bauform: Benachrichtigung mit Wort nur bei
   `blockiert`, Ton nur bei `stumm`/`blockiert`, in jeder Breite und Dichte; Tooltip und
   `aria-label` nennen weiter Zustand und Handlung. `TON_WORT_LAENGSTES`-Platz, `tonHaeltPlatz`,
   `knapp` und die Dichte-Weiche entfallen. `AlarmZentrale*.test.tsx` umgestellt und grün.
-- [ ] 1.3 Gebündelte Bauform: Wort nur, wenn der gezeigte Zustand auffällig ist (auch am Handy);
+- [x] 1.3 Gebündelte Bauform: Wort nur, wenn der gezeigte Zustand auffällig ist (auch am Handy);
   `sammelWortStil` bleibt für Störungswörter. Test: Handy im Ruhezustand ohne Wort, mit „Ton
   blockiert“ mit Wort.
-- [ ] 1.4 `WortPlatz` und `components/Kopfleiste.css` entfernen, `startWoerter` im Layout
+- [x] 1.4 `WortPlatz` und `components/Kopfleiste.css` entfernen, `startWoerter` im Layout
   entfernen, Verweis im Kommentar von `components/BenutzerMenu.tsx` berichtigen; `tsc` und
   ESLint grün, `grep -rn "WortPlatz\|kopf-wort-platz" frontend/` leer.
 

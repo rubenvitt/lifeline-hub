@@ -72,7 +72,7 @@ import { einsatzKennung } from './einsatzKennung';
 import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import SpiegelBand from './spiegel/SpiegelBand';
 import { useAktiveWarnung } from './useAktiveWarnung';
-import { useDichte, useWarnsperre } from '../theme/ThemeModeProvider';
+import { useWarnsperre } from '../theme/ThemeModeProvider';
 
 const { Header, Content } = Layout;
 
@@ -199,14 +199,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
-  // Ab `xl` trägt der Kopf alle Wörter; darunter (Führungs-Tablet) stehen Ruhezustände nur als
-  // Icon, damit er einzeilig bleibt.
+  // Ab `xl` steht das Modulpanel ohne Wahl offen (`panelZu`).
   const weit = abBreite('xl');
-  // In `handschuh` trägt der Kopf Ton- und Sync-Wort auch unter `xl`, mit dem Startplatz aus
-  // LLH-1158 (LLH-1232). Dort ist er bei 1100 und ab 1200 px ohnehin zweizeilig; nur dazwischen
-  // wurde er im Ruhezustand einzeilig und sprang beim Start zwischen einer und zwei Zeilen.
-  const { dichte } = useDichte();
-  const startWoerter = weit || dichte === 'handschuh';
   const { token } = theme.useToken();
   // Unter `md` rücken die Zellen zusammen, sonst bräche die rechte Gruppe auf 390 px in eine
   // dritte Zeile.
@@ -503,12 +497,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               />
             </EinsatzAnzeigeProvider>
           </div>
-          <SyncAnzeige
-            liveErwartet
-            kompakt={!mittel}
-            ruheOhneWort={!startWoerter}
-            haeltStartPlatz={startWoerter}
-          />
+          <SyncAnzeige liveErwartet kompakt={!mittel} />
           {mittel && <Uhr />}
           {!breit && (
             <div style={kopfZelleStil(zellToken)}>

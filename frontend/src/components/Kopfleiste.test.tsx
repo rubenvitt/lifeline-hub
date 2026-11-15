@@ -14,7 +14,6 @@ import {
   railBreite,
   syncZustand,
   wortmarkeStil,
-  WortPlatz,
 } from './Kopfleiste';
 
 const LEER = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
@@ -147,32 +146,23 @@ describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => 
   });
 });
 
-describe('syncZeigtWort — Wort nur, wo es trägt', () => {
-  it('unter md nie ein Wort (kompakt)', () => {
-    expect(syncZeigtWort('getrennt', true, false)).toBe(false);
-  });
-  it('auf dem Tablet: der Ruhezustand ohne Wort, jede Störung mit', () => {
-    expect(syncZeigtWort('verbunden', false, true)).toBe(false);
-    for (const z of ['verbinde', 'ausstehend', 'getrennt', 'offline', 'abgelehnt'] as const) {
-      expect(syncZeigtWort(z, false, true), z).toBe(true);
-    }
-  });
-  it('ab xl trägt auch der Ruhezustand sein Wort', () => {
-    expect(syncZeigtWort('verbunden', false, false)).toBe(true);
-  });
-});
-
 /**
- * LLH-1158: Der Platz ist erzeugter Inhalt aus `data-platz` (`Kopfleiste.css`), kein Text im DOM.
- * Ob er die Breite hält, misst `e2e/kopfhoehe-tonpruefung.spec.ts`.
+ * LLH-1726 (Spec `kopfleiste`): Ruhezustände stehen in jeder Breite nur als Symbol, auch der
+ * Verbindungsaufbau beim Start. Ein Wort trägt nur die Störung, und unter md nicht einmal sie
+ * (dort meldet die Betriebszeile).
  */
-describe('WortPlatz — das Wort hält die Breite seines Startworts', () => {
-  it('trägt den Platz als Attribut, der Text bleibt das sichtbare Wort', () => {
-    const { container } = render(<WortPlatz platz="VERBINDE">SYNC</WortPlatz>);
-    const wort = container.querySelector('.kopf-wort-platz');
-    expect(wort).toHaveAttribute('data-platz', 'VERBINDE');
-    expect(wort).toHaveAttribute('aria-hidden', 'true');
-    expect(container.textContent).toBe('SYNC');
+describe('syncZeigtWort — Wort genau bei Störung', () => {
+  it('unter md nie ein Wort (kompakt)', () => {
+    expect(syncZeigtWort('getrennt', true)).toBe(false);
+  });
+  it('Verbindung und Verbindungsaufbau stehen als Symbol, in jeder Breite', () => {
+    expect(syncZeigtWort('verbunden', false)).toBe(false);
+    expect(syncZeigtWort('verbinde', false)).toBe(false);
+  });
+  it('jede Störung trägt ihr Wort', () => {
+    for (const z of ['ausstehend', 'getrennt', 'offline', 'abgelehnt'] as const) {
+      expect(syncZeigtWort(z, false), z).toBe(true);
+    }
   });
 });
 

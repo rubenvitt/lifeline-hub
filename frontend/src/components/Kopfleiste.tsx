@@ -14,7 +14,6 @@ import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
-import './Kopfleiste.css';
 
 /**
  * Bausteine der Kommandoleiste (`shell.dc.html`) — geteilt von der Ebene-1-Shell (`AppLayout`)
@@ -200,26 +199,6 @@ export function Uhr() {
 }
 
 /**
- * Ein Zustandswort des Kopfs, das die Breite von `platz` hält (LLH-1158, `Kopfleiste.css`): für
- * Wörter, die beim Start ohne Zutun wechseln. Ist das Wort breiter als `platz`, gilt das Wort.
- */
-export function WortPlatz({
-  platz,
-  style,
-  children,
-}: {
-  platz: string;
-  style?: CSSProperties;
-  children: ReactNode;
-}) {
-  return (
-    <span aria-hidden="true" className="kopf-wort-platz" data-platz={platz} style={style}>
-      {children}
-    </span>
-  );
-}
-
-/**
  * Die Zustände der SYNC-Anzeige. `ruhe` heißt „nichts zu melden UND keine Live-Verbindung
  * erwartet" — auf der Einsatzliste läuft kein SSE-Strom.
  */
@@ -316,37 +295,26 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * `liveErwartet`: nur der Einsatz-Workspace hält einen SSE-Strom. Auf der Einsatzliste erscheint
  * die Zelle nur bei Netzverlust oder offener Queue.
  *
- * `kompakt` (unter `md`): nur Icon, das Wort wandert in den zugänglichen Namen und `title`.
+ * WORT GENAU BEI STÖRUNG (LLH-1726, Spec `kopfleiste`): Die stehende Verbindung und ihr Aufbau
+ * stehen in jeder Breite nur als Icon, der Aufbau in `achtung`. Beide verlangen nichts, und der
+ * Aufbau beim Start wechselte sonst ohne Zutun die Breite des Kopfs (vorher hielt ein Platzhalter
+ * dafür dauerhaft die Breite von „VERBINDE“, LLH-1158). Jede Störung (WARTET, GETRENNT, OFFLINE,
+ * PRÜFEN) trägt ihr Wort — Farbe allein wäre ein Kanal (WCAG 1.4.1). Den Zustand nennen in jedem
+ * Fall `aria-label` und `title`.
  *
- * `ruheOhneWort` (zwischen `md` und `xl`): nur der RUHEZUSTAND „SYNC" steht als Icon. Jede
- * Störung (VERBINDE, WARTET, GETRENNT, OFFLINE, PRÜFEN) behält ihr Wort — Farbe allein wäre ein
- * Kanal (WCAG 1.4.1).
- *
- * `haeltStartPlatz` (im Einsatz-Kopf ab `xl`, in `handschuh` auch darunter, LLH-1232): das Wort
- * hält die Breite von „VERBINDE“ (LLH-1158, {@link WortPlatz}). Der Verbindungsaufbau beim Start
- * wechselt es ohne Zutun auf „SYNC“, und dort hängt der Umbruch an der Breite der rechten Gruppe.
- * Nicht zusammen mit `ruheOhneWort`: dort steht „SYNC“ nur als Icon, und der Platz machte nur
- * Störungswörter breiter.
+ * `kompakt` (unter `md`): nur Icon, auch bei Störung; das Wort steht in der Betriebszeile.
  */
-export function syncZeigtWort(
-  zustand: Exclude<SyncZustand, 'ruhe'>,
-  kompakt: boolean,
-  ruheOhneWort: boolean,
-): boolean {
+export function syncZeigtWort(zustand: Exclude<SyncZustand, 'ruhe'>, kompakt: boolean): boolean {
   if (kompakt) return false;
-  return !(ruheOhneWort && zustand === 'verbunden');
+  return zustand !== 'verbunden' && zustand !== 'verbinde';
 }
 
 export function SyncAnzeige({
   liveErwartet,
   kompakt = false,
-  ruheOhneWort = false,
-  haeltStartPlatz = false,
 }: {
   liveErwartet: boolean;
   kompakt?: boolean;
-  ruheOhneWort?: boolean;
-  haeltStartPlatz?: boolean;
 }) {
   const { token } = theme.useToken();
   const { benutzer } = useAuth();
@@ -373,19 +341,11 @@ export function SyncAnzeige({
       <span aria-hidden="true" style={{ display: 'inline-flex', color: d.farbe }}>
         <Icon size={16} />
       </span>
-      {syncZeigtWort(zustand, kompakt, ruheOhneWort) && (
-        <WortPlatz
-          platz={haeltStartPlatz ? SYNC_DARSTELLUNG.verbinde.wort : ''}
-          style={{
-            fontFamily: schrift.zahl,
-            fontSize: 11,
-            // Verbunden bleibt das Wort gedämpft wie im Entwurf — das grüne Icon trägt den
-            // Zustand. Jede Störung färbt auch das Wort: dann soll es auffallen.
-            color: zustand === 'verbunden' ? rahmenFarben.gedaempft : d.farbe,
-          }}
-        >
+      {syncZeigtWort(zustand, kompakt) && (
+        // Nur Störungen tragen ein Wort, also färbt es mit: dann soll es auffallen.
+        <span aria-hidden="true" style={{ fontFamily: schrift.zahl, fontSize: 11, color: d.farbe }}>
           {wort}
-        </WortPlatz>
+        </span>
       )}
     </div>
   );
