@@ -210,7 +210,7 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
       '100 EP ausgegeben',
     );
     await feldkueche
-      .getByRole('button', { name: 'Auflösen … zu Stelle Feldküche BR Sportplatz' })
+      .getByRole('button', { name: 'Auflösen zu Stelle Feldküche BR Sportplatz' })
       .click();
     const rueckfrage = page.getByRole('dialog', {
       name: 'Stelle ‚Feldküche BR Sportplatz‘ auflösen?',

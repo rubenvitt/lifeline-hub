@@ -649,6 +649,34 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('nach „Vom Fahrzeug lösen“ setzt „Rückgängig“ die Person wieder auf das Fahrzeug (LLH-1722)', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params }) => {
+        aufrufe.push(`DELETE ${params.epId}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params }) => {
+        aufrufe.push(`PUT ${params.epId}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+    ]);
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    await userEvent.click(
+      await within(block).findByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
+    const hinweis = (await screen.findByText('Anna Crew vom Fahrzeug gelöst')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 100', 'PUT 100']));
+  });
+
   it('markiert eine Besatzung aus anderer Einheit als das Fahrzeug', async () => {
     // Fahrzeug ef.einheit_id = null, Person in Einheit 3 → Diskrepanz-Tag nach Aufklappen.
     const crew = person({ id: 100, name: 'Cara Diskrepanz', fahrzeug_id: 10, einheit_id: 3 });

@@ -19,7 +19,8 @@ import KatalogTabelle, { type KatalogSpalte } from '../../components/KatalogTabe
 import { Select } from '../../components/Select';
 import { teilwortSuche } from '../../components/teilwortSuche';
 import { Datenfeld, Datenraster } from '../../components/instrument';
-import { ZeilenFehler } from '../../components/SpeicherHinweis';
+import { SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
+import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { freieEinheiten, kraftAuswahlText, zaehleQualifikationen } from './uhsKraefteKern';
@@ -107,14 +108,24 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
       invalidate();
     },
   });
+  // „Rückgängig“ nach dem Abziehen (LLH-1722, `frontend/AGENTS.md`, „Beenden: Verb, Ort und
+  // Sicherung je Art“): ordnet die Kraft über denselben Weg wieder dieser UHS zu. Die Zeile ist dann
+  // weg; die Ablehnung steht über der Liste.
+  const rueckgaengigMut = useMutation({
+    mutationFn: (k: { id: number; name: string }) => ordneKraftZu(einsatzId, uhs.id, k.id),
+    onSuccess: invalidate,
+  });
   const abziehenMut = useMutation({
-    mutationFn: (kraftId: number) => zieheKraftAb(einsatzId, uhs.id, kraftId),
-    onMutate: (kraftId) => abziehenZeilen.beginne(kraftId),
-    onSuccess: () => {
-      message.success('Kraft abgezogen');
+    mutationFn: (k: { id: number; name: string }) => zieheKraftAb(einsatzId, uhs.id, k.id),
+    onMutate: (k) => {
+      abziehenZeilen.beginne(k.id);
+      rueckgaengigMut.reset();
+    },
+    onSuccess: (_d, k) => {
+      zeigeRueckgaengig(message, `${k.name} abgezogen`, () => rueckgaengigMut.mutate(k));
       invalidate();
     },
-    onError: (e, kraftId) => abziehenZeilen.melde(kraftId, e, 'Abziehen fehlgeschlagen'),
+    onError: (e, k) => abziehenZeilen.melde(k.id, e, 'Abziehen fehlgeschlagen'),
   });
 
   const keineFreie = ohneUhsQuery.isSuccess && ohneUhs.length === 0;
@@ -182,8 +193,9 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
           {
             title: 'Aktion',
             key: 'aktion',
-            // Keine Rückfrage: die Kraft bleibt im Einsatz und lässt sich wieder zuordnen
-            // (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“).
+            // Keine Rückfrage: die Kraft bleibt im Einsatz und lässt sich wieder zuordnen, der
+            // Hinweis bietet „Rückgängig“ (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich
+            // destruktiv“). Einzige Handlung der Zeile, deshalb ein Knopf (LLH-1722).
             render: (_: unknown, k: UhsKraft) => {
               const grund = abziehenZeilen.grund(k.id);
               return (
@@ -191,8 +203,8 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
                   <Button
                     danger
                     aria-label={`${k.name} abziehen`}
-                    loading={abziehenMut.isPending && abziehenMut.variables === k.id}
-                    onClick={() => abziehenMut.mutate(k.id)}
+                    loading={abziehenMut.isPending && abziehenMut.variables?.id === k.id}
+                    onClick={() => abziehenMut.mutate({ id: k.id, name: k.name })}
                   >
                     Abziehen
                   </Button>
@@ -207,6 +219,13 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+      {rueckgaengigMut.isError && (
+        <SpeicherFehler
+          fehler={rueckgaengigMut.error}
+          titel={`${rueckgaengigMut.variables?.name ?? 'Kraft'} nicht zurückgenommen`}
+          fallback="Rückgängig fehlgeschlagen"
+        />
+      )}
       <Datenraster beschriftung="Stärke der UHS" spalten={2}>
         <Datenfeld label="Stärke" mono>
           <span data-testid="uhs-staerke">{staerkeText(uhs.staerke)}</span>

@@ -51,6 +51,8 @@ Regeln, die sich bei der Farbe widersprechen.
 - `einheit-ansicht`: Fahrzeuge bekommen ein Menü, das Lösen hat einen Rückweg, die gelöste Zeile
   hält ihre Stelle, und Lösen-Einträge stehen neutral.
 - `material-am-ort`: Die gehaltene Zeile trägt „Rückgängig“ selbst, nicht nur im Hinweis.
+- `material-liste`: „Aus dem Einsatz nehmen“ steht als erster Eintrag im Zeilenmenü, nicht als
+  roter Knopf und nicht als Hauptaktion der Karte (beim Nachziehen ergänzt).
 - `bedien-wortlaut`: Im Szenario „Bereitstellungsraum stornieren“ steht „Stornieren“ im letzten
   Abschnitt statt im Kopf.
 
@@ -83,4 +85,5 @@ den Bestand nachziehen. Bis dahin beschriebe eine Spec ein Verhalten, das der Co
   - Anlegen vereinheitlichen (Drawer UHS und BR, eingeklappte Formulare)
   - Personal-Entlassen vollständig zurücknehmen
   - Material „Aus dem Einsatz nehmen“ vollständig zurücknehmen
-  - Material am Ort: Vorbedingung beim Rückgängig
+  - Rückgängig mit Vorbedingung für Material am Ort, Besatzung und UHS-Kraft
+  - Rückgängig für „Austragen“ am Bereitstellungsraum und das UHS-„Austragen“ an der Person

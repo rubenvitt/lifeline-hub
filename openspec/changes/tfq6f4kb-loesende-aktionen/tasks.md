@@ -38,15 +38,15 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 - [x] 4.0 Geteilter Baustein `components/BeendenAbschnitt.tsx` (letzter Abschnitt „… auflösen oder stornieren“, je Rückfrage mit Folgesatz und benanntem Knopf, Sperre mit Grund, Ablehnung im Abschnitt) aus `pages/einheit/EinheitAufloesen.tsx`; die Einheit nutzt ihn, ihre Tests bleiben grün
 - [x] 4.1 Bereitstellungsraum (`pages/bereitstellungsraum/BrDetailPage.tsx`): „Auflösen“ und „Stornieren“ aus dem Kopf in den letzten Abschnitt „Bereitstellungsraum auflösen oder stornieren“; Kopf ≤ 2 Knöpfe; Tests rot→grün; `components/rueckfrage.guard.test.ts` grün
 - [x] 4.2 UHS (`pages/uhs/UhsDetailPage.tsx`, Fensterseite): „Auflösen“ aus dem roten Kopfknopf ins ⋮ des Kopfs neben „Stornieren“, belegt gesperrt mit Grund im Eintrag, Rückfrage im Dialog; Kopf „Patient aufnehmen“ + „Bearbeiten“ + ⋮; e2e-Anker in `e2e/uhs-grundriss-menue-belegung.spec.ts` nachziehen; Tests rot→grün
-- [ ] 4.3 Evakuierungsbezirk (`pages/EvakuierungsbezirkPage.tsx`): „Bearbeiten“ ins ⋮ des Kopfs, Kopf ≤ 2 Knöpfe; Test „Kopf in einer Zeile bei 1180 px“ (e2e) rot→grün
-- [ ] 4.4 Betreuungsstelle (`pages/BetreuungsstelleDetailPage.tsx`): „Schließen“ ohne Belegung zeigt Rückgängig (zurück auf `in_betrieb`), mit Leermeldung nicht; Kopf ≤ 2 Knöpfe prüfen; Tests rot→grün
-- [ ] 4.5 Verpflegungsstelle (`verpflegung/StellenListe.tsx`): Ellipse an „Auflösen …“/„Stornieren …“ entfernen; Test nachziehen
-- [ ] 4.6 Übrige Stellen aus dem Inventar gegen D1 prüfen (Tier, Schaden, Person, Einsatzabschnitt, UhsKraefte „Abziehen“, BR „Austragen“, Material, Personal); Abweichungen beheben oder im Commit begründen; Kopfregel an Tier und Schaden prüfen
+- [x] 4.3 Evakuierungsbezirk (`pages/EvakuierungsbezirkPage.tsx`): „Bearbeiten“ ins ⋮ des Kopfs, Kopf ≤ 2 Knöpfe; Test „Kopf in einer Zeile bei 1180 px“ (e2e) rot→grün
+- [x] 4.4 Betreuungsstelle (`pages/BetreuungsstelleDetailPage.tsx`): „Schließen“ ohne Belegung zeigt Rückgängig (zurück auf `in_betrieb`), mit Leermeldung nicht; Kopf ≤ 2 Knöpfe prüfen; Tests rot→grün
+- [x] 4.5 Verpflegungsstelle (`verpflegung/StellenListe.tsx`): Ellipse an „Auflösen …“/„Stornieren …“ entfernen; Test nachziehen
+- [x] 4.6 Übrige Stellen aus dem Inventar gegen D1 prüfen (Tier, Schaden, Person, Einsatzabschnitt, UhsKraefte „Abziehen“, BR „Austragen“, Material, Personal); Abweichungen beheben oder im Commit begründen; Kopfregel an Tier und Schaden prüfen
 - [ ] 4.7 Doku: Kapitel `uhs`, `bereitstellungsraeume`, `betreuung`, `evakuierung` (und Verpflegung, falls betroffen) samt Bilder-Specs nachziehen und Bilder neu erzeugen; Mitänderungsregel `docs/architektur/AGENTS.md` (Kapitel 8/11) prüfen
 
 ## 5. Folgeaufgaben und Integration
 
-- [ ] 5.1 Folgeaufgaben über `zunder-task-anlegen` am Parent: UHS/BR in der Ansicht bearbeiten; Anlegen vereinheitlichen; Personal-Entlassen vollständig zurücknehmen; Material „Aus dem Einsatz nehmen“ vollständig zurücknehmen; Material am Ort: Vorbedingung beim Rückgängig. Links in `frontend/AGENTS.md`-Altstellenliste und im PR
+- [ ] 5.1 Folgeaufgaben über `zunder-task-anlegen` am Parent: UHS/BR in der Ansicht bearbeiten; Anlegen vereinheitlichen; Personal-Entlassen vollständig zurücknehmen; Material „Aus dem Einsatz nehmen“ vollständig zurücknehmen; Rückgängig mit Vorbedingung (Material am Ort, Besatzung, UHS-Kraft); Rückgängig für „Austragen“ (BR, UHS an der Person). Links in `frontend/AGENTS.md`-Altstellenliste und im PR
 - [ ] 5.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
 ## Workflow follow-up

@@ -78,7 +78,8 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
-import { abstand, dichten } from '../theme/tokens';
+import { abstand } from '../theme/tokens';
+import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
@@ -173,7 +174,7 @@ function BesatzungsBlock({
    */
   freiInhalt: string;
   onZuordnen: (epId: number) => void;
-  onFreigeben: (epId: number) => void;
+  onFreigeben: (epId: number, name: string) => void;
   /** Grund des letzten abgelehnten Zuordnens an diesem Fahrzeug. */
   zuordnenFehler: ZeilenGrund | null;
   /** Grund des letzten abgelehnten Freigebens je Kraft. */
@@ -256,13 +257,14 @@ function BesatzungsBlock({
                     <Tag style={{ margin: 0 }}>andere Einheit</Tag>
                   )}
                 </Space>
-                {/* Umkehrbar: `danger` mit Abstand, ohne Rückfrage (D13, Regel „Destruktiv ist
-                    nicht gleich destruktiv“). Der Name nennt Handlung und Person. */}
+                {/* Umkehrbar: `danger` mit Abstand, ohne Rückfrage, mit Rückgängig-Hinweis (D13,
+                    LLH-1722). Einzige Handlung der Zeile, deshalb ein Knopf. Der Name nennt
+                    Handlung und Person. */}
                 {darfSchreiben && (
                   <Button
                     danger
                     aria-label={`${m.name} vom Fahrzeug lösen`}
-                    onClick={() => onFreigeben(m.id)}
+                    onClick={() => onFreigeben(m.id, m.name)}
                   >
                     Vom Fahrzeug lösen
                   </Button>
@@ -380,14 +382,8 @@ function FahrzeugeInhalt() {
   const navigate = useNavigate();
   const { benutzer } = useAuth();
   const { dichte } = useDichte();
-  /**
-   * Nur der Menüauslöser (Entscheidung 14.10.2026): die quadratische Steuerhöhe der Dichte oder der
-   * Kopf „Aktionen“ (rund 4,4 Schriftgrößen), was breiter ist, plus das Zellpolster beidseits
-   * (`abstand.md`). Gemessen 82 / 102 / 124 px (`e2e/gate1-ueberlauf.spec.ts`).
-   */
-  const stufe = dichten[dichte];
-  const aktionenBreite =
-    Math.ceil(Math.max(stufe.zeilenhoehe, 4.4 * stufe.schriftgroesse)) + 2 * stufe.abstand.md;
+  /** Nur der Menüauslöser (Entscheidung 14.10.2026, `components/menueSpalte.ts`). */
+  const aktionenBreite = menueSpaltenBreite(dichte);
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [adhocWeitereOffen, setAdhocWeitereOffen] = useState(false);
@@ -646,10 +642,24 @@ function FahrzeugeInhalt() {
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     await qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
   }
-  const besatzungFreiMutation = useMutation({
-    mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
-    onMutate: (v) => freigebenFehler.beginne(v.epId),
+  // „Rückgängig“ setzt die Person wieder auf das Fahrzeug (LLH-1722, `frontend/AGENTS.md`, „Beenden:
+  // Verb, Ort und Sicherung je Art“); die Ablehnung steht im Seitenhinweis wie beim Entlassen.
+  const besatzungZurueckMutation = useMutation({
+    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
+    onMutate: () => setRueckgaengigFehler(null),
     onSuccess: invalidate,
+    onError: (e) => setRueckgaengigFehler(e),
+  });
+  const besatzungFreiMutation = useMutation({
+    mutationFn: (v: { efId: number; epId: number; name: string }) =>
+      gibBesatzungFrei(einsatzId, v.efId, v.epId),
+    onMutate: (v) => freigebenFehler.beginne(v.epId),
+    onSuccess: (_d, v) => {
+      invalidate();
+      zeigeRueckgaengig(message, `${v.name} vom Fahrzeug gelöst`, () =>
+        besatzungZurueckMutation.mutate({ efId: v.efId, epId: v.epId }),
+      );
+    },
     onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Nicht vom Fahrzeug gelöst'),
   });
 
@@ -1109,7 +1119,7 @@ function FahrzeugeInhalt() {
               rechteText={einsatzRechteGrund(einsatz)}
               rechteFehlt={nurAnsicht}
               fehler={rueckgaengigFehler}
-              fehlerTitel="Entlassung nicht zurückgenommen"
+              fehlerTitel="Nicht zurückgenommen"
               fehlerFallback="Rückgängig fehlgeschlagen"
             />
             {ausgelassenText != null && (
@@ -1234,7 +1244,9 @@ function FahrzeugeInhalt() {
                       darfSchreiben={darfSchreiben}
                       freiInhalt={besatzungInhalt}
                       onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-                      onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+                      onFreigeben={(epId, name) =>
+                        besatzungFreiMutation.mutate({ efId: ef.id, epId, name })
+                      }
                       zuordnenFehler={zuordnenFehler.grund(ef.id)}
                       freigebenFehler={freigebenFehler.grund}
                       gesperrt={personalGesperrt}

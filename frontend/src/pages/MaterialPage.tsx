@@ -76,6 +76,8 @@ import { Segmentleiste } from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus } from '../theme/statusFarben';
+import { useDichte } from '../theme/ThemeModeProvider';
+import { menueSpaltenBreite } from '../components/menueSpalte';
 import DemoMarke from '../components/DemoMarke';
 import { demoGroupedOptions, type AuswahlOption } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -242,6 +244,7 @@ function MaterialInhalt() {
   });
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { dichte } = useDichte();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [stammForm] = Form.useForm<StammDisposition>();
@@ -606,7 +609,10 @@ function MaterialInhalt() {
    * (LLH-1528): „Als Gerät führen“ macht es wieder zu dem einen Stück, mit Menge 1.
    */
   const menueEintraege = (em: EinsatzMaterial): MenueEintrag[] => {
-    const eintraege: MenueEintrag[] = [];
+    // Das Beenden einer Kraft steht zuerst im Menü, neutral (LLH-1722, `frontend/AGENTS.md`,
+    // „Beenden: Verb, Ort und Sicherung je Art“): nie Hauptaktion einer Karte, kein roter Knopf
+    // in der Zeile. Ohne Rückfrage, mit Rückgängig-Hinweis.
+    const eintraege: MenueEintrag[] = [{ key: 'herausnehmen', label: 'Aus dem Einsatz nehmen' }];
     const rest = em.menge - em.ausgegeben;
     if (em.art === 'verbrauchsgut') {
       eintraege.push({ key: 'menge', label: 'Menge ändern …' });
@@ -684,7 +690,9 @@ function MaterialInhalt() {
     setAusgabeFuer({ posten: em, modus });
   };
   const handleAktion = (key: string, em: EinsatzMaterial) => {
-    if (key === 'angaben') {
+    if (key === 'herausnehmen') {
+      herausnehmenMutation.mutate({ emId: em.id, name: em.bezeichnung });
+    } else if (key === 'angaben') {
       angabenMutation.reset();
       setAngabenFuer(em);
     } else if (key === 'menge') {
@@ -960,29 +968,19 @@ function MaterialInhalt() {
           {
             title: 'Aktionen',
             key: 'aktionen' as const,
-            width: 250,
+            width: menueSpaltenBreite(dichte),
             immerSichtbar: true,
-            // Herausnehmen ist umkehrbar: `danger` mit Abstand, keine Rückfrage; Angaben ändern,
-            // Aufteilen und Stornieren stehen im Zeilenmenü, Stornieren fragt nach (LLH-1079 D8,
-            // LLH-1093 D11, wie die Fahrzeugseite).
+            // Alle Handlungen im Zeilenmenü (LLH-1722), zuerst „Aus dem Einsatz nehmen“; Stornieren
+            // fragt nach (LLH-1079 D8, LLH-1093 D11, wie die Fahrzeugseite).
             render: (_: unknown, em: EinsatzMaterial) => (
               <Space size="middle">
-                <Button
-                  danger
-                  loading={
-                    herausnehmenMutation.isPending && herausnehmenMutation.variables?.emId === em.id
-                  }
-                  disabled={isZeileBusy(em.id)}
-                  aria-label={`${em.bezeichnung} aus dem Einsatz nehmen`}
-                  onClick={() => herausnehmenMutation.mutate({ emId: em.id, name: em.bezeichnung })}
-                >
-                  Aus dem Einsatz nehmen
-                </Button>
                 <MenueAusloeser
                   eintraege={menueEintraege(em)}
                   zugaenglicherName={`Weitere Aktionen zu ${em.bezeichnung}`}
                   gesperrt={isZeileBusy(em.id)}
                   laeuft={
+                    (herausnehmenMutation.isPending &&
+                      herausnehmenMutation.variables?.emId === em.id) ||
                     (stornierenMutation.isPending && stornierenMutation.variables === em.id) ||
                     (aufteilenMutation.isPending && aufteilenMutation.variables?.em.id === em.id) ||
                     (artMutation.isPending && artMutation.variables?.emId === em.id) ||
@@ -1110,16 +1108,8 @@ function MaterialInhalt() {
               // Zwei Sekundärfelder: `status` steht im Slot darüber und stünde sonst doppelt. Die
               // Kategorie bleibt in der Suche (LLH-1093, design.md D13).
               sekundaer: ['ort', 'menge'],
-              // „Aus dem Einsatz nehmen“ ließe dem Inhalt rechts daneben auf 390 px keinen Platz.
-              gestapelt: true,
-              aktion: darfSchreiben
-                ? {
-                    etikett: 'Aus dem Einsatz nehmen',
-                    zugaenglicherName: (em) => `${em.bezeichnung} aus dem Einsatz nehmen`,
-                    onKlick: (em) =>
-                      herausnehmenMutation.mutate({ emId: em.id, name: em.bezeichnung }),
-                  }
-                : undefined,
+              // Keine Primäraktion: „Aus dem Einsatz nehmen“ ist nie Hauptaktion einer Karte
+              // (LLH-1722, Spec `bedien-muster`); es steht zuerst im Menü.
               weitere: darfSchreiben
                 ? {
                     eintraege: menueEintraege,

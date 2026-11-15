@@ -54,12 +54,14 @@ test('Bezirk: aus der Übersicht auf die Detailseite, melden, räumen, bearbeite
   await page.getByRole('button', { name: 'Räumung beginnen' }).click();
   await expect(page.getByRole('button', { name: 'Als geräumt melden' })).toBeVisible();
 
-  // Plangröße in der Ansicht bearbeiten.
-  await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+  // Plangröße in der Ansicht bearbeiten; „Bearbeiten“ steht seit LLH-1722 im ⋮ des Kopfs.
+  const kopfMenue = page.getByRole('button', { name: /^Weitere Aktionen zu Bezirk / });
+  await kopfMenue.click();
+  await page.getByRole('menuitem', { name: 'Bearbeiten', exact: true }).click();
   const plan = page.getByLabel('Plangröße (Personen)');
   await plan.fill('800');
   await page.getByRole('button', { name: 'Speichern' }).click();
-  await expect(page.getByRole('button', { name: 'Bearbeiten', exact: true })).toBeVisible();
+  await expect(kopfMenue).toBeVisible();
   await expect(band).toContainText('40 %');
 
   // Der Server trägt beides.
@@ -81,4 +83,31 @@ test('Bezirk: aus der Übersicht auf die Detailseite, melden, räumen, bearbeite
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(ueber, 'waagerechter Überlauf in px').toBeLessThanOrEqual(1);
+});
+
+/**
+ * LLH-1722 (Spec `bedien-muster`, „Höchstens zwei Handlungen im Kopf einer Detailseite“): am
+ * Tablet steht der Kopf eines laufenden Bezirks in der Zeile des Titels, statt unter ihn
+ * umzubrechen — „Stand melden“ und der Räumungsschritt als Knöpfe, „Bearbeiten“ im ⋮.
+ */
+test('Bezirk bei 1180 px: der Kopf steht in der Zeile des Titels', async ({ page }) => {
+  await anmelden(page, { startseite: false });
+  const { id: einsatzId } = await senden(page, '/api/einsaetze', {
+    bezeichnung: `E2E Bezirk-Kopf ${Date.now()}`,
+  });
+  const { id: bezirkId } = await senden(page, `/api/einsaetze/${einsatzId}/evakuierung/bezirke`, {
+    bezeichnung: 'Uferstraße 12–40',
+    plan_personen: 640,
+    plan_erhebung: 'geschaetzt',
+  });
+  await page.setViewportSize({ width: 1180, height: 820 });
+  await page.goto(`/einsaetze/${einsatzId}/evakuierung/${bezirkId}`);
+  const titel = page.getByRole('heading', { level: 1, name: /Bezirk Uferstraße 12–40/ });
+  await expect(titel).toBeVisible();
+  const aktionen = page.locator('[data-lfh="seitenkopf-aktionen"]');
+  await expect(aktionen.getByRole('button', { name: 'Stand melden', exact: true })).toBeVisible();
+  await expect(aktionen.getByRole('button', { name: 'Bearbeiten', exact: true })).toHaveCount(0);
+  const t = (await titel.boundingBox())!;
+  const a = (await aktionen.boundingBox())!;
+  expect(a.y, 'Kopfaktionen unter den Titel umgebrochen').toBeLessThan(t.y + t.height);
 });

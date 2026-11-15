@@ -246,9 +246,15 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
     mutationFn: (status: BetreuungsstelleStatus) => aendereStelle(einsatzId, stelleId, { status }),
     onSuccess: (s) => {
       invalidiere();
-      message.success(
-        `Betreuungsstelle ${s.bezeichnung}: ${betreuungsstelleStatus[s.status].label}`,
-      );
+      const text = `Betreuungsstelle ${s.bezeichnung}: ${betreuungsstelleStatus[s.status].label}`;
+      // „Schließen“ einer leeren Stelle ist umkehrbar (LLH-1722, `frontend/AGENTS.md`, „Beenden:
+      // Verb, Ort und Sicherung je Art“): der Rückweg ist der Statusübergang zurück in Betrieb.
+      // Eine belegte Stelle schließt über die Leermeldung (`schliessenMut`), ohne Rückweg.
+      if (s.status === 'geschlossen') {
+        zeigeRueckgaengig(message, text, () => statusMut.mutate('in_betrieb'));
+      } else {
+        message.success(text);
+      }
     },
   });
   // Die Leermeldung vor dem Schließen: ohne Rückgängig-Toast — ein Rückweg auf die alte Zahl
