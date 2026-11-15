@@ -29,7 +29,7 @@ Arbeitsweise je Aufgabe: `superpowers:test-driven-development` (Test zuerst rot)
 ## 5. Nachweis im Browser
 
 - [x] 5.1 `e2e/rahmen-stehen-bleiben.spec.ts` um die Szenarien der Delta-Spec erweitern (Modulpanel im ETB bei 1440 × 900, Panel in 1366 × 520 handschuh, Seitenkopf in ETB/Personal/Einstellungen/Verwaltung, niedriges Fenster, Tabellenkopf unter dem Seitenkopf, Fokus rückwärts). Nachweis: Spec läuft grün gegen den Stand des Branches
-- [ ] 5.2 Bestehende Rahmen- und Fokus-Specs laufen grün: `rahmen-stehen-bleiben`, `fokus-verdeckung`, `etb-filterleiste`, `alarm-verdeckung`, `rahmen-cls-dichte`, `gate3-trefflaeche`, `kraefte-seitenkopf`, eine Druck-Spec (`etb-druck`). Nachweis: Lauf mit Ergebnis im PR unter „Geprüft“
+- [x] 5.2 Bestehende Rahmen- und Fokus-Specs laufen grün: `rahmen-stehen-bleiben`, `fokus-verdeckung`, `etb-filterleiste`, `alarm-verdeckung`, `rahmen-cls-dichte`, `gate3-trefflaeche`, `kraefte-seitenkopf`, eine Druck-Spec (`etb-druck`). Nachweis: Lauf mit Ergebnis im PR unter „Geprüft“
 
 ## 6. Regeln und Design System
 
