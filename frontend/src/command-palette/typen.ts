@@ -200,7 +200,8 @@ export interface BefehlKontext {
   setKoordinaten: (f: Koordinatenformat) => void;
   /** Zeitdarstellung dieses Geräts (LLH-1053); `null` folgt wieder Einsatz und Organisation. */
   setZeitdarstellung: (z: Zeitdarstellung | null) => void;
-  logout: () => void;
+  /** Öffnet die Rückfrage zum Abmelden (LLH-1730); erst ihre Bestätigung beendet die Sitzung. */
+  abmelden: () => void;
   tastaturAktionen?: TastaturAktionen;
   userAgent?: string;
 }

@@ -5,6 +5,7 @@ import {
   istModulGesperrt,
   istModulSichtbar,
   KEINE_BERECHTIGUNG,
+  modulZielRoute,
   type ModulEintrag,
 } from './modulRegistry';
 import {
@@ -22,6 +23,8 @@ import { einsatzDauer } from './einsatzDauer';
 import { MODUL_PANEL_ID } from './IconRail';
 import { bringIntoView } from '../components/bringIntoView';
 import { abonniereRahmenOben } from '../components/rahmenOben';
+import { einsatzModulPfad } from '../routing/deeplinks';
+import { handleLinkKlick } from '../routing/linkModifier';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -32,11 +35,21 @@ const PANEL_KOPF = 42;
 /** Aktive Modulmarke: 2 × 16 px in `bedien`. Markermaß. */
 const MARKE = { breite: 2, hoehe: 16 } as const;
 
+/**
+ * Einzug des Etiketts einer Sprungmarke hinter ihrer Linie. Markermaß, bewusst NICHT aus der
+ * Dichte: mit `padding` (bis 26 px) kürzte das 208-px-Panel gesperrte Namen schon in komfortabel
+ * („Kommunikationsp…“, Review LLH-1733).
+ */
+const SPRUNG_EINZUG = 10;
+
 interface ListeProps {
+  /** Der Einsatz, in dessen Module die Links führen (LLH-1732). */
+  einsatzId: number;
   module: ModulEintrag[];
   /** Modulfreigaben des Servers (LFH-669); steuern Sichtbarkeit und Sperre. */
   freigaben?: ModulFreigaben;
   aktiverModulKey: string | null;
+  /** Einfacher Klick auf ein freies Modul; Strg/⌘/Umschalt/Mittelklick behält der Browser. */
   onModulKlick: (modul: ModulEintrag) => void;
   /**
    * Zusätzlicher Trefflächen-BODEN in Pixeln, der die Dichtestufe anhebt — nie senkt. Die
@@ -85,6 +98,14 @@ export function modulZeilenStil(
 ): CSSProperties {
   return {
     display: 'flex',
+    boxSizing: 'border-box',
+    // Die freie Zeile ist ein `<a href>` (LLH-1732), die gesperrte ein `<button>`. Ein Link erbt
+    // Schrift und Zeilenhöhe der App, ein Knopf nimmt die Systemschrift des Browsers. Beide
+    // bekommen deshalb die Schrift der App (Archivo, Entwurf) und die Zeilenhöhe `normal`, die die
+    // Zeile als Knopf hatte; so wächst sie nicht. Der Link ohne Unterstrich.
+    fontFamily: 'inherit',
+    lineHeight: 'normal',
+    textDecoration: 'none',
     alignItems: 'center',
     gap: token.marginSM,
     padding: `${token.paddingSM}px ${token.padding}px`,
@@ -138,6 +159,27 @@ export function modulMarkeStil(farben: Pick<Farbrollen, 'bedien'>, aktiv: boolea
 }
 
 /**
+ * Führungslinie einer Sprungmarke (LLH-1733, Spec `modul-sprungmarken`): 1 px in `linie`, in der
+ * Spalte der Modulmarke, damit die Marke als eingerückte Unteransicht des Moduls darüber liest
+ * und nicht als Link nach außen. `stretch` mit negativem Block-Rand zieht sie durch die
+ * Polsterung, so bilden Marken untereinander eine durchgehende Linie; der Rand nach rechts ist
+ * der feste Einzug des Etiketts ({@link SPRUNG_EINZUG}).
+ */
+export function sprungLinieStil(
+  token: { paddingSM: number },
+  farben: Pick<Farbrollen, 'linie'>,
+): CSSProperties {
+  return {
+    width: 1,
+    alignSelf: 'stretch',
+    marginBlock: -token.paddingSM,
+    marginInlineEnd: SPRUNG_EINZUG,
+    flexShrink: 0,
+    background: farben.linie,
+  };
+}
+
+/**
  * Stil der Knopfspalte, rein und exportiert. Die Zeilen stehen ohne Zwischenraum; Luft nur oben
  * und unten aus `token.marginXS`.
  */
@@ -162,11 +204,12 @@ interface Props extends ListeProps {
 }
 
 /**
- * Die Modulknöpfe einer Kategorie — ohne Rahmen, Titel und feste Breite. Eigener Export für
+ * Die Moduleinträge einer Kategorie — ohne Rahmen, Titel und feste Breite. Eigener Export für
  * zwei Träger: das {@link ModulPanel} und das Akkordeon im Navigations-Drawer. Sichtbarkeits-
  * und Sperrlogik samt `aria-hidden`-Markern darf es nur EINMAL geben.
  */
 export function ModulListe({
+  einsatzId,
   module,
   freigaben,
   aktiverModulKey,
@@ -193,36 +236,58 @@ export function ModulListe({
           if (!ziel || ziel.status !== 'fertig' || !istModulSichtbar(ziel, freigaben)) return null;
           const gesperrt =
             istModulGesperrt(ziel, freigaben) || sprungVoraussetzungGesperrt(marke, freigaben);
-          return (
-            <button
-              key={`sprung:${marke.key}`}
-              type="button"
-              data-lfh="modul-sprungmarke"
-              disabled={gesperrt}
-              title={gesperrt ? KEINE_BERECHTIGUNG : marke.hinweis}
-              // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen", wer vorliest, soll vorher
-              // wissen, dass er im ETB landet.
-              aria-label={`${marke.label}, springt zu ${marke.hinweis}`}
-              onClick={() => !gesperrt && onSprungKlick?.(marke)}
-              style={modulZeilenStil(token, farben, { aktiv: false, gesperrt, mindestTrefflaeche })}
-            >
-              <span aria-hidden="true" style={modulMarkeStil(farben, false)} />
-              <span style={{ minWidth: 0, flex: 1 }}>{marke.label}</span>
-              {/* Dasselbe Icon wie am `verweistAuf`-Eintrag; Dekoration in `aria-hidden`-Hülle. */}
-              {!gesperrt && (
-                <span
-                  aria-hidden
-                  style={{ display: 'inline-flex', flexShrink: 0, color: farben.schwach }}
-                >
-                  <IconExternPfeil />
-                </span>
-              )}
+          const sprungProps = {
+            'data-lfh': 'modul-sprungmarke',
+            // Gesperrt mit Namen: im schmalen Panel kann das Etikett gekürzt sein, und der Titel ist
+            // dann die einzige Stelle, an der er ganz steht (LLH-1733).
+            title: gesperrt ? `${marke.label} · ${KEINE_BERECHTIGUNG}` : marke.hinweis,
+            // Das Ziel gehört in den Namen: sichtbar steht nur „Entscheidungen“ unter dem ETB, wer
+            // vorliest, soll vorher wissen, dass er dort landet.
+            'aria-label': `${marke.label}, springt zu ${marke.hinweis}`,
+            style: modulZeilenStil(token, farben, { aktiv: false, gesperrt, mindestTrefflaeche }),
+          };
+          const sprungInhalt = (
+            <>
+              {/* Eingerückte Unteransicht statt Pfeil (LLH-1733): die Linie steht an der Stelle der
+                 Modulmarke, eine Marke wird nie aktiv. */}
+              <span
+                aria-hidden="true"
+                data-lfh="sprung-linie"
+                style={sprungLinieStil(token, farben)}
+              />
+              <span
+                style={{
+                  minWidth: 0,
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {marke.label}
+              </span>
               {gesperrt && (
                 <span aria-hidden style={{ display: 'inline-flex', flexShrink: 0 }}>
                   <IconSchloss />
                 </span>
               )}
+            </>
+          );
+          // Gesperrt bleibt ein gesperrter Knopf: ein Link zeigte eine Adresse, die nichts öffnet.
+          // Frei ist es ein Link (LLH-1732), damit Strg/⌘+Klick einen neuen Tab öffnet.
+          return gesperrt ? (
+            <button key={`sprung:${marke.key}`} type="button" disabled {...sprungProps}>
+              {sprungInhalt}
             </button>
+          ) : (
+            <a
+              key={`sprung:${marke.key}`}
+              href={marke.pfad(einsatzId)}
+              onClick={(e) => handleLinkKlick(e, () => onSprungKlick?.(marke))}
+              {...sprungProps}
+            >
+              {sprungInhalt}
+            </a>
           );
         }
         const m = zeile.modul;
@@ -232,18 +297,15 @@ export function ModulListe({
         const modulZaehler = m.zaehlerQuelle ? zaehler?.[m.zaehlerQuelle] : undefined;
         const zaehlerSichtbar = modulZaehler !== undefined && modulZaehler.wert > 0;
         const beschreibungId = m.beschreibung ? `${listenId}-${m.key}` : undefined;
-        return (
-          <button
-            key={m.key}
-            type="button"
-            disabled={gesperrt}
-            title={gesperrt ? KEINE_BERECHTIGUNG : m.beschreibung}
-            aria-current={aktiv ? 'true' : undefined}
-            aria-label={zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined}
-            aria-describedby={beschreibungId}
-            onClick={() => !gesperrt && onModulKlick(m)}
-            style={modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche })}
-          >
+        const modulProps = {
+          title: gesperrt ? KEINE_BERECHTIGUNG : m.beschreibung,
+          'aria-current': aktiv ? ('true' as const) : undefined,
+          'aria-label': zaehlerSichtbar ? `${m.label}, ${modulZaehler.beschreibung}` : undefined,
+          'aria-describedby': beschreibungId,
+          style: modulZeilenStil(token, farben, { aktiv, gesperrt, mindestTrefflaeche }),
+        };
+        const modulInhalt = (
+          <>
             {/* Keine Modulicon: die Zeile trägt Marke · Etikett · Zähler. Die Icons bleiben in der
                Kommandopalette, wo sie Module, Aktionen und Datensätze unterscheiden. */}
             <span aria-hidden="true" style={modulMarkeStil(farben, aktiv)} />
@@ -301,7 +363,23 @@ export function ModulListe({
                 <IconSchloss />
               </span>
             )}
+          </>
+        );
+        // Wie bei der Sprungmarke: frei ein Link auf die Adresse des Moduls (LLH-1732), gesperrt ein
+        // gesperrter Knopf ohne Adresse.
+        return gesperrt ? (
+          <button key={m.key} type="button" disabled {...modulProps}>
+            {modulInhalt}
           </button>
+        ) : (
+          <a
+            key={m.key}
+            href={einsatzModulPfad(einsatzId, modulZielRoute(m))}
+            onClick={(e) => handleLinkKlick(e, () => onModulKlick(m))}
+            {...modulProps}
+          >
+            {modulInhalt}
+          </a>
         );
       })}
     </div>

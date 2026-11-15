@@ -11,6 +11,7 @@ import DruckKnopf from '../components/druck/DruckKnopf';
 import { useViewport } from '../components/useViewport';
 import { Bildmarke } from '../marke/Bildmarke';
 import { warGeraet } from '../geraet/geraetMarke';
+import { useEinsatzRueckweg } from '../einsatz/einsatzRueckweg';
 import { rueckmeldungsAdresse } from '../rueckmeldung/adresse';
 import {
   GERAET_START_PFAD,
@@ -27,10 +28,15 @@ import './Hilfe.css';
 /** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`, HEIC-Decoder LFH-1000). */
 const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
 
+/** Ein Pfad dieser App: beginnt mit `/`, aber nicht mit `//` (das wäre eine fremde Adresse). */
+function isAppPfad(wert: unknown): wert is string {
+  return typeof wert === 'string' && wert.startsWith('/') && !wert.startsWith('//');
+}
+
 /** Der Pfad, aus dem das Benutzermenü die Hilfe geöffnet hat (`state.von`, LLH-1642 D5). */
 function parseHerkunft(state: unknown): string | undefined {
   const von = (state as { von?: unknown } | null)?.von;
-  return typeof von === 'string' && von.startsWith('/') ? von : undefined;
+  return isAppPfad(von) ? von : undefined;
 }
 
 /** Klein, ohne Umlaute und ß: „gerat“ findet „Gerät“. */
@@ -63,7 +69,7 @@ interface Gliederungspunkt {
  * Offen ohne Anmeldung (das Kapitel „Anmelden“ braucht man davor) und ohne Netz (die Texte stecken
  * im Chunk dieser Seite, den der Service Worker vorhält). Bilder lädt die Seite erst beim Ansehen
  * und hält sie danach im Laufzeit-Cache (`HilfeBild`, `bilder.ts`, LFH-1128). Der Rückweg folgt
- * der Sitzung: Person, Gerät oder Anmeldung.
+ * der Sitzung: Gerät, Anmeldung, die Stelle im aktiven Einsatz oder die Einsatzliste (LLH-1731).
  */
 export default function HilfePage() {
   const { kapitel: slug } = useParams();
@@ -94,11 +100,17 @@ export default function HilfePage() {
   const zurueck = stelle > 0 ? KAPITEL[stelle - 1] : undefined;
   const weiter = stelle >= 0 ? KAPITEL[stelle + 1] : undefined;
 
+  // Genau ein Rückweg (LLH-1731, Spec `seiten-orientierung`, „Rückweg aus der Hilfe“): Gerät,
+  // Anmeldung, die zuletzt geöffnete Stelle des aktiven Einsatzes, sonst die Einsatzliste.
+  const einsatzRueckweg = useEinsatzRueckweg(benutzer?.id, !geraet && benutzer != null, {
+    // Je Besuch fest (Review B5): ein Kapitelwechsel ändert den Rückweg nicht.
+    isJeBesuchFest: true,
+  });
   const rueckweg = geraet
     ? { pfad: GERAET_START_PFAD, label: 'Zum Gerät' }
-    : benutzer
-      ? { pfad: einsaetzePfad(), label: 'Zur App' }
-      : { pfad: '/login', label: 'Zur Anmeldung' };
+    : !benutzer
+      ? { pfad: '/login', label: 'Zur Anmeldung' }
+      : (einsatzRueckweg ?? { pfad: einsaetzePfad(), label: 'Zu den Einsätzen' });
 
   // Rückmeldeweg (LLH-1549, seit LLH-1642 hier statt im Benutzermenü): das Issue-Formular,
   // vorbefüllt mit Version, Oberfläche und dem Bereich, aus dem die Hilfe geöffnet wurde — nur als
@@ -150,6 +162,23 @@ export default function HilfePage() {
   // Wechsel innerhalb der Hilfe tragen die Herkunft weiter, sonst meldete die Rückmeldung nach
   // einem Kapitelwechsel `/hilfe` statt des Bereichs, aus dem die Hilfe geöffnet wurde (D5).
   const herkunftState = location.state;
+
+  // Im neuen Tab reist die Herkunft als `von` in der Adresse (LLH-1731 D5): einmal in den
+  // History-State übernehmen und aus der Adresse nehmen, damit sie nicht in Lesezeichen und
+  // kopierten Links landet. Die übrigen Parameter (Gruppe) bleiben.
+  const vonInAdresse = params.get('von');
+  useEffect(() => {
+    if (vonInAdresse === null) return;
+    const rest = new URLSearchParams(params);
+    rest.delete('von');
+    const suche = rest.toString();
+    void navigate(
+      { pathname: location.pathname, search: suche ? `?${suche}` : '' },
+      { replace: true, state: isAppPfad(vonInAdresse) ? { von: vonInAdresse } : location.state },
+    );
+    // Nur der Parameter löst aus; Pfad, State und übrige Suche gelten zum selben Zeitpunkt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vonInAdresse]);
 
   // „/“ springt in die Suche, wie in der Doku der Website.
   useEffect(() => {
@@ -287,7 +316,17 @@ export default function HilfePage() {
         </div>
         <div className="hilfe-kopf__aktionen">
           <DruckKnopf ohneOrganisation gesperrt={gezeigt.length === 0} />
-          <Button onClick={() => void navigate(rueckweg.pfad)}>{rueckweg.label}</Button>
+          {/* Ein langer Einsatzname kürzt, statt die Hilfe bei 390 px quer zu sprengen (Muster von
+              `RueckwegKnopf` in `AdminPage`, LLH-1731): `maxWidth` am Knopf, Auslassung innen. */}
+          <Button
+            title={rueckweg.label}
+            style={{ maxWidth: '100%' }}
+            onClick={() => void navigate(rueckweg.pfad)}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {rueckweg.label}
+            </span>
+          </Button>
         </div>
       </header>
 

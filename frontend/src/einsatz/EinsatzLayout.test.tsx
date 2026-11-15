@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { skipToken, useQuery } from '@tanstack/react-query';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
@@ -20,6 +20,7 @@ import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixtures';
 import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
+import { queryNavEintrag } from './navEintragTest';
 
 vi.mock('./useModulZaehler', () => ({
   useModulZaehler: () => ({}),
@@ -248,7 +249,7 @@ describe('EinsatzLayout', () => {
     // einem Routen-Effekt grün.
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Betroffene' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Betroffene' }));
 
     expect(await screen.findByText('Personen-Inhalt')).toBeInTheDocument();
     expect(leseZuletztModule(admin.id, 7)).toEqual(['personen']);
@@ -265,9 +266,9 @@ describe('EinsatzLayout', () => {
     merkeModulBesuch(admin.id, 7, 'lagekarte');
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: 'Betroffene' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Betroffene' })).toBeInTheDocument();
     expect(screen.queryByText('Zuletzt')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Lagekarte' })).toBeNull();
+    expect(queryNavEintrag('Lagekarte')).toBeNull();
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
@@ -276,10 +277,8 @@ describe('EinsatzLayout', () => {
     setup(freigabenFixture({ personen: { sichtbar: false, zugriff: false } }));
     // Erst der Panel-Anker, dann die Abwesenheit ABWARTEN: bis die Freigaben ankommen, steht
     // „Personen" offen da (LFH-788). Der ETB-Inhalt allein sagt darüber nichts.
-    expect(await screen.findByRole('button', { name: 'ETB' })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Betroffene' })).not.toBeInTheDocument(),
-    );
+    expect(await screen.findByRole('link', { name: 'ETB' })).toBeInTheDocument();
+    await waitFor(() => expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument());
   });
 
   it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
@@ -287,7 +286,7 @@ describe('EinsatzLayout', () => {
     // Letztes Segment ist „liste"; das aktive Modul wird am Segment nach der Einsatz-ID erkannt —
     // sonst klappt das Panel beim UHS-Redirect zu.
     setupRoute('/einsaetze/7/unfallhilfsstellen/liste', 'unfallhilfsstellen/liste');
-    expect(await screen.findByRole('button', { name: 'Unfallhilfsstellen' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Unfallhilfsstellen' })).toBeInTheDocument();
   });
 
   it('öffnet genau EINE SSE-Verbindung für den Einsatz (Stream im Layout, LFH-97)', async () => {
@@ -364,7 +363,7 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Navigation öffnen' })).not.toBeInTheDocument();
     // Der Drawer existiert im Breitstand gar nicht — auch nicht geschlossen.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -509,14 +508,14 @@ describe('EinsatzLayout', () => {
   it('merkt das eingeklappte Panel über einen Neu-Mount (lfh:nav:eingeklappt)', async () => {
     setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     setup();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Erfassung' }));
 
-    expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     // Die Rail bleibt auf der Kategorie — sonst wäre „zugeklappt" von „keine Kategorie aktiv"
     // nicht zu unterscheiden.
-    expect(screen.getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Erfassung' })).toHaveAttribute(
       'aria-current',
       'true',
     );
@@ -528,7 +527,7 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
   });
 
   it('klappt beim Wechsel auf eine andere Kategorie wieder auf, ohne die Wahl zu überschreiben', async () => {
@@ -536,9 +535,9 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
 
-    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Lage' }));
 
-    expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Lagekarte' })).toBeInTheDocument();
     // Der Sprung ist keine Wahl (LFH-952, D5): gemerkt bleibt „zu“.
     expect(localStorage.getItem(EINGEKLAPPT)).toBe('1');
   });
@@ -552,12 +551,12 @@ describe('EinsatzLayout', () => {
     it('1024 ohne Wahl: Panel zu, Griff „Menü ausklappen“ mit aria-expanded false', async () => {
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-      expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+      expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Menü ausklappen' })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
-      expect(screen.getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+      expect(await screen.findByRole('link', { name: 'Erfassung' })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
@@ -566,7 +565,7 @@ describe('EinsatzLayout', () => {
     it('1440 ohne Wahl: Panel offen (Gegenprobe zur Vorgabe)', async () => {
       setzeViewportBreite(XL);
       setup();
-      expect(await screen.findByRole('button', { name: 'ETB' })).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: 'ETB' })).toBeInTheDocument();
       const griff = screen.getByRole('button', { name: 'Menü einklappen' });
       expect(griff).toHaveAttribute('aria-expanded', 'true');
       expect(document.getElementById(griff.getAttribute('aria-controls')!)).toHaveAttribute(
@@ -579,12 +578,12 @@ describe('EinsatzLayout', () => {
       const { unmount } = setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: 'Menü ausklappen' }));
-      expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument();
       expect(localStorage.getItem(EINGEKLAPPT)).toBe('0');
       unmount();
 
       setup();
-      expect(await screen.findByRole('button', { name: 'ETB' })).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: 'ETB' })).toBeInTheDocument();
     });
 
     it('eine Wahl „zu“ gilt auch ab xl', async () => {
@@ -592,15 +591,15 @@ describe('EinsatzLayout', () => {
       setzeViewportBreite(XL);
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-      expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+      expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     });
 
     it('der Rail-Sprung öffnet am Tablet, schreibt aber keine Wahl', async () => {
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       await freigabenAngekommen();
-      await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
-      expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole('link', { name: 'Lage' }));
+      expect(await screen.findByRole('link', { name: 'Lagekarte' })).toBeInTheDocument();
       expect(localStorage.getItem(EINGEKLAPPT)).toBeNull();
     });
   });
@@ -618,7 +617,7 @@ describe('EinsatzLayout', () => {
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       expect(screen.getByRole('button', { name: 'Navigation öffnen' })).toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: 'Kategorien' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'ETB' })).not.toBeInTheDocument();
+      expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     });
 
     it('öffnet die Navigation im Drawer', async () => {
@@ -632,7 +631,7 @@ describe('EinsatzLayout', () => {
         'aria-expanded',
         'true',
       );
-      expect(within(dialog).getByRole('button', { name: 'ETB' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('link', { name: 'ETB' })).toBeInTheDocument();
       // Genau EINE Navigations-Landmarke — die Rail darf im Drawer-Zustand nicht zusätzlich im Baum
       // stehen.
       expect(screen.getAllByRole('navigation')).toHaveLength(1);
@@ -645,7 +644,7 @@ describe('EinsatzLayout', () => {
 
       const dialog = await screen.findByRole('dialog');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Lage' }));
-      await userEvent.click(await screen.findByRole('button', { name: 'Lagekarte' }));
+      await userEvent.click(await screen.findByRole('link', { name: 'Lagekarte' }));
 
       expect(await screen.findByText('Lagekarte-Inhalt')).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -729,7 +728,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Vermisste, springt zu Personen · Vermisst' }),
+      screen.getByRole('link', { name: 'Vermisste, springt zu Personen · Vermisst' }),
     );
 
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
@@ -737,7 +736,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
       'data-suche',
       '?filter=vermisst&ansicht=zeilen',
     );
-    expect(screen.getByRole('button', { name: 'Betroffene' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Betroffene' })).toHaveAttribute(
       'aria-current',
       'true',
     );
@@ -750,7 +749,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // Ohne Freigaben gibt der Resolver nichts frei, der Klick spränge nirgends hin (LFH-788).
     await freigabenAngekommen();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Lage' }));
 
     // Die Aussage ist der PFAD, und das ZIEL wird benannt: ein Resolver, der das erste Modul einer
     // FALSCHEN Kategorie liefert, bestünde eine schwächere Form. Käme ein `verweistAuf`-Eintrag
@@ -768,7 +767,7 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     await freigabenAngekommen();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Lage' }));
 
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
@@ -784,12 +783,12 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     const vorher = pfad();
 
     // „Erfassung" ist die Kategorie von 'personen' — der Klick trifft die aktive.
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassung' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Erfassung' }));
 
     expect(pfad()).toBe(vorher);
     // Panel zugeklappt: ein Erfassung-Modul wie „Personen" steht nicht mehr im Baum
     // (dieselbe Abfrage wie im Bestandstest zum gemerkten Einklapp-Zustand oben).
-    expect(screen.queryByRole('button', { name: 'Betroffene' })).not.toBeInTheDocument();
+    expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument();
   });
 
   /**
@@ -812,10 +811,40 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
       'Keine Berechtigung',
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Lage' }));
 
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lagekarte'));
     expect(screen.getByRole('button', { name: 'Lagebild' })).toBeDisabled();
+  });
+
+  /**
+   * LLH-1732: Rail und Modulpanel tragen echte Adressen, damit Strg/⌘+Klick ein Modul in einen
+   * neuen Tab legt. Die Rail-Adresse ist das Ziel des Rail-Sprungs (erstes freigegebenes Modul),
+   * und ein Strg-Klick lässt diesen Tab, wo er ist.
+   */
+  it('führt Rail und Modulpanel als Links; Strg-Klick wechselt die Seite nicht (LLH-1732)', async () => {
+    setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
+    localStorage.clear();
+    setup(freigabenFixture({ 'lage-dashboard': { zugriff: false } }));
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
+
+    // Das gesperrte Lage-Dashboard überspringt auch die Adresse, wie der Sprung (LFH-669).
+    const lage = await screen.findByRole('link', { name: 'Lage' });
+    expect(lage).toHaveAttribute('href', '/einsaetze/7/lagekarte');
+    expect(screen.getByRole('link', { name: 'Betroffene' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/personen',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Vermisste, springt zu Personen · Vermisst' }),
+    ).toHaveAttribute('href', '/einsaetze/7/personen?filter=vermisst&ansicht=zeilen');
+
+    const vorher = pfad();
+    fireEvent.click(lage, { ctrlKey: true });
+    fireEvent.click(screen.getByRole('link', { name: 'Betroffene' }), { ctrlKey: true });
+    expect(pfad()).toBe(vorher);
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
 
   it('öffnet das Panel auch ohne freigegebenes Modul der Kategorie, navigiert aber nicht', async () => {

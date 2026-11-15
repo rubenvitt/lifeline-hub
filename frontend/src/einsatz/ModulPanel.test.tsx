@@ -1,13 +1,19 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel } from '../theme/tokens';
-import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
+import ModulPanel, {
+  modulListenStil,
+  modulMarkeStil,
+  modulZeilenStil,
+  sprungLinieStil,
+} from './ModulPanel';
 import { modulRegistry, type ModulEintrag } from './modulRegistry';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import type { ModulFreigaben } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
+import { queryNavEintrag } from './navEintragTest';
 
 /**
  * Freigaben wie vom Server (LFH-669). Die Liste unten trägt eigene Schlüssel (`sach`, `geheim`),
@@ -38,6 +44,7 @@ describe('ModulPanel', () => {
   it('listet Module, markiert WIP, sperrt vom Server gesperrte', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         freigaben={freigaben()}
@@ -46,8 +53,8 @@ describe('ModulPanel', () => {
       />,
     );
     expect(screen.getByText('Erfassung')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /ETB/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Sachschäden/ })).toBeEnabled();
+    expect(screen.getByRole('link', { name: /ETB/ })).toBeEnabled();
+    expect(screen.getByRole('link', { name: /Sachschäden/ })).toBeEnabled();
     // Am Titel der Hülle greifen, nicht am Zeichen: der Glyph ist austauschbar, die Aussage ist der Titel.
     expect(screen.getByTitle('In Arbeit')).toBeInTheDocument();
     const geheim = screen.getByRole('button', { name: /Geheim/ });
@@ -62,6 +69,7 @@ describe('ModulPanel', () => {
   it('haelt den WIP-Marker aus dem Accessible Name heraus', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         freigaben={freigaben()}
@@ -69,7 +77,7 @@ describe('ModulPanel', () => {
         onModulKlick={() => {}}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Sachschäden' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Sachschäden' })).toBeInTheDocument();
     expect(screen.getByTitle('In Arbeit')).toBeInTheDocument();
     // Dasselbe gilt für das Schloss: die Sperre trägt `disabled` + `title`.
     expect(screen.getByRole('button', { name: 'Geheim' })).toBeDisabled();
@@ -78,6 +86,7 @@ describe('ModulPanel', () => {
   it('markiert ein Deep-Link-Modul mit Hinweis-Symbol', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Lage"
         module={[
           basis({
@@ -99,6 +108,7 @@ describe('ModulPanel', () => {
   it('blendet ein ausgeblendetes Modul nicht in der Liste ein (LFH-132)', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         freigaben={freigaben({ sach: { sichtbar: false, zugriff: false } })}
@@ -106,8 +116,8 @@ describe('ModulPanel', () => {
         onModulKlick={() => {}}
       />,
     );
-    expect(screen.getByRole('button', { name: /ETB/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Sachschäden/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ETB/ })).toBeInTheDocument();
+    expect(queryNavEintrag(/Sachschäden/)).not.toBeInTheDocument();
   });
 
   it('zeigt Module ungesperrt, solange die Freigaben unbekannt sind (LFH-669, D3)', () => {
@@ -115,20 +125,22 @@ describe('ModulPanel', () => {
     // höchstens auf den 403-Zustand der Modulseite.
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         aktiverModulKey={null}
         onModulKlick={() => {}}
       />,
     );
-    expect(screen.getByRole('button', { name: /ETB/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Sachschäden/ })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Geheim' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: /ETB/ })).toBeEnabled();
+    expect(screen.getByRole('link', { name: /Sachschäden/ })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'Geheim' })).toBeEnabled();
   });
 
   it('sperrt ein Modul, dem der Server den Zugriff verweigert (LFH-132/LFH-669)', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         freigaben={freigaben({ etb: { zugriff: false } })}
@@ -143,6 +155,7 @@ describe('ModulPanel', () => {
     const onKlick = vi.fn();
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         freigaben={freigaben()}
@@ -150,13 +163,14 @@ describe('ModulPanel', () => {
         onModulKlick={onKlick}
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: /ETB/ }));
+    await userEvent.click(screen.getByRole('link', { name: /ETB/ }));
     expect(onKlick).toHaveBeenCalledWith(expect.objectContaining({ key: 'etb' }));
   });
 
   it('zeigt einen neutralen Zähler und nimmt seine Bedeutung in den Accessible Name auf', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Kommunikation"
         module={[
           basis({
@@ -173,7 +187,7 @@ describe('ModulPanel', () => {
         zaehler={{ meldungen: { wert: 5, beschreibung: '5 offene Meldungen, davon 2 ungesehen' } }}
       />,
     );
-    const knopf = screen.getByRole('button', {
+    const knopf = screen.getByRole('link', {
       name: 'Meldungen, 5 offene Meldungen, davon 2 ungesehen',
     });
     const zahl = knopf.querySelector('[data-lfh="modul-zaehler"]');
@@ -190,6 +204,7 @@ describe('ModulPanel', () => {
     const wetter = modulRegistry.find((m) => m.key === 'wetter-pegel')!;
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Lage"
         module={[wetter]}
         freigaben={freigaben()}
@@ -203,7 +218,7 @@ describe('ModulPanel', () => {
         }}
       />,
     );
-    const knopf = screen.getByRole('button', {
+    const knopf = screen.getByRole('link', {
       name: 'Wetter & Pegel, 2 Unwetterwarnungen für den Einsatzort, davon 1 angekündigt',
     });
     expect(knopf.querySelector('[data-lfh="modul-zaehler"]')!.textContent).toBe('2');
@@ -214,6 +229,7 @@ describe('ModulPanel', () => {
     // bewacht den Anker hier statt erst im e2e-Lauf.
     const { container } = renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         freigaben={freigaben()}
@@ -231,6 +247,7 @@ describe('ModulPanel', () => {
      */
     const { container } = renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={module}
         freigaben={freigaben()}
@@ -238,8 +255,8 @@ describe('ModulPanel', () => {
         onModulKlick={() => {}}
       />,
     );
-    expect(screen.getByRole('button', { name: /ETB/ })).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByRole('button', { name: /Sachschäden/ })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: /ETB/ })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('link', { name: /Sachschäden/ })).not.toHaveAttribute('aria-current');
     expect(container.querySelectorAll('[aria-current]')).toHaveLength(1);
   });
 
@@ -251,6 +268,7 @@ describe('ModulPanel', () => {
      */
     const { container } = renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={[
           ...module,
@@ -261,8 +279,13 @@ describe('ModulPanel', () => {
         onModulKlick={() => {}}
       />,
     );
-    for (const name of ['Sachschäden', 'Geheim', 'Zonen']) {
-      const knopf = screen.getByRole('button', { name });
+    // „Geheim“ ist gesperrt und deshalb ein Knopf, die freien Einträge sind Links (LLH-1732).
+    for (const knopf of [
+      screen.getByRole('link', { name: 'Sachschäden' }),
+      screen.getByRole('button', { name: 'Geheim' }),
+      screen.getByRole('link', { name: 'Zonen' }),
+    ]) {
+      const name = knopf.textContent;
       expect(within(knopf).queryByRole('img'), `${name}: Icon ist kein Vorleseziel`).toBeNull();
     }
     expect(container.textContent, 'kein Emoji mehr im Baum').not.toMatch(/🚧|🔒|↗/);
@@ -346,12 +369,45 @@ describe('ModulPanel · Dichte', () => {
   it('traegt den Steuer-Radius, nicht die weiche Ecke', () => {
     expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).borderRadius).toBe(0);
   });
+
+  // LLH-1732: die freie Zeile ist ein Link und erbte die App-Schrift samt Zeilenhöhe, die gesperrte
+  // ein Knopf mit der Systemschrift des Browsers. Beide tragen deshalb die Schrift der App
+  // (Archivo, Entwurf) und die Zeilenhöhe `normal`, die die Zeile vorher als Knopf hatte.
+  it('gibt Link und Knopf dieselbe Schrift: Archivo der App, Zeilenhöhe wie bisher', () => {
+    for (const gesperrt of [false, true]) {
+      const stil = modulZeilenStil(tokenFuer('kompakt'), farben, { ...frei, gesperrt });
+      expect(stil.fontFamily).toBe('inherit');
+      expect(stil.lineHeight).toBe('normal');
+    }
+  });
+
+  // Spec `modul-sprungmarken`, „Eine Sprungmarke erscheint als eingerückte Unteransicht“
+  // (LLH-1733): die Linie steht in der Spalte der Modulmarke, das Etikett rückt um `padding` ein.
+  it('Sprungmarke: Linie in `linie` über die ganze Zeilenhöhe, fester Einzug', () => {
+    const linie = (s: keyof typeof dichten) => sprungLinieStil(tokenFuer(s), { linie: '#LINIE' });
+    expect(linie('kompakt')).toMatchObject({
+      width: 1,
+      alignSelf: 'stretch',
+      background: '#LINIE',
+      flexShrink: 0,
+    });
+    // Die Linie reicht durch die Polsterung der Zeile, damit Marken untereinander eine
+    // durchgehende Linie bilden.
+    expect(linie('kompakt').marginBlock).toBe(-7);
+    expect(linie('handschuh').marginBlock).toBe(-16);
+    // Fester Einzug statt `padding` der Dichte: gesperrt (Schloss) kürzte sonst in komfortabel
+    // und Handschuh die Namen („Entscheidu…“), Review-Befund LLH-1733.
+    for (const s of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      expect(linie(s).marginInlineEnd, s).toBe(10);
+    }
+  });
 });
 
 describe('ModulPanel · Einsatzdauer im Fuß', () => {
   it('zeigt die Dauer seit Beginn, wenn der Einsatz da ist', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Führung"
         module={module}
         freigaben={freigaben()}
@@ -367,6 +423,7 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
   it('lässt den Fuß ohne Einsatz weg, statt eine Dauer zu erfinden', () => {
     const { container } = renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Führung"
         module={module}
         freigaben={freigaben()}
@@ -385,6 +442,7 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
   it('klebt als Spalte unter dem Kopf; nur die Liste rollt, Kopf und Fuß stehen fest', () => {
     const { container } = renderMitProviders(
       <ModulPanel
+        einsatzId={7}
         titel="Führung"
         einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: null }}
         module={module}
@@ -412,6 +470,7 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
   it('trägt Kopf-Augenbraue und Panelgrund aus den Nachtrollen (Vorgabe)', () => {
     const { container } = renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Führung"
         module={module}
         freigaben={freigaben()}
@@ -427,7 +486,9 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
 
 /**
  * Sprungmarken (LFH-620) erben Sichtbarkeit und Sperre ihres ZIELmoduls — geprüft an einem
- * echten Registry-Schlüssel, weil `sprungZiel` in der Registry nachschlägt.
+ * echten Registry-Schlüssel, weil `sprungZiel` in der Registry nachschlägt. Die Fixture hängt die
+ * Marke bewusst hinter ein FREMDES Modul (Aufträge): so trennt sie Anker und Ziel. Die echte
+ * Tabelle stellt sie seit LLH-1733 unter ihr Ziel (`sprungmarken.test.ts`).
  */
 describe('ModulListe — Sprungmarken', () => {
   const marke: Sprungmarke = {
@@ -452,6 +513,7 @@ describe('ModulListe — Sprungmarken', () => {
   const zeige = (props: { freigaben?: ModulFreigaben; onSprungKlick?: (m: Sprungmarke) => void }) =>
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Führung"
         module={fuehrung}
         freigaben={freigaben()}
@@ -465,15 +527,17 @@ describe('ModulListe — Sprungmarken', () => {
   it('steht hinter ihrem Anker, nennt das Ziel im Namen und ist nie aktuell', async () => {
     const klick = vi.fn();
     zeige({ onSprungKlick: klick });
-    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const knoepfe = screen.getAllByRole('link').map((b) => b.textContent);
     expect(knoepfe).toEqual(['Aufträge', 'Entscheidungen', 'Lagebesprechung']);
-    const sprung = screen.getByRole('button', {
+    const sprung = screen.getByRole('link', {
       name: 'Entscheidungen, springt zu ETB · Entscheidung',
     });
-    // Der Titel nennt nur das Ziel, kein Verb (LFH-1078); der Pfeil zeigt den Sprung.
+    // Der Titel nennt nur das Ziel, kein Verb (LFH-1078).
     expect(sprung).toHaveAttribute('title', 'ETB · Entscheidung');
     expect(sprung).not.toHaveAttribute('aria-current');
-    // Das Icon ist Dekoration: kein eigenes Vorleseziel (englisches `aria-label` „export").
+    // Unteransicht, kein Link nach außen (LLH-1733): kein Pfeil, dafür die Führungslinie.
+    expect(sprung.querySelector('[data-lfh-icon="extern-pfeil"]')).toBeNull();
+    expect(sprung.querySelector('[data-lfh="sprung-linie"]')).not.toBeNull();
     expect(within(sprung).queryByRole('img')).not.toBeInTheDocument();
     await userEvent.click(sprung);
     expect(klick).toHaveBeenCalledWith(marke);
@@ -483,11 +547,11 @@ describe('ModulListe — Sprungmarken', () => {
     const { unmount } = zeige({
       freigaben: freigabenFixture({ etb: { sichtbar: false, zugriff: false } }),
     });
-    expect(screen.queryByRole('button', { name: /Entscheidungen/ })).not.toBeInTheDocument();
+    expect(queryNavEintrag(/Entscheidungen/)).not.toBeInTheDocument();
     unmount();
     // Gegenprobe: ein ausgeblendeter ANKER nimmt die Marke nicht mit.
     zeige({ freigaben: freigabenFixture({ auftraege: { sichtbar: false, zugriff: false } }) });
-    expect(screen.getByRole('button', { name: /Entscheidungen/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Entscheidungen/ })).toBeInTheDocument();
   });
 
   it('ist gesperrt, wenn das Zielmodul für den Benutzer gesperrt ist', async () => {
@@ -495,7 +559,12 @@ describe('ModulListe — Sprungmarken', () => {
     zeige({ freigaben: freigabenFixture({ etb: { zugriff: false } }), onSprungKlick: klick });
     const sprung = screen.getByRole('button', { name: /Entscheidungen/ });
     expect(sprung).toBeDisabled();
-    expect(sprung).toHaveAttribute('title', 'Keine Berechtigung');
+    // Der Name steht mit im Titel: ist er im schmalen Panel gekürzt, bleibt er so lesbar.
+    expect(sprung).toHaveAttribute('title', 'Entscheidungen · Keine Berechtigung');
+    // Gesperrt wie eine Modulzeile: Schloss, eingerückt, ohne Pfeil.
+    expect(sprung.querySelector('[data-lfh-icon="schloss"]')).not.toBeNull();
+    expect(sprung.querySelector('[data-lfh-icon="extern-pfeil"]')).toBeNull();
+    expect(sprung.querySelector('[data-lfh="sprung-linie"]')).not.toBeNull();
     await userEvent.click(sprung);
     expect(klick).not.toHaveBeenCalled();
   });
@@ -519,6 +588,7 @@ describe('ModulListe — Sprungmarke mit weiterem Modul (LLH-1312)', () => {
   const zeige = (freigabenWert?: ModulFreigaben) =>
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Kräfte"
         module={kraefte}
         freigaben={freigabenWert}
@@ -532,15 +602,15 @@ describe('ModulListe — Sprungmarke mit weiterem Modul (LLH-1312)', () => {
     zeige(freigabenFixture({ einheiten: { zugriff: false } }));
     const sprung = screen.getByRole('button', { name: /Ohne Schicht/ });
     expect(sprung).toBeDisabled();
-    expect(sprung).toHaveAttribute('title', 'Keine Berechtigung');
+    expect(sprung).toHaveAttribute('title', 'Ohne Schicht · Keine Berechtigung');
   });
 
   it('ist frei mit beiden Freigaben und flackert beim Laden nicht', () => {
     const { unmount } = zeige(freigabenFixture());
-    expect(screen.getByRole('button', { name: /Ohne Schicht/ })).toBeEnabled();
+    expect(screen.getByRole('link', { name: /Ohne Schicht/ })).toBeEnabled();
     unmount();
     zeige(undefined);
-    expect(screen.getByRole('button', { name: /Ohne Schicht/ })).toBeEnabled();
+    expect(screen.getByRole('link', { name: /Ohne Schicht/ })).toBeEnabled();
   });
 });
 
@@ -560,6 +630,7 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
   it('zeigt die Beschreibung unter dem Namen, der Name bleibt der zugängliche Name', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={mitBeschreibung}
         freigaben={freigaben()}
@@ -567,7 +638,7 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
         onModulKlick={() => {}}
       />,
     );
-    const etb = screen.getByRole('button', { name: 'ETB', description: 'Einsatztagebuch' });
+    const etb = screen.getByRole('link', { name: 'ETB', description: 'Einsatztagebuch' });
     expect(within(etb).getByText('Einsatztagebuch')).toHaveAttribute(
       'data-lfh',
       'modul-beschreibung',
@@ -579,6 +650,7 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
   it('lässt ein Modul ohne Beschreibung einzeilig, ohne leere Beschreibung', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={mitBeschreibung}
         freigaben={freigaben()}
@@ -586,7 +658,7 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
         onModulKlick={() => {}}
       />,
     );
-    const sach = screen.getByRole('button', { name: 'Sachschäden' });
+    const sach = screen.getByRole('link', { name: 'Sachschäden' });
     expect(sach).not.toHaveAttribute('aria-describedby');
     expect(sach.querySelector('[data-lfh="modul-beschreibung"]')).toBeNull();
   });
@@ -594,6 +666,7 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
   it('behält bei gesperrtem Modul „Keine Berechtigung“ als Titel und zeigt die Beschreibung', () => {
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={mitBeschreibung}
         freigaben={freigaben()}
@@ -610,6 +683,7 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
     const erfassung = modulRegistry.filter((m) => m.kategorie === 'erfassung');
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Erfassung"
         module={erfassung}
         freigaben={freigabenFixture()}
@@ -620,7 +694,7 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
     for (const m of erfassung) {
       if (!m.beschreibung) continue;
       expect(
-        screen.getByRole('button', { name: m.label, description: m.beschreibung }),
+        screen.getByRole('link', { name: m.label, description: m.beschreibung }),
       ).toBeInTheDocument();
     }
   });
@@ -636,6 +710,7 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
   const zeige = (props: { freigaben?: ModulFreigaben }) =>
     renderMitProviders(
       <ModulPanel
+        einsatzId={1}
         titel="Kommunikation"
         module={kommunikation}
         freigaben={freigaben()}
@@ -648,28 +723,28 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
 
   it('folgen „Fernmeldewesen“ und nennen ihr Ziel', () => {
     zeige({});
-    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const knoepfe = screen.getAllByRole('link').map((b) => b.textContent);
     const modul = knoepfe.findIndex((t) => t?.startsWith('Fernmeldewesen'));
     expect(modul).toBeGreaterThanOrEqual(0);
     expect(knoepfe.slice(modul + 1, modul + 3)).toEqual(MARKEN);
     expect(
-      screen.getByRole('button', { name: 'Fernmeldeskizze, springt zu Fernmeldewesen · Skizze' }),
+      screen.getByRole('link', { name: 'Fernmeldeskizze, springt zu Fernmeldewesen · Skizze' }),
     ).not.toHaveAttribute('aria-current');
   });
 
   it('vor dem Informationstelefon, das als Modulzeile ohne Zahl folgt (i6k6mzed)', () => {
     zeige({});
-    const knoepfe = screen.getAllByRole('button').map((b) => b.textContent);
+    const knoepfe = screen.getAllByRole('link').map((b) => b.textContent);
     const modul = knoepfe.findIndex((t) => t?.startsWith('Fernmeldewesen'));
     expect(knoepfe[modul + 3]).toMatch(/^Informationstelefon/);
-    expect(screen.queryByRole('button', { name: /^Informationstelefon, springt zu/ })).toBeNull();
+    expect(queryNavEintrag(/^Informationstelefon, springt zu/)).toBeNull();
   });
 
   it('bleiben bei ausgeblendetem Informationstelefon stehen', () => {
     zeige({ freigaben: freigaben({ infotelefon: { sichtbar: false, zugriff: false } }) });
     for (const label of MARKEN) {
       expect(
-        screen.getByRole('button', { name: new RegExp(`^${label}, springt zu`) }),
+        screen.getByRole('link', { name: new RegExp(`^${label}, springt zu`) }),
         label,
       ).toBeEnabled();
     }
@@ -678,10 +753,7 @@ describe('ModulListe — Marken des Fernmeldewesens', () => {
   it('fehlen mit ausgeblendetem Fernmeldewesen', () => {
     zeige({ freigaben: freigaben({ fernmeldewesen: { sichtbar: false, zugriff: false } }) });
     for (const label of MARKEN) {
-      expect(
-        screen.queryByRole('button', { name: new RegExp(`^${label}, springt zu`) }),
-        label,
-      ).not.toBeInTheDocument();
+      expect(queryNavEintrag(new RegExp(`^${label}, springt zu`)), label).not.toBeInTheDocument();
     }
   });
 });
@@ -718,6 +790,7 @@ describe('ModulPanel — aktiver Eintrag im Bild', () => {
     try {
       const { container } = renderMitProviders(
         <ModulPanel
+          einsatzId={7}
           titel="Erfassung"
           module={module}
           freigaben={freigaben()}
@@ -737,11 +810,11 @@ describe('ModulPanel — aktiver Eintrag im Bild', () => {
     try {
       const props = { module, freigaben: freigaben(), onModulKlick: () => {} };
       const { container, rerender } = renderMitProviders(
-        <ModulPanel titel="Erfassung" aktiverModulKey="etb" {...props} />,
+        <ModulPanel einsatzId={7} titel="Erfassung" aktiverModulKey="etb" {...props} />,
       );
       const liste = container.querySelector<HTMLElement>('[data-lfh="modul-panel-liste"]')!;
       liste.scrollTop = 50;
-      rerender(<ModulPanel titel="Lage" aktiverModulKey="etb" {...props} />);
+      rerender(<ModulPanel einsatzId={7} titel="Lage" aktiverModulKey="etb" {...props} />);
       expect(liste.scrollTop).toBe(0);
     } finally {
       spion.mockRestore();
@@ -774,6 +847,7 @@ describe('ModulPanel — Spalte endet am Fensterrand', () => {
     try {
       const { container } = renderMitProviders(
         <ModulPanel
+          einsatzId={7}
           titel="Erfassung"
           einsatz={{ begonnen_at: '2026-11-15T08:00:00Z', abgeschlossen_at: null }}
           module={module}
@@ -787,5 +861,120 @@ describe('ModulPanel — Spalte endet am Fensterrand', () => {
     } finally {
       spion.mockRestore();
     }
+  });
+});
+
+/**
+ * Echte Links (LLH-1732): Strg/⌘+Klick, Mittelklick und das Kontextmenü des Browsers legen ein
+ * Modul in einen neuen Tab, etwa auf den zweiten Monitor im Führungsraum. Der einfache Klick
+ * bleibt beim Rahmen (Zuletzt-Speicher, Drawer schließen). Geprüft über `fireEvent`, weil nur
+ * dessen Rückgabe zeigt, ob `preventDefault` lief.
+ */
+describe('ModulListe — Einträge als Links (LLH-1732)', () => {
+  const zeige = (props: Partial<React.ComponentProps<typeof ModulPanel>> = {}) =>
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        einsatzId={7}
+        module={[
+          ...module,
+          basis({
+            key: 'verweis',
+            label: 'Gefahren',
+            route: 'verweis',
+            verweistAuf: 'lagekarte',
+            status: 'fertig',
+          }),
+        ]}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        {...props}
+      />,
+    );
+
+  it('führt jedes freie Modul als Link auf seine Adresse, ein Verweis auf sein Ziel', () => {
+    zeige();
+    expect(screen.getByRole('link', { name: 'ETB' })).toHaveAttribute('href', '/einsaetze/7/etb');
+    expect(screen.getByRole('link', { name: 'Gefahren' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/lagekarte',
+    );
+  });
+
+  it('lässt ein gesperrtes Modul ein gesperrter Knopf ohne Adresse sein', () => {
+    zeige();
+    expect(screen.getByRole('button', { name: 'Geheim' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Geheim' })).not.toBeInTheDocument();
+  });
+
+  it('übernimmt den einfachen Klick selbst und hält den Browser davon ab', () => {
+    const onModulKlick = vi.fn();
+    zeige({ onModulKlick });
+    const ungehindert = fireEvent.click(screen.getByRole('link', { name: 'ETB' }));
+    expect(ungehindert).toBe(false);
+    expect(onModulKlick).toHaveBeenCalledWith(expect.objectContaining({ key: 'etb' }));
+  });
+
+  it('überlässt Strg-, ⌘- und Umschalt-Klick dem Browser (neuer Tab)', () => {
+    const onModulKlick = vi.fn();
+    zeige({ onModulKlick });
+    const etb = screen.getByRole('link', { name: 'ETB' });
+    for (const taste of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }]) {
+      expect(fireEvent.click(etb, taste), JSON.stringify(taste)).toBe(true);
+    }
+    expect(onModulKlick).not.toHaveBeenCalled();
+  });
+
+  it('führt eine freie Sprungmarke als Link auf ihr Ziel, eine gesperrte bleibt Knopf', () => {
+    const onSprungKlick = vi.fn();
+    const { unmount } = renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        einsatzId={7}
+        module={[
+          basis({
+            key: 'etb',
+            kategorie: 'erfassung',
+            label: 'ETB',
+            route: 'etb',
+            status: 'fertig',
+          }),
+        ]}
+        freigaben={freigaben()}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        sprungmarken={sprungmarkenNachKategorie('erfassung')}
+        onSprungKlick={onSprungKlick}
+      />,
+    );
+    const sprung = screen.getByRole('link', { name: /^Entscheidungen, springt zu/ });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/7/etb?typ=entscheidung');
+    expect(fireEvent.click(sprung, { ctrlKey: true })).toBe(true);
+    expect(onSprungKlick).not.toHaveBeenCalled();
+    expect(fireEvent.click(sprung)).toBe(false);
+    expect(onSprungKlick).toHaveBeenCalledWith(expect.objectContaining({ key: 'entscheidungen' }));
+    unmount();
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung"
+        einsatzId={7}
+        module={[
+          basis({
+            key: 'etb',
+            kategorie: 'erfassung',
+            label: 'ETB',
+            route: 'etb',
+            status: 'fertig',
+          }),
+        ]}
+        freigaben={freigaben({ etb: { zugriff: false } })}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+        sprungmarken={sprungmarkenNachKategorie('erfassung')}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /^Entscheidungen, springt zu/ })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: /^Entscheidungen/ })).not.toBeInTheDocument();
   });
 });

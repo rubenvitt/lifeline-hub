@@ -26,8 +26,11 @@ import type { ModulFreigaben } from '../api/types';
  * Kategorie. Eine Marke ERBT Sichtbarkeit und Sperre ihres Zielmoduls; die Pfade kommen aus
  * `routing/deeplinks.ts`.
  *
- * Eine Marke ist nie `aria-current`: nach dem Sprung trägt das Zielmodul die Hervorhebung, und
- * das Panel folgt dem Ort (Erfassung statt Führung) — gewollt, die Marke trägt ihr Ziel im
+ * Eine Marke steht in der KATEGORIE ihres Zielmoduls, direkt hinter ihm oder hinter einer Marke
+ * desselben Ziels (LLH-1733, Spec `modul-sprungmarken`), und das Panel zeigt sie als eingerückte
+ * Unteransicht. Sie ist nie `aria-current`: nach dem Sprung trägt das Zielmodul darüber die
+ * Hervorhebung, in derselben Kategorie; die Ansichtsfilter räumt die Zielseite aus der Adresse
+ * (apply-then-clean), die Marke wüsste also nicht, ob ihre Sicht noch gilt. Ihr Ziel trägt sie im
  * Namen („springt zu ETB …").
  *
  * Keine Zähler: für Sprungmarken gibt es keine Quelle — weggelassen, nicht erfunden.
@@ -42,13 +45,13 @@ export interface Sprungmarke {
   /** Registry-Schlüssel des Moduls, in das gesprungen wird. Sichtbarkeit und Sperre folgen ihm. */
   zielModul: string;
   /**
-   * Registry-Schlüssel des Moduls, HINTER dem die Marke im Panel steht. Fehlt es (anderer
-   * Zuschnitt), steht die Marke am Ende ihrer Kategorie.
+   * Registry-Schlüssel des Moduls, HINTER dem die Marke im Panel steht: das Zielmodul oder eine
+   * Marke desselben Ziels. Fehlt es (anderer Zuschnitt), steht die Marke am Ende ihrer Kategorie.
    */
   nach: string;
   /**
    * Was der Sprung zeigt, als Ziel ohne Verb („ETB · Entscheidung“, LFH-1078): der Titel; der
-   * zugängliche Name stellt „springt zu“ davor, weil der Pfeil daneben nur Dekoration ist.
+   * zugängliche Name stellt „springt zu“ davor, weil sichtbar nur der Name der Marke steht.
    */
   hinweis: string;
   /** Suchworte für die Sprungpalette; das Menü zeigt sie nicht. */
@@ -105,11 +108,13 @@ const FERNMELDEWESEN_MARKEN: Sprungmarke[] = [
 
 export const sprungmarken: Sprungmarke[] = [
   {
+    // In der Erfassung direkt unter dem ETB (LLH-1733): in der Führung wechselte die Hervorhebung
+    // nach dem Sprung die Kategorie.
     key: 'entscheidungen',
-    kategorie: 'fuehrung',
+    kategorie: 'erfassung',
     label: 'Entscheidungen',
     zielModul: 'etb',
-    nach: 'auftraege',
+    nach: 'etb',
     hinweis: 'ETB · Entscheidung',
     schlagworte: ['entscheidung', 'beschluss', 'entschluss'],
     pfad: (einsatzId) => etbPfad(einsatzId, { typ: 'entscheidung' }),

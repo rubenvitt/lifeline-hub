@@ -174,7 +174,7 @@ test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', 
   expect(drawerKasten.width).toBeLessThan(HANDSCHIRM.width);
 
   // Modulklick navigiert UND schließt den Drawer.
-  await drawer.getByRole('button', { name: 'Betroffene', exact: true }).click();
+  await drawer.getByRole('link', { name: 'Betroffene', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen`));
   await expect(drawer).toHaveCount(0);
 });
@@ -227,10 +227,11 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
  * `src/einsatz/berechtigung.rs`); die gesperrten Zeilen (Schloss, „Keine Berechtigung") sieht nur
  * ein Benutzer ohne die verlangte Rolle — hier der Beobachter.
  *
- * Gesperrt werden zwei Module der Kategorie Führung, die auf dem Überblick offen steht: eine
- * Modulzeile und das Ziel der Sprungmarke „Entscheidungen" (ETB). So steht beides ohne Klick da.
+ * Gesperrt werden zwei Module der Kategorie Erfassung, die auf „Betroffene“ offen steht: eine
+ * Modulzeile ohne Zähler und das Ziel der Sprungmarke „Entscheidungen" (ETB), die seit LLH-1733
+ * unter dem ETB steht. So steht beides ohne Klick da.
  */
-const GESPERRT_ZEILE = 'Aufträge/Befehle';
+const GESPERRT_ZEILE = 'Unfallhilfsstellen';
 const GESPERRT_SPRUNG = 'Entscheidungen, springt zu ETB · Entscheidung';
 
 async function modulSperren(page: Page, einsatzId: string, modulKey: string) {
@@ -248,18 +249,25 @@ async function modulSperren(page: Page, einsatzId: string, modulKey: string) {
 async function beobachterMitSperre(page: Page, name: string): Promise<string> {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `${name} ${Date.now()}`);
-  await modulSperren(page, einsatzId, 'auftraege');
+  await modulSperren(page, einsatzId, 'unfallhilfsstellen');
   await modulSperren(page, einsatzId, 'etb');
   await wechsleZuRolle(page, 'beobachter', einsatzId);
   return einsatzId;
 }
 
-/** Vorbedingung: der Sperrzweig steht — beide Zeilen gesperrt, mit Grund. */
+/**
+ * Vorbedingung: der Sperrzweig steht — beide Zeilen gesperrt, mit Grund. Die Marke nennt im
+ * Titel zusätzlich ihren Namen (LLH-1733): im schmalen Panel kann er gekürzt sein.
+ */
 async function sperrzweigSteht(ort: Locator) {
-  for (const name of [GESPERRT_ZEILE, GESPERRT_SPRUNG]) {
+  const titel = [
+    [GESPERRT_ZEILE, 'Keine Berechtigung'],
+    [GESPERRT_SPRUNG, 'Entscheidungen · Keine Berechtigung'],
+  ] as const;
+  for (const [name, grund] of titel) {
     const zeile = ort.getByRole('button', { name, exact: true });
     await expect(zeile, `Vorbedingung: „${name}" gesperrt`).toBeDisabled();
-    await expect(zeile).toHaveAttribute('title', 'Keine Berechtigung');
+    await expect(zeile).toHaveAttribute('title', grund);
   }
 }
 
@@ -278,9 +286,9 @@ test('Navigationsrahmen: auf 390 px hält der Drawer gesperrte Zeilen (Beobachte
   const einsatzId = await beobachterMitSperre(page, 'E2E Nav Sperre schmal');
 
   await page.setViewportSize(HANDSCHIRM);
-  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  await page.goto(`/einsaetze/${einsatzId}/personen`);
   // Rollenneutraler Anker (wie Gate 1): die Überschrift, nicht die ETB-Erfassung.
-  await expect(page.getByRole('heading', { name: 'Überblick', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Betroffene', level: 1 })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Kategorien' })).toHaveCount(0);
 
   const hamburger = page.getByRole('button', { name: 'Navigation öffnen' });
@@ -334,8 +342,8 @@ test('Navigationsrahmen: auf 1024 px hält die Liste gesperrte Zeilen (Beobachte
   const einsatzId = await beobachterMitSperre(page, 'E2E Nav Sperre Tablet');
 
   await page.setViewportSize({ width: 1024, height: 768 });
-  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
-  await expect(page.getByRole('heading', { name: 'Überblick', level: 1 })).toBeVisible();
+  await page.goto(`/einsaetze/${einsatzId}/personen`);
+  await expect(page.getByRole('heading', { name: 'Betroffene', level: 1 })).toBeVisible();
   // Ab `lg` inline: Rail und Modulpanel, kein Hamburger.
   await expect(page.getByRole('navigation', { name: 'Kategorien' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Navigation öffnen' })).toHaveCount(0);

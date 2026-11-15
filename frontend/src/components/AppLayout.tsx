@@ -1,11 +1,8 @@
 import { IconSchloss } from '../icons';
 import { Layout, Tag, Typography, theme } from 'antd';
-import { useMemo, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { Link, Outlet, useLocation } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
-import { listeEinsaetze } from '../api/einsaetze';
-import { globalKeys } from '../api/queryKeys';
-import { leseLetztenOrt } from '../einsatz/letzterOrt';
+import { useEinsatzRueckweg } from '../einsatz/einsatzRueckweg';
 import { useAuth } from '../auth/AuthContext';
 import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
@@ -140,32 +137,14 @@ function GlobalLink({
 }
 
 /**
- * Ort und Rückweg der Ebene 1 (LFH-954, design.md D5): der Rückweg nur, wenn der zuletzt offene
- * Einsatz der Person in der Liste steht und aktiv ist; der Name kommt aus der Liste, nicht aus dem
- * Speicher. Abgerufen wird die Liste nur auf Profil und Verwaltung (derselbe Key wie im Wechsler).
+ * Ort und Rückweg der Ebene 1 (LFH-954, design.md D5): der Rückweg aus `useEinsatzRueckweg`
+ * (LLH-1731 D1), nur auf Seiten mit Ort, also nicht auf der Einsatzliste.
  */
 function useEbene1Ort(pathname: string, benutzerId: number | undefined): Ebene1OrtWert | undefined {
   const { ort } = ebene1Seite(pathname);
-  // Je Adresse neu gelesen: die Person kann zwischendurch in einem anderen Tab im Einsatz sein.
-  const letzter = useMemo(
-    () =>
-      benutzerId == null || ebene1Seite(pathname).ort == null ? null : leseLetztenOrt(benutzerId),
-    [benutzerId, pathname],
-  );
-  const { data: einsaetze } = useQuery({
-    queryKey: globalKeys.einsaetze(),
-    queryFn: listeEinsaetze,
-    enabled: letzter != null,
-  });
+  const rueckweg = useEinsatzRueckweg(benutzerId, ort != null);
   if (ort == null) return undefined;
-  const einsatz = letzter && einsaetze?.find((e) => e.id === letzter.einsatzId);
-  return {
-    ort,
-    rueckweg:
-      letzter && einsatz && einsatz.status === 'aktiv'
-        ? { label: `Zurück zu ${einsatz.bezeichnung}`, pfad: letzter.pfad }
-        : undefined,
-  };
+  return { ort, rueckweg };
 }
 
 export default function AppLayout() {

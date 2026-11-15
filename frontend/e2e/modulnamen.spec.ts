@@ -21,13 +21,15 @@ async function einsatzAnlegen(page: Page): Promise<string> {
 async function beschreibungenImRahmen(rahmen: Locator, wo: string): Promise<number> {
   const masse = await rahmen.locator('[data-lfh="modul-beschreibung"]').evaluateAll((alle) =>
     alle.map((b) => {
-      const knopf = b.closest('button')!.getBoundingClientRect();
+      // Freie Zeilen sind Links, gesperrte Knöpfe (LLH-1732).
+      const zeile = b.closest('a, button')!;
+      const knopf = zeile.getBoundingClientRect();
       const kasten = b.getBoundingClientRect();
       return {
         text: b.textContent ?? '',
         rechts: kasten.right,
         knopfRechts: knopf.right,
-        knopfScroll: b.closest('button')!.scrollWidth - b.closest('button')!.clientWidth,
+        knopfScroll: zeile.scrollWidth - zeile.clientWidth,
       };
     }),
   );
@@ -72,7 +74,7 @@ for (const breite of [
     // Der zugängliche Name bleibt der Modulname, die Beschreibung beschreibt.
     const lageKopf = nav.getByRole('button', { name: 'Lage', exact: true });
     if ((await lageKopf.getAttribute('aria-expanded')) !== 'true') await lageKopf.click();
-    const lagebild = nav.getByRole('button', { name: 'Lagebild', exact: true });
+    const lagebild = nav.getByRole('link', { name: 'Lagebild', exact: true });
     await expect(lagebild).toHaveAccessibleDescription('Lage in Zahlen, jüngste ETB-Einträge');
     await lagebild.click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lage-dashboard`));
@@ -112,7 +114,7 @@ test('1366 × 768: die Kräfte stehen mit Beschreibung ganz im Modulpanel', asyn
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
   const panel = page.locator('#modul-panel');
   await expect(panel).toBeVisible();
-  const zeilen = panel.locator('button:has([data-lfh="modul-beschreibung"])');
+  const zeilen = panel.locator(':is(a, button):has([data-lfh="modul-beschreibung"])');
   // Neun Kräfte-Module (mit Nachforderungen), jedes mit Beschreibung.
   await expect(zeilen).toHaveCount(9);
   await beschreibungenImRahmen(panel, '1366 px, Kräfte');

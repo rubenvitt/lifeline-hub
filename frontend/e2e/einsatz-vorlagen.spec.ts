@@ -48,12 +48,12 @@ test('Einsatz mit Vorlage „MANV“: das Modulpanel zeigt „Unfallhilfsstellen
   // Kommunikation · Meldungen (Kernmodul): das „Informationstelefon“ gehört dorthin und ist
   // ausgeblendet.
   await page.goto(`/einsaetze/${einsatzId}/meldungen`);
-  await expect(panel(page).getByRole('button', { name: /^Meldungen/ })).toBeVisible();
-  await expect(panel(page).getByRole('button', { name: /^Informationstelefon/ })).toHaveCount(0);
+  await expect(panel(page).getByRole('link', { name: /^Meldungen/ })).toBeVisible();
+  await expect(panel(page).getByRole('link', { name: /^Informationstelefon/ })).toHaveCount(0);
 
   // „Unfallhilfsstellen“ steht unter Erfassung und bleibt sichtbar.
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);
-  await expect(panel(page).getByRole('button', { name: /^Unfallhilfsstellen/ })).toBeVisible();
+  await expect(panel(page).getByRole('link', { name: /^Unfallhilfsstellen/ })).toBeVisible();
 
   // Ein Einsatz ohne Vorlage zeigt das „Informationstelefon“ (Gegenprobe zur Ausblendung).
   const ohne = await page.request.post('/api/einsaetze', {
@@ -61,7 +61,7 @@ test('Einsatz mit Vorlage „MANV“: das Modulpanel zeigt „Unfallhilfsstellen
   });
   expect(ohne.ok(), `Einsatz ohne Vorlage: ${ohne.status()}`).toBe(true);
   await page.goto(`/einsaetze/${((await ohne.json()) as { id: number }).id}/meldungen`);
-  await expect(panel(page).getByRole('button', { name: /^Informationstelefon/ })).toBeVisible();
+  await expect(panel(page).getByRole('link', { name: /^Informationstelefon/ })).toBeVisible();
 });
 
 test('ein gekoppeltes Stichwort stellt im Anlegedialog seine Vorlage ein', async ({ page }) => {

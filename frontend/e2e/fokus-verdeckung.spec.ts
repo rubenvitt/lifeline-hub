@@ -1060,7 +1060,7 @@ test('Modulpanel: der Einsatzdauer-Fuß verdeckt kein fokussiertes Modul (1366 �
   const panel = page.locator('[data-lfh="modul-panel"]');
   const fuss = panel.locator('[data-lfh="modul-panel-fuss"]');
   await expect(panel.locator('[data-lfh="modul-panel-spalte"]')).toHaveCSS('position', 'sticky');
-  const ziel = panel.getByRole('button', { name: /^Bereitstellungsräume/ });
+  const ziel = panel.getByRole('link', { name: /^Bereitstellungsräume/ });
   await expect(ziel).toHaveCount(1);
   const befunde: string[] = [];
   let unterDemFussGestartet = 0;
@@ -1120,14 +1120,14 @@ test('Rail (LLH-1241, LLH-1273): kein Kategorie-Ziel liegt unter dem Fuß, auch 
   expect(await spalte.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
   await expect(fuss).not.toHaveCSS('position', 'sticky');
 
-  const kategorien = await rail.locator('[data-lfh="rail-haupt"] button').all();
+  const kategorien = await rail.locator('[data-lfh="rail-haupt"] :is(a, button)').all();
   const namen: string[] = [];
   for (const k of kategorien) {
     const name = (await k.getAttribute('aria-label'))!;
     namen.push(name);
     await k.evaluate((el, kennung) => el.setAttribute('data-e2e-fokus', kennung), name);
   }
-  const fussZiele = fuss.locator('button');
+  const fussZiele = fuss.locator('a, button');
   const zieleImFuss = await fussZiele.count();
   for (let i = 0; i < zieleImFuss; i += 1) {
     await fussZiele.nth(i).evaluate((el) => el.setAttribute('data-e2e-fuss', 'ja'));
@@ -1139,7 +1139,7 @@ test('Rail (LLH-1241, LLH-1273): kein Kategorie-Ziel liegt unter dem Fuß, auch 
   const ueberlappungJetzt = () =>
     rail.evaluate((nav) => {
       const fussOben = nav.querySelector('[data-lfh="rail-fuss"]')!.getBoundingClientRect().top;
-      return [...nav.querySelectorAll<HTMLElement>('[data-lfh="rail-haupt"] button')]
+      return [...nav.querySelectorAll<HTMLElement>('[data-lfh="rail-haupt"] :is(a, button)')]
         .map((b) => ({
           name: b.getAttribute('aria-label'),
           ueber: b.getBoundingClientRect().bottom - fussOben,

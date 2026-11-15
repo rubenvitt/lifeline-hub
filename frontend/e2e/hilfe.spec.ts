@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { einsatzPerApi } from './einsatz-kern';
 
 /**
  * Hilfe (LFH-1096, Spec `anwenderdoku`): erreichbar vor der Anmeldung und aus dem Benutzermenü,
@@ -37,6 +38,79 @@ test('angemeldet: Hilfe aus dem Benutzermenü, Gruppe wählen, zurück in die Ap
   await expect(navi.getByText('Gerät verloren')).toBeVisible();
   await expect(navi.getByText('Arbeiten ohne Netz')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Zur App' }).click();
+  // Ohne offenen Einsatz in dieser Sitzung: zur Einsatzliste (LLH-1731).
+  await page.getByRole('button', { name: 'Zu den Einsätzen' }).click();
   await expect(page).toHaveURL(/\/einsaetze/);
+});
+
+test('aus dem Einsatz am breiten Schirm: Hilfe im neuen Tab, Rückweg an die Stelle (LLH-1731)', async ({
+  page,
+}) => {
+  await anmeldenPerApi(page, ADMIN, PW);
+  const name = `Hilfe neben dem Einsatz ${Date.now()}`;
+  const einsatzId = await einsatzPerApi(page, name);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.getByRole('region', { name: 'Einsatztagebuch' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Benutzermenü' }).click();
+  const [hilfe] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.getByRole('menuitem', { name: 'Hilfe' }).click(),
+  ]);
+  await expect(hilfe.getByRole('heading', { level: 1, name: 'Hilfe' })).toBeVisible();
+  // Die Herkunft ist in den Verlauf gewandert, die Adresse trägt sie nicht mehr.
+  await expect(hilfe).toHaveURL(/\/hilfe$/);
+  // Der Einsatz bleibt im ersten Tab.
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
+  await expect(hilfe.getByRole('button', { name: `Zurück zu ${name}` })).toBeVisible();
+
+  // Der erste Tab arbeitet weiter; der Rückweg der Hilfe bleibt je Besuch fest (Review B5).
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte$`));
+  // Erst wenn der Einsatzrahmen die Lagekarte gemerkt hat (nach Sitzung und Freigaben) und der
+  // Hilfe-Tab das sieht, belegt der Kapitelwechsel etwas: ohne festen Rückweg läse er sie jetzt.
+  await expect
+    .poll(() =>
+      hilfe.evaluate(() =>
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith('lfh:nav:letzter-ort:'))
+          .map((k) => localStorage.getItem(k) ?? '')
+          .join(' '),
+      ),
+    )
+    .toContain(`/einsaetze/${einsatzId}/lagekarte`);
+  await hilfe
+    .getByRole('navigation', { name: 'Kapitel' })
+    .getByRole('link', { name: 'Arbeiten ohne Netz' })
+    .click();
+  await expect(hilfe).toHaveURL(/\/hilfe\/ohne-netz$/);
+
+  await hilfe.getByRole('button', { name: `Zurück zu ${name}` }).click();
+  await expect(hilfe).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
+});
+
+test('am Handy: ein langer Einsatzname im Rückweg sprengt die Hilfe nicht quer (LLH-1731)', async ({
+  page,
+}) => {
+  await anmeldenPerApi(page, ADMIN, PW);
+  const name = `Unwetter mit Starkregen und Überflutung im gesamten Kreisgebiet Süd ${Date.now()}`;
+  const einsatzId = await einsatzPerApi(page, name);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.getByRole('region', { name: 'Einsatztagebuch' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Benutzermenü' }).click();
+  await page.getByRole('menuitem', { name: 'Hilfe' }).click();
+  const zurueck = page.getByRole('button', { name: `Zurück zu ${name}` });
+  await expect(zurueck).toBeVisible();
+  // Gekürzt statt quer: die Seite rollt nicht waagerecht, der volle Name steht im `title`.
+  const breiten = await page.evaluate(() => ({
+    inhalt: document.documentElement.scrollWidth,
+    fenster: window.innerWidth,
+  }));
+  expect(breiten.inhalt).toBeLessThanOrEqual(breiten.fenster);
+  await expect(zurueck).toHaveAttribute('title', `Zurück zu ${name}`);
+  await zurueck.click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
 });

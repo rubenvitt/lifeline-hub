@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { abmeldenUeberMenue } from './menue-kern';
 
 /**
  * Der Rahmen bleibt beim Rollen erreichbar (LFH-952, Spec `einsatztauglichkeit-layout`,
@@ -84,12 +85,12 @@ for (const rolle of ['admin', 'beobachter'] as const) {
       expect(Math.round(await oben(page, '[data-lfh="rahmen-kopf"]')), 'Kopf steht oben').toBe(0);
       // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): das Benutzermenü öffnet.
       await page.getByRole('button', { name: 'Benutzermenü' }).click();
-      await expect(page.getByRole('menuitem', { name: 'Abmelden' })).toBeInViewport();
+      await expect(page.getByRole('menuitem', { name: 'Profil' })).toBeInViewport();
       await page.keyboard.press('Escape');
 
       if (b.rail) {
         const kopfUnten = (await kopf.boundingBox())!;
-        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('button', {
+        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('link', {
           name: 'Erfassung',
         });
         await expect(etb).toBeInViewport();
@@ -100,7 +101,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
         // Bedienbar: der Sprung aus der gerollten Seite führt in die Kategorie.
         const lage = page
           .getByRole('navigation', { name: 'Kategorien' })
-          .getByRole('button', { name: 'Lage', exact: true });
+          .getByRole('link', { name: 'Lage', exact: true });
         await lage.click();
         await expect(lage).toHaveAttribute('aria-current', 'true');
         await expect(page).not.toHaveURL(/\/etb$/);
@@ -134,10 +135,10 @@ test('1366 × 520, handschuh, gerollt: auch die letzte Kategorie ist erreichbar'
   );
 
   const rail = page.getByRole('navigation', { name: 'Kategorien' });
-  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
+  const letzte = rail.locator('[data-lfh="rail-haupt"] :is(a, button)').last();
   const name = (await letzte.getAttribute('aria-label'))!;
   await letzte.click();
-  await expect(rail.getByRole('button', { name, exact: true })).toHaveAttribute(
+  await expect(rail.getByRole('link', { name, exact: true })).toHaveAttribute(
     'aria-current',
     'true',
   );
@@ -178,7 +179,10 @@ for (const b of [
   { width: 390, height: 844 },
   { width: 1180, height: 820 },
 ]) {
-  test(`${b.width} px, handschuh: Abmelden ohne Rollen im Benutzermenü`, async ({ page }) => {
+  // LLH-1730: „Abmelden“ steht zuletzt und darf im Handschuh-Betrieb erst durch Rollen ins Bild
+  // kommen; erreichbar und bedienbar bleibt es (Spec `einsatztauglichkeit-layout`, „Benutzermenü:
+  // Einsatzfunktion im Kopf“, Szenario „Schichtwechsel am Handy im Handschuh-Betrieb“).
+  test(`${b.width} px, handschuh: Abmelden im Benutzermenü erreichbar`, async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, `Rahmen Abmelden ${b.width} ${Date.now()}`);
@@ -186,14 +190,7 @@ for (const b of [
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
-    await page.getByRole('button', { name: 'Benutzermenü' }).click();
-    const abmelden = page.getByRole('menuitem', { name: 'Abmelden' });
-    // Ohne Rollen: Abmelden steht oben im Menü, das Menü ist dafür nicht gerollt worden.
-    const gerollt = await page.locator('.ant-dropdown-menu').evaluate((m) => m.scrollTop);
-    expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
-    await expect(abmelden).toBeInViewport();
-    await abmelden.click();
-    await expect(page).toHaveURL(/\/login/);
+    await abmeldenUeberMenue(page);
   });
 }
 
@@ -307,7 +304,7 @@ test('Modulpanel bleibt im ETB am Ende der Zeitachse stehen (1440 × 900)', asyn
   );
   // Kopf der Kategorie, jeder Eintrag und der Fuß stehen ganz im Bild.
   await expect(spalte.getByText('Erfassung', { exact: true })).toBeInViewport({ ratio: 1 });
-  const eintraege = page.locator('[data-lfh="modul-panel-liste"] button');
+  const eintraege = page.locator('[data-lfh="modul-panel-liste"] :is(a, button)');
   for (const eintrag of await eintraege.all()) await expect(eintrag).toBeInViewport({ ratio: 1 });
   await expect(page.locator('[data-lfh="modul-panel-fuss"]')).toBeInViewport({ ratio: 1 });
   // Bedienbar ohne vorheriges Rollen: der Wechsel ins nächste Modul.
@@ -332,7 +329,7 @@ test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1
   // Die Kategorie mit den meisten Einträgen (Kräfte, neun Module).
   await page
     .getByRole('navigation', { name: 'Kategorien' })
-    .getByRole('button', { name: 'Kräfte & Mittel', exact: true })
+    .getByLabel('Kräfte & Mittel', { exact: true })
     .click();
   await expect(page).not.toHaveURL(/\/etb$/);
   // Vorbedingung: die Seite ist WIRKLICH gerollt, mindestens um die Kopfhöhe; sonst stünden Kopf
@@ -349,7 +346,7 @@ test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1
   await expect(kopfZeile).toBeInViewport({ ratio: 1 });
   await expect(fuss).toBeInViewport({ ratio: 1 });
   // Der letzte Eintrag kommt per Wischen ins Bild, ganz zwischen Kopf und Fuß, nicht darunter.
-  const letzter = liste.locator('button').last();
+  const letzter = liste.locator(':is(a, button)').last();
   await liste.evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await expect(letzter).toBeInViewport({ ratio: 1 });
   const l = (await letzter.boundingBox())!;
@@ -512,12 +509,12 @@ test('Fokus in der klebenden Rail rollt die Seite nicht (1440 × 900)', async ({
   // Vorbedingung: der Seitenkopf klebt, die Rahmenhöhe ist größer als die Kopfhöhe.
   await expect(page.locator('[data-lfh="seitenkopf"]')).toHaveCSS('position', 'sticky');
   const vorher = await page.evaluate(() => window.scrollY);
-  const rail = page.locator('[data-lfh="rail-spalte"] button').first();
+  const rail = page.locator('[data-lfh="rail-spalte"] :is(a, button)').first();
   await rail.focus();
   await page.waitForTimeout(100);
   expect(await page.evaluate(() => window.scrollY), 'Fokus auf „Führung“').toBe(vorher);
   // Auch per Tastatur, rückwärts vom zweiten Ziel der Rail.
-  await page.locator('[data-lfh="rail-spalte"] button').nth(1).focus();
+  await page.locator('[data-lfh="rail-spalte"] :is(a, button)').nth(1).focus();
   await page.keyboard.press('Shift+Tab');
   await expect(rail).toBeFocused();
   expect(await page.evaluate(() => window.scrollY), 'Shift+Tab auf „Führung“').toBe(vorher);

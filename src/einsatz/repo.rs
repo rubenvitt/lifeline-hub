@@ -82,6 +82,15 @@ pub(crate) async fn naechste_id(conn: &mut SqliteConnection) -> Result<i64, sqlx
     .await
 }
 
+/// Die laufende Nummer nach `lfd`. Ist sie nicht darstellbar, ist der Nummernkreis des Jahres
+/// erschöpft: 422 statt Panik oder Umlauf (Spec `einsatznummer`, „Die Vergabe läuft nicht über“;
+/// LLH-1859). Auch für die freie Nummer eines Spiegels, der eigen wird.
+pub(crate) fn naechste_lfd(lfd: i64) -> Result<i64, AppError> {
+    lfd.checked_add(1).ok_or_else(|| {
+        AppError::UnprocessableEntity("Der Nummernkreis des Jahres ist erschöpft.".into())
+    })
+}
+
 /// Legt einen Einsatz auf der Verbindung des Aufrufers an: Einsatznummer aus dem Kreis der
 /// Organisation und Mitgliedschaft des Erstellers als Einsatzleitung. Liefert die neue ID.
 ///
@@ -151,7 +160,9 @@ pub(crate) async fn anlegen_tx(
     // Ausweichen schlüge der Text-Index aus 0005 an — bei jedem weiteren Versuch
     // wieder, denn MAX(nummer_lfd) wüchse nie darüber hinaus. Die Schleife endet, weil
     // eine Org nur endlich viele Texte hat.
-    let mut lfd = max_lfd.unwrap_or(0) + 1;
+    // Geprüft, nicht `+ 1` (LLH-1859): Ein Bestandswert am Höchstwert führt zu 422 statt zur
+    // Panik oder zu einer umgelaufenen Nummer.
+    let mut lfd = naechste_lfd(max_lfd.unwrap_or(0))?;
     let einsatznummer = loop {
         let kandidat = super::nummer::formatiere(praefix.as_deref(), jahr, lfd);
         let belegt: bool = sqlx::query_scalar(
@@ -167,7 +178,7 @@ pub(crate) async fn anlegen_tx(
         if !belegt {
             break kandidat;
         }
-        lfd += 1;
+        lfd = naechste_lfd(lfd)?;
     };
 
     // COALESCE statt eines zweiten INSERT-Zweigs: `einsatzart` und `begonnen_at`

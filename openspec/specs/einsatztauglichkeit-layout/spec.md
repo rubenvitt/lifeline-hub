@@ -394,19 +394,23 @@ eine gemerkte Wahl MUST auf jeder Breite gelten. Das Panel MUST einen sichtbaren
 - **WHEN** der Überblick bei 1180 px mit offenem Modulpanel steht
 - **THEN** beginnt der Stärkeblock jeder Abschnittszeile auf der Höhe des Abschnittsnamens
 
-### Requirement: Benutzermenü: Abmelden ohne Rollen
+### Requirement: Benutzermenü: Einsatzfunktion im Kopf
 
-Im Benutzermenü MUST „Profil“ und „Abmelden“ direkt nach dem Kopf stehen, vor den
-Umschaltgruppen, und auf 390 × 844 und 1180 × 820 in jeder Dichtestufe ohne Rollen sichtbar und
-anklickbar sein. Der Menükopf MUST die eigene Einsatzfunktion nennen, wenn es eine gibt, auf
-jeder Breite.
+Der Kopf des Benutzermenüs MUST die eigene Einsatzfunktion nennen, wenn es eine gibt, auf jeder
+Breite. Wo „Profil“ und „Abmelden“ im Menü stehen und was davon am Handy ohne Rollen sichtbar
+ist, regelt die Fähigkeit `benutzermenue`; „Abmelden“ MUST auf 390 × 844 und 1180 × 820 in jeder
+Dichtestufe im Menü erreichbar sein, im Handschuh-Betrieb am Handy auch erst durch Rollen.
 
 #### Scenario: Schichtwechsel am Handy im Handschuh-Betrieb
 - **WHEN** das Benutzermenü bei 390 × 844 in `handschuh` geöffnet wird
-- **THEN** liegt „Abmelden“ ohne Rollen im Fenster, und ein Klick darauf meldet ab
+- **THEN** ist „Abmelden“ im Menü erreichbar, gegebenenfalls durch Rollen, und meldet nach der Rückfrage ab
 
 #### Scenario: Funktion auf dem Tablet
 - **WHEN** das Benutzermenü im Einsatz unter `xl` geöffnet wird und die Person eine Funktion hat
+- **THEN** nennt der Menükopf die Funktion
+
+#### Scenario: Funktion am Handy
+- **WHEN** das Benutzermenü im Einsatz bei 390 × 844 geöffnet wird und die Person eine Funktion hat
 - **THEN** nennt der Menükopf die Funktion
 
 ### Requirement: Der Seitenkopf bündelt Nebenwege unter md
