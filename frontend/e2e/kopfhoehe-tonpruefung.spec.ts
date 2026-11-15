@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
-import { einsatzAnlegen } from './einsatz-kern';
+import { einsatzPerApi } from './einsatz-kern';
 
 /**
  * LLH-1158: Zwei Wörter im Kopf wechseln beim Start ohne Zutun, die Tonprüfung („Ton wird
@@ -252,23 +252,34 @@ async function messe(page: Page, einsatzId: string, breite: number, ton: 'bereit
   expect.soft(hoehen.size, `${fall}: Kopfhöhe über das Laden\n${verlauf.join('\n')}`).toBe(1);
 }
 
+/**
+ * LLH-1869: Ein Test je Ton und Rolle, jeder mit allen {@link BREITEN}. Zusammen liefen beide
+ * Rollen 30 Seitenaufrufe in einem Test und kamen unter CI-Last bis an 600 s. Nach 7f36953b
+ * brauchte ein Ton für beide Rollen 187–223 s (vier `alpha`-Läufe); geteilt braucht jeder Test
+ * lokal mit einem Worker 1,3 min (15.11.2026), und eine langsame Rolle reißt die andere nicht
+ * mehr mit.
+ */
+const TEST_FRIST_MS = 300_000;
+
 test.describe('LLH-1158/LLH-1232 Kopfhöhe über Tonprüfung und Verbindungsaufbau (handschuh, Maus)', () => {
   for (const ton of ['bereit', 'blockiert'] as const) {
-    test(`1100–1440 px, Ton prüft → ${ton}, VERBINDE → SYNC: der Kopf springt nicht (auch als Beobachter)`, async ({
-      page,
-    }) => {
-      test.setTimeout(600_000);
-      await tonPruefungNachbilden(page, ton);
-      await anmeldenAlsAdmin(page);
-      const einsatzId = await einsatzAnlegen(
+    for (const rolle of ['admin', 'beobachter'] as const) {
+      test(`1100–1440 px, Ton prüft → ${ton}, VERBINDE → SYNC: der Kopf springt nicht (als ${rolle === 'admin' ? 'Admin' : 'Beobachter'})`, async ({
         page,
-        `LFH-460 Hochwasser Abschnitt Nordwest ${Date.now()}`,
-      );
-      await stromNachVerbindeFreigeben(page, einsatzId);
-      for (const breite of BREITEN) await messe(page, einsatzId, breite, ton);
-      // Der Benutzerkopf trägt die Einsatzfunktion, seine Breite hängt an der Rolle (LFH-435).
-      await wechsleZuRolle(page, 'beobachter', einsatzId);
-      for (const breite of BREITEN) await messe(page, einsatzId, breite, ton);
-    });
+      }) => {
+        test.setTimeout(TEST_FRIST_MS);
+        await tonPruefungNachbilden(page, ton);
+        // Der Dialog ist hier nicht Prüfgegenstand: Anlage über die API, erste Ladung ist `messe`.
+        await anmeldenAlsAdmin(page, { startseite: false });
+        const einsatzId = await einsatzPerApi(
+          page,
+          `LFH-460 Hochwasser Abschnitt Nordwest ${Date.now()}`,
+        );
+        await stromNachVerbindeFreigeben(page, einsatzId);
+        // Der Benutzerkopf trägt die Einsatzfunktion, seine Breite hängt an der Rolle (LFH-435).
+        if (rolle === 'beobachter') await wechsleZuRolle(page, 'beobachter', einsatzId);
+        for (const breite of BREITEN) await messe(page, einsatzId, breite, ton);
+      });
+    }
   }
 });
