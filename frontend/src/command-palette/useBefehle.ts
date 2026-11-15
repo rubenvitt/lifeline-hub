@@ -26,6 +26,9 @@ const OHNE_GEDAECHTNIS: BefehlsGedaechtnis = { ids: [], merke: () => {} };
  * Das Befehls-Gedächtnis kommt als PARAMETER von einem Träger oberhalb der Palette (Herleitung
  * an `useZuletztBefehle`); optional, weil `useBefehle` auch außerhalb der Palette rendert.
  *
+ * `abmelden` öffnet die Rückfrage zum Abmelden (LLH-1730). Sie hängt am Provider, nicht hier: die
+ * Palette schließt beim Ausführen, ein Dialog in ihr verschwände mit ihr.
+ *
  * `navigate` ist PFLICHT: es ist das `gehZu` des Paletten-Hosts, der als EINZIGE Stelle den neuen
  * Tab öffnet. Ein eigenes `useNavigate` öffnete Strg/⌘+↵ still im aktuellen Tab. Identitätsstabil
  * übergeben, es steht in der Dependency-Liste.
@@ -34,9 +37,10 @@ export function useBefehle(
   tastaturAktionen: TastaturAktionen | undefined,
   gedaechtnis: BefehlsGedaechtnis | undefined,
   navigate: BefehlKontext['navigate'],
+  abmelden: BefehlKontext['abmelden'],
 ): Befehl[] {
   const gedaechtnisOderLeer = gedaechtnis ?? OHNE_GEDAECHTNIS;
-  const { benutzer, logout } = useAuth();
+  const { benutzer } = useAuth();
   const { setModus } = useThemeMode();
   const { setDichte } = useDichte();
   // Wie `setDichte`: der Setter ist identitätsstabil, das Objekt von `useHelligkeit()` nicht.
@@ -115,9 +119,7 @@ export function useBefehle(
         setHelligkeit,
         setKoordinaten: setzeOverride,
         setZeitdarstellung: setzeZeitdarstellung,
-        logout: () => {
-          void logout();
-        },
+        abmelden,
         tastaturAktionen,
         userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
       }),
@@ -134,7 +136,7 @@ export function useBefehle(
       setModus,
       setDichte,
       setHelligkeit,
-      logout,
+      abmelden,
       tastaturAktionen,
       zuletztModulKeys,
       aktuellerModulKey,

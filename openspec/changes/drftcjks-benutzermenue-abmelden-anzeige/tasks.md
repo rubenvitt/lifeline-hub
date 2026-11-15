@@ -4,18 +4,18 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/drftcjksxrh0vazqkadyuegy (LLH-1730)
 
 ## 1. Rückfrage zum Abmelden (D2, D3)
 
-- [ ] 1.1 Test zuerst: Hook/Komponente der Rückfrage (`auth/`): `fragAbmelden()` öffnet „Abmelden?“ mit „Abbrechen“ (Anfangsfokus) und rotem „Abmelden“; Bestätigen ruft `logout()` und navigiert bei `true` nach `/login`, bei `false` (412) bleibt die Route; „Abbrechen“ und Escape ändern nichts (Vitest rot, dann grün)
-- [ ] 1.2 Rückfrage umsetzen (antd `Modal`, Ladezustand während `logout()`), Bezeichner nach `AGENTS.md`, „Bezeichner-Sprache“; Tests aus 1.1 grün
+- [x] 1.1 Test zuerst: Hook/Komponente der Rückfrage (`auth/`): `fragAbmelden()` öffnet „Abmelden?“ mit „Abbrechen“ (Anfangsfokus) und rotem „Abmelden“; Bestätigen ruft `logout()` und navigiert bei `true` nach `/login`, bei `false` (412) bleibt die Route; „Abbrechen“ und Escape ändern nichts (Vitest rot, dann grün)
+- [x] 1.2 Rückfrage umsetzen (antd `Modal`, Ladezustand während `logout()`), Bezeichner nach `AGENTS.md`, „Bezeichner-Sprache“; Tests aus 1.1 grün
 
 ## 2. Benutzermenü (D1)
 
-- [ ] 2.1 `components/BenutzerMenu.test.tsx` anpassen und erweitern: Reihenfolge Kopf, „Profil“, „Anzeige“, „Benachrichtigungen“, „Neuigkeiten“, „Hilfe“, „Abmelden“; Abmelden folgt nicht auf Profil, auch in `handschuh`; Klick auf „Abmelden“ öffnet die Rückfrage statt abzumelden; Bestätigen meldet ab (rot, dann grün)
-- [ ] 2.2 `components/BenutzerMenu.tsx` umbauen: Abmelden ans Ende hinter Trenner, halbe Zeile aus D11 entfernen, Rückfrage einhängen; Kommentare (LFH-952, U89, D11) auf den neuen Stand bringen; `AppLayout.test.tsx` und weitere Unit-Tests mit „Abmelden“ grün
+- [x] 2.1 `components/BenutzerMenu.test.tsx` anpassen und erweitern: Reihenfolge Kopf, „Profil“, „Anzeige“, „Benachrichtigungen“, „Neuigkeiten“, „Hilfe“, „Abmelden“; Abmelden folgt nicht auf Profil, auch in `handschuh`; Klick auf „Abmelden“ öffnet die Rückfrage statt abzumelden; Bestätigen meldet ab (rot, dann grün)
+- [x] 2.2 `components/BenutzerMenu.tsx` umbauen: Abmelden ans Ende hinter Trenner, halbe Zeile aus D11 entfernen, Rückfrage einhängen; Kommentare (LFH-952, U89, D11) auf den neuen Stand bringen; `AppLayout.test.tsx` und weitere Unit-Tests mit „Abmelden“ grün
 
 ## 3. Sprungpalette
 
-- [ ] 3.1 Test zuerst (`command-palette/`): ↵ auf „Abmelden“ schließt die Palette, öffnet die Rückfrage mit Fokus auf „Abbrechen“ und beendet die Sitzung nicht; Bestätigen meldet ab; `nav:abmelden` bleibt `nichtMerkbar` (rot, dann grün)
-- [ ] 3.2 Rückfrage im `CommandPaletteProvider` einhängen, `useBefehle` reicht `fragAbmelden` statt `logout` weiter (`command-palette/typen.ts`, `befehle.ts`); Tests aus 3.1 und bestehende Palettentests grün
+- [x] 3.1 Test zuerst (`command-palette/`): ↵ auf „Abmelden“ schließt die Palette, öffnet die Rückfrage mit Fokus auf „Abbrechen“ und beendet die Sitzung nicht; Bestätigen meldet ab; `nav:abmelden` bleibt `nichtMerkbar` (rot, dann grün)
+- [x] 3.2 Rückfrage im `CommandPaletteProvider` einhängen, `useBefehle` reicht `fragAbmelden` statt `logout` weiter (`command-palette/typen.ts`, `befehle.ts`); Tests aus 3.1 und bestehende Palettentests grün
 
 ## 4. Anzeige-Leisten außerhalb des Menüs (D5)
 

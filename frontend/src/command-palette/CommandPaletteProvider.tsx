@@ -19,6 +19,7 @@ import { modulAusPfad } from '../einsatz/modulRegistry';
 import { CommandPalette } from './CommandPalette';
 import { tastaturAktionFuerEreignis } from './befehle';
 import { useAuthOptional } from '../auth/AuthContext';
+import { AbmeldenRueckfrageDialog } from '../auth/AbmeldenRueckfrage';
 import type { Oeffnung, PaletteModus, TastaturAktionen } from './typen';
 
 interface TastaturEbene {
@@ -134,6 +135,13 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
    * funktioniert noch nach dem Abhängen der Palette (Herleitung an `useZuletztBefehle`).
    */
   const gedaechtnis = useZuletztBefehle();
+  /**
+   * Rückfrage zum Abmelden (LLH-1730, Spec `sprungpalette`): HIER und nicht in `PaletteHost`, weil
+   * die Palette beim Ausführen schließt und abgehängt wird. Eingehängt nur, solange sie offen ist:
+   * der Dialog liest `useAuth`, und der Provider rendert auch ohne `AuthProvider`.
+   */
+  const [isAbmeldenOffen, setAbmeldenOffen] = useState(false);
+  const openAbmelden = useCallback(() => setAbmeldenOffen(true), []);
   const ebenenRef = useRef(new Map<symbol, TastaturEbene>());
   // Ketten statt einzelner Ebenen: eine Werkzeugleiste kennt „Filter zurücksetzen“, die Seite
   // darüber „Neue Zeile“. Beide Refs halten die Kette von TIEF nach FLACH; leer heißt „keine
@@ -294,7 +302,11 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           schliesse={schliesse}
           tastaturAktionen={aktiveAktionen}
           gedaechtnis={gedaechtnis}
+          abmelden={openAbmelden}
         />
+      )}
+      {isAbmeldenOffen && (
+        <AbmeldenRueckfrageDialog isOpen onClose={() => setAbmeldenOffen(false)} />
       )}
     </PaletteContext.Provider>
   );
@@ -309,10 +321,12 @@ function PaletteHost({
   schliesse,
   tastaturAktionen,
   gedaechtnis,
+  abmelden,
 }: {
   schliesse: () => void;
   tastaturAktionen: TastaturAktionen;
   gedaechtnis: BefehlsGedaechtnis;
+  abmelden: () => void;
 }) {
   /**
    * EIN STANDBILD beim Öffnen: `useState` liest den Initialwert einmal, der Stand gilt für die ganze
@@ -352,7 +366,7 @@ function PaletteHost({
   );
   // ALLE drei Befehlsquellen öffnen über `gehZu` (feste Befehle, Datensätze, Koordinatensprung),
   // nur so gilt der neue Tab für jede Zeile mit Ziel.
-  const befehle = useBefehle(tastaturAktionen, gefroren, gehZu);
+  const befehle = useBefehle(tastaturAktionen, gefroren, gehZu, abmelden);
   const melde = useCallback((modus: PaletteModus, rest: string) => {
     // Gleicher Stand → gleiches Objekt: die Frist läuft auch beim bloßen Öffnen ab.
     setStand((v) => (v.modus === modus && v.rest === rest ? v : { modus, rest }));
