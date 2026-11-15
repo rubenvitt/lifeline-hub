@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Messhelfer der Schrift-Specs (LLH-1719, Change `i1o47voj-schrift-lesbarkeit`):
@@ -65,11 +66,9 @@ export async function textproben(page: Page, wurzel = 'body'): Promise<Textprobe
   }, wurzel);
 }
 
-/** Lädt eine Seite in einer Dichte und wartet auf den Seitenkopf. */
+/** Lädt eine Seite in einer Dichte (`ladeInDichte`, eine Ladung) und wartet auf den Anker. */
 export async function ladeSeite(page: Page, pfad: string, dichte: string, anker: string) {
-  await page.evaluate((wert) => window.localStorage.setItem('lifeline-hub.dichte', wert), dichte);
-  await page.goto(pfad);
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+  await ladeInDichte(page, pfad, dichte);
   await expect(page.locator(anker).first()).toBeVisible();
 }
 

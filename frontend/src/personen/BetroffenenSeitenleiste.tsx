@@ -8,6 +8,7 @@ import {
   useRollen,
   type Segment,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../components/instrument';
 import { sichtung } from '../theme/statusFarben';
@@ -149,7 +150,8 @@ export default function BetroffenenSeitenleiste({
             {SICHTUNGSBILD_REIHE.map((k) => (
               <li key={k} data-sichtung-zeile={k} style={zeile}>
                 <Farbfeld k={k} groesse={8} />
-                <span style={{ ...zahlStil('klein'), color: rollen.text2, width: 72 }}>
+                {/* Kategorie als Wort („SK I“, „unverletzt“): Textschrift (LLH-1777). */}
+                <span style={{ ...schriftStil('meta'), color: rollen.text2, width: 72 }}>
                   {kuerzel(k)}
                 </span>
                 <span style={{ flex: 1, fontSize: schriftGroesse('fein'), color: rollen.schwach }}>

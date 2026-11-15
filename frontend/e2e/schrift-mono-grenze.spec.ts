@@ -11,7 +11,8 @@ import { einsatzMitEtb, ladeSeite, textproben } from './schrift-kern';
  * Einträge tragen die Metazeile „von Leitstelle Musterstadt · an Einsatzleitung“, die vorher in
  * Mono stand.
  *
- * Mutationsprobe: in `Zeitachseneintrag` die Metazeile wieder auf `zahlStil` → rot im ETB.
+ * Mutationsprobe: die Von→An-Zelle der ETB-Spaltenzeile (`etb/EtbSpaltenzeile.tsx`) auf
+ * `fontFamily: 'var(--lfh-schrift-zahl)'` → rot im ETB („Leitstelle Musterstadt“).
  */
 
 const WORT = /[a-zäöüß]{4,}/;
