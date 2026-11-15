@@ -72,6 +72,12 @@ export function UebungsMarke({
   );
 }
 
+/** Hinweis, wenn der Einsatzkopf fehlt; auch die Statusleiste des Lagemonitors nennt ihn so. */
+export const UNBEKANNT = 'Einsatzart nicht geladen';
+
+/** Takt, in dem eine Hülle ohne Einsatzkopf ihn erneut lädt (Gerät, Lagemonitor). */
+export const EINSATZKOPF_NACHLADEN_MS = 30_000;
+
 /** Schriftgröße des Worts im Band: eine Stufe über dem Lauftext, damit es aus dem Augenwinkel trägt. */
 const BAND_SCHRIFT = 13;
 
@@ -80,12 +86,43 @@ const BAND_SCHRIFT = 13;
  * seine Höhe (Einsatzrahmen, D4). `false` in einer Hülle fester Höhe, die nur innen rollt
  * (Gerätehülle, D7): dort steht es im Fluss, und eine gemeldete Höhe versetzte stehende
  * Tabellenköpfe im inneren Scrollbereich.
+ *
+ * `unbekannt`: der Einsatzkopf ließ sich nicht laden (Gerätehülle, Server startet neu). Dann steht
+ * statt nichts ein neutraler Hinweis „Einsatzart nicht geladen“, denn ohne ihn sähe eine Übung
+ * still aus wie ein Realeinsatz (Review vor dem PR, LLH-1725). Liegt die Art vor, zählt nur sie.
  */
-export function UebungsBand({ einsatz, klebend = true }: { einsatz: MitArt; klebend?: boolean }) {
+export function UebungsBand({
+  einsatz,
+  klebend = true,
+  unbekannt = false,
+}: {
+  einsatz: MitArt;
+  klebend?: boolean;
+  unbekannt?: boolean;
+}) {
   const aktiv = istUebung(einsatz);
   const { rollen } = useRollen();
   // Die Quelle meldet sich nur bei einer klebenden Übung; sonst bleibt die Summe, wie sie war.
   const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv && klebend);
+  if (!aktiv && unbekannt && !einsatz?.einsatzart) {
+    return (
+      <div
+        data-lfh="uebung-unbekannt"
+        style={{
+          flexShrink: 0,
+          paddingBlock: 3,
+          paddingInline: 'var(--lfh-seiten-polsterung)',
+          textAlign: 'center',
+          background: rollen.flaeche3,
+          borderBlockEnd: `1px solid ${rollen.linie}`,
+          color: rollen.text2,
+          fontSize: BAND_SCHRIFT,
+        }}
+      >
+        {UNBEKANNT}
+      </div>
+    );
+  }
   if (!aktiv) return null;
   return (
     <div

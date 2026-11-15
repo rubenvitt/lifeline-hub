@@ -134,7 +134,8 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   `Math.max(56, controlHeight)`. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
   Handschuh-Stufe wählt das Gerätemenü. Eine Übung zeigt das Übungsband direkt unter dem Kopf, im
   Fluss und nicht klebend, der Lagemonitor die Marke in der Statusleiste (Regel: `frontend/AGENTS.md`,
-  Rahmen, „Übung“).
+  Rahmen, „Übung“). Fehlt der Einsatzkopf, laden beide ihn alle 30 s nach und nennen nach einem
+  Fehler „Einsatzart nicht geladen“.
 - **Lagemonitor (Großbild):** feste Kachelung ohne Bildlauf bei 1920 × 1080, Kacheln und Karte
   ohne Bedienung; Kennzahlen mindestens 72 px, jeder Text mindestens 28 px; keine Namen und keine
   Personenkennungen, auch nicht in der Serverantwort (der Einsatzkopf kommt ohne Sachverhalt,

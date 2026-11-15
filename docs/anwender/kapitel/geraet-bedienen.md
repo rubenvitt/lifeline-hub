@@ -47,7 +47,9 @@ In der letzten Stunde vor dem Ende steht „endet …“ hervorgehoben; verläng
 Einsatzleitung. Ohne Netz zeigt die Kopfzeile zusätzlich, von wann die angezeigten Daten sind
 („Stand …“).
 
-Gehört das Gerät zu einer Übung, steht unter der Kopfzeile ein violettes Band „ÜBUNG“.
+Gehört das Gerät zu einer Übung, steht unter der Kopfzeile ein violettes Band „ÜBUNG“. Steht dort
+„Einsatzart nicht geladen“, konnte das Gerät den Einsatz nicht abrufen; es versucht es alle
+30 Sekunden erneut. Bis dahin ist offen, ob es eine Übung ist.
 
 ### Darstellung, Bediendichte und Helligkeit einstellen
 

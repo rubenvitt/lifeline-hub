@@ -77,4 +77,4 @@ export {
   type Gliederungszeile,
 } from './GliederungsPaneel';
 export { default as WarnstufenHinweis } from './WarnstufenHinweis';
-export { UebungsBand, UebungsMarke } from './Uebung';
+export { EINSATZKOPF_NACHLADEN_MS, UNBEKANNT, UebungsBand, UebungsMarke } from './Uebung';

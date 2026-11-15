@@ -100,12 +100,21 @@ Einsatzwechsler SHALL jede Übung in seiner Liste mit der Marke „ÜBUNG“ zei
 Ein gekoppeltes Gerät, das einer Übung zugeordnet ist, SHALL in jeder Funktionsansicht direkt unter
 dem Gerätekopf das Band „ÜBUNG“ zeigen. Der Lagemonitor SHALL die Marke „ÜBUNG“ in seiner
 Statusleiste zeigen, in mindestens 28 px Schrift, ohne die Kachelung zu verkleinern und ohne
-Bildlauf bei 1920 × 1080. Die Kennzeichnung MUST still sein: kein Ton, kein Blinken.
+Bildlauf bei 1920 × 1080. Die Kennzeichnung MUST still sein: kein Ton, kein Blinken. Lässt sich die
+Einsatzart am Gerät nicht laden, SHALL statt der Kennzeichnung „Einsatzart nicht geladen“ stehen, und
+das Gerät SHALL den Einsatz erneut laden, bis die Art bekannt ist.
 
 #### Scenario: Gerät einer Übung
 
 - **WHEN** ein gekoppeltes Gerät einer Übung seine Funktionsansicht zeigt
 - **THEN** steht unter dem Gerätekopf das Band „ÜBUNG“
+
+#### Scenario: Einsatzart am Gerät nicht geladen
+
+- **WHEN** ein gekoppeltes Gerät oder ein Lagemonitor startet, während der Server den Einsatz nicht
+  ausliefert
+- **THEN** steht unter dem Gerätekopf bzw. in der Statusleiste „Einsatzart nicht geladen“
+- **AND** sobald der Einsatz wieder geladen ist, steht bei einer Übung das Band bzw. die Marke
 
 #### Scenario: Lagemonitor einer Übung
 

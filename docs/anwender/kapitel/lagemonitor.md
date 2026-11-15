@@ -57,7 +57,7 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    farbig hinterlegt, und oben in der Kachel steht „Neue Sofortmeldung“ bzw. „Neu in SK I“.
 8. Die Statusleiste nennt Einsatz, Gerät, Verbindung („live“, „verbinde …“, „getrennt“), den
    Stand der Daten mit Alter und die Uhr. Bei einer Übung steht vor dem Einsatz die violette
-   Marke „ÜBUNG“.
+   Marke „ÜBUNG“; „Einsatzart nicht geladen“ heißt, dass der Einsatz gerade nicht abrufbar ist.
 
 ### Gerätemenü öffnen
 

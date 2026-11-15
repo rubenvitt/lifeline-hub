@@ -205,6 +205,14 @@ describe('Gerätehülle — Übung (LLH-1725, Spec `uebungsmarke`)', () => {
     expect(band.style.position).toBe('');
   });
 
+  it('scheitert der Einsatzkopf, steht „Einsatzart nicht geladen“ statt still nichts', async () => {
+    stelleBereit();
+    server.use(http.get('/api/einsaetze/7', () => new HttpResponse(null, { status: 503 })));
+    renderApp('/geraet');
+    expect(await screen.findByText('Einsatzart nicht geladen')).toBeVisible();
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
+
   it('beim Realeinsatz steht kein Band (Gegenprobe)', async () => {
     stelleBereit();
     renderApp('/geraet');

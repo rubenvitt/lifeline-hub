@@ -198,6 +198,15 @@ describe('Lagemonitor — Großbild', () => {
     expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
   });
 
+  it('scheitert der Einsatzkopf, nennt die Statusleiste „Einsatzart nicht geladen“ (LLH-1725)', async () => {
+    bereit();
+    server.use(http.get('/api/einsaetze/7', () => new HttpResponse(null, { status: 503 })));
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    const leiste = document.querySelector<HTMLElement>('[data-lfh="monitor-statusleiste"]')!;
+    expect(await within(leiste).findByText('Einsatzart nicht geladen')).toBeInTheDocument();
+  });
+
   it('ein Realeinsatz trägt keine Übungsmarke (Gegenprobe)', async () => {
     bereit();
     renderApp('/geraet/7/monitor');

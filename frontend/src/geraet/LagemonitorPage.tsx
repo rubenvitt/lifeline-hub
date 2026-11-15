@@ -23,7 +23,12 @@ import type {
   LagemonitorSanitaetsdienst,
   Programmpunkt,
 } from '../api/types';
-import { UebungsMarke, useRollen } from '../components/instrument';
+import {
+  EINSATZKOPF_NACHLADEN_MS,
+  UNBEKANNT,
+  UebungsMarke,
+  useRollen,
+} from '../components/instrument';
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
@@ -562,6 +567,7 @@ const VERBINDUNG_TEXT = {
 function Statusleiste({
   geraet,
   einsatz,
+  einsatzUnbekannt,
   einsatzName,
   standMs,
   jetzt,
@@ -569,6 +575,7 @@ function Statusleiste({
 }: {
   geraet: GeraetAnzeige;
   einsatz: EinsatzAnzeige | undefined;
+  einsatzUnbekannt: boolean;
   einsatzName: string | undefined;
   standMs: number;
   jetzt: number;
@@ -610,6 +617,7 @@ function Statusleiste({
       {/* Übung (LLH-1725, D7): die Marke vor dem Namen, ≥ 28 px; kein Band oben, die Kachelung
           für 1920 × 1080 bleibt. Still, wie alles am Gerät. */}
       <UebungsMarke einsatz={einsatz} groesse="monitor" />
+      {einsatzUnbekannt && <span data-lfh="uebung-unbekannt">{UNBEKANNT}</span>}
       <strong
         style={{ flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}
       >
@@ -735,6 +743,8 @@ export default function LagemonitorPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
     enabled: geraet != null,
+    // Ohne Kopf keine Übungsmarke: bis er da ist, nachfragen (LLH-1725, wie die Gerätehülle).
+    refetchInterval: (q) => (q.state.data ? false : EINSATZKOPF_NACHLADEN_MS),
   });
   const lageQuery = useQuery({
     queryKey: einsatzKeys.lagemonitor(einsatzId),
@@ -831,6 +841,7 @@ export default function LagemonitorPage() {
       <Statusleiste
         geraet={geraet}
         einsatz={einsatz}
+        einsatzUnbekannt={einsatzQuery.isError && !einsatz}
         einsatzName={einsatz?.bezeichnung}
         standMs={lageQuery.dataUpdatedAt}
         jetzt={jetzt}

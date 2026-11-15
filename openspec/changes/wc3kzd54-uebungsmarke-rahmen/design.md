@@ -148,6 +148,13 @@ hat keinen Kopf: `UebungsMarke groesse="monitor"` steht in der Statusleiste vor 
 Die Kachelung bleibt unverändert, `geraet-lagemonitor.spec.ts` prüft weiter „ohne Bildlauf, jeder
 Text ≥ 28 px“. Kein Ton, keine Animation (`geraet/AGENTS.md`).
 
+Anders als der Einsatzrahmen haben Gerätehülle und Lagemonitor keinen Fehlerzweig für den
+Einsatzkopf: Scheitert sein erster Abruf (Server startet neu, 502/503), liefe die Ansicht still wie
+bei einem Realeinsatz weiter. Beide laden den Kopf deshalb alle 30 s nach, solange er fehlt
+(`EINSATZKOPF_NACHLADEN_MS`), und nennen nach einem Fehler „Einsatzart nicht geladen“ (neutral unter
+dem Kopf bzw. in der Statusleiste). Verworfen: die Einsatzart über `/me` mitzuliefern
+(`GeraetAnzeige`); das hätte das Backend berührt. Aus dem Review vor dem PR, abgestimmt 15.11.2026.
+
 ### D8 Druck: Kopfzeile plus Randfeld in Chromium
 
 - `Druckkopf` weitet seinen Prop auf `einsatz: { bezeichnung; einsatznummer_intern?; einsatzart? }`.

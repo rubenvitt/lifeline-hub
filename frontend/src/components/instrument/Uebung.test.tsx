@@ -45,6 +45,19 @@ describe('UebungsBand (LLH-1725, Spec `uebungsmarke`)', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('nennt eine unbekannte Einsatzart, statt still nichts zu zeigen (LLH-1725)', () => {
+    render(<UebungsBand einsatz={undefined} unbekannt klebend={false} />);
+    const hinweis = document.querySelector('[data-lfh="uebung-unbekannt"]');
+    expect(hinweis).toHaveTextContent('Einsatzart nicht geladen');
+    // Kein Übungsband: die Art ist unbekannt, nicht „Übung“.
+    expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
+
+  it('mit bekannter Art zählt die Art, nicht der Merker „unbekannt“', () => {
+    render(<UebungsBand einsatz={REAL} unbekannt klebend={false} />);
+    expect(document.querySelector('[data-lfh="uebung-unbekannt"]')).toBeNull();
+  });
+
   /**
    * jsdom misst keine Höhe: `offsetHeight` am Prototyp gestubbt, damit „meldet sich“ und „meldet
    * sich nicht“ unterscheidbar sind. Das gerenderte Kleben misst e2e/rahmen-stehen-bleiben.spec.ts.

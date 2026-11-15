@@ -88,7 +88,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 - [x] 9.4 Druck: benannte Seiten `lageplan`, `dokument-anlage`, `fernmeldeskizze-a3/-a4` erhalten
   bei einer Übung eine Variante mit Randfeld „ÜBUNG“; der Titel jedes Anlageblatts einer Übung trägt
   „ÜBUNG“; CSS-Tests und `etb-druck`/Anlagen-Test grün.
-- [ ] 9.5 Gerätehülle und Lagemonitor laden den Einsatzkopf ohne Daten alle 30 s nach und zeigen nach
+- [x] 9.5 Gerätehülle und Lagemonitor laden den Einsatzkopf ohne Daten alle 30 s nach und zeigen nach
   einem Fehler „Einsatzart nicht geladen“ (Gerät unter dem Kopf, Monitor in der Statusleiste); Tests.
 - [ ] 9.6 Marke zusätzlich in Sprungpalette (Einsatz-Wechsel), Planungsübernahme („Laufender
   Einsatz“), externem Lagebild, „Zurück zu …“ (Ebene 1) und im Bildkopf des Lageplan-PNG; je ein Test.
