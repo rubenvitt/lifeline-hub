@@ -404,6 +404,34 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     );
   });
 
+  it('„Rückgängig“ nach „Stattdessen schließen“ stellt den Status davor her, nicht „in Betrieb“', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      stellen: [
+        {
+          ...TURNHALLE,
+          status: 'vorbereitet',
+          belegung: { id: 30, belegt: 0, zeitpunkt_at: 'x' },
+        },
+      ],
+    });
+    api.aendereStelle.mockResolvedValue({ ...TURNHALLE, status: 'geschlossen' });
+    renderPage();
+    await waehleMenueEintrag(
+      await screen.findByRole('button', { name: 'Weitere Aktionen zu Stelle Turnhalle Ost' }),
+      /Stornieren/,
+    );
+    const dialog = await dialogMit('Betreuungsstelle Turnhalle Ost stornieren?');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stattdessen schließen' }));
+    const hinweis = (
+      await screen.findByText('Betreuungsstelle Turnhalle Ost: geschlossen')
+    ).closest('.ant-message-notice') as HTMLElement;
+    api.aendereStelle.mockResolvedValue({ ...TURNHALLE, status: 'vorbereitet' });
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(api.aendereStelle).toHaveBeenLastCalledWith(1, 8, { status: 'vorbereitet' }),
+    );
+  });
+
   it('eine leere Stelle schließt ohne Rückfrage; „In Betrieb nehmen“ und „Wieder öffnen“ ebenso', async () => {
     api.ladeBetreuung.mockResolvedValue({
       stellen: [{ ...TURNHALLE, belegung: { id: 30, belegt: 0, zeitpunkt_at: 'x' } }],
