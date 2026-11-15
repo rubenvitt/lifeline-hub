@@ -5,7 +5,7 @@ import { useRollen } from '../components/instrument/rollenwerte';
 import { useBandAbstand } from '../components/untereLeiste';
 import { useViewport } from '../components/useViewport';
 import { IconChevronRechts, IconKreuz } from '../icons';
-import { useAlarmZone } from './alarmZoneSpeicher';
+import { useAlarmZone, type ZonenEintrag } from './alarmZoneSpeicher';
 import { bandUnten } from './Eingangsband';
 import { oeffneEingaenge } from './eingaenge';
 import { useFokusInEingabe } from './useFokusInEingabe';
@@ -44,17 +44,43 @@ export default function HandyLeiste({
   eingaenge: number;
   eingaengeAusblenden: () => void;
 }) {
-  const { token } = theme.useToken();
-  const { rollen } = useRollen();
   const { istSchmal } = useViewport();
   const tippt = useFokusInEingabe();
   const { eintraege: alarme } = useAlarmZone();
+  if (!istSchmal) return null;
+  if (alarme.length === 0 && (eingaenge === 0 || tippt)) return null;
+  // Eigene Komponente: `useBandAbstand` misst ab dem Einhängen der Leiste. Stünde der Hook hier,
+  // läse er die Ref schon, solange die Leiste noch nichts zeigt, und rückte später nicht nach.
+  return (
+    <Leiste
+      einsatzId={einsatzId}
+      eingaenge={eingaenge}
+      eingaengeAusblenden={eingaengeAusblenden}
+      tippt={tippt}
+      alarme={alarme}
+    />
+  );
+}
+
+function Leiste({
+  einsatzId,
+  eingaenge,
+  eingaengeAusblenden,
+  tippt,
+  alarme,
+}: {
+  einsatzId: number;
+  eingaenge: number;
+  eingaengeAusblenden: () => void;
+  tippt: boolean;
+  alarme: readonly ZonenEintrag[];
+}) {
+  const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const ref = useRef<HTMLElement>(null);
   const rand = 0;
   const abstand = useBandAbstand(ref, rand);
   const alarm = alarme.length > 0;
-  if (!istSchmal) return null;
-  if (!alarm && (eingaenge === 0 || tippt)) return null;
 
   const juengster = alarme[alarme.length - 1];
   const text = tippt
