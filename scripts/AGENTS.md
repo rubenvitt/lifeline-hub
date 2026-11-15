@@ -4,50 +4,42 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 
 ## Sammel-Gate (LFH-235/F17)
 
-`./scripts/check-all.sh` vor dem Merge: `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
+`./scripts/check-all.sh` (voller Lauf; vor dem PR genügt `--geaendert --ohne-e2e`, s. „Leichte PR-Prüfung“): `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` + `nur-umnummeriert.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-auswahl.test.sh` + `ci-stufen.test.sh` + `ziel-branch-build.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ziel-branch-build.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-archiv.sh` → `check-schreibweisen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) für den Check „Baut mit
 Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
-- **Im PR laufen nur die betroffenen Suiten** (LFH-1111/1115): `scripts/bereiche.sh` ordnet
-  jede geänderte Datei den Suiten Rust, Frontend und e2e zu, `scripts/ci-auswahl.sh` (Job
-  `aenderungen` beider Stufen) und `check-all.sh --geaendert` fragen beide nur dieses Skript;
-  die Schnellprüfungen und Push-Läufe auf Kanal-Branches laufen immer voll. **Im Zweifel alles:** ein Pfad ohne Regel
-  fordert alle drei. Eine Datei, die eine Suite aus einem fremden Bereich liest (Rust liest
-  `frontend/src/api/openapi.json`, Vitest liest `src-tauri/src/faehigkeiten.js`), braucht
-  einen Querbezug in `bereiche.sh`; `scripts/bereiche.test.sh` (Schritt 11) sucht solche
-  Pfade im Quelltext und wird rot, wenn einer fehlt. Jobs mit Pflicht-Check (Rust-Suite,
-  Frontend-Shards) laufen leer und grün durch statt per Job-`if`: ein übersprungener Matrix-Job
-  hinge auf „Expected", ein übersprungener ohne Matrix zeigt grün, hält Auto-Merge aber auf
-  (#1283, #1336). Kopf von `ci.yml`; die Form prüft `scripts/ci-stufen.test.sh`.
-  `check-all.sh --geaendert` wählt lokal dieselben Suiten wie die CI im PR, `--auswahl` zeigt sie
-  nur an; ohne Argument läuft alles.
-- **Zwei Stufen im PR** (LLH-1662): `ci.yml` prüft jeden Push (Schnellprüfungen, Rust, Vitest).
-  e2e-Binary und `e2e 1/4` bis `4/4` stehen in `.github/workflows/e2e.yml` und laufen erst,
-  wenn der PR **fertig** ist: Auto-Merge an oder Label `e2e`. Beim Einschalten startet die
-  Stufe ohne neuen Commit, danach bei jedem Push; wer beides zurücknimmt, bricht sie ab. Davor
-  **fehlen** ihre Pflicht-Checks (übersprungene Matrix-Jobs, auch das Binary heißt über eine
-  Ein-Element-Matrix); nie leer grün, sonst mergte Ungeprüftes. Ob sie startet, entscheidet
-  allein das `if` des Jobs `aenderungen` in `e2e.yml`; neue Ereignistypen gehören nie in
-  `ci.yml` (das Einschalten von Auto-Merge bräche den laufenden Lauf ab). Push-Läufe auf
-  Kanal-Branches rufen `e2e.yml` aus `ci.yml` auf, der Release wartet darauf. Die Form hält
-  `scripts/ci-stufen.test.sh` (Schritt 11) fest; Start- und Gruppenbedingung von `e2e.yml` stehen
-  dort im Wortlaut und ändern sich nur zusammen mit ihm. **e2e-Rückmeldung vor dem Merge:** Label
-  `e2e` setzen oder lokal `check-all.sh --geaendert`. Herleitung:
-  `openspec/changes/archive/2026-11-12-k133wmg6-zweistufige-ci/design.md`.
-- **Eine reine Umnummerierung übernimmt Frontend- und e2e-Suite, jede für sich** (LLH-1660,
-  LLH-1662): Folgen auf einen Commit, auf dem eine Suite grün war, nur Autofix-Commits, die Migrationen unverändert auf eine
-  höhere Nummer legen (gleicher Name, gleiche Reihenfolge; daneben höchstens Dateien, die laut
-  `bereiche.sh` keine Suite liest), läuft diese Suite auf dem neuen Kopf leer durch; ein
-  Vorgänger ohne e2e-Lauf (PR nicht fertig) verhindert nur die e2e-Übernahme. **Die
-  Rust-Suite läuft immer neu:** der PR-Lauf prüft den Merge mit dem Ziel-Branch, und dort kam
-  die Migration dazu, wegen der umnummeriert wurde. `scripts/nur-umnummeriert.sh` nennt den
-  Vorgänger und wertet dessen Check-Runs je Suite aus, `scripts/ci-auswahl.sh` fragt es. Entschieden wird am Inhalt des Commits, nicht am Autor; jeder Zweifel
-  lässt alles laufen. Die Liste der schweren Checks steht im Skript, der Selbsttest vergleicht
-  sie mit `ci.yml` und `e2e.yml`: wer einen Anteil hinzufügt oder umbenennt, zieht sie nach.
+- **Leichte PR-Prüfung** (LLH-1889, ADR-0047; ersetzt die zwei Stufen von LLH-1662):
+  - **Im PR** läuft nur der Job `schnell` aus `ci.yml`. Pflicht im Ruleset 17017911 sind
+    `Schnellprüfungen`, `Migrationsnummern`, `ADR-Nummern` und `Baut mit Ziel-Branch`, sonst
+    nichts. Ein fremdes Label startet an einem PR ohne `voll` nur die Schnellprüfungen neu, in
+    eigener Gruppe, ohne einen laufenden Lauf abzubrechen; an einem PR mit `voll` startet es alle
+    Suiten neu (ein übersprungener gleichnamiger Check verdeckte sonst eine rote Suite). Rust-, Frontend- und e2e-Suite laufen im PR nur mit dem **Label `voll`**, dann ganz
+    und ohne Pflicht (eine rote Suite steht sichtbar am PR, sperrt aber nicht). Das frühere Label
+    `e2e` bedeutet nichts mehr. „Fertig“ heißt Auto-Merge an (für „Baut mit Ziel-Branch“).
+  - **Vor dem PR lokal:** `./scripts/check-all.sh --geaendert --ohne-e2e`. `scripts/bereiche.sh`
+    ordnet jede geänderte Datei den Suiten Rust, Frontend und e2e zu (**im Zweifel alles**; ein
+    Querbezug aus einem fremden Bereich braucht eine Regel dort, `bereiche.test.sh` sucht
+    fehlende). `--auswahl` zeigt die Schritte nur an; ohne Argument läuft alles. Die CI wählt
+    nicht mehr nach Bereichen.
+  - **Auf `alpha`, `beta`, `main`** laufen bei jedem Push alle Suiten. Ein neuer Push bricht die
+    **Testjobs** des laufenden Laufs ab (Concurrency je Job: `rust`, `frontend` je Anteil, `e2e`,
+    `berichte`), der jüngste Lauf deckt alle früheren mit ab. Der **Release** hat eine eigene
+    Gruppe ohne Abbruch: ein laufender Release endet nie mittendrin (Tag ohne Release), und ein
+    Lauf mit abgebrochenen oder roten Tests released nicht (`needs`). Nie
+    `cancel-in-progress` für den ganzen Workflow auf einem Kanal-Branch. **Neu starten nur den
+    jüngsten Lauf** eines Kanal-Branches: ein neu gestarteter Job eines älteren Laufs tritt in
+    dieselbe Gruppe und bricht die Tests des jüngeren ab.
+  - **Label-Ereignisse:** `ci.yml` hört im PR auf `labeled`; die Schnellprüfungen laufen dabei
+    immer neu, nie übersprungen (ein übersprungener jüngster Check zählte grün). Auto-Merge-
+    Ereignisse gehören nicht nach `ci.yml`.
+  - `e2e.yml` ist nur noch `workflow_call` (Binary, Anteile, Bericht, Runner-Wahl).
+  - Die Form hält `scripts/ci-stufen.test.sh` (Schritt 11) fest.
+  - Folge: Testbrüche landen auf `alpha` und gehen über „alpha rot“ (Stau-Wächter, unten).
+  - Herleitung: `openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md`.
 - **Stau-Wächter** (LLH-1660, `scripts/stau-waechter.sh`, `.github/workflows/stau-waechter.yml`:
   Push auf einen Ziel-Branch, stündlich, von Hand): bewertet jeden offenen PR, der kein Entwurf
   ist. Was er tut und warum, steht im Skriptkopf; die Grenzen belegt `stau-waechter.test.sh`.
@@ -59,14 +51,9 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Migrations-Autofix: nur PRs aus diesem Repository, nie `alpha`/`beta`/`main`, nur
     Fast-Forward auf genau den bewerteten Kopf (Push mit Lease), kein zweiter Versuch auf einem Wächter-Merge (Trailer
     `Stau-Waechter`; gilt nur hier, „alpha rot“ hat seine eigene Bremse). **Nach einem Wächter-Merge vor dem nächsten Push den Branch holen.**
-  - **Auto-Merge an, e2e-Stufe fehlt** (LLH-1662; 20 Minuten ab dem späteren von erstem Check
-    des Kopfes und Einschalten von Auto-Merge): ein Hinweis, Auto-Merge aus- und wieder
-    einschalten (mit Label `e2e` vorher das Label entfernen). Kein Push. Geht „grün, nicht
-    gemergt“ vor, das sonst fälschlich anschlüge. Gelaufen ist die Stufe, wenn der jüngste Lauf
-    eines ihrer Pflicht-Checks weder übersprungen noch abgebrochen ist oder ihre Auswahl
-    (`e2e-Auswahl`) gerade läuft; je Name zählt wie bei den Required Checks der jüngste
-    Check-Run, auch für „grün“.
-  - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand.
+  - **Grün, Auto-Merge an, nicht gemergt** (20 Minuten): ein Hinweis; gemergt wird von Hand. Je
+    Name zählt wie bei den Required Checks der jüngste Check-Run. Hinweise einer Art, die es
+    nicht mehr gibt (`ohne-e2e`, bis LLH-1889), gehen ohne Befund auf „behoben“.
   - **alpha rot** (LLH-1849; zusätzlich ausgelöst, wenn ein CI-Lauf auf `alpha` fertig ist):
     schlägt im jüngsten abgeschlossenen Push-Lauf von `ci.yml` auf `alpha` ein Job außer dem
     Release fehl (dessen Jobs heißen „Release / …“), ist **höchstens ein** offener PR zuständig:
@@ -95,14 +82,25 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     „alpha rot“ und „Baut mit Ziel-Branch“
     `openspec/changes/archive/2026-11-12-g10eo9co-alpha-rot-schutz/design.md`.
 - **Baut mit Ziel-Branch** (LLH-1849, `.github/workflows/ziel-branch-build.yml`,
-  `scripts/ziel-branch-build.sh`): Pflicht-Check an einem fertigen PR (Auto-Merge an oder Label
-  `e2e`, kein Entwurf): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert
+  `scripts/ziel-branch-build.sh`): Pflicht-Check an einem fertigen PR (Auto-Merge an, kein
+  Entwurf; Labels zählen nicht): der PR zusammen mit dem **aktuellen** Ziel-Branch, nur kompiliert
   (`check-all.sh --nur baut`). Nach jedem Push auf einen Kanal-Branch setzt `verteilen` den Check
   jedes fertigen PRs auf „läuft“ und startet **je PR einen eigenen Lauf auf dessen Branch**
   (`workflow_dispatch`); ein nicht fertiger mit Check (auch ein Entwurf) bekommt „wartet“, ein
   Branch ohne den Workflow einen roten Check mit „`alpha` hineinmergen“. Der Einzellauf rechnet
   nur auf dem Kopf-Branch eines PRs dieses Repositorys, nie auf einem Kanal-Branch, und legt einen
-  frischen Check an. Der Check entsteht über
+  frischen Check an. **Warteschlange statt Abbruch** (LLH-1889): je PR rechnet ein Lauf, einer
+  wartet, ein neuer Anstoß ersetzt den wartenden (`cancel-in-progress: false`, auch bei neuem
+  PR-Commit); so bündeln sich Merges auf den jüngsten Stand. **Kein Check und kein Job endet
+  abgebrochen, weil er überholt ist**: ein überholter Check bleibt auf „läuft“, bis ihn der
+  jüngere Check des nächsten Laufs ablöst (GitHub wertet je Name den jüngsten; alle Checks-API-Runs
+  liegen in einer Suite, ohne `filter=all` liefert die API nur ihn). Hat sich nur der Ziel-Branch bewegt
+  und erscheint binnen 5 Minuten kein jüngerer, ohne dass ein Push-Lauf aussteht, wird er rot mit
+  „neu starten“ (bei neuem PR-Kopf bleibt er ohne Frist stehen, der PR zeigt den alten Kopf nicht). Abgebrochen hieß am PR rot, und am 14.11.2026 mergte so
+  nichts mehr. Jeder Check trägt den gerechneten Ziel-Stand in `external_id`; ist ein Stand auf dem
+  Kopf schon gerechnet, übernimmt der Einzellauf das Ergebnis, statt noch einmal zu rechnen (nicht
+  bei einem Neustart des Laufs; „Kein Ergebnis“ trägt keinen Stand). Herleitung:
+  `openspec/changes/archive/2026-11-14-p4avye3q-ziel-branch-build-ersetzen-buendeln/design.md`. Der Check entsteht über
   die Checks-API, nie als Job-Name (ein übersprungener Job meldete grün). **PR-Code läuft nie in
   einem Lauf auf einem Kanal-Branch** (dessen Cache-Bereich liest der Release-Build; Runtime-Token
   und `sudo` umgehen jedes `save-if`), nur im Job `kompilieren` eines PR- oder Einzellaufs: dort
@@ -143,9 +141,8 @@ Ziel-Branch“; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   `alpha` vorgezogen ist
   (`openspec/changes/archive/2026-09-30-lfh-520-cargo-artefakte-isolieren/design.md`).
 - **Playwright fährt drei Projekte** (LFH-729): `chromium` alles, `firefox` und `webkit` nur die
-  Druck-Specs (`frontend/playwright.config.ts`). Die vier Pflicht-Shards `e2e k/4` fahren alle
-  drei und installieren alle drei Browser. Ein eigener Job sperrte erst mit einem Eintrag im
-  Ruleset 17017911. `PW_PROJEKTE=chromium` wählt lokal eine Teilmenge. Schritt 7 bricht vorab
+  Druck-Specs (`frontend/playwright.config.ts`). Die vier Shards `e2e k/4` fahren alle
+  drei und installieren alle drei Browser. `PW_PROJEKTE=chromium` wählt lokal eine Teilmenge. Schritt 7 bricht vorab
   ab, wenn ein Browser fehlt, und überspringt nie still
   (`openspec/changes/archive/2026-10-01-lfh-729-druck-firefox-webkit-pdf-nachweis/design.md`, D1/D2).
 - **Die e2e-Anteile teilen nach gemessener Laufzeit, nicht nach Testzahl** (LFH-1117):

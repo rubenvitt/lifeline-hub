@@ -2,7 +2,8 @@
 # `artefakte.yml`, das ihn nach grünem Bau aller Plattformen veröffentlicht (LFH-1054).
 #
 # WIRD AUFGERUFEN, LÄUFT NICHT SELBST LOS: ci.yml ruft ihn nach grünem Gate und nur bei einem
-# Push. `workflow_call` statt `workflow_run`, weil semantic-release den Branch über env-ci aus
+# Push; ein Lauf, dessen Tests ein neuerer Push abgebrochen hat, released nicht, und ein laufender
+# Release bricht nie ab (eigene Gruppe in ci.yml, LLH-1889). `workflow_call` statt `workflow_run`, weil semantic-release den Branch über env-ci aus
 # `GITHUB_REF` liest — ein `workflow_run`-Lauf trägt dort immer den Default-Branch, und ein
 # Push auf `beta` released sonst still als stabile Version. `workflow_call` erbt den
 # auslösenden Ereigniskontext.

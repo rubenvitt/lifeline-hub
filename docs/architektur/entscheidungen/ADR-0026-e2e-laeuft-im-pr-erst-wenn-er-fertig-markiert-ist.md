@@ -1,12 +1,12 @@
 ---
 id: ADR-0026
 titel: Die e2e-Suite läuft im PR erst, wenn er fertig markiert ist, und ihre Pflicht-Checks fehlen davor
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0047
 datum: 2026-11-12
 gilt_fuer:
   - .github/workflows/ci.yml
   - .github/workflows/e2e.yml
-  - scripts/ci-auswahl.sh
   - scripts/ci-stufen.test.sh
 herleitung:
   - openspec/changes/archive/2026-11-12-k133wmg6-zweistufige-ci/design.md

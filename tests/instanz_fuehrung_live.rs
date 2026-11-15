@@ -401,3 +401,44 @@ async fn widerruf_durch_den_elw_meldet_am_hub_den_uebernommenen_spiegel() {
     assert!(fuehrt, "der Hub führt nach dem Widerruf");
     assert!(has_kopf(&mut rx), "der Widerruf meldet den Einsatzkopf");
 }
+
+/// Erste Akte nennt schon den Empfänger (LLH-1860): Der Spiegel liegt schon am Hub (Takt), die
+/// Übergabe geschieht aber vor der ersten Meldung mit der Akte. Der Hub legt die Akte neu an,
+/// hängt sie an den Spiegel und wird darüber zum Führer; Kopf und Vollabgleich gehen hinaus.
+#[tokio::test]
+async fn erste_akte_mit_uebergabe_meldet_am_hub_kopf_und_vollabgleich() {
+    let _serial = lock_serial().await;
+    let (hub, elw, live, _e, _akte) = setup().await;
+    let e2 = common::einsatz_anlegen(&elw.app, &elw.admin).await;
+    for _ in 0..2 {
+        lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
+            .await
+            .unwrap();
+    }
+    let h2: i64 = eine(
+        &hub.pool,
+        "SELECT id FROM einsatz WHERE spiegel = 1 AND NOT EXISTS \
+         (SELECT 1 FROM einsatz_fuehrung f WHERE f.einsatz_id = einsatz.id)",
+    )
+    .await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/einsaetze/{e2}/fuehrung/uebergeben"),
+        json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut rx = live.abonniere(h2);
+    melden(&elw).await;
+    let spiegel: bool = eine(
+        &hub.pool,
+        &format!("SELECT spiegel = 1 FROM einsatz WHERE id = {h2}"),
+    )
+    .await;
+    assert!(!spiegel, "der Hub führt");
+    let gemeldet = ereignisse(&mut rx);
+    assert!(
+        gemeldet.contains(&LiveEvent::Einsatz) && gemeldet.contains(&LiveEvent::Lagged),
+        "{gemeldet:?}"
+    );
+}
