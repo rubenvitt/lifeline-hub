@@ -41,7 +41,7 @@ TDD: erst der Test, der ohne die Änderung rot ist.
 
 ## 4. Abschluss
 
-- [ ] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis im PR unter „Geprüft“.
+- [x] 4.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis im PR unter „Geprüft“. (15.11.2026: Bündel `schnell` und `frontend` lokal grün, 20288 Vitest-Fälle; die Rust-Suite, die `--geaendert` wegen `frontend/src/api/` wählt, passte mit rund 28 GB Testbau nicht in den Plattenplatz der Cloud-Sitzung. Der Diff ändert keinen Rust-Code; sie läuft auf `alpha`.)
 
 ## Workflow follow-up
 
