@@ -131,6 +131,7 @@ import {
 } from './admin/adminNav';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
+import SeiteNichtGefunden from './einsatz/SeiteNichtGefunden';
 import ModulRedirect from './einsatz/ModulRedirect';
 import AltpfadWeiterleitung from './einsatz/AltpfadWeiterleitung';
 import ModulStub from './einsatz/ModulStub';
@@ -533,6 +534,9 @@ export const appRouten = createRoutesFromElements(
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
           {/* Detailseite eines Evakuierungsbezirks; gegatet über das Segment `evakuierung`. */}
           <Route path="evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />
+          {/* Unbekannte Adresse im Einsatz (LLH-1729): bleibt im Rahmen und sagt „Seite nicht
+              gefunden“, statt bis zur globalen Auffangroute auf die Einsatzliste durchzufallen. */}
+          <Route path="*" element={<SeiteNichtGefunden />} />
         </Route>
       </Route>
     </Route>

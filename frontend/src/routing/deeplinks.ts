@@ -1560,10 +1560,16 @@ export const HILFE_PFAD = '/hilfe';
 /**
  * Ohne Kapitel zeigt die Hilfe alle Kapitel der Gruppe hintereinander (Einweisungsmappe), mit
  * Kapitel nur dieses. Die Gruppe reist in der Adresse; die Vorgabe `alle` steht nicht darin.
+ *
+ * `von` ist die Herkunft für den Rückmeldeweg, nur für eine Hilfe im neuen Tab, der den
+ * History-State nicht erbt (LLH-1731 D5). Die Hilfe nimmt sie beim Öffnen aus der Adresse.
  */
-export function hilfePfad(opts: { kapitel?: string; gruppe?: Gruppe } = {}): string {
+export function hilfePfad(opts: { kapitel?: string; gruppe?: Gruppe; von?: string } = {}): string {
   const pfad = opts.kapitel ? `${HILFE_PFAD}/${opts.kapitel}` : HILFE_PFAD;
-  return mitQuery(pfad, { gruppe: opts.gruppe === 'alle' ? undefined : opts.gruppe });
+  return mitQuery(pfad, {
+    gruppe: opts.gruppe === 'alle' ? undefined : opts.gruppe,
+    von: opts.von,
+  });
 }
 
 /** Gruppe aus der Adresse; Fehlendes oder Unbekanntes ist `alle`. */
