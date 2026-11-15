@@ -244,12 +244,12 @@ export function storniereEinheit(einsatzId: number, eid: number): Promise<void> 
  * `nurWennFrei` lehnt mit 409 ab, statt den Datensatz einer anderen Einheit still zu nehmen;
  * `alsFuehrer` setzt eine Person in derselben Transaktion wieder als Einheitsführer ein.
  */
-export interface ZuruecknahmeOptionen {
+export interface ZuruecknahmeFilter {
   nurWennFrei?: boolean;
   alsFuehrer?: boolean;
 }
 
-function zuruecknahmeQuery(o: ZuruecknahmeOptionen = {}): string {
+function zuruecknahmeQuery(o: ZuruecknahmeFilter = {}): string {
   const q = new URLSearchParams();
   if (o.nurWennFrei) q.set('nur_wenn_frei', '1');
   if (o.alsFuehrer) q.set('als_fuehrer', '1');
@@ -261,7 +261,7 @@ export function ordnePersonalZu(
   einsatzId: number,
   eid: number,
   epId: number,
-  optionen?: ZuruecknahmeOptionen,
+  optionen?: ZuruecknahmeFilter,
 ): Promise<void> {
   return apiSend<void>(
     `/api/einsaetze/${einsatzId}/einheiten/${eid}/personal/${epId}${zuruecknahmeQuery(optionen)}`,
@@ -277,7 +277,7 @@ export function ordneFahrzeugZu(
   einsatzId: number,
   eid: number,
   efId: number,
-  optionen?: Pick<ZuruecknahmeOptionen, 'nurWennFrei'>,
+  optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
 ): Promise<void> {
   return apiSend<void>(
     `/api/einsaetze/${einsatzId}/einheiten/${eid}/fahrzeug/${efId}${zuruecknahmeQuery(optionen)}`,
