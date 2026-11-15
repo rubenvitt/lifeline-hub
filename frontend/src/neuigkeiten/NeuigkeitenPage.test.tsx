@@ -3,6 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { EINTRAEGE } from 'virtual:neuigkeiten';
+import { useLocation } from 'react-router';
+import { Ebene1OrtProvider } from '../components/Ebene1OrtKontext';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import NeuigkeitenPage from './NeuigkeitenPage';
@@ -96,5 +98,39 @@ describe('NeuigkeitenPage', () => {
     // Gelegenheit für einen (falschen) Aufruf geben, bevor das Ausbleiben geprüft wird.
     await new Promise((r) => setTimeout(r, 50));
     expect(aufgerufen).toBe(false);
+  });
+
+  // LLH-1731: Neuigkeiten ist eine Seite der Ebene 1 wie Profil, mit Ortspfad und Rückweg.
+  it('trägt „Einsätze › Neuigkeiten“ und führt mit dem Rückweg an die Stelle im Einsatz', async () => {
+    function PfadSonde() {
+      const { pathname } = useLocation();
+      return <span data-testid="pfad">{pathname}</span>;
+    }
+    const { container } = renderMitProviders(
+      <>
+        <Ebene1OrtProvider
+          value={{
+            ort: ['Neuigkeiten'],
+            rueckweg: { label: 'Zurück zu Starkregen Nord', pfad: '/einsaetze/5/lagekarte' },
+          }}
+        >
+          <NeuigkeitenPage />
+        </Ebene1OrtProvider>
+        <PfadSonde />
+      </>,
+      { route: '/neuigkeiten' },
+    );
+
+    // Abfragen im Seitenkopf: über das ganze Archiv wäre `getByRole` zu langsam.
+    await waitFor(() => expect(container.querySelector('[data-lfh="seitenkopf"]')).not.toBeNull());
+    const kopf = container.querySelector('[data-lfh="seitenkopf"]') as HTMLElement;
+    expect(within(kopf).getByRole('heading', { level: 1 })).toHaveTextContent('Neuigkeiten');
+    const pfad = kopf.querySelector('.lfh-seitenkopf__pfad') as HTMLElement;
+    expect(within(pfad).getByRole('link', { name: 'Einsätze' })).toHaveAttribute(
+      'href',
+      '/einsaetze',
+    );
+    await userEvent.click(within(kopf).getByRole('link', { name: 'Zurück zu Starkregen Nord' }));
+    expect(screen.getByTestId('pfad')).toHaveTextContent('/einsaetze/5/lagekarte');
   });
 });

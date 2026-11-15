@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel } from '../theme/tokens';
-import ModulPanel, { modulListenStil, modulMarkeStil, modulZeilenStil } from './ModulPanel';
+import ModulPanel, {
+  modulListenStil,
+  modulMarkeStil,
+  modulZeilenStil,
+  sprungLinieStil,
+} from './ModulPanel';
 import { modulRegistry, type ModulEintrag } from './modulRegistry';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import type { ModulFreigaben } from '../api/types';
@@ -346,6 +351,27 @@ describe('ModulPanel · Dichte', () => {
   it('traegt den Steuer-Radius, nicht die weiche Ecke', () => {
     expect(modulZeilenStil(tokenFuer('kompakt'), farben, frei).borderRadius).toBe(0);
   });
+
+  // Spec `modul-sprungmarken`, „Eine Sprungmarke erscheint als eingerückte Unteransicht“
+  // (LLH-1733): die Linie steht in der Spalte der Modulmarke, das Etikett rückt um `padding` ein.
+  it('Sprungmarke: Linie in `linie` über die ganze Zeilenhöhe, fester Einzug', () => {
+    const linie = (s: keyof typeof dichten) => sprungLinieStil(tokenFuer(s), { linie: '#LINIE' });
+    expect(linie('kompakt')).toMatchObject({
+      width: 1,
+      alignSelf: 'stretch',
+      background: '#LINIE',
+      flexShrink: 0,
+    });
+    // Die Linie reicht durch die Polsterung der Zeile, damit Marken untereinander eine
+    // durchgehende Linie bilden.
+    expect(linie('kompakt').marginBlock).toBe(-7);
+    expect(linie('handschuh').marginBlock).toBe(-16);
+    // Fester Einzug statt `padding` der Dichte: gesperrt (Schloss) kürzte sonst in komfortabel
+    // und Handschuh die Namen („Entscheidu…“), Review-Befund LLH-1733.
+    for (const s of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      expect(linie(s).marginInlineEnd, s).toBe(10);
+    }
+  });
 });
 
 describe('ModulPanel · Einsatzdauer im Fuß', () => {
@@ -395,7 +421,9 @@ describe('ModulPanel · Einsatzdauer im Fuß', () => {
 
 /**
  * Sprungmarken (LFH-620) erben Sichtbarkeit und Sperre ihres ZIELmoduls — geprüft an einem
- * echten Registry-Schlüssel, weil `sprungZiel` in der Registry nachschlägt.
+ * echten Registry-Schlüssel, weil `sprungZiel` in der Registry nachschlägt. Die Fixture hängt die
+ * Marke bewusst hinter ein FREMDES Modul (Aufträge): so trennt sie Anker und Ziel. Die echte
+ * Tabelle stellt sie seit LLH-1733 unter ihr Ziel (`sprungmarken.test.ts`).
  */
 describe('ModulListe — Sprungmarken', () => {
   const marke: Sprungmarke = {
@@ -438,10 +466,12 @@ describe('ModulListe — Sprungmarken', () => {
     const sprung = screen.getByRole('button', {
       name: 'Entscheidungen, springt zu ETB · Entscheidung',
     });
-    // Der Titel nennt nur das Ziel, kein Verb (LFH-1078); der Pfeil zeigt den Sprung.
+    // Der Titel nennt nur das Ziel, kein Verb (LFH-1078).
     expect(sprung).toHaveAttribute('title', 'ETB · Entscheidung');
     expect(sprung).not.toHaveAttribute('aria-current');
-    // Das Icon ist Dekoration: kein eigenes Vorleseziel (englisches `aria-label` „export").
+    // Unteransicht, kein Link nach außen (LLH-1733): kein Pfeil, dafür die Führungslinie.
+    expect(sprung.querySelector('[data-lfh-icon="extern-pfeil"]')).toBeNull();
+    expect(sprung.querySelector('[data-lfh="sprung-linie"]')).not.toBeNull();
     expect(within(sprung).queryByRole('img')).not.toBeInTheDocument();
     await userEvent.click(sprung);
     expect(klick).toHaveBeenCalledWith(marke);
@@ -463,7 +493,12 @@ describe('ModulListe — Sprungmarken', () => {
     zeige({ freigaben: freigabenFixture({ etb: { zugriff: false } }), onSprungKlick: klick });
     const sprung = screen.getByRole('button', { name: /Entscheidungen/ });
     expect(sprung).toBeDisabled();
-    expect(sprung).toHaveAttribute('title', 'Keine Berechtigung');
+    // Der Name steht mit im Titel: ist er im schmalen Panel gekürzt, bleibt er so lesbar.
+    expect(sprung).toHaveAttribute('title', 'Entscheidungen · Keine Berechtigung');
+    // Gesperrt wie eine Modulzeile: Schloss, eingerückt, ohne Pfeil.
+    expect(sprung.querySelector('[data-lfh-icon="schloss"]')).not.toBeNull();
+    expect(sprung.querySelector('[data-lfh-icon="extern-pfeil"]')).toBeNull();
+    expect(sprung.querySelector('[data-lfh="sprung-linie"]')).not.toBeNull();
     await userEvent.click(sprung);
     expect(klick).not.toHaveBeenCalled();
   });
@@ -500,7 +535,7 @@ describe('ModulListe — Sprungmarke mit weiterem Modul (LLH-1312)', () => {
     zeige(freigabenFixture({ einheiten: { zugriff: false } }));
     const sprung = screen.getByRole('button', { name: /Ohne Schicht/ });
     expect(sprung).toBeDisabled();
-    expect(sprung).toHaveAttribute('title', 'Keine Berechtigung');
+    expect(sprung).toHaveAttribute('title', 'Ohne Schicht · Keine Berechtigung');
   });
 
   it('ist frei mit beiden Freigaben und flackert beim Laden nicht', () => {

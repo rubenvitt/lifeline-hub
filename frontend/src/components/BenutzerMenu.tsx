@@ -11,7 +11,7 @@ import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
 import { NEUIGKEITEN_PFAD } from '../neuigkeiten/pfad';
-import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD } from '../routing/deeplinks';
+import { BENACHRICHTIGUNGEN_PFAD, HILFE_PFAD, hilfePfad } from '../routing/deeplinks';
 import { useAuth } from '../auth/AuthContext';
 import { useAbmeldenRueckfrage } from '../auth/AbmeldenRueckfrage';
 import { useDichte } from '../theme/ThemeModeProvider';
@@ -93,11 +93,18 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * Name, und an der Umbruchkante des Kopfs reichten 4 px Unterschied für eine zweite Kopfzeile:
  * Rail, Panel und Inhalt sprangen 52 px (CLS 0,556). Vorbild ist `WortPlatz` in `Kopfleiste.tsx`;
  * hier ist der längste Wortlaut nicht bekannt, deshalb eine feste Breite.
+ *
+ * `hilfeDaneben` (im Einsatz-Kopf, LLH-1731 D4/D5): ab `lg` mit Maus öffnet „Hilfe“ in einem neuen Tab, in
+ * der Desktop-App in einem Nebenfenster, und der Einsatz bleibt im ersten Tab mit seinen Alarmen.
+ * Die Herkunft reist dann als `von` in der Adresse, weil ein neuer Tab den History-State nicht
+ * erbt. Am Handy und am Tablet verdeckte ein zweiter Tab den Einsatz nur; dort bleibt es beim selben
+ * Tab.
  */
 export default function BenutzerMenu({
   funktion,
   hasFixedWidth = false,
-}: { funktion?: string | null; hasFixedWidth?: boolean } = {}) {
+  hilfeDaneben = false,
+}: { funktion?: string | null; hasFixedWidth?: boolean; hilfeDaneben?: boolean } = {}) {
   const { benutzer } = useAuth();
   const abmelden = useAbmeldenRueckfrage();
   const navigate = useNavigate();
@@ -107,12 +114,16 @@ export default function BenutzerMenu({
   const { token } = theme.useToken();
   // ALLE Hooks vor dem frühen Rückgabewert unten — sonst wechselt die Hook-Reihenfolge, sobald
   // der Benutzer eintrifft.
-  const { abBreite } = useViewport();
+  const { abBreite, istBeruehrung } = useViewport();
   // Handschuh (LLH-1642 D11): Kopf knapper — sonst läge am Handy unter dem zweizeiligen App-Kopf
   // die Leiste „Helligkeit“ unter dem Rand. Profil und Abmelden nebeneinander entfällt mit LLH-1730.
   const isKnapp = useDichte().dichte === 'handschuh';
   // Funktion und Pfeil erst ab `xl`: auf dem Führungs-Tablet brächen sie die Kopfzeile um.
   const breit = abBreite('xl');
+  // Hilfe neben dem Einsatz nur am breiten Schirm mit Maus (LLH-1731 D4): unter `lg` Handy und
+  // Tablet hochkant, mit grobem Zeiger das Führungs-Tablet quer (1024–1280 px). Dort verdeckte ein
+  // zweiter Tab den Einsatz nur. Die Zeigerart, nicht die Breite, erkennt das Tablet (`useViewport`).
+  const isHilfeImNeuenTab = hilfeDaneben && abBreite('lg') && !istBeruehrung;
   // Unter `md` (Handschirm) nimmt das Menü die Fensterbreite abzüglich 2 × 8 px Rand.
   const menueBreite = !abBreite('md')
     ? 'calc(100vw - 16px)'
@@ -267,7 +278,9 @@ export default function BenutzerMenu({
   const onClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'profil') navigate('/profil');
     else if (key === 'abmelden') abmelden.open();
-    else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });
+    else if (key === 'hilfe' && isHilfeImNeuenTab) {
+      window.open(hilfePfad({ von: location.pathname }), '_blank', 'noopener');
+    } else if (key === 'hilfe') navigate(HILFE_PFAD, { state: { von: location.pathname } });
     else if (key === 'neuigkeiten') navigate(NEUIGKEITEN_PFAD);
     else if (key === 'benachrichtigungen') navigate(BENACHRICHTIGUNGEN_PFAD);
   };

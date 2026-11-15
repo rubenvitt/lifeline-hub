@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx]
 ---
 
 ## Überblick
@@ -296,16 +296,25 @@ Berechtigung“ da. Was die eigene Rolle im Einsatz erlaubt, steht in
 
 Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
-Einige Einträge der Modulliste sind **Sprungmarken** in ein anderes Modul: „Entscheidungen“
-(Einsatztagebuch, nur Entscheidungen), „Patienten“ und „Vermisste“ (Betroffene), „FMS-Tableau“
-(Fahrzeuge) sowie unter „Fernmeldewesen“ (Kategorie „Kommunikation“) „Fernmeldeskizze“ und
-„Kommunikationsplan“. Das
+Einige Einträge der Modulliste sind **Sprungmarken** in eine Ansicht eines Moduls. Sie stehen
+eingerückt mit einer feinen Linie direkt unter diesem Modul: „Entscheidungen“ unter „ETB“
+(Kategorie „Erfassung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
+„FMS-Tableau“ unter „Fahrzeuge“, „Ohne Schicht“ unter „Ablösung“ sowie „Fernmeldeskizze“ und
+„Kommunikationsplan“ unter „Fernmeldewesen“ (Kategorie „Kommunikation“). Nach dem Sprung ist das
+Modul darüber hervorgehoben. Das
 „Informationstelefon“ ist keine Sprungmarke, sondern ein eigenes Modul der Kategorie
 „Kommunikation“.
-Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt.
+Eine Sprungmarke ist gesperrt oder fehlt, wenn ihr Zielmodul gesperrt ist oder fehlt; „Ohne
+Schicht“ ist außerdem gesperrt, wenn das Modul Einheiten gesperrt ist. Den vollen Namen einer
+gesperrten Marke zeigt der Hinweis beim Zeigen mit der Maus.
 
-Wer aus einem Einsatz ins Profil oder in die Verwaltung wechselt, findet dort „Zurück zu …“: Es
-führt an die zuletzt geöffnete Stelle des Einsatzes zurück, solange er läuft.
+Wer aus einem Einsatz ins Profil, in die Benachrichtigungen, die Neuigkeiten, die Hilfe oder die
+Verwaltung wechselt, findet dort „Zurück zu …“: Es führt an die zuletzt geöffnete Stelle des
+Einsatzes zurück, solange er läuft; in der Hilfe an die Stelle, aus der sie geöffnet wurde, auch
+wenn man im Einsatz inzwischen weitergearbeitet hat. Ist der Einsatz abgeschlossen, führt die
+Hilfe stattdessen „Zu den Einsätzen“. Am breiten Schirm mit Maus öffnet die Hilfe aus einem
+Einsatz in einem neuen Tab, in der Desktop-App in einem eigenen Fenster; der Einsatz bleibt im
+ersten Tab offen. Am Handy und am Tablet öffnet sie im selben Tab.
 
 ### Wo das Kontextmenü gilt
 

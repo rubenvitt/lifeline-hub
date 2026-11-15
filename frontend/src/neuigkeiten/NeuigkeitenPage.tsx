@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Tag, Typography } from 'antd';
 import { EINTRAEGE } from 'virtual:neuigkeiten';
 import type { ChangelogEintrag, Kanal } from '../../scripts/changelog-zerlegen.mjs';
+import AdminPage from '../components/AdminPage';
 import Markdown from '../components/Markdown';
 import { Paneel, Segmentleiste } from '../components/instrument';
 import { useVersionsstand, useMarkiereGelesen } from './useVersionsstand';
@@ -52,45 +53,45 @@ export default function NeuigkeitenPage() {
   const archiv = nachKanal(EINTRAEGE, filter);
 
   return (
-    <div style={{ display: 'grid', gap: 24, maxWidth: 900 }}>
-      <Typography.Title level={1} style={{ margin: 0 }}>
-        Neuigkeiten
-      </Typography.Title>
-
-      {notizenFehlen && (
-        <Alert
-          type="info"
-          showIcon
-          title={`Die Notizen zu Version ${laufend} kommen mit der Aktualisierung der App.`}
-        />
-      )}
-
-      {seitLetzter.length > 0 && (
-        <Paneel titel="Seit deiner letzten Version" koerperPolster>
-          <Eintragsliste eintraege={seitLetzter} />
-        </Paneel>
-      )}
-
-      <Paneel titel="Archiv" koerperPolster>
-        <div style={{ marginBottom: 16 }}>
-          <Segmentleiste
-            optionen={FILTER_OPTIONEN}
-            wert={filter}
-            onWechsel={setFilter}
-            beschriftung="Einträge nach Kanal filtern"
+    // Seitenkopf der Ebene 1 (LLH-1731 D2): Ortspfad „Einsätze › Neuigkeiten“ und der Rückweg in
+    // den Einsatz, wie auf Profil und Benachrichtigungen. Die Lesebreite bleibt 900 px.
+    <AdminPage titel="Neuigkeiten">
+      <div style={{ display: 'grid', gap: 24, maxWidth: 900 }}>
+        {notizenFehlen && (
+          <Alert
+            type="info"
+            showIcon
+            title={`Die Notizen zu Version ${laufend} kommen mit der Aktualisierung der App.`}
           />
-        </div>
-        {archiv.length === 0 ? (
-          <Typography.Text type="secondary">
-            {filter === 'beta'
-              ? 'Noch keine Beta-Versionen. Dieser Kanal füllt sich mit dem ersten Beta-Release.'
-              : 'Keine Einträge in diesem Kanal.'}
-          </Typography.Text>
-        ) : (
-          <Eintragsliste eintraege={archiv} />
         )}
-      </Paneel>
-    </div>
+
+        {seitLetzter.length > 0 && (
+          <Paneel titel="Seit deiner letzten Version" koerperPolster>
+            <Eintragsliste eintraege={seitLetzter} />
+          </Paneel>
+        )}
+
+        <Paneel titel="Archiv" koerperPolster>
+          <div style={{ marginBottom: 16 }}>
+            <Segmentleiste
+              optionen={FILTER_OPTIONEN}
+              wert={filter}
+              onWechsel={setFilter}
+              beschriftung="Einträge nach Kanal filtern"
+            />
+          </div>
+          {archiv.length === 0 ? (
+            <Typography.Text type="secondary">
+              {filter === 'beta'
+                ? 'Noch keine Beta-Versionen. Dieser Kanal füllt sich mit dem ersten Beta-Release.'
+                : 'Keine Einträge in diesem Kanal.'}
+            </Typography.Text>
+          ) : (
+            <Eintragsliste eintraege={archiv} />
+          )}
+        </Paneel>
+      </div>
+    </AdminPage>
   );
 }
 
