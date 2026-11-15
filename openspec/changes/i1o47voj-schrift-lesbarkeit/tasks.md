@@ -22,20 +22,20 @@ TDD: erst der rote Test oder Wächter, dann die Änderung. LLH-1772 (`zrrpki0p`,
 
 - [x] 3.1 `theme/schriftLiteral.guard.test.ts` (Regeln aus design.md, Entscheidung 4) und `fernsicht` als benannte Skala im Theme (Lagemonitor). Beleg: Wächter meldet den Bestand mit Datei und Zeile, ohne Ausnahmeliste.
 - [x] 3.2 `refactor`-Commit: `monoStil` → `zahlStil` mit Stufe statt Pixelzahl. Beleg: `tsc` grün, kein `monoStil(` mehr.
-- [ ] 3.3 Migration Kern und Rahmen: `components/` (inkl. `instrument/`, `anzeige/`), `Kopfleiste.tsx` (Uhr Rolle `uhr`, Rail-Etikett), `pages/` außer Lagekarte, `routes`, `hilfe/Hilfe.css`, `Markdown.css`, `LoginPage.css`, `EinsaetzePage.css`, `theme/sprache.css`. Beleg: Wächter für diese Pfade leer, Unit-Tests der Bereiche grün.
-- [ ] 3.4 Migration Einsatzmodule I: `etb/`, `einsatz/`, `personen/`, `betreuung/`, `verpflegung/`, `kraefte/`, `abloesung/`, `fuehrung/`. Beleg: wie 3.3.
-- [ ] 3.5 Migration Einsatzmodule II: `fernmeldewesen/`, `infotelefon/`, `lagebesprechung/`, `lage/`, `lageberichte/`, `lagemeldungen/`, `meldungen/`, `nachforderungen/`, `auftraege/`, `befehle/`, `pages/lagekarte/`, `geraet/`, `wetter/`, `pegel/`. Beleg: wie 3.3.
-- [ ] 3.6 Migration Rest: alle übrigen Verzeichnisse unter `frontend/src` (`admin/`, `stammdaten/`, `alarm/`, `dokumente/`, `entwurf/`, `neuigkeiten/` …). Beleg: Literal-Wächter ganz grün.
+- [x] 3.3 Migration Kern und Rahmen: `components/` (inkl. `instrument/`, `anzeige/`), `Kopfleiste.tsx` (Uhr Rolle `uhr`, Rail-Etikett), `pages/` außer Lagekarte, `routes`, `hilfe/Hilfe.css`, `Markdown.css`, `LoginPage.css`, `EinsaetzePage.css`, `theme/sprache.css`. Beleg: Wächter für diese Pfade leer, Unit-Tests der Bereiche grün.
+- [x] 3.4 Migration Einsatzmodule I: `etb/`, `einsatz/`, `personen/`, `betreuung/`, `verpflegung/`, `kraefte/`, `abloesung/`, `fuehrung/`. Beleg: wie 3.3.
+- [x] 3.5 Migration Einsatzmodule II: `fernmeldewesen/`, `infotelefon/`, `lagebesprechung/`, `lage/`, `lageberichte/`, `lagemeldungen/`, `meldungen/`, `nachforderungen/`, `auftraege/`, `befehle/`, `pages/lagekarte/`, `geraet/`, `wetter/`, `pegel/`. Beleg: wie 3.3.
+- [x] 3.6 Migration Rest: alle übrigen Verzeichnisse unter `frontend/src` (`admin/`, `stammdaten/`, `alarm/`, `dokumente/`, `entwurf/`, `neuigkeiten/` …). Beleg: Literal-Wächter ganz grün.
 - [x] 3.7 Warnhinweise auf die Rolle `warnung` (Warnstufen-Marke, `GefahrenStufe`, `WetterKopfMarke`, `Sammelbanner`, `Filterhinweis`, Alarmhinweise). Beleg: Unit-Test je Baustein auf die Rolle.
 
 ## 4. Versalien nur in Köpfen — LLH-1776 `bymbxu4u`
 
 - [x] 4.1 `Datenfeld`, `DatenfeldEingabe` und `FeldLabel` tragen das `Feldetikett`; `'dt'` fällt aus `AugenbraueElement`; Dateikopf der Augenbraue auf Köpfe eingeengt. Beleg: Komponententests, `tsc`.
-- [ ] 4.2 Die übrigen Augenbrauen sichten: Feld benennende werden `Feldetikett`, Köpfe bleiben; lokale Etikett-Stile (Einsatzdaten `KopfAngabe`, Inspector) mit. Beleg: Liste der Stellen im Commit; e2e der Augenbrauen-Kontrastmessung auf einer verbleibenden Augenbraue grün.
+- [x] 4.2 Die übrigen Augenbrauen sichten: Feld benennende werden `Feldetikett`, Köpfe bleiben; lokale Etikett-Stile (Einsatzdaten `KopfAngabe`, Inspector) mit. Beleg: Liste der Stellen im Commit; e2e der Augenbrauen-Kontrastmessung auf einer verbleibenden Augenbraue grün.
 
 ## 5. Mono-Grenze — LLH-1777 `oec0vmz1`
 
-- [ ] 5.1 Meta-Slots in der Textschrift (`paneelMetaStil`, `seitenMetaStil`, Datenstand, Zeitachseneintrag, `ListenPaneel`, Schnellerfassung, `Sammelbanner`, `Aufgliederung`); Kennungen und Funkrufnamen in Mono, Funkrufnamen mit `data-schrift="kennung"`. Beleg: Komponententests auf die Familie.
+- [x] 5.1 Meta-Slots in der Textschrift (`paneelMetaStil`, `seitenMetaStil`, Datenstand, Zeitachseneintrag, `ListenPaneel`, Schnellerfassung, `Sammelbanner`, `Aufgliederung`); Kennungen und Funkrufnamen in Mono, Funkrufnamen mit `data-schrift="kennung"`. Beleg: Komponententests auf die Familie.
 - [ ] 5.2 e2e `schrift-mono-grenze.spec.ts`: auf Überblick, ETB, Einsatzdaten und Betroffenen kein Mono-Textknoten mit einem Wort aus vier oder mehr Kleinbuchstaben außerhalb von `data-schrift="kennung"`. Beleg: Spec grün, vor 5.1 rot.
 
 ## 6. Messung und Nachweis über das Epic
@@ -43,7 +43,7 @@ TDD: erst der rote Test oder Wächter, dann die Änderung. LLH-1772 (`zrrpki0p`,
 - [ ] 6.1 e2e `schrift-skala.spec.ts`: auf fünf Kernseiten in `kompakt` nur Größen aus {11, 12, 14, 16, 22, 32}, nichts unter 11 px, Seitentitel 16 und Lauftext 14; in `handschuh` Chip und Knopf das 1,25-Fache; Anteil unter 12 px je Stufe nicht steigend. Beleg: Spec grün.
 - [ ] 6.2 Rail-Etikett in 11 px ohne Überlauf in der 60-px-Rail (`rail-etikett.spec.ts`), Seitenkopf auf 390 px, Trefffläche-Gates (`gate3-trefflaeche`, `trefflaeche-pruefflaechen`) in allen drei Stufen. Beleg: Specs grün.
 - [x] 6.3 `frontend/AGENTS.md`: `schriftskala` mit Stufen, Faktor und Literal-Verbot; „Kein Zoom“ ersetzt durch „Zoom frei“; Feldetikett und Augenbraue; Mono-Grenze; je mit Marke „umgekehrt 15.11.2026“ gegenüber dem Neuentwurf. Beleg: Prettier grün, Verweise auf `keinZoom.guard` gegrept und nachgezogen.
-- [ ] 6.4 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), Erzeugtes im Commit. Beleg: `designSystem.guard.test.ts` grün.
+- [x] 6.4 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), Erzeugtes im Commit. Beleg: `designSystem.guard.test.ts` grün.
 - [ ] 6.5 Folgeaufgabe für den Bildlauf der Anwender-Doku über `zunder-task-anlegen`, falls `docs/anwender/AGENTS.md` ihn nicht im selben PR verlangt. Beleg: Link im PR.
 - [ ] 6.6 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, betroffene e2e-Specs lokal grün. Beleg: Ausgabe im PR unter „Geprüft“.
 
