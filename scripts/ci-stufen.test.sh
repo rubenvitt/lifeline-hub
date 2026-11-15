@@ -19,8 +19,6 @@ CI="$WF/ci.yml"
 PR="$WF/pr.yml"
 SUITEN="$WF/suiten.yml"
 E2E="$WF/e2e.yml"
-ZBB="$WF/ziel-branch-build.yml"
-ZBV="$WF/ziel-branch-verteilen.yml"
 MIG="$WF/migrationen.yml"
 MIGK="$WF/migrationen-kanal.yml"
 RULESET="$WF/ruleset.yml"
@@ -33,7 +31,7 @@ pruefe() { # <name> <bedingung …>
   if "$@"; then ok "$name"; else fehl "$name"; fi
 }
 
-for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$ZBB" "$ZBV" "$MIG" "$MIGK" "$RULESET"; do
+for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET"; do
   [ -f "$datei" ] || { echo "FEHLER: $datei fehlt." >&2; fehler=$((fehler + 1)); }
 done
 [ "$fehler" = 0 ] || { echo "==> FEHLER: $fehler Datei(en) fehlen im Selbsttest ci-stufen." >&2; exit 1; }
@@ -101,20 +99,20 @@ pruefe "ci.yml hört nur auf push" nur_ausloeser "$CI" "push "
 pruefe "pr.yml hört nur auf pull_request" nur_ausloeser "$PR" "pull_request "
 pruefe "suiten.yml startet nur als Aufruf" nur_ausloeser "$SUITEN" "workflow_call "
 pruefe "e2e.yml startet nur als Aufruf" nur_ausloeser "$E2E" "workflow_call "
-pruefe "ziel-branch-build.yml ohne push (Verteilen läuft eigens)" nur_ausloeser "$ZBB" "pull_request workflow_dispatch "
-pruefe "ziel-branch-verteilen.yml hört nur auf push" nur_ausloeser "$ZBV" "push "
 pruefe "migrationen.yml hört nur auf pull_request" nur_ausloeser "$MIG" "pull_request "
 pruefe "migrationen-kanal.yml hört nur auf push" nur_ausloeser "$MIGK" "push "
 # Ein `if` auf `push` hieße: der Job erwartet ein Ereignis, das dieser Workflow nicht hat.
-# `ziel-branch-build.yml` behält `!= 'push'` bewusst als zweite Sperre (ADR-0030).
 for datei in "$PR" "$MIG"; do
   for id in $(job_ids "$datei"); do
     pruefe "$(basename "$datei"): Job $id fragt nicht nach push" fehlt "$(job_if "$datei" "$id")" "'push'"
   done
 done
-pruefe "verteilen steht nur in ziel-branch-verteilen.yml" test -z "$(job "$ZBB" verteilen)"
-pruefe "verteilen läuft in ziel-branch-verteilen.yml" test -n "$(job "$ZBV" verteilen)"
-pruefe "Verteilen startet ziel-branch-build.yml" enthaelt "$(job "$ZBV" verteilen)" "scripts/ziel-branch-build.sh verteilen"
+# LLH-1899: „Baut mit Ziel-Branch“ ist abgeschafft; nach einem Merge startet keine Kette von
+# Kompilierläufen mehr.
+pruefe "ziel-branch-build.yml gibt es nicht mehr" test ! -e "$WF/ziel-branch-build.yml"
+pruefe "ziel-branch-verteilen.yml gibt es nicht mehr" test ! -e "$WF/ziel-branch-verteilen.yml"
+pruefe "kein Workflow erzeugt den Check „Baut mit Ziel-Branch“" \
+  test -z "$(grep -lE '^[^#]*Baut mit Ziel-Branch|ziel-branch-build\.sh' "$WF"/*.yml 2> /dev/null || true)"
 pruefe "offene-prs steht nur in migrationen-kanal.yml" test -z "$(job "$MIG" offene-prs)"
 pruefe "offene-prs läuft in migrationen-kanal.yml" test -n "$(job "$MIGK" offene-prs)"
 

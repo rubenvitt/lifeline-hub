@@ -125,9 +125,8 @@ else
   fehler=1
 fi
 
-# Bündel `baut` (LLH-1849): der Kompilierlauf des Checks „Baut mit Ziel-Branch“. Er fährt NUR den
-# Kompilierschritt, und der volle Lauf fährt ihn nicht mit (Schritt 3, 4 und 15 bauen dasselbe
-# samt Tests). Fehlte er im Skript, fiele der Pflicht-Check mit „unbekanntes Bündel“ rot aus.
+# Bündel `baut` (LLH-1849): der schnelle lokale Kompilierlauf. Er fährt NUR den Kompilierschritt,
+# und der volle Lauf fährt ihn nicht mit (Schritt 3, 4 und 15 bauen dasselbe samt Tests).
 CHECK_ALL="$(cd "$(dirname "$0")" && pwd)/check-all.sh"
 rc=0; "$CHECK_ALL" --nur baut --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
 pruefe "10 Bündel baut ist bekannt" 0 "$rc"

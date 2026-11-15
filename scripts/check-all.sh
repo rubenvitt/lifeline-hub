@@ -34,7 +34,7 @@ set -euo pipefail
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
 #   --nur e2e        Playwright                              (~18 min, shardbar)
 #   --nur baut       nur kompilieren: Backend mit allen Zielen und Feature dev-seeds,
-#                    Frontend-Typprüfung (Check „Baut mit Ziel-Branch“, LLH-1849;
+#                    Frontend-Typprüfung (schneller lokaler Test, ob ein Stand übersetzt;
 #                    gehört nicht zum vollen Lauf, Schritt 3, 4, 15 bauen dasselbe mit Tests)
 # Nach Bereichen statt nach Bündel (LFH-1115), wie die CI im PR:
 #   --geaendert[=REF]  die Schnellprüfungen und nur die Suiten, die die Änderungen seit dem
@@ -363,7 +363,7 @@ schritt_10() {
 }
 
 schritt_11() {
-  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Ruleset-Pflicht-Checks, Baut mit Ziel-Branch, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849, LLH-1895)"
+  echo "==> [11/$SCHRITTE] Selbsttests des Sammel-Gates: Schrittläufer, Binary-Suche, Build-Ziel, Netz-Wiederholung, Bereichs-Erkennung, Form der PR-Prüfung, Ruleset-Pflicht-Checks, e2e-Anteile, Lauf-Verzeichnis, Runner-Wahl und -Schleife (LFH-386/518/520/1101/1115/1117, LLH-1662, LLH-1666, LLH-1849, LLH-1895)"
   # Der Läufer entscheidet, ob ein roter Schritt die folgenden mitnimmt und ob ein Schritt, dessen
   # erstes Kommando scheitert, grün meldet — beides wäre still.
   "$ROOT/scripts/check-all.test.sh"
@@ -387,10 +387,6 @@ schritt_11() {
   # Die Pflicht-Checks im Ruleset (LLH-1895): übersieht die Prüfung eine Quelle an einem Status,
   # hängen wieder alle PRs über Nacht; meldet sie Unsinn, mailt jeder Lauf grundlos.
   "$ROOT/scripts/ruleset-pruefen.test.sh"
-  # Der Check „Baut mit Ziel-Branch“ (LLH-1849): irrt die Auswahl, rechnet ein fertiger PR nicht
-  # gegen den neuen Ziel-Branch und mergt mit veraltetem Grün; irrt die Form, liefe PR-Code mit
-  # Schreibrecht oder schriebe einen Cache, den `alpha` liest.
-  "$ROOT/scripts/ziel-branch-build.test.sh"
   # Die Messung der PR-CI vor und nach der Zweiteilung: zählt sie falsch, belegt der Vergleich
   # das Gegenteil dessen, was passiert ist.
   "$ROOT/scripts/ci-messung.test.sh"
@@ -490,11 +486,11 @@ schritt_16() {
 
 schritt_17() {
   echo "==> [17/$SCHRITTE] Kompiliert: Backend mit allen Zielen, Frontend-Typprüfung (LLH-1849)"
-  # Der Kompilierlauf des Checks „Baut mit Ziel-Branch“ (.github/workflows/ziel-branch-build.yml):
-  # ein PR zusammen mit dem aktuellen Ziel-Branch, nur übersetzt, ohne Tests. Er fängt, was erst
-  # die Kombination zweier einzeln grüner PRs bricht (am 12.11.2026 ein Testaufruf mit alter
-  # Signatur). Paketzuschnitt wie Schritt 4 und 15, damit Cargo die Features von Server und Hülle
-  # nicht vereinigt. Nicht im vollen Lauf: Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
+  # Nur übersetzt, ohne Tests: ein schneller lokaler Test, ob ein Stand kompiliert, etwa nach
+  # einem Merge von `alpha` in den Branch. Früher der Kompilierlauf des abgeschafften Checks
+  # „Baut mit Ziel-Branch“ (LLH-1849, abgeschafft mit LLH-1899). Paketzuschnitt wie Schritt 4 und
+  # 15, damit Cargo die Features von Server und Hülle nicht vereinigt. Nicht im vollen Lauf:
+  # Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   bauziel_pruefen "$ROOT"
   # Ohne `--locked` wie Schritt 4 und 15: sonst wäre ein PR mit nicht nachgezogener Cargo.lock
   # hier rot und in der CI grün, mit einer Meldung, die einen fremden Merge verdächtigt.
