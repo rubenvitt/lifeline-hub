@@ -31,7 +31,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 - [x] 3.4 `pages/einheit/FahrzeugeBesatzung.tsx`: roter Zeilenknopf weg (Baum- und flacher Zweig), ⋮ mit Zeilenkennung, Kontextmenü am Namensteil (Spec `datensatz-aktionsmenue`, Zeilen mit Reglern); gehaltene Zeile „Gelöst · Rückgängig“ über `useHoldGeloest` mit gedämpfter Besatzung; Toast; Rückgängig mit `nur_wenn_frei`, Ablehnung im Seitenhinweis; Tests in `FahrzeugeBesatzung.test.tsx` und `EinheitDetailPage.test.tsx` (Doppeltipp löst ein Fahrzeug, Rückgängig in der Zeile, 409 nennt die andere Einheit) rot→grün
 - [x] 3.5 Personen: Rückgängig-Hinweis nach „Aus Einheit lösen“ und „Vom Fahrzeug lösen“, inkl. Führerrolle; Test rot→grün
 - [x] 3.6 Wächter und e2e: `components/aktionsabstand.guard.test.ts` (Eintrag FahrzeugeBesatzung streichen), `e2e/einheit-fixture.ts` (`fahrzeugLoesen` als Menüziel), `e2e/gate3-trefflaeche.spec.ts`, `e2e/fokus-verdeckung.spec.ts`, `e2e/einheit-ansicht.spec.ts` nachziehen
-- [ ] 3.7 Doku: `docs/anwender/kapitel/einheiten.md` (Schritt „Aus Einheit lösen“ im ⋮, Rückgängig), Bild `einheiten/besatzung.png` neu erzeugen
+- [x] 3.7 Doku: `docs/anwender/kapitel/einheiten.md` (Schritt „Aus Einheit lösen“ im ⋮, Rückgängig), Bild `einheiten/besatzung.png` neu erzeugen
 
 ## 4. fx4335q2: Beenden und Kopf in den übrigen Modulen nachziehen
 
@@ -42,7 +42,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 - [x] 4.4 Betreuungsstelle (`pages/BetreuungsstelleDetailPage.tsx`): „Schließen“ ohne Belegung zeigt Rückgängig (zurück auf `in_betrieb`), mit Leermeldung nicht; Kopf ≤ 2 Knöpfe prüfen; Tests rot→grün
 - [x] 4.5 Verpflegungsstelle (`verpflegung/StellenListe.tsx`): Ellipse an „Auflösen …“/„Stornieren …“ entfernen; Test nachziehen
 - [x] 4.6 Übrige Stellen aus dem Inventar gegen D1 prüfen (Tier, Schaden, Person, Einsatzabschnitt, UhsKraefte „Abziehen“, BR „Austragen“, Material, Personal); Abweichungen beheben oder im Commit begründen; Kopfregel an Tier und Schaden prüfen
-- [ ] 4.7 Doku: Kapitel `uhs`, `bereitstellungsraeume`, `betreuung`, `evakuierung` (und Verpflegung, falls betroffen) samt Bilder-Specs nachziehen und Bilder neu erzeugen; Mitänderungsregel `docs/architektur/AGENTS.md` (Kapitel 8/11) prüfen
+- [x] 4.7 Doku: Kapitel `uhs`, `bereitstellungsraeume`, `betreuung`, `evakuierung` (und Verpflegung, falls betroffen) samt Bilder-Specs nachziehen und Bilder neu erzeugen; Mitänderungsregel `docs/architektur/AGENTS.md` (Kapitel 8/11) prüfen
 
 ## 5. Folgeaufgaben und Integration
 

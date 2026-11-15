@@ -25,7 +25,7 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
 2. Die Zeile über der Liste zählt die Posten: „einsatzbereit“, „im Einsatz“ und „Ausfall“.
    „Meldebild“ führt ins Meldebild.
 
-   ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 Betreuungsgruppe · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
+   ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 Betreuungsgruppe · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten das Menü „Weitere Aktionen“](../bilder/material/material.png)
 
 3. Die Liste ist nach Ort gruppiert: erst die Einheiten in der Folge des Kräftebaums, dann
    Fahrzeuge, Unfallhilfsstellen und Bereitstellungsräume, „ohne Ort“ zuletzt. Über der Tabelle
