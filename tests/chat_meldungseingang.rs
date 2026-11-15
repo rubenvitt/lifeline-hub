@@ -11,6 +11,7 @@ use std::time::Duration;
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup, setup_mit_live,
+    setup_mit_pool_und_live,
 };
 
 async fn lesen(app: &axum::Router, cookie: &str, pfad: &str) -> Vec<Value> {
@@ -62,7 +63,11 @@ async fn meldung_aus_dem_chat_legt_meldung_und_einen_eintrag_an() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let (_, m) = nachricht(&app, e, &admin, "Deich km12 instabil").await;
+    // Eine Person schreibt, eine ANDERE stuft herauf: nur so trennt der Test Absender und Erfasser.
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, e, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (_, m) = nachricht(&app, e, &frieda, "Deich km12 instabil").await;
     let mid = m["id"].as_i64().unwrap();
 
     let (s, hoch) = heraufstufen(
@@ -86,7 +91,16 @@ async fn meldung_aus_dem_chat_legt_meldung_und_einen_eintrag_an() {
     assert_eq!(meldungen.len(), 1, "{meldungen:?}");
     let meldung = &meldungen[0];
     assert_eq!(meldung["meldungsart"], "sonstige");
-    assert_eq!(meldung["absender"], m["autor_name"]);
+    assert_eq!(
+        meldung["absender"], m["autor_name"],
+        "Absender ist, wer schrieb"
+    );
+    let (_, ich) = anfrage(&app, "GET", "/api/auth/me", &admin, None).await;
+    assert_eq!(
+        meldung["erfasst_von_id"], ich["id"],
+        "erfasst hat, wer heraufstufte"
+    );
+    assert_ne!(meldung["erfasst_von_id"], frieda_id);
     assert_eq!(meldung["inhalt"], "Deich km 12 instabil, Sickerstelle");
     assert_eq!(meldung["meldeweg"], "sonstige");
     assert_eq!(meldung["status"], "neu");
@@ -264,4 +278,78 @@ async fn live_ereignisse_wie_eine_erfasste_meldung() {
     assert_eq!(tags.iter().filter(|t| *t == "etb").count(), 1, "{tags:?}");
     assert!(tags.iter().any(|t| t == "meldung"), "{tags:?}");
     assert!(tags.iter().any(|t| t == "chat"), "{tags:?}");
+}
+
+/// Review vor dem PR: Scheitert die Live-Zustellung nach dem Commit (etwa SQLITE_BUSY), bleibt die
+/// Meldung ohne `live_published_at`. Ein zweiter Versuch endet am 409-Guard; er MUSS die Zustellung
+/// nachholen, sonst gehen Live-Ereignisse und Hinweis für immer verloren (Spec `meldungseingang`,
+/// „Die Meldung aus dem Chat übernimmt die Angaben der Nachricht“, Live wie eine erfasste).
+#[tokio::test]
+async fn zweiter_versuch_holt_eine_verlorene_zustellung_nach() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = nachricht(&app, e, &admin, "Deich km12 instabil").await;
+    let mid = m["id"].as_i64().unwrap();
+    let body = r#"{"typ":"meldung","in_meldungseingang":true}"#;
+    let (s, _) = heraufstufen(&app, &admin, e, mid, body).await;
+    assert_eq!(s, StatusCode::OK);
+    // Die Zustellung gilt als gescheitert: der Marker steht wieder auf NULL.
+    sqlx::query("UPDATE meldung SET live_published_at = NULL WHERE einsatz_id = ?")
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let mut rx = live.abonniere(e);
+
+    let (s, _) = heraufstufen(&app, &admin, e, mid, body).await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "die Nachricht bleibt heraufgestuft"
+    );
+
+    let offen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM meldung WHERE einsatz_id = ? AND live_published_at IS NULL",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(offen, 0, "die Zustellung ist nachgeholt");
+    let mut tags = Vec::new();
+    while let Ok(Ok(n)) = tokio::time::timeout(Duration::from_millis(200), rx.recv()).await {
+        tags.push(n.event.as_str().to_string());
+    }
+    assert!(tags.iter().any(|t| t == "meldung"), "{tags:?}");
+    assert_eq!(
+        lesen(&app, &admin, &format!("/api/einsaetze/{e}/meldungen"))
+            .await
+            .len(),
+        1
+    );
+}
+
+/// Eine bereits zugestellte Meldung wird beim zweiten Versuch nicht noch einmal gemeldet.
+#[tokio::test]
+async fn zweiter_versuch_meldet_eine_zugestellte_meldung_nicht_noch_einmal() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = nachricht(&app, e, &admin, "Deich km12 instabil").await;
+    let mid = m["id"].as_i64().unwrap();
+    let body = r#"{"typ":"meldung","in_meldungseingang":true}"#;
+    let (s, _) = heraufstufen(&app, &admin, e, mid, body).await;
+    assert_eq!(s, StatusCode::OK);
+    let mut rx = live.abonniere(e);
+
+    let (s, _) = heraufstufen(&app, &admin, e, mid, body).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert!(
+        matches!(
+            rx.try_recv(),
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+        ),
+        "nichts zweimal publiziert"
+    );
 }

@@ -80,8 +80,10 @@ function Adresse() {
   return <output data-testid="adresse">{decodeURIComponent(useLocation().search)}</output>;
 }
 
-function renderPage(pfad = '/einsaetze/1/lagemeldungen') {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderPage(
+  pfad = '/einsaetze/1/lagemeldungen',
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
@@ -508,6 +510,24 @@ describe('LagemeldungenPage', () => {
         await screen.findByRole('region', { name: 'Lagemeldung erfassen' }),
       ).toBeInTheDocument();
       await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+    });
+
+    /** Der Riegel selbst: die später ankommende Freigabe öffnet das Formular nicht nachträglich. */
+    it('?neu=1 ohne Modul Meldungen öffnet auch dann nichts, wenn die Freigabe danach kommt', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      ladeModulFreigaben.mockResolvedValueOnce({ meldungen: { sichtbar: true, zugriff: false } });
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      renderPage('/einsaetze/1/lagemeldungen?neu=1', client);
+      expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+
+      ladeModulFreigaben.mockResolvedValue({ meldungen: { sichtbar: true, zugriff: true } });
+      await act(() => client.invalidateQueries());
+
+      expect(
+        await screen.findByRole('button', { name: 'Lagemeldung erfassen' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull();
     });
 
     it('?neu=1 öffnet ohne Modul Meldungen nichts, räumt aber den Parameter', async () => {

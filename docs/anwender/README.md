@@ -83,11 +83,11 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Gekoppelte Geräte | [Lagebild für Externe](kapitel/lagebild-extern.md) | Führung |
 | Gekoppelte Geräte | [Anbindungen](kapitel/anbindungen.md) | Administration |
 
-Jeder Bereich ordnet seine Kapitel in einem eigenen Hunderterblock der `reihenfolge`
-(Einstieg 0–99, Führungsmittel 100–199, Lage 200–299, Kräfte 300–399, Führungsorganisation
-400–499, Betroffene 500–599, Einstellungen und Verwaltung 600–699, Gekoppelte Geräte 700–799).
-Ein neues Kapitel nimmt die nächste freie Zehnerstelle seines Bereichs und bekommt hier eine
-Zeile.
+Die Bereiche folgen den Kategorien der Navigation. Jeder ordnet seine Kapitel in einem eigenen
+Hunderterblock der `reihenfolge` (Einstieg 0–99, Führung 100–199, Kräfte & Mittel 200–299,
+Betroffene & Schäden 300–399, Lage 400–499, Kommunikation 500–599, Einstellungen und Verwaltung
+600–699, Gekoppelte Geräte 700–799). Ein neues Kapitel nimmt die nächste freie Zehnerstelle seines
+Bereichs und bekommt hier eine Zeile; das Kapitel eines Moduls steht im Bereich seiner Kategorie.
 
 ## Lesergruppen
 

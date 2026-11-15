@@ -150,6 +150,23 @@ describe('baueBefehle — Synonyme der Module', () => {
     const treffer = ordneTreffer(filtereBefehle(baueBefehle(kontext()), q), q).map((x) => x.id);
     expect(treffer).toContain(id);
   });
+  /** Spec `sprungpalette`, „Ein Treffer braucht Wortanfang oder Teilwort“, an der echten Liste. */
+  it('stellt die Spec-Fälle an der echten Liste auf den ersten Platz', () => {
+    const erster = (q: string) =>
+      ordneTreffer(filtereBefehle(baueBefehle(kontext({ benutzer: admin })), q), q)[0]?.id;
+    expect(erster('kraefte')).toBe('modul:kraefteuebersicht');
+    expect(erster('funk')).toBe('modul:fernmeldewesen');
+    expect(erster('hilfe')).toBe('nav:hilfe');
+  });
+  it('lässt „rtw“ an der echten Liste weder Lagekarte noch Zeichnen noch Benutzer treffen', () => {
+    const treffer = filtereBefehle(baueBefehle(kontext({ benutzer: admin })), 'rtw').map(
+      (x) => x.befehl.id,
+    );
+    expect(treffer).toContain('modul:fahrzeuge');
+    for (const id of ['modul:lagekarte', 'aktion:lagekarte-gefahrengebiet', 'nav:benutzer']) {
+      expect(treffer).not.toContain(id);
+    }
+  });
   it('zeigt ein Synonym nicht unter dem Modul', () => {
     const modul = baueBefehle(kontext()).find((x) => x.id === 'modul:kraefteuebersicht')!;
     expect(modul.nebenzeile).not.toMatch(/Meldebild/);

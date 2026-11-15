@@ -4,6 +4,7 @@ import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
+import { MODUL_MELDUNGEN_GESPERRT } from '../components/nurAnsicht';
 import { ETB_ANHAENGE_MAX } from '../api/etb';
 import { formatGroesse } from '../karten/formatGroesse';
 import type { ChatNachricht, EtbTyp } from '../api/types';
@@ -125,7 +126,7 @@ export default function HeraufstufenModal({
       )}
       {mitMeldung && !meldungenFrei && (
         <Typography.Paragraph type="secondary">
-          Nur ins ETB: Modul Meldungen gesperrt
+          Nur ins ETB: {MODUL_MELDUNGEN_GESPERRT}
         </Typography.Paragraph>
       )}
       <Form.Item

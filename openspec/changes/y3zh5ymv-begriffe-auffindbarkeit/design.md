@@ -102,8 +102,10 @@ Neuer Schlüssel `schnellaktionen_zaehler` in `BEKANNTE_SCHLUESSEL`; Wert JSON-O
 `{ "<befehls-id>": <anzahl> }`, opak wie `zuletzt_befehle`. Der Client
 (`command-palette/schnellaktionZaehler.ts` für den reinen Kern, Verdrahtung im Muster von
 `useZuletztBefehle`) zählt bei jeder Ausführung einer Schnellaktion, auch aus „Zuletzt
-ausgeführt“ (gezählt wird die Original-Id). Er schreibt erst, wenn der Bestand bekannt ist, und
-verwirft die Antwort, wie dort begründet. Lesen räumt auf: unbekannte Ids fallen weg, Zahlen
+ausgeführt“ (gezählt wird die Original-Id). Weil der Wert aufzählt und das PUT ihn ganz ersetzt,
+holt er vor jedem Schreiben den aktuellen Serverstand und schreibt der Reihe nach (Review vor dem
+PR: aus dem Cache gebaut, überschrieb ein alter Stand die Zahlen eines anderen Tabs oder Rechners).
+Bleibt der Stand unbekannt, schreibt er nicht. Lesen räumt auf: unbekannte Ids fallen weg, Zahlen
 deckeln bei 9999, und der Wert bleibt unter 2000 Zeichen.
 
 `baueBefehle` sortiert die Tabelle vor dem Aufbau stabil nach Anzahl absteigend, bei Gleichstand

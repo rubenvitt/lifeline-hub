@@ -23,7 +23,7 @@ import {
   schadenDetailPfad,
   uhsDetailPfad,
 } from '../routing/deeplinks';
-import { normalisiere, textStufe, UNBEWERTET, type Treffer } from './fuzzy';
+import { normalisiere, textStufe, trifftText, UNBEWERTET, type Treffer } from './fuzzy';
 import {
   DATENSATZ_MINDESTZEICHEN,
   PALETTE_MODI,
@@ -522,9 +522,8 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
       // Teilzeichenkette in `normalisiere`-Form (Groß/klein und Umschrift egal), dieselbe Regel wie
       // die Suchachse der `Datensicht`, über das BASISLABEL; erst danach über die Merkmale.
       const imLabel = qu.serverGefiltert || normalisiere(kand.basisLabel).includes(gesucht);
-      const merkmal = imLabel
-        ? undefined
-        : kand.merkmale.find((m) => normalisiere(m).includes(gesucht));
+      // Merkmale nach der Regel der Befehle (design.md D3): unter drei Zeichen nur am Wortanfang.
+      const merkmal = imLabel ? undefined : kand.merkmale.find((m) => trifftText(m, suche));
       if (!imLabel && merkmal === undefined) continue;
       // Die Stufe kommt aus dem Basislabel OHNE Modulherkunft (bzw. aus dem Merkmal): sonst stünde
       // bei 'personen' jede Person auf Stufe 1 über allem, was wirklich so heißt.

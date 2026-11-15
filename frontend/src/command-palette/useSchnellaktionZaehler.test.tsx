@@ -25,7 +25,9 @@ function stand(zaehlung: Record<string, number>): BenutzerEinstellungen {
   return { eintraege: { [SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER]: JSON.stringify(zaehlung) } };
 }
 
-function handler(serverStand: BenutzerEinstellungen | 'fehler') {
+/** Ein Server mit Gedächtnis: ein PUT ändert, was das nächste GET liefert. */
+function handler(anfang: BenutzerEinstellungen | 'fehler') {
+  let serverStand = anfang;
   return [
     meHandler(nutzer),
     http.get('/api/benutzer-einstellungen', () => {
@@ -37,6 +39,11 @@ function handler(serverStand: BenutzerEinstellungen | 'fehler') {
     http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };
       puts.push({ schluessel: String(params.schluessel), wert: body.wert });
+      if (serverStand !== 'fehler') {
+        serverStand = {
+          eintraege: { ...serverStand.eintraege, [String(params.schluessel)]: body.wert },
+        };
+      }
       return HttpResponse.json({ eintraege: { [String(params.schluessel)]: body.wert } });
     }),
   ];
@@ -103,6 +110,37 @@ describe('useSchnellaktionZaehler', () => {
     });
   });
 
+  /**
+   * Review vor dem PR: Zählt ein anderer Tab oder Rechner desselben Benutzers dazwischen, darf ein
+   * alter Cache dessen Zahlen nicht überschreiben (das PUT ersetzt den ganzen Wert).
+   */
+  it('zählt auf dem aktuellen Serverstand, nicht auf einem veralteten Cache', async () => {
+    let serverStand = stand({ 'aktion:etb': 2 });
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/benutzer-einstellungen', () => {
+        gets += 1;
+        return HttpResponse.json(serverStand);
+      }),
+      http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+        const body = (await request.json()) as { wert: string };
+        puts.push({ schluessel: String(params.schluessel), wert: body.wert });
+        serverStand = stand(JSON.parse(body.wert) as Record<string, number>);
+        return HttpResponse.json({ eintraege: { [String(params.schluessel)]: body.wert } });
+      }),
+    );
+    const { Wrapper } = wrapper();
+    const { result } = renderHook(() => useSchnellaktionZaehler(), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.zaehlung).toEqual({ 'aktion:etb': 2 }));
+    // Ein anderer Rechner hat inzwischen fünfmal „Meldung erfassen“ gezählt.
+    serverStand = stand({ 'aktion:etb': 2, 'aktion:meldung-erfassen': 5 });
+
+    result.current.zaehle('aktion:etb');
+
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(JSON.parse(puts[0].wert)).toEqual({ 'aktion:etb': 3, 'aktion:meldung-erfassen': 5 });
+  });
+
   /** Vollersatz aus dem Nichts löschte alle Zahlen: ohne bekannten Bestand wird nicht geschrieben. */
   it('schreibt nicht, wenn der Bestand nicht zu lesen ist', async () => {
     server.use(...handler('fehler'));
@@ -126,5 +164,6 @@ describe('useSchnellaktionZaehler', () => {
     await flush();
 
     expect(result.current.zaehlung).toEqual({ 'aktion:etb': 1 });
+    expect(puts).toEqual([]);
   });
 });

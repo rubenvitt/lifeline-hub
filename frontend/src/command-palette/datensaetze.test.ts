@@ -169,6 +169,16 @@ describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
       expect(t[0].befehl.label).toBe('Rotkreuz Uelzen 83/1 · UE-RK 831');
     });
 
+    /** Dieselbe Regel wie für Befehle (design.md D1/D3): unter drei Zeichen nur am Wortanfang. */
+    it('trifft ein Merkmal unter drei Zeichen nicht mitten im Wort', () => {
+      expect(
+        ids(baueDatensatzTreffer(kontext({ suche: 'tw', quellen: { fahrzeuge: [rtw] } }))),
+      ).toEqual([]);
+      expect(
+        ids(baueDatensatzTreffer(kontext({ suche: 'rt', quellen: { fahrzeuge: [rtw] } }))),
+      ).toEqual(['datensatz:fahrzeuge:8']);
+    });
+
     it('zeigt kein Merkmal, wenn schon der Funkrufname trifft', () => {
       const t = baueDatensatzTreffer(kontext({ suche: 'rotkreuz', quellen: { fahrzeuge: [rtw] } }));
       expect(t[0].befehl.label).toBe('Rotkreuz Uelzen 83/1');

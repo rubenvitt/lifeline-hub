@@ -427,7 +427,7 @@ pub async fn heraufstufen(
         geo: None,
     });
 
-    let (etb_id, meldung_id) = repo::heraufstufen_zu_etb(
+    let (etb_id, meldung_id) = match repo::heraufstufen_zu_etb(
         &state.pool,
         einsatz_id,
         nachricht_id,
@@ -438,7 +438,27 @@ pub async fn heraufstufen(
         &anhang_ids,
         meldung.as_ref(),
     )
-    .await?;
+    .await
+    {
+        Ok(ids) => ids,
+        Err(fehler @ AppError::Conflict(_)) => {
+            // Schon heraufgestuft: scheiterte beim ersten Mal die Zustellung NACH dem Commit, gibt
+            // es ohne `client_id` keinen Replay wie beim ETB. Der zweite Versuch holt sie hier
+            // nach; `live_publikation_sicherstellen` ist über `live_published_at` idempotent.
+            if let Some(etb) = quelle.etb_eintrag_id {
+                if let Some(mid) =
+                    crate::meldung::repo::meldung_id_zum_etb_eintrag(&state.pool, einsatz_id, etb)
+                        .await?
+                {
+                    let m = crate::meldung::repo::laden(&state.pool, mid, &crate::zeit::jetzt())
+                        .await?;
+                    crate::meldung::live_publikation_sicherstellen(&state, &m).await?;
+                }
+            }
+            return Err(fehler);
+        }
+        Err(fehler) => return Err(fehler),
+    };
 
     // Beide Events publizieren (wie lagebericht::freigeben): ETB-Eintrag + Chat-Update. Mit Meldung
     // publiziert deren Weg den Eintrag mit (über `etb_meldung_id`), dazu `meldung` und die

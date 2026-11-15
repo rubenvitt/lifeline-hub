@@ -168,6 +168,17 @@ export function filtereBefehle(befehle: Befehl[], suche: string): Treffer[] {
 }
 
 /**
+ * Dieselbe Trefferregel wie {@link filtereBefehle} über einen NACKTEN Text: jedes Suchwort trifft
+ * einen Wortanfang oder ab {@link TEILWORT_MIN} Zeichen ein Teilwort. Für die Merkmale der
+ * Datensätze (design.md D3), damit „tw“ nicht jeden RTW findet.
+ */
+export function trifftText(text: string, suche: string): boolean {
+  const wortListe = suchwoerter(suche);
+  const texte = [normalisiere(text)];
+  return wortListe.length > 0 && wortListe.every((w) => trifft(w, texte));
+}
+
+/**
  * Die erste Ordnungsachse. Stufen: 0 = das Label IST die Suche, 1 = das Label beginnt damit,
  * 2 = jedes Suchwort trifft einen Wortanfang in Label oder Schlagworten, 3 = mindestens ein Wort
  * nur als Teilwort. Verglichen wird in {@link normalisiere}-Form.
