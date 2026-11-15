@@ -107,6 +107,50 @@ async fn anlegen_ueber_dem_hoechstwert_ist_422_ohne_neuen_einsatz() {
     assert_eq!(anzahl, 1, "kein neuer Einsatz");
 }
 
+/// Wie oben, aber der Überlauf kommt erst beim Ausweichen vor einem vergebenen Text: Die Schleife
+/// rechnet ebenfalls geprüft (LLH-1859).
+#[tokio::test]
+async fn ausweichen_ueber_den_hoechstwert_ist_422() {
+    let pool = crate::db::test_pool().await;
+    let leit = benutzer_anlegen(&pool, "leit").await;
+    let jetzt = chrono::DateTime::parse_from_rfc3339("2026-06-01T12:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    sqlx::query(
+        "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern, nummer_jahr, nummer_lfd) \
+         VALUES (1, 'Bestand', 'E-2026-9223372036854775806', 2026, ?)",
+    )
+    .bind(i64::MAX - 1)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) \
+         VALUES (1, 'Handwert', 'E-2026-9223372036854775807')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let ergebnis = anlegen_zum(
+        &pool,
+        NeuerEinsatzDaten {
+            bezeichnung: "Neu",
+            stichwort: None,
+            einsatzart: None,
+            begonnen_at: None,
+            ort: Default::default(),
+            vorlage_id: None,
+        },
+        leit,
+        jetzt,
+    )
+    .await;
+    assert!(
+        matches!(ergebnis, Err(AppError::UnprocessableEntity(_))),
+        "{ergebnis:?}"
+    );
+}
+
 #[tokio::test]
 async fn rolle_von_fuer_nicht_mitglied_ist_none() {
     let pool = crate::db::test_pool().await;

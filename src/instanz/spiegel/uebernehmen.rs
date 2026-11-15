@@ -531,7 +531,7 @@ async fn kopf_uebernehmen(
     };
     werte.retain(|(s, _)| s != "id" && s != "kennung");
     werte.push(("kennung".into(), Value::from(l.kennung.clone())));
-    if let Some(hinweis) = begrenze_nummer(&mut werte) {
+    if let Some(hinweis) = limit_gelieferte_nummer(&mut werte) {
         hinweise.push(hinweis);
     }
     if let Some(id) = vorhanden {
@@ -585,7 +585,7 @@ async fn kopf_uebernehmen(
 /// gekoppelte Instanz gilt für sie nicht als vertrauenswürdig (LLH-1859, Spec `einsatznummer`,
 /// „Die Zahlen eines Spiegels liegen in festen Grenzen“). Außerhalb der Grenzen werden beide leer,
 /// der Nummerntext bleibt; geliefert wird dann der Hinweis für den Spiegel.
-fn begrenze_nummer(werte: &mut Vec<(String, Value)>) -> Option<String> {
+fn limit_gelieferte_nummer(werte: &mut Vec<(String, Value)>) -> Option<String> {
     use crate::einsatz::nummer::{check_gelieferte_zahlen, GelieferteZahlen};
     let wert = |werte: &[(String, Value)], spalte: &str| {
         werte
@@ -602,10 +602,14 @@ fn begrenze_nummer(werte: &mut Vec<(String, Value)>) -> Option<String> {
     werte.push(("nummer_jahr".into(), Value::Null));
     werte.push(("nummer_lfd".into(), Value::Null));
     Some(format!(
-        "Einsatznummer der Gegenstelle außerhalb der Grenzen (Jahr {jahr}, laufende Nummer \
-         {lfd}); Jahr und laufende Nummer nicht übernommen."
+        "{NUMMER_HINWEIS} (Jahr {jahr}, laufende Nummer {lfd}); Jahr und laufende Nummer nicht \
+         übernommen."
     ))
 }
+
+/// Anfang des Hinweises zu einer Einsatznummer außerhalb der Grenzen; an ihm erkennt
+/// `abgleich::hinweise_fortschreiben`, dass er bis zur nächsten Übernahme des Kopfs haftet.
+pub(super) const NUMMER_HINWEIS: &str = "Einsatznummer der Gegenstelle außerhalb der Grenzen";
 
 /// Merkt die Schwärzungsmarke am Kopf des Einsatzes (LLH-1649); `true`, wenn sie hier neu ist.
 async fn merke_schwaerzung_marke(

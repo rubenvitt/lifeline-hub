@@ -46,6 +46,12 @@ Vergabe. Ein leeres Paar ohne Text ist gültig und bekommt keinen Hinweis.
 Hinweistext: „Einsatznummer der Gegenstelle außerhalb der Grenzen (Jahr …, laufende Nummer …);
 Jahr und laufende Nummer nicht übernommen.“ Dazu `tracing::warn!` wie bei jedem Übernahmehinweis.
 
+**Nachtrag 15.11.2026 (Review, abgestimmt):** Der Hinweis haftet wie „zu groß“, bis der Kopf das
+nächste Mal übernommen ist (`abgleich::build_hinweis`, `hinweise_fortschreiben`). Der Führer
+liefert den Kopf nur bei einer Änderung; ohne Haften verschwände der Hinweis schon mit dem
+nächsten Paket, beim ersten Abgleich eines großen Einsatzes nach Sekunden, während die Zahlen
+leer bleiben.
+
 Verworfen:
 - **Ganze Lieferung ablehnen:** Der Spiegel bliebe auf altem Stand, bis die Gegenstelle ihren Kopf
   ändert; ein Nummernfeld legte das Lagebild still.
@@ -72,11 +78,26 @@ offen, verteilte die Grenze aber auf drei SQL-Abfragen und verdeckte kaputte Dat
 die ein geliefertes Paar prüft. So stehen Format und Grenzen nebeneinander und sind ohne Datenbank
 testbar.
 
+### D5 Die freie Nummer bleibt in der Grenze (Nachtrag 15.11.2026, Review, abgestimmt)
+
+`ensure_freie_nummer` zählt über alle Spiegel. Eine gültige Spiegelnummer 999.999 höbe die freie
+Nummer auf 1.000.000; ab dann zählte die Anlage von dort weiter, und jede Gegenstelle übernähme
+alle eigenen Nummern des Jahres leer. Liegt das Maximum über allen Einsätzen an oder über
+`LFD_GRENZEN.end()`, zählt die freie Nummer deshalb nur über den eigenen Einsätzen und dem
+Löschprotokoll, wie die Anlage. Eine Nummer, die so einem Spiegel gleicht, ist erlaubt (Spiegel
+sind von der Eindeutigkeit ausgenommen); gleiche Texte fängt die Ausweichschleife ab.
+
+Verworfen: eine freie Nummer über der Grenze mit 422 ablehnen (ein Führungswechsel mit belegter
+Nummer scheiterte dann im ganzen Jahr) und hinnehmen.
+
 ## Risks / Trade-offs
 
-- [Der Hinweis gilt nur für die letzte Übernahme] → Er verschwindet mit der nächsten Lieferung, die
-  den Kopf nicht enthält (`hinweise_fortschreiben`). Das gilt für alle Übernahmehinweise außer „zu
-  groß“; das Log behält ihn. Kommt der Kopf wieder mit denselben Zahlen, erscheint er neu.
+- [Ein Führer liefert Altbestand außerhalb der Grenzen] → Migration 0115 hat Handwerte im Muster
+  `JJJJ-NNN` übernommen; ein Wert wie `2026-000` (laufende Nummer 0) oder ein Jahr vor 2000 kommt am
+  Spiegel leer an und trägt den Hinweis. Der Text bleibt, die Zählung braucht die Zahlen eines
+  Spiegels nicht. Hingenommen.
+- [Ein fremder Spiegel an der Grenze] → Wird ein Spiegel mit dieser Nummer später selbst eigen,
+  kann seine Nummer belegt sein und er bekommt eine neue (D5); das ist der gewöhnliche Weg.
 - [Ein Führer schickt erst gültige, dann ungültige Zahlen] → Das Paar wird leer, die gültigen
   Werte von vorher gehen verloren. Gewollt: Der Spiegel zeigt den Stand des Führers, nicht eine
   Mischung.

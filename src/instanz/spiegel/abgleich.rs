@@ -340,11 +340,7 @@ async fn save_hinweis(
             .fetch_optional(&mut *conn)
             .await?
             .flatten();
-    let geliefert: Vec<String> = erledigt
-        .iter()
-        .map(|(art, schluessel)| uebernehmen::zu_gross_anfang(art, schluessel))
-        .collect();
-    let neu = hinweise_fortschreiben(alt.as_deref(), hinweise, &geliefert);
+    let neu = build_hinweis(alt.as_deref(), hinweise, erledigt);
     if neu != alt {
         sqlx::query("UPDATE einsatz_spiegel SET hinweis = ? WHERE einsatz_id = ?")
             .bind(neu)
@@ -355,17 +351,41 @@ async fn save_hinweis(
     Ok(())
 }
 
+/// Der Hinweis am Spiegel nach einer Übernahme mit den Hinweisen `hinweise` und den erledigten
+/// Zeilen `erledigt` (Art, fremder Schlüssel). Der Hinweis zur Einsatznummer gilt dem Kopf: Er ist
+/// erledigt, sobald der Kopf übernommen ist (LLH-1859).
+fn build_hinweis(
+    alt: Option<&str>,
+    hinweise: &[String],
+    erledigt: &[(String, String)],
+) -> Option<String> {
+    let mut geliefert: Vec<String> = erledigt
+        .iter()
+        .map(|(art, schluessel)| uebernehmen::zu_gross_anfang(art, schluessel))
+        .collect();
+    if erledigt.iter().any(|(art, _)| art == "einsatz") {
+        geliefert.push(uebernehmen::NUMMER_HINWEIS.to_owned());
+    }
+    hinweise_fortschreiben(alt, hinweise, &geliefert)
+}
+
 /// Der Hinweis am Spiegel nach einer Übernahme. „Zu groß“ steht je Zeile, bis dieselbe Zeile
 /// übernommen oder gelöscht ist (`Ergebnis::erledigt`): ihr Stand wird nicht neu geliefert, der
 /// Hinweis ginge sonst mit der nächsten Runde verloren, und er zählt nicht zur Grenze von 20
-/// (LLH-1630). Andere Hinweise gelten nur für die letzte Übernahme, höchstens 20.
+/// (LLH-1630). Ebenso haftet der Hinweis zur Einsatznummer, bis der Kopf wieder übernommen ist
+/// (LLH-1859). Andere Hinweise gelten nur für die letzte Übernahme, höchstens 20. Haftende
+/// Hinweise dieser Übernahme stehen auch dann, wenn ihre Zeile in derselben erledigt ist: Sie
+/// kam mit Daten, die wieder nicht übernommen wurden.
 fn hinweise_fortschreiben(
     alt: Option<&str>,
     neu: &[String],
     erledigt: &[String],
 ) -> Option<String> {
     let ist_erledigt = |zeile: &str| erledigt.iter().any(|g| zeile.starts_with(g.as_str()));
-    let ist_zu_gross = |zeile: &str| zeile.starts_with("Zeile ") && zeile.contains(" ist zu groß");
+    let is_haftend = |zeile: &str| {
+        (zeile.starts_with("Zeile ") && zeile.contains(" ist zu groß"))
+            || zeile.starts_with(uebernehmen::NUMMER_HINWEIS)
+    };
     let alte: Vec<&str> = alt
         .unwrap_or("")
         .lines()
@@ -375,8 +395,9 @@ fn hinweise_fortschreiben(
     for z in alte
         .iter()
         .copied()
+        .filter(|z| !ist_erledigt(z))
         .chain(neu.iter().map(String::as_str))
-        .filter(|z| ist_zu_gross(z) && !ist_erledigt(z))
+        .filter(|z| is_haftend(z))
     {
         if !zeilen.iter().any(|v| v == z) {
             zeilen.push(z.to_owned());
@@ -385,7 +406,7 @@ fn hinweise_fortschreiben(
     let neue_andere: Vec<&str> = neu
         .iter()
         .map(String::as_str)
-        .filter(|z| !ist_zu_gross(z))
+        .filter(|z| !is_haftend(z))
         .collect();
     zeilen.extend(neue_andere.into_iter().take(20).map(str::to_owned));
     (!zeilen.is_empty()).then(|| zeilen.join("\n"))
@@ -945,6 +966,31 @@ mod reihum_tests {
             &[],
         );
         assert_eq!(h.as_deref(), Some("Lieferung nicht übernommen: y"));
+    }
+
+    /// Der Hinweis zur Einsatznummer haftet, bis der Kopf das nächste Mal übernommen ist
+    /// (LLH-1859): Lieferungen ohne Kopf räumen ihn nicht, ein gültiger Kopf schon, ein weiter
+    /// ungültiger bringt ihn neu.
+    #[test]
+    fn der_hinweis_zur_einsatznummer_bleibt_bis_der_kopf_kommt() {
+        let nummer = format!(
+            "{} (Jahr 2026, laufende Nummer 0).",
+            uebernehmen::NUMMER_HINWEIS
+        );
+        let kopf = [(String::from("einsatz"), String::from("hub/1-aa"))];
+        let h = build_hinweis(None, std::slice::from_ref(&nummer), &kopf);
+        assert_eq!(h.as_deref(), Some(nummer.as_str()));
+        // Lieferung ohne Kopf, mit einem anderen Hinweis: beide stehen.
+        let h = build_hinweis(h.as_deref(), &["Lieferung nicht übernommen: x".into()], &[]);
+        assert_eq!(h, Some(format!("{nummer}\nLieferung nicht übernommen: x")));
+        // Lieferung ohne Kopf und ohne Hinweis: der zur Nummer bleibt.
+        let h = build_hinweis(h.as_deref(), &[], &[]);
+        assert_eq!(h.as_deref(), Some(nummer.as_str()));
+        // Der Kopf kommt wieder ungültig: der Hinweis steht einmal.
+        let h = build_hinweis(h.as_deref(), std::slice::from_ref(&nummer), &kopf);
+        assert_eq!(h.as_deref(), Some(nummer.as_str()));
+        // Der Kopf kommt gültig: der Hinweis geht.
+        assert_eq!(build_hinweis(h.as_deref(), &[], &kopf), None);
     }
 
     #[test]

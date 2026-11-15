@@ -165,17 +165,17 @@ mod tests {
         );
     }
 
-    fn pruefe(jahr: serde_json::Value, lfd: serde_json::Value) -> GelieferteZahlen {
+    fn check(jahr: serde_json::Value, lfd: serde_json::Value) -> GelieferteZahlen {
         check_gelieferte_zahlen(&jahr, &lfd)
     }
 
     #[test]
     fn gelieferte_zahlen_in_den_grenzen_gelten() {
         use serde_json::json;
-        assert_eq!(pruefe(json!(2026), json!(12)), GelieferteZahlen::Gueltig);
-        assert_eq!(pruefe(json!(2000), json!(1)), GelieferteZahlen::Gueltig);
+        assert_eq!(check(json!(2026), json!(12)), GelieferteZahlen::Gueltig);
+        assert_eq!(check(json!(2000), json!(1)), GelieferteZahlen::Gueltig);
         assert_eq!(
-            pruefe(json!(9999), json!(999_999)),
+            check(json!(9999), json!(999_999)),
             GelieferteZahlen::Gueltig
         );
     }
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn ohne_beide_zahlen_ist_altbestand() {
         assert_eq!(
-            pruefe(serde_json::Value::Null, serde_json::Value::Null),
+            check(serde_json::Value::Null, serde_json::Value::Null),
             GelieferteZahlen::Leer
         );
     }
@@ -206,7 +206,7 @@ mod tests {
             (json!(2026), json!(u64::MAX)),
         ] {
             assert_eq!(
-                pruefe(jahr.clone(), lfd.clone()),
+                check(jahr.clone(), lfd.clone()),
                 GelieferteZahlen::Ungueltig,
                 "{jahr} / {lfd}"
             );

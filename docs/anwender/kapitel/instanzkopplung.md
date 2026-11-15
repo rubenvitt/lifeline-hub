@@ -507,6 +507,13 @@ Führung später zurück, bleibt die neue Nummer, solange sie dort frei ist. Wid
 dagegen einer Notübernahme, führt er mit seiner Nummer weiter, und der Hub zeigt sie wieder,
 sobald der ELW den Einsatz das nächste Mal ändert.
 
+Liefert die führende Installation eine Einsatznummer, deren Jahr nicht vierstellig ab 2000 ist
+oder deren laufende Nummer nicht zwischen 1 und 999.999 liegt, zeigt der Spiegel die Nummer zwar
+an, zählt sie aber nicht mit. Auf der Seite Instanzkopplung steht beim Einsatz dann
+„Einsatznummer der Gegenstelle außerhalb der Grenzen“. Der übrige Einsatz wird normal
+abgeglichen. Der Hinweis bleibt, bis die führende Installation die Daten des Einsatzes das
+nächste Mal ändert.
+
 Benachrichtigungen werden nicht gespiegelt. Jede Installation führt ihre eigenen; „gelesen“ und
 das Quittieren gelten nur dort.
 
