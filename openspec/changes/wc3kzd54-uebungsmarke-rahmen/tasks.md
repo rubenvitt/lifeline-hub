@@ -26,10 +26,10 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 - [x] 3.1 `components/rahmenOben.ts`: `useRahmenObenStapel` (D4) mit Unit-Test (Summe ohne eigene
   Quelle, keine Rückkopplung bei Höhenänderung); `rahmenOben.guard.test.ts` kennt das Band.
-- [ ] 3.2 `einsatz/EinsatzLayout.tsx`: `UebungsBand` direkt nach dem Kopf, klebt in jeder Breite
+- [x] 3.2 `einsatz/EinsatzLayout.tsx`: `UebungsBand` direkt nach dem Kopf, klebt in jeder Breite
   (D4); Kopfmarke ab `md` vor dem Einsatznamen (D5); Test in der Layout-Testdatei: Band und Marke
   bei Übung, beides fehlt bei Realeinsatz und während des Ladens.
-- [ ] 3.3 Tab-Titel mit Präfix (D6) in `components/useDokumentTitel.ts`, Aufruf im Einsatzrahmen;
+- [x] 3.3 Tab-Titel mit Präfix (D6) in `components/useDokumentTitel.ts`, Aufruf im Einsatzrahmen;
   Tests in `useDokumentTitel.test.ts` für „ÜBUNG · ETB · Starkregen Nord · lifeline-hub“ und
   „ÜBUNG · (3) ETB · …“, Realeinsatz unverändert.
 - [ ] 3.4 e2e `frontend/e2e/rahmen-stehen-bleiben.spec.ts` um die Übung erweitern: Band bei 390,

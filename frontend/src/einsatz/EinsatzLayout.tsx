@@ -20,7 +20,7 @@ import {
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
 import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
-import { StatusChip } from '../components/instrument';
+import { StatusChip, UebungsBand, UebungsMarke } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
 import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
@@ -32,6 +32,7 @@ import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersis
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
 import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
+import { istUebung } from './einsatzart';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
@@ -270,7 +271,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // ungelesenen Eingänge, auch am App-Badge (LLH-1062, LLH-1143 D8): dieselbe Zahl wie am Knopf
   // „Eingänge“, so steht ein stiller Eingang im Hintergrund-Tab und an der installierten App.
   const ungelesen = useUngeleseneEingaenge(einsatzId);
-  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], ungelesen);
+  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], ungelesen, {
+    uebung: istUebung(einsatz),
+  });
   useEffect(() => setzeAppBadge(ungelesen), [ungelesen]);
   useEffect(() => () => setzeAppBadge(0), []);
   // Der letzte Ort für den Rückweg von Profil und Verwaltung (LFH-954, `letzterOrt.ts`): jede
@@ -454,6 +457,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                 <StatusChip ton="achtung" wort={fuehrungBeiKurz(einsatz.fuehrung.bei)} />
               </span>
             )}
+            {/* Übung (LLH-1725, D5): ab `md` vor dem Namen; darunter trägt das klebende Band. */}
+            {mittel && <UebungsMarke einsatz={einsatz} />}
             <div data-lfh="kopf-einsatzname" style={nameZelleStil(token)}>
               {einsatzQuery.isLoading ? (
                 <span
@@ -523,6 +528,9 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           </div>
         </KopfRechts>
       </Header>
+      {/* Übung (LLH-1725, Spec `uebungsmarke`, D4): direkt unter dem Kopf, klebt in jeder Breite
+         unter den übrigen Rahmenquellen. Beim Realeinsatz steht nichts, auch kein Platzhalter. */}
+      <UebungsBand einsatz={einsatz} />
       {/* Warnung, keine Sackgasse: ohne Freigaben fällt `istModulSichtbar` nach OFFEN, jedes
          ausgeblendete oder gesperrte Modul stünde stumm bedienbar in der Navigation. Ein stiller
          Fehlschlag sähe aus wie eine Konfiguration, die niemand gesetzt hat. `warning`, weil Rot der
