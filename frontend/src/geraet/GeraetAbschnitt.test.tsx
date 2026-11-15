@@ -26,6 +26,7 @@ import { isEigenerEmpfaenger } from './GeraetAuftraegePage';
 import { abschnittsZonen, flaechenRahmen } from './GeraetAbschnittKarte';
 import { navigationZeigt } from './GeraeteLayout';
 import { spieleAlarmTon } from '../alarm/alarmTon';
+import { EINSATZKOPF_REFETCH_MS } from '../components/instrument';
 
 // Ob ein gekoppeltes Gerät einen Ton spielt, zeigt der Aufruf; jsdom hat kein Web-Audio.
 vi.mock('../alarm/alarmTon', async (original) => ({
@@ -211,6 +212,35 @@ describe('Gerätehülle — Übung (LLH-1725, Spec `uebungsmarke`)', () => {
     renderApp('/geraet');
     expect(await screen.findByText('Einsatzart nicht geladen')).toBeVisible();
     expect(document.querySelector('[data-lfh="uebung-band"]')).toBeNull();
+  });
+
+  it('lädt den Einsatzkopf nach 30 s nach und zeigt dann das Band (LLH-1725)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      stelleBereit();
+      let abrufe = 0;
+      server.use(
+        http.get('/api/einsaetze/7', () => {
+          abrufe += 1;
+          return abrufe === 1
+            ? new HttpResponse(null, { status: 503 })
+            : HttpResponse.json(
+                einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal', einsatzart: 'uebung' }),
+              );
+        }),
+      );
+      renderApp('/geraet');
+      expect(await screen.findByText('Einsatzart nicht geladen')).toBeVisible();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(EINSATZKOPF_REFETCH_MS);
+      });
+      await waitFor(() =>
+        expect(document.querySelector('[data-lfh="uebung-band"]')).not.toBeNull(),
+      );
+      expect(screen.queryByText('Einsatzart nicht geladen')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('beim Realeinsatz steht kein Band (Gegenprobe)', async () => {
