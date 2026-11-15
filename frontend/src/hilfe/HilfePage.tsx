@@ -11,6 +11,7 @@ import DruckKnopf from '../components/druck/DruckKnopf';
 import { useViewport } from '../components/useViewport';
 import { Bildmarke } from '../marke/Bildmarke';
 import { warGeraet } from '../geraet/geraetMarke';
+import { useEinsatzRueckweg } from '../einsatz/einsatzRueckweg';
 import { rueckmeldungsAdresse } from '../rueckmeldung/adresse';
 import {
   GERAET_START_PFAD,
@@ -63,7 +64,7 @@ interface Gliederungspunkt {
  * Offen ohne Anmeldung (das Kapitel „Anmelden“ braucht man davor) und ohne Netz (die Texte stecken
  * im Chunk dieser Seite, den der Service Worker vorhält). Bilder lädt die Seite erst beim Ansehen
  * und hält sie danach im Laufzeit-Cache (`HilfeBild`, `bilder.ts`, LFH-1128). Der Rückweg folgt
- * der Sitzung: Person, Gerät oder Anmeldung.
+ * der Sitzung: Gerät, Anmeldung, die Stelle im aktiven Einsatz oder die Einsatzliste (LLH-1731).
  */
 export default function HilfePage() {
   const { kapitel: slug } = useParams();
@@ -94,11 +95,14 @@ export default function HilfePage() {
   const zurueck = stelle > 0 ? KAPITEL[stelle - 1] : undefined;
   const weiter = stelle >= 0 ? KAPITEL[stelle + 1] : undefined;
 
+  // Genau ein Rückweg (LLH-1731, Spec `seiten-orientierung`, „Rückweg aus der Hilfe“): Gerät,
+  // Anmeldung, die zuletzt geöffnete Stelle des aktiven Einsatzes, sonst die Einsatzliste.
+  const einsatzRueckweg = useEinsatzRueckweg(benutzer?.id, !geraet && benutzer != null);
   const rueckweg = geraet
     ? { pfad: GERAET_START_PFAD, label: 'Zum Gerät' }
-    : benutzer
-      ? { pfad: einsaetzePfad(), label: 'Zur App' }
-      : { pfad: '/login', label: 'Zur Anmeldung' };
+    : !benutzer
+      ? { pfad: '/login', label: 'Zur Anmeldung' }
+      : (einsatzRueckweg ?? { pfad: einsaetzePfad(), label: 'Zu den Einsätzen' });
 
   // Rückmeldeweg (LLH-1549, seit LLH-1642 hier statt im Benutzermenü): das Issue-Formular,
   // vorbefüllt mit Version, Oberfläche und dem Bereich, aus dem die Hilfe geöffnet wurde — nur als

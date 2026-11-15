@@ -12,7 +12,7 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`.
 
 ## 2. Rückweg der Hilfe (D3)
 
-- [ ] 2.1 `HilfePage` nimmt den Rückweg aus `useEinsatzRueckweg`; „Zur App“ wird „Zu den Einsätzen“. Prüfung: `HilfePage.test.tsx` mit gemerktem aktivem Einsatz → „Zurück zu <Einsatz>“ führt an den gemerkten Pfad, auch nach einem Kapitelwechsel; abgeschlossen oder nichts gemerkt → „Zu den Einsätzen“ → `/einsaetze`; „Zum Gerät“ und „Zur Anmeldung“ unverändert grün (inkl. `geraet/GeraeteHuelle.test.tsx`)
+- [x] 2.1 `HilfePage` nimmt den Rückweg aus `useEinsatzRueckweg`; „Zur App“ wird „Zu den Einsätzen“. Prüfung: `HilfePage.test.tsx` mit gemerktem aktivem Einsatz → „Zurück zu <Einsatz>“ führt an den gemerkten Pfad, auch nach einem Kapitelwechsel; abgeschlossen oder nichts gemerkt → „Zu den Einsätzen“ → `/einsaetze`; „Zum Gerät“ und „Zur Anmeldung“ unverändert grün (inkl. `geraet/GeraeteHuelle.test.tsx`)
 
 ## 3. Hilfe neben dem Einsatz (D4, D5)
 
