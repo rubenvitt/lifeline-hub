@@ -146,8 +146,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
     Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
     Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
-    nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht nur als Symbol, ein Wort genau
-    bei Störung, in jeder Breite. Einziger Breitenhalter: der Platz von „Ton blockiert“ am
+    nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht in jeder Breite nur als
+    Symbol, eine Störung ab `md` mit Wort (darunter trägt die Betriebszeile die Verbindung, die
+    gebündelte Alarmzentrale nennt die vorrangige Störung). Einziger Breitenhalter: der Platz von „Ton blockiert“ am
     Glockenknopf, weil der Browser den Ton vor der ersten Geste ohne Zutun sperrt. Tastenhinweise
     nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
