@@ -38,9 +38,9 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 4. Liste und Wechsler
 
-- [ ] 4.1 `pages/EinsaetzePage.tsx`: `UebungsMarke` statt grauem Tag bei Übung (D9); Test in
+- [x] 4.1 `pages/EinsaetzePage.tsx`: `UebungsMarke` statt grauem Tag bei Übung (D9); Test in
   `EinsaetzePage.test.tsx`: Übung trägt Marke, Realeinsatz den Tag „Realeinsatz“.
-- [ ] 4.2 `einsatz/EinsatzSwitcher.tsx`: Marke im Eintrag einer Übung (D9); Test: nur der
+- [x] 4.2 `einsatz/EinsatzSwitcher.tsx`: Marke im Eintrag einer Übung (D9); Test: nur der
   Übungseintrag trägt „ÜBUNG“.
 
 ## 5. Gerät und Lagemonitor
