@@ -43,6 +43,13 @@ holt die Einsatzliste nur, wenn ein Ort gemerkt ist, und liefert `{ label, pfad 
 aktiven, gelisteten Einsatz, sonst `undefined`. `AppLayout` ruft ihn mit `aktiv` = „Seite hat
 einen Ort“, `HilfePage` mit `aktiv` = „Person angemeldet und kein Gerät“.
 
+Je Adresse neu gelesen wird der Ort nur auf den Seiten der Ebene 1. Die Hilfe liest ihn einmal je
+Besuch (`isJeBesuchFest`, Review B5, Entscheidung 15.11.2026): arbeitet die Person im ersten Tab
+weiter, änderte sonst der nächste Kapitelwechsel das Ziel des Knopfs still, und die Anforderung
+„Rückweg aus der Hilfe“ verlangt, dass ein Kapitelwechsel den Rückweg nicht ändert. Im Hilfe-Tab
+neben dem Einsatz führt der Rückweg auch diesen Tab in den Einsatz; mehrere Tabs sind vorgesehen
+(LFH-387), „Hilfe schließen“ wurde am 15.11.2026 verworfen.
+
 Verworfen: den Rückweg in der Hilfe aus `state.von` bilden. Der Pfad dort ist genauer nur in
 einem Fall (gesperrtes Modul, das `EinsatzLayout` nicht merkt), fehlt aber bei jedem Direktaufruf
 und im neuen Tab, und der Name des Einsatzes müsste ohnehin aus der Liste kommen. Eine Quelle für
