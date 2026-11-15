@@ -17,9 +17,11 @@ import type { Dayjs } from 'dayjs';
 import {
   RUECKMELDUNG_WORT,
   ohneRueckmeldung,
+  rueckmeldungUeberfaelligSeit,
   rueckmeldungZustand,
   type RueckmeldungZustand,
 } from '../meldungen/rueckmeldung';
+import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
 import { statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
 import { isAufgebraucht, materialDarstellung, mengeText } from './materialPosten';
@@ -625,6 +627,8 @@ export interface BandZelle {
 export interface RueckmeldungAnzeige {
   zustand: RueckmeldungZustand;
   letzte: LetzteRueckmeldung | null;
+  /** Minuten seit der Fälligkeit, nur bei `ueberfaellig` (LLH-1741), sonst `null`. */
+  seitMin: number | null;
 }
 
 /** Nur echte Einheiten tragen eine Rückmeldung — „Ohne Einheit" ist `art: 'einheit'`, hat aber keine id. */
@@ -646,7 +650,9 @@ export function rueckmeldungDerZeile(
 ): RueckmeldungAnzeige | null {
   if (!istEchteEinheit(z)) return null;
   const letzte = je.get(z.einheitId) ?? null;
-  return { zustand: rueckmeldungZustand(letzte, jetzt), letzte };
+  const zustand = rueckmeldungZustand(letzte, jetzt);
+  const seitMin = zustand === 'ueberfaellig' ? rueckmeldungUeberfaelligSeit(letzte, jetzt) : null;
+  return { zustand, letzte, seitMin };
 }
 
 /** Überfällig oder nie zurückgemeldet — die Zeile wird getönt wie eine Problemzeile. */
@@ -654,31 +660,61 @@ export function istRueckmeldungProblem(r: RueckmeldungAnzeige | null | undefined
   return r != null && r.zustand !== 'aktuell';
 }
 
-/** Das Wort zur Tönung, wenn die Rückmeldung den Grund liefert. */
-const TOENUNG_RUECKMELDUNG: Record<Exclude<RueckmeldungZustand, 'aktuell'>, string> = {
-  ueberfaellig: 'Rückm. überfällig',
-  keine: 'keine Rückm.',
-};
+/**
+ * Ein Grund, warum eine Zeile getönt ist (LFH-973, LLH-1741). Strukturiert statt als Text, damit
+ * Meldebild und Überblick (Abschnittskarte, LLH-1739) dasselbe Wort aus {@link grundWort} lesen
+ * und die Dauer mit der Seitenuhr wächst.
+ */
+export type TonungsGrund =
+  | { art: 'ausfall'; anzahl: number }
+  | { art: 'ausfall_material'; anzahl: number }
+  | { art: 'rueckmeldung_ueberfaellig'; seitMin: number | null }
+  | { art: 'rueckmeldung_keine' };
 
 /**
- * Warum eine Zeile getönt ist, als Wörter für die Statusspalte (LFH-973): die Tönung allein
+ * Wortlaut eines Grundes — EINE Stelle für Meldebild und Überblick: „1 Ausfall“, „1 Ausfall
+ * Material“, „Rückm. überfällig seit 47 min“, „keine Rückm.“. Jeder Grund steht als Etikett in
+ * der Alarmrolle (Spec `kraeftebaum`, „Grund einer Problemzeile als Alarm-Etikett“).
+ */
+export function grundWort(g: TonungsGrund): string {
+  switch (g.art) {
+    case 'ausfall':
+      return `${g.anzahl} Ausfall`;
+    case 'ausfall_material':
+      return `${g.anzahl} Ausfall Material`;
+    case 'rueckmeldung_ueberfaellig':
+      return g.seitMin == null
+        ? 'Rückm. überfällig'
+        : `Rückm. überfällig seit ${dauerText(g.seitMin)}`;
+    case 'rueckmeldung_keine':
+      return 'keine Rückm.';
+  }
+}
+
+/**
+ * Warum eine Zeile getönt ist, als Gründe für die Statusspalte (LFH-973): die Tönung allein
  * trägt die Aussage nicht (WCAG 1.4.1), und Ausfall-Zahl und Rückmeldung stehen in Spalten, die
  * am schmalen Schirm weichen oder hinten liegen. Ein Einheitenstatus „nicht verfügbar“ braucht
- * kein Wort, sein Chip in derselben Spalte nennt ihn schon.
+ * keinen Grund, sein Chip in derselben Spalte nennt ihn schon. Die Dauer einer überfälligen
+ * Rückmeldung kommt aus `r.seitMin` (Seitenuhr, {@link rueckmeldungDerZeile}).
  */
 export function toenungsGruende(
   z: RasterZeile,
   r: RueckmeldungAnzeige | null | undefined,
-): string[] {
-  const gruende: string[] = [];
+): TonungsGrund[] {
+  const gruende: TonungsGrund[] = [];
   const ausfall = z.verteilung?.ausfall ?? 0;
   if (ausfall > 0 && z.einheitStatus?.kategorie !== 'nicht_verfuegbar') {
-    gruende.push(`${ausfall} Ausfall`);
+    gruende.push({ art: 'ausfall', anzahl: ausfall });
   }
   if (z.art === 'einheit' && z.materialAusfall > 0) {
-    gruende.push(`${z.materialAusfall} Ausfall Material`);
+    gruende.push({ art: 'ausfall_material', anzahl: z.materialAusfall });
   }
-  if (r != null && r.zustand !== 'aktuell') gruende.push(TOENUNG_RUECKMELDUNG[r.zustand]);
+  if (r?.zustand === 'ueberfaellig') {
+    gruende.push({ art: 'rueckmeldung_ueberfaellig', seitMin: r.seitMin });
+  } else if (r?.zustand === 'keine') {
+    gruende.push({ art: 'rueckmeldung_keine' });
+  }
   return gruende;
 }
 

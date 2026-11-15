@@ -6,7 +6,9 @@
  * Seitenuhr umschlägt.
  *
  * - `aktuell`: Uhrzeit, neutral.
- * - `ueberfaellig`: Uhrzeit, `achtung` — die letzte Rückmeldung ist älter als die Frist.
+ * - `ueberfaellig`: Uhrzeit, `alarm` — die letzte Rückmeldung ist älter als die Frist. Seit
+ *   LLH-1741 Alarm statt Achtung: eine Einheit, von der man nichts mehr hört, ist ein Signal
+ *   (ein Zustand, eine Rolle; Meldebild und Überblick lesen dieselbe Karte).
  * - `keine`: „—", `alarm` — noch nie eine Rückmeldung. NUR diese zählt die Kachel
  *   „keine Rückmeldung".
  */
@@ -22,7 +24,7 @@ export type RueckmeldungZustand = 'aktuell' | 'ueberfaellig' | 'keine';
 /** Zustand → Rolle. Exhaustiv, damit ein vierter Zustand den Build bricht. */
 export const RUECKMELDUNG_ROLLE: Record<RueckmeldungZustand, Statusrolle> = {
   aktuell: 'neutral',
-  ueberfaellig: 'achtung',
+  ueberfaellig: 'alarm',
   keine: 'alarm',
 };
 
@@ -49,6 +51,20 @@ export function rueckmeldungZustand(
   const faellig = dayjs.utc(r.faellig_at);
   if (!faellig.isValid()) return 'ueberfaellig';
   return faellig.valueOf() <= jetzt.valueOf() ? 'ueberfaellig' : 'aktuell';
+}
+
+/**
+ * Ganze Minuten seit der Fälligkeit einer Rückmeldung (LLH-1741: „Rückm. überfällig seit 47 min“),
+ * nie negativ; `null` ohne Rückmeldung oder ohne lesbare Fälligkeit. Zeitbasis ist die Seitenuhr.
+ */
+export function rueckmeldungUeberfaelligSeit(
+  r: LetzteRueckmeldung | null | undefined,
+  jetzt: Dayjs,
+): number | null {
+  if (!r) return null;
+  const faellig = dayjs.utc(r.faellig_at);
+  if (!faellig.isValid()) return null;
+  return Math.max(0, Math.floor((jetzt.valueOf() - faellig.valueOf()) / 60_000));
 }
 
 /** Letzte Rückmeldung je Einheit-id. Leere Map, solange keine Daten da sind. */
