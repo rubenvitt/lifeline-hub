@@ -637,6 +637,10 @@ describe('PlanungPage (LLH-1586)', () => {
           .querySelector('.ant-select-item-option[title="E-2027-0007 · Konzert"]')!
           .querySelector('[data-lfh="uebung-marke"]'),
       ).not.toBeNull();
+      // Die Suche findet die Übung über ihren Namen, obwohl ihre Option die Marke trägt (LLH-1725).
+      await userEvent.type(screen.getByRole('combobox', { name: 'Laufender Einsatz' }), 'Konz');
+      expect(optionenVon('Laufender Einsatz')).toEqual(['E-2027-0007 · Konzert']);
+      await userEvent.clear(screen.getByRole('combobox', { name: 'Laufender Einsatz' }));
       await waehle('Laufender Einsatz', 'E-2027-0007 · Konzert');
       await waitFor(() =>
         expect(anfragen[anfragen.length - 1]).toEqual({

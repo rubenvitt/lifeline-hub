@@ -262,6 +262,9 @@ export default function PlanungUebernahmeDialog({
               ) : (
                 <Select<number>
                   aria-label="Laufender Einsatz"
+                  // Gesucht wird im Text (`title`): das `label` einer Übung trägt die Marke und ist
+                  // kein Text mehr (LLH-1725).
+                  showSearch={{ optionFilterProp: 'title' }}
                   placeholder="Einsatz wählen"
                   value={einsatzId ?? undefined}
                   onChange={(id) => changeZiel('einsatz', null, id)}
