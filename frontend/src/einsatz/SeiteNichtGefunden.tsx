@@ -5,6 +5,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
+import { useNichtGefundenMelden } from './nichtGefundenMarke';
 import { freiesRueckwegModul, modulZielRoute, modulZuRoute, redirectZiel } from './modulRegistry';
 
 /**
@@ -18,12 +19,15 @@ import { freiesRueckwegModul, modulZielRoute, modulZuRoute, redirectZiel } from 
  * (`frontend/AGENTS.md`). Keine Zweitadresse für Registry-Schlüssel, jedes Modul hat eine Route.
  *
  * Der Rückweg führt in den Überblick, ist er gesperrt, ins erste freie Modul
- * (`freiesRueckwegModul`, wie beim Modulwächter). Bis die Freigaben geladen sind, steht kein Knopf,
- * sonst wechselte sein Ziel unter dem Finger.
+ * (`freiesRueckwegModul` ohne das Standardmodul des Einsatzes, anders als Modulwächter und
+ * `ModulStub`: der Auftrag nennt den Überblick). Bis die Freigaben geladen sind, steht kein Knopf,
+ * sonst wechselte sein Ziel unter dem Finger. Die Adresse merkt der Rahmen nicht als letzten Ort
+ * (`nichtGefundenMarke.ts`).
  */
 export default function SeiteNichtGefunden() {
   const einsatzId = parseRouteId(useParams().id);
   const { pathname } = useLocation();
+  useNichtGefundenMelden();
   const freigabenQ = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId ?? 0),
     queryFn: () => ladeModulFreigaben(einsatzId!),
@@ -45,7 +49,7 @@ export default function SeiteNichtGefunden() {
   }
 
   return (
-    <EinsatzSeite titel="Seite nicht gefunden" breite="schmal">
+    <EinsatzSeite titel="Seite nicht gefunden">
       <SeitenLeer
         titel="Diese Adresse gibt es im Einsatz nicht"
         hinweis={pathname}

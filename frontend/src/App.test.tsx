@@ -11,6 +11,8 @@ import { http, HttpResponse } from 'msw';
 import { meHandler, server } from './test/server';
 import { SITZUNG_ABGELAUFEN } from './auth/sitzungsEvent';
 import { adminFixture, freigabenFixture } from './test/fixtures';
+import { freiesRueckwegModul, modulZielRoute } from './einsatz/modulRegistry';
+import { leseLetztenOrt } from './einsatz/letzterOrt';
 import { setzeViewportBreite } from './test/viewport';
 
 /**
@@ -359,9 +361,30 @@ describe('App-Routing', () => {
           HttpResponse.json(freigabenFixture({ ueberblick: { zugriff: false } })),
         ),
       );
-      renderApp('/einsaetze/7/gibtsnicht');
-      expect(await screen.findByRole('button', { name: /öffnen$/ })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Überblick öffnen' })).toBeNull();
+      // Das Ziel aus derselben Auflösung wie der Modulwächter, ohne Standardmodul: Beschriftung
+      // UND Ziel müssen ihm folgen, sonst führte ein richtig beschrifteter Knopf in die Sperre.
+      const ziel = freiesRueckwegModul(freigabenFixture({ ueberblick: { zugriff: false } }));
+      expect(ziel.key).not.toBe('ueberblick');
+      const { router } = renderApp('/einsaetze/7/gibtsnicht');
+      await userEvent.click(await screen.findByRole('button', { name: `${ziel.label} öffnen` }));
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe(`/einsaetze/7/${modulZielRoute(ziel)}`),
+      );
+    });
+
+    it('merkt die unbekannte Adresse nicht als letzten Ort, die nächste gültige schon', async () => {
+      einsatzServer();
+      const { router } = renderApp('/einsaetze/7/gibtsnicht');
+      await screen.findByRole('heading', { level: 1, name: 'Seite nicht gefunden' });
+      // Freigaben angekommen: der Knopf steht erst danach, also hätte der Rahmen jetzt gemerkt.
+      await screen.findByRole('button', { name: 'Überblick öffnen' });
+      expect(leseLetztenOrt(admin.id)).toBeNull();
+      await act(async () => {
+        await router.navigate('/einsaetze/7/ueberblick');
+      });
+      await waitFor(() =>
+        expect(leseLetztenOrt(admin.id)).toEqual({ einsatzId: 7, pfad: '/einsaetze/7/ueberblick' }),
+      );
     });
   });
 
