@@ -10,7 +10,7 @@ import { istBildMime, originalPfad } from '../api/anhangFassung';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { aktionsNamen } from './aktionsNamen';
-import { StatusChip, monoStil } from '../components/instrument';
+import { StatusChip, zahlStil } from '../components/instrument';
 import type { BezugKurzinfo } from './bezug';
 import { formatGroesse } from '../karten/formatGroesse';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
@@ -307,7 +307,7 @@ export default function NachrichtenStrom({
                   <Space size="small">
                     <Typography.Text strong>{n.autor_name}</Typography.Text>
                     <Tooltip title={zeitpunkt(n.erstellt_at)}>
-                      <Typography.Text type="secondary" style={monoStil(12)}>
+                      <Typography.Text type="secondary" style={zahlStil('klein')}>
                         {zeitKurz(n.erstellt_at)}
                       </Typography.Text>
                     </Tooltip>

@@ -24,8 +24,8 @@ import {
   Datenraster,
   Paneel,
   StatusChip,
-  monoStil,
   useRollen,
+  zahlStil,
 } from '../../components/instrument';
 import { nichtGefundenInhalt } from '../../components/SeitenZustand';
 import { Select } from '../../components/Select';
@@ -123,7 +123,7 @@ export default function EinheitKopf({
       etikett={etikett}
       wert={e[feld] ?? ''}
       anzeige={
-        <span style={feld === 'funkrufname' ? monoStil(13) : { whiteSpace: 'pre-wrap' }}>
+        <span style={feld === 'funkrufname' ? zahlStil('text') : { whiteSpace: 'pre-wrap' }}>
           {e[feld]}
         </span>
       }
@@ -341,7 +341,7 @@ export default function EinheitKopf({
                 etikett="Soll-Stärke"
                 wert={e.soll ?? null}
                 anzeige={
-                  <span style={monoStil(13)}>
+                  <span style={zahlStil('text')}>
                     <StaerkeAnzeige wert={e.soll ?? null} />
                   </span>
                 }
@@ -427,7 +427,7 @@ function IstAnzeige({
         gap: token.marginXS,
       }}
     >
-      <span style={monoStil(13)}>
+      <span style={zahlStil('text')}>
         <StaerkeAnzeige wert={ist} />
         {kumuliert && (
           <>
@@ -468,7 +468,7 @@ function StatusZeile({
   const [fehler, setFehler] = useState<unknown>(null);
   const s = einheitStatusAnzeige(e.status);
   const seit = e.status.seit ? (
-    <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+    <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
       seit {zeitKurz(e.status.seit, konventionen)}
     </span>
   ) : null;
@@ -520,7 +520,7 @@ function StatusZeile({
         {seit}
       </span>
       {s.verteilung && (
-        <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{s.verteilung}</span>
+        <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>{s.verteilung}</span>
       )}
       {fehler != null && <ZeilenFehler fehler={fehler} fallback="Status nicht gesetzt" />}
     </span>

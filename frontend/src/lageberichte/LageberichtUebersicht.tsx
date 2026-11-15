@@ -16,8 +16,9 @@ import {
   Paneel,
   PaneelLink,
   PaneelZustand,
-  monoStil,
   useRollen,
+  schriftGroesse,
+  zahlStil,
 } from '../components/instrument';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { VORLAGEN } from './vorlagen';
@@ -126,7 +127,14 @@ function AktuellPaneel({
         data-lfh="lagebericht-aktuell"
         style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
       >
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: rollen.text }}>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: schriftGroesse('titel'),
+            fontWeight: 600,
+            color: rollen.text,
+          }}
+        >
           {bericht.titel}
         </h3>
         <Datenraster spalten={2}>
@@ -207,7 +215,7 @@ function InArbeitPaneel({
                 >
                   {b.titel}
                 </KennungsLink>
-                <div style={{ ...monoStil(11), color: rollen.gedaempft }}>
+                <div style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
                   {`${vorlageLabel(b.vorlage)} · v${b.version} · `}
                   <ZeitAnzeige wert={b.zeitstand} />
                   {` · ${b.ersteller_name}`}
@@ -218,7 +226,7 @@ function InArbeitPaneel({
                     flexWrap: 'wrap',
                     alignItems: 'center',
                     columnGap: token.marginSM,
-                    ...monoStil(11),
+                    ...zahlStil('fein'),
                     color: rollen.text2,
                   }}
                 >
@@ -277,13 +285,13 @@ function VerlaufPaneel({
               borderBlockEnd: `1px solid ${rollen.flaeche3}`,
             }}
           >
-            <span style={{ ...monoStil(12, 500), color: rollen.text2 }}>
+            <span style={{ ...zahlStil('klein', 500), color: rollen.text2 }}>
               <ZeitAnzeige wert={b.zeitstand} />
             </span>
             <span style={{ flex: '1 1 12em', minWidth: 0 }}>
               <KennungsLink to={lageberichtDetailPfad(einsatzId, b.id)}>{b.titel}</KennungsLink>
             </span>
-            <span style={{ ...monoStil(11), color: rollen.gedaempft }}>v{b.version}</span>
+            <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>v{b.version}</span>
           </li>
         ))}
       </ol>

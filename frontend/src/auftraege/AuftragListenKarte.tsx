@@ -4,7 +4,7 @@ import type { Auftrag } from '../api/types';
 import KommKarte from '../kommunikation/KommKarte';
 import { AuswahlZiel, type AuswahlZielProps } from '../components/ListeDetail';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
-import { useRollen } from '../components/instrument';
+import { useRollen, schriftGroesse } from '../components/instrument';
 import {
   AuftragKopf,
   AuftragQuittungsstand,
@@ -60,7 +60,7 @@ function AuftragListenKarte({
           strong
           data-zeilen={3}
           style={{
-            fontSize: 15,
+            fontSize: schriftGroesse('text'),
             lineHeight: 1.4,
             display: '-webkit-box',
             WebkitBoxOrient: 'vertical',
@@ -74,7 +74,10 @@ function AuftragListenKarte({
       <Flex align="baseline" gap={8} wrap style={{ marginTop: 4 }}>
         <AuftragQuittungsstand auftrag={a} />
         {empfaenger !== '' && (
-          <Text style={{ fontSize: 13, color: rollen.text2, minWidth: 0 }} ellipsis>
+          <Text
+            style={{ fontSize: schriftGroesse('text'), color: rollen.text2, minWidth: 0 }}
+            ellipsis
+          >
             {empfaenger}
           </Text>
         )}

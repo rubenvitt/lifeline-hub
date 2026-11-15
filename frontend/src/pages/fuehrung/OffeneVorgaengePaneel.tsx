@@ -12,10 +12,11 @@ import {
   ListenAbschnitt,
   Segmentleiste,
   listenZeileStil,
-  monoStil,
   useRollen,
   type DashboardZustand,
   type ListenAbschnittZustand,
+  schriftGroesse,
+  zahlStil,
 } from '../../components/instrument';
 import { MELDUNG_STATUS } from '../../kommunikation';
 import { istAlarmiert } from '../../meldungen/meldungKennzahlen';
@@ -183,7 +184,7 @@ export default function OffeneVorgaengePaneel({
     alarm ? { ...zeile, boxShadow: `inset 3px 0 0 ${rollen.alarm}` } : zeile;
 
   const zeit = (text: string) => (
-    <span style={{ ...monoStil(11), color: rollen.gedaempft, flex: '0 0 auto', minWidth: 48 }}>
+    <span style={{ ...zahlStil('fein'), color: rollen.gedaempft, flex: '0 0 auto', minWidth: 48 }}>
       {text}
     </span>
   );
@@ -192,17 +193,22 @@ export default function OffeneVorgaengePaneel({
       style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}
     >
       <span
-        style={{ fontSize: 12, lineHeight: 1.45, color: rollen.text2, overflowWrap: 'anywhere' }}
+        style={{
+          fontSize: schriftGroesse('klein'),
+          lineHeight: 1.45,
+          color: rollen.text2,
+          overflowWrap: 'anywhere',
+        }}
       >
         {haupt}
       </span>
-      {unter && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unter}</span>}
+      {unter && <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>{unter}</span>}
     </span>
   );
   const wort = (w: string, t: 'alarm' | 'achtung' | null) => (
     <span
       data-lfh="vorgang-wort"
-      style={{ ...monoStil(10), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
+      style={{ ...zahlStil('fein'), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
     >
       {w}
     </span>
@@ -453,7 +459,7 @@ export default function OffeneVorgaengePaneel({
                       alignItems: 'center',
                       gap: token.marginXXS,
                       minHeight: token.controlHeight,
-                      ...monoStil(11),
+                      ...zahlStil('fein'),
                       color: rollen.bedienText,
                       textDecoration: 'none',
                     }}

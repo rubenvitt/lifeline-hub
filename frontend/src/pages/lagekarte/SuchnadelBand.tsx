@@ -1,5 +1,5 @@
 import { Button, Card, Typography } from 'antd';
-import { monoStil, useRollen } from '../../components/instrument';
+import { useRollen, zahlStil } from '../../components/instrument';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import { bandStil } from './KartenFuss';
 
@@ -35,7 +35,7 @@ export default function SuchnadelBand({
           style={{
             display: 'block',
             overflowWrap: 'anywhere',
-            ...(ort.art === 'koordinate' ? monoStil(token.fontSize) : {}),
+            ...(ort.art === 'koordinate' ? zahlStil('text') : {}),
           }}
         >
           {ort.beschriftung}

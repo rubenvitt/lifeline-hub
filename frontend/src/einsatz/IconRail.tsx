@@ -5,6 +5,7 @@ import { railBreite } from '../components/Kopfleiste';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
 import { handleLinkKlick } from '../routing/linkModifier';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 interface Props {
   kategorien: Kategorie[];
@@ -83,7 +84,7 @@ export function railZielStil(
  */
 const ETIKETT_STIL: CSSProperties = {
   fontFamily: schrift[schriftskala.railEtikett.familie],
-  fontSize: schriftskala.railEtikett.groesse,
+  fontSize: schriftGroesse('fein'),
   fontWeight: schriftskala.railEtikett.gewicht,
   letterSpacing: schriftskala.railEtikett.sperrung,
   textTransform: 'uppercase',

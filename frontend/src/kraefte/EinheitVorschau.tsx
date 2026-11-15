@@ -4,7 +4,7 @@ import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import FunkUndTelefon from '../components/FunkUndTelefon';
 import StatusTag from '../components/StatusTag';
-import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
+import { Datenfeld, Datenraster, useRollen, zahlStil } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { einheitStatusAnzeige } from './meldebildRaster';
@@ -58,7 +58,7 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
                   farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
                 />
                 {status.verteilung && (
-                  <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
+                  <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
                     {status.verteilung}
                   </span>
                 )}

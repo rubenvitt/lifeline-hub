@@ -32,7 +32,7 @@ import {
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
-import { schrift } from '../theme/tokens';
+import { fernsicht, schrift } from '../theme/tokens';
 import LagemonitorKarte from './LagemonitorKarte';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -58,8 +58,12 @@ export const ABRUF_TAKT_MS = 30_000;
  */
 export const HERVORHEBUNG_MS = 60_000;
 
-/** Kennzahlen mindestens 72 px, jeder Text mindestens 28 px (Großbild-Regel, `geraet/AGENTS.md`). */
-export const GROSS = { kennzahl: 96, kennzahlKlein: 72, text: 28, titel: 32 } as const;
+/**
+ * Kennzahlen mindestens 72 px, jeder Text mindestens 28 px (Großbild-Regel, `geraet/AGENTS.md`).
+ * Die Werte stehen als Fernsicht-Skala im Theme (`fernsicht`, Spec `schriftskala`: eine benannte
+ * Ausnahme von den sechs Stufen).
+ */
+export const GROSS = fernsicht;
 
 export function istVeraltet(standMs: number, jetztMs: number): boolean {
   return standMs > 0 && jetztMs - standMs > VERALTET_AB_MS;

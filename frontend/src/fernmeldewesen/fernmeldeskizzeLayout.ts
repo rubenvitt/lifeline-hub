@@ -67,6 +67,17 @@ export const KASTEN_SCHRIFT = 14;
 export const KASTEN_ZEILE = 18;
 export const NAME_SCHRIFT = 12;
 export const NAME_ZEILE = 16;
+/**
+ * Schriften der Skizze sind Zeichnungseinheiten (`viewBox`), keine Bildschirmskala: die Skizze
+ * zoomt und druckt mit ihrem eigenen Maßstab, wie die Lagekarte (Spec `schriftskala` nimmt
+ * Zeichnungen mit eigenem Maßstab aus, `theme/schriftLiteral.guard.test.ts`). Der Boden von 11
+ * gilt trotzdem für jedes Wort; nur das Ausrufezeichen in der Lückenmarke ist Teil des Zeichens.
+ */
+export const HINWEIS_SCHRIFT = 11;
+/** Das Wort „neu“ über einer neuen Einheit (`NeuMarke`). */
+export const NEU_SCHRIFT = 11;
+/** Das Ausrufezeichen in der Lückenmarke: ein Zeichen, kein Text. */
+export const MARKE_SCHRIFT = 7;
 /** Eine Zeile für Rufname und eine für Lücke oder Status — immer reserviert, damit eine neue
  * Lücke kein Element verschiebt. */
 export const RUFNAME_ZEILE = 16;

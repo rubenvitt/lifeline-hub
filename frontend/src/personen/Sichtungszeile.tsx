@@ -1,5 +1,5 @@
 import type { Person } from '../api/types';
-import { monoStil, useRollen } from '../components/instrument';
+import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
 import { sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
 import {
@@ -51,12 +51,12 @@ export default function Sichtungszeile({
         alignItems: 'center',
         columnGap: token.margin,
         rowGap: token.marginXXS,
-        fontSize: 12,
+        fontSize: schriftGroesse('klein'),
         color: rollen.text2,
       }}
     >
       <li data-sichtung-summe="">
-        <span style={{ ...monoStil(14, 500), color: rollen.text }}>{bild.gesamt}</span> gesamt
+        <span style={{ ...zahlStil('text', 500), color: rollen.text }}>{bild.gesamt}</span> gesamt
       </li>
       {kategorien.map((k) => {
         const farbe = k === 'ohne' ? null : sichtung[k].farbe;
@@ -78,7 +78,7 @@ export default function Sichtungszeile({
                 border: `1px solid ${k === 'ohne' ? token.colorTextTertiary : token.colorText}`,
               }}
             />
-            <span style={{ ...monoStil(14, 500), color: rollen.text }}>{bild.je[k]}</span>{' '}
+            <span style={{ ...zahlStil('text', 500), color: rollen.text }}>{bild.je[k]}</span>{' '}
             <span>{wort(k)}</span>
           </li>
         );

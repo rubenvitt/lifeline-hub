@@ -11,11 +11,11 @@ import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
-import { monoStil } from '../components/instrument';
 import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 const TYP_FOLGE = Object.keys(etbTyp) as EtbBaustein['typ'][];
 
@@ -112,7 +112,7 @@ export default function EtbBausteineTab() {
           <span
             data-typ={t}
             style={{
-              ...monoStil(11, 500),
+              ...zahlStil('fein', 500),
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: farbe.wort,
@@ -131,7 +131,7 @@ export default function EtbBausteineTab() {
       key: 'sortier',
       sorter: nachZahl((b: EtbBaustein) => b.sortier),
       // Zahlen in Mono — die Spalte wird zeilenweise verglichen.
-      render: (n: number) => <span style={monoStil(12)}>{n}</span>,
+      render: (n: number) => <span style={zahlStil('klein')}>{n}</span>,
     },
     ...(istAdmin
       ? ([

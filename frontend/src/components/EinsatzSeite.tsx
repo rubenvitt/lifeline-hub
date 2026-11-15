@@ -24,6 +24,7 @@ import StatusTag from './StatusTag';
 import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
 import type { EinsatzAnzeige } from '../api/types';
+import { schriftGroesse } from './instrument/rollenwerte';
 
 /** Höhe der Seitenkopfleiste (Neuentwurf: 44 px). Layoutmaß und Boden — in
  *  `komfortabel`/`handschuh` wächst sie mit der Staffel (48/72, {@link titelblockStil}), eine
@@ -115,7 +116,7 @@ export function seitentitelStil(farben: Pick<Farbrollen, 'text'>): CSSProperties
   return {
     margin: 0,
     fontFamily: schrift[schriftskala.seitentitel.familie],
-    fontSize: schriftskala.seitentitel.groesse,
+    fontSize: schriftGroesse('titel'),
     fontWeight: schriftskala.seitentitel.gewicht,
     lineHeight: 1.4,
     color: farben.text,
@@ -126,7 +127,7 @@ export function seitentitelStil(farben: Pick<Farbrollen, 'text'>): CSSProperties
 export function seitenMetaStil(farben: Pick<Farbrollen, 'gedaempft'>): CSSProperties {
   return {
     fontFamily: schrift[schriftskala.meta.familie],
-    fontSize: schriftskala.meta.groesse,
+    fontSize: schriftGroesse('klein'),
     fontVariantNumeric: 'tabular-nums',
     color: farben.gedaempft,
     whiteSpace: 'nowrap',
@@ -145,7 +146,8 @@ export function ortspfadStil(token: { controlHeight: number }): CSSProperties {
 }
 
 /**
- * Der Ortspfad im Seitenkopf: 12 px, `schwach`, Chevron als Trenner, letzter Teil `text2`. Jeder
+ * Der Ortspfad im Seitenkopf: Stufe `klein` (12 px in `kompakt`, wächst mit der Dichte, Spec
+ * `einsatztauglichkeit-layout`), `schwach`, Chevron als Trenner, letzter Teil `text2`. Jeder
  * Link hält die Dichte-Staffel ({@link ortspfadStil}).
  *
  * Über einen verschachtelten `ConfigProvider`, nicht über Props: der Breadcrumb ist ein
@@ -164,7 +166,7 @@ export function Ortspfad({
   className?: string;
 }) {
   // Der Token der umgebenden Stufe, nicht der des verschachtelten Providers unten (der setzt nur
-  // Schrift und Farben).
+  // Schrift und Farben); er liefert auch die Schriftgröße des Pfads.
   const { token } = theme.useToken();
   const wurzel = useRef<HTMLDivElement>(null);
   // Der volle Wortlaut jedes Eintrags im `title` (LFH-954, design.md D2): unter `md` kürzt der
@@ -188,7 +190,8 @@ export function Ortspfad({
         ),
       }}
       theme={{
-        token: { fontSize: 12 },
+        // antds `fontSizeSM` der umgebenden Stufe IST die Stufe `klein` mal Dichtefaktor (LLH-1774).
+        token: { fontSize: token.fontSizeSM },
         components: {
           Breadcrumb: {
             itemColor: farben.schwach,
@@ -226,7 +229,7 @@ export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | unde
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        fontSize: 12,
+        fontSize: schriftGroesse('klein'),
         color: farben.gedaempft,
         whiteSpace: 'nowrap',
       }}

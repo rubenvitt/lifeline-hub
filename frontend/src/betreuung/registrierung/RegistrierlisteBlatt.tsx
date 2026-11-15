@@ -2,7 +2,6 @@ import { theme } from 'antd';
 import type { CSSProperties } from 'react';
 import { registrierNummer } from '../../anzeige/registrierNummer';
 import type { RegistrierListe, RegistriertePerson } from '../../api/types';
-import { monoStil } from '../../components/instrument';
 import {
   KOSTFORM_REIHE,
   KOSTFORM_WORT,
@@ -11,6 +10,8 @@ import {
   kostformBand,
   personName,
 } from './registrierKern';
+import { zahlStil } from '../../components/instrument/rollenwerte';
+
 import './registrierlisteDruck.css';
 
 export interface RegistrierlisteBlattProps {
@@ -52,7 +53,7 @@ export default function RegistrierlisteBlatt({
     textAlign: 'start',
   };
   const kopfzelle: CSSProperties = { ...zelle, borderBlockEnd: rand, fontWeight: 600 };
-  const mono: CSSProperties = { ...monoStil(token.fontSize), whiteSpace: 'nowrap' };
+  const mono: CSSProperties = { ...zahlStil('text'), whiteSpace: 'nowrap' };
   const spalten = hasUnvertraeglichkeiten ? 6 : 5;
 
   const personZeile = (p: RegistriertePerson) => (

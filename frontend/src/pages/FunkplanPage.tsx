@@ -17,7 +17,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import { Paneel, PaneelZeile, useRollen, zahlStil } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
@@ -118,7 +118,7 @@ import { isUebung } from '../einsatz/einsatzart';
 type SpalteKey = 'stelle' | 'rufname' | 'leitung' | 'tmo' | 'dmo' | 'telefon';
 
 function Mono({ children }: { children: ReactNode }) {
-  return <span style={monoStil(12)}>{children}</span>;
+  return <span style={zahlStil('klein')}>{children}</span>;
 }
 
 /** Leerzelle: „—" als Text, gedämpft. Mit Grund, wenn die Quelle fehlt. */
@@ -456,10 +456,10 @@ function LueckenZeile<T>({
         <Flex wrap align="baseline" gap={token.marginXS}>
           <span>{titel}</span>
           {luecke.zustand === 'daten' ? (
-            <span style={monoStil(14, 500)}>{luecke.treffer.length}</span>
+            <span style={zahlStil('text', 500)}>{luecke.treffer.length}</span>
           ) : (
             <>
-              <span style={monoStil(14, 500)}>—</span>
+              <span style={zahlStil('text', 500)}>—</span>
               <span style={{ color: rollen.gedaempft }}>{ZUSTAND_GRUND[luecke.zustand]}</span>
             </>
           )}
@@ -474,7 +474,7 @@ function LueckenZeile<T>({
                   {t.name}
                 </Link>
               ) : (
-                <span key={t.key} style={{ ...linkZeilenzielStil(token), ...monoStil(12) }}>
+                <span key={t.key} style={{ ...linkZeilenzielStil(token), ...zahlStil('klein') }}>
                   {t.name}
                 </span>
               ),
@@ -1028,7 +1028,7 @@ export default function FunkplanPage() {
                     ) : (
                       <>
                         <span>Leitstelle</span>
-                        <span style={monoStil(14, 500)}>—</span>
+                        <span style={zahlStil('text', 500)}>—</span>
                         <span style={{ color: rollen.gedaempft }}>
                           {stellen.zustand !== 'daten'
                             ? `Kommunikationsplan ${ZUSTAND_GRUND[leitstelle.zustand]}`
@@ -1048,7 +1048,7 @@ export default function FunkplanPage() {
                 <div data-lfh="funkplan-luecke">
                   <Flex wrap align="baseline" gap={token.marginXS}>
                     <span>{GEGENSTELLE_HINWEIS}</span>
-                    <span style={monoStil(14, 500)}>—</span>
+                    <span style={zahlStil('text', 500)}>—</span>
                     <span style={{ color: rollen.gedaempft }}>{gegenstelle}</span>
                     {/* In derselben Zeile, mit der Trefffläche der übrigen Lücken-Verweise. */}
                     {quellen.fuehrungsstelle.zustand === 'daten' && (

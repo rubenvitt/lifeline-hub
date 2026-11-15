@@ -28,9 +28,10 @@ import {
   PaneelZustand,
   StatusChip,
   tonVonRolle,
-  monoStil,
   useRollen,
   type PaneelDatenzustand,
+  schriftGroesse,
+  zahlStil,
 } from '../components/instrument';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { dwdWarnstufe } from '../theme/statusFarben';
@@ -102,7 +103,9 @@ function StandHinweis({
   if (stand.art === 'kein_ort') {
     return (
       <div data-lfh="wetter-kein-ort" style={{ ...polster, display: 'grid', gap: token.marginXS }}>
-        <span style={{ color: rollen.text2, fontSize: 12 }}>{KEIN_ORT_TEXT}</span>
+        <span style={{ color: rollen.text2, fontSize: schriftGroesse('klein') }}>
+          {KEIN_ORT_TEXT}
+        </span>
         {onEinsatzdaten && (
           <span>
             <Button onClick={onEinsatzdaten}>Einsatzort in den Einsatzdaten verorten</Button>
@@ -123,8 +126,12 @@ function StandHinweis({
           boxShadow: `inset 3px 0 0 ${rollen.achtung}`,
         }}
       >
-        <b style={{ color: rollen.achtungText, fontSize: 13 }}>{STAND_UNBEKANNT}</b>
-        <span style={{ color: rollen.text2, fontSize: 12 }}>{ausfallText}</span>
+        <b style={{ color: rollen.achtungText, fontSize: schriftGroesse('text') }}>
+          {STAND_UNBEKANNT}
+        </b>
+        <span style={{ color: rollen.text2, fontSize: schriftGroesse('klein') }}>
+          {ausfallText}
+        </span>
       </div>
     );
   }
@@ -132,7 +139,12 @@ function StandHinweis({
     return (
       <div
         data-lfh="wetter-veraltet"
-        style={{ ...polster, color: rollen.achtungText, fontSize: 12, fontWeight: 600 }}
+        style={{
+          ...polster,
+          color: rollen.achtungText,
+          fontSize: schriftGroesse('klein'),
+          fontWeight: 600,
+        }}
       >
         {stand.stand} · {VERALTET} — {veraltetGrund}
       </div>
@@ -169,12 +181,16 @@ function WarnungEintrag({
     >
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginXS }}>
         <StatusChip ton={tonVonRolle(d.rolle) ?? 'achtung'} wort={d.label} />
-        <b style={{ color: rollen.text, fontSize: 13 }}>{titelSchreibung(w.ereignis)}</b>
+        <b style={{ color: rollen.text, fontSize: schriftGroesse('text') }}>
+          {titelSchreibung(w.ereignis)}
+        </b>
       </div>
-      <span style={{ ...monoStil(12), color: rollen.text2 }}>
+      <span style={{ ...zahlStil('klein'), color: rollen.text2 }}>
         {warnZeitraum(w.beginn, w.ende, jetzt, konv)}
       </span>
-      <span style={{ color: rollen.text2, fontSize: 12 }}>{w.ueberschrift}</span>
+      <span style={{ color: rollen.text2, fontSize: schriftGroesse('klein') }}>
+        {w.ueberschrift}
+      </span>
       {hatText && (
         <span>
           <Button
@@ -191,7 +207,10 @@ function WarnungEintrag({
         </span>
       )}
       {hatText && offen && (
-        <div id={textId} style={{ display: 'grid', gap: token.marginXS, fontSize: 12 }}>
+        <div
+          id={textId}
+          style={{ display: 'grid', gap: token.marginXS, fontSize: schriftGroesse('klein') }}
+        >
           {w.beschreibung?.trim() && <p style={{ margin: 0 }}>{w.beschreibung}</p>}
           {w.handlungsempfehlung?.trim() && (
             <p style={{ margin: 0 }}>
@@ -277,7 +296,11 @@ export function WarnungenPaneel({
     <Paneel
       titel="Warnungen (DWD)"
       meta={stand ? standMeta(stand, ort) : undefined}
-      fuss={<span style={{ color: rollen.gedaempft, fontSize: 11 }}>{QUELLENVERMERK}</span>}
+      fuss={
+        <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('fein') }}>
+          {QUELLENVERMERK}
+        </span>
+      }
     >
       <PaneelZustand
         zustand={zustand}
@@ -292,7 +315,11 @@ export function WarnungenPaneel({
           (anzahl === 0 ? (
             <div
               data-lfh="wetter-keine-warnung"
-              style={{ paddingBlock: token.paddingSM, paddingInline: token.padding, fontSize: 12 }}
+              style={{
+                paddingBlock: token.paddingSM,
+                paddingInline: token.padding,
+                fontSize: schriftGroesse('klein'),
+              }}
             >
               Keine gültigen Warnungen{ort ? ` für ${ort}` : ''}.
             </div>
@@ -320,7 +347,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
       titel="Vorhersage 24 h"
       meta={stand ? standMeta(stand) : undefined}
       fuss={
-        <span style={{ color: rollen.gedaempft, fontSize: 11 }}>
+        <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('fein') }}>
           {[station, 'MOSMIX', QUELLENVERMERK].filter(Boolean).join(' · ')}
         </span>
       }
@@ -338,7 +365,11 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
         {mitInhalt &&
           (stunden.length === 0 ? (
             <div
-              style={{ paddingBlock: token.paddingSM, paddingInline: token.padding, fontSize: 12 }}
+              style={{
+                paddingBlock: token.paddingSM,
+                paddingInline: token.padding,
+                fontSize: schriftGroesse('klein'),
+              }}
             >
               Keine Vorhersagewerte für die nächsten 24 Stunden.
             </div>
@@ -366,7 +397,7 @@ export function VorhersagePaneel({ zustand, wetter, jetzt, konv, onNeuladen }: T
                       paddingBlock: token.paddingXS,
                       paddingInline: token.padding,
                       borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-                      ...monoStil(12),
+                      ...zahlStil('klein'),
                       color: rollen.text2,
                     }}
                   >
@@ -410,7 +441,11 @@ function Messwerte({ a }: { a: WetterAktuell }) {
   const wert = (text: ReactNode, herkunft: string | null) => (
     <span style={{ display: 'grid', gap: 2 }}>
       <span>{text}</span>
-      {herkunft && <span style={{ fontSize: 11, color: rollen.gedaempft }}>{herkunft}</span>}
+      {herkunft && (
+        <span style={{ fontSize: schriftGroesse('fein'), color: rollen.gedaempft }}>
+          {herkunft}
+        </span>
+      )}
     </span>
   );
   return (
@@ -485,7 +520,7 @@ export function AktuellPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: Teil
         titel="Aktuelle Bedingungen"
         meta={stand ? standMeta(stand, mitInhalt ? station : null) : undefined}
         fuss={
-          <span style={{ color: rollen.gedaempft, fontSize: 11 }}>
+          <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('fein') }}>
             {['Messung', 'SYNOP', QUELLENVERMERK].join(' · ')}
           </span>
         }

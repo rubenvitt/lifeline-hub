@@ -15,7 +15,6 @@ import DemoMarke from '../components/DemoMarke';
 import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import AdminPage from '../components/AdminPage';
-import { monoStil } from '../components/instrument';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
@@ -37,7 +36,7 @@ import { parseRouteId } from '../routing/deeplinks';
 import type { Fahrzeug, Staerke } from '../api/types';
 import { fahrzeugListePfad } from './stammdatenDetail';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
-import { Formularpaneel } from '../components/instrument';
+import { Formularpaneel, zahlStil } from '../components/instrument';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../instanz/herkunft';
 import { teilwortSuche } from '../components/teilwortSuche';
 
@@ -162,7 +161,7 @@ export default function FahrzeugDetailPage() {
         breite="schmal"
         titel={
           <Space size={8}>
-            <span style={monoStil(14, 500)}>{fahrzeug.funkrufname}</span>
+            <span style={zahlStil('text', 500)}>{fahrzeug.funkrufname}</span>
             {fahrzeug.ist_demo && <DemoMarke />}
           </Space>
         }

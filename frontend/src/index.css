@@ -20,11 +20,12 @@ select {
   font: inherit;
 }
 
-/* Kein Zoom wie in einer App (LLH-1328, `frontend/AGENTS.md`, Bedien-Leitlinie), Gegenstück zum
-   Viewport in `index.html`. `manipulation` sperrt nur den Doppeltipp-Zoom, den iOS trotz
-   `maximum-scale` zulässt; Rollen bleibt, und Karte und Ziehgriffe mit eigenem `touch-action`
-   behalten ihre Gesten (der Browser schneidet die Werte der Vorfahren mit). `text-size-adjust`
-   hält die Schrift beim Drehen ins Querformat auf der Dichte-Stufe. */
+/* Kein Doppeltipp-Zoom (LLH-1328); der Zoom per Geste ist frei (LLH-1774, Spec `schriftskala`,
+   Wächter `theme/zoomFrei.guard.test.ts`). `manipulation` sperrt nur den Doppeltipp, der sonst
+   jeden schnellen Doppelklick auf einen Knopf zum Zoom machte; Rollen und Pinch bleiben, und
+   Karte und Ziehgriffe mit eigenem `touch-action` behalten ihre Gesten (der Browser schneidet die
+   Werte der Vorfahren mit). `text-size-adjust` hält die Schrift beim Drehen ins Querformat auf
+   der Dichte-Stufe. */
 html {
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;

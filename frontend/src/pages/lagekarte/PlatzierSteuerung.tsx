@@ -1,6 +1,6 @@
 import { Button, Card, Space, Switch, Typography, theme } from 'antd';
 import type { ReactNode } from 'react';
-import { monoStil, Segmentleiste } from '../../components/instrument';
+import { Segmentleiste, zahlStil } from '../../components/instrument';
 import type { GriffModus } from './bildGriffe';
 import { bandStil } from './KartenFuss';
 
@@ -94,7 +94,6 @@ export function ModusBedienung({
   zusatz?: ReactNode;
   bedienung?: boolean;
 }) {
-  const { token } = theme.useToken();
   if (modus.art === 'verortet')
     return bedienung ? <VerortetInhalt meldung={modus.meldung} /> : null;
   return (
@@ -116,7 +115,7 @@ export function ModusBedienung({
             />
             <Typography.Text>Weitere platzieren</Typography.Text>
             {modus.anzahl > 0 && (
-              <Typography.Text type="secondary" style={monoStil(token.fontSize)}>
+              <Typography.Text type="secondary" style={zahlStil('text')}>
                 {modus.anzahl} platziert
               </Typography.Text>
             )}

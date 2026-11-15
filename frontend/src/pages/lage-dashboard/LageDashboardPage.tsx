@@ -85,9 +85,9 @@ import {
   PaneelReihe,
   Sammelbanner,
   WarnstufenHinweis,
-  monoStil,
   useRollen,
   type KennzahlZustand,
+  zahlStil,
 } from '../../components/instrument';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import {
@@ -428,7 +428,7 @@ export default function LageDashboardPage() {
               flexWrap: 'wrap',
               alignItems: 'center',
               gap: token.padding,
-              ...monoStil(11),
+              ...zahlStil('fein'),
               color: rollen.schwach,
             }}
           >

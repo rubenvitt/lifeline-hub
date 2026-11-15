@@ -22,6 +22,7 @@ import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import { GeraeteMenue } from './GeraeteMenue';
 import { useStellenName } from './stellenName';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 dayjs.extend(utc);
 
@@ -77,7 +78,7 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
         aria-hidden="true"
         style={{
           fontFamily: schrift.zahl,
-          fontSize: 12,
+          fontSize: schriftGroesse('klein'),
           fontVariantNumeric: 'tabular-nums',
           whiteSpace: 'nowrap',
           color: bald ? farbe : rahmenFarben.text,
@@ -145,7 +146,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
             style={{
               ...kopfZelleStil(token),
               fontFamily: schrift.zahl,
-              fontSize: 12,
+              fontSize: schriftGroesse('klein'),
               fontVariantNumeric: 'tabular-nums',
               whiteSpace: 'nowrap',
               color: farbenDunkel.achtung,

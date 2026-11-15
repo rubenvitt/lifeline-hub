@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { rahmenFarben, schrift } from '../theme/tokens';
 import { eingaengeZahlText } from './eingaenge';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /**
  * Ein Zeichen mit der Zahl der ungelesenen Eingänge als Plakette darüber (LLH-1143). Die
@@ -29,7 +30,7 @@ export default function EingaengeZahl({ zahl, children }: { zahl: number; childr
             color: rahmenFarben.grund,
             fontFamily: schrift.zahl,
             fontVariantNumeric: 'tabular-nums',
-            fontSize: 10,
+            fontSize: schriftGroesse('fein'),
             fontWeight: 700,
             lineHeight: '16px',
             textAlign: 'center',

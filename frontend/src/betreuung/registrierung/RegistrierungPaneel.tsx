@@ -25,8 +25,8 @@ import {
   Kennzahlenband,
   Paneel,
   PaneelZustand,
-  monoStil,
   useRollen,
+  zahlStil,
 } from '../../components/instrument';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
@@ -302,12 +302,12 @@ export default function RegistrierungPaneel({
           borderTop: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        <Link to={pfade.personDetail(einsatzId, p.id)} style={monoStil(14)}>
+        <Link to={pfade.personDetail(einsatzId, p.id)} style={zahlStil('text')}>
           {kennung}
         </Link>
         <span style={{ fontWeight: 600 }}>{name}</span>
         {istBezugsperson && <Typography.Text type="secondary">Bezugsperson</Typography.Text>}
-        {alterText(p, heute) && <span style={monoStil(14)}>{alterText(p, heute)}</span>}
+        {alterText(p, heute) && <span style={zahlStil('text')}>{alterText(p, heute)}</span>}
         <Typography.Text type="secondary">
           {p.kostform ? KOSTFORM_WORT[p.kostform] : 'Kostform ohne Angabe'}
         </Typography.Text>

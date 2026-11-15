@@ -26,7 +26,7 @@ import { Liste, ListenEintrag } from '../../components/Liste';
 import DemoMarke from '../../components/DemoMarke';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
-import { monoStil, useRollen } from '../../components/instrument';
+import { useRollen, zahlStil } from '../../components/instrument';
 import { PANEEL_FEHLER_TITEL, PANEEL_LADEN_TEXT } from '../../components/instrument/PaneelZustand';
 import AdhocFahrzeugFelder from '../../kraefte/AdhocFahrzeugFelder';
 import { eintreffenQueryKeys } from '../../bereitstellungsraum/eintreffenQueryKeys';
@@ -426,7 +426,7 @@ export default function EintreffenDialog({
             {t.typ && <Typography.Text type="secondary">{t.typ}</Typography.Text>}
           </Space>
           {t.funkrufnamen.length > 0 && (
-            <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+            <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
               {t.funkrufnamen.join(' · ')}
             </span>
           )}
@@ -506,7 +506,7 @@ export default function EintreffenDialog({
             {t.ist_demo && <DemoMarke />}
           </Space>
           {t.fahrzeuge.length > 0 && (
-            <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+            <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
               {t.fahrzeuge.join(' · ')}
             </span>
           )}

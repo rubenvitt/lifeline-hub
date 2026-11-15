@@ -34,6 +34,7 @@ import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
 import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /**
  * Farbe eines Alarm-Knopfs in der Kommandoleiste. Die Leiste ist in beiden Modi dunkel, die
@@ -434,7 +435,7 @@ export default function AlarmZentrale({
             }
             style={{
               color: alarmKnopfFarbe(sammelAuffaellig),
-              fontSize: 12,
+              fontSize: schriftGroesse('klein'),
               flexShrink: 0,
             }}
           >
@@ -468,7 +469,7 @@ export default function AlarmZentrale({
           aria-disabled={desktop !== 'aus'}
           onClick={desktop === 'aus' ? desktopAktivieren : undefined}
           icon={desktopIcon}
-          style={{ color: alarmKnopfFarbe(desktopAuffaellig), fontSize: 12 }}
+          style={{ color: alarmKnopfFarbe(desktopAuffaellig), fontSize: schriftGroesse('klein') }}
         >
           {desktopWort}
         </Button>
@@ -481,7 +482,7 @@ export default function AlarmZentrale({
           onClick={() => void tonUmschalten()}
           style={{
             color: alarmKnopfFarbe(tonAuffaellig),
-            fontSize: 12,
+            fontSize: schriftGroesse('klein'),
           }}
           icon={tonIcon}
         >

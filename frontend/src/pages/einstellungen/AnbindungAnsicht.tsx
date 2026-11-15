@@ -11,9 +11,9 @@ import {
   Datenraster,
   Paneel,
   StatusChip,
-  monoStil,
   useRollen,
   type BearbeitbaresFeld,
+  zahlStil,
 } from '../../components/instrument';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../../components/SeitenZustand';
 import { RechteHinweis, SeitenHinweise } from '../../components/SpeicherHinweis';
@@ -190,7 +190,7 @@ export default function AnbindungAnsicht() {
           {SCOPES.map((s) => (
             <Checkbox key={s} value={s}>
               {SCOPE_TEXT[s]}{' '}
-              <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+              <span style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>{s}</span>
             </Checkbox>
           ))}
         </Checkbox.Group>
@@ -292,7 +292,7 @@ export default function AnbindungAnsicht() {
             )}
             {zugang.fingerabdruck_neu && (
               <Datenfeld label="Neuer Schlüssel" breit>
-                <span style={monoStil(13)}>{zugang.fingerabdruck_neu}</span>
+                <span style={zahlStil('text')}>{zugang.fingerabdruck_neu}</span>
                 <span style={{ color: rollen.gedaempft }}>
                   {' · gilt ab der ersten Anfrage damit'}
                 </span>

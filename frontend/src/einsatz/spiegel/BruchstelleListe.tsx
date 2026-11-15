@@ -11,7 +11,7 @@ import type { BruchErfassung, EinsatzAnzeige } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { monoStil, useRollen } from '../../components/instrument';
+import { useRollen, zahlStil } from '../../components/instrument';
 import { darfBeantragen, darfNachreichenVerwerfen } from '../schreibrecht';
 import {
   bruchArtWort,
@@ -155,7 +155,7 @@ function BruchZeile({
         borderBlockStart: `1px solid ${rollen.bannerLinie}`,
       }}
     >
-      <span style={monoStil(12)}>{zeitKurz(zeit, konventionen)}</span>
+      <span style={zahlStil('klein')}>{zeitKurz(zeit, konventionen)}</span>
       <strong>{bruchArtWort(e)}</strong>
       {!e.verborgen && e.von && (
         <span style={{ color: rollen.text2 }}>

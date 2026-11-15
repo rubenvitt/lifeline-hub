@@ -3,7 +3,7 @@ import { Alert, App, Button, Form, Input, Modal, Radio, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { IconKreuz, IconPlus } from '../../icons';
-import { Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
+import { Paneel, StatusChip, useRollen, zahlStil } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -168,13 +168,15 @@ function AdresseDialog({
           <KopierbarerText text={adresse} bezeichnung="Adresse">
             <span
               data-lfh="einwurf-adresse-text"
-              style={{ ...monoStil(13, 500), wordBreak: 'break-all' }}
+              style={{ ...zahlStil('text', 500), wordBreak: 'break-all' }}
             >
               {adresse}
             </span>
           </KopierbarerText>
           <KopierbarerText text={neu.schluessel} bezeichnung="Schlüssel">
-            <span style={{ ...monoStil(12, 500), color: rollen.gedaempft, wordBreak: 'break-all' }}>
+            <span
+              style={{ ...zahlStil('klein', 500), color: rollen.gedaempft, wordBreak: 'break-all' }}
+            >
               {neu.schluessel}
             </span>
           </KopierbarerText>
@@ -504,7 +506,7 @@ export default function EinwurfZugaenge() {
             {EINWURF_ZWECKE.map((s) => (
               <Radio key={s} value={s}>
                 {SCOPE_TEXT[s]}{' '}
-                <span style={{ ...monoStil(11, 500), color: rollen.schwach }}>{s}</span>
+                <span style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>{s}</span>
               </Radio>
             ))}
           </Radio.Group>

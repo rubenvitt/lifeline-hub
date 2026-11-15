@@ -9,9 +9,10 @@ import {
   Augenbraue,
   Datenfeld,
   Datenraster,
-  monoStil,
   Paneel,
   useRollen,
+  schriftGroesse,
+  zahlStil,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
@@ -63,9 +64,11 @@ export default function EinheitAufgeloestAnsicht({
     minHeight: token.controlHeight,
   } as const;
   const nebentext = (text: string | null | undefined) =>
-    text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
+    text ? (
+      <span style={{ fontSize: schriftGroesse('klein'), color: rollen.gedaempft }}>{text}</span>
+    ) : null;
   const leer = (text: string) => (
-    <span style={{ color: rollen.gedaempft, fontSize: 12 }}>{text}</span>
+    <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>{text}</span>
   );
 
   const person = (p: LetztePerson) => (
@@ -78,7 +81,7 @@ export default function EinheitAufgeloestAnsicht({
         )}
       </span>
       {p.ist_fuehrer && (
-        <span style={{ ...monoStil(11), color: rollen.text2 }} title="Einheitsführer">
+        <span style={{ ...zahlStil('fein'), color: rollen.text2 }} title="Einheitsführer">
           EF
         </span>
       )}
@@ -92,7 +95,7 @@ export default function EinheitAufgeloestAnsicht({
       </ul>
     );
   const fahrzeug = (f: LetztesFahrzeug) => (
-    <span style={monoStil(13)}>
+    <span style={zahlStil('text')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: f.ef_id })}>
           {f.funkrufname}
@@ -133,7 +136,9 @@ export default function EinheitAufgeloestAnsicht({
             <div role="group" aria-label="Ohne Fahrzeug">
               {fahrzeuge.length > 0 && (
                 <div style={zeile}>
-                  <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
+                  <Augenbraue style={{ fontSize: schriftGroesse('fein') }}>
+                    Ohne Fahrzeug
+                  </Augenbraue>
                 </div>
               )}
               {personen(ohneFahrzeug)}
@@ -148,7 +153,7 @@ export default function EinheitAufgeloestAnsicht({
               {besetzung.material.map((m) => (
                 <li key={m.em_id} data-lfh="aufgeloest-material" style={zeile}>
                   {m.bezeichnung}
-                  <span style={monoStil(13)}>×{m.menge}</span>
+                  <span style={zahlStil('text')}>×{m.menge}</span>
                 </li>
               ))}
             </ul>

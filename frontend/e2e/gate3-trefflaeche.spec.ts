@@ -218,8 +218,9 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
 
 // ── Ortspfad im Seitenkopf (LFH-909) ───────────────────────────────────────────────
 //
-// Die Brotkrume hat keine Dichte-Ausnahme: jeder Pfad-Link hält die Staffel, die Schrift bleibt
-// 12 px. antd setzt den Link auf `height: fontHeight` (20 px in jeder Stufe); den Boden trägt
+// Die Brotkrume hat keine Dichte-Ausnahme: jeder Pfad-Link hält die Staffel, die Schrift steht in
+// der Stufe `klein` und wächst mit der Dichte (LLH-1774). antd setzt den Link auf
+// `height: fontHeight`; den Boden trägt
 // `ortspfadStil` in `EinsatzSeite.tsx` mit der Regel in `EinsatzSeite.css`. Gemessen auf der
 // Druckansicht der Personenliste, weil ihr Pfad ZWEI Links trägt („Einsätze“ und „Betroffene“) und
 // nichts außer dem Einsatz gesät werden muss. Fükw und Handschirm, weil der Pfad unter `md` auf
@@ -227,12 +228,19 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
 
 /** Pfad-Links der Druckansicht: „Einsätze“ und das Modul; der Einsatzname ist Text. */
 const PFAD_LINKS = 2;
-/** Schriftgröße des Ortspfads (`Ortspfad` in `EinsatzSeite.tsx`), als Literal. */
-const PFAD_SCHRIFT = '12px';
+/**
+ * Schriftgröße des Ortspfads (`Ortspfad` in `EinsatzSeite.tsx`) je Stufe, als Literal: die Stufe
+ * `klein` mal Dichtefaktor 1 / 1,15 / 1,25 (LLH-1774, Spec `einsatztauglichkeit-layout`).
+ */
+const PFAD_SCHRIFT: Record<string, string> = {
+  kompakt: '12px',
+  komfortabel: '13.8px',
+  handschuh: '15px',
+};
 /** Mindesthöhe der Seitenkopfleiste (`SEITENKOPF_HOEHE`), als Literal. */
 const SEITENKOPF = 44;
 
-test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Schrift bleibt 12 px', async ({
+test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Schrift der Stufe klein', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -263,7 +271,7 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
         PFAD_LINKS,
       );
       for (let i = 0; i < PFAD_LINKS; i += 1) {
-        await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT);
+        await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT[dichte]);
       }
 
       let kopf = '';
@@ -318,7 +326,7 @@ for (const { liste, api, daten, pfad } of [
     pfad: (id: number) => `/admin/stammdaten/einheiten/${id}`,
   },
 ]) {
-  test(`Ortspfad der ${liste}-Detailseite: „${liste}“ folgt der Dichte-Staffel 30 / 48 / 72 px, die Schrift bleibt 12 px`, async ({
+  test(`Ortspfad der ${liste}-Detailseite: „${liste}“ folgt der Dichte-Staffel 30 / 48 / 72 px, die Schrift der Stufe klein`, async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -354,7 +362,7 @@ for (const { liste, api, daten, pfad } of [
           PFAD_LINKS,
         );
         for (let i = 0; i < PFAD_LINKS; i += 1) {
-          await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT);
+          await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT[dichte]);
         }
 
         je.set(`${dichte} ${schirm}`, kleinstes);

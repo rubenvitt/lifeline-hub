@@ -5,6 +5,7 @@ import { useOhneVerbindung } from '../offline/verbindung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
 import { leereUhrzeit, zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
+import { schriftGroesse } from './instrument/rollenwerte';
 
 interface DatenstandProps {
   /** TanStack-Query-Zeitstempel (`query.dataUpdatedAt`) in Millisekunden. */
@@ -66,7 +67,7 @@ export function gemeinsamerDatenstand(...zeitstempel: Array<number | undefined>)
  */
 const STIL = {
   fontFamily: schrift[schriftskala.meta.familie],
-  fontSize: schriftskala.meta.groesse,
+  fontSize: schriftGroesse('klein'),
   fontVariantNumeric: 'tabular-nums',
   whiteSpace: 'nowrap',
 } as const;

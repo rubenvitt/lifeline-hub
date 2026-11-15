@@ -9,7 +9,7 @@ import { farbenDunkel } from '../theme/tokens';
 import type { EinsatzAnzeige } from '../api/types';
 import { einsatzKennung } from './einsatzKennung';
 import { isUebung } from './einsatzart';
-import { UebungsMarke } from '../components/instrument';
+import { UebungsMarke, schriftGroesse } from '../components/instrument';
 import { useModusFarben } from '../components/rahmenStil';
 
 /** Nebenzeile eines Eintrags: Einsatznummer und Ort, soweit vorhanden (LFH-954). */
@@ -67,7 +67,10 @@ export default function EinsatzSwitcher({
         label: neben ? (
           <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
             <span>{name}</span>
-            <span data-lfh="wechsler-nebenzeile" style={{ fontSize: 12, color: farben.gedaempft }}>
+            <span
+              data-lfh="wechsler-nebenzeile"
+              style={{ fontSize: schriftGroesse('klein'), color: farben.gedaempft }}
+            >
               {neben}
             </span>
           </span>
@@ -98,7 +101,7 @@ export default function EinsatzSwitcher({
         style={{
           color: farbenDunkel.text2,
           fontWeight: 500,
-          fontSize: 13,
+          fontSize: schriftGroesse('text'),
           maxWidth: '100%',
           // Auch ein kurzer Name wie „A“ hält den Handschuh-Boden (LFH-460).
           minWidth: token.controlHeight,

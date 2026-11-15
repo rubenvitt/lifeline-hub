@@ -24,6 +24,7 @@ import { useDokumentTitel } from './useDokumentTitel';
 import { ebene1Seite } from './ebene1Seite';
 import { planungenPfad } from '../routing/deeplinks';
 import { Ebene1OrtProvider, type Ebene1OrtWert } from './Ebene1OrtKontext';
+import { schriftGroesse } from './instrument/rollenwerte';
 
 const { Header, Content } = Layout;
 
@@ -77,7 +78,7 @@ function GlobalLink({
           // freie Link (`gedaempft`). Die Tag-Schwelle gilt für bedienbaren Text, nicht für
           // Gesperrtes (LFH-434); deshalb steht das Schloss daneben.
           color: rahmenFarben.gesperrt,
-          fontSize: 12,
+          fontSize: schriftGroesse('klein'),
           cursor: 'not-allowed',
           display: 'inline-flex',
           alignItems: 'center',
@@ -171,7 +172,7 @@ export default function AppLayout() {
   // Nachtrolle, weil die Leiste in beiden Modi dunkel ist.
   const linkStil: CSSProperties = {
     color: rahmenFarben.gedaempft,
-    fontSize: 12,
+    fontSize: schriftGroesse('klein'),
     display: 'inline-flex',
     alignItems: 'center',
     flexShrink: 0,

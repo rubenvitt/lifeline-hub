@@ -1,6 +1,6 @@
 import { Button, Modal, Space, Tag } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { StatusChip, zahlStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -146,7 +146,7 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.betriebsart),
       // Eine Betriebsart ist eine KENNUNG, kein Zustand — Mono statt einer Etikettfarbe, die
       // TMO und DMO Bedeutungen andichtete (blau = Bedienung, orange = Achtung).
-      render: (ba: string) => <span style={monoStil(12, 500)}>{ba}</span>,
+      render: (ba: string) => <span style={zahlStil('klein', 500)}>{ba}</span>,
     },
     // Netz und Sicherheit (LFH-1030): kurze Kennzeichnungen wie die Betriebsart, deshalb Mono.
     {
@@ -157,7 +157,7 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.netz),
       filters: netzWerte.length > 0 ? netzWerte : undefined,
       onFilter: (wert, sg) => sg.netz === wert,
-      render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
+      render: (n?: string) => (n ? <span style={zahlStil('klein', 500)}>{n}</span> : '—'),
     },
     {
       title: 'Sicherheit',
@@ -167,7 +167,7 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.sicherheit),
       filters: sicherheitWerte.length > 0 ? sicherheitWerte : undefined,
       onFilter: (wert, sg) => sg.sicherheit === wert,
-      render: (n?: string) => (n ? <span style={monoStil(12, 500)}>{n}</span> : '—'),
+      render: (n?: string) => (n ? <span style={zahlStil('klein', 500)}>{n}</span> : '—'),
     },
     {
       title: 'Hinweis',

@@ -1,6 +1,6 @@
 import { Button, Flex, Space, Typography } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { monoStil, useRollen } from '../components/instrument';
+import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
 import type { OhneSchicht } from './ohneSchicht';
 
 const { Text } = Typography;
@@ -58,17 +58,17 @@ export default function OhneSchichtKarte({
           gap: 2,
         }}
       >
-        <span style={{ ...monoStil(13, 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
+        <span style={{ ...zahlStil('text', 500), minWidth: '6ch' }} data-lfh="abloesung-zeit">
           <ZeitAnzeige wert={e.eintreffen_at ?? e.beginn_at} rolle="kurz" />
         </span>
         {/* So breit wie „eingetroffen“: sonst stünde die Spalte je nach Wort verschieden breit,
             und die Namen der Zeilen fluchteten nicht. */}
-        <span style={{ ...monoStil(10), color: rollen.schwach, minWidth: '12ch' }}>
+        <span style={{ ...zahlStil('fein'), color: rollen.schwach, minWidth: '12ch' }}>
           {eingetroffen ? 'eingetroffen' : 'alarmiert'}
         </span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: token.paddingSM }}>
-        <Text strong style={{ fontSize: 15 }}>
+        <Text strong style={{ fontSize: schriftGroesse('text') }}>
           {e.einheit_name}
         </Text>
         {(e.abschnitt_name || e.abloeser_fuer) && (

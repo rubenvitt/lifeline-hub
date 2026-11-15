@@ -24,6 +24,7 @@ import { useFussFokusabstand } from './fussFokusabstand';
 import { MODUL_PANEL_ID } from './IconRail';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { handleLinkKlick } from '../routing/linkModifier';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -113,7 +114,7 @@ export function modulZeilenStil(
     borderRadius: form.radiusSteuer,
     textAlign: 'left',
     width: '100%',
-    fontSize: 13,
+    fontSize: schriftGroesse('text'),
     cursor: zustand.gesperrt ? 'not-allowed' : 'pointer',
     background: zustand.aktiv ? farben.flaeche3 : 'transparent',
     color: zustand.gesperrt
@@ -135,7 +136,7 @@ export function modulBeschreibungStil(
 ): CSSProperties {
   return {
     display: 'block',
-    fontSize: 12,
+    fontSize: schriftGroesse('klein'),
     lineHeight: 1.35,
     whiteSpace: 'nowrap',
     overflow: 'hidden',
@@ -334,7 +335,7 @@ export function ModulListe({
                 style={{
                   flexShrink: 0,
                   fontFamily: schrift.zahl,
-                  fontSize: 11,
+                  fontSize: schriftGroesse('fein'),
                   fontVariantNumeric: 'tabular-nums',
                   color: aktiv ? farben.text2 : farben.schwach,
                 }}
@@ -450,7 +451,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
           <span
             style={{
               fontFamily: schrift.zahl,
-              fontSize: 18,
+              fontSize: schriftGroesse('titel'),
               fontWeight: 500,
               fontVariantNumeric: 'tabular-nums',
               color: farben.text,

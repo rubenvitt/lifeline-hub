@@ -9,7 +9,7 @@ import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import StatusTag from '../components/StatusTag';
-import { Paneel, monoStil, useRollen } from '../components/instrument';
+import { Paneel, useRollen, zahlStil } from '../components/instrument';
 import { einheitStatusAnzeige } from '../kraefte/meldebildRaster';
 import AbschnittDaten from '../pages/einsatzabschnitte/AbschnittDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
@@ -49,7 +49,7 @@ function EinheitZeile({
         <span>
           <strong>{e.name}</strong>
           {e.funkrufname && (
-            <span style={{ ...monoStil(13), color: rollen.gedaempft }}> · {e.funkrufname}</span>
+            <span style={{ ...zahlStil('text'), color: rollen.gedaempft }}> · {e.funkrufname}</span>
           )}
           {zeigeAbschnitt && e.abschnitt_name && (
             <span style={{ color: rollen.gedaempft }}> · {e.abschnitt_name}</span>
@@ -63,7 +63,7 @@ function EinheitZeile({
           farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
         />
       </Flex>
-      <span style={monoStil(13)}>
+      <span style={zahlStil('text')}>
         <StaerkeAnzeige wert={e.ist_kumuliert} />
       </span>
     </li>

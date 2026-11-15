@@ -5,6 +5,7 @@ import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import Tastenkuerzel from './Tastenkuerzel';
 import { useViewport } from './useViewport';
+import { schriftGroesse } from './instrument/rollenwerte';
 
 const TREFFLAECHE = 48;
 
@@ -51,7 +52,7 @@ export function suchfeldStil(token: {
     background: rahmenFarben.feld,
     border: `1px solid ${farbenDunkel.linieStark}`,
     color: rahmenFarben.gedaempft,
-    fontSize: 13,
+    fontSize: schriftGroesse('text'),
     textAlign: 'left',
     boxShadow: 'none',
   };

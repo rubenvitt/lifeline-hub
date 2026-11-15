@@ -1,10 +1,11 @@
 import { IconPfeilZurueckGebogen, IconWarndreieck } from '../../icons';
 import { Button, Card, Space, Switch, Typography } from 'antd';
-import { monoStil, useRollen } from '../../components/instrument';
+import { useRollen, zahlStil } from '../../components/instrument';
 import EscKappe from './EscKappe';
 import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
 import { bandStil } from './KartenFuss';
+
 import './lagekarte.css';
 
 type ZeichnenPhase = 'zeichnen' | 'bestaetigen';
@@ -148,7 +149,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               }}
             >
               {!bestaetigen && props.punkte != null && (
-                <Typography.Text data-lfh="zeichnen-punkte" style={monoStil(token.fontSize)}>
+                <Typography.Text data-lfh="zeichnen-punkte" style={zahlStil('text')}>
                   {props.punkte === 1 ? '1 Punkt' : `${grenzeText(props.punkte)} Punkte`}
                 </Typography.Text>
               )}

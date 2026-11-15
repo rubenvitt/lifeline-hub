@@ -20,15 +20,16 @@ import {
 import { Popover } from 'antd';
 import {
   naechsterIndex,
-  monoStil,
   segmentStil,
   segmentZelleStil,
   useRollen,
   zielEinzug,
+  zahlStil,
 } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
 import { blindHinweis, type GrundlageOption, type GrundlageWert } from './leistenDaten';
+
 import '../../theme/sprache.css';
 import './lagekarte.css';
 
@@ -308,7 +309,7 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
           background: rollen.kopf,
           border: `1px solid ${rollen.linieStark}`,
           color: rollen.gedaempft,
-          ...monoStil(11),
+          ...zahlStil('fein'),
         }}
       >
         <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>

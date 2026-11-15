@@ -120,7 +120,7 @@
   --lfh-luft-3: 11px;
   --lfh-luft-4: 18px;
   --lfh-zeilenhoehe: 30px;
-  --lfh-schriftgroesse: 13.5px;
+  --lfh-schriftgroesse: 14px;
 
   /* ── Seitenrinne · Viewport-Achse (LFH-329 · B1) ───────────────────────── */
   /* Mobil zuerst: hier steht der Ausgangswert für den schmalen Schirm, der
@@ -172,36 +172,52 @@
   --lfh-schrift-display: 'LFH Archivo Narrow', 'LFH Archivo', system-ui, sans-serif;
   --lfh-schrift-zahl: 'LFH JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
-  /* ── Schriftskala (Neuentwurf, 21.09.2026) ─────────────────────────────── */
-  /* TS-Seite: `schriftskala` in `tokens.ts`. Je Stufe Größe und Schnitt, dazu
-     die Sperrung, wo der Entwurf sie setzt. Die Familie steht hier nicht noch
-     einmal — sie ist `--lfh-schrift-text` bzw. `--lfh-schrift-zahl`.
-     Modus- und dichteunabhängig: die Grundschrift der Dichte-Achse ist
-     `--lfh-schriftgroesse`, diese Skala benennt die Stufen daneben. */
-  --lfh-typo-ueberschrift-groesse: 30px;
+  /* ── Schriftskala (LLH-1773/LLH-1775, Change `i1o47voj-schrift-lesbarkeit`) ── */
+  /* TS-Seite: `groessenstufen`, `dichteFaktor` und `schriftskala` in `tokens.ts`.
+     Sechs Größenstufen; die vier bis 16 px wachsen mit dem Faktor der Dichte
+     (`--lfh-schrift-faktor`, unten in den `[data-dichte]`-Blöcken), die
+     Datenwerte stehen fest. Die Rollen nennen eine Stufe, dazu Schnitt und
+     Sperrung. Die Familie steht hier nicht noch einmal — sie ist
+     `--lfh-schrift-text` bzw. `--lfh-schrift-zahl`. Das Merkmal `data-dichte`
+     sitzt am <html>, also rechnet `calc` mit dem Faktor der Stufe. */
+  --lfh-schrift-faktor: 1;
+  --lfh-groesse-fein: calc(11px * var(--lfh-schrift-faktor));
+  --lfh-groesse-klein: calc(12px * var(--lfh-schrift-faktor));
+  --lfh-groesse-text: calc(14px * var(--lfh-schrift-faktor));
+  --lfh-groesse-titel: calc(16px * var(--lfh-schrift-faktor));
+  --lfh-groesse-wert: 22px;
+  --lfh-groesse-gross: 32px;
+  --lfh-typo-ueberschrift-groesse: var(--lfh-groesse-gross);
   --lfh-typo-ueberschrift-gewicht: 600;
   --lfh-typo-ueberschrift-sperrung: -0.02em;
-  --lfh-typo-seitentitel-groesse: 14px;
+  --lfh-typo-seitentitel-groesse: var(--lfh-groesse-titel);
   --lfh-typo-seitentitel-gewicht: 600;
-  --lfh-typo-text-groesse: 14px;
+  --lfh-typo-uhr-groesse: var(--lfh-groesse-titel);
+  --lfh-typo-uhr-gewicht: 500;
+  --lfh-typo-uhr-sperrung: 0.04em;
+  --lfh-typo-text-groesse: var(--lfh-groesse-text);
   --lfh-typo-text-gewicht: 400;
-  --lfh-typo-text-klein-groesse: 12px;
+  --lfh-typo-warnung-groesse: var(--lfh-groesse-text);
+  --lfh-typo-warnung-gewicht: 600;
+  --lfh-typo-text-klein-groesse: var(--lfh-groesse-klein);
   --lfh-typo-text-klein-gewicht: 400;
-  --lfh-typo-augenbraue-groesse: 10px;
+  --lfh-typo-etikett-groesse: var(--lfh-groesse-klein);
+  --lfh-typo-etikett-gewicht: 400;
+  --lfh-typo-augenbraue-groesse: var(--lfh-groesse-fein);
   --lfh-typo-augenbraue-gewicht: 600;
-  --lfh-typo-augenbraue-sperrung: 0.14em;
-  --lfh-typo-rail-etikett-groesse: 9px;
+  --lfh-typo-augenbraue-sperrung: 0.08em;
+  --lfh-typo-rail-etikett-groesse: var(--lfh-groesse-fein);
   --lfh-typo-rail-etikett-gewicht: 500;
-  --lfh-typo-rail-etikett-sperrung: 0.06em;
-  --lfh-typo-meta-groesse: 11px;
+  --lfh-typo-rail-etikett-sperrung: 0.04em;
+  --lfh-typo-meta-groesse: var(--lfh-groesse-klein);
   --lfh-typo-meta-gewicht: 400;
-  --lfh-typo-datenwert-klein-groesse: 22px;
+  --lfh-typo-datenwert-klein-groesse: var(--lfh-groesse-wert);
   --lfh-typo-datenwert-klein-gewicht: 500;
   --lfh-typo-datenwert-klein-sperrung: -0.02em;
-  --lfh-typo-datenwert-groesse: 32px;
+  --lfh-typo-datenwert-groesse: var(--lfh-groesse-gross);
   --lfh-typo-datenwert-gewicht: 500;
   --lfh-typo-datenwert-sperrung: -0.02em;
-  --lfh-typo-datenwert-gross-groesse: 40px;
+  --lfh-typo-datenwert-gross-groesse: var(--lfh-groesse-gross);
   --lfh-typo-datenwert-gross-gewicht: 500;
   --lfh-typo-datenwert-gross-sperrung: -0.02em;
 }
@@ -295,7 +311,8 @@
   --lfh-luft-3: 18px;
   --lfh-luft-4: 28px;
   --lfh-zeilenhoehe: 48px;
-  --lfh-schriftgroesse: 15px;
+  --lfh-schriftgroesse: 16.1px;
+  --lfh-schrift-faktor: 1.15;
 }
 
 [data-dichte='handschuh'] {
@@ -304,7 +321,8 @@
   --lfh-luft-3: 26px;
   --lfh-luft-4: 44px;
   --lfh-zeilenhoehe: 72px;
-  --lfh-schriftgroesse: 15px;
+  --lfh-schriftgroesse: 17.5px;
+  --lfh-schrift-faktor: 1.25;
 }
 
 /* ── Helligkeit · die Deckschicht (LFH-397) ───────────────────────────────

@@ -1,6 +1,6 @@
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../anzeige/zeitDarstellung';
-import { monoStil, useRollen } from '../components/instrument';
+import { useRollen, zahlStil } from '../components/instrument';
 import { stufenGeometrie, type Stufe } from './standlinieKern';
 
 const BREITE = 600;
@@ -62,7 +62,7 @@ export default function Stufenlinie({
   const zeit = (s: Stufe) => zeitKurz(wire(s.t), konventionen);
   const erste = stufen[0];
   const letzte = stufen[stufen.length - 1];
-  const beschriftung = { ...monoStil(11), color: rollen.schwach };
+  const beschriftung = { ...zahlStil('fein'), color: rollen.schwach };
 
   return (
     <figure

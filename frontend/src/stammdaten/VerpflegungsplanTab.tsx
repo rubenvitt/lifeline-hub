@@ -8,7 +8,7 @@ import type { VerpflegungVorlage, Verpflegungsart } from '../api/types';
 import { listVerpflegungVorlagen, updateVerpflegungVorlage } from '../api/verpflegungVorlagen';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
-import { StatusChip, monoStil } from '../components/instrument';
+import { StatusChip, zahlStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -121,11 +121,14 @@ function VerpflegungsplanInhalt() {
       sorter: nachText((m: VerpflegungVorlage) => `${m.folgetag ? 1 : 0}${m.beginn}`),
       render: (_, m) => (
         <span style={{ whiteSpace: 'nowrap' }}>
-          <span style={monoStil(13)}>
+          <span style={zahlStil('text')}>
             {uhrzeitOhneDatum(m.beginn, konventionen)}–{uhrzeitOhneDatum(m.ende, konventionen)}
           </span>
           {m.folgetag && (
-            <Typography.Text type="secondary" style={{ ...monoStil(12), marginInlineStart: 6 }}>
+            <Typography.Text
+              type="secondary"
+              style={{ ...zahlStil('klein'), marginInlineStart: 6 }}
+            >
               +1 Tag
             </Typography.Text>
           )}

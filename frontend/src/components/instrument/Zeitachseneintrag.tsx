@@ -1,9 +1,9 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import type { EtbTyp } from '../../api/types';
 import { etbTypFarbe } from '../../theme/statusFarben';
-import { schriftskala, type EtbTypFarbe, type Farbrollen } from '../../theme/tokens';
+import { type EtbTypFarbe, type Farbrollen } from '../../theme/tokens';
 import { useViewport } from '../useViewport';
-import { monoStil, useRollen } from './rollenwerte';
+import { useRollen, schriftGroesse, zahlStil, schriftStil } from './rollenwerte';
 
 /**
  * Zeitachsen-Eintrag — die Zeile des Einsatztagebuchs und jedes anderen zeitlich gelesenen
@@ -141,7 +141,7 @@ export default function Zeitachseneintrag({
   const metaImKopf = einzeilig && (verfasser == null || typeof verfasser === 'string');
   const menueImKopf = einzeilig && menue != null;
   const trenner = (
-    <span aria-hidden="true" style={{ ...monoStil(10), color: rollen.schwach }}>
+    <span aria-hidden="true" style={{ ...schriftStil('meta'), color: rollen.schwach }}>
       ·
     </span>
   );
@@ -172,10 +172,10 @@ export default function Zeitachseneintrag({
           gap: 2,
         }}
       >
-        <span data-lfh="zeitachse-zeit" style={{ ...monoStil(13, 500), color: rollen.text }}>
+        <span data-lfh="zeitachse-zeit" style={{ ...zahlStil('text', 500), color: rollen.text }}>
           {zeit}
         </span>
-        {nr != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{nr}</span>}
+        {nr != null && <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>{nr}</span>}
       </div>
       <span
         aria-hidden="true"
@@ -203,8 +203,9 @@ export default function Zeitachseneintrag({
         >
           <span
             data-lfh="typwort"
+            data-schrift="kennung"
             style={{
-              ...monoStil(10, 500),
+              ...zahlStil('fein', 500),
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
               color: farbe.wort,
@@ -212,7 +213,9 @@ export default function Zeitachseneintrag({
           >
             {typwort}
           </span>
-          {meta != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{meta}</span>}
+          {meta != null && (
+            <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{meta}</span>
+          )}
           {metaImKopf && verfasser != null && (
             <>
               {trenner}
@@ -222,7 +225,7 @@ export default function Zeitachseneintrag({
                 data-lfh="verfasser"
                 title={typeof verfasser === 'string' ? verfasser : undefined}
                 style={{
-                  ...monoStil(10),
+                  ...schriftStil('meta'),
                   color: rollen.gedaempft,
                   maxWidth: '24ch',
                   whiteSpace: 'nowrap',
@@ -237,7 +240,7 @@ export default function Zeitachseneintrag({
           {metaImKopf && weg != null && (
             <>
               {trenner}
-              <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>
+              <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{weg}</span>
             </>
           )}
           {menueImKopf && (
@@ -250,7 +253,7 @@ export default function Zeitachseneintrag({
         </div>
         <div
           style={{
-            fontSize: leise ? schriftskala.textKlein.groesse : 13,
+            fontSize: schriftGroesse(leise ? 'klein' : 'text'),
             lineHeight: 1.5,
             color: leise ? rollen.gedaempft : rollen.text2,
             overflowWrap: 'anywhere',
@@ -262,7 +265,13 @@ export default function Zeitachseneintrag({
           {children}
         </div>
         {hinweis != null && (
-          <div style={{ fontSize: 11, lineHeight: 1.5, color: hinweisFarbe(rollen, hinweisTon) }}>
+          <div
+            style={{
+              fontSize: schriftGroesse('fein'),
+              lineHeight: 1.5,
+              color: hinweisFarbe(rollen, hinweisTon),
+            }}
+          >
             {hinweis}
           </div>
         )}
@@ -291,7 +300,7 @@ export default function Zeitachseneintrag({
             <span
               data-lfh="verfasser"
               style={{
-                ...monoStil(11),
+                ...schriftStil('meta'),
                 color: rollen.gedaempft,
                 maxWidth: '15ch',
                 overflowWrap: 'anywhere',
@@ -301,7 +310,7 @@ export default function Zeitachseneintrag({
             </span>
           )}
           {!metaImKopf && weg != null && (
-            <span style={{ ...monoStil(10), color: rollen.schwach }}>{weg}</span>
+            <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{weg}</span>
           )}
           {aktionen}
           {!menueImKopf && menue}

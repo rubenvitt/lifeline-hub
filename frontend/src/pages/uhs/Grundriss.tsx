@@ -73,7 +73,14 @@ import {
   type ZuflussSteuerung,
 } from '../../components/useZuflussSchleuse';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  StatusChip,
+  useRollen,
+  schriftGroesse,
+  zahlStil,
+} from '../../components/instrument';
 import {
   rollenFarbe,
   uebergabeOffen,
@@ -376,7 +383,7 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
             : { minWidth: 0, overflowWrap: 'anywhere' }
         }
       >
-        <span style={{ ...monoStil(token.fontSizeSM), whiteSpace: 'nowrap' }}>{nr}</span>
+        <span style={{ ...zahlStil('klein'), whiteSpace: 'nowrap' }}>{nr}</span>
         {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
         {` · ${person.name || 'unbekannt'}`}
       </span>
@@ -433,7 +440,7 @@ function Wartezeit({ seit, vorwort }: { seit: string; vorwort?: string }) {
       style={{ flex: 'none', fontSize: token.fontSizeSM, color: rollen.text2 }}
     >
       {vorwort && `${vorwort} `}
-      <span style={monoStil(token.fontSizeSM)}>{wartezeitText(minuten)}</span>
+      <span style={zahlStil('klein')}>{wartezeitText(minuten)}</span>
     </span>
   );
 }
@@ -742,7 +749,7 @@ function PlatzKarte({
           WebkitLineClamp: 2,
           overflow: 'hidden',
           lineHeight: '15px',
-          fontSize: 13,
+          fontSize: schriftGroesse('text'),
           maxHeight: 30,
         }}
       >
@@ -1110,7 +1117,7 @@ function UnterwegsSpalte({
               <Button
                 type="link"
                 style={{
-                  ...monoStil(12),
+                  ...zahlStil('klein'),
                   paddingInline: 0,
                   justifyContent: 'flex-start',
                   maxWidth: '100%',
@@ -2170,9 +2177,7 @@ function KandidatenWahl({
               >
                 <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
                 <span style={{ flex: 'none' }}>
-                  <span style={monoStil(token.fontSizeSM)}>
-                    {registrierAnzeige(p.registrier_nr)}
-                  </span>
+                  <span style={zahlStil('klein')}>{registrierAnzeige(p.registrier_nr)}</span>
                   {` · ${p.name || 'unbekannt'}`}
                 </span>
                 {seit && (

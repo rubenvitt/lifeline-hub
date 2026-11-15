@@ -2,7 +2,7 @@ import { Button } from 'antd';
 import { Fragment, useId, type ReactNode } from 'react';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AusgabeEingabe, VerpflegungEmpfaenger, VerpflegungZeitfenster } from '../api/types';
-import { Augenbraue, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, useRollen, zahlStil } from '../components/instrument';
 import {
   betreuungsstellenVon,
   staerkeAnzeige,
@@ -91,7 +91,7 @@ export default function EmpfaengerStand({
     return null;
   const stand = verpflegungsstand(zeitfenster, empfaenger, ausstehend);
   const uhr = (s: string) => uhrzeit(s, konventionen);
-  const nebentext = { ...monoStil(12), color: rollen.text2 };
+  const nebentext = { ...zahlStil('klein'), color: rollen.text2 };
   const listeStil = { listStyle: 'none', margin: 0, padding: 0 } as const;
   const zeileStil = {
     display: 'flex',
@@ -122,9 +122,9 @@ export default function EmpfaengerStand({
           <Teile
             teile={[
               z.name,
-              z.funkrufname && <span style={monoStil(13)}>{z.funkrufname}</span>,
+              z.funkrufname && <span style={zahlStil('text')}>{z.funkrufname}</span>,
               staerkeAnzeige(z.einheit) && (
-                <span style={monoStil(13)}>{staerkeAnzeige(z.einheit)}</span>
+                <span style={zahlStil('text')}>{staerkeAnzeige(z.einheit)}</span>
               ),
               z.abschnitt,
               z.ausstehend > 0 && <span style={nebentext}>ausstehend {z.ausstehend} EP</span>,
@@ -180,16 +180,16 @@ export default function EmpfaengerStand({
                 <Teile
                   teile={[
                     z.name,
-                    z.funkrufname && <span style={monoStil(13)}>{z.funkrufname}</span>,
+                    z.funkrufname && <span style={zahlStil('text')}>{z.funkrufname}</span>,
                     z.ausgaben.length > 0 && (
-                      <span key="m" style={monoStil(13, 500)}>
+                      <span key="m" style={zahlStil('text', 500)}>
                         {ausgabenText(z.ausgaben, uhr)}
                       </span>
                     ),
                     // Am gebundenen Gerät (LLH-1048): nur die Summe des Servers, ohne Zeit.
                     z.anderswo > 0 && 'anderswo verpflegt',
                     z.anderswo > 0 && (
-                      <span key="a" data-lfh="stand-anderswo" style={monoStil(13, 500)}>
+                      <span key="a" data-lfh="stand-anderswo" style={zahlStil('text', 500)}>
                         {z.anderswo} EP
                       </span>
                     ),
@@ -212,7 +212,7 @@ export default function EmpfaengerStand({
                 <Teile
                   teile={[
                     `Zuführung ${z.name}`,
-                    <span key="m" style={monoStil(13, 500)}>
+                    <span key="m" style={zahlStil('text', 500)}>
                       {ausgabenText(z.ausgaben, uhr)}
                     </span>,
                   ]}
@@ -230,7 +230,7 @@ export default function EmpfaengerStand({
                 <Teile
                   teile={[
                     z.name,
-                    <span key="m" style={monoStil(13, 500)}>
+                    <span key="m" style={zahlStil('text', 500)}>
                       {ausgabenText(z.ausgaben, uhr)}
                     </span>,
                   ]}

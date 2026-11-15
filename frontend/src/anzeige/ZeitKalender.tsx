@@ -11,7 +11,7 @@
 import { Button, Calendar, Flex, Input, type InputRef } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { monoStil, useRollen } from '../components/instrument';
+import { useRollen, zahlStil } from '../components/instrument';
 import { IconChevronRechts } from '../icons';
 import './dayjsSprache';
 import { ZeitSchnellwahlKnoepfe } from './ZeitSchnellwahlKnoepfe';
@@ -170,7 +170,12 @@ export function ZeitKalender({
             status={grund === GRUND.uhrzeit ? 'error' : undefined}
             aria-invalid={grund === GRUND.uhrzeit ? true : undefined}
             aria-describedby={grund ? grundId : undefined}
-            style={{ ...monoStil(16), width: '8ch', flex: '0 0 auto', boxSizing: 'content-box' }}
+            style={{
+              ...zahlStil('titel'),
+              width: '8ch',
+              flex: '0 0 auto',
+              boxSizing: 'content-box',
+            }}
             onChange={(e) => {
               setUhrzeit(e.target.value);
               setGrund(null);
@@ -196,7 +201,7 @@ export function ZeitKalender({
       )}
       {zonenHinweis && (
         <span style={{ color: rollen.gedaempft }}>
-          Zeiten in <span style={monoStil(12)}>{zonenHinweis}</span>
+          Zeiten in <span style={zahlStil('klein')}>{zonenHinweis}</span>
         </span>
       )}
       {/* Die Fußzeile klebt im Blatt unten, wenn der Inhalt rollt (`ZeitpunktEingabe.css`). */}

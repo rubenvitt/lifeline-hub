@@ -2,7 +2,7 @@ import { IconBaustelle } from '../icons';
 import { Button } from 'antd';
 import { useNavigate } from 'react-router';
 import Paneel from './instrument/Paneel';
-import { schriftStil, useRollen } from './instrument/rollenwerte';
+import { schriftStil, useRollen, schriftGroesse } from './instrument/rollenwerte';
 import { flaeche } from '../theme/tokens';
 
 /** Rückweg aus einer Sackgasse: Zielpfad und Beschriftung des Primärknopfes.
@@ -70,11 +70,25 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
           {titel}
         </div>
         {beschreibung && (
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: rollen.text2 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: schriftGroesse('text'),
+              lineHeight: 1.5,
+              color: rollen.text2,
+            }}
+          >
             {beschreibung}
           </p>
         )}
-        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: rollen.gedaempft }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: schriftGroesse('klein'),
+            lineHeight: 1.5,
+            color: rollen.gedaempft,
+          }}
+        >
           {ERWARTUNGSHORIZONT}
         </p>
         {rueckweg && (

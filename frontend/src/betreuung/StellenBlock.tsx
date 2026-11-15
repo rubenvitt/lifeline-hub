@@ -20,7 +20,6 @@ import { KennungsLink } from '../components/kennungsLink';
 import { betreuungsstellePfad } from '../routing/deeplinks';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
-import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
@@ -33,6 +32,7 @@ import {
   personenZahl,
 } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Block „Betreuungsstellen" der Betreuungsseite (seit LLH-1034 ihr einziger Block).
@@ -404,7 +404,7 @@ export default function StellenBlock({
         aktion,
         weitere,
         namentlichJeStelle,
-        monoStil(token.fontSize),
+        zahlStil('text'),
         istSchmal,
         token.marginXS,
       ),
@@ -415,7 +415,6 @@ export default function StellenBlock({
       aktion,
       weitere,
       namentlichJeStelle,
-      token.fontSize,
       istSchmal,
       token.marginXS,
     ],

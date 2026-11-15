@@ -14,10 +14,11 @@ import type { Einheit, EinsatzFahrzeug, EinsatzPersonal, StaerkePosition } from 
 import { kraefteText } from '../../anzeige/staerke';
 import {
   Augenbraue,
-  monoStil,
   Paneel,
   PaneelZustand,
   useRollen,
+  schriftGroesse,
+  zahlStil,
 } from '../../components/instrument';
 import { KennungsLink } from '../../components/kennungsLink';
 import type { WeitereAktionen } from '../../components/Datensicht';
@@ -329,7 +330,9 @@ export default function FahrzeugeBesatzung({
   } as const;
   const secondaryText = (parts: readonly (string | null | undefined)[]) => {
     const text = parts.filter(Boolean).join(' · ');
-    return text ? <span style={{ fontSize: 12, color: rollen.gedaempft }}>{text}</span> : null;
+    return text ? (
+      <span style={{ fontSize: schriftGroesse('klein'), color: rollen.gedaempft }}>{text}</span>
+    ) : null;
   };
 
   const renderPersonRow = (p: PersonRow) => (
@@ -356,7 +359,7 @@ export default function FahrzeugeBesatzung({
 
   /** Name eines Fahrzeugs, als Sprung in die Fahrzeugzeile, wenn das Modul offen ist. */
   const renderFunkrufname = (efId: number, name: string) => (
-    <span style={monoStil(13)}>
+    <span style={zahlStil('text')}>
       {rechte.hasFahrzeugLink ? (
         <KennungsLink to={fahrzeugePfad(einsatzId, { fahrzeug: efId })}>{name}</KennungsLink>
       ) : (
@@ -468,7 +471,7 @@ export default function FahrzeugeBesatzung({
           {(f.urteil === 'erfuellt' || f.urteil === 'unterbesetzt') && (
             <StatusTag darstellung={besatzungsUrteil[f.urteil]} />
           )}
-          <span style={monoStil(12)}>{besatzungText(f)}</span>
+          <span style={zahlStil('klein')}>{besatzungText(f)}</span>
           {secondaryText([fremdText(f)])}
         </span>
         {renderFahrzeugActions(ef.id, { wahl: ef }, renderUebernehmen(ef))}
@@ -497,8 +500,8 @@ export default function FahrzeugeBesatzung({
         {needsOhneFahrzeugKnoten(mittel) ? (
           <div role="group" aria-label="Ohne Fahrzeug">
             <div style={rowStyle}>
-              <Augenbraue style={{ fontSize: 11 }}>Ohne Fahrzeug</Augenbraue>
-              <span style={{ ...monoStil(11), color: rollen.gedaempft }}>
+              <Augenbraue style={{ fontSize: schriftGroesse('fein') }}>Ohne Fahrzeug</Augenbraue>
+              <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
                 · {kraefteText(ohne.length)}
               </span>
             </div>

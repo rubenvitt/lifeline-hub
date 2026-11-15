@@ -1,9 +1,9 @@
 import { useRef } from 'react';
 import type { Sprechgruppe } from '../api/types';
 import { InlineAngabe } from './InlineAngabe';
-import { monoStil } from './instrument';
 import { mitBetriebsart, teileSprechgruppen } from './kommunikationsmittel';
 import SprechgruppenPicker from './SprechgruppenPicker';
+import { zahlStil } from './instrument/rollenwerte';
 
 /** Was das Speichern der Sprechgruppen ändert: je Eintrag eine Zuordnung bzw. Lösung. */
 export interface SprechgruppenAenderung {
@@ -114,7 +114,7 @@ export default function SprechgruppenAngabe({
     <InlineAngabe<number[]>
       etikett="Sprechgruppen"
       wert={ids}
-      anzeige={<span style={monoStil(13)}>{sprechgruppenText(sprechgruppen)}</span>}
+      anzeige={<span style={zahlStil('text')}>{sprechgruppenText(sprechgruppen)}</span>}
       leer={(w) => w.length === 0}
       gleich={isSameIds}
       darfSchreiben={darfSchreiben}

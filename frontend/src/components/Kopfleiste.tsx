@@ -14,6 +14,8 @@ import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import { schriftGroesse } from './instrument/rollenwerte';
+
 import './Kopfleiste.css';
 
 /**
@@ -143,7 +145,7 @@ export function wortmarkeStil(token: { controlHeight: number; paddingXS: number 
     minHeight: token.controlHeight,
     padding: `${token.paddingXS}px 0`,
     fontFamily: schrift.zahl,
-    fontSize: 12,
+    fontSize: schriftGroesse('klein'),
     fontWeight: 500,
     letterSpacing: '0.02em',
     color: rahmenFarben.gedaempft,
@@ -159,7 +161,7 @@ export function wortmarkeStil(token: { controlHeight: number; paddingXS: number 
 export function Wortmarke() {
   const { token } = theme.useToken();
   return (
-    <Link to={einsaetzePfad()} style={wortmarkeStil(token)}>
+    <Link to={einsaetzePfad()} data-schrift="kennung" style={wortmarkeStil(token)}>
       lifeline-hub
     </Link>
   );
@@ -186,7 +188,7 @@ export function Uhr() {
         aria-label={`Uhrzeit ${text}`}
         style={{
           fontFamily: schrift.zahl,
-          fontSize: 14,
+          fontSize: schriftGroesse('text'),
           fontWeight: 500,
           letterSpacing: '0.04em',
           fontVariantNumeric: 'tabular-nums',
@@ -378,7 +380,7 @@ export function SyncAnzeige({
           platz={haeltStartPlatz ? SYNC_DARSTELLUNG.verbinde.wort : ''}
           style={{
             fontFamily: schrift.zahl,
-            fontSize: 11,
+            fontSize: schriftGroesse('fein'),
             // Verbunden bleibt das Wort gedämpft wie im Entwurf — das grüne Icon trägt den
             // Zustand. Jede Störung färbt auch das Wort: dann soll es auffallen.
             color: zustand === 'verbunden' ? rahmenFarben.gedaempft : d.farbe,

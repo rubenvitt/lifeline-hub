@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from 'react';
 import type { Auftrag, AuftragEmpfaenger } from '../api/types';
 import { AUFTRAG_HANDLUNG, AUFTRAG_STATUS, PrioBadge, StatusBadge } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { StatusChip, monoStil, useRollen } from '../components/instrument';
+import { StatusChip, useRollen, schriftGroesse, zahlStil } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbPfad } from '../routing/deeplinks';
 import { mitBesetzung } from '../fuehrung/funktionsOptionenKern';
@@ -60,7 +60,7 @@ export function AuftragZeit({ auftrag: a }: { auftrag: Auftrag }) {
   const { rollen } = useRollen();
   return (
     <>
-      <span style={{ display: 'block', ...monoStil(10), color: rollen.schwach }}>erteilt</span>
+      <span style={{ display: 'block', ...zahlStil('fein'), color: rollen.schwach }}>erteilt</span>
       <span>
         <ZeitAnzeige wert={a.erteilt_at} rolle="kurz" />
       </span>
@@ -108,7 +108,7 @@ export function AuftragKopf({
       </Space>
       <Space size={10} wrap>
         {a.ist_ueberfaellig && (
-          <Text type="danger" strong style={{ fontSize: 12 }}>
+          <Text type="danger" strong style={{ fontSize: schriftGroesse('klein') }}>
             <span aria-hidden="true">
               <IconUhr />
             </span>{' '}
@@ -116,7 +116,7 @@ export function AuftragKopf({
           </Text>
         )}
         {a.frist_at && (
-          <Text type="secondary" style={{ ...monoStil(11), color: rollen.gedaempft }}>
+          <Text type="secondary" style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
             Frist {zeitpunkt(a.frist_at)}
           </Text>
         )}
@@ -197,7 +197,7 @@ export function AuftragAufhebung({ auftrag: a }: { auftrag: Auftrag }) {
   if (a.bearbeitungsstatus !== 'aufgehoben') return null;
   return (
     <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
-      <Text style={{ fontSize: 13 }}>
+      <Text style={{ fontSize: schriftGroesse('text') }}>
         {[
           `Aufgehoben am: ${a.aufgehoben_at ? zeitpunkt(a.aufgehoben_at) : '—'}`,
           a.aufgehoben_von_name,
@@ -205,7 +205,9 @@ export function AuftragAufhebung({ auftrag: a }: { auftrag: Auftrag }) {
           .filter(Boolean)
           .join(' · ')}
       </Text>
-      {a.aufhebungsgrund && <Text style={{ fontSize: 13 }}>{`Grund: ${a.aufhebungsgrund}`}</Text>}
+      {a.aufhebungsgrund && (
+        <Text style={{ fontSize: schriftGroesse('text') }}>{`Grund: ${a.aufhebungsgrund}`}</Text>
+      )}
     </Space>
   );
 }
@@ -223,17 +225,17 @@ export function AuftragVollzug({
     return (
       <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
         {a.vollzogen_at && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Text type="secondary" style={{ fontSize: schriftGroesse('text') }}>
             Vollzogen am: {zeitpunkt(a.vollzogen_at)}
           </Text>
         )}
         {a.abgenommen_at && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Text type="secondary" style={{ fontSize: schriftGroesse('text') }}>
             Abgenommen am: {zeitpunkt(a.abgenommen_at)}
           </Text>
         )}
         {a.vollzugsmeldung && (
-          <Text type="secondary" style={{ fontSize: 13 }}>
+          <Text type="secondary" style={{ fontSize: schriftGroesse('text') }}>
             Vollzugsvermerk: {a.vollzugsmeldung}
           </Text>
         )}
@@ -242,7 +244,7 @@ export function AuftragVollzug({
   }
   if (!a.vollzugsmeldung) return null;
   return (
-    <Text style={{ fontSize: 13, display: 'block', marginBottom: 8 }}>
+    <Text style={{ fontSize: schriftGroesse('text'), display: 'block', marginBottom: 8 }}>
       <Text type="secondary">Vollzug: </Text>
       {a.vollzugsmeldung}
     </Text>

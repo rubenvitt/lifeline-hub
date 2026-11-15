@@ -10,7 +10,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { monoStil, useRollen } from '../../components/instrument';
+import { useRollen, schriftGroesse, zahlStil } from '../../components/instrument';
 import { KontextMenue, type KontextMenueOffen } from '../../components/KontextMenue';
 import type { MenueEintrag } from '../../components/MenueAusloeser';
 import { useKontextMenue, type KontextHandler } from '../../components/useKontextMenue';
@@ -432,7 +432,7 @@ export default function SchichtplanRaster({
                           : 'translateX(-50%)',
                     bottom: 2,
                     color: rollen.gedaempft,
-                    ...monoStil(11),
+                    ...zahlStil('fein'),
                     whiteSpace: 'nowrap',
                   }}
                 >
@@ -572,7 +572,7 @@ export default function SchichtplanRaster({
                           background: rollen.auswahlFlaeche,
                           pointerEvents: 'none',
                           zIndex: 3,
-                          ...monoStil(11),
+                          ...zahlStil('fein'),
                           color: rollen.text,
                           paddingInline: 4,
                           whiteSpace: 'nowrap',
@@ -727,12 +727,12 @@ function BlockKachel({
         zIndex: 2,
       }}
     >
-      <span style={{ ...monoStil(11), whiteSpace: 'nowrap' }}>
+      <span style={{ ...zahlStil('fein'), whiteSpace: 'nowrap' }}>
         {zeit} · {block.ampelWort}
       </span>
       <span
         style={{
-          fontSize: 12,
+          fontSize: schriftGroesse('klein'),
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
