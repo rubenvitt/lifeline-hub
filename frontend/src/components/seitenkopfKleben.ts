@@ -60,59 +60,63 @@ export function useSeitenkopfKleben<T extends HTMLElement>(
   vorgabe?: boolean,
 ): { klebt: boolean; ref: (el: T | null) => void } {
   const { abBreite } = useViewport();
-  const mittel = abBreite('md');
+  const fromMd = abBreite('md');
   const kopf = useKopfOben();
   const [el, setEl] = useState<T | null>(null);
-  const [mass, setMass] = useState({ seitenkopf: 0, fenster: 0, eigenerBereich: false });
+  const [measured, setMeasured] = useState({ seitenkopf: 0, fenster: 0, ownScrollArea: false });
 
   useLayoutEffect(() => {
     if (!el || vorgabe !== undefined) return undefined;
-    const messen = () => {
-      const neu = {
+    const measure = () => {
+      const next = {
         seitenkopf: el.offsetHeight,
         fenster: window.innerHeight,
-        eigenerBereich: scrollbereichVon(el) != null,
+        ownScrollArea: scrollbereichVon(el) != null,
       };
-      setMass((alt) =>
-        alt.seitenkopf === neu.seitenkopf &&
-        alt.fenster === neu.fenster &&
-        alt.eigenerBereich === neu.eigenerBereich
-          ? alt
-          : neu,
+      setMeasured((prev) =>
+        prev.seitenkopf === next.seitenkopf &&
+        prev.fenster === next.fenster &&
+        prev.ownScrollArea === next.ownScrollArea
+          ? prev
+          : next,
       );
     };
-    messen();
-    let geplant = 0;
-    const planen = () => {
-      if (geplant) return;
-      geplant = requestAnimationFrame(() => {
-        geplant = 0;
-        messen();
+    measure();
+    let scheduled = 0;
+    const schedule = () => {
+      if (scheduled) return;
+      scheduled = requestAnimationFrame(() => {
+        scheduled = 0;
+        measure();
       });
     };
-    const beobachter = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(planen);
-    beobachter?.observe(el);
-    window.addEventListener('resize', planen);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    observer?.observe(el);
+    window.addEventListener('resize', schedule);
     return () => {
-      beobachter?.disconnect();
-      window.removeEventListener('resize', planen);
-      if (geplant) cancelAnimationFrame(geplant);
+      observer?.disconnect();
+      window.removeEventListener('resize', schedule);
+      if (scheduled) cancelAnimationFrame(scheduled);
     };
   }, [el, vorgabe]);
 
   const klebt =
     vorgabe ??
-    (mittel &&
-      !mass.eigenerBereich &&
-      seitenkopfKlebtImFenster({ kopf, seitenkopf: mass.seitenkopf, fenster: mass.fenster }));
+    (fromMd &&
+      !measured.ownScrollArea &&
+      seitenkopfKlebtImFenster({
+        kopf,
+        seitenkopf: measured.seitenkopf,
+        fenster: measured.fenster,
+      }));
 
-  const quelle = useRahmenObenQuelle<T>(klebt, 'seitenkopf');
+  const sourceRef = useRahmenObenQuelle<T>(klebt, 'seitenkopf');
   const ref = useCallback(
-    (neu: T | null) => {
-      setEl(neu);
-      quelle(neu);
+    (next: T | null) => {
+      setEl(next);
+      sourceRef(next);
     },
-    [quelle],
+    [sourceRef],
   );
   return { klebt, ref };
 }

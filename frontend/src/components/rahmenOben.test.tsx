@@ -9,8 +9,8 @@ import { useCallback, useRef } from 'react';
 import {
   KOPF_OBEN_VAR,
   RAHMEN_OBEN_VAR,
-  leseKopfOben,
-  leseRahmenOben,
+  readKopfOben,
+  readRahmenOben,
   useKopfOben,
   useRahmenOben,
   useRahmenObenFuer,
@@ -55,7 +55,7 @@ afterEach(() => {
 describe('rahmenOben', () => {
   it('ohne klebendes Element ist die Höhe 0', () => {
     render(<Anzeige />);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
     expect(screen.getByTestId('anzeige').textContent).toBe('0');
   });
 
@@ -66,14 +66,14 @@ describe('rahmenOben', () => {
         <Anzeige />
       </>,
     );
-    expect(leseRahmenOben()).toBe(52);
+    expect(readRahmenOben()).toBe(52);
     expect(variable()).toBe('52px');
     expect(screen.getByTestId('anzeige').textContent).toBe('52');
   });
 
   it('eine inaktive Quelle zählt nicht (Gegenprobe zur aktiven)', () => {
     render(<Quelle hoehe={52} aktiv={false} name="kopf" />);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
   });
 
   it('zwei aktive Quellen addieren sich, das Aushängen nimmt den Anteil wieder weg', () => {
@@ -83,19 +83,19 @@ describe('rahmenOben', () => {
         <Quelle hoehe={40} aktiv name="zeile" />
       </>,
     );
-    expect(leseRahmenOben()).toBe(92);
+    expect(readRahmenOben()).toBe(92);
     rerender(<Quelle hoehe={52} aktiv name="kopf" />);
-    expect(leseRahmenOben()).toBe(52);
+    expect(readRahmenOben()).toBe(52);
     rerender(<></>);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
     expect(variable()).toBe('0px');
   });
 
   it('ein getauschtes Element unter derselben Quelle wird neu gemessen (Fehlerausstieg)', () => {
     const { rerender } = render(<Tausch variante="alt" />);
-    expect(leseRahmenOben()).toBe(52);
+    expect(readRahmenOben()).toBe(52);
     rerender(<Tausch variante="neu" />);
-    expect(leseRahmenOben()).toBe(73);
+    expect(readRahmenOben()).toBe(73);
   });
 
   it('wird eine Quelle inaktiv, fällt ihr Anteil weg, und die Anzeige folgt', () => {
@@ -175,9 +175,9 @@ describe('rahmenOben', () => {
           <Anzeige />
         </>,
       );
-      expect(leseRahmenOben()).toBe(97);
+      expect(readRahmenOben()).toBe(97);
       expect(variable()).toBe('97px');
-      expect(leseKopfOben()).toBe(52);
+      expect(readKopfOben()).toBe(52);
       expect(document.documentElement.style.getPropertyValue(KOPF_OBEN_VAR)).toBe('52px');
       expect(screen.getByTestId('kopf-anzeige').textContent).toBe('52');
       expect(screen.getByTestId('anzeige').textContent).toBe('97');
@@ -196,11 +196,11 @@ describe('rahmenOben', () => {
           <SeitenkopfQuelle hoehe={45} aktiv={false} />
         </>,
       );
-      expect(leseRahmenOben()).toBe(52);
-      expect(leseKopfOben()).toBe(52);
+      expect(readRahmenOben()).toBe(52);
+      expect(readKopfOben()).toBe(52);
       rerender(<></>);
-      expect(leseRahmenOben()).toBe(0);
-      expect(leseKopfOben()).toBe(0);
+      expect(readRahmenOben()).toBe(0);
+      expect(readKopfOben()).toBe(0);
       expect(document.documentElement.style.getPropertyValue(KOPF_OBEN_VAR)).toBe('0px');
     });
   });
@@ -254,7 +254,7 @@ describe('rahmenOben', () => {
       expect(bilder).toHaveLength(1);
       act(() => bilder[0](0));
       expect(variable()).toBe('53px');
-      expect(leseRahmenOben()).toBe(53);
+      expect(readRahmenOben()).toBe(53);
     } finally {
       vi.unstubAllGlobals();
     }

@@ -10,7 +10,7 @@ import {
   seitenkopfKlebtImFenster,
   useSeitenkopfKleben,
 } from './seitenkopfKleben';
-import { leseKopfOben, leseRahmenOben } from './rahmenOben';
+import { readKopfOben, readRahmenOben } from './rahmenOben';
 import { setzeViewportBreite, setzeViewportZurueck } from '../test/viewport';
 
 const fensterHoeheVorher = window.innerHeight;
@@ -60,22 +60,22 @@ describe('useSeitenkopfKleben', () => {
   it('ab md klebt ein passender Seitenkopf und zählt zum Rahmen, nicht zum Kopf', () => {
     render(<Seitenkopf hoehe={45} />);
     expect(klebt()).toBe(true);
-    expect(leseRahmenOben()).toBe(45);
-    expect(leseKopfOben()).toBe(0);
+    expect(readRahmenOben()).toBe(45);
+    expect(readKopfOben()).toBe(0);
   });
 
   it('unter md klebt er nicht und meldet keine Höhe', () => {
     setzeViewportBreite(500);
     render(<Seitenkopf hoehe={45} />);
     expect(klebt()).toBe(false);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
   });
 
   it('nimmt er mehr als ein Drittel der Fensterhöhe, rollt er mit', () => {
     setzeFensterHoehe(520);
     render(<Seitenkopf hoehe={180} />);
     expect(klebt()).toBe(false);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
   });
 
   it('in einem eigenen Scrollbereich (Gerätehülle) klebt er nicht', () => {
@@ -90,11 +90,11 @@ describe('useSeitenkopfKleben', () => {
   it('eine Vorgabe von außen gilt in beide Richtungen (ETB)', () => {
     const { unmount } = render(<Seitenkopf hoehe={45} vorgabe={false} />);
     expect(klebt()).toBe(false);
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
     unmount();
     setzeFensterHoehe(300);
     render(<Seitenkopf hoehe={180} vorgabe />);
     expect(klebt()).toBe(true);
-    expect(leseRahmenOben()).toBe(180);
+    expect(readRahmenOben()).toBe(180);
   });
 });

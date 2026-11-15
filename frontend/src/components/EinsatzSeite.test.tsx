@@ -678,7 +678,7 @@ describe('EinsatzSeite — klebender Seitenkopf', () => {
  */
 describe('EinsatzSeite — Arbeitsfläche bis zum Fensterende', () => {
   it('der Seitenkopf klebt nicht und zählt nicht zur Rahmenhöhe', async () => {
-    const { leseRahmenOben } = await import('./rahmenOben');
+    const { readRahmenOben } = await import('./rahmenOben');
     const { container } = renderMitProviders(
       <EinsatzSeite titel="UHS" fensterInhalt={{ inhalt: <div>Grundriss</div> }}>
         {null}
@@ -686,6 +686,6 @@ describe('EinsatzSeite — Arbeitsfläche bis zum Fensterende', () => {
     );
     const kopf = container.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
     expect(kopf.style.position).toBe('');
-    expect(leseRahmenOben()).toBe(0);
+    expect(readRahmenOben()).toBe(0);
   });
 });

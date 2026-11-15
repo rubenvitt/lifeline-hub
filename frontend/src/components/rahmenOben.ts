@@ -51,19 +51,19 @@ const hoerer = new Set<() => void>();
 let summe = 0;
 let kopfSumme = 0;
 
-function neuRechnen(): void {
-  let neu = 0;
-  let neuKopf = 0;
+function recompute(): void {
+  let next = 0;
+  let nextKopf = 0;
   for (const { ebene, hoehe } of anteile.values()) {
-    neu += hoehe;
-    if (ebene === 'kopf') neuKopf += hoehe;
+    next += hoehe;
+    if (ebene === 'kopf') nextKopf += hoehe;
   }
-  const stil = document.documentElement.style;
-  stil.setProperty(RAHMEN_OBEN_VAR, `${neu}px`);
-  stil.setProperty(KOPF_OBEN_VAR, `${neuKopf}px`);
-  if (neu === summe && neuKopf === kopfSumme) return;
-  summe = neu;
-  kopfSumme = neuKopf;
+  const style = document.documentElement.style;
+  style.setProperty(RAHMEN_OBEN_VAR, `${next}px`);
+  style.setProperty(KOPF_OBEN_VAR, `${nextKopf}px`);
+  if (next === summe && nextKopf === kopfSumme) return;
+  summe = next;
+  kopfSumme = nextKopf;
   for (const h of hoerer) h();
 }
 
@@ -74,23 +74,23 @@ export function abonniereRahmenOben(h: () => void): () => void {
 }
 
 /** Die aktuelle Summe beider Ebenen in px — rein lesend, für Aufrufer außerhalb von React. */
-export function leseRahmenOben(): number {
+export function readRahmenOben(): number {
   return summe;
 }
 
 /** Die aktuelle Summe der Ebene `kopf` in px — rein lesend. */
-export function leseKopfOben(): number {
+export function readKopfOben(): number {
   return kopfSumme;
 }
 
 /** Die Summe beider Ebenen in px; rendert neu, sobald sie sich ändert. */
 export function useRahmenOben(): number {
-  return useSyncExternalStore(abonniereRahmenOben, leseRahmenOben, leseRahmenOben);
+  return useSyncExternalStore(abonniereRahmenOben, readRahmenOben, readRahmenOben);
 }
 
 /** Die Summe der Ebene `kopf` in px; rendert neu, sobald sie sich ändert. */
 export function useKopfOben(): number {
-  return useSyncExternalStore(abonniereRahmenOben, leseKopfOben, leseKopfOben);
+  return useSyncExternalStore(abonniereRahmenOben, readKopfOben, readKopfOben);
 }
 
 /**
@@ -110,31 +110,31 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
   const [el, setEl] = useState<T | null>(null);
   useLayoutEffect(() => {
     if (!aktiv || !el) return;
-    const schluessel = Symbol('rahmen-oben');
-    const messen = () => {
-      anteile.set(schluessel, { ebene, hoehe: el.offsetHeight });
-      neuRechnen();
+    const key = Symbol('rahmen-oben');
+    const measure = () => {
+      anteile.set(key, { ebene, hoehe: el.offsetHeight });
+      recompute();
     };
-    messen();
+    measure();
     // Nicht im ResizeObserver schreiben: die Variable verändert sofort, was an ihr hängt (die Höhe
     // der IconRail, `calc(100dvh - var(--lfh-rahmen-oben))`), und Vorfahren, die der Fensterrahmen
     // beobachtet, wüchsen noch in derselben Auslieferungsrunde. Beim Live-Wechsel der Dichte
     // meldete der Browser dann „ResizeObserver loop completed with undelivered notifications“
     // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen` und `alarmOben`.
-    let geplant = 0;
-    const beobachter = new ResizeObserver(() => {
-      if (geplant) return;
-      geplant = requestAnimationFrame(() => {
-        geplant = 0;
-        messen();
+    let scheduled = 0;
+    const observer = new ResizeObserver(() => {
+      if (scheduled) return;
+      scheduled = requestAnimationFrame(() => {
+        scheduled = 0;
+        measure();
       });
     });
-    beobachter.observe(el);
+    observer.observe(el);
     return () => {
-      beobachter.disconnect();
-      if (geplant) cancelAnimationFrame(geplant);
-      anteile.delete(schluessel);
-      neuRechnen();
+      observer.disconnect();
+      if (scheduled) cancelAnimationFrame(scheduled);
+      anteile.delete(key);
+      recompute();
     };
   }, [el, aktiv, ebene]);
   return setEl;
