@@ -2,9 +2,9 @@
 
 ## 1. Platz der Marke (D1)
 
-- [ ] 1.1 Test in `frontend/src/einsatz/sprungmarken.test.ts`: jede Marke steht in der Kategorie ihres Zielmoduls; die Reihenfolge der Kategorien Führung (ohne `↗entscheidungen`) und Erfassung (`etb`, `↗entscheidungen`, `personen`, …) ist erwartet; der Fall „Anker fehlt“ nutzt ETB statt Aufträge. Erst rot, verifiziert mit `mise exec -- pnpm exec vitest run src/einsatz/sprungmarken.test.ts` in `frontend/`
-- [ ] 1.2 `sprungmarken.ts`: „Entscheidungen“ auf `kategorie: 'erfassung'`, `nach: 'etb'`, Kopfkommentar nachziehen (die Marke steht in der Kategorie ihres Ziels); Test aus 1.1 grün
-- [ ] 1.3 `command-palette/befehle.test.ts` und alle weiteren Tests, die „Entscheidungen“ in der Führung erwarten, laufen grün (`mise exec -- pnpm exec vitest run src/command-palette src/einsatz`)
+- [x] 1.1 Test in `frontend/src/einsatz/sprungmarken.test.ts`: jede Marke steht in der Kategorie ihres Zielmoduls; die Reihenfolge der Kategorien Führung (ohne `↗entscheidungen`) und Erfassung (`etb`, `↗entscheidungen`, `personen`, …) ist erwartet; der Fall „Anker fehlt“ nutzt ETB statt Aufträge. Erst rot, verifiziert mit `mise exec -- pnpm exec vitest run src/einsatz/sprungmarken.test.ts` in `frontend/`
+- [x] 1.2 `sprungmarken.ts`: „Entscheidungen“ auf `kategorie: 'erfassung'`, `nach: 'etb'`, Kopfkommentar nachziehen (die Marke steht in der Kategorie ihres Ziels); Test aus 1.1 grün
+- [x] 1.3 `command-palette/befehle.test.ts` und alle weiteren Tests, die „Entscheidungen“ in der Führung erwarten, laufen grün (`mise exec -- pnpm exec vitest run src/command-palette src/einsatz`)
 
 ## 2. Unteransicht im Menü (D2–D4)
 
