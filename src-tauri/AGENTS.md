@@ -69,4 +69,4 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
 - **Schritt 4 testet Server und Hülle getrennt** (`--workspace --exclude lifeline-desktop`, dann
   `-p lifeline-desktop`): in einem Zug vereinigte Cargo die Features, der Server liefe mit zwei
   rustls-Providern (Stolperdraht `tls::tests::rcgen_pem_ist_per_rustls_ladbar`). Linux-Runner
-  des Rust-Jobs brauchen die GTK-/WebKit-Pakete (`ci.yml`); `coverage.yml` misst ohne Hülle.
+  des Rust-Jobs brauchen die GTK-/WebKit-Pakete (`suiten.yml`); `coverage.yml` misst ohne Hülle.

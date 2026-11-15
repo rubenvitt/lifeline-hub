@@ -66,6 +66,11 @@ case "$methode $pfad" in
     d="$(kdatei "$nr")"; [ -f "$d" ] || echo '[]' > "$d"
     cat "$d" ;;
   "GET repos/test/repo/pulls"*) cat "$F/pulls.json" ;;
+  "GET repos/test/repo/rules/branches/"*)
+    # Ohne regeln.json nicht lesbar: der Hinweis bleibt dann wie vor LLH-1895.
+    echo "RULES ${pfad##*/}" >> "$F/abfragen"
+    [ -f "$F/regeln.json" ] || { echo "HTTP 404" >&2; exit 1; }
+    cat "$F/regeln.json" ;;
   "GET repos/test/repo/actions/workflows/ci.yml/runs"*)
     [ ! -e "$F/laeufe-kaputt" ] || { echo "HTTP 502" >&2; exit 1; }
     if [ -f "$F/laeufe.json" ]; then cat "$F/laeufe.json"; else echo '{"workflow_runs":[]}'; fi ;;
@@ -505,6 +510,73 @@ aendere "$r" feature b.txt "feature"
 ci_gruen "$r"
 lauf "$r" false false true
 pruefe "19 grün und Auto-Merge: Hinweis" "POST haengt" "$(log "$r")"
+
+# 19b — Grün, nicht gemergt, und im Ruleset trägt `Migrationsnummern` eine Quelle (der Fall vom
+# 14.11.2026, LLH-1895): der Hinweis nennt sie als wahrscheinliche Ursache.
+regeln() { # <klon> <integration_id von Migrationsnummern oder leer>
+  jq -n --arg m "$2" '[{type: "required_status_checks", parameters: {
+      strict_required_status_checks_policy: false,
+      required_status_checks: [{context: "Schnellprüfungen", integration_id: 15368},
+        (if $m == "" then {context: "Migrationsnummern"} else {context: "Migrationsnummern", integration_id: ($m | tonumber)} end),
+        {context: "ADR-Nummern"}, {context: "Baut mit Ziel-Branch"}]}}]' > "$(fake "$1")/regeln.json"
+}
+r="$(repo_neu haengtpin)"
+aendere "$r" feature b.txt "feature"
+ci_gruen "$r"
+regeln "$r" 15368
+lauf "$r" false false true
+pruefe "19b grün, Pin im Ruleset: Hinweis" "POST haengt" "$(log "$r")"
+kommentar_enthaelt "19b Hinweis nennt die Ursache" "$r" "Wahrscheinliche Ursache"
+kommentar_enthaelt "19b Hinweis nennt den Status" "$r" '`Migrationsnummern`'
+kommentar_enthaelt "19b Hinweis nennt die Abhilfe" "$r" "Any source"
+pruefe "19b Regeln von alpha gelesen" "RULES alpha" "$(cat "$(fake "$r")/abfragen" 2> /dev/null)"
+# Derselbe Lauf noch einmal: nichts Neues.
+lauf "$r" false false true
+pruefe "19b gleicher Befund mit gleicher Ursache schreibt nichts" "POST haengt" "$(log "$r")"
+# Ein Aussetzer der API (Regeln kurz nicht lesbar) lässt den Hinweis mit Ursache stehen: sonst
+# bekäme jeder hängende PR zwei neue Kommentare (Review des Fix-Commits).
+mv "$(fake "$r")/regeln.json" "$(fake "$r")/regeln.weg"
+lauf "$r" false false true
+pruefe "19g Ruleset kurz nicht lesbar: Hinweis mit Ursache bleibt" "POST haengt" "$(log "$r")"
+kommentar_enthaelt "19g Ursache steht weiter" "$r" "Wahrscheinliche Ursache"
+mv "$(fake "$r")/regeln.weg" "$(fake "$r")/regeln.json"
+lauf "$r" false false true
+pruefe "19g wieder lesbar: nichts Neues" "POST haengt" "$(log "$r")"
+# Ruleset inzwischen repariert, der PR mergt trotzdem nicht: der Hinweis nennt die alte Ursache
+# nicht mehr (Review LLH-1894: eine veraltete Ursache führte auf die falsche Spur).
+regeln "$r" ""
+lauf "$r" false false true
+pruefe "19b Ruleset repariert: Hinweis neu, ohne Ursache" "POST haengt DELETE POST haengt" "$(log "$r")"
+pruefe "19b ohne Ursache" 0 "$(kommentar "$r" | grep -c 'Wahrscheinliche Ursache' || true)"
+
+# 19f — Ein Hinweis ohne Ursache steht schon (alter Wächter oder Ruleset nicht lesbar), dann wird
+# die Abweichung lesbar: der Hinweis wird mit Ursache neu geschrieben (Review LLH-1894).
+r="$(repo_neu haengtspaet)"
+aendere "$r" feature b.txt "feature"
+ci_gruen "$r"
+lauf "$r" false false true
+pruefe "19f Hinweis ohne Ursache" "POST haengt" "$(log "$r")"
+lauf "$r" false false true
+pruefe "19f Ruleset weiter nicht lesbar: nichts Neues" "POST haengt" "$(log "$r")"
+regeln "$r" 15368
+lauf "$r" false false true
+pruefe "19f Ursache wird lesbar: Hinweis neu" "POST haengt DELETE POST haengt" "$(log "$r")"
+kommentar_enthaelt "19f jetzt mit Ursache" "$r" "Wahrscheinliche Ursache"
+
+# 19c — Ruleset in Ordnung: der Hinweis wie bisher, ohne Ursache.
+r="$(repo_neu haengtgut)"
+aendere "$r" feature b.txt "feature"
+ci_gruen "$r"
+regeln "$r" ""
+lauf "$r" false false true
+pruefe "19c grün, Ruleset in Ordnung: Hinweis" "POST haengt" "$(log "$r")"
+pruefe "19c ohne Ursache" 0 "$(kommentar "$r" | grep -c 'Wahrscheinliche Ursache' || true)"
+
+# 19d — Ruleset nicht lesbar (Fall 19 hat keine Regeln): Hinweis ohne Ursache, kein Abbruch.
+pruefe "19d nicht lesbar: ohne Ursache" 0 "$(kommentar "$(ls -d "$ARBEIT"/haengt | head -1)" | grep -c 'Wahrscheinliche Ursache' || true)"
+
+# 19e — Kein Befund: das Ruleset wird gar nicht erst gelesen.
+pruefe "19e ohne Befund keine Abfrage des Rulesets" "" "$(cat "$(fake "$ARBEIT/ruhig")/abfragen" 2> /dev/null)"
 
 # 20 — Ohne Auto-Merge wartet der PR auf den Menschen: kein Befund.
 r="$(repo_neu wartet)"
@@ -951,6 +1023,34 @@ printf '%s\n' '11|f11|false|false|ruben|' | prs "$r"
 export STAU_JETZT="$UM_1035"
 alpha_lauf "$r"
 pruefe "48 nur Release rot: kein Hinweis" "" "$(log "$r")"
+
+# 48b — Seit LLH-1896 stehen die Suiten in `suiten.yml`: ihre Jobs heißen „Suiten / …“, und der
+# Release-Aufruf meldet bei roter Suite „Release“ übersprungen. Rot bleibt rot, der Job wird genannt.
+r="$(repo_neu suitenrot)"
+zweig "$r" f11
+printf '%s
+' "2102|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" | laeufe "$r"
+printf '%s
+' 'Schnellprüfungen|success' 'Suiten / Rust-Suite|failure' 'Suiten / e2e / e2e 1/4|success' \
+  'Suiten / Testberichte zusammenführen|success' 'Release|skipped' | jobs_von "$r" 2102
+printf '%s
+' '11|f11|false|false|ruben|' | prs "$r"
+export STAU_JETZT="$UM_1035"
+alpha_lauf "$r"
+pruefe "48b rote Suite in suiten.yml: alpha rot" 1 "$(zaehle "$r" 'POST#11 alpha-zustaendig')"
+pr_kommentar_enthaelt "48b nennt den roten Job mit Präfix" "$r" 11 'Suiten / Rust-Suite'
+
+# 48c — Nur der Release scheitert, die Suiten aus `suiten.yml` sind grün: alpha gilt nicht als rot.
+r="$(repo_neu suitengruen)"
+zweig "$r" f11
+printf '%s
+' "2202|$(kopf "$r" alpha)|completed|failure|2026-11-12T10:30:00Z" | laeufe "$r"
+printf '%s
+' 'Schnellprüfungen|success' 'Suiten / Rust-Suite|success' 'Release / release|failure' | jobs_von "$r" 2202
+printf '%s
+' '11|f11|false|false|ruben|' | prs "$r"
+alpha_lauf "$r"
+pruefe "48c Suiten grün, nur Release rot: kein Hinweis" "" "$(log "$r")"
 
 # 49 — Der jüngste Lauf läuft noch, der davor war grün: alpha gilt nicht als rot.
 r="$(repo_neu laeuftnoch)"
