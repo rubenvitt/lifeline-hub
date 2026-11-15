@@ -68,6 +68,18 @@ test('aus dem Einsatz am breiten Schirm: Hilfe im neuen Tab, Rückweg an die Ste
   // Der erste Tab arbeitet weiter; der Rückweg der Hilfe bleibt je Besuch fest (Review B5).
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte$`));
+  // Erst wenn der Einsatzrahmen die Lagekarte gemerkt hat (nach Sitzung und Freigaben) und der
+  // Hilfe-Tab das sieht, belegt der Kapitelwechsel etwas: ohne festen Rückweg läse er sie jetzt.
+  await expect
+    .poll(() =>
+      hilfe.evaluate(() =>
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith('lfh:nav:letzter-ort:'))
+          .map((k) => localStorage.getItem(k) ?? '')
+          .join(' '),
+      ),
+    )
+    .toContain(`/einsaetze/${einsatzId}/lagekarte`);
   await hilfe
     .getByRole('navigation', { name: 'Kapitel' })
     .getByRole('link', { name: 'Arbeiten ohne Netz' })
