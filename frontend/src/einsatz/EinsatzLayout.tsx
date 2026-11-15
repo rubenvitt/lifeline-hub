@@ -30,7 +30,7 @@ import ModulAkkordeon from './ModulAkkordeon';
 import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersistenz';
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
-import { leseKategorieModul, merkeKategorieModul, rueckkehrModul } from './kategorieModul';
+import { loadKategorieModul, rueckkehrModul, saveKategorieModul } from './kategorieModul';
 import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
@@ -296,7 +296,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // jede Ankunft zählt, unter derselben Bedingung wie der letzte Ort.
   useEffect(() => {
     if (merkbar && benutzerId != null && aktuellesModul) {
-      merkeKategorieModul(benutzerId, einsatzId, aktuellesModul);
+      saveKategorieModul(benutzerId, einsatzId, aktuellesModul);
     }
   }, [merkbar, benutzerId, einsatzId, aktuellesModul]);
   const modulZaehler = useModulZaehler({ einsatzId, freigaben: modulFreigaben });
@@ -333,7 +333,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
    * besuchte Modul der Kategorie, sonst das erste freigegebene (LLH-1734, `kategorieModul.ts`).
    * Nicht immer navigieren: der Angleich-Effekt höbe sonst das persistierte Zuklappen in
    * derselben Runde auf. Die Rail behält ihre Hervorhebung über
-   * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen.
+   * `offeneKategorie ?? aktiveKategorie`. Ohne freigegebenes Modul nur aufklappen, auch gegen eine
+   * gemerkte Wahl „zu“.
    * Dieser Sprung wird NICHT gemerkt: sein Ziel hat niemand gewählt, und drei Rail-Klicks
    * überschrieben sonst die ganze „Zuletzt"-Liste. Gemerkt wird in `onModulKlick`.
    */
@@ -343,11 +344,12 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       return;
     }
     setOffeneKategorie(key);
-    // Ohne Wahl öffnet der Sprung das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem
-    // ersten Sprung am Tablet die Vorgabe „zu“ für immer weg. Eine gemerkte Wahl gilt (LLH-1734).
-    if (navWahl === null) setSprungOffen(true);
-    const gemerkt = benutzerId != null ? leseKategorieModul(benutzerId, einsatzId, key) : null;
+    const gemerkt = benutzerId != null ? loadKategorieModul(benutzerId, einsatzId, key) : null;
     const ziel = rueckkehrModul(key, gemerkt, modulFreigaben);
+    // Ohne Wahl öffnet der Sprung das Panel, schreibt aber keine Wahl (LFH-952): sonst wäre nach dem
+    // ersten Sprung am Tablet die Vorgabe „zu“ für immer weg. Eine gemerkte Wahl gilt (LLH-1734),
+    // außer der Sprung hat kein Ziel: dann zeigt erst das offene Panel, was geschah.
+    setSprungOffen(navWahl === null || ziel === null);
     if (ziel) navigate(einsatzModulPfad(einsatzId, modulZielRoute(ziel)));
   }
 

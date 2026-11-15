@@ -27,58 +27,58 @@ import { ZULETZT_FRIST_MS } from './zuletztModule';
 /** Lebensdauer eines Eintrags ab der letzten Ankunft: eine Schichtlänge. */
 export const KATEGORIE_MODUL_FRIST_MS = ZULETZT_FRIST_MS;
 
-interface Eintrag {
+interface Entry {
   key: string;
   /** Zeitpunkt der letzten Ankunft, Millisekunden seit Epoch. */
   at: number;
 }
 
-const schluessel = (benutzerId: number, einsatzId: number) =>
+const storageKey = (benutzerId: number, einsatzId: number) =>
   `lfh:nav:kategorie-modul:${benutzerId}:${einsatzId}`;
 
 /** Die gültigen Einträge je Kategorie; fremder oder kaputter Inhalt gilt als „nichts gemerkt“. */
-function leseAlle(benutzerId: number, einsatzId: number, jetzt: number): Record<string, Eintrag> {
-  const roh = sicherLesen(schluessel(benutzerId, einsatzId));
-  if (!roh) return {};
-  let wert: unknown;
+function readAll(benutzerId: number, einsatzId: number, jetzt: number): Record<string, Entry> {
+  const raw = sicherLesen(storageKey(benutzerId, einsatzId));
+  if (!raw) return {};
+  let value: unknown;
   try {
-    wert = JSON.parse(roh);
+    value = JSON.parse(raw);
   } catch {
     return {};
   }
-  if (typeof wert !== 'object' || wert === null || Array.isArray(wert)) return {};
-  const gueltig: Record<string, Eintrag> = {};
-  for (const [kategorie, e] of Object.entries(wert as Record<string, unknown>)) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const valid: Record<string, Entry> = {};
+  for (const [kategorie, e] of Object.entries(value as Record<string, unknown>)) {
     if (typeof e !== 'object' || e === null) continue;
     const { key, at } = e as Record<string, unknown>;
     if (typeof key !== 'string' || typeof at !== 'number') continue;
     if (jetzt - at > KATEGORIE_MODUL_FRIST_MS) continue;
-    gueltig[kategorie] = { key, at };
+    valid[kategorie] = { key, at };
   }
-  return gueltig;
+  return valid;
 }
 
 /** Merkt die Ankunft in einem Modul für dessen Kategorie; Abgelaufenes fällt dabei heraus. */
-export function merkeKategorieModul(
+export function saveKategorieModul(
   benutzerId: number,
   einsatzId: number,
   modul: ModulEintrag,
   jetzt: number = Date.now(),
 ): void {
-  const alle = leseAlle(benutzerId, einsatzId, jetzt);
-  alle[modul.kategorie] = { key: modul.key, at: jetzt };
+  const all = readAll(benutzerId, einsatzId, jetzt);
+  all[modul.kategorie] = { key: modul.key, at: jetzt };
   // Speicher gesperrt (Privatmodus): ohne Persistenz weiterarbeiten.
-  sicherSchreiben(schluessel(benutzerId, einsatzId), JSON.stringify(alle));
+  sicherSchreiben(storageKey(benutzerId, einsatzId), JSON.stringify(all));
 }
 
 /** Der gemerkte Modulschlüssel einer Kategorie innerhalb der Frist, sonst `null`. */
-export function leseKategorieModul(
+export function loadKategorieModul(
   benutzerId: number,
   einsatzId: number,
   kategorie: KategorieKey,
   jetzt: number = Date.now(),
 ): string | null {
-  return leseAlle(benutzerId, einsatzId, jetzt)[kategorie]?.key ?? null;
+  return readAll(benutzerId, einsatzId, jetzt)[kategorie]?.key ?? null;
 }
 
 /**

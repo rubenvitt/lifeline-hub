@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   KATEGORIE_MODUL_FRIST_MS,
-  leseKategorieModul,
-  merkeKategorieModul,
+  loadKategorieModul,
+  saveKategorieModul,
   rueckkehrModul,
 } from './kategorieModul';
 import { modulRegistry, type ModulEintrag } from './modulRegistry';
@@ -23,36 +23,36 @@ describe('kategorieModul: gemerktes Modul je Kategorie', () => {
   beforeEach(() => localStorage.clear());
 
   it('liefert ohne Besuch nichts', () => {
-    expect(leseKategorieModul(A, 1, 'kraefte')).toBeNull();
+    expect(loadKategorieModul(A, 1, 'kraefte')).toBeNull();
   });
 
   it('merkt je Kategorie das zuletzt besuchte Modul', () => {
-    merkeKategorieModul(A, 1, modul('kraefteuebersicht'));
-    merkeKategorieModul(A, 1, modul('abloesung'));
-    merkeKategorieModul(A, 1, modul('etb'));
-    expect(leseKategorieModul(A, 1, 'kraefte')).toBe('abloesung');
-    expect(leseKategorieModul(A, 1, 'erfassung')).toBe('etb');
+    saveKategorieModul(A, 1, modul('kraefteuebersicht'));
+    saveKategorieModul(A, 1, modul('abloesung'));
+    saveKategorieModul(A, 1, modul('etb'));
+    expect(loadKategorieModul(A, 1, 'kraefte')).toBe('abloesung');
+    expect(loadKategorieModul(A, 1, 'erfassung')).toBe('etb');
   });
 
   it('trennt Personen und Einsätze', () => {
-    merkeKategorieModul(A, 1, modul('abloesung'));
-    expect(leseKategorieModul(B, 1, 'kraefte')).toBeNull();
-    expect(leseKategorieModul(A, 2, 'kraefte')).toBeNull();
+    saveKategorieModul(A, 1, modul('abloesung'));
+    expect(loadKategorieModul(B, 1, 'kraefte')).toBeNull();
+    expect(loadKategorieModul(A, 2, 'kraefte')).toBeNull();
   });
 
   it('vergisst einen Besuch nach Ablauf der Frist', () => {
     const t0 = 1_000_000;
-    merkeKategorieModul(A, 1, modul('abloesung'), t0);
-    expect(leseKategorieModul(A, 1, 'kraefte', t0 + KATEGORIE_MODUL_FRIST_MS)).toBe('abloesung');
-    expect(leseKategorieModul(A, 1, 'kraefte', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBeNull();
+    saveKategorieModul(A, 1, modul('abloesung'), t0);
+    expect(loadKategorieModul(A, 1, 'kraefte', t0 + KATEGORIE_MODUL_FRIST_MS)).toBe('abloesung');
+    expect(loadKategorieModul(A, 1, 'kraefte', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBeNull();
   });
 
   it('hält einen abgelaufenen Eintrag nicht auf, wenn eine andere Kategorie geschrieben wird', () => {
     const t0 = 1_000_000;
-    merkeKategorieModul(A, 1, modul('abloesung'), t0);
-    merkeKategorieModul(A, 1, modul('etb'), t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE);
-    expect(leseKategorieModul(A, 1, 'kraefte', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBeNull();
-    expect(leseKategorieModul(A, 1, 'erfassung', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBe(
+    saveKategorieModul(A, 1, modul('abloesung'), t0);
+    saveKategorieModul(A, 1, modul('etb'), t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE);
+    expect(loadKategorieModul(A, 1, 'kraefte', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBeNull();
+    expect(loadKategorieModul(A, 1, 'erfassung', t0 + KATEGORIE_MODUL_FRIST_MS + MINUTE)).toBe(
       'etb',
     );
   });
@@ -66,7 +66,7 @@ describe('kategorieModul: gemerktes Modul je Kategorie', () => {
       'kaputt',
     ]) {
       localStorage.setItem(`lfh:nav:kategorie-modul:${A}:1`, roh);
-      expect(leseKategorieModul(A, 1, 'kraefte')).toBeNull();
+      expect(loadKategorieModul(A, 1, 'kraefte')).toBeNull();
     }
   });
 });

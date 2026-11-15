@@ -99,23 +99,23 @@ function useVorlauf(): [(el: HTMLElement | null) => void, number] {
   const rahmenOben = useRahmenOben();
   useLayoutEffect(() => {
     if (!el) return;
-    const messen = () => {
-      const oben = el.getBoundingClientRect().top + window.scrollY;
-      setVorlauf(Math.max(0, Math.round(oben - leseRahmenOben())));
+    const measure = () => {
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setVorlauf(Math.max(0, Math.round(top - leseRahmenOben())));
     };
-    messen();
-    let geplant = 0;
-    const beobachter = new ResizeObserver(() => {
-      if (geplant) return;
-      geplant = requestAnimationFrame(() => {
-        geplant = 0;
-        messen();
+    measure();
+    let pending = 0;
+    const observer = new ResizeObserver(() => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        measure();
       });
     });
-    beobachter.observe(document.body);
+    observer.observe(document.body);
     return () => {
-      beobachter.disconnect();
-      if (geplant) cancelAnimationFrame(geplant);
+      observer.disconnect();
+      if (pending) cancelAnimationFrame(pending);
     };
   }, [el, rahmenOben]);
   return [setEl, vorlauf];

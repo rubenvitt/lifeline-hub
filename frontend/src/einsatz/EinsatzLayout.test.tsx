@@ -556,6 +556,24 @@ describe('EinsatzLayout', () => {
   });
 
   /**
+   * LLH-1734, Review: Ohne Sprungziel (Freigaben gescheitert oder alles gesperrt) navigiert der Klick
+   * nicht. Bliebe das zugeklappte Panel dann zu, wäre der Klick tot: nur die Hervorhebung spränge.
+   */
+  it('öffnet das zugeklappte Panel, wenn der Rail-Sprung kein Ziel hat', async () => {
+    localStorage.setItem(EINGEKLAPPT, '1');
+    setzeViewportBreite(XL);
+    setup(freigabenFixture(), { freigaben: true });
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(await screen.findByText('Modulfreigaben nicht geladen')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lage' }));
+
+    expect(await screen.findByRole('button', { name: 'Lagekarte' })).toBeInTheDocument();
+    expect(pfad()).toBe('/einsaetze/7/etb');
+    expect(localStorage.getItem(EINGEKLAPPT)).toBe('1');
+  });
+
+  /**
    * LFH-952 (D5): ohne Wahl ist das Panel am Tablet quer (`lg` bis `xl`, hier die Testbreite 1024)
    * zu und ab `xl` offen. Der Griff „Menü“ im Rail-Fuß schreibt die Wahl, und sie gilt dann auf
    * jeder Breite.
