@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { dichten, farbenDunkel } from '../theme/tokens';
 import ModulPanel, {
+  modulBeschreibungStil,
   modulListenStil,
   modulMarkeStil,
   modulZeilenStil,
@@ -612,6 +613,20 @@ describe('ModulListe · Beschreibung als zweite Zeile (LFH-965)', () => {
     );
     // Zu Lange endet in „…“; der volle Text steht im `title`.
     expect(etb).toHaveAttribute('title', 'Einsatztagebuch');
+  });
+
+  /**
+   * LLH-1734 (Spec `modul-benennung`): im 208 px breiten Panel endete fast jede Beschreibung nach
+   * einer Zeile in „…“. Sie bricht jetzt auf höchstens zwei Zeilen um, erst danach die Auslassung.
+   * jsdom rechnet keinen Umbruch, deshalb am reinen Stil.
+   */
+  it('bricht die Beschreibung auf höchstens zwei Zeilen um, dann „…“', () => {
+    const stil = modulBeschreibungStil({ schwach: '#777' }, false);
+    expect(stil.whiteSpace).toBe('normal');
+    expect(stil.display).toBe('-webkit-box');
+    expect(stil.WebkitLineClamp).toBe(2);
+    expect(stil.WebkitBoxOrient).toBe('vertical');
+    expect(stil.overflow).toBe('hidden');
   });
 
   it('lässt ein Modul ohne Beschreibung einzeilig, ohne leere Beschreibung', () => {

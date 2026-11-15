@@ -692,11 +692,15 @@ export const seitenrinne = {
 } as const;
 
 /**
- * Breite des Navigations-Drawers, der den Einsatz-Rahmen unter antds `lg`-Schwelle ersetzt.
- * Viewport-Achse wie die Seitenrinne. Das Maß trägt, weil der Drawer ein flaches Akkordeon in
- * einer Spalte zeigt statt Rail plus Modulspalte.
+ * Breite des Navigations-Drawers, der den Einsatz-Rahmen unter antds `lg`-Schwelle ersetzt, höchstens
+ * aber die Fensterbreite minus {@link navDrawerRand}. Viewport-Achse wie die Seitenrinne. Das Maß
+ * trägt, weil der Drawer ein flaches Akkordeon in einer Spalte zeigt statt Rail plus Modulspalte;
+ * fest 280 px ließen am Handy 232 px für die Modulbeschreibungen (LLH-1734).
  */
-export const navDrawerBreite = 280;
+export const navDrawerBreite = 360;
+
+/** Streifen rechts neben dem Navigations-Drawer, der frei bleibt, damit man ihn antippen und schließen kann. */
+export const navDrawerRand = 48;
 
 /** Formrollen. Radius 0 ist eine Entscheidung: die Kachel trägt der Umrissrahmen, nicht eine
  *  weiche Ecke. `zeilenhoehe`/`schriftgroesse` sind Dichte und zeigen auf `dichten.kompakt`;
