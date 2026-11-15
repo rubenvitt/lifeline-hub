@@ -9,7 +9,7 @@ gilt_fuer:
   - frontend/src/components/druck/Druckkopf.tsx
   - frontend/src/theme/tokens.ts
 herleitung:
-  - openspec/changes/wc3kzd54-uebungsmarke-rahmen/design.md
+  - openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md
   - Zunder LLH-1725 (Farbe, Platz, Gerät und Druck abgestimmt mit Ruben am 15.11.2026)
 ---
 

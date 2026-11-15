@@ -265,7 +265,7 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
 
 /**
  * Übungsband (LLH-1725, Spec `uebungsmarke`, „Das Übungsband bleibt beim Rollen stehen“; D4 in
- * `openspec/changes/wc3kzd54-uebungsmarke-rahmen/design.md`): es klebt in JEDER Breite, ab `md`
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): es klebt in JEDER Breite, ab `md`
  * direkt unter dem Kopf, unter `md` an der Fensterkante bzw. unter der gestörten Betriebszeile.
  * `--lfh-rahmen-oben` endet an seiner Unterkante: daran hängt jeder stehende Tabellenkopf (Guard
  * `rahmenOben.guard.test.ts`), also liegt keiner hinter dem Band.

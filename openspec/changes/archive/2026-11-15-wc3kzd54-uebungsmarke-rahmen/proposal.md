@@ -41,7 +41,8 @@ jemand „ÜBUNG“ in den Namen getippt hat. So landen Übungsdaten im echten E
 ### Modified Capabilities
 
 - `seiten-orientierung`: Der Tab-Titel einer Übung beginnt mit „ÜBUNG ·“
-  (Requirement „Tab-Titel nennt Seite und Einsatz“).
+  (neue Requirement „Tab-Titel einer Übung beginnt mit „ÜBUNG““; beim Archivieren aus
+  „Tab-Titel nennt Seite und Einsatz“ ausgelagert, damit diese unter 500 Zeichen bleibt).
 - `druck-dokumente`: Der gemeinsame Druckkopf nennt die Übung, in Chromium steht sie am Rand jedes
   Blatts (Requirement „Gemeinsamer Druckkopf“).
 

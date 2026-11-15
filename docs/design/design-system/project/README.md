@@ -146,7 +146,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
     deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Übung** (LLH-1725, Spec `uebungsmarke`, Herleitung
-    `openspec/changes/wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
+    `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,
     Planungsübernahme, externes Lagebild, „Zurück zu …“, Tab-Titel, Druck, Lageplan-Anlage,
     Fernmeldeskizze).

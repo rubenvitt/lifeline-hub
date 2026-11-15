@@ -110,7 +110,7 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
 
 /**
  * Eine klebende Quelle, die selbst UNTER den übrigen klebt: das Übungsband (LLH-1725, design.md
- * D4 in `openspec/changes/wc3kzd54-uebungsmarke-rahmen/`). Es meldet seine Höhe wie jede Quelle
+ * D4 in `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`). Es meldet seine Höhe wie jede Quelle
  * (`ref`), und `oben` ist die Summe OHNE seinen eigenen Anteil, also sein `top`: ab `md` die
  * Kopfhöhe, unter `md` die gestörte Betriebszeile oder 0. Keine Rückkopplung: die eigene Höhe
  * hängt nicht vom eigenen `top` ab. Die Reihenfolge im DOM muss dazu passen — das Element steht

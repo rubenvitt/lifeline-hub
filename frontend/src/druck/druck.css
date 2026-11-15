@@ -32,7 +32,7 @@
     }
   }
 
-  /* Übung (LLH-1725, Spec `druck-dokumente`, D8 in `openspec/changes/wc3kzd54-uebungsmarke-rahmen/`):
+  /* Übung (LLH-1725, Spec `druck-dokumente`, D8 in `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`):
      meldet der Druckkopf eine Übung (`data-uebung`), läuft die Wurzel auf der benannten Seite
      „uebung“. Die erbt Rand und Zählung der unbenannten und trägt oben auf JEDER Seite das feste
      Wort — keine Zeichenkette aus Daten. Randfelder zeichnet nur Chromium; Firefox und WebKit

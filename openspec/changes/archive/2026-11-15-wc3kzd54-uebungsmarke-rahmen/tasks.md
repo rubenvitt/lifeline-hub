@@ -72,7 +72,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 - [x] 7.2 `docs/anwender/kapitel/einsatz-oberflaeche.md`: Band und Marke beschreiben, dazu je ein
   Satz in `drucken-export.md`, `geraet-bedienen.md` und `lagemonitor.md`;
   `hilfe/anwenderdoku.guard.test.ts` grün.
-- [ ] 7.3 Bilder der Anwenderdoku mit Einsatzrahmen neu erzeugen (`pnpm doku:bilder`, mindestens
+- [x] 7.3 Bilder der Anwenderdoku mit Einsatzrahmen neu erzeugen (`pnpm doku:bilder`, mindestens
   `einsatz-oberflaeche` und die Gerätekapitel); was in der Sitzung nicht läuft, als Folgeaufgabe auf
   dem Board und im PR genannt.
 
@@ -96,7 +96,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 ## 8. Abschluss
 
 - [x] 8.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (Ergebnis im PR unter „Geprüft“).
-- [ ] 8.2 Bilder der Änderung (Rahmen Nacht/Tag, Handy gerollt, Liste, Wechsler, Gerät,
+- [x] 8.2 Bilder der Änderung (Rahmen Nacht/Tag, Handy gerollt, Liste, Wechsler, Gerät,
   Lagemonitor, Druck) für PR und Meldung aufgenommen.
 
 ## Workflow follow-up

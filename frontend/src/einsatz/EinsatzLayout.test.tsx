@@ -1265,7 +1265,7 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
 
 /**
  * Übungsmarke im Rahmen (LLH-1725, Spec `uebungsmarke`, design.md D4–D6 in
- * `openspec/changes/wc3kzd54-uebungsmarke-rahmen/`). Das Kleben im Browser misst
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`). Das Kleben im Browser misst
  * `e2e/rahmen-stehen-bleiben.spec.ts`.
  */
 describe('EinsatzLayout · Übung (LLH-1725)', () => {

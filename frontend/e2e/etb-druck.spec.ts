@@ -374,7 +374,7 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
 
 /**
  * Übung im Druck (LLH-1725, Spec `druck-dokumente`, „Gemeinsamer Druckkopf“; D8 in
- * `openspec/changes/wc3kzd54-uebungsmarke-rahmen/design.md`): der Druckkopf trägt „ÜBUNG“ in allen
+ * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): der Druckkopf trägt „ÜBUNG“ in allen
  * drei Engines; das Randfeld je Seite zeichnet nur Chromium, belegt am erzeugten PDF.
  * Mutationsprobe (15.11.2026): ohne `page: uebung` in `druck.css` rot an Seite 2.
  */
