@@ -892,7 +892,10 @@ mod tests {
         let (_, org) = neuer_zugang(&pool).await;
         let hub = |pool: SqlitePool| async move {
             let mut c = pool.acquire().await.unwrap();
-            hub_fuer_org(&mut c, org).await.unwrap().map(|(name, _)| name)
+            hub_fuer_org(&mut c, org)
+                .await
+                .unwrap()
+                .map(|(name, _)| name)
         };
 
         koppeln(&pool, org, "elw-2", "ELW 2", "vor_ort").await;
