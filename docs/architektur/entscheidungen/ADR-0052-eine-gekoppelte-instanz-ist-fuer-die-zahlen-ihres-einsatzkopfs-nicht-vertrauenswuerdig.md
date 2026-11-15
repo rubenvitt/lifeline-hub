@@ -1,5 +1,5 @@
 ---
-id: ADR-0049
+id: ADR-0052
 titel: Eine gekoppelte Instanz ist für die Zahlen ihres Einsatzkopfs nicht vertrauenswürdig
 status: akzeptiert
 datum: 2026-11-15
@@ -12,7 +12,7 @@ herleitung:
   - openspec/changes/archive/2026-11-15-bqz5qimz-spiegel-nummer-grenze/design.md
 ---
 
-# ADR-0049: Eine gekoppelte Instanz ist für die Zahlen ihres Einsatzkopfs nicht vertrauenswürdig
+# ADR-0052: Eine gekoppelte Instanz ist für die Zahlen ihres Einsatzkopfs nicht vertrauenswürdig
 
 ## Regeln
 
@@ -22,9 +22,9 @@ herleitung:
 - MUST NOT: Eine ungültige Einsatznummer der Gegenstelle hält die übrige Lieferung an.
 - MUST: Jede Vergabe einer laufenden Nummer rechnet die nächste über
   `einsatz::repo::naechste_lfd` (geprüft, 422 statt Panik oder Umlauf), nie mit `+ 1`.
-- MUST: Die freie Nummer beim Übergang vom Spiegel zum eigenen Einsatz bleibt unter
-  `LFD_GRENZEN.end()`, solange die eigenen Einsätze es tun (Spec `einsatznummer`, „Die freie
-  Nummer bleibt in der Grenze“).
+- MUST: Eine neu vergebene freie Nummer beim Übergang vom Spiegel zum eigenen Einsatz liegt unter
+  `LFD_GRENZEN.end()`, solange die eigenen Einsätze es tun; dafür zählt sie notfalls nur über
+  den eigenen Einsätzen (Spec `einsatznummer`, „Die freie Nummer bleibt in der Grenze“).
 
 ## Prüfung
 
@@ -46,5 +46,6 @@ Debug-Bau abstürzen und im Release in negative Nummern umlaufen (LLH-1859).
 
 Ein Fehler der Gegenstelle bleibt an ihrem Spiegel: leere Zahlen und ein Hinweis, das Lagebild
 läuft weiter. Wer künftig eine neue Stelle schreibt, die laufende Nummern vergibt oder Kopfzahlen
-übernimmt, muss über diese Bausteine gehen. Bestand außerhalb der Grenzen führt zu 422 statt zu
-einer falschen Nummer.
+übernimmt, muss über diese Bausteine gehen. Ist die nächste Nummer in `i64` nicht mehr
+darstellbar, auch nach dem Ausweichen vor vergebenen Texten, endet die Vergabe mit 422 statt mit
+einer umgelaufenen Nummer.

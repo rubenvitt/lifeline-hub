@@ -23,6 +23,10 @@ nicht erst, wenn genau dieser Spiegel eigen wird.
   die nächste laufende Nummer geprüft; ist sie nicht darstellbar, endet der Vorgang mit 422 statt
   mit Panik oder Umlauf. Das ist das Netz für Bestand, der vor dieser Änderung schon übernommen
   wurde.
+- **Die freie Nummer bleibt in der Grenze (Nachtrag aus dem Review, abgestimmt 15.11.2026).**
+  Läge die freie Nummer beim Eigenwerden wegen eines Spiegels an oder über der Grenze, zählt sie nur
+  über den eigenen Einsätzen. Der Hinweis zur Einsatznummer bleibt am Spiegel, bis der Kopf das
+  nächste Mal übernommen wird.
 - Verworfen: die ganze Lieferung ablehnen (friert das Lagebild des Spiegels wegen eines
   Nummernfelds ein) und dem Kopf vertrauen, nur mit geprüfter Addition (sperrt die Vergabe des
   Jahres dauerhaft). Begründung in `design.md`.
@@ -35,8 +39,10 @@ _keine_
 
 ### Modified Capabilities
 
-- `einsatznummer`: neue Anforderungen „Die Zahlen eines Spiegels liegen in festen Grenzen“ und
-  „Die Vergabe läuft nicht über“.
+- `einsatznummer`: neue Anforderungen „Die Zahlen eines Spiegels liegen in festen Grenzen“,
+  „Die Vergabe läuft nicht über“ und „Die freie Nummer bleibt in der Grenze“ (Nachtrag aus dem
+  Review, 15.11.2026); „Freie Nummer, wenn ein Spiegel zum eigenen Einsatz wird“ nennt diese
+  Ausnahme.
 
 ## Impact
 

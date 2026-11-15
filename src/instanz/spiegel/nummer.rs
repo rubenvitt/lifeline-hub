@@ -61,12 +61,12 @@ pub(super) async fn ensure_freie_nummer(
     };
     // Über allen Einsätzen des Jahres, auch Spiegeln, und dem Löschprotokoll: anders als die
     // Anlage (`einsatz::repo::anlegen_tx` zählt nur eigene), damit die neue Nummer keinem Spiegel
-    // gleicht, der später selbst eigen werden kann und dann wieder umnummeriert würde. Hebt ein
-    // Spiegel die Zählung an oder über die Grenze, zählen nur die eigenen (LLH-1859, Spec
+    // gleicht, der später selbst eigen werden kann und dann wieder umnummeriert würde. Läge die
+    // neue Nummer wegen eines Spiegels an oder über der Grenze, zählen nur die eigenen (LLH-1859, Spec
     // `einsatznummer`, „Die freie Nummer bleibt in der Grenze“): Sonst trüge jeder eigene Einsatz
     // des Jahres danach eine Nummer, die jede Gegenstelle leer übernimmt.
     let mut max_lfd = load_max_lfd(conn, org_id, jahr, true).await?;
-    if max_lfd.is_some_and(|m| m >= *crate::einsatz::nummer::LFD_GRENZEN.end()) {
+    if max_lfd.is_some_and(|m| m.saturating_add(1) >= *crate::einsatz::nummer::LFD_GRENZEN.end()) {
         max_lfd = load_max_lfd(conn, org_id, jahr, false).await?;
     }
     let mut neu_lfd = crate::einsatz::repo::naechste_lfd(max_lfd.unwrap_or(0))?;
@@ -302,7 +302,7 @@ mod tests {
     /// den eigenen Einsätzen und dem Löschprotokoll.
     #[tokio::test]
     async fn ein_fremder_spiegel_an_der_grenze_hebt_die_freie_nummer_nicht() {
-        for fremd in [999_999, i64::MAX] {
+        for fremd in [999_998, 999_999, i64::MAX] {
             let pool = pool().await;
             eigener_einsatz(&pool, 1).await;
             fremder_spiegel(&pool, fremd).await;

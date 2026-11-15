@@ -82,9 +82,10 @@ testbar.
 
 `ensure_freie_nummer` zählt über alle Spiegel. Eine gültige Spiegelnummer 999.999 höbe die freie
 Nummer auf 1.000.000; ab dann zählte die Anlage von dort weiter, und jede Gegenstelle übernähme
-alle eigenen Nummern des Jahres leer. Liegt das Maximum über allen Einsätzen an oder über
-`LFD_GRENZEN.end()`, zählt die freie Nummer deshalb nur über den eigenen Einsätzen und dem
-Löschprotokoll, wie die Anlage. Eine Nummer, die so einem Spiegel gleicht, ist erlaubt (Spiegel
+alle eigenen Nummern des Jahres leer. Läge die neue Nummer (Maximum über allen Einsätzen plus
+eins) an oder über `LFD_GRENZEN.end()`, zählt die freie Nummer deshalb nur über den eigenen
+Einsätzen und dem Löschprotokoll, wie die Anlage. An der Grenze selbst, nicht erst darüber: Eine
+eigene Nummer 999.999 brächte die nächste Anlage auf 1.000.000. Eine Nummer, die so einem Spiegel gleicht, ist erlaubt (Spiegel
 sind von der Eindeutigkeit ausgenommen); gleiche Texte fängt die Ausweichschleife ab.
 
 Verworfen: eine freie Nummer über der Grenze mit 422 ablehnen (ein Führungswechsel mit belegter

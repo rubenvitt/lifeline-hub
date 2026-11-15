@@ -2,7 +2,7 @@
 titel: Instanzkopplung
 gruppen: [alle, administration]
 reihenfolge: 690
-quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
+quellen: [frontend/src/instanz/InstanzkopplungSeite.tsx, frontend/src/einsatz/spiegel/, frontend/src/instanz/instanzText.ts, frontend/src/instanz/herkunft.tsx, frontend/src/api/instanz.ts, src/routes/instanz.rs, src/instanz/mod.rs, src/instanz/melden.rs, src/instanz/repo.rs, src/instanz/stammdaten/, src/instanz/spiegel/, src/einsatz/nummer.rs, src/error.rs, src/auth/unterschrift/repo.rs, src/routes/auth.rs, frontend/src/instanz/FuehrungPaneel.tsx, frontend/src/instanz/FuehrungHinweisband.tsx, frontend/src/instanz/EinsaetzeBeimGegenueber.tsx, frontend/src/components/nurAnsicht.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/fuehrung.ts, src/instanz/fuehrung/, src/routes/fuehrung.rs, src/instanz/entdeckung.rs, src/instanz/zertifikat.rs, frontend/src/instanz/fuehrungText.ts, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/einsatz/spiegel/abgelehnteAntraege.ts, src/einsatz/kontext.rs, src/benachrichtigung/text.rs, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -500,7 +500,8 @@ Einsatznummern vergibt jede Installation selbst. Ein Spiegel trägt die Nummer d
 die ihn führt; am Hub kann deshalb ein eigener Einsatz dieselbe Nummer tragen wie ein Spiegel.
 Wechselt die Führung und hat die übernehmende Installation die Nummer schon selbst vergeben,
 bekommt der übernommene Einsatz dort eine neue Nummer, die über allen ihren Einsätzen des Jahres
-liegt. Sein Einsatztagebuch nennt dann „Neue Einsatznummer …, bisher …“. Die abgebende
+liegt, auch über den Spiegeln; nur wenn ein Spiegel die Zählung an die Grenze von 999.999 bringen
+würde, zählt sie allein über den eigenen Einsätzen. Sein Einsatztagebuch nennt dann „Neue Einsatznummer …, bisher …“. Die abgebende
 Installation zeigt die neue Nummer, sobald sie den Einsatz als Spiegel hält, bei einer
 Notübernahme mit Unterschrift also erst nach dem Bestätigen. Übergibt die neue Installation die
 Führung später zurück, bleibt die neue Nummer, solange sie dort frei ist. Widerspricht der ELW
@@ -511,8 +512,9 @@ Liefert die führende Installation eine Einsatznummer, deren Jahr nicht vierstel
 oder deren laufende Nummer nicht zwischen 1 und 999.999 liegt, zeigt der Spiegel die Nummer zwar
 an, zählt sie aber nicht mit. Auf der Seite Instanzkopplung steht beim Einsatz dann
 „Einsatznummer der Gegenstelle außerhalb der Grenzen“. Der übrige Einsatz wird normal
-abgeglichen. Der Hinweis bleibt, bis die führende Installation die Daten des Einsatzes das
-nächste Mal ändert.
+abgeglichen. Der Hinweis bleibt, bis die führende Installation die Einsatzdaten selbst
+(Bezeichnung, Ort, Nummer und andere Angaben im Kopf des Einsatzes) das nächste Mal ändert; neue
+Einträge etwa im Einsatztagebuch räumen ihn nicht.
 
 Benachrichtigungen werden nicht gespiegelt. Jede Installation führt ihre eigenen; „gelesen“ und
 das Quittieren gelten nur dort.
