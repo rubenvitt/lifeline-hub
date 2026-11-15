@@ -269,6 +269,10 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
  * direkt unter dem Kopf, unter `md` an der Fensterkante bzw. unter der gestörten Betriebszeile.
  * `--lfh-rahmen-oben` endet an seiner Unterkante: daran hängt jeder stehende Tabellenkopf (Guard
  * `rahmenOben.guard.test.ts`), also liegt keiner hinter dem Band.
+ *
+ * Mutationsprobe (15.11.2026, Chromium): klebt das Band mit `top: 0` statt unter den übrigen
+ * Quellen, rot bei 820/1180/1440 („Band bündig unter dem Kopf“) und offline bei 390; die Probe bei
+ * 390 ohne Störung bleibt zu Recht grün.
  */
 async function rahmenOben(page: Page): Promise<number> {
   return page.evaluate(() =>

@@ -32,7 +32,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 - [x] 3.3 Tab-Titel mit Präfix (D6) in `components/useDokumentTitel.ts`, Aufruf im Einsatzrahmen;
   Tests in `useDokumentTitel.test.ts` für „ÜBUNG · ETB · Starkregen Nord · lifeline-hub“ und
   „ÜBUNG · (3) ETB · …“, Realeinsatz unverändert.
-- [ ] 3.4 e2e `frontend/e2e/rahmen-stehen-bleiben.spec.ts` um die Übung erweitern: Band bei 390,
+- [x] 3.4 e2e `frontend/e2e/rahmen-stehen-bleiben.spec.ts` um die Übung erweitern: Band bei 390,
   820, 1180, 1440 px nach 1500 px Rollen im Bild, Tabellenkopf unter dem Band, offline am Handy
   Betriebszeile und Band übereinander; lokal gegen den Branch grün.
 
@@ -47,7 +47,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 - [x] 5.1 `geraet/GeraeteLayout.tsx`: `UebungsBand` nach `GeraeteKopf` (D7); Test in der Testdatei
   der Gerätehülle: Band bei Übung, keins bei Realeinsatz.
-- [ ] 5.2 `geraet/LagemonitorPage.tsx`: `UebungsMarke groesse="monitor"` in der Statusleiste (D7);
+- [x] 5.2 `geraet/LagemonitorPage.tsx`: `UebungsMarke groesse="monitor"` in der Statusleiste (D7);
   Vitest grün, `frontend/e2e/geraet-lagemonitor.spec.ts` lokal grün (ohne Bildlauf, Texte ≥ 28 px).
 - [x] 5.3 Satz mit Verweis in `frontend/src/geraet/AGENTS.md` (D10).
 
@@ -62,7 +62,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
   (`pages/lagekarte/useLageplan.ts`), Planung (`planung/PlanungDruckPage.tsx`) und Einsatzbericht
   (`einsatzStand`) reichen die Art durch; `tsc` grün, je ein Test, dass der Kopf einer Übung
   „ÜBUNG“ trägt.
-- [ ] 6.4 e2e: `frontend/e2e/etb-druck.spec.ts` um eine Übung erweitern (Druckkopf trägt „ÜBUNG“,
+- [x] 6.4 e2e: `frontend/e2e/etb-druck.spec.ts` um eine Übung erweitern (Druckkopf trägt „ÜBUNG“,
   in Chromium das Randfeld laut erzeugtem PDF-Text); lokal in Chromium grün.
 - [x] 6.5 Satz mit Verweis in `frontend/src/druck/AGENTS.md` (D10).
 
