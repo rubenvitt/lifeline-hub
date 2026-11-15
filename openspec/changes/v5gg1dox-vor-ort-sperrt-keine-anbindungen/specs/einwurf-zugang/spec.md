@@ -20,3 +20,7 @@ bleibt möglich. Eine Direktkopplung vor Ort mit einem zweiten ELW MUST NOT sper
 #### Scenario: Direktkopplung vor Ort sperrt nicht
 - **WHEN** ein ELW sich für seine Org nur per Direktkopplung vor Ort bei einem zweiten ELW meldet und ein Einwurf eines Zugangs der Org kommt
 - **THEN** nimmt der Server ihn an, das Paneel nennt keinen Sperrgrund, und ein Admin kann Einwurf-Zugänge anlegen und Schlüssel wechseln
+
+#### Scenario: Hub und Direktkopplung zugleich
+- **WHEN** ein ELW sich für seine Org per Direktkopplung vor Ort bei einem zweiten ELW und per Standardkopplung bei einem Hub meldet
+- **THEN** bleibt die Sperre, und das Paneel nennt den Hub, nicht den zweiten ELW
