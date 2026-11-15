@@ -77,15 +77,17 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
 ### Ein Modul öffnen
 
 1. Links eine Kategorie wählen: „Führung“, „Kräfte“, „Erfass.“ (Erfassung), „Lage“, „Komm.“
-   (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das erste Modul der
-   Kategorie und zeigt daneben ihre Module.
+   (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das Modul der
+   Kategorie, das in diesem Einsatz zuletzt offen war, beim ersten Mal in ihr erstes Modul, und
+   zeigt daneben ihre Module. Unter jedem Modul steht in bis zu zwei Zeilen, was es enthält.
 
    ![Geöffneter Einsatz: Kopfzeile mit Einsatzname, Suchen, Alarmzentrale, SYNC und Uhr; links die Kategorien, daneben die Module der Kategorie „Führung“, rechts der Überblick](../bilder/einsatz-oberflaeche/arbeitsflaeche.png)
 
 2. In der Modulliste das Modul wählen. Die Zahl neben einem Modul zählt dessen Inhalt, etwa
    Einträge im Einsatztagebuch, offene Aufträge oder ungelesene Nachrichten im Chat.
 3. Die Modulliste einklappen: unten in der Kategorienleiste „Menü“ wählen, oder ein zweites
-   Mal auf die offene Kategorie tippen. „Menü“ klappt sie wieder aus.
+   Mal auf die offene Kategorie tippen. „Menü“ klappt sie wieder aus. Eingeklappt bleibt sie
+   auch beim Sprung in eine andere Kategorie.
 
 Auf schmalen Schirmen (Tablet hochkant, Telefon) stehen Kategorien und Module hinter
 „Navigation öffnen“ links oben.

@@ -100,9 +100,11 @@ werden. Das ist gewollt, die Trefffläche wächst mit.
 
 ### D5 Drawer-Breite
 
-`navDrawerBreite` wird zu `'min(360px, calc(100vw - 48px))'`. Nimmt antds `size` keinen
-CSS-Ausdruck, steht die Breite stattdessen in `styles.wrapper.width`. Das klärt die Umsetzung am
-Typ von antd 6. Wächter ist ein e2e-Maß bei 390 × 844 (342 px).
+`navDrawerBreite` wird 360, dazu kommt `navDrawerRand = 48`. Beide bleiben Zahlen, weil das
+Design System sie als Längen-Token erzeugt und kein `min(…)` kennt. `EinsatzLayout` setzt daraus
+`size="min(360px, calc(100vw - 48px))"`; antd 6.7 reicht den CSS-Ausdruck an `@rc-component/drawer`
+durch. Das Design System wird neu erzeugt (`tokens.json`, neues Token `nav-drawer-rand`). Wächter
+ist ein e2e-Maß bei 390 × 844 (342 px).
 
 ### D6 Kopplungsende als Restzeit
 

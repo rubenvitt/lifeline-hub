@@ -24,7 +24,7 @@ import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { freigabenFixture } from '../test/fixtures';
 import { stelle, zeitfenster } from '../test/verpflegungDaten';
 import { formatiereDatenstand } from '../components/Datenstand';
-import { kopplungEndetBald } from './GeraeteKopf';
+import { kopplungEndetBald, kopplungRestText } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
 import { queueLeerenFuerTests } from '../offline/queue';
 // Die Hilfe ist ein eigener Chunk (`App.tsx`, `lazy`) und lädt eager alle Kapiteltexte
@@ -528,7 +528,10 @@ describe('Gerätehülle — Kopfzeile', () => {
     expect(within(kopf).getByText('Tablet 1')).toBeVisible();
     const ende = kopf.querySelector('[data-lfh="kopf-kopplungsende"]')!;
     expect(ende.getAttribute('data-bald')).toBe('nein');
-    expect(ende.textContent).toMatch(/^bis /);
+    // LLH-1734: Restzeit mit Wort statt „bis 041800“; die Endzeit steht im Hinweis und im Namen.
+    expect(ende.textContent).toBe('Kopplung noch 8 h');
+    expect(ende.getAttribute('title')).toMatch(/^Kopplung bis \S/);
+    expect(ende.getAttribute('aria-label')).toMatch(/^Kopplung noch 8 Stunden, bis \S/);
   });
 
   it('Kopplung endet bald: in 40 Minuten mit Wort hervorgehoben', async () => {
@@ -540,8 +543,11 @@ describe('Gerätehülle — Kopfzeile', () => {
     );
     const ende = kopf.querySelector('[data-lfh="kopf-kopplungsende"]')!;
     expect(ende.getAttribute('data-bald')).toBe('ja');
-    expect(ende.textContent).toMatch(/^endet /);
-    expect(ende.getAttribute('aria-label')).toMatch(/endet bald/);
+    expect(ende.textContent).toBe('Kopplung noch 40 min');
+    expect(ende.getAttribute('aria-label')).toMatch(
+      /^Kopplung endet bald, noch 40 Minuten, bis \S/,
+    );
+    expect(ende.getAttribute('title')).toMatch(/Verlängern: Einsatzleitung/);
   });
 
   it('Verbindung weg: „offline“ und der Stand der angezeigten Daten', async () => {
@@ -1279,6 +1285,30 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
 });
 
 describe('Bausteine', () => {
+  it('kopplungRestText: ganze Stunden ab einer Stunde, darunter Minuten (LLH-1734)', () => {
+    // Abgerundet auf Stunden: lieber früher gewarnt; Minuten aufgerundet, die letzte heißt „1 min“.
+    expect(kopplungRestText('2026-10-04 15:40:00', JETZT)).toEqual({
+      kurz: 'noch 5 h',
+      lang: 'noch 5 Stunden',
+    });
+    expect(kopplungRestText('2026-10-04 11:00:00', JETZT)).toEqual({
+      kurz: 'noch 1 h',
+      lang: 'noch 1 Stunde',
+    });
+    expect(kopplungRestText('2026-10-04 10:40:00', JETZT)).toEqual({
+      kurz: 'noch 40 min',
+      lang: 'noch 40 Minuten',
+    });
+    expect(kopplungRestText('2026-10-04 10:00:30', JETZT)).toEqual({
+      kurz: 'noch 1 min',
+      lang: 'noch 1 Minute',
+    });
+    expect(kopplungRestText('2026-10-04 09:59:00', JETZT)).toEqual({
+      kurz: 'endet',
+      lang: 'endet jetzt',
+    });
+  });
+
   it('kopplungEndetBald: unter einer Stunde bald, ab einer Stunde nicht', () => {
     expect(kopplungEndetBald('2026-10-04 10:59:00', JETZT)).toBe(true);
     expect(kopplungEndetBald('2026-10-04 11:00:00', JETZT)).toBe(false);

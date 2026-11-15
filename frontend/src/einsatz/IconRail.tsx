@@ -1,7 +1,8 @@
-import type { CSSProperties } from 'react';
+import { useLayoutEffect, useState, type CSSProperties } from 'react';
 import { theme } from 'antd';
 import { IconSeitenleisteAuf, IconSeitenleisteZu } from '../icons';
 import { railBreite } from '../components/Kopfleiste';
+import { leseRahmenOben, useRahmenOben } from '../components/rahmenOben';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
 
@@ -83,6 +84,44 @@ const ETIKETT_STIL: CSSProperties = {
 };
 
 /**
+ * Der Vorlauf der Rail (LLH-1734, design.md D3 in `openspec/changes/f24jkokr-rahmen-kleinteile/`):
+ * was im Fluss über ihr steht und nicht zum klebenden Rahmen zählt, also die Betriebszeile ab `md`,
+ * das Spiegelband und die Warnung zu den Modulfreigaben. Gemessen als Abstand der `<nav>` vom
+ * Dokumentanfang minus `--lfh-rahmen-oben`; die `<nav>` klebt nicht, ihr Abstand hängt also nicht
+ * am Rollstand.
+ *
+ * Neu gemessen, wenn sich `body` in der Größe ändert (eine Zeile erscheint oder verschwindet) oder
+ * der Rahmen eine neue Höhe meldet; geschrieben im nächsten Bild, wie in `rahmenOben.ts` (LLH-1335).
+ */
+function useVorlauf(): [(el: HTMLElement | null) => void, number] {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [vorlauf, setVorlauf] = useState(0);
+  const rahmenOben = useRahmenOben();
+  useLayoutEffect(() => {
+    if (!el) return;
+    const messen = () => {
+      const oben = el.getBoundingClientRect().top + window.scrollY;
+      setVorlauf(Math.max(0, Math.round(oben - leseRahmenOben())));
+    };
+    messen();
+    let geplant = 0;
+    const beobachter = new ResizeObserver(() => {
+      if (geplant) return;
+      geplant = requestAnimationFrame(() => {
+        geplant = 0;
+        messen();
+      });
+    });
+    beobachter.observe(document.body);
+    return () => {
+      beobachter.disconnect();
+      if (geplant) cancelAnimationFrame(geplant);
+    };
+  }, [el, rahmenOben]);
+  return [setEl, vorlauf];
+}
+
+/**
  * Schmale vertikale Kategorie-Rail, 60 px.
  *
  * Das Etikett steht SICHTBAR, nicht im Tooltip: auf dem Führungs-Tablet gibt es kein Hover. Es
@@ -92,6 +131,7 @@ const ETIKETT_STIL: CSSProperties = {
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick, panel }: Props) {
   const { token } = theme.useToken();
+  const [navRef, vorlauf] = useVorlauf();
 
   const ziel = (k: Kategorie) => {
     const aktiv = k.key === aktiveKategorie;
@@ -126,8 +166,10 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
 
   return (
     <nav
+      ref={navRef}
       aria-label="Kategorien"
       style={{
+        ['--lfh-rail-vorlauf' as string]: `${vorlauf}px`,
         display: 'flex',
         flexDirection: 'column',
         background: rahmenFarben.grund,
@@ -144,15 +186,15 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
          klebende Teile (Kategorien oben, Fuß unten) überlappten bei geringer Höhe in `handschuh`,
          und keiner rollte die verdeckte Kategorie frei. Reicht die Höhe nicht, rollt die Spalte in
          sich, und der Fuß folgt den Kategorien (LLH-1273): die Kategorien stehen zuerst im Bild,
-         nichts liegt unter einem klebenden Teil. Steht über dem Kopf eine Zeile im Fluss
-         (Betriebszeile ab `md`), endet die Spalte um ihre Höhe unter dem Fensterrand, bis die Seite
-         so weit gerollt ist. */}
+         nichts liegt unter einem klebenden Teil. Was im Fluss über der Rail steht (Betriebszeile ab
+         `md`), zieht die Spalte als Vorlauf ab (LLH-1734), sonst lag der Fuß bei Rollstand 0 um
+         dessen Höhe unter dem Fensterrand. Gerollt bleibt darunter ein Streifen im Grund der Rail. */}
       <div
         data-lfh="rail-spalte"
         style={{
           position: 'sticky',
           top: 'var(--lfh-rahmen-oben, 0px)',
-          height: 'calc(100dvh - var(--lfh-rahmen-oben, 0px))',
+          height: 'calc(100dvh - var(--lfh-rahmen-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',

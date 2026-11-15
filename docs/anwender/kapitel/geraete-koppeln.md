@@ -78,8 +78,8 @@ Für die Einsatzleitung:
 
 3. „Verlängern“ wählen.
 
-Am Gerät steht das Ende der Kopplung in der Kopfzeile; in der letzten Stunde davor ist es
-hervorgehoben.
+Am Gerät steht die Restzeit der Kopplung in der Kopfzeile („Kopplung noch 5 h“); in der letzten
+Stunde davor zählt sie in Minuten und ist hervorgehoben.
 
 ### Neuen Code ausstellen
 

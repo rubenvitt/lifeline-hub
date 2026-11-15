@@ -54,7 +54,13 @@ import { useViewport } from '../components/useViewport';
 import { useDokumentTitel } from '../components/useDokumentTitel';
 import type { EinsatzAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzStatus } from '../theme/statusFarben';
-import { farbenDunkel, navDrawerBreite, rahmenFarben, schrift } from '../theme/tokens';
+import {
+  farbenDunkel,
+  navDrawerBreite,
+  navDrawerRand,
+  rahmenFarben,
+  schrift,
+} from '../theme/tokens';
 import {
   einsaetzePfad,
   einsatzEinstellungenPfad,
@@ -628,8 +634,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         <Drawer
           placement="left"
           title="Navigation"
-          // `size`, nicht `width` (in antd 6 abgekündigt).
-          size={navDrawerBreite}
+          // `size`, nicht `width` (in antd 6 abgekündigt); antd reicht den CSS-Ausdruck durch.
+          size={`min(${navDrawerBreite}px, calc(100vw - ${navDrawerRand}px))`}
           open={navOffen}
           onClose={() => setNavOffen(false)}
           destroyOnHidden

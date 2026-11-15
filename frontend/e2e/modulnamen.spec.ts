@@ -118,3 +118,42 @@ test('1366 × 768: die Kräfte stehen mit Beschreibung ganz im Modulpanel', asyn
   await beschreibungenImRahmen(panel, '1366 px, Kräfte');
   await expect(zeilen.last()).toBeInViewport({ ratio: 1 });
 });
+
+/**
+ * LLH-1734 (Spec `modul-benennung`, `einsatztauglichkeit-layout`): einzeilig endete im 208 px
+ * breiten Panel fast jede Beschreibung in „…“, und der Handy-Drawer war fest 280 px breit. Jetzt
+ * bricht die Beschreibung auf zwei Zeilen um, und der Drawer nutzt bis zu 360 px.
+ */
+test('1440 px: die Beschreibungen der Führung stehen ohne Auslassung im Modulpanel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page);
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  const panel = page.locator('#modul-panel');
+  await expect(panel).toBeVisible();
+  // Vorbedingung: die Zeile aus der Meldung steht da (einzeilig: „Kennzahlen, Fristen, Entschei…“).
+  await expect(
+    panel.getByRole('button', { name: 'Überblick' }).locator('[data-lfh="modul-beschreibung"]'),
+  ).toHaveText('Kennzahlen, Fristen, Entscheidungen');
+  const abgeschnitten = await panel
+    .locator('[data-lfh="modul-beschreibung"]')
+    .evaluateAll((alle) =>
+      alle
+        .filter((b) => b.scrollHeight > b.clientHeight || b.scrollWidth > b.clientWidth)
+        .map((b) => b.textContent),
+    );
+  expect(abgeschnitten, 'keine Beschreibung abgeschnitten').toEqual([]);
+});
+
+test('390 × 844: der Navigations-Drawer ist 342 px breit', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+  const drawer = page.locator('.ant-drawer-content-wrapper');
+  await expect(drawer).toBeVisible();
+  await expect.poll(async () => Math.round((await drawer.boundingBox())?.width ?? 0)).toBe(342);
+});

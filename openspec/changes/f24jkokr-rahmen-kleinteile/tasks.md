@@ -26,25 +26,25 @@ Jede Aufgabe per TDD: erst der Test, der ohne die Änderung rot ist, dann der Co
 
 ## 3. Rail-Fuß im Fenster (D3)
 
-- [ ] 3.1 `IconRail.tsx`: Vorlauf messen und von der Spaltenhöhe abziehen, Kommentar zur Spalte
+- [x] 3.1 `IconRail.tsx`: Vorlauf messen und von der Spaltenhöhe abziehen, Kommentar zur Spalte
       nachziehen; e2e-Fall in `e2e/rahmen-stehen-bleiben.spec.ts`: 1366 × 768, offline geschaltet,
       Rollstand 0 → Unterkante von „Einst.“ ≤ Fensterhöhe; ohne Änderung rot.
 
 ## 4. Beschreibungen und Drawer (D4, D5)
 
-- [ ] 4.1 `modulBeschreibungStil` auf zwei Zeilen mit Auslassung; Unit-Test in
+- [x] 4.1 `modulBeschreibungStil` auf zwei Zeilen mit Auslassung; Unit-Test in
       `ModulPanel.test.tsx` prüft Zeilenbegrenzung 2 und `whiteSpace: 'normal'`.
-- [ ] 4.2 `navDrawerBreite` als `min(360px, calc(100vw - 48px))` (über `size` oder
+- [x] 4.2 `navDrawerBreite` als `min(360px, calc(100vw - 48px))` (über `size` oder
       `styles.wrapper`, je nach antd-Typ); e2e-Maß bei 390 × 844 ergibt 342 px, und bei 1440 px
-      steht unter „Lagebesprechung“ die Beschreibung ohne Auslassung (`scrollHeight ≤
-      clientHeight`), in `e2e/modulnamen.spec.ts` oder einer benachbarten Spec.
+      steht keine Beschreibung der Führung abgeschnitten (`scrollHeight ≤ clientHeight`), Mutationsprobe
+      rot, in `e2e/modulnamen.spec.ts` oder einer benachbarten Spec.
 
 ## 5. Kopplungsende als Restzeit (D6)
 
-- [ ] 5.1 Reine Funktion `kopplungRestText` in `geraet/GeraeteKopf.tsx`; Unit-Tests für 5 h 40 →
+- [x] 5.1 Reine Funktion `kopplungRestText` in `geraet/GeraeteKopf.tsx`; Unit-Tests für 5 h 40 →
       „noch 5 h“, 60 min → „noch 1 h“, 40 min → „noch 40 min“, 30 s → „noch 1 min“, abgelaufen →
       „endet“.
-- [ ] 5.2 `KopplungsEnde` zeigt „Kopplung noch …“, `title`/`aria-label` „Kopplung bis
+- [x] 5.2 `KopplungsEnde` zeigt „Kopplung noch …“, `title`/`aria-label` „Kopplung bis
       <zeitpunkt>“; `GeraeteHuelle.test.tsx` und die e2e-Specs, die `kopf-kopplungsende` lesen,
       angepasst und grün.
 

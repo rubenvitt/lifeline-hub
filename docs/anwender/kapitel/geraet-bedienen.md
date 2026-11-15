@@ -39,12 +39,13 @@ der Einsatzleitung einen neuen geben.“
 ### Kopfzeile lesen
 
 1. Links stehen die Stelle (bei Ansichten ohne Stelle die Ansicht) und die Gerätebezeichnung.
-2. Rechts folgen das Ende der Kopplung („bis …“), die Verbindung, die Uhr und das Gerätemenü.
+2. Rechts folgen die Restzeit der Kopplung („Kopplung noch 5 h“), die Verbindung, die Uhr und das
+   Gerätemenü. Die genaue Endzeit zeigt der Hinweis beim Darüberfahren oder langen Antippen.
 
-   ![Kopfzeile eines UHS-Tablets mit Stelle, Gerät, hervorgehobenem „endet …“, Verbindung, Uhr und Gerätemenü](../bilder/geraet-bedienen/kopfzeile.png)
+   ![Kopfzeile eines UHS-Tablets mit Stelle, Gerät, hervorgehobenem „Kopplung noch 45 min“, Verbindung, Uhr und Gerätemenü](../bilder/geraet-bedienen/kopfzeile.png)
 
-In der letzten Stunde vor dem Ende steht „endet …“ hervorgehoben; verlängern kann nur die
-Einsatzleitung. Ohne Netz zeigt die Kopfzeile zusätzlich, von wann die angezeigten Daten sind
+In der letzten Stunde vor dem Ende zählt die Restzeit in Minuten („Kopplung noch 40 min“) und ist
+hervorgehoben; verlängern kann nur die Einsatzleitung. Ohne Netz zeigt die Kopfzeile zusätzlich, von wann die angezeigten Daten sind
 („Stand …“).
 
 ### Darstellung, Bediendichte und Helligkeit einstellen

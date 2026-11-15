@@ -17,8 +17,8 @@ Modulname bleiben.
 #### Scenario: Lange Beschreibung im Modulpanel
 
 - **WHEN** eine Person bei 1440 px die Kategorie Führung öffnet
-- **THEN** steht unter „Lagebesprechung“ „Termin, Vorbereitung, Entschluss“ vollständig, ohne
-  Auslassung
+- **THEN** steht unter „Überblick“ „Kennzahlen, Fristen, Entscheidungen“ vollständig, und keine
+  Beschreibung der Kategorie endet mit Auslassung
 
 #### Scenario: Handy
 
