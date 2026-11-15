@@ -9,7 +9,7 @@
 
 ## 2. Regel und Doku
 
-- [x] 2.1 ADR-0049 ersetzt ADR-0045 (akzeptierte ADRs sind unveränderlich, `docs/architektur/AGENTS.md`): alle Regeln übernommen, eine Regel nennt die Ausnahme, Prüfung verlangt `art <> 'vor_ort'` in `src/instanz/repo.rs`; ADR-0045 auf `ersetzt`; `scripts/adr-fuer.sh src/instanz/repo.rs` zeigt die neue Regel, die Prüfung des ADR-Wächters ist grün
+- [x] 2.1 ADR-0051 ersetzt ADR-0045 (akzeptierte ADRs sind unveränderlich, `docs/architektur/AGENTS.md`): alle Regeln übernommen, eine Regel nennt die Ausnahme, Prüfung verlangt `art <> 'vor_ort'` in `src/instanz/repo.rs`; ADR-0045 auf `ersetzt`; `scripts/adr-fuer.sh src/instanz/repo.rs` zeigt die neue Regel, die Prüfung des ADR-Wächters ist grün
 - [x] 2.2 `docs/anwender/kapitel/aufbewahrung.md` („Ein Archiv einspielen“, „Nicht am Hub“, „Wer was darf“) und `docs/betrieb/backup-restore.md` („Nicht an einem Hub“) nennen die Ausnahme; die Doku-Wächter in `check-all.sh` sind grün
 
 ## 3. Abschluss
