@@ -1,5 +1,5 @@
 import { Typography, theme } from 'antd';
-import { useEffect, useImperativeHandle, useMemo, useState, forwardRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { EtbBaustein } from '../api/types';
 import { filterSlashEintraege, type MetaFeld, type SlashEintrag } from './schnellerfassungModell';
 
@@ -67,6 +67,17 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   const { token } = theme.useToken();
 
   useEffect(() => setAktiv(0), [filter, offen]);
+
+  // Die gewählte Zeile bleibt im Bild (LLH-1847): das Menü rollt ab rund acht Zeilen (im
+  // Handschuh-Betrieb ab drei), und die Pfeiltasten wanderten sonst unsichtbar weiter. `nearest`
+  // rollt nur so weit wie nötig und lässt die Seite dahinter stehen.
+  const liste = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!offen) return;
+    liste.current?.querySelector('[role="option"][aria-selected="true"]')?.scrollIntoView?.({
+      block: 'nearest',
+    });
+  }, [aktiv, offen]);
 
   useImperativeHandle(
     ref,
@@ -181,6 +192,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
 
   return (
     <div
+      ref={liste}
       data-testid="slash-menu"
       // Eigenes Attribut statt des Testids: der Aufrufer nimmt das Menü vom
       // „Klick daneben schliesst"-Griff aus, und dafür darf er sich nicht auf
