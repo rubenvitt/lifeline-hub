@@ -133,7 +133,7 @@ Einsatzleitung, aus den Führungsfunktionen der Mitglieder oder aus anderen Date
 
 Die Übernahme in den Lagebericht SHALL unter „Einsatzleitung“ dieselbe Angabe tragen. Solange die
 Führungsstelle lädt, MUST die Übernahme gesperrt sein. Das gilt für beide Wege: „In Lagebericht
-übernehmen“ am Organigramm und „Aus Meldebild und Führungsorganisation übernehmen“.
+übernehmen“ am Organigramm und „Aus Kräfteübersicht und Führungsorganisation übernehmen“.
 
 Führt mindestens ein Mitglied des Einsatzes in seiner Mitgliedschaft ein Sachgebiet S1–S6, SHALL
 neben der Wurzel eine Stabsstelle „Stab“ stehen, mit jedem so geführten Sachgebiet und den Namen

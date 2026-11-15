@@ -51,7 +51,7 @@ Vitest-Läufe in `frontend/` mit `mise exec -- pnpm exec vitest run <datei>`, Ru
 ## 6. Gesamtprüfung
 
 - [x] 6.1 Im Browser gegen die Demo-Lage: „rtw“, „kraefte“, „funk“, „hilfe“ in der Palette; „Meldung erfassen“ öffnet das Formular; Chat-Nachricht als Meldung heraufstufen → steht in Meldungen; Rail mit „Betroffene & Schäden“, ETB unter Führung; Hilfe-Bereiche. Prüfung: Bilder für PR und Meldung
-- [ ] 6.2 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün. Prüfung: Gesamtstatus aus dem Lauf
+- [x] 6.2 `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün. Prüfung: Gesamtstatus aus dem Lauf
 
 ## Workflow follow-up
 

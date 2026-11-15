@@ -29,6 +29,11 @@ das Modul im h1 nennen und den Reiter darunter, nicht umgekehrt.
 - **WHEN** eine Person in der Sprungpalette „Betroffene“ sucht
 - **THEN** findet sie das Modul unter diesem Namen, und die Seite trägt das h1 „Betroffene“
 
+#### Scenario: Kräfteübersicht
+
+- **WHEN** eine Person in der Sprungpalette „Kräfteübersicht“ sucht
+- **THEN** findet sie das Modul unter diesem Namen, und die Seite trägt das h1 „Kräfteübersicht“
+
 #### Scenario: Fernmeldewesen
 
 - **WHEN** eine Person im Modul Fernmeldewesen den Reiter „Kommunikationsplan“ öffnet
@@ -58,8 +63,8 @@ Modulname bleiben.
 
 #### Scenario: ETB im Menü
 
-- **WHEN** eine Person die Kategorie Erfassung öffnet
-- **THEN** steht unter „ETB“ „Einsatztagebuch“
+- **WHEN** eine Person die Kategorie Führung öffnet
+- **THEN** steht „ETB“ direkt unter „Überblick“, und unter „ETB“ steht „Einsatztagebuch“
 
 #### Scenario: Lange Beschreibung im Modulpanel
 
@@ -99,3 +104,57 @@ Bearbeitung“ tragen; das Modul Lagemeldungen behält seinen Namen und trägt d
 
 - **WHEN** eine Person die Kategorie Kommunikation öffnet
 - **THEN** steht dort „Meldungen“ mit der Zeile „Eingang, Ausgang, Bearbeitung“, und das h1 der Seite lautet „Meldungen“
+
+### Requirement: Die Kräfteübersicht heißt nicht mehr Meldebild
+Das Modul der Kräfte mit Schlüssel `kraefteuebersicht` SHALL überall sichtbar „Kräfteübersicht“
+heißen: Menü, Seite, Druck, Lagebericht-Übernahme, Hilfe und Website. „Meldebild“ MUST als
+Synonym in der Sprungpalette weiter treffen. Der Begriff „Sachverhalt / Meldebild“ der
+Einsatzdaten MUST bleiben; er meint den gemeldeten Sachverhalt der Leitstelle.
+
+#### Scenario: Menü und Seite
+- **WHEN** eine Person die Kategorie Kräfte & Mittel öffnet und das erste Modul wählt
+- **THEN** heißen Menüeintrag, h1 und Tab-Titel „Kräfteübersicht“
+
+#### Scenario: Verweise auf das Modul
+- **WHEN** eine Einheit in der Verdichtungszeile auf das Kräftemodul verweist
+- **THEN** lautet der Verweis „Kräfteübersicht“
+
+#### Scenario: Einsatzdaten bleiben
+- **WHEN** eine Person die Einsatzdaten öffnet
+- **THEN** heißt das Feld weiterhin „Sachverhalt / Meldebild“
+
+#### Scenario: Hilfe-Adresse bleibt
+- **WHEN** jemand ein Lesezeichen auf `/hilfe/meldebild` öffnet
+- **THEN** zeigt die Hilfe das Kapitel „Kräfteübersicht und Kräfte-Zeitachse“
+
+### Requirement: Die Kategorie der Betroffenen
+Die Kategorie, die Betroffene, Unfallhilfsstellen, Evakuierung, Betreuung, Tiere und Schäden
+führt, SHALL „Betroffene & Schäden“ heißen, damit sie nicht wie ihr Modul „Betroffene“ heißt. Ihr
+Etikett in der Rail MUST in die Rail passen, ohne abzuschneiden.
+
+#### Scenario: Rail
+- **WHEN** eine Person die Rail am Fükw sieht
+- **THEN** trägt die dritte Kategorie das Etikett „Betroffene“ oder eine Kurzform davon, vollständig sichtbar, und ihr zugänglicher Name lautet „Betroffene & Schäden“
+
+#### Scenario: Kein doppelter Name
+- **WHEN** eine Person die Kategorie „Betroffene & Schäden“ öffnet
+- **THEN** heißt in der Navigation nur das Modul „Betroffene“, die Kategorie trägt einen anderen Namen
+
+### Requirement: Die Hilfe gliedert wie die Navigation
+Die Bereiche der Anwenderhilfe SHALL den Kategorien der Navigation folgen, in derselben
+Reihenfolge und mit denselben Namen: Einstieg, Führung, Kräfte & Mittel, Betroffene & Schäden,
+Lage, Kommunikation, Einstellungen und Verwaltung, Gekoppelte Geräte. Das Kapitel eines Moduls MUST
+im Bereich der Kategorie seines Moduls stehen. Kapitel ohne eigenes Modul MUST einem Bereich
+zugeordnet sein.
+
+#### Scenario: ETB in der Hilfe
+- **WHEN** eine Person die Hilfe öffnet
+- **THEN** steht „Einsatztagebuch“ im Bereich „Führung“
+
+#### Scenario: Nachforderung in der Hilfe
+- **WHEN** eine Person den Bereich „Kräfte & Mittel“ der Hilfe aufklappt
+- **THEN** steht dort das Kapitel „Nachforderung“
+
+#### Scenario: Chat in der Hilfe
+- **WHEN** eine Person den Bereich „Kommunikation“ der Hilfe aufklappt
+- **THEN** stehen dort Chat, Erinnerungen, Meldungen, Fernmeldewesen und Informationstelefon
