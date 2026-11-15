@@ -88,14 +88,28 @@ export async function waehleAnzeige(
 }
 
 /**
+ * Wählt „Abmelden“ im stehenden Benutzermenü und gibt die Rückfrage zurück, sobald sie ganz
+ * eingeblendet ist: ein Klick in den noch einzoomenden Dialog fiel unter Last neben den Knopf
+ * (gemessen hier, wie LFH-1114 in `einsatz-kern.ts`).
+ */
+export async function oeffneAbmeldenRueckfrage(page: Page, menue: Locator): Promise<Locator> {
+  await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden', exact: true }));
+  const rueckfrage = page.getByRole('dialog', { name: 'Abmelden?' });
+  await expect(rueckfrage).toBeVisible();
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  // Der Fokus steht erst nach der Einblendung auf „Abbrechen“ (design.md D3).
+  await expect(rueckfrage.getByRole('button', { name: 'Abbrechen' })).toBeFocused();
+  return rueckfrage;
+}
+
+/**
  * Abmelden über das Benutzermenü samt Rückfrage (LLH-1730, Spec `benutzermenue`): „Abmelden“ steht
  * zuletzt und rollt im Handschuh-Betrieb am Handy erst ins Bild (`klickeEintrag`), die Rückfrage
  * wird bestätigt. Ein gemeinsamer Weg für alle Specs, die über die Oberfläche abmelden.
  */
 export async function abmeldenUeberMenue(page: Page): Promise<void> {
   const menue = await oeffneMenue(page, page.getByRole('button', { name: 'Benutzermenü' }));
-  await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden', exact: true }));
-  const rueckfrage = page.getByRole('dialog', { name: 'Abmelden?' });
+  const rueckfrage = await oeffneAbmeldenRueckfrage(page, menue);
   await rueckfrage.getByRole('button', { name: 'Abmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
 }

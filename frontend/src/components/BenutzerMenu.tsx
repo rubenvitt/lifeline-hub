@@ -211,7 +211,9 @@ export default function BenutzerMenu({
         </div>
       ),
     },
-    { type: 'divider' },
+    // KEIN TRENNER ZWISCHEN KOPF UND PROFIL (LLH-1730, design.md D1): der Trenner vor „Abmelden“
+    // kostete am Handy in `komfortabel` die letzten 5 px, „Abmelden“ ragte unter den Rand. Der Kopf
+    // ist als Gruppe ohnehin abgesetzt.
     { key: 'profil', icon: <IconPerson />, label: 'Profil' },
     // AUF JEDER BREITE (LFH-392, LLH-1642): die Kopfzeile ist die Aktionsreihe, eine Einstellung
     // gehört dort nicht hinein. Wer das an eine Breite hängt, nimmt allen drei Achsen ihren

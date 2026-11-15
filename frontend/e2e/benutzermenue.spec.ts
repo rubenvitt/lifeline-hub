@@ -1,7 +1,14 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
-import { klickeEintrag, offenesMenue, oeffneMenue } from './menue-kern';
-import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { offenesMenue, oeffneAbmeldenRueckfrage, oeffneMenue } from './menue-kern';
+import {
+  anmeldenAlsAdmin,
+  benachrichtigungenQuittieren,
+  benutzerAnlegen,
+  mitgliedEintragen,
+  wechsleZu,
+  wechsleZuRolle,
+} from './rollen-kern';
 
 /**
  * Das entschlackte Benutzermenü (LLH-1642, Spec `benutzermenue`): Platz am Handy, Tastatur in der
@@ -107,10 +114,10 @@ for (const nutzer of NUTZER) {
     );
     await expect(offenesMenue(page)).toHaveCount(1);
     // „Abmelden“ steht zuletzt und ist durch Rollen erreichbar (LLH-1730); „Abbrechen“ lässt die
-    // Person angemeldet.
-    await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden', exact: true }));
-    const rueckfrage = page.getByRole('dialog', { name: 'Abmelden?' });
-    await rueckfrage.getByRole('button', { name: 'Abbrechen' }).click();
+    // Person angemeldet. Per ↵ auf dem fokussierten „Abbrechen“: am Handy liegt eine
+    // Info-Benachrichtigung des Rollenwechsels zeitweise über dem Dialogfuß und finge den Klick.
+    const rueckfrage = await oeffneAbmeldenRueckfrage(page, menue);
+    await page.keyboard.press('Enter');
     await expect(rueckfrage).toBeHidden();
     await expect(page).toHaveURL(/\/einsaetze/);
   });
@@ -126,19 +133,13 @@ test('Rückfrage aus dem Menü: Fokus auf „Abbrechen“, Bestätigen meldet ab
   await page.setViewportSize({ width: 1180, height: 820 });
   await page.goto('/einsaetze');
   const menue = await oeffneMenue(page, ausloeser(page));
-  await klickeEintrag(menue.getByRole('menuitem', { name: 'Abmelden', exact: true }));
-  const rueckfrage = page.getByRole('dialog', { name: 'Abmelden?' });
-  await expect(rueckfrage.getByRole('button', { name: 'Abbrechen' })).toBeFocused();
+  // Wartet die Einblendung ab und sichert den Fokus auf „Abbrechen“ zu.
+  const rueckfrage = await oeffneAbmeldenRueckfrage(page, menue);
   await page.keyboard.press('Enter');
   await expect(rueckfrage).toBeHidden();
   await expect(page).toHaveURL(/\/einsaetze/);
 
-  await klickeEintrag(
-    (await oeffneMenue(page, ausloeser(page))).getByRole('menuitem', {
-      name: 'Abmelden',
-      exact: true,
-    }),
-  );
+  await oeffneAbmeldenRueckfrage(page, await oeffneMenue(page, ausloeser(page)));
   await rueckfrage.getByRole('button', { name: 'Abmelden', exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
 });
@@ -164,22 +165,33 @@ test('Rückfrage aus der Sprungpalette: ↵ schließt die Palette, ↵ in der R�
 });
 
 /**
- * Reiter „Anzeige“ der Einsatz-Einstellungen (LLH-1730): am Handy im Handschuh-Betrieb als
- * Beobachter stehen die fünf Helligkeitsstufen in einer Zeile, ohne über die Leiste zu ragen, und
- * eine Wahl wirkt. Der Beobachter ist der Rollenzweig ohne Schreibrecht (`e2e/AGENTS.md`).
+ * Reiter „Anzeige“ der Einsatz-Einstellungen (LLH-1730, Szenario „Ohne Recht und im
+ * abgeschlossenen Einsatz“): ein Beobachter im abgeschlossenen Einsatz, am Handy im
+ * Handschuh-Betrieb. Die fünf Helligkeitsstufen stehen in einer Zeile, ohne über die Leiste zu
+ * ragen, und eine Wahl wirkt. Der Rollenzweig ist Vorbedingung (`e2e/AGENTS.md`): „Allgemein“
+ * zeigt diesem Nutzer „Nur Ansicht“, „Anzeige“ nicht.
  */
-test('Reiter „Anzeige“ am Handy im Handschuh-Betrieb, als Beobachter bedienbar', async ({
+test('Reiter „Anzeige“ am Handy im Handschuh-Betrieb, als Beobachter im abgeschlossenen Einsatz', async ({
   page,
 }) => {
   await dichte(page, 'handschuh');
-  await anmeldenAlsAdmin(page);
-  const einsatzId = await einsatzAnlegen(page, `Anzeige Beobachter ${Date.now()}`);
-  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await anmeldenAlsAdmin(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `Anzeige Beobachter ${Date.now()}`);
+  const konto = await benutzerAnlegen(page, 'beobachter');
+  await mitgliedEintragen(page, einsatzId, konto.id, 'beobachter');
+  const zu = await page.request.post(`/api/einsaetze/${einsatzId}/abschliessen`);
+  expect(zu.ok(), await zu.text()).toBe(true);
+  await benachrichtigungenQuittieren(konto);
+  await wechsleZu(page, konto);
   await page.setViewportSize(HANDY);
-  await page.goto(`/einsaetze/${einsatzId}/einstellungen/anzeige`);
+
+  // Gegenprobe des Rollenzweigs mit demselben Locator: „Allgemein“ ist für ihn gesperrt.
+  const rechteHinweis = page.locator('[data-lfh="rechte-hinweis"]');
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/allgemein`);
+  await expect(rechteHinweis).toBeVisible();
+  await page.getByRole('tab', { name: 'Anzeige' }).click();
   await expect(page.getByRole('tab', { name: 'Anzeige', selected: true })).toBeVisible();
-  // Vorbedingung des Rollenzweigs: kein Rechtehinweis, die Leisten sind bedienbar.
-  await expect(page.locator('[data-lfh="rechte-hinweis"]')).toHaveCount(0);
+  await expect(rechteHinweis).toHaveCount(0);
   const helligkeit = page.getByRole('radiogroup', { name: 'Helligkeit in %' });
   const mass = await helligkeit.evaluate((leiste) => {
     const l = leiste.getBoundingClientRect();
