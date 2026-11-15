@@ -861,8 +861,9 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     )
     .await;
     assert_eq!(st, StatusCode::ACCEPTED, "{v}");
-    // Mit Anhang geht es am Spiegel nicht.
-    let (st, _) = common::anfrage_json(
+    // Mit Anhang geht es am Spiegel nicht. Das Feld ist für sich gültig, es scheitert am Zustand
+    // „Spiegel“: 422 nach der Statuscode-Konvention (`src/AGENTS.md`), Wortlaut unverändert.
+    let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
         &format!("/api/einsaetze/{s}/etb"),
@@ -873,7 +874,11 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
         ),
     )
     .await;
-    assert_eq!(st, StatusCode::BAD_REQUEST);
+    assert_eq!(st, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(
+        v["error"], "Anhänge gehen an einem Spiegel nicht; ohne Anhang erneut erfassen.",
+        "{v}"
+    );
 
     for _ in 0..3 {
         abgleichen(&elw).await;
