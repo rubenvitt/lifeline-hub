@@ -17,9 +17,9 @@ TDD: erst der Test, der ohne die Änderung rot ist.
 ## 2. ETB hält das Senden an (D1–D4)
 
 - [x] 2.1 `etb/EtbFeldzeile.tsx` reicht `onDiscard` des Felds Zeit durch; `etb/Schnellerfassung.tsx`
-  führt `zeitVerworfen` und setzt es beim Entwurfswechsel zurück. Prüfen: Test in
+  führt `zeitDiscarded` und setzt es beim Entwurfswechsel zurück. Prüfen: Test in
   `Schnellerfassung.test.tsx`, dass ein Wechsel des Entwurfs keinen Grund mitnimmt.
-- [x] 2.2 `absenden()` hält an, wenn `zeitVerworfen` oder `zeitBefehlGrund` gesetzt ist, nach
+- [x] 2.2 `absenden()` hält an, wenn `zeitDiscarded` oder `zeitBefehlGrund` gesetzt ist, nach
   Von/An-Pflicht und Zeichengrenzen, vor der Zukunftsprüfung; Grund „Zeit nicht übernommen: …“ als
   `role="alert"` in der Fußzeile, Feld Zeit in der Fehlerrolle, Fokus dorthin. Prüfen: Tests für
   „14:3x“ + Klick auf „Erfassen“ (`blur` dann `click`), „2460“ + Enter im Inhalt, „/zeit 2590 Pumpe“

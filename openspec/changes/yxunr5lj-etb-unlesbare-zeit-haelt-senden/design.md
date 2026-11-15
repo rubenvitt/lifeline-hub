@@ -38,7 +38,7 @@ Motivation: `proposal.md`, „Why“. Stand im Code:
 läuft, wenn sich der Grund einer verworfenen Eingabe ändert: mit dem Grund beim Verwerfen im
 `onBlur`, mit `null`, sobald der Grund weicht (erneutes Tippen, Wahl im Kalender,
 Schnellwahl, Escape während des Tippens). Die ETB-Erfassung führt ihn als Zustand
-`zeitVerworfen` und prüft ihn in `absenden()`.
+`zeitDiscarded` und prüft ihn in `absenden()`.
 
 - *Verworfen:* den getippten Text über eine Ref aus dem Feld lesen. Das Feld hielte dann zwei
   Wahrheiten (Text und Grund), und die Erfassung müsste die Deutung wiederholen.
@@ -111,9 +111,9 @@ davor). Fehlen Von oder An, geht der Fokus dorthin wie bisher; erst danach zur Z
 
 ### D4 · Stand nach dem Senden und beim Entwurfswechsel
 
-`zeitVerworfen` gehört zum Entwurf, ist aber kein gespeicherter Wert: Nach einem erfolgreichen
+`zeitDiscarded` gehört zum Entwurf, ist aber kein gespeicherter Wert: Nach einem erfolgreichen
 Senden ist er ohnehin `null` (sonst wäre nicht gesendet worden). Beim Wechsel des Entwurfsreiters
-wird das Feld neu eingehängt und meldet keinen Grund mehr; die Erfassung setzt `zeitVerworfen`
+wird das Feld neu eingehängt und meldet keinen Grund mehr; die Erfassung setzt `zeitDiscarded`
 dabei auf `null`, damit kein Grund aus dem anderen Entwurf hängen bleibt.
 
 ## Risks / Trade-offs

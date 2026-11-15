@@ -55,6 +55,17 @@ Text, Felder und Anhänge bleiben. Andere Formulare behalten die Spec `zeiteinga
   geklickt wird
 - **THEN** wird der unveränderte Wert gesendet, wie die Spec `zeiteingabe` es verlangt
 
+### Requirement: Ein Grund für die Zeit in der Fußzeile
+Die Fußzeile der ETB-Erfassung MUST zur Zeit genau einen Grund nennen, und zwar den, an dem ein Halt
+hängt: eine unlesbare Zeit geht einer Zeit in der Zukunft vor, beide gehen dem höflichen Hinweis
+„/zeit: …“ beim Tippen vor.
+
+#### Scenario: Unlesbares `/zeit` vor einer Zeit in der Zukunft
+- **WHEN** das Feld Zeit 18:20 zeigt, es 14:31 ist, „/zeit 2590 Pumpe“ getippt und „Erfassen“
+  gewählt wird
+- **THEN** entsteht kein Eintrag, und die Fußzeile nennt nur „/zeit im Text: …“, nicht „liegt in der
+  Zukunft“; ist die Angabe berichtigt, gilt wieder die Prüfung auf die Zukunft
+
 ## MODIFIED Requirements
 
 ### Requirement: Kurzeingabe der Ereigniszeit

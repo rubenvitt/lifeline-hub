@@ -2234,6 +2234,17 @@ describe('Unlesbare Zeit hält das Senden an (LLH-1866)', () => {
     expect(screen.queryByText('Zeit liegt in der Zukunft')).toBeNull();
   });
 
+  it('der Alarm beim Halt hängt neu ein, statt den höflichen Hinweis umzuwidmen (Vorleser, Review 4)', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(inhaltFeld(), '/zeit 2590 Pumpe');
+    const hinweis = screen.getByRole('status');
+    await userEvent.click(erfassenKnopf());
+    const alarm = await screen.findByRole('alert');
+    expect(alarm).not.toBe(hinweis);
+    expect(hinweis).not.toBeInTheDocument();
+  });
+
   it('ein anderer Entwurf übernimmt keinen Grund', async () => {
     const p = props();
     const { rerender } = renderMitProviders(<Schnellerfassung key="a" {...p} />);

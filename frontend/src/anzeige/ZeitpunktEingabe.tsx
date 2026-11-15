@@ -229,14 +229,14 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   /** Getippter Text; `null` = es wird nicht getippt, das Feld zeigt den Wert. */
   const [text, setText] = useState<string | null>(null);
   /** Grund einer verworfenen Eingabe, bis erneut getippt wird. */
-  const [verworfen, setVerworfenState] = useState<string | null>(null);
+  const [discarded, setDiscardedState] = useState<string | null>(null);
   // Gemeldet wird im Ereignis selbst, nicht in einem Effekt: das Verwerfen geschieht beim Verlassen
   // (`mousedown` auf einen Knopf), und dessen `click` muss den Grund schon kennen (LLH-1866).
-  const verworfenReported = useRef<string | null>(null);
-  function setVerworfen(grund: string | null) {
-    setVerworfenState(grund);
-    if (verworfenReported.current === grund) return;
-    verworfenReported.current = grund;
+  const discardReported = useRef<string | null>(null);
+  function setDiscarded(grund: string | null) {
+    setDiscardedState(grund);
+    if (discardReported.current === grund) return;
+    discardReported.current = grund;
     onDiscard?.(grund);
   }
   const [offenIntern, setOffenIntern] = useState(false);
@@ -252,8 +252,8 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   useEffect(() => {
     if (prevWert.current === wertKey) return;
     prevWert.current = wertKey;
-    if (verworfenReported.current != null) setVerworfen(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `setVerworfen` meldet nur weiter
+    if (discardReported.current != null) setDiscarded(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `setDiscarded` meldet nur weiter
   }, [wertKey]);
   // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
   // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten, React ruft die Ref dabei mit
@@ -295,7 +295,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
           nurTag,
         });
   const leerVerboten = deutung?.ok && deutung.zeitpunkt === null && allowClear === false;
-  const grund = deutung && !deutung.ok ? deutung.grund : leerVerboten ? 'Angabe fehlt' : verworfen;
+  const grund = deutung && !deutung.ok ? deutung.grund : leerVerboten ? 'Angabe fehlt' : discarded;
 
   function melde(neu: Dayjs | null) {
     if (gleich(neu, wert)) return;
@@ -309,13 +309,13 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
       // Der gezeigte Wert wird ausdrücklich bestätigt: ein Grund einer früher verworfenen Eingabe
       // gilt nicht mehr (LLH-1866, D1a).
       setText(null);
-      setVerworfen(null);
+      setDiscarded(null);
       return wert ?? null;
     }
     if (!deutung.ok || leerVerboten) return false;
     melde(deutung.zeitpunkt);
     setText(null);
-    setVerworfen(null);
+    setDiscarded(null);
     return deutung.zeitpunkt;
   }
 
@@ -327,7 +327,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   function ausWahl(neu: Dayjs) {
     melde(neu);
     setText(null);
-    setVerworfen(null);
+    setDiscarded(null);
     onOk?.(neu);
   }
 
@@ -409,7 +409,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
         }}
         onChange={(e) => {
           setText(e.target.value);
-          setVerworfen(null);
+          setDiscarded(null);
         }}
         onKeyDown={(e) => {
           const speichern = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's';
@@ -427,18 +427,18 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
             // weiter, wie es Escape dort immer tut.
             e.preventDefault();
             setText(null);
-            setVerworfen(null);
-          } else if (e.key === 'Escape' && verworfen !== null) {
+            setDiscarded(null);
+          } else if (e.key === 'Escape' && discarded !== null) {
             // Ohne Tippen nimmt Escape den Grund der verworfenen Eingabe zurück (LLH-1866, D1a); der
             // Tastendruck gehört dann dem Feld, wie oben.
             e.preventDefault();
-            setVerworfen(null);
+            setDiscarded(null);
           }
           onKeyDown?.(e);
         }}
         onBlur={(e) => {
           if (text !== null && uebernimmText() === false) {
-            setVerworfen(grund);
+            setDiscarded(grund);
             setText(null);
           }
           onBlur?.(e);

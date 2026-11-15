@@ -361,8 +361,8 @@ Am Bildschirm mit Spalten nennt das Menü auch die Vermerke der Zeile. Ein Foto 
 „Vorschau: …“ für die Großansicht und, wer Originale laden darf, „Original (mit Standort): …
 herunterladen“, auch wenn die Spalte Vermerk kein Vorschaubild zeigt. Das gilt auch für ein
 HEIC-Foto vom iPhone: das Gerät wandelt es für die Großansicht um, bis dahin dreht sich ein
-Ladezeichen, und Escape bricht ab. Lässt es sich nicht umwandeln oder antwortet der Server nicht,
-meldet die App „keine Vorschau möglich“. Ist der Anhang auf einer
+Ladezeichen, und Escape bricht ab. Kommt das Bild nicht vom Server oder lässt es sich nicht
+umwandeln, meldet die App „keine Vorschau möglich“. Ist der Anhang auf einer
 gespiegelten Instanz noch nicht da, meldet das Herunterladen „wird geholt“.
 
 ### Abgeschlossener Einsatz

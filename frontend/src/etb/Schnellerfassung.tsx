@@ -396,8 +396,8 @@ export default function Schnellerfassung({
    * Zusätzlich als Ref: das Verwerfen geschieht beim `mousedown` auf „Erfassen“, und `absenden`
    * im `click` desselben Klicks soll es sicher sehen.
    */
-  const [zeitVerworfen, setZeitVerworfenState] = useState<string | null>(null);
-  const zeitVerworfenRef = useRef<string | null>(null);
+  const [zeitDiscarded, setZeitDiscardedState] = useState<string | null>(null);
+  const zeitDiscardedRef = useRef<string | null>(null);
   /** Ein Sendeversuch wurde wegen unlesbarer Zeit angehalten; die Fußzeile nennt den Grund. */
   const [isUnlesbarHalted, setIsUnlesbarHalted] = useState(false);
   /**
@@ -413,8 +413,8 @@ export default function Schnellerfassung({
   const zeitImInhalt = erkenneZeitBefehl(inhalt, { zone: anzeigeZone, jetzt: serverJetzt() });
   const zeitBefehlGrund = zeitImInhalt && !zeitImInhalt.ok ? zeitImInhalt.grund : null;
   function handleZeitDiscard(grund: string | null) {
-    zeitVerworfenRef.current = grund;
-    setZeitVerworfenState(grund);
+    zeitDiscardedRef.current = grund;
+    setZeitDiscardedState(grund);
     // Ist kein Grund mehr übrig, endet der Halt: ein späterer Grund meldet sich dann wieder nur
     // höflich beim Tippen, nicht als Alarm (Review B3).
     if (grund == null && zeitBefehlGrund == null) setIsUnlesbarHalted(false);
@@ -621,7 +621,7 @@ export default function Schnellerfassung({
       text = zeit.rest;
     }
     // Bleibt kein Grund, endet ein Halt (Review B3); der Grund selbst folgt dem Text.
-    if (!(zeit && !zeit.ok) && zeitVerworfenRef.current == null) setIsUnlesbarHalted(false);
+    if (!(zeit && !zeit.ok) && zeitDiscardedRef.current == null) setIsUnlesbarHalted(false);
     if (befehl || (zeit?.ok && ausloesen)) {
       setInhalt(text);
       aktualisiereTrigger(text, text.length);
@@ -687,7 +687,7 @@ export default function Schnellerfassung({
   function bausteinEinsetzen(felder: BausteinFelder) {
     if (sendet) return;
     setInhalt(felder.inhalt);
-    if (zeitVerworfenRef.current == null) setIsUnlesbarHalted(false);
+    if (zeitDiscardedRef.current == null) setIsUnlesbarHalted(false);
     setMetadaten((m) => ({
       ...m,
       ...(felder.meldeweg ? { meldeweg: felder.meldeweg } : {}),
@@ -811,7 +811,7 @@ export default function Schnellerfassung({
       selectInText(zeitImInhalt.angabe);
       return;
     }
-    if (zeitVerworfenRef.current != null) {
+    if (zeitDiscardedRef.current != null) {
       setIsUnlesbarHalted(true);
       fokusFeld('ereigniszeit');
       return;
@@ -941,8 +941,8 @@ export default function Schnellerfassung({
     ? null
     : zeitBefehlGrund != null
       ? `/zeit im Text: ${zeitBefehlGrund}`
-      : zeitVerworfen != null
-        ? `Zeit nicht übernommen: ${zeitVerworfen}`
+      : zeitDiscarded != null
+        ? `Zeit nicht übernommen: ${zeitDiscarded}`
         : null;
   const nachtragMin = zukunftJetzt ? null : nachtragMinuten(metadaten.ereigniszeit, jetzt);
   // Heute nur die Uhrzeit, sonst mit Tag, in der Darstellung der Person (`anzeige/zeitDarstellung.ts`).
@@ -1030,9 +1030,11 @@ export default function Schnellerfassung({
         </span>
       ))}
       {/* EIN Grund zur Zeit, und zwar der, an dem der Halt hängt: `absenden` prüft die unlesbare
-          Zeit vor der Zukunft (Review 3, B1). Alle tragen dieselbe `id`, also nur einer im Bild. */}
+          Zeit vor der Zukunft (Review 3, B1). Alle tragen dieselbe `id`, also nur einer im Bild; je
+          ein `key`, damit ein neuer Grund neu einhängt und ein Vorleser den Alarm ansagt. */}
       {unlesbarGrund ? (
         <span
+          key="unlesbar"
           id={zeitGrundId}
           role="alert"
           data-lfh="etb-zeit-grund"
@@ -1043,6 +1045,7 @@ export default function Schnellerfassung({
         </span>
       ) : zukunftJetzt ? (
         <span
+          key="zukunft"
           id={zeitGrundId}
           role="alert"
           data-lfh="etb-zeit-grund"
@@ -1055,6 +1058,7 @@ export default function Schnellerfassung({
         // Höflich, nicht `alert`: der Grund erscheint beim Tippen, nicht beim Absenden, und
         // unterbräche sonst die Eingabe am Vorleser.
         <span
+          key="befehl"
           id={zeitGrundId}
           role="status"
           data-lfh="etb-zeit-hinweis"
