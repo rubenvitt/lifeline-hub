@@ -38,9 +38,9 @@ const MINUTE_MS = 60 * 1000;
 
 /**
  * Restzeit der Kopplung für die Kopfzeile (LLH-1734, Spec `feldgeraet-bedienung`): `kurz` sichtbar,
- * `lang` für den zugänglichen Namen. Ab einer Stunde ganze Stunden, abgerundet (lieber früher
- * gewarnt), darunter Minuten, aufgerundet (die letzte heißt „1 min“, nicht „0 min“). Danach
- * „endet“, bis die Hülle auf „Kopplung beendet“ wechselt.
+ * `lang` für den zugänglichen Namen. Ab einer Stunde ganze Stunden, darunter Minuten, beide
+ * abgerundet (lieber früher gewarnt; aufgerundet folgte auf „1 h“ eine Minute „60 min“). Die letzte
+ * Minute heißt „1 min“, nicht „0 min“. Danach „endet“, bis die Hülle auf „Kopplung beendet“ wechselt.
  */
 export function kopplungRestText(
   laeuftAbAt: string,
@@ -52,7 +52,7 @@ export function kopplungRestText(
     const h = Math.floor(rest / STUNDE_MS);
     return { kurz: `noch ${h} h`, lang: `noch ${h} ${h === 1 ? 'Stunde' : 'Stunden'}` };
   }
-  const min = Math.ceil(rest / MINUTE_MS);
+  const min = Math.max(1, Math.floor(rest / MINUTE_MS));
   return { kurz: `noch ${min} min`, lang: `noch ${min} ${min === 1 ? 'Minute' : 'Minuten'}` };
 }
 
@@ -95,7 +95,8 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
       data-bald={bald ? 'ja' : 'nein'}
       role="img"
       aria-label={
-        bald
+        // „bald“ nur, solange Zeit bleibt; abgelaufen sagt `rest.lang` selbst „endet jetzt“.
+        bald && rest.kurz !== 'endet'
           ? `Kopplung endet bald, ${rest.lang}, bis ${ende}`
           : `Kopplung ${rest.lang}, bis ${ende}`
       }

@@ -534,6 +534,18 @@ describe('Gerätehülle — Kopfzeile', () => {
     expect(ende.getAttribute('aria-label')).toMatch(/^Kopplung noch 8 Stunden, bis \S/);
   });
 
+  it('Kopplung abgelaufen: „endet“, ohne doppeltes „endet“ im zugänglichen Namen', async () => {
+    stelleBereit(geraet({ laeuft_ab_at: '2026-10-04 09:59:00' }));
+    renderApp('/geraet');
+    const kopf = await screen.findByRole('banner');
+    await waitFor(() =>
+      expect(kopf.querySelector('[data-lfh="kopf-kopplungsende"]')).not.toBeNull(),
+    );
+    const ende = kopf.querySelector('[data-lfh="kopf-kopplungsende"]')!;
+    expect(ende.textContent).toBe('Kopplung endet');
+    expect(ende.getAttribute('aria-label')).toMatch(/^Kopplung endet jetzt, bis \S/);
+  });
+
   it('Kopplung endet bald: in 40 Minuten mit Wort hervorgehoben', async () => {
     stelleBereit(geraet({ laeuft_ab_at: '2026-10-04 10:40:00' }));
     renderApp('/geraet');
@@ -1286,7 +1298,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
 
 describe('Bausteine', () => {
   it('kopplungRestText: ganze Stunden ab einer Stunde, darunter Minuten (LLH-1734)', () => {
-    // Abgerundet auf Stunden: lieber früher gewarnt; Minuten aufgerundet, die letzte heißt „1 min“.
+    // Abgerundet, lieber früher gewarnt; die letzte Minute heißt „1 min“, nicht „0 min“.
     expect(kopplungRestText('2026-10-04 15:40:00', JETZT)).toEqual({
       kurz: 'noch 5 h',
       lang: 'noch 5 Stunden',
@@ -1298,6 +1310,11 @@ describe('Bausteine', () => {
     expect(kopplungRestText('2026-10-04 10:40:00', JETZT)).toEqual({
       kurz: 'noch 40 min',
       lang: 'noch 40 Minuten',
+    });
+    // Knapp unter einer Stunde nicht „noch 60 min“ (Review LLH-1734): nach „1 h“ folgt „59 min“.
+    expect(kopplungRestText('2026-10-04 10:59:30', JETZT)).toEqual({
+      kurz: 'noch 59 min',
+      lang: 'noch 59 Minuten',
     });
     expect(kopplungRestText('2026-10-04 10:00:30', JETZT)).toEqual({
       kurz: 'noch 1 min',
