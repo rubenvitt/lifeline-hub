@@ -335,9 +335,10 @@ export type PersonMenuKey = 'fuehrer' | 'vom-fahrzeug' | 'aus-einheit' | `auf:${
 
 /**
  * Die Einträge des Menüs einer Person in der Folge aus D9: „Als Einheitsführer“ (nicht beim EF),
- * „Auf <Funkrufname>“ je anderem Fahrzeug der Einheit, dann rot „Vom Fahrzeug lösen“ (nur wer auf
- * einem Fahrzeug sitzt) und „Aus Einheit lösen“. Den Trenner setzt `MenueAusloeser` vor die
- * roten. Die Besatzungswege brauchen `canEditBesatzung`, die übrigen `canEditEinheit`; der
+ * „Auf <Funkrufname>“ je anderem Fahrzeug der Einheit, dann „Vom Fahrzeug lösen“ (nur wer auf
+ * einem Fahrzeug sitzt) und „Aus Einheit lösen“. Beide Lösen-Einträge stehen neutral: sie haben
+ * einen Rückgängig-Hinweis, rot ist im Menü nur Unumkehrbares (LLH-1722, `frontend/AGENTS.md`,
+ * „Destruktiv ist nicht gleich destruktiv“). Die Besatzungswege brauchen `canEditBesatzung`, die übrigen `canEditEinheit`; der
  * Aufrufer reicht `canEditBesatzung` nur, wenn die Besatzung zu sehen ist (`hasBesatzung`).
  */
 export function buildPersonMenuItems(
@@ -356,11 +357,11 @@ export function buildPersonMenuItems(
       }
     }
     if (person.fahrzeugId != null) {
-      items.push({ key: 'vom-fahrzeug', label: 'Vom Fahrzeug lösen', gefahr: true });
+      items.push({ key: 'vom-fahrzeug', label: 'Vom Fahrzeug lösen' });
     }
   }
   if (rechte.canEditEinheit) {
-    items.push({ key: 'aus-einheit', label: 'Aus Einheit lösen', gefahr: true });
+    items.push({ key: 'aus-einheit', label: 'Aus Einheit lösen' });
   }
   return items;
 }

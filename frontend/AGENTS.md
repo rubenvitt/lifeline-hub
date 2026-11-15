@@ -267,6 +267,15 @@ Kein Fach-Modul baut einen zweiten Baustein dafür; die Seiten stellen ihre Fach
 (Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte,
 Bereitstellungsraum, Betreuung).
 
+**Ort von „Bearbeiten“ und Form des Anlegens** (LLH-1722, D8): „Bearbeiten“ eines Paneels steht
+im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
+Kopfs). Anlegen geht über das `ErfassungsModal`; eine eigene Seite nur bei einem Ablauf oder mehr
+als ~5 Pflichtfeldern (Patient, Einheit aus Vorlage); ein eingeklapptes Formular nur bei
+Serienerfassung neben einer Liste; **kein Drawer zum Anlegen**. Altstellen mit Folgeaufgabe: UHS
+und Bereitstellungsraum bearbeiten im Modal und legen im Drawer an (`UhsBearbeitenModal`,
+`BrBearbeitenModal`, `UhsAnlegenDrawer`, `BrAnlegenDrawer`); die eingeklappten Formulare von
+Nachforderung, Meldungen, Lagemeldungen und Erinnerungen sind auf Serienerfassung zu prüfen.
+
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
 Liste/Karte (`components/Liste.tsx`, `Datensicht` `form="karte"`); Kachel nur für Überblick.
@@ -667,6 +676,24 @@ anwendbar), „nicht geprüft" ist keins.
   `aktionen != null`, gibt er bei leerer Menge selbst `null` zurück. Test über
   `.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`. Kartenmodus: `Datensicht`
   baut `weitere`.
+- **Beenden: Verb, Ort und Sicherung je Art** (LLH-1722, Spec `bedien-muster`,
+  `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D1): eine Handlung, die einen Datensatz
+  beendet, gehört zu genau einer Art, und die Art bestimmt alles:
+
+  | Art             | Verb                                                                               | Ort                                                                                                                           | Sicherung                                                                                                                              |
+  | --------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+  | Zuordnung lösen | „Aus <Ziel> lösen“, „Vom <Ziel> lösen“; „Abziehen“ (UHS), „Austragen“ (BR) bleiben | ⋮ der Zeile; sichtbarer Knopf nur als einzige Handlung der Zeile                                                              | ohne Rückfrage, Rückgängig; fällt der Datensatz aus der Ansicht, hält die Zeile „Gelöst · Rückgängig“ (`components/useHoldGeloest.ts`) |
+  | Kraft entlassen | „Entlassen“, Material „Aus dem Einsatz nehmen“                                     | Liste: ⋮; Detail: letzter Abschnitt „Aus dem Einsatz“; **nie Hauptaktion einer Karte**                                        | Rückgängig nur, wenn der Rückweg den Zustand davor herstellt, sonst Rückfrage                                                          |
+  | Gebilde beenden | „Auflösen“ (endgültig), „Schließen“ (umkehrbar)                                    | Auflösen: letzter Abschnitt der Detailseite (Vorbild `EinheitAufloesen`), ohne Detailseite rot im ⋮; Schließen: Statusschritt | Auflösen: Rückfrage mit Folgesatz und benanntem Knopf; Schließen: Rückgängig                                                           |
+  | Fehlanlage      | „Stornieren“                                                                       | immer ⋮, rot hinter dem Trenner (Detailseite: ⋮ des Kopfs), nie ein sichtbarer Knopf                                          | Rückfrage im Dialog                                                                                                                    |
+  | Eigene Buchung  | „Zurücknehmen“ („Zurückziehen“, „Aufheben“ bleiben Fachwörter)                     | Zeile oder ⋮                                                                                                                  | Rückfrage, Grund nur, wo das Fach ihn verlangt                                                                                         |
+
+  In der gehaltenen Zeile steht „Gelöst“ träge an der Stelle des Auslösers, der gelöst hat,
+  „Rückgängig“ an der Stelle eines Reglers, der nichts löst: ein zweiter Tipp trifft nie den
+  Rückweg. **Bekannte Lücke:** Personal-Entlassen und Material „Aus dem Einsatz nehmen“ machen beim
+  Rückgängig nur die Kraft wieder aktiv, ohne ihre Bindungen; bis zu ihren Folgeaufgaben bleibt das
+  so, ohne Rückfrage. Das Fahrzeug nimmt vollständig zurück (`…/entlassen/zuruecknehmen`).
+
 - **Kontextmenü nur über den Baustein** (LLH-1596, Spec `datensatz-aktionsmenue`,
   `openspec/changes/archive/2026-11-08-om9oxxiq-kontextmenue-baustein/design.md`): Rechtsklick, langer Druck (550 ms,
   8 px) und Kontextmenü-Taste/Umschalt+F10 kommen aus **`components/useKontextMenue.ts`**, das Menü
@@ -699,6 +726,10 @@ anwendbar), „nicht geprüft" ist keins.
   Last verhungert der Timer, und der erste echte Klick geht verloren. Guard und Gegenprobe in
   `zugPointerSensor.test.tsx`, Nachweis `e2e/uhs-grundriss-menue-belegung.spec.ts`.
 - **„Genau eine Primäraktion"** prüft der Kopf (`data-lfh="seitenkopf-aktionen"`), nicht global.
+  **Höchstens zwei Handlungen als Knopf im Kopf einer Detailseite** (LLH-1722, Spec
+  `bedien-muster`): die Primäraktion und eine zweite, ein Statusschritt vor „Bearbeiten“; alles
+  Weitere (Stornieren, Bearbeiten an zweiter Stelle, Rückwege) steht im ⋮ des Kopfs. So steht der
+  Kopf ab `lg` in der Zeile des Titels, statt unter ihn umzubrechen. Auflösen steht nicht im Kopf.
 - **Ein Anker in der Zeile bedient den Klick allein** (Riegel `closest('a')` in `Datensicht`);
   mit `titel.ziel` erzeugt das `render` keinen Anker.
 - **Der Kopf-Slot trägt, was ÖFFNET — nie, was ABSENDET**; Speichern gehört ins `<form>`.
@@ -866,7 +897,7 @@ anwendbar), „nicht geprüft" ist keins.
   Rechte wie beim Zuordnen (Schreibrecht und Freigabe Material); ein beendeter Ort sperrt Zuordnen,
   Erfassen und Ausgeben, nicht Status und Lösen. Nachweis `kraefte/materialSchreibweg.test.tsx`.
   Eine selbst gelöste Zeile hält ihre Stelle als träge Marke „Gelöst“, bis Zeiger und Fokus den
-  Baustein verlassen haben (LLH-1254, `useHoldGeloest` in `kraefte/MaterialAmOrt.tsx`); Rückgängig
+  Baustein verlassen haben (LLH-1254, `components/useHoldGeloest.ts`); Rückgängig
   über `kommunikation/rueckgaengig.tsx`, nicht am beendeten Ort, Ablehnung über dem Block.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`checkVerlassen`, `components/useZuflussSchleuse.ts`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
@@ -926,7 +957,11 @@ anwendbar), „nicht geprüft" ist keins.
   Nachweis `e2e/dialogfuss-dichte.spec.ts`, `e2e/dokumente.spec.ts`.
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",
   „Deaktivieren", eine gelöste Zuordnung) → Abstand + `danger`, keine Rückfrage; Unumkehrbares →
-  Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}` und benanntem `okText`.
+  Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}` und benanntem `okText`. **Im
+  ⋮-Menü ist nur Unumkehrbares rot** (LLH-1722, D2): ein Lösen, Entlassen oder Austragen mit
+  Rückgängig steht neutral unter den umkehrbaren, `gefahr` nur für Stornieren, Auflösen und
+  Ähnliches (Wächter `components/menueFarbe.guard.test.ts`). In der Zeile trennt der rote Knopf,
+  im Menü der Trenner.
   **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**
   (LFH-960, Spec `bedien-wortlaut`): der Einsatzabschluss steht als letzter Abschnitt auf den
   Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.
@@ -956,7 +991,10 @@ und `pages/personen/`.
   es einen **serverseitigen** Rückweg gibt (`POST …/vollzug` → `offen`,
   `POST …/erinnerungen/{eid}/oeffnen`, `uebergang_erlaubt` eine Stufe zurück); sonst bleibt sie.
   Toast `kommunikation/rueckgaengig.tsx` mit festem Schlüssel; nach einer Nutzeraktion ist er
-  keine Alarmmeldung (EEMUA 191).
+  keine Alarmmeldung (EEMUA 191). Ein Rückgängig stellt den Zustand **vor** der Handlung her, nicht
+  nur „wieder aktiv“; was inzwischen anders gebunden ist, lässt es aus und nennt es im
+  `SeitenHinweis`, statt es still zu überschreiben (Vorbedingung `nur_wenn_frei` beim Zuordnen,
+  LLH-1722). Lücken stehen bei „Beenden: Verb, Ort und Sicherung je Art“.
 - **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`colorError` vor `colorWarning`; prüfbar
   über `data-alarm`/`data-unbearbeitet`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
   fünfte `KommPhase`.

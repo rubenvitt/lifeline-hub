@@ -319,7 +319,7 @@ describe('FahrzeugeBesatzung · ohne Freigabe Personal oder Fahrzeuge (D5)', () 
 });
 
 describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
-  it('Person ohne Fahrzeug: Einheitsführer, auf jedes Fahrzeug, rot aus der Einheit', async () => {
+  it('Person ohne Fahrzeug: Einheitsführer, auf jedes Fahrzeug, neutral aus der Einheit (LLH-1722)', async () => {
     zeige();
     const menue = await oeffneMenue('Dora Ohne');
     expect(eintraege(menue)).toEqual([
@@ -328,7 +328,8 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
       'Auf 83-2',
       'Aus Einheit lösen',
     ]);
-    expect(within(menue).getByRole('separator')).toBeInTheDocument();
+    // Lösen hat einen Rückweg: kein Trenner, kein Rot (Spec `datensatz-aktionsmenue`).
+    expect(within(menue).queryByRole('separator')).toBeNull();
   });
 
   it('der Einheitsführer auf 83-1: auf das andere Fahrzeug, vom Fahrzeug lösen', async () => {

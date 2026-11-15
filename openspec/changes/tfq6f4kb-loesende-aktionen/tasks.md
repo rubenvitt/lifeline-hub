@@ -5,11 +5,11 @@ ist. Pfade im Frontend relativ zu `frontend/src/`.
 
 ## 1. fx4335q2: Muster festlegen (Regel, ADR, Bausteine)
 
-- [ ] 1.1 `frontend/AGENTS.md`, Bedien-Leitlinie: Block „Beenden: Verb, Ort und Sicherung je Art“ (D1) unter „Aktionen“; „Destruktiv ist nicht gleich destruktiv“ um die Menüregel (D2) schärfen; Kopfregel (D3) bei „Genau eine Primäraktion“; „Bearbeiten in der Ansicht“ und „Form nach Umfang“ um D8 samt Altstellenliste ergänzen; „Rückwege und Fehler“ nennt die Lücke bei Personal und Material. Prettier über `frontend/` grün
+- [x] 1.1 `frontend/AGENTS.md`, Bedien-Leitlinie: Block „Beenden: Verb, Ort und Sicherung je Art“ (D1) unter „Aktionen“; „Destruktiv ist nicht gleich destruktiv“ um die Menüregel (D2) schärfen; Kopfregel (D3) bei „Genau eine Primäraktion“; „Bearbeiten in der Ansicht“ und „Form nach Umfang“ um D8 samt Altstellenliste ergänzen; „Rückwege und Fehler“ nennt die Lücke bei Personal und Material. Prettier über `frontend/` grün
 - [ ] 1.2 Neue ADR `docs/architektur/entscheidungen/ADR-<nächste>-…` (Nummer größer als jede auf `origin/alpha`) mit Regeln aus D1–D4 und einer `## Prüfung`, die mindestens „kein `aktion`-Slot mit Entlassen in Kräfte-Listen“ und „Stornieren nicht als sichtbarer Knopf“ als `verbiete` prüft; `scripts/adr-fuer.sh` nennt sie für die betroffenen Seiten, ADR-Wächter grün
-- [ ] 1.3 `useHoldGeloest` nach `components/useHoldGeloest.ts` herauslösen (D7), MaterialAmOrt darauf umstellen; `kraefte/MaterialAmOrt.test.tsx` unverändert grün
-- [ ] 1.4 MaterialAmOrt: gehaltene Zeile trägt „Rückgängig“ an der Stelle der Statuswahl, nicht am beendeten Ort (Spec `material-am-ort`); Test „Rückgängig in der gehaltenen Zeile“ und „zwei Tipps auf Lösen treffen nie Rückgängig“ rot→grün
-- [ ] 1.5 Wächter der Menüfarbe: ein Lösen-, Entlassen- oder Austragen-Eintrag mit `gefahr` ist rot (Test in `components/`, Gegenprobe mit einem präparierten Eintrag)
+- [x] 1.3 `useHoldGeloest` nach `components/useHoldGeloest.ts` herauslösen (D7), MaterialAmOrt darauf umstellen; `kraefte/MaterialAmOrt.test.tsx` unverändert grün
+- [x] 1.4 MaterialAmOrt: gehaltene Zeile trägt „Rückgängig“ an der Stelle der Statuswahl, nicht am beendeten Ort (Spec `material-am-ort`); Test „Rückgängig in der gehaltenen Zeile“ und „zwei Tipps auf Lösen treffen nie Rückgängig“ rot→grün
+- [x] 1.5 Wächter der Menüfarbe: ein Lösen-, Entlassen- oder Austragen-Eintrag mit `gefahr` ist rot (Test in `components/`, Gegenprobe mit einem präparierten Eintrag)
 
 ## 2. zjnw0rkj: Fahrzeug „Entlassen“ vollständig zurücknehmen
 
