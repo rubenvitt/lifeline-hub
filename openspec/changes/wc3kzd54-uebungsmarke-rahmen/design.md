@@ -57,20 +57,25 @@ an sieben Stellen stünde und eine spätere Erweiterung (etwa „Planspiel“) s
 ### D2 Farbrolle `uebung`: gefüllt, Violett, je Modus
 
 Neue Rollen in `Farbrollen` (`theme/tokens.ts`) und `theme/rollen.css` (`--lfh-uebung-*`):
-`uebungFuellung` (Grund von Band und Marke), `uebungSchraffur` (zweiter Streifenton im Band) und
-`uebungText` (Wort darauf). Ausgangswerte, die `uebungKontrast.test.ts` festhält:
+`uebungFuellung` (Grund von Band und Marke), `uebungSchraffur` (zweiter Streifenton im Band),
+`uebungText` (Wort darauf) und `uebungKante` (Umriss gegen dunkle Flächen). Werte, die
+`uebungKontrast.test.ts` festhält, in Nacht und Tag gleich:
 
-| Rolle | Nacht | Tag |
+| Rolle | Wert | gerechnet |
 | --- | --- | --- |
-| `uebungFuellung` | `#7c3aed` | `#6d28d9` |
-| `uebungSchraffur` | `#6d28d9` | `#5b21b6` |
-| `uebungText` | `#ffffff` | `#ffffff` |
+| `uebungFuellung` | `#6d28d9` | Weiß darauf 7,10; gegen helle Flächen ≥ 5,9 |
+| `uebungSchraffur` | `#5b21b6` | Weiß darauf 8,98 |
+| `uebungText` | `#ffffff` | |
+| `uebungKante` | `#a78bfa` | gegen dunkle Flächen und den Rahmen ≥ 6,4 |
 
-Prüfgrenzen: Text auf beiden Streifentönen ≥ 4,5 : 1. Füllung gegen den angrenzenden Grund
-(Rahmen `kopf` darüber, Seitengrund `flaeche` darunter, Kachel `paneel` in der Liste) ≥ 3 : 1
-(Nicht-Text-Kontrast). Trägt ein Wert eine Grenze nicht, verschiebt der Test ihn innerhalb von
-Violett. Die Rolle steht dann auch in `rollen.guard.test.ts` (deckungsgleich mit CSS), und das
-Design System wird neu erzeugt (`frontend/AGENTS.md`, Gestaltungssprache).
+Prüfgrenzen: Das Wort hält auf beiden Streifentönen den Tagesboden 7 : 1, in beiden Modi, weil das
+Band am Rahmen hängt, der in beiden Modi dunkel ist. Der Umriss hält gegen jeden angrenzenden Grund
+(Rahmen, `grund`, `flaeche`, `flaeche2`, `paneel`, `kopf`) ≥ 3 : 1, getragen von der Füllung oder
+der Kante. Bei der Umsetzung hat sich gezeigt, dass kein einzelner Violettton zugleich Weiß ≥ 7
+und ≥ 3 gegen den dunklen Rahmen hält. Deshalb gibt es die eigene Kante, und es gibt keine
+helleren Nachtwerte (der erste Entwurf hatte nachts `#7c3aed`, Weiß darauf nur 5,70). Die Rolle
+steht auch in `rollen.guard.test.ts` (deckungsgleich mit CSS), und das Design System wird neu
+erzeugt (`frontend/AGENTS.md`, Gestaltungssprache).
 *Alternativen:* Gelb-schwarze Warnschraffur (mit Achtung und Störung belegt, und Offline- und
 Spiegelhinweise sähen gleich aus), Hinweis-Blau `bannerGrund` (verwechselbar mit Spiegelband und
 Bedienelementen). Beide hat der Mensch am 15.11.2026 verworfen.

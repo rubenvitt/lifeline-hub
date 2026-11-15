@@ -158,6 +158,16 @@ export interface Farbrollen {
    *  tragen keine Platte (LFH-833): nachts zeichnet sie das Render-Theme `dark` der Bibliothek
    *  selbst hell (`zeichen/zeichenTheme.ts`, LLH-1141). */
   zeichenPlatte: string;
+  /** Übung (LLH-1725, Spec `uebungsmarke`): Grund von Band und Marke. Violett ist NUR Übung und
+   *  in beiden Modi gleich, weil das Band am Rahmen hängt, der in beiden Modi dunkel ist. Das
+   *  Wort hält den Tagesboden 7 : 1 auf Füllung und Schraffur (`uebungKontrast.test.ts`). */
+  uebungFuellung: string;
+  /** Zweiter Streifenton der Schrägschraffur im Band — dunkler als die Füllung. */
+  uebungSchraffur: string;
+  /** Das Wort „ÜBUNG“ auf Füllung und Schraffur. */
+  uebungText: string;
+  /** Umriss von Band und Marke gegen dunkle Flächen (≥ 3 : 1); gegen helle trägt ihn die Füllung. */
+  uebungKante: string;
 }
 
 /**
@@ -266,6 +276,10 @@ export const farbenHell: Farbrollen = {
   lueckeZeile: '#faf3da',
   problemZeile: '#f8eded',
   zeichenPlatte: 'transparent',
+  uebungFuellung: '#6d28d9',
+  uebungSchraffur: '#5b21b6',
+  uebungText: '#ffffff',
+  uebungKante: '#a78bfa',
 };
 
 /**
@@ -351,6 +365,10 @@ export const farbenDunkel: Farbrollen = {
   lueckeZeile: '#161305',
   problemZeile: '#130f0f',
   zeichenPlatte: '#c9ced4',
+  uebungFuellung: '#6d28d9',
+  uebungSchraffur: '#5b21b6',
+  uebungText: '#ffffff',
+  uebungKante: '#a78bfa',
 };
 
 /**

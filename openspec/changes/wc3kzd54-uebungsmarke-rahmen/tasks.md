@@ -5,12 +5,12 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
 
 ## 1. Quelle und Farbrolle
 
-- [ ] 1.1 `istUebung` in `einsatz/einsatzart.ts` (D1) mit Test `einsatzart.test.ts`: wahr nur bei
+- [x] 1.1 `istUebung` in `einsatz/einsatzart.ts` (D1) mit Test `einsatzart.test.ts`: wahr nur bei
   `uebung`, falsch bei den drei anderen Arten, bei `null` und bei `undefined`; Vitest grün.
-- [ ] 1.2 Rollen `uebungFuellung`, `uebungSchraffur`, `uebungText` in `theme/tokens.ts`
+- [x] 1.2 Rollen `uebungFuellung`, `uebungSchraffur`, `uebungText`, `uebungKante` in `theme/tokens.ts`
   (Nacht/Tag) und `theme/rollen.css` (D2); neuer Test `theme/uebungKontrast.test.ts` mit den
-  Grenzen aus D2 (Text ≥ 4,5 auf beiden Streifentönen, Füllung ≥ 3 gegen `kopf`, `flaeche`,
-  `paneel`), dazu `rollen.guard.test.ts` und `gate5.guard.test.ts` grün.
+  Grenzen aus D2 (Wort ≥ 7 auf beiden Streifentönen, Umriss ≥ 3 gegen Rahmen und Flächen),
+  dazu `rollen.guard.test.ts` und `gate5.guard.test.ts` grün.
 
 ## 2. Baustein
 
