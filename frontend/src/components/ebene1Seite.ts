@@ -10,8 +10,9 @@ import {
  * Wo eine Person auf Ebene 1 steht (LFH-954, Spec `seiten-orientierung`) — rein und exportiert.
  *
  * - `titel`: die Teile des Tab-Titels vom engsten zum weitesten Ort („Fahrzeuge · Verwaltung“).
- * - `ort`: der Ortspfad hinter „Einsätze ›“ auf Profil und Verwaltung, sonst `null` (die
- *   Einsatzliste ist selbst der Anfang). Profil und Verwaltung tragen dort den Rückweg in den Einsatz.
+ * - `ort`: der Ortspfad hinter „Einsätze ›“ auf Profil, Benachrichtigungen, Neuigkeiten, Planungen
+ *   und Verwaltung, sonst `null` (die Einsatzliste ist selbst der Anfang). Diese Seiten tragen dort
+ *   den Rückweg in den Einsatz.
  *
  * Die Sektionsnamen kommen aus der Admin-Registry, derselben Quelle wie die Seitenleiste.
  */
@@ -37,6 +38,8 @@ export function ebene1Seite(pathname: string): Ebene1Ort {
   if (teile[0] === 'benachrichtigungen') {
     return { titel: ['Benachrichtigungen'], ort: ['Benachrichtigungen'] };
   }
+  // Neuigkeiten (LLH-1731): wie Profil und Benachrichtigungen aus dem Benutzermenü, mit Rückweg.
+  if (teile[0] === 'neuigkeiten') return { titel: ['Neuigkeiten'], ort: ['Neuigkeiten'] };
   // Vorplanung ohne Einsatz (LLH-1586): die Detailseite bringt ihren eigenen Pfad mit Namen.
   if (teile[0] === 'planungen') return { titel: ['Planungen'], ort: ['Planungen'] };
   if (teile[0] === 'admin') {

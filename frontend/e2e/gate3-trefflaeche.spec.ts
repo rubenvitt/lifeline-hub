@@ -744,14 +744,14 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
 
     // (a) Kategorie-Rail — sechs Kategorien als Mindestmenge.
     const railZiel = await alleHaltenStufe(
-      rail.locator('button'),
+      rail.locator('a, button'),
       BODEN.mitA1Boden[dichte],
       `Kategorie-Ziel (${dichte})`,
       6,
     );
     // Die Rail-Spalte ist fest; in `handschuh` muss sie mitwachsen, sonst bleibt das Ziel
     // 59 px breit (LFH-384). Ein Ziel genügt — alle teilen dieselbe Spaltenbreite.
-    const railBreite = (await rail.locator('button').first().boundingBox())!.width;
+    const railBreite = (await rail.locator('a, button').first().boundingBox())!.width;
     expect(
       railBreite,
       `Kategorie-Ziel (${dichte}, gemessen ${railBreite}px breit, Soll ≥ ${BODEN.mitA1Boden[dichte]})`,
@@ -761,7 +761,7 @@ test('Navigationsrahmen inline: Rail, Modul-Panel, Einsatz-Kopfzeile und Kommand
     const panel = page.locator('[data-lfh="modul-panel"]');
     await expect(panel, 'das Modul-Panel steht am Fükw-Maß').toHaveCount(1);
     const panelZeile = await alleHaltenStufe(
-      panel.locator('button'),
+      panel.locator('a, button'),
       BODEN.staffel[dichte],
       `Modul-Panel-Zeile (${dichte})`,
       5,
@@ -1003,7 +1003,7 @@ test('Navigations-Drawer auf 390 px: Hamburger, Akkordeon-Kopf, Modulzeilen und 
     );
     // Die Route hat „Kräfte & Mittel" aufgeklappt — fünf Module stehen ohne Klick da.
     const modulZeile = await alleHaltenStufe(
-      nav.locator('button:not([aria-expanded])'),
+      nav.locator('a, button:not([aria-expanded])'),
       BODEN.mitA1Boden[dichte],
       `Drawer-Modulzeile (${dichte})`,
       5,
@@ -5846,7 +5846,7 @@ test.describe('Rail bei 1366 × 520 in Handschuh (LLH-1273)', () => {
   const getroffen = (page: Page, x: number, y: number) =>
     page.evaluate(
       ([px, py]) =>
-        document.elementFromPoint(px, py)?.closest('button')?.getAttribute('aria-label'),
+        document.elementFromPoint(px, py)?.closest('a, button')?.getAttribute('aria-label'),
       [x, y] as const,
     );
 
@@ -5861,7 +5861,7 @@ test.describe('Rail bei 1366 × 520 in Handschuh (LLH-1273)', () => {
     const rail = page.getByRole('navigation', { name: 'Kategorien' });
     const spalte = rail.locator('[data-lfh="rail-spalte"]');
     const fuss = rail.locator('[data-lfh="rail-fuss"]');
-    const kategorien = rail.locator('[data-lfh="rail-haupt"] button');
+    const kategorien = rail.locator('[data-lfh="rail-haupt"] :is(a, button)');
     // Vorbedingung: die Spalte reicht nicht für Kategorien UND Fuß. Sonst bewiese der Tipp nichts.
     expect(await spalte.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(0);
     await expect(kategorien).toHaveCount(5);
@@ -5884,7 +5884,7 @@ test.describe('Rail bei 1366 × 520 in Handschuh (LLH-1273)', () => {
         ).toBe(name);
       }
     }
-    const kommunikation = rail.getByRole('button', { name: 'Kommunikation', exact: true });
+    const kommunikation = rail.getByRole('link', { name: 'Kommunikation', exact: true });
     const k = (await kommunikation.boundingBox())!;
     await page.touchscreen.tap(k.x + k.width / 2, k.y + k.height / 2);
     await expect(kommunikation).toHaveAttribute('aria-current', 'true');
@@ -5896,7 +5896,7 @@ test.describe('Rail bei 1366 × 520 in Handschuh (LLH-1273)', () => {
     await expect
       .poll(() => spalte.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop))
       .toBeLessThanOrEqual(1);
-    const einstellungen = rail.getByRole('button', { name: 'Einstellungen', exact: true });
+    const einstellungen = rail.getByRole('link', { name: 'Einstellungen', exact: true });
     const e = (await einstellungen.boundingBox())!;
     expect(e.y + e.height, 'Einstellungen endet nach dem Wischen im Bild').toBeLessThanOrEqual(
       sichtUnten + SUBPIXEL,

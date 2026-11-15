@@ -41,7 +41,7 @@ function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
     setHelligkeit: vi.fn(),
     setKoordinaten: vi.fn(),
     setZeitdarstellung: vi.fn(),
-    logout: vi.fn(),
+    abmelden: vi.fn(),
     ...over,
   };
 }

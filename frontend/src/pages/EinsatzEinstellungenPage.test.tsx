@@ -63,6 +63,7 @@ function rendern(route = '/einsaetze/1/einstellungen/allgemein') {
         <Route path="aufbewahrung" element={<div>Sektionsinhalt Aufbewahrung</div>} />
         <Route path="module" element={<div>Sektionsinhalt Module</div>} />
         <Route path="pegel" element={<div>Sektionsinhalt Pegel</div>} />
+        <Route path="anzeige" element={<div>Sektionsinhalt Anzeige</div>} />
       </Route>
     </Routes>,
     { route },
@@ -138,6 +139,28 @@ describe('EinsatzEinstellungenPage (Sektions-Layout)', () => {
     await screen.findByText('Sektionsinhalt Aufbewahrung');
     expect(container.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
     expect(container.querySelector('[data-lfh="seiten-beschreibung"]')).toBeNull();
+  });
+
+  it('führt „Anzeige“ als letzten Reiter, „Allgemein“ bleibt der erste (LLH-1730)', async () => {
+    rendern();
+
+    const reiter = await screen.findAllByRole('tab');
+    expect(reiter[0]).toHaveAccessibleName('Allgemein');
+    expect(reiter[reiter.length - 1]).toHaveAccessibleName('Anzeige');
+  });
+
+  it('nennt im Reiter „Anzeige“ keine „Nur Ansicht“ — die Wahl gilt dem Gerät (LLH-1730)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'abgeschlossen',
+      meine_rolle: 'beobachter',
+    } as never);
+
+    const { container } = rendern('/einsaetze/1/einstellungen/anzeige');
+
+    await screen.findByText('Sektionsinhalt Anzeige');
+    expect(container.querySelector('[data-lfh="rechte-hinweis"]')).toBeNull();
   });
 
   it('laesst beim laufenden Einsatz keinen leeren Hinweis-Abstand unter dem Kopf', async () => {

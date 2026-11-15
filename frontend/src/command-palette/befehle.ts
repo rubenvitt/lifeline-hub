@@ -608,7 +608,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     label: 'Abmelden',
     icon: IconAbmelden,
     nichtMerkbar: true,
-    ausfuehren: () => k.logout(),
+    ausfuehren: () => k.abmelden(),
   });
 
   // 8. Gedächtnis, ZULETZT, weil beide Hälften die FERTIGE Liste brauchen. Die Position im Array

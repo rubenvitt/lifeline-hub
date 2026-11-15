@@ -146,7 +146,7 @@ test('legt ab, zählt, lädt herunter, filtert und entfernt — der ganze Weg im
   // Der Zähler im Navigationsrahmen belegt zweitens, dass die Ablage im Bestand landet
   // (Serverzähler, LFH-666; das `dokument`-Ereignis frischt ihn auch im ablegenden Tab auf).
   // Angesteuert über die Modulzeile — der Einstieg über die Navigation ist Teil der Aussage.
-  const modulKnopf = page.getByRole('button', { name: /^Dokumente/ });
+  const modulKnopf = page.getByRole('link', { name: /^Dokumente/ });
   const zaehler = modulKnopf.locator('[data-lfh="modul-zaehler"]');
   await expect(modulKnopf, 'Modulzeile „Dokumente" steht im Rahmen').toBeVisible();
   await modulKnopf.click();

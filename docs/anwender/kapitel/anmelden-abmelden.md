@@ -2,7 +2,7 @@
 titel: Anmelden und Abmelden
 gruppen: [alle, geraete]
 reihenfolge: 10
-quellen: [frontend/src/pages/LoginPage.tsx, src/auth/passwort_wechsel.rs, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/stammdaten/zuletztVerwendet.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/pages/LoginPage.tsx, src/auth/passwort_wechsel.rs, frontend/src/pages/AppAnmeldungPage.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/auth/AbmeldenRueckfrage.tsx, src/auth/session.rs, frontend/src/offline/geraetRaeumung.ts, frontend/src/stammdaten/zuletztVerwendet.ts, frontend/src/auth/BenutzerKonfliktDialog.tsx, frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/geraet/KoppelnPage.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -61,11 +61,14 @@ folgt auf „Anmelden“ (und gegebenenfalls den Code) noch ein Schritt:
 
 1. Oben rechts das „Benutzermenü“ (Kachel mit den Initialen) öffnen.
 
-   ![Geöffnetes Benutzermenü mit „Profil“ und „Abmelden“ unter dem Namen der Person, darunter die Gruppe „Anzeige“](../bilder/anmelden-abmelden/benutzermenue.png)
+   ![Geöffnetes Benutzermenü mit „Profil“, der Gruppe „Anzeige“, „Benachrichtigungen“, „Neuigkeiten“, „Hilfe“ und zuletzt „Abmelden“](../bilder/anmelden-abmelden/benutzermenue.png)
 
-2. „Abmelden“ wählen. Die App kehrt zur Anmeldeseite zurück.
+2. „Abmelden“ wählen, den letzten Eintrag. Im Handschuh-Betrieb am Handy liegt er erst nach
+   Rollen im Menü im Bild.
+3. Die Rückfrage „Abmelden?“ mit „Abmelden“ bestätigen. Die App kehrt zur Anmeldeseite zurück.
+   „Abbrechen“ lässt die Person angemeldet.
 
-„Abmelden“ steht auch in der Sprungpalette.
+„Abmelden“ steht auch in der Sprungpalette und fragt dort genauso zurück.
 
 ### Ein Gerät koppeln
 

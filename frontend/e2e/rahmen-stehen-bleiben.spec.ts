@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { abmeldenUeberMenue } from './menue-kern';
 
 /**
  * Der Rahmen bleibt beim Rollen erreichbar (LFH-952, Spec `einsatztauglichkeit-layout`,
@@ -89,12 +90,12 @@ for (const rolle of ['admin', 'beobachter'] as const) {
       expect(Math.round(await oben(page, '[data-lfh="rahmen-kopf"]')), 'Kopf steht oben').toBe(0);
       // Bedienbar, nicht nur sichtbar (`e2e/AGENTS.md`): das Benutzermenü öffnet.
       await page.getByRole('button', { name: 'Benutzermenü' }).click();
-      await expect(page.getByRole('menuitem', { name: 'Abmelden' })).toBeInViewport();
+      await expect(page.getByRole('menuitem', { name: 'Profil' })).toBeInViewport();
       await page.keyboard.press('Escape');
 
       if (b.rail) {
         const kopfUnten = (await kopf.boundingBox())!;
-        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('button', {
+        const etb = page.getByRole('navigation', { name: 'Kategorien' }).getByRole('link', {
           name: 'Erfassung',
         });
         await expect(etb).toBeInViewport();
@@ -105,7 +106,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
         // Bedienbar: der Sprung aus der gerollten Seite führt in die Kategorie.
         const lage = page
           .getByRole('navigation', { name: 'Kategorien' })
-          .getByRole('button', { name: 'Lage', exact: true });
+          .getByRole('link', { name: 'Lage', exact: true });
         await lage.click();
         await expect(lage).toHaveAttribute('aria-current', 'true');
         await expect(page).not.toHaveURL(/\/etb$/);
@@ -139,10 +140,10 @@ test('1366 × 520, handschuh, gerollt: auch die letzte Kategorie ist erreichbar'
   );
 
   const rail = page.getByRole('navigation', { name: 'Kategorien' });
-  const letzte = rail.locator('[data-lfh="rail-haupt"] button').last();
+  const letzte = rail.locator('[data-lfh="rail-haupt"] :is(a, button)').last();
   const name = (await letzte.getAttribute('aria-label'))!;
   await letzte.click();
-  await expect(rail.getByRole('button', { name, exact: true })).toHaveAttribute(
+  await expect(rail.getByRole('link', { name, exact: true })).toHaveAttribute(
     'aria-current',
     'true',
   );
@@ -183,7 +184,10 @@ for (const b of [
   { width: 390, height: 844 },
   { width: 1180, height: 820 },
 ]) {
-  test(`${b.width} px, handschuh: Abmelden ohne Rollen im Benutzermenü`, async ({ page }) => {
+  // LLH-1730: „Abmelden“ steht zuletzt und darf im Handschuh-Betrieb erst durch Rollen ins Bild
+  // kommen; erreichbar und bedienbar bleibt es (Spec `einsatztauglichkeit-layout`, „Benutzermenü:
+  // Einsatzfunktion im Kopf“, Szenario „Schichtwechsel am Handy im Handschuh-Betrieb“).
+  test(`${b.width} px, handschuh: Abmelden im Benutzermenü erreichbar`, async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, `Rahmen Abmelden ${b.width} ${Date.now()}`);
@@ -191,14 +195,7 @@ for (const b of [
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
 
-    await page.getByRole('button', { name: 'Benutzermenü' }).click();
-    const abmelden = page.getByRole('menuitem', { name: 'Abmelden' });
-    // Ohne Rollen: Abmelden steht oben im Menü, das Menü ist dafür nicht gerollt worden.
-    const gerollt = await page.locator('.ant-dropdown-menu').evaluate((m) => m.scrollTop);
-    expect(gerollt, 'Vorbedingung: das Menü steht am Anfang').toBe(0);
-    await expect(abmelden).toBeInViewport();
-    await abmelden.click();
-    await expect(page).toHaveURL(/\/login/);
+    await abmeldenUeberMenue(page);
   });
 }
 

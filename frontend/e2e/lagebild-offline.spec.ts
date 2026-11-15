@@ -3,6 +3,7 @@ import { etbVonSetzen } from './etb-kern';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { anmeldenPerApi } from './anmelde-kern';
+import { abmeldenUeberMenue } from './menue-kern';
 
 // Lagebild ohne Netz lesen (LFH-723, design.md D10).
 //
@@ -286,9 +287,7 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
     // Abmelden OHNE Netz: der Server-Logout scheitert, lokal wird trotzdem abgemeldet — und
     // gelöscht. Mit Netz spülte der Flush die Queue vor dem Abmelden leer, und „sie bleibt"
     // wäre nicht mehr prüfbar (gemessen).
-    await page.getByRole('button', { name: 'Benutzermenü' }).click();
-    await page.getByRole('menuitem', { name: 'Abmelden' }).click();
-    await expect(page).toHaveURL(/\/login/);
+    await abmeldenUeberMenue(page);
 
     await expect.poll(() => vorgehalteneKeys(page), { timeout: 10_000 }).toBeNull();
     expect(await queueEintraege(page)).toBe(1);

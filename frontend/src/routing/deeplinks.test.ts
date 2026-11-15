@@ -1180,6 +1180,7 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
       'benachrichtigungen',
       'geraete',
       'zugriff',
+      'anzeige',
     ]);
     expect(einsatzEinstellungenPfad(E, EINSTELLUNGEN_SEKTIONEN[0].key)).toBe(
       einsatzEinstellungenPfad(E),
@@ -1343,6 +1344,15 @@ describe('hilfePfad / parseHilfeGruppe (LFH-1096)', () => {
     expect(parseHilfeGruppe(rund)).toBe('geraete');
     expect(parseHilfeGruppe(new URLSearchParams('gruppe=leitstelle'))).toBe('alle');
     expect(parseHilfeGruppe(new URLSearchParams(''))).toBe('alle');
+  });
+
+  // LLH-1731 D5: die Herkunft reist in einen neuen Tab, der den History-State nicht erbt.
+  it('trägt die Herkunft als `von`, mit und ohne Gruppe', () => {
+    expect(hilfePfad({ von: '/einsaetze/5/etb' })).toBe('/hilfe?von=%2Feinsaetze%2F5%2Fetb');
+    const rund = new URL(hilfePfad({ gruppe: 'geraete', von: '/einsaetze/5/etb' }), 'http://x');
+    expect(rund.pathname).toBe('/hilfe');
+    expect(rund.searchParams.get('gruppe')).toBe('geraete');
+    expect(rund.searchParams.get('von')).toBe('/einsaetze/5/etb');
   });
 });
 
