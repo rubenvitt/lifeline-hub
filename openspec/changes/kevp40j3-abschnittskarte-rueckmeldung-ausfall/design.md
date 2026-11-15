@@ -24,19 +24,25 @@ Zählweise der Stärken (LLH-1744, Welle 3).
 
 ## Decisions
 
-1. **Daten im Memo, Urteil im Render.** `abschnittZeilen` führt je Zeile `einheitIds` des
-   Teilbaums und den summierten Ausfall (`ausfallMittel`, `ausfallMaterial`). Das Urteil über die
-   Rückmeldung hängt an der Uhr. Deshalb rechnet eine reine Funktion
-   `abschnittRueckmeldung(zeile, je, jetzt)` → `{ ueberfaellig: number; laengsteSeitMin: number | null;
-   keine: number } | null` im Render (Muster `rueckmeldungDerZeile`). `null`, solange die
-   Rückmeldungen nicht feststehen.
+1. **Daten im Memo, Urteil im Render.** `abschnittZeilen` führt je Zeile die letzte Rückmeldung
+   jeder Einheit des Teilbaums (`einheitenRueckmeldung`, `null` solange unbekannt) und den
+   summierten Ausfall (`ausfallMittel`, `ausfallMaterial`). Das Urteil über die Rückmeldung hängt
+   an der Uhr. Deshalb rechnet eine reine Funktion `abschnittGruende(zeile, jetzt)` →
+   `TonungsGrund[]` im Render (Muster `rueckmeldungDerZeile`): Ausfall, überfällige Einheiten mit
+   längster Dauer, Einheiten ohne Rückmeldung. Ohne feststehende Rückmeldungen kein
+   Rückmeldungsgrund.
    *Verworfen:* nur die jüngste Rückmeldung beurteilen. Billig, verdeckt aber genau den
    Schadensfall.
-2. **Ausfall aus einem gemeinsamen Kern.** Der Ausfall einer Einheit (eigene Mittel
-   `nicht_verfuegbar` + `materialAusfall` inkl. Beladung) wird als reine Funktion aus
-   `meldebildRaster.ts` gehoben (`kraefte/einheitAusfall.ts`). Meldebild und Überblick rufen ihn.
-   Die Summe über die Einheiten des Teilbaums zählt jede Einheit einmal, weil jede nur ihre eigenen
-   Mittel zählt (Spec `kraeftebaum`).
+2. **Ausfall aus dem Meldebild selbst.** `ausfallJeEinheit` baut aus denselben Rohdaten das
+   Meldebild-Raster (`baueMeldebildRaster`) und liest je Einheit die Gründe der Tönung
+   (`toenungsGruende`: Ausfall der eigenen Mittel, Ausfall Material inkl. Beladung). Die
+   Abschnittskarte zeigt so genau die Zahlen, die im Meldebild an den Einheiten stehen, auch die
+   Regel, dass eine Einheit mit Status „nicht verfügbar“ keinen zusätzlichen Ausfall-Grund trägt.
+   Die Summe über die Einheiten des Teilbaums zählt jede Einheit einmal, weil jede nur ihre
+   eigenen Mittel zählt (Spec `kraeftebaum`).
+   *Umsetzungsänderung gegenüber dem Entwurf:* Geplant war, einen Kern
+   `kraefte/einheitAusfall.ts` herauszulösen. Das Raster selbst zu lesen hält die Regel an einer
+   Stelle und braucht keinen zweiten Rechenweg.
    *Verworfen:* Zahl der Problem-Einheiten. Verliert „Ausfall Material“ als eigene Aussage.
    *Verworfen:* die Statuszelle umdefinieren. Dann summiert sich die Verteilung nicht mehr auf die
    Einheitenzahl.
@@ -49,12 +55,13 @@ Zählweise der Stärken (LLH-1744, Welle 3).
    eine zweite Lage-Wahrheit ohne Eintrag.
 5. **Statuszelle „nicht verfügbar“.** Wort und Rolle der dritten Verteilungszelle: „nicht
    verfügbar“, Rolle bleibt alarm.
-6. **Regel** in `frontend/AGENTS.md`, „Eine Heimat je Zahl“: Ausfall einer Einheit nur über den
-   gemeinsamen Kern; Rückmeldung eines Abschnitts je Einheit, nie über die jüngste allein.
+6. **Regel** in `frontend/AGENTS.md`, „Eine Heimat je Zahl“: Ausfall einer Einheit nur über die
+   Gründe der Tönung des Meldebilds (`toenungsGruende`); Rückmeldung eines Abschnitts je Einheit,
+   nie über die jüngste allein.
 
 ## Risks / Trade-offs
 
-- [Rechenlast je Uhrtakt] → `abschnittRueckmeldung` läuft über eine Map je Einheit, O(Einheiten);
+- [Rechenlast je Uhrtakt] → `abschnittGruende` läuft über die Einheiten des Teilbaums, O(Einheiten);
   bei 30-s-Takt unkritisch.
 - [Karte wird höher] → Chips nur bei Befund; Zeile bricht um. CLS-Wächter des Überblicks laufen
   mit.

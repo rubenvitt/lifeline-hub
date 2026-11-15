@@ -668,8 +668,10 @@ export function istRueckmeldungProblem(r: RueckmeldungAnzeige | null | undefined
 export type TonungsGrund =
   | { art: 'ausfall'; anzahl: number }
   | { art: 'ausfall_material'; anzahl: number }
-  | { art: 'rueckmeldung_ueberfaellig'; seitMin: number | null }
-  | { art: 'rueckmeldung_keine' };
+  /** `einheiten`: nur in der Abschnittskarte des Überblicks, wenn mehrere Einheiten betroffen sind;
+   *  `seitMin` ist dann die längste Überfälligkeit. */
+  | { art: 'rueckmeldung_ueberfaellig'; seitMin: number | null; einheiten?: number }
+  | { art: 'rueckmeldung_keine'; einheiten?: number };
 
 /**
  * Wortlaut eines Grundes — EINE Stelle für Meldebild und Überblick: „1 Ausfall“, „1 Ausfall
@@ -682,12 +684,16 @@ export function grundWort(g: TonungsGrund): string {
       return `${g.anzahl} Ausfall`;
     case 'ausfall_material':
       return `${g.anzahl} Ausfall Material`;
-    case 'rueckmeldung_ueberfaellig':
-      return g.seitMin == null
-        ? 'Rückm. überfällig'
-        : `Rückm. überfällig seit ${dauerText(g.seitMin)}`;
+    case 'rueckmeldung_ueberfaellig': {
+      const seit = g.seitMin == null ? null : dauerText(g.seitMin);
+      if ((g.einheiten ?? 1) > 1) {
+        const kopf = `${g.einheiten} Einh. Rückm. überfällig`;
+        return seit ? `${kopf}, längste seit ${seit}` : kopf;
+      }
+      return seit ? `Rückm. überfällig seit ${seit}` : 'Rückm. überfällig';
+    }
     case 'rueckmeldung_keine':
-      return 'keine Rückm.';
+      return (g.einheiten ?? 1) > 1 ? `${g.einheiten} Einh. ohne Rückm.` : 'keine Rückm.';
   }
 }
 

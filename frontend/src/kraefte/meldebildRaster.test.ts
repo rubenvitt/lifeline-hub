@@ -920,6 +920,17 @@ describe('Rückmeldung je Rasterzeile', () => {
     expect(gruende('eh-3').map(grundWort)).toEqual(['keine Rückm.']);
   });
 
+  it('fasst mehrere Einheiten eines Abschnitts zusammen (LLH-1739)', () => {
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 47, einheiten: 1 })).toBe(
+      'Rückm. überfällig seit 47 min',
+    );
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 47, einheiten: 3 })).toBe(
+      '3 Einh. Rückm. überfällig, längste seit 47 min',
+    );
+    expect(grundWort({ art: 'rueckmeldung_keine', einheiten: 1 })).toBe('keine Rückm.');
+    expect(grundWort({ art: 'rueckmeldung_keine', einheiten: 2 })).toBe('2 Einh. ohne Rückm.');
+  });
+
   it('gibt Ausfall und Material als Anzahl, mit Wort in der Einzahl wie im Meldebild', () => {
     expect(grundWort({ art: 'ausfall', anzahl: 2 })).toBe('2 Ausfall');
     expect(grundWort({ art: 'ausfall_material', anzahl: 1 })).toBe('1 Ausfall Material');

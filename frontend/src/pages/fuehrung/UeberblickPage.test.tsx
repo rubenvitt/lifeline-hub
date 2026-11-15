@@ -494,7 +494,8 @@ describe('UeberblickPage', () => {
     // Status, nicht ihre Mittel (die ergäben 1/1/1).
     expect(zeile).toHaveAccessibleName(/bereit\s*0/);
     expect(zeile).toHaveAccessibleName(/gebunden\s*0/);
-    expect(zeile).toHaveAccessibleName(/Ausfall\s*1/);
+    // LLH-1739: „Ausfall“ zählt das Meldebild an den Mitteln; die Statuszelle heißt danach.
+    expect(zeile).toHaveAccessibleName(/nicht verfügbar\s*1/);
     const werte = zeile.querySelectorAll('[data-lfh="abschnitt-status-wert"]');
     expect(Array.from(werte).map((z) => z.textContent)).toEqual(['0', '0', '1']);
     const balken = zeile.querySelectorAll<HTMLElement>('[data-lfh="abschnitt-status-anteil"]');
@@ -537,6 +538,60 @@ describe('UeberblickPage', () => {
     // Die Zeit trägt im Linknamen ihre Bedeutung, nicht als nackte Uhrzeit.
     expect(zeile).toHaveAccessibleName(new RegExp(`Letzte Rückmeldung:\\s*${uhr}\\s+Verbau hält`));
     expect(rueck).not.toHaveTextContent('noch keine');
+  });
+
+  it('Abschnittszeile „planmäßig“ mit überfälliger Rückmeldung: Zustand bleibt, Alarm-Etikett daneben (LLH-1739)', async () => {
+    stelleBereit({
+      ...volleDaten,
+      abschnitte: [
+        { ...volleDaten.abschnitte[0], lagezustand: 'planmaessig' } as Daten['abschnitte'][number],
+      ],
+      rueckmeldungen: {
+        frist_min: 60,
+        einheiten: [
+          {
+            bezug_id: 10,
+            meldung_id: 7,
+            lfd_nr: 7,
+            ereigniszeit: vor(107),
+            inhalt: 'Lage unverändert',
+            meldeweg: 'funk',
+            faellig_at: vor(47),
+          },
+        ],
+        abschnitte: [],
+      },
+    });
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    const etikett = await waitFor(() => {
+      const el = zeile.querySelector<HTMLElement>(
+        '[data-lfh="abschnitt-zustand"] [data-lfh="status-chip"]',
+      );
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(etikett).toHaveAttribute('data-ton', 'alarm');
+    expect(etikett.textContent).toMatch(/^Rückm\. überfällig seit 4[78] min$/);
+    // Der gepflegte Zustand bleibt stehen, Kante normal.
+    expect(
+      zeile.querySelector('[data-lfh="ueberblick-abschnitt-kante"]')!.getAttribute('data-rolle'),
+    ).toBe('normal');
+    expect(within(zeile).getByText('planmäßig')).toBeInTheDocument();
+  });
+
+  it('Abschnittszeile: ohne geladene Rückmeldungen kein Rückmeldungs-Etikett (LLH-1739)', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+        HttpResponse.json({ error: 'kein Zugriff' }, { status: 403 }),
+      ),
+    ]);
+    rendern();
+    const p = await waitFor(() => paneel('Einsatzabschnitte'));
+    const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
+    await waitFor(() => expect(zeile).toHaveTextContent('1/0/1//2'));
+    expect(zeile).not.toHaveTextContent(/Rückm\./);
   });
 
   it('Abschnittszeile: geladen, aber ohne Rückmeldung sagt es ruhig „noch keine"', async () => {

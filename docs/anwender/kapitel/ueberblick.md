@@ -26,8 +26,12 @@ Modulen selbst.
    „Einsatzabschnitte“ und die „Einsatzdauer“.
 4. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
    „kritisch“), den festen Auftrag, bei Aufträgen an den Abschnitt die Zahl der erledigten, die
-   letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „Ausfall“ mit Zahl und
-   Balken) lesen.
+   letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „nicht verfügbar“ mit
+   Zahl und Balken) lesen. Was im Abschnitt brennt, steht als rotes Etikett direkt neben dem
+   Lagezustand, mit denselben Zahlen wie im Meldebild: „Rückm. überfällig seit 47 min“ (bei
+   mehreren Einheiten „3 Einh. Rückm. überfällig, längste seit 47 min“), „keine Rückm.“, „1
+   Ausfall“ und „1 Ausfall Material“. Der Lagezustand bleibt dabei, wie die Führung ihn beurteilt
+   hat; ein „planmäßig“ mit rotem Etikett daneben heißt: die Beurteilung ist zu prüfen.
 
    ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Vorgängen, nächsten Marken und Entscheidungen der letzten Stunde](../bilder/ueberblick/ueberblick.png)
 

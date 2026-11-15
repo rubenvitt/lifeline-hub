@@ -43,7 +43,18 @@ import {
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
-import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
+import {
+  letzteImTeilbaum,
+  rueckmeldungJeEinheit,
+  rueckmeldungUeberfaelligSeit,
+  rueckmeldungZustand,
+} from '../../meldungen/rueckmeldung';
+import {
+  baueMeldebildRaster,
+  einheitZeilen,
+  toenungsGruende,
+  type TonungsGrund,
+} from '../../kraefte/meldebildRaster';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import {
   dauerText,
@@ -253,7 +264,9 @@ export function folgeText(anzahl: number): string | null {
 export interface EinheitenVerteilung {
   bereit: number;
   gebunden: number;
-  ausfall: number;
+  /** Einheiten mit Status „nicht verfügbar“ — nicht „Ausfall“: den zählt das Meldebild an den
+   *  Mitteln (LLH-1739, {@link AbschnittZeile.ausfallMittel}). */
+  nichtVerfuegbar: number;
   /**
    * Einheiten ohne Kategorie — ohne Status oder „gemischt" über Kategorien hinweg; gezählt,
    * damit die drei Zellen nicht mehr behaupten.
@@ -283,6 +296,16 @@ export interface AbschnittZeile {
   /** Jüngste Rückmeldung im Teilbaum (Abschnitte direkt UND Einheiten darin); `null`, wenn
    *  keine vorliegt oder {@link rueckmeldungBekannt} `false` ist. */
   letzteRueckmeldung: LetzteRueckmeldung | null;
+  /**
+   * Letzte Rückmeldung JE Einheit des Teilbaums (`null` = nie zurückgemeldet), damit eine frische
+   * Meldung einer Einheit eine andere, die schweigt, nicht verdeckt (LLH-1739). `null`, solange
+   * {@link rueckmeldungBekannt} `false` ist. Das Urteil hängt an der Uhr: {@link abschnittGruende}.
+   */
+  einheitenRueckmeldung: (LetzteRueckmeldung | null)[] | null;
+  /** Ausfall der Mittel und des Materials der Einheiten im Teilbaum, gezählt wie die Gründe der
+   *  Tönung im Meldebild (`toenungsGruende`, eine Heimat je Zahl). */
+  ausfallMittel: number;
+  ausfallMaterial: number;
   /**
    * Alle Aufträge an den Teilbaum; erledigt = vollzogen oder abgenommen. Eine Zählung, in der
    * jeder Auftrag gleich wiegt; die Lage selbst trägt der Lagezustand.
@@ -357,7 +380,7 @@ function zaehleImTeilbaum(zeile: MeldebildZeile): {
 
 /** Einheiten nach der Kategorie ihres Status — „gemischt" zählt mit, wenn die Kategorie gemeinsam ist. */
 function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): EinheitenVerteilung {
-  const v: EinheitenVerteilung = { bereit: 0, gebunden: 0, ausfall: 0, ohne: 0 };
+  const v: EinheitenVerteilung = { bereit: 0, gebunden: 0, nichtVerfuegbar: 0, ohne: 0 };
   for (const e of einheiten) {
     switch (e?.status?.kategorie) {
       case 'verfuegbar':
@@ -367,7 +390,7 @@ function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): Einhe
         v.gebunden += 1;
         break;
       case 'nicht_verfuegbar':
-        v.ausfall += 1;
+        v.nichtVerfuegbar += 1;
         break;
       default:
         v.ohne += 1;
@@ -381,11 +404,14 @@ function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): Einhe
  * so summieren sich die Zeilen zur Einsatzstärke. Die Sammelzeile „Ohne Abschnitt" steht am Ende,
  * wenn sie etwas trägt — sonst gingen diese Kräfte still aus der Summe verloren.
  *
- * Das Raster bereit / gebunden / Ausfall zählt die Einheiten im Teilbaum nach der Kategorie ihres
- * Status (abgeleitet aus den Fahrzeugen oder von Hand).
+ * Das Raster bereit / gebunden / nicht verfügbar zählt die Einheiten im Teilbaum nach der
+ * Kategorie ihres Status (abgeleitet aus den Fahrzeugen oder von Hand). Den Ausfall zählt das
+ * Meldebild: dieselben Gründe der Tönung je Einheit, summiert über den Teilbaum (LLH-1739).
  */
 export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const { baum } = baueKraeftebild(r.abschnitte, r.einheiten, r.personal, r.fahrzeuge, r.material);
+  const ausfallJe = ausfallJeEinheit(r);
+  const rueckJe = r.rueckmeldungen != null ? rueckmeldungJeEinheit(r.rueckmeldungen) : null;
   const abschnittNachId = new Map(r.abschnitte.map((a) => [a.id, a]));
   const einheitNachId = new Map(r.einheiten.map((e) => [e.id, e]));
   const offen = r.auftraege
@@ -440,6 +466,9 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
         r.rueckmeldungen != null
           ? letzteImTeilbaum(r.rueckmeldungen, teilbaum, new Set(einheitIds))
           : null,
+      einheitenRueckmeldung: rueckJe ? einheitIds.map((eid) => rueckJe.get(eid) ?? null) : null,
+      ausfallMittel: einheitIds.reduce((n, eid) => n + (ausfallJe.get(eid)?.mittel ?? 0), 0),
+      ausfallMaterial: einheitIds.reduce((n, eid) => n + (ausfallJe.get(eid)?.material ?? 0), 0),
     };
   });
 
@@ -450,6 +479,58 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
     if (b.abschnittId == null) return -1;
     return (rang.get(a.abschnittId) ?? 0) - (rang.get(b.abschnittId) ?? 0);
   });
+}
+
+/**
+ * Ausfall je Einheit aus dem Meldebild selbst (LLH-1739): dieselben Gründe der Tönung, die dort in
+ * der Statusspalte stehen. Jede Einheit zählt nur ihre eigenen Mittel (Spec `kraeftebaum`), die
+ * Summe über einen Teilbaum zählt also keine Kraft doppelt.
+ */
+function ausfallJeEinheit(r: AbschnittRohdaten): Map<number, { mittel: number; material: number }> {
+  const raster = baueMeldebildRaster({ ...r, statusKatalog: [], auftraege: [] });
+  const je = new Map<number, { mittel: number; material: number }>();
+  for (const z of einheitZeilen(raster)) {
+    if (z.einheitId == null) continue;
+    let mittel = 0;
+    let material = 0;
+    for (const g of toenungsGruende(z, null)) {
+      if (g.art === 'ausfall') mittel += g.anzahl;
+      if (g.art === 'ausfall_material') material += g.anzahl;
+    }
+    je.set(z.einheitId, { mittel, material });
+  }
+  return je;
+}
+
+/**
+ * Gründe, die die Abschnittskarte im Überblick als Etikett in der Alarmrolle nennt (LLH-1739):
+ * Ausfall der Mittel und des Materials, überfällige Rückmeldungen (Zahl der Einheiten, längste
+ * Dauer) und Einheiten ohne jede Rückmeldung. Gerechnet zur Seitenuhr `jetzt`, nicht im Memo der
+ * Zeilen; ohne feststehende Rückmeldungen kein Rückmeldungsgrund. Wortlaut: `grundWort`.
+ */
+export function abschnittGruende(zeile: AbschnittZeile, jetzt: Dayjs): TonungsGrund[] {
+  const gruende: TonungsGrund[] = [];
+  if (zeile.ausfallMittel > 0) gruende.push({ art: 'ausfall', anzahl: zeile.ausfallMittel });
+  if (zeile.ausfallMaterial > 0) {
+    gruende.push({ art: 'ausfall_material', anzahl: zeile.ausfallMaterial });
+  }
+  if (!zeile.rueckmeldungBekannt || zeile.einheitenRueckmeldung == null) return gruende;
+  let ueberfaellig = 0;
+  let laengste: number | null = null;
+  let keine = 0;
+  for (const r of zeile.einheitenRueckmeldung) {
+    const zustand = rueckmeldungZustand(r, jetzt);
+    if (zustand === 'keine') keine += 1;
+    if (zustand !== 'ueberfaellig') continue;
+    ueberfaellig += 1;
+    const seit = rueckmeldungUeberfaelligSeit(r, jetzt);
+    if (seit != null && (laengste == null || seit > laengste)) laengste = seit;
+  }
+  if (ueberfaellig > 0) {
+    gruende.push({ art: 'rueckmeldung_ueberfaellig', seitMin: laengste, einheiten: ueberfaellig });
+  }
+  if (keine > 0) gruende.push({ art: 'rueckmeldung_keine', einheiten: keine });
+  return gruende;
 }
 
 // ── Entscheidungen ──────────────────────────────────────────────────────────────
