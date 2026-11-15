@@ -240,13 +240,14 @@ geplanten Raum:
 Für Einsatzleitung und Führungspersonal:
 
 1. Einen aktiven Raum erst leeren: abgerufene Kräfte ausrücken lassen, die übrigen austragen.
-   Solange noch Kräfte dort stehen, auch abgerufene, ist „Auflösen“ gesperrt, daneben steht
+   Solange noch Kräfte dort stehen, auch abgerufene, ist „BR auflösen“ gesperrt, daneben steht
    „noch … belegt“.
-2. „Auflösen“ wählen und die Rückfrage „BR auflösen?“ mit „BR auflösen“ bestätigen. Der Raum steht
-   dann auf „aufgelöst“.
-3. Ein Raum, der nie in Betrieb war, wird stattdessen mit „Stornieren“ verworfen; die Rückfrage „BR
-   stornieren?“ mit „BR stornieren“ bestätigen. Er verschwindet aus Übersicht und Umschalter.
-   Liegt dort noch Material, lehnt die App den Storno ab und nennt den Grund über der Seite;
+2. Im letzten Abschnitt der Seite, „Bereitstellungsraum auflösen oder stornieren“, „BR auflösen“
+   wählen und die Rückfrage „BR auflösen?“ mit „BR auflösen“ bestätigen. Der Raum steht dann auf
+   „aufgelöst“.
+3. Ein Raum, der nie in Betrieb war, wird stattdessen im selben Abschnitt mit „BR stornieren“
+   verworfen; die Rückfrage „BR stornieren?“ mit „BR stornieren“ bestätigen. Er verschwindet aus Übersicht und Umschalter.
+   Liegt dort noch Material, lehnt die App den Storno ab und nennt den Grund im Abschnitt;
    erst die Posten mit „Lösen“ aus dem Raum nehmen.
 
 ## Hintergrund

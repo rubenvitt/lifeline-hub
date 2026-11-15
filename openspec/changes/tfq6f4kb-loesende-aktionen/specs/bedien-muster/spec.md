@@ -90,9 +90,9 @@ nennt. Ein umkehrbares Beenden SHALL „Schließen“ heißen und einen Rückgä
 ### Requirement: Eine Fehlanlage stornieren
 
 „Stornieren“ MUST rot stehen und erst nach einer Rückfrage wirken, deren Bestätigung die Handlung
-nennt. Es MUST dort stehen, wo „Auflösen“ steht (letzter Abschnitt oder ⋮ des Kopfs); ohne
-„Auflösen“ hinter dem Trenner im ⋮ des Datensatzes, auf einer Detailseite im ⋮ des Kopfs. Es MUST
-NOT als Knopf im Kopf stehen.
+nennt. Es MUST dort stehen, wo „Auflösen“ oder „Entlassen“ der Seite steht (letzter Abschnitt
+oder ⋮); sonst hinter dem Trenner im ⋮ des Datensatzes, auf einer Detailseite im ⋮ des Kopfs. Es
+MUST NOT als Knopf im Kopf stehen.
 
 #### Scenario: Geplanten Bereitstellungsraum stornieren
 - **WHEN** jemand die Detailseite eines geplanten Bereitstellungsraums öffnet

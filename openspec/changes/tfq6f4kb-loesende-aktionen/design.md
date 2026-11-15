@@ -55,7 +55,7 @@ Siehe proposal.md, „Why“. Der Scope vom 15.11.2026 hat ergeben:
 | Zuordnung lösen | „Aus <Ziel> lösen“ / „Vom <Ziel> lösen“; „Abziehen“, „Austragen“ bleiben | ⋮ der Zeile; sichtbarer Knopf nur als einzige Handlung der Zeile | ohne Rückfrage, Rückgängig; fällt der Datensatz aus der Ansicht, hält die Zeile „Gelöst · Rückgängig“ |
 | Kraft entlassen | „Entlassen“, Material „Aus dem Einsatz nehmen“ | Liste: ⋮; Detail: letzter Abschnitt „Aus dem Einsatz“; nie Hauptaktion einer Karte | Rückgängig nur bei vollständigem Rückweg, sonst Rückfrage (Ausnahme bis zu den Folgeaufgaben: Personal, Material) |
 | Gebilde beenden | „Auflösen“ (endgültig), „Schließen“ (umkehrbar) | Auflösen: letzter Abschnitt der Detailseite; auf einer Fensterseite (UHS) oder ohne Detailseite rot im ⋮; Schließen: Statusschritt im Kopf | Auflösen: Rückfrage mit Folgesatz; Schließen: Rückgängig |
-| Fehlanlage | „Stornieren“ | dort, wo „Auflösen“ steht (letzter Abschnitt bei Einheit und BR, ⋮ des Kopfs bei der UHS); sonst ⋮, rot hinter dem Trenner (Detailseite: ⋮ des Kopfs); nie ein Kopfknopf | Rückfrage |
+| Fehlanlage | „Stornieren“ | dort, wo „Auflösen“ oder „Entlassen“ der Seite steht (letzter Abschnitt bei Einheit, BR und Personal, ⋮ bei UHS, Fahrzeug und Material); sonst ⋮, rot hinter dem Trenner (Detailseite: ⋮ des Kopfs); nie ein Kopfknopf | Rückfrage |
 | Eigene Buchung | „Zurücknehmen“ („Zurückziehen“, „Aufheben“ bleiben Fachwörter) | Zeile oder ⋮ | Rückfrage; Grund nur, wo das Fach ihn verlangt |
 
 **Warum nach Art statt nach Modul:** Die Sicherung folgt aus der Umkehrbarkeit, der Ort aus der

@@ -178,11 +178,12 @@ Transport mit ihm vor.
 ### Eine Unfallhilfsstelle auflösen
 
 1. Alle Patienten der Stelle entlassen, verlegen oder zurückweisen. Solange noch jemand in der
-   Stelle ist, steht der Knopf als „Auflösen (noch … Personen)“ gesperrt.
-2. „Auflösen“ wählen und die Rückfrage „Unfallhilfsstelle auflösen?“ bestätigen.
+   Stelle ist, steht „Auflösen“ im Menü oben (drei Punkte) gesperrt, mit „noch … Personen“.
+2. Im Menü oben „Auflösen“ wählen und die Rückfrage „Unfallhilfsstelle auflösen?“ mit
+   „Unfallhilfsstelle auflösen“ bestätigen.
 
-Eine Stelle, die noch „geplant“ ist, wird stattdessen verworfen: im Menü neben „Bearbeiten“ (drei
-Punkte) „Stornieren“ wählen und die Rückfrage bestätigen. Liegt dort noch
+Eine Stelle, die noch „geplant“ ist, wird stattdessen verworfen: im selben Menü „Stornieren“
+wählen und die Rückfrage bestätigen. Liegt dort noch
 Material, lehnt die App den Storno ab und nennt den Grund über der Seite; erst die Posten unter
 „Material“ mit „Lösen“ von der Stelle nehmen.
 

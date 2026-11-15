@@ -191,7 +191,8 @@ Verbrauchsgut „Aufteilen · aufgebraucht“. Ein Gerät hat den Eintrag nicht.
 
 Für Einsatzleitung und Führungspersonal, wenn ein Posten den Einsatz verlässt:
 
-1. In der Zeile des Postens „Aus dem Einsatz nehmen“ wählen. Eine Rückfrage gibt es nicht.
+1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Aus dem Einsatz nehmen“ wählen, auf
+   dem Handy ebenso im Menü der Karte. Eine Rückfrage gibt es nicht.
 2. Der Posten verlässt die Liste. Der Hinweis unten bietet einige Sekunden lang „Rückgängig“.
 3. Unter der Liste „Aus dem Einsatz genommen“ aufklappen. Dort stehen alle herausgenommenen
    Posten mit Menge und Zeitpunkt.
