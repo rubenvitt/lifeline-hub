@@ -33,11 +33,13 @@ ausgetragen.
 
 - `pr-pruefstufen`: Die Anforderungen zu `Baut mit Ziel-Branch` und zu „fertig“ entfallen; die
   Pflichtliste schrumpft auf drei.
-- `merge-stau`: Das Szenario „Baut mit Ziel-Branch rechnet noch“ entfällt.
 
 ## Impact
 
 - Workflows: zwei entfallen; `stau-waechter.yml` unverändert.
+- `merge-stau` bleibt unverändert: sein Szenario „Baut mit Ziel-Branch rechnet noch“ gilt
+  sinngemäß für jeden laufenden Check (OpenSpec lässt ein Szenario einer geänderten Anforderung
+  nicht weg; die Anforderung selbst ändert sich nicht).
 - Skripte: `ruleset-pruefen.sh` (Liste), `stau-waechter.test.sh`, `check-all.sh`/`check-all.test.sh`
   (Kommentare, Schritt 11), `ci-stufen.test.sh` (Formfälle).
 - Doku: `scripts/AGENTS.md`, Skill `dev-zunder-ausfuehren`, Kapitel 7 und 11, ADR-0030 → neue ADR.

@@ -18,7 +18,7 @@ Ein Ereignis an einem PR MUST keinen Job anlegen, der nur bei einem Push auf ein
 - **WHEN** auf einen PR ohne `voll` gepusht wird
 - **THEN** stehen am PR weder `Release`, `Testberichte zusammenführen` noch `Offene PRs neu bewerten`, und aus dem PR-Workflow der Prüfungen erscheint als übersprungen höchstens der Aufruf der Suiten
 
-#### Scenario: Pflicht-Checks
+#### Scenario: Pflicht-Checks unverändert
 - **WHEN** an einem PR alle Pflicht-Checks grün sind
 - **THEN** heißen sie `Schnellprüfungen`, `Migrationsnummern` und `ADR-Nummern`
 
