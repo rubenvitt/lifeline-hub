@@ -179,6 +179,30 @@ describe('HilfePage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Starkregen Nord' }));
       expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/5/etb');
     });
+
+    // Review B5 (Entscheidung 15.11.2026): der Rückweg ist je Besuch der Hilfe fest. Arbeitet die
+    // Person im ersten Tab weiter, ändert ein Kapitelwechsel in der Hilfe ihn nicht.
+    it('bleibt je Besuch fest, auch wenn ein anderer Tab inzwischen einen Ort merkt', async () => {
+      merkeLetztenOrt(1, { einsatzId: 5, pfad: '/einsaetze/5/etb' });
+      angemeldet([aktiv, { id: 6, bezeichnung: 'Sturm Süd', status: 'aktiv' }]);
+      zeige('/hilfe');
+      await screen.findByRole('button', { name: 'Zurück zu Starkregen Nord' });
+      // Der erste Tab wechselt in einen anderen Einsatz.
+      merkeLetztenOrt(1, { einsatzId: 6, pfad: '/einsaetze/6/lagekarte' });
+      const navi = screen.getByRole('navigation', { name: 'Kapitel' });
+      await userEvent.click(within(navi).getByRole('link', { name: KAPITEL[1].titel }));
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(`/hilfe/${KAPITEL[1].slug}`),
+      );
+      await userEvent.click(within(navi).getByRole('link', { name: KAPITEL[2].titel }));
+      await waitFor(() =>
+        expect(screen.getByTestId('ort')).toHaveTextContent(`/hilfe/${KAPITEL[2].slug}`),
+      );
+      await new Promise((r) => setTimeout(r, 50));
+      expect(screen.queryByRole('button', { name: 'Zurück zu Sturm Süd' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Starkregen Nord' }));
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/5/etb');
+    });
   });
 });
 

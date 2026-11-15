@@ -102,7 +102,10 @@ export default function HilfePage() {
 
   // Genau ein Rückweg (LLH-1731, Spec `seiten-orientierung`, „Rückweg aus der Hilfe“): Gerät,
   // Anmeldung, die zuletzt geöffnete Stelle des aktiven Einsatzes, sonst die Einsatzliste.
-  const einsatzRueckweg = useEinsatzRueckweg(benutzer?.id, !geraet && benutzer != null);
+  const einsatzRueckweg = useEinsatzRueckweg(benutzer?.id, !geraet && benutzer != null, {
+    // Je Besuch fest (Review B5): ein Kapitelwechsel ändert den Rückweg nicht.
+    isJeBesuchFest: true,
+  });
   const rueckweg = geraet
     ? { pfad: GERAET_START_PFAD, label: 'Zum Gerät' }
     : !benutzer

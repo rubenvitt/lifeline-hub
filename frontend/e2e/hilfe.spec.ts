@@ -63,6 +63,16 @@ test('aus dem Einsatz am breiten Schirm: Hilfe im neuen Tab, Rückweg an die Ste
   await expect(hilfe).toHaveURL(/\/hilfe$/);
   // Der Einsatz bleibt im ersten Tab.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
+  await expect(hilfe.getByRole('button', { name: `Zurück zu ${name}` })).toBeVisible();
+
+  // Der erste Tab arbeitet weiter; der Rückweg der Hilfe bleibt je Besuch fest (Review B5).
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte$`));
+  await hilfe
+    .getByRole('navigation', { name: 'Kapitel' })
+    .getByRole('link', { name: 'Arbeiten ohne Netz' })
+    .click();
+  await expect(hilfe).toHaveURL(/\/hilfe\/ohne-netz$/);
 
   await hilfe.getByRole('button', { name: `Zurück zu ${name}` }).click();
   await expect(hilfe).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
