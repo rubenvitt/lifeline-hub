@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { dichten } from '../theme/tokens';
 import { useState } from 'react';
+import { onlineManager } from '@tanstack/react-query';
 import AnhangVorschau, {
   AnhangGrossansicht,
   AnhangVorschauGruppe,
@@ -321,6 +322,22 @@ describe('AnhangGrossansicht — HEIC aus dem Zeilenmenü (LLH-1887)', () => {
     // `gross` ist die zweite Object-URL des gelungenen Versuchs (klein, dann gross).
     await waitFor(() => expect(document.querySelector('img[src="blob:gross-2"]')).not.toBeNull());
     expect(melde).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne Netz sagt sie das und schließt, statt endlos umzuwandeln (Nach-Review 5)', async () => {
+    const melde = vi.fn();
+    const user = userEvent.setup();
+    heic.dekodiere.mockResolvedValue({ klein: new Blob(['k']), gross: new Blob(['g']) });
+    onlineManager.setOnline(false);
+    try {
+      renderMitProviders(<Huelle melde={melde} />);
+      await user.click(screen.getByRole('button', { name: 'Vorschau öffnen' }));
+      await waitFor(() => expect(melde).toHaveBeenCalledWith('IMG.HEIC: ohne Netz keine Vorschau'));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(heic.dekodiere).not.toHaveBeenCalled();
+    } finally {
+      onlineManager.setOnline(true);
+    }
   });
 
   it('während der Dekodierung schließt Escape oder das Kreuz (B7)', async () => {

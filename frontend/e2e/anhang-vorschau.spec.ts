@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { FOTO_JPEG } from './bildFixture';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
-import { einsatzDialogOeffnen } from './einsatz-kern';
+import { einsatzDialogOeffnen, einsatzPerApi } from './einsatz-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Bildvorschau an Anhängen im Browser (LFH-759, Spec `anhang-vorschau`): das Vorschaubild vom
@@ -155,13 +156,12 @@ test('HEIC in der kompakten Spaltenzeile: Großansicht über das Zeilenmenü, ni
   const anfragen: string[] = [];
   page.on('request', (r) => anfragen.push(r.url()));
 
-  await anmeldenAlsAdmin(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Vorschau kompakt ${Date.now()}`);
+  // Ohne Startseite und Einsatzdialog: jede volle Ladung zählt hier (LFH-1114, LLH-1665).
+  await anmeldenAlsAdmin(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Vorschau kompakt ${Date.now()}`);
   const nr = await etbEintragMitHeic(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
-  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
-  await page.goto(`/einsaetze/${einsatzId}/etb`);
-  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, 'kompakt');
   await page.getByRole('button', { name: `Aktionen zu Eintrag ${nr}`, exact: true }).click();
   await page.getByRole('menuitem', { name: 'Vorschau: IMG_0001.HEIC' }).click();
   const ansicht = page.locator('.ant-image-preview');
