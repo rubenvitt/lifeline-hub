@@ -1,13 +1,11 @@
 ---
 id: ADR-0030
 titel: Ein fertiger PR baut mit dem aktuellen Ziel-Branch, und bei rotem alpha ist genau ein PR zuständig
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0049
 datum: 2026-11-12
 gilt_fuer:
-  - .github/workflows/ziel-branch-build.yml
-  - .github/workflows/ziel-branch-verteilen.yml
   - .github/workflows/stau-waechter.yml
-  - scripts/ziel-branch-build.sh
   - scripts/stau-waechter.sh
 herleitung:
   - openspec/changes/archive/2026-11-12-g10eo9co-alpha-rot-schutz/design.md

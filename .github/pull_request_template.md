@@ -43,12 +43,13 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
 
 ## Geprüft
 
-<!-- Im PR prüft die CI nur leicht (Schnellprüfungen, Migrations- und ADR-Nummern, Baut mit
-     Ziel-Branch); die Suiten laufen auf alpha. Der lokale Lauf ist die Untergrenze, nicht der
+<!-- Im PR prüft die CI nur leicht (Schnellprüfungen, Migrations- und ADR-Nummern); die
+     Suiten laufen auf alpha. Der lokale Lauf ist die Untergrenze, nicht der
      Nachweis. Was wurde GEMESSEN statt angenommen? Bei UI-Änderungen: welcher Klickweg, welche
-     Dichtestufe, welcher Browser? Riskanter Umbau: Label `voll` setzen. -->
+     Dichtestufe, welcher Browser? Label `voll` nur nach `scripts/AGENTS.md`, „Wann `voll`“. -->
 
 - [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün
+- [ ] Bei UI-Abläufen: die betroffene e2e-Spec lokal grün (Kommando: `scripts/AGENTS.md`, „Wann `voll`“)
 - [ ] Bei Backend-Typänderungen: `openapi.json` + `types.generated.ts` mitcommittet
 - [ ] Bei neuer/umgebauter Seite: Prüfliste Einsatztauglichkeit ausgefüllt (15 Kriterien)
 - [ ] Anwenderdoku (`docs/anwender/`) nachgezogen oder nicht betroffen, Bilder neu erzeugt

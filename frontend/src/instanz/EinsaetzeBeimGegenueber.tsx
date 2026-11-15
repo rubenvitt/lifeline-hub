@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
 import { Alert, Button, Modal } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Paneel, StatusChip, useRollen } from '../components/instrument';
+import { Paneel, PaneelZustand, StatusChip, useRollen } from '../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenStandVeraltet } from '../components/SeitenZustand';
-import { ApiError, fehlerText } from '../api/client';
+import { ApiError } from '../api/client';
 import { loadFuehrungFremd } from '../api/fuehrung';
 import { globalKeys } from '../api/queryKeys';
 import type { FuehrungAnzeige } from '../api/types';
@@ -73,19 +73,17 @@ export function EinsaetzeBeimGegenueber({ darfBedienen }: { darfBedienen: boolea
   if (q.isError && isAusgeblendet(q.error)) return null;
   if (!q.data) {
     if (!q.isError) return null;
+    // Im Bild von „Führung“ auf „Einsatzdaten“ (LLH-1861): `PaneelZustand` polstert selbst.
     return (
-      <Paneel
-        titel="Einsätze beim Gegenüber"
-        koerperPolster
-        style={{ marginBlockStart: token.marginMD }}
-      >
-        <Alert
-          type="error"
-          showIcon
-          title="Akten des Gegenübers nicht abrufbar"
-          description={fehlerText(q.error, 'Keine Verbindung zum Server')}
-          action={<Button onClick={() => void q.refetch()}>Erneut laden</Button>}
-        />
+      <Paneel titel="Einsätze beim Gegenüber" style={{ marginBlockStart: token.marginMD }}>
+        <PaneelZustand
+          zustand="fehler"
+          titel="Einsätze beim Gegenüber"
+          leerText=""
+          onNeuladen={() => void q.refetch()}
+        >
+          {null}
+        </PaneelZustand>
       </Paneel>
     );
   }

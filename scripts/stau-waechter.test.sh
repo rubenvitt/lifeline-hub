@@ -518,7 +518,7 @@ regeln() { # <klon> <integration_id von Migrationsnummern oder leer>
       strict_required_status_checks_policy: false,
       required_status_checks: [{context: "Schnellprüfungen", integration_id: 15368},
         (if $m == "" then {context: "Migrationsnummern"} else {context: "Migrationsnummern", integration_id: ($m | tonumber)} end),
-        {context: "ADR-Nummern"}, {context: "Baut mit Ziel-Branch"}]}}]' > "$(fake "$1")/regeln.json"
+        {context: "ADR-Nummern"}]}}]' > "$(fake "$1")/regeln.json"
 }
 r="$(repo_neu haengtpin)"
 aendere "$r" feature b.txt "feature"
@@ -623,25 +623,23 @@ printf '%s\n' \
 lauf "$r" false false true
 pruefe "37 abgebrochen, dann grün: grün, nicht gemergt" "POST haengt" "$(log "$r")"
 
-# 37b — „Baut mit Ziel-Branch“ rechnet nach einem Merge auf alpha neu (LLH-1889): ein jüngerer Check
-# auf „läuft“ neben dem älteren Grün. Der PR wartet zu Recht, kein „grün, nicht gemergt“. Und ein
-# älterer, noch offener Check (überholter Lauf) neben einem jüngeren Grün hält ihn nicht auf.
+# 37b — Ein Check rechnet neu (etwa ein neu gestarteter Lauf): ein jüngerer Check auf „läuft“
+# neben dem älteren Grün. Der PR wartet zu Recht, kein „grün, nicht gemergt“. Und ein älterer,
+# noch offener Check (überholter Lauf) neben einem jüngeren Grün hält ihn nicht auf.
 r="$(repo_neu zielbaulaeuft)"
 aendere "$r" feature b.txt "feature"
 printf '%s\n' \
-  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
   'e2e 1/4|completed|success|2026-11-12T10:03:00Z|2026-11-12T11:00:00Z' \
-  'Baut mit Ziel-Branch|completed|success|2026-11-12T10:05:00Z|2026-11-12T10:15:00Z' \
-  'Baut mit Ziel-Branch|in_progress||2026-11-12T11:30:00Z|' | checks "$r"
+  'Schnellprüfungen|completed|success|2026-11-12T10:05:00Z|2026-11-12T10:15:00Z' \
+  'Schnellprüfungen|in_progress||2026-11-12T11:30:00Z|' | checks "$r"
 lauf "$r" false false true
-pruefe "37b Baut mit Ziel-Branch rechnet neu: kein Befund" "" "$(log "$r")"
+pruefe "37b Check rechnet neu: kein Befund" "" "$(log "$r")"
 r="$(repo_neu zielbaualtoffen)"
 aendere "$r" feature b.txt "feature"
 printf '%s\n' \
-  'Schnellprüfungen|completed|success|2026-11-12T10:00:00Z|2026-11-12T10:07:00Z' \
   'e2e 1/4|completed|success|2026-11-12T10:03:00Z|2026-11-12T11:00:00Z' \
-  'Baut mit Ziel-Branch|in_progress||2026-11-12T10:05:00Z|' \
-  'Baut mit Ziel-Branch|completed|success|2026-11-12T10:20:00Z|2026-11-12T10:30:00Z' | checks "$r"
+  'Schnellprüfungen|in_progress||2026-11-12T10:05:00Z|' \
+  'Schnellprüfungen|completed|success|2026-11-12T10:20:00Z|2026-11-12T10:30:00Z' | checks "$r"
 lauf "$r" false false true
 pruefe "37b älterer offener neben jüngerem Grün: grün, nicht gemergt" "POST haengt" "$(log "$r")"
 

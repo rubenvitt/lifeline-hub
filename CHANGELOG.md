@@ -1,3 +1,31 @@
+## [1.0.0-alpha.194](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.193...v1.0.0-alpha.194) (2026-11-15)
+
+### Wichtige Änderungen
+
+- **Schnittstelle, Erfassung am Spiegel mit Anhängen:** Wer am Spiegel eine Erfassung mit Anhängen sendet, erhält jetzt den Statuscode 422 statt 400. Der Wortlaut der Meldung ist gleich geblieben. Die eigenen Clients behandeln beide Codes gleich; eigene Anbindungen sollten das prüfen.
+- **Schnittstelle, Erfassung an einem entfernten Bezug:** Erfasst man am Spiegel an einer Zeile, die es nicht mehr gibt, antwortet der Server jetzt mit 422 und „Bezug nicht mehr vorhanden.“. Bisher kam „Bezug noch nicht beim Führer.“, und die Erfassung blieb wartend stehen.
+- **Lagebild für Externe:** Geometrien von Zonen und Abschnitten enthalten nur noch Typ und Koordinaten. Zusätzliche Angaben in einer Geometrie, etwa eine Notiz, gehen nicht mehr nach außen, auch nicht auf der Stufe „öffentlich“. Geometrien ohne solche Angaben bleiben unverändert.
+
+### Kräfte und Mittel
+
+- **Fehlanlage stornieren:** Im Einheit-Detail heißt das letzte Paneel jetzt „Einheit auflösen oder stornieren“. Neben „Einheit auflösen“ gibt es dort den Knopf „Einheit stornieren“ mit eigener Rückfrage. Die Rückfrage nennt alle Folgen: Unter-Einheiten rücken eine Ebene hoch, und gekoppelte Geräte werden beendet. Ob eine Einheit schon Spuren hat und deshalb nicht storniert werden kann, entscheidet der Server. Lehnt er ab, steht der Grund im Paneel unter „Nicht storniert“.
+
+### Lagekarte
+
+- **Kreis zeichnen:** Wer mitten im Ziehen eines Kreis-Griffs Esc drückt, verliert den Griff nicht mehr. Bisher hing er danach an der alten Stelle fest und ließ sich nicht mehr greifen.
+- Ein kurzes Tippen auf den Randgriff mit leichtem Zittern wird nicht mehr als Ziehen gewertet. Bisher konnte es die Kreismitte an den Rand versetzen.
+
+### Vorplanung
+
+- Kopf, Liste und Übernahme-Dialog einer übernommenen Vorplanung zeigen die Einsatznummer, die der Einsatz gerade trägt. Bisher stand dort nach einer Umnummerierung beim Führungswechsel die alte Nummer, im schlimmsten Fall die eines anderen Einsatzes.
+- Wird der Einsatz später endgültig gelöscht, steht dort die Nummer, die er zuletzt trug.
+
+### Instanzkopplung (Hub, ELW und Spiegel)
+
+- **Widerspruch gegen eine Notübernahme:** Fällt der Hub danach zum Spiegel zurück, entfernt er jetzt alle Zeilen, die nicht vom Führer stammen. Ihr Inhalt bleibt in der Bruchstelle gesichert. Neue Einträge des ELW im Einsatztagebuch kommen wieder an; bisher konnte ein Eintrag mit derselben laufenden Nummer dauerhaft fehlen. Der Spiegel wird außerdem sofort neu versorgt und nicht erst bei der nächsten Änderung am ELW.
+- **Nach einem Führungswechsel:** Zeilen, die im Einsatz stehen, aber vom neuen Führer noch nicht abgeglichen sind, nehmen Erfassungen weiter an. Die Erfassung wartet auf den nächsten Abgleich und wird nicht mehr irrtümlich als „Bezug nicht mehr vorhanden.“ abgelehnt.
+- **„Einsätze beim Gegenüber“:** Scheitert der erste Abruf, zeigt das Paneel jetzt einheitlich „Daten nicht abrufbar“ mit dem Knopf „Erneut abrufen“.
+
 ## [1.0.0-alpha.193](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.192...v1.0.0-alpha.193) (2026-11-14)
 
 ### Wichtige Änderungen

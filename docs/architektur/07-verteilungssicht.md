@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 15.11.2026 (ein Workflow je Ereignis, Ruleset-Prüfung, LLH-1896/LLH-1895).
+Stand: 15.11.2026 (ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA oder Desktop-App darauf zu. Einen
@@ -142,9 +142,8 @@ Diese ausgehenden Verbindungen hängen an Schaltern (Vorgaben aus `src/config.rs
 ```mermaid
 flowchart LR
   PR["PR auf alpha"] -->|jeder Push| CIPR["pr.yml<br/>Schnellprüfungen"]
-  PR -->|"fertig: Auto-Merge an"| ZB["ziel-branch-build.yml<br/>Baut mit Ziel-Branch"]
   PR -->|Merge| CI["ci.yml auf alpha, beta, main<br/>Schnellprüfungen und Suiten,<br/>neuer Push bricht ältere Tests ab"]
-  PR -->|Merge| KAN["ziel-branch-verteilen.yml,<br/>migrationen-kanal.yml,<br/>ruleset.yml (nur alpha)"]
+  PR -->|Merge| KAN["migrationen-kanal.yml,<br/>ruleset.yml (nur alpha)"]
   CIPR -->|"Label voll: ruft auf"| SU["suiten.yml<br/>Rust, Frontend, Bericht"]
   CI -->|ruft auf| SU
   SU -->|ruft auf| E2E["e2e.yml<br/>e2e-Binary, e2e 1/4 bis 4/4"]
@@ -166,15 +165,16 @@ flowchart LR
 Jeder Workflow hört entweder auf einen PR oder auf einen Push, damit ein PR keine Jobs der
 Kanal-Branches als übersprungene Einträge trägt. Im PR prüft `pr.yml` jeden Push mit den
 Schnellprüfungen. Pflicht sind daneben nur `Migrationsnummern` und `ADR-Nummern`
-(`migrationen.yml`) und `Baut mit Ziel-Branch` (`ziel-branch-build.yml`), das an jedem PR mit
-eingeschaltetem Auto-Merge rechnet; die Liste steht in `scripts/ruleset-pruefen.sh`, und
+(`migrationen.yml`); die Liste steht in `scripts/ruleset-pruefen.sh`, und
 `ruleset.yml` prüft das Ruleset von `alpha` dagegen. Rust-, Frontend- und e2e-Suite
 (`suiten.yml`) fährt ein PR nur mit dem Label `voll`, ohne Pflicht. Auf `alpha`, `beta` und
 `main` läuft `ci.yml` bei jedem Push voll; ein neuer Push bricht die Testjobs des älteren Laufs
 ab, ein laufender Release bricht nie ab (`concurrency` der Jobs in `suiten.yml` und `ci.yml`,
 [ADR-0048](entscheidungen/ADR-0048-ein-workflow-je-ereignis-ein-pr-prueft-leicht-und-das-ruleset-wird-geprueft.md)).
-Nach dem Push stoßen `ziel-branch-verteilen.yml` und `migrationen-kanal.yml` die offenen PRs neu
-an. Brüche, die erst ein Test zeigt, fallen so auf `alpha` auf (11.2, R41).
+Nach dem Push bewertet `migrationen-kanal.yml` die Nummern der offenen PRs neu; einen Kompilierlauf
+je offenem PR gibt es nicht mehr
+([ADR-0049](entscheidungen/ADR-0049-kein-pflicht-check-baut-mit-ziel-branch-bei-rotem-alpha-ist-genau-ein-pr-zustaendig.md)).
+Brüche, die erst der Build oder ein Test zeigt, fallen so auf `alpha` auf (11.2, R41).
 
 | Kanal | Branch | Version | Desktop-Update liest |
 | --- | --- | --- | --- |
