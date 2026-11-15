@@ -21,8 +21,9 @@ die Lifeline Hub bedienen.
 
 ### Einen Einsatz öffnen
 
-1. Die Einsatzliste öffnen: Sie erscheint nach der Anmeldung, sonst führt „lifeline-hub“ links
-   oben in der Kopfzeile dorthin.
+1. Die Einsatzliste öffnen: Sie erscheint nach der Anmeldung. Aus einem Einsatz führt „Alle
+   Einsätze …“ im Menü am Einsatznamen dorthin, auf großen Monitoren auch „lifeline-hub“ links
+   oben in der Kopfzeile.
 2. Die Kachel des Einsatzes wählen. Sie nennt Status, Einsatzart, die eigene Rolle („Deine
    Rolle: …“), den Einsatzleiter („EL …“, sonst „EL nicht erfasst“) und, soweit erfasst, Ort,
    Einsatznummer, Beginn („seit …“) und Stichwort.
@@ -243,24 +244,27 @@ geben.
 Von links nach rechts:
 
 - **Statuspunkt, Einsatznummer und Name** des offenen Einsatzes; über den Namen geht der Wechsel
-  in einen anderen Einsatz.
-- **Suchen** öffnet die Sprungpalette.
+  in einen anderen Einsatz. Der Name hat Vorrang: Wird es eng, schrumpft zuerst das Suchfeld bis
+  auf die Lupe, erst dann kürzt der Name mit „…“. Ganz steht er im Tooltip.
+- **Suchen** öffnet die Sprungpalette. Am Touch-Gerät steht dort kein Tastenkürzel.
 - **Eingänge**: der Verlauf der eigenen Benachrichtigungen dieses Einsatzes; die Zahl darüber
   nennt die ungelesenen Eingänge (siehe „Eingänge nachlesen“).
-- **Alarmzentrale**: „Benachrichtigung …“ zeigt, ob der Browser Benachrichtigungen zeigen darf,
-  „Ton …“, ob Alarmtöne zu hören sind. „Ton stumm“ und „Ton blockiert“ stehen auffällig da: Eine
-  Sofortmeldung oder eine fällige Erinnerung bliebe dann ohne Ton. Stummschalten gilt für alle
-  Töne auf diesem Gerät, in jedem Einsatz, auch für den Ton bei neuen Meldungen.
-- **Verbindung**: „SYNC“ heißt, die Live-Verbindung steht. „VERBINDE“, „GETRENNT“, „OFFLINE“,
-  „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung; was
-  dann gilt, steht in [Arbeiten ohne Netz](ohne-netz.md).
+- **Alarmzentrale**: Das Bildschirm-Zeichen zeigt, ob der Browser Benachrichtigungen zeigen darf,
+  die Glocke, ob Alarmtöne zu hören sind. Ist alles in Ordnung, stehen beide nur als Zeichen; den
+  Zustand nennt der Tooltip. „Ton stumm“, „Ton blockiert“ und „Benachrichtigung blockiert“ stehen
+  als Wort und auffällig da: Eine Sofortmeldung oder eine fällige Erinnerung bliebe dann ohne Ton
+  bzw. ohne Meldung. Stummschalten gilt für alle Töne auf diesem Gerät, in jedem Einsatz, auch für
+  den Ton bei neuen Meldungen.
+- **Verbindung**: Das grüne Funkzeichen heißt, die Live-Verbindung steht; gelb wird sie gerade
+  aufgebaut. „GETRENNT“, „OFFLINE“, „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte
+  Einträge) melden eine Störung mit Wort; was dann gilt, steht in
+  [Arbeiten ohne Netz](ohne-netz.md).
 - **Uhr**: die Uhrzeit des Geräts.
 - **Benutzermenü** mit Name, Funktion im Einsatz, Profil, Abmelden, der Anzeige des Geräts
   (Darstellung, Bediendichte, Helligkeit), den Benachrichtigungen, den Neuigkeiten und der Hilfe.
   Rückmeldung und Lizenzen stehen in der Hilfe.
 
-Auf schmalen Schirmen zeigt die Kopfzeile Ruhezustände nur als Zeichen; jede Störung behält ihr
-Wort. Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eingänge in einem
+Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eingänge in einem
 Knopf. Außerhalb eines Einsatzes führt „Verwaltung“ in die Verwaltung der Organisation. Wer dort
 keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 
@@ -387,8 +391,8 @@ und je Bereich einen Sprung, etwa „Zu Aufträgen“ oder „Zu Meldungen“. E
 Toasts und quittiert sie, ebenso ✕ am Sammeltoast. Das Eingangsband nimmt den Toasts keinen
 Platz und liegt nie über ihnen.
 
-Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen („Benachrichtigung erlaubt“
-in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
+Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen (Tooltip „Benachrichtigung
+erlaubt“ in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
 Tab wieder vorn ist; dann trägt der Toast.
 
 Geht eine Benachrichtigung unterwegs verloren, etwa während einer Störung der Verbindung oder
