@@ -506,3 +506,42 @@ in dieser Frist oder scheitern sie, MUST die App trotzdem rendern, in der Ersatz
 #### Scenario: Schriften kommen nicht
 - **WHEN** die Schriftabrufe nicht innerhalb von 300 ms antworten oder scheitern
 - **THEN** rendert die App trotzdem, und der Text steht in der Ersatzschrift
+
+### Requirement: Ein Rail-Sprung achtet die gemerkte Panel-Wahl
+
+Hat eine Person das Modulpanel zugeklappt, MUST es nach einem Klick auf eine andere Kategorie der
+Rail zugeklappt bleiben. Ohne gemerkte Wahl SHALL ein solcher Klick das Panel für die laufende
+Sitzung öffnen.
+
+#### Scenario: Zugeklappt bleibt zu
+
+- **WHEN** eine Person bei 1440 px das Modulpanel mit „Menü“ zuklappt und dann in der Rail auf
+  eine andere Kategorie klickt
+- **THEN** wechselt die Seite in ein Modul dieser Kategorie, und das Modulpanel bleibt zugeklappt
+
+#### Scenario: Tablet quer ohne Wahl
+
+- **WHEN** eine Person bei 1180 px ohne gemerkte Wahl in der Rail auf eine andere Kategorie klickt
+- **THEN** steht das Modulpanel dieser Kategorie offen
+
+### Requirement: Der Rail-Fuß bleibt im Fenster
+
+Ab `lg` MUST die Spalte der Rail am unteren Fensterrand enden, auch wenn über der Kopfleiste oder
+zwischen Kopfleiste und Rail eine Zeile im Fluss steht, etwa die Betriebszeile mit dem
+Offline-Hinweis. Passen Kategorien und Fuß („Menü“, „Einst.“) in die Höhe, steht der Fuß damit im
+Fenster; sonst rollt die Spalte in sich, und der Fuß folgt den Kategorien.
+
+#### Scenario: Offline am Fükw
+
+- **WHEN** ein Einsatz bei 1366 × 768 oben steht und das Gerät das Netz verliert
+- **THEN** liegt die Unterkante von „Einst.“ am oder über dem unteren Fensterrand
+
+### Requirement: Der Navigations-Drawer nutzt die Breite des Handys
+
+Unter `lg` MUST der Navigations-Drawer 360 px breit sein, höchstens aber die Fensterbreite minus
+48 px, damit rechts ein Streifen zum Schließen bleibt.
+
+#### Scenario: Handy
+
+- **WHEN** eine Person bei 390 × 844 die Navigation öffnet
+- **THEN** ist der Drawer 342 px breit

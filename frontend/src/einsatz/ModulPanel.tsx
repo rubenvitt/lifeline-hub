@@ -127,20 +127,22 @@ export function modulZeilenStil(
 
 /**
  * Zweite Zeile einer Modulzeile: die Kurzbeschreibung aus der Registry (LFH-965, Spec
- * `modul-benennung`). 12 px in `schwach`, das den Textboden auf jeder Flächenstufe hält; eine
- * Zeile, zu Lange endet in „…“ und steht ganz im `title` des Knopfes.
+ * `modul-benennung`). 12 px in `schwach`, das den Textboden auf jeder Flächenstufe hält. Höchstens
+ * zwei Zeilen (LLH-1734: einzeilig endete im 208 px breiten Panel fast jede in „…“), zu Lange endet
+ * danach in „…“ und steht ganz im `title` des Knopfes.
  */
 export function modulBeschreibungStil(
   farben: Pick<Farbrollen, 'schwach'>,
   gesperrt: boolean,
 ): CSSProperties {
   return {
-    display: 'block',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
     fontSize: 12,
     lineHeight: 1.35,
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
     color: gesperrt ? 'inherit' : farben.schwach,
   };
 }

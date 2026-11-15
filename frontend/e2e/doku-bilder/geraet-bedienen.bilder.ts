@@ -132,6 +132,12 @@ test.describe(KAPITEL, () => {
       await geraet.getByRole('button', { name: 'Gerätemenü' }).click();
       const menue = geraet.getByRole('menu');
       await expect(menue.getByRole('menuitem', { name: 'Gerät abmelden …' })).toBeVisible();
+      // Erst nach dem Einblenden fotografieren: mitten in antds Animation fehlten im hellen Bild
+      // „Hilfe“ und „Gerät abmelden …“ (Review LLH-1734).
+      await expect(geraet.locator('.ant-dropdown')).not.toHaveClass(/-(enter|appear)/);
+      await expect(menue.getByRole('menuitem', { name: 'Gerät abmelden …' })).toBeInViewport({
+        ratio: 1,
+      });
       await fotografiere(menue, KAPITEL, 'geraetemenue');
 
       // Nachgeklickt: „Hilfe“ verlässt die Hülle, „Zum Gerät“ führt zurück.

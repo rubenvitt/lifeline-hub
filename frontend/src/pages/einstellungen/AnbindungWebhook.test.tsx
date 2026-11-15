@@ -146,8 +146,10 @@ describe('Webhook einer Anbindung (LLH-1656)', () => {
       'http://empfaenger.example/',
     );
     await user.click(within(dialog).getByRole('button', { name: 'Einrichten' }));
+    // antd prüft die Felder asynchron und blendet jede Meldung für sich ein; unter Last kommt
+    // die zweite später als die erste. Deshalb auf beide warten.
     expect(await within(dialog).findByText(/muss mit https:\/\/ beginnen/)).toBeInTheDocument();
-    expect(within(dialog).getByText('Mindestens eine Art wählen')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Mindestens eine Art wählen')).toBeInTheDocument();
     expect(aufrufe).toEqual([]);
   });
 

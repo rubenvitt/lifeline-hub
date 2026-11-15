@@ -109,6 +109,30 @@ describe('IconRail', () => {
     expect(fuss.querySelector('button')).toHaveAttribute('aria-label', 'Einstellungen');
   });
 
+  /**
+   * LLH-1734: Steht über der Rail etwas im Fluss (ab `md` die Betriebszeile mit dem Offline-Hinweis),
+   * misst die Rail diesen Vorlauf und zieht ihn von der Spaltenhöhe ab; sonst lag der Fuß um seine
+   * Höhe unter dem Fensterrand. jsdom rechnet kein Layout, deshalb die gestellte Lage der `<nav>`.
+   */
+  it('misst den Vorlauf über der Rail und legt ihn als Variable an die Landmarke', () => {
+    const echt = Element.prototype.getBoundingClientRect;
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      if (this.getAttribute('aria-label') === 'Kategorien') return new DOMRect(0, 37, 60, 700);
+      return echt.call(this);
+    });
+    try {
+      renderMitProviders(
+        <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
+      );
+      const nav = screen.getByRole('navigation', { name: 'Kategorien' });
+      expect(nav.style.getPropertyValue('--lfh-rail-vorlauf')).toBe('37px');
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('Kategorien und Fuß kleben als eine Spalte unter dem Rahmen (LFH-952)', () => {
     renderMitProviders(
       <IconRail kategorien={kategorien} aktiveKategorie={null} onKategorieKlick={() => {}} />,
@@ -118,7 +142,10 @@ describe('IconRail', () => {
     const spalte = nav.querySelector<HTMLElement>('[data-lfh="rail-spalte"]')!;
     expect(spalte.style.position).toBe('sticky');
     expect(spalte.style.top).toBe('var(--lfh-kopf-oben, 0px)');
-    expect(spalte.style.height).toBe('calc(100dvh - var(--lfh-kopf-oben, 0px))');
+    // Abzüglich des Vorlaufs: was im Fluss über der Rail steht (LLH-1734).
+    expect(spalte.style.height).toBe(
+      'calc(100dvh - var(--lfh-kopf-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
+    );
     expect(spalte.style.overflowY).toBe('auto');
     const haupt = spalte.querySelector<HTMLElement>('[data-lfh="rail-haupt"]')!;
     expect(haupt.style.position).toBe('');

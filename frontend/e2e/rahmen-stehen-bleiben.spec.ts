@@ -181,6 +181,45 @@ for (const b of BREITEN) {
   });
 }
 
+/**
+ * Der Rail-Fuß bleibt im Fenster (LLH-1734, Spec `einsatztauglichkeit-layout`): ab `md` steht die
+ * Betriebszeile im Fluss über dem Kopf und schob die Rail-Spalte um ihre Höhe nach unten, „Einst.“
+ * lag unter dem Fensterrand. Gemessen bei Rollstand 0, denn erst gerollt rutscht die Zeile weg.
+ */
+test('1366 × 768 offline, oben: „Einst.“ am Rail-Fuß bleibt im Fenster', async ({
+  page,
+  context,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Fuß ${Date.now()}`);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  const einstellungen = page
+    .getByRole('navigation', { name: 'Kategorien' })
+    .getByRole('link', { name: 'Einstellungen', exact: true });
+  await expect(einstellungen).toBeVisible();
+  await context.setOffline(true);
+  try {
+    // Vorbedingung: die Zeile steht wirklich im Fluss über dem Kopf, sonst wäre die Aussage leer.
+    const zeile = page.locator('[data-lfh="betriebszeile"]');
+    await expect(zeile).toContainText('Offline');
+    await expect.poll(async () => (await zeile.boundingBox())?.height ?? 0).toBeGreaterThan(20);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
+    await expect
+      .poll(
+        async () => {
+          const box = await einstellungen.boundingBox();
+          return box ? box.y + box.height : Number.POSITIVE_INFINITY;
+        },
+        { message: 'Unterkante von „Einst.“' },
+      )
+      .toBeLessThanOrEqual(768);
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
 for (const b of [
   { width: 390, height: 844 },
   { width: 1180, height: 820 },

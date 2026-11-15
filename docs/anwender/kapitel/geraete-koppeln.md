@@ -2,7 +2,7 @@
 titel: Geräte koppeln
 gruppen: [fuehrung, geraete]
 reihenfolge: 700
-quellen: [frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/pages/einstellungen/geraeteKern.ts, frontend/src/geraet/stellenName.ts, src/geraet/mod.rs, src/geraet/stelle.rs, src/geraet/repo.rs, src/routes/geraet.rs, src/routes/einsatz.rs, src/routes/einsatzabschnitt.rs]
+quellen: [frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/pages/einstellungen/geraeteKern.ts, frontend/src/geraet/stellenName.ts, src/geraet/mod.rs, src/geraet/stelle.rs, src/geraet/repo.rs, src/routes/geraet.rs, src/routes/einsatz.rs, src/routes/einsatzabschnitt.rs, frontend/src/geraet/GeraeteKopf.tsx]
 ---
 
 ## Überblick
@@ -78,8 +78,8 @@ Für die Einsatzleitung:
 
 3. „Verlängern“ wählen.
 
-Am Gerät steht das Ende der Kopplung in der Kopfzeile; in der letzten Stunde davor ist es
-hervorgehoben.
+Am Gerät steht die Restzeit der Kopplung in der Kopfzeile („Kopplung noch 5 h“); in der letzten
+Stunde davor zählt sie in Minuten und ist hervorgehoben.
 
 ### Neuen Code ausstellen
 
