@@ -196,6 +196,14 @@ export interface BefehlKontext {
    * WELCHE Befehle melden, entscheidet {@link GRUPPE_MERKBAR}, nicht der Aufrufer.
    */
   merkeBefehl?: (id: string) => void;
+  /**
+   * Ausführungen je Schnellaktion dieses Benutzers (y3zh5ymv D5): `baueBefehle` ordnet die
+   * Schnellaktionen danach, bei Gleichstand nach der festen Folge der Tabelle. Die Herkunft
+   * (`useSchnellaktionZaehler`) kennt `baueBefehle` nicht.
+   */
+  schnellaktionZaehlung?: Readonly<Record<string, number>>;
+  /** Meldet die Ausführung einer Schnellaktion mit ihrer Befehls-Id, injiziert wie `merkeBefehl`. */
+  zaehleSchnellaktion?: (id: string) => void;
   /** `oeffnung` fehlt = im aktuellen Tab. */
   navigate: (pfad: string, oeffnung?: Oeffnung) => void;
   setThemeModus: (m: ThemeModus) => void;

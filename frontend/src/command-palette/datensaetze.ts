@@ -238,7 +238,7 @@ function baueQuelle<T>(
  * beieinander.
  *
  * Die Reihenfolge ist nur Gleichstandsachse (die Ordnung machen Stufe und `ordneTreffer`); sie
- * folgt der Erfassungshäufigkeit wie `SCHNELLAKTIONEN`.
+ * folgt der Erfassungshäufigkeit, wie die feste Folge von `SCHNELLAKTIONEN`.
  *
  * Beschriftungen sind wiederverwendet (`personLabel` fällt bei fehlendem Namen auf 'R-042'
  * zurück, `schadenLabel`/`meldungLabel` bringen die Nummer mit). ETB, Fahrzeug, Personal und

@@ -13,12 +13,15 @@ import { baueBefehle } from './befehle';
 import { leseZuletztModule, merkeModulBesuch } from '../einsatz/zuletztModule';
 import { modulAusPfad } from '../einsatz/modulRegistry';
 import type { BefehlsGedaechtnis } from './useZuletztBefehle';
+import type { SchnellaktionZaehlung } from './useSchnellaktionZaehler';
 import type { Befehl, BefehlKontext, TastaturAktionen } from './typen';
 
 /** Kein Gedächtnis übergeben → keine Gruppe, keine Aufzeichnung. EIN Objekt statt eines
  *  Vorgabewerts im Kopf: ein `{}` dort wäre je Render eine neue Identität und machte das
  *  `useMemo` unten wirkungslos. */
 const OHNE_GEDAECHTNIS: BefehlsGedaechtnis = { ids: [], merke: () => {} };
+/** Dasselbe für die Zählung der Schnellaktionen (y3zh5ymv D5). */
+const OHNE_ZAEHLUNG: SchnellaktionZaehlung = { zaehlung: {}, zaehle: () => {} };
 
 /**
  * Verdrahtet Auth/Theme/Router/Query mit der reinen baueBefehle-Funktion.
@@ -38,8 +41,11 @@ export function useBefehle(
   gedaechtnis: BefehlsGedaechtnis | undefined,
   navigate: BefehlKontext['navigate'],
   abmelden: BefehlKontext['abmelden'],
+  /** Zählung der Schnellaktionen, wie `gedaechtnis` von oberhalb der Palette und memoisiert. */
+  zaehlung?: SchnellaktionZaehlung,
 ): Befehl[] {
   const gedaechtnisOderLeer = gedaechtnis ?? OHNE_GEDAECHTNIS;
+  const zaehlungOderLeer = zaehlung ?? OHNE_ZAEHLUNG;
   const { benutzer } = useAuth();
   const { setModus } = useThemeMode();
   const { setDichte } = useDichte();
@@ -113,6 +119,8 @@ export function useBefehle(
         merkeModulBesuch: merkeBesuch,
         zuletztBefehlIds: gedaechtnisOderLeer.ids,
         merkeBefehl: gedaechtnisOderLeer.merke,
+        schnellaktionZaehlung: zaehlungOderLeer.zaehlung,
+        zaehleSchnellaktion: zaehlungOderLeer.zaehle,
         navigate,
         setThemeModus: setModus,
         setDichte,
@@ -142,6 +150,7 @@ export function useBefehle(
       aktuellerModulKey,
       merkeBesuch,
       gedaechtnisOderLeer,
+      zaehlungOderLeer,
     ],
   );
 }

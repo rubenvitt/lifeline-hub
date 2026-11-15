@@ -138,6 +138,55 @@ const beendet: EinsatzAnzeige = {
 };
 
 describe('baueBefehle — Schnellaktionen', () => {
+  /** Spec `sprungpalette`, „Schnellaktionen nach Nutzung geordnet“ (y3zh5ymv D5). */
+  describe('Ordnung nach Nutzung', () => {
+    const aktionen = (k: BefehlKontext) =>
+      baueBefehle(k)
+        .filter((x) => x.gruppe === 'schnellaktionen')
+        .map((x) => x.id);
+
+    it('stellt die häufigste Schnellaktion zuerst, bei Gleichstand gilt die feste Folge', () => {
+      const ids = aktionen(
+        kontext({
+          schnellaktionZaehlung: {
+            'aktion:infotelefon-anruf': 3,
+            'aktion:tiere': 1,
+            'aktion:etb': 1,
+          },
+        }),
+      );
+      expect(ids.slice(0, 4)).toEqual([
+        'aktion:infotelefon-anruf',
+        'aktion:etb',
+        'aktion:tiere',
+        'aktion:personen',
+      ]);
+    });
+
+    it('zählt eine ausgeführte Schnellaktion, auch aus „Zuletzt ausgeführt“', () => {
+      const zaehle = vi.fn();
+      const b = baueBefehle(
+        kontext({
+          zaehleSchnellaktion: zaehle,
+          merkeBefehl: vi.fn(),
+          zuletztBefehlIds: ['aktion:etb'],
+        }),
+      );
+      b.find((x) => x.id === 'aktion:personen')!.ausfuehren();
+      expect(zaehle).toHaveBeenLastCalledWith('aktion:personen');
+      b.find((x) => x.id === 'ausgefuehrt:aktion:etb')!.ausfuehren();
+      expect(zaehle).toHaveBeenLastCalledWith('aktion:etb');
+    });
+
+    it('zählt keine andere Zeile', () => {
+      const zaehle = vi.fn();
+      const b = baueBefehle(kontext({ zaehleSchnellaktion: zaehle }));
+      b.find((x) => x.id === 'modul:etb')!.ausfuehren();
+      b.find((x) => x.id === 'nav:profil')!.ausfuehren();
+      expect(zaehle).not.toHaveBeenCalled();
+    });
+  });
+
   it('verdrahtet die Schnellaktionen mit ?neu=1 für Berechtigte', () => {
     const k = kontext();
     const b = baueBefehle(k);

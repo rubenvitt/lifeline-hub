@@ -50,6 +50,7 @@ import {
   unfallhilfsstellenListePfad,
 } from '../routing/deeplinks';
 import { GRUPPE_MERKBAR, sprungZu } from './typen';
+import { ordneNachNutzung } from './schnellaktionZaehler';
 import type { Befehl, BefehlKontext, Oeffnung, TastaturAktionId } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Dichte } from '../theme/tokens';
@@ -283,6 +284,14 @@ export const SCHNELLAKTIONEN: {
     schlagworte: ['anruf', 'bürgertelefon', 'hotline', 'infotelefon', 'informationstelefon'],
   },
 ];
+
+/** Befehls-Id einer Schnellaktion: `aktion:<kennung>`, ohne Kennung `aktion:<modulKey>`. */
+export function schnellaktionId(a: { kennung?: string; modulKey: string }): string {
+  return `aktion:${a.kennung ?? a.modulKey}`;
+}
+
+/** Alle Befehls-Ids der Schnellaktionen; die Zählung (`schnellaktionZaehler.ts`) räumt gegen sie auf. */
+export const SCHNELLAKTION_IDS: readonly string[] = SCHNELLAKTIONEN.map(schnellaktionId);
 
 const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: Icon }[] = [
   { id: 'theme:system', label: 'Darstellung: System', modus: 'system', icon: IconMonitor },
@@ -521,7 +530,14 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
     //    die LESEACHSE `istModulFreigegeben` wie in 2. und 3., sonst zeigte eine Schnellaktion auf
     //    ein unfertiges Modul.
     if (k.darfSchreibenImEinsatz) {
-      for (const a of SCHNELLAKTIONEN) {
+      // Nach Nutzung geordnet, bei Gleichstand die feste Folge der Tabelle (y3zh5ymv D5). Die
+      // Folge gilt in der Startansicht und als Gleichstandsachse der Suche (Eingabeindex).
+      const geordnet = ordneNachNutzung(
+        SCHNELLAKTIONEN,
+        schnellaktionId,
+        k.schnellaktionZaehlung ?? {},
+      );
+      for (const a of geordnet) {
         if (a.recht === 'leitung' && !k.darfEinsatzLeiten) continue;
         const m = modulRegistry.find((x) => x.key === a.modulKey);
         if (!m || !istModulFreigegeben(m, k.freigaben)) continue;
@@ -530,16 +546,21 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
           if (!zusatz || !istModulFreigegeben(zusatz, k.freigaben)) continue;
         }
         const ziel = a.pfad(k.einsatzId);
+        const id = schnellaktionId(a);
         befehle.push({
-          id: `aktion:${a.kennung ?? a.modulKey}`,
+          id,
           gruppe: 'schnellaktionen',
           label: a.label,
           // Das Icon und der Name des Trägermoduls: die Zeile sagt ohne Lesen, WO sie landet.
           kontext: m.label,
           icon: m.icon,
           schlagworte: a.schlagworte,
-          // Gemerkt wird das MODUL der Aktion (LFH-436): ein Griff, ein Modul.
-          ...sprungZu(ziel, k.navigate, () => k.merkeModulBesuch?.(a.modulKey)),
+          // Gemerkt wird das MODUL der Aktion (LFH-436): ein Griff, ein Modul. Gezählt wird die
+          // Aktion selbst; die Kopie in „Zuletzt ausgeführt“ ruft dieses `ausfuehren` mit.
+          ...sprungZu(ziel, k.navigate, () => {
+            k.merkeModulBesuch?.(a.modulKey);
+            k.zaehleSchnellaktion?.(id);
+          }),
         });
       }
     }

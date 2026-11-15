@@ -14,6 +14,7 @@ import { useDatensatzTreffer } from './useDatensaetze';
 import { useKoordinatenSprung } from './useKoordinatenSprung';
 import { useAdressSprung } from './useAdressSprung';
 import { useZuletztBefehle, type BefehlsGedaechtnis } from './useZuletztBefehle';
+import { useSchnellaktionZaehler, type SchnellaktionZaehlung } from './useSchnellaktionZaehler';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { modulAusPfad } from '../einsatz/modulRegistry';
 import { CommandPalette } from './CommandPalette';
@@ -137,6 +138,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
    * funktioniert noch nach dem Abhängen der Palette (Herleitung an `useZuletztBefehle`).
    */
   const gedaechtnis = useZuletztBefehle();
+  /** Die Zählung der Schnellaktionen (y3zh5ymv D5), aus demselben Grund hier wie das Gedächtnis. */
+  const zaehlung = useSchnellaktionZaehler();
   /**
    * Rückfrage zum Abmelden (LLH-1730, Spec `sprungpalette`): HIER und nicht in `PaletteHost`, weil
    * die Palette beim Ausführen schließt und abgehängt wird. Eingehängt nur, solange sie offen ist:
@@ -312,6 +315,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           schliesse={schliesse}
           tastaturAktionen={aktiveAktionen}
           gedaechtnis={gedaechtnis}
+          zaehlung={zaehlung}
           abmelden={openAbmelden}
         />
       )}
@@ -331,11 +335,13 @@ function PaletteHost({
   schliesse,
   tastaturAktionen,
   gedaechtnis,
+  zaehlung,
   abmelden,
 }: {
   schliesse: () => void;
   tastaturAktionen: TastaturAktionen;
   gedaechtnis: BefehlsGedaechtnis;
+  zaehlung: SchnellaktionZaehlung;
   abmelden: () => void;
 }) {
   /**
@@ -352,6 +358,13 @@ function PaletteHost({
   const gefroren = useMemo(
     () => ({ ids: zuletztBefehlIds, merke: gedaechtnis.merke }),
     [zuletztBefehlIds, gedaechtnis.merke],
+  );
+  // Dasselbe Standbild für die Zählung: die Folge der Schnellaktionen steht, solange die Palette
+  // offen ist (Spec `sprungpalette`, „Schnellaktionen nach Nutzung geordnet“).
+  const [zaehlungBeimOeffnen] = useState(zaehlung.zaehlung);
+  const zaehlungGefroren = useMemo(
+    () => ({ zaehlung: zaehlungBeimOeffnen, zaehle: zaehlung.zaehle }),
+    [zaehlungBeimOeffnen, zaehlung.zaehle],
   );
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -376,7 +389,7 @@ function PaletteHost({
   );
   // ALLE drei Befehlsquellen öffnen über `gehZu` (feste Befehle, Datensätze, Koordinatensprung),
   // nur so gilt der neue Tab für jede Zeile mit Ziel.
-  const befehle = useBefehle(tastaturAktionen, gefroren, gehZu, abmelden);
+  const befehle = useBefehle(tastaturAktionen, gefroren, gehZu, abmelden, zaehlungGefroren);
   const melde = useCallback((modus: PaletteModus, rest: string) => {
     // Gleicher Stand → gleiches Objekt: die Frist läuft auch beim bloßen Öffnen ab.
     setStand((v) => (v.modus === modus && v.rest === rest ? v : { modus, rest }));
