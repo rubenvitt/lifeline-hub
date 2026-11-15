@@ -835,16 +835,21 @@ describe('abschnittGruende — Rückmeldung und Ausfall wie das Meldebild (LLH-1
   });
 
   it('Mittel ohne Einheit: die Karte „Ohne Abschnitt“ nennt ihren Ausfall wie das Meldebild (Review)', () => {
-    const ohne = abschnittZeilen({
+    const zeilen = abschnittZeilen({
       abschnitte,
       einheiten,
       personal: [...personalListe, personal(8, null, 'mannschaft', 'nicht_verfuegbar')],
       fahrzeuge: [],
       material: [],
       auftraege: [],
-    }).find((z) => z.abschnittId == null)!;
+    });
+    const ohne = zeilen.find((z) => z.abschnittId == null)!;
     expect(ohne).toBeDefined();
     expect(abschnittGruende(ohne, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
+    // Nur dort: die Logistik-Karte behält ihren eigenen Ausfall (Person 5 in E40, hier ohne
+    // Material), ohne den der Mittel ohne Einheit.
+    const logistik = zeilen.find((z) => z.abschnittId === 1)!;
+    expect(abschnittGruende(logistik, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
   });
 
   it('ohne geladene Rückmeldungen kein Rückmeldungsgrund — nie ein erfundenes „keine“', () => {

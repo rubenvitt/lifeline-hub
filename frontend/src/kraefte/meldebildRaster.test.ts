@@ -927,6 +927,10 @@ describe('Rückmeldung je Rasterzeile', () => {
     expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 0, einheiten: 2 })).toBe(
       '2 Einh. Rückm. überfällig, längste seit < 1 min',
     );
+    // Ab der ersten vollen Minute die Dauer.
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 1 })).toBe(
+      'Rückm. überfällig seit 1 min',
+    );
   });
 
   it('fasst mehrere Einheiten eines Abschnitts zusammen (LLH-1739)', () => {
