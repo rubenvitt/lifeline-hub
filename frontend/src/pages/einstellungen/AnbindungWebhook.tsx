@@ -13,6 +13,7 @@ import {
   StatusChip,
   useRollen,
   type BearbeitbaresFeld,
+  schriftStil,
   zahlStil,
 } from '../../components/instrument';
 import { SeitenFehler } from '../../components/SeitenZustand';
@@ -106,7 +107,12 @@ function ArtenAuswahl({
           return (
             <Checkbox key={a} value={a} disabled={grund != null} data-lfh={`webhook-art-${a}`}>
               {ART_TEXT[a]}{' '}
-              <span style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>{a}</span>
+              <span
+                data-schrift="kennung"
+                style={{ ...zahlStil('fein', 500), color: rollen.schwach }}
+              >
+                {a}
+              </span>
               {grund && <span style={{ color: rollen.gedaempft }}>{` · ${grund}`}</span>}
             </Checkbox>
           );
@@ -553,7 +559,8 @@ function Zustellungen({ zugangId }: { zugangId: string }) {
               style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'baseline' }}
             >
               <span style={zahlStil('klein')}>{zeitKurz(v.at, konv)}</span>
-              <span style={zahlStil('klein')}>
+              {/* „Test“ ist ein Wort und steht in der Textschrift (LLH-1777). */}
+              <span style={v.test ? schriftStil('meta') : zahlStil('klein')}>
                 {v.test ? 'Test' : v.ereignis_id != null ? `#${v.ereignis_id}` : '—'}
               </span>
               <span style={{ color: v.erfolg ? rollen.text : rollen.achtungText }}>

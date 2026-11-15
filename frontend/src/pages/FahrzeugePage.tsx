@@ -31,7 +31,7 @@ import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Segmentleiste, zahlStil } from '../components/instrument';
+import { Segmentleiste, schriftStil, zahlStil } from '../components/instrument';
 import {
   kraefteuebersichtPfad,
   parseFahrzeugeAnsicht,
@@ -118,7 +118,7 @@ function BesatzungsStaerkeBadge({ crew, soll }: { crew: EinsatzPersonal[]; soll:
   return (
     <Space size={abstand.sm} wrap data-lfh="besatzung-urteil" data-urteil={urteil}>
       <StatusTag darstellung={besatzungsUrteil[urteil]} />
-      <span style={zahlStil('klein')}>
+      <span style={schriftStil('meta')}>
         {urteil !== 'nicht_erfasst' && (
           <>
             Ist <StaerkeAnzeige wert={ist} />
@@ -869,7 +869,9 @@ function FahrzeugeInhalt() {
       render: (_, ef) => (
         <Space wrap>
           {/* Funkrufname in Mono. */}
-          <span style={zahlStil('text')}>{ef.funkrufname}</span>
+          <span data-schrift="kennung" style={zahlStil('text')}>
+            {ef.funkrufname}
+          </span>
           {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
           {ef.ist_demo && <DemoMarke />}
         </Space>

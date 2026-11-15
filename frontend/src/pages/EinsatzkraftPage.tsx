@@ -40,7 +40,14 @@ import {
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import { Datenfeld, Datenraster, Paneel, useRollen, zahlStil } from '../components/instrument';
+import {
+  Datenfeld,
+  Datenraster,
+  Paneel,
+  useRollen,
+  schriftStil,
+  zahlStil,
+} from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
@@ -387,7 +394,7 @@ export default function EinsatzkraftPage() {
       // Nur die Dauer bleibt immer beisammen.
       meta={
         metaTeile.length > 0 ? (
-          <span className="lfh-personenkopf-meta" style={zahlStil('klein')}>
+          <span className="lfh-personenkopf-meta" style={schriftStil('meta')}>
             {metaTeile.map((teil, i) => (
               <Fragment key={i}>
                 {i > 0 && ' · '}

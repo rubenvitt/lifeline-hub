@@ -300,6 +300,7 @@ export default function ProfilPage() {
                           einmal.
                         </Typography.Paragraph>
                         <pre
+                          data-schrift="kennung"
                           style={{
                             background: rollen.flaeche2,
                             padding: 12,

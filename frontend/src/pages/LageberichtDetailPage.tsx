@@ -56,7 +56,7 @@ import {
   verteilerNamesFromForm,
   type VerteilerFormValues,
 } from '../entwurf/verteilerKern';
-import { Paneel, zahlStil } from '../components/instrument';
+import { Paneel, schriftStil } from '../components/instrument';
 
 import './lageberichtPrint.css';
 
@@ -443,7 +443,7 @@ function LageberichtDetail() {
             Uhrzeiten für denselben Wert. Der Lesezweig rendert über `ZeitAnzeige` in der
             taktischen DTG und der Anzeigezone (der Wirestring ist UTC ohne Zonenkennung). */}
         {!schreibtEntwurf && (
-          <Typography.Paragraph type="secondary" style={zahlStil('klein')}>
+          <Typography.Paragraph type="secondary" style={schriftStil('meta')}>
             Zeitstand: <ZeitAnzeige wert={bericht.zeitstand} />
           </Typography.Paragraph>
         )}

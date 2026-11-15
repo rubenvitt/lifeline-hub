@@ -282,6 +282,7 @@ export default function EinsatzLagebildExtern({
             <KopierbarerText text={link} bezeichnung="Link">
               <Typography.Text
                 data-lfh="lagebild-link-text"
+                data-schrift="kennung"
                 style={{ ...zahlStil('text', 400), overflowWrap: 'anywhere' }}
               >
                 {link}

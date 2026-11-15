@@ -17,8 +17,8 @@ import {
 import { darfBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import {
-  Augenbraue,
   DashboardFlaeche,
+  Feldetikett,
   GliederungsPaneel,
   Kennzahl,
   Kennzahlenband,
@@ -36,6 +36,7 @@ import {
   type KennzahlZustand,
   type Verteilungszeile,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../../components/instrument';
 import { anteil } from '../../components/instrument/Aufgliederung';
@@ -829,7 +830,13 @@ export default function UeberblickPage() {
                     }}
                     fuss={
                       zAbschnitte === 'daten' && zeilen.length > 0 && auftraegeFehlen ? (
-                        <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>
+                        <span
+                          style={{
+                            ...schriftStil('meta'),
+                            fontSize: schriftGroesse('fein'),
+                            color: rollen.schwach,
+                          }}
+                        >
                           Aufträge nicht abrufbar, Auftragstexte fehlen
                         </span>
                       ) : undefined
@@ -922,7 +929,13 @@ export default function UeberblickPage() {
                           <span style={{ ...zahlStil('text'), color: markenFarbe(m) }}>
                             {kurz(m.zeit)}
                           </span>
-                          <span style={{ ...zahlStil('fein'), color: markenFarbe(m) }}>
+                          <span
+                            style={{
+                              ...schriftStil('meta'),
+                              fontSize: schriftGroesse('fein'),
+                              color: markenFarbe(m),
+                            }}
+                          >
                             {m.wort}
                           </span>
                         </span>
@@ -998,7 +1011,8 @@ export default function UeberblickPage() {
                               <span
                                 data-lfh="entscheidung-folge"
                                 style={{
-                                  ...zahlStil('fein'),
+                                  ...schriftStil('meta'),
+                                  fontSize: schriftGroesse('fein'),
                                   letterSpacing: '0.06em',
                                   color: rollen.bedien,
                                 }}
@@ -1091,8 +1105,24 @@ function abschnittGliederung(
         >
           {zeile.name}
         </span>
-        {leitung && <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>{leitung}</span>}
-        <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>
+        {leitung && (
+          <span
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
+          >
+            {leitung}
+          </span>
+        )}
+        <span
+          style={{
+            ...schriftStil('meta'),
+            fontSize: schriftGroesse('fein'),
+            color: rollen.gedaempft,
+          }}
+        >
           {/* Was gezählt wird, steht dran (LFH-973): hier der ganze Teilbaum, im Abschnittsbaum
               nur die direkt zugeordneten. */}
           {anzahlWort(zeile.einheiten, 'Einheit', 'Einheiten')}
@@ -1125,7 +1155,13 @@ function abschnittGliederung(
           <span>
             {juengster.auftrag_text}
             {weitere.length > 0 && (
-              <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>
+              <span
+                style={{
+                  ...schriftStil('meta'),
+                  fontSize: schriftGroesse('fein'),
+                  color: rollen.schwach,
+                }}
+              >
                 {' '}
                 · +{weitere.length} weitere offen
               </span>
@@ -1133,7 +1169,15 @@ function abschnittGliederung(
           </span>
         ) : null}
         {unterzeile && (
-          <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>{unterzeile}</span>
+          <span
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
+          >
+            {unterzeile}
+          </span>
         )}
         {/* Nur wenn die Rückmeldungen feststehen, sonst gar nichts. Der verborgene Vorsatz gibt
             der Zeit im Linknamen ihre Bedeutung. */}
@@ -1144,7 +1188,14 @@ function abschnittGliederung(
           >
             {rueck ? (
               <>
-                <span style={{ ...zahlStil('fein'), color: rollen.schwach, flex: '0 0 auto' }}>
+                <span
+                  style={{
+                    ...schriftStil('meta'),
+                    fontSize: schriftGroesse('fein'),
+                    color: rollen.schwach,
+                    flex: '0 0 auto',
+                  }}
+                >
                   <span style={NUR_VORLESER}>Letzte Rückmeldung:</span> {zeit(rueck.ereigniszeit)}
                 </span>
                 {/* Leerzeichen zwischen den Flex-Kindern: unsichtbar, trennt aber im Linknamen
@@ -1175,12 +1226,18 @@ function abschnittGliederung(
     zahl: (
       <>
         <span style={zahlStil('text')}>{zeile.staerkeText}</span>
-        <Augenbraue>F/UF/M//Ges</Augenbraue>
+        <Feldetikett>F/UF/M//Ges</Feldetikett>
         {/* Einheiten je Status als Verteilung: Wort, Zahl, Balken (Dashboard-Baukasten). Kein
             `aria-label` an der Liste: im Link bildet sich der Name aus dem Inhalt. */}
         <Verteilungsliste kennung="abschnitt-status" dichte="zeile" zeilen={status} />
         {verteilung.ohne > 0 && (
-          <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>
+          <span
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
+          >
             +{verteilung.ohne} ohne Status
           </span>
         )}

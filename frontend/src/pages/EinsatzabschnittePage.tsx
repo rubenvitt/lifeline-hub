@@ -36,7 +36,13 @@ import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Augenbraue, Paneel, Segmentleiste, useRollen, zahlStil } from '../components/instrument';
+import {
+  Augenbraue,
+  Paneel,
+  Segmentleiste,
+  useRollen,
+  schriftStil,
+} from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
@@ -579,7 +585,7 @@ export default function EinsatzabschnittePage() {
               )}
               <span>{e.name}</span>
               {e.typ_label && <Tag>{e.typ_label}</Tag>}
-              <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
+              <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
                 kumuliert <StaerkeAnzeige wert={e.ist_kumuliert} />
               </span>
             </Space>

@@ -108,6 +108,7 @@ import {
   StatusZelle,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../components/instrument';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
@@ -390,7 +391,9 @@ function rasterSpalten(
       abBreite: 'xxl',
       render: (_t, z) =>
         z.art === 'einheit' && z.funkrufname ? (
-          <span style={zahlStil('klein')}>{z.funkrufname}</span>
+          <span data-schrift="kennung" style={zahlStil('klein')}>
+            {z.funkrufname}
+          </span>
         ) : null,
     },
     // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht
@@ -401,7 +404,10 @@ function rasterSpalten(
       title: (
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span>Fahrzeuge und Personal</span>
-          <span data-lfh="status-legende" style={{ ...zahlStil('fein'), fontWeight: 400 }}>
+          <span
+            data-lfh="status-legende"
+            style={{ ...schriftStil('meta'), fontSize: schriftGroesse('fein') }}
+          >
             bereit · gebunden · Ausfall
           </span>
         </span>
@@ -451,7 +457,8 @@ function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
     <span
       data-lfh="meldebild-besatzung"
       style={{
-        ...zahlStil('fein'),
+        ...schriftStil('meta'),
+        fontSize: schriftGroesse('fein'),
         display: 'flex',
         flexDirection: 'column',
         color: rollen.gedaempft,
@@ -510,7 +517,11 @@ function StatusSpalte({
         {verteilung && (
           <span
             data-lfh="meldebild-statusverteilung"
-            style={{ ...zahlStil('fein'), color: rollen.gedaempft }}
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.gedaempft,
+            }}
           >
             {verteilung}
           </span>

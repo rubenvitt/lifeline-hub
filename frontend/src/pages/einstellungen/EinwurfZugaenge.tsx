@@ -168,6 +168,7 @@ function AdresseDialog({
           <KopierbarerText text={adresse} bezeichnung="Adresse">
             <span
               data-lfh="einwurf-adresse-text"
+              data-schrift="kennung"
               style={{ ...zahlStil('text', 500), wordBreak: 'break-all' }}
             >
               {adresse}
@@ -175,6 +176,7 @@ function AdresseDialog({
           </KopierbarerText>
           <KopierbarerText text={neu.schluessel} bezeichnung="Schlüssel">
             <span
+              data-schrift="kennung"
               style={{ ...zahlStil('klein', 500), color: rollen.gedaempft, wordBreak: 'break-all' }}
             >
               {neu.schluessel}
@@ -506,7 +508,12 @@ export default function EinwurfZugaenge() {
             {EINWURF_ZWECKE.map((s) => (
               <Radio key={s} value={s}>
                 {SCOPE_TEXT[s]}{' '}
-                <span style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>{s}</span>
+                <span
+                  data-schrift="kennung"
+                  style={{ ...zahlStil('fein', 500), color: rollen.schwach }}
+                >
+                  {s}
+                </span>
               </Radio>
             ))}
           </Radio.Group>

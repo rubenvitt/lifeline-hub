@@ -343,7 +343,12 @@ export default function Anbindungen() {
             {SCOPES.map((s) => (
               <Checkbox key={s} value={s}>
                 {SCOPE_TEXT[s]}{' '}
-                <span style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>{s}</span>
+                <span
+                  data-schrift="kennung"
+                  style={{ ...zahlStil('fein', 500), color: rollen.schwach }}
+                >
+                  {s}
+                </span>
               </Checkbox>
             ))}
           </Checkbox.Group>

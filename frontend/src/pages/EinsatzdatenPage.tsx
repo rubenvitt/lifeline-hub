@@ -15,7 +15,6 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
-  Augenbraue,
   Paneel,
   kennzahlenbandStil,
   paneelZeileStil,
@@ -311,7 +310,7 @@ const KOPF_MIN_BREITE = 220;
  * Nichts hier ist bedienbar, die Zwei-Angaben-Regel für handgebaute Bedienziele gilt nicht.
  */
 /**
- * Eine Angabe als Zelle im Fugenraster (Augenbraue über dem Wert). Kein `Kennzahl`-Baustein: die
+ * Eine Angabe als Zelle im Fugenraster (Feldetikett über dem Wert). Kein `Kennzahl`-Baustein: die
  * Werte sind Wörter — ein Stichwort in Datenwert-Mono läse sich wie ein Messwert.
  */
 function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode; mono?: boolean }) {
@@ -327,7 +326,9 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
         minWidth: 0,
       }}
     >
-      <Augenbraue style={{ display: 'block', marginBottom: token.marginXXS }}>{etikett}</Augenbraue>
+      <Feldetikett style={{ display: 'block', marginBottom: token.marginXXS }}>
+        {etikett}
+      </Feldetikett>
       <div
         style={{
           ...(mono ? zahlStil('text', 500) : { fontSize: schriftGroesse('text'), fontWeight: 500 }),
@@ -972,7 +973,11 @@ function RufnameAngabe({
     <InlineAngabe<string>
       etikett="Rufname"
       wert={rufname ?? ''}
-      anzeige={<span style={zahlStil('text')}>{rufname}</span>}
+      anzeige={
+        <span data-schrift="kennung" style={zahlStil('text')}>
+          {rufname}
+        </span>
+      }
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}

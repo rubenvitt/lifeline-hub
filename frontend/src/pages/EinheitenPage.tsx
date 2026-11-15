@@ -123,7 +123,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       // 11-|1“ läse sich als zwei Fahrzeuge), nur zwischen den Namen.
       render: (_t, z) =>
         z.fahrzeuge.length > 0 ? (
-          <span data-lfh="einheit-fahrzeuge" style={zahlStil('klein')}>
+          <span data-lfh="einheit-fahrzeuge" data-schrift="kennung" style={zahlStil('klein')}>
             {z.fahrzeuge.length} ·{' '}
             {z.fahrzeuge.map((f, i) => (
               <Fragment key={`${i}-${f}`}>

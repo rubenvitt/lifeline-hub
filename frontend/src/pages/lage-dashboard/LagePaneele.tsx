@@ -20,6 +20,7 @@ import {
   Zeitachseneintrag,
   useRollen,
   schriftGroesse,
+  schriftStil,
   zahlStil,
 } from '../../components/instrument';
 import type { LiveVerbindungsStatus } from '../../live/liveVerbindung';
@@ -113,7 +114,11 @@ export function GefahrenmatrixPaneel({
           <div
             aria-hidden="true"
             data-lfh="gefahrenlegende-erlaeuterung"
-            style={{ ...zahlStil('fein'), color: rollen.schwach }}
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
           >
             <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
           </div>
@@ -383,7 +388,7 @@ export function VerlaufPaneel({
             style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
           >
             <span style={{ fontSize: schriftGroesse('fein'), color: rollen.schwach }}>Spitze</span>
-            <span style={{ ...zahlStil('klein'), color: rollen.text2 }}>
+            <span style={{ ...schriftStil('meta'), color: rollen.text2 }}>
               {verlauf.spitze.stunde} Uhr · {verlauf.spitze.gesamt}
             </span>
           </span>

@@ -430,7 +430,12 @@ function Baum({
             meta={
               <span>
                 {k.typ_label}
-                {k.funkrufname && <span style={zahlStil('klein')}> · {k.funkrufname}</span>}
+                {k.funkrufname && (
+                  <span data-schrift="kennung" style={zahlStil('klein')}>
+                    {' '}
+                    · {k.funkrufname}
+                  </span>
+                )}
               </span>
             }
             koerperPolster
@@ -452,7 +457,9 @@ function Baum({
                   onWahl={onWahl}
                   beschriftung={
                     <>
-                      <span style={zahlStil('text')}>{f.funkrufname}</span>
+                      <span data-schrift="kennung" style={zahlStil('text')}>
+                        {f.funkrufname}
+                      </span>
                       {f.fahrzeugtyp && (
                         <Typography.Text type="secondary"> {f.fahrzeugtyp}</Typography.Text>
                       )}

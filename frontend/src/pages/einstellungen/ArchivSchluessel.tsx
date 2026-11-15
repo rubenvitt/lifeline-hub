@@ -3,7 +3,7 @@ import { Alert, App, Button, Form, Input, Modal, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconHaken, IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
-import { Paneel, useRollen, zahlStil } from '../../components/instrument';
+import { Paneel, schriftStil, useRollen, zahlStil } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -203,7 +203,7 @@ export default function ArchivSchluessel() {
                     title={<span data-lfh="archiv-schluessel-titel">{s.bezeichnung}</span>}
                     description={
                       <span
-                        style={{ ...zahlStil('text'), color: rollen.gedaempft }}
+                        style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
                         data-lfh="archiv-schluessel-zustand"
                       >
                         {schluesselZustand(s, zeit)}
@@ -254,6 +254,7 @@ export default function ArchivSchluessel() {
         >
           <Input
             placeholder="age1…"
+            data-schrift="kennung"
             spellCheck={false}
             autoComplete="off"
             style={zahlStil('text')}
@@ -282,7 +283,10 @@ export default function ArchivSchluessel() {
         {probe?.probe && (
           <div data-lfh="archiv-schluessel-probe" style={{ marginBlockEnd: token.marginSM }}>
             <KopierbarerText text={probe.probe} bezeichnung="Probe">
-              <pre style={{ ...zahlStil('klein'), margin: 0, overflowX: 'auto' }}>
+              <pre
+                data-schrift="kennung"
+                style={{ ...zahlStil('klein'), margin: 0, overflowX: 'auto' }}
+              >
                 {probe.probe}
               </pre>
             </KopierbarerText>
@@ -319,7 +323,7 @@ export default function ArchivSchluessel() {
         destroyOnHidden
       >
         {entfernenFuer && (
-          <p style={{ ...zahlStil('text'), color: rollen.gedaempft }}>
+          <p data-schrift="kennung" style={{ ...zahlStil('text'), color: rollen.gedaempft }}>
             {entfernenFuer.fingerabdruck}
           </p>
         )}

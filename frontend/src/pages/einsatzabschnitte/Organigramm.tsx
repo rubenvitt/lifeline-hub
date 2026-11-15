@@ -14,7 +14,7 @@ import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { staerkeText } from '../../anzeige/staerke';
-import { useRollen, zahlStil } from '../../components/instrument';
+import { schriftStil, useRollen, zahlStil } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import HaengenderBaum, {
   baumZielStil,
@@ -129,13 +129,17 @@ function OrganigrammKopf({
       >
         <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
         {fuehrungsstelle?.bezeichnung && <div>{fuehrungsstelle.bezeichnung}</div>}
-        {fuehrungsstelle?.rufname && <div style={zahlStil('text')}>{fuehrungsstelle.rufname}</div>}
+        {fuehrungsstelle?.rufname && (
+          <div data-schrift="kennung" style={zahlStil('text')}>
+            {fuehrungsstelle.rufname}
+          </div>
+        )}
         {/* Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke: keine
             erfundene Leitung aus App-Rolle oder Stab. */}
         {einsatzleiter.art === 'erfasst' ? (
           <>
             <div style={{ overflowWrap: 'anywhere' }}>{einsatzleiter.name}</div>
-            <div style={{ ...zahlStil('klein', 500), color: rollen.gedaempft }}>
+            <div style={{ ...schriftStil('meta'), fontWeight: 500, color: rollen.gedaempft }}>
               {einsatzleiter.nichtMehrDisponiert && <span>nicht mehr disponiert · </span>}
               <span>{`seit ${zeitKurz(einsatzleiter.seit, konventionen)}`}</span>
             </div>
@@ -252,6 +256,8 @@ function KnotenInhalt({
       ? einsatzabschnittePfad(einsatzId, { abschnitt: knoten.id })
       : einheitDetailPfad(einsatzId, knoten.id);
   const meta: CSSProperties = { ...zahlStil('klein'), overflowWrap: 'anywhere' };
+  // Ohne Rufname steht das Wort „kein Rufname“ da: Text, nicht Mono (LLH-1777).
+  const metaText: CSSProperties = { ...schriftStil('meta'), overflowWrap: 'anywhere' };
   // Dieselbe Prüfung wie in `EinsatzZeichen` (rendert dort `null`): hier entscheidet sie, ob der
   // Platz überhaupt entsteht.
   const darstellbar = fachobjektZeichen(knoten.tz) != null;
@@ -296,7 +302,12 @@ function KnotenInhalt({
             color: rollen.gedaempft,
           }}
         >
-          <span style={meta}>{knoten.rufname ?? 'kein Rufname'}</span>
+          <span
+            data-schrift={knoten.rufname != null ? 'kennung' : undefined}
+            style={knoten.rufname != null ? meta : metaText}
+          >
+            {knoten.rufname ?? 'kein Rufname'}
+          </span>
           {knoten.leitung != null ? (
             <span style={{ overflowWrap: 'anywhere' }}>{knoten.leitung}</span>
           ) : (

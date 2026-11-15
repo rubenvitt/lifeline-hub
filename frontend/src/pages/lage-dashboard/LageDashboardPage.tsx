@@ -87,7 +87,8 @@ import {
   WarnstufenHinweis,
   useRollen,
   type KennzahlZustand,
-  zahlStil,
+  schriftGroesse,
+  schriftStil,
 } from '../../components/instrument';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import {
@@ -428,7 +429,8 @@ export default function LageDashboardPage() {
               flexWrap: 'wrap',
               alignItems: 'center',
               gap: token.padding,
-              ...zahlStil('fein'),
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
               color: rollen.schwach,
             }}
           >

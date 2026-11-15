@@ -97,7 +97,10 @@ export default function AbschnittDetail({
       etikett={etikett}
       wert={a[feld] ?? ''}
       anzeige={
-        <span style={feld === 'rufname' ? zahlStil('text') : { whiteSpace: 'pre-wrap' }}>
+        <span
+          data-schrift={feld === 'rufname' ? 'kennung' : undefined}
+          style={feld === 'rufname' ? zahlStil('text') : { whiteSpace: 'pre-wrap' }}
+        >
           {a[feld]}
         </span>
       }
@@ -148,7 +151,11 @@ export default function AbschnittDetail({
         <InlineAngabe<string>
           etikett="Kurzbezeichnung"
           wert={a.kurzbezeichnung ?? ''}
-          anzeige={<span style={zahlStil('text')}>{a.kurzbezeichnung}</span>}
+          anzeige={
+            <span data-schrift="kennung" style={zahlStil('text')}>
+              {a.kurzbezeichnung}
+            </span>
+          }
           leer={isEmptyText}
           gleich={isSameText}
           darfSchreiben={darfSchreiben}

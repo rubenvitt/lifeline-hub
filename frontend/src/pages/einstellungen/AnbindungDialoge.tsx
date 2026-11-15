@@ -16,7 +16,9 @@ export function RechteText({ scopes }: { scopes: readonly string[] }) {
         <span key={s}>
           {i > 0 && ' · '}
           {scopeText(s)}{' '}
-          <span style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>{s}</span>
+          <span data-schrift="kennung" style={{ ...zahlStil('fein', 500), color: rollen.schwach }}>
+            {s}
+          </span>
         </span>
       ))}
     </span>
@@ -65,7 +67,12 @@ export function CodeDialog({
             gilt bis {zeitKurz(code.laeuft_ab_at, konv)}, einmal einlösbar · nur jetzt sichtbar
           </span>
           <KopierbarerText text={kommando} bezeichnung="Kommando">
-            <span style={{ ...zahlStil('klein', 500), wordBreak: 'break-all' }}>{kommando}</span>
+            <span
+              data-schrift="kennung"
+              style={{ ...zahlStil('klein', 500), wordBreak: 'break-all' }}
+            >
+              {kommando}
+            </span>
           </KopierbarerText>
           <span style={{ color: rollen.gedaempft }}>
             Nach dem Einlösen steht der Fingerabdruck des Fremdsystems am Zugang. Das Kommando zeigt

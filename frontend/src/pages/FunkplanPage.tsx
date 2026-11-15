@@ -17,7 +17,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { Paneel, PaneelZeile, useRollen, zahlStil } from '../components/instrument';
+import { Paneel, PaneelZeile, schriftStil, useRollen, zahlStil } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
@@ -118,7 +118,11 @@ import { isUebung } from '../einsatz/einsatzart';
 type SpalteKey = 'stelle' | 'rufname' | 'leitung' | 'tmo' | 'dmo' | 'telefon';
 
 function Mono({ children }: { children: ReactNode }) {
-  return <span style={zahlStil('klein')}>{children}</span>;
+  return (
+    <span data-schrift="kennung" style={zahlStil('klein')}>
+      {children}
+    </span>
+  );
 }
 
 /** Leerzelle: „—" als Text, gedämpft. Mit Grund, wenn die Quelle fehlt. */
@@ -318,9 +322,7 @@ function sprechgruppenSpalten() {
       sortWert: (z) => z.bedingung,
       filter: { werte: BETRIEBSART_WERTE, trifft: (z, w) => z.betriebsart === w },
       render: (_t, z) => (
-        <span style={{ overflowWrap: 'anywhere' }}>
-          <Mono>{z.bedingung}</Mono>
-        </span>
+        <span style={{ ...schriftStil('textKlein'), overflowWrap: 'anywhere' }}>{z.bedingung}</span>
       ),
     },
     {
@@ -474,7 +476,10 @@ function LueckenZeile<T>({
                   {t.name}
                 </Link>
               ) : (
-                <span key={t.key} style={{ ...linkZeilenzielStil(token), ...zahlStil('klein') }}>
+                <span
+                  key={t.key}
+                  style={{ ...linkZeilenzielStil(token), ...schriftStil('textKlein') }}
+                >
                   {t.name}
                 </span>
               ),
