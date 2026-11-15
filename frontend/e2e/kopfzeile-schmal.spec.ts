@@ -331,9 +331,9 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand höchstens zwei Zeilen
   /**
    * Der RUHEZUSTAND, für den die Verdichtung gebaut ist (die Störungswörter misst
    * `gate1-ueberlauf.spec.ts`): Benachrichtigungen erlaubt und Ton bereit (beide headless
-   * nachgebildet), Strom verbunden. Die Benachrichtigung steht dann nur als Icon; Ton- und
-   * Sync-Wort trägt `handschuh` auch unter `xl` mit ihrem Startplatz (LLH-1232), damit der Kopf
-   * beim Start nicht zwischen einer und zwei Zeilen springt.
+   * nachgebildet), Strom verbunden. Benachrichtigung, Ton und Verbindung stehen dann nur als Icon
+   * (LLH-1726); der Glockenknopf hält leer den Platz von „Ton blockiert“, damit der Kopf beim
+   * Start nicht zwischen einer und zwei Zeilen springt.
    *
    * Eine Zeile hält `handschuh` hier NICHT (LFH-1126, Entscheidung 10.10.2026): Marke,
    * Wortmarke, Nummer und 72 px Name (≈ 436 px), die Suche und die rechte Gruppe (488 px)
@@ -378,8 +378,8 @@ test('Führungs-Tablet 1024 px, handschuh: im Ruhezustand höchstens zwei Zeilen
     }),
   ).toBeVisible();
   await expect(alarm.getByRole('button', { name: 'Ton bereit – stummschalten' })).toBeVisible();
-  // Die Benachrichtigung ohne Wort, aber benannt; der Ton mit Wort (LLH-1232).
-  await expect(alarm).toHaveText('Ton bereit');
+  // Ruhezustand ohne Wort, aber benannt (LLH-1726).
+  await expect(alarm).toHaveText('');
   const hoehe = await page.locator('header').evaluate((h) => h.clientHeight);
   expect(hoehe, 'höchstens zwei Zeilen in handschuh (2 × 72 px)').toBeLessThanOrEqual(144);
   await pruefeNameUeberdecktNichts(page, 'Ruhezustand');

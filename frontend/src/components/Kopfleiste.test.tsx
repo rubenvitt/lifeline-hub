@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { LINIE_PFAD } from '../marke/bildmarkeGeometrie';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import {
-  KOPF_NAME_FLEX,
   KOPF_NAME_FLEX_SCHMAL,
-  KOPF_SUCHE_FLEX,
+  kopfNameSucheFlex,
+  kopfRasterSpalten,
   Markenzelle,
   SYNC_DARSTELLUNG,
   syncZeigtWort,
@@ -14,7 +14,6 @@ import {
   railBreite,
   syncZustand,
   wortmarkeStil,
-  WortPlatz,
 } from './Kopfleiste';
 
 const LEER = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
@@ -39,6 +38,24 @@ describe('syncZustand — Rangfolge der SYNC-Anzeige', () => {
   it('liest `idle` im Einsatz als „verbinde", nie als „getrennt" (Kaltstart)', () => {
     expect(syncZustand({ ...basis, live: 'idle' })).toBe('verbinde');
     expect(syncZustand({ ...basis, live: 'lost' })).toBe('getrennt');
+  });
+
+  // Review LLH-1726: `connecting` meldet die Verbindung erst nach der Schonfrist, mitten in der
+  // Sitzung, und bei Netzfehlern endlos. Das ist eine Störung mit Wort, nicht der Start (`idle`).
+  it('trennt den Wiederaufbau (`connecting`) vom Start (`idle`)', () => {
+    expect(syncZustand({ ...basis, live: 'connecting' })).toBe('wiederaufbau');
+    expect(SYNC_DARSTELLUNG.wiederaufbau).toMatchObject({
+      wort: 'VERBINDE',
+      farbe: farbenDunkel.achtung,
+    });
+    expect(SYNC_DARSTELLUNG.wiederaufbau.satz(LEER)).toBe('Live-Verbindung wird wiederhergestellt');
+    expect(syncZeigtWort('wiederaufbau', false)).toBe(true);
+  });
+
+  it('nennt beim Start vorgemerkte Aktionen statt des wortlosen Aufbaus', () => {
+    expect(syncZustand({ ...basis, live: 'idle', queue: { ...LEER, ausstehend: 2 } })).toBe(
+      'ausstehend',
+    );
   });
 
   it('meldet ausstehende Aktionen erst nach stehender Verbindung', () => {
@@ -112,34 +129,25 @@ describe('Kopfleiste · Stile', () => {
   });
 });
 
-describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => {
-  // `flex`-Kurzform zerlegt: Wachstum, Schrumpfung, Basis in px.
-  const teile = (flex: string) => {
-    const [grow, shrink, basis] = flex.split(' ');
-    return { grow: Number(grow), shrink: Number(shrink), basis: Number.parseInt(basis, 10) };
-  };
-
-  it('lässt ab lg die Namensgruppe stärker wachsen als die Suche', () => {
-    const name = teile(KOPF_NAME_FLEX);
-    const suche = teile(KOPF_SUCHE_FLEX);
-    // Der Name wächst stärker als die Suche, sonst bliebe ihm bei 1440 px kaum Platz.
-    expect(name.grow).toBeGreaterThan(suche.grow);
-    // Beide dürfen schrumpfen, sonst läuft die Kopfzeile über statt umzubrechen (Gate 1).
-    expect(name.shrink).toBeGreaterThan(0);
-    expect(suche.shrink).toBeGreaterThan(0);
+describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (LLH-1726)', () => {
+  it('gibt im Raster dem Namen seine Eigenbreite und der Suche den Rest', () => {
+    const spalten = kopfRasterSpalten(48);
+    expect(spalten).toMatch(/^minmax\(min-content, max-content\) /);
+    expect(spalten).toContain('calc(48px + 2 * var(--lfh-kopf-polsterung))');
+    expect(spalten).toMatch(/, 1fr\)$/);
   });
 
-  it('gibt der Namensgruppe eine Basis über ihrem festen Teil (≈ 270 px in kompakt)', () => {
-    // LITERALE: mit 240 px deckte die Basis nicht einmal Marke, Wortmarke und Nummer.
-    expect(teile(KOPF_NAME_FLEX).basis).toBe(340);
-    expect(teile(KOPF_SUCHE_FLEX).basis).toBe(136);
+  it('bricht in kompakt nicht früher um als vorher — Basis 476 px, die Summe der alten Basen', () => {
+    // Eine größere Summe kostete das Führungs-Tablet eine zweite Kopfzeile; eine kleinere hielte
+    // bei 992 px alles einzeilig. Seit LLH-1726 ist die rechte Gruppe ohne Ruhewörter schmaler,
+    // der Kopf bleibt also bei mehr Breiten einzeilig.
+    expect(kopfNameSucheFlex({ controlHeight: dichten.kompakt.zeilenhoehe })).toBe('1 1 476px');
   });
 
-  it('bricht nicht früher um als vorher — Basen plus Knopf „Eingänge“ bleiben 520 px', () => {
-    // Eine größere Summe kostete das Führungs-Tablet (1024–1280 px) eine zweite Kopfzeile; eine
-    // kleinere hielte bei 992 px alles einzeilig und drückte den Namen auf 0 px. Seit LLH-1143
-    // steht rechts der Knopf „Eingänge“ (44 px samt Abstand); die Suche gibt ihn her.
-    expect(teile(KOPF_NAME_FLEX).basis + teile(KOPF_SUCHE_FLEX).basis + 44).toBe(520);
+  it('wächst mit der Dichte, damit in handschuh der Kopf umbricht statt den Namen zu kürzen', () => {
+    // 1180 px in `handschuh`: rechte Gruppe ≈ 580 px, Basis 644 → zwei Zeilen, der Name ganz.
+    expect(kopfNameSucheFlex({ controlHeight: dichten.komfortabel.zeilenhoehe })).toBe('1 1 548px');
+    expect(kopfNameSucheFlex({ controlHeight: dichten.handschuh.zeilenhoehe })).toBe('1 1 644px');
   });
 
   it('gibt unter lg dem Knopf „Eingänge“ die 44 px aus der Namensbasis (vorher 240 px)', () => {
@@ -147,32 +155,23 @@ describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => 
   });
 });
 
-describe('syncZeigtWort — Wort nur, wo es trägt', () => {
-  it('unter md nie ein Wort (kompakt)', () => {
-    expect(syncZeigtWort('getrennt', true, false)).toBe(false);
-  });
-  it('auf dem Tablet: der Ruhezustand ohne Wort, jede Störung mit', () => {
-    expect(syncZeigtWort('verbunden', false, true)).toBe(false);
-    for (const z of ['verbinde', 'ausstehend', 'getrennt', 'offline', 'abgelehnt'] as const) {
-      expect(syncZeigtWort(z, false, true), z).toBe(true);
-    }
-  });
-  it('ab xl trägt auch der Ruhezustand sein Wort', () => {
-    expect(syncZeigtWort('verbunden', false, false)).toBe(true);
-  });
-});
-
 /**
- * LLH-1158: Der Platz ist erzeugter Inhalt aus `data-platz` (`Kopfleiste.css`), kein Text im DOM.
- * Ob er die Breite hält, misst `e2e/kopfhoehe-tonpruefung.spec.ts`.
+ * LLH-1726 (Spec `kopfleiste`): Ruhezustände stehen in jeder Breite nur als Symbol, auch der
+ * Verbindungsaufbau beim Start. Ein Wort trägt nur die Störung, und unter md nicht einmal sie
+ * (dort meldet die Betriebszeile).
  */
-describe('WortPlatz — das Wort hält die Breite seines Startworts', () => {
-  it('trägt den Platz als Attribut, der Text bleibt das sichtbare Wort', () => {
-    const { container } = render(<WortPlatz platz="VERBINDE">SYNC</WortPlatz>);
-    const wort = container.querySelector('.kopf-wort-platz');
-    expect(wort).toHaveAttribute('data-platz', 'VERBINDE');
-    expect(wort).toHaveAttribute('aria-hidden', 'true');
-    expect(container.textContent).toBe('SYNC');
+describe('syncZeigtWort — Wort genau bei Störung', () => {
+  it('unter md nie ein Wort (kompakt)', () => {
+    expect(syncZeigtWort('getrennt', true)).toBe(false);
+  });
+  it('Verbindung und Verbindungsaufbau stehen als Symbol, in jeder Breite', () => {
+    expect(syncZeigtWort('verbunden', false)).toBe(false);
+    expect(syncZeigtWort('verbinde', false)).toBe(false);
+  });
+  it('jede Störung trägt ihr Wort', () => {
+    for (const z of ['ausstehend', 'getrennt', 'offline', 'abgelehnt'] as const) {
+      expect(syncZeigtWort(z, false), z).toBe(true);
+    }
   });
 });
 

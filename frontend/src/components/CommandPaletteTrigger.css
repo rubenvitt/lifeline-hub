@@ -1,0 +1,13 @@
+/* Das Suchfeld im Einsatz-Kopf schrumpft auf die Lupe, bevor der Einsatzname kürzt (LLH-1726,
+   Spec `kopfleiste`). Container ist die Suchzelle in `einsatz/EinsatzLayout.tsx`
+   (`container-name: kopfsuche`); außerhalb davon greift die Abfrage nicht. Unter 140 px Inhalt
+   bliebe vom Hinweistext nur ein Anschnitt („M“). `!important`, weil Inline-Stile des Felds und
+   der Kürzelmarke sonst vorgehen. Keine Farbwerte hier. */
+@container kopfsuche (max-width: 140px) {
+  .kopf-suchfeld {
+    justify-content: center !important;
+  }
+  .kopf-suchfeld-text {
+    display: none !important;
+  }
+}

@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts]
 ---
 
 ## Überblick
@@ -21,8 +21,9 @@ die Lifeline Hub bedienen.
 
 ### Einen Einsatz öffnen
 
-1. Die Einsatzliste öffnen: Sie erscheint nach der Anmeldung, sonst führt „lifeline-hub“ links
-   oben in der Kopfzeile dorthin.
+1. Die Einsatzliste öffnen: Sie erscheint nach der Anmeldung. Aus einem Einsatz führt „Alle
+   Einsätze …“ im Menü am Einsatznamen dorthin, auf großen Monitoren auch „lifeline-hub“ links
+   oben in der Kopfzeile.
 2. Die Kachel des Einsatzes wählen. Sie nennt Status, Einsatzart, die eigene Rolle („Deine
    Rolle: …“), den Einsatzleiter („EL …“, sonst „EL nicht erfasst“) und, soweit erfasst, Ort,
    Einsatznummer, Beginn („seit …“) und Stichwort. Eine Übung trägt statt der grauen Einsatzart
@@ -82,7 +83,7 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
    Kategorie, das in diesem Einsatz zuletzt offen war, beim ersten Mal in ihr erstes Modul, und
    zeigt daneben ihre Module. Unter jedem Modul steht in bis zu zwei Zeilen, was es enthält.
 
-   ![Geöffneter Einsatz: Kopfzeile mit Einsatzname, Suchen, Alarmzentrale, SYNC und Uhr; links die Kategorien, daneben die Module der Kategorie „Führung“, rechts der Überblick](../bilder/einsatz-oberflaeche/arbeitsflaeche.png)
+   ![Geöffneter Einsatz: Kopfzeile mit Einsatzname, Suchen, Alarmzentrale, Verbindungszeichen und Uhr; links die Kategorien, daneben die Module der Kategorie „Führung“, rechts der Überblick](../bilder/einsatz-oberflaeche/arbeitsflaeche.png)
 
 2. In der Modulliste das Modul wählen. Die Zahl neben einem Modul zählt dessen Inhalt, etwa
    Einträge im Einsatztagebuch, offene Aufträge oder ungelesene Nachrichten im Chat.
@@ -253,25 +254,29 @@ geben.
 Von links nach rechts:
 
 - **Statuspunkt, Einsatznummer und Name** des offenen Einsatzes; über den Namen geht der Wechsel
-  in einen anderen Einsatz.
-- **Suchen** öffnet die Sprungpalette.
+  in einen anderen Einsatz. Der Name hat Vorrang: Wird es eng, schrumpft zuerst das Suchfeld bis
+  auf die Lupe, erst dann kürzt der Name mit „…“. Ganz steht er im Tooltip.
+- **Suchen** öffnet die Sprungpalette. Am Touch-Gerät steht dort kein Tastenkürzel.
 - **Eingänge**: der Verlauf der eigenen Benachrichtigungen dieses Einsatzes; die Zahl darüber
   nennt die ungelesenen Eingänge (siehe „Eingänge nachlesen“).
-- **Alarmzentrale**: „Benachrichtigung …“ zeigt, ob der Browser Benachrichtigungen zeigen darf,
-  „Ton …“, ob Alarmtöne zu hören sind. „Ton stumm“ und „Ton blockiert“ stehen auffällig da: Eine
-  Sofortmeldung oder eine fällige Erinnerung bliebe dann ohne Ton. Stummschalten gilt für alle
-  Töne auf diesem Gerät, in jedem Einsatz, auch für den Ton bei neuen Meldungen.
-- **Verbindung**: „SYNC“ heißt, die Live-Verbindung steht. „VERBINDE“, „GETRENNT“, „OFFLINE“,
-  „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung; was
-  dann gilt, steht in [Arbeiten ohne Netz](ohne-netz.md).
+- **Alarmzentrale**: Das erste Zeichen zeigt, ob der Browser Benachrichtigungen zeigen darf
+  (Haken: erlaubt, Bildschirm: aus oder nicht verfügbar, Verbotsschild: blockiert), die Glocke, ob
+  Alarmtöne zu hören sind. Ist alles in Ordnung, stehen beide nur als Zeichen; den
+  Zustand nennt der Tooltip. „Ton stumm“, „Ton blockiert“ und „Benachrichtigung blockiert“ stehen
+  als Wort und auffällig da: Eine Sofortmeldung oder eine fällige Erinnerung bliebe dann ohne Ton
+  bzw. ohne Meldung. Stummschalten gilt für alle Töne auf diesem Gerät, in jedem Einsatz, auch für
+  den Ton bei neuen Meldungen.
+- **Verbindung**: Das grüne Funkzeichen heißt, die Live-Verbindung steht; gelb wird sie beim Start
+  gerade aufgebaut. „VERBINDE“ (die Verbindung wird wiederhergestellt), „GETRENNT“, „OFFLINE“,
+  „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung mit Wort; was dann gilt, steht in
+  [Arbeiten ohne Netz](ohne-netz.md).
 - **Uhr**: die Uhrzeit des Geräts.
 - **Benutzermenü** mit Name, Funktion im Einsatz, Profil, der Anzeige des Geräts (Darstellung,
   Bediendichte, Helligkeit), den Benachrichtigungen, den Neuigkeiten, der Hilfe und zuletzt
   „Abmelden“ mit Rückfrage.
   Rückmeldung und Lizenzen stehen in der Hilfe.
 
-Auf schmalen Schirmen zeigt die Kopfzeile Ruhezustände nur als Zeichen; jede Störung behält ihr
-Wort. Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eingänge in einem
+Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eingänge in einem
 Knopf. Außerhalb eines Einsatzes führt „Verwaltung“ in die Verwaltung der Organisation. Wer dort
 keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 
@@ -434,8 +439,8 @@ und je Bereich einen Sprung, etwa „Zu Aufträgen“ oder „Zu Meldungen“. E
 Toasts und quittiert sie, ebenso ✕ am Sammeltoast. Das Eingangsband nimmt den Toasts keinen
 Platz und liegt nie über ihnen.
 
-Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen („Benachrichtigung erlaubt“
-in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
+Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen (Tooltip „Benachrichtigung
+erlaubt“ in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
 Tab wieder vorn ist; dann trägt der Toast.
 
 Geht eine Benachrichtigung unterwegs verloren, etwa während einer Störung der Verbindung oder
