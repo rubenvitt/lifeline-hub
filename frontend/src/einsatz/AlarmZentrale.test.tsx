@@ -858,6 +858,30 @@ describe('AlarmZentrale: das Ton-Wort steht genau bei Störung (LLH-1726)', () =
     },
   );
 
+  // Nachentscheid 15.11.2026: Vor der ersten Bediengeste sperrt der Browser den Ton, nach der Frist
+  // erscheint ohne Zutun „Ton blockiert“. Damit der Kopf dann nicht springt (Spec
+  // `einsatztauglichkeit-layout`), hält das Ton-Wort die Breite von „Ton blockiert“, auch leer.
+  // Den Platz trägt erzeugter Inhalt (`AlarmZentrale.css`); ob er hält, misst
+  // `e2e/kopfhoehe-tonpruefung.spec.ts`.
+  it.each([1024, 1366, 390])(
+    '%i px: das Ton-Wort hält den Platz von „Ton blockiert“',
+    async (px) => {
+      setzeViewportBreite(px);
+      stubAudioReady();
+      stubNotification('granted');
+      renderAlarm();
+      const knopf =
+        px < 768
+          ? await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' })
+          : await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+      await waitFor(() => expect(knopf.querySelector('.ton-wort-platz')).not.toBeNull());
+      const platz = knopf.querySelector('.ton-wort-platz')!;
+      expect(platz).toHaveAttribute('data-platz', 'Ton blockiert');
+      expect(platz).toHaveAttribute('aria-hidden', 'true');
+      expect(knopf.textContent).toBe('');
+    },
+  );
+
   it('1140 px in handschuh: auch dort der Ruhezustand ohne Wort', async () => {
     setzeViewportBreite(1140);
     localStorage.setItem('lifeline-hub.dichte', 'handschuh');

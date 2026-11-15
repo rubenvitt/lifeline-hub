@@ -33,7 +33,8 @@ Benachrichtigung, Alarmton und Live-Verbindung SHALL in der Kopfleiste des Einsa
 Zustand ohne Handlungsbedarf nur als Symbol zeigen, in jeder Breite und Dichte: Benachrichtigung
 „erlaubt“, „aus“, „nicht verfügbar“, Ton „bereit“, „wird geprüft“, Verbindung „steht“, „wird
 aufgebaut“. Zugänglicher Name und Tooltip MUST den Zustand nennen. Ein Zustand, der sich beim
-Start ohne Zutun einstellt, MUST die Breite der Kopfleiste nicht ändern.
+Start ohne Zutun einstellt, MUST die Breite der Kopfleiste nicht ändern; der Alarmton hält dafür
+auch im Ruhezustand die Breite von „Ton blockiert“ frei.
 
 #### Scenario: Alles in Ordnung
 - **WHEN** ein Einsatz bei 1440 × 900 geöffnet ist, Benachrichtigungen erlaubt sind, der Ton bereit ist und die Live-Verbindung steht
@@ -42,6 +43,10 @@ Start ohne Zutun einstellt, MUST die Breite der Kopfleiste nicht ändern.
 #### Scenario: Start ohne Sprung
 - **WHEN** ein Einsatz geladen wird und Tonprüfung und Verbindungsaufbau ohne Störung enden
 - **THEN** erscheint in der Kopfleiste kein Wort „Ton wird geprüft“ oder „VERBINDE“, und die Kopfleiste ändert dabei weder Breite noch Zeilenzahl
+
+#### Scenario: Ton beim Start gesperrt
+- **WHEN** ein Einsatz in `handschuh` zwischen 1100 und 1440 px mit Maus geladen wird und der Browser den Ton bis zur ersten Bediengeste sperrt
+- **THEN** erscheint nach der Frist „Ton blockiert“, und die Kopfleiste behält dabei ihre Zeilenzahl
 
 ### Requirement: Eine Störung in der Kopfleiste trägt ihr Wort
 

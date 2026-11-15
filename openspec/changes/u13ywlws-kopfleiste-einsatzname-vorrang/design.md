@@ -42,8 +42,16 @@ auffällig ist (bisher am Handy immer). `SyncAnzeige`: Wort nur für `getrennt`,
 Unter `md` (`kompakt`) bleibt es beim reinen Symbol, dort trägt die Betriebszeile die Störung.
 
 Damit entfallen `ruheOhneWort`, `haeltStartPlatz`, `tonHaeltPlatz`, `TON_WORT_LAENGSTES` als
-Platzhalter, `startWoerter` im Layout und der Baustein `WortPlatz` samt `Kopfleiste.css`. Beim Start
-wechselt kein Wort mehr (Prüfung und Aufbau sind Symbole), also gibt es nichts zu halten. Die
+Platzhalter, `startWoerter` im Layout und der Baustein `WortPlatz` samt `Kopfleiste.css`.
+
+**Nachentscheid 15.11.2026 (beim Umsetzen gemessen):** Ein Startwort bleibt: Vor der ersten
+Bediengeste sperrt der Browser den Ton, und nach `ALARM_TON_FRIST_MS` erscheint ohne Zutun „Ton
+blockiert“. Ohne Platz sprang der Kopf in `handschuh` bei 1340/1360 px 2 s nach dem Laden von 72
+auf 144 px (`kopfhoehe-tonpruefung`). Gewählt: am Glockenknopf bleibt die Breite von „Ton
+blockiert“ frei, in beiden Bauformen, auch leer im Ruhezustand (`AlarmZentrale.css`). Verworfen:
+vor der ersten Geste nur die durchgestrichene Glocke ohne Wort (ein unberührter Schirm nennte die
+Störung nur als Zeichen) und den Sprung per Spec-Ausnahme hinnehmen. Preis: 70–95 px Leerraum am
+Glockenknopf; in `handschuh` bei 1366 px wird der Kopf zweizeilig. Die
 Spec `einsatztauglichkeit-layout` („Der App-Rahmen springt beim Laden nicht“) bleibt erfüllt;
 ihre e2e-Messung an der Umbruchkante (`kopfzeile-start-cls.spec.ts`) läuft weiter.
 

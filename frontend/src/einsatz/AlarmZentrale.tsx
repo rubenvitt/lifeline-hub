@@ -7,7 +7,7 @@ import {
   IconVerbotsschild,
 } from '../icons';
 import { Button, Dropdown, Tooltip, theme } from 'antd';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   ALARM_TON_STATUS_EVENT,
   alarmTonStatus,
@@ -32,6 +32,7 @@ import EingaengeZahl from '../alarm/EingaengeZahl';
 import { wetterPegelPfad } from '../routing/deeplinks';
 import { useViewport } from '../components/useViewport';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import './AlarmZentrale.css';
 
 /**
  * Farbe eines Alarm-Knopfs in der Kommandoleiste. Die Leiste ist in beiden Modi dunkel, die
@@ -66,6 +67,23 @@ type UnwetterDetail = {
   titel?: string;
   beschreibung?: string;
 };
+
+/**
+ * Platz des Ton-Worts: die Breite von „Ton blockiert“ (Nachentscheid LLH-1726, `AlarmZentrale.css`).
+ * Vor der ersten Bediengeste sperrt der Browser den Ton; nach der Frist erscheint das Wort ohne
+ * Zutun, und ohne Platz sprang der Kopf an seiner Umbruchkante um eine Zeile. Auch im
+ * Ruhezustand bleibt der Platz deshalb frei, leer. Ist das Wort breiter („Benachrichtigung
+ * blockiert“ in der gebündelten Bauform), gilt das Wort.
+ */
+const TON_WORT_PLATZ = 'Ton blockiert';
+
+function WortPlatz({ style, children }: { style?: CSSProperties; children: ReactNode }) {
+  return (
+    <span aria-hidden="true" className="ton-wort-platz" data-platz={TON_WORT_PLATZ} style={style}>
+      {children}
+    </span>
+  );
+}
 
 /**
  * Zustand der Benachrichtigungen (LFH-950). `nicht-verfuegbar` ist eine Eigenschaft des Geräts
@@ -286,7 +304,8 @@ export default function AlarmZentrale({
   // „Benachrichtigung erlaubt/aus/nicht verfügbar“) nur als Icon, Name und Tooltip nennen ihn. Eine
   // STÖRUNG („Ton stumm/blockiert", „Benachrichtigung blockiert") trägt ihr Wort; Wort und Warnfarbe
   // hängen an derselben Bedingung. Vorher trugen Ruhezustände ab `xl` ihr Wort und hielten beim
-  // Start dessen Breite (LLH-1158, LLH-1232): der Einsatzname bekam dort nur noch 50 px.
+  // Start dessen Breite (LLH-1158, LLH-1232): der Einsatzname bekam dort nur noch 50 px. Frei bleibt
+  // nur der Platz von „Ton blockiert“ am Glockenknopf ({@link TON_WORT_PLATZ}).
   //
   // Mit grobem Zeiger zwischen `md` und `xl` gilt die Bauform des Handschirms (LFH-950): ein
   // Tooltip erscheint auf Touch erst NACH dem Tipp, und der Tipp auf die Glocke schaltete den Ton
@@ -432,9 +451,9 @@ export default function AlarmZentrale({
               flexShrink: 0,
             }}
           >
-            {sammelAuffaellig ? (
-              <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
-            ) : null}
+            <WortPlatz style={sammelWortStil(token.controlHeight, istSchmal)}>
+              {sammelAuffaellig ? sammelText : null}
+            </WortPlatz>
           </Button>
         </Dropdown>
         {eingangsband}
@@ -471,7 +490,7 @@ export default function AlarmZentrale({
           }}
           icon={tonIcon}
         >
-          {tonWort}
+          <WortPlatz>{tonWort}</WortPlatz>
         </Button>
       </Tooltip>
       {eingangsband}
