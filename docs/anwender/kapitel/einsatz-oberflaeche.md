@@ -293,6 +293,12 @@ Berechtigung“ da. Was die eigene Rolle im Einsatz erlaubt, steht in
 
 Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
+Auf langen Seiten rollt nur der Inhalt. Ab Tabletbreite bleiben die Kopfzeile und der Kopf der
+Seite mit Titel und Knöpfen oben stehen; auf breiten Bildschirmen auch die Kategorien und die
+Modulliste daneben. Hat eine Kategorie mehr Module, als ins Fenster passen, rollt die Modulliste
+für sich. In einem niedrigen Fenster rollt der Kopf der Seite mit, damit für den Inhalt Platz
+bleibt. Dasselbe gilt in der Verwaltung.
+
 Einige Einträge der Modulliste sind **Sprungmarken** in ein anderes Modul: „Entscheidungen“
 (Einsatztagebuch, nur Entscheidungen), „Patienten“ und „Vermisste“ (Betroffene), „FMS-Tableau“
 (Fahrzeuge) sowie unter „Fernmeldewesen“ (Kategorie „Kommunikation“) „Fernmeldeskizze“ und
