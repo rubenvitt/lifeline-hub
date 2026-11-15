@@ -56,7 +56,7 @@ Pfade relativ zu `frontend/src/`, falls nicht anders angegeben.
   `trefflaeche-pruefflaechen`, `orientierung`, `lagekarte-smoke`): erst die Navigation öffnen,
   gemeinsamer Helfer; die betroffenen Specs grün.
 - [ ] 5.4 `e2e/orientierung.spec.ts`: bei 390 px kein Ortspfad auf den Einsatzdaten, auf einer
-  Personen-Detailseite nur „‹ Personen“, der zur Liste führt; bei 820 px der volle Pfad.
+  Personen-Detailseite nur „‹ Betroffene“, der zur Liste führt; bei 820 px der volle Pfad.
 
 ## 6. Regeln und Doku
 

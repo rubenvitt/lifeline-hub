@@ -115,7 +115,7 @@ test.describe('Orientierung (LFH-954)', () => {
     await expect(page.locator('.lfh-seitenkopf__pfad')).toContainText('Einsätze');
   });
 
-  test('390 px auf einer Detailseite: nur „‹ Personen“, und er führt zur Liste', async ({
+  test('390 px auf einer Detailseite: nur „‹ Betroffene“, und er führt zur Liste', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -135,7 +135,7 @@ test.describe('Orientierung (LFH-954)', () => {
     const sichtbar = pfad.locator('li:visible');
     await expect(sichtbar).toHaveCount(1);
     const rueckweg = sichtbar.getByRole('link');
-    await expect(rueckweg).toHaveText('Personen');
+    await expect(rueckweg).toHaveText('Betroffene');
     const zeichen = await rueckweg.evaluate((a) => getComputedStyle(a, '::before').content);
     expect(zeichen, '„‹“ vor dem Rückweg').toBe('"‹"');
     await rueckweg.click();

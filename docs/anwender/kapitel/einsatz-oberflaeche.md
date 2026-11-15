@@ -279,7 +279,7 @@ Die Kopfzeile bleibt beim Rollen oben stehen, auf jedem Gerät. Auf dem Handy tr
 eine Zeile: „Navigation öffnen“, Statuspunkt und Name, Alarmzentrale, Verbindung und Uhr. „Suchen“
 steht dort oben in der Navigation, das Benutzermenü unten in der Navigation. Über einer Seite
 steht am Handy kein Ortspfad, den Einsatz nennt die Kopfzeile; auf einer Detailseite führt
-„‹ Personen“ (oder die jeweilige Liste) zurück. Außerhalb eines Einsatzes führt am Handy das
+„‹ Betroffene“ (oder die jeweilige Liste) zurück. Außerhalb eines Einsatzes führt am Handy das
 Zeichen links oben zur Einsatzliste.
 
 Über der Kopfzeile erscheint bei Bedarf die **Betriebszeile**: bei Störungen der Verbindung, bei

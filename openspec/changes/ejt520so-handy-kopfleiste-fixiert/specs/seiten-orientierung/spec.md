@@ -7,9 +7,10 @@ Die Seiten Einsatzdaten, Meldebild, Lagekarte und Einsatz-Einstellungen SHALL ei
 1440 px). Einsatzdaten SHALL das h1 „Einsatzdaten“ tragen.
 Im Einsatzrahmen SHALL der Ortspfad erst ab `md` stehen; darunter nennt die Kopfleiste den
 Einsatz, und an seiner Stelle SHALL höchstens ein Rückweg „‹ <Eintrag>“ zum nächsten verlinkten
-Eintrag unterhalb des Einsatzes stehen (etwa von einer Person zur Personenliste). Außerhalb des Einsatzrahmens SHALL unter `md` der Eintrag „Einsätze“ ungekürzt bleiben,
-nur ein Einsatzname SHALL mit Auslassung kürzen; jeder Eintrag SHALL seinen vollen Wortlaut im
-`title` tragen.
+Eintrag unterhalb des Einsatzes stehen (etwa von einer Person zur Liste „Betroffene“).
+Außerhalb des Einsatzrahmens SHALL unter `md` der Eintrag „Einsätze“ ungekürzt bleiben, nur ein
+Einsatzname SHALL mit Auslassung kürzen; jeder Eintrag SHALL seinen vollen Wortlaut im `title`
+tragen.
 
 #### Scenario: Einsatzdaten
 
@@ -28,8 +29,8 @@ nur ein Einsatzname SHALL mit Auslassung kürzen; jeder Eintrag SHALL seinen vol
 
 #### Scenario: Detailseite am Handy
 
-- **WHEN** eine Person bei 390 px Breite eine Person aus der Personenliste eines Einsatzes öffnet
-- **THEN** steht über dem h1 nur der Rückweg „‹ Personen“, und er führt zur Personenliste
+- **WHEN** eine Person bei 390 px Breite eine Person aus der Liste „Betroffene“ eines Einsatzes öffnet
+- **THEN** steht über dem h1 nur der Rückweg „‹ Betroffene“, und er führt zur Liste
 
 #### Scenario: Ab Tablet im Einsatz
 

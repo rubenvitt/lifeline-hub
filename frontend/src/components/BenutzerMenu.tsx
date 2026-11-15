@@ -301,6 +301,9 @@ export default function BenutzerMenu({
         menu={{ items, onClick, onKeyDown: handleMenuKeyDown, style: { width: menueBreite } }}
         trigger={['click']}
         placement={inNavigation ? 'topLeft' : 'bottomRight'}
+        // Aus der Navigation ist das Menü breiter als der Platz rechts vom Auslöser: es rückt in
+        // das Fenster, statt rechts abgeschnitten zu stehen (LLH-1728).
+        {...(inNavigation ? { autoAdjustOverflow: { shiftX: true, adjustY: true } } : {})}
       >
         <Button
           type="text"
