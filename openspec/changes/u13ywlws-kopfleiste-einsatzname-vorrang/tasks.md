@@ -23,27 +23,28 @@ der ohne die Änderung rot ist.
 
 ## 2. Name vor Suche (D2, D3, D4)
 
-- [ ] 2.1 `einsatz/EinsatzSwitcher.tsx`: Name 16 px, Gewicht 500; Test prüft die Schriftgröße.
-- [ ] 2.2 `einsatz/EinsatzLayout.tsx`: ab `lg` Namensgruppe und Suchzelle in einem Raster
+- [x] 2.1 `einsatz/EinsatzSwitcher.tsx`: Name 16 px, Gewicht 500; Test prüft die Schriftgröße.
+- [x] 2.2 `einsatz/EinsatzLayout.tsx`: ab `lg` Namensgruppe und Suchzelle in einem Raster
   (`minmax(min-content, max-content)` / `minmax(<Lupe>, 1fr)`), Behälter nimmt am Umbruch teil wie
   bisher beide Gruppen; Namenstext misst über `overflow-wrap: anywhere` und zeigt eine Zeile mit
   „…“. Unter `lg` unverändert. `kopfpolsterung.guard.test.ts` und `EinsatzLayout.test.tsx` grün.
-- [ ] 2.3 Suchzelle als Größen-Container; Hinweistext und Kürzel fallen unter der Mindestbreite
+- [x] 2.3 Suchzelle als Größen-Container; Hinweistext und Kürzel fallen unter der Mindestbreite
   weg (`components/CommandPaletteTrigger.tsx`). Test: Klassen/Struktur in Vitest, Wirkung in 2.5.
-- [ ] 2.4 Wortmarke und Trennstrich im Einsatz-Kopf nur bei `abBreite('xxl')`;
+- [x] 2.4 Wortmarke und Trennstrich im Einsatz-Kopf nur bei `abBreite('xxl')`;
   `EinsatzLayout.test.tsx` prüft 1440 (keine) und 1600 (da).
-- [ ] 2.5 Neue e2e-Spec `frontend/e2e/kopfleiste-einsatzname.spec.ts`: Demo-Einsatz „ÜBUNG –
+- [x] 2.5 Neue e2e-Spec `frontend/e2e/kopfleiste-einsatzname.spec.ts`: Demo-Einsatz „ÜBUNG –
   Starkregen Musterstadt“ ungekürzt (Text nicht abgeschnitten: `scrollWidth ≤ clientWidth`) bei
   1280×800 `kompakt`, 1180×820 `handschuh`; bei 1024 `komfortabel` kürzt zuerst die Suche
   (Hinweistext weg, Lupe da), Kopf ohne waagerechten Überlauf. Lokal in Chromium grün.
-- [ ] 2.6 Wenn 2.5 in einem Fall rot bleibt: Rückfallweg aus D2 (`contain-intrinsic-inline-size`
-  aus Messung) und dieselbe Spec grün. Sonst abhaken mit Vermerk „nicht nötig“.
+- [x] 2.6 Wenn 2.5 in einem Fall rot bleibt: Rückfallweg aus D2 (`contain-intrinsic-inline-size`
+  aus Messung) und dieselbe Spec grün. Sonst abhaken mit Vermerk „nicht nötig“. — Nicht nötig: rot
+  war nur das geerbte `nowrap` (behoben) und `handschuh` 1180 px (dichteabhängige Basis, D2).
 
 ## 3. Kürzel und Plakette (D5, D6)
 
-- [ ] 3.1 `components/CommandPaletteTrigger.tsx`: `Tastenkuerzel` nur ohne `istBeruehrung`,
+- [x] 3.1 `components/CommandPaletteTrigger.tsx`: `Tastenkuerzel` nur ohne `istBeruehrung`,
   `aria-keyshortcuts` bleibt; `CommandPaletteTrigger.test.tsx` deckt groben und feinen Zeiger ab.
-- [ ] 3.2 `alarm/EingaengeZahl.tsx`: Plakette mittig über dem Symbol; e2e-Fall in
+- [x] 3.2 `alarm/EingaengeZahl.tsx`: Plakette mittig über dem Symbol; e2e-Fall in
   `kopfleiste-einsatzname.spec.ts` bei 390×844 mit „Ton blockiert“ und drei ungelesenen Eingängen:
   Plakette und Wort überlappen nicht, Knopfbreite gleich wie ohne Eingänge.
 

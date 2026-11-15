@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { LINIE_PFAD } from '../marke/bildmarkeGeometrie';
 import { dichten, farbenDunkel, rahmenFarben } from '../theme/tokens';
 import {
-  KOPF_NAME_FLEX,
   KOPF_NAME_FLEX_SCHMAL,
-  KOPF_SUCHE_FLEX,
+  kopfNameSucheFlex,
+  kopfRasterSpalten,
   Markenzelle,
   SYNC_DARSTELLUNG,
   syncZeigtWort,
@@ -111,34 +111,25 @@ describe('Kopfleiste · Stile', () => {
   });
 });
 
-describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => {
-  // `flex`-Kurzform zerlegt: Wachstum, Schrumpfung, Basis in px.
-  const teile = (flex: string) => {
-    const [grow, shrink, basis] = flex.split(' ');
-    return { grow: Number(grow), shrink: Number(shrink), basis: Number.parseInt(basis, 10) };
-  };
-
-  it('lässt ab lg die Namensgruppe stärker wachsen als die Suche', () => {
-    const name = teile(KOPF_NAME_FLEX);
-    const suche = teile(KOPF_SUCHE_FLEX);
-    // Der Name wächst stärker als die Suche, sonst bliebe ihm bei 1440 px kaum Platz.
-    expect(name.grow).toBeGreaterThan(suche.grow);
-    // Beide dürfen schrumpfen, sonst läuft die Kopfzeile über statt umzubrechen (Gate 1).
-    expect(name.shrink).toBeGreaterThan(0);
-    expect(suche.shrink).toBeGreaterThan(0);
+describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (LLH-1726)', () => {
+  it('gibt im Raster dem Namen seine Eigenbreite und der Suche den Rest', () => {
+    const spalten = kopfRasterSpalten(48);
+    expect(spalten).toMatch(/^minmax\(min-content, max-content\) /);
+    expect(spalten).toContain('calc(48px + 2 * var(--lfh-kopf-polsterung))');
+    expect(spalten).toMatch(/, 1fr\)$/);
   });
 
-  it('gibt der Namensgruppe eine Basis über ihrem festen Teil (≈ 270 px in kompakt)', () => {
-    // LITERALE: mit 240 px deckte die Basis nicht einmal Marke, Wortmarke und Nummer.
-    expect(teile(KOPF_NAME_FLEX).basis).toBe(340);
-    expect(teile(KOPF_SUCHE_FLEX).basis).toBe(136);
+  it('bricht in kompakt nicht früher um als vorher — Basis 476 px, die Summe der alten Basen', () => {
+    // Eine größere Summe kostete das Führungs-Tablet eine zweite Kopfzeile; eine kleinere hielte
+    // bei 992 px alles einzeilig. Seit LLH-1726 ist die rechte Gruppe ohne Ruhewörter schmaler,
+    // der Kopf bleibt also bei mehr Breiten einzeilig.
+    expect(kopfNameSucheFlex({ controlHeight: dichten.kompakt.zeilenhoehe })).toBe('1 1 476px');
   });
 
-  it('bricht nicht früher um als vorher — Basen plus Knopf „Eingänge“ bleiben 520 px', () => {
-    // Eine größere Summe kostete das Führungs-Tablet (1024–1280 px) eine zweite Kopfzeile; eine
-    // kleinere hielte bei 992 px alles einzeilig und drückte den Namen auf 0 px. Seit LLH-1143
-    // steht rechts der Knopf „Eingänge“ (44 px samt Abstand); die Suche gibt ihn her.
-    expect(teile(KOPF_NAME_FLEX).basis + teile(KOPF_SUCHE_FLEX).basis + 44).toBe(520);
+  it('wächst mit der Dichte, damit in handschuh der Kopf umbricht statt den Namen zu kürzen', () => {
+    // 1180 px in `handschuh`: rechte Gruppe ≈ 580 px, Basis 644 → zwei Zeilen, der Name ganz.
+    expect(kopfNameSucheFlex({ controlHeight: dichten.komfortabel.zeilenhoehe })).toBe('1 1 548px');
+    expect(kopfNameSucheFlex({ controlHeight: dichten.handschuh.zeilenhoehe })).toBe('1 1 644px');
   });
 
   it('gibt unter lg dem Knopf „Eingänge“ die 44 px aus der Namensbasis (vorher 240 px)', () => {

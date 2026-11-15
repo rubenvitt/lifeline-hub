@@ -59,7 +59,13 @@ Aufbau ab, steht „GETRENNT“ als Wort, und die Tonprüfung endet spätestens 
 ### D2 Name vor Suche: Raster statt Wachstumsquote
 
 Ab `lg` liegen Namensgruppe und Suchzelle in einem Behälter, der als ein Flex-Element am Umbruch
-teilnimmt (Basis wie bisher die Summe beider Basen, Boden `min-content`). Innen ein Raster mit
+teilnimmt (Boden `min-content`). Seine Basis ist in `kompakt` die Summe der alten Basen (476 px) und
+wächst mit der Steuerhöhe um deren Vierfaches über 30 px (`komfortabel` 548, `handschuh` 644).
+Grund, beim Umsetzen gemessen: in `handschuh` ist die rechte Gruppe allein ≈ 580 px breit (fünf
+72-px-Ziele mit Abständen, Uhr, Benutzer), bei 1180 px blieben dem Namen einzeilig 181 px. Mit der
+größeren Basis bricht die rechte Gruppe dort um, und der Name steht ganz; zweizeilig war der Kopf
+in `handschuh` bei dieser Breite vorher auch. Die Basis hängt bewusst nicht am geladenen Namen:
+sonst bekäme der Kopf nach dem Laden eine Zeile mehr (Spec `einsatztauglichkeit-layout`). Innen ein Raster mit
 zwei Spalten: `minmax(min-content, max-content)` für die Namensgruppe, `minmax(<Lupe>, 1fr)` für
 die Suche. Das Raster gibt intrinsischen Spalten ihren `max-content`, bevor `fr` den Rest bekommt;
 reicht es nicht, bleibt der Suche ihr Minimum, und der Name kürzt. In Chromium gegengeprüft (700 /
@@ -68,14 +74,16 @@ reicht es nicht, bleibt der Suche ihr Minimum, und der Name kürzt. In Chromium 
 Dafür braucht die Namensgruppe einen echten `max-content` (ganzer Name) bei kleinem `min-content`
 (fester Teil plus Trefffläche). `contain: inline-size` kann das nicht, es nimmt beides. Der
 Namenstext bricht deshalb für die Messung überall (`overflow-wrap: anywhere`, `min-content` = ein
-Zeichen) und zeigt sichtbar eine Zeile mit „…“ (`-webkit-line-clamp: 1`). Die Trefffläche als
+Zeichen; `white-space: normal` gegen das von antds Knopf geerbte `nowrap`, sonst lief der Kopf bei
+1024 px auf 1103 px über) und zeigt sichtbar eine Zeile mit „…“ (`-webkit-line-clamp: 1`). Die Trefffläche als
 Boden hält `minWidth: controlHeight` am Wechsler wie bisher. Trägt das in Chromium oder Firefox
 nicht, misst die Namenszelle ihren Text einmal per `ResizeObserver` und setzt
 `contain-intrinsic-inline-size` (Rückfallweg, nur bei rotem Test).
 
 Die Suche: Mindestbreite = Trefffläche der Lupe plus Kopf-Polsterung. Die Zelle ist ein
-Größen-Container (`container-type: inline-size`); unter der Breite von Lupe + Kurzwort fallen
-Hinweistext und Kürzel weg (Container-Abfrage in CSS, kein JS). Die Obergrenze 520 px bleibt.
+Größen-Container (`container-type: inline-size`, Name `kopfsuche`); unter 140 px Inhalt fallen
+Hinweistext und Kürzel weg (Container-Abfrage in `CommandPaletteTrigger.css`, kein JS). Die
+Obergrenze 520 px bleibt.
 
 Unter `lg` ändert sich nichts: dort gibt es keine Suchzelle, `KOPF_NAME_FLEX_SCHMAL` gilt weiter.
 
@@ -101,8 +109,10 @@ Signal nutzt die Sprungpalette für ihre Tastenhinweise (Spec `sprungpalette`).
 
 ### D6 Plakette über dem Symbol
 
-`EingaengeZahl` setzt die Plakette mittig über das Symbol (waagerecht zentriert, nach oben
-versetzt), statt links bei 55 % anzusetzen und nach rechts in den Text zu laufen. Sie nimmt weiter
+`EingaengeZahl` setzt die Plakette mittig über das Symbol (waagerecht zentriert, Unterkante knapp
+über der Oberkante des Symbols, 18 px nach oben), statt links bei 55 % anzusetzen und nach rechts
+in den Text zu laufen. Das Wort steht 1 px höher als das 12-px-Symbol; bei 15 px überlappten sich
+Plakette und Wort am Handy noch um 2 px. Sie nimmt weiter
 keine Breite. Auch „99+“ endet vor dem Abstand zwischen Symbol und Wort.
 
 ### D7 Regel

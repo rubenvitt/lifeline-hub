@@ -80,29 +80,51 @@ export function kopfZelleStil(
 }
 
 /**
- * Flex-Angaben der wachsenden Kopfgruppen im Einsatz-Workspace — rein und exportiert.
+ * Kopfgruppen im Einsatz-Workspace — rein und exportiert.
  *
- * Der Einsatzname ist die Identität der Seite, das Suchfeld nur ein Auslöser. Ab `lg` startet
- * die Namensgruppe mit 340 px (fester Teil aus Marke, Wortmarke, Nummer ≈ 270 px plus Name) und
- * wächst dreimal so stark wie die Suche; die Suche startet bei 136 px und SCHRUMPFT zuerst. Ihre
- * Obergrenze hält `CommandPaletteTrigger` (`SUCHFELD_MAX_BREITE`).
+ * Der Einsatzname ist die Identität der Seite, das Suchfeld nur ein Auslöser. AB `lg` liegen
+ * Namensgruppe und Suche in EINEM Raster ({@link kopfRasterSpalten}, LLH-1726, Spec `kopfleiste`):
+ * die Namensspalte bekommt ihre Eigenbreite (`max-content`, der ganze Name), bevor die Suche
+ * (`1fr`) mehr als ihre Lupe bekommt. Reicht die Breite nicht, steht die Suche auf ihrem Minimum,
+ * und erst dann kürzt der Name. Eine Wachstumsquote (vorher `3 1 340px` gegen `1 1 136px`) konnte
+ * das nicht ausdrücken: sie verteilt anteilig, und bei 1280 px blieben dem Namen 50 px.
  *
- * Die BASEN entscheiden zugleich den Umbruch (`flexWrap` am Kopf): die rechte Zellgruppe wandert
- * in eine zweite Zeile, sobald Namensbasis + Suchbasis + rechte Gruppe die Breite übersteigen.
- * Die Summe 340 + 136 = 476 px plus der Knopf „Eingänge“ (44 px samt Abstand, rechte Gruppe,
- * LLH-1143) hält den Umbruchpunkt von vorher (520 px, ≈ 1100 px in `kompakt`); kleiner würde der
- * Name bei mittleren Breiten auf 0 px gedrückt. Die Suche gibt die 44 px her, der Name nicht.
+ * Der Behälter nimmt als EIN Flex-Element am Umbruch teil (`flexWrap` am Kopf), mit der Basis
+ * aus {@link kopfNameSucheFlex}: die rechte Zellgruppe wandert in eine zweite Zeile, sobald Basis
+ * plus rechte Gruppe die Breite übersteigen. Sein Boden ist `min-content`: fester Teil der
+ * Namensgruppe plus Trefffläche des Namens (LFH-1126) plus Lupe. Die Basis hängt NIE am geladenen
+ * Namen: sonst bekäme der Kopf nach dem Laden eine Zeile mehr (Spec `einsatztauglichkeit-layout`,
+ * „Der App-Rahmen springt beim Laden nicht“).
  *
- * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}: dort gibt es keine Suchzelle. Ein Flex-Kind
- * mit Text braucht einen Boden, sonst kürzt es nicht, sondern läuft über (Gate 1): die
- * Namensgruppe `minWidth: 'min-content'`, die Namenszelle darin `contain: inline-size` mit der
- * Trefffläche als Boden (`EinsatzLayout`, LFH-1126). So zählt der Umbruch den festen Teil der
- * Gruppe, der in `handschuh` breiter ist als die Basis; die Basis allein ließ den Wechsler über
- * die Suche laufen.
+ * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}: dort gibt es keine Suchzelle. Ein Flex-Kind mit
+ * Text braucht einen Boden, sonst kürzt es nicht, sondern läuft über (Gate 1): die Namensgruppe
+ * `minWidth: 'min-content'`, der Name darin bricht für die Messung an jeder Stelle
+ * (`EinsatzSwitcher`), die Namenszelle hält die Trefffläche als Boden (`EinsatzLayout`).
  */
-export const KOPF_NAME_FLEX = '3 1 340px';
 export const KOPF_NAME_FLEX_SCHMAL = '1 1 196px';
-export const KOPF_SUCHE_FLEX = '1 1 136px';
+
+/**
+ * Basis in `kompakt`: die Summe der alten Basen (340 + 136), damit der Umbruch dort bleibt, wo er
+ * war. Mit der Dichte wächst der feste Teil der Namensgruppe (Marke, Nummernzelle, Trefffläche)
+ * und die Lupe; die Basis wächst um das Vierfache der Steuerhöhe über 30 px mit (komfortabel 548,
+ * handschuh 644). In `handschuh` bricht die rechte Gruppe (fünf 72-px-Ziele, Uhr, Benutzer ≈ 580
+ * px) so bis 1224 px um, statt den Namen auf 180 px zu drücken (LLH-1726, vorher „ÜBUNG – Sta…“
+ * bei 1180 px). Der Kopf ist dort zweizeilig, wie er es vorher auch war.
+ */
+const KOPF_NAME_SUCHE_BASIS = 476;
+const KOPF_STEUERHOEHE_KOMPAKT = 30;
+
+export function kopfNameSucheFlex(token: { controlHeight: number }): string {
+  return `1 1 ${KOPF_NAME_SUCHE_BASIS + 4 * (token.controlHeight - KOPF_STEUERHOEHE_KOMPAKT)}px`;
+}
+
+/**
+ * Spalten des Rasters aus Namensgruppe und Suche. Die Suche hält mindestens die Trefffläche der
+ * Lupe plus die Kopf-Polsterung beidseits (`--lfh-kopf-polsterung` an der Suchzelle).
+ */
+export function kopfRasterSpalten(suchTrefflaeche: number): string {
+  return `minmax(min-content, max-content) minmax(calc(${suchTrefflaeche}px + 2 * var(--lfh-kopf-polsterung)), 1fr)`;
+}
 
 /**
  * Markenzelle: Bildmarke „Lebenslinie“ (LFH-837) in der Textfarbe des Rahmens, in Rail-Breite.

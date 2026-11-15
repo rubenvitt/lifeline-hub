@@ -377,18 +377,28 @@ describe('EinsatzLayout', () => {
    */
 
   /**
-   * Die Kopfzeile trägt 6 Knöpfe (seit LLH-1143 mit „Eingänge“) und die Wortmarke. Die Aufschlüsselung steht daneben, weil eine
+   * Die Kopfzeile trägt 6 Knöpfe (seit LLH-1143 mit „Eingänge“). Die Aufschlüsselung steht daneben, weil eine
    * nackte Zahl beim Fehlschlag nicht sagt, welche Sorte Ziel dazukam (`test/kopfzeile.ts`).
+   * Die Wortmarke steht im Einsatz erst ab `xxl` (LLH-1726, Spec `app-marke`): darunter gehört ihr
+   * Platz dem Einsatznamen, zur Einsatzliste führt „Alle Einsätze …“ im Wechsler.
    */
-  it('AK1 — die Kopfzeile trägt 6 Knöpfe und die Wortmarke (vorher 11 Ziele)', async () => {
-    // Die Wortmarke ist ab `lg` ein Link zur Einsatzliste — ein Bedienziel, kein Umschalter.
+  it('AK1 — die Kopfzeile trägt 6 Knöpfe, unter xxl ohne Wortmarke (vorher 11 Ziele)', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(bedienzieleNachRolle()).toEqual({ button: 6, radio: 0, link: 1 });
-    expect(zaehleBedienziele()).toBe(7);
-    expect(
-      within(screen.getByRole('banner')).getByRole('link', { name: 'lifeline-hub' }),
-    ).toHaveAttribute('href', '/einsaetze');
+    expect(bedienzieleNachRolle()).toEqual({ button: 6, radio: 0, link: 0 });
+    expect(zaehleBedienziele()).toBe(6);
+  });
+
+  it.each([
+    [XL, false],
+    [1600, true],
+  ])('bei %i px steht die Wortmarke: %s (LLH-1726)', async (px, da) => {
+    setzeViewportBreite(px);
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const marke = within(screen.getByRole('banner')).queryByRole('link', { name: 'lifeline-hub' });
+    if (da) expect(marke).toHaveAttribute('href', '/einsaetze');
+    else expect(marke).toBeNull();
   });
 
   /**
@@ -481,24 +491,33 @@ describe('EinsatzLayout', () => {
     expect(screen.getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
   });
 
-  it('der Einsatzname sitzt im Restbreiten-Rahmen', async () => {
-    // Der Rahmen ist eine Hälfte der Kürzung, die andere (Ellipsis, `title`) sitzt im Switcher.
+  /**
+   * LLH-1726 (Spec `kopfleiste`, design.md D2): ab `lg` liegen Namensgruppe und Suche in EINEM
+   * Raster. Die Namensspalte bekommt ihre Eigenbreite (`max-content`), bevor die Suche (`1fr`) mehr
+   * als ihre Lupe bekommt. Ob das im Browser trägt, misst `e2e/kopfleiste-einsatzname.spec.ts`;
+   * hier die Verdrahtung.
+   */
+  it('der Einsatzname hat ab lg Vorrang vor der Suche (Raster)', async () => {
     setup();
     // `parentElement` ist belastbar: antds Dropdown klont sein Kind, statt es einzupacken.
     const switcher = await screen.findByRole('button', { name: /Hochwasser Nord/ });
     const rahmen = switcher.parentElement!;
-    // Boden = Trefffläche des Wechslers, nicht 0 und nicht die Namenslänge (LFH-1126):
-    // `contain: inline-size` nimmt den Namen aus der Eigenbreite, sonst kürzte ein langer Name
-    // nicht, sondern schöbe die Nachbarn hinaus.
+    // Boden = Trefffläche des Wechslers, nicht 0 (LFH-1126). Ohne `contain`: der Name zählt jetzt
+    // zur Eigenbreite, seine Mindestbreite ist dank Umbruch an jeder Stelle ein Zeichen.
     expect(Number.parseFloat(rahmen.style.minWidth)).toBeGreaterThan(0);
-    expect(rahmen.style.contain).toBe('inline-size');
-    expect(rahmen.style.flexGrow).toBe('1');
-    // `flex-basis: 0`: mit `auto` wüchse der Rahmen mit einem langen Namen über die Kopfzeile.
-    expect(rahmen.style.flexBasis).toBe('0px');
-    // Die Namensgruppe (Zelle → Gruppe) schrumpft nie unter festen Teil plus Trefffläche: ab
-    // diesem Maß bricht der Kopf um, statt den Wechsler über die Suche zu schieben.
+    expect(rahmen.style.contain).toBe('');
+    expect(rahmen.style.flex).toBe('1 1 auto');
     const gruppe = rahmen.parentElement!.parentElement!;
-    expect(gruppe.style.minWidth).toBe('min-content');
+    const raster = gruppe.parentElement!;
+    expect(raster.dataset.lfh).toBe('kopf-name-suche');
+    expect(raster.style.gridTemplateColumns).toMatch(
+      /^minmax\(min-content, max-content\) minmax\(/,
+    );
+    expect(raster.style.gridTemplateColumns).toMatch(/1fr\)$/);
+    // Der Behälter nimmt am Umbruch teil wie vorher beide Gruppen: Summe der Basen, Boden
+    // `min-content` (fester Teil plus Trefffläche plus Lupe).
+    expect(raster.style.minWidth).toBe('min-content');
+    expect(within(raster).getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
   });
 
   /**
