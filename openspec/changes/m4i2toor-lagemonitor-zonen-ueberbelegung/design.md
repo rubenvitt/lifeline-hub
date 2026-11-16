@@ -60,13 +60,13 @@ der Name des Beurteilenden wird nicht übernommen.
 
 ### D2 Beschriftung als DOM-Marke, Text aus einer reinen Funktion
 
-`lagemonitorFlaechen.ts` liefert neben den Abschnittsmarken Zonenmarken `{ id, text, rolle,
-lat, lon }`: Text „<Bezeichnung oder ‚Gefahrengebiet‘> · <stufenWort(stufe)>“ (das Wort der Lagekarte: „keine Stufe“, nie „keine“), bei
+`lagemonitorFlaechen.ts` liefert neben den Abschnittsmarken Zonenmarken `{ id, text, name, stufe,
+rolle, lat, lon }` (`zonenMarkenTeile`): Text „<Bezeichnung oder ‚Gefahrengebiet‘> · <stufenWort(stufe)>“ (das Wort der Lagekarte: „keine Stufe“, nie „keine“), bei
 `bestaetigt = false` „ · unbestätigt“ (`UNBESTAETIGT` aus `pages/gefahren/beurteilung.ts`);
 Absperrbereich, Absperrgrenze und Sperrgebiet `zoneTypLabel(typ)`; eine Gefahrengebiet-Zone ohne
 `gebiet` „Gefahrengebiet“ ohne Stufe (wie die Lagekarte: ohne Gebiet keine Stufe). Ort: Schwerpunkt
-des Polygons (`polygonZentroid`), bei einer Linie die Mitte zwischen ihren mittleren Stützpunkten. Ein langer Name wird in der Marke gekürzt (höchstens 16 Schriftgrößen breit), die Stufe bleibt
-ganz stehen. Die Karte zeichnet sie
+des Polygons (`polygonZentroid`), bei einer Linie die Mitte zwischen ihren mittleren Stützpunkten. Ein langer Name bricht in der Marke um (höchstens 16 Schriftgrößen breit, nie gekürzt: „Keine
+Kachel schneidet ihren Inhalt ab“), die Stufe bleibt als Ganzes zusammen. Die Karte zeichnet sie
 wie die Abschnittsmarken in `schrift` (28 px am Monitor), Rand in der Rolle der Stufe
 (`rollenFarbe`), Text in `rollen.text`.
 

@@ -251,32 +251,32 @@ export default function LagemonitorKarte({
       el.setAttribute('data-lfh', 'monitor-zone');
       el.setAttribute('aria-label', z.text);
       if (z.rolle) el.setAttribute('data-rolle', z.rolle);
+      // Ein langer Name (Freitext bis 200 Zeichen) bricht innerhalb einer Höchstbreite um, statt
+      // die Karte zu sprengen oder abgeschnitten zu werden („Keine Kachel schneidet ihren Inhalt
+      // ab“, `geraet/AGENTS.md`); die Stufe bleibt als Ganzes zusammen.
       Object.assign(el.style, {
-        display: 'flex',
+        width: 'max-content',
+        maxWidth: `${schrift * 16}px`,
         fontSize: `${schrift}px`,
+        lineHeight: '1.2',
         fontWeight: '600',
         padding: '2px 10px',
         borderRadius: '6px',
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
         background: rollen.grund,
         color: rollen.text,
         border: `2px solid ${z.rolle ? rollenFarbe(z.rolle, token) : rollen.linieStark}`,
       });
-      // Ein langer Name (Freitext bis 200 Zeichen) wird gekürzt; die Stufe bleibt ganz stehen.
       const name = document.createElement('span');
       name.textContent = z.name;
       name.setAttribute('data-lfh', 'monitor-zone-name');
-      Object.assign(name.style, {
-        maxWidth: `${schrift * 16}px`,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      });
       el.append(name);
       if (z.stufe) {
         const stufe = document.createElement('span');
-        stufe.textContent = `\u00a0· ${z.stufe}`;
+        stufe.textContent = ` · ${z.stufe}`;
         stufe.setAttribute('data-lfh', 'monitor-zone-stufe');
-        stufe.style.flexShrink = '0';
+        stufe.style.whiteSpace = 'nowrap';
         el.append(stufe);
       }
       neu.push(new maplibregl.Marker({ element: el }).setLngLat([z.lon, z.lat]));

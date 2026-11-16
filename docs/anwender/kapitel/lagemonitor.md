@@ -52,8 +52,9 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    seines Gebiets und die höchste Warnstufe der Gefahrenmatrix, etwa „Hangrutsch Kirchberg ·
    hoch“, und ist in deren Farbe gefärbt wie auf der [Lagekarte](lagekarte.md); solange niemand
    die Beurteilung bestätigt hat, steht dahinter „unbestätigt“ (Kapitel
-   [Gefahren](gefahren.md)). Absperrungen und Sperrgebiete tragen nur ihre Art, etwa
-   „Absperrbereich“.
+   [Gefahren](gefahren.md)). Ist in der Matrix noch keine Gefahr gesetzt, steht dort „keine
+   Stufe“, und die Fläche ist vorsichtshalber rot. Ein langer Name bricht in der Beschriftung um.
+   Absperrungen und Sperrgebiete tragen nur ihre Art, etwa „Absperrbereich“.
 5. „Meldungen“ unter der Karte zählt die „Sofortmeldungen offen“, die noch niemand bestätigt
    hat.
 6. „Ablauf“ neben „Meldungen“ nennt die nächsten drei Programmpunkte aus den

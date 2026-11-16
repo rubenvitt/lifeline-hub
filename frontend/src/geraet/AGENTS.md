@@ -149,8 +149,10 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   `kcjecn9e-benachrichtigungskonzept`); `/zonen`, `/abschnitte` und `/gefahrengebiete` bleiben ihm
   gesperrt, sie tragen Notizen, Leiternamen und den Namen dessen, der beurteilt hat. Beschriftung
   und Notiz einer Zone erreichen ihn nie. Die Karte beschriftet Gefahrenzonen mit Marken in
-  Großbild-Schrift (`geraet/lagemonitorFlaechen.ts`, `zonenMarkenText`) und färbt Gefahrengebiete
-  wie die Lagekarte (`gefahrengebietStil`); eine überbelegte UHS (`istUeberbelegt`: mehr Belegte
+  Großbild-Schrift (`geraet/lagemonitorFlaechen.ts`, `zonenMarkenTeile`: Name und Stufe getrennt,
+  die Stufe im Wort der Lagekarte, `stufenWort`; ein langer Name bricht um, nie gekürzt) und färbt
+  Gefahrengebiete wie die Lagekarte (`gefahrengebietStil`); das Lagebild für Externe nutzt dieselbe
+  Karte ohne Zonenmarken (`zonenBeschriften={false}`); eine überbelegte UHS (`istUeberbelegt`: mehr Belegte
   als Plätze) steht in Kachel und Kartenmarke in der Alarmrolle. Die nächsten drei
   Programmpunkte (LLH-1570, `programm`: Bezeichnung und Zeitpunkt) kommen ebenfalls von dort,
   `/programmpunkte` bleibt ihm gesperrt; die Kachel „Ablauf“ filtert verstrichene Punkte mit der

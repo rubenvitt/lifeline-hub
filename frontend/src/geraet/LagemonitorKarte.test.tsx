@@ -241,7 +241,7 @@ describe('LagemonitorKarte Marken (LLH-1746)', () => {
     expect(absperrung.dataset.rolle).toBeUndefined();
   });
 
-  it('ein langer Name wird gekürzt, die Stufe bleibt ganz stehen', async () => {
+  it('ein langer Name bricht um statt abgeschnitten zu werden, die Stufe bleibt ganz', async () => {
     const lang = 'Hangrutsch am Hang hinter der Grundschule Kirchberg Richtung Ortsausgang Nord';
     renderMitProviders(
       <LagemonitorKarte
@@ -261,12 +261,13 @@ describe('LagemonitorKarte Marken (LLH-1746)', () => {
     const [gebiet] = marke('monitor-zone');
     const name = gebiet.querySelector<HTMLElement>('[data-lfh="monitor-zone-name"]')!;
     const stufe = gebiet.querySelector<HTMLElement>('[data-lfh="monitor-zone-stufe"]')!;
+    // Der ganze Name steht da, ohne Kürzung; die Marke ist höchstens 16 Schriftgrößen breit.
     expect(name).toHaveTextContent(lang);
-    expect(name.style.textOverflow).toBe('ellipsis');
-    expect(name.style.overflow).toBe('hidden');
-    expect(name.style.maxWidth).toBe('448px');
+    expect(name.style.textOverflow).toBe('');
+    expect(gebiet.style.maxWidth).toBe('448px');
+    expect(gebiet.style.whiteSpace).toBe('normal');
     expect(stufe).toHaveTextContent('· hoch · unbestätigt');
-    expect(stufe.style.flexShrink).toBe('0');
+    expect(stufe.style.whiteSpace).toBe('nowrap');
   });
 
   it('ohne Zonenbeschriftung (Lagebild für Externe) keine Zonenmarken', async () => {
