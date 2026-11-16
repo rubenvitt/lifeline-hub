@@ -436,10 +436,12 @@ export default function EinsatzabschnittePage() {
     const ziel = e.over?.data.current as DropDaten | undefined;
     // Gesperrte Ziele sind `disabled` und melden sich nie als `over`.
     if (!drag || !ziel) return;
+    // Der Rückweg kommt aus dem gespeicherten Wert, nicht aus dem Griff: der Griff einer Einheit
+    // trägt den wirksamen Abschnitt nur für die Sperre (LLH-1744), ein geerbter ist `null`.
     const von =
       drag.art === 'abschnitt'
         ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
-        : drag.abschnittId;
+        : (einheitenQuery.data?.find((x) => x.id === drag.id)?.abschnitt_id ?? null);
     verschieben.mutate({
       einsatzId,
       art: drag.art,

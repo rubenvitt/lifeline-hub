@@ -1717,6 +1717,32 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       messung.mockRestore();
     });
 
+    it('Rückgängig gibt einer Einheit mit geerbtem Abschnitt ihr Erben zurück (LLH-1744)', async () => {
+      const gruppe = {
+        ...zug,
+        id: 11,
+        name: 'Gruppe Nord',
+        abschnitt_id: null,
+        ueber_einheit_id: 10,
+      };
+      const messung = messeZiele();
+      const { einheitPatches } = mitPatches('einsatzleitung', [zug, gruppe]);
+      renderPage();
+      await userEvent.click(await findInTree('Nord'));
+      await screen.findByText('über 1. Zug');
+
+      zieheBis(griff('einheit', 11), mitte('Süd'))();
+      await screen.findByText('„Gruppe Nord“ zu „Süd“ zugeordnet');
+      await userEvent.click(screen.getByRole('button', { name: 'Rückgängig' }));
+      await waitFor(() =>
+        expect(einheitPatches).toEqual([
+          { id: 11, body: { abschnitt_id: 6 } },
+          { id: 11, body: { abschnitt_id: null } },
+        ]),
+      );
+      messung.mockRestore();
+    });
+
     it('eine Einheit mit geerbtem Abschnitt lässt sich nicht auf ihn selbst ziehen (LLH-1744)', async () => {
       // Gruppe 11 ohne eigenen Abschnitt unter dem 1. Zug (Nord): sie steht in Nord „über 1. Zug“.
       const gruppe = {
