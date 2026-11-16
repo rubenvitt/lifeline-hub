@@ -34,7 +34,8 @@ test('Einsatzfunktion setzen: Meldebild nennt sie vor der Qualifikation, das ETB
   const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
   await expect(region.getByText(NAME)).toBeVisible();
   await region.getByRole('button', { name: `Funktion zu ${NAME} eintragen` }).click();
-  const feld = region.getByRole('combobox', { name: `Funktion zu ${NAME}` });
+  // Die Bearbeitung schwebt an der Zelle, außerhalb der Region (LLH-1795).
+  const feld = page.getByRole('combobox', { name: `Funktion zu ${NAME}` });
   await feld.fill('sprech');
   const liste = await stehendeAuswahl(page);
   await liste
@@ -42,7 +43,7 @@ test('Einsatzfunktion setzen: Meldebild nennt sie vor der Qualifikation, das ETB
     .filter({ hasText: /^Sprechfunker$/ })
     .click();
   await expect(feld).toHaveValue('Sprechfunker');
-  await region.getByRole('button', { name: `Funktion zu ${NAME} speichern` }).click();
+  await page.getByRole('button', { name: `Funktion zu ${NAME} speichern` }).click();
 
   const wert = region.getByRole('button', { name: `Funktion zu ${NAME} bearbeiten` });
   await expect(wert).toHaveAccessibleDescription('Sprechfunker');

@@ -37,7 +37,8 @@ async function waehleEinheit(page: Page, funkrufname: string, pfad: string, leer
     .click();
   await page.getByRole('combobox', { name: `Einheit zu ${funkrufname}` }).click();
   await waehleStehend(page, pfad);
-  await region.getByRole('button', { name: `Einheit zu ${funkrufname} speichern` }).click();
+  // Die Bearbeitung schwebt an der Zelle, außerhalb der Region (LLH-1795).
+  await page.getByRole('button', { name: `Einheit zu ${funkrufname} speichern` }).click();
 }
 
 test('Fahrzeug einer Einheit zuordnen: der Abschnitt folgt, das Meldebild zeigt es dort, ein Wechsel nennt die vorige', async ({

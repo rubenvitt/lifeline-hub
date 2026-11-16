@@ -290,12 +290,13 @@ for (const { dichte, soll } of STAFFEL) {
     }
 
     await zeile.getByRole('button', { name: `Einheit zu ${KRAFT} eintragen` }).click();
-    const feld = zeile.getByRole('combobox', { name: `Einheit zu ${KRAFT}` });
+    // Die Bearbeitung schwebt an der Zelle, außerhalb der Zeile (LLH-1795).
+    const feld = page.getByRole('combobox', { name: `Einheit zu ${KRAFT}` });
     await expect(feld).toBeFocused();
     // Gemessen wird der sichtbare Rahmen des Auswahlfelds, nicht das innere `input`. Der
     // `has`-Locator gilt relativ zum Rahmen, deshalb ohne den Zeilen-Präfix.
     await haeltTreffflaeche(
-      zeile
+      page
         .locator('.ant-select')
         .filter({ has: page.getByRole('combobox', { name: `Einheit zu ${KRAFT}` }) }),
       soll,
@@ -305,7 +306,7 @@ for (const { dichte, soll } of STAFFEL) {
       `Einheit zu ${KRAFT} speichern`,
       `Bearbeitung von Einheit zu ${KRAFT} abbrechen`,
     ]) {
-      await haeltTreffflaeche(zeile.getByRole('button', { name: knopf }), soll, `Knopf „${knopf}“`);
+      await haeltTreffflaeche(page.getByRole('button', { name: knopf }), soll, `Knopf „${knopf}“`);
     }
     test
       .info()

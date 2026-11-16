@@ -2,17 +2,20 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx]
 ---
 
 ## Überblick
 
 Das Modul **Fahrzeuge** führt alle Fahrzeuge, die im Einsatz disponiert sind, aus dem Fahrzeugstamm
 der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, Einheit, FMS-Status und
-Besatzung. Typ, Abschnitt, „Seit“ (wann der Status gesetzt wurde), Kennzeichen und Träger stehen
-erst ab 1600 px Fensterbreite in der Liste, darunter lassen sie sich wie die Bemerkung unter
-„Spalten“ einblenden. Ist das Modul Einheiten im Einsatz nicht freigegeben, fehlen Einheit und
-Abschnitt.
+Besatzung. Der Typ steht unter 1600 px Fensterbreite unter dem Funkrufnamen, ab 1600 px in
+einer eigenen Spalte. Abschnitt, „Seit“ (wann der Status gesetzt wurde), Kennzeichen und Träger
+stehen erst ab 1600 px in der Liste, darunter lassen sie sich wie die Bemerkung unter „Spalten“
+einblenden. Der Knopf heißt „Spalten“, solange niemand selbst etwas ein- oder ausgeblendet hat;
+danach nennt er, wie viele Spalten verborgen sind. Am rechten Rand der Tabelle steht das Menü
+„Weitere Aktionen“ fest, auch wenn die Tabelle quer rollt. Ist das Modul Einheiten im Einsatz
+nicht freigegeben, fehlen Einheit und Abschnitt.
 
 Zwei Ansichten zeigen dieselben Fahrzeuge: die **Liste** zum Pflegen und Vergleichen und das
 **FMS-Tableau** als Überblick über die ganze Flotte, in dem sich der Status mit einem Klick oder
@@ -27,7 +30,7 @@ entlassen dürfen Einsatzleitung und Führungspersonal.
 2. Je Fahrzeug „Einheit“, „Status“ und „Besatzung“ lesen. Die Besatzung steht als Urteil, etwa
    „Besatzung nicht erfasst“ oder „Soll erfüllt“, daneben Ist- und Soll-Stärke.
 
-   ![Fahrzeugliste mit Funkrufname, Einheit, FMS-Status, Besatzung und dem Menü „Weitere Aktionen“ je Fahrzeug, darüber „Spalten · 6 ausgeblendet“](../bilder/fahrzeuge/fahrzeuge.png)
+   ![Fahrzeugliste mit Funkrufname und Typ darunter, Einheit, FMS-Status, Besatzung und dem Menü „Weitere Aktionen“ je Fahrzeug, darüber der Knopf „Spalten“](../bilder/fahrzeuge/fahrzeuge.png)
 
 3. In „Funkrufname, Typ, Kennzeichen“ suchen, oder im Kopf der Spalten „Typ“, „Einheit“,
    „Abschnitt“, „Status“ und „Träger“ filtern: das Trichterzeichen öffnet die Werte zum Ankreuzen,
@@ -70,7 +73,7 @@ Fahrzeug einer Nachbarwehr:
 Für Einsatzleitung und Führungspersonal, wenn das Modul Einheiten freigegeben ist:
 
 1. In der Zeile des Fahrzeugs unter „Einheit“ „Einheit eintragen“ wählen, oder bei einer schon
-   zugeordneten Einheit ihren Namen.
+   zugeordneten Einheit ihren Namen. Die Auswahl öffnet an der Zelle; die Tabelle bleibt stehen.
 2. Die Einheit wählen. Die Auswahl ist nach Abschnitt gegliedert, unterstellte Einheiten stehen
    mit ihrem Pfad, etwa „Sanitätszug Musterstadt › Rettungsstaffel“. Mit dem Kreuz im Feld wird die
    Einheit geleert.

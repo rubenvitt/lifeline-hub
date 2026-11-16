@@ -1750,9 +1750,10 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         }
         let offen = ueber;
         if (rolle === 'admin') {
-          // Die offene Einheitsangabe (Auswahl, „Speichern“, „Abbrechen“) passt in die Spalte.
+          // Die offene Einheitsangabe (Auswahl, „Speichern“, „Abbrechen“) schwebt an der Zelle
+          // (LLH-1795, Popover außerhalb der Region) und lässt die Tabelle stehen.
           await einheitAngabe.click();
-          const speichern = region.getByRole('button', {
+          const speichern = page.getByRole('button', {
             name: `Einheit zu ${KRAFT_KURZ} speichern`,
           });
           await expect(speichern).toBeVisible();
