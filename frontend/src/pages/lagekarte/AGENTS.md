@@ -126,11 +126,15 @@ diese Zusage.
   letztes Argument `BEDIENUNG` (Knopf, Tipp, `flyToZiel`) oder `AUTOMATISCH` (Startansicht,
   Eigenpositions-Anflug); Wächter `kamera.guard.test.ts`. Daran entfällt der erste Anflug der
   Eigenposition nach einer Bedienung.
-- **Ein Marker-Tipp bewegt die Kamera nicht, ein Anflug zoomt nur heran** (LLH-1751, Specs
+- **Ein Marker-Tipp fliegt nicht an, ein Anflug zoomt nur heran** (LLH-1751, Specs
   `lagekarte-klickziele`, `lagekarte-objektsuche`): `onMarkerWaehlen(schluessel, { anfliegen })`
-  setzt `flyToZiel` nur auf Wunsch; der Tipp auf der Karte wählt ohne, die Objektliste mit Anflug.
-  Jedes `flyToZiel` fliegt mit `anflugZoom(map.getZoom())` (`kamera.ts`), also nie heraus. Der
-  Bündel-Tipp zoomt weiter gewollt hinein.
+  setzt `flyToZiel` nur auf Wunsch; der Tipp auf der Karte wählt ohne Anflug und setzt `sichtZiel`:
+  verdeckt die aufgehende Leiste den Marker, schiebt `Kartenflaeche` ihn per `panBy` um den kleinsten
+  Versatz herein (`nachfuehrVersatz`), nie mit Zoom. Jedes `flyToZiel` fliegt mit
+  `anflugZoom(map.getZoom(), laufendesZiel)` (`kamera.ts`), also nie heraus, auch nicht mitten in
+  einem laufenden Anflug. Der Bündel-Tipp zoomt weiter gewollt hinein. Ein Wechsel der
+  Leistenansicht hält die Leiste für die Sitzung offen (`zeige`), auch wenn nur eine Auswahl sie
+  öffnete.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
 - **Karte ohne Grafik** (LLH-1353, Spec `lagekarte-kartengrundlage`): ohne WebGL2 wirft maplibres
   Konstruktor `GPUInitializationError`. Der Karten-Effekt baut die Karte nur über

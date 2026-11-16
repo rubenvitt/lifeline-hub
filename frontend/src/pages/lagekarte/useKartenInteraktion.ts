@@ -370,6 +370,9 @@ export function useKartenInteraktion({
   // Feld: ein Setzen verdrängt jede andere Selektion, null räumt.
   const [selektion, setSelektion] = useState<KartenSelektion>({ art: 'keine' });
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
+  // Ziel eines Marker-Tipps: kein Anflug, aber im Bild halten, wenn die aufgehende Leiste die
+  // Karte verkleinert (LLH-1751, Review; `nachfuehrVersatz` in `kamera.ts`). Je Tipp neu.
+  const [sichtZiel, setSichtZiel] = useState<{ lng: number; lat: number } | null>(null);
   const verortenLaeuft = useRef(false);
   // „Messen ab hier“ (LFH-776, D6): Startpunkt der nächsten Messung; `nr` macht jeden Start neu,
   // auch an derselben Stelle. Sichtbar nur, solange gemessen wird.
@@ -668,14 +671,16 @@ export function useKartenInteraktion({
 
   /**
    * Wählt ein Objekt aus. Angeflogen wird nur auf Wunsch (LLH-1751, Spec `lagekarte-klickziele`):
-   * ein Tipp auf den Marker lässt die Kamera stehen — der Marker liegt ja schon unter dem Finger —,
-   * ein Treffer der Objektliste fliegt hin (`anfliegen`).
+   * ein Tipp auf den Marker lässt die Kamera stehen — der Marker liegt ja schon unter dem Finger —
+   * und hält ihn nur im Bild, falls die aufgehende Leiste ihn verdeckte (`sichtZiel`); ein Treffer
+   * der Objektliste fliegt hin (`anfliegen`).
    */
   function onMarkerWaehlen(schluessel: string, optionen?: { anfliegen?: boolean }) {
     setSelektion({ art: 'objekt', schluessel });
-    if (!optionen?.anfliegen) return;
     const m = waehlbarRef.current.find((x) => x.schluessel === schluessel);
-    if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
+    if (!m) return;
+    if (optionen?.anfliegen) setFlyToZiel({ lng: m.lon, lat: m.lat });
+    else setSichtZiel({ lng: m.lon, lat: m.lat });
   }
 
   /**
@@ -1362,6 +1367,7 @@ export function useKartenInteraktion({
     zoneAuswahl,
     auswahl,
     flyToZiel,
+    sichtZiel,
     fachebeneAuswahl,
     bildPlatzierenId,
     zeichenPlatzieren,

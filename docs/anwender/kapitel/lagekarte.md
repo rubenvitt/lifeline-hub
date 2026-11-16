@@ -39,8 +39,9 @@ wer im Einsatz schreiben darf.
 
 1. Auf der Karte einen Marker antippen oder in der Leiste unter „Objekte“ eine Zeile wählen. Die
    Leiste zeigt die Ansicht „Auswahl“ mit Angaben und Aktionen des Objekts. Ein Tipp auf den Marker
-   lässt die Karte stehen. Eine Zeile der Liste fliegt die Karte zum Objekt und zoomt dabei nur
-   heran, nie heraus.
+   lässt die Karte stehen; würde die aufgehende Leiste ihn verdecken, rückt die Karte ihn gerade so
+   weit ins Bild, ohne zu zoomen. Eine Zeile der Liste fliegt die Karte zum Objekt und zoomt dabei
+   nur heran, nie heraus.
 
    ![Objektliste mit Suchfeld, „Nicht verortet 26“, dem Einsatzort und der aufgeklappten Gruppe „Einheiten 4/5“](../bilder/lagekarte/objektliste.png)
 
@@ -173,7 +174,8 @@ die Leiste ein oder aus (ab Tablet quer; darunter steht dieser Knopf im Seitenko
 
 Am Touch-Gerät ist die Leiste beim ersten Öffnen zu, auch am Tablet quer, damit die Karte die ganze
 Breite hat. „Leiste“ blendet sie ein; das Gerät merkt sich die Wahl. Wer mit der Maus arbeitet,
-findet sie ab Tablet-Breite offen vor. Wird ein Objekt gewählt, öffnet sie sich immer.
+findet sie ab Tablet-Breite offen vor. Wird ein Objekt gewählt, öffnet sie sich immer; wer darin auf
+„Ebenen“ oder „Objekte“ wechselt, behält sie offen, bis die Seite neu lädt.
 
 Die Ansicht „Ebenen“ ordnet die Ebenen in feste Gruppen: „Kräfte“ (Einheiten, Fahrzeuge, Personal,
 Abschnitte, Bereitstellungsräume), „Lage“ (Einsatzort, Führungsstelle, Zonen, Schäden,

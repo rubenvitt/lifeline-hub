@@ -31,9 +31,16 @@ Jede Aufgabe per TDD: Test zuerst rot, dann grün. Pfade relativ zu `frontend/sr
 - [x] 5.1 `pages/lagekarte/AGENTS.md` fortschreiben: Einleitung (Leiste bei grobem Zeiger per Vorgabe zu), Kamera-Regel (Marker-Tipp ohne Anflug, Anflug nur heran), Knopfspalte (Wort unter dem Symbol, `kartenKnopfBreite` statt Kante); Verweise auf `kartenKnopfKante` per grep prüfen
 - [ ] 5.2 `docs/anwender/kapitel/lagekarte.md`: Knöpfe mit Wort, Leiste am Touch-Gerät, Marker-Tipp ohne Zoom; Bilder über den Bildlauf (`e2e/doku-bilder/lagekarte.bilder.ts`) neu, Wächter der Anwenderdoku grün
 
-## 6. Integration
+## 6. Review-Befunde (16.11.2026)
 
-- [ ] 6.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die e2e-Suiten aus 2.3, 3.2 und 4.4 lokal grün
+- [x] 6.1 Marker im Bild halten (D4, Entscheidung Ruben): `nachfuehrVersatz` in `kamera.ts` mit Unit-Test, `sichtZiel` aus `useKartenInteraktion`, `panBy` in `Kartenflaeche`; e2e „Marker am rechten Rand“ in `lagekarte-touch.spec.ts` (LLH-1751-Block) grün
+- [x] 6.2 Anflug während eines Anflugs nimmt dessen Zielzoom (D5): `anflugZoom(aktuell, laufendesZiel)` mit Unit-Test, Ziel per Ref und laufender Nummer in `Kartenflaeche`
+- [x] 6.3 Ansichtswechsel hält die Leiste offen (D6, Entscheidung Ruben): `zeigeLeiste()` im `onAnsichtWechsel`; Seiten-Tests „hält offen“ und „ohne Wechsel schließt“ grün
+- [x] 6.4 Knopfbreite wird gemessen statt nachgerechnet: e2e „Wörter passen in die Kartenknöpfe“ (kompakt, handschuh) grün, Unit-Test pinnt den gemessenen Wert
+
+## 7. Integration
+
+- [ ] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die e2e-Suiten aus 2.3, 3.2 und 4.4 lokal grün
 
 ## Workflow follow-up
 

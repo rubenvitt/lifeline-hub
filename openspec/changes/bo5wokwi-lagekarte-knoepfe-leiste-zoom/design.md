@@ -61,18 +61,31 @@ Einhängen lesen. Das bräuchte einen eigenen Zustand, bringt aber nichts: Ein 2
 Tastatur abnimmt, soll die Vorgabe des neuen Zustands bekommen. Wer selbst geklappt hat, ist ohnehin
 gemerkt.
 
-**D4 – Marker-Tipp ohne Anflug.** `onMarkerWaehlen` bekommt eine Angabe, ob angeflogen wird.
-Der Tipp auf der Karte (`onMarkerKlick` in `LagekartePage`) wählt ohne Anflug, die Objektliste
-(`MarkerSuche`, `onWaehlen`) mit. Verworfen: „nur verschieben, wenn der Marker hinter Inspector oder
-Leiste läge“. Das braucht eine Verdeckungsrechnung, und der Marker liegt beim Tipp ohnehin dort, wo
-die Person hingetippt hat.
+**D4 – Marker-Tipp ohne Anflug, im Bild gehalten.** `onMarkerWaehlen` bekommt eine Angabe, ob
+angeflogen wird. Der Tipp auf der Karte (`onMarkerKlick` in `LagekartePage`) wählt ohne Anflug, die
+Objektliste (`MarkerSuche`, `onWaehlen`) mit. Ursprünglich war „nur verschieben, wenn verdeckt“
+verworfen, weil der Marker beim Tipp unter dem Finger liegt. Der Review hat gezeigt, dass die Auswahl
+selbst die Leiste öffnet und die Karte verkleinert (ab `lg` 300 px rechts, darunter 45 % der Höhe).
+Entscheidung von Ruben am 16.11.2026: nur nachführen, wenn verdeckt. Der Tipp setzt ein `sichtZiel`;
+`Kartenflaeche` prüft es im nächsten Frame und nach 350 ms (der ResizeObserver der Karte läuft nach
+dem Öffnen der Leiste) und schiebt es per `panBy` um den kleinsten Versatz in die Fläche minus 48 px
+Rand (`nachfuehrVersatz` in `kamera.ts`). Der Zoom bleibt.
 
 **D5 – Anflug zoomt nur heran.** Der Effekt in `Kartenflaeche` fliegt mit
 `zoom: Math.max(map.getZoom(), ANFLUG_ZOOM)` und behält `BEDIENUNG`. Das gilt für jedes
 `flyToZiel`: Listentreffer, Ortssuche, Deeplinks, Verorten aus einem Auftrag. Eine Regel statt
-einer Art je Aufrufer. Für Deeplinks ändert sich praktisch nichts, weil die Karte nach dem Laden in
+einer Art je Aufrufer. Folgt ein Anflug auf einen noch fliegenden, zählt dessen Zielzoom
+(`anflugZoom(aktuell, laufendesZiel)`), nicht der Zwischenzoom der Flugkurve; `flyTo` zoomt zwischen
+entfernten Punkten zwischendurch heraus (Review). Für Deeplinks ändert sich praktisch nichts, weil die Karte nach dem Laden in
 der Startansicht weiter draußen steht. Die reine Rechnung kommt als exportierte Funktion
 `anflugZoom(aktuell)` nach `kamera.ts`, prüfbar ohne Karte.
+
+**D6 – Ansichtswechsel hält die Leiste offen.** Öffnet nur eine Auswahl die Leiste und wechselt die
+Person darin die Ansicht, bleibt die Leiste für die Sitzung offen (`zeige` aus `useLeistenWahl`, nicht
+gespeichert). Sonst verlor sie mit „Zurück zu Objekte“ oder Esc die ganze Leiste, obwohl sie gerade in
+„Objekte“ arbeitete. Gilt auch am Handschirm, wo die Vorgabe schon vorher „zu“ war. Entscheidung von
+Ruben am 16.11.2026 (Review). Verworfen: den Wechsel als gemerkte Wahl speichern; dann wäre die
+Leiste am Gerät dauerhaft offen.
 
 ## Risks / Trade-offs
 

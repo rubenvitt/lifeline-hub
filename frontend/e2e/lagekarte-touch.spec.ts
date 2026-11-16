@@ -462,7 +462,10 @@ for (const viewport of [
       await ruhe(page);
       const nachTipp = await stand(page);
       expect(nachTipp.zoom, 'Marker-Tipp ändert den Zoom nicht').toBeCloseTo(ZOOM, 5);
-      expect(nachTipp.lng, 'Marker-Tipp verschiebt die Karte nicht').toBeCloseTo(BLICK_EINZEL[0], 5);
+      expect(nachTipp.lng, 'Marker-Tipp verschiebt die Karte nicht').toBeCloseTo(
+        BLICK_EINZEL[0],
+        5,
+      );
       // Die offene Leiste (unter `lg` unter der Karte) kann die Fläche verändern, und jede
       // Bewegung klappte einen Spider zu. Also zurück auf den Blickpunkt und erst tippen, wenn die
       // Karte steht. Die Auswahl bleibt offen: an ihr hängt die Esc-Reihenfolge unten.
@@ -750,8 +753,46 @@ test.describe('Lagekarte am Touch-Gerät quer (LLH-1751)', () => {
     await expect(umschalter).toBeVisible();
     await expect(umschalter).toContainText('Leiste');
 
-    // Marker-Tipp: Auswahl öffnet die Leiste, Zoom und Mitte bleiben.
-    await springe(page, BLICK_EINZEL, 16);
+    // Marker nahe dem rechten Rand: die aufgehende Leiste nähme ihm den Platz. Die Karte schiebt
+    // ihn gerade so weit herein, dass er sichtbar bleibt, und zoomt nicht (Review LLH-1751).
+    await springe(page, EINZEL, 16);
+    await page.evaluate(() => {
+      const k = (
+        window as unknown as {
+          __lfhKarte: MapHaken & {
+            panBy(o: [number, number], opt: { duration: number }): void;
+          };
+        }
+      ).__lfhKarte;
+      const c = k.getCanvas();
+      k.panBy([-(c.clientWidth / 2 - 110), -150], { duration: 0 });
+    });
+    await ruhe(page);
+    await expect(async () => {
+      const p = await aufSchirm(page, EINZEL);
+      await aufKarte(page, [p], 'Einzelzeichen am rechten Rand');
+      await tippe(page, p);
+      await expect(ausgewaehlt(page).getByText('Pumpe Ost')).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(page.locator('#lagekarte-leiste')).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          page.evaluate((ll) => {
+            const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
+            const px = k.project(ll);
+            const c = k.getCanvas();
+            return px.x >= 0 && px.x <= c.clientWidth && px.y >= 0 && px.y <= c.clientHeight;
+          }, EINZEL),
+        { message: 'der gewählte Marker bleibt nach dem Öffnen der Leiste im Bild' },
+      )
+      .toBe(true);
+    await ruhe(page);
+    expect((await stand(page)).zoom, 'Nachführen zoomt nicht').toBeCloseTo(16, 5);
+
+    // Marker-Tipp bei schon offener Leiste: Zoom und Mitte bleiben. Zoom 15, damit das Zeichen
+    // in der um die Leiste schmaleren Karte nicht unter dem Knopfblock liegt.
+    await springe(page, BLICK_EINZEL, 15);
     await expect(async () => {
       const p = await aufSchirm(page, EINZEL);
       await aufKarte(page, [p], 'Einzelzeichen');
@@ -761,7 +802,7 @@ test.describe('Lagekarte am Touch-Gerät quer (LLH-1751)', () => {
     await expect(page.locator('#lagekarte-leiste')).toBeVisible();
     await ruhe(page);
     const nachTipp = await stand(page);
-    expect(nachTipp.zoom, 'Marker-Tipp zoomt nicht').toBeCloseTo(16, 5);
+    expect(nachTipp.zoom, 'Marker-Tipp zoomt nicht').toBeCloseTo(15, 5);
     expect(nachTipp.lng, 'Marker-Tipp verschiebt nicht').toBeCloseTo(BLICK_EINZEL[0], 5);
 
     // Listentreffer bei nahem Ausschnitt: fliegt hin, behält Zoom 17.
@@ -787,6 +828,42 @@ test.describe('Lagekarte am Touch-Gerät quer (LLH-1751)', () => {
 
     expect(seitenFehler.map((f) => f.message)).toEqual([]);
   });
+});
+
+// LLH-1751 (Review): Ob ein Wort in seinen Knopf passt, entscheidet erst die echte Schrift.
+test.describe('Wörter passen in die Kartenknöpfe (LLH-1751)', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  for (const dichte of ['kompakt', 'handschuh'] as const) {
+    test(`kein Wort läuft über, Stufe ${dichte}`, async ({ page }) => {
+      await page.addInitScript(
+        ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+        [DICHTE_SCHLUESSEL, dichte] as const,
+      );
+      await anmelden(page, { startseite: false });
+      const einsatzId = await post(page, '/api/einsaetze', {
+        bezeichnung: `E2E Knopfwörter ${Date.now()}`,
+      });
+      await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      const woerter = page.locator('[data-lfh="karten-knoepfe"] [data-lfh="kartenknopf-wort"]');
+      await expect(woerter.first()).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const maße = await woerter.evaluateAll((els) =>
+        els.map((el) => {
+          const knopf = el.closest('button')!;
+          const stil = getComputedStyle(knopf);
+          const innen =
+            knopf.clientWidth - parseFloat(stil.paddingLeft) - parseFloat(stil.paddingRight);
+          return { wort: el.textContent, breite: el.getBoundingClientRect().width, innen };
+        }),
+      );
+      expect(maße.length, 'Wörter im Knopfblock').toBeGreaterThanOrEqual(3);
+      for (const m of maße) {
+        expect(m.breite, `„${m.wort}“ passt in ${m.innen}px`).toBeLessThanOrEqual(m.innen + 0.5);
+      }
+    });
+  }
 });
 
 test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {

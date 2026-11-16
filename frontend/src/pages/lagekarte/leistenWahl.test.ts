@@ -126,7 +126,13 @@ describe('leisteSichtbar bei grobem Zeiger (LLH-1751)', () => {
 
   it('feiner Zeiger: ab lg weiter offen', () => {
     expect(
-      leisteSichtbar({ ...touch, istBeruehrung: false, gemerkt: null, breit: true, istSchmal: false }),
+      leisteSichtbar({
+        ...touch,
+        istBeruehrung: false,
+        gemerkt: null,
+        breit: true,
+        istSchmal: false,
+      }),
     ).toBe(true);
   });
 });

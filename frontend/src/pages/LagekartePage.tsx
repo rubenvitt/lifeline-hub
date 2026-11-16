@@ -515,6 +515,7 @@ export default function LagekartePage() {
     zoneAuswahl,
     auswahl,
     flyToZiel,
+    sichtZiel,
     fachebeneAuswahl,
     bildPlatzierenId,
     zeichenPlatzieren,
@@ -1653,6 +1654,7 @@ export default function LagekartePage() {
           if (!exklusiverModusAktiv) waehleObjekt(schluessel);
         }}
         flyToZiel={flyToZiel}
+        sichtZiel={sichtZiel}
         startAnsicht={start}
         onStyleFehler={onStyleFehler}
         flaechen={kartenFlaechenImFokus}
@@ -1983,6 +1985,10 @@ export default function LagekartePage() {
           else {
             leistenAnsicht.wechsle(a);
             verlasseAuswahl();
+            // Wer in der Leiste weiterarbeitet, behält sie, auch wenn nur die Auswahl sie öffnete
+            // (bei Touch und am Handy per Vorgabe zu). Nur für die Sitzung, nie gespeichert
+            // (LLH-1751, Review).
+            zeigeLeiste();
           }
         }}
         onAuswahlZurueck={hebeAuswahlAuf}

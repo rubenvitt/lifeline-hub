@@ -193,14 +193,16 @@ export default function WetterPegelPage() {
         }}
       >
         {/* Ohne Einsatzort: der Grund einmal für alle drei Wetterteile (LLH-1752). */}
-        {wetterQuery.data?.warnungen.zustand === 'kein_ort' && (
-          <div style={volleBreite}>
-            <WetterOhneOrtHinweis
-              wetter={wetterQuery.data}
-              onEinsatzdaten={() => navigate(einsatzdatenPfad(einsatzId))}
-            />
-          </div>
-        )}
+        {paneelZustand(wetterQuery) === 'daten' &&
+          wetterQuery.data?.warnungen.zustand === 'kein_ort' && (
+            <div style={volleBreite}>
+              <WetterOhneOrtHinweis
+                zustand={paneelZustand(wetterQuery)}
+                wetter={wetterQuery.data}
+                onEinsatzdaten={() => navigate(einsatzdatenPfad(einsatzId))}
+              />
+            </div>
+          )}
         <div style={volleBreite}>
           <WarnungenPaneel
             zustand={paneelZustand(wetterQuery)}

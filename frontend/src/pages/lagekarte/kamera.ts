@@ -24,10 +24,31 @@ export const AUTOMATISCH = { bedienung: false } as const;
 /**
  * Zoom eines Anflugs (LLH-1751, design.md D5 der Change `bo5wokwi-lagekarte-knoepfe-leiste-zoom`):
  * nur heran, nie heraus. Steht die Karte näher als {@link ANFLUG_ZOOM}, behält sie ihren Zoom —
- * wer einen Ausschnitt eingestellt hat, verliert ihn nicht durch einen Anflug.
+ * wer einen Ausschnitt eingestellt hat, verliert ihn nicht durch einen Anflug. `laufendesZiel`:
+ * Zielzoom eines Anflugs, der gerade noch fliegt, sonst `null`.
  */
-export function anflugZoom(aktuell: number): number {
-  return Math.max(aktuell, ANFLUG_ZOOM);
+export function anflugZoom(aktuell: number, laufendesZiel: number | null = null): number {
+  // Mitten in einem Anflug ist `aktuell` ein Punkt der Flugkurve, die zwischen entfernten Zielen
+  // herauszoomt; maßgeblich ist dann das Ziel des laufenden Anflugs (Review LLH-1751).
+  return Math.max(laufendesZiel ?? aktuell, ANFLUG_ZOOM);
+}
+
+/**
+ * Versatz in Pixeln, um den ein Punkt der Karte zurück ins Bild muss (LLH-1751, Review): ein
+ * Marker-Tipp bewegt die Kamera nicht, aber die Auswahl öffnet die Leiste und verkleinert die
+ * Karte. Liegt der gewählte Marker danach außerhalb von `fläche` minus `rand`, liefert die
+ * Funktion den kleinsten Versatz `[dx, dy]` für `panBy`, der ihn an den Rand holt; sonst `null`.
+ * Rein und exportiert.
+ */
+export function nachfuehrVersatz(
+  punkt: { x: number; y: number },
+  flaeche: { breite: number; hoehe: number },
+  rand: number,
+): [number, number] | null {
+  const klemme = (w: number, max: number) => Math.min(Math.max(w, rand), max - rand);
+  const dx = punkt.x - klemme(punkt.x, flaeche.breite);
+  const dy = punkt.y - klemme(punkt.y, flaeche.hoehe);
+  return dx === 0 && dy === 0 ? null : [dx, dy];
 }
 
 /** Rand um den Genauigkeitskreis beim Anflug, in Pixeln. */

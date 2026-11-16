@@ -2,7 +2,8 @@
  * Paneele „Aktuelle Bedingungen" (LFH-864), „Warnungen (DWD)" und „Vorhersage 24 h" der
  * Modulseite „Wetter & Pegel".
  *
- * Jeder Teil trägt seinen Stand: `kein_ort` erklärt, was fehlt; `ausfall` (oder ein Stand über
+ * Jeder Teil trägt seinen Stand: `kein_ort` nennt nur „ohne Einsatzort“, erklärt wird einmal auf
+ * der Seite ({@link WetterOhneOrtHinweis}, LLH-1752); `ausfall` (oder ein Stand über
  * der Obergrenze) zeigt „Stand unbekannt" und KEINE Liste; ein veralteter Stand bleibt sichtbar
  * mit Wort und Abrufzeit, bei den aktuellen Bedingungen mit der Messzeit. Die Einordnung steht
  * in `wetterStand.ts`.
@@ -256,17 +257,21 @@ function ortName(ort: WetterOrt | null | undefined): string | null {
  * Fehlt der Einsatzort, erklärt die Seite das EINMAL über den Paneelen, mit dem Weg zu den
  * Einsatzdaten (LLH-1752, Spec `lage-wetter-pegel`, Szenario „Kein Einsatzort“). Alle drei
  * Wetterteile hängen an derselben Koordinate; die Warnungen stehen für sie. Solange die Antwort
- * fehlt (Laden, Fehler), ist der Zustand unbekannt — dann kein Hinweis.
+ * fehlt oder nicht gilt (Laden, Fehler — auch ein gescheiterter Neuabruf mit alten Daten, dann
+ * zeigen die Paneele „Erneut laden“), ist der Zustand unbekannt: kein Hinweis.
  */
 export function WetterOhneOrtHinweis({
+  zustand,
   wetter,
   onEinsatzdaten,
 }: {
+  /** Zustand der Abfrage wie an den Paneelen; nur `daten` darf etwas behaupten. */
+  zustand: PaneelDatenzustand;
   wetter: WetterAnzeige | undefined;
   onEinsatzdaten: () => void;
 }) {
   const { token, rollen } = useRollen();
-  if (wetter?.warnungen.zustand !== 'kein_ort') return null;
+  if (zustand !== 'daten' || wetter?.warnungen.zustand !== 'kein_ort') return null;
   return (
     <div
       data-lfh="wetter-kein-ort"

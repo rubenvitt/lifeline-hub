@@ -6,6 +6,7 @@ import {
   BEDIENUNG,
   anflugZoom,
   fliegeEigenpositionAn,
+  nachfuehrVersatz,
   hoereAufBedienung,
   istBedienung,
 } from './kamera';
@@ -38,6 +39,31 @@ describe('anflugZoom (LLH-1751, D5): ein Anflug zoomt nur heran', () => {
 
   it('näher als der Anflugmaßstab: behält den Zoom, nie heraus', () => {
     expect(anflugZoom(18)).toBe(18);
+  });
+
+  it('mitten in einem Anflug zählt dessen Ziel, nicht der Zwischenzoom der Flugkurve', () => {
+    // flyTo zoomt zwischen entfernten Punkten zwischendurch heraus; ein zweiter Treffer in dem
+    // Moment läse sonst etwa 13 und landete auf 15 statt auf den 17 von vorher.
+    expect(anflugZoom(13, 17)).toBe(17);
+    expect(anflugZoom(13, null)).toBe(ANFLUG_ZOOM);
+  });
+});
+
+describe('nachfuehrVersatz (LLH-1751, Review): Marker nach dem Öffnen der Leiste im Bild halten', () => {
+  const FLAECHE = { breite: 900, hoehe: 600 };
+
+  it('liegt der Marker im Bild, bewegt sich nichts', () => {
+    expect(nachfuehrVersatz({ x: 450, y: 300 }, FLAECHE, 48)).toBeNull();
+    expect(nachfuehrVersatz({ x: 48, y: 552 }, FLAECHE, 48)).toBeNull();
+  });
+
+  it('rechts hinausgeschoben: so weit zurück, dass er am Rand sichtbar steht', () => {
+    // Die Leiste nahm rechts 300 px; der Marker stand bei x = 1050 der alten Fläche.
+    expect(nachfuehrVersatz({ x: 1050, y: 300 }, FLAECHE, 48)).toEqual([1050 - 852, 0]);
+  });
+
+  it('unten unter der Leiste: nur senkrecht nachführen', () => {
+    expect(nachfuehrVersatz({ x: 200, y: 700 }, FLAECHE, 48)).toEqual([0, 700 - 552]);
   });
 });
 

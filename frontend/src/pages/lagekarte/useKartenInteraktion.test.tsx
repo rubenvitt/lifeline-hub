@@ -1839,7 +1839,15 @@ describe('useKartenInteraktion · „Zeichen hier setzen“ hält Einsatz und An
 });
 
 describe('useKartenInteraktion — Auswahl mit oder ohne Anflug (LLH-1751, D4)', () => {
-  const UHS = { schluessel: 'uhs-1', typ: 'uhs', id: 1, lat: 53.1, lon: 8.8, label: 'UHS', farbe: '#000' };
+  const UHS = {
+    schluessel: 'uhs-1',
+    typ: 'uhs',
+    id: 1,
+    lat: 53.1,
+    lon: 8.8,
+    label: 'UHS',
+    farbe: '#000',
+  };
   function rendereMitMarker() {
     return renderHook(
       () =>
@@ -1855,11 +1863,13 @@ describe('useKartenInteraktion — Auswahl mit oder ohne Anflug (LLH-1751, D4)',
     );
   }
 
-  it('ein Tipp auf den Marker wählt aus und setzt kein Anflugziel', () => {
+  it('ein Tipp auf den Marker wählt aus, setzt kein Anflugziel, nur ein Sichtziel', () => {
     const { result } = rendereMitMarker();
     act(() => result.current.onMarkerWaehlen('uhs-1'));
     expect(result.current.auswahl).toBe('uhs-1');
     expect(result.current.flyToZiel).toBeNull();
+    // Sichtziel: die Karte hält den Marker nach dem Öffnen der Leiste im Bild (Review).
+    expect(result.current.sichtZiel).toEqual({ lng: 8.8, lat: 53.1 });
   });
 
   it('ein Treffer der Objektliste wählt aus und fliegt hin', () => {

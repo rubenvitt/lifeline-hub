@@ -25,3 +25,18 @@ Vorgabe unverändert: ab `md` offen, auf dem Handschirm zu.
 #### Scenario: Maus am Fükw unverändert
 - **WHEN** die Lagekarte bei 1920 × 1080 mit feinem Zeiger ohne gemerkte Wahl geöffnet wird
 - **THEN** ist die Leiste offen
+
+### Requirement: Ansichtswechsel hält die Leiste offen
+
+Hat nur eine Auswahl die Leiste geöffnet (Vorgabe oder gemerkte Wahl „zu“) und wechselt die Person
+darin auf „Ebenen“ oder „Objekte“, SHALL die Leiste für die Sitzung offen bleiben, auch wenn die
+Auswahl danach endet. Die gemerkte Wahl MUST dabei unverändert bleiben; nach dem Neuladen gilt sie
+wieder.
+
+#### Scenario: Weiterarbeiten in „Objekte“
+- **WHEN** am Touch-Tablet ein Marker-Tipp die Leiste geöffnet hat, die Person auf „Objekte“ wechselt und dann „Zurück zu Objekte“ wählt
+- **THEN** bleibt die Leiste offen und zeigt „Objekte“
+
+#### Scenario: Ohne Wechsel schließt sie wieder
+- **WHEN** ein Marker-Tipp die Leiste geöffnet hat und die Person die Auswahl ohne Ansichtswechsel schließt
+- **THEN** ist die Leiste wieder zu

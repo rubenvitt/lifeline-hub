@@ -188,20 +188,16 @@ describe('KartenUeberlagerung — Knopfblock', () => {
 });
 
 describe('KartenUeberlagerung — Wort unter dem Symbol (LLH-1751)', () => {
-  const STUFEN = ['kompakt', 'komfortabel', 'handschuh'] as const;
-  const token = (s: (typeof STUFEN)[number]) => ({
-    controlHeight: dichten[s].zeilenhoehe,
-    fontSizeSM: dichten[s].schriftgroesse - 2,
-  });
-
-  it('die Knopfbreite ist nie schmaler als die Kante und fasst das längste Wort', () => {
-    for (const s of STUFEN) {
-      const t = token(s);
-      const breite = kartenKnopfBreite(t);
-      expect(breite, s).toBeGreaterThanOrEqual(kartenKnopfKante(t));
-      // „Zeichnen“ und „Position“ (8 Zeichen) bei rund 0,6 em je Zeichen, dazu der Innenrand.
-      expect(breite, s).toBeGreaterThanOrEqual(Math.ceil(8 * 0.6 * t.fontSizeSM) + 8);
-    }
+  it('die Knopfbreite ist nie schmaler als die Kante', () => {
+    // antd leitet `fontSizeSM` in jeder Stufe als 12 ab. Ob das Wort hineinpasst, misst der
+    // Browser (`e2e/lagekarte-touch.spec.ts`, „Wörter passen in die Kartenknöpfe“); hier steht
+    // nur der Wert, den die Messung bestätigt hat.
+    expect(kartenKnopfBreite({ controlHeight: dichten.kompakt.zeilenhoehe, fontSizeSM: 12 })).toBe(
+      66,
+    );
+    expect(
+      kartenKnopfBreite({ controlHeight: dichten.handschuh.zeilenhoehe, fontSizeSM: 12 }),
+    ).toBe(72);
   });
 
   it('Norden, Position, Messen, Zeichnen und Leiste tragen ein sichtbares Wort, der Name bleibt', () => {
