@@ -34,15 +34,15 @@ export function useOfflineQueueZaehler(
     scope,
     wert: startwert,
   });
-  const ladeGeneration = useRef(0);
-  const laden = useCallback(() => {
-    const generation = ++ladeGeneration.current;
+  const loadGeneration = useRef(0);
+  const load = useCallback(() => {
+    const generation = ++loadGeneration.current;
     if (benutzerId == null) {
       setStand({ scope, wert: LEER });
       return;
     }
     void queueZaehlerLaden(benutzerId, einsatzId).then((wert) => {
-      if (ladeGeneration.current !== generation) return;
+      if (loadGeneration.current !== generation) return;
       if (einsatzId == null) saveQueueZaehler(benutzerId, wert);
       setStand({ scope, wert });
     });
@@ -57,7 +57,7 @@ export function useOfflineQueueZaehler(
       uhr = null;
       if (!offen) return;
       offen = false;
-      laden();
+      load();
       uhr = setTimeout(ausfuehren, ZAEHLER_DROSSEL_MS);
     };
     const anstossen = () => {
@@ -69,8 +69,8 @@ export function useOfflineQueueZaehler(
     return () => {
       window.removeEventListener(OFFLINE_QUEUE_EVENT, anstossen);
       if (uhr !== null) clearTimeout(uhr);
-      ladeGeneration.current += 1;
+      loadGeneration.current += 1;
     };
-  }, [laden]);
+  }, [load]);
   return stand.scope === scope ? stand.wert : startwert;
 }
