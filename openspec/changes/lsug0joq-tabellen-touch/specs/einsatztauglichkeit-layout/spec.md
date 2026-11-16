@@ -46,6 +46,14 @@ Ansichten und die mehrzeilige Bemerkung bearbeiten weiter im Fluss.
 - **WHEN** in der schwebenden Bearbeitung die Auswahlliste der Einheit offen ist und Escape gedrückt wird
 - **THEN** schließt nur die Auswahlliste; ein weiteres Escape verwirft die Bearbeitung, und der Fokus steht wieder auf dem Wert der Zelle
 
+#### Scenario: Tipp ins Freie bei offener Bearbeitung
+- **WHEN** am Tablet die Einheit eines Fahrzeugs in Bearbeitung steht, danach auf eine freie Fläche getippt wird und per Live-Update ein Fahrzeug davor hinzukommt
+- **THEN** bleibt die Bearbeitung offen, und die Zeilen rücken nicht, bis sie schließt
+
+#### Scenario: Tab aus einer unveränderten Bearbeitung
+- **WHEN** der Fokus mit Tab vom letzten Knopf einer unveränderten schwebenden Bearbeitung weitergeht
+- **THEN** schließt sie, und der Fokus steht auf dem nächsten Ziel nach der Zelle
+
 #### Scenario: Ablehnung
 - **WHEN** der Server das Speichern ablehnt
 - **THEN** bleibt die Bearbeitung mit dem Entwurf offen, und der Grund steht in ihr

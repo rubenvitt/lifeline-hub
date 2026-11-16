@@ -17,7 +17,6 @@ import {
   useState,
 } from 'react';
 import { Link } from 'react-router';
-import { KEINE_SPALTEN, SichtbareSpaltenKontext } from './KennungMitZusatz';
 import KatalogTabelle, { type KatalogSpalte } from './KatalogTabelle';
 import { Liste, ListenEintrag, type ListenKopf } from './Liste';
 import type { UnterEbene } from './Markdown';
@@ -983,6 +982,17 @@ export function useSpalteAusgeblendet(key: string): boolean {
   return gezeigt != null && !gezeigt.has(key);
 }
 
+/**
+ * `true`, solange die Tabelle steht und die Spalte `key` darin gezeigt wird (nach Breite UND
+ * Handwahl). Im Kartenzweig, außerhalb einer `Datensicht` und ohne `key` `false`. Für eine Kennung,
+ * die den Wert einer Spalte als zweite Zeile trägt, wenn die Spalte fehlt (`KennungMitZusatz`,
+ * LLH-1790).
+ */
+export function useSpalteGezeigt(key: string | undefined): boolean {
+  const gezeigt = useContext(GezeigteSpaltenKontext);
+  return key != null && gezeigt != null && gezeigt.has(key);
+}
+
 function Platzhalterzeile(props: {
   hoehe: number;
   spalten: number;
@@ -1541,6 +1551,10 @@ export default function Datensicht<T extends object, const K extends string>(
     });
   }, []);
 
+  // Eine offene schwebende Bearbeitung in einer Zelle hält wie ein offenes Menü, auch wenn der
+  // Fokus das Popover verlassen hat (Touch, Klick ins Freie; `components/angabeForm.tsx`).
+  const [isBearbeitungOffen, setBearbeitungOffen] = useState(false);
+
   // Einfrieren, Fokus- und Zeigerbedingung: `useZuflussSchleuse` (Spec `datensicht-zufluss`).
   const zuflussBereich = useZuflussSchleuse(zuflussSteuerung, {
     zeilen,
@@ -1549,7 +1563,7 @@ export default function Datensicht<T extends object, const K extends string>(
     gruppeVon: gruppen?.schluessel,
     mitGerippe: baumKinder != null,
     wurzel,
-    halten: halten || kartenMenueOffen.size > 0 || kontext.offen,
+    halten: halten || kartenMenueOffen.size > 0 || kontext.offen || isBearbeitungOffen,
   });
 
   // ── DEV-Diagnose ──────────────────────────────────────────────────────────────────
@@ -2417,6 +2431,7 @@ export default function Datensicht<T extends object, const K extends string>(
     <GezeigteSpaltenKontext.Provider value={gezeigteSpaltenSchluessel}>
       <FensterKontext.Provider value={fensterTraeger}>
         <KatalogTabelle<T>
+          onBearbeitungOffen={setBearbeitungOffen}
           columns={gemerkteSpalten}
           dataSource={tabellenZeilen}
           components={virtuell ? FENSTER_KOMPONENTEN : undefined}
@@ -2880,13 +2895,7 @@ export default function Datensicht<T extends object, const K extends string>(
       )}
       {verdeckteFehlerBlock}
       {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}
-      {/* Welche Spalten die Tabelle wirklich zeigt (LLH-1790): eine Kennung mit Zusatz (Typ unter
-          dem Funkrufnamen) lässt ihn weg, wenn seine Spalte steht. Im Kartenzweig steht keine. */}
-      <SichtbareSpaltenKontext.Provider
-        value={alsTabelle ? gezeigteSpaltenSchluessel : KEINE_SPALTEN}
-      >
-        {alsTabelle ? tabelle : kartenZweig}
-      </SichtbareSpaltenKontext.Provider>
+      {alsTabelle ? tabelle : kartenZweig}
       {kontext.menue}
     </section>
   );

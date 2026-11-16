@@ -1,10 +1,7 @@
 import { Typography } from 'antd';
-import { createContext, useContext, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { useSpalteGezeigt } from './Datensicht';
 import { schriftStil } from './instrument/rollenwerte';
-
-/** Die Spalten, die die umgebende Tabelle wirklich zeigt (`Datensicht`); leer im Kartenzweig. */
-export const KEINE_SPALTEN: ReadonlySet<string> = new Set();
-export const SichtbareSpaltenKontext = createContext<ReadonlySet<string>>(KEINE_SPALTEN);
 
 /**
  * Kennung mit gedämpfter zweiter Zeile (LLH-1790, Change `lsug0joq-tabellen-touch`, D4): etwa der
@@ -24,9 +21,9 @@ export function KennungMitZusatz({
   zusatz?: string | null;
   ausSpalte?: string;
 }): ReactNode {
-  const sichtbar = useContext(SichtbareSpaltenKontext);
+  const isSpalteGezeigt = useSpalteGezeigt(ausSpalte);
   const text = zusatz?.trim();
-  if (!text || (ausSpalte != null && sichtbar.has(ausSpalte))) return kennung;
+  if (!text || isSpalteGezeigt) return kennung;
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}>
       {kennung}

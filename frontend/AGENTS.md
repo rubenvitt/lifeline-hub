@@ -891,7 +891,10 @@ anwendbar), „nicht geprüft" ist keins.
   lässt dort ihre Anzeige stehen und öffnet Eingabe, Fehler und Knöpfe in einem Popover an ihr;
   die Spalten bleiben stehen. Ein Klick daneben schließt nicht (Escape, „Abbrechen“, Speichern
   schon), je Tabelle ist höchstens eine offen (eine unveränderte schließt, eine geänderte behält den
-  Fokus), der Fokus kehrt auf die Anzeige zurück. Karten und Ansichten bearbeiten im Fluss;
+  Fokus), der Fokus kehrt auf die Anzeige zurück. Tab aus dem Popover schließt eine unveränderte
+  Bearbeitung, eine geänderte hält den Fokus (Tab im Kreis, Shift+Tab auf die Anzeige, Enter dort
+  zurück). Eine offene hält die Zeilenfolge der `Datensicht` auch ohne Fokus (`onBearbeitungOffen`
+  in `halten`). Karten und Ansichten bearbeiten im Fluss;
   `BemerkungZelle` liest den Kontext nicht. Nachweis `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten
   ohne Sprung“).
 - **Ein leeres Feld muss sagen, dass man es schreiben kann** (Listenform LLH-1791, Spec

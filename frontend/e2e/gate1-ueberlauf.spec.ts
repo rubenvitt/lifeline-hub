@@ -1711,10 +1711,16 @@ test.describe('Gate 1 · Aktion im Bild (LLH-1789)', () => {
         const flaeche = page.getByRole('region', { name: region, exact: true });
         const zeile = flaeche.locator('tr.ant-table-row').first();
         await expect(zeile).toBeVisible();
-        const rahmen = (await flaeche
-          .locator('.ant-table-body, .ant-table-content')
-          .first()
-          .boundingBox())!;
+        const koerper = flaeche.locator('.ant-table-body, .ant-table-content').first();
+        if (breite === 1440 && pfad === 'evakuierung') {
+          // Spec-Szenario „Evakuierung am Fükw“: mit offenem Modulpanel (ab `xl` Vorgabe) und
+          // einer Tabelle, die breiter ist als ihr Rahmen; sonst hielte der Test auch ohne
+          // Fixierung (Fix-Review LLH-1721).
+          await expect(page.locator('[data-lfh="modul-panel"]')).toBeVisible();
+          const ueber = await koerper.evaluate((el) => el.scrollWidth - el.clientWidth);
+          expect(ueber, 'Vorbedingung: die Bezirkstabelle läuft waagerecht über').toBeGreaterThan(0);
+        }
+        const rahmen = (await koerper.boundingBox())!;
         for (const ziel of [
           zeile.getByRole('button', { name: primaer }),
           zeile.getByRole('button', { name: menue }),

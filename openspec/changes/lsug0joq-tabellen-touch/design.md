@@ -89,9 +89,18 @@ kontrollierten antd-`Popover` am Wertknopf (`trigger` leer, `placement="bottomLe
   Fokus zurück, und die zweite öffnet nicht.
 - Die Zeilenschleuse hält die Folge: `checkVerlassen` (`useZuflussSchleuse`) prüft das
   Fokusziel am DOM und nimmt `.ant-popover` wie die Menü-Overlays als „in der Sicht“ (im
-  Review vor dem PR nachgetragen; vorher taute der Fokus im Popover die Schleuse).
+  Review vor dem PR nachgetragen; vorher taute der Fokus im Popover die Schleuse). Ohne Fokus
+  (Tipp ins Freie am Tablet) hält die offene Bearbeitung selbst: `AngabeFormProvider` meldet sie
+  über `onOffen`, `KatalogTabelle` reicht das als `onBearbeitungOffen` an die `Datensicht`, die es
+  in `halten` nimmt (Fix-Review).
 - Tab aus dem Popover geht zum nächsten Ziel nach der Zelle, Shift+Tab vom ersten Ziel zurück
-  auf die Anzeige; sonst liefe der Fokus ans Ende des Dokuments.
+  auf die Anzeige; sonst liefe der Fokus ans Ende des Dokuments. Eine unveränderte Bearbeitung
+  schließt dabei, offen stünde das Popover über den nächsten Zielen. Eine geänderte hält den
+  Fokus: Tab läuft im Popover im Kreis, Shift+Tab geht auf die Anzeige, und Enter dort führt in
+  die offene Bearbeitung zurück (Fix-Review).
+- Die Fokusrückgabe nach dem Schließen gilt eine Frist (1,5 s) statt einer Zahl von Renders und
+  endet mit einem Zeigerdruck anderswo; ein späterer Render (neuer FMS-Status) holt den Fokus
+  sonst noch Minuten danach zurück (Fix-Review).
 - `BemerkungZelle` liest den Kontext nicht.
 
 Verworfen: eine Zelle fester Größe mit ✓/✕. Zwei 72-px-Knöpfe sprengen in `handschuh` eine

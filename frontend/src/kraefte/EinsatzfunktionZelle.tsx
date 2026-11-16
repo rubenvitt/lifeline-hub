@@ -54,7 +54,7 @@ export default function EinsatzfunktionZelle({
   onSpeichern,
 }: EinsatzfunktionZelleProps) {
   const { token } = theme.useToken();
-  const [offen, setOffen] = useState(false);
+  const [isOffen, setOffen] = useState(false);
   const angabeForm = useAngabeForm().form;
   const wert = einsatzfunktion ?? '';
   const qualifikation = funktion ? (
@@ -69,7 +69,7 @@ export default function EinsatzfunktionZelle({
   // Im Fluss (Karte) ersetzt die offene Eingabe den Auslöser samt Qualifikation; dann steht sie
   // darunter, damit beide sichtbar bleiben (Spec `personal-einsatzangaben`). Schwebend in der
   // Tabelle bleibt der Auslöser stehen.
-  const imFluss = angabeForm === 'fluss';
+  const isFluss = angabeForm === 'fluss';
 
   return (
     <div style={{ minWidth: 0 }}>
@@ -123,7 +123,7 @@ export default function EinsatzfunktionZelle({
           />
         )}
       />
-      {leerMitQualifikation && !(offen && imFluss) ? null : qualifikation}
+      {leerMitQualifikation && !(isOffen && isFluss) ? null : qualifikation}
     </div>
   );
 }

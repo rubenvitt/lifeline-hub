@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 
 /**
  * Wie eine `InlineAngabe` ihre Bearbeitung zeigt (LLH-1795, Change `lsug0joq-tabellen-touch`, D2):
@@ -32,8 +32,25 @@ interface Kontext {
 const FLUSS: Kontext = { form: 'fluss', oeffne: () => true, schliesse: () => {} };
 const AngabeFormKontext = createContext<Kontext>(FLUSS);
 
-export function AngabeFormProvider({ form, children }: { form: AngabeForm; children: ReactNode }) {
-  const offen = useRef<OffeneAngabe | null>(null);
+export function AngabeFormProvider({
+  form,
+  onOffen,
+  children,
+}: {
+  form: AngabeForm;
+  /**
+   * Meldet, ob eine schwebende Bearbeitung offen ist. Die `Datensicht` hält damit ihre
+   * Zeilenfolge, auch wenn der Fokus das Popover verlassen hat (Touch, Klick ins Freie;
+   * `frontend/AGENTS.md`, „Popover einer Zeile hält wie Fokus“).
+   */
+  onOffen?: (isOffen: boolean) => void;
+  children: ReactNode;
+}) {
+  const openRef = useRef<OffeneAngabe | null>(null);
+  const onOffenRef = useRef(onOffen);
+  useEffect(() => {
+    onOffenRef.current = onOffen;
+  });
   const wert = useMemo<Kontext>(
     () =>
       form === 'fluss'
@@ -41,7 +58,7 @@ export function AngabeFormProvider({ form, children }: { form: AngabeForm; child
         : {
             form,
             oeffne: (angabe) => {
-              const vorige = offen.current;
+              const vorige = openRef.current;
               if (vorige && vorige !== angabe) {
                 if (vorige.geaendert()) {
                   vorige.fokus();
@@ -49,11 +66,14 @@ export function AngabeFormProvider({ form, children }: { form: AngabeForm; child
                 }
                 vorige.schliessen();
               }
-              offen.current = angabe;
+              openRef.current = angabe;
+              onOffenRef.current?.(true);
               return true;
             },
             schliesse: (angabe) => {
-              if (offen.current === angabe) offen.current = null;
+              if (openRef.current !== angabe) return;
+              openRef.current = null;
+              onOffenRef.current?.(false);
             },
           },
     [form],

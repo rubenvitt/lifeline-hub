@@ -228,6 +228,12 @@ export type KatalogTabelleProps<T> = Omit<
    * ihr Kontextmenü selbst an.
    */
   zeilenMenue?: WeitereAktionen<T>;
+  /**
+   * Meldet, ob in einer Zelle eine schwebende Bearbeitung offen ist (`components/angabeForm.tsx`).
+   * `Datensicht` hält damit die Zeilenfolge (Spec `einsatztauglichkeit-layout`, „Bearbeiten in
+   * einer Tabellenzelle verschiebt die Tabelle nicht“).
+   */
+  onBearbeitungOffen?: (isOffen: boolean) => void;
 };
 
 /**
@@ -811,6 +817,7 @@ export default function KatalogTabelle<T extends object>({
   gedaechtnis,
   mehrzahl,
   zeilenMenue,
+  onBearbeitungOffen,
   ...rest
 }: KatalogTabelleProps<T>) {
   const [suchbegriff, setSuchbegriff] = useState(() => gedaechtnis?.start.suche ?? '');
@@ -1013,21 +1020,21 @@ export default function KatalogTabelle<T extends object>({
             ('filters' in gebaut && gebaut.filters != null) ||
             ('filterDropdown' in gebaut && gebaut.filterDropdown != null),
         });
-        const gehoben = mitKopfMindestBreite(gebaut, mindest) as KatalogSpalte<T>;
-        if (gehoben.width != null || gehoben.mindestBreite != null) return gehoben;
+        const withMinWidth = mitKopfMindestBreite(gebaut, mindest) as KatalogSpalte<T>;
+        if (withMinWidth.width != null || withMinWidth.mindestBreite != null) return withMinWidth;
         // Ohne Breite trägt der Körper seine `max-content`-Breite; die Mindestbreite des Kopfs
         // steht dann als `min-width` an Kopf- und Körperzelle, sonst würde der feste Kopf gekürzt.
-        const eigenZelle = gehoben.onCell;
-        const eigenKopf = gehoben.onHeaderCell;
+        const callerOnCell = withMinWidth.onCell;
+        const callerOnHeaderCell = withMinWidth.onHeaderCell;
         return {
-          ...gehoben,
+          ...withMinWidth,
           onCell: (zeile: T, i?: number) => {
-            const basis = eigenZelle?.(zeile, i) ?? {};
-            return { ...basis, style: { ...basis.style, minWidth: mindest } };
+            const base = callerOnCell?.(zeile, i) ?? {};
+            return { ...base, style: { ...base.style, minWidth: mindest } };
           },
-          onHeaderCell: (spalte: Parameters<NonNullable<typeof eigenKopf>>[0]) => {
-            const basis = eigenKopf?.(spalte) ?? {};
-            return { ...basis, style: { ...basis.style, minWidth: mindest } };
+          onHeaderCell: (spalte: Parameters<NonNullable<typeof callerOnHeaderCell>>[0]) => {
+            const base = callerOnHeaderCell?.(spalte) ?? {};
+            return { ...base, style: { ...base.style, minWidth: mindest } };
           },
         } as KatalogSpalte<T>;
       }
@@ -1425,7 +1432,7 @@ export default function KatalogTabelle<T extends object>({
       <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
         {/* Inline-Angaben in Zellen schweben (LLH-1795): die Bearbeitung öffnet an der Zelle, die
             Spalten bleiben stehen. Aufgeklappte Zeilen sind eine Ansicht und bleiben im Fluss. */}
-        <AngabeFormProvider form="schwebend">
+        <AngabeFormProvider form="schwebend" onOffen={onBearbeitungOffen}>
           <Table<T>
             {...rest}
             expandable={aufklappImFluss}

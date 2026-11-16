@@ -961,6 +961,16 @@ describe('FahrzeugePage', () => {
       expect(within(kennungsZelle(container)).queryByText('LF 20')).toBeNull();
     });
 
+    it('ab xxl von Hand abgewählt: der Typ steht wieder unter dem Funkrufnamen', async () => {
+      setzeViewportBreite(1920);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Typ' }));
+      await waitFor(() => expect(screen.queryByRole('columnheader', { name: /^Typ/ })).toBeNull());
+      expect(within(kennungsZelle(container)).getByText('LF 20')).toBeInTheDocument();
+    });
+
     it('die Suche trifft den Typ auch, wenn er nur unter dem Funkrufnamen steht', async () => {
       setzeViewportBreite(1440);
       const { container } = render(einsatz());

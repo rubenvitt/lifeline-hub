@@ -9,8 +9,9 @@ quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/Fahrzeug
 
 Das Modul **Fahrzeuge** führt alle Fahrzeuge, die im Einsatz disponiert sind, aus dem Fahrzeugstamm
 der Organisation oder ad hoc erfasst. Je Fahrzeug stehen Funkrufname, Einheit, FMS-Status und
-Besatzung. Der Typ steht unter 1600 px Fensterbreite unter dem Funkrufnamen, ab 1600 px in
-einer eigenen Spalte. Abschnitt, „Seit“ (wann der Status gesetzt wurde), Kennzeichen und Träger
+Besatzung. Der Typ steht ab 1600 px Fensterbreite in einer eigenen Spalte, darunter unter dem
+Funkrufnamen; wer die Spalte „Typ“ selbst ein- oder ausblendet, findet ihn immer genau an einer
+der beiden Stellen. Abschnitt, „Seit“ (wann der Status gesetzt wurde), Kennzeichen und Träger
 stehen erst ab 1600 px in der Liste, darunter lassen sie sich wie die Bemerkung unter „Spalten“
 einblenden. Der Knopf heißt „Spalten“, solange niemand selbst etwas ein- oder ausgeblendet hat;
 danach nennt er, wie viele Spalten verborgen sind. Am rechten Rand der Tabelle steht das Menü

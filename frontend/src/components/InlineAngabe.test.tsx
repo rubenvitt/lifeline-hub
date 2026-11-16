@@ -975,7 +975,7 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
     );
   });
 
-  it('Tab vom letzten Knopf geht zum nächsten Ziel nach der Zelle, Shift+Tab vom Feld zurück zur Zelle', async () => {
+  it('unverändert: Tab vom letzten Knopf schließt und geht zum nächsten Ziel nach der Zelle, Shift+Tab vom Feld schließt und geht zur Zelle', async () => {
     renderMitProviders(
       schwebend(
         <>
@@ -984,21 +984,100 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
         </>,
       ),
     );
+    const wertKnopf = screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' });
+    await userEvent.click(wertKnopf);
+    await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    screen
+      .getByRole('button', { name: 'Bearbeitung von Leitstellen-Nr. zu Anna abbrechen' })
+      .focus();
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'nächste Zelle' })).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
+    );
+    // Das Popover stünde sonst über den nächsten Zielen; der Fokus bleibt, wo Tab ihn hinlegte.
+    expect(screen.getByRole('button', { name: 'nächste Zelle' })).toHaveFocus();
+
+    await userEvent.click(wertKnopf);
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    feld.focus();
+    await userEvent.tab({ shift: true });
+    expect(wertKnopf).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
+    );
+  });
+
+  it('geändert: Tab bleibt im Popover, Shift+Tab geht zur Zelle, Enter dort führt in die offene Bearbeitung zurück', async () => {
+    renderMitProviders(
+      schwebend(
+        <>
+          <Zelle wert="ILS-1" />
+          <button type="button">nächste Zelle</button>
+        </>,
+      ),
+    );
+    const wertKnopf = screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' });
+    await userEvent.click(wertKnopf);
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    await userEvent.type(feld, 'x');
+    screen
+      .getByRole('button', { name: 'Bearbeitung von Leitstellen-Nr. zu Anna abbrechen' })
+      .focus();
+    await userEvent.tab();
+    expect(feld).toHaveFocus();
+    await userEvent.tab({ shift: true });
+    expect(wertKnopf).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toHaveValue('ILS-1x');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(feld).toHaveFocus());
+    expect(feld).toHaveValue('ILS-1x');
+  });
+
+  it('ein späterer Render holt den Fokus nicht zurück, wenn danach woanders hingeklickt wurde', async () => {
+    const ansicht = renderMitProviders(
+      schwebend(
+        <>
+          <Zelle wert="ILS-1" />
+          <button type="button">daneben</button>
+        </>,
+      ),
+    );
+    const wertKnopf = screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' });
+    await userEvent.click(wertKnopf);
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    fireEvent.keyDown(feld, { key: 'Escape' });
+    await waitFor(() => expect(wertKnopf).toHaveFocus());
+    const daneben = screen.getByRole('button', { name: 'daneben' });
+    await userEvent.click(daneben);
+    daneben.blur();
+    expect(document.activeElement).toBe(document.body);
+    // Ein neuer Stand der Zeile (etwa ein FMS-Status) rendert die Zelle neu.
+    ansicht.rerender(
+      schwebend(
+        <>
+          <Zelle wert="ILS-2" />
+          <button type="button">daneben</button>
+        </>,
+      ),
+    );
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it('meldet über onOffen, ob eine Bearbeitung offen ist', async () => {
+    const onOffen = vi.fn();
+    renderMitProviders(
+      <AngabeFormProvider form="schwebend" onOffen={onOffen}>
+        <Zelle wert="ILS-1" />
+      </AngabeFormProvider>,
+    );
     await userEvent.click(
       screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
     );
     const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
-    const abbrechen = screen.getByRole('button', {
-      name: 'Bearbeitung von Leitstellen-Nr. zu Anna abbrechen',
-    });
-    abbrechen.focus();
-    await userEvent.tab();
-    expect(screen.getByRole('button', { name: 'nächste Zelle' })).toHaveFocus();
-    feld.focus();
-    await userEvent.tab({ shift: true });
-    expect(
-      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
-    ).toHaveFocus();
+    expect(onOffen).toHaveBeenLastCalledWith(true);
+    fireEvent.keyDown(feld, { key: 'Escape' });
+    await waitFor(() => expect(onOffen).toHaveBeenLastCalledWith(false));
   });
 
   it('ohne Kontext bleibt die Bearbeitung im Fluss', async () => {
