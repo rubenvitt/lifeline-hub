@@ -1182,12 +1182,23 @@ export default function KraefteuebersichtPage() {
     (abschnitteQuery.data ?? []).find((a) => a.id === aid)?.name ?? `Abschnitt ${aid}`;
   const chips = aktiveFilterChips(filter, abschnittName);
   const gefiltert = chips.length > 0;
-  /** „Kräfte" = Personal + Fahrzeuge, kein Material (eigene Statusachse). */
-  const sichtbareKraefte = v.anzahlPersonal + v.anzahlFahrzeuge;
-  const alleKraefte = gesamt.anzahlPersonal + gesamt.anzahlFahrzeuge;
-  /** Fehlt eine der beiden Listen (gesperrt, unbekannt, noch nicht da), ist die Zahl unbekannt. */
-  const kraefteBekannt =
-    personalBekannt && frei.fahrzeuge !== false && fahrzeugeQuery.data !== undefined;
+  /**
+   * „Kräfte“ sind Köpfe, die Fahrzeuge zählen eigens (LLH-1744, Spec `lage-verdichtung`), Material
+   * gar nicht (eigene Statusachse). Eine unbekannte Liste zeigt „—“, nie 0; gesperrte Fahrzeuge
+   * fallen weg, der Sperrhinweis steht daneben.
+   */
+  const auswahlText = [
+    personalBekannt
+      ? `${v.anzahlPersonal} von ${gesamt.anzahlPersonal} Kräften`
+      : '— von — Kräften',
+    ...(frei.fahrzeuge === false
+      ? []
+      : [
+          fahrzeugeQuery.data !== undefined
+            ? `${v.anzahlFahrzeuge} von ${gesamt.anzahlFahrzeuge} Fahrzeugen`
+            : '— von — Fahrzeugen',
+        ]),
+  ].join(' · ');
   // Rekursiv (D12): eine Untereinheit ist eine Einheit der Auswahl.
   const einheitenZeilen = einheitZeilen(raster).filter((z) => z.einheitId != null).length;
   /** Die zwei Filter hinter „Filter (n)“ — Abschnitt steht im Kopf, die Suche offen. */
@@ -1402,9 +1413,7 @@ export default function KraefteuebersichtPage() {
             marginBlockEnd: token.margin,
           }}
         >
-          <span style={{ color: token.colorTextSecondary }}>
-            {kraefteBekannt ? `${sichtbareKraefte} von ${alleKraefte} Kräften` : '— von — Kräften'}
-          </span>
+          <span style={{ color: token.colorTextSecondary }}>{auswahlText}</span>
           {mittelGesperrt && (
             <span
               id={sperreId}
