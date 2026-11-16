@@ -538,7 +538,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   der Voreinstellung der Seite und der Breite folgt, heißt der Schalter „Spalten“, danach
   „Spalten · n ausgeblendet“ mit allen verborgenen (`weichtVonVorgabeAb` in
   `components/SpaltenSchalter.tsx`; die Seite reicht `spaltenAusVoreinstellung` durch). Auf schmalem Schirm
-  **angepasst, nicht in Karten aufgelöst**. Träger `KatalogTabelle`/`Datensicht`.
+  **angepasst, nicht in Karten aufgelöst**; ausgenommen sind Flächen mit `form="auto"`, deren
+  Zeile am Handy nicht trägt (Fahrzeuge, Personal, seit LLH-1787 die Einheitenliste mit Baum als
+  Karten). Träger `KatalogTabelle`/`Datensicht`.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
@@ -575,8 +577,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
   Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
 - **Die Hauptaktion einer Zeile bleibt im Bild** (LLH-1789, Spec `einsatztauglichkeit-layout`,
-  Change `lsug0joq-tabellen-touch` D1): die Aktionsspalte trägt `amEnde` und steht ab `md` rechts
-  fixiert; unter `md` ziehen Primäraktion und ⋮ in die fixierte Kennung (`Datensicht`), eine
+  Change `lsug0joq-tabellen-touch` D1): die Aktionsspalte einer `Datensicht` trägt `amEnde` und
+  steht ab `md` rechts fixiert (direkte `KatalogTabelle`-Nutzer setzen `fixed: 'right'` selbst); unter `md` ziehen Primäraktion und ⋮ in die fixierte Kennung (`Datensicht`), eine
   zweite fixierte Spalte gibt es dort nicht. Spalte mit Primäraktion über
   `components/aktionsSpalte.tsx` (Breite je Stufe gerechnet, aus `PrimaerAktion`/`WeitereAktionen`
   wie Karte und Kontextmenü); eine reine ⋮-Spalte (`menueSpaltenBreite`) setzt nur `amEnde`.
