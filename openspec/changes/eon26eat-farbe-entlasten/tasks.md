@@ -20,13 +20,13 @@ ist. Pfade im Frontend relativ zu `frontend/src/`. Entscheidungen D1–D9 in `de
 - [x] 2.5 `kommunikation/kartenKante.ts`: `phaseTon(…, unbearbeitet)` → `neutral`, Eingangskante `linieStark` (D4); `kartenKante.test.ts`, `badges.test.tsx`, `meldungen/MeldungKarte.test.tsx`, `auftraege/AuftragListe.test.tsx` und `KommKarte`-Tests nachziehen; Test „dringende neue Meldung zeigt die Priorität gelb“ grün
 - [ ] 2.6 D3-Liste in `theme/statusFarben.ts` umstellen (`schadenStatus.offen`, `belegungsArt.austritt`, `etbTyp.anordnung`, `raeumungszustand.laeuft`, `brAbgerufen`) samt Dateikommentaren; Tests der betroffenen Seiten nachziehen. Prüfen, dass keine Zählung (`materialVerdichtungKern`, Warnsperre, `aktiveWarnung`) an einer dieser Rollen hängt
 - [ ] 2.7 Übrige Tests mit „gebunden → achtung“ nachziehen (`kraefte/Verdichtungszeile.test.tsx`, `components/StatusWahl.test.tsx`, `pages/lagekarte/leistenDaten.test.ts` u. a., per `grep`); `e2e/kraefte-kontrast.spec.ts` (gebunden) auf `neutral` umstellen und grün
-- [ ] 2.8 `frontend/AGENTS.md`, „Farbe und Zeichen“: Bedeutung der Rollen (Gelb = bald handeln, Rot = abnorm, Normalbetrieb nie Gelb), Sprechwunsch-Ausnahme, Verweis auf Spec `statusrollen`; `docs/design/2026-09-21-neuentwurf/umsetzung.md` Palette „gebunden“ mit Nachtrag auf diese Change; Prettier grün
+- [x] 2.8 `frontend/AGENTS.md`, „Farbe und Zeichen“: Bedeutung der Rollen (Gelb = bald handeln, Rot = abnorm, Normalbetrieb nie Gelb), Sprechwunsch-Ausnahme, Verweis auf Spec `statusrollen`; `docs/design/2026-09-21-neuentwurf/umsetzung.md` Palette „gebunden“ mit Nachtrag auf diese Change; Prettier grün
 
 ## 3. wnha7f8n (LLH-1784): Ortsmarke in der Bedienfarbe
 
 - [x] 3.1 `theme/tokens.ts` und `theme/rollen.css`: `rahmenFarben.bedien` / `--lfh-rahmen-bedien` (D7); `rollen.guard.test.ts`, Schlüsselliste in `theme/rahmenKontrast.test.ts` und Nachweis „Marke ≥ 3 : 1 gegen `aktiv` und `grund`“ rot→grün
 - [x] 3.2 `einsatz/IconRail.tsx` (`railZielStil`), `einsatz/ModulAkkordeon.tsx`, `geraet/GeraeteLayout.tsx` auf die Bedienrolle; Tests `IconRail.test.tsx` („markiert die aktive Kategorie“) und `ModulAkkordeon.test.tsx` umschreiben, rot→grün; Kommentar „DIE AKTIVE MARKE IST ROT“ berichtigen
-- [ ] 3.3 `docs/design/2026-09-21-neuentwurf/umsetzung.md` Entscheidung 2 und Palette `marke` mit Nachtrag; `frontend/AGENTS.md` Gestaltungssprache (Rahmen): Ortsmarke in `bedien`; Prettier grün
+- [x] 3.3 `docs/design/2026-09-21-neuentwurf/umsetzung.md` Entscheidung 2 und Palette `marke` mit Nachtrag; `frontend/AGENTS.md` Gestaltungssprache (Rahmen): Ortsmarke in `bedien`; Prettier grün
 
 ## 4. q7tef1db (LLH-1785): Sichtungswahl
 
@@ -39,7 +39,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`. Entscheidungen D1–D9 in `de
 
 ## 5. Erzeugtes und Integration
 
-- [ ] 5.1 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), `designSystem.guard.test.ts` grün, Erzeugtes mitcommitten
+- [x] 5.1 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), `designSystem.guard.test.ts` grün, Erzeugtes mitcommitten
 - [ ] 5.2 Anwenderbilder der Kapitel Kräfte, Arbeitsfläche und Kommunikation über den Bildlauf neu erzeugen (`docs/anwender/AGENTS.md`); Wächter der Anwenderdoku grün
 - [ ] 5.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
