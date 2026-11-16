@@ -275,6 +275,81 @@ describe('EinsatzabschnittePage', () => {
     expect(within(inkl).getByText('1/3/4//8')).toBeInTheDocument();
   });
 
+  /**
+   * Ein Abschnitt zählt, wer in ihm steht (LLH-1744): Die Sanitätsgruppe ist dem Zug in Nord
+   * unterstellt, steht aber selbst in „UHS Turnhalle“. Knoten, Stärke und Liste zählen sie dort,
+   * mit ihrer eigenen Stärke — nicht „0/0/0//0 · 1 Einheit direkt“.
+   */
+  it('zählt eine abgestellte Untereinheit bei ihrem eigenen Abschnitt', async () => {
+    const einheit = (
+      id: number,
+      name: string,
+      abschnitt: number,
+      ueber: number | null,
+      ist: number[],
+      kum: number[],
+    ) => ({
+      id,
+      einsatz_id: 1,
+      name,
+      abschnitt_id: abschnitt,
+      ueber_einheit_id: ueber,
+      ist: { fuehrer: ist[0], unterfuehrer: ist[1], mannschaft: ist[2] },
+      ist_kumuliert: { fuehrer: kum[0], unterfuehrer: kum[1], mannschaft: kum[2] },
+      sortier: id,
+      sprechgruppen: [],
+      verbindungen: [],
+      fahrzeug_mitglieder: [],
+      personal_mitglieder: [],
+      material_mitglieder: [],
+    });
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        {
+          id: 5,
+          einsatz_id: 1,
+          ueber_abschnitt_id: null,
+          name: 'Nord',
+          leiter_id: null,
+          leiter_name: null,
+          bemerkung: null,
+          sortier: 0,
+        },
+        {
+          id: 6,
+          einsatz_id: 1,
+          ueber_abschnitt_id: 5,
+          name: 'UHS Turnhalle',
+          leiter_id: null,
+          leiter_name: null,
+          bemerkung: null,
+          sortier: 1,
+        },
+      ]),
+    );
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([
+          einheit(1, 'Sanitätszug', 5, null, [1, 0, 2], [1, 1, 3]),
+          einheit(2, 'Sanitätsgruppe UHS', 6, 1, [0, 1, 1], [0, 1, 1]),
+        ]),
+      ),
+    );
+    renderPage();
+    const knoten = await findInTree('UHS Turnhalle');
+    const zeile = knoten.closest<HTMLElement>('.ant-tree-treenode')!;
+    expect(within(zeile).getByText('0/1/1//2')).toBeInTheDocument();
+    expect(within(zeile).getByText('1 Einheit direkt')).toBeInTheDocument();
+
+    await userEvent.click(knoten);
+    const eigene = screen
+      .getByText('Stärke (F/UF/M//Σ)')
+      .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
+    expect(within(eigene).getByText('0/1/1//2')).toBeInTheDocument();
+    expect(screen.getByText('Sanitätsgruppe UHS')).toBeInTheDocument();
+    expect(screen.queryByText('Sanitätszug')).not.toBeInTheDocument();
+  });
+
   it('selektiert per ?abschnitt=<id> den Abschnitt (LFH-25 Inspector-Deeplink)', async () => {
     server.use(...handlers());
     renderMitProviders(

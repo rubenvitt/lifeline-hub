@@ -367,6 +367,23 @@ describe('Raster als Kräftebaum', () => {
     });
   };
 
+  it('eine abgestellte Gruppe steht als Wurzel mit „aus …“, der Zug zählt sie nicht (LLH-1744)', () => {
+    const e = zugMitGruppen();
+    // Zug 1 und Gr 2 in Abschnitt 10; Gr 3 selbst im Abschnitt 20.
+    const abgestellt = eingabe({
+      ...e,
+      abschnitte: [ab(10), ab(20)],
+      einheiten: [eh(1, 10, null, { name: 'Zug 1' }), eh(2, null, 1), eh(3, 20, 1)],
+    });
+    const wurzeln = baueMeldebildRaster(abgestellt).filter((z) => z.art === 'einheit');
+    expect(wurzeln.map((z) => z.key)).toEqual(['eh-1', 'eh-3']);
+    expect(staerkeText(wurzeln[0].staerke)).toBe('1/2/10//13');
+    expect(wurzeln[0].abgestelltAus).toBeNull();
+    expect(staerkeText(wurzeln[1].staerke)).toBe('0/1/8//9');
+    expect(wurzeln[1].abgestelltAus).toBe('Zug 1');
+    expect(wurzeln[1].abschnitt).toBe('A20');
+  });
+
   it('die Elternzeile kumuliert, Kinder tragen ihre eigene Teilsumme, Σ Wurzeln = Kopf', () => {
     const e = zugMitGruppen();
     const [zug] = baueMeldebildRaster(e);

@@ -11,9 +11,9 @@ import type {
 } from '../api/types';
 import { kraefteText, staerkeText } from '../anzeige/staerke';
 import {
-  abschnittDerObersten,
+  abschnittDerEinheit,
   besatzungText,
-  einheitenBaum,
+  loeseAbgestellte,
   filterAktive,
   needsOhneFahrzeugKnoten,
   fremdText,
@@ -317,7 +317,14 @@ function baueEinheitZeile(
     gesammeltesSoll = addSoll(gesammeltesSoll, eigenesSoll);
   }
 
-  const detail = [einheit.typ_label, einheit.fuehrer_name].filter(Boolean).join(' · ') || null;
+  const detail =
+    [
+      einheit.typ_label,
+      einheit.fuehrer_name,
+      knoten.abgestelltAus ? `aus ${knoten.abgestelltAus.name}` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || null;
 
   const zeile: MeldebildZeile = {
     key: `eh-${einheit.id}`,
@@ -434,12 +441,13 @@ export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
   const s = f.suche.trim().toLowerCase();
   const treffer = (txt: (string | null | undefined)[]) =>
     !s || txt.some((t) => t?.toLowerCase().includes(s));
-  // Eine Untereinheit zählt beim Abschnitt ihrer OBERSTEN Einheit (D11, LLH-1025; Spec
-  // `lage-verdichtung`): eine Gruppe ohne eigenen Abschnitt bleibt unter ihrem Zug, und keine
-  // Kraft steht in zwei Abschnitten. Über die ungefilterte Einheitenliste.
-  const obersterAbschnitt = abschnittDerObersten(roh.einheiten);
+  // Eine Einheit zählt bei ihrem wirksamen Abschnitt (LLH-1744, Spec `lage-verdichtung`): dem
+  // eigenen, sonst dem ihrer Obereinheit. Eine Gruppe ohne eigenen Abschnitt bleibt so unter ihrem
+  // Zug, eine abgestellte steht in ihrem Abschnitt, und keine Kraft steht in zwei. Über die
+  // ungefilterte Einheitenliste.
+  const wirksamerAbschnitt = abschnittDerEinheit(roh.einheiten);
   const einheitErlaubt = (e: Einheit) =>
-    f.abschnittId == null || obersterAbschnitt.get(e.id) === f.abschnittId;
+    f.abschnittId == null || wirksamerAbschnitt.get(e.id)?.id === f.abschnittId;
   const erlaubteEinheiten = new Set(roh.einheiten.filter(einheitErlaubt).map((e) => e.id));
   const abschnittOk = (einheit_id: number | null | undefined) =>
     f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id));
@@ -756,7 +764,9 @@ export function baueKraeftebild(
   // nicht in der Liste) wird Wurzel, ein Zyklus verliert keine Einheit — so zählt die
   // Kräftegliederung dieselben Kräfte wie die Gesamtstärke. Wurzeln je Abschnitt (D11).
   const wurzelnByAbschnitt = new Map<number | null, EinheitKnoten[]>();
-  for (const knoten of einheitenBaum(einheiten, abschnitte)) {
+  // Abgestellte Untereinheiten stehen in ihrem eigenen Abschnitt (LLH-1744): so ergibt jede
+  // Abschnittszeile dieselbe Stärke wie `abschnittStaerken`, und jede Kraft steht einmal.
+  for (const knoten of loeseAbgestellte(einheiten, abschnitte, quelle.einheiten ?? alleEinheiten)) {
     const key = knoten.abschnittId;
     if (!wurzelnByAbschnitt.has(key)) wurzelnByAbschnitt.set(key, []);
     wurzelnByAbschnitt.get(key)!.push(knoten);

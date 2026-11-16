@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Einheit, Einsatzabschnitt } from '../../api/types';
-import { abschnittStaerken, nachfahrenInkl } from './abschnittStaerke';
+import { abschnittStaerken, einheitenImAbschnitt, nachfahrenInkl } from './abschnittStaerke';
 
 function abschnitt(id: number, ueber: number | null): Einsatzabschnitt {
   return {
@@ -82,10 +82,10 @@ describe('abschnittStaerken', () => {
     });
   });
 
-  describe('unterstellte Einheiten zählen einmal, beim Abschnitt ihrer obersten Einheit (LFH-550)', () => {
+  describe('ein Abschnitt zählt, wer in ihm steht (LLH-1744)', () => {
     const unter = (
       id: number,
-      abschnittId: number,
+      abschnittId: number | null,
       ueber: number,
       f: number,
       uf: number,
@@ -104,17 +104,49 @@ describe('abschnittStaerken', () => {
       expect(s.inklUnter).toEqual({ fuehrer: 1, unterfuehrer: 2, mannschaft: 5 });
     });
 
-    it('anderer Abschnitt: zählt bei der obersten Einheit; der eigene Abschnitt zeigt 0/0/0, nicht „—“', () => {
+    it('anderer Abschnitt: die Untereinheit zählt dort, die Obereinheit nur sich selbst', () => {
       const e2 = [oben, unter(2, 6, 1, 0, 1, 3)];
+      expect(abschnittStaerken(a5, e2, 5).eigene).toEqual({
+        fuehrer: 1,
+        unterfuehrer: 1,
+        mannschaft: 2,
+      });
+      expect(abschnittStaerken(a5, e2, 6)).toEqual({
+        eigene: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 },
+        inklUnter: { fuehrer: 0, unterfuehrer: 1, mannschaft: 3 },
+      });
+    });
+
+    it('ohne eigenen Abschnitt erbt die Untereinheit den ihrer Obereinheit', () => {
+      const e2 = [oben, unter(2, null, 1, 0, 1, 3)];
       expect(abschnittStaerken(a5, e2, 5).eigene).toEqual({
         fuehrer: 1,
         unterfuehrer: 2,
         mannschaft: 5,
       });
-      expect(abschnittStaerken(a5, e2, 6)).toEqual({
-        eigene: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-        inklUnter: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
-      });
+      expect(abschnittStaerken(a5, e2, 6).eigene).toBeNull();
     });
+
+    it('unter einer aufgelösten Obereinheit erbt sie nichts, und die aufgelöste zählt nicht', () => {
+      const weg = { ...oben, aufgeloest_at: '2026-11-16T08:00:00Z' } as Einheit;
+      const e2 = [weg, unter(2, null, 1, 0, 1, 3)];
+      expect(abschnittStaerken(a5, e2, 5).eigene).toBeNull();
+    });
+  });
+});
+
+describe('einheitenImAbschnitt', () => {
+  const unter = (id: number, abschnittId: number | null, ueber: number) =>
+    ({ ...einheit(id, abschnittId, 0, 0, 1), ueber_einheit_id: ueber }) as Einheit;
+
+  it('nennt die Einheiten mit diesem wirksamen Abschnitt, ohne Unterabschnitte und ohne aufgelöste', () => {
+    const e = [
+      einheit(1, 5, 1, 0, 0),
+      unter(2, null, 1), // erbt 5
+      unter(3, 6, 1), // eigener Abschnitt 6
+      { ...einheit(4, 5, 0, 0, 1), aufgeloest_at: '2026-11-16T08:00:00Z' } as Einheit,
+    ];
+    expect(einheitenImAbschnitt(e, 5).map((x) => x.id)).toEqual([1, 2]);
+    expect(einheitenImAbschnitt(e, 6).map((x) => x.id)).toEqual([3]);
   });
 });

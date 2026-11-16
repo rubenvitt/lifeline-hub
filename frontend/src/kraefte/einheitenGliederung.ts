@@ -14,7 +14,10 @@ import type { TzEinheit } from './meldebildRaster';
  * abgebildet aus dem EINEN Kräftebaum-Kern (`kraeftebaumKern.ts`, `einheitenBaum`), nicht neu
  * gebaut. Nur Einheiten, keine Mittel: die Seite fragt „welche Einheit?“, das Meldebild „wie steht
  * jede Kraft da?“. Knotenfolge und Schlüssel (`eh-<id>`) gleichen den Einheitenzeilen des
- * Meldebilds; `einheitenGliederung.test.ts` pinnt das gegen `baueMeldebildRaster`.
+ * Meldebilds; `einheitenGliederung.test.ts` pinnt das gegen `baueMeldebildRaster`. Einzige
+ * Ausnahme (LLH-1744): Eine abgestellte Untereinheit (eigener Abschnitt ungleich dem ihrer
+ * Obereinheit) löst sich im Meldebild vom Verband (`loeseAbgestellte`), hier bleibt sie darunter,
+ * denn die Zeile trägt die Verbandsstärke des Servers.
  *
  * IST VOM SERVER (Entscheidung LLH-1029): `ist_kumuliert` je Zeile — dieselbe Zahl wie auf der
  * Einheit-Ansicht, in den Abschnitten und in `summiereStaerke`. Die Form gleicht dem Meldebild
