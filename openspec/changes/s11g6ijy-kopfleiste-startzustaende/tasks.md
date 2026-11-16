@@ -15,7 +15,7 @@
 
 ## 3. Nachweis an der Kante
 
-- [ ] 3.1 e2e-Fall in `e2e/rahmen-cls-dichte.spec.ts`: zwei vorgemerkte Einträge, Abgleich zurückgehalten, Kante mit „WARTET 2“ suchen, dort neu laden; Seiten-CLS unter `HAUS_GRENZE` und „WARTET 2“ im Kopf; läuft lokal grün (bzw. ist ohne lauffähigen Stack mit Grund im PR vermerkt)
+- [x] 3.1 e2e-Fall in `e2e/rahmen-cls-dichte.spec.ts`: zwei vorgemerkte Einträge, Abgleich zurückgehalten, Kante mit „WARTET 2“ suchen, dort neu laden; Seiten-CLS unter `HAUS_GRENZE` und „WARTET 2“ im Kopf; läuft lokal grün (bzw. ist ohne lauffähigen Stack mit Grund im PR vermerkt)
 - [ ] 3.2 `./scripts/check-all.sh --geaendert --ohne-e2e` grün
 
 ## Workflow follow-up
