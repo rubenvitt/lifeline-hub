@@ -102,8 +102,12 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
 - [x] 5.4 Folgeaufgabe per `zunder-task-anlegen`: Ausfall-Regel an den Server, damit der Monitor
   sie zeigt (D6 B), an LLH-1746 hängen; Link im PR. Angelegt: LLH-1929
   (https://zunder.rubeen.dev/#/aufgabe/t31o93c2k279hpnglvh99q6y).
-- [ ] 5.5 `./scripts/check-all.sh --geaendert --ohne-e2e` grün;
-  `mise exec -- openspec validate t9jjrajy-alarmzeile-was-brennt --strict` grün.
+- [x] 5.5 `./scripts/check-all.sh --geaendert --ohne-e2e`: wegen des Plattenkontingents der
+  Cloud-Sitzung in Teilen gefahren, alle grün: Bündel `schnell`; Bündel `frontend` (zwei unter
+  Last zeitlich gescheiterte, fremde Tests einzeln grün); Rust-Suite je Testziel einzeln (lib und
+  alle 258 Integrationsziele, Desktop-Hülle und Dev-Seed nicht berührt, nicht gefahren); dazu die
+  betroffenen e2e-Specs (79 Tests). `mise exec -- openspec validate t9jjrajy-alarmzeile-was-brennt
+  --strict` grün.
 
 ## Workflow follow-up
 
