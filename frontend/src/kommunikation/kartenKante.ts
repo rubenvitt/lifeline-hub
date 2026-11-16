@@ -9,11 +9,13 @@ type KantenZustand = 'alarm' | 'unbearbeitet' | 'keine';
  * `unbearbeitet`, sonst die Rahmenlinie. Rein, damit der Vorrang ohne Rendern prüfbar ist.
  */
 export function kartenKante(
-  rollen: Pick<Farbrollen, 'alarm' | 'achtung' | 'linie'>,
+  rollen: Pick<Farbrollen, 'alarm' | 'linieStark' | 'linie'>,
   { alarm, unbearbeitet }: { alarm: boolean; unbearbeitet: boolean },
 ): { zustand: KantenZustand; farbe: string } {
   if (alarm) return { zustand: 'alarm', farbe: rollen.alarm };
-  if (unbearbeitet) return { zustand: 'unbearbeitet', farbe: rollen.achtung };
+  // Der Eingang ist Normalbetrieb: leise neutrale Kante statt Gelb (Spec `statusrollen`,
+  // Change `eon26eat-farbe-entlasten` D4). Dringliches zeigt die Priorität.
+  if (unbearbeitet) return { zustand: 'unbearbeitet', farbe: rollen.linieStark };
   return { zustand: 'keine', farbe: rollen.linie };
 }
 
@@ -41,10 +43,12 @@ export function kartenGrund(
 /**
  * Phase → Ton der Statusfläche. `in_arbeit` ist eine aktive Beziehung und trägt `bedien` (wie
  * `verfuegbarkeit.reserviert` in `theme/statusFarben.ts`); `ausnahme` ist `alarm`,
- * abgeschlossen `normal`, offen neutral. Der Eingangszustand schlägt die Phase und wird `achtung`.
+ * abgeschlossen `normal`, offen neutral. Der Eingangszustand schlägt die Phase und ist `neutral`
+ * (Spec `statusrollen`, eon26eat D4): ein Eingang ist Normalbetrieb, Dringliches zeigt
+ * {@link prioTon}.
  */
 export function phaseTon(phase: KommPhase, unbearbeitet = false): StatusTon {
-  if (unbearbeitet) return 'achtung';
+  if (unbearbeitet) return 'neutral';
   switch (phase) {
     case 'in_arbeit':
       return 'bedien';

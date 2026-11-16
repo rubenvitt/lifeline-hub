@@ -95,7 +95,12 @@ import {
   wetterPegelPfad,
 } from '../../routing/deeplinks';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { abschnittLagezustand, etbTyp, rollenFarbe } from '../../theme/statusFarben';
+import {
+  abschnittLagezustand,
+  etbTyp,
+  rollenFarbe,
+  statusKategorie,
+} from '../../theme/statusFarben';
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { grundWort } from '../../kraefte/meldebildRaster';
@@ -1070,7 +1075,8 @@ function abschnittGliederung(
   const status: Verteilungszeile[] = (
     [
       ['bereit', verteilung.bereit, 'normal'],
-      ['gebunden', verteilung.gebunden, 'bedien'],
+      // Rolle aus der Kategorie, nie fest: „gebunden“ ist überall dieselbe (Spec `statusrollen`).
+      ['gebunden', verteilung.gebunden, statusKategorie.gebunden.rolle],
       // Nicht „Ausfall“: den zählt das Meldebild an den Mitteln, er steht als Etikett im Kopf.
       ['nicht verfügbar', verteilung.nichtVerfuegbar, 'alarm'],
     ] as const

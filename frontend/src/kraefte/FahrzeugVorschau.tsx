@@ -7,6 +7,8 @@ import { Datenfeld, Datenraster } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import { VorschauZustand } from '../command-palette/VorschauZustand';
 import { fahrzeugStatusDarstellung } from './mittelStatus';
+import { globalKeys } from '../api/queryKeys';
+import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 
 /**
  * Lese-Vorschau eines disponierten Fahrzeugs in der Sprungpalette.
@@ -20,6 +22,10 @@ import { fahrzeugStatusDarstellung } from './mittelStatus';
 export default function FahrzeugVorschau({ einsatzId, id }: { einsatzId: number; id: number }) {
   const select = useCallback((liste: EinsatzFahrzeug[]) => liste.find((f) => f.id === id), [id]);
   const abfrage = useQuery({ ...datensatzAbfrage.fahrzeuge(einsatzId), select });
+  // Nur für den FMS-Anker: ein Sprechwunsch (S5, S0) ist gelb (Spec `statusrollen`).
+  const stati = useQuery({ queryKey: globalKeys.fahrzeugStatus(), queryFn: listeFahrzeugStatus });
+  const ankerVon = (f: EinsatzFahrzeug) =>
+    f.status_id != null ? stati.data?.find((s) => s.id === f.status_id)?.fms_anker : null;
 
   return (
     <VorschauZustand abfrage={abfrage} sorte="Das Fahrzeug">
@@ -29,7 +35,10 @@ export default function FahrzeugVorschau({ einsatzId, id }: { einsatzId: number;
             {f.funkrufname}
           </Datenfeld>
           <Datenfeld label="Status">
-            <StatusTag darstellung={fahrzeugStatusDarstellung(f)} farbe={f.status_farbe} />
+            <StatusTag
+              darstellung={fahrzeugStatusDarstellung(f, ankerVon(f))}
+              farbe={f.status_farbe}
+            />
           </Datenfeld>
           {f.fahrzeugtyp && <Datenfeld label="Fahrzeugtyp">{f.fahrzeugtyp}</Datenfeld>}
           {f.kennzeichen && (

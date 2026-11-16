@@ -23,7 +23,7 @@ import {
 } from '../meldungen/rueckmeldung';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { tonVonRolle, type StatusTon } from '../components/instrument/statusFlaeche';
-import { statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
+import { fahrzeugStatusRolle, statusKategorie, type BesatzungsUrteil } from '../theme/statusFarben';
 import { isAufgebraucht, materialDarstellung, mengeText } from './materialPosten';
 import { materialAusfall } from './materialVerdichtungKern';
 import { verdichte, type StaerkeSumme, type Rohdaten } from './kraeftebild';
@@ -189,9 +189,12 @@ export const OHNE_EINHEIT_SCHLUESSEL = 'eh-ohne';
 
 // ── Status einzelner Mittel ───────────────────────────────────────────────────
 
-function tonAusKategorie(k: StatusKategorie | null | undefined): StatusTon {
+function tonAusKategorie(
+  k: StatusKategorie | null | undefined,
+  fmsAnker: number | null = null,
+): StatusTon {
   if (!k) return 'neutral';
-  return tonVonRolle(statusKategorie[k].rolle) ?? 'neutral';
+  return tonVonRolle(fahrzeugStatusRolle(k, fmsAnker)) ?? 'neutral';
 }
 
 /**
@@ -225,7 +228,7 @@ export function fahrzeugStatus(
   }
   const anker = eintrag?.fms_anker ?? null;
   return {
-    ton: tonAusKategorie(kategorie),
+    ton: tonAusKategorie(kategorie, anker),
     wort: label != null ? fmsWort(label, anker) : statusKategorie[kategorie!].label,
     code: anker != null ? `S${anker}` : null,
   };
@@ -238,7 +241,7 @@ function codeVon(w: StatusWert | null | undefined): string | null {
 /** Ein Katalogeintrag als Chip-Beschreibung (Ton nur aus der Kategorie). */
 function statusWertAnzeige(w: StatusWert): MittelStatus {
   return {
-    ton: tonAusKategorie(w.kategorie),
+    ton: tonAusKategorie(w.kategorie, w.fms_anker ?? null),
     wort: fmsWort(w.label, w.fms_anker),
     code: codeVon(w),
   };

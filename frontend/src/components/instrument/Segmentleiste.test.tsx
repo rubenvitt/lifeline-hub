@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
-import { dichten } from '../../theme/tokens';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dichten, farbenDunkel, farbenHell } from '../../theme/tokens';
+import { kontrast } from '../../test/farbmass';
 import Segmentleiste, {
   SegmentUmschalter,
   naechsterIndex,
@@ -31,6 +35,10 @@ function Gesteuert({ rolle }: { rolle?: 'radiogroup' | 'tablist' }) {
   );
 }
 
+const sprache = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../theme/sprache.css'),
+  'utf-8',
+);
 describe('Segmentleiste', () => {
   it('ist eine benannte Radiogruppe mit genau einem gewählten Segment', () => {
     renderMitProviders(<Gesteuert />);
@@ -163,6 +171,19 @@ describe('Segmentleiste', () => {
       'rgb(19, 194, 194)',
     );
     expect(screen.getByRole('radio', { name: 'Meldung' }).style.boxShadow).toBe('');
+  });
+
+  it('gewählt trägt unten eine 2-px-Bedienkante, die nachts und am Tag ≥ 3 : 1 hält (eon26eat D6)', () => {
+    // Spec `farbrollen-kontrast`, „Das gewählte Segment trägt eine Bedienkante“: nachts hob sich
+    // das gewählte Segment nur mit 1,07 : 1 über die Fläche ab. Die Kante steht in der Klasse,
+    // eine Option mit eigener `kante` (ETB-Typ) überschreibt sie inline (Test oben).
+    const regel = sprache.match(/\.lfh-segment--aktiv\s*\{([^}]*)\}/);
+    expect(regel, 'Regel `.lfh-segment--aktiv` fehlt in sprache.css').not.toBeNull();
+    expect(regel![1]).toMatch(/box-shadow:\s*inset 0 -2px 0 var\(--lfh-bedien\);/);
+    expect(regel![1]).toMatch(/background:\s*var\(--lfh-flaeche-3\);/);
+    for (const farben of [farbenHell, farbenDunkel]) {
+      expect(kontrast(farben.bedien, farben.flaeche3)).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it('volle Breite (LLH-1642): Leiste als Block, jede Zelle wächst gleich; ohne bleibt sie inline', () => {

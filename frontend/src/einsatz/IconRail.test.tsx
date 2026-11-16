@@ -66,10 +66,11 @@ describe('IconRail', () => {
     expect(namen.every((n) => n && !n.endsWith('.gefuellt'))).toBe(true);
   });
 
-  // Die aktive Kategorie trägt eine 2-px-Marke in `marke` auf NEUTRALER Fläche; rot ist allein
-  // die Ortsmarke („Rot bedient nichts"). Gepinnt, weil der Gate-5-Hexscan nur sieht, DASS kein
-  // Literal dasteht, nicht welche Rolle gewählt wurde.
-  it('markiert die aktive Kategorie mit der roten Marke auf neutraler Fläche (Neuentwurf)', () => {
+  // Die aktive Kategorie trägt eine 2-px-Marke in der BEDIENFARBE auf NEUTRALER Fläche, wie das
+  // aktive Modul im Modulpanel (Spec `farbrollen-kontrast`, „Die Ortsmarke im Rahmen trägt die
+  // Bedienfarbe“; Change `eon26eat-farbe-entlasten` D7). Vorher Markenrot mit 2,28 : 1, gegen
+  // „Rot bedient nichts“. Gepinnt, weil der Gate-5-Hexscan nur sieht, DASS kein Literal dasteht.
+  it('markiert die aktive Kategorie mit der Bedienmarke auf neutraler Fläche (eon26eat D7)', () => {
     renderMitProviders(
       <>
         <TokenSonde />
@@ -78,10 +79,11 @@ describe('IconRail', () => {
     );
     const alarm = screen.getByTestId('token').getAttribute('data-alarm')!;
     const aktiv = screen.getByRole('button', { name: 'Lage' });
-    // Die Marke ist die Markenrolle, nicht die Alarmrolle — und nicht die Bedienfarbe.
+    // Die Marke ist die Bedienrolle des Rahmens, nicht die Alarm- und nicht die Markenrolle.
     expect(aktiv.style.boxShadow).toContain('2px 0 0');
-    expect(rahmenFarben.marke).toBe(farbenDunkel.marke);
-    expect(rahmenFarben.marke).not.toBe(alarm);
+    expect(rahmenFarben.bedien).toBe(farbenDunkel.bedien);
+    expect(rahmenFarben.bedien).not.toBe(alarm);
+    expect(rahmenFarben.bedien).not.toBe(farbenDunkel.marke);
     // Die FLÄCHE ist neutral (`flaeche3`), keine rote und keine blaue Vollfläche mehr.
     expect(aktiv).toHaveStyle({ backgroundColor: rahmenFarben.aktiv });
     expect(aktiv).not.toHaveStyle({ backgroundColor: farbenDunkel.bedien });

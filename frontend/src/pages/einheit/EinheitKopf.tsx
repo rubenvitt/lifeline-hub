@@ -38,7 +38,7 @@ import NichtUebernommenMarke from '../../kraefte/NichtUebernommenMarke';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../../kraefte/fmsTableauKern';
 import { einheitStaerkeUrteilVon } from '../../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
-import { einheitStaerkeUrteil, statusKategorie } from '../../theme/statusFarben';
+import { einheitStaerkeUrteil, kategorieDarstellung } from '../../theme/statusFarben';
 import { collectNachfahren } from './einheitAnsichtKern';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
@@ -481,7 +481,7 @@ function StatusZeile({
         darstellung={
           hand
             ? {
-                ...statusKategorie[hand.kategorie],
+                ...kategorieDarstellung(hand.kategorie, hand.fms_anker),
                 label: s.code ? `${s.code} · ${s.wort}` : s.wort,
               }
             : null

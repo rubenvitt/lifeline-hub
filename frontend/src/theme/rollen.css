@@ -38,15 +38,15 @@
 
 :root {
   /* ── Farbrollen · Tagmodus ─────────────────────────────────────────────── */
-  --lfh-grund: #e9ebee;
+  --lfh-grund: #e6e7e9;
   --lfh-flaeche: #ffffff;
-  --lfh-flaeche-2: #f5f6f8;
+  --lfh-flaeche-2: #f2f3f5;
   --lfh-linie: #d4d8dd;
   --lfh-linie-stark: #b9bfc6;
   --lfh-raster-linie: rgba(26, 95, 160, 0.07);
   --lfh-text: #111418;
-  --lfh-gedaempft: #363d45;
-  --lfh-schwach: #424a53;
+  --lfh-gedaempft: #323941;
+  --lfh-schwach: #3d454e;
   --lfh-bedien: #154e84;
   --lfh-alarm: #b02318;
   --lfh-achtung: #7a5200;
@@ -59,24 +59,24 @@
   --lfh-achtung-fuellung-stark: rgba(122, 82, 0, 0.2);
   --lfh-normal-fuellung: rgba(28, 102, 64, 0.07);
   /* Neuentwurf „Instrumententafel" (21.09.2026) — Rollen, Werte und Messwerte in tokens.ts. */
-  --lfh-kopf: #eef0f2;
-  --lfh-paneel: #f4f5f7;
-  --lfh-flaeche-3: #e1e4e8;
-  --lfh-text-2: #2b3138;
-  --lfh-steuer-rahmen: #79818a;
+  --lfh-kopf: #e6e7e9;
+  --lfh-paneel: #f2f3f5;
+  --lfh-flaeche-3: #dbdcde;
+  --lfh-text-2: #272d34;
+  --lfh-steuer-rahmen: #747c85;
   --lfh-bedien-hover: #185895;
-  --lfh-bedien-text: #144779;
+  --lfh-bedien-text: #114577;
   --lfh-auf-bedien: #ffffff;
   --lfh-normal-text: #155234;
   --lfh-achtung-text: #604200;
-  --lfh-alarm-text: #8f1c12;
+  --lfh-alarm-text: #88140d;
   --lfh-alarm-hover: #7d1810;
   --lfh-normal-flaeche: #e3f1e8;
   --lfh-achtung-flaeche: #f7efd5;
   --lfh-alarm-flaeche: #f9e3e3;
   --lfh-bedien-flaeche: #e4edf7;
   --lfh-auswahl-flaeche: #dbe7f5;
-  --lfh-gesperrt: #565e67;
+  --lfh-gesperrt: #525a63;
   --lfh-banner-grund: #e6eef8;
   --lfh-banner-linie: #9dbbe0;
   --lfh-berichtigung-zeile: #fbeaea;
@@ -98,9 +98,9 @@
   --lfh-etb-lage-kante: #0e8c90;
   --lfh-etb-lage-wort: #005357;
   --lfh-etb-berichtigung-kante: #cf1322;
-  --lfh-etb-berichtigung-wort: #8f1c12;
-  --lfh-etb-system-kante: #424a53;
-  --lfh-etb-system-wort: #363d45;
+  --lfh-etb-berichtigung-wort: #88140d;
+  --lfh-etb-system-kante: #3d454e;
+  --lfh-etb-system-wort: #323941;
 
   /* ── Warnstufen-Balken · Tagmodus (tokens.ts: warnstufeFarbenHell) ─────── */
   --lfh-warnstufe-niedrig: #9e7f00;
@@ -161,7 +161,7 @@
   --lfh-rahmen-gedaempft: #a0a8b1;
   --lfh-rahmen-gesperrt: #838b94;
   --lfh-rahmen-alarm: #ff7070;
-  --lfh-rahmen-marke: #a8071a;
+  --lfh-rahmen-bedien: #4d94d6;
 
   /* ── Stimme und Bewegung ───────────────────────────────────────────────── */
   --lfh-versal-sperrung: 2.2px;
@@ -209,14 +209,14 @@
 [data-theme='dark'] {
   /* ── Farbrollen · Nachtmodus ───────────────────────────────────────────── */
   --lfh-grund: #08090b;
-  --lfh-flaeche: #0f1215;
-  --lfh-flaeche-2: #14171b;
+  --lfh-flaeche: #151719;
+  --lfh-flaeche-2: #1f2123;
   --lfh-linie: #22262b;
   --lfh-linie-stark: #2e343a;
   --lfh-raster-linie: rgba(77, 148, 214, 0.055);
   --lfh-text: #e8ebee;
-  --lfh-gedaempft: #9aa2ab;
-  --lfh-schwach: #838b94;
+  --lfh-gedaempft: #9fa7b0;
+  --lfh-schwach: #9199a2;
   --lfh-bedien: #4d94d6;
   --lfh-alarm: #ff6b6b;
   --lfh-achtung: #e8cc3a;
@@ -229,11 +229,11 @@
   --lfh-achtung-fuellung-stark: rgba(232, 204, 58, 0.24);
   --lfh-normal-fuellung: rgba(82, 196, 26, 0.1);
   /* Neuentwurf „Instrumententafel" (21.09.2026) — Rollen, Werte und Messwerte in tokens.ts. */
-  --lfh-kopf: #0c0e11;
-  --lfh-paneel: #0a0c0e;
-  --lfh-flaeche-3: #16191d;
+  --lfh-kopf: #151719;
+  --lfh-paneel: #08090b;
+  --lfh-flaeche-3: #27292b;
   --lfh-text-2: #c6ccd2;
-  --lfh-steuer-rahmen: #626a73;
+  --lfh-steuer-rahmen: #6c747d;
   --lfh-bedien-hover: #7db3e8;
   --lfh-bedien-text: #8ec2f0;
   --lfh-auf-bedien: #08090b;
@@ -246,7 +246,7 @@
   --lfh-alarm-flaeche: #1c0a0d;
   --lfh-bedien-flaeche: #0d1620;
   --lfh-auswahl-flaeche: #08172b;
-  --lfh-gesperrt: #8f97a0;
+  --lfh-gesperrt: #9ca4ad;
   --lfh-banner-grund: #0d1520;
   --lfh-banner-linie: #1d3a5c;
   --lfh-berichtigung-zeile: #160d0f;
@@ -267,10 +267,10 @@
   --lfh-etb-entscheidung-wort: #a57ff0;
   --lfh-etb-lage-kante: #13c2c2;
   --lfh-etb-lage-wort: #13c2c2;
-  --lfh-etb-berichtigung-kante: #cf1322;
+  --lfh-etb-berichtigung-kante: #d41b25;
   --lfh-etb-berichtigung-wort: #ff6b6b;
-  --lfh-etb-system-kante: #838b94;
-  --lfh-etb-system-wort: #9aa2ab;
+  --lfh-etb-system-kante: #9199a2;
+  --lfh-etb-system-wort: #9fa7b0;
 
   /* ── Warnstufen-Balken · Nachtmodus (tokens.ts: warnstufeFarbenDunkel) ─── */
   --lfh-warnstufe-niedrig: #d4b106;

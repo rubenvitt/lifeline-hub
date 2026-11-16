@@ -101,11 +101,12 @@ describe('PersonErfassungModal — Tastaturweg', () => {
   it('setzt den Fokus beim Öffnen auf das erste Feld', async () => {
     zeige();
     /**
-     * Das erste Feld ist die Sichtung, der Fokus landet auf ihrer ERSTEN Fläche: sie trägt das
-     * ausdrückliche Fokusziel der Hülle (`data-erfassung-fokus`, `SichtungsWahl`).
+     * Das erste Feld ist die Sichtung, der Fokus landet auf ihrer GRUPPE, nicht auf „SK I“: die
+     * Gruppe trägt das ausdrückliche Fokusziel der Hülle (`data-erfassung-fokus`), damit nichts
+     * wie vorausgewählt aussieht (Spec `sichtungswahl`, „Der Startfokus liegt auf der Gruppe“).
      */
-    const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
-    await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
+    const gruppe = screen.getByRole('radiogroup');
+    await waitFor(() => expect(document.activeElement).toBe(gruppe));
   });
 
   it('Enter im letzten sichtbaren Zahlfeld sendet ab', async () => {
@@ -176,8 +177,8 @@ describe('PersonErfassungModal — Serienmodus', () => {
     expect(onFertig).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue(''));
-    const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
-    await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
+    // Feld 1 ist die Sichtung; der Fokus kehrt auf ihre Gruppe zurück, nicht auf „SK I“.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('radiogroup')));
   });
 
   it('der Fundort überlebt das Serien-Speichern (Kontext-Default)', async () => {

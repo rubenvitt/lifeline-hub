@@ -89,7 +89,7 @@ Die Regel aus `statusrollen` angewandt auf die übrigen `achtung`-Zuordnungen in
 | Zuordnung | heute | neu | Grund |
 |---|---|---|---|
 | `schadenStatus.offen` | achtung | neutral | Eingang wie Auftrag „Offen“; Handlungsbedarf zeigt die Dringlichkeit |
-| `belegungsArt.austritt` | achtung | neutral | Buchungsart eines Bereitstellungsraums, kein Zustand |
+| `belegungsArt.austritt` | achtung | neutral | Bewegungsart einer UHS-Belegung, kein Zustand |
 | `etbTyp.anordnung` (nur Etikett) | achtung | neutral | Eintragstyp ist eine Kategorie; die Zeitachse hat eine eigene Palette |
 | `raeumungszustand.laeuft` | achtung | neutral | planmäßiger Ablauf; „angeordnet“ bleibt gelb, dort muss jemand anfangen |
 | `brAbgerufen` | achtung | neutral | abgerufene Einheit ist unterwegs, Normalbetrieb |
@@ -110,12 +110,29 @@ noch über das Wort.
 
 ### D5 — Vier Flächenwerte, Rollennamen bleiben
 
-Die sechs Rollen behalten ihre Namen, belegen aber nur vier Werte je Modus: Stufe 1 `grund` =
-`paneel`, Stufe 2 `flaeche`, Stufe 3 `flaeche2` = `kopf`, Stufe 4 `flaeche3`. Zwischen zwei
-Stufen liegen mindestens **1,10 : 1**, im Tag- und im Nachtmodus. Nachts heißt das etwa #08090b,
-#151618, #1e2023, #27292d (genaue Werte rechnet der Test). Ein Wächter in `tokens.test.ts` zählt
-die verschiedenen Flächenwerte (höchstens vier) und prüft die Schritte. `rahmenFarben.grund =
-kopf` bleibt gepinnt; der Rahmen wird damit eine Stufe heller.
+Die sechs Rollen behalten ihre Namen, belegen aber nur vier Werte je Modus. Zusammengelegt wird
+**je Modus entlang der heutigen Helligkeitsfolge**, damit sich zwischen zwei Rollen nichts
+umkehrt. Die Folge ist am Tag eine andere als nachts. Nachgetragen in der Umsetzung, nach
+Rückfrage am 16.11.: „`paneel` = `grund`“ in beiden Modi hätte am Tag die Paneele mit dem
+Seitengrund verschmolzen.
+
+| Stufe | Nacht (dunkel → hell) | Tag (hell → dunkel) |
+|---|---|---|
+| 1 | `grund` = `paneel` #08090b | `flaeche` #ffffff |
+| 2 | `kopf` = `flaeche` #151719 | `paneel` = `flaeche2` #f2f3f5 |
+| 3 | `flaeche2` #1f2123 | `grund` = `kopf` #e6e7e9 |
+| 4 | `flaeche3` #27292b | `flaeche3` #dbdcde |
+
+Zwischen zwei Stufen liegen mindestens **1,10 : 1**, im Tag- und im Nachtmodus. Ein Wächter in
+`tokens.test.ts` zählt die verschiedenen Flächenwerte (höchstens vier) und prüft die Schritte.
+
+Der dauerdunkle Rahmen (Kopfleiste, Rail, `rahmenFarben`) ist keine Inhaltsfläche und behält
+seine Werte (`grund` #0c0e11, `aktiv` #16191d, `feld` #14171b) als eigene Literale, statt
+weiter auf `farbenDunkel.kopf`, `flaeche3` und `flaeche2` zu zeigen. Dafür gibt es zwei Gründe:
+#0c0e11 ist zugleich das Kopf-Schwarz von Bildmarke, PWA-Manifest und `index.html`. Und die
+zweite Textstufe des Rahmens (`#a0a8b1`) fiele auf einem helleren `aktiv` unter die
+Tag-Schwelle 7 : 1 (LFH-434). Der Wächter in `rollen.guard.test.ts` pinnt die Literale statt
+der Gleichheit mit `kopf`.
 
 *Abstand:* Der Scope schlug 1,15 : 1 vor. Das hellt die oberste Stufe nachts bis etwa #303030 auf
 und erhöht die Blendung im abgedunkelten Fahrzeug. 1,10 ist der Kompromiss, zur Freigabe.
@@ -150,11 +167,15 @@ Farben.
 
 ### D8 — Sichtungswahl: Innenrahmen, Schraffur, Gruppenfokus
 
-- **Nicht gewählt nach einer Wahl:** 4 px Innenrahmen in der Flächenfarbe plus Tönung (die
-  Flächenfarbe mit rund 20 % Deckkraft über dem Grund), Kante 1 px in `text`. Text in `text`,
-  Kontrast gegen die Tönung im Test.
-- **„tot“:** Schraffur 45° in `text` mit rund 25 % Deckkraft über Schwarz, in jedem Zustand (gefüllt,
-  getönt, gewählt). Weiße Schrift gegen den hellsten Streifen liegt bei etwa 10 : 1.
+- **Nicht gewählt nach einer Wahl:** 4 px Innenrahmen in der **Anzeigefarbe** (`punkt`) plus
+  Tönung (die Anzeigefarbe mit 18 % Deckkraft über `flaeche`), Kante 1 px in `text`. Text in
+  `text`, Kontrast gegen die Tönung im Test. Die Anzeigefarbe statt der abgedunkelten
+  Flächenfarbe (in der Umsetzung entschieden): Dunkelrot, -grün und -blau stünden nachts mit
+  rund 2 : 1 auf dem Grund. Die Anzeigefarben leuchten dort, und die Wahl zeigt danach dieselben
+  Töne wie Liste und Karte.
+- **„tot“:** Schraffur 45° mit 20 % Deckkraft, in jedem Zustand. Gefüllt und gewählt nimmt sie
+  die Schrift der Fläche (Weiß auf Schwarz, Text gegen den Strich rund 12 : 1), getönt die
+  Textfarbe des Modus.
   *Verworfen:* „†“ (Zeichen mit religiöser Lesart, klein) und ein Diagonalkreuz (liest sich wie
   „gesperrt“).
 - **„unverletzt“:** transparent auf dem Grund der Maske, 1 px Rahmen, ohne Streifen und ohne Tönung.
@@ -190,9 +211,7 @@ Farben.
   Das ist hingenommen und steht in der Spec (Szenario „Mandantenstatus ohne Anker“).
 - **Die Anwenderbilder ändern sich breit.** → Der Bildlauf erzeugt nur die betroffenen Kapitel neu.
 
-## Open Questions
+## Freigabe
 
-Zur Freigabe am Checkpoint, ohne Einfluss auf den Aufgabenschnitt:
-
-- D3: Stimmt die Liste der umgestellten Zuordnungen, besonders `schadenStatus.offen`?
-- D5: Abstand 1,10 : 1 (Empfehlung) oder 1,15 : 1?
+Am 16.11.2026 freigegeben, mit D3 (alle fünf Zuordnungen neutral) und D5 (Abstand 1,10 : 1) wie
+empfohlen.
