@@ -51,6 +51,9 @@ function ausListe<T, W>(
   return daten === undefined ? { zustand: 'laden' } : { zustand: 'daten', wert: wert(daten) };
 }
 
+/** Abruftakt des Modulzählers für die Alarmzeile. */
+export const ZAEHLER_TAKT_MS = 60_000;
+
 export interface AlarmZeilenDaten extends WasBrennt {
   /** Freigaben für die Sprungziele (`lage/alarmZiel.ts`). */
   freigaben: ModulFreigaben | undefined;
@@ -65,9 +68,13 @@ export function useWasBrennt(einsatzId: number, jetzt: Dayjs): AlarmZeilenDaten 
   const freigabenGescheitert = freigaben === undefined && freigabenQ.isError;
   const frei = (key: string) => freigabeVon(key, freigaben);
 
+  // Überfällig urteilt der Server beim Abruf; für das Verstreichen einer Nachforderungsfrist gibt
+  // es kein Live-Ereignis. Deshalb holt die Zeile den Zähler auch ohne neue Daten jede Minute
+  // (Spec `lage-alarmzeile`, „Zeit läuft ohne neue Daten weiter“; Review LLH-1743).
   const zaehlerQ = useQuery({
     queryKey: einsatzKeys.modulZaehler(einsatzId),
     queryFn: () => ladeModulZaehler(einsatzId),
+    refetchInterval: ZAEHLER_TAKT_MS,
   });
   const personenFrei = frei('personen');
   const personenQ = useQuery({
@@ -122,15 +129,24 @@ export function useWasBrennt(einsatzId: number, jetzt: Dayjs): AlarmZeilenDaten 
   const materialZ = z(materialQ, materialFrei);
   const rueckmeldungenZ = z(rueckmeldungenQ, rueckmeldungenFrei);
 
-  // Ausfall braucht alle Mittel: fehlt eine Liste, ist die Zahl nicht die des Meldebilds.
-  const ausfallZ = schlechtesterZustand(einheitenZ, abschnitteZ, personalZ, fahrzeugeZ, materialZ);
+  // Ausfall wie im Meldebild (LLH-1743, Review): ohne Einheiten keine Aussage; eine gesperrte
+  // Mittel-Liste zählt dort als leer (`?? []`), also auch hier, nie mit einem Altstand aus dem
+  // Cache. Lädt oder scheitert eine Liste, hält die Quelle den Ausfall zurück, sonst wiche die Zahl
+  // vom Meldebild ab.
+  const mittelZ = [abschnitteZ, personalZ, fahrzeugeZ, materialZ];
+  const ausfallZ: AbrufZustand =
+    einheitenZ === 'gesperrt'
+      ? 'gesperrt'
+      : schlechtesterZustand(einheitenZ, ...mittelZ.filter((m) => m !== 'gesperrt'));
+  const leerWennGesperrt = <T>(zustand: AbrufZustand, daten: T[] | undefined): T[] | undefined =>
+    zustand === 'gesperrt' ? [] : daten;
   const ausfall = useMemo(() => {
     if (ausfallZ !== 'daten') return null;
-    const { data: einheiten } = einheitenQ;
-    const { data: abschnitte } = abschnitteQ;
-    const { data: personal } = personalQ;
-    const { data: fahrzeuge } = fahrzeugeQ;
-    const { data: material } = materialQ;
+    const einheiten = einheitenQ.data;
+    const abschnitte = leerWennGesperrt(abschnitteZ, abschnitteQ.data);
+    const personal = leerWennGesperrt(personalZ, personalQ.data);
+    const fahrzeuge = leerWennGesperrt(fahrzeugeZ, fahrzeugeQ.data);
+    const material = leerWennGesperrt(materialZ, materialQ.data);
     if (!einheiten || !abschnitte || !personal || !fahrzeuge || !material) return null;
     const je = ausfallJeEinheit({ abschnitte, einheiten, personal, fahrzeuge, material });
     return [...je.entries()]
@@ -139,7 +155,18 @@ export function useWasBrennt(einsatzId: number, jetzt: Dayjs): AlarmZeilenDaten 
         id: schluessel === OHNE_EINHEIT ? null : schluessel,
         name: a.bezeichnung,
       }));
-  }, [ausfallZ, einheitenQ, abschnitteQ, personalQ, fahrzeugeQ, materialQ]);
+  }, [
+    ausfallZ,
+    abschnitteZ,
+    personalZ,
+    fahrzeugeZ,
+    materialZ,
+    einheitenQ.data,
+    abschnitteQ.data,
+    personalQ.data,
+    fahrzeugeQ.data,
+    materialQ.data,
+  ]);
 
   const quellen: WasBrenntQuellen = {
     meldungen: ausZaehler(meldungsStand(zaehlerQ), (m) => m),

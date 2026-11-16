@@ -4,11 +4,11 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { http, HttpResponse } from 'msw';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
 import { neuerQueryClient } from '../test/utils';
-import { useWasBrennt } from './useWasBrennt';
+import { useWasBrennt, ZAEHLER_TAKT_MS } from './useWasBrennt';
 
 dayjs.extend(utc);
 
@@ -136,5 +136,64 @@ describe('useWasBrennt (LLH-1743)', () => {
     const { result } = renderHook(() => useWasBrennt(1, JETZT), { wrapper });
     await waitFor(() => expect(result.current.stand).toBe('vollstaendig'));
     expect(result.current.eintraege.map((e) => e.art)).toEqual(['kritisch']);
+  });
+
+  it('gesperrtes Material: Ausfall aus Personal und Fahrzeugen bleibt, wie im Meldebild (Review)', async () => {
+    handler();
+    server.use(
+      http.get(`${BASIS}/modul-freigaben`, () =>
+        HttpResponse.json(freigabenFixture({ material: { sichtbar: true, zugriff: false } })),
+      ),
+      http.get(`${BASIS}/einheiten`, () =>
+        HttpResponse.json([{ ...einheit(10, 'Logistiktrupp'), status: null }]),
+      ),
+      http.get(`${BASIS}/fahrzeuge`, () =>
+        HttpResponse.json([
+          { id: 1, funkrufname: 'Florian 1', einheit_id: 10, status_kategorie: 'nicht_verfuegbar' },
+          { id: 2, funkrufname: 'Florian 2', einheit_id: 10, status_kategorie: 'verfuegbar' },
+        ]),
+      ),
+    );
+    const { result } = renderHook(() => useWasBrennt(1, JETZT), { wrapper });
+    await waitFor(() => expect(result.current.stand).toBe('vollstaendig'));
+    expect(result.current.eintraege.map((e) => e.text)).toContain('Ausfall: Logistiktrupp');
+  });
+
+  it('gesperrte Einheiten: kein Ausfall, kein unvollständiger Stand', async () => {
+    handler();
+    server.use(
+      http.get(`${BASIS}/modul-freigaben`, () =>
+        HttpResponse.json(freigabenFixture({ einheiten: { sichtbar: true, zugriff: false } })),
+      ),
+    );
+    const { result } = renderHook(() => useWasBrennt(1, JETZT), { wrapper });
+    await waitFor(() => expect(result.current.stand).toBe('vollstaendig'));
+    expect(result.current.eintraege.map((e) => e.art)).not.toContain('ausfall');
+  });
+
+  it('holt den Modulzähler auch ohne neue Daten jede Minute (überfällige Nachforderung)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      handler();
+      let abrufe = 0;
+      server.use(
+        http.get(`${BASIS}/modul-zaehler`, () => {
+          abrufe += 1;
+          return HttpResponse.json({
+            ...zaehler,
+            nachforderungen: { ...zaehler.nachforderungen, ueberfaellig: abrufe > 1 ? 1 : 0 },
+          });
+        }),
+      );
+      const { result } = renderHook(() => useWasBrennt(1, JETZT), { wrapper });
+      await waitFor(() => expect(result.current.stand).toBe('vollstaendig'));
+      expect(result.current.eintraege.map((e) => e.art)).not.toContain('nachforderung');
+      await vi.advanceTimersByTimeAsync(ZAEHLER_TAKT_MS);
+      await waitFor(() =>
+        expect(result.current.eintraege.map((e) => e.art)).toContain('nachforderung'),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
