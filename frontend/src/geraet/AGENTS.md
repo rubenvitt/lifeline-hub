@@ -146,10 +146,18 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   meldende Stelle und Ortsangabe, `routes/einsatz.rs` `detail`); Datenstand älter als 2 Minuten
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe.
   Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
-  nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie) und Abschnittsflächen
-  (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen Sofortmeldungen nur als
-  Zahl (`sofortmeldungen_offen`, D12 der Change `kcjecn9e-benachrichtigungskonzept`); `/zonen`
-  und `/abschnitte` bleiben ihm gesperrt, sie tragen Notizen und Leiternamen. Die nächsten drei
+  nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie, bei einem Gefahrengebiet dazu
+  `gebiet`: Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, LLH-1746) und
+  Abschnittsflächen (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen
+  Sofortmeldungen nur als Zahl (`sofortmeldungen_offen`, D12 der Change
+  `kcjecn9e-benachrichtigungskonzept`); `/zonen`, `/abschnitte` und `/gefahrengebiete` bleiben ihm
+  gesperrt, sie tragen Notizen, Leiternamen und den Namen dessen, der beurteilt hat. Beschriftung
+  und Notiz einer Zone erreichen ihn nie. Die Karte beschriftet Gefahrenzonen mit Marken in
+  Großbild-Schrift (`geraet/lagemonitorFlaechen.ts`, `zonenMarkenTeile`: Name und Stufe getrennt,
+  die Stufe im Wort der Lagekarte, `stufenWort`; ein langer Name bricht um, nie gekürzt) und färbt
+  Gefahrengebiete wie die Lagekarte (`gefahrengebietStil`); das Lagebild für Externe nutzt dieselbe
+  Karte ohne Zonenmarken (`zonenBeschriften={false}`); eine überbelegte UHS (`istUeberbelegt`: mehr Belegte
+  als Plätze) steht in Kachel und Kartenmarke in der Alarmrolle. Die nächsten drei
   Programmpunkte (LLH-1570, `programm`: Bezeichnung und Zeitpunkt) kommen ebenfalls von dort,
   `/programmpunkte` bleibt ihm gesperrt; die Kachel „Ablauf“ filtert verstrichene Punkte mit der
   Monitoruhr und fehlt, wenn keiner ansteht, ohne Alarm und Hervorhebung. Steigt diese Zahl

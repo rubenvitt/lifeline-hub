@@ -14,6 +14,7 @@ import {
   kopfZelleStil,
 } from '../components/Kopfleiste';
 import { useMinutenTakt } from '../components/useMinutenTakt';
+import { useViewport } from '../components/useViewport';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useOhneVerbindung } from '../offline/verbindung';
@@ -79,8 +80,16 @@ function useJuengsterDatenstand(): number {
  * Darstellung erklärte sich nicht). Die Endzeit in der Zeitdarstellung steht im Hinweis und im
  * zugänglichen Namen. Unter einer Stunde mit Wort und Farbe hervorgehoben (WCAG 1.4.1).
  */
-function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
-  const { token } = theme.useToken();
+function KopplungsEnde({
+  laeuftAbAt,
+  zelle,
+  mitSymbol,
+}: {
+  laeuftAbAt: string;
+  zelle: { padding: number };
+  /** Unter `md` ohne Uhr-Symbol: das Wort „Kopplung“ trägt die Zelle allein, Platz für die Zeile. */
+  mitSymbol: boolean;
+}) {
   const jetzt = useMinutenTakt();
   const bald = kopplungEndetBald(laeuftAbAt, jetzt);
   // Die Hülle hat keinen `EinsatzAnzeigeProvider` (`geraet/AGENTS.md`): der Hook liefert dort die
@@ -101,11 +110,13 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
           : `Kopplung ${rest.lang}, bis ${ende}`
       }
       title={bald ? `Kopplung bis ${ende} · Verlängern: Einsatzleitung` : `Kopplung bis ${ende}`}
-      style={kopfZelleStil(token)}
+      style={kopfZelleStil(zelle)}
     >
-      <span aria-hidden="true" style={{ display: 'inline-flex', color: farbe }}>
-        <IconUhr size={16} />
-      </span>
+      {mitSymbol && (
+        <span aria-hidden="true" style={{ display: 'inline-flex', color: farbe }}>
+          <IconUhr size={16} />
+        </span>
+      )}
       <span
         aria-hidden="true"
         style={{
@@ -135,6 +146,12 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
   const stand = useJuengsterDatenstand();
   const stelle = useStellenName(geraet);
   const { konventionen } = useAnzeigeKonventionen();
+  // Unter `md` rücken die Zellen zusammen wie im Einsatzkopf (LLH-1728, D3), und die Restzeit steht
+  // ohne Uhr-Symbol: sonst bräche die rechte Gruppe auf 390 px seit „Kopplung noch 5 h“ (LLH-1734)
+  // in `kompakt` und `komfortabel` in eine zweite Zeile, und die Ausgabeansicht rollte um deren
+  // Höhe (LLH-1294). In `handschuh` bricht sie weiter um, wie schon vorher.
+  const mittel = useViewport().abBreite('md');
+  const zellToken = mittel ? token : { padding: token.paddingXS };
   return (
     <header
       data-lfh="geraet-kopf"
@@ -151,7 +168,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
       <Markenzelle />
       <div
         data-lfh="kopf-stelle"
-        style={{ ...kopfZelleStil(token), flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}
+        style={{ ...kopfZelleStil(zellToken), flex: '1 1 0', minWidth: 0, flexWrap: 'wrap' }}
       >
         <strong style={{ whiteSpace: 'nowrap' }}>{stelle ?? ANSICHT_LABEL[geraet.ansicht]}</strong>
         <span
@@ -166,8 +183,8 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
         </span>
       </div>
       <KopfRechts>
-        <KopplungsEnde laeuftAbAt={geraet.laeuft_ab_at} />
-        <SyncAnzeige liveErwartet />
+        <KopplungsEnde laeuftAbAt={geraet.laeuft_ab_at} zelle={zellToken} mitSymbol={mittel} />
+        <SyncAnzeige liveErwartet zelle={zellToken} />
         {ohneVerbindung && stand > 0 && (
           // Eigene Zelle statt `Datenstand`: dessen Sekundärtext folgt dem Modus, der Kopf ist
           // immer dunkel.
@@ -176,7 +193,7 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
             aria-label={`Datenstand ${formatiereDatenstand(stand, konventionen)}, offline`}
             role="img"
             style={{
-              ...kopfZelleStil(token),
+              ...kopfZelleStil(zellToken),
               fontFamily: schrift.zahl,
               fontSize: 12,
               fontVariantNumeric: 'tabular-nums',
@@ -187,8 +204,8 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
             <span aria-hidden="true">Stand {formatiereDatenstand(stand, konventionen)}</span>
           </div>
         )}
-        <Uhr />
-        <div style={{ ...kopfZelleStil(token, 'keiner'), paddingInlineStart: token.paddingXS }}>
+        <Uhr zelle={zellToken} />
+        <div style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}>
           <GeraeteMenue />
         </div>
       </KopfRechts>

@@ -58,7 +58,7 @@ export function einheitenImAbschnitt(
  * Stärke einer Abschnittsmenge: Es zählt, wer in ihr steht (LLH-1744, Spec `lage-verdichtung`),
  * jede aktive Einheit mit ihrer EIGENEN Stärke (`ist`) bei ihrem wirksamen Abschnitt. So zählt
  * jede Kraft genau einmal, eine abgestellte Untereinheit bei ihrem Abschnitt und nicht bei dem
- * ihrer Obereinheit, wie im Meldebild (`loeseAbgestellte`) und im Bereitstellungsraum
+ * ihrer Obereinheit, wie im Meldebild (`detachAbgestellte`) und im Bereitstellungsraum
  * (`staerkeImRaum`, LLH-1289). `null` heißt „keine Einheit zugeordnet“.
  */
 function staerkeIn(einheiten: readonly Einheit[], abschnittIds: Set<number>): Staerke | null {

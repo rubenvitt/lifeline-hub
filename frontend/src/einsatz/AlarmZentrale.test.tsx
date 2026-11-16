@@ -1368,11 +1368,11 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
 describe('AlarmZentrale: Meldungen über den Service Worker (LFH-1062)', () => {
   type SwMeldung = { titel: string; tag: string; data: { id: string; ziel?: string } };
 
-  function stubAndroidMitServiceWorker() {
+  function stubAndroidMitServiceWorker(permission: NotificationPermission = 'granted') {
     const Ctor = vi.fn(function () {
       throw new TypeError('Illegal constructor');
     }) as unknown as typeof Notification & { permission: NotificationPermission };
-    Ctor.permission = 'granted';
+    Ctor.permission = permission;
     vi.stubGlobal('Notification', Ctor);
     const sw: SwMeldung[] = [];
     const hoerer: ((ev: MessageEvent) => void)[] = [];
@@ -1423,6 +1423,16 @@ describe('AlarmZentrale: Meldungen über den Service Worker (LFH-1062)', () => {
     setzeHidden(false);
     vi.unstubAllGlobals();
     setzeViewportBreite(VIEWPORT_STANDARD);
+  });
+
+  // LLH-1910, Spec `kopfleiste`: die verweigerte Berechtigung steht im ersten Bild, nicht erst nach
+  // der Antwort des Service Workers; sonst erschiene das Wort später und verbreiterte den Kopf.
+  it('nennt eine verweigerte Benachrichtigung schon im ersten Render', () => {
+    stubAudioReady();
+    stubAndroidMitServiceWorker('denied');
+    renderAlarm();
+    const knopf = screen.getByRole('button', { name: 'Benachrichtigung blockiert' });
+    expect(knopf).toHaveTextContent('Benachrichtigung blockiert');
   });
 
   it('meldet „erlaubt", zeigt die Sofortmeldung als Systemmeldung, und der Tipp führt zur Quelle', async () => {

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Lagebild Großbild</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-700.woff2") format("woff2");font-weight:700}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-600.woff2") format("woff2");font-weight:600}
+body{margin:0}
+.gb{box-sizing:border-box;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:calc(32*var(--u));padding:calc(32*var(--u)) calc(40*var(--u));background:var(--grund);color:var(--text);font-family:"LFH Archivo",system-ui,sans-serif;overflow:hidden}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.kopf{display:flex;align-items:center;gap:calc(24*var(--u));min-height:calc(64*var(--u))}
+.kopf h1{margin:0;font-size:calc(32*var(--u));line-height:1.2;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.kopf .meta{font-size:calc(28*var(--u));color:var(--gedaempft)}
+.kopf .sp{flex:1}
+.alarm{display:inline-flex;align-items:center;gap:calc(12*var(--u));height:calc(56*var(--u));padding:0 calc(20*var(--u));background:var(--alarmFl);box-shadow:inset calc(6*var(--u)) 0 0 var(--alarm);color:var(--alarmText);font-size:calc(28*var(--u));font-weight:700}
+.uebung{display:inline-flex;align-items:center;height:calc(56*var(--u));padding:0 calc(20*var(--u));background:#6d28d9;color:#ffffff;font-size:calc(28*var(--u));font-weight:700;letter-spacing:.12em;box-shadow:inset 0 0 0 2px #a78bfa}
+.kn{display:inline-flex;align-items:center;gap:calc(10*var(--u));height:calc(56*var(--u));padding:0 calc(20*var(--u));border:2px solid var(--steuer);background:transparent;color:var(--text);font:inherit;font-size:calc(28*var(--u))}
+.band{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border-top:1px solid var(--linie);border-bottom:1px solid var(--linie)}
+.kz{display:flex;flex-direction:column;gap:calc(6*var(--u));padding:calc(20*var(--u)) calc(24*var(--u));border-left:1px solid var(--linie);min-width:0}
+.kz:first-child{border-left:none;padding-left:0}
+.kz .t{font-size:calc(28*var(--u));line-height:1.2;color:var(--text2)}
+.kz .z{font-size:calc(96*var(--u));line-height:1.05;font-weight:600}
+.kz .z.k{font-size:calc(72*var(--u));line-height:calc(101/72)}
+.kz .n{font-size:calc(28*var(--u));line-height:1.2;color:var(--gedaempft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kz.al .z,.kz.al .n{color:var(--alarmText)}
+.unten{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:calc(48*var(--u));min-height:0}
+.block{display:flex;flex-direction:column;gap:calc(14*var(--u));min-width:0;min-height:0}
+.block h2{margin:0;font-size:calc(28*var(--u));font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gedaempft);padding-bottom:calc(10*var(--u));border-bottom:1px solid var(--linie)}
+.zeilen{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);column-gap:calc(32*var(--u));row-gap:calc(10*var(--u));align-items:baseline}
+.zeilen .b{display:flex;align-items:center;gap:calc(14*var(--u));font-size:calc(28*var(--u));line-height:1.2}
+.zeilen .w{font-size:calc(72*var(--u));line-height:1.15;font-weight:600}
+.zeilen .w.wort{font-size:calc(40*var(--u));font-weight:700}
+.sw{display:inline-block;width:calc(28*var(--u));height:calc(28*var(--u));flex-shrink:0;box-shadow:inset 0 0 0 1px var(--kante)}
+.mehr{font-size:calc(28*var(--u));color:var(--gedaempft)}
+.fs{display:grid;grid-template-columns:1fr 1fr;row-gap:calc(18*var(--u));column-gap:calc(32*var(--u))}
+.fs .kz{border-left:none;padding:0}
+</style>
+</helmet>
+<div class="gb" role="dialog" aria-label="Lagebild im Großbild" style="width: {{w}}px; height: {{h}}px; --u: {{u}}px; --grund: {{c.grund}}; --text: {{c.text}}; --text2: {{c.text2}}; --gedaempft: {{c.gedaempft}}; --linie: {{c.linie}}; --steuer: {{c.steuer}}; --alarm: {{c.alarm}}; --alarmText: {{c.alarmText}}; --alarmFl: {{c.alarmFl}}; --achtung: {{c.achtung}}; --kante: {{c.kante}}">
+  <div class="kopf">
+    <h1>Lagebild</h1>
+    <span class="meta mono">1430 · Stand vor 12 s</span>
+    <span class="sp"></span>
+    <span class="alarm" role="status"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 3 2 21h20L12 3z"></path><path d="M12 10v5"></path><path d="M12 18v.5"></path></svg>1 Alarm offen</span>
+    <sc-if value="{{uebung}}" hint-placeholder-val="{{true}}"><span class="uebung">ÜBUNG</span></sc-if>
+    <button class="kn" type="button"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 4H4v5"></path><path d="M15 20h5v-5"></path><path d="M4 4l6 6"></path><path d="M20 20l-6-6"></path></svg>Großbild verlassen</button>
+  </div>
+
+  <div class="band" role="group" aria-label="Lage in Zahlen">
+    <div class="kz"><span class="t">Verbleib offen</span><span class="z mono">12</span><span class="n">von 248 Betroffenen</span></div>
+    <div class="kz"><span class="t">Betroffene</span><span class="z mono">248</span><span class="n">· 2 ohne Sichtung</span></div>
+    <div class="kz"><span class="t">Schäden offen</span><span class="z mono">7</span><span class="n">3 Gebäude · 4 Straßen</span></div>
+    <div class="kz"><span class="t">Kräfte</span><span class="z k mono">0/12/58//70</span><span class="n">14 Einheiten</span></div>
+    <div class="kz al"><span class="t">Vermisste</span><span class="z mono">3</span><span class="n">1 seit über 4 h</span></div>
+    <div class="kz"><span class="t">Einsatzdauer</span><span class="z mono">5:01 h</span><span class="n">seit 0929</span></div>
+  </div>
+
+  <div class="unten">
+    <section class="block" aria-label="Gefahren">
+      <h2>Gefahren · 4 Gebiete</h2>
+      <div class="zeilen">
+        <span class="b"><span class="sw" style="background: {{c.alarm}}"></span>Hochwasser</span><span class="w wort" style="color: {{c.alarmText}}">hoch</span>
+        <span class="b"><span class="sw" style="background: {{c.achtung}}"></span>Sturm</span><span class="w wort" style="color: {{c.achtungText}}">mittel</span>
+        <span class="b"><span class="sw" style="background: {{c.normal}}"></span>Stromausfall</span><span class="w wort">gering</span>
+        <span class="b"><span class="sw" style="background: {{c.normal}}"></span>Gas</span><span class="w wort">gering · unbestätigt</span>
+      </div>
+      <span class="mehr">+ 1 weitere</span>
+    </section>
+
+    <section class="block" aria-label="Sichtung">
+      <h2>Sichtung · 248 erfasst</h2>
+      <div class="zeilen">
+        <span class="b"><span class="sw" style="background: #f5222d"></span>SK I</span><span class="w mono">4</span>
+        <span class="b"><span class="sw" style="background: #fadb14"></span>SK II</span><span class="w mono">11</span>
+        <span class="b"><span class="sw" style="background: #52c41a"></span>SK III</span><span class="w mono">63</span>
+        <span class="b"><span class="sw" style="background: #1677ff"></span>SK IV</span><span class="w mono">0</span>
+        <span class="b"><span class="sw" style="background: transparent"></span>ohne Sichtung</span><span class="w mono">2</span>
+      </div>
+    </section>
+
+    <section class="block" aria-label="Führungsstand">
+      <h2>Führungsstand</h2>
+      <div class="fs">
+        <div class="kz al"><span class="t">Aufträge offen</span><span class="z k mono">5</span><span class="n">1 überfällig</span></div>
+        <div class="kz"><span class="t">Meldungen offen</span><span class="z k mono">9</span><span class="n">2 neu</span></div>
+        <div class="kz"><span class="t">Lagebericht</span><span class="z k mono">1400</span><span class="n">freigegeben · Lage 3</span></div>
+        <div class="kz"><span class="t">UHS aktiv</span><span class="z k mono">3</span><span class="n">1 geplant · 24 Kräfte</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["nacht","tag"],"default":"nacht"},"scale":{"editor":"float","min":0.5,"max":2,"step":0.05,"default":1},"uebung":{"editor":"boolean","default":true},"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const farben = {
+      nacht: { grund: '#08090b', text: '#e8ebee', text2: '#c6ccd2', gedaempft: '#9aa2ab', linie: '#22262b', steuer: '#626a73', alarm: '#ff6b6b', alarmText: '#ff6b6b', alarmFl: '#1c0a0d', achtung: '#e8cc3a', achtungText: '#e8cc3a', normal: '#52c41a', kante: '#e8ebee' },
+      tag: { grund: '#e9ebee', text: '#111418', text2: '#2b3138', gedaempft: '#363d45', linie: '#d4d8dd', steuer: '#79818a', alarm: '#b02318', alarmText: '#8f1c12', alarmFl: '#f9e3e3', achtung: '#7a5200', achtungText: '#604200', normal: '#1c6640', kante: '#111418' }
+    };
+    const scale = this.props.scale ?? 1;
+    return {
+      c: farben[this.props.theme ?? 'nacht'] ?? farben.nacht,
+      u: scale,
+      w: Math.round(1920 * scale),
+      h: Math.round(1080 * scale),
+      uebung: this.props.uebung ?? true
+    };
+  }
+}
+</script>
+</body>
+</html>

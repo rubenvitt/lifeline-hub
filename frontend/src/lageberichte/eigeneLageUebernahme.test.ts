@@ -17,8 +17,8 @@ import type {
 } from '../api/types';
 import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebild';
 import {
-  baueFuehrungsorganisation,
-  rendereFuehrungsorganisationMarkdown,
+  buildFuehrungsorganisation,
+  renderFuehrungsorganisationMarkdown,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
 import { freigabenFixture } from '../test/fixtures';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
@@ -146,10 +146,10 @@ const MELDEBILD = () =>
     dtg,
   });
 const ORG = (
-  opts: Partial<Parameters<typeof rendereFuehrungsorganisationMarkdown>[1]> = {},
+  opts: Partial<Parameters<typeof renderFuehrungsorganisationMarkdown>[1]> = {},
   einheiten: Einheit[] | null = EINHEITEN,
 ) =>
-  rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation(ABSCHNITTE, einheiten), {
+  renderFuehrungsorganisationMarkdown(buildFuehrungsorganisation(ABSCHNITTE, einheiten), {
     stand: STAND,
     fuehrungsfunktionen: [
       { funktion: 'el', kuerzel: 'EL', namen: 'Lea Leitung' },

@@ -139,7 +139,7 @@ export interface RasterZeile {
   zusatz: string | null;
   /**
    * Nur Einheiten: Name der Obereinheit, von der die Einheit in ihren eigenen Abschnitt abgestellt
-   * ist (LLH-1744, `loeseAbgestellte`); sie steht dann als Wurzel und zählt dort.
+   * ist (LLH-1744, `detachAbgestellte`); sie steht dann als Wurzel und zählt dort.
    */
   abgestelltAus: string | null;
   funkrufname: string | null;

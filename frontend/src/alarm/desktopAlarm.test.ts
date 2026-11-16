@@ -322,6 +322,22 @@ describe('Desktop-Meldung über den Service Worker (LFH-1062)', () => {
     expect(zeigeDesktopAlarm('Titel')).toBeNull();
   });
 
+  // LLH-1910: Die verweigerte Berechtigung kennt der Browser sofort, sie hängt an keinem Weg. Die
+  // Kopfleiste nennt „Benachrichtigung blockiert“ so schon im ersten Bild.
+  it('meldet auf Android eine verweigerte Berechtigung sofort, ohne steuernden Worker', () => {
+    stubNotification('denied');
+    stubServiceWorker({ controller: false });
+    expect(desktopPermission()).toBe('denied');
+  });
+
+  it('meldet auf Android eine verweigerte Berechtigung, bevor der Worker antwortet', () => {
+    stubNotification('denied');
+    const { steuernd } = stubServiceWorker({ antwortet: false });
+    expect(desktopPermission()).toBe('denied');
+    // Den Weg braucht eine verweigerte Berechtigung nicht: keine Nachfrage.
+    expect(steuernd.postMessage).not.toHaveBeenCalled();
+  });
+
   it('zeigt die Meldung über showNotification statt über den Konstruktor', async () => {
     const { Ctor } = stubNotification('granted');
     const { registrierung, offeneSw } = stubServiceWorker();

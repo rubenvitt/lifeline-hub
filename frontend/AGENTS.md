@@ -78,7 +78,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `alarm/AlarmZone.tsx` (Alarmzone,
   Rahmen) · `personen/SichtungsWahl.tsx` ·
   `personen/koerperschema/Koerperschema.tsx` · `zeichen/EinsatzZeichen.tsx` (taktische Zeichen,
-  am Schirm mit `useZeichenTheme`, LLH-1409). Jeder hat eine Karte im Design System.
+  am Schirm mit `useZeichenTheme`, LLH-1409) · `components/grossbild/` (Großbild am Bedienplatz,
+  LLH-1747, Spec `grossbild-ansicht`: `GrossKennzahl`, `GrossZeile(n)`, Hülle `GrossbildFlaeche`
+  mit Element-Vollbild, nur Ansehen; Größen nur über `grossMass`, Bezug 1920 × 1080 = Lagemonitor,
+  mitwachsend über `min(vw, vh)`). Jeder hat eine Karte im Design System, außer der Hülle
+  `GrossbildFlaeche` (Portal und Vollbild).
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
@@ -245,7 +249,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
   ihm steht (LLH-1744): Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit
   beim wirksamen Abschnitt), seine Einheiten nur über `einheitenImAbschnitt`, dieselbe Menge. „Kräfte“
-  sind Köpfe, Fahrzeuge zählen eigens; Kräfte an UHS nur an aktiven UHS (`zaehltKraefteAnUhs`,
+  sind Köpfe, Fahrzeuge zählen eigens; Kräfte an UHS nur an aktiven UHS (`countsKraefteAnUhs`,
   Lagebild und Lagemonitor). Belegung eines Bereitstellungsraums (LLH-1095, Spec
   `bereitstellungsraum-belegung`): Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
   des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
@@ -261,9 +265,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Kraft genau einmal, Elternstärke über `accumulateStaerke`. Meldebild (`meldebildRaster.ts`) und
   Lagebericht-Text (`kraeftebild.ts`) bilden den Kern nur ab; ein neuer Abnehmer baut keinen
   eigenen Baum. Meldebild, Kräftebild und Organigramm lösen abgestellte Untereinheiten (eigener
-  Abschnitt ungleich dem der Obereinheit) über `loeseAbgestellte`/`abgestelltVon` vom Verband,
+  Abschnitt ungleich dem der Obereinheit) über `detachAbgestellte`/`abgestelltVon` vom Verband,
   „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau, Funkplan und Fernmeldeskizze
-  (`baueFuehrungsorganisation(…, { abgestellteLoesen: false })`) behalten den Verband.
+  (`baueFuehrungsorganisation(…, { detachAbgestellte: false })`) behalten den Verband.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -353,7 +357,7 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Organigramm der Führungsorganisation** (LFH-626, `pages/einsatzabschnitte/Organigramm.tsx`,
   `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
-  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, nur eine abgestellte
+  `buildFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, nur eine abgestellte
   Untereinheit steht wie im Meldebild unter ihrem Abschnitt, LLH-1744; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
   „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `einsatz/einsatzleiter.ts`

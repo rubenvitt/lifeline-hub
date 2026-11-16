@@ -17,6 +17,7 @@ import { entwuerfeAufraeumen, entwuerfeRaeumen } from '../etb/entwuerfe/entwurfS
 import { zuletztRaeumen } from '../stammdaten/zuletztVerwendet';
 import { gemerkteStellenRaeumen } from '../verpflegung/stellenGedaechtnis';
 import { personErfassungsQuittungenAufraeumen, personErfassungsQuittungenRaeumen } from './queue';
+import { queueZaehlerMerkerRaeumen } from './queueZaehlerMerker';
 
 /**
  * - `jeder-ausgang`: beim Abmelden UND beim Sitzungsende (401) geräumt.
@@ -59,6 +60,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'jeder-ausgang',
     grund:
       'Nur Kennung und R-Nr der Person (LFH-941); die Person liegt nach dem Replay auf dem Server, die Quittung ist nur der Hinweis darauf.',
+  },
+  {
+    ort: 'localStorage lfh:queue-zaehler',
+    datei: 'offline/queueZaehlerMerker.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Zuletzt gelesener Zähler der Offline-Queue mit Benutzer-id, nur Zahlen (LLH-1910): die Kopfleiste zeigt „WARTET n“ schon im ersten Bild. Die Queue bleibt und füllt ihn nach der nächsten Anmeldung wieder.',
   },
   {
     ort: 'IndexedDB lifeline-etb-entwuerfe; localStorage lifeline-etb-entwuerfe-ausstehend:<id>',
@@ -286,6 +294,7 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     listenGedaechtnis: listenGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
     stammdatenfeldZuletzt: zuletztRaeumen,
+    queueZaehlerMerker: queueZaehlerMerkerRaeumen,
     ...(anlass === 'abmelden' ? { etbEntwuerfe: entwuerfeRaeumen } : {}),
   });
 }

@@ -16,7 +16,7 @@ import type { TzEinheit } from './meldebildRaster';
  * jede Kraft da?“. Knotenfolge und Schlüssel (`eh-<id>`) gleichen den Einheitenzeilen des
  * Meldebilds; `einheitenGliederung.test.ts` pinnt das gegen `baueMeldebildRaster`. Einzige
  * Ausnahme (LLH-1744): Eine abgestellte Untereinheit (eigener Abschnitt ungleich dem ihrer
- * Obereinheit) löst sich im Meldebild vom Verband (`loeseAbgestellte`), hier bleibt sie darunter,
+ * Obereinheit) löst sich im Meldebild vom Verband (`detachAbgestellte`), hier bleibt sie darunter,
  * denn die Zeile trägt die Verbandsstärke des Servers.
  *
  * IST VOM SERVER (Entscheidung LLH-1029): `ist_kumuliert` je Zeile — dieselbe Zahl wie auf der

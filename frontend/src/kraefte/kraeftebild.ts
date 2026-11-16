@@ -13,7 +13,7 @@ import { kraefteText, staerkeText } from '../anzeige/staerke';
 import {
   abschnittDerEinheit,
   besatzungText,
-  loeseAbgestellte,
+  detachAbgestellte,
   filterAktive,
   needsOhneFahrzeugKnoten,
   fremdText,
@@ -766,7 +766,11 @@ export function baueKraeftebild(
   const wurzelnByAbschnitt = new Map<number | null, EinheitKnoten[]>();
   // Abgestellte Untereinheiten stehen in ihrem eigenen Abschnitt (LLH-1744): so ergibt jede
   // Abschnittszeile dieselbe Stärke wie `abschnittStaerken`, und jede Kraft steht einmal.
-  for (const knoten of loeseAbgestellte(einheiten, abschnitte, quelle.einheiten ?? alleEinheiten)) {
+  for (const knoten of detachAbgestellte(
+    einheiten,
+    abschnitte,
+    quelle.einheiten ?? alleEinheiten,
+  )) {
     const key = knoten.abschnittId;
     if (!wurzelnByAbschnitt.has(key)) wurzelnByAbschnitt.set(key, []);
     wurzelnByAbschnitt.get(key)!.push(knoten);

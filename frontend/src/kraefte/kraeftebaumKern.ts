@@ -134,7 +134,7 @@ export interface EinheitKnoten {
   abschnittId: number | null;
   kinder: EinheitKnoten[];
   /**
-   * Nur aus {@link loeseAbgestellte}: die Obereinheit, von der sich diese Einheit gelöst hat, weil
+   * Nur aus {@link detachAbgestellte}: die Obereinheit, von der sich diese Einheit gelöst hat, weil
    * sie selbst in einem anderen Abschnitt steht (LLH-1744).
    */
   abgestelltAus?: Einheit;
@@ -161,7 +161,7 @@ export function einheitenBaum(
  * Organigramm: dort zählt ein Abschnitt, wer in ihm steht. `alle` ist die ungefilterte Liste, damit
  * eine Obereinheit, die ein Filter ausblendet, trotzdem genannt wird; aufgelöste zählen nicht.
  */
-export function loeseAbgestellte(
+export function detachAbgestellte(
   einheiten: readonly Einheit[],
   abschnitte: readonly Einsatzabschnitt[],
   alle: readonly Einheit[] = einheiten,
@@ -169,7 +169,7 @@ export function loeseAbgestellte(
   return baueEinheitenBaum(einheiten, abschnitte, abgestelltVon(einheiten, alle));
 }
 
-/** Die Obereinheit, von der eine Einheit abgestellt ist, sonst `undefined` (s. {@link loeseAbgestellte}). */
+/** Die Obereinheit, von der eine Einheit abgestellt ist, sonst `undefined` (s. {@link detachAbgestellte}). */
 export function abgestelltVon(
   einheiten: readonly Einheit[],
   alle: readonly Einheit[] = einheiten,
@@ -663,7 +663,7 @@ export interface KraeftebaumKnoten {
   abschnittId: number | null;
   mittel: MittelDerEinheit;
   kinder: KraeftebaumKnoten[];
-  /** Abgestellt aus dieser Obereinheit (LLH-1744, {@link loeseAbgestellte}). */
+  /** Abgestellt aus dieser Obereinheit (LLH-1744, {@link detachAbgestellte}). */
   abgestelltAus?: Einheit;
 }
 
@@ -735,7 +735,7 @@ export function kraeftebaum(eingabe: KraeftebaumEingabe): KraeftebaumWurzel[] {
     ...(k.abgestelltAus ? { abgestelltAus: k.abgestelltAus } : {}),
   });
   // Ein Abschnitt zählt, wer in ihm steht (LLH-1744): abgestellte Untereinheiten lösen sich.
-  const baum = loeseAbgestellte(e.einheiten, e.abschnitte, quelle.einheiten);
+  const baum = detachAbgestellte(e.einheiten, e.abschnitte, quelle.einheiten);
   const wurzeln: KraeftebaumWurzel[] = baum.map((k) => ({
     art: 'einheit',
     knoten: mitMitteln(k),

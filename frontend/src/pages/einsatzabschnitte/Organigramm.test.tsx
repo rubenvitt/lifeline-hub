@@ -19,7 +19,7 @@ import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenCo
 import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { antdToken, dichten, farbenDunkel } from '../../theme/tokens';
-import { baueFuehrungsorganisation } from './fuehrungsorganisation';
+import { buildFuehrungsorganisation } from './fuehrungsorganisation';
 import { contrastSurface } from '@einsatzzeichen/core/blocks';
 import { ConfigProvider, theme } from 'antd';
 import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
@@ -110,7 +110,7 @@ function bild(
   onUmschalten = vi.fn(),
   einsatzleiter: EinsatzleiterDarstellung = { art: 'nicht-erfasst' },
 ) {
-  const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
+  const org = buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
   return {
     onUmschalten,
     ...renderMitProviders(
@@ -140,7 +140,7 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
-        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        org={buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
         einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={[]}
         fuehrungsstelle={{ bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian Musterstadt 10/1' }}
@@ -158,7 +158,7 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
-        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        org={buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
         einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={[]}
         fuehrungsstelle={{ bezeichnung: null, rufname: 'Florian 10/1' }}
@@ -222,7 +222,7 @@ describe('OrganigrammBild — Knoten', () => {
   });
 
   it('zeigt „—“ statt einer Stärke, wenn einem Abschnitt keine Einheit zugeordnet ist', () => {
-    const org = baueFuehrungsorganisation([abschnitt(5, { name: 'Leer' })], []);
+    const org = buildFuehrungsorganisation([abschnitt(5, { name: 'Leer' })], []);
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
@@ -251,7 +251,7 @@ describe('OrganigrammBild — Knoten', () => {
   // hinterlegt das Render-Theme `dark` jede Kontur hell, ohne Fläche dahinter; am Tag keins.
   it('zeichnet nachts jedes Zeichen mit dem Theme `dark`, am Tag ohne, nie mit Fläche dahinter', () => {
     const hinterlegung = `[stroke="${contrastSurface(ZEICHEN_THEME_DUNKEL)}"]`;
-    const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
+    const org = buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
     const { container, unmount } = renderMitProviders(
       <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
         <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
@@ -283,7 +283,7 @@ describe('OrganigrammBild — Knoten', () => {
   });
 
   it('stellt Einheiten ohne Abschnitt unter „Ohne Abschnitt“', () => {
-    const org = baueFuehrungsorganisation(ABSCHNITTE, [einheit(20, { name: 'Lose Gruppe' })]);
+    const org = buildFuehrungsorganisation(ABSCHNITTE, [einheit(20, { name: 'Lose Gruppe' })]);
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
@@ -298,7 +298,7 @@ describe('OrganigrammBild — Knoten', () => {
     expect(within(sammel).getByRole('link', { name: 'Lose Gruppe' })).toBeInTheDocument();
   });
   it('nennt an einer abgestellten Einheit ihre Obereinheit (LLH-1744)', () => {
-    const org = baueFuehrungsorganisation(ABSCHNITTE, [
+    const org = buildFuehrungsorganisation(ABSCHNITTE, [
       einheit(10, { name: '1. Zug', abschnitt_id: 1 }),
       einheit(11, { name: 'Gruppe Deich', abschnitt_id: 2, ueber_einheit_id: 10 }),
     ]);
@@ -316,6 +316,62 @@ describe('OrganigrammBild — Knoten', () => {
   });
 });
 
+describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
+  function renderBild(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]) {
+    return renderMitProviders(
+      <OrganigrammBild
+        einsatzId={1}
+        org={buildFuehrungsorganisation(abschnitte, einheiten)}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
+        stab={[]}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+  }
+  const knotenFrom = (name: string) =>
+    screen.getByRole('link', { name }).closest('[data-lfh="org-knoten"]') as HTMLElement;
+  const lageTag = (knoten: HTMLElement) =>
+    knoten.querySelector('[data-lfh="org-lagezustand"] [data-rolle]') as HTMLElement | null;
+
+  it('zeigt den eigenen Lagezustand als Etikett am Abschnitt, nicht beurteilt ohne', () => {
+    renderBild(
+      [
+        abschnitt(1, { name: 'EA Nord', lagezustand: 'planmaessig' }),
+        abschnitt(2, { name: 'UHS Turnhalle', ueber_abschnitt_id: 1, lagezustand: 'kritisch' }),
+        abschnitt(3, { name: 'EA West' }),
+      ],
+      [einheit(10, { name: 'GW-San', abschnitt_id: 2 })],
+    );
+    const uhs = lageTag(knotenFrom('UHS Turnhalle'));
+    expect(uhs).toHaveTextContent('kritisch');
+    expect(uhs).toHaveAttribute('data-rolle', 'alarm');
+    expect(uhs).toHaveAttribute('data-darstellung', 'rand');
+    // Nur der eigene Zustand: der kritische Unterabschnitt färbt seinen Abschnitt nicht.
+    expect(lageTag(knotenFrom('EA Nord'))).toHaveTextContent('planmäßig');
+    expect(lageTag(knotenFrom('EA West'))).toBeNull();
+    expect(lageTag(knotenFrom('GW-San'))).toBeNull();
+  });
+
+  it('steht direkt am Namen, nicht in der Metazeile', () => {
+    renderBild([abschnitt(1, { name: 'UHS Turnhalle', lagezustand: 'kritisch' })], []);
+    const link = screen.getByRole('link', { name: 'UHS Turnhalle' });
+    const lage = knotenFrom('UHS Turnhalle').querySelector('[data-lfh="org-lagezustand"]');
+    expect(link.parentElement).toBe(lage?.parentElement);
+  });
+
+  it('nennt „Leitung nicht besetzt“ gedämpft wie den Rufnamen, nicht in Achtungrolle', () => {
+    const { container } = renderBild([abschnitt(1, { name: 'EA West' })], []);
+    const knoten = knotenFrom('EA West');
+    const wort = within(knoten).getByText('Leitung nicht besetzt');
+    const rufname = within(knoten).getByText('kein Rufname');
+    expect(getComputedStyle(wort).color).toBe(getComputedStyle(rufname).color);
+    // Keine eigene Farbe am Wort: es erbt die gedämpfte Metazeile.
+    expect(wort.style.color).toBe('');
+    expect(container.querySelector('[data-lfh="status-chip"]')).toBeNull();
+  });
+});
+
 describe('OrganigrammBild — Klappen', () => {
   it('trägt den Zustand am Bedienziel und verbirgt beim Zuklappen nur die Kinder', async () => {
     const { onUmschalten, rerender } = bild();
@@ -326,7 +382,7 @@ describe('OrganigrammBild — Klappen', () => {
     await userEvent.click(knopf);
     expect(onUmschalten).toHaveBeenCalledWith('ab-1');
 
-    const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
+    const org = buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
     rerender(
       <OrganigrammBild
         einsatzId={1}
@@ -470,6 +526,132 @@ describe('Organigramm — Klappzustand im Container', () => {
       .getByRole('link', { name: 'EA Nord' })
       .closest('[data-lfh="org-knoten"]') as HTMLElement;
     expect(within(knoten).getByText('—')).toBeInTheDocument();
+  });
+});
+
+describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
+  beforeEach(() => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
+    vi.mocked(ladeMitglieder).mockReset().mockResolvedValue([]);
+  });
+
+  const zeile = (c: HTMLElement) =>
+    c.querySelector('[data-lfh="org-ohne-leitung"]') as HTMLElement | null;
+
+  it('zählt Abschnitte ohne Leitung und Einheiten ohne Führer getrennt, in Achtungrolle', () => {
+    const { container } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[...ABSCHNITTE, abschnitt(3, { name: 'EA West' })]}
+        einheiten={daten([
+          ...EINHEITEN,
+          einheit(11, { name: 'Trupp', abschnitt_id: 3 }),
+          einheit(12, { name: 'Lose' }),
+        ])}
+      />,
+    );
+    const z = zeile(container)!;
+    expect(z).toHaveTextContent('2 Abschnitte ohne Leitung');
+    expect(z).toHaveTextContent('2 Einheiten ohne Führer');
+    const chips = z.querySelectorAll('[data-lfh="status-chip"]');
+    expect([...chips].map((c) => c.getAttribute('data-ton'))).toEqual(['achtung', 'achtung']);
+    // Feste Höhe ohne Umbruch: wird ein Chip auf schmalem Schirm gekappt, nennt der Titel ihn ganz.
+    expect([...chips].map((c) => c.getAttribute('title'))).toEqual([
+      '2 Abschnitte ohne Leitung',
+      '2 Einheiten ohne Führer',
+    ]);
+    // Über dem Organigramm, außerhalb der Schleuse, mit fester Höhe; gedruckt wird sie mit.
+    const baum = screen.getByRole('region', { name: 'Organigramm' });
+    expect(baum.contains(z)).toBe(false);
+    expect(z.compareDocumentPosition(baum) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(z.style.height).not.toBe('');
+    expect(z.closest('.organigramm-no-print')).toBeNull();
+  });
+
+  it('nennt ohne Lücke leise „Leitung überall besetzt“', () => {
+    const { container } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })]}
+        einheiten={daten([einheit(10, { abschnitt_id: 1, fuehrer_name: 'Bernd Führer' })])}
+      />,
+    );
+    const z = zeile(container)!;
+    expect(z.textContent).toBe('Leitung überall besetzt');
+    expect(z.querySelector('[data-lfh="status-chip"]')).toBeNull();
+  });
+
+  it('zählt bei fehlenden Einheiten nur die Abschnitte, ohne „0“', () => {
+    const { container, rerender } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={ABSCHNITTE}
+        einheiten={{ zustand: 'fehler', daten: [] }}
+      />,
+    );
+    expect(zeile(container)!.textContent).toBe('1 Abschnitt ohne Leitung');
+    // Alle Abschnitte besetzt, Einheiten unbekannt: kein „überall“.
+    rerender(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })]}
+        einheiten={{ zustand: 'fehler', daten: [] }}
+      />,
+    );
+    expect(zeile(container)!.textContent).toBe('Alle Abschnitte mit Leitung');
+  });
+
+  it('folgt live, auch während die Schleuse hält, und behält ihre Höhe', () => {
+    const besetzt = [abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })];
+    const mitFuehrer = [einheit(10, { abschnitt_id: 1, fuehrer_name: 'Bernd Führer' })];
+    const { container, rerender } = renderMitProviders(
+      <Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(mitFuehrer)} />,
+    );
+    const hoehe = zeile(container)!.style.height;
+    fireEvent.pointerEnter(screen.getByRole('region', { name: 'Organigramm' }), {
+      pointerType: 'mouse',
+    });
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
+    // Am gezeigten Knoten fällt der Führer weg: Knoten und Zeile zeigen es sofort.
+    const ohneFuehrer = [einheit(10, { abschnitt_id: 1 })];
+    rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(ohneFuehrer)} />);
+    const knoten = screen
+      .getByRole('link', { name: 'Einheit 10' })
+      .closest('[data-lfh="org-knoten"]') as HTMLElement;
+    expect(within(knoten).getByText('Leitung nicht besetzt')).toBeInTheDocument();
+    expect(zeile(container)!.textContent).toBe('1 Einheit ohne Führer');
+    expect(zeile(container)!.style.height).toBe(hoehe);
+    // Eine neue Einheit ohne Führer wartet im Baum, gezählt wird sie schon.
+    const neu = [...ohneFuehrer, einheit(11, { name: 'Trupp', abschnitt_id: 1 })];
+    rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(neu)} />);
+    expect(screen.queryByRole('link', { name: 'Trupp' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'anzeigen' })).toBeInTheDocument();
+    expect(zeile(container)!.textContent).toBe('2 Einheiten ohne Führer');
+    expect(zeile(container)!.style.height).toBe(hoehe);
+  });
+
+  it('zeigt einen neuen Lagezustand sofort, auch wenn die Schleuse hält', () => {
+    const { rerender } = renderMitProviders(
+      <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
+    );
+    fireEvent.pointerEnter(screen.getByRole('region', { name: 'Organigramm' }), {
+      pointerType: 'mouse',
+    });
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
+    rerender(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[ABSCHNITTE[0], { ...ABSCHNITTE[1], lagezustand: 'kritisch' }]}
+        einheiten={daten(EINHEITEN)}
+      />,
+    );
+    const deich = screen
+      .getByRole('link', { name: 'UA Deich' })
+      .closest('[data-lfh="org-knoten"]') as HTMLElement;
+    expect(deich.querySelector('[data-lfh="org-lagezustand"]')).toHaveTextContent('kritisch');
+    expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
   });
 });
 

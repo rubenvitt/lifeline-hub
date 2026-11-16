@@ -13149,6 +13149,31 @@
           }
         }
       },
+      "LagemonitorGefahrengebiet": {
+        "type": "object",
+        "description": "Was der Monitor über das Gefahrengebiet einer Zone erfährt (LLH-1746, Spec `lagemonitor`,\n„Zonen ohne Freitext“): die Bezeichnung des Gebiets, seine höchste Warnstufe und ob die\nBeurteilung bestätigt ist. Nicht, wer bestätigt hat, und nicht wann.",
+        "required": [
+          "warnstufe",
+          "bestaetigt"
+        ],
+        "properties": {
+          "bestaetigt": {
+            "type": "boolean",
+            "description": "Ob die Beurteilung der Matrix bestätigt ist (LLH-1090)."
+          },
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bezeichnung des Gefahrengebiets (nicht die Beschriftung der Zone), falls gesetzt."
+          },
+          "warnstufe": {
+            "$ref": "#/components/schemas/Warnstufe",
+            "description": "Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste."
+          }
+        }
+      },
       "LagemonitorKraefte": {
         "type": "object",
         "description": "Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke.",
@@ -13321,13 +13346,24 @@
       },
       "LagemonitorZone": {
         "type": "object",
-        "description": "Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit\nund gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext.",
+        "description": "Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit\nund gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext der Zone.",
         "required": [
           "id",
           "typ",
           "geometrie"
         ],
         "properties": {
+          "gebiet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorGefahrengebiet",
+                "description": "Das Gefahrengebiet der Zone (LLH-1746), nur bei Typ `gefahrengebiet` mit zugeordnetem\nGebiet; sonst fehlt das Feld."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "geometrie": {
             "type": "string",
             "description": "GeoJSON-Geometrie als String, wie in der Zonenliste."

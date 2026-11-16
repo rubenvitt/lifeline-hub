@@ -2,7 +2,7 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
 ---
 
 ## Überblick
@@ -27,7 +27,7 @@ Eine eigene Anzeige außerhalb der App liest das Lagebild als Anbindung, ohne Ko
 2. „Anzeige starten“ wählen. Der Monitor wechselt in den Vollbildmodus und hält den Bildschirm
    wach.
 
-   ![Lagemonitor mit Lagekarte samt Gefahrengebieten und Abschnittsfläche, darunter die Kachel Meldungen mit einer offenen Sofortmeldung, rechts die Kacheln Betroffene, Kräfte und Belegung der Unfallhilfsstellen, unten die Statusleiste](../bilder/lagemonitor/lagemonitor.png)
+   ![Lagemonitor mit Lagekarte samt beschrifteten Gefahrengebieten, Abschnittsfläche und überbelegter Unfallhilfsstelle, darunter die Kachel Meldungen mit einer offenen Sofortmeldung, rechts die Kacheln Betroffene, Kräfte und Belegung der Unfallhilfsstellen mit „1 überbelegt“, unten die Statusleiste](../bilder/lagemonitor/lagemonitor.png)
 
 Kann der Browser den Bildschirm nicht wach halten, steht über der Statusleiste: „Dieser Browser
 kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abschalten.“
@@ -42,11 +42,19 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    Transporte und SK I.
 2. „Kräfte“ zählt Personal, Einheiten und die Stärke F/UF/M; oben rechts steht, wie viele Kräfte an
    aktiven Unfallhilfsstellen arbeiten, gezählt wie im Lagebild.
-3. „Belegung der Unfallhilfsstellen“ nennt je UHS Belegte und Plätze, die vollsten zuerst, bis zu
-   sechs; der Rest steht als „+… weitere“.
-4. Die Lagekarte zeigt den Einsatzort, jede verortete UHS mit ihrer Belegung, die Gefahrenzonen
-   (Gefahrengebiete, Absperrungen, Sperrgebiete) und die gezeichneten Flächen der
-   Einsatzabschnitte mit ihrer Kurzbezeichnung, ohne Kurzbezeichnung mit ihrem Namen.
+3. „Belegung der Unfallhilfsstellen“ nennt je UHS Belegte und Plätze, etwa „8/5“, bis zu sechs;
+   der Rest steht als „+… weitere“. Überbelegte UHS (mehr Belegte als Plätze) stehen zuerst, rot
+   hinterlegt, und oben in der Kachel steht, wie viele es sind, etwa „1 überbelegt“. Danach
+   folgen die vollsten. Eine volle UHS („5/5“) gilt nicht als überbelegt.
+4. Die Lagekarte zeigt den Einsatzort, jede verortete UHS mit Belegten und Plätzen (überbelegt
+   rot), die Gefahrenzonen und die gezeichneten Flächen der Einsatzabschnitte mit ihrer
+   Kurzbezeichnung, ohne Kurzbezeichnung mit ihrem Namen. Ein Gefahrengebiet trägt den Namen
+   seines Gebiets und die höchste Warnstufe der Gefahrenmatrix, etwa „Hangrutsch Kirchberg ·
+   hoch“, und ist in deren Farbe gefärbt wie auf der [Lagekarte](lagekarte.md); solange niemand
+   die Beurteilung bestätigt hat, steht dahinter „unbestätigt“ (Kapitel
+   [Gefahren](gefahren.md)). Ist in der Matrix noch keine Gefahr gesetzt, steht dort „keine
+   Stufe“, und die Fläche ist vorsichtshalber rot. Ein langer Name bricht in der Beschriftung um.
+   Absperrungen und Sperrgebiete tragen nur ihre Art, etwa „Absperrbereich“.
 5. „Meldungen“ unter der Karte zählt die „Sofortmeldungen offen“, die noch niemand bestätigt
    hat.
 6. „Ablauf“ neben „Meldungen“ nennt die nächsten drei Programmpunkte aus den
@@ -102,7 +110,10 @@ alle übrigen Kacheln und die Statusleiste laufen weiter.
 
 Auf der Karte fehlen Evakuierungsbezirke und freie Skizzen, außerdem Beschriftung und Notiz der
 Gefahrenzonen sowie Leitung und Bemerkung der Abschnitte: Freitexte können Personen nennen.
-Gefahrenzonen erscheinen unabhängig von der Kartenansicht, in der sie gezeichnet wurden.
+Ein Gefahrengebiet trägt deshalb den Namen seines Gefahrengebiets, nicht die Beschriftung der
+gezeichneten Fläche; wer die Beurteilung bestätigt hat, erfährt der Monitor nicht. Gehören
+mehrere Flächen zu einem Gefahrengebiet, trägt jede die Beschriftung. Gefahrenzonen erscheinen
+unabhängig von der Kartenansicht, in der sie gezeichnet wurden.
 
 ### Ende der Kopplung
 

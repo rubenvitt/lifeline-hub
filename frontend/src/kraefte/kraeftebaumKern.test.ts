@@ -9,7 +9,7 @@ import {
   needsOhneFahrzeugKnoten,
   einheitenBaum,
   kraeftebaum,
-  loeseAbgestellte,
+  detachAbgestellte,
   accumulateStaerke,
   materialImBaum,
   mittelDerEinheit,
@@ -270,12 +270,12 @@ describe('buildEinheitOptions / groupEinheitOptions (LLH-1073, design.md D3)', (
   });
 });
 
-describe('loeseAbgestellte (LLH-1744, Spec `kraeftebaum`)', () => {
+describe('detachAbgestellte (LLH-1744, Spec `kraeftebaum`)', () => {
   const abschnitte = [ab(10), ab(11, 10), ab(12)];
 
   it('eine Untereinheit mit eigenem, anderem Abschnitt wird samt Kindern Wurzel ihres Abschnitts', () => {
     // Zug 1 in 10; Gruppe 2 in 11 mit Trupp 3 (erbt 11); Gruppe 4 ohne Abschnitt (erbt 10).
-    const baum = loeseAbgestellte(
+    const baum = detachAbgestellte(
       [eh(1, 10), eh(2, 11, 1), eh(3, null, 2), eh(4, null, 1)],
       abschnitte,
     );
@@ -290,30 +290,30 @@ describe('loeseAbgestellte (LLH-1744, Spec `kraeftebaum`)', () => {
   });
 
   it('eine Untereinheit mit demselben eigenen Abschnitt bleibt unter ihrer Einheit', () => {
-    const baum = loeseAbgestellte([eh(1, 10), eh(2, 10, 1)], abschnitte);
+    const baum = detachAbgestellte([eh(1, 10), eh(2, 10, 1)], abschnitte);
     expect(ids(baum)).toEqual([[1, [2]]]);
   });
 
   it('ohne eigenen Abschnitt bleibt sie unter einer Obereinheit ohne Abschnitt', () => {
-    const baum = loeseAbgestellte([eh(1, null), eh(2, null, 1)], abschnitte);
+    const baum = detachAbgestellte([eh(1, null), eh(2, null, 1)], abschnitte);
     expect(ids(baum)).toEqual([[1, [2]]]);
   });
 
   it('mit eigenem Abschnitt löst sie sich auch von einer Obereinheit ohne Abschnitt', () => {
-    const baum = loeseAbgestellte([eh(1, null), eh(2, 12, 1)], abschnitte);
+    const baum = detachAbgestellte([eh(1, null), eh(2, 12, 1)], abschnitte);
     expect(ids(baum)).toEqual([2, 1]);
     expect(baum[0].abgestelltAus?.id).toBe(1);
   });
 
   it('fehlt die Obereinheit in der Auswahl, nennt die ungefilterte Liste sie trotzdem', () => {
     const alle = [eh(1, 10), eh(2, 11, 1)];
-    const baum = loeseAbgestellte([alle[1]], abschnitte, alle);
+    const baum = detachAbgestellte([alle[1]], abschnitte, alle);
     expect(ids(baum)).toEqual([2]);
     expect(baum[0].abgestelltAus?.id).toBe(1);
   });
 
   it('Waise und Zyklus verlieren keine Einheit', () => {
-    const baum = loeseAbgestellte([eh(5, 10, 6), eh(6, 11, 5), eh(7, null, 99)], abschnitte);
+    const baum = detachAbgestellte([eh(5, 10, 6), eh(6, 11, 5), eh(7, null, 99)], abschnitte);
     const flach: number[] = [];
     const sammle = (k: readonly EinheitKnoten[]) =>
       k.forEach((x) => {

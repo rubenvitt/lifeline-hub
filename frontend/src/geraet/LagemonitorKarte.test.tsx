@@ -21,6 +21,8 @@ const karte = vi.hoisted(() => ({
   wurf: null as null | (() => Error),
   gebaut: 0,
   marker: 0,
+  /** Die Elemente der Marken, wie maplibre sie bekäme (LLH-1746). */
+  elemente: [] as HTMLElement[],
   optionen: null as null | Record<string, unknown>,
 }));
 
@@ -42,8 +44,9 @@ vi.mock('maplibre-gl', () => {
     }
   }
   class Marker {
-    constructor() {
+    constructor(optionen?: { element?: HTMLElement }) {
       karte.marker += 1;
+      if (optionen?.element) karte.elemente.push(optionen.element);
       return spion();
     }
   }
@@ -81,6 +84,7 @@ beforeEach(() => {
   karte.wurf = null;
   karte.gebaut = 0;
   karte.marker = 0;
+  karte.elemente = [];
   karte.optionen = null;
   server.use(
     http.get('/api/karte/config', () =>
@@ -190,5 +194,125 @@ describe('LagemonitorKarte Quellenangabe (LLH-1496)', () => {
     zeige();
     await waitFor(() => expect(karte.gebaut).toBe(1));
     expect(karte.optionen?.attributionControl).toBe(false);
+  });
+});
+
+/**
+ * Beschriftung der Gefahrenzonen und Belegung der UHS auf der Karte (LLH-1746, Spec `lagemonitor`).
+ * Mutationsprobe: Zonenmarken nicht zeichnen → der erste Fall rot; Alarmrand an jeder UHS → der
+ * zweite Fall rot (die volle UHS trüge ihn).
+ */
+describe('LagemonitorKarte Marken (LLH-1746)', () => {
+  const POLY = JSON.stringify({
+    type: 'Polygon',
+    coordinates: [
+      [
+        [13.4, 52.5],
+        [13.41, 52.5],
+        [13.41, 52.51],
+        [13.4, 52.5],
+      ],
+    ],
+  });
+  const marke = (lfh: string) => karte.elemente.filter((e) => e.dataset.lfh === lfh);
+
+  it('beschriftet ein Gefahrengebiet mit Name und Stufe in Großbild-Schrift', async () => {
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={{ lat: 52.52, lon: 13.405 }}
+        uhs={[]}
+        zonen={[
+          {
+            id: 1,
+            typ: 'gefahrengebiet',
+            geometrie: POLY,
+            gebiet: { bezeichnung: 'Hangrutsch Kirchberg', warnstufe: 'hoch', bestaetigt: false },
+          },
+          { id: 2, typ: 'absperrbereich', geometrie: POLY },
+        ]}
+      />,
+    );
+    await waitFor(() => expect(marke('monitor-zone')).toHaveLength(2));
+    const [gebiet, absperrung] = marke('monitor-zone');
+    expect(gebiet).toHaveTextContent('Hangrutsch Kirchberg · hoch · unbestätigt');
+    expect(gebiet.dataset.rolle).toBe('alarm');
+    expect(gebiet.style.fontSize).toBe('28px');
+    expect(absperrung).toHaveTextContent('Absperrbereich');
+    expect(absperrung.dataset.rolle).toBeUndefined();
+  });
+
+  it('ein langer Name bricht um statt abgeschnitten zu werden, die Stufe bleibt ganz', async () => {
+    const lang = 'Hangrutsch am Hang hinter der Grundschule Kirchberg Richtung Ortsausgang Nord';
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={{ lat: 52.52, lon: 13.405 }}
+        uhs={[]}
+        zonen={[
+          {
+            id: 1,
+            typ: 'gefahrengebiet',
+            geometrie: POLY,
+            gebiet: { bezeichnung: lang, warnstufe: 'hoch', bestaetigt: false },
+          },
+        ]}
+      />,
+    );
+    await waitFor(() => expect(marke('monitor-zone')).toHaveLength(1));
+    const [gebiet] = marke('monitor-zone');
+    const name = gebiet.querySelector<HTMLElement>('[data-lfh="monitor-zone-name"]')!;
+    const stufe = gebiet.querySelector<HTMLElement>('[data-lfh="monitor-zone-stufe"]')!;
+    // Der ganze Name steht da, ohne Kürzung; die Marke ist höchstens 16 Schriftgrößen breit.
+    expect(name).toHaveTextContent(lang);
+    expect(name.style.textOverflow).toBe('');
+    expect(gebiet.style.maxWidth).toBe('448px');
+    expect(gebiet.style.whiteSpace).toBe('normal');
+    expect(stufe).toHaveTextContent('· hoch · unbestätigt');
+    expect(stufe.style.whiteSpace).toBe('nowrap');
+  });
+
+  it('ohne Zonenbeschriftung (Lagebild für Externe) keine Zonenmarken', async () => {
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={{ lat: 52.52, lon: 13.405 }}
+        uhs={[]}
+        zonen={[{ id: 2, typ: 'absperrbereich', geometrie: POLY }]}
+        zonenBeschriften={false}
+      />,
+    );
+    await waitFor(() => expect(karte.marker).toBe(1));
+    expect(marke('monitor-zone')).toHaveLength(0);
+  });
+
+  it('zeigt an der UHS Belegte und Plätze, überbelegt in der Alarmrolle', async () => {
+    const uhs = (id: number, bezeichnung: string, belegt: number, plaetze: number) => ({
+      id,
+      bezeichnung,
+      typ: 'behandlungsplatz' as const,
+      status: 'aktiv' as const,
+      lat: 52.52,
+      lon: 13.41,
+      belegt,
+      plaetze,
+      kraefte: 0,
+    });
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={{ lat: 52.52, lon: 13.405 }}
+        uhs={[uhs(1, 'Turnhalle', 8, 5), uhs(2, 'Schule', 5, 5), uhs(3, 'Zelt', 2, 0)]}
+      />,
+    );
+    await waitFor(() => expect(marke('monitor-uhs-marke')).toHaveLength(3));
+    const [turnhalle, schule, zelt] = marke('monitor-uhs-marke');
+    expect(turnhalle).toHaveTextContent('Turnhalle · 8/5');
+    expect(turnhalle.dataset.ueberbelegt).toBe('ja');
+    expect(schule).toHaveTextContent('Schule · 5/5');
+    expect(schule.dataset.ueberbelegt).toBe('nein');
+    // Die Alarmrolle selbst: Rand und Fläche unterscheiden sich von der vollen, nicht überbelegten.
+    expect(turnhalle.style.borderColor).not.toBe(schule.style.borderColor);
+    expect(turnhalle.style.background).not.toBe(schule.style.background);
+    expect(turnhalle.style.color).not.toBe(schule.style.color);
+    expect(zelt.style.borderColor).toBe(schule.style.borderColor);
+    expect(zelt).toHaveTextContent('Zelt · 2');
+    expect(zelt.dataset.ueberbelegt).toBe('nein');
   });
 });

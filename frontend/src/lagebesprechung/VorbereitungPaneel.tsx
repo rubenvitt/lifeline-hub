@@ -1,42 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from 'antd';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
 import type { AbrufZustand } from '../api/abrufZustand';
 import { legeLageberichtAn } from '../api/lageberichte';
 import type { EinsatzAnzeige, LagebesprechungStand, ModulFreigaben } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import {
-  auftragsStand,
-  meldungsStand,
-  nachforderungsStand,
-} from '../pages/lage-dashboard/fuehrungsZahlen';
-import { baueLagebild, kennzahlReihe } from '../pages/lage-dashboard/lagebild';
-import { kraefteZustand, useLagebild } from '../pages/lage-dashboard/useLagebild';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
-import { quellenLaden, vorbereitungMarkdown, vorbereitungsZeilen } from './vorbereitung';
+import { useVorbereitung } from './useVorbereitung';
+import { vorbereitungMarkdown } from './vorbereitung';
 import { zeitKurz, zeitpunkt } from '../anzeige/zeitDarstellung';
-
-dayjs.extend(utc);
-
-/** Takt der Uhr: die Notiz „n seit über 4 h" an „Vermisste" zieht nach, ohne jede Sekunde zu
- *  rendern. */
-const TAKT_MS = 30_000;
-
-/** Die Reihe ohne aktive Lagekennzahlen: Kern plus Füllplätze, nie Pegel oder Evakuiert. */
-const KERN_REIHE = kennzahlReihe([]);
-
-/** Epoche → Wire-String (UTC ohne Zone), wie die Formatierer ihn erwarten. */
-function alsWire(ms: number): string {
-  return dayjs.utc(ms).format('YYYY-MM-DD HH:mm:ss');
-}
 
 interface Props {
   einsatzId: number;
@@ -67,61 +43,12 @@ export default function VorbereitungPaneel({
   const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
   const navigate = useNavigate();
-  const [jetzt, setJetzt] = useState(() => Date.now());
-  useEffect(() => {
-    const t = window.setInterval(() => setJetzt(Date.now()), TAKT_MS);
-    return () => window.clearInterval(t);
-  }, []);
-
-  const { q, zustand, basis, stand: standVon } = useLagebild(einsatzId, { mitPegel: false });
-  // Die Lageplätze (Pegel, Evakuiert) zeigt die Vorbereitung nicht: sie baut mit der Reihe ohne
-  // Lagekennzahlen, die Kern-Kennzahlen sind dieselben wie im Dashboard.
-  const lagebild = useMemo(
-    () =>
-      basis
-        ? baueLagebild({ ...basis, evakuierung: { zustand: 'laden' } }, jetzt, konv, KERN_REIHE)
-        : null,
-    [basis, jetzt, konv],
-  );
-
-  const zeilen = vorbereitungsZeilen(
-    {
-      lagebild,
-      zustand: {
-        personen: zustand.personen,
-        kraefte: kraefteZustand(zustand),
-        gefahren: zustand.gefahren,
-        lageberichte: zustand.lageberichte,
-        besprechung: besprechungZustand,
-      },
-      auftraege: auftragsStand(q.zaehler),
-      meldungen: meldungsStand(q.zaehler),
-      nachforderungen: nachforderungsStand(q.zaehler),
-      besprechung,
-    },
-    konv,
-  );
-
-  const stand = Math.min(
-    ...[
-      // Eine gesperrte Quelle zählt nicht in den Stand (LFH-669, `useLagebild`).
-      gemeinsamerDatenstand(
-        standVon('einsatz'),
-        standVon('personen'),
-        standVon('personal'),
-        standVon('fahrzeuge'),
-        standVon('material'),
-        standVon('einheiten'),
-        standVon('abschnitte'),
-        standVon('gefahren'),
-        standVon('lageberichte'),
-        standVon('zaehler'),
-      ),
-      besprechungStand,
-    ].filter((s) => s > 0),
-  );
-  const standWire = Number.isFinite(stand) ? alsWire(stand) : null;
-  const laedt = quellenLaden(zeilen);
+  const { zeilen, standWire, laedt } = useVorbereitung({
+    einsatzId,
+    besprechung,
+    besprechungZustand,
+    besprechungStand,
+  });
 
   // Die Übernahme legt einen Lagebericht an: Schreibrecht im Einsatz UND Modul Lageberichte frei
   // (Freigabe vom Server; solange sie fehlt, gilt das Modul als nicht frei).
@@ -181,11 +108,15 @@ export default function VorbereitungPaneel({
             data-zustand={z.zustand}
             style={{
               display: 'grid',
+              // Wert direkt neben der Bezeichnung (LLH-1747, Spec `lagebesprechung-vorbereitung`,
+              // „Wert neben der Bezeichnung“): die Bezeichnungsspalte ist gedeckelt, 16 em am
+              // Fükw, 40 % auf schmalen Schirmen; vorher stand der Wert rechtsbündig am Rand
+              // der vollen Breite, bei 1920 px rund 1500 px von seiner Bezeichnung.
               // Beide Spalten dürfen schrumpfen: die Sichtung ist lang und bricht um, statt auf
               // 390 px über den Rand zu laufen. Nur hinter „ · “: im Teil und vor dem Punkt stehen
               // geschützte Leerzeichen (`sichtungText`, LFH-978); `overflowWrap` an der
               // Wertspalte bleibt Notbremse für einen Teil, der allein nicht passt.
-              gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.6fr)',
+              gridTemplateColumns: 'minmax(0, min(16em, 40%)) minmax(0, 1fr)',
               columnGap: token.marginSM,
               rowGap: token.marginXXS,
               width: '100%',
@@ -196,17 +127,17 @@ export default function VorbereitungPaneel({
               data-teil="wert"
               style={{
                 ...monoStil(token.fontSize, 500),
-                textAlign: 'end',
                 overflowWrap: 'anywhere',
               }}
             >
               {z.wert}
             </span>
+            {/* Quelle unter der Bezeichnung, Notiz unter dem Wert. */}
+            <span style={{ color: rollen.gedaempft, fontSize: token.fontSizeSM }}>
+              Quelle: {z.quelle}
+            </span>
             <span style={{ color: rollen.gedaempft, fontSize: token.fontSizeSM }}>
               {z.notiz ?? ''}
-            </span>
-            <span style={{ color: rollen.gedaempft, fontSize: token.fontSizeSM, textAlign: 'end' }}>
-              Quelle: {z.quelle}
             </span>
           </div>
         </PaneelZeile>

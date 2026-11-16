@@ -78,6 +78,11 @@ export function desktopPermission(): NotificationPermission | 'unsupported' {
   // Ob die App melden darf, regelt das Betriebssystem; die Seite erfährt es nicht.
   if (huelleBenachrichtigung()) return 'granted';
   if (!verfuegbar()) return 'unsupported';
+  // Verweigert ist verweigert, auf welchem Weg auch immer; der Browser weiß es sofort. Erst eine
+  // erteilte oder offene Berechtigung braucht den Weg. So steht „Benachrichtigung blockiert“ auf
+  // Android schon im ersten Bild, nicht erst nach der Antwort des Service Workers (LLH-1910, Spec
+  // `kopfleiste`).
+  if (Notification.permission === 'denied') return 'denied';
   if (!konstruktorNutzbar() && !serviceWorkerDa()) return 'unsupported';
   return Notification.permission;
 }

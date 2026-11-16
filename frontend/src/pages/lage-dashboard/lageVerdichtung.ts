@@ -215,7 +215,7 @@ interface UhsVerdichtung {
   aktiv: number;
   aufgeloest: number;
   gesamt: number;
-  /** Kräfte an aktiven UHS, Summe ihrer Stärke (LFH-1045, über {@link zaehltKraefteAnUhs}). */
+  /** Kräfte an aktiven UHS, Summe ihrer Stärke (LFH-1045, über {@link countsKraefteAnUhs}). */
   kraefteAktiv: number;
 }
 
@@ -224,7 +224,7 @@ interface UhsVerdichtung {
  * geplanten arbeitet noch niemand, an einer aufgelösten keiner mehr (LLH-1744, Spec
  * `lage-verdichtung`). Lagebild und Lagemonitor zählen beide hierüber.
  */
-export function zaehltKraefteAnUhs(status: Uhs['status']): boolean {
+export function countsKraefteAnUhs(status: Uhs['status']): boolean {
   return status === 'aktiv';
 }
 
@@ -238,7 +238,7 @@ export function verdichteUhs(uhs: Uhs[]): UhsVerdichtung {
   };
   for (const u of uhs) {
     v[u.status] += 1;
-    if (zaehltKraefteAnUhs(u.status)) {
+    if (countsKraefteAnUhs(u.status)) {
       v.kraefteAktiv += u.staerke.fuehrer + u.staerke.unterfuehrer + u.staerke.mannschaft;
     }
   }

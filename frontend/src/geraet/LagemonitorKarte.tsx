@@ -22,7 +22,8 @@ import {
   sorgeFuerZonenLayer,
 } from '../pages/lagekarte/kartenLayer';
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
-import { baueMonitorFlaechen } from './lagemonitorFlaechen';
+import { rollenFarbe } from '../theme/statusFarben';
+import { baueMonitorFlaechen, belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 
 /**
  * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`,
@@ -82,6 +83,7 @@ export default function LagemonitorKarte({
   abschnitte = [],
   schrift = GROSS_TEXT,
   bedienbar = false,
+  zonenBeschriften = true,
   anfrage = absolutiereProxyAnfrage,
 }: {
   einsatzort: MonitorPunkt | null;
@@ -92,10 +94,16 @@ export default function LagemonitorKarte({
   schrift?: number;
   /** Verschieben und Zoomen zulassen. */
   bedienbar?: boolean;
+  /**
+   * Gefahrenzonen mit Name und Stufe beschriften (LLH-1746). Das Lagebild für Externe lässt sie
+   * unbeschriftet (D5 in
+   * `openspec/changes/archive/2026-11-16-m4i2toor-lagemonitor-zonen-ueberbelegung/design.md`).
+   */
+  zonenBeschriften?: boolean;
   /** `transformRequest` der Karte; die Vorgabe absolutiert die Proxy-Adressen. */
   anfrage?: (url: string) => maplibregl.RequestParameters;
 }) {
-  const { rollen, dunkel } = useRollen();
+  const { rollen, dunkel, token } = useRollen();
   const container = useRef<HTMLDivElement>(null);
   const karte = useRef<maplibregl.Map | null>(null);
   const marker = useRef<maplibregl.Marker[]>([]);
@@ -108,9 +116,10 @@ export default function LagemonitorKarte({
   const verortetSchluessel = JSON.stringify(verortet);
   const flaechenSchluessel = JSON.stringify([zonen, abschnitte]);
   const flaechen = useMemo(
-    () => baueMonitorFlaechen(zonen, abschnitte),
+    () => baueMonitorFlaechen(zonen, abschnitte, token),
+    // `dunkel` statt `token`: die Stufenfarbe hängt nur am Modus, der Token wechselt öfter.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Inhalt statt Objektidentität
-    [flaechenSchluessel],
+    [flaechenSchluessel, dunkel],
   );
   const punkte: MonitorPunkt[] = [
     ...(einsatzort ? [einsatzort] : []),
@@ -203,8 +212,8 @@ export default function LagemonitorKarte({
     });
   }, [flaechen, config, dunkel, hatAusschnitt]);
 
-  // Marker: Einsatzort, je Abschnittsfläche ihre Bezeichnung und je UHS ein Schild mit der
-  // Belegung.
+  // Marker: Einsatzort, je Abschnittsfläche ihre Bezeichnung, je Gefahrenzone Name und Stufe
+  // (LLH-1746) und je UHS ein Schild mit Belegten und Plätzen, überbelegt in der Alarmrolle.
   useEffect(() => {
     const map = karte.current;
     if (!map) return;
@@ -238,18 +247,56 @@ export default function LagemonitorKarte({
       });
       neu.push(new maplibregl.Marker({ element: el }).setLngLat([a.lon, a.lat]));
     }
-    for (const u of verortet) {
+    for (const z of zonenBeschriften ? flaechen.zonenMarken : []) {
       const el = document.createElement('div');
-      el.textContent = `${u.bezeichnung} · ${u.belegt}`;
+      el.setAttribute('data-lfh', 'monitor-zone');
+      el.setAttribute('aria-label', z.text);
+      if (z.rolle) el.setAttribute('data-rolle', z.rolle);
+      // Ein langer Name (Freitext bis 200 Zeichen) bricht innerhalb einer Höchstbreite um, statt
+      // die Karte zu sprengen oder abgeschnitten zu werden („Keine Kachel schneidet ihren Inhalt
+      // ab“, `geraet/AGENTS.md`); die Stufe bleibt als Ganzes zusammen.
+      Object.assign(el.style, {
+        width: 'max-content',
+        maxWidth: `${schrift * 16}px`,
+        fontSize: `${schrift}px`,
+        lineHeight: '1.2',
+        fontWeight: '600',
+        padding: '2px 10px',
+        borderRadius: '6px',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        background: rollen.grund,
+        color: rollen.text,
+        border: `2px solid ${z.rolle ? rollenFarbe(z.rolle, token) : rollen.linieStark}`,
+      });
+      const name = document.createElement('span');
+      name.textContent = z.name;
+      name.setAttribute('data-lfh', 'monitor-zone-name');
+      el.append(name);
+      if (z.stufe) {
+        const stufe = document.createElement('span');
+        stufe.textContent = ` · ${z.stufe}`;
+        stufe.setAttribute('data-lfh', 'monitor-zone-stufe');
+        stufe.style.whiteSpace = 'nowrap';
+        el.append(stufe);
+      }
+      neu.push(new maplibregl.Marker({ element: el }).setLngLat([z.lon, z.lat]));
+    }
+    for (const u of verortet) {
+      const ueberbelegt = istUeberbelegt(u);
+      const el = document.createElement('div');
+      el.textContent = `${u.bezeichnung} · ${belegungText(u)}`;
+      el.setAttribute('data-lfh', 'monitor-uhs-marke');
+      el.setAttribute('data-ueberbelegt', ueberbelegt ? 'ja' : 'nein');
       Object.assign(el.style, {
         fontSize: `${schrift}px`,
         fontWeight: '600',
         padding: '4px 12px',
         borderRadius: '6px',
         whiteSpace: 'nowrap',
-        background: rollen.flaeche,
-        color: rollen.text,
-        border: `2px solid ${rollen.linieStark}`,
+        background: ueberbelegt ? rollen.alarmFuellung : rollen.flaeche,
+        color: ueberbelegt ? rollen.alarmText : rollen.text,
+        border: `2px solid ${ueberbelegt ? rollen.alarmText : rollen.linieStark}`,
       });
       neu.push(new maplibregl.Marker({ element: el }).setLngLat([u.lon!, u.lat!]));
     }
@@ -265,6 +312,7 @@ export default function LagemonitorKarte({
     dunkel,
     rollen,
     schrift,
+    zonenBeschriften,
   ]);
 
   if (!ausschnitt) {

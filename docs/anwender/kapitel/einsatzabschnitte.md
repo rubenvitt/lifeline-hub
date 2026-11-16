@@ -196,6 +196,17 @@ Wurzel steht keine Stärke; die Gesamtstärke zeigt die Kräfteübersicht. Absch
 zählen wie in der Gliederung: Eine Untereinheit, die selbst in einem anderen Abschnitt steht, hängt
 dort mit „aus“ und dem Namen ihrer Einheit, und diese zählt sie nicht mehr mit.
 
+Ein beurteilter Abschnitt trägt neben seinem Namen den Lagezustand („planmäßig“, „angespannt“,
+„kritisch“) in derselben Form wie im Gliederungsbaum; ein nicht beurteilter trägt keinen. Jeder
+Knoten zeigt nur seinen eigenen Zustand, die Unterabschnitte stehen mit ihrem darunter. Fehlt einem
+Abschnitt der Abschnittsleiter oder einer Einheit der Führer, steht am Knoten leise „Leitung nicht
+besetzt“. Gezählt stehen die Lücken einmal über dem Organigramm, etwa „2 Abschnitte ohne Leitung“
+und „7 Einheiten ohne Führer“; sind alle besetzt, steht dort leise „Leitung überall besetzt“
+(fehlen die Einheiten, „Alle Abschnitte mit Leitung“). Die Zahl folgt jeder Änderung sofort, auch
+während das Organigramm neue Knoten hinter einem Hinweis wie „1 neu“ zurückhält, bis „anzeigen“
+gewählt wird. Der Ausdruck trägt Lagezustand und Sammelzeile wie der Bildschirm; „In Lagebericht
+übernehmen“ schreibt den Lagezustand und, wenn eine Leitung fehlt, die Sammelzeile.
+
 Daneben steht der Kasten „Stab“, sobald ein Mitglied ein Sachgebiet S1 bis S6 führt. Er nennt je
 Sachgebiet die Namen der Mitglieder, die es tragen, mehrere alphabetisch; ein Sachgebiet ohne
 Mitglied fehlt. Gepflegt wird die Funktion als Führungsstelle der Mitglieder im Reiter „Zugriff“

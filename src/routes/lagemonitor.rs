@@ -82,13 +82,31 @@ pub struct LagemonitorUhs {
 }
 
 /// Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit
-/// und gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext.
+/// und gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext der Zone.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LagemonitorZone {
     pub id: i64,
     pub typ: LageZoneTyp,
     /// GeoJSON-Geometrie als String, wie in der Zonenliste.
     pub geometrie: String,
+    /// Das Gefahrengebiet der Zone (LLH-1746), nur bei Typ `gefahrengebiet` mit zugeordnetem
+    /// Gebiet; sonst fehlt das Feld.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gebiet: Option<LagemonitorGefahrengebiet>,
+}
+
+/// Was der Monitor über das Gefahrengebiet einer Zone erfährt (LLH-1746, Spec `lagemonitor`,
+/// „Zonen ohne Freitext“): die Bezeichnung des Gebiets, seine höchste Warnstufe und ob die
+/// Beurteilung bestätigt ist. Nicht, wer bestätigt hat, und nicht wann.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LagemonitorGefahrengebiet {
+    /// Bezeichnung des Gefahrengebiets (nicht die Beschriftung der Zone), falls gesetzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bezeichnung: Option<String>,
+    /// Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste.
+    pub warnstufe: crate::gefahr::Warnstufe,
+    /// Ob die Beurteilung der Matrix bestätigt ist (LLH-1090).
+    pub bestaetigt: bool,
 }
 
 /// Die Fläche eines Einsatzabschnitts für die Monitorkarte, ohne Leiter und Freitexte.
@@ -329,19 +347,37 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
     }
 
     // Gefahrenzonen wie beim Abschnittsgerät (`routes/lage_zone.rs`, `liste`): einsatzweit, ohne
-    // Bezirke und Skizzen.
-    let zonen_roh: Vec<(i64, String, String)> =
-        sqlx::query_as("SELECT id, typ, geometrie FROM lage_zone WHERE einsatz_id = ? ORDER BY id")
-            .bind(einsatz_id)
-            .fetch_all(pool)
-            .await?;
+    // Bezirke und Skizzen. Das Gebiet einer Gefahrengebiet-Zone kommt aus der Gebietsliste (eine
+    // Rang-Regel für die Warnstufe); deren Name der bestätigenden Person bleibt hier liegen.
+    let zonen_roh: Vec<(i64, String, String, Option<i64>)> = sqlx::query_as(
+        "SELECT id, typ, geometrie, gefahrengebiet_id FROM lage_zone \
+         WHERE einsatz_id = ? ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let gebiete = crate::gefahr::repo::gebiete_liste(pool, einsatz_id).await?;
     let mut zonen = Vec::new();
-    for (id, typ, geometrie) in zonen_roh {
+    for (id, typ, geometrie, gebiet_id) in zonen_roh {
         let typ = LageZoneTyp::parse(&typ)
             .ok_or_else(|| AppError::Internal(format!("Zonentyp {typ}")))?;
-        if typ.ist_gefahrenzone() {
-            zonen.push(LagemonitorZone { id, typ, geometrie });
+        if !typ.ist_gefahrenzone() {
+            continue;
         }
+        let gebiet = gebiet_id
+            .filter(|_| typ == LageZoneTyp::Gefahrengebiet)
+            .and_then(|gid| gebiete.iter().find(|g| g.id == gid))
+            .map(|g| LagemonitorGefahrengebiet {
+                bezeichnung: g.label.clone(),
+                warnstufe: g.hoechste_warnstufe,
+                bestaetigt: g.beurteilt_at.is_some(),
+            });
+        zonen.push(LagemonitorZone {
+            id,
+            typ,
+            geometrie,
+            gebiet,
+        });
     }
 
     let abschnitte = sqlx::query_as::<_, (i64, String, Option<String>, String)>(
@@ -805,6 +841,7 @@ mod tests {
                 geometrie: format!(
                     r#"{{"type":"Feature","properties":{{}},"geometry":{polygon}}}"#
                 ),
+                gebiet: None,
             }],
             abschnitte: vec![
                 LagemonitorAbschnitt {

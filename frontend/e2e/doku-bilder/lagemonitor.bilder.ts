@@ -153,8 +153,16 @@ test.describe(KAPITEL, () => {
       await expect(
         geraet.getByRole('region', { name: 'Meldungen' }).locator('[data-lfh="monitor-zahl"]'),
       ).toContainText('1');
-      // Gerendert heißt: Einsatzort, UHS und die Abschnittsfläche stehen als Marken auf der Karte.
-      await expect(geraet.locator('.maplibregl-marker')).toHaveCount(3);
+      // Gerendert heißt: Einsatzort, UHS, die Abschnittsfläche und je Gefahrenzone ihre
+      // Beschriftung (LLH-1746) stehen als Marken auf der Karte.
+      const zonen = await page.request.get(`/api/einsaetze/${einsatz}/zonen`);
+      expect(zonen.ok(), `Zonen: ${zonen.status()}`).toBe(true);
+      const gefahrenzonen = ((await zonen.json()) as { typ: string }[]).filter((z) =>
+        ['gefahrengebiet', 'absperrbereich', 'absperrgrenze', 'sperrgebiet'].includes(z.typ),
+      ).length;
+      expect(gefahrenzonen, 'der Demo-Einsatz hat Gefahrenzonen').toBeGreaterThan(0);
+      await expect(geraet.locator('[data-lfh="monitor-zone"]')).toHaveCount(gefahrenzonen);
+      await expect(geraet.locator('.maplibregl-marker')).toHaveCount(3 + gefahrenzonen);
       // Die Marken stehen vor den Flächen: erst wenn Gefahrengebiete und Abschnittsfläche
       // gezeichnet sind, ist die Karte fertig (wie in `e2e/geraet-lagemonitor.spec.ts`).
       await expect
