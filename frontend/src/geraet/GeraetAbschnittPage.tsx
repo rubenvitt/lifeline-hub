@@ -10,19 +10,26 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import StatusTag from '../components/StatusTag';
 import { Paneel, monoStil, useRollen } from '../components/instrument';
+import { abschnittDerEinheit } from '../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../kraefte/meldebildRaster';
 import AbschnittDaten from '../pages/einsatzabschnitte/AbschnittDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
 
-/** Einheiten nach Abschnitt (der eigene zuerst), darin nach Sortierung und Name. */
+/**
+ * Einheiten nach Abschnitt (der eigene zuerst), darin nach Sortierung und Name. Es zählt der
+ * wirksame Abschnitt (LLH-1744): eine Untereinheit ohne eigenen steht bei dem ihrer Obereinheit.
+ */
 export function ordneEinheiten(
   einheiten: readonly Einheit[],
   abschnittId: number | null,
 ): Einheit[] {
+  const wirksam = abschnittDerEinheit(einheiten);
+  const id = (e: Einheit) => wirksam.get(e.id)?.id ?? null;
+  const name = (e: Einheit) => wirksam.get(e.id)?.name ?? '';
   return [...einheiten].sort(
     (a, b) =>
-      Number(a.abschnitt_id !== abschnittId) - Number(b.abschnitt_id !== abschnittId) ||
-      (a.abschnitt_name ?? '').localeCompare(b.abschnitt_name ?? '') ||
+      Number(id(a) !== abschnittId) - Number(id(b) !== abschnittId) ||
+      name(a).localeCompare(name(b)) ||
       a.sortier - b.sortier ||
       a.name.localeCompare(b.name),
   );
@@ -30,10 +37,14 @@ export function ordneEinheiten(
 
 function EinheitZeile({
   einheit: e,
-  zeigeAbschnitt,
+  abschnittName,
+  ueber,
 }: {
   einheit: Einheit;
-  zeigeAbschnitt: boolean;
+  /** Wirksamer Abschnitt, nur wenn der Teilbaum Unterabschnitte hat. */
+  abschnittName: string | null;
+  /** Name der Obereinheit, wenn die Einheit deren Abschnitt erbt (LLH-1744). */
+  ueber: string | null;
 }) {
   const { token, rollen } = useRollen();
   const status = einheitStatusAnzeige(e.status);
@@ -51,9 +62,8 @@ function EinheitZeile({
           {e.funkrufname && (
             <span style={{ ...monoStil(13), color: rollen.gedaempft }}> · {e.funkrufname}</span>
           )}
-          {zeigeAbschnitt && e.abschnitt_name && (
-            <span style={{ color: rollen.gedaempft }}> · {e.abschnitt_name}</span>
-          )}
+          {abschnittName && <span style={{ color: rollen.gedaempft }}> · {abschnittName}</span>}
+          {ueber && <span style={{ color: rollen.gedaempft }}> · über {ueber}</span>}
         </span>
         <StatusTag
           darstellung={{
@@ -63,8 +73,10 @@ function EinheitZeile({
           farbe={e.status.quelle === 'hand' ? e.status.status?.farbe : null}
         />
       </Flex>
+      {/* Eigene Stärke wie „Zugeordnete Einheiten“ der Abschnittsseite (LLH-1744): die Zeilen
+          ergeben die Stärke im Kopf, eine Untereinheit zählt nicht zusätzlich bei ihrem Zug. */}
       <span style={monoStil(13)}>
-        <StaerkeAnzeige wert={e.ist_kumuliert} />
+        eigene <StaerkeAnzeige wert={e.ist} />
       </span>
     </li>
   );
@@ -99,6 +111,8 @@ export default function GeraetAbschnittPage() {
       ? abschnittStaerken(abschnitte, einheiten, abschnittId)
       : undefined;
   const hatUnterabschnitte = abschnitte.some((a) => a.id !== abschnittId);
+  const wirksam = abschnittDerEinheit(einheiten);
+  const einheitName = new Map(einheiten.map((e) => [e.id, e.name]));
 
   return (
     <EinsatzSeite
@@ -135,7 +149,16 @@ export default function GeraetAbschnittPage() {
             ) : (
               <ul aria-label="Einheiten" style={{ margin: 0, padding: 0 }}>
                 {ordneEinheiten(einheiten, abschnittId).map((e) => (
-                  <EinheitZeile key={e.id} einheit={e} zeigeAbschnitt={hatUnterabschnitte} />
+                  <EinheitZeile
+                    key={e.id}
+                    einheit={e}
+                    abschnittName={hatUnterabschnitte ? (wirksam.get(e.id)?.name ?? null) : null}
+                    ueber={
+                      e.abschnitt_id == null && e.ueber_einheit_id != null
+                        ? (einheitName.get(e.ueber_einheit_id) ?? null)
+                        : null
+                    }
+                  />
                 ))}
               </ul>
             )}
