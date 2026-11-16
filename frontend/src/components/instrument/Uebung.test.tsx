@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readRahmenOben } from '../rahmenOben';
 import { UebungsBand, UebungsMarke } from './Uebung';
+import { grossMass } from '../grossbild/grossMass';
 
 const UEBUNG = { einsatzart: 'uebung' as const };
 const REAL = { einsatzart: 'realeinsatz' as const };
@@ -20,6 +21,11 @@ describe('UebungsMarke (LLH-1725, Spec `uebungsmarke`)', () => {
   ])('steht bei %s nicht da', (_fall, einsatz) => {
     const { container } = render(<UebungsMarke einsatz={einsatz} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('wächst im Großbild mit dem Fenster (LLH-1747)', () => {
+    render(<UebungsMarke einsatz={UEBUNG} groesse="grossbild" />);
+    expect(screen.getByText('Übung').style.fontSize).toBe(grossMass(28));
   });
 
   it('trägt auf dem Lagemonitor mindestens 28 px', () => {
