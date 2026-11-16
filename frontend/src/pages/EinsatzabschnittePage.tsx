@@ -575,7 +575,9 @@ export default function EinsatzabschnittePage() {
                     art: 'einheit',
                     id: e.id,
                     name: e.name,
-                    abschnittId: e.abschnitt_id ?? null,
+                    // Der wirksame Abschnitt, in dem die Liste sie zeigt (LLH-1744): eine Einheit
+                    // mit geerbtem Abschnitt lässt sich nicht auf ihn selbst ziehen.
+                    abschnittId: aktuell?.id ?? e.abschnitt_id ?? null,
                   }}
                 />
               )}

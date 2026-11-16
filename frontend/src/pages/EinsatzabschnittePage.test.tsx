@@ -350,6 +350,69 @@ describe('EinsatzabschnittePage', () => {
     expect(screen.queryByText('Sanitätszug')).not.toBeInTheDocument();
   });
 
+  /**
+   * „Zugeordnete Einheiten“ zeigt jede Einheit mit ihrer EIGENEN Stärke, auch eine mit geerbtem
+   * Abschnitt („über …“); zusammen ergeben sie die „Stärke“ (LLH-1744). Der Zug kumuliert 1/1/3,
+   * zeigt hier aber nur seine eigenen 1/0/2.
+   */
+  it('listet geerbte Einheiten mit „über …“ und jede mit eigener Stärke', async () => {
+    const einheit = (
+      id: number,
+      name: string,
+      abschnitt: number | null,
+      ueber: number | null,
+      ist: number[],
+      kum: number[],
+    ) => ({
+      id,
+      einsatz_id: 1,
+      name,
+      abschnitt_id: abschnitt,
+      ueber_einheit_id: ueber,
+      ist: { fuehrer: ist[0], unterfuehrer: ist[1], mannschaft: ist[2] },
+      ist_kumuliert: { fuehrer: kum[0], unterfuehrer: kum[1], mannschaft: kum[2] },
+      sortier: id,
+      sprechgruppen: [],
+      verbindungen: [],
+      fahrzeug_mitglieder: [],
+      personal_mitglieder: [],
+      material_mitglieder: [],
+    });
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [
+        {
+          id: 5,
+          einsatz_id: 1,
+          ueber_abschnitt_id: null,
+          name: 'Nord',
+          leiter_id: null,
+          leiter_name: null,
+          bemerkung: null,
+          sortier: 0,
+        },
+      ]),
+    );
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () =>
+        HttpResponse.json([
+          einheit(1, 'Zug Nord', 5, null, [1, 0, 2], [1, 1, 3]),
+          einheit(2, 'Gruppe Nord', null, 1, [0, 1, 1], [0, 1, 1]),
+        ]),
+      ),
+    );
+    renderPage();
+    await userEvent.click(await findInTree('Nord'));
+    const eigene = screen
+      .getByText('Stärke (F/UF/M//Σ)')
+      .closest<HTMLElement>('[data-lfh="datenfeld"]')!;
+    expect(within(eigene).getByText('1/1/3//5')).toBeInTheDocument();
+    const zugZeile = screen.getByText('Zug Nord').closest<HTMLElement>('li')!;
+    expect(zugZeile).toHaveTextContent('eigene 1/0/2//3');
+    const gruppeZeile = screen.getByText('Gruppe Nord').closest<HTMLElement>('li')!;
+    expect(gruppeZeile).toHaveTextContent('eigene 0/1/1//2');
+    expect(within(gruppeZeile).getByText('über Zug Nord')).toBeInTheDocument();
+  });
+
   it('selektiert per ?abschnitt=<id> den Abschnitt (LFH-25 Inspector-Deeplink)', async () => {
     server.use(...handlers());
     renderMitProviders(
@@ -1388,12 +1451,12 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
   };
 
   /** Schreibt jeden PATCH mit; der Server antwortet mit dem Abschnitt bzw. der Einheit. */
-  function mitPatches(rolle = 'einsatzleitung') {
+  function mitPatches(rolle = 'einsatzleitung', einheiten: unknown[] = [zug]) {
     const abschnittPatches: { id: number; body: unknown }[] = [];
     const einheitPatches: { id: number; body: unknown }[] = [];
     server.use(
       // Vor den Grund-Handlern: MSW nimmt den ersten passenden.
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([zug])),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
       ...handlers(rolle, 'aktiv', [nord, nordOst, sued]),
       http.patch('/api/einsaetze/1/abschnitte/:aid', async ({ request, params }) => {
         const body = await request.json();
@@ -1651,6 +1714,34 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
 
       await waitFor(() => expect(einheitPatches).toEqual([{ id: 10, body: { abschnitt_id: 6 } }]));
       expect(await screen.findByText('„1. Zug“ zu „Süd“ zugeordnet')).toBeInTheDocument();
+      messung.mockRestore();
+    });
+
+    it('eine Einheit mit geerbtem Abschnitt lässt sich nicht auf ihn selbst ziehen (LLH-1744)', async () => {
+      // Gruppe 11 ohne eigenen Abschnitt unter dem 1. Zug (Nord): sie steht in Nord „über 1. Zug“.
+      const gruppe = {
+        ...zug,
+        id: 11,
+        name: 'Gruppe Nord',
+        abschnitt_id: null,
+        ueber_einheit_id: 10,
+      };
+      const messung = messeZiele();
+      const { einheitPatches } = mitPatches('einsatzleitung', [zug, gruppe]);
+      renderPage();
+      await userEvent.click(await findInTree('Nord'));
+      expect(await screen.findByText('über 1. Zug')).toBeInTheDocument();
+
+      const loslassen = zieheBis(griff('einheit', 11), mitte('Nord'));
+      expect(
+        within(screen.getByRole('tree'))
+          .getByText('Nord')
+          .closest('[data-lfh="gliederung-ziel"]')
+          ?.getAttribute('data-ziel'),
+      ).toBe('gesperrt');
+      loslassen();
+      await act(async () => {});
+      expect(einheitPatches).toEqual([]);
       messung.mockRestore();
     });
   });
