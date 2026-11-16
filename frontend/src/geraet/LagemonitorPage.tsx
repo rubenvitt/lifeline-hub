@@ -34,6 +34,9 @@ import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeMode
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
 import { schrift } from '../theme/tokens';
 import LagemonitorKarte from './LagemonitorKarte';
+import { AlarmZeile } from '../components/instrument';
+import { alarmAusMonitor } from '../lage/alarmAusMonitor';
+import { wasBrennt } from '../lage/wasBrennt';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -773,11 +776,17 @@ export default function LagemonitorPage() {
         height: '100dvh',
         overflow: 'hidden',
         display: 'grid',
-        gridTemplateRows: 'minmax(0, 1fr) auto auto',
+        gridTemplateRows: 'auto minmax(0, 1fr) auto auto',
         background: rollen.grund,
         color: rollen.text,
       }}
     >
+      {/* Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne Personenbezug“):
+        dieselben Arten, Folge und Wörter wie in Überblick und Lagebild, aus dem Block `alarm` der
+        Serverantwort; 28 px, ohne Bedienung. Den Ausfall trägt der Monitor nicht (design.md D6). */}
+      <div style={{ pointerEvents: 'none' }}>
+        <AlarmZeile daten={wasBrennt(alarmAusMonitor(lage), dayjs(jetzt))} groesse="gross" />
+      </div>
       <main
         style={{
           display: 'grid',

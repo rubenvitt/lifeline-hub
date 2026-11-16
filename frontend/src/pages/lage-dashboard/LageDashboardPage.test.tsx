@@ -1632,58 +1632,48 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   });
 });
 
-describe('LageDashboardPage — Führungsstand', () => {
-  const FUEHRUNG = 'Führungsstand';
+describe('LageDashboardPage — Stand und Alarmzeile (LLH-1743)', () => {
+  const STAND = 'Stand';
 
-  // Aufträge und Meldungen kommen aus dem Modulzähler (LFH-550), nicht aus den Listen: dieselbe
-  // Zahl wie im Modulpanel. „Überfällig" heißt „davon überfällig".
-  it('zeigt offene Aufträge aus dem Modulzähler, überfällige mit Alarmkante', async () => {
+  // Seitenrollen (Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt die Lage“): Aufträge
+  // und Meldungen stehen nur im Überblick; ihre Alarmbeiträge trägt die Alarmzeile.
+  it('keine Kennzahl „Aufträge offen“ oder „Meldungen offen“; der überfällige Auftrag steht in der Alarmzeile', async () => {
     mockEndpunkte({ zaehler: { auftraege: { offen: 2, in_arbeit: 1, ueberfaellig: 1 } } });
     render();
     await kennzahlGeladen('Betroffene');
-    const zelle = await waitFor(() => {
-      const z = kennzahl('Aufträge offen', FUEHRUNG);
-      expect(z).toHaveTextContent('1 überfällig');
-      return z;
-    });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
-    expect(kante(zelle)).toBe(6);
+    const zeile = screen.getByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveTextContent('1 Auftrag überfällig'));
+    expect(screen.queryByText('Aufträge offen')).toBeNull();
+    expect(screen.queryByText('Meldungen offen')).toBeNull();
+    expect(within(zeile).getByRole('link', { name: '1 Auftrag überfällig' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege',
+    );
   });
 
-  it('zeigt offene und neue Meldungen; Bestätigung überfällig trägt die Alarmkante', async () => {
+  it('eine frische Sofortmeldung steht ab Eingang in der Alarmzeile', async () => {
     mockEndpunkte({
       zaehler: {
         meldungen: {
-          offen: 2,
+          offen: 1,
           ungesehen: 1,
-          bestaetigung_ueberfaellig: 1,
-          sofort_offen: 0,
+          bestaetigung_ueberfaellig: 0,
+          sofort_offen: 1,
           dringend_offen: 0,
         },
       },
     });
     render();
-    await kennzahlGeladen('Betroffene');
-    const zelle = await waitFor(() => {
-      const z = kennzahl('Meldungen offen', FUEHRUNG);
-      expect(z).toHaveTextContent('1 neu · 1 Bestätigung überfällig');
-      return z;
-    });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
-    expect(kante(zelle)).toBe(6);
+    const zeile = await screen.findByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveTextContent('1 Sofortmeldung'));
+    expect(zeile.querySelector('[data-art="sofort"]')).toHaveAttribute('data-ton', 'alarm');
   });
 
-  it('ein nicht freigegebenes Modul sagt das und zeigt keine 0', async () => {
-    mockEndpunkte({ zaehler: { auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 } } });
+  it('der Seitenkopf springt in den Überblick', async () => {
+    mockEndpunkte({});
     render();
     await kennzahlGeladen('Betroffene');
-    const zelle = await waitFor(() => {
-      const z = kennzahl('Meldungen offen', FUEHRUNG);
-      expect(z).toHaveTextContent('nicht freigegeben');
-      return z;
-    });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
-    expect(zelle.querySelector('a')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Überblick' })).toBeEnabled();
   });
 
   it('lädt keine Auftrags- oder Meldungsliste', async () => {
@@ -1701,18 +1691,19 @@ describe('LageDashboardPage — Führungsstand', () => {
     );
     render();
     await kennzahlGeladen('Betroffene');
-    await waitFor(() => expect(kennzahl('Aufträge offen', FUEHRUNG)).toHaveTextContent('keiner'));
+    await waitFor(() =>
+      expect(kennzahl('Lagebericht', STAND)).toHaveTextContent('noch nicht erstellt'),
+    );
     expect(listen).toEqual([]);
   });
 
-  it('während der Einsatz-Abruf hängt, behauptet der Führungsstand keinen Stand', async () => {
-    // Der Zähler löst auf, der Einsatz hängt: ohne Lagebild darf keine Zelle „0" melden.
+  it('während der Einsatz-Abruf hängt, behauptet der Stand keinen Stand', async () => {
     mockEndpunkte({ einsatzLaedt: true });
     const { client } = render();
     await waitFor(() =>
       expect(client.getQueryState(einsatzKeys.modulZaehler(1))?.status).toBe('success'),
     );
-    for (const z of zellen(FUEHRUNG)) expect(z).toHaveTextContent('wird abgerufen');
+    for (const z of zellen(STAND)) expect(z).toHaveTextContent('wird abgerufen');
   });
 
   it('ohne Lagebericht sagt die Zelle das, statt eine Zeit zu erfinden', async () => {
@@ -1720,7 +1711,7 @@ describe('LageDashboardPage — Führungsstand', () => {
     render();
     await kennzahlGeladen('Betroffene');
     await waitFor(() =>
-      expect(kennzahl('Lagebericht', FUEHRUNG)).toHaveTextContent('noch nicht erstellt'),
+      expect(kennzahl('Lagebericht', STAND)).toHaveTextContent('noch nicht erstellt'),
     );
   });
 });
@@ -1732,7 +1723,7 @@ describe('LageDashboardPage — Führungsstand', () => {
  * Tests zählen die Requests mit.
  */
 describe('LageDashboardPage — Modulgrenze des Lagebilds (LFH-669)', () => {
-  const FUEHRUNG = 'Führungsstand';
+  const FUEHRUNG = 'Stand';
   const wert = (z: HTMLElement) => z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent;
   const kurzWarten = () =>
     act(async () => {
@@ -1972,7 +1963,7 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
     await kennzahlGeladen('Betroffene');
     // 12:00 UTC → 1400 Sommerzeit in Berlin; ein anderer Tag trägt den Tag voran (taktisch).
     const zelle = await waitFor(() => {
-      const z = kennzahl('Lagebericht', 'Führungsstand');
+      const z = kennzahl('Lagebericht', 'Stand');
       expect(z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('251400');
       return z;
     });
@@ -1990,7 +1981,7 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
     renderMitZone();
     await kennzahlGeladen('Betroffene');
     const zelle = await waitFor(() => {
-      const z = kennzahl('Lagebericht', 'Führungsstand');
+      const z = kennzahl('Lagebericht', 'Stand');
       expect(z.querySelector('[data-lfh="kennzahl-notiz"]')?.textContent).toBe(
         'Entwurf · Lage 14:00',
       );

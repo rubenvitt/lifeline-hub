@@ -11,11 +11,10 @@
  * 2. Drei Paneele (1fr 1fr 1.1fr, unter `lg` gestapelt): Gefahrenmatrix (je Gefahrentyp über alle
  *    Gebiete verdichtet), Sichtung (BBK-Farben), Jüngste ETB-Einträge (im Code „Meldungsstrom“;
  *    neue Einträge per Sammelbanner, nie eingeschoben).
- * 3. Führungsstand: Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv. Er steht hier, weil an
- *    ihm die Alarmbeiträge überfälliger Aufträge und Meldungen hängen — eine überfällige
- *    Sofortmeldung soll auf dieser Seite rot stehen. Aufträge und Meldungen kommen aus dem
- *    Modulzähler, nicht aus eigener Zählung (LFH-550, `fuehrungsZahlen.ts`): dieselbe Zahl wie im
- *    Modulpanel und im Führungsüberblick.
+ * 3. Stand: Lagebericht und UHS aktiv. Aufträge und Meldungen stehen seit LLH-1743 nur noch im
+ *    Überblick („Führen: was ist zu tun“, Seitenrollen in `frontend/AGENTS.md`); ihre Alarmbeiträge
+ *    (überfällig, Sofortmeldungen ab Eingang) trägt die Alarmzeile „Was brennt“ ganz oben, auf
+ *    beiden Übersichten dieselbe (`lage/useWasBrennt.ts`).
  *
  * Die Warnstufe hat keine eigene Kennzahl: sie steht als Hinweis im Seitenkopf und je Gefahrentyp
  * in der Matrix. Daneben steht eine geltende oder angekündigte DWD-Warnung als Marke (LLH-1117,
@@ -44,29 +43,35 @@
  * freigegebenes Modul (LFH-669, `useLagebild`) wird nicht angefragt und steht als „—" bzw. Satz mit
  * Grund da, nie als Ausfall und nie als 0.
  */
+import dayjs from 'dayjs';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { Alert, Breadcrumb } from 'antd';
+import { Alert, Breadcrumb, Button } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
-  auftraegePfad,
   evakuierungPfad,
   einsatzModulPfad,
   etbPfad,
   gefahrenPfad,
   lageberichtDetailPfad,
   lageberichtePfad,
-  meldungenPfad,
   personenAufnahmePfad,
   pegelZielPfad,
   personenPfad,
+  ueberblickPfad,
   unfallhilfsstellenListePfad,
   wetterPegelPfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
 import { ladeModulFreigaben } from '../../api/einsaetze';
-import { istKeyFreigegeben, istPfadGesperrt, modulName } from '../../einsatz/modulRegistry';
+import {
+  KEINE_BERECHTIGUNG,
+  istKeyFreigegeben,
+  istPfadGesperrt,
+  istSprungGesperrt,
+  modulName,
+} from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import { ladeMatrix } from '../../api/gefahren';
 import { wetterAbfrage } from '../../api/wetter';
@@ -85,6 +90,7 @@ import {
   PaneelReihe,
   Sammelbanner,
   WarnstufenHinweis,
+  AlarmZeile,
   monoStil,
   useRollen,
   type KennzahlZustand,
@@ -118,17 +124,11 @@ import { kontakteJeStunde } from './verlauf';
 import { versorgungsBilanz } from '../../personen/personenBilanz';
 import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
-import {
-  NICHT_FREIGEGEBEN,
-  auftraegeNotiz,
-  auftragsStand,
-  meldungenNotiz,
-  meldungsStand,
-  nachforderungsStand,
-  type Zaehlstand,
-} from './fuehrungsZahlen';
+import { NICHT_FREIGEGEBEN, nachforderungsStand } from './fuehrungsZahlen';
 import { kraefteZustand, useLagebild } from './useLagebild';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import { useWasBrennt } from '../../lage/useWasBrennt';
+import { alarmZiel } from '../../lage/alarmZiel';
 
 /**
  * Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener Block mit
@@ -166,6 +166,8 @@ export default function LageDashboardPage() {
   const { abBreite } = useViewport();
   const { konventionen: konv } = useAnzeigeKonventionen();
   const jetzt = useJetzt(TAKT_MS);
+  // Alarmzeile „Was brennt“ (LLH-1743): derselbe Hook wie im Überblick, gegen die Uhr der Seite.
+  const wasBrenntDaten = useWasBrennt(einsatzId, dayjs(jetzt));
   const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
 
   // Die Quellen des Lagebilds teilt sich die Seite mit der Vorbereitung der Lagebesprechung
@@ -393,13 +395,8 @@ export default function LageDashboardPage() {
     !lagebild ? 'laden' : z === 'gesperrt' ? 'daten' : alsKennzahlZustand(z);
   // Gesperrt erst mit Lagebild: vorher behauptet der Führungsstand keinen Stand, auch keinen Grund.
   const lageberichteGesperrt = lagebild != null && quellZustand.lageberichte === 'gesperrt';
+  const ueberblickGesperrt = istSprungGesperrt('ueberblick', wasBrenntDaten.freigaben);
   const uhsGesperrt = lagebild != null && quellZustand.uhs === 'gesperrt';
-  // Aufträge und Meldungen aus dem Modulzähler (LFH-550): dieselbe Zahl wie im Modulpanel. Ein
-  // fehlendes Modul steht als „—" mit Grund da, nie als 0.
-  const auftraege = auftragsStand(zaehlerQuery);
-  const meldungen = meldungsStand(zaehlerQuery);
-  const zZaehlstand = (z: Zaehlstand<unknown>): KennzahlZustand =>
-    !lagebild || z.zustand === 'laden' ? 'laden' : z.zustand === 'fehler' ? 'fehler' : 'daten';
 
   return (
     // Jeder Link der Seite ist eine Modulwahl für „Zuletzt besucht" (LFH-436, `useModulWahl`).
@@ -419,32 +416,48 @@ export default function LageDashboardPage() {
             ]}
           />
         }
-        // Der rechte Slot trägt hier Meta und die Wettermarke (ein Sprung), keinen Knopf.
+        // Der rechte Slot trägt Meta, die Wettermarke und den Sprung in den Überblick: die
+        // Übersichten verweisen aufeinander (LLH-1743, Spec `lage-verdichtung`).
         aktionen={
-          <span
-            data-lfh="lagebild-meta"
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: token.padding,
-              ...monoStil(11),
-              color: rollen.schwach,
-            }}
-          >
-            <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
-            {warnTon !== 'neutral' && lagebild && (
-              <WarnstufenHinweis ton={warnTon === 'alarm' ? 'alarm' : 'achtung'}>
-                Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
-              </WarnstufenHinweis>
-            )}
-            {dwdWarnung && (
-              <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
-            )}
-          </span>
+          <>
+            <span
+              data-lfh="lagebild-meta"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: token.padding,
+                ...monoStil(11),
+                color: rollen.schwach,
+              }}
+            >
+              <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
+              {warnTon !== 'neutral' && lagebild && (
+                <WarnstufenHinweis ton={warnTon === 'alarm' ? 'alarm' : 'achtung'}>
+                  Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
+                </WarnstufenHinweis>
+              )}
+              {dwdWarnung && (
+                <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
+              )}
+            </span>
+            <Button
+              disabled={ueberblickGesperrt}
+              title={ueberblickGesperrt ? KEINE_BERECHTIGUNG : undefined}
+              onClick={() => waehle(ueberblickPfad(einsatzId))}
+            >
+              {modulName('ueberblick')}
+            </Button>
+          </>
         }
       >
         <DashboardFlaeche kennung="lagebild">
+          {/* Alarmzeile „Was brennt“ (LLH-1743, Spec `lage-alarmzeile`): das erste Element unter
+            dem Seitenkopf, dieselbe wie im Überblick. */}
+          <AlarmZeile
+            daten={wasBrenntDaten}
+            ziel={(e) => alarmZiel(e, einsatzId, wasBrenntDaten.freigaben)}
+          />
           {wechsel && (
             <Sammelbanner
               aktion={{
@@ -562,63 +575,9 @@ export default function LageDashboardPage() {
             />
           </PaneelReihe>
 
-          {/* Führungsstand (siehe Dateikopf). Die Überfällig-Zahlen sind Alarmbeiträge und
-            behalten ihren Ton. */}
-          <Kennzahlenband
-            beschriftung="Führungsstand"
-            spalten={abBreite('md') ? 4 : 2}
-            style={{ border: 'none' }}
-          >
-            <Kennzahl
-              titel="Aufträge offen"
-              groesse="klein"
-              wert={
-                auftraege.zustand === 'daten'
-                  ? auftraege.zahl.offen
-                  : auftraege.zustand === 'gesperrt'
-                    ? '—'
-                    : ''
-              }
-              notiz={
-                auftraege.zustand === 'daten'
-                  ? auftraegeNotiz(auftraege.zahl)
-                  : auftraege.zustand === 'gesperrt'
-                    ? NICHT_FREIGEGEBEN
-                    : ''
-              }
-              ton={
-                auftraege.zustand === 'daten' && auftraege.zahl.ueberfaellig > 0
-                  ? 'alarm'
-                  : 'neutral'
-              }
-              zustand={zZaehlstand(auftraege)}
-              ziel={auftraege.zustand === 'gesperrt' ? undefined : auftraegePfad(einsatzId)}
-            />
-            <Kennzahl
-              titel="Meldungen offen"
-              groesse="klein"
-              wert={
-                meldungen.zustand === 'daten'
-                  ? meldungen.zahl.offen
-                  : meldungen.zustand === 'gesperrt'
-                    ? '—'
-                    : ''
-              }
-              notiz={
-                meldungen.zustand === 'daten'
-                  ? meldungenNotiz(meldungen.zahl)
-                  : meldungen.zustand === 'gesperrt'
-                    ? NICHT_FREIGEGEBEN
-                    : ''
-              }
-              ton={
-                meldungen.zustand === 'daten' && meldungen.zahl.bestaetigung_ueberfaellig > 0
-                  ? 'alarm'
-                  : 'neutral'
-              }
-              zustand={zZaehlstand(meldungen)}
-              ziel={meldungen.zustand === 'gesperrt' ? undefined : meldungenPfad(einsatzId)}
-            />
+          {/* Stand (siehe Dateikopf): Lagebericht und Unfallhilfsstellen. Aufträge und Meldungen
+            haben ihre Heimat im Überblick (LLH-1743). */}
+          <Kennzahlenband beschriftung="Stand" spalten={2} style={{ border: 'none' }}>
             {/* Kein `ton` (LFH-532): der Status folgt der Phasenachse (`LAGEBERICHT_STATUS`), ein
               Entwurf ist kein Warnzustand. Beschriftet wird mit dessen `label`, nie mit dem
               Wire-Wert. Eine abweichende Kennzahl-Lesart gehört benannt nach `statusFarben.ts`. */}

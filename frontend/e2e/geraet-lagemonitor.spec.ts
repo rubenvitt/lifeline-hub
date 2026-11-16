@@ -219,6 +219,12 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
       }));
       expect(masse.hoehe).toBeLessThanOrEqual(1080);
       expect(masse.breite).toBeLessThanOrEqual(1920);
+      // Die Alarmzeile „Was brennt“ steht ganz im Bild, Text ab 28 px (LLH-1743).
+      const alarmZeile = monitor.getByRole('status', { name: 'Was brennt' });
+      await expect(alarmZeile).toBeInViewport({ ratio: 1 });
+      expect(
+        await alarmZeile.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+      ).toBeGreaterThanOrEqual(28);
       for (const kachel of [
         'Betroffene',
         'Kräfte',
