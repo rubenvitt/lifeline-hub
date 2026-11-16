@@ -14,7 +14,7 @@ import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { staerkeText } from '../../anzeige/staerke';
-import { monoStil, StatusChip, useRollen } from '../../components/instrument';
+import { schriftStil, StatusChip, useRollen, zahlStil } from '../../components/instrument';
 import StatusTag from '../../components/StatusTag';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
@@ -54,6 +54,7 @@ import {
   type WurzelFuehrungsstelle,
 } from './fuehrungsorganisation';
 import { zeitKurz, zeitpunkt } from '../../anzeige/zeitDarstellung';
+
 import './organigrammPrint.css';
 
 /**
@@ -137,14 +138,16 @@ function OrganigrammKopf({
         <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
         {fuehrungsstelle?.bezeichnung && <div>{fuehrungsstelle.bezeichnung}</div>}
         {fuehrungsstelle?.rufname && (
-          <div style={monoStil(token.fontSize)}>{fuehrungsstelle.rufname}</div>
+          <div data-schrift="kennung" style={zahlStil('text')}>
+            {fuehrungsstelle.rufname}
+          </div>
         )}
         {/* Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke: keine
             erfundene Leitung aus App-Rolle oder Stab. */}
         {einsatzleiter.art === 'erfasst' ? (
           <>
             <div style={{ overflowWrap: 'anywhere' }}>{einsatzleiter.name}</div>
-            <div style={{ ...monoStil(12, 500), color: rollen.gedaempft }}>
+            <div style={{ ...schriftStil('meta'), fontWeight: 500, color: rollen.gedaempft }}>
               {einsatzleiter.nichtMehrDisponiert && <span>nicht mehr disponiert · </span>}
               <span>{`seit ${zeitKurz(einsatzleiter.seit, konventionen)}`}</span>
             </div>
@@ -270,7 +273,7 @@ function Stabsstelle({
       <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {zeilen.map((z) => (
           <li key={z.kuerzel} style={{ display: 'flex', gap: token.marginXS }}>
-            <span style={monoStil(12, 500)}>{z.kuerzel}</span>
+            <span style={zahlStil('klein', 500)}>{z.kuerzel}</span>
             <span style={{ overflowWrap: 'anywhere' }}>{z.namen}</span>
           </li>
         ))}
@@ -293,7 +296,9 @@ function KnotenInhalt({
     knoten.art === 'abschnitt'
       ? einsatzabschnittePfad(einsatzId, { abschnitt: knoten.id })
       : einheitDetailPfad(einsatzId, knoten.id);
-  const meta: CSSProperties = { ...monoStil(12), overflowWrap: 'anywhere' };
+  const meta: CSSProperties = { ...zahlStil('klein'), overflowWrap: 'anywhere' };
+  // Ohne Rufname steht das Wort „kein Rufname“ da: Text, nicht Mono (LLH-1777).
+  const metaText: CSSProperties = { ...schriftStil('meta'), overflowWrap: 'anywhere' };
   // Dieselbe Prüfung wie in `EinsatzZeichen` (rendert dort `null`): hier entscheidet sie, ob der
   // Platz überhaupt entsteht.
   const darstellbar = fachobjektZeichen(knoten.tz) != null;
@@ -357,7 +362,12 @@ function KnotenInhalt({
             color: rollen.gedaempft,
           }}
         >
-          <span style={meta}>{knoten.rufname ?? 'kein Rufname'}</span>
+          <span
+            data-schrift={knoten.rufname != null ? 'kennung' : undefined}
+            style={knoten.rufname != null ? meta : metaText}
+          >
+            {knoten.rufname ?? 'kein Rufname'}
+          </span>
           {/* Fehlt sie, steht das Wort leise da; die Warnung trägt die Sammelzeile (LLH-1742). */}
           <span style={{ overflowWrap: 'anywhere' }}>
             {knoten.leitung ?? 'Leitung nicht besetzt'}

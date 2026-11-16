@@ -12,7 +12,7 @@ import { zeitKurz } from '../anzeige/zeitDarstellung';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenLeer } from '../components/SeitenZustand';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import { Paneel, StatusChip, monoStil, useRollen } from '../components/instrument';
+import { Paneel, StatusChip, schriftStil, useRollen } from '../components/instrument';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einheitStatusAnzeige, fmsEtikett } from '../kraefte/meldebildRaster';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
@@ -93,13 +93,19 @@ export default function GeraetStatusPage() {
           <Flex align="center" gap="small" wrap data-lfh="einheit-status-aktuell">
             <StatusChip ton={s.ton} code={s.code ?? undefined} wort={s.wort} trenner />
             {einheit.status.seit && (
-              <span style={{ ...monoStil(13), color: rollen.gedaempft }}>
+              <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
                 seit {zeitKurz(einheit.status.seit, konventionen)}
               </span>
             )}
           </Flex>
           {s.verteilung && (
-            <div style={{ ...monoStil(12), color: rollen.gedaempft, marginTop: token.marginXXS }}>
+            <div
+              style={{
+                ...schriftStil('meta'),
+                color: rollen.gedaempft,
+                marginTop: token.marginXXS,
+              }}
+            >
               {s.verteilung}
             </div>
           )}

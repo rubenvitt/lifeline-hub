@@ -241,6 +241,8 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
     ring.dataset.gedaempft = 'true';
   }
 
+  // Größere Cluster tragen eine größere Zahl, in Stufen der Skala (LLH-1775).
+  const zahlStufe = gesamt >= 60 ? 'titel' : gesamt >= 30 ? 'text' : 'klein';
   const kern = document.createElement('div');
   kern.style.cssText = [
     `width:${innen}px`,
@@ -252,9 +254,9 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
     'align-items:center',
     'justify-content:center',
     'line-height:1',
-    'font-family:-apple-system,Segoe UI,Roboto,sans-serif',
+    'font-family:var(--lfh-schrift-text)',
     'font-weight:700',
-    `font-size:${Math.round(12 + Math.min(6, gesamt / 15))}px`,
+    `font-size:var(--lfh-groesse-${zahlStufe})`,
     'color:#0f172a',
     'letter-spacing:-.3px',
   ].join(';');
@@ -264,7 +266,7 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
   if (dringlichst) {
     const kurz = document.createElement('span');
     kurz.dataset.lfh = 'cluster-sichtung';
-    kurz.style.cssText = 'font-size:10px;margin-top:1px';
+    kurz.style.cssText = 'font-size:var(--lfh-groesse-fein);margin-top:1px';
     kurz.textContent = SK_KURZZEICHEN[dringlichst];
     kern.appendChild(kurz);
     const text = personenClusterText(gesamt, dringlichst);

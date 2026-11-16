@@ -5,8 +5,9 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * Vorbereitung der Lagebesprechung (LFH-550) im Browser, seit LLH-1111 auf der Seite
  * Lagebesprechung (vorher Stab):
  *
- * - GLEICHE ZAHLEN: Betroffene, Kräfte und „Aufträge offen" stehen auf der Seite Lagebesprechung
- *   genau so wie auf dem Lage-Dashboard — eine Zusammenstellung, ein Rechenweg.
+ * - GLEICHE ZAHLEN: Betroffene und Kräfte stehen auf der Seite Lagebesprechung genau so wie auf dem
+ *   Lage-Dashboard, „Aufträge offen" so wie die „Offenen Aufträge" im Überblick (seit LLH-1743
+ *   ihre Heimat) — ein Rechenweg.
  * - „DAVON ÜBERFÄLLIG": ein vollzogener Auftrag mit abgelaufener Frist und Quittungslücke zählt
  *   weder offen noch überfällig, auf beiden Seiten.
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, danach der Bericht offen. Geklickt, nicht nur
@@ -54,21 +55,23 @@ const zeile = (page: Page, schluessel: string) =>
   page.locator(`[data-lfh="vorbereitung-zeile"][data-schluessel="${schluessel}"]`);
 
 async function dashboardWerte(page: Page, einsatzId: string) {
-  await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
   const wert = (titel: string) =>
     page
       .locator('[data-lfh="kennzahl"]')
       .filter({ hasText: titel })
       .first()
       .locator('[data-lfh="kennzahl-wert"]');
-  await expect(wert('Aufträge offen')).toHaveText('2');
-  // Jede Kachel hat ihre eigene Quelle: „Aufträge offen“ steht aus dem Modulzähler, während die
-  // Personen noch laden („····“). Erst lesen, wenn alle drei eine Zahl zeigen.
+  // Aufträge stehen seit LLH-1743 im Überblick (Seitenrollen), Betroffene und Kräfte im Lagebild.
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  await expect(wert('Offene Aufträge')).toHaveText('2');
+  const auftraege = (await wert('Offene Aufträge').textContent())!.trim();
+  await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
+  // Jede Kachel hat ihre eigene Quelle: erst lesen, wenn beide eine Zahl zeigen.
   for (const titel of ['Betroffene', 'Kräfte']) await expect(wert(titel)).toHaveText(/^\d+$/);
   return {
     betroffene: (await wert('Betroffene').textContent())!.trim(),
     kraefte: (await wert('Kräfte').textContent())!.trim(),
-    auftraege: (await wert('Aufträge offen').textContent())!.trim(),
+    auftraege,
   };
 }
 

@@ -1,7 +1,11 @@
 import type { CSSProperties } from 'react';
+import { schriftPx, type Groessenstufe } from '../theme/tokens';
 
-/** Schriftgröße der Zeile „Als Einheit übernommen: …“, wie die übrigen Zusatzzeilen der Karte. */
-export const EINHEITEN_SCHRIFT = 13;
+/**
+ * Stufe der Zeile „Als Einheit übernommen: …“, wie die übrigen Zusatzzeilen der Karte (LLH-1775;
+ * vorher 13 px, keine Stufe der Skala).
+ */
+export const EINHEITEN_STUFE: Groessenstufe = 'text';
 
 /**
  * Aufbau der Zeile „Als Einheit übernommen: 83-1 ↗, 83-2 ↗“ (LLH-1410) — rein und exportiert,
@@ -27,7 +31,8 @@ export function einheitenSprungAufbau(token: {
   lineHeight: number;
 }): EinheitenSprungAufbau {
   if (token.controlHeight >= 48) return { art: 'gereiht' };
-  const zeile = EINHEITEN_SCHRIFT * token.lineHeight;
+  // Nur in `kompakt` (darüber `gereiht`), also die Pixelzahl der Stufe in `kompakt`.
+  const zeile = schriftPx(EINHEITEN_STUFE, 'kompakt') * token.lineHeight;
   return {
     art: 'fliessend',
     link: { display: 'inline', paddingBlock: Math.max(0, (token.controlHeightSM - zeile) / 2) },

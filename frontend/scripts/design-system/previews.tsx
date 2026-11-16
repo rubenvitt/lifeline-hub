@@ -38,7 +38,11 @@ import { rollenFarbe, statusKategorie, warnstufeBalkenFarbe } from '../../src/th
 import type { Sichtungskategorie, Verletzung } from '../../src/api/types';
 import { createMemoryRouter, Link, MemoryRouter, RouterProvider } from 'react-router';
 import {
+  AlarmZeile,
   Augenbraue,
+  Feldetikett,
+  Schrift,
+  zahlStil,
   BearbeitbaresPaneel,
   DashboardFlaeche,
   DashboardPaneel,
@@ -1007,6 +1011,31 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     content: () => <DashboardBeispiel />,
   },
   {
+    name: 'Schrift',
+    title: 'Schrift: Rollen der Skala und Feldetikett',
+    group: 'Daten',
+    height: 420,
+    source: 'components/instrument/Schrift.tsx',
+    content: () => (
+      <div style={{ display: 'grid', gap: 8 }}>
+        <Schrift rolle="seitentitel">Seitentitel · Einsatz Hochwasser Celle</Schrift>
+        <Schrift rolle="text">
+          Lauftext: Pegel am Deichtor steigt weiter, Sandsäcke angefordert.
+        </Schrift>
+        <Schrift rolle="warnung">Warnstufe hoch</Schrift>
+        <Schrift rolle="meta" ton="gedaempft">
+          Stand 14:32 · von Leitstelle Celle an Einsatzleitung
+        </Schrift>
+        <Augenbraue>Paneelkopf in Versalien</Augenbraue>
+        <div>
+          <Feldetikett als="div">Einsatzort</Feldetikett>
+          <Schrift rolle="text">Celle, Altstadt</Schrift>
+        </div>
+        <span style={zahlStil('klein')}>Florian Celle 1-46-1 · 14:32</span>
+      </div>
+    ),
+  },
+  {
     name: 'Datenraster',
     title: 'Datenraster mit DatenfeldEingabe und FeldFehler',
     group: 'Daten',
@@ -1150,6 +1179,53 @@ export const PREVIEWS: readonly PreviewSpec[] = [
           ]}
         />
       </div>
+    ),
+  },
+  {
+    name: 'AlarmZeile',
+    title: 'AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)',
+    group: 'Rückmeldung',
+    height: 390,
+    source: 'components/instrument/AlarmZeile.tsx',
+    content: () => (
+      <MemoryRouter>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <AlarmZeile
+            daten={{
+              stand: 'vollstaendig',
+              fehlend: [],
+              eintraege: [
+                {
+                  art: 'sofort',
+                  rolle: 'alarm',
+                  text: '1 Sofortmeldung · älteste 2 min',
+                  voll: '1 Sofortmeldung · älteste 2 min',
+                  bezug: [],
+                },
+                {
+                  art: 'kritisch',
+                  rolle: 'alarm',
+                  text: 'kritisch: UHS Turnhalle',
+                  voll: 'kritisch: UHS Turnhalle',
+                  bezug: [],
+                },
+                {
+                  art: 'erinnerung',
+                  rolle: 'achtung',
+                  text: '1 Erinnerung fällig',
+                  voll: '1 Erinnerung fällig',
+                  bezug: [],
+                },
+              ],
+            }}
+            ziel={() => '/meldungen'}
+          />
+          <AlarmZeile daten={{ stand: 'vollstaendig', fehlend: [], eintraege: [] }} />
+          <AlarmZeile
+            daten={{ stand: 'unvollstaendig', fehlend: ['Rückmeldungen'], eintraege: [] }}
+          />
+        </div>
+      </MemoryRouter>
     ),
   },
   {

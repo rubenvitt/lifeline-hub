@@ -51,7 +51,8 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
   „Lagemeldungen“.
 - Seitenkopf: jeder Link im Ortspfad (Brotkrume) jeder Seite, die den gemeinsamen Seitenkopf
   trägt, auch im Kopf der Verwaltungsseiten (etwa „Fahrzeuge“ bzw. „Personal“ über der
-  Fahrzeug- und der Personal-Detailseite der Stammdaten). Seine Schrift MUST dabei 12 px bleiben; die Trefffläche wächst um Fläche über und
+  Fahrzeug- und der Personal-Detailseite der Stammdaten). Seine Schrift MUST dabei in der Stufe `klein` der Schriftskala stehen (12 px in `kompakt`,
+  mit der Dichte wachsend); die Trefffläche wächst darüber hinaus um Fläche über und
   unter dem Text, nicht über die Schrift. Der Ortspfad MUST den Seitenkopf in `kompakt` am
   Fükw-Schirm nicht über seine 44 px heben.
 
@@ -77,7 +78,7 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 
 #### Scenario: Brotkrume im Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und eine Seite mit zwei Links im Ortspfad (etwa „Einsätze“ und das Modul über der Druckansicht einer Liste) am Fükw-Schirm und auf dem Handschirm steht
-- **THEN** misst jeder Link im Ortspfad mindestens 72 px in der Höhe, und seine Schrift ist 12 px groß
+- **THEN** misst jeder Link im Ortspfad mindestens 72 px in der Höhe, und seine Schrift ist 15 px groß (12 px × 1,25)
 
 #### Scenario: Brotkrume in kompakt
 - **WHEN** dieselbe Seite in `kompakt` am Fükw-Schirm steht
@@ -85,7 +86,7 @@ und das Löschkreuz eines Auswahlfelds (das Feld selbst ist das gleichwertige Zi
 
 #### Scenario: Brotkrume der Stammdaten-Detailseiten
 - **WHEN** die Fahrzeug- oder die Personal-Detailseite der Stammdaten am Fükw-Schirm und auf dem Handschirm steht
-- **THEN** misst der Link „Fahrzeuge“ bzw. „Personal“ im Ortspfad in `handschuh` mindestens 72 px und in `kompakt` mindestens 30 px in der Höhe, und seine Schrift ist in jeder Stufe 12 px groß
+- **THEN** misst der Link „Fahrzeuge“ bzw. „Personal“ im Ortspfad in `handschuh` mindestens 72 px und in `kompakt` mindestens 30 px in der Höhe, und seine Schrift ist in `kompakt` 12 px und in `handschuh` 15 px groß
 
 #### Scenario: Liste und Detail der Aufträge im Handschuh-Betrieb
 - **WHEN** die Dichtestufe `handschuh` gewählt ist und auf dem Handschirm ein offener Auftrag mit offenem Empfänger aufgeklappt ist
@@ -315,7 +316,8 @@ MUST weder die Höhe der Werkzeugzeile noch die Lage der obersten Karte ändern.
 
 ### Requirement: Kennzahlenband hält seine Höhe
 
-Das Band „Lage in Zahlen“ im Lage-Dashboard und in Führung · Überblick MUST ab einer
+Das Band „Lage in Zahlen“ im Lage-Dashboard und das Band „Führungsstand“ in Führung · Überblick
+MUST ab einer
 Fensterbreite von 768 px seine Höhe behalten, wenn sich die Länge einer Notiz ändert. Jede
 Notiz des Bands SHALL dort genau drei Textzeilen hoch sein, ob ihr Text kürzer oder länger
 ist. Eine längere Notiz MUST mit einer Auslassung („…“) enden, ihr vollständiger Text MUST

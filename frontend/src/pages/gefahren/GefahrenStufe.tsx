@@ -1,5 +1,5 @@
 import type { Warnstufe } from '../../api/types';
-import { monoStil, useRollen } from '../../components/instrument';
+import { schriftStil, useRollen, zahlStil } from '../../components/instrument';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { zellFlaechenStil } from './zellStil';
 
@@ -25,10 +25,11 @@ export default function GefahrenStufe({ stufe }: { stufe: Warnstufe }) {
         ...zellFlaechenStil(stufe, token),
       }}
     >
-      <span aria-hidden="true" style={monoStil(token.fontSize, 500)}>
+      <span aria-hidden="true" style={zahlStil('text', 500)}>
         {kuerzel}
       </span>
-      <span>{label}</span>
+      {/* Das Wort der Warnstufe: Rolle `warnung`, mindestens 14 px (Spec `schriftskala`). */}
+      <span style={schriftStil('warnung')}>{label}</span>
     </span>
   );
 }

@@ -23,8 +23,8 @@ import {
   Datenfeld,
   Datenraster,
   Schnellerfassungszeile,
-  monoStil,
   useRollen,
+  zahlStil,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { useOhneVerbindung } from '../offline/verbindung';
@@ -443,8 +443,8 @@ export default function Patientenkopf({
                     key: v.id,
                     inhalt: (
                       <>
-                        <span style={monoStil(13)}>{nummer}</span> {regionName(v.ansicht, v.region)}{' '}
-                        · {VERLETZUNG_ART_WORT[v.art]}
+                        <span style={zahlStil('text')}>{nummer}</span>{' '}
+                        {regionName(v.ansicht, v.region)} · {VERLETZUNG_ART_WORT[v.art]}
                         {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`} ·{' '}
                         <ZeitAnzeige wert={v.zeitpunkt_at} rolle="kurz" />
                       </>

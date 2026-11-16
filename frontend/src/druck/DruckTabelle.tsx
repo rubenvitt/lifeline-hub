@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { theme } from 'antd';
-import { monoStil } from '../components/instrument';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 /** Eine Spalte der Papierform: Kopfwort und Zelleninhalt als reiner Text. */
 export interface DruckSpalte<T> {
@@ -63,9 +63,7 @@ export default function DruckTabelle<T>({ kennung, spalten, zeilen, schluessel }
             {spalten.map((s) => (
               <td
                 key={s.titel}
-                style={
-                  s.mono ? { ...zelle, ...monoStil(token.fontSize), whiteSpace: 'nowrap' } : zelle
-                }
+                style={s.mono ? { ...zelle, ...zahlStil('text'), whiteSpace: 'nowrap' } : zelle}
               >
                 {s.wert(z)}
               </td>

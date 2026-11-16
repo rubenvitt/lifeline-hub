@@ -38,6 +38,14 @@ macro_rules! ist_offen_sql {
     };
 }
 
+/// Sofortmeldung: löst den Sofortalarm aus (Meldungsart oder Priorität). SQL-Gegenstück von
+/// [`super::ist_sofort`]; Zähler und Lagemonitor beziehen das Prädikat von hier (LLH-1743).
+macro_rules! ist_sofort_sql {
+    () => {
+        "(m.meldungsart = 'sofortmeldung' OR m.prioritaet = 'sofort')"
+    };
+}
+
 /// Bestätigt: die Quittungs-Achse (`kommunikation_status`, Alias `ks`) trägt einen Zeitpunkt.
 macro_rules! ist_bestaetigt_sql {
     () => {
@@ -138,7 +146,12 @@ struct MerkmalGruppe {
     ist_bestaetigt: bool,
     ist_ueberfaellig: bool,
     eskaliert: bool,
+    ist_sofort: bool,
+    ist_dringend: bool,
     anzahl: i64,
+    /// Frühester Sofortalarm der Gruppe: `sofortalarm_at` einer heraufgestuften Meldung, sonst
+    /// ihr Eingang (UTC, SQLite-Format; gleiches Format, also lexikalisch).
+    aeltester_alarm: Option<String>,
 }
 
 /// Modulzähler der Meldungen (LFH-935): EINE Abfrage, gruppiert nach den Merkmalen, die die
@@ -158,18 +171,22 @@ pub async fn zaehlen(
         ist_bestaetigt_sql!(),
         " AS ist_bestaetigt, ",
         ist_ueberfaellig_sql!(),
-        " AS ist_ueberfaellig, m.eskaliert, COUNT(*) AS anzahl \
+        " AS ist_ueberfaellig, m.eskaliert, ",
+        ist_sofort_sql!(),
+        " AS ist_sofort, (m.prioritaet = 'dringend') AS ist_dringend, COUNT(*) AS anzahl, \
+           MIN(COALESCE(m.sofortalarm_at, m.eingang_at)) AS aeltester_alarm \
          FROM meldung m",
         quittung_join_sql!(),
-        " WHERE m.einsatz_id = ? GROUP BY 1, 2, 3, 4, 5, 6"
+        " WHERE m.einsatz_id = ? GROUP BY 1, 2, 3, 4, 5, 6, 7, 8"
     );
     let gruppen = sqlx::query_as::<_, MerkmalGruppe>(SQL)
         .bind(jetzt)
         .bind(einsatz_id)
         .fetch_all(pool)
         .await?;
-    Ok(crate::einsatz::zaehler::zaehle_meldungen_gewichtet(
-        gruppen.into_iter().map(|g| {
+    let gruppen: Vec<_> = gruppen
+        .into_iter()
+        .map(|g| {
             (
                 crate::einsatz::zaehler::MeldungsMerkmale {
                     status: g.status,
@@ -178,11 +195,27 @@ pub async fn zaehlen(
                     ist_bestaetigt: g.ist_bestaetigt,
                     ist_ueberfaellig: g.ist_ueberfaellig,
                     eskaliert: g.eskaliert,
+                    ist_sofort: g.ist_sofort,
+                    ist_dringend: g.ist_dringend,
                 },
                 g.anzahl,
+                g.aeltester_alarm,
             )
-        }),
-    ))
+        })
+        .collect();
+    // Der Sofortalarm der ältesten offenen Sofortmeldung (LLH-1743, entschieden 16.11.2026): eine
+    // heraufgestufte Meldung zählt ab ihrem Alarm, nicht ab ihrem Eingang. Über die Gruppen, die
+    // die Regel als offene Sofortmeldung zählt, nicht über ein eigenes Prädikat.
+    let sofort_aelteste_at = gruppen
+        .iter()
+        .filter(|(m, _, _)| m.ist_sofort_offen())
+        .filter_map(|(_, _, alarm)| alarm.clone())
+        .min();
+    let mut z = crate::einsatz::zaehler::zaehle_meldungen_gewichtet(
+        gruppen.into_iter().map(|(m, n, _)| (m, n)),
+    );
+    z.sofort_aelteste_at = sofort_aelteste_at;
+    Ok(z)
 }
 
 /// Lädt eine Meldung als Anzeige. `NotFound`, wenn unbekannt.
@@ -1206,26 +1239,6 @@ pub async fn count_lage_neu(pool: &SqlitePool, einsatz_id: i64) -> Result<i64, A
         lage_sicht_sql!(),
         " AND ",
         is_neu_sql!()
-    ))
-    .bind(einsatz_id)
-    .fetch_one(pool)
-    .await
-    .map_err(Into::into)
-}
-
-/// Offene Sofortmeldungen für den Lagemonitor (Change `kcjecn9e-benachrichtigungskonzept`, D12):
-/// Sofortmeldung ist, was den Sofortalarm auslöst (Meldungsart `sofortmeldung` oder Priorität
-/// `sofort`, `routes/meldung.rs`), offen ist sie, solange sie unbestätigt und nicht erledigt ist.
-/// Nur die Zahl, ohne Texte.
-pub async fn count_sofort_offen(pool: &SqlitePool, einsatz_id: i64) -> Result<i64, AppError> {
-    sqlx::query_scalar(concat!(
-        "SELECT COUNT(*) FROM meldung m",
-        quittung_join_sql!(),
-        " WHERE m.einsatz_id = ? \
-           AND (m.meldungsart = 'sofortmeldung' OR m.prioritaet = 'sofort') AND ",
-        ist_offen_sql!(),
-        " AND NOT ",
-        ist_bestaetigt_sql!()
     ))
     .bind(einsatz_id)
     .fetch_one(pool)

@@ -20,7 +20,13 @@ describe('Modul-Zähler', () => {
   it('bildet die Kommunikationszähler mit dem bisherigen Wortlaut ab', () => {
     expect(
       bildeZaehler({
-        meldungen: { offen: 2, ungesehen: 1, bestaetigung_ueberfaellig: 0 },
+        meldungen: {
+          offen: 2,
+          ungesehen: 1,
+          bestaetigung_ueberfaellig: 0,
+          sofort_offen: 0,
+          dringend_offen: 0,
+        },
         auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 },
         erinnerungen: { faellig: 1 },
         chat: { ungelesen: 5 },
@@ -33,7 +39,13 @@ describe('Modul-Zähler', () => {
     });
     expect(
       bildeZaehler({
-        meldungen: { offen: 1, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+        meldungen: {
+          offen: 1,
+          ungesehen: 0,
+          bestaetigung_ueberfaellig: 0,
+          sofort_offen: 0,
+          dringend_offen: 0,
+        },
         auftraege: { offen: 1, in_arbeit: 0, ueberfaellig: 0 },
         erinnerungen: { faellig: 2 },
         chat: { ungelesen: 1 },

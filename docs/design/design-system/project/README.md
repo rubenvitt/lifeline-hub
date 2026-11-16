@@ -16,12 +16,14 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 
 - **Paneel** (`components/Paneel/`, Gruppe Flächen)
 - **Dashboard-Baukasten (Verteilung und Matrix)** (`components/Dashboard/`, Gruppe Flächen)
+- **Schrift: Rollen der Skala und Feldetikett** (`components/Schrift/`, Gruppe Daten)
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
 - **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
 - **Großbild: Zeilen** (`components/GrossZeile/`, Gruppe Großbild)
 - **Segmentleiste** (`components/Segmentleiste/`, Gruppe Bedienung)
+- **AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)** (`components/AlarmZeile/`, Gruppe Rückmeldung)
 - **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
 - **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
 - **Verbindungen (Funk und Telefon getrennt; Liste offen)** (`components/Verbindungen/`, Gruppe Bedienung)
@@ -51,7 +53,7 @@ Diese Werte liest das Format des Design Systems nicht; sie stehen nur im Repo:
 - `farbenDunkel/farbenHell.markeGlut`: kein Farbwert (Nacht `0 0 12px 0 rgba(168, 7, 26, 0.55)`, Tag `0 0 10px 0 rgba(168, 7, 26, 0.3)`)
 - `form.versalSperrung`: Sperrung der Versalien, `2.2px`
 - `form.uebergang`: Übergang, `120ms cubic-bezier(0.2, 0.8, 0.2, 1)`
-- `schriftskala (Sperrung, Versalien)`: ueberschrift -0.02em · augenbraue 0.14em Versalien · railEtikett 0.06em Versalien · datenwertKlein -0.02em · datenwert -0.02em · datenwertGross -0.02em
+- `schriftskala (Sperrung, Versalien)`: ueberschrift -0.02em · uhr 0.04em · augenbraue 0.08em Versalien · railEtikett 0.04em Versalien · datenwertKlein -0.02em · datenwert -0.02em · datenwertGross -0.02em
 - `--lfh-abdunkelung (theme/rollen.css)`: Deckschicht des Helligkeitsreglers, keine Farbrolle
 
 ## Gestaltungssprache
@@ -74,11 +76,38 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `etbTypFarben{Dunkel,Hell}` (`etbTypFarbe()`), `warnstufeFarben{Dunkel,Hell}`
   (`warnstufeBalkenFarbe()`), `fachebeneFarben{Dunkel,Hell}` (`fachebeneFarbe()`, LFH-593:
   Ebenen-Identität, keine Vertragskarte; `FachebeneDef` trägt keine Farbe).
-- **`schriftskala`** (CSS `--lfh-typo-*`, deckungsgleich per `rollen.guard.test.ts`). Zahlen,
-  Zeiten, Funkrufnamen, Koordinaten, Nummern immer Mono mit `tabular-nums`. Die Dichte-Staffel
-  30/48/72 gilt, nicht die Entwurfsskizze.
+- **Schrift: sechs Stufen, Rollen darüber** (LLH-1773/LLH-1775, Spec `schriftskala`, Change
+  `i1o47voj-schrift-lesbarkeit`; umgekehrt 15.11.2026 gegenüber dem Neuentwurf): jede Größe am
+  Schirm ist eine der `groessenstufen` in `theme/tokens.ts` (`fein` 11 · `klein` 12 · `text` 14 ·
+  `titel` 16 · `wert` 22 · `gross` 32), nichts unter 11 px. `schriftskala` nennt je Rolle Stufe,
+  Gewicht und Familie (`seitentitel` und `uhr` 16, `warnung` 14/600 für jeden Warnhinweis,
+  `etikett`, `meta` …); CSS `--lfh-groesse-*`/`--lfh-typo-*`, deckungsgleich per
+  `rollen.guard.test.ts`. Die Stufen bis `titel` wachsen mit der Dichte um 1 / 1,15 / 1,25
+  (`--lfh-schrift-faktor`, `dichteFaktor`, LLH-1774), auch antds Schriftgrößen; `wert` und
+  `gross` stehen fest. Gesetzt wird eine Größe nur über `schriftGroesse(stufe)`,
+  `schriftStil(rolle)`, `zahlStil(stufe)` (`components/instrument/rollenwerte.ts`), den Baustein
+  `Schrift`, antds `token.fontSize*` oder `var(--lfh-…)` in CSS; Rechnungen nehmen `schriftPx`.
+  **Kein Größen-Literal** (`fontSize: 12`, `font-size: 12px`, `monoStil`), ohne Schuldmenge:
+  Wächter `theme/schriftLiteral.guard.test.ts`. Ausnahmen nur Druckblätter (pt), die
+  Fernsicht-Skala des Lagemonitors (`fernsicht`), die Großbild-Skala (`grossMass`, LLH-1747) und
+  Zeichnungen mit eigenem Maßstab (Lagekarte, Fernmeldeskizze, taktische Zeichen).
+- **Mono nur für Zahl, Zeit, Kennung und Funkrufname** (LLH-1777, Spec `schriftrollen`;
+  umgekehrt 15.11.2026: der Neuentwurf setzte auch die Meta-Zeilen in Mono): `zahlStil` trägt
+  Mono, Kennungen sind auch das Typwort der Zeitachse, `/typ`, Tastenkürzel, die Wortmarke und
+  FMS-Kürzel. Text mit Wörtern steht in der Textschrift, auch gemischt („Stand 14:32“) und ganz:
+  jede Rolle setzt `tabular-nums`. Funkrufnamen tragen `data-schrift="kennung"` (Messung
+  `e2e/schrift-mono-grenze.spec.ts`).
+- **Versalien nur in Köpfen, Feldetiketten gemischt** (LLH-1776, Spec `schriftrollen`;
+  umgekehrt 15.11.2026): die `Augenbraue` benennt Paneelköpfe, Kennzahlen, Tabellenköpfe und
+  Gruppen, das Rail-Etikett steht ebenso in Versalien. Ein Feld benennt das `Feldetikett`
+  (`components/instrument/Feldetikett.tsx`: Stufe `klein`, `gedaempft`, ohne Sperrung);
+  `Datenfeld`, `DatenfeldEingabe` und `FeldLabel` tragen es, die Augenbraue kennt `als="dt"` nicht.
+- **Body und native Bedienelemente erben die Textschrift** (LLH-1772): `index.css` setzt sie an
+  `html, body` und `font: inherit` an `button, input, textarea, select`; kein lokales
+  `font: 'inherit'` mehr nötig. Wächter `theme/schriftReset.guard.test.ts`, Beleg
+  `e2e/schrift-familie.spec.ts`.
 - **Bausteine** in `components/instrument/` (Import über `index.ts`, Dateikopf nennt die Regel):
-  `Augenbraue` (`als="h2…h6"`) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
+  `Augenbraue` (`als="h2…h6"`, nur Köpfe) · `Feldetikett` · `Schrift` · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
   Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`StatusChip` (`wort` Pflicht, Übersetzung
   nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; `SegmentUmschalter` als ein
@@ -93,8 +122,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
-  (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `rollenwerte`/`useRollen` ·
-  Dashboard-Baukasten (unten).
+  (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `AlarmZeile` („Was brennt“, LLH-1743,
+  Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
   `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
   `anzeige/Ortsfeld.tsx`, im Einsatz `anzeige/EinsatzOrtsfeld.tsx` (Ortsfeld) ·
@@ -111,7 +140,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   mitwachsend über `min(vw, vh)`). Jeder hat eine Karte im Design System, außer der Hülle
   `GrossbildFlaeche` (Portal und Vollbild).
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
-  Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
+  Staffel): `titel` als `h1` (16/600, Paneele ab `h2`), `meta` in der Textschrift, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
   `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion
@@ -186,7 +215,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
     Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
-    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
+    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (Stufe `titel`, 16 / 18,4 / 20 px)
+    seine Eigenbreite, bevor die
     Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
     nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht in jeder Breite nur als
     Symbol, eine Störung ab `md` mit Wort (darunter trägt die Betriebszeile die Verbindung, die
@@ -225,7 +255,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
   Evakuiert (LFH-607, `openspec/changes/archive/2026-09-29-lfh-607-kennzahl-evakuiert/`), Pegel auf Platz 1
   (LFH-606), Rückmeldung (LFH-610), ETB-Zählung (LFH-612).
-- **Kennzahlenband** (LFH-640): immer sechs Plätze (vier Kern, zwei Lage), jede Kennzahl ein
+- **Kennzahlenband** (LFH-640): „Lage in Zahlen“ hat immer sechs Plätze (vier Kern, zwei Lage); der
+  Führungsstand des Überblicks nur seine Handlungszahlen (LLH-1743). Jede Kennzahl hat einen
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
   per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen,
   LLH-1371); Neuzuschnitt während der Betrachtung als Sammelbanner
@@ -245,12 +276,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
   `components/instrument/`.
   Kopf: `EinsatzSeite` mit Datenstand und `WarnstufenHinweis` (nur bei Ton achtung/alarm; die
-  Warnstufe ist keine Kennzahl). Reihe 1: `Kennzahlenband`, sechs Plätze (Regel oben).
+  Warnstufe ist keine Kennzahl). Darunter, vor jedem Band, auf Überblick, Lagebild und Lagemonitor
+  die **Alarmzeile „Was brennt“** (`AlarmZeile`, LLH-1743, Spec `lage-alarmzeile`): Einträge,
+  Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
+  am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
+  Quellen, Sprungziele aus `lage/alarmZiel.ts`. Sie zeigt Zustände, die Alarmzone Ereignisse; keine
+  Seite baut eine zweite Sammlung. Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band
+  „Lage in Zahlen“ des Lagebilds, der Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
   Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
   `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
   (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
-  Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband „Führungsstand“ als
-  `Kennzahlenband` mit `groesse="klein"`, Zahlen aus dem Modulzähler. Jedes Paneel geht durch
+  Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband
+  „Stand“ des Lagebilds (Lagebericht, UHS aktiv) als `Kennzahlenband` mit `groesse="klein"`. Jedes Paneel geht durch
   `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, `PaneelZustand`; `gesperrt` nennt
   den Grund, ohne Sprung und Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
   Anteilsbalken je Kategorie: Sichtung, FMS-Status), `MatrixPaneel` (Stufenmatrix: Gefahren),
@@ -262,16 +299,24 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Leer und Gesperrt sehen verschieden aus; eine unbekannte Zahl steht als „—“, nie als 0. Balken
   ergänzen die Zahl, nie ersetzen sie; Farben kommen aufgelöst vom Aufrufer, der Baustein trägt
   keine Statuskarte. Ein neuer Paneeltyp kommt als Baustein hierher, nicht lokal in eine Seite.
+- **Rollen der Übersichten** (LLH-1743, Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt
+  die Lage“): der Überblick sagt, was zu tun ist (Aufträge, Meldungen, Abschnitte, offene
+  Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los ist (Betroffene, Kräfte,
+  Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Kennzahl steht auf genau
+  einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Beide verweisen im Seitenkopf
+  aufeinander. Herleitung: `openspec/changes/archive/2026-11-16-t9jjrajy-alarmzeile-was-brennt/design.md` (D8).
 - **Eine Heimat je Zahl** (LFH-550,
   `openspec/changes/archive/2026-09-30-lfh-550-lagebesprechung-eine-verdichtung/design.md`):
-  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig),
+  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig,
+  Sofort- und dringende Meldungen offen samt Eingang der ältesten, LLH-1743),
   Nachforderungen (offen, je Stufe, überfällig; LLH-1145), Erinnerungen (fällig) und Lagemeldungen
   (neu) nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
   Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
-  über die Gründe der Tönung des Meldebilds (`toenungsGruende`); der Überblick summiert sie je
-  Abschnitt. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
+  über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
+  `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
+  Einheiten. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
   jüngste Meldung allein (LLH-1739, `abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
   ihm steht (LLH-1744): Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit
@@ -574,20 +619,23 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (Höhe und Breite) und steht am unteren Rand (LLH-1032, `verpflegung/zaehltasteStil.ts`). Das ist
   eine Ausnahme nach oben, keine Stufenwahl: die übrigen Tasten folgen der Staffel. Nachweis
   `e2e/gate3-trefflaeche.spec.ts` („Ausgabeansicht“).
-- **Kein Zoom wie in einer App** (LLH-1328): der Viewport in `index.html` sperrt den Zoom
-  (`maximum-scale=1.0, user-scalable=no`), `html` in `index.css` den Doppeltipp
-  (`touch-action: manipulation`). Sonst zoomt iOS beim Fokus in jedes Feld unter 16 px Schrift,
-  und die Stufen liegen darunter. Größe trägt die Dichte, kein Feld wird dafür auf 16 px gehoben.
-  Wächter `theme/keinZoom.guard.test.ts`.
+- **Der Zoom ist frei, der Doppeltipp nicht** (LLH-1774, Spec `schriftskala`; umgekehrt
+  15.11.2026 gegenüber LLH-1328 „Kein Zoom wie in einer App“): der Viewport in `index.html` nennt
+  weder `maximum-scale` noch `user-scalable=no`, `html` in `index.css` sperrt nur den Doppeltipp
+  (`touch-action: manipulation`). iOS zoomt beim Fokus nicht, weil ein Feld in `komfortabel`
+  14 × 1,15 = 16,1 px misst; in `kompakt` auf dem iPhone ist der Fokus-Zoom hingenommen. Wächter
+  `theme/zoomFrei.guard.test.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
-  `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
-  Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
+  `theme/dichte.ts:startDichte`, gespiegelt im Bootstrap-Skript von `index.html` (setzt
+  `data-dichte` vor dem ersten Bild, LLH-1774) — immer beide ändern, `theme/dichte.test.ts` führt
+  das Skript gegen `startDichte` aus; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart,
+  kein Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
   `e2e/dichte-ableitung.spec.ts`; Flächenmessung der Modul-Prüflisten
   `e2e/trefflaeche-pruefflaechen.spec.ts`, Messhelfer in `e2e/trefflaeche-kern.ts`.
 - **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel
   (`Math.max(48, controlHeight)`, Griffe über `navGriffMass`); die Rail-Spalte wächst mit
-  (`railBreite` in `components/Kopfleiste.tsx`, 73 px in `handschuh`).
+  (`railBreite` in `components/Kopfleiste.tsx`, mit der Schrift: 64 / 74 / 80 px, LLH-1774).
 - Knopfboden `minWidth` = `controlHeightSM` (`antdKnopf()` in `theme/tokens.ts`). `Switch` über
   `switchMasse`/`antdKomponenten(farben, dichte)`; Nachweis am CSS der `css-var-…`-Klasse über
   `innerHTML`, nicht `textContent`. Schalter in fester Breite brechen um, statt zu kürzen

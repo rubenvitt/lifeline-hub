@@ -63,10 +63,10 @@ interface LagebildGrossbildProps {
  * design.md D5 in `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`).
  *
  * Die Seite reicht ihre schon berechneten Werte herein, das Großbild rechnet nichts selbst: das Band
- * und der Führungsstand kommen als {@link KennzahlAnzeige} aus `kennzahlAnzeige.ts`, Gefahren,
+ * und der Stand (Lagebericht, UHS) kommen als {@link KennzahlAnzeige} aus `kennzahlAnzeige.ts`, Gefahren,
  * Sichtung und Verlauf aus denselben Verdichtungen wie die Paneele. Aufteilung bei 16:9: das Band in
  * drei Spalten und zwei Reihen, darunter Gefahren (oder der Verlauf in der Reihe
- * „Sanitätsdienst“), Sichtung und Führungsstand. Der Meldungsstrom fehlt: ETB-Text ist aus 3 m
+ * „Sanitätsdienst“), Sichtung und Stand. Der Meldungsstrom fehlt: ETB-Text ist aus 3 m
  * kein Lagewert.
  */
 export default function LagebildGrossbild({
@@ -126,7 +126,9 @@ export default function LagebildGrossbild({
       >
         {sanitaetsdienst ? <VerlaufBlock {...verlauf} /> : <GefahrenBlock {...gefahren} />}
         <SichtungsBlock {...sichtungsDaten} />
-        <Block titel="Führungsstand">
+        {/* Stand: Lagebericht und UHS; Aufträge und Meldungen zeigt nur der Überblick (LLH-1743),
+            ihr Überfällig-Signal kommt mit der Alarmzeile (LLH-1931). */}
+        <Block titel="Stand">
           <div
             style={{
               display: 'grid',

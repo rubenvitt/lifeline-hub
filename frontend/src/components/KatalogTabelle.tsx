@@ -24,6 +24,7 @@ import {
 } from './SpaltenSchalter';
 import { useViewport, type AbBreitePunkt } from './useViewport';
 import type { Farbrollen } from '../theme/tokens';
+import { useDichte } from '../theme/ThemeModeProvider';
 import { useRollen } from './instrument/rollenwerte';
 import { useDruckModus } from './druck/useDruckModus';
 import { useRahmenObenFuer } from './rahmenOben';
@@ -951,6 +952,7 @@ export default function KatalogTabelle<T extends object>({
    * {@link sichtbareSpalten}, das Spalte 0 nie entfernt. Die Schalterfelder werden vor antd
    * herausgelöst.
    */
+  const { dichte } = useDichte();
   /** Schriftfamilie des Tabellenkopfs (`--lfh-schrift-text`), einmal je Montage gelesen. */
   const kopfSchrift = useMemo(
     () =>
@@ -1005,7 +1007,7 @@ export default function KatalogTabelle<T extends object>({
         const mindest = kopfMindestBreite({
           titel: kopfTitel,
           token,
-          messen: (text) => textBreiteKopf(text, kopfSchrift),
+          messen: (text) => textBreiteKopf(text, kopfSchrift, dichte),
           sortierbar: 'sorter' in gebaut && gebaut.sorter != null && gebaut.sorter !== false,
           filterbar:
             ('filters' in gebaut && gebaut.filters != null) ||
@@ -1034,6 +1036,7 @@ export default function KatalogTabelle<T extends object>({
   }, [
     token,
     kopfSchrift,
+    dichte,
     columns,
     spaltenSchalter,
     schaltbar,

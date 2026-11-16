@@ -1,3 +1,4 @@
+import { schriftPx, type Dichte } from '../theme/tokens';
 import { textBreite } from './textBreite';
 
 /**
@@ -14,8 +15,11 @@ import { textBreite } from './textBreite';
  * Gerechnet, nicht am DOM gemessen: so steht die Breite schon im ersten Bild und springt nicht.
  */
 
-/** Typografie des Tabellenkopfs, wie `.lfh-katalog .ant-table-thead > tr > th` in `sprache.css`. */
-export const KOPF_SCHRIFT = { groesse: 10, gewicht: 600, sperrung: 0.12 } as const;
+/**
+ * Typografie des Tabellenkopfs, wie `.lfh-katalog .ant-table-thead > tr > th` in `sprache.css`:
+ * die Stufe `fein` der Augenbraue, die mit der Dichte wächst (LLH-1774), Sperrung .12em.
+ */
+export const KOPF_TYPO = { stufe: 'fein', gewicht: 600, sperrung: 0.12 } as const;
 
 /** Breite des Sortiersymbols samt Abstand zum Titel (antd: 12 px Symbol, 4 px Abstand). */
 const SORTIER_BREITE = 16;
@@ -51,9 +55,13 @@ export function kopfMindestBreite({
   return Math.ceil(2 * token.padding + text + knoepfe);
 }
 
-/** Breite eines Texts in der Kopfschrift, Sperrung eingerechnet (`components/textBreite.ts`). */
-export function textBreiteKopf(text: string, schriftfamilie: string): number {
-  const { groesse, gewicht, sperrung } = KOPF_SCHRIFT;
+/**
+ * Breite eines Texts in der Kopfschrift der Dichte, Sperrung eingerechnet
+ * (`components/textBreite.ts`).
+ */
+export function textBreiteKopf(text: string, schriftfamilie: string, dichte: Dichte): number {
+  const { stufe, gewicht, sperrung } = KOPF_TYPO;
+  const groesse = schriftPx(stufe, dichte);
   return textBreite(text, { schrift: schriftfamilie, groesse, gewicht, sperrung });
 }
 

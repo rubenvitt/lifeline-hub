@@ -36,7 +36,13 @@ vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
 
 const ZAEHLER = {
   auftraege: { offen: 3, in_arbeit: 1, ueberfaellig: 2 },
-  meldungen: { offen: 4, ungesehen: 3, bestaetigung_ueberfaellig: 1 },
+  meldungen: {
+    offen: 4,
+    ungesehen: 3,
+    bestaetigung_ueberfaellig: 1,
+    sofort_offen: 0,
+    dringend_offen: 0,
+  },
 } as unknown as ModulZaehler;
 
 /** Freitext mit Namen Dritter: darf nie im Lagevortrag landen. */
@@ -196,7 +202,13 @@ describe('Besondere (Führungs-)Probleme (LFH-871)', () => {
   it('sagt „keine“, wo nichts vorliegt', async () => {
     vi.mocked(ladeModulZaehler).mockResolvedValue({
       auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-      meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+      meldungen: {
+        offen: 0,
+        ungesehen: 0,
+        bestaetigung_ueberfaellig: 0,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      },
     } as unknown as ModulZaehler);
     vi.mocked(listeAuftraege).mockResolvedValue([]);
     vi.mocked(listeMeldungen).mockResolvedValue([]);

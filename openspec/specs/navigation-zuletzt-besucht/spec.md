@@ -13,14 +13,14 @@ nicht, wohin er geleitet wurde.
 Das System SHALL ein Modul nur dann in „Zuletzt besucht" aufnehmen, wenn eine Person es über
 einen der folgenden Zugänge gewählt hat: Modul-Panel, Modul-Akkordeon im Navigations-Drawer,
 Sprungpalette (Gruppen „Module", „Zuletzt besucht" und Schnellaktionen), ein Ziel auf
-Führung · Überblick oder ein Ziel im Lage-Dashboard. Ein Zugang zeichnet nur auf, wenn sein
+Führung · Überblick (auch ein Eintrag der Alarmzeile) oder ein Ziel im Lage-Dashboard. Ein Zugang zeichnet nur auf, wenn sein
 Ziel in einem Modul des Einsatzes liegt. Die Aufnahme geschieht beim Klick bzw. bei der
 Ausführung, nicht beim Anzeigen eines Ziels.
 
 #### Scenario: Kennzahl auf dem Überblick
 
-- **WHEN** eine Person auf Führung · Überblick die Kennzahl „Betroffene" anklickt
-- **THEN** steht „Personen" danach als jüngster Eintrag in „Zuletzt besucht"
+- **WHEN** eine Person auf Führung · Überblick die Kennzahl „Offene Aufträge" anklickt
+- **THEN** steht „Aufträge/Befehle" danach als jüngster Eintrag in „Zuletzt besucht"
 
 #### Scenario: Knopf auf dem Überblick
 

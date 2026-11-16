@@ -20,7 +20,6 @@ import { KennungsLink } from '../components/kennungsLink';
 import { betreuungsstellePfad } from '../routing/deeplinks';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
-import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { aktionsSpalte } from '../components/aktionsSpalte';
 import { leseTextSchrift } from '../components/textBreite';
@@ -36,6 +35,7 @@ import {
   personenZahl,
 } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Block „Betreuungsstellen" der Betreuungsseite (seit LLH-1034 ihr einziger Block).
@@ -200,7 +200,8 @@ const stellenSpalten = (
     {
       key: 'belegt',
       title: 'belegt',
-      zahl: true,
+      // Keine Zahlspalte: die Zelle trägt Wörter („keine Meldung“, „namentlich …“); Mono nur an
+      // der Zahl selbst (LLH-1777).
       sortWert: (s) => s.belegung?.belegt,
       render: (_, s) => {
         const zusatz = namentlichTeile(namentlich?.get(s.id), s.belegung != null);
@@ -220,7 +221,7 @@ const stellenSpalten = (
         const stufe = auslastung(s.belegung.belegt, s.kapazitaet_personen);
         return (
           <Space wrap>
-            <span>{personenZahl(s.belegung.belegt)}</span>
+            <span style={zahlStil}>{personenZahl(s.belegung.belegt)}</span>
             {stufe && <StatusTag darstellung={stufe} />}
             {hinweis}
           </Space>
@@ -350,7 +351,7 @@ export default function StellenBlock({
       stellenSpalten(
         einsatzId,
         namentlichJeStelle,
-        monoStil(token.fontSize),
+        zahlStil('text'),
         istSchmal,
         darfSchreiben || darfMelden
           ? aktionsSpalte<Betreuungsstelle>({
@@ -378,7 +379,6 @@ export default function StellenBlock({
       aktion,
       weitere,
       namentlichJeStelle,
-      token.fontSize,
       istSchmal,
       dichte,
       schrift,

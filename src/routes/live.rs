@@ -74,9 +74,12 @@ pub async fn stream(
     let seit = crate::routes::support::last_event_id(&headers);
     let (replay, rx, position) = state.live.abonniere_mit_position(einsatz_id, seit);
     let benutzer_id = ctx.benutzer.id;
+    // Der Lagemonitor bekommt Sofortmeldungen als Signal ohne Inhalt (LLH-1743, D7).
+    let lagemonitor = ctx.geraet.as_ref().map(|g| g.ansicht)
+        == Some(crate::geraet::Funktionsansicht::Lagemonitor);
     let einsatz_strom =
         crate::routes::support::sse_stream_mit_replay(replay, rx, position, move |n| {
-            n.fuer(benutzer_id, &erlaubt)
+            n.fuer_verbindung(benutzer_id, &erlaubt, lagemonitor)
         });
     // Org-Ereignisse ohne `id:` und ohne Replay (LFH-734, design.md D4); gefiltert gegen den Benutzer,
     // nicht gegen die Modulrechte des Einsatzes. Ein Gerät kennt weder Einsatzliste noch

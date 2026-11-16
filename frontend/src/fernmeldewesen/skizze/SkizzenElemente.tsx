@@ -33,6 +33,9 @@ import {
   KASTEN_SCHRIFT,
   KASTEN_ZEILE,
   NAME_SCHRIFT,
+  HINWEIS_SCHRIFT,
+  NEU_SCHRIFT,
+  MARKE_SCHRIFT,
   NAME_ZEILE,
   RUFNAME_ZEILE,
   TZ_HOEHE,
@@ -109,7 +112,7 @@ export function LueckenMarke({ x, y }: { x: number; y: number }) {
       <text
         x={x + h / 2}
         y={y + h / 2 - 1.5}
-        fontSize={7}
+        fontSize={MARKE_SCHRIFT}
         fontWeight={700}
         textAnchor="middle"
         fill="currentColor"
@@ -147,7 +150,7 @@ function MarkenZeile({
       <text
         x={tx}
         y={y}
-        fontSize={NAME_SCHRIFT - 1}
+        fontSize={HINWEIS_SCHRIFT}
         textAnchor={anker}
         dominantBaseline="central"
         fill="currentColor"
@@ -462,6 +465,7 @@ export function StelleBild({
             // Festbreitenschrift eines Rufnamens tragen die Unterscheidung.
             fill="currentColor"
             style={stelle.art === 'extern' || !stelle.rufname ? SCHRIFT_TEXT : SCHRIFT_MONO}
+            data-schrift={stelle.art === 'extern' || !stelle.rufname ? undefined : 'kennung'}
           >
             {rufZeilen.length === 1
               ? ruf
@@ -672,7 +676,7 @@ export function NeuMarke({ platz, zustand }: { platz: Platz; zustand: Zustand })
       <text
         x={x + breite / 2}
         y={y + 6}
-        fontSize={9}
+        fontSize={NEU_SCHRIFT}
         textAnchor="middle"
         dominantBaseline="central"
         fill="currentColor"

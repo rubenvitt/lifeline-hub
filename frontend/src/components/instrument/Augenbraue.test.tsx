@@ -15,7 +15,8 @@ describe('Augenbraue', () => {
   it('wird mit `als` zur Überschrift, ohne die Optik zu ändern', () => {
     renderMitProviders(<Augenbraue als="h2">Einsatzabschnitte</Augenbraue>);
     const h = screen.getByRole('heading', { level: 2, name: 'Einsatzabschnitte' });
-    expect(h).toHaveStyle({ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' });
+    expect(h.style.fontSize).toBe('var(--lfh-groesse-fein)');
+    expect(h).toHaveStyle({ fontWeight: '600', textTransform: 'uppercase' });
   });
 
   it('lässt den Wortlaut im DOM, wie er übergeben wird — Versalien sind CSS', () => {

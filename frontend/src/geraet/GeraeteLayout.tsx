@@ -23,7 +23,7 @@ import {
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import SpiegelBand from '../einsatz/spiegel/SpiegelBand';
-import { EINSATZKOPF_REFETCH_MS, UebungsBand } from '../components/instrument';
+import { EINSATZKOPF_REFETCH_MS, UebungsBand, schriftGroesse } from '../components/instrument';
 import { abgleichFuer, useOfflineSync } from '../offline/useOfflineSync';
 import {
   EinsatzPfadeProvider,
@@ -276,7 +276,7 @@ function NavZiel({
         minHeight: Math.max(56, token.controlHeight),
         paddingBlock: token.paddingXS,
         textDecoration: 'none',
-        fontSize: 13,
+        fontSize: schriftGroesse('text'),
         background: isActive ? rahmenFarben.aktiv : 'transparent',
         boxShadow: isActive ? `inset 0 3px 0 ${rahmenFarben.marke}` : 'none',
         color: isActive ? rahmenFarben.text : rahmenFarben.gedaempft,

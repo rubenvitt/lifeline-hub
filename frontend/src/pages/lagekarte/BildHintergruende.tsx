@@ -1,6 +1,6 @@
 import { Button, Slider, Space, Switch, Tooltip, Typography, Upload } from 'antd';
 import { IconFadenkreuz, IconHochladen, IconMuelleimer, IconVollbildEcken } from '../../icons';
-import { useRollen } from '../../components/instrument';
+import { useRollen, schriftGroesse } from '../../components/instrument';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
 import { useZeilenMenueKontext } from '../../components/useDatensatzKontextMenue';
@@ -142,7 +142,10 @@ export default function BildHintergruende(
               </span>
             </div>
             {imPlatzieren && darfSchreiben && (
-              <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+              <Typography.Text
+                type="secondary"
+                style={{ fontSize: schriftGroesse('klein'), display: 'block' }}
+              >
                 wird eingepasst
               </Typography.Text>
             )}

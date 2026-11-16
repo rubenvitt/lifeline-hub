@@ -1,5 +1,6 @@
 import { Typography } from 'antd';
 import { createContext, useContext, type ReactNode } from 'react';
+import { schriftStil } from './instrument/rollenwerte';
 
 /** Die Spalten, die die umgebende Tabelle wirklich zeigt (`Datensicht`); leer im Kartenzweig. */
 export const KEINE_SPALTEN: ReadonlySet<string> = new Set();
@@ -29,7 +30,7 @@ export function KennungMitZusatz({
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', minWidth: 0 }}>
       {kennung}
-      <Typography.Text type="secondary" style={{ fontSize: 12 }} data-lfh="kennung-zusatz">
+      <Typography.Text type="secondary" style={schriftStil('meta')} data-lfh="kennung-zusatz">
         {text}
       </Typography.Text>
     </span>

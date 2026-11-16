@@ -67,6 +67,17 @@ export const KASTEN_SCHRIFT = 14;
 export const KASTEN_ZEILE = 18;
 export const NAME_SCHRIFT = 12;
 export const NAME_ZEILE = 16;
+/**
+ * Schriften der Skizze sind Zeichnungseinheiten (`viewBox`), keine Bildschirmskala: die Skizze
+ * zoomt und druckt mit ihrem eigenen Maßstab, wie die Lagekarte (Spec `schriftskala` nimmt
+ * Zeichnungen mit eigenem Maßstab aus, `theme/schriftLiteral.guard.test.ts`). Der Boden von 11
+ * gilt trotzdem für jedes Wort; nur das Ausrufezeichen in der Lückenmarke ist Teil des Zeichens.
+ */
+export const HINWEIS_SCHRIFT = 11;
+/** Das Wort „neu“ über einer neuen Einheit (`NeuMarke`). */
+export const NEU_SCHRIFT = 11;
+/** Das Ausrufezeichen in der Lückenmarke: ein Zeichen, kein Text. */
+export const MARKE_SCHRIFT = 7;
 /** Eine Zeile für Rufname und eine für Lücke oder Status — immer reserviert, damit eine neue
  * Lücke kein Element verschiebt. */
 export const RUFNAME_ZEILE = 16;
@@ -108,11 +119,12 @@ export function komponentenBildHoehe(s: Pick<NetzStelle, 'bezeichnung'>): number
  * Ausstattung im Kasten (LFH-1029): je Zeichen ein Platz mit Zeichen und Wort darunter, so
  * viele Plätze je Zeile wie die Innenbreite fasst. Gemessen im Druck (`e2e/fernmeldeskizze-
  * ausstattung.spec.ts`, „Messung“): acht Abschnitte, A4 quer 3,4 pt, A3 quer 5,1 pt, so
- * klein wie der Rufname im Verhältnis 10 : 12, nie kleiner.
+ * klein wie der Rufname im Verhältnis 11 : 12, nie kleiner (vor LLH-1775: 10 : 12).
  */
 export const AUSSTATTUNG_PLATZ = 52;
 export const AUSSTATTUNG_ZEICHEN = 24;
-export const AUSSTATTUNG_SCHRIFT = 10;
+/** Das Ausstattungswort; Boden 11 Zeichnungseinheiten wie jedes Wort der Skizze (LLH-1775). */
+export const AUSSTATTUNG_SCHRIFT = 11;
 export const AUSSTATTUNG_ZEILE = 12;
 /** Abstand über der ersten Zeile und zwischen zwei Zeilen; zwischen Zeichen und Wort die Hälfte. */
 export const AUSSTATTUNG_ABSTAND = 4;

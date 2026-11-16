@@ -6,7 +6,7 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { Breadcrumb, Button, Tag, Typography, theme } from 'antd';
-import { Segmentleiste, monoStil } from '../components/instrument';
+import { Segmentleiste, zahlStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
@@ -70,7 +70,7 @@ const schaedenSpalten = (einsatzId: number) =>
       suchText: (s) => schadenRegistrierAnzeige(s.registrier_nr),
       // Kein Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
       render: (_, s) => (
-        <Typography.Text strong style={monoStil(13, 500)}>
+        <Typography.Text strong style={zahlStil('text', 500)}>
           {schadenRegistrierAnzeige(s.registrier_nr)}
         </Typography.Text>
       ),

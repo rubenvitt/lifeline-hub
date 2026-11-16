@@ -1,8 +1,7 @@
 import { useState, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react';
 import type { EtbTyp } from '../api/types';
 import Fundstellen from '../components/Fundstellen';
-import { useRollen } from '../components/instrument';
-import { monoStil } from '../components/instrument/rollenwerte';
+import { useRollen, schriftGroesse, zahlStil } from '../components/instrument';
 import { zeilenGrund } from '../components/instrument/Zeitachseneintrag';
 import { etbTypFarbe } from '../theme/statusFarben';
 import { EinklappHuelle, EinklappKnopf, useEinklappen } from './EtbInhalt';
@@ -17,6 +16,7 @@ import {
   type VonAnAnzeige,
 } from './etbSpalten';
 import type { Vermerk } from './vermerke';
+
 import './etbSpaltenzeile.css';
 
 /**
@@ -83,7 +83,7 @@ export function EtbSpaltenkopf({ klebt }: { klebt: boolean }) {
         paddingInlineStart: ETB_SPALTEN_KANTE + ETB_SPALTEN_EINZUG,
         background: rollen.kopf,
         borderBlockEnd: `1px solid ${rollen.linie}`,
-        fontSize: 12,
+        fontSize: schriftGroesse('klein'),
         lineHeight: '16px',
         color: rollen.gedaempft,
       }}
@@ -116,7 +116,7 @@ export function VonAnText({
       style={{
         display: 'block',
         minWidth: 0,
-        fontSize: 13,
+        fontSize: schriftGroesse('text'),
         lineHeight: '20px',
         color: rollen.text2,
         whiteSpace: 'nowrap',
@@ -136,7 +136,7 @@ export function VonAnText({
         </>
       )}
       {weg && (
-        <span style={{ fontSize: 12, color: rollen.gedaempft }}>
+        <span style={{ fontSize: schriftGroesse('klein'), color: rollen.gedaempft }}>
           {anzeige ? ' · ' : ''}
           {weg}
         </span>
@@ -246,11 +246,11 @@ export default function EtbSpaltenzeile({
       />
       <span
         data-lfh="zeitachse-zeit"
-        style={{ ...monoStil(15, 500), lineHeight: '20px', color: rollen.text }}
+        style={{ ...zahlStil('text', 500), lineHeight: '20px', color: rollen.text }}
       >
         {zeit}
       </span>
-      <span style={{ ...monoStil(12), lineHeight: '20px', color: rollen.gedaempft }}>
+      <span style={{ ...zahlStil('klein'), lineHeight: '20px', color: rollen.gedaempft }}>
         {nr != null && (
           <>
             <span style={NUR_VORLESER}>Nr. </span>
@@ -261,7 +261,7 @@ export default function EtbSpaltenzeile({
       <span
         data-lfh="typwort"
         style={{
-          fontSize: 12,
+          fontSize: schriftGroesse('klein'),
           fontWeight: 600,
           lineHeight: '20px',
           color: farbe.wort,
@@ -280,7 +280,9 @@ export default function EtbSpaltenzeile({
           lineHeight: '20px',
           overflowWrap: 'anywhere',
           color: leise ? rollen.gedaempft : rollen.text,
-          ...(leise ? ({ '--etb-inhalt-groesse': '12px' } as CSSProperties) : {}),
+          ...(leise
+            ? ({ '--etb-inhalt-groesse': 'var(--lfh-groesse-klein)' } as CSSProperties)
+            : {}),
         }}
       >
         <div className={berichtigt ? 'etb-inhalt--berichtigt' : undefined}>{inhalt}</div>
@@ -310,7 +312,7 @@ export default function EtbSpaltenzeile({
             display: 'flex',
             flexDirection: 'column',
             gap: 4,
-            fontSize: 12,
+            fontSize: schriftGroesse('klein'),
             lineHeight: '18px',
             color: rollen.gedaempft,
           }}
