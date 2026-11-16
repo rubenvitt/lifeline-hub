@@ -63,10 +63,12 @@ import { funktionText } from './einsatzfunktionKern';
  * MITTELVERTEILUNG UND TÖNUNG BLEIBEN EIGEN (D3): sonst trügen Zug und Gruppe denselben Ausfall
  * doppelt. Die Vorgabestufe „Einheiten“ hält die Problemzeile der Gruppe sichtbar.
  *
- * STATUSTON NUR AUS DER KATEGORIE: der FMS-Katalog ist mandantengepflegt und `fms_anker`
- * nullable; eine Abbildung Anker → Rolle wäre eine harte Tabelle über fremde Daten und färbte
- * denselben Status hier anders als auf der Fahrzeugseite. Verfügbar `normal`, gebunden
- * `achtung`, nicht verfügbar `alarm`; `S<fms_anker>` ist reine Beschriftung.
+ * STATUSTON AUS DER KATEGORIE, SPRECHWUNSCH AUSGENOMMEN: der FMS-Katalog ist mandantengepflegt
+ * und `fms_anker` nullable. Verfügbar `normal`, gebunden `neutral`, nicht verfügbar `alarm`
+ * (Spec `statusrollen`). Die einzige Ausnahme sind die Anker 5 und 0 (Sprechwunsch, `achtung`):
+ * ihre Bedeutung legt der Funkstandard fest, nicht der Mandant, und sie gelten überall über
+ * `fahrzeugStatusRolle` (`theme/statusFarben.ts`), hier wie auf der Fahrzeugseite. Sonst ist
+ * `S<fms_anker>` reine Beschriftung (Change `eon26eat-farbe-entlasten`, D2).
  */
 
 export type RasterArt =

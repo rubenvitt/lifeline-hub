@@ -1,3 +1,5 @@
+import { theme as antdTheme } from 'antd';
+import { rollenFarbe } from '../../theme/statusFarben';
 import { delay, http, HttpResponse } from 'msw';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -343,7 +345,6 @@ const vorgaenge = () => paneel('Offene Vorgänge');
 const abschnitt = (name: string) => within(vorgaenge()).getByRole('region', { name });
 const abschnittZahl = (name: string) =>
   abschnitt(name).querySelector('[data-lfh="abschnitt-zahl"]') as HTMLElement;
-
 describe('UeberblickPage', () => {
   it('Seitenkopf: Ortspfad mit Einsatzname, Titel und genau eine Primäraktion', async () => {
     stelleBereit(volleDaten);
@@ -500,6 +501,14 @@ describe('UeberblickPage', () => {
     expect(Array.from(werte).map((z) => z.textContent)).toEqual(['0', '0', '1']);
     const balken = zeile.querySelectorAll<HTMLElement>('[data-lfh="abschnitt-status-anteil"]');
     expect(Array.from(balken).map((z) => z.style.width)).toEqual(['0%', '0%', '100%']);
+    // „gebunden“ trägt die Rolle der Kategorie (neutral), nicht mehr fest Blau und nicht Gelb
+    // (Spec `statusrollen`, eon26eat D1): dieselbe Rolle wie im Meldebild.
+    // Die Test-Provider rendern mit antds Standard-Token; dieselben Token lösen hier die Rolle auf.
+    const standard = antdTheme.getDesignToken();
+    // jsdom schreibt Farben mit Leerzeichen, antds Token ohne.
+    const gebundenFarbe = balken[1].style.background.replace(/ /g, '');
+    expect(gebundenFarbe).toBe(rollenFarbe('neutral', standard).replace(/ /g, ''));
+    expect(gebundenFarbe).not.toBe(rollenFarbe('bedien', standard));
     expect(within(p).queryByText(/Einheiten nach Status:/)).toBeNull();
     expect(within(p).getByText('1 Abschnitt · 1 Einheit')).toBeInTheDocument();
   });

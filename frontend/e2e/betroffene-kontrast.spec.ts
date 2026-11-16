@@ -37,8 +37,8 @@ for (const modus of ['light', 'dark'] as const) {
       await page.goto(`${basis}/personen${ort === 'route' ? '/aufnahme' : ''}`);
       if (ort === 'modal') await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
       // Die Sichtungswahl (LLH-1083, Spec `farbrollen-kontrast`, „Sichtungsfläche hält den
-      // Textboden“): Text auf jeder Fläche, Kante gegen den Grund ≥ 3 : 1, gefüllt und in der
-      // Randform, in Ruhe und unter dem Zeiger.
+      // Textboden“): Text auf jeder Fläche, Kante gegen den Grund ≥ 3 : 1, gefüllt und getönt
+      // (nicht gewählt nach einer Wahl, eon26eat D8), in Ruhe und unter dem Zeiger.
       const gruppe = page.getByRole('radiogroup', { name: 'Sichtungskategorie' });
       const flaechen = gruppe.getByRole('radio');
       await expect(flaechen).toHaveCount(6);
@@ -56,10 +56,20 @@ for (const modus of ['light', 'dark'] as const) {
         await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/gewählt+hover`);
         await page.mouse.move(0, 0);
         await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/gewählt`);
-        // Die übrigen stehen jetzt in der Randform und halten den Boden ebenso.
+        // Die übrigen stehen jetzt getönt mit Innenrahmen und halten den Boden ebenso.
         for (const andere of await gruppe.getByRole('radio', { checked: false }).all()) {
-          await pruefe(andere, minimum, `${modus}/${ort}/${label}/Randform`);
+          await pruefe(andere, minimum, `${modus}/${ort}/${label}/getönt`);
         }
+        // „tot“ und „unverletzt“ ohne Lesen unterscheidbar (Spec `sichtungswahl`): „tot“ trägt in
+        // jedem Zustand die Schraffur, „unverletzt“ nie.
+        const bild = (l: string) =>
+          gruppe
+            .getByRole('radio', { name: new RegExp(`^${l},`) })
+            .evaluate((el) => getComputedStyle(el).backgroundImage);
+        expect(await bild('tot'), `${modus}/${ort}/${label}/tot schraffiert`).toContain(
+          'repeating-linear-gradient',
+        );
+        expect(await bild('unverletzt'), `${modus}/${ort}/${label}/unverletzt glatt`).toBe('none');
       }
     }
   });

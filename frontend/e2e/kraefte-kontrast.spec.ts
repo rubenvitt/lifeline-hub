@@ -310,7 +310,8 @@ const ZEILEN_ZAHLEN = [/^\d+ verfügbar$/, /^\d+ gebunden$/, /^\d+ nicht verfüg
 /** Die drei Kategorien des FMS-Katalogs und der Ton ihres Segments in der Aufgliederung. */
 const BAND_TOENE = [
   { kategorie: 'verfuegbar', ton: 'normal' },
-  { kategorie: 'gebunden', ton: 'achtung' },
+  // `gebunden` ist Normalbetrieb und neutral (Spec `statusrollen`, eon26eat D1).
+  { kategorie: 'gebunden', ton: 'neutral' },
   { kategorie: 'nicht_verfuegbar', ton: 'alarm' },
 ] as const;
 
