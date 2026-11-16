@@ -177,6 +177,10 @@ test.describe(KAPITEL, () => {
         )
         .toBe(true);
       await geraet.mouse.move(0, 0);
+      await expect(geraet.locator('[data-lfh="alarm-zeile"]')).toHaveAttribute(
+        'data-stand',
+        'vollstaendig',
+      );
       await fotografiere(geraet, KAPITEL, 'lagemonitor');
     } finally {
       await kontext.close();

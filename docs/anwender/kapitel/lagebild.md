@@ -2,15 +2,17 @@
 titel: Lagebild
 gruppen: [alle, fuehrung]
 reihenfolge: 400
-quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/verlauf.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/lage/wasBrennt.ts, frontend/src/lage/useWasBrennt.ts, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/verlauf.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
 
-Das Lagebild zeigt die ganze Lage auf einem Schirm: sechs Kennzahlen, die Gefahren je Gefahrentyp,
-die Sichtung der Betroffenen, den Strom der jüngsten Einträge aus dem Einsatztagebuch und darunter
-den Führungsstand. Es ist eine reine Leseansicht für alle, die den Einsatz sehen; jede Zahl kommt
-aus dem Modul, in dem sie erfasst wird.
+Das Lagebild zeigt, was los ist, auf einem Schirm: ganz oben, was gerade brennt, darunter sechs
+Kennzahlen, die Gefahren je Gefahrentyp, die Sichtung der Betroffenen, den Strom der jüngsten
+Einträge aus dem Einsatztagebuch und am Fuß den Stand von Lagebericht und Unfallhilfsstellen. Was
+zu tun ist (Aufträge, Meldungen, offene Vorgänge), zeigt der [Überblick](ueberblick.md). Das
+Lagebild ist eine reine Leseansicht für alle, die den Einsatz sehen; jede Zahl kommt aus dem
+Modul, in dem sie erfasst wird.
 
 ## Abläufe
 
@@ -20,15 +22,17 @@ aus dem Modul, in dem sie erfasst wird.
    des Datenstands („Stand vor … s“), sobald eine erhöhte Warnstufe gilt, der Hinweis
    „Warnstufe …“ und, sobald für den Einsatzort eine Wetterwarnung gilt oder angekündigt ist, ihre
    Marke, etwa „Markantes Wetter Dauerregen bis 21:00 ↗“. Die Marke öffnet „Wetter & Pegel“.
-2. Das Kennzahlenband lesen. Fest stehen „Betroffene“, „Kräfte“, „Vermisste“ und „Einsatzdauer“;
+2. Die Zeile „Was brennt“ lesen: dieselbe wie im Überblick, mit offenen Sofortmeldungen ab
+   Eingang, Vermissten, kritischen Abschnitten, überfälligen Rückmeldungen und Fristen (Kapitel
+   [Überblick](ueberblick.md)). Ein Eintrag führt in sein Modul.
+3. Das Kennzahlenband lesen. Fest stehen „Betroffene“, „Kräfte“, „Vermisste“ und „Einsatzdauer“;
    die Plätze ganz links und in der Mitte richten sich nach der Lage (siehe Hintergrund).
-3. Die drei Paneele darunter lesen: „Gefahrenmatrix“, „Sichtung“ und „Jüngste ETB-Einträge“.
+4. Die drei Paneele darunter lesen: „Gefahrenmatrix“, „Sichtung“ und „Jüngste ETB-Einträge“.
 
-   ![Lagebild mit Kennzahlenband, Gefahrenmatrix, Sichtung, jüngsten ETB-Einträgen und Führungsstand](../bilder/lagebild/lagebild.png)
+   ![Lagebild mit der Zeile „Was brennt“, Kennzahlenband, Gefahrenmatrix, Sichtung, jüngsten ETB-Einträgen und Stand](../bilder/lagebild/lagebild.png)
 
-4. Am Fuß den Führungsstand lesen: „Aufträge offen“, „Meldungen offen“, der jüngste
-   „Lagebericht“ und „UHS aktiv“.
-5. Um ins Modul zu wechseln, den Verweis eines Paneels wählen, etwa „Gefahren ↗“ in der
+5. Am Fuß den Stand lesen: der jüngste „Lagebericht“ und „UHS aktiv“.
+6. Um ins Modul zu wechseln, den Verweis eines Paneels wählen, etwa „Gefahren ↗“ in der
    Gefahrenmatrix.
 
 ### Neue ETB-Einträge im Lagebild anzeigen
@@ -104,8 +108,8 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   Meldungen. Rechts im Kopf steht der Zustand der Leitung: „live“, „Verbindung wird aufgebaut“
   oder „Verbindung unterbrochen“. Ein berichtigter Eintrag trägt wie im Einsatztagebuch die Marke
   „berichtigt“ und den Sprung „→ Nr. …“ auf die jüngste Berichtigung.
-- **Führungsstand:** „Aufträge offen“ und „Meldungen offen“ zählen wie die Module selbst; ein
-  überfälliger Auftrag oder eine überfällige Meldung steht hier hervorgehoben.
+- **Aufträge und Meldungen** stehen nicht im Lagebild, sondern im Überblick; was davon überfällig
+  ist, nennt die Zeile „Was brennt“.
 
 ### Gesperrte Module und ohne Netz
 

@@ -91,7 +91,7 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
 - [x] 5.2 Design System: Karte `AlarmZeile` in `frontend/scripts/design-system/previews.tsx`
   (Nacht und Tag, mit Einträgen und in Ruhe), `mise exec -- pnpm -C frontend design-system`, das
   Erzeugte mitcommitten; `designSystem.guard.test.ts` grün.
-- [ ] 5.3 Anwenderdoku: `docs/anwender/kapitel/ueberblick.md`, `lagebild.md`, `lagemonitor.md`
+- [x] 5.3 Anwenderdoku: `docs/anwender/kapitel/ueberblick.md`, `lagebild.md`, `lagemonitor.md`
   (Zeile, Rollen der Seiten, entfallene Kennzahlen), Bilder über den Bildlauf erneuern;
   Doku-Wächter grün (`docs/anwender/AGENTS.md`).
 - [ ] 5.4 Folgeaufgabe per `zunder-task-anlegen`: Ausfall-Regel an den Server, damit der Monitor
