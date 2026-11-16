@@ -96,3 +96,6 @@ Warteschlange abmeldet, sieht beim ersten Laden danach den Sprung noch einmal. A
 - [Kurz falsche Zahl im ersten Bild] → Die Warteschlange bestätigt binnen Millisekunden; die Zahl
   ist die zuletzt gesehene des Geräts, keine erfundene.
 - [Testmeldung auf Android ohne Worker sagt „blockiert“] → gewollt (D1).
+- [Gerät ohne Browserspeicher (gehärteter Rechner, `sichererSpeicher` liefert `null`)] → kein
+  Merker, der Sprung bleibt dort wie bisher; die Spec nimmt diesen Fall wie das erste Laden nach
+  einer Anmeldung (D3) ausdrücklich aus (Befund aus dem Review vor dem PR).

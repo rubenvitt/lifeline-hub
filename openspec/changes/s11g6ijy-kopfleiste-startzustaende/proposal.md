@@ -12,8 +12,9 @@ Review von LLH-1726).
 ## What Changes
 
 - Die SYNC-Anzeige kennt die Zähler der Offline-Warteschlange schon im ersten Bild: Die zuletzt
-  gelesenen Zahlen je Benutzer liegen im Browserspeicher; die Warteschlange selbst bestätigt sie
-  danach. Abmelden und Sitzungsende räumen den Merker.
+  gelesenen Zahlen der zuletzt aktiven Person liegen auf einem Platz im Browserspeicher; die
+  Warteschlange selbst bestätigt sie danach. Abmelden und Sitzungsende räumen den Merker, das
+  erste Laden nach einer Anmeldung kennt die Zahl deshalb noch nicht.
 - Die Alarmzentrale meldet eine verweigerte Benachrichtigung auf Android sofort als „blockiert“,
   ohne auf die Antwort des Service Workers zu warten. Der Worker entscheidet nur noch, ob eine
   erlaubte oder offene Berechtigung einen Zustellweg hat.

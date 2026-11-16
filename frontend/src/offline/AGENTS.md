@@ -163,7 +163,8 @@ draußen gelassen werden.
   `etb/AGENTS.md`. Der Queue-Zähler zählt Altzeilen per `count()` ohne Payload, der Hook lädt
   höchstens einmal je `ZAEHLER_DROSSEL_MS` (LFH-939, D5). Bis die Queue antwortet, beginnt der
   Hook über alle Einsätze mit dem zuletzt gelesenen Stand der Person (`offline/queueZaehlerMerker.ts`,
-  ein Platz, LLH-1910), sonst stünde „WARTET n“ erst nach dem ersten Bild; jeder Ausgang räumt ihn. Herleitung: `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
+  ein Platz, LLH-1910), sonst stünde „WARTET n“ erst nach dem ersten Bild; jeder Ausgang räumt ihn, das erste Laden
+  nach einer Anmeldung und ein Gerät ohne Browserspeicher kennen die Zahl also noch nicht. Herleitung: `openspec/changes/archive/2026-10-06-lfh-939-941-offline-speicher-begrenzen/design.md`.
 - **Kein IndexedDB-Versionssprung ohne Not** (LFH-941, D9): Ein Tab mit altem Bundle hält die
   alte Version offen, das Upgrade im neuen Tab hinge, mit ihm Anmeldung, Queue oder
   Ortsvorschau. Neuer Inhalt geht in die bestehenden Stores, der Bestand wird beim Öffnen
