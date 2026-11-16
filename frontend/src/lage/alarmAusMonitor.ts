@@ -7,18 +7,25 @@
 import type { LagemonitorAnzeige } from '../api/types';
 import type { WasBrenntQuellen } from './wasBrennt';
 
-export function alarmAusMonitor(lage: LagemonitorAnzeige | undefined): WasBrenntQuellen {
+/**
+ * `fehler`: der Abruf ist gescheitert (Review LLH-1743). Ohne Daten heißt das „Stand
+ * unvollständig“, nicht „lädt“; eine Antwort ohne Block `alarm` (älterer Server) ebenso.
+ */
+export function alarmAusMonitor(
+  lage: LagemonitorAnzeige | undefined,
+  fehler = false,
+): WasBrenntQuellen {
   const a = lage?.alarm;
   if (!lage || !a) {
-    const laden = { zustand: 'laden' } as const;
+    const ohne = { zustand: lage || fehler ? 'fehler' : 'laden' } as const;
     return {
-      meldungen: laden,
-      auftraege: laden,
-      erinnerungen: laden,
-      nachforderungen: laden,
-      vermisst: laden,
-      kritisch: laden,
-      rueckmeldung: laden,
+      meldungen: ohne,
+      auftraege: ohne,
+      erinnerungen: ohne,
+      nachforderungen: ohne,
+      vermisst: lage ? { zustand: 'daten', wert: lage.betroffene.vermisst } : ohne,
+      kritisch: ohne,
+      rueckmeldung: ohne,
       ausfall: null,
     };
   }

@@ -447,6 +447,15 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
     expect(within(zeile).queryByRole('button')).toBeNull();
   });
 
+  it('Alarmzeile: scheitert der Abruf, steht „Stand unvollständig“ statt „—“ (Review LLH-1743)', async () => {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+    renderApp('/geraet/7/monitor');
+    const zeile = await screen.findByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveAttribute('data-stand', 'unvollstaendig'));
+    expect(zeile).toHaveTextContent('Stand unvollständig');
+  });
+
   it('Zwei offene Sofortmeldungen: „Sofortmeldungen offen 2“', async () => {
     bereit();
     lagebildAntwort = () => HttpResponse.json({ ...lage, sofortmeldungen_offen: 2 });

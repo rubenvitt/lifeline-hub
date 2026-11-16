@@ -66,4 +66,15 @@ describe('alarmAusMonitor (LLH-1743, D5)', () => {
   it('ohne Antwort lädt die Zeile', () => {
     expect(wasBrennt(alarmAusMonitor(undefined), JETZT).stand).toBe('laedt');
   });
+
+  it('gescheiterter Abruf ohne Daten: unvollständig statt „lädt“ (Review)', () => {
+    expect(wasBrennt(alarmAusMonitor(undefined, true), JETZT).stand).toBe('unvollstaendig');
+  });
+
+  it('Antwort ohne Block `alarm`: unvollständig, die Vermissten bleiben', () => {
+    const lage = { betroffene: { vermisst: 2 } } as unknown as LagemonitorAnzeige;
+    const w = wasBrennt(alarmAusMonitor(lage), JETZT);
+    expect(w.stand).toBe('unvollstaendig');
+    expect(w.eintraege.map((e) => e.text)).toEqual(['2 vermisst']);
+  });
 });

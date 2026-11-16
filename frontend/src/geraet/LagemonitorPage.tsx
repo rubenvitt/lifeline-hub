@@ -785,7 +785,10 @@ export default function LagemonitorPage() {
         dieselben Arten, Folge und Wörter wie in Überblick und Lagebild, aus dem Block `alarm` der
         Serverantwort; 28 px, ohne Bedienung. Den Ausfall trägt der Monitor nicht (design.md D6). */}
       <div style={{ pointerEvents: 'none' }}>
-        <AlarmZeile daten={wasBrennt(alarmAusMonitor(lage), dayjs(jetzt))} groesse="gross" />
+        <AlarmZeile
+          daten={wasBrennt(alarmAusMonitor(lage, lageQuery.isError), dayjs(jetzt))}
+          groesse="gross"
+        />
       </div>
       <main
         style={{
