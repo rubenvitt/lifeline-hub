@@ -3261,6 +3261,38 @@ export interface components {
          * @enum {string}
          */
         EntlassenAn: "selbst" | "begleitung" | "sorgeberechtigte" | "polizei";
+        /** @description Antwort von `POST …/fahrzeuge/{ef_id}/entlassen` (LLH-1722). */
+        EntlassungAntwort: {
+            fahrzeug: components["schemas"]["EinsatzFahrzeugAnzeige"];
+            vorzustand: components["schemas"]["EntlassungVorzustand"];
+        };
+        /** @description Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722). */
+        EntlassungRuecknahmeAntwort: {
+            ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
+            fahrzeug: components["schemas"]["EinsatzFahrzeugAnzeige"];
+        };
+        /**
+         * @description Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung
+         *     eines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).
+         *     Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+         *     zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
+         *     Die Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom
+         *     Client zu übernehmen.
+         */
+        EntlassungVorzustand: {
+            /** @description Beladung (`einsatz_material.id`). */
+            beladung?: number[];
+            /** @description Besatzung (`einsatz_personal.id`). */
+            besatzung?: number[];
+            /** Format: int64 */
+            br_id?: number | null;
+            /** Format: int64 */
+            einheit_id?: number | null;
+            /** @description Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt. */
+            entlassen_at: string;
+            /** @description Trug das Fahrzeug die Führungsstelle? */
+            fuehrungsstelle?: boolean;
+        };
         /**
          * @description Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
          *     `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und
@@ -7206,6 +7238,13 @@ export interface components {
              * @description Effektive Rückmeldefrist in Minuten (Einsatz ?? Org ?? 60).
              */
             frist_min: number;
+        };
+        /** @description Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten. */
+        RuecknahmeAusgelassen: {
+            /** @description Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“). */
+            bezeichnung: string;
+            /** @description Warum („inzwischen aufgelöst“, „sitzt inzwischen auf einem anderen Fahrzeug“). */
+            grund: string;
         };
         /**
          * @description Warum ein Webhook ruht: sein Zugang darf gerade nicht beliefert werden.

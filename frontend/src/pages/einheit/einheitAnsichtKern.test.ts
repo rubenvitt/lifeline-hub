@@ -13,6 +13,7 @@ import {
   buildBesatzungMittel,
   buildEinheitRechte,
   buildFahrzeugZuordnenGroups,
+  buildFahrzeugMenuItems,
   buildPersonMenuItems,
   buildPersonZuordnenGroups,
   collectNachfahren,
@@ -301,20 +302,20 @@ describe('buildPersonMenuItems (D9)', () => {
     rechte: { canEditEinheit: boolean; canEditBesatzung: boolean } = alle,
   ) => buildPersonMenuItems(person, fahrzeuge, rechte).map((e) => [e.key, e.label, !!e.gefahr]);
 
-  it('Person ohne Fahrzeug: Einheitsführer, auf jedes Fahrzeug, dann rot aus der Einheit', () => {
+  it('Person ohne Fahrzeug: Einheitsführer, auf jedes Fahrzeug, dann neutral aus der Einheit (LLH-1722)', () => {
     expect(items({ isFuehrer: false, fahrzeugId: null })).toEqual([
       ['fuehrer', 'Als Einheitsführer', false],
       ['auf:30', 'Auf 83-1', false],
       ['auf:31', 'Auf 83-2', false],
-      ['aus-einheit', 'Aus Einheit lösen', true],
+      ['aus-einheit', 'Aus Einheit lösen', false],
     ]);
   });
 
-  it('der Einheitsführer auf 83-1: kein „Als Einheitsführer“, nur das andere Fahrzeug, Lösen rot', () => {
+  it('der Einheitsführer auf 83-1: kein „Als Einheitsführer“, nur das andere Fahrzeug, Lösen neutral (LLH-1722)', () => {
     expect(items({ isFuehrer: true, fahrzeugId: 30 })).toEqual([
       ['auf:31', 'Auf 83-2', false],
-      ['vom-fahrzeug', 'Vom Fahrzeug lösen', true],
-      ['aus-einheit', 'Aus Einheit lösen', true],
+      ['vom-fahrzeug', 'Vom Fahrzeug lösen', false],
+      ['aus-einheit', 'Aus Einheit lösen', false],
     ]);
   });
 
@@ -336,7 +337,7 @@ describe('buildPersonMenuItems (D9)', () => {
       ),
     ).toEqual([
       ['fuehrer', 'Als Einheitsführer', false],
-      ['aus-einheit', 'Aus Einheit lösen', true],
+      ['aus-einheit', 'Aus Einheit lösen', false],
     ]);
   });
 
@@ -348,7 +349,7 @@ describe('buildPersonMenuItems (D9)', () => {
       ),
     ).toEqual([
       ['auf:31', 'Auf 83-2', false],
-      ['vom-fahrzeug', 'Vom Fahrzeug lösen', true],
+      ['vom-fahrzeug', 'Vom Fahrzeug lösen', false],
     ]);
     expect(
       items(
@@ -444,5 +445,17 @@ describe('visibleBesatzungRows', () => {
       buildBesatzungMittel(leer, [leer], personal, fahrzeuge, rechte),
     );
     expect(rows.personen.size + rows.fahrzeuge.size).toBe(0);
+  });
+});
+
+describe('buildFahrzeugMenuItems (LLH-1722)', () => {
+  it('mit Schreibrecht in Einheiten: neutral „Aus Einheit lösen“', () => {
+    expect(
+      buildFahrzeugMenuItems({ canEditEinheit: true }).map((e) => [e.key, e.label, !!e.gefahr]),
+    ).toEqual([['aus-einheit', 'Aus Einheit lösen', false]]);
+  });
+
+  it('ohne Schreibrecht in Einheiten: kein Eintrag, also kein Auslöser', () => {
+    expect(buildFahrzeugMenuItems({ canEditEinheit: false })).toEqual([]);
   });
 });

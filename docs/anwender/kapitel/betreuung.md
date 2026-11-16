@@ -265,8 +265,10 @@ Meldung davor. Das lässt sich nicht umkehren.
 
 ### Schließen und Stornieren
 
-Eine Stelle wird auf ihrer Seite mit „Schließen“ geschlossen. Ist sie noch belegt, verlangt der
-Dialog zuerst die Leermeldung („Alle haben die Stelle verlassen — Belegung 0 melden“). An einer
+Eine Stelle wird auf ihrer Seite mit „Schließen“ geschlossen. Ist sie leer, bietet der Hinweis
+danach einige Sekunden lang „Rückgängig“, das sie wieder in Betrieb setzt. Ist sie noch belegt,
+verlangt der Dialog zuerst die Leermeldung („Alle haben die Stelle verlassen — Belegung 0
+melden“); dann gibt es kein Rückgängig, weil die Meldung 0 stehen bleibt. An einer
 geschlossenen Stelle lassen sich keine Belegungen melden und keine Meldungen zurücknehmen; „Wieder
 öffnen“ setzt sie zurück in Betrieb.
 

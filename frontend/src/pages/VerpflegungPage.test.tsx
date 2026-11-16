@@ -946,7 +946,7 @@ describe('VerpflegungPage (LFH-634)', () => {
       await waitFor(() => expect(deich).toHaveAttribute('data-status', 'aktiv'));
       expect(deich).not.toHaveAttribute('aria-busy');
       expect(
-        within(deich).getByRole('button', { name: 'Auflösen … zu Stelle Zuführung Deich' }),
+        within(deich).getByRole('button', { name: 'Auflösen zu Stelle Zuführung Deich' }),
       ).toBeInTheDocument();
     });
 

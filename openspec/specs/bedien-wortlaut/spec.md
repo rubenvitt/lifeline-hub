@@ -147,6 +147,5 @@ prüfen; bekannte Altstellen MAY in einer Schuldliste stehen, die nur schrumpfen
 
 #### Scenario: Bereitstellungsraum stornieren
 
-- **WHEN** ein geplanter Bereitstellungsraum storniert werden soll
-- **THEN** heißt der rote Bestätigungsknopf „BR stornieren“, und „Stornieren“ steht mit
-  `size="middle"` neben „In Betrieb nehmen“
+- **WHEN** ein geplanter Bereitstellungsraum im letzten Abschnitt seiner Seite storniert werden soll
+- **THEN** heißt der rote Bestätigungsknopf der Rückfrage „BR stornieren“, und kein „Stornieren“ steht im Kopf

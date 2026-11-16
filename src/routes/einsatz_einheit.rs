@@ -1116,6 +1116,16 @@ async fn notify_aufgeloest(
     .await;
 }
 
+/// Abfrage des Rückgängig nach „Aus Einheit lösen“ (LLH-1722, Spec `einheit-ansicht`):
+/// `nur_wenn_frei=1` lehnt mit 409 ab, wenn der Datensatz inzwischen in einer anderen Einheit
+/// steht; `als_fuehrer=1` setzt die Person wieder als Führer ein, 409, wenn die Einheit inzwischen
+/// einen anderen hat.
+#[derive(Debug, Default, Deserialize)]
+pub struct ZuruecknahmeParams {
+    nur_wenn_frei: Option<String>,
+    als_fuehrer: Option<String>,
+}
+
 /// PUT .../einheiten/{eid}/personal/{ep_id} — Person zuordnen oder umhängen, aus der Einheit
 /// wie aus Personalliste und Personenansicht (LLH-1060 D3). ETB-Eintrag, der beim Umhängen die
 /// vorige Einheit und eine dabei endende Führung nennt; gemeldet werden die neue, die vorige und
@@ -1125,14 +1135,24 @@ pub async fn personal_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid, ep_id)): PfadParam<(i64, i64, i64)>,
+    Query(params): Query<ZuruecknahmeParams>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let nur_wenn_frei = parse_flag(params.nur_wenn_frei.as_deref(), "nur_wenn_frei")?;
+    let als_fuehrer = parse_flag(params.als_fuehrer.as_deref(), "als_fuehrer")?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     // F06/LFH-244 Tier-A: Zuordnung (inkl. Führer-Bereinigung) + System-ETB-Eintrag atomar in
-    // EINER Tx. Name, vorige Einheit und endende Führung kommen aus dem Write.
+    // EINER Tx. Name, vorige Einheit und endende Führung kommen aus dem Write. Das Rückgängig nach
+    // „Aus Einheit lösen“ (LLH-1722) prüft vorher, dass die Person frei ist, und setzt die Führung
+    // in derselben Tx wieder; scheitert die, bleibt nichts geschrieben.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let zuordnung = crate::write_retry!(&state.pool, |conn| {
+        if nur_wenn_frei {
+            mitglied_repo::require_personal_frei_tx(conn, einsatz_id, eid, ep_id).await?;
+        }
         let z = mitglied_repo::zuordnen_personal_tx(conn, einsatz_id, eid, ep_id).await?;
+        let fuehrer_gesetzt = als_fuehrer
+            && mitglied_repo::set_fuehrer_wenn_frei_tx(conn, einsatz_id, eid, ep_id).await?;
         if z.is_changed {
             let fuehrung: Vec<&str> = z.fuehrung_endet.iter().map(|(_, n)| n.as_str()).collect();
             let text = crate::einheit::etb_text_personal_eingeteilt(
@@ -1141,12 +1161,23 @@ pub async fn personal_zuordnen(
                 z.vorher.as_ref().map(|(_, n)| n.as_str()),
                 &fuehrung,
             );
+            let text = if als_fuehrer {
+                format!("{text}; wieder Einheitsführer")
+            } else {
+                text
+            };
+            crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
+                .await?;
+        } else if fuehrer_gesetzt {
+            // Die Person stand schon wieder in der Einheit; die Führung braucht ihren eigenen
+            // Eintrag, wie beim Führerwechsel über PATCH.
+            let text = format!("Einheit «{}»: Einheitsführer «{}» gesetzt", einheit, z.name);
             crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                 .await?;
         }
         Ok(z)
     })?;
-    if zuordnung.is_changed {
+    if zuordnung.is_changed || als_fuehrer {
         let mut einheiten = vec![eid];
         einheiten.extend(zuordnung.vorher.iter().map(|(id, _)| *id));
         einheiten.extend(zuordnung.fuehrung_endet.iter().map(|(id, _)| *id));
@@ -1196,12 +1227,18 @@ pub async fn fahrzeug_zuordnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
     PfadParam((_eid, eid, ef_id)): PfadParam<(i64, i64, i64)>,
+    Query(params): Query<ZuruecknahmeParams>,
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    let nur_wenn_frei = parse_flag(params.nur_wenn_frei.as_deref(), "nur_wenn_frei")?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
+    // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar. Das Rückgängig nach „Aus Einheit
+    // lösen“ (LLH-1722) nimmt das Fahrzeug keiner anderen Einheit still weg.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let zuordnung = crate::write_retry!(&state.pool, |conn| {
+        if nur_wenn_frei {
+            mitglied_repo::require_fahrzeug_frei_tx(conn, einsatz_id, eid, ef_id).await?;
+        }
         let z = mitglied_repo::zuordnen_fahrzeug_tx(conn, einsatz_id, eid, ef_id, ctx.benutzer.id)
             .await?;
         if z.is_changed {
