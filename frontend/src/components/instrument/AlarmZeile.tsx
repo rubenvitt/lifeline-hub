@@ -36,11 +36,21 @@ interface AlarmZeileProps {
   groesse?: 'normal' | 'gross';
 }
 
-/** Wie viele Einträge passen neben „+n“ in die Breite? Gemessen, nie gerechnet. */
-function passend(breite: number, eintragsBreiten: number[], plusBreite: number, abstand: number) {
+/**
+ * Wie viele Einträge passen neben „+n“ und den Hinweis in die Breite? Gemessen, nie gerechnet.
+ * `reserviert` ist der Platz des Hinweises („Stand unvollständig …“): er muss lesbar bleiben
+ * (Spec „Ruhe nur bei vollständigen Quellen“), also weichen Einträge ihm, nicht umgekehrt.
+ */
+export function passend(
+  breite: number,
+  eintragsBreiten: number[],
+  plusBreite: number,
+  abstand: number,
+  reserviert = 0,
+) {
   const alle = eintragsBreiten.reduce((n, b) => n + b + abstand, 0);
-  if (breite <= 0 || alle <= breite) return eintragsBreiten.length;
-  let belegt = plusBreite;
+  if (breite <= 0 || alle + reserviert <= breite) return eintragsBreiten.length;
+  let belegt = plusBreite + reserviert;
   let anzahl = 0;
   for (const b of eintragsBreiten) {
     if (belegt + b + abstand > breite) break;
@@ -68,14 +78,18 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
     const mess = messRef.current;
     if (!reihe || !mess) return;
     const messen = () => {
-      const kinder = Array.from(mess.children) as HTMLElement[];
-      const plus = kinder.pop();
+      const breiten = (art: string) =>
+        Array.from(mess.querySelectorAll<HTMLElement>(`:scope > [data-mess="${art}"]`)).map(
+          (k) => k.offsetWidth,
+        );
+      const hinweisBreite = breiten('hinweis')[0];
       setSichtbar(
         passend(
           reihe.clientWidth,
-          kinder.map((k) => k.offsetWidth),
-          (plus?.offsetWidth ?? 0) + abstand,
+          breiten('eintrag'),
+          (breiten('plus')[0] ?? 0) + abstand,
           abstand,
+          hinweisBreite != null ? hinweisBreite + abstand : 0,
         ),
       );
     };
@@ -84,7 +98,7 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
     const ro = new ResizeObserver(messen);
     ro.observe(reihe);
     return () => ro.disconnect();
-  }, [schluessel, abstand]);
+  }, [schluessel, abstand, stand, fehlend.join('|')]);
 
   const eintragStil = (e: AlarmEintrag): CSSProperties => {
     const f = statusFlaeche(rollen, e.rolle);
@@ -97,6 +111,8 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
       background: f.grund,
       color: f.text,
       borderLeft: `${gross ? 6 : 3}px solid ${f.kante}`,
+      // Auch in der Liste hinter „+n“ (Portal am body, erbt nichts): mindestens 16 px.
+      fontSize,
       fontWeight: 600,
       whiteSpace: 'nowrap',
       textDecoration: 'none',
@@ -105,9 +121,14 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
 
   const eintrag = (e: AlarmEintrag, mitLink: boolean, gemessen = false) => {
     const pfad = mitLink ? ziel?.(e) : undefined;
-    const inhalt = gemessen ? (
-      <span>{e.text}</span>
-    ) : (
+    if (gemessen) {
+      return (
+        <span key={e.art} data-mess="eintrag" style={eintragStil(e)}>
+          {e.text}
+        </span>
+      );
+    }
+    const inhalt = (
       <span data-lfh="alarm-eintrag" data-art={e.art} data-ton={e.rolle} title={e.voll}>
         {e.text}
       </span>
@@ -133,6 +154,13 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
           ? 'Nichts brennt'
           : null;
 
+  const hinweisStil: CSSProperties = {
+    color: rollen.text2,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    minWidth: 0,
+  };
   const plusStil: CSSProperties = {
     flex: '0 0 auto',
     height: hoehe - 2 * abstand,
@@ -148,7 +176,12 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
   const plus =
     rest > 0 ? (
       gross ? (
-        <span style={{ ...plusStil, display: 'inline-flex', alignItems: 'center' }}>+{rest}</span>
+        <span
+          data-lfh="alarm-mehr"
+          style={{ ...plusStil, display: 'inline-flex', alignItems: 'center' }}
+        >
+          +{rest}
+        </span>
       ) : (
         <Popover
           trigger="click"
@@ -161,10 +194,18 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
               {eintraege.map((e) => (
                 <li key={e.art}>{eintrag({ ...e, text: e.voll }, true)}</li>
               ))}
+              {stand === 'unvollstaendig' && hinweis && (
+                <li style={{ ...hinweisStil, fontSize }}>{hinweis}</li>
+              )}
             </ul>
           }
         >
-          <button type="button" style={plusStil} aria-label={`Alle ${eintraege.length} zeigen`}>
+          <button
+            type="button"
+            data-lfh="alarm-mehr"
+            style={plusStil}
+            aria-label={`Alle ${eintraege.length} zeigen`}
+          >
             +{rest}
           </button>
         </Popover>
@@ -207,22 +248,13 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
         {eintraege.slice(0, sichtbar).map((e) => eintrag(e, !gross))}
         {plus}
         {hinweis && (
-          <span
-            data-lfh="alarm-hinweis"
-            title={hinweis}
-            style={{
-              color: rollen.text2,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              minWidth: 0,
-            }}
-          >
+          <span data-lfh="alarm-hinweis" title={hinweis} style={hinweisStil}>
             {hinweis}
           </span>
         )}
       </div>
-      {/* Messreihe: alle Einträge und „+n“ unsichtbar, außerhalb des Flusses (keine Höhe). */}
+      {/* Messreihe: alle Einträge, „+n“ und der Hinweis eines unvollständigen Stands unsichtbar,
+        außerhalb des Flusses (keine Höhe). */}
       <div
         ref={messRef}
         aria-hidden="true"
@@ -238,7 +270,14 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
         }}
       >
         {eintraege.map((e) => eintrag(e, false, true))}
-        <span style={plusStil}>+{eintraege.length}</span>
+        <span data-mess="plus" style={plusStil}>
+          +{eintraege.length}
+        </span>
+        {stand === 'unvollstaendig' && hinweis && (
+          <span data-mess="hinweis" style={{ ...hinweisStil, overflow: 'visible' }}>
+            {hinweis}
+          </span>
+        )}
       </div>
     </section>
   );
