@@ -8,6 +8,9 @@ import type { Omitted } from './tokens';
 /** Der Befehl, der das Design System neu erzeugt (Node und pnpm aus `mise.toml`, LFH-773). */
 export const DESIGN_SYSTEM_COMMAND = 'mise exec -- pnpm -C frontend design-system';
 
+/** Kopf des Abschnitts „Bausteinwahl“ in `frontend/AGENTS.md`: Bedarf → Baustein → Karte. */
+export const BAUSTEINWAHL_HEAD = '## Frontend — Bausteinwahl (wann nehme ich was)';
+
 /**
  * Die Abschnitte von `frontend/AGENTS.md`, die die README trägt, in dieser Reihenfolge. Ein
  * Abschnitt beginnt mit einer Zeile, die so anfängt (`## …` oder ein fetter Absatzkopf), und endet
@@ -17,10 +20,28 @@ export const DESIGN_SYSTEM_COMMAND = 'mise exec -- pnpm -C frontend design-syste
  */
 export const README_SECTIONS: readonly { head: string; title: string; skip?: readonly string[] }[] =
   [
+    // Zuerst die Frage „welcher Baustein?“ (LLH-1807, Spec `design-system-artifact`).
+    { head: BAUSTEINWAHL_HEAD, title: 'Bausteinwahl: wann nehme ich was' },
     {
       head: '## Frontend — Gestaltungssprache',
       title: 'Gestaltungssprache',
-      skip: ['Größere UI-Entwürfe über das Design System'],
+      // Kriterium (LLH-1807, design.md D3): Sähe ein Entwurf ohne den Strich anders aus? Wenn nein,
+      // fällt er aus der README. Abläufe im Repo, Modulstruktur, Namen und Datenherkunft; die
+      // Bausteinlisten trägt die Bausteinwahl, kartenbezogene Regeln stehen an ihrer Karte
+      // (`regeln` bzw. `ruleHead` in `previews.tsx`).
+      skip: [
+        'Größere UI-Entwürfe über das Design System',
+        'Bausteine',
+        'Bausteine außerhalb von `instrument/`',
+        'Seitenkopf',
+        'Modulstruktur',
+        'Synonyme',
+        'Ein Name je Modul',
+        'Kennzahlenband',
+        'Dashboard-Baukasten',
+        'Eine Heimat je Zahl',
+        'Eine Baumlogik der Kräfte: `kraefte/kraeftebaumKern.ts`',
+      ],
     },
     { head: '**Farbachsen**', title: 'Farbachsen' },
     { head: '**Farbe und Zeichen**', title: 'Farbe und Zeichen' },
@@ -128,10 +149,167 @@ export function buildReadme(
     '',
   ];
   for (const { head, title, skip } of README_SECTIONS) {
-    parts.push(`## ${title}`, '', cutSection(agents, head, skip), '');
+    parts.push(`## ${title}`, '', ohneVerweise(cutSection(agents, head, skip)), '');
   }
   for (const { head, title } of README_RULES) {
-    parts.push(`## ${title}`, '', cutBullet(agents, head), '');
+    parts.push(`## ${title}`, '', ohneVerweise(cutBullet(agents, head)), '');
   }
-  return `${parts.join('\n').trimEnd()}\n`;
+  const readme = `${parts.join('\n').trimEnd()}\n`;
+  pruefeOhneTicket(readme);
+  return readme;
+}
+
+/**
+ * Bricht ab, wenn nach dem Filter noch eine Ticketnummer in der README steht: dann den Filter
+ * schärfen oder in `frontend/AGENTS.md` den Verweis in eine Klammer stellen (Spec
+ * `design-system-artifact`).
+ */
+export function pruefeOhneTicket(readme: string): void {
+  const reste = readme
+    .split('\n')
+    .map((zeile, i) => ({ zeile: i + 1, text: zeile }))
+    .filter(({ text }) => /\b(?:LFH|LLH)-\d+/.test(text));
+  if (reste.length > 0) {
+    throw new Error(
+      'Design System: Ticketnummer in der README nach dem Verweisfilter:\n' +
+        reste.map((r) => `  README.md:${r.zeile}  ${r.text.trim()}`).join('\n'),
+    );
+  }
+}
+
+/**
+ * Die Karten, die die Bausteinwahl nennt: Namen in Codeschrift in der dritten Spalte ihrer
+ * Tabelle. Gruppenzeilen und „—“ (Bedarf ohne Karte) tragen keine.
+ */
+export function kartenDerBausteinwahl(agents: string): string[] {
+  const karten: string[] = [];
+  for (const zeile of cutSection(agents, BAUSTEINWAHL_HEAD).split('\n')) {
+    if (!zeile.startsWith('|') || /^\|\s*-{3}/.test(zeile)) continue;
+    const zellen = zeile.split('|').map((z) => z.trim());
+    // ['', Bedarf, Baustein, Karte, '']
+    const karte = zellen[3] ?? '';
+    if (karte === 'Karte') continue;
+    for (const m of karte.matchAll(/`([^`]+)`/g)) karten.push(m[1]);
+  }
+  return karten;
+}
+
+/** Die Karten, die keine Zeile der Bausteinwahl brauchen. */
+const OHNE_BAUSTEINWAHL = new Set(['Cover']);
+
+/**
+ * Befunde, wenn Bausteinwahl und Karten auseinanderlaufen (Spec `design-system-artifact`,
+ * „Bausteinwahl und Karten sind deckungsgleich“). Leer = in Ordnung.
+ */
+export function abdeckung(bausteinwahl: readonly string[], karten: readonly string[]): string[] {
+  const genannt = new Set(bausteinwahl);
+  const vorhanden = new Set(karten);
+  return [
+    ...karten
+      .filter((k) => !OHNE_BAUSTEINWAHL.has(k) && !genannt.has(k))
+      .map((k) => `Karte „${k}“ fehlt in der Bausteinwahl von frontend/AGENTS.md`),
+    ...[...genannt]
+      .filter((k) => !vorhanden.has(k))
+      .map((k) => `Bausteinwahl nennt die Karte „${k}“, die es im Design System nicht gibt`),
+  ];
+}
+
+const TICKET = String.raw`(?:LFH|LLH)-\d+(?:…\d+)?`;
+const TICKETS = String.raw`${TICKET}(?:[ /·]+(?:[A-Z]\d+[a-z]?|${TICKET}))*(?: Punkt [\d–-]+)?(?: D\d+)?`;
+/**
+ * Ein Verweis: Ticket (mit Entscheidung, Punkt oder Phase), ADR, Spec, Pfad in Doku, Archiv oder
+ * Tests, Wächter, Zunder-Kurzkennung, Entscheidungskürzel, Datum, „löst … ab“, „schreibt … fort“,
+ * „seit …“, „Rollout …“.
+ */
+const VERWEIS = [
+  String.raw`(?:Epic |seit |Rollout )?${TICKETS}`,
+  String.raw`ADR-\d{4}`,
+  String.raw`Spec \`[^\`]+\``,
+  String.raw`\`(?:docs|openspec|\.claude|e2e)/[^\`]*\`(?: „[^“]*“)?`,
+  String.raw`(?:(?:Guard|Wächter) \d* ?in )?\`[^\`]*\.(?:guard\.)?test\.tsx?\``,
+  String.raw`[a-z0-9]{8}(?: D\d+)?`,
+  String.raw`D\d+`,
+  String.raw`\d{1,2}\.\d{1,2}\.\d{4}`,
+  String.raw`Entscheidungen? E\d+(?:–E\d+)? aus ${TICKET}`,
+  String.raw`(?:löst|ersetzt) .*${TICKET}.*?(?: ab)?`,
+  String.raw`schreibt .*${TICKET}.* fort`,
+  String.raw`Herleitung .*`,
+].join('|');
+const VERWEIS_GLIED = new RegExp(`^(?:${VERWEIS})$`);
+/** Ein Verweis vor einem Doppelpunkt: der Inhalt dahinter bleibt („LFH-593: Ebenen-Identität“). */
+const VERWEIS_PRAEFIX = new RegExp(`^(?:${VERWEIS}):\\s+([\\s\\S]+)$`);
+
+/** Teilt den Inhalt einer Klammer an `, ` und `; ` (auch vor einem Zeilenumbruch) in Glieder. */
+function glieder(inhalt: string): { trenner: string; text: string }[] {
+  const teile: { trenner: string; text: string }[] = [];
+  let trenner = '';
+  let start = 0;
+  let inCode = false;
+  let inZitat = false;
+  for (let i = 0; i < inhalt.length; i += 1) {
+    const c = inhalt[i];
+    if (c === '`') inCode = !inCode;
+    else if (c === '„') inZitat = true;
+    else if (c === '“') inZitat = false;
+    else if ((c === ',' || c === ';') && /\s/.test(inhalt[i + 1] ?? '') && !inCode && !inZitat) {
+      teile.push({ trenner, text: inhalt.slice(start, i).trim() });
+      trenner = `${c} `;
+      let j = i + 1;
+      while (j < inhalt.length && /\s/.test(inhalt[j])) j += 1;
+      start = j;
+      i = j - 1;
+    }
+  }
+  teile.push({ trenner, text: inhalt.slice(start).trim() });
+  return teile;
+}
+
+/** Eine Klammer ohne ihre Verweise, oder `null`, wenn sie keinen trägt. */
+function klammerOhneVerweise(inhalt: string): string | null {
+  const teile = glieder(inhalt);
+  const bleibt: { trenner: string; text: string }[] = [];
+  let geaendert = false;
+  let vorherSpec = false;
+  for (const teil of teile) {
+    const praefix = VERWEIS_PRAEFIX.exec(teil.text);
+    const istVerweis: boolean =
+      VERWEIS_GLIED.test(teil.text) || (vorherSpec && /^„[^“]*“$/.test(teil.text));
+    vorherSpec = istVerweis && teil.text.startsWith('Spec ');
+    if (istVerweis) geaendert = true;
+    else if (praefix) {
+      geaendert = true;
+      bleibt.push({ trenner: teil.trenner, text: praefix[1] });
+    } else bleibt.push(teil);
+  }
+  if (!geaendert) return null;
+  return bleibt.map((t, i) => (i === 0 ? t.text : `${t.trenner}${t.text}`)).join('');
+}
+
+const AUF = '\u0001';
+const ZU = '\u0002';
+
+/**
+ * Die README ohne Ticketnummern, Spec- und Herleitungsverweise (Spec `design-system-artifact`):
+ * eine Klammer aus lauter Verweisen fällt ganz, eine gemischte verliert nur ihre Verweisglieder;
+ * ein Verweis vor einem Doppelpunkt fällt, der Inhalt dahinter bleibt. Ein Zitat direkt hinter
+ * einem gefallenen Spec-Verweis ist dessen Anforderung und fällt mit. Klammern werden von innen
+ * nach außen gelesen. In `frontend/AGENTS.md` bleiben die Verweise als Prüfspur stehen.
+ */
+export function ohneVerweise(text: string): string {
+  let rest = text;
+  for (;;) {
+    // Der Leerraum davor fällt mit einer ganz gestrichenen Klammer, auch ein Zeilenumbruch.
+    const innen = /(\s*)\(([^()]*)\)/.exec(rest);
+    if (!innen) break;
+    const ohne = klammerOhneVerweise(innen[2]);
+    const vorn = innen[1];
+    const ersatz =
+      ohne === null
+        ? `${vorn}${AUF}${innen[2]}${ZU}`
+        : ohne === ''
+          ? ''
+          : `${vorn}${AUF}${ohne}${ZU}`;
+    rest = rest.slice(0, innen.index) + ersatz + rest.slice(innen.index + innen[0].length);
+  }
+  return rest.split(AUF).join('(').split(ZU).join(')');
 }

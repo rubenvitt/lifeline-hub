@@ -19,7 +19,7 @@ import FensterRahmen from './FensterRahmen';
 import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
 import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
-import { useModusFarben } from './rahmenStil';
+import { useRollen } from './instrument/rollenwerte';
 import StatusTag from './StatusTag';
 import { useEinsatzRahmen, useImEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
@@ -211,7 +211,9 @@ export function Ortspfad({
  * abgeschlossen“ steht. Exportiert für die Lagekarte, die ihren Kopf selbst baut.
  */
 export function EinsatzstatusMarke({ einsatz }: { einsatz: EinsatzAnzeige | undefined }) {
-  const farben = useModusFarben();
+  // Rollen aus dem antd-Theme (wie jeder Baustein): in der App derselbe Modus wie
+  // `useThemeMode`, in den Vorschauen des Design Systems das Thema der Karte.
+  const { rollen: farben } = useRollen();
   if (!einsatz || einsatz.status === 'aktiv') return null;
   return (
     <span
@@ -472,8 +474,7 @@ export default function EinsatzSeite({
   fuss,
   children,
 }: EinsatzSeiteProps) {
-  const { token } = theme.useToken();
-  const farben = useModusFarben();
+  const { token, rollen: farben } = useRollen();
   const aktionenRef = useRef<HTMLDivElement>(null);
   // Klebt der Seitenkopf, zählt er zum Rahmen über dem Inhalt (zjt7c073 D2/D3). Mit
   // `fensterInhalt` steckt er in `FensterRahmen` in einem eigenen Wrapper, der sein Containing
@@ -626,7 +627,7 @@ export default function EinsatzSeite({
           <div
             ref={aktionenRef}
             data-lfh="seitenkopf-aktionen"
-            // Zielabstand der Dichte-Staffel (LFH-968: `marginSM` = 7 / 11 / 16 px): ab `md` stehen
+            // Zielabstand der Dichte-Staffel (LFH-968: `marginSM` = 8 / 12 / 16 px): ab `md` stehen
             // Nebenwege hier als Geschwister nebeneinander, mit `marginXS * 2` fehlten im Handschuh
             // 2 px zwischen zwei Knöpfen (LFH-1079).
             style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}

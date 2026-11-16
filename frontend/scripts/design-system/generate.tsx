@@ -55,7 +55,7 @@ import {
   type Token,
 } from './tokens';
 import { docBefore, firstSentence, memberDocs } from './jsdoc';
-import { buildReadme, cutBullet } from './readme';
+import { buildReadme, cutBullet, ohneVerweise } from './readme';
 import { LAYOUT_CSS, PREVIEWS, renderPreview, type PreviewSpec } from './previews';
 import { buildCover } from './cover';
 import { ANTD_STYLE, fontFaceCss, type FontEntry } from './output';
@@ -114,12 +114,17 @@ const STATUS_TOENE: readonly StatusTon[] = ['normal', 'bedien', 'achtung', 'alar
 /** Gleicher Wert in beiden Themen (modusunabhängige Paletten). */
 const both = (werte: Readonly<Record<string, string>>) => [werte, werte] as const;
 
-/** Die Abbildung der antd-Abstände auf das Raster einer Dichtestufe. */
+/**
+ * Die Abbildung der antd-Abstände auf das Raster einer Dichtestufe (`antdToken` in
+ * `theme/tokens.ts`, Spec `abstandsraster`); antds MD fällt mit LG zusammen.
+ */
 const ABSTAND_ANTD = {
+  xxs: 'paddingXXS/marginXXS',
   xs: 'paddingXS/marginXS',
   sm: 'paddingSM/marginSM',
   md: 'padding/margin',
-  lg: 'paddingLG/marginLG',
+  lg: 'paddingMD/marginMD und paddingLG/marginLG',
+  xl: 'paddingXL/marginXL',
 };
 
 function buildColors(omitted: Omitted[]): FarbToken[] {
@@ -429,12 +434,14 @@ function componentReadme(spec: PreviewSpec, agents: string): string {
         '',
       ]
     : [];
+  const regeln = (spec.regeln ?? []).flatMap((kopf) => [ohneVerweise(cutBullet(agents, kopf)), '']);
   return [
     `# ${spec.title}`,
     '',
-    body,
+    ohneVerweise(body),
     '',
     ...more,
+    ...(regeln.length > 0 ? ['Regeln dazu:', '', ...regeln] : []),
     `Quelle: \`frontend/src/${spec.source}\` im Repo \`rubenvitt/lifeline-hub\`. Die Vorschau ist aus`,
     `${rendered} antd-Theme der App, Nacht und Tag, Dichte \`kompakt\`.`,
     '',
