@@ -98,7 +98,8 @@ Modulzähler. Fehlt einer Person das Recht auf eine Quelle oder ist die Quelle n
 „—“ mit Grund, nie eine 0. Sie gibt kein Vortragsschema vor und friert nichts ein; einen festen
 Stand gibt es nur über „In Lagebericht übernehmen“. Das Großbild zeigt dieselben Zeilen ohne
 Quellenangabe und ohne Bedienung; die Quelle bleibt im Paneel und im übernommenen Lagebericht.
-Gehen währenddessen Alarme oder Hinweise ein, nennt es nur ihre Zahl.
+Oben stehen Uhrzeit und Alter des Stands; gehen währenddessen Alarme oder Hinweise ein, nennt es
+nur ihre Zahl, und eine getrennte Live-Verbindung meldet es mit „Verbindung getrennt“.
 
 ### Fälliger Termin
 

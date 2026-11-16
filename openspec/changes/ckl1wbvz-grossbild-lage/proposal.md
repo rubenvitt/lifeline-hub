@@ -22,11 +22,11 @@ taugt nicht als Ansicht am Bedienplatz.
   Besprechung mit Zustand und die Zeilen der Vorbereitung, Wert direkt neben der Bezeichnung.
 - **Nur Ansehen:** Im Großbild führt nichts in ein Modul und nichts ändert Daten; einzige Bedienung
   ist „Großbild verlassen“ (auch mit Esc oder beim Verlassen des Vollbilds) und „Vollbild“, falls
-  der Browser es verlassen hat.
+  der Browser es beim Öffnen abgelehnt hat. Tastenkürzel der App wirken im Großbild nicht.
 - **Größen wachsen mit dem Fenster:** Bei 1920 × 1080 gelten die Werte des Lagemonitors, ein Beamer
   mit 1280 × 720 oder ein 4K-Schirm zeigt dieselbe Aufteilung im selben Verhältnis, ohne Bildlauf.
-- **Alarme gehen nicht unter:** Liegen Einträge in der Alarmzone, zeigt das Großbild ihre Zahl in
-  Alarmrolle; bearbeitet werden sie nach dem Verlassen.
+- **Alarme und Verbindung gehen nicht unter:** Liegen Einträge in der Alarmzone, zeigt das Großbild
+  ihre Zahl; ist der Live-Kanal getrennt, sagt es das. Bearbeitet wird nach dem Verlassen.
 - **Übung bleibt erkennbar:** Bei einer Übung trägt das Großbild die Übungsmarke.
 - **Vorbereitung, normale Ansicht:** Der Wert steht direkt neben der Bezeichnung statt am rechten
   Rand der vollen Breite.
@@ -54,7 +54,8 @@ deren Merge als Folgeaufgabe).
   `pages/LagebesprechungPage.tsx` (Knopf, Großbild-Zweig), `lagebesprechung/VorbereitungPaneel.tsx`
   (Zeilen aus einer geteilten Quelle, Zeilenraster), neue Bausteine unter
   `components/grossbild/` mit Karte im Design System. `geraet/LagemonitorPage.tsx` bleibt
-  unverändert; das Wachhalten des Bildschirms wird von dort nur importiert.
+  unverändert; das Wachhalten des Bildschirms steht als Kopie unter
+  `components/grossbild/` (ein Import zöge die Monitorseite samt Karte in jede Seite).
 - Backend, API, Migrationen: keine. Die Großbild-Ansicht nutzt die Abfragen der normalen Seite.
 - Anwenderdoku: Kapitel `lagebild.md` und `lagebesprechung.md` (Mitänderungsregel).
 - Überschneidung mit parallelen Branches: LLH-1743 ändert den Kopf der Lagebild-Seite, LLH-1746 den

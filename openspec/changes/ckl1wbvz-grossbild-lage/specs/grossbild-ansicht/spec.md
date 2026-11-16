@@ -9,8 +9,9 @@ lesbar aus 2–3 m, nur zum Ansehen, mit denselben Zahlen wie die Seite selbst.
 
 ### Requirement: Einstieg
 
-Die Seiten Lagebild und Lagebesprechung SHALL im Seitenkopf eine Aktion „Großbild“ anbieten, für
-jede Person, die die Seite sehen darf, auch ohne Schreibrecht. Sie MUST die Großbild-Ansicht der
+Die Seiten Lagebild und Lagebesprechung SHALL ab Tablet-Breite (`md`) im Seitenkopf eine Aktion
+„Großbild“ anbieten, für jede Person, die die Seite sehen darf, auch ohne Schreibrecht. Auf dem
+Handy fehlt sie. Sie MUST die Großbild-Ansicht der
 Seite bildschirmfüllend zeigen, ohne Kopfleiste, Rail, Modulpanel und Seitenkopf, und dabei Vollbild
 und Bildschirm-Wachhalten anfordern. Lehnt der Browser beides ab, MUST die Ansicht trotzdem das
 ganze Fenster füllen.
@@ -47,12 +48,17 @@ festgehalten werden.
 Die Großbild-Ansicht SHALL nur zeigen. Kennzahlen, Zeilen und Paneele MUST NOT in ein Modul führen
 und MUST NOT Daten ändern; es gibt keine Schnellwahl, keine Übernahme und keinen Abschluss. Die
 einzigen Bedienelemente MUST „Großbild verlassen“ und, solange das Vollbild nicht aktiv ist,
-„Vollbild“ sein.
+„Vollbild“ sein. Tastenkürzel der App (etwa die Sprungpalette) MUST NOT im Großbild wirken.
 
 #### Scenario: Klick auf eine Kennzahl
 
 - **WHEN** jemand im Großbild des Lagebilds auf die Kennzahl „Betroffene“ klickt
 - **THEN** bleibt die Großbild-Ansicht stehen, und es öffnet sich kein Modul
+
+#### Scenario: Sprungpalette im Großbild
+
+- **WHEN** jemand im Großbild Strg+K drückt
+- **THEN** öffnet sich keine Sprungpalette, und das Großbild bleibt stehen
 
 #### Scenario: Vollbild nachholen
 
@@ -82,7 +88,7 @@ der Fläche.
 
 Die Großbild-Ansicht SHALL jede Zahl aus derselben Zusammenstellung beziehen wie die normale Seite
 und MUST zur selben Zeit denselben Wert zeigen. Sie MUST sich live aktualisieren wie die Seite und
-den Datenstand mit Alter nennen. Eine gesperrte Quelle MUST als „—“ mit Grund erscheinen, eine
+den Datenstand mit Alter nennen. Ist der Live-Kanal getrennt, MUST sie „Verbindung getrennt“ zeigen. Eine gesperrte Quelle MUST als „—“ mit Grund erscheinen, eine
 ladende oder gescheiterte als solche, nie als 0.
 
 #### Scenario: Neue Betroffene während der Präsentation

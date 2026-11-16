@@ -60,7 +60,9 @@ kommen aus derselben Zusammenstellung wie die Seite und laufen live mit. Bei 192
 Zahlen so groß wie am Lagemonitor, auf einem kleineren oder größeren Bildschirm wächst alles im
 selben Verhältnis mit, ohne Bildlauf. Die jüngsten ETB-Einträge stehen nicht im Großbild. Gehen
 Alarme oder Hinweise ein, nennt das Großbild nur ihre Zahl („1 Alarm offen“), ohne Titel;
-bearbeitet werden sie nach dem Verlassen in der Alarmzone. Bei einer Übung trägt es die
+bearbeitet werden sie nach dem Verlassen in der Alarmzone. Ist die Live-Verbindung getrennt, steht oben
+„Verbindung getrennt“, und die Uhrzeit mit dem Alter des Stands zeigt, wie alt die Zahlen sind.
+Tastenkürzel der App, etwa die Suche, wirken im Großbild nicht. Bei einer Übung trägt es die
 Übungsmarke. Nach einem Neuladen steht die normale Seite da, das Großbild wird nicht gemerkt.
 
 ### Die wechselnden Kennzahlen

@@ -57,7 +57,7 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
   linksbündig, Quelle unter der Bezeichnung, Notiz unter dem Wert); Test: Wert-Element ohne
   `text-align: end`, Reihenfolge Bezeichnung, Wert, Quelle, Notiz.
 - [x] 4.3 `lagebesprechung/LagebesprechungGrossbild.tsx` nach D5 (Termin mit Zustand und Ton,
-  „Abgeschlossen“, Zeilen zweispaltig ohne Quelle, „Stand HH:MM“); Tests: Wort und Ton bei
+  „Abgeschlossen“, Zeilen dreispaltig ohne Quelle, Uhrzeit und Alter des Stands); Tests: Wort und Ton bei
   überfälligem Termin, „—“ mit „nicht freigegeben“ bei gesperrten Nachforderungen, keine
   Quellenangabe, keine Knöpfe außer denen der Hülle.
 - [x] 4.4 `LagebesprechungPage`: Knopf „Großbild“ ab `md` links vom Primärknopf, auch ohne
@@ -68,7 +68,8 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 ## 5. Ende zu Ende, Doku, Gates
 
 - [x] 5.1 e2e-Spec `e2e/grossbild.spec.ts`: Lagebild und Lagebesprechung bei 1920 × 1080 (Zahl
-  ≥ 72 px, jeder Text ≥ 28 px per `getComputedStyle`, kein Bildlauf, Esc führt zurück) und bei
+  ≥ 72 px, jeder Text ≥ 28 px per `getComputedStyle`, kein Bildlauf, Ende des Vollbilds bzw. Esc
+  führt zurück) und bei
   1280 × 720 (kein Bildlauf); `e2e/lagebesprechung-vorbereitung.spec.ts` um den Abstand
   Bezeichnung–Wert ≤ 400 px bei 1920 × 1080 und kein Überlauf bei 390 px ergänzen. Lauf der beiden
   Specs grün.

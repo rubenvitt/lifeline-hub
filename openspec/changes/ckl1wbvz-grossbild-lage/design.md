@@ -72,7 +72,9 @@ Anforderung oder fehlt die API (iPhone), füllt die feste Fläche das Fenster.
 
 - `fullscreenchange` ohne Vollbild-Element → `onVerlassen()`. Deckt Esc im Vollbild und den
   Ausstieg über Browsermittel ab.
-- `keydown` Esc ohne Vollbild → `onVerlassen()`.
+- Ein `keydown`-Hörer in der Capture-Phase am `window` stoppt jede Taste vor den Kürzeln der App
+  (Sprungpalette Strg+K hört am `window`, `inert` sperrt nur Klick und Fokus) und beendet bei Esc
+  ohne Vollbild das Großbild (Review vor dem PR).
 - Hat der Browser das Vollbild beim Öffnen abgelehnt (die Fläche füllt dann nur das Fenster),
   zeigt die Kopfzeile „Vollbild“, solange `document.fullscreenElement` nicht die Fläche ist; ein
   Klick ist die Geste, die der Browser für einen zweiten Versuch braucht. Ohne Vollbild-API fehlt
@@ -125,17 +127,16 @@ Unter `components/grossbild/` (Import über `index.ts`, Dateikopf nennt die Rege
 
 - `GrossKennzahl`: Bezeichnung (Text), darunter die Zahl (Mono, `tabular-nums`, `zahl` oder
   `zahlKlein`), darunter die Notiz (Text). Töne `alarm`/`achtung`/`neutral` über die Statusrollen wie
-  `Kennzahl` (`statusFlaeche.ts`), Zustände `laden` (Platzhalter gleicher Höhe), `fehler`
-  („nicht geladen“) und „—“ mit Grund. Kein `ziel`, kein Link.
+  `Kennzahl` (`statusFlaeche.ts`), Zustände `laden` („····“, „wird abgerufen“), `fehler`
+  („?“, „Stand unbekannt“, wie an der `Kennzahl`) und „—“ mit Grund. Kein `ziel`, kein Link.
 - `GrossZeile`: Bezeichnung und Wert in einer Zeile, der Wert in einer Spalte direkt rechts der
   Bezeichnung (gemeinsames Raster der Liste, nicht `space-between`), Notiz unter dem Wert; optional
   eine Farbmarke vor der Bezeichnung (Sichtungskategorie, Warnstufe) mit Wort, nie Farbe allein.
-- `GrossbildFlaeche` (D2) mit `GrossBlock` als Überschrift einer Gruppe (Augenbraue in
-  Großbild-Größe).
+- `GrossbildFlaeche` (D2). Überschriften der Blöcke bleiben lokal in den Ansichten.
 
 Warum nicht `Kennzahl groesse="riesig"`: die Instrument-Bausteine tragen Links, Tooltips und
 Dichteabhängigkeiten, die im Großbild alle entfallen müssten; eine eigene Familie bleibt klein und
-taugt später auch für den Lagemonitor. Jeder Baustein bekommt eine Karte in `PREVIEWS`
+taugt später auch für den Lagemonitor. `GrossKennzahl` und `GrossZeile` bekommen eine Karte in `PREVIEWS`
 (`frontend/scripts/design-system/previews.tsx`, Nacht und Tag), das Design System wird neu erzeugt
 (`frontend/AGENTS.md`, „Größere UI-Entwürfe über das Design System“).
 
@@ -168,7 +169,7 @@ Warnstufe, darunter „+ n weitere“.
 **Lagebesprechung** (`lagebesprechung/LagebesprechungGrossbild.tsx`): oben der Termin groß
 (`GrossKennzahl` mit `ZeitAnzeige` und dem Wort aus `lagebesprechungZustand`, Ton `achtung` nach
 Spec), daneben „Abgeschlossen“; darunter die Vorbereitungszeilen als `GrossZeile` in drei Spalten
-(Reihenfolge spaltenweise; zwei Spalten liefen in der e2e-Messung unten über), mit „Stand HH:MM“.
+(Reihenfolge spaltenweise; zwei Spalten liefen in der e2e-Messung unten über), Uhrzeit und Alter des Stands stehen wie im Lagebild in der Kopfzeile („1430 · Stand vor 12 s“).
 Als große Zahl stehen nur Ziffern mit Trennern und „Nr. n“, Wörter („keiner“, die Sichtung) im
 Wortmaß; Wörter und Notizen brechen um, statt abgeschnitten zu werden. Die Zeilen kommen aus `useVorbereitung` (D7).
 
@@ -178,7 +179,8 @@ Das Element-Vollbild verdeckt die Alarmzone. Damit ein Alarm nicht ungesehen ble
 Kopfzeile die Zahl der Einträge, Alarme als „n Alarm(e) offen“ in Alarmrolle, Org-Hinweise als
 „n Hinweis(e) offen“ in Bedienrolle, ohne Titel: die
 Einträge können Namen tragen, und das Großbild steht vor allen im Raum. Ton spielt die App wie
-sonst. Quittiert wird nach dem Verlassen. Erwogen: die Alarmzone im Großbild mitzeichnen; sie ist
+sonst. Quittiert wird nach dem Verlassen. Ebenso verdeckt das Großbild die Verbindungsanzeige: bei getrenntem Live-Kanal steht „Verbindung
+getrennt“ in Achtungsrolle (Review vor dem PR). Erwogen: die Alarmzone im Großbild mitzeichnen; sie ist
 eine Rahmenquelle mit Stapel-Logik (`useRahmenObenStapel`) und Bedienknöpfen, beides gehört nicht
 in eine Ansicht ohne Bedienung.
 
@@ -225,7 +227,7 @@ Sprungpalette.
 
 Reines Frontend, keine Migration, kein Schalter. Rückweg: Revert des PRs. Nach dem Merge:
 
-- Design System aus `alpha` neu veröffentlichen (neue Karten `GrossKennzahl`, `GrossZeile`,
-  `GrossbildFlaeche`).
+- Design System aus `alpha` neu veröffentlichen (neue Karten `GrossKennzahl` und `GrossZeile`;
+  `GrossbildFlaeche` hat keine, sie hängt per Portal am Dokument und fordert Vollbild an).
 - Folgeaufgaben über `zunder-task-anlegen`: „Lagemonitor auf Großbild-Bausteine“ (nach LLH-1746),
   „Alarmzeile ‚Was brennt‘ im Großbild“ (nach LLH-1743).
