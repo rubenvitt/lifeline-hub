@@ -120,9 +120,9 @@ export function GrossZeile({
               fontSize: grossMass(GROSS_BEZUG.text),
               lineHeight: 1.2,
               color: tonFarbe?.text ?? rollen.gedaempft,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              // Die Notiz trägt Information („1 angefordert · 2 zugesagt · 2 unterwegs“): sie bricht
+              // um, statt abgeschnitten zu werden.
+              overflowWrap: 'anywhere',
             }}
           >
             {notiz}

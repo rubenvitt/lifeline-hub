@@ -67,7 +67,7 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 
 ## 5. Ende zu Ende, Doku, Gates
 
-- [ ] 5.1 e2e-Spec `e2e/grossbild.spec.ts`: Lagebild und Lagebesprechung bei 1920 × 1080 (Zahl
+- [x] 5.1 e2e-Spec `e2e/grossbild.spec.ts`: Lagebild und Lagebesprechung bei 1920 × 1080 (Zahl
   ≥ 72 px, jeder Text ≥ 28 px per `getComputedStyle`, kein Bildlauf, Esc führt zurück) und bei
   1280 × 720 (kein Bildlauf); `e2e/lagebesprechung-vorbereitung.spec.ts` um den Abstand
   Bezeichnung–Wert ≤ 400 px bei 1920 × 1080 und kein Überlauf bei 390 px ergänzen. Lauf der beiden

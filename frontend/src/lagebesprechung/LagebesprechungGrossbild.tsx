@@ -17,8 +17,13 @@ import { modulName } from '../einsatz/modulRegistry';
 import { lagebesprechungZustand } from './lagebesprechungZustand';
 import type { Vorbereitung } from './useVorbereitung';
 
-/** Bis zu so vielen Zeichen bleibt ein Wert eine große Zahl; Längeres (Sichtung) steht als Wort. */
-const ZAHL_HOECHSTENS_ZEICHEN = 11;
+/**
+ * Was als große Zahl steht: Ziffern mit Trennern (Stärke „0/12/58//70“, Zeit „1430“) und „Nr. 3“.
+ * Alles andere („keiner“, „kein Termin“, die Sichtung) steht als Wort, kleiner und umbrechend.
+ */
+const ALS_ZAHL = /^(Nr\. )?[\d\s.,:/+–—-]+$/;
+/** Elf Zeilen in drei Spalten: vier Reihen passen bei 16:9 unter den Termin. */
+const SPALTEN = 3;
 
 interface LagebesprechungGrossbildProps {
   einsatz: EinsatzAnzeige | undefined;
@@ -35,7 +40,7 @@ interface LagebesprechungGrossbildProps {
  * Oben der Termin mit seinem Zustand (dasselbe Wort und derselbe Ton wie im Paneel „Termin“, Regel
  * „Überfälliger Besprechungstermin“ in `lagebesprechung/AGENTS.md`) und die Zahl der
  * abgeschlossenen Besprechungen. Darunter die Zeilen der Vorbereitung aus `useVorbereitung`, in
- * ihrer Reihenfolge, spaltenweise auf zwei Spalten, je Zeile Bezeichnung, Wert direkt daneben und
+ * ihrer Reihenfolge, spaltenweise auf drei Spalten, je Zeile Bezeichnung, Wert direkt daneben und
  * Notiz darunter. Die Quelle bleibt in der normalen Ansicht und in der Übernahme.
  */
 export default function LagebesprechungGrossbild({
@@ -51,8 +56,10 @@ export default function LagebesprechungGrossbild({
   const termin = stand?.naechste_lagebesprechung_at;
   const darstellung = lagebesprechungZustand(termin, jetzt);
   const { zeilen, standWire } = vorbereitung;
-  const haelfte = Math.ceil(zeilen.length / 2);
-  const spalten = [zeilen.slice(0, haelfte), zeilen.slice(haelfte)];
+  const jeSpalte = Math.ceil(zeilen.length / SPALTEN);
+  const spalten = Array.from({ length: SPALTEN }, (_, i) =>
+    zeilen.slice(i * jeSpalte, (i + 1) * jeSpalte),
+  );
 
   return (
     <GrossbildFlaeche
@@ -125,8 +132,8 @@ export default function LagebesprechungGrossbild({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-            columnGap: grossMass(64),
+            gridTemplateColumns: `repeat(${SPALTEN}, minmax(0, 1fr))`,
+            columnGap: grossMass(48),
             minHeight: 0,
           }}
         >
@@ -138,7 +145,7 @@ export default function LagebesprechungGrossbild({
                   bezeichnung={z.titel}
                   wert={z.wert}
                   notiz={z.notiz}
-                  art={z.wert.length <= ZAHL_HOECHSTENS_ZEICHEN ? 'zahl' : 'wort'}
+                  art={ALS_ZAHL.test(z.wert) ? 'zahl' : 'wort'}
                 />
               ))}
             </GrossZeilen>

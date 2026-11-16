@@ -167,8 +167,10 @@ Warnstufe, darunter „+ n weitere“.
 
 **Lagebesprechung** (`lagebesprechung/LagebesprechungGrossbild.tsx`): oben der Termin groß
 (`GrossKennzahl` mit `ZeitAnzeige` und dem Wort aus `lagebesprechungZustand`, Ton `achtung` nach
-Spec), daneben „Abgeschlossen“; darunter die Vorbereitungszeilen als `GrossZeile` in zwei Spalten
-(Reihenfolge spaltenweise), mit „Stand HH:MM“. Die Zeilen kommen aus `useVorbereitung` (D7).
+Spec), daneben „Abgeschlossen“; darunter die Vorbereitungszeilen als `GrossZeile` in drei Spalten
+(Reihenfolge spaltenweise; zwei Spalten liefen in der e2e-Messung unten über), mit „Stand HH:MM“.
+Als große Zahl stehen nur Ziffern mit Trennern und „Nr. n“, Wörter („keiner“, die Sichtung) im
+Wortmaß; Wörter und Notizen brechen um, statt abgeschnitten zu werden. Die Zeilen kommen aus `useVorbereitung` (D7).
 
 ### D6 Alarme als Zahl, nicht als Liste
 

@@ -90,6 +90,17 @@ describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => 
     expect(block).not.toHaveTextContent('Quelle');
   });
 
+  it('setzt Zahlen groß und Wörter als Wort', () => {
+    zeige();
+    const block = screen.getByRole('region', { name: 'Vorbereitung' });
+    expect(within(block).getByText('0/12/58//70').style.whiteSpace).toBe('nowrap');
+    expect(within(block).getByText('Nr. 3').style.whiteSpace).toBe('nowrap');
+    expect(within(block).getByText('hoch').style.whiteSpace).toBe('');
+    expect(
+      within(block).getByText('SK I 4 · SK II 11 · SK III 63 · SK IV 0').style.whiteSpace,
+    ).toBe('');
+  });
+
   it('nennt eine gesperrte Quelle mit Grund', () => {
     zeige();
     const z = within(screen.getByRole('region', { name: 'Vorbereitung' }))
