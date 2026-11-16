@@ -1,6 +1,6 @@
-import { Alert, Button, Flex, Modal, Tabs } from 'antd';
+import { Alert, Button, Flex, Modal } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import HelferListe from '../abloesung/schichtplan/HelferListe';
 import { ApiError } from '../api/client';
@@ -15,7 +15,7 @@ import {
 } from '../api/planungen';
 import { globalKeys } from '../api/queryKeys';
 import AdminPage from '../components/AdminPage';
-import { useRollen } from '../components/instrument';
+import { Segmentleiste, useRollen } from '../components/instrument';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { OffeneBearbeitungProvider } from '../components/offeneBearbeitung';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
@@ -42,6 +42,14 @@ import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
  * „In Einsatz übernehmen“ (LLH-1587) öffnet den Dialog mit Vorschau; danach ist die Planung
  * schreibgeschützt und nennt oben, wann und in welchen Einsatz sie ging.
  */
+/** Name der Reiterfläche je Reiter, ohne die Zahl im Wortlaut des Reiters. */
+const REITER_NAME: Record<PlanungReiter, string> = {
+  plan: 'Plan',
+  posten: 'Posten',
+  helfer: 'Helfer',
+  ablauf: 'Ablauf',
+};
+
 export default function PlanungPage() {
   const { planungId: roh } = useParams();
   const planungId = parseRouteId(roh);
@@ -53,6 +61,7 @@ export default function PlanungPage() {
   const { konventionen } = useAnzeigeKonventionen();
   const [loeschenOffen, setLoeschenOffen] = useState(false);
   const [isUebernahmeOpen, setUebernahmeOpen] = useState(false);
+  const reiterflaecheId = useId();
 
   const query = useQuery({
     queryKey: globalKeys.planung(planungId ?? 0),
@@ -181,29 +190,36 @@ export default function PlanungPage() {
             onNeuLaden={() => void query.refetch()}
           />
         </div>
-        <Tabs
-          activeKey={reiter}
-          onChange={waehleReiter}
-          destroyOnHidden
-          items={[
-            { key: 'plan', label: 'Plan', children: reiterInhalt.plan },
+        {/* Fläche umschalten: Segmentleiste als Reiter (Spec `bedien-umschalten`). Nur die aktive
+            Fläche steht im Baum, wie vorher mit `destroyOnHidden`. */}
+        <Segmentleiste<PlanungReiter>
+          rolle="tablist"
+          beschriftung="Bereiche der Planung"
+          wert={reiter}
+          onWechsel={waehleReiter}
+          optionen={[
+            { wert: 'plan', label: 'Plan', steuert: reiterflaecheId },
             {
-              key: 'posten',
+              wert: 'posten',
               label: `Posten · ${planung.posten.length}`,
-              children: reiterInhalt.posten,
+              steuert: reiterflaecheId,
             },
             {
-              key: 'helfer',
+              wert: 'helfer',
               label: `Helfer · ${planung.helfer.length}`,
-              children: reiterInhalt.helfer,
+              steuert: reiterflaecheId,
             },
             {
-              key: 'ablauf',
+              wert: 'ablauf',
               label: `Ablauf · ${planung.programmpunkte.length}`,
-              children: reiterInhalt.ablauf,
+              steuert: reiterflaecheId,
             },
           ]}
+          style={{ marginBottom: token.margin }}
         />
+        <div role="tabpanel" id={reiterflaecheId} aria-label={REITER_NAME[reiter]}>
+          {reiterInhalt[reiter]}
+        </div>
       </OffeneBearbeitungProvider>
       {isUebernahmeOpen && (
         <PlanungUebernahmeDialog planung={planung} onClose={() => setUebernahmeOpen(false)} />

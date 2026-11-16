@@ -167,6 +167,8 @@ interface SegmentleisteProps<W extends string | number> {
   hasFullWidth?: boolean;
   /** Id eines Texts, der die ganze Leiste beschreibt (`aria-describedby`, LLH-1642). */
   beschreibungId?: string;
+  /** Zusätzliche Klasse, etwa um die Leiste aus dem Druck zu nehmen (`funkplan-no-print`). */
+  className?: string;
   style?: CSSProperties;
 }
 
@@ -178,6 +180,7 @@ export default function Segmentleiste<W extends string | number>({
   rolle = 'radiogroup',
   hasFullWidth = false,
   beschreibungId: leistenBeschreibungId,
+  className,
   style,
 }: SegmentleisteProps<W>) {
   const { token } = useRollen();
@@ -202,7 +205,7 @@ export default function Segmentleiste<W extends string | number>({
       role={rolle}
       aria-label={beschriftung}
       aria-describedby={leistenBeschreibungId}
-      className="lfh-segmente"
+      className={className ? `lfh-segmente ${className}` : 'lfh-segmente'}
       data-lfh="segmentleiste"
       style={hasFullWidth ? { display: 'flex', ...style } : style}
     >
@@ -313,6 +316,52 @@ interface SegmentUmschalterProps {
   /** Aufgelöste Farbe des 6-px-Punkts; aus gestrichen (zweites Zeichen, WCAG 1.4.1). */
   punkt?: string;
   style?: CSSProperties;
+}
+
+/**
+ * Die Segmentleiste als Formularfeld (Spec `bedien-umschalten`): eine kurze Wahl aus wenigen Werten
+ * in einem antd-`Form`, statt einer Knopfgruppe aus `Radio.Group optionType="button"`. Nimmt antds
+ * Formularschnittstelle (`value`/`onChange`, gesetzt von `Form.Item`) und gibt sie an
+ * `Segmentleiste` weiter; ohne `value` ist kein Segment gewählt, die Gruppe bleibt erreichbar.
+ * Prüffehler zeigt `Form.Item` darunter wie bei jedem Feld.
+ */
+export function SegmentFeld<W extends string | number>({
+  value,
+  onChange,
+  optionen,
+  beschriftung,
+  beschreibungId,
+  onWahl,
+  hasFullWidth,
+  style,
+}: {
+  value?: W;
+  onChange?: (wert: W) => void;
+  optionen: readonly SegmentOption<W>[];
+  /** Zugänglicher Name der Gruppe, auch neben dem Etikett des `Form.Item`. */
+  beschriftung: string;
+  /** Id eines Texts, der die ganze Wahl beschreibt (etwa den Grund einer Sperre). */
+  beschreibungId?: string;
+  /** Meldet eine Wahl durch die Person, zusätzlich zum Formularwert. */
+  onWahl?: (wert: W) => void;
+  hasFullWidth?: boolean;
+  style?: CSSProperties;
+}) {
+  return (
+    <Segmentleiste<W>
+      optionen={optionen}
+      // Ohne Wert passt keine Option: kein Segment gewählt (siehe `Segmentleiste`).
+      wert={value as W}
+      onWechsel={(wert) => {
+        onChange?.(wert);
+        onWahl?.(wert);
+      }}
+      beschriftung={beschriftung}
+      beschreibungId={beschreibungId}
+      hasFullWidth={hasFullWidth}
+      style={style}
+    />
+  );
 }
 
 /**

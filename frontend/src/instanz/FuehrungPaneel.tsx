@@ -1,10 +1,11 @@
 import { useEffect, useId, useState } from 'react';
-import { App, Button, Form, Input, Modal, Popconfirm, Radio, Space, Typography } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Space, Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Datenfeld,
   Datenraster,
   Paneel,
+  SegmentFeld,
   StatusChip,
   monoStil,
   useRollen,
@@ -675,11 +676,11 @@ export default function FuehrungPaneel({
           <>
             {moeglich.unterschrift && (
               <Form.Item label="Beweis" name="beweis">
-                <Radio.Group
-                  optionType="button"
-                  options={[
-                    { value: 'unterschrift', label: 'Eigene Unterschrift' },
-                    { value: 'code', label: 'Code des Gegenübers' },
+                <SegmentFeld<'unterschrift' | 'code'>
+                  beschriftung="Beweis"
+                  optionen={[
+                    { wert: 'unterschrift', label: 'Eigene Unterschrift' },
+                    { wert: 'code', label: 'Code des Gegenübers' },
                   ]}
                 />
               </Form.Item>

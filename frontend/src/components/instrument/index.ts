@@ -26,6 +26,7 @@ export { StatusZelle, StatusChip, NUR_VORLESER } from './Status';
 export { tonVonRolle, type StatusTon } from './statusFlaeche';
 export {
   default as Segmentleiste,
+  SegmentFeld,
   SegmentUmschalter,
   segmentStil,
   segmentZelleStil,

@@ -221,6 +221,26 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     expect(within(reiter).getByRole('tab', { name: 'Unterwegs' })).toBeInTheDocument();
   });
 
+  // Spec `bedien-umschalten`: Segmentleiste als Reiter; die Reiterfläche trägt die Resthöhe des
+  // begrenzten Grundrisses weiter (Flex-Kind mit `minHeight: 0`), sonst wüchse die Fläche hinaus.
+  it('verbindet Reiter und Reiterfläche und reicht die Resthöhe weiter', async () => {
+    const { listePersonen } = await import('../../api/einsatzPerson');
+    vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
+    setzeRahmen(800, RAHMEN_SCHMAL);
+    renderMitProviders(kompakt(<Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={false} />));
+
+    const reiter = await screen.findByRole('tablist', { name: 'Bereiche der Unfallhilfsstelle' });
+    expect(reiter).toHaveAttribute('data-lfh', 'segmentleiste');
+    const flaeche = screen.getByRole('tabpanel', { name: 'Fläche' });
+    expect(within(reiter).getByRole('tab', { name: 'Fläche' })).toHaveAttribute(
+      'aria-controls',
+      flaeche.id,
+    );
+    expect(flaeche.style.flex).toMatch(/^1/);
+    expect(flaeche.style.minHeight).toBe('0px');
+    expect(screen.getByTestId('grundriss-rahmen').style.height).toBe('100%');
+  });
+
   it('hält in der Reiterform genau EINEN Zweig im Baum — der inaktive Reiter ist nicht bloß verborgen', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
@@ -234,9 +254,8 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Wartebereich' }));
     expect(await screen.findByText('Wartebereich (Eingang)')).toBeInTheDocument();
 
-    // Die eigentliche Aussage: der Anfangszustand stimmt auch ohne `destroyOnHidden` (die Pane wird
-    // erst beim ersten Besuch montiert). Ohne die Prop bliebe sie danach montiert — der Rückklick
-    // ist die Stelle, an der das kippt.
+    // Die eigentliche Aussage: auch nach einem Besuch bleibt der verlassene Zweig nicht montiert —
+    // der Rückklick ist die Stelle, an der das kippen könnte.
     await userEvent.click(screen.getByRole('tab', { name: 'Fläche' }));
     await waitFor(() =>
       expect(screen.queryByText('Wartebereich (Eingang)')).not.toBeInTheDocument(),

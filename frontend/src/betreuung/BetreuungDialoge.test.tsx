@@ -135,7 +135,7 @@ async function budgetUndAufklappen(dialog: HTMLElement, sichtbar: number) {
 
 /** Radio-Knöpfe in Knopfform: das `<input>` trägt `pointer-events: none`, geklickt wird das Etikett. */
 async function waehle(dialog: HTMLElement, name: string) {
-  await userEvent.click(within(dialog).getByRole('radio', { name }).closest('label')!);
+  await userEvent.click(within(dialog).getByRole('radio', { name }));
 }
 
 /** Struktur, aus der „Enter sendet" folgt (Erfassungs-Norm B4). */

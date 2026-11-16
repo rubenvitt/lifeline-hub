@@ -2100,11 +2100,10 @@ async function messeSkizze(page: Page, soll: number, dichte: string, schreibend:
     `Lücken-Wahlknopf (${dichte})`,
     SKIZZE_LUECKEN_WAHL,
   );
-  // Reiter des Fernmeldewesens (LLH-1180) statt des Umschalters „Darstellung“. Gemessen wird der
-  // Knoten, der den Klick trägt (`.ant-tabs-tab`, wie in `trefflaeche-pruefflaechen`): `role="tab"`
-  // sitzt bei antd auf dem inneren Text ohne das Polster der Kopfzeile.
+  // Reiter des Fernmeldewesens (LLH-1180) statt des Umschalters „Darstellung“, als Segmentleiste
+  // (Spec `bedien-umschalten`): `role="tab"` sitzt auf dem Knopf, der den Klick trägt.
   const umschalter = await alleHaltenStufe(
-    page.getByRole('tablist').locator('.ant-tabs-tab'),
+    page.getByRole('tablist', { name: 'Fernmeldewesen' }).getByRole('tab'),
     soll,
     `Reiter (${dichte})`,
     4,
@@ -3097,7 +3096,7 @@ test('Vorplanung (LLH-1595): Liste und Kopf im Bearbeiten folgen der Dichte-Staf
     const hMenue = await haeltStufe(menue, soll, `⋮ der Planung (${dichte})`);
     const hBearbeiten = await haeltStufe(bearbeiten, soll, `Planung bearbeiten (${dichte})`);
     const reiter = await alleHaltenStufe(
-      main.getByRole('tablist').locator('.ant-tabs-tab'),
+      main.getByRole('tablist', { name: 'Bereiche der Planung' }).getByRole('tab'),
       soll,
       `Reiter (${dichte})`,
       3,
@@ -3780,7 +3779,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
 //
 // Ansicht „Stellen“: eine GEPLANTE Stelle trägt drei Aktionen hinter einem `MenueAusloeser`, eine
 // AKTIVE zwei Knöpfe („Bearbeiten …“, „Auflösen“) in `stelle-aktionen` (Lücke `marginSM` =
-// 7 / 11 / 16 px). Die Stellenwahl der Ausgabeansicht ist ein antd-`Select` (`.ant-select` trägt
+// 8 / 12 / 16 px). Die Stellenwahl der Ausgabeansicht ist ein antd-`Select` (`.ant-select` trägt
 // die Steuerhöhe); vorgewählt ist die einzige zugeordnete Stelle.
 
 test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht folgen der Staffel, Abstand ≥ 16 px im Handschuh', async ({
@@ -4085,7 +4084,7 @@ test('Betroffene Detailseite: Knöpfe „+ …“ und Wertknöpfe der Personenda
 /**
  * Die Knöpfe „+ …“ der Zeile „Ohne Angabe“ brechen am Handschirm um. Auch zwischen den Reihen
  * stehen sie nach der Leitlinie auseinander, ≥ 8 px mit Maus (`kompakt`), ≥ 16 px mit Touch —
- * dieselbe Stufe wie der Dialogfuß (`padding`, 11/18/26 px). Gemessen wird der Abstand zwischen
+ * dieselbe Stufe wie der Dialogfuß (`padding`, 12/20/24 px). Gemessen wird der Abstand zwischen
  * den Knopfkanten zweier Reihen, nicht der Stil. Mutationsprobe: `rowGap` weg — 0 px, rot.
  */
 test('Betroffene Detailseite: die Knöpfe „+ …“ halten auch umgebrochen den Abstand', async ({

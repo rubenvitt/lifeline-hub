@@ -1,4 +1,5 @@
-import { Tabs } from 'antd';
+import { theme } from 'antd';
+import { Segmentleiste } from '../components/instrument';
 import { useNavigate } from 'react-router';
 import { funkplanPfad, kommunikationsplanPfad, type FunkplanAnsicht } from '../routing/deeplinks';
 
@@ -21,21 +22,27 @@ export const FERNMELDEWESEN_REITER: readonly { key: FernmeldewesenReiterKey; lab
  * Darstellungsreiter mit `?ansicht=` auf den Funkplan.
  *
  * Nur die Leiste: der Inhalt steht darunter in der Seite, damit Druckwurzel und Seitenkopf bei der
- * Seite bleiben. `className` nimmt die Leiste aus dem Druck (`funkplan-no-print` …).
+ * Seite bleiben; trägt sie die Rolle `tabpanel`, nennt `flaecheId` ihre Id. Die Leiste ist eine
+ * Segmentleiste als Reiter (Spec `bedien-umschalten`, löst die antd-Tabs aus LLH-1180 D5 ab).
+ * `className` nimmt die Leiste aus dem Druck (`funkplan-no-print` …).
  */
 export default function FernmeldewesenReiter({
   einsatzId,
   aktiv,
   onDarstellung,
   className,
+  flaecheId,
 }: {
   einsatzId: number;
   aktiv: FernmeldewesenReiterKey;
+  /** Id der Reiterfläche (`role="tabpanel"`) in der Seite, falls sie eine trägt. */
+  flaecheId?: string;
   /** Nur auf dem Funkplan: setzt die Darstellung, statt zu navigieren. */
   onDarstellung?: (ansicht: FunkplanAnsicht) => void;
   className?: string;
 }) {
   const navigate = useNavigate();
+  const { token } = theme.useToken();
   const wechseln = (key: string) => {
     const reiter = key as FernmeldewesenReiterKey;
     if (reiter === aktiv) return;
@@ -48,11 +55,18 @@ export default function FernmeldewesenReiter({
     }
   };
   return (
-    <Tabs
+    <Segmentleiste<FernmeldewesenReiterKey>
+      rolle="tablist"
+      beschriftung="Fernmeldewesen"
+      wert={aktiv}
+      onWechsel={wechseln}
+      optionen={FERNMELDEWESEN_REITER.map((r) => ({
+        wert: r.key,
+        label: r.label,
+        steuert: flaecheId,
+      }))}
       className={className}
-      activeKey={aktiv}
-      onChange={wechseln}
-      items={FERNMELDEWESEN_REITER.map((r) => ({ key: r.key, label: r.label }))}
+      style={{ marginBottom: token.margin }}
     />
   );
 }
