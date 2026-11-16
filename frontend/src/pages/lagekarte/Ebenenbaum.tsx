@@ -1,12 +1,7 @@
 import { Button, Input, Modal, Space, Typography } from 'antd';
 import { useId, useState } from 'react';
 import { IconHaken, IconLupe, IconMinus, IconSchloss } from '../../icons';
-import {
-  Segmentleiste,
-  useRollen,
-  schriftGroesse,
-  zahlStil,
-} from '../../components/instrument';
+import { Segmentleiste, useRollen, schriftGroesse, zahlStil } from '../../components/instrument';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { fachebeneFarbe } from '../../theme/statusFarben';

@@ -231,7 +231,11 @@ export default function BenutzerMenu({
             {funktion && (
               <Typography.Text
                 data-lfh="benutzermenue-funktion"
-                style={{ display: 'block', fontSize: schriftGroesse('klein'), marginTop: token.marginXS }}
+                style={{
+                  display: 'block',
+                  fontSize: schriftGroesse('klein'),
+                  marginTop: token.marginXS,
+                }}
               >
                 {funktion}
               </Typography.Text>
