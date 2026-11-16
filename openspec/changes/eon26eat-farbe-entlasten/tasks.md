@@ -40,7 +40,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`. Entscheidungen D1–D9 in `de
 ## 5. Erzeugtes und Integration
 
 - [x] 5.1 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), `designSystem.guard.test.ts` grün, Erzeugtes mitcommitten
-- [ ] 5.2 Anwenderbilder der Kapitel Kräfte, Arbeitsfläche und Kommunikation über den Bildlauf neu erzeugen (`docs/anwender/AGENTS.md`); Wächter der Anwenderdoku grün
+- [x] 5.2 Anwenderbilder der Kapitel Kräfte, Arbeitsfläche und Kommunikation über den Bildlauf neu erzeugen (`docs/anwender/AGENTS.md`); Wächter der Anwenderdoku grün
 - [ ] 5.3 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
 ## Workflow follow-up
