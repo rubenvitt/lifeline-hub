@@ -89,6 +89,37 @@ describe('KatalogTabelle', () => {
   });
 
   /**
+   * Kopf und Körper gleich breit (LLH-1788): die Kopftabelle ist fest (`sprache.css`), also muss
+   * jede Spalte schon im Körper so breit sein, wie ihr Kopf mindestens braucht. Eine zu schmale
+   * Zahlbreite wächst auf die Mindestbreite des Kopfs; eine breitere bleibt.
+   */
+  it('hebt eine zu schmale Spalte auf die Mindestbreite ihres Kopfs (LLH-1788)', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname', width: 300 },
+          {
+            title: 'Position',
+            dataIndex: 'typ',
+            key: 'typ',
+            width: 20,
+            sorter: (a, b) => a.typ.localeCompare(b.typ),
+          },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
+    );
+    const breiten = [
+      ...container.querySelectorAll<HTMLTableColElement>('.ant-table-body colgroup col'),
+    ].map((c) => parseFloat(c.style.width));
+    expect(breiten[0]).toBe(300);
+    // Polster beidseits plus „POSITION“ plus Sortiersymbol: weit mehr als 20 px.
+    expect(breiten[1]).toBeGreaterThan(60);
+  });
+
+  /**
    * Druck (LFH-71): mit `sticky` legt rc-table den Kopf in eine EIGENE Tabelle, der Körper hat
    * dann kein `thead`, und die Kopfwiederholung greift nicht. Bei `beforeprint` rendert das
    * Primitiv deshalb ohne `sticky`, bei `afterprint` wieder mit. Synchron geprüft, ohne `act`:

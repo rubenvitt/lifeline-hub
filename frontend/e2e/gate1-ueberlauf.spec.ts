@@ -1603,13 +1603,9 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
           region.getByRole('button', { name: / entlassen$|^Zeitachse zu / }),
         ).toHaveCount(0);
 
-        // Was weicht, steht im Zähler des Spaltenschalters: Träger, Ruhe und die Bemerkung
-        // (Voreinstellung), unter `xxl` der Abschnitt (LLH-1096), unter `xl` (1200) die Funktion.
-        await expect(
-          region.getByRole('button', {
-            name: `Spalten · ${breite >= 1200 ? 4 : 5} ausgeblendet`,
-          }),
-        ).toBeVisible();
+        // Was weicht (Träger, Ruhe, Bemerkung als Voreinstellung, unter `xxl` der Abschnitt, unter
+        // `xl` die Funktion), ist Vorgabe: der Schalter heißt „Spalten“ ohne Zähler (LLH-1790).
+        await expect(region.getByRole('button', { name: /^Spalten — / })).toBeVisible();
         const ueber = await tabellenUeberlauf(region);
         expect(ueber, 'Personaltabelle läuft nicht über').toBeLessThanOrEqual(1);
         for (const kopf of ['Einheit', 'Fahrzeug', 'Position', 'Einsatzdauer']) {
@@ -1636,6 +1632,66 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         });
       });
     }
+  }
+
+  /**
+   * Kopf und Körper bündig (LLH-1788): die stehende Kopfzeile ist eine eigene Tabelle. Jeder
+   * Spaltenkopf steht über seiner Spalte, Abweichung je Kante höchstens 1 px, in jeder Stufe.
+   * Gemessen waren in der Personalliste 51 px in `komfortabel` („Position“ über dem Fahrzeug).
+   *
+   * Mutationsprobe: die Regel `table-layout: fixed` an `.ant-table-sticky-holder > table`
+   * (`theme/sprache.css`) entfernen → `komfortabel` und `handschuh` werden rot.
+   */
+  for (const { breite, hoehe, dichte } of [
+    { breite: 1440, hoehe: 900, dichte: 'kompakt' },
+    { breite: 1024, hoehe: 768, dichte: 'komfortabel' },
+    { breite: 1280, hoehe: 800, dichte: 'handschuh' },
+  ] as const) {
+    test(`${breite} px, ${dichte}: Spaltenköpfe von Personal und Fahrzeugen stehen über ihren Spalten`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page, { startseite: false });
+      const einsatzId = await seedeKraefte(page);
+      await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+      await page.setViewportSize({ width: breite, height: hoehe });
+      for (const [pfad, region, anker] of [
+        ['personal', 'Personal im Einsatz', KRAFT],
+        ['fahrzeuge', 'Fahrzeuge im Einsatz', KRAFT_FAHRZEUG],
+      ] as const) {
+        await page.goto(`/einsaetze/${einsatzId}/${pfad}`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const flaeche = page.getByRole('region', { name: region, exact: true });
+        await expect(flaeche.getByText(anker).first()).toBeVisible();
+        const abweichung = await flaeche.evaluate((el) => {
+          const koepfe = [
+            ...el.querySelectorAll<HTMLElement>('.ant-table-sticky-holder thead th'),
+          ].filter((th) => !th.classList.contains('ant-table-cell-scrollbar'));
+          // Die erste Datenzeile; vor ihr steht rc-tables Messzeile.
+          const zeile = el.querySelector<HTMLElement>('.ant-table-tbody tr.ant-table-row');
+          const zellen = zeile ? [...zeile.querySelectorAll<HTMLElement>(':scope > td')] : [];
+          if (koepfe.length === 0 || koepfe.length !== zellen.length) {
+            return { max: Infinity, wo: `${koepfe.length} Köpfe, ${zellen.length} Zellen` };
+          }
+          let max = 0;
+          let wo = '';
+          koepfe.forEach((th, i) => {
+            const a = th.getBoundingClientRect();
+            const b = zellen[i].getBoundingClientRect();
+            const d = Math.max(Math.abs(a.left - b.left), Math.abs(a.right - b.right));
+            if (d > max) {
+              max = d;
+              wo = (th.textContent ?? '').trim();
+            }
+          });
+          return { max, wo };
+        });
+        expect(
+          abweichung.max,
+          `${pfad}: Kopf „${abweichung.wo}“ gegen seine Spalte`,
+        ).toBeLessThanOrEqual(1);
+      }
+    });
   }
 
   for (const rolle of ['admin', 'beobachter'] as const) {
@@ -2079,8 +2135,10 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
     await page.goto('/admin/aufbewahrung');
     const region = page.getByRole('region', { name: 'Aufbewahrung', exact: true });
     await expect(region.getByText(/E2E Sanitätsdienst Stadtlauf/).first()).toBeVisible();
-    // Vorbedingung: unter `xxl` weichen die drei Zustandsdaten in den Spaltenschalter.
-    await expect(region.getByRole('button', { name: 'Spalten · 3 ausgeblendet' })).toBeVisible();
+    // Vorbedingung: unter `xxl` weichen die drei Zustandsdaten in den Spaltenschalter; nach Breite
+    // verborgen ist Vorgabe, der Schalter heißt ohne Zähler „Spalten“ (LLH-1790).
+    await expect(region.getByRole('columnheader')).not.toHaveCount(0);
+    await expect(region.getByRole('button', { name: /^Spalten — / })).toBeVisible();
 
     const ueber = await tabellenUeberlauf(region);
     test.info().annotations.push({

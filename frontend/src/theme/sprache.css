@@ -355,6 +355,15 @@
   text-transform: uppercase;
   border-bottom-color: var(--lfh-linie);
 }
+/* Stehende Kopfzeile (LLH-1788): rc-table legt den Kopf in eine EIGENE Tabelle, deren colgroup
+   die im Körper gemessenen Breiten trägt, setzt aber inline `table-layout: auto`. Dort gälten die
+   Breiten nur als Mindestwert, ein Kopf mit Sortier- und Filterknopf (48 / 72 px) wüchse über
+   seine Körperspalte hinaus und schöbe alle Spalten daneben (51 px in der Personalliste). Fest
+   übernimmt der Kopf die Breiten des Körpers genau; dass er dabei nie gekürzt wird, sichert die
+   Mindestbreite je Spalte (`components/kopfBreite.ts`). `!important` gegen den Inline-Stil. */
+.ant-table-wrapper.lfh-katalog .ant-table-sticky-holder > table {
+  table-layout: fixed !important;
+}
 /* Spaltenfilter-Auslöser im Kopf (LLH-1227, Kriterium 2). antd zeichnet ihn in Schriftgröße
    (20 × 23 px in jeder Stufe); der Boden kommt als aufgelöster `controlHeightSM` über
    `--lfh-filter-ziel` (`filterKopfStil` in `KatalogTabelle.tsx`), 24 / 48 / 72 px. Er ragt um

@@ -1,4 +1,5 @@
 import { ConfigProvider, Input, Table, type InputRef, type TableProps, type TableRef } from 'antd';
+import { kopfMindestBreite, mitKopfMindestBreite, textBreiteKopf } from './kopfBreite';
 import {
   useCallback,
   useEffect,
@@ -937,6 +938,14 @@ export default function KatalogTabelle<T extends object>({
    * {@link sichtbareSpalten}, das Spalte 0 nie entfernt. Die Schalterfelder werden vor antd
    * herausgelöst.
    */
+  /** Schriftfamilie des Tabellenkopfs (`--lfh-schrift-text`), einmal je Montage gelesen. */
+  const kopfSchrift = useMemo(
+    () =>
+      typeof document === 'undefined'
+        ? ''
+        : getComputedStyle(document.documentElement).getPropertyValue('--lfh-schrift-text').trim(),
+    [],
+  );
   const gezeigteSpalten = useMemo(() => {
     if (!columns) return columns;
     let auswahl: readonly KatalogSpalte<T>[] = columns;
@@ -951,7 +960,6 @@ export default function KatalogTabelle<T extends object>({
     }
     return auswahl.map((spalte) => {
       const { etikett, immerSichtbar, abBreite: _ab, ...antd } = spalte;
-      void etikett;
       void immerSichtbar;
       void _ab;
       const gebaut = { ...antd } as KatalogSpalte<T> & {
@@ -977,9 +985,26 @@ export default function KatalogTabelle<T extends object>({
         gebaut.sortOrder =
           sortStand?.spalte === k ? (sortStand.richtung === 'auf' ? 'ascend' : 'descend') : null;
       }
+      // Die Kopftabelle ist fest (`sprache.css`, LLH-1788): der Körper muss mindestens so breit
+      // sein, wie sein Kopf braucht, sonst würde der Kopf gekürzt.
+      const kopfTitel = etikett ?? (typeof spalte.title === 'string' ? spalte.title : undefined);
+      if (kopfTitel != null && !('children' in spalte)) {
+        const mindest = kopfMindestBreite({
+          titel: kopfTitel,
+          token,
+          messen: (text) => textBreiteKopf(text, kopfSchrift),
+          sortierbar: 'sorter' in gebaut && gebaut.sorter != null && gebaut.sorter !== false,
+          filterbar:
+            ('filters' in gebaut && gebaut.filters != null) ||
+            ('filterDropdown' in gebaut && gebaut.filterDropdown != null),
+        });
+        return mitKopfMindestBreite(gebaut, mindest) as KatalogSpalte<T>;
+      }
       return gebaut as KatalogSpalte<T>;
     });
   }, [
+    token,
+    kopfSchrift,
     columns,
     spaltenSchalter,
     schaltbar,
