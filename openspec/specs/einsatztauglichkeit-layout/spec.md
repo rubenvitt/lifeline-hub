@@ -315,7 +315,8 @@ MUST weder die Höhe der Werkzeugzeile noch die Lage der obersten Karte ändern.
 
 ### Requirement: Kennzahlenband hält seine Höhe
 
-Das Band „Lage in Zahlen“ im Lage-Dashboard und in Führung · Überblick MUST ab einer
+Das Band „Lage in Zahlen“ im Lage-Dashboard und das Band „Führungsstand“ in Führung · Überblick
+MUST ab einer
 Fensterbreite von 768 px seine Höhe behalten, wenn sich die Länge einer Notiz ändert. Jede
 Notiz des Bands SHALL dort genau drei Textzeilen hoch sein, ob ihr Text kürzer oder länger
 ist. Eine längere Notiz MUST mit einer Auslassung („…“) enden, ihr vollständiger Text MUST

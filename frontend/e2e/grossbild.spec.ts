@@ -19,14 +19,18 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
   return ((await antwort.json()) as { id: number }).id;
 }
 
-/** Drei Betroffene, ein überfälliger Auftrag: genug, damit Band, Sichtung und Führungsstand Werte tragen. */
+/**
+ * Drei Betroffene, eine davon vermisst, und ein überfälliger Auftrag: genug, damit Band, Sichtung
+ * und die Vorbereitung der Lagebesprechung Werte tragen. Den Alarmton im Großbild des Lagebilds
+ * trägt seit LLH-1743 die Kennzahl „Vermisste“ (Aufträge zeigt nur der Überblick).
+ */
 async function seed(page: Page): Promise<string> {
   const einsatzId = String(
     await post(page, '/api/einsaetze', { bezeichnung: `E2E Großbild ${Date.now()}` }),
   );
   const basis = `/api/einsaetze/${einsatzId}`;
-  for (const name of ['Albers', 'Brandt', 'Claasen'])
-    await post(page, `${basis}/personen`, { name });
+  for (const name of ['Albers', 'Brandt']) await post(page, `${basis}/personen`, { name });
+  await post(page, `${basis}/personen`, { name: 'Claasen', status: 'vermisst' });
   await post(page, `${basis}/auftraege`, {
     auftrag_text: 'Deich sichern',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
@@ -110,12 +114,12 @@ for (const fenster of [
         6,
       );
       await expect(flaeche.getByRole('region', { name: 'Sichtung' })).toContainText('3 erfasst');
-      const auftraege = flaeche
+      const vermisste = band
         .locator('[data-lfh="gross-kennzahl"]')
-        .filter({ hasText: 'Aufträge offen' });
-      await expect(auftraege).toHaveAttribute('data-ton', 'alarm');
+        .filter({ hasText: 'Vermisste' });
+      await expect(vermisste).toHaveAttribute('data-ton', 'alarm');
       // Zweiter Kanal neben der Farbe: die Kante (Innenschatten), 6 px bei 1920.
-      expect(await auftraege.evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/inset/);
+      expect(await vermisste.evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/inset/);
 
       expect(await smallestFontSize(flaeche)).toBeGreaterThanOrEqual(28 * anteil - 0.5);
       expect(await smallestNumberSize(flaeche)).toBeGreaterThanOrEqual(72 * anteil - 0.5);

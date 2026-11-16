@@ -150,18 +150,19 @@ async function vorbereiten(page: Page, rolleName: (typeof ROLLEN)[number]): Prom
 }
 
 for (const rolleName of ROLLEN) {
-  test(`Überblick 390 px (${rolleName}): sechs Plätze ohne Restspur, Fuge 1 px`, async ({
+  test(`Überblick 390 px (${rolleName}): drei Plätze ohne Restspur, Fuge 1 px`, async ({
     page,
   }) => {
     const id = await vorbereiten(page, rolleName);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(ueberblickPfad(id));
-    const band = page.getByRole('group', { name: 'Lage in Zahlen' });
+    // Seit LLH-1743 der Führungsstand mit drei Handlungszahlen in einer Reihe.
+    const band = page.getByRole('group', { name: 'Führungsstand' });
     await expect(band.getByText('Einsatzabschnitte', { exact: true })).toBeVisible();
     await expect(band.locator('[aria-busy="true"]')).toHaveCount(0);
     const v = await pruefeRaster(page, band, false);
-    expect(v.spalten).toBe(2);
-    expect(v.rest, 'sechs Plätze füllen drei Reihen ganz').toBeNull();
+    expect(v.spalten).toBe(3);
+    expect(v.rest, 'drei Plätze füllen eine Reihe ganz').toBeNull();
   });
 
   for (const breite of [820, 1180]) {

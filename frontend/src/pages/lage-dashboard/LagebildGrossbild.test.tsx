@@ -24,8 +24,6 @@ const BAND: KennzahlAnzeige[] = [
 ];
 
 const FUEHRUNG: KennzahlAnzeige[] = [
-  kz('Aufträge offen', 5, { ton: 'alarm', notiz: '1 überfällig', ziel: '/auftraege' }),
-  kz('Meldungen offen', 9, { notiz: '2 neu' }),
   kz('Lagebericht', 'keiner', { notiz: 'noch nicht erstellt' }),
   kz('UHS aktiv', 3, { notiz: '1 geplant · 24 Kräfte an UHS' }),
 ];
@@ -101,13 +99,13 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
     for (const z of zellen) expect(z).toHaveAttribute('data-zustand', 'laden');
   });
 
-  it('zeigt den Führungsstand mit Alarmton bei überfälligem Auftrag', () => {
+  it('zeigt den Stand ohne Aufträge und Meldungen (LLH-1743)', () => {
     renderGrossbild();
-    const block = screen.getByRole('region', { name: 'Führungsstand' });
-    expect(
-      within(block).getByText('Aufträge offen').closest('[data-lfh="gross-kennzahl"]'),
-    ).toHaveAttribute('data-ton', 'alarm');
-    expect(block).toHaveTextContent('1 überfällig');
+    const block = screen.getByRole('region', { name: 'Stand' });
+    expect(block).toHaveTextContent('Lagebericht');
+    expect(block).toHaveTextContent('1 geplant · 24 Kräfte');
+    expect(block).not.toHaveTextContent('Aufträge');
+    expect(block).not.toHaveTextContent('Meldungen');
   });
 
   it('ordnet Gefahren nach Warnstufe und begrenzt sie', () => {

@@ -59,6 +59,11 @@ test.describe(KAPITEL, () => {
     await expect(page.locator('[data-lfh="gefahren-beurteilung"]')).toContainText('unbestätigt');
     await expect(page.locator('[data-sichtung]').first()).toBeVisible();
     await expect(page.getByRole('list', { name: 'Jüngste Einträge' })).toBeVisible();
+    // Die Alarmzeile hat alle Quellen (LLH-1743).
+    await expect(page.locator('[data-lfh="alarm-zeile"]')).toHaveAttribute(
+      'data-stand',
+      'vollstaendig',
+    );
     await fotografiere(page, KAPITEL, 'lagebild');
     // Ablauf weiter: aus einem Paneel ins Modul.
     await page

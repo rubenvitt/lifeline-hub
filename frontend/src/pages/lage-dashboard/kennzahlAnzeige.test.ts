@@ -18,8 +18,6 @@ const LAGEBILD = {
   fuehrung: { uhsAktiv: 3, uhsGeplant: 1, uhsKraefte: 24, bericht: null },
 } as unknown as Lagebild;
 
-const daten = <T>(zahl: T) => ({ zustand: 'daten' as const, zahl });
-
 describe('bandKennzahl (LLH-1747)', () => {
   it('übernimmt Wert, Notiz, Ton und Ziel bei Daten', () => {
     expect(bandKennzahl({ ...BETROFFENE, ton: 'alarm' }, 'daten', '/x')).toEqual({
@@ -50,46 +48,32 @@ describe('bandKennzahl (LLH-1747)', () => {
   });
 });
 
-describe('fuehrungsKennzahlen (LLH-1747)', () => {
+describe('fuehrungsKennzahlen (LLH-1747, LLH-1743)', () => {
   const basis = {
     lagebild: LAGEBILD,
-    auftraege: daten({ offen: 5, ueberfaellig: 1 }),
-    meldungen: daten({ offen: 9, neu: 2, bestaetigung_ueberfaellig: 0 }),
     lageberichte: 'daten' as const,
     uhs: 'daten' as const,
     konv,
   } as unknown as Parameters<typeof fuehrungsKennzahlen>[0];
 
-  it('setzt einen überfälligen Auftrag in Alarmrolle', () => {
-    const [auftraege, meldungen] = fuehrungsKennzahlen(basis);
-    expect(auftraege).toMatchObject({
-      titel: 'Aufträge offen',
-      wert: 5,
-      notiz: '1 überfällig',
-      ton: 'alarm',
-    });
-    expect(meldungen).toMatchObject({ titel: 'Meldungen offen', wert: 9, ton: 'neutral' });
+  it('trägt nur Lagebericht und UHS aktiv: Aufträge und Meldungen zeigt der Überblick', () => {
+    expect(fuehrungsKennzahlen(basis).map((k) => k.titel)).toEqual(['Lagebericht', 'UHS aktiv']);
   });
 
   it('nennt UHS und fehlenden Lagebericht', () => {
-    const [, , bericht, uhs] = fuehrungsKennzahlen(basis);
+    const [bericht, uhs] = fuehrungsKennzahlen(basis);
     expect(bericht).toMatchObject({ wert: 'keiner', notiz: 'noch nicht erstellt', ton: 'neutral' });
     expect(uhs).toMatchObject({ wert: 3, notiz: '1 geplant · 24 Kräfte an UHS' });
   });
 
   it('behauptet ohne Lagebild nichts', () => {
     const alle = fuehrungsKennzahlen({ ...basis, lagebild: null });
-    expect(alle.map((k) => k.zustand)).toEqual(['laden', 'laden', 'laden', 'laden']);
+    expect(alle.map((k) => k.zustand)).toEqual(['laden', 'laden']);
   });
 
   it('zeigt gesperrte Module als „—“ mit Grund, nie als 0', () => {
-    const [auftraege, , bericht, uhs] = fuehrungsKennzahlen({
-      ...basis,
-      auftraege: { zustand: 'gesperrt' },
-      lageberichte: 'gesperrt',
-      uhs: 'gesperrt',
-    });
-    for (const k of [auftraege, bericht, uhs]) {
+    const alle = fuehrungsKennzahlen({ ...basis, lageberichte: 'gesperrt', uhs: 'gesperrt' });
+    for (const k of alle) {
       expect(k).toMatchObject({ wert: '—', notiz: 'nicht freigegeben', ziel: undefined });
     }
   });
@@ -98,14 +82,8 @@ describe('fuehrungsKennzahlen (LLH-1747)', () => {
     expect(fuehrungsKennzahlen(basis).every((k) => k.ziel === undefined)).toBe(true);
     const mitZiel = fuehrungsKennzahlen({
       ...basis,
-      ziele: {
-        auftraege: '/a',
-        meldungen: '/m',
-        lageberichte: '/l',
-        lagebericht: (id) => `/l/${id}`,
-        uhs: '/u',
-      },
+      ziele: { lageberichte: '/l', lagebericht: (id) => `/l/${id}`, uhs: '/u' },
     });
-    expect(mitZiel.map((k) => k.ziel)).toEqual(['/a', '/m', '/l', '/u']);
+    expect(mitZiel.map((k) => k.ziel)).toEqual(['/l', '/u']);
   });
 });

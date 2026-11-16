@@ -152,6 +152,14 @@
   outline: 2px solid var(--lfh-bedien);
   outline-offset: -2px;
 }
+/* Ein Titel aus einem langen Wort trennt in der Zelle, statt über ihren Rand zu laufen: mit drei
+   Spalten auf 390 px lief „EINSATZABSCHNITTE“ im Überblick 15 px über (Gate 1, LLH-1748).
+   `hyphens` trennt, wo der Browser ein deutsches Wörterbuch hat, sonst bricht `anywhere` am
+   Spaltenrand. Ein Wort, das passt, bleibt unberührt. */
+.lfh-kennzahl__titel {
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
 
 /* Bündelzeile der Systemeinträge (LLH-1106, `etb/EtbZeitachse.tsx`): handgebautes Bedienziel,
    Fokusring in `bedien` wie oben, Hover als Unterstrich — die Zeile bleibt leise. */
