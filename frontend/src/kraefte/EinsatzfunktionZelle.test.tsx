@@ -2,7 +2,10 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import EinsatzfunktionZelle, { type EinsatzfunktionZelleProps } from './EinsatzfunktionZelle';
+import EinsatzfunktionZelle, {
+  stiftStil,
+  type EinsatzfunktionZelleProps,
+} from './EinsatzfunktionZelle';
 
 function zelle(p: Partial<EinsatzfunktionZelleProps> = {}) {
   const onSpeichern = p.onSpeichern ?? vi.fn().mockResolvedValue(undefined);
@@ -27,11 +30,27 @@ describe('EinsatzfunktionZelle (LLH-1067)', () => {
     expect(screen.getByText('Notfallsanitäter')).toBeVisible();
   });
 
-  it('leer: sichtbare Aufforderung, benannt mit der Zeile', () => {
+  it('leer mit Qualifikation: die Qualifikation als Wert, daneben ein Stift ohne Wort (LLH-1791)', () => {
     zelle();
+    const qualifikation = screen.getByText('Notfallsanitäter');
+    // Als Wert, nicht gedämpft.
+    expect(qualifikation.closest('.ant-typography-secondary')).toBeNull();
+    const stift = screen.getByRole('button', { name: 'Funktion zu Anna Muster eintragen' });
+    expect(stift).not.toHaveTextContent('Funktion eintragen');
+    expect(screen.queryByText('Funktion eintragen')).toBeNull();
+  });
+
+  it('leer ohne Qualifikation: die Aufforderung als Wort bleibt', () => {
+    zelle({ funktion: null });
     expect(
       screen.getByRole('button', { name: 'Funktion zu Anna Muster eintragen' }),
     ).toHaveTextContent('Funktion eintragen');
+  });
+
+  it('der Stift trägt den Boden der Stufe als Literale (stiftStil)', () => {
+    for (const h of [24, 48, 72]) {
+      expect(stiftStil({ controlHeightSM: h })).toMatchObject({ minWidth: h, minHeight: h });
+    }
   });
 
   it('schlägt passend zur Eingabe vor und sendet den gewählten Wert', async () => {

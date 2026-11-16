@@ -846,7 +846,12 @@ anwendbar), „nicht geprüft" ist keins.
   Fokus), der Fokus kehrt auf die Anzeige zurück. Karten und Ansichten bearbeiten im Fluss;
   `BemerkungZelle` liest den Kontext nicht. Nachweis `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten
   ohne Sprung“).
-- **Ein leeres Feld muss sagen, dass man es schreiben kann:** optionale Inline-Angaben nehmen
+- **Ein leeres Feld muss sagen, dass man es schreiben kann** (Listenform LLH-1791, Spec
+  `personal-einsatzangaben`): steht in einer Listenzelle schon ein anderer Wert (die Qualifikation
+  neben der leeren Einsatzfunktion), sagt ein Stift-Knopf mit zugänglichem Namen (Etikett und
+  Zeilenkennung, „Funktion zu Anna eintragen“) und dem Boden der Stufe das Schreibbare, über
+  `InlineAngabe.ausloeser` (Vorbild `kraefte/EinsatzfunktionZelle.tsx`); ohne solchen Wert bleibt
+  die Aufforderung als Wort. Optionale Inline-Angaben nehmen
   `components/BemerkungZelle.tsx`, nicht `Typography.Text editable` (Platzhalter `Button type="link"`, Zeilenkennung im Namen,
   Lesezweig „—", Fehler an der Zelle per `data-fehler`, Fokusrückgabe und Wertgleichheits-Riegel
   im Primitiv). Falle: antds `Editable` wertet **legacy `keyCode`** aus — Tasten per `fireEvent`

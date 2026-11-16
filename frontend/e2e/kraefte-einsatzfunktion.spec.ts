@@ -66,3 +66,39 @@ test('Einsatzfunktion setzen: Meldebild nennt sie vor der Qualifikation, das ETB
     .filter((i) => i.startsWith(`Person «${NAME}»`));
   expect(inhalte).toEqual([`Person «${NAME}»: Funktion «—» → «Sprechfunker»`]);
 });
+
+/**
+ * Leere Einsatzfunktion neben einer Qualifikation (LLH-1791, Spec `personal-einsatzangaben`,
+ * Szenario „Personalliste ohne Einsatzfunktion“): die Qualifikation steht als Wert, daneben ein
+ * Stift mit dem Boden der Stufe; das Wort „Funktion eintragen“ steht nicht in der Zeile.
+ *
+ * Mutationsprobe: `ausloeser` in `kraefte/EinsatzfunktionZelle.tsx` entfernen → in der Zeile steht
+ * wieder „Funktion eintragen“, der Test wird rot.
+ */
+for (const { dichte, soll } of [
+  { dichte: 'kompakt', soll: 24 },
+  { dichte: 'komfortabel', soll: 48 },
+  { dichte: 'handschuh', soll: 72 },
+] as const) {
+  test(`Personalliste (${dichte}): Qualifikation als Wert, Stift statt „Funktion eintragen“`, async ({
+    page,
+  }) => {
+    await anmeldenAlsAdmin(page, { startseite: false });
+    const name = `Stift ${dichte} ${Date.now()}`;
+    const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E ${name}` });
+    await post(page, `/api/einsaetze/${einsatzId}/personal`, {
+      adhoc: { name, funktion: 'Zugführer, Sprechfunker' },
+    });
+    await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/einsaetze/${einsatzId}/personal`);
+    const region = page.getByRole('region', { name: 'Personal im Einsatz', exact: true });
+    const zeile = region.locator('tr.ant-table-row').filter({ hasText: name });
+    await expect(zeile.getByText('Zugführer, Sprechfunker')).toBeVisible();
+    await expect(zeile.getByText('Funktion eintragen', { exact: true })).toHaveCount(0);
+    const stift = zeile.getByRole('button', { name: `Funktion zu ${name} eintragen` });
+    const box = (await stift.boundingBox())!;
+    expect(box.width, 'Stift breit genug').toBeGreaterThanOrEqual(soll - 0.5);
+    expect(box.height, 'Stift hoch genug').toBeGreaterThanOrEqual(soll - 0.5);
+  });
+}
