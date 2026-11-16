@@ -20,9 +20,9 @@
 
 ## 4. e2e, Regeln, Doku
 
-- [ ] 4.1 `frontend/e2e/geraet-lagemonitor.spec.ts`: Gefahrengebiet mit Stufe anlegen, Marke „… · hoch“ und überbelegte UHS („x/y“ mit `data-hervorgehoben="ja"`) prüfen, Markerzahlen nachziehen; „keine Kachel schneidet ab“ bleibt grün (`mise exec -- pnpm -C frontend exec playwright test e2e/geraet-lagemonitor.spec.ts --trace off`).
-- [ ] 4.2 `frontend/src/geraet/AGENTS.md`, Lagemonitor: „Gefahrenzonen (Typ und Geometrie)“ ersetzen durch Typ, Geometrie und bei Gefahrengebieten Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, ohne Freitext der Zone und ohne Namen; Prettier über `frontend/` grün.
-- [ ] 4.3 Anwenderkapitel `docs/anwender/kapitel/lagemonitor.md` (Abläufe „Lagebild lesen“: Beschriftung und Farbe der Gefahrenzonen, „überbelegt“; `quellen` um `frontend/src/geraet/lagemonitorFlaechen.ts` ergänzen), Bildlauf `frontend/e2e/doku-bilder/lagemonitor.bilder.ts` an die neue Markerzahl anpassen und die Bilder neu erzeugen (in `frontend/`: `mise exec -- pnpm doku:bilder --grep lagemonitor`, vorher `cargo build`); Wächter `hilfe/anwenderdoku.guard.test.ts` grün.
+- [x] 4.1 `frontend/e2e/geraet-lagemonitor.spec.ts`: Gefahrengebiet mit Stufe anlegen, Marke „… · hoch“ und überbelegte UHS („x/y“ mit `data-hervorgehoben="ja"`) prüfen, Markerzahlen nachziehen; „keine Kachel schneidet ab“ bleibt grün (`mise exec -- pnpm -C frontend exec playwright test e2e/geraet-lagemonitor.spec.ts --trace off`).
+- [x] 4.2 `frontend/src/geraet/AGENTS.md`, Lagemonitor: „Gefahrenzonen (Typ und Geometrie)“ ersetzen durch Typ, Geometrie und bei Gefahrengebieten Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, ohne Freitext der Zone und ohne Namen; Prettier über `frontend/` grün.
+- [x] 4.3 Anwenderkapitel `docs/anwender/kapitel/lagemonitor.md` (Abläufe „Lagebild lesen“: Beschriftung und Farbe der Gefahrenzonen, „überbelegt“; `quellen` um `frontend/src/geraet/lagemonitorFlaechen.ts` ergänzen), Bildlauf `frontend/e2e/doku-bilder/lagemonitor.bilder.ts` an die neue Markerzahl anpassen und die Bilder neu erzeugen (in `frontend/`: `mise exec -- pnpm doku:bilder --grep lagemonitor`, vorher `cargo build`); Wächter `hilfe/anwenderdoku.guard.test.ts` grün.
 
 ## 5. Abschluss
 
