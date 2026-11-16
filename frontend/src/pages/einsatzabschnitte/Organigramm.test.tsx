@@ -300,7 +300,7 @@ describe('OrganigrammBild — Knoten', () => {
 });
 
 describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
-  function bildAus(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]) {
+  function renderBild(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]) {
     return renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
@@ -312,13 +312,13 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
       />,
     );
   }
-  const knotenVon = (name: string) =>
+  const knotenFrom = (name: string) =>
     screen.getByRole('link', { name }).closest('[data-lfh="org-knoten"]') as HTMLElement;
   const lageTag = (knoten: HTMLElement) =>
     knoten.querySelector('[data-lfh="org-lagezustand"] [data-rolle]') as HTMLElement | null;
 
   it('zeigt den eigenen Lagezustand als Etikett am Abschnitt, nicht beurteilt ohne', () => {
-    bildAus(
+    renderBild(
       [
         abschnitt(1, { name: 'EA Nord', lagezustand: 'planmaessig' }),
         abschnitt(2, { name: 'UHS Turnhalle', ueber_abschnitt_id: 1, lagezustand: 'kritisch' }),
@@ -326,26 +326,26 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
       ],
       [einheit(10, { name: 'GW-San', abschnitt_id: 2 })],
     );
-    const uhs = lageTag(knotenVon('UHS Turnhalle'));
+    const uhs = lageTag(knotenFrom('UHS Turnhalle'));
     expect(uhs).toHaveTextContent('kritisch');
     expect(uhs).toHaveAttribute('data-rolle', 'alarm');
     expect(uhs).toHaveAttribute('data-darstellung', 'rand');
     // Nur der eigene Zustand: der kritische Unterabschnitt färbt seinen Abschnitt nicht.
-    expect(lageTag(knotenVon('EA Nord'))).toHaveTextContent('planmäßig');
-    expect(lageTag(knotenVon('EA West'))).toBeNull();
-    expect(lageTag(knotenVon('GW-San'))).toBeNull();
+    expect(lageTag(knotenFrom('EA Nord'))).toHaveTextContent('planmäßig');
+    expect(lageTag(knotenFrom('EA West'))).toBeNull();
+    expect(lageTag(knotenFrom('GW-San'))).toBeNull();
   });
 
   it('steht direkt am Namen, nicht in der Metazeile', () => {
-    bildAus([abschnitt(1, { name: 'UHS Turnhalle', lagezustand: 'kritisch' })], []);
+    renderBild([abschnitt(1, { name: 'UHS Turnhalle', lagezustand: 'kritisch' })], []);
     const link = screen.getByRole('link', { name: 'UHS Turnhalle' });
-    const lage = knotenVon('UHS Turnhalle').querySelector('[data-lfh="org-lagezustand"]');
+    const lage = knotenFrom('UHS Turnhalle').querySelector('[data-lfh="org-lagezustand"]');
     expect(link.parentElement).toBe(lage?.parentElement);
   });
 
   it('nennt „Leitung nicht besetzt“ gedämpft wie den Rufnamen, nicht in Achtungrolle', () => {
-    const { container } = bildAus([abschnitt(1, { name: 'EA West' })], []);
-    const knoten = knotenVon('EA West');
+    const { container } = renderBild([abschnitt(1, { name: 'EA West' })], []);
+    const knoten = knotenFrom('EA West');
     const wort = within(knoten).getByText('Leitung nicht besetzt');
     const rufname = within(knoten).getByText('kein Rufname');
     expect(getComputedStyle(wort).color).toBe(getComputedStyle(rufname).color);
@@ -540,10 +540,11 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     expect(z).toHaveTextContent('2 Einheiten ohne Führer');
     const chips = z.querySelectorAll('[data-lfh="status-chip"]');
     expect([...chips].map((c) => c.getAttribute('data-ton'))).toEqual(['achtung', 'achtung']);
-    // Über dem Baum, nicht im Kopf und nicht im Baum; gedruckt wird sie mit.
+    // Im Kopf über der Einsatzleitung, den die Schleuse hält (Review LLH-1742); gedruckt wird sie mit.
     const baum = screen.getByRole('region', { name: 'Organigramm' });
-    expect(baum.contains(z)).toBe(false);
-    expect(z.compareDocumentPosition(baum) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(baum.contains(z)).toBe(true);
+    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
+    expect(z.compareDocumentPosition(wurzel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(z.closest('.organigramm-no-print')).toBeNull();
   });
 
@@ -567,6 +568,30 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
       />,
     );
     expect(zeile(container)!.textContent).toBe('1 Abschnitt ohne Leitung');
+  });
+
+  it('steht still, solange die Schleuse hält, und folgt danach dem Live-Stand', async () => {
+    const besetzt = [abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })];
+    const mitFuehrer = [einheit(10, { abschnitt_id: 1, fuehrer_name: 'Bernd Führer' })];
+    const { container, rerender } = renderMitProviders(
+      <Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(mitFuehrer)} />,
+    );
+    // Erst wenn die Quellen des Kopfs geladen sind, hält die Schleuse ihn (LLH-1166).
+    await waitFor(() =>
+      expect(screen.getByRole('group', { name: 'Einsatzleitung' })).toHaveTextContent(
+        'Leitung nicht erfasst',
+      ),
+    );
+    await waitFor(() => expect(ladeMitglieder).toHaveBeenCalled());
+    await act(async () => {});
+    const region = screen.getByRole('region', { name: 'Organigramm' });
+    fireEvent.pointerEnter(region, { pointerType: 'mouse' });
+    // Live kommt eine Einheit ohne Führer: die Zeile erschiene und schöbe den Baum unter dem Zeiger.
+    const neu = [...mitFuehrer, einheit(11, { name: 'Trupp', abschnitt_id: 1 })];
+    rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(neu)} />);
+    expect(zeile(container)).toBeNull();
+    fireEvent.pointerLeave(region, { pointerType: 'mouse' });
+    expect(zeile(container)!.textContent).toBe('1 Einheit ohne Führer');
   });
 
   it('zeigt einen neuen Lagezustand sofort, auch wenn die Schleuse hält', () => {

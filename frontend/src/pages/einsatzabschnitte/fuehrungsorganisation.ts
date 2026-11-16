@@ -212,12 +212,12 @@ export interface OhneLeitung {
 export function countOhneLeitung(org: Fuehrungsorganisation): OhneLeitung {
   let abschnitte = 0;
   let einheiten = 0;
-  const besuche = (k: OrgKnoten) => {
+  const visit = (k: OrgKnoten) => {
     if (k.art === 'abschnitt' && k.leitung == null) abschnitte++;
     if (k.art === 'einheit' && k.leitung == null) einheiten++;
-    k.kinder.forEach(besuche);
+    k.kinder.forEach(visit);
   };
-  org.wurzeln.forEach(besuche);
+  org.wurzeln.forEach(visit);
   return { abschnitte, einheiten: org.einheitenFehlen ? null : einheiten };
 }
 

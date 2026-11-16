@@ -19,8 +19,8 @@ kritischen Abschnitt nicht.
   Ein nicht beurteilter Abschnitt trägt kein Etikett. Gezeigt wird nur der eigene Zustand, denn
   die Unterabschnitte stehen sichtbar darunter.
 - „Leitung nicht besetzt“ bleibt als Wort am Knoten, steht aber gedämpft statt in Achtungrolle.
-- Oberhalb des Baums fasst eine Sammelzeile in Achtungrolle die Lücken zusammen, getrennt nach
-  Art: „2 Abschnitte ohne Leitung · 7 Einheiten ohne Führer“. Ein Teil mit 0 entfällt. Sind alle
+- Über der Einsatzleitung fasst eine Sammelzeile die Lücken zusammen, je Art ein Etikett in
+  Achtungrolle: „2 Abschnitte ohne Leitung“, „7 Einheiten ohne Führer“. Ein Teil mit 0 entfällt. Sind alle
   besetzt, steht keine Zeile da. Fehlen die Einheiten, zählt die Zeile nur die Abschnitte.
 - Druck und „In Lagebericht übernehmen“ tragen beides: der Druck wie der Bildschirm, der Bericht
   mit „Lage <Zustand>“ an der Abschnittszeile und der Sammelzeile unter „Gliederung“.
@@ -41,6 +41,9 @@ Keine.
 
 - Frontend: `frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts` (Modell, Zählung,
   Markdown) und `Organigramm.tsx` (Etikett, Sammelzeile, gedämpftes Wort) samt Tests.
+- Der Lagevortrag übernimmt die „Eigene Lage“ mit demselben Text
+  (`frontend/src/lageberichte/eigeneLageUebernahme.ts`, Spec `lagevortrag-uebernahme`): Lagezustand
+  und Sammelzeile stehen damit auch dort.
 - Kein Backend, keine API, keine Migration: der Lagezustand liegt schon am Abschnitt
   (`Einsatzabschnitt.lagezustand`, LFH-608).
 - Anwenderdoku: Kapitel `docs/anwender/kapitel/einsatzabschnitte.md`, Abschnitt „Das

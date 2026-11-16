@@ -62,22 +62,30 @@ Knoten einschließlich Sammelknoten und unterstellter Einheiten. `einheiten` ist
 `org.einheitenFehlen` gilt: ein fehlender Bestand ist kein leerer (wie bei der Stärke). Dazu
 `ohneLeitungText(z): string | null` mit Einzahl/Mehrzahl („1 Abschnitt ohne Leitung“, „2 Abschnitte
 ohne Leitung“, „1 Einheit ohne Führer“, „7 Einheiten ohne Führer“), Teile mit 0 oder `null`
-entfallen, Trenner „ · “, `null` wenn nichts bleibt. Bildschirm und Bericht nutzen denselben Text.
+entfallen. `ohneLeitungTeile(z): string[]` liefert die Teile, `ohneLeitungText(z): string | null`
+fügt sie mit „ · “ zusammen (`null`, wenn nichts bleibt). Der Bildschirm setzt je Teil ein Etikett
+(D5), der Bericht schreibt den Text (D6); die Wörter sind dieselben.
 
-**D5 Sammelzeile außerhalb des Gerüsts, aus dem Live-Stand.** `Organigramm` rendert die Zeile
-zwischen dem Hinweis „Einheiten: …“ und `OrganigrammBild`, nicht im Kopf und nicht im Baum. Sie
-liest `org` (Live-Stand), nicht den gehaltenen Stand der Schleuse. Form: je Teil ein `StatusChip`
-mit `ton="achtung"` (derselbe Baustein wie „ohne Leiter“ in der Gliederung), in einem Container mit
-`data-lfh="org-ohne-leitung"` und ohne `organigramm-no-print`, damit sie gedruckt wird.
-*Alternative:* in den Kopf des Gerüsts. Verworfen: der Kopf steht während der Schleuse still
-(LLH-1166), und die Zeile ist keine Angabe der Einsatzleitung.
-*Folge:* Hält die Schleuse, kann die Zahl einen wartenden Knoten schon mitzählen. Das ist gewollt:
-die Zeile ist eine Warnung über den aktuellen Stand, und der Sammelbanner nennt den wartenden
-Knoten zugleich.
+**D5 Sammelzeile im gehaltenen Kopf.** `Organigramm` rechnet die Teile aus `org` (Live-Stand) und
+reicht sie an `OrganigrammBild`, das sie als eigenes Element `OhneLeitungZeile` vor
+`OrganigrammKopf` in den `kopf` des Gerüsts legt. Form: je Teil ein `StatusChip` mit
+`ton="achtung"` (derselbe Baustein wie „ohne Leiter“ in der Gliederung), Container
+`data-lfh="org-ohne-leitung"` ohne `organigramm-no-print`, damit sie gedruckt wird. Das Gerüst hält
+den Kopf samt Props, solange die Schleuse hält (LFH-867); im Druck ist sie offen, dort steht der
+Live-Stand. Die Einheiten zählen zu den Quellen des Kopfs (`kopfLaedt`), damit die Zahl nachkommt,
+wenn sie unter einem ruhenden Zeiger fertig laden (LLH-1166).
+*Erster Entwurf, im Review verworfen:* die Zeile außerhalb des Gerüsts, live. Erschien oder
+verschwand sie, während die Schleuse hielt (neue Einheit ohne Führer, letzte Lücke geschlossen),
+rückte der Baum samt Fokus und Zeiger um eine Zeile, gegen „Organigramm hält seine Knoten“.
+*Weitere Alternativen (16.11.2026 mit dem Menschen abgewogen):* live mit Scroll-Ausgleich
+(`useAmSchirmHalten` der Fernmeldeskizze; mehr Code, oben auf der Seite ohne Wirkung) und fest
+reservierter Platz (leerer Streifen, wenn nichts fehlt).
+*Folge:* Während jemand im Organigramm arbeitet, zählt die Zeile den gezeigten Baum, nicht den
+wartenden; der Sammelbanner nennt die wartende Änderung.
 
 **D6 Bericht.** `knotenMarkdown` setzt bei einem Abschnitt mit Zustand `Lage <label>` direkt hinter
 den Namen (`**UHS Turnhalle** · Lage kritisch · Rufname … · Leitung … · Stärke …`).
-`rendereFuehrungsorganisationMarkdown` schreibt unter `## Gliederung` vor der Liste die Zeile aus
+`renderFuehrungsorganisationMarkdown` schreibt unter `## Gliederung` vor der Liste die Zeile aus
 `ohneLeitungText` samt Leerzeile, wenn sie nicht `null` ist. Die Quellenzeile „Einheiten: … —
 Einheiten und Stärken fehlen“ bleibt, wie sie ist.
 

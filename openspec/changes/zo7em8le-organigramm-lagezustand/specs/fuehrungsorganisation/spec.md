@@ -68,8 +68,7 @@ Aktion gesperrt sein. Ein Fehler MUST an der Seite stehen.
 Ein Abschnittsknoten SHALL den gepflegten Lagezustand seines Abschnitts als Etikett neben dem Namen
 zeigen, in derselben Form wie der Gliederungsbaum: Rand in der Rolle der Stufe und das Wort
 „planmäßig“, „angespannt“ oder „kritisch“. Ein nicht beurteilter Abschnitt MUST ohne Etikett
-bleiben. Der Knoten MUST nur den eigenen Zustand zeigen, keinen aus Unterabschnitten. Eine
-Änderung des Lagezustands MUST live erscheinen, auch während die Schleuse die Struktur hält.
+bleiben. Der Knoten MUST nur den eigenen Zustand zeigen, keinen aus Unterabschnitten.
 
 #### Scenario: Kritischer Abschnitt
 
@@ -86,6 +85,12 @@ bleiben. Der Knoten MUST nur den eigenen Zustand zeigen, keinen aus Unterabschni
 - **WHEN** ein planmäßiger Abschnitt einen kritischen Unterabschnitt hat
 - **THEN** trägt der Abschnitt „planmäßig“ und der Unterabschnitt darunter „kritisch“
 
+### Requirement: Lagezustand fließt live
+
+Eine Änderung des Lagezustands SHALL am gezeigten Knoten live erscheinen, auch während die Schleuse
+die Struktur hält. Ausgenommen MUST ein umgehängter Knoten am alten Ort sein: er zeigt seinen
+gehaltenen Inhalt bis „anzeigen“ oder bis die Schleuse öffnet.
+
 #### Scenario: Zustand ändert sich, während der Zeiger über dem Organigramm liegt
 
 - **WHEN** der Mauszeiger über dem Organigramm liegt und an einem anderen Arbeitsplatz ein
@@ -94,26 +99,27 @@ bleiben. Der Knoten MUST nur den eigenen Zustand zeigen, keinen aus Unterabschni
 
 ### Requirement: Sammelzeile der fehlenden Leitung
 
-Oberhalb des Baums SHALL eine Sammelzeile in Achtungrolle die Knoten ohne Leitung zählen, getrennt
-nach Abschnitten ohne Abschnittsleiter und Einheiten ohne Führer, mit dem Wort für jede Zahl in
-Einzahl oder Mehrzahl. Ein Teil mit der Zahl 0 MUST entfallen; sind alle Knoten besetzt, MUST die
-Zeile fehlen. Gezählt wird der Live-Stand der Gliederung, Einheiten ohne Abschnitt und
-unterstellte Einheiten eingeschlossen. Die Zeile MUST auch im Druck stehen.
+Über der Einsatzleitung SHALL eine Sammelzeile die Knoten ohne Leitung zählen, je Art ein Etikett
+in Achtungrolle: Abschnitte ohne Abschnittsleiter, Einheiten ohne Führer, Wort in Einzahl oder
+Mehrzahl. Ein Teil mit 0 MUST entfallen, ohne Lücke MUST die Zeile fehlen. Gezählt werden alle
+Knoten, Einheiten ohne Abschnitt und unterstellte eingeschlossen. Die Zeile MUST mit dem Kopf
+gehalten werden und im Druck stehen.
 
 #### Scenario: Abschnitte und Einheiten ohne Leitung
 
 - **WHEN** zwei Abschnitte keinen Abschnittsleiter und sieben Einheiten keinen Führer haben
-- **THEN** steht über dem Baum „2 Abschnitte ohne Leitung · 7 Einheiten ohne Führer“
+- **THEN** stehen über der Einsatzleitung die Etiketten „2 Abschnitte ohne Leitung“ und „7
+  Einheiten ohne Führer“
 
 #### Scenario: Nur eine Einheit ohne Führer
 
 - **WHEN** alle Abschnitte einen Abschnittsleiter haben und genau eine Einheit keinen Führer
-- **THEN** steht über dem Baum „1 Einheit ohne Führer“ und kein Teil zu Abschnitten
+- **THEN** steht über der Einsatzleitung nur das Etikett „1 Einheit ohne Führer“
 
 #### Scenario: Alles besetzt
 
 - **WHEN** jeder Abschnitt einen Abschnittsleiter und jede Einheit einen Führer hat
-- **THEN** steht über dem Baum keine Sammelzeile
+- **THEN** steht keine Sammelzeile da
 
 #### Scenario: Einheiten nicht geladen
 
@@ -125,4 +131,11 @@ unterstellte Einheiten eingeschlossen. Die Zeile MUST auch im Druck stehen.
 #### Scenario: Druck mit Lücken
 
 - **WHEN** ein Abschnitt keinen Abschnittsleiter hat und die Person „Drucken / als PDF“ wählt
-- **THEN** steht die Sammelzeile auch im Ausdruck über dem Baum
+- **THEN** steht die Sammelzeile auch im Ausdruck über der Einsatzleitung
+
+#### Scenario: Neue Lücke, während jemand im Organigramm arbeitet
+
+- **WHEN** alle Knoten besetzt sind, der Mauszeiger über dem Organigramm liegt und live eine
+  Einheit ohne Führer hinzukommt
+- **THEN** erscheint die Sammelzeile noch nicht und der Baum rückt nicht; verlassen Zeiger und
+  Fokus das Organigramm, steht „1 Einheit ohne Führer“ da

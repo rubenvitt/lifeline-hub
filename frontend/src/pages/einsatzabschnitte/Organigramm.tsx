@@ -87,7 +87,12 @@ interface BildProps {
   /** Die geführten Sachgebiete aus den Mitgliedern; leer = keine Stabsstelle. */
   stab: readonly SachgebietZeile[];
   fuehrungsstelle?: WurzelFuehrungsstelle | null;
-  /** Führungsstelle oder Mitglieder laden noch: die Schleuse hält den Kopf nicht (LLH-1166). */
+  /**
+   * Die Teile der Sammelzeile „ohne Leitung“ (LLH-1742); leer = keine Zeile. Sie steht im Kopf, damit
+   * die Schleuse sie mit dem Baum hält: erschiene sie live, schöbe sie den Baum unter dem Zeiger.
+   */
+  ohneLeitung?: readonly string[];
+  /** Eine Quelle des Kopfs lädt noch: die Schleuse hält ihn nicht (LLH-1166). */
   kopfLaedt?: boolean;
   zugeklappt: ReadonlySet<string>;
   onUmschalten: (key: string) => void;
@@ -186,6 +191,7 @@ export function OrganigrammBild({
   einsatzleiter,
   stab,
   fuehrungsstelle = null,
+  ohneLeitung = [],
   kopfLaedt = false,
   zugeklappt,
   onUmschalten,
@@ -199,11 +205,14 @@ export function OrganigrammBild({
       bezeichnung="Organigramm"
       lfh="organigramm"
       kopf={
-        <OrganigrammKopf
-          einsatzleiter={einsatzleiter}
-          stab={stab}
-          fuehrungsstelle={fuehrungsstelle}
-        />
+        <>
+          <OhneLeitungZeile teile={ohneLeitung} />
+          <OrganigrammKopf
+            einsatzleiter={einsatzleiter}
+            stab={stab}
+            fuehrungsstelle={fuehrungsstelle}
+          />
+        </>
       }
       kopfLaedt={kopfLaedt}
       wurzeln={org.wurzeln}
@@ -219,6 +228,27 @@ export function OrganigrammBild({
         )
       }
     />
+  );
+}
+
+/** Die Sammelzeile der fehlenden Leitung: je Teil ein Chip, wie „ohne Leiter“ in der Gliederung. */
+function OhneLeitungZeile({ teile }: { teile: readonly string[] }) {
+  const { token } = useRollen();
+  if (teile.length === 0) return null;
+  return (
+    <div
+      data-lfh="org-ohne-leitung"
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: token.marginXS,
+        marginBlockEnd: token.marginSM,
+      }}
+    >
+      {teile.map((teil) => (
+        <StatusChip key={teil} ton="achtung" wort={teil} />
+      ))}
+    </div>
   );
 }
 
@@ -360,7 +390,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   );
   const [zugeklappt, setZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const klappbar = useMemo(() => klappbareSchluessel(org.wurzeln), [org]);
-  // Aus dem Live-Stand, nicht aus dem gehaltenen: die Zeile warnt über die Gliederung, wie sie ist.
+  // Aus dem Live-Stand gerechnet; am Bildschirm hält die Schleuse sie mit dem Kopf (Review LLH-1742).
   const ohneLeitung = useMemo(() => ohneLeitungTeile(countOhneLeitung(org)), [org]);
 
   // Die Führungsstelle liest jeder mit dem Einsatz, ohne Modul (LFH-849); sie trägt den
@@ -380,8 +410,10 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   // entsteht die Stabsstelle. Solange nichts da ist oder der Abruf scheitert, steht keine da.
   const mitgliederQuery = useQuery(mitgliederAbfrage(einsatz.id));
   const stab = useMemo(() => sachgebietZeilen(mitgliederQuery.data), [mitgliederQuery.data]);
-  // Die Quellen des Kopfs: Führungsstelle und Mitglieder (LLH-1166).
-  const kopfLaedt = fuehrungsstelleQuery.isPending || mitgliederQuery.isPending;
+  // Die Quellen des Kopfs: Führungsstelle, Mitglieder und, für die Sammelzeile, die Einheiten
+  // (LLH-1166, LLH-1742).
+  const kopfLaedt =
+    fuehrungsstelleQuery.isPending || mitgliederQuery.isPending || einheiten.zustand === 'laden';
 
   // Die Übernahme legt einen Lagebericht an, also braucht es Schreibrecht UND das freigegebene
   // Modul Lageberichte.
@@ -488,28 +520,13 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
           {`Einheiten: ${ZUSTAND_GRUND[einheiten.zustand]}`}
         </div>
       )}
-      {ohneLeitung.length > 0 && (
-        // Gedruckt wie am Bildschirm; je Teil ein Chip, wie „ohne Leiter“ in der Gliederung.
-        <div
-          data-lfh="org-ohne-leitung"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: token.marginXS,
-            marginBlockEnd: token.marginSM,
-          }}
-        >
-          {ohneLeitung.map((teil) => (
-            <StatusChip key={teil} ton="achtung" wort={teil} />
-          ))}
-        </div>
-      )}
       <OrganigrammBild
         einsatzId={einsatz.id}
         org={org}
         einsatzleiter={einsatzleiter}
         stab={stab}
         fuehrungsstelle={fuehrungsstelle}
+        ohneLeitung={ohneLeitung}
         kopfLaedt={kopfLaedt}
         zugeklappt={zugeklappt}
         onUmschalten={umschalten}
