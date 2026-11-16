@@ -9,7 +9,7 @@
  * `VerteilungsPaneel`, `StromPaneel`. Hier steht nur, was das Lagebild hineinlegt — Wortlaut,
  * Farben aus dem Vertrag, Fuß und Meta.
  */
-import type { EtbEintragAnzeige, Sichtungskategorie } from '../../api/types';
+import type { EtbEintragAnzeige } from '../../api/types';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import { Tooltip } from 'antd';
 import {
@@ -41,6 +41,8 @@ import {
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
 import BerichtigtMarke from '../../etb/BerichtigtMarke';
 import { modulName } from '../../einsatz/modulRegistry';
+import { SK_WORT } from '../../personen/personMeta';
+import { useOhneVerbindung } from '../../offline/verbindung';
 import { MIT_ERLAEUTERUNG } from '../gefahren/erlaeuterungen';
 import { ErlaeuterungsZeichen } from '../gefahren/ErlaeuterungsMarke';
 
@@ -119,16 +121,6 @@ export function GefahrenmatrixPaneel({
   );
 }
 
-/** Beschreibung je Sichtungskategorie (BBK). Kürzel und Farbe kommen aus dem Vertrag. */
-const SICHTUNG_BESCHREIBUNG: Record<Sichtungskategorie, string> = {
-  sk1: 'akute vitale Bedrohung',
-  sk2: 'schwer verletzt / erkrankt',
-  sk3: 'leicht verletzt / erkrankt',
-  sk4: 'ohne Überlebenschance',
-  tot: 'verstorben',
-  unverletzt: 'nicht verletzt',
-};
-
 export function SichtungsPaneel({
   zustand,
   zeilen,
@@ -199,7 +191,9 @@ export function SichtungsPaneel({
           // Schwarz auf Dunkel wären als Schrift unlesbar.
           wort: darstellung.label,
           farbfeld: farbe ? { farbe, umrandung: token.colorText } : undefined,
-          beschreibung: SICHTUNG_BESCHREIBUNG[z.kategorie],
+          // Bedeutungswort aus EINER Quelle mit Betroffenenliste und Sichtungswahl (LLH-1752):
+          // eine eigene Liste nannte SK IV „ohne Überlebenschance“, die Liste „abwartend“.
+          beschreibung: SK_WORT[z.kategorie],
           wert: z.wert,
           anteil: z.anteil,
           balkenFarbe: farbe ?? rollen.gedaempft,
@@ -228,7 +222,12 @@ const VERBINDUNG: Record<LiveVerbindungsStatus, string> = {
  * Titel, „Verbindung wird aufgebaut“ nicht, und der Kopf schrumpfte beim Verbinden von 53 auf
  * 38 px (LFH-629). Mit fester Breite bricht er in jedem Zustand gleich.
  */
-const VERBINDUNG_BREITE = `${Math.max(...Object.values(VERBINDUNG).map((w) => w.length))}ch`;
+/** Wort ohne Netz oder Server, vor jedem Leitungszustand (wie `offline` in der Kopfleiste). */
+const OHNE_VERBINDUNG = 'offline';
+
+const VERBINDUNG_BREITE = `${Math.max(
+  ...[...Object.values(VERBINDUNG), OHNE_VERBINDUNG].map((w) => w.length),
+)}ch`;
 
 /**
  * Das Paneel zeigt ETB-Einträge aller Typen, keine Meldungen; daher nicht „Meldungsstrom“
@@ -264,9 +263,13 @@ export function MeldungsstromPaneel({
   onErfassen: () => void;
 }) {
   const { rollen } = useRollen();
+  // Ohne Netz oder Server ist der Strom tot, auch wenn die EventSource das noch nicht gemeldet hat:
+  // eine offene Leitung erfährt den Netzverlust erst spät, der Browser früher (LLH-1752).
+  const ohneVerbindung = useOhneVerbindung();
   // „live" nur bei offener Leitung — bei totem Stream liefert der Cache weiter alte Daten.
-  const metaFarbe =
-    liveStatus === 'open'
+  const metaFarbe = ohneVerbindung
+    ? rollen.alarmText
+    : liveStatus === 'open'
       ? rollen.bedien
       : liveStatus === 'lost'
         ? rollen.alarmText
@@ -285,7 +288,7 @@ export function MeldungsstromPaneel({
             textAlign: 'end',
           }}
         >
-          {VERBINDUNG[liveStatus]}
+          {ohneVerbindung ? OHNE_VERBINDUNG : VERBINDUNG[liveStatus]}
         </span>
       }
       sprung={{ label: 'ETB', onKlick: onEtb }}
