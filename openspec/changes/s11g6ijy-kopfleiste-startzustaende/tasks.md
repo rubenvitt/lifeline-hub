@@ -2,9 +2,9 @@
 
 ## 1. Android: verweigerte Benachrichtigung sofort (D1)
 
-- [ ] 1.1 Test in `alarm/desktopAlarm.test.ts`: Android, `Notification.permission = 'denied'`, ohne steuernden Worker und mit unbeantworteter Nachfrage → `desktopPermission()` ist `denied` (rot vor der Änderung)
-- [ ] 1.2 `desktopPermission()` prüft `denied` vor dem Zustellweg; bestehende Tests zu `granted`/`unsupported` bleiben grün (`vitest run src/alarm`)
-- [ ] 1.3 Test in den Tests der Alarmzentrale: Android mit verweigerter Benachrichtigung zeigt „Benachrichtigung blockiert“ im ersten Render, vor `DESKTOP_ZUSTAND_EVENT`; Kommentar in `AlarmZentrale.tsx` am Ereignis nachziehen
+- [x] 1.1 Test in `alarm/desktopAlarm.test.ts`: Android, `Notification.permission = 'denied'`, ohne steuernden Worker und mit unbeantworteter Nachfrage → `desktopPermission()` ist `denied` (rot vor der Änderung)
+- [x] 1.2 `desktopPermission()` prüft `denied` vor dem Zustellweg; bestehende Tests zu `granted`/`unsupported` bleiben grün (`vitest run src/alarm`)
+- [x] 1.3 Test in den Tests der Alarmzentrale: Android mit verweigerter Benachrichtigung zeigt „Benachrichtigung blockiert“ im ersten Render, vor `DESKTOP_ZUSTAND_EVENT`; Kommentar in `AlarmZentrale.tsx` am Ereignis nachziehen
 
 ## 2. Warteschlange: Merker des Zählers (D2, D3)
 
