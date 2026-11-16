@@ -1216,7 +1216,10 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
-    const link = page.getByRole('link', { name: 'Kräfteübersicht', exact: true });
+    // In der Zeile gesucht: die Einsatz-Navigation trägt seit LLH-1732 einen gleichnamigen Link.
+    const link = page
+      .locator('[data-lfh="verdichtungszeile"]')
+      .getByRole('link', { name: 'Kräfteübersicht', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);

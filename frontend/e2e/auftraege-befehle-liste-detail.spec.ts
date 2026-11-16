@@ -10,6 +10,15 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 
 test.setTimeout(90_000);
 
+/**
+ * Die Brotkrume „Aufträge/Befehle“ über der Befehlsseite. Seit die Modulzeilen echte Links sind
+ * (LLH-1732), trägt die Einsatz-Navigation einen gleichnamigen Link auf `/auftraege` ohne Reiter;
+ * die Brotkrume steht im `main`, die Navigation nicht.
+ */
+function brotkrume(page: Page) {
+  return page.getByRole('main').getByRole('link', { name: 'Aufträge/Befehle', exact: true });
+}
+
 async function einsatz(page: Page): Promise<string> {
   const r = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `E2E Liste und Detail ${Date.now()}` },
@@ -115,7 +124,7 @@ for (const kontext of [
     await page.getByRole('textbox', { name: /Lage/ }).first().fill('Brand im Lager Nord.');
     await page.getByRole('button', { name: 'Entwurf speichern' }).click();
     await expect(page.getByText(/zuletzt gespeichert/)).toBeVisible();
-    await page.getByRole('link', { name: 'Aufträge/Befehle', exact: true }).click();
+    await brotkrume(page).click();
 
     // Zurück: Reiter Befehle, der Befehl gewählt und markiert (D6).
     const ziel = page.getByRole('button', { name: 'Befehl v1: Befehl an 2. Zug' });
