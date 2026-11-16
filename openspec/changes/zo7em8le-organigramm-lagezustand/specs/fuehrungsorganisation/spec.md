@@ -99,27 +99,21 @@ gehaltenen Inhalt bis „anzeigen“ oder bis die Schleuse öffnet.
 
 ### Requirement: Sammelzeile der fehlenden Leitung
 
-Über der Einsatzleitung SHALL eine Sammelzeile die Knoten ohne Leitung zählen, je Art ein Etikett
-in Achtungrolle: Abschnitte ohne Abschnittsleiter, Einheiten ohne Führer, Wort in Einzahl oder
-Mehrzahl. Ein Teil mit 0 MUST entfallen, ohne Lücke MUST die Zeile fehlen. Gezählt werden alle
-Knoten, Einheiten ohne Abschnitt und unterstellte eingeschlossen. Die Zeile MUST mit dem Kopf
-gehalten werden und im Druck stehen.
+Über dem Organigramm SHALL eine Sammelzeile die Knoten ohne Leitung zählen, je Art ein Etikett in
+Achtungrolle: Abschnitte ohne Abschnittsleiter, Einheiten ohne Führer, Wort in Einzahl oder
+Mehrzahl. Ein Teil mit 0 MUST entfallen. Gezählt werden alle Knoten im Live-Stand, Einheiten ohne
+Abschnitt und unterstellte eingeschlossen. Die Zeile MUST auch im Druck stehen.
 
 #### Scenario: Abschnitte und Einheiten ohne Leitung
 
 - **WHEN** zwei Abschnitte keinen Abschnittsleiter und sieben Einheiten keinen Führer haben
-- **THEN** stehen über der Einsatzleitung die Etiketten „2 Abschnitte ohne Leitung“ und „7
-  Einheiten ohne Führer“
+- **THEN** stehen über dem Organigramm die Etiketten „2 Abschnitte ohne Leitung“ und „7 Einheiten
+  ohne Führer“
 
 #### Scenario: Nur eine Einheit ohne Führer
 
 - **WHEN** alle Abschnitte einen Abschnittsleiter haben und genau eine Einheit keinen Führer
-- **THEN** steht über der Einsatzleitung nur das Etikett „1 Einheit ohne Führer“
-
-#### Scenario: Alles besetzt
-
-- **WHEN** jeder Abschnitt einen Abschnittsleiter und jede Einheit einen Führer hat
-- **THEN** steht keine Sammelzeile da
+- **THEN** steht über dem Organigramm nur das Etikett „1 Einheit ohne Führer“
 
 #### Scenario: Einheiten nicht geladen
 
@@ -131,11 +125,30 @@ gehalten werden und im Druck stehen.
 #### Scenario: Druck mit Lücken
 
 - **WHEN** ein Abschnitt keinen Abschnittsleiter hat und die Person „Drucken / als PDF“ wählt
-- **THEN** steht die Sammelzeile auch im Ausdruck über der Einsatzleitung
+- **THEN** steht die Sammelzeile auch im Ausdruck über dem Organigramm
 
-#### Scenario: Neue Lücke, während jemand im Organigramm arbeitet
+### Requirement: Sammelzeile ohne Lücke und ohne Sprung
 
-- **WHEN** alle Knoten besetzt sind, der Mauszeiger über dem Organigramm liegt und live eine
-  Einheit ohne Führer hinzukommt
-- **THEN** erscheint die Sammelzeile noch nicht und der Baum rückt nicht; verlassen Zeiger und
-  Fokus das Organigramm, steht „1 Einheit ohne Führer“ da
+Die Sammelzeile SHALL immer gleich hoch dastehen, auch während die Schleuse die Struktur hält.
+Fehlt keine Leitung, MUST sie leise „Leitung überall besetzt“ nennen, bei nicht geladenen Einheiten
+„Alle Abschnitte mit Leitung“, ohne Etikett in Achtungrolle. Ihr Wechsel MUST den Baum nicht
+verschieben.
+
+#### Scenario: Alles besetzt
+
+- **WHEN** jeder Abschnitt einen Abschnittsleiter und jede Einheit einen Führer hat
+- **THEN** steht über dem Organigramm leise „Leitung überall besetzt“ und kein Etikett in
+  Achtungrolle
+
+#### Scenario: Leitung fällt weg, während jemand im Organigramm arbeitet
+
+- **WHEN** alle Knoten besetzt sind, der Mauszeiger über dem Organigramm liegt und live an einer
+  gezeigten Einheit der Führer gelöscht wird
+- **THEN** zeigen der Knoten „Leitung nicht besetzt“ und die Sammelzeile „1 Einheit ohne Führer“
+  sofort, und die erste Ebene des Organigramms bleibt auf derselben Höhe
+
+#### Scenario: Neue Lücke wartet hinter dem Sammelbanner
+
+- **WHEN** der Mauszeiger über dem Organigramm liegt und live eine Einheit ohne Führer hinzukommt
+- **THEN** zählt die Sammelzeile sie sofort, während der Knoten hinter dem Sammelbanner wartet, und
+  weder „anzeigen“ noch das Verlassen verschiebt die erste Ebene

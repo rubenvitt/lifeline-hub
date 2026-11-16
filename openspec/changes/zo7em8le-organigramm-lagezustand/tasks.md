@@ -21,9 +21,9 @@
   am Knoten der UHS Turnhalle, kein Etikett an einem nicht beurteilten Abschnitt und an Einheiten
 - [x] 3.2 „Leitung nicht besetzt“ gedämpft statt Achtungrolle (D3); Test: das Wort steht da und
   trägt nicht die Achtungfarbe
-- [x] 3.3 Sammelzeile über dem Baum aus dem Live-Stand, druckbar (D5); Tests: Text bei Lücken,
-  keine Zeile bei voller Besetzung, nur Abschnitte bei nicht geladenen Einheiten, Container ohne
-  `organigramm-no-print`
+- [x] 3.3 Sammelzeile fest über dem Organigramm, live, immer gleich hoch, druckbar (D5); Tests:
+  Etiketten bei Lücken, leiser Text bei voller Besetzung, nur Abschnitte bei nicht geladenen
+  Einheiten, Zahl und Höhe bei gehaltener Schleuse, Container ohne `organigramm-no-print`
 - [x] 3.4 Live bei gehaltener Struktur: Test, dass eine Zustandsänderung bei Zeiger über dem
   Organigramm ohne Sammelbanner am Knoten erscheint (Szenario „Zustand ändert sich, während der
   Zeiger über dem Organigramm liegt“)

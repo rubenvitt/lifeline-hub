@@ -66,22 +66,24 @@ entfallen. `ohneLeitungTeile(z): string[]` liefert die Teile, `ohneLeitungText(z
 fügt sie mit „ · “ zusammen (`null`, wenn nichts bleibt). Der Bildschirm setzt je Teil ein Etikett
 (D5), der Bericht schreibt den Text (D6); die Wörter sind dieselben.
 
-**D5 Sammelzeile im gehaltenen Kopf.** `Organigramm` rechnet die Teile aus `org` (Live-Stand) und
-reicht sie an `OrganigrammBild`, das sie als eigenes Element `OhneLeitungZeile` vor
-`OrganigrammKopf` in den `kopf` des Gerüsts legt. Form: je Teil ein `StatusChip` mit
-`ton="achtung"` (derselbe Baustein wie „ohne Leiter“ in der Gliederung), Container
-`data-lfh="org-ohne-leitung"` ohne `organigramm-no-print`, damit sie gedruckt wird. Das Gerüst hält
-den Kopf samt Props, solange die Schleuse hält (LFH-867); im Druck ist sie offen, dort steht der
-Live-Stand. Die Einheiten zählen zu den Quellen des Kopfs (`kopfLaedt`), damit die Zahl nachkommt,
-wenn sie unter einem ruhenden Zeiger fertig laden (LLH-1166).
-*Erster Entwurf, im Review verworfen:* die Zeile außerhalb des Gerüsts, live. Erschien oder
-verschwand sie, während die Schleuse hielt (neue Einheit ohne Führer, letzte Lücke geschlossen),
-rückte der Baum samt Fokus und Zeiger um eine Zeile, gegen „Organigramm hält seine Knoten“.
-*Weitere Alternativen (16.11.2026 mit dem Menschen abgewogen):* live mit Scroll-Ausgleich
-(`useAmSchirmHalten` der Fernmeldeskizze; mehr Code, oben auf der Seite ohne Wirkung) und fest
-reservierter Platz (leerer Streifen, wenn nichts fehlt).
-*Folge:* Während jemand im Organigramm arbeitet, zählt die Zeile den gezeigten Baum, nicht den
-wartenden; der Sammelbanner nennt die wartende Änderung.
+**D5 Sammelzeile fest über dem Organigramm.** `Organigramm` rechnet die Teile aus `org`
+(Live-Stand) und rendert `OhneLeitungZeile` zwischen dem Hinweis „Einheiten: …“ und
+`OrganigrammBild`, außerhalb der Schleuse. Die Zeile steht immer da und ist immer so hoch wie ein
+`StatusChip` (22 px, `nowrap`, Überlauf abgeschnitten). Mit Lücken trägt sie je Teil einen
+`StatusChip` mit `ton="achtung"` (derselbe Baustein wie „ohne Leiter“ in der Gliederung), ohne
+Lücke leise „Leitung überall besetzt“, bei fehlenden Einheiten „Alle Abschnitte mit Leitung“; ohne
+jeden Knoten bleibt sie leer. Container `data-lfh="org-ohne-leitung"` ohne `organigramm-no-print`,
+damit sie gedruckt wird. So folgt die Zahl immer dem Live-Stand, und ihr Wechsel schiebt den Baum
+nie, weder beim Eintreffen noch bei „anzeigen“.
+*Verworfen im ersten Review:* die Zeile live außerhalb der Schleuse, nur bei Lücken sichtbar.
+Erschien oder verschwand sie, während die Schleuse hielt, rückte der Baum samt Fokus und Zeiger.
+*Verworfen im zweiten Review:* die Zeile im gehaltenen Kopf des Gerüsts. Eine live geänderte
+Leitung an einem gezeigten Knoten floss in den Knoten, aber nicht in die Zahl, ohne Banner; und
+„anzeigen“ schob den Baum, wenn mit ihm die erste Lücke kam oder die letzte ging.
+*Weitere Alternative (16.11.2026 mit dem Menschen abgewogen):* live mit Scroll-Ausgleich
+(`useAmSchirmHalten` der Fernmeldeskizze; mehr Code, oben auf der Seite ohne Wirkung).
+*Folge:* Während jemand im Organigramm arbeitet, zählt die Zeile auch Knoten, die noch hinter dem
+Sammelbanner warten; der Banner nennt sie zugleich.
 
 **D6 Bericht.** `knotenMarkdown` setzt bei einem Abschnitt mit Zustand `Lage <label>` direkt hinter
 den Namen (`**UHS Turnhalle** · Lage kritisch · Rufname … · Leitung … · Stärke …`).
@@ -97,5 +99,8 @@ Einheiten und Stärken fehlen“ bleibt, wie sie ist.
   eine eigene Spec-Änderung.
 - [StatusTag und StatusChip im Druck] → Die Prüfung, dass beide dunkel auf hell drucken, steht als
   eigene Aufgabe in tasks.md (Druckemulation im Bildlauf).
+- [Feste Höhe ohne Umbruch: sehr große Zahlen auf sehr schmalem Schirm würden abgeschnitten] → Bei
+  390 px passen „12 Abschnitte ohne Leitung“ und „15 Einheiten ohne Führer“ nebeneinander; ein
+  Umbruch hätte die Höhe und damit den Baum bewegt.
 - [Die Fernmeldeskizze teilt das Gerüst] → Es ändern sich nur `KnotenInhalt` und die Seite; ein
   Test der Skizze läuft im Gate mit.

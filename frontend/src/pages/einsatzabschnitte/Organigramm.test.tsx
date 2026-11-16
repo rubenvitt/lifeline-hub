@@ -540,15 +540,15 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     expect(z).toHaveTextContent('2 Einheiten ohne Führer');
     const chips = z.querySelectorAll('[data-lfh="status-chip"]');
     expect([...chips].map((c) => c.getAttribute('data-ton'))).toEqual(['achtung', 'achtung']);
-    // Im Kopf über der Einsatzleitung, den die Schleuse hält (Review LLH-1742); gedruckt wird sie mit.
+    // Über dem Organigramm, außerhalb der Schleuse, mit fester Höhe; gedruckt wird sie mit.
     const baum = screen.getByRole('region', { name: 'Organigramm' });
-    expect(baum.contains(z)).toBe(true);
-    const wurzel = screen.getByRole('group', { name: 'Einsatzleitung' });
-    expect(z.compareDocumentPosition(wurzel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(baum.contains(z)).toBe(false);
+    expect(z.compareDocumentPosition(baum) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(z.style.height).not.toBe('');
     expect(z.closest('.organigramm-no-print')).toBeNull();
   });
 
-  it('fehlt, wenn alles besetzt ist', () => {
+  it('nennt ohne Lücke leise „Leitung überall besetzt“, in derselben Höhe', () => {
     const { container } = renderMitProviders(
       <Organigramm
         einsatz={EINSATZ}
@@ -556,11 +556,13 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
         einheiten={daten([einheit(10, { abschnitt_id: 1, fuehrer_name: 'Bernd Führer' })])}
       />,
     );
-    expect(zeile(container)).toBeNull();
+    const z = zeile(container)!;
+    expect(z.textContent).toBe('Leitung überall besetzt');
+    expect(z.querySelector('[data-lfh="status-chip"]')).toBeNull();
   });
 
   it('zählt bei fehlenden Einheiten nur die Abschnitte, ohne „0“', () => {
-    const { container } = renderMitProviders(
+    const { container, rerender } = renderMitProviders(
       <Organigramm
         einsatz={EINSATZ}
         abschnitte={ABSCHNITTE}
@@ -568,30 +570,38 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
       />,
     );
     expect(zeile(container)!.textContent).toBe('1 Abschnitt ohne Leitung');
+    // Alle Abschnitte besetzt, Einheiten unbekannt: kein „überall“.
+    rerender(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })]}
+        einheiten={{ zustand: 'fehler', daten: [] }}
+      />,
+    );
+    expect(zeile(container)!.textContent).toBe('Alle Abschnitte mit Leitung');
   });
 
-  it('steht still, solange die Schleuse hält, und folgt danach dem Live-Stand', async () => {
+  it('folgt live, auch während die Schleuse hält, und behält ihre Höhe', () => {
     const besetzt = [abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })];
     const mitFuehrer = [einheit(10, { abschnitt_id: 1, fuehrer_name: 'Bernd Führer' })];
     const { container, rerender } = renderMitProviders(
       <Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(mitFuehrer)} />,
     );
-    // Erst wenn die Quellen des Kopfs geladen sind, hält die Schleuse ihn (LLH-1166).
-    await waitFor(() =>
-      expect(screen.getByRole('group', { name: 'Einsatzleitung' })).toHaveTextContent(
-        'Leitung nicht erfasst',
-      ),
-    );
-    await waitFor(() => expect(ladeMitglieder).toHaveBeenCalled());
-    await act(async () => {});
-    const region = screen.getByRole('region', { name: 'Organigramm' });
-    fireEvent.pointerEnter(region, { pointerType: 'mouse' });
-    // Live kommt eine Einheit ohne Führer: die Zeile erschiene und schöbe den Baum unter dem Zeiger.
-    const neu = [...mitFuehrer, einheit(11, { name: 'Trupp', abschnitt_id: 1 })];
-    rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(neu)} />);
-    expect(zeile(container)).toBeNull();
-    fireEvent.pointerLeave(region, { pointerType: 'mouse' });
+    const hoehe = zeile(container)!.style.height;
+    fireEvent.pointerEnter(screen.getByRole('region', { name: 'Organigramm' }), {
+      pointerType: 'mouse',
+    });
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
+    // Am gezeigten Knoten fällt der Führer weg: Knoten und Zeile zeigen es sofort.
+    const ohneFuehrer = [einheit(10, { abschnitt_id: 1 })];
+    rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(ohneFuehrer)} />);
     expect(zeile(container)!.textContent).toBe('1 Einheit ohne Führer');
+    expect(zeile(container)!.style.height).toBe(hoehe);
+    // Eine neue Einheit ohne Führer wartet im Baum, gezählt wird sie schon.
+    const neu = [...ohneFuehrer, einheit(11, { name: 'Trupp', abschnitt_id: 1 })];
+    rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(neu)} />);
+    expect(zeile(container)!.textContent).toBe('2 Einheiten ohne Führer');
+    expect(zeile(container)!.style.height).toBe(hoehe);
   });
 
   it('zeigt einen neuen Lagezustand sofort, auch wenn die Schleuse hält', () => {

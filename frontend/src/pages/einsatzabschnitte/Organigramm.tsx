@@ -74,7 +74,7 @@ import './organigrammPrint.css';
  * - **Lagezustand am Knoten, Lücken einmal oben** (LLH-1742, Herleitung
  *   `openspec/changes/zo7em8le-organigramm-lagezustand/design.md`): der Abschnitt trägt seinen
  *   Lagezustand in der Form der Gliederung; „Leitung nicht besetzt“ steht am Knoten leise, laut ist
- *   nur die Sammelzeile über dem Baum.
+ *   nur die Sammelzeile über dem Organigramm.
  */
 
 const ZEICHEN_PX = 22;
@@ -87,12 +87,7 @@ interface BildProps {
   /** Die geführten Sachgebiete aus den Mitgliedern; leer = keine Stabsstelle. */
   stab: readonly SachgebietZeile[];
   fuehrungsstelle?: WurzelFuehrungsstelle | null;
-  /**
-   * Die Teile der Sammelzeile „ohne Leitung“ (LLH-1742); leer = keine Zeile. Sie steht im Kopf, damit
-   * die Schleuse sie mit dem Baum hält: erschiene sie live, schöbe sie den Baum unter dem Zeiger.
-   */
-  ohneLeitung?: readonly string[];
-  /** Eine Quelle des Kopfs lädt noch: die Schleuse hält ihn nicht (LLH-1166). */
+  /** Führungsstelle oder Mitglieder laden noch: die Schleuse hält den Kopf nicht (LLH-1166). */
   kopfLaedt?: boolean;
   zugeklappt: ReadonlySet<string>;
   onUmschalten: (key: string) => void;
@@ -191,7 +186,6 @@ export function OrganigrammBild({
   einsatzleiter,
   stab,
   fuehrungsstelle = null,
-  ohneLeitung = [],
   kopfLaedt = false,
   zugeklappt,
   onUmschalten,
@@ -205,14 +199,11 @@ export function OrganigrammBild({
       bezeichnung="Organigramm"
       lfh="organigramm"
       kopf={
-        <>
-          <OhneLeitungZeile teile={ohneLeitung} />
-          <OrganigrammKopf
-            einsatzleiter={einsatzleiter}
-            stab={stab}
-            fuehrungsstelle={fuehrungsstelle}
-          />
-        </>
+        <OrganigrammKopf
+          einsatzleiter={einsatzleiter}
+          stab={stab}
+          fuehrungsstelle={fuehrungsstelle}
+        />
       }
       kopfLaedt={kopfLaedt}
       wurzeln={org.wurzeln}
@@ -231,23 +222,35 @@ export function OrganigrammBild({
   );
 }
 
-/** Die Sammelzeile der fehlenden Leitung: je Teil ein Chip, wie „ohne Leiter“ in der Gliederung. */
-function OhneLeitungZeile({ teile }: { teile: readonly string[] }) {
-  const { token } = useRollen();
-  if (teile.length === 0) return null;
+/** Höhe der Sammelzeile = die eines `StatusChip`: mit und ohne Lücke gleich hoch. */
+const OHNE_LEITUNG_PX = 22;
+
+/**
+ * Die Sammelzeile der fehlenden Leitung (LLH-1742): je Teil ein Chip, wie „ohne Leiter“ in der
+ * Gliederung; ohne Lücke leise der `ruhe`-Text. Sie steht immer da und immer gleich hoch, außerhalb
+ * der Schleuse: so folgt sie live, und ihr Wechsel schiebt den Baum unter dem Zeiger nie (Review
+ * LLH-1742, Spec „Organigramm hält seine Knoten“).
+ */
+function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: string | null }) {
+  const { token, rollen } = useRollen();
   return (
     <div
       data-lfh="org-ohne-leitung"
       style={{
         display: 'flex',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
+        alignItems: 'center',
         gap: token.marginXS,
+        height: OHNE_LEITUNG_PX,
+        overflow: 'hidden',
         marginBlockEnd: token.marginSM,
       }}
     >
-      {teile.map((teil) => (
-        <StatusChip key={teil} ton="achtung" wort={teil} />
-      ))}
+      {teile.length > 0
+        ? teile.map((teil) => <StatusChip key={teil} ton="achtung" wort={teil} />)
+        : ruhe && (
+            <span style={{ fontSize: token.fontSizeSM, color: rollen.gedaempft }}>{ruhe}</span>
+          )}
     </div>
   );
 }
@@ -393,8 +396,19 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   );
   const [zugeklappt, setZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const klappbar = useMemo(() => klappbareSchluessel(org.wurzeln), [org]);
-  // Aus dem Live-Stand gerechnet; am Bildschirm hält die Schleuse sie mit dem Kopf (Review LLH-1742).
-  const ohneLeitung = useMemo(() => ohneLeitungTeile(countOhneLeitung(org)), [org]);
+  // Aus dem Live-Stand; die Zeile steht außerhalb der Schleuse und hält ihre Höhe (Review LLH-1742).
+  const ohneLeitung = useMemo(() => {
+    const zahl = countOhneLeitung(org);
+    const teile = ohneLeitungTeile(zahl);
+    // Ohne Knoten gibt es nichts zu besetzen; ohne Einheiten ist „überall“ nicht belegt.
+    const ruhe =
+      teile.length > 0 || org.wurzeln.length === 0
+        ? null
+        : zahl.einheiten == null
+          ? 'Alle Abschnitte mit Leitung'
+          : 'Leitung überall besetzt';
+    return { teile, ruhe };
+  }, [org]);
 
   // Die Führungsstelle liest jeder mit dem Einsatz, ohne Modul (LFH-849); sie trägt den
   // Einsatzleiter (LFH-1199) und Bezeichnung und Rufname der Wurzel (LFH-1181). Gescheitert
@@ -413,10 +427,8 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   // entsteht die Stabsstelle. Solange nichts da ist oder der Abruf scheitert, steht keine da.
   const mitgliederQuery = useQuery(mitgliederAbfrage(einsatz.id));
   const stab = useMemo(() => sachgebietZeilen(mitgliederQuery.data), [mitgliederQuery.data]);
-  // Die Quellen des Kopfs: Führungsstelle, Mitglieder und, für die Sammelzeile, die Einheiten
-  // (LLH-1166, LLH-1742).
-  const kopfLaedt =
-    fuehrungsstelleQuery.isPending || mitgliederQuery.isPending || einheiten.zustand === 'laden';
+  // Die Quellen des Kopfs: Führungsstelle und Mitglieder (LLH-1166).
+  const kopfLaedt = fuehrungsstelleQuery.isPending || mitgliederQuery.isPending;
 
   // Die Übernahme legt einen Lagebericht an, also braucht es Schreibrecht UND das freigegebene
   // Modul Lageberichte.
@@ -523,13 +535,14 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
           {`Einheiten: ${ZUSTAND_GRUND[einheiten.zustand]}`}
         </div>
       )}
+      {/* Gedruckt wie am Bildschirm. */}
+      <OhneLeitungZeile teile={ohneLeitung.teile} ruhe={ohneLeitung.ruhe} />
       <OrganigrammBild
         einsatzId={einsatz.id}
         org={org}
         einsatzleiter={einsatzleiter}
         stab={stab}
         fuehrungsstelle={fuehrungsstelle}
-        ohneLeitung={ohneLeitung}
         kopfLaedt={kopfLaedt}
         zugeklappt={zugeklappt}
         onUmschalten={umschalten}
