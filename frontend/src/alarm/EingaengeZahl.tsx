@@ -8,6 +8,10 @@ import { eingaengeZahlText } from './eingaenge';
  * Meldung lässt den Kopf weder springen noch umbrechen (LLH-1158). Farben aus `rahmenFarben`
  * (Rahmen dauerdunkel), Text und Grund invertiert, also ≥ 7 : 1 (LFH-434). Rein darstellend; den
  * Namen trägt der Knopf.
+ *
+ * Die Plakette sitzt MITTIG ÜBER dem Zeichen (LLH-1726, Spec `kopfleiste`): angesetzt bei 55 %
+ * lief sie nach rechts in ein Wort daneben und verdeckte am Handy das „T“ von „Ton …“. Ihre
+ * Unterkante liegt knapp über der Oberkante des Zeichens, so trifft auch eine breite „99+“ kein Wort.
  */
 export default function EingaengeZahl({ zahl, children }: { zahl: number; children: ReactNode }) {
   return (
@@ -19,8 +23,9 @@ export default function EingaengeZahl({ zahl, children }: { zahl: number; childr
           data-lfh="eingaenge-zahl"
           style={{
             position: 'absolute',
-            insetBlockStart: -7,
-            insetInlineStart: '55%',
+            insetBlockStart: -18,
+            insetInlineStart: '50%',
+            transform: 'translateX(-50%)',
             minWidth: 16,
             height: 16,
             paddingInline: 3,

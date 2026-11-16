@@ -2,7 +2,7 @@ import { useLayoutEffect, useState, type CSSProperties } from 'react';
 import { theme } from 'antd';
 import { IconSeitenleisteAuf, IconSeitenleisteZu } from '../icons';
 import { railBreite } from '../components/Kopfleiste';
-import { leseRahmenOben, useRahmenOben } from '../components/rahmenOben';
+import { readKopfOben, useKopfOben } from '../components/rahmenOben';
 import { form, rahmenFarben, schrift, schriftskala } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
 import { handleLinkKlick } from '../routing/linkModifier';
@@ -99,7 +99,8 @@ const ETIKETT_STIL: CSSProperties = {
  * `openspec/changes/archive/2026-11-15-f24jkokr-rahmen-kleinteile/`): was im Fluss über ihr steht
  * und nicht zum klebenden Rahmen zählt, also die Betriebszeile ab `md`, das Spiegelband und die
  * Warnung zu den Modulfreigaben. Gemessen als Abstand der `<nav>` vom Dokumentanfang minus
- * `--lfh-rahmen-oben`; die `<nav>` klebt nicht, ihr Abstand hängt also nicht am Rollstand.
+ * `--lfh-kopf-oben` (nicht die Rahmenhöhe: ein klebender Seitenkopf steht neben der Rail, nicht
+ * über ihr, zjt7c073 D2); die `<nav>` klebt nicht, ihr Abstand hängt also nicht am Rollstand.
  *
  * Neu gemessen, wenn sich `body` in der Größe ändert (eine Zeile erscheint oder verschwindet) oder
  * der Rahmen eine neue Höhe meldet; geschrieben im nächsten Bild, wie in `rahmenOben.ts` (LLH-1335).
@@ -107,12 +108,12 @@ const ETIKETT_STIL: CSSProperties = {
 function useVorlauf(): [(el: HTMLElement | null) => void, number] {
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [vorlauf, setVorlauf] = useState(0);
-  const rahmenOben = useRahmenOben();
+  const kopfOben = useKopfOben();
   useLayoutEffect(() => {
     if (!el) return;
     const measure = () => {
       const top = el.getBoundingClientRect().top + window.scrollY;
-      setVorlauf(Math.max(0, Math.round(top - leseRahmenOben())));
+      setVorlauf(Math.max(0, Math.round(top - readKopfOben())));
     };
     measure();
     let pending = 0;
@@ -128,7 +129,7 @@ function useVorlauf(): [(el: HTMLElement | null) => void, number] {
       observer.disconnect();
       if (pending) cancelAnimationFrame(pending);
     };
-  }, [el, rahmenOben]);
+  }, [el, kopfOben]);
   return [setEl, vorlauf];
 }
 
@@ -220,13 +221,15 @@ export default function IconRail({
          sich, und der Fuß folgt den Kategorien (LLH-1273): die Kategorien stehen zuerst im Bild,
          nichts liegt unter einem klebenden Teil. Was im Fluss über der Rail steht (Betriebszeile ab
          `md`), zieht die Spalte als Vorlauf ab (LLH-1734), sonst lag der Fuß bei Rollstand 0 um
-         dessen Höhe unter dem Fensterrand. Gerollt bleibt darunter ein Streifen im Grund der Rail. */}
+         dessen Höhe unter dem Fensterrand. Gerollt bleibt darunter ein Streifen im Grund der Rail.
+         Sie hängt an der Kopfhöhe (`--lfh-kopf-oben`), nicht an der Rahmenhöhe: die zählt den
+         klebenden Seitenkopf mit, und die Rail spränge um ihn nach unten (zjt7c073 D2). */}
       <div
         data-lfh="rail-spalte"
         style={{
           position: 'sticky',
-          top: 'var(--lfh-rahmen-oben, 0px)',
-          height: 'calc(100dvh - var(--lfh-rahmen-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
+          top: 'var(--lfh-kopf-oben, 0px)',
+          height: 'calc(100dvh - var(--lfh-kopf-oben, 0px) - var(--lfh-rail-vorlauf, 0px))',
           display: 'flex',
           flexDirection: 'column',
           overflowY: 'auto',
