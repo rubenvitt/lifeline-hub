@@ -1,6 +1,7 @@
 import type { AbrufZustand } from '../../api/abrufZustand';
 import type { Einheit, Einsatzabschnitt, Fuehrungsstelle, Staerke } from '../../api/types';
-import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
+import { staerkeText } from '../../anzeige/staerke';
+import { abgestelltVon } from '../../kraefte/kraeftebaumKern';
 import type { FunktionZeile } from '../../fuehrung/besetzungAusMitgliedern';
 import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { ZUSTAND_GRUND } from '../../api/abrufZustand';
@@ -14,11 +15,13 @@ import { abschnittStaerken } from './abschnittStaerke';
  * Abschnitten und Einheiten, ohne eigene Datenhaltung (LFH-626). Bildschirm, Druck und Lagebericht
  * lesen alle dieses eine Modell.
  *
- * - **Platzierung wie im Funkplan** (`fernmeldewesen/funkplan.ts:baueFunkplan`) und im Meldebild:
+ * - **Platzierung wie im Meldebild** und sonst wie im Funkplan (`fernmeldewesen/funkplan.ts:baueFunkplan`):
  *   Unterabschnitte unter ihren Abschnitt, Waisen an die Wurzel; oberste Einheiten unter ihren
  *   Abschnitt, Untereinheiten unter ihre Einheit; Einheiten ohne Abschnitt in den Sammelknoten.
- *   Dieselben Schlüssel (`ab-<id>`, `eh-<id>`, `sammel`), damit der Kommunikationsplan (LFH-625)
- *   seine Ebene auf diesen Baum setzen kann.
+ *   Eine abgestellte Untereinheit (eigener Abschnitt ungleich dem ihrer Obereinheit) steht wie im
+ *   Meldebild unter ihrem Abschnitt, mit „aus <Obereinheit>“ (LLH-1744, `abgestelltVon`); der
+ *   Funkplan behält sie am Führungsweg ihres Verbands. Dieselben Schlüssel (`ab-<id>`, `eh-<id>`,
+ *   `sammel`), damit der Kommunikationsplan (LFH-625) seine Ebene auf diesen Baum setzen kann.
  * - **Stärke aus derselben Rechnung wie der Gliederungsbaum** (`abschnittStaerken`, LFH-550). Die
  *   Wurzel „Einsatzleitung“ gehört nicht ins Modell: sie trägt keine Zahl, die Einsatzstärke hat
  *   ihre Heimat im Meldebild.
@@ -43,7 +46,11 @@ interface KnotenBasis {
 
 export type OrgKnoten =
   | (KnotenBasis & { art: 'abschnitt' })
-  | (KnotenBasis & { art: 'einheit' })
+  | (KnotenBasis & {
+      art: 'einheit';
+      /** Name der Obereinheit, aus der die Einheit in ihren Abschnitt abgestellt ist (LLH-1744). */
+      abgestelltAus?: string;
+    })
   | { art: 'sammel'; key: 'sammel'; kinder: OrgKnoten[] };
 
 export interface Fuehrungsorganisation {
@@ -78,17 +85,40 @@ export function baueFuehrungsorganisation(
   const gesehen = new Set<string>();
 
   const einheitIds = new Set(alleEinheiten.map((e) => e.id));
+  const abgestellt = abgestelltVon(alleEinheiten);
   const istUntereinheit = (e: Einheit) =>
-    e.ueber_einheit_id != null && einheitIds.has(e.ueber_einheit_id);
+    e.ueber_einheit_id != null && einheitIds.has(e.ueber_einheit_id) && !abgestellt(e);
   const untereinheiten = gruppiere(
     alleEinheiten.filter(istUntereinheit),
     (e) => e.ueber_einheit_id!,
   );
 
+  // Stärke eines Einheitknotens: eigene plus die der Untereinheiten, die unter ihm stehen — wie
+  // die Meldebild-Zeile (LLH-1744). Eine abgestellte Untereinheit zählt in ihrem Abschnitt.
+  const teilbaumStaerke = (e: Einheit, pfad: Set<number> = new Set()): Staerke | null => {
+    if (e.aufgeloest_at) return null;
+    const s = {
+      fuehrer: e.ist?.fuehrer ?? 0,
+      unterfuehrer: e.ist?.unterfuehrer ?? 0,
+      mannschaft: e.ist?.mannschaft ?? 0,
+    };
+    pfad.add(e.id);
+    for (const u of untereinheiten.get(e.id) ?? []) {
+      if (pfad.has(u.id)) continue;
+      const t = teilbaumStaerke(u, pfad);
+      if (!t) continue;
+      s.fuehrer += t.fuehrer;
+      s.unterfuehrer += t.unterfuehrer;
+      s.mannschaft += t.mannschaft;
+    }
+    return s;
+  };
+
   const einheitKnoten = (e: Einheit): OrgKnoten | null => {
     const key = `eh-${e.id}`;
     if (gesehen.has(key)) return null;
     gesehen.add(key);
+    const aus = abgestellt(e);
     return {
       art: 'einheit',
       key,
@@ -96,7 +126,8 @@ export function baueFuehrungsorganisation(
       name: e.name,
       rufname: e.funkrufname ?? null,
       leitung: e.fuehrer_name ?? null,
-      staerke: summiereStaerke([e]),
+      staerke: teilbaumStaerke(e),
+      ...(aus ? { abgestelltAus: aus.name } : {}),
       tz: baueTzProps({
         objekttyp: 'einheit',
         einheitTypLabel: e.typ_label,
@@ -197,6 +228,7 @@ function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
           k.rufname != null ? `Rufname ${md(k.rufname)}` : 'kein Rufname',
           k.leitung != null ? `Leitung ${md(k.leitung)}` : 'Leitung nicht besetzt',
           `Stärke ${staerkeText(k.staerke)}`,
+          ...(k.art === 'einheit' && k.abgestelltAus ? [`aus ${md(k.abgestelltAus)}`] : []),
         ].join(' · ')}`;
   return [kopf, ...k.kinder.flatMap((c) => knotenMarkdown(c, tiefe + 1))];
 }
