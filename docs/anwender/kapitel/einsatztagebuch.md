@@ -2,7 +2,7 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbFeldzeile.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md, frontend/src/etb/EtbSpaltenzeile.tsx, frontend/src/etb/EtbHandschirmzeile.tsx, frontend/src/etb/EtbVermerke.tsx, frontend/src/etb/vermerke.ts, frontend/src/etb/EtbInhalt.tsx, frontend/src/etb/etbSpalten.ts, frontend/src/etb/EtbSendestatus.tsx, frontend/src/etb/etbKopfKleben.ts, frontend/src/routing/deeplinks.ts]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/EtbFeldzeile.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/BerichtigtMarke.tsx, frontend/src/etb/berichtigung.ts, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/anzeige/ZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md, frontend/src/etb/EtbSpaltenzeile.tsx, frontend/src/etb/EtbHandschirmzeile.tsx, frontend/src/etb/EtbVermerke.tsx, frontend/src/etb/vermerke.ts, frontend/src/etb/EtbInhalt.tsx, frontend/src/etb/etbSpalten.ts, frontend/src/etb/EtbSendestatus.tsx, frontend/src/etb/etbKopfKleben.ts, frontend/src/routing/deeplinks.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/components/AnhangVorschau.tsx, frontend/src/api/anhangFassung.ts]
 ---
 
 ## Überblick
@@ -112,10 +112,17 @@ der Zeitachse erscheinen wird.
    Zeitfeld (etwa „1420“, „14:20“, „101420“, „-10“ für zehn Minuten vor jetzt). Weicht die Zeit ab,
    wird das Feld gelb, die Fußzeile nennt „Nachtrag · Ereignis vor 14 min“ und der Knopf heißt
    „Erfassen als 1912“. Ein geleertes Feld gilt wieder „jetzt“. Liegt die Zeit an einem anderen Tag,
-   zeigt das Feld den Tag mit, etwa „162350okt26“.
+   zeigt das Feld den Tag mit, etwa „162350okt26“. Eine unlesbare Zeit, etwa „14:3x“, übernimmt das
+   Feld nicht: es zeigt wieder den alten Wert und nennt den Grund, und die Erfassung sendet nicht,
+   bis die Zeit stimmt. Dann steht in der Fußzeile „Zeit nicht übernommen“, und das Feld hat den
+   Cursor. Eine lesbare Zeit eintippen oder das Feld leeren (dann gilt „jetzt“); Enter oder Escape im
+   Feld behalten die gezeigte Zeit, bei einem leeren Feld also „jetzt“.
 3. Schneller geht ein Nachtrag mit „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ trägt 1420 in
    „Zeit“ ein, der Rest der Zeile bleibt der Inhalt. Eine unlesbare Angabe bleibt als Text stehen,
-   und die Fußzeile nennt den Grund. Eine Zeit in der Zukunft nimmt die Erfassung nicht an: die
+   die Fußzeile nennt den Grund, und die Erfassung sendet nicht, bis die Angabe lesbar oder der
+   Befehl aus dem Text gelöscht ist: „Erfassen“ markiert dann die Angabe im Text, Tippen
+   überschreibt sie. Wer eine Angabe mitten im Text berichtigt, sieht die Zeit nach „Erfassen“ erst
+   im Feld „Zeit“ und am Knopf; ein zweites „Erfassen“ sendet. Eine Zeit in der Zukunft nimmt die Erfassung nicht an: die
    Fußzeile nennt „Zeit liegt in der Zukunft“, das Feld hat den Cursor, Text und Felder bleiben.
 4. „Weg“ ist der Meldeweg: Funk, Telefon, Persönlich oder Sonstige. „+ Veranlassung“ rechts in der
    Fußzeile holt das Feld „Veranlassung“ in die Zeile. Ein Schrägstrich mitten im Text öffnet die
@@ -352,7 +359,10 @@ Menü: Text bleibt markierbar, die Aktionen stehen im Menü „⋮“.
 
 Am Bildschirm mit Spalten nennt das Menü auch die Vermerke der Zeile. Ein Foto bietet dort
 „Vorschau: …“ für die Großansicht und, wer Originale laden darf, „Original (mit Standort): …
-herunterladen“, auch wenn die Spalte Vermerk kein Vorschaubild zeigt. Ist der Anhang auf einer
+herunterladen“, auch wenn die Spalte Vermerk kein Vorschaubild zeigt. Das gilt auch für ein
+HEIC-Foto vom iPhone: das Gerät wandelt es für die Großansicht um, bis dahin dreht sich ein
+Ladezeichen, und Escape bricht ab. Kommt das Bild nicht vom Server oder lässt es sich nicht
+umwandeln, meldet die App „keine Vorschau möglich“. Ist der Anhang auf einer
 gespiegelten Instanz noch nicht da, meldet das Herunterladen „wird geholt“.
 
 ### Abgeschlossener Einsatz

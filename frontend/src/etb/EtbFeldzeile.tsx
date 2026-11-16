@@ -260,9 +260,13 @@ export interface EtbFeldzeileProps {
   /** Fehlende Pflichtseiten nach einem Sendeversuch, mit der Kennung ihres Grunds. */
   pflicht: ('von' | 'an')[];
   pflichtId: (feld: 'von' | 'an') => string;
-  /** Grund am Feld Zeit (Zukunft, unlesbares `/zeit`) und seine Kennung. */
+  /** Grund am Feld Zeit (Zukunft, unlesbares `/zeit`, angehaltenes Senden) und seine Kennung. */
   zeitGrund: string | null;
   zeitGrundId: string;
+  /** Das Feld Zeit hat eine unlesbare Eingabe verworfen (Grund) oder nicht mehr (`null`), LLH-1866. */
+  onZeitDiscard?: (grund: string | null) => void;
+  /** Steigt, wenn das Feld Zeit neu einhängen soll (eine Zeit aus `/zeit`, LLH-1866). */
+  zeitFeldKey?: number;
   /** Die Ereigniszeit weicht ab (Nachtrag): Feld in der Achtungsrolle. */
   nachtrag: boolean;
   veranlassungOffen: boolean;
@@ -292,6 +296,8 @@ export default function EtbFeldzeile({
   pflichtId,
   zeitGrund,
   zeitGrundId,
+  onZeitDiscard,
+  zeitFeldKey = 0,
   nachtrag,
   veranlassungOffen,
   onVeranlassungSchliessen,
@@ -310,6 +316,7 @@ export default function EtbFeldzeile({
   const zeit = (
     <Beschriftet label="Zeit" schmal={schmal}>
       <ZeitpunktEingabe
+        key={zeitFeldKey}
         art="ereignis"
         kurzAnzeige
         kalenderOhneTabstopp
@@ -326,6 +333,7 @@ export default function EtbFeldzeile({
         value={metadaten.ereigniszeit ?? null}
         onChange={(v: Dayjs | null) => onFeld('ereigniszeit', v ?? undefined)}
         onOk={() => onFertig()}
+        onDiscard={onZeitDiscard}
       />
     </Beschriftet>
   );

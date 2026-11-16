@@ -2,7 +2,7 @@ import { useId, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } fro
 import { useRollen } from './instrument/rollenwerte';
 import { formatGroesse } from '../karten/formatGroesse';
 import {
-  istBildMime,
+  isBildMime,
   ORIGINAL_TEXT,
   originalDateiname,
   originalZugaenglicherName,
@@ -200,7 +200,7 @@ export default function DownloadAnker({
         </a>
       </span>
     );
-  if (!istBildMime(mime)) return verweise;
+  if (!isBildMime(mime)) return verweise;
   return (
     <span
       data-lfh="download-anker-mit-vorschau"

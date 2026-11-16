@@ -540,7 +540,9 @@ nicht; eine solche Uhrzeit gilt eine Stunde später. Nur ein Feld für Ereigniss
 Stunde früher, wenn sie sonst noch bevorstünde: „0230“ um 03:20 ist dann 01:30 Winterzeit.
 
 Eine Eingabe, die sich nicht lesen lässt, wird nicht übernommen; das Feld nennt den Grund („Uhrzeit
-gibt es nicht“). Wer das Feld trotzdem verlässt, behält den bisherigen Wert. „Jetzt“ und die
+gibt es nicht“). Wer das Feld trotzdem verlässt, behält den bisherigen Wert; der Grund steht so
+lange am Feld, bis erneut getippt, gewählt, die Zeit anders gesetzt (im Einsatztagebuch etwa mit
+„/zeit“) oder im Feld Enter bzw. Escape gedrückt wird. Das Einsatztagebuch sendet bis dahin nicht. „Jetzt“ und die
 Schnellwahlen rechnen mit der Uhr des Servers, nicht mit der des Geräts. Zeiten gelten in der
 Zeitzone des Einsatzes; weicht das Gerät davon ab, steht die Zone am Feld.
 
