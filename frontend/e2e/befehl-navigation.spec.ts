@@ -5,6 +5,15 @@ import { anmeldenPerApi } from './anmelde-kern';
 
 test.setTimeout(90_000);
 
+/**
+ * Die Brotkrume „Aufträge/Befehle“ über der Befehlsseite. Seit die Modulzeilen echte Links sind
+ * (LLH-1732), trägt die Einsatz-Navigation einen gleichnamigen Link auf `/auftraege` ohne Reiter;
+ * die Brotkrume steht im `main`, die Navigation nicht.
+ */
+function brotkrume(page: Page) {
+  return page.getByRole('main').getByRole('link', { name: 'Aufträge/Befehle', exact: true });
+}
+
 async function vorbereiten(page: Page) {
   await anmeldenPerApi(page, 'admin', process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw');
   await einsatzDialogOeffnen(page);
@@ -50,7 +59,7 @@ test('Speicherfehler hält die Brotkrume; Speichern und weiter persistiert vor d
   });
   await page.goto(detail);
   await page.getByLabel('Titel', { exact: true }).fill('Gesicherte neue Fassung');
-  await page.getByRole('link', { name: 'Aufträge/Befehle', exact: true }).click();
+  await brotkrume(page).click();
   const dialog = page.getByRole('dialog', { name: 'Ungespeicherte Änderungen' });
   await expect(dialog).toBeVisible();
   await expect(page).toHaveURL(detail);
@@ -138,7 +147,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
     await expect(page).toHaveURL(detail);
     // Die Brotkrume wählt den Befehl wieder (`?befehl=`, oxgob5gk D6); der Parameter wird danach
     // geräumt, es bleibt der Reiter.
-    await page.getByRole('link', { name: 'Aufträge/Befehle', exact: true }).click();
+    await brotkrume(page).click();
     await expect(page).toHaveURL(befehle);
     await expect(reiterBefehle).toHaveAttribute('aria-selected', 'true');
     const karte = page.getByRole('button', { name: 'Befehl v1: Befehl Navigation', exact: true });

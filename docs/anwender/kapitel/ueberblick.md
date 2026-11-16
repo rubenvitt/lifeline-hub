@@ -2,16 +2,17 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/erinnerung/erinnerungZustand.ts, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/lage/wasBrennt.ts, frontend/src/lage/useWasBrennt.ts, frontend/src/lage/alarmZiel.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/erinnerung/erinnerungZustand.ts, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
 ---
 
 ## Überblick
 
 Der Überblick ist die Startseite eines Einsatzes im Bereich „Führung“. Er fasst auf einer Seite
-zusammen, was die Führung zuerst wissen muss: die Lage in Zahlen, den Stand der
+zusammen, was zu tun ist: was gerade brennt, den Führungsstand, den Stand der
 Einsatzabschnitte, die offenen Vorgänge, die Entscheidungen der letzten Stunde und die nächsten
-Fristen. Er rechnet nur aus Daten, die in den Modulen schon erfasst sind; erfasst wird in den
-Modulen selbst.
+Fristen. Was los ist (Betroffene, Kräfte, Gefahren, Einsatzdauer), zeigt das
+[Lagebild](lagebild.md). Der Überblick rechnet nur aus Daten, die in den Modulen schon erfasst
+sind; erfasst wird in den Modulen selbst.
 
 ## Abläufe
 
@@ -21,10 +22,14 @@ Modulen selbst.
 2. Im Seitenkopf neben dem Datenstand lesen: Ab „Warnstufe mittel“ steht dort die höchste
    Warnstufe der Gefahrengebiete, daneben, wie viele Gebiete „unbestätigt“ sind, und der
    Stand eines festgelegten Pegels.
-3. Im Kennzahlenband die sechs Zahlen lesen: „Betroffene“ mit dem Zuwachs der letzten 60 Minuten,
-   „Kräfte im Einsatz“ in der Stärke F/UF/M//Σ, „Offene Aufträge“, „Meldungen offen“, die Zahl der
-   „Einsatzabschnitte“ und die „Einsatzdauer“.
-4. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
+3. Ganz oben die Zeile „Was brennt“ lesen: Sie nennt in Rot offene Sofortmeldungen ab Eingang,
+   überfällige Bestätigungen, Vermisste, kritische Abschnitte, überfällige Rückmeldungen, Ausfälle
+   und überfällige Aufträge, danach in Gelb dringende Meldungen, fällige Erinnerungen und
+   überfällige Nachforderungen. Ein Eintrag führt in sein Modul; passt nicht alles in die Zeile,
+   zeigt „+n“ die ganze Liste. Ist nichts davon da, steht dort „Nichts brennt“.
+4. Im Führungsstand die drei Zahlen lesen: „Offene Aufträge“, „Meldungen offen“ und die Zahl der
+   „Einsatzabschnitte“.
+5. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
    „kritisch“), den festen Auftrag, bei Aufträgen an den Abschnitt die Zahl der erledigten, die
    letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „nicht verfügbar“ mit
    Zahl und Balken) lesen. Was im Abschnitt brennt, steht als rotes Etikett direkt neben dem
@@ -33,12 +38,12 @@ Modulen selbst.
    Ausfall“ und „1 Ausfall Material“. Der Lagezustand bleibt dabei, wie die Führung ihn beurteilt
    hat; ein „planmäßig“ mit rotem Etikett daneben heißt: die Beurteilung ist zu prüfen.
 
-   ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Vorgängen, nächsten Marken und Entscheidungen der letzten Stunde](../bilder/ueberblick/ueberblick.png)
+   ![Überblick mit der Zeile „Was brennt“, dem Führungsstand, Einsatzabschnitten, offenen Vorgängen, nächsten Marken und Entscheidungen der letzten Stunde](../bilder/ueberblick/ueberblick.png)
 
-5. Daneben „Offene Vorgänge“ lesen: Meldungen, Aufträge, Nachforderungen, Erinnerungen und
+6. Daneben „Offene Vorgänge“ lesen: Meldungen, Aufträge, Nachforderungen, Erinnerungen und
    Ablösungen, je mit ihrer Zahl und den drei dringendsten. Darunter stehen „Nächste Marken“ und
    „Entscheidungen der letzten Stunde“. Was zuerst fällig ist, steht oben.
-6. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
+7. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
    Entscheidungen. Jedes Paneel führt so über den Verweis oben rechts in sein Modul.
 
 ### Nur die eigenen Vorgänge sehen
@@ -55,20 +60,27 @@ Modulen selbst.
    einen neuen Eintrag.
 2. Zurück im Überblick „Lagebericht“ wählen: Die Liste der Lageberichte öffnet sich (Kapitel
    [Lageberichte](lageberichte.md)).
+3. „Lagebild“ im Seitenkopf wählen: Das Lagebild desselben Einsatzes öffnet sich.
 
 ## Hintergrund
 
 ### Was die Zahlen bedeuten
 
-- **Kräfte im Einsatz** zählt nur das Personal, nicht Fahrzeuge oder Material.
+- **Was brennt** zeigt Zustände, solange sie bestehen; anders als die Meldungen der Alarmzone
+  verschwindet ein Eintrag erst, wenn der Grund weg ist. Dieselbe Zeile steht im Lagebild und
+  auf dem Lagemonitor. Die Zahlen sind dieselben wie in den Modulen: Sofortmeldungen,
+  Bestätigungen, Aufträge, Erinnerungen und Nachforderungen aus deren Zählung, Rückmeldung und
+  Ausfall wie in der Kräfteübersicht, Vermisste wie bei den Betroffenen. Eine Rückmeldung, die
+  ohne neue Daten überfällig wird, steht spätestens nach einer halben Minute in der Zeile. Ein
+  Abschnitt im Lagezustand „angespannt“ steht nicht darin. Ist eine Quelle nicht abrufbar,
+  steht „Stand unvollständig“ mit ihrem Namen, nie „Nichts brennt“; ein gesperrtes Modul fehlt
+  ohne Hinweis.
 - **Warnstufe** ist die höchste Stufe aller Gefahrengebiete; sie steht wie im Lagebild im
   Seitenkopf, nur ab „mittel“, und daneben, falls es welche gibt, wie viele Gebiete
   „unbestätigt“ sind (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort auch sein
   Stand (Kapitel [Wetter und Pegel](wetter-pegel.md)).
 - **Meldungen offen** nennt dieselbe Zahl wie das Modul „Meldungen“, darunter die neuen; ist eine
   Bestätigung überfällig, steht die Zahl in Rot.
-- **Einsatzdauer** rechnet ab dem Beginn des Einsatzes, bei einem abgeschlossenen bis zum
-  Abschluss.
 - **Offene Aufträge** nennt dieselbe Zahl wie das Modul „Aufträge/Befehle“ und dazu, wie viele
   über ihrer Frist sind.
 - **Entscheidungen der letzten Stunde:** Gab es in der letzten Stunde keine, heißt das Paneel

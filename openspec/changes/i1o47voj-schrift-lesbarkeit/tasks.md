@@ -45,7 +45,7 @@ TDD: erst der rote Test oder Wächter, dann die Änderung. LLH-1772 (`zrrpki0p`,
 - [x] 6.3 `frontend/AGENTS.md`: `schriftskala` mit Stufen, Faktor und Literal-Verbot; „Kein Zoom“ ersetzt durch „Zoom frei“; Feldetikett und Augenbraue; Mono-Grenze; je mit Marke „umgekehrt 15.11.2026“ gegenüber dem Neuentwurf. Beleg: Prettier grün, Verweise auf `keinZoom.guard` gegrept und nachgezogen.
 - [x] 6.4 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), Erzeugtes im Commit. Beleg: `designSystem.guard.test.ts` grün.
 - [ ] 6.5 Bildlauf der Anwender-Doku im selben PR (`docs/anwender/AGENTS.md`, Mitänderungsregel): Bilder der geänderten Ansichten neu erzeugen und committen. Beleg: Wächter der Anwenderdoku grün.
-- [ ] 6.7 Befunde des Reviews vor dem PR behoben (Rail wächst mit der Schrift, `data-dichte` vor dem ersten Bild, `body` in der Lauftextgröße, benannte Konstanten im Wächter, Zeichnungen, gemischte Knoten, Warnrolle mit Tests) und ADR-0057 angelegt. Beleg: Abschnitt „Review“ im PR.
+- [ ] 6.7 Befunde des Reviews vor dem PR behoben (Rail wächst mit der Schrift, `data-dichte` vor dem ersten Bild, `body` in der Lauftextgröße, benannte Konstanten im Wächter, Zeichnungen, gemischte Knoten, Warnrolle mit Tests) und ADR-0058 angelegt. Beleg: Abschnitt „Review“ im PR.
 - [ ] 6.6 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, betroffene e2e-Specs lokal grün. Beleg: Ausgabe im PR unter „Geprüft“.
 
 ## Workflow follow-up

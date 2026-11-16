@@ -887,7 +887,10 @@ for (const [route, text] of [
         [`**/api/einsaetze/${einsatzId}/pegel`, pegelListe(10)],
       ]);
       await page.goto(`/einsaetze/${einsatzId}/${route}`);
-      const band = page.getByRole('group', { name: 'Lage in Zahlen' });
+      // Der Überblick trägt seit LLH-1743 das Band „Führungsstand“, das Lagebild „Lage in Zahlen“.
+      const band = page.getByRole('group', {
+        name: route === 'ueberblick' ? 'Führungsstand' : 'Lage in Zahlen',
+      });
       await expect(band.locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
       await wartenBisRuhig(page);
       const marke = await pegel.freigeben();

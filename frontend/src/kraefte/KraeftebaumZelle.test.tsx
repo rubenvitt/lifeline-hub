@@ -196,6 +196,27 @@ describe('KraeftebaumZelle — „nicht übernommen“ (LLH-1075)', () => {
   });
 });
 
+describe('KraeftebaumZelle — abgestellte Einheit (LLH-1744)', () => {
+  it('nennt die Obereinheit, aus der die Einheit abgestellt ist', () => {
+    renderMitProviders(
+      <KraeftebaumZelle
+        zeile={{
+          art: 'einheit',
+          einheitId: 2,
+          bezeichnung: 'Sanitätsgruppe UHS',
+          zusatz: 'Gruppe',
+          abgestelltAus: 'Sanitätszug',
+          tz: { typLabel: null, fachaufgabe: null, organisation: null },
+          isNichtUebernommen: false,
+        }}
+        einsatzId={7}
+        gesperrt={offen}
+      />,
+    );
+    expect(screen.getByText(/aus Sanitätszug/)).toBeInTheDocument();
+  });
+});
+
 describe('Texte des Kräftebaums', () => {
   it('Besatzung Ist/Soll statt Stärke, „nicht erfasst“ ohne Kraft', () => {
     const b = finde('ef-30').besatzung!;

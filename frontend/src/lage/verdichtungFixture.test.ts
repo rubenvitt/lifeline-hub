@@ -16,6 +16,7 @@ import { summiereStaerke } from '../anzeige/staerke';
 import { staerkeImRaum } from '../bereitstellungsraum/brZahlen';
 import { baueKraeftebild, verdichte, type MeldebildZeile } from '../kraefte/kraeftebild';
 import { istAlarmiert } from '../meldungen/meldungKennzahlen';
+import { istSofort } from '../meldungen/meldungKorrekturKern';
 import { istOffen } from '../pages/fuehrung/ueberblickDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
 import {
@@ -80,9 +81,22 @@ interface Fixture {
         | 'ist_bestaetigt'
         | 'ist_ueberfaellig'
         | 'eskaliert'
-      > & { name: string; bestaetigung_ueberfaellig: boolean }
+        | 'meldungsart'
+        | 'prioritaet'
+      > & {
+        name: string;
+        bestaetigung_ueberfaellig: boolean;
+        sofort_offen: boolean;
+        dringend_offen: boolean;
+      }
     >;
-    erwartet: { offen: number; ungesehen: number; bestaetigung_ueberfaellig: number };
+    erwartet: {
+      offen: number;
+      ungesehen: number;
+      bestaetigung_ueberfaellig: number;
+      sofort_offen: number;
+      dringend_offen: number;
+    };
   };
   nachforderungen: {
     jetzt: string;
@@ -113,6 +127,7 @@ interface Fixture {
     abschnitte: Array<{ id: number; ueber_abschnitt_id: number | null }>;
     erwartet_ist_kumuliert: Record<string, Tripel>;
     erwartet_abschnitte: Record<string, { eigene: Tripel; inkl_unter: Tripel }>;
+    erwartet_wurzeln_je_abschnitt: Record<string, number[]>;
     bereitstellungsraeume: Array<{ name: string; einheiten: number[]; erwartet: Tripel | null }>;
   };
   kraefte: {
@@ -160,8 +175,18 @@ describe('Fixture: Aufträge', () => {
 describe('Fixture: Meldungen', () => {
   const { faelle, erwartet } = fixture.meldungen;
 
+  // Sofort und Dringend (LLH-1743): offen und unbestätigt; die Art kommt aus `istSofort`, wie
+  // die Stufe im Überblick (`meldungsStufe`). Der Client zählt nicht selbst (Modulzähler), aber
+  // seine Einordnung einer Meldung muss der Zählregel des Servers entsprechen.
+  const offenUnbestaetigt = (m: (typeof faelle)[number]) => m.ist_offen && !m.ist_bestaetigt;
+  const sofortOffen = (m: (typeof faelle)[number]) => istSofort(m) && offenUnbestaetigt(m);
+  const dringendOffen = (m: (typeof faelle)[number]) =>
+    m.prioritaet === 'dringend' && !istSofort(m) && offenUnbestaetigt(m);
+
   it.each(faelle.map((f) => [f.name, f] as const))('%s', (_name, f) => {
     expect(istAlarmiert(f as unknown as Meldung)).toBe(f.bestaetigung_ueberfaellig);
+    expect(sofortOffen(f)).toBe(f.sofort_offen);
+    expect(dringendOffen(f)).toBe(f.dringend_offen);
   });
 
   it('Summen', () => {
@@ -170,6 +195,8 @@ describe('Fixture: Meldungen', () => {
       offen: offen.length,
       ungesehen: offen.filter((m) => m.status === 'neu').length,
       bestaetigung_ueberfaellig: faelle.filter((m) => istAlarmiert(m as unknown as Meldung)).length,
+      sofort_offen: faelle.filter(sofortOffen).length,
+      dringend_offen: faelle.filter(dringendOffen).length,
     }).toEqual(erwartet);
   });
 });
@@ -278,6 +305,14 @@ describe('Fixture: Stärke', () => {
       expect({ fuehrer, unterfuehrer, mannschaft }, `Abschnitt ${id}`).toEqual(
         alsStaerke(soll.inkl_unter),
       );
+    }
+    // Abgestellte Einheit (LLH-1744): sie steht als Wurzel unter ihrem eigenen Abschnitt.
+    for (const [id, wurzeln] of Object.entries(s.erwartet_wurzeln_je_abschnitt)) {
+      const z = knoten.get(`ab-${id}`)!;
+      const einheitWurzeln = (z.children ?? [])
+        .filter((k) => k.key.startsWith('eh-'))
+        .map((k) => Number(k.key.slice(3)));
+      expect(einheitWurzeln, `Wurzeln in Abschnitt ${id}`).toEqual(wurzeln);
     }
   });
 });

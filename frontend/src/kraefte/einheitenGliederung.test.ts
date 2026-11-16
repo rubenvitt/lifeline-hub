@@ -239,7 +239,7 @@ describe('Einheiten-Gliederung und Meldebild: gleiche Knotenfolge', () => {
       eh(5, null, 2),
       eh(1, 30),
       eh(2, 10),
-      eh(3, 20, 2),
+      eh(3, 10, 2),
       eh(4, null, 1),
       eh(6, null, 77),
       eh(7, 20),
@@ -276,5 +276,32 @@ describe('Einheiten-Gliederung und Meldebild: gleiche Knotenfolge', () => {
     expect(flach(gliederung).map(([k]) => k)).not.toEqual(einheiten.map((e) => `eh-${e.id}`));
 
     expect(flach(gliederung)).toEqual(meldebildEinheiten(raster));
+  });
+
+  /**
+   * Bewusste Ausnahme (LLH-1744): Eine Untereinheit, die selbst in einem anderen Abschnitt steht,
+   * löst sich im Meldebild vom Verband und zählt dort; die Seite Einheiten fragt „welche Einheit?“
+   * und zeigt weiter den Verband mit seiner Stärke vom Server.
+   */
+  it('eine abgestellte Untereinheit bleibt in der Gliederung im Verband, das Meldebild löst sie', () => {
+    const abschnitte = [ab(10), ab(20, 10)];
+    const einheiten = [eh(1, 10), eh(2, 20, 1)];
+    const raster = baueMeldebildRaster({
+      abschnitte,
+      einheiten,
+      personal: [],
+      fahrzeuge: [],
+      material: [],
+      statusKatalog: [],
+      auftraege: [],
+    });
+    expect(flach(buildEinheitenGliederung(einheiten, abschnitte))).toEqual([
+      ['eh-1', 0],
+      ['eh-2', 1],
+    ]);
+    expect(meldebildEinheiten(raster)).toEqual([
+      ['eh-1', 0],
+      ['eh-2', 0],
+    ]);
   });
 });

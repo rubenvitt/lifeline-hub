@@ -44,7 +44,7 @@ import {
   schriftStil,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import { abschnittStaerken } from './einsatzabschnitte/abschnittStaerke';
+import { abschnittStaerken, einheitenImAbschnitt } from './einsatzabschnitte/abschnittStaerke';
 import AbschnittKnoten from './einsatzabschnitte/AbschnittKnoten';
 import {
   schreibeSprechgruppen,
@@ -119,7 +119,7 @@ function buildBaum(
       <AbschnittKnoten
         abschnitt={a}
         staerke={abschnittStaerken(abschnitte, einheiten, a.id).inklUnter}
-        anzahlEinheiten={einheiten.filter((e) => e.abschnitt_id === a.id).length}
+        anzahlEinheiten={einheitenImAbschnitt(einheiten, a.id).length}
       />
     );
     return {
@@ -442,10 +442,12 @@ export default function EinsatzabschnittePage() {
     const ziel = e.over?.data.current as DropDaten | undefined;
     // Gesperrte Ziele sind `disabled` und melden sich nie als `over`.
     if (!drag || !ziel) return;
+    // Der Rückweg kommt aus dem gespeicherten Wert, nicht aus dem Griff: der Griff einer Einheit
+    // trägt den wirksamen Abschnitt nur für die Sperre (LLH-1744), ein geerbter ist `null`.
     const von =
       drag.art === 'abschnitt'
         ? (abschnitte.find((a) => a.id === drag.id)?.ueber_abschnitt_id ?? null)
-        : drag.abschnittId;
+        : (einheitenQuery.data?.find((x) => x.id === drag.id)?.abschnitt_id ?? null);
     verschieben.mutate({
       einsatzId,
       art: drag.art,
@@ -518,9 +520,11 @@ export default function EinsatzabschnittePage() {
   const verschiebenAbschnitt =
     verschiebenFuer != null ? (abschnitte.find((a) => a.id === verschiebenFuer) ?? null) : null;
   const personal = personalQuery.data ?? [];
-  const zugeordneteEinheiten = (einheitenQuery.data ?? []).filter(
-    (e) => e.abschnitt_id === aktuell?.id,
-  );
+  // Dieselbe Menge wie die Stärke daneben (LLH-1744): wer im Abschnitt steht, auch mit
+  // geerbtem Abschnitt; jede mit ihrer eigenen Stärke, so ergibt die Liste die „Stärke“.
+  const alleEinheiten = einheitenQuery.data ?? [];
+  const zugeordneteEinheiten = aktuell ? einheitenImAbschnitt(alleEinheiten, aktuell.id) : [];
+  const einheitName = new Map(alleEinheiten.map((e) => [e.id, e.name]));
 
   // Zwei Werte, getrennt beschriftet: „eigene" (Bedeutung der Bestandszeile) und „inkl.
   // Unterabschnitte".
@@ -579,15 +583,22 @@ export default function EinsatzabschnittePage() {
                     art: 'einheit',
                     id: e.id,
                     name: e.name,
-                    abschnittId: e.abschnitt_id ?? null,
+                    // Der wirksame Abschnitt, in dem die Liste sie zeigt (LLH-1744): eine Einheit
+                    // mit geerbtem Abschnitt lässt sich nicht auf ihn selbst ziehen.
+                    abschnittId: aktuell?.id ?? e.abschnitt_id ?? null,
                   }}
                 />
               )}
               <span>{e.name}</span>
               {e.typ_label && <Tag>{e.typ_label}</Tag>}
               <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
-                kumuliert <StaerkeAnzeige wert={e.ist_kumuliert} />
+                eigene <StaerkeAnzeige wert={e.ist} />
               </span>
+              {e.abschnitt_id == null && e.ueber_einheit_id != null && (
+                <span style={{ color: rollen.gedaempft }}>
+                  über {einheitName.get(e.ueber_einheit_id) ?? 'Obereinheit'}
+                </span>
+              )}
             </Space>
           </ListenEintrag>
         )}

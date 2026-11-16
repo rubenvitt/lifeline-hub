@@ -215,7 +215,13 @@ function mockEndpunkte(d: Daten) {
       HttpResponse.json(
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-          meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+          meldungen: {
+            offen: 0,
+            ungesehen: 0,
+            bestaetigung_ueberfaellig: 0,
+            sofort_offen: 0,
+            dringend_offen: 0,
+          },
         },
       ),
     ),
@@ -847,7 +853,13 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   describe('Nachforderungen offen (LLH-1371)', () => {
     const ZAEHLER = {
       auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-      meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+      meldungen: {
+        offen: 0,
+        ungesehen: 0,
+        bestaetigung_ueberfaellig: 0,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      },
       nachforderungen: { offen: 4, angefordert: 1, zugesagt: 1, unterwegs: 2, ueberfaellig: 0 },
     };
 
@@ -1620,50 +1632,75 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   });
 });
 
-describe('LageDashboardPage — Führungsstand', () => {
-  const FUEHRUNG = 'Führungsstand';
+describe('LageDashboardPage — Stand und Alarmzeile (LLH-1743)', () => {
+  const STAND = 'Stand';
 
-  // Aufträge und Meldungen kommen aus dem Modulzähler (LFH-550), nicht aus den Listen: dieselbe
-  // Zahl wie im Modulpanel. „Überfällig" heißt „davon überfällig".
-  it('zeigt offene Aufträge aus dem Modulzähler, überfällige mit Alarmkante', async () => {
+  // Seitenrollen (Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt die Lage“): Aufträge
+  // und Meldungen stehen nur im Überblick; ihre Alarmbeiträge trägt die Alarmzeile.
+  it('keine Kennzahl „Aufträge offen“ oder „Meldungen offen“; der überfällige Auftrag steht in der Alarmzeile', async () => {
     mockEndpunkte({ zaehler: { auftraege: { offen: 2, in_arbeit: 1, ueberfaellig: 1 } } });
     render();
     await kennzahlGeladen('Betroffene');
-    const zelle = await waitFor(() => {
-      const z = kennzahl('Aufträge offen', FUEHRUNG);
-      expect(z).toHaveTextContent('1 überfällig');
-      return z;
-    });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
-    expect(kante(zelle)).toBe(6);
+    const zeile = screen.getByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveTextContent('1 Auftrag überfällig'));
+    expect(screen.queryByText('Aufträge offen')).toBeNull();
+    expect(screen.queryByText('Meldungen offen')).toBeNull();
+    expect(within(zeile).getByRole('link', { name: '1 Auftrag überfällig' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege',
+    );
   });
 
-  it('zeigt offene und neue Meldungen; Bestätigung überfällig trägt die Alarmkante', async () => {
+  it('eine frische Sofortmeldung steht ab Eingang in der Alarmzeile', async () => {
     mockEndpunkte({
-      zaehler: { meldungen: { offen: 2, ungesehen: 1, bestaetigung_ueberfaellig: 1 } },
+      zaehler: {
+        meldungen: {
+          offen: 1,
+          ungesehen: 1,
+          bestaetigung_ueberfaellig: 0,
+          sofort_offen: 1,
+          dringend_offen: 0,
+        },
+      },
     });
     render();
-    await kennzahlGeladen('Betroffene');
-    const zelle = await waitFor(() => {
-      const z = kennzahl('Meldungen offen', FUEHRUNG);
-      expect(z).toHaveTextContent('1 neu · 1 Bestätigung überfällig');
-      return z;
-    });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
-    expect(kante(zelle)).toBe(6);
+    const zeile = await screen.findByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveTextContent('1 Sofortmeldung'));
+    expect(zeile.querySelector('[data-art="sofort"]')).toHaveAttribute('data-ton', 'alarm');
   });
 
-  it('ein nicht freigegebenes Modul sagt das und zeigt keine 0', async () => {
-    mockEndpunkte({ zaehler: { auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 } } });
+  it('„UHS aktiv“ nennt die Kräfte an aktiven UHS, nicht an geplanten (LLH-1744)', async () => {
+    const uhs = (id: number, status: string, mannschaft: number) => ({
+      id,
+      einsatz_id: 1,
+      abschnitt_id: null,
+      typ: 'behandlungsplatz',
+      bezeichnung: `UHS ${id}`,
+      standort: null,
+      notiz: null,
+      lat: null,
+      lon: null,
+      status,
+      erfasst_at: '2026-06-08 10:00:00',
+      erfasst_von: 1,
+      geaendert_at: '2026-06-08 10:00:00',
+      geaendert_von: 1,
+      storniert_at: null,
+      staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft },
+    });
+    mockEndpunkte({ uhs: [uhs(1, 'aktiv', 2), uhs(2, 'geplant', 1)] });
     render();
     await kennzahlGeladen('Betroffene');
-    const zelle = await waitFor(() => {
-      const z = kennzahl('Meldungen offen', FUEHRUNG);
-      expect(z).toHaveTextContent('nicht freigegeben');
-      return z;
-    });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
-    expect(zelle.querySelector('a')).toBeNull();
+    await waitFor(() =>
+      expect(kennzahl('UHS aktiv', STAND)).toHaveTextContent('1 geplant · 3 Kräfte an UHS'),
+    );
+  });
+
+  it('der Seitenkopf springt in den Überblick', async () => {
+    mockEndpunkte({});
+    render();
+    await kennzahlGeladen('Betroffene');
+    expect(screen.getByRole('button', { name: 'Überblick' })).toBeEnabled();
   });
 
   it('lädt keine Auftrags- oder Meldungsliste', async () => {
@@ -1681,18 +1718,19 @@ describe('LageDashboardPage — Führungsstand', () => {
     );
     render();
     await kennzahlGeladen('Betroffene');
-    await waitFor(() => expect(kennzahl('Aufträge offen', FUEHRUNG)).toHaveTextContent('keiner'));
+    await waitFor(() =>
+      expect(kennzahl('Lagebericht', STAND)).toHaveTextContent('noch nicht erstellt'),
+    );
     expect(listen).toEqual([]);
   });
 
-  it('während der Einsatz-Abruf hängt, behauptet der Führungsstand keinen Stand', async () => {
-    // Der Zähler löst auf, der Einsatz hängt: ohne Lagebild darf keine Zelle „0" melden.
+  it('während der Einsatz-Abruf hängt, behauptet der Stand keinen Stand', async () => {
     mockEndpunkte({ einsatzLaedt: true });
     const { client } = render();
     await waitFor(() =>
       expect(client.getQueryState(einsatzKeys.modulZaehler(1))?.status).toBe('success'),
     );
-    for (const z of zellen(FUEHRUNG)) expect(z).toHaveTextContent('wird abgerufen');
+    for (const z of zellen(STAND)) expect(z).toHaveTextContent('wird abgerufen');
   });
 
   it('ohne Lagebericht sagt die Zelle das, statt eine Zeit zu erfinden', async () => {
@@ -1700,7 +1738,7 @@ describe('LageDashboardPage — Führungsstand', () => {
     render();
     await kennzahlGeladen('Betroffene');
     await waitFor(() =>
-      expect(kennzahl('Lagebericht', FUEHRUNG)).toHaveTextContent('noch nicht erstellt'),
+      expect(kennzahl('Lagebericht', STAND)).toHaveTextContent('noch nicht erstellt'),
     );
   });
 });
@@ -1712,7 +1750,7 @@ describe('LageDashboardPage — Führungsstand', () => {
  * Tests zählen die Requests mit.
  */
 describe('LageDashboardPage — Modulgrenze des Lagebilds (LFH-669)', () => {
-  const FUEHRUNG = 'Führungsstand';
+  const FUEHRUNG = 'Stand';
   const wert = (z: HTMLElement) => z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent;
   const kurzWarten = () =>
     act(async () => {
@@ -1952,7 +1990,7 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
     await kennzahlGeladen('Betroffene');
     // 12:00 UTC → 1400 Sommerzeit in Berlin; ein anderer Tag trägt den Tag voran (taktisch).
     const zelle = await waitFor(() => {
-      const z = kennzahl('Lagebericht', 'Führungsstand');
+      const z = kennzahl('Lagebericht', 'Stand');
       expect(z.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('251400');
       return z;
     });
@@ -1970,7 +2008,7 @@ describe('LageDashboardPage — Stand des Lageberichts (LFH-350 · H60)', () => 
     renderMitZone();
     await kennzahlGeladen('Betroffene');
     const zelle = await waitFor(() => {
-      const z = kennzahl('Lagebericht', 'Führungsstand');
+      const z = kennzahl('Lagebericht', 'Stand');
       expect(z.querySelector('[data-lfh="kennzahl-notiz"]')?.textContent).toBe(
         'Entwurf · Lage 14:00',
       );
@@ -2024,5 +2062,59 @@ describe('LageDashboardPage — „Zuletzt"-Speicher (LFH-436)', () => {
     await userEvent.click(knopf);
     expect(await screen.findByText('AUFNAHME')).toBeInTheDocument();
     expect(gemerkt()).toEqual(['personen']);
+  });
+});
+
+describe('LageDashboardPage — Großbild (LLH-1747, Spec `grossbild-ansicht`)', () => {
+  function grossKennzahl(titel: string): HTMLElement {
+    const dialog = screen.getByRole('dialog', { name: 'Lagebild' });
+    const el = within(dialog)
+      .getAllByText(titel)
+      .map((t) => t.closest('[data-lfh="gross-kennzahl"]'))
+      .find(Boolean);
+    if (!el) throw new Error(`Großbild-Kennzahl „${titel}" nicht gefunden`);
+    return el as HTMLElement;
+  }
+
+  it('öffnet das Großbild über den Knopf im Seitenkopf und kehrt auf die Seite zurück', async () => {
+    mockEndpunkte({ personen: [person('sk1'), person('sk3')] });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+    expect(screen.getByRole('dialog', { name: 'Lagebild' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Lagebild' })).toBeInTheDocument();
+  });
+
+  it('zeigt dieselben Zahlen wie die Seite, auch nach einer Änderung ohne Neuladen', async () => {
+    const daten: Daten = { personen: [person('sk1'), person('sk3')] };
+    mockEndpunkte(daten);
+    const { client } = render();
+    await kennzahlGeladen('Betroffene');
+    const wertSeite = () =>
+      kennzahl('Betroffene').querySelector('[data-lfh="kennzahl-wert"]')?.textContent;
+    expect(wertSeite()).toBe('2');
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+    expect(grossKennzahl('Betroffene')).toHaveTextContent('2');
+
+    // Eine andere Person nimmt jemanden auf; das Großbild zieht ohne Neuladen nach.
+    daten.personen = [person('sk1'), person('sk3'), person('sk2')];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.personen(1) }));
+    await waitFor(() => expect(grossKennzahl('Betroffene')).toHaveTextContent('3'));
+    // Die Seite darunter zeigt denselben Wert.
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+    expect(wertSeite()).toBe('3');
+  });
+
+  it('zeigt im Großbild weder Aufträge noch Meldungen; die trägt der Überblick (LLH-1743)', async () => {
+    mockEndpunkte({ zaehler: { auftraege: { offen: 2, in_arbeit: 1, ueberfaellig: 1 } } });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+    const dialog = screen.getByRole('dialog', { name: 'Lagebild' });
+    expect(within(dialog).queryByText('Aufträge offen')).toBeNull();
+    expect(within(dialog).queryByText('Meldungen offen')).toBeNull();
+    expect(grossKennzahl('UHS aktiv')).toBeInTheDocument();
   });
 });

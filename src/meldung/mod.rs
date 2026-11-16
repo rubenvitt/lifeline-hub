@@ -238,11 +238,18 @@ impl TryFrom<String> for MeldungPatienten {
     }
 }
 
+/// Sofortmeldung (LFH-97, Spec „Sofortmeldung alarmiert“): Meldungsart Sofortmeldung oder
+/// Priorität sofort. Dieselbe Regel kennt der Client (`istSofort` in
+/// `frontend/src/meldungen/meldungKorrekturKern.ts`) und das SQL-Fragment `ist_sofort_sql!` in
+/// `meldung::repo`; das Fixture `regeln.json` (Abschnitt `meldungen`) hält sie gleich.
+pub fn ist_sofort(meldungsart: Meldungsart, prioritaet: Prioritaet) -> bool {
+    meldungsart == Meldungsart::Sofortmeldung || prioritaet == Prioritaet::Sofort
+}
+
 impl MeldungAnzeige {
-    /// Sofortmeldung (LFH-97, Spec „Sofortmeldung alarmiert“): Meldungsart Sofortmeldung oder
-    /// Priorität sofort.
+    /// Sofortmeldung, siehe [`ist_sofort`].
     pub fn ist_sofort(&self) -> bool {
-        self.meldungsart == Meldungsart::Sofortmeldung || self.prioritaet == Prioritaet::Sofort
+        ist_sofort(self.meldungsart, self.prioritaet)
     }
 }
 

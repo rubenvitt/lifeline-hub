@@ -15,7 +15,7 @@ import type {
   Verkehrsart,
 } from '../api/types';
 import {
-  baueFuehrungsorganisation,
+  buildFuehrungsorganisation,
   type OrgKnoten,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
 import { baueTzProps, type TzProps } from '../pages/lagekarte/taktischesZeichen';
@@ -64,7 +64,7 @@ import type { Herkunft } from './sprechgruppenplan';
  *   Führungsstelle und Abschnitt, keine Elemente (keine Lage, Stichleitung, Lücke, kein Fokus).
  *   Die der Führungsstelle zugeordneten Fahrzeuge stehen in ihrem Kasten (LFH-1106).
  *
- * Die Führungsorganisation (`baueFuehrungsorganisation`) ist nur noch Vorlage für Auto-Layout und
+ * Die Führungsorganisation (`buildFuehrungsorganisation`) ist nur noch Vorlage für Auto-Layout und
  * Fokusfolge (`baum`). Verwaiste Bezüge (Verbindung, Lagezeile auf ein fehlendes Element) fallen
  * weg; eine fehlende Quelle wird benannt und ist nie eine leere. Telefon, Kommunikationsmittel und
  * Rufnummern kommen nicht ins Modell (LLH-1134: Funk und Telefon getrennt; die Skizze ist Funk),
@@ -459,7 +459,9 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
 
   const abschnitte = q.abschnitte.daten;
   const einheiten = q.einheiten.zustand === 'daten' ? q.einheiten.daten : null;
-  const org = baueFuehrungsorganisation(abschnitte, einheiten);
+  // Wie der Funkplan: eine abgestellte Untereinheit bleibt am Führungsweg ihres Verbands
+  // (LLH-1744); nur das Organigramm hängt sie unter ihren Abschnitt.
+  const org = buildFuehrungsorganisation(abschnitte, einheiten, { detachAbgestellte: false });
   const abschnittJeId = new Map(abschnitte.map((a) => [a.id, a]));
   const einheitJeId = new Map((einheiten ?? []).map((e) => [e.id, e]));
 

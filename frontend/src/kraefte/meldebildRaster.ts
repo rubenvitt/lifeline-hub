@@ -137,6 +137,11 @@ export interface RasterZeile {
   bezeichnung: string;
   /** Typ, Funktion oder übergeordnete Einheit — Nebentext unter der Bezeichnung. */
   zusatz: string | null;
+  /**
+   * Nur Einheiten: Name der Obereinheit, von der die Einheit in ihren eigenen Abschnitt abgestellt
+   * ist (LLH-1744, `detachAbgestellte`); sie steht dann als Wurzel und zählt dort.
+   */
+  abgestelltAus: string | null;
   funkrufname: string | null;
   abschnitt: string | null;
   staerke: StaerkeSumme | null;
@@ -363,6 +368,7 @@ function personenVon(m: MittelDerEinheit): EinsatzPersonal[] {
 
 const LEER: Omit<RasterZeile, 'key' | 'art' | 'bezeichnung' | 'zusatz' | 'status'> = {
   einheitId: null,
+  abgestelltAus: null,
   funkrufname: null,
   abschnitt: null,
   staerke: null,
@@ -537,6 +543,7 @@ export function baueMeldebildRaster(e: RasterEingabe): RasterZeile[] {
       einheitId: x.id,
       bezeichnung: x.name,
       zusatz: x.typ_label ?? null,
+      abgestelltAus: k.abgestelltAus?.name ?? null,
       funkrufname: einheitFunkrufname(x),
       abschnitt:
         k.abschnittId != null

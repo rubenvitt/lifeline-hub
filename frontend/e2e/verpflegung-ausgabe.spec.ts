@@ -646,10 +646,18 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     browser,
   }) => {
     const { e, zf } = await saeenLang(page);
+    // Die Kopplung endet in 45 min: „Kopplung noch 45 min“ ist die breiteste Restzeit (LLH-1734).
     const kopplung = await anlegen<{ code: { code: string } }>(
       page,
       `/api/einsaetze/${e}/geraete`,
-      { ansicht: 'verpflegung', bezeichnung: 'Ausgabe Deich' },
+      {
+        ansicht: 'verpflegung',
+        bezeichnung: 'Ausgabe Deich',
+        laeuft_ab_at: new Date(Date.now() + 45 * 60_000)
+          .toISOString()
+          .slice(0, 16)
+          .replace('T', ' '),
+      },
     );
     const kontext = await browser.newContext({ viewport: flaeche, hasTouch: true });
     const geraet = await kontext.newPage();
@@ -660,6 +668,18 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
       await geraet.goto(`/geraet/${e}/verpflegung/${zf}/ausgabe`);
       await expect(geraet.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
       await expect(geraet.locator('[data-lfh="ausgabe-zeile"]')).toHaveCount(10);
+      // Der Gerätekopf steht am Handy auch in `komfortabel` einzeilig; bräche er um, rollte die
+      // Ausgabe um seine Höhe. Mutationsprobe: die schmale Zellpolsterung unter `md` in
+      // `GeraeteKopf.tsx` entfernt → die rechte Gruppe steht in einer zweiten Zeile, rot.
+      const kopf = geraet.locator('[data-lfh="geraet-kopf"]');
+      await expect(kopf.locator('[data-lfh="kopf-kopplungsende"]')).toHaveAttribute(
+        'data-bald',
+        'ja',
+      );
+      const zeilen = await kopf.evaluate(
+        (k) => new Set([...k.children].map((c) => Math.round(c.getBoundingClientRect().top))).size,
+      );
+      expect(zeilen, 'Gerätekopf einzeilig (390 px, komfortabel)').toBe(1);
       await pruefeKurzzeile(geraet, 'Gerät', '.geraet-huelle > main');
     } finally {
       await kontext.close();

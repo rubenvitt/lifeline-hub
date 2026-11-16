@@ -35,9 +35,11 @@ import { ohneKommentare } from '../test/ohneKommentare';
  * Benannte Konstanten fängt er in zwei Formen: `…_SCHRIFT`/`…FONT…` mit Zahlwert und eine
  * Konstante in Großbuchstaben am `fontSize` (auch `GROESSE.band`), die keine Stufe trägt (Review
  * LLH-1719). Als Stufe gilt nur eine Konstante dieser Datei, deren Zeile eine Stufe nennt und
- * keine Zahl; eine importierte oder über mehrere Zeilen geschriebene meldet er lieber zu viel.
+ * keine Zahl (über mehrere Zeilen zusammengezogen); eine importierte meldet er lieber zu viel.
  * Er sieht nicht: eine Zahl in einer kleingeschriebenen Variable (`const g = 13; fontSize: g`).
- * Das deckt die e2e-Messung `e2e/schrift-skala.spec.ts` am gerenderten Schirm.
+ * Das deckt die e2e-Messung `e2e/schrift-skala.spec.ts` am gerenderten Schirm. Die Großbild-Skala
+ * (`grossMass(GROSS_BEZUG.…)`, LLH-1747) wächst mit dem Fenster und ist wie die Fernsicht eine
+ * benannte Ausnahme; eine Zahl in `grossMass(28)` bleibt rot.
  *
  * Gelesen wird zeilenweise ohne Kommentare (`ohneKommentare`). Ein Wert über mehrere Zeilen wird
  * nur in seiner ersten Zeile geprüft; Prettier bricht kurze Werte nicht um. Der Lagemonitor
@@ -95,8 +97,24 @@ export function tsBefunde(
   const zeilen = ohneKommentare(inhalt);
   // Konstanten dieser Datei, die eine Stufe der Skala tragen (`BAND_GROESSE = schriftGroesse(…)`,
   // `EINHEITEN_STUFE: Groessenstufe = 'text'`): am `fontSize` erlaubt.
+  // Eine Konstante über mehrere Zeilen (Prettier bricht `{ … } as const` um) wird bis zur
+  // schließenden Klammer zusammengezogen und als eine Zeile gelesen.
+  const deklarationen = zeilen.map((z, i) => {
+    if (!/\b(?:const|let)\s+[A-Z][A-Z0-9_]*\b[^=]*=\s*\{\s*$/.test(z)) return z;
+    let tiefe = 0;
+    const teile: string[] = [];
+    for (const folge of zeilen.slice(i)) {
+      teile.push(folge.trim());
+      for (const zeichen of folge) {
+        if (zeichen === '{') tiefe += 1;
+        if (zeichen === '}') tiefe -= 1;
+      }
+      if (tiefe <= 0) break;
+    }
+    return teile.join(' ');
+  });
   const stufenKonstanten = new Set(
-    zeilen.flatMap((z) => {
+    deklarationen.flatMap((z) => {
       const m = /\b(?:const|let)\s+([A-Z][A-Z0-9_]*)\b[^=]*=\s*(.*)$/.exec(z);
       if (!m) return [];
       // Neben der Stufe keine Zahl (`leise ? schriftGroesse('klein') : 13` ist keine Stufe);
@@ -136,7 +154,10 @@ export function tsBefunde(
       // Eine Konstante in Großbuchstaben am `fontSize` trägt eine Zahl an der Prüfung vorbei
       // (Review LLH-1719: `BAND_SCHRIFT = 13`); erlaubt nur in Zeichnungen und im Lagemonitor.
       // Als Argument der Skala (`schriftGroesse(EINHEITEN_STUFE)`) ist die Konstante eine Stufe.
-      const konstante = /schriftGroesse\(|zahlStil\(|schriftStil\(|schriftPx\(/.test(wert)
+      // `grossMass(…)` ist die Großbild-Skala (LLH-1747): eine benannte Ausnahme wie die Fernsicht.
+      const konstante = /schriftGroesse\(|zahlStil\(|schriftStil\(|schriftPx\(|grossMass\(/.test(
+        wert,
+      )
         ? null
         : /(?<![\w.])([A-Z][A-Z0-9_]{2,})(?:\.\w+)*(?![\w(])/.exec(wert);
       // Auch der Zugriff auf ein Feld (`GROESSE.band`): die Stufe steht am Namen der Konstante.
@@ -312,6 +333,20 @@ describe('Regeln des Wächters an Texten (Mutationsproben)', () => {
           '  fontSize: MARKE.klein,',
       ),
     ).toEqual([]);
+    // Großbild-Skala (LLH-1747): Bezugsgrößen über `grossMass`, eine Zahl daneben bleibt rot.
+    expect(tsBefunde('fontSize: grossMass(GROSS_BEZUG.text),')).toEqual([]);
+    expect(tsBefunde('fontSize: grossMass(28),')).not.toEqual([]);
+    // Über mehrere Zeilen umgebrochen zählt die ganze Konstante (Stufe ja, Zahl daneben nein).
+    expect(
+      tsBefunde(
+        "const GROESSE = {\n  normal: schriftGroesse('titel'),\n  gross: `${fernsicht.text}px`,\n} as const;\n  fontSize: GROESSE.normal,",
+      ),
+    ).toEqual([]);
+    expect(
+      tsBefunde(
+        "const GROESSE = {\n  normal: schriftGroesse('titel'),\n  klein: 13,\n} as const;\n  fontSize: GROESSE.klein,",
+      ),
+    ).not.toEqual([]);
     // Eine Stufe neben einer Zahl macht die Konstante nicht zur Stufe.
     expect(
       tsBefunde("const BAND = leise ? schriftGroesse('klein') : 13;\n  fontSize: BAND,"),

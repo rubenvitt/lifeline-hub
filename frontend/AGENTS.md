@@ -60,8 +60,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Schrift`, antds `token.fontSize*` oder `var(--lfh-…)` in CSS; Rechnungen nehmen `schriftPx`.
   **Kein Größen-Literal** (`fontSize: 12`, `font-size: 12px`, `monoStil`), ohne Schuldmenge:
   Wächter `theme/schriftLiteral.guard.test.ts`. Ausnahmen nur Druckblätter (pt), die
-  Fernsicht-Skala des Lagemonitors (`fernsicht`) und Zeichnungen mit eigenem Maßstab (Lagekarte,
-  Fernmeldeskizze, taktische Zeichen).
+  Fernsicht-Skala des Lagemonitors (`fernsicht`), die Großbild-Skala (`grossMass`, LLH-1747) und
+  Zeichnungen mit eigenem Maßstab (Lagekarte, Fernmeldeskizze, taktische Zeichen).
 - **Mono nur für Zahl, Zeit, Kennung und Funkrufname** (LLH-1777, Spec `schriftrollen`;
   umgekehrt 15.11.2026: der Neuentwurf setzte auch die Meta-Zeilen in Mono): `zahlStil` trägt
   Mono, Kennungen sind auch das Typwort der Zeitachse, `/typ`, Tastenkürzel, die Wortmarke und
@@ -93,8 +93,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
-  (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `rollenwerte`/`useRollen` ·
-  Dashboard-Baukasten (unten).
+  (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `AlarmZeile` („Was brennt“, LLH-1743,
+  Regel im Dashboard-Baukasten) · `rollenwerte`/`useRollen` · Dashboard-Baukasten (unten).
 - **Bausteine außerhalb von `instrument/`** (LLH-1147; Regel je am genannten Spiegelstrich):
   `anzeige/ZeitpunktEingabe.tsx` (Zeiteingabe) · `anzeige/ZeitAnzeige.tsx` (Zeitdarstellung) ·
   `anzeige/Ortsfeld.tsx`, im Einsatz `anzeige/EinsatzOrtsfeld.tsx` (Ortsfeld) ·
@@ -105,7 +105,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `alarm/AlarmZone.tsx` (Alarmzone,
   Rahmen) · `personen/SichtungsWahl.tsx` ·
   `personen/koerperschema/Koerperschema.tsx` · `zeichen/EinsatzZeichen.tsx` (taktische Zeichen,
-  am Schirm mit `useZeichenTheme`, LLH-1409). Jeder hat eine Karte im Design System.
+  am Schirm mit `useZeichenTheme`, LLH-1409) · `components/grossbild/` (Großbild am Bedienplatz,
+  LLH-1747, Spec `grossbild-ansicht`: `GrossKennzahl`, `GrossZeile(n)`, Hülle `GrossbildFlaeche`
+  mit Element-Vollbild, nur Ansehen; Größen nur über `grossMass`, Bezug 1920 × 1080 = Lagemonitor,
+  mitwachsend über `min(vw, vh)`). Jeder hat eine Karte im Design System, außer der Hülle
+  `GrossbildFlaeche` (Portal und Vollbild).
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (16/600, Paneele ab `h2`), `meta` in der Textschrift, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
@@ -222,7 +226,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   trägt sein Ticket im Code-Kommentar und wird als **Abwesenheit** getestet. Eingelöst:
   Evakuiert (LFH-607, `openspec/changes/archive/2026-09-29-lfh-607-kennzahl-evakuiert/`), Pegel auf Platz 1
   (LFH-606), Rückmeldung (LFH-610), ETB-Zählung (LFH-612).
-- **Kennzahlenband** (LFH-640): immer sechs Plätze (vier Kern, zwei Lage), jede Kennzahl ein
+- **Kennzahlenband** (LFH-640): „Lage in Zahlen“ hat immer sechs Plätze (vier Kern, zwei Lage); der
+  Führungsstand des Überblicks nur seine Handlungszahlen (LLH-1743). Jede Kennzahl hat einen
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
   per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen,
   LLH-1371); Neuzuschnitt während der Betrachtung als Sammelbanner
@@ -242,12 +247,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   zeigt (Lagebild, Führung · Überblick, Meldebild-Kopf), baut sich aus denselben Bausteinen in
   `components/instrument/`.
   Kopf: `EinsatzSeite` mit Datenstand und `WarnstufenHinweis` (nur bei Ton achtung/alarm; die
-  Warnstufe ist keine Kennzahl). Reihe 1: `Kennzahlenband`, sechs Plätze (Regel oben).
+  Warnstufe ist keine Kennzahl). Darunter, vor jedem Band, auf Überblick, Lagebild und Lagemonitor
+  die **Alarmzeile „Was brennt“** (`AlarmZeile`, LLH-1743, Spec `lage-alarmzeile`): Einträge,
+  Folge und Wortlaut nur aus `lage/wasBrennt.ts`, auf den Übersichten über `lage/useWasBrennt.ts`,
+  am Monitor über `lage/alarmAusMonitor.ts`; feste Höhe, „Nichts brennt“ nur bei vollständigen
+  Quellen, Sprungziele aus `lage/alarmZiel.ts`. Sie zeigt Zustände, die Alarmzone Ereignisse; keine
+  Seite baut eine zweite Sammlung. Reihe 1: `Kennzahlenband` (Regel oben; sechs Plätze im Band
+  „Lage in Zahlen“ des Lagebilds, der Überblick trägt den „Führungsstand“ mit drei Handlungszahlen).
   Reihe 2: eine oder mehrere `PaneelReihe` mit je bis zu drei Paneelen (`1fr 1fr 1.1fr`, unter
   `lg` gestapelt) in der `DashboardFlaeche` (Fugenraster). Ein Kopf über einer Vergleichstabelle
   (Meldebild) ist nur eine Paneelreihe mit `dichte="kompakt"`, ohne Band, ohne Füllkachel; eine
-  Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband „Führungsstand“ als
-  `Kennzahlenband` mit `groesse="klein"`, Zahlen aus dem Modulzähler. Jedes Paneel geht durch
+  Einzelzahl darin (Rückmeldung) ist eine `Kennzahl` mit Sprung. Reihe 3, wo es sie gibt: Fußband
+  „Stand“ des Lagebilds (Lagebericht, UHS aktiv) als `Kennzahlenband` mit `groesse="klein"`. Jedes Paneel geht durch
   `DashboardPaneel` (Augenbraue, Zähler als Meta, Sprung „… ↗“, `PaneelZustand`; `gesperrt` nennt
   den Grund, ohne Sprung und Leeraktion) und ist einer der Typen `VerteilungsPaneel` (Zahl +
   Anteilsbalken je Kategorie: Sichtung, FMS-Status), `MatrixPaneel` (Stufenmatrix: Gefahren),
@@ -259,19 +270,30 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Leer und Gesperrt sehen verschieden aus; eine unbekannte Zahl steht als „—“, nie als 0. Balken
   ergänzen die Zahl, nie ersetzen sie; Farben kommen aufgelöst vom Aufrufer, der Baustein trägt
   keine Statuskarte. Ein neuer Paneeltyp kommt als Baustein hierher, nicht lokal in eine Seite.
+- **Rollen der Übersichten** (LLH-1743, Spec `lage-verdichtung`, „Überblick führt, Lagebild zeigt
+  die Lage“): der Überblick sagt, was zu tun ist (Aufträge, Meldungen, Abschnitte, offene
+  Vorgänge, nächste Marken, Entscheidungen), das Lagebild, was los ist (Betroffene, Kräfte,
+  Vermisste, Gefahren, Sichtung, Einsatzdauer, Lagebericht, UHS). Eine Kennzahl steht auf genau
+  einer der beiden Seiten; nur die Alarmzeile steht auf beiden. Beide verweisen im Seitenkopf
+  aufeinander. Herleitung: `openspec/changes/archive/2026-11-16-t9jjrajy-alarmzeile-was-brennt/design.md` (D8).
 - **Eine Heimat je Zahl** (LFH-550,
   `openspec/changes/archive/2026-09-30-lfh-550-lagebesprechung-eine-verdichtung/design.md`):
-  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig),
+  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig,
+  Sofort- und dringende Meldungen offen samt Eingang der ältesten, LLH-1743),
   Nachforderungen (offen, je Stufe, überfällig; LLH-1145), Erinnerungen (fällig) und Lagemeldungen
   (neu) nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
   Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
-  über die Gründe der Tönung des Meldebilds (`toenungsGruende`); der Überblick summiert sie je
-  Abschnitt. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
+  über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
+  `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
+  Einheiten. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
   jüngste Meldung allein (LLH-1739, `abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
-  (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
-  nur `anzeige/staerke.ts:staerkeText`. Belegung eines Bereitstellungsraums (LLH-1095, Spec
+  (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
+  ihm steht (LLH-1744): Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit
+  beim wirksamen Abschnitt), seine Einheiten nur über `einheitenImAbschnitt`, dieselbe Menge. „Kräfte“
+  sind Köpfe, Fahrzeuge zählen eigens; Kräfte an UHS nur an aktiven UHS (`countsKraefteAnUhs`,
+  Lagebild und Lagemonitor). Belegung eines Bereitstellungsraums (LLH-1095, Spec
   `bereitstellungsraum-belegung`): Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
   des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
   (`bereitstellungsraum/brZahlen.ts`; nur Einheiten im Raum mit ihrer eigenen Stärke, LLH-1289); „noch n belegt“ vor dem Auflösen zählt wie
@@ -285,7 +307,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Einheit → Untereinheiten, je Einheit Fahrzeuge mit Besatzung, „Ohne Fahrzeug“, Material; jede
   Kraft genau einmal, Elternstärke über `accumulateStaerke`. Meldebild (`meldebildRaster.ts`) und
   Lagebericht-Text (`kraeftebild.ts`) bilden den Kern nur ab; ein neuer Abnehmer baut keinen
-  eigenen Baum.
+  eigenen Baum. Meldebild, Kräftebild und Organigramm lösen abgestellte Untereinheiten (eigener
+  Abschnitt ungleich dem der Obereinheit) über `detachAbgestellte`/`abgestelltVon` vom Verband,
+  „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau, Funkplan und Fernmeldeskizze
+  (`baueFuehrungsorganisation(…, { detachAbgestellte: false })`) behalten den Verband.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -375,7 +400,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Organigramm der Führungsorganisation** (LFH-626, `pages/einsatzabschnitte/Organigramm.tsx`,
   `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
-  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan; Vorlage für Auto-Layout
+  `buildFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, nur eine abgestellte
+  Untereinheit steht wie im Meldebild unter ihrem Abschnitt, LLH-1744; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
   „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `einsatz/einsatzleiter.ts`
   (LFH-1199); die Stabsstelle nur aus den Mitgliedern (`fuehrung/besetzungAusMitgliedern.ts`,
@@ -1180,8 +1206,8 @@ und `pages/personen/`.
   Schlüssel `<praefix>:letzteAuswahl:<einsatzId>` ist gepinnt). **Ein reiner Kern bekommt ein Suffix** (`…Kern.ts`): gleicher Basename
   wie die `.tsx` kollidiert case-insensitiv, Vite löst `.ts` vor `.tsx` auf („Element type is
   invalid").
-- Stärke EINMAL summieren (`anzeige/staerke.ts:summiereStaerke`, `null` bei leerer Menge;
-  kumuliert `pages/einsatzabschnitte/abschnittStaerke.ts`).
+- Stärke EINMAL summieren (`anzeige/staerke.ts:summiereStaerke`, `null` bei leerer Menge); je
+  Abschnitt nur `pages/einsatzabschnitte/abschnittStaerke.ts` (wer im Abschnitt steht, LLH-1744).
   „Abschnitt anlegen" ist eine Erfassung mit drei Feldern (`ErfassungsModal`), den Datensatz gibt
   es erst nach dem Absenden; das Detail bearbeitet jede Angabe einzeln (`patcheAbschnitt`, ein
   Feld je PATCH, Spec `einsatzabschnitt-bearbeitung`, LFH-1208,

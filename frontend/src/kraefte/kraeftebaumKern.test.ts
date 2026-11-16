@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   abschnittDerEinheit,
-  abschnittDerObersten,
   buildEinheitOptions,
   groupEinheitOptions,
   besatzungsStaerke,
@@ -10,6 +9,7 @@ import {
   needsOhneFahrzeugKnoten,
   einheitenBaum,
   kraeftebaum,
+  detachAbgestellte,
   accumulateStaerke,
   materialImBaum,
   mittelDerEinheit,
@@ -270,21 +270,58 @@ describe('buildEinheitOptions / groupEinheitOptions (LLH-1073, design.md D3)', (
   });
 });
 
-describe('abschnittDerObersten', () => {
-  it('eine Untereinheit zählt beim Abschnitt ihrer obersten Einheit', () => {
-    const m = abschnittDerObersten([eh(1, 10), eh(2, null, 1), eh(3, 11, 1), eh(4, 12)]);
-    expect([...m]).toEqual([
-      [1, 10],
-      [2, 10],
-      [3, 10],
-      [4, 12],
+describe('detachAbgestellte (LLH-1744, Spec `kraeftebaum`)', () => {
+  const abschnitte = [ab(10), ab(11, 10), ab(12)];
+
+  it('eine Untereinheit mit eigenem, anderem Abschnitt wird samt Kindern Wurzel ihres Abschnitts', () => {
+    // Zug 1 in 10; Gruppe 2 in 11 mit Trupp 3 (erbt 11); Gruppe 4 ohne Abschnitt (erbt 10).
+    const baum = detachAbgestellte(
+      [eh(1, 10), eh(2, 11, 1), eh(3, null, 2), eh(4, null, 1)],
+      abschnitte,
+    );
+    expect(ids(baum)).toEqual([
+      [1, [4]],
+      [2, [3]],
     ]);
+    expect(baum[1].abgestelltAus?.id).toBe(1);
+    expect(baum[1].abschnittId).toBe(11);
+    expect(baum[0].abgestelltAus).toBeUndefined();
+    expect(baum[1].kinder[0].abgestelltAus).toBeUndefined();
   });
 
-  it('fehlt die Obereinheit, gilt der eigene Abschnitt; ein Zyklus hängt nicht', () => {
-    const m = abschnittDerObersten([eh(2, 11, 99), eh(5, 13, 6), eh(6, 14, 5)]);
-    expect(m.get(2)).toBe(11);
-    expect([13, 14]).toContain(m.get(5));
+  it('eine Untereinheit mit demselben eigenen Abschnitt bleibt unter ihrer Einheit', () => {
+    const baum = detachAbgestellte([eh(1, 10), eh(2, 10, 1)], abschnitte);
+    expect(ids(baum)).toEqual([[1, [2]]]);
+  });
+
+  it('ohne eigenen Abschnitt bleibt sie unter einer Obereinheit ohne Abschnitt', () => {
+    const baum = detachAbgestellte([eh(1, null), eh(2, null, 1)], abschnitte);
+    expect(ids(baum)).toEqual([[1, [2]]]);
+  });
+
+  it('mit eigenem Abschnitt löst sie sich auch von einer Obereinheit ohne Abschnitt', () => {
+    const baum = detachAbgestellte([eh(1, null), eh(2, 12, 1)], abschnitte);
+    expect(ids(baum)).toEqual([2, 1]);
+    expect(baum[0].abgestelltAus?.id).toBe(1);
+  });
+
+  it('fehlt die Obereinheit in der Auswahl, nennt die ungefilterte Liste sie trotzdem', () => {
+    const alle = [eh(1, 10), eh(2, 11, 1)];
+    const baum = detachAbgestellte([alle[1]], abschnitte, alle);
+    expect(ids(baum)).toEqual([2]);
+    expect(baum[0].abgestelltAus?.id).toBe(1);
+  });
+
+  it('Waise und Zyklus verlieren keine Einheit', () => {
+    const baum = detachAbgestellte([eh(5, 10, 6), eh(6, 11, 5), eh(7, null, 99)], abschnitte);
+    const flach: number[] = [];
+    const sammle = (k: readonly EinheitKnoten[]) =>
+      k.forEach((x) => {
+        flach.push(x.einheit.id);
+        sammle(x.kinder);
+      });
+    sammle(baum);
+    expect(flach.sort()).toEqual([5, 6, 7]);
   });
 });
 

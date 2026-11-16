@@ -15,18 +15,15 @@ import type {
   Gefahrengebiet,
   LetzteRueckmeldung,
   PegelAnzeige,
-  Person,
 } from '../../api/types';
 import {
   abschnittGruende,
   abschnittNamen,
   abschnittZeilen,
   auftraegeKennzahl,
-  betroffeneKennzahl,
   empfaengerText,
   entscheidungenAuswahl,
   folgeText,
-  kraefteKennzahl,
   markenBewertung,
   naechsteMarken,
   offeneAuftraege,
@@ -42,9 +39,6 @@ dayjs.extend(utc);
 const JETZT = dayjs.utc('2026-09-21 14:00:00');
 const vor = (min: number) => JETZT.subtract(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
 const nach = (min: number) => JETZT.add(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
-
-const person = (erfasst_at: string, id = Math.random()) =>
-  ({ id, erfasst_at, status: 'betroffen', aktuelle_sichtung: null }) as unknown as Person;
 
 const empfaenger = (over: Partial<AuftragEmpfaenger> = {}): AuftragEmpfaenger => ({
   id: 1,
@@ -140,24 +134,6 @@ describe('zeitpunkt', () => {
 });
 
 describe('Kennzahlen', () => {
-  it('Betroffene zählen alle und die in den letzten 60 min erfassten', () => {
-    const k = betroffeneKennzahl(
-      [person(vor(5)), person(vor(60)), person(vor(61)), person(vor(600))],
-      JETZT,
-    );
-    expect(k).toEqual({ anzahl: 4, neu: 2 });
-  });
-
-  it('Kräfte: Gesamtstärke und BOS-Schreibweise F/UF/M//Σ', () => {
-    const k = kraefteKennzahl([
-      personal(1, null, 'fuehrer', null),
-      personal(2, null, 'unterfuehrer', null),
-      personal(3, null, 'mannschaft', null),
-      personal(4, null, 'mannschaft', null),
-    ]);
-    expect(k).toEqual({ gesamt: 4, text: '1/1/2//4' });
-  });
-
   it('Warnstufe: höchste Stufe als Wort, Ton aus dem Kennzahl-Vertrag', () => {
     const g = (w: string) => ({ hoechste_warnstufe: w }) as unknown as Gefahrengebiet;
     expect(warnstufeKennzahlVon([])).toMatchObject({ wort: 'keine', ton: 'neutral' });
@@ -777,6 +753,30 @@ describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
     expect(nach(4).unterLage).toBeNull();
     // ohne eigene Beurteilung ist jede Beurteilung darunter eine Aussage
     expect(nach(6).unterLage).toBe('planmaessig');
+  });
+});
+
+describe('abschnittZeilen — abgestellte Untereinheit (LLH-1744)', () => {
+  it('zählt Stärke und Ausfall beim Abschnitt, in dem die Gruppe steht, nicht bei ihrem Zug', () => {
+    // Zug 40 in Logistik (1); Gruppe 42 dem Zug unterstellt, selbst an der UHS (2).
+    const zeilen = abschnittZeilen({
+      abschnitte: [abschnitt(1, 'Logistik'), abschnitt(2, 'UHS')],
+      einheiten: [einheit(40, 1, null, 'gebunden'), { ...einheit(42, 2, 40, 'gebunden') }],
+      personal: [
+        personal(5, 40, 'fuehrer', 'gebunden'),
+        personal(6, 42, 'unterfuehrer', 'gebunden'),
+        personal(7, 42, 'mannschaft', 'nicht_verfuegbar'),
+      ],
+      fahrzeuge: [],
+      material: [],
+      auftraege: [],
+    });
+    const logistik = zeilen.find((z) => z.abschnittId === 1)!;
+    const uhs = zeilen.find((z) => z.abschnittId === 2)!;
+    expect(logistik.staerkeText).toBe('1/0/0//1');
+    expect(uhs.staerkeText).toBe('0/1/1//2');
+    expect(abschnittGruende(logistik, JETZT)).toEqual([]);
+    expect(abschnittGruende(uhs, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
   });
 });
 

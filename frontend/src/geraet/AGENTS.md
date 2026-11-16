@@ -26,7 +26,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   das Gerät einsatzweit. Ihre Handler fragen `sicht_wahlweise` / `ziel_stelle_wahlweise`, nie die
   strenge `sicht`; eine neue wahlweise Ansicht braucht dieselbe Entscheidung in jedem Handler.
 - **Abschnittsansicht** (LFH-1043): der Bereich ist der Teilbaum des gebundenen Abschnitts samt
-  seiner Einheiten (`src/geraet/abschnitt.rs`, je Anfrage neu berechnet). Listen filtern über
+  seiner Einheiten (`src/geraet/abschnitt.rs`, je Anfrage neu berechnet). Seine Einheiten sind, wer
+  im Teilbaum steht (LLH-1744): aktive Einheiten mit wirksamem Abschnitt im Teilbaum, also auch eine
+  Untereinheit ohne eigenen Abschnitt unter einer Einheit dort; sie gilt für Liste, Stärke, Absender
+  und Quittung wie ihre Obereinheit. Die Liste der Startseite ordnet und beschriftet nach dem
+  wirksamen Abschnitt und zeigt je Einheit die eigene Stärke. Listen filtern über
   `abschnitt::bereich`, Aufträge im SQL (`AuftragFilter.bereich`, sonst stimmt das Blättern
   nicht); Fremdes ist 404, ein fremder Meldungsabsender 403, ohne Angabe meldet der Abschnitt.
   Quittiert wird nur die eigene Empfängerzeile (`darfQuittierenFuer` an `AuftragKarte`).
@@ -142,13 +146,29 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   meldende Stelle und Ortsangabe, `routes/einsatz.rs` `detail`); Datenstand älter als 2 Minuten
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe.
   Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
-  nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie) und Abschnittsflächen
-  (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen Sofortmeldungen nur als
-  Zahl (`sofortmeldungen_offen`, D12 der Change `kcjecn9e-benachrichtigungskonzept`); `/zonen`
-  und `/abschnitte` bleiben ihm gesperrt, sie tragen Notizen und Leiternamen. Die nächsten drei
+  nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie, bei einem Gefahrengebiet dazu
+  `gebiet`: Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, LLH-1746) und
+  Abschnittsflächen (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen
+  Sofortmeldungen nur als Zahl (`sofortmeldungen_offen`, D12 der Change
+  `kcjecn9e-benachrichtigungskonzept`); `/zonen`, `/abschnitte` und `/gefahrengebiete` bleiben ihm
+  gesperrt, sie tragen Notizen, Leiternamen und den Namen dessen, der beurteilt hat. Beschriftung
+  und Notiz einer Zone erreichen ihn nie. Die Karte beschriftet Gefahrenzonen mit Marken in
+  Großbild-Schrift (`geraet/lagemonitorFlaechen.ts`, `zonenMarkenTeile`: Name und Stufe getrennt,
+  die Stufe im Wort der Lagekarte, `stufenWort`; ein langer Name bricht um, nie gekürzt) und färbt
+  Gefahrengebiete wie die Lagekarte (`gefahrengebietStil`); das Lagebild für Externe nutzt dieselbe
+  Karte ohne Zonenmarken (`zonenBeschriften={false}`); eine überbelegte UHS (`istUeberbelegt`: mehr Belegte
+  als Plätze) steht in Kachel und Kartenmarke in der Alarmrolle. Die nächsten drei
   Programmpunkte (LLH-1570, `programm`: Bezeichnung und Zeitpunkt) kommen ebenfalls von dort,
   `/programmpunkte` bleibt ihm gesperrt; die Kachel „Ablauf“ filtert verstrichene Punkte mit der
-  Monitoruhr und fehlt, wenn keiner ansteht, ohne Alarm und Hervorhebung. Steigt diese Zahl
+  Monitoruhr und fehlt, wenn keiner ansteht, ohne Alarm und Hervorhebung. Die Alarmzeile
+  (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne Personenbezug“) liest den Block `alarm` derselben
+  Antwort: Zahlen aus den Zählfunktionen des Modulzählers, überfällige Rückmeldungen nur mit dem
+  Namen der Einheit, kritische Abschnitte nur mit ihrer Bezeichnung, nie Meldungs-, Auftrags- oder
+  Erinnerungstexte; den Ausfall trägt der Block nicht (die Regel lebt im Browser). Nur der
+  Handler `lagebild` füllt ihn, `verdichte` (Lagebild für Externe, API v1) nicht. Eine
+  Sofortmeldung erreicht den Monitor im Live-Kanal als `sofortmeldung` mit leerer Nutzlast
+  (`LiveNachricht::fuer_verbindung`), ohne das Modul Meldungen; alle anderen Meldungsereignisse
+  bleiben ihm fern. Steigt diese Zahl
   oder SK I gegenüber dem letzten Stand, hebt `useAnstieg` sie 60 s mit Farbe und Wort hervor,
   ohne Ton und Blinken. Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren

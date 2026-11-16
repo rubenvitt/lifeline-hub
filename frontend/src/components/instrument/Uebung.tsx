@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Einsatzart } from '../../api/types';
 import { isUebung } from '../../einsatz/einsatzart';
 import { fernsicht, type Farbrollen } from '../../theme/tokens';
+import { grossMass } from '../grossbild/grossMass';
 import { RAHMEN_EBENE, RAHMEN_RANG, useRahmenObenStapel } from '../rahmenOben';
 import { schriftGroesse, schriftStil, useRollen } from './rollenwerte';
 
@@ -28,9 +29,14 @@ const WORT = 'Übung';
 
 /**
  * Größen der Marke: Kopf, Liste und Wechsler `klein` in der Stufe `fein` (wächst mit der Dichte,
- * LLH-1774); der Lagemonitor liest aus Metern (Fernsicht-Skala).
+ * LLH-1774); der Lagemonitor liest aus Metern (Fernsicht-Skala). `grossbild` ist die Monitorgröße
+ * als mitwachsende Länge (LLH-1747, `components/grossbild/grossMass.ts`).
  */
-const MARKE_SCHRIFT = { klein: schriftGroesse('fein'), monitor: `${fernsicht.text}px` } as const;
+const MARKE_SCHRIFT = {
+  klein: schriftGroesse('fein'),
+  monitor: `${fernsicht.text}px`,
+  grossbild: grossMass(fernsicht.text),
+} as const;
 
 function wortStil(rollen: Pick<Farbrollen, 'uebungText'>, groesse: string): CSSProperties {
   return {
@@ -62,7 +68,8 @@ export function UebungsMarke({
         display: 'inline-flex',
         alignItems: 'center',
         flexShrink: 0,
-        // Polster im Verhältnis zur Schrift, die mit der Dichte wächst (LLH-1774).
+        // Polster im Verhältnis zur Schrift, die mit der Dichte bzw. dem Fenster wächst (LLH-1774,
+        // LLH-1747).
         paddingBlock: `calc(${px} * 0.2)`,
         paddingInline: `calc(${px} * 0.5)`,
         background: rollen.uebungFuellung,

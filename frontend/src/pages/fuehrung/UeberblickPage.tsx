@@ -1,4 +1,6 @@
 import { IconBericht, IconPlus } from '../../icons';
+import { useWasBrennt } from '../../lage/useWasBrennt';
+import { alarmZiel } from '../../lage/alarmZiel';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -8,7 +10,6 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
 import {
   istKeyFreigegeben,
-  istPfadGesperrt,
   istSprungGesperrt,
   KEINE_BERECHTIGUNG,
   modulRegistry,
@@ -29,6 +30,7 @@ import {
   StromPaneel,
   Verteilungsliste,
   WarnstufenHinweis,
+  AlarmZeile,
   Zeitachseneintrag,
   listenZeileStil,
   useRollen,
@@ -47,7 +49,6 @@ import { verfasserText } from '../../etb/verfasser';
 import BerichtigtMarke from '../../etb/BerichtigtMarke';
 import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
 import type { ModulFreigaben } from '../../api/types';
-import { listePersonen } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listEinsatzMaterial } from '../../api/einsatzMaterial';
@@ -68,7 +69,6 @@ import {
   meldungenNotiz,
   meldungsStand,
 } from '../lage-dashboard/fuehrungsZahlen';
-import { einsatzdauerKennzahl } from '../lage-dashboard/lagebild';
 import { UNBESTAETIGT } from '../gefahren/beurteilung';
 import { pegelAbfrage } from '../../api/pegel';
 import { wetterAbfrage } from '../../api/wetter';
@@ -87,10 +87,8 @@ import {
   einsatzabschnittePfad,
   erinnerungenPfad,
   etbPfad,
-  kraefteuebersichtPfad,
   lageberichtePfad,
   meldungenPfad,
-  personenPfad,
   lagebesprechungPfad,
   abloesungPfad,
   pegelZielPfad,
@@ -99,17 +97,14 @@ import {
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { abschnittLagezustand, etbTyp, rollenFarbe } from '../../theme/statusFarben';
 import StatusTag from '../../components/StatusTag';
-import { useViewport } from '../../components/useViewport';
 import { grundWort } from '../../kraefte/meldebildRaster';
 import {
   abschnittGruende,
   abschnittNamen,
   abschnittZeilen,
   auftraegeKennzahl,
-  betroffeneKennzahl,
   entscheidungenAuswahl,
   folgeText,
-  kraefteKennzahl,
   naechsteMarken,
   warnstufeKennzahlVon,
   ueberblickRechteText,
@@ -240,7 +235,6 @@ export default function UeberblickPage() {
   const einsatzId = Number(id);
   const { waehle, linkFaenger } = useModulWahl();
   const { token, rollen } = useRollen();
-  const { abBreite } = useViewport();
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useJetzt();
   const { benutzer } = useAuth();
@@ -274,10 +268,11 @@ export default function UeberblickPage() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const freigaben = freigabenQ.data;
+  // Alarmzeile „Was brennt“ (LLH-1743): derselbe Hook wie im Lagebild, gegen die Uhr der Seite.
+  const wasBrenntDaten = useWasBrennt(einsatzId, jetzt);
   // Ein gescheiterter Neuabruf lässt die alten Freigaben gültig, wie auf der Lagekarte.
   const freigabenStand: FreigabenStand =
     freigaben !== undefined ? 'da' : freigabenQ.isError ? 'fehler' : 'laden';
-  const personenFrei = istKeyFreigegeben('personen', freigaben);
   const personalFrei = istKeyFreigegeben('personal', freigaben);
   const fahrzeugeFrei = istKeyFreigegeben('fahrzeuge', freigaben);
   const materialFrei = istKeyFreigegeben('material', freigaben);
@@ -293,14 +288,8 @@ export default function UeberblickPage() {
   // es sagt; solange die Freigaben laden, steht kein Knopf gesperrt da.
   const lageberichtGesperrt = istSprungGesperrt('lageberichte', freigaben);
   const etbSprungGesperrt = istSprungGesperrt('etb', freigaben);
-  const meldebildGesperrt = istSprungGesperrt('kraefteuebersicht', freigaben);
   const lagebesprechungGesperrt = istSprungGesperrt('lagebesprechung', freigaben);
 
-  const personenQ = useQuery({
-    queryKey: einsatzKeys.personen(einsatzId),
-    queryFn: () => listePersonen(einsatzId),
-    enabled: personenFrei,
-  });
   const personalQ = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
@@ -422,7 +411,6 @@ export default function UeberblickPage() {
   // Ein ETB-Eintrag ist am Spiegel ein Antrag (LLH-1492, D13).
   const darfEtbErfassen = darfBeantragen(einsatz);
   // Daten nur aus freien Quellen: der Cache eines gesperrten Moduls kann einen Altstand tragen.
-  const personen = personenFrei ? personenQ.data : undefined;
   const personal = personalFrei ? personalQ.data : undefined;
   const fahrzeuge = fahrzeugeFrei ? fahrzeugeQ.data : undefined;
   const material = materialFrei ? materialQ.data : undefined;
@@ -437,8 +425,6 @@ export default function UeberblickPage() {
   const rueckmeldungen =
     !rueckmeldungenFrei || rueckmeldungenQ.isError ? undefined : rueckmeldungenQ.data;
 
-  const betroffene = useMemo(() => betroffeneKennzahl(personen ?? [], jetzt), [personen, jetzt]);
-  const kraefte = useMemo(() => kraefteKennzahl(personal ?? []), [personal]);
   const warnstufe = useMemo(() => warnstufeKennzahlVon(gefahren ?? []), [gefahren]);
   const pegel = pegelQ.data;
   const pegelNotiz = useMemo(
@@ -502,7 +488,6 @@ export default function UeberblickPage() {
 
   const qEinsatz: Quelle = { q: einsatzQ, frei: true };
   const qProgramm: Quelle = { q: programmQ, frei: true };
-  const qPersonen: Quelle = { q: personenQ, frei: personenFrei };
   const qPersonal: Quelle = { q: personalQ, frei: personalFrei };
   const qFahrzeuge: Quelle = { q: fahrzeugeQ, frei: fahrzeugeFrei };
   const qMaterial: Quelle = { q: materialQ, frei: materialFrei };
@@ -516,8 +501,6 @@ export default function UeberblickPage() {
   const ohneGesperrte = (...quellen: Quelle[]) =>
     quellen.filter((x) => x.frei || freigabenStand !== 'da');
 
-  const zBetroffene = zustandVon(freigabenStand, qPersonen);
-  const zKraefte = zustandVon(freigabenStand, qPersonal);
   const zWarnstufe = zustandVon(freigabenStand, qGefahren);
   const zAbschnitteZahl = zustandVon(freigabenStand, qAbschnitte);
   const zAbschnitte = zustandVon(
@@ -630,9 +613,11 @@ export default function UeberblickPage() {
     ) : undefined;
 
   const meldungsstand = meldungsStand(zaehlerQ);
-  const dauer = einsatz ? einsatzdauerKennzahl(einsatz, jetzt.valueOf(), konventionen) : null;
-  const einsatzdatenZiel = einsatzModulPfad(einsatzId, 'einsatzdaten');
-  const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
+  // Drei Handlungszahlen in einer Reihe, auch am Handy (LLH-1748: das Band nahm dort den ganzen
+  // ersten Schirm).
+  const bandSpalten = 3;
+  const lagebildZiel = einsatzModulPfad(einsatzId, 'lage-dashboard');
+  const lagebildGesperrt = istSprungGesperrt('lage-dashboard', freigaben);
 
   return (
     // Jeder Link der Seite ist eine Modulwahl für „Zuletzt besucht" (LFH-436, `useModulWahl`).
@@ -659,6 +644,14 @@ export default function UeberblickPage() {
         }
         aktionen={
           <>
+            {/* Die Übersichten verweisen aufeinander (LLH-1743, Spec `lage-verdichtung`). */}
+            <Button
+              disabled={lagebildGesperrt}
+              title={lagebildGesperrt ? KEINE_BERECHTIGUNG : undefined}
+              onClick={() => waehle(lagebildZiel)}
+            >
+              {modulName('lage-dashboard')}
+            </Button>
             <Button
               icon={
                 <Icon>
@@ -703,36 +696,20 @@ export default function UeberblickPage() {
             LLH-1481). */}
         {einsatzQ.isLoading || zaehlerQ.isLoading ? null : (
           <DashboardFlaeche kennung="ueberblick">
-            {/* Sechs Plätze wie im Lagebild (Kennzahlenband, LFH-640; Belegung LLH-1140 E1).
-              Notizplatz wie dort: unter `md` Boden (LFH-629), ab `md` drei Zeilen Boden und
-              Deckel (LFH-691). */}
+            {/* Die Alarmzeile „Was brennt“ steht als erstes unter dem Seitenkopf, auf Überblick,
+              Lagebild und Lagemonitor dieselbe (LLH-1743, Spec `lage-alarmzeile`). */}
+            <AlarmZeile daten={wasBrenntDaten} ziel={(e) => alarmZiel(e, einsatzId, freigaben)} />
+            {/* Führungsstand: nur Handlungszahlen (LLH-1743, Seitenrollen „Führen: was ist zu
+              tun“, `frontend/AGENTS.md`). Betroffene, Kräfte und Einsatzdauer haben ihre Heimat im
+              Lagebild. Notizplatz wie dort: unter `md` Boden (LFH-629), ab `md` drei Zeilen Boden
+              und Deckel (LFH-691). */}
             <Kennzahlenband
-              beschriftung="Lage in Zahlen"
+              beschriftung="Führungsstand"
               spalten={bandSpalten}
               notizZeilenSchmal={2}
               notizZeilen={3}
               style={{ border: 'none' }}
             >
-              {/* Gesperrt: „—" mit Grund und ohne Link, wie die Aufträge aus dem Modulzähler. */}
-              <Kennzahl
-                titel="Betroffene"
-                zustand={kennzahlZustand(zBetroffene)}
-                wert={zBetroffene === 'gesperrt' ? '—' : betroffene.anzahl}
-                einheit={zBetroffene === 'gesperrt' ? undefined : 'Pers.'}
-                notiz={
-                  zBetroffene === 'gesperrt' ? NICHT_FREIGEGEBEN : `+${betroffene.neu} in 60 min`
-                }
-                ziel={zBetroffene === 'gesperrt' ? undefined : personenPfad(einsatzId)}
-              />
-              <Kennzahl
-                titel="Kräfte im Einsatz"
-                zustand={kennzahlZustand(zKraefte)}
-                wert={zKraefte === 'gesperrt' ? '—' : kraefte.gesamt}
-                // „Σ“ wie in der Stärkeschreibweise darunter, nicht „Ges.“ (LFH-973).
-                einheit={zKraefte === 'gesperrt' ? undefined : 'Σ'}
-                notiz={zKraefte === 'gesperrt' ? NICHT_FREIGEGEBEN : `F/UF/M//Σ ${kraefte.text}`}
-                ziel={meldebildGesperrt ? undefined : kraefteuebersichtPfad(einsatzId)}
-              />
               <Kennzahl
                 titel="Offene Aufträge"
                 zustand={
@@ -791,14 +768,6 @@ export default function UeberblickPage() {
                       : 'noch keine angelegt'
                 }
                 ziel={zAbschnitteZahl === 'gesperrt' ? undefined : einsatzabschnittePfad(einsatzId)}
-              />
-              <Kennzahl
-                titel="Einsatzdauer"
-                wert={dauer?.wert ?? ''}
-                einheit={dauer?.einheit}
-                notiz={dauer?.notiz}
-                zustand={dauer ? 'daten' : 'laden'}
-                ziel={istPfadGesperrt(einsatzdatenZiel, freigaben) ? undefined : einsatzdatenZiel}
               />
             </Kennzahlenband>
 

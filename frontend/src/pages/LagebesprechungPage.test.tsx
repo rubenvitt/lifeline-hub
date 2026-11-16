@@ -9,7 +9,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Lagebesprechung, LagebesprechungStand } from '../api/types';
 import { AdresseSteht } from '../test/adresseSteht';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import LagebesprechungPage from './LagebesprechungPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -51,7 +52,13 @@ interface Lagequellen {
 }
 const ZAEHLER = {
   auftraege: { offen: 5, in_arbeit: 2, ueberfaellig: 1 },
-  meldungen: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 },
+  meldungen: {
+    offen: 3,
+    ungesehen: 1,
+    bestaetigung_ueberfaellig: 0,
+    sofort_offen: 0,
+    dringend_offen: 0,
+  },
 };
 const leererStand: LagebesprechungStand = { anzahl_lagebesprechungen: 0 };
 const GRUND = 'Einsatz ist abgeschlossen und schreibgeschützt';
@@ -105,6 +112,8 @@ function rendere({
   adresseSteht = false,
   /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
   daneben = null as ReactNode,
+  /** Vorbelegter Query-Client (etwa mit dem Einsatz aus dem Offline-Speicher). */
+  client = undefined as QueryClient | undefined,
 } = {}) {
   const zaehle = (liste: string) => {
     if (lage.abrufe) lage.abrufe[liste] = (lage.abrufe[liste] ?? 0) + 1;
@@ -177,7 +186,7 @@ function rendere({
       {adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
       {daneben}
     </>,
-    { route },
+    { route, client },
   );
   return { ...ergebnis, termine };
 }
@@ -523,6 +532,24 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     expect(zeile(p, 'meldungen')).toHaveTextContent('Quelle: Meldungen');
   });
 
+  it('stellt den Wert direkt neben die Bezeichnung, Quelle und Notiz darunter (LLH-1747)', async () => {
+    rendere({ lage: { personen: [person(1), person(2, { status: 'vermisst' })] } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('1 überfällig'));
+    const z = zeile(p, 'auftraege');
+    // Die Bezeichnungsspalte ist gedeckelt (16 em, auf schmalen Schirmen 40 %), der Wert beginnt
+    // linksbündig direkt daneben, nicht am anderen Rand der Paneelbreite.
+    expect(z.style.gridTemplateColumns).toBe('minmax(0, min(16em, 40%)) minmax(0, 1fr)');
+    const wert = z.querySelector<HTMLElement>('[data-teil="wert"]')!;
+    expect(wert.style.textAlign).toBe('');
+    expect([...z.children].map((k) => k.textContent)).toEqual([
+      'Aufträge offen',
+      '5',
+      'Quelle: Aufträge/Befehle',
+      '1 überfällig',
+    ]);
+  });
+
   it('„Letzte Lagebesprechung“ und „Nächster Termin“ kommen aus dem Modul Lagebesprechung', async () => {
     rendere({ stand: zweiStand, verlauf: ZWEI_VERLAUF });
     const p = await paneel();
@@ -720,5 +747,47 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     const p = await paneel();
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
     expect(within(p).queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
+  });
+});
+
+describe('LagebesprechungPage · Großbild (LLH-1747, Spec `grossbild-ansicht`)', () => {
+  it('nennt ohne Netz einen nie geladenen Termin „ohne Netz nicht geladen“, nicht „wird abgerufen“', async () => {
+    // Kaltstart ohne Netz: der Einsatz kommt aus dem Offline-Speicher, der Stand der
+    // Lagebesprechung nicht (Key nicht in `LAGEBILD_OFFLINE`); seine Abfrage pausiert.
+    const client = neuerQueryClient();
+    const einsatzObj = einsatz();
+    client.setQueryData(einsatzKeys.einsatz(1), einsatzObj);
+    onlineManager.setOnline(false);
+    try {
+      rendere({ einsatzObj, client });
+      await userEvent.click(await screen.findByRole('button', { name: 'Großbild' }));
+      const dialog = screen.getByRole('dialog', { name: 'Lagebesprechung' });
+      const termin = within(dialog)
+        .getByText('Abgeschlossen')
+        .closest('[data-lfh="gross-kennzahl"]') as HTMLElement;
+      expect(termin).toHaveTextContent('—ohne Netz nicht geladen');
+      expect(termin).not.toHaveTextContent('wird abgerufen');
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  });
+
+  it('bietet „Großbild“ auch ohne Schreibrecht an, öffnet und schließt es', async () => {
+    rendere({
+      einsatzObj: einsatz({ meine_rolle: 'beobachter' }),
+      stand: zweiStand,
+      verlauf: ZWEI_VERLAUF,
+    });
+    const knopf = await screen.findByRole('button', { name: 'Großbild' });
+    expect(knopf).toBeEnabled();
+    expect(primaerImKopf()).toBe(1);
+    await userEvent.click(knopf);
+    const dialog = screen.getByRole('dialog', { name: 'Lagebesprechung' });
+    const vorbereitung = within(dialog).getByRole('region', { name: 'Vorbereitung' });
+    await waitFor(() => expect(vorbereitung).toHaveTextContent('Letzte Lagebesprechung'));
+    expect(vorbereitung).toHaveTextContent('Nr. 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Großbild verlassen' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await vorbereitungPaneel()).toBeInTheDocument();
   });
 });

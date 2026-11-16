@@ -328,7 +328,9 @@ export default function BenutzerMenu({
           aria-label="Benutzermenü"
           block={inNavigation}
           style={{
-            height: Math.max(40, token.controlHeight),
+            // Im Kopf reichen 40 px als kompakter Boden (LFH-460); im Drawer am Handy hält die
+            // Zeile den Boden der übrigen Drawer-Ziele, 48 px (Gate 3, `mitA1Boden`, LLH-1728).
+            height: Math.max(inNavigation ? 48 : 40, token.controlHeight),
             minWidth: token.controlHeight,
             padding: `0 ${token.paddingXS}px`,
             color: inNavigation ? token.colorText : rahmenFarben.gedaempft,
@@ -358,8 +360,8 @@ export default function BenutzerMenu({
             {initialen(benutzer.anzeigename)}
           </span>
           {/* Unter `xl` bleibt die Kachel allein; der Name steht in der Kopfgruppe des Dropdowns, das
-            `aria-label` benennt den Trigger. Höhe und Mindestbreite folgen der Dichte; 40 px sind nur
-            der kompakte Höhenboden (LFH-460). */}
+            `aria-label` benennt den Trigger. Höhe und Mindestbreite folgen der Dichte; der Höhenboden
+            steht am `height` des Knopfs (LFH-460, im Drawer LLH-1728). */}
           {inNavigation && (
             <span
               style={{

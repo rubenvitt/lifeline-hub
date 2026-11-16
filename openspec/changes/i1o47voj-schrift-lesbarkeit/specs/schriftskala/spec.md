@@ -11,8 +11,9 @@ wie die Schrift mit der Bediendichte wächst und dass sich die Ansicht im Browse
 
 Text in der Oberfläche SHALL in genau einer von sechs Größenstufen stehen, in `kompakt` 11, 12,
 14, 16, 22 und 32 px. Keine andere Größe MUST am Schirm gerendert werden. Ausgenommen sind die
-Druckansichten (Papierskala in pt), die Fernsicht-Skala des Lagemonitors und Zeichnungen mit
-eigenem Maßstab (Lagekarte, Fernmeldeskizze, taktische Zeichen).
+Druckansichten (Papierskala in pt), die Fernsicht-Skala des Lagemonitors, die Großbild-Skala
+(`grossMass`, wächst mit dem Fenster) und Zeichnungen mit eigenem Maßstab (Lagekarte,
+Fernmeldeskizze, taktische Zeichen).
 
 #### Scenario: Gerenderte Größen am Fükw
 - **WHEN** in `kompakt` der Überblick, die Einsatzdaten, das ETB, die Betroffenen und die Lagekarte am Fükw-Schirm stehen
@@ -101,7 +102,7 @@ zulassen. Ein Doppeltipp MUST weiterhin nicht zoomen.
 Eine Schriftgröße SHALL im Frontend nur aus der Schriftskala des Themes kommen. Ein Größenwert
 als Zahl oder Pixelangabe außerhalb des Themes MUST die Prüfung rot machen, auch in einer benannten
 Konstante, ohne Ausnahmeliste für Bestand; ausgenommen sind Druck-CSS, die Fernsicht-Skala des
-Lagemonitors und Zeichnungen mit eigenem Maßstab.
+Lagemonitors, die Großbild-Skala (`grossMass`) und Zeichnungen mit eigenem Maßstab.
 
 #### Scenario: Neues Literal
 - **WHEN** eine Komponente eine Schriftgröße als Zahl oder `px`-Wert setzt, auch über eine Konstante wie `BAND_SCHRIFT = 13`

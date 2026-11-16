@@ -34,11 +34,16 @@ import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeMode
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
 import { fernsicht, schrift } from '../theme/tokens';
 import LagemonitorKarte from './LagemonitorKarte';
+import { AlarmZeile } from '../components/instrument';
+import { alarmAusMonitor } from '../lage/alarmAusMonitor';
+import { wasBrennt } from '../lage/wasBrennt';
+import { belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { anstehendeProgrammpunkte } from '../programmpunkt/programmpunkt';
+import { countsKraefteAnUhs } from '../pages/lage-dashboard/lageVerdichtung';
 
 /** Ab diesem Alter gilt der Datenstand als veraltet (Spec `lagemonitor`, „Veralteter Stand“). */
 export const VERALTET_AB_MS = 2 * 60_000;
@@ -224,8 +229,9 @@ function Zahl({
   /** Zeilen der Bezeichnung; ein UHS-Name bricht um, statt in der Mitte abzureißen. */
   zeilen?: 1 | 2;
   /**
-   * Nur an Zahlen, die bei einem Anstieg hervortreten ({@link useAnstieg}): Alarmfläche ohne
-   * Animation. Die Fläche reicht per `box-shadow` über den Rand, damit nichts verrutscht.
+   * Nur an Zahlen, die bei einem Anstieg hervortreten ({@link useAnstieg}), und an der Belegung
+   * einer überbelegten UHS (LLH-1746, solange sie es ist): Alarmfläche ohne Animation. Die Fläche
+   * reicht per `box-shadow` über den Rand, damit nichts verrutscht.
    */
   hervorgehoben?: boolean;
 }) {
@@ -342,12 +348,23 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
   const san = lage.sanitaetsdienst;
   const k = lage.kraefte;
   const s = k.staerke;
-  // Die vollsten zuerst: passt nicht jede UHS in die Kachel, fehlen die leeren.
+  // Überbelegte zuerst (LLH-1746), dann die vollsten: passt nicht jede UHS in die Kachel, fehlen
+  // zuerst die leeren. Eine überbelegte fällt nur hinter „+n weitere“, wenn mehr als sechs es sind;
+  // die Titelzeile zählt dann trotzdem alle.
   const uhsSichtbar = [...lage.uhs]
-    .sort((x, y) => y.belegt - x.belegt || x.bezeichnung.localeCompare(y.bezeichnung, 'de'))
+    .sort(
+      (x, y) =>
+        Number(istUeberbelegt(y)) - Number(istUeberbelegt(x)) ||
+        y.belegt - x.belegt ||
+        x.bezeichnung.localeCompare(y.bezeichnung, 'de'),
+    )
     .slice(0, UHS_SICHTBAR);
   const weitere = lage.uhs.length - uhsSichtbar.length;
-  const anUhs = lage.uhs.reduce((summe, u) => summe + u.kraefte, 0);
+  const ueberbelegt = lage.uhs.filter(istUeberbelegt).length;
+  // Nur aktive UHS, wie das Lagebild (LLH-1744); die Belegung zeigt weiter alle.
+  const anUhs = lage.uhs
+    .filter((u) => countsKraefteAnUhs(u.status))
+    .reduce((summe, u) => summe + u.kraefte, 0);
   return (
     <>
       {san ? (
@@ -390,7 +407,14 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
           />
         </div>
       </Kachel>
-      <Kachel titel="Belegung der Unfallhilfsstellen" style={{ flex: '1 1 0' }}>
+      {/* Überbelegung (LLH-1746): das Wort steht in der Titelzeile, die Zahl in der Alarmrolle;
+          gezählt über alle UHS, auch die unter „+n weitere“. */}
+      <Kachel
+        titel="Belegung der Unfallhilfsstellen"
+        zusatz={ueberbelegt > 0 ? `${ueberbelegt} überbelegt` : undefined}
+        zusatzAlarm={ueberbelegt > 0}
+        style={{ flex: '1 1 0' }}
+      >
         {lage.uhs.length === 0 ? (
           <span style={{ fontSize: GROSS.text, color: rollen.gedaempft }}>
             Keine Unfallhilfsstelle eingerichtet
@@ -406,9 +430,10 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
             {uhsSichtbar.map((u) => (
               <div key={u.id} data-lfh="monitor-uhs" style={{ minWidth: 0 }}>
                 <Zahl
-                  wert={u.plaetze > 0 ? `${u.belegt}/${u.plaetze}` : u.belegt}
+                  wert={belegungText(u)}
                   bezeichnung={u.bezeichnung}
                   zeilen={2}
+                  hervorgehoben={istUeberbelegt(u)}
                 />
               </div>
             ))}
@@ -794,6 +819,15 @@ export default function LagemonitorPage() {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          {/* Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
+            Personenbezug“): dieselben Arten, Folge und Wörter wie in Überblick und Lagebild, aus
+            dem Block `alarm` der Serverantwort; 28 px, ohne Bedienung. Sie steht über der Karte,
+            nicht über die volle Breite: rechts behalten Betroffene, Kräfte und UHS ihre Höhe
+            (entschieden 16.11.2026). Den Ausfall trägt der Monitor nicht (design.md D6). */}
+          <AlarmZeile
+            daten={wasBrennt(alarmAusMonitor(lage, lageQuery.isError), dayjs(jetzt))}
+            groesse="gross"
+          />
           <Kachel titel="Lagekarte" style={{ flex: '1 1 0' }}>
             <div style={{ flex: '1 1 0', minHeight: 0 }}>
               <LagemonitorKarte

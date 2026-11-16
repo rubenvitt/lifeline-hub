@@ -5,13 +5,16 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * Vorbereitung der Lagebesprechung (LFH-550) im Browser, seit LLH-1111 auf der Seite
  * Lagebesprechung (vorher Stab):
  *
- * - GLEICHE ZAHLEN: Betroffene, Kräfte und „Aufträge offen" stehen auf der Seite Lagebesprechung
- *   genau so wie auf dem Lage-Dashboard — eine Zusammenstellung, ein Rechenweg.
+ * - GLEICHE ZAHLEN: Betroffene und Kräfte stehen auf der Seite Lagebesprechung genau so wie auf dem
+ *   Lage-Dashboard, „Aufträge offen" so wie die „Offenen Aufträge" im Überblick (seit LLH-1743
+ *   ihre Heimat) — ein Rechenweg.
  * - „DAVON ÜBERFÄLLIG": ein vollzogener Auftrag mit abgelaufener Frist und Quittungslücke zählt
  *   weder offen noch überfällig, auf beiden Seiten.
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, danach der Bericht offen. Geklickt, nicht nur
  *   `toBeVisible` (LFH-355).
  * - BEOBACHTER (LFH-435): der Lagestand steht, die Übernahme fehlt.
+ * - WERT NEBEN DER BEZEICHNUNG (LLH-1747): bei 1920 × 1080 beginnt der Wert höchstens 400 px rechts
+ *   der Bezeichnung, auf dem Handy bricht die Zeile um, statt über den Rand zu laufen.
  */
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -52,21 +55,23 @@ const zeile = (page: Page, schluessel: string) =>
   page.locator(`[data-lfh="vorbereitung-zeile"][data-schluessel="${schluessel}"]`);
 
 async function dashboardWerte(page: Page, einsatzId: string) {
-  await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
   const wert = (titel: string) =>
     page
       .locator('[data-lfh="kennzahl"]')
       .filter({ hasText: titel })
       .first()
       .locator('[data-lfh="kennzahl-wert"]');
-  await expect(wert('Aufträge offen')).toHaveText('2');
-  // Jede Kachel hat ihre eigene Quelle: „Aufträge offen“ steht aus dem Modulzähler, während die
-  // Personen noch laden („····“). Erst lesen, wenn alle drei eine Zahl zeigen.
+  // Aufträge stehen seit LLH-1743 im Überblick (Seitenrollen), Betroffene und Kräfte im Lagebild.
+  await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+  await expect(wert('Offene Aufträge')).toHaveText('2');
+  const auftraege = (await wert('Offene Aufträge').textContent())!.trim();
+  await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
+  // Jede Kachel hat ihre eigene Quelle: erst lesen, wenn beide eine Zahl zeigen.
   for (const titel of ['Betroffene', 'Kräfte']) await expect(wert(titel)).toHaveText(/^\d+$/);
   return {
     betroffene: (await wert('Betroffene').textContent())!.trim(),
     kraefte: (await wert('Kräfte').textContent())!.trim(),
-    auftraege: (await wert('Aufträge offen').textContent())!.trim(),
+    auftraege,
   };
 }
 
@@ -103,4 +108,49 @@ test('Beobachter: Lagestand ja, Übernahme nein', async ({ page }) => {
   await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
   await expect(zeile(page, 'auftraege').locator('[data-teil="wert"]')).toHaveText('2');
   await expect(page.getByRole('button', { name: 'In Lagebericht übernehmen' })).toHaveCount(0);
+});
+
+test.describe('Wert neben der Bezeichnung (LLH-1747)', () => {
+  test.describe('Fükw 1920 × 1080', () => {
+    test.use({ viewport: { width: 1920, height: 1080 } });
+
+    test('der Wert beginnt höchstens 400 px rechts der Bezeichnung', async ({ page }) => {
+      await anmeldenAlsAdmin(page, { startseite: false });
+      const einsatzId = await seede(page);
+      await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+      const z = zeile(page, 'betroffene');
+      await expect(z.locator('[data-teil="wert"]')).toHaveText('2');
+      const bezeichnung = (await z.locator('> span').first().boundingBox())!;
+      const wert = (await z.locator('[data-teil="wert"]').boundingBox())!;
+      expect(wert.x - bezeichnung.x).toBeLessThanOrEqual(400);
+      expect(wert.x).toBeGreaterThan(bezeichnung.x);
+    });
+  });
+
+  test.describe('Handy 390 × 844', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test('keine Zeile ragt über den Rand des Paneels', async ({ page }) => {
+      await anmeldenAlsAdmin(page, { startseite: false });
+      const einsatzId = await seede(page);
+      await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+      await expect(zeile(page, 'sichtung').locator('[data-teil="wert"]')).not.toBeEmpty();
+      // Je Teil der Zeile: kein Text breiter als sein Kasten (die Kästen selbst streckt das Raster
+      // auf die Spalte, ihr Rand sagt also nichts), und kein Kasten über den Rand der Zeile.
+      const ueberstand = await page
+        .locator('[data-lfh="vorbereitung-zeile"]')
+        .evaluateAll((zeilen) =>
+          zeilen.flatMap((z) =>
+            [...z.children]
+              .filter(
+                (k) =>
+                  k.scrollWidth > k.clientWidth + 1 ||
+                  k.getBoundingClientRect().right > z.getBoundingClientRect().right + 1,
+              )
+              .map((k) => `${z.getAttribute('data-schluessel')}: ${k.textContent}`),
+          ),
+        );
+      expect(ueberstand).toEqual([]);
+    });
+  });
 });

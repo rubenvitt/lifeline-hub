@@ -337,10 +337,10 @@ it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschni
   expect(bild.baum.map((z) => z.key)).toEqual(['ab-1']);
 });
 
-it('Abschnitts-Filter behält eine Untereinheit ohne eigenen Abschnitt unter ihrem Zug (D11)', () => {
+it('Abschnitts-Filter folgt dem wirksamen Abschnitt der Einheit (LLH-1744)', () => {
   const abschnitte = [ab(1), ab(2)];
-  // Gr 11 ohne eigenen Abschnitt unter Zug 10 (Abschnitt 1); Gr 12 steht selbst in 2, zählt aber
-  // beim Abschnitt ihrer obersten Einheit (Spec `lage-verdichtung`).
+  // Gr 11 ohne eigenen Abschnitt unter Zug 10 (Abschnitt 1) bleibt bei 1; Gr 12 steht selbst in 2
+  // und zählt dort, wer in ihm steht (Spec `lage-verdichtung`).
   const einheiten = [eh(10, 1), eh(11, null, 10), eh(12, 2, 10), eh(20, 2)];
   const personal = [p(1, 11, 'mannschaft'), p(2, 12, 'mannschaft'), p(3, 20, 'mannschaft')];
   const nach = (abschnittId: number) =>
@@ -348,10 +348,50 @@ it('Abschnitts-Filter behält eine Untereinheit ohne eigenen Abschnitt unter ihr
       { abschnitte, einheiten, personal, fahrzeuge: [], material: [] },
       { traeger: null, abschnittId, kategorie: null, suche: '' },
     );
-  expect(nach(1).einheiten.map((e) => e.id)).toEqual([10, 11, 12]);
-  expect(nach(1).personal.map((x) => x.id)).toEqual([1, 2]);
-  expect(nach(2).einheiten.map((e) => e.id)).toEqual([20]);
-  expect(nach(2).personal.map((x) => x.id)).toEqual([3]);
+  expect(nach(1).einheiten.map((e) => e.id)).toEqual([10, 11]);
+  expect(nach(1).personal.map((x) => x.id)).toEqual([1]);
+  expect(nach(2).einheiten.map((e) => e.id)).toEqual([12, 20]);
+  expect(nach(2).personal.map((x) => x.id)).toEqual([2, 3]);
+});
+
+it('eine abgestellte Untereinheit steht im Kräftebild unter ihrem Abschnitt, mit „aus …“ (LLH-1744)', () => {
+  // Zug 10 (1/0/1) in Abschnitt 1; Gruppe 12 (0/1/1) unter dem Zug, selbst im Unterabschnitt 2.
+  const abschnitte = [ab(1), ab(2, 1)];
+  const zug = { ...eh(10, 1), name: 'Sanitätszug' };
+  const einheiten = [zug, eh(12, 2, 10)];
+  const personal = [
+    p(1, 10, 'fuehrer'),
+    p(2, 10, 'mannschaft'),
+    p(3, 12, 'unterfuehrer'),
+    p(4, 12, 'mannschaft'),
+  ];
+  const { baum } = baueKraeftebild(abschnitte, einheiten, personal, [], []);
+  const a1 = baum.find((z) => z.key === 'ab-1')!;
+  const a2 = a1.children!.find((z) => z.key === 'ab-2')!;
+  const zugZeile = a1.children!.find((z) => z.key === 'eh-10')!;
+  const gruppe = a2.children!.find((z) => z.key === 'eh-12')!;
+  expect(zugZeile.staerke).toMatchObject({ fuehrer: 1, unterfuehrer: 0, mannschaft: 1 });
+  expect(zugZeile.children?.some((z) => z.key === 'eh-12') ?? false).toBe(false);
+  expect(gruppe.detail).toContain('aus Sanitätszug');
+  expect(a2.staerke).toMatchObject({ fuehrer: 0, unterfuehrer: 1, mannschaft: 1 });
+  expect(a1.staerke).toMatchObject({ fuehrer: 1, unterfuehrer: 1, mannschaft: 2 });
+
+  // Gefiltert auf Abschnitt 2 fehlt der Zug in der Auswahl; die Gruppe nennt ihn trotzdem.
+  const gefiltert = filtereKraefte(
+    { abschnitte, einheiten, personal, fahrzeuge: [], material: [] },
+    { traeger: null, abschnittId: 2, kategorie: null, suche: '' },
+  );
+  const bild = baueKraeftebild(
+    gefiltert.abschnitte,
+    gefiltert.einheiten,
+    gefiltert.personal,
+    [],
+    [],
+    { einheiten, personal, fahrzeuge: [] },
+  );
+  const nur = bild.baum.find((z) => z.key === 'ab-2')!;
+  expect(nur.children!.map((z) => z.key)).toEqual(['eh-12']);
+  expect(nur.children![0].detail).toContain('aus Sanitätszug');
 });
 
 it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {

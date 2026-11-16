@@ -357,9 +357,14 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * Aufbau beim Start wechselte sonst ohne Zutun die Breite des Kopfs (vorher hielt ein Platzhalter
  * dafür dauerhaft die Breite von „VERBINDE“, LLH-1158). Jede Störung (VERBINDE beim Wiederaufbau,
  * WARTET, GETRENNT, OFFLINE, PRÜFEN) trägt ihr Wort — Farbe allein wäre ein Kanal (WCAG 1.4.1). Den Zustand nennen in jedem
- * Fall `aria-label` und `title`.
+ * Fall `aria-label` und `title`. WARTET und PRÜFEN stehen beim Neuladen schon im ersten Bild: der
+ * Zähler beginnt mit dem zuletzt gelesenen Stand der Person (LLH-1910,
+ * `offline/queueZaehlerMerker.ts`); nicht beim ersten Laden nach einer Anmeldung und nicht ohne
+ * Browserspeicher.
  *
  * `kompakt` (unter `md`): nur Icon, auch bei Störung; das Wort steht in der Betriebszeile.
+ * `zelle`: die Polsterung der Nachbarzellen, ohne das Wort zu nehmen (Gerätekopf unter `md`, der
+ * keine Betriebszeile hat und das Wort selbst tragen muss).
  */
 export function syncZeigtWort(zustand: Exclude<SyncZustand, 'ruhe'>, kompakt: boolean): boolean {
   if (kompakt) return false;
@@ -369,9 +374,11 @@ export function syncZeigtWort(zustand: Exclude<SyncZustand, 'ruhe'>, kompakt: bo
 export function SyncAnzeige({
   liveErwartet,
   kompakt = false,
+  zelle,
 }: {
   liveErwartet: boolean;
   kompakt?: boolean;
+  zelle?: { padding: number };
 }) {
   const { token } = theme.useToken();
   const { benutzer } = useAuth();
@@ -393,7 +400,7 @@ export function SyncAnzeige({
       role="img"
       aria-label={satz}
       title={satz}
-      style={kopfZelleStil(kompakt ? { padding: token.paddingXS } : token)}
+      style={kopfZelleStil(zelle ?? (kompakt ? { padding: token.paddingXS } : token))}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: d.farbe }}>
         <Icon size={16} />

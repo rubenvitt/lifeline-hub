@@ -204,7 +204,8 @@ export default function AlarmZentrale({
       setPermission(desktopPermission());
       if (!document.hidden) schliesseAlleDesktopAlarme();
     };
-    // Der Service Worker bestätigt den zweiten Weg erst nach dem Mount (LFH-1062).
+    // Der Service Worker bestätigt den zweiten Weg erst nach dem Mount (LFH-1062). Eine verweigerte
+    // Berechtigung braucht ihn nicht, sie steht schon im ersten Bild (LLH-1910).
     const neuLesen = () => setPermission(desktopPermission());
     window.addEventListener('focus', aktualisieren);
     document.addEventListener('visibilitychange', aktualisieren);

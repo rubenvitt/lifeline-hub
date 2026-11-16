@@ -5320,6 +5320,143 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
     }
 }
 
+// Spec `lagemonitor`, „Gefahrenzonen mit Name und Warnstufe“ und „Zonen ohne Freitext“ (LLH-1746):
+// eine Gefahrengebiet-Zone trägt Bezeichnung, höchste Warnstufe und Bestätigung ihres Gebiets,
+// aber weder Beschriftung noch Notiz der Zone noch den Namen dessen, der bestätigt hat.
+#[tokio::test]
+async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    sqlx::query(
+        "UPDATE benutzer SET anzeigename = 'Beurteiler Brandt' WHERE benutzername = 'admin'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let mut zonen = Vec::new();
+    for typ in ["gefahrengebiet", "absperrbereich"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/zonen"),
+            &admin,
+            Some(&json!({
+                "typ": typ,
+                "geometrie_typ": "Polygon",
+                "geometrie": ZONE_POLY,
+                "label": "Haus Muster",
+                "notiz": "Herr Muster wartet",
+            })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{typ}: {v}");
+        zonen.push(v);
+    }
+    let gebiet = zonen[0]["gefahrengebiet_id"]
+        .as_i64()
+        .expect("Gebiet zur Zone");
+    let gebiet_pfad = format!("{basis}/gefahrengebiete/{gebiet}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &gebiet_pfad,
+        &admin,
+        Some(&json!({"label": "Hangrutsch Kirchberg"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for (objekt, stufe) in [("menschen", "mittel"), ("sachwerte", "hoch")] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PUT",
+            &format!("{gebiet_pfad}/matrix/bewertung"),
+            &admin,
+            Some(&json!({"gefahrentyp": "einsturz", "schutzobjekt": objekt, "warnstufe": stufe})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+
+    let lagebild = format!("{basis}/lagemonitor");
+    let zone_von = |v: &Value, id: &Value| {
+        v["zonen"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|z| &z["id"] == id)
+            .cloned()
+            .unwrap_or_else(|| panic!("Zone {id} fehlt: {v}"))
+    };
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let gefahr = zone_von(&v, &zonen[0]["id"]);
+    assert_eq!(
+        gefahr["gebiet"],
+        json!({"bezeichnung": "Hangrutsch Kirchberg", "warnstufe": "hoch", "bestaetigt": false}),
+        "{v}"
+    );
+    let absperrung = zone_von(&v, &zonen[1]["id"]);
+    assert!(absperrung.get("gebiet").is_none(), "{absperrung}");
+
+    let (s, b) = anfrage(
+        &app,
+        "POST",
+        &format!("{gebiet_pfad}/beurteilung"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        zone_von(&v, &zonen[0]["id"])["gebiet"]["bestaetigt"],
+        json!(true)
+    );
+
+    // Ein Gebiet ohne Bezeichnung (Zone ohne Beschriftung gezeichnet): `bezeichnung` fehlt, statt
+    // als `null` hinauszugehen (`src/AGENTS.md`, Optionalität ehrlich machen).
+    let (s, ohne) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/zonen"),
+        &admin,
+        Some(&json!({
+            "typ": "gefahrengebiet",
+            "geometrie_typ": "Polygon",
+            "geometrie": ZONE_POLY,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{ohne}");
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ohne_namen = zone_von(&v, &ohne["id"]);
+    let gebiet_ohne = ohne_namen["gebiet"].as_object().expect("Gebiet zur Zone");
+    assert!(!gebiet_ohne.contains_key("bezeichnung"), "{ohne_namen}");
+    assert_eq!(gebiet_ohne["warnstufe"], json!("keine"));
+
+    let text = v.to_string();
+    for wort in ["Muster", "Brandt"] {
+        assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
+    }
+    for schluessel in [
+        "label",
+        "notiz",
+        "beurteilt_von",
+        "beurteilt_von_name",
+        "beurteilt_at",
+    ] {
+        assert!(
+            !text.contains(&format!("\"{schluessel}\"")),
+            "Feld {schluessel} in der Antwort: {text}"
+        );
+    }
+}
+
 // ---------- Betreuungsstelle (LFH-1041) ----------
 
 /// Legt eine Betreuungsstelle in Betrieb an.
@@ -8578,4 +8715,203 @@ async fn einheitengeraet_ruft_zeile_ohne_personalien_ab() {
     )
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Delta-Spec `lagemonitor`, „Alarmzeile ohne Personenbezug“ (LLH-1743, design.md D5): der Block
+/// `alarm` trägt Zahlen und nur Namen von Einheiten und Abschnitten. Auftrags-, Meldungs- und
+/// Erinnerungstexte, Absender und Empfänger stehen nicht in der Antwort.
+#[tokio::test]
+async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let lagebild = format!("{basis}/lagemonitor");
+
+    // Ruhige Lage: alles 0, Listen leer, kein Zeitpunkt der ältesten Sofortmeldung.
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v["alarm"],
+        json!({
+            "sofort_offen": 0, "dringend_offen": 0, "bestaetigung_ueberfaellig": 0,
+            "auftraege_ueberfaellig": 0, "erinnerungen_faellig": 0,
+            "nachforderungen_ueberfaellig": 0,
+            "rueckmeldung_ueberfaellig": [], "abschnitte_kritisch": []
+        }),
+        "{v}"
+    );
+
+    // Ein kritischer Abschnitt (ohne Fläche: er fehlt in `abschnitte`, nicht im Alarm), ein
+    // angespannter (nie im Alarm).
+    for (name, zustand) in [("UHS Turnhalle", "kritisch"), ("EA Süd", "angespannt")] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/abschnitte"),
+            &admin,
+            Some(&json!({ "name": name, "lagezustand": zustand })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    // Zwei Einheiten: der Logistiktrupp hat sich vor zwei Stunden zuletzt gemeldet (überfällig
+    // nach der Vorgabefrist von 60 min), der Sanitätszug eben.
+    let mut einheiten = Vec::new();
+    for name in ["Logistiktrupp", "Sanitätszug"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/einheiten"),
+            &admin,
+            Some(&json!({ "name": name })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        einheiten.push(v["id"].as_i64().unwrap());
+    }
+    let vor_zwei_stunden = (chrono::Utc::now() - chrono::Duration::minutes(120))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let eben = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    for (einheit, zeit, art, prio, inhalt) in [
+        (
+            einheiten[0],
+            &vor_zwei_stunden,
+            "rueckmeldung",
+            "normal",
+            "Herr Geheim verletzt",
+        ),
+        (
+            einheiten[1],
+            &eben,
+            "rueckmeldung",
+            "dringend",
+            "Material knapp bei Frau Still",
+        ),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/meldungen"),
+            &admin,
+            Some(&json!({
+                "absender": "Melder Unbekannt", "empfaenger": "Empfaengerin Vertraulich",
+                "meldeweg": "funk", "inhalt": inhalt, "meldungsart": art, "prioritaet": prio,
+                "ereigniszeit": zeit, "einheit_id": einheit,
+            })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    // Eine offene Sofortmeldung.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/meldungen"),
+        &admin,
+        Some(&json!({
+            "absender": "Melder Unbekannt", "meldeweg": "funk",
+            "inhalt": "Familie Verborgen eingeschlossen", "meldungsart": "sofortmeldung",
+            "prioritaet": "sofort", "ereigniszeit": eben,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let sofort_eingang = v["eingang_at"].as_str().unwrap().to_string();
+    // Ein überfälliger Auftrag und eine fällige Erinnerung mit Freitext.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/auftraege"),
+        &admin,
+        Some(&json!({
+            "auftrag_text": "Herrn Muster abholen",
+            "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Abschnitt Nord" }],
+            "frist_at": "2026-06-01 10:00:00",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/erinnerungen"),
+        &admin,
+        Some(&json!({ "titel": "Frau Notiz anrufen", "faellig_at": "2026-06-11 10:00" })),
+    )
+    .await;
+    assert!(s.is_success(), "{v}");
+
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let a = &v["alarm"];
+    assert_eq!(a["sofort_offen"], json!(1), "{v}");
+    assert_eq!(a["sofort_aelteste_at"], json!(sofort_eingang), "{v}");
+    assert_eq!(a["dringend_offen"], json!(1), "{v}");
+    assert_eq!(a["auftraege_ueberfaellig"], json!(1), "{v}");
+    // Der überfällige Auftrag legt selbst eine Erinnerung an die Quittierfrist an; die Zahl ist
+    // die des Modulzählers.
+    let (_, z) = anfrage(&app, "GET", &format!("{basis}/modul-zaehler"), &admin, None).await;
+    assert_eq!(
+        a["erinnerungen_faellig"], z["erinnerungen"]["faellig"],
+        "{z}"
+    );
+    assert!(a["erinnerungen_faellig"].as_i64().unwrap() >= 1, "{v}");
+    assert_eq!(a["abschnitte_kritisch"], json!(["UHS Turnhalle"]), "{v}");
+    let rueck = a["rueckmeldung_ueberfaellig"].as_array().unwrap();
+    assert_eq!(rueck.len(), 1, "{v}");
+    assert_eq!(rueck[0]["einheit"], json!("Logistiktrupp"), "{v}");
+    // Fällig seit 60 min (120 min alt, Frist 60 min); eine Minute Spiel für den Testlauf.
+    let seit = rueck[0]["seit_min"].as_i64().unwrap();
+    assert!((59..=61).contains(&seit), "{v}");
+    // Dieselbe Zahl wie der Modulzähler.
+    assert_eq!(z["meldungen"]["sofort_offen"], a["sofort_offen"], "{z}");
+    assert_eq!(v["sofortmeldungen_offen"], a["sofort_offen"], "{v}");
+
+    let text = v.to_string();
+    for wort in [
+        "Geheim",
+        "Frau Still",
+        "Verborgen",
+        "Herrn Muster",
+        "Frau Notiz",
+        "Melder Unbekannt",
+        "Empfaengerin Vertraulich",
+        "Abschnitt Nord",
+    ] {
+        assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
+    }
+    let _ = &pool;
+}
+
+/// Delta-Spec `lagemonitor`, „Sofortmeldungen erreichen den Monitor sofort“ (LLH-1743, D7): der
+/// Live-Kanal des Monitors trägt `sofortmeldung` als Signal ohne Inhalt, aber kein `meldung`.
+#[tokio::test]
+async fn lagemonitor_bekommt_sofortmeldung_im_live_kanal_ohne_inhalt() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let body = live_geraet(&app, &monitor, einsatz).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &admin,
+        Some(&json!({
+            "absender": "Melder Unbekannt", "meldeweg": "funk",
+            "inhalt": "Familie Verborgen eingeschlossen", "meldungsart": "sofortmeldung",
+            "prioritaet": "sofort", "ereigniszeit": "2026-10-04 10:00:00",
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let gelesen = common::sse_anfang_lesen(body, 500).await;
+    assert!(gelesen.contains("event: sofortmeldung"), "{gelesen}");
+    assert!(gelesen.contains("data: {}"), "{gelesen}");
+    assert!(!gelesen.contains("event: meldung\n"), "{gelesen}");
+    assert!(!gelesen.contains("meldung_id"), "{gelesen}");
+    assert!(!gelesen.contains("Verborgen"), "{gelesen}");
 }

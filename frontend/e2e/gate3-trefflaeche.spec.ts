@@ -1147,11 +1147,14 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
   for (const { dichte, soll } of STAFFEL) {
     await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
-    // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (Auswahlzeile nicht
-    // „0 von 0") — erst danach sagt eine Abwesenheit etwas.
+    // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (das Paneel „Personal
+    // nach Status“ zählt sie) — erst danach sagt eine Abwesenheit etwas. Ohne Filter steht in der
+    // Werkzeugzeile keine Auswahlzahl mehr (LLH-1744).
     await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     await expect(
-      page.locator('[data-lfh="meldebild-werkzeuge"]').getByText(/^[1-9]\d* von [1-9]\d* Kräften$/),
+      page
+        .getByRole('region', { name: 'Personal nach Status' })
+        .getByText(/^[1-9]\d* (Kraft|Kräfte)$/),
     ).toBeVisible();
 
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.
@@ -1224,9 +1227,10 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
-    // Im Hauptbereich: die Modulliste daneben trägt einen gleichnamigen Link, der je nach
-    // Ladereihenfolge erst nach `toHaveCount(1)` erscheint (Wettlauf, sichtbar seit LLH-1719).
-    const link = page.getByRole('main').getByRole('link', { name: 'Kräfteübersicht', exact: true });
+    // In der Zeile gesucht: die Einsatz-Navigation trägt seit LLH-1732 einen gleichnamigen Link.
+    const link = page
+      .locator('[data-lfh="verdichtungszeile"]')
+      .getByRole('link', { name: 'Kräfteübersicht', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);

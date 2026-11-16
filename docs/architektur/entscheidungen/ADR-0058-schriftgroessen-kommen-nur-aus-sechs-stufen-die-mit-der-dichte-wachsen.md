@@ -1,5 +1,5 @@
 ---
-id: ADR-0057
+id: ADR-0058
 titel: Schriftgrößen kommen nur aus sechs Stufen, die mit der Dichte wachsen
 status: akzeptiert
 datum: 2026-11-15
@@ -14,7 +14,7 @@ herleitung:
   - Zunder LLH-1719 (Stufen, Zoom, Feldetikett und Mono-Grenze abgestimmt mit Ruben am 15.11.2026)
 ---
 
-# ADR-0057: Schriftgrößen kommen nur aus sechs Stufen, die mit der Dichte wachsen
+# ADR-0058: Schriftgrößen kommen nur aus sechs Stufen, die mit der Dichte wachsen
 
 ## Regeln
 

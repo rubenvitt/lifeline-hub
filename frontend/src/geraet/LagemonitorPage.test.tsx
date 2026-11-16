@@ -149,6 +149,30 @@ afterEach(() => {
 });
 
 describe('Lagemonitor — Großbild', () => {
+  it('„an UHS“ zählt nur aktive UHS; eine geplante steht weiter in der Belegung (LLH-1744)', async () => {
+    bereit();
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        uhs: [
+          ...lage.uhs,
+          {
+            ...lage.uhs[0],
+            id: 3,
+            bezeichnung: 'UHS Süd',
+            status: 'geplant',
+            belegt: 0,
+            kraefte: 2,
+          },
+        ],
+      });
+    renderApp('/geraet/7/monitor');
+    const kraefte = await screen.findByRole('region', { name: 'Kräfte' });
+    expect(await within(kraefte).findByText('4 an UHS')).toBeInTheDocument();
+    const belegung = screen.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
+    expect(within(belegung).getByText('UHS Süd')).toBeInTheDocument();
+  });
+
   it('startet auf dem Großbild mit Kopfzahlen, Kräften und Belegung je UHS', async () => {
     bereit();
     const router = renderApp('/geraet');
@@ -418,6 +442,44 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
     expect(within(kachel).getByText('SK I')).toBeInTheDocument();
   });
 
+  it('Alarmzeile (LLH-1743): Arten aus dem Block `alarm`, 28 px, ohne Bedienung', async () => {
+    bereit();
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        alarm: {
+          sofort_offen: 1,
+          dringend_offen: 0,
+          bestaetigung_ueberfaellig: 0,
+          auftraege_ueberfaellig: 1,
+          erinnerungen_faellig: 0,
+          nachforderungen_ueberfaellig: 0,
+          rueckmeldung_ueberfaellig: [{ einheit: 'Logistiktrupp', seit_min: 47 }],
+          abschnitte_kritisch: ['UHS Turnhalle'],
+        },
+      });
+    renderApp('/geraet/7/monitor');
+    const zeile = await screen.findByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveTextContent('kritisch: UHS Turnhalle'));
+    expect(zeile.style.fontSize).toBe('28px');
+    const arten = Array.from(zeile.querySelectorAll<HTMLElement>('[data-lfh="alarm-eintrag"]')).map(
+      (e) => e.dataset.art,
+    );
+    // Folge wie in Überblick und Lagebild; die zwei Vermissten kommen aus `betroffene`.
+    expect(arten.slice(0, 2)).toEqual(['sofort', 'vermisst']);
+    expect(within(zeile).queryByRole('link')).toBeNull();
+    expect(within(zeile).queryByRole('button')).toBeNull();
+  });
+
+  it('Alarmzeile: scheitert der Abruf, steht „Stand unvollständig“ statt „—“ (Review LLH-1743)', async () => {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+    renderApp('/geraet/7/monitor');
+    const zeile = await screen.findByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveAttribute('data-stand', 'unvollstaendig'));
+    expect(zeile).toHaveTextContent('Stand unvollständig');
+  });
+
   it('Zwei offene Sofortmeldungen: „Sofortmeldungen offen 2“', async () => {
     bereit();
     lagebildAntwort = () => HttpResponse.json({ ...lage, sofortmeldungen_offen: 2 });
@@ -521,6 +583,63 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
       strom!.emit('abloesung', JSON.stringify({ einsatz_id: 7, art: 'faellig' }));
     });
     expect(spieleAlarmTon).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Spec `lagemonitor`, „Überbelegte Unfallhilfsstelle in Alarmrolle“ (LLH-1746). Mutationsprobe:
+ * ohne Vorrang der Überbelegten in der Sortierung → der zweite Fall rot (die Turnhalle fiele unter
+ * „+2 weitere“); `>=` statt `>` in `istUeberbelegt` → der dritte Fall rot.
+ */
+describe('Lagemonitor — Überbelegung (LLH-1746)', () => {
+  const uhs = (id: number, bezeichnung: string, belegt: number, plaetze: number) => ({
+    id,
+    bezeichnung,
+    typ: 'behandlungsplatz' as const,
+    status: 'aktiv' as const,
+    lat: null,
+    lon: null,
+    belegt,
+    plaetze,
+    kraefte: 0,
+  });
+  async function belegungMit(liste: ReturnType<typeof uhs>[]) {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, uhs: liste });
+    renderApp('/geraet/7/monitor');
+    return screen.findByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
+  }
+  const zahlVon = (kachel: HTMLElement, name: string) =>
+    within(kachel).getByText(name).closest<HTMLElement>('[data-lfh="monitor-zahl"]')!;
+
+  it('acht auf fünf: „8/5“ in der Alarmrolle, „1 überbelegt“ in der Titelzeile', async () => {
+    const kachel = await belegungMit([uhs(1, 'UHS Turnhalle', 8, 5), uhs(2, 'UHS Nord', 3, 8)]);
+    const turnhalle = zahlVon(kachel, 'UHS Turnhalle');
+    expect(turnhalle).toHaveTextContent('8/5UHS Turnhalle');
+    expect(turnhalle).toHaveAttribute('data-hervorgehoben', 'ja');
+    expect(zahlVon(kachel, 'UHS Nord')).toHaveAttribute('data-hervorgehoben', 'nein');
+    const zusatz = kachel.querySelector<HTMLElement>('[data-lfh="monitor-zusatz"]')!;
+    expect(zusatz).toHaveTextContent('1 überbelegt');
+    expect(zusatz.style.fontWeight).toBe('700');
+  });
+
+  it('eine kleine überbelegte UHS steht vor sieben größeren', async () => {
+    const groessere = [3, 4, 5, 6, 7, 8, 9].map((id) => uhs(id, `UHS ${id}`, 10, 20));
+    const kachel = await belegungMit([...groessere, uhs(1, 'UHS Turnhalle', 8, 5)]);
+    const reihe = within(kachel)
+      .getAllByText(/^UHS /)
+      .map((e) => e.textContent);
+    expect(reihe[0]).toBe('UHS Turnhalle');
+    expect(within(kachel).getByText('+2 weitere')).toBeInTheDocument();
+  });
+
+  it('voll (5/5) und ohne Plätze sind nicht überbelegt', async () => {
+    const kachel = await belegungMit([uhs(1, 'UHS Voll', 5, 5), uhs(2, 'UHS Zelt', 2, 0)]);
+    expect(zahlVon(kachel, 'UHS Voll')).toHaveTextContent('5/5UHS Voll');
+    expect(zahlVon(kachel, 'UHS Voll')).toHaveAttribute('data-hervorgehoben', 'nein');
+    expect(zahlVon(kachel, 'UHS Zelt')).toHaveTextContent('2UHS Zelt');
+    expect(zahlVon(kachel, 'UHS Zelt')).toHaveAttribute('data-hervorgehoben', 'nein');
+    expect(kachel.querySelector('[data-lfh="monitor-zusatz"]')).toBeNull();
   });
 });
 

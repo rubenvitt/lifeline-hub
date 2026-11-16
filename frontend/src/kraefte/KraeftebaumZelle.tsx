@@ -100,7 +100,8 @@ export type KraeftebaumZelleZeile =
   | ({ art: 'einheit' } & Pick<
       RasterZeile,
       'einheitId' | 'bezeichnung' | 'zusatz' | 'tz' | 'isNichtUebernommen'
-    >);
+    > &
+      Partial<Pick<RasterZeile, 'abgestelltAus'>>);
 
 interface KraeftebaumZelleProps {
   zeile: KraeftebaumZelleZeile;
@@ -154,7 +155,7 @@ export default function KraeftebaumZelle({ zeile: z, einsatzId, gesperrt }: Krae
               <NichtUebernommenMarke />
             </>
           )}
-          {nebentext([z.zusatz])}
+          {nebentext([z.zusatz, z.abgestelltAus ? `aus ${z.abgestelltAus}` : null])}
         </>,
       );
     }

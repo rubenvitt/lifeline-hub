@@ -260,6 +260,7 @@ export default function LagebildExternPage() {
             abschnitte={karte.abschnitte}
             schrift={14}
             bedienbar
+            zonenBeschriften={false}
             anfrage={anfrage}
           />
         </div>

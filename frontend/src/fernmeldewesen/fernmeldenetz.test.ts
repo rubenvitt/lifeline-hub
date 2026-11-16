@@ -415,6 +415,21 @@ describe('baueFernmeldenetz · Stellen', () => {
     expect(stelleMit(netz, 'eh-11')).toMatchObject({ oben: 'eh-10' });
   });
 
+  it('behält eine abgestellte Untereinheit am Verband wie der Funkplan (LLH-1744)', () => {
+    // Gruppe 11 dem Zug 10 (Abschnitt 1) unterstellt, selbst im Unterabschnitt 2: das Organigramm
+    // hängt sie unter 2, die Skizze bleibt am Führungsweg des Verbands.
+    const netz = baueFernmeldenetz(
+      quellen({
+        abschnitte: daten([abschnitt(1), abschnitt(2, { ueber_abschnitt_id: 1 })]),
+        einheiten: daten([
+          einheit(10, { abschnitt_id: 1 }),
+          einheit(11, { abschnitt_id: 2, ueber_einheit_id: 10 }),
+        ]),
+      }),
+    );
+    expect(stelleMit(netz, 'eh-11')).toMatchObject({ oben: 'eh-10' });
+  });
+
   it('leitet das Schreibrecht je Element aus dem Recht seines Datensatzes ab (D8)', () => {
     const netz = baueFernmeldenetz(
       quellen({

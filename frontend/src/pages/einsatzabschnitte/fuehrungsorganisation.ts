@@ -1,6 +1,14 @@
 import type { AbrufZustand } from '../../api/abrufZustand';
-import type { Einheit, Einsatzabschnitt, Fuehrungsstelle, Staerke } from '../../api/types';
-import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
+import type {
+  AbschnittLagezustand,
+  Einheit,
+  Einsatzabschnitt,
+  Fuehrungsstelle,
+  Staerke,
+} from '../../api/types';
+import { abschnittLagezustand } from '../../theme/statusFarben';
+import { staerkeText } from '../../anzeige/staerke';
+import { abgestelltVon } from '../../kraefte/kraeftebaumKern';
 import type { FunktionZeile } from '../../fuehrung/besetzungAusMitgliedern';
 import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { ZUSTAND_GRUND } from '../../api/abrufZustand';
@@ -14,14 +22,19 @@ import { abschnittStaerken } from './abschnittStaerke';
  * Abschnitten und Einheiten, ohne eigene Datenhaltung (LFH-626). Bildschirm, Druck und Lagebericht
  * lesen alle dieses eine Modell.
  *
- * - **Platzierung wie im Funkplan** (`fernmeldewesen/funkplan.ts:baueFunkplan`) und im Meldebild:
+ * - **Platzierung wie im Meldebild** und sonst wie im Funkplan (`fernmeldewesen/funkplan.ts:baueFunkplan`):
  *   Unterabschnitte unter ihren Abschnitt, Waisen an die Wurzel; oberste Einheiten unter ihren
  *   Abschnitt, Untereinheiten unter ihre Einheit; Einheiten ohne Abschnitt in den Sammelknoten.
- *   Dieselben Schlüssel (`ab-<id>`, `eh-<id>`, `sammel`), damit der Kommunikationsplan (LFH-625)
- *   seine Ebene auf diesen Baum setzen kann.
+ *   Eine abgestellte Untereinheit (eigener Abschnitt ungleich dem ihrer Obereinheit) steht wie im
+ *   Meldebild unter ihrem Abschnitt, mit „aus <Obereinheit>“ (LLH-1744, `abgestelltVon`); der
+ *   Funkplan behält sie am Führungsweg ihres Verbands. Dieselben Schlüssel (`ab-<id>`, `eh-<id>`,
+ *   `sammel`), damit der Kommunikationsplan (LFH-625) seine Ebene auf diesen Baum setzen kann.
  * - **Stärke aus derselben Rechnung wie der Gliederungsbaum** (`abschnittStaerken`, LFH-550). Die
  *   Wurzel „Einsatzleitung“ gehört nicht ins Modell: sie trägt keine Zahl, die Einsatzstärke hat
  *   ihre Heimat im Meldebild.
+ * - **Lagezustand am Abschnitt, Lücken gezählt** (LLH-1742): der gepflegte Zustand steht im Modell,
+ *   damit Bildschirm, Druck und Bericht dieselbe Angabe lesen; die fehlende Leitung zählt
+ *   {@link countOhneLeitung} einmal für die Sammelzeile über dem Baum.
  *
  * Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md` (D2, D4).
  */
@@ -42,8 +55,16 @@ interface KnotenBasis {
 }
 
 export type OrgKnoten =
-  | (KnotenBasis & { art: 'abschnitt' })
-  | (KnotenBasis & { art: 'einheit' })
+  | (KnotenBasis & {
+      art: 'abschnitt';
+      /** Der gepflegte Lagezustand (LFH-608); `null` = nicht beurteilt. Nur der eigene. */
+      lagezustand: AbschnittLagezustand | null;
+    })
+  | (KnotenBasis & {
+      art: 'einheit';
+      /** Name der Obereinheit, aus der die Einheit in ihren Abschnitt abgestellt ist (LLH-1744). */
+      abgestelltAus?: string;
+    })
   | { art: 'sammel'; key: 'sammel'; kinder: OrgKnoten[] };
 
 export interface Fuehrungsorganisation {
@@ -53,7 +74,7 @@ export interface Fuehrungsorganisation {
   einheitenFehlen: boolean;
 }
 
-function gruppiere<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T[]> {
+function groupBy<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T[]> {
   const m = new Map<K, T[]>();
   for (const x of liste) {
     const k = schluessel(x);
@@ -68,9 +89,14 @@ function gruppiere<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T
  * @param einheiten `null`, wenn die Einheiten nicht vorliegen — ein fehlender Bestand ist kein
  *   leerer.
  */
-export function baueFuehrungsorganisation(
+export function buildFuehrungsorganisation(
   abschnitte: readonly Einsatzabschnitt[],
   einheiten: readonly Einheit[] | null,
+  /**
+   * `false`: abgestellte Untereinheiten bleiben am Verband (Fernmeldeskizze, wie der Funkplan,
+   * LLH-1744). Vorgabe `true`: das Organigramm hängt sie wie das Meldebild unter ihren Abschnitt.
+   */
+  { detachAbgestellte = true }: { detachAbgestellte?: boolean } = {},
 ): Fuehrungsorganisation {
   const einheitenFehlen = einheiten == null;
   const alleEinheiten = einheiten ?? [];
@@ -78,17 +104,37 @@ export function baueFuehrungsorganisation(
   const gesehen = new Set<string>();
 
   const einheitIds = new Set(alleEinheiten.map((e) => e.id));
+  const abgestellt = detachAbgestellte ? abgestelltVon(alleEinheiten) : () => undefined;
   const istUntereinheit = (e: Einheit) =>
-    e.ueber_einheit_id != null && einheitIds.has(e.ueber_einheit_id);
-  const untereinheiten = gruppiere(
-    alleEinheiten.filter(istUntereinheit),
-    (e) => e.ueber_einheit_id!,
-  );
+    e.ueber_einheit_id != null && einheitIds.has(e.ueber_einheit_id) && !abgestellt(e);
+  const untereinheiten = groupBy(alleEinheiten.filter(istUntereinheit), (e) => e.ueber_einheit_id!);
+
+  // Stärke eines Einheitknotens: eigene plus die der Untereinheiten, die unter ihm stehen — wie
+  // die Meldebild-Zeile (LLH-1744). Eine abgestellte Untereinheit zählt in ihrem Abschnitt.
+  const teilbaumStaerke = (e: Einheit, pfad: Set<number> = new Set()): Staerke | null => {
+    if (e.aufgeloest_at) return null;
+    const s = {
+      fuehrer: e.ist?.fuehrer ?? 0,
+      unterfuehrer: e.ist?.unterfuehrer ?? 0,
+      mannschaft: e.ist?.mannschaft ?? 0,
+    };
+    pfad.add(e.id);
+    for (const u of untereinheiten.get(e.id) ?? []) {
+      if (pfad.has(u.id)) continue;
+      const t = teilbaumStaerke(u, pfad);
+      if (!t) continue;
+      s.fuehrer += t.fuehrer;
+      s.unterfuehrer += t.unterfuehrer;
+      s.mannschaft += t.mannschaft;
+    }
+    return s;
+  };
 
   const einheitKnoten = (e: Einheit): OrgKnoten | null => {
     const key = `eh-${e.id}`;
     if (gesehen.has(key)) return null;
     gesehen.add(key);
+    const aus = abgestellt(e);
     return {
       art: 'einheit',
       key,
@@ -96,26 +142,27 @@ export function baueFuehrungsorganisation(
       name: e.name,
       rufname: e.funkrufname ?? null,
       leitung: e.fuehrer_name ?? null,
-      staerke: summiereStaerke([e]),
+      staerke: teilbaumStaerke(e),
+      ...(aus ? { abgestelltAus: aus.name } : {}),
       tz: baueTzProps({
         objekttyp: 'einheit',
         einheitTypLabel: e.typ_label,
         fachaufgabe: e.tz_fachaufgabe,
         organisation: e.tz_organisation,
       }),
-      kinder: knotenAus(untereinheiten.get(e.id) ?? [], einheitKnoten),
+      kinder: knotenFrom(untereinheiten.get(e.id) ?? [], einheitKnoten),
     };
   };
 
   const abschnittIds = new Set(abschnitte.map((a) => a.id));
   const istUnterabschnitt = (a: Einsatzabschnitt) =>
     a.ueber_abschnitt_id != null && abschnittIds.has(a.ueber_abschnitt_id);
-  const unterabschnitte = gruppiere(
+  const unterabschnitte = groupBy(
     abschnitte.filter(istUnterabschnitt),
     (a) => a.ueber_abschnitt_id!,
   );
   const obersteEinheiten = alleEinheiten.filter((e) => !istUntereinheit(e));
-  const einheitenJeAbschnitt = gruppiere(
+  const einheitenJeAbschnitt = groupBy(
     obersteEinheiten.filter((e) => e.abschnitt_id != null && abschnittIds.has(e.abschnitt_id)),
     (e) => e.abschnitt_id!,
   );
@@ -132,6 +179,7 @@ export function baueFuehrungsorganisation(
       // Wie der Funkplan (LLH-1134): der Rufname der Abschnittsleitung vor der Kurzbezeichnung.
       rufname: a.rufname?.trim() || a.kurzbezeichnung || null,
       leitung: a.leiter_name ?? null,
+      lagezustand: a.lagezustand ?? null,
       // Derselbe Aufruf wie der Gliederungsbaum (`buildBaum`): inklusive aller Unterabschnitte.
       staerke: einheitenFehlen
         ? null
@@ -142,20 +190,20 @@ export function baueFuehrungsorganisation(
         organisation: a.tz_organisation,
       }),
       kinder: [
-        ...knotenAus(unterabschnitte.get(a.id) ?? [], abschnittKnoten),
-        ...knotenAus(einheitenJeAbschnitt.get(a.id) ?? [], einheitKnoten),
+        ...knotenFrom(unterabschnitte.get(a.id) ?? [], abschnittKnoten),
+        ...knotenFrom(einheitenJeAbschnitt.get(a.id) ?? [], einheitKnoten),
       ],
     };
   };
 
-  const wurzeln = knotenAus(
+  const wurzeln = knotenFrom(
     abschnitte.filter((a) => !istUnterabschnitt(a)),
     abschnittKnoten,
   );
   // Ein Ring aus Abschnitten hat keine Wurzel; seine Mitglieder kommen sonst nie vor.
-  wurzeln.push(...knotenAus(abschnitte, abschnittKnoten));
+  wurzeln.push(...knotenFrom(abschnitte, abschnittKnoten));
 
-  const heimatlos = knotenAus(
+  const heimatlos = knotenFrom(
     obersteEinheiten.filter((e) => e.abschnitt_id == null || !abschnittIds.has(e.abschnitt_id)),
     einheitKnoten,
   );
@@ -164,7 +212,7 @@ export function baueFuehrungsorganisation(
     if (gesehen.has(`eh-${e.id}`)) continue;
     const k = einheitKnoten(e);
     if (!k) continue;
-    const heimat = e.abschnitt_id != null ? finde(wurzeln, `ab-${e.abschnitt_id}`) : undefined;
+    const heimat = e.abschnitt_id != null ? findKnoten(wurzeln, `ab-${e.abschnitt_id}`) : undefined;
     (heimat ? heimat.kinder : heimatlos).push(k);
   }
   if (heimatlos.length > 0) wurzeln.push({ art: 'sammel', key: 'sammel', kinder: heimatlos });
@@ -172,17 +220,59 @@ export function baueFuehrungsorganisation(
   return { wurzeln, einheitenFehlen };
 }
 
-function knotenAus<T>(liste: readonly T[], bau: (x: T) => OrgKnoten | null): OrgKnoten[] {
+function knotenFrom<T>(liste: readonly T[], bau: (x: T) => OrgKnoten | null): OrgKnoten[] {
   return liste.map(bau).filter((k): k is OrgKnoten => k != null);
 }
 
-function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined {
+function findKnoten(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined {
   for (const k of knoten) {
     if (k.key === key) return k;
-    const t = finde(k.kinder, key);
+    const t = findKnoten(k.kinder, key);
     if (t) return t;
   }
   return undefined;
+}
+
+// ── Fehlende Leitung (LLH-1742) ──────────────────────────────────────────────────────────────
+
+export interface OhneLeitung {
+  abschnitte: number;
+  /** `null`, wenn die Einheiten fehlen: ein fehlender Bestand ist kein leerer, also nie „0“. */
+  einheiten: number | null;
+}
+
+/** Zählt die Knoten ohne Leitung im ganzen Baum, Sammelknoten und unterstellte Einheiten mit. */
+export function countOhneLeitung(org: Fuehrungsorganisation): OhneLeitung {
+  let abschnitte = 0;
+  let einheiten = 0;
+  const visit = (k: OrgKnoten) => {
+    if (k.art === 'abschnitt' && k.leitung == null) abschnitte++;
+    if (k.art === 'einheit' && k.leitung == null) einheiten++;
+    k.kinder.forEach(visit);
+  };
+  org.wurzeln.forEach(visit);
+  return { abschnitte, einheiten: org.einheitenFehlen ? null : einheiten };
+}
+
+/**
+ * Die Teile der Sammelzeile: „2 Abschnitte ohne Leitung“, „7 Einheiten ohne Führer“. Ein Teil mit
+ * 0 (oder ohne Zahl) entfällt. Der Bildschirm setzt je Teil einen Chip.
+ */
+export function ohneLeitungTeile(z: OhneLeitung): string[] {
+  return [
+    z.abschnitte > 0
+      ? `${z.abschnitte} ${z.abschnitte === 1 ? 'Abschnitt' : 'Abschnitte'} ohne Leitung`
+      : null,
+    z.einheiten != null && z.einheiten > 0
+      ? `${z.einheiten} ${z.einheiten === 1 ? 'Einheit' : 'Einheiten'} ohne Führer`
+      : null,
+  ].filter((t): t is string => t != null);
+}
+
+/** Die Sammelzeile als Text, wie sie im Bericht steht; `null`, wenn nichts fehlt. */
+export function ohneLeitungText(z: OhneLeitung): string | null {
+  const teile = ohneLeitungTeile(z);
+  return teile.length > 0 ? teile.join(' · ') : null;
 }
 
 // ── Markdown für den Lagebericht (D8) ──────────────────────────────────────────────────────────
@@ -194,9 +284,13 @@ function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
       ? `${einzug}- Ohne Abschnitt`
       : `${einzug}- ${[
           `**${md(k.name)}**`,
+          ...(k.art === 'abschnitt' && k.lagezustand
+            ? [`Lage ${abschnittLagezustand[k.lagezustand].label}`]
+            : []),
           k.rufname != null ? `Rufname ${md(k.rufname)}` : 'kein Rufname',
           k.leitung != null ? `Leitung ${md(k.leitung)}` : 'Leitung nicht besetzt',
           `Stärke ${staerkeText(k.staerke)}`,
+          ...(k.art === 'einheit' && k.abgestelltAus ? [`aus ${md(k.abgestelltAus)}`] : []),
         ].join(' · ')}`;
   return [kopf, ...k.kinder.flatMap((c) => knotenMarkdown(c, tiefe + 1))];
 }
@@ -226,7 +320,7 @@ export function wurzelFuehrungsstelle(
  * `md()`: im Bericht stehen sie als Text, nie als Auszeichnung. Telefon führt das Organigramm nicht,
  * also auch nicht hier.
  */
-export function rendereFuehrungsorganisationMarkdown(
+export function renderFuehrungsorganisationMarkdown(
   org: Fuehrungsorganisation,
   opts: {
     stand: string;
@@ -275,6 +369,8 @@ export function rendereFuehrungsorganisationMarkdown(
     org.wurzeln.length > 0
       ? org.wurzeln.flatMap((k) => knotenMarkdown(k, 0))
       : ['_(keine Abschnitte und keine Einheiten erfasst)_'];
+  // Dieselbe Sammelzeile wie über dem Baum (LLH-1742).
+  const ohneLeitung = ohneLeitungText(countOhneLeitung(org));
   return [
     '# Führungsorganisation',
     '',
@@ -293,6 +389,7 @@ export function rendereFuehrungsorganisationMarkdown(
     ...quellen,
     '## Gliederung',
     '',
+    ...(ohneLeitung ? [ohneLeitung, ''] : []),
     ...gliederung,
     '',
   ].join('\n');

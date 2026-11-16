@@ -26,7 +26,6 @@ import type {
   Gefahrengebiet,
   LetzteRueckmeldung,
   PegelAnzeige,
-  Person,
   Programmpunkt,
   Rueckmeldungen,
   Warnstufe,
@@ -38,7 +37,6 @@ import {
   OHNE_ABSCHNITT_KEY,
   OHNE_EINHEIT_KEY_PREFIX,
   baueKraeftebild,
-  verdichte,
   type MeldebildZeile,
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
@@ -49,14 +47,9 @@ import {
   rueckmeldungUeberfaelligSeit,
   rueckmeldungZustand,
 } from '../../meldungen/rueckmeldung';
-import {
-  baueMeldebildRaster,
-  einheitZeilen,
-  OHNE_EINHEIT_SCHLUESSEL,
-  toenungsGruende,
-  type ToenungsGrund,
-} from '../../kraefte/meldebildRaster';
+import { type ToenungsGrund } from '../../kraefte/meldebildRaster';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
+import { ausfallJeEinheit, OHNE_EINHEIT } from '../../lage/ausfallJeEinheit';
 import {
   dauerText,
   lagebesprechungUeberfaellig,
@@ -106,30 +99,6 @@ const ROLLE_ALS_TON: Record<Statusrolle, KennzahlTon> = {
   bedien: 'neutral',
   marke: 'neutral',
 };
-
-interface BetroffeneKennzahl {
-  anzahl: number;
-  /** Erfasst in den letzten {@link FENSTER_MINUTEN} Minuten. */
-  neu: number;
-}
-
-export function betroffeneKennzahl(personen: Person[], jetzt: Dayjs): BetroffeneKennzahl {
-  const grenze = jetzt.valueOf() - FENSTER_MINUTEN * 60_000;
-  const neu = personen.filter((p) => (ms(p.erfasst_at) ?? -Infinity) >= grenze).length;
-  return { anzahl: personen.length, neu };
-}
-
-interface KraefteKennzahl {
-  gesamt: number;
-  /** BOS-Schreibweise F/UF/M//Σ aus `staerkeText`. */
-  text: string;
-}
-
-/** Die Stärke kommt nur aus dem Personal; Fahrzeuge und Material zählen nicht (LFH-887). */
-export function kraefteKennzahl(personal: EinsatzPersonal[]): KraefteKennzahl {
-  const s = verdichte(personal, [], []).staerke;
-  return { gesamt: s.gesamt, text: staerkeText(s) };
-}
 
 interface WarnstufeKennzahl {
   stufe: Warnstufe;
@@ -495,34 +464,6 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
     if (b.abschnittId == null) return -1;
     return (rang.get(a.abschnittId) ?? 0) - (rang.get(b.abschnittId) ?? 0);
   });
-}
-
-/** Schlüssel der Meldebild-Zeile „Ohne Einheit“ in {@link ausfallJeEinheit}. */
-const OHNE_EINHEIT = 'ohne-einheit';
-
-/**
- * Ausfall je Einheit aus dem Meldebild selbst (LLH-1739): dieselben Gründe der Tönung, die dort in
- * der Statusspalte stehen, auch die der Sammelzeile „Ohne Einheit“ (unter {@link OHNE_EINHEIT}).
- * Jede Einheit zählt nur ihre eigenen Mittel (Spec `kraeftebaum`), die Summe über einen Teilbaum
- * zählt also keine Kraft doppelt.
- */
-function ausfallJeEinheit(
-  r: AbschnittRohdaten,
-): Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }> {
-  const raster = baueMeldebildRaster({ ...r, statusKatalog: [], auftraege: [] });
-  const je = new Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }>();
-  for (const z of einheitZeilen(raster)) {
-    const schluessel = z.einheitId ?? (z.key === OHNE_EINHEIT_SCHLUESSEL ? OHNE_EINHEIT : null);
-    if (schluessel == null) continue;
-    let mittel = 0;
-    let material = 0;
-    for (const g of toenungsGruende(z, null)) {
-      if (g.art === 'ausfall') mittel += g.anzahl;
-      if (g.art === 'ausfall_material') material += g.anzahl;
-    }
-    je.set(schluessel, { mittel, material });
-  }
-  return je;
 }
 
 /**
