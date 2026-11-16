@@ -72,7 +72,7 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
   1280 × 720 (kein Bildlauf); `e2e/lagebesprechung-vorbereitung.spec.ts` um den Abstand
   Bezeichnung–Wert ≤ 400 px bei 1920 × 1080 und kein Überlauf bei 390 px ergänzen. Lauf der beiden
   Specs grün.
-- [ ] 5.2 Anwenderdoku `docs/anwender/kapitel/lagebild.md` und `lagebesprechung.md` um
+- [x] 5.2 Anwenderdoku `docs/anwender/kapitel/lagebild.md` und `lagebesprechung.md` um
   „Großbild“ ergänzen (Einstieg, nur Ansehen, Verlassen, Alarmzahl) und die Bilder der Kapitel
   neu aufnehmen (`pnpm doku:bilder --grep lagebild`, `--grep lagebesprechung`); Wächter der Doku grün.
 - [x] 5.3 `frontend/AGENTS.md`: Bausteine unter `components/grossbild/` in die Liste „Bausteine
