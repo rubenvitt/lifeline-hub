@@ -677,8 +677,10 @@ anwendbar), „nicht geprüft" ist keins.
   `theme/zoomFrei.guard.test.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
-  `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
-  Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
+  `theme/dichte.ts:startDichte`, gespiegelt im Bootstrap-Skript von `index.html` (setzt
+  `data-dichte` vor dem ersten Bild, LLH-1774) — immer beide ändern, `theme/dichte.test.ts` führt
+  das Skript gegen `startDichte` aus; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart,
+  kein Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
   `e2e/dichte-ableitung.spec.ts`; Flächenmessung der Modul-Prüflisten
   `e2e/trefflaeche-pruefflaechen.spec.ts`, Messhelfer in `e2e/trefflaeche-kern.ts`.
 - **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel

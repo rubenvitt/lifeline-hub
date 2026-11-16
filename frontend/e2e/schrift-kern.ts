@@ -4,7 +4,8 @@ import { ladeInDichte } from './trefflaeche-kern';
 /**
  * Messhelfer der Schrift-Specs (LLH-1719, Change `i1o47voj-schrift-lesbarkeit`):
  * `schrift-skala.spec.ts` (Größen) und `schrift-mono-grenze.spec.ts` (Mono nur für Kennungen).
- * Gemessen wird, was der Browser rendert: berechnete Größe und Familie je sichtbarem Textknoten.
+ * Gemessen wird, was der Browser rendert: berechnete Größe (bei SVG-Text mal Maßstab der
+ * `viewBox`) und Familie je sichtbarem Textknoten.
  */
 
 /** Die sechs Stufen in `kompakt` (`groessenstufen` in `theme/tokens.ts`), als Literal. */
@@ -65,9 +66,17 @@ export async function textproben(page: Page, wurzel = 'body'): Promise<Textprobe
       }
       // Nur für Vorleser (Status-Wort hinter dem Chip u. ä.): nicht gesehen, nicht gemessen.
       if (k.width <= 1 && k.height <= 1) continue;
+      // SVG-Text: die berechnete Größe steht in Benutzereinheiten, die `viewBox` skaliert sie
+      // noch. Am Schirm zählt Größe mal Maßstab (wie `wortGrad` in der Ausstattungs-Spec), sonst
+      // läse ein Körperschema mit Maßstab 0,3 zu groß und ein gestauchtes Diagramm zu klein.
+      let massstab = 1;
+      if (el instanceof SVGGraphicsElement) {
+        const m = el.getScreenCTM();
+        if (m) massstab = Math.hypot(m.a, m.b);
+      }
       proben.push({
         text: text.slice(0, 60),
-        groesse: Math.round(parseFloat(s.fontSize) * 100) / 100,
+        groesse: Math.round(parseFloat(s.fontSize) * massstab * 100) / 100,
         familie: s.fontFamily
           .split(',')[0]
           .trim()

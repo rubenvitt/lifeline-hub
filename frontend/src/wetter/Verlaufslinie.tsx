@@ -253,6 +253,9 @@ export default function Verlaufslinie({
               transform: prognoseY < 12 ? 'translateY(2px)' : 'translateY(calc(-100% - 2px))',
               whiteSpace: 'nowrap',
               lineHeight: 1,
+              // Liegt über dem Diagramm: der Zeiger fährt durch, sonst verlöre das SVG
+              // `pointermove` und spränge per `pointerleave` auf den letzten Punkt.
+              pointerEvents: 'none',
             }}
           >
             Prognose {wasserstandMeter(prognoseCm)} m

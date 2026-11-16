@@ -1,5 +1,5 @@
 ---
-id: ADR-0055
+id: ADR-0057
 titel: Schriftgrößen kommen nur aus sechs Stufen, die mit der Dichte wachsen
 status: akzeptiert
 datum: 2026-11-15
@@ -10,11 +10,11 @@ gilt_fuer:
   - frontend/src/**/*.tsx
   - frontend/index.html
 herleitung:
-  - openspec/changes/archive/2026-11-15-i1o47voj-schrift-lesbarkeit/design.md
+  - openspec/changes/archive/2026-11-16-i1o47voj-schrift-lesbarkeit/design.md
   - Zunder LLH-1719 (Stufen, Zoom, Feldetikett und Mono-Grenze abgestimmt mit Ruben am 15.11.2026)
 ---
 
-# ADR-0055: Schriftgrößen kommen nur aus sechs Stufen, die mit der Dichte wachsen
+# ADR-0057: Schriftgrößen kommen nur aus sechs Stufen, die mit der Dichte wachsen
 
 ## Regeln
 

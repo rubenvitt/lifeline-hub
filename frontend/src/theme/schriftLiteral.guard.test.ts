@@ -33,9 +33,11 @@ import { ohneKommentare } from '../test/ohneKommentare';
  * ── BEKANNTE GRENZEN ──
  *
  * Benannte Konstanten fängt er in zwei Formen: `…_SCHRIFT`/`…FONT…` mit Zahlwert und eine
- * Konstante in Großbuchstaben am `fontSize`, die keine Stufe trägt (Review LLH-1719). Eine Zahl in
- * einer kleingeschriebenen lokalen Variable (`const g = 13; fontSize: g`) sieht er nicht; das
- * deckt die e2e-Messung `e2e/schrift-skala.spec.ts` am gerenderten Schirm.
+ * Konstante in Großbuchstaben am `fontSize` (auch `GROESSE.band`), die keine Stufe trägt (Review
+ * LLH-1719). Als Stufe gilt nur eine Konstante dieser Datei, deren Zeile eine Stufe nennt und
+ * keine Zahl; eine importierte oder über mehrere Zeilen geschriebene meldet er lieber zu viel.
+ * Er sieht nicht: eine Zahl in einer kleingeschriebenen Variable (`const g = 13; fontSize: g`).
+ * Das deckt die e2e-Messung `e2e/schrift-skala.spec.ts` am gerenderten Schirm.
  *
  * Gelesen wird zeilenweise ohne Kommentare (`ohneKommentare`). Ein Wert über mehrere Zeilen wird
  * nur in seiner ersten Zeile geprüft; Prettier bricht kurze Werte nicht um. Der Lagemonitor
@@ -59,10 +61,16 @@ export const FERNSICHT_DATEIEN: readonly string[] = [
 /**
  * Zeichnungen mit eigenem Maßstab (Spec `schriftskala`): ihre Schriften sind Zeichnungseinheiten
  * und stehen als benannte Konstanten (`…_SCHRIFT`), mindestens 11; nur die Glyphen in
- * `GLYPHEN` sind Teil eines Zeichens und dürfen kleiner sein.
+ * `GLYPHEN` sind Teil eines Zeichens und dürfen kleiner sein. Einzeln benannt, nicht als
+ * Verzeichnis: Paneel, Dialoge und Werkzeugleiste der Skizze sind Bedienoberfläche und gehören
+ * zur Skala (Review LLH-1719).
  */
-export const ZEICHNUNG_DATEIEN =
-  /^fernmeldewesen\/(fernmeldeskizzeLayout\.ts|skizzenZeichen\.tsx|skizze\/)/;
+export const ZEICHNUNG_DATEIEN: readonly string[] = [
+  'fernmeldewesen/fernmeldeskizzeLayout.ts',
+  'fernmeldewesen/skizzenZeichen.tsx',
+  'fernmeldewesen/skizze/SkizzenElemente.tsx',
+  'fernmeldewesen/skizze/schriftfeld.ts',
+];
 export const GLYPHEN: readonly string[] = ['MARKE_SCHRIFT'];
 /** TS-Druckansichten auf Papier mit eigener Skala (Nordpfeil des Lageplans). */
 export const DRUCK_TS: readonly string[] = ['pages/lagekarte/LageplanDruck.tsx'];
@@ -90,10 +98,16 @@ export function tsBefunde(
   const stufenKonstanten = new Set(
     zeilen.flatMap((z) => {
       const m = /\b(?:const|let)\s+([A-Z][A-Z0-9_]*)\b[^=]*=\s*(.*)$/.exec(z);
+      if (!m) return [];
+      // Neben der Stufe keine Zahl (`leise ? schriftGroesse('klein') : 13` ist keine Stufe);
+      // `${fernsicht.…}px` ist die benannte Skala des Lagemonitors.
+      const ohneSkala = m[2]
+        .replace(/\$\{fernsicht\.\w+\}px/g, '')
+        .replace(/var\(--lfh-[\w-]+\)/g, '');
       const istStufe =
-        m &&
         (/schriftGroesse\(|var\(--lfh-|\bfernsicht\b|Groessenstufe/.test(z) ||
-          /^['"](fein|klein|text|titel|wert|gross)['"]/.test(m[2]));
+          /^['"](fein|klein|text|titel|wert|gross)['"]/.test(m[2])) &&
+        !ZAHL.test(ohneSkala);
       return istStufe ? [m[1]] : [];
     }),
   );
@@ -124,8 +138,9 @@ export function tsBefunde(
       // Als Argument der Skala (`schriftGroesse(EINHEITEN_STUFE)`) ist die Konstante eine Stufe.
       const konstante = /schriftGroesse\(|zahlStil\(|schriftStil\(|schriftPx\(/.test(wert)
         ? null
-        : /(?<![\w.])[A-Z][A-Z0-9_]{2,}(?![\w.])/.exec(wert);
-      if (konstante && !stufenKonstanten.has(konstante[0]) && !zeichnung && !fernsichtDatei) {
+        : /(?<![\w.])([A-Z][A-Z0-9_]{2,})(?:\.\w+)*(?![\w(])/.exec(wert);
+      // Auch der Zugriff auf ein Feld (`GROESSE.band`): die Stufe steht am Namen der Konstante.
+      if (konstante && !stufenKonstanten.has(konstante[1]) && !zeichnung && !fernsichtDatei) {
         treffer.push({ zeile, grund: `fontSize aus Konstante ${konstante[0]}` });
       }
     }
@@ -217,7 +232,7 @@ export function befunde(dateien: Record<string, string>): string[] {
     for (const b of tsBefunde(
       inhalt,
       FERNSICHT_DATEIEN.includes(pfad),
-      ZEICHNUNG_DATEIEN.test(pfad),
+      ZEICHNUNG_DATEIEN.includes(pfad),
     )) {
       meldungen.push(`${pfad}:${b.zeile}  ${b.grund}`);
     }
@@ -231,7 +246,12 @@ describe('Schriftgrößen nur aus der Skala (LLH-1775)', () => {
   });
 
   it('die Druckblätter gibt es noch (sonst ist die Ausnahme tot)', () => {
-    for (const pfad of [...DRUCKBLAETTER, ...FERNSICHT_DATEIEN]) {
+    for (const pfad of [
+      ...DRUCKBLAETTER,
+      ...FERNSICHT_DATEIEN,
+      ...ZEICHNUNG_DATEIEN,
+      ...DRUCK_TS,
+    ]) {
       expect(existsSync(join(SRC, pfad)), pfad).toBe(true);
     }
   });
@@ -282,6 +302,20 @@ describe('Regeln des Wächters an Texten (Mutationsproben)', () => {
     expect(tsBefunde('export const HINWEIS_SCHRIFT = 10;', false, true)).not.toEqual([]);
     expect(tsBefunde('export const MARKE_SCHRIFT = 7;', false, true)).toEqual([]);
     expect(tsBefunde('        fontSize={NAME_SCHRIFT}', false, true)).toEqual([]);
+    // Zugriff auf ein Feld einer Konstante (Nach-Review LLH-1719).
+    expect(
+      tsBefunde('const GROESSE = { band: 13 } as const;\n  fontSize: GROESSE.band,'),
+    ).not.toEqual([]);
+    expect(
+      tsBefunde(
+        "const MARKE = { klein: schriftGroesse('fein'), monitor: `${fernsicht.text}px` } as const;\n" +
+          '  fontSize: MARKE.klein,',
+      ),
+    ).toEqual([]);
+    // Eine Stufe neben einer Zahl macht die Konstante nicht zur Stufe.
+    expect(
+      tsBefunde("const BAND = leise ? schriftGroesse('klein') : 13;\n  fontSize: BAND,"),
+    ).not.toEqual([]);
   });
 
   it('meldet monoStil, Mono-Literale, font-size in Strings und Canvas', () => {
