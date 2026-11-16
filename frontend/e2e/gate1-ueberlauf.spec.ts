@@ -1906,16 +1906,17 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
   }
 
   /*
-   * EINHEITEN-GLIEDERUNG (LLH-1029): eine Tabelle mit Baum aus dem Kräftebaum-Kern. Am Handy
-   * bleiben Einheit, Ist und Soll als Spalten, der Einzug je Ebene ist schmal, Name, Ist und Soll
-   * stehen ganz im Bild, und weder Tabelle noch Seite laufen quer — angepasst, nicht in Karten
-   * aufgelöst. Ein langes Wort im Namen („Behandlungsgruppe“) wird getrennt, statt die
-   * Einheitenspalte breit zu halten. Am Fükw (1366) läuft die volle Spaltenreihe nicht über.
+   * EINHEITEN-GLIEDERUNG (LLH-1029, LLH-1787): ab `md` eine Tabelle mit Baum aus dem
+   * Kräftebaum-Kern, am Fükw (1366) ohne Überlauf der vollen Spaltenreihe. Am Handy steht der
+   * Baum als Karten (Spec `einsatztauglichkeit-layout`, „Die Einheitenliste steht am Handschirm als
+   * Karten“): vorher setzte die enge Namensspalte Namen Buchstabe für Buchstabe senkrecht. Jede
+   * Karte trägt Name, Ist und Soll, die Untereinheit steht eingerückt und offen, kein Name bricht
+   * innerhalb eines Worts, und die Seite läuft nicht quer.
    * Zwei Ebenen (Zug → Gruppe), damit der Einzug messbar ist; die Gruppe ist gegen ihr Soll aus
    * dem Typ unterbesetzt, damit das Urteil mitgemessen wird.
    */
   for (const rolle of ['admin', 'beobachter'] as const) {
-    test(`mobil (390 px) · ${rolle}: Einheiten-Gliederung als Tabelle ohne Querlauf, schmaler Einzug`, async ({
+    test(`mobil (390 px) · ${rolle}: Einheiten-Gliederung als Karten ohne Querlauf, Gruppe eingerückt`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: 1366, height: 768 });
@@ -1958,45 +1959,49 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
       const breit = await tabellenUeberlauf(gliederung);
 
       await page.setViewportSize({ width: 390, height: 844 });
-      await expect(gliederung.getByRole('columnheader', { name: 'Abschnitt' })).toHaveCount(0);
-      const zeile = (link: Locator) => gliederung.locator('tbody tr').filter({ has: link });
+      await expect(gliederung.locator('.ant-table')).toHaveCount(0);
+      const karte = (link: Locator) =>
+        gliederung.locator('[data-lfh="datensicht-karte"]').filter({ has: link });
+      await expect(karte(zug)).toHaveCount(1);
+      await expect(karte(gruppe), 'die Gruppe steht offen, ohne Aufklappen').toHaveCount(1);
       const mass = async (link: Locator) => {
-        const r = await zeile(link).evaluate((tr) => {
-          const zellen = Array.from(tr.querySelectorAll('td')).map((td) =>
-            td.getBoundingClientRect(),
-          );
-          return {
-            istRechts: zellen[1]?.right ?? Infinity,
-            sollRechts: zellen[2]?.right ?? Infinity,
-            spalten: zellen.length,
-          };
+        const k = (await karte(link).boundingBox())!;
+        // Zeilen des Namens: ein Wort bricht nie in Buchstaben (höchstens drei Zeilen).
+        const zeilen = await link.evaluate((el) => {
+          const r = document.createRange();
+          r.selectNodeContents(el);
+          return new Set([...r.getClientRects()].map((q) => Math.round(q.top))).size;
         });
-        const box = (await link.boundingBox())!;
-        return { ...r, links: box.x, linkRechts: box.x + box.width };
+        // Eingerückt ist der Inhalt (Polsterung der Karte nach Tiefe), also misst der Name.
+        const l = (await link.boundingBox())!;
+        return { links: l.x, rechts: k.x + k.width, zeilen };
       };
       const [m1, m2] = [await mass(zug), await mass(gruppe)];
-      const schmal = await tabellenUeberlauf(gliederung);
       const seite = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
       test.info().annotations.push({
         type: 'messwert',
-        description: `Einzug ${Math.round(m2.links - m1.links)}px · Tabelle 1366 ${breit}px, 390 ${schmal}px · Seite ${seite}px · Spalten ${m1.spalten} · Soll-Kante ${Math.round(Math.max(m1.sollRechts, m2.sollRechts))}px`,
+        description: `Einzug ${Math.round(m2.links - m1.links)}px · Tabelle 1366 ${breit}px · Seite 390 ${seite}px · Namenszeilen ${m1.zeilen}/${m2.zeilen}`,
       });
-      for (const [m, name] of [
-        [m1, 'Zug'],
-        [m2, 'Gruppe'],
+      for (const [m, name, link] of [
+        [m1, 'Zug', zug],
+        [m2, 'Gruppe', gruppe],
       ] as const) {
-        expect(m.spalten, `${name}: Einheit, Ist und Soll`).toBe(3);
-        expect(m.linkRechts, `${name}: der Name steht im Bild`).toBeLessThanOrEqual(390);
-        expect(m.istRechts, `${name}: Ist steht im Bild`).toBeLessThanOrEqual(390);
-        expect(m.sollRechts, `${name}: Soll steht ganz im Bild`).toBeLessThanOrEqual(390);
+        expect(m.rechts, `${name}: die Karte steht im Bild`).toBeLessThanOrEqual(390);
+        expect(
+          m.zeilen,
+          `${name}: der Name bricht nicht Buchstabe für Buchstabe`,
+        ).toBeLessThanOrEqual(3);
+        await expect(
+          karte(link)
+            .getByText(/\d+\/\d+\/\d+\/\/\d+/)
+            .first(),
+        ).toBeVisible();
       }
-      await expect(zeile(gruppe).getByText('unterbesetzt')).toBeInViewport();
-      expect(m2.links - m1.links, 'Einzug der zweiten Ebene').toBeLessThanOrEqual(12);
+      await expect(karte(gruppe).getByText('unterbesetzt')).toBeVisible();
       expect(m2.links - m1.links, 'die Gruppe steht eingerückt').toBeGreaterThan(0);
       expect(seite, 'Seite läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
-      expect(schmal, 'Tabelle läuft bei 390 px nicht quer').toBeLessThanOrEqual(1);
       expect(breit, 'Tabelle läuft bei 1366 px nicht quer').toBeLessThanOrEqual(1);
     });
   }

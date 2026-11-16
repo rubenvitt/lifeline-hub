@@ -125,9 +125,6 @@ const NUR_TABELLE: string[] = [
   '/src/betreuung/BezirkTabelle.tsx',
   // Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?“), Tabelle in jeder Breite.
   '/src/betreuung/StellenBlock.tsx',
-  // Die Einheiten-Gliederung (LLH-1029): „welche Einheit?“ ist ein Vergleich über Ist und Soll,
-  // Tabelle in jeder Breite, am Handy über `abBreite` angepasst.
-  '/src/pages/EinheitenPage.tsx',
   // Der Funkplan (LFH-548) wird verglichen („welche Stelle funkt auf welcher Gruppe?“) und
   // gedruckt; Tabelle in jeder Breite, auf schmalem Schirm angepasst.
   '/src/pages/FunkplanPage.tsx',
@@ -714,11 +711,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
     // Kein Kartenmodul mehr (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`, die Bezirke
-    // seit LLH-1034 als Tabelle, die Lageberichte seit LLH-1064 auf Paneelen), sieben
-    // Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer
-    // umbaut, ohne einzutragen, an der Formprüfung.
+    // seit LLH-1034 als Tabelle, die Lageberichte seit LLH-1064 auf Paneelen), sechs
+    // Vergleichsflächen; die Einheiten-Gliederung steht seit LLH-1787 am Handy als Karten. Wer
+    // einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer umbaut, ohne
+    // einzutragen, an der Formprüfung.
     expect(NUR_KARTE).toHaveLength(0);
-    expect(NUR_TABELLE).toHaveLength(7);
+    expect(NUR_TABELLE).toHaveLength(6);
     // Zwei PFLICHTEN, dateibezogen: Meldebild und Einheiten-Gliederung (beide kumulieren über den
     // Kräftebaum). Ein weiterer Eintrag braucht dieselbe Herleitung.
     expect(VOLLMENGE_PFLICHT).toHaveLength(2);

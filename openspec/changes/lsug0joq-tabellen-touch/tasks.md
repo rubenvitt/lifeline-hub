@@ -35,10 +35,10 @@ klebenden Kopfzeile gleich breit) ist im Branch behoben.
 
 ## 5. i5c54naq: Einheiten am Handy als Karten
 
-- [ ] 5.1 `pages/EinheitenPage.tsx`: `form="auto"`, Kartenplan (Titel `KraeftebaumZelle`, Status Urteil, Sekundär Ist/Soll/Einheitsführer), Name mit Silbentrennung statt `overflowWrap: 'anywhere'`; Dateikopf berichtigen. Tests „unter md Karten mit Baum“, „Untereinheit eingerückt und aufgeklappt“, „ab md Tabelle“ rot→grün
-- [ ] 5.2 Baum-Kartenzweig der `Datensicht` (`baumEintrag`) in `komfortabel`/`handschuh` bei 390 px: Einzug und Knopf „n Untereinträge“ als Ziel der Stufe; Abweichungen beheben, Unit-Test rot→grün
-- [ ] 5.3 `components/datensicht.guard.test.ts`: `EinheitenPage.tsx` aus `NUR_TABELLE`, Kommentar an der Trennlinie der Formen in `Datensicht`; Wächter grün
-- [ ] 5.4 e2e: `e2e/fokus-verdeckung.spec.ts` (Einheitenliste nur ab `md`), neue Messung 390 × 844 `komfortabel` (Karten, kein Wortbruch, kein Querlauf) in `e2e/kraefte-schmal.spec.ts`, `e2e/gate3-trefflaeche.spec.ts` (Baumknopf der Karte); grün
+- [x] 5.1 `pages/EinheitenPage.tsx`: `form="auto"`, Kartenplan (Titel `KraeftebaumZelle`, Status Urteil, Sekundär Ist/Soll/Einheitsführer), Name mit Silbentrennung statt `overflowWrap: 'anywhere'`; Dateikopf berichtigen. Tests „unter md Karten mit Baum“, „Untereinheit eingerückt und aufgeklappt“, „ab md Tabelle“ rot→grün
+- [x] 5.2 Baum-Kartenzweig der `Datensicht` (`baumEintrag`) in `komfortabel`/`handschuh` bei 390 px: Einzug und Knopf „n Untereinträge“ als Ziel der Stufe; Abweichungen beheben, Unit-Test rot→grün
+- [x] 5.3 `components/datensicht.guard.test.ts`: `EinheitenPage.tsx` aus `NUR_TABELLE`, Kommentar an der Trennlinie der Formen in `Datensicht`; Wächter grün
+- [x] 5.4 e2e: `e2e/fokus-verdeckung.spec.ts` (Einheitenliste nur ab `md`), neue Messung 390 × 844 `komfortabel` (Karten, kein Wortbruch, kein Querlauf) in `e2e/kraefte-schmal.spec.ts`, `e2e/gate3-trefflaeche.spec.ts` (Baumknopf der Karte); grün
 
 ## 6. Regeln, Doku, Abschluss
 

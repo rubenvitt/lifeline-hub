@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import EinheitenPage from './EinheitenPage';
 import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
@@ -434,6 +435,34 @@ describe('EinheitenPage', () => {
           .paddingInlineStart;
       expect(einzug(oben)).toBe('0px');
       expect(einzug(unten)).not.toBe('0px');
+    });
+
+    it('am Handy Karten statt Tabelle: Name, Ist/Soll, Einheitsführer, Gruppe eingerückt und offen (LLH-1787)', async () => {
+      setzeViewportBreite(390);
+      zeige();
+      const gliederung = await screen.findByRole('region', { name: 'Gliederung' });
+      await within(gliederung).findByText('Gruppe Deich');
+      expect(gliederung.querySelector('.ant-table')).toBeNull();
+      const karten = [...gliederung.querySelectorAll<HTMLElement>('[data-lfh="datensicht-karte"]')];
+      expect(karten).toHaveLength(2);
+      const [zugKarte, gruppenKarte] = karten;
+      expect(zugKarte).toHaveTextContent('1. Zug');
+      expect(within(zugKarte).getByText('1/1/5//7')).toBeInTheDocument();
+      expect(within(zugKarte).getByText('Anna Probe')).toBeInTheDocument();
+      // Ohne Aufklappen: die Gruppe steht schon da, unter dem Zug.
+      expect(gruppenKarte).toHaveTextContent('Gruppe Deich');
+      expect(
+        zugKarte.compareDocumentPosition(gruppenKarte) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('ab md bleibt die Tabelle (LLH-1787)', async () => {
+      setzeViewportBreite(1024);
+      zeige();
+      const gliederung = await screen.findByRole('region', { name: 'Gliederung' });
+      await within(gliederung).findByText('Gruppe Deich');
+      expect(gliederung.querySelector('.ant-table')).not.toBeNull();
+      expect(gliederung.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
     });
 
     it('wartet auf die Abschnitte, statt die Folge nach dem Laden umzustellen', async () => {

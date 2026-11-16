@@ -2270,7 +2270,8 @@ test('Erste Zeile (LLH-1358): Einheiten — rückwärts steht kein Ziel unter de
     expect(einheit.ok(), await einheit.text()).toBeTruthy();
   }
   const gemessen: string[] = [];
-  for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
+  // Unter `md` steht die Gliederung als Karten (LLH-1787): die Tabelle gilt erst ab `md`.
+  for (const flaeche of ERSTE_ZEILE_FLAECHEN.filter((f) => f.width >= 768)) {
     const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
     await page.setViewportSize(flaeche);
     await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten`, 'handschuh');
