@@ -306,6 +306,27 @@ impl LiveNachricht {
             None => Some(self),
         }
     }
+
+    /// Wie [`Self::fuer`], für eine Verbindung, die ein gekoppelter Lagemonitor hält, mit
+    /// `lagemonitor = true` (LLH-1743, Spec `lagemonitor`, „Sofortmeldungen erreichen den Monitor
+    /// sofort“, design.md D7): dann geht eine Sofortmeldung als Signal ohne Inhalt an ihn, auch ohne
+    /// das Modul Meldungen; die Nutzlast ist `{}`, also weder Text noch Kennung. Alle anderen
+    /// Ereignisse filtert das Modul-Gate wie sonst; das Gate von `sofortmeldung` selbst bleibt
+    /// `meldungen` ([`LiveEvent::modul_keys`]).
+    pub fn fuer_verbindung(
+        self,
+        benutzer_id: i64,
+        erlaubt: &HashSet<&'static str>,
+        lagemonitor: bool,
+    ) -> Option<Self> {
+        if lagemonitor && self.event == LiveEvent::Sofortmeldung && self.empfaenger.is_none() {
+            return Some(Self {
+                data: "{}".into(),
+                ..self
+            });
+        }
+        self.fuer(benutzer_id, erlaubt)
+    }
 }
 
 /// Ergebnis eines (Wieder-)Abonnements mit `Last-Event-ID` (F14/LFH-263).
@@ -862,6 +883,37 @@ mod tests {
     }
 
     // --- F01/LFH-227: Modul-Gate-Registry ---
+
+    /// LLH-1743 D7: der Lagemonitor bekommt `sofortmeldung` ohne Inhalt, aber kein anderes
+    /// Meldungsereignis; ohne den Schalter bleibt das Modul-Gate allein maßgeblich.
+    #[test]
+    fn lagemonitor_bekommt_sofortmeldung_als_signal_ohne_inhalt() {
+        let nachricht = |event| LiveNachricht {
+            id: "1".into(),
+            event,
+            data: r#"{"meldung_id":3}"#.into(),
+            empfaenger: None,
+        };
+        let monitor: HashSet<&'static str> = HashSet::from(["lagekarte", "unfallhilfsstellen"]);
+
+        let n = nachricht(LiveEvent::Sofortmeldung)
+            .fuer_verbindung(7, &monitor, true)
+            .expect("Signal an den Monitor");
+        assert_eq!(n.data, "{}");
+        assert!(nachricht(LiveEvent::Meldung)
+            .fuer_verbindung(7, &monitor, true)
+            .is_none());
+        // Ohne Lagemonitor: kein Modul Meldungen, kein Ereignis.
+        assert!(nachricht(LiveEvent::Sofortmeldung)
+            .fuer_verbindung(7, &monitor, false)
+            .is_none());
+        // Mit dem Modul bleibt die Nutzlast für Personen unverändert.
+        let leser: HashSet<&'static str> = HashSet::from(["meldungen"]);
+        let n = nachricht(LiveEvent::Sofortmeldung)
+            .fuer_verbindung(7, &leser, false)
+            .unwrap();
+        assert_eq!(n.data, r#"{"meldung_id":3}"#);
+    }
 
     /// Guard: jeder Gate-Key muss ein echter Modul-Key sein. Ein Tippfehler hier wäre
     /// sonst ein stiller fail-closed (das Event erreichte niemanden mehr) — der

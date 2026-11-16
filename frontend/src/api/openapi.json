@@ -13015,6 +13015,68 @@
           }
         }
       },
+      "LagemonitorAlarm": {
+        "type": "object",
+        "description": "Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne\nPersonenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die\nüberfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten\nund Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall trägt der Block\nnicht (D6: die Regel lebt im Browser, Folgeaufgabe).",
+        "required": [
+          "sofort_offen",
+          "dringend_offen",
+          "bestaetigung_ueberfaellig",
+          "auftraege_ueberfaellig",
+          "erinnerungen_faellig",
+          "nachforderungen_ueberfaellig",
+          "rueckmeldung_ueberfaellig",
+          "abschnitte_kritisch"
+        ],
+        "properties": {
+          "abschnitte_kritisch": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Bezeichnungen der Abschnitte im Lagezustand „kritisch“, in der Folge der Gliederung."
+          },
+          "auftraege_ueberfaellig": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bestaetigung_ueberfaellig": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "dringend_offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erinnerungen_faellig": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nachforderungen_ueberfaellig": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rueckmeldung_ueberfaellig": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorRueckmeldung"
+            },
+            "description": "Einheiten mit überfälliger Rückmeldung, die längste zuerst."
+          },
+          "sofort_aelteste_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eingang der ältesten davon (UTC); fehlt ohne offene Sofortmeldung."
+          },
+          "sofort_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Offene, unbestätigte Sofortmeldungen (`meldungen.sofort_offen` des Modulzählers)."
+          }
+        }
+      },
       "LagemonitorAnzeige": {
         "type": "object",
         "required": [
@@ -13034,6 +13096,17 @@
               "$ref": "#/components/schemas/LagemonitorAbschnitt"
             },
             "description": "Einsatzabschnitte mit gezeichneter Fläche."
+          },
+          "alarm": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorAlarm",
+                "description": "Werte der Alarmzeile (LLH-1743). Nur der gekoppelte Lagemonitor bekommt sie: [`verdichte`]\nspeist auch das Lagebild für Externe und die API v1, die den Block nicht tragen."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "betroffene": {
             "$ref": "#/components/schemas/LagemonitorBetroffene"
@@ -13185,6 +13258,24 @@
           },
           "text": {
             "type": "string"
+          }
+        }
+      },
+      "LagemonitorRueckmeldung": {
+        "type": "object",
+        "description": "Eine Einheit mit überfälliger Rückmeldung: nur ihr Name und seit wann (LLH-1743).",
+        "required": [
+          "einheit",
+          "seit_min"
+        ],
+        "properties": {
+          "einheit": {
+            "type": "string"
+          },
+          "seit_min": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Minuten seit der Fälligkeit (abgerundet)."
           }
         }
       },
@@ -14086,7 +14177,9 @@
         "required": [
           "offen",
           "ungesehen",
-          "bestaetigung_ueberfaellig"
+          "bestaetigung_ueberfaellig",
+          "sofort_offen",
+          "dringend_offen"
         ],
         "properties": {
           "bestaetigung_ueberfaellig": {
@@ -14094,9 +14187,26 @@
             "format": "int64",
             "description": "Pflichtig, unbestätigt und Frist abgelaufen oder eskaliert — über ALLE Meldungen, nicht\nnur die offenen (LFH-397). Speist die Warnsperre des Helligkeitsreglers im Frontend."
           },
+          "dringend_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Offene, unbestätigte Meldungen mit Priorität „dringend“, die keine Sofortmeldungen sind."
+          },
           "offen": {
             "type": "integer",
             "format": "int64"
+          },
+          "sofort_aelteste_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eingang der ältesten offenen, unbestätigten Sofortmeldung (UTC, SQLite-Format); fehlt\nohne eine solche. Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es."
+          },
+          "sofort_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Offene, unbestätigte Sofortmeldungen (Art oder Priorität, [`crate::meldung::ist_sofort`]),\nab Eingang (LLH-1743, Alarmzeile). Dieselbe Zahl zeigt der Lagemonitor."
           },
           "ungesehen": {
             "type": "integer",

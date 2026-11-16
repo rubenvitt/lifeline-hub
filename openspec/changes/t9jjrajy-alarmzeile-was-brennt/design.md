@@ -135,7 +135,7 @@ und die Daten schon.
 - Im Client übersetzt eine kleine Funktion `alarmAusMonitor(lage.alarm, betroffene) → Quellen` in
   dieselben Eingaben für `wasBrennt`. Folge und Wortlaut sind damit identisch.
 
-### D6 Ausfall auf dem Monitor (offene Entscheidung, Empfehlung B)
+### D6 Ausfall auf dem Monitor (entschieden 16.11.2026: B)
 Der Ausfall einer Einheit ist eine Regel des Browsers: eigene Mittel nach Kräftebaum, Status der
 Kategorie „nicht verfügbar“ und Material mit Rolle Alarm oder Achtung samt Beladung, ohne Einheit
 mit eigenem Status „nicht verfügbar“. Am Server gibt es diese Regel nicht.

@@ -1,28 +1,27 @@
 # Tasks
 
-Zunder: LLH-1743 (t9jjrajy). Annahme D6 = B (Monitor ohne Ausfall, Folgeaufgabe); bei A per
-`/opsx:update` Abschnitt 2 um die Ausfall-Regel am Server erweitern.
+Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Ausfall, Folgeaufgabe).
 
 ## 1. Modulzähler: Sofort und Dringend (Backend)
 
-- [ ] 1.1 `src/meldung/repo.rs`: Zählung `count_sofort_offen` um die älteste Eingangszeit erweitern
+- [x] 1.1 `src/meldung/repo.rs`: Zählung `count_sofort_offen` um die älteste Eingangszeit erweitern
   (eine Abfrage, die Zahl und `MIN(eingang_at)` liefert) und `count_dringend_offen` (Priorität
   `dringend`, keine Sofortmeldung, offen, unbestätigt) dazu. Zuerst Tests in `src/db/tests.rs`
   oder im Repo-Testmodul (rot): Sofort und Dringend getrennt, bestätigte zählen nicht,
   Sofortmeldung mit Priorität „dringend“ zählt nur als Sofort, älteste Eingangszeit.
-- [ ] 1.2 `src/einsatz/zaehler.rs`: `MeldungsZaehler` um `sofort_offen`, `dringend_offen`,
+- [x] 1.2 `src/einsatz/zaehler.rs`: `MeldungsZaehler` um `sofort_offen`, `dringend_offen`,
   `sofort_aelteste_at` (`Option`, `skip_serializing_if`) erweitern und füllen; Monitor
   (`routes/lagemonitor.rs`) nutzt dieselbe Funktion. Neuer Fall in
   `tests/fixtures/verdichtung/regeln.json` (Abschnitt `meldungen`) mit Prüfung in
   `tests/verdichtung_fixture.rs` und `frontend/src/lage/verdichtungFixture.test.ts`.
   `scripts/check-typ-codegen.sh` grün, `openapi.json` und `types.generated.ts` mitcommitten.
-- [ ] 1.3 Test des Modulzähler-Endpunkts (bestehende Suite zu `modul_zaehler`): Szenarien der
+- [x] 1.3 Test des Modulzähler-Endpunkts (bestehende Suite zu `modul_zaehler`): Szenarien der
   Delta-Spec `modul-zaehler` (eine Sofort, eine Dringend, eine bestätigte; Sofort mit Priorität
   dringend; älteste Zeit) grün.
 
 ## 2. Lagemonitor: Block `alarm` und Sofort-Signal (Backend)
 
-- [ ] 2.1 `src/routes/lagemonitor.rs`: `LagemonitorAlarm` (`ToSchema`) mit `sofort_offen`,
+- [x] 2.1 `src/routes/lagemonitor.rs`: `LagemonitorAlarm` (`ToSchema`) mit `sofort_offen`,
   `sofort_aelteste_at`, `bestaetigung_ueberfaellig`, `dringend_offen`, `auftraege_ueberfaellig`,
   `erinnerungen_faellig`, `nachforderungen_ueberfaellig`, `rueckmeldung_ueberfaellig[{einheit,
   seit_min}]`, `abschnitte_kritisch[String]`; gefüllt nur im Handler `lagebild` (nicht in
@@ -32,11 +31,11 @@ Zunder: LLH-1743 (t9jjrajy). Annahme D6 = B (Monitor ohne Ausfall, Folgeaufgabe)
   Meldungstext stehen nicht in der Antwort (Erweiterung von
   `lagemonitor_antwort_traegt_keine_personen`); Lagebild für Externe und `GET /api/v1/lage`
   unverändert (`public_api_spec_aktuell` grün).
-- [ ] 2.2 `src/live/mod.rs`: `LiveEvent::Sofortmeldung` zusätzlich an den Gate-Schlüssel
+- [x] 2.2 `src/live/mod.rs`: `LiveEvent::Sofortmeldung` zusätzlich an den Gate-Schlüssel
   `lagemonitor`; die Live-Route gibt ihn nur einem Gerät mit Ansicht `Lagemonitor`. Test: ein
   Lagemonitor-Abonnent bekommt `sofortmeldung` (Nutzlast nur `meldung_id`), aber kein `meldung`;
   ein Personenabonnent ohne Modul Meldungen bekommt beides nicht.
-- [ ] 2.3 Typ-Codegen erneut (`scripts/check-typ-codegen.sh`), erzeugte Dateien mitcommitten;
+- [x] 2.3 Typ-Codegen erneut (`scripts/check-typ-codegen.sh`), erzeugte Dateien mitcommitten;
   `frontend/src/geraet/AGENTS.md` (Abschnitt Lagemonitor, Datenschutz) um die neuen Felder und das
   Sofort-Signal ergänzen.
 
