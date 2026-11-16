@@ -68,17 +68,21 @@ zeigte dann weiter 0, obwohl dort zwei Kräfte arbeiten (Abstimmung 16.11.2026).
 
 ### D2 Meldebild: abgestellte Untereinheiten lösen sich vom Verband
 
-`kraeftebaumKern.ts` bekommt `loeseAbgestellte(baum)`. Die Funktion geht den Baum aus
-`einheitenBaum` ab und hängt jedes Kind, dessen `abschnittId` (wirksam) von dem des Elternknotens
-abweicht, samt seinen Kindern als eigene Wurzel heraus. Der Knoten trägt dann `abgestelltAus` (die
-Obereinheit). Weicht der wirksame Abschnitt ab, trägt das Kind einen eigenen Abschnitt, denn sonst
+`kraeftebaumKern.ts` bekommt `loeseAbgestellte(einheiten, abschnitte, alle)`: derselbe Baum wie
+`einheitenBaum`, aber jedes Kind, dessen wirksamer Abschnitt von dem seiner Obereinheit abweicht,
+steht samt seinen Kindern als eigene Wurzel da. Der Knoten trägt dann `abgestelltAus` (die
+Obereinheit). Die Prüfung je Einheit (`abgestelltVon`) liest die ungefilterte, aktive Liste `alle`. Weicht der wirksame Abschnitt ab, trägt das Kind einen eigenen Abschnitt, denn sonst
 erbte es den der Eltern. Eine Gruppe ohne eigenen Abschnitt bleibt deshalb immer unter ihrem Zug.
 
 `baueKraeftebild` nutzt `loeseAbgestellte(einheitenBaum(...))`. Die Einheitzeile kumuliert weiter
 über ihre Kinder im Baum, und die abgestellte Gruppe ist keines mehr. Deshalb gilt: Zeile des Zugs
 = eigene + Kinder im selben Abschnitt, Abschnittszeile = D1. Die Zeile der abgestellten Einheit
 nennt „aus <Obereinheit>“ im Detail. Der Name kommt aus der ungefilterten Liste (`quelle`), damit
-er auch bei einem Filter steht, der die Obereinheit ausblendet.
+er auch bei einem Filter steht, der die Obereinheit ausblendet. Das Meldebild-Raster am Schirm
+(`meldebildRaster.ts`, über `kraeftebaum()` des Kerns) löst ebenso; dort steht die abgestellte
+Einheit als Wurzel mit ihrem Abschnitt in der Spalte und „aus <Obereinheit>“ im Nebentext.
+Die Einheiten-Gliederung der Seite Einheiten (`einheitenGliederung.ts`) bleibt beim Verband, denn
+ihre Zeilen tragen die Verbandsstärke des Servers.
 
 Der Filter „Abschnitt“ (`filtereKraefte`) liest den wirksamen Abschnitt (`abschnittDerEinheit`)
 statt `abschnittDerObersten`. `abschnittDerObersten` entfällt, sie hat keinen weiteren Aufrufer.
