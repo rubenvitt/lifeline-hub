@@ -444,7 +444,9 @@ export default function RegistrierungPaneel({
       aktion={
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
           {sperrGrund && (
-            <Typography.Text id={grundId} type="secondary">
+            // Der Grund ist Meta neben der Aktion (LLH-1777): in der Lauftextgröße lief der Kopf bei
+            // 390 px 6 px über (`e2e/gate1-ueberlauf.spec.ts`, Beobachter).
+            <Typography.Text id={grundId} type="secondary" style={schriftStil('meta')}>
               {sperrGrund}
             </Typography.Text>
           )}
