@@ -15,12 +15,13 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import EinsatzSeite, { type Nebenweg } from '../components/EinsatzSeite';
 import {
-  Augenbraue,
   Paneel,
   kennzahlenbandStil,
-  monoStil,
   paneelZeileStil,
   useRollen,
+  schriftGroesse,
+  zahlStil,
+  Feldetikett,
 } from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
@@ -158,7 +159,7 @@ function TextAngabe({
     <InlineAngabe<string>
       etikett={etikett}
       wert={text}
-      anzeige={mono ? <span style={monoStil(13)}>{text}</span> : text}
+      anzeige={mono ? <span style={zahlStil('text')}>{text}</span> : text}
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -309,7 +310,7 @@ const KOPF_MIN_BREITE = 220;
  * Nichts hier ist bedienbar, die Zwei-Angaben-Regel für handgebaute Bedienziele gilt nicht.
  */
 /**
- * Eine Angabe als Zelle im Fugenraster (Augenbraue über dem Wert). Kein `Kennzahl`-Baustein: die
+ * Eine Angabe als Zelle im Fugenraster (Feldetikett über dem Wert). Kein `Kennzahl`-Baustein: die
  * Werte sind Wörter — ein Stichwort in Datenwert-Mono läse sich wie ein Messwert.
  */
 function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode; mono?: boolean }) {
@@ -325,10 +326,12 @@ function KopfAngabe({ etikett, wert, mono }: { etikett: string; wert: ReactNode;
         minWidth: 0,
       }}
     >
-      <Augenbraue style={{ display: 'block', marginBottom: token.marginXXS }}>{etikett}</Augenbraue>
+      <Feldetikett style={{ display: 'block', marginBottom: token.marginXXS }}>
+        {etikett}
+      </Feldetikett>
       <div
         style={{
-          ...(mono ? monoStil(15, 500) : { fontSize: 15, fontWeight: 500 }),
+          ...(mono ? zahlStil('text', 500) : { fontSize: schriftGroesse('text'), fontWeight: 500 }),
           color: rollen.text,
           overflowWrap: 'anywhere',
         }}
@@ -361,7 +364,7 @@ function Angaben({ zeilen }: { zeilen: { etikett: string; wert: ReactNode }[] })
             alignItems: 'baseline',
           }}
         >
-          <Augenbraue als="dt">{etikett}</Augenbraue>
+          <Feldetikett als="dt">{etikett}</Feldetikett>
           <dd style={{ margin: 0, color: rollen.text2, overflowWrap: 'anywhere' }}>{wert}</dd>
         </div>
       ))}
@@ -970,7 +973,11 @@ function RufnameAngabe({
     <InlineAngabe<string>
       etikett="Rufname"
       wert={rufname ?? ''}
-      anzeige={<span style={monoStil(13)}>{rufname}</span>}
+      anzeige={
+        <span data-schrift="kennung" style={zahlStil('text')}>
+          {rufname}
+        </span>
+      }
       leer={leererText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darfSchreiben}
@@ -1347,7 +1354,7 @@ export default function EinsatzdatenPage() {
               },
               {
                 etikett: 'Einsatznummer',
-                wert: <span style={monoStil(13)}>{einsatz.einsatznummer_intern ?? '—'}</span>,
+                wert: <span style={zahlStil('text')}>{einsatz.einsatznummer_intern ?? '—'}</span>,
               },
               {
                 etikett: 'Leitstellen-Nr.',
@@ -1365,7 +1372,7 @@ export default function EinsatzdatenPage() {
               {
                 etikett: 'Angelegt',
                 wert: (
-                  <span style={monoStil(13)}>
+                  <span style={zahlStil('text')}>
                     <ZeitAnzeige wert={einsatz.angelegt_at} rolle="zeitpunkt" />
                   </span>
                 ),
@@ -1436,7 +1443,9 @@ export default function EinsatzdatenPage() {
                   <InlineAngabe<number | null>
                     etikett="Anzahl Betroffene (initial)"
                     wert={einsatz.anzahl_betroffene_initial ?? null}
-                    anzeige={<span style={monoStil(13)}>{einsatz.anzahl_betroffene_initial}</span>}
+                    anzeige={
+                      <span style={zahlStil('text')}>{einsatz.anzahl_betroffene_initial}</span>
+                    }
                     leer={(n) => n === null}
                     darfSchreiben={darfBearbeiten}
                     onSpeichern={(n) =>

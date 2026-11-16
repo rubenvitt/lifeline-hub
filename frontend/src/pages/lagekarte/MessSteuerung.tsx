@@ -1,5 +1,5 @@
 import { Button, Card, Space } from 'antd';
-import { Segmentleiste, monoStil, useRollen } from '../../components/instrument';
+import { Segmentleiste, schriftStil, useRollen, zahlStil } from '../../components/instrument';
 import { bandStil } from './KartenFuss';
 import EscKappe from './EscKappe';
 import { messErgebnis, type MessForm } from './messung';
@@ -54,11 +54,11 @@ export default function MessSteuerung(props: MessSteuerungProps) {
         {/* `<output>`: der Wert ist das Ergebnis einer Bedienung. Ohne `aria-live` — er ändert
             sich bei jeder Zeigerbewegung. */}
         <output data-lfh="messwert" style={{ display: 'block' }}>
-          <span style={{ ...monoStil(20, 500), color: rollen.text }}>{ergebnis.haupt}</span>
+          <span style={{ ...zahlStil('titel', 500), color: rollen.text }}>{ergebnis.haupt}</span>
           {ergebnis.neben && (
             <span
               style={{
-                ...monoStil(12),
+                ...schriftStil('meta'),
                 color: rollen.gedaempft,
                 marginInlineStart: token.marginSM,
               }}

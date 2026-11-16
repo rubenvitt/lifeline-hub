@@ -62,8 +62,11 @@ export const SKIZZE_EINHEITEN_JE_MM = 3;
 export const ZEICHENBREITE_EM = 0.6;
 /** Höhe des Langsechsecks; die Spitzen sind je eine halbe Höhe breit. */
 export const BEDINGUNGSZEICHEN_HOEHE = SKETCH_CONDITION_SIGN_HEIGHT_MM * SKIZZE_EINHEITEN_JE_MM;
-/** Schriftgrad der Zeile unter dem Bedingungszeichen (Netz, Sicherheit, Hinweis). */
-export const HINWEIS_SCHRIFT = 10;
+/**
+ * Schriftgrad der Zeile unter dem Bedingungszeichen (Netz, Sicherheit, Hinweis), in
+ * Zeichnungseinheiten; Boden 11 wie jedes Wort der Skizze (Spec `schriftskala`, LLH-1775).
+ */
+export const HINWEIS_SCHRIFT = 11;
 /** Abstand zwischen Unterkante des Bedingungszeichens und Oberkante der Zeile darunter. */
 export const HINWEIS_ABSTAND = 4;
 /** Überstand der Sammelschiene links und rechts des Bedingungszeichens. */
@@ -77,8 +80,8 @@ export const STRICH_ZEICHEN_MIN = 1.25;
 export const ZEICHEN_GROESSE = 32;
 /** Abstand der Bezeichnung unter einem Komponentenzeichen. */
 export const BESCHRIFTUNG_ABSTAND = 4;
-/** Schriftgrad der Bezeichnung unter einem Komponentenzeichen. */
-export const BESCHRIFTUNG_SCHRIFT = 10;
+/** Schriftgrad der Bezeichnung unter einem Komponentenzeichen; Boden 11 (LLH-1775). */
+export const BESCHRIFTUNG_SCHRIFT = 11;
 
 /**
  * Fläche hinter Zeichen und Text. Die Skizzenfläche setzt `--lfh-skizze-grund`, wenn ihr Grund

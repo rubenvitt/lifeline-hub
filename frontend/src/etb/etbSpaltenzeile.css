@@ -30,11 +30,13 @@
 }
 
 /* Der Inhalt einer Spaltenzeile: 14/20 wie im Entwurf, Absatzränder fallen am Rand weg
-   (`components/Markdown.css`). Ein Systemeintrag setzt `--etb-inhalt-groesse` auf 12 px (leise). */
+   (`components/Markdown.css`). Ein Systemeintrag setzt `--etb-inhalt-groesse` auf die Stufe
+   `klein` (leise); sonst die Stufe `text` (LLH-1775). */
 .etb-spaltenzeile .etb-inhalt,
 .etb-handschirmzeile .etb-inhalt {
-  font-size: var(--etb-inhalt-groesse, 14px);
-  line-height: 20px;
+  font-size: var(--etb-inhalt-groesse, var(--lfh-groesse-text));
+  /* 14/20 in `kompakt`; als Verhältnis, damit die Zeile mit der Schrift der Dichte mitwächst. */
+  line-height: calc(20 / 14);
 }
 
 .etb-spaltenzeile .etb-inhalt .markdown,
@@ -80,7 +82,7 @@
   border: 0;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--lfh-groesse-klein);
   color: var(--lfh-bedien-text);
   cursor: pointer;
   white-space: nowrap;
@@ -98,7 +100,7 @@
   gap: 6px;
   min-width: 0;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--lfh-groesse-klein);
   color: var(--lfh-gedaempft);
 }
 

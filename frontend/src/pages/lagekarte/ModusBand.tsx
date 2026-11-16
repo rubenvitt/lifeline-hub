@@ -1,7 +1,7 @@
 import { Button, Typography } from 'antd';
 import { useId, useState } from 'react';
 import FeldLabel from '../../components/FeldLabel';
-import { useRollen } from '../../components/instrument';
+import { useRollen, schriftGroesse } from '../../components/instrument';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import { istLatLon, type KoordinatenWert } from '../../anzeige/koordinatenWert';
@@ -95,7 +95,11 @@ export default function ModusBand({
         {bild.griffHinweis && (
           <Typography.Text
             type="warning"
-            style={{ fontSize: 12, display: 'block', marginBottom: token.marginXS }}
+            style={{
+              fontSize: schriftGroesse('klein'),
+              display: 'block',
+              marginBottom: token.marginXS,
+            }}
             data-lfh="bildgriff-hinweis"
           >
             {bild.griffHinweis}

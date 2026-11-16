@@ -20,8 +20,9 @@ import {
   Sammelbanner,
   Segmentleiste,
   StatusChip,
-  monoStil,
   useRollen,
+  schriftStil,
+  zahlStil,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { useZuflussSchleuse, type ZuflussSteuerung } from '../components/useZuflussSchleuse';
@@ -297,7 +298,7 @@ export default function NachforderungBoard({
       {sp.karten.length === 0 && sp.aeltere.length === 0 ? (
         <div
           data-lfh="board-spalte-leer"
-          style={{ ...monoStil(token.fontSizeSM), color: rollen.schwach, padding: token.paddingXS }}
+          style={{ ...schriftStil('meta'), color: rollen.schwach, padding: token.paddingXS }}
         >
           keine
         </div>
@@ -347,7 +348,7 @@ export default function NachforderungBoard({
           </span>
         )}
       </span>
-      <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+      <span data-lfh="board-zahl" style={zahlStil('text', 500)}>
         {sp.karten.length}
       </span>
     </h2>
@@ -379,7 +380,7 @@ export default function NachforderungBoard({
                 style={{ justifyContent: 'space-between', fontWeight: 600 }}
               >
                 <span>{stufeWort(stufe)}</span>
-                <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+                <span data-lfh="board-zahl" style={zahlStil('text', 500)}>
                   {sp.karten.length}
                 </span>
               </Button>
@@ -395,7 +396,7 @@ export default function NachforderungBoard({
               style={{ fontWeight: 600 }}
             >
               {stufeWort(stufe)}{' '}
-              <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+              <span data-lfh="board-zahl" style={zahlStil('text', 500)}>
                 {sp.karten.length}
               </span>
             </Button>

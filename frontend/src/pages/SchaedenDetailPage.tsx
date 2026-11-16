@@ -7,7 +7,7 @@ import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
 import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { ortFelder, ortRegeln, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { StatusChip, monoStil } from '../components/instrument';
+import { StatusChip, zahlStil } from '../components/instrument';
 import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
@@ -347,7 +347,7 @@ export default function SchaedenDetailPage() {
       titel={
         <Space wrap size={8}>
           <span>
-            Schaden <span style={monoStil(14, 500)}>{kennung}</span>
+            Schaden <span style={zahlStil('text', 500)}>{kennung}</span>
           </span>
           <StatusTag darstellung={STATUS_META[s.status]} />
           {s.storniert_at && <StatusChip ton="neutral" wort="storniert" />}

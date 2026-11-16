@@ -20,7 +20,7 @@ import {
   Datenraster,
   Paneel,
   StatusChip,
-  monoStil,
+  zahlStil,
 } from '../components/instrument';
 import { SPEZIES_META, TIER_STATUS, TIER_VERBLEIB, halterVorbelegung } from './tiere/tierHelfer';
 import { MenueAusloeser } from '../components/MenueAusloeser';
@@ -481,7 +481,7 @@ export default function TiereDetailPage() {
       titel={
         <Space wrap size={8}>
           <span>
-            Tier <span style={monoStil(14, 500)}>{kennung}</span>
+            Tier <span style={zahlStil('text', 500)}>{kennung}</span>
           </span>
           <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
           <Tag>{SPEZIES_META[t.spezies]}</Tag>

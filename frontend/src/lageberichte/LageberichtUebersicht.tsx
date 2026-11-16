@@ -9,15 +9,17 @@ import Markdown from '../components/Markdown';
 import { KennungsLink } from '../components/kennungsLink';
 import { useViewport } from '../components/useViewport';
 import {
-  Augenbraue,
   Balken,
   Datenfeld,
   Datenraster,
+  Feldetikett,
   Paneel,
   PaneelLink,
   PaneelZustand,
-  monoStil,
   useRollen,
+  schriftGroesse,
+  schriftStil,
+  zahlStil,
 } from '../components/instrument';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { VORLAGEN } from './vorlagen';
@@ -126,14 +128,21 @@ function AktuellPaneel({
         data-lfh="lagebericht-aktuell"
         style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
       >
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: rollen.text }}>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: schriftGroesse('titel'),
+            fontWeight: 600,
+            color: rollen.text,
+          }}
+        >
           {bericht.titel}
         </h3>
         <Datenraster spalten={2}>
           <Datenfeld label="Zeitstand" mono>
             <ZeitAnzeige wert={bericht.zeitstand} />
           </Datenfeld>
-          <Datenfeld label="Freigegeben" mono>
+          <Datenfeld label="Freigegeben">
             {bericht.freigegeben_von_name ?? '—'}
             {bericht.freigegeben_at && (
               <>
@@ -145,9 +154,9 @@ function AktuellPaneel({
         </Datenraster>
         {kern && auszug && (
           <div data-lfh="lagebericht-auszug">
-            <Augenbraue als="div" style={{ marginBlockEnd: token.marginXXS }}>
+            <Feldetikett als="div" style={{ marginBlockEnd: token.marginXXS }}>
               {kern.label}
-            </Augenbraue>
+            </Feldetikett>
             {/* Unter dem Titel (h3) — `#` im Text wird h4. */}
             <Markdown variante="kompakt" unterEbene={3}>
               {auszug.gekuerzt ? `${auszug.text} …` : auszug.text}
@@ -207,7 +216,13 @@ function InArbeitPaneel({
                 >
                   {b.titel}
                 </KennungsLink>
-                <div style={{ ...monoStil(11), color: rollen.gedaempft }}>
+                <div
+                  style={{
+                    ...schriftStil('meta'),
+                    fontSize: schriftGroesse('fein'),
+                    color: rollen.gedaempft,
+                  }}
+                >
                   {`${vorlageLabel(b.vorlage)} · v${b.version} · `}
                   <ZeitAnzeige wert={b.zeitstand} />
                   {` · ${b.ersteller_name}`}
@@ -218,7 +233,8 @@ function InArbeitPaneel({
                     flexWrap: 'wrap',
                     alignItems: 'center',
                     columnGap: token.marginSM,
-                    ...monoStil(11),
+                    ...schriftStil('meta'),
+                    fontSize: schriftGroesse('fein'),
                     color: rollen.text2,
                   }}
                 >
@@ -277,13 +293,13 @@ function VerlaufPaneel({
               borderBlockEnd: `1px solid ${rollen.flaeche3}`,
             }}
           >
-            <span style={{ ...monoStil(12, 500), color: rollen.text2 }}>
+            <span style={{ ...zahlStil('klein', 500), color: rollen.text2 }}>
               <ZeitAnzeige wert={b.zeitstand} />
             </span>
             <span style={{ flex: '1 1 12em', minWidth: 0 }}>
               <KennungsLink to={lageberichtDetailPfad(einsatzId, b.id)}>{b.titel}</KennungsLink>
             </span>
-            <span style={{ ...monoStil(11), color: rollen.gedaempft }}>v{b.version}</span>
+            <span style={{ ...zahlStil('fein'), color: rollen.gedaempft }}>v{b.version}</span>
           </li>
         ))}
       </ol>

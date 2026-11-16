@@ -24,6 +24,7 @@ import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import StatusTag from '../components/StatusTag';
 import { kartenBauStatus, offlineKarteStatus } from '../theme/statusFarben';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /** Bau-Status, während derer gepollt wird (2 s). */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -310,7 +311,7 @@ export default function OfflineRegionPicker({
     }
     // 5) Nicht gebaut und kein Bau möglich: der Grund steht sichtbar da, kein Tooltip (Touch).
     return (
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
         Nicht gebaut
       </Typography.Text>
     );
@@ -350,7 +351,10 @@ export default function OfflineRegionPicker({
                       title={z.name}
                       description={
                         <>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          <Typography.Text
+                            type="secondary"
+                            style={{ fontSize: schriftGroesse('klein') }}
+                          >
                             {z.region}
                           </Typography.Text>
                           {grund && (

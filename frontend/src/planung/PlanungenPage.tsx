@@ -9,7 +9,6 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { datum, tagUndUhrzeit } from '../anzeige/zeitDarstellung';
 import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 import AdminPage from '../components/AdminPage';
-import { monoStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -22,6 +21,7 @@ import { useViewport } from '../components/useViewport';
 import { EINSATZART_LABELS } from '../einsatz/einsatzart';
 import { planungPfad } from '../routing/deeplinks';
 import PlanungAnlegenDialog from './PlanungAnlegenDialog';
+import { schriftStil, zahlStil } from '../components/instrument/rollenwerte';
 
 /** Ab so vielen Tagen vor dem Löschen nennt die Liste den Tag. */
 const LOESCHHINWEIS_TAGE = 14;
@@ -54,7 +54,9 @@ export default function PlanungenPage() {
     key,
     zahl: true,
     sorter: nachZahl((p: PlanungListeneintrag) => p.kennzahlen?.[key] ?? null),
-    render: (_, p) => <span style={monoStil(12)}>{p.kennzahlen ? p.kennzahlen[key] : '—'}</span>,
+    render: (_, p) => (
+      <span style={zahlStil('klein')}>{p.kennzahlen ? p.kennzahlen[key] : '—'}</span>
+    ),
   });
 
   const spalten: KatalogSpalte<PlanungListeneintrag>[] = [
@@ -78,7 +80,11 @@ export default function PlanungenPage() {
                 style={{ display: 'block' }}
               >
                 übernommen in{' '}
-                <span style={monoStil(12)}>
+                <span
+                  style={
+                    p.uebernahme.einsatznummer != null ? zahlStil('klein') : schriftStil('meta')
+                  }
+                >
                   {p.uebernahme.einsatznummer ?? `Einsatz ${p.uebernahme.einsatz_id}`}
                 </span>
               </Typography.Text>
@@ -103,7 +109,7 @@ export default function PlanungenPage() {
       suchText: (p) =>
         `${tagUndUhrzeit(p.von, konventionen)} ${tagUndUhrzeit(p.bis, konventionen)}`,
       render: (_, p) => (
-        <span style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
+        <span style={{ ...zahlStil('klein'), whiteSpace: 'nowrap' }}>
           {tagUndUhrzeit(p.von, konventionen)}–{tagUndUhrzeit(p.bis, konventionen)}
         </span>
       ),

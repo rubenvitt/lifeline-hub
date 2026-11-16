@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { act } from 'react';
 import { renderMitProviders } from '../../test/utils';
-import { dichten } from '../../theme/tokens';
+import { dichten, schriftPx } from '../../theme/tokens';
 import KartenUeberlagerung, {
   GrundlageLeiste,
   kartenKnopfBreite,
@@ -188,16 +188,20 @@ describe('KartenUeberlagerung — Knopfblock', () => {
 });
 
 describe('KartenUeberlagerung — Wort unter dem Symbol (LLH-1751)', () => {
-  it('die Knopfbreite ist nie schmaler als die Kante', () => {
-    // antd leitet `fontSizeSM` in jeder Stufe als 12 ab. Ob das Wort hineinpasst, misst der
-    // Browser (`e2e/lagekarte-touch.spec.ts`, „Wörter passen in die Kartenknöpfe“); hier steht
-    // nur der Wert, den die Messung bestätigt hat.
-    expect(kartenKnopfBreite({ controlHeight: dichten.kompakt.zeilenhoehe, fontSizeSM: 12 })).toBe(
-      66,
+  it('die Knopfbreite ist nie schmaler als die Kante und wächst mit der Schrift', () => {
+    // `fontSizeSM` ist die Stufe `klein` der Schriftskala und wächst mit der Dichte (LLH-1774).
+    // Ob das Wort hineinpasst, misst der Browser (`e2e/lagekarte-touch.spec.ts`, „Wörter passen
+    // in die Kartenknöpfe“); hier stehen die Werte, die die Messung trägt.
+    const breite = (d: keyof typeof dichten) =>
+      kartenKnopfBreite({
+        controlHeight: dichten[d].zeilenhoehe,
+        fontSizeSM: schriftPx('klein', d),
+      });
+    expect(breite('kompakt')).toBe(66);
+    expect(breite('handschuh')).toBe(80);
+    expect(breite('handschuh')).toBeGreaterThanOrEqual(
+      kartenKnopfKante({ controlHeight: dichten.handschuh.zeilenhoehe }),
     );
-    expect(
-      kartenKnopfBreite({ controlHeight: dichten.handschuh.zeilenhoehe, fontSizeSM: 12 }),
-    ).toBe(72);
   });
 
   it('Norden, Position, Messen, Zeichnen und Leiste tragen ein sichtbares Wort, der Name bleibt', () => {
@@ -335,6 +339,16 @@ describe('KartenUeberlagerung — Zeigerkoordinate', () => {
     expect(huelle).not.toBeNull();
     // Ein Inline-`display` an der Hülle schlüge die Regel, die Koordinate bliebe stehen.
     expect(huelle!.style.display).toBe('');
+  });
+
+  it('fängt keinen Klick ab: die Anzeige folgt dem Zeiger und darf nie über dem Ziel liegen', () => {
+    // Review LLH-1719: mit der Schrift der Stufe (`handschuh` 13,75 px) lief der Text über den
+    // Kasten hinaus und lag unter dem Zeiger; der Klick auf einen Pegel öffnete nichts mehr.
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    const huelle = document
+      .querySelector('[data-lfh="zeiger-koordinate"]')!
+      .closest('.lfh-nur-feiner-zeiger') as HTMLElement;
+    expect(huelle.style.pointerEvents).toBe('none');
   });
 });
 

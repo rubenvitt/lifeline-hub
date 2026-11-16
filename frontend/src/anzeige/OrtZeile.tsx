@@ -2,6 +2,7 @@ import { Typography } from 'antd';
 import type { LatLon } from './koordinaten';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { useOrtVorschau } from './useOrtVorschau';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /** Sekundäre Ort-Zeile: «ortsname» · «distanz» «richtung» von «bezug». Additiv, degradiert leer.
  *  Braucht einen QueryClient. Ohne Einsatz (`einsatzId` `null`, LLH-1376) nur der Ortsname. */
@@ -29,7 +30,7 @@ export function OrtZeile({
 
   if (!data) {
     return isFetching ? (
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
         Ort wird ermittelt …
       </Typography.Text>
     ) : null;
@@ -51,7 +52,7 @@ export function OrtZeile({
     return (
       <Typography.Paragraph
         type="secondary"
-        style={{ fontSize: 12, marginBottom: 0 }}
+        style={{ fontSize: schriftGroesse('klein'), marginBottom: 0 }}
         ellipsis={{ rows: maxZeilen, tooltip: text }}
       >
         {text}
@@ -59,7 +60,7 @@ export function OrtZeile({
     );
   }
   return (
-    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+    <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
       {text}
     </Typography.Text>
   );
