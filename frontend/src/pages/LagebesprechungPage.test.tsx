@@ -51,7 +51,13 @@ interface Lagequellen {
 }
 const ZAEHLER = {
   auftraege: { offen: 5, in_arbeit: 2, ueberfaellig: 1 },
-  meldungen: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 },
+  meldungen: {
+    offen: 3,
+    ungesehen: 1,
+    bestaetigung_ueberfaellig: 0,
+    sofort_offen: 0,
+    dringend_offen: 0,
+  },
 };
 const leererStand: LagebesprechungStand = { anzahl_lagebesprechungen: 0 };
 const GRUND = 'Einsatz ist abgeschlossen und schreibgeschützt';

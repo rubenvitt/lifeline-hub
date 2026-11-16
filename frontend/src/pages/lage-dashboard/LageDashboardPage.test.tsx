@@ -215,7 +215,13 @@ function mockEndpunkte(d: Daten) {
       HttpResponse.json(
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-          meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+          meldungen: {
+            offen: 0,
+            ungesehen: 0,
+            bestaetigung_ueberfaellig: 0,
+            sofort_offen: 0,
+            dringend_offen: 0,
+          },
         },
       ),
     ),
@@ -847,7 +853,13 @@ describe('LageDashboardPage — Kennzahlenband', () => {
   describe('Nachforderungen offen (LLH-1371)', () => {
     const ZAEHLER = {
       auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-      meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+      meldungen: {
+        offen: 0,
+        ungesehen: 0,
+        bestaetigung_ueberfaellig: 0,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      },
       nachforderungen: { offen: 4, angefordert: 1, zugesagt: 1, unterwegs: 2, ueberfaellig: 0 },
     };
 
@@ -1640,7 +1652,15 @@ describe('LageDashboardPage — Führungsstand', () => {
 
   it('zeigt offene und neue Meldungen; Bestätigung überfällig trägt die Alarmkante', async () => {
     mockEndpunkte({
-      zaehler: { meldungen: { offen: 2, ungesehen: 1, bestaetigung_ueberfaellig: 1 } },
+      zaehler: {
+        meldungen: {
+          offen: 2,
+          ungesehen: 1,
+          bestaetigung_ueberfaellig: 1,
+          sofort_offen: 0,
+          dringend_offen: 0,
+        },
+      },
     });
     render();
     await kennzahlGeladen('Betroffene');

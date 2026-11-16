@@ -185,7 +185,13 @@ const volleDaten = {
    */
   zaehler: {
     auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 },
-    meldungen: { offen: 4, ungesehen: 2, bestaetigung_ueberfaellig: 0 },
+    meldungen: {
+      offen: 4,
+      ungesehen: 2,
+      bestaetigung_ueberfaellig: 0,
+      sofort_offen: 0,
+      dringend_offen: 0,
+    },
     nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1, ueberfaellig: 0 },
     erinnerungen: { faellig: 0 },
     lagemeldungen: { neu: 0 },
@@ -287,7 +293,13 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
       json(
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-          meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+          meldungen: {
+            offen: 0,
+            ungesehen: 0,
+            bestaetigung_ueberfaellig: 0,
+            sofort_offen: 0,
+            dringend_offen: 0,
+          },
           nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0, ueberfaellig: 0 },
           erinnerungen: { faellig: 0 },
           lagemeldungen: { neu: 0 },
@@ -404,7 +416,13 @@ describe('UeberblickPage', () => {
       ...volleDaten,
       zaehler: {
         auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-        meldungen: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 1 },
+        meldungen: {
+          offen: 3,
+          ungesehen: 1,
+          bestaetigung_ueberfaellig: 1,
+          sofort_offen: 0,
+          dringend_offen: 0,
+        },
         nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0, ueberfaellig: 0 },
       },
     });
@@ -809,7 +827,13 @@ describe('UeberblickPage', () => {
       ...volleDaten,
       zaehler: {
         ...volleDaten.zaehler,
-        meldungen: { offen: 4, ungesehen: 2, bestaetigung_ueberfaellig: 1 },
+        meldungen: {
+          offen: 4,
+          ungesehen: 2,
+          bestaetigung_ueberfaellig: 1,
+          sofort_offen: 0,
+          dringend_offen: 0,
+        },
         lagemeldungen: { neu: 3 },
       },
       meldungen: [
@@ -1603,7 +1627,13 @@ describe('UeberblickPage', () => {
           ...volleDaten,
           zaehler: {
             auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 0 },
-            meldungen: { offen: 5, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+            meldungen: {
+              offen: 5,
+              ungesehen: 0,
+              bestaetigung_ueberfaellig: 0,
+              sofort_offen: 0,
+              dringend_offen: 0,
+            },
             nachforderungen: {
               offen: 0,
               angefordert: 0,
@@ -1696,7 +1726,13 @@ describe('UeberblickPage', () => {
         await tor;
         return HttpResponse.json({
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
-          meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
+          meldungen: {
+            offen: 0,
+            ungesehen: 0,
+            bestaetigung_ueberfaellig: 0,
+            sofort_offen: 0,
+            dringend_offen: 0,
+          },
         });
       }),
     ]);
