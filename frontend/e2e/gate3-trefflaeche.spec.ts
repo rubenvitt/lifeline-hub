@@ -5168,7 +5168,7 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
     await expect(page.getByRole('note', { name: 'Legende der Matrix' })).toBeVisible();
     // LLH-1090: statt der Zellzählung die Beurteilung des Gebiets, ohne Knopf.
     await expect(
-      page.locator('[data-lfh="gefahrengebiet-beurteilung"]').getByText('nicht beurteilt'),
+      page.locator('[data-lfh="gefahrengebiet-beurteilung"]').getByText('unbestätigt'),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Beurteilung bestätigen' })).toHaveCount(0);
 

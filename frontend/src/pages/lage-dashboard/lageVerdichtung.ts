@@ -11,7 +11,7 @@ import type {
   Warnstufe,
 } from '../../api/types';
 import { GEFAHRENTYPEN_ALPHABETISCH } from '../gefahren/gefahrenSchema';
-import { NICHT_BEURTEILT, istBeurteilt } from '../gefahren/beurteilung';
+import { UNBESTAETIGT, istBeurteilt } from '../gefahren/beurteilung';
 import { gesetzteGefahren, hatErlaeuterung } from '../gefahren/erlaeuterungen';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ohneAbgeschlossene, sichtungsbild } from '../../personen/personenBilanz';
@@ -123,19 +123,19 @@ export function verdichteGefahrenmatrix(
   return { zeilen: [...zeilen.values()] };
 }
 
-/** Bis zu so vielen nicht beurteilten Gebieten nennt der Hinweis die Namen, darüber die Zahl. */
+/** Bis zu so vielen unbestätigten Gebieten nennt der Hinweis die Namen, darüber die Zahl. */
 const NAMEN_HOECHSTENS = 2;
 
 /**
- * Hinweis auf nicht beurteilte Gefahrengebiete (LLH-1090) statt der früheren Zählung
- * unbewerteter Gefahrentypen: „Hangrutsch Kirchberg: nicht beurteilt“, bei mehr als zwei Gebieten
- * „3 Gebiete nicht beurteilt“. `null`, wenn jedes Gebiet beurteilt ist oder es keines gibt.
+ * Hinweis auf unbestätigte Gefahrengebiete (LLH-1090) statt der früheren Zählung
+ * unbewerteter Gefahrentypen: „Hangrutsch Kirchberg: unbestätigt“, bei mehr als zwei Gebieten
+ * „3 Gebiete unbestätigt“. `null`, wenn jedes Gebiet beurteilt ist oder es keines gibt.
  */
 export function beurteilungHinweis(gebiete: readonly Gefahrengebiet[]): string | null {
   const offen = gebiete.filter((g) => !istBeurteilt(g));
   if (offen.length === 0) return null;
-  if (offen.length > NAMEN_HOECHSTENS) return `${offen.length} Gebiete ${NICHT_BEURTEILT}`;
-  return offen.map((g) => `${gefahrengebietName(g.label, g.id)}: ${NICHT_BEURTEILT}`).join(' · ');
+  if (offen.length > NAMEN_HOECHSTENS) return `${offen.length} Gebiete ${UNBESTAETIGT}`;
+  return offen.map((g) => `${gefahrengebietName(g.label, g.id)}: ${UNBESTAETIGT}`).join(' · ');
 }
 
 /** Eine Zeile des Sichtungsbilds. */

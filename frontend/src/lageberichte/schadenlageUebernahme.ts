@@ -17,7 +17,7 @@ import { pegelZeile, wasserstandMeter } from '../pegel/pegelKennzahl';
 import { ZUSTAND_GRUND } from '../api/abrufZustand';
 import { md } from '../lib/markdown';
 import { ausKennzahl, sichtungText, warnstufeAngabe } from '../lagebesprechung/vorbereitung';
-import { NICHT_BEURTEILT, istBeurteilt } from '../pages/gefahren/beurteilung';
+import { UNBESTAETIGT, istBeurteilt } from '../pages/gefahren/beurteilung';
 import {
   erlaeuterungEinzeilig,
   gesetzteGefahren,
@@ -198,7 +198,7 @@ function pegelZeilen(pegel: readonly PegelAnzeige[], jetzt: number, dtg: (iso: s
  */
 function gebietZeilen(gebiet: Gefahrengebiet, matrix: Geladen<GefahrBewertung[]>): string[] {
   const name = md(gefahrengebietName(gebiet.label, gebiet.id));
-  const kopf = istBeurteilt(gebiet) ? `- ${name}` : `- ${name} (${NICHT_BEURTEILT})`;
+  const kopf = istBeurteilt(gebiet) ? `- ${name}` : `- ${name} (${UNBESTAETIGT})`;
   if (matrix.zustand !== 'daten') {
     return [`${kopf}: ${grund(matrix.zustand === 'gesperrt' ? 'gesperrt' : 'fehler')}`];
   }

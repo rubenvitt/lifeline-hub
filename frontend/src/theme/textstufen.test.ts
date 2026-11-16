@@ -72,3 +72,25 @@ describe.each(MODI)('Textstufen im Modus %s (LFH-643)', (modus, farben) => {
     expect(new Set(werte).size).toBe(STUFEN.length);
   });
 });
+
+/**
+ * LLH-1741: die Tönung einer Problemzeile (Meldebild) ist der Zeilenkanal beim Überfliegen. Nachts
+ * lag sie mit ΔE 2,7 praktisch auf dem Paneelgrund. Sie hält deshalb in beiden Modi ≥ 4,5 ΔE*ab
+ * gegen Paneel und Fläche, nachts ≥ 6, und bleibt ≥ 3 ΔE*ab von der Alarmfläche der Etiketten
+ * entfernt, damit die Chips darauf nicht verschwimmen.
+ */
+describe('Problemzeile hebt sich vom Grund ab (LLH-1741)', () => {
+  const abstand = (a: string, b: string) => {
+    const [l1, a1, b1] = lab(a);
+    const [l2, a2, b2] = lab(b);
+    return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+  };
+  it.each([
+    ['hell', farbenHell, 4.5],
+    ['dunkel', farbenDunkel, 6],
+  ] as const)('im Modus %s', (_modus, farben, mindestens) => {
+    expect(abstand(farben.problemZeile, farben.paneel)).toBeGreaterThanOrEqual(mindestens);
+    expect(abstand(farben.problemZeile, farben.flaeche)).toBeGreaterThanOrEqual(mindestens);
+    expect(abstand(farben.problemZeile, farben.alarmFlaeche)).toBeGreaterThanOrEqual(3);
+  });
+});

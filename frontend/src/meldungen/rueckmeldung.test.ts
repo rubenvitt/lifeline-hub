@@ -7,6 +7,7 @@ import {
   ohneRueckmeldung,
   RUECKMELDUNG_ROLLE,
   rueckmeldungJeEinheit,
+  rueckmeldungUeberfaelligSeit,
   rueckmeldungZustand,
 } from './rueckmeldung';
 
@@ -59,10 +60,37 @@ describe('rueckmeldungZustand', () => {
     ).toBe('aktuell');
   });
 
-  it('bildet die drei Zustände auf drei verschiedene Rollen ab', () => {
-    expect(new Set(Object.values(RUECKMELDUNG_ROLLE)).size).toBe(3);
+  it('überfällig und keine tragen die Alarmrolle, aktuell bleibt neutral (LLH-1741)', () => {
     expect(RUECKMELDUNG_ROLLE.keine).toBe('alarm');
-    expect(RUECKMELDUNG_ROLLE.ueberfaellig).toBe('achtung');
+    expect(RUECKMELDUNG_ROLLE.ueberfaellig).toBe('alarm');
+    expect(RUECKMELDUNG_ROLLE.aktuell).toBe('neutral');
+  });
+});
+
+describe('rueckmeldungUeberfaelligSeit', () => {
+  it('nennt die ganzen Minuten seit der Fälligkeit', () => {
+    // fällig 13:33, jetzt 14:20 → 47 min
+    expect(
+      rueckmeldungUeberfaelligSeit(r(1, '2026-09-22 12:33:00', '2026-09-22 13:33:00'), JETZT),
+    ).toBe(47);
+    // 47 min 59 s bleiben 47
+    expect(
+      rueckmeldungUeberfaelligSeit(r(1, '2026-09-22 12:32:01', '2026-09-22 13:32:01'), JETZT),
+    ).toBe(47);
+  });
+
+  it('ist 0 genau auf der Fälligkeit und nie negativ', () => {
+    expect(
+      rueckmeldungUeberfaelligSeit(r(1, '2026-09-22 13:20:00', '2026-09-22 14:20:00'), JETZT),
+    ).toBe(0);
+    expect(
+      rueckmeldungUeberfaelligSeit(r(1, '2026-09-22 13:30:00', '2026-09-22 14:30:00'), JETZT),
+    ).toBe(0);
+  });
+
+  it('ist null ohne Rückmeldung oder mit ungültiger Fälligkeit', () => {
+    expect(rueckmeldungUeberfaelligSeit(null, JETZT)).toBeNull();
+    expect(rueckmeldungUeberfaelligSeit(r(1, '2026-09-22 13:30:00', 'kaputt'), JETZT)).toBeNull();
   });
 });
 

@@ -73,11 +73,11 @@ describe('GefahrengebietVorschau (LFH-664)', () => {
   });
 
   /** LLH-1090: statt der Zellzählung steht die Beurteilung des Gebiets. */
-  it('nennt ein nie bestätigtes Gebiet „nicht beurteilt“', async () => {
+  it('nennt ein nie bestätigtes Gebiet „unbestätigt“', async () => {
     liefere([gebiet()]);
     renderMitProviders(<GefahrengebietVorschau einsatzId={5} id={3} />);
 
-    expect(await screen.findByText('nicht beurteilt')).toBeInTheDocument();
+    expect(await screen.findByText('unbestätigt')).toBeInTheDocument();
   });
 
   it('nennt Zeit und Person einer bestätigten Beurteilung', async () => {
@@ -91,9 +91,9 @@ describe('GefahrengebietVorschau (LFH-664)', () => {
     renderMitProviders(<GefahrengebietVorschau einsatzId={5} id={3} />);
 
     expect(
-      await screen.findByText(/^beurteilt \d{6}[a-z]{3}\d{2} · Einsatzleitung$/),
+      await screen.findByText(/^bestätigt \d{6}[a-z]{3}\d{2} · Einsatzleitung$/),
     ).toBeInTheDocument();
-    expect(screen.queryByText('nicht beurteilt')).not.toBeInTheDocument();
+    expect(screen.queryByText('unbestätigt')).not.toBeInTheDocument();
   });
 
   it('zeigt das Gebiet, während die Matrix noch lädt', async () => {

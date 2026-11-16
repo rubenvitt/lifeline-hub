@@ -2,7 +2,7 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 200
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/erinnerung/erinnerungZustand.ts, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
 ---
 
 ## Überblick
@@ -19,15 +19,19 @@ Modulen selbst.
 
 1. Im Bereich „Führung“ „Überblick“ öffnen.
 2. Im Seitenkopf neben dem Datenstand lesen: Ab „Warnstufe mittel“ steht dort die höchste
-   Warnstufe der Gefahrengebiete, daneben, wie viele Gebiete „nicht beurteilt“ sind, und der
+   Warnstufe der Gefahrengebiete, daneben, wie viele Gebiete „unbestätigt“ sind, und der
    Stand eines festgelegten Pegels.
 3. Im Kennzahlenband die sechs Zahlen lesen: „Betroffene“ mit dem Zuwachs der letzten 60 Minuten,
    „Kräfte im Einsatz“ in der Stärke F/UF/M//Σ, „Offene Aufträge“, „Meldungen offen“, die Zahl der
    „Einsatzabschnitte“ und die „Einsatzdauer“.
 4. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
    „kritisch“), den festen Auftrag, bei Aufträgen an den Abschnitt die Zahl der erledigten, die
-   letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „Ausfall“ mit Zahl und
-   Balken) lesen.
+   letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „nicht verfügbar“ mit
+   Zahl und Balken) lesen. Was im Abschnitt brennt, steht als rotes Etikett direkt neben dem
+   Lagezustand, mit denselben Zahlen wie im Meldebild: „Rückm. überfällig seit 47 min“ (bei
+   mehreren Einheiten „3 Einh. Rückm. überfällig, längste seit 47 min“), „keine Rückm.“, „1
+   Ausfall“ und „1 Ausfall Material“. Der Lagezustand bleibt dabei, wie die Führung ihn beurteilt
+   hat; ein „planmäßig“ mit rotem Etikett daneben heißt: die Beurteilung ist zu prüfen.
 
    ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Vorgängen, nächsten Marken und Entscheidungen der letzten Stunde](../bilder/ueberblick/ueberblick.png)
 
@@ -58,8 +62,8 @@ Modulen selbst.
 
 - **Kräfte im Einsatz** zählt nur das Personal, nicht Fahrzeuge oder Material.
 - **Warnstufe** ist die höchste Stufe aller Gefahrengebiete; sie steht wie im Lagebild im
-  Seitenkopf, nur ab „mittel“, und daneben, falls es welche gibt, wie viele Gebiete „nicht
-  beurteilt“ sind (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort auch sein
+  Seitenkopf, nur ab „mittel“, und daneben, falls es welche gibt, wie viele Gebiete
+  „unbestätigt“ sind (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort auch sein
   Stand (Kapitel [Wetter und Pegel](wetter-pegel.md)).
 - **Meldungen offen** nennt dieselbe Zahl wie das Modul „Meldungen“, darunter die neuen; ist eine
   Bestätigung überfällig, steht die Zahl in Rot.
@@ -89,7 +93,10 @@ Erinnerungen und Ablösungen. Die Zahl jedes Abschnitts ist dieselbe wie im Modu
 - **Ablösungen**: die überfälligen und die bald fälligen Schichten.
 
 Jeder Abschnitt zeigt höchstens drei Einträge, das Überfällige zuerst; ein überfälliger Eintrag
-trägt dazu einen roten Rand links und das Wort „überfällig“. Ein Klick auf einen Eintrag öffnet
+trägt dazu einen roten Rand links und das Wort „überfällig“. Bei den Meldungen folgen danach die
+Sofortmeldungen mit dem roten Wort „SOFORT“ und die dringenden mit dem gelben Wort „DRINGEND“, je
+die zuletzt eingegangene zuerst, und zwar ab Eingang, nicht erst, wenn die Bestätigung überfällig
+ist. Eine fällige Erinnerung heißt „fällig“ in Gelb, hier und in den Nächsten Marken. Ein Klick auf einen Eintrag öffnet
 ihn im Modul, hervorgehoben. Alle weiteren erreicht „alle ↗“. Steht „keine“, gibt es nichts Offenes. Steht „ohne Netz nicht geladen“, war
 die Liste ohne Verbindung noch nie geladen; das heißt nicht, dass nichts offen ist.
 
@@ -107,7 +114,10 @@ Die Marken kommen aus sieben Quellen: Aufträge mit Frist, offene Erinnerungen, 
 Lagebesprechung, der erwartete Höchststand an einem maßgeblichen Pegel, fällige Ablösungen, der
 Beginn angekündigter Unwetterwarnungen der Stufen schwer und extrem und die Programmpunkte der
 Veranstaltung aus dem Paneel „Ablauf“ der [Einsatzdaten](einsatzdaten.md). Eine verstrichene Frist
-steht als „überfällig“ ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben.
+steht als „überfällig“ in Rot ganz oben, eine Frist in weniger als 30 Minuten ist hervorgehoben.
+Zwei Ausnahmen: Eine Erinnerung ist ein Wecker, keine Frist; verstrichen heißt sie „fällig“ in
+Gelb, wie im Abschnitt „Erinnerungen“ der Offenen Vorgänge. Eine verstrichene Lagebesprechung
+steht wie auf der Seite Lagebesprechung als „jetzt fällig“ bzw. „seit … überfällig“ in Gelb.
 Pegelprognose, Unwetterbeginn und Programmpunkte sind keine Fristen: Verstrichen fallen sie
 heraus. Pegelprognose und Unwetterbeginn sind unter 30 Minuten ebenso hervorgehoben, Programmpunkte
 nie. Es stehen höchstens sechs Marken da, der Rest als „+… weitere“. Ein

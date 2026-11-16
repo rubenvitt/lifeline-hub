@@ -120,7 +120,7 @@ sie.
   Nummern, Arten und Zeiten, keinen Freitext aus Aufträgen, Meldungen, Einsatztagebuch,
   Betroffenen oder Schäden.
 - Der Teil „Gefahrengebiete“ der Gefahren-/Schadenlage nennt je Gebiet den Namen, bei einem
-  nicht beurteilten „(nicht beurteilt)“, und darunter jede gesetzte Gefahr mit Stufe und
+  unbestätigten „(unbestätigt)“, und darunter jede gesetzte Gefahr mit Stufe und
   Erläuterung (Kapitel [Gefahren](gefahren.md)). Name und Erläuterung sind Beurteilung der eigenen
   Führung; „gemeldet von“ und wer zuletzt geändert hat, übernimmt der Text nicht.
 - Eine gesperrte oder nicht geladene Quelle steht als „—“ mit Grund, nie als 0.
