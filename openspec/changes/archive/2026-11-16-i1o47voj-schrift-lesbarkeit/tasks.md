@@ -16,7 +16,7 @@ TDD: erst der rote Test oder Wächter, dann die Änderung. LLH-1772 (`zrrpki0p`,
 - [x] 2.1 `--lfh-schrift-faktor` 1 / 1,15 / 1,25 in `rollen.css`, die Größen von fein bis titel als `calc(…)`, wert und gross fest; `dichteFaktor` in `tokens.ts`, vom Wächter gleich gehalten. Beleg: `rollen.guard.test.ts`, `dichte.test.ts`.
 - [x] 2.2 `antdToken(…, dichte)` setzt `fontSize`, `fontSizeSM/LG/XL` und `fontSizeHeading1–5` aus Stufe mal Faktor; `dichten.*.schriftgroesse` wird abgeleitet; Kommentare zu 13,5/21,5/35,5 und die Kontrastbegründung des Primärknopfs nachgezogen. Beleg: `tokens.test.ts` (14 / 16,1 / 17,5), `bedienKontrast.test.ts` grün.
 - [x] 2.3 Viewport in `index.html` ohne `maximum-scale` und `user-scalable=no`; `keinZoom.guard.test.ts` wird `zoomFrei.guard.test.ts`. Beleg: Wächter vorher rot.
-- [ ] 2.4 Brotkrume liest die Stufe `klein` (`EinsatzSeite.css`, `ortspfadStil`); e2e `PFAD_SCHRIFT` erwartet 12 / 15 px je Stufe, Seitenkopf in `kompakt` 44 px. Beleg: betroffene e2e-Specs grün.
+- [x] 2.4 Brotkrume liest die Stufe `klein` (`EinsatzSeite.css`, `ortspfadStil`); e2e `PFAD_SCHRIFT` erwartet 12 / 15 px je Stufe, Seitenkopf in `kompakt` 44 px. Beleg: betroffene e2e-Specs grün.
 
 ## 3. Literal-Wächter und Migration des Bestands — LLH-1775 `t4yjm0uk`, LLH-1773 `uqnkhwzl`, LLH-1777 `oec0vmz1`
 
@@ -36,17 +36,17 @@ TDD: erst der rote Test oder Wächter, dann die Änderung. LLH-1772 (`zrrpki0p`,
 ## 5. Mono-Grenze — LLH-1777 `oec0vmz1`
 
 - [x] 5.1 Meta-Slots in der Textschrift (`paneelMetaStil`, `seitenMetaStil`, Datenstand, Zeitachseneintrag, `ListenPaneel`, Schnellerfassung, `Sammelbanner`, `Aufgliederung`); Kennungen und Funkrufnamen in Mono, Funkrufnamen mit `data-schrift="kennung"`. Beleg: Komponententests auf die Familie.
-- [ ] 5.2 e2e `schrift-mono-grenze.spec.ts`: auf Überblick, ETB, Einsatzdaten und Betroffenen kein Mono-Textknoten mit einem Wort aus vier oder mehr Kleinbuchstaben außerhalb von `data-schrift="kennung"`. Beleg: Spec grün, vor 5.1 rot.
+- [x] 5.2 e2e `schrift-mono-grenze.spec.ts`: auf Überblick, ETB, Einsatzdaten und Betroffenen kein Mono-Textknoten mit einem Wort aus vier oder mehr Kleinbuchstaben außerhalb von `data-schrift="kennung"`. Beleg: Spec grün, vor 5.1 rot.
 
 ## 6. Messung und Nachweis über das Epic
 
-- [ ] 6.1 e2e `schrift-skala.spec.ts`: auf fünf Kernseiten in `kompakt` nur Größen aus {11, 12, 14, 16, 22, 32}, nichts unter 11 px, Seitentitel 16 und Lauftext 14; in `handschuh` Chip und Knopf das 1,25-Fache; Anteil unter 12 px je Stufe nicht steigend. Beleg: Spec grün.
-- [ ] 6.2 Rail-Etikett in 11 px ohne Überlauf in der Rail (64 / 74 / 80 px je Stufe) (`rail-etikett.spec.ts`), Seitenkopf auf 390 px, Trefffläche-Gates (`gate3-trefflaeche`, `trefflaeche-pruefflaechen`) in allen drei Stufen. Beleg: Specs grün.
+- [x] 6.1 e2e `schrift-skala.spec.ts`: auf fünf Kernseiten in `kompakt` nur Größen aus {11, 12, 14, 16, 22, 32}, nichts unter 11 px, Seitentitel 16 und Lauftext 14; in `handschuh` Chip und Knopf das 1,25-Fache; Anteil unter 12 px je Stufe nicht steigend. Beleg: Spec grün.
+- [x] 6.2 Rail-Etikett in 11 px ohne Überlauf in der Rail (64 / 74 / 80 px je Stufe) (`rail-etikett.spec.ts`), Seitenkopf auf 390 px, Trefffläche-Gates (`gate3-trefflaeche`, `trefflaeche-pruefflaechen`) in allen drei Stufen. Beleg: Specs grün.
 - [x] 6.3 `frontend/AGENTS.md`: `schriftskala` mit Stufen, Faktor und Literal-Verbot; „Kein Zoom“ ersetzt durch „Zoom frei“; Feldetikett und Augenbraue; Mono-Grenze; je mit Marke „umgekehrt 15.11.2026“ gegenüber dem Neuentwurf. Beleg: Prettier grün, Verweise auf `keinZoom.guard` gegrept und nachgezogen.
 - [x] 6.4 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), Erzeugtes im Commit. Beleg: `designSystem.guard.test.ts` grün.
-- [ ] 6.5 Bildlauf der Anwender-Doku im selben PR (`docs/anwender/AGENTS.md`, Mitänderungsregel): Bilder der geänderten Ansichten neu erzeugen und committen. Beleg: Wächter der Anwenderdoku grün.
-- [ ] 6.7 Befunde des Reviews vor dem PR behoben (Rail wächst mit der Schrift, `data-dichte` vor dem ersten Bild, `body` in der Lauftextgröße, benannte Konstanten im Wächter, Zeichnungen, gemischte Knoten, Warnrolle mit Tests) und ADR-0058 angelegt. Beleg: Abschnitt „Review“ im PR.
-- [ ] 6.6 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, betroffene e2e-Specs lokal grün. Beleg: Ausgabe im PR unter „Geprüft“.
+- [x] 6.5 Bildlauf der Anwender-Doku im selben PR (`docs/anwender/AGENTS.md`, Mitänderungsregel): Bilder der geänderten Ansichten neu erzeugen und committen. Beleg: Wächter der Anwenderdoku grün.
+- [x] 6.7 Befunde des Reviews vor dem PR behoben (Rail wächst mit der Schrift, `data-dichte` vor dem ersten Bild, `body` in der Lauftextgröße, benannte Konstanten im Wächter, Zeichnungen, gemischte Knoten, Warnrolle mit Tests) und ADR-0058 angelegt. Beleg: Abschnitt „Review“ im PR.
+- [x] 6.6 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, betroffene e2e-Specs lokal grün. Beleg: Ausgabe im PR unter „Geprüft“.
 
 ## Workflow follow-up
 
