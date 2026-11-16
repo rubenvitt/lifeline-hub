@@ -88,7 +88,8 @@ der Fläche.
 
 Die Großbild-Ansicht SHALL jede Zahl aus derselben Zusammenstellung beziehen wie die normale Seite
 und MUST zur selben Zeit denselben Wert zeigen. Sie MUST sich live aktualisieren wie die Seite und
-den Datenstand mit Alter nennen. Ist der Live-Kanal getrennt, MUST sie „Verbindung getrennt“ zeigen. Eine gesperrte Quelle MUST als „—“ mit Grund erscheinen, eine
+den Datenstand mit Alter nennen. Ist das Netz weg oder der Live-Kanal getrennt oder im Wiederaufbau, MUST sie das
+zeigen, wie die Kopfleiste, die sie verdeckt. Eine gesperrte Quelle MUST als „—“ mit Grund erscheinen, eine
 ladende oder gescheiterte als solche, nie als 0.
 
 #### Scenario: Neue Betroffene während der Präsentation

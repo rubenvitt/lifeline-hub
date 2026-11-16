@@ -64,8 +64,8 @@ ohne Vollbild zeigt, brächte nichts außer einem neuen Deeplink.
 ### D2 Hülle `GrossbildFlaeche`: Portal, Element-Vollbild, Wachhalten, Esc
 
 `components/grossbild/GrossbildFlaeche.tsx` rendert per Portal in `document.body` eine Fläche mit
-`position: fixed; inset: 0`, eigener Ebene über dem Rahmen (über der Alarmzone, unter nichts, denn
-im Großbild öffnet sich kein Dialog) und `overflow: hidden`. Beim Öffnen fordert sie
+`position: fixed; inset: 0`, eigener Ebene über dem Rahmen und über dem Eingangsband (`GROSSBILD_EBENE`
+1050) und `overflow: hidden`. Beim Öffnen fordert sie
 `element.requestFullscreen()` **für diese Fläche** an, nicht für das Dokument: im Element-Vollbild
 zeigt der Browser nur sie, Rahmen und Alarmzone sind ohne weiteres Zutun weg. Scheitert die
 Anforderung oder fehlt die API (iPhone), füllt die feste Fläche das Fenster.
@@ -79,6 +79,9 @@ Anforderung oder fehlt die API (iPhone), füllt die feste Fläche das Fenster.
   zeigt die Kopfzeile „Vollbild“, solange `document.fullscreenElement` nicht die Fläche ist; ein
   Klick ist die Geste, die der Browser für einen zweiten Versuch braucht. Ohne Vollbild-API fehlt
   der Knopf.
+- Solange die Fläche steht, ist jedes andere Kind des `body` `inert`, nicht nur `#root`: Portale
+  wie das Eingangsband hängen am `body`, auch solche, die erst währenddessen erscheinen
+  (`MutationObserver`; Review vor dem PR).
 - Solange die Fläche steht, trägt `<html>` `overflow: hidden` (ein Rad über der Fläche rollte sonst
   das unsichtbare Dokument), beim Verlassen wird der vorige Wert wiederhergestellt.
 - ADR-0054 bleibt gewahrt: die Inhaltsfläche des Rahmens bekommt keinen Rollbereich, die Hülle liegt
@@ -90,7 +93,7 @@ Anforderung oder fehlt die API (iPhone), füllt die feste Fläche das Fenster.
   Bildschirmschoner im Großbild: es läuft am Bedienplatz, nicht unbeaufsichtigt.
 
 Die Kopfzeile der Hülle trägt links den Titel der Seite (Menüname) und `meta` (Uhrzeit, Stand),
-rechts die Alarmzahl (D6), die Übungsmarke (`UebungsMarke`, `groesse="monitor"`) und die Knöpfe
+rechts die Alarmzahl (D6), die Übungsmarke (`UebungsMarke`, `groesse="grossbild"`, mitwachsend) und die Knöpfe
 „Vollbild“ (nur ohne Vollbild) und „Großbild verlassen“. Der Fokus springt beim Öffnen auf
 „Großbild verlassen“ und kehrt beim Verlassen auf den Knopf „Großbild“ zurück. Die Fläche ist ein
 `role="dialog"` mit `aria-modal` und dem Titel als Namen.
@@ -179,8 +182,8 @@ Das Element-Vollbild verdeckt die Alarmzone. Damit ein Alarm nicht ungesehen ble
 Kopfzeile die Zahl der Einträge, Alarme als „n Alarm(e) offen“ in Alarmrolle, Org-Hinweise als
 „n Hinweis(e) offen“ in Bedienrolle, ohne Titel: die
 Einträge können Namen tragen, und das Großbild steht vor allen im Raum. Ton spielt die App wie
-sonst. Quittiert wird nach dem Verlassen. Ebenso verdeckt das Großbild die Verbindungsanzeige: bei getrenntem Live-Kanal steht „Verbindung
-getrennt“ in Achtungsrolle (Review vor dem PR). Erwogen: die Alarmzone im Großbild mitzeichnen; sie ist
+sonst. Quittiert wird nach dem Verlassen. Ebenso verdeckt das Großbild die Verbindungsanzeige: ohne Netz, bei getrenntem oder sich wieder aufbauendem
+Live-Kanal steht das in Achtungsrolle, abgeleitet wie in der Kopfleiste (Review vor dem PR). Erwogen: die Alarmzone im Großbild mitzeichnen; sie ist
 eine Rahmenquelle mit Stapel-Logik (`useRahmenObenStapel`) und Bedienknöpfen, beides gehört nicht
 in eine Ansicht ohne Bedienung.
 

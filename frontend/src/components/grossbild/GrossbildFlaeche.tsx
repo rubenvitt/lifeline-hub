@@ -10,6 +10,8 @@ import {
 import { createPortal } from 'react-dom';
 import { useAlarmZone } from '../../alarm/alarmZoneSpeicher';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
+import type { LiveVerbindungsStatus } from '../../live/liveVerbindung';
+import { useOnline } from '../../offline/useOnline';
 import type { Einsatzart } from '../../api/types';
 import { IconPfeileEinwaerts, IconVollbildEcken, IconWarndreieck } from '../../icons';
 import { schrift } from '../../theme/tokens';
@@ -21,9 +23,18 @@ import { useBildschirmWach } from './useBildschirmWach';
 
 /**
  * Ebene der Fläche ohne Vollbild: über jedem klebenden Rahmen (`RAHMEN_EBENE` 100, Alarmzone
- * eingeschlossen), unter antds Popups (ab 1000). Im Großbild öffnet sich kein Dialog.
+ * eingeschlossen) und über dem Eingangsband (`zIndexPopupBase - 1` = 999), das per Portal am
+ * `body` hängt (Review vor dem PR). Was sonst am `body` hängt, ist während des Großbilds `inert`.
  */
-export const GROSSBILD_EBENE = 900;
+export const GROSSBILD_EBENE = 1050;
+
+/** Verbindungsstörung wie in der Kopfleiste (`syncZustand`), die das Großbild verdeckt. */
+function verbindungsText(online: boolean, live: LiveVerbindungsStatus): string | null {
+  if (!online) return 'Ohne Netz';
+  if (live === 'lost') return 'Verbindung getrennt';
+  if (live === 'connecting') return 'Verbindung wird wiederhergestellt';
+  return null;
+}
 
 interface GrossbildFlaecheProps {
   /** Name der Seite (Menüname); zugleich der Name des Dialogs. */
@@ -56,7 +67,8 @@ function countText(n: number, eins: string, viele: string): string {
  *
  * Die Alarmzone verdeckt das Vollbild. Darum nennt die Kopfzeile ihre Einträge als Zahl, ohne Titel:
  * die Fläche steht vor allen im Raum (D6). Ebenso verdeckt sie die Verbindungsanzeige der
- * Kopfleiste: ist der Live-Kanal getrennt, steht „Verbindung getrennt“ in Achtungsrolle, damit
+ * Kopfleiste: ohne Netz, bei getrenntem oder sich wieder aufbauendem Live-Kanal steht das in
+ * Achtungsrolle („Ohne Netz“, „Verbindung getrennt“, „… wird wiederhergestellt“), damit
  * niemand alte Zahlen für aktuell hält (Review vor dem PR).
  */
 export default function GrossbildFlaeche({
@@ -79,6 +91,8 @@ export default function GrossbildFlaeche({
   const alarme = eintraege.filter((e) => e.stufe === 'alarm').length;
   const hinweise = eintraege.length - alarme;
   const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
+  const online = useOnline();
+  const verbindung = verbindungsText(online, liveStatus);
 
   const requestVollbild = useCallback(() => {
     const el = flaeche.current;
@@ -86,19 +100,30 @@ export default function GrossbildFlaeche({
     el.requestFullscreen().catch(() => setIsVollbild(false));
   }, []);
 
-  // App dahinter sperren, Dokument nicht rollen lassen, Fokus hin und zurück.
+  // Alles dahinter sperren, Dokument nicht rollen lassen, Fokus hin und zurück. Gesperrt wird
+  // jedes Kind des `body` außer der Fläche, nicht nur `#root`: Portale wie das Eingangsband hängen
+  // am `body`, auch solche, die erst während des Großbilds erscheinen (Review vor dem PR).
   useEffect(() => {
     const vorher = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const html = document.documentElement;
     const overflowVorher = html.style.overflow;
     html.style.overflow = 'hidden';
-    const app = document.getElementById('root');
-    const inertVorher = app?.inert ?? false;
-    if (app) app.inert = true;
+    const gesperrt = new Map<HTMLElement, boolean>();
+    const sperre = (el: Element) => {
+      if (!(el instanceof HTMLElement) || el === flaeche.current || gesperrt.has(el)) return;
+      gesperrt.set(el, el.inert ?? false);
+      el.inert = true;
+    };
+    for (const kind of document.body.children) sperre(kind);
+    const beobachter = new MutationObserver((aenderungen) => {
+      for (const a of aenderungen) a.addedNodes.forEach((k) => k instanceof Element && sperre(k));
+    });
+    beobachter.observe(document.body, { childList: true });
     verlassenKnopf.current?.focus();
     return () => {
+      beobachter.disconnect();
       html.style.overflow = overflowVorher;
-      if (app) app.inert = inertVorher;
+      for (const [el, warInert] of gesperrt) el.inert = warInert;
       vorher?.focus();
     };
   }, []);
@@ -247,7 +272,7 @@ export default function GrossbildFlaeche({
             </span>
           )}
         </span>
-        {liveStatus === 'lost' && (
+        {verbindung != null && (
           <span
             data-lfh="grossbild-verbindung"
             style={{
@@ -262,7 +287,7 @@ export default function GrossbildFlaeche({
               fontWeight: 700,
             }}
           >
-            Verbindung getrennt
+            {verbindung}
           </span>
         )}
         <UebungsMarke einsatz={einsatz} groesse="grossbild" />

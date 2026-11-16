@@ -17,7 +17,9 @@ import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import LagebesprechungGrossbild from '../lagebesprechung/LagebesprechungGrossbild';
+import LagebesprechungGrossbild, {
+  type TerminAbruf,
+} from '../lagebesprechung/LagebesprechungGrossbild';
 import LagebesprechungHistorie from '../lagebesprechung/LagebesprechungHistorie';
 import { useVorbereitung } from '../lagebesprechung/useVorbereitung';
 import LagebesprechungModal from '../lagebesprechung/LagebesprechungModal';
@@ -193,7 +195,11 @@ export default function LagebesprechungPage() {
           stand={standQuery.data}
           // `abrufZustand`, nicht `isLoading`: eine ohne Netz pausierte Abfrage ist nicht `isLoading`
           // und stünde sonst als „0 abgeschlossen“ da (Review vor dem PR).
-          standAbruf={abrufZustand(standQuery)}
+          standAbruf={
+            standQuery.data == null && standQuery.fetchStatus === 'paused'
+              ? 'ohne-netz'
+              : abrufZustand(standQuery)
+          }
           besprechungZustand={abrufZustand(standQuery)}
           besprechungStand={standQuery.dataUpdatedAt}
           onVerlassen={() => setIsGrossbild(false)}
@@ -230,7 +236,7 @@ function GrossbildAnsicht({
   einsatzId: number;
   einsatz: EinsatzAnzeige;
   stand: LagebesprechungStand | undefined;
-  standAbruf: AbrufZustand;
+  standAbruf: TerminAbruf;
   besprechungZustand: AbrufZustand;
   besprechungStand: number;
   onVerlassen: () => void;

@@ -2,9 +2,8 @@ import { render, screen, within } from '@testing-library/react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import type { AbrufZustand } from '../api/abrufZustand';
 import type { LagebesprechungStand } from '../api/types';
-import LagebesprechungGrossbild from './LagebesprechungGrossbild';
+import LagebesprechungGrossbild, { type TerminAbruf } from './LagebesprechungGrossbild';
 import type { VorbereitungsZeile } from './vorbereitung';
 
 dayjs.extend(utc);
@@ -46,7 +45,7 @@ function stand(terminMs: number | null): LagebesprechungStand {
 
 function renderGrossbild(
   terminMs: number | null = Date.now() + 25 * 60_000,
-  standAbruf: AbrufZustand = 'daten',
+  standAbruf: TerminAbruf = 'daten',
 ) {
   return render(
     <LagebesprechungGrossbild
@@ -119,6 +118,21 @@ describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => 
     expect(kennzahl('Abgeschlossen')).toHaveTextContent('wird abgerufen');
     expect(kennzahl('Abgeschlossen')).not.toHaveTextContent('0');
   });
+
+  it.each([
+    ['gesperrt', 'nicht freigegeben'],
+    ['ohne-netz', 'ohne Netz nicht geladen'],
+  ] as const)(
+    'zeigt den Termin %s als „—“ mit Grund, nie als 0 oder „kein Termin“',
+    (abruf, grund) => {
+      renderGrossbild(Date.now() + 25 * 60_000, abruf);
+      for (const titel of ['Nächste Lagebesprechung', 'Abgeschlossen']) {
+        expect(kennzahl(titel)).toHaveTextContent(`—${grund}`);
+        expect(kennzahl(titel)).toHaveAttribute('data-ton', 'neutral');
+      }
+      expect(kennzahl('Abgeschlossen')).not.toHaveTextContent('3');
+    },
+  );
 
   it('nennt eine gesperrte Quelle mit Grund', () => {
     renderGrossbild();

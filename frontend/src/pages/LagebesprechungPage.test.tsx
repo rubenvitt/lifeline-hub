@@ -9,7 +9,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Lagebesprechung, LagebesprechungStand } from '../api/types';
 import { AdresseSteht } from '../test/adresseSteht';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import LagebesprechungPage from './LagebesprechungPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -105,6 +106,8 @@ function rendere({
   adresseSteht = false,
   /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
   daneben = null as ReactNode,
+  /** Vorbelegter Query-Client (etwa mit dem Einsatz aus dem Offline-Speicher). */
+  client = undefined as QueryClient | undefined,
 } = {}) {
   const zaehle = (liste: string) => {
     if (lage.abrufe) lage.abrufe[liste] = (lage.abrufe[liste] ?? 0) + 1;
@@ -177,7 +180,7 @@ function rendere({
       {adresseSteht ? <AdresseSteht>{seite}</AdresseSteht> : seite}
       {daneben}
     </>,
-    { route },
+    { route, client },
   );
   return { ...ergebnis, termine };
 }
@@ -742,6 +745,27 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
 });
 
 describe('LagebesprechungPage · Großbild (LLH-1747, Spec `grossbild-ansicht`)', () => {
+  it('nennt ohne Netz einen nie geladenen Termin „ohne Netz nicht geladen“, nicht „wird abgerufen“', async () => {
+    // Kaltstart ohne Netz: der Einsatz kommt aus dem Offline-Speicher, der Stand der
+    // Lagebesprechung nicht (Key nicht in `LAGEBILD_OFFLINE`); seine Abfrage pausiert.
+    const client = neuerQueryClient();
+    const einsatzObj = einsatz();
+    client.setQueryData(einsatzKeys.einsatz(1), einsatzObj);
+    onlineManager.setOnline(false);
+    try {
+      rendere({ einsatzObj, client });
+      await userEvent.click(await screen.findByRole('button', { name: 'Großbild' }));
+      const dialog = screen.getByRole('dialog', { name: 'Lagebesprechung' });
+      const termin = within(dialog)
+        .getByText('Abgeschlossen')
+        .closest('[data-lfh="gross-kennzahl"]') as HTMLElement;
+      expect(termin).toHaveTextContent('—ohne Netz nicht geladen');
+      expect(termin).not.toHaveTextContent('wird abgerufen');
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  });
+
   it('bietet „Großbild“ auch ohne Schreibrecht an, öffnet und schließt es', async () => {
     rendere({
       einsatzObj: einsatz({ meine_rolle: 'beobachter' }),

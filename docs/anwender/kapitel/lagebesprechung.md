@@ -99,7 +99,8 @@ Modulzähler. Fehlt einer Person das Recht auf eine Quelle oder ist die Quelle n
 Stand gibt es nur über „In Lagebericht übernehmen“. Das Großbild zeigt dieselben Zeilen ohne
 Quellenangabe und ohne Bedienung; die Quelle bleibt im Paneel und im übernommenen Lagebericht.
 Oben stehen Uhrzeit und Alter des Stands; gehen währenddessen Alarme oder Hinweise ein, nennt es
-nur ihre Zahl, und eine getrennte Live-Verbindung meldet es mit „Verbindung getrennt“.
+nur ihre Zahl, und ein fehlendes Netz oder eine getrennte Live-Verbindung meldet es oben. Ist der Termin ohne
+Netz nie geladen worden, steht dort „ohne Netz nicht geladen“.
 
 ### Fälliger Termin
 

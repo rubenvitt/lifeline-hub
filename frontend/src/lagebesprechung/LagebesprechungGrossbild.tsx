@@ -2,6 +2,8 @@ import { useUhr } from '../abloesung/useUhr';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AbrufZustand } from '../api/abrufZustand';
+import { ABSCHNITT_OFFLINE } from '../components/instrument/ListenPaneel';
+import { NICHT_FREIGEGEBEN } from '../pages/lage-dashboard/fuehrungsZahlen';
 import type { EinsatzAnzeige, LagebesprechungStand } from '../api/types';
 import {
   GROSS_BEZUG,
@@ -26,14 +28,18 @@ const ALS_ZAHL = /^(Nr\. )?[\d\s.,:/+–—-]+$/;
 /** Elf Zeilen in drei Spalten: vier Reihen passen bei 16:9 unter den Termin. */
 const SPALTEN = 3;
 
+/** Zustand der Termin-Abfrage, dazu „ohne Netz, nie geladen“ (`fetchStatus` `paused` ohne Daten). */
+export type TerminAbruf = AbrufZustand | 'ohne-netz';
+
 interface LagebesprechungGrossbildProps {
   einsatz: EinsatzAnzeige | undefined;
   stand: LagebesprechungStand | undefined;
   /**
-   * Zustand der Termin-Abfrage aus `abrufZustand`, nie aus `isLoading`: eine ohne Netz pausierte
-   * Abfrage ist nicht `isLoading` und stünde sonst als „0 abgeschlossen“ da (Review vor dem PR).
+   * Zustand der Termin-Abfrage: `abrufZustand`, nie `isLoading` (eine ohne Netz pausierte Abfrage
+   * ist nicht `isLoading` und stünde sonst als „0 abgeschlossen“ da), und `ohne-netz`, wenn sie
+   * ohne Daten pausiert: dann wäre „wird abgerufen“ gelogen (Review vor dem PR).
    */
-  standAbruf: AbrufZustand;
+  standAbruf: TerminAbruf;
   vorbereitung: Vorbereitung;
   onVerlassen: () => void;
 }
@@ -56,9 +62,16 @@ export default function LagebesprechungGrossbild({
   onVerlassen,
 }: LagebesprechungGrossbildProps) {
   const { rollen } = useRollen();
-  // `gesperrt` gibt es hier nicht: die Seite prüft ihre eigene Freigabe.
   const standZustand: GrossZustand =
     standAbruf === 'laden' || standAbruf === 'fehler' ? standAbruf : 'daten';
+  // Gesperrt (ein 403 räumt die Daten, `raeumeNachRechteentzug`) oder ohne Netz nie geladen: „—“
+  // mit Grund statt „0“ und „kein Termin“.
+  const ohneStand =
+    standAbruf === 'gesperrt'
+      ? NICHT_FREIGEGEBEN
+      : standAbruf === 'ohne-netz'
+        ? ABSCHNITT_OFFLINE
+        : null;
   const { konventionen: konv } = useAnzeigeKonventionen();
   // 5-s-Takt wie im Lagebild: „Stand vor n s“ läuft mit, ohne jede Sekunde zu rendern.
   const jetzt = useUhr(5_000);
@@ -93,18 +106,19 @@ export default function LagebesprechungGrossbild({
         <GrossKennzahl
           titel="Nächste Lagebesprechung"
           zustand={standZustand}
-          ton={darstellung.rolle === 'achtung' ? 'achtung' : 'neutral'}
-          wert={termin ? <ZeitAnzeige wert={termin} rolle="kurz" /> : '—'}
-          notiz={darstellung.label}
+          ton={ohneStand == null && darstellung.rolle === 'achtung' ? 'achtung' : 'neutral'}
+          wert={ohneStand == null && termin ? <ZeitAnzeige wert={termin} rolle="kurz" /> : '—'}
+          notiz={ohneStand ?? darstellung.label}
         />
         <GrossKennzahl
           titel="Abgeschlossen"
           zustand={standZustand}
-          wert={stand?.anzahl_lagebesprechungen ?? 0}
+          wert={ohneStand != null ? '—' : (stand?.anzahl_lagebesprechungen ?? 0)}
           notiz={
-            stand?.letzte_lagebesprechung
+            ohneStand ??
+            (stand?.letzte_lagebesprechung
               ? `zuletzt Nr. ${stand.letzte_lagebesprechung.lfd_nr}`
-              : 'noch keine'
+              : 'noch keine')
           }
         />
       </div>

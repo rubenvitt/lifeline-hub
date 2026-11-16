@@ -217,11 +217,49 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
     }
   });
 
-  it('nennt eine getrennte Live-Verbindung', () => {
+  it('nennt eine gestörte Verbindung wie die Kopfleiste, die es verdeckt', () => {
     openGrossbild();
-    expect(screen.queryByText('Verbindung getrennt')).toBeNull();
+    const verbindung = () => document.querySelector('[data-lfh="grossbild-verbindung"]');
+    act(() => setzeLiveStatusFuerTest('open'));
+    expect(verbindung()).toBeNull();
     act(() => setzeLiveStatusFuerTest('lost'));
-    expect(screen.getByText('Verbindung getrennt')).toBeInTheDocument();
+    expect(verbindung()).toHaveTextContent('Verbindung getrennt');
+    // Bei einem Netzfehler bleibt der Strom endlos im Aufbau, „lost“ kommt nie.
+    act(() => setzeLiveStatusFuerTest('connecting'));
+    expect(verbindung()).toHaveTextContent('Verbindung wird wiederhergestellt');
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      act(() => {
+        window.dispatchEvent(new Event('offline'));
+      });
+      expect(verbindung()).toHaveTextContent('Ohne Netz');
+    } finally {
+      onLine.mockRestore();
+    }
+  });
+
+  it('sperrt auch Portale am body, die erst während des Großbilds erscheinen', () => {
+    const vorher = document.createElement('div');
+    document.body.appendChild(vorher);
+    try {
+      openGrossbild();
+      expect(vorher.inert).toBe(true);
+      // Ein Eingangsband hängt sich per Portal an den body.
+      const band = document.createElement('div');
+      act(() => {
+        document.body.appendChild(band);
+      });
+      return Promise.resolve().then(() => {
+        expect(band.inert).toBe(true);
+        expect(screen.getByRole('dialog').inert).not.toBe(true);
+        fireEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+        expect(vorher.inert).toBe(false);
+        expect(band.inert).toBe(false);
+        band.remove();
+      });
+    } finally {
+      vorher.remove();
+    }
   });
 
   it('trägt bei einer Übung die Übungsmarke', () => {
