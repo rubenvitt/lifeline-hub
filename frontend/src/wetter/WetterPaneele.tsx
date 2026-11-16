@@ -61,7 +61,10 @@ import {
 } from './wetterText';
 
 const QUELLENVERMERK = 'Datenbasis: Deutscher Wetterdienst · über Bright Sky';
-const KEIN_ORT_TEXT = 'Einsatzort nicht verortet';
+/** Zustand im Paneel; erklärt wird einmal auf der Seite ({@link WetterOhneOrtHinweis}, LLH-1752). */
+const KEIN_ORT_TEXT = 'ohne Einsatzort';
+const KEIN_ORT_SEITE =
+  'Einsatzort nicht verortet — Warnungen, Vorhersage und aktuelle Bedingungen brauchen eine Koordinate';
 const AUSFALL_TEXT = 'Wetterquelle nicht erreichbar';
 const VERALTET_GRUND = 'die Aktualisierung gelingt gerade nicht';
 /** Bei den aktuellen Bedingungen ist der Stand die Messzeit: alt ist die Station, nicht der Abruf. */
@@ -88,26 +91,20 @@ function standMeta(stand: TeilStand, vorne?: string | null): string | undefined 
 /** Hinweis im Körper für die Zustände ohne Inhalt bzw. mit veraltetem Inhalt. */
 function StandHinweis({
   stand,
-  onEinsatzdaten,
   ausfallText = AUSFALL_TEXT,
   veraltetGrund = VERALTET_GRUND,
 }: {
   stand: TeilStand;
-  onEinsatzdaten?: () => void;
   ausfallText?: string;
   veraltetGrund?: string;
 }) {
   const { token, rollen } = useRollen();
   const polster = { paddingBlock: token.paddingSM, paddingInline: token.padding } as const;
   if (stand.art === 'kein_ort') {
+    // Nur der Zustand: der Grund und der Weg stehen einmal auf der Seite (LLH-1752).
     return (
-      <div data-lfh="wetter-kein-ort" style={{ ...polster, display: 'grid', gap: token.marginXS }}>
+      <div data-lfh="wetter-paneel-ohne-ort" style={polster}>
         <span style={{ color: rollen.text2, fontSize: 12 }}>{KEIN_ORT_TEXT}</span>
-        {onEinsatzdaten && (
-          <span>
-            <Button onClick={onEinsatzdaten}>Einsatzort in den Einsatzdaten verorten</Button>
-          </span>
-        )}
       </div>
     );
   }
@@ -255,14 +252,39 @@ function ortName(ort: WetterOrt | null | undefined): string | null {
   return ort?.name?.trim() || null;
 }
 
-export function WarnungenPaneel({
-  zustand,
+/**
+ * Fehlt der Einsatzort, erklärt die Seite das EINMAL über den Paneelen, mit dem Weg zu den
+ * Einsatzdaten (LLH-1752, Spec `lage-wetter-pegel`, Szenario „Kein Einsatzort“). Alle drei
+ * Wetterteile hängen an derselben Koordinate; die Warnungen stehen für sie. Solange die Antwort
+ * fehlt (Laden, Fehler), ist der Zustand unbekannt — dann kein Hinweis.
+ */
+export function WetterOhneOrtHinweis({
   wetter,
-  jetzt,
-  konv,
-  onNeuladen,
   onEinsatzdaten,
-}: TeilProps & { onEinsatzdaten: () => void }) {
+}: {
+  wetter: WetterAnzeige | undefined;
+  onEinsatzdaten: () => void;
+}) {
+  const { token, rollen } = useRollen();
+  if (wetter?.warnungen.zustand !== 'kein_ort') return null;
+  return (
+    <div
+      data-lfh="wetter-kein-ort"
+      style={{
+        display: 'grid',
+        gap: token.marginXS,
+        justifyItems: 'start',
+        paddingBlock: token.paddingSM,
+        paddingInline: token.padding,
+      }}
+    >
+      <span style={{ color: rollen.text2 }}>{KEIN_ORT_SEITE}</span>
+      <Button onClick={onEinsatzdaten}>Einsatzort in den Einsatzdaten verorten</Button>
+    </div>
+  );
+}
+
+export function WarnungenPaneel({ zustand, wetter, jetzt, konv, onNeuladen }: TeilProps) {
   const { token, rollen } = useRollen();
   const teil = wetter?.warnungen;
   const stand = teil ? teilStand(teil, 'warnungen', jetzt, konv) : null;
@@ -287,7 +309,7 @@ export function WarnungenPaneel({
         onLeerAktion={onNeuladen}
         onNeuladen={onNeuladen}
       >
-        {stand && <StandHinweis stand={stand} onEinsatzdaten={onEinsatzdaten} />}
+        {stand && <StandHinweis stand={stand} />}
         {mitInhalt &&
           (anzahl === 0 ? (
             <div

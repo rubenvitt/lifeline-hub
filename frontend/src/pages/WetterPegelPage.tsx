@@ -14,7 +14,12 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { useRollen, type PaneelDatenzustand } from '../components/instrument';
 import { einsatzdatenPfad, einsatzEinstellungenPfad } from '../routing/deeplinks';
 import PegelPaneel, { PegelLeerzeile } from '../wetter/PegelPaneel';
-import { AktuellPaneel, VorhersagePaneel, WarnungenPaneel } from '../wetter/WetterPaneele';
+import {
+  AktuellPaneel,
+  VorhersagePaneel,
+  WarnungenPaneel,
+  WetterOhneOrtHinweis,
+} from '../wetter/WetterPaneele';
 import { teileWarnungen } from '../wetter/wetterStand';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -187,6 +192,15 @@ export default function WetterPegelPage() {
           alignItems: 'start',
         }}
       >
+        {/* Ohne Einsatzort: der Grund einmal für alle drei Wetterteile (LLH-1752). */}
+        {wetterQuery.data?.warnungen.zustand === 'kein_ort' && (
+          <div style={volleBreite}>
+            <WetterOhneOrtHinweis
+              wetter={wetterQuery.data}
+              onEinsatzdaten={() => navigate(einsatzdatenPfad(einsatzId))}
+            />
+          </div>
+        )}
         <div style={volleBreite}>
           <WarnungenPaneel
             zustand={paneelZustand(wetterQuery)}
@@ -194,7 +208,6 @@ export default function WetterPegelPage() {
             jetzt={jetzt}
             konv={konv}
             onNeuladen={() => void wetterQuery.refetch()}
-            onEinsatzdaten={() => navigate(einsatzdatenPfad(einsatzId))}
           />
         </div>
         {mitPegel && <div style={volleBreite}>{pegelPaneel}</div>}
