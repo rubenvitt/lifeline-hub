@@ -602,6 +602,21 @@ describe('auswahlRaster', () => {
     ]);
   });
 
+  it('Abschnitt: zählt, wer in ihm steht — mit geerbtem Abschnitt, ohne aufgelöste (LLH-1744)', () => {
+    const roh: AuswahlRoh = {
+      ...ROH,
+      einheiten: [
+        EINHEIT,
+        { ...EINHEIT, id: EINHEIT.id + 1, abschnitt_id: null, ueber_einheit_id: EINHEIT.id },
+        { ...EINHEIT, id: EINHEIT.id + 2, abschnitt_id: null, ueber_einheit_id: EINHEIT.id + 1 },
+        { ...EINHEIT, id: EINHEIT.id + 3, aufgeloest_at: '2026-11-16 10:00:00' },
+      ],
+    };
+    // Zug, Gruppe und Trupp stehen in Nord (4); die aufgelöste zählt nicht.
+    const raster = auswahlRaster(marker('abschnitt', 4), roh, zeit);
+    expect(raster.find((f) => f.label === 'Einheiten')?.wert).toBe('3');
+  });
+
   it('ohne Rohdatensatz kein Raster — nichts wird erfunden', () => {
     expect(auswahlRaster(marker('einheit', 99), ROH, zeit)).toEqual([]);
     expect(auswahlRaster(marker('einsatzort', 0), ROH, zeit)).toEqual([]);

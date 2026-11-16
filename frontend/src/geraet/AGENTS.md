@@ -26,7 +26,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   das Gerät einsatzweit. Ihre Handler fragen `sicht_wahlweise` / `ziel_stelle_wahlweise`, nie die
   strenge `sicht`; eine neue wahlweise Ansicht braucht dieselbe Entscheidung in jedem Handler.
 - **Abschnittsansicht** (LFH-1043): der Bereich ist der Teilbaum des gebundenen Abschnitts samt
-  seiner Einheiten (`src/geraet/abschnitt.rs`, je Anfrage neu berechnet). Listen filtern über
+  seiner Einheiten (`src/geraet/abschnitt.rs`, je Anfrage neu berechnet). Seine Einheiten sind, wer
+  im Teilbaum steht (LLH-1744): aktive Einheiten mit wirksamem Abschnitt im Teilbaum, also auch eine
+  Untereinheit ohne eigenen Abschnitt unter einer Einheit dort; sie gilt für Liste, Stärke, Absender
+  und Quittung wie ihre Obereinheit. Die Liste der Startseite ordnet und beschriftet nach dem
+  wirksamen Abschnitt und zeigt je Einheit die eigene Stärke. Listen filtern über
   `abschnitt::bereich`, Aufträge im SQL (`AuftragFilter.bereich`, sonst stimmt das Blättern
   nicht); Fremdes ist 404, ein fremder Meldungsabsender 403, ohne Angabe meldet der Abschnitt.
   Quittiert wird nur die eigene Empfängerzeile (`darfQuittierenFuer` an `AuftragKarte`).

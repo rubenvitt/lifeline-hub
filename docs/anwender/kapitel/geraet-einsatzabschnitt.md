@@ -2,7 +2,7 @@
 titel: Einsatzabschnitt am Gerät
 gruppen: [geraete]
 reihenfolge: 750
-quellen: [frontend/src/geraet/GeraetAbschnittPage.tsx, frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraetAbschnittKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/geraet/GeraetBefehle.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, src/geraet/mod.rs, src/routes/befehl.rs]
+quellen: [frontend/src/geraet/GeraetAbschnittPage.tsx, frontend/src/geraet/GeraetAuftraegePage.tsx, frontend/src/geraet/GeraetMeldenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/GeraetAbschnittKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/geraet/GeraetBefehle.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, src/geraet/mod.rs, src/geraet/abschnitt.rs, src/routes/befehl.rs]
 ---
 
 ## Überblick
@@ -24,7 +24,8 @@ Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 1. „Abschnitt“ öffnen. Oben stehen „Kurzbezeichnung“, „Abschnittsleiter“, „Lagezustand“,
    „Abschnittsauftrag“, „Funk“ (Rufname und Sprechgruppen), „Telefon“ und die Stärke, einmal für den Abschnitt und
    einmal einschließlich der Unterabschnitte.
-2. Darunter listet „Einheiten“ alle Einheiten des Teilbaums mit Abschnitt, Stärke und Status.
+2. Darunter listet „Einheiten“ alle Einheiten des Teilbaums mit Abschnitt, Stärke und Status, auch
+   eine Untereinheit ohne eigenen Abschnitt, die unter einer Einheit des Teilbaums steht.
 
    ![Seite „Sanitätsdienst“ eines Abschnittstablets mit den Daten des Abschnitts EA 1 und dem Beginn der Einheitenliste](../bilder/geraet-einsatzabschnitt/abschnitt.png)
 

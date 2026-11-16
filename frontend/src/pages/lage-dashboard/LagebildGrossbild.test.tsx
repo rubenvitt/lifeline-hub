@@ -25,7 +25,7 @@ const BAND: KennzahlAnzeige[] = [
 
 const FUEHRUNG: KennzahlAnzeige[] = [
   kz('Lagebericht', 'keiner', { notiz: 'noch nicht erstellt' }),
-  kz('UHS aktiv', 3, { notiz: '1 geplant · 24 Kräfte' }),
+  kz('UHS aktiv', 3, { notiz: '1 geplant · 24 Kräfte an UHS' }),
 ];
 
 const gefahr = (typ: string, stufe: GefahrenZeile['stufe']): GefahrenZeile =>

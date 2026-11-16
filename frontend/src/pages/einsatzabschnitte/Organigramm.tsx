@@ -363,6 +363,9 @@ function KnotenInhalt({
             {knoten.leitung ?? 'Leitung nicht besetzt'}
           </span>
           <span style={{ ...meta, color: rollen.text }}>{staerkeText(knoten.staerke)}</span>
+          {knoten.art === 'einheit' && knoten.abgestelltAus && (
+            <span style={{ overflowWrap: 'anywhere' }}>aus {knoten.abgestelltAus}</span>
+          )}
         </div>
       </div>
     </>

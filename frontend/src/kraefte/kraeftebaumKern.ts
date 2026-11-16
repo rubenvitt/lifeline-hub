@@ -81,29 +81,6 @@ export function abschnittRang(abschnitte: readonly Einsatzabschnitt[]): Map<numb
 }
 
 /**
- * Abschnitt der OBERSTEN Einheit je Einheit (D11, Spec `lage-verdichtung`): eine unterstellte
- * Einheit zählt beim Abschnitt ihrer obersten Einheit. Fehlt die Obereinheit in der Liste, ist
- * die Einheit selbst die oberste (Waise). In einem Zyklus gilt die zuletzt erreichte Einheit vor
- * der Wiederholung.
- */
-export function abschnittDerObersten(einheiten: readonly Einheit[]): Map<number, number | null> {
-  const nachId = new Map(einheiten.map((e) => [e.id, e]));
-  const ergebnis = new Map<number, number | null>();
-  for (const e of einheiten) {
-    let cur = e;
-    const gesehen = new Set<number>([e.id]);
-    while (cur.ueber_einheit_id != null) {
-      const eltern = nachId.get(cur.ueber_einheit_id);
-      if (!eltern || gesehen.has(eltern.id)) break;
-      gesehen.add(eltern.id);
-      cur = eltern;
-    }
-    ergebnis.set(e.id, cur.abschnitt_id ?? null);
-  }
-  return ergebnis;
-}
-
-/**
  * Was {@link abschnittDerEinheit} von einer Einheit braucht; auch die Empfängerliste der
  * Verpflegung (`EmpfaengerEinheit`, LLH-1055) trägt es.
  */
@@ -123,8 +100,8 @@ export interface EinheitAbschnitt {
  * Einheit, sonst der des nächsten Vorfahren mit Abschnitt; ohne Abschnitt in der Kette `null`.
  * Der Name kommt aus `abschnitt_name` der Einheit, die ihn trägt. Zyklen und fehlende
  * Obereinheiten brechen den Aufstieg ab. Gelesen von {@link einheitenBaum}, der Abschnitt-Spalte
- * der Fahrzeugliste und dem FMS-Tableau; Filter und Stärke bleiben bei
- * {@link abschnittDerObersten} (Spec `lage-verdichtung`).
+ * der Fahrzeugliste und dem FMS-Tableau; seit LLH-1744 auch Filter und Stärke eines Abschnitts
+ * (Spec `lage-verdichtung`: ein Abschnitt zählt, wer in ihm steht).
  */
 export function abschnittDerEinheit(
   einheiten: readonly AbschnittTraeger[],
@@ -156,6 +133,11 @@ export interface EinheitKnoten {
   /** Der eigene Abschnitt, sonst der geerbte (Spalte und Rang). */
   abschnittId: number | null;
   kinder: EinheitKnoten[];
+  /**
+   * Nur aus {@link detachAbgestellte}: die Obereinheit, von der sich diese Einheit gelöst hat, weil
+   * sie selbst in einem anderen Abschnitt steht (LLH-1744).
+   */
+  abgestelltAus?: Einheit;
 }
 
 /**
@@ -167,12 +149,54 @@ export function einheitenBaum(
   einheiten: readonly Einheit[],
   abschnitte: readonly Einsatzabschnitt[],
 ): EinheitKnoten[] {
+  return baueEinheitenBaum(einheiten, abschnitte, () => undefined);
+}
+
+/**
+ * Der Baum aus {@link einheitenBaum}, aber eine Untereinheit, die selbst in einem anderen
+ * Abschnitt steht als ihre Obereinheit (eigener Abschnitt ungleich dem wirksamen der
+ * Obereinheit), löst sich samt ihren Kindern und wird Wurzel; `abgestelltAus` nennt die
+ * Obereinheit (LLH-1744, Spec `kraeftebaum`, „Abgestellte Untereinheit unter ihrem Abschnitt“).
+ * Ohne eigenen Abschnitt bleibt sie unter ihrer Obereinheit. Für Meldebild, Kräftebild und
+ * Organigramm: dort zählt ein Abschnitt, wer in ihm steht. `alle` ist die ungefilterte Liste, damit
+ * eine Obereinheit, die ein Filter ausblendet, trotzdem genannt wird; aufgelöste zählen nicht.
+ */
+export function detachAbgestellte(
+  einheiten: readonly Einheit[],
+  abschnitte: readonly Einsatzabschnitt[],
+  alle: readonly Einheit[] = einheiten,
+): EinheitKnoten[] {
+  return baueEinheitenBaum(einheiten, abschnitte, abgestelltVon(einheiten, alle));
+}
+
+/** Die Obereinheit, von der eine Einheit abgestellt ist, sonst `undefined` (s. {@link detachAbgestellte}). */
+export function abgestelltVon(
+  einheiten: readonly Einheit[],
+  alle: readonly Einheit[] = einheiten,
+): (x: Einheit) => Einheit | undefined {
+  const nachId = new Map<number, Einheit>();
+  for (const x of [...alle, ...einheiten]) if (!x.aufgeloest_at) nachId.set(x.id, x);
+  const wirksam = abschnittDerEinheit([...nachId.values()]);
+  const abschnittVon = (x: Einheit) => wirksam.get(x.id)?.id ?? x.abschnitt_id ?? null;
+  return (x) => {
+    if (x.abschnitt_id == null || x.ueber_einheit_id == null) return undefined;
+    const eltern = nachId.get(x.ueber_einheit_id);
+    if (!eltern) return undefined;
+    return abschnittVon(x) !== abschnittVon(eltern) ? eltern : undefined;
+  };
+}
+
+function baueEinheitenBaum(
+  einheiten: readonly Einheit[],
+  abschnitte: readonly Einsatzabschnitt[],
+  abgestellt: (x: Einheit) => Einheit | undefined,
+): EinheitKnoten[] {
   const rang = abschnittRang(abschnitte);
   const nachId = new Map(einheiten.map((x) => [x.id, x]));
   const kinderJe = new Map<number, Einheit[]>();
   const wurzeln: Einheit[] = [];
   for (const x of einheiten) {
-    if (x.ueber_einheit_id != null && nachId.has(x.ueber_einheit_id)) {
+    if (x.ueber_einheit_id != null && nachId.has(x.ueber_einheit_id) && !abgestellt(x)) {
       const l = kinderJe.get(x.ueber_einheit_id);
       if (l) l.push(x);
       else kinderJe.set(x.ueber_einheit_id, [x]);
@@ -201,7 +225,13 @@ export function einheitenBaum(
     // Erst alle Kinder markieren, dann absteigen: ein Kind darf nicht über ein Geschwister
     // zweimal erreicht werden.
     for (const k of kinder) besucht.add(k.id);
-    return { einheit: x, abschnittId: abschnittVon(x), kinder: kinder.map(build) };
+    const aus = abgestellt(x);
+    return {
+      einheit: x,
+      abschnittId: abschnittVon(x),
+      kinder: kinder.map(build),
+      ...(aus ? { abgestelltAus: aus } : {}),
+    };
   };
   const baum = sortByRang(wurzeln).map(build);
   // Zyklen (a ↔ b) hätten keine Wurzel — sie dürfen trotzdem nicht verschwinden.
@@ -633,6 +663,8 @@ export interface KraeftebaumKnoten {
   abschnittId: number | null;
   mittel: MittelDerEinheit;
   kinder: KraeftebaumKnoten[];
+  /** Abgestellt aus dieser Obereinheit (LLH-1744, {@link detachAbgestellte}). */
+  abgestelltAus?: Einheit;
 }
 
 /**
@@ -700,8 +732,11 @@ export function kraeftebaum(eingabe: KraeftebaumEingabe): KraeftebaumWurzel[] {
     abschnittId: k.abschnittId,
     mittel: mittelVon(k.einheit.id, k.einheit.fuehrer_id ?? null),
     kinder: k.kinder.map(mitMitteln),
+    ...(k.abgestelltAus ? { abgestelltAus: k.abgestelltAus } : {}),
   });
-  const wurzeln: KraeftebaumWurzel[] = einheitenBaum(e.einheiten, e.abschnitte).map((k) => ({
+  // Ein Abschnitt zählt, wer in ihm steht (LLH-1744): abgestellte Untereinheiten lösen sich.
+  const baum = detachAbgestellte(e.einheiten, e.abschnitte, quelle.einheiten);
+  const wurzeln: KraeftebaumWurzel[] = baum.map((k) => ({
     art: 'einheit',
     knoten: mitMitteln(k),
   }));

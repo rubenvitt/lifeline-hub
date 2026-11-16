@@ -31,7 +31,8 @@ Modul, in dem sie erfasst wird.
 
    ![Lagebild mit der Zeile „Was brennt“, Kennzahlenband, Gefahrenmatrix, Sichtung, jüngsten ETB-Einträgen und Stand](../bilder/lagebild/lagebild.png)
 
-5. Am Fuß den Stand lesen: der jüngste „Lagebericht“ und „UHS aktiv“.
+5. Am Fuß den Stand lesen: der jüngste „Lagebericht“ und „UHS aktiv“ mit den geplanten UHS und
+   den Kräften an aktiven UHS, etwa „1 geplant · 3 Kräfte an UHS“.
 6. Um ins Modul zu wechseln, den Verweis eines Paneels wählen, etwa „Gefahren ↗“ in der
    Gefahrenmatrix.
 

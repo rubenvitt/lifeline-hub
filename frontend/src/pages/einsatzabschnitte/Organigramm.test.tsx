@@ -297,6 +297,23 @@ describe('OrganigrammBild — Knoten', () => {
     const sammel = screen.getByRole('group', { name: 'Ohne Abschnitt' });
     expect(within(sammel).getByRole('link', { name: 'Lose Gruppe' })).toBeInTheDocument();
   });
+  it('nennt an einer abgestellten Einheit ihre Obereinheit (LLH-1744)', () => {
+    const org = buildFuehrungsorganisation(ABSCHNITTE, [
+      einheit(10, { name: '1. Zug', abschnitt_id: 1 }),
+      einheit(11, { name: 'Gruppe Deich', abschnitt_id: 2, ueber_einheit_id: 10 }),
+    ]);
+    renderMitProviders(
+      <OrganigrammBild
+        einsatzId={1}
+        org={org}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
+        stab={[]}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('aus 1. Zug')).toBeInTheDocument();
+  });
 });
 
 describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {

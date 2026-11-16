@@ -43,6 +43,7 @@ import utc from 'dayjs/plugin/utc';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { anstehendeProgrammpunkte } from '../programmpunkt/programmpunkt';
+import { countsKraefteAnUhs } from '../pages/lage-dashboard/lageVerdichtung';
 
 /** Ab diesem Alter gilt der Datenstand als veraltet (Spec `lagemonitor`, „Veralteter Stand“). */
 export const VERALTET_AB_MS = 2 * 60_000;
@@ -356,7 +357,10 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
     .slice(0, UHS_SICHTBAR);
   const weitere = lage.uhs.length - uhsSichtbar.length;
   const ueberbelegt = lage.uhs.filter(istUeberbelegt).length;
-  const anUhs = lage.uhs.reduce((summe, u) => summe + u.kraefte, 0);
+  // Nur aktive UHS, wie das Lagebild (LLH-1744); die Belegung zeigt weiter alle.
+  const anUhs = lage.uhs
+    .filter((u) => countsKraefteAnUhs(u.status))
+    .reduce((summe, u) => summe + u.kraefte, 0);
   return (
     <>
       {san ? (

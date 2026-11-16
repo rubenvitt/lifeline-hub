@@ -127,6 +127,7 @@ interface Fixture {
     abschnitte: Array<{ id: number; ueber_abschnitt_id: number | null }>;
     erwartet_ist_kumuliert: Record<string, Tripel>;
     erwartet_abschnitte: Record<string, { eigene: Tripel; inkl_unter: Tripel }>;
+    erwartet_wurzeln_je_abschnitt: Record<string, number[]>;
     bereitstellungsraeume: Array<{ name: string; einheiten: number[]; erwartet: Tripel | null }>;
   };
   kraefte: {
@@ -304,6 +305,14 @@ describe('Fixture: Stärke', () => {
       expect({ fuehrer, unterfuehrer, mannschaft }, `Abschnitt ${id}`).toEqual(
         alsStaerke(soll.inkl_unter),
       );
+    }
+    // Abgestellte Einheit (LLH-1744): sie steht als Wurzel unter ihrem eigenen Abschnitt.
+    for (const [id, wurzeln] of Object.entries(s.erwartet_wurzeln_je_abschnitt)) {
+      const z = knoten.get(`ab-${id}`)!;
+      const einheitWurzeln = (z.children ?? [])
+        .filter((k) => k.key.startsWith('eh-'))
+        .map((k) => Number(k.key.slice(3)));
+      expect(einheitWurzeln, `Wurzeln in Abschnitt ${id}`).toEqual(wurzeln);
     }
   });
 });

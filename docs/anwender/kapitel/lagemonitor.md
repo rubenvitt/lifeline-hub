@@ -2,7 +2,7 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
 ---
 
 ## Überblick
@@ -48,7 +48,7 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    steht dort „Hilfeleistungen“: Kontakte, letzte Stunde und vermisst, darunter in Versorgung,
    Transporte und SK I.
 3. „Kräfte“ zählt Personal, Einheiten und die Stärke F/UF/M; oben rechts steht, wie viele Kräfte an
-   Unfallhilfsstellen arbeiten.
+   aktiven Unfallhilfsstellen arbeiten, gezählt wie im Lagebild.
 4. „Belegung der Unfallhilfsstellen“ nennt je UHS Belegte und Plätze, etwa „8/5“, bis zu sechs;
    der Rest steht als „+… weitere“. Überbelegte UHS (mehr Belegte als Plätze) stehen zuerst, rot
    hinterlegt, und oben in der Kachel steht, wie viele es sind, etwa „1 überbelegt“. Danach

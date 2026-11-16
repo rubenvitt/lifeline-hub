@@ -42,6 +42,7 @@ import { ART_LABEL, evakuiertText, personenZahl } from '../../betreuung/betreuun
 import { staerkeText } from '../../anzeige/staerke';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
 import { GEFAHR_LABEL, SCHADENSGRAD_LABEL } from '../schaeden/gefahrWorte';
+import { einheitenImAbschnitt } from '../einsatzabschnitte/abschnittStaerke';
 
 /**
  * Reine Ableitungen der rechten Kartenleiste — getrennt von `Sidebar.tsx`, damit Zähler,
@@ -692,7 +693,8 @@ export function auswahlRaster(
     case 'abschnitt': {
       const a = roh.abschnitte.find((x) => x.id === marker.id);
       if (!a) return [];
-      const einheiten = roh.einheiten.filter((e) => e.abschnitt_id === a.id).length;
+      // Wer im Abschnitt steht, wie Gliederung und Stärke (LLH-1744, `einheitenImAbschnitt`).
+      const einheiten = einheitenImAbschnitt(roh.einheiten, a.id).length;
       return [
         { label: 'Leiter', wert: text(a.leiter_name), mono: false },
         { label: 'Einheiten', wert: String(einheiten) },

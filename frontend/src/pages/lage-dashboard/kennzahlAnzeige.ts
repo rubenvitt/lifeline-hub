@@ -110,7 +110,8 @@ export function fuehrungsKennzahlen(q: FuehrungsQuellen): KennzahlAnzeige[] {
       wert: uhsGesperrt ? '—' : (fuehrung?.uhsAktiv ?? ''),
       notiz: uhsGesperrt
         ? NICHT_FREIGEGEBEN
-        : `${fuehrung?.uhsGeplant ?? 0} geplant · ${kraefteText(fuehrung?.uhsKraefte ?? 0)}`,
+        : // „an UHS“: eine eigene Achse, nicht die Stärke eines Abschnitts (LLH-1744).
+          `${fuehrung?.uhsGeplant ?? 0} geplant · ${kraefteText(fuehrung?.uhsKraefte ?? 0)} an UHS`,
       ton: 'neutral',
       zustand: zQuelle(q.uhs),
       ziel: uhsGesperrt ? undefined : ziele?.uhs,

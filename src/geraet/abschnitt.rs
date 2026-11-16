@@ -43,11 +43,24 @@ impl Abschnittsbereich {
     ) -> Result<Self, AppError> {
         let abschnitte =
             crate::einsatzabschnitt::repo::teilbaum(pool, einsatz_id, abschnitt_id).await?;
+        // Wer im Teilbaum steht (LLH-1744, D8): der wirksame Abschnitt einer aktiven Einheit ist
+        // der eigene, sonst der ihrer nächsten aktiven Obereinheit mit Abschnitt — dieselbe Lesart
+        // wie `abschnittDerEinheit` im Client über die aktiven Einheiten. Der Aufstieg endet am
+        // ersten Abschnitt; die Tiefengrenze hält einen Ring in `ueber_einheit_id` aus.
         let einheiten: Vec<i64> = sqlx::query_scalar(
-            "SELECT id FROM einsatz_einheit \
-             WHERE einsatz_id = ? AND aufgeloest_at IS NULL \
-               AND abschnitt_id IN (SELECT value FROM json_each(?))",
+            "WITH RECURSIVE kette(id, ueber, abschnitt, tiefe) AS ( \
+                 SELECT id, ueber_einheit_id, abschnitt_id, 0 FROM einsatz_einheit \
+                  WHERE einsatz_id = ? AND aufgeloest_at IS NULL \
+                 UNION ALL \
+                 SELECT k.id, o.ueber_einheit_id, o.abschnitt_id, k.tiefe + 1 \
+                   FROM kette k JOIN einsatz_einheit o ON o.id = k.ueber \
+                  WHERE k.abschnitt IS NULL AND o.einsatz_id = ? \
+                    AND o.aufgeloest_at IS NULL AND k.tiefe < 64 \
+             ) \
+             SELECT DISTINCT id FROM kette \
+              WHERE abschnitt IN (SELECT value FROM json_each(?))",
         )
+        .bind(einsatz_id)
         .bind(einsatz_id)
         .bind(json_liste(&abschnitte))
         .fetch_all(pool)
@@ -288,6 +301,75 @@ mod tests {
             .await
             .unwrap();
         assert!(leer.abschnitte.is_empty() && leer.einheiten.is_empty());
+    }
+
+    async fn untereinheit(
+        pool: &SqlitePool,
+        einsatz: i64,
+        name: &str,
+        abschnitt: Option<i64>,
+        ueber: i64,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name, abschnitt_id, ueber_einheit_id) \
+             VALUES (?, ?, ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(name)
+        .bind(abschnitt)
+        .bind(ueber)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LLH-1744 (D8): Der Bereich nimmt, wer im Teilbaum steht — auch eine Untereinheit ohne
+    /// eigenen Abschnitt, die ihn von ihrer Obereinheit erbt. Eine abgestellte mit eigenem
+    /// Abschnitt außerhalb bleibt draußen, eine aufgelöste Obereinheit vererbt nichts, ein Zyklus
+    /// hängt nicht.
+    #[tokio::test]
+    async fn bereich_nimmt_untereinheiten_mit_geerbtem_abschnitt() {
+        let pool = crate::db::test_pool().await;
+        let l = lage(&pool).await;
+        let e = l.einsatz;
+        let gruppe = untereinheit(&pool, e, "Gruppe", None, l.zug_nord).await;
+        let trupp = untereinheit(&pool, e, "Trupp", None, gruppe).await;
+        let abgestellt = untereinheit(&pool, e, "Abgestellt", Some(l.sued), l.zug_nord).await;
+        let fremd = untereinheit(&pool, e, "Fremd", None, l.zug_sued).await;
+        let weg = einheit(&pool, e, "Aufgelöst", Some(l.nord)).await;
+        sqlx::query(
+            "UPDATE einsatz_einheit SET aufgeloest_at = '2026-11-16 10:00:00' WHERE id = ?",
+        )
+        .bind(weg)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let waise = untereinheit(&pool, e, "Waise", None, weg).await;
+        let ring_a = einheit(&pool, e, "Ring A", None).await;
+        let ring_b = untereinheit(&pool, e, "Ring B", None, ring_a).await;
+        sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE id = ?")
+            .bind(ring_b)
+            .bind(ring_a)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let nord = Abschnittsbereich::laden(&pool, e, l.nord).await.unwrap();
+        assert_eq!(
+            nord.einheiten,
+            HashSet::from([l.zug_nord, l.zug_ost, gruppe, trupp])
+        );
+        for draussen in [abgestellt, fremd, weg, waise, ring_a, ring_b] {
+            assert!(
+                !nord.einheiten.contains(&draussen),
+                "{draussen} gehört nicht zu Nord"
+            );
+        }
+        let sued = Abschnittsbereich::laden(&pool, e, l.sued).await.unwrap();
+        assert_eq!(
+            sued.einheiten,
+            HashSet::from([l.zug_sued, abgestellt, fremd])
+        );
     }
 
     #[tokio::test]

@@ -1139,11 +1139,14 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
   for (const { dichte, soll } of STAFFEL) {
     await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
-    // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (Auswahlzeile nicht
-    // „0 von 0") — erst danach sagt eine Abwesenheit etwas.
+    // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (das Paneel „Personal
+    // nach Status“ zählt sie) — erst danach sagt eine Abwesenheit etwas. Ohne Filter steht in der
+    // Werkzeugzeile keine Auswahlzahl mehr (LLH-1744).
     await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     await expect(
-      page.locator('[data-lfh="meldebild-werkzeuge"]').getByText(/^[1-9]\d* von [1-9]\d* Kräften$/),
+      page
+        .getByRole('region', { name: 'Personal nach Status' })
+        .getByText(/^[1-9]\d* (Kraft|Kräfte)$/),
     ).toBeVisible();
 
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.

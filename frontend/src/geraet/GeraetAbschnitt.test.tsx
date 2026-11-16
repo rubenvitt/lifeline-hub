@@ -272,6 +272,41 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
     ).toEqual(['Abschnitt', 'Aufträge', 'Melden', 'Karte']);
   });
 
+  it('eine Untereinheit mit geerbtem Abschnitt: Abschnitt, „über …“ und eigene Stärke (LLH-1744)', async () => {
+    stelleBereit();
+    server.use(
+      http.get('/api/einsaetze/7/einheiten', () =>
+        HttpResponse.json([
+          einheit(5, {
+            name: '2. Zug',
+            abschnitt_id: 21,
+            abschnitt_name: 'UA Nord-Ost',
+            ist: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+            ist_kumuliert: { fuehrer: 1, unterfuehrer: 1, mannschaft: 10 },
+          }),
+          einheit(6, {
+            name: 'Gruppe Ost',
+            abschnitt_id: null,
+            abschnitt_name: null,
+            ueber_einheit_id: 5,
+            ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+            ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
+          }),
+        ]),
+      ),
+    );
+    renderApp('/geraet');
+    const liste = await screen.findByRole('list', { name: 'Einheiten' });
+    const zeilen = within(liste).getAllByRole('listitem');
+    const gruppe = zeilen.find((z) => within(z).queryByText('Gruppe Ost'))!;
+    expect(gruppe).toHaveTextContent('UA Nord-Ost');
+    expect(gruppe).toHaveTextContent('über 2. Zug');
+    expect(gruppe).toHaveTextContent('eigene 0/1/8//9');
+    const zug = zeilen.find((z) => within(z).queryByText('2. Zug'))!;
+    // Die Zeilen ergeben die Stärke: der Zug zählt die Gruppe nicht zweimal.
+    expect(zug).toHaveTextContent('eigene 1/0/2//3');
+  });
+
   it('fremde Seiten führen auf den Abschnitt, und ein UHS-Tablet kommt nicht auf ihn', async () => {
     stelleBereit();
     const router = renderApp('/geraet/7/patienten');
@@ -654,6 +689,24 @@ describe('Bausteine', () => {
       20,
     );
     expect(liste.map((e) => e.name)).toEqual(['Z', 'C', 'A', 'B']);
+  });
+
+  it('ordneEinheiten: eine geerbte Untereinheit steht beim Abschnitt ihrer Obereinheit (LLH-1744)', () => {
+    const liste = ordneEinheiten(
+      [
+        einheit(1, {
+          name: 'Gruppe',
+          abschnitt_id: null,
+          abschnitt_name: null,
+          ueber_einheit_id: 2,
+        }),
+        einheit(2, { name: 'Zug Ost', abschnitt_id: 21, abschnitt_name: 'UA Ost', sortier: 2 }),
+        einheit(3, { name: 'Zug Nord', abschnitt_id: 20, abschnitt_name: 'EA Nord', sortier: 3 }),
+        einheit(4, { name: 'Zug Alpha', abschnitt_id: 22, abschnitt_name: 'UA Alpha', sortier: 4 }),
+      ],
+      20,
+    );
+    expect(liste.map((e) => e.name)).toEqual(['Zug Nord', 'Zug Alpha', 'Gruppe', 'Zug Ost']);
   });
 
   it('isEigenerEmpfaenger: Abschnitt des Teilbaums oder eigene Einheit', () => {

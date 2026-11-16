@@ -14,7 +14,12 @@ import {
   verdichteGefahrengebiete,
   verdichtePersonen,
 } from './lageVerdichtung';
-import { verdichteSchaeden, verdichteTiere, verdichteUhs } from './lageVerdichtung';
+import {
+  verdichteSchaeden,
+  verdichteTiere,
+  verdichteUhs,
+  countsKraefteAnUhs,
+} from './lageVerdichtung';
 import { beurteilungHinweis, sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 import { sichtungsbild } from '../../personen/personenBilanz';
 
@@ -217,6 +222,12 @@ describe('einfache Status-Zählungen', () => {
       abgeschlossen: 0,
       gesamt: 3,
     });
+  });
+
+  it('countsKraefteAnUhs: nur aktive UHS tragen Kräfte an UHS (LLH-1744)', () => {
+    expect(countsKraefteAnUhs('aktiv')).toBe(true);
+    expect(countsKraefteAnUhs('geplant')).toBe(false);
+    expect(countsKraefteAnUhs('aufgeloest')).toBe(false);
   });
 
   it('verdichteUhs zählt nach Status, Kräfte nur an aktiven UHS', () => {
