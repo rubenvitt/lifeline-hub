@@ -263,13 +263,15 @@ pub async fn alarm(
     let jetzt_utc = crate::zeit::parse_utc(jetzt)
         .ok_or_else(|| AppError::Internal(format!("Zeitpunkt {jetzt}")))?;
     let frist = crate::meldung::rueckmeldung::frist_min(pool, einsatz_id, org_id).await?;
-    let namen: std::collections::HashMap<i64, String> =
-        sqlx::query_as("SELECT id, name FROM einsatz_einheit WHERE einsatz_id = ?")
-            .bind(einsatz_id)
-            .fetch_all(pool)
-            .await?
-            .into_iter()
-            .collect();
+    // Aufgelöste Einheiten melden nichts (wie `letzte_je_einheit`).
+    let namen: std::collections::HashMap<i64, String> = sqlx::query_as(
+        "SELECT id, name FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .collect();
     let mut rueckmeldung_ueberfaellig = Vec::new();
     for r in crate::meldung::repo::letzte_je_einheit(pool, einsatz_id).await? {
         let faellig = crate::meldung::rueckmeldung::faellig_at(&r.ereigniszeit, frist);
