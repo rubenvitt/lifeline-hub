@@ -12,6 +12,7 @@ import {
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { oeffneObjektGruppe } from './leisten-kern';
+import { benutzermenueAusloeser, oeffneSucheUeberOberflaeche } from './menue-kern';
 import { FOTO_JPEG } from './bildFixture';
 import { seedeVorlage, type GesaeteVorlage } from './vorlage-kern';
 
@@ -123,7 +124,10 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
             expect(
               messung.ziele.length,
               `${kontext}: tatsächlich Bedienziele messen`,
-            ).toBeGreaterThanOrEqual(mitVerwaltung ? 4 : 3);
+            ).toBeGreaterThanOrEqual(
+              // Am Handy trägt der Einsatzkopf Suche und Benutzermenü nicht (LLH-1728, D3).
+              mitVerwaltung ? (route !== '/einsaetze' && breite < 768 ? 3 : 4) : 3,
+            );
             for (const ziel of messung.ziele) {
               const name = `${kontext}: ${ziel.name}`;
               expect.soft(ziel.x, name).toBeGreaterThanOrEqual(0);
@@ -168,10 +172,11 @@ test.describe('LFH-460 Kopfzeilen und Bediendichte', () => {
               inhalt!.y,
               `${kontext}: Kopf verdeckt keinen Seiteninhalt`,
             ).toBeGreaterThanOrEqual(messung.kopfUnten);
-            await kopf.getByRole('button', { name: 'Suchen', exact: true }).click();
+            // Bedienbar: im Kopf, am Handy im Einsatz aus der Navigation (LLH-1728, D3).
+            await oeffneSucheUeberOberflaeche(page);
             await expect(page.getByRole('combobox', { name: /Suchen: Module/ })).toBeFocused();
             await page.keyboard.press('Escape');
-            await kopf.getByRole('button', { name: 'Benutzermenü' }).click();
+            await (await benutzermenueAusloeser(page)).click();
             await expect(page.getByRole('menuitem', { name: /Profil/ })).toBeVisible();
             await page.keyboard.press('Escape');
           }

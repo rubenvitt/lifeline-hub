@@ -7,7 +7,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Breadcrumb, Button, Form, Input } from 'antd';
 import type { EinsatzAnzeige } from '../api/types';
-import { EinsatzRahmenProvider } from '../einsatz/EinsatzRahmenKontext';
+import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from '../einsatz/EinsatzRahmenKontext';
 import {
   CommandPaletteProvider,
   useTastaturEbene,
@@ -642,6 +642,58 @@ describe('EinsatzSeite · Orientierung (LFH-954)', () => {
     );
     expect(regel, 'EinsatzSeite.css trägt die Regel für „Einsätze“').not.toBeNull();
     expect(regel![1]).toMatch(/flex-shrink:\s*0/);
+  });
+});
+
+describe('EinsatzSeite · Ortspfad im Einsatzrahmen (LLH-1728, D6)', () => {
+  const pfad = (
+    <Breadcrumb items={[{ title: 'Einsätze' }, { title: 'Hochwasser' }, { title: 'Personen' }]} />
+  );
+  const klasse = () => document.querySelector('.lfh-seitenkopf__pfad')!.className;
+
+  it('im Einsatzrahmen trägt der Ortspfad die Klasse für den Rückweg unter md', () => {
+    renderMitProviders(
+      <ImEinsatzRahmenProvider value>
+        <EinsatzSeite titel="Person" breadcrumb={pfad}>
+          <div />
+        </EinsatzSeite>
+      </ImEinsatzRahmenProvider>,
+    );
+    expect(klasse()).toContain('lfh-ortspfad--einsatz');
+  });
+
+  it('auch solange der Einsatz lädt (kein Einsatz im Rahmenkontext)', () => {
+    renderMitProviders(
+      <ImEinsatzRahmenProvider value>
+        <EinsatzRahmenProvider value={undefined}>
+          <EinsatzSeite titel="Person" breadcrumb={pfad}>
+            <div />
+          </EinsatzSeite>
+        </EinsatzRahmenProvider>
+      </ImEinsatzRahmenProvider>,
+    );
+    expect(klasse()).toContain('lfh-ortspfad--einsatz');
+  });
+
+  it('außerhalb des Einsatzrahmens bleibt der Ortspfad ohne die Klasse', () => {
+    renderMitProviders(
+      <EinsatzSeite titel="Profil" breadcrumb={pfad}>
+        <div />
+      </EinsatzSeite>,
+    );
+    expect(klasse()).not.toContain('lfh-ortspfad--einsatz');
+  });
+
+  it('`ortspfadAbMd` geht vor: unter md gar nichts', () => {
+    renderMitProviders(
+      <ImEinsatzRahmenProvider value>
+        <EinsatzSeite titel="Lagekarte" breadcrumb={pfad} ortspfadAbMd>
+          <div />
+        </EinsatzSeite>
+      </ImEinsatzRahmenProvider>,
+    );
+    expect(klasse()).toContain('lfh-ortspfad--ab-md');
+    expect(klasse()).not.toContain('lfh-ortspfad--einsatz');
   });
 });
 

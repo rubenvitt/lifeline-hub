@@ -213,9 +213,9 @@ describe('EinsatzLayout', () => {
   });
 
   /**
-   * LFH-952 (D1): ab `md` klebt der Kopf über dem Inhalt, unter `md` rollt er mit (am Handy wären
-   * ~140 px Kopf zu teuer). Die gemessene Höhe prüft `components/rahmenOben.test.tsx`, das Kleben
-   * im Browser `e2e/rahmen-stehen-bleiben.spec.ts`.
+   * LFH-952 (D1), LLH-1728 (D1): der Kopf klebt über dem Inhalt, in jeder Breite. Die gemessene
+   * Höhe prüft `components/rahmenOben.test.tsx`, das Kleben im Browser
+   * `e2e/rahmen-stehen-bleiben.spec.ts`.
    */
   it('ab md klebt der Kopf auf der Rahmenebene (LFH-952)', async () => {
     setup();
@@ -227,13 +227,17 @@ describe('EinsatzLayout', () => {
     expect(kopf).toHaveStyle({ position: 'sticky', top: '0px', zIndex: '100' });
   });
 
-  it('unter md rollt der Kopf mit (Gegenprobe, LFH-952)', async () => {
+  it('unter md klebt der Kopf ebenfalls (LLH-1728)', async () => {
     setzeViewportBreite(390);
     setup();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument(),
     );
-    expect(screen.getByRole('banner').style.position).toBe('');
+    expect(screen.getByRole('banner')).toHaveStyle({
+      position: 'sticky',
+      top: '0px',
+      zIndex: '100',
+    });
   });
 
   /**
@@ -763,7 +767,7 @@ describe('EinsatzLayout', () => {
       expect(screen.queryAllByRole('navigation')).toHaveLength(0);
     });
 
-    it('legt beide Umschalter ab, behält Alarm-Zentrale und Benutzermenü', async () => {
+    it('legt beide Umschalter ab, behält die Alarm-Zentrale', async () => {
       // Die Alarmzentrale bleibt, weil sie ihren Zustand ausspricht (sichtbarer Text plus
       // `aria-label`). Auf 390 px ist sie EIN gebündeltes Ziel, das seinen Zustand weiter nennt
       // („Ton blockiert"), mit beiden Steuerungen beschriftet im Menü — zwei Knöpfe brächen dort um.
@@ -772,7 +776,6 @@ describe('EinsatzLayout', () => {
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       expect(radiosImKopf()).toBe(0);
-      expect(screen.getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
       const alarm = screen.getByRole('button', { name: /^Alarmzentrale:/ });
       expect(alarm).toHaveTextContent('Ton blockiert');
       // Die Einzelknöpfe der breiten Bauform stehen hier NICHT — sonst erfüllten auch drei Ziele
@@ -780,8 +783,21 @@ describe('EinsatzLayout', () => {
       expect(screen.queryByRole('button', { name: 'Ton blockiert – freischalten' })).toBeNull();
     });
 
+    it('der Suchauslöser zwischen md und lg hält die A1-Trefffläche und die Rahmenfarbe', async () => {
+      setzeViewportBreite(820);
+      setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      const suche = within(screen.getByRole('banner')).getByRole('button', { name: 'Suchen' });
+      expect(suche).toHaveAttribute('aria-label', 'Suchen');
+      expect(suche.style.width).toBe('48px');
+      expect(suche.style.height).toBe('48px');
+      // Farbe aus der Nachtrolle des Rahmens — der Kopf ist modusfest.
+      expect(suche).toHaveStyle({ color: farbenDunkel.text });
+    });
+
     it('zeigt unter lg die Suche als Icon und keine Wortmarke', async () => {
-      // Auf 390 px kein Suchfeld, und die Wortmarke weicht dem Griff der Navigation.
+      // Zwischen `md` und `lg` kein Suchfeld, und die Wortmarke weicht dem Griff der Navigation.
+      setzeViewportBreite(820);
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       const kopf = screen.getByRole('banner');
@@ -807,13 +823,6 @@ describe('EinsatzLayout', () => {
       expect(hamburger.style.width).toBe('48px');
       expect(hamburger.style.height).toBe('48px');
 
-      const suche = screen.getByRole('button', { name: 'Suchen' });
-      expect(suche).toHaveAttribute('aria-label', 'Suchen');
-      expect(suche.style.width).toBe('48px');
-      expect(suche.style.height).toBe('48px');
-      // Farbe aus der Nachtrolle des Rahmens — der Kopf ist modusfest.
-      expect(suche).toHaveStyle({ color: farbenDunkel.text });
-
       await userEvent.click(hamburger);
       // Der Schließen-Knopf des Drawers ist von Haus aus kleiner als 48 px und wird gesetzt.
       const schliessen = (await screen.findByRole('dialog')).querySelector<HTMLElement>(
@@ -822,6 +831,71 @@ describe('EinsatzLayout', () => {
       expect(schliessen.style.minWidth).toBe('48px');
       expect(schliessen.style.minHeight).toBe('48px');
     });
+  });
+});
+
+describe('EinsatzLayout · Handy-Kopf (LLH-1728)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setzeViewportBreite(390);
+  });
+
+  it('trägt Menü, Name, Alarm, Verbindung und Uhr, aber weder Suche noch Benutzermenü (D3)', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const kopf = screen.getByRole('banner');
+    expect(within(kopf).getByRole('button', { name: 'Navigation öffnen' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /^Alarmzentrale:/ })).toBeInTheDocument();
+    expect(kopf.querySelector('[data-lfh="kopf-sync"]')).not.toBeNull();
+    const uhr = kopf.querySelector<HTMLElement>('[data-lfh="kopf-uhr"]');
+    expect(uhr).not.toBeNull();
+    // Die schmale Zellpolsterung des Handy-Kopfs, wie die Alarmzelle daneben.
+    const alarmZelle = kopf.querySelector<HTMLElement>('[data-lfh="kopf-alarm"]')!;
+    expect(uhr!.style.paddingInlineStart).toBe(alarmZelle.style.paddingInlineStart);
+    expect(within(kopf).queryByRole('button', { name: 'Suchen' })).toBeNull();
+    expect(within(kopf).queryByRole('button', { name: 'Benutzermenü' })).toBeNull();
+  });
+
+  it('ab md stehen Suche und Benutzermenü im Kopf, nicht im Drawer (Gegenprobe)', async () => {
+    setzeViewportBreite(820);
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const kopf = screen.getByRole('banner');
+    expect(within(kopf).getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Navigation öffnen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: 'Suchen' })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Benutzermenü' })).toBeNull();
+  });
+
+  it('„Suchen“ im Drawer schließt ihn und öffnet die Sprungpalette', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Navigation öffnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Suchen' }));
+    const feld = await screen.findByPlaceholderText(
+      'Suchen: Module, Aktionen, Einstellungen …',
+      {},
+      { timeout: 4000 },
+    );
+    expect(feld).toBeInTheDocument();
+    // Wohin der Fokus nach dem Schließen geht, misst `e2e/kopfzeile-schmal.spec.ts` (Animation).
+    // Der Drawer ist zu (`destroyOnHidden`: sein Inhalt verlässt den Baum).
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Erfassung' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('das Benutzermenü im Drawer öffnet dasselbe Menü bis „Abmelden“', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Navigation öffnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Benutzermenü' }));
+    expect(await screen.findByRole('menuitem', { name: /Abmelden/ })).toBeInTheDocument();
   });
 });
 
@@ -1492,7 +1566,7 @@ describe('EinsatzLayout · Übung (LLH-1725)', () => {
     expect(kopf.querySelector('[data-lfh="uebung-marke"]')).not.toBeNull();
   });
 
-  it('das Band klebt auch unter md, wo der Kopf mitrollt', async () => {
+  it('das Band klebt auch unter md, unter dem klebenden Kopf', async () => {
     setzeViewportBreite(390);
     setupUebung();
     const band = await waitFor(() => {

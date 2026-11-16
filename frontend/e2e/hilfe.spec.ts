@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 import { einsatzPerApi } from './einsatz-kern';
+import { benutzermenueAusloeser } from './menue-kern';
 
 /**
  * Hilfe (LFH-1096, Spec `anwenderdoku`): erreichbar vor der Anmeldung und aus dem Benutzermenü,
@@ -100,7 +101,8 @@ test('am Handy: ein langer Einsatzname im Rückweg sprengt die Hilfe nicht quer 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(page.getByRole('region', { name: 'Einsatztagebuch' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Benutzermenü' }).click();
+  // Am Handy steht das Benutzermenü im Einsatz in der Navigation (LLH-1728, D3).
+  await (await benutzermenueAusloeser(page)).click();
   await page.getByRole('menuitem', { name: 'Hilfe' }).click();
   const zurueck = page.getByRole('button', { name: `Zurück zu ${name}` });
   await expect(zurueck).toBeVisible();

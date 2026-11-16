@@ -1,4 +1,5 @@
-import { IconMenue } from '../icons';
+import { IconLupe, IconMenue } from '../icons';
+import { useCommandPalette } from '../command-palette/CommandPaletteProvider';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Alert, Button, Drawer, Layout, Spin, theme } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router';
@@ -31,12 +32,12 @@ import { leseNavWahl, panelZu, schreibeNavWahl, type NavWahl } from './navPersis
 import { merkeModulBesuch } from './zuletztModule';
 import { merkeLetztenOrt } from './letzterOrt';
 import { loadKategorieModul, rueckkehrModul, saveKategorieModul } from './kategorieModul';
-import { EinsatzRahmenProvider } from './EinsatzRahmenKontext';
+import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from './EinsatzRahmenKontext';
 import { isUebung } from './einsatzart';
 import { NichtGefundenProvider } from './nichtGefundenContext';
 import AlarmZentrale from './AlarmZentrale';
 import BenutzerMenu from '../components/BenutzerMenu';
-import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
+import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import AlarmZone from '../alarm/AlarmZone';
 import CommandPaletteTrigger, { suchTrefflaeche } from '../components/CommandPaletteTrigger';
 import {
@@ -265,6 +266,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const aktiveKategorie: KategorieKey | null = aktuellesModul?.kategorie ?? null;
 
   const { abBreite } = useViewport();
+  const palette = useCommandPalette();
   const breit = abBreite('lg');
   const mittel = abBreite('md');
   // Ab `xl` steht das Modulpanel ohne Wahl offen (`panelZu`).
@@ -273,9 +275,10 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   // Unter `md` rücken die Zellen zusammen, sonst bräche die rechte Gruppe auf 390 px in eine
   // dritte Zeile.
   const zellToken = mittel ? token : { padding: token.paddingXS };
-  // Ab `md` bleibt der Kopf beim Rollen stehen (LFH-952, `frontend/AGENTS.md`, Rahmen); seine
-  // gemessene Höhe ist `--lfh-rahmen-oben`, unter der alles hängt, was selbst oben klebt.
-  const kopfRef = useRahmenObenQuelle<HTMLElement>(mittel);
+  // Der Kopf bleibt beim Rollen stehen, in jeder Breite (LFH-952, LLH-1728, `frontend/AGENTS.md`,
+  // Rahmen); seine gemessene Höhe zählt zu `--lfh-rahmen-oben`, unter der alles hängt, was selbst
+  // oben klebt. Unter `md` hängt er sich unter die gestörte Betriebszeile (Rang, design.md D2).
+  const { ref: kopfRef, oben: kopfOben } = useRahmenObenStapel<HTMLElement>(true, RAHMEN_RANG.kopf);
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
   /**
@@ -291,6 +294,18 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   const [sprungOffen, setSprungOffen] = useState(false);
   const panelEingeklappt = sprungOffen ? false : panelZu(navWahl, weit);
   const [navOffen, setNavOffen] = useState(false);
+  // „Suchen“ im Drawer (LLH-1728, D3): die Palette gibt beim Schließen keinen Fokus zurück (sie
+  // wird ausgehängt), und der Knopf im Drawer ist dann abgebaut (`destroyOnHidden`). Ist die
+  // Palette wieder zu und der Fokus verwaist, geht er auf den Griff (Muster `useFokusRueckgabe`).
+  // Der schließende Drawer holt ihn vorher nicht zurück: er zöge ihn hinter die offene Palette.
+  const [sucheAusDrawer, setSucheAusDrawer] = useState(false);
+  const navGriff = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!sucheAusDrawer || palette.offen) return;
+    const aktiv = document.activeElement;
+    if (aktiv === document.body || aktiv === null) navGriff.current?.focus();
+    setSucheAusDrawer(false);
+  }, [sucheAusDrawer, palette.offen]);
 
   // Panel an die aktuelle Modul-Kategorie angleichen (auch nach dem Default-Redirect).
   useEffect(() => {
@@ -472,7 +487,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
       <Header
         ref={kopfRef}
         data-lfh="rahmen-kopf"
-        style={mittel ? { ...KOPF_STIL, ...RAHMEN_KLEBT } : KOPF_STIL}
+        style={{ ...KOPF_STIL, ...RAHMEN_KLEBT, top: kopfOben }}
       >
         {/* LINKE GRUPPE: Marke (bzw. Griff unter `lg`), Wortmarke, Einsatzkennung. Ab `lg` liegt
            sie mit der Suche in einem Raster, das dem Namen Vorrang gibt (LLH-1726). Bei Platzmangel
@@ -499,6 +514,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
               <div style={{ ...kopfZelleStil({ padding: 0 }), flexShrink: 0 }}>
                 <Button
                   type="text"
+                  ref={navGriff}
                   aria-label="Navigation öffnen"
                   // `flexShrink: 0`: sonst drückt der Inhalt daneben den Knopf auf dem Handschirm auf die halbe
                   // Trefffläche. Die Farbe folgt dem dunklen Rahmengrund, nicht dem Modus.
@@ -616,18 +632,22 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             </EinsatzAnzeigeProvider>
           </div>
           <SyncAnzeige liveErwartet kompakt={!mittel} />
-          {mittel && <Uhr />}
-          {!breit && (
+          {/* Am Handy ist die Uhr die letzte Zelle; Suche und Benutzermenü stehen dort in der
+              Navigation (LLH-1728, D3), sonst bliebe der Kopf zweizeilig. */}
+          <Uhr zelle={zellToken} trenner={mittel ? 'ende' : 'keiner'} />
+          {mittel && !breit && (
             <div style={kopfZelleStil(zellToken)}>
               <CommandPaletteTrigger />
             </div>
           )}
-          <div
-            style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
-          >
-            {/* Das Etikett hält seine Breite: die Funktion kommt erst mit dem Einsatz (LLH-1272). */}
-            <BenutzerMenu funktion={einsatz?.meine_funktion} hasFixedWidth hilfeDaneben />
-          </div>
+          {mittel && (
+            <div
+              style={{ ...kopfZelleStil(zellToken, 'keiner'), paddingInlineStart: token.paddingXS }}
+            >
+              {/* Das Etikett hält seine Breite: die Funktion kommt erst mit dem Einsatz (LLH-1272). */}
+              <BenutzerMenu funktion={einsatz?.meine_funktion} hasFixedWidth hilfeDaneben />
+            </div>
+          )}
         </KopfRechts>
       </Header>
       {/* Übung (LLH-1725, Spec `uebungsmarke`, D4): direkt unter dem Kopf, klebt in jeder Breite
@@ -694,16 +714,18 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
         <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
           <EinsatzAnzeigeProvider einsatzId={einsatzId}>
             <EinsatzRahmenProvider value={einsatz}>
-              <NichtGefundenProvider value={nichtGefunden}>
-                {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
+              {/* Auch während des Ladens: die Seite zeigt unter `md` nur den Rückweg (LLH-1728, D6). */}
+              <ImEinsatzRahmenProvider value>
+                <NichtGefundenProvider value={nichtGefunden}>
+                  {/* Neue Unwetterwarnung am Einsatzort → ein Hinweis in der AlarmZentrale (LFH-663).
                Im Rahmen, weil nur er für den ganzen Einsatz steht; im Provider, weil der Text
                Zeitzone und Zeitformat des Einsatzes trägt. */}
-                <UnwetterHinweis
-                  einsatzId={einsatzId}
-                  benutzer={benutzer}
-                  freigaben={modulFreigaben}
-                />
-                {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
+                  <UnwetterHinweis
+                    einsatzId={einsatzId}
+                    benutzer={benutzer}
+                    freigaben={modulFreigaben}
+                  />
+                  {/* Modulwächter (LFH-888, Spec `modul-freigabe`, D1 in
                `openspec/changes/archive/2026-10-04-lfh-888-modulwaechter-gesperrte-sprungziele/design.md`):
                meldet der Server für das Modul der Route `zugriff: false`, steht der Hinweis an der
                Stelle der Seite — auch für Unterrouten (`modulAusPfad`). Solange die Freigaben laden, wartet der
@@ -711,23 +733,24 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
                raus); Einsatzdaten und Einstellungen sind nie gesperrt und warten nicht. Ein
                gescheiterter oder pausierter Abruf (offline) sperrt nicht, dann bleibt der
                403-Zustand der Seite das Netz. */}
-                {aktuellesModul &&
-                istModulAusblendbar(aktuellesModul.key) &&
-                modulFreigabenQuery.isLoading ? (
-                  <div data-testid="modulwaechter-laedt">
-                    <SeitenSkeleton />
-                  </div>
-                ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
-                  <GesperrtesModul
-                    einsatzId={einsatzId}
-                    modul={aktuellesModul}
-                    freigaben={modulFreigaben!}
-                    darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
-                  />
-                ) : (
-                  <Outlet />
-                )}
-              </NichtGefundenProvider>
+                  {aktuellesModul &&
+                  istModulAusblendbar(aktuellesModul.key) &&
+                  modulFreigabenQuery.isLoading ? (
+                    <div data-testid="modulwaechter-laedt">
+                      <SeitenSkeleton />
+                    </div>
+                  ) : aktuellesModul && istModulGesperrt(aktuellesModul, modulFreigaben) ? (
+                    <GesperrtesModul
+                      einsatzId={einsatzId}
+                      modul={aktuellesModul}
+                      freigaben={modulFreigaben!}
+                      darfFreigabenVerwalten={darfModuleVerwalten(einsatz, benutzer)}
+                    />
+                  ) : (
+                    <Outlet />
+                  )}
+                </NichtGefundenProvider>
+              </ImEinsatzRahmenProvider>
             </EinsatzRahmenProvider>
           </EinsatzAnzeigeProvider>
         </Content>
@@ -742,10 +765,36 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           size={`min(${navDrawerBreite}px, calc(100vw - ${navDrawerRand}px))`}
           open={navOffen}
           onClose={() => setNavOffen(false)}
+          focusable={{ focusTriggerAfterClose: !sucheAusDrawer }}
           destroyOnHidden
           // Der Schließer folgt der Staffel wie der Hamburger, der ihn öffnet (LFH-384).
           styles={{ close: { minWidth: navGriffMass(token), minHeight: navGriffMass(token) } }}
+          // Am Handy trägt die Navigation auch, was im Kopf keinen Platz hat (LLH-1728, D3).
+          footer={
+            mittel ? undefined : (
+              <BenutzerMenu funktion={einsatz?.meine_funktion} hilfeDaneben inNavigation />
+            )
+          }
         >
+          {!mittel && (
+            <Button
+              block
+              icon={<IconLupe size={20} />}
+              onClick={() => {
+                setSucheAusDrawer(true);
+                setNavOffen(false);
+                palette.oeffne();
+              }}
+              // Dieselbe Trefffläche wie der Griff „Menü“ (A1, LFH-384), wie vorher im Kopf.
+              style={{
+                height: navGriffMass(token),
+                justifyContent: 'flex-start',
+                marginBlockEnd: token.marginSM,
+              }}
+            >
+              Suchen
+            </Button>
+          )}
           <ModulAkkordeon
             einsatzId={einsatzId}
             kategorien={kategorien}

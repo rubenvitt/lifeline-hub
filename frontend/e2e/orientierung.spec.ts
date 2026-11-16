@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
+import { benutzermenueAusloeser } from './menue-kern';
 
 /**
  * Orientierung (LFH-954, Spec `seiten-orientierung`): Tab-Titel, Ortspfad, Einsatzstatus und
@@ -92,37 +93,55 @@ test.describe('Orientierung (LFH-954)', () => {
     }
   });
 
-  test('390 px: „Einsätze“ bleibt ganz, nur der Einsatzname kürzt', async ({ page }) => {
+  /**
+   * Im Einsatz unter `md` kein Ortspfad, nur der Rückweg zum nächsten verlinkten Eintrag
+   * (LLH-1728, D6, Spec `seiten-orientierung`): den Einsatz nennt der klebende Kopf. Per CSS
+   * (`:has()`), deshalb im Browser.
+   */
+  test('390 px im Einsatz: kein Ortspfad, der Einsatzname steht im Kopf', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await anmeldenAlsAdmin(page);
-    const id = await einsatzAnlegen(
-      page,
-      `ÜBUNG Starkregen Musterstadt Abschnitt Nordwest Deichverteidigung ${Date.now()}`,
-    );
-    await page.goto(`/einsaetze/${id}/fahrzeuge`);
-    const eintraege = page.locator('.lfh-seitenkopf__pfad li:not(.ant-breadcrumb-separator)');
-    await expect(eintraege.nth(1)).toContainText('ÜBUNG');
-    // Gemessen am TEXT, nicht an `scrollWidth`: antds Pfad-Link ragt mit negativem Rand 4 px über
-    // sein `li` hinaus (Hover-Fläche), das zählte als Überlauf, obwohl jeder Buchstabe steht.
-    const masse = await eintraege.evaluateAll((lis) =>
-      lis.map((li) => {
-        const bereich = document.createRange();
-        bereich.selectNodeContents(li);
-        const text = bereich.getBoundingClientRect();
-        const kasten = li.getBoundingClientRect();
-        return {
-          textRechts: text.right,
-          kastenRechts: kasten.right,
-          title: li.getAttribute('title') ?? '',
-        };
-      }),
-    );
-    // Vorbedingung: der Name ist lang genug, dass etwas kürzen muss.
-    expect(masse[1].textRechts, 'der Einsatzname kürzt').toBeGreaterThan(masse[1].kastenRechts);
-    expect(masse[1].title, 'voller Name im title').toContain('Deichverteidigung');
-    expect(masse[0].textRechts, '„Einsätze“ ungekürzt').toBeLessThanOrEqual(
-      masse[0].kastenRechts + 0.5,
-    );
+    const name = `ÜBUNG Starkregen Musterstadt Abschnitt Nordwest ${Date.now()}`;
+    const id = await einsatzAnlegen(page, name);
+    await page.goto(`/einsaetze/${id}/einsatzdaten`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Einsatzdaten' })).toBeVisible();
+    // Vorbedingung: der Pfad steht im DOM und nennt den Einsatz, er ist nur ausgeblendet.
+    await expect(page.locator('.lfh-seitenkopf__pfad')).toHaveCount(1);
+    await expect(page.locator('.lfh-seitenkopf__pfad')).toBeHidden();
+    await expect(page.locator('[data-lfh="kopf-einsatzname"]')).toContainText('ÜBUNG Starkregen');
+
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await expect(page.locator('.lfh-seitenkopf__pfad')).toBeVisible();
+    await expect(page.locator('.lfh-seitenkopf__pfad')).toContainText('Einsätze');
+  });
+
+  test('390 px auf einer Detailseite: nur „‹ Betroffene“, und er führt zur Liste', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await anmeldenAlsAdmin(page);
+    const id = await einsatzAnlegen(page, `Rückweg Detail ${Date.now()}`);
+    const antwort = await page.request.post(`/api/einsaetze/${id}/personen`, {
+      data: { name: 'Rückweg', vorname: 'Rita', antreff_ort: 'Brücke' },
+    });
+    expect(antwort.ok(), `Person: ${antwort.status()}`).toBe(true);
+    const personId = ((await antwort.json()) as { id: number }).id;
+    await page.goto(`/einsaetze/${id}/personen/${personId}`);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+    const pfad = page.locator('.lfh-seitenkopf__pfad');
+    await expect(pfad).toBeVisible();
+    // Genau ein sichtbarer Eintrag, der Link zur Liste; „Einsätze“ und der Einsatz stehen nicht.
+    const sichtbar = pfad.locator('li:visible');
+    await expect(sichtbar).toHaveCount(1);
+    const rueckweg = sichtbar.getByRole('link');
+    await expect(rueckweg).toHaveText('Betroffene');
+    const zeichen = await rueckweg.evaluate((a) => getComputedStyle(a, '::before').content);
+    expect(zeichen, '„‹“ vor dem Rückweg').toContain('‹');
+    // Das Zeichen steht nicht im zugänglichen Namen (CSS-Ersatztext leer).
+    await expect(sichtbar.getByRole('link', { name: 'Betroffene', exact: true })).toBeVisible();
+    await rueckweg.click();
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/personen(\\?.*)?$`));
   });
 
   test('Beobachter: aus dem Profil zurück an dieselbe Stelle im Einsatz', async ({ page }) => {
@@ -132,7 +151,7 @@ test.describe('Orientierung (LFH-954)', () => {
     await wechsleZuRolle(page, 'beobachter', id);
     await page.goto(`/einsaetze/${id}/etb`);
     await expect(page).toHaveTitle(`ETB · ${name} · lifeline-hub`);
-    await page.getByRole('button', { name: 'Benutzermenü' }).click();
+    await (await benutzermenueAusloeser(page)).click();
     await page.getByRole('menuitem', { name: 'Profil' }).click();
     await expect(page).toHaveURL(/\/profil$/);
     await expect(page).toHaveTitle('Profil · lifeline-hub');

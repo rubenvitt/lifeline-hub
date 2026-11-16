@@ -705,9 +705,10 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(screen.getAllByRole('button', { name: /^Alarmzentrale:/ })).toHaveLength(1);
   });
 
-  it('bei erlaubtem Desktop und gutem Ton nennt die Marke den Ton', async () => {
+  it('bei erlaubtem Desktop und gutem Ton steht die Glocke allein, der Name nennt den Ton (LLH-1728, D4)', async () => {
     // Deckt `|| desktop === 'erlaubt'` ab: auch im unauffälligen Fall nennt die Marke einen
-    // Zustand statt eines Sammelworts.
+    // Zustand statt eines Sammelworts, aber nur im zugänglichen Namen. Sichtbar steht das Wort nur
+    // bei Störung, wie am Tablet (LFH-637): sonst bliebe der Handy-Kopf zweizeilig.
     stubAudioReady();
     stubNotification('granted');
     setzeViewportBreite(390);
@@ -717,6 +718,9 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     await waitFor(() => expect(ziel).toHaveAccessibleName('Alarmzentrale: Ton bereit'));
     // Der Ruhezustand steht auch am Handy nur als Icon (LLH-1726).
     expect(ziel).toHaveTextContent(/^$/);
+    // Am Handy hält die Marke keinen Platz für das Wort frei: er kostete die eine Zeile des Kopfs
+    // (LLH-1728, D4). Am Tablet mit Finger bleibt der Platz (LLH-1726, Gegenprobe unten).
+    expect(ziel.querySelector('.ton-wort-platz')).toBeNull();
   });
 
   it('ist der Desktop abschaltbar, ist sein Menüeintrag bedienbar und fordert die Berechtigung an', async () => {
@@ -893,25 +897,20 @@ describe('AlarmZentrale: das Ton-Wort steht genau bei Störung (LLH-1726)', () =
   // erscheint ohne Zutun „Ton blockiert“. Damit der Kopf dann nicht springt (Spec
   // `einsatztauglichkeit-layout`), hält das Ton-Wort die Breite von „Ton blockiert“, auch leer.
   // Den Platz trägt erzeugter Inhalt (`AlarmZentrale.css`); ob er hält, misst
-  // `e2e/kopfhoehe-tonpruefung.spec.ts`.
-  it.each([1024, 1366, 390])(
-    '%i px: das Ton-Wort hält den Platz von „Ton blockiert“',
-    async (px) => {
-      setzeViewportBreite(px);
-      stubAudioReady();
-      stubNotification('granted');
-      renderAlarm();
-      const knopf =
-        px < 768
-          ? await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' })
-          : await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
-      await waitFor(() => expect(knopf.querySelector('.ton-wort-platz')).not.toBeNull());
-      const platz = knopf.querySelector('.ton-wort-platz')!;
-      expect(platz).toHaveAttribute('data-platz', 'Ton blockiert');
-      expect(platz).toHaveAttribute('aria-hidden', 'true');
-      expect(knopf.textContent).toBe('');
-    },
-  );
+  // `e2e/kopfhoehe-tonpruefung.spec.ts`. Am Handy nicht: dort kostete der Platz die eine Zeile des
+  // Kopfs (LLH-1728, D4; Test „bei erlaubtem Desktop und gutem Ton …“ oben).
+  it.each([1024, 1366])('%i px: das Ton-Wort hält den Platz von „Ton blockiert“', async (px) => {
+    setzeViewportBreite(px);
+    stubAudioReady();
+    stubNotification('granted');
+    renderAlarm();
+    const knopf = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+    await waitFor(() => expect(knopf.querySelector('.ton-wort-platz')).not.toBeNull());
+    const platz = knopf.querySelector('.ton-wort-platz')!;
+    expect(platz).toHaveAttribute('data-platz', 'Ton blockiert');
+    expect(platz).toHaveAttribute('aria-hidden', 'true');
+    expect(knopf.textContent).toBe('');
+  });
 
   it('1140 px in handschuh: auch dort der Ruhezustand ohne Wort', async () => {
     setzeViewportBreite(1140);
@@ -1099,6 +1098,7 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
   });
 
   it('auf dem Handschirm nennt die Marke bei abgeschalteter Benachrichtigung den Ton', async () => {
+    // Im Namen; sichtbar steht der Ruhezustand am Handy nur als Glocke (LLH-1728, D4).
     setzeViewportBreite(390);
     stubAudioReady();
     stubNotification('default');

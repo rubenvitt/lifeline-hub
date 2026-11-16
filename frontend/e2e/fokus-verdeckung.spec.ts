@@ -122,8 +122,10 @@ test('Selbstbeweis (LFH-811): `beschnitt` meldet ein ganz abgeschnittenes Ziel ‚
     await page.goto('/admin/benutzer');
     await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
     await page.evaluate(() => {
+      // Am unteren Fensterrand: oben klebt seit LLH-1728 auch am Handy der Kopf, und eine Attrappe
+      // bei (0,0) l√§ge hinter ihm, statt nur abgeschnitten zu sein.
       const huelle = Object.assign(document.createElement('div'), {
-        style: 'overflow:hidden;height:0',
+        style: 'position:fixed;left:0;bottom:0;overflow:hidden;height:0',
       });
       const knopf = Object.assign(document.createElement('button'), { textContent: 'Attrappe' });
       knopf.setAttribute('data-e2e-fokus', 'attrappe');

@@ -21,7 +21,7 @@ import { useViewport } from './useViewport';
 import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useModusFarben } from './rahmenStil';
 import StatusTag from './StatusTag';
-import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
+import { useEinsatzRahmen, useImEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
 import type { EinsatzAnzeige } from '../api/types';
 
@@ -333,7 +333,8 @@ interface EinsatzSeiteProps {
   /**
    * Den Ortspfad erst ab `md` zeigen (`lfh-ortspfad--ab-md`): für Seiten, deren erster Bildschirm
    * auf dem Handy der Zeitachse gehört (Informationstelefon, LFH-1067). Den Einsatz nennt dort der
-   * Wechsler, den Rückweg die Navigation.
+   * Wechsler, den Rückweg die Navigation. Ohne diese Angabe zeigt eine Seite im Einsatzrahmen unter
+   * `md` nur den Rückweg zum nächsten verlinkten Eintrag (`lfh-ortspfad--einsatz`, LLH-1728).
    */
   ortspfadAbMd?: boolean;
   /**
@@ -490,6 +491,13 @@ export default function EinsatzSeite({
   const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
   const rahmenEinsatz = useEinsatzRahmen();
+  // Im Einsatzrahmen unter `md` nur der Rückweg (LLH-1728, D6); `ortspfadAbMd` geht vor.
+  const imEinsatzRahmen = useImEinsatzRahmen();
+  const ortspfadKlasse = ortspfadAbMd
+    ? 'lfh-ortspfad--ab-md'
+    : imEinsatzRahmen
+      ? 'lfh-ortspfad--einsatz'
+      : undefined;
 
   /*
    * Seitenweite Tastatur-Ebene (LFH-391 · B5): sie liegt in der Ebenen-KETTE ÜBER den tiefen
@@ -553,7 +561,7 @@ export default function EinsatzSeite({
       >
         <div className="lfh-seitenkopf__titelblock" style={titelblockStil(token)}>
           {breadcrumb && (
-            <Ortspfad farben={farben} className={ortspfadAbMd ? 'lfh-ortspfad--ab-md' : undefined}>
+            <Ortspfad farben={farben} className={ortspfadKlasse}>
               {breadcrumb}
             </Ortspfad>
           )}

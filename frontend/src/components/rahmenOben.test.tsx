@@ -16,6 +16,8 @@ import {
   useRahmenObenFuer,
   useRahmenObenQuelle,
   useRahmenObenStapel,
+  RAHMEN_RANG,
+  type RahmenRang,
 } from './rahmenOben';
 
 function Quelle({ hoehe, aktiv, name }: { hoehe: number; aktiv: boolean; name: string }) {
@@ -266,18 +268,18 @@ describe('rahmenOben', () => {
 function Stapel({
   hoehe,
   aktiv = true,
-  rang,
-  testId = 'stapel',
+  rang = RAHMEN_RANG.uebungsband,
+  name = 'stapel',
 }: {
   hoehe: number;
   aktiv?: boolean;
-  rang?: number;
-  testId?: string;
+  rang?: RahmenRang;
+  name?: string;
 }) {
   const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv, rang);
   return (
     <div
-      data-testid={testId}
+      data-testid={name}
       data-oben={oben}
       ref={(el) => {
         if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: hoehe });
@@ -328,7 +330,7 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
     expect(readRahmenOben()).toBe(121);
   });
 
-  it('ohne andere Quelle klebt es an der Fensterkante (Handy, Kopf rollt)', () => {
+  it('ohne andere Quelle klebt es an der Fensterkante', () => {
     render(<Stapel hoehe={24} />);
     expect(screen.getByTestId('stapel').dataset.oben).toBe('0');
     expect(readRahmenOben()).toBe(24);
@@ -364,13 +366,68 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
   });
 });
 
+describe('Stapel nach Rang (LLH-1728, design.md D2)', () => {
+  it('jede Quelle klebt unter denen mit kleinerem Rang: Betriebszeile, Kopf, Band', () => {
+    render(
+      <>
+        <Stapel hoehe={40} rang={RAHMEN_RANG.betriebszeile} name="zeile" />
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    expect(screen.getByTestId('zeile').dataset.oben).toBe('0');
+    expect(screen.getByTestId('kopf').dataset.oben).toBe('40');
+    expect(screen.getByTestId('band').dataset.oben).toBe('92');
+    expect(readRahmenOben()).toBe(116);
+    expect(variable()).toBe('116px');
+  });
+
+  it('ohne gestörte Betriebszeile steht der Kopf an der Fensterkante und das Band darunter', () => {
+    const { rerender } = render(
+      <>
+        <Stapel hoehe={40} rang={RAHMEN_RANG.betriebszeile} name="zeile" />
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    rerender(
+      <>
+        <Stapel hoehe={40} rang={RAHMEN_RANG.betriebszeile} name="zeile" aktiv={false} />
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    expect(screen.getByTestId('kopf').dataset.oben).toBe('0');
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(readRahmenOben()).toBe(76);
+  });
+
+  it('die eigene Höhe verschiebt weder das eigene oben noch das der Quellen darüber', () => {
+    const { rerender } = render(
+      <>
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    rerender(
+      <>
+        <Stapel hoehe={52} rang={RAHMEN_RANG.kopf} name="kopf" />
+        <Stapel hoehe={48} rang={RAHMEN_RANG.uebungsband} name="band" />
+      </>,
+    );
+    // Die Höhe wird im Layout-Effekt gemessen; ein neuer Wert kommt erst mit dem nächsten Einhängen.
+    expect(screen.getByTestId('kopf').dataset.oben).toBe('0');
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+  });
+});
+
 describe('useRahmenObenStapel mit Rang (Alarmzone unter dem Übungsband, LLH-1735)', () => {
   it('stapelt nach Rang: die Zone klebt unter dem Band, das Band nicht unter der Zone', () => {
     render(
       <>
         <Quelle hoehe={52} aktiv name="kopf" />
-        <Stapel hoehe={24} rang={1} testId="band" />
-        <Stapel hoehe={40} rang={2} testId="zone" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+        <Stapel hoehe={40} rang={RAHMEN_RANG.alarmzone} name="zone" />
       </>,
     );
     expect(screen.getByTestId('band').dataset.oben).toBe('52');
@@ -382,8 +439,8 @@ describe('useRahmenObenStapel mit Rang (Alarmzone unter dem Übungsband, LLH-173
     render(
       <>
         <Quelle hoehe={52} aktiv name="kopf" />
-        <Stapel hoehe={24} rang={1} aktiv={false} testId="band" />
-        <Stapel hoehe={40} rang={2} testId="zone" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} aktiv={false} name="band" />
+        <Stapel hoehe={40} rang={RAHMEN_RANG.alarmzone} name="zone" />
       </>,
     );
     expect(screen.getByTestId('zone').dataset.oben).toBe('52');
@@ -406,8 +463,8 @@ describe('useRahmenObenStapel mit Rang (Alarmzone unter dem Übungsband, LLH-173
     render(
       <>
         <Quelle hoehe={52} aktiv name="kopf" />
-        <Stapel hoehe={24} rang={1} testId="band" />
-        <Stapel hoehe={40} rang={2} testId="zone" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+        <Stapel hoehe={40} rang={RAHMEN_RANG.alarmzone} name="zone" />
         <SeitenkopfQuelle />
       </>,
     );

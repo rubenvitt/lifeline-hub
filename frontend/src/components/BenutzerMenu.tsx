@@ -6,7 +6,17 @@ import {
   IconPerson,
   IconPosteingang,
 } from '../icons';
-import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
+import {
+  Avatar,
+  Button,
+  Dropdown,
+  Space,
+  Tag,
+  Typography,
+  theme,
+  type DropdownProps,
+  type MenuProps,
+} from 'antd';
 import type { KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { istUngelesen, useVersionsstand } from '../neuigkeiten/useVersionsstand';
@@ -99,12 +109,29 @@ function handleMenuKeyDown(e: KeyboardEvent<HTMLElement>) {
  * Die Herkunft reist dann als `von` in der Adresse, weil ein neuer Tab den History-State nicht
  * erbt. Am Handy und am Tablet verdeckte ein zweiter Tab den Einsatz nur; dort bleibt es beim selben
  * Tab.
+ *
+ * `inNavigation` (LLH-1728, D3): am Handy steht der Auslöser im Fuß des Drawers „Navigation“ statt
+ * im Kopf. Dann ist er eine volle Zeile mit Kachel und Name (oder Funktion) in den Farben der
+ * Fläche, nicht des dunklen Rahmens, und das Menü öffnet nach oben. Das Menü selbst bleibt gleich.
  */
+/**
+ * Aus der Navigation darf das Menü seitlich ins Fenster rücken (`shiftX`, LLH-1728). antds Typ
+ * `AdjustOverflow` kennt `shiftX` nicht, `getOverflowOptions` (`antd/es/_util/placements`)
+ * übernimmt es aber aus jedem Objekt; e2e `rahmen-stehen-bleiben` belegt die Lage im Fenster.
+ */
+const INS_FENSTER = { adjustY: 1, shiftX: true } as unknown as DropdownProps['autoAdjustOverflow'];
+
 export default function BenutzerMenu({
   funktion,
   hasFixedWidth = false,
   hilfeDaneben = false,
-}: { funktion?: string | null; hasFixedWidth?: boolean; hilfeDaneben?: boolean } = {}) {
+  inNavigation = false,
+}: {
+  funktion?: string | null;
+  hasFixedWidth?: boolean;
+  hilfeDaneben?: boolean;
+  inNavigation?: boolean;
+} = {}) {
   const { benutzer } = useAuth();
   const abmelden = useAbmeldenRueckfrage();
   const navigate = useNavigate();
@@ -290,18 +317,23 @@ export default function BenutzerMenu({
       <Dropdown
         menu={{ items, onClick, onKeyDown: handleMenuKeyDown, style: { width: menueBreite } }}
         trigger={['click']}
-        placement="bottomRight"
+        placement={inNavigation ? 'topLeft' : 'bottomRight'}
+        // Aus der Navigation ist das Menü breiter als der Platz rechts vom Auslöser: es rückt in
+        // das Fenster, statt rechts abgeschnitten zu stehen (LLH-1728).
+        {...(inNavigation ? { autoAdjustOverflow: INS_FENSTER } : {})}
       >
         <Button
           type="text"
           aria-label="Benutzermenü"
+          block={inNavigation}
           style={{
             height: Math.max(40, token.controlHeight),
             minWidth: token.controlHeight,
             padding: `0 ${token.paddingXS}px`,
-            color: rahmenFarben.gedaempft,
+            color: inNavigation ? token.colorText : rahmenFarben.gedaempft,
             display: 'inline-flex',
             alignItems: 'center',
+            justifyContent: inNavigation ? 'flex-start' : undefined,
             gap: 9,
           }}
         >
@@ -327,7 +359,19 @@ export default function BenutzerMenu({
           {/* Unter `xl` bleibt die Kachel allein; der Name steht in der Kopfgruppe des Dropdowns, das
             `aria-label` benennt den Trigger. Höhe und Mindestbreite folgen der Dichte; 40 px sind nur
             der kompakte Höhenboden (LFH-460). */}
-          {breit && (
+          {inNavigation && (
+            <span
+              style={{
+                minWidth: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {funktion ?? benutzer.anzeigename}
+            </span>
+          )}
+          {breit && !inNavigation && (
             <>
               <span
                 title={hasFixedWidth ? (funktion ?? benutzer.anzeigename) : undefined}

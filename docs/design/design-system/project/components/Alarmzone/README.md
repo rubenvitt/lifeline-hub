@@ -3,7 +3,7 @@
 Alarmzone (LLH-1735, Spec `benachrichtigungen`, „Alarmzone verdeckt nichts“, design.md D1–D3 in
 `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`, Entwurf `docs/design/2026-11-15-alarmzone/`): Alarme,
 Org-Hinweise und die Unwetterwarnung stehen hier statt als Toast oben rechts. Sie steht im Rahmen
-direkt unter dem Kopf und einem Übungsband, klebt beim Rollen darunter (`RANG_ALARMZONE`) und
+direkt unter dem Kopf und einem Übungsband, klebt beim Rollen darunter (`RAHMEN_RANG.alarmzone`) und
 schiebt den Inhalt, statt ihn zu verdecken. Auf `RAHMEN_EBENE` liegt sie unter Drawer, Dialogen
 und Menüs. Ohne Eintrag steht nichts.
 

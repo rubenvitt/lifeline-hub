@@ -404,6 +404,8 @@ export default function AlarmZentrale({
     //
     // Der Ruhezustand steht wie in der breiten Bauform nur als Icon, eine Störung mit Wort
     // (LLH-1726; vorher stand am Handy auch „Ton bereit“, und die Zahl der Eingänge verdeckte sein „T“).
+    // Den Platz des Worts hält die Marke nur ab `md` frei (Tablet mit Finger): am Handy kostete er
+    // die eine Zeile des Kopfs; dort bricht der Kopf in `handschuh` nur bei Störung um (LLH-1728, D4).
     //
     // Zwei Einträge verstoßen nicht gegen „ab drei bündeln": hier bündelt die Breite bzw. der
     // Finger, nicht die Bequemlichkeit. Der Preis: Stummschalten kostet zwei Tipper.
@@ -464,9 +466,15 @@ export default function AlarmZentrale({
               flexShrink: 0,
             }}
           >
-            <WortPlatz style={sammelWortStil(token.controlHeight, istSchmal)}>
-              {sammelAuffaellig ? sammelText : null}
-            </WortPlatz>
+            {istSchmal ? (
+              sammelAuffaellig ? (
+                <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
+              ) : null
+            ) : (
+              <WortPlatz style={sammelWortStil(token.controlHeight, istSchmal)}>
+                {sammelAuffaellig ? sammelText : null}
+              </WortPlatz>
+            )}
           </Button>
         </Dropdown>
         {eingangsband}
