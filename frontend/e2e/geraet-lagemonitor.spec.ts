@@ -75,6 +75,11 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     data: { lat: 52.52, lon: 13.405 },
   });
   expect(verortet.ok(), await verortet.text()).toBeTruthy();
+  // LLH-1746: zwei Plätze für drei Personen — die UHS Nord ist überbelegt.
+  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/plaetze/bulk`, {
+    typ: 'behandlungsplatz',
+    menge: 2,
+  });
   // „A …“ steht als zweite UHS sichtbar und ist zu lang für eine Zeile: der Name bricht um.
   const langerName = 'UHS A Sportplatz am Nordufer der Spree Ostseite';
   for (const b of [langerName.slice(4), 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']) {
@@ -104,6 +109,20 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
       label: 'Garten Familie Erste',
     });
   }
+  // LLH-1746: ein Gefahrengebiet mit Stufe „hoch“; die Beschriftung der Zone bleibt draußen.
+  const gefahr = await anlegen<{ gefahrengebiet_id: number }>(page, `/api/einsaetze/${e}/zonen`, {
+    typ: 'gefahrengebiet',
+    geometrie_typ: 'Polygon',
+    geometrie: rechteck(13.406, 52.521, 13.409, 52.523),
+    label: 'Garten Familie Erste',
+  });
+  const gebiet = `/api/einsaetze/${e}/gefahrengebiete/${gefahr.gefahrengebiet_id}`;
+  const umbenannt = await page.request.patch(gebiet, { data: { label: 'Hangrutsch' } });
+  expect(umbenannt.ok(), await umbenannt.text()).toBeTruthy();
+  const bewertet = await page.request.put(`${gebiet}/matrix/bewertung`, {
+    data: { gefahrentyp: 'einsturz', schutzobjekt: 'menschen', warnstufe: 'hoch' },
+  });
+  expect(bewertet.ok(), await bewertet.text()).toBeTruthy();
   const abschnitt = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
     name: 'EA Nord',
     kurzbezeichnung: 'EA-N',
@@ -202,10 +221,16 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
 
     // Belegung der UHS Nord als Zahl; keine Namen der Betroffenen.
     const belegung = monitor.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
-    // Die vollste UHS steht vorn; zehn leere passen nicht alle hinein.
+    // Die überbelegte UHS steht vorn; zehn leere passen nicht alle hinein. Drei auf zwei
+    // Plätzen: „3/2“ in der Alarmrolle, die Titelzeile nennt „1 überbelegt“ (LLH-1746).
     const erste = belegung.locator('[data-lfh="monitor-uhs"]').first();
     await expect(erste).toContainText('UHS Nord');
-    await expect(erste.locator('span').first()).toHaveText('3');
+    await expect(erste.locator('span').first()).toHaveText('3/2');
+    await expect(erste.locator('[data-lfh="monitor-zahl"]')).toHaveAttribute(
+      'data-hervorgehoben',
+      'ja',
+    );
+    await expect(belegung.locator('[data-lfh="monitor-zusatz"]')).toHaveText('1 überbelegt');
     // Die Kräfte an den UHS als eine Zahl, ohne Namen (LFH-1045).
     await expect(
       monitor.getByRole('region', { name: 'Kräfte' }).locator('[data-lfh="monitor-zusatz"]'),
@@ -334,9 +359,20 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     // Die Karte steht: MapLibre zeichnet in eine Leinwand, die UHS trägt ihre Belegung.
     const karte = monitor.locator('[data-lfh="lagemonitor-karte"]');
     await expect(karte.locator('canvas')).toBeVisible();
-    await expect(karte.getByText('UHS Nord · 3')).toBeVisible();
-    // Gefahrenzone und Abschnittsfläche sind gezeichnet, Bezirk und Skizze nicht (LLH-1153).
+    const uhsMarke = karte.getByText('UHS Nord · 3/2');
+    await expect(uhsMarke).toBeVisible();
+    await expect(uhsMarke).toHaveAttribute('data-ueberbelegt', 'ja');
+    // Gefahrenzonen und Abschnittsfläche sind gezeichnet, Bezirk und Skizze nicht (LLH-1153).
+    // Das Gefahrengebiet trägt Name und Stufe in Großbild-Schrift, die Absperrung ihr Artwort
+    // (LLH-1746).
     await expect(karte.getByText('EA-N')).toBeVisible();
+    const gefahrMarke = karte.getByText('Hangrutsch · hoch · unbestätigt');
+    await expect(gefahrMarke).toBeVisible();
+    await expect(gefahrMarke).toHaveAttribute('data-rolle', 'alarm');
+    expect(
+      await gefahrMarke.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+    ).toBeGreaterThanOrEqual(28);
+    await expect(karte.getByText('Absperrbereich', { exact: true })).toBeVisible();
     await expect
       .poll(
         () =>
@@ -351,7 +387,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
           }),
         { timeout: 15_000, message: 'Flächen der Monitorkarte' },
       )
-      .toEqual({ typen: ['absperrbereich'], flaeche: true });
+      .toEqual({ typen: ['absperrbereich', 'gefahrengebiet'], flaeche: true });
     await expect(monitor.getByText('Garten Familie Erste')).toHaveCount(0);
 
     // Tippen und Ziehen auf die Kacheln ändert nichts.

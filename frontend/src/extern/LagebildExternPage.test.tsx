@@ -10,9 +10,13 @@ import { seiteNeuLaden } from './seiteNeuLaden';
 
 // jsdom hat kein WebGL: die Karte selbst zeigt das Bild im PR.
 vi.mock('./seiteNeuLaden', () => ({ seiteNeuLaden: vi.fn() }));
+const karteProps = vi.hoisted(() => [] as Record<string, unknown>[]);
 vi.mock('../geraet/LagemonitorKarte', async (original) => ({
   ...(await original<typeof import('../geraet/LagemonitorKarte')>()),
-  default: () => <div data-lfh="lagemonitor-karte" />,
+  default: (props: Record<string, unknown>) => {
+    karteProps.push(props);
+    return <div data-lfh="lagemonitor-karte" />;
+  },
 }));
 
 /** Seite des Lagebilds für Externe (LLH-1496, Spec `lagebild-extern`, design.md D9). */
@@ -133,6 +137,8 @@ describe('LagebildExternPage', () => {
     expect(screen.getByText('UHS Nord')).toBeInTheDocument();
     expect(screen.getByText('Pegel steigt, Deich hält.')).toBeInTheDocument();
     expect(document.querySelector('[data-lfh="lagemonitor-karte"]')).not.toBeNull();
+    // Zonen ohne Beschriftung, wie vor LLH-1746 (design.md D5): die Marken gehören dem Monitor.
+    expect(karteProps[karteProps.length - 1]?.zonenBeschriften).toBe(false);
     // Der Schlüssel bleibt in der Adresse: Neuladen und Lesezeichen gehen.
     expect(window.location.hash).toBe('#llh_lb_GEHEIM');
   });
