@@ -1625,33 +1625,6 @@ describe('LageDashboardPage — Führungsstand', () => {
 
   // Aufträge und Meldungen kommen aus dem Modulzähler (LFH-550), nicht aus den Listen: dieselbe
   // Zahl wie im Modulpanel. „Überfällig" heißt „davon überfällig".
-  it('„UHS aktiv“ nennt die Kräfte an aktiven UHS, nicht an geplanten (LLH-1744)', async () => {
-    const uhs = (id: number, status: string, mannschaft: number) => ({
-      id,
-      einsatz_id: 1,
-      abschnitt_id: null,
-      typ: 'behandlungsplatz',
-      bezeichnung: `UHS ${id}`,
-      standort: null,
-      notiz: null,
-      lat: null,
-      lon: null,
-      status,
-      erfasst_at: '2026-06-08 10:00:00',
-      erfasst_von: 1,
-      geaendert_at: '2026-06-08 10:00:00',
-      geaendert_von: 1,
-      storniert_at: null,
-      staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft },
-    });
-    mockEndpunkte({ uhs: [uhs(1, 'aktiv', 2), uhs(2, 'geplant', 1)] });
-    render();
-    await kennzahlGeladen('Betroffene');
-    await waitFor(() =>
-      expect(kennzahl('UHS aktiv', FUEHRUNG)).toHaveTextContent('1 geplant · 3 Kräfte an UHS'),
-    );
-  });
-
   it('zeigt offene Aufträge aus dem Modulzähler, überfällige mit Alarmkante', async () => {
     mockEndpunkte({ zaehler: { auftraege: { offen: 2, in_arbeit: 1, ueberfaellig: 1 } } });
     render();
@@ -1678,6 +1651,33 @@ describe('LageDashboardPage — Führungsstand', () => {
     });
     expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('2');
     expect(kante(zelle)).toBe(6);
+  });
+
+  it('„UHS aktiv“ nennt die Kräfte an aktiven UHS, nicht an geplanten (LLH-1744)', async () => {
+    const uhs = (id: number, status: string, mannschaft: number) => ({
+      id,
+      einsatz_id: 1,
+      abschnitt_id: null,
+      typ: 'behandlungsplatz',
+      bezeichnung: `UHS ${id}`,
+      standort: null,
+      notiz: null,
+      lat: null,
+      lon: null,
+      status,
+      erfasst_at: '2026-06-08 10:00:00',
+      erfasst_von: 1,
+      geaendert_at: '2026-06-08 10:00:00',
+      geaendert_von: 1,
+      storniert_at: null,
+      staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft },
+    });
+    mockEndpunkte({ uhs: [uhs(1, 'aktiv', 2), uhs(2, 'geplant', 1)] });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() =>
+      expect(kennzahl('UHS aktiv', FUEHRUNG)).toHaveTextContent('1 geplant · 3 Kräfte an UHS'),
+    );
   });
 
   it('ein nicht freigegebenes Modul sagt das und zeigt keine 0', async () => {

@@ -262,8 +262,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Lagebericht-Text (`kraeftebild.ts`) bilden den Kern nur ab; ein neuer Abnehmer baut keinen
   eigenen Baum. Meldebild, Kräftebild und Organigramm lösen abgestellte Untereinheiten (eigener
   Abschnitt ungleich dem der Obereinheit) über `loeseAbgestellte`/`abgestelltVon` vom Verband,
-  „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau und Funkplan behalten den
-  Verband.
+  „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau, Funkplan und Fernmeldeskizze
+  (`baueFuehrungsorganisation(…, { abgestellteLoesen: false })`) behalten den Verband. Der Bereich
+  eines Abschnittsgeräts zählt ebenso, wer im Teilbaum steht (`src/geraet/abschnitt.rs`).
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 

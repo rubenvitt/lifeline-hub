@@ -20,7 +20,9 @@ import type { TzEinheit } from './meldebildRaster';
  * denn die Zeile trägt die Verbandsstärke des Servers.
  *
  * IST VOM SERVER (Entscheidung LLH-1029): `ist_kumuliert` je Zeile — dieselbe Zahl wie auf der
- * Einheit-Ansicht, in den Abschnitten und in `summiereStaerke`. Die Form gleicht dem Meldebild
+ * Einheit-Ansicht und in `summiereStaerke`, die Verbandsstärke. Die Stärke eines Abschnitts zählt
+ * dagegen, wer in ihm steht (`abschnittStaerke.ts`, LLH-1744), und weicht bei einer abgestellten
+ * Untereinheit von der Zeile ihrer Obereinheit ab. Die Form gleicht dem Meldebild
  * (Eltern = eigen + Σ Untereinheiten, jedes Kind seine Teilsumme), die Zählregel ist die des
  * Servers. Rein.
  */

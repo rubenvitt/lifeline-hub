@@ -30,14 +30,14 @@
 
 ## 6. Befunde aus dem Review (16.11.2026, D3, D4, D8)
 
-- [ ] 6.1 `src/geraet/abschnitt.rs`: `Abschnittsbereich::laden` über den wirksamen Abschnitt (D8). Rust-Test zuerst: Untereinheit ohne eigenen Abschnitt unter einer Einheit im Teilbaum gehört dazu, abgestellte mit Abschnitt außerhalb nicht, aufgelöste Obereinheit vererbt nicht, Zyklus hängt nicht. `cargo test` des Moduls grün.
-- [ ] 6.2 `fuehrungsorganisation.ts`: Option `abgestellteLoesen` (Vorgabe `true`); `fernmeldewesen/fernmeldeskizze.ts:baueFernmeldenetz` ruft mit `false`. Test: in der Skizze hängt die abgestellte Gruppe am Zug, im Organigramm unter ihrem Abschnitt. Delta-Spec `fuehrungsorganisation` dazu.
-- [ ] 6.3 Liste „Zugeordnete Einheiten“: Griff trägt den wirksamen Abschnitt; Test, dass Ziehen auf denselben Abschnitt gesperrt ist (`canDropEinheit`).
-- [ ] 6.4 `pages/lagekarte/leistenDaten.ts`: Einheiten eines Abschnitts über `einheitenImAbschnitt`; Test mit geerbter Untereinheit und aufgelöster Einheit.
-- [ ] 6.5 Kopfkommentar `kraefte/einheitenGliederung.ts`: `ist_kumuliert` gleicht Einheit-Ansicht und `summiereStaerke`, nicht der Abschnittsstärke.
-- [ ] 6.6 `EinsatzabschnittePage.test.tsx`: Fall mit geerbter Gruppe, `ist` ≠ `ist_kumuliert`, Liste zeigt „eigene“ und „über <Obereinheit>“, Summe = Stärke. Mutationsprobe: mit `ist_kumuliert` rot.
-- [ ] 6.7 `LageDashboardPage.test.tsx`: neuer UHS-Test nicht zwischen Kommentar und seinem Test.
-- [ ] 6.8 Anwenderdoku `geraet-einsatzabschnitt.md`: Einheitenliste umfasst Untereinheiten mit geerbtem Abschnitt; Wächter grün.
+- [x] 6.1 `src/geraet/abschnitt.rs`: `Abschnittsbereich::laden` über den wirksamen Abschnitt (D8). Rust-Test zuerst: Untereinheit ohne eigenen Abschnitt unter einer Einheit im Teilbaum gehört dazu, abgestellte mit Abschnitt außerhalb nicht, aufgelöste Obereinheit vererbt nicht, Zyklus hängt nicht. `cargo test` des Moduls grün.
+- [x] 6.2 `fuehrungsorganisation.ts`: Option `abgestellteLoesen` (Vorgabe `true`); `fernmeldewesen/fernmeldeskizze.ts:baueFernmeldenetz` ruft mit `false`. Test: in der Skizze hängt die abgestellte Gruppe am Zug, im Organigramm unter ihrem Abschnitt. Delta-Spec `fuehrungsorganisation` dazu.
+- [x] 6.3 Liste „Zugeordnete Einheiten“: Griff trägt den wirksamen Abschnitt; Test, dass Ziehen auf denselben Abschnitt gesperrt ist (`canDropEinheit`).
+- [x] 6.4 `pages/lagekarte/leistenDaten.ts`: Einheiten eines Abschnitts über `einheitenImAbschnitt`; Test mit geerbter Untereinheit und aufgelöster Einheit.
+- [x] 6.5 Kopfkommentar `kraefte/einheitenGliederung.ts`: `ist_kumuliert` gleicht Einheit-Ansicht und `summiereStaerke`, nicht der Abschnittsstärke.
+- [x] 6.6 `EinsatzabschnittePage.test.tsx`: Fall mit geerbter Gruppe, `ist` ≠ `ist_kumuliert`, Liste zeigt „eigene“ und „über <Obereinheit>“, Summe = Stärke. Mutationsprobe: mit `ist_kumuliert` rot.
+- [x] 6.7 `LageDashboardPage.test.tsx`: neuer UHS-Test nicht zwischen Kommentar und seinem Test.
+- [x] 6.8 Anwenderdoku `geraet-einsatzabschnitt.md`: Einheitenliste umfasst Untereinheiten mit geerbtem Abschnitt; Wächter grün.
 
 ## Workflow follow-up
 
