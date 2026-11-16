@@ -149,11 +149,16 @@ Datenstand, `jetzt`). Die Abbildung „Kennzahl + Zustand → Anzeige“ (gesper
 und Großbild benutzt, damit kein Ton und kein „—“ auseinanderläuft. Aufteilung bei 16:9:
 
 ```
-┌ Lagebild · 1430 · Stand vor 12 s          1 Alarm offen · ÜBUNG · [Großbild verlassen] ┐
-│  6 Kennzahlen in einer Reihe (zahl 96)                                                 │
-│  Gefahren je Typ (GrossZeile) │ Sichtung SK I–IV, ohne (GrossZeile) │ Führungsstand 2×2 │
+┌ LAGEBILD 1430 · Stand vor 12 s            1 Alarm offen · ÜBUNG · [Großbild verlassen] ┐
+│  Kennzahl 1   │ Kennzahl 2    │ Kennzahl 3      (Band 3 × 2, Zahl 96, lange Werte 72)   │
+│  Kennzahl 4   │ Kennzahl 5    │ Kennzahl 6                                              │
+│  Gefahren je Typ (GrossZeile) │ Sichtung SK I–IV, ohne │ Führungsstand 2 × 2 (Zahl 72)  │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+Das Band steht in drei Spalten statt sechs: die Stärke („0/12/58//70“) braucht in 72 px rund
+475 px, eine von sechs Spalten hat bei 1920 px nur rund 300. Werte ab sieben Zeichen stehen in der
+kleinen Zahl. Der Entwurf zeigt noch die Reihe aus sechs.
 
 Die Fläche füllt die Höhe (Raster mit `1fr` für die untere Reihe), es bleibt kein leeres Drittel.
 Der Meldungsstrom entfällt: ETB-Text ist aus 3 m in 28 px nur in wenigen Zeilen lesbar und kein

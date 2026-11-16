@@ -105,9 +105,11 @@ export function GrossZeile({
             lineHeight: 1.1,
             fontWeight: art === 'zahl' ? 600 : 700,
             color: tonFarbe?.text ?? rollen.text,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            // Eine Zahl bleibt auf einer Zeile; ein Wort (Sichtung „SK I 4 · SK II 11 · …“) bricht
+            // um, statt abgeschnitten zu werden.
+            ...(art === 'zahl'
+              ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+              : { overflowWrap: 'anywhere' }),
           }}
         >
           {wert}

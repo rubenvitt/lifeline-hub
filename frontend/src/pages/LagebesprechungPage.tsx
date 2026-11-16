@@ -1,20 +1,25 @@
-import { App, Breadcrumb, Button } from 'antd';
+import { App, Breadcrumb, Button, Flex } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { abrufZustand } from '../api/abrufZustand';
+import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { fetchLagebesprechungStand } from '../api/lagebesprechung';
+import type { EinsatzAnzeige, LagebesprechungStand } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
 import EinsatzSeite from '../components/EinsatzSeite';
+import { useViewport } from '../components/useViewport';
+import { IconPfeileAuswaerts } from '../icons';
 import { Paneel } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { RechteHinweis } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import LagebesprechungGrossbild from '../lagebesprechung/LagebesprechungGrossbild';
 import LagebesprechungHistorie from '../lagebesprechung/LagebesprechungHistorie';
+import { useVorbereitung } from '../lagebesprechung/useVorbereitung';
 import LagebesprechungModal from '../lagebesprechung/LagebesprechungModal';
 import TerminPaneel from '../lagebesprechung/TerminPaneel';
 import VorbereitungPaneel from '../lagebesprechung/VorbereitungPaneel';
@@ -43,6 +48,10 @@ export default function LagebesprechungPage() {
   const [searchParams] = useSearchParams();
   const neuAuftrag = useLinkAuftrag();
   const [isAbschlussOffen, setIsAbschlussOffen] = useState(false);
+  // Großbild (LLH-1747, Spec `grossbild-ansicht`): nur im React-State, für jede Person, die die
+  // Seite sehen darf; die Seite bleibt darunter stehen.
+  const [istGrossbild, setIstGrossbild] = useState(false);
+  const { abBreite } = useViewport();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -126,9 +135,16 @@ export default function LagebesprechungPage() {
       }
       // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
-        <Button type="primary" disabled={!canAbschliessen} onClick={openAbschluss}>
-          Lagebesprechung abschließen
-        </Button>
+        <Flex gap="small" wrap>
+          {abBreite('md') && (
+            <Button icon={<IconPfeileAuswaerts />} onClick={() => setIstGrossbild(true)}>
+              Großbild
+            </Button>
+          )}
+          <Button type="primary" disabled={!canAbschliessen} onClick={openAbschluss}>
+            Lagebesprechung abschließen
+          </Button>
+        </Flex>
       }
       // Derselbe Riegel wie am Knopf — die Palette ist ein zweiter Weg auf dieselbe Aktion.
       neueZeile={canAbschliessen ? openAbschluss : undefined}
@@ -170,6 +186,18 @@ export default function LagebesprechungPage() {
       {/* Montiert = offen: die Maske friert Vorbelegung und Basis beim Montieren ein, und jede
           Öffnung hat eine frische Mutation ohne alten Fehler. Der Toast nimmt das `navigate`
           dieser Seite — `<AntApp>` liegt außerhalb des Routers. */}
+      {istGrossbild && (
+        <GrossbildAnsicht
+          einsatzId={einsatzId}
+          einsatz={einsatz}
+          stand={standQuery.data}
+          standZustand={standQuery.isLoading ? 'laden' : standQuery.isError ? 'fehler' : 'daten'}
+          besprechungZustand={abrufZustand(standQuery)}
+          besprechungStand={standQuery.dataUpdatedAt}
+          onVerlassen={() => setIstGrossbild(false)}
+        />
+      )}
+
       {isAbschlussOffen && darfSchreiben && standQuery.data && (
         <LagebesprechungModal
           einsatzId={einsatzId}
@@ -181,5 +209,43 @@ export default function LagebesprechungPage() {
         />
       )}
     </EinsatzSeite>
+  );
+}
+
+/**
+ * Das Großbild mit seinen Vorbereitungszeilen: `useVorbereitung` läuft nur, solange es offen ist,
+ * und teilt sich die Abfragen mit dem Paneel „Vorbereitung“ darunter.
+ */
+function GrossbildAnsicht({
+  einsatzId,
+  einsatz,
+  stand,
+  standZustand,
+  besprechungZustand,
+  besprechungStand,
+  onVerlassen,
+}: {
+  einsatzId: number;
+  einsatz: EinsatzAnzeige;
+  stand: LagebesprechungStand | undefined;
+  standZustand: 'daten' | 'laden' | 'fehler';
+  besprechungZustand: AbrufZustand;
+  besprechungStand: number;
+  onVerlassen: () => void;
+}) {
+  const vorbereitung = useVorbereitung({
+    einsatzId,
+    besprechung: stand,
+    besprechungZustand,
+    besprechungStand,
+  });
+  return (
+    <LagebesprechungGrossbild
+      einsatz={einsatz}
+      stand={stand}
+      standZustand={standZustand}
+      vorbereitung={vorbereitung}
+      onVerlassen={onVerlassen}
+    />
   );
 }

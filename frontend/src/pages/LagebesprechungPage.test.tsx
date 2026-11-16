@@ -523,6 +523,24 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     expect(zeile(p, 'meldungen')).toHaveTextContent('Quelle: Meldungen');
   });
 
+  it('stellt den Wert direkt neben die Bezeichnung, Quelle und Notiz darunter (LLH-1747)', async () => {
+    rendere({ lage: { personen: [person(1), person(2, { status: 'vermisst' })] } });
+    const p = await paneel();
+    await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('1 überfällig'));
+    const z = zeile(p, 'auftraege');
+    // Die Bezeichnungsspalte ist gedeckelt (16 em, auf schmalen Schirmen 40 %), der Wert beginnt
+    // linksbündig direkt daneben, nicht am anderen Rand der Paneelbreite.
+    expect(z.style.gridTemplateColumns).toBe('minmax(0, min(16em, 40%)) minmax(0, 1fr)');
+    const wert = z.querySelector<HTMLElement>('[data-teil="wert"]')!;
+    expect(wert.style.textAlign).toBe('');
+    expect([...z.children].map((k) => k.textContent)).toEqual([
+      'Aufträge offen',
+      '5',
+      'Quelle: Aufträge/Befehle',
+      '1 überfällig',
+    ]);
+  });
+
   it('„Letzte Lagebesprechung“ und „Nächster Termin“ kommen aus dem Modul Lagebesprechung', async () => {
     rendere({ stand: zweiStand, verlauf: ZWEI_VERLAUF });
     const p = await paneel();
@@ -720,5 +738,26 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     const p = await paneel();
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
     expect(within(p).queryByRole('button', { name: /In Lagebericht übernehmen/ })).toBeNull();
+  });
+});
+
+describe('LagebesprechungPage · Großbild (LLH-1747, Spec `grossbild-ansicht`)', () => {
+  it('bietet „Großbild“ auch ohne Schreibrecht an, öffnet und schließt es', async () => {
+    rendere({
+      einsatzObj: einsatz({ meine_rolle: 'beobachter' }),
+      stand: zweiStand,
+      verlauf: ZWEI_VERLAUF,
+    });
+    const knopf = await screen.findByRole('button', { name: 'Großbild' });
+    expect(knopf).toBeEnabled();
+    expect(primaerImKopf()).toBe(1);
+    await userEvent.click(knopf);
+    const dialog = screen.getByRole('dialog', { name: 'Lagebesprechung' });
+    const vorbereitung = within(dialog).getByRole('region', { name: 'Vorbereitung' });
+    await waitFor(() => expect(vorbereitung).toHaveTextContent('Letzte Lagebesprechung'));
+    expect(vorbereitung).toHaveTextContent('Nr. 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Großbild verlassen' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(await vorbereitungPaneel()).toBeInTheDocument();
   });
 });

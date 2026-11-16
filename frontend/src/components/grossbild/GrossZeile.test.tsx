@@ -14,7 +14,9 @@ describe('GrossZeile (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entf
     );
     const liste = screen.getByRole('list', { name: 'Sichtung' });
     // Zwei Spalten, die erste so breit wie die längste Bezeichnung: kein Rand dazwischen.
-    expect(liste.style.gridTemplateColumns).toBe('repeat(1, minmax(0, max-content) minmax(0, 1fr))');
+    expect(liste.style.gridTemplateColumns).toBe(
+      'repeat(1, minmax(0, max-content) minmax(0, 1fr))',
+    );
     const zeilen = screen.getAllByRole('listitem');
     expect(zeilen).toHaveLength(2);
     expect(zeilen[1]).toHaveTextContent('SK II112 neu');
@@ -62,6 +64,9 @@ describe('GrossZeile (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entf
     expect(screen.getByText('4').style.fontSize).toBe(grossMass(72));
     expect(screen.getByText('4').style.fontVariantNumeric).toBe('tabular-nums');
     expect(screen.getByText('mittel').style.fontSize).toBe(grossMass(40));
+    // Die Zahl bleibt auf einer Zeile, das Wort darf umbrechen.
+    expect(screen.getByText('4').style.whiteSpace).toBe('nowrap');
+    expect(screen.getByText('mittel').style.whiteSpace).toBe('');
   });
 
   it('führt nirgendwohin', () => {

@@ -26,11 +26,19 @@ Einsatzleiter der Führungsstelle; `frontend/src/fuehrung/AGENTS.md`, i6k6mzed D
 Stab.
 
 **Vorbereitung der Lagebesprechung** (LFH-550, `lagebesprechung/VorbereitungPaneel.tsx`,
-`lagebesprechung/vorbereitung.ts`): Paneel der Seite Lagebesprechung, rechnet keine Zahl selbst
+`lagebesprechung/vorbereitung.ts`, Zeilen aus `lagebesprechung/useVorbereitung.ts`): Paneel der
+Seite Lagebesprechung, rechnet keine Zahl selbst
 (Lagebild wie das Dashboard, Aufträge/Meldungen/Nachforderungen vom Modulzähler), Quelle je Zeile, Rechteweiche je
 Quelle („—“ mit Grund, nie 0). Reihenfolge wie das Dashboard, **kein Vortragsschema** (LFH-46
 §2.3), nichts wird eingefroren; ein fester Stand nur über „In Lagebericht übernehmen“ (EIN Aufruf,
-Freitext).
+Freitext). Der Wert steht direkt neben der Bezeichnung (Spaltenraster mit gedeckelter
+Bezeichnung, LLH-1747), nie am anderen Rand der Paneelbreite.
+
+**Großbild** (LLH-1747, Spec `grossbild-ansicht`,
+`openspec/changes/ckl1wbvz-grossbild-lage/design.md`): `lagebesprechung/LagebesprechungGrossbild.tsx`
+zeigt Termin und Vorbereitung aus `useVorbereitung`, also dieselben Zeilen wie das Paneel, ohne
+Quellenangabe und ohne Bedienung außer der Hülle (`components/grossbild/`). Die Quelle bleibt im
+Paneel und in der Übernahme.
 
 **Überfälliger Besprechungstermin** (LFH-859,
 `openspec/changes/archive/2026-10-04-lfh-859-lagebesprechung-ein-warnton/design.md`): ein erreichter

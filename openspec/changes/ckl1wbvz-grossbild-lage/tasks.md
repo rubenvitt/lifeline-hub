@@ -51,18 +51,18 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 
 ## 4. Lagebesprechung im Großbild und Vorbereitung
 
-- [ ] 4.1 `lagebesprechung/useVorbereitung.ts` aus `VorbereitungPaneel` ziehen (Zeilen, Stand,
+- [x] 4.1 `lagebesprechung/useVorbereitung.ts` aus `VorbereitungPaneel` ziehen (Zeilen, Stand,
   `laedt`), Paneel darauf umstellen; bestehende Tests von Paneel und `vorbereitung.ts` grün.
-- [ ] 4.2 Zeilenraster der Vorbereitung nach D8 (`minmax(0, min(16em, 40%)) minmax(0, 1fr)`,
+- [x] 4.2 Zeilenraster der Vorbereitung nach D8 (`minmax(0, min(16em, 40%)) minmax(0, 1fr)`,
   linksbündig, Quelle unter der Bezeichnung, Notiz unter dem Wert); Test: Wert-Element ohne
   `text-align: end`, Reihenfolge Bezeichnung, Wert, Quelle, Notiz.
-- [ ] 4.3 `lagebesprechung/LagebesprechungGrossbild.tsx` nach D5 (Termin mit Zustand und Ton,
+- [x] 4.3 `lagebesprechung/LagebesprechungGrossbild.tsx` nach D5 (Termin mit Zustand und Ton,
   „Abgeschlossen“, Zeilen zweispaltig ohne Quelle, „Stand HH:MM“); Tests: Wort und Ton bei
   überfälligem Termin, „—“ mit „nicht freigegeben“ bei gesperrten Nachforderungen, keine
   Quellenangabe, keine Knöpfe außer denen der Hülle.
-- [ ] 4.4 `LagebesprechungPage`: Knopf „Großbild“ ab `md` links vom Primärknopf, auch ohne
+- [x] 4.4 `LagebesprechungPage`: Knopf „Großbild“ ab `md` links vom Primärknopf, auch ohne
   Schreibrecht; Test: Knopf da ohne Schreibrecht, öffnet und schließt das Großbild.
-- [ ] 4.5 `lagebesprechung/AGENTS.md` um den Absatz „Großbild“ ergänzen (Zeilen aus
+- [x] 4.5 `lagebesprechung/AGENTS.md` um den Absatz „Großbild“ ergänzen (Zeilen aus
   `useVorbereitung`, keine Quelle im Großbild, Verweis auf Spec `grossbild-ansicht`).
 
 ## 5. Ende zu Ende, Doku, Gates
