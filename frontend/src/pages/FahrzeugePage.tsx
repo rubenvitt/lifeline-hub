@@ -63,6 +63,8 @@ import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
+import { KennungMitZusatz } from '../components/KennungMitZusatz';
+import { useViewport } from '../components/useViewport';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
@@ -384,6 +386,7 @@ function FahrzeugeInhalt() {
   const { dichte } = useDichte();
   /** Nur der Menüauslöser (Entscheidung 14.10.2026, `components/menueSpalte.ts`). */
   const aktionenBreite = menueSpaltenBreite(dichte);
+  const { abBreite } = useViewport();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [adhocWeitereOffen, setAdhocWeitereOffen] = useState(false);
@@ -891,6 +894,8 @@ function FahrzeugeInhalt() {
    * nie. Wer eine Breite ändert, misst neu
    * (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
+  // Steht die Spalte „Typ“ (ab `xxl`, dieselbe Schwelle wie ihr `abBreite`)?
+  const typSpalteDa = abBreite('xxl');
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
     {
       title: 'Funkrufname',
@@ -901,13 +906,21 @@ function FahrzeugeInhalt() {
       suchText: (ef) => ef.funkrufname,
       // `wrap`: die Marken dürfen unter den Funkrufnamen rutschen, statt die Fließspalte über ihr
       // Maß zu drücken (wie `PersonalPage`, LFH-975).
+      // Unter `xxl` steht der Typ als zweite Zeile darunter, ab `xxl` in seiner Spalte (LLH-1790,
+      // Spec `fahrzeug-bearbeitung`, „Typ eines Fahrzeugs in der Liste“). Der Kartentitel nimmt
+      // dasselbe `render`: am Handy steht der Typ also auch in der Karte.
       render: (_, ef) => (
-        <Space wrap>
-          {/* Funkrufname in Mono. */}
-          <span style={monoStil(13)}>{ef.funkrufname}</span>
-          {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
-          {ef.ist_demo && <DemoMarke />}
-        </Space>
+        <KennungMitZusatz
+          kennung={
+            <Space wrap>
+              {/* Funkrufname in Mono. */}
+              <span style={monoStil(13)}>{ef.funkrufname}</span>
+              {ef.ist_adhoc && <Tag>ad-hoc</Tag>}
+              {ef.ist_demo && <DemoMarke />}
+            </Space>
+          }
+          zusatz={typSpalteDa ? null : ef.fahrzeugtyp}
+        />
       ),
     },
     {
@@ -1298,10 +1311,8 @@ function FahrzeugeInhalt() {
                 // Der Bedienweg sitzt am `status`-Slot, nie am `aktion`-Slot (`frontend/AGENTS.md`,
                 // „Statuswechsel in Kräfte-Listen“).
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
-                // Einheit und Seit aus denselben Zellen (D5); ohne Freigabe der Typ statt der Einheit.
-                sekundaer: einheitenFrei
-                  ? ['einheit', 'seit', 'besatzung']
-                  : ['typ', 'seit', 'besatzung'],
+                // Einheit und Seit aus denselben Zellen (D5). Den Typ trägt der Titel (LLH-1790).
+                sekundaer: einheitenFrei ? ['einheit', 'seit', 'besatzung'] : ['seit', 'besatzung'],
                 // Keine Primäraktion: „Entlassen“ ist nie Hauptaktion einer Karte (LLH-1722, Spec
                 // `fahrzeug-bearbeitung`); es steht wie in der Tabelle zuerst im Menü.
                 weitere: darfSchreiben

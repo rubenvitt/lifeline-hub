@@ -908,6 +908,49 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('columnheader', { name: 'Träger' })).toBeNull();
   });
 
+  describe('Typ unter dem Funkrufnamen (LLH-1790, Spec fahrzeug-bearbeitung)', () => {
+    const kennungsZelle = (container: HTMLElement) =>
+      container.querySelector<HTMLElement>('[data-row-key="10"] td')!;
+
+    it('bei 1440 px steht der Typ unter dem Funkrufnamen, die Spalte fehlt', async () => {
+      setzeViewportBreite(1440);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      expect(screen.queryByRole('columnheader', { name: /^Typ/ })).toBeNull();
+      expect(within(kennungsZelle(container)).getByText('LF 20')).toBeInTheDocument();
+    });
+
+    it('ab xxl steht er in der Spalte und nicht doppelt', async () => {
+      setzeViewportBreite(1920);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      expect(screen.getByRole('columnheader', { name: /^Typ/ })).toBeInTheDocument();
+      expect(within(kennungsZelle(container)).queryByText('LF 20')).toBeNull();
+      expect(screen.getAllByText('LF 20')).toHaveLength(1);
+    });
+
+    it('in der Karte am Handy auch mit Freigabe Einheiten', async () => {
+      setzeViewportBreite(390);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      const karte = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]')!;
+      expect(within(karte).getAllByText('LF 20')).toHaveLength(1);
+    });
+
+    it('ohne Freigabe Einheiten steht der Typ in der Karte einmal, nicht zusätzlich als Feld', async () => {
+      setzeViewportBreite(390);
+      server.use(
+        http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+          HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
+        ),
+      );
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      const karte = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]')!;
+      await waitFor(() => expect(within(karte).getAllByText('LF 20')).toHaveLength(1));
+    });
+  });
+
   describe('unter md', () => {
     it('steht keine Tabelle, sondern Karten — und genau EIN Zweig im Baum', async () => {
       setzeViewportBreite(390);
