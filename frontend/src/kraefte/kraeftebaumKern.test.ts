@@ -279,7 +279,10 @@ describe('loeseAbgestellte (LLH-1744, Spec `kraeftebaum`)', () => {
       [eh(1, 10), eh(2, 11, 1), eh(3, null, 2), eh(4, null, 1)],
       abschnitte,
     );
-    expect(ids(baum)).toEqual([[1, [4]], [2, [3]]]);
+    expect(ids(baum)).toEqual([
+      [1, [4]],
+      [2, [3]],
+    ]);
     expect(baum[1].abgestelltAus?.id).toBe(1);
     expect(baum[1].abschnittId).toBe(11);
     expect(baum[0].abgestelltAus).toBeUndefined();
