@@ -67,22 +67,26 @@ Objektliste (`MarkerSuche`, `onWaehlen`) mit. Ursprünglich war „nur verschieb
 verworfen, weil der Marker beim Tipp unter dem Finger liegt. Der Review hat gezeigt, dass die Auswahl
 selbst die Leiste öffnet und die Karte verkleinert (ab `lg` 300 px rechts, darunter 45 % der Höhe).
 Entscheidung von Ruben am 16.11.2026: nur nachführen, wenn verdeckt. Der Tipp setzt ein `sichtZiel`;
-`Kartenflaeche` prüft es im nächsten Frame und nach 350 ms (der ResizeObserver der Karte läuft nach
-dem Öffnen der Leiste) und schiebt es per `panBy` um den kleinsten Versatz in die Fläche minus 48 px
-Rand (`nachfuehrVersatz` in `kamera.ts`). Der Zoom bleibt.
+`Kartenflaeche` wartet bis zu einer Sekunde auf das `resize` der Karte, das MapLibres
+ResizeObserver nach dem Öffnen der Leiste mit der neuen Größe meldet, und schiebt den Marker dann per
+`panBy` um den kleinsten Versatz in die Fläche: 48 px Rand, rechts Knopfblock plus Abstand und Luft
+(`nachfuehrVersatz` in `kamera.ts`). Ohne Größenänderung (Leiste schon offen) bewegt sich nichts;
+eine eigene Geste der Person vorher bricht das Nachführen ab. Der Zoom bleibt. Verworfen (Nachreview):
+eine Prüfung im nächsten Frame, denn der läuft vor dem ResizeObserver und sieht die alte Größe.
 
 **D5 – Anflug zoomt nur heran.** Der Effekt in `Kartenflaeche` fliegt mit
-`zoom: Math.max(map.getZoom(), ANFLUG_ZOOM)` und behält `BEDIENUNG`. Das gilt für jedes
+`zoom: anflugZoom(map.getZoom(), laufendesZiel)` und behält `BEDIENUNG`. Das gilt für jedes
 `flyToZiel`: Listentreffer, Ortssuche, Deeplinks, Verorten aus einem Auftrag. Eine Regel statt
 einer Art je Aufrufer. Folgt ein Anflug auf einen noch fliegenden, zählt dessen Zielzoom
 (`anflugZoom(aktuell, laufendesZiel)`), nicht der Zwischenzoom der Flugkurve; `flyTo` zoomt zwischen
 entfernten Punkten zwischendurch heraus (Review). Für Deeplinks ändert sich praktisch nichts, weil die Karte nach dem Laden in
-der Startansicht weiter draußen steht. Die reine Rechnung kommt als exportierte Funktion
-`anflugZoom(aktuell)` nach `kamera.ts`, prüfbar ohne Karte.
+der Startansicht weiter draußen steht. Die reine Rechnung steht als exportierte Funktion
+`anflugZoom` in `kamera.ts`, prüfbar ohne Karte.
 
 **D6 – Ansichtswechsel hält die Leiste offen.** Öffnet nur eine Auswahl die Leiste und wechselt die
 Person darin die Ansicht, bleibt die Leiste für die Sitzung offen (`zeige` aus `useLeistenWahl`, nicht
-gespeichert). Sonst verlor sie mit „Zurück zu Objekte“ oder Esc die ganze Leiste, obwohl sie gerade in
+gespeichert), nicht aber während eines Kartenmodus (dort gilt LFH-765). `zeige` gilt je
+Breitenklasse; wer das Tablet danach dreht, bekommt die Vorgabe der anderen Klasse. Sonst verlor sie mit „Zurück zu Objekte“ oder Esc die ganze Leiste, obwohl sie gerade in
 „Objekte“ arbeitete. Gilt auch am Handschirm, wo die Vorgabe schon vorher „zu“ war. Entscheidung von
 Ruben am 16.11.2026 (Review). Verworfen: den Wechsel als gemerkte Wahl speichern; dann wäre die
 Leiste am Gerät dauerhaft offen.

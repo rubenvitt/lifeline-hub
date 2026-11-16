@@ -63,7 +63,8 @@ function lesen(klasse: LeistenKlasse): boolean | null {
  * unbekannt ist. Das Einhängen schreibt nichts, sonst würde die Vorgabe zur Wahl.
  *
  * `merke` ist das eigene Umschalten und wird gespeichert. `zeige` öffnet nur für die Sitzung, für
- * eine Handlung, die die Leiste braucht (`?ort=`) — gespeichert, öffnete ein
+ * eine Handlung, die die Leiste braucht (`?ort=`, ein Ansichtswechsel in der Leiste, die nur eine
+ * Auswahl geöffnet hatte, LLH-1751) — gespeichert, öffnete ein
  * Stiftklick die Leiste am Handschirm nach jedem Neuladen. Das nächste `merke` löst es ab.
  *
  * `umschalteImModus` ist das Umschalten während eines Kartenmodus unter `lg` (LFH-765): es gilt nur

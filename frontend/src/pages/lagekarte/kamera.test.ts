@@ -51,19 +51,25 @@ describe('anflugZoom (LLH-1751, D5): ein Anflug zoomt nur heran', () => {
 
 describe('nachfuehrVersatz (LLH-1751, Review): Marker nach dem Öffnen der Leiste im Bild halten', () => {
   const FLAECHE = { breite: 900, hoehe: 600 };
+  // Rechts hält der Rand den Knopfblock frei (Blockbreite + Abstand + Luft).
+  const RAND = { oben: 48, rechts: 100, unten: 48, links: 48 };
 
   it('liegt der Marker im Bild, bewegt sich nichts', () => {
-    expect(nachfuehrVersatz({ x: 450, y: 300 }, FLAECHE, 48)).toBeNull();
-    expect(nachfuehrVersatz({ x: 48, y: 552 }, FLAECHE, 48)).toBeNull();
+    expect(nachfuehrVersatz({ x: 450, y: 300 }, FLAECHE, RAND)).toBeNull();
+    expect(nachfuehrVersatz({ x: 48, y: 552 }, FLAECHE, RAND)).toBeNull();
   });
 
-  it('rechts hinausgeschoben: so weit zurück, dass er am Rand sichtbar steht', () => {
+  it('rechts hinausgeschoben: so weit zurück, dass er links vom Knopfblock steht', () => {
     // Die Leiste nahm rechts 300 px; der Marker stand bei x = 1050 der alten Fläche.
-    expect(nachfuehrVersatz({ x: 1050, y: 300 }, FLAECHE, 48)).toEqual([1050 - 852, 0]);
+    expect(nachfuehrVersatz({ x: 1050, y: 300 }, FLAECHE, RAND)).toEqual([1050 - 800, 0]);
+  });
+
+  it('unter dem Knopfblock (rechter Rand) zählt als verdeckt', () => {
+    expect(nachfuehrVersatz({ x: 860, y: 100 }, FLAECHE, RAND)).toEqual([60, 0]);
   });
 
   it('unten unter der Leiste: nur senkrecht nachführen', () => {
-    expect(nachfuehrVersatz({ x: 200, y: 700 }, FLAECHE, 48)).toEqual([0, 700 - 552]);
+    expect(nachfuehrVersatz({ x: 200, y: 700 }, FLAECHE, RAND)).toEqual([0, 700 - 552]);
   });
 });
 

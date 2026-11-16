@@ -765,7 +765,7 @@ test.describe('Lagekarte am Touch-Gerät quer (LLH-1751)', () => {
         }
       ).__lfhKarte;
       const c = k.getCanvas();
-      k.panBy([-(c.clientWidth / 2 - 110), -150], { duration: 0 });
+      k.panBy([-(c.clientWidth / 2 - 30), -150], { duration: 0 });
     });
     await ruhe(page);
     await expect(async () => {
@@ -782,9 +782,12 @@ test.describe('Lagekarte am Touch-Gerät quer (LLH-1751)', () => {
             const k = (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte;
             const px = k.project(ll);
             const c = k.getCanvas();
-            return px.x >= 0 && px.x <= c.clientWidth && px.y >= 0 && px.y <= c.clientHeight;
+            const r = c.getBoundingClientRect();
+            // Sichtbar heißt: an der Stelle liegt die Karte, nicht Knopfblock oder Leiste.
+            const oben = document.elementFromPoint(r.left + px.x, r.top + px.y);
+            return oben === c;
           }, EINZEL),
-        { message: 'der gewählte Marker bleibt nach dem Öffnen der Leiste im Bild' },
+        { message: 'der gewählte Marker liegt nach dem Öffnen der Leiste frei auf der Karte' },
       )
       .toBe(true);
     await ruhe(page);

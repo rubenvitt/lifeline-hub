@@ -36,18 +36,19 @@ export function anflugZoom(aktuell: number, laufendesZiel: number | null = null)
 /**
  * Versatz in Pixeln, um den ein Punkt der Karte zurück ins Bild muss (LLH-1751, Review): ein
  * Marker-Tipp bewegt die Kamera nicht, aber die Auswahl öffnet die Leiste und verkleinert die
- * Karte. Liegt der gewählte Marker danach außerhalb von `fläche` minus `rand`, liefert die
- * Funktion den kleinsten Versatz `[dx, dy]` für `panBy`, der ihn an den Rand holt; sonst `null`.
+ * Karte. Liegt der gewählte Marker danach außerhalb von `fläche` minus `rand` (je Seite; rechts
+ * mit dem Knopfblock), liefert die Funktion den kleinsten Versatz `[dx, dy]` für `panBy`, der ihn
+ * an den Rand holt; sonst `null`.
  * Rein und exportiert.
  */
 export function nachfuehrVersatz(
   punkt: { x: number; y: number },
   flaeche: { breite: number; hoehe: number },
-  rand: number,
+  rand: { oben: number; rechts: number; unten: number; links: number },
 ): [number, number] | null {
-  const klemme = (w: number, max: number) => Math.min(Math.max(w, rand), max - rand);
-  const dx = punkt.x - klemme(punkt.x, flaeche.breite);
-  const dy = punkt.y - klemme(punkt.y, flaeche.hoehe);
+  const klemme = (w: number, min: number, max: number) => Math.min(Math.max(w, min), max);
+  const dx = punkt.x - klemme(punkt.x, rand.links, flaeche.breite - rand.rechts);
+  const dy = punkt.y - klemme(punkt.y, rand.oben, flaeche.hoehe - rand.unten);
   return dx === 0 && dy === 0 ? null : [dx, dy];
 }
 

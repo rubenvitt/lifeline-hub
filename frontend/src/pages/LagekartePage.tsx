@@ -1987,8 +1987,9 @@ export default function LagekartePage() {
             verlasseAuswahl();
             // Wer in der Leiste weiterarbeitet, behält sie, auch wenn nur die Auswahl sie öffnete
             // (bei Touch und am Handy per Vorgabe zu). Nur für die Sitzung, nie gespeichert
-            // (LLH-1751, Review).
-            zeigeLeiste();
+            // (LLH-1751, Review). Nicht im Kartenmodus: dort gilt nach dem Modus wieder der
+            // vorherige Zustand (LFH-765), das vorläufige Einblenden ist `umschalteImModus`.
+            if (auswahlInhalt != null && !exklusiverModusAktiv) zeigeLeiste();
           }
         }}
         onAuswahlZurueck={hebeAuswahlAuf}

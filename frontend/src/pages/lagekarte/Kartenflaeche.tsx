@@ -116,6 +116,7 @@ import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
 import { escGehoertOverlay } from './zeichnenEsc';
 import { zonenPlakette } from './plakette';
 import { useRollen } from '../../components/instrument/rollenwerte';
+import { UEBERLAGERUNG_RAND, kartenKnopfBreite } from './KartenUeberlagerung';
 import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLayer';
 import { sorgeFuerSuchnadelLayer, suchnadelFc } from './suchnadelLayer';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
@@ -147,6 +148,12 @@ const ANFRAGEN_DECKEL = 40;
  * bleiben muss (LLH-1751, Review): halbe Trefferzone im Handschuh plus Luft.
  */
 const NACHFUEHR_RAND = 48;
+
+/** Luft zwischen nachgeführtem Marker und Knopfblock (LLH-1751, Review). */
+const NACHFUEHR_LUFT = 24;
+
+/** So lange nach einem Marker-Tipp wartet das Nachführen auf das `resize` der aufgehenden Leiste. */
+const NACHFUEHR_FRIST_MS = 1000;
 
 /**
  * `transformRequest` der Karte — plus DEV-Mitschnitt unter `window.__lfhKartenAnfragen`.
@@ -1037,32 +1044,44 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
   }, [startAnsicht]);
 
-  // Marker-Tipp: im Bild halten, nie zoomen. Die Auswahl öffnet die Leiste in DEMSELBEN Zug; die
-  // Karte wird erst danach kleiner (ResizeObserver). Deshalb zweimal prüfen: im nächsten Frame und
-  // nach dem Umbau; wer zuerst etwas findet, schiebt, danach ist der Marker im Bild.
+  // Marker-Tipp: im Bild halten, nie zoomen (LLH-1751). Nachgeführt wird NUR, wenn die Karte nach
+  // dem Tipp kleiner wird — die Auswahl öffnet die Leiste, MapLibres ResizeObserver meldet danach
+  // `resize` mit der neuen Größe. Ohne Größenänderung (Leiste schon offen) bewegt sich nichts; ein
+  // Frame-Callback sähe noch die alte Größe (Review). Bedient die Person die Karte vorher selbst,
+  // entfällt das Nachführen; nach einer Sekunde ohne `resize` ebenso.
+  const sichtRandRechts = kartenKnopfBreite(token) + UEBERLAGERUNG_RAND + NACHFUEHR_LUFT;
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !sichtZiel) return;
-    let erledigt = false;
-    const pruefe = () => {
-      if (erledigt) return;
+    const beiResize = () => {
+      aufraeumen();
       const canvas = map.getCanvas();
       const versatz = nachfuehrVersatz(
         map.project([sichtZiel.lng, sichtZiel.lat]),
         { breite: canvas.clientWidth, hoehe: canvas.clientHeight },
-        NACHFUEHR_RAND,
+        {
+          oben: NACHFUEHR_RAND,
+          rechts: sichtRandRechts,
+          unten: NACHFUEHR_RAND,
+          links: NACHFUEHR_RAND,
+        },
       );
-      if (versatz) {
-        erledigt = true;
-        map.panBy(versatz, { duration: 300 }, BEDIENUNG);
-      }
+      if (versatz) map.panBy(versatz, { duration: 300 }, BEDIENUNG);
     };
-    const frame = requestAnimationFrame(pruefe);
-    const spaeter = window.setTimeout(pruefe, 350);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.clearTimeout(spaeter);
+    const beiBewegung = (e: { originalEvent?: unknown }) => {
+      if (e.originalEvent != null) aufraeumen();
     };
+    const frist = window.setTimeout(() => aufraeumen(), NACHFUEHR_FRIST_MS);
+    function aufraeumen() {
+      window.clearTimeout(frist);
+      map!.off('resize', beiResize);
+      map!.off('movestart', beiBewegung);
+    }
+    map.on('resize', beiResize);
+    map.on('movestart', beiBewegung);
+    return aufraeumen;
+    // Der Rand rechts hängt an der Dichte; ein Wechsel mitten im Tipp ist kein neuer Anlass.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sichtZiel]);
 
   // Anflug auf ein gewähltes Ziel: nur heran, nie heraus (LLH-1751, `anflugZoom`). Folgt ein
