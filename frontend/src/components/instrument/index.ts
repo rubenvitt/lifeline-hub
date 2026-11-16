@@ -4,6 +4,8 @@
  * jede Datei trägt im Kopf, wofür sie da ist und welche Regel sie hält.
  */
 export { default as Augenbraue, augenbraueStil } from './Augenbraue';
+export { default as Schrift, type SchriftTon, type SchriftElement } from './Schrift';
+export { default as Feldetikett, feldetikettStil } from './Feldetikett';
 export {
   default as Paneel,
   PaneelZeile,
@@ -36,7 +38,7 @@ export {
 export { default as Sammelbanner, sammelbannerKurz } from './Sammelbanner';
 export { default as Filterhinweis } from './Filterhinweis';
 export { default as Schnellerfassungszeile } from './Schnellerfassungszeile';
-export { rollenwerte, useRollen, monoStil } from './rollenwerte';
+export { rollenwerte, useRollen, zahlStil, schriftStil, schriftGroesse } from './rollenwerte';
 export { default as Datenraster, Datenfeld } from './Datenraster';
 export { default as DatenfeldEingabe, type DatenfeldEingabeProps } from './DatenfeldEingabe';
 export {
@@ -78,4 +80,5 @@ export {
   type Gliederungszeile,
 } from './GliederungsPaneel';
 export { default as WarnstufenHinweis } from './WarnstufenHinweis';
+export { default as AlarmZeile, alarmEintragHoehe, ALARMZEILE_SCHRIFT } from './AlarmZeile';
 export { EINSATZKOPF_REFETCH_MS, UNBEKANNT, UebungsBand, UebungsMarke } from './Uebung';

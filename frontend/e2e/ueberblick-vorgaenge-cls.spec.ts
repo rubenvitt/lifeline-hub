@@ -205,7 +205,7 @@ async function messe(page: Page, einsatzId: string, folge: Folge): Promise<Messu
   } else if (folge === 'Gliederung zuletzt') {
     // Vorbedingung: das Kennzahlenband steht, die Quellen der Gliederung fehlen noch.
     await expect(
-      page.getByRole('group', { name: 'Lage in Zahlen' }).locator('a[data-lfh="kennzahl"]').first(),
+      page.getByRole('group', { name: 'Führungsstand' }).locator('a[data-lfh="kennzahl"]').first(),
     ).toBeVisible();
     await expect(page.locator('[data-lfh="ueberblick-abschnitt"]')).toHaveCount(0);
     await ruheShifts(page);

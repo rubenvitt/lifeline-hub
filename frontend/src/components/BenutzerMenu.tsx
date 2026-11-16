@@ -28,6 +28,7 @@ import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
 import AnzeigeLeisten, { ANZEIGE_GRUPPE } from './AnzeigeLeisten';
 import { useViewport } from './useViewport';
+import { schriftGroesse } from './instrument/rollenwerte';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
 function initialen(name: string): string {
@@ -211,7 +212,7 @@ export default function BenutzerMenu({
                 rowGap: token.marginXS,
               }}
             >
-              <Typography.Text strong style={{ fontSize: 14, lineHeight: 1.3 }}>
+              <Typography.Text strong style={{ fontSize: schriftGroesse('text'), lineHeight: 1.3 }}>
                 {benutzer.anzeigename}
               </Typography.Text>
               {isKnapp && rollenTags.length > 0 && (
@@ -220,7 +221,7 @@ export default function BenutzerMenu({
                 </Space>
               )}
             </div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
               {isKnapp
                 ? `@${benutzer.benutzername} · Version ${__APP_VERSION__}`
                 : `@${benutzer.benutzername}`}
@@ -230,7 +231,7 @@ export default function BenutzerMenu({
             {funktion && (
               <Typography.Text
                 data-lfh="benutzermenue-funktion"
-                style={{ display: 'block', fontSize: 12, marginTop: token.marginXS }}
+                style={{ display: 'block', fontSize: schriftGroesse('klein'), marginTop: token.marginXS }}
               >
                 {funktion}
               </Typography.Text>
@@ -245,7 +246,7 @@ export default function BenutzerMenu({
             {!isKnapp && (
               <Typography.Text
                 type="secondary"
-                style={{ display: 'block', fontSize: 11, marginTop: 6 }}
+                style={{ display: 'block', fontSize: schriftGroesse('fein'), marginTop: 6 }}
               >
                 Version {__APP_VERSION__}
               </Typography.Text>
@@ -358,7 +359,7 @@ export default function BenutzerMenu({
               background: rahmenFarben.aktiv,
               color: farbenDunkel.text2,
               fontFamily: schrift.zahl,
-              fontSize: 10,
+              fontSize: schriftGroesse('fein'),
             }}
           >
             {initialen(benutzer.anzeigename)}
@@ -394,12 +395,12 @@ export default function BenutzerMenu({
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
-                  fontSize: 12,
+                  fontSize: schriftGroesse('klein'),
                 }}
               >
                 {funktion ?? benutzer.anzeigename}
               </span>
-              <IconChevronRunter style={{ fontSize: 10, opacity: 0.65 }} />
+              <IconChevronRunter style={{ fontSize: schriftGroesse('fein'), opacity: 0.65 }} />
             </>
           )}
         </Button>

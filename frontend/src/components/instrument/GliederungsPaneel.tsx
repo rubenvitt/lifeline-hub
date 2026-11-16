@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import DashboardPaneel, { type DashboardPaneelBasis } from './DashboardPaneel';
 import { listenZeileStil } from './ListenPaneel';
-import { useRollen } from './rollenwerte';
+import { useRollen, schriftGroesse } from './rollenwerte';
+
 import './gliederungsPaneel.css';
 
 /**
@@ -102,7 +103,7 @@ export default function GliederungsPaneel({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: token.marginSM,
-                  fontSize: 12,
+                  fontSize: schriftGroesse('klein'),
                   lineHeight: 1.45,
                   color: rollen.gedaempft,
                   overflowWrap: 'anywhere',

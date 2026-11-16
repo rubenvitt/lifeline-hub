@@ -4,8 +4,9 @@ import {
   Augenbraue,
   Paneel,
   PaneelZustand,
-  monoStil,
   useRollen,
+  schriftGroesse,
+  zahlStil,
 } from '../../components/instrument';
 import { useViewport } from '../../components/useViewport';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
@@ -139,7 +140,11 @@ export default function KraefteOhneBrSidebar({
         </Augenbraue>
         {g.einheiten.map((e) => (
           <div key={`einheit-${e.id}`} data-lfh="br-kraft-zeile" style={kraftZeileStil(token)}>
-            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: rollen.text }}>{e.name}</span>
+            <span
+              style={{ flex: 1, minWidth: 0, fontSize: schriftGroesse('text'), color: rollen.text }}
+            >
+              {e.name}
+            </span>
             {!schreibgeschuetzt && (
               <Button aria-label={`${e.name} zuweisen`} onClick={() => onZuweisenEinheit(e)}>
                 zuweisen
@@ -150,7 +155,10 @@ export default function KraefteOhneBrSidebar({
         ))}
         {g.fahrzeuge.map((f) => (
           <div key={`fahrzeug-${f.id}`} data-lfh="br-kraft-zeile" style={kraftZeileStil(token)}>
-            <span style={{ flex: 1, minWidth: 0, ...monoStil(13), color: rollen.text }}>
+            <span
+              data-schrift="kennung"
+              style={{ flex: 1, minWidth: 0, ...zahlStil('text'), color: rollen.text }}
+            >
               {f.funkrufname}
             </span>
             {!schreibgeschuetzt && (
@@ -255,7 +263,7 @@ export default function KraefteOhneBrSidebar({
                   label: (
                     <span>
                       Im Einsatz{' '}
-                      <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                      <span style={{ ...zahlStil('klein'), color: rollen.gedaempft }}>
                         {trefferImEinsatz}
                       </span>
                     </span>

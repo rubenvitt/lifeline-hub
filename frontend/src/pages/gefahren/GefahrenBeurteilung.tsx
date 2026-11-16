@@ -1,7 +1,7 @@
 import { Button, Typography } from 'antd';
 import type { Gefahrengebiet } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { StatusChip, monoStil, useRollen } from '../../components/instrument';
+import { StatusChip, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { BESTAETIGT, UNBESTAETIGT } from './beurteilung';
 
@@ -53,7 +53,9 @@ export default function GefahrenBeurteilung({
         {gebiet.beurteilt_at ? (
           <Typography.Text data-lfh="beurteilung-stand">
             {BESTAETIGT}{' '}
-            <span style={monoStil(token.fontSize)}>{zeitpunkt(gebiet.beurteilt_at)}</span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+              {zeitpunkt(gebiet.beurteilt_at)}
+            </span>
             {gebiet.beurteilt_von_name ? ` · ${gebiet.beurteilt_von_name}` : ''}
           </Typography.Text>
         ) : (

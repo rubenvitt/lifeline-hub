@@ -1,16 +1,38 @@
 /* Globaler Reset: ohne ihn bleibt `body { margin: 8px }` als weißer Rahmen stehen und
-   `min-height: 100vh` erzeugt äußere Scrollbars. */
+   `min-height: 100vh` erzeugt äußere Scrollbars. Die Textschrift steht hier und nicht nur an
+   antds `.ant-app`, sonst rechnen Portale an `document.body` (Eingangsband, Punktanker-Menü)
+   auf die Vorgabe des Browsers, eine Serifenschrift (LLH-1772, Wächter
+   `theme/schriftReset.guard.test.ts`). */
 html,
 body {
   margin: 0;
   padding: 0;
+  font-family: var(--lfh-schrift-text);
 }
 
-/* Kein Zoom wie in einer App (LLH-1328, `frontend/AGENTS.md`, Bedien-Leitlinie), Gegenstück zum
-   Viewport in `index.html`. `manipulation` sperrt nur den Doppeltipp-Zoom, den iOS trotz
-   `maximum-scale` zulässt; Rollen bleibt, und Karte und Ziehgriffe mit eigenem `touch-action`
-   behalten ihre Gesten (der Browser schneidet die Werte der Vorfahren mit). `text-size-adjust`
-   hält die Schrift beim Drehen ins Querformat auf der Dichte-Stufe. */
+/* Die Lauftextgröße der Stufe auch außerhalb von antds `.ant-app` (LLH-1774): Portale an
+   `document.body` standen sonst in den 16 px des Browsers, in keiner Dichte eine Stufe. Nur
+   `body`, nicht `html`: `rem` bleibt die Vorgabe des Browsers. */
+body {
+  font-size: var(--lfh-groesse-text);
+}
+
+/* Native Bedienelemente erben die Schrift im Browser nicht und fielen sonst auf Arial bzw. die
+   Systemschrift in 13,33 px zurück (LLH-1772). Element-Spezifität (0,0,1): antds Klassenregeln
+   gewinnen weiter. */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Kein Doppeltipp-Zoom (LLH-1328); der Zoom per Geste ist frei (LLH-1774, Spec `schriftskala`,
+   Wächter `theme/zoomFrei.guard.test.ts`). `manipulation` sperrt nur den Doppeltipp, der sonst
+   jeden schnellen Doppelklick auf einen Knopf zum Zoom machte; Rollen und Pinch bleiben, und
+   Karte und Ziehgriffe mit eigenem `touch-action` behalten ihre Gesten (der Browser schneidet die
+   Werte der Vorfahren mit). `text-size-adjust` hält die Schrift beim Drehen ins Querformat auf
+   der Dichte-Stufe. */
 html {
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;

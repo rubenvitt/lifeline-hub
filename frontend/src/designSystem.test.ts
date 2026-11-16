@@ -415,6 +415,12 @@ describe('Verweise fallen aus der README (Spec `design-system-artifact`)', () =>
     expect(ohneVerweise('Text (früher „A (noch 2)“, jetzt im ⋮; LLH-1722)')).toBe(
       'Text (früher „A (noch 2)“, jetzt im ⋮)',
     );
+    // Eine Umkehr mit Datum und dem umgekehrten Ticket ist Historie.
+    expect(
+      ohneVerweise(
+        '- **Der Zoom ist frei** (LLH-1774, Spec `schriftskala`; umgekehrt\n  15.11.2026 gegenüber LLH-1328 „Kein Zoom wie in einer App“): der Viewport',
+      ),
+    ).toBe('- **Der Zoom ist frei**: der Viewport');
   });
 
   it('behält den Inhalt gemischter Klammern', () => {

@@ -52,6 +52,16 @@ pub struct MeldungsZaehler {
     /// Pflichtig, unbestätigt und Frist abgelaufen oder eskaliert — über ALLE Meldungen, nicht
     /// nur die offenen (LFH-397). Speist die Warnsperre des Helligkeitsreglers im Frontend.
     pub bestaetigung_ueberfaellig: i64,
+    /// Offene, unbestätigte Sofortmeldungen (Art oder Priorität, [`crate::meldung::ist_sofort`]),
+    /// ab Eingang (LLH-1743, Alarmzeile). Dieselbe Zahl zeigt der Lagemonitor.
+    pub sofort_offen: i64,
+    /// Offene, unbestätigte Meldungen mit Priorität „dringend“, die keine Sofortmeldungen sind.
+    pub dringend_offen: i64,
+    /// Sofortalarm der ältesten offenen, unbestätigten Sofortmeldung (UTC, SQLite-Format): bei
+    /// einer heraufgestuften Meldung `sofortalarm_at`, sonst ihr Eingang; fehlt ohne eine solche.
+    /// Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sofort_aelteste_at: Option<String>,
 }
 
 /// Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig.
@@ -111,6 +121,27 @@ pub struct MeldungsMerkmale {
     pub ist_bestaetigt: bool,
     pub ist_ueberfaellig: bool,
     pub eskaliert: bool,
+    /// Löst den Sofortalarm aus ([`crate::meldung::ist_sofort`]).
+    pub ist_sofort: bool,
+    /// Priorität „dringend“.
+    pub ist_dringend: bool,
+}
+
+impl MeldungsMerkmale {
+    /// Offen und unbestätigt: was in der Alarmzeile als Sofort- oder dringende Meldung steht.
+    fn ist_offen_unbestaetigt(&self) -> bool {
+        self.ist_offen && !self.ist_bestaetigt
+    }
+
+    /// Zählt als offene Sofortmeldung (`sofort_offen`).
+    pub fn ist_sofort_offen(&self) -> bool {
+        self.ist_sofort && self.ist_offen_unbestaetigt()
+    }
+
+    /// Zählt als offene dringende Meldung (`dringend_offen`): keine Sofortmeldung.
+    pub fn ist_dringend_offen(&self) -> bool {
+        self.ist_dringend && !self.ist_sofort && self.ist_offen_unbestaetigt()
+    }
 }
 
 /// Zählregel der Aufträge: offen = `ist_offen()` der Phase; davon in Arbeit; davon überfällig.
@@ -143,8 +174,9 @@ pub fn zaehle_auftraege_gewichtet(
     z
 }
 
-/// Zählregel der Meldungen: offen, davon ungesehen (Status „neu"), und die überfällige
-/// Bestätigungspflicht über ALLE Meldungen (LFH-397). Die letzte Regel kennt auch der Client
+/// Zählregel der Meldungen: offen, davon ungesehen (Status „neu"), die überfällige
+/// Bestätigungspflicht über ALLE Meldungen (LFH-397) und die offenen, unbestätigten Sofort- und
+/// dringenden Meldungen (LLH-1743). Die letzte Regel kennt auch der Client
 /// (`istAlarmiert` in `frontend/src/meldungen/meldungKennzahlen.ts`); das gemeinsame Fixture
 /// hält beide gleich.
 pub fn zaehle_meldungen(meldungen: &[MeldungsMerkmale]) -> MeldungsZaehler {
@@ -160,8 +192,17 @@ pub fn zaehle_meldungen_gewichtet(
         offen: 0,
         ungesehen: 0,
         bestaetigung_ueberfaellig: 0,
+        sofort_offen: 0,
+        dringend_offen: 0,
+        sofort_aelteste_at: None,
     };
     for (m, n) in gruppen {
+        if m.ist_sofort_offen() {
+            z.sofort_offen += n;
+        }
+        if m.ist_dringend_offen() {
+            z.dringend_offen += n;
+        }
         if m.ist_offen {
             z.offen += n;
             if m.status == MeldungStatus::Neu {
@@ -415,6 +456,9 @@ mod tests {
                 offen: 1,
                 ungesehen: 0,
                 bestaetigung_ueberfaellig: 0,
+                sofort_offen: 0,
+                dringend_offen: 0,
+                sofort_aelteste_at: None,
             }),
             auftraege: Some(AuftragsZaehler {
                 offen: 1,
@@ -477,7 +521,7 @@ mod tests {
             MeldungStatus::InBearbeitung,
             MeldungStatus::Erledigt,
         ] {
-            for bits in 0u8..16 {
+            for bits in 0u8..64 {
                 meldungen.push(MeldungsMerkmale {
                     status,
                     ist_offen: status != MeldungStatus::Erledigt,
@@ -485,6 +529,8 @@ mod tests {
                     ist_bestaetigt: bits & 2 != 0,
                     ist_ueberfaellig: bits & 4 != 0,
                     eskaliert: bits & 8 != 0,
+                    ist_sofort: bits & 16 != 0,
+                    ist_dringend: bits & 32 != 0,
                 });
             }
         }

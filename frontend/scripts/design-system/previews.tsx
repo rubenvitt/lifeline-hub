@@ -38,7 +38,11 @@ import { rollenFarbe, statusKategorie, warnstufeBalkenFarbe } from '../../src/th
 import type { Sichtungskategorie, Verletzung } from '../../src/api/types';
 import { createMemoryRouter, Link, MemoryRouter, RouterProvider } from 'react-router';
 import {
+  AlarmZeile,
   Augenbraue,
+  Feldetikett,
+  Schrift,
+  zahlStil,
   BearbeitbaresPaneel,
   DashboardFlaeche,
   DashboardPaneel,
@@ -1364,7 +1368,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Paneel',
     title: 'Paneel',
     group: 'Flächen',
-    height: 420,
+    height: 423,
     source: 'components/instrument/Paneel.tsx',
     docAnchor: 'export const PANEEL_KOPF_HOEHE',
     content: () => (
@@ -1398,10 +1402,35 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     content: () => <DashboardBeispiel />,
   },
   {
+    name: 'Schrift',
+    title: 'Schrift: Rollen der Skala und Feldetikett',
+    group: 'Daten',
+    height: 420,
+    source: 'components/instrument/Schrift.tsx',
+    content: () => (
+      <div style={{ display: 'grid', gap: 8 }}>
+        <Schrift rolle="seitentitel">Seitentitel · Einsatz Hochwasser Celle</Schrift>
+        <Schrift rolle="text">
+          Lauftext: Pegel am Deichtor steigt weiter, Sandsäcke angefordert.
+        </Schrift>
+        <Schrift rolle="warnung">Warnstufe hoch</Schrift>
+        <Schrift rolle="meta" ton="gedaempft">
+          Stand 14:32 · von Leitstelle Celle an Einsatzleitung
+        </Schrift>
+        <Augenbraue>Paneelkopf in Versalien</Augenbraue>
+        <div>
+          <Feldetikett als="div">Einsatzort</Feldetikett>
+          <Schrift rolle="text">Celle, Altstadt</Schrift>
+        </div>
+        <span style={zahlStil('klein')}>Florian Celle 1-46-1 · 14:32</span>
+      </div>
+    ),
+  },
+  {
     name: 'Datenraster',
     title: 'Datenraster mit DatenfeldEingabe und FeldFehler',
     group: 'Daten',
-    height: 550,
+    height: 570,
     source: 'components/instrument/Datenraster.tsx',
     content: () => (
       <Form layout="vertical" initialValues={{ funkrufname: 'Florian Celle 1-46-1' }}>
@@ -1457,7 +1486,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Kennzahl',
     title: 'Kennzahl und Kennzahlenband',
     group: 'Daten',
-    height: 490,
+    height: 513,
     source: 'components/instrument/Kennzahl.tsx',
     regeln: ['Kennzahlenband', 'Eine Heimat je Zahl'],
     content: () => (
@@ -1514,7 +1543,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Segmentleiste',
     title: 'Segmentleiste (Filter, Umbruch, als Formularfeld)',
     group: 'Bedienung',
-    height: 421,
+    height: 425,
     source: 'components/instrument/Segmentleiste.tsx',
     // Die zweite Leiste zeigt den Zeilenumbruch im Wortlaut (Ablösung im Handschuh-Betrieb).
     // `alignItems` hält beide Leisten so breit wie ihre Segmente, wie in der App.
@@ -1558,10 +1587,57 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     ),
   },
   {
+    name: 'AlarmZeile',
+    title: 'AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)',
+    group: 'Rückmeldung',
+    height: 390,
+    source: 'components/instrument/AlarmZeile.tsx',
+    content: () => (
+      <MemoryRouter>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <AlarmZeile
+            daten={{
+              stand: 'vollstaendig',
+              fehlend: [],
+              eintraege: [
+                {
+                  art: 'sofort',
+                  rolle: 'alarm',
+                  text: '1 Sofortmeldung · älteste 2 min',
+                  voll: '1 Sofortmeldung · älteste 2 min',
+                  bezug: [],
+                },
+                {
+                  art: 'kritisch',
+                  rolle: 'alarm',
+                  text: 'kritisch: UHS Turnhalle',
+                  voll: 'kritisch: UHS Turnhalle',
+                  bezug: [],
+                },
+                {
+                  art: 'erinnerung',
+                  rolle: 'achtung',
+                  text: '1 Erinnerung fällig',
+                  voll: '1 Erinnerung fällig',
+                  bezug: [],
+                },
+              ],
+            }}
+            ziel={() => '/meldungen'}
+          />
+          <AlarmZeile daten={{ stand: 'vollstaendig', fehlend: [], eintraege: [] }} />
+          <AlarmZeile
+            daten={{ stand: 'unvollstaendig', fehlend: ['Rückmeldungen'], eintraege: [] }}
+          />
+        </div>
+      </MemoryRouter>
+    ),
+  },
+  {
     name: 'Sammelbanner',
     title: 'Sammelbanner',
     group: 'Rückmeldung',
-    height: 200,
+    height: 213,
     source: 'components/instrument/Sammelbanner.tsx',
     content: () => (
       <Sammelbanner aktion={{ label: 'Anzeigen', onKlick: nichts }}>12 neue Meldungen</Sammelbanner>
@@ -1571,7 +1647,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Zustaende',
     title: 'Zustände: Seite und Paneel (laden, leer, Fehler)',
     group: 'Rückmeldung',
-    height: 1215,
+    height: 1217,
     source: 'components/SeitenZustand.tsx',
     moreDoc: 'components/instrument/PaneelZustand.tsx',
     content: () => <ZustaendeBeispiel />,
@@ -1590,7 +1666,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'InlineAngabe',
     title: 'InlineAngabe (geschlossen, leer, offen)',
     group: 'Bedienung',
-    height: 570,
+    height: 602,
     source: 'components/InlineAngabe.tsx',
     content: () => (
       <Datenraster spalten={1} beschriftung="Angaben">
@@ -1619,7 +1695,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Verbindungen',
     title: 'Verbindungen (Funk und Telefon getrennt; Liste offen)',
     group: 'Bedienung',
-    height: 1003,
+    height: 1025,
     source: 'components/VerbindungenFeld.tsx',
     moreDoc: 'components/FunkUndTelefon.tsx',
     content: () => (
@@ -1704,7 +1780,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'BearbeitbaresPaneel',
     title: 'BearbeitbaresPaneel (offen und gesperrt)',
     group: 'Formular',
-    height: 734,
+    height: 751,
     source: 'components/instrument/BearbeitbaresPaneel.tsx',
     content: () => <BearbeitbaresPaneelBeispiel />,
     interact: async (container) => {
@@ -1724,7 +1800,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Knopf',
     title: 'Knopf (primär, Standard, Text, Gefahr, gesperrt, mit Symbol)',
     group: 'Eingabe',
-    height: 360,
+    height: 361,
     source: 'theme/tokens.ts',
     docAnchor: 'export function antdKnopf',
     styles: ['icons/icons.css'],
@@ -1762,7 +1838,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Eingabefeld',
     title: 'Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)',
     group: 'Eingabe',
-    height: 895,
+    height: 903,
     source: 'components/instrument/FeldFehler.tsx',
     styles: ['anzeige/ZeitpunktEingabe.css'],
     content: () => <EingabefeldBeispiel />,
@@ -1772,7 +1848,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Formularlayout',
     title: 'Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)',
     group: 'Eingabe',
-    height: 910,
+    height: 915,
     source: 'components/instrument/Formularpaneel.tsx',
     content: () => <FormularlayoutBeispiel />,
   },
@@ -1780,7 +1856,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Dialog',
     title: 'Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)',
     group: 'Eingabe',
-    height: 1170,
+    height: 1173,
     source: 'components/Erfassung.tsx',
     docAnchor: 'export function ErfassungsModal',
     styles: ['components/Erfassung.css'],
@@ -1791,7 +1867,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Speicherleiste',
     title: 'Speicherleiste',
     group: 'Formular',
-    height: 360,
+    height: 371,
     source: 'components/speicherLeiste.ts',
     docAnchor: 'export function speicherLeisteStil',
     content: () => <SpeicherleisteBeispiel />,
@@ -1919,7 +1995,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Tabelle',
     title: 'Tabelle: KatalogTabelle mit Suche, Spalten, Filtern und Zeilenmenü',
     group: 'Daten',
-    height: 920,
+    height: 921,
     source: 'components/KatalogTabelle.tsx',
     docAnchor: 'export type KatalogSpalte<T>',
     moreDoc: 'components/tabellenFilter.tsx',
@@ -1949,7 +2025,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Ortsfeld',
     title: 'Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)',
     group: 'Formular',
-    height: 1140,
+    height: 1146,
     source: 'anzeige/Ortsfeld.tsx',
     docAnchor: 'export function Ortsfeld',
     content: () => <OrtsfeldBeispiel />,

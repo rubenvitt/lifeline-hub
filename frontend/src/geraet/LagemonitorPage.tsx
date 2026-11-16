@@ -32,8 +32,11 @@ import {
 import { abonniereLiveStatus, leseLiveStatus } from '../live/liveStatusStore';
 import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeModeProvider';
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
-import { schrift } from '../theme/tokens';
+import { fernsicht, schrift } from '../theme/tokens';
 import LagemonitorKarte from './LagemonitorKarte';
+import { AlarmZeile } from '../components/instrument';
+import { alarmAusMonitor } from '../lage/alarmAusMonitor';
+import { wasBrennt } from '../lage/wasBrennt';
 import { belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -60,8 +63,12 @@ export const ABRUF_TAKT_MS = 30_000;
  */
 export const HERVORHEBUNG_MS = 60_000;
 
-/** Kennzahlen mindestens 72 px, jeder Text mindestens 28 px (Großbild-Regel, `geraet/AGENTS.md`). */
-export const GROSS = { kennzahl: 96, kennzahlKlein: 72, text: 28, titel: 32 } as const;
+/**
+ * Kennzahlen mindestens 72 px, jeder Text mindestens 28 px (Großbild-Regel, `geraet/AGENTS.md`).
+ * Die Werte stehen als Fernsicht-Skala im Theme (`fernsicht`, Spec `schriftskala`: eine benannte
+ * Ausnahme von den sechs Stufen).
+ */
+export const GROSS = fernsicht;
 
 export function istVeraltet(standMs: number, jetztMs: number): boolean {
   return standMs > 0 && jetztMs - standMs > VERALTET_AB_MS;
@@ -812,6 +819,15 @@ export default function LagemonitorPage() {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          {/* Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
+            Personenbezug“): dieselben Arten, Folge und Wörter wie in Überblick und Lagebild, aus
+            dem Block `alarm` der Serverantwort; 28 px, ohne Bedienung. Sie steht über der Karte,
+            nicht über die volle Breite: rechts behalten Betroffene, Kräfte und UHS ihre Höhe
+            (entschieden 16.11.2026). Den Ausfall trägt der Monitor nicht (design.md D6). */}
+          <AlarmZeile
+            daten={wasBrennt(alarmAusMonitor(lage, lageQuery.isError), dayjs(jetzt))}
+            groesse="gross"
+          />
           <Kachel titel="Lagekarte" style={{ flex: '1 1 0' }}>
             <div style={{ flex: '1 1 0', minHeight: 0 }}>
               <LagemonitorKarte

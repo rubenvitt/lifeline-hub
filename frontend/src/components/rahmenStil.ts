@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { farbenDunkel, farbenHell, schrift, schriftskala, type Farbrollen } from '../theme/tokens';
+import { schriftGroesse } from './instrument/rollenwerte';
 
 /*
  * Kleine, abhängigkeitsarme Stilhelfer des Rahmens (Neuentwurf „Instrumententafel"),
@@ -21,14 +22,14 @@ export function useModusFarben(): Farbrollen {
 }
 
 /**
- * Augenbraue (10 px, 600, Versalien, Sperrung .14em, `schwach`) — `schriftskala.augenbraue`.
+ * Augenbraue (Stufe `fein`, 600, Versalien, Sperrung .08em, `schwach`) — `schriftskala.augenbraue`.
  * Rein und exportiert: dieselbe Stufe steht im Modulpanel, im Drawer und in der Palette.
  */
 export function augenbraueStil(farbe: string): CSSProperties {
   const stufe = schriftskala.augenbraue;
   return {
     fontFamily: schrift[stufe.familie],
-    fontSize: stufe.groesse,
+    fontSize: schriftGroesse(stufe.stufe),
     fontWeight: stufe.gewicht,
     letterSpacing: stufe.sperrung,
     textTransform: 'uppercase',

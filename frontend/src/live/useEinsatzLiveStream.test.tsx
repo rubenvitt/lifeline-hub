@@ -3,6 +3,7 @@ import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { einsatzKeys } from '../api/queryKeys';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useEinsatzLiveStream } from './useEinsatzLiveStream';
@@ -215,6 +216,9 @@ describe('useEinsatzLiveStream', () => {
     await waitFor(() => {
       const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
       expect(keys).toContain('einsatz-meldungen');
+      // LLH-1743 D7: Modulzähler und Verdichtung des Lagemonitors frischen mit auf.
+      expect(keys).toContain('einsatz-modul-zaehler');
+      expect(keys).toContain(einsatzKeys.lagemonitor(7)[0]);
     });
     // Den Alarm trägt die Benachrichtigung; das Highlight allein meldet nichts an die Zentrale.
     expect(zentrale).not.toHaveBeenCalled();

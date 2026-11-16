@@ -5172,9 +5172,40 @@ export interface components {
             /** @description Kurzbezeichnung im Einsatz (z. B. „EA-N“), falls gesetzt. */
             kurzbezeichnung?: string | null;
         };
+        /**
+         * @description Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
+         *     Personenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die
+         *     überfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten
+         *     und Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall trägt der Block
+         *     nicht (D6: die Regel lebt im Browser, Folgeaufgabe).
+         */
+        LagemonitorAlarm: {
+            /** @description Bezeichnungen der Abschnitte im Lagezustand „kritisch“, in der Folge der Gliederung. */
+            abschnitte_kritisch: string[];
+            /** Format: int64 */
+            auftraege_ueberfaellig: number;
+            /** Format: int64 */
+            bestaetigung_ueberfaellig: number;
+            /** Format: int64 */
+            dringend_offen: number;
+            /** Format: int64 */
+            erinnerungen_faellig: number;
+            /** Format: int64 */
+            nachforderungen_ueberfaellig: number;
+            /** @description Einheiten mit überfälliger Rückmeldung, die längste zuerst. */
+            rueckmeldung_ueberfaellig: components["schemas"]["LagemonitorRueckmeldung"][];
+            /** @description Eingang der ältesten davon (UTC); fehlt ohne offene Sofortmeldung. */
+            sofort_aelteste_at?: string | null;
+            /**
+             * Format: int64
+             * @description Offene, unbestätigte Sofortmeldungen (`meldungen.sofort_offen` des Modulzählers).
+             */
+            sofort_offen: number;
+        };
         LagemonitorAnzeige: {
             /** @description Einsatzabschnitte mit gezeichneter Fläche. */
             abschnitte: components["schemas"]["LagemonitorAbschnitt"][];
+            alarm?: components["schemas"]["LagemonitorAlarm"] | null;
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             /**
@@ -5254,6 +5285,15 @@ export interface components {
             /** @description Freigabe des Lageberichts (UTC, SQLite-Format). */
             freigegeben_at: string;
             text: string;
+        };
+        /** @description Eine Einheit mit überfälliger Rückmeldung: nur ihr Name und seit wann (LLH-1743). */
+        LagemonitorRueckmeldung: {
+            einheit: string;
+            /**
+             * Format: int64
+             * @description Minuten seit der Fälligkeit (abgerundet).
+             */
+            seit_min: number;
         };
         /**
          * @description Hilfeleistungen in Zahlen für die Reihe „Sanitätsdienst“ (LLH-1574, design.md D6): dieselben
@@ -5672,8 +5712,25 @@ export interface components {
              *     nur die offenen (LFH-397). Speist die Warnsperre des Helligkeitsreglers im Frontend.
              */
             bestaetigung_ueberfaellig: number;
+            /**
+             * Format: int64
+             * @description Offene, unbestätigte Meldungen mit Priorität „dringend“, die keine Sofortmeldungen sind.
+             */
+            dringend_offen: number;
             /** Format: int64 */
             offen: number;
+            /**
+             * @description Sofortalarm der ältesten offenen, unbestätigten Sofortmeldung (UTC, SQLite-Format): bei
+             *     einer heraufgestuften Meldung `sofortalarm_at`, sonst ihr Eingang; fehlt ohne eine solche.
+             *     Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es.
+             */
+            sofort_aelteste_at?: string | null;
+            /**
+             * Format: int64
+             * @description Offene, unbestätigte Sofortmeldungen (Art oder Priorität, [`crate::meldung::ist_sofort`]),
+             *     ab Eingang (LLH-1743, Alarmzeile). Dieselbe Zahl zeigt der Lagemonitor.
+             */
+            sofort_offen: number;
             /** Format: int64 */
             ungesehen: number;
         };

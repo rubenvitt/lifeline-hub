@@ -181,8 +181,8 @@ export interface Farbrollen {
  *
  * Primärknopf (LFH-661, Spec `farbrollen-kontrast`): die Beschriftung auf satter Bedienfläche
  * hält den TAGESBODEN 7 : 1, in Ruhe und unter dem Zeiger — KEIN eigener Knopfboden. Die
- * Knopfschrift misst 13,5 px, der große Anmelde-Knopf 16 px; WCAGs Großtext-Boden 4,5 gilt fett
- * erst ab 18,66 px. Weiß auf bedien 8,55 (vorher `#1a5fa0`, 6,59), auf bedienHover 7,32 (vorher
+ * Knopfschrift misst 14 px in `kompakt` (16,1 / 17,5 in `komfortabel` / `handschuh`), der große
+ * Anmelde-Knopf 16 px; WCAGs Großtext-Boden 4,5 gilt fett erst ab 18,66 px. Weiß auf bedien 8,55 (vorher `#1a5fa0`, 6,59), auf bedienHover 7,32 (vorher
  * `#236aad`, 5,62): gleicher Ton und gleiche Sättigung, nur dunkler; der Zeiger hellt um
  * denselben Schritt auf wie zuvor (1,17). bedien auf grund 7,16. Gedrückt trägt den Zeigerton
  * (LFH-897), also ebenfalls 7,32 (antds Ableitung `#0a335e` lag bei 12,74). Gerechnet in
@@ -610,6 +610,64 @@ export interface Abstandsraster {
  *  mit Einsatzhandschuh (72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). */
 export type Dichte = 'kompakt' | 'komfortabel' | 'handschuh';
 
+/**
+ * Die sechs Größenstufen der Schrift in `kompakt` (LLH-1775, Spec `schriftskala`, Change
+ * `i1o47voj-schrift-lesbarkeit`). Jede Schriftgröße am Schirm ist eine davon; 9, 10, 13, 13,5,
+ * 15, 30 und 40 px gibt es nicht mehr (umgekehrt 15.11.2026 gegenüber dem Neuentwurf). Die Rollen
+ * der {@link schriftskala} nennen eine Stufe, keine Pixelzahl. CSS-Seite: `--lfh-groesse-<stufe>`
+ * in `rollen.css`, gleich gehalten von `rollen.guard.test.ts`.
+ */
+export const groessenstufen = {
+  /** Kleinste Schrift: Augenbraue, Rail-Etikett, Tabellenkopf. Boden der Skala. */
+  fein: 11,
+  /** Meta, dichter Lauftext, Feldetikett, Brotkrume. */
+  klein: 12,
+  /** Lauftext und Grundschrift der Bedienelemente. */
+  text: 14,
+  /** Seitentitel, Uhr, Zwischenüberschrift. */
+  titel: 16,
+  /** Datenwert in Paneelzeilen und Kennzahlenbändern. */
+  wert: 22,
+  /** Datenwert einer Kennzahl-Kachel, große Überschrift. */
+  gross: 32,
+} as const;
+
+export type Groessenstufe = keyof typeof groessenstufen;
+
+/**
+ * Die Stufen, die mit der Bediendichte wachsen (LLH-1774). Die Datenwerte (`wert`, `gross`)
+ * bleiben fest: sie sind schon groß, und im Handschuh-Betrieb auf dem Handschirm sprengten sie
+ * sonst die Kennzahlenbänder.
+ */
+export const WACHSENDE_STUFEN: ReadonlySet<Groessenstufe> = new Set([
+  'fein',
+  'klein',
+  'text',
+  'titel',
+]);
+
+/**
+ * Der Faktor, um den die wachsenden Stufen je Dichte steigen (LLH-1774, Spec `schriftskala`).
+ * Vorher stieg nur antds Grundschrift (13,5 → 15), der Rest stand fest: der Anteil kleiner Schrift
+ * wuchs mit der Stufe. In CSS `--lfh-schrift-faktor` in den `[data-dichte]`-Blöcken.
+ */
+export const dichteFaktor: Record<Dichte, number> = {
+  kompakt: 1,
+  komfortabel: 1.15,
+  handschuh: 1.25,
+};
+
+/**
+ * Die Pixelzahl einer Stufe in einer Dichte. Für Rechnungen (antd-Token, Höhen, Canvas); Stile
+ * nehmen `schriftGroesse`/`schriftStil` aus `components/instrument/rollenwerte.ts`, die die
+ * CSS-Variable setzen und damit beim ersten Bild stimmen.
+ */
+export function schriftPx(stufe: Groessenstufe, dichte: Dichte = 'kompakt'): number {
+  const px = groessenstufen[stufe];
+  if (!WACHSENDE_STUFEN.has(stufe)) return px;
+  return Math.round(px * dichteFaktor[dichte] * 100) / 100;
+}
+
 interface Dichtestufe {
   /** `controlHeight` — trägt die Treffläche für alle Steuerelemente auf einmal. */
   zeilenhoehe: number;
@@ -619,6 +677,7 @@ interface Dichtestufe {
    * {@link dichten}).
    */
   kleineZeilenhoehe: number;
+  /** antds Grundschrift: die Stufe `text` mal {@link dichteFaktor} (14 / 16,1 / 17,5). */
   schriftgroesse: number;
   abstand: Abstandsraster;
 }
@@ -627,8 +686,9 @@ interface Dichtestufe {
  * Die Staffel, Werte aus A1 Festlegung 4 (die Abstände auf Vielfache von 4 gerundet, Spec
  * `abstandsraster`). `antdToken()` nimmt die Stufe als Parameter,
  * `rollen.css` spiegelt sie als `[data-dichte='…']`. `componentSize` scheidet als Träger aus:
- * dessen `large` endet bei 40 px. Die Grundschrift steigt nur einmal (13,5 → 15): der Handschuh
- * ändert die Hand, nicht das Auge.
+ * dessen `large` endet bei 40 px. Die Grundschrift ist die Stufe `text` mal Dichtefaktor
+ * (LLH-1774; vorher 13,5 / 15 / 15 mit der Begründung „der Handschuh ändert die Hand, nicht das
+ * Auge“ — gemessen stieg so der Anteil kleiner Schrift mit der Stufe, umgekehrt 15.11.2026).
  *
  * `kleineZeilenhoehe` steht hier statt abgeleitet zu werden: antd rechnet
  * `controlHeightSM = controlHeight × 0,75` (22,5 / 36 / 54) und unterschritte damit in jeder
@@ -640,7 +700,7 @@ export const dichten: Record<Dichte, Dichtestufe> = {
   kompakt: {
     zeilenhoehe: 30,
     kleineZeilenhoehe: 24,
-    schriftgroesse: 13.5,
+    schriftgroesse: schriftPx('text', 'kompakt'),
     // A1 Festlegung 4 (3/7/11/18) auf Vielfache von 4 gerundet (Change `m113c8ln-abstandsraster`,
     // design.md D1): 18 → 16, damit die 16er-Literale in `kompakt` unverändert umziehen; xl neu.
     abstand: { xxs: 4, xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
@@ -648,14 +708,14 @@ export const dichten: Record<Dichte, Dichtestufe> = {
   komfortabel: {
     zeilenhoehe: 48,
     kleineZeilenhoehe: 48,
-    schriftgroesse: 15,
+    schriftgroesse: schriftPx('text', 'komfortabel'),
     // Aus 5/11/18/28 gerundet; 18 → 20 hält sichtbare Schritte zwischen sm, md und lg.
     abstand: { xxs: 4, xs: 4, sm: 12, md: 20, lg: 28, xl: 40 },
   },
   handschuh: {
     zeilenhoehe: 72,
     kleineZeilenhoehe: 72,
-    schriftgroesse: 15,
+    schriftgroesse: schriftPx('text', 'handschuh'),
     // Aus 7/16/26/44 gerundet; sm bleibt 16 (Untergrenze aus `einsatztauglichkeit-layout`).
     abstand: { xxs: 4, xs: 8, sm: 16, md: 24, lg: 44, xl: 64 },
   },
@@ -731,8 +791,8 @@ export const schrift = {
 type Schriftfamilie = keyof typeof schrift;
 
 interface Schriftstufe {
-  /** px */
-  groesse: number;
+  /** Eine der sechs {@link groessenstufen}, keine Pixelzahl. */
+  stufe: Groessenstufe;
   gewicht: 400 | 500 | 600 | 700;
   familie: Schriftfamilie;
   /** `letter-spacing` als CSS-Wert. Nur wo der Entwurf ihn setzt. */
@@ -742,39 +802,58 @@ interface Schriftstufe {
 }
 
 /**
- * Schriftskala des Neuentwurfs („Kontrastsprung statt Abstufung“, `umsetzung.md`).
+ * Die Rollen der Schrift (Neuentwurf „Kontrastsprung statt Abstufung“, `umsetzung.md`; Stufen und
+ * Werte seit LLH-1773/LLH-1775, Change `i1o47voj-schrift-lesbarkeit`). Jede Rolle ist Stufe,
+ * Gewicht und Familie; die Größe kommt aus {@link groessenstufen} und wächst mit der Dichte.
  *
- * Ergänzt die Dichte-Achse: antds Grundschrift bleibt `dichten[…].schriftgroesse`, die Skala
- * benennt die Stufen darüber und daneben, die handgebaute Bausteine setzen. Zahlen, Zeiten,
- * Funkrufnamen, Koordinaten und Nummern laufen immer in `zahl` (Mono, `tabular-nums`).
+ * Mono (`zahl`) trägt nur Zahl, Zeit, Kennung und Funkrufname (LLH-1777, Spec `schriftrollen`);
+ * `meta` steht deshalb in der Textschrift, mit gleich breiten Ziffern. Versalien nur in Köpfen
+ * (LLH-1776): Augenbraue und Rail-Etikett; ein Feldetikett ist `etikett`, gemischt geschrieben.
  *
- * CSS-Seite: `--lfh-typo-<stufe>-{groesse,gewicht,sperrung}` in `rollen.css`, deckungsgleich
- * gehalten von `rollen.guard.test.ts`; die Familie ist `--lfh-schrift-<familie>`.
+ * CSS-Seite: `--lfh-typo-<rolle>-{groesse,gewicht,sperrung}` in `rollen.css`, die Größe als
+ * `var(--lfh-groesse-<stufe>)`, deckungsgleich gehalten von `rollen.guard.test.ts`.
  */
 export const schriftskala = {
-  /** Große Überschrift (Einstiegsflächen). */
-  ueberschrift: { groesse: 30, gewicht: 600, familie: 'text', sperrung: '-0.02em' },
-  /** Seitenkopf: Titel 14/600. */
-  seitentitel: { groesse: 14, gewicht: 600, familie: 'text' },
-  /** Lauftext-Grundmaß des Entwurfs. */
-  text: { groesse: 14, gewicht: 400, familie: 'text' },
+  /** Große Überschrift (Einstiegsflächen); vorher 30 px. */
+  ueberschrift: { stufe: 'gross', gewicht: 600, familie: 'text', sperrung: '-0.02em' },
+  /** Seitenkopf: Titel 16/600, größer als der Lauftext (LLH-1773). */
+  seitentitel: { stufe: 'titel', gewicht: 600, familie: 'text' },
+  /**
+   * Uhr im Kopf: Stufe `text`, 500, Mono (LLH-1773). Daueranzeige hinter dem Einsatznamen
+   * (LLH-1726); in `titel` bräche der Kopf am Handy in `handschuh` auf zwei Zeilen um.
+   */
+  uhr: { stufe: 'text', gewicht: 500, familie: 'zahl', sperrung: '0.04em' },
+  /** Lauftext-Grundmaß. */
+  text: { stufe: 'text', gewicht: 400, familie: 'text' },
+  /** Warnhinweis: Warnstufe, Sammelbanner, Filterhinweis, Alarmhinweis, mindestens 14 px. */
+  warnung: { stufe: 'text', gewicht: 600, familie: 'text' },
   /** Dichter Lauftext in Listen und Paneelen. */
-  textKlein: { groesse: 12, gewicht: 400, familie: 'text' },
-  /** Augenbraue: 10 px, 600, Versalien, Sperrung .14em, Farbe `schwach`. */
-  augenbraue: { groesse: 10, gewicht: 600, familie: 'text', sperrung: '0.14em', versal: true },
-  /** Etikett unter dem Rail-Icon: 9 px Versalien. */
-  railEtikett: { groesse: 9, gewicht: 500, familie: 'text', sperrung: '0.06em', versal: true },
-  /** Mono-Meta: Zeiten, Nummern, Zähler neben Text. */
-  meta: { groesse: 11, gewicht: 400, familie: 'zahl' },
+  textKlein: { stufe: 'klein', gewicht: 400, familie: 'text' },
+  /** Feldetikett: gemischt geschrieben, ohne Sperrung, Ton `gedaempft` (LLH-1776). */
+  etikett: { stufe: 'klein', gewicht: 400, familie: 'text' },
+  /** Augenbraue: 11 px, 600, Versalien, Sperrung .08em, Farbe `schwach`. Nur Köpfe. */
+  augenbraue: { stufe: 'fein', gewicht: 600, familie: 'text', sperrung: '0.08em', versal: true },
+  /** Etikett unter dem Rail-Icon: 11 px Versalien. */
+  railEtikett: { stufe: 'fein', gewicht: 500, familie: 'text', sperrung: '0.04em', versal: true },
+  /** Meta neben Text (Datenstand, Absender, Zähler): Textschrift, gleich breite Ziffern. */
+  meta: { stufe: 'klein', gewicht: 400, familie: 'text' },
   /** Datenwert in Paneelzeilen und Kennzahlenbändern. */
-  datenwertKlein: { groesse: 22, gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
+  datenwertKlein: { stufe: 'wert', gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
   /** Datenwert einer Kennzahl-Kachel. */
-  datenwert: { groesse: 32, gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
-  /** Führende Kennzahl („Zahl führt"). */
-  datenwertGross: { groesse: 40, gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
+  datenwert: { stufe: 'gross', gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
+  /** Führende Kennzahl („Zahl führt"); vorher 40 px, jetzt die größte Stufe. */
+  datenwertGross: { stufe: 'gross', gewicht: 500, familie: 'zahl', sperrung: '-0.02em' },
 } as const satisfies Record<string, Schriftstufe>;
 
 export type Schriftstufenname = keyof typeof schriftskala;
+
+/**
+ * Die Fernsicht-Skala des Lagemonitors (`geraet/`, Großbild-Regel in `geraet/AGENTS.md`): Kennzahlen
+ * mindestens 72 px, jeder Text mindestens 28 px, gelesen aus Metern Abstand. Die einzige benannte
+ * Ausnahme von den sechs {@link groessenstufen} am Schirm (Spec `schriftskala`); sie wächst nicht
+ * mit der Dichte, ein Lagemonitor wird nicht bedient.
+ */
+export const fernsicht = { kennzahl: 96, kennzahlKlein: 72, text: 28, titel: 32 } as const;
 
 /**
  * Der antd-Algorithmus eines Modus.
@@ -808,8 +887,8 @@ const SWITCH_SPURPOLSTER = 2;
  * Die Maße des Kippschalters aus der Dichte-Staffel (LFH-380).
  *
  * antd leitet den `Switch` aus der Schrift ab, nicht aus `controlHeight`: die Spur ist
- * `fontSize × lineHeight` = `fontSize + 8` (`antd/es/switch/style/index.js`), also 21,5 / 23 /
- * 23 px. Boden ist `kleineZeilenhoehe` (24 / 48 / 72), die kurze Achse aus Gate 3.
+ * `fontSize × lineHeight` = `fontSize + 8` (`antd/es/switch/style/index.js`), also 22 / 24,1 /
+ * 25,5 px (Grundschrift 14 / 16,1 / 17,5, LLH-1774). Boden ist `kleineZeilenhoehe` (24 / 48 / 72), die kurze Achse aus Gate 3.
  *
  * Gesetzt wird der GANZE abhängige Satz (Griff, Mindestbreite, Innenränder): antd rechnet ihn
  * aus der Schrift, und ein überschriebener Komponententoken zieht die übrigen nicht nach. Die
@@ -835,7 +914,8 @@ export function switchMasse(stufe: Pick<Dichtestufe, 'kleineZeilenhoehe'>) {
  * Senkrechtes Polster der Kopfzeile eines `Tabs` (LFH-724).
  *
  * antd rechnet den Tab aus der Schrift, nicht aus `controlHeight`: Höhe = `2 × paddingSM` +
- * Zeilenhöhe der Grundschrift (`fontSize + 8`, `getLineHeight`), also 35,5 / 45 / 55 px. In
+ * Zeilenhöhe der Grundschrift (`fontSize + 8`, `getLineHeight`), also 36 / 46,1 / 57,5 px (Grundschrift 14 / 16,1 /
+ * 17,5, LLH-1774). In
  * `komfortabel` und `handschuh` lag damit jeder Tab (Aufträge/Befehle, UHS-Reiter) unter dem
  * Boden aus Gate 3. Das Polster wächst genau so weit, dass die Zeile die Steuerhöhe erreicht,
  * und nie unter `paddingSM`: `kompakt` bleibt unverändert. Kartentabs (`editable-card`) folgen
@@ -991,7 +1071,8 @@ export function antdKnopf(dichte: Dichte = 'kompakt'): NonNullable<ConfigProvide
  * also 30 / 48 / 72 (A1 Gate 3), dazu die Beschriftung senkrecht mittig.
  *
  * antd rechnet den Kopf aus Schrift und Polsterung (`fontSize · lineHeight + 2 · paddingSM`,
- * `collapse/style/index.js`), nicht aus `controlHeight`: gemessen 36 / 45 / 55 px. Das Muster ist
+ * `collapse/style/index.js`), nicht aus `controlHeight`: gemessen 36 / 45 / 55 px bei der alten Grundschrift 13,5 / 15 / 15
+ * (vor LLH-1774; seitdem etwas höher, unter dem Boden bleibt es). Das Muster ist
  * das handgebaute Bedienziel aus LFH-365 — Boden plus Polsterung; die Polsterung bleibt antds
  * `paddingSM`/`padding`, die schon der Staffel folgen. In `kompakt` liegt der Inhalt mit 36 px
  * über dem Boden, der Kopf bleibt dort wie er war. Ohne `alignItems` stünde die Beschriftung im
@@ -1011,7 +1092,7 @@ export function antdKlappkopf(dichte: Dichte): NonNullable<ConfigProviderProps['
  *
  * antd rendert Box und Text als EIN `label.ant-checkbox-wrapper` (`display: inline-flex`) und
  * kennt für dessen Höhe kein Komponenten-Token: das Label ist so hoch wie seine Schrift, gemessen
- * 21,5 px in `kompakt` und 36 px in `handschuh`. Ohne `alignItems` stünde die Box im 72-px-Label
+ * 21,5 px in `kompakt` und 36 px in `handschuh` (alte Grundschrift 13,5 / 15, vor LLH-1774). Ohne `alignItems` stünde die Box im 72-px-Label
  * oben (antd: `baseline`). Der Boden ist `kleineZeilenhoehe`, nicht `zeilenhoehe`: in `kompakt`
  * steht das Kästchen oft in einer Text- oder Chipzeile (ETB „Werte behalten“) und wächst dort nur
  * auf den Gate-3-Boden, nicht auf die Steuerhöhe 30.
@@ -1038,7 +1119,7 @@ export function antdKaestchen(dichte: Dichte): NonNullable<ConfigProviderProps['
  *
  * antd baut `label.ant-radio-wrapper` wie das Kästchen-Label (`inline-flex`, Ausrichtung
  * `baseline`) und kennt für dessen Höhe ebenfalls kein Komponenten-Token: ohne Boden gemessen
- * 21,5 / 23 / 23 px (Kartenansicht löschen, `e2e/trefflaeche-optionsknopf.spec.ts`). Ohne Text
+ * 21,5 / 23 / 23 px (alte Grundschrift, vor LLH-1774) (Kartenansicht löschen, `e2e/trefflaeche-optionsknopf.spec.ts`). Ohne Text
  * bleibt der Optionsknopf frei, wie die Auswahlspalte einer Tabelle ihn baut.
  *
  * `Radio.Button` und die Gruppe mit `optionType="button"` laufen durch dieselbe Stilfunktion, und
@@ -1146,6 +1227,17 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     // Archivo 600 wird lokal ausgeliefert.
     fontWeightStrong: 600,
     fontSize: stufe.schriftgroesse,
+    // Die übrigen Größen setzt das Theme selbst aus der Skala (LLH-1775): antd leitete sie sonst
+    // aus `fontSize` ab (`fontSize ± 2`, Überschriften 38/30/24/20/16) und läge neben den sechs
+    // Stufen. Alle wachsen mit der Dichte wie die Stufen selbst.
+    fontSizeSM: schriftPx('klein', dichte),
+    fontSizeLG: schriftPx('titel', dichte),
+    fontSizeXL: schriftPx('wert', dichte),
+    fontSizeHeading1: schriftPx('gross', dichte),
+    fontSizeHeading2: schriftPx('wert', dichte),
+    fontSizeHeading3: schriftPx('titel', dichte),
+    fontSizeHeading4: schriftPx('titel', dichte),
+    fontSizeHeading5: schriftPx('text', dichte),
 
     // `controlHeight` trägt die Dichte für alle Steuerelemente auf einmal.
     controlHeight: stufe.zeilenhoehe,

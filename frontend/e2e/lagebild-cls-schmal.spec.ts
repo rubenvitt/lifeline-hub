@@ -163,12 +163,14 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite
 }
 
 const inhalt = (page: Page) => page.locator('[data-lfh="seiten-inhalt"]');
-const band = (page: Page) => page.getByRole('group', { name: 'Lage in Zahlen' });
+/** Das Band der Seite: im Überblick seit LLH-1743 der „Führungsstand“. */
+const band = (page: Page, seite: Seite) =>
+  page.getByRole('group', { name: seite === 'ueberblick' ? 'Führungsstand' : 'Lage in Zahlen' });
 
 /** Anker des Endzustands: Ortspfad mit Namen, Kennzahlen als Links, kein Ladezeichen mehr. */
-async function endzustand(page: Page) {
+async function endzustand(page: Page, seite: Seite) {
   await expect(page.locator('[data-lfh="seitenkopf"]')).toContainText(NAME_PRAEFIX);
-  await expect(band(page).locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
+  await expect(band(page, seite).locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
   await expect(inhalt(page).locator('[aria-busy="true"]')).toHaveCount(0);
 }
 
@@ -185,7 +187,7 @@ async function messe(page: Page, seite: Seite, einsatzId: string, folge: Folge, 
     await ruheShifts(page);
     abfragen.freigeben();
   }
-  await endzustand(page);
+  await endzustand(page, seite);
   return ruheShifts(page);
 }
 
@@ -293,12 +295,14 @@ for (const dichte of DICHTEN) {
       await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
       await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
       // Vorbedingung: das Band steht im Ladezustand, mit geladener Schrift.
-      await expect(band(page).locator('[aria-busy="true"]').first()).toBeVisible();
+      await expect(
+        band(page, 'lage-dashboard').locator('[aria-busy="true"]').first(),
+      ).toBeVisible();
       await page.evaluate(() => document.fonts.ready.then(() => undefined));
-      const vorher = (await band(page).boundingBox())?.height ?? Number.NaN;
+      const vorher = (await band(page, 'lage-dashboard').boundingBox())?.height ?? Number.NaN;
       abfragen.freigeben();
-      await endzustand(page);
-      const nachher = (await band(page).boundingBox())?.height ?? Number.NaN;
+      await endzustand(page, 'lage-dashboard');
+      const nachher = (await band(page, 'lage-dashboard').boundingBox())?.height ?? Number.NaN;
       const messwert = `${folge}: ${vorher.toFixed(1)} → ${nachher.toFixed(1)}`;
       hoehen.push(messwert);
       expect.soft(Math.abs(nachher - vorher), `${dichte}, ${messwert}`).toBeLessThanOrEqual(1);

@@ -65,7 +65,7 @@ for (const fall of [
   { viewport: { width: 1280, height: 800 }, dichte: 'kompakt' },
   { viewport: { width: 1180, height: 820 }, dichte: 'handschuh' },
 ] as const) {
-  test(`${fall.viewport.width} px ${fall.dichte}: der Name steht ungekürzt in 16 px, Ruhezustände ohne Wort`, async ({
+  test(`${fall.viewport.width} px ${fall.dichte}: der Name steht ungekürzt in der Stufe titel, Ruhezustände ohne Wort`, async ({
     page,
   }) => {
     await page.setViewportSize(fall.viewport);
@@ -75,7 +75,8 @@ for (const fall of [
 
     const masse = await nameMasse(page);
     expect(masse.gekuerzt, `Name gekürzt (Breite ${masse.breite} px)`).toBe(false);
-    expect(masse.schrift).toBe('16px');
+    // Stufe `titel` wächst mit der Dichte (LLH-1774, Entscheidung 16.11.2026): 16 / 20 px.
+    expect(masse.schrift).toBe(fall.dichte === 'handschuh' ? '20px' : '16px');
 
     // Ruhezustände ohne Wort: der Kopf trägt weder „Ton bereit“ noch „Benachrichtigung“ noch SYNC.
     const kopf = page.locator('header');

@@ -1,7 +1,7 @@
 import { useId, type CSSProperties, type ReactNode } from 'react';
 import type { Farbrollen } from '../../theme/tokens';
 import Augenbraue from './Augenbraue';
-import { monoStil, useRollen } from './rollenwerte';
+import { useRollen, schriftStil } from './rollenwerte';
 
 /**
  * Paneel — die Grundfläche für Seitenleisten, Kachel-Paneele und Listenblöcke.
@@ -70,10 +70,13 @@ export function paneelKopfRechtsStil(token: { paddingSM: number }): CSSPropertie
   };
 }
 
-/** Das Mono-Meta im Kopf: kürzt mit Auslassung statt überzulaufen. */
+/**
+ * Das Meta im Kopf: Rolle `meta` in der Textschrift mit gleich breiten Ziffern (LLH-1777; vorher
+ * Mono), kürzt mit Auslassung statt überzulaufen.
+ */
 export function paneelMetaStil(rollen: Pick<Farbrollen, 'schwach'>): CSSProperties {
   return {
-    ...monoStil(11),
+    ...schriftStil('meta'),
     color: rollen.schwach,
     minWidth: 0,
     overflow: 'hidden',

@@ -38,7 +38,14 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import DruckKnopf from '../components/druck/DruckKnopf';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { NUR_VORLESER, Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrument';
+import {
+  NUR_VORLESER,
+  Paneel,
+  PaneelZeile,
+  schriftStil,
+  useRollen,
+  zahlStil,
+} from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
@@ -72,6 +79,7 @@ import FernmeldewesenReiter from '../fernmeldewesen/FernmeldewesenReiter';
 import { linkZeilenzielStil } from '../components/linkZeilenziel';
 import { useExterneStellen } from '../stammdaten/externeStellenVorschlaege';
 import { zeitpunkt } from '../anzeige/zeitDarstellung';
+
 import './kommunikationsplanPrint.css';
 
 /**
@@ -153,11 +161,12 @@ function StelleZelle({ zeile: p }: { zeile: PlanZeile }) {
           <Gedaempft>{z.nebentext}</Gedaempft>
         </>
       )}
-      {/* Kanäle externer Stellen (LFH-893): Kennungen in Mono, je eine eigene Angabe. */}
+      {/* Kanäle externer Stellen (LFH-893), je eine eigene Angabe. In der Textschrift: ein
+          geplanter Kanal trägt das Wort „(geplant)“ (LLH-1777, gemischt nie Mono). */}
       {z.kanaele.length > 0 && (
         <Flex wrap data-lfh="stelle-kanaele" gap={token.marginXS}>
           {z.kanaele.map((k) => (
-            <span key={k} style={monoStil(12)}>
+            <span key={k} style={schriftStil('meta')}>
               <Gedaempft>{k}</Gedaempft>
             </span>
           ))}
@@ -180,12 +189,22 @@ function VerbindungenZelle({ verbindungen }: { verbindungen: VerbindungsAnzeige[
               // Ein Bedienziel wie die Zeilenziele des Stabs: Höhe aus `controlHeight` (Gate 3).
               <a
                 href={v.verweis}
-                style={{ ...linkZeilenzielStil(token), ...monoStil(14), overflowWrap: 'anywhere' }}
+                data-schrift="kennung"
+                style={{
+                  ...linkZeilenzielStil(token),
+                  ...zahlStil('text'),
+                  overflowWrap: 'anywhere',
+                }}
               >
                 {v.wert}
               </a>
             ) : (
-              <span style={{ ...monoStil(14), overflowWrap: 'anywhere' }}>{v.wert}</span>
+              <span
+                data-schrift="kennung"
+                style={{ ...zahlStil('text'), overflowWrap: 'anywhere' }}
+              >
+                {v.wert}
+              </span>
             ))}
           {v.hinweis && <Gedaempft>{v.hinweis}</Gedaempft>}
         </Flex>
@@ -713,7 +732,7 @@ export default function KommunikationsplanPage() {
                   ) : (
                     <>
                       <span>Leitstelle</span>
-                      <span style={monoStil(14, 500)}>—</span>
+                      <span style={zahlStil('text', 500)}>—</span>
                       {/* Ohne Stellen fehlt alles; sonst fehlt nur die Skizze (Spec-Delta). */}
                       <Gedaempft>
                         {stellen.zustand !== 'daten'

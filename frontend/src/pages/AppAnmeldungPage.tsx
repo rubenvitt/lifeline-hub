@@ -5,6 +5,8 @@ import { appCodeAusstellen } from '../api/auth';
 import { fehlerText } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { Bildmarke } from '../marke/Bildmarke';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
+
 import './LoginPage.css';
 
 /**
@@ -68,7 +70,7 @@ export default function AppAnmeldungPage({ navigiere = (a) => window.location.as
   } else {
     inhalt = (
       <>
-        <Typography.Title level={2} style={{ fontSize: 20, marginTop: 0 }}>
+        <Typography.Title level={2} style={{ fontSize: schriftGroesse('titel'), marginTop: 0 }}>
           In der Mac-App anmelden als {benutzer?.anzeigename}
         </Typography.Title>
         <Typography.Paragraph type="secondary">Konto {benutzer?.benutzername}</Typography.Paragraph>

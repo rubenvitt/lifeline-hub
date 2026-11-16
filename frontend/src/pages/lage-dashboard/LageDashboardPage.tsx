@@ -11,11 +11,10 @@
  * 2. Drei Paneele (1fr 1fr 1.1fr, unter `lg` gestapelt): Gefahrenmatrix (je Gefahrentyp über alle
  *    Gebiete verdichtet), Sichtung (BBK-Farben), Jüngste ETB-Einträge (im Code „Meldungsstrom“;
  *    neue Einträge per Sammelbanner, nie eingeschoben).
- * 3. Führungsstand: Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv. Er steht hier, weil an
- *    ihm die Alarmbeiträge überfälliger Aufträge und Meldungen hängen — eine überfällige
- *    Sofortmeldung soll auf dieser Seite rot stehen. Aufträge und Meldungen kommen aus dem
- *    Modulzähler, nicht aus eigener Zählung (LFH-550, `fuehrungsZahlen.ts`): dieselbe Zahl wie im
- *    Modulpanel und im Führungsüberblick.
+ * 3. Stand: Lagebericht und UHS aktiv. Aufträge und Meldungen stehen seit LLH-1743 nur noch im
+ *    Überblick („Führen: was ist zu tun“, Seitenrollen in `frontend/AGENTS.md`); ihre Alarmbeiträge
+ *    (überfällig, Sofortmeldungen ab Eingang) trägt die Alarmzeile „Was brennt“ ganz oben, auf
+ *    beiden Übersichten dieselbe (`lage/useWasBrennt.ts`).
  *
  * Die Warnstufe hat keine eigene Kennzahl: sie steht als Hinweis im Seitenkopf und je Gefahrentyp
  * in der Matrix. Daneben steht eine geltende oder angekündigte DWD-Warnung als Marke (LLH-1117,
@@ -44,29 +43,35 @@
  * freigegebenes Modul (LFH-669, `useLagebild`) wird nicht angefragt und steht als „—" bzw. Satz mit
  * Grund da, nie als Ausfall und nie als 0.
  */
+import dayjs from 'dayjs';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
-  auftraegePfad,
   evakuierungPfad,
   einsatzModulPfad,
   etbPfad,
   gefahrenPfad,
   lageberichtDetailPfad,
   lageberichtePfad,
-  meldungenPfad,
   personenAufnahmePfad,
   pegelZielPfad,
   personenPfad,
+  ueberblickPfad,
   unfallhilfsstellenListePfad,
   wetterPegelPfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
 import { ladeModulFreigaben } from '../../api/einsaetze';
-import { istKeyFreigegeben, istPfadGesperrt, modulName } from '../../einsatz/modulRegistry';
+import {
+  KEINE_BERECHTIGUNG,
+  istKeyFreigegeben,
+  istPfadGesperrt,
+  istSprungGesperrt,
+  modulName,
+} from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import { ladeMatrix } from '../../api/gefahren';
 import { wetterAbfrage } from '../../api/wetter';
@@ -84,8 +89,10 @@ import {
   PaneelReihe,
   Sammelbanner,
   WarnstufenHinweis,
-  monoStil,
+  AlarmZeile,
   useRollen,
+  schriftGroesse,
+  schriftStil,
 } from '../../components/instrument';
 import { warnstufeKennzahl } from '../../theme/statusFarben';
 import {
@@ -116,11 +123,13 @@ import { kontakteJeStunde } from './verlauf';
 import { versorgungsBilanz } from '../../personen/personenBilanz';
 import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
-import { auftragsStand, meldungsStand, nachforderungsStand } from './fuehrungsZahlen';
+import { nachforderungsStand } from './fuehrungsZahlen';
 import { bandKennzahl, fuehrungsKennzahlen } from './kennzahlAnzeige';
 import LagebildGrossbild from './LagebildGrossbild';
 import { IconPfeileAuswaerts } from '../../icons';
 import { kraefteZustand, useLagebild } from './useLagebild';
+import { useWasBrennt } from '../../lage/useWasBrennt';
+import { alarmZiel } from '../../lage/alarmZiel';
 
 /**
  * Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener Block mit
@@ -153,6 +162,8 @@ export default function LageDashboardPage() {
   const { abBreite } = useViewport();
   const { konventionen: konv } = useAnzeigeKonventionen();
   const jetzt = useJetzt(TAKT_MS);
+  // Alarmzeile „Was brennt“ (LLH-1743): derselbe Hook wie im Überblick, gegen die Uhr der Seite.
+  const wasBrenntDaten = useWasBrennt(einsatzId, dayjs(jetzt));
   const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
   // Großbild (LLH-1747, Spec `grossbild-ansicht`): ein Zweig dieser Seite, nur im React-State. Die
   // Seite bleibt darunter stehen, Abfragen und gehaltener Zuschnitt laufen weiter.
@@ -380,13 +391,12 @@ export default function LageDashboardPage() {
     zGefahren === 'daten' && lagebild ? warnstufeTon(lagebild.hoechsteWarnstufe) : 'neutral';
   const dwdWarnung = kopfWarnung(wetterWarnungen, jetzt, konv);
   const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
-  // Führungsstand (siehe Dateikopf): Aufträge und Meldungen aus dem Modulzähler (LFH-550), dieselbe
-  // Zahl wie im Modulpanel. Ein fehlendes Modul steht als „—" mit Grund da, nie als 0. Seite und
-  // Großbild lesen dieselbe Liste (`kennzahlAnzeige.ts`, LLH-1747).
+  const ueberblickGesperrt = istSprungGesperrt('ueberblick', wasBrenntDaten.freigaben);
+  // Stand (siehe Dateikopf): Lagebericht und UHS aktiv. Aufträge und Meldungen haben ihre Heimat
+  // im Überblick (LLH-1743). Seite und Großbild lesen dieselbe Liste (`kennzahlAnzeige.ts`,
+  // LLH-1747).
   const fuehrungsQuellen = {
     lagebild,
-    auftraege: auftragsStand(zaehlerQuery),
-    meldungen: meldungsStand(zaehlerQuery),
     lageberichte: quellZustand.lageberichte,
     uhs: quellZustand.uhs,
     konv,
@@ -394,8 +404,6 @@ export default function LageDashboardPage() {
   const fuehrungsstand = fuehrungsKennzahlen({
     ...fuehrungsQuellen,
     ziele: {
-      auftraege: auftraegePfad(einsatzId),
-      meldungen: meldungenPfad(einsatzId),
       lageberichte: lageberichtePfad(einsatzId),
       lagebericht: (id) => lageberichtDetailPfad(einsatzId, id),
       uhs: unfallhilfsstellenListePfad(einsatzId),
@@ -420,38 +428,55 @@ export default function LageDashboardPage() {
             ]}
           />
         }
-        // Der rechte Slot trägt hier Meta, die Wettermarke (ein Sprung) und ab `md` den Knopf
-        // „Großbild“ (LLH-1747).
+        // Der rechte Slot trägt Meta, die Wettermarke (ein Sprung), ab `md` den Knopf „Großbild“
+        // (LLH-1747) und den Sprung in den Überblick: die Übersichten verweisen aufeinander
+        // (LLH-1743, Spec `lage-verdichtung`).
         aktionen={
-          <span
-            data-lfh="lagebild-meta"
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: token.padding,
-              ...monoStil(11),
-              color: rollen.schwach,
-            }}
-          >
-            <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
-            {warnTon !== 'neutral' && lagebild && (
-              <WarnstufenHinweis ton={warnTon === 'alarm' ? 'alarm' : 'achtung'}>
-                Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
-              </WarnstufenHinweis>
-            )}
-            {dwdWarnung && (
-              <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
-            )}
-            {abBreite('md') && (
-              <Button icon={<IconPfeileAuswaerts />} onClick={() => setIsGrossbild(true)}>
-                Großbild
-              </Button>
-            )}
-          </span>
+          <>
+            <span
+              data-lfh="lagebild-meta"
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: token.padding,
+                ...schriftStil('meta'),
+                fontSize: schriftGroesse('fein'),
+                color: rollen.schwach,
+              }}
+            >
+              <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
+              {warnTon !== 'neutral' && lagebild && (
+                <WarnstufenHinweis ton={warnTon === 'alarm' ? 'alarm' : 'achtung'}>
+                  Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
+                </WarnstufenHinweis>
+              )}
+              {dwdWarnung && (
+                <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
+              )}
+              {abBreite('md') && (
+                <Button icon={<IconPfeileAuswaerts />} onClick={() => setIsGrossbild(true)}>
+                  Großbild
+                </Button>
+              )}
+            </span>
+            <Button
+              disabled={ueberblickGesperrt}
+              title={ueberblickGesperrt ? KEINE_BERECHTIGUNG : undefined}
+              onClick={() => waehle(ueberblickPfad(einsatzId))}
+            >
+              {modulName('ueberblick')}
+            </Button>
+          </>
         }
       >
         <DashboardFlaeche kennung="lagebild">
+          {/* Alarmzeile „Was brennt“ (LLH-1743, Spec `lage-alarmzeile`): das erste Element unter
+            dem Seitenkopf, dieselbe wie im Überblick. */}
+          <AlarmZeile
+            daten={wasBrenntDaten}
+            ziel={(e) => alarmZiel(e, einsatzId, wasBrenntDaten.freigaben)}
+          />
           {wechsel && (
             <Sammelbanner
               aktion={{
@@ -558,13 +583,9 @@ export default function LageDashboardPage() {
             />
           </PaneelReihe>
 
-          {/* Führungsstand (siehe Dateikopf). Die Überfällig-Zahlen sind Alarmbeiträge und
-            behalten ihren Ton. */}
-          <Kennzahlenband
-            beschriftung="Führungsstand"
-            spalten={abBreite('md') ? 4 : 2}
-            style={{ border: 'none' }}
-          >
+          {/* Stand (siehe Dateikopf): Lagebericht und Unfallhilfsstellen. Aufträge und Meldungen
+            haben ihre Heimat im Überblick (LLH-1743). */}
+          <Kennzahlenband beschriftung="Stand" spalten={2} style={{ border: 'none' }}>
             {fuehrungsstand.map((a) => (
               <Kennzahl
                 key={a.titel}

@@ -12,7 +12,8 @@ use lifeline_hub::einsatz::zaehler::{
     NachforderungsMerkmale, NachforderungsZaehler,
 };
 use lifeline_hub::entlassung::BeendetAls;
-use lifeline_hub::meldung::MeldungStatus;
+use lifeline_hub::kommunikation::Prioritaet;
+use lifeline_hub::meldung::{ist_sofort, MeldungStatus, Meldungsart};
 use lifeline_hub::nachforderung::NachforderungStatus;
 use lifeline_hub::person::{
     versorgung_von, zaehle_lage_sichtung, PersonStatus, Sichtungskategorie, TransportDurch,
@@ -65,6 +66,11 @@ fn meldung(f: &Value) -> MeldungsMerkmale {
         ist_bestaetigt: flag(f, "ist_bestaetigt"),
         ist_ueberfaellig: flag(f, "ist_ueberfaellig"),
         eskaliert: flag(f, "eskaliert"),
+        ist_sofort: ist_sofort(
+            Meldungsart::parse(f["meldungsart"].as_str().unwrap()).expect("bekannte Art"),
+            Prioritaet::parse(f["prioritaet"].as_str().unwrap()).expect("bekannte Priorität"),
+        ),
+        ist_dringend: f["prioritaet"] == "dringend",
     }
 }
 
@@ -110,6 +116,16 @@ fn meldungen_zaehlen_wie_das_fixture() {
             flag(f, "bestaetigung_ueberfaellig"),
             "Bestätigung überfällig: {name}"
         );
+        assert_eq!(
+            z.sofort_offen == 1,
+            flag(f, "sofort_offen"),
+            "Sofort offen: {name}"
+        );
+        assert_eq!(
+            z.dringend_offen == 1,
+            flag(f, "dringend_offen"),
+            "Dringend offen: {name}"
+        );
     }
 
     let merkmale: Vec<_> = faelle.iter().map(meldung).collect();
@@ -120,6 +136,9 @@ fn meldungen_zaehlen_wie_das_fixture() {
             offen: zahl(&e["offen"]),
             ungesehen: zahl(&e["ungesehen"]),
             bestaetigung_ueberfaellig: zahl(&e["bestaetigung_ueberfaellig"]),
+            sofort_offen: zahl(&e["sofort_offen"]),
+            dringend_offen: zahl(&e["dringend_offen"]),
+            sofort_aelteste_at: None,
         }
     );
 }

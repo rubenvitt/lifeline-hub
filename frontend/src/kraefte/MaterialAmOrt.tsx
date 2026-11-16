@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { setzeMaterialStatus, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
-import { monoStil, useRollen } from '../components/instrument';
+import { schriftStil, useRollen, zahlStil } from '../components/instrument';
 import { KennungsLink } from '../components/kennungsLink';
 import { MODUL_MATERIAL_GESPERRT } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
@@ -298,7 +298,7 @@ export default function MaterialAmOrt({
           {showKopfzahl && (
             <span
               data-testid="material-am-ort-kopf"
-              style={{ ...monoStil(12), color: rollen.gedaempft }}
+              style={{ ...schriftStil('meta'), color: rollen.gedaempft }}
             >
               {materialKopfzahl(posten)}
             </span>
@@ -362,8 +362,16 @@ export default function MaterialAmOrt({
             >
               <span>{p.bezeichnung}</span>
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
-              {/* Eine Zahl bricht nicht um. */}
-              <span style={{ ...monoStil(13), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
+              {/* Eine Zahl bricht nicht um. Die reine Menge in Mono, „30 von 50 übrig“ trägt Wörter
+                  und steht in der Textschrift (LLH-1777). */}
+              <span
+                style={{
+                  ...(/^\d+$/.test(mengeText(p)) ? zahlStil('text') : schriftStil('text')),
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {mengeText(p)}
+              </span>
               {/* Statuswahl und „Rückgängig“ teilen ein Gitterfeld (LLH-1722, Spec `material-am-ort`):
                   der Rückweg steht in der gehaltenen Zeile, aber nie an der Stelle des Lösen-Knopfs,
                   den ein zweiter Tipp träfe. */}

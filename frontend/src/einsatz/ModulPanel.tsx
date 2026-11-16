@@ -25,6 +25,7 @@ import { bringIntoView } from '../components/bringIntoView';
 import { abonniereRahmenOben } from '../components/rahmenOben';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { handleLinkKlick } from '../routing/linkModifier';
+import { schriftGroesse, zahlStil } from '../components/instrument/rollenwerte';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -114,7 +115,7 @@ export function modulZeilenStil(
     borderRadius: form.radiusSteuer,
     textAlign: 'left',
     width: '100%',
-    fontSize: 13,
+    fontSize: schriftGroesse('text'),
     cursor: zustand.gesperrt ? 'not-allowed' : 'pointer',
     background: zustand.aktiv ? farben.flaeche3 : 'transparent',
     color: zustand.gesperrt
@@ -139,7 +140,7 @@ export function modulBeschreibungStil(
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
-    fontSize: 12,
+    fontSize: schriftGroesse('klein'),
     lineHeight: 1.35,
     whiteSpace: 'normal',
     overflow: 'hidden',
@@ -337,7 +338,7 @@ export function ModulListe({
                 style={{
                   flexShrink: 0,
                   fontFamily: schrift.zahl,
-                  fontSize: 11,
+                  fontSize: schriftGroesse('fein'),
                   fontVariantNumeric: 'tabular-nums',
                   color: aktiv ? farben.text2 : farben.schwach,
                 }}
@@ -521,17 +522,7 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
             }}
           >
             <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>
-            <span
-              style={{
-                fontFamily: schrift.zahl,
-                fontSize: 18,
-                fontWeight: 500,
-                fontVariantNumeric: 'tabular-nums',
-                color: farben.text,
-              }}
-            >
-              {dauer}
-            </span>
+            <span style={{ ...zahlStil('titel', 500), color: farben.text }}>{dauer}</span>
           </div>
         )}
       </div>

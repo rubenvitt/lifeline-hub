@@ -235,7 +235,7 @@ const TICKETS = String.raw`${TICKET}(?:[ /·]+(?:[A-Z]\d+[a-z]?|${TICKET}))*(?: 
 /**
  * Ein Verweis: Ticket (mit Entscheidung, Punkt oder Phase), ADR, Spec, Pfad in Doku, Archiv oder
  * Tests, Wächter, Zunder-Kurzkennung, Entscheidungskürzel, Datum, „löst … ab“, „schreibt … fort“,
- * „seit …“, „Rollout …“.
+ * „umgekehrt … gegenüber …“, „seit …“, „Rollout …“.
  */
 const VERWEIS = [
   String.raw`(?:Epic |seit |Rollout )?${TICKETS}`,
@@ -252,6 +252,8 @@ const VERWEIS = [
   String.raw`Entscheidungen? E\d+(?:–E\d+)? aus ${TICKET}`,
   String.raw`(?:löst|ersetzt) .*${TICKET}.*?(?: ab)?`,
   String.raw`schreibt .*${TICKET}.* fort`,
+  // Umkehr einer früheren Festlegung: „umgekehrt 15.11.2026 gegenüber LLH-1328 „Titel““.
+  String.raw`umgekehrt\s+\d{1,2}\.\d{1,2}\.\d{4}\s+gegenüber\s+${TICKET}(?:\s+„[^“]*“)?`,
   String.raw`Herleitung[:\s][\s\S]*`,
 ].join('|');
 const VERWEIS_GLIED = new RegExp(`^(?:${VERWEIS})$`);

@@ -2,7 +2,7 @@ import { POSITION_KUERZEL, POSITION_LABELS, POSITION_OPTIONEN } from '../api/per
 import type { StaerkePosition } from '../api/types';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { Select } from '../components/Select';
-import { monoStil } from '../components/instrument';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 export interface PositionAngabeProps {
   kennung?: string;
@@ -36,7 +36,7 @@ export default function PositionAngabe({
         wert == null ? null : ausgeschrieben ? (
           POSITION_LABELS[wert]
         ) : (
-          <span style={monoStil(13)} title={POSITION_LABELS[wert]}>
+          <span style={zahlStil('text')} title={POSITION_LABELS[wert]}>
             {POSITION_KUERZEL[wert]}
           </span>
         )

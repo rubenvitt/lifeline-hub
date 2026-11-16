@@ -5,7 +5,7 @@ import { loadBrVerlauf } from '../../api/einsatzBereitstellungsraum';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BrVerlaufEintrag } from '../../api/types';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { monoStil, NUR_VORLESER, useRollen } from '../../components/instrument';
+import { NUR_VORLESER, useRollen, schriftGroesse, zahlStil } from '../../components/instrument';
 import {
   PANEEL_FEHLER_TEXT,
   PANEEL_FEHLER_TITEL,
@@ -52,8 +52,10 @@ export default function BrVerlauf({ einsatzId, brId, bezeichnung }: BrVerlaufPro
         data-lfh="br-verlauf-fehler"
         style={{ ...paddingStyle, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        <b style={{ color: rollen.alarmText, fontSize: 13 }}>{PANEEL_FEHLER_TITEL}</b>
-        <span style={{ color: rollen.gedaempft, fontSize: 12 }}>
+        <b style={{ color: rollen.alarmText, fontSize: schriftGroesse('text') }}>
+          {PANEEL_FEHLER_TITEL}
+        </b>
+        <span style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}>
           Verlauf konnte nicht geladen werden. {PANEEL_FEHLER_TEXT}
         </span>
         <span>
@@ -122,13 +124,18 @@ function VerlaufZeile({ eintrag: e }: { eintrag: BrVerlaufEintrag }) {
         borderBottom: `1px solid ${rollen.linie}`,
       }}
     >
-      <span style={{ ...monoStil(13), color: rollen.gedaempft }}>
+      <span style={{ ...zahlStil('text'), color: rollen.gedaempft }}>
         <ZeitAnzeige wert={e.zeitpunkt_at} rolle="kurz" />
       </span>
       <span>{verlaufText(e)}</span>
-      <span style={e.objekt_typ === 'fahrzeug' ? monoStil(13) : undefined}>{e.objekt_name}</span>
+      <span
+        data-schrift={e.objekt_typ === 'fahrzeug' ? 'kennung' : undefined}
+        style={e.objekt_typ === 'fahrzeug' ? zahlStil('text') : undefined}
+      >
+        {e.objekt_name}
+      </span>
       {e.notiz && (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
           {e.notiz}
         </Typography.Text>
       )}

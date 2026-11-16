@@ -20,7 +20,6 @@ import { KennungsLink } from '../components/kennungsLink';
 import { betreuungsstellePfad } from '../routing/deeplinks';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
-import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
@@ -33,6 +32,7 @@ import {
   personenZahl,
 } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Block „Betreuungsstellen" der Betreuungsseite (seit LLH-1034 ihr einziger Block).
@@ -230,7 +230,8 @@ const stellenSpalten = (
     {
       key: 'belegt',
       title: 'belegt',
-      zahl: true,
+      // Keine Zahlspalte: die Zelle trägt Wörter („keine Meldung“, „namentlich …“); Mono nur an
+      // der Zahl selbst (LLH-1777).
       sortWert: (s) => s.belegung?.belegt,
       render: (_, s) => {
         const zusatz = namentlichTeile(namentlich?.get(s.id), s.belegung != null);
@@ -250,7 +251,7 @@ const stellenSpalten = (
         const stufe = auslastung(s.belegung.belegt, s.kapazitaet_personen);
         return (
           <Space wrap>
-            <span>{personenZahl(s.belegung.belegt)}</span>
+            <span style={zahlStil}>{personenZahl(s.belegung.belegt)}</span>
             {stufe && <StatusTag darstellung={stufe} />}
             {hinweis}
           </Space>
@@ -404,7 +405,7 @@ export default function StellenBlock({
         aktion,
         weitere,
         namentlichJeStelle,
-        monoStil(token.fontSize),
+        zahlStil('text'),
         istSchmal,
         token.marginXS,
       ),
@@ -415,7 +416,6 @@ export default function StellenBlock({
       aktion,
       weitere,
       namentlichJeStelle,
-      token.fontSize,
       istSchmal,
       token.marginXS,
     ],

@@ -20,15 +20,16 @@ import {
 import { Popover } from 'antd';
 import {
   naechsterIndex,
-  monoStil,
   segmentStil,
   segmentZelleStil,
   useRollen,
   zielEinzug,
+  zahlStil,
 } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { useZeigerLage, type ZeigerQuelle } from './mausPosition';
 import { blindHinweis, type GrundlageOption, type GrundlageWert } from './leistenDaten';
+
 import '../../theme/sprache.css';
 import './lagekarte.css';
 
@@ -292,13 +293,14 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
     // Nur mit feinem Zeiger (`.lfh-nur-feiner-zeiger`, LFH-712/LFH-971): gespeist wird sie über
     // `mousemove`, auf reinem Touch bliebe sie ein „—“-Kästchen, das wie ein Fehler aussieht. Die
     // Klasse sitzt an einer Hülle ohne Inline-`display` — der schlüge die Regel.
+    // Kein Ziel: die Anzeige folgt dem Zeiger und lag mit der Schrift der Stufe (LLH-1774) unter
+    // ihm; `pointer-events: none`, damit jeder Klick die Karte erreicht (Review LLH-1719).
     <div
       className="lfh-nur-feiner-zeiger"
-      style={{ alignSelf: 'flex-start', pointerEvents: 'auto' }}
+      style={{ alignSelf: 'flex-start', pointerEvents: 'none' }}
     >
       <div
         data-lfh="zeiger-koordinate"
-        title="Position des Zeigers"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -308,7 +310,7 @@ function ZeigerKoordinate({ quelle }: { quelle: ZeigerQuelle }) {
           background: rollen.kopf,
           border: `1px solid ${rollen.linieStark}`,
           color: rollen.gedaempft,
-          ...monoStil(11),
+          ...zahlStil('fein'),
         }}
       >
         <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>

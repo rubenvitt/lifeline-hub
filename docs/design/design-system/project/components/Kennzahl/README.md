@@ -83,7 +83,8 @@ Wege (breitere Fuge, Kacheln):
 
 Regeln dazu:
 
-- **Kennzahlenband**: immer sechs Plätze (vier Kern, zwei Lage), jede Kennzahl ein
+- **Kennzahlenband**: „Lage in Zahlen“ hat immer sechs Plätze (vier Kern, zwei Lage); der
+  Führungsstand des Überblicks nur seine Handlungszahlen. Jede Kennzahl hat einen
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
   per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen); Neuzuschnitt während der Betrachtung als Sammelbanner. Die Fuge
   zeichnet die Zelle, nicht der Rastergrund: Grund `flaeche`, Umriss je Zelle über
@@ -98,14 +99,15 @@ Regeln dazu:
   steht deshalb vorn.
 
 - **Eine Heimat je Zahl**:
-  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig),
+  Aufträge und Meldungen (offen, in Arbeit, überfällig = davon überfällig, Bestätigung überfällig, Sofort- und dringende Meldungen offen samt Eingang der ältesten),
   Nachforderungen (offen, je Stufe, überfällig), Erinnerungen (fällig) und Lagemeldungen
   (neu) nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
   Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
   Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
-  über die Gründe der Tönung des Meldebilds (`toenungsGruende`); der Überblick summiert sie je
-  Abschnitt. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
+  über die Gründe der Tönung des Meldebilds (`toenungsGruende`, gelesen über
+  `lage/ausfallJeEinheit.ts`); der Überblick summiert sie je Abschnitt, die Alarmzeile nennt die
+  Einheiten. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
   jüngste Meldung allein (`abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
   ihm steht: Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit

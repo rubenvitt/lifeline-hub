@@ -179,6 +179,37 @@ pub fn zaehle_sanitaetsdienst(
     z
 }
 
+/// Eine Einheit mit überfälliger Rückmeldung: nur ihr Name und seit wann (LLH-1743).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LagemonitorRueckmeldung {
+    pub einheit: String,
+    /// Minuten seit der Fälligkeit (abgerundet).
+    pub seit_min: i64,
+}
+
+/// Die Werte der Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
+/// Personenbezug“, design.md D5): Zahlen aus denselben Zählfunktionen wie der Modulzähler und die
+/// überfälligen Rückmeldungen nach der Regel von `meldung::rueckmeldung`. Namen nur von Einheiten
+/// und Abschnitten; kein Meldungs-, Auftrags- oder Erinnerungstext. Den Ausfall trägt der Block
+/// nicht (D6: die Regel lebt im Browser, Folgeaufgabe).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LagemonitorAlarm {
+    /// Offene, unbestätigte Sofortmeldungen (`meldungen.sofort_offen` des Modulzählers).
+    pub sofort_offen: i64,
+    /// Eingang der ältesten davon (UTC); fehlt ohne offene Sofortmeldung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sofort_aelteste_at: Option<String>,
+    pub dringend_offen: i64,
+    pub bestaetigung_ueberfaellig: i64,
+    pub auftraege_ueberfaellig: i64,
+    pub erinnerungen_faellig: i64,
+    pub nachforderungen_ueberfaellig: i64,
+    /// Einheiten mit überfälliger Rückmeldung, die längste zuerst.
+    pub rueckmeldung_ueberfaellig: Vec<LagemonitorRueckmeldung>,
+    /// Bezeichnungen der Abschnitte im Lagezustand „kritisch“, in der Folge der Gliederung.
+    pub abschnitte_kritisch: Vec<String>,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LagemonitorAnzeige {
     /// Zeitpunkt der Berechnung (UTC, SQLite-Format).
@@ -199,6 +230,10 @@ pub struct LagemonitorAnzeige {
     /// (LLH-1574); dann zeigt der Monitor sie statt der Sichtungszeile.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sanitaetsdienst: Option<LagemonitorSanitaetsdienst>,
+    /// Werte der Alarmzeile (LLH-1743). Nur der gekoppelte Lagemonitor bekommt sie: [`verdichte`]
+    /// speist auch das Lagebild für Externe und die API v1, die den Block nicht tragen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alarm: Option<LagemonitorAlarm>,
 }
 
 /// GET /api/einsaetze/{id}/lagemonitor — nur für einen gekoppelten Lagemonitor; eine Person und
@@ -210,7 +245,93 @@ pub async fn lagebild(
     if ctx.geraet.as_ref().map(|g| g.ansicht) != Some(Funktionsansicht::Lagemonitor) {
         return Err(AppError::Forbidden);
     }
-    Ok(Json(verdichte(&state.pool, ctx.einsatz.id).await?))
+    let mut anzeige = verdichte(&state.pool, ctx.einsatz.id).await?;
+    let alarm = alarm(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+        &anzeige.stand_at,
+    )
+    .await?;
+    // Kachel und Alarmzeile zeigen in einer Antwort dieselbe Zahl (Review LLH-1743): `verdichte`
+    // und `alarm` zählen in getrennten Lesevorgängen; dazwischen kann eine Sofortmeldung
+    // eingehen oder bestätigt werden. Es gilt die Zählung des Alarm-Blocks.
+    anzeige.sofortmeldungen_offen = alarm.sofort_offen;
+    anzeige.alarm = Some(alarm);
+    Ok(Json(anzeige))
+}
+
+/// Die Werte der Alarmzeile für den Lagemonitor (LLH-1743, design.md D5). Prüft keine Rechte: der
+/// Aufrufer ist der gekoppelte Lagemonitor, und der Block trägt nur Zahlen und Namen von
+/// Einheiten und Abschnitten (wie `sofortmeldungen_offen`, Change `kcjecn9e`, D12).
+pub async fn alarm(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    jetzt: &str,
+) -> Result<LagemonitorAlarm, AppError> {
+    let meldungen = crate::meldung::repo::zaehlen(pool, einsatz_id, jetzt).await?;
+    let auftraege = crate::auftrag::repo::zaehlen(pool, einsatz_id, jetzt).await?;
+    let erinnerungen_faellig =
+        crate::erinnerung::repo::faellige_offene(pool, einsatz_id, jetzt).await?;
+    let nachforderungen = crate::nachforderung::repo::zaehlen(pool, einsatz_id, jetzt).await?;
+
+    // Rückmeldung je Einheit wie der Hinweis „Rückmeldung überfällig“ und das Meldebild
+    // (`meldung::rueckmeldung`): jüngste an die Einheit gebundene Meldung plus wirksame Frist.
+    let jetzt_utc = crate::zeit::parse_utc(jetzt)
+        .ok_or_else(|| AppError::Internal(format!("Zeitpunkt {jetzt}")))?;
+    let frist = crate::meldung::rueckmeldung::frist_min(pool, einsatz_id, org_id).await?;
+    // Aufgelöste Einheiten melden nichts (wie `letzte_je_einheit`).
+    let namen: std::collections::HashMap<i64, String> = sqlx::query_as(
+        "SELECT id, name FROM einsatz_einheit WHERE einsatz_id = ? AND aufgeloest_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .collect();
+    let mut rueckmeldung_ueberfaellig = Vec::new();
+    for r in crate::meldung::repo::letzte_je_einheit(pool, einsatz_id).await? {
+        let faellig = crate::meldung::rueckmeldung::faellig_at(&r.ereigniszeit, frist);
+        if !crate::meldung::rueckmeldung::ist_ueberfaellig(&faellig, jetzt_utc) {
+            continue;
+        }
+        let Some(einheit) = namen.get(&r.bezug_id) else {
+            continue;
+        };
+        let seit_min = crate::zeit::parse_utc(&faellig)
+            .map(|f| (jetzt_utc - f).num_minutes().max(0))
+            .unwrap_or(0);
+        rueckmeldung_ueberfaellig.push(LagemonitorRueckmeldung {
+            einheit: einheit.clone(),
+            seit_min,
+        });
+    }
+    rueckmeldung_ueberfaellig.sort_by(|a, b| {
+        b.seit_min
+            .cmp(&a.seit_min)
+            .then_with(|| a.einheit.cmp(&b.einheit))
+    });
+
+    let abschnitte_kritisch: Vec<String> = sqlx::query_scalar(
+        "SELECT name FROM einsatzabschnitt \
+         WHERE einsatz_id = ? AND lagezustand = 'kritisch' ORDER BY sortier, id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(LagemonitorAlarm {
+        sofort_offen: meldungen.sofort_offen,
+        sofort_aelteste_at: meldungen.sofort_aelteste_at,
+        dringend_offen: meldungen.dringend_offen,
+        bestaetigung_ueberfaellig: meldungen.bestaetigung_ueberfaellig,
+        auftraege_ueberfaellig: auftraege.ueberfaellig,
+        erinnerungen_faellig,
+        nachforderungen_ueberfaellig: nachforderungen.ueberfaellig,
+        rueckmeldung_ueberfaellig,
+        abschnitte_kritisch,
+    })
 }
 
 /// Die Verdichtung des Lagebilds. Sie trägt den gekoppelten Lagemonitor, das Lagebild für Externe
@@ -398,9 +519,11 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
     )
     .collect();
 
-    let sofortmeldungen_offen = crate::meldung::repo::count_sofort_offen(pool, einsatz_id).await?;
-
     let stand_at = crate::zeit::jetzt();
+    // Dieselbe Zählung wie der Modulzähler (`meldungen.sofort_offen`, LLH-1743): eine Regel.
+    let sofortmeldungen_offen = crate::meldung::repo::zaehlen(pool, einsatz_id, &stand_at)
+        .await?
+        .sofort_offen;
     let programm = crate::programmpunkt::repo::anstehende(
         pool,
         einsatz_id,
@@ -423,6 +546,7 @@ pub async fn verdichte(pool: &SqlitePool, einsatz_id: i64) -> Result<Lagemonitor
         sofortmeldungen_offen,
         programm,
         sanitaetsdienst,
+        alarm: None,
     })
 }
 
@@ -861,6 +985,7 @@ mod tests {
             sofortmeldungen_offen: 0,
             programm: Vec::new(),
             sanitaetsdienst: None,
+            alarm: None,
         };
         (pool, kopf, verdichtet)
     }

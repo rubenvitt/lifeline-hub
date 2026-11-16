@@ -238,7 +238,10 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     assert_eq!((offen, neu), (2, 1), "Erwartung aus der Liste: {liste:?}");
     assert_eq!(
         v["meldungen"],
-        json!({ "offen": offen, "ungesehen": neu, "bestaetigung_ueberfaellig": 0 }),
+        json!({
+            "offen": offen, "ungesehen": neu, "bestaetigung_ueberfaellig": 0,
+            "sofort_offen": 0, "dringend_offen": 0
+        }),
         "{v:?}"
     );
 
@@ -272,6 +275,113 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
     // selbst anlegen (auch der vollzogene: seine Quittung fehlt noch).
     assert_eq!(faellig, 3, "Erwartung aus der Liste: {liste:?}");
     assert_eq!(v["erinnerungen"], json!({ "faellig": faellig }), "{v:?}");
+}
+
+/// Delta-Spec `modul-zaehler`, „Sofort- und dringende Meldungen im Zähler“ und „Eingang der
+/// ältesten offenen Sofortmeldung“ (LLH-1743): offen und unbestätigt; eine Sofortmeldung mit
+/// Priorität „dringend“ zählt nur als Sofort. Dieselbe Zahl zeigt der Lagemonitor
+/// (`geraet_kopplung.rs`).
+#[tokio::test]
+async fn sofort_und_dringend_zaehlen_offen_und_unbestaetigt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(v["meldungen"]["sofort_offen"], json!(0), "{v}");
+    assert_eq!(v["meldungen"]["dringend_offen"], json!(0), "{v}");
+    assert!(
+        !v["meldungen"]
+            .as_object()
+            .unwrap()
+            .contains_key("sofort_aelteste_at"),
+        "ohne offene Sofortmeldung fehlt das Feld: {v}"
+    );
+
+    let mut ids = Vec::new();
+    for (art, prio) in [
+        ("sofortmeldung", "normal"),   // Sofort, Eingang 14:05
+        ("lagemeldung", "sofort"),     // Sofort, Eingang 14:02 (älteste)
+        ("sofortmeldung", "dringend"), // nur Sofort
+        ("rueckmeldung", "dringend"),  // Dringend
+        ("lagemeldung", "dringend"),   // Dringend, wird bestätigt
+        ("sofortmeldung", "sofort"),   // Sofort, wird bestätigt
+        ("lagemeldung", "normal"),     // nichts
+    ] {
+        let body = json!({
+            "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+            "inhalt": "Lage", "ereigniszeit": "2026-06-12 09:00:00",
+            "meldungsart": art, "prioritaet": prio,
+        });
+        let m = post(
+            &app,
+            &admin,
+            &format!("{basis}/meldungen"),
+            &body.to_string(),
+        )
+        .await;
+        ids.push(m["id"].as_i64().unwrap());
+    }
+    for (id, eingang) in [
+        (ids[0], "2026-06-12 14:05:00"),
+        (ids[1], "2026-06-12 14:02:00"),
+        // Um 13:30 eingegangen, erst um 14:20 zur Sofortmeldung heraufgestuft (Merker
+        // `sofortalarm_at`, LLH-1380): sie zählt ab dem Alarm, ist also nicht die älteste.
+        (ids[2], "2026-06-12 13:30:00"),
+        // Bestätigt und älter: zählt nicht als älteste.
+        (ids[5], "2026-06-12 13:00:00"),
+    ] {
+        sqlx::query("UPDATE meldung SET eingang_at = ? WHERE id = ?")
+            .bind(eingang)
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    sqlx::query("UPDATE meldung SET sofortalarm_at = '2026-06-12 14:20:00' WHERE id = ?")
+        .bind(ids[2])
+        .execute(&pool)
+        .await
+        .unwrap();
+    for id in [ids[4], ids[5]] {
+        let (status, m) = anfrage(
+            &app,
+            "POST",
+            &format!("{basis}/meldungen/{id}/bestaetigen"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{m:?}");
+    }
+
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(v["meldungen"]["sofort_offen"], json!(3), "{v}");
+    assert_eq!(v["meldungen"]["dringend_offen"], json!(1), "{v}");
+    assert_eq!(
+        v["meldungen"]["sofort_aelteste_at"],
+        json!("2026-06-12 14:02:00"),
+        "{v}"
+    );
+
+    // Erledigt ist nicht mehr offen.
+    for id in [ids[0], ids[1], ids[2]] {
+        sqlx::query("UPDATE meldung SET status = 'erledigt' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(v["meldungen"]["sofort_offen"], json!(0), "{v}");
+    assert!(
+        !v["meldungen"]
+            .as_object()
+            .unwrap()
+            .contains_key("sofort_aelteste_at"),
+        "{v}"
+    );
 }
 
 /// Überfällige Bestätigungspflicht (LFH-397): die Quelle der Warnsperre am
@@ -697,7 +807,10 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
     );
     assert_eq!(
         v["meldungen"],
-        json!({ "offen": 0, "ungesehen": 0, "bestaetigung_ueberfaellig": 0 }),
+        json!({
+            "offen": 0, "ungesehen": 0, "bestaetigung_ueberfaellig": 0,
+            "sofort_offen": 0, "dringend_offen": 0
+        }),
         "{v:?}"
     );
     // Nur die belegten Module — kein Zähler für Module ohne festgelegte Bedeutung.

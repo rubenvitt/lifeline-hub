@@ -20,9 +20,12 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import {
   Augenbraue,
   StatusChip,
-  monoStil,
   tonVonRolle,
   useRollen,
+  schriftGroesse,
+  schriftStil,
+  zahlStil,
+  Feldetikett,
 } from '../../components/instrument';
 import {
   LEERE_ROHDATEN,
@@ -128,13 +131,13 @@ function markerBildUrl(mk: KarteMarker, dunkel: boolean): string | null {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
-/** Ein Feld des Datenrasters: Augenbraue über dem Wert; mit Statusrolle als getönter Chip. */
+/** Ein Feld des Datenrasters: Feldetikett über dem Wert; mit Statusrolle als getönter Chip. */
 function RasterZelle({ feld }: { feld: RasterFeld }) {
   const { token, rollen } = useRollen();
   const ton = feld.rolle ? tonVonRolle(feld.rolle) : null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}>
-      <Augenbraue als="dt">{feld.label}</Augenbraue>
+      <Feldetikett als="dt">{feld.label}</Feldetikett>
       <dd style={{ margin: 0, minWidth: 0, overflowWrap: 'anywhere' }}>
         {ton ? (
           <StatusChip ton={ton} wort={feld.wert} />
@@ -142,8 +145,8 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
           <span
             style={
               feld.mono === false
-                ? { fontSize: 13, color: rollen.text }
-                : { ...monoStil(15), color: rollen.text }
+                ? { fontSize: schriftGroesse('text'), color: rollen.text }
+                : { ...zahlStil('text'), color: rollen.text }
             }
           >
             {feld.wert}
@@ -155,7 +158,7 @@ function RasterZelle({ feld }: { feld: RasterFeld }) {
 }
 
 /**
- * Marker-Inspector im Paneel „Ausgewählt": Symbol-Kachel, Name, Mono-Unterzeile, Datenraster (nur
+ * Marker-Inspector im Paneel „Ausgewählt": Symbol-Kachel, Name, Unterzeile, Datenraster (nur
  * Felder mit Datenquelle, siehe `auswahlRaster`), bei einer Einheit die letzte Meldung, Ort und
  * Aktionen.
  */
@@ -241,15 +244,30 @@ export default function Inspector({
         >
           <Augenbraue>Letzte Meldung</Augenbraue>
           <span
-            style={{ fontSize: 12, lineHeight: 1.5, color: rollen.text2, overflowWrap: 'anywhere' }}
+            style={{
+              fontSize: schriftGroesse('klein'),
+              lineHeight: 1.5,
+              color: rollen.text2,
+              overflowWrap: 'anywhere',
+            }}
           >
             {letzte.text}
           </span>
-          <span style={{ ...monoStil(10), color: rollen.schwach }}>{letzte.meta}</span>
+          <span
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.schwach,
+            }}
+          >
+            {letzte.meta}
+          </span>
         </section>
       )}
       {marker.typ === 'lagemeldung' && marker.lageMeldung && !lageOffen && (
-        <Typography.Paragraph style={{ margin: 0, fontSize: 12, color: rollen.text2 }}>
+        <Typography.Paragraph
+          style={{ margin: 0, fontSize: schriftGroesse('klein'), color: rollen.text2 }}
+        >
           {marker.lageMeldung.inhalt}
         </Typography.Paragraph>
       )}
@@ -268,7 +286,7 @@ export default function Inspector({
       )}
       {!ohneOrt && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-          <Augenbraue>Koordinate</Augenbraue>
+          <Feldetikett>Koordinate</Feldetikett>
           {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
             der Tooltip mit dem vollen Wortlaut hängt an Hover/Fokus, und auf Touch muss das
             Sichtbare tragen. Die Koordinate darüber bleibt ungekürzt. */}
