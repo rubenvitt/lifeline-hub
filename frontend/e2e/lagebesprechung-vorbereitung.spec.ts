@@ -12,6 +12,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, danach der Bericht offen. Geklickt, nicht nur
  *   `toBeVisible` (LFH-355).
  * - BEOBACHTER (LFH-435): der Lagestand steht, die Übernahme fehlt.
+ * - WERT NEBEN DER BEZEICHNUNG (LLH-1747): bei 1920 × 1080 beginnt der Wert höchstens 400 px rechts
+ *   der Bezeichnung, auf dem Handy bricht die Zeile um, statt über den Rand zu laufen.
  */
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -103,4 +105,43 @@ test('Beobachter: Lagestand ja, Übernahme nein', async ({ page }) => {
   await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
   await expect(zeile(page, 'auftraege').locator('[data-teil="wert"]')).toHaveText('2');
   await expect(page.getByRole('button', { name: 'In Lagebericht übernehmen' })).toHaveCount(0);
+});
+
+test.describe('Wert neben der Bezeichnung (LLH-1747)', () => {
+  test.describe('Fükw 1920 × 1080', () => {
+    test.use({ viewport: { width: 1920, height: 1080 } });
+
+    test('der Wert beginnt höchstens 400 px rechts der Bezeichnung', async ({ page }) => {
+      await anmeldenAlsAdmin(page, { startseite: false });
+      const einsatzId = await seede(page);
+      await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+      const z = zeile(page, 'betroffene');
+      await expect(z.locator('[data-teil="wert"]')).toHaveText('2');
+      const bezeichnung = (await z.locator('> span').first().boundingBox())!;
+      const wert = (await z.locator('[data-teil="wert"]').boundingBox())!;
+      expect(wert.x - bezeichnung.x).toBeLessThanOrEqual(400);
+      expect(wert.x).toBeGreaterThan(bezeichnung.x);
+    });
+  });
+
+  test.describe('Handy 390 × 844', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test('keine Zeile ragt über den Rand des Paneels', async ({ page }) => {
+      await anmeldenAlsAdmin(page, { startseite: false });
+      const einsatzId = await seede(page);
+      await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
+      await expect(zeile(page, 'sichtung').locator('[data-teil="wert"]')).not.toBeEmpty();
+      const ueberstand = await page
+        .locator('[data-lfh="vorbereitung-zeile"]')
+        .evaluateAll((zeilen) =>
+          zeilen.flatMap((z) =>
+            [...z.children]
+              .filter((k) => k.getBoundingClientRect().right > z.getBoundingClientRect().right + 1)
+              .map((k) => `${z.getAttribute('data-schluessel')}: ${k.textContent}`),
+          ),
+        );
+      expect(ueberstand).toEqual([]);
+    });
+  });
 });

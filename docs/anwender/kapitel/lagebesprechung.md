@@ -2,7 +2,7 @@
 titel: Lagebesprechung
 gruppen: [fuehrung]
 reihenfolge: 150
-quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs, src/lagebesprechung/ankuendigung.rs, src/erinnerung/scheduler.rs, src/benachrichtigung/text.rs]
+quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/useVorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungGrossbild.tsx, frontend/src/components/grossbild/, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs, src/lagebesprechung/ankuendigung.rs, src/erinnerung/scheduler.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
@@ -36,6 +36,14 @@ Einsatzes, bedienen Einsatzleitung und Führungspersonal.
 
 2. Soll der Stand festgehalten werden, „In Lagebericht übernehmen“ wählen. Das legt einen
    Lagebericht „Vorbereitung Lagebesprechung …“ an.
+
+### Die Lagebesprechung im Großbild zeigen
+
+Für einen Beamer oder Wandbildschirm im Führungsraum, ab Tablet-Breite:
+
+1. Im Seitenkopf „Großbild“ wählen. Termin, Zustand und die Zeilen der Vorbereitung stehen
+   bildschirmfüllend und groß, jeder Wert direkt neben seiner Bezeichnung.
+2. Zum Verlassen „Großbild verlassen“ wählen oder Esc drücken.
 
 ### Die Lagebesprechung abschließen
 
@@ -88,7 +96,9 @@ Gesetzt wird er nur hier.
 Die „Vorbereitung“ rechnet keine eigenen Zahlen, sie zeigt dieselben wie Überblick und
 Modulzähler. Fehlt einer Person das Recht auf eine Quelle oder ist die Quelle nicht geladen, steht
 „—“ mit Grund, nie eine 0. Sie gibt kein Vortragsschema vor und friert nichts ein; einen festen
-Stand gibt es nur über „In Lagebericht übernehmen“.
+Stand gibt es nur über „In Lagebericht übernehmen“. Das Großbild zeigt dieselben Zeilen ohne
+Quellenangabe und ohne Bedienung; die Quelle bleibt im Paneel und im übernommenen Lagebericht.
+Gehen währenddessen Alarme oder Hinweise ein, nennt es nur ihre Zahl.
 
 ### Fälliger Termin
 

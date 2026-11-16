@@ -75,7 +75,7 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 - [ ] 5.2 Anwenderdoku `docs/anwender/kapitel/lagebild.md` und `lagebesprechung.md` um
   „Großbild“ ergänzen (Einstieg, nur Ansehen, Verlassen, Alarmzahl) und die Bilder der Kapitel
   neu aufnehmen (`pnpm doku:bilder --grep lagebild`, `--grep lagebesprechung`); Wächter der Doku grün.
-- [ ] 5.3 `frontend/AGENTS.md`: Bausteine unter `components/grossbild/` in die Liste „Bausteine
+- [x] 5.3 `frontend/AGENTS.md`: Bausteine unter `components/grossbild/` in die Liste „Bausteine
   außerhalb von `instrument/`“ aufnehmen, mit Verweis auf die Spec.
 - [ ] 5.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis für den PR festhalten.
 
