@@ -105,7 +105,14 @@ import {
   toHerausgenommenesMaterial,
 } from '../kraefte/entlassene';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { StatusChip, StatusZelle, monoStil, useRollen } from '../components/instrument';
+import {
+  StatusChip,
+  StatusZelle,
+  useRollen,
+  schriftGroesse,
+  schriftStil,
+  zahlStil,
+} from '../components/instrument';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
 import Segmentleiste from '../components/instrument/Segmentleiste';
 import './kraefteuebersichtPrint.css';
@@ -337,10 +344,10 @@ function rasterSpalten(
       render: (_t, z) =>
         !staerkeBekannt ? (
           z.art === 'einheit' || z.art === 'fahrzeug' ? (
-            <span style={monoStil(12)}>—</span>
+            <span style={zahlStil('klein')}>—</span>
           ) : null
         ) : z.staerke ? (
-          <span style={monoStil(12)}>{staerkeText(z.staerke)}</span>
+          <span style={zahlStil('klein')}>{staerkeText(z.staerke)}</span>
         ) : z.besatzung ? (
           <StaerkeBesatzung zeilen={besatzungZeilen(z.besatzung)} />
         ) : null,
@@ -354,7 +361,7 @@ function rasterSpalten(
       width: 90,
       render: (_t, z) =>
         (z.art === 'einheit' && z.einheitId != null) || z.art === 'fahrzeug' ? (
-          <span data-lfh="meldebild-seit" style={monoStil(12)}>
+          <span data-lfh="meldebild-seit" style={zahlStil('klein')}>
             {z.seit ? kontext.zeit(z.seit) : '—'}
           </span>
         ) : null,
@@ -386,7 +393,9 @@ function rasterSpalten(
       abBreite: 'xxl',
       render: (_t, z) =>
         z.art === 'einheit' && z.funkrufname ? (
-          <span style={monoStil(12)}>{z.funkrufname}</span>
+          <span data-schrift="kennung" style={zahlStil('klein')}>
+            {z.funkrufname}
+          </span>
         ) : null,
     },
     // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht
@@ -397,7 +406,10 @@ function rasterSpalten(
       title: (
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span>Fahrzeuge und Personal</span>
-          <span data-lfh="status-legende" style={{ ...monoStil(10), fontWeight: 400 }}>
+          <span
+            data-lfh="status-legende"
+            style={{ ...schriftStil('meta'), fontSize: schriftGroesse('fein') }}
+          >
             bereit · gebunden · Ausfall
           </span>
         </span>
@@ -423,7 +435,7 @@ function ImEinsatzZelle({
   zeit: (utc: string) => string;
 }) {
   if (zustand !== 'daten') return null;
-  if (!eintrag) return <span style={monoStil(12)}>—</span>;
+  if (!eintrag) return <span style={zahlStil('klein')}>—</span>;
   const { dauer, einstufung } = eintrag;
   // Der Anker steht sehend im `title`, vorgelesen hinter der Zahl; die Einstufung dahinter.
   return (
@@ -446,7 +458,13 @@ function StaerkeBesatzung({ zeilen }: { zeilen: readonly string[] }) {
   return (
     <span
       data-lfh="meldebild-besatzung"
-      style={{ ...monoStil(10), display: 'flex', flexDirection: 'column', color: rollen.gedaempft }}
+      style={{
+        ...schriftStil('meta'),
+        fontSize: schriftGroesse('fein'),
+        display: 'flex',
+        flexDirection: 'column',
+        color: rollen.gedaempft,
+      }}
     >
       {zeilen.map((z) => (
         <span key={z}>{z}</span>
@@ -504,7 +522,11 @@ function StatusSpalte({
         {verteilung && (
           <span
             data-lfh="meldebild-statusverteilung"
-            style={{ ...monoStil(11), color: rollen.gedaempft }}
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.gedaempft,
+            }}
           >
             {verteilung}
           </span>
@@ -666,7 +688,7 @@ function RueckmeldungZelle({
       data-lfh="meldebild-rueckmeldung"
       data-zustand={anzeige.zustand}
       data-rolle={rolle}
-      style={{ ...monoStil(11), color: farbe, whiteSpace: 'nowrap' }}
+      style={{ ...zahlStil('fein'), color: farbe, whiteSpace: 'nowrap' }}
     >
       {zeit ?? '—'}
     </span>

@@ -11,7 +11,7 @@
  * Als eigener Baustein gebaut, damit die Dashboard-Bausteine (LFH-1162) ihn übernehmen können.
  */
 import { Link } from 'react-router';
-import { useRollen } from '../components/instrument';
+import { useRollen, schriftStil } from '../components/instrument';
 import { IconWarndreieck } from '../icons';
 import { dwdWarnstufe } from '../theme/statusFarben';
 import type { KopfWarnung } from './kopfWarnung';
@@ -33,7 +33,15 @@ export default function WetterKopfMarke({ warnung, ziel }: { warnung: KopfWarnun
           color: rollen.text,
         }}
       >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: farbe }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            ...schriftStil('warnung'),
+            color: farbe,
+          }}
+        >
           <span aria-hidden="true" style={{ display: 'inline-flex' }}>
             <IconWarndreieck size={14} />
           </span>

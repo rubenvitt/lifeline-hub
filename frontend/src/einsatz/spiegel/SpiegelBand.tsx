@@ -10,7 +10,7 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { useAuthOptional } from '../../auth/AuthContext';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { NUR_VORLESER, monoStil, useRollen } from '../../components/instrument';
+import { NUR_VORLESER, useRollen, zahlStil } from '../../components/instrument';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { createAndActivateEntwurf } from '../../etb/entwuerfe/entwurfStore';
 import { kopplungBeendetText } from '../../instanz/fuehrungText';
@@ -190,14 +190,14 @@ function BandInhalt({
               style={{ color: z.endsWith('abgelehnt') ? rollen.achtungText : rollen.text2 }}
             >
               <span aria-hidden="true">· </span>
-              <span style={monoStil(12)}>{z.split(' ')[0]}</span>
+              <span style={zahlStil('klein')}>{z.split(' ')[0]}</span>
               {z.slice(z.indexOf(' '))}
             </span>
           ))}
           {bruch && (
             <span data-lfh="spiegel-band-bruch" style={{ color: rollen.achtungText }}>
               <span aria-hidden="true">· </span>
-              <span style={monoStil(12)}>{bruch.split(' ')[0]}</span>
+              <span style={zahlStil('klein')}>{bruch.split(' ')[0]}</span>
               {bruch.slice(bruch.indexOf(' '))}
             </span>
           )}
@@ -337,7 +337,7 @@ function AntragZeile({
         borderBlockStart: `1px solid ${rollen.bannerLinie}`,
       }}
     >
-      <span style={monoStil(12)}>{zeitKurz(a.erfasst_at, konventionen)}</span>
+      <span style={zahlStil('klein')}>{zeitKurz(a.erfasst_at, konventionen)}</span>
       <strong>{antragArtWort(a.art)}</strong>
       {daten && <span>{daten}</span>}
       <span style={{ color: abgelehnt ? rollen.achtungText : rollen.text2 }}>

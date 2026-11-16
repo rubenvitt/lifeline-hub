@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
+import { schriftGroesse } from '../components/instrument';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinsatzSwitcher from './EinsatzSwitcher';
@@ -189,11 +190,11 @@ describe('EinsatzSwitcher', () => {
     expect(span.style.whiteSpace).toBe('normal');
   });
 
-  it('setzt den Namen in 16 px, in jeder Dichte (LLH-1726)', async () => {
+  it('setzt den Namen in der Stufe titel: 16 px in kompakt, wächst mit der Dichte (LLH-1726, LLH-1774)', async () => {
     server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
     setup();
     const knopf = await screen.findByRole('button', { name: /Hochwasser/ });
-    expect(knopf.style.fontSize).toBe('16px');
+    expect(knopf.style.fontSize).toBe(schriftGroesse('titel'));
   });
 
   it('navigiert ueber „Alle Einsätze …" zur Heim-Seite', async () => {

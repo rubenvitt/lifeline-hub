@@ -52,6 +52,7 @@ function Eintrag({
       <span
         ref={setNodeRef}
         {...listeners}
+        data-schrift="kennung"
         style={{
           flex: 1,
           minWidth: 0,

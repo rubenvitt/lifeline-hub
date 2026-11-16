@@ -27,8 +27,9 @@ import {
   PaneelZustand,
   Sammelbanner,
   Zeitachseneintrag,
-  monoStil,
+  schriftStil,
   useRollen,
+  zahlStil,
 } from '../components/instrument';
 import { Select } from '../components/Select';
 import { RechteHinweis, SpeicherFehler } from '../components/SpeicherHinweis';
@@ -371,7 +372,7 @@ export default function KraftZeitachse({
                   als="li"
                   data-lfh="zeitachse-ereignis"
                   data-gestrichen={gestrichen || undefined}
-                  zeit={<span style={monoStil(13)}>{zeit(e.zeitpunkt_at)}</span>}
+                  zeit={<span style={zahlStil('text')}>{zeit(e.zeitpunkt_at)}</span>}
                   typwort={ART_WORT[e.art]}
                   meta={herkunftText(e)}
                   toenung={gestrichen ? 'berichtigung' : undefined}
@@ -638,7 +639,7 @@ function DauerZeile({
   if (dauern.gesamtMinuten != null) teile.push(`gesamt ${dauerText(dauern.gesamtMinuten)}`);
   if (teile.length === 0) return <span />;
   return (
-    <span data-lfh="kraft-dauer" style={{ ...monoStil(12), color: rollen.text2 }}>
+    <span data-lfh="kraft-dauer" style={{ ...schriftStil('meta'), color: rollen.text2 }}>
       {teile.join(' · ')}
     </span>
   );

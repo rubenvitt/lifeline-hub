@@ -13,7 +13,8 @@ import { useMinutenTakt } from './useMinutenTakt';
 import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
-import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schrift, schriftPx } from '../theme/tokens';
+import { schriftGroesse, schriftStil } from './instrument/rollenwerte';
 
 /**
  * Bausteine der Kommandoleiste (`shell.dc.html`) — geteilt von der Ebene-1-Shell (`AppLayout`)
@@ -22,7 +23,7 @@ import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
  * DER RAHMEN IST IN BEIDEN MODI DUNKEL. Alle Farben kommen deshalb aus `rahmenFarben` bzw.
  * `farbenDunkel`, NICHT aus dem modusabhängigen antd-Token.
  *
- * MASSE: 52 px Kopfhöhe und 60 px Markenzelle sind LAYOUTMASSE, keine Trefflächen. Beide sind
+ * MASSE: 52 px Kopfhöhe und 64 px Markenzelle sind LAYOUTMASSE, keine Trefflächen. Beide sind
  * BÖDEN: in `komfortabel`/`handschuh` wachsen die Bedienziele (48 / 72), und der Rahmen wächst
  * mit — die Markenzelle folgt der Rail-Spalte ({@link railBreite}, LFH-384).
  */
@@ -31,24 +32,26 @@ export const KOPF_HOEHE = 52;
 export const MARKENZELLE_BILDMARKE_HOEHE = 22;
 
 /**
- * Breite der Rail und damit der Markenzelle links oben — beide fluchten im Entwurf. Die
- * 60 px sind ein BODEN, nicht die Breite: gelesen wird immer {@link railBreite}.
+ * Breite der Rail und damit der Markenzelle links oben in `kompakt` — beide fluchten im Entwurf.
+ * Ein BODEN, nicht die Breite: gelesen wird immer {@link railBreite}. 64 statt der 60 des Entwurfs
+ * (LLH-1773): das Rail-Etikett steht seit 15.11.2026 in 11 statt 9 px, „FÜHRUNG“ misst 58,5 px.
  */
-const RAIL_BREITE = 60;
+const RAIL_BREITE = 64;
 
 /** Die Haarlinie rechts an Rail und Markenzelle; sie geht in der Spalte vom Ziel ab. */
 const RAIL_LINIE = 1;
 
 /**
- * Breite der Rail-Spalte zur Dichtestufe (LFH-384): die Entwurfsbreite als Boden, darüber
- * wächst sie mit, bis das Kategorie-Ziel auch in der BREITE `controlHeight` hält — in
- * `handschuh` 73 px (72 Ziel + Haarlinie), sonst 60. Entscheidung des Auftraggebers vom
- * 29.09.2026: die Spalte wächst, statt die Breite als Dauerausnahme festzuschreiben; der
- * Preis sind 13 px Inhalt, und nur in der Stufe, die man bewusst wählt. REIN und exportiert,
- * damit die Zusicherung ohne Rendern prüfbar ist (antds Seed im Vitest kennt die Staffel nicht).
+ * Breite der Rail-Spalte zur Dichtestufe (LFH-384): sie wächst mit der Schrift der Stufe
+ * (`RAIL_BREITE` × Faktor der Grundschrift, LLH-1774: 64 / 74 / 80 px), damit das Rail-Etikett
+ * in jeder Stufe hineinpasst, und nie unter das Kategorie-Ziel in der BREITE `controlHeight`
+ * plus Haarlinie. Entscheidung des Auftraggebers vom 29.09.2026 (die Spalte wächst, statt eine
+ * Dauerausnahme festzuschreiben), fortgeschrieben am 16.11.2026 (Rail wächst mit der Schrift).
+ * REIN und exportiert, damit die Zusicherung ohne Rendern prüfbar ist.
  */
-export function railBreite(token: { controlHeight: number }): number {
-  return Math.max(RAIL_BREITE, token.controlHeight + RAIL_LINIE);
+export function railBreite(token: { controlHeight: number; fontSize: number }): number {
+  const mitSchrift = Math.round((RAIL_BREITE * token.fontSize) / schriftPx('text'));
+  return Math.max(mitSchrift, token.controlHeight + RAIL_LINIE);
 }
 
 /**
@@ -176,7 +179,7 @@ export function wortmarkeStil(token: { controlHeight: number; paddingXS: number 
     minHeight: token.controlHeight,
     padding: `${token.paddingXS}px 0`,
     fontFamily: schrift.zahl,
-    fontSize: 12,
+    fontSize: schriftGroesse('klein'),
     fontWeight: 500,
     letterSpacing: '0.02em',
     color: rahmenFarben.gedaempft,
@@ -192,7 +195,7 @@ export function wortmarkeStil(token: { controlHeight: number; paddingXS: number 
 export function Wortmarke() {
   const { token } = theme.useToken();
   return (
-    <Link to={einsaetzePfad()} style={wortmarkeStil(token)}>
+    <Link to={einsaetzePfad()} data-schrift="kennung" style={wortmarkeStil(token)}>
       lifeline-hub
     </Link>
   );
@@ -204,9 +207,9 @@ export function formatiereUhr(ms: number): string {
 }
 
 /**
- * Die Uhr der Kommandoleiste (Mono 14/500). Browserzeit, nicht die Anzeigezone eines Einsatzes:
- * der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider` und steht auch auf der Einsatzliste.
- * Eine Uhr, die je Route die Zone wechselt, wäre schlimmer.
+ * Die Uhr der Kommandoleiste (Rolle `uhr`: Mono, Stufe `titel`, 500; LLH-1773). Browserzeit,
+ * nicht die Anzeigezone eines Einsatzes: der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider`
+ * und steht auch auf der Einsatzliste. Eine Uhr, die je Route die Zone wechselt, wäre schlimmer.
  */
 export function Uhr({
   zelle,
@@ -225,11 +228,7 @@ export function Uhr({
         dateTime={dayjs(jetzt).format('HH:mm')}
         aria-label={`Uhrzeit ${text}`}
         style={{
-          fontFamily: schrift.zahl,
-          fontSize: 14,
-          fontWeight: 500,
-          letterSpacing: '0.04em',
-          fontVariantNumeric: 'tabular-nums',
+          ...schriftStil('uhr'),
           color: rahmenFarben.text,
         }}
       >
@@ -407,8 +406,12 @@ export function SyncAnzeige({
         <Icon size={16} />
       </span>
       {syncZeigtWort(zustand, kompakt) && (
-        // Nur Störungen tragen ein Wort, also färbt es mit: dann soll es auffallen.
-        <span aria-hidden="true" style={{ fontFamily: schrift.zahl, fontSize: 11, color: d.farbe }}>
+        // Nur Störungen tragen ein Wort, also färbt es mit: dann soll es auffallen. Ein
+        // Zustandswort, keine Zahl: Textschrift (LLH-1777, Mono-Grenze).
+        <span
+          aria-hidden="true"
+          style={{ ...schriftStil('meta'), fontSize: schriftGroesse('fein'), color: d.farbe }}
+        >
           {wort}
         </span>
       )}

@@ -5,6 +5,7 @@ import {
   schrift,
   schriftskala,
   type Farbrollen,
+  type Groessenstufe,
   type Schriftstufenname,
 } from '../../theme/tokens';
 
@@ -51,33 +52,46 @@ export function useRollen(): { token: GlobalToken; rollen: Farbrollen; dunkel: b
 }
 
 /**
- * Eine Stufe der Schriftskala als Inline-Stil. Familie aus `schrift`, Werte aus
- * `schriftskala` — keine zweite Skala. Zahlenfamilien bekommen `tabular-nums` mit
- * (Signatur 3: Ziffernflattern ist ein Lesefehler).
+ * Die Schriftgröße einer Stufe als Stilwert (LLH-1775, Spec `schriftskala`): die CSS-Variable
+ * `--lfh-groesse-<stufe>`, die mit der Dichte wächst und beim ersten Bild stimmt. Der einzige Weg
+ * zu einer Größe außerhalb des Themes; ein Zahlwert macht `theme/schriftLiteral.guard.test.ts`
+ * rot. Wer eine Zahl rechnen muss, nimmt `schriftPx` aus `theme/tokens.ts`.
  */
-export function schriftStil(stufe: Schriftstufenname) {
+export function schriftGroesse(stufe: Groessenstufe): string {
+  return `var(--lfh-groesse-${stufe})`;
+}
+
+/**
+ * Eine Rolle der Schriftskala als Inline-Stil. Familie aus `schrift`, Werte aus `schriftskala` —
+ * keine zweite Skala. Jede Rolle setzt gleich breite Ziffern (LLH-1777): auch Wörter mit Zahlen
+ * („Stand 14:32“) stehen in der Textschrift und flattern nicht.
+ */
+export function schriftStil(rolle: Schriftstufenname) {
   const s: {
-    groesse: number;
+    stufe: Groessenstufe;
     gewicht: number;
     familie: keyof typeof schrift;
     sperrung?: string;
     versal?: boolean;
-  } = schriftskala[stufe];
+  } = schriftskala[rolle];
   return {
     fontFamily: schrift[s.familie],
-    fontSize: s.groesse,
+    fontSize: schriftGroesse(s.stufe),
     fontWeight: s.gewicht,
     ...(s.sperrung ? { letterSpacing: s.sperrung } : {}),
     ...(s.versal ? { textTransform: 'uppercase' as const } : {}),
-    ...(s.familie === 'zahl' ? { fontVariantNumeric: 'tabular-nums' as const } : {}),
+    fontVariantNumeric: 'tabular-nums' as const,
   };
 }
 
-/** Mono in beliebiger Größe (Meta 10/11, Zeiten 12/13, Präfix 14) — Familie aus `schrift.zahl`. */
-export function monoStil(groesse: number, gewicht: 400 | 500 = 400) {
+/**
+ * Mono für Zahl, Zeit, Kennung und Funkrufname (LLH-1777, Spec `schriftrollen`), in einer Stufe
+ * der Skala. Text mit Wörtern nimmt `schriftStil`, nie diesen Helfer.
+ */
+export function zahlStil(stufe: Groessenstufe, gewicht: 400 | 500 = 400) {
   return {
     fontFamily: schrift.zahl,
-    fontSize: groesse,
+    fontSize: schriftGroesse(stufe),
     fontWeight: gewicht,
     fontVariantNumeric: 'tabular-nums' as const,
   };

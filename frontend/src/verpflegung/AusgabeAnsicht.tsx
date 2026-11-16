@@ -37,9 +37,11 @@ import {
   Sammelbanner,
   Zeitachseneintrag,
   sammelbannerKurz,
-  monoStil,
   useRollen,
   zahlFarbe,
+  schriftGroesse,
+  schriftStil,
+  zahlStil,
 } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useViewport } from '../components/useViewport';
@@ -542,9 +544,9 @@ export default function AusgabeAnsicht() {
             ).map(([titel, wert, farbe]) => (
               <div key={titel} data-lfh="kurzzeile-zahl" style={{ minWidth: 0 }}>
                 <Augenbraue style={{ ...einzeilig, display: 'block' }}>{titel}</Augenbraue>
-                <div style={{ ...einzeilig, ...monoStil(15, 500), color: farbe }}>
+                <div style={{ ...einzeilig, ...zahlStil('text', 500), color: farbe }}>
                   {wert}
-                  <span style={{ ...monoStil(11), color: rollen.text2 }}> EP</span>
+                  <span style={{ ...zahlStil('fein'), color: rollen.text2 }}> EP</span>
                 </div>
               </div>
             ))}
@@ -575,7 +577,12 @@ export default function AusgabeAnsicht() {
             <span
               role="status"
               data-lfh="ausgabe-offline"
-              style={{ ...monoStil(12, 500), color: rollen.text2, minHeight: 22 }}
+              style={{
+                ...schriftStil('meta'),
+                fontWeight: 500,
+                color: rollen.text2,
+                minHeight: 22,
+              }}
             >
               {online ? '' : 'Offline vorgemerkt'}
             </span>
@@ -644,13 +651,13 @@ export default function AusgabeAnsicht() {
             <div style={{ flex: '1 1 0', minWidth: 0 }}>
               <div style={einzeilig}>
                 Sammlung{' '}
-                <span data-lfh="sammlung-menge" style={monoStil(15, 500)}>
+                <span data-lfh="sammlung-menge" style={zahlStil('text', 500)}>
                   {sammlung.menge}
                 </span>{' '}
                 <span
                   data-lfh="ausgabe-ausstehend"
                   style={{
-                    ...monoStil(12),
+                    ...schriftStil('meta'),
                     color: rollen.text2,
                     marginInlineStart: token.marginXS,
                   }}
@@ -661,7 +668,7 @@ export default function AusgabeAnsicht() {
               <div
                 data-lfh="sammlung-sonderkost"
                 title={sammelSonderkost || undefined}
-                style={{ ...einzeilig, ...monoStil(12), color: rollen.text2 }}
+                style={{ ...einzeilig, ...schriftStil('meta'), color: rollen.text2 }}
               >
                 {/* Leer ein geschütztes Leerzeichen: die Zeile behält ihre Höhe. */}
                 {sammelSonderkost || '\u00a0'}
@@ -718,7 +725,7 @@ export default function AusgabeAnsicht() {
                     style={{ ...einzeilig, flex: 'none', color: rollen.text2 }}
                   >
                     an der Stelle{' '}
-                    <span style={{ ...monoStil(13, 500), color: rollen.text }}>
+                    <span style={{ ...zahlStil('text', 500), color: rollen.text }}>
                       {zf.je_stelle.find((e) => e.stelle_id === gewaehlteStelle)?.ausgegeben
                         .gesamt ?? 0}{' '}
                       EP
@@ -843,7 +850,7 @@ export default function AusgabeAnsicht() {
                   >
                     <span
                       style={{
-                        ...monoStil(13),
+                        ...zahlStil('text'),
                         display: 'inline-block',
                         minWidth: `${
                           Math.max(
@@ -859,7 +866,8 @@ export default function AusgabeAnsicht() {
                     </span>
                     <span
                       style={{
-                        ...monoStil(12, 500),
+                        ...schriftStil('meta'),
+                        fontWeight: 500,
                         display: 'inline-block',
                         minWidth: `${ziffern(zf.bedarf.sonderkost[k]) + 6}ch`,
                         marginInlineStart: '1ch',
@@ -874,7 +882,7 @@ export default function AusgabeAnsicht() {
                     <span
                       data-lfh="sonderkost-sammlung"
                       style={{
-                        ...monoStil(12, 500),
+                        ...zahlStil('klein', 500),
                         display: 'inline-block',
                         minWidth: '5ch',
                         visibility: n > 0 ? 'visible' : 'hidden',
@@ -984,7 +992,7 @@ export default function AusgabeAnsicht() {
                     typwort={v.antrag ? 'beantragt' : 'ausstehend'}
                   >
                     <span style={{ color: rollen.text2 }}>
-                      <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                      <span style={zahlStil('text', 500)}>{d.menge} EP</span>
                       {d.verpflegungsstelle_id != null
                         ? ` · ${stellenName(d.verpflegungsstelle_id, stellen)}`
                         : ''}
@@ -1021,7 +1029,7 @@ export default function AusgabeAnsicht() {
                     }
                   >
                     <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
-                      <span style={monoStil(13, 500)}>{a.menge} EP</span>
+                      <span style={zahlStil('text', 500)}>{a.menge} EP</span>
                       {a.verpflegungsstelle_id != null
                         ? ` · ${stellenName(a.verpflegungsstelle_id, stellen)}`
                         : ''}
@@ -1071,7 +1079,7 @@ export default function AusgabeAnsicht() {
           <div
             id={grundId}
             data-lfh="zaehltasten-grund"
-            style={{ ...monoStil(12), color: rollen.text2, minHeight: 18 }}
+            style={{ ...schriftStil('meta'), color: rollen.text2, minHeight: 18 }}
           >
             {grundText}
           </div>
@@ -1122,7 +1130,7 @@ export default function AusgabeAnsicht() {
               style={{
                 ...zaehltasteStil(token, 'plus1'),
                 ...(istSchmal ? { width: '100%' } : {}),
-                fontSize: 22,
+                fontSize: schriftGroesse('wert'),
               }}
               disabled={tastenGesperrt}
               aria-describedby={beschrieben(tastenGesperrt)}

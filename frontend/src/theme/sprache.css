@@ -36,7 +36,7 @@
 }
 
 .lfh-zahl--mittel {
-  font-size: 17px;
+  font-size: var(--lfh-groesse-titel);
   font-weight: 500;
 }
 
@@ -207,12 +207,14 @@
   /* Handschuh (LFH-883): die Polsterung von 44 px lässt der Zelle eine Textspalte von rund 94 px.
      Darin brach „Schäden offen“ zweizeilig um (+13 px) und die Pegel-Notiz dreizeilig (+16 px),
      beides erst mit den Daten. Der Platz steht deshalb hier vom ersten Bild an: zwei Zeilen
-     Augenbraue (`lineHeight: 1.3`, `augenbraueStil`), eine Notizzeile über dem Boden des Bandes. */
+     Augenbraue (`lineHeight: 1.3`, `augenbraueStil`), zwei Notizzeilen über dem Boden des Bandes
+     (seit LLH-1774 wächst die Schrift mit der Stufe, die Pegel-Notiz bricht eine Zeile öfter um:
+     gemessen +19,25 px = 1,4 × 13,75). */
   [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen .lfh-kennzahl__titel {
     min-height: 2.6em;
   }
   [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen [data-lfh='kennzahl-notiz'] {
-    min-height: calc((var(--lfh-kennzahl-notizzeilen) + 1) * 1.4em);
+    min-height: calc((var(--lfh-kennzahl-notizzeilen) + 2) * 1.4em);
   }
 }
 
@@ -256,7 +258,7 @@
   background: var(--lfh-flaeche);
   color: var(--lfh-gedaempft);
   font-family: var(--lfh-schrift-text);
-  font-size: 12px;
+  font-size: var(--lfh-groesse-klein);
   line-height: 1.2;
   /* Ein Zeilenumbruch im Wortlaut bricht (LLH-1128: „Ohne\nSchicht“ der Ablösung auf 390 px im
      Handschuh-Betrieb, wo das Segment 72 px hoch ist); sonst bleibt jedes Wort einzeilig. */
@@ -324,7 +326,7 @@
   background: transparent;
   box-shadow: none;
   color: var(--lfh-text);
-  font-size: 14px;
+  font-size: var(--lfh-groesse-text);
   /* Die Zeile behält die Zeilenhöhe der Stufe: antd rechnet die Polsterung aus `fontHeight`
      (`controlHeight − fontHeight`), mit der 14-px-Zeile allein fehlten in `handschuh` 2 px am
      Textfeld (70 statt 72, `e2e/trefflaeche-pruefflaechen.spec.ts` C7). */

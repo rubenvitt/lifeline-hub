@@ -3,7 +3,7 @@ import { VERBINDUNGEN_MAX, VERBINDUNG_TEXT_MAX } from '../api/eingabegrenzen';
 import type { KommunikationsVerbindung, NeueVerbindung, Verbindungsmittel } from '../api/types';
 import { IconMuelleimer, IconPlus } from '../icons';
 import { InlineAngabe, type InlineEingabe } from './InlineAngabe';
-import { monoStil, useRollen } from './instrument';
+import { useRollen, zahlStil } from './instrument';
 import { kennungsLinkStil } from './kennungsLink';
 import { Select } from './Select';
 import {
@@ -47,7 +47,11 @@ export function VerbindungenListe({
     <Flex vertical gap={token.paddingSM}>
       {verbindungen.map((v, i) => {
         const verweis = verbindungsVerweis(v.mittel, v.wert);
-        const wert = <span style={{ ...monoStil(13), overflowWrap: 'anywhere' }}>{v.wert}</span>;
+        const wert = (
+          <span data-schrift="kennung" style={{ ...zahlStil('text'), overflowWrap: 'anywhere' }}>
+            {v.wert}
+          </span>
+        );
         return (
           <Flex key={`${i}-${v.mittel}-${v.wert}`} wrap align="baseline" gap={token.marginXS}>
             <span style={gedaempft}>{VERBINDUNGSMITTEL_LABEL[v.mittel]}</span>
@@ -112,7 +116,7 @@ export function VerbindungenEingabe({
               <Input
                 {...(i === 0 ? { id, autoFocus } : {})}
                 aria-label={`Nummer oder Adresse ${nr}`}
-                style={{ flex: '1 1 160px', minWidth: 0, ...monoStil(13) }}
+                style={{ flex: '1 1 160px', minWidth: 0, ...zahlStil('text') }}
                 placeholder="z. B. 0170 1234567"
                 maxLength={VERBINDUNG_TEXT_MAX}
                 value={v.wert}
