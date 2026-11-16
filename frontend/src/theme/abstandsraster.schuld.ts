@@ -118,7 +118,6 @@ export const SCHULD: Readonly<Record<string, number>> = {
   'pages/gefahren/GefahrengebietVorschau.tsx': 1,
   'pages/gefahren/GefahrenPage.tsx': 3,
   'pages/gefahren/GefahrenStufe.tsx': 1,
-  'pages/kraefteuebersichtPrint.css': 2,
   'pages/lage-dashboard/LagePaneele.tsx': 1,
   'pages/LageberichtDetailPage.tsx': 1,
   'pages/lagekarte/BearbeitenSteuerung.tsx': 1,

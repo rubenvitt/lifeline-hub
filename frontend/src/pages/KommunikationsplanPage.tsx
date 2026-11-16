@@ -1,6 +1,6 @@
 import { Breadcrumb, Button, Flex, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState, type Key, type ReactNode } from 'react';
+import { useId, useMemo, useState, type Key, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
@@ -354,6 +354,7 @@ type Dialog =
   | { art: 'entfernen'; stelle: KommunikationsStelle; text: string };
 
 export default function KommunikationsplanPage() {
+  const reiterflaecheId = useId();
   const { id } = useParams();
   const einsatzId = Number(id);
   const { token } = useRollen();
@@ -661,121 +662,129 @@ export default function KommunikationsplanPage() {
           einsatzId={einsatzId}
           aktiv="kommunikationsplan"
           className="kommunikationsplan-no-print"
+          flaecheId={reiterflaecheId}
         />
-        <Druckkopf
-          dokumentart="Kommunikationsplan"
-          einsatz={einsatz}
-          sichtbarkeit="druck"
-          zeilen={[
-            {
-              etikett: 'Stand',
-              wert: zeitpunkt(new Date(datenstand || Date.now()).toISOString(), konventionen),
-            },
-          ]}
-        />
+        <div role="tabpanel" id={reiterflaecheId} aria-label="Kommunikationsplan">
+          <Druckkopf
+            dokumentart="Kommunikationsplan"
+            einsatz={einsatz}
+            sichtbarkeit="druck"
+            zeilen={[
+              {
+                etikett: 'Stand',
+                wert: zeitpunkt(new Date(datenstand || Date.now()).toISOString(), konventionen),
+              },
+            ]}
+          />
 
-        {/* ── Lücke „Leitstelle“ ── im ersten Bild. Ohne geladene Stellen „—“ mit Grund. */}
-        {(luecke.fehlt || luecke.zustand !== 'daten') && luecke.zustand !== 'laden' && (
-          <Paneel titel="Lücken" style={{ marginBlockEnd: token.margin }}>
-            <PaneelZeile style={{ borderBlockEnd: 'none' }}>
-              <Flex wrap align="baseline" gap={token.marginXS} data-lfh="kommunikationsplan-luecke">
-                {luecke.zustand === 'daten' ? (
-                  <>
-                    <span>Leitstelle: keine Verbindung erfasst</span>
-                    {vorschlag && darfSchreiben && (
-                      <Button
-                        className="kommunikationsplan-no-print"
-                        disabled={ohneVerbindung}
-                        title={sperrGrund}
-                        onClick={() =>
-                          oeffne({
-                            art: 'stelle',
-                            vorbelegung: {
-                              stellenart: 'leitstelle',
-                              bezeichnung: vorschlag.bezeichnung,
-                              rufnummer: vorschlag.rufnummer ?? '',
-                            },
-                          })
-                        }
-                      >
-                        {`${vorschlag.bezeichnung} hinzufügen`}
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <span>Leitstelle</span>
-                    <span style={monoStil(14, 500)}>—</span>
-                    {/* Ohne Stellen fehlt alles; sonst fehlt nur die Skizze (Spec-Delta). */}
-                    <Gedaempft>
-                      {stellen.zustand !== 'daten'
-                        ? ZUSTAND_GRUND[luecke.zustand]
-                        : `Fernmeldeskizze ${ZUSTAND_GRUND[luecke.zustand]}`}
-                    </Gedaempft>
-                  </>
-                )}
-              </Flex>
-            </PaneelZeile>
-          </Paneel>
-        )}
+          {/* ── Lücke „Leitstelle“ ── im ersten Bild. Ohne geladene Stellen „—“ mit Grund. */}
+          {(luecke.fehlt || luecke.zustand !== 'daten') && luecke.zustand !== 'laden' && (
+            <Paneel titel="Lücken" style={{ marginBlockEnd: token.margin }}>
+              <PaneelZeile style={{ borderBlockEnd: 'none' }}>
+                <Flex
+                  wrap
+                  align="baseline"
+                  gap={token.marginXS}
+                  data-lfh="kommunikationsplan-luecke"
+                >
+                  {luecke.zustand === 'daten' ? (
+                    <>
+                      <span>Leitstelle: keine Verbindung erfasst</span>
+                      {vorschlag && darfSchreiben && (
+                        <Button
+                          className="kommunikationsplan-no-print"
+                          disabled={ohneVerbindung}
+                          title={sperrGrund}
+                          onClick={() =>
+                            oeffne({
+                              art: 'stelle',
+                              vorbelegung: {
+                                stellenart: 'leitstelle',
+                                bezeichnung: vorschlag.bezeichnung,
+                                rufnummer: vorschlag.rufnummer ?? '',
+                              },
+                            })
+                          }
+                        >
+                          {`${vorschlag.bezeichnung} hinzufügen`}
+                        </Button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span>Leitstelle</span>
+                      <span style={monoStil(14, 500)}>—</span>
+                      {/* Ohne Stellen fehlt alles; sonst fehlt nur die Skizze (Spec-Delta). */}
+                      <Gedaempft>
+                        {stellen.zustand !== 'daten'
+                          ? ZUSTAND_GRUND[luecke.zustand]
+                          : `Fernmeldeskizze ${ZUSTAND_GRUND[luecke.zustand]}`}
+                      </Gedaempft>
+                    </>
+                  )}
+                </Flex>
+              </PaneelZeile>
+            </Paneel>
+          )}
 
-        <Space
-          className="kommunikationsplan-no-print"
-          wrap
-          style={{ marginBlockEnd: token.margin }}
-        >
-          <DruckKnopf />
-        </Space>
-        {rufnummerFehler != null && (
-          <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
-            <SpeicherFehler fehler={rufnummerFehler} titel="Rufnummer nicht übernommen" />
-          </div>
-        )}
-        {entfernFehler != null && (
-          <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
-            <SpeicherFehler fehler={entfernFehler} titel="Nicht entfernt" />
-          </div>
-        )}
+          <Space
+            className="kommunikationsplan-no-print"
+            wrap
+            style={{ marginBlockEnd: token.margin }}
+          >
+            <DruckKnopf />
+          </Space>
+          {rufnummerFehler != null && (
+            <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
+              <SpeicherFehler fehler={rufnummerFehler} titel="Rufnummer nicht übernommen" />
+            </div>
+          )}
+          {entfernFehler != null && (
+            <div className="kommunikationsplan-no-print" style={{ marginBlockEnd: token.margin }}>
+              <SpeicherFehler fehler={entfernFehler} titel="Nicht entfernt" />
+            </div>
+          )}
 
-        {/*
-          Weder Sortierung noch Kopffilter (LLH-1096, Ausnahme wie Meldebild und Funkplan): der Plan
-          ist ein Baum aus vier Gruppen, und im Baummodus verbietet `Datensicht` beides. Die Gruppen
-          SIND die Achse Stellenart (Einsatzleitung und Stab, externe Stellen, Abschnitte,
-          Einheiten), eine leere Gruppe nennt ihren Grund; zugeklappt wird statt gefiltert. Ein
-          Filter nach Verbindungsmittel risse Stellen aus ihrer Gruppe, und den Grund einer leeren
-          Gruppe sähe man nicht mehr.
-        */}
-        <Datensicht
-          bezeichnung="Kommunikationsplan"
-          form="tabelle"
-          spalten={spalten}
-          // Im Druck flach: alles steht da, und kein Aufklappsymbol landet auf dem Papier.
-          daten={druckt ? flach : zeilen}
-          zeilenSchluessel="key"
-          ladend={stellen.zustand === 'laden'}
-          baum={
-            druckt
-              ? undefined
-              : {
-                  kinder: 'children',
-                  aufgeklappt,
-                  onAufgeklappt: (offen) =>
-                    setZugeklappt(new Set(aufklappbar.filter((k) => !offen.includes(k)))),
-                }
-          }
-          karte={{
-            art: 'plan',
-            titel: {
-              spalte: 'stelle',
-              // Abgeleitete Zeilen führen zu ihrem Datensatz, die Führungsstelle zu Einsatzdaten.
-              ziel: (p) => (p.zeile && p.zeile.art !== 'gepflegt' ? p.zeile.ziel : null),
-            },
-            sekundaer: ['besetzung', 'verbindungen'],
-            // Kontextmenü der gepflegten Stellen (LLH-1599 D7); der Kartenzweig rendert bei
-            // `form="tabelle"` nie, die Karten bekommen also keinen zweiten Knopf.
-            ...aktionen,
-          }}
-        />
+          {/*
+            Weder Sortierung noch Kopffilter (LLH-1096, Ausnahme wie Meldebild und Funkplan): der Plan
+            ist ein Baum aus vier Gruppen, und im Baummodus verbietet `Datensicht` beides. Die Gruppen
+            SIND die Achse Stellenart (Einsatzleitung und Stab, externe Stellen, Abschnitte,
+            Einheiten), eine leere Gruppe nennt ihren Grund; zugeklappt wird statt gefiltert. Ein
+            Filter nach Verbindungsmittel risse Stellen aus ihrer Gruppe, und den Grund einer leeren
+            Gruppe sähe man nicht mehr.
+          */}
+          <Datensicht
+            bezeichnung="Kommunikationsplan"
+            form="tabelle"
+            spalten={spalten}
+            // Im Druck flach: alles steht da, und kein Aufklappsymbol landet auf dem Papier.
+            daten={druckt ? flach : zeilen}
+            zeilenSchluessel="key"
+            ladend={stellen.zustand === 'laden'}
+            baum={
+              druckt
+                ? undefined
+                : {
+                    kinder: 'children',
+                    aufgeklappt,
+                    onAufgeklappt: (offen) =>
+                      setZugeklappt(new Set(aufklappbar.filter((k) => !offen.includes(k)))),
+                  }
+            }
+            karte={{
+              art: 'plan',
+              titel: {
+                spalte: 'stelle',
+                // Abgeleitete Zeilen führen zu ihrem Datensatz, die Führungsstelle zu Einsatzdaten.
+                ziel: (p) => (p.zeile && p.zeile.art !== 'gepflegt' ? p.zeile.ziel : null),
+              },
+              sekundaer: ['besetzung', 'verbindungen'],
+              // Kontextmenü der gepflegten Stellen (LLH-1599 D7); der Kartenzweig rendert bei
+              // `form="tabelle"` nie, die Karten bekommen also keinen zweiten Knopf.
+              ...aktionen,
+            }}
+          />
+        </div>
       </EinsatzSeite>
 
       {dialog?.art === 'stelle' && (

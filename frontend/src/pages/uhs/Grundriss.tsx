@@ -2019,6 +2019,9 @@ export default function Grundriss({
             <Segmentleiste<GrundrissReiter>
               rolle="tablist"
               beschriftung="Bereiche der Unfallhilfsstelle"
+              // Im Spaltenstapel nicht auf volle Breite strecken: die Leiste ist so breit wie ihre
+              // Segmente, wie an jeder anderen Stelle.
+              style={{ alignSelf: 'flex-start' }}
               wert={reiter}
               onWechsel={setReiter}
               optionen={GRUNDRISS_REITER.map((r) => ({

@@ -1,7 +1,6 @@
 # StammdatenFeld (aus Stammdaten oder frei)
 
-StammdatenFeld — Vorschlagsfeld „aus Stammdaten oder frei“ (Regel `frontend/AGENTS.md`, Erfassungs-Norm; Herleitung
-`/mnt/project-files/llh-1022/LLH-1144/design.md`).
+StammdatenFeld — Vorschlagsfeld „aus Stammdaten oder frei“ (Regel `frontend/AGENTS.md`, Erfassungs-Norm).
 
 Tippen filtert die Vorschläge der Quellen in den Gruppen „Im Einsatz“, „Stammdaten“, „Zuletzt
 verwendet“, Demo-Einträge dahinter (`stammdaten/demoAuswahl.tsx`). Freitext bleibt erlaubt und

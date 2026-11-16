@@ -20,7 +20,7 @@ Jede Dichtestufe (`kompakt`, `komfortabel`, `handschuh`) SHALL ein Abstandsraste
 
 ### Requirement: Alle Abstandstoken der Komponentenbibliothek folgen dem Raster
 
-Jedes Abstandstoken der Komponentenbibliothek (Innen- und Außenabstand in allen Größen von XXS bis XL) SHALL seinen Wert aus dem Raster der aktiven Dichtestufe beziehen. Kein Abstandstoken MUST auf einer festen Vorgabe der Bibliothek stehen bleiben.
+Jedes Innen- und Außenabstandstoken der Komponentenbibliothek (`padding` und `margin` in allen Größen von XXS bis XL) SHALL seinen Wert aus dem Raster der aktiven Dichtestufe beziehen. Keines dieser Token MUST auf einer festen Vorgabe der Bibliothek stehen bleiben. Abgeleitete Polsterungen einzelner Steuerelemente und Inhaltsflächen gehören nicht dazu.
 
 #### Scenario: Mittlere und große Abstandsstufe in Handschuh
 - **WHEN** die Dichtestufe `handschuh` aktiv ist

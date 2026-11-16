@@ -681,6 +681,29 @@ describe('RaeumungDialog', () => {
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'angeordnet' }));
   });
 
+  // Review vor dem PR (LLH-1808): die Segmentleiste meldete auch den Klick auf das schon gewählte
+  // Segment, das Feld galt als berührt und ein Speichern drehte die fremde Meldung zurück.
+  it('LFH-681: ein Klick auf den schon gewählten Zustand übernimmt den Live-Stand weiter', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    await waehle(dialog, 'angeordnet');
+    rerender(raeumungDialog(bezirk({ raeumung: 'geraeumt' }), onErfassen));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onErfassen).not.toHaveBeenCalled());
+  });
+
+  it('setzt den Fokus beim Öffnen auf die Wahl des Räumungszustands (Erfassungs-Norm)', async () => {
+    renderMitProviders(raeumungDialog(bezirk({ raeumung: 'laeuft' }), vi.fn()));
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: 'läuft' })).toHaveFocus());
+  });
+
   it('LFH-681: eine eigene Wahl bleibt stehen, wenn der Live-Stand wechselt (Gegenstück)', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const { rerender } = renderMitProviders(

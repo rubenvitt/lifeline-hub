@@ -23,6 +23,13 @@ export default function AuftraegePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const reiter = parseAuftraegeReiter(searchParams);
   const reiterflaecheId = useId();
+  // Welche Fläche schon einmal offen war: sie bleibt danach montiert (siehe unten).
+  const [besuchtListe, setBesuchtListe] = useState<readonly string[]>([reiter]);
+  if (!besuchtListe.includes(reiter)) setBesuchtListe([...besuchtListe, reiter]);
+  const besucht = {
+    auftraege: besuchtListe.includes('auftraege'),
+    befehle: besuchtListe.includes('befehle'),
+  };
   const { token } = theme.useToken();
   const reiterWechseln = (neu: string) =>
     setSearchParams(
@@ -109,19 +116,20 @@ export default function AuftraegePage() {
         wert={reiter}
         onWechsel={reiterWechseln}
         optionen={[
-          { wert: 'auftraege', label: 'Einzelaufträge', steuert: reiterflaecheId },
-          { wert: 'befehle', label: 'Einsatzbefehle', steuert: reiterflaecheId },
+          { wert: 'auftraege', label: 'Einzelaufträge', steuert: `${reiterflaecheId}-auftraege` },
+          { wert: 'befehle', label: 'Einsatzbefehle', steuert: `${reiterflaecheId}-befehle` },
         ]}
         style={{ marginBottom: token.margin }}
       />
+      {/* Eine besuchte Fläche bleibt montiert und ist nur verborgen, wie vorher bei antds Tabs:
+          Ansicht, Filter, Suche und Auswahl einer Liste überstehen den Wechsel zur anderen. */}
       <div
         role="tabpanel"
-        id={reiterflaecheId}
-        aria-label={reiter === 'befehle' ? 'Einsatzbefehle' : 'Einzelaufträge'}
+        id={`${reiterflaecheId}-auftraege`}
+        aria-label="Einzelaufträge"
+        hidden={reiter !== 'auftraege'}
       >
-        {reiter === 'befehle' ? (
-          <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />
-        ) : (
+        {besucht.auftraege && (
           <AuftraegeListe
             einsatzId={einsatzId}
             darfSchreiben={darfSchreiben}
@@ -130,6 +138,14 @@ export default function AuftraegePage() {
             onErteilenAngenommen={() => setErteilenAngefordert(false)}
           />
         )}
+      </div>
+      <div
+        role="tabpanel"
+        id={`${reiterflaecheId}-befehle`}
+        aria-label="Einsatzbefehle"
+        hidden={reiter !== 'befehle'}
+      >
+        {besucht.befehle && <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />}
       </div>
     </EinsatzSeite>
   );

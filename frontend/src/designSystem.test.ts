@@ -221,9 +221,19 @@ describe('README des Design Systems', () => {
     expect(readme).not.toContain('ohne Gestaltungsbezug');
   });
 
-  it('bricht ab, wenn nach dem Filter eine Ticketnummer übrig bleibt', () => {
+  it('bricht ab, wenn nach dem Filter ein Verweis übrig bleibt, auch über einen Umbruch', () => {
     expect(() => pruefeOhneTicket('Satz.\nseit LLH-12 so.\n')).toThrow(/README.md:2/);
+    expect(() => pruefeOhneTicket('Satz\n(Spec\n `x`).\n')).toThrow(/README.md:2/);
+    expect(() => pruefeOhneTicket('Satz.\nHerleitung: `openspec/changes/a`.\n')).toThrow(
+      /README.md:2/,
+    );
     expect(() => pruefeOhneTicket('Satz ohne.\n')).not.toThrow();
+  });
+
+  it('beginnt mit der Bausteinwahl, vor der Liste der Karten', () => {
+    const koepfe = readme.split('\n').filter((z) => z.startsWith('## '));
+    expect(koepfe[0]).toBe(`## ${README_SECTIONS[0].title}`);
+    expect(koepfe.indexOf('## Bausteine')).toBeGreaterThan(0);
   });
 
   it('trägt die einzelnen Regeln aus anderen Abschnitten (Zeitdarstellung, LLH-1053)', () => {
@@ -371,7 +381,10 @@ describe('Bausteinwahl und Karten (Spec `design-system-artifact`, LLH-1807)', ()
   });
 
   it('Bausteinwahl und PREVIEWS sind deckungsgleich', () => {
-    const agents = readFileSync(join(process.cwd().replace(/\/frontend$/, ''), 'frontend', 'AGENTS.md'), 'utf8');
+    const agents = readFileSync(
+      join(process.cwd().replace(/\/frontend$/, ''), 'frontend', 'AGENTS.md'),
+      'utf8',
+    );
     const meldungen = abdeckung(
       kartenDerBausteinwahl(agents),
       PREVIEWS.map((p) => p.name),
@@ -396,7 +409,9 @@ describe('Verweise fallen aus der README (Spec `design-system-artifact`)', () =>
     expect(ohneVerweise('Wort (LLH-1722, D2).')).toBe('Wort.');
     expect(ohneVerweise('Staffel (LFH-328 · A2) gilt.')).toBe('Staffel gilt.');
     expect(ohneVerweise('Platz 1\n  (LFH-606), Rückmeldung')).toBe('Platz 1, Rückmeldung');
-    expect(ohneVerweise('Wert (`f()`, LFH-593:\n  Ebenen-Identität)')).toBe('Wert (`f()`, Ebenen-Identität)');
+    expect(ohneVerweise('Wert (`f()`, LFH-593:\n  Ebenen-Identität)')).toBe(
+      'Wert (`f()`, Ebenen-Identität)',
+    );
     expect(ohneVerweise('Text (früher „A (noch 2)“, jetzt im ⋮; LLH-1722)')).toBe(
       'Text (früher „A (noch 2)“, jetzt im ⋮)',
     );
@@ -412,8 +427,27 @@ describe('Verweise fallen aus der README (Spec `design-system-artifact`)', () =>
     expect(ohneVerweise('Ort (`lfh-ortspfad--einsatz`, LLH-1728) bleibt.')).toBe(
       'Ort (`lfh-ortspfad--einsatz`) bleibt.',
     );
-    expect(ohneVerweise('Kopf (LLH-1139, Spec `formularseiten`, „Eine offene Bearbeitung“; schreibt LFH-19 und LFH-979 fort)')).toBe(
-      'Kopf',
+    expect(
+      ohneVerweise(
+        'Kopf (LLH-1139, Spec `formularseiten`, „Eine offene Bearbeitung“; schreibt LFH-19 und LFH-979 fort)',
+      ),
+    ).toBe('Kopf');
+  });
+
+  // Review vor dem PR (LLH-1807): Wörter aus acht Kleinbuchstaben sind keine Zunder-Kennung.
+  it('hält ein Wort aus acht Buchstaben nicht für eine Kennung', () => {
+    expect(ohneVerweise('Höhe (gemessen, Oberkante im Fenster)')).toBe(
+      'Höhe (gemessen, Oberkante im Fenster)',
+    );
+    expect(ohneVerweise('Kopf (zjt7c073 D2) klebt.')).toBe('Kopf klebt.');
+  });
+
+  it('erkennt Spec- und Herleitungsverweise auch über einen Zeilenumbruch', () => {
+    expect(
+      ohneVerweise('Zone (Spec\n  `benachrichtigungen`, Herleitung\n  `openspec/x.md`) bleibt.'),
+    ).toBe('Zone bleibt.');
+    expect(ohneVerweise('Regel gilt. Herleitung: `openspec/changes/archive/x/design.md`.')).toBe(
+      'Regel gilt.',
     );
   });
 

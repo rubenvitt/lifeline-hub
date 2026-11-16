@@ -46,8 +46,7 @@ alles darunter springen (Prüfliste Kriterium 12). Das Band fordert deshalb Plat
 `sprache.css` vom ersten Bild an: unter `md` mit `notizZeilenSchmal` einen Boden, ab
 `md` mit `notizZeilen` Boden UND Deckel. Eine längere Notiz endet dort mit „…“; der
 volle Text bleibt im DOM, also im zugänglichen Namen, und steht im Zustand `daten` im `title`.
-Die tragende Aussage einer Notiz steht deshalb vorn. Herleitung:
-`openspec/changes/archive/2026-10-01-lfh-691-kennzahl-notiz-feste-hoehe/design.md`.
+Die tragende Aussage einer Notiz steht deshalb vorn.
 
 HANDSCHUH UNTER `md`: die Polsterung `paddingLG` (44 px) lässt auf 390 px eine
 Textspalte von rund 94 px (kompakt 146, komfortabel 126). Darin bricht eine Augenbraue wie
@@ -112,8 +111,7 @@ Regeln dazu:
   ihm steht: Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit
   beim wirksamen Abschnitt), seine Einheiten nur über `einheitenImAbschnitt`, dieselbe Menge. „Kräfte“
   sind Köpfe, Fahrzeuge zählen eigens; Kräfte an UHS nur an aktiven UHS (`countsKraefteAnUhs`,
-  Lagebild und Lagemonitor). Belegung eines Bereitstellungsraums (Spec
-  `bereitstellungsraum-belegung`): Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
+  Lagebild und Lagemonitor). Belegung eines Bereitstellungsraums: Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
   des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
   (`bereitstellungsraum/brZahlen.ts`; nur Einheiten im Raum mit ihrer eigenen Stärke); „noch n belegt“ vor dem Auflösen zählt wie
   `aktive_belegungen_tx` (Einheiten und einheitenlose Fahrzeuge). Lage einer UHS (In der Stelle, Plätze frei, Wartend, Unterwegs) nur über `pages/uhs/uhsLage.ts`, aus denselben

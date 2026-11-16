@@ -57,6 +57,9 @@ export default function FernmeldewesenReiter({
   return (
     <Segmentleiste<FernmeldewesenReiterKey>
       rolle="tablist"
+      // Der Kommunikationsplan ist eine eigene Route: die Pfeiltaste bewegt nur den Fokus, Enter
+      // wechselt (wie vorher bei antds Tabs), sonst risse jeder Pfeilschritt den Fokus mit.
+      aktivierung="manuell"
       beschriftung="Fernmeldewesen"
       wert={aktiv}
       onWechsel={wechseln}

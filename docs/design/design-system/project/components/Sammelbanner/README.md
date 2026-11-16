@@ -18,7 +18,7 @@ bringen ein eigenes englisches `aria-label` mit.
 
 KURZFORM für den Handschirm: steht das Banner in einer
 Werkzeugzeile neben einer Segmentleiste, bleibt ihm bei 390 px zu wenig Breite für Satz UND
-Knopf (Text 0 px, bis 59 px Überlauf). Mit `kurz` (und einer
+Knopf (gemessen: Text 0 px, bis 59 px Überlauf). Mit `kurz` (und einer
 `aktion`) wird das GANZE Banner ein Knopf: Icon plus „1 neu" (`sammelbannerKurz`),
 eine Polsterung statt zwei, die ganze Fläche Trefffläche. Der Name lautet „1 neu anzeigen"
 (sichtbarer Text im Namen, WCAG 2.5.3); der volle Satz bleibt visuell verborgen im

@@ -80,6 +80,9 @@ const FOKUSSIERBAR = [
   'input:not([type="hidden"]):not([disabled])',
   'textarea:not([disabled])',
   'select:not([disabled])',
+  // Eine Wahl als `SegmentFeld` (Spec `bedien-umschalten`): ihr Tabulatorhalt, wie bei einer
+  // Radiogruppe das gewählte bzw. erste Feld.
+  '[role="radiogroup"] [role="radio"][tabindex="0"]:not([aria-disabled="true"])',
 ].join(', ');
 
 /**

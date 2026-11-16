@@ -137,6 +137,15 @@ export function buildReadme(
     'kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschauen zeigen',
     '`kompakt`. Pfade ohne Präfix in den Regeln sind relativ zu `frontend/src/`.',
     '',
+  ];
+  // Die README beginnt mit der Bausteinwahl (Spec `design-system-artifact`): erst „welcher
+  // Baustein?“, dann die Liste der Karten und die Regeln.
+  const [bausteinwahl, ...regeln] = README_SECTIONS;
+  parts.push(
+    `## ${bausteinwahl.title}`,
+    '',
+    ohneVerweise(cutSection(agents, bausteinwahl.head, bausteinwahl.skip)),
+    '',
     '## Bausteine',
     '',
     ...previews.map((p) => `- **${p.title}** (\`components/${p.name}/\`, Gruppe ${p.group})`),
@@ -147,8 +156,8 @@ export function buildReadme(
     '',
     ...omitted.map((o) => `- \`${o.source}\`: ${o.reason}`),
     '',
-  ];
-  for (const { head, title, skip } of README_SECTIONS) {
+  );
+  for (const { head, title, skip } of regeln) {
     parts.push(`## ${title}`, '', ohneVerweise(cutSection(agents, head, skip)), '');
   }
   for (const { head, title } of README_RULES) {
@@ -160,18 +169,23 @@ export function buildReadme(
 }
 
 /**
- * Bricht ab, wenn nach dem Filter noch eine Ticketnummer in der README steht: dann den Filter
+ * Bricht ab, wenn nach dem Filter noch eine Ticketnummer, ein Spec- oder ein Herleitungsverweis in
+ * der README steht: dann den Filter
  * schärfen oder in `frontend/AGENTS.md` den Verweis in eine Klammer stellen (Spec
  * `design-system-artifact`).
  */
 export function pruefeOhneTicket(readme: string): void {
-  const reste = readme
-    .split('\n')
-    .map((zeile, i) => ({ zeile: i + 1, text: zeile }))
-    .filter(({ text }) => /\b(?:LFH|LLH)-\d+/.test(text));
+  const zeilen = readme.split('\n');
+  // Über den ganzen Text, nicht je Zeile: ein Verweis bricht in `frontend/AGENTS.md` oft um.
+  const reste = [
+    ...readme.matchAll(/\b(?:LFH|LLH)-\d+|\bSpec\s+`|`openspec\/changes|\bHerleitung[:\s]/g),
+  ].map((m) => {
+    const zeile = readme.slice(0, m.index).split('\n').length;
+    return { zeile, text: zeilen[zeile - 1] };
+  });
   if (reste.length > 0) {
     throw new Error(
-      'Design System: Ticketnummer in der README nach dem Verweisfilter:\n' +
+      'Design System: Ticket-, Spec- oder Herleitungsverweis in der README nach dem Verweisfilter:\n' +
         reste.map((r) => `  README.md:${r.zeile}  ${r.text.trim()}`).join('\n'),
     );
   }
@@ -224,16 +238,17 @@ const TICKETS = String.raw`${TICKET}(?:[ /·]+(?:[A-Z]\d+[a-z]?|${TICKET}))*(?: 
 const VERWEIS = [
   String.raw`(?:Epic |seit |Rollout )?${TICKETS}`,
   String.raw`ADR-\d{4}`,
-  String.raw`Spec \`[^\`]+\``,
+  String.raw`Spec\s+\`[^\`]+\``,
   String.raw`\`(?:docs|openspec|\.claude|e2e)/[^\`]*\`(?: „[^“]*“)?`,
   String.raw`(?:(?:Guard|Wächter) \d* ?in )?\`[^\`]*\.(?:guard\.)?test\.tsx?\``,
-  String.raw`[a-z0-9]{8}(?: D\d+)?`,
+  // Zunder-Kurzkennung: 8 Zeichen mit mindestens einer Ziffer, sonst träfe es Wörter („gemessen“).
+  String.raw`(?=[a-z]*\d)[a-z0-9]{8}(?: D\d+)?`,
   String.raw`D\d+`,
   String.raw`\d{1,2}\.\d{1,2}\.\d{4}`,
   String.raw`Entscheidungen? E\d+(?:–E\d+)? aus ${TICKET}`,
   String.raw`(?:löst|ersetzt) .*${TICKET}.*?(?: ab)?`,
   String.raw`schreibt .*${TICKET}.* fort`,
-  String.raw`Herleitung .*`,
+  String.raw`Herleitung[:\s][\s\S]*`,
 ].join('|');
 const VERWEIS_GLIED = new RegExp(`^(?:${VERWEIS})$`);
 /** Ein Verweis vor einem Doppelpunkt: der Inhalt dahinter bleibt („LFH-593: Ebenen-Identität“). */
@@ -296,7 +311,8 @@ const ZU = '\u0002';
  * nach außen gelesen. In `frontend/AGENTS.md` bleiben die Verweise als Prüfspur stehen.
  */
 export function ohneVerweise(text: string): string {
-  let rest = text;
+  // Ein Herleitungssatz ohne Klammer („Herleitung: `openspec/…`.“) fällt ganz.
+  let rest = text.replace(/\s*Herleitung:\s*`[^`]*`(?:,\s*`[^`]*`)*\.?/g, '');
   for (;;) {
     // Der Leerraum davor fällt mit einer ganz gestrichenen Klammer, auch ein Zeilenumbruch.
     const innen = /(\s*)\(([^()]*)\)/.exec(rest);

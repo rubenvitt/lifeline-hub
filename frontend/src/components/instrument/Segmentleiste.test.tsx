@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { dichten } from '../../theme/tokens';
 import { zielEinzug } from './zielEinzug';
-import { Button, Form } from 'antd';
+import { Button, Form, type FormInstance } from 'antd';
 import Segmentleiste, {
   SegmentFeld,
   SegmentUmschalter,
@@ -221,8 +221,8 @@ describe('Segmentleiste', () => {
 
   /** Gate 3: ZWEI Angaben an einem handgebauten Bedienziel, Böden als Literale. */
   it('Bedienziel: Boden 30 / 48 / 72 aus controlHeight, plus Polsterung, die mitwächst', () => {
-    // Die Polsterung des Worts bleibt im Raster bei 8 px; was mitwächst, ist der Platz je Segment
-    // aus Polsterung und Zieleinzug (`zielEinzug`, 0 / 4 / 8 px).
+    // Die Polsterung kommt aus dem Token der Stufe (`paddingSM` abzüglich des Zieleinzugs, im
+    // Raster 8 px in jeder Stufe); was mitwächst, ist der Platz je Segment samt Einzug.
     const t = (s: keyof typeof dichten) => ({
       controlHeight: dichten[s].zeilenhoehe,
       paddingSM: dichten[s].abstand.sm,
@@ -231,6 +231,9 @@ describe('Segmentleiste', () => {
     expect(segmentStil(t('kompakt')).minHeight).toBe(30);
     expect(segmentStil(t('komfortabel')).minHeight).toBe(48);
     expect(segmentStil(t('handschuh')).minHeight).toBe(72);
+    for (const s of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      expect(segmentStil(t(s)).paddingInline, s).toBe(t(s).paddingSM - zielEinzug(t(s)));
+    }
     const platz = (s: keyof typeof dichten) =>
       Number(segmentStil(t(s)).paddingInline) + zielEinzug(t(s));
     expect(platz('kompakt')).toBeLessThan(platz('handschuh'));
@@ -422,11 +425,63 @@ describe('SegmentFeld', () => {
     expect(knoepfe[0]).toHaveAttribute('tabindex', '0');
   });
 
+  it('ein Klick auf das gewählte Segment meldet keine Änderung, das Feld bleibt unberührt', async () => {
+    const onValuesChange = vi.fn();
+    const formular = { current: null as FormInstance | null };
+    function Mit() {
+      const [form] = Form.useForm();
+      formular.current = form;
+      return (
+        <Form form={form} initialValues={{ art: 'funk' }} onValuesChange={onValuesChange}>
+          <Form.Item name="art" label="Art">
+            <SegmentFeld optionen={ARTEN} beschriftung="Art" />
+          </Form.Item>
+        </Form>
+      );
+    }
+    renderMitProviders(<Mit />);
+    await userEvent.click(screen.getByRole('radio', { name: 'Funk' }));
+    expect(onValuesChange).not.toHaveBeenCalled();
+    expect(formular.current?.isFieldTouched('art')).toBe(false);
+  });
+
+  it('trägt Id und Prüfzustand aus Form.Item an der Gruppe', async () => {
+    renderMitProviders(<Formular onFinish={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Art wählen');
+    const gruppe = screen.getByRole('radiogroup', { name: 'Art' });
+    expect(gruppe).toHaveAttribute('aria-invalid', 'true');
+    expect(gruppe).toHaveAttribute('aria-required', 'true');
+    expect(gruppe.id).not.toBe('');
+  });
+
   it('zeigt die Fehlerzeile einer Pflichtwahl wie jedes andere Feld', async () => {
     const onFinish = vi.fn();
     renderMitProviders(<Formular onFinish={onFinish} />);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(await screen.findByText('Art wählen')).toBeInTheDocument();
     expect(onFinish).not.toHaveBeenCalled();
+  });
+});
+
+describe('Segmentleiste mit manueller Aktivierung', () => {
+  it('bewegt mit der Pfeiltaste nur den Fokus, gewählt wird mit Enter', async () => {
+    const onWechsel = vi.fn();
+    renderMitProviders(
+      <Segmentleiste
+        rolle="tablist"
+        aktivierung="manuell"
+        optionen={OPTIONEN}
+        wert="alle"
+        onWechsel={onWechsel}
+        beschriftung="Reiter"
+      />,
+    );
+    screen.getByRole('tab', { name: 'Alle' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Meldung' })).toHaveFocus();
+    expect(onWechsel).not.toHaveBeenCalled();
+    await userEvent.keyboard('{Enter}');
+    expect(onWechsel).toHaveBeenCalledWith('meldung');
   });
 });

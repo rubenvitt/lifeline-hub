@@ -33,6 +33,14 @@ import PlanungPostenListe from './PlanungPostenListe';
 import PlanungSchichtplan from './PlanungSchichtplan';
 import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
 
+/** Name der Reiterfläche je Reiter, ohne die Zahl im Wortlaut des Reiters. */
+const REITER_NAME: Record<PlanungReiter, string> = {
+  plan: 'Plan',
+  posten: 'Posten',
+  helfer: 'Helfer',
+  ablauf: 'Ablauf',
+};
+
 /**
  * Eine Planung ohne Einsatz (LLH-1586, Spec `vorplanung`): der Kopf wird in der Ansicht
  * bearbeitet, darunter die Reiter „Plan“, „Posten“, „Helfer“ (Abstimmung 08.11.2026) und „Ablauf“
@@ -42,14 +50,6 @@ import PlanungUebernahmeDialog from './PlanungUebernahmeDialog';
  * „In Einsatz übernehmen“ (LLH-1587) öffnet den Dialog mit Vorschau; danach ist die Planung
  * schreibgeschützt und nennt oben, wann und in welchen Einsatz sie ging.
  */
-/** Name der Reiterfläche je Reiter, ohne die Zahl im Wortlaut des Reiters. */
-const REITER_NAME: Record<PlanungReiter, string> = {
-  plan: 'Plan',
-  posten: 'Posten',
-  helfer: 'Helfer',
-  ablauf: 'Ablauf',
-};
-
 export default function PlanungPage() {
   const { planungId: roh } = useParams();
   const planungId = parseRouteId(roh);

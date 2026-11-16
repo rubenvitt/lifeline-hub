@@ -30,7 +30,8 @@ import { SCHULD } from './abstandsraster.schuld';
  * 3. `<Space … size={n}>` wird nur erkannt, solange zwischen `<Space` und `size=` kein `>` steht
  *    (Pfeilfunktion in einer Prop davor).
  * 4. Die Kurzschreibweise `padding: '8px 12px'` zählt je Wert.
- * 5. Testdateien zählen nicht.
+ * 5. Testdateien zählen nicht. Druckansichten zählen auch außerhalb von `druck/` nicht
+ *    (`DRUCKDATEI`, am Dateinamen erkannt).
  */
 
 const SRC = (() => {
@@ -56,6 +57,12 @@ export const AUSNAHMEN: Readonly<Record<string, string>> = {
   'druck/': 'Druck: Papiermaß, keine Bildschirmdichte',
 };
 
+/**
+ * Druckansichten außerhalb von `druck/` (`pages/befehlPrint.css`, `pages/EtbDruckPage.tsx`,
+ * `personen/PersonDruckBlatt.tsx` …): dieselbe Ausnahme wie `druck/`, erkannt am Dateinamen.
+ */
+const DRUCKDATEI = /(?:Druck|druck|Print|print)[^/]*\.(?:tsx?|css)$/;
+
 /** Feinsatz (Haarlinie, Symbolversatz) zählt nicht. */
 const FEINSATZ = 2;
 
@@ -66,6 +73,7 @@ const TS_TEXT = new RegExp(`(?:${TS_PROP.source})\\s*:\\s*(['"\`])([^'"\`]*)\\1`
 const PX = /(-?\d+(?:\.\d+)?)px\b/g;
 const JSX_SPACE = /<Space\b[^>]*?\bsize=\{\s*(\[[^\]]*\]|-?\d+(?:\.\d+)?)\s*\}/g;
 const JSX_GAP = /\bgap=\{\s*(-?\d+(?:\.\d+)?)\s*\}/g;
+const JSX_GAP_TEXT = /\bgap=(?:"([^"]*)"|\{\s*['"`]([^'"`]*)['"`]\s*\})/g;
 const JSX_GUTTER = /\bgutter=\{\s*(\[[^\]]*\]|-?\d+(?:\.\d+)?)\s*\}/g;
 const CSS_DEKL =
   /(?:^|[\s;{])(?:padding|margin)(?:-[a-z-]+)?\s*:\s*([^;}]*)|(?:^|[\s;{])(?:gap|row-gap|column-gap)\s*:\s*([^;}]*)/g;
@@ -113,6 +121,12 @@ export function abstandsliterale(pfad: string, inhalt: string): Fund[] {
         [...m[2].matchAll(PX)].map((p) => Number(p[1])),
       );
     }
+    for (const m of text.matchAll(JSX_GAP_TEXT)) {
+      nimm(
+        m.index,
+        [...(m[1] ?? m[2] ?? '').matchAll(PX)].map((p) => Number(p[1])),
+      );
+    }
     for (const muster of [JSX_SPACE, JSX_GAP, JSX_GUTTER]) {
       for (const m of text.matchAll(muster)) nimm(m.index, zahlenIn(m[1]));
     }
@@ -121,7 +135,11 @@ export function abstandsliterale(pfad: string, inhalt: string): Fund[] {
 }
 
 function ausgenommen(pfad: string, ausnahmen: Readonly<Record<string, string>>): boolean {
-  return pfad === ROLLENQUELLE || Object.keys(ausnahmen).some((p) => pfad.startsWith(p));
+  return (
+    pfad === ROLLENQUELLE ||
+    Object.keys(ausnahmen).some((p) => pfad.startsWith(p)) ||
+    (ausnahmen === AUSNAHMEN && DRUCKDATEI.test(pfad))
+  );
 }
 
 /**
@@ -261,6 +279,22 @@ describe('Abstandsraster: kein neues Abstands-Literal (Spec `abstandsraster`)', 
       const datei = { 'alt.tsx': 'const a = { padding: 8 };' };
       expect(befunde(datei, { 'alt.tsx': 2 }, {})[0]).toContain('Schuld senken');
       expect(befunde({ 'alt.tsx': '' }, { 'alt.tsx': 1 }, {})[0]).toContain('Eintrag streichen');
+    });
+
+    it('meldet gap als String-Prop', () => {
+      const tsx = ['<Flex gap="12px">', "<Flex gap={'8px'}>", '<Flex gap="small">'].join('\n');
+      expect(abstandsliterale('a.tsx', tsx).map((f) => f.wert)).toEqual([12, 8]);
+    });
+
+    it('nimmt Druckansichten auch außerhalb von druck/ aus', () => {
+      const css = '@media print { .x { padding: 6px; } }';
+      expect(
+        befunde(
+          { 'pages/befehlPrint.css': css, 'pages/EtbDruckPage.tsx': 'const a = { padding: 8 };' },
+          {},
+        ),
+      ).toEqual([]);
+      expect(befunde({ 'pages/befehl.css': css }, {})).toHaveLength(1);
     });
 
     it('nimmt Rollenquelle und Ausnahmen aus, ein Schuldeintrag dort ist rot', () => {

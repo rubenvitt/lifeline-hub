@@ -1047,6 +1047,19 @@ describe('AuftraegePage', () => {
       expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Einsatzbefehle');
     });
 
+    // Review vor dem PR (LLH-1808): wie vorher bei antds Tabs bleibt eine besuchte Fläche montiert.
+    it('behält Filter und Ansicht der Einzelaufträge über einen Reiterwechsel', async () => {
+      renderPage();
+      await geladen();
+      await waehleAuswahl('Richtung', 'Extern');
+      await userEvent.click(screen.getByRole('tab', { name: 'Einsatzbefehle' }));
+      expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Einsatzbefehle');
+      await userEvent.click(screen.getByRole('tab', { name: 'Einzelaufträge' }));
+      expect(
+        screen.getByRole('combobox', { name: 'Richtung' }).closest('.ant-select'),
+      ).toHaveTextContent('Extern');
+    });
+
     it('die Reiternamen grenzen ab, ohne Erklärsatz darunter (LFH-1078)', async () => {
       const { container } = renderPage();
       await geladen();

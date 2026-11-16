@@ -12,55 +12,6 @@ abgeleitet. Radius 0, Archivo für Text, JetBrains Mono für jede fachliche Zahl
 kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschauen zeigen
 `kompakt`. Pfade ohne Präfix in den Regeln sind relativ zu `frontend/src/`.
 
-## Bausteine
-
-- **Paneel** (`components/Paneel/`, Gruppe Flächen)
-- **Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)** (`components/Seitenkopf/`, Gruppe Rahmen)
-- **Dashboard-Baukasten (Verteilung und Matrix)** (`components/Dashboard/`, Gruppe Flächen)
-- **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
-- **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
-- **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
-- **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
-- **Großbild: Zeilen** (`components/GrossZeile/`, Gruppe Großbild)
-- **Segmentleiste (Filter, Umbruch, als Formularfeld)** (`components/Segmentleiste/`, Gruppe Bedienung)
-- **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
-- **Zustände: Seite und Paneel (laden, leer, Fehler)** (`components/Zustaende/`, Gruppe Rückmeldung)
-- **Hinweis: Rechte, Warnstufe und Alert auf der Statusfläche** (`components/Hinweis/`, Gruppe Rückmeldung)
-- **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
-- **Verbindungen (Funk und Telefon getrennt; Liste offen)** (`components/Verbindungen/`, Gruppe Bedienung)
-- **Übungsmarke: Band und Marke** (`components/Uebung/`, Gruppe Status)
-- **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
-- **BearbeitbaresPaneel (offen und gesperrt)** (`components/BearbeitbaresPaneel/`, Gruppe Formular)
-- **Knopf (primär, Standard, Text, Gefahr, gesperrt, mit Symbol)** (`components/Knopf/`, Gruppe Eingabe)
-- **Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)** (`components/Eingabefeld/`, Gruppe Eingabe)
-- **Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)** (`components/Formularlayout/`, Gruppe Eingabe)
-- **Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)** (`components/Dialog/`, Gruppe Eingabe)
-- **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
-- **StammdatenFeld (aus Stammdaten oder frei)** (`components/StammdatenFeld/`, Gruppe Formular)
-- **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
-- **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
-- **Kopfaktion mit wechselndem Wortlaut (frei und gesperrt)** (`components/BreiteHalten/`, Gruppe Bedienung)
-- **Dashboard-Baukasten (Abschnitte, Gliederung, Strom)** (`components/DashboardListen/`, Gruppe Flächen)
-- **Tabelle: KatalogTabelle mit Suche, Spalten, Filtern und Zeilenmenü** (`components/Tabelle/`, Gruppe Daten)
-- **Zeitdarstellung (taktisch und Datum mit Uhrzeit)** (`components/Zeitdarstellung/`, Gruppe Daten)
-- **Zeiteingabe (Wert mit Schnellwahl, leer, unlesbar)** (`components/Zeiteingabe/`, Gruppe Formular)
-- **Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)** (`components/Ortsfeld/`, Gruppe Formular)
-- **Alarmzone (gebündelt, aufgeklappt)** (`components/Alarmzone/`, Gruppe Rückmeldung)
-- **Eingänge (Knopf im Kopf und Eingangsband)** (`components/Eingaenge/`, Gruppe Rückmeldung)
-- **SichtungsWahl (BBK-Flächen, ohne und mit Wahl)** (`components/SichtungsWahl/`, Gruppe Fach)
-- **Körperschema (Lesen)** (`components/Koerperschema/`, Gruppe Fach)
-- **Taktische Zeichen (Einheit, Fahrzeug, Gefahr; Meldebildzeile)** (`components/TaktischeZeichen/`, Gruppe Fach)
-
-## Nur im Code
-
-Diese Werte liest das Format des Design Systems nicht; sie stehen nur im Repo:
-
-- `farbenDunkel/farbenHell.markeGlut`: kein Farbwert (Nacht `0 0 12px 0 rgba(168, 7, 26, 0.55)`, Tag `0 0 10px 0 rgba(168, 7, 26, 0.3)`)
-- `form.versalSperrung`: Sperrung der Versalien, `2.2px`
-- `form.uebergang`: Übergang, `120ms cubic-bezier(0.2, 0.8, 0.2, 1)`
-- `schriftskala (Sperrung, Versalien)`: ueberschrift -0.02em · augenbraue 0.14em Versalien · railEtikett 0.06em Versalien · datenwertKlein -0.02em · datenwert -0.02em · datenwertGross -0.02em
-- `--lfh-abdunkelung (theme/rollen.css)`: Deckschicht des Helligkeitsreglers, keine Farbrolle
-
 ## Bausteinwahl: wann nehme ich was
 
 Die erste Frage beim Bauen und beim Entwerfen: Welcher Baustein trägt den Bedarf? Eine Zeile je
@@ -124,6 +75,55 @@ die Karten deckungsgleich.
 | Unumkehrbares                                                                                   | rote `Popconfirm`, aus einem Zeilenmenü ein Modal („Aktionen“)                              | `Knopf`                            |
 | Nur ansehen                                                                                     | Drawer; nie zum Anlegen oder Bearbeiten                                                     | —                                  |
 
+## Bausteine
+
+- **Paneel** (`components/Paneel/`, Gruppe Flächen)
+- **Seitenkopf (Ortspfad, Titel, Meta, Kopfaktionen)** (`components/Seitenkopf/`, Gruppe Rahmen)
+- **Dashboard-Baukasten (Verteilung und Matrix)** (`components/Dashboard/`, Gruppe Flächen)
+- **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
+- **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
+- **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
+- **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
+- **Großbild: Zeilen** (`components/GrossZeile/`, Gruppe Großbild)
+- **Segmentleiste (Filter, Umbruch, als Formularfeld)** (`components/Segmentleiste/`, Gruppe Bedienung)
+- **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
+- **Zustände: Seite und Paneel (laden, leer, Fehler)** (`components/Zustaende/`, Gruppe Rückmeldung)
+- **Hinweis: Rechte, Warnstufe und Alert auf der Statusfläche** (`components/Hinweis/`, Gruppe Rückmeldung)
+- **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
+- **Verbindungen (Funk und Telefon getrennt; Liste offen)** (`components/Verbindungen/`, Gruppe Bedienung)
+- **Übungsmarke: Band und Marke** (`components/Uebung/`, Gruppe Status)
+- **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
+- **BearbeitbaresPaneel (offen und gesperrt)** (`components/BearbeitbaresPaneel/`, Gruppe Formular)
+- **Knopf (primär, Standard, Text, Gefahr, gesperrt, mit Symbol)** (`components/Knopf/`, Gruppe Eingabe)
+- **Eingabefeld (Beschriftung darüber, Pflicht mit Fehlerzeile, FeldFehler)** (`components/Eingabefeld/`, Gruppe Eingabe)
+- **Formularlayout (Feldgruppen im Formularpaneel, Speicherleiste)** (`components/Formularlayout/`, Gruppe Eingabe)
+- **Dialog: ErfassungsModal (Felder und Fuß, Serienmodus)** (`components/Dialog/`, Gruppe Eingabe)
+- **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
+- **StammdatenFeld (aus Stammdaten oder frei)** (`components/StammdatenFeld/`, Gruppe Formular)
+- **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
+- **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
+- **Kopfaktion mit wechselndem Wortlaut (frei und gesperrt)** (`components/BreiteHalten/`, Gruppe Bedienung)
+- **Dashboard-Baukasten (Abschnitte, Gliederung, Strom)** (`components/DashboardListen/`, Gruppe Flächen)
+- **Tabelle: KatalogTabelle mit Suche, Spalten, Filtern und Zeilenmenü** (`components/Tabelle/`, Gruppe Daten)
+- **Zeitdarstellung (taktisch und Datum mit Uhrzeit)** (`components/Zeitdarstellung/`, Gruppe Daten)
+- **Zeiteingabe (Wert mit Schnellwahl, leer, unlesbar)** (`components/Zeiteingabe/`, Gruppe Formular)
+- **Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)** (`components/Ortsfeld/`, Gruppe Formular)
+- **Alarmzone (gebündelt, aufgeklappt)** (`components/Alarmzone/`, Gruppe Rückmeldung)
+- **Eingänge (Knopf im Kopf und Eingangsband)** (`components/Eingaenge/`, Gruppe Rückmeldung)
+- **SichtungsWahl (BBK-Flächen, ohne und mit Wahl)** (`components/SichtungsWahl/`, Gruppe Fach)
+- **Körperschema (Lesen)** (`components/Koerperschema/`, Gruppe Fach)
+- **Taktische Zeichen (Einheit, Fahrzeug, Gefahr; Meldebildzeile)** (`components/TaktischeZeichen/`, Gruppe Fach)
+
+## Nur im Code
+
+Diese Werte liest das Format des Design Systems nicht; sie stehen nur im Repo:
+
+- `farbenDunkel/farbenHell.markeGlut`: kein Farbwert (Nacht `0 0 12px 0 rgba(168, 7, 26, 0.55)`, Tag `0 0 10px 0 rgba(168, 7, 26, 0.3)`)
+- `form.versalSperrung`: Sperrung der Versalien, `2.2px`
+- `form.uebergang`: Übergang, `120ms cubic-bezier(0.2, 0.8, 0.2, 1)`
+- `schriftskala (Sperrung, Versalien)`: ueberschrift -0.02em · augenbraue 0.14em Versalien · railEtikett 0.06em Versalien · datenwertKlein -0.02em · datenwert -0.02em · datenwertGross -0.02em
+- `--lfh-abdunkelung (theme/rollen.css)`: Deckschicht des Helligkeitsreglers, keine Farbrolle
+
 ## Gestaltungssprache
 
 Neuentwurf „Instrumententafel“
@@ -184,8 +184,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     eine Zeile: Menü, Einsatzname, Alarmzentrale (Ruhe als Glocke, Störung im Wort), Verbindung,
     Uhr (umbrechen darf er nur in `handschuh` bei einer Störung im Wort der Alarmzentrale); Suche
     und Benutzermenü stehen dort im Drawer „Navigation“. Der App-Rahmen lässt unter `md` die
-    Wortmarke weg, ihr Link liegt dann auf der Bildmarke. Herleitung:
-    `openspec/changes/archive/2026-11-15-ejt520so-handy-kopfleiste-fixiert/design.md`. Der Fuß der Rail (Griff „Menü“,
+    Wortmarke weg, ihr Link liegt dann auf der Bildmarke. Der Fuß der Rail (Griff „Menü“,
     Einstellungen) klebt nicht: reicht die Höhe nicht, folgt er den Kategorien, statt sie zu
     verdecken. Das Modulpanel ist eine Spalte
     mit festem Kopf und Fuß „Einsatzdauer“, nur die Liste rollt in sich (`modul-panel-spalte`);
@@ -204,13 +203,12 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     alles andere die Rahmenhöhe (Guard). Innerhalb der Ebene `kopf` stapelt sich der Rahmen nach
     Rang (`RAHMEN_RANG`: Betriebszeile, Kopf, Übungsband, Alarmzone; `useRahmenObenStapel`): jede Quelle klebt unter denen mit kleinerem Rang.
   - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
-    rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, nie gerechnet), also auch unter den klebenden Seitenkopf. Ausnahme nur mit Vermerk
+    rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
+    nie gerechnet), also auch unter den klebenden Seitenkopf. Ausnahme nur mit Vermerk
     `rahmen-oben: frei` und Grund (Guard `components/rahmenOben.guard.test.ts`). Den Fokusabstand
     trägt `scroll-padding-block-start` am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen;
     bei Fokus im Seitenkopf gilt nur die Kopfhöhe.
-  - **Alarme stehen in der Alarmzone, nie über dem Inhalt** (Spec
-    `benachrichtigungen`, „Alarmzone verdeckt nichts“, Herleitung
-    `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/design.md`): Alarme, Org-Hinweise und
+  - **Alarme stehen in der Alarmzone, nie über dem Inhalt** („Alarmzone verdeckt nichts“): Alarme, Org-Hinweise und
     die Unwetterwarnung zeichnet `alarm/AlarmZone.tsx` direkt unter Kopf und Übungsband, nie
     antds `notification` (`AntApp` trägt kein `notification`-Prop). Die Zone ist eine
     Rahmenquelle der Ebene `kopf` unter dem Übungsband (`useRahmenObenStapel` mit
@@ -229,8 +227,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Glockenknopf ab `md`, weil der Browser den Ton vor der ersten Geste ohne Zutun sperrt (am Handy
     nicht, dort hätte die eine Zeile keinen Platz dafür). Tastenhinweise
     nur bei feinem Zeiger. Die Wortmarke steht im Einsatz erst ab `xxl`.
-  - **Übung** (Herleitung
-    `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): Jede Fläche, die einen Einsatz zeigt,
+  - **Übung**: Jede Fläche, die einen Einsatz zeigt,
     kennzeichnet eine Übung (Rahmen, Gerät, Lagemonitor, Einsatzliste, Wechsler, Sprungpalette,
     Planungsübernahme, externes Lagebild, „Zurück zu …“, Tab-Titel, Druck, Lageplan-Anlage,
     Fernmeldeskizze).
@@ -366,7 +363,6 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 - **Demo-Marke**: Demo-Stammdaten (`ist_demo`) zeigt nur `components/DemoMarke.tsx`
   (`Tag` ohne `color`, kein `StatusTag`, keine Karte in `statusFarben.ts`); Auswahllisten zum
   Disponieren gruppieren sie nur über `stammdaten/demoAuswahl.tsx` hinter die echten Einträge.
-  Herleitung: `openspec/changes/archive/2026-10-01-lfh-733-demo-marke-stammdaten/design.md`.
 - **Helligkeit: ein Regler, eine Sperre** (Kriterium 8): dritte Achse im
   `ThemeModeProvider` (`useHelligkeit`, Stufen 100/80/60/40/20, `lifeline-hub.helligkeit`,
   **gespiegelt in `index.html`**), wirkt nur über die Deckschicht `html::after` in `rollen.css`
@@ -428,8 +424,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Zustand aus `useSpaltenSchalterZustand`, an die Sicht als `spaltenSchalterAussen`;
   sein Fokus hält die Zeilenschleuse nicht, die Werkzeugzeile der Sicht bleibt Standzeile des
   Sammelbanners. Sonst bleibt der eingebaute Schalter.
-- **Eine Vergleichstabelle ist sortier- und filterbar, im Spaltenkopf** (Spec
-  `tabellen-sortieren-filtern`): Sortieren per Klick auf den Kopf, Filter über antds
+- **Eine Vergleichstabelle ist sortier- und filterbar, im Spaltenkopf**: Sortieren per Klick auf den Kopf, Filter über antds
   Spaltenfilter (kontrolliert, im Clientmodus mit Zähler „Groß (3)“), je aktivem Wert ein Chip
   (`components/tabellenFilter.tsx`) und darüber der `Filterhinweis` (Treffer von Gesamt,
   „Filter zurücksetzen“ leert Suche und Filter, nicht die Sortierung). Die gefilterte Kopfzelle
