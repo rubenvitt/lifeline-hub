@@ -222,7 +222,7 @@ pub struct EinsatzFahrzeugAnzeige {
 }
 
 /// Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung
-/// eines Fahrzeugs zurücknehmen“; `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D5).
+/// eines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).
 /// Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
 /// zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
 /// Die Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom

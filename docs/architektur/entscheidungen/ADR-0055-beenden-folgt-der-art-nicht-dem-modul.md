@@ -10,7 +10,7 @@ gilt_fuer:
   - frontend/src/kraefte/MaterialAmOrt.tsx
   - src/fahrzeug/disposition_repo.rs
 herleitung:
-  - openspec/changes/tfq6f4kb-loesende-aktionen/design.md
+  - openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md
 ---
 
 # ADR-0055: Beenden folgt der Art, nicht dem Modul

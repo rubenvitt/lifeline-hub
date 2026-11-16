@@ -677,7 +677,7 @@ anwendbar), „nicht geprüft" ist keins.
   `.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]` + `within`. Kartenmodus: `Datensicht`
   baut `weitere`.
 - **Beenden: Verb, Ort und Sicherung je Art** (LLH-1722, Spec `bedien-muster`,
-  `openspec/changes/tfq6f4kb-loesende-aktionen/design.md` D1): eine Handlung, die einen Datensatz
+  `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D1): eine Handlung, die einen Datensatz
   beendet, gehört zu genau einer Art, und die Art bestimmt alles:
 
   | Art             | Verb                                                                               | Ort                                                                                                                                                                                                                    | Sicherung                                                                                                                              |
