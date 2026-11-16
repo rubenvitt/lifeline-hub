@@ -149,6 +149,30 @@ afterEach(() => {
 });
 
 describe('Lagemonitor — Großbild', () => {
+  it('„an UHS“ zählt nur aktive UHS; eine geplante steht weiter in der Belegung (LLH-1744)', async () => {
+    bereit();
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        uhs: [
+          ...lage.uhs,
+          {
+            ...lage.uhs[0],
+            id: 3,
+            bezeichnung: 'UHS Süd',
+            status: 'geplant',
+            belegt: 0,
+            kraefte: 2,
+          },
+        ],
+      });
+    renderApp('/geraet/7/monitor');
+    const kraefte = await screen.findByRole('region', { name: 'Kräfte' });
+    expect(await within(kraefte).findByText('4 an UHS')).toBeInTheDocument();
+    const belegung = screen.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
+    expect(within(belegung).getByText('UHS Süd')).toBeInTheDocument();
+  });
+
   it('startet auf dem Großbild mit Kopfzahlen, Kräften und Belegung je UHS', async () => {
     bereit();
     const router = renderApp('/geraet');

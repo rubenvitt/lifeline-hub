@@ -657,7 +657,8 @@ export default function LageDashboardPage() {
               notiz={
                 uhsGesperrt
                   ? NICHT_FREIGEGEBEN
-                  : `${fuehrung?.uhsGeplant ?? 0} geplant · ${kraefteText(fuehrung?.uhsKraefte ?? 0)}`
+                  : // „an UHS“: eine eigene Achse, nicht die Stärke eines Abschnitts (LLH-1744).
+                    `${fuehrung?.uhsGeplant ?? 0} geplant · ${kraefteText(fuehrung?.uhsKraefte ?? 0)} an UHS`
               }
               zustand={zFuehrung(quellZustand.uhs)}
               ziel={uhsGesperrt ? undefined : unfallhilfsstellenListePfad(einsatzId)}

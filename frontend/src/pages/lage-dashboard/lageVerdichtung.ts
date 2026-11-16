@@ -215,9 +215,19 @@ interface UhsVerdichtung {
   aktiv: number;
   aufgeloest: number;
   gesamt: number;
-  /** Kräfte an aktiven UHS, Summe ihrer Stärke (LFH-1045, Spec `uhs-staerke`). */
+  /** Kräfte an aktiven UHS, Summe ihrer Stärke (LFH-1045, über {@link zaehltKraefteAnUhs}). */
   kraefteAktiv: number;
 }
+
+/**
+ * Zählen die Kräfte einer UHS in diesem Status zu den „Kräften an UHS“? Nur an aktiven: an einer
+ * geplanten arbeitet noch niemand, an einer aufgelösten keiner mehr (LLH-1744, Spec
+ * `lage-verdichtung`). Lagebild und Lagemonitor zählen beide hierüber.
+ */
+export function zaehltKraefteAnUhs(status: Uhs['status']): boolean {
+  return status === 'aktiv';
+}
+
 export function verdichteUhs(uhs: Uhs[]): UhsVerdichtung {
   const v: UhsVerdichtung = {
     geplant: 0,
@@ -228,7 +238,7 @@ export function verdichteUhs(uhs: Uhs[]): UhsVerdichtung {
   };
   for (const u of uhs) {
     v[u.status] += 1;
-    if (u.status === 'aktiv') {
+    if (zaehltKraefteAnUhs(u.status)) {
       v.kraefteAktiv += u.staerke.fuehrer + u.staerke.unterfuehrer + u.staerke.mannschaft;
     }
   }
