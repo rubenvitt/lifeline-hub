@@ -26,7 +26,6 @@ import type {
   Gefahrengebiet,
   LetzteRueckmeldung,
   PegelAnzeige,
-  Person,
   Programmpunkt,
   Rueckmeldungen,
   Warnstufe,
@@ -38,7 +37,6 @@ import {
   OHNE_ABSCHNITT_KEY,
   OHNE_EINHEIT_KEY_PREFIX,
   baueKraeftebild,
-  verdichte,
   type MeldebildZeile,
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
@@ -101,30 +99,6 @@ const ROLLE_ALS_TON: Record<Statusrolle, KennzahlTon> = {
   bedien: 'neutral',
   marke: 'neutral',
 };
-
-interface BetroffeneKennzahl {
-  anzahl: number;
-  /** Erfasst in den letzten {@link FENSTER_MINUTEN} Minuten. */
-  neu: number;
-}
-
-export function betroffeneKennzahl(personen: Person[], jetzt: Dayjs): BetroffeneKennzahl {
-  const grenze = jetzt.valueOf() - FENSTER_MINUTEN * 60_000;
-  const neu = personen.filter((p) => (ms(p.erfasst_at) ?? -Infinity) >= grenze).length;
-  return { anzahl: personen.length, neu };
-}
-
-interface KraefteKennzahl {
-  gesamt: number;
-  /** BOS-Schreibweise F/UF/M//Σ aus `staerkeText`. */
-  text: string;
-}
-
-/** Die Stärke kommt nur aus dem Personal; Fahrzeuge und Material zählen nicht (LFH-887). */
-export function kraefteKennzahl(personal: EinsatzPersonal[]): KraefteKennzahl {
-  const s = verdichte(personal, [], []).staerke;
-  return { gesamt: s.gesamt, text: staerkeText(s) };
-}
 
 interface WarnstufeKennzahl {
   stufe: Warnstufe;

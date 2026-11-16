@@ -15,18 +15,15 @@ import type {
   Gefahrengebiet,
   LetzteRueckmeldung,
   PegelAnzeige,
-  Person,
 } from '../../api/types';
 import {
   abschnittGruende,
   abschnittNamen,
   abschnittZeilen,
   auftraegeKennzahl,
-  betroffeneKennzahl,
   empfaengerText,
   entscheidungenAuswahl,
   folgeText,
-  kraefteKennzahl,
   markenBewertung,
   naechsteMarken,
   offeneAuftraege,
@@ -42,9 +39,6 @@ dayjs.extend(utc);
 const JETZT = dayjs.utc('2026-09-21 14:00:00');
 const vor = (min: number) => JETZT.subtract(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
 const nach = (min: number) => JETZT.add(min, 'minute').format('YYYY-MM-DD HH:mm:ss');
-
-const person = (erfasst_at: string, id = Math.random()) =>
-  ({ id, erfasst_at, status: 'betroffen', aktuelle_sichtung: null }) as unknown as Person;
 
 const empfaenger = (over: Partial<AuftragEmpfaenger> = {}): AuftragEmpfaenger => ({
   id: 1,
@@ -140,24 +134,6 @@ describe('zeitpunkt', () => {
 });
 
 describe('Kennzahlen', () => {
-  it('Betroffene zählen alle und die in den letzten 60 min erfassten', () => {
-    const k = betroffeneKennzahl(
-      [person(vor(5)), person(vor(60)), person(vor(61)), person(vor(600))],
-      JETZT,
-    );
-    expect(k).toEqual({ anzahl: 4, neu: 2 });
-  });
-
-  it('Kräfte: Gesamtstärke und BOS-Schreibweise F/UF/M//Σ', () => {
-    const k = kraefteKennzahl([
-      personal(1, null, 'fuehrer', null),
-      personal(2, null, 'unterfuehrer', null),
-      personal(3, null, 'mannschaft', null),
-      personal(4, null, 'mannschaft', null),
-    ]);
-    expect(k).toEqual({ gesamt: 4, text: '1/1/2//4' });
-  });
-
   it('Warnstufe: höchste Stufe als Wort, Ton aus dem Kennzahl-Vertrag', () => {
     const g = (w: string) => ({ hoechste_warnstufe: w }) as unknown as Gefahrengebiet;
     expect(warnstufeKennzahlVon([])).toMatchObject({ wort: 'keine', ton: 'neutral' });
