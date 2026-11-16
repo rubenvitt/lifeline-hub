@@ -242,8 +242,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   über die Gründe der Tönung des Meldebilds (`toenungsGruende`); der Überblick summiert sie je
   Abschnitt. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
   jüngste Meldung allein (LLH-1739, `abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
-  (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
-  nur `anzeige/staerke.ts:staerkeText`. Belegung eines Bereitstellungsraums (LLH-1095, Spec
+  (Wurzeln der Menge), Formatierung nur `anzeige/staerke.ts:staerkeText`. Ein Abschnitt zählt, wer in
+  ihm steht (LLH-1744): Stärke nur über `abschnittStaerken` (eigene Stärke `ist` je aktiver Einheit
+  beim wirksamen Abschnitt), seine Einheiten nur über `einheitenImAbschnitt`, dieselbe Menge. „Kräfte“
+  sind Köpfe, Fahrzeuge zählen eigens; Kräfte an UHS nur an aktiven UHS (`zaehltKraefteAnUhs`,
+  Lagebild und Lagemonitor). Belegung eines Bereitstellungsraums (LLH-1095, Spec
   `bereitstellungsraum-belegung`): Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
   des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
   (`bereitstellungsraum/brZahlen.ts`; nur Einheiten im Raum mit ihrer eigenen Stärke, LLH-1289); „noch n belegt“ vor dem Auflösen zählt wie
@@ -257,7 +260,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Einheit → Untereinheiten, je Einheit Fahrzeuge mit Besatzung, „Ohne Fahrzeug“, Material; jede
   Kraft genau einmal, Elternstärke über `accumulateStaerke`. Meldebild (`meldebildRaster.ts`) und
   Lagebericht-Text (`kraeftebild.ts`) bilden den Kern nur ab; ein neuer Abnehmer baut keinen
-  eigenen Baum.
+  eigenen Baum. Meldebild, Kräftebild und Organigramm lösen abgestellte Untereinheiten (eigener
+  Abschnitt ungleich dem der Obereinheit) über `loeseAbgestellte`/`abgestelltVon` vom Verband,
+  „aus <Obereinheit>“ (LLH-1744); Einheiten-Gliederung, FMS-Tableau und Funkplan behalten den
+  Verband.
 
 ## Frontend — UI-Form-Leitlinie (Drawer-Nutzung)
 
@@ -347,7 +353,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 - **Organigramm der Führungsorganisation** (LFH-626, `pages/einsatzabschnitte/Organigramm.tsx`,
   `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md`): Ansicht
   `?ansicht=organigramm` der Seite Einsatzabschnitte, kein Modul; rein abgeleitet über
-  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan; Vorlage für Auto-Layout
+  `baueFuehrungsorganisation` (Platzierung und Schlüssel wie der Funkplan, nur eine abgestellte
+  Untereinheit steht wie im Meldebild unter ihrem Abschnitt, LLH-1744; Vorlage für Auto-Layout
   und Fokusfolge der Fernmeldeskizze LFH-893); Stärke je Abschnitt nur über `abschnittStaerken`, die Wurzel
   „Einsatzleitung“ trägt keine Zahl, ihren Einsatzleiter nur über `einsatz/einsatzleiter.ts`
   (LFH-1199); die Stabsstelle nur aus den Mitgliedern (`fuehrung/besetzungAusMitgliedern.ts`,
@@ -1149,8 +1156,8 @@ und `pages/personen/`.
   Schlüssel `<praefix>:letzteAuswahl:<einsatzId>` ist gepinnt). **Ein reiner Kern bekommt ein Suffix** (`…Kern.ts`): gleicher Basename
   wie die `.tsx` kollidiert case-insensitiv, Vite löst `.ts` vor `.tsx` auf („Element type is
   invalid").
-- Stärke EINMAL summieren (`anzeige/staerke.ts:summiereStaerke`, `null` bei leerer Menge;
-  kumuliert `pages/einsatzabschnitte/abschnittStaerke.ts`).
+- Stärke EINMAL summieren (`anzeige/staerke.ts:summiereStaerke`, `null` bei leerer Menge); je
+  Abschnitt nur `pages/einsatzabschnitte/abschnittStaerke.ts` (wer im Abschnitt steht, LLH-1744).
   „Abschnitt anlegen" ist eine Erfassung mit drei Feldern (`ErfassungsModal`), den Datensatz gibt
   es erst nach dem Absenden; das Detail bearbeitet jede Angabe einzeln (`patcheAbschnitt`, ein
   Feld je PATCH, Spec `einsatzabschnitt-bearbeitung`, LFH-1208,
