@@ -16,6 +16,7 @@ import {
 } from './adminNav';
 import { useDemoDatenStatus } from './useDemoDaten';
 import DatentraegerWarnung, { useDatentraeger } from './DatentraegerWarnung';
+import { bringIntoView } from '../components/bringIntoView';
 
 const { Sider, Content } = Layout;
 
@@ -53,18 +54,6 @@ function markierterKey(keys: string[], aktiv: string): string | undefined {
 }
 
 /**
- * Hält den markierten Eintrag im eigenen Bildlauf der Seitenleiste sichtbar (LFH-980), wie
- * `scrollIntoView({ block: 'nearest' })`, aber NUR im Container: `scrollIntoView` rollte auch das
- * Fenster, und die Seite spränge beim Routenwechsel.
- */
-export function holeInsBild(container: HTMLElement, eintrag: HTMLElement): void {
-  const rahmen = container.getBoundingClientRect();
-  const ziel = eintrag.getBoundingClientRect();
-  if (ziel.top < rahmen.top) container.scrollTop -= rahmen.top - ziel.top;
-  else if (ziel.bottom > rahmen.bottom) container.scrollTop += ziel.bottom - rahmen.bottom;
-}
-
-/**
  * Die Seitenleiste ab `lg` (LFH-980), rein und exportiert. Bei 21 Einträgen in Touch-Dichte ist das
  * Menü rund 1400 px hoch; im Fluss bestimmte es die Seitenhöhe, und die unteren Einträge lagen
  * unter dem Bildschirmrand. Deshalb:
@@ -74,7 +63,8 @@ export function holeInsBild(container: HTMLElement, eintrag: HTMLElement): void 
  * · das Menü klebt oben, ist höchstens `rest` hoch und scrollt in sich, es trägt zur Seitenhöhe
  *   nie mehr bei als die Verwaltung selbst. Es klebt unter dem Kopf, nicht an der Fensterkante
  *   (LFH-952, `frontend/AGENTS.md`, Rahmen); `rest` ist dort nie größer als der Platz darunter,
- *   weil `oben` die Kopfhöhe schon enthält.
+ *   weil `oben` die Kopfhöhe schon enthält. Es hängt an der Kopfhöhe (`--lfh-kopf-oben`), nicht an
+ *   der Rahmenhöhe, die den klebenden Seitenkopf mitzählt (zjt7c073 D2).
  */
 export function seitenleistenStil(oben: number): {
   verwaltung: CSSProperties;
@@ -85,7 +75,7 @@ export function seitenleistenStil(oben: number): {
     verwaltung: { minHeight: rest },
     menue: {
       position: 'sticky',
-      top: 'var(--lfh-rahmen-oben, 0px)',
+      top: 'var(--lfh-kopf-oben, 0px)',
       maxHeight: rest,
       overflowY: 'auto',
     },
@@ -153,7 +143,7 @@ export default function AdminLayout() {
     if (!breit) return;
     const menue = menueRef.current;
     const eintrag = menue?.querySelector<HTMLElement>('.ant-menu-item-selected');
-    if (menue && eintrag) holeInsBild(menue, eintrag);
+    if (menue && eintrag) bringIntoView(menue, eintrag);
   }, [breit, pathname, laedt, demoFreigeschaltet, oben]);
 
   if (laedt) {

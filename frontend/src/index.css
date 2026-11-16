@@ -192,17 +192,6 @@ main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-end: var(--lfh-zaehltasten-fokusabstand, 0px);
 }
 
-/* Modulpanel: Fokusabstand zum klebenden Fuß „Einsatzdauer“ (LLH-1241, WCAG 2.4.11), aus demselben
-   gemessenen Grund `scroll-padding` am SCROLLPORT statt `scroll-margin` an den Zeilen: bei
-   1366 × 520 in `handschuh` blieben „Material“ und „Bereitstellungsräume“ getabbt ganz unter dem
-   Fuß. Nur solange der Fokus im Panel steht, sonst rollte jeder Fokus im Inhalt um die Fußhöhe zu
-   weit; der Browser rechnet den Stil mit dem neuen Fokus, bevor er das Ziel ins Bild rollt. Die
-   Höhe setzt `einsatz/fussFokusabstand.ts` am `<html>`. Schlägt die Speicherleiste-Regel darüber
-   (Spezifität): eine Speicherleiste steht im Inhalt, nicht unter dem Panel. */
-:root:has([data-lfh='modul-panel'] :focus) {
-  scroll-padding-block-end: var(--lfh-modulpanel-fokusabstand, 0px);
-}
-
 /* Erfassungsdialog: Fokusabstand zum klebenden Fuß der Hülle (LLH-1274, WCAG 2.4.11), aus demselben
    gemessenen Grund wie die Speicherleiste `scroll-padding` am SCROLLPORT, hier antds `.ant-modal-wrap`
    (der Dialog rollt in ihm, nicht im Dokument). Ohne ihn blieb im Ad-hoc-Material auf 390 px im
@@ -226,6 +215,19 @@ main:has([data-lfh='zaehltasten']) {
 :root {
   scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
 }
+/* Der klebende Seitenkopf zählt zur Rahmenhöhe (zjt7c073 D2/D6); steht der Fokus in ihm selbst,
+   gilt nur die Kopfleiste darüber, sonst rollte jeder Tab durch die Seitenaktionen die Seite.
+   Dasselbe für alles, was neben dem Inhalt an der Kopfhöhe klebt (Rail, Modulpanel,
+   Verwaltungsmenü): ein Fokus auf ihr oberstes Ziel rollte die Seite sonst um die Seitenkopfhöhe
+   zurück, obwohl das Ziel klebt (Review B3, `e2e/rahmen-stehen-bleiben.spec.ts`). */
+:root:has(
+  [data-lfh='seitenkopf'] :focus,
+  [data-lfh='rail-spalte'] :focus,
+  [data-lfh='modul-panel'] :focus,
+  [data-lfh='verwaltung-menue'] :focus
+) {
+  scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
+}
 :root:has(
   [data-lfh='rahmen-kopf'] :focus,
   [data-lfh='betriebszeile'] :focus,
@@ -234,21 +236,22 @@ main:has([data-lfh='zaehltasten']) {
   scroll-padding-block-start: 0px;
 }
 
-/* ETB: Seitenkopf, Filterleiste und Spaltenkopf kleben unter dem Rahmen (kwc2yszv D8, WCAG
+/* ETB: Filterleiste und Spaltenkopf kleben unter Rahmen und Seitenkopf (kwc2yszv D8, WCAG
    2.4.11). Der Fokusabstand oben wächst um ihre gemessene Höhe, damit ein getabbtes Ziel oder ein
    Sprung nicht darunter landet; `scroll-padding` am Scrollport aus demselben Grund wie beim Rahmen.
-   Die Höhen setzt `etb/etbKopfKleben.ts`, nur solange die Köpfe kleben (Marke an der Leiste).
-   Steht der Fokus in den klebenden Köpfen selbst, gilt nur der Rahmen: sonst rollte jeder Tab durch
-   die Filterleiste die Seite (dieselbe Falle wie oben). Die Ausnahme für den Fokus im Rahmen
-   schlägt beide Regeln über die Spezifität. */
+   Den Seitenkopf zählt die Rahmenhöhe schon mit (zjt7c073 D5). Die Höhen setzt
+   `etb/etbKopfKleben.ts`, nur solange die Köpfe kleben (Marke an der Leiste). Steht der Fokus in
+   den klebenden Köpfen selbst, gilt nur die Kopfleiste: sonst rollte jeder Tab durch die
+   Filterleiste die Seite (dieselbe Falle wie oben). Die Ausnahme für den Fokus im Rahmen schlägt
+   beide Regeln über die Spezifität. */
 :root:has([data-lfh='etb-kopf-klebt']) {
   scroll-padding-block-start: calc(
-    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-seitenkopf-hoehe, 0px) +
-      var(--lfh-etb-filterleiste-hoehe, 0px) + var(--lfh-etb-spaltenkopf-hoehe, 0px)
+    var(--lfh-rahmen-oben, 0px) + var(--lfh-etb-filterleiste-hoehe, 0px) +
+      var(--lfh-etb-spaltenkopf-hoehe, 0px)
   );
 }
 :root:has([data-lfh='etb-kopf-klebt'] :focus, [data-lfh='seitenkopf'] :focus) {
-  scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
+  scroll-padding-block-start: var(--lfh-kopf-oben, 0px);
 }
 
 /* Ausgabeansicht der Verpflegung: Fokusabstand zur klebenden Kurzzeile mit Soll/ausgegeben/fehlt

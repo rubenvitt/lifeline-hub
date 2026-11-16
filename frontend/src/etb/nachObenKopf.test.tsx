@@ -1,12 +1,14 @@
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useRahmenObenQuelle } from '../components/rahmenOben';
 import { useEtbKopfKleben } from './etbKopfKleben';
 import { useNachObenPasst } from './nachOben';
 
 /**
  * „Nach oben“ passt nur ganz unter den klebenden Kopf (LLH-1386). Kleben Seitenkopf und
  * Filterleiste des ETB mit (kwc2yszv D8), gehören sie zum Kopf: die Wurzel des Beobachters ist oben
- * um sie gekürzt, sonst stünde der Knopf als unsichtbarer Tab-Stopp unter der Filterleiste.
+ * um sie gekürzt, sonst stünde der Knopf als unsichtbarer Tab-Stopp unter der Filterleiste. Den
+ * Seitenkopf meldet `EinsatzSeite` als Rahmenquelle (zjt7c073 D5); die Probe tut dasselbe.
  */
 describe('useNachObenPasst unter klebenden ETB-Köpfen', () => {
   const raender: string[] = [];
@@ -19,10 +21,16 @@ describe('useNachObenPasst unter klebenden ETB-Köpfen', () => {
 
   function Probe() {
     const kleben = useEtbKopfKleben(true);
+    const seitenkopfQuelle = useRahmenObenQuelle<HTMLDivElement>(kleben.klebt, 'seitenkopf');
     const [, messen] = useNachObenPasst();
     return (
       <>
-        <div ref={kleben.seitenkopfRef} />
+        <div
+          ref={(el) => {
+            kleben.seitenkopfRef(el);
+            seitenkopfQuelle(el);
+          }}
+        />
         <div ref={kleben.filterleisteRef} />
         <button ref={messen}>Nach oben</button>
       </>

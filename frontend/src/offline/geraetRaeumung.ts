@@ -174,6 +174,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Modulnamen, schon je Benutzer getrennt; kein Inhalt aus dem Einsatz.',
   },
   {
+    ort: 'localStorage lfh:nav:kategorie-modul:<benutzer>:<einsatz>',
+    datei: 'einsatz/kategorieModul.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Je Kategorie ein Modulname, je Benutzer getrennt, 12 h gültig; kein Inhalt aus dem Einsatz.',
+  },
+  {
     ort: 'localStorage lfh:nav:letzter-ort:<benutzer>',
     datei: 'einsatz/letzterOrt.ts',
     entscheidung: 'bleibt',

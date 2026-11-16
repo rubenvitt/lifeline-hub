@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import { skipToken, useQuery } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { setzeViewportBreite } from '../test/viewport';
+import { sendeBreitenAenderung, setzeViewportBreite } from '../test/viewport';
 import { bedienzieleNachRolle, radiosImKopf, zaehleBedienziele } from '../test/kopfzeile';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import EinsatzLayout, { navGriffMass } from './EinsatzLayout';
@@ -376,18 +376,28 @@ describe('EinsatzLayout', () => {
    */
 
   /**
-   * Die Kopfzeile trägt 6 Knöpfe (seit LLH-1143 mit „Eingänge“) und die Wortmarke. Die Aufschlüsselung steht daneben, weil eine
+   * Die Kopfzeile trägt 6 Knöpfe (seit LLH-1143 mit „Eingänge“). Die Aufschlüsselung steht daneben, weil eine
    * nackte Zahl beim Fehlschlag nicht sagt, welche Sorte Ziel dazukam (`test/kopfzeile.ts`).
+   * Die Wortmarke steht im Einsatz erst ab `xxl` (LLH-1726, Spec `app-marke`): darunter gehört ihr
+   * Platz dem Einsatznamen, zur Einsatzliste führt „Alle Einsätze …“ im Wechsler.
    */
-  it('AK1 — die Kopfzeile trägt 6 Knöpfe und die Wortmarke (vorher 11 Ziele)', async () => {
-    // Die Wortmarke ist ab `lg` ein Link zur Einsatzliste — ein Bedienziel, kein Umschalter.
+  it('AK1 — die Kopfzeile trägt 6 Knöpfe, unter xxl ohne Wortmarke (vorher 11 Ziele)', async () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(bedienzieleNachRolle()).toEqual({ button: 6, radio: 0, link: 1 });
-    expect(zaehleBedienziele()).toBe(7);
-    expect(
-      within(screen.getByRole('banner')).getByRole('link', { name: 'lifeline-hub' }),
-    ).toHaveAttribute('href', '/einsaetze');
+    expect(bedienzieleNachRolle()).toEqual({ button: 6, radio: 0, link: 0 });
+    expect(zaehleBedienziele()).toBe(6);
+  });
+
+  it.each([
+    [XL, false],
+    [1600, true],
+  ])('bei %i px steht die Wortmarke: %s (LLH-1726)', async (px, da) => {
+    setzeViewportBreite(px);
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const marke = within(screen.getByRole('banner')).queryByRole('link', { name: 'lifeline-hub' });
+    if (da) expect(marke).toHaveAttribute('href', '/einsaetze');
+    else expect(marke).toBeNull();
   });
 
   /**
@@ -480,24 +490,91 @@ describe('EinsatzLayout', () => {
     expect(screen.getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
   });
 
-  it('der Einsatzname sitzt im Restbreiten-Rahmen', async () => {
-    // Der Rahmen ist eine Hälfte der Kürzung, die andere (Ellipsis, `title`) sitzt im Switcher.
+  /**
+   * LLH-1726 (Spec `kopfleiste`, design.md D2): ab `lg` liegen Namensgruppe und Suche in EINEM
+   * Raster. Die Namensspalte bekommt ihre Eigenbreite (`max-content`), bevor die Suche (`1fr`) mehr
+   * als ihre Lupe bekommt. Ob das im Browser trägt, misst `e2e/kopfleiste-einsatzname.spec.ts`;
+   * hier die Verdrahtung.
+   */
+  it('der Einsatzname hat ab lg Vorrang vor der Suche (Raster)', async () => {
     setup();
     // `parentElement` ist belastbar: antds Dropdown klont sein Kind, statt es einzupacken.
     const switcher = await screen.findByRole('button', { name: /Hochwasser Nord/ });
     const rahmen = switcher.parentElement!;
-    // Boden = Trefffläche des Wechslers, nicht 0 und nicht die Namenslänge (LFH-1126):
-    // `contain: inline-size` nimmt den Namen aus der Eigenbreite, sonst kürzte ein langer Name
-    // nicht, sondern schöbe die Nachbarn hinaus.
+    // Boden = Trefffläche des Wechslers, nicht 0 (LFH-1126). Ohne `contain`: der Name zählt jetzt
+    // zur Eigenbreite, seine Mindestbreite ist dank Umbruch an jeder Stelle ein Zeichen.
     expect(Number.parseFloat(rahmen.style.minWidth)).toBeGreaterThan(0);
-    expect(rahmen.style.contain).toBe('inline-size');
-    expect(rahmen.style.flexGrow).toBe('1');
-    // `flex-basis: 0`: mit `auto` wüchse der Rahmen mit einem langen Namen über die Kopfzeile.
-    expect(rahmen.style.flexBasis).toBe('0px');
-    // Die Namensgruppe (Zelle → Gruppe) schrumpft nie unter festen Teil plus Trefffläche: ab
-    // diesem Maß bricht der Kopf um, statt den Wechsler über die Suche zu schieben.
+    expect(rahmen.style.contain).toBe('');
+    expect(rahmen.style.flex).toBe('1 1 auto');
     const gruppe = rahmen.parentElement!.parentElement!;
-    expect(gruppe.style.minWidth).toBe('min-content');
+    const raster = gruppe.parentElement!;
+    expect(raster.dataset.lfh).toBe('kopf-name-suche');
+    expect(raster.style.gridTemplateColumns).toMatch(
+      /^minmax\(min-content, max-content\) minmax\(/,
+    );
+    expect(raster.style.gridTemplateColumns).toMatch(/1fr\)$/);
+    // Der Behälter nimmt am Umbruch teil wie vorher beide Gruppen: Summe der Basen, Boden
+    // `min-content` (fester Teil plus Trefffläche plus Lupe).
+    expect(raster.style.minWidth).toBe('min-content');
+    expect(within(raster).getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
+  });
+
+  /**
+   * LLH-1726: Der Name nimmt mit dem Laden seine Eigenbreite, und die Suche daneben rückte dabei
+   * nach rechts (CLS 0,0103 an der Umbruchkante, `e2e/rahmen-cls-dichte.spec.ts`). Solange der
+   * Einsatz lädt, ist die Suchzelle deshalb unsichtbar: sie erscheint gleich an ihrem Platz, und
+   * ein Element, das erst sichtbar wird, verschiebt nichts.
+   */
+  // Review LLH-1726: Ein Wechsel über `lg` (Tablet drehen) darf den Wechsler nicht neu einhängen,
+  // sonst gehen offenes Menü und Fokus verloren. Der Behälter des Rasters bleibt deshalb stehen und
+  // ist unter `lg` nur `display: contents`.
+  it('hängt den Einsatz-Wechsler beim Wechsel über lg nicht neu ein', async () => {
+    setup();
+    const vorher = await screen.findByRole('button', { name: /Hochwasser Nord/ });
+    act(() => void sendeBreitenAenderung(820));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Navigation öffnen' })).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBe(vorher);
+    act(() => void sendeBreitenAenderung(1024));
+    // Zurück ab `lg`: die Markenzelle steht wieder statt des Griffs.
+    await waitFor(() => expect(document.querySelector('[data-lfh="kopf-marke"]')).not.toBeNull());
+    expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBe(vorher);
+  });
+
+  // Review LLH-1726: Lädt der Einsatz lange (Wiederholungen), führt sonst nichts aus dem Kopf.
+  it('zeigt die Suchzelle nach einer Sekunde auch dann, wenn der Einsatz noch lädt', async () => {
+    setup();
+    server.use(http.get('/api/einsaetze/7', () => new Promise<never>(() => {})));
+    const zelle = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="kopf-suche"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(zelle.style.visibility).toBe('hidden');
+    await waitFor(() => expect(zelle.style.visibility).toBe(''), { timeout: 2500 });
+  });
+
+  it('hält die Suchzelle unsichtbar, solange der Einsatz lädt', async () => {
+    let freigeben: () => void = () => {};
+    const geladen = new Promise<void>((r) => (freigeben = r));
+    setup();
+    server.use(
+      http.get('/api/einsaetze/7', async () => {
+        await geladen;
+        return HttpResponse.json(einsatz);
+      }),
+    );
+    // Über das Attribut, nicht über die Rolle: unsichtbar hat die Suche keinen zugänglichen Namen.
+    const zelle = await waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="kopf-suche"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    expect(zelle.style.visibility).toBe('hidden');
+    freigeben();
+    await screen.findByRole('button', { name: /Hochwasser Nord/ });
+    await waitFor(() => expect(zelle.style.visibility).toBe(''));
   });
 
   /**
@@ -530,15 +607,50 @@ describe('EinsatzLayout', () => {
     expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
   });
 
-  it('klappt beim Wechsel auf eine andere Kategorie wieder auf, ohne die Wahl zu überschreiben', async () => {
+  /**
+   * LLH-1734 (Spec `einsatztauglichkeit-layout`, „Ein Rail-Sprung achtet die gemerkte Panel-Wahl“):
+   * vorher klappte der Sprung ein zugeklapptes Panel wieder auf. Beide Hälften: der Klick
+   * navigiert, und das Panel bleibt trotzdem zu.
+   */
+  it('lässt ein zugeklapptes Panel beim Wechsel auf eine andere Kategorie zu', async () => {
     localStorage.setItem(EINGEKLAPPT, '1');
+    setzeViewportBreite(XL);
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Lage' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Lage' }));
 
-    expect(await screen.findByRole('link', { name: 'Lagekarte' })).toBeInTheDocument();
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+    expect(screen.queryByRole('link', { name: 'Lagekarte' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Menü ausklappen' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
     // Der Sprung ist keine Wahl (LFH-952, D5): gemerkt bleibt „zu“.
+    expect(localStorage.getItem(EINGEKLAPPT)).toBe('1');
+  });
+
+  /**
+   * LLH-1734, Review: Ohne Sprungziel (Freigaben gescheitert oder alles gesperrt) navigiert der Klick
+   * nicht. Bliebe das zugeklappte Panel dann zu, wäre der Klick tot: nur die Hervorhebung spränge.
+   */
+  it('öffnet das zugeklappte Panel, wenn der Rail-Sprung kein Ziel hat', async () => {
+    localStorage.setItem(EINGEKLAPPT, '1');
+    setzeViewportBreite(XL);
+    setup(freigabenFixture(), { freigaben: true });
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(await screen.findByText('Modulfreigaben nicht geladen')).toBeInTheDocument();
+
+    // Ohne Ziel ist die Kategorie ein Knopf, kein Link (LLH-1732).
+    await userEvent.click(await screen.findByRole('button', { name: 'Lage' }));
+
+    await waitFor(() => expect(document.querySelector('[data-lfh="modul-panel"]')).not.toBeNull());
+    expect(screen.getByRole('button', { name: 'Menü einklappen' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(pfad()).toBe('/einsaetze/7/etb');
     expect(localStorage.getItem(EINGEKLAPPT)).toBe('1');
   });
 
@@ -679,6 +791,14 @@ describe('EinsatzLayout', () => {
       );
     });
 
+    // LLH-1726: Der Name trägt seine Eigenbreite als Basis und drückt auf seine Nachbarn. Die
+    // Zelle des Griffs schrumpft deshalb nie, sonst lag der Name 2 px über dem Griff (Gate 1, 390 px).
+    it('die Zelle des Griffs schrumpft nicht unter den Griff', async () => {
+      setup();
+      const griff = await screen.findByRole('button', { name: 'Navigation öffnen' });
+      expect(griff.parentElement!.style.flexShrink).toBe('0');
+    });
+
     it('hält Hamburger und Schließen-Knopf auf der A1-Trefffläche', async () => {
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
@@ -755,6 +875,51 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // FALSCHEN Kategorie liefert, bestünde eine schwächere Form. Käme ein `verweistAuf`-Eintrag
     // dazu (er spränge in eine andere Kategorie), färbte sich dieser Test rot.
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+  });
+
+  /**
+   * LLH-1734 (Spec `seiten-orientierung`): der Rail-Sprung führt ins zuletzt besuchte Modul der
+   * Kategorie. Start in 'personen' (nicht das erste Modul von Erfassung) als Ankunft per Adresse:
+   * auch sie zählt. Vorher landete der Rückweg in 'etb'.
+   */
+  it('springt zurück ins zuletzt besuchte Modul der Kategorie', async () => {
+    localStorage.clear();
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen');
+    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Lage' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
+    // Die Adresse des Rail-Links zeigt dorthin, wohin der Klick springt (LLH-1732): Strg/⌘+Klick
+    // landet im neuen Tab im selben Modul.
+    expect(screen.getByRole('link', { name: 'Erfassung' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/personen',
+    );
+
+    await userEvent.click(screen.getByRole('link', { name: 'Erfassung' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
+    // Ankünfte füllen „Zuletzt besucht“ der Palette nicht (Spec `navigation-zuletzt-besucht`).
+    expect(leseZuletztModule(admin.id, 7)).toEqual([]);
+  });
+
+  it('springt ins erste Modul, wenn das gemerkte inzwischen gesperrt ist', async () => {
+    localStorage.clear();
+    localStorage.setItem(
+      `lfh:nav:kategorie-modul:${admin.id}:7`,
+      JSON.stringify({ erfassung: { key: 'personen', at: Date.now() } }),
+    );
+    setup(
+      freigabenFixture({ personen: { zugriff: false } }),
+      {},
+      admin,
+      '/einsaetze/7/lage-dashboard',
+    );
+    await waitFor(() => expect(screen.getByText('Dashboard-Inhalt')).toBeInTheDocument());
+    await freigabenAngekommen();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Erfassung' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/etb'));
   });
 
   /**

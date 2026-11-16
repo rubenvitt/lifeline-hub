@@ -5,7 +5,8 @@ import { abmeldenUeberMenue } from './menue-kern';
 /**
  * Der Rahmen bleibt beim Rollen erreichbar (LFH-952, Spec `einsatztauglichkeit-layout`,
  * `frontend/AGENTS.md`, Rahmen). Gestuft: ab `md` klebt der Kopf, ab `lg` die Rail-Kategorien
- * darunter; unter `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung. jsdom rechnet
+ * und das Modulpanel darunter, ab `md` der Seitenkopf, wenn er ins Drittel passt (zjt7c073); unter
+ * `md` rollt der Kopf, und die Betriebszeile klebt nur bei Störung. jsdom rechnet
  * kein Layout, deshalb im Browser.
  *
  * Jede Messung hat ihre Vorbedingung (die Seite ist WIRKLICH gerollt), sonst stünde der Kopf auch
@@ -180,6 +181,45 @@ for (const b of BREITEN) {
   });
 }
 
+/**
+ * Der Rail-Fuß bleibt im Fenster (LLH-1734, Spec `einsatztauglichkeit-layout`): ab `md` steht die
+ * Betriebszeile im Fluss über dem Kopf und schob die Rail-Spalte um ihre Höhe nach unten, „Einst.“
+ * lag unter dem Fensterrand. Gemessen bei Rollstand 0, denn erst gerollt rutscht die Zeile weg.
+ */
+test('1366 × 768 offline, oben: „Einst.“ am Rail-Fuß bleibt im Fenster', async ({
+  page,
+  context,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Fuß ${Date.now()}`);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  const einstellungen = page
+    .getByRole('navigation', { name: 'Kategorien' })
+    .getByRole('link', { name: 'Einstellungen', exact: true });
+  await expect(einstellungen).toBeVisible();
+  await context.setOffline(true);
+  try {
+    // Vorbedingung: die Zeile steht wirklich im Fluss über dem Kopf, sonst wäre die Aussage leer.
+    const zeile = page.locator('[data-lfh="betriebszeile"]');
+    await expect(zeile).toContainText('Offline');
+    await expect.poll(async () => (await zeile.boundingBox())?.height ?? 0).toBeGreaterThan(20);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
+    await expect
+      .poll(
+        async () => {
+          const box = await einstellungen.boundingBox();
+          return box ? box.y + box.height : Number.POSITIVE_INFINITY;
+        },
+        { message: 'Unterkante von „Einst.“' },
+      )
+      .toBeLessThanOrEqual(768);
+  } finally {
+    await context.setOffline(false);
+  }
+});
+
 for (const b of [
   { width: 390, height: 844 },
   { width: 1180, height: 820 },
@@ -251,30 +291,296 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
   await page.evaluate((y) => window.scrollTo(0, y), tabelle.y + 200);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
 
-  const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+  // Der Seitenkopf der Verwaltung klebt mit (zjt7c073): der Tabellenkopf hängt unter ihm.
+  const seitenkopf = page.locator('[data-lfh="seitenkopf"]');
+  await expect(seitenkopf).toHaveCSS('position', 'sticky');
+  const unterkante = (await seitenkopf.boundingBox())!;
   const tabellenkopf = page.locator('.ant-table-sticky-holder');
   await expect(tabellenkopf).toBeInViewport();
   const t = (await tabellenkopf.boundingBox())!;
-  expect(Math.round(t.y), 'Tabellenkopf bündig unter dem Rahmen').toBe(
-    Math.round(kopf.y + kopf.height),
+  expect(Math.round(t.y), 'Tabellenkopf bündig unter dem Seitenkopf').toBe(
+    Math.round(unterkante.y + unterkante.height),
   );
+});
+
+/**
+ * zjt7c073 (Spec `einsatztauglichkeit-layout`, „Der Rahmen bleibt beim Rollen erreichbar“): das
+ * Modulpanel und der Seitenkopf bleiben stehen. Vorher rollten beide mit: das ETB öffnet am Ende der
+ * Zeitachse, die zweite Spalte war dort leer bis auf „Einsatzdauer“.
+ *
+ * Mutationsprobe (15.11.2026, Chromium): ohne `position: sticky` an `modul-panel-spalte` rot
+ * („Modulpanel …“), ohne `SEITENKOPF_KLEBT` rot („Seitenkopf …“, Tabellenkopf oben).
+ */
+
+/**
+ * Rollt ans Seitenende und prüft die Vorbedingung: die Seite ist WIRKLICH gerollt, mindestens um
+ * `mindestens` px (Vorgabe 200).
+ */
+async function ansEnde(page: Page, mindestens = 200) {
+  // Wiederholt gerollt: lädt der Inhalt noch, wächst die Seite nach dem ersten Rollen weiter.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        return window.scrollY;
+      }),
+    )
+    .toBeGreaterThan(mindestens);
+}
+
+async function unterkanteKopf(page: Page): Promise<number> {
+  const k = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+  return k.y + k.height;
+}
+
+test('Modulpanel bleibt im ETB am Ende der Zeitachse stehen (1440 × 900)', async ({ page }) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Panel ${Date.now()}`);
+  await etbFuellen(page, einsatzId);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await etbGerollt(page, einsatzId);
+
+  const panel = page.locator('[data-lfh="modul-panel"]');
+  await expect(panel).toBeVisible();
+  const spalte = page.locator('[data-lfh="modul-panel-spalte"]');
+  await expect(spalte).toHaveCSS('position', 'sticky');
+  expect(Math.round((await spalte.boundingBox())!.y), 'Modulpanel hängt unter der Kopfleiste').toBe(
+    Math.round(await unterkanteKopf(page)),
+  );
+  // Kopf der Kategorie, jeder Eintrag und der Fuß stehen ganz im Bild.
+  await expect(spalte.getByText('Erfassung', { exact: true })).toBeInViewport({ ratio: 1 });
+  const eintraege = page.locator('[data-lfh="modul-panel-liste"] :is(a, button)');
+  for (const eintrag of await eintraege.all()) await expect(eintrag).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('[data-lfh="modul-panel-fuss"]')).toBeInViewport({ ratio: 1 });
+  // Bedienbar ohne vorheriges Rollen: der Wechsel ins nächste Modul.
+  const vorher = await page.evaluate(() => window.scrollY);
+  const ziel = eintraege.filter({ hasNotText: 'ETB' }).first();
+  await expect(ziel).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => window.scrollY)).toBe(vorher);
+  await ziel.click();
+  await expect(page).not.toHaveURL(/\/etb$/);
+});
+
+test('Modulpanel länger als das Fenster rollt in sich, Kopf und Fuß bleiben (1366 × 520, handschuh)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Panel niedrig ${Date.now()}`);
+  await etbFuellen(page, einsatzId);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  await etbGerollt(page, einsatzId);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  // Die Kategorie mit den meisten Einträgen (Kräfte, neun Module).
+  await page
+    .getByRole('navigation', { name: 'Kategorien' })
+    .getByLabel('Kräfte & Mittel', { exact: true })
+    .click();
+  await expect(page).not.toHaveURL(/\/etb$/);
+  // Vorbedingung: die Seite ist WIRKLICH gerollt, mindestens um die Kopfhöhe; sonst stünden Kopf
+  // und Fuß des Panels auch ohne `sticky` im Fenster.
+  await ansEnde(page, await unterkanteKopf(page));
+
+  const liste = page.locator('[data-lfh="modul-panel-liste"]');
+  const ueberhang = await liste.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(ueberhang, 'Vorbedingung: die Einträge passen nicht ins Fenster').toBeGreaterThan(0);
+  const kopfZeile = page.locator('[data-lfh="modul-panel-spalte"]').getByText('Kräfte & Mittel', {
+    exact: true,
+  });
+  const fuss = page.locator('[data-lfh="modul-panel-fuss"]');
+  await expect(kopfZeile).toBeInViewport({ ratio: 1 });
+  await expect(fuss).toBeInViewport({ ratio: 1 });
+  // Der letzte Eintrag kommt per Wischen ins Bild, ganz zwischen Kopf und Fuß, nicht darunter.
+  const letzter = liste.locator(':is(a, button)').last();
+  await liste.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(letzter).toBeInViewport({ ratio: 1 });
+  const l = (await letzter.boundingBox())!;
+  const f = (await fuss.boundingBox())!;
+  expect(l.y + l.height, 'letzter Eintrag über dem Fuß').toBeLessThanOrEqual(f.y + 1);
+  await expect(kopfZeile).toBeInViewport({ ratio: 1 });
+});
+
+for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) {
+  test(`Seitenkopf bleibt stehen: ${ziel} (1180 × 600)`, async ({ page }) => {
+    await anmeldenAlsAdmin(page);
+    const einsatzId = await einsatzAnlegen(page, `Rahmen Seitenkopf ${ziel} ${Date.now()}`);
+    if (ziel === 'etb') await etbFuellen(page, einsatzId);
+    if (ziel === 'personal') {
+      for (let i = 0; i < 30; i += 1) {
+        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+          data: { adhoc: { name: `Seitenkopf Kraft ${i}`, funktion: 'Helfer' } },
+        });
+        expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);
+      }
+    }
+    if (ziel === 'verwaltung') {
+      const lauf = Date.now();
+      for (let i = 0; i < 20; i += 1) {
+        const antwort = await page.request.post('/api/benutzer', {
+          data: {
+            anzeigename: `Seitenkopf ${i}`,
+            benutzername: `e2e-seitenkopf-${lauf}-${i}`,
+            passwort: 'e2e-rahmen-pw-123',
+          },
+        });
+        expect(antwort.ok(), `Benutzer ${i}: ${antwort.status()}`).toBe(true);
+      }
+    }
+    await page.setViewportSize({ width: 1180, height: 600 });
+    await page.goto(
+      ziel === 'verwaltung'
+        ? '/admin/benutzer'
+        : ziel === 'einstellungen'
+          ? `/einsaetze/${einsatzId}/einstellungen/allgemein`
+          : `/einsaetze/${einsatzId}/${ziel}`,
+    );
+    const seitenkopf = page.locator('[data-lfh="seitenkopf"]');
+    await expect(seitenkopf.getByRole('heading', { level: 1 })).toBeVisible();
+    // Vorbedingung: so weit gerollt, dass ein mitrollender Seitenkopf ganz hinter der Kopfleiste
+    // läge. Gemessen vor dem Rollen, in Dokumentkoordinaten.
+    const seitenkopfUnten = await seitenkopf.evaluate(
+      (el) => el.getBoundingClientRect().bottom + window.scrollY,
+    );
+    const kopfHoehe = await unterkanteKopf(page);
+    await ansEnde(page, seitenkopfUnten - kopfHoehe);
+
+    await expect(seitenkopf).toHaveCSS('position', 'sticky');
+    expect(Math.round((await seitenkopf.boundingBox())!.y), 'Seitenkopf unter der Kopfleiste').toBe(
+      Math.round(await unterkanteKopf(page)),
+    );
+    await expect(seitenkopf.getByRole('heading', { level: 1 })).toBeInViewport({ ratio: 1 });
+    // Bedienbar: jede Seitenaktion steht ganz im Bild.
+    for (const knopf of await seitenkopf.locator('button, a[href]').all()) {
+      if (await knopf.isVisible()) await expect(knopf).toBeInViewport({ ratio: 1 });
+    }
+  });
+}
+
+test('niedriges Fenster: passt der Seitenkopf nicht ins Drittel, rollt er mit (1366 × 520, handschuh)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Seitenkopf niedrig ${Date.now()}`);
+  await page.setViewportSize({ width: 1366, height: 520 });
+  await page.goto(`/einsaetze/${einsatzId}/einstellungen/allgemein`);
+  const seitenkopf = page.locator('[data-lfh="seitenkopf"]');
+  await expect(seitenkopf.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  const kopfHoehe = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!.height;
+  const seitenkopfHoehe = (await seitenkopf.boundingBox())!.height;
+  expect(
+    kopfHoehe + seitenkopfHoehe,
+    'Vorbedingung: zusammen mehr als ein Drittel',
+  ).toBeGreaterThan(520 / 3);
+  await ansEnde(page);
+  await expect(seitenkopf).not.toHaveCSS('position', 'sticky');
+  expect((await seitenkopf.boundingBox())!.y, 'Seitenkopf ist weggerollt').toBeLessThan(0);
+  // Die Kopfleiste bleibt wie bisher stehen.
+  expect(Math.round((await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!.y)).toBe(0);
+});
+
+test('Fokus rückwärts unter dem klebenden Seitenkopf, Fokus im Seitenkopf rollt nicht (1440 × 900)', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const lauf = Date.now();
+  for (let i = 0; i < 30; i += 1) {
+    const antwort = await page.request.post('/api/benutzer', {
+      data: {
+        anzeigename: `Fokus ${i}`,
+        benutzername: `e2e-fokus-sk-${lauf}-${i}`,
+        passwort: 'e2e-rahmen-pw-123',
+      },
+    });
+    expect(antwort.ok(), `Benutzer ${i}: ${antwort.status()}`).toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/admin/benutzer');
+  await page.getByPlaceholder('Name oder Benutzername').fill(`e2e-fokus-sk-${lauf}`);
+  await expect(page.locator('tr.ant-table-row')).toHaveCount(30);
+  await ansEnde(page);
+  const seitenkopf = page.locator('[data-lfh="seitenkopf"]');
+  await expect(seitenkopf).toHaveCSS('position', 'sticky');
+
+  // Ein Ziel unten im Inhalt fokussieren, dann rückwärts durch die Tabelle.
+  await page.locator('tr.ant-table-row').last().locator('a, button').last().focus();
+  let geprueft = 0;
+  for (let i = 0; i < 25; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    const lage = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el || el.closest('[data-lfh="seitenkopf"], [data-lfh="rahmen-kopf"], aside, nav'))
+        return null;
+      const k = document.querySelector('[data-lfh="seitenkopf"]')!.getBoundingClientRect();
+      return { oben: el.getBoundingClientRect().top, kante: k.bottom };
+    });
+    if (!lage) continue;
+    geprueft += 1;
+    expect(lage.oben, `Ziel ${i} liegt nicht hinter dem Seitenkopf`).toBeGreaterThanOrEqual(
+      lage.kante - 1,
+    );
+  }
+  expect(geprueft, 'Vorbedingung: Ziele im Inhalt getroffen').toBeGreaterThan(5);
+
+  // Ein Fokus in den Seitenaktionen rollt die Seite nicht.
+  const vorher = await page.evaluate(() => window.scrollY);
+  await seitenkopf.locator('button, a[href]').first().focus();
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.scrollY)).toBe(vorher);
+});
+
+/**
+ * Review zjt7c073 (B3): Rail, Modulpanel und Verwaltungsmenü kleben an der Kopfhöhe, der
+ * Fokusabstand am Dokument zählt aber den klebenden Seitenkopf mit. Ohne Ausnahme rollte ein
+ * Fokus auf die oberste Kategorie die Seite um die Seitenkopfhöhe zurück (gemessen 1349 → 1305),
+ * obwohl das Ziel klebt und an seinem Platz blieb.
+ */
+test('Fokus in der klebenden Rail rollt die Seite nicht (1440 × 900)', async ({ page }) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await einsatzAnlegen(page, `Rahmen Rail-Fokus ${Date.now()}`);
+  for (let i = 0; i < 30; i += 1) {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+      data: { adhoc: { name: `Rail-Fokus Kraft ${i}`, funktion: 'Helfer' } },
+    });
+    expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(`/einsaetze/${einsatzId}/personal`);
+  await expect(
+    page.locator('[data-lfh="seitenkopf"]').getByRole('heading', { level: 1 }),
+  ).toBeVisible();
+  await ansEnde(page);
+  // Vorbedingung: der Seitenkopf klebt, die Rahmenhöhe ist größer als die Kopfhöhe.
+  await expect(page.locator('[data-lfh="seitenkopf"]')).toHaveCSS('position', 'sticky');
+  const vorher = await page.evaluate(() => window.scrollY);
+  const rail = page.locator('[data-lfh="rail-spalte"] :is(a, button)').first();
+  await rail.focus();
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.scrollY), 'Fokus auf „Führung“').toBe(vorher);
+  // Auch per Tastatur, rückwärts vom zweiten Ziel der Rail.
+  await page.locator('[data-lfh="rail-spalte"] :is(a, button)').nth(1).focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(rail).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY), 'Shift+Tab auf „Führung“').toBe(vorher);
 });
 
 /**
  * Übungsband (LLH-1725, Spec `uebungsmarke`, „Das Übungsband bleibt beim Rollen stehen“; D4 in
  * `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/design.md`): es klebt in JEDER Breite, ab `md`
  * direkt unter dem Kopf, unter `md` an der Fensterkante bzw. unter der gestörten Betriebszeile.
- * `--lfh-rahmen-oben` endet an seiner Unterkante: daran hängt jeder stehende Tabellenkopf (Guard
- * `rahmenOben.guard.test.ts`), also liegt keiner hinter dem Band.
+ * Die Kopfhöhe `--lfh-kopf-oben` endet an seiner Unterkante, die Rahmenhöhe `--lfh-rahmen-oben`
+ * zählt einen klebenden Seitenkopf darunter mit (zjt7c073 D2): daran hängt jeder stehende
+ * Tabellenkopf (Guard `rahmenOben.guard.test.ts`), also liegt keiner hinter dem Band.
  *
  * Mutationsprobe (15.11.2026, Chromium): klebt das Band mit `top: 0` statt unter den übrigen
  * Quellen, rot bei 820/1180/1440 („Band bündig unter dem Kopf“) und offline bei 390; die Probe bei
  * 390 ohne Störung bleibt zu Recht grün.
  */
-async function rahmenOben(page: Page): Promise<number> {
+async function kopfOben(page: Page): Promise<number> {
   return page.evaluate(() =>
     Number.parseFloat(
-      getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
+      getComputedStyle(document.documentElement).getPropertyValue('--lfh-kopf-oben'),
     ),
   );
 }
@@ -299,7 +605,7 @@ for (const b of BREITEN) {
       expect(Math.round(r.y), 'Band an der Fensterkante, der Kopf ist weggerollt').toBe(0);
     }
     await expect
-      .poll(async () => Math.round(await rahmenOben(page)), 'Rahmenkante unter dem Band')
+      .poll(async () => Math.round(await kopfOben(page)), 'Kopfkante unter dem Band')
       .toBe(Math.round(r.y + r.height));
   });
 }
@@ -329,7 +635,7 @@ test('390 px, Übung, offline: Betriebszeile und Band stehen übereinander', asy
   }
 });
 
-test('Realeinsatz: kein Band, die Rahmenkante bleibt am Kopf (Gegenprobe)', async ({ page }) => {
+test('Realeinsatz: kein Band, die Kopfkante bleibt am Kopf (Gegenprobe)', async ({ page }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page, `Rahmen real ${Date.now()}`, 'realeinsatz');
   await etbFuellen(page, einsatzId);
@@ -337,5 +643,5 @@ test('Realeinsatz: kein Band, die Rahmenkante bleibt am Kopf (Gegenprobe)', asyn
   await etbGerollt(page, einsatzId);
   await expect(page.locator('[data-lfh="uebung-band"]')).toHaveCount(0);
   const kopf = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
-  expect(Math.round(await rahmenOben(page))).toBe(Math.round(kopf.height));
+  expect(Math.round(await kopfOben(page))).toBe(Math.round(kopf.height));
 });

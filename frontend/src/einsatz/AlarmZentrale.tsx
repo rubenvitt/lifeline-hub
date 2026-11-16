@@ -7,7 +7,7 @@ import {
   IconVerbotsschild,
 } from '../icons';
 import { Button, Dropdown, Tooltip, theme } from 'antd';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
   ALARM_TON_STATUS_EVENT,
   alarmTonStatus,
@@ -31,10 +31,9 @@ import { eingaengeName, oeffneEingaenge, useKopfBuendelt } from '../alarm/eingae
 import EingaengeZahl from '../alarm/EingaengeZahl';
 import HandyLeiste from '../alarm/HandyLeiste';
 import { wetterPegelPfad } from '../routing/deeplinks';
-import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
-import { useDichte } from '../theme/ThemeModeProvider';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import './AlarmZentrale.css';
 
 /**
  * Farbe eines Alarm-Knopfs in der Kommandoleiste. Die Leiste ist in beiden Modi dunkel, die
@@ -70,8 +69,22 @@ type UnwetterDetail = {
   beschreibung?: string;
 };
 
-/** Längster Wortlaut des Ton-Knopfs; das Wort hält seine Breite (LLH-1158). */
-const TON_WORT_LAENGSTES = 'Ton wird geprüft';
+/**
+ * Platz des Ton-Worts: die Breite von „Ton blockiert“ (Nachentscheid LLH-1726, `AlarmZentrale.css`).
+ * Vor der ersten Bediengeste sperrt der Browser den Ton; nach der Frist erscheint das Wort ohne
+ * Zutun, und ohne Platz sprang der Kopf an seiner Umbruchkante um eine Zeile. Auch im
+ * Ruhezustand bleibt der Platz deshalb frei, leer. Ist das Wort breiter („Benachrichtigung
+ * blockiert“ in der gebündelten Bauform), gilt das Wort.
+ */
+const TON_WORT_PLATZ = 'Ton blockiert';
+
+function WortPlatz({ style, children }: { style?: CSSProperties; children: ReactNode }) {
+  return (
+    <span aria-hidden="true" className="ton-wort-platz" data-platz={TON_WORT_PLATZ} style={style}>
+      {children}
+    </span>
+  );
+}
 
 /**
  * Zustand der Benachrichtigungen (LFH-950). `nicht-verfuegbar` ist eine Eigenschaft des Geräts
@@ -83,10 +96,9 @@ type DesktopZustand = 'aus' | 'erlaubt' | 'blockiert' | 'nicht-verfuegbar';
  * Tonzustand der Anzeige (LFH-637). `prueft` gilt, bis die Audio-Prüfung zum ersten Mal
  * antwortet: „blockiert" hieße dort etwas, das niemand festgestellt hat, und das Wort brach beim
  * Start die Kopfzeile bei 1024 px um (CLS 0,46). `prueft` ist keine Störung, steht also wie der
- * Ruhezustand: gedämpft, ohne durchgestrichene Glocke, zwischen `md` und `xl` ohne Wort (außer in
- * `handschuh`, LLH-1232). Seit LFH-950 dauert es höchstens `ALARM_TON_FRIST_MS`: ohne Antwort
- * meldet `alarmTon` danach „blockiert", ein dauerhaftes „prüft" verdeckte sonst einen stummen
- * Alarm.
+ * Ruhezustand: gedämpft, ohne durchgestrichene Glocke, ohne Wort (LLH-1726). Seit LFH-950 dauert es
+ * höchstens `ALARM_TON_FRIST_MS`: ohne Antwort meldet `alarmTon` danach „blockiert", ein
+ * dauerhaftes „prüft" verdeckte sonst einen stummen Alarm.
  */
 type TonZustand = AlarmTonStatus | 'prueft';
 
@@ -288,19 +300,20 @@ export default function AlarmZentrale({
     setGemutet(true);
   };
 
-  // Die Breitenfrage stellt `useViewport`. Unter `md` bündelt die Zentrale zu EINEM Ziel (siehe
-  // unten). Zwischen `md` und `xl` (Führungs-Tablet) bleiben es mit Maus zwei Knöpfe, der
-  // RUHEZUSTAND steht aber nur als Icon — die Wörter brachen die Kopfzeile bei 1024 px auf zwei
-  // Zeilen. Eine STÖRUNG („Ton stumm/blockiert", „Benachrichtigung blockiert") trägt ihr Wort auf
-  // jeder Breite; Wort und Warnfarbe hängen an derselben Bedingung.
+  // WORT GENAU BEI STÖRUNG (LLH-1726, Spec `kopfleiste`): Unter `md` bündelt die Zentrale zu EINEM
+  // Ziel (siehe unten), darüber bleiben es mit Maus zwei Knöpfe. In beiden Bauformen und jeder
+  // Breite steht ein Zustand ohne Handlungsbedarf („Ton bereit“, „Ton wird geprüft“,
+  // „Benachrichtigung erlaubt/aus/nicht verfügbar“) nur als Icon, Name und Tooltip nennen ihn. Eine
+  // STÖRUNG („Ton stumm/blockiert", „Benachrichtigung blockiert") trägt ihr Wort; Wort und Warnfarbe
+  // hängen an derselben Bedingung. Vorher trugen Ruhezustände ab `xl` ihr Wort und hielten beim
+  // Start dessen Breite (LLH-1158, LLH-1232): der Einsatzname bekam dort nur noch 50 px. Frei bleibt
+  // nur der Platz von „Ton blockiert“ am Glockenknopf ({@link TON_WORT_PLATZ}).
   //
   // Mit grobem Zeiger zwischen `md` und `xl` gilt die Bauform des Handschirms (LFH-950): ein
   // Tooltip erscheint auf Touch erst NACH dem Tipp, und der Tipp auf die Glocke schaltete den Ton
   // sofort und für jeden Einsatz stumm. Das Menü nennt Handlung und Zustand, bevor etwas schaltet.
-  const { istSchmal, abBreite } = useViewport();
+  const { istSchmal } = useViewport();
   const { token } = theme.useToken();
-  const knapp = !abBreite('xl');
-  const { dichte } = useDichte();
   // Dieselbe Bedingung wie der Knopf „Eingänge“ (`alarm/eingaenge.ts`).
   const buendeln = useKopfBuendelt();
   // Am Handschirm tragen Alarme und Eingänge eine Leiste unten statt Zone und Band (LLH-1738, D5).
@@ -337,7 +350,7 @@ export default function AlarmZentrale({
     : tonStatus === 'bereit'
       ? 'Ton bereit'
       : tonStatus === 'prueft'
-        ? TON_WORT_LAENGSTES
+        ? 'Ton wird geprüft'
         : 'Ton blockiert';
   const tonHandlung = gemutet
     ? 'einschalten'
@@ -389,8 +402,8 @@ export default function AlarmZentrale({
     // Zeile trägt EINEN Zustand: sind beide auffällig, steht der Benachrichtigungs-Zustand nur im
     // Menü (`desktopHinweis`).
     //
-    // Auf dem Tablet steht der Ruhezustand wie in der breiten Bauform nur als Icon (LFH-637), eine
-    // Störung mit Wort.
+    // Der Ruhezustand steht wie in der breiten Bauform nur als Icon, eine Störung mit Wort
+    // (LLH-1726; vorher stand am Handy auch „Ton bereit“, und die Zahl der Eingänge verdeckte sein „T“).
     //
     // Zwei Einträge verstoßen nicht gegen „ab drei bündeln": hier bündelt die Breite bzw. der
     // Finger, nicht die Bequemlichkeit. Der Preis: Stummschalten kostet zwei Tipper.
@@ -451,9 +464,9 @@ export default function AlarmZentrale({
               flexShrink: 0,
             }}
           >
-            {istSchmal || sammelAuffaellig ? (
-              <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
-            ) : null}
+            <WortPlatz style={sammelWortStil(token.controlHeight, istSchmal)}>
+              {sammelAuffaellig ? sammelText : null}
+            </WortPlatz>
           </Button>
         </Dropdown>
         {eingangsband}
@@ -461,16 +474,8 @@ export default function AlarmZentrale({
     );
   }
 
-  const desktopWort = knapp && !desktopAuffaellig ? null : desktopText;
-  // Ab `xl` hält das Wort die Breite von „Ton wird geprüft“ (LLH-1158, `WortPlatz`): die
-  // Tonprüfung beim Start wechselt den Wortlaut ohne Zutun, und an der Umbruchgrenze sprang der
-  // Kopf mit dem kürzeren Wort von zwei Zeilen auf eine. Darunter steht die Prüfung nur als Icon;
-  // der Platz machte „Ton blockiert“ breiter, und der Kopf brach bei 1024 px um (LFH-637).
-  // In `handschuh` gilt das auch unter `xl` (LLH-1232): dort ist der Kopf bei 1100 und ab
-  // 1200 px ohnehin zweizeilig, und nur das Wort mit Platz hält ihn über „Ton bereit“ und „Ton
-  // blockiert“ gleich hoch.
-  const tonHaeltPlatz = !knapp || dichte === 'handschuh';
-  const tonWort = !tonHaeltPlatz && !tonAuffaellig ? null : tonText;
+  const desktopWort = desktopAuffaellig ? desktopText : null;
+  const tonWort = tonAuffaellig ? tonText : null;
 
   return (
     <>
@@ -498,9 +503,7 @@ export default function AlarmZentrale({
           }}
           icon={tonIcon}
         >
-          {tonWort ? (
-            <WortPlatz platz={tonHaeltPlatz ? TON_WORT_LAENGSTES : ''}>{tonWort}</WortPlatz>
-          ) : null}
+          <WortPlatz>{tonWort}</WortPlatz>
         </Button>
       </Tooltip>
       {eingangsband}

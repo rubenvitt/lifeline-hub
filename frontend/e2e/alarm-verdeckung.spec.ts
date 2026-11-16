@@ -150,6 +150,18 @@ test.describe('Alarmzone verdeckt nichts', () => {
     await expect
       .poll(async () => (await box(page.locator(ZONE))).y, { message: 'Zone klebt unter dem Kopf' })
       .toBeCloseTo(kopf.y + kopf.height, 0);
+    // Klebt der Seitenkopf (zjt7c073, nur wenn er ins Drittel der Fensterhöhe passt), steht er
+    // unter der Zone: sie zählt zur Kopfebene, an der er hängt.
+    if (
+      (await page.locator(SEITENKOPF).evaluate((el) => getComputedStyle(el).position)) === 'sticky'
+    ) {
+      const zoneGerollt = await box(page.locator(ZONE));
+      await expect
+        .poll(async () => (await box(page.locator(SEITENKOPF))).y, {
+          message: 'Seitenkopf klebt unter der Zone',
+        })
+        .toBeCloseTo(zoneGerollt.y + zoneGerollt.height, 0);
+    }
     await kommandoleisteKlickbar(page);
 
     // Tab durch die Zone rollt die Seite nicht (Fokusabstand ausgesetzt wie im Kopf).
