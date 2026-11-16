@@ -96,7 +96,8 @@ export default function LagemonitorKarte({
   bedienbar?: boolean;
   /**
    * Gefahrenzonen mit Name und Stufe beschriften (LLH-1746). Das Lagebild für Externe lässt sie
-   * unbeschriftet (design.md D5 der Change `m4i2toor-lagemonitor-zonen-ueberbelegung`).
+   * unbeschriftet (D5 in
+   * `openspec/changes/archive/2026-11-16-m4i2toor-lagemonitor-zonen-ueberbelegung/design.md`).
    */
   zonenBeschriften?: boolean;
   /** `transformRequest` der Karte; die Vorgabe absolutiert die Proxy-Adressen. */

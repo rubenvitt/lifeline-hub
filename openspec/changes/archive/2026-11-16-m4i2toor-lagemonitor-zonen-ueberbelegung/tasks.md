@@ -26,7 +26,7 @@
 
 ## 5. Abschluss
 
-- [ ] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis für den PR unter „Geprüft“ notiert.
+- [x] 5.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis für den PR unter „Geprüft“ notiert.
 
 ## Workflow follow-up
 
