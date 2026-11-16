@@ -5706,8 +5706,9 @@ export interface components {
             /** Format: int64 */
             offen: number;
             /**
-             * @description Eingang der ältesten offenen, unbestätigten Sofortmeldung (UTC, SQLite-Format); fehlt
-             *     ohne eine solche. Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es.
+             * @description Sofortalarm der ältesten offenen, unbestätigten Sofortmeldung (UTC, SQLite-Format): bei
+             *     einer heraufgestuften Meldung `sofortalarm_at`, sonst ihr Eingang; fehlt ohne eine solche.
+             *     Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es.
              */
             sofort_aelteste_at?: string | null;
             /**

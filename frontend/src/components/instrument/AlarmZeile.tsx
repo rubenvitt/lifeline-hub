@@ -72,6 +72,7 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
   const messRef = useRef<HTMLDivElement>(null);
   const [sichtbar, setSichtbar] = useState(eintraege.length);
   const schluessel = eintraege.map((e) => e.text).join('|');
+  const fehlendSchluessel = fehlend.join('|');
 
   useLayoutEffect(() => {
     const reihe = reiheRef.current;
@@ -98,7 +99,7 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
     const ro = new ResizeObserver(messen);
     ro.observe(reihe);
     return () => ro.disconnect();
-  }, [schluessel, abstand, stand, fehlend.join('|')]);
+  }, [schluessel, abstand, stand, fehlendSchluessel]);
 
   const eintragStil = (e: AlarmEintrag): CSSProperties => {
     const f = statusFlaeche(rollen, e.rolle);
