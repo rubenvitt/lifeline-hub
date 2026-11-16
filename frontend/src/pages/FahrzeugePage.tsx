@@ -1073,6 +1073,8 @@ function FahrzeugeInhalt() {
             key: 'aktionen' as const,
             width: aktionenBreite,
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             // Nur der Menüauslöser (Entscheidung 14.10.2026): Entlassen, Angaben, Stamm und
             // Stornieren stehen im Menü; Stornieren fragt im `<Modal>` nach (LLH-1079).
             render: (_: unknown, ef: EinsatzFahrzeug) => (

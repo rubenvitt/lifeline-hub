@@ -1559,6 +1559,59 @@ async function tabellenUeberlauf(region: Locator): Promise<number> {
   });
 }
 
+/**
+ * Die Hauptaktion einer Zeile liegt ohne Querscrollen im Bild (LLH-1789, Spec
+ * `einsatztauglichkeit-layout`, „Die Hauptaktion einer Tabellenzeile bleibt im Bild“): ab `md` steht
+ * die Aktionsspalte rechts fixiert, unter `md` stehen Primäraktion und ⋮ in der fixierten Kennung.
+ * Gemessen war die Evakuierung bei 1440 px mit „Stand melden“ bei x 1332–1448 hinter dem Rand.
+ *
+ * Mutationsprobe: `amEnde` aus `aktionsSpalte()` entfernen → ab `md` liegt das ⋮ am Ende des
+ * Querscrolls, die Fälle mit überlaufender Tabelle werden rot.
+ */
+test.describe('Gate 1 · Aktion im Bild (LLH-1789)', () => {
+  test.describe.configure({ mode: 'parallel' });
+  for (const { breite, hoehe, dichte } of [
+    { breite: 1440, hoehe: 900, dichte: 'kompakt' },
+    { breite: 1024, hoehe: 768, dichte: 'handschuh' },
+    { breite: 390, hoehe: 844, dichte: 'komfortabel' },
+  ] as const) {
+    test(`${breite} px, ${dichte}: „Stand melden“, „Belegung melden“ und ⋮ ohne Querscrollen`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page, { startseite: false });
+      const einsatzId = await gate1Saeen(page);
+      await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+      await page.setViewportSize({ width: breite, height: hoehe });
+      for (const [pfad, region, primaer, menue] of [
+        ['evakuierung', 'Evakuierungsbezirke', /^Stand melden für Bezirk /, /^Aktionen zu Bezirk /],
+        ['betreuung', 'Betreuungsstellen', /^Belegung melden für /, /^Aktionen zu Stelle /],
+      ] as const) {
+        await page.goto(`/einsaetze/${einsatzId}/${pfad}`);
+        await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+        const flaeche = page.getByRole('region', { name: region, exact: true });
+        const zeile = flaeche.locator('tr.ant-table-row').first();
+        await expect(zeile).toBeVisible();
+        const rahmen = (await flaeche
+          .locator('.ant-table-body, .ant-table-content')
+          .first()
+          .boundingBox())!;
+        for (const ziel of [
+          zeile.getByRole('button', { name: primaer }),
+          zeile.getByRole('button', { name: menue }),
+        ]) {
+          await expect(ziel).toHaveCount(1);
+          const b = (await ziel.boundingBox())!;
+          expect(b.x, `${pfad}: Aktion links im Rahmen`).toBeGreaterThanOrEqual(rahmen.x - 1);
+          expect(b.x + b.width, `${pfad}: Aktion rechts im Rahmen`).toBeLessThanOrEqual(
+            rahmen.x + rahmen.width + 1,
+          );
+        }
+      }
+    });
+  }
+});
+
 test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
   test.describe.configure({ mode: 'parallel' });
 

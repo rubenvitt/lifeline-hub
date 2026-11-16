@@ -673,6 +673,8 @@ export function personenSpalten(
             key: 'aktionen' as const,
             width: bedienung.menue.breite,
             immerSichtbar: true,
+            // Ab `md` rechts fixiert, die Aktion bleibt ohne Querscrollen im Bild (LLH-1789).
+            amEnde: true as const,
             render: (_: unknown, p: Person) => (
               <ZeilenMenue p={p} bedienung={bedienung} menue={bedienung.menue!} />
             ),

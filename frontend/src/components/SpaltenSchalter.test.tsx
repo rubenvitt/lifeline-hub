@@ -123,7 +123,7 @@ describe('Zähler erst nach eigener Wahl (LLH-1790, Spec katalogtabelle-spaltens
     expect(pruefe([])).toBe(true);
     expect(pruefe(['sortierung', 'url'])).toBe(true);
     expect(pruefe(['sortierung'], ['url'])).toBe(true);
-    expect(weichtVonVorgabeAb({ verborgen: new Set(), voreinstellung: [] })).toBe(false);
+    expect(weichtVonVorgabeAb({ verborgen: new Set<string>(), voreinstellung: [] })).toBe(false);
   });
 
   it('der Schalter heißt „Spalten“, solange die Vorgabe gilt, und zählt nach eigener Wahl alle', async () => {
