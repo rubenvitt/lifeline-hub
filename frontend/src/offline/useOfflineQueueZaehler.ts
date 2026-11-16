@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OFFLINE_QUEUE_EVENT, queueZaehlerLaden, type OfflineQueueZaehler } from './queue';
-import { queueZaehlerGemerkt, queueZaehlerMerken } from './queueZaehlerMerker';
+import { loadStoredQueueZaehler, saveQueueZaehler } from './queueZaehlerMerker';
 
 const LEER: OfflineQueueZaehler = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
 
@@ -25,10 +25,10 @@ export function useOfflineQueueZaehler(
   einsatzId?: number,
 ): OfflineQueueZaehler {
   const scope = `${benutzerId ?? 'anonym'}:${einsatzId ?? 'alle'}`;
-  const merkerGilt = benutzerId != null && einsatzId == null;
+  const isMerkerScope = benutzerId != null && einsatzId == null;
   const startwert = useMemo(
-    () => (merkerGilt ? (queueZaehlerGemerkt(benutzerId) ?? LEER) : LEER),
-    [merkerGilt, benutzerId],
+    () => (isMerkerScope ? (loadStoredQueueZaehler(benutzerId) ?? LEER) : LEER),
+    [isMerkerScope, benutzerId],
   );
   const [stand, setStand] = useState<{ scope: string; wert: OfflineQueueZaehler }>({
     scope,
@@ -43,7 +43,7 @@ export function useOfflineQueueZaehler(
     }
     void queueZaehlerLaden(benutzerId, einsatzId).then((wert) => {
       if (ladeGeneration.current !== generation) return;
-      if (einsatzId == null) queueZaehlerMerken(benutzerId, wert);
+      if (einsatzId == null) saveQueueZaehler(benutzerId, wert);
       setStand({ scope, wert });
     });
   }, [benutzerId, einsatzId, scope]);

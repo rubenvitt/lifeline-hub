@@ -52,31 +52,31 @@ describe('useOfflineQueueZaehler (LFH-939, design.md D5)', () => {
 });
 
 /** Die Queue antwortet nie: alles, was der Hook zeigt, stammt aus dem Merker. */
-const nieAntworten = () => new Promise<OfflineQueueZaehler>(() => {});
+const neverResolve = () => new Promise<OfflineQueueZaehler>(() => {});
 
-function merke(wert: unknown) {
+function saveMerker(wert: unknown) {
   localStorage.setItem(
     QUEUE_ZAEHLER_MERKER,
     typeof wert === 'string' ? wert : JSON.stringify(wert),
   );
 }
 
-function gemerkt(): unknown {
+function loadMerker(): unknown {
   const roh = localStorage.getItem(QUEUE_ZAEHLER_MERKER);
   return roh === null ? null : JSON.parse(roh);
 }
 
 describe('useOfflineQueueZaehler: der Stand vor dem ersten Bild (LLH-1910, Spec `kopfleiste`)', () => {
   it('startet mit dem gemerkten Stand derselben Person, bevor die Queue antwortet', () => {
-    geladen.antwort = nieAntworten;
-    merke({ benutzer_id: 11, ausstehend: 2, abgelehnt: 1, nicht_zugeordnet: 0 });
+    geladen.antwort = neverResolve;
+    saveMerker({ benutzer_id: 11, ausstehend: 2, abgelehnt: 1, nicht_zugeordnet: 0 });
     const { result } = renderHook(() => useOfflineQueueZaehler(11));
     expect(result.current).toEqual({ ausstehend: 2, abgelehnt: 1, nicht_zugeordnet: 0 });
   });
 
   it('nimmt keinen Stand einer anderen Person', () => {
-    geladen.antwort = nieAntworten;
-    merke({ benutzer_id: 12, ausstehend: 2, abgelehnt: 0, nicht_zugeordnet: 0 });
+    geladen.antwort = neverResolve;
+    saveMerker({ benutzer_id: 12, ausstehend: 2, abgelehnt: 0, nicht_zugeordnet: 0 });
     const { result } = renderHook(() => useOfflineQueueZaehler(11));
     expect(result.current).toEqual({ ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 });
   });
@@ -88,15 +88,15 @@ describe('useOfflineQueueZaehler: der Stand vor dem ersten Bild (LLH-1910, Spec 
     ['ohne Feld', { benutzer_id: 11, ausstehend: 2 }],
     ['null', null],
   ])('liest einen kaputten Merker (%s) als leer', (_, wert) => {
-    geladen.antwort = nieAntworten;
-    merke(wert);
+    geladen.antwort = neverResolve;
+    saveMerker(wert);
     const { result } = renderHook(() => useOfflineQueueZaehler(11));
     expect(result.current).toEqual({ ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 });
   });
 
   it('nimmt den Merker auch, wenn die Person erst nach dem ersten Render feststeht', () => {
-    geladen.antwort = nieAntworten;
-    merke({ benutzer_id: 11, ausstehend: 2, abgelehnt: 0, nicht_zugeordnet: 0 });
+    geladen.antwort = neverResolve;
+    saveMerker({ benutzer_id: 11, ausstehend: 2, abgelehnt: 0, nicht_zugeordnet: 0 });
     const { result, rerender } = renderHook(({ id }) => useOfflineQueueZaehler(id), {
       initialProps: { id: undefined as number | undefined },
     });
@@ -106,11 +106,11 @@ describe('useOfflineQueueZaehler: der Stand vor dem ersten Bild (LLH-1910, Spec 
   });
 
   it('merkt nach dem Laden den gelesenen Stand, auch einen leeren', async () => {
-    merke({ benutzer_id: 11, ausstehend: 2, abgelehnt: 0, nicht_zugeordnet: 0 });
+    saveMerker({ benutzer_id: 11, ausstehend: 2, abgelehnt: 0, nicht_zugeordnet: 0 });
     geladen.antwort = async () => ({ ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 });
     const { result } = renderHook(() => useOfflineQueueZaehler(11));
     await vi.waitFor(() => expect(result.current.ausstehend).toBe(0));
-    expect(gemerkt()).toEqual({
+    expect(loadMerker()).toEqual({
       benutzer_id: 11,
       ausstehend: 0,
       abgelehnt: 0,
@@ -119,11 +119,11 @@ describe('useOfflineQueueZaehler: der Stand vor dem ersten Bild (LLH-1910, Spec 
   });
 
   it('merkt nach einem Benutzerwechsel den Stand der neuen Person', async () => {
-    merke({ benutzer_id: 12, ausstehend: 4, abgelehnt: 0, nicht_zugeordnet: 0 });
+    saveMerker({ benutzer_id: 12, ausstehend: 4, abgelehnt: 0, nicht_zugeordnet: 0 });
     geladen.antwort = async () => ({ ausstehend: 1, abgelehnt: 0, nicht_zugeordnet: 0 });
     const { result } = renderHook(() => useOfflineQueueZaehler(11));
     await vi.waitFor(() => expect(result.current.ausstehend).toBe(1));
-    expect(gemerkt()).toEqual({
+    expect(loadMerker()).toEqual({
       benutzer_id: 11,
       ausstehend: 1,
       abgelehnt: 0,
@@ -133,13 +133,13 @@ describe('useOfflineQueueZaehler: der Stand vor dem ersten Bild (LLH-1910, Spec 
 
   it('liest und schreibt im Scope eines Einsatzes keinen Merker', async () => {
     const vorher = { benutzer_id: 11, ausstehend: 2, abgelehnt: 0, nicht_zugeordnet: 0 };
-    merke(vorher);
+    saveMerker(vorher);
     let antworten: (wert: OfflineQueueZaehler) => void = () => {};
     geladen.antwort = () => new Promise((fertig) => (antworten = fertig));
     const { result } = renderHook(() => useOfflineQueueZaehler(11, 5));
     expect(result.current.ausstehend).toBe(0);
     await act(async () => antworten({ ausstehend: 7, abgelehnt: 0, nicht_zugeordnet: 0 }));
     expect(result.current.ausstehend).toBe(7);
-    expect(gemerkt()).toEqual(vorher);
+    expect(loadMerker()).toEqual(vorher);
   });
 });

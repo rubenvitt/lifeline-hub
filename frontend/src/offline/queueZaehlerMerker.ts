@@ -12,11 +12,11 @@ import type { OfflineQueueZaehler } from './queue';
  */
 export const QUEUE_ZAEHLER_MERKER = 'lfh:queue-zaehler';
 
-const istAnzahl = (wert: unknown): wert is number =>
+const isAnzahl = (wert: unknown): wert is number =>
   typeof wert === 'number' && Number.isInteger(wert) && wert >= 0;
 
 /** Der gemerkte Stand dieser Person, sonst `null` (fremd, fehlt, unlesbar). Wirft nie. */
-export function queueZaehlerGemerkt(benutzerId: number): OfflineQueueZaehler | null {
+export function loadStoredQueueZaehler(benutzerId: number): OfflineQueueZaehler | null {
   const roh = sicherLesen(QUEUE_ZAEHLER_MERKER);
   if (roh === null) return null;
   let wert: unknown;
@@ -28,12 +28,12 @@ export function queueZaehlerGemerkt(benutzerId: number): OfflineQueueZaehler | n
   if (typeof wert !== 'object' || wert === null) return null;
   const { benutzer_id, ausstehend, abgelehnt, nicht_zugeordnet } = wert as Record<string, unknown>;
   if (benutzer_id !== benutzerId) return null;
-  if (!istAnzahl(ausstehend) || !istAnzahl(abgelehnt) || !istAnzahl(nicht_zugeordnet)) return null;
+  if (!isAnzahl(ausstehend) || !isAnzahl(abgelehnt) || !isAnzahl(nicht_zugeordnet)) return null;
   return { ausstehend, abgelehnt, nicht_zugeordnet };
 }
 
 /** Merkt den gelesenen Stand, auch einen leeren: sonst bliebe eine abgebaute Queue stehen. */
-export function queueZaehlerMerken(benutzerId: number, wert: OfflineQueueZaehler): void {
+export function saveQueueZaehler(benutzerId: number, wert: OfflineQueueZaehler): void {
   sicherSchreiben(
     QUEUE_ZAEHLER_MERKER,
     JSON.stringify({
