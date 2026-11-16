@@ -637,11 +637,6 @@
   background: var(--lfh-linie);
 }
 
-.hilfe-druckkopf {
-  margin-bottom: 12px;
-  font-size: 9pt;
-}
-
 /* Bildschirmfotos der Kapitel (LFH-1128): Breite aus `.markdown img` (nie breiter als die
    Lesespalte), dazu ein Rahmen; Radius 0 wie die übrige App. Im Nachtbetrieb zeigt `HilfeBild`
    die dunkle Aufnahme. Ohne Netz und ohne Cache zeigt der Browser den Alt-Text an seiner Stelle.
@@ -711,6 +706,12 @@
 }
 
 @media print {
+  /* Der Druckkopf steht nur auf Papier (`druckkopf--nur-druck`), seine Größe in pt. */
+  .hilfe-druckkopf {
+    margin-bottom: 12px;
+    font-size: 9pt;
+  }
+
   .hilfe-kapitel + .hilfe-kapitel {
     margin-top: 0;
     padding-top: 0;

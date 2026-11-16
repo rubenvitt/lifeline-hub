@@ -174,79 +174,91 @@ export default function Verlaufslinie({
         maxWidth: BREITE + 64,
       }}
     >
-      <svg
-        role="img"
-        aria-label={verlaufsAussage(g.minCm, g.maxCm, richtung)}
-        viewBox={`0 0 ${BREITE} ${HOEHE + 2 * RAND}`}
-        width="100%"
-        style={{ display: 'block', height: 'auto', overflow: 'visible', touchAction: 'pan-y' }}
-        onPointerMove={beiZeiger}
-        onPointerLeave={() => setZeiger(null)}
-      >
-        <g transform={`translate(0 ${RAND})`} aria-hidden>
-          <line
-            x1={0}
-            x2={BREITE}
-            y1={HOEHE}
-            y2={HOEHE}
-            stroke={rollen.rasterLinie}
-            strokeWidth={1}
-          />
-          {prognoseY != null && prognoseCm != null && (
-            <g data-lfh="verlauf-prognose">
-              <line
-                x1={0}
-                x2={BREITE}
-                y1={prognoseY}
-                y2={prognoseY}
-                stroke={rollen.gedaempft}
-                strokeWidth={1}
-                strokeDasharray="4 3"
-              />
-              {/* Direkt an der Hilfslinie beschriftet; oben am Rand steht der Text darunter statt außerhalb. */}
-              <text
-                x={2}
-                y={prognoseY < 12 ? prognoseY + 10 : prognoseY - 3}
-                fill={rollen.gedaempft}
-                style={{
-                  ...schriftStil('meta'),
-                  fontSize: schriftGroesse('fein'),
-                }}
-              >
-                Prognose {wasserstandMeter(prognoseCm)} m
-              </text>
-            </g>
-          )}
-          <path
-            data-lfh="verlauf-linie"
-            d={g.d}
-            fill="none"
-            stroke={rollen.text}
-            strokeWidth="2"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
-          {abgelesen && (
+      {/* Das SVG skaliert mit der Spalte; die Beschriftung der Prognose steht deshalb als HTML
+          darüber, in der Stufe der Skala (Spec `schriftskala`, kein Text unter 11 px, LLH-1775). */}
+      <div style={{ position: 'relative', minWidth: 0 }}>
+        <svg
+          role="img"
+          aria-label={verlaufsAussage(g.minCm, g.maxCm, richtung)}
+          viewBox={`0 0 ${BREITE} ${HOEHE + 2 * RAND}`}
+          width="100%"
+          style={{ display: 'block', height: 'auto', overflow: 'visible', touchAction: 'pan-y' }}
+          onPointerMove={beiZeiger}
+          onPointerLeave={() => setZeiger(null)}
+        >
+          <g transform={`translate(0 ${RAND})`} aria-hidden>
             <line
-              x1={abgelesen.x}
-              x2={abgelesen.x}
-              y1={0}
+              x1={0}
+              x2={BREITE}
+              y1={HOEHE}
               y2={HOEHE}
-              stroke={rollen.gedaempft}
+              stroke={rollen.rasterLinie}
               strokeWidth={1}
             />
-          )}
-          <circle
-            cx={(abgelesen ?? g.letzter).x}
-            cy={(abgelesen ?? g.letzter).y}
-            r={4}
-            fill={rollen.text}
-            stroke={rollen.paneel}
-            strokeWidth={2}
-          />
-        </g>
-      </svg>
+            {prognoseY != null && prognoseCm != null && (
+              <g data-lfh="verlauf-prognose">
+                <line
+                  x1={0}
+                  x2={BREITE}
+                  y1={prognoseY}
+                  y2={prognoseY}
+                  stroke={rollen.gedaempft}
+                  strokeWidth={1}
+                  strokeDasharray="4 3"
+                />
+              </g>
+            )}
+            <path
+              data-lfh="verlauf-linie"
+              d={g.d}
+              fill="none"
+              stroke={rollen.text}
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+            {abgelesen && (
+              <line
+                x1={abgelesen.x}
+                x2={abgelesen.x}
+                y1={0}
+                y2={HOEHE}
+                stroke={rollen.gedaempft}
+                strokeWidth={1}
+              />
+            )}
+            <circle
+              cx={(abgelesen ?? g.letzter).x}
+              cy={(abgelesen ?? g.letzter).y}
+              r={4}
+              fill={rollen.text}
+              stroke={rollen.paneel}
+              strokeWidth={2}
+            />
+          </g>
+        </svg>
+        {prognoseY != null && prognoseCm != null && (
+          // Direkt an der Hilfslinie; oben am Rand steht der Text darunter statt außerhalb.
+          <span
+            aria-hidden
+            data-lfh="verlauf-prognose-wort"
+            style={{
+              ...schriftStil('meta'),
+              fontSize: schriftGroesse('fein'),
+              color: rollen.gedaempft,
+              position: 'absolute',
+              insetInlineStart: 2,
+              top: prozent(RAND + prognoseY),
+              transform: prognoseY < 12 ? 'translateY(2px)' : 'translateY(calc(-100% - 2px))',
+              whiteSpace: 'nowrap',
+              lineHeight: 1,
+            }}
+          >
+            Prognose {wasserstandMeter(prognoseCm)} m
+          </span>
+        )}
+      </div>
       <div aria-hidden style={{ ...meta, position: 'relative', minWidth: '8ch' }}>
         {(
           [

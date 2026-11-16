@@ -40,14 +40,7 @@ import {
   ZeilenFehler,
 } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
-import {
-  Datenfeld,
-  Datenraster,
-  Paneel,
-  useRollen,
-  schriftStil,
-  zahlStil,
-} from '../components/instrument';
+import { Datenfeld, Datenraster, Paneel, useRollen, schriftStil } from '../components/instrument';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
@@ -634,7 +627,10 @@ export default function EinsatzkraftPage() {
             {isEntlassen ? (
               <Space size="middle" wrap>
                 <span>
-                  entlassen <span style={zahlStil('text')}>{zeitKurz(ep.beendet_at)}</span>
+                  entlassen{' '}
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {zeitKurz(ep.beendet_at)}
+                  </span>
                 </span>
                 {imEinsatzSchreiben && (
                   <Button

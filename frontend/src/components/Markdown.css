@@ -47,7 +47,8 @@
 
 .markdown code {
   font-family: var(--lfh-schrift-zahl);
-  font-size: var(--lfh-groesse-klein);
+  /* Die Größe der Umgebung (Absatz, Überschrift): Code in einer h1 stünde sonst klein daneben. */
+  font-size: inherit;
   background: var(--md-flaeche);
   padding: 0.1em 0.35em;
   border-radius: 4px;

@@ -32,6 +32,11 @@ import { ohneKommentare } from '../test/ohneKommentare';
  *
  * ── BEKANNTE GRENZEN ──
  *
+ * Benannte Konstanten fängt er in zwei Formen: `…_SCHRIFT`/`…FONT…` mit Zahlwert und eine
+ * Konstante in Großbuchstaben am `fontSize`, die keine Stufe trägt (Review LLH-1719). Eine Zahl in
+ * einer kleingeschriebenen lokalen Variable (`const g = 13; fontSize: g`) sieht er nicht; das
+ * deckt die e2e-Messung `e2e/schrift-skala.spec.ts` am gerenderten Schirm.
+ *
  * Gelesen wird zeilenweise ohne Kommentare (`ohneKommentare`). Ein Wert über mehrere Zeilen wird
  * nur in seiner ersten Zeile geprüft; Prettier bricht kurze Werte nicht um. Der Lagemonitor
  * liest seine Fernsicht-Skala aus `theme/tokens.ts` (`fernsicht`), sie ist damit Theme.
@@ -51,6 +56,17 @@ export const FERNSICHT_DATEIEN: readonly string[] = [
   'geraet/LagemonitorKarte.tsx',
 ];
 
+/**
+ * Zeichnungen mit eigenem Maßstab (Spec `schriftskala`): ihre Schriften sind Zeichnungseinheiten
+ * und stehen als benannte Konstanten (`…_SCHRIFT`), mindestens 11; nur die Glyphen in
+ * `GLYPHEN` sind Teil eines Zeichens und dürfen kleiner sein.
+ */
+export const ZEICHNUNG_DATEIEN =
+  /^fernmeldewesen\/(fernmeldeskizzeLayout\.ts|skizzenZeichen\.tsx|skizze\/)/;
+export const GLYPHEN: readonly string[] = ['MARKE_SCHRIFT'];
+/** TS-Druckansichten auf Papier mit eigener Skala (Nordpfeil des Lageplans). */
+export const DRUCK_TS: readonly string[] = ['pages/lagekarte/LageplanDruck.tsx'];
+
 /** Druckblätter: Papier, Größen in pt, Spec `schriftskala` nimmt sie aus. */
 export const DRUCKBLAETTER: readonly string[] = [
   'druck/druck.css',
@@ -65,9 +81,23 @@ const ZAHL = /(?<![\w.$-])\d+(?:\.\d+)?(?:px|pt|r?em|%)?(?![\w])|\}(?:px|pt|r?em
 export function tsBefunde(
   inhalt: string,
   fernsichtDatei = false,
+  zeichnung = false,
 ): { zeile: number; grund: string }[] {
   const treffer: { zeile: number; grund: string }[] = [];
-  ohneKommentare(inhalt).forEach((sichtbar, i) => {
+  const zeilen = ohneKommentare(inhalt);
+  // Konstanten dieser Datei, die eine Stufe der Skala tragen (`BAND_GROESSE = schriftGroesse(…)`,
+  // `EINHEITEN_STUFE: Groessenstufe = 'text'`): am `fontSize` erlaubt.
+  const stufenKonstanten = new Set(
+    zeilen.flatMap((z) => {
+      const m = /\b(?:const|let)\s+([A-Z][A-Z0-9_]*)\b[^=]*=\s*(.*)$/.exec(z);
+      const istStufe =
+        m &&
+        (/schriftGroesse\(|var\(--lfh-|\bfernsicht\b|Groessenstufe/.test(z) ||
+          /^['"](fein|klein|text|titel|wert|gross)['"]/.test(m[2]));
+      return istStufe ? [m[1]] : [];
+    }),
+  );
+  zeilen.forEach((sichtbar, i) => {
     const zeile = i + 1;
     const groesse = /\bfontSize\s*[:=]\s*(.*)$/.exec(sichtbar);
     if (groesse) {
@@ -89,6 +119,25 @@ export function tsBefunde(
       if (ZAHL.test(wert) && !nurEinheit) {
         treffer.push({ zeile, grund: `fontSize mit Zahl: ${wert.trim()}` });
       }
+      // Eine Konstante in Großbuchstaben am `fontSize` trägt eine Zahl an der Prüfung vorbei
+      // (Review LLH-1719: `BAND_SCHRIFT = 13`); erlaubt nur in Zeichnungen und im Lagemonitor.
+      // Als Argument der Skala (`schriftGroesse(EINHEITEN_STUFE)`) ist die Konstante eine Stufe.
+      const konstante = /schriftGroesse\(|zahlStil\(|schriftStil\(|schriftPx\(/.test(wert)
+        ? null
+        : /(?<![\w.])[A-Z][A-Z0-9_]{2,}(?![\w.])/.exec(wert);
+      if (konstante && !stufenKonstanten.has(konstante[0]) && !zeichnung && !fernsichtDatei) {
+        treffer.push({ zeile, grund: `fontSize aus Konstante ${konstante[0]}` });
+      }
+    }
+    // Eine Größe heißt `…_SCHRIFT` bzw. `…FONT…` und trägt eine Zahl (nicht `UEBERSCHRIFT = /h1/`).
+    const benannt =
+      /\b(?:const|let)\s+((?:[A-Z0-9_]*_)?SCHRIFT|[A-Z0-9_]*FONT[A-Z0-9_]*)\b\s*(?::[^=]+)?=\s*(.*)$/.exec(
+        sichtbar,
+      );
+    if (benannt && /^(?:\d|\{[^}]*:\s*\d|\[\s*\d)/.test(benannt[2])) {
+      const zahlen = [...benannt[2].matchAll(/\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+      const imBoden = zeichnung && (GLYPHEN.includes(benannt[1]) || zahlen.every((z) => z >= 11));
+      if (!imBoden) treffer.push({ zeile, grund: `Schriftgröße als Konstante ${benannt[1]}` });
     }
     if (/font-size\s*:\s*[^;'"`]*\d/.test(sichtbar)) {
       treffer.push({ zeile, grund: 'font-size mit Zahl im String' });
@@ -112,19 +161,30 @@ export function tsBefunde(
  * (`@page`-Ränder, Druckköpfe).
  */
 const CSS_ERLAUBT =
-  /^\s*(?:var\(--lfh-(?:typo-[\w-]+-groesse|groesse-[\w-]+)\)|var\(--[\w-]+,\s*var\(--lfh-groesse-[\w-]+\)\)|inherit|\d+(?:\.\d+)?pt)\s*(?:!important\s*)?$/;
+  /^\s*(?:var\(--lfh-(?:typo-[\w-]+-groesse|groesse-[\w-]+)\)|var\(--[\w-]+,\s*var\(--lfh-groesse-[\w-]+\)\)|inherit)\s*(?:!important\s*)?$/;
 
 /** Befunde einer CSS-Datei als `Zeile: Grund`. */
 export function cssBefunde(inhalt: string): { zeile: number; grund: string }[] {
   const treffer: { zeile: number; grund: string }[] = [];
+  // Blockstapel: `pt` ist nur in `@media print` und `@page` erlaubt, Punkte gibt es nur auf Papier.
+  const stapel: boolean[] = [];
   ohneKommentare(inhalt).forEach((sichtbar, i) => {
+    const imDruck = () => stapel.some(Boolean) || /@media\s+print|@page/.test(sichtbar);
     const groesse = /(?:^|[\s;{])font-size\s*:\s*([^;}]*)/.exec(sichtbar);
-    if (groesse && !CSS_ERLAUBT.test(groesse[1])) {
-      treffer.push({ zeile: i + 1, grund: `font-size: ${groesse[1].trim()}` });
+    if (groesse) {
+      const wert = groesse[1];
+      const ptImDruck = /^\s*\d+(?:\.\d+)?pt\s*$/.test(wert) && imDruck();
+      if (!CSS_ERLAUBT.test(wert) && !ptImDruck) {
+        treffer.push({ zeile: i + 1, grund: `font-size: ${wert.trim()}` });
+      }
     }
     const kurz = /(?:^|[\s;{])font\s*:\s*([^;}]*)/.exec(sichtbar);
     if (kurz && /\d(?:\.\d+)?(?:px|pt|em|rem|%)/.test(kurz[1])) {
       treffer.push({ zeile: i + 1, grund: `font: ${kurz[1].trim()}` });
+    }
+    for (const z of sichtbar) {
+      if (z === '{') stapel.push(/@media\s+print|@page/.test(sichtbar));
+      if (z === '}') stapel.pop();
     }
   });
   return treffer;
@@ -153,7 +213,12 @@ export function befunde(dateien: Record<string, string>): string[] {
     if (/\.test\.tsx?$/.test(pfad) || /^(theme|test)\//.test(pfad) || pfad.endsWith('.d.ts')) {
       continue;
     }
-    for (const b of tsBefunde(inhalt, FERNSICHT_DATEIEN.includes(pfad))) {
+    if (DRUCK_TS.includes(pfad)) continue;
+    for (const b of tsBefunde(
+      inhalt,
+      FERNSICHT_DATEIEN.includes(pfad),
+      ZEICHNUNG_DATEIEN.test(pfad),
+    )) {
       meldungen.push(`${pfad}:${b.zeile}  ${b.grund}`);
     }
   }
@@ -203,6 +268,22 @@ describe('Regeln des Wächters an Texten (Mutationsproben)', () => {
     expect(tsBefunde('fontSize: 28,', true)).not.toEqual([]);
   });
 
+  it('benannte Konstanten: Zahl am Namen …SCHRIFT und Konstante am fontSize sind rot', () => {
+    expect(tsBefunde('const BAND_SCHRIFT = 13;')).not.toEqual([]);
+    expect(tsBefunde('const UEBERSCHRIFT = /^h[1-6]$/;')).toEqual([]);
+    expect(
+      tsBefunde("const BAND_GROESSE = schriftGroesse('text');\n          fontSize: BAND_GROESSE,"),
+    ).toEqual([]);
+    expect(tsBefunde('const MARKE_SCHRIFT = { klein: 11, monitor: 28 } as const;')).not.toEqual([]);
+    expect(tsBefunde('          fontSize: BAND_SCHRIFT,')).not.toEqual([]);
+    expect(tsBefunde('        fontSize={EINHEITEN}')).not.toEqual([]);
+    // Zeichnung mit eigenem Maßstab: Konstanten ab 11, Glyphen benannt.
+    expect(tsBefunde('export const HINWEIS_SCHRIFT = 11;', false, true)).toEqual([]);
+    expect(tsBefunde('export const HINWEIS_SCHRIFT = 10;', false, true)).not.toEqual([]);
+    expect(tsBefunde('export const MARKE_SCHRIFT = 7;', false, true)).toEqual([]);
+    expect(tsBefunde('        fontSize={NAME_SCHRIFT}', false, true)).toEqual([]);
+  });
+
   it('meldet monoStil, Mono-Literale, font-size in Strings und Canvas', () => {
     expect(tsBefunde('...monoStil(11),')).not.toEqual([]);
     expect(tsBefunde("fontFamily: 'monospace',")).not.toEqual([]);
@@ -219,6 +300,9 @@ describe('Regeln des Wächters an Texten (Mutationsproben)', () => {
     expect(cssBefunde('.a { font: inherit; font-size: inherit; }')).toEqual([]);
     expect(cssBefunde('.a { font-size: var(--x, var(--lfh-groesse-text)); }')).toEqual([]);
     expect(cssBefunde('.a { font-size: var(--x, 14px); }')).not.toEqual([]);
-    expect(cssBefunde('@top-center { font-size: 11pt; }')).toEqual([]);
+    expect(cssBefunde('@page x {\n  @top-center { font-size: 11pt; }\n}')).toEqual([]);
+    expect(cssBefunde('@media print {\n  .a {\n    font-size: 9pt;\n  }\n}')).toEqual([]);
+    // Am Schirm gibt es keine Punkte (Review LLH-1719): `pt` außerhalb des Drucks ist rot.
+    expect(cssBefunde('.a {\n  font-size: 8pt;\n}')).not.toEqual([]);
   });
 });

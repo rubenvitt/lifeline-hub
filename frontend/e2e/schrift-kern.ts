@@ -31,11 +31,25 @@ export interface Textprobe {
 
 /**
  * Alle sichtbaren Textknoten unter `wurzel` mit Größe, erster Familie und Zeichenzahl. Nicht Teil
- * der App: die Devtools von TanStack Query; Zeichnungen mit eigenem Maßstab: SVG, Kartenleinwand.
+ * der App: die Devtools von TanStack Query; ausgenommen sind nur Zeichnungen mit eigenem Maßstab.
  */
 export async function textproben(page: Page, wurzel = 'body'): Promise<Textprobe[]> {
   return page.evaluate((wurzel) => {
-    const FREMD = 'script, style, noscript, svg, canvas, .tsqd-parent-container, [class*="tsqd-"]';
+    // Zeichnungen mit eigenem Maßstab (Spec `schriftskala`): Karte samt Markern, taktische
+    // Zeichen, Fernmeldeskizze. Anderer SVG-Text (Diagramme, Körperschema) wird gemessen.
+    const FREMD = [
+      'script',
+      'style',
+      'noscript',
+      'canvas',
+      '.tsqd-parent-container',
+      '[class*="tsqd-"]',
+      '.maplibregl-map',
+      '[data-lfh="einheit-zeichen"]',
+      '[data-lfh="fahrzeug-zeichen"]',
+      '[data-lfh="fernmeldeskizze"]',
+      '[data-lfh="skizze-flaeche"]',
+    ].join(', ');
     const start = document.querySelector(wurzel);
     if (!start) return [];
     const proben: Textprobe[] = [];

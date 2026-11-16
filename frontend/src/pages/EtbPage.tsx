@@ -895,8 +895,9 @@ export default function EtbPage() {
           zusaetze={[
             ausserhalbHier && (
               <span key="ausserhalb">
-                Nr. <span style={zahlStil('klein')}>{ausserhalbHier.lfd_nr}</span> erfasst –
-                außerhalb des Filters ·{' '}
+                Nr.{' '}
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{ausserhalbHier.lfd_nr}</span>{' '}
+                erfasst – außerhalb des Filters ·{' '}
                 <Button
                   type="link"
                   style={{ paddingInline: 0 }}

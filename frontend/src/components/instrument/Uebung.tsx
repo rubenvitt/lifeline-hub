@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react';
 import type { Einsatzart } from '../../api/types';
 import { isUebung } from '../../einsatz/einsatzart';
-import type { Farbrollen } from '../../theme/tokens';
+import { fernsicht, type Farbrollen } from '../../theme/tokens';
 import { RAHMEN_EBENE, useRahmenObenStapel } from '../rahmenOben';
-import { schriftStil, useRollen } from './rollenwerte';
+import { schriftGroesse, schriftStil, useRollen } from './rollenwerte';
 
 /**
  * Übungsmarke (LLH-1725, Spec `uebungsmarke`; `frontend/AGENTS.md`, Rahmen, „Übung“): der EINE
@@ -26,10 +26,13 @@ type MitArt = { einsatzart?: Einsatzart | null } | null | undefined;
 /** Das Wort; Versalien per CSS, im DOM „Übung“, damit Vorleser es nicht buchstabieren. */
 const WORT = 'Übung';
 
-/** Größen der Marke: Kopf, Liste und Wechsler `klein`; der Lagemonitor liest aus Metern. */
-const MARKE_SCHRIFT = { klein: 11, monitor: 28 } as const;
+/**
+ * Größen der Marke: Kopf, Liste und Wechsler `klein` in der Stufe `fein` (wächst mit der Dichte,
+ * LLH-1774); der Lagemonitor liest aus Metern (Fernsicht-Skala).
+ */
+const MARKE_SCHRIFT = { klein: schriftGroesse('fein'), monitor: `${fernsicht.text}px` } as const;
 
-function wortStil(rollen: Pick<Farbrollen, 'uebungText'>, groesse: number): CSSProperties {
+function wortStil(rollen: Pick<Farbrollen, 'uebungText'>, groesse: string): CSSProperties {
   return {
     ...schriftStil('augenbraue'),
     fontSize: groesse,
@@ -59,8 +62,9 @@ export function UebungsMarke({
         display: 'inline-flex',
         alignItems: 'center',
         flexShrink: 0,
-        paddingBlock: Math.round(px * 0.2),
-        paddingInline: Math.round(px * 0.5),
+        // Polster im Verhältnis zur Schrift, die mit der Dichte wächst (LLH-1774).
+        paddingBlock: `calc(${px} * 0.2)`,
+        paddingInline: `calc(${px} * 0.5)`,
         background: rollen.uebungFuellung,
         // Kante gegen dunkle Flächen; gegen helle trägt die Füllung den Umriss (D2).
         boxShadow: `inset 0 0 0 1px ${rollen.uebungKante}`,
@@ -78,8 +82,11 @@ export const UNBEKANNT = 'Einsatzart nicht geladen';
 /** Takt, in dem eine Hülle ohne Einsatzkopf ihn erneut lädt (Gerät, Lagemonitor). */
 export const EINSATZKOPF_REFETCH_MS = 30_000;
 
-/** Schriftgröße des Worts im Band: eine Stufe über dem Lauftext, damit es aus dem Augenwinkel trägt. */
-const BAND_SCHRIFT = 13;
+/**
+ * Schriftgröße des Worts im Band: die Stufe `text`, damit es aus dem Augenwinkel trägt (vorher
+ * 13 px, keine Stufe der Skala, LLH-1775).
+ */
+const BAND_GROESSE = schriftGroesse('text');
 
 /**
  * `klebend` (Vorgabe): das Band klebt im Dokument-Scroll unter den übrigen Rahmenquellen und meldet
@@ -116,7 +123,7 @@ export function UebungsBand({
           background: rollen.flaeche3,
           borderBlockEnd: `1px solid ${rollen.linie}`,
           color: rollen.text2,
-          fontSize: BAND_SCHRIFT,
+          fontSize: BAND_GROESSE,
         }}
       >
         {UNBEKANNT}
@@ -142,7 +149,7 @@ export function UebungsBand({
         borderBlock: `1px solid ${rollen.uebungKante}`,
       }}
     >
-      <span style={wortStil(rollen, BAND_SCHRIFT)}>{WORT}</span>
+      <span style={wortStil(rollen, BAND_GROESSE)}>{WORT}</span>
     </div>
   );
 }

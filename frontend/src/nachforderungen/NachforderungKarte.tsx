@@ -37,7 +37,7 @@ import {
   kannEinheitUebernehmen,
   uebernommeneEinheiten,
 } from './einheitUebernahme';
-import { EINHEITEN_SCHRIFT, einheitenSprungAufbau } from './einheitenSprung';
+import { EINHEITEN_STUFE, einheitenSprungAufbau } from './einheitenSprung';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
 import { adressatText, nachforderungName } from './nachforderungName';
@@ -198,7 +198,7 @@ function EinheitenZeile({
       <Text
         type="secondary"
         // Block: mit zwei Wegen stehen beide Zeilen im selben Space-Item der Karte (LLH-1445).
-        style={{ display: 'block', fontSize: EINHEITEN_SCHRIFT }}
+        style={{ display: 'block', fontSize: schriftGroesse(EINHEITEN_STUFE) }}
         data-lfh="nachforderung-einheiten"
       >
         {zahl} {einleitung === 'Am Raum eingetroffen' ? 'am Raum eingetroffen' : 'übernommen'}
@@ -219,9 +219,9 @@ function EinheitenZeile({
               flexWrap: 'wrap',
               alignItems: 'center',
               columnGap: token.marginXXS,
-              fontSize: EINHEITEN_SCHRIFT,
+              fontSize: schriftGroesse(EINHEITEN_STUFE),
             }
-          : { display: 'block', fontSize: EINHEITEN_SCHRIFT }
+          : { display: 'block', fontSize: schriftGroesse(EINHEITEN_STUFE) }
       }
       data-lfh="nachforderung-einheiten"
     >
