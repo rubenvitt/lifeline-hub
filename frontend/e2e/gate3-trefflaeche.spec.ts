@@ -1140,10 +1140,13 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
     await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
     // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (Auswahlzeile nicht
-    // „0 von 0") — erst danach sagt eine Abwesenheit etwas.
+    // „0 von 0") — erst danach sagt eine Abwesenheit etwas. „Kräfte“ sind Köpfe, die Fahrzeuge
+    // zählen eigens (LLH-1744).
     await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     await expect(
-      page.locator('[data-lfh="meldebild-werkzeuge"]').getByText(/^[1-9]\d* von [1-9]\d* Kräften$/),
+      page
+        .locator('[data-lfh="meldebild-werkzeuge"]')
+        .getByText(/^[1-9]\d* von [1-9]\d* Kräften · [1-9]\d* von [1-9]\d* Fahrzeugen$/),
     ).toBeVisible();
 
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.
