@@ -193,6 +193,15 @@ Entscheidung Ruben 16.11.2026 statt gekürzter oder gemischt geschriebener Etike
 44-px-Kopf (16 × 1,4 = 22,4 px bei 37 px Innenhöhe); die Uhr in `Kopfleiste.tsx:189` liest die
 Rolle `uhr`.
 
+### 9. Einsatzname im Kopf wächst mit (LLH-1726 trifft LLH-1774)
+
+LLH-1726 legte den Einsatznamen im Kopf am 15.11. auf 16 px in jeder Dichte fest (Spec
+`kopfleiste`); parallel entstand hier die Regel, dass die Stufe `titel` mit der Dichte wächst.
+Nach dem Merge mit `alpha` gemessen: bei 1180 px in `handschuh` steht der Name auch in 20 px
+ungekürzt. Entscheidung Ruben 16.11.2026: der Name bleibt in der Stufe `titel` und wächst mit
+(16 / 18,4 / 20 px); die Spec `kopfleiste` wird geändert, statt in der Skala eine Ausnahme für
+eine feste 16 zu schaffen. Nachweis `e2e/kopfleiste-einsatzname.spec.ts`.
+
 ## Risks / Trade-offs
 
 - **Sehr großer, sichtbarer Diff** (rund 190 Dateien) → Migration nach Bereichen in eigenen

@@ -59,6 +59,9 @@ liest das schlecht.
 - `einsatztauglichkeit-layout`: Die Brotkrume trägt künftig die Stufe `klein` der Schriftskala
   und wächst mit der Dichte, statt in jeder Stufe 12 px zu bleiben. In `kompakt` bleibt sie
   12 px, und der Seitenkopf bleibt 44 px hoch.
+- `kopfleiste`: Der Einsatzname im Kopf steht in der Stufe `titel` und wächst mit der Dichte
+  (16 / 18,4 / 20 px), statt in jeder Stufe 16 px zu bleiben (Entscheidung Ruben 16.11.2026,
+  nach dem Merge mit LLH-1726).
 
 ## Impact
 
