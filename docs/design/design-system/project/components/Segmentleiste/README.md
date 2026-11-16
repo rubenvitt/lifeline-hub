@@ -13,7 +13,8 @@ Tokens.
 ZUGÄNGLICH als `radiogroup` (Vorgabe, eine Wahl unter mehreren) oder als `tablist` (wenn das
 Segment eine Fläche darunter umschaltet). Tastatur nach APG: ←/→ (und ↑/↓) wandern und
 wählen, Pos1/Ende springen; nur das gewählte Segment liegt in der Tab-Reihenfolge (roving
-tabindex).
+tabindex). Mit `aktivierung="manuell"` (Reiter, die die Seite wechseln) wandern die Pfeile nur,
+gewählt wird mit Enter oder Leertaste.
 
 BEDIENZIEL: jedes Segment ist ein `<button>` ohne antd-Höhe und trägt die ZWEI Angaben aus
 LFH-365 (`segmentStil`). Die Staffel 30 / 48 / 72 gilt, nicht die Entwurfsskizze — als

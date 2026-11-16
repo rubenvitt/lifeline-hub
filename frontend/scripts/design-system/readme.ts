@@ -178,7 +178,9 @@ export function pruefeOhneTicket(readme: string): void {
   const zeilen = readme.split('\n');
   // Über den ganzen Text, nicht je Zeile: ein Verweis bricht in `frontend/AGENTS.md` oft um.
   const reste = [
-    ...readme.matchAll(/\b(?:LFH|LLH)-\d+|\bSpec\s+`|`openspec\/changes|\bHerleitung[:\s]/g),
+    ...readme.matchAll(
+      /\b(?:LFH|LLH)-\d+|\bSpec\s+`|`openspec\/changes|\bHerleitung[:\s]|\b[a-z0-9]{8} D\d+\b/g,
+    ),
   ].map((m) => {
     const zeile = readme.slice(0, m.index).split('\n').length;
     return { zeile, text: zeilen[zeile - 1] };
@@ -243,6 +245,8 @@ const VERWEIS = [
   String.raw`(?:(?:Guard|Wächter) \d* ?in )?\`[^\`]*\.(?:guard\.)?test\.tsx?\``,
   // Zunder-Kurzkennung: 8 Zeichen mit mindestens einer Ziffer, sonst träfe es Wörter („gemessen“).
   String.raw`(?=[a-z]*\d)[a-z0-9]{8}(?: D\d+)?`,
+  // Mit Entscheidungskürzel ist es immer eine Kennung, auch ohne Ziffer („gyidpati D2“).
+  String.raw`[a-z0-9]{8} D\d+`,
   String.raw`D\d+`,
   String.raw`\d{1,2}\.\d{1,2}\.\d{4}`,
   String.raw`Entscheidungen? E\d+(?:–E\d+)? aus ${TICKET}`,
@@ -289,7 +293,7 @@ function klammerOhneVerweise(inhalt: string): string | null {
     const praefix = VERWEIS_PRAEFIX.exec(teil.text);
     const istVerweis: boolean =
       VERWEIS_GLIED.test(teil.text) || (vorherSpec && /^„[^“]*“$/.test(teil.text));
-    vorherSpec = istVerweis && teil.text.startsWith('Spec ');
+    vorherSpec = istVerweis && /^Spec\s/.test(teil.text);
     if (istVerweis) geaendert = true;
     else if (praefix) {
       geaendert = true;

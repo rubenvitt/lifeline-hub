@@ -83,3 +83,45 @@ describe('FernmeldewesenReiter', () => {
     );
   });
 });
+
+/**
+ * Review vor dem PR (LLH-1808): die Leiste ist eine Segmentleiste als Reiter mit Reiterfläche.
+ * `aria-controls` nur dort, wo der Inhalt auf der Seite steht; die Pfeiltaste bewegt nur den
+ * Fokus (wie vorher bei antds Tabs), gewählt wird mit Enter.
+ */
+describe('FernmeldewesenReiter als Segmentleiste', () => {
+  it('verbindet die Darstellungen mit der Fläche, den Kommunikationsplan nicht', () => {
+    renderMitProviders(
+      <>
+        <FernmeldewesenReiter
+          einsatzId={7}
+          aktiv="tabelle"
+          onDarstellung={vi.fn()}
+          flaecheId="blatt"
+        />
+        <div role="tabpanel" id="blatt" aria-label="Funkplan" />
+      </>,
+      { route: '/einsaetze/7/fernmeldewesen' },
+    );
+    for (const name of ['Funkplan', 'Fernmeldeskizze', 'Sprechgruppen']) {
+      expect(screen.getByRole('tab', { name })).toHaveAttribute('aria-controls', 'blatt');
+    }
+    expect(screen.getByRole('tab', { name: 'Kommunikationsplan' })).not.toHaveAttribute(
+      'aria-controls',
+    );
+  });
+
+  it('die Pfeiltaste bewegt nur den Fokus, Enter wählt', async () => {
+    const onDarstellung = vi.fn();
+    renderMitProviders(
+      <FernmeldewesenReiter einsatzId={7} aktiv="tabelle" onDarstellung={onDarstellung} />,
+      { route: '/einsaetze/7/fernmeldewesen' },
+    );
+    screen.getByRole('tab', { name: 'Funkplan' }).focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Fernmeldeskizze' })).toHaveFocus();
+    expect(onDarstellung).not.toHaveBeenCalled();
+    await userEvent.keyboard('{Enter}');
+    expect(onDarstellung).toHaveBeenCalledWith('skizze');
+  });
+});

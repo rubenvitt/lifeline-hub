@@ -66,7 +66,12 @@ export default function FernmeldewesenReiter({
       optionen={FERNMELDEWESEN_REITER.map((r) => ({
         wert: r.key,
         label: r.label,
-        steuert: flaecheId,
+        // `aria-controls` nur, wo der Inhalt des Reiters auf dieser Seite steht: auf dem Funkplan
+        // die drei Darstellungen, sonst nur der aktive Reiter.
+        steuert:
+          r.key === aktiv || (onDarstellung && r.key !== 'kommunikationsplan')
+            ? flaecheId
+            : undefined,
       }))}
       className={className}
       style={{ marginBottom: token.margin }}

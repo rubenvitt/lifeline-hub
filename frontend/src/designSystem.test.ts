@@ -440,12 +440,14 @@ describe('Verweise fallen aus der README (Spec `design-system-artifact`)', () =>
       'Höhe (gemessen, Oberkante im Fenster)',
     );
     expect(ohneVerweise('Kopf (zjt7c073 D2) klebt.')).toBe('Kopf klebt.');
+    expect(ohneVerweise('Wahl (gyidpati D2) gilt.')).toBe('Wahl gilt.');
   });
 
   it('erkennt Spec- und Herleitungsverweise auch über einen Zeilenumbruch', () => {
     expect(
       ohneVerweise('Zone (Spec\n  `benachrichtigungen`, Herleitung\n  `openspec/x.md`) bleibt.'),
     ).toBe('Zone bleibt.');
+    expect(ohneVerweise('Zone (Spec\n  `x`, „Anforderung“) bleibt.')).toBe('Zone bleibt.');
     expect(ohneVerweise('Regel gilt. Herleitung: `openspec/changes/archive/x/design.md`.')).toBe(
       'Regel gilt.',
     );

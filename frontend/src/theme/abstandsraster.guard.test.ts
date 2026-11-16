@@ -59,9 +59,11 @@ export const AUSNAHMEN: Readonly<Record<string, string>> = {
 
 /**
  * Druckansichten außerhalb von `druck/` (`pages/befehlPrint.css`, `pages/EtbDruckPage.tsx`,
- * `personen/PersonDruckBlatt.tsx` …): dieselbe Ausnahme wie `druck/`, erkannt am Dateinamen.
+ * `personen/PersonDruckBlatt.tsx` …): dieselbe Ausnahme wie `druck/`, erkannt am Dateinamen. Nur
+ * Druck-CSS und Druckseiten; Bausteine am Bildschirm (`components/druck/DruckKnopf.tsx`) zählen.
  */
-const DRUCKDATEI = /(?:Druck|druck|Print|print)[^/]*\.(?:tsx?|css)$/;
+const DRUCKDATEI =
+  /(?:[Pp]rint|[Dd]ruck)\.css$|(?:DruckPage|DruckSeite|DruckBlatt|DruckInhalt|DruckTabelle)\.tsx$/;
 
 /** Feinsatz (Haarlinie, Symbolversatz) zählt nicht. */
 const FEINSATZ = 2;
@@ -295,6 +297,9 @@ describe('Abstandsraster: kein neues Abstands-Literal (Spec `abstandsraster`)', 
         ),
       ).toEqual([]);
       expect(befunde({ 'pages/befehl.css': css }, {})).toHaveLength(1);
+      expect(befunde({ 'components/druck/DruckKnopf.tsx': '<Space size={12}>' }, {})).toHaveLength(
+        1,
+      );
     });
 
     it('nimmt Rollenquelle und Ausnahmen aus, ein Schuldeintrag dort ist rot', () => {

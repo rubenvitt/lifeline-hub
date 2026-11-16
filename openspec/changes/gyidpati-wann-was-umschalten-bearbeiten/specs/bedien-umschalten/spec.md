@@ -15,8 +15,12 @@ Schaltet eine Wahl die Fläche oder den Bereich darunter um, SHALL die Seite sie
 - **THEN** stehen „Einzelaufträge“ und „Einsatzbefehle“ als Segmentleiste mit den Rollen Reiterliste und Reiter, und die gewählte Fläche ist mit dem Reiter verbunden
 
 #### Scenario: Tastatur
-- **WHEN** der Fokus auf einem Reiter liegt und die Person die Pfeiltaste nach rechts drückt
+- **WHEN** der Fokus auf einem Reiter liegt, dessen Fläche auf derselben Seite steht, und die Person die Pfeiltaste nach rechts drückt
 - **THEN** wechselt die Auswahl auf den nächsten Reiter und die Fläche darunter zeigt dessen Inhalt
+
+#### Scenario: Reiter, die die Seite wechseln
+- **WHEN** ein Reiter auf eine andere Seite führt (Fernmeldewesen: Kommunikationsplan) und die Person die Pfeiltaste drückt
+- **THEN** bewegt die Pfeiltaste nur den Fokus, gewählt wird mit Enter oder Leertaste, und der Fokus bleibt in der Leiste
 
 #### Scenario: Entwurfsreiter des ETB
 - **WHEN** im ETB mehrere Entwürfe offen sind

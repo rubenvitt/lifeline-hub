@@ -19,6 +19,8 @@ herleitung:
 - MUST NOT: antd `Tabs` außerhalb der Dokumentreiter des ETB (`frontend/src/etb/entwuerfe/`).
 - MUST NOT: `Radio.Group optionType="button"`; eine kurze Wahl im Formular ist ein `SegmentFeld`.
 - SHOULD: Über einer Liste steht höchstens eine Segmentleiste; weitere Einschränkungen sind Filter.
+- MUST: Führt ein Reiter auf eine andere Seite, wählt die Leiste mit Enter, nicht mit der
+  Pfeiltaste (`aktivierung="manuell"`).
 
 ## Prüfung
 

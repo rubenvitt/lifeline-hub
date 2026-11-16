@@ -685,17 +685,20 @@ describe('RaeumungDialog', () => {
   // Segment, das Feld galt als berührt und ein Speichern drehte die fremde Meldung zurück.
   it('LFH-681: ein Klick auf den schon gewählten Zustand übernimmt den Live-Stand weiter', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onSchliessen = vi.fn();
     const { rerender } = renderMitProviders(
-      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen),
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen, onSchliessen),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
     await waehle(dialog, 'angeordnet');
-    rerender(raeumungDialog(bezirk({ raeumung: 'geraeumt' }), onErfassen));
+    rerender(raeumungDialog(bezirk({ raeumung: 'geraeumt' }), onErfassen, onSchliessen));
     await waitFor(() =>
       expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).not.toHaveBeenCalled());
+    // Erst das Ende des Speicherns abwarten: ohne Änderung schließt der Dialog ohne Aufruf.
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
   });
 
   it('setzt den Fokus beim Öffnen auf die Wahl des Räumungszustands (Erfassungs-Norm)', async () => {
