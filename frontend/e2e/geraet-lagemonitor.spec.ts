@@ -146,6 +146,37 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
       zeitpunkt_at: wireAb(minuten),
     });
   }
+  // LLH-1743: viele Arten der Alarmzeile zugleich (Spec `lagemonitor`, „Alle Kacheln bleiben
+  // sichtbar“), damit die Zeile in 28 px überläuft und „+n“ zeigt: vermisst, kritischer Abschnitt,
+  // Einheit mit überfälliger Rückmeldung, überfälliger Auftrag (samt fälliger Erinnerung an die
+  // Quittierfrist), dringende Meldung, dazu die Sofortmeldung oben.
+  await anlegen(page, `/api/einsaetze/${e}/personen`, { name: 'Vermisst', status: 'vermisst' });
+  await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
+    name: 'UHS Turnhalle Nordufer',
+    lagezustand: 'kritisch',
+  });
+  const trupp = await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'Logistiktrupp' });
+  const vorZweiStunden = new Date(Date.now() - 120 * 60_000).toISOString();
+  await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+    absender: 'Logistiktrupp',
+    meldeweg: 'funk',
+    inhalt: 'Lage ruhig',
+    meldungsart: 'rueckmeldung',
+    ereigniszeit: vorZweiStunden,
+    einheit_id: trupp.id,
+  });
+  await anlegen(page, `/api/einsaetze/${e}/auftraege`, {
+    auftrag_text: 'Sandsäcke an den Deich',
+    empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
+    frist_at: wireAb(-60),
+  });
+  await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
+    absender: 'EA Nord',
+    meldeweg: 'funk',
+    inhalt: 'Nachschub Trinkwasser',
+    prioritaet: 'dringend',
+    ereigniszeit: new Date().toISOString(),
+  });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
     `/api/einsaetze/${e}/geraete`,
@@ -219,9 +250,12 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
       }));
       expect(masse.hoehe).toBeLessThanOrEqual(1080);
       expect(masse.breite).toBeLessThanOrEqual(1920);
-      // Die Alarmzeile „Was brennt“ steht ganz im Bild, Text ab 28 px (LLH-1743).
+      // Die Alarmzeile „Was brennt“ steht ganz im Bild, Text ab 28 px (LLH-1743); bei so vielen
+      // Arten läuft sie über und fasst den Rest als „+n“ zusammen, ohne zu wachsen.
       const alarmZeile = monitor.getByRole('status', { name: 'Was brennt' });
       await expect(alarmZeile).toBeInViewport({ ratio: 1 });
+      await expect(alarmZeile.locator('[data-lfh="alarm-mehr"]')).toBeVisible();
+      await expect(alarmZeile.locator('[data-lfh="alarm-mehr"]')).toBeInViewport({ ratio: 1 });
       expect(
         await alarmZeile.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
       ).toBeGreaterThanOrEqual(28);
