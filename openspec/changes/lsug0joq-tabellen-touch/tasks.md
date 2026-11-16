@@ -30,8 +30,8 @@ klebenden Kopfzeile gleich breit) ist im Branch behoben.
 - [x] 4.2 `InlineAngabe` schwebend (D2): Anzeige bleibt in der Zelle, Bearbeitung im kontrollierten Popover; Fokus, Escape-Reihenfolge, Fokusrückgabe, Prüfung, Ablehnung, `OFFEN_LASSEN` unverändert. Unit-Tests je Punkt im schwebenden Zweig rot→grün, der Fluss-Zweig bleibt unverändert grün
 - [x] 4.3 Eine schwebende Bearbeitung je Tabelle (zweite schließt eine unveränderte erste, eine geänderte behält den Fokus); Klick außerhalb schließt nicht; Unit-Tests rot→grün
 - [x] 4.4 Testhelfer `test/` für die offene Bearbeitung über ihren zugänglichen Namen; bestehende Tests der Tabellen mit Inline-Angaben (Fahrzeuge, Personal, Material, Betroffene) gesammelt umstellen, alle grün
-- [ ] 4.5 e2e „Bearbeiten ohne Sprung“: Spaltenbreiten und Zeilenhöhe der Fahrzeugliste vor und nach dem Stift der Einheit (1440 × 900 `kompakt`, 1024 × 768 `handschuh`), Abweichung ≤ 1 px; Escape-Reihenfolge; Karte bei 390 px bearbeitet im Fluss. Grün
-- [ ] 4.6 `e2e/inline-angabe-dichte.spec.ts`, `e2e/kraefte-einsatzfunktion.spec.ts` und weitere e2e mit Inline-Angaben in Tabellen nachziehen; einzeln grün
+- [x] 4.5 e2e „Bearbeiten ohne Sprung“: Spaltenbreiten und Zeilenhöhe der Fahrzeugliste vor und nach dem Stift der Einheit (1440 × 900 `kompakt`, 1024 × 768 `handschuh`), Abweichung ≤ 1 px; Escape-Reihenfolge; Karte bei 390 px bearbeitet im Fluss. Grün
+- [x] 4.6 `e2e/inline-angabe-dichte.spec.ts`, `e2e/kraefte-einsatzfunktion.spec.ts` und weitere e2e mit Inline-Angaben in Tabellen nachziehen; einzeln grün
 
 ## 5. i5c54naq: Einheiten am Handy als Karten
 

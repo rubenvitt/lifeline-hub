@@ -2138,11 +2138,13 @@ test.describe('Gate 1 · Tabellen am Führungsarbeitsplatz (LFH-1149)', () => {
       expect(ueber, 'Fahrzeugtabelle läuft nicht über').toBeLessThanOrEqual(1);
       const besatzung = zeile.locator('[data-lfh="besatzung-urteil"]');
       await expect(besatzung, 'Besatzung ohne Querscrollen').toBeInViewport({ ratio: 1 });
-      // Urteil, Ist und Soll in EINER Zeile: die Zeile bleibt so hoch wie in den Kräfte-Listen.
+      // Urteil, Ist und Soll in EINER Zeile. Unter dem Funkrufnamen steht unter `xxl` der Typ
+      // (LLH-1790, Spec `fahrzeug-bearbeitung`, „Typ eines Fahrzeugs in der Liste“): zwei
+      // Textzeilen in der Kennung, gemessen 56 px; mehr hieße, Ist und Soll brächen um.
       expect(
         (await zeile.boundingBox())!.height,
         'Zeilenhöhe mit Ist und Soll',
-      ).toBeLessThanOrEqual(48);
+      ).toBeLessThanOrEqual(60);
       if (rolle === 'admin') {
         await expect(menue, 'Menüauslöser ohne Querscrollen').toBeInViewport({ ratio: 1 });
         // Geklickt, nicht nur sichtbar (`e2e/AGENTS.md`): Entlassen fragt nicht nach, der
