@@ -579,13 +579,15 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `theme/zoomFrei.guard.test.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
-  `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein
-  Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
+  `theme/dichte.ts:startDichte`, gespiegelt im Bootstrap-Skript von `index.html` (setzt
+  `data-dichte` vor dem ersten Bild, LLH-1774) — immer beide ändern, `theme/dichte.test.ts` führt
+  das Skript gegen `startDichte` aus; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart,
+  kein Import aus Einsatz, Rolle oder Funktion (`theme/dichteQuelle.guard.test.ts`). Browser-Beleg
   `e2e/dichte-ableitung.spec.ts`; Flächenmessung der Modul-Prüflisten
   `e2e/trefflaeche-pruefflaechen.spec.ts`, Messhelfer in `e2e/trefflaeche-kern.ts`.
 - **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel
   (`Math.max(48, controlHeight)`, Griffe über `navGriffMass`); die Rail-Spalte wächst mit
-  (`railBreite` in `components/Kopfleiste.tsx`, 73 px in `handschuh`).
+  (`railBreite` in `components/Kopfleiste.tsx`, mit der Schrift: 64 / 74 / 80 px, LLH-1774).
 - Knopfboden `minWidth` = `controlHeightSM` (`antdKnopf()` in `theme/tokens.ts`). `Switch` über
   `switchMasse`/`antdKomponenten(farben, dichte)`; Nachweis am CSS der `css-var-…`-Klasse über
   `innerHTML`, nicht `textContent`. Schalter in fester Breite brechen um, statt zu kürzen
