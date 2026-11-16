@@ -112,7 +112,8 @@ export function fmsStatusOptionen(katalog: readonly FahrzeugStatus[]): StatusOpt
   return katalog.map((s) => ({
     wert: s.id,
     label: fmsEtikett(s.label, s.fms_anker),
-    darstellung: kategorieDarstellung(s.kategorie, s.fms_anker),
+    // Ohne Kategorie keine Darstellung, wie vorher `statusKategorie[undefined]`.
+    darstellung: s.kategorie ? kategorieDarstellung(s.kategorie, s.fms_anker) : undefined,
     farbe: s.farbe,
   }));
 }

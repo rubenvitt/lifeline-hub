@@ -206,7 +206,9 @@ export function fahrzeugStatusRolle(
   fmsAnker: number | null | undefined,
 ): Statusrolle {
   if (fmsAnker != null && FMS_SPRECHWUNSCH.has(fmsAnker)) return 'achtung';
-  return statusKategorie[kategorie].rolle;
+  // Katalogdaten kommen von außen: eine fehlende oder unbekannte Kategorie ist neutral, nie ein
+  // Absturz der Seite.
+  return statusKategorie[kategorie]?.rolle ?? 'neutral';
 }
 
 /**

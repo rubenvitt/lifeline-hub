@@ -167,6 +167,13 @@ describe('Statusfarb-Vertrag', () => {
       expect(sf.fahrzeugStatusRolle('gebunden', anker)).toBe('neutral');
     });
 
+    it('eine unbekannte oder fehlende Kategorie wirft nicht und ist neutral', () => {
+      // Katalogdaten von außen: ein Eintrag ohne Kategorie darf die Seite nicht abstürzen lassen.
+      expect(sf.fahrzeugStatusRolle(undefined as never, null)).toBe('neutral');
+      expect(sf.fahrzeugStatusRolle('unbekannt' as never, 4)).toBe('neutral');
+      expect(sf.fahrzeugStatusRolle(undefined as never, 5)).toBe('achtung');
+    });
+
     it('ohne Anker gilt die Kategorie', () => {
       expect(sf.fahrzeugStatusRolle('gebunden', null)).toBe('neutral');
       expect(sf.fahrzeugStatusRolle('gebunden', undefined)).toBe('neutral');

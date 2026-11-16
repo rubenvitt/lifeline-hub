@@ -444,8 +444,9 @@ describe('BemerkungZelle', () => {
      * der Test die Rolle gegen sich selbst.
      */
     renderMitProviders(<BemerkungZelle wert={null} darfSchreiben onSpeichern={vi.fn()} />);
+    // `#114577` seit eon26eat D5 (auf der dunkleren `flaeche3` des Tags nachgezogen).
     expect(screen.getByRole('button', { name: BEMERKUNG_HINZUFUEGEN }).style.color).toBe(
-      'rgb(20, 71, 121)',
+      'rgb(17, 69, 119)',
     );
   });
 });

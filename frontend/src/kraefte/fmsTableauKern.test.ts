@@ -80,6 +80,11 @@ describe('fmsStatusOptionen (LFH-642)', () => {
     expect(o[0].darstellung?.rolle).toBeDefined();
   });
 
+  it('wirft nicht bei einem Katalogeintrag ohne Kategorie und lässt die Darstellung weg', () => {
+    const ohne = { ...status(9, 'Reserve', null), kategorie: undefined as never };
+    expect(fmsStatusOptionen([ohne])[0].darstellung).toBeUndefined();
+  });
+
   it('färbt den Sprechwunsch gelb, den übrigen gebundenen Status neutral (eon26eat D2)', () => {
     // `status` legt per Vorgabe die Kategorie „gebunden“ an.
     const o = fmsStatusOptionen([
