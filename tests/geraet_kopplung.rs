@@ -5417,6 +5417,28 @@ async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
         json!(true)
     );
 
+    // Ein Gebiet ohne Bezeichnung (Zone ohne Beschriftung gezeichnet): `bezeichnung` fehlt, statt
+    // als `null` hinauszugehen (`src/AGENTS.md`, Optionalität ehrlich machen).
+    let (s, ohne) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/zonen"),
+        &admin,
+        Some(&json!({
+            "typ": "gefahrengebiet",
+            "geometrie_typ": "Polygon",
+            "geometrie": ZONE_POLY,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{ohne}");
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ohne_namen = zone_von(&v, &ohne["id"]);
+    let gebiet_ohne = ohne_namen["gebiet"].as_object().expect("Gebiet zur Zone");
+    assert!(!gebiet_ohne.contains_key("bezeichnung"), "{ohne_namen}");
+    assert_eq!(gebiet_ohne["warnstufe"], json!("keine"));
+
     let text = v.to_string();
     for wort in ["Muster", "Brandt"] {
         assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
