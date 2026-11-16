@@ -627,6 +627,14 @@ anwendbar), „nicht geprüft" ist keins.
   Zeile hält ihre Stelle, LLH-1254).
   Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
   Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
+- **Die Hauptaktion einer Zeile bleibt im Bild** (LLH-1789, Spec `einsatztauglichkeit-layout`,
+  Change `lsug0joq-tabellen-touch` D1): die Aktionsspalte trägt `amEnde` und steht ab `md` rechts
+  fixiert; unter `md` ziehen Primäraktion und ⋮ in die fixierte Kennung (`Datensicht`), eine
+  zweite fixierte Spalte gibt es dort nicht. Spalte mit Primäraktion über
+  `components/aktionsSpalte.tsx` (Breite je Stufe gerechnet, aus `PrimaerAktion`/`WeitereAktionen`
+  wie Karte und Kontextmenü); eine reine ⋮-Spalte (`menueSpaltenBreite`) setzt nur `amEnde`.
+  Nachweis `e2e/gate1-ueberlauf.spec.ts` („Aktion im Bild“), Fokus in
+  `e2e/fokus-verdeckung.spec.ts`.
 - **Kopf und Körper sind gleich breit** (LLH-1788): mit stehender Kopfzeile legt rc-table den
   Kopf in eine eigene Tabelle; `theme/sprache.css` setzt sie auf `table-layout: fixed`, damit
   sie die gemessenen Körperbreiten genau übernimmt. Damit der feste Kopf nie gekürzt wird, hebt
@@ -829,6 +837,15 @@ anwendbar), „nicht geprüft" ist keins.
 
 **Inline-Bearbeitung und Status**
 
+- **In einer Tabellenzelle schwebt die Bearbeitung** (LLH-1795, Spec `einsatztauglichkeit-layout`,
+  Change `lsug0joq-tabellen-touch` D2): `KatalogTabelle` setzt `AngabeFormProvider form="schwebend"`
+  (`components/angabeForm.tsx`) um den Körper, `fluss` um aufgeklappte Zeilen. Eine `InlineAngabe`
+  lässt dort ihre Anzeige stehen und öffnet Eingabe, Fehler und Knöpfe in einem Popover an ihr;
+  die Spalten bleiben stehen. Ein Klick daneben schließt nicht (Escape, „Abbrechen“, Speichern
+  schon), je Tabelle ist höchstens eine offen (eine unveränderte schließt, eine geänderte behält den
+  Fokus), der Fokus kehrt auf die Anzeige zurück. Karten und Ansichten bearbeiten im Fluss;
+  `BemerkungZelle` liest den Kontext nicht. Nachweis `e2e/gate1-ueberlauf.spec.ts` („Bearbeiten
+  ohne Sprung“).
 - **Ein leeres Feld muss sagen, dass man es schreiben kann:** optionale Inline-Angaben nehmen
   `components/BemerkungZelle.tsx`, nicht `Typography.Text editable` (Platzhalter `Button type="link"`, Zeilenkennung im Namen,
   Lesezweig „—", Fehler an der Zelle per `data-fehler`, Fokusrückgabe und Wertgleichheits-Riegel

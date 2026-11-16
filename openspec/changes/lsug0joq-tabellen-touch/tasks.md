@@ -26,10 +26,10 @@ klebenden Kopfzeile gleich breit) ist im Branch behoben.
 
 ## 4. j10okn8m: Bearbeiten in der Zelle ohne Sprung
 
-- [ ] 4.1 Kontext `angabeForm` (`'fluss' | 'schwebend'`, Vorgabe `'fluss'`) in `components/`; `KatalogTabelle` setzt `'schwebend'` um den Körper und `'fluss'` um aufgeklappte Zeilen; Unit-Test rot→grün
-- [ ] 4.2 `InlineAngabe` schwebend (D2): Anzeige bleibt in der Zelle, Bearbeitung im kontrollierten Popover; Fokus, Escape-Reihenfolge, Fokusrückgabe, Prüfung, Ablehnung, `OFFEN_LASSEN` unverändert. Unit-Tests je Punkt im schwebenden Zweig rot→grün, der Fluss-Zweig bleibt unverändert grün
-- [ ] 4.3 Eine schwebende Bearbeitung je Tabelle (zweite schließt eine unveränderte erste, eine geänderte behält den Fokus); Klick außerhalb schließt nicht; Unit-Tests rot→grün
-- [ ] 4.4 Testhelfer `test/` für die offene Bearbeitung über ihren zugänglichen Namen; bestehende Tests der Tabellen mit Inline-Angaben (Fahrzeuge, Personal, Material, Betroffene) gesammelt umstellen, alle grün
+- [x] 4.1 Kontext `angabeForm` (`'fluss' | 'schwebend'`, Vorgabe `'fluss'`) in `components/`; `KatalogTabelle` setzt `'schwebend'` um den Körper und `'fluss'` um aufgeklappte Zeilen; Unit-Test rot→grün
+- [x] 4.2 `InlineAngabe` schwebend (D2): Anzeige bleibt in der Zelle, Bearbeitung im kontrollierten Popover; Fokus, Escape-Reihenfolge, Fokusrückgabe, Prüfung, Ablehnung, `OFFEN_LASSEN` unverändert. Unit-Tests je Punkt im schwebenden Zweig rot→grün, der Fluss-Zweig bleibt unverändert grün
+- [x] 4.3 Eine schwebende Bearbeitung je Tabelle (zweite schließt eine unveränderte erste, eine geänderte behält den Fokus); Klick außerhalb schließt nicht; Unit-Tests rot→grün
+- [x] 4.4 Testhelfer `test/` für die offene Bearbeitung über ihren zugänglichen Namen; bestehende Tests der Tabellen mit Inline-Angaben (Fahrzeuge, Personal, Material, Betroffene) gesammelt umstellen, alle grün
 - [ ] 4.5 e2e „Bearbeiten ohne Sprung“: Spaltenbreiten und Zeilenhöhe der Fahrzeugliste vor und nach dem Stift der Einheit (1440 × 900 `kompakt`, 1024 × 768 `handschuh`), Abweichung ≤ 1 px; Escape-Reihenfolge; Karte bei 390 px bearbeitet im Fluss. Grün
 - [ ] 4.6 `e2e/inline-angabe-dichte.spec.ts`, `e2e/kraefte-einsatzfunktion.spec.ts` und weitere e2e mit Inline-Angaben in Tabellen nachziehen; einzeln grün
 

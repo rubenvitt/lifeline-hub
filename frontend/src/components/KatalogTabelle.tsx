@@ -1,5 +1,6 @@
 import { ConfigProvider, Input, Table, type InputRef, type TableProps, type TableRef } from 'antd';
 import { kopfMindestBreite, mitKopfMindestBreite, textBreiteKopf } from './kopfBreite';
+import { AngabeFormProvider } from './angabeForm';
 import {
   useCallback,
   useEffect,
@@ -1303,6 +1304,25 @@ export default function KatalogTabelle<T extends object>({
       ? { pageSize: BLAETTER_SCHWELLE, showSizeChanger: false }
       : (false as const));
 
+  /** Der Inhalt aufgeklappter Zeilen ist eine Ansicht: dort bearbeitet eine Angabe im Fluss. */
+  const aufklappen = rest.expandable;
+  const aufklappImFluss = useMemo(
+    () =>
+      aufklappen?.expandedRowRender
+        ? {
+            ...aufklappen,
+            expandedRowRender: (
+              ...args: Parameters<NonNullable<typeof aufklappen.expandedRowRender>>
+            ) => (
+              <AngabeFormProvider form="fluss">
+                {aufklappen.expandedRowRender!(...args)}
+              </AngabeFormProvider>
+            ),
+          }
+        : aufklappen,
+    [aufklappen],
+  );
+
   return (
     <>
       {(suche != null || schalterDa) && (
@@ -1372,38 +1392,43 @@ export default function KatalogTabelle<T extends object>({
       {/* Geschachtelter Provider nur für die Tabellen-Tokens: er erbt Algorithmus, Rollen und Dichte
           und färbt NUR diese Tabelle; `tokens.ts:antdKomponenten` bleibt die globale Stelle. */}
       <ConfigProvider theme={{ components: { Table: tabellenTokens(rollen, dunkel, token) } }}>
-        <Table<T>
-          {...rest}
-          onRow={zeilenProps}
-          onChange={beiAenderung}
-          ref={tabelleRef}
-          className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
-          style={{ ...filterKopfStil(token), ...sortierKopfStyle(token), ...rest.style }}
-          columns={antdSpalten}
-          dataSource={sichtbareZeilen}
-          loading={loading}
-          locale={wirkendesLocale}
-          pagination={blaetterung}
-          // `test/utils.tsx` montiert `ConfigProvider` ohne Locale; der Sortier-Tooltip wäre im Test
-          // englisch und in Produktion deutsch. Am Berührungsgerät trägt er ohnehin nichts.
-          showSorterTooltip={false}
-          scroll={{ x: scrollX }}
-          /*
-           * rc-table wählt das Layout selbst: `if (fixColumn) return mergedScrollX === 'max-content' ?
-           * 'auto' : 'fixed'`. Dieses Primitiv fixiert Spalte 0 immer; eine Zahl kippte das Layout still
-           * auf `fixed`, wo Spaltenbreiten BINDEND sind (ein 72-px-Knopf in einer 96-px-Aktionsspalte wurde
-           * angeschnitten). Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und
-           * bei einer Gruppe an Position 0 wäre ein hartes `auto` eine stille Änderung.
-           */
-          tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
-          /*
-           * Stehende Kopfzeile am Bildschirm, NICHT im Druck: mit `sticky` legt rc-table den Kopf in eine
-           * eigene Tabelle, der Körper trüge kein `thead`, und die Kopfwiederholung aus `druck/druck.css`
-           * griffe nicht. Umgeschaltet über `beforeprint`/`afterprint`. Der Kopf steht unter dem
-           * klebenden Rahmen, nicht an der Fensterkante (LFH-952, `frontend/AGENTS.md`, Rahmen).
-           */
-          sticky={druckt ? false : { offsetHeader: rahmenOben }}
-        />
+        {/* Inline-Angaben in Zellen schweben (LLH-1795): die Bearbeitung öffnet an der Zelle, die
+            Spalten bleiben stehen. Aufgeklappte Zeilen sind eine Ansicht und bleiben im Fluss. */}
+        <AngabeFormProvider form="schwebend">
+          <Table<T>
+            {...rest}
+            expandable={aufklappImFluss}
+            onRow={zeilenProps}
+            onChange={beiAenderung}
+            ref={tabelleRef}
+            className={['lfh-katalog', rest.className].filter(Boolean).join(' ')}
+            style={{ ...filterKopfStil(token), ...sortierKopfStyle(token), ...rest.style }}
+            columns={antdSpalten}
+            dataSource={sichtbareZeilen}
+            loading={loading}
+            locale={wirkendesLocale}
+            pagination={blaetterung}
+            // `test/utils.tsx` montiert `ConfigProvider` ohne Locale; der Sortier-Tooltip wäre im Test
+            // englisch und in Produktion deutsch. Am Berührungsgerät trägt er ohnehin nichts.
+            showSorterTooltip={false}
+            scroll={{ x: scrollX }}
+            /*
+             * rc-table wählt das Layout selbst: `if (fixColumn) return mergedScrollX === 'max-content' ?
+             * 'auto' : 'fixed'`. Dieses Primitiv fixiert Spalte 0 immer; eine Zahl kippte das Layout still
+             * auf `fixed`, wo Spaltenbreiten BINDEND sind (ein 72-px-Knopf in einer 96-px-Aktionsspalte wurde
+             * angeschnitten). Nur im Zahlfall gesetzt: bei `'max-content'` wählt rc-table ohnehin `auto`, und
+             * bei einer Gruppe an Position 0 wäre ein hartes `auto` eine stille Änderung.
+             */
+            tableLayout={typeof scrollX === 'number' ? 'auto' : undefined}
+            /*
+             * Stehende Kopfzeile am Bildschirm, NICHT im Druck: mit `sticky` legt rc-table den Kopf in eine
+             * eigene Tabelle, der Körper trüge kein `thead`, und die Kopfwiederholung aus `druck/druck.css`
+             * griffe nicht. Umgeschaltet über `beforeprint`/`afterprint`. Der Kopf steht unter dem
+             * klebenden Rahmen, nicht an der Fensterkante (LFH-952, `frontend/AGENTS.md`, Rahmen).
+             */
+            sticky={druckt ? false : { offsetHeader: rahmenOben }}
+          />
+        </AngabeFormProvider>
       </ConfigProvider>
       {kontext.menue}
     </>

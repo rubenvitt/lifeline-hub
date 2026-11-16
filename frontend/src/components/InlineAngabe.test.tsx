@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Input } from 'antd';
 import type { Dayjs } from 'dayjs';
@@ -12,6 +12,8 @@ import { tippeZeit } from '../test/zeitEingabe';
 import { verschachtelteZiele } from '../test/verschachtelteZiele';
 import { ApiError } from '../api/client';
 import { InlineAngabe, OFFEN_LASSEN, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
+import { AngabeFormProvider } from './angabeForm';
+import type React from 'react';
 
 /**
  * Verhalten der inline bearbeitbaren Angabe (LFH-472).
@@ -839,5 +841,116 @@ describe('InlineAngabe · OFFEN_LASSEN', () => {
     );
     expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('ILS-12');
     expect(document.querySelector('[data-fehler]')).toBeNull();
+  });
+});
+
+describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
+  function Zelle(p: Props & { name?: string }) {
+    return (
+      <div data-testid={`zelle-${p.name ?? 'a'}`}>
+        <TextAngabe kennung={p.name ?? 'Anna'} {...p} />
+      </div>
+    );
+  }
+  const schwebend = (kinder: React.ReactNode) => (
+    <AngabeFormProvider form="schwebend">{kinder}</AngabeFormProvider>
+  );
+
+  it('die Anzeige bleibt in der Zelle, die Bearbeitung öffnet außerhalb (Popover)', async () => {
+    renderMitProviders(schwebend(<Zelle wert="ILS-1" />));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    const zelle = screen.getByTestId('zelle-a');
+    expect(zelle).not.toContainElement(feld);
+    expect(
+      within(zelle).getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    ).toBeInTheDocument();
+    expect(feld).toHaveFocus();
+  });
+
+  it('Enter sendet, danach steht der Fokus wieder auf dem Wert der Zelle', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(schwebend(<Zelle wert="ILS-1" onSpeichern={onSpeichern} />));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'ILS-2{Enter}');
+    expect(onSpeichern).toHaveBeenCalledWith('ILS-2');
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it('Escape verwirft, ein Klick außerhalb schließt nicht', async () => {
+    const onSpeichern = vi.fn();
+    renderMitProviders(
+      <>
+        {schwebend(<Zelle wert="ILS-1" onSpeichern={onSpeichern} />)}
+        <button type="button">daneben</button>
+      </>,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    await userEvent.click(screen.getByRole('button', { name: 'daneben' }));
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeInTheDocument();
+    feld.focus();
+    fireEvent.keyDown(feld, { key: 'Escape' });
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
+    );
+    expect(onSpeichern).not.toHaveBeenCalled();
+  });
+
+  it('eine Tabelle hält eine Bearbeitung: eine unveränderte schließt, eine geänderte behält den Fokus', async () => {
+    renderMitProviders(
+      schwebend(
+        <>
+          <Zelle name="Anna" wert="A-1" />
+          <Zelle name="Bert" wert="B-1" />
+        </>,
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    // Unverändert: die zweite öffnet, die erste schließt.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Bert bearbeiten' }),
+    );
+    const bert = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Bert' });
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull(),
+    );
+    // Geändert: die erste behält Entwurf und Fokus, die zweite öffnet nicht.
+    await userEvent.type(bert, 'x');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    expect(screen.queryByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr. zu Bert' })).toHaveValue('B-1x');
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr. zu Bert' })).toHaveFocus(),
+    );
+  });
+
+  it('ohne Kontext bleibt die Bearbeitung im Fluss', async () => {
+    renderMitProviders(<Zelle wert="ILS-1" />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    expect(screen.getByTestId('zelle-a')).toContainElement(feld);
   });
 });

@@ -2,6 +2,7 @@ import { IconStift } from '../icons';
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -9,7 +10,8 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { Button, Space } from 'antd';
+import { Button, Popover, Space } from 'antd';
+import { useAngabeForm, type OffeneAngabe } from './angabeForm';
 import { FeldFehler } from './instrument';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
@@ -293,6 +295,45 @@ export function InlineAngabe<T>({
   const geaendert = darfSchreiben && bearbeitet && !gleich(entwurf, wert);
   const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
 
+  /**
+   * In einer Tabellenzelle schwebt die Bearbeitung (LLH-1795, `components/angabeForm.tsx`): die
+   * Anzeige bleibt stehen, Eingabe und Knöpfe öffnen in einem Popover an ihr. Die Tabelle hält
+   * höchstens eine offen; dafür meldet sich die Angabe mit diesem gleichbleibenden Griff an.
+   */
+  const formKontext = useAngabeForm();
+  const schwebend = formKontext.form === 'schwebend';
+  const geaendertRef = useRef(geaendert);
+  geaendertRef.current = geaendert;
+  const schliessenRef = useRef<() => void>(() => {});
+  const griffRef = useRef<OffeneAngabe>({
+    geaendert: () => geaendertRef.current,
+    schliessen: () => schliessenRef.current(),
+    fokus: () => document.getElementById(feldId)?.focus(),
+  });
+  const kontextRef = useRef(formKontext);
+  kontextRef.current = formKontext;
+  useEffect(() => {
+    if (!bearbeitet) kontextRef.current.schliesse(griffRef.current);
+  }, [bearbeitet]);
+  useEffect(() => () => kontextRef.current.schliesse(griffRef.current), []);
+  /*
+   * Fokusrückgabe aus dem Popover: `useFokusRueckgabe` greift nur, wenn der Fokus beim Schließen
+   * auf `body` fällt. Das Popover hält seinen Inhalt aber bis zum Ende der Ausblendung im Baum,
+   * der Fokus stünde so noch im verschwindenden Feld. Liegt er dort (oder im Nichts), geht er zurück
+   * auf die Anzeige der Zelle.
+   */
+  const fokusZurAnzeigeRef = useRef(false);
+  const popoverInhaltRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (bearbeitet || !fokusZurAnzeigeRef.current) return;
+    fokusZurAnzeigeRef.current = false;
+    const aktiv = document.activeElement;
+    const imPopover = aktiv != null && (popoverInhaltRef.current?.contains(aktiv) ?? false);
+    if (aktiv == null || aktiv === document.body || !aktiv.isConnected || imPopover) {
+      knopfRef.current?.focus();
+    }
+  });
+
   // Die Sperre schließt eine offene Bearbeitung ohne Änderung (Zustand beim Rendern angepasst,
   // nicht per Effekt: sonst stünde einen Frame lang ein bedienbares Feld unter der Sperre). Ein
   // Entwurf bleibt stehen.
@@ -362,6 +403,10 @@ export function InlineAngabe<T>({
 
   function oeffnen() {
     if (isGesperrt) return;
+    // Schon offen (schwebend bleibt der Wertknopf klickbar): kein zweites Öffnen, das den Entwurf
+    // zurücksetzte.
+    if (bearbeitet) return;
+    if (schwebend && !formKontext.oeffne(griffRef.current)) return;
     popupOffenRef.current = false;
     setEntwurf(wert);
     setFehler(null);
@@ -375,7 +420,9 @@ export function InlineAngabe<T>({
     popupOffenRef.current = false;
     setFehler(null);
     setBearbeitet(false);
+    if (schwebend) fokusZurAnzeigeRef.current = true;
   }
+  schliessenRef.current = schliessen;
 
   async function abschicken() {
     if (sendetRef.current || isGesperrt) return;
@@ -440,58 +487,91 @@ export function InlineAngabe<T>({
     </div>
   ) : null;
 
-  if (bearbeitet) {
-    return (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void abschicken();
-        }}
-        onKeyDownCapture={tastenVorab}
-        onKeyDown={tasten}
-        style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}
+  const formular = (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void abschicken();
+      }}
+      onKeyDownCapture={tastenVorab}
+      onKeyDown={tasten}
+      style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}
+    >
+      {eingabe({
+        feld: {
+          id: feldId,
+          'aria-label': name,
+          autoFocus: true,
+          ...(pruefGrund ? { 'aria-invalid': true, 'aria-describedby': pruefId } : {}),
+        },
+        value: entwurf,
+        onChange: setEntwurf,
+        popup: {
+          onOpenChange: (offen) => {
+            popupOffenRef.current = offen;
+          },
+        },
+      })}
+      <FeldFehler id={pruefId}>{pruefGrund}</FeldFehler>
+      <SpeicherFehler fehler={fehler} />
+      {sperrHinweis}
+      {/* Abstand der Dialogfüße (frontend/AGENTS.md, „Rot steht nicht bündig neben Neutralem“). */}
+      <Space wrap size="middle">
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={sendet}
+          disabled={isGesperrt}
+          aria-label={`${name} speichern`}
+          aria-describedby={isGesperrt ? sperrBeschreibung : undefined}
+        >
+          Speichern
+        </Button>
+        <Button
+          disabled={sendet}
+          aria-label={`Bearbeitung von ${name} abbrechen`}
+          onClick={schliessen}
+        >
+          Abbrechen
+        </Button>
+      </Space>
+    </form>
+  );
+
+  if (bearbeitet && !schwebend) return formular;
+
+  /**
+   * Schwebend: die Anzeige (Wertknopf, Aufforderung oder eigener Auslöser) ist der Anker des
+   * Popovers. Kein Auslöser am Popover selbst und kein Schließen beim Klick daneben: wie im Fluss
+   * schließen nur „Abbrechen“, Escape und das Speichern (Regel „kein Speichern beim Verlassen“).
+   */
+  const mitPopover = (inhalt: ReactNode): ReactNode =>
+    !schwebend ? (
+      inhalt
+    ) : (
+      <Popover
+        open={bearbeitet}
+        trigger={[]}
+        placement="bottomLeft"
+        arrow={false}
+        destroyOnHidden
+        content={
+          <div
+            ref={popoverInhaltRef}
+            style={{ minWidth: 220, maxWidth: 'min(360px, calc(100vw - 32px))' }}
+          >
+            {formular}
+          </div>
+        }
       >
-        {eingabe({
-          feld: {
-            id: feldId,
-            'aria-label': name,
-            autoFocus: true,
-            ...(pruefGrund ? { 'aria-invalid': true, 'aria-describedby': pruefId } : {}),
-          },
-          value: entwurf,
-          onChange: setEntwurf,
-          popup: {
-            onOpenChange: (offen) => {
-              popupOffenRef.current = offen;
-            },
-          },
-        })}
-        <FeldFehler id={pruefId}>{pruefGrund}</FeldFehler>
-        <SpeicherFehler fehler={fehler} />
-        {sperrHinweis}
-        {/* Abstand der Dialogfüße (frontend/AGENTS.md, „Rot steht nicht bündig neben Neutralem“). */}
-        <Space wrap size="middle">
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={sendet}
-            disabled={isGesperrt}
-            aria-label={`${name} speichern`}
-            aria-describedby={isGesperrt ? sperrBeschreibung : undefined}
-          >
-            Speichern
-          </Button>
-          <Button
-            disabled={sendet}
-            aria-label={`Bearbeitung von ${name} abbrechen`}
-            onClick={schliessen}
-          >
-            Abbrechen
-          </Button>
-        </Space>
-      </form>
+        <span
+          data-lfh="angabe-anker"
+          style={{ display: 'inline-block', maxWidth: '100%', minWidth: 0 }}
+        >
+          {inhalt}
+        </span>
+      </Popover>
     );
-  }
 
   const hinweis = pflichtHinweis ? (
     <div data-fehler role="status" style={{ color: rollen.alarmText }}>
@@ -500,17 +580,17 @@ export function InlineAngabe<T>({
   ) : null;
 
   if (ausloeser) {
-    return (
+    return mitPopover(
       <>
         {ausloeser({ ref: knopfRef, onClick: oeffnen, disabled: isGesperrt })}
         {sperrHinweis}
         {hinweis}
-      </>
+      </>,
     );
   }
 
   if (leer(wert)) {
-    return (
+    return mitPopover(
       <>
         <Button
           ref={knopfRef}
@@ -525,14 +605,14 @@ export function InlineAngabe<T>({
         </Button>
         {sperrHinweis}
         {hinweis}
-      </>
+      </>,
     );
   }
 
   const wertBeschreibung = isGesperrt ? `${wertId} ${sperrBeschreibung}` : wertId;
 
   if (bearbeitenDaneben) {
-    return (
+    return mitPopover(
       <>
         <div
           style={{
@@ -559,11 +639,11 @@ export function InlineAngabe<T>({
         </div>
         {sperrHinweis}
         {hinweis}
-      </>
+      </>,
     );
   }
 
-  return (
+  return mitPopover(
     <>
       <Button
         ref={knopfRef}
@@ -582,6 +662,6 @@ export function InlineAngabe<T>({
       </Button>
       {sperrHinweis}
       {hinweis}
-    </>
+    </>,
   );
 }

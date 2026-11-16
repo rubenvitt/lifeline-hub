@@ -1560,6 +1560,87 @@ async function tabellenUeberlauf(region: Locator): Promise<number> {
 }
 
 /**
+ * Bearbeiten in der Zelle ohne Sprung (LLH-1795, Spec `einsatztauglichkeit-layout`, „Bearbeiten in
+ * einer Tabellenzelle verschiebt die Tabelle nicht“): der Stift der Einheit öffnet ein Popover an
+ * der Zelle; keine Spalte ändert ihre Breite um mehr als 1 px, die Zeile behält ihre Höhe. Vorher
+ * wuchs die Zeile von 45 auf rund 71 px, und alle Spalten verteilten sich neu.
+ *
+ * Mutationsprobe: `AngabeFormProvider form="schwebend"` in `KatalogTabelle.tsx` auf `fluss` →
+ * das Formular steht wieder in der Zelle, der Test wird rot.
+ */
+test.describe('Gate 1 · Bearbeiten ohne Sprung (LLH-1795)', () => {
+  test.describe.configure({ mode: 'parallel' });
+  for (const { breite, hoehe, dichte } of [
+    { breite: 1440, hoehe: 900, dichte: 'kompakt' },
+    { breite: 1024, hoehe: 768, dichte: 'handschuh' },
+  ] as const) {
+    test(`Fahrzeuge ${breite} px, ${dichte}: der Stift der Einheit verschiebt keine Spalte`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1366, height: 768 });
+      await anmelden(page, { startseite: false });
+      const einsatzId = await seedeKraefte(page);
+      await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);
+      await page.setViewportSize({ width: breite, height: hoehe });
+      await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+      await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+      const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+      const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT_FAHRZEUG });
+      await expect(zeile).toHaveCount(1);
+      const masse = () =>
+        region.evaluate((el) => {
+          const z = [...el.querySelectorAll<HTMLElement>('.ant-table-tbody tr.ant-table-row')];
+          return {
+            spalten: [...el.querySelectorAll<HTMLElement>('.ant-table-sticky-holder thead th')].map(
+              (th) => Math.round(th.getBoundingClientRect().width * 10) / 10,
+            ),
+            hoehen: z.map((r) => Math.round(r.getBoundingClientRect().height * 10) / 10),
+          };
+        });
+      const vorher = await masse();
+      await zeile.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} eintragen` }).click();
+      const speichern = page.getByRole('button', {
+        name: `Einheit zu ${KRAFT_FAHRZEUG} speichern`,
+      });
+      await expect(speichern).toBeVisible();
+      await expect(speichern, '„Speichern“ steht vollständig im Fenster').toBeInViewport({
+        ratio: 1,
+      });
+      // Die Bearbeitung steht nicht in der Zeile.
+      await expect(zeile.getByRole('button', { name: /speichern$/ })).toHaveCount(0);
+      const nachher = await masse();
+      vorher.spalten.forEach((b, i) =>
+        expect(Math.abs(nachher.spalten[i] - b), `Spalte ${i}`).toBeLessThanOrEqual(1),
+      );
+      vorher.hoehen.forEach((h, i) =>
+        expect(Math.abs(nachher.hoehen[i] - h), `Zeile ${i}`).toBeLessThanOrEqual(1),
+      );
+      // Escape: zuerst die Auswahlliste, dann die Bearbeitung; der Fokus kehrt zur Zelle zurück.
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      await expect(speichern).toHaveCount(0);
+      await expect(
+        zeile.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} eintragen` }),
+      ).toBeFocused();
+    });
+  }
+
+  test('Fahrzeuge 390 px: in der Karte bearbeitet die Einheit im Fluss', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await anmelden(page, { startseite: false });
+    const einsatzId = await seedeKraefte(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+    const karte = page.locator('[data-lfh="datensicht-karte"]').filter({ hasText: KRAFT_FAHRZEUG });
+    await expect(karte).toHaveCount(1);
+    await karte.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} eintragen` }).click();
+    await expect(
+      karte.getByRole('button', { name: `Einheit zu ${KRAFT_FAHRZEUG} speichern` }),
+    ).toBeVisible();
+  });
+});
+
+/**
  * Die Hauptaktion einer Zeile liegt ohne Querscrollen im Bild (LLH-1789, Spec
  * `einsatztauglichkeit-layout`, „Die Hauptaktion einer Tabellenzeile bleibt im Bild“): ab `md` steht
  * die Aktionsspalte rechts fixiert, unter `md` stehen Primäraktion und ⋮ in der fixierten Kennung.

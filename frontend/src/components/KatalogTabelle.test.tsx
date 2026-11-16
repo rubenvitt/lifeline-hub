@@ -8,6 +8,7 @@ import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { useAngabeForm } from './angabeForm';
 import KatalogTabelle, {
   BLAETTER_SCHWELLE,
   KOPF_FREIRAUM,
@@ -86,6 +87,32 @@ describe('KatalogTabelle', () => {
     const koerper = container.querySelector<HTMLTableElement>('.ant-table-body table');
     expect(koerper).not.toBeNull();
     expect(koerper!.style.width).toBe('max-content');
+  });
+
+  it('Zellen bearbeiten schwebend, aufgeklappte Zeilen im Fluss (LLH-1795)', () => {
+    function Probe({ wo }: { wo: string }) {
+      return <span data-testid={wo}>{useAngabeForm().form}</span>;
+    }
+    renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          {
+            title: 'Funkrufname',
+            key: 'funkrufname',
+            render: () => <Probe wo="zelle" />,
+          },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+        expandable={{
+          expandedRowRender: () => <Probe wo="aufgeklappt" />,
+          defaultExpandAllRows: true,
+        }}
+      />,
+    );
+    expect(screen.getByTestId('zelle')).toHaveTextContent('schwebend');
+    expect(screen.getByTestId('aufgeklappt')).toHaveTextContent('fluss');
   });
 
   /**

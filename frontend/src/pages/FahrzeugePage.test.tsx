@@ -1140,7 +1140,11 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     await userEvent.click(within(zeile).getByRole('button', { name: `${FELD} eintragen` }));
     await waehle(FELD, 'Zug 1');
     await userEvent.click(screen.getByRole('button', { name: `${FELD} speichern` }));
-    expect(await within(zeile).findByText(/Einheit ist aufgelöst/)).toBeInTheDocument();
+    // In der Tabelle schwebt die Bearbeitung an der Zelle (LLH-1795): sie bleibt mit dem Entwurf
+    // offen, und der Grund steht in ihr, nicht im Zellfluss.
+    expect(await screen.findByText(/Einheit ist aufgelöst/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: `${FELD} speichern` })).toBeInTheDocument();
+    expect(within(zeile).queryByText(/Einheit ist aufgelöst/)).toBeNull();
   });
 
   it('Beobachter sieht die Einheit als Text', async () => {
