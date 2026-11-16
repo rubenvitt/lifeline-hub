@@ -84,6 +84,8 @@ async function einsatzAnlegen(page: Page, name: string): Promise<number> {
 }
 
 const band = (page: Page) => page.getByRole('group', { name: 'Lage in Zahlen' });
+/** Das Band des Überblicks heißt seit LLH-1743 „Führungsstand“ (drei Handlungszahlen). */
+const fuehrungsstand = (page: Page) => page.getByRole('group', { name: 'Führungsstand' });
 
 /** Die Zelle einer Kennzahl über ihre Augenbraue. */
 const zelle = (page: Page, etikett: RegExp) =>
@@ -196,10 +198,11 @@ for (const breite of BREITEN) {
     const einsatzId = await einsatzAnlegen(page, 'E2E Notizhöhe Überblick');
     await page.setViewportSize({ width: breite, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
-    await geladen(page);
-    const notizen = band(page).locator('[data-lfh="kennzahl-notiz"]');
-    // Sechs Plätze wie im Lagebild (LLH-1140).
-    await expect(notizen).toHaveCount(6);
+    await expect(fuehrungsstand(page).locator('a[data-lfh="kennzahl"]').first()).toBeVisible();
+    await expect(page.locator('[data-lfh="seiten-inhalt"] [aria-busy="true"]')).toHaveCount(0);
+    const notizen = fuehrungsstand(page).locator('[data-lfh="kennzahl-notiz"]');
+    // Drei Handlungszahlen (LLH-1743, Seitenrollen in `frontend/AGENTS.md`).
+    await expect(notizen).toHaveCount(3);
     const hoehen = await notizen.evaluateAll((els) =>
       els.map((el) => el.getBoundingClientRect().height),
     );

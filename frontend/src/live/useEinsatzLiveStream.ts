@@ -97,7 +97,13 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // `eskaliert`). Ton und Toast kommen seit LLH-1209 als Benachrichtigung über die Zentrale
     // (design.md D5); deshalb spielt hier und auf gekoppelten Geräten kein Ton. NICHT im
     // lagged-Fan-out.
-    const onSofort = () => invalAlle(EINSATZ_STREAM_EVENTS.meldung);
+    // Dazu die Verdichtung des Lagemonitors (LLH-1743, D7): sein Strom trägt nur dieses Signal
+    // ohne Inhalt, die Alarmzeile steht so ab Eingang da, nicht erst nach dem Abruftakt. Der
+    // Modulzähler steckt in den `meldung`-Keys (Zählerfenster 1 s).
+    const onSofort = () => {
+      invalAlle(EINSATZ_STREAM_EVENTS.meldung);
+      inval(EINSATZ_KEYS.lagemonitor);
+    };
     listeners.push(['sofortmeldung', onSofort as EventListener]);
 
     // Die fällige Quittierfrist eines Auftrags macht ihn überfällig: die Auftragsliste frischt mit

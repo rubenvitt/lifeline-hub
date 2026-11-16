@@ -2,14 +2,7 @@ import type { AnzeigeKonventionen } from '../../anzeige/format';
 import { kraefteText } from '../../anzeige/staerke';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import type { KennzahlTon, KennzahlZustand } from '../../components/instrument';
-import {
-  NICHT_FREIGEGEBEN,
-  auftraegeNotiz,
-  meldungenNotiz,
-  type Zaehlstand,
-  type auftragsStand,
-  type meldungsStand,
-} from './fuehrungsZahlen';
+import { NICHT_FREIGEGEBEN } from './fuehrungsZahlen';
 import type { Lagebild, Quellzustand } from './lagebild';
 
 /**
@@ -64,15 +57,11 @@ export function bandKennzahl(k: BandKennzahl, z: Quellzustand, ziel?: string): K
 interface FuehrungsQuellen {
   /** `null`, solange das Lagebild noch nicht steht: dann behauptet der Führungsstand nichts. */
   lagebild: Lagebild | null;
-  auftraege: ReturnType<typeof auftragsStand>;
-  meldungen: ReturnType<typeof meldungsStand>;
   lageberichte: Quellzustand;
   uhs: Quellzustand;
   konv: AnzeigeKonventionen;
   /** Sprungziele der Seite; das Großbild lässt sie weg. */
   ziele?: {
-    auftraege: string;
-    meldungen: string;
     lageberichte: string;
     lagebericht: (id: number) => string;
     uhs: string;
@@ -80,61 +69,21 @@ interface FuehrungsQuellen {
 }
 
 /**
- * Der Führungsstand: Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv. Aufträge und
- * Meldungen aus dem Modulzähler (LFH-550), die Überfällig-Zahlen sind Alarmbeiträge. Der
- * Lagebericht hat keinen Ton (LFH-532): ein Entwurf ist kein Warnzustand.
+ * Der Stand der Lage: Lagebericht und UHS aktiv. Aufträge und Meldungen offen zeigt nur der
+ * Überblick (LLH-1743, `frontend/AGENTS.md`, „Rollen der Übersichten“); ihr Überfällig-Signal
+ * trägt die Alarmzeile, auf dem Großbild ab LLH-1931. Der Lagebericht hat keinen Ton (LFH-532):
+ * ein Entwurf ist kein Warnzustand.
  */
 export function fuehrungsKennzahlen(q: FuehrungsQuellen): KennzahlAnzeige[] {
-  const { lagebild, auftraege, meldungen, konv, ziele } = q;
+  const { lagebild, konv, ziele } = q;
   const fuehrung = lagebild?.fuehrung;
-  const zZaehlstand = (z: Zaehlstand<unknown>): KennzahlZustand =>
-    !lagebild || z.zustand === 'laden' ? 'laden' : z.zustand === 'fehler' ? 'fehler' : 'daten';
   const zQuelle = (z: Quellzustand): KennzahlZustand =>
     !lagebild ? 'laden' : z === 'gesperrt' ? 'daten' : alsKennzahlZustand(z);
-  // Gesperrt erst mit Lagebild: vorher behauptet der Führungsstand keinen Stand, auch keinen Grund.
+  // Gesperrt erst mit Lagebild: vorher behauptet der Stand keinen Stand, auch keinen Grund.
   const berichteGesperrt = lagebild != null && q.lageberichte === 'gesperrt';
   const uhsGesperrt = lagebild != null && q.uhs === 'gesperrt';
 
   return [
-    {
-      titel: 'Aufträge offen',
-      wert:
-        auftraege.zustand === 'daten'
-          ? auftraege.zahl.offen
-          : auftraege.zustand === 'gesperrt'
-            ? '—'
-            : '',
-      notiz:
-        auftraege.zustand === 'daten'
-          ? auftraegeNotiz(auftraege.zahl)
-          : auftraege.zustand === 'gesperrt'
-            ? NICHT_FREIGEGEBEN
-            : '',
-      ton: auftraege.zustand === 'daten' && auftraege.zahl.ueberfaellig > 0 ? 'alarm' : 'neutral',
-      zustand: zZaehlstand(auftraege),
-      ziel: auftraege.zustand === 'gesperrt' ? undefined : ziele?.auftraege,
-    },
-    {
-      titel: 'Meldungen offen',
-      wert:
-        meldungen.zustand === 'daten'
-          ? meldungen.zahl.offen
-          : meldungen.zustand === 'gesperrt'
-            ? '—'
-            : '',
-      notiz:
-        meldungen.zustand === 'daten'
-          ? meldungenNotiz(meldungen.zahl)
-          : meldungen.zustand === 'gesperrt'
-            ? NICHT_FREIGEGEBEN
-            : '',
-      ton:
-        meldungen.zustand === 'daten' && meldungen.zahl.bestaetigung_ueberfaellig > 0
-          ? 'alarm'
-          : 'neutral',
-      zustand: zZaehlstand(meldungen),
-      ziel: meldungen.zustand === 'gesperrt' ? undefined : ziele?.meldungen,
-    },
     {
       titel: 'Lagebericht',
       // `stand` ist ein UTC-Wirestring ohne Zonenkennung; die Zone hängt an den Konventionen.

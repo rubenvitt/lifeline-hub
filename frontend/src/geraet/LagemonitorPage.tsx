@@ -34,6 +34,9 @@ import { useHelligkeit, useThemeMode, type ThemeModus } from '../theme/ThemeMode
 import { HELLIGKEIT_OPTIONEN } from '../theme/darstellungOptionen';
 import { schrift } from '../theme/tokens';
 import LagemonitorKarte from './LagemonitorKarte';
+import { AlarmZeile } from '../components/instrument';
+import { alarmAusMonitor } from '../lage/alarmAusMonitor';
+import { wasBrennt } from '../lage/wasBrennt';
 import { belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -812,6 +815,15 @@ export default function LagemonitorPage() {
         }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
+          {/* Alarmzeile „Was brennt“ (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne
+            Personenbezug“): dieselben Arten, Folge und Wörter wie in Überblick und Lagebild, aus
+            dem Block `alarm` der Serverantwort; 28 px, ohne Bedienung. Sie steht über der Karte,
+            nicht über die volle Breite: rechts behalten Betroffene, Kräfte und UHS ihre Höhe
+            (entschieden 16.11.2026). Den Ausfall trägt der Monitor nicht (design.md D6). */}
+          <AlarmZeile
+            daten={wasBrennt(alarmAusMonitor(lage, lageQuery.isError), dayjs(jetzt))}
+            groesse="gross"
+          />
           <Kachel titel="Lagekarte" style={{ flex: '1 1 0' }}>
             <div style={{ flex: '1 1 0', minHeight: 0 }}>
               <LagemonitorKarte

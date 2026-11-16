@@ -160,7 +160,15 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   als Plätze) steht in Kachel und Kartenmarke in der Alarmrolle. Die nächsten drei
   Programmpunkte (LLH-1570, `programm`: Bezeichnung und Zeitpunkt) kommen ebenfalls von dort,
   `/programmpunkte` bleibt ihm gesperrt; die Kachel „Ablauf“ filtert verstrichene Punkte mit der
-  Monitoruhr und fehlt, wenn keiner ansteht, ohne Alarm und Hervorhebung. Steigt diese Zahl
+  Monitoruhr und fehlt, wenn keiner ansteht, ohne Alarm und Hervorhebung. Die Alarmzeile
+  (LLH-1743, Spec `lagemonitor`, „Alarmzeile ohne Personenbezug“) liest den Block `alarm` derselben
+  Antwort: Zahlen aus den Zählfunktionen des Modulzählers, überfällige Rückmeldungen nur mit dem
+  Namen der Einheit, kritische Abschnitte nur mit ihrer Bezeichnung, nie Meldungs-, Auftrags- oder
+  Erinnerungstexte; den Ausfall trägt der Block nicht (die Regel lebt im Browser). Nur der
+  Handler `lagebild` füllt ihn, `verdichte` (Lagebild für Externe, API v1) nicht. Eine
+  Sofortmeldung erreicht den Monitor im Live-Kanal als `sofortmeldung` mit leerer Nutzlast
+  (`LiveNachricht::fuer_verbindung`), ohne das Modul Meldungen; alle anderen Meldungsereignisse
+  bleiben ihm fern. Steigt diese Zahl
   oder SK I gegenüber dem letzten Stand, hebt `useAnstieg` sie 60 s mit Farbe und Wort hervor,
   ohne Ton und Blinken. Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren

@@ -442,6 +442,44 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
     expect(within(kachel).getByText('SK I')).toBeInTheDocument();
   });
 
+  it('Alarmzeile (LLH-1743): Arten aus dem Block `alarm`, 28 px, ohne Bedienung', async () => {
+    bereit();
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        alarm: {
+          sofort_offen: 1,
+          dringend_offen: 0,
+          bestaetigung_ueberfaellig: 0,
+          auftraege_ueberfaellig: 1,
+          erinnerungen_faellig: 0,
+          nachforderungen_ueberfaellig: 0,
+          rueckmeldung_ueberfaellig: [{ einheit: 'Logistiktrupp', seit_min: 47 }],
+          abschnitte_kritisch: ['UHS Turnhalle'],
+        },
+      });
+    renderApp('/geraet/7/monitor');
+    const zeile = await screen.findByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveTextContent('kritisch: UHS Turnhalle'));
+    expect(zeile.style.fontSize).toBe('28px');
+    const arten = Array.from(zeile.querySelectorAll<HTMLElement>('[data-lfh="alarm-eintrag"]')).map(
+      (e) => e.dataset.art,
+    );
+    // Folge wie in Überblick und Lagebild; die zwei Vermissten kommen aus `betroffene`.
+    expect(arten.slice(0, 2)).toEqual(['sofort', 'vermisst']);
+    expect(within(zeile).queryByRole('link')).toBeNull();
+    expect(within(zeile).queryByRole('button')).toBeNull();
+  });
+
+  it('Alarmzeile: scheitert der Abruf, steht „Stand unvollständig“ statt „—“ (Review LLH-1743)', async () => {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ error: 'kaputt' }, { status: 500 });
+    renderApp('/geraet/7/monitor');
+    const zeile = await screen.findByRole('status', { name: 'Was brennt' });
+    await waitFor(() => expect(zeile).toHaveAttribute('data-stand', 'unvollstaendig'));
+    expect(zeile).toHaveTextContent('Stand unvollständig');
+  });
+
   it('Zwei offene Sofortmeldungen: „Sofortmeldungen offen 2“', async () => {
     bereit();
     lagebildAntwort = () => HttpResponse.json({ ...lage, sofortmeldungen_offen: 2 });
