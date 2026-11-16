@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Vorbereitung auf der Seite</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.s{width:1440px;height:560px;box-sizing:border-box;padding:20px;background:#08090b;color:#e8ebee;font-family:"LFH Archivo",system-ui,sans-serif;font-size:13.5px;line-height:20px}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.p{border:1px solid #22262b;background:#0a0c0e}
+.pk{display:flex;align-items:center;gap:12px;height:36px;padding:0 12px;border-bottom:1px solid #22262b}
+.pk .ab{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#9aa2ab}
+.pk .sp{flex:1}
+.pk .meta{font-size:11px;color:#838b94}
+.z{display:grid;grid-template-columns:minmax(0,min(16em,40%)) minmax(0,1fr);column-gap:11px;row-gap:3px;padding:7px 12px;border-bottom:1px solid #22262b}
+.z .w{font-weight:500}
+.z .q,.z .n{color:#9aa2ab;font-size:12px}
+.z .n.al{color:#ff6b6b}
+.fuss{padding:7px 12px}
+.kn{height:30px;box-sizing:border-box;padding:0 12px;border:1px solid #626a73;background:transparent;color:#e8ebee;font:inherit;font-size:13.5px}
+</style>
+</helmet>
+<div class="s">
+  <section class="p" aria-label="Vorbereitung">
+    <div class="pk"><span class="ab">Vorbereitung</span><span class="sp"></span><span class="meta mono">Stand 1432</span></div>
+    <div class="z"><span>Betroffene</span><span class="w mono">248</span><span class="q">Quelle: Betroffene</span><span class="n">davon 3 vermisst</span></div>
+    <div class="z"><span>Sichtung</span><span class="w mono">SK I 4 · SK II 11 · SK III 63 · SK IV 0</span><span class="q">Quelle: Betroffene</span><span class="n">2 ohne Sichtung</span></div>
+    <div class="z"><span>Kräfte</span><span class="w mono">0/12/58//70</span><span class="q">Quelle: Kräfte</span><span class="n">14 Einheiten</span></div>
+    <div class="z"><span>Höchste Warnstufe</span><span class="w">hoch</span><span class="q">Quelle: Gefahren</span><span class="n">2 Gebiete</span></div>
+    <div class="z"><span>Aufträge offen</span><span class="w mono">5</span><span class="q">Quelle: Aufträge</span><span class="n al">1 überfällig</span></div>
+    <div class="z"><span>Meldungen offen</span><span class="w mono">9</span><span class="q">Quelle: Meldungen</span><span class="n">2 neu · 1 Bestätigung überfällig</span></div>
+    <div class="z"><span>Nachforderungen offen</span><span class="w mono">—</span><span class="q">Quelle: Nachforderungen</span><span class="n">nicht freigegeben</span></div>
+    <div class="fuss"><button class="kn" type="button">In Lagebericht übernehmen</button></div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":560}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

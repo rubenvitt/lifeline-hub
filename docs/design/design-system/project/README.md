@@ -19,6 +19,8 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **Datenraster mit DatenfeldEingabe und FeldFehler** (`components/Datenraster/`, Gruppe Daten)
 - **StatusZelle, StatusChip und StatusTag** (`components/Status/`, Gruppe Status)
 - **Kennzahl und Kennzahlenband** (`components/Kennzahl/`, Gruppe Daten)
+- **Großbild: Kennzahl** (`components/GrossKennzahl/`, Gruppe Großbild)
+- **Großbild: Zeilen** (`components/GrossZeile/`, Gruppe Großbild)
 - **Segmentleiste** (`components/Segmentleiste/`, Gruppe Bedienung)
 - **AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)** (`components/AlarmZeile/`, Gruppe Rückmeldung)
 - **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
@@ -104,7 +106,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `alarm/AlarmZone.tsx` (Alarmzone,
   Rahmen) · `personen/SichtungsWahl.tsx` ·
   `personen/koerperschema/Koerperschema.tsx` · `zeichen/EinsatzZeichen.tsx` (taktische Zeichen,
-  am Schirm mit `useZeichenTheme`, LLH-1409). Jeder hat eine Karte im Design System.
+  am Schirm mit `useZeichenTheme`, LLH-1409) · `components/grossbild/` (Großbild am Bedienplatz,
+  LLH-1747, Spec `grossbild-ansicht`: `GrossKennzahl`, `GrossZeile(n)`, Hülle `GrossbildFlaeche`
+  mit Element-Vollbild, nur Ansehen; Größen nur über `grossMass`, Bezug 1920 × 1080 = Lagemonitor,
+  mitwachsend über `min(vw, vh)`). Jeder hat eine Karte im Design System, außer der Hülle
+  `GrossbildFlaeche` (Portal und Vollbild).
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab

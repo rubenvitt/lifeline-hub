@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Einsatzart } from '../../api/types';
 import { isUebung } from '../../einsatz/einsatzart';
 import type { Farbrollen } from '../../theme/tokens';
+import { grossMass } from '../grossbild/grossMass';
 import { RAHMEN_EBENE, RAHMEN_RANG, useRahmenObenStapel } from '../rahmenOben';
 import { schriftStil, useRollen } from './rollenwerte';
 
@@ -26,10 +27,18 @@ type MitArt = { einsatzart?: Einsatzart | null } | null | undefined;
 /** Das Wort; Versalien per CSS, im DOM „Übung“, damit Vorleser es nicht buchstabieren. */
 const WORT = 'Übung';
 
-/** Größen der Marke: Kopf, Liste und Wechsler `klein`; der Lagemonitor liest aus Metern. */
-const MARKE_SCHRIFT = { klein: 11, monitor: 28 } as const;
+/**
+ * Größen der Marke: Kopf, Liste und Wechsler `klein`; der Lagemonitor liest aus Metern. `grossbild`
+ * ist die Monitorgröße als mitwachsende Länge (LLH-1747, `components/grossbild/grossMass.ts`).
+ */
+const MARKE_SCHRIFT = { klein: 11, monitor: 28, grossbild: 28 } as const;
 
-function wortStil(rollen: Pick<Farbrollen, 'uebungText'>, groesse: number): CSSProperties {
+/** Länge einer Markengröße: im Großbild mit dem Fenster, sonst feste Pixel. */
+function markenMass(groesse: keyof typeof MARKE_SCHRIFT, px: number): number | string {
+  return groesse === 'grossbild' ? grossMass(px) : px;
+}
+
+function wortStil(rollen: Pick<Farbrollen, 'uebungText'>, groesse: number | string): CSSProperties {
   return {
     ...schriftStil('augenbraue'),
     fontSize: groesse,
@@ -59,15 +68,15 @@ export function UebungsMarke({
         display: 'inline-flex',
         alignItems: 'center',
         flexShrink: 0,
-        paddingBlock: Math.round(px * 0.2),
-        paddingInline: Math.round(px * 0.5),
+        paddingBlock: markenMass(groesse, Math.round(px * 0.2)),
+        paddingInline: markenMass(groesse, Math.round(px * 0.5)),
         background: rollen.uebungFuellung,
         // Kante gegen dunkle Flächen; gegen helle trägt die Füllung den Umriss (D2).
         boxShadow: `inset 0 0 0 1px ${rollen.uebungKante}`,
         ...style,
       }}
     >
-      <span style={wortStil(rollen, px)}>{WORT}</span>
+      <span style={wortStil(rollen, markenMass(groesse, px))}>{WORT}</span>
     </span>
   );
 }

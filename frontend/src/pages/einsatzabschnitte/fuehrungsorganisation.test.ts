@@ -7,8 +7,10 @@ import { baueFunkplan, type FunkplanZeile } from '../../fernmeldewesen/funkplan'
 import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { abschnittStaerken } from './abschnittStaerke';
 import {
-  baueFuehrungsorganisation,
-  rendereFuehrungsorganisationMarkdown,
+  buildFuehrungsorganisation,
+  countOhneLeitung,
+  ohneLeitungText,
+  renderFuehrungsorganisationMarkdown,
   type OrgKnoten,
 } from './fuehrungsorganisation';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
@@ -57,10 +59,10 @@ function funkplanSchluessel(z: FunkplanZeile): Schluesselbaum {
   return [z.key, (z.children ?? []).filter((c) => c.art !== 'fahrzeug').map(funkplanSchluessel)];
 }
 
-function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined {
+function findKnoten(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined {
   for (const k of knoten) {
     if (k.key === key) return k;
-    const t = finde(k.kinder, key);
+    const t = findKnoten(k.kinder, key);
     if (t) return t;
   }
   return undefined;
@@ -69,9 +71,9 @@ function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined
 const DTG = (utc: string) => zeitpunkt(utc, { zeitzone: 'Europe/Berlin' });
 const OHNE_EL: EinsatzleiterDarstellung = { art: 'nicht-erfasst' };
 
-describe('baueFuehrungsorganisation — Knotenaufbau', () => {
+describe('buildFuehrungsorganisation — Knotenaufbau', () => {
   it('stellt oberste Abschnitte an die Wurzel, Unterabschnitte vor Einheiten', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [abschnitt(1), abschnitt(2, { ueber_abschnitt_id: 1 }), abschnitt(3)],
       [einheit(10, { abschnitt_id: 1 })],
     );
@@ -88,7 +90,7 @@ describe('baueFuehrungsorganisation — Knotenaufbau', () => {
   });
 
   it('hängt eine unterstellte Einheit unter ihre Einheit, nicht unter den Abschnitt', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [abschnitt(1)],
       [einheit(10, { abschnitt_id: 1 }), einheit(11, { abschnitt_id: 1, ueber_einheit_id: 10 })],
     );
@@ -96,7 +98,7 @@ describe('baueFuehrungsorganisation — Knotenaufbau', () => {
   });
 
   it('macht Waisen zu Wurzeln bzw. obersten Einheiten', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [abschnitt(2, { ueber_abschnitt_id: 99 })],
       [einheit(11, { abschnitt_id: 2, ueber_einheit_id: 98 })],
     );
@@ -104,7 +106,7 @@ describe('baueFuehrungsorganisation — Knotenaufbau', () => {
   });
 
   it('sammelt Einheiten ohne Abschnitt unter „Ohne Abschnitt“ — nur, wenn es welche gibt', () => {
-    const mit = baueFuehrungsorganisation(
+    const mit = buildFuehrungsorganisation(
       [abschnitt(1)],
       [einheit(10, { abschnitt_id: null }), einheit(11, { abschnitt_id: 77 })],
     );
@@ -118,12 +120,12 @@ describe('baueFuehrungsorganisation — Knotenaufbau', () => {
         ],
       ],
     ]);
-    const ohne = baueFuehrungsorganisation([abschnitt(1)], [einheit(10, { abschnitt_id: 1 })]);
+    const ohne = buildFuehrungsorganisation([abschnitt(1)], [einheit(10, { abschnitt_id: 1 })]);
     expect(ohne.wurzeln.some((k) => k.art === 'sammel')).toBe(false);
   });
 
   it('übersteht einen Zyklus und nimmt jeden Knoten höchstens einmal auf', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [
         abschnitt(1, { ueber_abschnitt_id: 2 }),
         abschnitt(2, { ueber_abschnitt_id: 1 }),
@@ -145,9 +147,9 @@ describe('baueFuehrungsorganisation — Knotenaufbau', () => {
   });
 });
 
-describe('baueFuehrungsorganisation — Knoteninhalt', () => {
+describe('buildFuehrungsorganisation — Knoteninhalt', () => {
   it('trägt Rufname und Leitung aus den Daten, fehlende als null — nie geraten', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [
         abschnitt(1, { kurzbezeichnung: 'EA-N', leiter_name: 'Vitt' }),
         abschnitt(2, { ueber_abschnitt_id: 1 }),
@@ -157,10 +159,10 @@ describe('baueFuehrungsorganisation — Knoteninhalt', () => {
         einheit(11, { abschnitt_id: 2 }),
       ],
     );
-    const a1 = finde(org.wurzeln, 'ab-1')!;
-    const a2 = finde(org.wurzeln, 'ab-2')!;
-    const e10 = finde(org.wurzeln, 'eh-10')!;
-    const e11 = finde(org.wurzeln, 'eh-11')!;
+    const a1 = findKnoten(org.wurzeln, 'ab-1')!;
+    const a2 = findKnoten(org.wurzeln, 'ab-2')!;
+    const e10 = findKnoten(org.wurzeln, 'eh-10')!;
+    const e11 = findKnoten(org.wurzeln, 'eh-11')!;
     expect(a1).toMatchObject({
       art: 'abschnitt',
       name: 'Abschnitt 1',
@@ -174,24 +176,26 @@ describe('baueFuehrungsorganisation — Knoteninhalt', () => {
 
   // LLH-1134: wie der Funkplan — der Rufname der Abschnittsleitung vor der Kurzbezeichnung.
   it('nimmt beim Abschnitt den Rufnamen vor der Kurzbezeichnung', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [
         abschnitt(1, { kurzbezeichnung: 'EA-N', rufname: 'Rotkreuz Musterstadt 1/10-1' }),
         abschnitt(2, { kurzbezeichnung: 'EA-S', rufname: '  ' }),
       ],
       [],
     );
-    expect(finde(org.wurzeln, 'ab-1')).toMatchObject({ rufname: 'Rotkreuz Musterstadt 1/10-1' });
-    expect(finde(org.wurzeln, 'ab-2')).toMatchObject({ rufname: 'EA-S' });
+    expect(findKnoten(org.wurzeln, 'ab-1')).toMatchObject({
+      rufname: 'Rotkreuz Musterstadt 1/10-1',
+    });
+    expect(findKnoten(org.wurzeln, 'ab-2')).toMatchObject({ rufname: 'EA-S' });
   });
 
   it('leitet die Zeichen wie die Lagekarte ab', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [abschnitt(1, { tz_organisation: 'thw' })],
       [einheit(10, { abschnitt_id: 1, typ_label: 'Zug' })],
     );
-    const a = finde(org.wurzeln, 'ab-1')!;
-    const e = finde(org.wurzeln, 'eh-10')!;
+    const a = findKnoten(org.wurzeln, 'ab-1')!;
+    const e = findKnoten(org.wurzeln, 'eh-10')!;
     expect(a.art === 'abschnitt' && a.tz).toMatchObject({
       grundzeichen: 'befehlsstelle',
       organisation: 'thw',
@@ -203,17 +207,80 @@ describe('baueFuehrungsorganisation — Knoteninhalt', () => {
   });
 
   it('meldet fehlende Einheiten: Abschnitte ohne Stärke, kein „Ohne Abschnitt“', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [abschnitt(1), abschnitt(2, { ueber_abschnitt_id: 1 })],
       null,
     );
     expect(org.einheitenFehlen).toBe(true);
     expect(org.wurzeln.map(schluessel)).toEqual([['ab-1', [['ab-2', []]]]]);
-    expect(finde(org.wurzeln, 'ab-1')).toMatchObject({ staerke: null });
+    expect(findKnoten(org.wurzeln, 'ab-1')).toMatchObject({ staerke: null });
   });
 });
 
-describe('baueFuehrungsorganisation — Stärke aus derselben Rechnung wie der Gliederungsbaum', () => {
+describe('buildFuehrungsorganisation — Lagezustand (LLH-1742)', () => {
+  it('trägt den gepflegten Lagezustand am Abschnitt, nicht beurteilt als null', () => {
+    const org = buildFuehrungsorganisation(
+      [
+        abschnitt(1, { lagezustand: 'planmaessig' }),
+        abschnitt(2, { ueber_abschnitt_id: 1, lagezustand: 'kritisch' }),
+        abschnitt(3),
+      ],
+      [einheit(10, { abschnitt_id: 1 })],
+    );
+    // Nur der eigene Zustand: der kritische Unterabschnitt färbt seinen Abschnitt nicht.
+    expect(findKnoten(org.wurzeln, 'ab-1')).toMatchObject({ lagezustand: 'planmaessig' });
+    expect(findKnoten(org.wurzeln, 'ab-2')).toMatchObject({ lagezustand: 'kritisch' });
+    expect(findKnoten(org.wurzeln, 'ab-3')).toMatchObject({ lagezustand: null });
+    expect(findKnoten(org.wurzeln, 'eh-10')).not.toHaveProperty('lagezustand');
+  });
+});
+
+describe('countOhneLeitung und ohneLeitungText (LLH-1742)', () => {
+  it('zählt Abschnitte und Einheiten getrennt, mit Sammelknoten und unterstellten Einheiten', () => {
+    const org = buildFuehrungsorganisation(
+      [
+        abschnitt(1, { leiter_name: 'Vitt' }),
+        abschnitt(2, { ueber_abschnitt_id: 1 }),
+        abschnitt(3),
+      ],
+      [
+        einheit(10, { abschnitt_id: 2, fuehrer_name: 'Muster' }),
+        einheit(11, { ueber_einheit_id: 10 }),
+        einheit(12, { abschnitt_id: 3 }),
+        einheit(20),
+      ],
+    );
+    const z = countOhneLeitung(org);
+    expect(z).toEqual({ abschnitte: 2, einheiten: 3 });
+    expect(ohneLeitungText(z)).toBe('2 Abschnitte ohne Leitung · 3 Einheiten ohne Führer');
+  });
+
+  it('schreibt Einzahl und lässt einen Teil mit 0 weg', () => {
+    expect(ohneLeitungText({ abschnitte: 1, einheiten: 0 })).toBe('1 Abschnitt ohne Leitung');
+    expect(ohneLeitungText({ abschnitte: 0, einheiten: 1 })).toBe('1 Einheit ohne Führer');
+    expect(ohneLeitungText({ abschnitte: 0, einheiten: 7 })).toBe('7 Einheiten ohne Führer');
+  });
+
+  it('gibt null, wenn alles besetzt ist', () => {
+    const org = buildFuehrungsorganisation(
+      [abschnitt(1, { leiter_name: 'Vitt' })],
+      [einheit(10, { abschnitt_id: 1, fuehrer_name: 'Muster' })],
+    );
+    expect(countOhneLeitung(org)).toEqual({ abschnitte: 0, einheiten: 0 });
+    expect(ohneLeitungText(countOhneLeitung(org))).toBeNull();
+    expect(ohneLeitungText(countOhneLeitung(buildFuehrungsorganisation([], [])))).toBeNull();
+  });
+
+  it('zählt bei fehlenden Einheiten nur die Abschnitte — nie „0 Einheiten“', () => {
+    const org = buildFuehrungsorganisation([abschnitt(1)], null);
+    const z = countOhneLeitung(org);
+    expect(z).toEqual({ abschnitte: 1, einheiten: null });
+    expect(ohneLeitungText(z)).toBe('1 Abschnitt ohne Leitung');
+    expect(ohneLeitungText({ abschnitte: 0, einheiten: null })).toBeNull();
+  });
+});
+
+describe('buildFuehrungsorganisation — Stärke aus derselben Rechnung wie der Gliederungsbaum', () => {
   const abschnitte = [
     abschnitt(1),
     abschnitt(2, { ueber_abschnitt_id: 1 }),
@@ -226,10 +293,10 @@ describe('baueFuehrungsorganisation — Stärke aus derselben Rechnung wie der G
     einheit(11, { abschnitt_id: 2, ueber_einheit_id: 10 }, [0, 1, 2]),
     einheit(12, { abschnitt_id: 3 }, [0, 1, 5]),
   ];
-  const org = baueFuehrungsorganisation(abschnitte, einheiten);
+  const org = buildFuehrungsorganisation(abschnitte, einheiten);
 
   it.each([1, 2, 3, 4])('Abschnitt %i zeigt den Wert des Gliederungsbaums', (id) => {
-    expect(finde(org.wurzeln, `ab-${id}`)).toMatchObject({
+    expect(findKnoten(org.wurzeln, `ab-${id}`)).toMatchObject({
       staerke: abschnittStaerken(abschnitte, einheiten, id).inklUnter,
     });
   });
@@ -237,26 +304,26 @@ describe('baueFuehrungsorganisation — Stärke aus derselben Rechnung wie der G
   it('pinnt die Werte als Literale, nicht nur gegen dieselbe Funktion', () => {
     // 10 (1/1/4, kumuliert inkl. 11) in Abschnitt 2, 12 (0/1/5) in Abschnitt 3; 11 zählt nicht
     // doppelt. Abschnitt 1 trägt beide Unterabschnitte.
-    expect(finde(org.wurzeln, 'ab-2')).toMatchObject({
+    expect(findKnoten(org.wurzeln, 'ab-2')).toMatchObject({
       staerke: { fuehrer: 1, unterfuehrer: 1, mannschaft: 4 },
     });
-    expect(finde(org.wurzeln, 'ab-1')).toMatchObject({
+    expect(findKnoten(org.wurzeln, 'ab-1')).toMatchObject({
       staerke: { fuehrer: 1, unterfuehrer: 2, mannschaft: 9 },
     });
   });
 
   it('Abschnitt ohne Einheiten hat null, nicht 0/0/0', () => {
-    expect(finde(org.wurzeln, 'ab-4')).toMatchObject({ staerke: null });
+    expect(findKnoten(org.wurzeln, 'ab-4')).toMatchObject({ staerke: null });
   });
 
   it('Einheit zeigt ihre kumulierte Ist-Stärke', () => {
-    expect(finde(org.wurzeln, 'eh-11')).toMatchObject({
+    expect(findKnoten(org.wurzeln, 'eh-11')).toMatchObject({
       staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 },
     });
   });
 });
 
-describe('baueFuehrungsorganisation — dieselbe Platzierung wie der Funkplan', () => {
+describe('buildFuehrungsorganisation — dieselbe Platzierung wie der Funkplan', () => {
   it('ergibt denselben Abschnitt/Einheit-Baum wie baueFunkplan ohne Fahrzeuge', () => {
     const abschnitte = [
       abschnitt(1),
@@ -281,12 +348,12 @@ describe('baueFuehrungsorganisation — dieselbe Platzierung wie der Funkplan', 
       // Ohne erfasste Führungsstelle: sie stünde sonst als Zeile vor den Wurzeln (LFH-849).
       fuehrungsstelle: { zustand: 'daten', daten: null },
     });
-    const org = baueFuehrungsorganisation(abschnitte, einheiten);
+    const org = buildFuehrungsorganisation(abschnitte, einheiten);
     expect(org.wurzeln.map(schluessel)).toEqual(funkplan.map(funkplanSchluessel));
   });
 });
 
-describe('rendereFuehrungsorganisationMarkdown', () => {
+describe('renderFuehrungsorganisationMarkdown', () => {
   const abschnitte = [
     abschnitt(1, { name: 'EA Nord', kurzbezeichnung: 'EA-N', leiter_name: 'Anna Leiter' }),
     abschnitt(2, { name: 'UA Deich', ueber_abschnitt_id: 1 }),
@@ -307,8 +374,8 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   ];
 
   it('schreibt Kopf, Einsatzleitung und die Gliederung in Baumtiefe', () => {
-    const md = rendereFuehrungsorganisationMarkdown(
-      baueFuehrungsorganisation(abschnitte, einheiten),
+    const md = renderFuehrungsorganisationMarkdown(
+      buildFuehrungsorganisation(abschnitte, einheiten),
       {
         stand: '011200Okt26',
         fuehrungsfunktionen: null,
@@ -337,9 +404,50 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     expect(md).not.toContain('GEHEIM');
   });
 
+  it('trägt den Lagezustand an der Abschnittszeile und die Lücken unter „Gliederung“ (LLH-1742)', () => {
+    const md = renderFuehrungsorganisationMarkdown(
+      buildFuehrungsorganisation(
+        [
+          abschnitt(1, { name: 'UHS Turnhalle', lagezustand: 'kritisch' }),
+          abschnitt(2, { name: 'EA Süd', leiter_name: 'Vitt' }),
+          abschnitt(3, { name: 'EA West' }),
+        ],
+        [einheit(10, { name: 'GW-San', abschnitt_id: 2, fuehrer_name: 'Muster' })],
+      ),
+      {
+        stand: '011200Okt26',
+        fuehrungsfunktionen: null,
+        einheitenZustand: 'daten',
+        einsatzleiter: OHNE_EL,
+        dtg: DTG,
+      },
+    );
+    expect(md).toContain('## Gliederung\n\n2 Abschnitte ohne Leitung\n\n- **UHS Turnhalle**');
+    expect(md).toContain(
+      '- **UHS Turnhalle** · Lage kritisch · kein Rufname · Leitung nicht besetzt · Stärke —',
+    );
+    // Nicht beurteilt: kein „Lage“.
+    expect(md).toContain('- **EA West** · kein Rufname · Leitung nicht besetzt · Stärke —');
+  });
+
+  it('schreibt ohne Lücken keine Sammelzeile (LLH-1742)', () => {
+    const md = renderFuehrungsorganisationMarkdown(
+      buildFuehrungsorganisation([abschnitt(1, { name: 'EA Süd', leiter_name: 'Vitt' })], []),
+      {
+        stand: '011200Okt26',
+        fuehrungsfunktionen: null,
+        einheitenZustand: 'daten',
+        einsatzleiter: OHNE_EL,
+        dtg: DTG,
+      },
+    );
+    expect(md).toContain('## Gliederung\n\n- **EA Süd**');
+    expect(md).not.toContain('ohne Leitung');
+  });
+
   it('nennt den erfassten Einsatzleiter statt der Lücke (LFH-1199)', () => {
-    const org = baueFuehrungsorganisation(abschnitte, einheiten);
-    const mit = rendereFuehrungsorganisationMarkdown(org, {
+    const org = buildFuehrungsorganisation(abschnitte, einheiten);
+    const mit = renderFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
@@ -355,7 +463,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
       '## Einsatzleitung\n\n- Einsatzleiter: \\*KBM\\* Weber (extern) (seit 111430okt26)\n',
     );
     expect(mit).not.toContain('Leitung nicht erfasst');
-    const grund = rendereFuehrungsorganisationMarkdown(org, {
+    const grund = renderFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
@@ -368,8 +476,8 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   // Design D7 (i6k6mzed): die Zeile heißt „Führungsfunktionen“ und nennt EL und S1–S7 aus den
   // Mitgliedern; ohne Träger keine Zeile.
   it('nennt die Führungsfunktionen nur mit Trägern, in Katalogfolge mit Namen', () => {
-    const org = baueFuehrungsorganisation(abschnitte, einheiten);
-    const md = rendereFuehrungsorganisationMarkdown(org, {
+    const org = buildFuehrungsorganisation(abschnitte, einheiten);
+    const md = renderFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       fuehrungsfunktionen: [
         { funktion: 'el', kuerzel: 'EL', namen: 'Lea Leitung' },
@@ -381,7 +489,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     });
     expect(md).toContain('- Führungsfunktionen: EL Lea Leitung · S2 Clara Lage, \\*Dora\\*\n');
     expect(md).not.toContain('Stab:');
-    const leer = rendereFuehrungsorganisationMarkdown(org, {
+    const leer = renderFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       fuehrungsfunktionen: [],
       einheitenZustand: 'daten',
@@ -390,7 +498,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     });
     expect(leer).not.toContain('Führungsfunktionen:');
     // Was fehlt, steht darin: ein gescheiterter Abruf ist keine leere Liste.
-    const fehler = rendereFuehrungsorganisationMarkdown(org, {
+    const fehler = renderFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       fuehrungsfunktionen: 'fehler',
       einheitenZustand: 'daten',
@@ -401,7 +509,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   });
 
   it('nennt fehlende Einheiten als Quelle und schreibt die Stärke als „—“', () => {
-    const md = rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation(abschnitte, null), {
+    const md = renderFuehrungsorganisationMarkdown(buildFuehrungsorganisation(abschnitte, null), {
       stand: 'x',
       fuehrungsfunktionen: null,
       einheitenZustand: 'gesperrt',
@@ -415,7 +523,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   });
 
   it('schreibt ohne Abschnitte einen Leervermerk statt einer leeren Liste', () => {
-    const md = rendereFuehrungsorganisationMarkdown(baueFuehrungsorganisation([], []), {
+    const md = renderFuehrungsorganisationMarkdown(buildFuehrungsorganisation([], []), {
       stand: 'x',
       fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
@@ -426,8 +534,11 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   });
 
   it('übernimmt Namen als Text, nie als Auszeichnung', () => {
-    const md = rendereFuehrungsorganisationMarkdown(
-      baueFuehrungsorganisation([abschnitt(1, { name: '*Nord* [alt]', leiter_name: '_Kai_' })], []),
+    const md = renderFuehrungsorganisationMarkdown(
+      buildFuehrungsorganisation(
+        [abschnitt(1, { name: '*Nord* [alt]', leiter_name: '_Kai_' })],
+        [],
+      ),
       {
         stand: 'x',
         fuehrungsfunktionen: null,
@@ -445,8 +556,8 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
 
   it('übernimmt Namen mit www., http(s):// und @ als Text, ohne Link (LFH-868)', () => {
     const roh = ['www.thw-nord.de', 'https://thw.de/ov', '<https://x.de>', 'ops@thw-nord.de'];
-    const md = rendereFuehrungsorganisationMarkdown(
-      baueFuehrungsorganisation(
+    const md = renderFuehrungsorganisationMarkdown(
+      buildFuehrungsorganisation(
         [abschnitt(1, { name: roh[0], leiter_name: roh[3] })],
         [einheit(10, { name: roh[1], abschnitt_id: 1 }), einheit(11, { name: roh[2] })],
       ),
@@ -465,10 +576,10 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
   });
 });
 
-describe('rendereFuehrungsorganisationMarkdown · Führungsstelle (LFH-1181)', () => {
+describe('renderFuehrungsorganisationMarkdown · Führungsstelle (LFH-1181)', () => {
   it('nennt Bezeichnung und Rufname vor der Leitung, ohne Bezeichnung nur den Rufnamen', () => {
-    const org = baueFuehrungsorganisation([], []);
-    const mit = rendereFuehrungsorganisationMarkdown(org, {
+    const org = buildFuehrungsorganisation([], []);
+    const mit = renderFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       fuehrungsfunktionen: null,
       einheitenZustand: 'daten',
@@ -479,7 +590,7 @@ describe('rendereFuehrungsorganisationMarkdown · Führungsstelle (LFH-1181)', (
     expect(mit).toContain(
       '## Einsatzleitung\n\n- Führungsstelle ELW 2 Musterstadt · Rufname Florian 10/1\n- Leitung nicht erfasst\n',
     );
-    const ohne = rendereFuehrungsorganisationMarkdown(org, {
+    const ohne = renderFuehrungsorganisationMarkdown(org, {
       stand: 'x',
       fuehrungsfunktionen: null,
       einheitenZustand: 'daten',

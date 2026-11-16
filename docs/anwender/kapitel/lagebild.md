@@ -2,7 +2,7 @@
 titel: Lagebild
 gruppen: [alle, fuehrung]
 reihenfolge: 400
-quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/lage/wasBrennt.ts, frontend/src/lage/useWasBrennt.ts, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/verlauf.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/lage/wasBrennt.ts, frontend/src/lage/useWasBrennt.ts, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/verlauf.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts, frontend/src/pages/lage-dashboard/LagebildGrossbild.tsx, frontend/src/pages/lage-dashboard/kennzahlAnzeige.ts, frontend/src/components/grossbild/]
 ---
 
 ## Überblick
@@ -44,7 +44,31 @@ Modul, in dem sie erfasst wird.
 
 2. „anzeigen“ wählen: Die neuen Einträge stehen oben im Paneel, der Hinweis verschwindet.
 
+### Das Lagebild im Großbild zeigen
+
+Für einen Beamer oder Wandbildschirm im Führungsraum, ab Tablet-Breite:
+
+1. Im Seitenkopf des Lagebilds „Großbild“ wählen. Das Lagebild füllt den Bildschirm ohne Kopfleiste
+   und Navigation: die sechs Kennzahlen groß, darunter die Gefahren je Typ (in der Reihe
+   Sanitätsdienst der Verlauf), die Sichtung und der Stand mit Lagebericht und UHS.
+2. Hat der Browser das Vollbild abgelehnt, steht oben „Vollbild“; es holt das Vollbild nach.
+3. Zum Verlassen „Großbild verlassen“ wählen oder Esc drücken. Das Lagebild steht wieder an
+   derselben Stelle.
+
 ## Hintergrund
+
+### Großbild
+
+Das Großbild ist nur zum Ansehen: Nichts darin führt in ein Modul oder ändert etwas. Die Zahlen
+kommen aus derselben Zusammenstellung wie die Seite und laufen live mit. Bei 1920 × 1080 sind die
+Zahlen so groß wie am Lagemonitor, auf einem kleineren oder größeren Bildschirm wächst alles im
+selben Verhältnis mit, ohne Bildlauf. Die jüngsten ETB-Einträge und die Zeile „Was brennt“ stehen
+nicht im Großbild. Gehen
+Alarme oder Hinweise ein, nennt das Großbild nur ihre Zahl („1 Alarm offen“), ohne Titel;
+bearbeitet werden sie nach dem Verlassen in der Alarmzone. Ist das Netz weg oder die Live-Verbindung
+getrennt, steht das oben („Ohne Netz“, „Verbindung getrennt“), und die Uhrzeit mit dem Alter des Stands zeigt, wie alt die Zahlen sind.
+Tastenkürzel der App, etwa die Suche, wirken im Großbild nicht. Bei einer Übung trägt es die
+Übungsmarke. Nach einem Neuladen steht die normale Seite da, das Großbild wird nicht gemerkt.
 
 ### Die wechselnden Kennzahlen
 

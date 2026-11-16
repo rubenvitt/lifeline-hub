@@ -17,7 +17,7 @@
  * Nachbauten in HTML gibt es nicht: sie drifteten. Kombinationen aus Text und Grund sind die der
  * Bausteine, also von deren Kontrast-Tests gedeckt.
  */
-import { act, useId, useState, type ReactElement, type ReactNode } from 'react';
+import { act, useId, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { createRoot } from 'react-dom/client';
 import { createCache, extractStyle, StyleProvider } from '@ant-design/cssinjs';
@@ -66,6 +66,7 @@ import {
   Zeitachseneintrag,
   useRollen,
 } from '../../src/components/instrument';
+import { GrossKennzahl, GrossZeile, GrossZeilen } from '../../src/components/grossbild';
 import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
 import BreiteHalten from '../../src/components/BreiteHalten';
@@ -954,6 +955,31 @@ function TaktischeZeichenBeispiel() {
   );
 }
 
+/** Zeilen im Großbild mit Warnstufen-Marken aus dem Theme (Nacht und Tag). */
+function GrossZeilenVorschau() {
+  const { token } = useRollen();
+  return (
+    <GrossZeilen beschriftung="Gefahren und Führung">
+      <GrossZeile
+        bezeichnung="Hochwasser"
+        marke={warnstufeBalkenFarbe('hoch', token) ?? undefined}
+        wert="hoch"
+        art="wort"
+        ton="alarm"
+      />
+      <GrossZeile
+        bezeichnung="Sturm"
+        marke={warnstufeBalkenFarbe('mittel', token) ?? undefined}
+        wert="mittel"
+        art="wort"
+        ton="achtung"
+      />
+      <GrossZeile bezeichnung="Aufträge offen" wert={5} notiz="1 überfällig" ton="alarm" />
+      <GrossZeile bezeichnung="Meldungen offen" wert={9} notiz="2 neu" />
+    </GrossZeilen>
+  );
+}
+
 /** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
 export const PREVIEWS: readonly PreviewSpec[] = [
   {
@@ -1050,6 +1076,47 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         <Kennzahl titel="Aufträge überfällig" wert={2} ton="achtung" notiz="älteste 18 min" />
         <Kennzahl titel="Meldungen offen" wert={5} ton="alarm" notiz="Bestätigung überfällig" />
       </Kennzahlenband>
+    ),
+  },
+  // Großbild (LLH-1747): die Vorschau hat kein ganzes Fenster, deshalb setzt sie die Einheit auf
+  // 0,375 px fest (1920 px Bezug auf 720 px Karte), statt sie aus `vw`/`vh` zu nehmen.
+  {
+    name: 'GrossKennzahl',
+    title: 'Großbild: Kennzahl',
+    group: 'Großbild',
+    height: 425,
+    source: 'components/grossbild/GrossKennzahl.tsx',
+    docAnchor: 'export default function GrossKennzahl',
+    moreDoc: 'components/grossbild/grossMass.ts',
+    content: () => (
+      <div
+        style={
+          {
+            '--lfh-gross-einheit': '0.375px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gap: 12,
+          } as CSSProperties
+        }
+      >
+        <GrossKennzahl titel="Betroffene" wert={248} notiz="· 2 ohne Sichtung" />
+        <GrossKennzahl titel="Kräfte" wert="0/12/58//70" groesse="zahlKlein" notiz="14 Einheiten" />
+        <GrossKennzahl titel="Vermisste" wert={3} ton="alarm" notiz="1 seit über 4 h" />
+        <GrossKennzahl titel="Lagebericht" wert="—" notiz="nicht freigegeben" />
+      </div>
+    ),
+  },
+  {
+    name: 'GrossZeile',
+    title: 'Großbild: Zeilen',
+    group: 'Großbild',
+    height: 383,
+    source: 'components/grossbild/GrossZeile.tsx',
+    docAnchor: 'export function GrossZeilen',
+    content: () => (
+      <div style={{ '--lfh-gross-einheit': '0.375px' } as CSSProperties}>
+        <GrossZeilenVorschau />
+      </div>
     ),
   },
   {

@@ -61,6 +61,8 @@ eine klare Aufgabe.
 - `lagemonitor`:
   - Neue Anforderung: Alarmzeile ohne Personenbezug.
   - Neue Anforderung: Sofortmeldungen erreichen den Monitor sofort.
+- `grossbild-ansicht` (Nachtrag beim Merge von LLH-1747): Das Großbild des Lagebilds zeigt
+  Lagebericht und UHS aktiv unter „Stand“, ohne Aufträge und Meldungen (design.md, D8).
 
 ## Impact
 

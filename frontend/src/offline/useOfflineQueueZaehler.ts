@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OFFLINE_QUEUE_EVENT, queueZaehlerLaden, type OfflineQueueZaehler } from './queue';
+import { loadStoredQueueZaehler, saveQueueZaehler } from './queueZaehlerMerker';
 
 const LEER: OfflineQueueZaehler = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
 
@@ -11,25 +12,39 @@ const LEER: OfflineQueueZaehler = { ausstehend: 0, abgelehnt: 0, nicht_zugeordne
  */
 export const ZAEHLER_DROSSEL_MS = 250;
 
-/** Reaktive Sicht auf die persistenten Queue-Zähler. */
+/**
+ * Reaktive Sicht auf die persistenten Queue-Zähler.
+ *
+ * VOR DEM ERSTEN BILD (LLH-1910, Spec `kopfleiste`): Über alle Einsätze (so rufen Kopfleiste und
+ * Betriebszeile) beginnt der Hook mit dem zuletzt gelesenen Stand der Person
+ * (`queueZaehlerMerker.ts`), bis die Queue antwortet, und merkt jeden gelesenen Stand. Im Scope
+ * eines Einsatzes beginnt er leer.
+ */
 export function useOfflineQueueZaehler(
   benutzerId: number | undefined,
   einsatzId?: number,
 ): OfflineQueueZaehler {
   const scope = `${benutzerId ?? 'anonym'}:${einsatzId ?? 'alle'}`;
+  const isMerkerScope = benutzerId != null && einsatzId == null;
+  const startwert = useMemo(
+    () => (isMerkerScope ? (loadStoredQueueZaehler(benutzerId) ?? LEER) : LEER),
+    [isMerkerScope, benutzerId],
+  );
   const [stand, setStand] = useState<{ scope: string; wert: OfflineQueueZaehler }>({
     scope,
-    wert: LEER,
+    wert: startwert,
   });
-  const ladeGeneration = useRef(0);
-  const laden = useCallback(() => {
-    const generation = ++ladeGeneration.current;
+  const loadGeneration = useRef(0);
+  const load = useCallback(() => {
+    const generation = ++loadGeneration.current;
     if (benutzerId == null) {
       setStand({ scope, wert: LEER });
       return;
     }
     void queueZaehlerLaden(benutzerId, einsatzId).then((wert) => {
-      if (ladeGeneration.current === generation) setStand({ scope, wert });
+      if (loadGeneration.current !== generation) return;
+      if (einsatzId == null) saveQueueZaehler(benutzerId, wert);
+      setStand({ scope, wert });
     });
   }, [benutzerId, einsatzId, scope]);
 
@@ -42,7 +57,7 @@ export function useOfflineQueueZaehler(
       uhr = null;
       if (!offen) return;
       offen = false;
-      laden();
+      load();
       uhr = setTimeout(ausfuehren, ZAEHLER_DROSSEL_MS);
     };
     const anstossen = () => {
@@ -54,8 +69,8 @@ export function useOfflineQueueZaehler(
     return () => {
       window.removeEventListener(OFFLINE_QUEUE_EVENT, anstossen);
       if (uhr !== null) clearTimeout(uhr);
-      ladeGeneration.current += 1;
+      loadGeneration.current += 1;
     };
-  }, [laden]);
-  return stand.scope === scope ? stand.wert : LEER;
+  }, [load]);
+  return stand.scope === scope ? stand.wert : startwert;
 }

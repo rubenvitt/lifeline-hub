@@ -188,6 +188,13 @@ mit eigenem Status „nicht verfügbar“. Am Server gibt es diese Regel nicht.
 
 *Verworfen:* Seiten zusammenlegen (Abstimmung 16.11.2026).
 
+*Nachtrag beim Merge von LLH-1747 (16.11.2026, mit Ruben):* Das Großbild des Lagebilds liest
+dieselbe Liste wie das Fußband (`fuehrungsKennzahlen` in `kennzahlAnzeige.ts`). Sie verliert
+Aufträge und Meldungen für Seite und Großbild zugleich; der Block im Großbild heißt „Stand“. Das
+Überfällig-Signal kommt mit der Alarmzeile ins Großbild (LLH-1931). *Verworfen:* eine eigene
+Liste nur für das Großbild (zwei Listen derselben Zahlen) und das Großbild ohne Alarmsignal mit
+Aufträgen weiterzuführen (widerspricht D8).
+
 ### D9 Sprungziele
 Die Ziele kommen aus den vorhandenen Deeplink-Helfern:
 

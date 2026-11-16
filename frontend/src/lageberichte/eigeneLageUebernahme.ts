@@ -17,8 +17,8 @@ import {
 } from '../kraefte/entlassene';
 import { baueKraeftebild, rendereMeldebildMarkdown } from '../kraefte/kraeftebild';
 import {
-  baueFuehrungsorganisation,
-  rendereFuehrungsorganisationMarkdown,
+  buildFuehrungsorganisation,
+  renderFuehrungsorganisationMarkdown,
   wurzelFuehrungsstelle,
 } from '../pages/einsatzabschnitte/fuehrungsorganisation';
 import { einsatzleiterDarstellung } from '../einsatz/einsatzleiter';
@@ -170,8 +170,8 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
 
     const organisation =
       abschnitte.zustand === 'daten'
-        ? rendereFuehrungsorganisationMarkdown(
-            baueFuehrungsorganisation(
+        ? renderFuehrungsorganisationMarkdown(
+            buildFuehrungsorganisation(
               abschnitte.daten,
               einheiten.zustand === 'daten' ? einheiten.daten : null,
             ),

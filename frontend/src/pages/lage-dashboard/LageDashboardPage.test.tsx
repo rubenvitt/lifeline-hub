@@ -2037,3 +2037,57 @@ describe('LageDashboardPage — „Zuletzt"-Speicher (LFH-436)', () => {
     expect(gemerkt()).toEqual(['personen']);
   });
 });
+
+describe('LageDashboardPage — Großbild (LLH-1747, Spec `grossbild-ansicht`)', () => {
+  function grossKennzahl(titel: string): HTMLElement {
+    const dialog = screen.getByRole('dialog', { name: 'Lagebild' });
+    const el = within(dialog)
+      .getAllByText(titel)
+      .map((t) => t.closest('[data-lfh="gross-kennzahl"]'))
+      .find(Boolean);
+    if (!el) throw new Error(`Großbild-Kennzahl „${titel}" nicht gefunden`);
+    return el as HTMLElement;
+  }
+
+  it('öffnet das Großbild über den Knopf im Seitenkopf und kehrt auf die Seite zurück', async () => {
+    mockEndpunkte({ personen: [person('sk1'), person('sk3')] });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+    expect(screen.getByRole('dialog', { name: 'Lagebild' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Lagebild' })).toBeInTheDocument();
+  });
+
+  it('zeigt dieselben Zahlen wie die Seite, auch nach einer Änderung ohne Neuladen', async () => {
+    const daten: Daten = { personen: [person('sk1'), person('sk3')] };
+    mockEndpunkte(daten);
+    const { client } = render();
+    await kennzahlGeladen('Betroffene');
+    const wertSeite = () =>
+      kennzahl('Betroffene').querySelector('[data-lfh="kennzahl-wert"]')?.textContent;
+    expect(wertSeite()).toBe('2');
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+    expect(grossKennzahl('Betroffene')).toHaveTextContent('2');
+
+    // Eine andere Person nimmt jemanden auf; das Großbild zieht ohne Neuladen nach.
+    daten.personen = [person('sk1'), person('sk3'), person('sk2')];
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.personen(1) }));
+    await waitFor(() => expect(grossKennzahl('Betroffene')).toHaveTextContent('3'));
+    // Die Seite darunter zeigt denselben Wert.
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+    expect(wertSeite()).toBe('3');
+  });
+
+  it('zeigt im Großbild weder Aufträge noch Meldungen; die trägt der Überblick (LLH-1743)', async () => {
+    mockEndpunkte({ zaehler: { auftraege: { offen: 2, in_arbeit: 1, ueberfaellig: 1 } } });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await userEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+    const dialog = screen.getByRole('dialog', { name: 'Lagebild' });
+    expect(within(dialog).queryByText('Aufträge offen')).toBeNull();
+    expect(within(dialog).queryByText('Meldungen offen')).toBeNull();
+    expect(grossKennzahl('UHS aktiv')).toBeInTheDocument();
+  });
+});

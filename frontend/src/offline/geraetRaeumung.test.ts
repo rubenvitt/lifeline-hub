@@ -19,6 +19,7 @@ import {
   schreibaktionenLaden,
   schreibaktionPersonAbschliessen,
 } from './queue';
+import { loadStoredQueueZaehler, saveQueueZaehler } from './queueZaehlerMerker';
 
 const A = 11;
 const B = 22;
@@ -57,6 +58,7 @@ async function geraetBefuellen(): Promise<void> {
   sessionStorage.setItem('lfh:liste:personen:7', 'q=Meier');
   merkeZuletzt('funkrufname', 'Polizei vor Ort');
   blendeAus(40);
+  saveQueueZaehler(A, { ausstehend: 1, abgelehnt: 0, nicht_zugeordnet: 0 });
   await queueEinreihen(A, 7, { typ: 'meldung', inhalt: 'offline vorgemerkt', client_id: 'etb-a' });
 }
 
@@ -86,6 +88,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(ladeZuletzt('funkrufname')).toEqual([]);
     expect(istAusgeblendet(40)).toBe(false);
+    expect(loadStoredQueueZaehler(A)).toBeNull();
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 
@@ -102,6 +105,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(ladeZuletzt('funkrufname')).toEqual([]);
     expect(istAusgeblendet(40)).toBe(false);
+    expect(loadStoredQueueZaehler(A)).toBeNull();
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 

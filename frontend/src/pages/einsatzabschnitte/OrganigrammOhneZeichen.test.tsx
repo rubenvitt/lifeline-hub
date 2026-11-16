@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react';
 import { renderMitProviders } from '../../test/utils';
 import type { Einsatzabschnitt } from '../../api/types';
 import { OrganigrammBild } from './Organigramm';
-import { baueFuehrungsorganisation } from './fuehrungsorganisation';
+import { buildFuehrungsorganisation } from './fuehrungsorganisation';
 
 // Eigene Datei, weil das Modul für ALLE Tests darin ersetzt wird: hier ist kein Zeichen
 // darstellbar (Spec „Taktische Zeichen als Zierde“: entfällt ohne Platzhalter).
@@ -11,7 +11,7 @@ vi.mock('../../zeichen/fachobjektZeichen', () => ({ fachobjektZeichen: () => nul
 
 describe('OrganigrammBild — ohne darstellbares Zeichen', () => {
   it('lässt den Zeichenplatz ganz weg', () => {
-    const org = baueFuehrungsorganisation(
+    const org = buildFuehrungsorganisation(
       [
         {
           id: 1,
