@@ -30,7 +30,7 @@
 
 ## 4. Anwenderdoku
 
-- [ ] 4.1 Kapitel `docs/anwender/kapitel/einsatzabschnitte.md`, „Das Organigramm“: Lagezustand am
+- [x] 4.1 Kapitel `docs/anwender/kapitel/einsatzabschnitte.md`, „Das Organigramm“: Lagezustand am
   Knoten und Sammelzeile beschreiben; Wächter `src/hilfe/anwenderdoku.guard.test.ts` grün
 - [ ] 4.2 Bild `organigramm.png` (hell und dunkel) neu aufnehmen
   (`pnpm doku:bilder e2e/doku-bilder/einsatzabschnitte.bilder.ts` nach `cargo build`) und
