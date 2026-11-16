@@ -191,7 +191,7 @@ export default function LagekartePage() {
   // Der Einsatz des Rahmens für Ortspfad und Einsatzstatus (LFH-954): die Karte baut ihren Kopf
   // selbst, ohne `EinsatzSeite`.
   const rahmenEinsatz = useEinsatzRahmen();
-  const { abBreite, istSchmal } = useViewport();
+  const { abBreite, istSchmal, istBeruehrung } = useViewport();
   const breit = abBreite('lg');
   /** Scharfe Griffsorte beim Bild-Einpassen. Vorgabe: Größe. */
   const [griffModus, setGriffModus] = useState<GriffModus>('groesse');
@@ -842,8 +842,9 @@ export default function LagekartePage() {
   );
   const zeigeAuswahl = auswahlVorn.zeige;
   const verlasseAuswahl = auswahlVorn.verlasse;
-  const waehleObjekt = (schluessel: string) => {
-    onMarkerWaehlen(schluessel);
+  // Ein Marker-Tipp wählt ohne Anflug, ein Treffer der Objektliste fliegt hin (LLH-1751).
+  const waehleObjekt = (schluessel: string, optionen?: { anfliegen?: boolean }) => {
+    onMarkerWaehlen(schluessel, optionen);
     zeigeAuswahl();
   };
   const fokusQuelle = useMemo(
@@ -1422,6 +1423,8 @@ export default function LagekartePage() {
     gemerkt: leistenWahl.wahl,
     breit,
     istSchmal,
+    // Touch: Leiste per Vorgabe zu, auch ab `lg` (LLH-1751).
+    istBeruehrung,
     erzwungen: leisteErzwungen,
     modusAktiv: exklusiverModusAktiv,
     imModus: leistenWahl.imModus,
@@ -2002,7 +2005,7 @@ export default function LagekartePage() {
         sammelstelle={{ zugriff: evakuierungZugriff }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
-        onMarkerWaehlen={waehleObjekt}
+        onMarkerWaehlen={(schluessel) => waehleObjekt(schluessel, { anfliegen: true })}
         onlineVerfuegbar={onlineStyles.length > 0}
         offlineVerfuegbar={!!config?.offline_verfuegbar}
         kartenTheme={kartenTheme}

@@ -1837,3 +1837,35 @@ describe('useKartenInteraktion · „Zeichen hier setzen“ hält Einsatz und An
     );
   });
 });
+
+describe('useKartenInteraktion — Auswahl mit oder ohne Anflug (LLH-1751, D4)', () => {
+  const UHS = { schluessel: 'uhs-1', typ: 'uhs', id: 1, lat: 53.1, lon: 8.8, label: 'UHS', farbe: '#000' };
+  function rendereMitMarker() {
+    return renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          darfSchreiben: true,
+          waehlbarRef: { current: [UHS as never] },
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
+          erfolg: vi.fn(),
+        }),
+      { wrapper: wrapper() },
+    );
+  }
+
+  it('ein Tipp auf den Marker wählt aus und setzt kein Anflugziel', () => {
+    const { result } = rendereMitMarker();
+    act(() => result.current.onMarkerWaehlen('uhs-1'));
+    expect(result.current.auswahl).toBe('uhs-1');
+    expect(result.current.flyToZiel).toBeNull();
+  });
+
+  it('ein Treffer der Objektliste wählt aus und fliegt hin', () => {
+    const { result } = rendereMitMarker();
+    act(() => result.current.onMarkerWaehlen('uhs-1', { anfliegen: true }));
+    expect(result.current.auswahl).toBe('uhs-1');
+    expect(result.current.flyToZiel).toEqual({ lng: 8.8, lat: 53.1 });
+  });
+});

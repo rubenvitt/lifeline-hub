@@ -77,6 +77,28 @@ export function kartenKnopfKante(token: { controlHeight: number }): number {
   return Math.max(32, token.controlHeight);
 }
 
+/** Reserve links und rechts neben dem Wort (antds `paddingXXS`, in jeder Stufe 4 px). */
+const WORT_RAND = 4;
+
+/**
+ * Breite eines Kartenknopfs und damit des ganzen Knopfblocks (LLH-1751, design.md D1 der Change
+ * `bo5wokwi-lagekarte-knoepfe-leiste-zoom`): mindestens die Kante, und breit genug für das längste
+ * Wort unter dem Symbol („Zeichnen“, „Position“: 8 Zeichen, rund 0,6 em je Zeichen). Der Block ist
+ * eine Spalte, deshalb tragen alle Knöpfe diese Breite, auch die Zoomknöpfe ohne Wort. Kartenfuß
+ * und linke Überlagerung enden an ihr (`fussStil`, `maxWidth`) — rein und exportiert.
+ */
+export function kartenKnopfBreite(token: { controlHeight: number; fontSizeSM: number }): number {
+  return Math.max(kartenKnopfKante(token), Math.ceil(8 * 0.6 * token.fontSizeSM) + 2 * WORT_RAND);
+}
+
+/**
+ * Höhe eines Kartenknopfs mit Wort: Symbol, darunter eine Wortzeile. In `kompakt` reicht die Kante
+ * von 32 px dafür nicht, dort wächst der Knopf auf 44 px; ab `komfortabel` fasst die Kante beides.
+ */
+export function kartenKnopfHoeheMitWort(token: { controlHeight: number }): number {
+  return Math.max(kartenKnopfKante(token), 44);
+}
+
 /**
  * Nächster WÄHLBARER Index nach einer Pfeil-/Pos1-/Ende-Taste: gesperrte Segmente werden
  * übersprungen. `null`, wenn die Taste nicht wandert oder nichts wählbar ist.
@@ -332,8 +354,10 @@ const NUR_VORLESEN: CSSProperties = {
 
 function Kartenknopf({
   beschriftung,
+  wort,
   onClick,
   kante,
+  breite,
   farbe,
   gedrueckt,
   ausgeklappt,
@@ -343,8 +367,16 @@ function Kartenknopf({
   children,
 }: {
   beschriftung: string;
+  /**
+   * Sichtbares Wort unter dem Symbol (LLH-1751): der Name steht so auch auf Touch da, wo ein
+   * `title` nie erscheint. Ohne Wort (Zoom: „+“ und „−“ sind eindeutig) bleibt der Knopf so hoch
+   * wie die Kante.
+   */
+  wort?: string;
   onClick: () => void;
   kante: number;
+  /** Breite des Knopfblocks ({@link kartenKnopfBreite}); alle Knöpfe des Blocks gleich breit. */
+  breite: number;
   farbe: string;
   /** Gesetzt = Umschalter; der Zustand steht in `aria-pressed`, die Optik folgt daraus (CSS). */
   gedrueckt?: boolean;
@@ -373,16 +405,20 @@ function Kartenknopf({
       data-lfh={kennung}
       aria-disabled={sperrGrund != null ? true : undefined}
       aria-describedby={sperrGrund != null ? grundId : undefined}
-      title={sperrGrund ?? beschriftung}
+      // Mit Wort doppelte ein `title` nur, was dasteht; ohne Wort bleibt er für die Maus.
+      title={sperrGrund ?? (wort ? undefined : beschriftung)}
       onClick={sperrGrund != null ? undefined : onClick}
       className="lfh-kartenknopf"
       style={{
-        width: kante,
-        height: kante,
+        width: breite,
+        height: wort ? kartenKnopfHoeheMitWort(token) : kante,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 0,
+        gap: token.marginXXS,
+        paddingBlock: 0,
+        paddingInline: wort ? token.paddingXXS : 0,
         margin: 0,
         border: 0,
         // Gesperrt: Farbe und Zeiger aus `.lfh-kartenknopf[aria-disabled]` (`lagekarte.css`) — ein
@@ -393,6 +429,16 @@ function Kartenknopf({
       <span aria-hidden="true" style={{ display: 'inline-flex' }}>
         {children}
       </span>
+      {wort && (
+        // Für Vorlesende trägt der Knopf seinen Namen (`aria-label`), das Wort ist dessen Kurzform.
+        <span
+          aria-hidden="true"
+          data-lfh="kartenknopf-wort"
+          style={{ fontSize: token.fontSizeSM, lineHeight: 1.2, whiteSpace: 'nowrap' }}
+        >
+          {wort}
+        </span>
+      )}
     </button>
   );
   return (
@@ -452,6 +498,7 @@ interface KartenUeberlagerungProps {
 export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
   const { token, rollen } = useRollen();
   const kante = kartenKnopfKante(token);
+  const breite = kartenKnopfBreite(token);
   const blockStil: CSSProperties = {
     position: 'absolute',
     top: UEBERLAGERUNG_RAND,
@@ -465,7 +512,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           ...blockStil,
           left: UEBERLAGERUNG_RAND,
           // Platz für den Knopfblock lassen — sonst überdeckt eine lange Stil-Liste die Zoomknöpfe.
-          maxWidth: `calc(100% - ${kante + 3 * UEBERLAGERUNG_RAND}px)`,
+          maxWidth: `calc(100% - ${breite + 3 * UEBERLAGERUNG_RAND}px)`,
           display: 'flex',
           flexDirection: 'column',
           // Nicht strecken: die Segmentleiste und die Koordinate sind so breit wie ihr Inhalt.
@@ -508,6 +555,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           beschriftung="Hineinzoomen"
           onClick={props.onZoomRein}
           kante={kante}
+          breite={breite}
           farbe={rollen.gedaempft}
         >
           <IconPlus size={16} />
@@ -516,14 +564,17 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
           beschriftung="Herauszoomen"
           onClick={props.onZoomRaus}
           kante={kante}
+          breite={breite}
           farbe={rollen.gedaempft}
         >
           <IconMinus size={16} />
         </Kartenknopf>
         <Kartenknopf
           beschriftung="Nach Norden ausrichten"
+          wort="Norden"
           onClick={props.onNorden}
           kante={kante}
+          breite={breite}
           farbe={rollen.gedaempft}
         >
           <IconKompass size={16} />
@@ -532,8 +583,10 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         {props.eigenposition && (
           <Kartenknopf
             beschriftung="Eigenposition"
+            wort="Position"
             onClick={props.eigenposition.onUmschalten}
             kante={kante}
+            breite={breite}
             farbe={props.eigenposition.an ? rollen.bedien : rollen.gedaempft}
             gedrueckt={props.eigenposition.an}
             sperrGrund={props.eigenposition.sperrGrund}
@@ -545,8 +598,10 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         {props.onMessen && (
           <Kartenknopf
             beschriftung="Messen"
+            wort="Messen"
             onClick={props.onMessen}
             kante={kante}
+            breite={breite}
             farbe={props.messenAktiv ? rollen.bedien : rollen.gedaempft}
             gedrueckt={props.messenAktiv ?? false}
           >
@@ -556,8 +611,10 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         {props.zeichenwerkzeuge && (
           <Kartenknopf
             beschriftung="Zeichenwerkzeuge"
+            wort="Zeichnen"
             onClick={props.zeichenwerkzeuge.onUmschalten}
             kante={kante}
+            breite={breite}
             farbe={rollen.bedien}
             ausgeklappt={props.zeichenwerkzeuge.offen}
             // Zugeklappt steht das Menü nicht im Baum — dann verweist der Knopf auf nichts.
@@ -570,8 +627,10 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
         {props.leiste && (
           <Kartenknopf
             beschriftung={props.leiste.sichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
+            wort="Leiste"
             onClick={props.leiste.onUmschalten}
             kante={kante}
+            breite={breite}
             farbe={rollen.gedaempft}
             ausgeklappt={props.leiste.sichtbar}
             steuert="lagekarte-leiste"

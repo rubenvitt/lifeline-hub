@@ -5,30 +5,30 @@ Jede Aufgabe per TDD: Test zuerst rot, dann grün. Pfade relativ zu `frontend/sr
 
 ## 1. Anflug zoomt nur heran (D5)
 
-- [ ] 1.1 `anflugZoom(aktuell)` in `pages/lagekarte/kamera.ts` (Ergebnis `max(aktuell, ANFLUG_ZOOM)`) mit Unit-Test für Zoom 12, 15 und 18; Test grün
-- [ ] 1.2 Der Effekt `flyToZiel` in `pages/lagekarte/Kartenflaeche.tsx` fliegt mit `anflugZoom(map.getZoom())` und `BEDIENUNG`; `kamera.guard.test.ts` bleibt grün, ein Test am Karten-Mock prüft den übergebenen Zoom
+- [x] 1.1 `anflugZoom(aktuell)` in `pages/lagekarte/kamera.ts` (Ergebnis `max(aktuell, ANFLUG_ZOOM)`) mit Unit-Test für Zoom 12, 15 und 18; Test grün
+- [x] 1.2 Der Effekt `flyToZiel` in `pages/lagekarte/Kartenflaeche.tsx` fliegt mit `anflugZoom(map.getZoom())` und `BEDIENUNG`; `kamera.guard.test.ts` bleibt grün (der Aufruf bleibt dafür in `Kartenflaeche`), den Zoom an der echten Karte prüft e2e 2.3
 
 ## 2. Marker-Tipp ohne Kamera (D4)
 
-- [ ] 2.1 `onMarkerWaehlen` (`pages/lagekarte/useKartenInteraktion.ts`) bekommt die Angabe „anfliegen“; ohne sie bleibt `flyToZiel` ungesetzt. Unit-Test am Hook: Auswahl gesetzt, `flyToZiel` unverändert bzw. gesetzt
-- [ ] 2.2 `LagekartePage`: Der Marker-Tipp (`onMarkerKlick`) wählt ohne Anflug, die Objektliste (`MarkerSuche` `onWaehlen`) mit Anflug. Weitere Aufrufer von `waehleObjekt` prüfen und je Weg begründet zuordnen. Seiten-Test grün
-- [ ] 2.3 e2e in `lagekarte-touch.spec.ts`: Zoom setzen, Marker antippen, danach sind `getZoom()` und Mitte unverändert und der Inspector ist offen. Listentreffer bei Zoom 17 behält 17, bei Zoom 12 wird auf 15 herangezoomt
+- [x] 2.1 `onMarkerWaehlen` (`pages/lagekarte/useKartenInteraktion.ts`) bekommt die Angabe „anfliegen“; ohne sie bleibt `flyToZiel` ungesetzt. Unit-Test am Hook: Auswahl gesetzt, `flyToZiel` unverändert bzw. gesetzt
+- [x] 2.2 `LagekartePage`: Der Marker-Tipp (`onMarkerKlick`) wählt ohne Anflug, die Objektliste (`MarkerSuche` `onWaehlen`) mit Anflug. Weitere Aufrufer von `waehleObjekt` prüfen und je Weg begründet zuordnen. Seiten-Test grün
+- [x] 2.3 e2e in `lagekarte-touch.spec.ts`: Zoom setzen, Marker antippen, danach sind `getZoom()` und Mitte unverändert und der Inspector ist offen. Listentreffer bei Zoom 17 behält 17, bei Zoom 12 wird auf 15 herangezoomt
 
 ## 3. Leiste bei grobem Zeiger zu (D3)
 
-- [ ] 3.1 `leisteSichtbar` (`pages/lagekarte/leistenWahl.ts`) nimmt `istBeruehrung`: Vorgabe `!istBeruehrung && (breit || !istSchmal)`, gemerkte Wahl und `erzwungen` gehen vor. Fälle in `leistenWahl.test.ts` ergänzen (Touch ab lg ohne Wahl → zu, Touch mit Wahl offen → offen, Touch und Auswahl → offen, fein ab lg → offen); Doc-Kommentar nachziehen
-- [ ] 3.2 `LagekartePage` reicht `istBeruehrung` aus `useViewport` durch; e2e (`hasTouch`, 1280 × 800, ohne gemerkte Wahl) zeigt die Leiste geschlossen und den Knopf „Leiste einblenden“, nach Marker-Tipp ist sie offen
+- [x] 3.1 `leisteSichtbar` (`pages/lagekarte/leistenWahl.ts`) nimmt `istBeruehrung`: Vorgabe `!istBeruehrung && (breit || !istSchmal)`, gemerkte Wahl und `erzwungen` gehen vor. Fälle in `leistenWahl.test.ts` ergänzen (Touch ab lg ohne Wahl → zu, Touch mit Wahl offen → offen, Touch und Auswahl → offen, fein ab lg → offen); Doc-Kommentar nachziehen
+- [x] 3.2 `LagekartePage` reicht `istBeruehrung` aus `useViewport` durch; e2e (`hasTouch`, 1280 × 800, ohne gemerkte Wahl) zeigt die Leiste geschlossen und den Knopf „Leiste einblenden“, nach Marker-Tipp ist sie offen
 
 ## 4. Kartenknöpfe mit Wort (D1, D2)
 
-- [ ] 4.1 `kartenKnopfBreite(token)` in `KartenUeberlagerung.tsx` mit Unit-Test (≥ Kante, längstes Wort passt in `kompakt`, `komfortabel`, `handschuh`); `Kartenknopf` erhält die Prop `wort`, rendert Symbol und Wort untereinander und lässt `title` bei gesetztem Wort weg; Komponenten-Test: Wort sichtbar, `aria-label` unverändert, Zoom ohne Wort
-- [ ] 4.2 Wörter setzen: Norden, Position, Messen, Zeichnen, Leiste; alle Knöpfe des Blocks gleich breit; `fussStil` (`KartenFuss.tsx`) und `maxWidth` der linken Überlagerung rechnen mit `kartenKnopfBreite`. Test in `KartenFuss` bzw. Überlagerung grün
-- [ ] 4.3 Mitnutzer prüfen: `personen/BetroffeneKarte.tsx`, `geraet/GeraetAbschnittKarte.tsx` (gleiche Wörter, Fußkante); ihre Tests grün
+- [x] 4.1 `kartenKnopfBreite(token)` in `KartenUeberlagerung.tsx` mit Unit-Test (≥ Kante, längstes Wort passt in `kompakt`, `komfortabel`, `handschuh`); `Kartenknopf` erhält die Prop `wort`, rendert Symbol und Wort untereinander und lässt `title` bei gesetztem Wort weg; Komponenten-Test: Wort sichtbar, `aria-label` unverändert, Zoom ohne Wort
+- [x] 4.2 Wörter setzen: Norden, Position, Messen, Zeichnen, Leiste; alle Knöpfe des Blocks gleich breit; `fussStil` (`KartenFuss.tsx`) und `maxWidth` der linken Überlagerung rechnen mit `kartenKnopfBreite`. Test in `KartenFuss` bzw. Überlagerung grün
+- [x] 4.3 Mitnutzer prüfen: `personen/BetroffeneKarte.tsx`, `geraet/GeraetAbschnittKarte.tsx` (gleiche Wörter, Fußkante); ihre Tests grün
 - [ ] 4.4 e2e `fokus-verdeckung.spec.ts`, `leisten-flaeche.spec.ts`, `lagekarte-smoke.spec.ts` bei 390 und 1024 px in `handschuh` grün (Knopfblock, Fuß und Überlagerung überschneiden sich nicht, jeder Knopf antippbar)
 
 ## 5. Regeln und Anwenderdoku
 
-- [ ] 5.1 `pages/lagekarte/AGENTS.md` fortschreiben: Einleitung (Leiste bei grobem Zeiger per Vorgabe zu), Kamera-Regel (Marker-Tipp ohne Anflug, Anflug nur heran), Knopfspalte (Wort unter dem Symbol, `kartenKnopfBreite` statt Kante); Verweise auf `kartenKnopfKante` per grep prüfen
+- [x] 5.1 `pages/lagekarte/AGENTS.md` fortschreiben: Einleitung (Leiste bei grobem Zeiger per Vorgabe zu), Kamera-Regel (Marker-Tipp ohne Anflug, Anflug nur heran), Knopfspalte (Wort unter dem Symbol, `kartenKnopfBreite` statt Kante); Verweise auf `kartenKnopfKante` per grep prüfen
 - [ ] 5.2 `docs/anwender/kapitel/lagekarte.md`: Knöpfe mit Wort, Leiste am Touch-Gerät, Marker-Tipp ohne Zoom; Bilder über den Bildlauf (`e2e/doku-bilder/lagekarte.bilder.ts`) neu, Wächter der Anwenderdoku grün
 
 ## 6. Integration

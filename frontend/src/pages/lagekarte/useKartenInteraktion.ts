@@ -666,8 +666,14 @@ export function useKartenInteraktion({
     verorten(lngLat.lat, lngLat.lng);
   }
 
-  function onMarkerWaehlen(schluessel: string) {
+  /**
+   * Wählt ein Objekt aus. Angeflogen wird nur auf Wunsch (LLH-1751, Spec `lagekarte-klickziele`):
+   * ein Tipp auf den Marker lässt die Kamera stehen — der Marker liegt ja schon unter dem Finger —,
+   * ein Treffer der Objektliste fliegt hin (`anfliegen`).
+   */
+  function onMarkerWaehlen(schluessel: string, optionen?: { anfliegen?: boolean }) {
     setSelektion({ art: 'objekt', schluessel });
+    if (!optionen?.anfliegen) return;
     const m = waehlbarRef.current.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }

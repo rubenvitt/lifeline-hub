@@ -5,7 +5,8 @@ import type { MarkerTyp } from './marker';
 import { OBJEKT_GRUPPEN } from './objektsuche';
 
 /**
- * Ein-/Ausblenden der rechten Kartenleiste. Per Vorgabe offen, auf jeder Breite ausblendbar (am
+ * Ein-/Ausblenden der rechten Kartenleiste. Per Vorgabe offen (außer Handschirm und grobem Zeiger,
+ * {@link leisteSichtbar}), auf jeder Breite ausblendbar (am
  * Fükw blieben nach Rail, Modulpanel und Leiste sonst nur ~800 px Karte). Eine Anzeigevorliebe je
  * Gerät, kein Teil der Kartenansicht: im Konfig-Bag von `useKartenAnsicht` machte jedes Klappen die
  * geteilte Ansicht schmutzig. Deshalb `localStorage`.
@@ -30,20 +31,25 @@ export const LEISTE_SPEICHER_SCHLUESSEL: Record<LeistenKlasse, string> = {
  * weg und es gilt wieder, was vorher galt (Entscheidung des Auftraggebers, 29.09.2026). Im Modus
  * zählt nur die vorläufige Wahl `imModus` („Leiste einblenden" für Koordinate oder Mittelpunkt).
  *
- * Danach die gemerkte Wahl, sonst die Vorgabe: offen, außer auf dem Handschirm (< `md`).
+ * Danach die gemerkte Wahl, sonst die Vorgabe: offen, außer auf dem Handschirm (< `md`) und bei
+ * grobem Zeiger (`istBeruehrung`, LLH-1751). Am Touch-Gerät im Handschuh ließen Rail, 72-px-Knöpfe
+ * und die 300-px-Leiste kaum die halbe Breite für die Karte; die Leiste ist dort eine Handlung
+ * entfernt. Die Zeigerart wird live gelesen wie die Breite: sie zählt nur ohne gemerkte Wahl.
  */
 export function leisteSichtbar(args: {
   gemerkt: boolean | null;
   breit: boolean;
   istSchmal: boolean;
+  /** Primärer Zeiger ist grob (Finger, Handschuh), aus `useViewport`. */
+  istBeruehrung: boolean;
   erzwungen: boolean;
   modusAktiv: boolean;
   imModus: boolean | null;
 }): boolean {
-  const { gemerkt, breit, istSchmal, erzwungen, modusAktiv, imModus } = args;
+  const { gemerkt, breit, istSchmal, istBeruehrung, erzwungen, modusAktiv, imModus } = args;
   if (erzwungen) return true;
   if (!breit && modusAktiv) return imModus ?? false;
-  return gemerkt ?? (breit || !istSchmal);
+  return gemerkt ?? (!istBeruehrung && (breit || !istSchmal));
 }
 
 function lesen(klasse: LeistenKlasse): boolean | null {

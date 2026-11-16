@@ -5,6 +5,7 @@ import { renderMitProviders } from '../../test/utils';
 import { dichten } from '../../theme/tokens';
 import KartenUeberlagerung, {
   GrundlageLeiste,
+  kartenKnopfBreite,
   kartenKnopfKante,
   kartenKnopfZelleStil,
   naechsterFreierIndex,
@@ -183,6 +184,67 @@ describe('KartenUeberlagerung — Knopfblock', () => {
       expect(zelle).toHaveClass('lfh-kartenknopf-zelle');
       expect(zelle.parentElement).toBe(block);
     }
+  });
+});
+
+describe('KartenUeberlagerung — Wort unter dem Symbol (LLH-1751)', () => {
+  const STUFEN = ['kompakt', 'komfortabel', 'handschuh'] as const;
+  const token = (s: (typeof STUFEN)[number]) => ({
+    controlHeight: dichten[s].zeilenhoehe,
+    fontSizeSM: dichten[s].schriftgroesse - 2,
+  });
+
+  it('die Knopfbreite ist nie schmaler als die Kante und fasst das längste Wort', () => {
+    for (const s of STUFEN) {
+      const t = token(s);
+      const breite = kartenKnopfBreite(t);
+      expect(breite, s).toBeGreaterThanOrEqual(kartenKnopfKante(t));
+      // „Zeichnen“ und „Position“ (8 Zeichen) bei rund 0,6 em je Zeichen, dazu der Innenrand.
+      expect(breite, s).toBeGreaterThanOrEqual(Math.ceil(8 * 0.6 * t.fontSizeSM) + 8);
+    }
+  });
+
+  it('Norden, Position, Messen, Zeichnen und Leiste tragen ein sichtbares Wort, der Name bleibt', () => {
+    renderMitProviders(
+      <KartenUeberlagerung
+        {...basis()}
+        eigenposition={{ an: false, sperrGrund: null, onUmschalten: vi.fn() }}
+        leiste={{ sichtbar: true, sperrGrund: null, onUmschalten: vi.fn() }}
+      />,
+    );
+    const paare = [
+      ['Nach Norden ausrichten', 'Norden'],
+      ['Eigenposition', 'Position'],
+      ['Messen', 'Messen'],
+      ['Zeichenwerkzeuge', 'Zeichnen'],
+      ['Leiste ausblenden', 'Leiste'],
+    ] as const;
+    for (const [name, wort] of paare) {
+      const knopf = screen.getByRole('button', { name });
+      expect(knopf, name).toHaveTextContent(wort);
+      // Kein Tooltip als einzige Erklärung: das Wort steht da, ein `title` doppelte es nur.
+      expect(knopf, name).not.toHaveAttribute('title');
+    }
+  });
+
+  it('Zoom bleibt Symbol, alle Knöpfe des Blocks sind gleich breit', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    expect(screen.getByRole('button', { name: 'Hineinzoomen' })).toHaveTextContent('');
+    expect(screen.getByRole('button', { name: 'Herauszoomen' })).toHaveTextContent('');
+    const breiten = new Set(
+      [...screen.getByRole('group', { name: 'Kartensteuerung' }).querySelectorAll('button')].map(
+        (b) => b.style.width,
+      ),
+    );
+    expect(breiten.size).toBe(1);
+  });
+
+  it('die linke Überlagerung lässt Platz für die Blockbreite, nicht nur die Kante', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    const knopf = screen.getByRole('button', { name: 'Hineinzoomen' });
+    const breite = parseInt(knopf.style.width, 10);
+    const links = document.querySelector<HTMLElement>('[data-lfh="karten-ueberlagerung-links"]')!;
+    expect(links.style.maxWidth).toBe(`calc(100% - ${breite + 3 * 12}px)`);
   });
 });
 

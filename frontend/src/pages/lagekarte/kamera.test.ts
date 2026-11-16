@@ -4,6 +4,7 @@ import {
   ANFLUG_ZOOM,
   AUTOMATISCH,
   BEDIENUNG,
+  anflugZoom,
   fliegeEigenpositionAn,
   hoereAufBedienung,
   istBedienung,
@@ -25,6 +26,20 @@ function fakeMap() {
     getBearing: vi.fn(() => 0),
   };
 }
+
+describe('anflugZoom (LLH-1751, D5): ein Anflug zoomt nur heran', () => {
+  it('weiter draußen als der Anflugmaßstab: auf ihn heran', () => {
+    expect(anflugZoom(12)).toBe(ANFLUG_ZOOM);
+  });
+
+  it('genau auf dem Anflugmaßstab: bleibt', () => {
+    expect(anflugZoom(ANFLUG_ZOOM)).toBe(ANFLUG_ZOOM);
+  });
+
+  it('näher als der Anflugmaßstab: behält den Zoom, nie heraus', () => {
+    expect(anflugZoom(18)).toBe(18);
+  });
+});
 
 describe('istBedienung (LFH-766, D2)', () => {
   it('Geste (originalEvent) und markierter Bedienweg zählen', () => {

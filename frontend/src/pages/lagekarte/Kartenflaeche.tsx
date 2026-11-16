@@ -12,7 +12,7 @@ import {
 // `useRef<Map<string, Drawing>>` nutzt. `import * as ns, { type X }` ist kein gültiges ES,
 // daher zwei Zeilen.
 import * as maplibregl from 'maplibre-gl';
-import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl';
+import type { StyleSpecification, GeoJSONSource } from 'maplibre-gl';
 // Worker-URL vor der ersten Map (Begründung in `maplibreWorker.ts`).
 import './maplibreWorker';
 import type { Drawing } from '@einsatzzeichen/schema';
@@ -121,9 +121,9 @@ import { sorgeFuerSuchnadelLayer, suchnadelFc } from './suchnadelLayer';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import type { Eigenposition } from './useEigenposition';
 import {
-  ANFLUG_ZOOM,
   AUTOMATISCH,
   BEDIENUNG,
+  anflugZoom,
   fliegeEigenpositionAn,
   hoereAufBedienung,
 } from './kamera';
@@ -204,8 +204,9 @@ export interface KartenflaecheProps {
   /** Marker-Klick → Inspector öffnen. */
   onMarkerKlick?: (schluessel: string) => void;
   /**
-   * Beim Setzen sanft hinfliegen. Zählt als Bedienung (`onBedienung`): die Seite setzt es nur auf
-   * eine Handlung hin (Auswahl, Deeplink, Ortssuche).
+   * Beim Setzen sanft hinfliegen, nur heran, nie heraus (`anflugZoom`). Zählt als Bedienung
+   * (`onBedienung`): die Seite setzt es nur auf eine Handlung hin (Listentreffer, Deeplink,
+   * Ortssuche); ein Tipp auf einen Marker setzt es nicht (LLH-1751).
    */
   flyToZiel?: { lng: number; lat: number } | null;
   /**
@@ -1022,13 +1023,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
   }, [startAnsicht]);
 
-  // fly-to bei Auswahl.
+  // Anflug auf ein gewähltes Ziel: nur heran, nie heraus (LLH-1751, `anflugZoom`).
   useEffect(() => {
     const map = mapRef.current;
     if (map && flyToZiel) {
       startAufKarteRef.current = map;
       map.flyTo(
-        { center: [flyToZiel.lng, flyToZiel.lat] as LngLatLike, zoom: ANFLUG_ZOOM },
+        { center: [flyToZiel.lng, flyToZiel.lat], zoom: anflugZoom(map.getZoom()) },
         BEDIENUNG,
       );
     }

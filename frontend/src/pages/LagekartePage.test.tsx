@@ -840,6 +840,24 @@ describe('LagekartePage', () => {
     expect(patchBody).toEqual({ einsatzort_lat: 50.1, einsatzort_lon: 8.6 });
   });
 
+  it('Marker-Tipp wählt aus, ohne die Karte anzufliegen (LLH-1751)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-schaden-9'));
+    await screen.findByRole('link', { name: /Im Fachmodul öffnen/ });
+    expect(screen.getByTestId('flyto')).toHaveTextContent('null');
+  });
+
+  it('ein Treffer der Objektliste wählt aus und fliegt hin (LLH-1751)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    objekteVorn();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'S-003' }));
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":7,"lat":51}');
+  });
+
   it('Marker-Klick öffnet den Inspector mit Modul-Link', async () => {
     basisHandler();
     const user = userEvent.setup();

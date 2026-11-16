@@ -21,6 +21,15 @@ export const BEDIENUNG = { bedienung: true } as const;
 /** `eventData` einer Kamerabewegung, die die Karte von sich aus macht (Startansicht, Anflug). */
 export const AUTOMATISCH = { bedienung: false } as const;
 
+/**
+ * Zoom eines Anflugs (LLH-1751, design.md D5 der Change `bo5wokwi-lagekarte-knoepfe-leiste-zoom`):
+ * nur heran, nie heraus. Steht die Karte näher als {@link ANFLUG_ZOOM}, behält sie ihren Zoom —
+ * wer einen Ausschnitt eingestellt hat, verliert ihn nicht durch einen Anflug.
+ */
+export function anflugZoom(aktuell: number): number {
+  return Math.max(aktuell, ANFLUG_ZOOM);
+}
+
 /** Rand um den Genauigkeitskreis beim Anflug, in Pixeln. */
 const ANFLUG_RAND = 48;
 

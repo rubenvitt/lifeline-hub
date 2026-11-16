@@ -11,7 +11,7 @@ Die Lagekarte zeigt, wo was ist: Einsatzort, Einheiten, Zonen, Gefahrengebiete, 
 Bereitstellungsräume, Lagemeldungen und taktische Zeichen. Rechts steht die Leiste mit den
 Ansichten „Ebenen“ und „Objekte“: „Ebenen“ ordnet alles, was die Karte zeigen kann, in Gruppen;
 „Objekte“ führt alle Objekte des Einsatzes in einer durchsuchbaren Liste, verortet oder nicht.
-Gezeichnet wird über den Knopf „Zeichenwerkzeuge“ rechts an der Karte. Solange ein Objekt gewählt ist, kommt die Ansicht „Auswahl“ dazu. Auf der Karte wird
+Gezeichnet wird über den Knopf „Zeichnen“ rechts an der Karte. Solange ein Objekt gewählt ist, kommt die Ansicht „Auswahl“ dazu. Auf der Karte wird
 gelesen, verortet, gezeichnet und gemessen. Lesen und Messen kann jede Person im Einsatz, Verorten und Zeichnen nur,
 wer im Einsatz schreiben darf.
 
@@ -38,8 +38,9 @@ wer im Einsatz schreiben darf.
 ### Ein Objekt wählen
 
 1. Auf der Karte einen Marker antippen oder in der Leiste unter „Objekte“ eine Zeile wählen. Die
-   Leiste zeigt die Ansicht „Auswahl“ mit Angaben und Aktionen des Objekts; ein verortetes Objekt
-   fliegt die Karte an.
+   Leiste zeigt die Ansicht „Auswahl“ mit Angaben und Aktionen des Objekts. Ein Tipp auf den Marker
+   lässt die Karte stehen. Eine Zeile der Liste fliegt die Karte zum Objekt und zoomt dabei nur
+   heran, nie heraus.
 
    ![Objektliste mit Suchfeld, „Nicht verortet 26“, dem Einsatzort und der aufgeklappten Gruppe „Einheiten 4/5“](../bilder/lagekarte/objektliste.png)
 
@@ -84,7 +85,7 @@ wer im Einsatz schreiben darf.
 
 ### Ein taktisches Zeichen setzen
 
-1. Rechts an der Karte „Zeichenwerkzeuge“ wählen. Unter „Taktisches Zeichen“ stehen die zuletzt
+1. Rechts an der Karte „Zeichnen“ wählen. Unter „Taktisches Zeichen“ stehen die zuletzt
    verwendeten Zeichen. Ein Tipp auf eines davon wählt es ohne Zeichenwahl; dann gleich auf die
    Stelle der Karte tippen wie in Schritt 3. Für ein anderes Zeichen „Weitere …“ wählen.
 2. Ein Grundzeichen wählen, bei Bedarf ein Symbol; beide Listen lassen sich durchsuchen. Ein
@@ -103,7 +104,7 @@ wer im Einsatz schreiben darf.
 
 ### Eine Zone zeichnen
 
-1. Rechts an der Karte „Zeichenwerkzeuge“ wählen und unter „Flächen und Linien“ die Art, etwa
+1. Rechts an der Karte „Zeichnen“ wählen und unter „Flächen und Linien“ die Art, etwa
    „Gefahrengebiet“. Eine freie Skizze entsteht mit „Freie Skizze“ als Fläche oder mit „Linie“
    daneben als Linie. Esc oder ein Tipp neben das Menü schließt es, ohne zu zeichnen.
 2. Die Eckpunkte nacheinander auf die Karte tippen. Das Band unten zählt die Punkte;
@@ -116,7 +117,7 @@ wer im Einsatz schreiben darf.
 
 ### Einen Absperr- oder Gefahrenbereich als Kreis zeichnen
 
-1. Unter „Zeichenwerkzeuge“ neben der Art, etwa „Absperrbereich“, „Kreis“ wählen. Mit
+1. Unter „Zeichnen“ neben der Art, etwa „Absperrbereich“, „Kreis“ wählen. Mit
    Schreibrecht geht es auch über einen Rechtsklick oder langen Druck auf die Karte und „Kreis
    hier …“; die Stelle ist dann schon die Mitte.
 2. Im Band unten unter „Art“ bei Bedarf eine andere Art wählen.
@@ -161,7 +162,18 @@ wer im Einsatz schreiben darf.
 
 ## Hintergrund
 
+### Knöpfe an der Karte
+
+Rechts oben an der Karte stehen die Knöpfe, jeder mit seinem Wort unter dem Symbol: „+“ und „−“
+zoomen, „Norden“ richtet die Karte nach Norden aus, „Position“ zeigt den eigenen Standort,
+„Messen“ misst Strecken und Flächen, „Zeichnen“ öffnet die Zeichenwerkzeuge und „Leiste“ blendet
+die Leiste ein oder aus (ab Tablet quer; darunter steht dieser Knopf im Seitenkopf).
+
 ### Die Leiste: Ebenen, Objekte und Auswahl
+
+Am Touch-Gerät ist die Leiste beim ersten Öffnen zu, auch am Tablet quer, damit die Karte die ganze
+Breite hat. „Leiste“ blendet sie ein; das Gerät merkt sich die Wahl. Wer mit der Maus arbeitet,
+findet sie ab Tablet-Breite offen vor. Wird ein Objekt gewählt, öffnet sie sich immer.
 
 Die Ansicht „Ebenen“ ordnet die Ebenen in feste Gruppen: „Kräfte“ (Einheiten, Fahrzeuge, Personal,
 Abschnitte, Bereitstellungsräume), „Lage“ (Einsatzort, Führungsstelle, Zonen, Schäden,
@@ -362,7 +374,7 @@ Gebiets bleiben still.
 Lesen, Ebenen schalten und Messen gehen mit jeder Rolle. Verorten, Zeichnen und Zeichen setzen
 brauchen das Schreibrecht im Einsatz: Einsatzleitung oder Führungspersonal in einem laufenden
 Einsatz (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht fehlt der Knopf
-„Zeichenwerkzeuge“.
+„Zeichnen“.
 
 ### Bereitstellungsräume
 
