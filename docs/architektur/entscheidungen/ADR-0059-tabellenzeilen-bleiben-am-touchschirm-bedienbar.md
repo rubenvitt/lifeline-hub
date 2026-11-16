@@ -1,5 +1,5 @@
 ---
-id: ADR-0058
+id: ADR-0059
 titel: Tabellenzeilen bleiben am Touchschirm bedienbar, die Primitive tragen es
 status: akzeptiert
 datum: 2026-11-16
@@ -15,7 +15,7 @@ herleitung:
   - openspec/changes/archive/2026-11-16-lsug0joq-tabellen-touch/design.md
 ---
 
-# ADR-0058: Tabellenzeilen bleiben am Touchschirm bedienbar, die Primitive tragen es
+# ADR-0059: Tabellenzeilen bleiben am Touchschirm bedienbar, die Primitive tragen es
 
 ## Regeln
 
