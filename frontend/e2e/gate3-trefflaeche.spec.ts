@@ -1218,7 +1218,9 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
     // Die Fahrzeugseite steht für alle vier Einbauorte derselben Komponente.
     await ladeInDichte(page, `/einsaetze/${einsatzId}/fahrzeuge`, dichte);
 
-    const link = page.getByRole('link', { name: 'Meldebild', exact: true });
+    // Im Hauptbereich: die Modulliste daneben trägt einen gleichnamigen Link, der je nach
+    // Ladereihenfolge erst nach `toHaveCount(1)` erscheint (Wettlauf, sichtbar seit LLH-1719).
+    const link = page.getByRole('main').getByRole('link', { name: 'Meldebild', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);
@@ -5701,6 +5703,9 @@ async function measurePersonalKopf(page: Page, dichte: keyof typeof ZIELABSTAND,
   }
   let kleinsteHoehe = Number.POSITIVE_INFINITY;
   for (let i = 0; i < anzahl; i += 1) {
+    // Mit der Schrift der Stufe (LLH-1774) ist die Tabelle in `handschuh` breiter als der Fükw und
+    // rollt seitlich (`scroll.x`); gemessen wird jeder Kopf dort, wo man ihn bedient: im Bild.
+    await sortierbar.nth(i).scrollIntoViewIfNeeded();
     const hoehe = await sortierTrefferHoehe(sortierbar.nth(i));
     expect(
       hoehe,

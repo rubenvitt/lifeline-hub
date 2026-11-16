@@ -278,6 +278,16 @@ describe('KartenUeberlagerung — Zeigerkoordinate', () => {
     // Ein Inline-`display` an der Hülle schlüge die Regel, die Koordinate bliebe stehen.
     expect(huelle!.style.display).toBe('');
   });
+
+  it('fängt keinen Klick ab: die Anzeige folgt dem Zeiger und darf nie über dem Ziel liegen', () => {
+    // Review LLH-1719: mit der Schrift der Stufe (`handschuh` 13,75 px) lief der Text über den
+    // Kasten hinaus und lag unter dem Zeiger; der Klick auf einen Pegel öffnete nichts mehr.
+    renderMitProviders(<KartenUeberlagerung {...basis()} />);
+    const huelle = document
+      .querySelector('[data-lfh="zeiger-koordinate"]')!
+      .closest('.lfh-nur-feiner-zeiger') as HTMLElement;
+    expect(huelle.style.pointerEvents).toBe('none');
+  });
 });
 
 describe('GrundlageLeiste', () => {
