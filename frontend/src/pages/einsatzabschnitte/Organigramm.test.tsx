@@ -540,6 +540,11 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     expect(z).toHaveTextContent('2 Einheiten ohne Führer');
     const chips = z.querySelectorAll('[data-lfh="status-chip"]');
     expect([...chips].map((c) => c.getAttribute('data-ton'))).toEqual(['achtung', 'achtung']);
+    // Feste Höhe ohne Umbruch: wird ein Chip auf schmalem Schirm gekappt, nennt der Titel ihn ganz.
+    expect([...chips].map((c) => c.getAttribute('title'))).toEqual([
+      '2 Abschnitte ohne Leitung',
+      '2 Einheiten ohne Führer',
+    ]);
     // Über dem Organigramm, außerhalb der Schleuse, mit fester Höhe; gedruckt wird sie mit.
     const baum = screen.getByRole('region', { name: 'Organigramm' });
     expect(baum.contains(z)).toBe(false);
@@ -548,7 +553,7 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     expect(z.closest('.organigramm-no-print')).toBeNull();
   });
 
-  it('nennt ohne Lücke leise „Leitung überall besetzt“, in derselben Höhe', () => {
+  it('nennt ohne Lücke leise „Leitung überall besetzt“', () => {
     const { container } = renderMitProviders(
       <Organigramm
         einsatz={EINSATZ}
@@ -595,11 +600,17 @@ describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
     // Am gezeigten Knoten fällt der Führer weg: Knoten und Zeile zeigen es sofort.
     const ohneFuehrer = [einheit(10, { abschnitt_id: 1 })];
     rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(ohneFuehrer)} />);
+    const knoten = screen
+      .getByRole('link', { name: 'Einheit 10' })
+      .closest('[data-lfh="org-knoten"]') as HTMLElement;
+    expect(within(knoten).getByText('Leitung nicht besetzt')).toBeInTheDocument();
     expect(zeile(container)!.textContent).toBe('1 Einheit ohne Führer');
     expect(zeile(container)!.style.height).toBe(hoehe);
     // Eine neue Einheit ohne Führer wartet im Baum, gezählt wird sie schon.
     const neu = [...ohneFuehrer, einheit(11, { name: 'Trupp', abschnitt_id: 1 })];
     rerender(<Organigramm einsatz={EINSATZ} abschnitte={besetzt} einheiten={daten(neu)} />);
+    expect(screen.queryByRole('link', { name: 'Trupp' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'anzeigen' })).toBeInTheDocument();
     expect(zeile(container)!.textContent).toBe('2 Einheiten ohne Führer');
     expect(zeile(container)!.style.height).toBe(hoehe);
   });

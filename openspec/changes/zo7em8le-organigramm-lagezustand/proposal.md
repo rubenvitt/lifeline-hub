@@ -24,7 +24,8 @@ kritischen Abschnitt nicht.
   Sind alle besetzt, steht dort leise „Leitung überall besetzt“. Fehlen die Einheiten, zählt die
   Zeile nur die Abschnitte. Die Zeile ist immer gleich hoch, damit sie den Baum nie verschiebt.
 - Druck und „In Lagebericht übernehmen“ tragen beides: der Druck wie der Bildschirm, der Bericht
-  mit „Lage <Zustand>“ an der Abschnittszeile und der Sammelzeile unter „Gliederung“.
+  mit „Lage <Zustand>“ an der Abschnittszeile und, wenn eine Leitung fehlt, der Sammelzeile unter
+  „Gliederung“.
 
 ## Capabilities
 

@@ -247,7 +247,7 @@ function OhneLeitungZeile({ teile, ruhe }: { teile: readonly string[]; ruhe: str
       }}
     >
       {teile.length > 0
-        ? teile.map((teil) => <StatusChip key={teil} ton="achtung" wort={teil} />)
+        ? teile.map((teil) => <StatusChip key={teil} ton="achtung" wort={teil} title={teil} />)
         : ruhe && (
             <span style={{ fontSize: token.fontSizeSM, color: rollen.gedaempft }}>{ruhe}</span>
           )}

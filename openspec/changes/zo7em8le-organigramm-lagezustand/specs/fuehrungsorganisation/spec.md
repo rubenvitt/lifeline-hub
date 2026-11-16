@@ -34,8 +34,8 @@ Das Organigramm SHALL „In Lagebericht übernehmen“ anbieten, wenn die Person
 darf und das Modul Lageberichte freigegeben ist. Die Übernahme MUST in genau einem Aufruf einen
 Freitext-Lagebericht „Führungsorganisation <DTG>“ anlegen. Er enthält die Gliederung als
 verschachtelte Liste mit Rufname, Leitung und Stärke, an einem beurteilten Abschnitt dazu „Lage
-<Zustand>“, und unter „Gliederung“ die Sammelzeile der fehlenden Leitung, soweit sie am
-Bildschirm stünde. Namen erscheinen als Text, nie als Markup. Solange eine Quelle lädt, MUST die
+<Zustand>“, und unter „Gliederung“ die Teile der Sammelzeile, wenn eine Leitung fehlt. Namen
+erscheinen als Text, nie als Markup. Solange eine Quelle lädt, MUST die
 Aktion gesperrt sein. Ein Fehler MUST an der Seite stehen.
 
 #### Scenario: Erfolgreiche Übernahme
@@ -131,8 +131,8 @@ Abschnitt und unterstellte eingeschlossen. Die Zeile MUST auch im Druck stehen.
 
 Die Sammelzeile SHALL immer gleich hoch dastehen, auch während die Schleuse die Struktur hält.
 Fehlt keine Leitung, MUST sie leise „Leitung überall besetzt“ nennen, bei nicht geladenen Einheiten
-„Alle Abschnitte mit Leitung“, ohne Etikett in Achtungrolle. Ihr Wechsel MUST den Baum nicht
-verschieben.
+„Alle Abschnitte mit Leitung“, ohne Etikett in Achtungrolle; ohne jeden Knoten bleibt sie leer.
+Ihr Wechsel MUST den Baum nicht verschieben.
 
 #### Scenario: Alles besetzt
 

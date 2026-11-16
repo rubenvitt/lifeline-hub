@@ -82,6 +82,11 @@ Leitung an einem gezeigten Knoten floss in den Knoten, aber nicht in die Zahl, o
 „anzeigen“ schob den Baum, wenn mit ihm die erste Lücke kam oder die letzte ging.
 *Weitere Alternative (16.11.2026 mit dem Menschen abgewogen):* live mit Scroll-Ausgleich
 (`useAmSchirmHalten` der Fernmeldeskizze; mehr Code, oben auf der Seite ohne Wirkung).
+*Warum jetzt der feste Platz:* Nach dem ersten Review war „fest reservierter Platz (leerer
+Streifen, wenn nichts fehlt)“ zugunsten des gehaltenen Kopfs verworfen. Der zweite Review zeigte,
+dass der Kopf die Zahl gegen den gezeigten Inhalt veralten lässt und „anzeigen“ trotzdem schiebt.
+Am 16.11.2026 hat der Mensch deshalb den festen Platz gewählt, mit einem leisen Text statt eines
+leeren Streifens.
 *Folge:* Während jemand im Organigramm arbeitet, zählt die Zeile auch Knoten, die noch hinter dem
 Sammelbanner warten; der Banner nennt sie zugleich.
 
@@ -99,8 +104,10 @@ Einheiten und Stärken fehlen“ bleibt, wie sie ist.
   eine eigene Spec-Änderung.
 - [StatusTag und StatusChip im Druck] → Die Prüfung, dass beide dunkel auf hell drucken, steht als
   eigene Aufgabe in tasks.md (Druckemulation im Bildlauf).
-- [Feste Höhe ohne Umbruch: sehr große Zahlen auf sehr schmalem Schirm würden abgeschnitten] → Bei
-  390 px passen „12 Abschnitte ohne Leitung“ und „15 Einheiten ohne Führer“ nebeneinander; ein
-  Umbruch hätte die Höhe und damit den Baum bewegt.
+- [Feste Höhe ohne Umbruch: auf schmalem Schirm kann der zweite Chip gekappt werden] → Bei 390 px
+  und 100 % passen auch zweistellige Zahlen nebeneinander. Bei 320 px (WCAG 1.4.10) laufen erst
+  dreistellige Zahlen über, mit Seitenzoom ab 125–150 % auch kleinere. Die Zahl steht vorn und
+  bleibt meist sichtbar; jeder Chip trägt seinen vollen Text als `title`, Vorleser lesen ihn ganz.
+  Ein Umbruch hätte die Höhe und damit den Baum bewegt.
 - [Die Fernmeldeskizze teilt das Gerüst] → Es ändern sich nur `KnotenInhalt` und die Seite; ein
   Test der Skizze läuft im Gate mit.
