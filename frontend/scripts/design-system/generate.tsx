@@ -27,6 +27,7 @@ import {
   form,
   koerperschemaFarben,
   navDrawerBreite,
+  navDrawerRand,
   paletteMaske,
   rahmenFarben,
   schrift,
@@ -311,6 +312,11 @@ function buildSize(): Token[] {
       'nav-drawer-breite',
       navDrawerBreite,
       firstSentence(docBefore(source, 'export const navDrawerBreite').replace(/\s+/g, ' ')),
+    ),
+    px(
+      'nav-drawer-rand',
+      navDrawerRand,
+      firstSentence(docBefore(source, 'export const navDrawerRand').replace(/\s+/g, ' ')),
     ),
   );
   return tokens;

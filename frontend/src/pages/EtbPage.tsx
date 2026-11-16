@@ -1165,7 +1165,7 @@ export default function EtbPage() {
               ...(kleben.klebt
                 ? {
                     position: 'sticky',
-                    top: ETB_FILTERLEISTE_OBEN, // --lfh-rahmen-oben + Seitenkopf, `etbKopfKleben.ts`
+                    top: ETB_FILTERLEISTE_OBEN, // --lfh-rahmen-oben, zählt den Seitenkopf mit, `etbKopfKleben.ts`
                     zIndex: FILTERLEISTE_EBENE,
                     background: rollen.grund,
                   }

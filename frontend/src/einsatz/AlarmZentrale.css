@@ -1,0 +1,19 @@
+/* Platz des Ton-Worts im Kopf (Nachentscheid LLH-1726, 15.11.2026; Vorgänger LLH-1158). Vor der
+   ersten Bediengeste sperrt der Browser den Alarmton, und nach der Frist erscheint ohne Zutun
+   „Ton blockiert“. Ohne Platz sprang der Kopf an seiner Umbruchkante dann von einer auf zwei
+   Zeilen. Das Wort hält deshalb die Breite von `data-platz`, auch leer im Ruhezustand.
+   Der Platzhalter ist erzeugter Inhalt, kein Text im DOM: `textContent` bleibt das sichtbare Wort,
+   und `visibility: hidden` nimmt ihn aus dem Barrierebaum. Spalte statt Zeile: der Platzhalter
+   hat keine Höhe, die Breite ist das Maximum beider. Schrift und Umbruch erbt er vom Wort.
+   Keine Farbwerte hier. */
+.ton-wort-platz {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.ton-wort-platz::after {
+  content: attr(data-platz);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}

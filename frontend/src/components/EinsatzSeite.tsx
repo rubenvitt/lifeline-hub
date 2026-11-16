@@ -18,6 +18,7 @@ import Datenstand from './Datenstand';
 import FensterRahmen from './FensterRahmen';
 import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
+import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useModusFarben } from './rahmenStil';
 import { useAlarmKante } from './alarmOben';
 import StatusTag from './StatusTag';
@@ -33,12 +34,6 @@ const SEITENKOPF_HOEHE = 44;
 
 /** Haarlinie unter der Seitenkopfleiste; sie zählt zur Höhe (`boxSizing: 'border-box'`). */
 const SEITENKOPF_LINIE = 1;
-
-/**
- * Stapelebene des klebenden Seitenkopfs (`kopfKlebt`): unter dem Rahmen (`RAHMEN_EBENE` 100), über
- * der angepinnten ETB-Erfassung (20) und den Köpfen, die eine Seite darunter klebt.
- */
-export const KOPF_KLEBT_EBENE = 30;
 
 /**
  * Stil der Seitenkopfleiste — rein und exportiert.
@@ -388,9 +383,10 @@ interface EinsatzSeiteProps {
   /** Optionaler Hinweis unter dem Header (z. B. `RechteHinweis` „Nur Ansicht · Grund“). */
   hinweis?: ReactNode;
   /**
-   * Der Seitenkopf klebt unter dem Rahmen (ETB, kwc2yszv D8): `position: sticky` unter
-   * `--lfh-rahmen-oben`, mit dem Seitengrund, über dem Inhalt. OB er klebt, entscheidet die Seite —
-   * sie misst über {@link EinsatzSeiteProps.kopfRef}, ob ihre klebenden Köpfe ins Fenster passen.
+   * Vorgabe, ob der Seitenkopf klebt (zjt7c073 D3, `components/seitenkopfKleben.ts`). Fehlt sie,
+   * klebt er ab `md` unter der Kopfleiste, solange er mit ihr höchstens ein Drittel der Fensterhöhe
+   * nimmt. Das ETB setzt sie (kwc2yszv D8): dort kleben Seitenkopf, Filterleiste und Spaltenkopf
+   * nur gemeinsam, gemessen über {@link EinsatzSeiteProps.kopfRef}.
    */
   kopfKlebt?: boolean;
   /** Callback-Ref auf die Seitenkopfleiste, zum Messen (`etb/etbKopfKleben.ts`). */
@@ -470,7 +466,7 @@ export default function EinsatzSeite({
   weitere,
   neueZeile,
   hinweis,
-  kopfKlebt = false,
+  kopfKlebt,
   kopfRef,
   dataUpdatedAt,
   breite = 'voll',
@@ -484,13 +480,19 @@ export default function EinsatzSeite({
   const aktionenRef = useRef<HTMLDivElement>(null);
   // Stehende Alarme beginnen unter dem Seitenkopf, solange er im Bild ist (LFH-1112).
   const alarmKante = useAlarmKante<HTMLDivElement>();
-  // Eine Ref-Funktion für beide Abnehmer; stabil, sonst hängte React sie bei jedem Render um.
+  // Klebt der Seitenkopf, zählt er zum Rahmen über dem Inhalt (zjt7c073 D2/D3). Mit
+  // `fensterInhalt` steckt er in `FensterRahmen` in einem eigenen Wrapper, der sein Containing
+  // Block ist: kleben kann er dort nicht, also meldet er sich auch nicht als Rahmenquelle.
+  const kleben = useSeitenkopfKleben<HTMLDivElement>(fensterInhalt != null ? false : kopfKlebt);
+  const klebeRef = kleben.ref;
+  // Eine Ref-Funktion für alle Abnehmer; stabil, sonst hängte React sie bei jedem Render um.
   const kopfLeiste = useCallback(
     (el: HTMLDivElement | null) => {
       alarmKante(el);
+      klebeRef(el);
       kopfRef?.(el);
     },
-    [alarmKante, kopfRef],
+    [alarmKante, klebeRef, kopfRef],
   );
   const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
@@ -545,14 +547,12 @@ export default function EinsatzSeite({
         ref={kopfLeiste}
         data-lfh="seitenkopf"
         style={
-          kopfKlebt
+          kleben.klebt
             ? {
                 ...seitenkopfStil(token, farben, true),
-                // Unter dem klebenden Rahmen (`frontend/AGENTS.md`, Rahmen), über dem Inhalt samt
-                // klebender Filterleiste der Seite, mit Grund: darunter rollt die Zeitachse durch.
-                position: 'sticky',
-                top: 'var(--lfh-rahmen-oben, 0px)',
-                zIndex: KOPF_KLEBT_EBENE,
+                // Unter der Kopfleiste (`frontend/AGENTS.md`, Rahmen), über dem Inhalt samt
+                // klebender Filterleiste der Seite, mit Grund: darunter rollt der Inhalt durch.
+                ...SEITENKOPF_KLEBT,
                 background: farben.grund,
               }
             : seitenkopfStil(token, farben, true)

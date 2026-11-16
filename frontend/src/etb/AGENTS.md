@@ -122,17 +122,20 @@ Ableitungen in `etb/zeitachseModell.ts`)
   sind Sprungwerte der Seite aus der URL. Der Zeitraum schreibt bei jeder Wahl ABSOLUTE,
   minutengenaue Grenzen (`anzeige/zeitfenster.ts`); „Seit letzter Lagebesprechung“ nur mit
   Freigabe `lagebesprechung` und abgehaltener Besprechung (`lagebesprechung/useLetzteLagebesprechung.ts`).
-  **Kleben** (kwc2yszv D8, `etb/etbKopfKleben.ts`): ab `md` kleben Seitenkopf
-  (`EinsatzSeite kopfKlebt`) und Filterleiste unter dem Rahmen (`top: var(--lfh-rahmen-oben)` + gemessene Höhe
-  des Seitenkopfs), solange sie mit Rahmen und Spaltenkopf höchstens ein Drittel der Fensterhöhe
-  nehmen (`KLEBEN_HOECHSTENS`): sonst bliebe zwischen ihnen und der angepinnten Erfassung kein Platz
-  und ein getabbtes Ziel läge ganz verdeckt (`e2e/fokus-verdeckung.spec.ts`, 1366 × 520
-  Handschuh). Der Seitencontainer `[data-lfh="etb-seite"]` trägt `--etb-kopf-unterkante` (Rahmen +
-  Seitenkopf + Filterleiste); dort klebt der Spaltenkopf der Zeitachse
+  **Kleben** (kwc2yszv D8, `etb/etbKopfKleben.ts`): ab `md` kleben Seitenkopf, Filterleiste und
+  Spaltenkopf gemeinsam, solange sie mit der Kopfleiste (`useKopfOben`, nicht die Rahmenhöhe, in die
+  der Seitenkopf selbst eingeht) höchstens ein Drittel der Fensterhöhe nehmen
+  (`KLEBEN_HOECHSTENS`, `components/seitenkopfKleben.ts`): sonst bliebe zwischen ihnen und der
+  angepinnten Erfassung kein Platz und ein getabbtes Ziel läge ganz verdeckt
+  (`e2e/fokus-verdeckung.spec.ts`, 1366 × 520 Handschuh). Die Seite reicht die Entscheidung als
+  `kopfKlebt` an `EinsatzSeite`; der klebende Seitenkopf zählt dann wie auf jeder Seite zu
+  `--lfh-rahmen-oben` (zjt7c073 D5, `frontend/AGENTS.md`, Rahmen). Die Filterleiste klebt unter
+  `var(--lfh-rahmen-oben)`, der Seitencontainer `[data-lfh="etb-seite"]` trägt
+  `--etb-kopf-unterkante` (Rahmen + Filterleiste); dort klebt der Spaltenkopf der Zeitachse
   (`[data-lfh="etb-spaltenkopf"]`). Den Fokusabstand oben trägt `scroll-padding-block-start` am
   Dokument (`index.css`, Marke `etb-kopf-klebt`), ausgesetzt bei Fokus in den Köpfen; „Nach oben“
-  rechnet die Köpfe mit (`useEtbKopfHoehe`). Nachweis `e2e/etb-filterleiste.spec.ts` („am Ende der
-  Zeitachse“).
+  rechnet Filterleiste und Spaltenkopf dazu (`useEtbKopfHoehe`). Nachweis
+  `e2e/etb-filterleiste.spec.ts` („am Ende der Zeitachse“).
 - **Systemeinträge sind in der Vorgabe aus** (LFH-958, kwc2yszv D6, Spec
   `etb-zeitachse-darstellung`, „Systemeinträge zeigen“): am Server ist `ohne_system=true` ein
   Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste, `zaehler`
@@ -209,7 +212,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
     lang ist, was unter ihr herausragt), mit „mehr“/„weniger“; offen bei `?eintrag=` und bei
     einem Treffer der Volltextsuche im Inhalt, im Druck nie (`@media print`).
   - Der Spaltenkopf klebt unter `--etb-kopf-unterkante` (setzt die Seite: Unterkante von
-    Seitenkopf und Filterleiste), ohne sie unter `--lfh-rahmen-oben`.
+    Rahmen samt Seitenkopf und Filterleiste), ohne sie unter `--lfh-rahmen-oben`.
   - Nachweis: ≤ 36 px und ≥ 14 Einträge zwischen Filter- und Erfassungsleiste bei 1440 × 900
     (`e2e/etb-zeilenhoehe.spec.ts`); ab 1200 px bekommt die Spalte Inhalt ≥ 45 % der
     **Contentbreite** und ist die breiteste Spalte, bei 390 px nutzt der Text ≥ 330 px

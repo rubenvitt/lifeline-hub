@@ -6,8 +6,18 @@ import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import Tastenkuerzel from './Tastenkuerzel';
 import { useViewport } from './useViewport';
 import { schriftGroesse } from './instrument/rollenwerte';
+import './CommandPaletteTrigger.css';
 
 const TREFFLAECHE = 48;
+
+/**
+ * Trefffläche der Lupe: der A1-Boden, in `handschuh` die Steuerhöhe (LFH-460). Auch das
+ * Suchfeld ab `lg` schrumpft nie darunter (LLH-1726: dort wird es zur Lupe, bevor der Einsatzname
+ * kürzt; `kopfRasterSpalten` in `Kopfleiste.tsx`).
+ */
+export function suchTrefflaeche(token: { controlHeight: number }): number {
+  return Math.max(TREFFLAECHE, token.controlHeight);
+}
 
 /** Größte Breite des Suchfelds in der Kommandoleiste (Neuentwurf, `shell.dc.html`). */
 const SUCHFELD_MAX_BREITE = 520;
@@ -72,9 +82,9 @@ export function suchfeldStil(token: {
 export default function CommandPaletteTrigger() {
   const { toggle } = useCommandPalette();
   const { token } = theme.useToken();
-  const { abBreite } = useViewport();
+  const { abBreite, istBeruehrung } = useViewport();
   const breit = abBreite('lg');
-  const trefflaeche = Math.max(TREFFLAECHE, token.controlHeight);
+  const trefflaeche = suchTrefflaeche(token);
   const kuerzel = suchKuerzelFuerUserAgent(
     typeof navigator === 'undefined' ? '' : navigator.userAgent,
   );
@@ -105,7 +115,9 @@ export default function CommandPaletteTrigger() {
       aria-label="Suchen"
       aria-keyshortcuts={kuerzel === '⌘K' ? 'Meta+K' : 'Control+K'}
       onClick={toggle}
-      style={suchfeldStil(token)}
+      className="kopf-suchfeld"
+      // Die Trefffläche als Boden: wird die Suchzelle schmal, bleibt die Lupe (LLH-1726).
+      style={{ ...suchfeldStil(token), minWidth: trefflaeche }}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', flexShrink: 0 }}>
         <IconLupe size={15} />
@@ -113,6 +125,7 @@ export default function CommandPaletteTrigger() {
       {/* Eine Flex-Zeile, kein Fragment: JSX verschluckt den Zeilenumbruch zwischen zwei
           Elementen ersatzlos — so stand bis zum 08.08.2026 „Suchen⌘K" in einem Zug. */}
       <span
+        className="kopf-suchfeld-text"
         style={{
           flex: 1,
           minWidth: 0,
@@ -123,9 +136,17 @@ export default function CommandPaletteTrigger() {
       >
         {SUCHFELD_TEXT}
       </span>
-      <Tastenkuerzel aria-hidden style={{ color: rahmenFarben.gedaempft }}>
-        {kuerzel}
-      </Tastenkuerzel>
+      {/* Am Touch-Gerät verspricht das Feld keine Taste (LLH-1726, Spec `kopfleiste`); mit
+          angesteckter Tastatur wirkt das Kürzel trotzdem (`aria-keyshortcuts`). */}
+      {!istBeruehrung && (
+        <Tastenkuerzel
+          aria-hidden
+          className="kopf-suchfeld-text"
+          style={{ color: rahmenFarben.gedaempft }}
+        >
+          {kuerzel}
+        </Tastenkuerzel>
+      )}
     </Button>
   );
 }

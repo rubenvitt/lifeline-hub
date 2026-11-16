@@ -9,6 +9,7 @@ import {
   type SeitenBreite,
 } from './EinsatzSeite';
 import { useModusFarben } from './rahmenStil';
+import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useEbene1Ort } from './Ebene1OrtKontext';
 import { einsaetzePfad } from '../routing/deeplinks';
 import { UebungsMarke } from './instrument';
@@ -90,6 +91,8 @@ export default function AdminPage({
 }: AdminPageProps) {
   const { token } = theme.useToken();
   const farben = useModusFarben();
+  // Der Seitenkopf klebt unter der Kopfleiste wie auf den Einsatzseiten (zjt7c073 D3).
+  const kleben = useSeitenkopfKleben<HTMLDivElement>();
   // Ort und Rückweg auf Profil und Verwaltung, gestellt von `AppLayout` (LFH-954).
   const ebene1 = useEbene1Ort();
   const rueckweg = ebene1?.rueckweg;
@@ -103,7 +106,19 @@ export default function AdminPage({
     : pfad;
   return (
     <div style={{ maxWidth: seitenBreiteMax(breite) }}>
-      <div data-lfh="seitenkopf" style={seitenkopfStil(token, farben, false)}>
+      <div
+        ref={kleben.ref}
+        data-lfh="seitenkopf"
+        style={
+          kleben.klebt
+            ? {
+                ...seitenkopfStil(token, farben, false),
+                ...SEITENKOPF_KLEBT,
+                background: farben.grund,
+              }
+            : seitenkopfStil(token, farben, false)
+        }
+      >
         <div
           className="lfh-seitenkopf__titelblock"
           style={{

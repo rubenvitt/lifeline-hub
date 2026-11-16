@@ -112,16 +112,18 @@ test('1440 × 900 kompakt, am Ende der Zeitachse: Kopf und Filterleiste kleben, 
   // Vorbedingung: die Seite steht am Ende, nicht oben — sonst stünde die Leiste trivial im Bild.
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
 
+  // Der Seitenkopf hängt an der Kopfhöhe und zählt selbst zur Rahmenhöhe (zjt7c073 D2/D5).
   const m = await page.evaluate(() => {
-    const rahmen =
-      parseFloat(
-        getComputedStyle(document.documentElement).getPropertyValue('--lfh-rahmen-oben'),
-      ) || 0;
+    const wert = (name: string) =>
+      parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+    const rahmen = wert('--lfh-kopf-oben');
+    const rahmenSamtSeitenkopf = wert('--lfh-rahmen-oben');
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!.getBoundingClientRect();
     const leiste = document.getElementById('etb-filterleiste')!.getBoundingClientRect();
     const spaltenkopf = document.querySelector('[data-lfh="etb-spaltenkopf"]');
     return {
       rahmen,
+      rahmenSamtSeitenkopf,
       kopfOben: kopf.top,
       kopfUnten: kopf.bottom,
       leisteOben: leiste.top,
@@ -133,6 +135,10 @@ test('1440 × 900 kompakt, am Ende der Zeitachse: Kopf und Filterleiste kleben, 
   expect(
     Math.abs(m.kopfOben - m.rahmen),
     `Seitenkopf unter dem Rahmen ${JSON.stringify(m)}`,
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(m.rahmenSamtSeitenkopf - m.kopfUnten),
+    'die Rahmenhöhe endet an der Unterkante des Seitenkopfs',
   ).toBeLessThanOrEqual(1);
   expect(
     Math.abs(m.leisteOben - m.kopfUnten),

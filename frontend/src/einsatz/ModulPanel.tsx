@@ -1,5 +1,5 @@
 import { IconExternPfeil, IconSchloss, IconSchraubenschluessel } from '../icons';
-import { useId, type CSSProperties } from 'react';
+import { useId, useLayoutEffect, useRef, type CSSProperties, type RefObject } from 'react';
 import { theme } from 'antd';
 import {
   istModulGesperrt,
@@ -20,11 +20,12 @@ import type { ModulZaehlerMap } from './useModulZaehler';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { augenbraueStil, useModusFarben } from '../components/rahmenStil';
 import { einsatzDauer } from './einsatzDauer';
-import { useFussFokusabstand } from './fussFokusabstand';
 import { MODUL_PANEL_ID } from './IconRail';
+import { bringIntoView } from '../components/bringIntoView';
+import { abonniereRahmenOben } from '../components/rahmenOben';
 import { einsatzModulPfad } from '../routing/deeplinks';
 import { handleLinkKlick } from '../routing/linkModifier';
-import { schriftGroesse } from '../components/instrument/rollenwerte';
+import { schriftGroesse, zahlStil } from '../components/instrument/rollenwerte';
 
 /** Breite des Modulpanels. Layoutmaß, keine Dichte-Angabe. */
 const PANEL_BREITE = 208;
@@ -127,20 +128,22 @@ export function modulZeilenStil(
 
 /**
  * Zweite Zeile einer Modulzeile: die Kurzbeschreibung aus der Registry (LFH-965, Spec
- * `modul-benennung`). 12 px in `schwach`, das den Textboden auf jeder Flächenstufe hält; eine
- * Zeile, zu Lange endet in „…“ und steht ganz im `title` des Knopfes.
+ * `modul-benennung`). 12 px in `schwach`, das den Textboden auf jeder Flächenstufe hält. Höchstens
+ * zwei Zeilen (LLH-1734: einzeilig endete im 208 px breiten Panel fast jede in „…“), zu Lange endet
+ * danach in „…“ und steht ganz im `title` des Knopfes.
  */
 export function modulBeschreibungStil(
   farben: Pick<Farbrollen, 'schwach'>,
   gesperrt: boolean,
 ): CSSProperties {
   return {
-    display: 'block',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
     fontSize: schriftGroesse('klein'),
     lineHeight: 1.35,
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
     color: gesperrt ? 'inherit' : farben.schwach,
   };
 }
@@ -387,9 +390,54 @@ export function ModulListe({
 }
 
 /**
+ * Hält die klebende Spalte genau so hoch wie den Platz von ihrer Oberkante im Fenster bis zum
+ * Fensterrand (zjt7c073, Review B2). Geklebt ist das `100dvh` minus Kopfhöhe; ungerollt beginnt die
+ * Spalte aber tiefer, sobald Bänder über dem Rahmen stehen (Spiegel, Führungshinweis, Betriebszeile
+ * ab `md`), und mit der festen Höhe läge der Fuß „Einsatzdauer“ unter dem Fensterrand. Gemessen bei
+ * Bildlauf, Fenstergröße, Änderung der Rahmenhöhe und der Seitenhöhe (ein Band erscheint), höchstens
+ * einmal je Bild; geschrieben direkt am Element, ohne neues Rendern. Die feste Höhe bleibt als Stil
+ * für das erste Bild und ohne Messung.
+ */
+function useFitToWindow(ref: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    let frame = 0;
+    const fit = () => {
+      frame = 0;
+      const top = Math.max(0, el.getBoundingClientRect().top);
+      el.style.height = `${Math.max(0, window.innerHeight - top)}px`;
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(fit);
+    };
+    fit();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    observer?.observe(document.body);
+    const unsubscribe = abonniereRahmenOben(schedule);
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      observer?.disconnect();
+      unsubscribe();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [ref]);
+}
+
+/**
  * Liste der Module einer Kategorie im inline-Rahmen, 208 px auf `paneel`. Kopf 42 px mit
  * Augenbraue; Fuß „Einsatzdauer" in Mono, live je Minute (abgeschlossen: bis
  * `abgeschlossen_at`). Ohne geladenen Einsatz oder lesbaren Beginn entfällt der Fuß.
+ *
+ * Klebt wie die Rail als EINE Spalte unter dem Kopf (zjt7c073 D4, `frontend/AGENTS.md`, Rahmen):
+ * Kopf und Fuß stehen fest, nur die Liste dazwischen rollt in sich. So bleibt die Kategorie auch
+ * am Ende einer langen Seite im Bild (das ETB öffnet dort), und kein Teil liegt über einem
+ * anderen: ein getabbter Eintrag rollt nur die Liste, deren Ränder die Kanten von Kopf und Fuß
+ * sind. Die Spalte hängt an der Kopfhöhe, nicht an der Rahmenhöhe, die den klebenden Seitenkopf
+ * mitzählt (D2).
  */
 export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const { token } = theme.useToken();
@@ -397,7 +445,23 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
   const jetzt = useMinutenTakt();
   const dauer = einsatz ? einsatzDauer(einsatz.begonnen_at, einsatz.abgeschlossen_at, jetzt) : null;
   const linie = `1px solid ${farben.linie}`;
-  const { fussRef } = useFussFokusabstand();
+  // Die Liste rollt in sich (zjt7c073, Review B8): eine neue Kategorie beginnt oben, statt die
+  // Rollposition der vorigen zu erben, und der aktive Eintrag kommt ins Bild, auch nach einem
+  // Sprung über die Palette. Nur im Container, nie im Fenster (`bringIntoView`).
+  const listRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
+  useFitToWindow(columnRef);
+  const prevTitel = useRef(titel);
+  useLayoutEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+    if (prevTitel.current !== titel) {
+      container.scrollTop = 0;
+      prevTitel.current = titel;
+    }
+    const eintrag = container.querySelector<HTMLElement>('[aria-current="true"]');
+    if (eintrag) bringIntoView(container, eintrag);
+  }, [titel, liste.aktiverModulKey]);
   return (
     <div
       // Testanker für den e2e-Trefflächennachweis. Der inline-Rahmen hat als einziger
@@ -409,58 +473,59 @@ export default function ModulPanel({ titel, einsatz, ...liste }: Props) {
       style={{
         width: PANEL_BREITE,
         flex: `0 0 ${PANEL_BREITE}px`,
-        display: 'flex',
-        flexDirection: 'column',
         background: farben.paneel,
         borderInlineEnd: linie,
         boxSizing: 'border-box',
       }}
     >
       <div
+        ref={columnRef}
+        data-lfh="modul-panel-spalte"
         style={{
-          minHeight: PANEL_KOPF,
+          position: 'sticky',
+          top: 'var(--lfh-kopf-oben, 0px)',
+          height: 'calc(100dvh - var(--lfh-kopf-oben, 0px))',
           display: 'flex',
-          alignItems: 'center',
-          paddingInline: token.padding,
-          borderBottom: linie,
+          flexDirection: 'column',
         }}
       >
-        <span style={augenbraueStil(farben.schwach)}>{titel}</span>
-      </div>
-      <ModulListe {...liste} />
-      {dauer && (
-        // `sticky; bottom: 0`: die Seite scrollt im Dokument, der Fuß hängt so am Fensterrand statt
-        // am Seitenende. Den Fokusabstand über ihm hält `index.css` per
-        // `scroll-padding` am Dokument, solange der Fokus im Panel steht (`fussFokusabstand`).
         <div
-          ref={fussRef}
-          data-lfh="modul-panel-fuss"
           style={{
-            marginTop: 'auto',
-            position: 'sticky',
-            bottom: 0,
-            background: farben.paneel,
-            borderTop: linie,
-            padding: `${token.paddingSM}px ${token.padding}px`,
+            minHeight: PANEL_KOPF,
+            flexShrink: 0,
             display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
+            alignItems: 'center',
+            paddingInline: token.padding,
+            borderBottom: linie,
           }}
         >
-          <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>
-          <span
+          <span style={augenbraueStil(farben.schwach)}>{titel}</span>
+        </div>
+        <div
+          ref={listRef}
+          data-lfh="modul-panel-liste"
+          style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}
+        >
+          <ModulListe {...liste} />
+        </div>
+        {dauer && (
+          <div
+            data-lfh="modul-panel-fuss"
             style={{
-              fontFamily: schrift.zahl,
-              fontSize: schriftGroesse('titel'),
-              fontWeight: 500,
-              fontVariantNumeric: 'tabular-nums',
-              color: farben.text,
+              flexShrink: 0,
+              background: farben.paneel,
+              borderTop: linie,
+              padding: `${token.paddingSM}px ${token.padding}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
             }}
           >
-            {dauer}
-          </span>
-        </div>
-      )}
+            <span style={augenbraueStil(farben.schwach)}>Einsatzdauer</span>
+            <span style={{ ...zahlStil('titel', 500), color: farben.text }}>{dauer}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

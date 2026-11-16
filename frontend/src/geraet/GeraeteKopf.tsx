@@ -21,7 +21,7 @@ import { ANSICHT_LABEL } from '../pages/einstellungen/geraeteKern';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
 import { GeraeteMenue } from './GeraeteMenue';
 import { useStellenName } from './stellenName';
-import { zeitKurz } from '../anzeige/zeitDarstellung';
+import { zeitpunkt } from '../anzeige/zeitDarstellung';
 import { schriftStil } from '../components/instrument/rollenwerte';
 
 dayjs.extend(utc);
@@ -32,6 +32,29 @@ export const KOPPLUNG_ENDET_BALD_MS = 60 * 60 * 1000;
 /** Endet die Kopplung in weniger als einer Stunde? `laeuftAbAt` ist UTC vom Server. */
 export function kopplungEndetBald(laeuftAbAt: string, jetzt: number): boolean {
   return dayjs.utc(laeuftAbAt).valueOf() - jetzt < KOPPLUNG_ENDET_BALD_MS;
+}
+
+const STUNDE_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * Restzeit der Kopplung für die Kopfzeile (LLH-1734, Spec `feldgeraet-bedienung`): `kurz` sichtbar,
+ * `lang` für den zugänglichen Namen. Ab einer Stunde ganze Stunden, darunter Minuten, beide
+ * abgerundet (lieber früher gewarnt; aufgerundet folgte auf „1 h“ eine Minute „60 min“). Die letzte
+ * Minute heißt „1 min“, nicht „0 min“. Danach „endet“, bis die Hülle auf „Kopplung beendet“ wechselt.
+ */
+export function kopplungRestText(
+  laeuftAbAt: string,
+  jetzt: number,
+): { kurz: string; lang: string } {
+  const rest = dayjs.utc(laeuftAbAt).valueOf() - jetzt;
+  if (rest <= 0) return { kurz: 'endet', lang: 'endet jetzt' };
+  if (rest >= STUNDE_MS) {
+    const h = Math.floor(rest / STUNDE_MS);
+    return { kurz: `noch ${h} h`, lang: `noch ${h} ${h === 1 ? 'Stunde' : 'Stunden'}` };
+  }
+  const min = Math.max(1, Math.floor(rest / MINUTE_MS));
+  return { kurz: `noch ${min} min`, lang: `noch ${min} ${min === 1 ? 'Minute' : 'Minuten'}` };
 }
 
 /**
@@ -52,7 +75,11 @@ function useJuengsterDatenstand(): number {
   );
 }
 
-/** Ende der Kopplung; unter einer Stunde mit Wort und Farbe hervorgehoben (WCAG 1.4.1). */
+/**
+ * Ende der Kopplung als Restzeit mit Wort, „Kopplung noch 5 h“ (LLH-1734: „bis 131757“ in taktischer
+ * Darstellung erklärte sich nicht). Die Endzeit in der Zeitdarstellung steht im Hinweis und im
+ * zugänglichen Namen. Unter einer Stunde mit Wort und Farbe hervorgehoben (WCAG 1.4.1).
+ */
 function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
   const { token } = theme.useToken();
   const jetzt = useMinutenTakt();
@@ -60,15 +87,21 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
   // Die Hülle hat keinen `EinsatzAnzeigeProvider` (`geraet/AGENTS.md`): der Hook liefert dort die
   // Browserzone, unter einem Provider dessen Zone (LFH-913).
   const { konventionen } = useAnzeigeKonventionen();
-  const uhrzeit = zeitKurz(laeuftAbAt, konventionen);
+  const ende = zeitpunkt(laeuftAbAt, konventionen);
+  const rest = kopplungRestText(laeuftAbAt, jetzt);
   const farbe = bald ? farbenDunkel.achtung : rahmenFarben.gedaempft;
   return (
     <div
       data-lfh="kopf-kopplungsende"
       data-bald={bald ? 'ja' : 'nein'}
       role="img"
-      aria-label={bald ? `Kopplung endet bald, um ${uhrzeit}` : `Kopplung bis ${uhrzeit}`}
-      title={bald ? 'Verlängern: Einsatzleitung' : undefined}
+      aria-label={
+        // „bald“ nur, solange Zeit bleibt; abgelaufen sagt `rest.lang` selbst „endet jetzt“.
+        bald && rest.kurz !== 'endet'
+          ? `Kopplung endet bald, ${rest.lang}, bis ${ende}`
+          : `Kopplung ${rest.lang}, bis ${ende}`
+      }
+      title={bald ? `Kopplung bis ${ende} · Verlängern: Einsatzleitung` : `Kopplung bis ${ende}`}
       style={kopfZelleStil(token)}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: farbe }}>
@@ -83,7 +116,7 @@ function KopplungsEnde({ laeuftAbAt }: { laeuftAbAt: string }) {
           fontWeight: bald ? 600 : 400,
         }}
       >
-        {bald ? `endet ${uhrzeit}` : `bis ${uhrzeit}`}
+        {`Kopplung ${rest.kurz}`}
       </span>
     </div>
   );

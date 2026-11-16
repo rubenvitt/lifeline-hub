@@ -7,7 +7,7 @@ import { theme as antdTheme, type CheckboxProps, type RadioProps } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { abstand, antdToken, dichten, farbenHell, flaeche, schriftPx, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
-import { navDrawerBreite } from './tokens';
+import { navDrawerBreite, navDrawerRand } from './tokens';
 import {
   antdAlgorithmus,
   antdKaestchen,
@@ -162,7 +162,9 @@ describe('Seitenrinne (LFH-329 · B1)', () => {
  */
 describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
   it('exportiert die Breite des Navigations-Drawers als Token (LFH-329 · B1)', () => {
-    expect(navDrawerBreite).toBe(280);
+    // LLH-1734: 360 px, höchstens die Fensterbreite minus 48 px (bei 390 px also 342 statt 280).
+    expect(navDrawerBreite).toBe(360);
+    expect(navDrawerRand).toBe(48);
   });
 
   it('lässt den geschlossenen Flächen-Pin unberührt', () => {

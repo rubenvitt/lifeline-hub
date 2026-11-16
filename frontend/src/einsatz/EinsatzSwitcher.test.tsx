@@ -177,10 +177,23 @@ describe('EinsatzSwitcher', () => {
     // `overflow: hidden` klippte nie, und die Behauptungen dahinter wären grün durch Nichtstun.
     expect(knopf.style.maxWidth).toBe('100%');
 
+    // Eine sichtbare Zeile mit „…“; gebrochen wird für die Messung überall (LLH-1726, design.md
+    // D2): so ist die Mindestbreite ein Zeichen, die Eigenbreite der ganze Name.
     const span = screen.getByText(lang);
     expect(span.style.overflow).toBe('hidden');
-    expect(span.style.textOverflow).toBe('ellipsis');
-    expect(span.style.whiteSpace).toBe('nowrap');
+    expect(span.style.display).toBe('-webkit-box');
+    expect(span.style.webkitLineClamp).toBe('1');
+    expect(span.style.overflowWrap).toBe('anywhere');
+    // antds Knopf vererbt `nowrap`: ohne `normal` bräche der Name nie, und seine Mindestbreite
+    // wäre wieder der ganze Name (Kopf lief bei 1024 px über, LLH-1726).
+    expect(span.style.whiteSpace).toBe('normal');
+  });
+
+  it('setzt den Namen in 16 px, in jeder Dichte (LLH-1726)', async () => {
+    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    setup();
+    const knopf = await screen.findByRole('button', { name: /Hochwasser/ });
+    expect(knopf.style.fontSize).toBe('16px');
   });
 
   it('navigiert ueber „Alle Einsätze …" zur Heim-Seite', async () => {
