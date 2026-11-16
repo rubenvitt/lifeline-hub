@@ -8,8 +8,8 @@ quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/lage/alarmAusMon
 ## Überblick
 
 Der **Lagemonitor** ist ein Großbildschirm im Stabsraum oder Führungsfahrzeug. Er zeigt das
-Lagebild des Einsatzes verdichtet: ganz oben die Zeile „Was brennt“, darunter feste Kacheln mit
-der Lagekarte, den offenen Sofortmeldungen, den nächsten Programmpunkten der Veranstaltung, den
+Lagebild des Einsatzes verdichtet in festen Kacheln: über der Lagekarte die Zeile „Was brennt“,
+dazu die Lagekarte, den offenen Sofortmeldungen, den nächsten Programmpunkten der Veranstaltung, den
 Betroffenen, den Kräften und der Belegung der Unfallhilfsstellen, unten eine Statusleiste. Er zeigt
 **keine Namen von Personen** und keinen Meldungstext, spielt keinen Ton und wird nicht bedient: Antippen und
 Ziehen auf den Kacheln bleiben ohne Wirkung.
@@ -35,7 +35,7 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
 
 ### Lagebild lesen
 
-1. Die Zeile „Was brennt“ über den Kacheln nennt dasselbe wie im Überblick und im Lagebild,
+1. Die Zeile „Was brennt“ über der Lagekarte nennt dasselbe wie im Überblick und im Lagebild,
    in derselben Folge (Kapitel [Überblick](ueberblick.md)): offene Sofortmeldungen,
    überfällige Bestätigungen, Vermisste, kritische Abschnitte mit Namen, Einheiten mit
    überfälliger Rückmeldung mit Namen und überfällige Aufträge in Rot, dringende Meldungen,

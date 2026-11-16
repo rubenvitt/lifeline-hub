@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import type { AlarmEintrag, WasBrennt } from '../../lage/wasBrennt';
-import AlarmZeile, { ALARMZEILE_HOEHE, ALARMZEILE_SCHRIFT } from './AlarmZeile';
+import AlarmZeile, { ALARMZEILE_SCHRIFT, alarmEintragHoehe } from './AlarmZeile';
 
 const e = (art: AlarmEintrag['art'], rolle: AlarmEintrag['rolle'], text: string): AlarmEintrag => ({
   art,
@@ -38,13 +38,21 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('AlarmZeile (Spec lage-alarmzeile)', () => {
   it('feste Höhe, unabhängig von 0, 1 oder 8 Einträgen', () => {
+    const hoehen = new Set<string>();
     for (const liste of [[], ACHT.slice(0, 1), ACHT]) {
       const { container, unmount } = renderMitProviders(<AlarmZeile daten={daten(liste)} />);
-      expect(zeile(container).style.height).toBe(`${ALARMZEILE_HOEHE.normal}px`);
+      hoehen.add(zeile(container).style.height);
       expect(zeile(container).style.fontSize).toBe(`${ALARMZEILE_SCHRIFT.normal}px`);
       unmount();
     }
+    expect(hoehen.size).toBe(1);
     expect(ALARMZEILE_SCHRIFT.normal).toBeGreaterThanOrEqual(16);
+  });
+
+  it('Treffläche folgt der Dichtestufe: Einträge in Steuerhöhe 30 / 48 / 72 px', () => {
+    expect([30, 48, 72].map((h) => alarmEintragHoehe('normal', h))).toEqual([30, 48, 72]);
+    expect(alarmEintragHoehe('normal', 20)).toBe(28);
+    expect(alarmEintragHoehe('gross', 72)).toBe(40);
   });
 
   it('Rolle als Fläche und Wort, Links nur mit Ziel, role=status statt alert', () => {

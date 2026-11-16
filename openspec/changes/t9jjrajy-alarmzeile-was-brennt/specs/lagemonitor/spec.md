@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Alarmzeile ohne Personenbezug
-Der Lagemonitor SHALL die Alarmzeile über den Kacheln zeigen, mit denselben Arten, Rollen und
+Der Lagemonitor SHALL die Alarmzeile über der Kachel „Lagekarte“ zeigen, mit denselben Arten, Rollen und
 derselben Folge wie Überblick und Lagebild, ohne die Art „Ausfall“, Text mindestens 28 px. Er MUST ihre Werte als
 verdichtete Zahlen vom Server erhalten. Namen MUST die Antwort nur von Einheiten und
 Einsatzabschnitten tragen; Meldungs-, Auftrags- und Erinnerungstexte, Absender, Empfänger und

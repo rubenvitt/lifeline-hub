@@ -24,10 +24,16 @@ import { statusFlaeche } from './statusFlaeche';
 
 /** Schriftgröße der Zeile: mindestens 16 px (Spec), am Monitor die Großbild-Stufe 28 px. */
 export const ALARMZEILE_SCHRIFT = { normal: 16, gross: 28 } as const;
-/** Feste Höhe der Zeile je Größe. */
-export const ALARMZEILE_HOEHE = { normal: 40, gross: 64 } as const;
+/**
+ * Höhe eines Eintrags: am Monitor fest, sonst die Steuerhöhe der Dichtestufe (30 / 48 / 72 px,
+ * Spec `einsatztauglichkeit-layout`, „Trefffläche folgt der Dichtestufe“), nie unter 28 px. Die
+ * Zeile ist um den Abstand oben und unten höher; in einer Stufe bleibt sie fest.
+ */
+export function alarmEintragHoehe(groesse: 'normal' | 'gross', steuerHoehe: number): number {
+  return groesse === 'gross' ? 40 : Math.max(28, steuerHoehe);
+}
 
-const ABSTAND = { normal: 6, gross: 12 } as const;
+const ABSTAND = { normal: 6, gross: 6 } as const;
 
 interface AlarmZeileProps {
   daten: Pick<WasBrennt, 'eintraege' | 'stand' | 'fehlend'>;
@@ -61,11 +67,12 @@ export function passend(
 }
 
 export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZeileProps) {
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   const gross = groesse === 'gross';
   const fontSize = ALARMZEILE_SCHRIFT[groesse];
-  const hoehe = ALARMZEILE_HOEHE[groesse];
+  const eintragHoehe = alarmEintragHoehe(groesse, token.controlHeight);
   const abstand = ABSTAND[groesse];
+  const hoehe = eintragHoehe + 2 * abstand;
   const { eintraege, stand, fehlend } = daten;
 
   const reiheRef = useRef<HTMLDivElement>(null);
@@ -107,7 +114,7 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
       display: 'inline-flex',
       alignItems: 'center',
       flex: '0 0 auto',
-      height: hoehe - 2 * abstand,
+      height: eintragHoehe,
       padding: `0 ${gross ? 16 : 10}px`,
       background: f.grund,
       color: f.text,
@@ -164,7 +171,7 @@ export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZei
   };
   const plusStil: CSSProperties = {
     flex: '0 0 auto',
-    height: hoehe - 2 * abstand,
+    height: eintragHoehe,
     padding: `0 ${gross ? 16 : 10}px`,
     border: `1px solid ${rollen.steuerRahmen}`,
     background: 'transparent',

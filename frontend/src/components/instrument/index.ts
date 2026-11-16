@@ -77,5 +77,5 @@ export {
   type Gliederungszeile,
 } from './GliederungsPaneel';
 export { default as WarnstufenHinweis } from './WarnstufenHinweis';
-export { default as AlarmZeile, ALARMZEILE_HOEHE, ALARMZEILE_SCHRIFT } from './AlarmZeile';
+export { default as AlarmZeile, alarmEintragHoehe, ALARMZEILE_SCHRIFT } from './AlarmZeile';
 export { EINSATZKOPF_REFETCH_MS, UNBEKANNT, UebungsBand, UebungsMarke } from './Uebung';

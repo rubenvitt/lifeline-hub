@@ -80,10 +80,12 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
   (`lage/useWasBrennt.test.tsx`), kein zweiter Weg.
 - [x] 4.3 Sprungziele laut design D9; Filter „vermisst“ der Personenliste prüfen und bei Bedarf
   als URL-Parameter ergänzen (mit Test). Ziele ohne Leserecht ohne Link.
-- [ ] 4.4 Lagemonitor: Zeile `groesse="gross"` als erste Rasterzeile über den Kacheln, gespeist
-  über `alarmAusMonitor`; invalidiert `einsatzKeys.lagemonitor` bei `sofortmeldung`.
-  `LagemonitorPage.test.tsx`: Zeile mit kritischem Abschnitt, 28 px, keine Bedienung.
-  e2e/Layout-Prüfung des Monitors bei 1920 × 1080 mit acht Arten ohne Bildlauf.
+- [x] 4.4 Lagemonitor: Zeile `groesse="gross"` über der Kachel „Lagekarte“ (nicht über die volle
+  Breite: sonst schnitt die UHS-Kachel bei sechs langen Namen 39 px ab; entschieden 16.11.2026),
+  gespeist über `alarmAusMonitor`; invalidiert `einsatzKeys.lagemonitor` bei `sofortmeldung`.
+  `LagemonitorPage.test.tsx`: Zeile mit kritischem Abschnitt, 28 px, keine Bedienung, Fehlerzustand.
+  e2e `geraet-lagemonitor.spec.ts` bei 1920 × 1080 mit sieben Arten: Zeile läuft mit „+n“ über,
+  alle Kacheln ohne Bildlauf und ohne Abschneiden (lokal grün).
 
 ## 5. Regeln, Design System, Doku
 
