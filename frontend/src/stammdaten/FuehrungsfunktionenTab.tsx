@@ -5,13 +5,13 @@ import { InlineAngabe } from '../components/InlineAngabe';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { mitVorgabe } from '../components/vorgabeText';
-import { monoStil } from '../components/instrument';
 import { useAuth } from '../auth/AuthContext';
 import { ladeFuehrungsfunktionen, setzeFuehrungsfunktion } from '../api/fuehrungsfunktionen';
 import { globalKeys } from '../api/queryKeys';
 import type { FuehrungsfunktionEintrag, FuehrungsfunktionUpdate } from '../api/types';
 import { HerkunftAbzeichen, useStammdatenHerkunft } from '../instanz/herkunft';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Verwaltung → Stammdaten → Führungsfunktionen (LFH-549).
@@ -115,7 +115,7 @@ export default function FuehrungsfunktionenTab() {
               <ListenEintragMeta
                 title={
                   <span>
-                    <span style={monoStil(13)}>{kennung}</span>{' '}
+                    <span style={zahlStil('text')}>{kennung}</span>{' '}
                     <Typography.Text type="secondary">· {ART_TEXT[eintrag.art]}</Typography.Text>{' '}
                     <HerkunftAbzeichen
                       herkunft={herkunft.herkunft('fuehrungsfunktion', eintrag.funktion)}

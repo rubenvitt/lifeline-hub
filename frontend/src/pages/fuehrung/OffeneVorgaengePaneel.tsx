@@ -13,10 +13,12 @@ import {
   ListenAbschnitt,
   Segmentleiste,
   listenZeileStil,
-  monoStil,
   useRollen,
   type DashboardZustand,
   type ListenAbschnittZustand,
+  schriftGroesse,
+  schriftStil,
+  zahlStil,
 } from '../../components/instrument';
 import { MELDUNG_STATUS } from '../../kommunikation';
 import { istAlarmiert } from '../../meldungen/meldungKennzahlen';
@@ -184,8 +186,19 @@ export default function OffeneVorgaengePaneel({
   const mitKante = (alarm: boolean): CSSProperties =>
     alarm ? { ...zeile, boxShadow: `inset 3px 0 0 ${rollen.alarm}` } : zeile;
 
-  const zeit = (text: string) => (
-    <span style={{ ...monoStil(11), color: rollen.gedaempft, flex: '0 0 auto', minWidth: 48 }}>
+  // Eine Uhrzeit steht in Mono, ein Abstand („vor 5 min“, „gerade eben“) trägt Wörter und steht in
+  // der Textschrift (LLH-1777).
+  const zeit = (text: string, art: 'uhrzeit' | 'abstand' = 'uhrzeit') => (
+    <span
+      style={{
+        ...(art === 'uhrzeit'
+          ? zahlStil('fein')
+          : { ...schriftStil('meta'), fontSize: schriftGroesse('fein') }),
+        color: rollen.gedaempft,
+        flex: '0 0 auto',
+        minWidth: 48,
+      }}
+    >
       {text}
     </span>
   );
@@ -194,17 +207,38 @@ export default function OffeneVorgaengePaneel({
       style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}
     >
       <span
-        style={{ fontSize: 12, lineHeight: 1.45, color: rollen.text2, overflowWrap: 'anywhere' }}
+        style={{
+          fontSize: schriftGroesse('klein'),
+          lineHeight: 1.45,
+          color: rollen.text2,
+          overflowWrap: 'anywhere',
+        }}
       >
         {haupt}
       </span>
-      {unter && <span style={{ ...monoStil(10), color: rollen.schwach }}>{unter}</span>}
+      {unter && (
+        <span
+          style={{
+            ...schriftStil('meta'),
+            fontSize: schriftGroesse('fein'),
+            color: rollen.schwach,
+          }}
+        >
+          {unter}
+        </span>
+      )}
     </span>
   );
   const wort = (w: string, t: 'alarm' | 'achtung' | null) => (
     <span
       data-lfh="vorgang-wort"
-      style={{ ...monoStil(10), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
+      style={{
+        ...schriftStil('meta'),
+        fontSize: schriftGroesse('fein'),
+        letterSpacing: '0.06em',
+        color: ton(t),
+        flex: '0 0 auto',
+      }}
     >
       {w}
     </span>
@@ -405,7 +439,7 @@ export default function OffeneVorgaengePaneel({
                 data-lfh="vorgang-nachforderung"
                 style={zeile}
               >
-                {zeit(formatVor(n.angefordert_at, jetzt))}
+                {zeit(formatVor(n.angefordert_at, jetzt), 'abstand')}
                 {text(
                   nachforderungName(n),
                   [`an ${adressatText(n)}`, n.benoetigt_bis ? `bis ${kurz(n.benoetigt_bis)}` : null]
@@ -466,7 +500,8 @@ export default function OffeneVorgaengePaneel({
                       alignItems: 'center',
                       gap: token.marginXXS,
                       minHeight: token.controlHeight,
-                      ...monoStil(11),
+                      ...schriftStil('meta'),
+                      fontSize: schriftGroesse('fein'),
                       color: rollen.bedienText,
                       textDecoration: 'none',
                     }}

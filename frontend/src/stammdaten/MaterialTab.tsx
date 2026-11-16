@@ -1,7 +1,6 @@
 import { Button, Space } from 'antd';
 import DemoMarke from '../components/DemoMarke';
 import AdminPage from '../components/AdminPage';
-import { monoStil } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -28,6 +27,7 @@ import {
   useDienststatusMutation,
   type DienststatusOptionen,
 } from './dienststatus';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 export default function MaterialTab() {
   const { benutzer } = useAuth();
@@ -122,7 +122,7 @@ export default function MaterialTab() {
       dataIndex: 'bestandsnummer',
       key: 'bestandsnummer',
       sorter: nachText((m: Material) => m.bestandsnummer),
-      render: (t) => (t ? <span style={monoStil(13)}>{t}</span> : '—'),
+      render: (t) => (t ? <span style={zahlStil('text')}>{t}</span> : '—'),
     },
     {
       title: 'Träger',

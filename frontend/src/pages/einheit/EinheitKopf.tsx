@@ -24,8 +24,10 @@ import {
   Datenraster,
   Paneel,
   StatusChip,
-  monoStil,
+  schriftGroesse,
+  schriftStil,
   useRollen,
+  zahlStil,
 } from '../../components/instrument';
 import { nichtGefundenInhalt } from '../../components/SeitenZustand';
 import { Select } from '../../components/Select';
@@ -123,7 +125,10 @@ export default function EinheitKopf({
       etikett={etikett}
       wert={e[feld] ?? ''}
       anzeige={
-        <span style={feld === 'funkrufname' ? monoStil(13) : { whiteSpace: 'pre-wrap' }}>
+        <span
+          data-schrift={feld === 'funkrufname' ? 'kennung' : undefined}
+          style={feld === 'funkrufname' ? zahlStil('text') : { whiteSpace: 'pre-wrap' }}
+        >
           {e[feld]}
         </span>
       }
@@ -341,7 +346,7 @@ export default function EinheitKopf({
                 etikett="Soll-Stärke"
                 wert={e.soll ?? null}
                 anzeige={
-                  <span style={monoStil(13)}>
+                  <span style={zahlStil('text')}>
                     <StaerkeAnzeige wert={e.soll ?? null} />
                   </span>
                 }
@@ -427,7 +432,8 @@ function IstAnzeige({
         gap: token.marginXS,
       }}
     >
-      <span style={monoStil(13)}>
+      {/* Mit „kumuliert“ trägt die Zeile ein Wort: dann Textschrift (LLH-1777). */}
+      <span style={kumuliert ? schriftStil('text') : zahlStil('text')}>
         <StaerkeAnzeige wert={ist} />
         {kumuliert && (
           <>
@@ -468,7 +474,7 @@ function StatusZeile({
   const [fehler, setFehler] = useState<unknown>(null);
   const s = einheitStatusAnzeige(e.status);
   const seit = e.status.seit ? (
-    <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+    <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>
       seit {zeitKurz(e.status.seit, konventionen)}
     </span>
   ) : null;
@@ -520,7 +526,15 @@ function StatusZeile({
         {seit}
       </span>
       {s.verteilung && (
-        <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{s.verteilung}</span>
+        <span
+          style={{
+            ...schriftStil('meta'),
+            fontSize: schriftGroesse('fein'),
+            color: rollen.gedaempft,
+          }}
+        >
+          {s.verteilung}
+        </span>
       )}
       {fehler != null && <ZeilenFehler fehler={fehler} fallback="Status nicht gesetzt" />}
     </span>

@@ -1,6 +1,7 @@
 import { InputNumber, Space, Typography, theme } from 'antd';
 import { useEffect, useState } from 'react';
 import type { Staerke } from '../api/types';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 type Feld = number | null;
 
@@ -65,7 +66,7 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
   return (
     <Space align="end" size={token.marginSM} wrap>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
           Führer
         </Typography.Text>
         <InputNumber
@@ -80,7 +81,7 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
         />
       </span>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
           Unterführer
         </Typography.Text>
         <InputNumber
@@ -94,7 +95,7 @@ export default function StaerkeEingabe({ value, onChange, disabled, autoFocus }:
         />
       </span>
       <span style={SPALTE}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <Typography.Text type="secondary" style={{ fontSize: schriftGroesse('klein') }}>
           Mannschaft
         </Typography.Text>
         <InputNumber

@@ -423,6 +423,13 @@ export default function VerpflegungPage() {
     !geladen && (verpflegungQuery.isError || verpflegungQuery.fetchStatus === 'paused');
   /** Anzahl im Segment nur mit Stand: „(0)“ hieße sonst „es gibt keine“. */
   const anzahl = (n: number) => (geladen ? ` (${n})` : '');
+  // Schmal im Handschuh-Betrieb bricht „aktuell (n)“ zweizeilig, wie „Ohne Schicht“ der Ablösung:
+  // die Schrift wächst mit der Dichte (LLH-1774), und neben „1 neu“ fehlten der Zeile sonst
+  // 23 px (`e2e/gate1-ueberlauf.spec.ts`, Sammelbanner).
+  const aktuellLabel = (zahl: string) => {
+    if (!istSchmal) return `laufend & anstehend${zahl}`;
+    return token.controlHeight >= 72 && zahl ? `aktuell\n${zahl.trim()}` : `aktuell${zahl}`;
+  };
 
   const vergangen = alle.filter((zf) => istVergangen(zf, jetzt));
   const unterdeckung = alle.filter((zf) => deckungEinstufung(zf, jetzt) === 'unterdeckung').length;
@@ -533,7 +540,7 @@ export default function VerpflegungPage() {
             optionen={[
               {
                 wert: 'laufend',
-                label: `${istSchmal ? 'aktuell' : 'laufend & anstehend'}${anzahl(alle.length - vergangen.length)}`,
+                label: aktuellLabel(anzahl(alle.length - vergangen.length)),
               },
               // Schmal ohne Zahl: mit drei Werten und dem Banner „1 neu“ trägt die Zeile bei 390 px
               // im Handschuh-Betrieb die Zahlen nicht (5 px Überlauf; design.md, Risiken;

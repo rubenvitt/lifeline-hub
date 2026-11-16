@@ -1,7 +1,7 @@
 import { Button, Dropdown } from 'antd';
 import { Fragment } from 'react';
 import { IconHaken, IconTrichter } from '../icons';
-import { monoStil, useRollen } from '../components/instrument';
+import { useRollen, zahlStil } from '../components/instrument';
 import type { MeldungKennzahlen } from '../api/types';
 
 /**
@@ -44,7 +44,7 @@ export function MeldungKennzahlZeile({
       {teile.map((t, i) => (
         <Fragment key={t.wort}>
           {i > 0 && ' · '}
-          <strong style={{ ...monoStil(14), color: t.farbe ?? rollen.text }}>
+          <strong style={{ ...zahlStil('text'), color: t.farbe ?? rollen.text }}>
             {laedt || t.wert == null ? '—' : t.wert}
           </strong>{' '}
           <span style={t.farbe ? { color: t.farbe } : undefined}>{t.wort}</span>

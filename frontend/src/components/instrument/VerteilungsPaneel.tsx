@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from 'react';
 import DashboardPaneel, { type DashboardPaneelBasis } from './DashboardPaneel';
-import { monoStil, useRollen } from './rollenwerte';
+import { useRollen, schriftGroesse, schriftStil, zahlStil } from './rollenwerte';
 
 /**
  * VerteilungsPaneel — eine Menge nach Kategorien: je Zeile Wort, Zahl und darunter ein
@@ -48,11 +48,11 @@ export function anteilProzent(anteil: number): string {
   return `${Math.round(sicher * 1000) / 10}%`;
 }
 
-/** Maße je Dichte: Zahl, Wort, Abstand, Balken. */
+/** Maße je Dichte: Zahl und Wort als Stufe der Schriftskala (LLH-1775), Abstand, Balken. */
 const DICHTE = {
-  paneel: { wert: 20, wort: 12, abstand: 14, zeile: 6, balken: 6 },
-  kompakt: { wert: 15, wort: 12, abstand: 8, zeile: 4, balken: 4 },
-  zeile: { wert: 13, wort: 10, abstand: 6, zeile: 3, balken: 4 },
+  paneel: { wert: 'titel', wort: 'klein', abstand: 14, zeile: 6, balken: 6 },
+  kompakt: { wert: 'text', wort: 'klein', abstand: 8, zeile: 4, balken: 4 },
+  zeile: { wert: 'text', wort: 'fein', abstand: 6, zeile: 3, balken: 4 },
 } as const;
 
 /**
@@ -111,8 +111,9 @@ export function Verteilungsliste({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                ...monoStil(mass.wort),
-                letterSpacing: '0.06em',
+                // Das Wort einer Kategorie ist Text, keine Kennung (LLH-1777): Textschrift.
+                ...schriftStil('textKlein'),
+                fontSize: schriftGroesse(mass.wort),
                 color: inZeile ? rollen.gedaempft : rollen.text,
               }}
             >
@@ -130,12 +131,14 @@ export function Verteilungsliste({
               )}
               {z.wort}
             </span>
-            <span style={{ flex: '1 1 auto', fontSize: 11, color: rollen.schwach }}>
+            <span
+              style={{ flex: '1 1 auto', fontSize: schriftGroesse('fein'), color: rollen.schwach }}
+            >
               {z.beschreibung}
             </span>
             <span
               data-lfh={`${kennung}-wert`}
-              style={{ ...monoStil(mass.wert, 500), color: rollen.text }}
+              style={{ ...zahlStil(mass.wert, 500), color: rollen.text }}
             >
               {z.wert ?? '—'}
             </span>

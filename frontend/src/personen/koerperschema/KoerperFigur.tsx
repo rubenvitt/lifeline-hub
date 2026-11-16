@@ -1,7 +1,8 @@
 import { useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import type { VerletzungAnsicht } from '../../api/types';
 import { useRollen } from '../../components/instrument';
-import { koerperschemaFarben, schrift } from '../../theme/tokens';
+import { koerperschemaFarben, schrift, schriftPx, type Groessenstufe } from '../../theme/tokens';
+import { useDichte } from '../../theme/ThemeModeProvider';
 import {
   RAHMEN,
   ZONEN,
@@ -63,7 +64,16 @@ export interface KoerperZiel {
 
 /** Größe von Sternchen und Nummer in Pixeln, unabhängig vom Maßstab. */
 const STERN_PX: Record<FigurModus, number> = { lesen: 9, markieren: 10, druck: 9, mini: 5 };
-const NUMMER_PX: Record<FigurModus, number> = { lesen: 13, markieren: 14, druck: 12, mini: 9 };
+/**
+ * Die Nummer ist Bildschirmschrift, keine Zeichnung (Spec `schriftskala`, „Kein Text unter 11 px“):
+ * eine Stufe der Skala, am Schirm mit der Dichte (LLH-1775). Nur der Druck rechnet fest auf Papier.
+ */
+const NUMMER_STUFE: Record<FigurModus, Groessenstufe> = {
+  lesen: 'text',
+  markieren: 'text',
+  druck: 'klein',
+  mini: 'fein',
+};
 
 /** Deckkraft der Binnenlinien gegen die Kontur. */
 const BINNEN_DECKKRAFT = 0.6;
@@ -117,6 +127,7 @@ export default function KoerperFigur({
   onStern,
 }: KoerperFigurProps) {
   const { rollen, token } = useRollen();
+  const { dichte } = useDichte();
   const farben = koerperschemaFarben(rollen);
   const zonen = ZONEN[ansicht];
   const knoepfe = useRef<(SVGGElement | null)[]>([]);
@@ -246,7 +257,8 @@ export default function KoerperFigur({
             ? inEinheiten(v.x, v.y)
             : (zoneVon(v.ansicht, v.region)?.mitte ?? [RAHMEN.breite / 2, RAHMEN.hoehe / 2]);
         const r = STERN_PX[modus] * einheit;
-        const nummerGroesse = NUMMER_PX[modus] * einheit;
+        const nummerGroesse =
+          schriftPx(NUMMER_STUFE[modus], modus === 'druck' ? 'kompakt' : dichte) * einheit;
         const sternBedienbar = bedienbar && onStern != null;
         const gewaehltHier = gewaehlterStern === v.id;
         // Wahl und Tastaturfokus zeichnen den Rahmen in `bedien` (wie die Zonen).

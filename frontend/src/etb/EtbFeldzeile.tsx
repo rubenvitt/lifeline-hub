@@ -7,7 +7,7 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { uhrzeit } from '../anzeige/zeitDarstellung';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
-import { Segmentleiste, useRollen } from '../components/instrument';
+import { Segmentleiste, useRollen, schriftGroesse } from '../components/instrument';
 import { Select } from '../components/Select';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { serverJetzt } from '../offline/serveruhr';
@@ -131,7 +131,7 @@ function Beschriftet({
       <span
         aria-hidden="true"
         style={{
-          fontSize: 12,
+          fontSize: schriftGroesse('klein'),
           color: rollen.text2,
           flex: '0 0 auto',
           ...(schmal ? { width: 32 } : {}),

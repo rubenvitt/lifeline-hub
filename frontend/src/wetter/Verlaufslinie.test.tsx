@@ -118,6 +118,8 @@ describe('<Verlaufslinie>', () => {
     rerender(<Verlaufslinie punkte={reihe} richtung={null} prognoseCm={710} />);
     expect(container.querySelector('[data-lfh="verlauf-prognose"]')).not.toBeNull();
     expect(screen.getByText('Prognose 7,10 m')).toBeInTheDocument();
+    // Das Wort liegt über dem Diagramm und darf den Zeiger nicht abfangen.
+    expect(screen.getByText('Prognose 7,10 m')).toHaveStyle({ pointerEvents: 'none' });
   });
 
   it('keine Farbe als einziger Träger: die Linie trägt Textfarbe, keine Status-Rolle', () => {

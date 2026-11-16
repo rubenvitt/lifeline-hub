@@ -12,6 +12,7 @@ import {
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import { globalKeys } from '../api/queryKeys';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 /** Dateiname → lesbarer Default-Name: `.mbtiles` weg, `osm.`-Präfix + `.YYYY-MM-DD`-Datum weg. */
 function nameAusDatei(dateiname: string): string {
@@ -117,7 +118,10 @@ export default function OfflineVorhandeneModal({
                   }
                   description={
                     <>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: schriftGroesse('klein') }}
+                      >
                         {v.dateiname} <Tag>{formatGroesse(v.groesse)}</Tag>
                       </Typography.Text>
                       {grund && (

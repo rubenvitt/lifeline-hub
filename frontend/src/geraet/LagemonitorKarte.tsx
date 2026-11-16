@@ -8,6 +8,7 @@ import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import type { LagemonitorAbschnitt, LagemonitorUhs, LagemonitorZone } from '../api/types';
 import { useRollen } from '../components/instrument';
+import { fernsicht } from '../theme/tokens';
 import {
   absolutiereProxyAnfrage,
   aktuelleAttribution,
@@ -26,10 +27,10 @@ import { rollenFarbe } from '../theme/statusFarben';
 import { baueMonitorFlaechen, belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 
 /**
- * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`,
- * wie `GROSS.text` in `LagemonitorPage.tsx`; nicht von dort importiert, die Seite bindet diese Datei).
+ * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`),
+ * aus der Fernsicht-Skala des Themes wie `GROSS.text` in `LagemonitorPage.tsx`.
  */
-const GROSS_TEXT = 28;
+const GROSS_TEXT = fernsicht.text;
 
 /**
  * Ein Punkt, den die Karte zeigen muss: der Einsatzort, jede verortete UHS und jeder Stützpunkt
