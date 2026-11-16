@@ -37,6 +37,9 @@
 - [x] 6.5 Kopfkommentar `kraefte/einheitenGliederung.ts`: `ist_kumuliert` gleicht Einheit-Ansicht und `summiereStaerke`, nicht der Abschnittsstärke.
 - [x] 6.6 `EinsatzabschnittePage.test.tsx`: Fall mit geerbter Gruppe, `ist` ≠ `ist_kumuliert`, Liste zeigt „eigene“ und „über <Obereinheit>“, Summe = Stärke. Mutationsprobe: mit `ist_kumuliert` rot.
 - [x] 6.7 `LageDashboardPage.test.tsx`: neuer UHS-Test nicht zwischen Kommentar und seinem Test.
+- [x] 6.9 Nach-Review: „Rückgängig“ nach dem Ziehen einer geerbten Einheit schickt `abschnitt_id: null` zurück (Test in `EinsatzabschnittePage.test.tsx`).
+- [x] 6.10 Nach-Review: Geräteliste ordnet und beschriftet nach dem wirksamen Abschnitt, „über …“, eigene Stärke (Tests in `GeraetAbschnitt.test.tsx`); Regel in `frontend/src/geraet/AGENTS.md`, Kommentar `fernmeldewesen/luecken.ts`.
+- [x] 6.11 Bild `geraet-einsatzabschnitt` neu aufnehmen.
 - [x] 6.8 Anwenderdoku `geraet-einsatzabschnitt.md`: Einheitenliste umfasst Untereinheiten mit geerbtem Abschnitt; Wächter grün.
 
 ## Workflow follow-up

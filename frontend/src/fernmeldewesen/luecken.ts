@@ -307,7 +307,8 @@ export interface Verbindung {
 
 /**
  * Verbindungen ohne gemeinsame Sprechgruppe. Die Paare folgen der Platzierung des Funkplans und
- * des Organigramms (Spec `stab-fernmeldeskizze`, „Knotenaufbau“): oberster Abschnitt → eigene
+ * der Fernmeldeskizze, also dem Verband (`abgestellteLoesen: false`, LLH-1744; Spec
+ * `fuehrungsorganisation`, „Knotenaufbau“): oberster Abschnitt → eigene
  * Führungsstelle (LFH-849), Unterabschnitt → Abschnitt, oberste Einheit → Abschnitt, Untereinheit
  * → Einheit. Ein Abschnitt mit unbekanntem Oberabschnitt steht oben und urteilt gegen die
  * Führungsstelle; eine Einheit ohne bekannte übergeordnete Stelle hat kein Paar. Treffer erst der

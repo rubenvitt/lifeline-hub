@@ -128,7 +128,8 @@ Einheiten mit diesem wirksamen Abschnitt, ohne Unterabschnitte. Daraus kommt die
 liest diese Menge. Jede Einheit steht dort mit ihrer eigenen Stärke („eigene“ statt „kumuliert“),
 sodass die Liste die „Stärke“ des Abschnitts ergibt. Eine Einheit ohne eigenen Abschnitt trägt
 den Zusatz „über <Obereinheit>“. Ihr Griff trägt den wirksamen Abschnitt (Review 16.11.2026): Ziehen
-auf den Abschnitt, in dem sie schon steht, ist gesperrt und schreibt keinen festen Abschnitt.
+auf den Abschnitt, in dem sie schon steht, ist gesperrt und schreibt keinen festen Abschnitt. Der
+Rückweg von „Rückgängig“ liest den gespeicherten Abschnitt (`null` bei geerbtem), nicht den Griff.
 
 Dieselbe Menge zählt die Leiste der Lagekarte als Einheiten eines Abschnitts
 (`pages/lagekarte/leistenDaten.ts`, über `einheitenImAbschnitt`).
@@ -168,7 +169,9 @@ Liste, und seit D1 auch in der Stärke. Neu: die aktiven Einheiten, deren wirksa
 Teilbaum liegt, also der eigene, sonst der der nächsten aktiven Obereinheit mit Abschnitt. Gerechnet
 wird in einer Abfrage (rekursiver Aufstieg über `ueber_einheit_id`, zyklussicher über eine
 Tiefengrenze). Folge: Liste, Stärke und Schreibrecht des Geräts umfassen die geerbte Untereinheit,
-wie für ihre Obereinheit. Eine abgestellte Untereinheit mit eigenem Abschnitt außerhalb des
+wie für ihre Obereinheit. Die Liste der Startseite (`GeraetAbschnittPage.tsx`) ordnet und beschriftet
+nach dem wirksamen Abschnitt, nennt „über <Obereinheit>“ und zeigt je Einheit die eigene Stärke wie
+D4, damit die Zeilen die Stärke im Kopf ergeben. Die Regel steht in `frontend/src/geraet/AGENTS.md`. Eine abgestellte Untereinheit mit eigenem Abschnitt außerhalb des
 Teilbaums bleibt draußen.
 
 *Verworfen:* Das Gerät rechnet weiter nach Unterstellung (Spec-Ausnahme, abweichende Zahl), und eine
