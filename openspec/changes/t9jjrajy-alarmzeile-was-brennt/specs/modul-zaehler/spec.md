@@ -19,12 +19,17 @@ Regel wie die Zahl des Lagemonitors. `dringend_offen` MUST die offenen, unbestä
 - **WHEN** eine Meldung der Art „Sofortmeldung“ die Priorität „dringend“ trägt
 - **THEN** zählt sie in `sofort_offen` und nicht in `dringend_offen`
 
-### Requirement: Eingang der ältesten offenen Sofortmeldung
-Gibt es offene Sofortmeldungen, SHALL der Zähler `meldungen` in `sofort_aelteste_at` den Eingang
-der ältesten von ihnen tragen (UTC). Ohne offene Sofortmeldung MUST das Feld fehlen.
+### Requirement: Alarm der ältesten offenen Sofortmeldung
+Gibt es offene Sofortmeldungen, SHALL der Zähler `meldungen` in `sofort_aelteste_at` den frühesten
+Sofortalarm unter ihnen tragen (UTC): bei einer heraufgestuften Meldung den Zeitpunkt ihres
+Alarms, sonst ihren Eingang. Ohne offene Sofortmeldung MUST das Feld fehlen.
 
 #### Scenario: Älteste offene Sofortmeldung
 - **WHEN** zwei offene, unbestätigte Sofortmeldungen um 14:02 und 14:05 UTC eingegangen sind
+- **THEN** trägt `meldungen.sofort_aelteste_at` den Zeitpunkt 14:02 UTC
+
+#### Scenario: Heraufgestufte Meldung zählt ab dem Alarm
+- **WHEN** eine Meldung um 13:30 UTC als „normal“ einging, um 14:20 UTC zur Sofortmeldung heraufgestuft wurde und eine zweite Sofortmeldung um 14:02 UTC einging
 - **THEN** trägt `meldungen.sofort_aelteste_at` den Zeitpunkt 14:02 UTC
 
 #### Scenario: Keine offene Sofortmeldung

@@ -57,8 +57,9 @@ pub struct MeldungsZaehler {
     pub sofort_offen: i64,
     /// Offene, unbestätigte Meldungen mit Priorität „dringend“, die keine Sofortmeldungen sind.
     pub dringend_offen: i64,
-    /// Eingang der ältesten offenen, unbestätigten Sofortmeldung (UTC, SQLite-Format); fehlt
-    /// ohne eine solche. Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es.
+    /// Sofortalarm der ältesten offenen, unbestätigten Sofortmeldung (UTC, SQLite-Format): bei
+    /// einer heraufgestuften Meldung `sofortalarm_at`, sonst ihr Eingang; fehlt ohne eine solche.
+    /// Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sofort_aelteste_at: Option<String>,
 }

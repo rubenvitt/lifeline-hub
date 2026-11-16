@@ -326,7 +326,9 @@ async fn sofort_und_dringend_zaehlen_offen_und_unbestaetigt() {
     for (id, eingang) in [
         (ids[0], "2026-06-12 14:05:00"),
         (ids[1], "2026-06-12 14:02:00"),
-        (ids[2], "2026-06-12 14:07:00"),
+        // Um 13:30 eingegangen, erst um 14:20 zur Sofortmeldung heraufgestuft (Merker
+        // `sofortalarm_at`, LLH-1380): sie zählt ab dem Alarm, ist also nicht die älteste.
+        (ids[2], "2026-06-12 13:30:00"),
         // Bestätigt und älter: zählt nicht als älteste.
         (ids[5], "2026-06-12 13:00:00"),
     ] {
@@ -337,6 +339,11 @@ async fn sofort_und_dringend_zaehlen_offen_und_unbestaetigt() {
             .await
             .unwrap();
     }
+    sqlx::query("UPDATE meldung SET sofortalarm_at = '2026-06-12 14:20:00' WHERE id = ?")
+        .bind(ids[2])
+        .execute(&pool)
+        .await
+        .unwrap();
     for id in [ids[4], ids[5]] {
         let (status, m) = anfrage(
             &app,

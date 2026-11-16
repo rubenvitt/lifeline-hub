@@ -120,8 +120,10 @@ und die Daten schon.
   - „1 dringend“
   - „1 Erinnerung fällig“
   - „1 Nachforderung überfällig“
-- Namen: höchstens zwei, dann „+n“ im Eintrag. Das Alter der ältesten Sofortmeldung liefert der
-  Zähler als `sofort_aelteste_at` (optional, UTC). Ein Sprung zur Liste reicht für die Einzelheiten.
+- Namen: höchstens zwei, dann „+n“ im Eintrag. Ein Sprung zur Liste reicht für die Einzelheiten.
+- Das Alter der ältesten Sofortmeldung liefert der Zähler als `sofort_aelteste_at` (optional, UTC).
+  Eine heraufgestufte Meldung zählt ab ihrem Sofortalarm (`sofortalarm_at`), nicht ab ihrem Eingang
+  (entschieden 16.11.2026 im Review).
 
 ### D5 Lagemonitor: Zählfelder in der Verdichtung, Ableitung mit demselben Kern
 - `LagemonitorAnzeige` bekommt einen Block `alarm: LagemonitorAlarm`:

@@ -149,8 +149,9 @@ struct MerkmalGruppe {
     ist_sofort: bool,
     ist_dringend: bool,
     anzahl: i64,
-    /// Ältester Eingang der Gruppe (UTC, SQLite-Format; gleiches Format, also lexikalisch).
-    aeltester_eingang: Option<String>,
+    /// Frühester Sofortalarm der Gruppe: `sofortalarm_at` einer heraufgestuften Meldung, sonst
+    /// ihr Eingang (UTC, SQLite-Format; gleiches Format, also lexikalisch).
+    aeltester_alarm: Option<String>,
 }
 
 /// Modulzähler der Meldungen (LFH-935): EINE Abfrage, gruppiert nach den Merkmalen, die die
@@ -173,7 +174,7 @@ pub async fn zaehlen(
         " AS ist_ueberfaellig, m.eskaliert, ",
         ist_sofort_sql!(),
         " AS ist_sofort, (m.prioritaet = 'dringend') AS ist_dringend, COUNT(*) AS anzahl, \
-           MIN(m.eingang_at) AS aeltester_eingang \
+           MIN(COALESCE(m.sofortalarm_at, m.eingang_at)) AS aeltester_alarm \
          FROM meldung m",
         quittung_join_sql!(),
         " WHERE m.einsatz_id = ? GROUP BY 1, 2, 3, 4, 5, 6, 7, 8"
@@ -198,16 +199,17 @@ pub async fn zaehlen(
                     ist_dringend: g.ist_dringend,
                 },
                 g.anzahl,
-                g.aeltester_eingang,
+                g.aeltester_alarm,
             )
         })
         .collect();
-    // Der Eingang der ältesten offenen Sofortmeldung (LLH-1743): über die Gruppen, die die Regel
-    // als offene Sofortmeldung zählt, nicht über ein eigenes Prädikat.
+    // Der Sofortalarm der ältesten offenen Sofortmeldung (LLH-1743, entschieden 16.11.2026): eine
+    // heraufgestufte Meldung zählt ab ihrem Alarm, nicht ab ihrem Eingang. Über die Gruppen, die
+    // die Regel als offene Sofortmeldung zählt, nicht über ein eigenes Prädikat.
     let sofort_aelteste_at = gruppen
         .iter()
         .filter(|(m, _, _)| m.ist_sofort_offen())
-        .filter_map(|(_, _, eingang)| eingang.clone())
+        .filter_map(|(_, _, alarm)| alarm.clone())
         .min();
     let mut z = crate::einsatz::zaehler::zaehle_meldungen_gewichtet(
         gruppen.into_iter().map(|(m, n, _)| (m, n)),
