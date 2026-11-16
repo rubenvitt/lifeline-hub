@@ -586,7 +586,11 @@ anwendbar), „nicht geprüft" ist keins.
 **Tabelle und Dichte**
 
 - **Tabelle nur, wenn verglichen wird**: stehende Kopfzeile, fixierte **menschenlesbare** Kennung
-  (nie DB-`id`), Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Auf schmalem Schirm
+  (nie DB-`id`), Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Der Zähler steht erst
+  nach eigener Wahl im Namen (LLH-1790, Spec `katalogtabelle-spaltenschalter`): solange die Wahl
+  der Voreinstellung der Seite und der Breite folgt, heißt der Schalter „Spalten“, danach
+  „Spalten · n ausgeblendet“ mit allen verborgenen (`weichtVonVorgabeAb` in
+  `components/SpaltenSchalter.tsx`; die Seite reicht `spaltenAusVoreinstellung` durch). Auf schmalem Schirm
   **angepasst, nicht in Karten aufgelöst**. Träger `KatalogTabelle`/`Datensicht`.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
@@ -623,6 +627,13 @@ anwendbar), „nicht geprüft" ist keins.
   Zeile hält ihre Stelle, LLH-1254).
   Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
   Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
+- **Kopf und Körper sind gleich breit** (LLH-1788): mit stehender Kopfzeile legt rc-table den
+  Kopf in eine eigene Tabelle; `theme/sprache.css` setzt sie auf `table-layout: fixed`, damit
+  sie die gemessenen Körperbreiten genau übernimmt. Damit der feste Kopf nie gekürzt wird, hebt
+  `KatalogTabelle` jede Zahlbreite und jedes `mindestBreite` auf die Mindestbreite ihres Kopfs
+  (`components/kopfBreite.ts`: längstes Wort des Titels in der Kopfschrift, Sortiersymbol,
+  Filterauslöser der Stufe, Zellpolster). Gerechnet, nicht gemessen, damit nichts springt.
+  Nachweis `e2e/gate1-ueberlauf.spec.ts` („Spaltenköpfe … stehen über ihren Spalten“).
 - **Kopfwerkzeuge der `KatalogTabelle` folgen der Dichte** (LLH-1227): Suche und Spaltenschalter
   stehen `paddingSM` auseinander, antds Spaltenfilter-Auslöser hält `controlHeightSM` und liegt
   in der Tab-Folge (Name „<Spalte> filtern“, Enter/Leertaste öffnen), beides im Primitiv, nie je

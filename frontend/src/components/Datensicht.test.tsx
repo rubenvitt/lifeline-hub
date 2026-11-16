@@ -1443,7 +1443,8 @@ describe('Datensicht · Tabellenzweig', () => {
     );
     expect(kopfzellen).toEqual(['Funkrufname', 'Typ']);
 
-    const schalter = screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ });
+    // Voreinstellung und Breite sind die Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
+    const schalter = screen.getByRole('button', { name: /^Spalten —/ });
     expect(container.querySelector('.ant-badge-count')).toBeNull();
 
     await userEvent.click(schalter);
@@ -1476,7 +1477,7 @@ describe('Datensicht · Tabellenzweig', () => {
       [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
     expect(kopf()).not.toContain('Besatzung');
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
     const besatzung = await screen.findByRole('checkbox', { name: 'Besatzung' });
     expect(besatzung).not.toBeChecked();
 

@@ -1851,6 +1851,7 @@ export default function Datensicht<T extends object, const K extends string>(
           onAn={setzeSpaltenAn}
           offen={spaltenOffen}
           onOffen={setSpaltenOffen}
+          voreinstellung={spaltenAusVoreinstellung}
         />
       )}
       {/* ZAHL VOR WORT, MIT SICHTBAREM TRENNER (LFH-973): „1 verfügbar · 6 gebunden · 1 nicht

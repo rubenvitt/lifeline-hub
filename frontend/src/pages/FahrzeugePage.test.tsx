@@ -869,7 +869,8 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(screen.queryByRole('button', { name: 'Bemerkung zu Florian 1 hinzufügen' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ }));
+    // Ohne eigene Wahl kein Zähler im Namen (LLH-1790).
+    await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Bemerkung' }));
 
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
@@ -889,7 +890,8 @@ describe('FahrzeugePage', () => {
     setzeViewportBreite(1600);
     const { unmount } = render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    // Voreinstellung (Bemerkung) und Breite sind Vorgabe: kein Zähler ohne eigene Wahl (LLH-1790).
+    expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Kennzeichen' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Typ' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Abschnitt' })).toBeInTheDocument();
@@ -898,7 +900,7 @@ describe('FahrzeugePage', () => {
     setzeViewportBreite(1024);
     render(einsatz());
     await screen.findByText('Florian 1');
-    expect(screen.getByRole('button', { name: /Spalten · 6 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Abschnitt' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Seit' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: 'Typ' })).toBeNull();

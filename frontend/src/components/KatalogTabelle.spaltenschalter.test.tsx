@@ -113,7 +113,8 @@ describe('KatalogTabelle · Spaltenschalter (LFH-374)', () => {
     setzeViewportBreite(800);
     const { container } = renderBasis(tabelle(MIT_SCHALTER));
     expect(kopf(container)).toEqual(['Name', 'Typ', 'Aktionen']);
-    expect(screen.getByRole('button', { name: /^Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
+    // Nur nach Breite verborgen: das ist die Vorgabe, kein Zähler im Namen (LLH-1790).
+    expect(screen.getByRole('button', { name: 'Spalten — Online-Quellen' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     await userEvent.click(within(await offenesMenue()).getByRole('checkbox', { name: 'Typ' }));
