@@ -80,7 +80,10 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
             flex: '1 1 auto',
             justifyContent: 'flex-start',
             gap: token.paddingXS,
-            paddingInline: token.paddingSM,
+            // Schmal: die Kurzform wächst mit der Dichte (`meta`, LLH-1774) und teilt die
+            // Werkzeugzeile am Handy mit der Segmentleiste; `paddingSM` ließ „1 neu“ in
+            // `handschuh` 4 px zu eng (`e2e/gate1-ueberlauf.spec.ts`, Sammelbanner).
+            paddingInline: token.paddingXS,
             background: rollen.bannerGrund,
             border: `1px solid ${rollen.bannerLinie}`,
             color: rollen.bedienText,

@@ -62,7 +62,7 @@ Abgestimmt mit Ruben am 15.11.2026 (Kommentar an LLH-1719): Stufen 11/12/14/16/2
 | `gross` | 32 | nein |
 
 `schriftskala` bleibt die Liste der Rollen, nennt aber statt einer Pixelzahl eine Stufe:
-`ueberschrift` gross/600, `seitentitel` titel/600, `uhr` titel/500 Mono (neu), `text` text/400,
+`ueberschrift` gross/600, `seitentitel` titel/600, `uhr` text/500 Mono (neu; zuerst titel, nach dem Merge mit LLH-1726 zurück auf text, Abschnitt 9), `text` text/400,
 `textKlein` klein/400, `warnung` text/600 (neu), `etikett` klein/400 (neu, Feldetikett),
 `augenbraue` fein/600 Versalien .08em, `railEtikett` fein/500 Versalien .04em, `meta` klein/400
 **Textschrift**, `datenwertKlein` wert/500 Mono, `datenwert` und `datenwertGross` gross/500 Mono.
@@ -201,6 +201,12 @@ Nach dem Merge mit `alpha` gemessen: bei 1180 px in `handschuh` steht der Name a
 ungekürzt. Entscheidung Ruben 16.11.2026: der Name bleibt in der Stufe `titel` und wächst mit
 (16 / 18,4 / 20 px); die Spec `kopfleiste` wird geändert, statt in der Skala eine Ausnahme für
 eine feste 16 zu schaffen. Nachweis `e2e/kopfleiste-einsatzname.spec.ts`.
+
+Die Uhr dagegen ist Daueranzeige und steht hinter dem Namen (LLH-1726). In der Stufe `titel`
+(20 px in `handschuh`) machte sie die rechte Gruppe am Handy 197 px breit; mit der festen
+Namensbasis von 196 px (`KOPF_NAME_FLEX_SCHMAL`) brach der Kopf bei 390 px auf zwei Zeilen um
+(`e2e/kopfzeile-schmal.spec.ts`). Sie steht deshalb in der Stufe `text` (14 / 16,1 / 17,5 px),
+in `kompakt` wie vorher auf `alpha`.
 
 ## Risks / Trade-offs
 

@@ -465,6 +465,9 @@ describe('Schriftskala — CSS und TS tragen dieselben Stufen (LLH-1773/LLH-1775
       versal: true,
     });
     expect(schriftskala.seitentitel).toMatchObject({ stufe: 'titel', gewicht: 600 });
+    // Die Uhr ist Daueranzeige und steht hinter dem Einsatznamen (LLH-1726): Stufe `text`, sonst
+    // bricht der Kopf am Handy in `handschuh` auf zwei Zeilen um (Merge mit alpha, 16.11.2026).
+    expect(schriftskala.uhr).toMatchObject({ stufe: 'text', gewicht: 500, familie: 'zahl' });
     expect(schriftskala.meta).toMatchObject({ stufe: 'klein', familie: 'text' });
     expect(schriftskala.warnung).toMatchObject({ stufe: 'text', gewicht: 600 });
     expect(

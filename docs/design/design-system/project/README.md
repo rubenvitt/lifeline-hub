@@ -208,7 +208,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
     Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
-    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
+    Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (Stufe `titel`, 16 / 18,4 / 20 px)
+    seine Eigenbreite, bevor die
     Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
     nie am geladenen Namen. Ein Zustand ohne Handlungsbedarf steht in jeder Breite nur als
     Symbol, eine Störung ab `md` mit Wort (darunter trägt die Betriebszeile die Verbindung, die

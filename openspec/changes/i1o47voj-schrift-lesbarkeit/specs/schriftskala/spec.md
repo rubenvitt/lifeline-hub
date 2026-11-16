@@ -43,7 +43,8 @@ gilt der Boden in Zeichnungseinheiten; nur Glyphen eines Zeichens sind kleiner.
 ### Requirement: Der Seitentitel überragt den Lauftext
 
 Der Titel im Seitenkopf SHALL in der Stufe 16 px mit Gewicht 600 stehen, also größer als der
-Lauftext (14 px). Die Uhr im Kopf steht ebenfalls in 16 px. Der Seitenkopf MUST in `kompakt` am
+Lauftext (14 px). Die Uhr im Kopf ist Daueranzeige und steht in der Stufe des Lauftexts (14 px
+in `kompakt`). Der Seitenkopf MUST in `kompakt` am
 Fükw-Schirm 44 px hoch bleiben.
 
 #### Scenario: Titel und Lauftext

@@ -814,8 +814,11 @@ export const schriftskala = {
   ueberschrift: { stufe: 'gross', gewicht: 600, familie: 'text', sperrung: '-0.02em' },
   /** Seitenkopf: Titel 16/600, größer als der Lauftext (LLH-1773). */
   seitentitel: { stufe: 'titel', gewicht: 600, familie: 'text' },
-  /** Uhr im Kopf: 16/500 Mono (LLH-1773). */
-  uhr: { stufe: 'titel', gewicht: 500, familie: 'zahl', sperrung: '0.04em' },
+  /**
+   * Uhr im Kopf: Stufe `text`, 500, Mono (LLH-1773). Daueranzeige hinter dem Einsatznamen
+   * (LLH-1726); in `titel` bräche der Kopf am Handy in `handschuh` auf zwei Zeilen um.
+   */
+  uhr: { stufe: 'text', gewicht: 500, familie: 'zahl', sperrung: '0.04em' },
   /** Lauftext-Grundmaß. */
   text: { stufe: 'text', gewicht: 400, familie: 'text' },
   /** Warnhinweis: Warnstufe, Sammelbanner, Filterhinweis, Alarmhinweis, mindestens 14 px. */
