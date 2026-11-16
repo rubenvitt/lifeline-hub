@@ -24,12 +24,12 @@ Jede Aufgabe per TDD: Test zuerst rot, dann grün. Pfade relativ zu `frontend/sr
 - [x] 4.1 `kartenKnopfBreite(token)` in `KartenUeberlagerung.tsx` mit Unit-Test (≥ Kante, längstes Wort passt in `kompakt`, `komfortabel`, `handschuh`); `Kartenknopf` erhält die Prop `wort`, rendert Symbol und Wort untereinander und lässt `title` bei gesetztem Wort weg; Komponenten-Test: Wort sichtbar, `aria-label` unverändert, Zoom ohne Wort
 - [x] 4.2 Wörter setzen: Norden, Position, Messen, Zeichnen, Leiste; alle Knöpfe des Blocks gleich breit; `fussStil` (`KartenFuss.tsx`) und `maxWidth` der linken Überlagerung rechnen mit `kartenKnopfBreite`. Test in `KartenFuss` bzw. Überlagerung grün
 - [x] 4.3 Mitnutzer prüfen: `personen/BetroffeneKarte.tsx`, `geraet/GeraetAbschnittKarte.tsx` (gleiche Wörter, Fußkante); ihre Tests grün
-- [ ] 4.4 e2e `fokus-verdeckung.spec.ts`, `leisten-flaeche.spec.ts`, `lagekarte-smoke.spec.ts` bei 390 und 1024 px in `handschuh` grün (Knopfblock, Fuß und Überlagerung überschneiden sich nicht, jeder Knopf antippbar)
+- [x] 4.4 e2e `fokus-verdeckung.spec.ts`, `leisten-flaeche.spec.ts`, `lagekarte-smoke.spec.ts` bei 390 und 1024 px in `handschuh` grün (Knopfblock, Fuß und Überlagerung überschneiden sich nicht, jeder Knopf antippbar)
 
 ## 5. Regeln und Anwenderdoku
 
 - [x] 5.1 `pages/lagekarte/AGENTS.md` fortschreiben: Einleitung (Leiste bei grobem Zeiger per Vorgabe zu), Kamera-Regel (Marker-Tipp ohne Anflug, Anflug nur heran), Knopfspalte (Wort unter dem Symbol, `kartenKnopfBreite` statt Kante); Verweise auf `kartenKnopfKante` per grep prüfen
-- [ ] 5.2 `docs/anwender/kapitel/lagekarte.md`: Knöpfe mit Wort, Leiste am Touch-Gerät, Marker-Tipp ohne Zoom; Bilder über den Bildlauf (`e2e/doku-bilder/lagekarte.bilder.ts`) neu, Wächter der Anwenderdoku grün
+- [x] 5.2 `docs/anwender/kapitel/lagekarte.md`: Knöpfe mit Wort, Leiste am Touch-Gerät, Marker-Tipp ohne Zoom; Bilder über den Bildlauf (`e2e/doku-bilder/lagekarte.bilder.ts`) neu, Wächter der Anwenderdoku grün
 
 ## 6. Review-Befunde (16.11.2026)
 
@@ -40,7 +40,7 @@ Jede Aufgabe per TDD: Test zuerst rot, dann grün. Pfade relativ zu `frontend/sr
 
 ## 7. Integration
 
-- [ ] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die e2e-Suiten aus 2.3, 3.2 und 4.4 lokal grün
+- [x] 7.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die e2e-Suiten aus 2.3, 3.2 und 4.4 lokal grün. Lokal (16.11.2026): `--nur schnell` und `--nur frontend` grün; die Rust-Suite passte nicht ins Plattenkontingent der Cloud-Sitzung, gefahren und grün sind `cargo test --lib` und die berührten Integrationstests, die volle Suite läuft auf `alpha`
 
 ## Workflow follow-up
 

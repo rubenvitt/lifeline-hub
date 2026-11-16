@@ -22,7 +22,8 @@ export const BEDIENUNG = { bedienung: true } as const;
 export const AUTOMATISCH = { bedienung: false } as const;
 
 /**
- * Zoom eines Anflugs (LLH-1751, design.md D5 der Change `bo5wokwi-lagekarte-knoepfe-leiste-zoom`):
+ * Zoom eines Anflugs (LLH-1751, D5 in
+ * `openspec/changes/archive/2026-11-16-bo5wokwi-lagekarte-knoepfe-leiste-zoom/design.md`):
  * nur heran, nie heraus. Steht die Karte näher als {@link ANFLUG_ZOOM}, behält sie ihren Zoom —
  * wer einen Ausschnitt eingestellt hat, verliert ihn nicht durch einen Anflug. `laufendesZiel`:
  * Zielzoom eines Anflugs, der gerade noch fliegt, sonst `null`.

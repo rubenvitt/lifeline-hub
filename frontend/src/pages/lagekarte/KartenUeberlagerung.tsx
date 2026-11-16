@@ -82,7 +82,7 @@ const WORT_RAND = 4;
 
 /**
  * Breite eines Kartenknopfs und damit des ganzen Knopfblocks (LLH-1751, design.md D1 der Change
- * `bo5wokwi-lagekarte-knoepfe-leiste-zoom`): mindestens die Kante, und breit genug für das längste
+ * `openspec/changes/archive/2026-11-16-bo5wokwi-lagekarte-knoepfe-leiste-zoom/`): mindestens die Kante, und breit genug für das längste
  * Wort unter dem Symbol („Zeichnen“, „Position“: 8 Zeichen, rund 0,6 em je Zeichen). Der Block ist
  * eine Spalte, deshalb tragen alle Knöpfe diese Breite, auch die Zoomknöpfe ohne Wort. Kartenfuß
  * und linke Überlagerung enden an ihr (`fussStil`, `maxWidth`) — rein und exportiert.

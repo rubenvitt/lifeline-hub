@@ -13,7 +13,7 @@ Per TDD, Test zuerst rot. Pfade relativ zu `frontend/src/`.
 
 ## 3. Integration
 
-- [ ] 3.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (gemeinsam mit der Lagekarten-Change im selben Branch)
+- [x] 3.1 `./scripts/check-all.sh --geaendert --ohne-e2e` grün (gemeinsam mit der Lagekarten-Change im selben Branch); Stand und Einschränkung bei der Rust-Suite wie in `bo5wokwi-lagekarte-knoepfe-leiste-zoom`, Aufgabe 7.1
 
 ## Workflow follow-up
 
