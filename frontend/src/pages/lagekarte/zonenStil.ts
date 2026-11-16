@@ -158,7 +158,7 @@ export function bezirkBeschriftung(
  * KEINE" läse sich als „keine Gefahr", und „unbekannt" allein sagte nicht, was unbekannt ist. Der
  * Wortlaut der Stufe bleibt der des Vertrags.
  */
-function stufenWort(warnstufe: Warnstufe | 'unbekannt'): string {
+export function stufenWort(warnstufe: Warnstufe | 'unbekannt'): string {
   if (warnstufe === 'unbekannt') return 'Stufe unbekannt';
   const wort = warnstufeKarte[warnstufe].label;
   return warnstufe === 'keine' ? `${wort} Stufe` : wort;

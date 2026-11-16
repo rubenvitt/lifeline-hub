@@ -524,6 +524,63 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
   });
 });
 
+/**
+ * Spec `lagemonitor`, „Überbelegte Unfallhilfsstelle in Alarmrolle“ (LLH-1746). Mutationsprobe:
+ * ohne Vorrang der Überbelegten in der Sortierung → der zweite Fall rot (die Turnhalle fiele unter
+ * „+2 weitere“); `>=` statt `>` in `istUeberbelegt` → der dritte Fall rot.
+ */
+describe('Lagemonitor — Überbelegung (LLH-1746)', () => {
+  const uhs = (id: number, bezeichnung: string, belegt: number, plaetze: number) => ({
+    id,
+    bezeichnung,
+    typ: 'behandlungsplatz' as const,
+    status: 'aktiv' as const,
+    lat: null,
+    lon: null,
+    belegt,
+    plaetze,
+    kraefte: 0,
+  });
+  async function belegungMit(liste: ReturnType<typeof uhs>[]) {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, uhs: liste });
+    renderApp('/geraet/7/monitor');
+    return screen.findByRole('region', { name: 'Belegung der Unfallhilfsstellen' });
+  }
+  const zahlVon = (kachel: HTMLElement, name: string) =>
+    within(kachel).getByText(name).closest<HTMLElement>('[data-lfh="monitor-zahl"]')!;
+
+  it('acht auf fünf: „8/5“ in der Alarmrolle, „1 überbelegt“ in der Titelzeile', async () => {
+    const kachel = await belegungMit([uhs(1, 'UHS Turnhalle', 8, 5), uhs(2, 'UHS Nord', 3, 8)]);
+    const turnhalle = zahlVon(kachel, 'UHS Turnhalle');
+    expect(turnhalle).toHaveTextContent('8/5UHS Turnhalle');
+    expect(turnhalle).toHaveAttribute('data-hervorgehoben', 'ja');
+    expect(zahlVon(kachel, 'UHS Nord')).toHaveAttribute('data-hervorgehoben', 'nein');
+    const zusatz = kachel.querySelector<HTMLElement>('[data-lfh="monitor-zusatz"]')!;
+    expect(zusatz).toHaveTextContent('1 überbelegt');
+    expect(zusatz.style.fontWeight).toBe('700');
+  });
+
+  it('eine kleine überbelegte UHS steht vor sieben größeren', async () => {
+    const groessere = [3, 4, 5, 6, 7, 8, 9].map((id) => uhs(id, `UHS ${id}`, 10, 20));
+    const kachel = await belegungMit([...groessere, uhs(1, 'UHS Turnhalle', 8, 5)]);
+    const reihe = within(kachel)
+      .getAllByText(/^UHS /)
+      .map((e) => e.textContent);
+    expect(reihe[0]).toBe('UHS Turnhalle');
+    expect(within(kachel).getByText('+2 weitere')).toBeInTheDocument();
+  });
+
+  it('voll (5/5) und ohne Plätze sind nicht überbelegt', async () => {
+    const kachel = await belegungMit([uhs(1, 'UHS Voll', 5, 5), uhs(2, 'UHS Zelt', 2, 0)]);
+    expect(zahlVon(kachel, 'UHS Voll')).toHaveTextContent('5/5UHS Voll');
+    expect(zahlVon(kachel, 'UHS Voll')).toHaveAttribute('data-hervorgehoben', 'nein');
+    expect(zahlVon(kachel, 'UHS Zelt')).toHaveTextContent('2UHS Zelt');
+    expect(zahlVon(kachel, 'UHS Zelt')).toHaveAttribute('data-hervorgehoben', 'nein');
+    expect(kachel.querySelector('[data-lfh="monitor-zusatz"]')).toBeNull();
+  });
+});
+
 describe('Lagemonitor — Ablauf der Veranstaltung (LLH-1570)', () => {
   // Je 30 s nach der vollen Minute: die Uhr läuft mit `shouldAdvanceTime` beim Laden ein paar
   // Sekunden weiter, der Abstand bleibt trotzdem auf der Minute.

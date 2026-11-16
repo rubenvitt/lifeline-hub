@@ -201,9 +201,11 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.gefahrengebiete,
       EINSATZ_KEYS.lagemonitor,
     ]);
+    // Warnstufe, Bestätigung und Name eines Gebiets stehen im Lagebild des Monitors (LLH-1746).
     expect(EINSATZ_STREAM_EVENTS.gefahr).toEqual([
       EINSATZ_KEYS.gefahrenmatrix,
       EINSATZ_KEYS.gefahrengebiete,
+      EINSATZ_KEYS.lagemonitor,
     ]);
     expect(EINSATZ_STREAM_EVENTS.meldung).toEqual([
       EINSATZ_KEYS.meldungen,

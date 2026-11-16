@@ -256,7 +256,8 @@ export const EINSATZ_STREAM_EVENTS = {
   // Der Lagemonitor zeigt die Gefahrenzonen aus seinem Lagebild (LLH-1153).
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete, EINSATZ_KEYS.lagemonitor],
   freies_zeichen: [EINSATZ_KEYS.freieZeichen],
-  gefahr: [EINSATZ_KEYS.gefahrenmatrix, EINSATZ_KEYS.gefahrengebiete],
+  // Warnstufe, Bestätigung und Name eines Gebiets stehen im Lagebild des Monitors (LLH-1746).
+  gefahr: [EINSATZ_KEYS.gefahrenmatrix, EINSATZ_KEYS.gefahrengebiete, EINSATZ_KEYS.lagemonitor],
   einheit: [
     EINSATZ_KEYS.einheiten,
     EINSATZ_KEYS.fuehrungskraefte,
