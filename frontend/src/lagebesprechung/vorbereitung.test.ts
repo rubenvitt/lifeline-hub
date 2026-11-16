@@ -80,7 +80,16 @@ function quellen(over: Partial<VorbereitungsQuellen> = {}): VorbereitungsQuellen
     lagebild: baueLagebild(roh(), JETZT, BERLIN),
     zustand: alleDa,
     auftraege: { zustand: 'daten', zahl: { offen: 5, in_arbeit: 2, ueberfaellig: 1 } },
-    meldungen: { zustand: 'daten', zahl: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 } },
+    meldungen: {
+      zustand: 'daten',
+      zahl: {
+        offen: 3,
+        ungesehen: 1,
+        bestaetigung_ueberfaellig: 0,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      },
+    },
     nachforderungen: {
       zustand: 'daten',
       zahl: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 },

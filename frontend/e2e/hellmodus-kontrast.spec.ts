@@ -197,7 +197,10 @@ for (const modus of ['light', 'dark'] as const) {
       [
         'flaeche',
         'ueberblick',
-        page.locator('[data-lfh="kennzahl"] .lfh-augenbraue').filter({ hasText: 'Betroffene' }),
+        // „Betroffene“ steht seit LLH-1743 nur im Lagebild; der Überblick führt „Offene Aufträge“.
+        page
+          .locator('[data-lfh="kennzahl"] .lfh-augenbraue')
+          .filter({ hasText: 'Offene Aufträge' }),
       ],
     ] as const;
     for (const [rolle, modul, augenbraue] of faelle) {

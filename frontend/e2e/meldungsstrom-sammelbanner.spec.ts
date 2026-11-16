@@ -86,7 +86,8 @@ for (const { viewport, dichte, soll, vorher: anzahl } of FAELLE) {
     // Ein später Schriftwechsel verschöbe die Zeilen ohne Banner (Muster `gate1-ueberlauf`).
     await page.evaluate(() => document.fonts.ready);
 
-    const fuehrungsstand = page.getByRole('group', { name: 'Führungsstand' });
+    // Das Fußband heißt seit LLH-1743 „Stand“ (Lagebericht, UHS aktiv).
+    const fuehrungsstand = page.getByRole('group', { name: 'Stand', exact: true });
     const ersteZeile = zeilen.first();
     const davor = { zeile: await oben(ersteZeile), band: await oben(fuehrungsstand) };
 

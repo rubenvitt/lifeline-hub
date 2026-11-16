@@ -22,7 +22,13 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
   it('liest Aufträge und Meldungen aus der Serverantwort, zählt nichts selbst', () => {
     const q = daten({
       auftraege: { offen: 5, in_arbeit: 2, ueberfaellig: 1 },
-      meldungen: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 2 },
+      meldungen: {
+        offen: 3,
+        ungesehen: 1,
+        bestaetigung_ueberfaellig: 2,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      },
     });
     expect(auftragsStand(q)).toEqual({
       zustand: 'daten',
@@ -30,7 +36,13 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
     });
     expect(meldungsStand(q)).toEqual({
       zustand: 'daten',
-      zahl: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 2 },
+      zahl: {
+        offen: 3,
+        ungesehen: 1,
+        bestaetigung_ueberfaellig: 2,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      },
     });
   });
 
@@ -74,10 +86,24 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
   it('Notizen: „davon überfällig“ und „Bestätigung überfällig“', () => {
     expect(auftraegeNotiz({ offen: 5, in_arbeit: 2, ueberfaellig: 1 })).toBe('1 überfällig');
     expect(auftraegeNotiz({ offen: 5, in_arbeit: 2, ueberfaellig: 0 })).toBe('keiner überfällig');
-    expect(meldungenNotiz({ offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 })).toBe('1 neu');
-    expect(meldungenNotiz({ offen: 3, ungesehen: 0, bestaetigung_ueberfaellig: 2 })).toBe(
-      '0 neu · 2 Bestätigung überfällig',
-    );
+    expect(
+      meldungenNotiz({
+        offen: 3,
+        ungesehen: 1,
+        bestaetigung_ueberfaellig: 0,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      }),
+    ).toBe('1 neu');
+    expect(
+      meldungenNotiz({
+        offen: 3,
+        ungesehen: 0,
+        bestaetigung_ueberfaellig: 2,
+        sofort_offen: 0,
+        dringend_offen: 0,
+      }),
+    ).toBe('0 neu · 2 Bestätigung überfällig');
   });
 
   it('Notiz der Nachforderungen: „davon unterwegs“ — Band und Werkzeugkachel (LLH-1371)', () => {

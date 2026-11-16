@@ -5,7 +5,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep ueberblick`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   ueberblick.png   frontend/src/pages/fuehrung/UeberblickPage.tsx
+ *   ueberblick.png   frontend/src/pages/fuehrung/UeberblickPage.tsx,
+ *                    frontend/src/components/instrument/AlarmZeile.tsx
  */
 
 const KAPITEL = 'ueberblick';
@@ -18,6 +19,11 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/ueberblick`);
     await expect(page.locator('[data-lfh="ueberblick-abschnitt"]').first()).toBeVisible();
     await expect(page.locator('[data-lfh="ueberblick-marke"]').first()).toBeVisible();
+    // Die Alarmzeile hat alle Quellen (LLH-1743), sonst zeigte das Bild einen Zwischenstand.
+    await expect(page.locator('[data-lfh="alarm-zeile"]')).toHaveAttribute(
+      'data-stand',
+      'vollstaendig',
+    );
     await fotografiere(page, KAPITEL, 'ueberblick');
     // Ablauf weiter: aus dem Paneel der Entscheidungen ins Einsatztagebuch.
     // Der Sprung „ETB ↗“ im Paneelkopf (Dashboard-Baukasten, LLH-1140).
@@ -47,6 +53,17 @@ test.describe(KAPITEL, () => {
     await expect(page).toHaveURL(/[?&]vorgaenge=meine/);
     await page.getByRole('radio', { name: 'alle', exact: true }).click();
     await expect(page).not.toHaveURL(/vorgaenge=/);
+  });
+
+  // Ablauf „Vom Überblick weiterarbeiten“, Schritt 3 (LLH-1743): die Übersichten verweisen
+  // aufeinander.
+  test('Vom Überblick ins Lagebild', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/ueberblick`);
+    await page.getByRole('button', { name: 'Lagebild', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/lage-dashboard`));
   });
 
   test('Vom Überblick zur Erfassung und zum Lagebericht', async ({ page }) => {
