@@ -65,7 +65,7 @@ lat, lon }`: Text „<Bezeichnung oder ‚Gefahrengebiet‘> · <warnstufeKarte[
 `bestaetigt = false` „ · unbestätigt“ (`UNBESTAETIGT` aus `pages/gefahren/beurteilung.ts`);
 Absperrbereich, Absperrgrenze und Sperrgebiet `zoneTypLabel(typ)`; eine Gefahrengebiet-Zone ohne
 `gebiet` „Gefahrengebiet“ ohne Stufe (wie die Lagekarte: ohne Gebiet keine Stufe). Ort: Schwerpunkt
-des Polygons (`polygonZentroid`), bei einer Linie ihr mittlerer Stützpunkt. Die Karte zeichnet sie
+des Polygons (`polygonZentroid`), bei einer Linie die Mitte zwischen ihren mittleren Stützpunkten. Die Karte zeichnet sie
 wie die Abschnittsmarken in `schrift` (28 px am Monitor), Rand in der Rolle der Stufe
 (`rollenFarbe`), Text in `rollen.text`.
 
@@ -88,8 +88,8 @@ getestet). Die Kachel sortiert überbelegte zuerst, dann wie bisher nach `belegt
 eine kleine überbelegte Stelle nicht hinter „+n weitere“ verschwindet. Die Zahl nutzt die
 vorhandene Alarmfläche von `Zahl` (`hervorgehoben`, ohne die 60-s-Frist: sie gilt, solange die
 Lage es ist), die Titelzeile `zusatz` = „n überbelegt“ mit `zusatzAlarm`. Die Kartenmarke zeigt
-`Name · belegt/plaetze` (ohne Plätze `Name · belegt`), überbelegt mit Rand `rollen.alarmText`
-und Text in `rollen.alarmText`.
+`Name · belegt/plaetze` (ohne Plätze `Name · belegt`), überbelegt auf `rollen.alarmFuellung` mit
+Rand und Text in `rollen.alarmText` (dieselbe Alarmfläche wie die Zahl in der Kachel).
 
 - *Verworfen: „8 von 5 Plätzen“ ausgeschrieben* (Abstimmung 16.11.2026): bei 72 px nur in zwei
   Spalten mit vier Stellen.
