@@ -61,8 +61,8 @@ setzen Status, tragen nach und streichen.
    Namen eingeben oder unter „Filter“ nach „Trägerorganisation“ oder „Status“ (verfügbar,
    gebunden, nicht verfügbar) filtern; der Knopf nennt dann die Zahl, etwa „Filter (1)“. Jeder
    gesetzte Filter steht als Marke in der Werkzeugzeile und lässt sich dort einzeln entfernen. Die
-   Zahl links, etwa „20 von 20 Kräften“, nennt, wie viele Kräfte die Auswahl zeigt; „Filter
-   zurücksetzen“ hebt alle Filter auf. Trifft die Suche ein Fahrzeug, steht seine ganze Beladung
+   Zahlen links, etwa „12 von 12 Kräften · 8 von 8 Fahrzeugen“, nennen, wie viele Personen und
+   Fahrzeuge die Auswahl zeigt; „Filter zurücksetzen“ hebt alle Filter auf. Trifft die Suche ein Fahrzeug, steht seine ganze Beladung
    darunter; trifft sie einen Posten der Beladung, steht das Fahrzeug mit seiner Einheit darüber,
    aber nur mit diesem Posten.
 
@@ -154,8 +154,11 @@ ihn. Jeder Wechsel steht im Einsatztagebuch, und „Seit“ zeigt, seit wann er 
 
 ### Stärke und Besatzung
 
-Die Stärke einer Einheit zählt ihr eigenes Personal und das aller Untereinheiten; jede Untereinheit
-nennt ihre eigene. Die obersten Zeilen ergeben zusammen die Stärke im Kopf. Jede Kraft zählt
+Die Stärke einer Einheit zählt ihr eigenes Personal und das aller Untereinheiten, die unter ihr
+stehen; jede Untereinheit nennt ihre eigene. Steht eine Untereinheit selbst in einem anderen
+Abschnitt als ihre Einheit, etwa eine Gruppe des Zugs an einer UHS, steht sie als eigene Zeile mit
+dem Namen des Zugs, etwa „aus Sanitätszug“, und zählt dort, nicht beim Zug. Die obersten Zeilen
+ergeben zusammen die Stärke im Kopf. Jede Kraft zählt
 einmal, bei ihrer Einheit, auch wenn sie auf dem Fahrzeug einer anderen Einheit sitzt: dann steht
 sie unter „Ohne Fahrzeug“ ihrer Einheit mit dem Zusatz „fährt auf …“. Die Besatzung „Ist“ eines
 Fahrzeugs zählt dagegen jede Kraft darauf, auch die anderer Einheiten, und nennt sie, etwa „davon 1
@@ -165,8 +168,9 @@ Status, Mittelverteilung und Tönung bleiben bei der eigenen Zeile: ein Ausfall 
 Untereinheit tönt nur sie. Material, das defekt, verbraucht, „Desinfektion nötig“ oder aufgebraucht
 ist, zählt als Ausfall und tönt die Einheit, an der es liegt; ein Ausfall in der Beladung tönt die
 Einheit des Fahrzeugs. Die Gruppen „Material“ und „Beladung“ zählen nur ihre eigenen Posten. Der
-Filter „Abschnitt“ richtet sich nach dem Abschnitt der obersten Einheit: eine Untereinheit bleibt
-unter ihrer Einheit, auch wenn sie selbst keinen oder einen anderen Abschnitt trägt. Beladung
+Filter „Abschnitt“ richtet sich nach dem Abschnitt, in dem eine Einheit steht: ihrem eigenen, sonst
+dem ihrer Einheit. Eine Untereinheit ohne eigenen Abschnitt bleibt so unter ihrer Einheit, eine mit
+anderem Abschnitt erscheint nur bei diesem. Beladung
 zählt beim Abschnitt der Einheit ihres Fahrzeugs; Material an einer UHS oder in einem
 Bereitstellungsraum fällt bei einem gewählten Abschnitt heraus.
 

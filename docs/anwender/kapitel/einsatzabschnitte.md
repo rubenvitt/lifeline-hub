@@ -2,7 +2,7 @@
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
 reihenfolge: 130
-quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/einsatz/einsatzleiter.ts, frontend/src/components/SprechgruppenPicker.tsx]
+quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/abschnittStaerke.ts, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/einsatz/einsatzleiter.ts, frontend/src/components/SprechgruppenPicker.tsx]
 ---
 
 ## Überblick
@@ -166,8 +166,13 @@ lautet er „Auf Karte zeigen (Keine Berechtigung)“ und ist gesperrt. Einzelhe
   Gliederung bietet solche Ziele gar nicht erst an, und der Server lehnt sie ebenso ab.
 - Umgehängt wird nur die Stellung im Baum: Name, Leitung, Lage und Einheiten des Abschnitts
   bleiben, wie sie sind. Die Stärke der Über-Abschnitte rechnet sich neu.
-- Die „Stärke“ eines Abschnitts ergibt sich aus seinen Einheiten; „Stärke inkl.
-  Unterabschnitte“ nimmt die der Unterabschnitte hinzu.
+- Die „Stärke“ eines Abschnitts zählt, wer in ihm steht: jede Einheit mit ihrem eigenen Personal,
+  auch eine, die einer Einheit in einem anderen Abschnitt unterstellt ist (etwa die Gruppe eines
+  Zugs an einer UHS). Eine Einheit ohne eigenen Abschnitt steht in dem ihrer Einheit. „Zugeordnete
+  Einheiten“ nennt dieselben Einheiten mit ihrer „eigenen“ Stärke, ihre Summe ist die „Stärke“;
+  „über …“ heißt, die Einheit trägt den Abschnitt ihrer Einheit. „Stärke inkl. Unterabschnitte“
+  nimmt die der Unterabschnitte hinzu. Kräfte an einer UHS zählen dabei nicht eigens: sie gehören
+  zu ihrer Einheit.
 
 ### Änderungen anderer Arbeitsplätze
 
@@ -187,7 +192,9 @@ Rufname der eigenen Führungsstelle, sobald sie in den Einsatzdaten erfasst sind
 Einsatzleiter mit „seit“, wie er in „Einsatzdaten“ festgelegt ist (siehe
 [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Ist keiner festgelegt, steht dort „Leitung
 nicht erfasst“; die Rolle Einsatzleitung im „Zugriff“ macht niemanden zum Einsatzleiter. An der
-Wurzel steht keine Stärke; die Gesamtstärke zeigt die Kräfteübersicht.
+Wurzel steht keine Stärke; die Gesamtstärke zeigt die Kräfteübersicht. Abschnitte und Einheiten
+zählen wie in der Gliederung: Eine Untereinheit, die selbst in einem anderen Abschnitt steht, hängt
+dort mit „aus“ und dem Namen ihrer Einheit, und diese zählt sie nicht mehr mit.
 
 Daneben steht der Kasten „Stab“, sobald ein Mitglied ein Sachgebiet S1 bis S6 führt. Er nennt je
 Sachgebiet die Namen der Mitglieder, die es tragen, mehrere alphabetisch; ein Sachgebiet ohne

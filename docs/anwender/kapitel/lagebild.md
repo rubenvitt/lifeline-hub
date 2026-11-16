@@ -27,7 +27,8 @@ aus dem Modul, in dem sie erfasst wird.
    ![Lagebild mit Kennzahlenband, Gefahrenmatrix, Sichtung, jüngsten ETB-Einträgen und Führungsstand](../bilder/lagebild/lagebild.png)
 
 4. Am Fuß den Führungsstand lesen: „Aufträge offen“, „Meldungen offen“, der jüngste
-   „Lagebericht“ und „UHS aktiv“.
+   „Lagebericht“ und „UHS aktiv“ mit den geplanten UHS und den Kräften an aktiven UHS, etwa
+   „1 geplant · 3 Kräfte an UHS“.
 5. Um ins Modul zu wechseln, den Verweis eines Paneels wählen, etwa „Gefahren ↗“ in der
    Gefahrenmatrix.
 

@@ -2,7 +2,7 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
 ---
 
 ## Überblick
@@ -41,7 +41,7 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    steht dort „Hilfeleistungen“: Kontakte, letzte Stunde und vermisst, darunter in Versorgung,
    Transporte und SK I.
 2. „Kräfte“ zählt Personal, Einheiten und die Stärke F/UF/M; oben rechts steht, wie viele Kräfte an
-   Unfallhilfsstellen arbeiten.
+   aktiven Unfallhilfsstellen arbeiten, gezählt wie im Lagebild.
 3. „Belegung der Unfallhilfsstellen“ nennt je UHS Belegte und Plätze, die vollsten zuerst, bis zu
    sechs; der Rest steht als „+… weitere“.
 4. Die Lagekarte zeigt den Einsatzort, jede verortete UHS mit ihrer Belegung, die Gefahrenzonen
