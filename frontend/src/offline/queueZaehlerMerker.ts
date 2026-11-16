@@ -2,10 +2,11 @@ import { sicherEntfernen, sicherLesen, sicherSchreiben } from '../lib/sichererSp
 import type { OfflineQueueZaehler } from './queue';
 
 /**
- * Der zuletzt gelesene Zähler der Offline-Queue (LLH-1910, Change
- * `s11g6ijy-kopfleiste-startzustaende`, design.md D2/D3). Die Queue liegt in IndexedDB und
- * antwortet erst nach dem ersten Bild; ohne diesen Merker erschien „WARTET n“ bzw. „PRÜFEN“ erst
- * danach, und der Kopf brach an der Umbruchkante in eine zweite Zeile um (Spec `kopfleiste`).
+ * Der zuletzt gelesene Zähler der Offline-Queue (LLH-1910,
+ * `openspec/changes/archive/2026-11-16-s11g6ijy-kopfleiste-startzustaende/design.md` D2/D3). Die
+ * Queue liegt in IndexedDB und antwortet erst nach dem ersten Bild; ohne diesen Merker erschien
+ * „WARTET n“ bzw. „PRÜFEN“ erst danach, und der Kopf brach an der Umbruchkante in eine zweite Zeile
+ * um (Spec `kopfleiste`).
  *
  * Ein Platz für die zuletzt aktive Person, nur Zahlen und ihre Kennung. Jeder Ausgang räumt ihn
  * (`GERAETESPEICHER`, `jeder-ausgang`); die Queue selbst bleibt und füllt ihn wieder.
