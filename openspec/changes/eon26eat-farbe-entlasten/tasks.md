@@ -9,7 +9,7 @@ ist. Pfade im Frontend relativ zu `frontend/src/`. Entscheidungen D1–D9 in `de
 - [x] 1.2 `theme/tokens.ts` und `theme/rollen.css`: vier Werte je Modus nach D5 (`paneel` = `grund`, `kopf` = `flaeche2`), Kommentare an den Rollen nachziehen; `rollen.guard.test.ts` und 1.1 grün
 - [x] 1.3 Alle Kontrasttests in `theme/` grün: `textstufen`, `rahmenKontrast`, `bedienKontrast`, `gesperrtKontrast`, `fehlertextKontrast`, `hinweisKontrast`, `auswahlKontrast` und die übrigen `*Kontrast.test.ts`. Verliert eine Textstufe den Boden, wird sie nachgezogen, nicht die Fläche (D5, Risiko); Abweichungen im Commit nennen
 - [x] 1.4 `theme/sprache.css`: `.lfh-segment--aktiv` mit `inset 0 -2px 0 var(--lfh-bedien)`; Segment mit `kante` behält nur die Typkante (D6). Test in `components/instrument/Segmentleiste.test.tsx` (gewählt trägt Bedienkante, ETB-Segment nur Typkante) rot→grün, Kontrastnachweis Kante gegen `flaeche3` ≥ 3 : 1 in `theme/bedienKontrast.test.ts`
-- [ ] 1.5 Kommentar in `components/instrument/Segmentleiste.tsx` (Fugenraster, aktiv) und `pages/lagekarte/KartenUeberlagerung.tsx` prüfen; `e2e/auswahl-kontrast.spec.ts` um das gewählte Segment (Nacht, Kante sichtbar) ergänzen und grün
+- [x] 1.5 Kommentar in `components/instrument/Segmentleiste.tsx` (Fugenraster, aktiv) und `pages/lagekarte/KartenUeberlagerung.tsx` prüfen; `e2e/auswahl-kontrast.spec.ts` um das gewählte Segment (Nacht, Kante sichtbar) ergänzen und grün
 
 ## 2. qim1zbwk (LLH-1778): Gelb entlasten
 
@@ -34,8 +34,8 @@ ist. Pfade im Frontend relativ zu `frontend/src/`. Entscheidungen D1–D9 in `de
 - [x] 4.2 Kontrastnachweis in `theme/sichtungKontrast.test.ts`: Text auf getönter Kachel (Tag ≥ 7, Nacht ≥ 5), Text auf der Schraffur von „tot“ (gefüllt und getönt), Tönung unterscheidet sich vom Grund; die Kante in `text` hält weiter ≥ 3 : 1
 - [x] 4.3 `personen/SichtungsWahl.tsx`: nicht gewählte Kacheln nach einer Wahl mit Innenrahmen + Tönung statt `borderInlineStart` 8 px; „tot“ mit Schraffur in jedem Zustand; „unverletzt“ transparent mit Rahmen. Tests in `personen/SichtungsWahl.test.tsx` (Spec `sichtungswahl`: „SK II gewählt“, „Fehlwahl korrigieren“, „unverletzt ohne Farbe“, „tot und unverletzt unterscheidbar“) rot→grün
 - [x] 4.4 Startfokus auf der Gruppe (D8): `radiogroup` mit `tabIndex={-1}`, `data-erfassung-fokus`, Fokusring in `theme/sprache.css`, Pfeiltaste von der Gruppe zur gewählten bzw. ersten Kachel; `components/Erfassung.tsx` fokussiert die Gruppe beim Öffnen und nach dem Serien-Speichern. Tests in `SichtungsWahl.test.tsx` und `personen/PersonErfassungModal.test.tsx` rot→grün
-- [ ] 4.5 e2e: `e2e/personen-aufnahme.spec.ts` (Fokus auf der Gruppe) und `e2e/betroffene-kontrast.spec.ts` (Randform → Innenrahmen, Nacht „tot“ gegen „unverletzt“) nachziehen und grün
-- [ ] 4.6 `frontend/AGENTS.md` Sichtungsabsatz (keine Randform, Schraffur, Startfokus), `docs/anwender/kapitel/betroffene.md` (Streifen → Innenrahmen), Karte „Sichtung“ in `frontend/scripts/design-system/previews.tsx` prüfen; Bilder des Kapitels Betroffene neu erzeugen
+- [x] 4.5 e2e: `e2e/personen-aufnahme.spec.ts` (Fokus auf der Gruppe) und `e2e/betroffene-kontrast.spec.ts` (Randform → Innenrahmen, Nacht „tot“ gegen „unverletzt“) nachziehen und grün
+- [x] 4.6 `frontend/AGENTS.md` Sichtungsabsatz (keine Randform, Schraffur, Startfokus), `docs/anwender/kapitel/betroffene.md` (Streifen → Innenrahmen), Karte „Sichtung“ in `frontend/scripts/design-system/previews.tsx` prüfen; Bilder des Kapitels Betroffene neu erzeugen
 
 ## 5. Erzeugtes und Integration
 
