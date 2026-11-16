@@ -5228,6 +5228,19 @@ export interface components {
             /** Format: int64 */
             vermisst: number;
         };
+        /**
+         * @description Was der Monitor über das Gefahrengebiet einer Zone erfährt (LLH-1746, Spec `lagemonitor`,
+         *     „Zonen ohne Freitext“): die Bezeichnung des Gebiets, seine höchste Warnstufe und ob die
+         *     Beurteilung bestätigt ist. Nicht, wer bestätigt hat, und nicht wann.
+         */
+        LagemonitorGefahrengebiet: {
+            /** @description Ob die Beurteilung der Matrix bestätigt ist (LLH-1090). */
+            bestaetigt: boolean;
+            /** @description Bezeichnung des Gefahrengebiets (nicht die Beschriftung der Zone), falls gesetzt. */
+            bezeichnung?: string | null;
+            /** @description Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste. */
+            warnstufe: components["schemas"]["Warnstufe"];
+        };
         /** @description Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke. */
         LagemonitorKraefte: {
             /** Format: int64 */
@@ -5320,9 +5333,10 @@ export interface components {
         };
         /**
          * @description Eine Gefahrenzone für die Monitorkarte (Gefahrengebiet, Absperrung, Sperrgebiet), einsatzweit
-         *     und gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext.
+         *     und gleich welcher Kartenansicht. Ohne Beschriftung und Notiz: beides ist Freitext der Zone.
          */
         LagemonitorZone: {
+            gebiet?: components["schemas"]["LagemonitorGefahrengebiet"] | null;
             /** @description GeoJSON-Geometrie als String, wie in der Zonenliste. */
             geometrie: string;
             /** Format: int64 */

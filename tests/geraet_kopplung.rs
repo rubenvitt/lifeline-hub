@@ -5320,6 +5320,121 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
     }
 }
 
+// Spec `lagemonitor`, „Gefahrenzonen mit Name und Warnstufe“ und „Zonen ohne Freitext“ (LLH-1746):
+// eine Gefahrengebiet-Zone trägt Bezeichnung, höchste Warnstufe und Bestätigung ihres Gebiets,
+// aber weder Beschriftung noch Notiz der Zone noch den Namen dessen, der bestätigt hat.
+#[tokio::test]
+async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    sqlx::query(
+        "UPDATE benutzer SET anzeigename = 'Beurteiler Brandt' WHERE benutzername = 'admin'",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let mut zonen = Vec::new();
+    for typ in ["gefahrengebiet", "absperrbereich"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("{basis}/zonen"),
+            &admin,
+            Some(&json!({
+                "typ": typ,
+                "geometrie_typ": "Polygon",
+                "geometrie": ZONE_POLY,
+                "label": "Haus Muster",
+                "notiz": "Herr Muster wartet",
+            })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{typ}: {v}");
+        zonen.push(v);
+    }
+    let gebiet = zonen[0]["gefahrengebiet_id"]
+        .as_i64()
+        .expect("Gebiet zur Zone");
+    let gebiet_pfad = format!("{basis}/gefahrengebiete/{gebiet}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &gebiet_pfad,
+        &admin,
+        Some(&json!({"label": "Hangrutsch Kirchberg"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for (objekt, stufe) in [("menschen", "mittel"), ("sachwerte", "hoch")] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PUT",
+            &format!("{gebiet_pfad}/matrix/bewertung"),
+            &admin,
+            Some(&json!({"gefahrentyp": "einsturz", "schutzobjekt": objekt, "warnstufe": stufe})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+    }
+
+    let lagebild = format!("{basis}/lagemonitor");
+    let zone_von = |v: &Value, id: &Value| {
+        v["zonen"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|z| &z["id"] == id)
+            .cloned()
+            .unwrap_or_else(|| panic!("Zone {id} fehlt: {v}"))
+    };
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let gefahr = zone_von(&v, &zonen[0]["id"]);
+    assert_eq!(
+        gefahr["gebiet"],
+        json!({"bezeichnung": "Hangrutsch Kirchberg", "warnstufe": "hoch", "bestaetigt": false}),
+        "{v}"
+    );
+    let absperrung = zone_von(&v, &zonen[1]["id"]);
+    assert!(absperrung.get("gebiet").is_none(), "{absperrung}");
+
+    let (s, b) = anfrage(
+        &app,
+        "POST",
+        &format!("{gebiet_pfad}/beurteilung"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        zone_von(&v, &zonen[0]["id"])["gebiet"]["bestaetigt"],
+        json!(true)
+    );
+
+    let text = v.to_string();
+    for wort in ["Muster", "Brandt"] {
+        assert!(!text.contains(wort), "{wort} in der Antwort: {text}");
+    }
+    for schluessel in [
+        "label",
+        "notiz",
+        "beurteilt_von",
+        "beurteilt_von_name",
+        "beurteilt_at",
+    ] {
+        assert!(
+            !text.contains(&format!("\"{schluessel}\"")),
+            "Feld {schluessel} in der Antwort: {text}"
+        );
+    }
+}
+
 // ---------- Betreuungsstelle (LFH-1041) ----------
 
 /// Legt eine Betreuungsstelle in Betrieb an.
