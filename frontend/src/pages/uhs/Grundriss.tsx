@@ -1,3 +1,4 @@
+import { WORTUMBRUCH_STIL } from '../../anzeige/wortumbruch';
 import {
   IconAbmelden,
   IconAuto,
@@ -744,6 +745,8 @@ function PlatzKarte({
           lineHeight: '15px',
           fontSize: 13,
           maxHeight: 30,
+          // Silbengrenzen statt Wortbruch ohne Trennstrich (LLH-1793).
+          ...WORTUMBRUCH_STIL,
         }}
       >
         {platz.bezeichnung}
@@ -1779,18 +1782,22 @@ export default function Grundriss({
 
   const flaeche = (
     <div style={{ flex: 1, minWidth: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Die Werkzeugzeile bricht um, statt die Seite seitlich zu schieben (LLH-1793): mit offenem
+          „Plätze anlegen“ lief sie bei 390 px auf über 410 px. Die Fläche rollt in sich. */}
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 8,
           gap: 8,
+          minWidth: 0,
         }}
       >
         <Augenbraue als="h3">Unfallhilfsstelle</Augenbraue>
         {!schreibgeschuetzt && platzBearbeitbar && (
-          <Space>
+          <Space wrap style={{ minWidth: 0, maxWidth: '100%' }}>
             {platzEditAktiv && (
               <Button
                 type="text"
@@ -2158,44 +2165,47 @@ function KandidatenWahl({
         {personen.map((p) => {
           const seit = isWartend(p) ? wartetSeitVon(p) : null;
           return (
-            <Radio key={p.id} value={p.id} style={{ width: '100%' }}>
-              <span
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: token.paddingXS,
-                  minWidth: 0,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
-                <span style={{ flex: 'none' }}>
+            <Radio key={p.id} value={p.id} style={{ width: '100%', minWidth: 0 }}>
+              {/* Zwei Zeilen wie die Personenzeile des Wartebereichs (LLH-1793): oben Sichtung,
+                  Kennung und Name, umbrechend; unten Wartezeit und Zustand, gekürzt. Nichts läuft
+                  über den rechten Rand des Dialogs. */}
+              <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span
+                  data-lfh="kandidat-zeile1"
+                  style={{ minWidth: 0, whiteSpace: 'normal', ...WORTUMBRUCH_STIL }}
+                >
+                  <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
                   <span style={monoStil(token.fontSizeSM)}>
                     {registrierAnzeige(p.registrier_nr)}
                   </span>
                   {` · ${p.name || 'unbekannt'}`}
                 </span>
-                {seit && (
-                  <>
-                    {' '}
-                    <Wartezeit seit={seit} />
-                  </>
-                )}
-                {p.zustand && (
-                  <>
-                    {' '}
-                    <span
-                      title={p.zustand}
-                      style={{
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        color: rollen.text2,
-                      }}
-                    >
-                      {p.zustand}
-                    </span>
-                  </>
+                {(seit || p.zustand) && (
+                  <span
+                    data-lfh="kandidat-zeile2"
+                    style={{
+                      display: 'flex',
+                      gap: token.paddingXS,
+                      minWidth: 0,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {seit && <Wartezeit seit={seit} />}
+                    {p.zustand && (
+                      <span
+                        title={p.zustand}
+                        style={{
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          color: rollen.text2,
+                        }}
+                      >
+                        {p.zustand}
+                      </span>
+                    )}
+                  </span>
                 )}
               </span>
             </Radio>
@@ -2277,7 +2287,7 @@ function NeuerPlatzKnopf({
           value={typ}
           onChange={setTyp}
           options={PLATZ_TYPEN}
-          style={{ width: 200 }}
+          style={{ width: 200, maxWidth: '100%' }}
           aria-label="Platz-Typ"
         />
         <InputNumber
