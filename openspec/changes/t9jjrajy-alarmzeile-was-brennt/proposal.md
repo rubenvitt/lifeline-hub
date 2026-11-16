@@ -54,6 +54,10 @@ eine klare Aufgabe.
     Lagebilds.
   - Neue Anforderung: eine Heimat je Kennzahl zwischen Überblick und Lagebild (Seitenrollen).
 - `modul-zaehler`: Meldungen zählen zusätzlich offene Sofortmeldungen und offene dringende Meldungen.
+- `navigation-zuletzt-besucht`: Das Szenario „Kennzahl auf dem Überblick“ nennt „Offene
+  Aufträge“ statt „Betroffene“; ein Eintrag der Alarmzeile zählt als Ziel auf dem Überblick.
+- `einsatztauglichkeit-layout`: „Kennzahlenband hält seine Höhe“ nennt im Überblick das Band
+  „Führungsstand“.
 - `lagemonitor`:
   - Neue Anforderung: Alarmzeile ohne Personenbezug.
   - Neue Anforderung: Sofortmeldungen erreichen den Monitor sofort.

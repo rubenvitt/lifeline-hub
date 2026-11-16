@@ -55,9 +55,13 @@
 ### D1 Ableitung im Browser, ein Hook für beide Übersichten
 - Eine reine Funktion `wasBrennt(quellen, jetzt) → AlarmEintrag[]` in `frontend/src/lage/wasBrennt.ts`
   baut die Einträge aus bereits verdichteten Eingaben.
-- Ein Hook `useWasBrennt(einsatzId)` (`lage/useWasBrennt.ts`) lädt die Quellen über dieselben
-  Query-Keys wie die Seiten (React Query teilt den Cache) und ruft `wasBrennt` gegen die
-  Seitenuhr (`useJetzt`, 30 s).
+- Ein Hook `useWasBrennt(einsatzId, jetzt)` (`lage/useWasBrennt.ts`) lädt die Quellen über
+  dieselben Query-Keys wie die Seiten (React Query teilt den Cache) und ruft `wasBrennt` gegen die
+  Uhr der Seite. Der Überblick tickt alle 30 s, das Lagebild alle 5 s.
+- Den Modulzähler holt der Hook jede Minute auch ohne neue Daten: Für eine verstrichene Frist
+  einer Nachforderung gibt es kein Live-Ereignis.
+- Eine gesperrte Mittel-Liste zählt für den Ausfall wie im Meldebild als leer. Nur ohne Einheiten
+  fehlt die Aussage.
 - Überblick und Lagebild rufen denselben Hook, also zeigen sie dieselbe Zeile.
 - Quellen:
 
@@ -149,11 +153,19 @@ mit eigenem Status „nicht verfügbar“. Am Server gibt es diese Regel nicht.
   deshalb nicht als unvollständig: Der Monitor hat diese Quelle nicht.
 
 ### D7 Sofortmeldung erreicht den Monitor
-- `LiveEvent::Sofortmeldung` bekommt einen zweiten Gate-Schlüssel `lagemonitor`.
-- Die Live-Route nimmt ihn in die erlaubte Menge, wenn ein Gerät mit der Ansicht `Lagemonitor`
-  abonniert. Die Nutzlast ist nur `meldung_id`, also kein Inhalt.
+- Umgesetzt anders als zuerst geplant (Review 16.11.2026): Ein zweiter Gate-Schlüssel
+  `lagemonitor` scheiterte daran, dass jeder Gate-Schlüssel ein Modul sein muss
+  (`gate_keys_sind_echte_modul_keys`).
+- Stattdessen stellt `LiveNachricht::fuer_verbindung` einer Verbindung des gekoppelten
+  Lagemonitors (`routes/live.rs`, Ansicht `Lagemonitor`) das Ereignis `sofortmeldung` zu, auch
+  ohne das Modul Meldungen.
+- Die Nutzlast ist dabei `{}`, also weder Inhalt noch Kennung.
+- Das Gate von `sofortmeldung` selbst bleibt `meldungen`. Die Ausnahme hält ADR-0057 als
+  Präzisierung von ADR-0003 fest.
 - Der Monitor invalidiert bei `sofortmeldung` den Key `lagemonitor`.
 - Andere Meldungsereignisse bleiben dem Monitor fern; Fristen holt er mit dem 30-s-Takt.
+- Kachel und Zeile zeigen dieselbe Zahl: Der Handler übernimmt `sofort_offen` des Alarm-Blocks auch
+  für `sofortmeldungen_offen`.
 
 ### D8 Seitenrollen und Kennzahlen
 - **Überblick** „Führen: was ist zu tun“:

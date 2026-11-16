@@ -31,10 +31,13 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
   Meldungstext stehen nicht in der Antwort (Erweiterung von
   `lagemonitor_antwort_traegt_keine_personen`); Lagebild für Externe und `GET /api/v1/lage`
   unverändert (`public_api_spec_aktuell` grün).
-- [x] 2.2 `src/live/mod.rs`: `LiveEvent::Sofortmeldung` zusätzlich an den Gate-Schlüssel
-  `lagemonitor`; die Live-Route gibt ihn nur einem Gerät mit Ansicht `Lagemonitor`. Test: ein
-  Lagemonitor-Abonnent bekommt `sofortmeldung` (Nutzlast nur `meldung_id`), aber kein `meldung`;
-  ein Personenabonnent ohne Modul Meldungen bekommt beides nicht.
+- [x] 2.2 Sofort-Signal an den Lagemonitor (design.md D7, wie umgesetzt):
+  `LiveNachricht::fuer_verbindung` reicht einer Verbindung des gekoppelten Lagemonitors
+  `sofortmeldung` mit der Nutzlast `{}` durch, das Gate `meldungen` bleibt. Tests:
+  `live::tests::lagemonitor_bekommt_sofortmeldung_als_signal_ohne_inhalt` (Lagemonitor-Abonnent
+  bekommt `sofortmeldung`, aber kein `meldung`; ohne Ansicht kein Ereignis) und
+  `lagemonitor_bekommt_sofortmeldung_im_live_kanal_ohne_inhalt` in `tests/geraet_kopplung.rs`.
+  ADR-0057 präzisiert ADR-0003.
 - [x] 2.3 Typ-Codegen erneut (`scripts/check-typ-codegen.sh`), erzeugte Dateien mitcommitten;
   `frontend/src/geraet/AGENTS.md` (Abschnitt Lagemonitor, Datenschutz) um die neuen Felder und das
   Sofort-Signal ergänzen.
