@@ -1541,19 +1541,23 @@ describe('KraefteuebersichtPage — Filterwahrheit', () => {
     ).toBeInTheDocument();
   });
 
-  it('zeigt „X von Y Kräften · X von Y Fahrzeugen" und setzt mit einem Klick alle Filter zurück', async () => {
+  it('zeigt mit Filter „X von Y Kräften · X von Y Fahrzeugen", ohne Filter keine Auswahlzahl', async () => {
     // P1 hängt an KEINER Einheit, F1 an Einheit 20 (Abschnitt Nord). „Kräfte“ sind Köpfe, die
-    // Fahrzeuge zählen eigens (LLH-1744).
+    // Fahrzeuge zählen eigens; ohne Filter steht die Zahl nur in Statusband und Kopf, sonst bräche
+    // die Werkzeugzeile um (LLH-1744).
     mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
 
-    expect(await screen.findByText('1 von 1 Kräften · 1 von 1 Fahrzeugen')).toBeInTheDocument();
+    expect(
+      await (await seitenkopf()).findByText('1 Einheit · Stärke 0/0/1//1'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/von \d+ Kräften/)).toBeNull();
     await waehleAbschnitt('Abschnitt Nord');
     expect(await screen.findByText('0 von 1 Kräften · 1 von 1 Fahrzeugen')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
-    expect(await screen.findByText('1 von 1 Kräften · 1 von 1 Fahrzeugen')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText(/von \d+ Kräften/)).toBeNull());
     expect((await seitenkopf()).getByText('1 Einheit · Stärke 0/0/1//1')).toBeInTheDocument();
   });
 
@@ -1561,7 +1565,7 @@ describe('KraefteuebersichtPage — Filterwahrheit', () => {
     mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
-    await screen.findByText('1 von 1 Kräften · 1 von 1 Fahrzeugen');
+    await (await seitenkopf()).findByText('1 Einheit · Stärke 0/0/1//1');
 
     await waehleAbschnitt('Abschnitt Nord');
     // In der Werkzeugzeile: der (am Schirm verborgene) Druckkopf nennt die Auswahl auch.
@@ -1570,8 +1574,8 @@ describe('KraefteuebersichtPage — Filterwahrheit', () => {
     );
     const marke = await werkzeuge.findByText('Abschnitt: Abschnitt Nord');
     fireEvent.click(marke.closest('.ant-tag')!.querySelector('.ant-tag-close-icon')!);
-    expect(await screen.findByText('1 von 1 Kräften · 1 von 1 Fahrzeugen')).toBeInTheDocument();
-    expect(screen.queryByText('Abschnitt: Abschnitt Nord')).toBeNull();
+    await waitFor(() => expect(screen.queryByText('Abschnitt: Abschnitt Nord')).toBeNull());
+    expect(screen.queryByText(/von \d+ Kräften/)).toBeNull();
   });
 });
 
@@ -2018,7 +2022,8 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
     );
     // Ein Bericht ohne Personal meldete eine falsche Stärke.
     expect(screen.getByRole('button', { name: /In Lagebericht übernehmen/i })).toBeDisabled();
-    expect(screen.getByText(/^— von — Kräften( · |$)/)).toBeInTheDocument();
+    // Ohne Filter keine Auswahlzahl, also auch keine erfundene 0 (LLH-1744).
+    expect(screen.queryByText(/von .* Kräften/)).toBeNull();
     expect(listeEinsatzPersonal).not.toHaveBeenCalled();
     expect(listEntlassenesPersonal).not.toHaveBeenCalled();
   });
@@ -2035,7 +2040,8 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
     expect(platzhalter).toHaveAttribute('aria-hidden', 'true');
     expect(platzhalter).toHaveStyle({ visibility: 'hidden' });
     expect(kopf.queryByText(/1 Einheit/)).toBeNull();
-    expect(screen.getByText(/^— von — Kräften( · |$)/)).toBeInTheDocument();
+    // Ohne Filter keine Auswahlzahl, also auch keine erfundene 0 (LLH-1744).
+    expect(screen.queryByText(/von .* Kräften/)).toBeNull();
     await waitFor(() => expect(zeile(container, 'eh-20')).not.toBeNull());
     expect(zeile(container, 'eh-20')).toHaveTextContent('—');
     expect(zeile(container, 'eh-20')).not.toHaveTextContent('0/0/0//0');
@@ -2052,9 +2058,8 @@ describe('KraefteuebersichtPage — gesperrte Nachbarmodule (LLH-1462)', () => {
     expect(document.querySelector('[data-lfh="meldebild-sperre"]')).toHaveTextContent(
       'Modul Fahrzeuge gesperrt',
     );
-    // Die Köpfe bleiben gezählt, die Fahrzeugzahl entfällt neben dem Sperrhinweis (LLH-1744).
-    expect(await screen.findByText(/^\d+ von \d+ Kräften$/)).toBeInTheDocument();
-    expect(screen.queryByText(/von .* Fahrzeugen/)).toBeNull();
+    // Ohne Filter keine Auswahlzahl, auch keine Fahrzeugzahl neben dem Sperrhinweis (LLH-1744).
+    expect(screen.queryByText(/von .* (Kräften|Fahrzeugen)/)).toBeNull();
     expect(listeEinsatzFahrzeuge).not.toHaveBeenCalled();
   });
 

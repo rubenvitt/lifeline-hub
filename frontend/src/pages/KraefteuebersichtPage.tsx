@@ -1183,7 +1183,8 @@ export default function KraefteuebersichtPage() {
   const chips = aktiveFilterChips(filter, abschnittName);
   const gefiltert = chips.length > 0;
   /**
-   * „Kräfte“ sind Köpfe, die Fahrzeuge zählen eigens (LLH-1744, Spec `lage-verdichtung`), Material
+   * Auswahlzahl bei gesetztem Filter. „Kräfte“ sind Köpfe, die Fahrzeuge zählen eigens (LLH-1744,
+   * Spec `lage-verdichtung`), Material
    * gar nicht (eigene Statusachse). Eine unbekannte Liste zeigt „—“, nie 0; gesperrte Fahrzeuge
    * fallen weg, der Sperrhinweis steht daneben.
    */
@@ -1413,7 +1414,9 @@ export default function KraefteuebersichtPage() {
             marginBlockEnd: token.margin,
           }}
         >
-          <span style={{ color: token.colorTextSecondary }}>{auswahlText}</span>
+          {/* Nur mit Filter (LLH-1744): ohne nennen Statusband und Kopf die Zahlen, und die längere
+              Zeile ließe die Werkzeugzeile umbrechen. */}
+          {gefiltert && <span style={{ color: token.colorTextSecondary }}>{auswahlText}</span>}
           {mittelGesperrt && (
             <span
               id={sperreId}
