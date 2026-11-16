@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzPerApi } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { etbVonSetzen } from './etb-kern';
 
 /**
  * Taktische Zeit in der ETB-Zeitachse (LLH-1061, Specs `zeitdarstellung` und
@@ -89,4 +90,34 @@ test('ETB: taktisch heute `1446`, am Vortag `091446`; „Datum und Uhrzeit“ am
     new RegExp(`^${tag}\\.\\d{2}\\. \\d{2}:46$`),
   );
   await page.evaluate((k) => localStorage.removeItem(k), GERAETEWAHL);
+});
+
+test('ETB-Erfassung: unlesbare Zeit und direkt „Erfassen“ hält an, Escape im Feld gibt frei (LLH-1866)', async ({
+  page,
+}) => {
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E ETB unlesbare Zeit ${Date.now()}`);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await etbVonSetzen(page);
+  const inhalt = page.getByPlaceholder(/Inhalt/);
+  await inhalt.fill('Pumpe läuft unlesbar');
+  const zeit = page.getByRole('textbox', { name: 'Zeit', exact: true });
+  await zeit.fill('14:3x');
+  // Direkt aus dem Feld auf den Knopf: `blur` verwirft, derselbe Klick versucht zu senden.
+  await page.getByRole('button', { name: /^Erfassen/ }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Zeit nicht übernommen' })).toBeVisible();
+  await expect(zeit).toBeFocused();
+  await expect(inhalt).toHaveValue('Pumpe läuft unlesbar');
+  // Kein Eintrag: die Zeitachse kennt den Text nicht.
+  await expect(
+    page.locator('[data-lfh-eintrag="zeitachse"]').filter({ hasText: 'Pumpe läuft unlesbar' }),
+  ).toHaveCount(0);
+
+  // Escape im Feld bestätigt „jetzt“, dann geht der Eintrag hinaus.
+  await zeit.press('Escape');
+  await expect(page.getByText(/Zeit nicht übernommen/)).toHaveCount(0);
+  await page.getByRole('button', { name: /^Erfassen/ }).click();
+  await expect(
+    page.locator('[data-lfh-eintrag="zeitachse"]').filter({ hasText: 'Pumpe läuft unlesbar' }),
+  ).toHaveCount(1);
 });

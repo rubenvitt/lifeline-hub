@@ -1,7 +1,7 @@
 import type { EtbEintragAnzeige } from '../api/types';
 import { etbAnhangPfad } from '../api/etb';
 import {
-  istBildMime,
+  isBildMime,
   originalDateiname,
   originalPfad,
   originalZugaenglicherName,
@@ -79,7 +79,7 @@ export default function EtbAnhaenge({
               >
                 {a.dateiname} · {groesse}
               </AnhangVerweis>
-              {darfOriginal && istBildMime(a.mime) && (
+              {darfOriginal && isBildMime(a.mime) && (
                 <a
                   href={originalPfad(href)}
                   download={originalDateiname(a.dateiname)}

@@ -6,7 +6,7 @@ import type { BezugTyp, ChatNachricht } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import DownloadAnker from '../components/DownloadAnker';
 import { AnhangVorschauGruppe } from '../components/AnhangVorschau';
-import { istBildMime, originalPfad } from '../api/anhangFassung';
+import { isBildMime, originalPfad } from '../api/anhangFassung';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { aktionsNamen } from './aktionsNamen';
@@ -398,7 +398,7 @@ export default function NachrichtenStrom({
                               groesse={a.groesse}
                               zugaenglicherName={`${a.dateiname}, ${formatGroesse(a.groesse)}, Anhang der Nachricht von ${n.autor_name} herunterladen`}
                               originalHref={
-                                darfOriginal && istBildMime(a.mime) ? originalPfad(href) : undefined
+                                darfOriginal && isBildMime(a.mime) ? originalPfad(href) : undefined
                               }
                               originalKennung={`${a.dateiname}, Anhang der Nachricht von ${n.autor_name}`}
                               mime={a.mime}
