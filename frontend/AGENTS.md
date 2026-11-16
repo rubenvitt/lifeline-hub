@@ -591,7 +591,9 @@ anwendbar), „nicht geprüft" ist keins.
   der Voreinstellung der Seite und der Breite folgt, heißt der Schalter „Spalten“, danach
   „Spalten · n ausgeblendet“ mit allen verborgenen (`weichtVonVorgabeAb` in
   `components/SpaltenSchalter.tsx`; die Seite reicht `spaltenAusVoreinstellung` durch). Auf schmalem Schirm
-  **angepasst, nicht in Karten aufgelöst**. Träger `KatalogTabelle`/`Datensicht`.
+  **angepasst, nicht in Karten aufgelöst**; ausgenommen sind Flächen mit `form="auto"`, deren
+  Zeile am Handy nicht trägt (Fahrzeuge, Personal, seit LLH-1787 die Einheitenliste mit Baum als
+  Karten). Träger `KatalogTabelle`/`Datensicht`.
 - Spaltenschalter: `components/SpaltenSchalter.tsx` (eine Wahrheit für Handwahl und `abBreite`);
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt

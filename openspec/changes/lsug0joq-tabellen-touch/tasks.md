@@ -42,8 +42,8 @@ klebenden Kopfzeile gleich breit) ist im Branch behoben.
 
 ## 6. Regeln, Doku, Abschluss
 
-- [ ] 6.1 `frontend/AGENTS.md`: „Tabelle und Dichte“ (Aktionsspalte nach Breite, Zähler erst nach eigener Wahl, Einheitenliste als Beispiel für `auto`) und „Inline-Bearbeitung und Status“ (schwebend in Tabellenzellen); Prettier über `frontend/` grün
-- [ ] 6.2 `scripts/adr-fuer.sh` für die geänderten Pfade prüfen, betroffene ADRs und die Mitänderungsregel in `docs/architektur/AGENTS.md` beachten; Ergebnis im Commit nennen
+- [x] 6.1 `frontend/AGENTS.md`: „Tabelle und Dichte“ (Aktionsspalte nach Breite, Zähler erst nach eigener Wahl, Einheitenliste als Beispiel für `auto`) und „Inline-Bearbeitung und Status“ (schwebend in Tabellenzellen); Prettier über `frontend/` grün
+- [x] 6.2 `scripts/adr-fuer.sh` für die geänderten Pfade prüfen, betroffene ADRs und die Mitänderungsregel in `docs/architektur/AGENTS.md` beachten; Ergebnis im Commit nennen
 - [ ] 6.3 Anwenderdoku nach `docs/anwender/AGENTS.md`: Kapitel Fahrzeuge (Typ, Bearbeiten, Spalten), Einheiten (Handy), Evakuierung, Betreuung, Material samt Bilder-Specs; Bilder neu erzeugen, Wächter grün
 - [ ] 6.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, dazu die geänderten e2e-Specs einzeln grün
 
