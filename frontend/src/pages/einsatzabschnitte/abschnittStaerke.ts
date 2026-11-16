@@ -1,5 +1,5 @@
 import type { Einheit, Einsatzabschnitt, Staerke } from '../../api/types';
-import { summiereStaerke } from '../../anzeige/staerke';
+import { abschnittDerEinheit } from '../../kraefte/kraeftebaumKern';
 
 /** Der Abschnitt selbst plus alle Nachfahren (Tiefensuche, zyklussicher). */
 export function nachfahrenInkl(abschnitte: Einsatzabschnitt[], id: number): Set<number> {
@@ -22,27 +22,60 @@ export function nachfahrenInkl(abschnitte: Einsatzabschnitt[], id: number): Set<
 }
 
 export interface AbschnittStaerken {
-  /** Nur direkt zugeordnete Einheiten — die Bedeutung der Bestandszeile „Stärke (F/UF/M//Σ)". */
+  /** Wer im Abschnitt selbst steht — die Bedeutung der Bestandszeile „Stärke (F/UF/M//Σ)". */
   eigene: Staerke | null;
   /** Über `nachfahrenInkl` summiert — Abschnitt inklusive aller Unterabschnitte. */
   inklUnter: Staerke | null;
 }
 
-const KEINE: Staerke = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
+/** Nur aktive Einheiten zählen (LLH-1079), wie im Meldebild. */
+const aktive = (einheiten: readonly Einheit[]) => einheiten.filter((e) => !e.aufgeloest_at);
 
 /**
- * Stärke der Einheiten in einer Abschnittsmenge. Es zählen nur die OBERSTEN Einheiten (ohne
- * übergeordnete) mit ihrer kumulierten Stärke — eine unterstellte Einheit zählt beim Abschnitt
- * ihrer obersten Einheit, wie im Meldebild (`baueKraeftebild`, LFH-550). Steht im Abschnitt eine
- * Einheit, aber keine oberste, ist die Stärke 0/0/0, nicht `null`: `null` heißt „keine Einheit
- * zugeordnet".
+ * Wirksamer Abschnitt je aktiver Einheit: der eigene, sonst der ihrer nächsten Obereinheit mit
+ * Abschnitt (`abschnittDerEinheit`). Über die aktiven allein: eine Untereinheit einer aufgelösten
+ * Obereinheit erbt deren Abschnitt nicht, wie sie im Meldebild ihre eigene Wurzel ist.
  */
-function staerkeIn(einheiten: Einheit[], abschnittIds: Set<number>): Staerke | null {
-  const zugeordnet = einheiten.filter(
-    (e) => e.abschnitt_id != null && abschnittIds.has(e.abschnitt_id),
+function wirksamerAbschnitt(einheiten: readonly Einheit[]): Map<number, number | null> {
+  const je = abschnittDerEinheit(aktive(einheiten));
+  return new Map([...je].map(([id, a]) => [id, a?.id ?? null]));
+}
+
+/**
+ * Die aktiven Einheiten, die im Abschnitt stehen: eigener oder geerbter Abschnitt gleich
+ * `abschnittId`, ohne Unterabschnitte. Dieselbe Menge, die {@link abschnittStaerken} als
+ * „eigene“ zählt (Spec `lage-verdichtung`, LLH-1744).
+ */
+export function einheitenImAbschnitt(
+  einheiten: readonly Einheit[],
+  abschnittId: number,
+): Einheit[] {
+  const wirksam = wirksamerAbschnitt(einheiten);
+  return aktive(einheiten).filter((e) => wirksam.get(e.id) === abschnittId);
+}
+
+/**
+ * Stärke einer Abschnittsmenge: Es zählt, wer in ihr steht (LLH-1744, Spec `lage-verdichtung`),
+ * jede aktive Einheit mit ihrer EIGENEN Stärke (`ist`) bei ihrem wirksamen Abschnitt. So zählt
+ * jede Kraft genau einmal, eine abgestellte Untereinheit bei ihrem Abschnitt und nicht bei dem
+ * ihrer Obereinheit, wie im Meldebild (`detachAbgestellte`) und im Bereitstellungsraum
+ * (`staerkeImRaum`, LLH-1289). `null` heißt „keine Einheit zugeordnet“.
+ */
+function staerkeIn(einheiten: readonly Einheit[], abschnittIds: Set<number>): Staerke | null {
+  const wirksam = wirksamerAbschnitt(einheiten);
+  const drin = aktive(einheiten).filter((e) => {
+    const a = wirksam.get(e.id);
+    return a != null && abschnittIds.has(a);
+  });
+  if (drin.length === 0) return null;
+  return drin.reduce<Staerke>(
+    (s, e) => ({
+      fuehrer: s.fuehrer + (e.ist?.fuehrer ?? 0),
+      unterfuehrer: s.unterfuehrer + (e.ist?.unterfuehrer ?? 0),
+      mannschaft: s.mannschaft + (e.ist?.mannschaft ?? 0),
+    }),
+    { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
   );
-  if (zugeordnet.length === 0) return null;
-  return summiereStaerke(zugeordnet.filter((e) => e.ueber_einheit_id == null)) ?? KEINE;
 }
 
 export function abschnittStaerken(

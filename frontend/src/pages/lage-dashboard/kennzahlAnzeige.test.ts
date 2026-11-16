@@ -74,7 +74,7 @@ describe('fuehrungsKennzahlen (LLH-1747)', () => {
   it('nennt UHS und fehlenden Lagebericht', () => {
     const [, , bericht, uhs] = fuehrungsKennzahlen(basis);
     expect(bericht).toMatchObject({ wert: 'keiner', notiz: 'noch nicht erstellt', ton: 'neutral' });
-    expect(uhs).toMatchObject({ wert: 3, notiz: '1 geplant · 24 Kräfte' });
+    expect(uhs).toMatchObject({ wert: 3, notiz: '1 geplant · 24 Kräfte an UHS' });
   });
 
   it('behauptet ohne Lagebild nichts', () => {

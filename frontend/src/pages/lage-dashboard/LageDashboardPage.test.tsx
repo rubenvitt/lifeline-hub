@@ -1653,6 +1653,33 @@ describe('LageDashboardPage — Führungsstand', () => {
     expect(kante(zelle)).toBe(6);
   });
 
+  it('„UHS aktiv“ nennt die Kräfte an aktiven UHS, nicht an geplanten (LLH-1744)', async () => {
+    const uhs = (id: number, status: string, mannschaft: number) => ({
+      id,
+      einsatz_id: 1,
+      abschnitt_id: null,
+      typ: 'behandlungsplatz',
+      bezeichnung: `UHS ${id}`,
+      standort: null,
+      notiz: null,
+      lat: null,
+      lon: null,
+      status,
+      erfasst_at: '2026-06-08 10:00:00',
+      erfasst_von: 1,
+      geaendert_at: '2026-06-08 10:00:00',
+      geaendert_von: 1,
+      storniert_at: null,
+      staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft },
+    });
+    mockEndpunkte({ uhs: [uhs(1, 'aktiv', 2), uhs(2, 'geplant', 1)] });
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() =>
+      expect(kennzahl('UHS aktiv', FUEHRUNG)).toHaveTextContent('1 geplant · 3 Kräfte an UHS'),
+    );
+  });
+
   it('ein nicht freigegebenes Modul sagt das und zeigt keine 0', async () => {
     mockEndpunkte({ zaehler: { auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 } } });
     render();

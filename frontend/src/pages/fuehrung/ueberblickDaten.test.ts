@@ -780,6 +780,30 @@ describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
   });
 });
 
+describe('abschnittZeilen — abgestellte Untereinheit (LLH-1744)', () => {
+  it('zählt Stärke und Ausfall beim Abschnitt, in dem die Gruppe steht, nicht bei ihrem Zug', () => {
+    // Zug 40 in Logistik (1); Gruppe 42 dem Zug unterstellt, selbst an der UHS (2).
+    const zeilen = abschnittZeilen({
+      abschnitte: [abschnitt(1, 'Logistik'), abschnitt(2, 'UHS')],
+      einheiten: [einheit(40, 1, null, 'gebunden'), { ...einheit(42, 2, 40, 'gebunden') }],
+      personal: [
+        personal(5, 40, 'fuehrer', 'gebunden'),
+        personal(6, 42, 'unterfuehrer', 'gebunden'),
+        personal(7, 42, 'mannschaft', 'nicht_verfuegbar'),
+      ],
+      fahrzeuge: [],
+      material: [],
+      auftraege: [],
+    });
+    const logistik = zeilen.find((z) => z.abschnittId === 1)!;
+    const uhs = zeilen.find((z) => z.abschnittId === 2)!;
+    expect(logistik.staerkeText).toBe('1/0/0//1');
+    expect(uhs.staerkeText).toBe('0/1/1//2');
+    expect(abschnittGruende(logistik, JETZT)).toEqual([]);
+    expect(abschnittGruende(uhs, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
+  });
+});
+
 describe('abschnittGruende — Rückmeldung und Ausfall wie das Meldebild (LLH-1739)', () => {
   const abschnitte = [abschnitt(1, 'Logistik', { lagezustand: 'planmaessig' })];
   const einheiten = [

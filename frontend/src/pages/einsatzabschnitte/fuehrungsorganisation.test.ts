@@ -302,13 +302,13 @@ describe('buildFuehrungsorganisation — Stärke aus derselben Rechnung wie der 
   });
 
   it('pinnt die Werte als Literale, nicht nur gegen dieselbe Funktion', () => {
-    // 10 (1/1/4, kumuliert inkl. 11) in Abschnitt 2, 12 (0/1/5) in Abschnitt 3; 11 zählt nicht
-    // doppelt. Abschnitt 1 trägt beide Unterabschnitte.
+    // Wer im Abschnitt steht, mit eigener Stärke (LLH-1744): 10 (1/1/4) und 11 (0/1/2) in
+    // Abschnitt 2, 12 (0/1/5) in Abschnitt 3. Abschnitt 1 trägt beide Unterabschnitte.
     expect(findKnoten(org.wurzeln, 'ab-2')).toMatchObject({
-      staerke: { fuehrer: 1, unterfuehrer: 1, mannschaft: 4 },
+      staerke: { fuehrer: 1, unterfuehrer: 2, mannschaft: 6 },
     });
     expect(findKnoten(org.wurzeln, 'ab-1')).toMatchObject({
-      staerke: { fuehrer: 1, unterfuehrer: 2, mannschaft: 9 },
+      staerke: { fuehrer: 1, unterfuehrer: 3, mannschaft: 11 },
     });
   });
 
@@ -316,10 +316,65 @@ describe('buildFuehrungsorganisation — Stärke aus derselben Rechnung wie der 
     expect(findKnoten(org.wurzeln, 'ab-4')).toMatchObject({ staerke: null });
   });
 
-  it('Einheit zeigt ihre kumulierte Ist-Stärke', () => {
+  it('Einheit zeigt ihre Stärke samt der Untereinheiten unter ihr', () => {
     expect(findKnoten(org.wurzeln, 'eh-11')).toMatchObject({
       staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 2 },
     });
+    expect(findKnoten(org.wurzeln, 'eh-10')).toMatchObject({
+      staerke: { fuehrer: 1, unterfuehrer: 2, mannschaft: 6 },
+    });
+  });
+});
+
+describe('buildFuehrungsorganisation — abgestellte Untereinheit (LLH-1744)', () => {
+  // Zug 10 (1/0/2, kumuliert 1/1/3) in EA 1; Gruppe 11 (0/1/1) dem Zug unterstellt, selbst in
+  // „UHS Turnhalle“ (2, unter 1).
+  const abschnitte = [abschnitt(1), abschnitt(2, { ueber_abschnitt_id: 1, name: 'UHS Turnhalle' })];
+  const einheiten = [
+    {
+      ...einheit(10, { abschnitt_id: 1, name: 'Sanitätszug' }, [1, 0, 2]),
+      ist_kumuliert: { fuehrer: 1, unterfuehrer: 1, mannschaft: 3 },
+    },
+    einheit(11, { abschnitt_id: 2, ueber_einheit_id: 10, name: 'Sanitätsgruppe UHS' }, [0, 1, 1]),
+  ];
+  const org = buildFuehrungsorganisation(abschnitte, einheiten);
+
+  it('steht unter ihrem Abschnitt mit „aus …“, der Zug zählt sie nicht', () => {
+    expect(org.wurzeln.map(schluessel)).toEqual([
+      [
+        'ab-1',
+        [
+          ['ab-2', [['eh-11', []]]],
+          ['eh-10', []],
+        ],
+      ],
+    ]);
+    expect(findKnoten(org.wurzeln, 'eh-11')).toMatchObject({
+      abgestelltAus: 'Sanitätszug',
+      staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+    });
+    expect(findKnoten(org.wurzeln, 'eh-10')).toMatchObject({
+      staerke: { fuehrer: 1, unterfuehrer: 0, mannschaft: 2 },
+    });
+    expect(findKnoten(org.wurzeln, 'ab-2')).toMatchObject({
+      staerke: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+    });
+    expect(findKnoten(org.wurzeln, 'ab-1')).toMatchObject({
+      staerke: { fuehrer: 1, unterfuehrer: 1, mannschaft: 3 },
+    });
+  });
+
+  it('nennt die Obereinheit auch im Lagebericht', () => {
+    const text = renderFuehrungsorganisationMarkdown(org, {
+      stand: '011200Okt26',
+      fuehrungsfunktionen: null,
+      einheitenZustand: 'daten',
+      einsatzleiter: OHNE_EL,
+      dtg: DTG,
+    });
+    expect(text).toContain(
+      '**Sanitätsgruppe UHS** · kein Rufname · Leitung nicht besetzt · Stärke 0/1/1//2 · aus Sanitätszug',
+    );
   });
 });
 
@@ -333,7 +388,9 @@ describe('buildFuehrungsorganisation — dieselbe Platzierung wie der Funkplan',
     ];
     const einheiten = [
       einheit(10, { abschnitt_id: 1 }),
-      einheit(11, { abschnitt_id: 2, ueber_einheit_id: 10 }),
+      // Ohne eigenen Abschnitt: eine abgestellte Untereinheit stünde im Organigramm unter ihrem
+      // Abschnitt, im Funkplan am Verband (LLH-1744, eigener Test oben).
+      einheit(11, { abschnitt_id: null, ueber_einheit_id: 10 }),
       einheit(12, { abschnitt_id: 2 }),
       einheit(13, { abschnitt_id: null }),
       einheit(14, { abschnitt_id: 3, ueber_einheit_id: 99 }),

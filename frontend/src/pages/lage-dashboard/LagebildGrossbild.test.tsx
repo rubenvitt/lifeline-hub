@@ -27,7 +27,7 @@ const FUEHRUNG: KennzahlAnzeige[] = [
   kz('Aufträge offen', 5, { ton: 'alarm', notiz: '1 überfällig', ziel: '/auftraege' }),
   kz('Meldungen offen', 9, { notiz: '2 neu' }),
   kz('Lagebericht', 'keiner', { notiz: 'noch nicht erstellt' }),
-  kz('UHS aktiv', 3, { notiz: '1 geplant · 24 Kräfte' }),
+  kz('UHS aktiv', 3, { notiz: '1 geplant · 24 Kräfte an UHS' }),
 ];
 
 const gefahr = (typ: string, stufe: GefahrenZeile['stufe']): GefahrenZeile =>
