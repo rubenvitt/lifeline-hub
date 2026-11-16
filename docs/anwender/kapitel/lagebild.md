@@ -126,7 +126,7 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   abgeschlossen“), „Verbleib offen“ nennt, wie viele unterwegs sind.
 - **Jüngste ETB-Einträge:** die jüngsten Einträge des Einsatztagebuchs aller Typen, nicht nur
   Meldungen. Rechts im Kopf steht der Zustand der Leitung: „live“, „Verbindung wird aufgebaut“
-  oder „Verbindung unterbrochen“. Ein berichtigter Eintrag trägt wie im Einsatztagebuch die Marke
+  oder „Verbindung unterbrochen“, ohne Netz oder Server „offline“. Ein berichtigter Eintrag trägt wie im Einsatztagebuch die Marke
   „berichtigt“ und den Sprung „→ Nr. …“ auf die jüngste Berichtigung.
 - **Führungsstand:** „Aufträge offen“ und „Meldungen offen“ zählen wie die Module selbst; ein
   überfälliger Auftrag oder eine überfällige Meldung steht hier hervorgehoben.
