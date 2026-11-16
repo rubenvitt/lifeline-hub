@@ -46,7 +46,7 @@ export default function GefahrenBeurteilung({
           display: 'flex',
           flexWrap: 'wrap',
           alignItems: 'center',
-          // `marginSM` (7/11/16): Aussage und Knopf halten den Zielabstand der Stufe.
+          // `marginSM` (8/12/16): Aussage und Knopf halten den Zielabstand der Stufe.
           gap: token.marginSM,
         }}
       >

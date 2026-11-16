@@ -95,6 +95,7 @@ import {
   zitat,
 } from './verpflegungText';
 import { zaehltasteStil, zaehltastenAbstand } from './zaehltasteStil';
+import { flaeche as flaechenMass } from '../theme/tokens';
 
 /** So viele Buchungen stehen unter „Letzte Buchungen“; ältere führt ein Link zur Karte (D6). */
 const LETZTE = 10;
@@ -375,7 +376,7 @@ export default function AusgabeAnsicht() {
   }
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaechenMass.zustandOben }}>
         <Spin size="large" />
       </div>
     );

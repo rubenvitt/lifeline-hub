@@ -349,7 +349,7 @@ export default function HelferListe({
   // Reiter einer Detailseite: Sortierung und Filter ohne Gedächtnis, die Adresse meint den Plan.
   return (
     <div data-lfh={dataLfh}>
-      {/* Zielabstand zur Werkzeugzeile der Tabelle darunter (LLH-1595): 7 / 11 / 16 px. */}
+      {/* Zielabstand zur Werkzeugzeile der Tabelle darunter (LLH-1595): 8 / 12 / 16 px. */}
       {!readOnly && (
         <Space style={{ marginBottom: token.marginSM }}>
           <Button

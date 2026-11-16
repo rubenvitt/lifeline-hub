@@ -101,7 +101,7 @@ describe('Kopfleiste · Stile', () => {
     });
     expect(wortmarkeStil(t('kompakt')).minHeight).toBe(30);
     expect(wortmarkeStil(t('handschuh')).minHeight).toBe(72);
-    expect(wortmarkeStil(t('handschuh')).padding).toBe('7px 0');
+    expect(wortmarkeStil(t('handschuh')).padding).toBe('8px 0');
   });
 
   it('die Zelle hält die 52-px-Leiste als Boden und trägt die Haarlinie', () => {

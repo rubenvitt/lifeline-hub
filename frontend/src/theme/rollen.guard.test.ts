@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  abstand,
   dichten,
   farbenDunkel,
   farbenHell,
@@ -70,10 +69,12 @@ const DICHTE_BLOECKE: Record<Dichte, Record<string, string>> = {
 /** Abstandsstufe in TS → Property-Name in CSS. Die Namen laufen auseinander
  *  (`xs/sm/md/lg` gegen `luft-1..4`), deshalb eine Abbildung. */
 const LUFT_ABBILDUNG: Record<keyof Abstandsraster, string> = {
+  xxs: '--lfh-luft-0',
   xs: '--lfh-luft-1',
   sm: '--lfh-luft-2',
   md: '--lfh-luft-3',
   lg: '--lfh-luft-4',
+  xl: '--lfh-luft-5',
 };
 
 /** Alles, was eine Dichtestufe ausmacht — und nichts sonst. */
@@ -228,10 +229,11 @@ describe('Gestaltungssprache E — CSS und TS tragen dieselben Werte', () => {
   );
 
   it('Abstandsraster stimmt überein', () => {
-    expect(hell['--lfh-luft-1']).toBe(`${abstand.xs}px`);
-    expect(hell['--lfh-luft-2']).toBe(`${abstand.sm}px`);
-    expect(hell['--lfh-luft-3']).toBe(`${abstand.md}px`);
-    expect(hell['--lfh-luft-4']).toBe(`${abstand.lg}px`);
+    for (const [stufe, property] of Object.entries(LUFT_ABBILDUNG)) {
+      expect(hell[property], stufe).toBe(
+        `${dichten.kompakt.abstand[stufe as keyof Abstandsraster]}px`,
+      );
+    }
   });
 
   it('Form- und Stimmrollen stimmen überein', () => {

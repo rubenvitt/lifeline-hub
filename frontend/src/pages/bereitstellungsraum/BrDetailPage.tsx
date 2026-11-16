@@ -53,7 +53,6 @@ import {
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
 import { brAbgerufen, brStatus } from '../../theme/statusFarben';
-import { abstand } from '../../theme/tokens';
 import BrSwitcher from './BrSwitcher';
 import BrBearbeitenModal from './BrBearbeitenModal';
 import AufKarteVerorten from './AufKarteVerorten';
@@ -97,6 +96,7 @@ import EintreffenDialog from './EintreffenDialog';
 import NichtUebernommenMarke, { UnangemeldetMarke } from '../../kraefte/NichtUebernommenMarke';
 import { useVorgemerkteEintreffen } from '../../offline/useVorgemerkteSchreibaktionen';
 import dayjs from 'dayjs';
+import { flaeche as flaechenMass } from '../../theme/tokens';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
 const KEINE_FAHRZEUGE: BrFahrzeugKurz[] = [];
@@ -413,7 +413,7 @@ export default function BrDetailPage() {
   }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaechenMass.zustandOben }}>
         <Spin size="large" />
       </div>
     );
@@ -780,7 +780,7 @@ export default function BrDetailPage() {
           )
         }
       />
-      <Datenraster spalten={2} beschriftung="Raumdaten" style={{ marginBottom: abstand.lg }}>
+      <Datenraster spalten={2} beschriftung="Raumdaten" style={{ marginBottom: token.marginLG }}>
         <Datenfeld label="Standort">{br.standort ?? '—'}</Datenfeld>
         <Datenfeld label="Notiz">{br.notiz ?? '—'}</Datenfeld>
       </Datenraster>
@@ -792,7 +792,7 @@ export default function BrDetailPage() {
         style={{
           display: 'flex',
           flexDirection: breit ? 'row' : 'column',
-          gap: abstand.lg,
+          gap: token.marginLG,
           alignItems: breit ? 'flex-start' : 'stretch',
         }}
       >
@@ -802,7 +802,7 @@ export default function BrDetailPage() {
               Belegung: das Band hält ihre Höhe fest, sonst schöbe ein Ein- oder Austritt die
               Belegung unter dem Zeiger (`frontend/AGENTS.md`, „Kennzahlenband“). Ton neutral,
               kein Grenzwert für lange Wartezeit. */}
-          <div data-testid="br-summe" style={{ marginBottom: abstand.md }}>
+          <div data-testid="br-summe" style={{ marginBottom: token.margin }}>
             <Kennzahlenband
               beschriftung="Bereitgestellte Kräfte"
               notizZeilen={2}
@@ -863,7 +863,7 @@ export default function BrDetailPage() {
                   }
                 >
                   <Liste
-                    style={{ marginBottom: abstand.lg }}
+                    style={{ marginBottom: token.marginLG }}
                     dataSource={abgerufenZufluss.sichtbar}
                     emptyText="Keine Kraft abgerufen"
                     renderItem={(z) => (
@@ -895,7 +895,7 @@ export default function BrDetailPage() {
               extra={bannerPlatz(einheitenZufluss, ['neue Einheit', 'neue Einheiten'])}
             />
             <Liste
-              style={{ marginBottom: abstand.lg }}
+              style={{ marginBottom: token.marginLG }}
               dataSource={einheitenZufluss.sichtbar}
               emptyText="Keine Einheiten bereitgestellt"
               renderItem={(e) => (
@@ -930,7 +930,7 @@ export default function BrDetailPage() {
                 Gehen keine Zeile darüber verschiebt; nicht in den Kennzahlen, die bleiben die des
                 Servers. Beim Nachsenden lädt der Abgleich erst den Raum, dann geht die Zeile. */}
             {vorgemerktHier.length > 0 && (
-              <div data-testid="br-vorgemerkt" style={{ marginTop: abstand.lg }}>
+              <div data-testid="br-vorgemerkt" style={{ marginTop: token.marginLG }}>
                 {/* Anträge am Spiegel (LLH-1492) stehen hier wie Vorgemerktes. */}
                 <SektionHeader
                   titel={vorgemerktHier.every((v) => v.antrag) ? 'Beantragt' : 'Vorgemerkt'}
@@ -960,7 +960,7 @@ export default function BrDetailPage() {
           {/* Unter der Halte-Fläche: eingeschobenes Material verschiebt keine Belegungszeile unter
               dem Zeiger (D13). Bedienbar auch im Zustand „geplant“, anders als das Belegen. */}
           {materialFrei && (
-            <div data-testid="br-material" style={{ marginTop: abstand.lg }}>
+            <div data-testid="br-material" style={{ marginTop: token.marginLG }}>
               {/* Leer sagt der Baustein „Kein Material“; „0 Posten“ daneben wäre doppelt (LLH-1255). */}
               <SektionHeader
                 titel="Material"

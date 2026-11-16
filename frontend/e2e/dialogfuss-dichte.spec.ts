@@ -6,8 +6,8 @@ import { anmeldenPerApi } from './anmelde-kern';
  * Fußfuge eines Dialogs mit antds STANDARDFUSS (LFH-653, Spec `einsatztauglichkeit-layout`,
  * „Abstand zwischen den Knöpfen eines Dialogfußes“, Szenario „Dialog mit Standardfuß“).
  *
- * antd trennt die Knöpfe seiner eigenen Füße mit `marginXS` (3 / 5 / 7 px). Die Regel in
- * `src/index.css` setzt den Folgeknopf auf `var(--ant-padding)` (11 / 18 / 26). Ob die Variable AM
+ * antd trennt die Knöpfe seiner eigenen Füße mit `marginXS` (4 / 4 / 8 px). Die Regel in
+ * `src/index.css` setzt den Folgeknopf auf `var(--ant-padding)` (12 / 20 / 24). Ob die Variable AM
  * KNOPF auflöst und die Regel antds `:where(…)`-Selektor schlägt, belegt nur der Browser — der
  * Modal-Fuß hat von den drei Füßen den spezifischsten Selektor. Der Titelabstand bleibt antds
  * `marginXS`; die Regel darf ihn nicht mitnehmen.
@@ -25,11 +25,11 @@ const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 /** Böden als Literale. `fuge: null` = nur gemessen (Fükw, Ausnahme der Leitlinie). `titel` ist
- *  antds `marginXS` der Stufe (`abstand.xs`), der unverändert bleiben soll. */
+ *  antds `marginXS` der Stufe (Raster `xs`, Spec `abstandsraster`), der unverändert bleiben soll. */
 const STAFFEL = [
-  { dichte: 'kompakt', soll: 30, fuge: null, titel: 3 },
-  { dichte: 'komfortabel', soll: 48, fuge: 8, titel: 5 },
-  { dichte: 'handschuh', soll: 72, fuge: 16, titel: 7 },
+  { dichte: 'kompakt', soll: 30, fuge: null, titel: 4 },
+  { dichte: 'komfortabel', soll: 48, fuge: 8, titel: 4 },
+  { dichte: 'handschuh', soll: 72, fuge: 16, titel: 8 },
 ] as const;
 
 async function anmelden(page: Page, optionen?: { startseite?: boolean }) {

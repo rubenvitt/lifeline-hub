@@ -1441,7 +1441,7 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
 
   it('trägt in kompakt die Knopfzeile mit vollem marginSM, und sie passt in die Karte', () => {
     const form = platzBedienform(tokenFuer('kompakt'));
-    expect(form).toEqual({ form: 'zeile', abstand: 7 });
+    expect(form).toEqual({ form: 'zeile', abstand: 8 });
     // Knopfbreiten + Lücken ≤ Innenbreite. Icon-only-Knöpfe sind `controlHeightSM` breit, der Boden
     // in kompakt ist 24.
     const t = tokenFuer('kompakt');

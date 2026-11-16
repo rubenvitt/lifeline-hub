@@ -107,9 +107,9 @@ mark.lfh-fundstelle {
 }
 
 /* Fußfuge der Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und
-   Bestätigungsblase trennen ihre Knöpfe mit `marginXS` = 3 / 5 / 7 px; in einer Rückfrage steht
+   Bestätigungsblase trennen ihre Knöpfe mit `marginXS` = 4 / 4 / 8 px; in einer Rückfrage steht
    fast immer Rot neben „Abbrechen", und im Handschuh-Betrieb verlangt die Leitlinie ≥ 16 px.
-   `var(--ant-padding)` ist antds Token `padding` = `abstand.md` = 11 / 18 / 26, dieselbe Stufe
+   `var(--ant-padding)` ist antds Token `padding` = `abstand.md` = 12 / 20 / 24, dieselbe Stufe
    wie `<Space size="middle">`. Eine Stilregel statt eines Komponenten-Tokens: jeder antd-Knopf
    trägt die `css-var-…`-Klasse des globalen Themes und setzt dort `--ant-margin-xs` zurück, eine
    Überschreibung an Blase oder Modal kam am Knopf nie an (gemessen 7 px). `--ant-padding` löst am

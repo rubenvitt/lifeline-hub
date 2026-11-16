@@ -483,7 +483,7 @@ export default function AbloesungKarte({
           )}
         </Space>
         {darfSchreiben && laufend && (
-          // `marginSM` = 7 / 11 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen
+          // `marginSM` = 8 / 12 / 16 px: im Handschuh-Betrieb ≥ 16 px zwischen zwei Zielen
           // (MIL-STD-1472F Fig. 24).
           <Flex justify="flex-end" gap={token.marginSM} style={{ marginTop: token.marginXS }}>
             {vollziehen && (

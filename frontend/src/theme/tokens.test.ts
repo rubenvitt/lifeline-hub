@@ -5,7 +5,7 @@
  */
 import { theme as antdTheme, type CheckboxProps, type RadioProps } from 'antd';
 import { describe, expect, it } from 'vitest';
-import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
+import { antdToken, dichten, farbenHell, flaeche, type Dichte } from './tokens';
 import { seitenrinne } from './tokens';
 import { navDrawerBreite, navDrawerRand } from './tokens';
 import {
@@ -44,14 +44,29 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
     expect(dichten.handschuh.schriftgroesse).toBe(15);
   });
 
-  it('staffelt das Abstandsraster mit (die xs/sm-Werte sind abgeleitet)', () => {
-    expect(dichten.kompakt.abstand).toEqual({ xs: 3, sm: 7, md: 11, lg: 18 });
-    expect(dichten.komfortabel.abstand).toEqual({ xs: 5, sm: 11, md: 18, lg: 28 });
-    expect(dichten.handschuh.abstand).toEqual({ xs: 7, sm: 16, md: 26, lg: 44 });
+  // Literale statt Rechnung: das Raster ist eine Festlegung (Change `m113c8ln-abstandsraster`,
+  // design.md D1), keine Ableitung.
+  it('staffelt das Abstandsraster auf Vielfachen von 4 mit (Spec `abstandsraster`)', () => {
+    expect(dichten.kompakt.abstand).toEqual({ xxs: 4, xs: 4, sm: 8, md: 12, lg: 16, xl: 24 });
+    expect(dichten.komfortabel.abstand).toEqual({ xxs: 4, xs: 4, sm: 12, md: 20, lg: 28, xl: 40 });
+    expect(dichten.handschuh.abstand).toEqual({ xxs: 4, xs: 8, sm: 16, md: 24, lg: 44, xl: 64 });
   });
 
-  it('hält `abstand` als A0-Export am Leben — er IST die kompakte Stufe', () => {
-    expect(abstand).toBe(dichten.kompakt.abstand);
+  it('hält das Raster je Stufe auf Vielfachen von 4, nicht fallend und nie unter kompakt', () => {
+    const stufen = ['xxs', 'xs', 'sm', 'md', 'lg', 'xl'] as const;
+    for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const raster = dichten[dichte].abstand;
+      stufen.forEach((stufe, i) => {
+        expect(raster[stufe] % 4, `${dichte}.${stufe}`).toBe(0);
+        if (i > 0)
+          expect(raster[stufe], `${dichte}.${stufe}`).toBeGreaterThanOrEqual(raster[stufen[i - 1]]);
+        expect(raster[stufe], `${dichte}.${stufe}`).toBeGreaterThanOrEqual(
+          dichten.kompakt.abstand[stufe],
+        );
+      });
+    }
+    // Untergrenze aus `einsatztauglichkeit-layout` (Abstand zwischen Bedienzielen im Handschuh).
+    expect(dichten.handschuh.abstand.sm).toBeGreaterThanOrEqual(16);
   });
 
   // Literale statt `dichten.x.kleineZeilenhoehe`, sonst prüfte der Test die Konstante gegen sich
@@ -90,6 +105,25 @@ describe('Dichte-Staffel (A1 Festlegung 4)', () => {
     expect(t.marginSM).toBe(dichten.handschuh.abstand.sm);
     expect(t.marginXS).toBe(dichten.handschuh.abstand.xs);
     expect(t.marginLG).toBe(dichten.handschuh.abstand.lg);
+  });
+
+  /**
+   * Kein Abstandstoken bleibt auf antds fester Vorgabe (XXS 4, MD 20, XL 32): jedes kommt aus dem
+   * Raster der Stufe (design.md D2). MD fällt mit LG zusammen, weil das Raster dazwischen keine
+   * Stufe hat.
+   */
+  it('bildet auch XXS, MD und XL auf das Raster ab', () => {
+    for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
+      const t = tokenFuer(dichte);
+      const r = dichten[dichte].abstand;
+      expect([t.paddingXXS, t.marginXXS], dichte).toEqual([r.xxs, r.xxs]);
+      expect([t.paddingMD, t.marginMD], dichte).toEqual([r.lg, r.lg]);
+      expect([t.paddingXL, t.marginXL], dichte).toEqual([r.xl, r.xl]);
+    }
+    const kompakt = tokenFuer('kompakt');
+    const handschuh = tokenFuer('handschuh');
+    expect(handschuh.paddingMD).toBeGreaterThan(kompakt.paddingMD as number);
+    expect(handschuh.marginXL).toBeGreaterThan(kompakt.marginXL as number);
   });
 
   it('erzeugt für jede Stufe einen anderen Token-Satz (Spec §2.1)', () => {
@@ -428,8 +462,8 @@ describe('Geerbte Textfarben auf Textrollen (LFH-652)', () => {
 
 /**
  * Die Füße, die antd selbst baut (LFH-653): Modal-Fuß, `modal.confirm` und `Popconfirm` trennen
- * ihre Knöpfe mit `marginXS` (3 / 5 / 7 px). Eine globale Regel in `index.css` setzt den zweiten
- * Knopf auf antds `padding` (11 / 18 / 26) — die Variable löst AM KNOPF auf, wo eine
+ * ihre Knöpfe mit `marginXS` (4 / 4 / 8 px). Eine globale Regel in `index.css` setzt den zweiten
+ * Knopf auf antds `padding` (12 / 20 / 24) — die Variable löst AM KNOPF auf, wo eine
  * Komponenten-Überschreibung von `marginXS` nie ankam (D4 in
  * `openspec/changes/archive/2026-10-01-lfh-653-erfassung-handschuh-klappkopf-fuge/design.md`).
  * Quelltext statt Pixel: jsdom rechnet kein Layout, die Auflösung messen

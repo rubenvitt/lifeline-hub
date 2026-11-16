@@ -82,6 +82,7 @@ import {
   zitat,
 } from '../verpflegung/verpflegungText';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
+import { flaeche } from '../theme/tokens';
 
 /** Grund der fehlenden Schreibberechtigung (`components/nurAnsicht.ts`). */
 const verpflegungRechteText = einsatzRechteGrund;
@@ -405,7 +406,7 @@ export default function VerpflegungPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

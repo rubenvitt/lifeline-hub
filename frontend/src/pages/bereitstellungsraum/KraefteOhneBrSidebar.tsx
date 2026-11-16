@@ -53,7 +53,7 @@ export { freieKraefteOhneBr };
 /**
  * Eine Zeile der Seitenleiste (Name + „zuweisen“), rein und exportiert (Muster `bedienzielStil`).
  * Der Zeilenabstand ist der Zielabstand zwischen zwei „zuweisen“-Knöpfen (LFH-968): `marginSM` =
- * 7 / 11 / 16 px hält komfortabel ≥ 8 und handschuh ≥ 16; die festen 6 px vorher hielten keins.
+ * 8 / 12 / 16 px hält komfortabel ≥ 8 und handschuh ≥ 16; die festen 6 px vorher hielten keins.
  */
 export function kraftZeileStil(token: { marginXS: number; marginSM: number }) {
   return {

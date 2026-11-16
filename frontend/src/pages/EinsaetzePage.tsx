@@ -36,7 +36,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import SektionHeader from '../components/SektionHeader';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenLeer } from '../components/SeitenZustand';
-import { abstand, flaeche } from '../theme/tokens';
+import { flaeche } from '../theme/tokens';
 import { einsatzStatus } from '../theme/statusFarben';
 // Die Skelettform lebt als Klasse in der Gestaltungssprache. Der Import steht bewusst hier und
 // nicht nur transitiv: ohne ihn wären die Balken 0 px hoch, und jsdom rechnet kein Layout — der
@@ -128,7 +128,7 @@ const kartenTitelTextStil: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-/** Ein Kartenraster; die Mindestbreite kommt aus `flaeche`, der Abstand aus `abstand`. */
+/** Ein Kartenraster; die Mindestbreite kommt aus `flaeche`, der Abstand aus dem Raster der Dichte. */
 function rasterStil(minBreite: number, luft: number): CSSProperties {
   return {
     display: 'grid',
@@ -534,14 +534,14 @@ function EinsaetzeInhalt() {
           der Weg heraus ist die Anlegen-Kachel direkt darunter; ein zweiter gleich
           beschrifteter Knopf machte jede Abfrage darauf mehrdeutig. */}
       {!isPending && leer && (
-        <div style={{ marginBottom: abstand.lg }}>
+        <div style={{ marginBottom: token.marginLG }}>
           <SeitenLeer titel="Keine Einsätze" />
         </div>
       )}
 
       <div ref={bereichRef} data-lfh="einsaetze-bereich" {...zuflussBereich}>
         {!isPending && sucheZeigen && (
-          <div style={{ marginBottom: abstand.md, maxWidth: flaeche.kachelMin * 2 }}>
+          <div style={{ marginBottom: token.margin, maxWidth: flaeche.kachelMin * 2 }}>
             <Input.Search
               aria-label="Einsätze durchsuchen"
               placeholder="Bezeichnung, Ort oder Stichwort"
@@ -559,7 +559,7 @@ function EinsaetzeInhalt() {
         {/* Dritter Zustand neben „lädt" und „gar keine Einsätze". Keine Primäraktion: der Weg
             heraus ist das `allowClear` am Suchfeld darüber. */}
         {!isPending && keineTreffer && (
-          <div style={{ marginBottom: abstand.lg }}>
+          <div style={{ marginBottom: token.marginLG }}>
             <SeitenLeer titel={`Keine Treffer für „${suche.trim()}"`} />
           </div>
         )}
@@ -568,7 +568,7 @@ function EinsaetzeInhalt() {
             dieselbe Kachelhöhe. Der Wechsel tauscht nur die Kinder. */}
         <div
           data-testid="einsaetze-raster"
-          style={rasterStil(flaeche.kachelMin, abstand.md)}
+          style={rasterStil(flaeche.kachelMin, token.margin)}
           aria-busy={isPending || undefined}
           aria-label={isPending ? 'Einsätze werden geladen' : undefined}
         >
@@ -595,9 +595,9 @@ function EinsaetzeInhalt() {
         </div>
 
         {gezeigteAbgeschlossene.length > 0 && (
-          <div style={{ marginTop: abstand.lg }}>
+          <div style={{ marginTop: token.marginLG }}>
             <SektionHeader titel="Abgeschlossen" />
-            <div style={rasterStil(flaeche.kachelMinKlein, abstand.md)}>
+            <div style={rasterStil(flaeche.kachelMinKlein, token.margin)}>
               {gezeigteAbgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
             </div>
           </div>
@@ -627,7 +627,7 @@ function EinsaetzeInhalt() {
       </div>
 
       {!isPending && demoHinweis && (
-        <div data-lfh="demo-hinweis" style={{ marginTop: abstand.lg }}>
+        <div data-lfh="demo-hinweis" style={{ marginTop: token.marginLG }}>
           {demoHinweis}
         </div>
       )}

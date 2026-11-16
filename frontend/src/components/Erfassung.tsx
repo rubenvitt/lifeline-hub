@@ -53,9 +53,9 @@ import './Erfassung.css';
  * Der Schalter startet **AUS**: ein Vorgabewert AN wäre benutzt, ohne gewählt zu sein. Er hält
  * für die Lebensdauer des Dialogs.
  *
- * Die Knöpfe der Aktion stehen mit `size="middle"` auseinander (`token.padding` = 11 / 18 / 26 px,
+ * Die Knöpfe der Aktion stehen mit `size="middle"` auseinander (`token.padding` = 12 / 20 / 24 px,
  * LFH-653): der Primärknopf kann rot sein (`unumkehrbar`), und im Handschuh-Betrieb verlangt die
- * Leitlinie ≥ 16 px zwischen zwei Zielen. antds Vorgabe wären 3 / 5 / 7 px (`paddingXS`).
+ * Leitlinie ≥ 16 px zwischen zwei Zielen. antds Vorgabe wären 4 / 4 / 8 px (`paddingXS`).
  *
  * **Unter `md` stehen die Knöpfe untereinander** (LFH-953), in voller Breite: oben „Abbrechen“,
  * unten, dem Daumen am nächsten, der Primärknopf. Nebeneinander waren die drei Knöpfe der Serie
@@ -476,7 +476,7 @@ export function ErfassungsFormular<T extends object>({
                 alignItems: 'center',
                 gap: token.marginXS,
                 flexWrap: 'wrap',
-                // Zielabstand von „Werte behalten“ zu den Knöpfen darunter (LLH-1595): 7 / 11 / 16 px.
+                // Zielabstand von „Werte behalten“ zu den Knöpfen darunter (LLH-1595): 8 / 12 / 16 px.
                 marginBottom: token.marginSM,
               }}
             >
@@ -636,7 +636,7 @@ export function titelzeilenHoehe(
 }
 
 /**
- * Mindesthöhe des Dialogkopfs, damit das Schließkreuz `paddingSM` (7 / 11 / 16 px) über dem
+ * Mindesthöhe des Dialogkopfs, damit das Schließkreuz `paddingSM` (8 / 12 / 16 px) über dem
  * Körper endet und damit über dem ersten Feld (LLH-1274; Leitlinie ≥ 8 / ≥ 16 px zwischen zwei
  * Zielen, `kompakt` die Spacing-Ausnahme). antd macht das Kreuz so groß wie die Steuerhöhe
  * (`modalCloseBtnSize`, 72 px im Handschuh) und mittelt es nur auf seinen gedachten Kopf
@@ -645,8 +645,9 @@ export function titelzeilenHoehe(
  *
  * Gerechnet mit antds Formeln (`antd/es/modal/style`): Unterkante des Kreuzes ab Oberkante des
  * Dialogs = (Kopf + Kreuz) / 2, der Körper beginnt bei `paddingMD` + Kopf + `marginXS`. Ein
- * Boden, keine feste Höhe: ein umbrechender Titel wächst weiter. In `kompakt` greift er nicht
- * (22 gegen die Titelzeile von 24 px). Nachweis: C17 in `e2e/trefflaeche-pruefflaechen.spec.ts`.
+ * Boden, keine feste Höhe: ein umbrechender Titel wächst weiter. In `kompakt` hebt er den Kopf
+ * um 3 px (27 gegen die Titelzeile von 24 px); der Körper beginnt dort wie vor dem Abstandsraster
+ * bei 47 px, weil `paddingMD` um 4 px sank. Nachweis: C17 in `e2e/trefflaeche-pruefflaechen.spec.ts`.
  */
 export function kopfBoden(token: KopfToken): number {
   const titelzeile = titelzeilenHoehe(token);
