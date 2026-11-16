@@ -202,6 +202,102 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
   }
 }
 
+/**
+ * Legt `anzahl` vorgemerkte ETB-Einträge der angemeldeten Person in die Offline-Queue
+ * (`lifeline-offline`, Store `ausstehend`), so wie sie nach Arbeit ohne Netz dort liegen. Die DB
+ * hat die App beim ersten Laden angelegt; geöffnet wird ohne Version, also ohne Upgrade.
+ */
+async function seedQueue(page: Page, einsatzId: string, anzahl: number) {
+  const ich = (await (await page.request.get('/api/auth/me')).json()) as { id: number };
+  await page.evaluate(
+    ([benutzerId, einsatz, n]) =>
+      new Promise<void>((fertig, fehler) => {
+        const anfrage = indexedDB.open('lifeline-offline');
+        anfrage.onerror = () => fehler(anfrage.error);
+        anfrage.onsuccess = () => {
+          const db = anfrage.result;
+          const tx = db.transaction('ausstehend', 'readwrite');
+          for (let i = 0; i < n; i++) {
+            tx.objectStore('ausstehend').add({
+              benutzer_id: benutzerId,
+              einsatz_id: einsatz,
+              eintrag: {
+                typ: 'meldung',
+                inhalt: `Offline vorgemerkt ${i + 1}`,
+                von: 'ELW 1',
+                an: 'EL',
+                client_id: `cls-wartet-${einsatz}-${i}`,
+              },
+              erstellt_at: new Date().toISOString(),
+            });
+          }
+          tx.oncomplete = () => {
+            db.close();
+            fertig();
+          };
+          tx.onerror = () => fehler(tx.error);
+        };
+      }),
+    [ich.id, Number(einsatzId), anzahl] as const,
+  );
+}
+
+/**
+ * Vorgemerkte Offline-Einträge beim Laden (LLH-1910, Spec `kopfleiste`, „Eine beim Laden
+ * feststehende Störung steht im ersten Bild“). Die Queue liegt in IndexedDB und antwortet erst
+ * nach dem ersten Bild; vorher erschien „WARTET 2“ danach, und der Kopf sprang an der Kante in
+ * eine zweite Zeile (52/72 px). Jetzt beginnt der Zähler mit dem zuletzt gelesenen Stand der
+ * Person (`offline/queueZaehlerMerker.ts`).
+ *
+ * Der Abgleich bleibt dabei hängen: die Wiedergabe der Einträge (`POST …/etb`) bekommt keine
+ * Antwort. Sonst gingen die Einträge raus, und „WARTET“ verschwände zu Recht — ein echter
+ * Zustandswechsel, nicht der Startzustand, den dieser Fall misst.
+ */
+for (const dichte of ['komfortabel', 'handschuh'] as const) {
+  test(`Rahmen an der Umbruchkante mit zwei vorgemerkten Einträgen, ${dichte}: kein Sprung beim Laden`, async ({
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    const einsatzId = await prepare(page, dichte);
+    const pfad = `/einsaetze/${einsatzId}/ueberblick`;
+    await page.route(/\/api\/einsaetze\/\d+\/etb(\?|$)/, async (route) => {
+      // Keine Antwort: die Einträge bleiben vorgemerkt.
+      if (route.request().method() === 'POST') return;
+      await route.continue();
+    });
+    await page.setViewportSize(ARBEITSPLATZ);
+    await measure(page, pfad, dichte);
+    await seedQueue(page, einsatzId, 2);
+    // Einmal laden, damit der Zähler den Stand liest und merkt, wie nach jeder Arbeit ohne Netz.
+    await measure(page, pfad, dichte);
+    const sync = kopf(page).locator('[data-lfh="kopf-sync"]');
+    // Vorbedingung: der Zustand, dessen Wort den Kopf verbreitert, steht.
+    await expect(sync).toHaveAttribute('data-zustand', 'ausstehend');
+    await expect(sync).toContainText('WARTET 2');
+    const kante = await findWrapEdge(page);
+
+    const werte: string[] = [`Kante ${kante.twoRows}/${kante.oneRow} px`];
+    for (const [breite, zeilen] of [
+      [kante.twoRows, 'zweizeilig'],
+      [kante.oneRow, 'einzeilig'],
+    ] as const) {
+      await page.setViewportSize({ width: breite, height: ARBEITSPLATZ.height });
+      const m = await measure(page, pfad, dichte);
+      await expect(sync).toContainText('WARTET 2');
+      const hoehe = await kopfHeight(page);
+      expect(
+        hoehe > kante.rowHeight + 1 ? 'zweizeilig' : 'einzeilig',
+        `Kopf bei ${breite} px`,
+      ).toBe(zeilen);
+      werte.push(`${breite} px (${zeilen}): ${bericht(m)}`);
+      expect
+        .soft(m.summe, `${dichte}, WARTET 2 bei ${breite} px (${zeilen}): ${bericht(m)}`)
+        .toBeLessThanOrEqual(HAUS_GRENZE);
+    }
+    test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+  });
+}
+
 /** Die Schnitte, auf die das erste Bild wartet (`bildschirm` in `theme/schriften.ts`). */
 const BILDSCHIRM_SCHNITTE = [
   'LFH Archivo 400',
