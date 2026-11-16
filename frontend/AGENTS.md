@@ -647,7 +647,7 @@ anwendbar), „nicht geprüft" ist keins.
   `e2e/trefflaeche-pruefflaechen.spec.ts`, Messhelfer in `e2e/trefflaeche-kern.ts`.
 - **Der Navigationsrahmen hat keine Dichte-Ausnahme** (LFH-384): die 48 ist Boden, nie Deckel
   (`Math.max(48, controlHeight)`, Griffe über `navGriffMass`); die Rail-Spalte wächst mit
-  (`railBreite` in `components/Kopfleiste.tsx`, 73 px in `handschuh`).
+  (`railBreite` in `components/Kopfleiste.tsx`, mit der Schrift: 64 / 74 / 80 px, LLH-1774).
 - Knopfboden `minWidth` = `controlHeightSM` (`antdKnopf()` in `theme/tokens.ts`). `Switch` über
   `switchMasse`/`antdKomponenten(farben, dichte)`; Nachweis am CSS der `css-var-…`-Klasse über
   `innerHTML`, nicht `textContent`. Schalter in fester Breite brechen um, statt zu kürzen

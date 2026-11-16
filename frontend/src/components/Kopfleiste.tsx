@@ -13,7 +13,7 @@ import { useMinutenTakt } from './useMinutenTakt';
 import { anzahl } from '../anzeige/anzahl';
 import type { OfflineQueueZaehler } from '../offline/queue';
 import { einsaetzePfad } from '../routing/deeplinks';
-import { farbenDunkel, rahmenFarben, schrift } from '../theme/tokens';
+import { farbenDunkel, rahmenFarben, schrift, schriftPx } from '../theme/tokens';
 import { schriftGroesse, schriftStil } from './instrument/rollenwerte';
 
 /**
@@ -23,7 +23,7 @@ import { schriftGroesse, schriftStil } from './instrument/rollenwerte';
  * DER RAHMEN IST IN BEIDEN MODI DUNKEL. Alle Farben kommen deshalb aus `rahmenFarben` bzw.
  * `farbenDunkel`, NICHT aus dem modusabhängigen antd-Token.
  *
- * MASSE: 52 px Kopfhöhe und 60 px Markenzelle sind LAYOUTMASSE, keine Trefflächen. Beide sind
+ * MASSE: 52 px Kopfhöhe und 64 px Markenzelle sind LAYOUTMASSE, keine Trefflächen. Beide sind
  * BÖDEN: in `komfortabel`/`handschuh` wachsen die Bedienziele (48 / 72), und der Rahmen wächst
  * mit — die Markenzelle folgt der Rail-Spalte ({@link railBreite}, LFH-384).
  */
@@ -32,24 +32,26 @@ export const KOPF_HOEHE = 52;
 export const MARKENZELLE_BILDMARKE_HOEHE = 22;
 
 /**
- * Breite der Rail und damit der Markenzelle links oben — beide fluchten im Entwurf. Die
- * 60 px sind ein BODEN, nicht die Breite: gelesen wird immer {@link railBreite}.
+ * Breite der Rail und damit der Markenzelle links oben in `kompakt` — beide fluchten im Entwurf.
+ * Ein BODEN, nicht die Breite: gelesen wird immer {@link railBreite}. 64 statt der 60 des Entwurfs
+ * (LLH-1773): das Rail-Etikett steht seit 15.11.2026 in 11 statt 9 px, „FÜHRUNG“ misst 58,5 px.
  */
-const RAIL_BREITE = 60;
+const RAIL_BREITE = 64;
 
 /** Die Haarlinie rechts an Rail und Markenzelle; sie geht in der Spalte vom Ziel ab. */
 const RAIL_LINIE = 1;
 
 /**
- * Breite der Rail-Spalte zur Dichtestufe (LFH-384): die Entwurfsbreite als Boden, darüber
- * wächst sie mit, bis das Kategorie-Ziel auch in der BREITE `controlHeight` hält — in
- * `handschuh` 73 px (72 Ziel + Haarlinie), sonst 60. Entscheidung des Auftraggebers vom
- * 29.09.2026: die Spalte wächst, statt die Breite als Dauerausnahme festzuschreiben; der
- * Preis sind 13 px Inhalt, und nur in der Stufe, die man bewusst wählt. REIN und exportiert,
- * damit die Zusicherung ohne Rendern prüfbar ist (antds Seed im Vitest kennt die Staffel nicht).
+ * Breite der Rail-Spalte zur Dichtestufe (LFH-384): sie wächst mit der Schrift der Stufe
+ * (`RAIL_BREITE` × Faktor der Grundschrift, LLH-1774: 64 / 74 / 80 px), damit das Rail-Etikett
+ * in jeder Stufe hineinpasst, und nie unter das Kategorie-Ziel in der BREITE `controlHeight`
+ * plus Haarlinie. Entscheidung des Auftraggebers vom 29.09.2026 (die Spalte wächst, statt eine
+ * Dauerausnahme festzuschreiben), fortgeschrieben am 16.11.2026 (Rail wächst mit der Schrift).
+ * REIN und exportiert, damit die Zusicherung ohne Rendern prüfbar ist.
  */
-export function railBreite(token: { controlHeight: number }): number {
-  return Math.max(RAIL_BREITE, token.controlHeight + RAIL_LINIE);
+export function railBreite(token: { controlHeight: number; fontSize: number }): number {
+  const mitSchrift = Math.round((RAIL_BREITE * token.fontSize) / schriftPx('text'));
+  return Math.max(mitSchrift, token.controlHeight + RAIL_LINIE);
 }
 
 /**

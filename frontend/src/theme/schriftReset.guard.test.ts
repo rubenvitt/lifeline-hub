@@ -17,6 +17,13 @@ describe('Schrift-Reset in index.css', () => {
     expect(regel).toMatch(/font-family:\s*var\(--lfh-schrift-text\);/);
   });
 
+  it('body trägt die Lauftextgröße der Stufe, nicht die 16 px des Browsers', () => {
+    // Nur `body`, nicht `html`: `rem` bliebe sonst nicht 16 px (Review LLH-1719, Eingangsband).
+    // Der eigene `body`-Block, nicht der gemeinsame `html, body` (dort stünde es auch an `html`).
+    const regel = /(?:^|\n)(?<!,\s*)body\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(regel).toMatch(/font-size:\s*var\(--lfh-groesse-text\);/);
+  });
+
   it('native Bedienelemente erben die ganze Schrift', () => {
     const regel =
       /(?:^|\n)button,\s*input,\s*textarea,\s*select\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';

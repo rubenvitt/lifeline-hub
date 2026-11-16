@@ -3,6 +3,8 @@
  * gespeicherte Wahl → Zeigerart → `kompakt`. Jede Zeile kann rot werden; die Mount-Tests in
  * `ThemeModeProvider.test.tsx` belegen nur, dass der Provider diese Funktion auch aufruft.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { startDichte } from './dichte';
 import type { Dichte } from './tokens';
@@ -53,4 +55,30 @@ describe('startDichte — Handschuh nur auf Wahl (LFH-724)', () => {
       });
     }
   }
+});
+
+/**
+ * Der Spiegel in `index.html` (LLH-1774, Review vor dem PR): das Bootstrap-Skript setzt
+ * `data-dichte` vor dem ersten Bild, sonst rechnen die Schriftvariablen (`--lfh-schrift-faktor`)
+ * im ersten Bild mit `kompakt`, antd aber schon mit der Stufe, und Text springt nach dem Mount.
+ * Es spiegelt `startDichte`: gespeicherte Wahl, sonst grober Zeiger → `komfortabel`, sonst
+ * `kompakt`. Diese Handkopie hält der Test an Schlüssel, Stufen und Zeigerabfrage.
+ */
+describe('Bootstrap-Spiegel der Dichte in index.html', () => {
+  const html = readFileSync(resolve(__dirname, '../../index.html'), 'utf8');
+
+  it('liest denselben Schlüssel und kennt genau die drei Stufen', () => {
+    expect(html).toContain("localStorage.getItem('lifeline-hub.dichte')");
+    const liste = /var dichten = \[([^\]]*)\];/.exec(html)?.[1] ?? '';
+    expect(liste.split(',').map((w) => w.trim().replace(/'/g, ''))).toEqual([
+      'kompakt',
+      'komfortabel',
+      'handschuh',
+    ]);
+  });
+
+  it('fällt ohne Wahl wie startDichte auf die Zeigerart zurück und setzt das Merkmal', () => {
+    expect(html).toContain("matchMedia('(pointer: coarse)').matches ? 'komfortabel' : 'kompakt'");
+    expect(html).toContain('document.documentElement.dataset.dichte = d;');
+  });
 });

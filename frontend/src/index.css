@@ -10,6 +10,13 @@ body {
   font-family: var(--lfh-schrift-text);
 }
 
+/* Die Lauftextgröße der Stufe auch außerhalb von antds `.ant-app` (LLH-1774): Portale an
+   `document.body` standen sonst in den 16 px des Browsers, in keiner Dichte eine Stufe. Nur
+   `body`, nicht `html`: `rem` bleibt die Vorgabe des Browsers. */
+body {
+  font-size: var(--lfh-groesse-text);
+}
+
 /* Native Bedienelemente erben die Schrift im Browser nicht und fielen sonst auf Arial bzw. die
    Systemschrift in 13,33 px zurück (LLH-1772). Element-Spezifität (0,0,1): antds Klassenregeln
    gewinnen weiter. */

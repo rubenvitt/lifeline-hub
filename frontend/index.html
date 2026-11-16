@@ -51,6 +51,30 @@
         }
       })();
     </script>
+    <!-- Bediendichte synchron vor dem React-Mount setzen (LLH-1774): die Schriftgrößen rechnen in
+         CSS mit dem Faktor der Stufe (`--lfh-schrift-faktor` an `[data-dichte]`). Ohne das Merkmal
+         stünde das erste Bild in `kompakt`, antd schon in der Stufe, und Text spränge nach dem
+         Mount. Gespiegelt aus `theme/dichte.ts:startDichte` (Pin: `dichte.test.ts`). -->
+    <script>
+      (function () {
+        var d = 'kompakt';
+        try {
+          var dichten = ['kompakt', 'komfortabel', 'handschuh'];
+          d = localStorage.getItem('lifeline-hub.dichte');
+          if (dichten.indexOf(d) === -1) {
+            d = matchMedia('(pointer: coarse)').matches ? 'komfortabel' : 'kompakt';
+          }
+        } catch (e) {
+          /* localStorage gesperrt o. Ä. – wie `startDichte` ohne Wahl: die Zeigerart. */
+          try {
+            d = matchMedia('(pointer: coarse)').matches ? 'komfortabel' : 'kompakt';
+          } catch (f) {
+            d = 'kompakt';
+          }
+        }
+        document.documentElement.dataset.dichte = d;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
