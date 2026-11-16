@@ -8,10 +8,10 @@
 
 ## 2. Warteschlange: Merker des Zählers (D2, D3)
 
-- [ ] 2.1 Tests in `offline/useOfflineQueueZaehler.test.ts`: Startwert aus dem Merker im ersten Render; fremde `benutzer_id` und kaputter Wert → `LEER`; nach dem Laden steht der gelesene Stand im Merker, auch `LEER`; Einsatz-Scope liest und schreibt keinen Merker (rot vor der Änderung)
-- [ ] 2.2 Merker umsetzen (Lesen/Schreiben über `lib/sichererSpeicher`), Hook nimmt ihn als Startwert; Tests aus 2.1 grün
-- [ ] 2.3 `GERAETESPEICHER`-Eintrag (`jeder-ausgang`) und Schritt in `geraetRaeumen`; Test, dass Abmelden und Sitzungsende den Merker entfernen; `geraetRaeumung.guard.test.ts` und `sichererSpeicher.guard.test.ts` grün
-- [ ] 2.4 Regel in `frontend/src/offline/AGENTS.md`, „Gerätedaten beim Abmelden“ (Satz zum Queue-Zähler) um den Merker ergänzen; Kommentar an `SyncAnzeige` in `components/Kopfleiste.tsx` nachziehen
+- [x] 2.1 Tests in `offline/useOfflineQueueZaehler.test.ts`: Startwert aus dem Merker im ersten Render; fremde `benutzer_id` und kaputter Wert → `LEER`; nach dem Laden steht der gelesene Stand im Merker, auch `LEER`; Einsatz-Scope liest und schreibt keinen Merker (rot vor der Änderung)
+- [x] 2.2 Merker umsetzen (Lesen/Schreiben über `lib/sichererSpeicher`), Hook nimmt ihn als Startwert; Tests aus 2.1 grün
+- [x] 2.3 `GERAETESPEICHER`-Eintrag (`jeder-ausgang`) und Schritt in `geraetRaeumen`; Test, dass Abmelden und Sitzungsende den Merker entfernen; `geraetRaeumung.guard.test.ts` und `sichererSpeicher.guard.test.ts` grün
+- [x] 2.4 Regel in `frontend/src/offline/AGENTS.md`, „Gerätedaten beim Abmelden“ (Satz zum Queue-Zähler) um den Merker ergänzen; Kommentar an `SyncAnzeige` in `components/Kopfleiste.tsx` nachziehen
 
 ## 3. Nachweis an der Kante
 
