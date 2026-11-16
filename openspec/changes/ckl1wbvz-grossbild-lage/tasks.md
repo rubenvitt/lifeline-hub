@@ -38,14 +38,14 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 
 ## 3. Lagebild im Großbild
 
-- [ ] 3.1 Abbildung „Kennzahl + Zustand → Anzeige“ (gesperrt → „—“ mit `NICHT_FREIGEGEBEN`, Ton,
+- [x] 3.1 Abbildung „Kennzahl + Zustand → Anzeige“ (gesperrt → „—“ mit `NICHT_FREIGEGEBEN`, Ton,
   Notiz, Zustand) als reine Funktion neben `pages/lage-dashboard/lagebild.ts` ziehen und in
   `LageDashboardPage` benutzen; Test der Funktion, die bestehenden Tests der Seite bleiben grün.
-- [ ] 3.2 `pages/lage-dashboard/LagebildGrossbild.tsx` nach D5 (sechs Kennzahlen, Gefahren je Typ
+- [x] 3.2 `pages/lage-dashboard/LagebildGrossbild.tsx` nach D5 (sechs Kennzahlen, Gefahren je Typ
   begrenzt mit „+ n weitere“ bzw. Verlauf bei „Sanitätsdienst“, Sichtung, Führungsstand 2 × 2,
   Uhrzeit und Datenstand, kein Meldungsstrom); Tests: dieselben Werte wie die Seite bei gleichen
   Daten, Alarmton bei überfälligem Auftrag, „—“ bei gesperrter Quelle, kein Link.
-- [ ] 3.3 `LageDashboardPage`: Zustand `istGrossbild`, Knopf „Großbild“ ab `md` im Slot
+- [x] 3.3 `LageDashboardPage`: Zustand `istGrossbild`, Knopf „Großbild“ ab `md` im Slot
   `aktionen`, Zweig nach `</EinsatzSeite>`; Test: Knopf öffnet die Fläche, Verlassen zeigt die
   Seite, Wert ändert sich live in beiden.
 

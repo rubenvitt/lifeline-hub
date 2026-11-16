@@ -33,7 +33,20 @@ describe('GrossKennzahl (LLH-1747, Spec `grossbild-ansicht`)', () => {
     expect(zelle().dataset.ton).toBe('alarm');
     expect(screen.getByText('5')).toHaveStyle({ color: farbenHell.alarmText });
     expect(screen.getByText('1 überfällig')).toHaveStyle({ color: farbenHell.alarmText });
-    // Die Kante (Innenschatten mit `calc(var(…))`) verwirft jsdom; sie prüft `e2e/grossbild.spec.ts`.
+    expect(zelle().style.boxShadow).toContain(`${grossMass(6)} 0 0 0`);
+  });
+
+  it('setzt eine Einheit klein hinter die Zahl', () => {
+    render(<GrossKennzahl titel="Einsatzdauer" wert="5:01" einheit="h" />);
+    const einheit = screen.getByText('h');
+    expect(einheit.style.fontSize).toBe(grossMass(28));
+    expect(einheit.parentElement).toHaveTextContent('5:01h');
+  });
+
+  it('färbt bei „normal“ nur die Zahl, ohne Kante', () => {
+    render(<GrossKennzahl titel="Einheiten frei" wert={7} ton="normal" />);
+    expect(screen.getByText('7')).toHaveStyle({ color: farbenHell.normalText });
+    expect(zelle().style.boxShadow).toBe('');
   });
 
   it('zeigt beim Laden einen Platzhalter statt einer Zahl', () => {

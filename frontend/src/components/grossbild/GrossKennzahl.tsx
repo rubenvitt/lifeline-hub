@@ -4,20 +4,26 @@ import { useRollen } from '../instrument/rollenwerte';
 import { statusFlaeche } from '../instrument/statusFlaeche';
 import { GROSS_BEZUG, grossMass } from './grossMass';
 
-/** Töne einer Großbild-Zahl: die beiden Eskalationsstufen und nichts. */
-export type GrossTon = 'neutral' | 'achtung' | 'alarm';
+/** Töne einer Großbild-Zahl: dieselben wie an der `Kennzahl` (`KennzahlTon`). */
+export type GrossTon = 'neutral' | 'normal' | 'bedien' | 'achtung' | 'alarm';
 export type GrossZustand = 'daten' | 'laden' | 'fehler';
 
 /** Wörter wie an der `Kennzahl` (`components/instrument/Kennzahl.tsx`, Datenzustände). */
 export const GROSS_LADEN = 'wird abgerufen';
 export const GROSS_FEHLER = 'Stand unbekannt';
 
-/** Kante je Ton: abgestuft wie an der `Kennzahl` (3 bzw. 6 px bei 1920 × 1080), zweiter Kanal neben der Farbe. */
-const KANTE = { neutral: 0, achtung: 3, alarm: 6 } as const;
+/**
+ * Kante je Ton: abgestuft wie an der `Kennzahl` (3 bzw. 6 px bei 1920 × 1080), zweiter Kanal neben
+ * der Farbe. `normal` und `bedien` färben nur die Zahl: ein Zustand ohne Handlungsbedarf bekommt
+ * keine Kante.
+ */
+const KANTE = { neutral: 0, normal: 0, bedien: 0, achtung: 3, alarm: 6 } as const;
 
 interface GrossKennzahlProps {
   titel: string;
   wert: ReactNode;
+  /** Kurz hinter der Zahl, in Textgröße („h“, „m“). */
+  einheit?: string;
   notiz?: ReactNode;
   ton?: GrossTon;
   zustand?: GrossZustand;
@@ -37,6 +43,7 @@ interface GrossKennzahlProps {
 export default function GrossKennzahl({
   titel,
   wert,
+  einheit,
   notiz,
   ton = 'neutral',
   zustand = 'daten',
@@ -62,7 +69,7 @@ export default function GrossKennzahl({
         // wenn der Ton wechselt. Der Einzug hält Platz für die breiteste Kante.
         paddingInlineStart: grossMass(GROSS_BEZUG.fuge + KANTE.alarm),
         boxShadow:
-          tonFarbe != null
+          tonFarbe != null && KANTE[wirksam] > 0
             ? `inset ${grossMass(KANTE[wirksam])} 0 0 0 ${tonFarbe.kante}`
             : undefined,
       }}
@@ -93,6 +100,18 @@ export default function GrossKennzahl({
         }}
       >
         {zahl}
+        {zustand === 'daten' && einheit != null && (
+          <span
+            style={{
+              fontSize: grossMass(GROSS_BEZUG.text),
+              fontWeight: 400,
+              color: rollen.gedaempft,
+              marginInlineStart: grossMass(GROSS_BEZUG.eng),
+            }}
+          >
+            {einheit}
+          </span>
+        )}
       </span>
       {notizText != null && notizText !== '' && (
         <span

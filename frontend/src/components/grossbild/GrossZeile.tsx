@@ -19,9 +19,12 @@ import { GROSS_BEZUG, grossMass } from './grossMass';
  */
 export function GrossZeilen({
   beschriftung,
+  spalten = 1,
   children,
 }: {
   beschriftung: string;
+  /** Zwei Spaltenpaare nebeneinander, wenn die Zeilen sonst nicht in die Höhe passen. */
+  spalten?: 1 | 2;
   children: ReactNode;
 }) {
   return (
@@ -30,7 +33,7 @@ export function GrossZeilen({
       aria-label={beschriftung}
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, max-content) minmax(0, 1fr)',
+        gridTemplateColumns: `repeat(${spalten}, minmax(0, max-content) minmax(0, 1fr))`,
         columnGap: grossMass(GROSS_BEZUG.luft),
         rowGap: grossMass(GROSS_BEZUG.eng),
         alignItems: 'baseline',

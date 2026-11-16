@@ -14,12 +14,23 @@ describe('GrossZeile (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entf
     );
     const liste = screen.getByRole('list', { name: 'Sichtung' });
     // Zwei Spalten, die erste so breit wie die längste Bezeichnung: kein Rand dazwischen.
-    expect(liste.style.gridTemplateColumns).toBe('minmax(0, max-content) minmax(0, 1fr)');
+    expect(liste.style.gridTemplateColumns).toBe('repeat(1, minmax(0, max-content) minmax(0, 1fr))');
     const zeilen = screen.getAllByRole('listitem');
     expect(zeilen).toHaveLength(2);
     expect(zeilen[1]).toHaveTextContent('SK II112 neu');
     const wert = screen.getByText('11');
     expect(wert.style.textAlign).not.toBe('end');
+  });
+
+  it('legt viele Zeilen auf zwei Spaltenpaare', () => {
+    render(
+      <GrossZeilen beschriftung="Sichtung" spalten={2}>
+        <GrossZeile bezeichnung="SK I" wert={4} />
+      </GrossZeilen>,
+    );
+    expect(screen.getByRole('list').style.gridTemplateColumns).toBe(
+      'repeat(2, minmax(0, max-content) minmax(0, 1fr))',
+    );
   });
 
   it('zeigt eine Farbmarke nur zusammen mit dem Wort', () => {
