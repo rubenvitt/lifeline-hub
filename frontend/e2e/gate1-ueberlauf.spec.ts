@@ -1718,7 +1718,9 @@ test.describe('Gate 1 · Aktion im Bild (LLH-1789)', () => {
           // Fixierung (Fix-Review LLH-1721).
           await expect(page.locator('[data-lfh="modul-panel"]')).toBeVisible();
           const ueber = await koerper.evaluate((el) => el.scrollWidth - el.clientWidth);
-          expect(ueber, 'Vorbedingung: die Bezirkstabelle läuft waagerecht über').toBeGreaterThan(0);
+          expect(ueber, 'Vorbedingung: die Bezirkstabelle läuft waagerecht über').toBeGreaterThan(
+            0,
+          );
         }
         const rahmen = (await koerper.boundingBox())!;
         for (const ziel of [
