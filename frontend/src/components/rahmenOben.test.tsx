@@ -263,11 +263,21 @@ describe('rahmenOben', () => {
 });
 
 /** Eine Quelle, die selbst unter den übrigen klebt (Übungsband, LLH-1725, design.md D4). */
-function Stapel({ hoehe, aktiv = true }: { hoehe: number; aktiv?: boolean }) {
-  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv);
+function Stapel({
+  hoehe,
+  aktiv = true,
+  rang,
+  testId = 'stapel',
+}: {
+  hoehe: number;
+  aktiv?: boolean;
+  rang?: number;
+  testId?: string;
+}) {
+  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv, rang);
   return (
     <div
-      data-testid="stapel"
+      data-testid={testId}
       data-oben={oben}
       ref={(el) => {
         if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: hoehe });
@@ -351,5 +361,60 @@ describe('useRahmenObenStapel (Übungsband, LLH-1725)', () => {
     );
     expect(screen.getByTestId('stapel').dataset.oben).toBe('52');
     expect(readRahmenOben()).toBe(52);
+  });
+});
+
+describe('useRahmenObenStapel mit Rang (Alarmzone unter dem Übungsband, LLH-1735)', () => {
+  it('stapelt nach Rang: die Zone klebt unter dem Band, das Band nicht unter der Zone', () => {
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Stapel hoehe={24} rang={1} testId="band" />
+        <Stapel hoehe={40} rang={2} testId="zone" />
+      </>,
+    );
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(screen.getByTestId('zone').dataset.oben).toBe('76');
+    expect(readRahmenOben()).toBe(116);
+  });
+
+  it('ohne Band klebt die Zone direkt unter dem Kopf', () => {
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Stapel hoehe={24} rang={1} aktiv={false} testId="band" />
+        <Stapel hoehe={40} rang={2} testId="zone" />
+      </>,
+    );
+    expect(screen.getByTestId('zone').dataset.oben).toBe('52');
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(readRahmenOben()).toBe(92);
+  });
+
+  it('Band und Zone zählen zur Kopfebene; ein klebender Seitenkopf zählt für ihr `top` nicht', () => {
+    function SeitenkopfQuelle() {
+      const ref = useRahmenObenQuelle<HTMLDivElement>(true, 'seitenkopf');
+      return (
+        <div
+          ref={(el) => {
+            if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: 45 });
+            ref(el);
+          }}
+        />
+      );
+    }
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Stapel hoehe={24} rang={1} testId="band" />
+        <Stapel hoehe={40} rang={2} testId="zone" />
+        <SeitenkopfQuelle />
+      </>,
+    );
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(screen.getByTestId('zone').dataset.oben).toBe('76');
+    // Rail, Modulpanel und Seitenkopf hängen an der Kopfhöhe: unter der Zone.
+    expect(readKopfOben()).toBe(116);
+    expect(readRahmenOben()).toBe(161);
   });
 });

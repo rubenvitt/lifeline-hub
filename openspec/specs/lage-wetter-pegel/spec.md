@@ -312,10 +312,11 @@ erscheint nur, wenn das Modul für die Person sichtbar und frei ist.
 ### Requirement: Hinweis bei neuer Unwetterwarnung
 
 Erscheint für den Einsatzort eine neue Warnung der Stufe „schwer“ oder „extrem“, gilt sie jetzt
-oder ist sie angekündigt, SHALL die Oberfläche genau einen Hinweis in der AlarmZentrale zeigen.
-Der Hinweis nennt Stufenbezeichnung, Ereignis und Zeitraum und springt zur Modulseite. Er MUST dem
-Budget der AlarmZentrale unterliegen (höchstens drei sichtbar, der Rest gebündelt), quittierbar
-sein, einen dezenten Ton spielen (stummschaltbar) und darf nicht blinken.
+oder ist sie angekündigt, SHALL die Oberfläche genau einen Hinweis in der Alarmzone zeigen.
+Der Hinweis nennt Stufenbezeichnung, Ereignis und Zeitraum und springt zur Modulseite. Er MUST in der
+Alarmzone stehen (ab zwei gebündelt, Spec `benachrichtigungen`, „Gemeinsames Budget und
+Bündelung“), sich ausblenden lassen (ein „Gelesen“ hat er nicht, denn keine Benachrichtigung steht
+dahinter), einen dezenten Ton spielen (stummschaltbar) und darf nicht blinken.
 
 #### Scenario: Unwetter angekündigt
 - **WHEN** für den Einsatzort erstmals eine Warnung „SCHWERES GEWITTER“ der Stufe „schwer“ ab 17:00 bis 20:00 erscheint
@@ -326,8 +327,8 @@ sein, einen dezenten Ton spielen (stummschaltbar) und darf nicht blinken.
 - **THEN** entsteht kein Hinweis
 
 #### Scenario: Ein Platz im Budget
-- **WHEN** nacheinander zwei verschiedene Unwetterwarnungen neu erscheinen, ohne dass der erste Hinweis geschlossen wurde
-- **THEN** ist in der AlarmZentrale höchstens ein Unwetterhinweis sichtbar, und er nennt die zuletzt erkannte Warnung
+- **WHEN** nacheinander zwei verschiedene Unwetterwarnungen neu erscheinen, ohne dass der erste Hinweis ausgeblendet wurde
+- **THEN** steht in der Alarmzone höchstens ein Unwetterhinweis, und er nennt die zuletzt erkannte Warnung
 
 ### Requirement: Kein Doppelalarm bei Unwetterwarnungen
 

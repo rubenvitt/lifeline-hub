@@ -60,7 +60,7 @@ function audioContext(): AudioContext | null {
  * Frist für eine Freischaltung ohne Antwort (LFH-950). Ohne Bediengeste bleibt `resume()` in
  * Chromium offen, und „wird geprüft" stünde sonst für immer. Nach der Frist gilt der Ton als
  * blockiert; dieselbe Frist begrenzt, wie alt ein aufgestauter Ton sein darf, damit er nach
- * der Freischaltung noch spielt. Ältere Alarme tragen die Toasts.
+ * der Freischaltung noch spielt. Ältere Alarme trägt die Alarmzone.
  */
 export const ALARM_TON_FRIST_MS = 2000;
 

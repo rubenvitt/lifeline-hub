@@ -25,7 +25,7 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
 2. Die Zeile über der Liste zählt die Posten: „einsatzbereit“, „im Einsatz“ und „Ausfall“.
    „Kräfteübersicht“ führt in die Kräfteübersicht.
 
-   ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 Betreuungsgruppe · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten „Aus dem Einsatz nehmen“](../bilder/material/material.png)
+   ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 Betreuungsgruppe · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten das Menü „Weitere Aktionen“](../bilder/material/material.png)
 
 3. Die Liste ist nach Ort gruppiert: erst die Einheiten in der Folge des Kräftebaums, dann
    Fahrzeuge, Unfallhilfsstellen und Bereitstellungsräume, „ohne Ort“ zuletzt. Über der Tabelle
@@ -191,7 +191,8 @@ Verbrauchsgut „Aufteilen · aufgebraucht“. Ein Gerät hat den Eintrag nicht.
 
 Für Einsatzleitung und Führungspersonal, wenn ein Posten den Einsatz verlässt:
 
-1. In der Zeile des Postens „Aus dem Einsatz nehmen“ wählen. Eine Rückfrage gibt es nicht.
+1. In der Zeile des Postens „Weitere Aktionen“ öffnen und „Aus dem Einsatz nehmen“ wählen, auf
+   dem Handy ebenso im Menü der Karte. Eine Rückfrage gibt es nicht.
 2. Der Posten verlässt die Liste. Der Hinweis unten bietet einige Sekunden lang „Rückgängig“.
 3. Unter der Liste „Aus dem Einsatz genommen“ aufklappen. Dort stehen alle herausgenommenen
    Posten mit Menge und Zeitpunkt.

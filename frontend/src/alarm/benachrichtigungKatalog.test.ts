@@ -3,9 +3,6 @@ import {
   ALLE_ARTEN,
   BENACHRICHTIGUNG_ARTEN,
   ersatzPfad,
-  sammelGruppeVon,
-  sammelTitel,
-  sammelZeilen,
   toastSchluessel,
   ZIEL_SPRUENGE,
   zielPfad,
@@ -74,8 +71,6 @@ describe('Katalog der Benachrichtigungsarten', () => {
       expect(zielVon({ art: 'abloesung_abloeser', bezug_typ })).toBe('abloesung');
     }
     expect(zielVon({ art: 'abloesung_planung', bezug_typ: 'abloesung' })).toBe('abloesung');
-    expect(sammelGruppeVon('abloesung_planung')).toBe('abloesung');
-    expect(sammelGruppeVon('abloesung_abloeser')).toBe('abloesung_abloeser');
   });
 
   it('Ersatz ohne gelesenen Text: eine Benachrichtigung der Ablösung springt zu ihrer Schicht', () => {
@@ -125,26 +120,5 @@ describe('Katalog der Benachrichtigungsarten', () => {
       expect(zielPfad(ziel, 4)).toMatch(/^\/einsaetze\/4(\/|$)/);
       expect(zielPfad(ziel, null)).toBe('/einsaetze');
     }
-  });
-});
-
-describe('Sammeltoast', () => {
-  it('Titel: eigene Gruppe der bestehenden Alarme, sonst Alarme oder Hinweise', () => {
-    const sofort = { gruppe: 'sofort' as const, stufe: 'alarm' as const };
-    const auftrag = { gruppe: 'auftrag_erteilt' as const, stufe: 'hinweis' as const };
-    expect(sammelTitel([sofort, sofort])).toBe('2 weitere Sofortmeldungen');
-    expect(sammelTitel([auftrag, auftrag])).toBe('2 weitere Hinweise');
-    expect(sammelTitel([auftrag, sofort])).toBe('2 weitere Alarme');
-  });
-
-  it('Zählzeilen erst ab zwei Arten', () => {
-    expect(sammelZeilen([{ name: 'Neuer Auftrag' }, { name: 'Neuer Auftrag' }])).toEqual([]);
-    expect(
-      sammelZeilen([
-        { name: 'Neuer Auftrag' },
-        { name: 'Neuer Befehl' },
-        { name: 'Neuer Auftrag' },
-      ]),
-    ).toEqual(['2 × Neuer Auftrag', '1 × Neuer Befehl']);
   });
 });

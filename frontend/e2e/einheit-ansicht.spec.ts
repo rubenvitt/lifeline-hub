@@ -286,6 +286,7 @@ for (const dichte of DICHTEN) {
       await expect(main.getByRole('button', { name: /^Aktionen zu Person / })).toHaveCount(0);
       await expect(main.getByRole('combobox', { name: /zuordnen$/ })).toHaveCount(0);
       await expect(main.getByRole('button', { name: 'Aus Einheit lösen' })).toHaveCount(0);
+      await expect(main.getByRole('button', { name: /^Aktionen zu Fahrzeug / })).toHaveCount(0);
       await expect(main.getByRole('button', { name: /(bearbeiten|eintragen)$/ })).toHaveCount(0);
       await expect(main.getByRole('button', { name: /^Status von / })).toHaveCount(0);
       await expect(

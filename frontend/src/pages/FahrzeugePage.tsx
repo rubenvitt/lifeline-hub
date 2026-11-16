@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography, theme } from 'antd';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -20,6 +20,7 @@ import {
   listeEinsatzFahrzeuge,
   listEntlasseneFahrzeuge,
   ordneBesatzungZu,
+  nimmEntlassungZurueck,
   reaktiviereDisposition,
   storniereDisposition,
   type AdhocEingabe,
@@ -27,7 +28,13 @@ import {
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { useFehlerOhneDaten } from '../api/useFehlerOhneDaten';
-import type { EinsatzFahrzeug, EinsatzPersonal, Staerke } from '../api/types';
+import type {
+  EinsatzFahrzeug,
+  EinsatzPersonal,
+  EntlassungRuecknahmeAntwort,
+  EntlassungVorzustand,
+  Staerke,
+} from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -71,7 +78,8 @@ import {
   kategorieVon,
 } from '../kraefte/statusAchse';
 import { besatzungsUrteil, statusKategorie } from '../theme/statusFarben';
-import { abstand, dichten } from '../theme/tokens';
+import { abstand } from '../theme/tokens';
+import { menueSpaltenBreite } from '../components/menueSpalte';
 import { useDichte } from '../theme/ThemeModeProvider';
 import StatusTag from '../components/StatusTag';
 import DemoMarke from '../components/DemoMarke';
@@ -166,7 +174,7 @@ function BesatzungsBlock({
    */
   freiInhalt: string;
   onZuordnen: (epId: number) => void;
-  onFreigeben: (epId: number) => void;
+  onFreigeben: (epId: number, name: string) => void;
   /** Grund des letzten abgelehnten Zuordnens an diesem Fahrzeug. */
   zuordnenFehler: ZeilenGrund | null;
   /** Grund des letzten abgelehnten Freigebens je Kraft. */
@@ -249,13 +257,14 @@ function BesatzungsBlock({
                     <Tag style={{ margin: 0 }}>andere Einheit</Tag>
                   )}
                 </Space>
-                {/* Umkehrbar: `danger` mit Abstand, ohne Rückfrage (D13, Regel „Destruktiv ist
-                    nicht gleich destruktiv“). Der Name nennt Handlung und Person. */}
+                {/* Umkehrbar: `danger` mit Abstand, ohne Rückfrage, mit Rückgängig-Hinweis (D13,
+                    LLH-1722). Einzige Handlung der Zeile, deshalb ein Knopf. Der Name nennt
+                    Handlung und Person. */}
                 {darfSchreiben && (
                   <Button
                     danger
                     aria-label={`${m.name} vom Fahrzeug lösen`}
-                    onClick={() => onFreigeben(m.id)}
+                    onClick={() => onFreigeben(m.id, m.name)}
                   >
                     Vom Fahrzeug lösen
                   </Button>
@@ -348,6 +357,15 @@ const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
  * hängt die Liste aus. Ohne `aktiv`, weil die Seite erst darunter weiß, ob sie schreiben darf;
  * ohne Schreibrecht meldet keine Angabe einen Entwurf.
  */
+/**
+ * Der Satz zu einer Rücknahme, die nicht alles zurückbekam (LLH-1722): „83-1 zurück, ohne: Anna
+ * Müller (inzwischen auf einem anderen Fahrzeug)“.
+ */
+export function ausgelassenSatz(name: string, antwort: EntlassungRuecknahmeAntwort): string {
+  const teile = antwort.ausgelassen.map((a) => `${a.bezeichnung} (${a.grund})`);
+  return `${name} zurück, ohne: ${teile.join(', ')}`;
+}
+
 export default function FahrzeugePage() {
   return (
     <OffeneBearbeitungProvider>
@@ -364,14 +382,8 @@ function FahrzeugeInhalt() {
   const navigate = useNavigate();
   const { benutzer } = useAuth();
   const { dichte } = useDichte();
-  /**
-   * Nur der Menüauslöser (Entscheidung 14.10.2026): die quadratische Steuerhöhe der Dichte oder der
-   * Kopf „Aktionen“ (rund 4,4 Schriftgrößen), was breiter ist, plus das Zellpolster beidseits
-   * (`abstand.md`). Gemessen 82 / 102 / 124 px (`e2e/gate1-ueberlauf.spec.ts`).
-   */
-  const stufe = dichten[dichte];
-  const aktionenBreite =
-    Math.ceil(Math.max(stufe.zeilenhoehe, 4.4 * stufe.schriftgroesse)) + 2 * stufe.abstand.md;
+  /** Nur der Menüauslöser (Entscheidung 14.10.2026, `components/menueSpalte.ts`). */
+  const aktionenBreite = menueSpaltenBreite(dichte);
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [adhocWeitereOffen, setAdhocWeitereOffen] = useState(false);
@@ -566,25 +578,37 @@ function FahrzeugeInhalt() {
     onError: (e, efId) => zeilen.melde(efId, e, 'Nicht erneut disponiert'),
   });
   const [rueckgaengigFehler, setRueckgaengigFehler] = useState<unknown>(null);
-  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen.
+  // Was die Rücknahme ausgelassen hat (LLH-1722): ein Teilerfolg, den niemand im Toast überliest.
+  const [ausgelassenText, setAusgelassenText] = useState<string | null>(null);
+  // Die nächste Rücknahme aus dem Toast räumt den Grund der vorigen. Sie nimmt mit dem Vorzustand
+  // aus der Antwort des Entlassens alles zurück (Spec `kraefte-entlassung`, design.md D5).
   const rueckgaengigMutation = useMutation({
-    mutationFn: (efId: number) => reaktiviereDisposition(einsatzId, efId),
-    onMutate: () => setRueckgaengigFehler(null),
-    onSuccess: invalidate,
+    mutationFn: (v: { efId: number; name: string; vorzustand: EntlassungVorzustand }) =>
+      nimmEntlassungZurueck(einsatzId, v.efId, v.vorzustand),
+    onMutate: () => {
+      setRueckgaengigFehler(null);
+      setAusgelassenText(null);
+    },
+    onSuccess: (antwort, v) => {
+      invalidateNachEntlassen();
+      if (antwort.ausgelassen.length > 0) setAusgelassenText(ausgelassenSatz(v.name, antwort));
+    },
     onError: (e) => {
       setRueckgaengigFehler(e);
       invalidate();
     },
   });
   // Entlassen ist umkehrbar: keine Rückfrage, sondern ein Rückgängig-Toast (`frontend/AGENTS.md`,
-  // „Destruktiv ist nicht gleich destruktiv“, design.md D8). Rückgängig setzt Besatzung, Einheit
-  // und Bereitstellungsraum nicht wieder (design.md, Risiken).
+  // „Beenden: Verb, Ort und Sicherung je Art“, LLH-1722). Rückgängig stellt den Zustand davor
+  // her: Status, Einheit, Besatzung, Raum, Führungsstelle und Beladung.
   const entlassenMutation = useMutation({
     mutationFn: (v: { efId: number; name: string }) => entlasseDisposition(einsatzId, v.efId),
     onMutate: (v) => zeilen.beginne(v.efId),
-    onSuccess: (_, v) => {
+    onSuccess: (antwort, v) => {
       invalidateNachEntlassen();
-      zeigeRueckgaengig(message, `${v.name} entlassen`, () => rueckgaengigMutation.mutate(v.efId));
+      zeigeRueckgaengig(message, `${v.name} entlassen`, () =>
+        rueckgaengigMutation.mutate({ ...v, vorzustand: antwort.vorzustand }),
+      );
     },
     onError: (e, v) => zeilen.melde(v.efId, e, 'Nicht entlassen'),
   });
@@ -618,10 +642,24 @@ function FahrzeugeInhalt() {
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     await qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
   }
-  const besatzungFreiMutation = useMutation({
-    mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
-    onMutate: (v) => freigebenFehler.beginne(v.epId),
+  // „Rückgängig“ setzt die Person wieder auf das Fahrzeug (LLH-1722, `frontend/AGENTS.md`, „Beenden:
+  // Verb, Ort und Sicherung je Art“); die Ablehnung steht im Seitenhinweis wie beim Entlassen.
+  const besatzungZurueckMutation = useMutation({
+    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
+    onMutate: () => setRueckgaengigFehler(null),
     onSuccess: invalidate,
+    onError: (e) => setRueckgaengigFehler(e),
+  });
+  const besatzungFreiMutation = useMutation({
+    mutationFn: (v: { efId: number; epId: number; name: string }) =>
+      gibBesatzungFrei(einsatzId, v.efId, v.epId),
+    onMutate: (v) => freigebenFehler.beginne(v.epId),
+    onSuccess: (_d, v) => {
+      invalidate();
+      zeigeRueckgaengig(message, `${v.name} vom Fahrzeug gelöst`, () =>
+        besatzungZurueckMutation.mutate({ efId: v.efId, epId: v.epId }),
+      );
+    },
     onError: (e, v) => freigebenFehler.melde(v.epId, e, 'Nicht vom Fahrzeug gelöst'),
   });
 
@@ -648,23 +686,20 @@ function FahrzeugeInhalt() {
     (entlassenMutation.isPending && entlassenMutation.variables?.efId === efId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === efId);
   /**
-   * Zeilenmenü (design.md D6, nachgeschärft 14.10.2026): in der Tabelle steht „Entlassen“ als
-   * erster Eintrag im Menü statt als Knopf — die Einheit-Spalte (LLH-1073) braucht den Platz, damit
-   * der Funkrufname bei 1440 px einzeilig bleibt. Entlassen ist umkehrbar und steht deshalb nicht
-   * rot (Rückgängig-Hinweis wie bisher). Auf der Karte bleibt es die Primäraktion (`aktion`), das
-   * Menü dort führt den Rest. „Angaben ändern“ steht beim Stamm-Fahrzeug gesperrt mit dem Grund im
+   * Zeilenmenü (design.md D6, nachgeschärft 14.10.2026): „Entlassen“ steht als erster Eintrag im
+   * Menü statt als Knopf — in der Tabelle braucht die Einheit-Spalte (LLH-1073) den Platz, damit
+   * der Funkrufname bei 1440 px einzeilig bleibt; auf der Karte ist es seit LLH-1722 keine
+   * Primäraktion mehr. Entlassen ist umkehrbar und steht deshalb nicht rot (Rückgängig-Hinweis
+   * mit vollständiger Rücknahme). „Angaben ändern“ steht beim Stamm-Fahrzeug gesperrt mit dem Grund im
    * Etikett — sein Fehlen verwirrte; den Sprung in den Stamm sieht nur, wer dort schreiben darf
    * (Verwaltung der Org des Einsatzes, `src/AGENTS.md`, Admin-Schreibwege). „Stornieren“ steht für
    * jede aktive Zeile rot hinter dem Trenner, das Menü ist also nie leer.
    */
   const canStamm = darfVerwaltung(benutzer) && benutzer?.org_id === einsatz.org_id;
-  const zeilenEintraege = (
-    ef: EinsatzFahrzeug,
-    { mitEntlassen }: { mitEntlassen: boolean },
-  ): MenueEintrag<ZeilenAktion>[] => {
+  const zeilenEintraege = (ef: EinsatzFahrzeug): MenueEintrag<ZeilenAktion>[] => {
     const ausStamm = ef.fahrzeug_id != null;
     return [
-      ...(mitEntlassen ? [{ key: 'entlassen' as const, label: 'Entlassen' }] : []),
+      { key: 'entlassen', label: 'Entlassen' },
       ausStamm
         ? { key: 'angaben', label: 'Angaben ändern · aus dem Stamm', gesperrt: true }
         : { key: 'angaben', label: 'Angaben ändern …' },
@@ -1029,7 +1064,7 @@ function FahrzeugeInhalt() {
             // Stornieren stehen im Menü; Stornieren fragt im `<Modal>` nach (LLH-1079).
             render: (_: unknown, ef: EinsatzFahrzeug) => (
               <MenueAusloeser<ZeilenAktion>
-                eintraege={zeilenEintraege(ef, { mitEntlassen: true })}
+                eintraege={zeilenEintraege(ef)}
                 zugaenglicherName={`Weitere Aktionen zu ${ef.funkrufname}`}
                 gesperrt={isZeileBusy(ef.id)}
                 laeuft={isZeileBusy(ef.id)}
@@ -1078,21 +1113,32 @@ function FahrzeugeInhalt() {
         </Space>
       }
       hinweis={
-        nurAnsicht || rueckgaengigFehler != null ? (
-          <SeitenHinweise
-            rechteText={einsatzRechteGrund(einsatz)}
-            rechteFehlt={nurAnsicht}
-            fehler={rueckgaengigFehler}
-            fehlerTitel="Nicht erneut disponiert"
-            fehlerFallback="Rückgängig fehlgeschlagen"
-          />
+        nurAnsicht || rueckgaengigFehler != null || ausgelassenText != null ? (
+          <>
+            <SeitenHinweise
+              rechteText={einsatzRechteGrund(einsatz)}
+              rechteFehlt={nurAnsicht}
+              fehler={rueckgaengigFehler}
+              fehlerTitel="Nicht zurückgenommen"
+              fehlerFallback="Rückgängig fehlgeschlagen"
+            />
+            {ausgelassenText != null && (
+              <Alert
+                type="warning"
+                showIcon
+                closable
+                message={ausgelassenText}
+                onClose={() => setAusgelassenText(null)}
+              />
+            )}
+          </>
         ) : null
       }
     >
       {/* `karte.titel` trägt bewusst kein `ziel`: `fahrzeugePfad` ist eine
-          Query-Param-Selektion auf diese Seite, der Link zeigte auf sich selbst. Tastaturziel
-          der Karte ist die Primäraktion; eine Karte im Nur-Lese-Modus hat unter `md` kein
-          fokussierbares Element.
+          Query-Param-Selektion auf diese Seite, der Link zeigte auf sich selbst. Tastaturziele
+          der Karte sind Statuswahl und ⋮ (eine Primäraktion trägt sie seit LLH-1722 nicht); eine
+          Karte im Nur-Lese-Modus hat unter `md` kein fokussierbares Element.
 
           `zufluss` bleibt `sammelbanner`: der Status wird in der Zeile gewechselt, eigen wie
           fremd über eine Invalidierung. */}
@@ -1198,7 +1244,9 @@ function FahrzeugeInhalt() {
                       darfSchreiben={darfSchreiben}
                       freiInhalt={besatzungInhalt}
                       onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
-                      onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+                      onFreigeben={(epId, name) =>
+                        besatzungFreiMutation.mutate({ efId: ef.id, epId, name })
+                      }
                       zuordnenFehler={zuordnenFehler.grund(ef.id)}
                       freigebenFehler={freigebenFehler.grund}
                       gesperrt={personalGesperrt}
@@ -1247,24 +1295,18 @@ function FahrzeugeInhalt() {
                 // Mandantenfarbe geht über `statusBedienung.farbe` mit und steht auf Rand und Text,
                 // nie auf der Fläche.
                 status: (ef) => statusDarstellung(ef),
-                // Der Bedienweg sitzt hier und nicht im `aktion`-Slot: der ist mit „Entlassen"
-                // belegt, und `Datensicht` sichert genau eine Primäraktion zu.
+                // Der Bedienweg sitzt am `status`-Slot, nie am `aktion`-Slot (`frontend/AGENTS.md`,
+                // „Statuswechsel in Kräfte-Listen“).
                 statusBedienung: (ef) => (darfSchreiben ? statusBedienungVon(ef) : null),
                 // Einheit und Seit aus denselben Zellen (D5); ohne Freigabe der Typ statt der Einheit.
                 sekundaer: einheitenFrei
                   ? ['einheit', 'seit', 'besatzung']
                   : ['typ', 'seit', 'besatzung'],
-                aktion: darfSchreiben
-                  ? {
-                      etikett: 'Entlassen',
-                      zugaenglicherName: (ef) => `${ef.funkrufname} entlassen`,
-                      onKlick: (ef) =>
-                        entlassenMutation.mutate({ efId: ef.id, name: ef.funkrufname }),
-                    }
-                  : undefined,
+                // Keine Primäraktion: „Entlassen“ ist nie Hauptaktion einer Karte (LLH-1722, Spec
+                // `fahrzeug-bearbeitung`); es steht wie in der Tabelle zuerst im Menü.
                 weitere: darfSchreiben
                   ? {
-                      eintraege: (ef) => zeilenEintraege(ef, { mitEntlassen: false }),
+                      eintraege: (ef) => zeilenEintraege(ef),
                       zugaenglicherName: (ef) => `Weitere Aktionen zu ${ef.funkrufname}`,
                       laeuft: (ef) => isZeileBusy(ef.id),
                       onWahl: (aktion, ef) => handleZeilenAktion(aktion as ZeilenAktion, ef),

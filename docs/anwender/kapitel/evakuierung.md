@@ -136,7 +136,8 @@ In der Tabelle setzt „Räumung setzen“ im Menü eines Bezirks den Zustand eb
 
 ### Plangröße und Angaben eines Bezirks ändern
 
-1. Auf der Seite des Bezirks „Bearbeiten“ wählen. Die Stammdaten werden zu Eingabefeldern.
+1. Auf der Seite des Bezirks im Menü oben (drei Punkte) „Bearbeiten“ wählen. Die Stammdaten werden
+   zu Eingabefeldern.
 2. Die Angaben ändern, etwa die „Plangröße (Personen)“ und ihre „Erhebung“.
 3. „Speichern“ wählen. Gespeichert wird nur, was geändert wurde; was jemand anders inzwischen
    geändert hat, bleibt stehen. „Abbrechen“ verwirft die Eingabe.

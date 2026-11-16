@@ -72,7 +72,7 @@ describe('GefahrenPage', () => {
 
   /**
    * LLH-1102: die Zeile sagt, was im Gebiet los ist („1 Zone“ sagte im Einsatz nichts). Gezählt
-   * werden Gefahren über „keine“, nicht Zellen; ein nicht beurteiltes Gebiet heißt so (LLH-1090).
+   * werden Gefahren über „keine“, nicht Zellen; ein unbestätigtes Gebiet heißt so (LLH-1090).
    */
   it('nennt in der Liste Gefahren und höchste Stufe statt der Zonenzahl (LLH-1102)', async () => {
     const nord = { ...gebiet, beurteilt_at: '2026-10-20 13:15:00', beurteilt_von: 2 };
@@ -92,7 +92,10 @@ describe('GefahrenPage', () => {
     renderPage();
     const liste = await screen.findByRole('region', { name: 'Gefahrengebiete' });
     expect(await within(liste).findByText('2 Gefahren · hoch')).toBeInTheDocument();
-    expect(within(liste).getByText('nicht beurteilt')).toBeInTheDocument();
+    // LLH-1745: Stufe und Vorläufigkeit in einem Etikett, kein zweiter Zusatz.
+    expect(within(liste).getByText('mittel · unbestätigt')).toBeInTheDocument();
+    expect(within(liste).queryByText('unbestätigt')).toBeNull();
+    expect(within(liste).queryByText(/nicht beurteilt/)).toBeNull();
     expect(within(liste).queryByText(/Zonen?$/)).toBeNull();
   });
 
@@ -194,9 +197,10 @@ describe('GefahrenPage', () => {
   it('zeigt die höchste Warnstufe als Etikett, nicht als Flächenfarbe (LFH-368)', async () => {
     server.use(...handlers());
     renderPage();
-    // In der Gebietsliste: „hoch“ steht auch im Druckkopf (nur auf Papier, LLH-1364).
+    // In der Gebietsliste: „hoch“ steht auch im Druckkopf (nur auf Papier, LLH-1364). Das Gebiet
+    // der Vorgabe ist unbestätigt, sein Etikett heißt deshalb „hoch · unbestätigt“ (LLH-1745).
     const liste = await screen.findByRole('region', { name: 'Gefahrengebiete' });
-    const tag = await within(liste).findByText('hoch');
+    const tag = await within(liste).findByText('hoch · unbestätigt');
     // Signatur des Fehlgriffs: `warnstufeFarbe('hoch')` = '#ffa39e' als `color=` am `<Tag>`. antd
     // rechnet den Hex-Wert in `rgb(...)` um und trägt ihn als Textfarbe — geprüft wird deshalb die
     // Abwesenheit des umgerechneten Werts. Den neuen Wert positiv zu pinnen prüfte nur antds
@@ -314,15 +318,15 @@ describe('GefahrenPage', () => {
   });
 
   describe('Beurteilung (LLH-1090)', () => {
-    it('nennt ein nie bestätigtes Gebiet „nicht beurteilt“ — am Kopf und in der Liste', async () => {
+    it('nennt ein nie bestätigtes Gebiet „unbestätigt“ — am Kopf und in der Liste', async () => {
       server.use(...handlers());
       renderPage();
       await screen.findByRole('button', { name: 'Beurteilung bestätigen' });
       const kopf = document.querySelector<HTMLElement>('[data-lfh="gefahrengebiet-beurteilung"]');
       expect(kopf).not.toBeNull();
-      expect(within(kopf!).getByText('nicht beurteilt')).toBeInTheDocument();
+      expect(within(kopf!).getByText('unbestätigt')).toBeInTheDocument();
       const liste = screen.getByRole('region', { name: 'Gefahrengebiete' });
-      expect(within(liste).getByText('nicht beurteilt')).toBeInTheDocument();
+      expect(within(liste).getByText(/^\S+ · unbestätigt$/)).toBeInTheDocument();
     });
 
     it('nennt Zeit und Person einer Bestätigung, ohne Listenzusatz', async () => {
@@ -334,11 +338,11 @@ describe('GefahrenPage', () => {
       };
       server.use(...handlers([beurteilt]));
       renderPage();
-      const stand = await screen.findByText(/^beurteilt /, {
+      const stand = await screen.findByText(/^bestätigt /, {
         selector: '[data-lfh="beurteilung-stand"]',
       });
-      expect(stand).toHaveTextContent(/^beurteilt \d{6}[a-z]{3}\d{2} · Einsatzleitung$/);
-      expect(screen.queryByText('nicht beurteilt')).toBeNull();
+      expect(stand).toHaveTextContent(/^bestätigt \d{6}[a-z]{3}\d{2} · Einsatzleitung$/);
+      expect(screen.queryByText('unbestätigt')).toBeNull();
     });
 
     it('bestätigt die Beurteilung (POST auf das gewählte Gebiet) und lädt die Liste nach', async () => {
@@ -386,7 +390,7 @@ describe('GefahrenPage', () => {
       server.use(...handlers([gebiet], [], einsatzFixture({ meine_rolle: 'beobachter' })));
       renderPage();
       expect(await screen.findByText('Nur Ansicht')).toBeInTheDocument();
-      expect(screen.getAllByText('nicht beurteilt').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('unbestätigt').length).toBeGreaterThan(0);
       expect(screen.queryByRole('button', { name: 'Beurteilung bestätigen' })).toBeNull();
     });
   });
@@ -635,7 +639,7 @@ describe('GefahrenPage · Druck (LLH-1364)', () => {
     expect(kopf).not.toBeNull();
     expect(kopf).toHaveTextContent('Gefahrenbewertung – Nord');
     expect(kopf).toHaveTextContent(/Warnstufe\s*hoch/);
-    expect(kopf).toHaveTextContent(/Beurteilung\s*beurteilt \d{6}[a-z]{3}\d{2} · Einsatzleitung/);
+    expect(kopf).toHaveTextContent(/Beurteilung\s*bestätigt \d{6}[a-z]{3}\d{2} · Einsatzleitung/);
     const liste = w!.querySelector<HTMLElement>('[data-lfh="gefahren-erlaeuterungen"]');
     expect(liste).not.toBeNull();
     expect(liste).toHaveTextContent('Elektrizität × Menschen');
@@ -644,12 +648,12 @@ describe('GefahrenPage · Druck (LLH-1364)', () => {
     expect(w!.querySelector('[data-lfh="erlaeuterung-marke"]')).not.toBeNull();
   });
 
-  it('nennt ein nie bestätigtes Gebiet im Druckkopf „nicht beurteilt“', async () => {
+  it('nennt ein nie bestätigtes Gebiet im Druckkopf „unbestätigt“', async () => {
     server.use(...handlers([gebiet], []));
     renderPage();
     await screen.findByRole('button', { name: 'Drucken / als PDF' });
     expect(wurzel()!.querySelector('[data-lfh="druckkopf"]')).toHaveTextContent(
-      /Beurteilung\s*nicht beurteilt/,
+      /Beurteilung\s*unbestätigt/,
     );
   });
 

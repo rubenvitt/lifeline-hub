@@ -12,6 +12,7 @@ import type {
 import type { ListenAbschnittZustand } from '../../components/instrument';
 import { einstufungOf } from '../../abloesung/einstufung';
 import { istAlarmiert } from '../../meldungen/meldungKennzahlen';
+import { istSofort } from '../../meldungen/meldungKorrekturKern';
 import {
   istOffen as nachforderungOffen,
   istUeberfaellig,
@@ -136,17 +137,39 @@ function frueher(a: number | null, b: number | null): number {
   return a - b;
 }
 
-/** Meldungen: offen; Bestätigung überfällig → neu → älteste (Eingang). */
+/**
+ * Dringlichkeitsstufe einer Meldung im Überblick (LLH-1740, Spec `ueberblick-offene-vorgaenge`):
+ * 0 Bestätigung überfällig (Alarm), 1 Sofort (Art oder Priorität, wie am Server `ist_sofort`),
+ * 2 Dringend, 3 übrige. Sofort und Dringend stehen ab Eingang oben, nicht erst nach Ablauf der
+ * Bestätigungsfrist.
+ */
+export function meldungsStufe(m: Meldung): 0 | 1 | 2 | 3 {
+  if (istAlarmiert(m)) return 0;
+  if (istSofort(m)) return 1;
+  if (m.prioritaet === 'dringend') return 2;
+  return 3;
+}
+
+/**
+ * Meldungen: offen; Bestätigung überfällig → Sofort → Dringend → übrige. Sofort und Dringend die
+ * neueste zuerst (das Frische ist das Dringliche), Alarmierte und übrige wie bisher: neu → älteste.
+ */
 export function vorgangsMeldungen(meldungen: readonly Meldung[]): Meldung[] {
   return meldungen
     .filter((m) => m.ist_offen)
-    .sort(
-      (a, b) =>
-        Number(istAlarmiert(b)) - Number(istAlarmiert(a)) ||
+    .sort((a, b) => {
+      const stufe = meldungsStufe(a) - meldungsStufe(b);
+      if (stufe !== 0) return stufe;
+      const s = meldungsStufe(a);
+      if (s === 1 || s === 2) {
+        return frueher(ms(b.eingang_at), ms(a.eingang_at)) || b.id - a.id;
+      }
+      return (
         Number(b.status === 'neu') - Number(a.status === 'neu') ||
         frueher(ms(a.eingang_at), ms(b.eingang_at)) ||
-        a.id - b.id,
-    );
+        a.id - b.id
+      );
+    });
 }
 
 /** Aufträge: die Folge des Überblicks (überfällig → Frist → älteste), `offeneAuftraege`. */

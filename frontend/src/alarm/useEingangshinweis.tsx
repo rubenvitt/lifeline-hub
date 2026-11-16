@@ -5,6 +5,7 @@ import { setzeMeldungStatus } from '../api/meldungen';
 import type { BenachrichtigungArt, BenachrichtigungBezugTyp } from '../api/types';
 import { einsatzModulPfad, meldungenPfad } from '../routing/deeplinks';
 import { spieleAlarmTon } from './alarmTon';
+import { blendeAus } from './benachrichtigungGedaechtnis';
 import { type AlarmZiel, ZIEL_SPRUENGE, zielPfad } from './benachrichtigungKatalog';
 import { type DesktopMeldung, schliesseDesktopMeldung, zeigeDesktopAlarm } from './desktopAlarm';
 import { oeffneEingaenge } from './eingaenge';
@@ -15,7 +16,7 @@ import Eingangsband from './Eingangsband';
  * Eingangshinweis (LLH-1062, Spec `benachrichtigungen`, „Eingangshinweis“, design.md E7): EIN
  * gebündelter, stehender Hinweis für alle Eingänge eines Einsatzes (Stufe `hinweis`, seit
  * LLH-1143; vorher nur die Art `meldung`). Er steht im Eingangsband unten (`Eingangsband.tsx`,
- * LLH-1143 D7), getrennt von den drei Toastplätzen der Zentrale (`useAlarmToasts.tsx`), und
+ * LLH-1143 D7), getrennt von der Alarmzone (`AlarmZone.tsx`, LLH-1735), und
  * verbraucht deren Budget nicht: ein Eingang ist Information, kein Alarm (`frontend/AGENTS.md`,
  * Layout und Live).
  *
@@ -23,8 +24,9 @@ import Eingangsband from './Eingangsband';
  * - Steht der Fokus in einem Eingabefeld, wartet er bis zum Verlassen des Feldes.
  * - Auf der eigenen Seite (Meldungen bzw. Lagemeldungen) zeigt er deren Einträge nicht; dort
  *   trägt das Sammelbanner die Neuen.
- * - ✕ und der Sprung quittieren für den Nutzer, „Sichten“ setzt die Meldung auf Gesichtet; dann
- *   räumt der Server den Hinweis bei allen Empfängern (Quittier-Ereignis).
+ * - Der Sprung quittiert für den Nutzer, „Sichten“ setzt die Meldung auf Gesichtet; dann räumt
+ *   der Server den Hinweis bei allen Empfängern (Quittier-Ereignis). ✕ blendet nur aus (LLH-1736,
+ *   `benachrichtigungGedaechtnis.ts`): in diesem Tab kommen die Einträge nicht wieder.
  * - Sammelt er Eingänge verschiedener Module, öffnet „Ansehen“ den Verlauf am Knopf „Eingänge“
  *   (`EingaengeKnopf.tsx`) und quittiert nichts: gelesen ist erst, was jemand öffnet.
  * - „Alle gelesen“ auf einem anderen Gerät (`entferneBis`) räumt alles bis zur gemeldeten Kennung.
@@ -138,6 +140,7 @@ export function eingangTitel(
 
 /** Was das Band gerade zeigt; `null`: kein Band. */
 type BandAnsicht = {
+  anzahl: number;
   titel: string;
   inhalt: ReactNode;
   aktion: { text: string; beiKlick: () => void };
@@ -167,7 +170,14 @@ export function useEingangshinweis(
   einsatzId: number,
   quittiere: (id: number) => void,
   darfSichten: boolean,
-): { hinweis: Eingangshinweis; band: ReactNode } {
+): {
+  hinweis: Eingangshinweis;
+  band: ReactNode;
+  /** Einträge, die das Band zeigt; am Handschirm nennt sie die Leiste (LLH-1738). */
+  bandAnzahl: number;
+  /** ✕ des Bands: blendet seine Einträge aus, ohne zu quittieren. */
+  bandAusblenden: () => void;
+} {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [ansicht, setAnsicht] = useState<BandAnsicht | null>(null);
@@ -190,7 +200,7 @@ export function useEingangshinweis(
       desktopAusstehend: null,
       desktop: null,
     }),
-    // Je Einsatz ein eigener Zustand (wie der Scope der Toasts).
+    // Je Einsatz ein eigener Zustand (wie der Scope der Alarmzone).
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [einsatzId],
   );
@@ -316,6 +326,7 @@ export function useEingangshinweis(
 
     const weitere = zeilen.length - EINGANG_ZEILEN;
     setAnsicht({
+      anzahl: zeilen.length,
       titel: eingangTitel(zeilen),
       inhalt: (
         <>
@@ -342,9 +353,16 @@ export function useEingangshinweis(
           allesErledigt(true);
         },
       },
+      // ✕ blendet aus, ohne zu quittieren (LLH-1736): die Zahl am Knopf „Eingänge“ bleibt, der
+      // Verlauf nennt sie unter „Neu“. Zurückgehaltene und auf ihrer Seite verborgene bleiben.
       beiSchliessen: () => {
+        if (!zustand.aktiv) return;
+        for (const e of sichtbar) {
+          blendeAus(e.benachrichtigungId);
+          zustand.eintraege.delete(e.benachrichtigungId);
+        }
+        desktopSchliessen();
         schliessen();
-        allesErledigt(true);
       },
     });
 
@@ -460,5 +478,6 @@ export function useEingangshinweis(
       {ansicht.inhalt}
     </Eingangsband>
   ) : null;
-  return { hinweis, band };
+  const bandAusblenden = useCallback(() => ansicht?.beiSchliessen(), [ansicht]);
+  return { hinweis, band, bandAnzahl: ansicht?.anzahl ?? 0, bandAusblenden };
 }

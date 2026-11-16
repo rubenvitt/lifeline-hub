@@ -86,7 +86,7 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   Screenreader liest „… · mit Erläuterung“. Eine Gefahr, zu der nur eine Erläuterung bei „keine“
   vorliegt, steht mit leerem Balken und „keine“ da. Den Text der Erläuterung zeigt das Paneel
   nicht; er steht auf der Seite „Gefahren“ unter der Matrix. Darunter stehen die
-  Gebiete, deren Matrix noch nicht beurteilt ist, etwa „Hangrutsch Kirchberg: nicht beurteilt“,
+  Gebiete, deren Beurteilung noch nicht bestätigt ist, etwa „Hangrutsch Kirchberg: unbestätigt“,
   bei mehr als zwei nur ihre Zahl. Bewertet und beurteilt wird im Kapitel
   [Gefahren](gefahren.md).
 - **Verlauf** (nur in der Reihe „Sanitätsdienst“): die Kontakte je Stunde der letzten zwölf

@@ -27,11 +27,17 @@ import {
   BENACHRICHTIGUNG_ARTEN,
   ersatzPfad,
   istOrgArt,
-  sammelGruppeVon,
   toastSchluessel,
   zielVon,
 } from './benachrichtigungKatalog';
-import { gezeigt, inArbeit, quittiert } from './benachrichtigungGedaechtnis';
+import {
+  gezeigt,
+  inArbeit,
+  istAusgeblendet,
+  quittiert,
+  vergissAusgeblendet,
+} from './benachrichtigungGedaechtnis';
+import { ladeErinnerungTitel } from './erinnerungInhalt';
 import { ladeMeldungInhalt, type MeldungInhalt } from './meldungInhalt';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
 import { markVerlaufQuittiert } from './useBenachrichtigungVerlauf';
@@ -63,6 +69,7 @@ export interface QuittierOrt {
 export function quittiereNachNutzer(id: number, ort?: QuittierOrt): void {
   if (quittiert.has(id)) return;
   quittiert.add(id);
+  vergissAusgeblendet(id);
   void schliessePushMeldungen(id);
   if (!ort) {
     quittiereBenachrichtigung(id).catch(() => quittiert.delete(id));
@@ -82,7 +89,7 @@ export function quittiereNachNutzer(id: number, ort?: QuittierOrt): void {
 }
 
 /**
- * {@link quittiereNachNutzer} für die Zentrale eines Einsatzes (LLH-1477): Verlauf, Toasts und
+ * {@link quittiereNachNutzer} für die Zentrale eines Einsatzes (LLH-1477): Verlauf, Alarmzone und
  * Eingangsband merken ohne Netz vor. `null` (Org-Zentrale) oder ohne Benutzer: nur online.
  */
 export function useQuittiereNachNutzer(einsatzId: number | null): (id: number) => void {
@@ -139,7 +146,18 @@ function ersatzAnzeige(e: BenachrichtigungEreignis): BenachrichtigungAnzeige {
 }
 
 /**
- * Der Toast einer Benachrichtigung. `inhalt` (LLH-1052, `meldungInhalt.ts`) ersetzt Titel und
+ * Der Titel einer fälligen Erinnerung (LLH-1737, `erinnerungInhalt.ts`) hinter dem Titel des
+ * Servers: „Erinnerung fällig: Pegel prüfen“. Ohne Titel bleibt der Text des Servers.
+ */
+function mitErinnerungTitel(
+  a: BenachrichtigungAnzeige,
+  titel: string | null,
+): BenachrichtigungAnzeige {
+  return titel ? { ...a, titel: `${a.titel}: ${titel}` } : a;
+}
+
+/**
+ * Der Eintrag einer Benachrichtigung in der Alarmzone. `inhalt` (LLH-1052, `meldungInhalt.ts`) ersetzt Titel und
  * Detailzeile des Servers durch Absender und Wortlautanfang der Meldung; was fehlt, bleibt beim
  * Server.
  */
@@ -157,8 +175,6 @@ function eintragVon(
     beschreibung,
     beschreibungVoll: anfang ? (opts.inhalt?.wortlaut ?? undefined) : undefined,
     pfad: a.pfad,
-    ziel: zielVon(a),
-    gruppe: sammelGruppeVon(a.art),
     name: BENACHRICHTIGUNG_ARTEN[a.art]?.name ?? a.titel,
     stufe: a.stufe,
     benachrichtigungId: a.id,
@@ -170,7 +186,7 @@ function eintragVon(
 /**
  * Gehört die Benachrichtigung in den Eingangshinweis? Jeder Eingang des Einsatzes (Stufe
  * `hinweis`, LLH-1143 D7; bis dahin nur die Art `meldung`, LLH-1062). Org-Arten betreffen keinen
- * offenen Einsatz und bleiben Toasts.
+ * offenen Einsatz und stehen in der Alarmzone.
  */
 function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'stufe'>): boolean {
   return e.stufe === 'hinweis' && !istOrgArt(e.art);
@@ -208,7 +224,7 @@ function eingangVon(
 /**
  * Benachrichtigungen in einer Zentrale (design.md D5). Hört auf das Live-Ereignis (über
  * `live/benachrichtigungListener.ts`), holt den Text (`GET /api/benachrichtigungen/{id}`), zeigt
- * den Toast im gemeinsamen Budget und spielt den Ton der Stufe; das Quittier-Ereignis nimmt ihn
+ * den Eintrag in der Alarmzone (LLH-1735) und spielt den Ton der Stufe; das Quittier-Ereignis nimmt ihn
  * weg. Eine fremde oder aufgeräumte Benachrichtigung (4xx) bleibt still.
  *
  * Nachreichen beim Mount (Öffnen eines Einsatzes, Org-Layout) und auf Bitte des Stroms (`lagged`,
@@ -218,7 +234,7 @@ function eingangVon(
  * `einsatzId` `null` ist die Org-Zentrale: nur Org-Arten.
  *
  * Eingänge des Einsatzes (Stufe `hinweis`) gehen ins Eingangsband (`eingang`, LLH-1062,
- * LLH-1143 D7), nicht ins Toast-Budget; ihr Ton ist gedrosselt. Die Toasts tragen Alarme und
+ * LLH-1143 D7), nicht in die Alarmzone; ihr Ton ist gedrosselt. Die Zone trägt Alarme und
  * Org-Arten. Ohne `eingang` (Org-Zentrale) gibt es keine Einsatz-Eingänge. Die Stufe `still`
  * steht nur im Verlauf.
  */
@@ -232,6 +248,9 @@ export function useBenachrichtigungen(
   konvRef.current = useAnzeigeKonventionen().konventionen;
   const benutzerIdRef = useRef<number | undefined>(undefined);
   benutzerIdRef.current = useAuthOptional()?.benutzer?.id;
+  // Für den Titel einer Erinnerung aus dem Cache (LLH-1737); optional wie in den Tests.
+  const qcRef = useRef<QueryClient | undefined>(undefined);
+  qcRef.current = useContext(QueryClientContext);
 
   useEffect(() => {
     let aktiv = true;
@@ -241,8 +260,13 @@ export function useBenachrichtigungen(
       return zeitKurz(a.erstellt_at, konvRef.current) || null;
     };
 
+    // Ausgeblendet (LLH-1736): kommt in diesem Tab nicht wieder, bis sie quittiert ist.
     const unbekannt = (id: number) =>
-      !quittiert.has(id) && !inArbeit.has(id) && !toasts.zeigt(id) && !eingang?.zeigt(id);
+      !quittiert.has(id) &&
+      !istAusgeblendet(id) &&
+      !inArbeit.has(id) &&
+      !toasts.zeigt(id) &&
+      !eingang?.zeigt(id);
 
     const beiEreignis = async (ev: Event) => {
       const e = (ev as CustomEvent<BenachrichtigungEreignis>).detail;
@@ -250,11 +274,12 @@ export function useBenachrichtigungen(
       // Die Push-Meldung (LLH-1223) steht unabhängig davon, welche Zentrale sie zeigen würde.
       if (e.quittiert) void schliessePushMeldungen(e.benachrichtigung_id);
       if (!passt(e, einsatzId)) return;
-      // Stufe still (LLH-1143, design.md D2): steht nur im Verlauf, kein Toast, kein Ton.
+      // Stufe still (LLH-1143, design.md D2): steht nur im Verlauf, kein Eintrag, kein Ton.
       if (e.stufe === 'still') return;
       const id = e.benachrichtigung_id;
       if (e.quittiert) {
         quittiert.add(id);
+        vergissAusgeblendet(id);
         toasts.entferneBenachrichtigung(id);
         eingang?.entferneBenachrichtigung(id);
         // „Alle gelesen“ (LLH-1143 D4): ein Ereignis für alle Eingänge bis dahin, nie für Alarme.
@@ -263,8 +288,10 @@ export function useBenachrichtigungen(
       }
       if (!unbekannt(id)) return;
       inArbeit.add(id);
-      // Der Inhalt der Meldung (LLH-1052) kommt parallel und mit eigener Frist; er wirft nie.
+      // Der Inhalt der Meldung (LLH-1052) und der Titel einer Erinnerung (LLH-1737) kommen
+      // parallel und mit eigener Frist; sie werfen nie.
       const inhaltZusage = ladeMeldungInhalt(e);
+      const erinnerungZusage = ladeErinnerungTitel(e, qcRef.current);
       let anzeige: BenachrichtigungAnzeige;
       let inhalt: MeldungInhalt | null;
       try {
@@ -275,6 +302,7 @@ export function useBenachrichtigungen(
           anzeige = ersatzAnzeige(e);
         }
         inhalt = await inhaltZusage;
+        anzeige = mitErinnerungTitel(anzeige, await erinnerungZusage);
       } finally {
         inArbeit.delete(id);
       }
@@ -320,12 +348,17 @@ export function useBenachrichtigungen(
           const offen = [...liste]
             .reverse()
             .filter((a) => !a.quittiert_at && passt(a, einsatzId) && unbekannt(a.id));
-          // Die Inhalte (LLH-1052) zusammen holen, je mit Frist: ein Abruf je offenem Alarm.
-          const inhalte = await Promise.all(offen.map((a) => ladeMeldungInhalt(a)));
+          // Die Inhalte (LLH-1052) zusammen holen, je mit Frist: ein Abruf je offenem Alarm. Die
+          // Titel der Erinnerungen (LLH-1737) teilen sich über den Cache einen Abruf.
+          const [inhalte, erinnerungTitel] = await Promise.all([
+            Promise.all(offen.map((a) => ladeMeldungInhalt(a))),
+            Promise.all(offen.map((a) => ladeErinnerungTitel(a, qcRef.current))),
+          ]);
           if (!aktiv) return;
           let ton = false;
           let eingangNeu = false;
-          for (const [i, a] of offen.entries()) {
+          for (const [i, roh] of offen.entries()) {
+            const a = mitErinnerungTitel(roh, erinnerungTitel[i]);
             // Während der Inhalte kann sie live gekommen oder quittiert worden sein.
             if (!unbekannt(a.id)) continue;
             const wiederholt = gezeigt.has(a.id);

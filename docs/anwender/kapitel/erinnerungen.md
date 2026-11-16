@@ -2,7 +2,7 @@
 titel: Erinnerungen
 gruppen: [fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/pages/ErinnerungenPage.tsx, frontend/src/erinnerung/ErinnerungFormular.tsx, frontend/src/erinnerung/ErinnerungKarte.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, src/routes/erinnerung.rs, src/erinnerung/repo.rs, src/erinnerung/scheduler.rs, src/erinnerung/faelligkeit.rs, src/erinnerung/mod.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/pages/ErinnerungenPage.tsx, frontend/src/erinnerung/ErinnerungFormular.tsx, frontend/src/erinnerung/ErinnerungKarte.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, src/routes/erinnerung.rs, src/erinnerung/repo.rs, src/erinnerung/scheduler.rs, src/erinnerung/faelligkeit.rs, src/erinnerung/mod.rs, src/erinnerung/benachrichtigung.rs, frontend/src/alarm/erinnerungInhalt.ts]
 ---
 
 ## Überblick
@@ -62,7 +62,9 @@ Linie oben und unten hervor.
 
 ### Auf eine fällige Erinnerung reagieren
 
-1. Zur fälligen Zeit erscheint der Hinweis „Erinnerung fällig“ mit einem dezenten Ton.
+1. Zur fälligen Zeit erscheint im Eingangsband der Hinweis „Erinnerung fällig“ mit dem Titel der
+   Erinnerung, etwa „Erinnerung fällig: Pegel prüfen“, und ein dezenter Ton. Unter „Eingänge“
+   steht er ebenso. Ist der Titel nicht rasch zu holen, steht nur „Erinnerung fällig“.
 2. „Öffnen“ führt zu den Erinnerungen und hebt die fällige Karte hervor; sie trägt „fällig“.
 3. Die Erinnerung wie oben erledigen oder erübrigen.
 

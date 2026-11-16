@@ -7,6 +7,7 @@ import type {
   AuftragEmpfaenger,
   Einheit,
   EinsatzFahrzeug,
+  EinsatzMaterial,
   EinsatzPersonal,
   Einsatzabschnitt,
   Erinnerung,
@@ -17,6 +18,7 @@ import type {
   Person,
 } from '../../api/types';
 import {
+  abschnittGruende,
   abschnittNamen,
   abschnittZeilen,
   auftraegeKennzahl,
@@ -178,8 +180,8 @@ describe('Kennzahlen', () => {
     );
   });
 
-  /** LLH-1090: „keine“ ist die Vorgabe jeder Zelle; ungeprüft heißt „nicht beurteilt“. */
-  it('Warnstufe: zählt die nicht beurteilten Gebiete, die Notiz nennt sie vor dem Pegel', () => {
+  /** LLH-1090: „keine“ ist die Vorgabe jeder Zelle; ungeprüft heißt „unbestätigt“. */
+  it('Warnstufe: zählt die unbestätigten Gebiete, die Notiz nennt sie vor dem Pegel', () => {
     const g = (beurteilt: boolean) =>
       ({
         hoechste_warnstufe: 'keine',
@@ -187,9 +189,9 @@ describe('Kennzahlen', () => {
       }) as unknown as Gefahrengebiet;
     expect(warnstufeKennzahlVon([g(false), g(true), g(false)]).nichtBeurteilt).toBe(2);
     expect(warnstufeKennzahlVon([]).nichtBeurteilt).toBe(0);
-    expect(warnstufeNotiz(0, null, 2)).toBe('0 Gefahrengebiete mit Warnstufe · 2 nicht beurteilt');
+    expect(warnstufeNotiz(0, null, 2)).toBe('0 Gefahrengebiete mit Warnstufe · 2 unbestätigt');
     expect(warnstufeNotiz(1, 'Pegel 6,84 m steigend', 1)).toBe(
-      '1 Gefahrengebiet mit Warnstufe · 1 nicht beurteilt · Pegel 6,84 m steigend',
+      '1 Gefahrengebiet mit Warnstufe · 1 unbestätigt · Pegel 6,84 m steigend',
     );
     expect(warnstufeNotiz(1, null, 0)).toBe('1 Gefahrengebiet mit Warnstufe');
   });
@@ -304,6 +306,29 @@ describe('Nächste Marken', () => {
     expect(markenBewertung(JETZT.add(20, 'second'), JETZT).wort).toBe('in < 1 min');
   });
 
+  it('eine verstrichene Erinnerung heißt „fällig“ in Achtung wie im Abschnitt Erinnerungen (LLH-1749)', () => {
+    expect(markenBewertung(JETZT.subtract(5, 'minute'), JETZT, 'erinnerung')).toEqual({
+      ton: 'achtung',
+      wort: 'fällig',
+    });
+    expect(markenBewertung(JETZT, JETZT, 'erinnerung')).toEqual({ ton: 'achtung', wort: 'fällig' });
+    // Meldet der Server sie fällig, gilt das auch, wenn die Uhr des Geräts nachgeht (Review).
+    expect(markenBewertung(JETZT.add(1, 'minute'), JETZT, 'erinnerung', true)).toEqual({
+      ton: 'achtung',
+      wort: 'fällig',
+    });
+    // Ein Auftrag mit verpasster Frist bleibt „überfällig“ in Alarm.
+    expect(markenBewertung(JETZT.subtract(5, 'minute'), JETZT, 'auftrag')).toEqual({
+      ton: 'alarm',
+      wort: 'überfällig',
+    });
+    // Vor der Fälligkeit wie jede Frist.
+    expect(markenBewertung(JETZT.add(10, 'minute'), JETZT, 'erinnerung')).toEqual({
+      ton: 'achtung',
+      wort: 'in 10 min',
+    });
+  });
+
   /**
    * LFH-859: derselbe überfällige Termin trägt auf der Stab-Seite und in der Fristenliste denselben
    * Ton und dasselbe Wort. Verglichen werden die beiden Ergebnisse MITEINANDER, nicht mit
@@ -336,6 +361,26 @@ describe('Nächste Marken', () => {
     ]);
     const knapp = naechsteMarken([], [], nach(20), JETZT).marken[0];
     expect([knapp.ton, knapp.wort]).toEqual(['achtung', 'in 20 min']);
+  });
+
+  it('eine Erinnerung, die der Server fällig meldet, heißt auch in der Marke „fällig“ (Review)', () => {
+    const r = naechsteMarken(
+      [],
+      [
+        {
+          id: 7,
+          faellig_at: nach(1),
+          ist_faellig: true,
+          status: 'offen',
+          titel: 'Rückruf Leitstelle',
+        } as unknown as Erinnerung,
+      ],
+      null,
+      JETZT,
+    );
+    expect(r.marken.map((m) => [m.text, m.ton, m.wort])).toEqual([
+      ['Rückruf Leitstelle', 'achtung', 'fällig'],
+    ]);
   });
 
   it('mischt Auftragsfristen, offene Erinnerungen und Lagebesprechung, aufsteigend', () => {
@@ -579,11 +624,11 @@ describe('abschnittZeilen', () => {
     expect(nord.staerkeText).toBe('1/0/2//3');
     // Gezählt werden Einheiten nach der Kategorie ihres Status (auch „gemischt" mit gemeinsamer
     // Kategorie), nicht die Mittel — die ergäben 1/2/2.
-    expect(nord.einheitenStatus).toEqual({ bereit: 1, gebunden: 1, ausfall: 1, ohne: 0 });
+    expect(nord.einheitenStatus).toEqual({ bereit: 1, gebunden: 1, nichtVerfuegbar: 1, ohne: 0 });
     const sued = zeilen.find((z) => z.abschnittId === 2)!;
-    expect(sued.einheitenStatus).toEqual({ bereit: 0, gebunden: 0, ausfall: 0, ohne: 1 });
+    expect(sued.einheitenStatus).toEqual({ bereit: 0, gebunden: 0, nichtVerfuegbar: 0, ohne: 1 });
     const ohne = zeilen.find((z) => z.abschnittId === null)!;
-    expect(ohne.einheitenStatus).toEqual({ bereit: 0, gebunden: 0, ausfall: 0, ohne: 1 });
+    expect(ohne.einheitenStatus).toEqual({ bereit: 0, gebunden: 0, nichtVerfuegbar: 0, ohne: 1 });
   });
 
   it('Summe der Zeilen ist die Einsatzsumme', () => {
@@ -732,5 +777,110 @@ describe('abschnittZeilen — Lage je Abschnitt (LFH-608)', () => {
     expect(nach(4).unterLage).toBeNull();
     // ohne eigene Beurteilung ist jede Beurteilung darunter eine Aussage
     expect(nach(6).unterLage).toBe('planmaessig');
+  });
+});
+
+describe('abschnittGruende — Rückmeldung und Ausfall wie das Meldebild (LLH-1739)', () => {
+  const abschnitte = [abschnitt(1, 'Logistik', { lagezustand: 'planmaessig' })];
+  const einheiten = [
+    einheit(40, 1, null, 'gebunden'),
+    einheit(41, 1, null, 'verfuegbar'),
+    einheit(42, null, 40, 'gebunden'),
+    einheit(43, 1, null, 'gebunden'),
+  ];
+  const personalListe = [
+    personal(5, 40, 'mannschaft', 'nicht_verfuegbar'),
+    personal(6, 41, 'fuehrer', 'verfuegbar'),
+  ];
+  const material = [
+    {
+      id: 7,
+      einsatz_id: 1,
+      einheit_id: 41,
+      bezeichnung: 'Trage',
+      menge: 1,
+      status: 'defekt',
+      art: 'geraet',
+      ausgegeben: 0,
+    } as EinsatzMaterial,
+  ];
+  const rueck = (bezug_id: number, faelligVorMin: number): LetzteRueckmeldung => ({
+    bezug_id,
+    meldung_id: bezug_id,
+    lfd_nr: bezug_id,
+    ereigniszeit: vor(faelligVorMin + 60),
+    inhalt: 'Lage',
+    meldeweg: 'funk',
+    faellig_at: vor(faelligVorMin),
+  });
+  const zeileMit = (rueckmeldungen?: LetzteRueckmeldung[]) =>
+    abschnittZeilen({
+      abschnitte,
+      einheiten,
+      personal: personalListe,
+      fahrzeuge: [],
+      material,
+      auftraege: [],
+      rueckmeldungen: rueckmeldungen
+        ? { frist_min: 60, einheiten: rueckmeldungen, abschnitte: [] }
+        : undefined,
+    }).find((z) => z.abschnittId === 1)!;
+
+  it('nennt Ausfall der Mittel und des Materials mit denselben Zahlen wie das Meldebild', () => {
+    const z = zeileMit();
+    expect(abschnittGruende(z, JETZT).filter((g) => g.art.startsWith('ausfall'))).toEqual([
+      { art: 'ausfall', anzahl: 1 },
+      { art: 'ausfall_material', anzahl: 1 },
+    ]);
+  });
+
+  it('Mittel ohne Einheit: die Karte „Ohne Abschnitt“ nennt ihren Ausfall wie das Meldebild (Review)', () => {
+    const zeilen = abschnittZeilen({
+      abschnitte,
+      einheiten,
+      personal: [...personalListe, personal(8, null, 'mannschaft', 'nicht_verfuegbar')],
+      fahrzeuge: [],
+      material: [],
+      auftraege: [],
+    });
+    const ohne = zeilen.find((z) => z.abschnittId == null)!;
+    expect(ohne).toBeDefined();
+    expect(abschnittGruende(ohne, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
+    // Nur dort: die Logistik-Karte behält ihren eigenen Ausfall (Person 5 in E40, hier ohne
+    // Material), ohne den der Mittel ohne Einheit.
+    const logistik = zeilen.find((z) => z.abschnittId === 1)!;
+    expect(abschnittGruende(logistik, JETZT)).toEqual([{ art: 'ausfall', anzahl: 1 }]);
+  });
+
+  it('ohne geladene Rückmeldungen kein Rückmeldungsgrund — nie ein erfundenes „keine“', () => {
+    const z = zeileMit();
+    expect(abschnittGruende(z, JETZT).some((g) => g.art.startsWith('rueckmeldung'))).toBe(false);
+  });
+
+  it('eine schweigende Einheit wird nicht von einer frischen Meldung einer anderen verdeckt', () => {
+    // 40 seit 47 min überfällig, 41/42/43 frisch (fällig in der Zukunft).
+    const z = zeileMit([rueck(40, 47), rueck(41, -30), rueck(42, -30), rueck(43, -30)]);
+    expect(abschnittGruende(z, JETZT).filter((g) => g.art.startsWith('rueckmeldung'))).toEqual([
+      { art: 'rueckmeldung_ueberfaellig', seitMin: 47, einheiten: 1 },
+    ]);
+  });
+
+  it('mehrere überfällige: Zahl und die längste Dauer; ohne Rückmeldung getrennt gezählt', () => {
+    // 40 seit 47, 41 seit 12 min überfällig, 42 und 43 nie zurückgemeldet.
+    const z = zeileMit([rueck(40, 47), rueck(41, 12)]);
+    expect(abschnittGruende(z, JETZT).filter((g) => g.art.startsWith('rueckmeldung'))).toEqual([
+      { art: 'rueckmeldung_ueberfaellig', seitMin: 47, einheiten: 2 },
+      { art: 'rueckmeldung_keine', einheiten: 2 },
+    ]);
+  });
+
+  it('schlägt mit der Uhr um, ohne neue Daten', () => {
+    const z = zeileMit([rueck(40, -1), rueck(41, -30), rueck(42, -30), rueck(43, -30)]);
+    expect(abschnittGruende(z, JETZT).some((g) => g.art.startsWith('rueckmeldung'))).toBe(false);
+    expect(abschnittGruende(z, JETZT.add(3, 'minute'))).toContainEqual({
+      art: 'rueckmeldung_ueberfaellig',
+      seitMin: 2,
+      einheiten: 1,
+    });
   });
 });

@@ -2,7 +2,7 @@ import { IconPersonPlus } from '../../icons';
 import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
-import { Alert, App, Breadcrumb, Button, Flex, Modal, Popconfirm, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Modal, Space, Spin } from 'antd';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
@@ -44,12 +44,7 @@ import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { KennungsLink } from '../../components/kennungsLink';
 import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 import { MenueAusloeser } from '../../components/MenueAusloeser';
-import BreiteHalten from '../../components/BreiteHalten';
 import UhsBearbeitenModal from './UhsBearbeitenModal';
-
-/** Breiteste Form von „Auflösen“ im gesperrten Zustand, Zahl als `0` (LLH-1627, `BreiteHalten`).
- *  Zwei Ziffern decken jede UHS-Belegung, die im Betrieb vorkommt; darüber wächst der Knopf. */
-const AUFLOESEN_RESERVE = 'Auflösen (noch 00 Personen)';
 
 /**
  * Die Bereiche der Seite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
@@ -191,9 +186,9 @@ export default function UhsDetailPage() {
     stornoMut.mutate();
   };
   const [bearbeitenOffen, setBearbeitenOffen] = useState(false);
-  // Die Rückfrage vor dem Stornieren: aus dem Menü heraus ein `<Modal>`, keine `Popconfirm`
-  // (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“).
-  const [stornoFrage, setStornoFrage] = useState(false);
+  // Die Rückfrage vor dem Auflösen oder Stornieren: aus dem Menü heraus ein `<Modal>`, keine
+  // `Popconfirm` (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“).
+  const [frage, setFrage] = useState<'aufloesen' | 'stornieren' | null>(null);
 
   // Die Route hat keinen `key`: der Umschalter behält diese Seite. Der Grund der vorigen UHS
   // gehört nicht an die nächste. `reset` ist stabil, der Effekt läuft nur mit `uhsId`.
@@ -203,7 +198,7 @@ export default function UhsDetailPage() {
     statusReset();
     stornoReset();
     setBearbeitenOffen(false);
-    setStornoFrage(false);
+    setFrage(null);
   }, [uhsId, statusReset, stornoReset]);
 
   // Ungültige UHS-ID → zurück zur Liste (nach allen Hooks).
@@ -347,36 +342,35 @@ export default function UhsDetailPage() {
                 In Betrieb nehmen
               </Button>
               {bearbeitenKnopf}
-              {/* Mit „Bearbeiten“ sind es drei Datensatz-Aktionen: das Stornieren geht ins Menü
-                  (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“). */}
-              <MenueAusloeser
-                eintraege={[{ key: 'stornieren', label: 'Stornieren', gefahr: true }]}
-                zugaenglicherName={`Weitere Aktionen zu ${uhs.bezeichnung}`}
-                laeuft={stornoMut.isPending}
-                onWahl={() => setStornoFrage(true)}
-              />
             </>
           )}
           {/* Aktiv zählt „Patient aufnehmen“ als Sprung nicht mit (LFH-616): zwei Handlungen. */}
           {uhs.status === 'aktiv' && bearbeitenKnopf}
-          {verwalten && uhs.status === 'aktiv' && (
-            <Popconfirm
-              title="Unfallhilfsstelle auflösen?"
-              okText="Unfallhilfsstelle auflösen"
-              onConfirm={() => setzeStatus('aufgeloest')}
-              okButtonProps={{ danger: true }}
-            >
-              {/* Gesperrt mit Grund im Wort (LFH-1078), solange jemand in der UHS steht. Der Knopf
-                  hält die Breite der gesperrten Form (LLH-1627): sonst wuchs er beim Ablegen des
-                  ersten Patienten, ein knapper Kopf brach um, und der Grundriss sprang ~35 px. */}
-              <Button danger disabled={nochBelegt > 0}>
-                <BreiteHalten reserve={[AUFLOESEN_RESERVE]}>
-                  {nochBelegt > 0
-                    ? `Auflösen (noch ${nochBelegt} ${nochBelegt === 1 ? 'Person' : 'Personen'})`
-                    : 'Auflösen'}
-                </BreiteHalten>
-              </Button>
-            </Popconfirm>
+          {/* Endgültiges steht gebündelt rot im ⋮ des Kopfs (LLH-1722, `frontend/AGENTS.md`, „Beenden:
+              Verb, Ort und Sicherung je Art“): die UHS ist eine Fensterseite, unter der Arbeitsfläche
+              hängt kein letzter Abschnitt. Aktiv „Auflösen“, gesperrt mit dem Grund im Eintrag,
+              solange jemand in der UHS steht (LFH-1078; der Server prüft dasselbe, 409); geplant
+              „Stornieren“. So trägt der Kopf höchstens zwei Knöpfe. */}
+          {verwalten && (uhs.status === 'aktiv' || uhs.status === 'geplant') && (
+            <MenueAusloeser
+              eintraege={
+                uhs.status === 'aktiv'
+                  ? [
+                      nochBelegt > 0
+                        ? {
+                            key: 'aufloesen',
+                            label: `Auflösen · noch ${nochBelegt} ${nochBelegt === 1 ? 'Person' : 'Personen'}`,
+                            gefahr: true,
+                            gesperrt: true,
+                          }
+                        : { key: 'aufloesen', label: 'Auflösen', gefahr: true },
+                    ]
+                  : [{ key: 'stornieren', label: 'Stornieren', gefahr: true }]
+              }
+              zugaenglicherName={`Weitere Aktionen zu ${uhs.bezeichnung}`}
+              laeuft={stornoMut.isPending || (statusMut.isPending && uhs.status === 'aktiv')}
+              onWahl={(key) => setFrage(key === 'aufloesen' ? 'aufloesen' : 'stornieren')}
+            />
           )}
         </Space>
       }
@@ -467,16 +461,31 @@ export default function UhsDetailPage() {
                 Stornierens steht wie bisher im Seitenhinweis: die Rückfrage schließt beim
                 Bestätigen. */}
             <Modal
-              open={stornoFrage}
+              open={frage === 'stornieren'}
               title="Unfallhilfsstelle stornieren?"
               okText="Unfallhilfsstelle stornieren"
               okButtonProps={{ danger: true }}
               onOk={() => {
-                setStornoFrage(false);
+                setFrage(null);
                 storniere();
               }}
-              onCancel={() => setStornoFrage(false)}
-            />
+              onCancel={() => setFrage(null)}
+            >
+              Die geplante Stelle war eine Fehlanlage und fällt aus jeder Auswahl.
+            </Modal>
+            <Modal
+              open={frage === 'aufloesen'}
+              title="Unfallhilfsstelle auflösen?"
+              okText="Unfallhilfsstelle auflösen"
+              okButtonProps={{ danger: true }}
+              onOk={() => {
+                setFrage(null);
+                setzeStatus('aufgeloest');
+              }}
+              onCancel={() => setFrage(null)}
+            >
+              Die Stelle nimmt niemanden mehr auf und bleibt im Nachweis.
+            </Modal>
             {verwalten && (
               <UhsBearbeitenModal
                 einsatzId={einsatzId}

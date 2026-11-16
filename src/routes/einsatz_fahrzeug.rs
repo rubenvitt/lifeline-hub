@@ -5,14 +5,16 @@ use crate::benachrichtigung::{
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Einheiten, Fahrzeuge};
+use crate::einsatz::modul::{Bereitstellungsraeume, Einheiten, Fahrzeuge, Material, ModulMarker};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten, FahrzeugPatch};
 use crate::fahrzeug::status_repo;
-use crate::fahrzeug::EinsatzFahrzeugAnzeige;
+use crate::fahrzeug::{
+    EinsatzFahrzeugAnzeige, EntlassungAntwort, EntlassungRuecknahmeAntwort, EntlassungVorzustand,
+};
 use crate::fahrzeug::{ADHOC_TEXT_MAX, BEMERKUNG_MAX};
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::katalog::StatusKategorie;
@@ -444,14 +446,15 @@ pub async fn update(
 
 /// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Besatzung, Einheit, Bereitstellungsraum und
-/// Führungsstelle gehen, Auftragsempfänger bleiben. Ohne Rückfrage, der Rückweg ist
-/// `…/reaktivieren`. Schreibt ETB-Eintrag; ein beendetes Fahrzeug → 409. Liefert das entlassene
-/// Fahrzeug.
+/// Führungsstelle gehen, Auftragsempfänger bleiben. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
+/// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1722), der Block „Entlassen“
+/// nimmt `…/reaktivieren`. Schreibt ETB-Eintrag; ein beendetes Fahrzeug → 409. Liefert das
+/// entlassene Fahrzeug und seinen Vorzustand.
 pub async fn entlassen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
-) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
+) -> Result<Json<EntlassungAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
@@ -478,6 +481,7 @@ pub async fn entlassen(
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         Ok((ergebnis, anzeige))
     })?;
+    let vorzustand = ergebnis.vorzustand(&jetzt);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     // Die Zuordnung an der Führungsstelle ist gelöscht (LFH-1106): deren Leser hängen am
     // Ereignis `einsatz`. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
@@ -506,7 +510,110 @@ pub async fn entlassen(
     for em_id in ergebnis.material {
         super::einsatz_material::sse_material(&state, einsatz_id, em_id);
     }
-    Ok(Json(anzeige))
+    Ok(Json(EntlassungAntwort {
+        fahrzeug: anzeige,
+        vorzustand,
+    }))
+}
+
+/// Darf die Person in das Modul `Z` schreiben? Für die Rücknahme, die einen Teil ohne Recht
+/// auslässt statt abzulehnen (LLH-1722, design.md D5).
+async fn darf_zielmodul<Z: ModulMarker>(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Fahrzeuge>,
+) -> Result<bool, AppError> {
+    match ctx.fordere_zielmodul::<Z>(&state.pool).await {
+        Ok(()) => Ok(true),
+        Err(AppError::Forbidden | AppError::ForbiddenMit(_)) => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+/// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen/zuruecknehmen — „Rückgängig“ nach dem
+/// Entlassen (LLH-1722, Spec `kraefte-entlassung`, design.md D5): Body ist der Vorzustand aus der
+/// Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses Entlassen, höchstens
+/// [`disposition_repo::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders
+/// gebunden ist oder wofür das Modulrecht fehlt, bleibt aus und steht in `ausgelassen`. Ein
+/// ETB-Eintrag, Live-Meldungen wie beim Entlassen, keine Benachrichtigung.
+pub async fn zuruecknehmen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Fahrzeuge>,
+    PfadParam((_eid, ef_id)): PfadParam<(i64, i64)>,
+    JsonBody(mut vorzustand): JsonBody<EntlassungVorzustand>,
+) -> Result<Json<EntlassungRuecknahmeAntwort>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    // Listen von außen: gedeckelt vor dem Entdoppeln, dann entdoppelt (`src/AGENTS.md`,
+    // „Eingabegrenzen“).
+    for (feld, liste) in [
+        ("Besatzung", &mut vorzustand.besatzung),
+        ("Beladung", &mut vorzustand.beladung),
+    ] {
+        if liste.len() > crate::fahrzeug::RUECKNAHME_LISTE_MAX {
+            return Err(AppError::Validation(format!(
+                "{feld} darf höchstens {} Einträge haben",
+                crate::fahrzeug::RUECKNAHME_LISTE_MAX
+            )));
+        }
+        liste.sort_unstable();
+        liste.dedup();
+    }
+    let rechte = disposition_repo::RuecknahmeRechte {
+        einheiten: darf_zielmodul::<Einheiten>(&state, &ctx).await?,
+        material: darf_zielmodul::<Material>(&state, &ctx).await?,
+        bereitstellungsraeume: darf_zielmodul::<Bereitstellungsraeume>(&state, &ctx).await?,
+    };
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let jetzt = crate::zeit::jetzt();
+    let (ergebnis, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        let ergebnis = disposition_repo::zuruecknehmen_tx(
+            conn,
+            einsatz_id,
+            ef_id,
+            ctx.benutzer.id,
+            &jetzt,
+            &vorzustand,
+            rechte,
+        )
+        .await?;
+        let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::fahrzeug::etb_text_entlassung_zurueckgenommen(
+                &anzeige.funkrufname,
+                &ergebnis.ausgelassen,
+            ),
+        )
+        .await?;
+        Ok((ergebnis, anzeige))
+    })?;
+    // Live wie beim Entlassen: dieselben Leser, nur in der Gegenrichtung.
+    sse_fahrzeug(&state, einsatz_id, ef_id);
+    if ergebnis.fuehrungsstelle {
+        crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
+    }
+    super::einsatz_bereitstellungsraum::sse_br_fuer(
+        &state,
+        einsatz_id,
+        ergebnis.br_id.as_slice(),
+        ergebnis.einheit_id.as_slice(),
+    )
+    .await;
+    if let Some(einheit_id) = ergebnis.einheit_id {
+        super::einsatz_einheit::sse_einheit(&state, einsatz_id, einheit_id);
+    }
+    for ep_id in &ergebnis.besatzung {
+        sse_personal(&state, einsatz_id, *ep_id);
+    }
+    for em_id in &ergebnis.beladung {
+        super::einsatz_material::sse_material(&state, einsatz_id, *em_id);
+    }
+    Ok(Json(EntlassungRuecknahmeAntwort {
+        fahrzeug: anzeige,
+        ausgelassen: ergebnis.ausgelassen,
+    }))
 }
 
 /// POST /api/einsaetze/{id}/fahrzeuge/{ef_id}/stornieren — Fehldisposition stornieren (LLH-1079,

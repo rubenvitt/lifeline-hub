@@ -2,12 +2,12 @@ import { huelleBenachrichtigung } from '../huelle/faehigkeiten';
 
 /**
  * Desktop-Benachrichtigung — NUR wenn der Tab im Hintergrund ist und die Permission erteilt
- * wurde. API fehlt oder Permission verweigert → No-op (der In-App-Toast trägt). Einzige Ausnahme
+ * wurde. API fehlt oder Permission verweigert → No-op (die Alarmzone in der App trägt). Einzige Ausnahme
  * vom Hintergrund: die Testbenachrichtigung ({@link showTestMeldung}, LLH-1284).
  *
  * Offene Meldungen führt das Modul selbst (LFH-951): eine OS-Meldung, die niemand anklickt,
  * bliebe sonst im Benachrichtigungs-Center stehen, auch wenn ihr Alarm in der App längst
- * quittiert ist. Wer die Toasts abräumt, räumt über {@link schliesseDesktopAlarm} bzw.
+ * quittiert ist. Wer Einträge der Alarmzone abräumt, räumt über {@link schliesseDesktopAlarm} bzw.
  * {@link schliesseAlleDesktopAlarme} auch diese ab.
  *
  * Zwei Wege zur Meldung (LFH-1062): der `Notification`-Konstruktor, und wo es den nicht gibt
@@ -19,7 +19,7 @@ import { huelleBenachrichtigung } from '../huelle/faehigkeiten';
  * {@link huelleBenachrichtigung}): WKWebView bietet die Web-API nicht verlässlich, und das Plugin
  * der Hülle ersetzt sie in jeder Seite durch einen Weg ohne Freigabe. Die native Meldung meldet
  * keinen Klick an die Seite und lässt sich nicht schließen; ein Klick holt das Fenster nach vorn
- * (Hülle), dort steht der Toast mit dem Sprung zur Quelle bereit.
+ * (Hülle), dort steht der Eintrag der Alarmzone mit dem Sprung zur Quelle bereit.
  */
 function verfuegbar(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
@@ -189,7 +189,7 @@ function zeigeUeberKonstruktor(titel: string, opts: AlarmOptionen): DesktopMeldu
 /**
  * Native Meldung der Desktop-App. Sie bleibt im Buch der offenen Meldungen, damit das Abräumen
  * überall gleich läuft; schließen kann die Seite sie nicht. `beiKlick` und `ziel` entfallen: den
- * Sprung trägt der Toast.
+ * Sprung trägt die Alarmzone.
  */
 function zeigeUeberHuelle(
   zeigen: (titel: string, text?: string) => Promise<void>,
@@ -360,7 +360,7 @@ export function schliesseDesktopAlarm(tag: string): void {
 
 /**
  * Schließt genau diese Meldung. Für Aufrufer, die erst später schließen (etwa nach der
- * Ausblendung eines Toasts): ein `tag` träfe dann womöglich schon eine neuere Meldung zum
+ * Ausblendung eines Eintrags): ein `tag` träfe dann womöglich schon eine neuere Meldung zum
  * selben Bezug.
  */
 export function schliesseDesktopMeldung(n: DesktopMeldung): void {

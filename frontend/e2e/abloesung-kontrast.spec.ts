@@ -161,38 +161,25 @@ for (const modus of ['light', 'dark'] as const) {
     await post(page, `${basis}/abloesungen`, { einheit_id: entlassen, rhythmus_minuten: 360 });
     await nachtrag(entlassen, 'entlassung', 10);
 
-    // Die überfällige Schicht meldet der Erinnerungs-Scheduler im nächsten Takt (30 s) als
-    // stehende Benachrichtigung oben rechts (AlarmZentrale, `duration: 0`). Ob die Seite dann
-    // schon offen ist, entscheidet der Takt; steht sie, liegt sie unter dem Seitenkopf über dem
-    // rechten Inhalt (LFH-1112). Der Test quittiert sie wie ein Mensch über
-    // „Schließen", sobald sie vor einer Aktion oder Zusicherung steht, und nimmt den Zeiger
-    // danach aus dem Kopf, sonst mäße er den Hover des Kopfknopfs. Gemessen wird sie nicht: sie
-    // hängt nicht im Baum von Kopf und Inhalt.
-    // Eine geschlossene trägt bis zum Ende ihres Ausblendens `-fade-leave` und zählt nicht mehr.
-    // Jede wird vor dem Klick markiert: ein Locator auf „die erste offene" könnte zwischen
-    // Auflösen und Klick auf eine gerade ausblendende zeigen und dann ins Leere warten.
-    const offen = page.locator('.ant-notification-notice:not(.ant-notification-fade-leave)');
-    let quittung = 0;
-    await page.addLocatorHandler(offen.first(), async () => {
-      for (;;) {
-        const marke = await page.evaluate((m) => {
-          const notiz = document.querySelector(
-            '.ant-notification-notice:not(.ant-notification-fade-leave):not([data-quittung])',
-          );
-          notiz?.setAttribute('data-quittung', m);
-          return notiz ? m : null;
-        }, String(++quittung));
-        if (marke === null) break;
-        const notiz = page.locator(`[data-quittung="${marke}"]`);
-        await notiz.getByRole('button', { name: 'Schließen', exact: true }).click();
-        await expect(notiz.and(offen)).toHaveCount(0);
+    // Die überfällige Schicht meldet der Erinnerungs-Scheduler im nächsten Takt als Alarm in der
+    // Alarmzone unter dem Kopf (LLH-1735). Sie verdeckt nichts, schiebt aber den Inhalt; ob die
+    // Seite dann schon offen ist, entscheidet der Takt. Der Test quittiert jeden Alarm wie ein
+    // Mensch über „Gelesen“, sobald die Zone vor einer Aktion oder Zusicherung steht (✕ blendete
+    // nur aus, LLH-1736), und nimmt den Zeiger danach aus dem Kopf, sonst mäße er den Hover des
+    // Kopfknopfs. Gemessen wird sie nicht: sie hängt nicht im Baum von Kopf und Inhalt.
+    const zone = page.locator('[data-lfh="alarmzone"]');
+    await page.addLocatorHandler(zone, async () => {
+      while ((await zone.count()) > 0) {
+        await zone.getByRole('button', { name: 'Gelesen', exact: true }).first().click();
       }
       await page.mouse.move(0, 0);
     });
     // Vorwarnung und Planung sind Eingänge (LLH-1143): sie stehen im Eingangsband unten rechts,
     // über den Karten. Auch das Band schließt der Test wie ein Mensch.
     await page.addLocatorHandler(page.locator('[data-lfh="eingangsband"]'), async (band) => {
-      await band.getByRole('button', { name: 'Schließen', exact: true }).click();
+      await band
+        .getByRole('button', { name: 'Ausblenden, ohne zu quittieren', exact: true })
+        .click();
       await expect(band).toHaveCount(0);
       await page.mouse.move(0, 0);
     });

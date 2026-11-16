@@ -417,7 +417,7 @@ describe('Gefahren-/Schadenlage (LFH-872)', () => {
           '- Zone A\n' +
           '  - Absturz × Menschen: keine · Hangkante geprüft\n' +
           '  - Elektrizität × Menschen: hoch · Stromführende Kellerverteilungen unter \\*Wasser\\*\n' +
-          '- Zone B (nicht beurteilt)\n' +
+          '- Zone B (unbestätigt)\n' +
           '  - Ertrinken × Menschen: niedrig\n' +
           '- Gefahrengebiet #3: keine Gefahr über „keine“\n',
       );
@@ -446,7 +446,7 @@ describe('Gefahren-/Schadenlage (LFH-872)', () => {
         return MATRIZEN[gid] ?? [];
       });
       const text = await erzeuge();
-      expect(text).toContain('- Zone B (nicht beurteilt): — (nicht geladen)\n');
+      expect(text).toContain('- Zone B (unbestätigt): — (nicht geladen)\n');
       expect(text).toContain('  - Elektrizität × Menschen: hoch');
     });
 

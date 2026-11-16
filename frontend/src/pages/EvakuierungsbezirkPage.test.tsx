@@ -126,6 +126,12 @@ function renderSeite(pfad = '/einsaetze/1/evakuierung/5') {
 const titel = () => screen.findByRole('heading', { name: /Bezirk Uferstraße 12–40/ });
 
 /** Das geöffnete Menü — antd lässt die Portale geschlossener Dropdowns im Baum stehen. */
+/** „Bearbeiten“ steht seit LLH-1722 im ⋮ des Kopfs (höchstens zwei Knöpfe im Kopf). */
+async function starteBearbeitung() {
+  await userEvent.click(within(await kopfmenue()).getByRole('menuitem', { name: 'Bearbeiten' }));
+}
+const kopfAusloeser = /^Weitere Aktionen zu Bezirk/;
+
 async function kopfmenue(): Promise<HTMLElement> {
   await userEvent.click(
     await screen.findByRole('button', { name: 'Weitere Aktionen zu Bezirk Uferstraße 12–40' }),
@@ -168,7 +174,13 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       expect(primaer).toHaveLength(1);
       expect(primaer[0]).toHaveAccessibleName('Stand melden');
       expect(within(kopf).getByRole('button', { name: 'Als geräumt melden' })).toBeInTheDocument();
-      expect(within(kopf).getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+      // Höchstens zwei Handlungen als Knopf (LLH-1722): „Bearbeiten“ steht im ⋮.
+      expect(within(kopf).queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+      expect(
+        within(kopf)
+          .getAllByRole('button')
+          .filter((b) => !b.getAttribute('aria-label')?.startsWith('Weitere Aktionen')),
+      ).toHaveLength(2);
       // Die Brotkrume führt zurück zur Übersicht.
       expect(screen.getByRole('link', { name: 'Evakuierung' })).toHaveAttribute(
         'href',
@@ -181,12 +193,14 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       const menue = await kopfmenue();
       const eintraege = within(menue).getAllByRole('menuitem');
       expect(eintraege.map((m) => m.textContent)).toEqual([
+        'Bearbeiten',
         'Zurück auf angeordnet',
         'Anordnung aufheben',
         'Stornieren',
       ]);
-      expect(eintraege[1]).toHaveClass('ant-dropdown-menu-item-danger');
+      expect(eintraege[0]).not.toHaveClass('ant-dropdown-menu-item-danger');
       expect(eintraege[2]).toHaveClass('ant-dropdown-menu-item-danger');
+      expect(eintraege[3]).toHaveClass('ant-dropdown-menu-item-danger');
     });
 
     it('„Als geräumt melden" schickt den Zustand als PATCH und meldet ihn in Worten', async () => {
@@ -363,10 +377,10 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       ) as HTMLElement;
       expect(raster).toHaveTextContent('Turnhalle Süd');
       expect(raster).toHaveTextContent('Deichwache Nord');
-      await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       expect(await screen.findByLabelText('Plangröße (Personen)')).toHaveValue('640');
       expect(screen.queryByRole('button', { name: 'Stand melden' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('button', { name: kopfAusloeser })).toBeNull();
       const leiste = screen
         .getByRole('button', { name: 'Speichern' })
         .closest('[data-lfh="speicherleiste"]');
@@ -376,7 +390,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
     it('Speichern sendet nur das Geänderte, auch wenn fremd ein anderes Feld kam (dreiseitig)', async () => {
       api.aendereBezirk.mockResolvedValue({ ...UFER, plan_personen: 820 });
       const { client } = renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       const feld = await screen.findByLabelText('Plangröße (Personen)');
       // Während der Sitzung schreibt jemand anders eine Notiz.
       act(() => {
@@ -393,7 +407,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       expect(api.aendereBezirk).toHaveBeenCalledTimes(1);
       expect(await screen.findByText('Bezirk Uferstraße 12–40 gespeichert')).toBeInTheDocument();
       // Zurück im Lesemodus mit dem Kopf.
-      expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: kopfAusloeser })).toBeInTheDocument();
     });
 
     /** Sammelstelle über das Ortsfeld (LLH-1121, design.md D7). */
@@ -436,7 +450,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       );
       api.aendereBezirk.mockResolvedValue(UFER);
       renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       const feld = await screen.findByLabelText('Sammelstelle');
       await userEvent.clear(feld);
       await userEvent.type(feld, 'Schulweg 2{Enter}');
@@ -456,15 +470,15 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
 
     it('ohne Änderung schließt Speichern die Sitzung, ohne zu senden', async () => {
       renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-      expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: kopfAusloeser })).toBeInTheDocument();
       expect(api.aendereBezirk).not.toHaveBeenCalled();
     });
 
     it('Prüffehler stehen am Feld und verhindern das Senden', async () => {
       renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       const feld = await screen.findByLabelText('Plangröße (Personen)');
       await userEvent.clear(feld);
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -477,7 +491,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
 
     it('LLH-1560: Bezeichnung, Sammelstelle und Notiz über der Grenze stehen am Feld und senden nicht', async () => {
       renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       const felder = [
         ['Bezeichnung', EVAKUIERUNG_BEZIRK_BEZEICHNUNG_MAX, '200'],
         ['Sammelstelle', EVAKUIERUNG_BEZIRK_SAMMELSTELLE_MAX, '500'],
@@ -501,7 +515,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
     it('eine Ablehnung steht am Formular, die Sitzung bleibt offen', async () => {
       api.aendereBezirk.mockRejectedValue(new Error('Bezeichnung schon vergeben'));
       renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       const feld = await screen.findByLabelText('Bezeichnung');
       await userEvent.type(feld, 'x');
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
@@ -511,7 +525,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
 
     it('Verlassen-Schutz: mit offener Änderung fragt der Wechsel nach', async () => {
       renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       await userEvent.type(await screen.findByLabelText('Sammelstelle'), ' Ost');
       await userEvent.click(screen.getByRole('link', { name: 'Evakuierung' }));
       const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
@@ -527,10 +541,10 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
 
     it('nach Abbrechen fragt der Wechsel nicht mehr', async () => {
       renderSeite();
-      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      await starteBearbeitung();
       await userEvent.type(await screen.findByLabelText('Sammelstelle'), ' Ost');
       await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-      await screen.findByRole('button', { name: 'Bearbeiten' });
+      await screen.findByRole('button', { name: kopfAusloeser });
       await userEvent.click(screen.getByRole('link', { name: 'Evakuierung' }));
       expect(await screen.findByText('UEBERSICHT')).toBeInTheDocument();
     });
@@ -567,7 +581,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       await titel();
       expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Stand melden' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+      expect(screen.queryByRole('button', { name: kopfAusloeser })).toBeNull();
       expect(screen.queryByRole('button', { name: /Weitere Aktionen/ })).toBeNull();
       expect(await screen.findByRole('link', { name: /Auf Lagekarte öffnen/ })).toBeInTheDocument();
       // Zeichnen schreibt: ohne Schreibrecht kein Knopf (der Hinweis über der Seite nennt den Grund).

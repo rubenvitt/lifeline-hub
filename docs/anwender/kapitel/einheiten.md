@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx]
 ---
 
 ## Überblick
@@ -141,15 +141,20 @@ Für Einsatzleitung und Führungspersonal:
 
 5. Im selben Menü setzt „Als Einheitsführer“ die Person als Einheitsführer, „Vom Fahrzeug
    lösen“ nimmt sie vom Fahrzeug und lässt sie in der Einheit, „Aus Einheit lösen“ löst sie aus
-   der Einheit.
+   der Einheit. Der Hinweis unten bietet danach einige Sekunden lang „Rückgängig“; beim
+   Einheitsführer kommt auch die Führung zurück.
 6. Mehrere Personen auf einmal setzt „Personal der Einheit übernehmen“ in der Zeile des
    Fahrzeugs: derselbe Dialog wie in der [Fahrzeugliste](fahrzeuge.md), mit den Kräften der
    Einheit, die auf keinem Fahrzeug sitzen, angehakt bis zur Soll-Stärke, ohne Soll alle.
    „Übernehmen“ setzt alle gewählten in einem Schritt auf das Fahrzeug. Ist der Knopf gesperrt,
    steht daneben „keine freien Kräfte der Einheit“; wer unter „Ohne Fahrzeug“ mit „fährt auf …“
    steht, sitzt schon auf einem Fahrzeug einer anderen Einheit.
-7. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen; „Aus Einheit lösen“ daneben
-   löst das Fahrzeug aus der Einheit. Gelöste Kräfte bleiben im Einsatz, nur ohne Einheit.
+7. Den FMS-Status eines Fahrzeugs am Status in seiner Zeile wählen. „Aus Einheit lösen“ steht im
+   Menü „Aktionen zu Fahrzeug …“ (drei Punkte) am Ende der Zeile und löst das Fahrzeug aus der
+   Einheit. Seine Zeile bleibt als „Gelöst“ mit „Rückgängig“ an ihrer Stelle stehen, die Besatzung
+   gedämpft darunter, bis Zeiger und Fokus das Paneel verlassen haben; so rückt kein anderes
+   Fahrzeug unter den Finger. „Rückgängig“ in der Zeile oder im Hinweis holt es zurück. Gelöste
+   Kräfte bleiben im Einsatz, nur ohne Einheit.
 
 ### Material zuordnen, lösen und ausgeben
 
@@ -167,7 +172,7 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    mit „Ausgeben“ bestätigen. Die Zeile nennt danach den Rest, etwa „15 von 20 übrig“.
 4. Mit „Aus Einheit lösen“ einen Posten wieder lösen. Er bleibt ohne Ort im Einsatz. Die Zeile
    bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein
-   anderer Knopf unter den Finger rückt. „Rückgängig“ im Hinweis oben holt den Posten zurück.
+   anderer Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den Posten zurück.
 
 ### Eine Einheit auflösen
 
@@ -293,6 +298,15 @@ Einheit übernehmen“ und die FMS-Wahl fehlen dann, und Namen führen nicht ins
 „Person zuordnen …“ bzw. „Fahrzeug zuordnen …“ nichts an und nennt den Grund. Ohne Freigabe Material
 stehen die Posten der Einheit weiter im Paneel „Material“, „Material zuordnen …“ steht gesperrt mit
 „Modul Material gesperrt“, und „Aus Einheit lösen“ und „Ausgeben“ fehlen.
+
+### Lösen und Rückgängig
+
+„Aus Einheit lösen“ und „Vom Fahrzeug lösen“ fragen nicht nach, weil „Rückgängig“ den Stand davor
+herstellt: das Fahrzeug mit seiner Besatzung wieder in der Einheit, die Person wieder in der Einheit
+oder auf ihrem Fahrzeug, der Einheitsführer wieder als Führer. Steht das Fahrzeug oder die Person
+inzwischen in einer anderen Einheit, nimmt „Rückgängig“ sie dieser nicht weg, sondern nennt sie;
+ebenso, wenn die Einheit inzwischen einen anderen Einheitsführer hat. Der Grund steht an der Zeile
+oder, ist die Zeile weg, über dem Paneel.
 
 ### Status und Zeitachse
 

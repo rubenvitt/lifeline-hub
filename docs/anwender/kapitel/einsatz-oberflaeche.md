@@ -159,15 +159,19 @@ Wer lieber wählt: „Kalender und Uhrzeit“ neben dem Feld öffnen, einen Tag 
 
 ### Auf eine Benachrichtigung reagieren
 
-1. Die Meldung lesen: Ein Alarm steht als Toast oben rechts, ein Eingang im Eingangsband unten.
-   Oben steht die Art, etwa „Auftrag überfällig“ oder „Neuer Auftrag“, darunter, wo vorhanden,
-   die Kennung, etwa „Auftrag #12“.
-2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder mit ✕ schließen. Stehen im Eingangsband
-   mehrere Eingänge, führt der Knopf in das Modul, etwa „Zu Aufträgen“; kommen sie aus mehreren
-   Modulen, öffnet „Ansehen“ die Liste der Eingänge.
+1. Die Meldung lesen: Ein Alarm steht in der Alarmzone direkt unter der Kopfzeile, ein Eingang
+   im Eingangsband unten. Vorn steht die Art, etwa „Auftrag überfällig“ oder „Neuer Auftrag“,
+   dahinter, wo vorhanden, der Gegenstand, etwa „Auftrag #12“.
+2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder „Gelesen“, um auf der Seite zu bleiben.
+   Stehen im Eingangsband mehrere Eingänge, führt der Knopf in das Modul, etwa „Zu Aufträgen“;
+   kommen sie aus mehreren Modulen, öffnet „Ansehen“ die Liste der Eingänge.
+3. Wer einen Alarm oder das Band nur aus dem Weg haben will, wählt ✕ („Ausblenden, ohne zu
+   quittieren“).
 
-„Öffnen“, ein Sprung und ✕ quittieren die Benachrichtigung: Sie verschwindet auch in anderen
-Tabs und auf anderen Geräten derselben Person. „Ansehen“ quittiert nichts.
+„Öffnen“, „Gelesen“ und ein Sprung aus dem Band quittieren die Benachrichtigung: Sie verschwindet
+auch in anderen Tabs und auf anderen Geräten derselben Person. ✕ quittiert nichts: Der Eintrag
+bleibt unter „Eingänge“ bei „Neu“ und kommt in diesem Tab nicht wieder, bis der Tab geschlossen
+wird; andere Tabs und Geräte zeigen ihn weiter. „Ansehen“ quittiert ebenfalls nichts.
 
 ### Eingänge nachlesen
 
@@ -422,7 +426,8 @@ Eine Benachrichtigung geht an die Personen, die sie betrifft, nicht an alle im E
 eine von drei Stufen:
 
 - **Alarm** („Sofortmeldung“, „Sofortmeldung unbestätigt“, „Auftrag überfällig“, „Ablösung
-  fällig“, „Vermisstenmeldung“, „Unwetterwarnung“): Toast oben rechts in Warnfarbe und Alarmton.
+  fällig“, „Vermisstenmeldung“, „Unwetterwarnung“): Eintrag in der Alarmzone mit dem Wort „ALARM“
+  und roter Kante, dazu der Alarmton.
   Alarme lassen sich nicht abschalten.
 - **Eingang** (unter „Benachrichtigungen“ als „Hinweise“): Eingangsband unten und ein kurzer,
   tieferer Ton, höchstens alle zwei Minuten. Jede Art lässt sich unter „Benachrichtigungen“
@@ -446,35 +451,37 @@ eingeschaltet und die App zu ist: Für eine stumme Art erscheint dann keine Meld
 Betriebssystems, ein Alarm schon. Wer ohne Netz umschaltet, hat bei geschlossener App bis zur
 nächsten Anmeldung noch den alten Stand.
 
-Toasts tragen nur Alarme (dazu, außerhalb eines Einsatzes, „Neuer
-Einsatz“ und „Aufnahme in einen Einsatz“). Sie bleiben stehen, bis sie geöffnet oder geschlossen
-werden. Höchstens drei stehen einzeln da; ab dem vierten fasst ein Sammeltoast die älteren
-zusammen. Er nennt ihre Zahl, bei mehreren Arten je Art eine Zeile wie „2 × Auftrag überfällig“,
-und je Bereich einen Sprung, etwa „Zu Aufträgen“ oder „Zu Meldungen“. Ein Sprung schließt alle
-Toasts und quittiert sie, ebenso ✕ am Sammeltoast. Das Eingangsband nimmt den Toasts keinen
-Platz und liegt nie über ihnen.
+Die **Alarmzone** trägt nur Alarme (dazu, außerhalb eines Einsatzes, „Neuer Einsatz“ und
+„Aufnahme in einen Einsatz“ mit dem Wort „HINWEIS“ und blauer Kante). Sie steht direkt unter
+der Kopfzeile, unter einem Übungsband, und schiebt die Seite um ihre Zeile nach unten, statt
+etwas zu verdecken; beim Rollen bleibt sie unter der Kopfzeile stehen. Menüs, Dialoge und die
+Navigation liegen über ihr. Ohne Alarm steht sie nicht. Ein Alarm bleibt, bis er geöffnet, als
+gelesen markiert oder ausgeblendet wird. Ab zwei Alarmen steht der jüngste mit „+ n weitere“;
+aufgeklappt nennt die Zone ihre Zahl („3 Alarme“) und je Art die Zahl, etwa „2 × Auftrag
+überfällig · 1 × Bestätigung ausstehend“, darunter jeden Alarm mit eigenem „Öffnen“, „Gelesen“
+und ✕. Die Unwetterwarnung hat kein „Gelesen“; eine neuere ersetzt die ältere. Das Eingangsband
+steht nie in der Zone und liegt nie über ihr.
 
 Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen (Tooltip „Benachrichtigung
-erlaubt“ in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
-Tab wieder vorn ist; dann trägt der Toast.
+erlaubt“ in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt,
+sobald der Tab wieder vorn ist; dann trägt die Alarmzone.
 
 Geht eine Benachrichtigung unterwegs verloren, etwa während einer Störung der Verbindung oder
 eines Neustarts des Servers, holt die App sie nach, sobald die Verbindung wieder steht. Ebenso
 beim Öffnen eines Einsatzes: Was in den letzten zwölf Stunden kam und noch nicht quittiert ist,
-erscheint mit der Uhrzeit, zu der es kam. Für alle nachgeholten zusammen klingt höchstens einmal
+erscheint mit der Uhrzeit, zu der es kam, außer es wurde in diesem Tab ausgeblendet. Für alle nachgeholten zusammen klingt höchstens einmal
 der kurze Ton. „Neuer Einsatz“ und „Aufnahme in einen Einsatz“ erscheinen auch außerhalb eines
 Einsatzes, in der Einsatzliste, im Profil und in der Verwaltung; „Öffnen“ führt in den Einsatz.
 
 Ist „Auch bei geschlossener App“ eingeschaltet, kommt eine Benachrichtigung auch ohne offenen
 Tab als Meldung des Betriebssystems, Alarme wie Hinweise; abgeschaltete Hinweis-Arten bleiben aus.
 Ein Tipp auf die Meldung öffnet die App beim Gegenstand. Ist ein Tab der App gerade vorn, zeigt er
-den Toast, und die Meldung des Betriebssystems entfällt. Quittiert die Person an einem anderen
+den Alarm in der Alarmzone, und die Meldung des Betriebssystems entfällt. Quittiert die Person an einem anderen
 Gerät, geht die Meldung auf diesem Gerät nicht in jedem Fall von selbst weg; sie lässt sich dann
 wegwischen. Ohne Verbindung zum Server, etwa ohne VPN, zeigt die Meldung nur „Alarm“ oder „Neue
 Benachrichtigung“; den Inhalt zeigt die App nach dem Öffnen.
 
-Alle Eingänge eines Einsatzes stehen im **Eingangsband** unten, auf dem Handy über die ganze
-Breite, sonst rechts. Hat die Seite unten eine feste Leiste, etwa die Erfassung im
+Alle Eingänge eines Einsatzes stehen im **Eingangsband** unten rechts. Hat die Seite unten eine feste Leiste, etwa die Erfassung im
 Einsatztagebuch oder „Entwurf speichern“ und „Freigeben“ am Befehl, steht das Band darüber und
 deckt keinen ihrer Knöpfe ab. Es bündelt sie: „3 neue Meldungen“ oder, sind andere Eingänge dabei, „3 neue
 Eingänge“, mit den beiden jüngsten und darunter „+ n weitere“; eine Meldung nennt Absender und
@@ -483,6 +490,13 @@ kommen. Wer gerade in ein Feld schreibt, behält den Fokus: Das Band erscheint e
 verlassen ist. Auf der Seite „Meldungen“ zeigt es keine Meldungen, denn dort stehen sie schon in
 der Liste; eine Übernahme in die Lage bleibt ebenso auf „Lagemeldungen“ aus. Was eine Meldung
 auslöst und wer sie bekommt, steht in [Meldungen](meldungen.md).
+
+Auf dem **Handy** gibt es im Einsatz weder Alarmzone noch Eingangsband, sondern eine schmale
+Leiste unten über die ganze Breite, etwa „1 Alarm · 3 Eingänge“. Sie steht über einer festen
+Leiste wie der Erfassung im Einsatztagebuch. Ein Tipp öffnet von unten „Alarme und Eingänge“:
+oben die Alarme mit „Öffnen“, „Gelesen“ und ✕, darunter die Eingänge wie unter „Eingänge“. Stehen
+nur Eingänge an, blendet ✕ an der Leiste sie aus. Wer in ein Feld tippt, bekommt den Platz: Die
+Leiste klappt ein. Steht ein Alarm an, bleibt sie dabei als eine Zeile mit diesem Alarm stehen.
 
 Solange im Einsatz ungelesene Eingänge offen sind, steht ihre Zahl vorn im Titel des Tabs, etwa
 „(3) Lagekarte · …“, dieselbe wie über „Eingänge“. Ist die App installiert, trägt auch ihr Symbol

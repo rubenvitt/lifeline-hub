@@ -161,14 +161,15 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     const { container } = render();
     await screen.findByText('Wolldecke');
 
-    await userEvent.click(
-      within(zeile(container, 10)).getByRole('button', {
-        name: 'Wolldecke aus dem Einsatz nehmen',
-      }),
+    // „Aus dem Einsatz nehmen“ steht seit LLH-1722 im Zeilenmenü.
+    await waehleMenueEintrag(
+      within(zeile(container, 10)).getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }),
+      'Aus dem Einsatz nehmen',
     );
     // Die zweite Zeile schreibt, bevor die erste Antwort da ist.
-    await userEvent.click(
-      within(zeile(container, 11)).getByRole('button', { name: 'Zeltbahn aus dem Einsatz nehmen' }),
+    await waehleMenueEintrag(
+      within(zeile(container, 11)).getByRole('button', { name: 'Weitere Aktionen zu Zeltbahn' }),
+      'Aus dem Einsatz nehmen',
     );
     await act(async () => ersteAntwort.frei());
 

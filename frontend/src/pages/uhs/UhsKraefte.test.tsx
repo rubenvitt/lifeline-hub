@@ -146,6 +146,53 @@ describe('UhsKraefte', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('nach dem Abziehen ordnet „Rückgängig“ die Kraft wieder dieser UHS zu (LLH-1722)', async () => {
+    mitFreien();
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete('/api/einsaetze/1/uhs/2/kraefte/:kid', ({ params }) => {
+        aufrufe.push(`DELETE ${params.kid}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.put('/api/einsaetze/1/uhs/2/kraefte/:kid', ({ params }) => {
+        aufrufe.push(`PUT ${params.kid}`);
+        return HttpResponse.json({ id: Number(params.kid) });
+      }),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bernd Berg abziehen' }));
+    const hinweis = (await screen.findByText('Bernd Berg abgezogen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 12', 'PUT 12']));
+  });
+
+  it('scheitert das Rückgängig, steht der Grund über der Liste (LLH-1722)', async () => {
+    mitFreien();
+    server.use(
+      http.delete(
+        '/api/einsaetze/1/uhs/2/kraefte/:kid',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+      http.put('/api/einsaetze/1/uhs/2/kraefte/:kid', () =>
+        HttpResponse.json({ error: 'Kraft ist entlassen' }, { status: 409 }),
+      ),
+    );
+    renderMitProviders(
+      <UhsKraefte einsatzId={1} uhs={uhs()} schreibgeschuetzt={false} einheitZuordnen={false} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bernd Berg abziehen' }));
+    const hinweis = (await screen.findByText('Bernd Berg abgezogen')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    expect(await screen.findByText('Kraft ist entlassen')).toBeInTheDocument();
+    expect(screen.getByText('Bernd Berg nicht zurückgenommen')).toBeInTheDocument();
+  });
+
   it('der Laptop ordnet keine Einheit zu; ohne freie Kraft ist „Kraft zuordnen“ gesperrt', async () => {
     mitFreien([]);
     renderMitProviders(

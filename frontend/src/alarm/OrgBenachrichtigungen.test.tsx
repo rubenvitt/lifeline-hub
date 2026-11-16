@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { http, HttpResponse } from 'msw';
@@ -8,6 +8,7 @@ import type { BenachrichtigungAnzeige, BenachrichtigungEreignis } from '../api/t
 import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener';
 import { server } from '../test/server';
 import { spieleAlarmTon } from './alarmTon';
+import AlarmZone from './AlarmZone';
 import OrgBenachrichtigungen from './OrgBenachrichtigungen';
 
 vi.mock('./alarmTon', async (original) => ({
@@ -64,6 +65,7 @@ function renderOrg() {
   return render(
     <AntApp>
       <MemoryRouter initialEntries={['/einsaetze']}>
+        <AlarmZone />
         <OrgBenachrichtigungen />
         <Routes>
           <Route path="*" element={<Ort />} />
@@ -124,17 +126,22 @@ describe('Org-Zentrale (tasks.md 2.5)', () => {
     expect(screen.getByText('Hochwasser Elbe · 141405')).toBeInTheDocument();
   });
 
-  it('der Sammeltoast der Org-Zentrale springt in die Einsatzliste', async () => {
+  it('die gebündelte Zone der Org-Zentrale nennt „4 Hinweise“, jede Zeile führt in ihren Einsatz', async () => {
     const liste = [1, 2, 3, 4].map((n) => ({
       ...NEUER_EINSATZ,
       id: 90 + n,
       einsatz_id: 20 + n,
       detail: `Einsatz ${n}`,
+      pfad: `/einsaetze/${20 + n}`,
     }));
     serverMit(liste);
     renderOrg();
-    expect(await screen.findByText('3 weitere Hinweise')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Einsätzen' }));
-    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze');
+    await userEvent.click(await screen.findByRole('button', { name: '+ 3 weitere' }));
+    expect(screen.getByText('4 Hinweise')).toBeInTheDocument();
+    const zeile = screen
+      .getByText(/^Einsatz 2/)
+      .closest<HTMLElement>('[data-lfh="alarm-eintrag"]')!;
+    await userEvent.click(within(zeile).getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/22');
   });
 });

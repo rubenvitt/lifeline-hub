@@ -223,13 +223,13 @@ Für Einsatzleitung und Führungspersonal:
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Unter „Stellen“ bei der Stelle „Auflösen …“ wählen; bei einer geplanten Stelle liegt es im Menü
+1. Unter „Stellen“ bei der Stelle „Auflösen“ wählen; bei einer geplanten Stelle liegt es im Menü
    „Aktionen zu Stelle …“.
 2. Die Rückfrage „Stelle ‚…‘ auflösen?“ mit „Auflösen“ bestätigen. Die Stelle steht danach
    eingeklappt unter „aufgelöst“ am Ende der Liste und ist in der Ausgabeansicht nicht mehr wählbar.
-3. Eine geplante Stelle ohne Ausgabe lässt sich stattdessen über „Stornieren …“ im Menü entfernen;
+3. Eine geplante Stelle ohne Ausgabe lässt sich stattdessen über „Stornieren“ im Menü entfernen;
    die Rückfrage mit „Stornieren“ bestätigen. Sie fällt aus der Liste und aus allen Zeitfenstern.
-   Ist an ihr ein Gerät gekoppelt, steht im Menü gesperrt „Stornieren … (Gerät gekoppelt)“.
+   Ist an ihr ein Gerät gekoppelt, steht im Menü gesperrt „Stornieren (Gerät gekoppelt)“.
 
 ## Hintergrund
 

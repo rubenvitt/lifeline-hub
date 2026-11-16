@@ -50,7 +50,7 @@ export async function einheitMitZuordnungen(page: Page) {
 /**
  * Wer den Sperrzweig der Einheit-Ansicht sieht (LLH-1270): der Beobachter nach der Regel LFH-820
  * (`e2e/AGENTS.md`), dazu das Führungspersonal, weil die Sperre hier auch Schreibziele ändert
- * (flache Liste mit „Aus Einheit lösen“, „Person zuordnen …“ gesperrt mit Grund).
+ * (flache Liste mit dem ⋮ „Aus Einheit lösen“, „Person zuordnen …“ gesperrt mit Grund).
  */
 export type SperrRolle = 'beobachter' | 'fuehrungspersonal';
 
@@ -120,7 +120,7 @@ export function kopfFelder(page: Page): { name: string; huelle: Locator; fokus: 
 
 /**
  * Die Bedienziele der Zuordnungen (LLH-1036 Teil II): im Paneel „Fahrzeuge und Besatzung“ das
- * Menü der Person, die FMS-Wahl und „Aus Einheit lösen“ des Fahrzeugs und die beiden
+ * Menü der Person, die FMS-Wahl und das ⋮ des Fahrzeugs („Aus Einheit lösen“, LLH-1722) und die beiden
  * Auswahlfelder, im Paneel „Material“ Lösen und Auswahl. `reihen` sind benachbarte Ziele (auf
  * einer Zeile oder Zeile über Zeile), `stapel` je Paneel die letzte Zeilenaktion über dem ersten
  * Auswahlfeld. `uebernehmen` ist „Personal der Einheit übernehmen“ (LLH-1267): hier gesperrt, weil
@@ -134,8 +134,9 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
   const fmsStatus = fahrzeugZeile.getByRole('button', {
     name: `Status von ${namen.fahrzeug} ändern`,
   });
-  const fahrzeugLoesen = fahrzeugZeile.getByRole('button', {
-    name: 'Aus Einheit lösen',
+  // „Aus Einheit lösen“ steht seit LLH-1722 im ⋮ des Fahrzeugs; das ⋮ ist das Bedienziel.
+  const fahrzeugMenue = fahrzeugZeile.getByRole('button', {
+    name: `Aktionen zu Fahrzeug ${namen.fahrzeug}`,
     exact: true,
   });
   const uebernehmen = fahrzeugZeile.getByRole('button', {
@@ -159,7 +160,7 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
     ziele: [
       { name: 'Person: Aktionen', ziel: personMenue, fokus: personMenue },
       { name: 'Fahrzeug: Status', ziel: fmsStatus, fokus: fmsStatus },
-      { name: 'Fahrzeug aus Einheit lösen', ziel: fahrzeugLoesen, fokus: fahrzeugLoesen },
+      { name: 'Fahrzeug: Aktionen', ziel: fahrzeugMenue, fokus: fahrzeugMenue },
       { name: 'Person zuordnen', ziel: huelle(personZuordnen), fokus: personZuordnen },
       { name: 'Fahrzeug zuordnen', ziel: huelle(fahrzeugZuordnen), fokus: fahrzeugZuordnen },
       { name: 'Material aus Einheit lösen', ziel: materialLoesen, fokus: materialLoesen },
@@ -172,14 +173,14 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
     ],
     reihen: [
       [fmsStatus, uebernehmen],
-      [uebernehmen, fahrzeugLoesen],
+      [uebernehmen, fahrzeugMenue],
       [huelle(personZuordnen), huelle(fahrzeugZuordnen)],
-      // Zeile über Zeile: Funkrufname über dem Namen der Person, Lösen über ihrem Menü.
+      // Zeile über Zeile: Funkrufname über dem Namen der Person, ⋮ des Fahrzeugs über ihrem Menü.
       [
         fahrzeugZeile.getByRole('link', { name: namen.fahrzeug }),
         besatzung.getByRole('link', { name: namen.personal }),
       ],
-      [fahrzeugLoesen, personMenue],
+      [fahrzeugMenue, personMenue],
     ],
     stapel: [
       { name: 'Fahrzeuge und Besatzung', aktion: personMenue, auswahl: huelle(personZuordnen) },
@@ -253,7 +254,7 @@ export async function checkGesperrtReady(page: Page, rolle: SperrRolle) {
 /**
  * Die Bedienziele im Sperrzweig (LLH-1270), als Gegenstück zu {@link zuordnungsZiele}: die
  * Fahrzeugzeile steht flach (kein `group`), ihr Funkrufname bleibt ein Link (Fahrzeuge ist frei).
- * Dem Beobachter bleibt nur dieser Link; das Führungspersonal behält Lösen, das Menü der Person,
+ * Dem Beobachter bleibt nur dieser Link; das Führungspersonal behält das ⋮ des Fahrzeugs, das Menü der Person,
  * „Fahrzeug zuordnen …“ und Material. `gesperrt` sind sichtbare, gesperrte Ziele ohne Fokus.
  */
 export function zuordnungTargetsGesperrt(
@@ -278,8 +279,8 @@ export function zuordnungTargetsGesperrt(
     feld.locator(
       'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-select ")][1]',
     );
-  const fahrzeugLoesen = fahrzeugZeile.getByRole('button', {
-    name: 'Aus Einheit lösen',
+  const fahrzeugMenue = fahrzeugZeile.getByRole('button', {
+    name: `Aktionen zu Fahrzeug ${namen.fahrzeug}`,
     exact: true,
   });
   const personMenue = besatzung.getByRole('button', {
@@ -292,7 +293,7 @@ export function zuordnungTargetsGesperrt(
   return {
     ziele: [
       linkZiel,
-      { name: 'Fahrzeug aus Einheit lösen', ziel: fahrzeugLoesen, fokus: fahrzeugLoesen },
+      { name: 'Fahrzeug: Aktionen', ziel: fahrzeugMenue, fokus: fahrzeugMenue },
       { name: 'Person: Aktionen', ziel: personMenue, fokus: personMenue },
       { name: 'Fahrzeug zuordnen', ziel: huelle(fahrzeugZuordnen), fokus: fahrzeugZuordnen },
       { name: 'Material aus Einheit lösen', ziel: materialLoesen, fokus: materialLoesen },
@@ -303,9 +304,9 @@ export function zuordnungTargetsGesperrt(
     ],
     zeilen,
     reihen: [
-      // Zeile über Zeile: Lösen am Fahrzeug über dem Menü der Person; das gesperrte Feld mit
+      // Zeile über Zeile: das ⋮ am Fahrzeug über dem Menü der Person; das gesperrte Feld mit
       // seinem Grund über „Fahrzeug zuordnen …“.
-      [fahrzeugLoesen, personMenue],
+      [fahrzeugMenue, personMenue],
       [huelle(personZuordnen), huelle(fahrzeugZuordnen)],
     ],
     stapel: [
