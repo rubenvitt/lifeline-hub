@@ -72,9 +72,9 @@ import './organigrammPrint.css';
  *   Modulfreigabe; ein Sachgebiet ohne Mitglied fehlt, ohne Mitglieder fehlt die Stabsstelle.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
  * - **Lagezustand am Knoten, Lücken einmal oben** (LLH-1742, Herleitung
- *   `openspec/changes/zo7em8le-organigramm-lagezustand/design.md`): der Abschnitt trägt seinen
- *   Lagezustand in der Form der Gliederung; „Leitung nicht besetzt“ steht am Knoten leise, laut ist
- *   nur die Sammelzeile über dem Organigramm.
+ *   `openspec/changes/archive/2026-11-16-zo7em8le-organigramm-lagezustand/design.md`): der
+ *   Abschnitt trägt seinen Lagezustand in der Form der Gliederung; „Leitung nicht besetzt“ steht am
+ *   Knoten leise, laut ist nur die Sammelzeile über dem Organigramm.
  */
 
 const ZEICHEN_PX = 22;
