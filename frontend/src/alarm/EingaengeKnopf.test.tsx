@@ -20,6 +20,7 @@ import { benutzerFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { neuerQueryClient, renderMitProviders, setzeOnline } from '../test/utils';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
+import { zoneSetzen } from './alarmZoneSpeicher';
 import EingaengeKnopf from './EingaengeKnopf';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeZahlText } from './eingaenge';
 import { istStumm, setzeStumm, vergesseStummStand } from './eingaengeStumm';
@@ -187,6 +188,89 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     ).toBeInTheDocument();
   });
 
+  it('ein gescheiterter Inhaltsabruf wird beim nächsten Öffnen wiederholt', async () => {
+    serverMit({
+      eintraege: [
+        eintrag(9, {
+          art: 'sofortmeldung_eskaliert',
+          stufe: 'alarm',
+          bezug_typ: 'meldung',
+          bezug_id: 78,
+          titel: 'Bestätigung ausstehend',
+          detail: 'Meldung #78',
+        }),
+      ],
+      ungelesen: 0,
+    });
+    let erreichbar = false;
+    server.use(
+      http.get('/api/einsaetze/:id/meldungen/:mid', ({ params }) =>
+        erreichbar
+          ? HttpResponse.json({ id: Number(params.mid), absender: 'RTW 3', inhalt: 'Lage stabil' })
+          : HttpResponse.json({ error: 'weg' }, { status: 503 }),
+      ),
+    );
+    rendern();
+    const knopf = await screen.findByRole('button', { name: /^Eingänge/ });
+    await userEvent.click(knopf);
+    const neu = () =>
+      within(screen.getByRole('region', { name: 'Eingänge' })).getByRole('list', { name: 'Neu' });
+    await waitFor(() => expect(within(neu()).getByText(/Meldung #78/)).toBeInTheDocument());
+    await userEvent.click(knopf);
+    erreichbar = true;
+    await userEvent.click(knopf);
+    expect(
+      await within(neu()).findByText('Alarm: Bestätigung ausstehend · RTW 3'),
+    ).toBeInTheDocument();
+  });
+
+  it('Neu: eine Meldung nennt Absender und Wortlaut, eine Erinnerung ihren Titel (LLH-1737)', async () => {
+    serverMit({
+      eintraege: [
+        eintrag(8, {
+          art: 'sofortmeldung_eskaliert',
+          stufe: 'alarm',
+          bezug_typ: 'meldung',
+          bezug_id: 77,
+          titel: 'Bestätigung ausstehend',
+          detail: 'Meldung #77',
+        }),
+        eintrag(7, {
+          art: 'erinnerung_faellig',
+          bezug_typ: 'erinnerung',
+          bezug_id: 5,
+          titel: 'Erinnerung fällig',
+          detail: undefined,
+        }),
+      ],
+      ungelesen: 1,
+    });
+    server.use(
+      http.get('/api/einsaetze/:id/meldungen/:mid', ({ params }) =>
+        HttpResponse.json({
+          id: Number(params.mid),
+          absender: 'RTW 2',
+          inhalt: 'Patient ansprechbar, Transport ins Klinikum',
+        }),
+      ),
+      http.get('/api/einsaetze/:id/erinnerungen', () =>
+        HttpResponse.json([{ id: 5, einsatz_id: 1, titel: 'Pegel prüfen' }]),
+      ),
+    );
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: /^Eingänge, 1 ungelesen/ }));
+    const neu = within(await screen.findByRole('region', { name: 'Eingänge' })).getByRole('list', {
+      name: 'Neu',
+    });
+    expect(
+      await within(neu).findByText('Alarm: Bestätigung ausstehend · RTW 2'),
+    ).toBeInTheDocument();
+    expect(
+      within(neu).getByText(/Patient ansprechbar, Transport ins Klinikum/),
+    ).toBeInTheDocument();
+    expect(await within(neu).findByText('Erinnerung fällig: Pegel prüfen')).toBeInTheDocument();
+  });
+
   it('ein Eintrag springt zum Objekt und quittiert ihn', async () => {
     const zaehler = serverMit({ eintraege: [eintrag(5)], ungelesen: 1 });
     rendern();
@@ -336,6 +420,66 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
       within(blatt).getByRole('link', { name: /Benachrichtigungen einstellen/ }),
     );
     expect(screen.getByTestId('route')).toHaveTextContent(/^\/benachrichtigungen$/);
+  });
+
+  it('ein Hinweis der Organisation steht im Blatt als „Hinweis“, nicht als Alarm', async () => {
+    setzeViewportBreite(390);
+    serverMit({ eintraege: [], ungelesen: 0 });
+    act(() =>
+      zoneSetzen(Symbol('test'), [
+        {
+          schluessel: 'b-4',
+          stufe: 'hinweis' as const,
+          titel: 'Neuer Einsatz',
+          name: 'Neuer Einsatz',
+          oeffnen: vi.fn(),
+          gelesen: vi.fn(),
+          ausblenden: vi.fn(),
+        },
+      ]),
+    );
+    rendern();
+    act(() => {
+      window.dispatchEvent(new CustomEvent(EINGAENGE_OEFFNEN_EVENT, { detail: { einsatzId: 1 } }));
+    });
+    const blatt = await screen.findByRole('dialog', { name: 'Alarme und Eingänge' });
+    const region = within(blatt).getByRole('region', { name: 'Alarme' });
+    expect(within(region).getByRole('heading', { name: 'Hinweis' })).toBeInTheDocument();
+  });
+
+  it('das Blatt nennt oben die Alarme mit „Öffnen“, „Gelesen“ und ✕ (LLH-1738)', async () => {
+    setzeViewportBreite(390);
+    serverMit({ eintraege: [eintrag(1)], ungelesen: 1 });
+    const alarm = {
+      schluessel: 'b-9',
+      stufe: 'alarm' as const,
+      titel: 'Auftrag überfällig',
+      beschreibung: 'Auftrag #12 an S2',
+      name: 'Auftrag überfällig',
+      oeffnen: vi.fn(),
+      gelesen: vi.fn(),
+      ausblenden: vi.fn(),
+    };
+    act(() => zoneSetzen(Symbol('test'), [alarm]));
+    rendern();
+    act(() => {
+      window.dispatchEvent(new CustomEvent(EINGAENGE_OEFFNEN_EVENT, { detail: { einsatzId: 1 } }));
+    });
+    const blatt = await screen.findByRole('dialog', { name: 'Alarme und Eingänge' });
+    const alarme = within(blatt).getByRole('region', { name: 'Alarme' });
+    expect(within(alarme).getByRole('heading', { name: 'Alarm' })).toBeInTheDocument();
+    expect(within(alarme).getByText('Auftrag überfällig')).toBeInTheDocument();
+    expect(within(alarme).getByText('Auftrag #12 an S2')).toBeInTheDocument();
+    await userEvent.click(within(alarme).getByRole('button', { name: 'Gelesen' }));
+    expect(alarm.gelesen).toHaveBeenCalledOnce();
+    await userEvent.click(
+      within(alarme).getByRole('button', { name: 'Ausblenden, ohne zu quittieren' }),
+    );
+    expect(alarm.ausblenden).toHaveBeenCalledOnce();
+    await userEvent.click(within(alarme).getByRole('button', { name: 'Öffnen' }));
+    expect(alarm.oeffnen).toHaveBeenCalledOnce();
+    // Die Eingänge stehen darunter wie bisher.
+    expect(within(blatt).getByRole('region', { name: 'Eingänge' })).toBeInTheDocument();
   });
 });
 

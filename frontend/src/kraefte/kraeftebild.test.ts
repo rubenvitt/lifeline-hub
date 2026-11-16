@@ -365,7 +365,7 @@ it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
     [mat(1, 10, 'einsatzbereit')],
   );
   const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
-  expect(md).toContain('# Kräftemeldebild');
+  expect(md).toContain('# Kräfteübersicht');
   expect(md).toContain('Stand 12:00');
   expect(md).toContain('Gesamtstärke');
   expect(md).toContain('A1');

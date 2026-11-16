@@ -1,7 +1,7 @@
 ---
 titel: Gefahren
 gruppen: [fuehrung]
-reihenfolge: 230
+reihenfolge: 430
 quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/gefahren/GefahrenMatrixAuszug.tsx, frontend/src/pages/gefahren/gefahrenPrint.css, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
@@ -17,12 +17,13 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 ### Gefahrengebiete ansehen
 
 1. Im Bereich „Lage“ „Gefahren“ öffnen. Links stehen unter „Gefahrengebiete“ alle Gebiete mit
-   ihrer höchsten Warnstufe. Darunter steht bei einem beurteilten Gebiet, wie viele Gefahren es
-   trägt und wie hoch die höchste ist, etwa „3 Gefahren · hoch“, bei einem anderen
-   „nicht beurteilt“.
+   ihrer höchsten Warnstufe. Darunter steht bei einem bestätigten Gebiet, wie viele Gefahren es
+   trägt und wie hoch die höchste ist, etwa „3 Gefahren · hoch“. Ist die Beurteilung noch nicht
+   bestätigt, steht das im Etikett der Stufe selbst: „hoch · unbestätigt“, bei einem Gebiet ohne
+   gesetzte Gefahr „keine · unbestätigt“.
 2. Ein Gebiet in der Liste wählen. Rechts unter „Bewertung“ steht seine Matrix: je Zeile ein
    Gefahrentyp, je Spalte ein Schutzobjekt, in der Zelle das Kürzel der Warnstufe. Darüber steht,
-   ob die Matrix beurteilt ist: „beurteilt“ mit Zeit und Person oder „nicht beurteilt“.
+   ob die Beurteilung bestätigt ist: „bestätigt“ mit Zeit und Person oder „unbestätigt“.
 
    ![Seite „Gefahren“ mit zwei Gefahrengebieten, der Matrix der Überflutung Unterstadt und darunter der Liste „Erläuterungen“](../bilder/gefahren/gefahren.png)
 
@@ -45,8 +46,8 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 1. Das Gebiet wählen und die Matrix Zeile für Zeile durchsehen. Jede Zelle ohne andere Stufe
    zeigt „–“ (keine).
 2. Gefahren, die bestehen, wie oben bewerten.
-3. „Beurteilung bestätigen“ wählen. Über der Matrix steht danach „beurteilt“ mit Zeit und dem
-   eigenen Namen, und in der Gebietsliste entfällt „nicht beurteilt“.
+3. „Beurteilung bestätigen“ wählen. Über der Matrix steht danach „bestätigt“ mit Zeit und dem
+   eigenen Namen, und in der Gebietsliste entfällt „· unbestätigt“ am Etikett.
 
 ### Eine Bewertung erläutern
 
@@ -113,7 +114,7 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 ### Das gedruckte Blatt
 
 - Gedruckt wird das gewählte Gebiet. Der Druckkopf nennt es mit der Warnstufe und der
-  Beurteilung („beurteilt“ mit Zeit und Person oder „nicht beurteilt“). Darunter stehen die
+  Beurteilung („bestätigt“ mit Zeit und Person oder „unbestätigt“). Darunter stehen die
   Legende, die Matrix und die Liste „Erläuterungen“ in derselben Folge wie am Schirm, mit Stufe,
   Text, „gemeldet von“ und „geändert“. Ohne Erläuterung im Gebiet fehlt die Liste auch auf dem
   Blatt.
@@ -125,16 +126,17 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 
 ### Beurteilung
 
-- Ob jemand die Matrix angesehen hat, zeigt nicht die Zelle, sondern das Gebiet: „nicht
-  beurteilt“, bis jemand „Beurteilung bestätigen“ wählt, danach „beurteilt“ mit Zeit und Person.
-  Ein neues Gebiet ist nicht beurteilt.
-- In der Gebietsliste zählt ein beurteiltes Gebiet seine Gefahren: jede Gefahr mit mindestens
+- Ob jemand die Matrix angesehen hat, zeigt nicht die Zelle, sondern das Gebiet: „unbestätigt“,
+  bis jemand „Beurteilung bestätigen“ wählt, danach „bestätigt“ mit Zeit und Person. Ein neues
+  Gebiet ist unbestätigt. „unbestätigt“ heißt nicht, dass die Stufe nicht gilt: Gesetzte Zellen
+  zählen auch vorher, nur hat noch niemand die ganze Matrix bestätigt.
+- In der Gebietsliste zählt ein bestätigtes Gebiet seine Gefahren: jede Gefahr mit mindestens
   einer Zelle über „keine“ zählt einmal, gleich für wie viele Schutzobjekte. Daneben steht die
-  höchste Stufe. Ein beurteiltes Gebiet ohne Gefahr zeigt „0 Gefahren“.
-- Ändert in einem beurteilten Gebiet jemand eine Zelle, nennt die Beurteilung danach die Zeit
-  dieser Änderung und diese Person. In einem nicht beurteilten Gebiet ändert eine Zelle daran
+  höchste Stufe. Ein bestätigtes Gebiet ohne Gefahr zeigt „0 Gefahren“.
+- Ändert in einem bestätigten Gebiet jemand eine Zelle, nennt die Beurteilung danach die Zeit
+  dieser Änderung und diese Person. In einem unbestätigten Gebiet ändert eine Zelle daran
   nichts: Eine gesetzte Zelle sagt nichts über die übrigen.
-- Nicht beurteilte Gebiete nennt auch das Lagebild unter dem Paneel „Gefahrenmatrix“ und die
+- Unbestätigte Gebiete nennt auch das Lagebild unter dem Paneel „Gefahrenmatrix“ und die
   Kennzahl „Warnstufe“ im Überblick.
 - Die Gefahren eines Gebiets mit Stufe und Erläuterung zeigt auch die Lagekarte, wenn eine Zone
   des Gebiets gewählt ist (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)), und die

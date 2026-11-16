@@ -49,12 +49,23 @@ Gilt für `frontend/src/command-palette/`, ergänzt `frontend/AGENTS.md`. Pfade 
   `hinweis` der Marke. Angeboten nur bei `istModulFreigegeben(zielModul)`, gesperrt nie (im Menü
   steht sie dann mit Schloss). Merkbar wie `navigation`, nicht im Modul-Gedächtnis. Eine neue
   Marke ist ein Eintrag in der Tabelle, keine Palette-Zeile von Hand.
+- **Treffer** (y3zh5ymv D1, `fuzzy.ts`): kein Fuzzy-Abgleich. Jedes Suchwort trifft einen
+  Wortanfang in Label oder Schlagwort oder ab `TEILWORT_MIN` (3) Zeichen ein Teilwort; verglichen
+  wird in `normalisiere`-Form (klein, Umlaute als Umschrift). Datensätze tragen weitere Merkmale
+  (`merkmale` in der Quellentabelle, Fahrzeugtyp, Kennzeichen, Funktion); trifft nur ein Merkmal,
+  steht es mit „ · “ an der Zeile. Module tragen Synonyme in der Registry (`ModulEintrag.schlagworte`).
 - **Schnellaktionen** (`SCHNELLAKTIONEN` in `befehle.ts`, Guard `schnellaktionen.guard.test.ts`):
   das Ziel liegt unter dem Modulpfad des **eigenen** Trägers, und eine Seite dieses Moduls liest
-  den deklarierten `parameter` als Literal (`X.get('neu')` bzw. `X.get('zeichnen')`). `neu` ist die
-  Erfassung (`?neu=1`), `zeichnen` der Zeichenmodus der Lagekarte (LFH-825, Träger `lagekarte`,
-  `?zeichnen=<zonentyp>`). Eine Zeile ohne Leser gibt es nicht; neue Zeilen ans Ende (Pins in
-  `befehle.test.ts`, `befehle.modulstatus.test.ts`), Bestandszeilen ohne `kennung`. Die Zeile
+  den deklarierten `parameter` als Literal (`X.get('neu')`, `X.get('zeichnen')`, `X.has('ansicht')`).
+  `neu` ist die Erfassung (`?neu=1`), `zeichnen` der Zeichenmodus der Lagekarte (LFH-825, Träger
+  `lagekarte`, `?zeichnen=<zonentyp>`), `ansicht` eine Ansicht des Moduls (y3zh5ymv D4,
+  „Fahrzeugstatus setzen“ → `?ansicht=tableau`; Parser in `routing/deeplinks.ts` zählen nicht als
+  Leser). Eine Zeile ohne Leser gibt es nicht. Die Reihenfolge der Tabelle ist die **feste Folge**;
+  angezeigt wird nach der **gezählten Nutzung je Benutzer** (`schnellaktionZaehler.ts`, Schlüssel
+  `schnellaktionen_zaehler` am Server, Standbild beim Öffnen wie das Gedächtnis), die feste Folge
+  gilt bei Gleichstand (Spec `sprungpalette`, „Schnellaktionen nach Nutzung geordnet“; Pins in
+  `befehle.test.ts`, `befehle.modulstatus.test.ts`). Bestandszeilen ohne `kennung`, neue mit;
+  braucht eine Zeile ein zweites Modul, trägt sie `braucht`. Die Zeile
   trägt Icon und Namen des Trägermoduls (`kontext`), die Beschriftung heißt Objekt + Verb
   („Person erfassen“); wer eine Beschriftung ändert, legt die alte als Schlagwort ab (LFH-1055).
   Ein engeres Recht als das Schreibrecht trägt die Zeile selbst: `recht: 'leitung'` zeigt sie nur

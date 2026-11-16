@@ -124,9 +124,12 @@ function setup(
           {/* Erstes freigegebenes Modul der Kategorie 'lage': der Rail-Klick auf eine fremde Kategorie
               navigiert dorthin; ohne diese Route bliebe der Rahmen leer. */}
           <Route path="lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
-          {/* Zweites Ziel INNERHALB von 'erfassung': 'personen' ist dort nicht das erste Modul ('etb') —
-              nur so sagt die Pfad-Sonde beim Selbstklick-Test etwas aus. */}
+          {/* Ziele INNERHALB von 'erfassung' („Betroffene & Schäden“): 'schaeden' ist dort nicht das
+              erste Modul ('personen') — nur so sagt die Pfad-Sonde beim Selbstklick-Test etwas aus. */}
           <Route path="personen" element={<div>Personen-Inhalt</div>} />
+          <Route path="schaeden" element={<div>Schäden-Inhalt</div>} />
+          {/* Zweites Ziel in 'fuehrung', der Kategorie des ETB (y3zh5ymv D10). */}
+          <Route path="einsatzdaten" element={<div>Einsatzdaten-Inhalt</div>} />
         </Route>
       </Routes>
       <PfadAnzeige />
@@ -213,9 +216,9 @@ describe('EinsatzLayout', () => {
   });
 
   /**
-   * LFH-952 (D1): ab `md` klebt der Kopf über dem Inhalt, unter `md` rollt er mit (am Handy wären
-   * ~140 px Kopf zu teuer). Die gemessene Höhe prüft `components/rahmenOben.test.tsx`, das Kleben
-   * im Browser `e2e/rahmen-stehen-bleiben.spec.ts`.
+   * LFH-952 (D1), LLH-1728 (D1): der Kopf klebt über dem Inhalt, in jeder Breite. Die gemessene
+   * Höhe prüft `components/rahmenOben.test.tsx`, das Kleben im Browser
+   * `e2e/rahmen-stehen-bleiben.spec.ts`.
    */
   it('ab md klebt der Kopf auf der Rahmenebene (LFH-952)', async () => {
     setup();
@@ -227,13 +230,17 @@ describe('EinsatzLayout', () => {
     expect(kopf).toHaveStyle({ position: 'sticky', top: '0px', zIndex: '100' });
   });
 
-  it('unter md rollt der Kopf mit (Gegenprobe, LFH-952)', async () => {
+  it('unter md klebt der Kopf ebenfalls (LLH-1728)', async () => {
     setzeViewportBreite(390);
     setup();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument(),
     );
-    expect(screen.getByRole('banner').style.position).toBe('');
+    expect(screen.getByRole('banner')).toHaveStyle({
+      position: 'sticky',
+      top: '0px',
+      zIndex: '100',
+    });
   });
 
   /**
@@ -249,15 +256,15 @@ describe('EinsatzLayout', () => {
     // einem Routen-Effekt grün.
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
 
-    await userEvent.click(screen.getByRole('link', { name: 'Betroffene' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Einsatzdaten' }));
 
-    expect(await screen.findByText('Personen-Inhalt')).toBeInTheDocument();
-    expect(leseZuletztModule(admin.id, 7)).toEqual(['personen']);
+    expect(await screen.findByText('Einsatzdaten-Inhalt')).toBeInTheDocument();
+    expect(leseZuletztModule(admin.id, 7)).toEqual(['einsatzdaten']);
   });
 
   /**
    * Die Panel-Gruppe „Zuletzt" gibt es nicht (Begründung an `ModulPanel`); der Speicher lebt für
-   * die Kommandopalette. 'lagekarte' liegt in 'lage', offen ist 'erfassung': stünde die Gruppe
+   * die Kommandopalette. 'lagekarte' liegt in 'lage', offen ist 'fuehrung': stünde die Gruppe
    * noch, wäre „Lagekarte" hier ein Knopf. Die Vorbedingung macht die Abwesenheit zur Aussage.
    */
   it('zeigt gemerkte Module nicht als „Zuletzt"-Gruppe im Panel', async () => {
@@ -266,19 +273,19 @@ describe('EinsatzLayout', () => {
     merkeModulBesuch(admin.id, 7, 'lagekarte');
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'Betroffene' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Einsatzdaten' })).toBeInTheDocument();
     expect(screen.queryByText('Zuletzt')).toBeNull();
     expect(queryNavEintrag('Lagekarte')).toBeNull();
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
     setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
-    // 'personen' ausblenden; das Erfassung-Panel ist via /etb offen.
-    setup(freigabenFixture({ personen: { sichtbar: false, zugriff: false } }));
+    // 'einsatzdaten' ausblenden; das Panel der Führung ist via /etb offen.
+    setup(freigabenFixture({ einsatzdaten: { sichtbar: false, zugriff: false } }));
     // Erst der Panel-Anker, dann die Abwesenheit ABWARTEN: bis die Freigaben ankommen, steht
     // „Personen" offen da (LFH-788). Der ETB-Inhalt allein sagt darüber nichts.
     expect(await screen.findByRole('link', { name: 'ETB' })).toBeInTheDocument();
-    await waitFor(() => expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument());
+    await waitFor(() => expect(queryNavEintrag('Einsatzdaten')).not.toBeInTheDocument());
   });
 
   it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
@@ -587,12 +594,12 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument());
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Erfassung' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Führung' }));
 
     expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     // Die Rail bleibt auf der Kategorie — sonst wäre „zugeklappt" von „keine Kategorie aktiv"
     // nicht zu unterscheiden.
-    expect(await screen.findByRole('link', { name: 'Erfassung' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Führung' })).toHaveAttribute(
       'aria-current',
       'true',
     );
@@ -668,7 +675,7 @@ describe('EinsatzLayout', () => {
         'aria-expanded',
         'false',
       );
-      expect(await screen.findByRole('link', { name: 'Erfassung' })).toHaveAttribute(
+      expect(await screen.findByRole('link', { name: 'Führung' })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
@@ -739,7 +746,7 @@ describe('EinsatzLayout', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Navigation öffnen' }));
 
       const dialog = await screen.findByRole('dialog');
-      expect(within(dialog).getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+      expect(within(dialog).getByRole('button', { name: 'Führung' })).toHaveAttribute(
         'aria-expanded',
         'true',
       );
@@ -763,7 +770,7 @@ describe('EinsatzLayout', () => {
       expect(screen.queryAllByRole('navigation')).toHaveLength(0);
     });
 
-    it('legt beide Umschalter ab, behält Alarm-Zentrale und Benutzermenü', async () => {
+    it('legt beide Umschalter ab, behält die Alarm-Zentrale', async () => {
       // Die Alarmzentrale bleibt, weil sie ihren Zustand ausspricht (sichtbarer Text plus
       // `aria-label`). Auf 390 px ist sie EIN gebündeltes Ziel, das seinen Zustand weiter nennt
       // („Ton blockiert"), mit beiden Steuerungen beschriftet im Menü — zwei Knöpfe brächen dort um.
@@ -772,7 +779,6 @@ describe('EinsatzLayout', () => {
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       expect(radiosImKopf()).toBe(0);
-      expect(screen.getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
       const alarm = screen.getByRole('button', { name: /^Alarmzentrale:/ });
       expect(alarm).toHaveTextContent('Ton blockiert');
       // Die Einzelknöpfe der breiten Bauform stehen hier NICHT — sonst erfüllten auch drei Ziele
@@ -780,8 +786,21 @@ describe('EinsatzLayout', () => {
       expect(screen.queryByRole('button', { name: 'Ton blockiert – freischalten' })).toBeNull();
     });
 
+    it('der Suchauslöser zwischen md und lg hält die A1-Trefffläche und die Rahmenfarbe', async () => {
+      setzeViewportBreite(820);
+      setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      const suche = within(screen.getByRole('banner')).getByRole('button', { name: 'Suchen' });
+      expect(suche).toHaveAttribute('aria-label', 'Suchen');
+      expect(suche.style.width).toBe('48px');
+      expect(suche.style.height).toBe('48px');
+      // Farbe aus der Nachtrolle des Rahmens — der Kopf ist modusfest.
+      expect(suche).toHaveStyle({ color: farbenDunkel.text });
+    });
+
     it('zeigt unter lg die Suche als Icon und keine Wortmarke', async () => {
-      // Auf 390 px kein Suchfeld, und die Wortmarke weicht dem Griff der Navigation.
+      // Zwischen `md` und `lg` kein Suchfeld, und die Wortmarke weicht dem Griff der Navigation.
+      setzeViewportBreite(820);
       setup();
       await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
       const kopf = screen.getByRole('banner');
@@ -807,13 +826,6 @@ describe('EinsatzLayout', () => {
       expect(hamburger.style.width).toBe('48px');
       expect(hamburger.style.height).toBe('48px');
 
-      const suche = screen.getByRole('button', { name: 'Suchen' });
-      expect(suche).toHaveAttribute('aria-label', 'Suchen');
-      expect(suche.style.width).toBe('48px');
-      expect(suche.style.height).toBe('48px');
-      // Farbe aus der Nachtrolle des Rahmens — der Kopf ist modusfest.
-      expect(suche).toHaveStyle({ color: farbenDunkel.text });
-
       await userEvent.click(hamburger);
       // Der Schließen-Knopf des Drawers ist von Haus aus kleiner als 48 px und wird gesetzt.
       const schliessen = (await screen.findByRole('dialog')).querySelector<HTMLElement>(
@@ -822,6 +834,71 @@ describe('EinsatzLayout', () => {
       expect(schliessen.style.minWidth).toBe('48px');
       expect(schliessen.style.minHeight).toBe('48px');
     });
+  });
+});
+
+describe('EinsatzLayout · Handy-Kopf (LLH-1728)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setzeViewportBreite(390);
+  });
+
+  it('trägt Menü, Name, Alarm, Verbindung und Uhr, aber weder Suche noch Benutzermenü (D3)', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const kopf = screen.getByRole('banner');
+    expect(within(kopf).getByRole('button', { name: 'Navigation öffnen' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /Hochwasser Nord/ })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: /^Alarmzentrale:/ })).toBeInTheDocument();
+    expect(kopf.querySelector('[data-lfh="kopf-sync"]')).not.toBeNull();
+    const uhr = kopf.querySelector<HTMLElement>('[data-lfh="kopf-uhr"]');
+    expect(uhr).not.toBeNull();
+    // Die schmale Zellpolsterung des Handy-Kopfs, wie die Alarmzelle daneben.
+    const alarmZelle = kopf.querySelector<HTMLElement>('[data-lfh="kopf-alarm"]')!;
+    expect(uhr!.style.paddingInlineStart).toBe(alarmZelle.style.paddingInlineStart);
+    expect(within(kopf).queryByRole('button', { name: 'Suchen' })).toBeNull();
+    expect(within(kopf).queryByRole('button', { name: 'Benutzermenü' })).toBeNull();
+  });
+
+  it('ab md stehen Suche und Benutzermenü im Kopf, nicht im Drawer (Gegenprobe)', async () => {
+    setzeViewportBreite(820);
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    const kopf = screen.getByRole('banner');
+    expect(within(kopf).getByRole('button', { name: 'Suchen' })).toBeInTheDocument();
+    expect(within(kopf).getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Navigation öffnen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('button', { name: 'Suchen' })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Benutzermenü' })).toBeNull();
+  });
+
+  it('„Suchen“ im Drawer schließt ihn und öffnet die Sprungpalette', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Navigation öffnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Suchen' }));
+    const feld = await screen.findByPlaceholderText(
+      'Suchen: Module, Aktionen, Einstellungen …',
+      {},
+      { timeout: 4000 },
+    );
+    expect(feld).toBeInTheDocument();
+    // Wohin der Fokus nach dem Schließen geht, misst `e2e/kopfzeile-schmal.spec.ts` (Animation).
+    // Der Drawer ist zu (`destroyOnHidden`: sein Inhalt verlässt den Baum).
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Erfassung' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('das Benutzermenü im Drawer öffnet dasselbe Menü bis „Abmelden“', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Navigation öffnen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Benutzermenü' }));
+    expect(await screen.findByRole('menuitem', { name: /Abmelden/ })).toBeInTheDocument();
   });
 });
 
@@ -844,8 +921,9 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
   it('springt über eine Sprungmarke ins Zielmodul, ohne sie als Besuch zu merken', async () => {
     setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     localStorage.clear();
-    setup();
-    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Start in der Kategorie der Marke (Betroffene & Schäden), damit ihr Panel offen ist.
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/schaeden');
+    await waitFor(() => expect(screen.getByText('Schäden-Inhalt')).toBeInTheDocument());
 
     await userEvent.click(
       screen.getByRole('link', { name: 'Vermisste, springt zu Personen · Vermisst' }),
@@ -879,26 +957,26 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
 
   /**
    * LLH-1734 (Spec `seiten-orientierung`): der Rail-Sprung führt ins zuletzt besuchte Modul der
-   * Kategorie. Start in 'personen' (nicht das erste Modul von Erfassung) als Ankunft per Adresse:
-   * auch sie zählt. Vorher landete der Rückweg in 'etb'.
+   * Kategorie. Start in 'schaeden' (nicht das erste Modul von „Betroffene & Schäden“) als Ankunft
+   * per Adresse: auch sie zählt. Vorher landete der Rückweg im ersten Modul.
    */
   it('springt zurück ins zuletzt besuchte Modul der Kategorie', async () => {
     localStorage.clear();
-    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen');
-    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/schaeden');
+    await waitFor(() => expect(screen.getByText('Schäden-Inhalt')).toBeInTheDocument());
     await freigabenAngekommen();
 
     await userEvent.click(screen.getByRole('link', { name: 'Lage' }));
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
     // Die Adresse des Rail-Links zeigt dorthin, wohin der Klick springt (LLH-1732): Strg/⌘+Klick
     // landet im neuen Tab im selben Modul.
-    expect(screen.getByRole('link', { name: 'Erfassung' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Betroffene & Schäden' })).toHaveAttribute(
       'href',
-      '/einsaetze/7/personen',
+      '/einsaetze/7/schaeden',
     );
 
-    await userEvent.click(screen.getByRole('link', { name: 'Erfassung' }));
-    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
+    await userEvent.click(screen.getByRole('link', { name: 'Betroffene & Schäden' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/schaeden'));
     // Ankünfte füllen „Zuletzt besucht“ der Palette nicht (Spec `navigation-zuletzt-besucht`).
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
@@ -907,10 +985,10 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     localStorage.clear();
     localStorage.setItem(
       `lfh:nav:kategorie-modul:${admin.id}:7`,
-      JSON.stringify({ erfassung: { key: 'personen', at: Date.now() } }),
+      JSON.stringify({ erfassung: { key: 'schaeden', at: Date.now() } }),
     );
     setup(
-      freigabenFixture({ personen: { zugriff: false } }),
+      freigabenFixture({ schaeden: { zugriff: false } }),
       {},
       admin,
       '/einsaetze/7/lage-dashboard',
@@ -918,8 +996,8 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await waitFor(() => expect(screen.getByText('Dashboard-Inhalt')).toBeInTheDocument());
     await freigabenAngekommen();
 
-    await userEvent.click(screen.getByRole('link', { name: 'Erfassung' }));
-    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/etb'));
+    await userEvent.click(screen.getByRole('link', { name: 'Betroffene & Schäden' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
   });
 
   /**
@@ -941,17 +1019,17 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
   it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {
     setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     // Der Selbstklick ist der Zuklapp-Umschalter mit Persistenz; ohne diese Gegenaussage färbte
-    // auch ein bedingungslos navigierender Klick den Test darüber grün. Startpunkt 'personen',
-    // nicht 'etb' (das erste Modul der Kategorie) — sonst änderte ein falscher Sprung den Pfad nicht.
-    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen');
-    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
+    // auch ein bedingungslos navigierender Klick den Test darüber grün. Startpunkt 'schaeden',
+    // nicht 'personen' (das erste Modul der Kategorie) — sonst änderte ein falscher Sprung den Pfad nicht.
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/schaeden');
+    await waitFor(() => expect(screen.getByText('Schäden-Inhalt')).toBeInTheDocument());
     const vorher = pfad();
 
-    // „Erfassung" ist die Kategorie von 'personen' — der Klick trifft die aktive.
-    await userEvent.click(await screen.findByRole('link', { name: 'Erfassung' }));
+    // „Betroffene & Schäden“ ist die Kategorie von 'schaeden' — der Klick trifft die aktive.
+    await userEvent.click(await screen.findByRole('link', { name: 'Betroffene & Schäden' }));
 
     expect(pfad()).toBe(vorher);
-    // Panel zugeklappt: ein Erfassung-Modul wie „Personen" steht nicht mehr im Baum
+    // Panel zugeklappt: ein Modul der Kategorie wie „Betroffene“ steht nicht mehr im Baum
     // (dieselbe Abfrage wie im Bestandstest zum gemerkten Einklapp-Zustand oben).
     expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument();
   });
@@ -965,13 +1043,15 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     setup(
       freigabenFixture({
         'lage-dashboard': { zugriff: false },
-        personen: { zugriff: false },
+        einsatzdaten: { zugriff: false },
       }),
     );
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     // Erst wenn die Freigaben da sind, steht das gesperrte Modul mit Schloss in der Liste.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Betroffene' })).toBeDisabled());
-    expect(screen.getByRole('button', { name: 'Betroffene' })).toHaveAttribute(
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Einsatzdaten' })).toBeDisabled(),
+    );
+    expect(screen.getByRole('button', { name: 'Einsatzdaten' })).toHaveAttribute(
       'title',
       'Keine Berechtigung',
     );
@@ -997,17 +1077,18 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // Das gesperrte Lage-Dashboard überspringt auch die Adresse, wie der Sprung (LFH-669).
     const lage = await screen.findByRole('link', { name: 'Lage' });
     expect(lage).toHaveAttribute('href', '/einsaetze/7/lagekarte');
-    expect(screen.getByRole('link', { name: 'Betroffene' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Betroffene & Schäden' })).toHaveAttribute(
       'href',
       '/einsaetze/7/personen',
     );
-    expect(
-      screen.getByRole('link', { name: 'Vermisste, springt zu Personen · Vermisst' }),
-    ).toHaveAttribute('href', '/einsaetze/7/personen?filter=vermisst&ansicht=zeilen');
+    expect(screen.getByRole('link', { name: 'Einsatzdaten' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/einsatzdaten',
+    );
 
     const vorher = pfad();
     fireEvent.click(lage, { ctrlKey: true });
-    fireEvent.click(screen.getByRole('link', { name: 'Betroffene' }), { ctrlKey: true });
+    fireEvent.click(screen.getByRole('link', { name: 'Einsatzdaten' }), { ctrlKey: true });
     expect(pfad()).toBe(vorher);
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
@@ -1492,7 +1573,7 @@ describe('EinsatzLayout · Übung (LLH-1725)', () => {
     expect(kopf.querySelector('[data-lfh="uebung-marke"]')).not.toBeNull();
   });
 
-  it('das Band klebt auch unter md, wo der Kopf mitrollt', async () => {
+  it('das Band klebt auch unter md, unter dem klebenden Kopf', async () => {
     setzeViewportBreite(390);
     setupUebung();
     const band = await waitFor(() => {

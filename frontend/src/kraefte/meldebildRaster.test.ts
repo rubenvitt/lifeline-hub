@@ -10,6 +10,7 @@ import {
   fmsWort,
   istProblemZeile,
   toenungsGruende,
+  grundWort,
   istRueckmeldungProblem,
   keineRueckmeldungZelle,
   offeneAuftraegeJeEinheit,
@@ -476,7 +477,7 @@ describe('Raster als Kräftebaum', () => {
     expect(gruppe.children!.map((z) => z.art)).toEqual(['material', 'material', 'material']);
     expect(zug.materialAusfall).toBe(1);
     expect(istProblemZeile(zug)).toBe(true);
-    expect(toenungsGruende(zug, null)).toEqual(['1 Ausfall Material']);
+    expect(toenungsGruende(zug, null).map(grundWort)).toEqual(['1 Ausfall Material']);
   });
 
   it('ein Posten zeigt Status und Menge über materialPosten; aufgebraucht ist Ausfall (LLH-1224)', () => {
@@ -535,7 +536,7 @@ describe('Raster als Kräftebaum', () => {
     expect(material.gruppe).toEqual({ anzahl: 1, ausfall: 0 });
     expect(zug.materialAusfall).toBe(1);
     expect(istProblemZeile(zug)).toBe(true);
-    expect(toenungsGruende(zug, null)).toEqual(['1 Ausfall Material']);
+    expect(toenungsGruende(zug, null).map(grundWort)).toEqual(['1 Ausfall Material']);
     // Material an der UHS steht nicht im Baum.
     expect(alleZeilen([zug]).some((z) => z.key === 'em-4')).toBe(false);
   });
@@ -811,7 +812,11 @@ describe('istProblemZeile', () => {
         fahrzeuge: [fz(1, 3, 106, 'nicht_verfuegbar')],
       }),
     );
-    expect(raster.map((z) => toenungsGruende(z, null))).toEqual([['1 Ausfall'], [], ['1 Ausfall']]);
+    expect(raster.map((z) => toenungsGruende(z, null).map(grundWort))).toEqual([
+      ['1 Ausfall'],
+      [],
+      ['1 Ausfall'],
+    ]);
     const [hand] = baueMeldebildRaster(
       eingabe({
         einheiten: [eh(9, null, null, { status: st.hand(S6) } as Partial<Einheit>)],
@@ -864,11 +869,17 @@ describe('Rückmeldung je Rasterzeile', () => {
     expect(rueckmeldungDerZeile(zeile('eh-1'), je, JETZT)).toEqual({
       zustand: 'aktuell',
       letzte: DATEN.einheiten[0],
+      seitMin: null,
     });
-    expect(rueckmeldungDerZeile(zeile('eh-2'), je, JETZT)?.zustand).toBe('ueberfaellig');
+    expect(rueckmeldungDerZeile(zeile('eh-2'), je, JETZT)).toEqual({
+      zustand: 'ueberfaellig',
+      letzte: DATEN.einheiten[1],
+      seitMin: 1,
+    });
     expect(rueckmeldungDerZeile(zeile('eh-3'), je, JETZT)).toEqual({
       zustand: 'keine',
       letzte: null,
+      seitMin: null,
     });
   });
 
@@ -893,12 +904,49 @@ describe('Rückmeldung je Rasterzeile', () => {
     expect(istRueckmeldungProblem(null)).toBe(false);
   });
 
-  it('begründet die Tönung mit einem Wort je Rückmeldungszustand', () => {
-    const gruende = (key: string) =>
-      toenungsGruende(zeile(key), rueckmeldungDerZeile(zeile(key), je, JETZT));
+  it('begründet die Tönung mit einem Grund je Rückmeldungszustand, überfällig mit Dauer', () => {
+    const gruende = (key: string, jetzt = JETZT) =>
+      toenungsGruende(zeile(key), rueckmeldungDerZeile(zeile(key), je, jetzt));
     expect(gruende('eh-1')).toEqual([]);
-    expect(gruende('eh-2')).toEqual(['Rückm. überfällig']);
-    expect(gruende('eh-3')).toEqual(['keine Rückm.']);
+    expect(gruende('eh-2')).toEqual([{ art: 'rueckmeldung_ueberfaellig', seitMin: 1 }]);
+    expect(gruende('eh-3')).toEqual([{ art: 'rueckmeldung_keine' }]);
+    // Die Dauer wächst mit der Seitenuhr (fällig 11:59).
+    expect(gruende('eh-2', dayjs.utc('2026-09-22 12:46:00')).map(grundWort)).toEqual([
+      'Rückm. überfällig seit 47 min',
+    ]);
+    expect(gruende('eh-2', dayjs.utc('2026-09-22 14:04:00')).map(grundWort)).toEqual([
+      'Rückm. überfällig seit 2 h 05 min',
+    ]);
+    expect(gruende('eh-3').map(grundWort)).toEqual(['keine Rückm.']);
+  });
+
+  it('in der ersten Minute „seit < 1 min“, nie „seit 0 min“ (Review)', () => {
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 0 })).toBe(
+      'Rückm. überfällig seit < 1 min',
+    );
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 0, einheiten: 2 })).toBe(
+      '2 Einh. Rückm. überfällig, längste seit < 1 min',
+    );
+    // Ab der ersten vollen Minute die Dauer.
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 1 })).toBe(
+      'Rückm. überfällig seit 1 min',
+    );
+  });
+
+  it('fasst mehrere Einheiten eines Abschnitts zusammen (LLH-1739)', () => {
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 47, einheiten: 1 })).toBe(
+      'Rückm. überfällig seit 47 min',
+    );
+    expect(grundWort({ art: 'rueckmeldung_ueberfaellig', seitMin: 47, einheiten: 3 })).toBe(
+      '3 Einh. Rückm. überfällig, längste seit 47 min',
+    );
+    expect(grundWort({ art: 'rueckmeldung_keine', einheiten: 1 })).toBe('keine Rückm.');
+    expect(grundWort({ art: 'rueckmeldung_keine', einheiten: 2 })).toBe('2 Einh. ohne Rückm.');
+  });
+
+  it('gibt Ausfall und Material als Anzahl, mit Wort in der Einzahl wie im Meldebild', () => {
+    expect(grundWort({ art: 'ausfall', anzahl: 2 })).toBe('2 Ausfall');
+    expect(grundWort({ art: 'ausfall_material', anzahl: 1 })).toBe('1 Ausfall Material');
   });
 
   it('die Kachel zählt NUR nie zurückgemeldete Einheiten — überfällige nicht', () => {

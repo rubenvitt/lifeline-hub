@@ -63,7 +63,7 @@ test('Meldebild bei 390 px: das Aufklapp-Symbol lebt in der fixierten Spalte, kl
   await page.setViewportSize(HANDSCHIRM);
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
 
-  const bereich = page.getByRole('region', { name: 'Meldebild' });
+  const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
   await expect(bereich).toHaveCount(1);
 
   // (a) `form="tabelle"` wirkt: auf 390 px steht eine Tabelle, KEIN Kartenzweig
@@ -153,11 +153,13 @@ test('Meldebild: der Baum-Einzug hält bei langen Namen, 390 und 1440 px', async
   for (const viewport of [HANDSCHIRM, { width: 1440, height: 900 }]) {
     await page.setViewportSize(viewport);
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-    const zeilen = page.getByRole('region', { name: 'Meldebild' }).locator('tr.ant-table-row');
+    const zeilen = page
+      .getByRole('region', { name: 'Kräfteübersicht' })
+      .locator('tr.ant-table-row');
     await expect(zeilen).toHaveCount(1);
     await zeilen.first().locator('.ant-table-row-expand-icon').click();
     await expect(zeilen, 'Aufklappen bringt die 3 gesäten Kräfte').toHaveCount(4);
-    const lage = await baumLage(page, '[aria-label="Meldebild"]');
+    const lage = await baumLage(page, '[aria-label="Kräfteübersicht"]');
     expect(lage.filter((z) => z.ebene === 1)).toHaveLength(3);
     pruefeHaengendenEinzug(lage, `Meldebild ${viewport.width} px`, 'inhalt');
   }
@@ -283,7 +285,7 @@ test('Meldebild bei 1440 px: Rückmeldung und Auftrag ohne Querscrollen im Bild,
     for (const { breite, ohneQuerscrollen } of SPALTEN_SCHIRME) {
       await page.setViewportSize({ width: breite, height: 900 });
       await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-      const bereich = page.getByRole('region', { name: 'Meldebild' });
+      const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
       await expect(bereich.locator('tr.ant-table-row')).toHaveCount(4);
       const kopf = (name: string) => bereich.getByRole('columnheader', { name, exact: true });
       // Gepollt: solange der Abruf läuft, steht die Spalte, erst die 403 nimmt sie weg.
@@ -352,7 +354,7 @@ test('Meldebild als Kräftebaum: Einheit → Untergruppe → Fahrzeug → Besatz
   for (const breite of [1366, 1440]) {
     await page.setViewportSize({ width: breite, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-    const bereich = page.getByRole('region', { name: 'Meldebild' });
+    const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
     const zeile = (key: string) => bereich.locator(`tr[data-row-key="${key}"]`);
 
     // Vorgabe „Einheiten“: Zug offen (Fahrzeug und Gruppe), Besatzung und Gruppenkraft zu.

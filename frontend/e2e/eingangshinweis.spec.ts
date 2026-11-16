@@ -79,8 +79,8 @@ test('Lagemeldung von einem zweiten Schirm: Eingangshinweis in zwei Tabs, „Sic
   // Dieselbe Zahl am Knopf „Eingänge“, in beiden Tabs (LLH-1143 D8).
   await expect(page.getByRole('button', { name: 'Eingänge, 1 ungelesen' })).toBeVisible();
   await expect(zweiterTab.getByRole('button', { name: 'Eingänge, 1 ungelesen' })).toBeVisible();
-  // Ein Eingang nimmt keinen Toastplatz.
-  await expect(page.locator('.ant-notification-notice')).toHaveCount(0);
+  // Ein Eingang steht nicht in der Alarmzone (LLH-1735).
+  await expect(page.locator('[data-lfh="alarmzone"]')).toHaveCount(0);
 
   await hinweis.getByRole('button', { name: `Sichten: ${ABSENDER}`, exact: true }).click();
 

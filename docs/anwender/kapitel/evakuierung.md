@@ -1,7 +1,7 @@
 ---
 titel: Evakuierung
 gruppen: [alle, fuehrung]
-reihenfolge: 525
+reihenfolge: 320
 quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/Stufenlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, frontend/src/components/RadiusEingabe.tsx, src/routes/evakuierung.rs, src/betreuung/repo.rs]
 ---
 
@@ -136,7 +136,8 @@ In der Tabelle setzt „Räumung setzen“ im Menü eines Bezirks den Zustand eb
 
 ### Plangröße und Angaben eines Bezirks ändern
 
-1. Auf der Seite des Bezirks „Bearbeiten“ wählen. Die Stammdaten werden zu Eingabefeldern.
+1. Auf der Seite des Bezirks im Menü oben (drei Punkte) „Bearbeiten“ wählen. Die Stammdaten werden
+   zu Eingabefeldern.
 2. Die Angaben ändern, etwa die „Plangröße (Personen)“ und ihre „Erhebung“.
 3. „Speichern“ wählen. Gespeichert wird nur, was geändert wurde; was jemand anders inzwischen
    geändert hat, bleibt stehen. „Abbrechen“ verwirft die Eingabe.

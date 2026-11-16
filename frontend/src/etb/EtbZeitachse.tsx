@@ -1,5 +1,5 @@
-import { App, Button, Image, Space } from 'antd';
-import { grossansichtPfad, originalDateiname, originalPfad } from '../api/anhangFassung';
+import { App, Button, Space } from 'antd';
+import { originalDateiname, originalPfad } from '../api/anhangFassung';
 import { ladeAnhangHerunter } from '../components/anhangHerunterladen';
 import { useSpiegelAusCache } from '../einsatz/spiegel/useSpiegelAntraege';
 import {
@@ -62,6 +62,7 @@ import {
   type VonAnAnzeige,
 } from './etbSpalten';
 import { vermerkeVon, type Vermerk } from './vermerke';
+import { AnhangGrossansicht } from '../components/AnhangVorschau';
 import { scrollNachOben, useNachObenPasst, useWeitGerollt } from './nachOben';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
@@ -518,7 +519,7 @@ export default function EtbZeitachse({
     melde: (art: 'info' | 'error', text: string) => void message[art](text),
   });
   // Großansicht eines Bild-Anhangs aus dem Zeilenmenü (Review L1); `null`: zu.
-  const [menueVorschau, setMenueVorschau] = useState<string | null>(null);
+  const [menueVorschau, setMenueVorschau] = useState<NonNullable<Vermerk['datei']> | null>(null);
   useLayoutEffect(() => {
     navigateRef.current = navigate;
     ladeOptionen.current = {
@@ -553,7 +554,7 @@ export default function EtbZeitachse({
           originalDateiname(d.dateiname),
           ladeOptionen.current,
         ),
-      vorschau: (d) => setMenueVorschau(grossansichtPfad(d.href)),
+      vorschau: (d) => setMenueVorschau(d),
     }),
     [],
   );
@@ -799,11 +800,15 @@ export default function EtbZeitachse({
         />
       )}
       {/* Großansicht aus dem Zeilenmenü (Review L1): dieselbe Überlagerung wie am Vorschaubild
-          (`AnhangVorschauGruppe`), ohne eigenes Bild im Fluss. */}
+          (`AnhangVorschauGruppe`), ohne eigenes Bild im Fluss; ein HEIC dekodiert das Gerät
+          (LLH-1887). */}
       {menueVorschau != null && (
-        <Image.PreviewGroup
-          items={[menueVorschau]}
-          preview={{ open: true, onOpenChange: (offen) => !offen && setMenueVorschau(null) }}
+        <AnhangGrossansicht
+          href={menueVorschau.href}
+          mime={menueVorschau.mime}
+          dateiname={menueVorschau.dateiname}
+          onSchliessen={() => setMenueVorschau(null)}
+          melde={(text) => ladeOptionen.current.melde('error', text)}
         />
       )}
       {/* Die Achse hält unten die Höhe von „Nach oben“ frei: in der Funkprotokoll-Ordnung steht er

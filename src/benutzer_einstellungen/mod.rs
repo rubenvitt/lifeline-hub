@@ -35,12 +35,19 @@ pub const SCHLUESSEL_ETB_STANDARD_RUFNAME: &str = "etb_standard_rufname";
 /// ([`pruefe_wert`]): nur Hinweis-Arten, Alarm-Arten sind nicht abschaltbar.
 pub const SCHLUESSEL_BENACHRICHTIGUNGEN_AUS: &str = "benachrichtigungen_aus";
 
+/// Ausführungen je Schnellaktion der Kommandopalette (y3zh5ymv D5, Spec `sprungpalette`,
+/// „Schnellaktionen nach Nutzung geordnet“); Wert ist ein JSON-Objekt `{"<befehls-id>": <anzahl>}`
+/// als Text. Opak wie [`SCHLUESSEL_ZULETZT_BEFEHLE`]: gelesen, geprüft und aufgeräumt wird er nur im
+/// Client (`command-palette/schnellaktionZaehler.ts`).
+pub const SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER: &str = "schnellaktionen_zaehler";
+
 /// Der gesamte gültige Schlüsselraum. Eine neue Präferenz wird hier eingetragen —
 /// die Tabelle bleibt unangetastet.
 pub const BEKANNTE_SCHLUESSEL: &[&str] = &[
     SCHLUESSEL_ZULETZT_BEFEHLE,
     SCHLUESSEL_ETB_STANDARD_RUFNAME,
     SCHLUESSEL_BENACHRICHTIGUNGEN_AUS,
+    SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER,
 ];
 
 /// Obergrenze für einen Wert in **Zeichen** (nicht Bytes, sonst hinge sie an der Kodierung).
@@ -132,6 +139,20 @@ mod tests {
         assert!(!ist_gueltiger_schluessel(""));
         // Kein Präfix-Match: ein Schlüssel gilt ganz oder gar nicht.
         assert!(!ist_gueltiger_schluessel("zuletzt_befehle_v2"));
+    }
+
+    #[test]
+    fn schnellaktionen_zaehler_ist_ein_gueltiger_opaker_schluessel() {
+        assert!(ist_gueltiger_schluessel(SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER));
+        assert_eq!(
+            SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER,
+            "schnellaktionen_zaehler"
+        );
+        // Opak: der Server prüft den Inhalt nicht, der Client räumt beim Lesen auf.
+        assert_eq!(
+            pruefe_wert(SCHLUESSEL_SCHNELLAKTIONEN_ZAEHLER, "{\"aktion:etb\":3}").unwrap(),
+            "{\"aktion:etb\":3}"
+        );
     }
 
     #[test]

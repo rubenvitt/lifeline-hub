@@ -25,6 +25,7 @@ import {
   ListenPaneel,
   NUR_VORLESER,
   PaneelReihe,
+  StatusChip,
   StromPaneel,
   Verteilungsliste,
   WarnstufenHinweis,
@@ -68,7 +69,7 @@ import {
   meldungsStand,
 } from '../lage-dashboard/fuehrungsZahlen';
 import { einsatzdauerKennzahl } from '../lage-dashboard/lagebild';
-import { NICHT_BEURTEILT } from '../gefahren/beurteilung';
+import { UNBESTAETIGT } from '../gefahren/beurteilung';
 import { pegelAbfrage } from '../../api/pegel';
 import { wetterAbfrage } from '../../api/wetter';
 import { unwetterLage } from '../../wetter/unwetter';
@@ -99,7 +100,9 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import { abschnittLagezustand, etbTyp, rollenFarbe } from '../../theme/statusFarben';
 import StatusTag from '../../components/StatusTag';
 import { useViewport } from '../../components/useViewport';
+import { grundWort } from '../../kraefte/meldebildRaster';
 import {
+  abschnittGruende,
   abschnittNamen,
   abschnittZeilen,
   auftraegeKennzahl,
@@ -595,7 +598,7 @@ export default function UeberblickPage() {
 
   // ── Seitenkopf: Warnstufe wie im Lagebild (Dashboard-Baukasten, LLH-1140) ── Sie ist keine
   // Kennzahl: der Hinweis steht nur bei Ton achtung/alarm. Was die Kennzahl außerdem trug, steht
-  // daneben: nicht beurteilte Gebiete (LLH-1090, Offenes sieht nicht wie Entwarnung aus) und die
+  // daneben: unbestätigte Gebiete (LLH-1090, Offenes sieht nicht wie Entwarnung aus) und die
   // Pegel-Notiz (LFH-606).
   const warnTon =
     zWarnstufe === 'daten' && (warnstufe.ton === 'alarm' || warnstufe.ton === 'achtung')
@@ -603,7 +606,7 @@ export default function UeberblickPage() {
       : null;
   const nichtBeurteilt =
     zWarnstufe === 'daten' && warnstufe.nichtBeurteilt > 0
-      ? `${warnstufe.nichtBeurteilt} ${NICHT_BEURTEILT}`
+      ? `${warnstufe.nichtBeurteilt} ${UNBESTAETIGT}`
       : null;
   const kopfLage =
     warnTon || nichtBeurteilt || pegelNotiz ? (
@@ -859,7 +862,7 @@ export default function UeberblickPage() {
                       nachladen(qAbschnitte, qEinheiten, qPersonal, qFahrzeuge, qMaterial)
                     }
                     zeilen={zeilen.map((z) =>
-                      abschnittGliederung(z, einsatzId, kurz, token, rollen),
+                      abschnittGliederung(z, einsatzId, kurz, token, rollen, jetzt),
                     )}
                   />
 
@@ -1058,8 +1061,13 @@ function abschnittGliederung(
   zeit: (utc: string | null | undefined) => string,
   token: Parameters<typeof rollenFarbe>[1],
   rollen: ReturnType<typeof useRollen>['rollen'],
+  /** Seitenuhr: das Urteil über die Rückmeldung schlägt ohne neue Daten um (LLH-1739). */
+  jetzt: Dayjs,
 ): Gliederungszeile {
   const [juengster, ...weitere] = zeile.auftraege;
+  // Was brennt (LLH-1739): Ausfall und Rückmeldung wie im Meldebild, als Etikett in Alarmrolle
+  // direkt neben dem Lagezustand. Der gepflegte Zustand bleibt stehen (Beurteilung, LFH-608).
+  const gruende = abschnittGruende(zeile, jetzt);
   const { auftragsbilanz } = zeile;
   const verteilung = zeile.einheitenStatus;
   const rueck = zeile.letzteRueckmeldung;
@@ -1076,12 +1084,14 @@ function abschnittGliederung(
   ]
     .filter(Boolean)
     .join(' · ');
-  const summe = verteilung.bereit + verteilung.gebunden + verteilung.ausfall + verteilung.ohne;
+  const summe =
+    verteilung.bereit + verteilung.gebunden + verteilung.nichtVerfuegbar + verteilung.ohne;
   const status: Verteilungszeile[] = (
     [
       ['bereit', verteilung.bereit, 'normal'],
       ['gebunden', verteilung.gebunden, 'bedien'],
-      ['Ausfall', verteilung.ausfall, 'alarm'],
+      // Nicht „Ausfall“: den zählt das Meldebild an den Mitteln, er steht als Etikett im Kopf.
+      ['nicht verfügbar', verteilung.nichtVerfuegbar, 'alarm'],
     ] as const
   ).map(([wort, wert, rolle]) => ({
     schluessel: wort,
@@ -1128,8 +1138,11 @@ function abschnittGliederung(
           {anzahlWort(zeile.einheiten, 'Einheit', 'Einheiten')}
           {zeile.unterabschnitte > 0 && ` inkl. UA · ${zeile.unterabschnitte} UA`}
         </span>
-        {(lage || zeile.unterLage) && (
-          <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+        {(lage || zeile.unterLage || gruende.length > 0) && (
+          <span
+            data-lfh="abschnitt-zustand"
+            style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}
+          >
             {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
             {/* Ein schlechter beurteilter Unterabschnitt bekommt dieselbe Form wie der eigene
                 Zustand (Rollenrand + Wort), sonst stünde „UA kritisch“ leiser da als ein grünes
@@ -1143,6 +1156,9 @@ function abschnittGliederung(
                 darstellungsart="rand"
               />
             )}
+            {gruende.map((g) => (
+              <StatusChip key={g.art} ton="alarm" wort={grundWort(g)} />
+            ))}
           </span>
         )}
       </>

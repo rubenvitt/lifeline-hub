@@ -1,4 +1,9 @@
-import type { EinsatzFahrzeug } from './types';
+import type {
+  EinsatzFahrzeug,
+  EntlassungAntwort,
+  EntlassungRuecknahmeAntwort,
+  EntlassungVorzustand,
+} from './types';
 import { apiGet, apiSend } from './client';
 import type { PositionPatch } from './einheiten';
 
@@ -69,13 +74,30 @@ export function listEntlasseneFahrzeuge(einsatzId: number): Promise<EinsatzFahrz
 
 /**
  * Aus dem Einsatz entlassen (LLH-1079): die Zeile bleibt, Besatzung, Einheit,
- * Bereitstellungsraum und Führungsstelle gehen. Umkehrbar über {@link reaktiviereDisposition},
- * deshalb ohne Rückfrage.
+ * Bereitstellungsraum, Führungsstelle und Beladung gehen. Die Antwort trägt den Vorzustand, mit
+ * dem {@link nimmEntlassungZurueck} alles zurücknimmt (LLH-1722); deshalb ohne Rückfrage.
  */
-export function entlasseDisposition(einsatzId: number, efId: number): Promise<EinsatzFahrzeug> {
-  return apiSend<EinsatzFahrzeug>(
+export function entlasseDisposition(einsatzId: number, efId: number): Promise<EntlassungAntwort> {
+  return apiSend<EntlassungAntwort>(
     `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/entlassen`,
     'POST',
+  );
+}
+
+/**
+ * „Rückgängig“ nach dem Entlassen (LLH-1722, Spec `kraefte-entlassung`): stellt den Zustand
+ * davor her; was inzwischen anders gebunden ist, steht in `ausgelassen`. Nur direkt danach und
+ * nur für die entlassende Person, sonst 409; danach bleibt {@link reaktiviereDisposition}.
+ */
+export function nimmEntlassungZurueck(
+  einsatzId: number,
+  efId: number,
+  vorzustand: EntlassungVorzustand,
+): Promise<EntlassungRuecknahmeAntwort> {
+  return apiSend<EntlassungRuecknahmeAntwort>(
+    `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/entlassen/zuruecknehmen`,
+    'POST',
+    vorzustand,
   );
 }
 
@@ -84,7 +106,7 @@ export function storniereDisposition(einsatzId: number, efId: number): Promise<v
   return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/stornieren`, 'POST');
 }
 
-/** Ein entlassenes oder storniertes Fahrzeug erneut disponieren (Rückgängig, Block „Entlassen“). */
+/** Ein entlassenes oder storniertes Fahrzeug erneut disponieren (Block „Entlassen“): neuer Anfangsstatus, keine Bindung. */
 export function reaktiviereDisposition(einsatzId: number, efId: number): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(
     `/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/reaktivieren`,

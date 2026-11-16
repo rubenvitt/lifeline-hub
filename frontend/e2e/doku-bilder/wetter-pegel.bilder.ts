@@ -207,13 +207,19 @@ async function vorbereiten(page: Page, pegelListe = true): Promise<number> {
   return demo.id;
 }
 
+/** Der Eintrag der Unwetterwarnung in der Alarmzone (LLH-1735). */
+function unwetterEintrag(page: Page) {
+  return page.locator('[data-lfh="alarm-eintrag"]').filter({ hasText: 'Unwetterwarnung' });
+}
+
 /**
- * Die angekündigte Unwetterwarnung löst beim ersten Laden den Hinweis der AlarmZentrale aus. Er
- * läge über dem Pegel bzw. dem Paneel; er hat ein eigenes Bild.
+ * Die angekündigte Unwetterwarnung löst beim ersten Laden einen Alarm in der Alarmzone aus. Er
+ * schöbe die Seite um eine Zeile nach unten; er hat ein eigenes Bild. Ausblenden, nicht quittieren:
+ * die Unwetterwarnung hat kein „Gelesen“.
  */
 async function unwetterHinweisSchliessen(page: Page) {
-  const hinweis = page.locator('.ant-notification-notice').filter({ hasText: 'Unwetterwarnung' });
-  await hinweis.locator('.ant-notification-notice-close').click();
+  const hinweis = unwetterEintrag(page);
+  await hinweis.getByRole('button', { name: 'Ausblenden, ohne zu quittieren' }).click();
   await expect(hinweis).toHaveCount(0);
 }
 
@@ -242,9 +248,9 @@ test.describe(KAPITEL, () => {
   test('Hinweis auf eine neue Unwetterwarnung', async ({ page }) => {
     const id = await vorbereiten(page);
     await page.goto(`/einsaetze/${id}/ueberblick`);
-    const hinweis = page.locator('.ant-notification-notice').filter({ hasText: 'Unwetterwarnung' });
+    const hinweis = unwetterEintrag(page);
     await expect(hinweis.getByRole('button', { name: 'Öffnen' })).toBeVisible();
-    await fotografiere(hinweis, KAPITEL, 'unwetter-hinweis');
+    await fotografiere(page.locator('[data-lfh="alarmzone"]'), KAPITEL, 'unwetter-hinweis');
     await hinweis.getByRole('button', { name: 'Öffnen' }).click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/wetter-pegel$`));
   });

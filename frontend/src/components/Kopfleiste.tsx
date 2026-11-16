@@ -131,26 +131,38 @@ export function kopfRasterSpalten(suchTrefflaeche: number): string {
 
 /**
  * Markenzelle: Bildmarke „Lebenslinie“ (LFH-837) in der Textfarbe des Rahmens, in Rail-Breite.
- * Reine Dekoration; den Namen trägt die Wortmarke daneben.
+ * Sonst reine Dekoration, den Namen trägt die Wortmarke daneben. Mit `alsLink` übernimmt sie
+ * deren Ziel und Namen: im App-Rahmen unter `md`, wo die Wortmarke der Uhr weicht (LLH-1728, D5).
  */
-export function Markenzelle() {
+export function Markenzelle({ alsLink = false }: { alsLink?: boolean }) {
   const { token } = theme.useToken();
   const breite = railBreite(token);
+  const stil: CSSProperties = {
+    width: breite,
+    flex: `0 0 ${breite}px`,
+    minHeight: KOPF_HOEHE,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderInlineEnd: `1px solid ${rahmenFarben.linie}`,
+  };
+  const marke = <Bildmarke hoehe={MARKENZELLE_BILDMARKE_HOEHE} linienFarbe={rahmenFarben.text} />;
+  if (alsLink) {
+    // Als Bedienziel hält die Zelle den Boden der Staffel (72 px in `handschuh`, Gate 1).
+    return (
+      <Link
+        to={einsaetzePfad()}
+        aria-label="lifeline-hub"
+        data-lfh="kopf-marke"
+        style={{ ...stil, minHeight: Math.max(KOPF_HOEHE, token.controlHeight) }}
+      >
+        {marke}
+      </Link>
+    );
+  }
   return (
-    <div
-      aria-hidden="true"
-      data-lfh="kopf-marke"
-      style={{
-        width: breite,
-        flex: `0 0 ${breite}px`,
-        minHeight: KOPF_HOEHE,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderInlineEnd: `1px solid ${rahmenFarben.linie}`,
-      }}
-    >
-      <Bildmarke hoehe={MARKENZELLE_BILDMARKE_HOEHE} linienFarbe={rahmenFarben.text} />
+    <div aria-hidden="true" data-lfh="kopf-marke" style={stil}>
+      {marke}
     </div>
   );
 }
@@ -199,12 +211,19 @@ export function formatiereUhr(ms: number): string {
  * nicht die Anzeigezone eines Einsatzes: der Kopf liegt AUSSERHALB des `EinsatzAnzeigeProvider`
  * und steht auch auf der Einsatzliste. Eine Uhr, die je Route die Zone wechselt, wäre schlimmer.
  */
-export function Uhr() {
+export function Uhr({
+  zelle,
+  trenner = 'ende',
+}: {
+  zelle?: { padding: number };
+  trenner?: 'ende' | 'keiner';
+}) {
   const { token } = theme.useToken();
   const jetzt = useMinutenTakt();
   const text = formatiereUhr(jetzt);
+  // `zelle`: die Polsterung der Nachbarzellen; unter `md` die schmale des Handy-Kopfs (LLH-1728, D3).
   return (
-    <div data-lfh="kopf-uhr" style={kopfZelleStil(token)}>
+    <div data-lfh="kopf-uhr" style={kopfZelleStil(zelle ?? token, trenner)}>
       <time
         dateTime={dayjs(jetzt).format('HH:mm')}
         aria-label={`Uhrzeit ${text}`}

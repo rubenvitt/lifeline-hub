@@ -122,13 +122,23 @@ export function heraufstufenZuEtb(
   typ: EtbTyp,
   inhalt: string,
   anhangIds: number[] = [],
+  /**
+   * Legt bei Meldung/Lage die Meldung im Meldungseingang mit an (y3zh5ymv D8). Nur gesendet, wenn
+   * wahr: fehlt das Feld, protokolliert der Server nur.
+   */
+  inMeldungseingang = false,
 ): Promise<ChatNachricht> {
   // LFH-700: gewählte Anhänge gehen als Kopie ins ETB. Ohne Auswahl fehlt das Feld, der Server
   // übernimmt dann keine Datei.
   return apiSend<ChatNachricht>(
     `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-etb`,
     'POST',
-    anhangIds.length > 0 ? { typ, inhalt, anhang_ids: anhangIds } : { typ, inhalt },
+    {
+      typ,
+      inhalt,
+      ...(anhangIds.length > 0 ? { anhang_ids: anhangIds } : {}),
+      ...(inMeldungseingang ? { in_meldungseingang: true } : {}),
+    },
   );
 }
 

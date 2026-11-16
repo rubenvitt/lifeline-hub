@@ -364,7 +364,7 @@ export const farbenDunkel: Farbrollen = {
   bannerLinie: '#1d3a5c',
   berichtigungZeile: '#160d0f',
   lueckeZeile: '#161305',
-  problemZeile: '#130f0f',
+  problemZeile: '#1e1416',
   zeichenPlatte: '#c9ced4',
   uebungFuellung: '#6d28d9',
   uebungSchraffur: '#5b21b6',

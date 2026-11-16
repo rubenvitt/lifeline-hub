@@ -69,6 +69,8 @@ import {
   personalBand,
   rueckmeldungDerZeile,
   toenungsGruende,
+  grundWort,
+  type ToenungsGrund,
   type RasterZeile,
   type RueckmeldungAnzeige,
 } from '../kraefte/meldebildRaster';
@@ -484,7 +486,7 @@ function StatusSpalte({
 }: {
   zeile: RasterZeile;
   handStatus: StatusKontext['handStatus'];
-  gruende: readonly string[];
+  gruende: readonly ToenungsGrund[];
   /**
    * Grund eines abgelehnten Handstatus (LFH-1077). Steht unabhängig vom Auslöser: nach einer
    * Ablehnung nimmt der Refetch ihn oft weg, weil die Einheit inzwischen ein Fahrzeug führt.
@@ -492,14 +494,17 @@ function StatusSpalte({
   fehler: ZeilenGrund | null;
 }) {
   const { token, rollen } = useRollen();
-  // Der Grund der Zeilentönung als Wort (LFH-973): sichtbar in einer Spalte, die auch bei
-  // 1180 px steht; der Text ist zugleich der zugängliche Name, kein abweichendes `aria-label`.
+  // Der Grund der Zeilentönung als Etikett in der Alarmrolle (LFH-973, LLH-1741): sichtbar in
+  // einer Spalte, die auch bei 1180 px steht; das Wort ist zugleich der zugängliche Name, kein
+  // abweichendes `aria-label`. Die Chips brechen zwischen, nicht in einem Wort um.
   const grund = gruende.length > 0 && (
     <span
       data-lfh="meldebild-toenungsgrund"
-      style={{ fontSize: schriftGroesse('klein'), fontWeight: 500 }}
+      style={{ display: 'flex', flexWrap: 'wrap', gap: token.marginXXS }}
     >
-      {gruende.join(' · ')}
+      {gruende.map((g) => (
+        <StatusChip key={g.art} ton="alarm" wort={grundWort(g)} />
+      ))}
     </span>
   );
   let status: React.ReactNode = null;
@@ -682,6 +687,7 @@ function RueckmeldungZelle({
       title={beschreibung}
       data-lfh="meldebild-rueckmeldung"
       data-zustand={anzeige.zustand}
+      data-rolle={rolle}
       style={{ ...zahlStil('fein'), color: farbe, whiteSpace: 'nowrap' }}
     >
       {zeit ?? '—'}
@@ -1115,7 +1121,7 @@ export default function KraefteuebersichtPage() {
       // frühere POST + PATCH ließ bei gescheitertem PATCH einen leeren Entwurf stehen.
       const lb = await legeLageberichtAn(einsatzId, {
         vorlage: 'freitext',
-        titel: `Kräftemeldebild ${stand}`,
+        titel: `Kräfteübersicht ${stand}`,
         abschnitte: [{ schluessel: 'text', text: md }],
       });
       return lb.id;
@@ -1356,7 +1362,7 @@ export default function KraefteuebersichtPage() {
             Meldeblatt nicht zuordenbar. Am Schirm verborgen. Der Stand ist der älteste
             erfolgreiche Listenabruf, nicht die Druckzeit. */}
         <Druckkopf
-          dokumentart="Meldebild"
+          dokumentart={modulName('kraefteuebersicht')}
           einsatz={einsatz}
           sichtbarkeit="druck"
           zeilen={[
@@ -1523,7 +1529,11 @@ export default function KraefteuebersichtPage() {
               { wert: 'alles', label: 'alles' },
             ]}
           />
-          <SpaltenSchalter bezeichnung="Meldebild" spalten={spalten} {...spaltenSchalter} />
+          <SpaltenSchalter
+            bezeichnung={modulName('kraefteuebersicht')}
+            spalten={spalten}
+            {...spaltenSchalter}
+          />
           {darfSchreiben && (
             <Button
               loading={uebernehmen.isPending}
@@ -1574,7 +1584,7 @@ export default function KraefteuebersichtPage() {
             „—" samt Wort im zugänglichen Namen. Eine Tönungsfarbe für beide Fälle, wie im
             Entwurf. */}
         <Datensicht
-          bezeichnung="Meldebild"
+          bezeichnung={modulName('kraefteuebersicht')}
           form="tabelle"
           spalten={spalten}
           spaltenSchalterAussen={spaltenSchalter}

@@ -223,8 +223,8 @@ test('Einsatzauswahl: Einsatzkarten-Titel-Link und Suchfeld folgen der Dichte-St
 // `height: fontHeight`; den Boden trägt
 // `ortspfadStil` in `EinsatzSeite.tsx` mit der Regel in `EinsatzSeite.css`. Gemessen auf der
 // Druckansicht der Personenliste, weil ihr Pfad ZWEI Links trägt („Einsätze“ und „Betroffene“) und
-// nichts außer dem Einsatz gesät werden muss. Fükw und Handschirm, weil der Pfad unter `md` auf
-// eine eigene, nicht umbrechende Zeile mit Auslassung wechselt.
+// nichts außer dem Einsatz gesät werden muss. Fükw und Handschirm: unter `md` steht im Einsatz
+// nur der Rückweg „‹ Betroffene“ (LLH-1728, D6), und er hält dieselbe Staffel.
 
 /** Pfad-Links der Druckansicht: „Einsätze“ und das Modul; der Einsatzname ist Text. */
 const PFAD_LINKS = 2;
@@ -261,16 +261,17 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
 
       // Gescopt auf den Pfad, sonst zählten Rail- und Kopfzeilen-Links mit.
       const pfad = page.locator('[data-lfh="seitenkopf"] .lfh-seitenkopf__pfad');
-      const links = pfad.locator('.ant-breadcrumb-item a');
-      await expect(links).toHaveCount(PFAD_LINKS);
-      await expect(links.first()).toHaveText('Einsätze');
+      const links = pfad.locator('.ant-breadcrumb-item a:visible');
+      const anzahl = schirm === 'Handschirm' ? 1 : PFAD_LINKS;
+      await expect(links).toHaveCount(anzahl);
+      await expect(links.first()).toHaveText(schirm === 'Handschirm' ? 'Betroffene' : 'Einsätze');
       const kleinstes = await alleHaltenStufe(
         links,
         soll,
         `Pfad-Link (${schirm}, ${dichte})`,
-        PFAD_LINKS,
+        anzahl,
       );
-      for (let i = 0; i < PFAD_LINKS; i += 1) {
+      for (let i = 0; i < anzahl; i += 1) {
         await expect(links.nth(i)).toHaveCSS('font-size', PFAD_SCHRIFT[dichte]);
       }
 
@@ -987,16 +988,21 @@ test('Navigations-Drawer auf 390 px: Hamburger, Akkordeon-Kopf, Modulzeilen und 
       `Hamburger-Breite (${dichte}, gemessen ${griffBreite}px, Soll ≥ ${BODEN.mitA1Boden[dichte]})`,
     ).toBeGreaterThanOrEqual(BODEN.mitA1Boden[dichte] - SUBPIXEL);
 
-    // Unter `lg` bekommt der Suchzugang seine feste Trefffläche (`Math.max(48, …)`).
-    const suchen = await haeltStufe(
-      page.locator('.ant-layout-header').getByRole('button', { name: 'Suchen', exact: true }),
-      BODEN.mitA1Boden[dichte],
-      `Suchzugang schmal (${dichte})`,
-    );
-
     await hamburger.click();
     const drawer = page.getByRole('dialog');
     await expect(drawer).toBeVisible();
+    // Am Handy steht der Suchzugang in der Navigation (LLH-1728, D3), mit der festen Trefffläche
+    // des Griffs (`navGriffMass`, `Math.max(48, …)`); das Benutzermenü im Fuß hält die Staffel.
+    const suchen = await haeltStufe(
+      drawer.getByRole('button', { name: 'Suchen', exact: true }),
+      BODEN.mitA1Boden[dichte],
+      `Suchzugang schmal (${dichte})`,
+    );
+    await haeltStufe(
+      drawer.getByRole('button', { name: 'Benutzermenü' }),
+      BODEN.mitA1Boden[dichte],
+      `Benutzermenü in der Navigation (${dichte})`,
+    );
     const nav = drawer.getByRole('navigation', { name: 'Einsatz-Navigation' });
     await expect(nav).toBeVisible();
 
@@ -1073,7 +1079,7 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
     await ladeInDichte(page, `/einsaetze/${einsatzId}/kraefteuebersicht`, dichte);
 
     // Anker: die Seite ist fertig geladen.
-    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
 
     // (1) Umschalter: jedes Segment der Leiste (`role="radio"`) hält den Boden selbst.
     const leiste = page.locator('[data-lfh="meldebild-werkzeuge"] [data-lfh="segmentleiste"]');
@@ -1143,7 +1149,7 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
 
     // Datenanker: die Seite steht UND die gesäten Kräfte sind angekommen (Auswahlzeile nicht
     // „0 von 0") — erst danach sagt eine Abwesenheit etwas.
-    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     await expect(
       page.locator('[data-lfh="meldebild-werkzeuge"]').getByText(/^[1-9]\d* von [1-9]\d* Kräften$/),
     ).toBeVisible();
@@ -1220,7 +1226,7 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
 
     // Im Hauptbereich: die Modulliste daneben trägt einen gleichnamigen Link, der je nach
     // Ladereihenfolge erst nach `toHaveCount(1)` erscheint (Wettlauf, sichtbar seit LLH-1719).
-    const link = page.getByRole('main').getByRole('link', { name: 'Meldebild', exact: true });
+    const link = page.getByRole('main').getByRole('link', { name: 'Kräfteübersicht', exact: true });
     const hoehe = await haeltStufe(link, soll, `Meldebild-Link (${dichte})`);
     // Er muss auch dorthin zeigen: ein Ziel der richtigen Größe am falschen Ort bestünde sonst.
     await expect(link).toHaveAttribute('href', `/einsaetze/${einsatzId}/kraefteuebersicht`);
@@ -1761,7 +1767,7 @@ const BAUMTABELLEN = [
   // 1. Zug über der 1. Gruppe; Abschnitt und Fahrzeug stehen in der Gliederung als Spalten.
   { modul: 'einheiten', bereich: 'Gliederung', knoepfe: 1, vergleich: 'inhalt' },
   // 1. Zug (Fahrzeug, 1. Gruppe) und „Ohne Einheit“ mit der freien Kraft, beide auf der Wurzel.
-  { modul: 'kraefteuebersicht', bereich: 'Meldebild', knoepfe: 2, vergleich: 'inhalt' },
+  { modul: 'kraefteuebersicht', bereich: 'Kräfteübersicht', knoepfe: 2, vergleich: 'inhalt' },
   // Abschnitt Nord und 1. Zug.
   { modul: 'fernmeldewesen', bereich: 'Funkplan', knoepfe: 2, vergleich: 'text' },
 ] as const;
@@ -3777,7 +3783,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
 // ── Verpflegungsstellen (LLH-1040) ────────────────────────────────────────────────────
 //
 // Ansicht „Stellen“: eine GEPLANTE Stelle trägt drei Aktionen hinter einem `MenueAusloeser`, eine
-// AKTIVE zwei Knöpfe („Bearbeiten …“, „Auflösen …“) in `stelle-aktionen` (Lücke `marginSM` =
+// AKTIVE zwei Knöpfe („Bearbeiten …“, „Auflösen“) in `stelle-aktionen` (Lücke `marginSM` =
 // 7 / 11 / 16 px). Die Stellenwahl der Ausgabeansicht ist ein antd-`Select` (`.ant-select` trägt
 // die Steuerhöhe); vorgewählt ist die einzige zugeordnete Stelle.
 
@@ -3838,7 +3844,7 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
     if (dichte === 'handschuh') {
       expect(
         luecke,
-        `Abstand „Bearbeiten …“ ↔ „Auflösen …“ (handschuh, gemessen ${luecke}px)`,
+        `Abstand „Bearbeiten …“ ↔ „Auflösen“ (handschuh, gemessen ${luecke}px)`,
       ).toBeGreaterThanOrEqual(16 - SUBPIXEL);
     }
 
@@ -5178,7 +5184,7 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
     await expect(page.getByRole('note', { name: 'Legende der Matrix' })).toBeVisible();
     // LLH-1090: statt der Zellzählung die Beurteilung des Gebiets, ohne Knopf.
     await expect(
-      page.locator('[data-lfh="gefahrengebiet-beurteilung"]').getByText('nicht beurteilt'),
+      page.locator('[data-lfh="gefahrengebiet-beurteilung"]').getByText('unbestätigt'),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Beurteilung bestätigen' })).toHaveCount(0);
 

@@ -54,7 +54,7 @@ vor. Was ohne Netz angezeigt wird, ist der Stand der letzten Verbindung, nicht d
 - Einsatzliste, Einsatzkopf und Einstellungen des Einsatzes
 - Einsatztagebuch in seinen festen Ansichten; die Ergebnisse einer Suche (Volltext, Zeitraum,
   Einheit) nicht
-- Meldebild mit Einheiten, Personal, Fahrzeugen, Material, Abschnitten und Fahrzeugstatus
+- Kräfteübersicht mit Einheiten, Personal, Fahrzeugen, Material, Abschnitten und Fahrzeugstatus
 - Aufträge und Befehle
 - Betroffene, Unfallhilfsstellen, Betreuung
 - Bereitstellungsräume als Liste mit Standort und Belegung; die Seite eines einzelnen Raums nicht
@@ -85,8 +85,8 @@ ist.
 - Einträge im Einsatztagebuch
 - „Alle gelesen“ unter „Eingänge“; dort steht dann „Offline vorgemerkt“, die Zahl der ungelesenen
   Eingänge verschwindet sofort
-- das Lesen eines einzelnen Eingangs: unter „Eingänge“ öffnen, im Eingangsband oder an einem
-  Toast „Öffnen“ oder ✕ wählen; die Zahl der ungelesenen Eingänge sinkt sofort
+- das Lesen eines einzelnen Eingangs: unter „Eingänge“ öffnen, im Eingangsband „Öffnen“ oder in
+  der Alarmzone „Öffnen“ oder „Gelesen“ wählen; die Zahl der ungelesenen Eingänge sinkt sofort
 
 Anhänge brauchen Netz: Im Einsatztagebuch ist „Anhang“ ohne Netz gesperrt und trägt „offline“.
 Bei Personen brauchen das Aufheben einer Maßnahme oder Verletzung, das Eintragen von PAT-Nummer

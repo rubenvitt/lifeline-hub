@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import HeraufstufenModal from './HeraufstufenModal';
@@ -36,13 +36,14 @@ function nachricht(anhaenge: Anhang[] = []): ChatNachricht {
   };
 }
 
-function oeffne(n: ChatNachricht) {
+function oeffne(n: ChatNachricht, { meldungenFrei = true } = {}) {
   const onHeraufstufen = vi.fn().mockResolvedValue(undefined);
   renderMitProviders(
     <HeraufstufenModal
       offen
       nachricht={n}
       senden={false}
+      meldungenFrei={meldungenFrei}
       onAbbrechen={vi.fn()}
       onHeraufstufen={onHeraufstufen}
     />,
@@ -57,7 +58,37 @@ describe('HeraufstufenModal', () => {
     const onHeraufstufen = oeffne(nachricht());
     expect(screen.getByDisplayValue('Deich instabil')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
-    expect(onHeraufstufen).toHaveBeenCalledWith('meldung', 'Deich instabil', []);
+    // „Auch in den Meldungseingang“ ist vorgewählt (y3zh5ymv D8, wie im ETB).
+    expect(onHeraufstufen).toHaveBeenCalledWith('meldung', 'Deich instabil', [], true);
+  });
+
+  /** Spec `meldungseingang`, „Chat-Heraufstufung von Meldung und Lage …“. */
+  describe('Meldungseingang', () => {
+    it('protokolliert ohne „Auch in den Meldungseingang“ nur', async () => {
+      const onHeraufstufen = oeffne(nachricht());
+      const schalter = screen.getByRole('checkbox', { name: 'Auch in den Meldungseingang' });
+      expect(schalter).toBeChecked();
+      await userEvent.click(schalter);
+      await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
+      expect(onHeraufstufen).toHaveBeenCalledWith('meldung', 'Deich instabil', [], false);
+    });
+
+    it('bietet bei Anordnung den Meldungseingang nicht an und sendet keine Meldung', async () => {
+      const onHeraufstufen = oeffne(nachricht());
+      await userEvent.click(screen.getByRole('combobox', { name: 'ETB-Typ' }));
+      await userEvent.click(await screen.findByTitle('Anordnung'));
+      expect(screen.queryByRole('checkbox', { name: 'Auch in den Meldungseingang' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
+      expect(onHeraufstufen).toHaveBeenCalledWith('anordnung', 'Deich instabil', [], false);
+    });
+
+    it('sagt ohne Freigabe der Meldungen, dass nur ins ETB übernommen wird', async () => {
+      const onHeraufstufen = oeffne(nachricht(), { meldungenFrei: false });
+      expect(screen.queryByRole('checkbox', { name: 'Auch in den Meldungseingang' })).toBeNull();
+      expect(screen.getByText(/Nur ins ETB/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
+      expect(onHeraufstufen).toHaveBeenCalledWith('meldung', 'Deich instabil', [], false);
+    });
   });
 
   // Erfassungs-Norm (frontend/AGENTS.md): Ein `Select` schluckt Enter, also muss der Knopf im
@@ -86,7 +117,7 @@ describe('HeraufstufenModal', () => {
     await userEvent.click(privat);
 
     await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
-    expect(onHeraufstufen).toHaveBeenCalledWith('meldung', 'Deich instabil', [11]);
+    expect(onHeraufstufen).toHaveBeenCalledWith('meldung', 'Deich instabil', [11], true);
   });
 
   it('wählt bei elf Anhängen zehn vor und lässt keinen elften zu', async () => {
@@ -94,7 +125,10 @@ describe('HeraufstufenModal', () => {
     const elf = Array.from({ length: 11 }, (_, i) => anhang(100 + i, `f${i}.jpg`)).reverse();
     const onHeraufstufen = oeffne(nachricht(elf));
 
-    const kaestchen = screen.getAllByRole('checkbox');
+    // Die Kästchen der Anhangsauswahl, ohne „Auch in den Meldungseingang“.
+    const kaestchen = within(
+      screen.getByRole('group', { name: 'Anhänge übernehmen' }),
+    ).getAllByRole('checkbox');
     expect(kaestchen).toHaveLength(11);
     expect(kaestchen.filter((k) => (k as HTMLInputElement).checked)).toHaveLength(10);
     const elfter = screen.getByRole('checkbox', { name: /f10\.jpg/ });
@@ -111,6 +145,7 @@ describe('HeraufstufenModal', () => {
       'meldung',
       'Deich instabil',
       [101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
+      true,
     );
   });
 

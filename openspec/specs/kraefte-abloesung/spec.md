@@ -548,18 +548,19 @@ bleiben. Die Einstufung im Client MUST mit `vorwarnung_minuten` der Schicht rech
 
 ### Requirement: Hinweis in der AlarmZentrale
 
-Die Oberfläche SHALL zur Vorwarnung und zur Fälligkeit einer Schicht genau einen Toast zeigen,
+Die Oberfläche SHALL zur Vorwarnung und zur Fälligkeit einer Schicht genau einen Eintrag zeigen,
 mit Einheit, Uhrzeit und einem Sprung zu dieser Schicht auf der Seite Ablösung (`?schicht=<id>`,
 Requirement „Sprung zur Schicht“). Er kommt als Benachrichtigung
 (`abloesung_vorwarnung` als Hinweis, `abloesung_faellig` als Alarm, Spec `benachrichtigungen`)
 an alle mit dem Modul Ablösung; das Live-Ereignis `abloesung` frischt nur die Liste auf. Der
-Toast MUST dem gemeinsamen Budget der Benachrichtigungen unterliegen (höchstens drei sichtbar, der
-Rest gebündelt) und quittierbar sein. Dieselbe Fälligkeit darf nicht zusätzlich als allgemeine
+Eintrag MUST in der Alarmzone der Benachrichtigungen stehen (ab zwei gebündelt, Spec
+`benachrichtigungen`, „Gemeinsames Budget und Bündelung“) und mit „Öffnen“ oder „Gelesen“
+quittierbar sein. Dieselbe Fälligkeit darf nicht zusätzlich als allgemeine
 Erinnerung alarmieren. Der Planungshinweis und die Hinweise zur ablösenden Einheit (LLH-1131)
-SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Toast und Sprung zu ihrer
+SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Eintrag im Eingangsband und Sprung zu ihrer
 Schicht, ohne dass etwas blinkt. Der Sprungpfad jeder Benachrichtigung mit einem Bezug der
 Ablösung MUST `/einsaetze/<id>/abloesung?schicht=<schicht>` sein, auch der Ersatz, wenn der Text
-nicht zu holen war; der Sammeltoast springt zur Seite.
+nicht zu holen war.
 
 #### Scenario: Fälligkeit erreicht
 - **WHEN** die Schicht von „Florian 1“ um 15:30 fällig wird
@@ -997,7 +998,7 @@ sie kurz hervor; sonst sucht sie die Schicht unter den abgelösten und beendeten
 Parameter MUST danach geräumt sein; eine unbekannte Kennung MUST nichts ändern.
 
 #### Scenario: Toast „Ablösung fällig“
-- **WHEN** jemand im Toast „Ablösung fällig“ zur Schicht von „Florian 1“ springt
+- **WHEN** jemand im Alarm „Ablösung fällig“ der Alarmzone zur Schicht von „Florian 1“ springt
 - **THEN** steht „Laufend“, die Karte von „Florian 1“ ist im Bild und hervorgehoben, und die Adresse trägt keinen Parameter mehr
 
 #### Scenario: Zurückgehaltene Schicht

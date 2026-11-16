@@ -7,6 +7,10 @@
         "beschreibung": "Kennzahlen, Fristen, Entscheidungen"
       },
       {
+        "name": "ETB",
+        "beschreibung": "Einsatztagebuch"
+      },
+      {
         "name": "Einsatzdaten",
         "beschreibung": "Bezeichnung, Stichwort, Zeiten, Leitung"
       },
@@ -32,7 +36,7 @@
     "name": "Kräfte & Mittel",
     "module": [
       {
-        "name": "Meldebild",
+        "name": "Kräfteübersicht",
         "beschreibung": "Status, Stärke, Gliederung"
       },
       {
@@ -70,12 +74,8 @@
     ]
   },
   {
-    "name": "Erfassung",
+    "name": "Betroffene & Schäden",
     "module": [
-      {
-        "name": "ETB",
-        "beschreibung": "Einsatztagebuch"
-      },
       {
         "name": "Betroffene",
         "beschreibung": "Vermisste, Betroffene, Patienten"

@@ -71,7 +71,7 @@ test('„Neuer Lagevortrag“ legt mit einem POST an und öffnet den Entwurf', a
     // Jeder übernommene Abschnitt trägt den Stand seiner Übernahme (LLH-1357).
     expect(a.uebernommen_at, a.schluessel).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   }
-  await expect(page.getByRole('textbox', { name: 'Eigene Lage' })).toHaveValue(/Kräftemeldebild/);
+  await expect(page.getByRole('textbox', { name: 'Eigene Lage' })).toHaveValue(/Kräfteübersicht/);
   // Die Marke steht an den fünf Abschnitten mit Quelle, in Fassung 1 nicht auffällig.
   const marken = page.locator('[data-lfh="uebernahme-stand"]');
   await expect(marken).toHaveCount(MIT_QUELLE.length);
@@ -109,7 +109,7 @@ test('„Leerer Lagevortrag“ legt ohne Startinhalt an, der Entwurf füllt leer
   const probleme = page.getByRole('textbox', { name: 'Besondere (Führungs-)Probleme' });
   await probleme.fill('Von Hand');
   await page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }).click();
-  await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
+  await expect(eigeneLage).toHaveValue(/Kräfteübersicht/);
   await expect(probleme).toHaveValue('Von Hand');
   // Ohne Quelle bleiben von Hand: Auftrag und die Medienlage (i6k6mzed, design.md D6).
   await expect(page.getByRole('textbox', { name: 'Auftrag' })).toHaveValue('');
@@ -181,7 +181,7 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
   await lageentwicklung.fill('Von Hand');
   reihenfolgeFest = true;
   await page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }).click();
-  await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
+  await expect(eigeneLage).toHaveValue(/Kräfteübersicht/);
   expect(patches).toHaveLength(1);
   // Erst jetzt darf der Refetch nach der Quittung durch; danach ist das Verlustfenster vorbei.
   const refetch = page.waitForResponse(
@@ -201,11 +201,11 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
   const text = (b: PatchBody, s: string) => b.abschnitte.find((a) => a.schluessel === s)?.text;
   const letzter = patches[patches.length - 1];
   expect(text(letzter, 'lageentwicklung')).toBe('Von Hand');
-  expect(text(letzter, 'eigene_lage')).toMatch(/Kräftemeldebild/);
+  expect(text(letzter, 'eigene_lage')).toMatch(/Kräfteübersicht/);
 
   // Auch der Server hat beides.
   await page.reload();
-  await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
+  await expect(eigeneLage).toHaveValue(/Kräfteübersicht/);
   await expect(lageentwicklung).toHaveValue('Von Hand');
 });
 
@@ -253,7 +253,7 @@ test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die
         // Übernommen vor der Freigabe (LLH-1357): die Fortschreibung zeigt ihn als Vorfassung.
         {
           schluessel: 'eigene_lage',
-          text: 'Kräftemeldebild',
+          text: 'Kräfteübersicht',
           uebernommen_at: '2026-01-01 08:00:00',
         },
       ],

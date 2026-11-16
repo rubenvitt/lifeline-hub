@@ -302,7 +302,7 @@ describe('EinheitenPage', () => {
       </Routes>,
       { route: '/einsaetze/1/einheiten' },
     );
-    const link = await screen.findByRole('link', { name: 'Meldebild' });
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht');
   });
 

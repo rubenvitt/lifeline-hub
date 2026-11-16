@@ -77,7 +77,7 @@ export default function Eingangsband({
         </div>
         <Button
           type="text"
-          aria-label="Schließen"
+          aria-label="Ausblenden, ohne zu quittieren"
           icon={<IconKreuz />}
           onClick={beiSchliessen}
           style={{ flexShrink: 0 }}

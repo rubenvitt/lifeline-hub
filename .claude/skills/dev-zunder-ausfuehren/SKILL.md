@@ -29,8 +29,8 @@ verliert die Zusicherung, ohne dass ein Test rot wird.
 
 ## Wann benutzen
 
-- User nennt einen konkreten Task (Zunder-Link `…/#/aufgabe/<uuid>`, UUID, Titel oder eine alte
-  Kennung `LFH-<n>`)
+- User nennt einen konkreten Task (Zunder-Link `…/#/aufgabe/<id>`, ID, Kennung `LLH-<n>`, Titel
+  oder eine alte Kennung `LFH-<n>`)
 - Bevor Code-Arbeit für einen bekannten Board-Task beginnt
 
 **Nicht** zum Anlegen neuer Tasks → `zunder-task-anlegen`.
@@ -120,12 +120,13 @@ Regeln dazu:
 
 ## Schritt 1: Task laden
 
-`get_task` des Zunder-Connectors mit der UUID (aus dem Link `…/#/aufgabe/<uuid>`). Bei einem
+`get_task` des Zunder-Connectors mit der ID (aus dem Link `…/#/aufgabe/<id>`) oder der Kennung
+`LLH-<n>`. Bei einem
 Titel oder einer alten Kennung `LFH-<n>` erst per `search` die Aufgabe finden (Verfahren in
 `AGENTS.md`, Abschnitt „Zunder“). Daraus ziehen:
 
-- **`id`** (UUID) — für Zunder-Link und Commit-Referenz; **`<kurz>`** = die ersten 8
-  Hex-Zeichen, für Branch- und Change-Namen
+- **`id`** — für Zunder-Link und Commit-Referenz; **`<kurz>`** = die ersten 8 Zeichen der ID,
+  für Branch- und Change-Namen
 - **Titel + Beschreibung** — für Slug, Typ und Komplexität
 - **`status`, `branch`, `pr_url`, `plan`** — wo die Arbeit steht (Merge nachtragen, s. o.)
 - **Conventional-Typ** aus `type` (`bug` → `fix`) und Inhalt ableiten: `feat` / `fix` /
@@ -149,7 +150,7 @@ Worktree-Helfer deshalb von dort abzweigt. Nach einem `EnterWorktree` deshalb
 **prüfen**, worauf der Branch zeigt (`git rev-list --left-right --count HEAD...origin/alpha`),
 und bei Bedarf auf `origin/alpha` umsetzen, bevor die erste Zeile Code entsteht.
 
-Branch-Name bilden: **`<typ>/<kurz>-<slug>`**, `<kurz>` = erste 8 Hex-Zeichen der UUID, Slug
+Branch-Name bilden: **`<typ>/<kurz>-<slug>`**, `<kurz>` = erste 8 Zeichen der ID, Slug
 aus dem Titel (ASCII, kebab-case, Umlaute auflösen, 3–5 Wörter).
 Beispiel: `feat/a1b2c3d4-personal-status`.
 
@@ -272,7 +273,7 @@ ist eingefrorenes Archiv — dort wird nichts Neues angelegt.
 - **Bilder der Änderung** in PR-Beschreibung und Meldung an den Menschen (Abschnitt „Bilder der
   Änderung“ unten)
 - Commit-Body und PR-Beschreibung tragen die Zeile
-  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>` (Konvention: `AGENTS.md`, Abschnitt „Zunder“)
+  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<id>` (Konvention: `AGENTS.md`, Abschnitt „Zunder“)
 - Integration → **`superpowers:finishing-a-development-branch`**, **Ziel `alpha`** (PR-Base
   `alpha`, nicht `main`) → PR offen: **Status `review`** samt `pr_url`, dann `release_task`;
   nach dem Merge **`done`**

@@ -68,7 +68,9 @@ test('öffnet auf 390 px per sichtbarem Trigger, fokussiert die Palette und navi
   await page.setViewportSize(SCHMAL);
   await zumModul(page, id, 'etb');
 
-  const trigger = page.getByRole('button', { name: 'Suchen' });
+  // Am Handy steht „Suchen“ im Einsatz in der Navigation (LLH-1728, D3).
+  await page.locator('header').getByRole('button', { name: 'Navigation öffnen' }).click();
+  const trigger = page.locator('.ant-drawer-open').getByRole('button', { name: 'Suchen' });
   const kasten = (await trigger.boundingBox())!;
   expect(
     Math.min(kasten.width, kasten.height),
@@ -498,7 +500,16 @@ for (const viewport of [
         await zumModul(page, id, 'etb');
         await expect(page.locator('html')).toHaveAttribute('data-dichte', 'komfortabel');
 
-        await page.getByRole('button', { name: 'Suchen', exact: true }).tap();
+        // Am Handy steht „Suchen“ im Einsatz in der Navigation (LLH-1728, D3), ab `md` im Kopf.
+        if (viewport.width < 768) {
+          await page.locator('header').getByRole('button', { name: 'Navigation öffnen' }).tap();
+          await page
+            .locator('.ant-drawer-open')
+            .getByRole('button', { name: 'Suchen', exact: true })
+            .tap();
+        } else {
+          await page.getByRole('button', { name: 'Suchen', exact: true }).tap();
+        }
         await expect(paletteInput(page)).toBeVisible();
         const modal = page.locator('.ant-modal');
         const zu = page.getByRole('button', { name: 'Sprungpalette schließen' });

@@ -16,7 +16,7 @@ fehlt auch die, die Vorgabe des Systems.
 Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, die Reiter „Module“ und
 „Zugriff“ nur von der Einsatzleitung. Der Reiter „Ablösung“ legt das Schichtmodell fest, nach dem
 die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)), dazu Höchstdienst und
-Mindestruhe, gegen die Schichtplan, Meldebild und Personalliste prüfen. Der Reiter „Kennzahlen“
+Mindestruhe, gegen die Schichtplan, Kräfteübersicht und Personalliste prüfen. Der Reiter „Kennzahlen“
 wählt, was Platz 3 der Kennzahlen im Lagebild zeigt, und schaltet die Reihe für den
 Sanitätsdienst. Der Reiter „Benachrichtigungen“ legt fest,
 welche Eingänge für welche Funktion still bleiben. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
@@ -201,8 +201,8 @@ die kürzer als die Mindestruhe ist, unterbricht den Dienst nicht. Bei „0 min�
 Ohne eigenen Wert gelten 12 h und 8 h.
 
 Gegen beide Werte prüfen der Befund „zu lange im Dienst“ im Schichtplan und die Wörter „zu lang“
-und „Ruhe zu kurz“ im Meldebild und in der Personalliste (Kapitel
-[Meldebild und Kräfte-Zeitachse](meldebild.md)). Eine Änderung wirkt dort sofort, auch auf
+und „Ruhe zu kurz“ in der Kräfteübersicht und in der Personalliste (Kapitel
+[Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)). Eine Änderung wirkt dort sofort, auch auf
 anderen Geräten und ohne Neuladen, auch für Personen, die die Ablösung nicht sehen. Die Ansicht
 „Schichtplan“ nennt die Werte über dem Raster; wer sie ändern darf, kommt mit „ändern“ hierher.
 Das Einsatztagebuch hält jede Änderung fest, etwa „Schichtplan: höchstens 10 h im Dienst,

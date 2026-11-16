@@ -58,12 +58,12 @@ describe('Verdichtungszeile', () => {
     expect(screen.getByText('0 nicht verfügbar')).toBeInTheDocument();
     expect(screen.queryByText(/frei|n\. verf\./)).toBeNull();
 
-    // Der Linktext folgt dem Seitennamen „Meldebild"; die Route bleibt `kraefteuebersicht`.
-    expect(screen.getByRole('link', { name: 'Meldebild' })).toHaveAttribute(
+    // Der Linktext ist der Modulname (y3zh5ymv D7); die Route bleibt `kraefteuebersicht`.
+    expect(screen.getByRole('link', { name: 'Kräfteübersicht' })).toHaveAttribute(
       'href',
       '/einsaetze/1/kraefteuebersicht',
     );
-    expect(screen.queryByRole('link', { name: /Kräfteübersicht/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Meldebild/ })).toBeNull();
   });
 
   it('bleibt beim ERSTEN gescheiterten Abruf stumm, statt eine Null zu behaupten', async () => {
@@ -217,7 +217,7 @@ describe('Verdichtungszeile · Meldebild gesperrt (LFH-888)', () => {
     );
     setup();
     expect(await screen.findByText('0/0/0//0')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole('link', { name: 'Meldebild' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Kräfteübersicht' })).toBeNull());
   });
 });
 

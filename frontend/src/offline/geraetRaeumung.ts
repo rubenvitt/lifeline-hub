@@ -9,6 +9,7 @@
  *
  * Einziger Aufrufer ist der `AuthProvider` (`auth/AuthContext.tsx`), wie beim Lagebild.
  */
+import { ausgeblendetRaeumen, verlaufInhalt } from '../alarm/benachrichtigungGedaechtnis';
 import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
 import { listenGedaechtnisRaeumen } from '../components/listenGedaechtnis';
@@ -85,6 +86,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'jeder-ausgang',
     grund:
       'Letzter Antreff- bzw. Schadensort; ein zweiter Benutzer im selben Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LFH-785).',
+  },
+  {
+    ort: 'sessionStorage lfh:alarm:ausgeblendet',
+    datei: 'alarm/benachrichtigungGedaechtnis.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Kennungen der Benachrichtigungen, die der Nutzer in diesem Tab mit ✕ ausgeblendet hat (LLH-1736); der Server liefert sie unquittiert wieder, ein zweiter Benutzer im Tab braucht sie nicht.',
   },
   {
     ort: 'sessionStorage lfh:liste:<seite>:<einsatz>, lfh:liste:@besitzer',
@@ -272,6 +280,9 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     personErfassungsQuittungen: personErfassungsQuittungenRaeumen,
     ortCache: ortCacheRaeumen,
     erfassungsSitzung: erfassungsSitzungRaeumen,
+    alarmAusgeblendet: ausgeblendetRaeumen,
+    // Absender, Wortlaut und Titel der Eingänge im Speicher des Tabs (LLH-1737), kein Speicherort.
+    verlaufInhalt: () => verlaufInhalt.clear(),
     listenGedaechtnis: listenGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
     stammdatenfeldZuletzt: zuletztRaeumen,

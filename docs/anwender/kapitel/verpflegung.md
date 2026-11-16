@@ -1,7 +1,7 @@
 ---
 titel: Verpflegung
 gruppen: [fuehrung]
-reihenfolge: 370
+reihenfolge: 250
 quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/ZeitfensterBearbeiten.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/zaehltasteStil.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/StelleDialog.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/stellenGedaechtnis.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/EinsatzOrtsfeld.tsx, frontend/src/verpflegung/useBedarfsvorschlag.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/verpflegung/TagAusVorlage.tsx, frontend/src/verpflegung/tagAusVorlageKern.ts, frontend/src/anzeige/uhrzeit.ts, frontend/src/offline/schreiben.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/einsatz/modulRegistry.ts, frontend/src/fuehrung/sachgebiete.ts, src/routes/verpflegung.rs, src/verpflegung/repo.rs, src/verpflegung/deckung.rs, src/verpflegung/stelle.rs, src/verpflegung/vorlage.rs, openspec/specs/kraefte-verpflegung/spec.md, openspec/specs/stab-versorgung/spec.md]
 ---
 
@@ -223,13 +223,13 @@ Für Einsatzleitung und Führungspersonal:
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Unter „Stellen“ bei der Stelle „Auflösen …“ wählen; bei einer geplanten Stelle liegt es im Menü
+1. Unter „Stellen“ bei der Stelle „Auflösen“ wählen; bei einer geplanten Stelle liegt es im Menü
    „Aktionen zu Stelle …“.
 2. Die Rückfrage „Stelle ‚…‘ auflösen?“ mit „Auflösen“ bestätigen. Die Stelle steht danach
    eingeklappt unter „aufgelöst“ am Ende der Liste und ist in der Ausgabeansicht nicht mehr wählbar.
-3. Eine geplante Stelle ohne Ausgabe lässt sich stattdessen über „Stornieren …“ im Menü entfernen;
+3. Eine geplante Stelle ohne Ausgabe lässt sich stattdessen über „Stornieren“ im Menü entfernen;
    die Rückfrage mit „Stornieren“ bestätigen. Sie fällt aus der Liste und aus allen Zeitfenstern.
-   Ist an ihr ein Gerät gekoppelt, steht im Menü gesperrt „Stornieren … (Gerät gekoppelt)“.
+   Ist an ihr ein Gerät gekoppelt, steht im Menü gesperrt „Stornieren (Gerät gekoppelt)“.
 
 ## Hintergrund
 

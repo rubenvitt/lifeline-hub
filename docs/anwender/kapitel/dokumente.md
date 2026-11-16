@@ -1,7 +1,7 @@
 ---
 titel: Dokumente
 gruppen: [fuehrung]
-reihenfolge: 460
+reihenfolge: 160
 quellen: [frontend/src/pages/DokumentePage.tsx, frontend/src/dokumente/DokumentAblegenModal.tsx, frontend/src/dokumente/DokumentBearbeitenModal.tsx, frontend/src/dokumente/bezug.ts, frontend/src/dokumente/kategorien.ts, frontend/src/api/dokumente.ts, frontend/src/components/DownloadAnker.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/dokument.rs, src/dokument/, src/anhang/mod.rs]
 ---
 

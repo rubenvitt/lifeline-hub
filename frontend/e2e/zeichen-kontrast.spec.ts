@@ -62,7 +62,7 @@ async function imDruck(page: Page, zeichen: Locator) {
 
 const SEITEN = [
   {
-    name: 'Meldebild',
+    name: 'Kräfteübersicht',
     pfad: (id: string) => `/einsaetze/${id}/kraefteuebersicht`,
     zeichen: (page: Page) => page.locator('[data-lfh="einheit-zeichen"] svg'),
     // Beide Einheiten; der Abschnitt trägt im Meldebild kein Zeichen.

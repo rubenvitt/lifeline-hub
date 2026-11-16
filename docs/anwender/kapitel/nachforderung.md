@@ -1,7 +1,7 @@
 ---
 titel: Nachforderungen
 gruppen: [fuehrung]
-reihenfolge: 140
+reihenfolge: 270
 quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx, migrations/0246_einheit_nachforderung_herkunft.sql, migrations/0250_einheit_nachforderung_am_raum.sql, src/nachforderung/erwartet.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/nachforderungen/PostenZuordnenModal.tsx, frontend/src/pages/MaterialPage.tsx, src/material/disposition_repo.rs, frontend/src/nachforderungen/nurVorwaerts.ts]
 ---
 
@@ -388,7 +388,7 @@ Nachforderungen, davon 2 unterwegs“), in den „Offenen Vorgängen“ des
 zurückgezogene zählen nicht. Die Zahlen in den Spaltenköpfen zählen die Karten, die das Board gerade zeigt, also auch
 innerhalb eines Filters „Für Stelle“.
 
-Das [Meldebild](meldebild.md) zeigt im Statusband unter „Zulauf“, was zugesagt oder unterwegs ist,
+Die [Kräfteübersicht](meldebild.md) zeigt im Statusband unter „Zulauf“, was zugesagt oder unterwegs ist,
 je Art mit dem erwarteten Eintreffen, und die angeforderten Arten ohne Beitrag zur Zahl. Der Zulauf
 zählt dort nicht in die Stärke.
 

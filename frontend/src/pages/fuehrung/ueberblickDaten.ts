@@ -43,18 +43,31 @@ import {
   type StaerkeSumme,
 } from '../../kraefte/kraeftebild';
 import { verdichteGefahrengebiete } from '../lage-dashboard/lageVerdichtung';
-import { letzteImTeilbaum } from '../../meldungen/rueckmeldung';
+import {
+  letzteImTeilbaum,
+  rueckmeldungJeEinheit,
+  rueckmeldungUeberfaelligSeit,
+  rueckmeldungZustand,
+} from '../../meldungen/rueckmeldung';
+import {
+  baueMeldebildRaster,
+  einheitZeilen,
+  OHNE_EINHEIT_SCHLUESSEL,
+  toenungsGruende,
+  type ToenungsGrund,
+} from '../../kraefte/meldebildRaster';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
 import {
   dauerText,
   lagebesprechungUeberfaellig,
 } from '../../lagebesprechung/lagebesprechungZustand';
 import { abloesungsMarken } from '../../abloesung/einstufung';
+import { ERINNERUNG_FAELLIG, erinnerungZustand } from '../../erinnerung/erinnerungZustand';
 import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/unwetter';
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
-import { NICHT_BEURTEILT, istBeurteilt } from '../gefahren/beurteilung';
+import { UNBESTAETIGT, istBeurteilt } from '../gefahren/beurteilung';
 
 dayjs.extend(utc);
 
@@ -145,9 +158,9 @@ export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennza
 }
 
 /**
- * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die nicht beurteilten Gebiete
+ * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die unbestätigten Gebiete
  * (LLH-1090, nur wenn es welche gibt) und die Pegel-Notiz (`pegelNotizKurz`). Angehängt statt
- * ersetzt: die Gebietszahl begründet den Wert, „nicht beurteilt“ schränkt ihn ein, der Pegel ist
+ * ersetzt: die Gebietszahl begründet den Wert, „unbestätigt“ schränkt ihn ein, der Pegel ist
  * die Lage daneben. Ohne festgelegten Pegel (`null`) fehlt er.
  */
 export function warnstufeNotiz(
@@ -159,7 +172,7 @@ export function warnstufeNotiz(
     anzahlAktiv === 1
       ? '1 Gefahrengebiet mit Warnstufe'
       : `${anzahlAktiv} Gefahrengebiete mit Warnstufe`;
-  const offen = nichtBeurteilt > 0 ? `${nichtBeurteilt} ${NICHT_BEURTEILT}` : null;
+  const offen = nichtBeurteilt > 0 ? `${nichtBeurteilt} ${UNBESTAETIGT}` : null;
   return [gebiete, offen, pegelNotiz].filter(Boolean).join(' · ');
 }
 
@@ -253,7 +266,9 @@ export function folgeText(anzahl: number): string | null {
 export interface EinheitenVerteilung {
   bereit: number;
   gebunden: number;
-  ausfall: number;
+  /** Einheiten mit Status „nicht verfügbar“ — nicht „Ausfall“: den zählt das Meldebild an den
+   *  Mitteln (LLH-1739, {@link AbschnittZeile.ausfallMittel}). */
+  nichtVerfuegbar: number;
   /**
    * Einheiten ohne Kategorie — ohne Status oder „gemischt" über Kategorien hinweg; gezählt,
    * damit die drei Zellen nicht mehr behaupten.
@@ -283,6 +298,16 @@ export interface AbschnittZeile {
   /** Jüngste Rückmeldung im Teilbaum (Abschnitte direkt UND Einheiten darin); `null`, wenn
    *  keine vorliegt oder {@link rueckmeldungBekannt} `false` ist. */
   letzteRueckmeldung: LetzteRueckmeldung | null;
+  /**
+   * Letzte Rückmeldung JE Einheit des Teilbaums (`null` = nie zurückgemeldet), damit eine frische
+   * Meldung einer Einheit eine andere, die schweigt, nicht verdeckt (LLH-1739). `null`, solange
+   * {@link rueckmeldungBekannt} `false` ist. Das Urteil hängt an der Uhr: {@link abschnittGruende}.
+   */
+  einheitenRueckmeldung: (LetzteRueckmeldung | null)[] | null;
+  /** Ausfall der Mittel und des Materials der Einheiten im Teilbaum, gezählt wie die Gründe der
+   *  Tönung im Meldebild (`toenungsGruende`, eine Heimat je Zahl). */
+  ausfallMittel: number;
+  ausfallMaterial: number;
   /**
    * Alle Aufträge an den Teilbaum; erledigt = vollzogen oder abgenommen. Eine Zählung, in der
    * jeder Auftrag gleich wiegt; die Lage selbst trägt der Lagezustand.
@@ -337,8 +362,11 @@ function zaehleImTeilbaum(zeile: MeldebildZeile): {
   einheiten: number;
   abschnittIds: number[];
   einheitIds: number[];
+  /** Hängt die Sammelzeile „Ohne Einheit“ (Mittel ohne Einheit) in diesem Teilbaum? */
+  ohneEinheit: boolean;
 } {
   let einheiten = 0;
+  let ohneEinheit = zeile.art === 'einheit' && zeile.key.startsWith(OHNE_EINHEIT_KEY_PREFIX);
   const abschnittIds: number[] = [];
   const einheitIds: number[] = [];
   const id = abschnittIdAusKey(zeile.key);
@@ -351,13 +379,14 @@ function zaehleImTeilbaum(zeile: MeldebildZeile): {
     einheiten += k.einheiten;
     abschnittIds.push(...k.abschnittIds);
     einheitIds.push(...k.einheitIds);
+    ohneEinheit ||= k.ohneEinheit;
   }
-  return { einheiten, abschnittIds, einheitIds };
+  return { einheiten, abschnittIds, einheitIds, ohneEinheit };
 }
 
 /** Einheiten nach der Kategorie ihres Status — „gemischt" zählt mit, wenn die Kategorie gemeinsam ist. */
 function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): EinheitenVerteilung {
-  const v: EinheitenVerteilung = { bereit: 0, gebunden: 0, ausfall: 0, ohne: 0 };
+  const v: EinheitenVerteilung = { bereit: 0, gebunden: 0, nichtVerfuegbar: 0, ohne: 0 };
   for (const e of einheiten) {
     switch (e?.status?.kategorie) {
       case 'verfuegbar':
@@ -367,7 +396,7 @@ function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): Einhe
         v.gebunden += 1;
         break;
       case 'nicht_verfuegbar':
-        v.ausfall += 1;
+        v.nichtVerfuegbar += 1;
         break;
       default:
         v.ohne += 1;
@@ -381,11 +410,14 @@ function einheitenVerteilung(einheiten: readonly (Einheit | undefined)[]): Einhe
  * so summieren sich die Zeilen zur Einsatzstärke. Die Sammelzeile „Ohne Abschnitt" steht am Ende,
  * wenn sie etwas trägt — sonst gingen diese Kräfte still aus der Summe verloren.
  *
- * Das Raster bereit / gebunden / Ausfall zählt die Einheiten im Teilbaum nach der Kategorie ihres
- * Status (abgeleitet aus den Fahrzeugen oder von Hand).
+ * Das Raster bereit / gebunden / nicht verfügbar zählt die Einheiten im Teilbaum nach der
+ * Kategorie ihres Status (abgeleitet aus den Fahrzeugen oder von Hand). Den Ausfall zählt das
+ * Meldebild: dieselben Gründe der Tönung je Einheit, summiert über den Teilbaum (LLH-1739).
  */
 export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const { baum } = baueKraeftebild(r.abschnitte, r.einheiten, r.personal, r.fahrzeuge, r.material);
+  const ausfallJe = ausfallJeEinheit(r);
+  const rueckJe = r.rueckmeldungen != null ? rueckmeldungJeEinheit(r.rueckmeldungen) : null;
   const abschnittNachId = new Map(r.abschnitte.map((a) => [a.id, a]));
   const einheitNachId = new Map(r.einheiten.map((e) => [e.id, e]));
   const offen = r.auftraege
@@ -395,7 +427,11 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
   const zeilen: AbschnittZeile[] = baum.map((knoten) => {
     const id = abschnittIdAusKey(knoten.key);
     const abschnitt = id != null ? abschnittNachId.get(id) : undefined;
-    const { einheiten, abschnittIds, einheitIds } = zaehleImTeilbaum(knoten);
+    const { einheiten, abschnittIds, einheitIds, ohneEinheit } = zaehleImTeilbaum(knoten);
+    // Mittel ohne Einheit zählen wie im Meldebild mit (dort die Zeile „Ohne Einheit“).
+    const ausfallIds: (number | typeof OHNE_EINHEIT)[] = ohneEinheit
+      ? [...einheitIds, OHNE_EINHEIT]
+      : einheitIds;
     const teilbaum = new Set(abschnittIds);
     const anTeilbaum =
       teilbaum.size === 0
@@ -440,6 +476,15 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
         r.rueckmeldungen != null
           ? letzteImTeilbaum(r.rueckmeldungen, teilbaum, new Set(einheitIds))
           : null,
+      einheitenRueckmeldung: rueckJe ? einheitIds.map((eid) => rueckJe.get(eid) ?? null) : null,
+      ausfallMittel: ausfallIds.reduce<number>(
+        (n, eid) => n + (ausfallJe.get(eid)?.mittel ?? 0),
+        0,
+      ),
+      ausfallMaterial: ausfallIds.reduce<number>(
+        (n, eid) => n + (ausfallJe.get(eid)?.material ?? 0),
+        0,
+      ),
     };
   });
 
@@ -450,6 +495,65 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
     if (b.abschnittId == null) return -1;
     return (rang.get(a.abschnittId) ?? 0) - (rang.get(b.abschnittId) ?? 0);
   });
+}
+
+/** Schlüssel der Meldebild-Zeile „Ohne Einheit“ in {@link ausfallJeEinheit}. */
+const OHNE_EINHEIT = 'ohne-einheit';
+
+/**
+ * Ausfall je Einheit aus dem Meldebild selbst (LLH-1739): dieselben Gründe der Tönung, die dort in
+ * der Statusspalte stehen, auch die der Sammelzeile „Ohne Einheit“ (unter {@link OHNE_EINHEIT}).
+ * Jede Einheit zählt nur ihre eigenen Mittel (Spec `kraeftebaum`), die Summe über einen Teilbaum
+ * zählt also keine Kraft doppelt.
+ */
+function ausfallJeEinheit(
+  r: AbschnittRohdaten,
+): Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }> {
+  const raster = baueMeldebildRaster({ ...r, statusKatalog: [], auftraege: [] });
+  const je = new Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }>();
+  for (const z of einheitZeilen(raster)) {
+    const schluessel = z.einheitId ?? (z.key === OHNE_EINHEIT_SCHLUESSEL ? OHNE_EINHEIT : null);
+    if (schluessel == null) continue;
+    let mittel = 0;
+    let material = 0;
+    for (const g of toenungsGruende(z, null)) {
+      if (g.art === 'ausfall') mittel += g.anzahl;
+      if (g.art === 'ausfall_material') material += g.anzahl;
+    }
+    je.set(schluessel, { mittel, material });
+  }
+  return je;
+}
+
+/**
+ * Gründe, die die Abschnittskarte im Überblick als Etikett in der Alarmrolle nennt (LLH-1739):
+ * Ausfall der Mittel und des Materials, überfällige Rückmeldungen (Zahl der Einheiten, längste
+ * Dauer) und Einheiten ohne jede Rückmeldung. Gerechnet zur Seitenuhr `jetzt`, nicht im Memo der
+ * Zeilen; ohne feststehende Rückmeldungen kein Rückmeldungsgrund. Wortlaut: `grundWort`.
+ */
+export function abschnittGruende(zeile: AbschnittZeile, jetzt: Dayjs): ToenungsGrund[] {
+  const gruende: ToenungsGrund[] = [];
+  if (zeile.ausfallMittel > 0) gruende.push({ art: 'ausfall', anzahl: zeile.ausfallMittel });
+  if (zeile.ausfallMaterial > 0) {
+    gruende.push({ art: 'ausfall_material', anzahl: zeile.ausfallMaterial });
+  }
+  if (!zeile.rueckmeldungBekannt || zeile.einheitenRueckmeldung == null) return gruende;
+  let ueberfaellig = 0;
+  let laengste: number | null = null;
+  let keine = 0;
+  for (const r of zeile.einheitenRueckmeldung) {
+    const zustand = rueckmeldungZustand(r, jetzt);
+    if (zustand === 'keine') keine += 1;
+    if (zustand !== 'ueberfaellig') continue;
+    ueberfaellig += 1;
+    const seit = rueckmeldungUeberfaelligSeit(r, jetzt);
+    if (seit != null && (laengste == null || seit > laengste)) laengste = seit;
+  }
+  if (ueberfaellig > 0) {
+    gruende.push({ art: 'rueckmeldung_ueberfaellig', seitMin: laengste, einheiten: ueberfaellig });
+  }
+  if (keine > 0) gruende.push({ art: 'rueckmeldung_keine', einheiten: keine });
+  return gruende;
 }
 
 // ── Entscheidungen ──────────────────────────────────────────────────────────────
@@ -515,19 +619,25 @@ interface MarkenAuswahl {
  * Ton und Wort einer Frist: überfällig `alarm`, unter {@link KNAPP_MINUTEN} `achtung`, sonst
  * `neutral`. Ausnahme ist die überfällige Lagebesprechung: sie liest Ton und Wort aus
  * `lagebesprechungUeberfaellig`, damit die Seite Lagebesprechung und diese Liste denselben Termin
- * gleich zeigen (LFH-859, `lagebesprechung/AGENTS.md`). Ein Programmpunkt ist keine Frist und
+ * gleich zeigen (LFH-859, `lagebesprechung/AGENTS.md`). Ebenso eine verstrichene Erinnerung: sie
+ * heißt „fällig“ in Achtung wie im Abschnitt „Erinnerungen“ (`erinnerungZustand`, LLH-1749). Ein Programmpunkt ist keine Frist und
  * bleibt immer `neutral` (LLH-1570, Spec `ablaufplan`: Marke ohne Alarm).
  */
 export function markenBewertung(
   zeit: Dayjs,
   jetzt: Dayjs,
   art?: MarkenArt,
+  /** Nur Erinnerung: fällig nach `erinnerungZustand` (Server oder Uhr). */
+  erinnerungFaellig = false,
 ): { ton: MarkenTon; wort: string } {
   if (art === 'lagebesprechung') {
     const ueberfaellig = lagebesprechungUeberfaellig(zeit, jetzt);
     if (ueberfaellig) return { ton: ueberfaellig.rolle, wort: ueberfaellig.label };
   }
   const abstand = zeit.valueOf() - jetzt.valueOf();
+  if (art === 'erinnerung' && (erinnerungFaellig || abstand <= 0)) {
+    return { ton: ERINNERUNG_FAELLIG.ton, wort: ERINNERUNG_FAELLIG.wort };
+  }
   if (abstand <= 0) return { ton: 'alarm', wort: 'überfällig' };
   const minuten = Math.floor(abstand / 60_000);
   const wort = abstandText(minuten);
@@ -572,7 +682,16 @@ export function naechsteMarken(
   }[] = [],
   programm: readonly Programmpunkt[] = [],
 ): MarkenAuswahl {
-  const roh: { key: string; art: MarkenArt; id: number | null; zeit: string; text: string }[] = [];
+  const roh: {
+    key: string;
+    art: MarkenArt;
+    id: number | null;
+    zeit: string;
+    text: string;
+    /** Nur Erinnerung: der Server meldet sie fällig (`ist_faellig`), auch wenn die Uhr des Geräts
+     *  nachgeht — dieselbe Regel wie der Abschnitt „Erinnerungen“ (`erinnerungZustand`). */
+    faellig?: boolean;
+  }[] = [];
   for (const a of auftraege) {
     if (istOffen(a) && zeitpunkt(a.frist_at)) {
       roh.push({
@@ -599,6 +718,7 @@ export function naechsteMarken(
         id: e.id,
         zeit: e.faellig_at,
         text: e.titel,
+        faellig: erinnerungZustand(e, jetzt.valueOf()).wort === ERINNERUNG_FAELLIG.wort,
       });
     }
   }
@@ -650,9 +770,9 @@ export function naechsteMarken(
   const sortiert = roh.sort(
     (a, b) => (ms(a.zeit) ?? 0) - (ms(b.zeit) ?? 0) || a.key.localeCompare(b.key),
   );
-  const marken = sortiert.slice(0, MARKEN_MAX).map((m) => ({
+  const marken = sortiert.slice(0, MARKEN_MAX).map(({ faellig, ...m }) => ({
     ...m,
-    ...markenBewertung(zeitpunkt(m.zeit)!, jetzt, m.art),
+    ...markenBewertung(zeitpunkt(m.zeit)!, jetzt, m.art, faellig),
   }));
   return { marken, weitere: Math.max(0, sortiert.length - MARKEN_MAX) };
 }

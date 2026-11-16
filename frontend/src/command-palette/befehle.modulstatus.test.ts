@@ -72,6 +72,11 @@ describe('baueBefehle — Schnellaktionen folgen der Leseachse', () => {
         .filter((id) => id.startsWith('aktion:')),
     ).toEqual([
       'aktion:etb',
+      'aktion:meldung-erfassen',
+      'aktion:lagemeldung-erfassen',
+      'aktion:auftrag-erteilen',
+      'aktion:nachforderung-stellen',
+      'aktion:fahrzeugstatus',
       'aktion:unfallhilfsstellen',
       'aktion:schaeden',
       'aktion:stab',

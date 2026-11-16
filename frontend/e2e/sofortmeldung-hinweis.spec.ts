@@ -21,7 +21,8 @@ import { anmeldenAlsAdmin, benutzerAnlegen, mitgliedEintragen } from './rollen-k
 const ABSENDER = 'Rettungsstaffel Süd';
 const WORTLAUT =
   'Kellerabgang Mühlbachweg 34: eine schwer verletzte Person geborgen, Transport in die UHS Turnhalle.';
-const ALARM = '.ant-notification-notice:not(.ant-notification-fade-leave)';
+/** Ein Eintrag der Alarmzone (LLH-1735). */
+const ALARM = '[data-lfh="alarm-eintrag"]';
 
 async function oeffnenMitStrom(page: Page, pfad: string, einsatzId: number) {
   const strom = page.waitForResponse(

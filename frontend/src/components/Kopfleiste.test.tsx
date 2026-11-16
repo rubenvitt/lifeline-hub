@@ -14,7 +14,10 @@ import {
   railBreite,
   syncZustand,
   wortmarkeStil,
+  Uhr,
 } from './Kopfleiste';
+import { MemoryRouter } from 'react-router';
+import { ConfigProvider } from 'antd';
 
 const LEER = { ausstehend: 0, abgelehnt: 0, nicht_zugeordnet: 0 };
 
@@ -191,5 +194,39 @@ describe('Markenzelle — Bildmarke „Lebenslinie“ (LFH-837)', () => {
     expect(marke!.querySelector('path')).toHaveAttribute('stroke', rahmenFarben.text);
     // Das alte 14-px-Quadrat ist fort: die Zelle enthält kein Element außer der Bildmarke.
     expect(zelle.children).toHaveLength(1);
+  });
+});
+
+describe('Handy-Kopf (LLH-1728)', () => {
+  it('die Markenzelle als Link trägt Ziel und Namen der Wortmarke', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <Markenzelle alsLink />
+      </MemoryRouter>,
+    );
+    const zelle = container.querySelector('[data-lfh="kopf-marke"]')!;
+    expect(zelle.tagName).toBe('A');
+    expect(zelle).toHaveAttribute('href', '/einsaetze');
+    expect(zelle).toHaveAttribute('aria-label', 'lifeline-hub');
+    expect(zelle).not.toHaveAttribute('aria-hidden');
+  });
+
+  it('als Link hält die Markenzelle den Boden der Dichte-Staffel', () => {
+    const { container } = render(
+      <ConfigProvider theme={{ token: { controlHeight: 72 } }}>
+        <MemoryRouter>
+          <Markenzelle alsLink />
+        </MemoryRouter>
+      </ConfigProvider>,
+    );
+    const zelle = container.querySelector<HTMLElement>('[data-lfh="kopf-marke"]')!;
+    expect(zelle.style.minHeight).toBe('72px');
+  });
+
+  it('die Uhr nimmt die Zellpolsterung des Handy-Kopfs', () => {
+    const { container } = render(<Uhr zelle={{ padding: 8 }} />);
+    const zelle = container.querySelector<HTMLElement>('[data-lfh="kopf-uhr"]')!;
+    expect(zelle.style.paddingInlineStart).toBe('8px');
+    expect(zelle.style.paddingInlineEnd).toBe('8px');
   });
 });

@@ -1,3 +1,4 @@
+import { blendeAus, istAusgeblendet } from '../alarm/benachrichtigungGedaechtnis';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Person } from '../api/types';
 import { ortCacheRaeumen, ortKeyVon, setzeOrt } from '../anzeige/ortCache';
@@ -55,6 +56,7 @@ async function geraetBefuellen(): Promise<void> {
   saveGemerkteStelle(7, 21);
   sessionStorage.setItem('lfh:liste:personen:7', 'q=Meier');
   merkeZuletzt('funkrufname', 'Polizei vor Ort');
+  blendeAus(40);
   await queueEinreihen(A, 7, { typ: 'meldung', inhalt: 'offline vorgemerkt', client_id: 'etb-a' });
 }
 
@@ -83,6 +85,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(loadGemerkteStelle(7)).toBeNull();
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(ladeZuletzt('funkrufname')).toEqual([]);
+    expect(istAusgeblendet(40)).toBe(false);
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 
@@ -98,6 +101,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(loadGemerkteStelle(7)).toBeNull();
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(ladeZuletzt('funkrufname')).toEqual([]);
+    expect(istAusgeblendet(40)).toBe(false);
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 

@@ -147,7 +147,7 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7/kraefteuebersicht');
-    expect(await screen.findByRole('heading', { name: /Meldebild/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Kräfteübersicht/ })).toBeInTheDocument();
   });
 
   it('leitet ohne Anmeldung zu /login um', async () => {

@@ -71,7 +71,7 @@ function hasAusgabe(stelleId: number, zeitfenster: readonly VerpflegungZeitfenst
  *
  * Aktionen nach Status, gezählt nach der Rechteprüfung (`frontend/AGENTS.md`, „Datensatz-Aktionen
  * werden gebündelt“): geplant drei oder vier hinter EINEM `MenueAusloeser`, aktiv zwei Knöpfe,
- * aufgelöst nur „Bearbeiten …“. „Auflösen …“ und „Stornieren …“ fragen rot zurück; die Rückfrage
+ * aufgelöst nur „Bearbeiten …“. „Auflösen“ und „Stornieren“ fragen rot zurück; die Rückfrage
  * ist EIN `Modal` außerhalb der Zeilen und bleibt bis zum Erfolg offen, ihr Grund steht darin.
  * „In Betrieb nehmen“ ist umkehrbar genug (Auflösen bleibt möglich) und geht ohne Rückfrage; ihr
  * Grund steht an der Zeile (`useZeilenFehler`, LFH-1077), nie als Toast. Bis zur Antwort dreht der
@@ -108,7 +108,7 @@ export default function StellenListe({
         ? [
             { key: 'aktiv', label: 'In Betrieb nehmen' },
             { key: 'bearbeiten', label: 'Bearbeiten …' },
-            { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
+            { key: 'aufloesen', label: 'Auflösen', gefahr: true },
             ...(hasAusgabe(s.id, zeitfenster)
               ? []
               : s.geraet_gekoppelt
@@ -117,17 +117,17 @@ export default function StellenListe({
                   [
                     {
                       key: 'stornieren' as const,
-                      label: `Stornieren … (${GERAET_GEKOPPELT})`,
+                      label: `Stornieren (${GERAET_GEKOPPELT})`,
                       gefahr: true as const,
                       gesperrt: true as const,
                     },
                   ]
-                : [{ key: 'stornieren' as const, label: 'Stornieren …', gefahr: true as const }]),
+                : [{ key: 'stornieren' as const, label: 'Stornieren', gefahr: true as const }]),
           ]
         : s.status === 'aktiv'
           ? [
               { key: 'bearbeiten', label: 'Bearbeiten …' },
-              { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
+              { key: 'aufloesen', label: 'Auflösen', gefahr: true },
             ]
           : [{ key: 'bearbeiten', label: 'Bearbeiten …' }];
     return aktionen;

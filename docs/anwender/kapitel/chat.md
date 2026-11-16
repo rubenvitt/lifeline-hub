@@ -1,7 +1,7 @@
 ---
 titel: Chat
 gruppen: [alle]
-reihenfolge: 70
+reihenfolge: 500
 quellen: [frontend/src/pages/ChatPage.tsx, frontend/src/chat/KanalListe.tsx, frontend/src/chat/KanalAnlegenDialog.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/chat/NachrichtEingabe.tsx, frontend/src/chat/erwaehnung.ts, frontend/src/chat/HeraufstufenModal.tsx, frontend/src/chat/HeraufstufenAuftragModal.tsx, frontend/src/chat/BezugDialog.tsx, frontend/src/chat/BearbeitenModal.tsx, frontend/src/chat/bezug.ts, frontend/src/einsatz/useModulZaehler.ts, frontend/src/components/nurAnsicht.ts, src/routes/chat.rs, src/chat/, src/benachrichtigung/]
 ---
 
@@ -60,8 +60,10 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Dialog „Zu ETB heraufstufen“ mit ETB-Typ „Meldung“ und dem aus der Nachricht übernommenen Text](../bilder/chat/zu-etb-heraufstufen.png)
 
-4. Trägt die Nachricht Anhänge, unter „Anhänge übernehmen“ die wählen, die ins ETB sollen.
-5. „Heraufstufen“ wählen. Die Nachricht trägt danach „heraufgestuft zu ETB“.
+4. Bei „Meldung“ und „Lage“ steht „Auch in den Meldungseingang“, vorgewählt. Soll die Nachricht
+   nur ins Tagebuch, das Häkchen abwählen.
+5. Trägt die Nachricht Anhänge, unter „Anhänge übernehmen“ die wählen, die ins ETB sollen.
+6. „Heraufstufen“ wählen. Die Nachricht trägt danach „heraufgestuft zu ETB“.
 
 ### Eine Nachricht als Auftrag übernehmen
 
@@ -117,6 +119,12 @@ zum Objekt, das Kreuz an der Marke entfernt ihn. Ein vorhandener Bezug lässt si
 - Ein ETB-Eintrag ist unveränderlich. Übernommene Anhänge sind eine Kopie im ETB; höchstens so
   viele, wie ein ETB-Eintrag tragen darf, sind vorgewählt.
 - Ein Auftrag aus dem Chat legt wie jeder Auftrag seine Anordnung im ETB an.
+- Mit „Auch in den Meldungseingang“ legt eine „Meldung“ oder „Lage“ aus dem Chat zugleich die
+  Meldung an, als Art „Sonstige“ beziehungsweise „Lagemeldung“. Absender ist, wer die Nachricht
+  geschrieben hat, Zeitpunkt der der Nachricht. Sie steht im Meldungseingang wie jede erfasste
+  Meldung, eine Lagemeldung auch unter Lagemeldungen, und bekommt keinen zweiten ETB-Eintrag
+  (Kapitel [Meldungen](meldungen.md)). Das braucht die Freigabe des Moduls Meldungen; ohne sie
+  steht im Dialog „Nur ins ETB: Modul Meldungen gesperrt“.
 
 ### Kanäle und Ungelesenes
 

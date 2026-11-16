@@ -156,9 +156,11 @@ async function oeffneStatusmenue(zeile: HTMLElement, funkrufname: string): Promi
  * Wählt einen Eintrag im Zeilenmenü „⋯“ (LLH-1073, Entscheidung 14.10.2026: „Entlassen“ steht dort
  * als erster Eintrag). Das geöffnete Menü-Portal wird über die sichtbare Dropdown-Hülle gegriffen.
  */
-async function waehleImZeilenmenue(funkrufname: string, eintrag: string) {
+async function waehleImZeilenmenue(funkrufname: string, eintrag: string, in_?: HTMLElement) {
   await waehleMenueEintrag(
-    screen.getByRole('button', { name: `Weitere Aktionen zu ${funkrufname}` }),
+    (in_ ? within(in_) : screen).getByRole('button', {
+      name: `Weitere Aktionen zu ${funkrufname}`,
+    }),
     eintrag,
   );
 }
@@ -170,7 +172,7 @@ describe('FahrzeugePage', () => {
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatz());
-    const link = await screen.findByRole('link', { name: 'Meldebild' });
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
   });
 
@@ -303,15 +305,32 @@ describe('FahrzeugePage', () => {
 
   /**
    * Entlassen ist umkehrbar (LLH-1079 Teil II, design.md D8): ein Klick ohne Rückfrage, danach ein
-   * Rückgängig-Toast, der dasselbe Fahrzeug erneut disponiert. Seit LLH-1073 steht es als erster
-   * Eintrag im Zeilenmenü, nicht rot (umkehrbar).
+   * Rückgängig-Toast. Seit LLH-1722 nimmt Rückgängig die Entlassung mit dem Vorzustand aus der
+   * Antwort zurück (`…/entlassen/zuruecknehmen`), statt neu zu disponieren. Der Eintrag steht
+   * als erster im Zeilenmenü, nicht rot (umkehrbar).
    */
-  it('Entlassen fragt nicht nach und bietet Rückgängig an', async () => {
+  const VORZUSTAND = {
+    entlassen_at: '2026-11-15 10:00:00',
+    einheit_id: 3,
+    fuehrungsstelle: false,
+    besatzung: [21, 22],
+    beladung: [],
+  };
+  const entlassenAntwort = () =>
+    HttpResponse.json({ fahrzeug: { ...ef, beendet_als: 'entlassen' }, vorzustand: VORZUSTAND });
+
+  it('Entlassen fragt nicht nach, Rückgängig nimmt die Entlassung mit dem Vorzustand zurück (LLH-1722)', async () => {
     const aufrufe: string[] = [];
+    let body: unknown = null;
     server.use(
       http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () => {
         aufrufe.push('entlassen');
-        return HttpResponse.json({ ...ef, beendet_als: 'entlassen' });
+        return entlassenAntwort();
+      }),
+      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen/zuruecknehmen', async ({ request }) => {
+        aufrufe.push('zuruecknehmen');
+        body = await request.json();
+        return HttpResponse.json({ fahrzeug: ef, ausgelassen: [] });
       }),
       http.post('/api/einsaetze/7/fahrzeuge/10/reaktivieren', () => {
         aufrufe.push('reaktivieren');
@@ -325,24 +344,48 @@ describe('FahrzeugePage', () => {
     expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
     expect(await screen.findByText('Florian 1 entlassen')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'reaktivieren']));
+    await waitFor(() => expect(aufrufe).toEqual(['entlassen', 'zuruecknehmen']));
+    expect(body).toEqual(VORZUSTAND);
   });
 
-  /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
-  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
+  it('nennt im Seitenhinweis, was die Rücknahme ausgelassen hat (LLH-1722)', async () => {
     server.use(
-      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () =>
-        HttpResponse.json({ ...ef, beendet_als: 'entlassen' }),
-      ),
-      http.post('/api/einsaetze/7/fahrzeuge/10/reaktivieren', () =>
-        HttpResponse.json({ error: 'Fahrzeug ist außer Dienst' }, { status: 422 }),
+      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () => entlassenAntwort()),
+      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen/zuruecknehmen', () =>
+        HttpResponse.json({
+          fahrzeug: ef,
+          ausgelassen: [
+            { bezeichnung: 'Anna Müller', grund: 'inzwischen auf einem anderen Fahrzeug' },
+          ],
+        }),
       ),
     );
     render(einsatz());
     await screen.findByText('Florian 1');
     await waehleImZeilenmenue('Florian 1', 'Entlassen');
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
-    const hinweis = await screen.findByText('Fahrzeug ist außer Dienst');
+    const hinweis = await screen.findByText(
+      'Florian 1 zurück, ohne: Anna Müller (inzwischen auf einem anderen Fahrzeug)',
+    );
+    expect(hinweis.closest('.ant-alert')).not.toBeNull();
+  });
+
+  /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
+  it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
+    server.use(
+      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () => entlassenAntwort()),
+      http.post('/api/einsaetze/7/fahrzeuge/10/entlassen/zuruecknehmen', () =>
+        HttpResponse.json(
+          { error: 'Die Entlassung lässt sich nicht mehr zurücknehmen' },
+          { status: 409 },
+        ),
+      ),
+    );
+    render(einsatz());
+    await screen.findByText('Florian 1');
+    await waehleImZeilenmenue('Florian 1', 'Entlassen');
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    const hinweis = await screen.findByText('Die Entlassung lässt sich nicht mehr zurücknehmen');
     expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
     expect(hinweis.closest('.ant-alert')).not.toBeNull();
   });
@@ -606,6 +649,34 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('nach „Vom Fahrzeug lösen“ setzt „Rückgängig“ die Person wieder auf das Fahrzeug (LLH-1722)', async () => {
+    const aufrufe: string[] = [];
+    server.use(
+      http.delete('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params }) => {
+        aufrufe.push(`DELETE ${params.epId}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', ({ params }) => {
+        aufrufe.push(`PUT ${params.epId}`);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+    ]);
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    await userEvent.click(
+      await within(block).findByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
+    const hinweis = (await screen.findByText('Anna Crew vom Fahrzeug gelöst')).closest(
+      '.ant-message-notice',
+    ) as HTMLElement;
+    await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(aufrufe).toEqual(['DELETE 100', 'PUT 100']));
+  });
+
   it('markiert eine Besatzung aus anderer Einheit als das Fahrzeug', async () => {
     // Fahrzeug ef.einheit_id = null, Person in Einheit 3 → Diskrepanz-Tag nach Aufklappen.
     const crew = person({ id: 100, name: 'Cara Diskrepanz', fahrzeug_id: 10, einheit_id: 3 });
@@ -847,25 +918,29 @@ describe('FahrzeugePage', () => {
     });
 
     /**
-     * Genau eine Primäraktion (Kriterium 4): „Entlassen“ ist umkehrbar und fragt nicht nach
-     * (LLH-1079, design.md D8); Stornieren steht im Menü daneben.
+     * LLH-1722 (Spec `fahrzeug-bearbeitung`, `bedien-muster`): „Entlassen“ ist nie Hauptaktion
+     * einer Karte; ein Fehltipp auf den größten Knopf riss das Fahrzeug aus der Gliederung. Es
+     * steht als erster Eintrag im Menü, neutral, und wirkt ohne Rückfrage; der Status bleibt in
+     * der Titelzeile.
      */
-    it('die Karte trägt genau eine Primäraktion, und die entlässt ohne Rückfrage', async () => {
+    it('die Karte trägt keinen Knopf „Entlassen“; das Menü entlässt ohne Rückfrage (LLH-1722)', async () => {
       let entlassen = 0;
       server.use(
         http.post('/api/einsaetze/7/fahrzeuge/10/entlassen', () => {
           entlassen += 1;
-          return HttpResponse.json({ ...ef, beendet_als: 'entlassen' });
+          return HttpResponse.json({
+            fahrzeug: { ...ef, beendet_als: 'entlassen' },
+            vorzustand: { entlassen_at: '2026-11-15 10:00:00' },
+          });
         }),
       );
       setzeViewportBreite(390);
       const { container } = render(einsatz());
       await screen.findByText('Florian 1');
       const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
-      expect(
-        within(karte).getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }),
-      ).toBeInTheDocument();
-      fireEvent.click(within(karte).getByRole('button', { name: 'Florian 1 entlassen' }));
+      expect(within(karte).queryByRole('button', { name: 'Florian 1 entlassen' })).toBeNull();
+      expect(within(karte).queryByRole('button', { name: /^Entlassen$/ })).toBeNull();
+      await waehleImZeilenmenue('Florian 1', 'Entlassen', karte);
       await waitFor(() => expect(entlassen).toBe(1));
       expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
     });
@@ -1078,8 +1153,8 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
  * LLH-1073 Teil I, design.md D6 mit der Entscheidung vom 14.10.2026: in der Tabelle steht
  * „Entlassen“ als erster Menüeintrag (die Aktionsspalte trägt nur den Auslöser), dann „Angaben
  * ändern …“ (beim Stamm-Fahrzeug gesperrt mit Grund), „Im Stamm ändern ↗“ nur für die Verwaltung
- * der Einsatz-Org, hinter dem Trenner rot „Stornieren“. Auf der Karte bleibt „Entlassen“ die
- * Primäraktion.
+ * der Einsatz-Org, hinter dem Trenner rot „Stornieren“. Auf der Karte steht „Entlassen“ seit
+ * LLH-1722 ebenso als erster Menüeintrag, nicht als Primäraktion.
  */
 describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
   const adhoc = {
@@ -1171,13 +1246,14 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
     expect(within(menue).queryByRole('menuitem', { name: 'Im Stamm ändern ↗' })).toBeNull();
   });
 
-  it('die Karte führt „Entlassen“ als Primäraktion, das Menü den Rest', async () => {
+  it('das Menü der Karte beginnt wie die Tabelle mit „Entlassen“ (LLH-1722)', async () => {
     setzeViewportBreite(390);
     const { container } = render(einsatz(), [], adhoc);
     await screen.findByText('Florian Nachbarstadt 44/1');
     const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
     const menue = await oeffneMenue('Florian Nachbarstadt 44/1', karte);
     expect(eintraege(menue)).toEqual([
+      'Entlassen',
       'Angaben ändern …',
       'Als eigene Einheit führen …',
       '—',

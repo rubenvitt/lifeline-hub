@@ -1046,6 +1046,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen",
             post(routes::einsatz_fahrzeug::entlassen),
         )
+        // LLH-1722: „Rückgängig“ nach dem Entlassen nimmt den Vorzustand vollständig zurück.
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen/zuruecknehmen",
+            post(routes::einsatz_fahrzeug::zuruecknehmen),
+        )
         .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/stornieren",
             post(routes::einsatz_fahrzeug::stornieren),

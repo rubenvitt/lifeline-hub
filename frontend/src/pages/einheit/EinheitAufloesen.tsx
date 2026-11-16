@@ -1,21 +1,14 @@
-import { useState } from 'react';
-import { Button, Popconfirm, Space } from 'antd';
-import { Paneel, useRollen } from '../../components/instrument';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
-
-type Art = 'aufloesen' | 'stornieren';
+import BeendenAbschnitt from '../../components/BeendenAbschnitt';
 
 /**
  * „Einheit auflösen oder stornieren“ als letzter Abschnitt der Seite (LLH-1036, design.md D12),
- * abgesetzt von den Angaben, nach dem Muster des Einsatzabschlusses (LFH-960). Beide Wege sind
+ * über den geteilten Baustein `components/BeendenAbschnitt.tsx` (LLH-1722). Beide Wege sind
  * unumkehrbar: eine aufgelöste Einheit wird nicht reaktiviert (LLH-1079), eine stornierte ist
- * gelöscht. Deshalb je eine Rückfrage mit benanntem `okText` und rotem Knopf
- * (`components/rueckfrage.guard.test.ts`) und dem einen Satz zur Folge.
+ * gelöscht.
  *
  * Stornieren (LLH-1881) nimmt eine Fehlanlage zurück und gelingt nur ohne jede Spur; ob eine
  * Einheit Spuren hat, weiß nur der Server. Der Knopf steht deshalb immer da wie bei Fahrzeug,
- * Personal und Material, und der Server nennt den Grund einer Ablehnung. Eine Ablehnung steht im
- * Paneel, kein Toast; ein neuer Versuch räumt sie weg.
+ * Personal und Material, und der Server nennt den Grund einer Ablehnung.
  *
  * Nur mit Schreibrecht und Freigabe Einheiten eingehängt; der Aufrufer entscheidet.
  */
@@ -28,61 +21,31 @@ export default function EinheitAufloesen({
   /** Storniert die Fehlanlage; lehnt bei Ablehnung ab. Nach Erfolg wie `onAufloesen`. */
   onStornieren: () => Promise<unknown>;
 }) {
-  const { token } = useRollen();
-  const [laeuft, setLaeuft] = useState<Art | null>(null);
-  const [fehler, setFehler] = useState<{ art: Art; fehler: unknown } | null>(null);
-
-  function fuehreAus(art: Art) {
-    setLaeuft(art);
-    setFehler(null);
-    (art === 'aufloesen' ? onAufloesen() : onStornieren())
-      .catch((e: unknown) => setFehler({ art, fehler: e }))
-      .finally(() => setLaeuft(null));
-  }
-
   return (
-    <Paneel titel="Einheit auflösen oder stornieren" koerperPolster>
-      {fehler != null && (
-        <div style={{ marginBottom: token.marginSM }}>
-          {fehler.art === 'aufloesen' ? (
-            <SpeicherFehler
-              fehler={fehler.fehler}
-              titel="Nicht aufgelöst"
-              fallback="Auflösen fehlgeschlagen"
-            />
-          ) : (
-            <SpeicherFehler
-              fehler={fehler.fehler}
-              titel="Nicht storniert"
-              fallback="Stornieren fehlgeschlagen"
-            />
-          )}
-        </div>
-      )}
-      <Space size="middle" wrap>
-        <Popconfirm
-          title="Einheit auflösen?"
-          description="Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden."
-          okText="Einheit auflösen"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => fuehreAus('aufloesen')}
-        >
-          <Button danger loading={laeuft === 'aufloesen'} disabled={laeuft === 'stornieren'}>
-            Einheit auflösen
-          </Button>
-        </Popconfirm>
-        <Popconfirm
-          title="Einheit stornieren?"
-          description="Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden, die Einheit wird gelöscht."
-          okText="Einheit stornieren"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => fuehreAus('stornieren')}
-        >
-          <Button danger loading={laeuft === 'stornieren'} disabled={laeuft === 'aufloesen'}>
-            Einheit stornieren
-          </Button>
-        </Popconfirm>
-      </Space>
-    </Paneel>
+    <BeendenAbschnitt
+      titel="Einheit auflösen oder stornieren"
+      schritte={[
+        {
+          key: 'aufloesen',
+          knopf: 'Einheit auflösen',
+          frage: 'Einheit auflösen?',
+          folge:
+            'Mitglieder werden frei, Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden.',
+          fehlerTitel: 'Nicht aufgelöst',
+          fehlerFallback: 'Auflösen fehlgeschlagen',
+          ausfuehren: onAufloesen,
+        },
+        {
+          key: 'stornieren',
+          knopf: 'Einheit stornieren',
+          frage: 'Einheit stornieren?',
+          folge:
+            'Unter-Einheiten rücken eine Ebene hoch, gekoppelte Geräte enden, die Einheit wird gelöscht.',
+          fehlerTitel: 'Nicht storniert',
+          fehlerFallback: 'Stornieren fehlgeschlagen',
+          ausfuehren: onStornieren,
+        },
+      ]}
+    />
   );
 }

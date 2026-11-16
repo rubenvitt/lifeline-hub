@@ -6,9 +6,10 @@ import { useEinsatzRueckweg } from '../einsatz/einsatzRueckweg';
 import { useAuth } from '../auth/AuthContext';
 import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import AlarmZone from '../alarm/AlarmZone';
 import OrgBenachrichtigungen from '../alarm/OrgBenachrichtigungen';
 import BenutzerMenu from './BenutzerMenu';
-import { RAHMEN_KLEBT, useRahmenObenQuelle } from './rahmenOben';
+import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from './rahmenOben';
 import CommandPaletteTrigger from './CommandPaletteTrigger';
 import {
   KOPF_HOEHE,
@@ -155,7 +156,7 @@ export default function AppLayout() {
   useDokumentTitel(ebene1Seite(pathname).titel);
   const ebene1Ort = useEbene1Ort(pathname, benutzer?.id);
   // Dieselbe Schwelle wie im Einsatz-Workspace. Sie trägt drei Fragen: ob der Sperrgrund als Tag
-  // danebensteht, ob die Suche als Feld oder als Icon steht, und (ab `md`) ob die Uhr Platz hat.
+  // danebensteht, ob die Suche als Feld oder als Icon steht und ob die Wortmarke Platz hat.
   // Die Frage stellt ausschließlich `useViewport` (`useViewport.guard.test.ts`).
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
@@ -164,8 +165,9 @@ export default function AppLayout() {
   // Unter `md` rücken die Zellen zusammen: mit der vollen Staffel-Polsterung (18 px je Seite
   // in `komfortabel`) bräche die rechte Zellgruppe auf 390 px in eine dritte Zeile um.
   const zellToken = mittel ? token : { padding: token.paddingXS };
-  // Ab `md` bleibt der Kopf stehen wie im Einsatz-Workspace (LFH-952, `frontend/AGENTS.md`, Rahmen).
-  const kopfRef = useRahmenObenQuelle<HTMLElement>(mittel);
+  // Der Kopf bleibt stehen wie im Einsatz-Workspace, in jeder Breite (LFH-952, LLH-1728,
+  // `frontend/AGENTS.md`, Rahmen); unter `md` unter der gestörten Betriebszeile (Rang, D2).
+  const { ref: kopfRef, oben: kopfOben } = useRahmenObenStapel<HTMLElement>(true, RAHMEN_RANG.kopf);
   // Der Verwaltungs-Link ist ein handgebautes Bedienziel: ZWEI Angaben (LFH-365). Farbe aus der
   // Nachtrolle, weil die Leiste in beiden Modi dunkel ist.
   const linkStil: CSSProperties = {
@@ -187,17 +189,23 @@ export default function AppLayout() {
       <Header
         ref={kopfRef}
         data-lfh="rahmen-kopf"
-        style={mittel ? { ...KOPF_STIL, ...RAHMEN_KLEBT } : KOPF_STIL}
+        style={{ ...KOPF_STIL, ...RAHMEN_KLEBT, top: kopfOben }}
       >
         {/* LINKE GRUPPE: Marke, Wortmarke (Link zur Einsatzliste), Verwaltung. */}
         <div style={{ display: 'flex', alignItems: 'stretch', flex: '1 1 auto', minWidth: 0 }}>
-          <Markenzelle />
+          {/* Unter `md` weicht die Wortmarke der Uhr, und die Bildmarke trägt ihren Link zur
+              Einsatzliste (LLH-1728, D5): sonst bliebe der Kopf am Handy zweizeilig. */}
+          <Markenzelle alsLink={!mittel} />
           <div style={kopfZelleStil(zellToken)}>
-            <Wortmarke />
-            <span
-              aria-hidden="true"
-              style={{ width: 1, height: 18, flexShrink: 0, background: rahmenFarben.linie }}
-            />
+            {mittel && (
+              <>
+                <Wortmarke />
+                <span
+                  aria-hidden="true"
+                  style={{ width: 1, height: 18, flexShrink: 0, background: rahmenFarben.linie }}
+                />
+              </>
+            )}
             <GlobalLink
               to="/admin"
               label="Verwaltung"
@@ -241,7 +249,7 @@ export default function AppLayout() {
           {/* Außerhalb eines Einsatzes läuft kein Live-Strom — die SYNC-Zelle erscheint hier
               nur bei Netzverlust oder offener Offline-Queue. */}
           <SyncAnzeige liveErwartet={false} kompakt={!mittel} />
-          {mittel && <Uhr />}
+          <Uhr zelle={zellToken} />
           {!breit && (
             <div style={kopfZelleStil(zellToken)}>
               <CommandPaletteTrigger />
@@ -254,6 +262,9 @@ export default function AppLayout() {
           </div>
         </KopfRechts>
       </Header>
+      {/* Alarmzone (LLH-1735): Org-Hinweise direkt unter dem Kopf, in jeder Breite; der Org-Rahmen
+         hat keine Leiste am Handschirm (design.md D5). */}
+      <AlarmZone />
       <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
         <Ebene1OrtProvider value={ebene1Ort}>
           <Outlet />

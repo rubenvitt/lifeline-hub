@@ -1,7 +1,7 @@
 ---
 titel: Rückmeldung geben
 gruppen: [alle]
-reihenfolge: 90
+reihenfolge: 80
 quellen: [frontend/src/rueckmeldung/, frontend/src/components/BenutzerMenu.tsx, frontend/src/hilfe/HilfePage.tsx, .github/ISSUE_TEMPLATE/, scripts/rueckmeldung/, SECURITY.md]
 ---
 

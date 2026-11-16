@@ -47,13 +47,13 @@ Grund erscheinen, nie mit 0. Dasselbe gilt für eine Quelle, die beim Klick nich
 kann.
 
 #### Scenario: Alle Quellen gesperrt
-- **WHEN** für die Person weder Meldebild noch Führungsorganisation freigegeben sind
+- **WHEN** für die Person weder Kräfteübersicht noch Führungsorganisation freigegeben sind
 - **THEN** zeigt der Abschnitt „Eigene Lage“ keinen Übernahme-Knopf, sondern einen Hinweis, der
   die fehlenden Freigaben nennt
 
 #### Scenario: Teil gesperrt
 - **WHEN** das Personal für die Person nicht freigegeben ist, Abschnitte und Einheiten aber schon
-- **THEN** steht der Knopf, und der übernommene Text führt das Kräftemeldebild als „—“ mit Grund
+- **THEN** steht der Knopf, und der übernommene Text führt die Kräfteübersicht als „—“ mit Grund
   und die Führungsorganisation vollständig
 
 #### Scenario: Quelle scheitert beim Klick
@@ -62,15 +62,15 @@ kann.
   bearbeitbar
 
 ### Requirement: Eigene Lage aus Meldebild und Führungsorganisation
-Der Abschnitt „Eigene Lage“ des Lagevortrags zur Information SHALL das Kräftemeldebild und die
+Der Abschnitt „Eigene Lage“ des Lagevortrags zur Information SHALL die Kräfteübersicht und die
 Führungsorganisation des ganzen Einsatzes übernehmen können, in dieser Reihenfolge. Jeder Teil
-MUST denselben Text tragen wie die Fassung, die „In Lagebericht übernehmen“ im Meldebild (ohne
+MUST denselben Text tragen wie die Fassung, die „In Lagebericht übernehmen“ in der Kräfteübersicht (ohne
 Filter) bzw. im Organigramm erzeugt, mit derselben Zahl an jeder Stelle. Jeder Teil MUST seinen
 Stand (DTG) im Text tragen; der Stand ist der älteste Abruf der Listen, aus denen der Teil
 gerechnet wurde. Die Übernahme MUST keine zweite Verdichtung rechnen.
 
 #### Scenario: Gleicher Text wie die Einzelübernahme
-- **WHEN** die Person „Eigene Lage“ übernimmt und im selben Datenstand das Meldebild und das
+- **WHEN** die Person „Eigene Lage“ übernimmt und im selben Datenstand die Kräfteübersicht und das
   Organigramm in einen Lagebericht übernimmt
 - **THEN** stimmen die beiden Teile in „Eigene Lage“ wörtlich mit den Texten der beiden neuen
   Freitext-Berichte überein, bis auf den Stand
@@ -78,6 +78,10 @@ gerechnet wurde. Die Übernahme MUST keine zweite Verdichtung rechnen.
 #### Scenario: Stand im Text
 - **WHEN** die Person „Eigene Lage“ übernimmt
 - **THEN** nennt jeder Teil eine Zeile „Stand:“ mit einer taktischen DTG
+
+#### Scenario: Überschrift des Kräfteteils
+- **WHEN** die Person „Eigene Lage“ übernimmt
+- **THEN** ist der Kräfteteil mit „Kräfteübersicht“ überschrieben, nicht mit „Kräftemeldebild“
 
 ### Requirement: Weitere Abschnitte des Lagevortrags zur Information
 Im Lagevortrag zur Information SHALL je eine Übernahme in den Abschnitten „Besondere
@@ -177,7 +181,7 @@ mit dem Grund stehen bleiben.
 
 ### Requirement: Gefahren je Gebiet in der Gefahren-/Schadenlage
 Die Übernahme der Gefahren-/Schadenlage SHALL einen Teil „Gefahrengebiete“ enthalten: je Gebiet
-den Namen, bei einem nicht beurteilten „nicht beurteilt“, und darunter jede gesetzte Gefahr (Stufe
+den Namen, bei einem unbestätigten „(unbestätigt)“, und darunter jede gesetzte Gefahr (Stufe
 über „keine“ oder mit Erläuterung) mit Stufe und Erläuterung in der Folge der Matrix. Die
 Erläuterung und der Gebietsname sind Beurteilung der eigenen Führung, kein Freitext Dritter, und
 SHALL übernommen werden; „gemeldet von“ und der Name der letzten Änderung MUST draußen bleiben.
@@ -193,6 +197,10 @@ SHALL übernommen werden; „gemeldet von“ und der Name der letzten Änderung 
 #### Scenario: Gefahren gesperrt
 - **WHEN** das Modul Gefahren für die Person gesperrt ist und sie die Gefahren-/Schadenlage übernimmt
 - **THEN** steht der Teil „Gefahrengebiete“ als „— (nicht freigegeben)“, und weder Gebiete noch Matrizen wurden angefragt
+
+#### Scenario: Unbestätigtes Gebiet
+- **WHEN** das Gebiet „Zone B“ noch niemand bestätigt hat
+- **THEN** nennt der Teil „Gefahrengebiete“ es als „Zone B (unbestätigt)“, nie „nicht beurteilt“
 
 ### Requirement: Inhalt der Lageentwicklung
 Die Übernahme SHALL die ETB-Einträge seit dem Eintrag der letzten abgehaltenen Lagebesprechung

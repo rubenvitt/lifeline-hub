@@ -90,13 +90,14 @@ Organisation des Einsatzes den Sprung in den Stamm anbieten.
 
 ### Requirement: Zeilenaktionen eines Fahrzeugs
 
-Die Tabelle der Fahrzeugliste SHALL je Zeile ein Aktionsmenü führen, dessen erster Eintrag
+Die Fahrzeugliste SHALL je Zeile und je Karte ein Aktionsmenü führen, dessen erster Eintrag
 „Entlassen“ ist; danach folgen die weiteren Aktionen eines Fahrzeugs (Angaben ändern, beim
 Stamm-Fahrzeug der Sprung in den Stamm, bei einem Fahrzeug ohne Einheit mit Freigabe des Moduls
 Einheiten „Als eigene Einheit führen …“), Stornieren rot hinter einem Trenner. „Entlassen“ MUST
-ohne Rückfrage wirken und einen Rückgängig-Hinweis zeigen. Auf der Karte (schmale Fläche) MUST
-„Entlassen“ die sichtbare Hauptaktion sein und im Menü fehlen. Das Lösen einer Person von der
-Besatzung MUST „Vom Fahrzeug lösen“ heißen und ohne Rückfrage wirken.
+neutral stehen, ohne Rückfrage wirken und einen Rückgängig-Hinweis zeigen, der das Fahrzeug
+vollständig zurücknimmt. Auf der Karte (schmale Fläche) MUST kein Knopf „Entlassen“ stehen; der
+Status bleibt dort in der Titelzeile. Das Lösen einer Person von der Besatzung MUST „Vom Fahrzeug
+lösen“ heißen und ohne Rückfrage wirken.
 
 #### Scenario: Ad-hoc-Fahrzeug in der Tabelle
 - **WHEN** das Menü eines Ad-hoc-Fahrzeugs mit Einheit in der Tabelle geöffnet wird
@@ -112,7 +113,7 @@ Besatzung MUST „Vom Fahrzeug lösen“ heißen und ohne Rückfrage wirken.
 
 #### Scenario: Karte
 - **WHEN** die Fahrzeugliste als Karte erscheint
-- **THEN** steht „Entlassen“ als Knopf auf der Karte und nicht im Menü
+- **THEN** trägt die Karte keinen Knopf „Entlassen“, ihr Menü beginnt mit „Entlassen“, und der Status steht in der Titelzeile
 
 #### Scenario: Person lösen
 - **WHEN** bei einer Person der Besatzung „Vom Fahrzeug lösen“ gewählt wird

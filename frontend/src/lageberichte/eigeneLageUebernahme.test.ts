@@ -257,7 +257,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     const text = await erzeuge(freigabenFixture({ personal: { zugriff: false } }));
     expect(listeEinsatzPersonal).not.toHaveBeenCalled();
     expect(listEntlassenesPersonal).not.toHaveBeenCalled();
-    expect(text).toBe(`# Kräftemeldebild\n\n— nicht freigegeben (Personal)\n\n${ORG()}`);
+    expect(text).toBe(`# Kräfteübersicht\n\n— nicht freigegeben (Personal)\n\n${ORG()}`);
   });
 
   it('nennt eine Liste, die beim Klick scheitert, mit ihrem Grund', async () => {
@@ -266,7 +266,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     const text = await erzeuge();
     expect(
       text.startsWith(
-        '# Kräftemeldebild\n\n— nicht freigegeben (Fahrzeuge); nicht geladen (Material)\n',
+        '# Kräfteübersicht\n\n— nicht freigegeben (Fahrzeuge); nicht geladen (Material)\n',
       ),
     ).toBe(true);
   });
@@ -275,7 +275,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
     vi.mocked(listeAbschnitte).mockRejectedValue(new Error('500'));
     const text = await erzeuge();
     expect(text).toBe(
-      '# Kräftemeldebild\n\n— nicht geladen (Abschnitte)\n\n' +
+      '# Kräfteübersicht\n\n— nicht geladen (Abschnitte)\n\n' +
         '# Führungsorganisation\n\n— nicht geladen (Abschnitte)\n',
     );
   });
@@ -367,7 +367,7 @@ describe('Eigene Lage aus Meldebild und Führungsorganisation (LFH-870)', () => 
       ).toEqual({
         frei: false,
         grund:
-          'Kräftemeldebild nicht freigegeben (Abschnitte, Material), ' +
+          'Kräfteübersicht nicht freigegeben (Abschnitte, Material), ' +
           'Führungsorganisation nicht freigegeben (Abschnitte)',
       });
     });

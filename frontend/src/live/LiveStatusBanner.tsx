@@ -9,7 +9,7 @@ import {
 import { useOfflineQueueZaehler } from '../offline/useOfflineQueueZaehler';
 import { useFruehereKopplungCount } from '../offline/fruehereKopplung';
 import OfflineRecoveryDrawer from '../offline/OfflineRecoveryDrawer';
-import { RAHMEN_KLEBT, useRahmenObenQuelle } from '../components/rahmenOben';
+import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from '../components/rahmenOben';
 import { useViewport } from '../components/useViewport';
 import { anzahl } from '../anzeige/anzahl';
 import {
@@ -23,9 +23,10 @@ import {
  * Zeigt bei unterbrochener Leitung (`liveStatusStore`) und bei `navigator.onLine === false`
  * einen Hinweis, damit weder ein toter Feed noch ein lokaler Netzausfall unsichtbar bleibt.
  *
- * `klebend` (LFH-952, `frontend/AGENTS.md`, Rahmen): unter `md` rollt der Kopf mit, dann bleibt
- * die Zeile am oberen Rand stehen, solange sie eine Verbindungsstörung meldet (offline oder
- * Live-Verbindung `lost`). Ab `md` trägt die SYNC-Zelle im klebenden Kopf die Störung. Nur der
+ * `klebend` (LFH-952, `frontend/AGENTS.md`, Rahmen): unter `md` bleibt die Zeile am oberen Rand
+ * stehen, solange sie eine Verbindungsstörung meldet (offline oder Live-Verbindung `lost`), über
+ * dem dort ebenfalls klebenden Kopf (LLH-1728, Rang 0): die Verbindung steht im Handy-Kopf nur als
+ * Symbol. Ab `md` trägt die SYNC-Zelle im klebenden Kopf die Störung im Wort. Nur der
  * Rahmen, der im Dokument rollt, setzt es; die Gerätehülle rollt in einem eigenen Bereich.
  */
 export default function LiveStatusBanner({
@@ -103,7 +104,11 @@ export default function LiveStatusBanner({
 
   const stoerung = !istOnline || status === 'lost';
   const klebt = klebend && !mittel && stoerung;
-  const zeileRef = useRahmenObenQuelle<HTMLDivElement>(klebt);
+  // Rang 0: über dem Kopf, der am Handy jetzt auch klebt (LLH-1728, design.md D2, ADR-0056).
+  const { ref: zeileRef, oben: zeileOben } = useRahmenObenStapel<HTMLDivElement>(
+    klebt,
+    RAHMEN_RANG.betriebszeile,
+  );
 
   const quelle =
     antragQuelle.laden && antragQuelle.id != null ? (
@@ -208,7 +213,11 @@ export default function LiveStatusBanner({
     <>
       {quelle}
       {bannerSichtbar && (
-        <div ref={zeileRef} data-lfh="betriebszeile" style={klebt ? RAHMEN_KLEBT : undefined}>
+        <div
+          ref={zeileRef}
+          data-lfh="betriebszeile"
+          style={klebt ? { ...RAHMEN_KLEBT, top: zeileOben } : undefined}
+        >
           <Alert
             type={typ}
             showIcon

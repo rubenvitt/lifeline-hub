@@ -1,9 +1,10 @@
-import { render, screen, waitFor, act, fireEvent, within } from '@testing-library/react';
+import { render, screen, waitFor, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App as AntApp } from 'antd';
 import { StrictMode, useState } from 'react';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate, useParams } from 'react-router';
+import AlarmZone from '../alarm/AlarmZone';
 import AlarmZentrale, { sammelWortStil } from './AlarmZentrale';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 import { offeneDesktopAlarme, schliesseAlleDesktopAlarme } from '../alarm/desktopAlarm';
@@ -32,10 +33,25 @@ const bekannt = new Map<number, BenachrichtigungAnzeige>();
  * Zentrale über die Meldung selbst. Ohne Eintrag 404, dann bleibt der Text des Servers.
  */
 const meldungen = new Map<number, { absender: string; inhalt: string }>();
+/**
+ * Was `GET /api/einsaetze/{e}/erinnerungen` liefert (LLH-1737): den Titel einer fälligen
+ * Erinnerung holt die Zentrale aus der offenen Liste. Ohne Eintrag bleibt der Text des Servers.
+ */
+const offeneErinnerungen = new Map<number, string>();
 beforeEach(() => {
   bekannt.clear();
   meldungen.clear();
+  offeneErinnerungen.clear();
   server.use(
+    http.get('/api/einsaetze/:einsatzId/erinnerungen', ({ params }) =>
+      HttpResponse.json(
+        [...offeneErinnerungen].map(([id, titel]) => ({
+          id,
+          einsatz_id: Number(params.einsatzId),
+          titel,
+        })),
+      ),
+    ),
     http.get('/api/benachrichtigungen/:id', ({ params }) => {
       const b = bekannt.get(Number(params.id));
       return b
@@ -173,6 +189,7 @@ function AlarmTestRoute({
           </button>
         </>
       )}
+      <AlarmZone />
       {sichtbar && <AlarmZentrale einsatzId={einsatzId} eingaengeUngelesen={eingaengeUngelesen} />}
       <output data-testid="route">
         {location.pathname}
@@ -210,20 +227,20 @@ function renderAlarm({
   return render(strictMode ? <StrictMode>{inhalt}</StrictMode> : inhalt);
 }
 
-/**
- * antd wartet beim Entfernen einer Notification auf das Ende der CSS-Bewegung, das jsdom nicht
- * erzeugt; ohne Anstoß bliebe die zerstörte Notice mit `*-leave-active` im DOM.
- */
 async function warteBisNotificationWeg(titel: string) {
-  await waitFor(() => {
-    const notice = screen.queryByText(titel)?.closest<HTMLElement>('.ant-notification-notice');
-    if (notice) {
-      fireEvent.transitionEnd(notice);
-      fireEvent.animationEnd(notice);
-      notice.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
-    }
-    expect(screen.queryByText(titel)).not.toBeInTheDocument();
-  });
+  await waitFor(() => expect(screen.queryByText(titel)).not.toBeInTheDocument());
+}
+
+/** Die Zeile eines Eintrags der Alarmzone (LLH-1735). */
+function zeileVon(el: HTMLElement): HTMLElement {
+  const zeile = el.closest<HTMLElement>('[data-lfh="alarm-eintrag"]');
+  if (!zeile) throw new Error('kein Eintrag der Alarmzone');
+  return zeile;
+}
+
+/** Einträge der Alarmzone, gebündelt oder nicht. */
+function zonenZahl(): number {
+  return Number(document.querySelector<HTMLElement>('[data-lfh="alarmzone"]')?.dataset.anzahl ?? 0);
 }
 
 function stubAudioReady() {
@@ -294,7 +311,7 @@ describe('AlarmZentrale', () => {
     renderAlarm();
     sofortmeldung(3);
     const titel = await screen.findByText('Sofortmeldung · Rettungsstaffel');
-    const notice = titel.closest<HTMLElement>('.ant-notification-notice')!;
+    const notice = zeileVon(titel);
     const anfang = within(notice).getByText(/^Kellerabgang Mühlbachweg 34: .* …$/);
     expect(Array.from(anfang.textContent ?? '').length).toBeLessThanOrEqual(120);
     expect(anfang).toHaveAttribute('title', wortlaut);
@@ -325,20 +342,30 @@ describe('AlarmZentrale', () => {
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=3');
   });
 
-  it('zeigt eine fällige Erinnerung im Eingangsband, ohne Detailzeile (LLH-1143)', async () => {
+  it('zeigt eine fällige Erinnerung mit ihrem Titel im Eingangsband (LLH-1143, LLH-1737)', async () => {
+    offeneErinnerungen.set(5, 'Pegel prüfen');
     renderAlarm();
     erinnerungFaellig(5);
-    await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
-    // Ein Eingang, kein Alarm: das Band, kein Toast.
+    await waitFor(() =>
+      expect(screen.getByText('Erinnerung fällig: Pegel prüfen')).toBeInTheDocument(),
+    );
+    // Ein Eingang, kein Alarm: das Band, nicht die Alarmzone.
     const band = screen
-      .getByText('Erinnerung fällig')
+      .getByText('Erinnerung fällig: Pegel prüfen')
       .closest<HTMLElement>('[data-lfh="eingangsband"]')!;
     expect(band).not.toBeNull();
-    expect(document.querySelector('.ant-notification-notice')).toBeNull();
+    expect(zonenZahl()).toBe(0);
     // LFH-1078: der Titel sagt alles, kein Bittsatz darunter.
-    expect(screen.getAllByText('Erinnerung fällig')).toHaveLength(1);
+    expect(screen.getAllByText(/^Erinnerung fällig/)).toHaveLength(1);
     await userEvent.click(within(band).getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
+  });
+
+  it('ohne Titel der Erinnerung bleibt der Text des Servers (LLH-1737)', async () => {
+    renderAlarm();
+    erinnerungFaellig(6);
+    await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
+    expect(screen.queryByText(/^Erinnerung fällig:/)).not.toBeInTheDocument();
   });
 
   it('zeigt einen überfälligen Auftrag und springt zum Auftrag', async () => {
@@ -420,50 +447,40 @@ describe('AlarmZentrale', () => {
     },
   );
 
-  it('bündelt beim vierten Sofort-Ereignis die drei vorherigen und behält das neueste einzeln', async () => {
+  it('bündelt ab zwei: vier Sofortmeldungen, zu der jüngste mit „+ 3 weitere“ (LLH-1735)', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     for (let meldung = 1; meldung <= 4; meldung += 1) sofortmeldung(meldung);
 
-    expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
-    // LFH-1078: Zahl und Art im Titel, das Ziel am Knopf — kein Bittsatz darunter.
-    const sammel = screen
-      .getByText('3 weitere Sofortmeldungen')
-      .closest<HTMLElement>('.ant-notification-notice')!;
-    expect(sammel.querySelector('.ant-notification-notice-description')).toBeNull();
-    await waitFor(() => {
-      expect(document.querySelectorAll('.ant-notification-notice').length).toBeLessThanOrEqual(3);
-    });
+    expect(await screen.findByRole('button', { name: '+ 3 weitere' })).toBeInTheDocument();
     expect(screen.getAllByText('Sofortmeldung eingegangen')).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Meldungen' }));
-    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen');
+    expect(zonenZahl()).toBe(4);
+    await userEvent.click(screen.getByRole('button', { name: '+ 3 weitere' }));
+    expect(screen.getByText('4 Alarme')).toBeInTheDocument();
+    expect(screen.getAllByText('Sofortmeldung eingegangen')).toHaveLength(4);
+    await userEvent.click(
+      within(zeileVon(screen.getByText('Meldung #2'))).getByRole('button', { name: 'Öffnen' }),
+    );
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=2');
+    expect(zonenZahl()).toBe(3);
   });
 
   it('räumt beim Einsatzwechsel und Unmount nur die eigenen langlebigen Toasts ab', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start', mitSteuerung: true, strictMode: true });
     for (let meldung = 1; meldung <= 4; meldung += 1) sofortmeldung(meldung);
-    expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
-    expect(await screen.findByText('Sofortmeldung eingegangen')).toBeInTheDocument();
-    expect(screen.getByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
-    const alteSammelAktion = screen.getByRole('button', { name: 'Zu Meldungen' });
+    expect(await screen.findByRole('button', { name: '+ 3 weitere' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Fremde Notification öffnen' }));
     expect(await screen.findByText('Fremde Notification')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Einsatz wechseln' }));
 
-    // Selbst während antd die alte Notice ausblendet, darf ihre Aktion nicht zur Route des
-    // vorherigen Einsatzes springen. Seit antd 6.6.6 trägt die ausblendende Notice
-    // `pointer-events: none`; erreichbar bleibt ihr Knopf über die Tastatur.
-    alteSammelAktion.focus();
-    await userEvent.keyboard('{Enter}');
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/2/start');
     await warteBisNotificationWeg('Sofortmeldung eingegangen');
-    await warteBisNotificationWeg('3 weitere Sofortmeldungen');
+    expect(zonenZahl()).toBe(0);
     expect(screen.getByText('Fremde Notification')).toBeInTheDocument();
-    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/2/start');
 
     sofortmeldung(4, { id: 14, einsatz: 2 });
     expect(await screen.findByText('Sofortmeldung eingegangen')).toBeInTheDocument();
-    expect(screen.queryByText('3 weitere Sofortmeldungen')).not.toBeInTheDocument();
+    expect(zonenZahl()).toBe(1);
     await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/2/meldungen');
     await warteBisNotificationWeg('Sofortmeldung eingegangen');
@@ -475,18 +492,19 @@ describe('AlarmZentrale', () => {
     expect(screen.getByText('Fremde Notification')).toBeInTheDocument();
   });
 
-  it('bündelt vier Aufträge mit dem korrekten Auftrags-Ziel', async () => {
+  it('bündelt vier Aufträge; jede Zeile springt zu ihrem Auftrag', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     for (let id = 1; id <= 4; id += 1) {
       auftragUeberfaellig(id);
       await screen.findByText(`Auftrag #${id}`);
     }
 
-    expect(await screen.findByText('3 weitere überfällige Aufträge')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Zu Erinnerungen' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Aufträgen' }));
-    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege');
+    await userEvent.click(await screen.findByRole('button', { name: '+ 3 weitere' }));
+    expect(screen.getByText('4 × Auftrag überfällig')).toBeInTheDocument();
+    await userEvent.click(
+      within(zeileVon(screen.getByText('Auftrag #3'))).getByRole('button', { name: 'Öffnen' }),
+    );
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=3');
   });
 
   it('bündelt vier Erinnerungen im Eingangsband mit dem Erinnerungs-Ziel (LLH-1143)', async () => {
@@ -494,7 +512,7 @@ describe('AlarmZentrale', () => {
     for (let id = 1; id <= 4; id += 1) erinnerungFaellig(id);
 
     expect(await screen.findByText('4 neue Eingänge')).toBeInTheDocument();
-    expect(document.querySelector('.ant-notification-notice')).toBeNull();
+    expect(zonenZahl()).toBe(0);
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Erinnerungen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
@@ -520,15 +538,20 @@ describe('AlarmZentrale', () => {
     expect(screen.getAllByText('Ablösung fällig')).toHaveLength(1);
   });
 
-  it('bündelt vier Ablösungen mit dem Ablösungs-Ziel — dasselbe Budget wie alle Quellen', async () => {
+  it('bündelt vier Ablösungen in derselben Zone wie alle Quellen', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     for (let id = 1; id <= 4; id += 1) abloesung(id, 'abloesung_faellig');
-    expect(await screen.findByText('3 weitere Ablösungen')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Ablösungen' }));
+    await userEvent.click(await screen.findByRole('button', { name: '+ 3 weitere' }));
+    expect(screen.getByText('4 × Ablösung fällig')).toBeInTheDocument();
+    await userEvent.click(
+      within(zeileVon(screen.getByText('Florian 2, 15:30'))).getByRole('button', {
+        name: 'Öffnen',
+      }),
+    );
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/abloesung');
   });
 
-  it('bietet bei gemischter Bündelung getrennte Aktionen nur für betroffene Module', async () => {
+  it('nennt bei gemischter Bündelung je Art die Zahl; jede Zeile springt in ihr Modul', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     sofortmeldung(1);
     await screen.findByText('Meldung #1');
@@ -538,11 +561,15 @@ describe('AlarmZentrale', () => {
     await screen.findByText('Ablösung fällig');
     sofortmeldung(4);
 
-    expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Zu Meldungen' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Zu Aufträgen' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Zu Erinnerungen' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Ablösungen' }));
+    await userEvent.click(await screen.findByRole('button', { name: '+ 3 weitere' }));
+    expect(
+      screen.getByText(/^2 × .+ · 1 × Auftrag überfällig · 1 × Ablösung fällig$/),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(zeileVon(screen.getByText('Ablösung fällig'))).getByRole('button', {
+        name: 'Öffnen',
+      }),
+    );
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/abloesung');
   });
 });
@@ -590,7 +617,7 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
     expect(screen.getAllByRole('button', { name: 'Öffnen' })).toHaveLength(1);
   });
 
-  it('unterliegt dem gemeinsamen Budget: drei Sofortmeldungen und ein Unwetter → Zusammenfassung', async () => {
+  it('teilt die Zone: drei Sofortmeldungen und ein Unwetter stehen gebündelt', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     for (let id = 1; id <= 3; id += 1) {
       sofortmeldung(id);
@@ -603,11 +630,12 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
         beschreibung: 'Dauerregen, seit 08:00 · bis 20:00',
       }),
     );
-    expect(await screen.findByText('3 weitere Sofortmeldungen')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '+ 3 weitere' })).toBeInTheDocument();
     expect(screen.getByText('Unwetterwarnung')).toBeInTheDocument();
+    expect(zonenZahl()).toBe(4);
   });
 
-  it('dasselbe Paar erneut, während sein alter Hinweis gebündelt ist: der neue erscheint', async () => {
+  it('dasselbe Paar erneut, während sein alter Hinweis gebündelt ist: der neue ersetzt ihn', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     const detail = {
       schluessel: 'schwer|DAUERREGEN',
@@ -619,13 +647,14 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
       sofortmeldung(id);
       await screen.findByText(`Meldung #${id}`);
     }
-    expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
-    await warteBisNotificationWeg('Unwetterwarnung');
+    expect(await screen.findByRole('button', { name: '+ 3 weitere' })).toBeInTheDocument();
     act(() => unwetter({ ...detail, beschreibung: 'Dauerregen, seit 15:00 · bis 23:00' }));
     expect(await screen.findByText('Dauerregen, seit 15:00 · bis 23:00')).toBeInTheDocument();
+    // Ein Platz für das Wetter: der ältere Hinweis ging, der neue steht.
+    expect(zonenZahl()).toBe(4);
   });
 
-  it('die Zusammenfassung bietet den Weg zu Wetter & Pegel, wenn ein Unwetter darin steckt', async () => {
+  it('die aufgeklappte Zone führt aus der Zeile des Unwetters zu Wetter & Pegel', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     act(() =>
       unwetter({
@@ -638,8 +667,10 @@ describe('AlarmZentrale: Unwetterhinweis (LFH-663)', () => {
       sofortmeldung(id);
       await screen.findByText(`Meldung #${id}`);
     }
-    expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Wetter & Pegel' }));
+    await userEvent.click(await screen.findByRole('button', { name: '+ 3 weitere' }));
+    const zeile = zeileVon(screen.getByText('Unwetterwarnung'));
+    expect(within(zeile).queryByRole('button', { name: 'Gelesen' })).toBeNull();
+    await userEvent.click(within(zeile).getByRole('button', { name: 'Öffnen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/wetter-pegel');
   });
 });
@@ -674,9 +705,10 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     expect(screen.getAllByRole('button', { name: /^Alarmzentrale:/ })).toHaveLength(1);
   });
 
-  it('bei erlaubtem Desktop und gutem Ton nennt die Marke den Ton', async () => {
+  it('bei erlaubtem Desktop und gutem Ton steht die Glocke allein, der Name nennt den Ton (LLH-1728, D4)', async () => {
     // Deckt `|| desktop === 'erlaubt'` ab: auch im unauffälligen Fall nennt die Marke einen
-    // Zustand statt eines Sammelworts.
+    // Zustand statt eines Sammelworts, aber nur im zugänglichen Namen. Sichtbar steht das Wort nur
+    // bei Störung, wie am Tablet (LFH-637): sonst bliebe der Handy-Kopf zweizeilig.
     stubAudioReady();
     stubNotification('granted');
     setzeViewportBreite(390);
@@ -686,6 +718,9 @@ describe('AlarmZentrale auf dem Handschirm (LFH-511)', () => {
     await waitFor(() => expect(ziel).toHaveAccessibleName('Alarmzentrale: Ton bereit'));
     // Der Ruhezustand steht auch am Handy nur als Icon (LLH-1726).
     expect(ziel).toHaveTextContent(/^$/);
+    // Am Handy hält die Marke keinen Platz für das Wort frei: er kostete die eine Zeile des Kopfs
+    // (LLH-1728, D4). Am Tablet mit Finger bleibt der Platz (LLH-1726, Gegenprobe unten).
+    expect(ziel.querySelector('.ton-wort-platz')).toBeNull();
   });
 
   it('ist der Desktop abschaltbar, ist sein Menüeintrag bedienbar und fordert die Berechtigung an', async () => {
@@ -862,25 +897,20 @@ describe('AlarmZentrale: das Ton-Wort steht genau bei Störung (LLH-1726)', () =
   // erscheint ohne Zutun „Ton blockiert“. Damit der Kopf dann nicht springt (Spec
   // `einsatztauglichkeit-layout`), hält das Ton-Wort die Breite von „Ton blockiert“, auch leer.
   // Den Platz trägt erzeugter Inhalt (`AlarmZentrale.css`); ob er hält, misst
-  // `e2e/kopfhoehe-tonpruefung.spec.ts`.
-  it.each([1024, 1366, 390])(
-    '%i px: das Ton-Wort hält den Platz von „Ton blockiert“',
-    async (px) => {
-      setzeViewportBreite(px);
-      stubAudioReady();
-      stubNotification('granted');
-      renderAlarm();
-      const knopf =
-        px < 768
-          ? await screen.findByRole('button', { name: 'Alarmzentrale: Ton bereit' })
-          : await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
-      await waitFor(() => expect(knopf.querySelector('.ton-wort-platz')).not.toBeNull());
-      const platz = knopf.querySelector('.ton-wort-platz')!;
-      expect(platz).toHaveAttribute('data-platz', 'Ton blockiert');
-      expect(platz).toHaveAttribute('aria-hidden', 'true');
-      expect(knopf.textContent).toBe('');
-    },
-  );
+  // `e2e/kopfhoehe-tonpruefung.spec.ts`. Am Handy nicht: dort kostete der Platz die eine Zeile des
+  // Kopfs (LLH-1728, D4; Test „bei erlaubtem Desktop und gutem Ton …“ oben).
+  it.each([1024, 1366])('%i px: das Ton-Wort hält den Platz von „Ton blockiert“', async (px) => {
+    setzeViewportBreite(px);
+    stubAudioReady();
+    stubNotification('granted');
+    renderAlarm();
+    const knopf = await screen.findByRole('button', { name: 'Ton bereit – stummschalten' });
+    await waitFor(() => expect(knopf.querySelector('.ton-wort-platz')).not.toBeNull());
+    const platz = knopf.querySelector('.ton-wort-platz')!;
+    expect(platz).toHaveAttribute('data-platz', 'Ton blockiert');
+    expect(platz).toHaveAttribute('aria-hidden', 'true');
+    expect(knopf.textContent).toBe('');
+  });
 
   it('1140 px in handschuh: auch dort der Ruhezustand ohne Wort', async () => {
     setzeViewportBreite(1140);
@@ -1068,6 +1098,7 @@ describe('AlarmZentrale: Wortwahl der Benachrichtigungen (LFH-950)', () => {
   });
 
   it('auf dem Handschirm nennt die Marke bei abgeschalteter Benachrichtigung den Ton', async () => {
+    // Im Namen; sichtbar steht der Ruhezustand am Handy nur als Glocke (LLH-1728, D4).
     setzeViewportBreite(390);
     stubAudioReady();
     stubNotification('default');
@@ -1243,14 +1274,14 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     // Sichtbar machen ohne Ereignis: so prüft der Test den Weg über den Toast allein.
     setzeHidden(false);
     const toast = (await screen.findAllByText('Sofortmeldung eingegangen'))[0].closest<HTMLElement>(
-      '.ant-notification-notice',
+      '[data-lfh="alarm-eintrag"]',
     )!;
     await userEvent.click(within(toast).getByRole('button', { name: 'Öffnen' }));
     expect(meldungen.filter((m) => m.close.mock.calls.length > 0)).toHaveLength(1);
     expect(offeneDesktopAlarme()).toBe(1);
   });
 
-  it('Schließen des Toasts (Quittieren) schließt die zugehörige Desktop-Meldung', async () => {
+  it('Ausblenden des Eintrags schließt die zugehörige Desktop-Meldung', async () => {
     stubAudioReady();
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
@@ -1260,11 +1291,11 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     await waitFor(() => expect(meldungen).toHaveLength(2));
     setzeHidden(false);
     const toast = (await screen.findAllByText('Sofortmeldung eingegangen'))[0].closest<HTMLElement>(
-      '.ant-notification-notice',
+      '[data-lfh="alarm-eintrag"]',
     )!;
-    const kreuz = toast.querySelector<HTMLElement>('.ant-notification-notice-close');
-    expect(kreuz, 'der Toast hat ein Schließkreuz').not.toBeNull();
-    await userEvent.click(kreuz!);
+    await userEvent.click(
+      within(toast).getByRole('button', { name: 'Ausblenden, ohne zu quittieren' }),
+    );
     await waitFor(() => expect(offeneDesktopAlarme()).toBe(1));
     expect(meldungen.filter((m) => m.close.mock.calls.length > 0)).toHaveLength(1);
   });
@@ -1285,7 +1316,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     );
     setzeHidden(false);
     const toast = (await screen.findByText('Sofortmeldung eingegangen')).closest<HTMLElement>(
-      '.ant-notification-notice',
+      '[data-lfh="alarm-eintrag"]',
     )!;
     await userEvent.click(within(toast).getByRole('button', { name: 'Öffnen' }));
     expect(meldungen[1].close).toHaveBeenCalledOnce();
@@ -1293,7 +1324,7 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     expect(offeneDesktopAlarme()).toBe(1);
   });
 
-  it('Schließen der Zusammenfassung schließt die Desktop-Meldungen der gebündelten Alarme', async () => {
+  it('Ausblenden der gebündelten Zone schließt die Desktop-Meldungen aller Alarme', async () => {
     stubAudioReady();
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
@@ -1303,15 +1334,16 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
       await waitFor(() => expect(meldungen).toHaveLength(id));
     }
     setzeHidden(false);
-    const sammel = (await screen.findByText('3 weitere Sofortmeldungen')).closest<HTMLElement>(
-      '.ant-notification-notice',
-    )!;
-    await userEvent.click(sammel.querySelector<HTMLElement>('.ant-notification-notice-close')!);
-    await waitFor(() => expect(offeneDesktopAlarme()).toBe(1));
+    await userEvent.click(await screen.findByRole('button', { name: '+ 3 weitere' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Alle ausblenden, ohne zu quittieren' }),
+    );
+    await waitFor(() => expect(offeneDesktopAlarme()).toBe(0));
     expect(meldungen.filter((m) => m.close.mock.calls.length > 0).map((m) => m.tag)).toEqual([
       '1-b-1',
       '1-b-2',
       '1-b-3',
+      '1-b-4',
     ]);
   });
 

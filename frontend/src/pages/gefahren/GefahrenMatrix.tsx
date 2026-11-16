@@ -105,7 +105,7 @@ export { zellBalkenStil, zellFlaechenStil } from './zellStil';
  * „keine“ ist die Vorgabe (LLH-1090, Spec `gefahrenmatrix`, fortgeschrieben aus LFH-969): eine
  * gültige Zelle ohne Bewertung zeigt „–“ wie eine ausdrücklich auf „keine“ gesetzte, mit demselben
  * Namen und derselben Kennung. Die Sorge von LFH-969 („sonst sähe eine offene Beurteilung aus wie
- * eine Entwarnung“) trägt jetzt die Beurteilung am Gefahrengebiet („nicht beurteilt“,
+ * eine Entwarnung“) trägt jetzt die Beurteilung am Gefahrengebiet („unbestätigt“,
  * `GefahrenBeurteilung`), nicht mehr eine leere Zelle.
  */
 export function zellStufe(zelle: GefahrBewertung | undefined): Warnstufe {

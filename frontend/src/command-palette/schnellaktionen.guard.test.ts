@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import * as ts from 'typescript';
 import { SCHNELLAKTIONEN, type SchnellaktionParameter } from './befehle';
 import { modulRegistry, modulZielRoute } from '../einsatz/modulRegistry';
-import { einsatzModulPfad, parseZeichnenAuftrag } from '../routing/deeplinks';
+import {
+  einsatzModulPfad,
+  parseFahrzeugeAnsicht,
+  parseZeichnenAuftrag,
+} from '../routing/deeplinks';
 import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
 
 /**
@@ -11,9 +15,10 @@ import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
  * Test rot: die Zielseite ignoriert den Parameter, und die Person steht auf einer Liste statt in
  * der Erfassung.
  *
- * Zwei Aktionsarten, je nach dem Parameter, den der Eintrag deklariert (LFH-825): `neu`
- * (Erfassung, `?neu=1`) und `zeichnen` (Zeichenmodus der Lagekarte, `?zeichnen=<zonentyp>`). Ziel
- * und Deckung werden JE PARAMETER geprüft; ein `neu`-Leser deckt keine Zeichen-Aktion.
+ * Drei Aktionsarten, je nach dem Parameter, den der Eintrag deklariert (LFH-825): `neu`
+ * (Erfassung, `?neu=1`), `zeichnen` (Zeichenmodus der Lagekarte, `?zeichnen=<zonentyp>`) und
+ * `ansicht` (eine Ansicht des Moduls, `?ansicht=tableau`, y3zh5ymv D4). Ziel und Deckung werden JE
+ * PARAMETER geprüft; ein `neu`-Leser deckt keine Zeichen-Aktion.
  *
  * Erkennung per TS-AST (Muster `api/queryKeyScan.ts`): ein Grep auf `neu=1` träfe auch Kommentare
  * und Builder. Die Deckung ist eine ZUORDNUNG, kein Zählvergleich: je Eintrag muss es einen Leser
@@ -31,7 +36,8 @@ import { zeichenAuftragZuEntwurf } from '../pages/lagekarte/zeichenAuftrag';
  *  3. OB DER LESER DEN PARAMETER VERWERTET; ein toter Zweig zählt mit.
  *  4. TESTDATEIEN werden gar nicht gescannt.
  *  5. DIE ZUORDNUNG HÄNGT AM DATEINAMEN; ein Leser ohne passenden Registry-Eintrag wird gemeldet,
- *     nicht zugeordnet.
+ *     nicht zugeordnet. Ausgenommen sind die Parser in {@link PARSER_DATEIEN}: sie lesen den
+ *     Parameter für die Seiten, sind aber selbst keine.
  *
  * SEITEN MIT ANDEREM NAMEN ALS IHR MODUL: Funkplan und Kommunikationsplan zählen zum
  * Fernmeldewesen (LLH-1180, {@link SEITE_MODUL}). Das Informationstelefon ist seit i6k6mzed ein
@@ -94,7 +100,17 @@ const ZIEL_TRAEGT: Record<SchnellaktionParameter, (wert: string | null) => boole
     const auftrag = parseZeichnenAuftrag(wert);
     return auftrag != null && zeichenAuftragZuEntwurf(auftrag) != null;
   },
+  // Eine Ansichts-Aktion gibt es bisher nur bei den Fahrzeugen (FMS-Tableau). Eine weitere bringt
+  // den Parser ihres Moduls hier mit.
+  ansicht: (wert) =>
+    wert != null && parseFahrzeugeAnsicht(new URLSearchParams({ ansicht: wert })) != null,
 };
+
+/**
+ * Dateien, die einen Schnellaktions-Parameter für die Seiten auswerten, ohne selbst eine Seite zu
+ * sein (`parseFahrzeugeAnsicht` u. a. lesen `ansicht`). Sie zählen nicht als Leser.
+ */
+const PARSER_DATEIEN: ReadonlySet<string> = new Set(['/src/routing/deeplinks.ts']);
 
 // Das Glob bleibt HIER im Guard, sonst landete der Quelltext des Frontends im App-Bundle.
 const dateien = import.meta.glob('/src/**/*.{ts,tsx}', {
@@ -112,7 +128,12 @@ const QUELLEN = Object.entries(dateien).filter(([pfad]) => !istTestdatei(pfad));
 const PARAMETER = [...new Set(SCHNELLAKTIONEN.map((a) => a.parameter))];
 
 const LESER = new Map<SchnellaktionParameter, Leser[]>(
-  PARAMETER.map((p) => [p, QUELLEN.flatMap(([pfad, inhalt]) => findeLeser(pfad, inhalt, p))]),
+  PARAMETER.map((p) => [
+    p,
+    QUELLEN.filter(([pfad]) => !PARSER_DATEIEN.has(pfad)).flatMap(([pfad, inhalt]) =>
+      findeLeser(pfad, inhalt, p),
+    ),
+  ]),
 );
 
 /** Vergleichsform für die Dateiname-↔-Registry-Zuordnung: nur Buchstaben und Ziffern. */
@@ -165,7 +186,7 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
   it('scannt die Quellen und findet Leser', () => {
     expect(Object.keys(dateien).length).toBeGreaterThan(200);
     // Beide Aktionsarten sind in Gebrauch; fiele eine weg, prüfte der Guard sie still nicht mehr.
-    expect([...PARAMETER].sort()).toEqual(['neu', 'zeichnen']);
+    expect([...PARAMETER].sort()).toEqual(['ansicht', 'neu', 'zeichnen']);
     for (const p of PARAMETER) {
       expect(
         LESER.get(p)!.length,
@@ -216,6 +237,9 @@ describe('Schnellaktionen-Guard: der Scan läuft überhaupt', () => {
     expect(ZIEL_TRAEGT.zeichnen(null)).toBe(false);
     // Syntaktisch gültig, aber nicht zeichenbar: die Karte räumte nur.
     expect(ZIEL_TRAEGT.zeichnen('absperrgrenze:flaeche')).toBe(false);
+    expect(ZIEL_TRAEGT.ansicht('tableau')).toBe(true);
+    expect(ZIEL_TRAEGT.ansicht('kacheln')).toBe(false);
+    expect(ZIEL_TRAEGT.ansicht(null)).toBe(false);
   });
 });
 

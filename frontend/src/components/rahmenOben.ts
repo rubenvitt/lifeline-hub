@@ -1,10 +1,12 @@
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 
 /**
- * Die Höhe dessen, was am oberen Fensterrand klebt (LFH-952, `frontend/AGENTS.md`, Rahmen):
- * ab `md` die Kopfleiste, unter `md` die Betriebszeile, solange sie eine Verbindungsstörung
- * meldet, und darunter ab `md` der klebende Seitenkopf. Herleitung: D2 in
- * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`.
+ * Die Höhe dessen, was am oberen Fensterrand klebt (LFH-952, `frontend/AGENTS.md`, Rahmen): die
+ * Kopfleiste in jeder Breite (LLH-1728), darüber unter `md` die Betriebszeile, solange sie eine
+ * Verbindungsstörung meldet, darunter in einer Übung das Übungsband und ab `md` der klebende
+ * Seitenkopf. Herleitung: D2 in
+ * `openspec/changes/archive/2026-10-06-lfh-952-app-rahmen-stehen-bleiben/design.md`, D2 in
+ * `openspec/changes/archive/2026-11-15-ejt520so-handy-kopfleiste-fixiert/design.md` (Ränge).
  *
  * ZWEI HÖHEN (zjt7c073 D2): die Quellen gehören zur Ebene `kopf` (Kopfleiste, Betriebszeile, Übungsband) oder
  * `seitenkopf` (der klebende Seitenkopf von `EinsatzSeite`/`AdminPage`).
@@ -31,22 +33,31 @@ export const KOPF_OBEN_VAR = '--lfh-kopf-oben';
 export type RahmenEbene = 'kopf' | 'seitenkopf';
 
 /**
+ * Die Ränge der klebenden Quellen der Ebene `kopf`, von oben nach unten (LLH-1728, design.md D2,
+ * ADR-0056). Eine Quelle klebt unter allen mit kleinerem Rang; ihre Reihenfolge im DOM muss dazu
+ * passen. Der Seitenkopf (Ebene `seitenkopf`) steht unter allen und nimmt `--lfh-kopf-oben`.
+ */
+export const RAHMEN_RANG = { betriebszeile: 0, kopf: 1, uebungsband: 2, alarmzone: 3 } as const;
+
+export type RahmenRang = (typeof RAHMEN_RANG)[keyof typeof RAHMEN_RANG];
+
+/**
  * Stapelebene des klebenden Rahmens: über dem Inhalt samt angepinnter ETB-Leiste (20) und den
  * stehenden Tabellenköpfen, unter antds Overlays (Dropdown, Drawer, Modal ab 1000).
  */
 export const RAHMEN_EBENE = 100;
 
 /**
- * Stil des klebenden Rahmens selbst: an der Fensterkante, auf {@link RAHMEN_EBENE}. Nur der Rahmen
- * (Kopf ab `md`, Betriebszeile unter `md` im Störungsfall) trägt ihn; alles andere hängt sich mit
- * `var(--lfh-rahmen-oben)` darunter.
+ * Stil des klebenden Rahmens selbst: auf {@link RAHMEN_EBENE}, `top` aus dem Stapel
+ * ({@link useRahmenObenStapel}). Nur der Rahmen (Betriebszeile, Kopf, Übungsband) trägt ihn;
+ * alles andere hängt sich mit `var(--lfh-rahmen-oben)` bzw. `var(--lfh-kopf-oben)` darunter.
  */
 export const RAHMEN_KLEBT = { position: 'sticky', top: 0, zIndex: RAHMEN_EBENE } as const;
 
 /** antds Hüllen mit eigenem Scrollbereich, in denen der Dokument-Rahmen nicht gilt. */
 const EIGENER_SCROLLBEREICH = '.ant-drawer-body, .ant-modal-wrap';
 
-const anteile = new Map<symbol, { ebene: RahmenEbene; hoehe: number }>();
+const anteile = new Map<symbol, { ebene: RahmenEbene; rang: RahmenRang; hoehe: number }>();
 const hoerer = new Set<() => void>();
 let summe = 0;
 let kopfSumme = 0;
@@ -61,13 +72,23 @@ function recompute(): void {
   const style = document.documentElement.style;
   style.setProperty(RAHMEN_OBEN_VAR, `${next}px`);
   style.setProperty(KOPF_OBEN_VAR, `${nextKopf}px`);
-  if (next === summe && nextKopf === kopfSumme) return;
   summe = next;
   kopfSumme = nextKopf;
+  // Auch bei gleichen Summen: das `oben` eines Rangs kann sich verschieben (eine Quelle wächst,
+  // eine andere schrumpft). Unveränderte Messungen kommen gar nicht erst hier an (`measure`).
   for (const h of hoerer) h();
 }
 
-/** Hört auf Änderungen beider Summen, außerhalb von React (`alarmOben.ts`). */
+/** Die Summe der Quellen der Ebene `kopf` mit kleinerem Rang: das `top` dieses Rangs. */
+function sumAbove(rang: RahmenRang): number {
+  let oben = 0;
+  for (const anteil of anteile.values()) {
+    if (anteil.ebene === 'kopf' && anteil.rang < rang) oben += anteil.hoehe;
+  }
+  return oben;
+}
+
+/** Hört auf Änderungen beider Summen, außerhalb von React. */
 export function abonniereRahmenOben(h: () => void): () => void {
   hoerer.add(h);
   return () => hoerer.delete(h);
@@ -97,8 +118,8 @@ export function useKopfOben(): number {
  * Meldet ein Element als klebende Quelle der Ebene `ebene`, solange `aktiv` gilt; das Ergebnis ist
  * der Callback-Ref dafür. Callback-Ref statt `useRef`: tauscht React das Element (der Rahmen hängt
  * nach einem Fehlerausstieg neu ein), beobachtet der Effekt das neue — mit einem `RefObject` in den
- * Abhängigkeiten bliebe er am alten hängen. `eigenerSchluessel` braucht nur
- * {@link useRahmenObenStapel}, das den eigenen Anteil wieder abzieht.
+ * Abhängigkeiten bliebe er am alten hängen. `eigenerSchluessel` und `rang` braucht nur
+ * {@link useRahmenObenStapel}; eine Quelle ohne Rang zählt in der Ebene `kopf` als oberste.
  *
  * Die erste Messung läuft in `useLayoutEffect`, also vor dem ersten Bild: sonst säße ein stehender
  * Tabellenkopf ein Bild lang unter dem Kopf. Danach hält ein `ResizeObserver` den Wert (Umbruch,
@@ -108,13 +129,17 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
   aktiv: boolean,
   ebene: RahmenEbene = 'kopf',
   eigenerSchluessel?: symbol,
+  rang: RahmenRang = RAHMEN_RANG.betriebszeile,
 ): (el: T | null) => void {
   const [el, setEl] = useState<T | null>(null);
   useLayoutEffect(() => {
     if (!aktiv || !el) return;
     const key = eigenerSchluessel ?? Symbol('rahmen-oben');
     const measure = () => {
-      anteile.set(key, { ebene, hoehe: el.offsetHeight });
+      const alt = anteile.get(key);
+      const hoehe = el.offsetHeight;
+      if (alt && alt.hoehe === hoehe && alt.ebene === ebene && alt.rang === rang) return;
+      anteile.set(key, { ebene, rang, hoehe });
       recompute();
     };
     measure();
@@ -122,7 +147,7 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
     // der IconRail, `calc(100dvh - var(--lfh-rahmen-oben))`), und Vorfahren, die der Fensterrahmen
     // beobachtet, wüchsen noch in derselben Auslieferungsrunde. Beim Live-Wechsel der Dichte
     // meldete der Browser dann „ResizeObserver loop completed with undelivered notifications“
-    // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen` und `alarmOben`.
+    // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen`.
     let scheduled = 0;
     const observer = new ResizeObserver(() => {
       if (scheduled) return;
@@ -138,33 +163,31 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
       anteile.delete(key);
       recompute();
     };
-  }, [el, aktiv, ebene, eigenerSchluessel]);
+  }, [el, aktiv, ebene, eigenerSchluessel, rang]);
   return setEl;
 }
 
 /**
- * Eine klebende Quelle, die selbst UNTER den übrigen klebt: das Übungsband (LLH-1725, design.md
- * D4 in `openspec/changes/archive/2026-11-15-wc3kzd54-uebungsmarke-rahmen/`). Es meldet seine Höhe wie jede Quelle
- * (`ref`), und `oben` ist die Summe OHNE seinen eigenen Anteil, also sein `top`: ab `md` die
- * Kopfhöhe, unter `md` die gestörte Betriebszeile oder 0. Keine Rückkopplung: die eigene Höhe
- * hängt nicht vom eigenen `top` ab. Die Reihenfolge im DOM muss dazu passen — das Element steht
- * nach allen anderen Quellen.
+ * Eine klebende Quelle im Stapel der Ebene `kopf` (LLH-1728, design.md D2): Betriebszeile, Kopf,
+ * Übungsband (LLH-1725) und Alarmzone (LLH-1735, design.md D2 in
+ * `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`). Sie meldet ihre Höhe (`ref`), und
+ * `oben` ist die Summe der Quellen mit kleinerem Rang, also ihr `top`. Keine Rückkopplung: weder die
+ * eigene Höhe noch die der Quellen darunter verschiebt es. Die Reihenfolge im DOM muss zum Rang
+ * passen. Rail, Modulpanel und Seitenkopf hängen sich unter die ganze Ebene (`--lfh-kopf-oben`,
+ * zjt7c073 D2); der klebende Seitenkopf zählt für das `top` nicht mit.
  */
 export function useRahmenObenStapel<T extends HTMLElement>(
   aktiv: boolean,
+  rang: RahmenRang,
 ): { ref: (el: T | null) => void; oben: number } {
   const [schluessel] = useState(() => Symbol('rahmen-oben-stapel'));
-  // Das Band gehört zur Ebene `kopf`: Rail, Modulpanel und Seitenkopf hängen sich unter es. Sein
-  // `top` ist die Kopfhöhe ohne den eigenen Anteil; der klebende Seitenkopf steht darunter und
-  // zählt nicht mit (zjt7c073 D2).
-  const ref = useRahmenObenQuelle<T>(aktiv, 'kopf', schluessel);
-  const summe = useKopfOben();
-  const eigen = useSyncExternalStore(
+  const ref = useRahmenObenQuelle<T>(aktiv, 'kopf', schluessel, rang);
+  const oben = useSyncExternalStore(
     abonniereRahmenOben,
-    () => anteile.get(schluessel)?.hoehe ?? 0,
+    () => sumAbove(rang),
     () => 0,
   );
-  return { ref, oben: Math.max(0, summe - eigen) };
+  return { ref, oben };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { waehleAnzeige } from './menue-kern';
+import { waehleAnzeige, benutzermenueAusloeser } from './menue-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { anmeldenPerApi } from './anmelde-kern';
 
@@ -177,12 +177,9 @@ for (const breite of [1366, 1024, 390]) {
     // rollt nur die Liste, sonst richtet antd das Menü mitten im Klick neu aus (`menue-kern.ts`,
     // LLH-1337).
     await page.evaluate(() => window.scrollTo(0, 0));
-    await waehleAnzeige(
-      page,
-      page.getByRole('button', { name: /Benutzermenü/ }),
-      'Bediendichte',
-      'Kompakt',
-    );
+    // Am Handy steht das Benutzermenü im Einsatz in der Navigation (LLH-1728, D3).
+    await waehleAnzeige(page, await benutzermenueAusloeser(page), 'Bediendichte', 'Kompakt');
+    if (await page.locator('.ant-drawer-open').count()) await page.keyboard.press('Escape');
     await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
     await fuelltArbeitsflaeche(page);
     expect(browserFehler).toEqual([]);

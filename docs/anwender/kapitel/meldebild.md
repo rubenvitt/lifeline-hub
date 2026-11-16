@@ -1,16 +1,16 @@
 ---
-titel: Meldebild und Kräfte-Zeitachse
+titel: Kräfteübersicht und Kräfte-Zeitachse
 gruppen: [fuehrung]
-reihenfolge: 300
+reihenfolge: 200
 quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/kraefte/DauerMitEinstufung.tsx, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts, src/meldung/rueckmeldung.rs, src/abloesung/kopplung.rs]
 ---
 
 ## Überblick
 
-Das **Meldebild** zeigt auf einer Seite, was an Kräften im Einsatz ist, gegliedert als
+Die **Kräfteübersicht** zeigt auf einer Seite, was an Kräften im Einsatz ist, gegliedert als
 Kräftebaum: jede Einheit mit ihren Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, ihr
 Personal und ihr Material. Je Einheit stehen Status, letzte Rückmeldung, laufender Auftrag, Stärke,
-Abschnitt und Einsatzdauer. Darüber zählt ein Statusband die Einheiten und das Personal. Es ist die
+Abschnitt und Einsatzdauer. Darüber zählt ein Statusband die Einheiten und das Personal. Sie ist die
 Seite für den Lagevortrag und für die Frage, wo etwas fehlt.
 
 Die **Kräfte-Zeitachse** hält je Einheit und Person fest, wann sie alarmiert wurde, eingetroffen
@@ -21,9 +21,9 @@ setzen Status, tragen nach und streichen.
 
 ## Abläufe
 
-### Das Meldebild lesen
+### Die Kräfteübersicht lesen
 
-1. Unter „Kräfte & Mittel“ das „Meldebild“ öffnen. Der Kopf nennt die Zahl der Einheiten und die
+1. Unter „Kräfte & Mittel“ die „Kräfteübersicht“ öffnen. Der Kopf nennt die Zahl der Einheiten und die
    Stärke (Führer/Unterführer/Mannschaft//Gesamt).
 2. Im Statusband unter „Einheiten nach FMS-Status“ je Status Code, Wort und Zahl lesen, etwa
    „S3 Anfahrt 2“; der Balken darunter zeigt den Anteil, die Summe steht oben rechts. Daneben
@@ -35,16 +35,17 @@ setzen Status, tragen nach und streichen.
    unterwegs, Eintreffen 16:10 · 1 NEF angefordert“. Ein Klick darauf öffnet die Nachforderungen.
 3. Im Raster je Einheit „Status“, „Rückmeldung“ (Uhrzeit der letzten), „Auftrag“ (der jüngste
    offene, als Verweis), „Stärke“, „Abschnitt“, „Seit“ und „Im Einsatz“ lesen. Eine getönte Zeile
-   nennt ihren Grund als Wort, etwa „1 Ausfall“, „1 Ausfall Material“ oder „Rückm. überfällig“.
+   nennt in der Spalte „Status“ ihren Grund als rotes Etikett, etwa „1 Ausfall“, „1 Ausfall
+   Material“ oder „Rückm. überfällig seit 47 min“.
    „nicht übernommen“ hinter dem Namen kennzeichnet eine Einheit, die ein Bereitstellungsraum
    unangemeldet gebucht hat und die noch niemand übernommen oder abgewiesen hat (Kapitel
    [Einheiten](einheiten.md)).
-4. Die Tiefe des Baums in der Werkzeugzeile wählen. Das Meldebild öffnet auf „Einheiten“:
+4. Die Tiefe des Baums in der Werkzeugzeile wählen. Die Kräfteübersicht öffnet auf „Einheiten“:
    Untereinheiten stehen unter ihrer Einheit, Fahrzeuge sind zugeklappt. „mit Fahrzeugen“ öffnet
    jede Einheit, „alles“ auch Besatzung und Beladung jedes Fahrzeugs. Mit „+“ vor einer Zeile oder einem
    Klick auf die Zeile klappt sie einzeln auf oder zu.
 
-   ![Meldebild mit Statusband, Werkzeugzeile und Kräftebaum: Sanitätszug mit Fahrzeug und aufgeklappter Besatzung, darunter Rettungsstaffel und Sanitätsgruppe als Untereinheiten](../bilder/meldebild/meldebild.png)
+   ![Kräfteübersicht mit Statusband, Werkzeugzeile und Kräftebaum: Sanitätszug mit Fahrzeug und aufgeklappter Besatzung, darunter Rettungsstaffel und Sanitätsgruppe als Untereinheiten](../bilder/meldebild/meldebild.png)
 
 5. Unter einer Einheit lesen, was zu ihr gehört: zuerst ihre Fahrzeuge, in der Spalte „Stärke“
    mit der Besatzung „Ist … · Soll …“, aufgeklappt mit den Personen darauf und danach „Beladung“
@@ -67,15 +68,15 @@ setzen Status, tragen nach und streichen.
 
 Die Zeile „Ohne Einheit“ sammelt Fahrzeuge und Personal, die keiner Einheit zugeordnet sind, und
 Material ohne Ort; ein Fahrzeug ohne Einheit bringt seine Beladung mit. Material an einer UHS oder
-in einem Bereitstellungsraum steht nicht im Meldebild; es zählt im Modul [Material](material.md). Unter „Spalten“ lassen sich Spalten aus- und einblenden; „Funkrufname“ und „Fahrzeuge und
+in einem Bereitstellungsraum steht nicht in der Kräfteübersicht; es zählt im Modul [Material](material.md). Unter „Spalten“ lassen sich Spalten aus- und einblenden; „Funkrufname“ und „Fahrzeuge und
 Personal (bereit · gebunden · Ausfall)“ erscheinen nur auf breiten Bildschirmen und nicht im Druck.
 
-### Das Meldebild in den Lagebericht übernehmen oder drucken
+### Die Kräfteübersicht in den Lagebericht übernehmen oder drucken
 
-1. Das Meldebild wie gewünscht eingrenzen.
+1. Die Kräfteübersicht wie gewünscht eingrenzen.
 2. „In Lagebericht übernehmen“ wählen. Die App legt aus der Auswahl einen Lagebericht
-   „Kräftemeldebild“ mit Datum-Zeit-Gruppe an und öffnet ihn. Er ist nach Abschnitten gegliedert,
-   darin wie das Meldebild: Einheit, Fahrzeuge mit Besatzung und „Beladung“, „Ohne Fahrzeug“,
+   „Kräfteübersicht“ mit Datum-Zeit-Gruppe an und öffnet ihn. Er ist nach Abschnitten gegliedert,
+   darin wie die Kräfteübersicht: Einheit, Fahrzeuge mit Besatzung und „Beladung“, „Ohne Fahrzeug“,
    „Material“ mit Posten und Ausfall, Untereinheiten. Ohne Eingrenzung folgen darunter
    „Entlassen“ mit den entlassenen Personen und Fahrzeugen und „Aus dem Einsatz genommen“ mit dem
    herausgenommenen Material, jeder Eintrag mit Datum-Zeit-Gruppe.
@@ -182,8 +183,9 @@ gesetzten Filter entfällt der Zulauf, weil er zu keiner Auswahl gehört.
 ### Rückmeldung und Frist
 
 Als Rückmeldung zählt jede Meldung, die an die Einheit gebunden ist, gleich welcher Art. Ist die
-letzte älter als die Frist, steht ihre Uhrzeit hervorgehoben und die Zeile trägt „Rückm.
-überfällig“; ohne jede Rückmeldung steht „—“ und die Zeile trägt „keine Rückm.“. Die Frist beträgt
+letzte älter als die Frist, steht ihre Uhrzeit in Rot, und die Zeile trägt das rote Etikett
+„Rückm. überfällig seit …“ mit der Zeit seit Ablauf der Frist; ohne jede Rückmeldung steht „—“ in
+Rot und die Zeile trägt „keine Rückm.“. Die Frist beträgt
 60 Minuten, solange nichts anderes eingestellt ist. Einsatzleitung und Führungspersonal ändern sie
 in den Einstellungen des Einsatzes unter „Verhalten & Automatik“, Feld „Rückmeldefrist Einheiten
 (Minuten)“. In der Verwaltung unter „Einsatz-Vorgaben“ steht dasselbe Feld als Vorgabe der
@@ -252,11 +254,11 @@ wenn danach keine Periode mehr offen ist.
 
 Die Einsatzdauer zählt ab der Alarmierung, fehlt sie, ab dem Eintreffen. „gesamt“ addiert alle
 Einsatzabschnitte der Kraft, „Ruhe“ zählt seit dem Ende des letzten. Ohne Ereignis steht keine Zahl,
-sondern „—“. Die Dauer erscheint im Meldebild unter „Im Einsatz“, bei Einheiten und Personen im
+sondern „—“. Die Dauer erscheint in der Kräfteübersicht unter „Im Einsatz“, bei Einheiten und Personen im
 Paneel „Zeitachse“ ihrer Ansicht und in der Personalliste in den Spalten „Einsatzdauer“ und „Ruhe“
 (diese unter „Spalten“).
 
-Im Meldebild unter „Im Einsatz“ und in der Personalliste unter „Einsatzdauer“ steht neben der Zahl
+In der Kräfteübersicht unter „Im Einsatz“ und in der Personalliste unter „Einsatzdauer“ steht neben der Zahl
 ein Wort, wenn eine Kraft die Grenzwerte des Schichtplans reißt (Kapitel [Ablösung](abloesung.md)):
 Höchstdienst und Mindestruhe des Einsatzes, ohne eigenen Wert 12 h und 8 h. Der Plan prüft mit
 denselben Werten. Einsatzleitung und Führungspersonal legen sie in den Einstellungen des Einsatzes
@@ -278,7 +280,7 @@ Zähler aus; sie steht nur in der Zelle und auf dem Meldeblatt.
 
 ### Rechte
 
-Das Meldebild zeigt die Daten aus den Modulen Einheiten und Personal, soweit diese freigegeben sind.
+Die Kräfteübersicht zeigt die Daten aus den Modulen Einheiten und Personal, soweit diese freigegeben sind.
 Fehlt eines davon oder das Modul Fahrzeuge oder Material, steht an seiner Stelle „Modul … gesperrt“:
 im Statusband im Paneel des Moduls, neben der Auswahlzeile für die Mittel. Ohne Einheiten steht der
 Grund auch in der Tabelle, statt eines leeren Einsatzes. Ohne Personal ist die Stärke unbekannt und
@@ -290,5 +292,5 @@ nachtragen, Zeit berichtigen, streichen und in den Lagebericht übernehmen dürf
 
 ### Ohne Netz
 
-Meldebild und Zeitachse bleiben mit dem zuletzt geladenen Stand lesbar. Status setzen, Nachtragen,
+Kräfteübersicht und Zeitachse bleiben mit dem zuletzt geladenen Stand lesbar. Status setzen, Nachtragen,
 Periode nachtragen, Zeit berichtigen und Streichen brauchen das Netz (Kapitel [Ohne Netz](ohne-netz.md)).

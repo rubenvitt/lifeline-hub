@@ -123,7 +123,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
         within(menue)
           .getAllByRole('menuitem')
           .map((m) => m.textContent),
-      ).toEqual(['In Betrieb nehmen', 'Bearbeiten …', 'Auflösen …', 'Stornieren …']);
+      ).toEqual(['In Betrieb nehmen', 'Bearbeiten …', 'Auflösen', 'Stornieren']);
     });
 
     it('geplant mit Ausgabe (auch zurückgenommen): kein Stornieren', async () => {
@@ -141,7 +141,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
         within(menue)
           .getAllByRole('menuitem')
           .map((m) => m.textContent),
-      ).toEqual(['In Betrieb nehmen', 'Bearbeiten …', 'Auflösen …']);
+      ).toEqual(['In Betrieb nehmen', 'Bearbeiten …', 'Auflösen']);
     });
 
     it('geplant mit gekoppeltem Gerät: „Stornieren“ gesperrt mit Grund „Gerät gekoppelt“ (LLH-1048)', async () => {
@@ -151,7 +151,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
       });
       const menue = await oeffneMenue('Zuführung Deich');
       const eintrag = within(menue).getByRole('menuitem', {
-        name: 'Stornieren … (Gerät gekoppelt)',
+        name: 'Stornieren (Gerät gekoppelt)',
       });
       expect(eintrag).toHaveAttribute('aria-disabled', 'true');
       await userEvent.click(eintrag);
@@ -166,7 +166,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
         within(fk).getByRole('button', { name: 'Bearbeiten … zu Stelle Feldküche BR Sportplatz' }),
       ).toBeInTheDocument();
       expect(
-        within(fk).getByRole('button', { name: 'Auflösen … zu Stelle Feldküche BR Sportplatz' }),
+        within(fk).getByRole('button', { name: 'Auflösen zu Stelle Feldküche BR Sportplatz' }),
       ).toBeInTheDocument();
       expect(within(fk).queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
     });
@@ -236,7 +236,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
     it('Auflösen fragt rot zurück, der Knopf nennt die Handlung; Abbrechen sendet nichts', async () => {
       const props = zeige();
       await userEvent.click(
-        screen.getByRole('button', { name: 'Auflösen … zu Stelle Feldküche BR Sportplatz' }),
+        screen.getByRole('button', { name: 'Auflösen zu Stelle Feldküche BR Sportplatz' }),
       );
       const dialog = await screen.findByRole('dialog', {
         name: 'Stelle ‚Feldküche BR Sportplatz‘ auflösen?',
@@ -247,7 +247,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
       expect(props.onStatus).not.toHaveBeenCalled();
 
       await userEvent.click(
-        screen.getByRole('button', { name: 'Auflösen … zu Stelle Feldküche BR Sportplatz' }),
+        screen.getByRole('button', { name: 'Auflösen zu Stelle Feldküche BR Sportplatz' }),
       );
       const zweiter = await screen.findByRole('dialog', {
         name: 'Stelle ‚Feldküche BR Sportplatz‘ auflösen?',
@@ -263,7 +263,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
     it('Stornieren fragt rot zurück und ruft den Storno', async () => {
       const props = zeige();
       const menue = await oeffneMenue('Zuführung Deich');
-      await userEvent.click(within(menue).getByText('Stornieren …'));
+      await userEvent.click(within(menue).getByText('Stornieren'));
       const dialog = await screen.findByRole('dialog', {
         name: 'Stelle ‚Zuführung Deich‘ stornieren?',
       });
@@ -302,7 +302,7 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
         onStatus: vi.fn(() => Promise.reject(new ApiError(422, 'Übergang nicht zulässig'))),
       });
       await userEvent.click(
-        screen.getByRole('button', { name: 'Auflösen … zu Stelle Ausgabe Turnhalle Nord' }),
+        screen.getByRole('button', { name: 'Auflösen zu Stelle Ausgabe Turnhalle Nord' }),
       );
       const dialog = await screen.findByRole('dialog', {
         name: 'Stelle ‚Ausgabe Turnhalle Nord‘ auflösen?',
@@ -341,7 +341,7 @@ describe('StellenListe — Kontextmenü (LLH-1598)', () => {
   const rechtsklick = (el: Element) =>
     fireEvent.contextMenu(el, { clientX: 20, clientY: 20, button: 2 });
 
-  it('aktive Stelle ohne ⋮: „Bearbeiten …“, Trenner, rot „Auflösen …“', async () => {
+  it('aktive Stelle ohne ⋮: „Bearbeiten …“, Trenner, rot „Auflösen“', async () => {
     zeige({ stellen: [stelle({ id: 1, bezeichnung: 'Feldküche', status: 'aktiv' })] });
     expect(rechtsklick(zeile('Feldküche'))).toBe(false);
     const menue = await kontextMenue();
@@ -350,7 +350,7 @@ describe('StellenListe — Kontextmenü (LLH-1598)', () => {
       within(menue)
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
-    ).toEqual(['Bearbeiten …', 'Auflösen …']);
+    ).toEqual(['Bearbeiten …', 'Auflösen']);
     expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
   });
 

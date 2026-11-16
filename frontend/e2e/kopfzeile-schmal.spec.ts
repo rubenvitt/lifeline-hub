@@ -229,26 +229,63 @@ for (const { breite, mitTag } of [
   });
 }
 
-test('Such-Trigger bleibt auf 390 px in beiden Kopfzeilen eine 48-px-Trefffläche', async ({
+test('Such-Trigger bleibt auf 390 px eine 48-px-Trefffläche, im Einsatz in der Navigation', async ({
   page,
 }) => {
   await anmelden(page);
   const einsatzId = await einsatzPerApi(page, `E2E Suche ${Date.now()}`);
 
   await page.setViewportSize(SCHMAL);
-  for (const route of ['/einsaetze', `/einsaetze/${einsatzId}/etb`]) {
-    await page.goto(route);
-    const trigger = page.getByRole('button', { name: 'Suchen' });
-    await expect(trigger, route).toBeVisible();
-    const kasten = (await trigger.boundingBox())!;
-    expect(
-      Math.min(kasten.width, kasten.height),
-      `${route}: Such-Trefffläche`,
-    ).toBeGreaterThanOrEqual(48);
-  }
+  await page.goto('/einsaetze');
+  const trigger = page.locator('header').getByRole('button', { name: 'Suchen' });
+  await expect(trigger).toBeVisible();
+  const kasten = (await trigger.boundingBox())!;
+  expect(Math.min(kasten.width, kasten.height), 'Such-Trefffläche').toBeGreaterThanOrEqual(48);
+
+  // Im Einsatz steht „Suchen“ am Handy in der Navigation, nicht im Kopf (LLH-1728, D3).
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  const kopf = page.locator('header');
+  await kopf.getByRole('button', { name: 'Navigation öffnen' }).click();
+  await expect(kopf.getByRole('button', { name: 'Suchen' })).toHaveCount(0);
+  const imDrawer = page.locator('.ant-drawer-open').getByRole('button', { name: 'Suchen' });
+  await expect(imDrawer).toBeVisible();
+  expect(
+    (await imDrawer.boundingBox())!.height,
+    'Such-Trefffläche im Drawer',
+  ).toBeGreaterThanOrEqual(48);
+  await imDrawer.click();
+  await expect(page.getByPlaceholder('Suchen: Module, Aktionen, Einstellungen …')).toBeFocused();
+  // Nach dem Schließen kehrt der Fokus auf den Griff zurück, nicht auf `body`: der Knopf im
+  // Drawer ist dann abgebaut (Review LLH-1728).
+  await page.keyboard.press('Escape');
+  await expect(kopf.getByRole('button', { name: 'Navigation öffnen' })).toBeFocused();
+});
+
+/**
+ * Am Handy eine Zeile (LLH-1728, Spec `einsatztauglichkeit-layout`): im Ruhezustand hält der
+ * Einsatzname auch in `handschuh` seine Trefffläche (72 px), und kein Ziel liegt über einem anderen.
+ */
+test('390 px, handschuh, Ruhezustand: eine Zeile, und der Name überdeckt nichts', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await ruhezustandNachbilden(page);
+  await page.setViewportSize(SCHMAL);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `LFH-460 Hochwasser Handy ${Date.now()}`);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'handschuh');
+  // Vorbedingung: Ruhezustand, die Glocke steht ohne Wort (D4).
+  const alarm = page.locator('header').getByRole('button', { name: 'Alarmzentrale: Ton bereit' });
+  await expect(alarm).toBeVisible();
+  await expect(alarm).not.toHaveText(/Ton bereit/);
+  const hoehe = await page.locator('header').evaluate((h) => h.clientHeight);
+  expect(hoehe, 'eine Zeile in handschuh (72 px)').toBeLessThanOrEqual(73);
+  await pruefeNameUeberdecktNichts(page, '390 px, Ruhezustand');
 });
 
 test('Bediendichte bleibt auf 390 px bedienbar — über das Benutzermenü', async ({ page }) => {
+  // Auf der Einsatzliste: dort steht das Benutzermenü auch am Handy im Kopf (LLH-1728, D5).
   // A1 weist Führungs-Tablet und mobilem Kontext `komfortabel` und `handschuh` zu; das Menü
   // ist der Bedienweg, der die Stufe zeigt UND setzt.
   await anmelden(page);

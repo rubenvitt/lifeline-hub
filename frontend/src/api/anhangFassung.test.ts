@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   grossansichtPfad,
-  hatServerVorschau,
-  istBildMime,
-  istHeicMime,
+  hasServerVorschau,
+  isBildMime,
+  isHeicMime,
   originalDateiname,
   originalPfad,
   originalZugaenglicherName,
@@ -37,10 +37,10 @@ describe('anhangFassung (LFH-747)', () => {
   });
 
   it('erkennt Bilder am MIME-Typ', () => {
-    expect(istBildMime('image/heic')).toBe(true);
-    expect(istBildMime('image/jpeg')).toBe(true);
-    expect(istBildMime('application/pdf')).toBe(false);
-    expect(istBildMime(undefined)).toBe(false);
+    expect(isBildMime('image/heic')).toBe(true);
+    expect(isBildMime('image/jpeg')).toBe(true);
+    expect(isBildMime('application/pdf')).toBe(false);
+    expect(isBildMime(undefined)).toBe(false);
   });
 });
 
@@ -61,19 +61,19 @@ describe('anhangFassung — Vorschau (LFH-759)', () => {
 
   it('kennt die Formate mit Vorschau vom Server', () => {
     for (const mime of ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/tiff']) {
-      expect(hatServerVorschau(mime)).toBe(true);
+      expect(hasServerVorschau(mime)).toBe(true);
     }
     for (const mime of ['image/heic', 'image/heif', 'image/svg+xml', 'application/pdf']) {
-      expect(hatServerVorschau(mime)).toBe(false);
+      expect(hasServerVorschau(mime)).toBe(false);
     }
-    expect(hatServerVorschau(undefined)).toBe(false);
+    expect(hasServerVorschau(undefined)).toBe(false);
   });
 
   it('erkennt HEIC und HEIF', () => {
-    expect(istHeicMime('image/heic')).toBe(true);
-    expect(istHeicMime('image/heif')).toBe(true);
-    expect(istHeicMime('image/jpeg')).toBe(false);
-    expect(istHeicMime(null)).toBe(false);
+    expect(isHeicMime('image/heic')).toBe(true);
+    expect(isHeicMime('image/heif')).toBe(true);
+    expect(isHeicMime('image/jpeg')).toBe(false);
+    expect(isHeicMime(null)).toBe(false);
   });
 });
 

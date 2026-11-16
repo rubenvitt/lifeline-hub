@@ -1192,7 +1192,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
    * LLH-1090: statt „n Gefahrentypen unbewertet“ steht, welches Gebiet niemand beurteilt hat —
    * eine Zelle ohne Bewertung heißt „keine“, die offene Beurteilung trägt das Gebiet.
    */
-  it('nennt nicht beurteilte Gebiete im Fuß, beurteilte nicht', async () => {
+  it('nennt unbestätigte Gebiete im Fuß, beurteilte nicht', async () => {
     mockEndpunkte({
       gefahren: [
         { ...gebiet(1, 'hoch'), label: 'Hangrutsch Kirchberg' },
@@ -1202,9 +1202,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     });
     render();
     const box = paneel('Gefahrenmatrix');
-    expect(
-      await within(box).findByText('Hangrutsch Kirchberg: nicht beurteilt'),
-    ).toBeInTheDocument();
+    expect(await within(box).findByText('Hangrutsch Kirchberg: unbestätigt')).toBeInTheDocument();
     expect(within(box).queryByText(/Gebiet 2/)).toBeNull();
     expect(within(box).queryByText(/unbewertet/)).toBeNull();
   });
@@ -1220,7 +1218,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     expect(await screen.findByText('GEFAHREN-MODUL')).toBeInTheDocument();
   });
 
-  it('Gebiete ohne Stufe über „keine“ sind leer und bleiben „nicht beurteilt“', async () => {
+  it('Gebiete ohne Stufe über „keine“ sind leer und bleiben „unbestätigt“', async () => {
     mockEndpunkte({
       gefahren: [gebiet(1)],
       matrix: { 1: [bewertung(1, 'brand', 'keine')] },
@@ -1229,7 +1227,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     const box = paneel('Gefahrenmatrix');
     expect(await within(box).findByText('Keine Gefahr über Stufe „keine“.')).toBeInTheDocument();
     expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(0);
-    expect(within(box).getByText('Gebiet 1: nicht beurteilt')).toBeInTheDocument();
+    expect(within(box).getByText('Gebiet 1: unbestätigt')).toBeInTheDocument();
   });
 
   /**

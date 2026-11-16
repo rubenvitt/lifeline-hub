@@ -1,17 +1,17 @@
 /**
  * Bereiche der Anwenderdokumentation (LFH-1096, `docs/anwender/README.md`). Jeder Bereich hat
- * einen Hunderterblock der `reihenfolge` (Einstieg 0–99, Führungsmittel 100–199 …).
+ * einen Hunderterblock der `reihenfolge` (Einstieg 0–99, Führung 100–199 …).
  *
  * KOPIE aus `frontend/src/hilfe/bereiche.ts` (LFH-1096): Namen und Funktionen wörtlich. Wer einen
  * Bereich ändert, zieht es hier nach (website/AGENTS.md).
  */
 export const BEREICHE = [
   'Einstieg',
-  'Führungsmittel',
+  'Führung',
+  'Kräfte & Mittel',
+  'Betroffene & Schäden',
   'Lage',
-  'Kräfte',
-  'Führungsorganisation',
-  'Betroffene',
+  'Kommunikation',
   'Einstellungen und Verwaltung',
   'Gekoppelte Geräte',
 ] as const;

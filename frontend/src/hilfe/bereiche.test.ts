@@ -10,7 +10,8 @@ describe('bereichVon', () => {
   it('ordnet die Hunderterblöcke den Bereichen zu', () => {
     expect(bereichVon(0)).toBe('Einstieg');
     expect(bereichVon(99)).toBe('Einstieg');
-    expect(bereichVon(100)).toBe('Führungsmittel');
+    expect(bereichVon(100)).toBe('Führung');
+    expect(bereichVon(300)).toBe('Betroffene & Schäden');
     expect(bereichVon(799)).toBe('Gekoppelte Geräte');
   });
 

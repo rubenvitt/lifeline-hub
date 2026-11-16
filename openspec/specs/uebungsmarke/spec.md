@@ -42,14 +42,14 @@ SHALL kein Band und kein Platzhalter dafür stehen.
 
 ### Requirement: Das Übungsband bleibt beim Rollen stehen
 
-Das Band MUST beim Rollen am oberen Fensterrand stehen bleiben, unter `md` auch dann, wenn die
-Kopfleiste mitrollt. Es MUST unter anderen klebenden Teilen des Rahmens stehen, nicht hinter
-ihnen, und MUST klebende Tabellenköpfe und Leisten nicht verdecken.
+Das Band MUST in jeder Breite beim Rollen direkt unter der klebenden Kopfleiste stehen bleiben.
+Es MUST unter anderen klebenden Teilen des Rahmens stehen, nicht hinter ihnen, und MUST klebende
+Tabellenköpfe und Leisten nicht verdecken.
 
 #### Scenario: Übung im ETB am Handy, gerollt
 
 - **WHEN** das ETB einer Übung bei 390 × 844 auf 1500 px gerollt ist
-- **THEN** steht das Band „ÜBUNG“ am oberen Fensterrand im Bild
+- **THEN** steht das Band „ÜBUNG“ direkt unter der Kopfleiste im Bild
 
 #### Scenario: Übung ab Tablet, gerollt
 
@@ -59,7 +59,7 @@ ihnen, und MUST klebende Tabellenköpfe und Leisten nicht verdecken.
 #### Scenario: Offline am Handy in der Übung
 
 - **WHEN** das Gerät am Handy in einer Übung das Netz verliert und die Betriebszeile oben klebt
-- **THEN** stehen Betriebszeile und Band übereinander, keines verdeckt das andere
+- **THEN** stehen Betriebszeile, Kopfleiste und Band in dieser Reihenfolge übereinander, keines verdeckt ein anderes
 
 #### Scenario: Stehender Tabellenkopf
 

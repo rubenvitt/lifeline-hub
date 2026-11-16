@@ -77,6 +77,7 @@ import {
   parseAbschnitteAnsicht,
   parseFunkplanAnsicht,
   meldungenPfad,
+  lagemeldungenPfad,
   chatPfad,
   nachforderungenPfad,
   parseNachforderungBezug,
@@ -797,6 +798,12 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(chatPfad(E, { kanal: 3 })).toBe('/einsaetze/5/chat?kanal=3');
   });
 
+  it('meldungenPfad, lagemeldungenPfad und auftraegePfad mit ?neu=1 (Schnellaktionen)', () => {
+    expect(meldungenPfad(E, { neu: true })).toBe('/einsaetze/5/meldungen?neu=1');
+    expect(lagemeldungenPfad(E, { neu: true })).toBe('/einsaetze/5/lagemeldungen?neu=1');
+    expect(auftraegePfad(E, { neu: true })).toBe('/einsaetze/5/auftraege?neu=1');
+    expect(meldungenPfad(E, { neu: false })).toBe('/einsaetze/5/meldungen');
+  });
   it('meldungenPfad mit ?meldung=', () => {
     expect(meldungenPfad(E, { meldung: 11 })).toBe('/einsaetze/5/meldungen?meldung=11');
   });

@@ -7,7 +7,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Breadcrumb, Button, Form, Input } from 'antd';
 import type { EinsatzAnzeige } from '../api/types';
-import { EinsatzRahmenProvider } from '../einsatz/EinsatzRahmenKontext';
+import { EinsatzRahmenProvider, ImEinsatzRahmenProvider } from '../einsatz/EinsatzRahmenKontext';
 import {
   CommandPaletteProvider,
   useTastaturEbene,
@@ -647,6 +647,58 @@ describe('EinsatzSeite · Orientierung (LFH-954)', () => {
   });
 });
 
+describe('EinsatzSeite · Ortspfad im Einsatzrahmen (LLH-1728, D6)', () => {
+  const pfad = (
+    <Breadcrumb items={[{ title: 'Einsätze' }, { title: 'Hochwasser' }, { title: 'Personen' }]} />
+  );
+  const klasse = () => document.querySelector('.lfh-seitenkopf__pfad')!.className;
+
+  it('im Einsatzrahmen trägt der Ortspfad die Klasse für den Rückweg unter md', () => {
+    renderMitProviders(
+      <ImEinsatzRahmenProvider value>
+        <EinsatzSeite titel="Person" breadcrumb={pfad}>
+          <div />
+        </EinsatzSeite>
+      </ImEinsatzRahmenProvider>,
+    );
+    expect(klasse()).toContain('lfh-ortspfad--einsatz');
+  });
+
+  it('auch solange der Einsatz lädt (kein Einsatz im Rahmenkontext)', () => {
+    renderMitProviders(
+      <ImEinsatzRahmenProvider value>
+        <EinsatzRahmenProvider value={undefined}>
+          <EinsatzSeite titel="Person" breadcrumb={pfad}>
+            <div />
+          </EinsatzSeite>
+        </EinsatzRahmenProvider>
+      </ImEinsatzRahmenProvider>,
+    );
+    expect(klasse()).toContain('lfh-ortspfad--einsatz');
+  });
+
+  it('außerhalb des Einsatzrahmens bleibt der Ortspfad ohne die Klasse', () => {
+    renderMitProviders(
+      <EinsatzSeite titel="Profil" breadcrumb={pfad}>
+        <div />
+      </EinsatzSeite>,
+    );
+    expect(klasse()).not.toContain('lfh-ortspfad--einsatz');
+  });
+
+  it('`ortspfadAbMd` geht vor: unter md gar nichts', () => {
+    renderMitProviders(
+      <ImEinsatzRahmenProvider value>
+        <EinsatzSeite titel="Lagekarte" breadcrumb={pfad} ortspfadAbMd>
+          <div />
+        </EinsatzSeite>
+      </ImEinsatzRahmenProvider>,
+    );
+    expect(klasse()).toContain('lfh-ortspfad--ab-md');
+    expect(klasse()).not.toContain('lfh-ortspfad--einsatz');
+  });
+});
+
 /**
  * Der Seitenkopf klebt unter der Kopfleiste (zjt7c073 D3). Wann genau, prüft
  * `seitenkopfKleben.test.tsx`; hier, dass die Seite die Entscheidung trägt und eine Vorgabe von
@@ -676,7 +728,7 @@ describe('EinsatzSeite — klebender Seitenkopf', () => {
 /**
  * Review zjt7c073 (B4): Mit `fensterInhalt` steckt die Leiste in `FensterRahmen` in einem eigenen
  * Wrapper, der ihr Containing Block ist; kleben kann sie dort nicht. Sie meldet sich dann auch
- * nicht als Rahmenquelle, sonst lägen Fokusabstand und Alarmkante um ihre Höhe zu tief.
+ * nicht als Rahmenquelle, sonst lägen Fokusabstand und klebende Inhalte um ihre Höhe zu tief.
  */
 describe('EinsatzSeite — Arbeitsfläche bis zum Fensterende', () => {
   it('der Seitenkopf klebt nicht und zählt nicht zur Rahmenhöhe', async () => {

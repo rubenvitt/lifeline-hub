@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts]
+quellen: [frontend/src/components/useKontextMenue.ts, frontend/src/components/KontextMenue.tsx, frontend/src/components/datensichtKontext.ts, frontend/src/components/useDatensatzKontextMenue.tsx, frontend/src/components/ZeilenMenueAusloeser.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/kartenKontext.ts, frontend/src/components/useKartenKontext.tsx, frontend/src/chat/NachrichtenStrom.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/auftraege/AuftragKarte.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/pages/EinsaetzePage.tsx, frontend/src/pages/einsatzVorlageWahlKern.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/CommandPaletteTrigger.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/einsatz/einsatzRueckweg.ts, frontend/src/components/ebene1Seite.ts, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/AnzeigeLeisten.tsx, frontend/src/pages/einstellungen/EinsatzAnzeige.tsx, frontend/src/pages/ProfilPage.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/zeitDarstellungStore.ts, frontend/src/anzeige/zeitDarstellung.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/components/untereLeiste.ts, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/, src/routes/web_push.rs, src/instanz/spiegel/hinweis.rs, frontend/src/etb/zeilenAktionen.ts, frontend/src/etb/EtbZeitachse.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/components/instrument/Uebung.tsx, frontend/src/components/useDokumentTitel.ts, frontend/src/components/AdminPage.tsx, frontend/src/einsatz/kategorieModul.ts, frontend/src/components/EinsatzSeite.tsx, frontend/src/components/EinsatzSeite.css, frontend/src/einsatz/EinsatzRahmenKontext.tsx]
 ---
 
 ## Überblick
@@ -78,8 +78,9 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
 
 ### Ein Modul öffnen
 
-1. Links eine Kategorie wählen: „Führung“, „Kräfte“, „Erfass.“ (Erfassung), „Lage“, „Komm.“
-   (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das Modul der
+1. Links eine Kategorie wählen: „Führung“, „Kräfte“ (Kräfte & Mittel), „Betroff.“ (Betroffene &
+   Schäden), „Lage“, „Komm.“ (Kommunikation) oder unten „Einst.“ (Einstellungen). Das ETB steht
+   unter „Führung“, direkt hinter dem Überblick. Die App springt in das Modul der
    Kategorie, das in diesem Einsatz zuletzt offen war, beim ersten Mal in ihr erstes Modul, und
    zeigt daneben ihre Module. Unter jedem Modul steht in bis zu zwei Zeilen, was es enthält.
 
@@ -101,7 +102,8 @@ Auf schmalen Schirmen (Tablet hochkant, Telefon) stehen Kategorien und Module hi
 
 ### Mit der Sprungpalette springen
 
-1. **Strg+K** drücken (am Mac **⌘K**) oder in der Kopfzeile „Suchen“ wählen.
+1. **Strg+K** drücken (am Mac **⌘K**) oder in der Kopfzeile „Suchen“ wählen. Auf dem Handy steht
+   „Suchen“ im Einsatz oben in der Navigation („Navigation öffnen“ links oben).
 2. Einige Buchstaben tippen, etwa den Namen eines Moduls, eines Fahrzeugs oder einer Person.
 
    ![Sprungpalette mit der Eingabe „betr“, oben die Treffer „Betreuung“ und „Betroffene“, unten die Tastenhinweise](../bilder/einsatz-oberflaeche/sprungpalette.png)
@@ -125,7 +127,8 @@ Touch stehen diese Filter als Knöpfe am unteren Rand der Palette.
 
 ### Darstellung, Bediendichte und Helligkeit einstellen
 
-1. Oben rechts das „Benutzermenü“ öffnen. Unter „Anzeige“ stehen drei Leisten.
+1. Oben rechts das „Benutzermenü“ öffnen (auf dem Handy im Einsatz: unten in der Navigation).
+   Unter „Anzeige“ stehen drei Leisten.
 2. In der Leiste „Darstellung“ „Hell“, „Dunkel“ oder „System“ wählen.
 3. In der Leiste „Bediendichte“ „Kompakt“, „Komfortabel“ oder „Handschuh“ wählen.
 4. In der Leiste „Helligkeit in %“ eine Stufe von „100“ bis „20“ wählen.
@@ -158,15 +161,19 @@ Wer lieber wählt: „Kalender und Uhrzeit“ neben dem Feld öffnen, einen Tag 
 
 ### Auf eine Benachrichtigung reagieren
 
-1. Die Meldung lesen: Ein Alarm steht als Toast oben rechts, ein Eingang im Eingangsband unten.
-   Oben steht die Art, etwa „Auftrag überfällig“ oder „Neuer Auftrag“, darunter, wo vorhanden,
-   die Kennung, etwa „Auftrag #12“.
-2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder mit ✕ schließen. Stehen im Eingangsband
-   mehrere Eingänge, führt der Knopf in das Modul, etwa „Zu Aufträgen“; kommen sie aus mehreren
-   Modulen, öffnet „Ansehen“ die Liste der Eingänge.
+1. Die Meldung lesen: Ein Alarm steht in der Alarmzone direkt unter der Kopfzeile, ein Eingang
+   im Eingangsband unten. Vorn steht die Art, etwa „Auftrag überfällig“ oder „Neuer Auftrag“,
+   dahinter, wo vorhanden, der Gegenstand, etwa „Auftrag #12“.
+2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder „Gelesen“, um auf der Seite zu bleiben.
+   Stehen im Eingangsband mehrere Eingänge, führt der Knopf in das Modul, etwa „Zu Aufträgen“;
+   kommen sie aus mehreren Modulen, öffnet „Ansehen“ die Liste der Eingänge.
+3. Wer einen Alarm oder das Band nur aus dem Weg haben will, wählt ✕ („Ausblenden, ohne zu
+   quittieren“).
 
-„Öffnen“, ein Sprung und ✕ quittieren die Benachrichtigung: Sie verschwindet auch in anderen
-Tabs und auf anderen Geräten derselben Person. „Ansehen“ quittiert nichts.
+„Öffnen“, „Gelesen“ und ein Sprung aus dem Band quittieren die Benachrichtigung: Sie verschwindet
+auch in anderen Tabs und auf anderen Geräten derselben Person. ✕ quittiert nichts: Der Eintrag
+bleibt unter „Eingänge“ bei „Neu“ und kommt in diesem Tab nicht wieder, bis der Tab geschlossen
+wird; andere Tabs und Geräte zeigen ihn weiter. „Ansehen“ quittiert ebenfalls nichts.
 
 ### Eingänge nachlesen
 
@@ -280,17 +287,25 @@ Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eingänge i
 Knopf. Außerhalb eines Einsatzes führt „Verwaltung“ in die Verwaltung der Organisation. Wer dort
 keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 
+Die Kopfzeile bleibt beim Rollen oben stehen, auf jedem Gerät. Auf dem Handy trägt sie im Einsatz
+eine Zeile: „Navigation öffnen“, Statuspunkt und Name, Alarmzentrale, Verbindung und Uhr; nur im
+Handschuh-Betrieb bricht sie um, wenn die Alarmzentrale eine Störung im Wort nennt. „Suchen“
+steht dort oben in der Navigation, das Benutzermenü unten in der Navigation. Über einer Seite
+steht am Handy kein Ortspfad, den Einsatz nennt die Kopfzeile; auf einer Detailseite führt
+„‹ Betroffene“ (oder die jeweilige Liste) zurück. Außerhalb eines Einsatzes führt am Handy das
+Zeichen links oben zur Einsatzliste.
+
 Über der Kopfzeile erscheint bei Bedarf die **Betriebszeile**: bei Störungen der Verbindung, bei
 vorgemerkten oder abgelehnten Einträgen und mit „Neue Version verfügbar.“, wenn eine neue
-Fassung der App bereitliegt. „Jetzt neu laden“ lädt sie.
+Fassung der App bereitliegt. „Jetzt neu laden“ lädt sie. Auf dem Handy bleibt sie bei einer
+Störung der Verbindung über der Kopfzeile stehen.
 
 ### Übung oder Realeinsatz
 
 Hat ein Einsatz die Einsatzart „Übung“, ist das überall zu sehen, ohne den Namen zu lesen:
 
 - Unter der Kopfzeile steht ein violettes, schräg gestreiftes Band „ÜBUNG“ über die volle Breite,
-  in jedem Modul. Es bleibt beim Rollen stehen, auch auf dem Handy, wo die Kopfzeile selbst
-  mitrollt.
+  in jedem Modul. Es bleibt beim Rollen unter der Kopfzeile stehen.
 - Ab Tabletbreite steht in der Kopfzeile vor dem Namen die Marke „ÜBUNG“.
 - Der Titel des Browser-Tabs beginnt mit „ÜBUNG ·“.
 - In der Einsatzliste, im Einsatzwechsel, in der Sprungpalette und auf „Zurück zu …“ in Profil
@@ -330,15 +345,15 @@ Berechtigung“ da. Was die eigene Rolle im Einsatz erlaubt, steht in
 
 Unten in der Modulliste läuft die **Einsatzdauer** seit Beginn des Einsatzes.
 
-Auf langen Seiten rollt nur der Inhalt. Ab Tabletbreite bleiben die Kopfzeile und der Kopf der
-Seite mit Titel und Knöpfen oben stehen; auf breiten Bildschirmen auch die Kategorien und die
+Auf langen Seiten rollt nur der Inhalt. Die Kopfzeile bleibt oben stehen, ab Tabletbreite auch
+der Kopf der Seite mit Titel und Knöpfen; auf breiten Bildschirmen auch die Kategorien und die
 Modulliste daneben. Hat eine Kategorie mehr Module, als ins Fenster passen, rollt die Modulliste
 für sich. In einem niedrigen Fenster rollt der Kopf der Seite mit, damit für den Inhalt Platz
 bleibt. Dasselbe gilt in der Verwaltung.
 
 Einige Einträge der Modulliste sind **Sprungmarken** in eine Ansicht eines Moduls. Sie stehen
 eingerückt mit einer feinen Linie direkt unter diesem Modul: „Entscheidungen“ unter „ETB“
-(Kategorie „Erfassung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
+(Kategorie „Führung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
 „FMS-Tableau“ unter „Fahrzeuge“, „Ohne Schicht“ unter „Ablösung“ sowie „Fernmeldeskizze“ und
 „Kommunikationsplan“ unter „Fernmeldewesen“ (Kategorie „Kommunikation“). Nach dem Sprung ist das
 Modul darüber hervorgehoben. Das
@@ -390,10 +405,24 @@ eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 Ohne Eingabe stehen oben die zuletzt ausgeführten Befehle und die zuletzt geöffneten Module.
 Mit Eingabe sucht die Palette in Modulen, Ansichten (den Sprungmarken der Modulliste, etwa
 „Kommunikationsplan“ oder „Vermisste“), Schnellaktionen („Person erfassen“, „ETB-Eintrag schreiben“,
-„Anruf erfassen“ …), laufenden Einsätzen, Einstellungen und, ab zwei Zeichen, in den Datensätzen des
-Einsatzes: Personen, Fahrzeuge, Personal, Einheiten, Einträge des Einsatztagebuchs und weitere.
+„Meldung erfassen“, „Auftrag erteilen“, „Nachforderung stellen“, „Fahrzeugstatus setzen“, „Anruf
+erfassen“ …), laufenden Einsätzen, Einstellungen, der „Hilfe“ und, ab zwei Zeichen, in den
+Datensätzen des Einsatzes: Personen, Fahrzeuge (auch über Fahrzeugtyp und Kennzeichen), Personal
+(auch über die Funktion), Einheiten, Einträge des Einsatztagebuchs und weitere.
 Module und Ansichten, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene
 Rolle schreiben darf.
+
+Ein Treffer braucht für jedes getippte Wort einen Wortanfang oder, ab drei Zeichen, einen Teil
+eines Wortes; „rtw“ findet also Fahrzeuge vom Typ RTW, aber nicht die Lagekarte. Umlaute und ihre
+Umschrift gelten gleich („kraefte“ findet „Kräfte“). Module sind auch unter gängigen Abkürzungen
+und früheren Namen zu finden, etwa „BHP“ für die Unfallhilfsstellen, „Tagebuch“ für das ETB und
+„Meldebild“ für die Kräfteübersicht.
+
+Die Schnellaktionen stehen nach eigener Nutzung geordnet: was eine Person am häufigsten
+ausführt, steht oben, bei Gleichstand gilt die feste Folge (Person, ETB-Eintrag, Meldung,
+Lagemeldung, Auftrag, Nachforderung, Fahrzeugstatus, dann die übrigen). Die Zählung gehört der
+Person, nicht dem Gerät, und gilt deshalb an jedem Rechner. Solange die Palette offen ist, bleibt
+die Folge stehen.
 
 „Koordinaten: …“ in der Palette stellt das Koordinatenformat für dieses Gerät ein. Es gilt vor
 der Vorgabe des Einsatzes und der Organisation, bis eine andere Wahl getroffen wird.
@@ -407,7 +436,8 @@ Eine Benachrichtigung geht an die Personen, die sie betrifft, nicht an alle im E
 eine von drei Stufen:
 
 - **Alarm** („Sofortmeldung“, „Sofortmeldung unbestätigt“, „Auftrag überfällig“, „Ablösung
-  fällig“, „Vermisstenmeldung“, „Unwetterwarnung“): Toast oben rechts in Warnfarbe und Alarmton.
+  fällig“, „Vermisstenmeldung“, „Unwetterwarnung“): Eintrag in der Alarmzone mit dem Wort „ALARM“
+  und roter Kante, dazu der Alarmton.
   Alarme lassen sich nicht abschalten.
 - **Eingang** (unter „Benachrichtigungen“ als „Hinweise“): Eingangsband unten und ein kurzer,
   tieferer Ton, höchstens alle zwei Minuten. Jede Art lässt sich unter „Benachrichtigungen“
@@ -431,35 +461,37 @@ eingeschaltet und die App zu ist: Für eine stumme Art erscheint dann keine Meld
 Betriebssystems, ein Alarm schon. Wer ohne Netz umschaltet, hat bei geschlossener App bis zur
 nächsten Anmeldung noch den alten Stand.
 
-Toasts tragen nur Alarme (dazu, außerhalb eines Einsatzes, „Neuer
-Einsatz“ und „Aufnahme in einen Einsatz“). Sie bleiben stehen, bis sie geöffnet oder geschlossen
-werden. Höchstens drei stehen einzeln da; ab dem vierten fasst ein Sammeltoast die älteren
-zusammen. Er nennt ihre Zahl, bei mehreren Arten je Art eine Zeile wie „2 × Auftrag überfällig“,
-und je Bereich einen Sprung, etwa „Zu Aufträgen“ oder „Zu Meldungen“. Ein Sprung schließt alle
-Toasts und quittiert sie, ebenso ✕ am Sammeltoast. Das Eingangsband nimmt den Toasts keinen
-Platz und liegt nie über ihnen.
+Die **Alarmzone** trägt nur Alarme (dazu, außerhalb eines Einsatzes, „Neuer Einsatz“ und
+„Aufnahme in einen Einsatz“ mit dem Wort „HINWEIS“ und blauer Kante). Sie steht direkt unter
+der Kopfzeile, unter einem Übungsband, und schiebt die Seite um ihre Zeile nach unten, statt
+etwas zu verdecken; beim Rollen bleibt sie unter der Kopfzeile stehen. Menüs, Dialoge und die
+Navigation liegen über ihr. Ohne Alarm steht sie nicht. Ein Alarm bleibt, bis er geöffnet, als
+gelesen markiert oder ausgeblendet wird. Ab zwei Alarmen steht der jüngste mit „+ n weitere“;
+aufgeklappt nennt die Zone ihre Zahl („3 Alarme“) und je Art die Zahl, etwa „2 × Auftrag
+überfällig · 1 × Bestätigung ausstehend“, darunter jeden Alarm mit eigenem „Öffnen“, „Gelesen“
+und ✕. Die Unwetterwarnung hat kein „Gelesen“; eine neuere ersetzt die ältere. Das Eingangsband
+steht nie in der Zone und liegt nie über ihr.
 
 Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen (Tooltip „Benachrichtigung
-erlaubt“ in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
-Tab wieder vorn ist; dann trägt der Toast.
+erlaubt“ in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt,
+sobald der Tab wieder vorn ist; dann trägt die Alarmzone.
 
 Geht eine Benachrichtigung unterwegs verloren, etwa während einer Störung der Verbindung oder
 eines Neustarts des Servers, holt die App sie nach, sobald die Verbindung wieder steht. Ebenso
 beim Öffnen eines Einsatzes: Was in den letzten zwölf Stunden kam und noch nicht quittiert ist,
-erscheint mit der Uhrzeit, zu der es kam. Für alle nachgeholten zusammen klingt höchstens einmal
+erscheint mit der Uhrzeit, zu der es kam, außer es wurde in diesem Tab ausgeblendet. Für alle nachgeholten zusammen klingt höchstens einmal
 der kurze Ton. „Neuer Einsatz“ und „Aufnahme in einen Einsatz“ erscheinen auch außerhalb eines
 Einsatzes, in der Einsatzliste, im Profil und in der Verwaltung; „Öffnen“ führt in den Einsatz.
 
 Ist „Auch bei geschlossener App“ eingeschaltet, kommt eine Benachrichtigung auch ohne offenen
 Tab als Meldung des Betriebssystems, Alarme wie Hinweise; abgeschaltete Hinweis-Arten bleiben aus.
 Ein Tipp auf die Meldung öffnet die App beim Gegenstand. Ist ein Tab der App gerade vorn, zeigt er
-den Toast, und die Meldung des Betriebssystems entfällt. Quittiert die Person an einem anderen
+den Alarm in der Alarmzone, und die Meldung des Betriebssystems entfällt. Quittiert die Person an einem anderen
 Gerät, geht die Meldung auf diesem Gerät nicht in jedem Fall von selbst weg; sie lässt sich dann
 wegwischen. Ohne Verbindung zum Server, etwa ohne VPN, zeigt die Meldung nur „Alarm“ oder „Neue
 Benachrichtigung“; den Inhalt zeigt die App nach dem Öffnen.
 
-Alle Eingänge eines Einsatzes stehen im **Eingangsband** unten, auf dem Handy über die ganze
-Breite, sonst rechts. Hat die Seite unten eine feste Leiste, etwa die Erfassung im
+Alle Eingänge eines Einsatzes stehen im **Eingangsband** unten rechts. Hat die Seite unten eine feste Leiste, etwa die Erfassung im
 Einsatztagebuch oder „Entwurf speichern“ und „Freigeben“ am Befehl, steht das Band darüber und
 deckt keinen ihrer Knöpfe ab. Es bündelt sie: „3 neue Meldungen“ oder, sind andere Eingänge dabei, „3 neue
 Eingänge“, mit den beiden jüngsten und darunter „+ n weitere“; eine Meldung nennt Absender und
@@ -468,6 +500,13 @@ kommen. Wer gerade in ein Feld schreibt, behält den Fokus: Das Band erscheint e
 verlassen ist. Auf der Seite „Meldungen“ zeigt es keine Meldungen, denn dort stehen sie schon in
 der Liste; eine Übernahme in die Lage bleibt ebenso auf „Lagemeldungen“ aus. Was eine Meldung
 auslöst und wer sie bekommt, steht in [Meldungen](meldungen.md).
+
+Auf dem **Handy** gibt es im Einsatz weder Alarmzone noch Eingangsband, sondern eine schmale
+Leiste unten über die ganze Breite, etwa „1 Alarm · 3 Eingänge“. Sie steht über einer festen
+Leiste wie der Erfassung im Einsatztagebuch. Ein Tipp öffnet von unten „Alarme und Eingänge“:
+oben die Alarme mit „Öffnen“, „Gelesen“ und ✕, darunter die Eingänge wie unter „Eingänge“. Stehen
+nur Eingänge an, blendet ✕ an der Leiste sie aus. Wer in ein Feld tippt, bekommt den Platz: Die
+Leiste klappt ein. Steht ein Alarm an, bleibt sie dabei als eine Zeile mit diesem Alarm stehen.
 
 Solange im Einsatz ungelesene Eingänge offen sind, steht ihre Zahl vorn im Titel des Tabs, etwa
 „(3) Lagekarte · …“, dieselbe wie über „Eingänge“. Ist die App installiert, trägt auch ihr Symbol
@@ -540,7 +579,9 @@ nicht; eine solche Uhrzeit gilt eine Stunde später. Nur ein Feld für Ereigniss
 Stunde früher, wenn sie sonst noch bevorstünde: „0230“ um 03:20 ist dann 01:30 Winterzeit.
 
 Eine Eingabe, die sich nicht lesen lässt, wird nicht übernommen; das Feld nennt den Grund („Uhrzeit
-gibt es nicht“). Wer das Feld trotzdem verlässt, behält den bisherigen Wert. „Jetzt“ und die
+gibt es nicht“). Wer das Feld trotzdem verlässt, behält den bisherigen Wert; der Grund steht so
+lange am Feld, bis erneut getippt, gewählt, die Zeit anders gesetzt (im Einsatztagebuch etwa mit
+„/zeit“) oder im Feld Enter bzw. Escape gedrückt wird. Das Einsatztagebuch sendet bis dahin nicht. „Jetzt“ und die
 Schnellwahlen rechnen mit der Uhr des Servers, nicht mit der des Geräts. Zeiten gelten in der
 Zeitzone des Einsatzes; weicht das Gerät davon ab, steht die Zone am Feld.
 

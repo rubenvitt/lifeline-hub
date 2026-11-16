@@ -76,13 +76,6 @@ const MIT_NACHBARSCHAFT = [
   // („UHS ändern" neben „Austragen"/`danger`). Das Stornieren steht im Kopfmenü; dessen Trenner
   // prüft der Komponententest und ersetzt diese Zeile nicht.
   'pages/PersonenDetailPage.tsx',
-  // ── UHS-Kopfzeile (LFH-341) ───────────────────────────────────────────────
-  // Je Zustand steht ein Knopf neben einem `danger`-Knopf („Auflösen" bzw. „Stornieren"); der
-  // Scanner sieht alle vier `<Button>` im selben unmittelbar umschließenden `<Space>`.
-  'pages/uhs/UhsDetailPage.tsx',
-  // ── BR-Kopfzeile (LFH-960) ────────────────────────────────────────────────
-  // Im Zustand „geplant“ steht „Stornieren“ (`danger`) neben „In Betrieb nehmen“, wie bei der UHS.
-  'pages/bereitstellungsraum/BrDetailPage.tsx',
   // ── Fuß der Erfassungs-Hülle (LFH-653) ───────────────────────────────────
   // Der Primärknopf trägt `danger={unumkehrbar}` und steht neben „Abbrechen" (und im Serienmodus
   // „Speichern und nächste"). Der Fuß jeder Erfassungsmaske hängt an dieser einen Reihe.
@@ -91,9 +84,6 @@ const MIT_NACHBARSCHAFT = [
   // „Übernehmen“ neben dem roten „Abweisen“, in der Einheit-Ansicht und an der Meldung.
   'pages/einheit/EinheitUebernahme.tsx',
   // ── Fahrzeugzeile der Einheit-Ansicht (LLH-1036 Teil II, LLH-1268) ───────
-  // Die FMS-`StatusWahl` neben dem roten „Aus Einheit lösen“. Die Personen tragen ihre Aktionen
-  // im Menü (rot hinter dem Trenner).
-  'pages/einheit/FahrzeugeBesatzung.tsx',
   // ── Offline-Wiederherstellung (LFH-746) ───────────────────────────────────
   // „Verwerfen" (`danger`) neben „Erneut versuchen" und, bei einem ETB-Eintrag mit Anhängen,
   // „Ohne Anhänge senden" — eine Reihe je abgelehnter Karte.

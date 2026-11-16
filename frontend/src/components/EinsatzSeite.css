@@ -94,6 +94,34 @@
   }
 }
 
+/* Im Einsatzrahmen unter `md` nur der Rückweg (LLH-1728, design.md D6): den Einsatz nennt die
+   klebende Kopfleiste. Stehen bleibt allein der letzte verlinkte Eintrag ab dem dritten (antd
+   zählt die Trenner als eigene `li`, der dritte Eintrag ist das fünfte Kind), also unterhalb von
+   „Einsätze“ und dem Einsatz, ohne den Seitennamen am Ende; er trägt „‹“ davor. Gibt es keinen,
+   fällt die Zeile ganz weg. Per CSS, weil die rund 60 Aufrufer ihren Pfad selbst bauen. */
+@media (max-width: 767.98px) {
+  .lfh-ortspfad--einsatz:not(:has(.ant-breadcrumb ol > li:nth-child(n + 5):not(:last-child) a)) {
+    display: none;
+  }
+  .lfh-ortspfad--einsatz
+    .ant-breadcrumb
+    ol
+    > li:not(:nth-child(n + 5):not(:last-child):has(a):not(:has(~ li:not(:last-child) a))) {
+    display: none;
+  }
+  .lfh-ortspfad--einsatz
+    .ant-breadcrumb
+    ol
+    > li:nth-child(n + 5):not(:last-child):has(a):not(:has(~ li:not(:last-child) a))
+    a::before {
+    /* Leerer Ersatztext: das Zeichen gehört nicht in den Namen des Links. Die erste Zeile trägt
+       Browser ohne Ersatztext (Safari vor 17.4, Bauziel `safari16.4`), dort steht es im Namen. */
+    content: '‹';
+    content: '‹' / '';
+    margin-inline-end: 4px;
+  }
+}
+
 /* Der Datenstand-Platzhalter gilt nur dort, wo er eine Zeile hält: unter `md` (oben). Ab `md`
    steht die Gruppe in der Titelzeile, und die spät eintreffende Meta schob den schon stehenden
    Platzhalter weit nach rechts. CLS rechnet die größte Strecke eines Bildes mal der ganzen

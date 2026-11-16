@@ -1085,9 +1085,11 @@ async fn schwaerzung_loescht_heraufgestufte_kopie_samt_chat_quelle_und_haelt_den
         "Lage am Deich",
         &m.erstellt_at,
         &[foto.id],
+        None,
     )
     .await
-    .unwrap();
+    .unwrap()
+    .0;
     let kopie = crate::etb::repo::laden(&pool, etb_id)
         .await
         .unwrap()

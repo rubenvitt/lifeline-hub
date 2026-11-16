@@ -20,9 +20,8 @@ import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
 import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useModusFarben } from './rahmenStil';
-import { useAlarmKante } from './alarmOben';
 import StatusTag from './StatusTag';
-import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
+import { useEinsatzRahmen, useImEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
 import type { EinsatzAnzeige } from '../api/types';
 import { schriftGroesse } from './instrument/rollenwerte';
@@ -337,7 +336,8 @@ interface EinsatzSeiteProps {
   /**
    * Den Ortspfad erst ab `md` zeigen (`lfh-ortspfad--ab-md`): für Seiten, deren erster Bildschirm
    * auf dem Handy der Zeitachse gehört (Informationstelefon, LFH-1067). Den Einsatz nennt dort der
-   * Wechsler, den Rückweg die Navigation.
+   * Wechsler, den Rückweg die Navigation. Ohne diese Angabe zeigt eine Seite im Einsatzrahmen unter
+   * `md` nur den Rückweg zum nächsten verlinkten Eintrag (`lfh-ortspfad--einsatz`, LLH-1728).
    */
   ortspfadAbMd?: boolean;
   /**
@@ -478,8 +478,6 @@ export default function EinsatzSeite({
   const { token } = theme.useToken();
   const farben = useModusFarben();
   const aktionenRef = useRef<HTMLDivElement>(null);
-  // Stehende Alarme beginnen unter dem Seitenkopf, solange er im Bild ist (LFH-1112).
-  const alarmKante = useAlarmKante<HTMLDivElement>();
   // Klebt der Seitenkopf, zählt er zum Rahmen über dem Inhalt (zjt7c073 D2/D3). Mit
   // `fensterInhalt` steckt er in `FensterRahmen` in einem eigenen Wrapper, der sein Containing
   // Block ist: kleben kann er dort nicht, also meldet er sich auch nicht als Rahmenquelle.
@@ -488,15 +486,21 @@ export default function EinsatzSeite({
   // Eine Ref-Funktion für alle Abnehmer; stabil, sonst hängte React sie bei jedem Render um.
   const kopfLeiste = useCallback(
     (el: HTMLDivElement | null) => {
-      alarmKante(el);
       klebeRef(el);
       kopfRef?.(el);
     },
-    [alarmKante, klebeRef, kopfRef],
+    [klebeRef, kopfRef],
   );
   const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);
   const rahmenEinsatz = useEinsatzRahmen();
+  // Im Einsatzrahmen unter `md` nur der Rückweg (LLH-1728, D6); `ortspfadAbMd` geht vor.
+  const imEinsatzRahmen = useImEinsatzRahmen();
+  const ortspfadKlasse = ortspfadAbMd
+    ? 'lfh-ortspfad--ab-md'
+    : imEinsatzRahmen
+      ? 'lfh-ortspfad--einsatz'
+      : undefined;
 
   /*
    * Seitenweite Tastatur-Ebene (LFH-391 · B5): sie liegt in der Ebenen-KETTE ÜBER den tiefen
@@ -560,7 +564,7 @@ export default function EinsatzSeite({
       >
         <div className="lfh-seitenkopf__titelblock" style={titelblockStil(token)}>
           {breadcrumb && (
-            <Ortspfad farben={farben} className={ortspfadAbMd ? 'lfh-ortspfad--ab-md' : undefined}>
+            <Ortspfad farben={farben} className={ortspfadKlasse}>
               {breadcrumb}
             </Ortspfad>
           )}

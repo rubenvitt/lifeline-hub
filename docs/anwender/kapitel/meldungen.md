@@ -1,7 +1,7 @@
 ---
 titel: Meldungen
 gruppen: [alle, fuehrung]
-reihenfolge: 110
+reihenfolge: 520
 quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/VersorgtVon.tsx, frontend/src/personen/Patientenkopf.tsx]
 ---
 
@@ -45,7 +45,8 @@ Unter „Abgeschlossen“ holt „Ältere laden“ die nächsten Einträge. Die 
 
 Für Einsatzleitung und Führungspersonal:
 
-1. „Meldung erfassen“ wählen. Das Formular „Neue Meldung erfassen“ öffnet sich über der Liste.
+1. „Meldung erfassen“ wählen, hier oder als Schnellaktion der Sprungpalette. Das Formular „Neue
+   Meldung erfassen“ öffnet sich über der Liste.
 2. Für eine eilige Meldung „Sofortmeldung“ wählen; das setzt Meldungsart und Priorität auf
    „Sofort“ und schaltet die Bestätigung ein. „Lagemeldung an übergeordnete Stelle“ belegt die
    Meldungsart „Lagemeldung“ und die Richtung „Extern“ vor.
@@ -253,13 +254,14 @@ und die Einsatzleitung den Hinweis **„In die Lage übernommen“** mit Sprung 
 
 Alle Hinweise auf Meldungen stehen gebündelt im **Eingangsband** unten, etwa „3 neue Meldungen“,
 mit Absender und Anfang des Wortlauts der jüngsten zwei; andere Eingänge stehen mit darin. Es
-belegt keinen der Plätze der Alarme, und sein Ton kommt höchstens alle zwei Minuten.
+steht nie in der Alarmzone, und sein Ton kommt höchstens alle zwei Minuten.
 
 - **„Sichten“** an einer Meldung im Hinweis setzt sie auf „Gesichtet“. Sobald jemand eine
   Meldung sichtet, bestätigt oder weiter bearbeitet, verschwindet ihr Hinweis bei allen. Eine
   als gesehen gekennzeichnete Lagemeldung nimmt „In die Lage übernommen“ ebenso weg.
-- **„Öffnen“** bzw. **„Zu Meldungen“** springt zur Meldung bzw. in die Liste; das Schließen
-  nimmt den Hinweis nur für einen selbst weg.
+- **„Öffnen“** bzw. **„Zu Meldungen“** springt zur Meldung bzw. in die Liste. ✕ blendet den
+  Hinweis nur in diesem Tab aus, ohne ihn zu quittieren: Er bleibt unter „Eingänge“ bei „Neu“,
+  und andere Tabs und Geräte zeigen ihn weiter.
 - Wer gerade in ein Feld schreibt, sieht den Hinweis erst, wenn er das Feld verlässt.
 - Auf der Seite „Meldungen“ selbst erscheint kein Hinweis; dort stehen die neuen
   Meldungen in der Liste.
@@ -289,7 +291,9 @@ Umgekehrt legt ein im ETB erfasster Eintrag vom Typ „Meldung“ oder „Lage�
 als Art „Sonstige“ beziehungsweise „Lagemeldung“, mit „Von“ als Absender und „An“ als Empfänger.
 Sie steht im Meldungseingang wie jede erfasste Meldung und bekommt keinen zweiten ETB-Eintrag. Ohne
 das Häkchen „Auch in den Meldungseingang“ entsteht keine Meldung; es steht aus, wenn „Von“ und „An“
-beide die eigene Stelle sind (Kapitel [Einsatztagebuch](einsatztagebuch.md)).
+beide die eigene Stelle sind (Kapitel [Einsatztagebuch](einsatztagebuch.md)). Dasselbe gilt für
+eine Chat-Nachricht, die als „Meldung“ oder „Lage“ ins ETB übernommen wird; Absender ist dann, wer
+sie geschrieben hat (Kapitel [Chat](chat.md)).
 
 Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12 in die Lage
 übernommen“; eine erneute Übernahme schreibt keinen, eine Lagemeldung ebenfalls nicht. Einträge

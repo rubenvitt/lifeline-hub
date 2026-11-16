@@ -81,6 +81,21 @@ describe('modulName (LFH-965)', () => {
 });
 
 describe('modulRegistry', () => {
+  /** Synonyme für die Sprungpalette (y3zh5ymv D2, Spec `sprungpalette`). */
+  it('Schlagworte sind Wörter und wiederholen nicht den Namen', () => {
+    for (const m of modulRegistry) {
+      for (const w of m.schlagworte ?? []) {
+        expect(w.trim(), m.key).toBe(w);
+        expect(w.length, m.key).toBeGreaterThan(1);
+        expect(w.toLocaleLowerCase('de'), m.key).not.toBe(m.label.toLocaleLowerCase('de'));
+      }
+    }
+  });
+  it('der frühere Name „Meldebild“ trifft die Kräfteübersicht weiter', () => {
+    expect(modulRegistry.find((m) => m.key === 'kraefteuebersicht')?.schlagworte).toContain(
+      'Meldebild',
+    );
+  });
   it('führt das Informationstelefon als eigenes Modul der Kommunikation (i6k6mzed, design.md D3)', () => {
     expect(modulRegistry.find((m) => m.key === 'infotelefon')).toMatchObject({
       kategorie: 'kommunikation',
@@ -94,18 +109,17 @@ describe('modulRegistry', () => {
     expect(modulRegistry.find((m) => m.key === 'infotelefon')?.zaehlerQuelle).toBeUndefined();
   });
 
-  it('enthaelt das fertige ETB-Modul in der Kategorie Erfassung', () => {
+  it('enthaelt das fertige ETB-Modul in der Kategorie Führung (y3zh5ymv D10)', () => {
     const etb = modulRegistry.find((m) => m.key === 'etb');
     expect(etb).toBeDefined();
     expect(etb?.status).toBe('fertig');
-    expect(etb?.kategorie).toBe('erfassung');
+    expect(etb?.kategorie).toBe('fuehrung');
     expect(etb?.route).toBe('etb');
   });
 
   it('führt Evakuierung direkt vor der Betreuung, beide nach den Unfallhilfsstellen (LFH-639, LLH-1034)', () => {
     // Reihenfolge-Pin: dieselbe Folge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
     expect(moduleNachKategorie('erfassung').map((m) => m.key)).toEqual([
-      'etb',
       'personen',
       'unfallhilfsstellen',
       'evakuierung',
@@ -209,8 +223,10 @@ describe('modulRegistry', () => {
    * `erstesFreigegebenesModul`.
    */
   it('Modulstruktur: Führung, Kräfte-Kopf, Lage ohne Meldebild', () => {
+    // y3zh5ymv D10: das ETB steht als Führungsmittel direkt hinter dem Überblick.
     expect(moduleNachKategorie('fuehrung').map((m) => m.key)).toEqual([
       'ueberblick',
+      'etb',
       'einsatzdaten',
       'einsatzabschnitte',
       'auftraege',
@@ -219,7 +235,7 @@ describe('modulRegistry', () => {
     ]);
     const kraefte = moduleNachKategorie('kraefte');
     expect(kraefte[0].key).toBe('kraefteuebersicht');
-    expect(kraefte[0].label).toBe('Meldebild');
+    expect(kraefte[0].label).toBe('Kräfteübersicht');
     // Route bleibt — Deeplinks und gespeicherte Standard-Module tragen weiter.
     expect(kraefte[0].route).toBe('kraefteuebersicht');
     expect(moduleNachKategorie('lage').map((m) => m.key)).not.toContain('kraefteuebersicht');
@@ -248,10 +264,12 @@ describe('modulRegistry', () => {
   });
 
   it('Kategorien: Kurzetikett je Kategorie, nur Einstellungen steht am Rail-Fuß', () => {
+    // y3zh5ymv D10: die Kategorie der Betroffenen; der Schlüssel `erfassung` bleibt (Browserspeicher).
+    expect(kategorien.find((k) => k.key === 'erfassung')?.label).toBe('Betroffene & Schäden');
     expect(kategorien.map((k) => k.kurz)).toEqual([
       'Führung',
       'Kräfte',
-      'Erfass.',
+      'Betroff.',
       'Lage',
       'Komm.',
       'Einst.',

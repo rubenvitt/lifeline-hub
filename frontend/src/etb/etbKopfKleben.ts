@@ -26,7 +26,8 @@ import { KLEBEN_HOECHSTENS } from '../components/seitenkopfKleben';
  * nehmen; sonst rollen sie mit wie bisher. Die Seite reicht die Entscheidung als `kopfKlebt` an
  * `EinsatzSeite`. Gerechnet wird mit der Kopfhöhe, nicht mit der Rahmenhöhe: in die geht der
  * klebende Seitenkopf selbst ein, und die Entscheidung schaltete sich an der Grenze im Wechsel an
- * und ab. Unter `md` klebt nichts (wie der Rahmen, LFH-952).
+ * und ab. Unter `md` klebt von den Seitenköpfen nichts: dort bleibt die Höhe der Zeitachse; der
+ * Rahmen darüber klebt auch dort (LLH-1728), seine Höhe steht in `--lfh-kopf-oben`.
  */
 
 /** Höhe der klebenden Filterleiste samt ihrem Abstand nach unten. */

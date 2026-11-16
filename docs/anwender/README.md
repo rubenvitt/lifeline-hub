@@ -24,42 +24,42 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Einstieg | [Einsatz auswählen und Oberfläche](kapitel/einsatz-oberflaeche.md) | Alle |
 | Einstieg | [Profil und Sicherheit](kapitel/profil-sicherheit.md) | Alle |
 | Einstieg | [Neuigkeiten](kapitel/neuigkeiten.md) | Alle |
-| Einstieg | [Chat](kapitel/chat.md) | Alle |
 | Einstieg | [Rückmeldung geben](kapitel/rueckmeldung.md) | Alle |
-| Führungsmittel | [Einsatztagebuch](kapitel/einsatztagebuch.md) | Alle, Führung |
-| Führungsmittel | [Meldungen](kapitel/meldungen.md) | Alle, Führung |
-| Führungsmittel | [Aufträge und Befehle](kapitel/auftraege-befehle.md) | Führung |
-| Führungsmittel | [Erinnerungen](kapitel/erinnerungen.md) | Führung |
-| Führungsmittel | [Nachforderung](kapitel/nachforderung.md) | Führung |
-| Führungsmittel | [Drucken und Export](kapitel/drucken-export.md) | Alle, Führung |
-| Lage | [Überblick](kapitel/ueberblick.md) | Führung |
+| Führung | [Überblick](kapitel/ueberblick.md) | Führung |
+| Führung | [Einsatztagebuch](kapitel/einsatztagebuch.md) | Alle, Führung |
+| Führung | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
+| Führung | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
+| Führung | [Aufträge und Befehle](kapitel/auftraege-befehle.md) | Führung |
+| Führung | [Lagebesprechung](kapitel/lagebesprechung.md) | Führung |
+| Führung | [Dokumente](kapitel/dokumente.md) | Führung |
+| Führung | [Drucken und Export](kapitel/drucken-export.md) | Alle, Führung |
+| Kräfte & Mittel | [Kräfteübersicht und Kräfte-Zeitachse](kapitel/meldebild.md) | Führung |
+| Kräfte & Mittel | [Einheiten](kapitel/einheiten.md) | Führung |
+| Kräfte & Mittel | [Personal](kapitel/personal.md) | Führung |
+| Kräfte & Mittel | [Fahrzeuge und FMS](kapitel/fahrzeuge.md) | Führung |
+| Kräfte & Mittel | [Material](kapitel/material.md) | Führung |
+| Kräfte & Mittel | [Verpflegung](kapitel/verpflegung.md) | Führung |
+| Kräfte & Mittel | [Bereitstellungsräume](kapitel/bereitstellungsraeume.md) | Führung |
+| Kräfte & Mittel | [Nachforderung](kapitel/nachforderung.md) | Führung |
+| Kräfte & Mittel | [Ablösung](kapitel/abloesung.md) | Führung |
+| Kräfte & Mittel | [Vorplanung](kapitel/vorplanung.md) | Führung, Administration |
+| Betroffene & Schäden | [Betroffene und Sichtung](kapitel/betroffene.md) | Alle, Führung |
+| Betroffene & Schäden | [Unfallhilfsstellen](kapitel/unfallhilfsstellen.md) | Alle, Führung |
+| Betroffene & Schäden | [Evakuierung](kapitel/evakuierung.md) | Alle, Führung |
+| Betroffene & Schäden | [Betreuung](kapitel/betreuung.md) | Alle, Führung |
+| Betroffene & Schäden | [Tiere](kapitel/tiere.md) | Alle, Führung |
+| Betroffene & Schäden | [Schäden](kapitel/schaeden.md) | Alle, Führung |
 | Lage | [Lagebild](kapitel/lagebild.md) | Alle, Führung |
 | Lage | [Lagekarte, Zeichnen und Messen](kapitel/lagekarte.md) | Alle, Führung |
+| Lage | [Lageberichte](kapitel/lageberichte.md) | Führung |
 | Lage | [Gefahren](kapitel/gefahren.md) | Führung |
 | Lage | [Wetter und Pegel](kapitel/wetter-pegel.md) | Führung |
 | Lage | [Lagemeldungen](kapitel/lagemeldungen.md) | Führung |
-| Lage | [Lageberichte](kapitel/lageberichte.md) | Führung |
-| Kräfte | [Meldebild und Kräfte-Zeitachse](kapitel/meldebild.md) | Führung |
-| Kräfte | [Einheiten](kapitel/einheiten.md) | Führung |
-| Kräfte | [Personal](kapitel/personal.md) | Führung |
-| Kräfte | [Fahrzeuge und FMS](kapitel/fahrzeuge.md) | Führung |
-| Kräfte | [Material](kapitel/material.md) | Führung |
-| Kräfte | [Bereitstellungsräume](kapitel/bereitstellungsraeume.md) | Führung |
-| Kräfte | [Ablösung](kapitel/abloesung.md) | Führung |
-| Kräfte | [Verpflegung](kapitel/verpflegung.md) | Führung |
-| Kräfte | [Vorplanung](kapitel/vorplanung.md) | Führung, Administration |
-| Führungsorganisation | [Einsatzdaten und Führungsstelle](kapitel/einsatzdaten.md) | Führung |
-| Führungsorganisation | [Einsatzabschnitte und Führungsorganisation](kapitel/einsatzabschnitte.md) | Führung |
-| Führungsorganisation | [Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
-| Führungsorganisation | [Informationstelefon](kapitel/infotelefon.md) | Führung |
-| Führungsorganisation | [Dokumente](kapitel/dokumente.md) | Führung |
-| Führungsorganisation | [Lagebesprechung](kapitel/lagebesprechung.md) | Führung |
-| Betroffene | [Betroffene und Sichtung](kapitel/betroffene.md) | Alle, Führung |
-| Betroffene | [Unfallhilfsstellen](kapitel/unfallhilfsstellen.md) | Alle, Führung |
-| Betroffene | [Evakuierung](kapitel/evakuierung.md) | Alle, Führung |
-| Betroffene | [Betreuung](kapitel/betreuung.md) | Alle, Führung |
-| Betroffene | [Tiere](kapitel/tiere.md) | Alle, Führung |
-| Betroffene | [Schäden](kapitel/schaeden.md) | Alle, Führung |
+| Kommunikation | [Chat](kapitel/chat.md) | Alle |
+| Kommunikation | [Erinnerungen](kapitel/erinnerungen.md) | Führung |
+| Kommunikation | [Meldungen](kapitel/meldungen.md) | Alle, Führung |
+| Kommunikation | [Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan](kapitel/funkplan.md) | Führung |
+| Kommunikation | [Informationstelefon](kapitel/infotelefon.md) | Führung |
 | Einstellungen und Verwaltung | [Einstellungen des Einsatzes und Module](kapitel/einsatz-einstellungen.md) | Führung |
 | Einstellungen und Verwaltung | [Einsatz abschließen und Einsatzbericht](kapitel/einsatzabschluss.md) | Führung |
 | Einstellungen und Verwaltung | [Stammdaten](kapitel/stammdaten.md) | Administration |
@@ -83,11 +83,11 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Gekoppelte Geräte | [Lagebild für Externe](kapitel/lagebild-extern.md) | Führung |
 | Gekoppelte Geräte | [Anbindungen](kapitel/anbindungen.md) | Administration |
 
-Jeder Bereich ordnet seine Kapitel in einem eigenen Hunderterblock der `reihenfolge`
-(Einstieg 0–99, Führungsmittel 100–199, Lage 200–299, Kräfte 300–399, Führungsorganisation
-400–499, Betroffene 500–599, Einstellungen und Verwaltung 600–699, Gekoppelte Geräte 700–799).
-Ein neues Kapitel nimmt die nächste freie Zehnerstelle seines Bereichs und bekommt hier eine
-Zeile.
+Die Bereiche folgen den Kategorien der Navigation. Jeder ordnet seine Kapitel in einem eigenen
+Hunderterblock der `reihenfolge` (Einstieg 0–99, Führung 100–199, Kräfte & Mittel 200–299,
+Betroffene & Schäden 300–399, Lage 400–499, Kommunikation 500–599, Einstellungen und Verwaltung
+600–699, Gekoppelte Geräte 700–799). Ein neues Kapitel nimmt die nächste freie Zehnerstelle seines
+Bereichs und bekommt hier eine Zeile; das Kapitel eines Moduls steht im Bereich seiner Kategorie.
 
 ## Lesergruppen
 

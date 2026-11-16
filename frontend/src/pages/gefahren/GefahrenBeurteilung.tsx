@@ -3,7 +3,7 @@ import type { Gefahrengebiet } from '../../api/types';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { StatusChip, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
-import { NICHT_BEURTEILT } from './beurteilung';
+import { BESTAETIGT, UNBESTAETIGT } from './beurteilung';
 
 export interface GefahrenBeurteilungProps {
   gebiet: Gefahrengebiet;
@@ -20,8 +20,8 @@ export interface GefahrenBeurteilungProps {
 
 /**
  * Beurteilung der Gefahrenmatrix eines Gebiets (LLH-1090, Spec `gefahrenmatrix`). Eine Zelle ohne
- * Bewertung zeigt „keine“; ob jemand die Matrix angesehen hat, steht hier: „beurteilt <DTG> ·
- * Name“ oder „nicht beurteilt“. Der Knopf steht nur mit Schreibrecht da; bestätigen schreibt
+ * Bewertung zeigt „keine“; ob jemand die Matrix angesehen hat, steht hier: „bestätigt <DTG> ·
+ * Name“ oder „unbestätigt“. Der Knopf steht nur mit Schreibrecht da; bestätigen schreibt
  * einen Systemeintrag ins ETB, jede spätere Zelländerung frischt Zeit und Person auf (Server).
  */
 export default function GefahrenBeurteilung({
@@ -52,14 +52,14 @@ export default function GefahrenBeurteilung({
       >
         {gebiet.beurteilt_at ? (
           <Typography.Text data-lfh="beurteilung-stand">
-            beurteilt{' '}
+            {BESTAETIGT}{' '}
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>
               {zeitpunkt(gebiet.beurteilt_at)}
             </span>
             {gebiet.beurteilt_von_name ? ` · ${gebiet.beurteilt_von_name}` : ''}
           </Typography.Text>
         ) : (
-          <StatusChip ton="achtung" wort={NICHT_BEURTEILT} />
+          <StatusChip ton="achtung" wort={UNBESTAETIGT} />
         )}
         {darfSchreiben && (
           // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider (`controlHeight`).

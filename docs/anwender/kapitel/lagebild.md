@@ -1,7 +1,7 @@
 ---
 titel: Lagebild
 gruppen: [alle, fuehrung]
-reihenfolge: 210
+reihenfolge: 400
 quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/verlauf.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
 ---
 
@@ -86,7 +86,7 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   Screenreader liest „… · mit Erläuterung“. Eine Gefahr, zu der nur eine Erläuterung bei „keine“
   vorliegt, steht mit leerem Balken und „keine“ da. Den Text der Erläuterung zeigt das Paneel
   nicht; er steht auf der Seite „Gefahren“ unter der Matrix. Darunter stehen die
-  Gebiete, deren Matrix noch nicht beurteilt ist, etwa „Hangrutsch Kirchberg: nicht beurteilt“,
+  Gebiete, deren Beurteilung noch nicht bestätigt ist, etwa „Hangrutsch Kirchberg: unbestätigt“,
   bei mehr als zwei nur ihre Zahl. Bewertet und beurteilt wird im Kapitel
   [Gefahren](gefahren.md).
 - **Verlauf** (nur in der Reihe „Sanitätsdienst“): die Kontakte je Stunde der letzten zwölf

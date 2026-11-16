@@ -122,8 +122,10 @@ test('Selbstbeweis (LFH-811): `beschnitt` meldet ein ganz abgeschnittenes Ziel �
     await page.goto('/admin/benutzer');
     await expect(page.locator('tr.ant-table-row').first()).toBeVisible();
     await page.evaluate(() => {
+      // Am unteren Fensterrand: oben klebt seit LLH-1728 auch am Handy der Kopf, und eine Attrappe
+      // bei (0,0) läge hinter ihm, statt nur abgeschnitten zu sein.
       const huelle = Object.assign(document.createElement('div'), {
-        style: 'overflow:hidden;height:0',
+        style: 'position:fixed;left:0;bottom:0;overflow:hidden;height:0',
       });
       const knopf = Object.assign(document.createElement('button'), { textContent: 'Attrappe' });
       knopf.setAttribute('data-e2e-fokus', 'attrappe');
@@ -799,6 +801,10 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
     }) => {
       test.setTimeout(150_000);
       await page.setViewportSize(viewport);
+      // Seit LLH-1722 trägt jedes Fahrzeug ein ⋮; bei 390 px landet ein Personen-⋮ dann unten
+      // rechts unter dem Devtools-Knopf, den es nur im DEV-Build gibt. Ohne ihn hat die Seite bei
+      // 390 px keinen angepinnten Verdecker; geprüft wird dort nur, dass jedes Ziel per Tab kommt.
+      await ohneDevtoolsKnopf(page);
       await anmelden(page);
       const { pfad, namen } = await seedEinheitPersonalGesperrt(page, rolle);
       const messwerte: string[] = [];
@@ -839,8 +845,8 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
         ).toEqual(ziele.map(({ name }) => name).sort());
         if (viewport.width >= 992) {
           expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
+          expect(befund.fixierteKandidaten).toBeGreaterThan(0);
         }
-        expect(befund.fixierteKandidaten).toBeGreaterThan(0);
         expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
         messwerte.push(
           `${dichte}: ${befund.besuchteZiele.length} Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,

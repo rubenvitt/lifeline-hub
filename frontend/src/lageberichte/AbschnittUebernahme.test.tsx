@@ -171,8 +171,8 @@ describe('AbschnittUebernahme (LFH-870)', () => {
     renderMitProviders(<Probe quelle={EIGENE_LAGE_QUELLE} />);
     expect(
       await screen.findByText(
-        'Aus Meldebild und Führungsorganisation übernehmen nicht verfügbar: ' +
-          'Kräftemeldebild nicht freigegeben (Abschnitte), ' +
+        'Aus Kräfteübersicht und Führungsorganisation übernehmen nicht verfügbar: ' +
+          'Kräfteübersicht nicht freigegeben (Abschnitte), ' +
           'Führungsorganisation nicht freigegeben (Abschnitte)',
       ),
     ).toBeInTheDocument();

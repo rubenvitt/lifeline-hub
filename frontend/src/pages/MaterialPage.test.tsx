@@ -192,7 +192,7 @@ describe('MaterialPage', () => {
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatzAktiv, [em]);
-    const link = await screen.findByRole('link', { name: 'Meldebild' });
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht');
   });
 
@@ -596,20 +596,41 @@ describe('MaterialPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('keine Klein-Variante mehr am Status-Auswahlfeld und am Herausnehmen-Knopf', async () => {
+  it('keine Klein-Variante am Status-Auswahlfeld; „Aus dem Einsatz nehmen“ steht neutral zuerst im Menü (LLH-1722)', async () => {
     /**
      * Keine punktuellen Klein-Angaben an den Zeilen-Bedienelementen (Dichte-Regel); den Bestand
-     * hält die Schuldmenge in `components/dichte.guard.test.ts`.
+     * hält die Schuldmenge in `components/dichte.guard.test.ts`. Seit LLH-1722 kein roter Knopf
+     * in der Zeile: das Beenden einer Kraft steht im ⋮ (Spec `bedien-muster`).
      */
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     expect(zeile.querySelector('.ant-select-sm')).toBeNull();
-    const knopf = within(zeile).getByRole('button', { name: 'Wolldecke aus dem Einsatz nehmen' });
-    expect(knopf).not.toHaveClass('ant-btn-sm');
-    // Umkehrbar und doch folgenreich: `danger` mit Abstand statt Rückfrage (LLH-1079, D8).
-    expect(knopf).toHaveClass('ant-btn-dangerous');
+    expect(
+      within(zeile).queryByRole('button', { name: 'Wolldecke aus dem Einsatz nehmen' }),
+    ).toBeNull();
+    await userEvent.click(
+      within(zeile).getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }),
+    );
+    await warteAufMenueFokus();
+    const menue = await waitFor(() => {
+      const offen = document.querySelectorAll<HTMLElement>(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      );
+      expect(offen.length).toBeGreaterThan(0);
+      return offen[offen.length - 1];
+    });
+    const erster = within(menue).getAllByRole('menuitem')[0];
+    expect(erster).toHaveTextContent('Aus dem Einsatz nehmen');
+    expect(erster).not.toHaveClass('ant-dropdown-menu-item-danger');
   });
+
+  /** „Aus dem Einsatz nehmen“ im Zeilenmenü (LLH-1722). */
+  const nimmHeraus = (zeile: HTMLElement, name: string) =>
+    waehleMenueEintrag(
+      within(zeile).getByRole('button', { name: `Weitere Aktionen zu ${name}` }),
+      'Aus dem Einsatz nehmen',
+    );
 
   /**
    * Aus dem Einsatz nehmen ist umkehrbar (LLH-1079 Teil II, Wortlaut LLH-1093): ein Klick ohne
@@ -630,9 +651,7 @@ describe('MaterialPage', () => {
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    await userEvent.click(
-      within(zeile).getByRole('button', { name: 'Wolldecke aus dem Einsatz nehmen' }),
-    );
+    await nimmHeraus(zeile, 'Wolldecke');
     await waitFor(() => expect(aufrufe).toEqual(['entlassen']));
     expect(document.querySelector('.ant-popconfirm:not(.ant-popover-hidden)')).toBeNull();
     expect(await screen.findByText('Wolldecke aus dem Einsatz genommen')).toBeInTheDocument();
@@ -653,9 +672,7 @@ describe('MaterialPage', () => {
     const { container } = render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
-    await userEvent.click(
-      within(zeile).getByRole('button', { name: 'Wolldecke aus dem Einsatz nehmen' }),
-    );
+    await nimmHeraus(zeile, 'Wolldecke');
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     const hinweis = await screen.findByText('Material ist außer Dienst');
     expect(hinweis.closest('[data-lfh="entlassen-block"]')).toBeNull();
@@ -1641,6 +1658,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const eintraege = within(menue).getAllByRole('menuitem');
     // Ein Stamm-Verbrauchsgut ohne Ausgabe (LLH-1225 D6); die Art trägt der Stamm.
     expect(eintraege.map((e) => e.textContent)).toEqual([
+      'Aus dem Einsatz nehmen',
       'Menge ändern …',
       'Ausgabe zurücknehmen · nichts ausgegeben',
       'Aufteilen …',
@@ -1649,6 +1667,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     ]);
     expect(eintraege.map((e) => e.getAttribute('aria-disabled') === 'true')).toEqual([
       false,
+      false,
       true,
       false,
       true,
@@ -1656,7 +1675,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     ]);
     // Stornieren rot hinter dem Trenner.
     expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
-    expect(eintraege[4]).toHaveClass('ant-dropdown-menu-item-danger');
+    expect(eintraege[5]).toHaveClass('ant-dropdown-menu-item-danger');
   });
 
   it('Zeilenmenü eines zugeordneten Postens: „Stornieren · zugeordnet“ gesperrt, weiter rot', async () => {
@@ -1688,7 +1707,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       within(menue)
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
-    ).toEqual(['Angaben ändern · im Stamm pflegen', 'Stornieren']);
+    ).toEqual(['Aus dem Einsatz nehmen', 'Angaben ändern · im Stamm pflegen', 'Stornieren']);
   });
 
   it('Ausgabe: der Rest steht an der Menge, ganz ausgegeben heißt der Posten „aufgebraucht“ (D4/D15)', async () => {
@@ -1727,6 +1746,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
     ).toEqual([
+      'Aus dem Einsatz nehmen',
       'Menge ändern …',
       'Ausgabe zurücknehmen · nichts ausgegeben',
       'Aufteilen · Rest 1',
@@ -1784,8 +1804,9 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(within(zeile(11)).getByText('doppelt')).toBeInTheDocument();
     expect(within(zeile(12)).queryByText('doppelt')).toBeNull();
 
-    await userEvent.click(
-      within(zeile(11)).getByRole('button', { name: 'Stromerzeuger aus dem Einsatz nehmen' }),
+    await waehleMenueEintrag(
+      within(zeile(11)).getByRole('button', { name: 'Weitere Aktionen zu Stromerzeuger' }),
+      'Aus dem Einsatz nehmen',
     );
     await waitFor(() => expect(container.querySelector('[data-row-key="11"]')).toBeNull());
     expect(within(zeile(10)).queryByText('doppelt')).toBeNull();
@@ -1933,7 +1954,12 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       within(menue)
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
-    ).toEqual(['Als Verbrauchsgut führen', 'Angaben ändern …', 'Stornieren']);
+    ).toEqual([
+      'Aus dem Einsatz nehmen',
+      'Als Verbrauchsgut führen',
+      'Angaben ändern …',
+      'Stornieren',
+    ]);
     server.use(
       http.get('/api/einsaetze/1/material', () =>
         HttpResponse.json([{ ...adhoc, art: 'verbrauchsgut' }]),

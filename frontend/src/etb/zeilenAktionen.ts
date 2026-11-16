@@ -5,7 +5,7 @@
  * Liste und wählen über dieselbe Funktion. So steht kein Weg nur an einem Ort.
  */
 import type { EtbEintragAnzeige } from '../api/types';
-import { ORIGINAL_TEXT, hatServerVorschau, istBildMime } from '../api/anhangFassung';
+import { ORIGINAL_TEXT, hasVorschau, isBildMime } from '../api/anhangFassung';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import type { AbgelehnterEintrag } from '../offline/queue';
@@ -108,7 +108,8 @@ const ORIGINAL = 'original:';
 /**
  * Ein Vermerk im Menü; ein Bild-Anhang dazu mit „Vorschau“ und, wer darf, „Original (mit
  * Standort)“ (Review L1): die Spaltenzeile zeigt Vorschaubild und Original erst nach „+n“, bei
- * einem einzelnen Foto gar nicht. So bleibt beides an jeder Zeile erreichbar.
+ * einem einzelnen Foto gar nicht. So bleibt beides an jeder Zeile erreichbar. „Vorschau“ auch für
+ * HEIC/HEIF, das die App selbst dekodiert (LLH-1887).
  */
 function vermerkEintraege(v: Vermerk, darfOriginal: boolean): MenueEintrag<string>[] {
   const eintrag: MenueEintrag<string> = {
@@ -120,10 +121,10 @@ function vermerkEintraege(v: Vermerk, darfOriginal: boolean): MenueEintrag<strin
   if (d == null) return [eintrag];
   return [
     eintrag,
-    ...(hatServerVorschau(d.mime)
+    ...(hasVorschau(d.mime)
       ? [{ key: `${VORSCHAU}${v.schluessel}`, label: `Vorschau: ${d.dateiname}` }]
       : []),
-    ...(darfOriginal && istBildMime(d.mime)
+    ...(darfOriginal && isBildMime(d.mime)
       ? [
           {
             key: `${ORIGINAL}${v.schluessel}`,

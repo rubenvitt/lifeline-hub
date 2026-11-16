@@ -109,6 +109,19 @@ describe('baueBefehle — Navigation/Berechtigung', () => {
     expect(b.some((x) => x.id === 'nav:stammdaten')).toBe(false);
     expect(b.some((x) => x.id === 'nav:planungen')).toBe(false);
   });
+  /** Spec `sprungpalette`, „Die Hilfe steht in der Palette“. */
+  it('führt „Hilfe“ als ersten Treffer zu „hilfe“, auch ohne Einsatz', () => {
+    for (const k of [kontext(), kontext({ einsatzId: null, benutzer: sichter })]) {
+      const b = baueBefehle(k);
+      const treffer = ordneTreffer(filtereBefehle(b, 'hilfe'), 'hilfe');
+      expect(treffer[0]?.id).toBe('nav:hilfe');
+    }
+    const k = kontext();
+    baueBefehle(k)
+      .find((x) => x.id === 'nav:hilfe')!
+      .ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/hilfe');
+  });
   it('bietet immer Abmelden + Alle Einsätze', () => {
     const b = baueBefehle(kontext({ einsatzId: null, benutzer: sichter }));
     expect(b.some((x) => x.id === 'nav:abmelden')).toBe(true);
@@ -124,7 +137,92 @@ const beendet: EinsatzAnzeige = {
   status: 'abgeschlossen',
 };
 
+/** Spec `sprungpalette`, „Module sind über Synonyme auffindbar“ (y3zh5ymv D2). */
+describe('baueBefehle — Synonyme der Module', () => {
+  it.each([
+    ['meldebild', 'modul:kraefteuebersicht'],
+    ['stärke', 'modul:kraefteuebersicht'],
+    ['kraefte', 'modul:kraefteuebersicht'],
+    ['tagebuch', 'modul:etb'],
+    ['bhp', 'modul:unfallhilfsstellen'],
+    ['rtw', 'modul:fahrzeuge'],
+  ])('„%s“ findet %s', (q, id) => {
+    const treffer = ordneTreffer(filtereBefehle(baueBefehle(kontext()), q), q).map((x) => x.id);
+    expect(treffer).toContain(id);
+  });
+  /** Spec `sprungpalette`, „Ein Treffer braucht Wortanfang oder Teilwort“, an der echten Liste. */
+  it('stellt die Spec-Fälle an der echten Liste auf den ersten Platz', () => {
+    const erster = (q: string) =>
+      ordneTreffer(filtereBefehle(baueBefehle(kontext({ benutzer: admin })), q), q)[0]?.id;
+    expect(erster('kraefte')).toBe('modul:kraefteuebersicht');
+    expect(erster('funk')).toBe('modul:fernmeldewesen');
+    expect(erster('hilfe')).toBe('nav:hilfe');
+  });
+  it('lässt „rtw“ an der echten Liste weder Lagekarte noch Zeichnen noch Benutzer treffen', () => {
+    const treffer = filtereBefehle(baueBefehle(kontext({ benutzer: admin })), 'rtw').map(
+      (x) => x.befehl.id,
+    );
+    expect(treffer).toContain('modul:fahrzeuge');
+    for (const id of ['modul:lagekarte', 'aktion:lagekarte-gefahrengebiet', 'nav:benutzer']) {
+      expect(treffer).not.toContain(id);
+    }
+  });
+  it('zeigt ein Synonym nicht unter dem Modul', () => {
+    const modul = baueBefehle(kontext()).find((x) => x.id === 'modul:kraefteuebersicht')!;
+    expect(modul.nebenzeile).not.toMatch(/Meldebild/);
+  });
+});
+
 describe('baueBefehle — Schnellaktionen', () => {
+  /** Spec `sprungpalette`, „Schnellaktionen nach Nutzung geordnet“ (y3zh5ymv D5). */
+  describe('Ordnung nach Nutzung', () => {
+    const aktionen = (k: BefehlKontext) =>
+      baueBefehle(k)
+        .filter((x) => x.gruppe === 'schnellaktionen')
+        .map((x) => x.id);
+
+    it('stellt die häufigste Schnellaktion zuerst, bei Gleichstand gilt die feste Folge', () => {
+      const ids = aktionen(
+        kontext({
+          schnellaktionZaehlung: {
+            'aktion:infotelefon-anruf': 3,
+            'aktion:tiere': 1,
+            'aktion:etb': 1,
+          },
+        }),
+      );
+      expect(ids.slice(0, 4)).toEqual([
+        'aktion:infotelefon-anruf',
+        'aktion:etb',
+        'aktion:tiere',
+        'aktion:personen',
+      ]);
+    });
+
+    it('zählt eine ausgeführte Schnellaktion, auch aus „Zuletzt ausgeführt“', () => {
+      const zaehle = vi.fn();
+      const b = baueBefehle(
+        kontext({
+          zaehleSchnellaktion: zaehle,
+          merkeBefehl: vi.fn(),
+          zuletztBefehlIds: ['aktion:etb'],
+        }),
+      );
+      b.find((x) => x.id === 'aktion:personen')!.ausfuehren();
+      expect(zaehle).toHaveBeenLastCalledWith('aktion:personen');
+      b.find((x) => x.id === 'ausgefuehrt:aktion:etb')!.ausfuehren();
+      expect(zaehle).toHaveBeenLastCalledWith('aktion:etb');
+    });
+
+    it('zählt keine andere Zeile', () => {
+      const zaehle = vi.fn();
+      const b = baueBefehle(kontext({ zaehleSchnellaktion: zaehle }));
+      b.find((x) => x.id === 'modul:etb')!.ausfuehren();
+      b.find((x) => x.id === 'nav:profil')!.ausfuehren();
+      expect(zaehle).not.toHaveBeenCalled();
+    });
+  });
+
   it('verdrahtet die Schnellaktionen mit ?neu=1 für Berechtigte', () => {
     const k = kontext();
     const b = baueBefehle(k);
@@ -132,9 +230,16 @@ describe('baueBefehle — Schnellaktionen', () => {
     expect(person).toBeDefined();
     person!.ausfuehren();
     expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/personen?neu=1');
+    // Ohne gezählte Ausführungen die feste Folge (Spec `sprungpalette`, „Schnellaktionen nach
+    // Nutzung geordnet“).
     expect(b.map((x) => x.id).filter((id) => id.startsWith('aktion:'))).toEqual([
       'aktion:personen',
       'aktion:etb',
+      'aktion:meldung-erfassen',
+      'aktion:lagemeldung-erfassen',
+      'aktion:auftrag-erteilen',
+      'aktion:nachforderung-stellen',
+      'aktion:fahrzeugstatus',
       'aktion:unfallhilfsstellen',
       'aktion:schaeden',
       'aktion:stab',
@@ -157,6 +262,11 @@ describe('baueBefehle — Schnellaktionen', () => {
     for (const [id, ziel] of [
       ['aktion:personen', '/einsaetze/5/personen?neu=1'],
       ['aktion:etb', '/einsaetze/5/etb?neu=1'],
+      ['aktion:meldung-erfassen', '/einsaetze/5/meldungen?neu=1'],
+      ['aktion:lagemeldung-erfassen', '/einsaetze/5/lagemeldungen?neu=1'],
+      ['aktion:auftrag-erteilen', '/einsaetze/5/auftraege?neu=1'],
+      ['aktion:nachforderung-stellen', '/einsaetze/5/nachforderungen?neu=1'],
+      ['aktion:fahrzeugstatus', '/einsaetze/5/fahrzeuge?ansicht=tableau'],
       ['aktion:unfallhilfsstellen', '/einsaetze/5/unfallhilfsstellen/liste?neu=1'],
       ['aktion:schaeden', '/einsaetze/5/schaeden?neu=1'],
       ['aktion:stab', '/einsaetze/5/lagebesprechung?neu=1'],
@@ -169,6 +279,38 @@ describe('baueBefehle — Schnellaktionen', () => {
     ] as const) {
       b.find((x) => x.id === id)!.ausfuehren();
       expect(k.navigate).toHaveBeenCalledWith(ziel);
+    }
+  });
+  /** Spec `sprungpalette`, „Meldung, Auftrag, Nachforderung und Fahrzeugstatus aus der Palette“. */
+  it.each([
+    ['aktion:meldung-erfassen', 'Meldung erfassen', 'meldungen'],
+    ['aktion:lagemeldung-erfassen', 'Lagemeldung erfassen', 'lagemeldungen'],
+    ['aktion:auftrag-erteilen', 'Auftrag erteilen', 'auftraege'],
+    ['aktion:nachforderung-stellen', 'Nachforderung stellen', 'nachforderungen'],
+    ['aktion:fahrzeugstatus', 'Fahrzeugstatus setzen', 'fahrzeuge'],
+  ] as const)('führt „%s“ mit Beschriftung und Trägermodul', (id, label, modulKey) => {
+    const m = modulRegistry.find((x) => x.key === modulKey)!;
+    const zeile = baueBefehle(kontext()).find((x) => x.id === id)!;
+    expect(zeile).toMatchObject({ label, kontext: m.label, icon: m.icon });
+    const ohneTraeger = freigabenFixture({ [modulKey]: { zugriff: false } });
+    expect(baueBefehle(kontext({ freigaben: ohneTraeger })).some((x) => x.id === id)).toBe(false);
+  });
+  it('verlangt für „Lagemeldung erfassen“ auch die Freigabe der Meldungen', () => {
+    const freigaben = freigabenFixture({ meldungen: { zugriff: false } });
+    const ids = baueBefehle(kontext({ freigaben })).map((x) => x.id);
+    expect(ids).not.toContain('aktion:lagemeldung-erfassen');
+    expect(ids).not.toContain('aktion:meldung-erfassen');
+    expect(ids).toContain('modul:lagemeldungen');
+  });
+  it('findet die neuen Zeilen über ihre Wörter als ersten Treffer', () => {
+    const b = baueBefehle(kontext());
+    for (const [q, id] of [
+      ['meldung erfassen', 'aktion:meldung-erfassen'],
+      ['auftrag erteilen', 'aktion:auftrag-erteilen'],
+      ['nachforderung stellen', 'aktion:nachforderung-stellen'],
+      ['fahrzeugstatus', 'aktion:fahrzeugstatus'],
+    ] as const) {
+      expect(ordneTreffer(filtereBefehle(b, q), q)[0]?.id, q).toBe(id);
     }
   });
   /**

@@ -1,12 +1,13 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin } from 'antd';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import BeantragtListe from '../einsatz/spiegel/BeantragtListe';
 import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
 import { useAuth } from '../auth/AuthContext';
@@ -167,6 +168,20 @@ export default function MeldungenPage() {
   });
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
+  // Schnellaktion „Meldung erfassen“ (Sprungpalette; Spec `meldungseingang`, „Das Meldungsformular
+  // öffnet sich über die Adresse“): ?neu=1 klappt das Formular auf. Muster wie `TierePage`: erst
+  // nach dem Laden des Einsatzes entscheiden, den Parameter immer räumen, einmal je Verlaufseintrag
+  // (`useLinkAuftrag`, LLH-1558). Das Recht ist das des Kopf-Knopfs (`darfBeantragen`).
+  const [searchParams] = useSearchParams();
+  const neuAuftrag = useLinkAuftrag();
+  const darfMeldenRoh = einsatzQuery.data != null && darfBeantragen(einsatzQuery.data);
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
+    if (einsatzQuery.isLoading) return;
+    if (darfMeldenRoh) setFormOffen(true);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfMeldenRoh]);
   // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
   const vorschlagsquellen = useFunkrufnamenQuellen({
     einsatzId,

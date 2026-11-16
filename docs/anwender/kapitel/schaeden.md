@@ -1,7 +1,7 @@
 ---
 titel: Schäden
 gruppen: [alle, fuehrung]
-reihenfolge: 550
+reihenfolge: 350
 quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/pages/schaeden/GefahrAuswahl.tsx, frontend/src/pages/schaeden/gefahrWorte.ts, frontend/src/pages/schaeden/SchaedenDruckTabelle.tsx, frontend/src/zeichen/fachobjektZeichen.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
 ---
 

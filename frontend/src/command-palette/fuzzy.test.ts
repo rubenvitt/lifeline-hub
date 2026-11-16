@@ -7,6 +7,7 @@ import {
   ordneTreffer,
   parsePraefix,
   praefixStufe,
+  normalisiere,
   textStufe,
   UNBEWERTET,
   type Treffer,
@@ -32,9 +33,8 @@ const liste: Befehl[] = [
 ];
 
 /**
- * Der Korpus mit den ECHTEN Schlagworten der Schnellaktion `personen`. Für 'etb' bewertet Fuse
- * `modul:etb` weit besser als `aktion:personen` (Rauschen), das aber in der Gruppe steht, die die
- * Startordnung nach vorn zieht; der Grund für den Sortierschlüssel unten.
+ * Der Korpus mit den ECHTEN Schlagworten der Schnellaktion `personen`: für 'etb' trifft nur das
+ * Modul, die Schnellaktion steht in der Gruppe, die die Startordnung nach vorn zieht.
  */
 const rangKorpus: Befehl[] = [
   b('modul:etb', 'ETB', ['tagebuch'], 'module'),
@@ -46,55 +46,86 @@ const rangKorpus: Befehl[] = [
   ),
 ];
 
-describe('filtereBefehle', () => {
-  it('gibt bei leerer Suche alles zurück', () => {
-    expect(filtereBefehle(liste, '   ')).toHaveLength(3);
-  });
-  it('findet per Substring im Label', () => {
-    expect(filtereBefehle(liste, 'lage').map((x) => x.befehl.id)).toContain('modul:lagekarte');
-  });
-  it('findet per Schlagwort', () => {
-    expect(filtereBefehle(liste, 'tagebuch').map((x) => x.befehl.id)).toContain('modul:etb');
-  });
-  it('toleriert leichte Tippfehler (Fuzzy)', () => {
-    expect(filtereBefehle(liste, 'persanen').map((x) => x.befehl.id)).toContain('modul:personen');
-  });
+const ids = (befehle: Befehl[], suche: string) =>
+  filtereBefehle(befehle, suche).map((x) => x.befehl.id);
 
-  /**
-   * `includeScore` ist in fuse.js per Vorgabe AUS. Tragend ist der Größenvergleich, nicht die
-   * Formprüfung: `filtereBefehle` fängt ein fehlendes `score` mit `?? 0` ab, die Form bliebe also
-   * auch ohne die Option `number`.
-   */
-  it('reicht den Fuse-Score hoch, und der genaue Treffer trägt den kleineren', () => {
-    const treffer = filtereBefehle(rangKorpus, 'etb');
-    expect(treffer.map((t) => typeof t.score)).toEqual(['number', 'number']);
-    const score = new Map(treffer.map((t) => [t.befehl.id, t.score]));
-    expect(score.get('modul:etb')!).toBeLessThan(score.get('aktion:personen')!);
+describe('normalisiere', () => {
+  it('schreibt klein und Umlaute und ß um', () => {
+    expect(normalisiere('Kräfteübersicht')).toBe('kraefteuebersicht');
+    expect(normalisiere('Größe')).toBe('groesse');
+    expect(normalisiere('ÖFFNEN')).toBe('oeffnen');
   });
-
-  /**
-   * Warum {@link UNBEWERTET} genau 1 ist: fuse.js deckelt den Bitap-Score auf `threshold` (0,4),
-   * potenziert ihn aber mit `weight * norm`, und `norm` ist `1/sqrt(Tokenzahl)`. Bei langem Feld
-   * geht der Score gegen 1 (ein Tippfehler auf einem 400-Wort-Label liefert rund 0,97), bleibt
-   * aber strikt darunter. Die untere Schranke widerlegt jeden kleineren Wert, die obere belegt,
-   * dass 1 hält.
-   */
-  it('kommt bei langem Label nahe an 1 heran, bleibt aber strikt darunter', () => {
-    const rauschen = Array.from({ length: 400 }, (_, i) => `wort${i}`).join(' ');
-    const treffer = filtereBefehle([b('lang', `${rauschen} etb`)], 'etp');
-    expect(
-      treffer,
-      'Fuse findet das Label trotz Tippfehler — sonst prüft der Test nichts',
-    ).toHaveLength(1);
-    expect(treffer[0].score).toBeGreaterThan(0.9);
-    expect(treffer[0].score).toBeLessThan(UNBEWERTET);
+  it('nimmt andere Diakritika weg', () => {
+    expect(normalisiere('Café')).toBe('cafe');
   });
 });
 
 /**
- * Die Stufe ist der Präfixbonus, den Fuse nicht liefert. Blindfleck, bewusst: keine
- * Diakritika-Faltung ('einsaetze' gegen 'Einsätze' bleibt Stufe 3).
+ * Trefferregel (Spec `sprungpalette`, „Ein Treffer braucht Wortanfang oder Teilwort“): jedes
+ * Suchwort trifft einen Wortanfang oder, ab drei Zeichen, ein Teilwort; eine Buchstabenfolge
+ * trifft nicht.
  */
+describe('filtereBefehle', () => {
+  const korpus: Befehl[] = [
+    ...liste,
+    b('modul:kraefteuebersicht', 'Kräfteübersicht', ['Meldebild', 'Stärke']),
+    b('modul:uhs', 'Unfallhilfsstellen', ['BHP']),
+    b('aktion:etb', 'ETB-Eintrag schreiben', ['tagebuch', 'Neuer ETB-Eintrag'], 'schnellaktionen'),
+    b('aktion:gefahr', 'Gefahrengebiet zeichnen', ['gefahr', 'lagekarte'], 'schnellaktionen'),
+    b('nav:benutzer', 'Benutzerverwaltung', undefined, 'navigation'),
+    b('einstellung:dunkel', 'Dunkel', ['theme', 'hell', 'dunkel'], 'einstellungen'),
+    b('modul:fernmeldewesen', 'Fernmeldewesen', ['Funkplan, Skizze, Kommunikationsplan']),
+  ];
+
+  it('gibt bei leerer Suche alles zurück', () => {
+    expect(filtereBefehle(liste, '   ')).toHaveLength(3);
+  });
+  it('findet über den Labelanfang', () => {
+    expect(ids(liste, 'lage')).toEqual(['modul:lagekarte']);
+  });
+  it('findet über ein Schlagwort', () => {
+    expect(ids(liste, 'tagebuch')).toContain('modul:etb');
+  });
+  it('lässt eine bloße Buchstabenfolge nicht treffen', () => {
+    // „rtw“ steckt als Folge in „lageka(r)(t)e“, „gefahrengebie(t)“ usw.: Fuse traf das.
+    expect(ids(korpus, 'rtw')).toEqual([]);
+  });
+  it('lässt einen Tippfehler nicht treffen', () => {
+    expect(ids(liste, 'persanen')).toEqual([]);
+  });
+  it('trifft „funk“ über den Wortanfang, nicht „Dunkel“', () => {
+    expect(ids(korpus, 'funk')).toEqual(['modul:fernmeldewesen']);
+  });
+  it('setzt Umschrift und Umlaut gleich', () => {
+    expect(ids(korpus, 'kraefte')).toContain('modul:kraefteuebersicht');
+    expect(ids(korpus, 'kräfte')).toContain('modul:kraefteuebersicht');
+    expect(ids(korpus, 'staerke')).toContain('modul:kraefteuebersicht');
+  });
+  it('trifft ein Teilwort ab drei Zeichen', () => {
+    expect(ids(korpus, 'hilfsstelle')).toContain('modul:uhs');
+    expect(ids(korpus, 'ersicht')).toContain('modul:kraefteuebersicht');
+  });
+  it('trifft unter drei Zeichen nur am Wortanfang', () => {
+    expect(ids(korpus, 'ar')).toEqual([]);
+    expect(ids(korpus, 'bh')).toEqual(['modul:uhs']);
+  });
+  it('verlangt jedes Suchwort, auch über Label und Schlagworte verteilt', () => {
+    expect(ids(korpus, 'neuer etb')).toEqual(['aktion:etb']);
+    expect(ids(korpus, 'etb zeichnen')).toEqual([]);
+  });
+
+  /** Zweite Ordnungsachse: Label vor Schlagwort, ohne Fuse. */
+  it('bewertet einen Treffer im Label besser als einen über Schlagworte', () => {
+    const score = new Map(
+      filtereBefehle(korpus, 'tagebuch').map((t) => [t.befehl.id, t.score] as const),
+    );
+    const imLabel = filtereBefehle(korpus, 'etb').find((t) => t.befehl.id === 'modul:etb');
+    expect(imLabel?.score).toBe(0);
+    expect(score.get('modul:etb')).toBeGreaterThan(0);
+    expect(score.get('modul:etb')).toBeLessThan(UNBEWERTET);
+  });
+});
+
 describe('praefixStufe', () => {
   const lagekarte = b('modul:lagekarte', 'Lagekarte', ['karte', 'lage']);
 
@@ -103,7 +134,7 @@ describe('praefixStufe', () => {
     expect(praefixStufe(lagekarte, 'Lage')).toBe(1);
     expect(praefixStufe(b('a', 'Neue Person erfassen'), 'Person')).toBe(2);
     expect(praefixStufe(b('a', 'ETB', ['tagebuch']), 'tage')).toBe(2);
-    expect(praefixStufe(b('a', 'Personen'), 'persanen')).toBe(3);
+    expect(praefixStufe(b('a', 'Unfallhilfsstellen'), 'hilfsstelle')).toBe(3);
   });
 
   /**
@@ -114,6 +145,19 @@ describe('praefixStufe', () => {
     expect(praefixStufe(lagekarte, 'lagekarte')).toBe(0);
     expect(praefixStufe(lagekarte, 'LAGE')).toBe(1);
     expect(praefixStufe(b('a', 'Neuer ETB-Eintrag', ['Tagebuch']), 'tage')).toBe(2);
+  });
+
+  it('faltet Umlaute auf jeder Stufe', () => {
+    expect(praefixStufe(b('a', 'Kräfteübersicht'), 'kraefteuebersicht')).toBe(0);
+    expect(praefixStufe(b('a', 'Kräfteübersicht'), 'kraefte')).toBe(1);
+    expect(praefixStufe(b('a', 'Einsätze'), 'einsaetze')).toBe(0);
+  });
+
+  it('verlangt auf Stufe 2 für jedes Suchwort einen Wortanfang', () => {
+    expect(praefixStufe(b('a', 'ETB-Eintrag schreiben', ['Neuer ETB-Eintrag']), 'neuer etb')).toBe(
+      2,
+    );
+    expect(praefixStufe(b('a', 'ETB-Eintrag schreiben'), 'etb reiben')).toBe(3);
   });
 });
 
@@ -126,7 +170,10 @@ describe('textStufe', () => {
     expect(textStufe('Lagekarte', 'lagekarte')).toBe(0);
     expect(textStufe('Lagekarte', 'lage')).toBe(1);
     expect(textStufe('R-042 · Müller', 'müller')).toBe(2);
-    expect(textStufe('Personen', 'persanen')).toBe(3);
+    expect(textStufe('Personen', 'sonen')).toBe(3);
+  });
+  it('faltet Umlaute', () => {
+    expect(textStufe('R-042 · Müller', 'mueller')).toBe(2);
   });
   /** Ein leerer Begriff darf keine Stufe 1 erzeugen — `''.startsWith` ist immer wahr. */
   it('stuft einen leeren Begriff auf 3', () => {
@@ -136,12 +183,21 @@ describe('textStufe', () => {
 
 describe('ordneTreffer', () => {
   /**
-   * Der gruppenübergreifend beste Treffer steht vorn; ohne Score-Achse stünde das Rauschen der
-   * Schnellaktion vor dem genauen Modultreffer.
+   * Der gruppenübergreifend beste Treffer steht vorn: auf gleicher Stufe schlägt der Treffer im
+   * Label den über ein Schlagwort, auch wenn dessen Gruppe in der Startordnung vorn steht.
    */
   it('stellt den besseren Score vor die kuratierte Gruppenachse', () => {
+    const korpus: Befehl[] = [
+      b('schlag', 'ETB-Eintrag schreiben', ['Neuer Eintrag'], 'schnellaktionen'),
+      b('label', 'Neuer Eintrag', undefined, 'module'),
+    ];
+    const treffer = filtereBefehle(korpus, 'neuer');
+    expect(ordneTreffer(treffer, 'neuer').map((x) => x.id)).toEqual(['label', 'schlag']);
+  });
+
+  it('lässt beim Kürzel „etb“ nur das Modul treffen', () => {
     const treffer = filtereBefehle(rangKorpus, 'etb');
-    expect(ordneTreffer(treffer, 'etb').map((x) => x.id)).toEqual(['modul:etb', 'aktion:personen']);
+    expect(ordneTreffer(treffer, 'etb').map((x) => x.id)).toEqual(['modul:etb']);
   });
 
   /** Das AK selbst: die Stufe schlägt den Score, nicht umgekehrt. */
@@ -175,7 +231,7 @@ describe('ordneTreffer', () => {
   });
 
   /**
-   * Ein Treffer, der NICHT durch Fuse gelaufen ist, bringt seine Stufe selbst mit; sonst rechnete
+   * Ein Treffer, der NICHT durch `filtereBefehle` gelaufen ist, bringt seine Stufe selbst mit; sonst rechnete
    * `ordneTreffer` sie aus einem Label, das mit der Fundstelle nichts zu tun haben muss.
    */
   it('respektiert eine mitgelieferte Stufe, statt sie aus dem Label zu rechnen', () => {

@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import type { Einsatzart } from '../../api/types';
 import { isUebung } from '../../einsatz/einsatzart';
 import { fernsicht, type Farbrollen } from '../../theme/tokens';
-import { RAHMEN_EBENE, useRahmenObenStapel } from '../rahmenOben';
+import { RAHMEN_EBENE, RAHMEN_RANG, useRahmenObenStapel } from '../rahmenOben';
 import { schriftGroesse, schriftStil, useRollen } from './rollenwerte';
 
 /**
@@ -110,7 +110,10 @@ export function UebungsBand({
   const aktiv = isUebung(einsatz);
   const { rollen } = useRollen();
   // Die Quelle meldet sich nur bei einer klebenden Übung; sonst bleibt die Summe, wie sie war.
-  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(aktiv && klebend);
+  const { ref, oben } = useRahmenObenStapel<HTMLDivElement>(
+    aktiv && klebend,
+    RAHMEN_RANG.uebungsband,
+  );
   if (!aktiv && unbekannt && !einsatz?.einsatzart) {
     return (
       <div

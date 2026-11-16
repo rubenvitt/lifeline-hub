@@ -1,7 +1,7 @@
 ---
 titel: Einsatzabschnitte und Führungsorganisation
 gruppen: [fuehrung]
-reihenfolge: 420
+reihenfolge: 130
 quellen: [frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/pages/einsatzabschnitte/AbschnittDetail.tsx, frontend/src/pages/einsatzabschnitte/AbschnittAnlegenModal.tsx, frontend/src/pages/einsatzabschnitte/GliederungDrag.tsx, frontend/src/pages/einsatzabschnitte/VerschiebenDialog.tsx, frontend/src/pages/einsatzabschnitte/useNewGesture.ts, frontend/src/pages/einsatzabschnitte/gliederungDragKern.ts, frontend/src/components/organigramm/useGehaltenerBaum.ts, src/routes/einsatz_einheit.rs, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/einsatzabschnitte/fuehrungsorganisation.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/fuehrung/, src/routes/einsatzabschnitt.rs, src/einsatzabschnitt/mod.rs, src/fuehrung/, frontend/src/einsatz/einsatzleiter.ts, frontend/src/components/SprechgruppenPicker.tsx]
 ---
 
@@ -187,7 +187,7 @@ Rufname der eigenen Führungsstelle, sobald sie in den Einsatzdaten erfasst sind
 Einsatzleiter mit „seit“, wie er in „Einsatzdaten“ festgelegt ist (siehe
 [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Ist keiner festgelegt, steht dort „Leitung
 nicht erfasst“; die Rolle Einsatzleitung im „Zugriff“ macht niemanden zum Einsatzleiter. An der
-Wurzel steht keine Stärke; die Gesamtstärke zeigt das Meldebild.
+Wurzel steht keine Stärke; die Gesamtstärke zeigt die Kräfteübersicht.
 
 Daneben steht der Kasten „Stab“, sobald ein Mitglied ein Sachgebiet S1 bis S6 führt. Er nennt je
 Sachgebiet die Namen der Mitglieder, die es tragen, mehrere alphabetisch; ein Sachgebiet ohne

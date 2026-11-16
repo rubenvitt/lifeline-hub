@@ -454,7 +454,13 @@ describe('ChatPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Heraufstufen' }));
 
     await waitFor(() =>
-      expect(gesendet).toEqual({ typ: 'meldung', inhalt: 'Erste Lage', anhang_ids: [31] }),
+      expect(gesendet).toEqual({
+        typ: 'meldung',
+        inhalt: 'Erste Lage',
+        anhang_ids: [31],
+        // „Auch in den Meldungseingang“ ist vorgewählt: die Meldung entsteht mit (y3zh5ymv D8).
+        in_meldungseingang: true,
+      }),
     );
   });
 

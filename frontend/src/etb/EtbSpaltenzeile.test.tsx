@@ -16,6 +16,10 @@ import { passendeVermerke } from './EtbVermerke';
 import { ETB_SPALTEN_RASTER } from './etbSpalten';
 import { groessenstufen } from '../theme/tokens';
 
+// Der HEIC-Decoder (Worker + WASM) ist hier eine Attrappe (Muster `components/AnhangVorschau.test.tsx`).
+const heic = vi.hoisted(() => ({ dekodiere: vi.fn() }));
+vi.mock('../heic/dekodiereHeic', () => ({ dekodiereHeic: heic.dekodiere }));
+
 /**
  * Leseansicht des ETB (Change `kwc2yszv-etb-neuentwurf`, Spec `etb-zeitachse-darstellung`):
  * Spaltenzeile in kompakter Dichte ab `lg`, Vermerkspalte, „Vermerk <Stelle>“, eingeklappte lange
@@ -259,6 +263,62 @@ describe('Spaltenzeile in kompakter Dichte', () => {
       .getAllByRole('img')
       .find((i) => i.getAttribute('src')?.includes('fassung=grossansicht'));
     expect(gross).toHaveAttribute('src', '/api/einsaetze/1/etb/1/anhaenge/9?fassung=grossansicht');
+  });
+
+  describe('HEIC-Foto: Großansicht aus dem Zeilenmenü mit Gerätedekodierung (LLH-1887)', () => {
+    const heicEintrag = () =>
+      eintrag({
+        anhaenge: [
+          {
+            id: 9,
+            einsatz_id: 1,
+            dateiname: 'IMG_0412.HEIC',
+            mime: 'image/heic',
+            groesse: 2048,
+            hochgeladen_von: 1,
+            erstellt_at: '2026-05-23 10:00:00',
+          },
+        ],
+      });
+    beforeEach(() => {
+      let n = 0;
+      vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:heic-${++n}`);
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+      heic.dekodiere.mockReset();
+    });
+
+    it('zeigt die auf dem Gerät dekodierte Fassung, nie das Original', async () => {
+      heic.dekodiere.mockResolvedValue({ klein: new Blob(['k']), gross: new Blob(['g']) });
+      renderZeitachse({ eintraege: [heicEintrag()] });
+      const menue = await oeffneMenue(1);
+      await userEvent.click(
+        within(menue).getByRole('menuitem', { name: 'Vorschau: IMG_0412.HEIC' }),
+      );
+      const dialog = await screen.findByRole('dialog');
+      const quellen = within(dialog)
+        .getAllByRole('img')
+        .map((i) => i.getAttribute('src') ?? '');
+      // `gross` ist die zweite Object-URL (klein, dann gross).
+      expect(quellen).toContain('blob:heic-2');
+      expect(heic.dekodiere).toHaveBeenCalledWith('/api/einsaetze/1/etb/1/anhaenge/9');
+      expect([...quellen, ...heic.dekodiere.mock.calls.flat()].join()).not.toContain(
+        'fassung=original',
+      );
+    });
+
+    it('meldet einen Decoder-Fehler und öffnet keine leere Großansicht', async () => {
+      heic.dekodiere.mockRejectedValue(new Error('HEIC nicht dekodierbar'));
+      renderZeitachse({ eintraege: [heicEintrag()] });
+      const menue = await oeffneMenue(1);
+      await userEvent.click(
+        within(menue).getByRole('menuitem', { name: 'Vorschau: IMG_0412.HEIC' }),
+      );
+      expect(await screen.findByText('IMG_0412.HEIC: keine Vorschau möglich')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 
   it('Bedienbarer Verfasser: auch Lesende haben das ⋮ mit dem Verfasser, das Browsermenü bleibt', async () => {

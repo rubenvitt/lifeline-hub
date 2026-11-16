@@ -163,7 +163,7 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
       'Betroffene',
       'Betroffene',
       'Betroffene',
-      'Meldebild',
+      'Kräfteübersicht',
       'Gefahren',
       'Aufträge/Befehle',
       'Meldungen',

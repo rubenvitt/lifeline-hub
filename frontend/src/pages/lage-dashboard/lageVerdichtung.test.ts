@@ -386,17 +386,17 @@ describe('beurteilungHinweis (LLH-1090)', () => {
     expect(beurteilungHinweis([g(1, 'Nord', true)])).toBeNull();
   });
 
-  it('nennt bis zu zwei nicht beurteilte Gebiete mit Namen', () => {
+  it('nennt bis zu zwei unbestätigte Gebiete mit Namen', () => {
     expect(beurteilungHinweis([g(1, 'Hangrutsch Kirchberg'), g(2, 'Nord', true)])).toBe(
-      'Hangrutsch Kirchberg: nicht beurteilt',
+      'Hangrutsch Kirchberg: unbestätigt',
     );
     expect(beurteilungHinweis([g(1, 'Hangrutsch Kirchberg'), g(2, null)])).toBe(
-      'Hangrutsch Kirchberg: nicht beurteilt · Gefahrengebiet #2: nicht beurteilt',
+      'Hangrutsch Kirchberg: unbestätigt · Gefahrengebiet #2: unbestätigt',
     );
   });
 
   it('zählt ab drei', () => {
-    expect(beurteilungHinweis([g(1, 'A'), g(2, 'B'), g(3, 'C')])).toBe('3 Gebiete nicht beurteilt');
+    expect(beurteilungHinweis([g(1, 'A'), g(2, 'B'), g(3, 'C')])).toBe('3 Gebiete unbestätigt');
   });
 });
 

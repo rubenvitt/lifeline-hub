@@ -682,6 +682,50 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     expect(marke('Trage')).toBeInTheDocument();
   });
 
+  it('„Rückgängig“ in der gehaltenen Zeile ordnet den Posten wieder diesem Ort zu (LLH-1722)', async () => {
+    const user = userEvent.setup();
+    const { gesendet, neu } = await loeseUndGleicheAb(user, 'Trage', 2);
+    await user.click(
+      within(zeile('Trage')).getByRole('button', {
+        name: 'Rückgängig: Trage zurück an diesen Ort',
+      }),
+    );
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
+        { url: '/api/einsaetze/1/material/2', body: { uhs_id: 7 } },
+      ]),
+    );
+    neu({ posten: POSTEN });
+    expect(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' })).toBeEnabled();
+  });
+
+  it('„Rückgängig“ in der Zeile steht nicht an der Stelle des Lösen-Knopfs: zwei Tipps dort schicken nichts zurück (LLH-1722)', async () => {
+    const user = userEvent.setup();
+    const { gesendet } = await loeseUndGleicheAb(user, 'Trage', 2);
+    const rueck = within(zeile('Trage')).getByRole('button', {
+      name: 'Rückgängig: Trage zurück an diesen Ort',
+    });
+    expect(rueck).not.toBe(marke('Trage'));
+    expect(marke('Trage').contains(rueck)).toBe(false);
+    await user.click(marke('Trage'));
+    await user.click(marke('Trage'));
+    expect(gesendet).toHaveLength(1);
+  });
+
+  it('am beendeten Ort trägt die gehaltene Zeile kein „Rückgängig“ (LLH-1722)', async () => {
+    const user = userEvent.setup();
+    patchMitschnitt();
+    zeige({ sperrgrund: 'UHS aufgelöst' });
+    await user.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
+    await screen.findByRole('button', { name: 'Trage gelöst' });
+    expect(
+      within(zeile('Trage')).queryByRole('button', {
+        name: 'Rückgängig: Trage zurück an diesen Ort',
+      }),
+    ).toBeNull();
+  });
+
   it('der letzte Posten gelöst: kein Leertext über dem Platzhalter', async () => {
     const user = userEvent.setup();
     const { neu } = await loeseUndGleicheAb(user, 'Trage', 2);

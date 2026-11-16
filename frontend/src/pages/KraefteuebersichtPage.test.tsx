@@ -309,11 +309,11 @@ const zeile = (container: HTMLElement, schluessel: string) =>
   container.querySelector(`[data-row-key="${schluessel}"]`) as HTMLElement | null;
 
 describe('KraefteuebersichtPage — Seitenkopf', () => {
-  it('trägt den Titel „Meldebild" und die Stärke in BOS-Schreibweise als Mono-Meta', async () => {
+  it('trägt den Titel „Kräfteübersicht" und die Stärke in BOS-Schreibweise als Mono-Meta', async () => {
     mitEinheit();
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
-    expect(await screen.findByRole('heading', { name: 'Meldebild' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Kräfteübersicht' })).toBeInTheDocument();
     expect(
       await (await seitenkopf()).findByText('1 Einheit · Stärke 0/0/1//1'),
     ).toBeInTheDocument();
@@ -665,7 +665,17 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(screen.queryByRole('columnheader', { name: /Fahrzeuge und Personal/ })).toBeNull();
     const grund = (key: string) =>
       zeile(container, key)!.querySelector('[data-lfh="meldebild-toenungsgrund"]');
-    await waitFor(() => expect(grund('eh-21')).toHaveTextContent(/^1 Ausfall · keine Rückm\.$/));
+    const etiketten = (key: string) =>
+      Array.from(grund(key)?.querySelectorAll('[data-lfh="status-chip"]') ?? []).map((c) => [
+        c.textContent,
+        c.getAttribute('data-ton'),
+      ]);
+    await waitFor(() =>
+      expect(etiketten('eh-21')).toEqual([
+        ['1 Ausfall', 'alarm'],
+        ['keine Rückm.', 'alarm'],
+      ]),
+    );
     expect(grund('eh-20')).toBeNull();
   });
 
@@ -874,7 +884,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
   });
 
-  it('überfällig: Uhrzeit in achtung, Wort „überfällig", Zeile getönt', async () => {
+  it('überfällig: Uhrzeit in alarm, Wort „überfällig", Etikett mit Dauer, Zeile getönt', async () => {
     mitEinheit();
     vi.mocked(holeRueckmeldungen).mockResolvedValue({
       ...KEINE_RUECKMELDUNGEN,
@@ -888,7 +898,14 @@ describe('KraefteuebersichtPage — Raster', () => {
     });
     expect(c.textContent).toMatch(/\d{4}$/);
     expect(c.getAttribute('aria-label')).toMatch(/^Rückmeldung überfällig · /);
+    // LLH-1741: ein Zustand, eine Rolle — überfällig ist Alarm wie „keine“.
+    expect(c).toHaveAttribute('data-rolle', 'alarm');
     expect(zeile(container, 'eh-20')).toHaveClass('meldebild-problemzeile');
+    const etikett = zeile(container, 'eh-20')!.querySelector(
+      '[data-lfh="meldebild-toenungsgrund"] [data-lfh="status-chip"]',
+    );
+    expect(etikett).toHaveAttribute('data-ton', 'alarm');
+    expect(etikett?.textContent).toMatch(/^Rückm\. überfällig seit \d+ min$/);
   });
 
   it('„Ohne Einheit" trägt keine Rückmeldung und zählt nicht in die Kachel', async () => {
@@ -1259,7 +1276,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
           abschnitte: [
             expect.objectContaining({
               schluessel: 'text',
-              text: expect.stringContaining('# Kräftemeldebild'),
+              text: expect.stringContaining('# Kräfteübersicht'),
             }),
           ],
         }),
@@ -1438,12 +1455,12 @@ describe('KraefteuebersichtPage — Druck', () => {
     return kopf!;
   }
 
-  it('trägt den gemeinsamen Druckkopf: „Meldebild", Einsatz, Stand als DTG, Umfang und druckende Person', async () => {
+  it('trägt den gemeinsamen Druckkopf: „Kräfteübersicht", Einsatz, Stand als DTG, Umfang und druckende Person', async () => {
     mitEinheit();
     setup();
     const kopf = await druckkopf();
     expect(within(kopf).getByRole('heading', { level: 1, hidden: true })).toHaveTextContent(
-      'Meldebild',
+      'Kräfteübersicht',
     );
     expect(within(kopf).getByText('Testeinsatz')).toBeInTheDocument();
     // Der Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit.

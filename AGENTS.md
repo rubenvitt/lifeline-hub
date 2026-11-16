@@ -79,10 +79,10 @@ Seit 12.10.2026 liegen die Aufgaben in **Zunder** (`https://zunder.rubeen.dev`),
 ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen; die Skills
 `zunder-task-anlegen`, `dev-zunder-ausfuehren` und `dev-zunder-orchestrieren` verweisen hierher.
 
-- **Stellen:** Bereich **Lifeline Hub** (`c6748f09-39fb-500e-875b-e0e8a68ad2e6`). Das
-  Dev-Projekt **„Dev: Lifeline-Hub“** (`aafceb07-f9e9-5e8b-8ffe-a38afadd7067`, Repo
-  `rubenvitt/lifeline-hub`) ist das Entwicklungsboard, das **Feedbackboard**
-  (`c28e466d-5525-5777-95c9-5d52bcb4d0f8`) sammelt Feedback. Im Zweifel `list_structure`.
+- **Stellen:** Bereich **Meine Dev-Projekte** (`ztmeijtb2otuygda2xja3xss`). **„Dev: Lifeline-Hub“**
+  (`eetrio0ldw4fe3ayr30s713o`, Schlüssel `LLH`) ist das Entwicklungsboard, das **Feedbackboard**
+  (`ljbml1mwnbvh7itw7jtoe4u3`) sammelt Feedback, **„Lifeline Hub Eingang“**
+  (`ll81adjdlutewvbrtznn28qk`) die GitHub-Rückmeldungen. Im Zweifel `list_structure`.
 - **Werkzeuge:** Zunder-Connector des claude.ai-Kontos, kein `.mcp.json` im Repo. Skills nennen
   die Werkzeuge ohne Präfix (`update_task`); im lokalen CLI heißen sie
   `mcp__claude_ai_Zunder__…`.
@@ -93,10 +93,10 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
   `dev-zunder-ausfuehren`, Abschnitt „Board-Status mitführen“. Erledigte und verworfene
   Aufgaben fehlen nach 3 Tagen in `filter_tasks` (`include_closed: true`).
 - **Typen:** `aufgabe`, `bug`, `feature`. Keine Tags, Prioritäten, Zuständigen.
-- **Kennung einer Aufgabe:** die UUID. Branch `<typ>/<kurz>-<slug>` und Change-Name
-  `<kurz>-<slug>`, wobei `<kurz>` die ersten 8 Hex-Zeichen der UUID sind (Beispiel
-  `feat/60638201-release-flow`). Commit-Body und PR-Beschreibung tragen die Zeile
-  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<uuid>`. Ergebnisse stehen an der Aufgabe in
+- **Kennung einer Aufgabe:** die ID; `get_task` nimmt auch die Kennung `LLH-<n>`. Branch
+  `<typ>/<kurz>-<slug>` und Change-Name `<kurz>-<slug>`, `<kurz>` = erste 8 Zeichen der ID
+  (`feat/f24jkokr-rahmen-kleinteile`). Commit-Body und PR-Beschreibung tragen die Zeile
+  `Zunder: https://zunder.rubeen.dev/#/aufgabe/<id>`. Ergebnisse stehen an der Aufgabe in
   `branch`, `pr_url` und `plan`.
 - **Alte Kennungen `LFH-<n>`** in Commits, Changes und Doku bleiben gültig und werden nicht
   umgeschrieben. Zunder kennt sie nicht als Feld: die importierte Aufgabe per `search` nach dem

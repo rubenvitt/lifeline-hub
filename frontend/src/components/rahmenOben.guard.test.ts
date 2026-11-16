@@ -3,7 +3,7 @@
  * klebenden Rahmen.
  *
  * ── Warum ───────────────────────────────────────────────────────────────────────
- * Ab `md` klebt der Kopf am oberen Fensterrand, unter `md` im Störungsfall die Betriebszeile.
+ * Der Kopf klebt am oberen Fensterrand, unter `md` im Störungsfall die Betriebszeile darüber.
  * Ein weiteres Element mit `position: sticky; top: 0` im Dokument-Scroll klebte an derselben
  * Kante und läge unter dem Rahmen (der höher gestapelt ist): ein stehender Tabellenkopf, ein
  * Sammelbanner, eine Seitenleiste wären still verdeckt. Die Kante darunter ist
@@ -40,6 +40,8 @@ const RAHMEN = [
   'live/LiveStatusBanner.tsx',
   // Das Übungsband klebt selbst unter den übrigen Quellen und ist Quelle der Höhe (LLH-1725, D4).
   'components/instrument/Uebung.tsx',
+  // Die Alarmzone klebt unter dem Übungsband und ist Quelle der Höhe (LLH-1735, design.md D2).
+  'alarm/AlarmZone.tsx',
 ];
 
 /** Zeilen vor und nach einem `sticky`, in denen sein `top` steht. */
