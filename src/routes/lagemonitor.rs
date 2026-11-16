@@ -228,15 +228,18 @@ pub async fn lagebild(
         return Err(AppError::Forbidden);
     }
     let mut anzeige = verdichte(&state.pool, ctx.einsatz.id).await?;
-    anzeige.alarm = Some(
-        alarm(
-            &state.pool,
-            ctx.einsatz.id,
-            ctx.einsatz.org_id,
-            &anzeige.stand_at,
-        )
-        .await?,
-    );
+    let alarm = alarm(
+        &state.pool,
+        ctx.einsatz.id,
+        ctx.einsatz.org_id,
+        &anzeige.stand_at,
+    )
+    .await?;
+    // Kachel und Alarmzeile zeigen in einer Antwort dieselbe Zahl (Review LLH-1743): `verdichte`
+    // und `alarm` zählen in getrennten Lesevorgängen; dazwischen kann eine Sofortmeldung
+    // eingehen oder bestätigt werden. Es gilt die Zählung des Alarm-Blocks.
+    anzeige.sofortmeldungen_offen = alarm.sofort_offen;
+    anzeige.alarm = Some(alarm);
     Ok(Json(anzeige))
 }
 
