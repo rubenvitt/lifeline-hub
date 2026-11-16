@@ -14,7 +14,9 @@ import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { staerkeText } from '../../anzeige/staerke';
-import { monoStil, useRollen } from '../../components/instrument';
+import { monoStil, StatusChip, useRollen } from '../../components/instrument';
+import StatusTag from '../../components/StatusTag';
+import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 import HaengenderBaum, {
   baumZielStil,
@@ -43,6 +45,8 @@ import { useZeichenTheme } from '../../zeichen/useZeichenTheme';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import {
   baueFuehrungsorganisation,
+  countOhneLeitung,
+  ohneLeitungTeile,
   rendereFuehrungsorganisationMarkdown,
   wurzelFuehrungsstelle,
   type Fuehrungsorganisation,
@@ -67,6 +71,10 @@ import './organigrammPrint.css';
  *   Stabsstelle steht daneben, sobald ein Mitglied ein Sachgebiet S1–S6 führt (i6k6mzed, D7), ohne
  *   Modulfreigabe; ein Sachgebiet ohne Mitglied fehlt, ohne Mitglieder fehlt die Stabsstelle.
  * - **Keine Zahl an der Wurzel** (D4): die Einsatzstärke hat ihre Heimat im Meldebild (LFH-550).
+ * - **Lagezustand am Knoten, Lücken einmal oben** (LLH-1742, Herleitung
+ *   `openspec/changes/zo7em8le-organigramm-lagezustand/design.md`): der Abschnitt trägt seinen
+ *   Lagezustand in der Form der Gliederung; „Leitung nicht besetzt“ steht am Knoten leise, laut ist
+ *   nur die Sammelzeile über dem Baum.
  */
 
 const ZEICHEN_PX = 22;
@@ -278,17 +286,36 @@ function KnotenInhalt({
         </span>
       )}
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Link
-          to={ziel}
+        {/* Name und Lagezustand in einer Zeile: wo das Auge den Knoten zuerst trifft (LLH-1742). */}
+        <div
           style={{
-            ...baumZielStil(token),
-            color: rollen.bedienText,
-            fontWeight: knoten.art === 'abschnitt' ? 600 : 400,
-            overflowWrap: 'anywhere',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: token.marginXS,
           }}
         >
-          {knoten.name}
-        </Link>
+          <Link
+            to={ziel}
+            style={{
+              ...baumZielStil(token),
+              color: rollen.bedienText,
+              fontWeight: knoten.art === 'abschnitt' ? 600 : 400,
+              overflowWrap: 'anywhere',
+            }}
+          >
+            {knoten.name}
+          </Link>
+          {/* Dieselbe Form wie Gliederungsbaum und Überblick; nicht beurteilt = kein Etikett. */}
+          {knoten.art === 'abschnitt' && knoten.lagezustand && (
+            <span data-lfh="org-lagezustand" style={{ display: 'inline-flex' }}>
+              <StatusTag
+                darstellung={abschnittLagezustand[knoten.lagezustand]}
+                darstellungsart="rand"
+              />
+            </span>
+          )}
+        </div>
         <div
           style={{
             display: 'flex',
@@ -298,12 +325,10 @@ function KnotenInhalt({
           }}
         >
           <span style={meta}>{knoten.rufname ?? 'kein Rufname'}</span>
-          {knoten.leitung != null ? (
-            <span style={{ overflowWrap: 'anywhere' }}>{knoten.leitung}</span>
-          ) : (
-            // Als Wort, nicht nur als Farbe (WCAG 1.4.1).
-            <span style={{ color: rollen.achtungText }}>Leitung nicht besetzt</span>
-          )}
+          {/* Fehlt sie, steht das Wort leise da; die Warnung trägt die Sammelzeile (LLH-1742). */}
+          <span style={{ overflowWrap: 'anywhere' }}>
+            {knoten.leitung ?? 'Leitung nicht besetzt'}
+          </span>
           <span style={{ ...meta, color: rollen.text }}>{staerkeText(knoten.staerke)}</span>
         </div>
       </div>
@@ -335,6 +360,8 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   );
   const [zugeklappt, setZugeklappt] = useState<ReadonlySet<string>>(new Set());
   const klappbar = useMemo(() => klappbareSchluessel(org.wurzeln), [org]);
+  // Aus dem Live-Stand, nicht aus dem gehaltenen: die Zeile warnt über die Gliederung, wie sie ist.
+  const ohneLeitung = useMemo(() => ohneLeitungTeile(countOhneLeitung(org)), [org]);
 
   // Die Führungsstelle liest jeder mit dem Einsatz, ohne Modul (LFH-849); sie trägt den
   // Einsatzleiter (LFH-1199) und Bezeichnung und Rufname der Wurzel (LFH-1181). Gescheitert
@@ -459,6 +486,22 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
       {einheiten.zustand !== 'daten' && (
         <div style={{ color: rollen.gedaempft, marginBlockEnd: token.marginSM }}>
           {`Einheiten: ${ZUSTAND_GRUND[einheiten.zustand]}`}
+        </div>
+      )}
+      {ohneLeitung.length > 0 && (
+        // Gedruckt wie am Bildschirm; je Teil ein Chip, wie „ohne Leiter“ in der Gliederung.
+        <div
+          data-lfh="org-ohne-leitung"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: token.marginXS,
+            marginBlockEnd: token.marginSM,
+          }}
+        >
+          {ohneLeitung.map((teil) => (
+            <StatusChip key={teil} ton="achtung" wort={teil} />
+          ))}
         </div>
       )}
       <OrganigrammBild

@@ -8,6 +8,8 @@ import type { EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
 import { abschnittStaerken } from './abschnittStaerke';
 import {
   baueFuehrungsorganisation,
+  countOhneLeitung,
+  ohneLeitungText,
   rendereFuehrungsorganisationMarkdown,
   type OrgKnoten,
 } from './fuehrungsorganisation';
@@ -213,6 +215,69 @@ describe('baueFuehrungsorganisation — Knoteninhalt', () => {
   });
 });
 
+describe('baueFuehrungsorganisation — Lagezustand (LLH-1742)', () => {
+  it('trägt den gepflegten Lagezustand am Abschnitt, nicht beurteilt als null', () => {
+    const org = baueFuehrungsorganisation(
+      [
+        abschnitt(1, { lagezustand: 'planmaessig' }),
+        abschnitt(2, { ueber_abschnitt_id: 1, lagezustand: 'kritisch' }),
+        abschnitt(3),
+      ],
+      [einheit(10, { abschnitt_id: 1 })],
+    );
+    // Nur der eigene Zustand: der kritische Unterabschnitt färbt seinen Abschnitt nicht.
+    expect(finde(org.wurzeln, 'ab-1')).toMatchObject({ lagezustand: 'planmaessig' });
+    expect(finde(org.wurzeln, 'ab-2')).toMatchObject({ lagezustand: 'kritisch' });
+    expect(finde(org.wurzeln, 'ab-3')).toMatchObject({ lagezustand: null });
+    expect(finde(org.wurzeln, 'eh-10')).not.toHaveProperty('lagezustand');
+  });
+});
+
+describe('countOhneLeitung und ohneLeitungText (LLH-1742)', () => {
+  it('zählt Abschnitte und Einheiten getrennt, mit Sammelknoten und unterstellten Einheiten', () => {
+    const org = baueFuehrungsorganisation(
+      [
+        abschnitt(1, { leiter_name: 'Vitt' }),
+        abschnitt(2, { ueber_abschnitt_id: 1 }),
+        abschnitt(3),
+      ],
+      [
+        einheit(10, { abschnitt_id: 2, fuehrer_name: 'Muster' }),
+        einheit(11, { ueber_einheit_id: 10 }),
+        einheit(12, { abschnitt_id: 3 }),
+        einheit(20),
+      ],
+    );
+    const z = countOhneLeitung(org);
+    expect(z).toEqual({ abschnitte: 2, einheiten: 3 });
+    expect(ohneLeitungText(z)).toBe('2 Abschnitte ohne Leitung · 3 Einheiten ohne Führer');
+  });
+
+  it('schreibt Einzahl und lässt einen Teil mit 0 weg', () => {
+    expect(ohneLeitungText({ abschnitte: 1, einheiten: 0 })).toBe('1 Abschnitt ohne Leitung');
+    expect(ohneLeitungText({ abschnitte: 0, einheiten: 1 })).toBe('1 Einheit ohne Führer');
+    expect(ohneLeitungText({ abschnitte: 0, einheiten: 7 })).toBe('7 Einheiten ohne Führer');
+  });
+
+  it('gibt null, wenn alles besetzt ist', () => {
+    const org = baueFuehrungsorganisation(
+      [abschnitt(1, { leiter_name: 'Vitt' })],
+      [einheit(10, { abschnitt_id: 1, fuehrer_name: 'Muster' })],
+    );
+    expect(countOhneLeitung(org)).toEqual({ abschnitte: 0, einheiten: 0 });
+    expect(ohneLeitungText(countOhneLeitung(org))).toBeNull();
+    expect(ohneLeitungText(countOhneLeitung(baueFuehrungsorganisation([], [])))).toBeNull();
+  });
+
+  it('zählt bei fehlenden Einheiten nur die Abschnitte — nie „0 Einheiten“', () => {
+    const org = baueFuehrungsorganisation([abschnitt(1)], null);
+    const z = countOhneLeitung(org);
+    expect(z).toEqual({ abschnitte: 1, einheiten: null });
+    expect(ohneLeitungText(z)).toBe('1 Abschnitt ohne Leitung');
+    expect(ohneLeitungText({ abschnitte: 0, einheiten: null })).toBeNull();
+  });
+});
+
 describe('baueFuehrungsorganisation — Stärke aus derselben Rechnung wie der Gliederungsbaum', () => {
   const abschnitte = [
     abschnitt(1),
@@ -335,6 +400,47 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
     );
     // Personenbezogen: nie im Lagebericht.
     expect(md).not.toContain('GEHEIM');
+  });
+
+  it('trägt den Lagezustand an der Abschnittszeile und die Lücken unter „Gliederung“ (LLH-1742)', () => {
+    const md = rendereFuehrungsorganisationMarkdown(
+      baueFuehrungsorganisation(
+        [
+          abschnitt(1, { name: 'UHS Turnhalle', lagezustand: 'kritisch' }),
+          abschnitt(2, { name: 'EA Süd', leiter_name: 'Vitt' }),
+          abschnitt(3, { name: 'EA West' }),
+        ],
+        [einheit(10, { name: 'GW-San', abschnitt_id: 2, fuehrer_name: 'Muster' })],
+      ),
+      {
+        stand: '011200Okt26',
+        fuehrungsfunktionen: null,
+        einheitenZustand: 'daten',
+        einsatzleiter: OHNE_EL,
+        dtg: DTG,
+      },
+    );
+    expect(md).toContain('## Gliederung\n\n2 Abschnitte ohne Leitung\n\n- **UHS Turnhalle**');
+    expect(md).toContain(
+      '- **UHS Turnhalle** · Lage kritisch · kein Rufname · Leitung nicht besetzt · Stärke —',
+    );
+    // Nicht beurteilt: kein „Lage“.
+    expect(md).toContain('- **EA West** · kein Rufname · Leitung nicht besetzt · Stärke —');
+  });
+
+  it('schreibt ohne Lücken keine Sammelzeile (LLH-1742)', () => {
+    const md = rendereFuehrungsorganisationMarkdown(
+      baueFuehrungsorganisation([abschnitt(1, { name: 'EA Süd', leiter_name: 'Vitt' })], []),
+      {
+        stand: '011200Okt26',
+        fuehrungsfunktionen: null,
+        einheitenZustand: 'daten',
+        einsatzleiter: OHNE_EL,
+        dtg: DTG,
+      },
+    );
+    expect(md).toContain('## Gliederung\n\n- **EA Süd**');
+    expect(md).not.toContain('ohne Leitung');
   });
 
   it('nennt den erfassten Einsatzleiter statt der Lücke (LFH-1199)', () => {

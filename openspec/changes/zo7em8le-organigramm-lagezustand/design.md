@@ -57,7 +57,7 @@ Zustand dort, wo das Auge den Knoten zuerst trifft, und die Form ist dieselbe wi
 geht in die Sammelzeile.
 
 **D4 Zählung als reine Funktion.** `fuehrungsorganisation.ts` bekommt
-`zaehleOhneLeitung(org): { abschnitte: number; einheiten: number | null }`, rekursiv über alle
+`countOhneLeitung(org): { abschnitte: number; einheiten: number | null }`, rekursiv über alle
 Knoten einschließlich Sammelknoten und unterstellter Einheiten. `einheiten` ist `null`, wenn
 `org.einheitenFehlen` gilt: ein fehlender Bestand ist kein leerer (wie bei der Stärke). Dazu
 `ohneLeitungText(z): string | null` mit Einzahl/Mehrzahl („1 Abschnitt ohne Leitung“, „2 Abschnitte

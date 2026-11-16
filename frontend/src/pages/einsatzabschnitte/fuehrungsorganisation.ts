@@ -1,5 +1,12 @@
 import type { AbrufZustand } from '../../api/abrufZustand';
-import type { Einheit, Einsatzabschnitt, Fuehrungsstelle, Staerke } from '../../api/types';
+import type {
+  AbschnittLagezustand,
+  Einheit,
+  Einsatzabschnitt,
+  Fuehrungsstelle,
+  Staerke,
+} from '../../api/types';
+import { abschnittLagezustand } from '../../theme/statusFarben';
 import { staerkeText, summiereStaerke } from '../../anzeige/staerke';
 import type { FunktionZeile } from '../../fuehrung/besetzungAusMitgliedern';
 import { einsatzleiterMarkdown, type EinsatzleiterDarstellung } from '../../einsatz/einsatzleiter';
@@ -22,6 +29,9 @@ import { abschnittStaerken } from './abschnittStaerke';
  * - **Stärke aus derselben Rechnung wie der Gliederungsbaum** (`abschnittStaerken`, LFH-550). Die
  *   Wurzel „Einsatzleitung“ gehört nicht ins Modell: sie trägt keine Zahl, die Einsatzstärke hat
  *   ihre Heimat im Meldebild.
+ * - **Lagezustand am Abschnitt, Lücken gezählt** (LLH-1742): der gepflegte Zustand steht im Modell,
+ *   damit Bildschirm, Druck und Bericht dieselbe Angabe lesen; die fehlende Leitung zählt
+ *   {@link countOhneLeitung} einmal für die Sammelzeile über dem Baum.
  *
  * Herleitung: `openspec/changes/archive/2026-10-01-lfh-626-fuehrungsorganisation-skizze/design.md` (D2, D4).
  */
@@ -42,7 +52,11 @@ interface KnotenBasis {
 }
 
 export type OrgKnoten =
-  | (KnotenBasis & { art: 'abschnitt' })
+  | (KnotenBasis & {
+      art: 'abschnitt';
+      /** Der gepflegte Lagezustand (LFH-608); `null` = nicht beurteilt. Nur der eigene. */
+      lagezustand: AbschnittLagezustand | null;
+    })
   | (KnotenBasis & { art: 'einheit' })
   | { art: 'sammel'; key: 'sammel'; kinder: OrgKnoten[] };
 
@@ -132,6 +146,7 @@ export function baueFuehrungsorganisation(
       // Wie der Funkplan (LLH-1134): der Rufname der Abschnittsleitung vor der Kurzbezeichnung.
       rufname: a.rufname?.trim() || a.kurzbezeichnung || null,
       leitung: a.leiter_name ?? null,
+      lagezustand: a.lagezustand ?? null,
       // Derselbe Aufruf wie der Gliederungsbaum (`buildBaum`): inklusive aller Unterabschnitte.
       staerke: einheitenFehlen
         ? null
@@ -185,6 +200,48 @@ function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined
   return undefined;
 }
 
+// ── Fehlende Leitung (LLH-1742) ──────────────────────────────────────────────────────────────
+
+export interface OhneLeitung {
+  abschnitte: number;
+  /** `null`, wenn die Einheiten fehlen: ein fehlender Bestand ist kein leerer, also nie „0“. */
+  einheiten: number | null;
+}
+
+/** Zählt die Knoten ohne Leitung im ganzen Baum, Sammelknoten und unterstellte Einheiten mit. */
+export function countOhneLeitung(org: Fuehrungsorganisation): OhneLeitung {
+  let abschnitte = 0;
+  let einheiten = 0;
+  const besuche = (k: OrgKnoten) => {
+    if (k.art === 'abschnitt' && k.leitung == null) abschnitte++;
+    if (k.art === 'einheit' && k.leitung == null) einheiten++;
+    k.kinder.forEach(besuche);
+  };
+  org.wurzeln.forEach(besuche);
+  return { abschnitte, einheiten: org.einheitenFehlen ? null : einheiten };
+}
+
+/**
+ * Die Teile der Sammelzeile: „2 Abschnitte ohne Leitung“, „7 Einheiten ohne Führer“. Ein Teil mit
+ * 0 (oder ohne Zahl) entfällt. Der Bildschirm setzt je Teil einen Chip.
+ */
+export function ohneLeitungTeile(z: OhneLeitung): string[] {
+  return [
+    z.abschnitte > 0
+      ? `${z.abschnitte} ${z.abschnitte === 1 ? 'Abschnitt' : 'Abschnitte'} ohne Leitung`
+      : null,
+    z.einheiten != null && z.einheiten > 0
+      ? `${z.einheiten} ${z.einheiten === 1 ? 'Einheit' : 'Einheiten'} ohne Führer`
+      : null,
+  ].filter((t): t is string => t != null);
+}
+
+/** Die Sammelzeile als Text, wie sie im Bericht steht; `null`, wenn nichts fehlt. */
+export function ohneLeitungText(z: OhneLeitung): string | null {
+  const teile = ohneLeitungTeile(z);
+  return teile.length > 0 ? teile.join(' · ') : null;
+}
+
 // ── Markdown für den Lagebericht (D8) ──────────────────────────────────────────────────────────
 
 function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
@@ -194,6 +251,9 @@ function knotenMarkdown(k: OrgKnoten, tiefe: number): string[] {
       ? `${einzug}- Ohne Abschnitt`
       : `${einzug}- ${[
           `**${md(k.name)}**`,
+          ...(k.art === 'abschnitt' && k.lagezustand
+            ? [`Lage ${abschnittLagezustand[k.lagezustand].label}`]
+            : []),
           k.rufname != null ? `Rufname ${md(k.rufname)}` : 'kein Rufname',
           k.leitung != null ? `Leitung ${md(k.leitung)}` : 'Leitung nicht besetzt',
           `Stärke ${staerkeText(k.staerke)}`,
@@ -275,6 +335,8 @@ export function rendereFuehrungsorganisationMarkdown(
     org.wurzeln.length > 0
       ? org.wurzeln.flatMap((k) => knotenMarkdown(k, 0))
       : ['_(keine Abschnitte und keine Einheiten erfasst)_'];
+  // Dieselbe Sammelzeile wie über dem Baum (LLH-1742).
+  const ohneLeitung = ohneLeitungText(countOhneLeitung(org));
   return [
     '# Führungsorganisation',
     '',
@@ -293,6 +355,7 @@ export function rendereFuehrungsorganisationMarkdown(
     ...quellen,
     '## Gliederung',
     '',
+    ...(ohneLeitung ? [ohneLeitung, ''] : []),
     ...gliederung,
     '',
   ].join('\n');

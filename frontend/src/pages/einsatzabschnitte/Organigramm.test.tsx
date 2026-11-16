@@ -299,6 +299,62 @@ describe('OrganigrammBild — Knoten', () => {
   });
 });
 
+describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
+  function bildAus(abschnitte: Einsatzabschnitt[], einheiten: Einheit[]) {
+    return renderMitProviders(
+      <OrganigrammBild
+        einsatzId={1}
+        org={baueFuehrungsorganisation(abschnitte, einheiten)}
+        einsatzleiter={{ art: 'nicht-erfasst' }}
+        stab={[]}
+        zugeklappt={new Set()}
+        onUmschalten={vi.fn()}
+      />,
+    );
+  }
+  const knotenVon = (name: string) =>
+    screen.getByRole('link', { name }).closest('[data-lfh="org-knoten"]') as HTMLElement;
+  const lageTag = (knoten: HTMLElement) =>
+    knoten.querySelector('[data-lfh="org-lagezustand"] [data-rolle]') as HTMLElement | null;
+
+  it('zeigt den eigenen Lagezustand als Etikett am Abschnitt, nicht beurteilt ohne', () => {
+    bildAus(
+      [
+        abschnitt(1, { name: 'EA Nord', lagezustand: 'planmaessig' }),
+        abschnitt(2, { name: 'UHS Turnhalle', ueber_abschnitt_id: 1, lagezustand: 'kritisch' }),
+        abschnitt(3, { name: 'EA West' }),
+      ],
+      [einheit(10, { name: 'GW-San', abschnitt_id: 2 })],
+    );
+    const uhs = lageTag(knotenVon('UHS Turnhalle'));
+    expect(uhs).toHaveTextContent('kritisch');
+    expect(uhs).toHaveAttribute('data-rolle', 'alarm');
+    expect(uhs).toHaveAttribute('data-darstellung', 'rand');
+    // Nur der eigene Zustand: der kritische Unterabschnitt färbt seinen Abschnitt nicht.
+    expect(lageTag(knotenVon('EA Nord'))).toHaveTextContent('planmäßig');
+    expect(lageTag(knotenVon('EA West'))).toBeNull();
+    expect(lageTag(knotenVon('GW-San'))).toBeNull();
+  });
+
+  it('steht direkt am Namen, nicht in der Metazeile', () => {
+    bildAus([abschnitt(1, { name: 'UHS Turnhalle', lagezustand: 'kritisch' })], []);
+    const link = screen.getByRole('link', { name: 'UHS Turnhalle' });
+    const lage = knotenVon('UHS Turnhalle').querySelector('[data-lfh="org-lagezustand"]');
+    expect(link.parentElement).toBe(lage?.parentElement);
+  });
+
+  it('nennt „Leitung nicht besetzt“ gedämpft wie den Rufnamen, nicht in Achtungrolle', () => {
+    const { container } = bildAus([abschnitt(1, { name: 'EA West' })], []);
+    const knoten = knotenVon('EA West');
+    const wort = within(knoten).getByText('Leitung nicht besetzt');
+    const rufname = within(knoten).getByText('kein Rufname');
+    expect(getComputedStyle(wort).color).toBe(getComputedStyle(rufname).color);
+    // Keine eigene Farbe am Wort: es erbt die gedämpfte Metazeile.
+    expect(wort.style.color).toBe('');
+    expect(container.querySelector('[data-lfh="status-chip"]')).toBeNull();
+  });
+});
+
 describe('OrganigrammBild — Klappen', () => {
   it('trägt den Zustand am Bedienziel und verbirgt beim Zuklappen nur die Kinder', async () => {
     const { onUmschalten, rerender } = bild();
@@ -453,6 +509,86 @@ describe('Organigramm — Klappzustand im Container', () => {
       .getByRole('link', { name: 'EA Nord' })
       .closest('[data-lfh="org-knoten"]') as HTMLElement;
     expect(within(knoten).getByText('—')).toBeInTheDocument();
+  });
+});
+
+describe('Organigramm — Sammelzeile der fehlenden Leitung (LLH-1742)', () => {
+  beforeEach(() => {
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ stab: { sichtbar: false } }),
+    );
+    vi.mocked(ladeMitglieder).mockReset().mockResolvedValue([]);
+  });
+
+  const zeile = (c: HTMLElement) =>
+    c.querySelector('[data-lfh="org-ohne-leitung"]') as HTMLElement | null;
+
+  it('zählt Abschnitte ohne Leitung und Einheiten ohne Führer getrennt, in Achtungrolle', () => {
+    const { container } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[...ABSCHNITTE, abschnitt(3, { name: 'EA West' })]}
+        einheiten={daten([
+          ...EINHEITEN,
+          einheit(11, { name: 'Trupp', abschnitt_id: 3 }),
+          einheit(12, { name: 'Lose' }),
+        ])}
+      />,
+    );
+    const z = zeile(container)!;
+    expect(z).toHaveTextContent('2 Abschnitte ohne Leitung');
+    expect(z).toHaveTextContent('2 Einheiten ohne Führer');
+    const chips = z.querySelectorAll('[data-lfh="status-chip"]');
+    expect([...chips].map((c) => c.getAttribute('data-ton'))).toEqual(['achtung', 'achtung']);
+    // Über dem Baum, nicht im Kopf und nicht im Baum; gedruckt wird sie mit.
+    const baum = screen.getByRole('region', { name: 'Organigramm' });
+    expect(baum.contains(z)).toBe(false);
+    expect(z.compareDocumentPosition(baum) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(z.closest('.organigramm-no-print')).toBeNull();
+  });
+
+  it('fehlt, wenn alles besetzt ist', () => {
+    const { container } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[abschnitt(1, { name: 'EA Nord', leiter_name: 'Anna Leiter' })]}
+        einheiten={daten([einheit(10, { abschnitt_id: 1, fuehrer_name: 'Bernd Führer' })])}
+      />,
+    );
+    expect(zeile(container)).toBeNull();
+  });
+
+  it('zählt bei fehlenden Einheiten nur die Abschnitte, ohne „0“', () => {
+    const { container } = renderMitProviders(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={ABSCHNITTE}
+        einheiten={{ zustand: 'fehler', daten: [] }}
+      />,
+    );
+    expect(zeile(container)!.textContent).toBe('1 Abschnitt ohne Leitung');
+  });
+
+  it('zeigt einen neuen Lagezustand sofort, auch wenn die Schleuse hält', () => {
+    const { rerender } = renderMitProviders(
+      <Organigramm einsatz={EINSATZ} abschnitte={ABSCHNITTE} einheiten={daten(EINHEITEN)} />,
+    );
+    fireEvent.pointerEnter(screen.getByRole('region', { name: 'Organigramm' }), {
+      pointerType: 'mouse',
+    });
+    expect(screen.getByText('Live pausiert')).toBeInTheDocument();
+    rerender(
+      <Organigramm
+        einsatz={EINSATZ}
+        abschnitte={[ABSCHNITTE[0], { ...ABSCHNITTE[1], lagezustand: 'kritisch' }]}
+        einheiten={daten(EINHEITEN)}
+      />,
+    );
+    const deich = screen
+      .getByRole('link', { name: 'UA Deich' })
+      .closest('[data-lfh="org-knoten"]') as HTMLElement;
+    expect(deich.querySelector('[data-lfh="org-lagezustand"]')).toHaveTextContent('kritisch');
+    expect(screen.queryByRole('button', { name: /anzeigen/ })).toBeNull();
   });
 });
 

@@ -2,29 +2,29 @@
 
 ## 1. Modell: Lagezustand und Zählung (`fuehrungsorganisation.ts`)
 
-- [ ] 1.1 Abschnittsknoten tragen `lagezustand` (D1); Test in `fuehrungsorganisation.test.ts`: ein
+- [x] 1.1 Abschnittsknoten tragen `lagezustand` (D1); Test in `fuehrungsorganisation.test.ts`: ein
   kritischer Abschnitt ergibt `lagezustand: 'kritisch'`, ein nicht beurteilter `null`, ein
   Unterabschnitt behält seinen eigenen Zustand
-- [ ] 1.2 `zaehleOhneLeitung` und `ohneLeitungText` (D4); Tests: Abschnitte und Einheiten getrennt,
+- [x] 1.2 `countOhneLeitung` und `ohneLeitungText` (D4); Tests: Abschnitte und Einheiten getrennt,
   Sammelknoten und unterstellte Einheiten gezählt, Einzahl/Mehrzahl, Teil mit 0 entfällt, alles
   besetzt → `null`, Einheiten fehlen → nur Abschnitte und kein „0“
 
 ## 2. Bericht (`rendereFuehrungsorganisationMarkdown`)
 
-- [ ] 2.1 „Lage <Zustand>“ an der Abschnittszeile und die Sammelzeile unter „Gliederung“ (D6);
+- [x] 2.1 „Lage <Zustand>“ an der Abschnittszeile und die Sammelzeile unter „Gliederung“ (D6);
   Tests: Szenario „Übernahme mit Lagezustand und Lücken“, nicht beurteilter Abschnitt ohne
   „Lage“, alles besetzt ohne Sammelzeile
 
 ## 3. Bildschirm und Druck (`Organigramm.tsx`)
 
-- [ ] 3.1 Lagezustandsetikett am Abschnittsknoten (D2); Test in `Organigramm.test.tsx`: „kritisch“
+- [x] 3.1 Lagezustandsetikett am Abschnittsknoten (D2); Test in `Organigramm.test.tsx`: „kritisch“
   am Knoten der UHS Turnhalle, kein Etikett an einem nicht beurteilten Abschnitt und an Einheiten
-- [ ] 3.2 „Leitung nicht besetzt“ gedämpft statt Achtungrolle (D3); Test: das Wort steht da und
+- [x] 3.2 „Leitung nicht besetzt“ gedämpft statt Achtungrolle (D3); Test: das Wort steht da und
   trägt nicht die Achtungfarbe
-- [ ] 3.3 Sammelzeile über dem Baum aus dem Live-Stand, druckbar (D5); Tests: Text bei Lücken,
+- [x] 3.3 Sammelzeile über dem Baum aus dem Live-Stand, druckbar (D5); Tests: Text bei Lücken,
   keine Zeile bei voller Besetzung, nur Abschnitte bei nicht geladenen Einheiten, Container ohne
   `organigramm-no-print`
-- [ ] 3.4 Live bei gehaltener Struktur: Test, dass eine Zustandsänderung bei Zeiger über dem
+- [x] 3.4 Live bei gehaltener Struktur: Test, dass eine Zustandsänderung bei Zeiger über dem
   Organigramm ohne Sammelbanner am Knoten erscheint (Szenario „Zustand ändert sich, während der
   Zeiger über dem Organigramm liegt“)
 
