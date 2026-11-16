@@ -9,7 +9,7 @@
   Sammelknoten und unterstellte Einheiten gezählt, Einzahl/Mehrzahl, Teil mit 0 entfällt, alles
   besetzt → `null`, Einheiten fehlen → nur Abschnitte und kein „0“
 
-## 2. Bericht (`rendereFuehrungsorganisationMarkdown`)
+## 2. Bericht (`renderFuehrungsorganisationMarkdown`)
 
 - [x] 2.1 „Lage <Zustand>“ an der Abschnittszeile und die Sammelzeile unter „Gliederung“ (D6);
   Tests: Szenario „Übernahme mit Lagezustand und Lücken“, nicht beurteilter Abschnitt ohne

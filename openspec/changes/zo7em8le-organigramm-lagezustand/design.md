@@ -3,8 +3,8 @@
 ## Context
 
 Das Organigramm (`frontend/src/pages/einsatzabschnitte/Organigramm.tsx`) liest ein Modell, das
-`fuehrungsorganisation.ts:baueFuehrungsorganisation` rein aus Abschnitten und Einheiten ableitet.
-Bildschirm, Druck und Lagebericht-Markdown (`rendereFuehrungsorganisationMarkdown`) lesen dieses
+`fuehrungsorganisation.ts:buildFuehrungsorganisation` rein aus Abschnitten und Einheiten ableitet.
+Bildschirm, Druck und Lagebericht-Markdown (`renderFuehrungsorganisationMarkdown`) lesen dieses
 eine Modell. Der Knoten (`OrgKnoten`) kennt heute keinen Lagezustand, obwohl der Abschnitt ihn
 trägt (`Einsatzabschnitt.lagezustand`, LFH-608). „Leitung nicht besetzt“ steht in
 `rollen.achtungText`, an Abschnitten wie an Einheiten.

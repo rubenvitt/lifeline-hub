@@ -67,7 +67,7 @@ export interface Fuehrungsorganisation {
   einheitenFehlen: boolean;
 }
 
-function gruppiere<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T[]> {
+function groupBy<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T[]> {
   const m = new Map<K, T[]>();
   for (const x of liste) {
     const k = schluessel(x);
@@ -82,7 +82,7 @@ function gruppiere<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T
  * @param einheiten `null`, wenn die Einheiten nicht vorliegen — ein fehlender Bestand ist kein
  *   leerer.
  */
-export function baueFuehrungsorganisation(
+export function buildFuehrungsorganisation(
   abschnitte: readonly Einsatzabschnitt[],
   einheiten: readonly Einheit[] | null,
 ): Fuehrungsorganisation {
@@ -94,10 +94,7 @@ export function baueFuehrungsorganisation(
   const einheitIds = new Set(alleEinheiten.map((e) => e.id));
   const istUntereinheit = (e: Einheit) =>
     e.ueber_einheit_id != null && einheitIds.has(e.ueber_einheit_id);
-  const untereinheiten = gruppiere(
-    alleEinheiten.filter(istUntereinheit),
-    (e) => e.ueber_einheit_id!,
-  );
+  const untereinheiten = groupBy(alleEinheiten.filter(istUntereinheit), (e) => e.ueber_einheit_id!);
 
   const einheitKnoten = (e: Einheit): OrgKnoten | null => {
     const key = `eh-${e.id}`;
@@ -117,19 +114,19 @@ export function baueFuehrungsorganisation(
         fachaufgabe: e.tz_fachaufgabe,
         organisation: e.tz_organisation,
       }),
-      kinder: knotenAus(untereinheiten.get(e.id) ?? [], einheitKnoten),
+      kinder: knotenFrom(untereinheiten.get(e.id) ?? [], einheitKnoten),
     };
   };
 
   const abschnittIds = new Set(abschnitte.map((a) => a.id));
   const istUnterabschnitt = (a: Einsatzabschnitt) =>
     a.ueber_abschnitt_id != null && abschnittIds.has(a.ueber_abschnitt_id);
-  const unterabschnitte = gruppiere(
+  const unterabschnitte = groupBy(
     abschnitte.filter(istUnterabschnitt),
     (a) => a.ueber_abschnitt_id!,
   );
   const obersteEinheiten = alleEinheiten.filter((e) => !istUntereinheit(e));
-  const einheitenJeAbschnitt = gruppiere(
+  const einheitenJeAbschnitt = groupBy(
     obersteEinheiten.filter((e) => e.abschnitt_id != null && abschnittIds.has(e.abschnitt_id)),
     (e) => e.abschnitt_id!,
   );
@@ -157,20 +154,20 @@ export function baueFuehrungsorganisation(
         organisation: a.tz_organisation,
       }),
       kinder: [
-        ...knotenAus(unterabschnitte.get(a.id) ?? [], abschnittKnoten),
-        ...knotenAus(einheitenJeAbschnitt.get(a.id) ?? [], einheitKnoten),
+        ...knotenFrom(unterabschnitte.get(a.id) ?? [], abschnittKnoten),
+        ...knotenFrom(einheitenJeAbschnitt.get(a.id) ?? [], einheitKnoten),
       ],
     };
   };
 
-  const wurzeln = knotenAus(
+  const wurzeln = knotenFrom(
     abschnitte.filter((a) => !istUnterabschnitt(a)),
     abschnittKnoten,
   );
   // Ein Ring aus Abschnitten hat keine Wurzel; seine Mitglieder kommen sonst nie vor.
-  wurzeln.push(...knotenAus(abschnitte, abschnittKnoten));
+  wurzeln.push(...knotenFrom(abschnitte, abschnittKnoten));
 
-  const heimatlos = knotenAus(
+  const heimatlos = knotenFrom(
     obersteEinheiten.filter((e) => e.abschnitt_id == null || !abschnittIds.has(e.abschnitt_id)),
     einheitKnoten,
   );
@@ -179,7 +176,7 @@ export function baueFuehrungsorganisation(
     if (gesehen.has(`eh-${e.id}`)) continue;
     const k = einheitKnoten(e);
     if (!k) continue;
-    const heimat = e.abschnitt_id != null ? finde(wurzeln, `ab-${e.abschnitt_id}`) : undefined;
+    const heimat = e.abschnitt_id != null ? findKnoten(wurzeln, `ab-${e.abschnitt_id}`) : undefined;
     (heimat ? heimat.kinder : heimatlos).push(k);
   }
   if (heimatlos.length > 0) wurzeln.push({ art: 'sammel', key: 'sammel', kinder: heimatlos });
@@ -187,14 +184,14 @@ export function baueFuehrungsorganisation(
   return { wurzeln, einheitenFehlen };
 }
 
-function knotenAus<T>(liste: readonly T[], bau: (x: T) => OrgKnoten | null): OrgKnoten[] {
+function knotenFrom<T>(liste: readonly T[], bau: (x: T) => OrgKnoten | null): OrgKnoten[] {
   return liste.map(bau).filter((k): k is OrgKnoten => k != null);
 }
 
-function finde(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined {
+function findKnoten(knoten: readonly OrgKnoten[], key: string): OrgKnoten | undefined {
   for (const k of knoten) {
     if (k.key === key) return k;
-    const t = finde(k.kinder, key);
+    const t = findKnoten(k.kinder, key);
     if (t) return t;
   }
   return undefined;
@@ -286,7 +283,7 @@ export function wurzelFuehrungsstelle(
  * `md()`: im Bericht stehen sie als Text, nie als Auszeichnung. Telefon führt das Organigramm nicht,
  * also auch nicht hier.
  */
-export function rendereFuehrungsorganisationMarkdown(
+export function renderFuehrungsorganisationMarkdown(
   org: Fuehrungsorganisation,
   opts: {
     stand: string;

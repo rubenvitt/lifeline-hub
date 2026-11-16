@@ -44,10 +44,10 @@ import EinsatzZeichen from '../../zeichen/EinsatzZeichen';
 import { useZeichenTheme } from '../../zeichen/useZeichenTheme';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import {
-  baueFuehrungsorganisation,
+  buildFuehrungsorganisation,
   countOhneLeitung,
   ohneLeitungTeile,
-  rendereFuehrungsorganisationMarkdown,
+  renderFuehrungsorganisationMarkdown,
   wurzelFuehrungsstelle,
   type Fuehrungsorganisation,
   type OrgKnoten,
@@ -385,7 +385,10 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
   const { konventionen } = useAnzeigeKonventionen();
   const org = useMemo(
     () =>
-      baueFuehrungsorganisation(abschnitte, einheiten.zustand === 'daten' ? einheiten.daten : null),
+      buildFuehrungsorganisation(
+        abschnitte,
+        einheiten.zustand === 'daten' ? einheiten.daten : null,
+      ),
     [abschnitte, einheiten],
   );
   const [zugeklappt, setZugeklappt] = useState<ReadonlySet<string>>(new Set());
@@ -440,7 +443,7 @@ export default function Organigramm({ einsatz, abschnitte, einheiten, datenstand
         abschnitte: [
           {
             schluessel: 'text',
-            text: rendereFuehrungsorganisationMarkdown(org, {
+            text: renderFuehrungsorganisationMarkdown(org, {
               stand,
               fuehrungsfunktionen: mitgliederQuery.data
                 ? fuehrungsfunktionZeilen(mitgliederQuery.data)

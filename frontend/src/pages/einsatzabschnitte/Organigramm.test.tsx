@@ -19,7 +19,7 @@ import { AnzeigeKonventionenProvider } from '../../anzeige/AnzeigeKonventionenCo
 import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { antdToken, dichten, farbenDunkel } from '../../theme/tokens';
-import { baueFuehrungsorganisation } from './fuehrungsorganisation';
+import { buildFuehrungsorganisation } from './fuehrungsorganisation';
 import { contrastSurface } from '@einsatzzeichen/core/blocks';
 import { ConfigProvider, theme } from 'antd';
 import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
@@ -110,7 +110,7 @@ function bild(
   onUmschalten = vi.fn(),
   einsatzleiter: EinsatzleiterDarstellung = { art: 'nicht-erfasst' },
 ) {
-  const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
+  const org = buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
   return {
     onUmschalten,
     ...renderMitProviders(
@@ -140,7 +140,7 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
-        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        org={buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
         einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={[]}
         fuehrungsstelle={{ bezeichnung: 'ELW 2 Musterstadt', rufname: 'Florian Musterstadt 10/1' }}
@@ -158,7 +158,7 @@ describe('OrganigrammBild — Einsatzleitung', () => {
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
-        org={baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
+        org={buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN)}
         einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={[]}
         fuehrungsstelle={{ bezeichnung: null, rufname: 'Florian 10/1' }}
@@ -222,7 +222,7 @@ describe('OrganigrammBild — Knoten', () => {
   });
 
   it('zeigt „—“ statt einer Stärke, wenn einem Abschnitt keine Einheit zugeordnet ist', () => {
-    const org = baueFuehrungsorganisation([abschnitt(5, { name: 'Leer' })], []);
+    const org = buildFuehrungsorganisation([abschnitt(5, { name: 'Leer' })], []);
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
@@ -251,7 +251,7 @@ describe('OrganigrammBild — Knoten', () => {
   // hinterlegt das Render-Theme `dark` jede Kontur hell, ohne Fläche dahinter; am Tag keins.
   it('zeichnet nachts jedes Zeichen mit dem Theme `dark`, am Tag ohne, nie mit Fläche dahinter', () => {
     const hinterlegung = `[stroke="${contrastSurface(ZEICHEN_THEME_DUNKEL)}"]`;
-    const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
+    const org = buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
     const { container, unmount } = renderMitProviders(
       <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
         <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
@@ -283,7 +283,7 @@ describe('OrganigrammBild — Knoten', () => {
   });
 
   it('stellt Einheiten ohne Abschnitt unter „Ohne Abschnitt“', () => {
-    const org = baueFuehrungsorganisation(ABSCHNITTE, [einheit(20, { name: 'Lose Gruppe' })]);
+    const org = buildFuehrungsorganisation(ABSCHNITTE, [einheit(20, { name: 'Lose Gruppe' })]);
     renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
@@ -304,7 +304,7 @@ describe('OrganigrammBild — Lagezustand und Leitung (LLH-1742)', () => {
     return renderMitProviders(
       <OrganigrammBild
         einsatzId={1}
-        org={baueFuehrungsorganisation(abschnitte, einheiten)}
+        org={buildFuehrungsorganisation(abschnitte, einheiten)}
         einsatzleiter={{ art: 'nicht-erfasst' }}
         stab={[]}
         zugeklappt={new Set()}
@@ -365,7 +365,7 @@ describe('OrganigrammBild — Klappen', () => {
     await userEvent.click(knopf);
     expect(onUmschalten).toHaveBeenCalledWith('ab-1');
 
-    const org = baueFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
+    const org = buildFuehrungsorganisation(ABSCHNITTE, EINHEITEN);
     rerender(
       <OrganigrammBild
         einsatzId={1}
