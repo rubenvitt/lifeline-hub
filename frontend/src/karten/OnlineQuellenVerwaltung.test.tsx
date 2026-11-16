@@ -541,9 +541,8 @@ describe('OnlineQuellenVerwaltung · Spaltenschalter', () => {
     const { container } = render();
     await screen.findByText('OpenStreetMap');
     expect(kopf(container)).toEqual(['Name', 'Typ', 'Sortierung', 'Aktiv', 'Aktionen']);
-    expect(
-      screen.getByRole('button', { name: 'Spalten · 2 ausgeblendet — Online-Quellen' }),
-    ).toBeInTheDocument();
+    // Nach Breite verborgen ist Vorgabe: ohne eigene Wahl kein Zähler (LLH-1790).
+    expect(screen.getByRole('button', { name: 'Spalten — Online-Quellen' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /^Spalten/ }));
     await userEvent.click(
