@@ -1,0 +1,245 @@
+import { Popover } from 'antd';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { Link } from 'react-router';
+import { schrift } from '../../theme/tokens';
+import type { AlarmEintrag, WasBrennt } from '../../lage/wasBrennt';
+import { useRollen } from './rollenwerte';
+import { statusFlaeche } from './statusFlaeche';
+
+/**
+ * AlarmZeile „Was brennt“ (LLH-1743, Spec `lage-alarmzeile`, design.md D3; Regel
+ * „Dashboard-Baukasten“, `frontend/AGENTS.md`): das erste Element unter dem Seitenkopf von
+ * Überblick, Lagebild und Lagemonitor. Der Baustein ordnet nur an; Einträge, Folge und Wortlaut
+ * kommen aus `lage/wasBrennt.ts`.
+ *
+ * - **Feste Höhe** in jeder Lage (Spec „Feste Höhe ohne Sprung“): eine Zeile, was nicht passt,
+ *   steht als „+n“; der Knopf zeigt alle Einträge als Liste. Kein Ton, kein Blinken, kein
+ *   Verschieben des Inhalts darunter (Alarmbudget, „Live-Updates springen nicht“).
+ * - **Ruhe nur bei vollständigen Quellen:** „Nichts brennt“ nur bei `stand: 'vollstaendig'`;
+ *   beim Laden „—“, mit gescheiterter Quelle „Stand unvollständig“ samt Grund.
+ * - **Rolle und Wort:** Alarm- und Achtungsfläche aus {@link statusFlaeche}; das Wort im Eintrag ist
+ *   der zweite Kanal zur Farbe. `role="status"` (höflich), denn `alert` gehört der Alarmzone.
+ * - **`gross`** für den Lagemonitor: 28 px, ohne Bedienung und ohne Links.
+ */
+
+/** Schriftgröße der Zeile: mindestens 16 px (Spec), am Monitor die Großbild-Stufe 28 px. */
+export const ALARMZEILE_SCHRIFT = { normal: 16, gross: 28 } as const;
+/** Feste Höhe der Zeile je Größe. */
+export const ALARMZEILE_HOEHE = { normal: 40, gross: 64 } as const;
+
+const ABSTAND = { normal: 6, gross: 12 } as const;
+
+interface AlarmZeileProps {
+  daten: Pick<WasBrennt, 'eintraege' | 'stand' | 'fehlend'>;
+  /** Sprungziel je Eintrag; `undefined` = ohne Link. Am Monitor weggelassen. */
+  ziel?: (e: AlarmEintrag) => string | undefined;
+  groesse?: 'normal' | 'gross';
+}
+
+/** Wie viele Einträge passen neben „+n“ in die Breite? Gemessen, nie gerechnet. */
+function passend(breite: number, eintragsBreiten: number[], plusBreite: number, abstand: number) {
+  const alle = eintragsBreiten.reduce((n, b) => n + b + abstand, 0);
+  if (breite <= 0 || alle <= breite) return eintragsBreiten.length;
+  let belegt = plusBreite;
+  let anzahl = 0;
+  for (const b of eintragsBreiten) {
+    if (belegt + b + abstand > breite) break;
+    belegt += b + abstand;
+    anzahl += 1;
+  }
+  return anzahl;
+}
+
+export default function AlarmZeile({ daten, ziel, groesse = 'normal' }: AlarmZeileProps) {
+  const { rollen } = useRollen();
+  const gross = groesse === 'gross';
+  const fontSize = ALARMZEILE_SCHRIFT[groesse];
+  const hoehe = ALARMZEILE_HOEHE[groesse];
+  const abstand = ABSTAND[groesse];
+  const { eintraege, stand, fehlend } = daten;
+
+  const reiheRef = useRef<HTMLDivElement>(null);
+  const messRef = useRef<HTMLDivElement>(null);
+  const [sichtbar, setSichtbar] = useState(eintraege.length);
+  const schluessel = eintraege.map((e) => e.text).join('|');
+
+  useLayoutEffect(() => {
+    const reihe = reiheRef.current;
+    const mess = messRef.current;
+    if (!reihe || !mess) return;
+    const messen = () => {
+      const kinder = Array.from(mess.children) as HTMLElement[];
+      const plus = kinder.pop();
+      setSichtbar(
+        passend(
+          reihe.clientWidth,
+          kinder.map((k) => k.offsetWidth),
+          (plus?.offsetWidth ?? 0) + abstand,
+          abstand,
+        ),
+      );
+    };
+    messen();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(messen);
+    ro.observe(reihe);
+    return () => ro.disconnect();
+  }, [schluessel, abstand]);
+
+  const eintragStil = (e: AlarmEintrag): CSSProperties => {
+    const f = statusFlaeche(rollen, e.rolle);
+    return {
+      display: 'inline-flex',
+      alignItems: 'center',
+      flex: '0 0 auto',
+      height: hoehe - 2 * abstand,
+      padding: `0 ${gross ? 16 : 10}px`,
+      background: f.grund,
+      color: f.text,
+      borderLeft: `${gross ? 6 : 3}px solid ${f.kante}`,
+      fontWeight: 600,
+      whiteSpace: 'nowrap',
+      textDecoration: 'none',
+    };
+  };
+
+  const eintrag = (e: AlarmEintrag, mitLink: boolean, gemessen = false) => {
+    const pfad = mitLink ? ziel?.(e) : undefined;
+    const inhalt = gemessen ? (
+      <span>{e.text}</span>
+    ) : (
+      <span data-lfh="alarm-eintrag" data-art={e.art} data-ton={e.rolle} title={e.voll}>
+        {e.text}
+      </span>
+    );
+    return pfad ? (
+      <Link key={e.art} to={pfad} style={eintragStil(e)} aria-label={e.voll}>
+        {inhalt}
+      </Link>
+    ) : (
+      <span key={e.art} style={eintragStil(e)}>
+        {inhalt}
+      </span>
+    );
+  };
+
+  const rest = eintraege.length - sichtbar;
+  const hinweis =
+    stand === 'unvollstaendig'
+      ? `Stand unvollständig: ${fehlend.join(', ')} nicht geladen`
+      : stand === 'laedt' && eintraege.length === 0
+        ? '—'
+        : stand === 'vollstaendig' && eintraege.length === 0
+          ? 'Nichts brennt'
+          : null;
+
+  const plusStil: CSSProperties = {
+    flex: '0 0 auto',
+    height: hoehe - 2 * abstand,
+    padding: `0 ${gross ? 16 : 10}px`,
+    border: `1px solid ${rollen.steuerRahmen}`,
+    background: 'transparent',
+    color: rollen.text,
+    font: 'inherit',
+    fontWeight: 600,
+    cursor: gross ? 'default' : 'pointer',
+    whiteSpace: 'nowrap',
+  };
+  const plus =
+    rest > 0 ? (
+      gross ? (
+        <span style={{ ...plusStil, display: 'inline-flex', alignItems: 'center' }}>+{rest}</span>
+      ) : (
+        <Popover
+          trigger="click"
+          placement="bottomLeft"
+          content={
+            <ul
+              data-lfh="alarm-liste"
+              style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}
+            >
+              {eintraege.map((e) => (
+                <li key={e.art}>{eintrag({ ...e, text: e.voll }, true)}</li>
+              ))}
+            </ul>
+          }
+        >
+          <button type="button" style={plusStil} aria-label={`Alle ${eintraege.length} zeigen`}>
+            +{rest}
+          </button>
+        </Popover>
+      )
+    ) : null;
+
+  return (
+    <section
+      data-lfh="alarm-zeile"
+      data-stand={stand}
+      role="status"
+      aria-live="polite"
+      aria-label="Was brennt"
+      style={{
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'center',
+        gap: abstand * 2,
+        height: hoehe,
+        padding: `0 ${abstand}px`,
+        background: rollen.paneel,
+        borderBottom: `1px solid ${rollen.linie}`,
+        fontFamily: schrift.text,
+        fontSize,
+        lineHeight: 1.2,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        ref={reiheRef}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: abstand,
+          flex: '1 1 auto',
+          minWidth: 0,
+          overflow: 'hidden',
+        }}
+      >
+        {eintraege.slice(0, sichtbar).map((e) => eintrag(e, !gross))}
+        {plus}
+        {hinweis && (
+          <span
+            data-lfh="alarm-hinweis"
+            title={hinweis}
+            style={{
+              color: rollen.text2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              minWidth: 0,
+            }}
+          >
+            {hinweis}
+          </span>
+        )}
+      </div>
+      {/* Messreihe: alle Einträge und „+n“ unsichtbar, außerhalb des Flusses (keine Höhe). */}
+      <div
+        ref={messRef}
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          visibility: 'hidden',
+          pointerEvents: 'none',
+          display: 'flex',
+          gap: abstand,
+          left: 0,
+          top: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {eintraege.map((e) => eintrag(e, false, true))}
+        <span style={plusStil}>+{eintraege.length}</span>
+      </div>
+    </section>
+  );
+}

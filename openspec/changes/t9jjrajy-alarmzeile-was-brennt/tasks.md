@@ -41,27 +41,28 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
 
 ## 3. Kern `wasBrennt` und Baustein `AlarmZeile` (Frontend)
 
-- [ ] 3.1 `frontend/src/lage/wasBrennt.ts` mit Tests zuerst (`wasBrennt.test.ts`): Quellen-Typ,
+- [x] 3.1 `frontend/src/lage/wasBrennt.ts` mit Tests zuerst (`wasBrennt.test.ts`): Quellen-Typ,
   Einträge je Art mit Rolle, Folge laut Spec, Wortlaut laut design D4 (höchstens zwei Namen, dann
   „+n“), Ruhe und Unvollständig, gesperrte Quellen ohne Einfluss, „angespannt“ nie, „keine
   Rückmeldung“ nie. Alle Szenarien der Delta-Spec `lage-alarmzeile` zu Quellen, Folge und Ruhe als
   Tests.
-- [ ] 3.2 `ausfallJeEinheit` unverändert von `pages/fuehrung/ueberblickDaten.ts` nach `lage/`
+- [x] 3.2 `ausfallJeEinheit` unverändert von `pages/fuehrung/ueberblickDaten.ts` nach `lage/`
   verlegen (Aufrufer nachziehen), damit Überblick und Kern es teilen; bestehende Tests der
   Abschnittskarte bleiben grün.
-- [ ] 3.3 `frontend/src/lage/useWasBrennt.ts`: lädt Modulzähler, Personen, Abschnitte, Einheiten,
+- [x] 3.3 `frontend/src/lage/useWasBrennt.ts`: lädt Modulzähler, Personen, Abschnitte, Einheiten,
   Personal, Fahrzeuge, Material und Rückmeldungen über die bestehenden `einsatzKeys`, je mit
   Freigabe (`istKeyFreigegeben`), und rechnet gegen `useJetzt(30_000)`. Test mit gemocktem API:
   Ladezustand → „—“, gescheiterte Rückmeldung → unvollständig, Frist läuft ohne neue Daten ab →
   Eintrag nach dem nächsten Tick.
-- [ ] 3.4 `frontend/src/lage/alarmAusMonitor.ts` mit Test: derselbe Fall über Browser-Quellen und
+- [x] 3.4 `frontend/src/lage/alarmAusMonitor.ts` mit Test: derselbe Fall über Browser-Quellen und
   über `LagemonitorAlarm` ergibt dieselben Einträge (ohne Ausfall).
-- [ ] 3.5 `components/instrument/AlarmZeile.tsx` mit `AlarmZeile.test.tsx` zuerst: feste Höhe
+- [x] 3.5 `components/instrument/AlarmZeile.tsx` mit `AlarmZeile.test.tsx` zuerst: feste Höhe
   (Höhe unabhängig von 0, 1, 8 Einträgen), Rollen alarm/achtung/neutral, „+n“ bei schmaler Breite
   mit Popover-Liste, Links nur mit `ziel`, `groesse="gross"` ohne Bedienung und mit 28 px,
   `role="status"`. Export über `components/instrument/index.ts`, Dateikopf nennt die Regel.
-- [ ] 3.6 `live/`: Ereignis `sofortmeldung` invalidiert den Modulzähler sofort (nicht über das
-  Zählerfenster). Test in den bestehenden Stream-Tests.
+- [x] 3.6 `live/`: Ereignis `sofortmeldung` invalidiert neben den Meldungs-Keys (Modulzähler im
+  1-s-Zählerfenster) auch `einsatzKeys.lagemonitor`. Test in `useEinsatzLiveStream.test.tsx`
+  („sofortmeldung frischt …“), Mutationsprobe ohne die Zeile rot.
 
 ## 4. Seiten (Frontend)
 

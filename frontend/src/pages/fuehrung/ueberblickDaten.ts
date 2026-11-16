@@ -49,14 +49,9 @@ import {
   rueckmeldungUeberfaelligSeit,
   rueckmeldungZustand,
 } from '../../meldungen/rueckmeldung';
-import {
-  baueMeldebildRaster,
-  einheitZeilen,
-  OHNE_EINHEIT_SCHLUESSEL,
-  toenungsGruende,
-  type ToenungsGrund,
-} from '../../kraefte/meldebildRaster';
+import { type ToenungsGrund } from '../../kraefte/meldebildRaster';
 import { prognoseOffen, wasserstandMeter } from '../../pegel/pegelKennzahl';
+import { ausfallJeEinheit, OHNE_EINHEIT } from '../../lage/ausfallJeEinheit';
 import {
   dauerText,
   lagebesprechungUeberfaellig,
@@ -495,34 +490,6 @@ export function abschnittZeilen(r: AbschnittRohdaten): AbschnittZeile[] {
     if (b.abschnittId == null) return -1;
     return (rang.get(a.abschnittId) ?? 0) - (rang.get(b.abschnittId) ?? 0);
   });
-}
-
-/** Schlüssel der Meldebild-Zeile „Ohne Einheit“ in {@link ausfallJeEinheit}. */
-const OHNE_EINHEIT = 'ohne-einheit';
-
-/**
- * Ausfall je Einheit aus dem Meldebild selbst (LLH-1739): dieselben Gründe der Tönung, die dort in
- * der Statusspalte stehen, auch die der Sammelzeile „Ohne Einheit“ (unter {@link OHNE_EINHEIT}).
- * Jede Einheit zählt nur ihre eigenen Mittel (Spec `kraeftebaum`), die Summe über einen Teilbaum
- * zählt also keine Kraft doppelt.
- */
-function ausfallJeEinheit(
-  r: AbschnittRohdaten,
-): Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }> {
-  const raster = baueMeldebildRaster({ ...r, statusKatalog: [], auftraege: [] });
-  const je = new Map<number | typeof OHNE_EINHEIT, { mittel: number; material: number }>();
-  for (const z of einheitZeilen(raster)) {
-    const schluessel = z.einheitId ?? (z.key === OHNE_EINHEIT_SCHLUESSEL ? OHNE_EINHEIT : null);
-    if (schluessel == null) continue;
-    let mittel = 0;
-    let material = 0;
-    for (const g of toenungsGruende(z, null)) {
-      if (g.art === 'ausfall') mittel += g.anzahl;
-      if (g.art === 'ausfall_material') material += g.anzahl;
-    }
-    je.set(schluessel, { mittel, material });
-  }
-  return je;
 }
 
 /**

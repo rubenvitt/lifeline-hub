@@ -41,8 +41,8 @@ Jede Zahl MUST aus derselben Heimat kommen wie an ihrer Stelle im Modul.
 - **THEN** zeigt die Zeile „Rückmeldung überfällig: Logistiktrupp, Sanitätszug · längste 47 min“ in der Alarmrolle
 
 #### Scenario: Ausfall wie im Meldebild
-- **WHEN** das Meldebild bei genau einer Einheit einen Ausfall nennt
-- **THEN** zeigt die Zeile „Ausfall: 1 Einheit“ mit dem Namen dieser Einheit in der Alarmrolle
+- **WHEN** das Meldebild beim Logistiktrupp, und nur dort, einen Ausfall nennt
+- **THEN** zeigt die Zeile „Ausfall: Logistiktrupp“ in der Alarmrolle
 
 #### Scenario: Gepflegter Lagezustand planmäßig
 - **WHEN** ein Abschnitt den Lagezustand „planmäßig“ trägt und eine Rückmeldung darin überfällig ist
