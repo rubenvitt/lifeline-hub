@@ -7,8 +7,8 @@ TDD: erst der rote Test oder Wächter, dann die Änderung. LLH-1772 (`zrrpki0p`,
 ## 1. Skala festlegen — LLH-1775 `t4yjm0uk` und LLH-1773 `uqnkhwzl`
 
 - [x] 1.1 `groessenstufen` (fein 11, klein 12, text 14, titel 16, wert 22, gross 32) in `theme/tokens.ts`; `schriftskala` nennt je Rolle eine Stufe, neue Rollen `uhr`, `warnung`, `etikett`, `meta` in der Textschrift, Augenbraue .08em, Rail-Etikett .04em. Beleg: `tokens.test.ts` pinnt die Werte als Literal (Quelle „umgekehrt 15.11.2026“) und ist vorher rot.
-- [x] 1.2 `rollen.css` spiegelt Stufen und Rollen als `--lfh-typo-*`; `rollen.guard.test.ts` hält Partition und Gleichheit beider Seiten. Beleg: Wächter grün, mit einem absichtlich abweichenden Wert rot.
-- [x] 1.3 `schriftStil(rolle)` und `zahlStil(stufe, gewicht)` in `rollenwerte.ts` geben `fontSize: var(--lfh-typo-…)` und `tabular-nums` zurück; `schriftPx(stufe, dichte)` liefert die Zahl. Beleg: Unit-Tests der drei Helfer.
+- [x] 1.2 `rollen.css` spiegelt Stufen als `--lfh-groesse-*` und Rollen als `--lfh-typo-*`; `rollen.guard.test.ts` hält Partition und Gleichheit beider Seiten. Beleg: Wächter grün, mit einem absichtlich abweichenden Wert rot.
+- [x] 1.3 `schriftStil(rolle)` und `zahlStil(stufe, gewicht)` in `rollenwerte.ts` geben `fontSize: var(--lfh-groesse-…)` und `tabular-nums` zurück; `schriftPx(stufe, dichte)` liefert die Zahl. Beleg: Unit-Tests der drei Helfer.
 - [x] 1.4 Bausteine `Schrift` und `Feldetikett` in `components/instrument/` samt `index.ts`, Dateikopf mit Regel, Karten in `PREVIEWS` (Nacht und Tag). Beleg: Komponententests (Element, Stil, Ton).
 
 ## 2. Kopplung an die Dichte und freier Zoom — LLH-1774 `k12gzfsa`
@@ -44,7 +44,8 @@ TDD: erst der rote Test oder Wächter, dann die Änderung. LLH-1772 (`zrrpki0p`,
 - [ ] 6.2 Rail-Etikett in 11 px ohne Überlauf in der 60-px-Rail (`rail-etikett.spec.ts`), Seitenkopf auf 390 px, Trefffläche-Gates (`gate3-trefflaeche`, `trefflaeche-pruefflaechen`) in allen drei Stufen. Beleg: Specs grün.
 - [x] 6.3 `frontend/AGENTS.md`: `schriftskala` mit Stufen, Faktor und Literal-Verbot; „Kein Zoom“ ersetzt durch „Zoom frei“; Feldetikett und Augenbraue; Mono-Grenze; je mit Marke „umgekehrt 15.11.2026“ gegenüber dem Neuentwurf. Beleg: Prettier grün, Verweise auf `keinZoom.guard` gegrept und nachgezogen.
 - [x] 6.4 Design System neu erzeugen (`mise exec -- pnpm -C frontend design-system`), Erzeugtes im Commit. Beleg: `designSystem.guard.test.ts` grün.
-- [ ] 6.5 Folgeaufgabe für den Bildlauf der Anwender-Doku über `zunder-task-anlegen`, falls `docs/anwender/AGENTS.md` ihn nicht im selben PR verlangt. Beleg: Link im PR.
+- [ ] 6.5 Bildlauf der Anwender-Doku im selben PR (`docs/anwender/AGENTS.md`, Mitänderungsregel): Bilder der geänderten Ansichten neu erzeugen und committen. Beleg: Wächter der Anwenderdoku grün.
+- [ ] 6.7 Befunde des Reviews vor dem PR behoben (Rail wächst mit der Schrift, `data-dichte` vor dem ersten Bild, `body` in der Lauftextgröße, benannte Konstanten im Wächter, Zeichnungen, gemischte Knoten, Warnrolle mit Tests) und ADR-0055 angelegt. Beleg: Abschnitt „Review“ im PR.
 - [ ] 6.6 `./scripts/check-all.sh --geaendert --ohne-e2e` grün, betroffene e2e-Specs lokal grün. Beleg: Ausgabe im PR unter „Geprüft“.
 
 ## Workflow follow-up

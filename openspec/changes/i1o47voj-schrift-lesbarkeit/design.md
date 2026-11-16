@@ -36,8 +36,11 @@ Abgestimmt mit Ruben am 15.11.2026 (Kommentar an LLH-1719): Stufen 11/12/14/16/2
 
 - Druckansichten (`druck/`, `lageplanDruck.css`, `skizzeDruck.css`): sie rechnen in pt auf
   Papier und bleiben, wie sie sind.
-- Text auf der MapLibre-Karte (`text-size` der Kartenstile) und in den taktischen Zeichen: das
-  ist Kartenmaßstab, keine Oberflächenschrift.
+- Zeichnungen mit eigenem Maßstab: Text auf der MapLibre-Karte (`text-size` der Kartenstile),
+  in den taktischen Zeichen und in der Fernmeldeskizze (zoombare `viewBox`). Ihre Schrift ist
+  Zeichnungsmaßstab; Wörter halten trotzdem 11 Zeichnungseinheiten, nur Glyphen eines Zeichens
+  (Ausrufezeichen der Lückenmarke) sind kleiner. Diagramme und das Körperschema rechnen dagegen in
+  Bildschirm-Pixeln und gehören zur Skala (Entscheidung Ruben 16.11.2026, Review vor dem PR).
 - Die Fernsicht-Skala des Lagemonitors (`GROSS` in `geraet/LagemonitorPage.tsx`): sie wird nur
   benannt ins Theme gezogen, ihre Werte bleiben.
 - Eine eigene Einstellung „Schrift größer“: der freie Zoom deckt das ab.
@@ -74,12 +77,16 @@ Familie und Versalien selbst, und die Augenbraue zerfiele in Einzelteile.
 
 `rollen.css` setzt `--lfh-schrift-faktor` auf `:root` (1) und in den bestehenden Blöcken
 `[data-dichte='komfortabel']` (1,15) und `[data-dichte='handschuh']` (1,25). Jede
-`--lfh-typo-<stufe>-groesse` der vier wachsenden Stufen ist `calc(<px> * var(--lfh-schrift-faktor))`;
-`wert` und `gross` stehen fest. Das Merkmal `data-dichte` sitzt schon vor dem ersten Paint am
-`<html>`, also ist die Größe beim ersten Bild richtig.
+`--lfh-groesse-<stufe>` der vier wachsenden Stufen ist `calc(<px> * var(--lfh-schrift-faktor))`;
+`wert` und `gross` stehen fest. Damit das erste Bild stimmt, setzt ein Bootstrap-Skript in
+`index.html` `data-dichte` vor dem Mount, als Spiegel von `startDichte` (gespeicherte Wahl, sonst
+Zeigerart); vorher setzte nur der Provider es in einem `useEffect`, und Text sprang nach dem Laden
+(Review vor dem PR). `body` trägt `var(--lfh-groesse-text)`, damit Portale an `document.body`
+(Eingangsband) nicht in den 16 px des Browsers stehen.
 
 TS liest Größen nur über `schriftStil(rolle)` und `zahlStil(stufe, gewicht)` aus `rollenwerte.ts`.
-Beide geben `fontSize: 'var(--lfh-typo-<stufe>-groesse)'` zurück, keine Zahl. Wo eine Zahl
+Beide geben `fontSize: 'var(--lfh-groesse-<stufe>)'` zurück, keine Zahl; die Rollen in CSS
+(`--lfh-typo-<rolle>-groesse`) zeigen auf diese Variablen. Wo eine Zahl
 gebraucht wird (Höhenrechnung, antd-Token, Canvas), liefert `schriftPx(stufe, dichte)` sie aus
 derselben Tabelle mal `dichteFaktor[dichte]`; `rollen.guard.test.ts` hält Faktor und Werte auf
 beiden Seiten gleich.
@@ -112,8 +119,12 @@ ESLint mit `--max-warnings 0` würde rot geboren, deshalb ein Vitest-Wächter na
 `frontend/src` (ohne Tests und ohne das Theme) und meldet:
 
 - `fontSize:` und `fontSize=` mit Zahl, Zahlstring oder Template-Literal;
-- `font-size:` in CSS, das nicht `var(--lfh-typo-…)` oder `inherit` ist, außer in den
-  Druck-Dateien (benannte Liste, pt);
+- benannte Größen: eine Konstante `…_SCHRIFT`/`…FONT…` mit Zahlwert und eine Konstante in
+  Großbuchstaben am `fontSize`, die keine Stufe trägt (Review vor dem PR: `BAND_SCHRIFT = 13`
+  ging sonst durch); in Zeichnungen mit eigenem Maßstab erlaubt ab 11, Glyphen benannt;
+- `font-size:` in CSS, das nicht `var(--lfh-typo-…)`, `var(--lfh-groesse-…)`, eine eigene Variable
+  mit einer Stufe als Rückfall oder `inherit` ist, außer in den Druck-Dateien (benannte Liste);
+  `pt` nur innerhalb von `@media print` oder `@page`;
 - `monoStil(` (der Name verschwindet);
 - `fontFamily` mit `monospace` oder `ui-monospace` außerhalb des Themes.
 
@@ -174,9 +185,11 @@ Funkrufnamen setzen es.
 
 ### 8. Rail-Etikett und Seitenkopf
 
-Das Rail-Etikett wächst von 9 auf 11 px. Damit „FÜHRUNG“ und „ERFASS.“ in die 60-px-Rail passen,
-sinkt die Sperrung auf .04em; reicht das nicht, werden die Kurzetiketten gekürzt, die Rail bleibt
-60 px breit. `e2e/rail-etikett.spec.ts` misst den Überlauf. Der Seitentitel in 16 px passt in den
+Das Rail-Etikett wächst von 9 auf 11 px, Sperrung .04em. Gemessen passte „FÜHRUNG“ (58,5 px in
+`kompakt`, 67 px in `komfortabel`) nicht in die 60-px-Rail. Deshalb wächst die Rail mit der
+Schrift: 64 / 74 / 80 px (`railBreite`, 64 × Schriftfaktor, nie unter Ziel plus Haarlinie;
+Entscheidung Ruben 16.11.2026 statt gekürzter oder gemischt geschriebener Etiketten).
+`e2e/rail-etikett.spec.ts` misst den Überlauf. Der Seitentitel in 16 px passt in den
 44-px-Kopf (16 × 1,4 = 22,4 px bei 37 px Innenhöhe); die Uhr in `Kopfleiste.tsx:189` liest die
 Rolle `uhr`.
 
@@ -191,7 +204,7 @@ Rolle `uhr`.
   `rollen.guard.test.ts:419`) → werden mit den neuen Werten als Literal gepinnt, Quelle
   „umgekehrt 15.11.2026“.
 - **Fokus-Zoom auf iOS in `kompakt`** → hingenommen (Entscheidung 3).
-- **Anwender-Doku-Bilder** ändern sich überall → der Bildlauf wird nach dem Merge neu gefahren,
-  nicht in diesem PR (eigene Aufgabe über `zunder-task-anlegen`).
+- **Anwender-Doku-Bilder** ändern sich überall → der Bildlauf läuft im selben PR
+  (`docs/anwender/AGENTS.md`, Mitänderungsregel; Review vor dem PR).
 - **13 → 14 oder 12** ist eine Ermessensfrage je Stelle → Standard `text`, Ausnahme nur mit
   sichtbarer Nebenrolle; der Review prüft die Stichproben.
