@@ -627,55 +627,6 @@ export default function AusgabeAnsicht() {
               }
             />
           </div>
-          {/* Die Sammelzeile steht immer, auch leer: „Sammlung 0“, „Buchen“ gesperrt (D3). Sie
-              bricht nie um: links zwei feste, einzeilige Zeilen (Menge und ausstehend; Sonderkost
-              der Sammlung, leer mit reservierter Höhe), rechts „Buchen“ an festem Platz. Ein
-              wachsender Text kürzt sich, statt Tasten zu schieben. */}
-          <Flex
-            data-lfh="ausgabe-sammlung"
-            align="center"
-            gap={token.marginSM}
-            style={{
-              paddingBlock: token.paddingSM,
-              paddingInline: token.padding,
-              borderBlockStart: `1px solid ${rollen.flaeche2}`,
-            }}
-          >
-            <div style={{ flex: '1 1 0', minWidth: 0 }}>
-              <div style={einzeilig}>
-                Sammlung{' '}
-                <span data-lfh="sammlung-menge" style={monoStil(15, 500)}>
-                  {sammlung.menge}
-                </span>{' '}
-                <span
-                  data-lfh="ausgabe-ausstehend"
-                  style={{
-                    ...monoStil(12),
-                    color: rollen.text2,
-                    marginInlineStart: token.marginXS,
-                  }}
-                >
-                  + {ausstehendMenge} ausstehend
-                </span>
-              </div>
-              <div
-                data-lfh="sammlung-sonderkost"
-                title={sammelSonderkost || undefined}
-                style={{ ...einzeilig, ...monoStil(12), color: rollen.text2 }}
-              >
-                {/* Leer ein geschütztes Leerzeichen: die Zeile behält ihre Höhe. */}
-                {sammelSonderkost || '\u00a0'}
-              </div>
-            </div>
-            <Button
-              style={{ ...uebrige, flex: 'none' }}
-              disabled={zuruckGesperrt}
-              aria-describedby={beschrieben(zuruckGesperrt)}
-              onClick={sammlung.buchen}
-            >
-              Buchen
-            </Button>
-          </Flex>
           {/* Stellenwahl (LLH-1040); ohne wählbare Stelle bleibt der Platz leer. Die Zeile bricht
               nicht um: die Wahl nimmt den Rest, das Ist steht fest daneben. Am gebundenen Gerät
               (LLH-1048) steht statt der Wahl die eigene Stelle als Text. */}
@@ -1116,20 +1067,73 @@ export default function AusgabeAnsicht() {
                 +10
               </Button>
             </Flex>
-            <Button
-              type="primary"
-              data-lfh="zaehltaste-plus1"
-              style={{
-                ...zaehltasteStil(token, 'plus1'),
-                ...(istSchmal ? { width: '100%' } : {}),
-                fontSize: 22,
-              }}
-              disabled={tastenGesperrt}
-              aria-describedby={beschrieben(tastenGesperrt)}
-              onClick={() => sammlung.tippe(1)}
+            {/* Die Sammelzeile steht in der Reihe von „+1“ (LLH-1794): gerollt bleiben Zählerstand
+                und „Buchen“ im Bild, und die Reihe kostet keine eigene Höhe. Sie steht immer, auch
+                leer: „Sammlung 0“, „Buchen“ gesperrt (D3). Links zwei feste, einzeilige Zeilen
+                (Menge und ausstehend; Sonderkost der Sammlung, leer mit reservierter Höhe) in
+                fester Breite: ein wachsender Text kürzt sich, statt Tasten zu schieben. */}
+            <Flex
+              data-lfh="zaehltasten-buchreihe"
+              gap={abstand}
+              align="center"
+              style={istSchmal ? { width: '100%' } : undefined}
             >
-              +1
-            </Button>
+              <div
+                data-lfh="ausgabe-sammlung"
+                style={
+                  istSchmal
+                    ? { flex: '1 1 0', minWidth: 0 }
+                    : { flex: '0 0 auto', width: '14em', minWidth: 0 }
+                }
+              >
+                <div style={einzeilig}>
+                  Sammlung{' '}
+                  <span data-lfh="sammlung-menge" style={monoStil(15, 500)}>
+                    {sammlung.menge}
+                  </span>{' '}
+                  <span
+                    data-lfh="ausgabe-ausstehend"
+                    style={{
+                      ...monoStil(12),
+                      color: rollen.text2,
+                      marginInlineStart: token.marginXS,
+                    }}
+                  >
+                    + {ausstehendMenge} ausstehend
+                  </span>
+                </div>
+                <div
+                  data-lfh="sammlung-sonderkost"
+                  title={sammelSonderkost || undefined}
+                  style={{ ...einzeilig, ...monoStil(12), color: rollen.text2 }}
+                >
+                  {/* Leer ein geschütztes Leerzeichen: die Zeile behält ihre Höhe. */}
+                  {sammelSonderkost || ' '}
+                </div>
+              </div>
+              <Button
+                style={{ ...uebrige, flex: 'none' }}
+                disabled={zuruckGesperrt}
+                aria-describedby={beschrieben(zuruckGesperrt)}
+                onClick={sammlung.buchen}
+              >
+                Buchen
+              </Button>
+              <Button
+                type="primary"
+                data-lfh="zaehltaste-plus1"
+                style={{
+                  ...zaehltasteStil(token, 'plus1'),
+                  ...(istSchmal ? { flex: '1 1 0' } : {}),
+                  fontSize: 22,
+                }}
+                disabled={tastenGesperrt}
+                aria-describedby={beschrieben(tastenGesperrt)}
+                onClick={() => sammlung.tippe(1)}
+              >
+                +1
+              </Button>
+            </Flex>
           </Flex>
         </div>
       </div>
