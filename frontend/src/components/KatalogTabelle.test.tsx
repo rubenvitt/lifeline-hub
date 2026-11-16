@@ -146,6 +146,29 @@ describe('KatalogTabelle', () => {
     expect(breiten[1]).toBeGreaterThan(60);
   });
 
+  it('eine Spalte ohne Breite hält die Mindestbreite ihres Kopfs an Kopf- und Körperzelle (LLH-1788)', () => {
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          { title: 'Funkrufname', dataIndex: 'funkrufname', key: 'funkrufname' },
+          {
+            title: 'Position',
+            dataIndex: 'typ',
+            key: 'typ',
+            sorter: (a, b) => a.typ.localeCompare(b.typ),
+          },
+        ]}
+        dataSource={ZEILEN}
+        pagination={false}
+      />,
+    );
+    const zelle = container.querySelectorAll<HTMLElement>(
+      '.ant-table-tbody tr.ant-table-row td',
+    )[1];
+    expect(parseFloat(zelle.style.minWidth)).toBeGreaterThan(60);
+  });
+
   /**
    * Druck (LFH-71): mit `sticky` legt rc-table den Kopf in eine EIGENE Tabelle, der Körper hat
    * dann kein `thead`, und die Kopfwiederholung greift nicht. Bei `beforeprint` rendert das

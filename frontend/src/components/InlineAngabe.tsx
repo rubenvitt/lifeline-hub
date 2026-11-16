@@ -91,6 +91,9 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
 const ZIEL_IN_ANZEIGE =
   'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"]), [role="button"], [role="link"]';
 
+/** Was der Fokus per Tab erreicht; für die Tab-Brücke aus dem Popover (LLH-1795). */
+const FOKUSZIEL = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 /** Rückgabe von `onSpeichern`: nichts gespeichert, nichts gescheitert — die Eingabe bleibt offen. */
 export const OFFEN_LASSEN = Symbol('offen lassen');
 
@@ -322,15 +325,26 @@ export function InlineAngabe<T>({
    * der Fokus stünde so noch im verschwindenden Feld. Liegt er dort (oder im Nichts), geht er zurück
    * auf die Anzeige der Zelle.
    */
-  const fokusZurAnzeigeRef = useRef(false);
+  // Zählt die Renders, in denen der Fokus noch auf die Anzeige zurück soll: nach dem Speichern
+  // kommt der neue Wert oft erst einen Takt später, und die Anzeige wechselt (Aufforderung →
+  // Wertknopf). Der erste Rückweg träfe dann einen Knopf, der gleich darauf aushängt.
+  const fokusZurAnzeigeRef = useRef(0);
   const popoverInhaltRef = useRef<HTMLDivElement>(null);
+  const ankerRef = useRef<HTMLSpanElement>(null);
   useLayoutEffect(() => {
-    if (bearbeitet || !fokusZurAnzeigeRef.current) return;
-    fokusZurAnzeigeRef.current = false;
+    if (bearbeitet || fokusZurAnzeigeRef.current <= 0) return;
+    fokusZurAnzeigeRef.current -= 1;
     const aktiv = document.activeElement;
+    if (aktiv != null && ankerRef.current?.contains(aktiv)) return;
     const imPopover = aktiv != null && (popoverInhaltRef.current?.contains(aktiv) ?? false);
     if (aktiv == null || aktiv === document.body || !aktiv.isConnected || imPopover) {
-      knopfRef.current?.focus();
+      const ziel = knopfRef.current?.isConnected
+        ? knopfRef.current
+        : ankerRef.current?.querySelector<HTMLElement>(FOKUSZIEL);
+      ziel?.focus();
+    } else {
+      // Der Fokus steht anderswo, weil jemand weitergegangen ist: nicht zurückholen.
+      fokusZurAnzeigeRef.current = 0;
     }
   });
 
@@ -420,7 +434,7 @@ export function InlineAngabe<T>({
     popupOffenRef.current = false;
     setFehler(null);
     setBearbeitet(false);
-    if (schwebend) fokusZurAnzeigeRef.current = true;
+    if (schwebend) fokusZurAnzeigeRef.current = 3;
   }
   schliessenRef.current = schliessen;
 
@@ -461,6 +475,42 @@ export function InlineAngabe<T>({
     }
   }
 
+  /**
+   * Das Popover hängt am Ende von `body`; Tab liefe aus ihm ans Ende des Dokuments. Wie im Fluss
+   * geht Tab vom letzten Ziel zum nächsten Ziel nach der Zelle und Shift+Tab vom ersten zurück auf
+   * die Anzeige der Zelle (LLH-1795). Die Bearbeitung bleibt offen, wie beim Verlassen im Fluss.
+   */
+  function tabAusDemPopover(e: KeyboardEvent<HTMLFormElement>): boolean {
+    const ziele = [...e.currentTarget.querySelectorAll<HTMLElement>(FOKUSZIEL)].filter(
+      (z) => !z.hasAttribute('disabled'),
+    );
+    if (ziele.length === 0) return false;
+    const anker = ankerRef.current;
+    if (!anker) return false;
+    if (e.shiftKey && e.target === ziele[0]) {
+      const zurueck = anker.querySelector<HTMLElement>(FOKUSZIEL);
+      if (!zurueck) return false;
+      e.preventDefault();
+      zurueck.focus();
+      return true;
+    }
+    if (!e.shiftKey && e.target === ziele[ziele.length - 1]) {
+      const alle = [...document.querySelectorAll<HTMLElement>(FOKUSZIEL)].filter(
+        (z) => !z.hasAttribute('disabled') && !e.currentTarget.contains(z),
+      );
+      const nach = alle.find(
+        (z) =>
+          !anker.contains(z) &&
+          (anker.compareDocumentPosition(z) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      );
+      if (!nach) return false;
+      e.preventDefault();
+      nach.focus();
+      return true;
+    }
+    return false;
+  }
+
   function tastenVorab(e: KeyboardEvent<HTMLFormElement>) {
     // Auswahl/Autovervollständigung melden ihr Popup zusätzlich am Feld; das deckt Eingaben ab,
     // deren Aufrufer `popup` nicht verdrahtet.
@@ -469,6 +519,7 @@ export function InlineAngabe<T>({
   }
 
   function tasten(e: KeyboardEvent<HTMLFormElement>) {
+    if (schwebend && e.key === 'Tab' && tabAusDemPopover(e)) return;
     if (e.key === 'Escape') {
       // Ein offenes Popup der Eingabe schließt zuerst allein; erst das nächste Escape verwirft die
       // Zeile. Keine der antd-Eingaben ruft dabei `preventDefault` (pages/lagekarte/AGENTS.md, LFH-712).
@@ -565,6 +616,7 @@ export function InlineAngabe<T>({
         }
       >
         <span
+          ref={ankerRef}
           data-lfh="angabe-anker"
           style={{ display: 'inline-block', maxWidth: '100%', minWidth: 0 }}
         >

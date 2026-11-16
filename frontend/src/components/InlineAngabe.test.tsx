@@ -13,7 +13,7 @@ import { verschachtelteZiele } from '../test/verschachtelteZiele';
 import { ApiError } from '../api/client';
 import { InlineAngabe, OFFEN_LASSEN, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
 import { AngabeFormProvider } from './angabeForm';
-import type React from 'react';
+import React from 'react';
 
 /**
  * Verhalten der inline bearbeitbaren Angabe (LFH-472).
@@ -943,6 +943,62 @@ describe('InlineAngabe · schwebend in Tabellenzellen (LLH-1795)', () => {
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr. zu Bert' })).toHaveFocus(),
     );
+  });
+
+  it('wechselt nach dem Speichern die Anzeige (Aufforderung → Wert), landet der Fokus auf der neuen', async () => {
+    function Wechsel() {
+      const [wert, setWert] = React.useState('');
+      return (
+        <div data-testid="zelle-w">
+          <TextAngabe
+            kennung="Anna"
+            wert={wert}
+            anzeige={wert}
+            onSpeichern={async (w) => {
+              // Der neue Wert kommt erst einen Takt nach dem Schließen (wie aus dem Cache).
+              setTimeout(() => setWert(w), 0);
+            }}
+          />
+        </div>
+      );
+    }
+    renderMitProviders(schwebend(<Wechsel />));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna eintragen' }),
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    await userEvent.type(feld, 'ILS-9{Enter}');
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it('Tab vom letzten Knopf geht zum nächsten Ziel nach der Zelle, Shift+Tab vom Feld zurück zur Zelle', async () => {
+    renderMitProviders(
+      schwebend(
+        <>
+          <Zelle wert="ILS-1" />
+          <button type="button">nächste Zelle</button>
+        </>,
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    );
+    const feld = await screen.findByRole('textbox', { name: 'Leitstellen-Nr. zu Anna' });
+    const abbrechen = screen.getByRole('button', {
+      name: 'Bearbeitung von Leitstellen-Nr. zu Anna abbrechen',
+    });
+    abbrechen.focus();
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'nächste Zelle' })).toHaveFocus();
+    feld.focus();
+    await userEvent.tab({ shift: true });
+    expect(
+      screen.getByRole('button', { name: 'Leitstellen-Nr. zu Anna bearbeiten' }),
+    ).toHaveFocus();
   });
 
   it('ohne Kontext bleibt die Bearbeitung im Fluss', async () => {

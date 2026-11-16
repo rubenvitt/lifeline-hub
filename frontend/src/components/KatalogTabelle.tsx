@@ -999,7 +999,23 @@ export default function KatalogTabelle<T extends object>({
             ('filters' in gebaut && gebaut.filters != null) ||
             ('filterDropdown' in gebaut && gebaut.filterDropdown != null),
         });
-        return mitKopfMindestBreite(gebaut, mindest) as KatalogSpalte<T>;
+        const gehoben = mitKopfMindestBreite(gebaut, mindest) as KatalogSpalte<T>;
+        if (gehoben.width != null || gehoben.mindestBreite != null) return gehoben;
+        // Ohne Breite trägt der Körper seine `max-content`-Breite; die Mindestbreite des Kopfs
+        // steht dann als `min-width` an Kopf- und Körperzelle, sonst würde der feste Kopf gekürzt.
+        const eigenZelle = gehoben.onCell;
+        const eigenKopf = gehoben.onHeaderCell;
+        return {
+          ...gehoben,
+          onCell: (zeile: T, i?: number) => {
+            const basis = eigenZelle?.(zeile, i) ?? {};
+            return { ...basis, style: { ...basis.style, minWidth: mindest } };
+          },
+          onHeaderCell: (spalte: Parameters<NonNullable<typeof eigenKopf>>[0]) => {
+            const basis = eigenKopf?.(spalte) ?? {};
+            return { ...basis, style: { ...basis.style, minWidth: mindest } };
+          },
+        } as KatalogSpalte<T>;
       }
       return gebaut as KatalogSpalte<T>;
     });
