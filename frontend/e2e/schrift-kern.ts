@@ -92,7 +92,7 @@ export async function textproben(page: Page, wurzel = 'body'): Promise<Textprobe
 /** Lädt eine Seite in einer Dichte (`ladeInDichte`, eine Ladung) und wartet auf den Anker. */
 export async function ladeSeite(page: Page, pfad: string, dichte: string, anker: string) {
   await ladeInDichte(page, pfad, dichte);
-  await expect(page.locator(anker).first()).toBeVisible();
+  await expect(page.locator(anker).first(), `${pfad} (${dichte}): Anker`).toBeVisible();
 }
 
 /** Ein Einsatz mit ETB-Einträgen, deren Metazeile Wörter trägt („von … an …“). */

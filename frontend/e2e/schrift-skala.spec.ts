@@ -57,22 +57,32 @@ test('Schriftskala: nur sechs Stufen, Boden 11 px, wächst mit der Dichte', asyn
   const id = await einsatzMitEtb(page, `E2E Schriftskala ${Date.now()}`);
 
   const anteil: Record<string, number> = {};
+  let tab = page;
   for (const dichte of ['kompakt', 'komfortabel', 'handschuh']) {
+    // Je Stufe eine frische Seite (Sitzung im Kontext bleibt): 15 Ladungen über den Vite-Dev-Server
+    // sind rund 20 000 Modul-Anfragen in einem Renderer, ab der zwölften bricht Chromium mit
+    // `ERR_INSUFFICIENT_RESOURCES` ab und der Seitenkopf erscheint nie (gemessen 16.11.2026).
+    if (dichte !== 'kompakt') {
+      const vorher = tab;
+      tab = await vorher.context().newPage();
+      await tab.setViewportSize(FUEKW);
+      await vorher.close();
+    }
     const alle: Textprobe[] = [];
     const erlaubt = erlaubteGroessen(dichte);
     for (const seite of SEITEN) {
-      await ladeSeite(page, `/einsaetze/${id}${seite.pfad}`, dichte, KOPF);
+      await ladeSeite(tab, `/einsaetze/${id}${seite.pfad}`, dichte, KOPF);
       await expect
-        .poll(async () => fremdeGroessen(await textproben(page), erlaubt), {
+        .poll(async () => fremdeGroessen(await textproben(tab), erlaubt), {
           message: `${seite.name} in ${dichte}: Größen außerhalb der Skala`,
         })
         .toEqual([]);
-      alle.push(...(await textproben(page)));
+      alle.push(...(await textproben(tab)));
 
       if (seite.name === 'Überblick') {
-        const titel = page.locator(`${KOPF} h1`).first();
+        const titel = tab.locator(`${KOPF} h1`).first();
         await expect(titel).toHaveCSS('font-size', `${16 * FAKTOR[dichte]}px`);
-        await expect(page.locator('.ant-app').first()).toHaveCSS(
+        await expect(tab.locator('.ant-app').first()).toHaveCSS(
           'font-size',
           `${Math.round(14 * FAKTOR[dichte] * 100) / 100}px`,
         );
