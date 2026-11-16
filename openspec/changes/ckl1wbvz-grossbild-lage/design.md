@@ -73,8 +73,10 @@ Anforderung oder fehlt die API (iPhone), füllt die feste Fläche das Fenster.
 - `fullscreenchange` ohne Vollbild-Element → `onVerlassen()`. Deckt Esc im Vollbild und den
   Ausstieg über Browsermittel ab.
 - `keydown` Esc ohne Vollbild → `onVerlassen()`.
-- Verliert das Fenster das Vollbild auf anderem Weg nicht (etwa durch Fensterwechsel unter macOS),
-  zeigt die Kopfzeile „Vollbild“, solange `document.fullscreenElement` nicht die Fläche ist.
+- Hat der Browser das Vollbild beim Öffnen abgelehnt (die Fläche füllt dann nur das Fenster),
+  zeigt die Kopfzeile „Vollbild“, solange `document.fullscreenElement` nicht die Fläche ist; ein
+  Klick ist die Geste, die der Browser für einen zweiten Versuch braucht. Ohne Vollbild-API fehlt
+  der Knopf.
 - Solange die Fläche steht, trägt `<html>` `overflow: hidden` (ein Rad über der Fläche rollte sonst
   das unsichtbare Dokument), beim Verlassen wird der vorige Wert wiederhergestellt.
 - ADR-0054 bleibt gewahrt: die Inhaltsfläche des Rahmens bekommt keinen Rollbereich, die Hülle liegt
@@ -98,8 +100,12 @@ rechts die Alarmzahl (D6), die Übungsmarke (`UebungsMarke`, `groesse="monitor"`
 mit dem Fenster gehen:
 
 ```ts
-grossMass(px) === `min(${px / 19.2}vw, ${px / 10.8}vh)`
+GROSS_EINHEIT = 'var(--lfh-gross-einheit, min(0.05208333vw, 0.09259259vh))'
+grossMass(px) === `calc(${GROSS_EINHEIT} * ${px})`
 ```
+
+Ein Vorfahr kann die Einheit über `--lfh-gross-einheit` festsetzen: die Vorschau im Design System
+(kein ganzes Fenster), später der Lagemonitor, wenn er bei festen Pixeln bleiben soll.
 
 Bei 1920 × 1080 ist das genau `px`, bei 1280 × 720 zwei Drittel, bei 3840 × 2160 das Doppelte; das
 kleinere Verhältnis gewinnt, ein schmales oder flaches Fenster bricht also nicht über den Rand. Ein
@@ -162,7 +168,8 @@ Spec), daneben „Abgeschlossen“; darunter die Vorbereitungszeilen als `GrossZ
 ### D6 Alarme als Zahl, nicht als Liste
 
 Das Element-Vollbild verdeckt die Alarmzone. Damit ein Alarm nicht ungesehen bleibt, zeigt die
-Kopfzeile `useAlarmZone().eintraege.length` als „n Alarm(e) offen“ in Alarmrolle, ohne Titel: die
+Kopfzeile die Zahl der Einträge, Alarme als „n Alarm(e) offen“ in Alarmrolle, Org-Hinweise als
+„n Hinweis(e) offen“ in Bedienrolle, ohne Titel: die
 Einträge können Namen tragen, und das Großbild steht vor allen im Raum. Ton spielt die App wie
 sonst. Quittiert wird nach dem Verlassen. Erwogen: die Alarmzone im Großbild mitzeichnen; sie ist
 eine Rahmenquelle mit Stapel-Logik (`useRahmenObenStapel`) und Bedienknöpfen, beides gehört nicht

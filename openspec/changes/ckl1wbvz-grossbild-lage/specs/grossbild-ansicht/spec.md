@@ -54,9 +54,9 @@ einzigen Bedienelemente MUST „Großbild verlassen“ und, solange das Vollbild
 - **WHEN** jemand im Großbild des Lagebilds auf die Kennzahl „Betroffene“ klickt
 - **THEN** bleibt die Großbild-Ansicht stehen, und es öffnet sich kein Modul
 
-#### Scenario: Vollbild zurückholen
+#### Scenario: Vollbild nachholen
 
-- **WHEN** das Vollbild durch einen Fensterwechsel verloren ging und die Ansicht noch offen ist
+- **WHEN** der Browser das Vollbild beim Öffnen abgelehnt hat und die Ansicht das Fenster füllt
 - **THEN** bietet die Ansicht „Vollbild“ an, und ein Klick fordert es erneut an
 
 ### Requirement: Lesbar aus der Entfernung
@@ -125,8 +125,9 @@ bleibt in der normalen Ansicht und in der Übernahme in einen Lagebericht.
 
 ### Requirement: Alarme und Übung im Großbild
 
-Liegen Einträge in der Alarmzone, SHALL die Großbild-Ansicht ihre Zahl in Alarmrolle zeigen, ohne
-Titel und ohne Personenbezug („2 Alarme offen“); bearbeitet werden sie nach dem Verlassen. Ist der
+Liegen Einträge in der Alarmzone, SHALL die Großbild-Ansicht ihre Zahl zeigen, ohne Titel und
+ohne Personenbezug: Alarme in Alarmrolle („2 Alarme offen“), Hinweise in Bedienrolle („1 Hinweis
+offen“); bearbeitet werden sie nach dem Verlassen. Ist der
 Einsatz eine Übung, MUST das Großbild die Übungsmarke tragen, wie auf jeder Seite des Einsatzes.
 
 #### Scenario: Alarm während der Präsentation

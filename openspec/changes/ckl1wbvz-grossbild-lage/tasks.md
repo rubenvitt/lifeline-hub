@@ -13,26 +13,28 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 
 ## 2. Großbild-Skala und Bausteine
 
-- [ ] 2.1 `components/grossbild/grossMass.ts`: `GROSS_BEZUG` (96/72/32/28 und Abstände) und
+- [x] 2.1 `components/grossbild/grossMass.ts`: `GROSS_BEZUG` (96/72/32/28 und Abstände) und
   `grossMass(px)` nach D3; Test: `grossMass(28)` ergibt `min(1.4583…vw, 2.5925…vh)`, und
   ausgerechnet bei 1920 × 1080 genau 28, bei 1280 × 720 zwei Drittel.
-- [ ] 2.2 `components/grossbild/useBildschirmWach.ts` (inhaltsgleich mit dem Lagemonitor, Kopf
+- [x] 2.2 `components/grossbild/useBildschirmWach.ts` (inhaltsgleich mit dem Lagemonitor, Kopf
   verweist auf die Folgeaufgabe); Test: fordert beim Start und bei Rückkehr in den Vordergrund an,
   gibt beim Abbau frei.
-- [ ] 2.3 `GrossKennzahl`: Bezeichnung, Zahl, Notiz, Töne über die Statusrollen, Zustände `laden`,
+- [x] 2.3 `GrossKennzahl`: Bezeichnung, Zahl, Notiz, Töne über die Statusrollen, Zustände `laden`,
   `fehler`, „—“ mit Grund, kein Link; Test je Zustand und Ton, und dass kein `<a>` und kein Knopf
   entsteht.
-- [ ] 2.4 `GrossZeile` mit gemeinsamem Raster (Wert direkt neben der Bezeichnung) und optionaler
+- [x] 2.4 `GrossZeile` mit gemeinsamem Raster (Wert direkt neben der Bezeichnung) und optionaler
   Farbmarke mit Wort; Test: Wert in der zweiten Spalte, Marke trägt ein Wort.
-- [ ] 2.5 `GrossbildFlaeche`: Portal, `role="dialog"`, Element-Vollbild beim Öffnen, Ausstieg über
+- [x] 2.5 `GrossbildFlaeche`: Portal, `role="dialog"`, Element-Vollbild beim Öffnen, Ausstieg über
   „Großbild verlassen“, Esc und `fullscreenchange`, Knopf „Vollbild“ nur ohne Vollbild,
   `overflow: hidden` an `<html>` mit Wiederherstellung, Fokus hin und zurück, Wachhalten,
   Alarmzahl aus `useAlarmZone` („1 Alarm offen“/„2 Alarme offen“ in Alarmrolle, ohne Titel),
   `UebungsMarke` bei Übung; Tests mit gestubbtem `requestFullscreen` je Punkt, Ablehnung des
   Vollbilds lässt die Fläche stehen.
-- [ ] 2.6 Export über `components/grossbild/index.ts`, Karten für die drei Bausteine in
-  `PREVIEWS` (`frontend/scripts/design-system/previews.tsx`), `pnpm design-system` laufen lassen
-  und Erzeugtes mitnehmen; Prüfen: `designSystem.guard.test.ts` und `gate5.guard.test.ts` grün.
+- [x] 2.6 Export über `components/grossbild/index.ts`, Karten für `GrossKennzahl` und `GrossZeile`
+  in `PREVIEWS` (`frontend/scripts/design-system/previews.tsx`, Einheit über
+  `--lfh-gross-einheit` festgesetzt); `GrossbildFlaeche` bekommt keine Karte, denn sie hängt per
+  Portal am Dokument und fordert Vollbild an. `pnpm design-system` laufen lassen und Erzeugtes
+  mitnehmen; Prüfen: `designSystem.guard.test.ts` und `gate5.guard.test.ts` grün.
 
 ## 3. Lagebild im Großbild
 

@@ -1,0 +1,205 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  zoneSetzen,
+  zoneZuruecksetzenFuerTests,
+  type ZonenEintrag,
+} from '../../alarm/alarmZoneSpeicher';
+import GrossbildFlaeche from './GrossbildFlaeche';
+
+const UEBUNG = { einsatzart: 'uebung' as const };
+
+let vollbildAnfordern: ReturnType<typeof vi.fn>;
+let vollbildVerlassen: ReturnType<typeof vi.fn>;
+let vollbildElement: Element | null = null;
+
+function setzeVollbild(el: Element | null) {
+  vollbildElement = el;
+  document.dispatchEvent(new Event('fullscreenchange'));
+}
+
+beforeEach(() => {
+  vollbildElement = null;
+  Object.defineProperty(document, 'fullscreenElement', {
+    configurable: true,
+    get: () => vollbildElement,
+  });
+  vollbildAnfordern = vi.fn(function (this: Element) {
+    setzeVollbild(this);
+    return Promise.resolve();
+  });
+  vollbildVerlassen = vi.fn(() => {
+    setzeVollbild(null);
+    return Promise.resolve();
+  });
+  Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
+    configurable: true,
+    value: vollbildAnfordern,
+  });
+  Object.defineProperty(document, 'exitFullscreen', {
+    configurable: true,
+    value: vollbildVerlassen,
+  });
+  const wurzel = document.createElement('div');
+  wurzel.id = 'root';
+  document.body.appendChild(wurzel);
+});
+
+afterEach(() => {
+  delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen;
+  delete (document as { exitFullscreen?: unknown }).exitFullscreen;
+  delete (document as { fullscreenElement?: unknown }).fullscreenElement;
+  document.getElementById('root')?.remove();
+  document.documentElement.style.overflow = '';
+  zoneZuruecksetzenFuerTests();
+});
+
+/** Seite mit Knopf „Großbild“, wie Lagebild und Lagebesprechung sie bauen. */
+function Seite({ einsatz }: { einsatz?: { einsatzart: 'uebung' | 'realeinsatz' } }) {
+  const [offen, setOffen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOffen(true)}>
+        Großbild
+      </button>
+      {offen && (
+        <GrossbildFlaeche
+          titel="Lagebild"
+          meta="1430"
+          einsatz={einsatz}
+          onVerlassen={() => setOffen(false)}
+        >
+          <p>Inhalt</p>
+        </GrossbildFlaeche>
+      )}
+    </>
+  );
+}
+
+function oeffnen() {
+  render(<Seite />, { container: document.getElementById('root')! });
+  fireEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+}
+
+function eintrag(stufe: 'alarm' | 'hinweis', titel: string): ZonenEintrag {
+  return {
+    schluessel: titel,
+    stufe,
+    titel,
+    name: 'Test',
+    oeffnen: () => undefined,
+    ausblenden: () => undefined,
+  };
+}
+
+describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
+  it('zeigt die Fläche als Dialog außerhalb der App und fordert Vollbild für sie an', () => {
+    oeffnen();
+    const dialog = screen.getByRole('dialog', { name: 'Lagebild' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(document.getElementById('root')!.contains(dialog)).toBe(false);
+    expect(vollbildAnfordern).toHaveBeenCalledTimes(1);
+    expect(vollbildAnfordern.mock.contexts[0]).toBe(dialog);
+    expect(screen.getByText('Inhalt')).toBeInTheDocument();
+    expect(screen.getByText('1430')).toBeInTheDocument();
+  });
+
+  it('sperrt die App dahinter und das Rollen des Dokuments, solange sie steht', () => {
+    oeffnen();
+    expect(document.getElementById('root')!.inert).toBe(true);
+    expect(document.documentElement.style.overflow).toBe('hidden');
+    fireEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+    expect(document.getElementById('root')!.inert).toBe(false);
+    expect(document.documentElement.style.overflow).toBe('');
+  });
+
+  it('setzt den Fokus auf „Großbild verlassen“ und gibt ihn danach an den Knopf zurück', () => {
+    render(<Seite />, { container: document.getElementById('root')! });
+    const knopf = screen.getByRole('button', { name: 'Großbild' });
+    knopf.focus();
+    fireEvent.click(knopf);
+    expect(screen.getByRole('button', { name: 'Großbild verlassen' })).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+    expect(knopf).toHaveFocus();
+  });
+
+  it('endet, wenn der Browser das Vollbild verlässt (Esc im Vollbild)', () => {
+    oeffnen();
+    act(() => setzeVollbild(null));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('endet mit Esc, wenn kein Vollbild läuft', () => {
+    vollbildAnfordern.mockImplementation(() => Promise.reject(new Error('abgelehnt')));
+    oeffnen();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('beendet beim Verlassen ein laufendes Vollbild', () => {
+    oeffnen();
+    fireEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
+    expect(vollbildVerlassen).toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('bleibt bei abgelehntem Vollbild stehen und bietet „Vollbild“ an', async () => {
+    vollbildAnfordern.mockImplementationOnce(() => Promise.reject(new Error('abgelehnt')));
+    oeffnen();
+    await act(async () => undefined);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Vollbild' }));
+    expect(vollbildAnfordern).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('button', { name: 'Vollbild' })).toBeNull();
+  });
+
+  it('zeigt im Vollbild keinen Knopf „Vollbild“', () => {
+    oeffnen();
+    expect(screen.queryByRole('button', { name: 'Vollbild' })).toBeNull();
+  });
+
+  it('hat ohne Vollbild-API keinen Knopf „Vollbild“ und füllt das Fenster', () => {
+    delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen;
+    oeffnen();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.style.position).toBe('fixed');
+    expect(screen.queryByRole('button', { name: 'Vollbild' })).toBeNull();
+  });
+
+  it('hat außer Verlassen und Vollbild nichts zu bedienen', () => {
+    vollbildAnfordern.mockImplementationOnce(() => Promise.reject(new Error('abgelehnt')));
+    oeffnen();
+    const knoepfe = screen
+      .getAllByRole('button')
+      .filter((b) => screen.getByRole('dialog').contains(b));
+    expect(knoepfe.map((k) => k.textContent)).toEqual(['Vollbild', 'Großbild verlassen']);
+  });
+
+  it('nennt Alarme der Alarmzone als Zahl, ohne Titel', () => {
+    act(() => zoneSetzen(Symbol('t'), [eintrag('alarm', 'Herr Muster vermisst')]));
+    oeffnen();
+    expect(screen.getByText('1 Alarm offen')).toBeInTheDocument();
+    expect(screen.queryByText(/Muster/)).toBeNull();
+    act(() =>
+      zoneSetzen(Symbol('t'), [
+        eintrag('alarm', 'a'),
+        eintrag('alarm', 'b'),
+        eintrag('hinweis', 'c'),
+      ]),
+    );
+    expect(screen.getByText('2 Alarme offen')).toBeInTheDocument();
+    expect(screen.getByText('1 Hinweis offen')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Einträge keine Alarmzahl', () => {
+    oeffnen();
+    expect(screen.queryByText(/Alarm/)).toBeNull();
+  });
+
+  it('trägt bei einer Übung die Übungsmarke', () => {
+    render(<Seite einsatz={UEBUNG} />, { container: document.getElementById('root')! });
+    fireEvent.click(screen.getByRole('button', { name: 'Großbild' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Übung');
+  });
+});
