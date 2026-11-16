@@ -38,6 +38,7 @@ import { rollenFarbe, statusKategorie, warnstufeBalkenFarbe } from '../../src/th
 import type { Sichtungskategorie, Verletzung } from '../../src/api/types';
 import { createMemoryRouter, Link, MemoryRouter, RouterProvider } from 'react-router';
 import {
+  AlarmZeile,
   Augenbraue,
   BearbeitbaresPaneel,
   DashboardFlaeche,
@@ -1083,6 +1084,53 @@ export const PREVIEWS: readonly PreviewSpec[] = [
           ]}
         />
       </div>
+    ),
+  },
+  {
+    name: 'AlarmZeile',
+    title: 'AlarmZeile „Was brennt“ (Einträge, Ruhe, unvollständig)',
+    group: 'Rückmeldung',
+    height: 390,
+    source: 'components/instrument/AlarmZeile.tsx',
+    content: () => (
+      <MemoryRouter>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <AlarmZeile
+            daten={{
+              stand: 'vollstaendig',
+              fehlend: [],
+              eintraege: [
+                {
+                  art: 'sofort',
+                  rolle: 'alarm',
+                  text: '1 Sofortmeldung · älteste 2 min',
+                  voll: '1 Sofortmeldung · älteste 2 min',
+                  bezug: [],
+                },
+                {
+                  art: 'kritisch',
+                  rolle: 'alarm',
+                  text: 'kritisch: UHS Turnhalle',
+                  voll: 'kritisch: UHS Turnhalle',
+                  bezug: [],
+                },
+                {
+                  art: 'erinnerung',
+                  rolle: 'achtung',
+                  text: '1 Erinnerung fällig',
+                  voll: '1 Erinnerung fällig',
+                  bezug: [],
+                },
+              ],
+            }}
+            ziel={() => '/meldungen'}
+          />
+          <AlarmZeile daten={{ stand: 'vollstaendig', fehlend: [], eintraege: [] }} />
+          <AlarmZeile
+            daten={{ stand: 'unvollstaendig', fehlend: ['Rückmeldungen'], eintraege: [] }}
+          />
+        </div>
+      </MemoryRouter>
     ),
   },
   {

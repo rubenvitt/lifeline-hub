@@ -66,15 +66,16 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
 
 ## 4. Seiten (Frontend)
 
-- [ ] 4.1 Überblick: `AlarmZeile` als erstes Element unter dem Seitenkopf; das Band wird zum
+- [x] 4.1 Überblick: `AlarmZeile` als erstes Element unter dem Seitenkopf; das Band wird zum
   „Führungsstand“ mit Offene Aufträge, Meldungen offen, Einsatzabschnitte (Betroffene, Kräfte,
   Einsatzdauer entfallen); Seitenkopf-Aktion „Lagebild“. `UeberblickPage.test.tsx`: vermisste
   Person steht in der Zeile; Band ohne Betroffene, Kräfte, Einsatzdauer; Sprung zum Lagebild.
-- [ ] 4.2 Lagebild: `AlarmZeile` unter dem Seitenkopf; Fußband ohne Aufträge und Meldungen,
+- [x] 4.2 Lagebild: `AlarmZeile` unter dem Seitenkopf; Fußband ohne Aufträge und Meldungen,
   Beschriftung „Stand“ (Lagebericht, UHS aktiv); Seitenkopf-Aktion „Überblick“. Seitentest:
   Sofortmeldung steht ab Eingang in der Zeile; keine Kennzahl „Aufträge offen“ und „Meldungen
-  offen“; gleiche Zeile wie im Überblick für denselben Fall.
-- [ ] 4.3 Sprungziele laut design D9; Filter „vermisst“ der Personenliste prüfen und bei Bedarf
+  offen“. Gleiche Zeile wie im Überblick: beide Seiten rufen denselben Hook `useWasBrennt`
+  (`lage/useWasBrennt.test.tsx`), kein zweiter Weg.
+- [x] 4.3 Sprungziele laut design D9; Filter „vermisst“ der Personenliste prüfen und bei Bedarf
   als URL-Parameter ergänzen (mit Test). Ziele ohne Leserecht ohne Link.
 - [ ] 4.4 Lagemonitor: Zeile `groesse="gross"` als erste Rasterzeile über den Kacheln, gespeist
   über `alarmAusMonitor`; invalidiert `einsatzKeys.lagemonitor` bei `sofortmeldung`.
@@ -83,11 +84,11 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
 
 ## 5. Regeln, Design System, Doku
 
-- [ ] 5.1 `frontend/AGENTS.md`: Dashboard-Baukasten (Alarmzeile ganz oben auf Überblick, Lagebild,
+- [x] 5.1 `frontend/AGENTS.md`: Dashboard-Baukasten (Alarmzeile ganz oben auf Überblick, Lagebild,
   Monitor; Baustein in der Liste), Seitenrollen „Führen“ gegen „Lage“ und Heimat der Kennzahlen
   (Abschnitt „Eine Heimat je Zahl“), Sechs-Plätze-Regel ausdrücklich für „Lage in Zahlen“.
   Prettier grün.
-- [ ] 5.2 Design System: Karte `AlarmZeile` in `frontend/scripts/design-system/previews.tsx`
+- [x] 5.2 Design System: Karte `AlarmZeile` in `frontend/scripts/design-system/previews.tsx`
   (Nacht und Tag, mit Einträgen und in Ruhe), `mise exec -- pnpm -C frontend design-system`, das
   Erzeugte mitcommitten; `designSystem.guard.test.ts` grün.
 - [ ] 5.3 Anwenderdoku: `docs/anwender/kapitel/ueberblick.md`, `lagebild.md`, `lagemonitor.md`
