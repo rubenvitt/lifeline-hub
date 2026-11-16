@@ -4,7 +4,7 @@ import { aktualisierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { PAT_NUMMER_MAX } from '../api/eingabegrenzen';
 import type { PersonDetail } from '../api/types';
 import { InlineAngabe } from '../components/InlineAngabe';
-import { monoStil, useRollen } from '../components/instrument';
+import { useRollen, zahlStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import StatusTag from '../components/StatusTag';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
@@ -76,7 +76,7 @@ export default function PatKennzeichen({
         <InlineAngabe<string>
           etikett="PAT-Nummer"
           wert={pat}
-          anzeige={<span style={monoStil(13)}>{`PAT ${pat}`}</span>}
+          anzeige={<span style={zahlStil('text')}>{`PAT ${pat}`}</span>}
           leer={(w) => w.trim() === ''}
           gleich={(a, b) => a.trim() === b.trim()}
           isValid={(w) => !istZuLang(w, PAT_NUMMER_MAX)}
@@ -94,7 +94,7 @@ export default function PatKennzeichen({
         />
       ) : (
         pat && (
-          <span data-lfh="pat-nummer" style={{ ...monoStil(13), color: rollen.text }}>
+          <span data-lfh="pat-nummer" style={{ ...zahlStil('text'), color: rollen.text }}>
             {`PAT ${pat}`}
           </span>
         )

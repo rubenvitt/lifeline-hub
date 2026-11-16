@@ -186,7 +186,7 @@ describe('Bediendichte — die drei Austritte (LFH-329 · B1)', () => {
     zeigeSonde();
     await userEvent.click(screen.getByRole('button', { name: 'handschuh' }));
     expect(gemesseneMasse().controlHeight).toBe(72);
-    expect(gemesseneMasse().fontSize).toBe(15);
+    expect(gemesseneMasse().fontSize).toBe(17.5);
   });
 
   it('<html> trägt die effektive Stufe', async () => {

@@ -1,6 +1,6 @@
 import { Alert, Flex, Typography } from 'antd';
 import type { Auftrag, AuftragEmpfaenger as AuftragEmpfaengerTyp } from '../api/types';
-import { Augenbraue, Paneel, monoStil, useRollen } from '../components/instrument';
+import { Augenbraue, Paneel, useRollen, schriftGroesse, zahlStil } from '../components/instrument';
 import { DetailSprung } from '../components/ListeDetail';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
@@ -153,7 +153,7 @@ export default function AuftragDetail({
         />
       )}
       <AuftragKopf auftrag={a} mitEtbSprung={false} />
-      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block' }}>
+      <Text strong style={{ fontSize: schriftGroesse('text'), lineHeight: 1.4, display: 'block' }}>
         {a.auftrag_text}
       </Text>
       <AuftragAufhebung auftrag={a} />
@@ -209,7 +209,7 @@ export default function AuftragDetail({
               key={`${e.zeit}-${i}`}
               style={{ listStyle: 'none', display: 'flex', gap: token.marginSM, paddingBlock: 2 }}
             >
-              <span style={{ ...monoStil(12), color: rollen.gedaempft, flex: '0 0 auto' }}>
+              <span style={{ ...zahlStil('klein'), color: rollen.gedaempft, flex: '0 0 auto' }}>
                 <ZeitAnzeige wert={e.zeit} rolle="kurz" />
               </span>
               <span>{e.wort}</span>

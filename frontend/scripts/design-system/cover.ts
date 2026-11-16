@@ -11,6 +11,7 @@ import {
   schrift,
   schriftskala,
   type Farbrollen,
+  schriftPx,
 } from '../../src/theme/tokens';
 
 /** Die Rollen, die das Deckblatt als Fläche zeigt — Grundstufen, Bedienung, Signale, Marke. */
@@ -50,10 +51,10 @@ export function buildCover(fontCss: string): string {
     'html,body{margin:0;padding:0}',
     `body{background:${farbenDunkel.grund};font-family:${schrift.text}}`,
     `.kopf{padding:32px 24px 8px;color:${farbenDunkel.text}}`,
-    `.kopf h1{margin:0;font-size:${titel.groesse}px;font-weight:${titel.gewicht};letter-spacing:${titel.sperrung}}`,
+    `.kopf h1{margin:0;font-size:${schriftPx(titel.stufe)}px;font-weight:${titel.gewicht};letter-spacing:${titel.sperrung}}`,
     `.kopf p{margin:8px 0 0;font-size:14px;color:${farbenDunkel.gedaempft}}`,
     '.band{padding:16px 24px 20px}',
-    `.braue{margin:0 0 12px;font-size:${braue.groesse}px;font-weight:${braue.gewicht};letter-spacing:${braue.sperrung};text-transform:uppercase}`,
+    `.braue{margin:0 0 12px;font-size:${schriftPx(braue.stufe)}px;font-weight:${braue.gewicht};letter-spacing:${braue.sperrung};text-transform:uppercase}`,
     '.felder{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:12px}',
     '.feld{display:flex;flex-direction:column;gap:4px}',
     '.probe{height:40px;border:1px solid var(--rand)}',

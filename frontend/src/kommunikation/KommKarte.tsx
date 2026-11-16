@@ -1,5 +1,5 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
-import { monoStil, useRollen } from '../components/instrument';
+import { useRollen, zahlStil } from '../components/instrument';
 import { kartenGrund, kartenKante } from './kartenKante';
 
 type Hueller = Omit<HTMLAttributes<HTMLElement>, 'children' | 'style'>;
@@ -87,8 +87,8 @@ export default function KommKarte({
             borderInlineEnd: `1px solid ${rollen.flaeche3}`,
           }}
         >
-          <span style={{ ...monoStil(13, 500), color: rollen.text }}>{zeit}</span>
-          {nr != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{nr}</span>}
+          <span style={{ ...zahlStil('text', 500), color: rollen.text }}>{zeit}</span>
+          {nr != null && <span style={{ ...zahlStil('fein'), color: rollen.schwach }}>{nr}</span>}
         </div>
       )}
       <div

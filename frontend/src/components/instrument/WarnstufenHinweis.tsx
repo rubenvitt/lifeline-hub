@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { IconWarndreieck } from '../../icons';
-import { useRollen } from './rollenwerte';
+import { schriftStil, useRollen } from './rollenwerte';
 
 /**
  * WarnstufenHinweis — die Warnstufe im Seitenkopf einer Dashboard-Fläche (Regel
@@ -26,6 +26,8 @@ export default function WarnstufenHinweis({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
+        // Das Wort des Warnhinweises: Rolle `warnung`, mindestens 14 px (Spec `schriftskala`).
+        ...schriftStil('warnung'),
         color: ton === 'alarm' ? rollen.alarmText : rollen.achtungText,
       }}
     >

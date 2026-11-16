@@ -16,8 +16,8 @@ import { einsatzAnlegen } from './einsatz-kern';
  *
  * Rollenunabhängig: `kategorien` ist eine statische Liste, die Rail zeigt sie jeder Rolle gleich.
  * Gemessen in beiden Modi (die Rail ist in beiden dunkel, die Schrift dieselbe — der Durchgang
- * belegt das, statt es anzunehmen) und in jeder Stufe: in `handschuh` wächst die Rail, die
- * Schrift nicht, also sind `kompakt`/`komfortabel` (60 px) die engen Fälle.
+ * belegt das, statt es anzunehmen) und in jeder Stufe: Etikett (11 px × Schriftfaktor, LLH-1773)
+ * und Rail (64 / 74 / 80 px, `railBreite`) wachsen beide mit der Dichte.
  */
 
 const BREITEN = [1440, 1024] as const;

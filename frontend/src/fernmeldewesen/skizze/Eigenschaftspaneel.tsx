@@ -34,6 +34,7 @@ import {
   Paneel,
   Segmentleiste,
   useRollen,
+  zahlStil,
 } from '../../components/instrument/index';
 import { Select } from '../../components/Select';
 import Tastenkuerzel from '../../components/Tastenkuerzel';
@@ -92,6 +93,7 @@ function TextAngabe({
   darf,
   mehrzeilig,
   maxLaenge,
+  kennung,
   onSpeichern,
 }: {
   etikett: string;
@@ -99,13 +101,24 @@ function TextAngabe({
   darf: boolean;
   mehrzeilig?: boolean;
   maxLaenge?: number;
+  /** Der Wert ist eine Kennung (Rufname): nur er steht in Mono, die Aufforderung in der
+      Textschrift (Spec `schriftrollen`, „Mono nur für Zahl, Zeit, Kennung und Funkrufname“). */
+  kennung?: boolean;
   onSpeichern: (w: string | null) => Promise<unknown>;
 }) {
   return (
     <InlineAngabe<string>
       etikett={etikett}
       wert={wert ?? ''}
-      anzeige={wert}
+      anzeige={
+        kennung && wert ? (
+          <span data-schrift="kennung" style={zahlStil('text')}>
+            {wert}
+          </span>
+        ) : (
+          wert
+        )
+      }
       leer={leerText}
       gleich={(a, b) => a.trim() === b.trim()}
       darfSchreiben={darf}
@@ -187,7 +200,13 @@ function ZeitAngabe({
     <InlineAngabe<Dayjs | null>
       etikett={etikett}
       wert={alsZeitpunkt(wert) ?? null}
-      anzeige={wert ? <ZeitAnzeige wert={wert} rolle="zeitpunkt" /> : null}
+      anzeige={
+        wert ? (
+          <span style={zahlStil('text')}>
+            <ZeitAnzeige wert={wert} rolle="zeitpunkt" />
+          </span>
+        ) : null
+      }
       leer={(d) => d == null}
       gleich={(a, b) => (a == null || b == null ? a === b : a.valueOf() === b.valueOf())}
       darfSchreiben={darf}
@@ -367,7 +386,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
             {stelle.art === 'fuehrungsstelle' ||
             stelle.art === 'abschnitt' ||
             stelle.art === 'einheit' ? (
-              <Datenfeld label="Rufname" mono>
+              <Datenfeld label="Rufname">
                 {stelle.art === 'fuehrungsstelle' && !stelle.erfasst ? (
                   <Wert>{stelle.hinweis}</Wert>
                 ) : (
@@ -375,6 +394,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                     etikett="Rufname"
                     wert={stelle.rufname}
                     darf={darf}
+                    kennung
                     onSpeichern={(r) => h.setzeRufname(stelle.key, r, stelle.rufname)}
                   />
                 )}
@@ -394,7 +414,9 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                     return (
                       <li key={k.key} style={{ marginBlockEnd: token.marginXS }}>
                         <Flex gap={token.marginSM} wrap align="center">
-                          <span style={{ fontFamily: token.fontFamilyCode }}>{sch.zeichen}</span>
+                          <span data-schrift="kennung" style={{ fontFamily: token.fontFamilyCode }}>
+                            {sch.zeichen}
+                          </span>
                           {stelle.art === 'extern' && darf ? (
                             <Segmentleiste<Verbindungsstatus>
                               beschriftung={`Status ${sch.zeichen}`}
@@ -469,7 +491,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
           <Datenraster spalten={1} beschriftung={`Angaben zu ${schiene.zeichen}`}>
             <Datenfeld label="Betriebsart">{schiene.betriebsart}</Datenfeld>
             <Datenfeld label="Bezeichnung" mono>
-              {schiene.bezeichnung}
+              <span data-schrift="kennung">{schiene.bezeichnung}</span>
             </Datenfeld>
             <Datenfeld label="Netz">
               <Wert>{schiene.netz}</Wert>
@@ -708,7 +730,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                 'Kein Vermerk'
               )}
             </Datenfeld>
-            <Datenfeld label="Gültig ab" mono>
+            <Datenfeld label="Gültig ab">
               <ZeitAngabe
                 etikett="Gültig ab"
                 wert={sf?.gueltig_ab ?? null}
@@ -728,7 +750,7 @@ const Eigenschaftspaneel = forwardRef<HTMLHeadingElement, EigenschaftspaneelProp
                 }
               />
             </Datenfeld>
-            <Datenfeld label="gez. (DTG)" mono>
+            <Datenfeld label="gez. (DTG)">
               <ZeitAngabe
                 etikett="gez. DTG"
                 wert={sf?.gez_at ?? null}

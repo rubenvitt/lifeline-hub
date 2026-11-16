@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { EtbBaustein } from '../api/types';
 import { filterSlashEintraege, type MetaFeld, type SlashEintrag } from './schnellerfassungModell';
+import { schriftGroesse } from '../components/instrument/rollenwerte';
 
 export interface SlashMenuHandle {
   /** Tastatur-Navigation vom Container weitergereicht. Liefert true, wenn verarbeitet. */
@@ -173,7 +174,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
         <Typography.Text
           type="secondary"
           style={{
-            fontSize: 11,
+            fontSize: schriftGroesse('fein'),
             padding: `${token.paddingXS}px ${token.padding}px`,
             display: 'block',
           }}
@@ -219,7 +220,7 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
                     marginInlineStart: token.marginXS,
                     color: token.colorTextSecondary,
                     fontFamily: token.fontFamilyCode,
-                    fontSize: 12,
+                    fontSize: schriftGroesse('klein'),
                   }}
                 >
                   {e.hinweis}

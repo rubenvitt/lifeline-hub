@@ -11,9 +11,9 @@ import {
   Datenfeld,
   Datenraster,
   Segmentleiste,
-  monoStil,
   useRollen,
   type SegmentOption,
+  zahlStil,
 } from '../../components/instrument';
 import { Select } from '../../components/Select';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
@@ -97,7 +97,10 @@ export default function AbschnittDetail({
       etikett={etikett}
       wert={a[feld] ?? ''}
       anzeige={
-        <span style={feld === 'rufname' ? monoStil(13) : { whiteSpace: 'pre-wrap' }}>
+        <span
+          data-schrift={feld === 'rufname' ? 'kennung' : undefined}
+          style={feld === 'rufname' ? zahlStil('text') : { whiteSpace: 'pre-wrap' }}
+        >
           {a[feld]}
         </span>
       }
@@ -148,7 +151,11 @@ export default function AbschnittDetail({
         <InlineAngabe<string>
           etikett="Kurzbezeichnung"
           wert={a.kurzbezeichnung ?? ''}
-          anzeige={<span style={monoStil(13)}>{a.kurzbezeichnung}</span>}
+          anzeige={
+            <span data-schrift="kennung" style={zahlStil('text')}>
+              {a.kurzbezeichnung}
+            </span>
+          }
           leer={isEmptyText}
           gleich={isSameText}
           darfSchreiben={darfSchreiben}

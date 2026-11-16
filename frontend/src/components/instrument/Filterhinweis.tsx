@@ -1,6 +1,6 @@
 import { Button } from 'antd';
 import type { ReactNode } from 'react';
-import { monoStil, useRollen } from './rollenwerte';
+import { useRollen, schriftStil } from './rollenwerte';
 
 /**
  * Filterhinweis — das Band über einer gefilterten Liste (LLH-1071, Spec `etb-filterleiste`,
@@ -71,20 +71,21 @@ export default function Filterhinweis({
           alignItems: 'center',
           gap: token.marginXS,
           minWidth: 0,
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
-        <strong style={{ flex: '0 0 auto' }}>Gefiltert</strong>
+        {/* Das Wort des Warnhinweises in der Rolle `warnung` (14/600, Spec `schriftskala`). */}
+        <strong style={{ flex: '0 0 auto', ...schriftStil('warnung') }}>Gefiltert</strong>
         {mitZahl && (
           <span style={{ flex: '0 1 auto', minWidth: 0 }}>
             <span aria-hidden="true">· </span>
-            <span style={monoStil(12)}>{treffer}</span> von{' '}
-            <span style={monoStil(12)}>{gesamt}</span> {dinge} sichtbar
+            {treffer} von {gesamt} {dinge} sichtbar
           </span>
         )}
         <span
           title={merkmalText}
           style={{
-            ...monoStil(12),
+            ...schriftStil('meta'),
             flex: '1 1 8em',
             minWidth: 0,
             overflow: 'hidden',

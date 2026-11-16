@@ -3,7 +3,6 @@ import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import StatusTag from '../components/StatusTag';
-import { monoStil } from '../components/instrument';
 import { Select } from '../components/Select';
 import {
   SeitenFehler,
@@ -43,6 +42,7 @@ import { RechteHinweis } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import type { EinheitVorlage } from '../api/types';
+import { zahlStil } from '../components/instrument/rollenwerte';
 
 /**
  * Gliederung der Einheiten eines Einsatzes (LLH-1029): eine Tabelle mit Baum, Zeilen aus dem
@@ -93,7 +93,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       // neben der Farbe (WCAG 1.4.1). „Soll erfüllt“ bliebe ein Grün-Teppich.
       render: (_t, z) => (
         <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-          <span style={monoStil(12)}>{staerkeText(z.ist)}</span>
+          <span style={zahlStil('klein')}>{staerkeText(z.ist)}</span>
           {z.urteil === 'unterbesetzt' && (
             // `umbrechen` nimmt antds Außenrand rechts (8 px) weg: er verbreiterte die Spalte.
             <StatusTag darstellung={einheitStaerkeUrteil.unterbesetzt} umbrechen />
@@ -105,7 +105,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       title: 'Soll',
       key: 'soll',
       width: 88,
-      render: (_t, z) => <span style={monoStil(12)}>{staerkeText(z.soll)}</span>,
+      render: (_t, z) => <span style={zahlStil('klein')}>{staerkeText(z.soll)}</span>,
     },
     {
       title: 'Abschnitt',
@@ -123,7 +123,7 @@ function gliederungSpalten(einsatzId: number, sprungGesperrt: SprungGesperrt) {
       // 11-|1“ läse sich als zwei Fahrzeuge), nur zwischen den Namen.
       render: (_t, z) =>
         z.fahrzeuge.length > 0 ? (
-          <span data-lfh="einheit-fahrzeuge" style={monoStil(12)}>
+          <span data-lfh="einheit-fahrzeuge" data-schrift="kennung" style={zahlStil('klein')}>
             {z.fahrzeuge.length} ·{' '}
             {z.fahrzeuge.map((f, i) => (
               <Fragment key={`${i}-${f}`}>

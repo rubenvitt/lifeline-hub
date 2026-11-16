@@ -1,7 +1,7 @@
 import { cloneElement, useId, type ReactElement, type ReactNode } from 'react';
 import { Form } from 'antd';
 import type { FormItemProps, FormRule } from 'antd';
-import Augenbraue from './Augenbraue';
+import Feldetikett from './Feldetikett';
 import { useRollen } from './rollenwerte';
 import { datenfeldStil } from './datenrasterStil';
 
@@ -24,7 +24,7 @@ import { datenfeldStil } from './datenrasterStil';
  * höher.
  */
 export interface DatenfeldEingabeProps {
-  /** Begriff — Augenbraue und zugänglicher Name der Eingabe. */
+  /** Begriff — Feldetikett und zugänglicher Name der Eingabe. */
   label: ReactNode;
   /** Feldname im Formular der Seite. */
   name: FormItemProps['name'];
@@ -55,9 +55,9 @@ export default function DatenfeldEingabe({
   const eingabeId = children.props.id ?? erzeugt;
   return (
     <div data-lfh="datenfeld" style={datenfeldStil(rollen, token, breit)}>
-      <Augenbraue als="dt">
+      <Feldetikett als="dt">
         <label htmlFor={eingabeId}>{label}</label>
-      </Augenbraue>
+      </Feldetikett>
       <dd style={{ margin: 0, minWidth: 0 }}>
         <Form.Item name={name} rules={rules} extra={hilfe} style={{ marginBottom: 0 }}>
           {cloneElement(children, { id: eingabeId })}

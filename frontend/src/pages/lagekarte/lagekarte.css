@@ -59,7 +59,7 @@
   box-sizing: border-box;
   color: var(--lfh-gedaempft);
   font-family: var(--lfh-schrift-zahl);
-  font-size: 10px;
+  font-size: var(--lfh-groesse-fein);
   font-variant-numeric: tabular-nums;
   line-height: 14px;
   white-space: nowrap;

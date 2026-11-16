@@ -1,13 +1,13 @@
 import type { CSSProperties, ReactNode } from 'react';
-import Augenbraue from './Augenbraue';
-import { monoStil, useRollen } from './rollenwerte';
+import Feldetikett from './Feldetikett';
+import { useRollen, schriftGroesse, zahlStil } from './rollenwerte';
 import { datenfeldStil, datenrasterStil } from './datenrasterStil';
 
 /**
- * Datenraster — die Detail-Optik statt antds `Descriptions`: je Feld eine Augenbraue über dem
+ * Datenraster — die Detail-Optik statt antds `Descriptions`: je Feld ein Feldetikett über dem
  * Wert, 2–4 Spalten im Fugenraster, Kennungen/Zahlen/Zeiten in Mono.
  *
- * SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Augenbraue) und `<dd>` — die
+ * SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Feldetikett, LLH-1776) und `<dd>` — die
  * zulässige Gruppierung nach HTML, Vorleser hören Begriff und Wert als Paar.
  *
  * BEARBEITEN AN ORT UND STELLE: im Edit-Modus einer Detailseite steht statt `Datenfeld` eine
@@ -45,7 +45,7 @@ export default function Datenraster({
 }
 
 interface DatenfeldProps {
-  /** Begriff — erscheint als Augenbraue. */
+  /** Begriff — erscheint als Feldetikett (gemischt geschrieben, LLH-1776). */
   label: ReactNode;
   children: ReactNode;
   /** Wert in Mono (Kennung, Zahl, Zeit, Funkrufname). */
@@ -58,14 +58,14 @@ export function Datenfeld({ label, children, mono = false, breit = false }: Date
   const { token, rollen } = useRollen();
   return (
     <div data-lfh="datenfeld" style={datenfeldStil(rollen, token, breit)}>
-      <Augenbraue als="dt">{label}</Augenbraue>
+      <Feldetikett als="dt">{label}</Feldetikett>
       <dd
         style={{
           margin: 0,
           minWidth: 0,
           overflowWrap: 'anywhere',
           color: rollen.text,
-          ...(mono ? monoStil(13) : { fontSize: 13 }),
+          ...(mono ? zahlStil('text') : { fontSize: schriftGroesse('text') }),
         }}
       >
         {children}

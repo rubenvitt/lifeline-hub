@@ -2,6 +2,7 @@ import { IconChevronRunter } from '../icons';
 import { Button, Dropdown, Space, theme, Typography, type MenuProps } from 'antd';
 import StatusTag from './StatusTag';
 import type { StatusDarstellung } from '../theme/statusFarben';
+import { schriftGroesse } from './instrument/rollenwerte';
 
 interface SwitcherEintrag {
   id: number;
@@ -63,8 +64,8 @@ export default function EinstiegSwitcher({
   return (
     <Dropdown menu={{ items, onClick }} trigger={['click']}>
       <Button type="text" style={wechslerStil(token)}>
-        <Typography.Text strong style={{ fontSize: 20 }}>
-          {aktuell.bezeichnung} <IconChevronRunter style={{ fontSize: 14 }} />
+        <Typography.Text strong style={{ fontSize: schriftGroesse('titel') }}>
+          {aktuell.bezeichnung} <IconChevronRunter style={{ fontSize: schriftGroesse('text') }} />
         </Typography.Text>
       </Button>
     </Dropdown>

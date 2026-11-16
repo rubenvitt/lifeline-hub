@@ -1,5 +1,5 @@
 import { Button, InputNumber } from 'antd';
-import { monoStil, useRollen } from './instrument';
+import { zahlStil } from './instrument';
 import { KREIS_RADIUS_M_MAX } from '../api/eingabegrenzen';
 
 /** Schnellwahl des Radius in Metern (LLH-1043): Erstabsperrung bis Evakuierungsradius. */
@@ -34,7 +34,6 @@ export default function RadiusEingabe({
   'aria-invalid': ariaInvalid,
   'aria-required': ariaRequired,
 }: RadiusEingabeProps) {
-  const { token } = useRollen();
   const radius = value ?? null;
   return (
     <>
@@ -51,7 +50,7 @@ export default function RadiusEingabe({
         disabled={disabled}
         suffix="m"
         inputMode="numeric"
-        style={{ width: 132, ...monoStil(token.fontSize) }}
+        style={{ width: 132, ...zahlStil('text') }}
         onChange={(v) => onChange?.(typeof v === 'number' ? v : null)}
         onPressEnter={onPressEnter}
       />
