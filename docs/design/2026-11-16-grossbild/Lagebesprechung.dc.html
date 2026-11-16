@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Lagebesprechung Großbild</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-700.woff2") format("woff2");font-weight:700}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-600.woff2") format("woff2");font-weight:600}
+body{margin:0}
+.gb{width:1920px;height:1080px;box-sizing:border-box;display:grid;grid-template-rows:auto auto auto minmax(0,1fr);gap:28px;padding:32px 40px;background:#08090b;color:#e8ebee;font-family:"LFH Archivo",system-ui,sans-serif;overflow:hidden}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.kopf{display:flex;align-items:center;gap:24px;min-height:64px}
+.kopf h1{margin:0;font-size:32px;line-height:1.2;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.kopf .sp{flex:1}
+.kn{display:inline-flex;align-items:center;gap:10px;height:56px;padding:0 20px;border:2px solid #626a73;background:transparent;color:#e8ebee;font:inherit;font-size:28px}
+.termin{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);border-top:1px solid #22262b;border-bottom:1px solid #22262b}
+.kz{display:flex;flex-direction:column;gap:6px;padding:18px 24px;min-width:0}
+.kz:first-child{padding-left:0}
+.kz + .kz{border-left:1px solid #22262b}
+.kz .t{font-size:28px;line-height:1.2;color:#c6ccd2}
+.kz .z{font-size:96px;line-height:1.05;font-weight:600}
+.kz .n{font-size:28px;line-height:1.2;color:#9aa2ab}
+.kz.ac .z,.kz.ac .n{color:#e8cc3a}
+.kz.ac .n{display:inline-flex;align-items:center;gap:10px;font-weight:700}
+.vk{display:flex;align-items:baseline;gap:20px;padding-bottom:10px;border-bottom:1px solid #22262b}
+.vk h2{margin:0;font-size:28px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9aa2ab}
+.vk .stand{font-size:28px;color:#9aa2ab}
+.spalten{display:grid;grid-template-columns:1fr 1fr;column-gap:64px;min-height:0}
+.zeilen{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);column-gap:32px;row-gap:16px;align-content:start}
+.zeilen .b{font-size:28px;line-height:1.2;color:#c6ccd2;padding-top:20px}
+.zeilen .wz{display:flex;flex-direction:column;min-width:0}
+.zeilen .w{font-size:72px;line-height:1.1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zeilen .w.al{color:#ff6b6b}
+.zeilen .n{font-size:28px;line-height:1.2;color:#9aa2ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zeilen .n.al{color:#ff6b6b}
+.zeilen .w.ges{color:#9aa2ab}
+</style>
+</helmet>
+<div class="gb" role="dialog" aria-label="Lagebesprechung im Großbild">
+  <div class="kopf">
+    <h1>Lagebesprechung</h1>
+    <span class="sp"></span>
+    <button class="kn" type="button"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 4H4v5"></path><path d="M15 20h5v-5"></path><path d="M4 4l6 6"></path><path d="M20 20l-6-6"></path></svg>Großbild verlassen</button>
+  </div>
+
+  <div class="termin" role="group" aria-label="Termin der nächsten Lagebesprechung">
+    <div class="kz ac"><span class="t">Nächste Lagebesprechung</span><span class="z mono">1430</span><span class="n"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>seit 5 min überfällig</span></div>
+    <div class="kz"><span class="t">Abgeschlossen</span><span class="z mono">3</span><span class="n">zuletzt Nr. 3 · 1330</span></div>
+  </div>
+
+  <div class="vk"><h2>Vorbereitung</h2><span class="stand mono">Stand 1432</span></div>
+
+  <div class="spalten">
+    <div class="zeilen">
+      <span class="b">Betroffene</span><span class="wz"><span class="w mono">248</span><span class="n">davon 3 vermisst</span></span>
+      <span class="b">Sichtung</span><span class="wz"><span class="w mono">4 · 11 · 63 · 0</span><span class="n">SK I · II · III · IV, 2 ohne</span></span>
+      <span class="b">Kräfte</span><span class="wz"><span class="w mono">0/12/58//70</span><span class="n">14 Einheiten</span></span>
+      <span class="b">Höchste Warnstufe</span><span class="wz"><span class="w al">hoch</span><span class="n">2 Gebiete</span></span>
+      <span class="b">Aufträge offen</span><span class="wz"><span class="w mono">5</span><span class="n al">1 überfällig</span></span>
+    </div>
+    <div class="zeilen">
+      <span class="b">Meldungen offen</span><span class="wz"><span class="w mono">9</span><span class="n">2 neu · 1 Bestätigung überfällig</span></span>
+      <span class="b">Nachforderungen offen</span><span class="wz"><span class="w ges">—</span><span class="n">nicht freigegeben</span></span>
+      <span class="b">Lagebericht</span><span class="wz"><span class="w mono">1400</span><span class="n">freigegeben · Lage 3</span></span>
+      <span class="b">Letzte Lagebesprechung</span><span class="wz"><span class="w mono">Nr. 3</span><span class="n">1330</span></span>
+      <span class="b">Nächster Termin</span><span class="wz"><span class="w mono">1430</span><span class="n">seit 5 min überfällig</span></span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

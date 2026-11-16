@@ -5,7 +5,7 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
 
 ## 1. Entwurf
 
-- [ ] 1.1 Großbild für Lagebild und Lagebesprechung mit `/design` (Artifact-Typ „Design“, Design
+- [x] 1.1 Großbild für Lagebild und Lagebesprechung mit `/design` (Artifact-Typ „Design“, Design
   System „Lifeline Hub“) entwerfen und unter `docs/design/2026-11-16-grossbild/` ablegen
   (Aufteilung aus design.md D5, Nacht und Tag, 1920 × 1080 und 1280 × 720); ist das Design System
   aus der Sitzung nicht lesbar, Entwurf aus den Bausteinen bauen und das im Ordner-README
