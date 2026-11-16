@@ -954,7 +954,6 @@ function TaktischeZeichenBeispiel() {
   );
 }
 
-/** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
 /** Zeilen im Großbild mit Warnstufen-Marken aus dem Theme (Nacht und Tag). */
 function GrossZeilenVorschau() {
   const { token } = useRollen();
@@ -980,6 +979,7 @@ function GrossZeilenVorschau() {
   );
 }
 
+/** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
 export const PREVIEWS: readonly PreviewSpec[] = [
   {
     name: 'Paneel',

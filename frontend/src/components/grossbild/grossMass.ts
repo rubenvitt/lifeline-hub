@@ -29,7 +29,7 @@ const BEZUG_BREITE = 1920;
 const BEZUG_HOEHE = 1080;
 
 /** Auf acht Stellen gerundet: bei 96 px bleibt die Abweichung unter 0,0001 px. */
-function rund(wert: number): number {
+function round8(wert: number): number {
   return Math.round(wert * 1e8) / 1e8;
 }
 
@@ -37,7 +37,7 @@ function rund(wert: number): number {
  * Ein Bezugspixel als CSS-Länge: `min(vw, vh)` mit Bezug 1920 × 1080. Ein Vorfahr kann es über
  * `--lfh-gross-einheit` festsetzen, etwa die Vorschau im Design System, die kein ganzes Fenster hat.
  */
-export const GROSS_EINHEIT = `var(--lfh-gross-einheit, min(${rund(100 / BEZUG_BREITE)}vw, ${rund(100 / BEZUG_HOEHE)}vh))`;
+export const GROSS_EINHEIT = `var(--lfh-gross-einheit, min(${round8(100 / BEZUG_BREITE)}vw, ${round8(100 / BEZUG_HOEHE)}vh))`;
 
 export function grossMass(px: number): string {
   return `calc(${GROSS_EINHEIT} * ${px})`;

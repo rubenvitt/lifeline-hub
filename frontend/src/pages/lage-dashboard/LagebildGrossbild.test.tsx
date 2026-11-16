@@ -42,7 +42,7 @@ const SICHTUNG: SichtungsZeile[] = [
 
 const LEERER_VERLAUF: Verlauf = { stunden: [], imFenster: 0, spitze: null };
 
-function zeige(mehr: Partial<Parameters<typeof LagebildGrossbild>[0]> = {}) {
+function renderGrossbild(mehr: Partial<Parameters<typeof LagebildGrossbild>[0]> = {}) {
   return render(
     <LagebildGrossbild
       einsatz={undefined}
@@ -70,13 +70,13 @@ function kennzahl(titel: string): HTMLElement {
 
 describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des Großbilds im Lagebild“)', () => {
   it('zeigt Titel, Uhrzeit und Datenstand', () => {
-    zeige();
+    renderGrossbild();
     expect(screen.getByRole('dialog', { name: 'Lagebild' })).toBeInTheDocument();
     expect(screen.getByText('1430 · Stand vor 12 s')).toBeInTheDocument();
   });
 
   it('zeigt die sechs Kennzahlen der Reihe mit ihren Werten und Tönen', () => {
-    zeige();
+    renderGrossbild();
     const band = screen.getByRole('group', { name: 'Lage in Zahlen' });
     expect(
       within(band).getAllByText((_, el) => el?.getAttribute('data-lfh') === 'gross-kennzahl'),
@@ -88,13 +88,13 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
   });
 
   it('setzt eine lange Zahl kleiner, damit sie in ihre Spalte passt', () => {
-    zeige();
+    renderGrossbild();
     expect(screen.getByText('0/12/58//70').style.fontSize).toBe(grossMass(72));
     expect(screen.getByText('248').style.fontSize).toBe(grossMass(96));
   });
 
   it('zeigt vor dem Lagebild sechs ladende Plätze', () => {
-    zeige({ kennzahlen: null });
+    renderGrossbild({ kennzahlen: null });
     const band = screen.getByRole('group', { name: 'Lage in Zahlen' });
     const zellen = band.querySelectorAll('[data-lfh="gross-kennzahl"]');
     expect(zellen).toHaveLength(6);
@@ -102,7 +102,7 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
   });
 
   it('zeigt den Führungsstand mit Alarmton bei überfälligem Auftrag', () => {
-    zeige();
+    renderGrossbild();
     const block = screen.getByRole('region', { name: 'Führungsstand' });
     expect(
       within(block).getByText('Aufträge offen').closest('[data-lfh="gross-kennzahl"]'),
@@ -120,7 +120,7 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
       gefahr('F', 'niedrig'),
       gefahr('G', 'niedrig'),
     ];
-    zeige({
+    renderGrossbild({
       gefahren: {
         zustand: 'daten',
         zeilen: viele,
@@ -140,11 +140,15 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
     ]);
     expect(block).toHaveTextContent(`+ ${viele.length - GEFAHREN_HOECHSTENS} weitere`);
     expect(block).toHaveTextContent('3 Gebiete unbestätigt');
+    // Ein langer Hinweis endet nach zwei Zeilen mit „…“, der ganze Text bleibt im `title`.
+    const hinweis = within(block).getByText('3 Gebiete unbestätigt');
+    expect(hinweis).toHaveAttribute('title', '3 Gebiete unbestätigt');
+    expect(hinweis.style.webkitLineClamp).toBe('2');
     expect(within(block).getByText('akut').closest('[role="listitem"]')).toBeTruthy();
   });
 
   it('zeigt die Sichtung mit Kategorie, Zahl und „ohne Sichtung“', () => {
-    zeige();
+    renderGrossbild();
     const block = screen.getByRole('region', { name: 'Sichtung' });
     expect(block).toHaveTextContent('248 erfasst');
     const zeilen = within(block)
@@ -154,13 +158,17 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
   });
 
   it('zeigt in der Reihe „Sanitätsdienst“ den Verlauf statt der Gefahren', () => {
-    zeige({
+    renderGrossbild({
       sanitaetsdienst: true,
       verlauf: {
         zustand: 'daten',
         verlauf: {
           imFenster: 5,
           stunden: [
+            { stunde: '09', gesamt: 1, laufend: false },
+            { stunde: '10', gesamt: 0, laufend: false },
+            { stunde: '11', gesamt: 4, laufend: false },
+            { stunde: '12', gesamt: 1, laufend: false },
             { stunde: '13', gesamt: 3, laufend: false },
             { stunde: '14', gesamt: 2, laufend: true },
           ] as Verlauf['stunden'],
@@ -174,12 +182,13 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
       within(block)
         .getAllByRole('listitem')
         .map((z) => z.textContent),
-    ).toEqual(['14 Uhr · laufend2', '13 Uhr3']);
+      // Vier Stunden, jüngste zuerst: fünf ragten samt „Spitze“ über die Höhe (Review vor dem PR).
+    ).toEqual(['14 Uhr · laufend2', '13 Uhr3', '12 Uhr1', '11 Uhr4']);
     expect(block).toHaveTextContent('Spitze 13 Uhr · 3');
   });
 
   it('nennt gesperrte, ladende und leere Blöcke mit Grund', () => {
-    zeige({
+    renderGrossbild({
       gefahren: { zustand: 'gesperrt', zeilen: [], gebiete: 0, beurteilung: null },
       sichtung: { zustand: 'laden', zeilen: [], erfasst: 0, ohneSichtung: 0 },
     });
@@ -188,7 +197,7 @@ describe('LagebildGrossbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des G
   });
 
   it('führt nirgendwohin und zeigt keine ETB-Einträge', () => {
-    zeige();
+    renderGrossbild();
     const dialog = screen.getByRole('dialog');
     expect(dialog.querySelector('a')).toBeNull();
     expect(

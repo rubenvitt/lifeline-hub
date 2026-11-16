@@ -1,7 +1,15 @@
 import { Button } from 'antd';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useAlarmZone } from '../../alarm/alarmZoneSpeicher';
+import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
 import type { Einsatzart } from '../../api/types';
 import { IconPfeileEinwaerts, IconVollbildEcken, IconWarndreieck } from '../../icons';
 import { schrift } from '../../theme/tokens';
@@ -28,7 +36,7 @@ interface GrossbildFlaecheProps {
   children: ReactNode;
 }
 
-function anzahl(n: number, eins: string, viele: string): string {
+function countText(n: number, eins: string, viele: string): string {
   return `${n} ${n === 1 ? eins : viele} offen`;
 }
 
@@ -47,7 +55,9 @@ function anzahl(n: number, eins: string, viele: string): string {
  * Element zurück, das ihn vorher hatte.
  *
  * Die Alarmzone verdeckt das Vollbild. Darum nennt die Kopfzeile ihre Einträge als Zahl, ohne Titel:
- * die Fläche steht vor allen im Raum (D6).
+ * die Fläche steht vor allen im Raum (D6). Ebenso verdeckt sie die Verbindungsanzeige der
+ * Kopfleiste: ist der Live-Kanal getrennt, steht „Verbindung getrennt“ in Achtungsrolle, damit
+ * niemand alte Zahlen für aktuell hält (Review vor dem PR).
  */
 export default function GrossbildFlaeche({
   titel,
@@ -61,18 +71,19 @@ export default function GrossbildFlaeche({
   const verlassenKnopf = useRef<HTMLButtonElement>(null);
   const verlassen = useRef(onVerlassen);
   verlassen.current = onVerlassen;
-  const kannVollbild =
+  const canVollbild =
     typeof HTMLElement !== 'undefined' && 'requestFullscreen' in HTMLElement.prototype;
-  const [imVollbild, setImVollbild] = useState(false);
+  const [isVollbild, setIsVollbild] = useState(false);
   useBildschirmWach(true);
   const { eintraege } = useAlarmZone();
   const alarme = eintraege.filter((e) => e.stufe === 'alarm').length;
   const hinweise = eintraege.length - alarme;
+  const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
 
-  const vollbildAnfordern = useCallback(() => {
+  const requestVollbild = useCallback(() => {
     const el = flaeche.current;
     if (!el?.requestFullscreen) return;
-    el.requestFullscreen().catch(() => setImVollbild(false));
+    el.requestFullscreen().catch(() => setIsVollbild(false));
   }, []);
 
   // App dahinter sperren, Dokument nicht rollen lassen, Fokus hin und zurück.
@@ -95,34 +106,41 @@ export default function GrossbildFlaeche({
   // Vollbild beim Öffnen; sein Ende beendet das Großbild.
   useEffect(() => {
     const el = flaeche.current;
-    let warImVollbild = false;
-    const wechsel = () => {
-      const jetzt = el != null && document.fullscreenElement === el;
-      setImVollbild(jetzt);
-      if (warImVollbild && !jetzt) verlassen.current();
-      warImVollbild = jetzt;
+    let wasVollbild = false;
+    const onChange = () => {
+      const isJetzt = el != null && document.fullscreenElement === el;
+      setIsVollbild(isJetzt);
+      if (wasVollbild && !isJetzt) verlassen.current();
+      wasVollbild = isJetzt;
     };
-    document.addEventListener('fullscreenchange', wechsel);
-    vollbildAnfordern();
+    document.addEventListener('fullscreenchange', onChange);
+    requestVollbild();
     return () => {
-      document.removeEventListener('fullscreenchange', wechsel);
+      document.removeEventListener('fullscreenchange', onChange);
       if (el != null && document.fullscreenElement === el) {
         void document.exitFullscreen?.().catch(() => undefined);
       }
     };
-  }, [vollbildAnfordern]);
+  }, [requestVollbild]);
 
-  // Esc ohne Vollbild; im Vollbild nimmt der Browser die Taste selbst.
+  // Tasten: Esc beendet (ohne Vollbild; im Vollbild nimmt der Browser die Taste selbst und meldet
+  // nur `fullscreenchange`). Jede andere Taste erreicht die App nicht: `inert` sperrt nur Klick und
+  // Fokus unter `#root`, die Kürzel der App (Sprungpalette Strg+K) hören aber am `window` und
+  // öffneten Dialoge über dem Großbild (Review vor dem PR). Der Hörer sitzt darum in der
+  // Capture-Phase am `window`, vor jedem anderen, und stoppt die Weitergabe; Standardaktionen
+  // (Tab, Enter und Leertaste an den eigenen Knöpfen) bleiben unberührt.
   useEffect(() => {
-    const taste = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      e.stopPropagation();
       if (e.key === 'Escape') verlassen.current();
     };
-    document.addEventListener('keydown', taste);
-    return () => document.removeEventListener('keydown', taste);
+    window.addEventListener('keydown', onKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, []);
 
   const alarmFarbe = statusFlaeche(rollen, 'alarm');
   const hinweisFarbe = statusFlaeche(rollen, 'bedien');
+  const achtungFarbe = statusFlaeche(rollen, 'achtung');
   const kopfSchrift = { fontSize: grossMass(GROSS_BEZUG.text), lineHeight: 1.2 };
   const knopfStil = {
     ...kopfSchrift,
@@ -207,7 +225,7 @@ export default function GrossbildFlaeche({
               }}
             >
               <IconWarndreieck />
-              {anzahl(alarme, 'Alarm', 'Alarme')}
+              {countText(alarme, 'Alarm', 'Alarme')}
             </span>
           )}
           {hinweise > 0 && (
@@ -225,13 +243,31 @@ export default function GrossbildFlaeche({
                 fontWeight: 600,
               }}
             >
-              {anzahl(hinweise, 'Hinweis', 'Hinweise')}
+              {countText(hinweise, 'Hinweis', 'Hinweise')}
             </span>
           )}
         </span>
-        <UebungsMarke einsatz={einsatz} groesse="monitor" />
-        {kannVollbild && !imVollbild && (
-          <Button icon={<IconVollbildEcken />} onClick={vollbildAnfordern} style={knopfStil}>
+        {liveStatus === 'lost' && (
+          <span
+            data-lfh="grossbild-verbindung"
+            style={{
+              ...kopfSchrift,
+              display: 'inline-flex',
+              alignItems: 'center',
+              minHeight: grossMass(56),
+              paddingInline: grossMass(20),
+              background: achtungFarbe.grund,
+              boxShadow: `inset ${grossMass(3)} 0 0 0 ${achtungFarbe.kante}`,
+              color: achtungFarbe.text,
+              fontWeight: 700,
+            }}
+          >
+            Verbindung getrennt
+          </span>
+        )}
+        <UebungsMarke einsatz={einsatz} groesse="grossbild" />
+        {canVollbild && !isVollbild && (
+          <Button icon={<IconVollbildEcken />} onClick={requestVollbild} style={knopfStil}>
             Vollbild
           </Button>
         )}

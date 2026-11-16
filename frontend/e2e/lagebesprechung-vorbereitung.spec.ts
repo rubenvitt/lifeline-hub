@@ -132,12 +132,18 @@ test.describe('Wert neben der Bezeichnung (LLH-1747)', () => {
       const einsatzId = await seede(page);
       await page.goto(`/einsaetze/${einsatzId}/lagebesprechung`);
       await expect(zeile(page, 'sichtung').locator('[data-teil="wert"]')).not.toBeEmpty();
+      // Je Teil der Zeile: kein Text breiter als sein Kasten (die Kästen selbst streckt das Raster
+      // auf die Spalte, ihr Rand sagt also nichts), und kein Kasten über den Rand der Zeile.
       const ueberstand = await page
         .locator('[data-lfh="vorbereitung-zeile"]')
         .evaluateAll((zeilen) =>
           zeilen.flatMap((z) =>
             [...z.children]
-              .filter((k) => k.getBoundingClientRect().right > z.getBoundingClientRect().right + 1)
+              .filter(
+                (k) =>
+                  k.scrollWidth > k.clientWidth + 1 ||
+                  k.getBoundingClientRect().right > z.getBoundingClientRect().right + 1,
+              )
               .map((k) => `${z.getAttribute('data-schluessel')}: ${k.textContent}`),
           ),
         );

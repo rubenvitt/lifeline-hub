@@ -50,7 +50,7 @@ export default function LagebesprechungPage() {
   const [isAbschlussOffen, setIsAbschlussOffen] = useState(false);
   // Großbild (LLH-1747, Spec `grossbild-ansicht`): nur im React-State, für jede Person, die die
   // Seite sehen darf; die Seite bleibt darunter stehen.
-  const [istGrossbild, setIstGrossbild] = useState(false);
+  const [isGrossbild, setIsGrossbild] = useState(false);
   const { abBreite } = useViewport();
 
   const einsatzQuery = useQuery({
@@ -137,7 +137,7 @@ export default function LagebesprechungPage() {
       aktionen={
         <Flex gap="small" wrap>
           {abBreite('md') && (
-            <Button icon={<IconPfeileAuswaerts />} onClick={() => setIstGrossbild(true)}>
+            <Button icon={<IconPfeileAuswaerts />} onClick={() => setIsGrossbild(true)}>
               Großbild
             </Button>
           )}
@@ -186,15 +186,17 @@ export default function LagebesprechungPage() {
       {/* Montiert = offen: die Maske friert Vorbelegung und Basis beim Montieren ein, und jede
           Öffnung hat eine frische Mutation ohne alten Fehler. Der Toast nimmt das `navigate`
           dieser Seite — `<AntApp>` liegt außerhalb des Routers. */}
-      {istGrossbild && (
+      {isGrossbild && (
         <GrossbildAnsicht
           einsatzId={einsatzId}
           einsatz={einsatz}
           stand={standQuery.data}
-          standZustand={standQuery.isLoading ? 'laden' : standQuery.isError ? 'fehler' : 'daten'}
+          // `abrufZustand`, nicht `isLoading`: eine ohne Netz pausierte Abfrage ist nicht `isLoading`
+          // und stünde sonst als „0 abgeschlossen“ da (Review vor dem PR).
+          standAbruf={abrufZustand(standQuery)}
           besprechungZustand={abrufZustand(standQuery)}
           besprechungStand={standQuery.dataUpdatedAt}
-          onVerlassen={() => setIstGrossbild(false)}
+          onVerlassen={() => setIsGrossbild(false)}
         />
       )}
 
@@ -220,7 +222,7 @@ function GrossbildAnsicht({
   einsatzId,
   einsatz,
   stand,
-  standZustand,
+  standAbruf,
   besprechungZustand,
   besprechungStand,
   onVerlassen,
@@ -228,7 +230,7 @@ function GrossbildAnsicht({
   einsatzId: number;
   einsatz: EinsatzAnzeige;
   stand: LagebesprechungStand | undefined;
-  standZustand: 'daten' | 'laden' | 'fehler';
+  standAbruf: AbrufZustand;
   besprechungZustand: AbrufZustand;
   besprechungStand: number;
   onVerlassen: () => void;
@@ -243,7 +245,7 @@ function GrossbildAnsicht({
     <LagebesprechungGrossbild
       einsatz={einsatz}
       stand={stand}
-      standZustand={standZustand}
+      standAbruf={standAbruf}
       vorbereitung={vorbereitung}
       onVerlassen={onVerlassen}
     />

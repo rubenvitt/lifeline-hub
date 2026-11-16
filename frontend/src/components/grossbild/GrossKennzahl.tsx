@@ -87,6 +87,7 @@ export default function GrossKennzahl({
         {titel}
       </span>
       <span
+        data-lfh="gross-zahl"
         style={{
           fontFamily: schrift.zahl,
           fontVariantNumeric: 'tabular-nums',

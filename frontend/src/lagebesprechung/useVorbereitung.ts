@@ -39,6 +39,8 @@ export interface Vorbereitung {
   zeilen: VorbereitungsZeile[];
   /** Ältester Stand der Quellen als Wire-String, `null` ohne Stand. */
   standWire: string | null;
+  /** Derselbe Stand als Epoche, für „Stand vor n s“; nicht endlich ohne Stand. */
+  standMs: number;
   /** Eine Quelle lädt noch. */
   laedt: boolean;
 }
@@ -114,5 +116,5 @@ export function useVorbereitung({
   );
   const standWire = Number.isFinite(stand) ? alsWire(stand) : null;
   const laedt = quellenLaden(zeilen);
-  return { zeilen, standWire, laedt };
+  return { zeilen, standWire, standMs: stand, laedt };
 }

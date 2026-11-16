@@ -156,7 +156,7 @@ export default function LageDashboardPage() {
   const liveStatus = useSyncExternalStore(abonniereLiveStatus, leseLiveStatus, leseLiveStatus);
   // Großbild (LLH-1747, Spec `grossbild-ansicht`): ein Zweig dieser Seite, nur im React-State. Die
   // Seite bleibt darunter stehen, Abfragen und gehaltener Zuschnitt laufen weiter.
-  const [istGrossbild, setIstGrossbild] = useState(false);
+  const [isGrossbild, setIsGrossbild] = useState(false);
 
   // Die Quellen des Lagebilds teilt sich die Seite mit der Vorbereitung der Lagebesprechung
   // (LFH-550): eine Zusammenstellung, ein `baueLagebild`.
@@ -420,7 +420,8 @@ export default function LageDashboardPage() {
             ]}
           />
         }
-        // Der rechte Slot trägt hier Meta und die Wettermarke (ein Sprung), keinen Knopf.
+        // Der rechte Slot trägt hier Meta, die Wettermarke (ein Sprung) und ab `md` den Knopf
+        // „Großbild“ (LLH-1747).
         aktionen={
           <span
             data-lfh="lagebild-meta"
@@ -443,7 +444,7 @@ export default function LageDashboardPage() {
               <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
             )}
             {abBreite('md') && (
-              <Button icon={<IconPfeileAuswaerts />} onClick={() => setIstGrossbild(true)}>
+              <Button icon={<IconPfeileAuswaerts />} onClick={() => setIsGrossbild(true)}>
                 Großbild
               </Button>
             )}
@@ -579,7 +580,7 @@ export default function LageDashboardPage() {
           </Kennzahlenband>
         </DashboardFlaeche>
       </EinsatzSeite>
-      {istGrossbild && (
+      {isGrossbild && (
         <LagebildGrossbild
           einsatz={einsatz}
           meta={`${lagebildZeit(jetzt, konv)} · ${standText(datenstand, jetzt, konv)}`}
@@ -601,7 +602,7 @@ export default function LageDashboardPage() {
             ohneSichtung: lagebild?.sk.ohne ?? 0,
           }}
           fuehrung={fuehrungsKennzahlen(fuehrungsQuellen)}
-          onVerlassen={() => setIstGrossbild(false)}
+          onVerlassen={() => setIsGrossbild(false)}
         />
       )}
     </div>

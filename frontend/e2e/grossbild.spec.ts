@@ -8,7 +8,9 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * - LESBAR AUS DER ENTFERNUNG: bei 1920 × 1080 jede führende Zahl ≥ 72 px, jeder Text ≥ 28 px.
  * - MITWACHSEN OHNE BILDLAUF: bei 1920 × 1080 und 1280 × 720 rollt nichts, und kein Block schneidet
  *   seinen Inhalt unten ab.
- * - AUSSTIEG: Esc führt auf die Seite zurück, im Vollbild wie ohne.
+ * - AUSSTIEG, zwei Wege getrennt: das Lagebild läuft im Element-Vollbild, und dessen Ende (wie Esc im
+ *   Vollbild, das der Browser selbst nimmt) beendet das Großbild; in der Lagebesprechung beendet die
+ *   Taste Esc es über den Tastenhörer der Hülle.
  */
 
 async function post(page: Page, pfad: string, data: unknown): Promise<number> {
@@ -18,7 +20,7 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 /** Drei Betroffene, ein überfälliger Auftrag: genug, damit Band, Sichtung und Führungsstand Werte tragen. */
-async function seede(page: Page): Promise<string> {
+async function seed(page: Page): Promise<string> {
   const einsatzId = String(
     await post(page, '/api/einsaetze', { bezeichnung: `E2E Großbild ${Date.now()}` }),
   );
@@ -34,7 +36,7 @@ async function seede(page: Page): Promise<string> {
 }
 
 /** Kleinste Schrift aller Elemente mit eigenem Text in der Fläche. */
-function kleinsteSchrift(flaeche: Locator): Promise<number> {
+function smallestFontSize(flaeche: Locator): Promise<number> {
   return flaeche.evaluate((wurzel) => {
     let kleinste = Infinity;
     for (const el of wurzel.querySelectorAll<HTMLElement>('*')) {
@@ -49,18 +51,19 @@ function kleinsteSchrift(flaeche: Locator): Promise<number> {
   });
 }
 
-/** Kleinste Schrift der führenden Zahlen (Kennzahlen und Zahlen der Zeilen). */
-function kleinsteZahl(flaeche: Locator): Promise<number> {
+/** Kleinste Schrift der führenden Zahlen: jede Zahl einer Kennzahl und jede Zahl einer Zeile. */
+function smallestNumberSize(flaeche: Locator): Promise<number> {
   return flaeche.evaluate((wurzel) => {
-    const zahlen = [
-      ...wurzel.querySelectorAll<HTMLElement>('[data-lfh="gross-kennzahl"] > span:nth-child(2)'),
-    ].filter((z) => /\d/.test(z.textContent ?? ''));
+    const zahlen = [...wurzel.querySelectorAll<HTMLElement>('[data-lfh="gross-zahl"]')].filter(
+      (z) => /\d/.test(z.textContent ?? ''),
+    );
+    if (zahlen.length === 0) throw new Error('keine Zahl im Großbild');
     return Math.min(...zahlen.map((z) => parseFloat(getComputedStyle(z).fontSize)));
   });
 }
 
 /** Rollt die Fläche, oder schneidet ein Block seinen Inhalt unten ab? */
-function ueberlauf(flaeche: Locator): Promise<string[]> {
+function findOverflow(flaeche: Locator): Promise<string[]> {
   return flaeche.evaluate((wurzel) => {
     const befunde: string[] = [];
     if (wurzel.scrollHeight > wurzel.clientHeight + 1) befunde.push('Fläche rollt');
@@ -75,7 +78,7 @@ function ueberlauf(flaeche: Locator): Promise<string[]> {
   });
 }
 
-async function oeffne(page: Page, pfad: string, anker: Locator): Promise<Locator> {
+async function openGrossbild(page: Page, pfad: string, anker: Locator): Promise<Locator> {
   await page.goto(pfad);
   await expect(anker).toBeVisible();
   await page.getByRole('button', { name: 'Großbild', exact: true }).click();
@@ -92,10 +95,12 @@ for (const fenster of [
     test.use({ viewport: { width: fenster.breite, height: fenster.hoehe } });
     const anteil = fenster.breite / 1920;
 
-    test('Lagebild: Großbild-Größen, kein Bildlauf, Esc führt zurück', async ({ page }) => {
+    test('Lagebild: Großbild-Größen, kein Bildlauf, Ende des Vollbilds führt zurück', async ({
+      page,
+    }) => {
       await anmeldenAlsAdmin(page, { startseite: false });
-      const einsatzId = await seede(page);
-      const flaeche = await oeffne(
+      const einsatzId = await seed(page);
+      const flaeche = await openGrossbild(
         page,
         `/einsaetze/${einsatzId}/lage-dashboard`,
         page.locator('[data-lfh="kennzahl"]').filter({ hasText: 'Betroffene' }).first(),
@@ -112,19 +117,21 @@ for (const fenster of [
       // Zweiter Kanal neben der Farbe: die Kante (Innenschatten), 6 px bei 1920.
       expect(await auftraege.evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/inset/);
 
-      expect(await kleinsteSchrift(flaeche)).toBeGreaterThanOrEqual(28 * anteil - 0.5);
-      expect(await kleinsteZahl(flaeche)).toBeGreaterThanOrEqual(72 * anteil - 0.5);
-      expect(await ueberlauf(flaeche)).toEqual([]);
+      expect(await smallestFontSize(flaeche)).toBeGreaterThanOrEqual(28 * anteil - 0.5);
+      expect(await smallestNumberSize(flaeche)).toBeGreaterThanOrEqual(72 * anteil - 0.5);
+      expect(await findOverflow(flaeche)).toEqual([]);
 
-      await page.keyboard.press('Escape');
+      // Das Großbild läuft im Vollbild der Fläche; endet das Vollbild, endet das Großbild.
+      expect(await flaeche.evaluate((el) => document.fullscreenElement === el)).toBe(true);
+      await page.evaluate(() => document.exitFullscreen());
       await expect(flaeche).toHaveCount(0);
       await expect(page.getByRole('heading', { level: 1, name: 'Lagebild' })).toBeVisible();
     });
 
     test('Lagebesprechung: Großbild-Größen, kein Bildlauf, Esc führt zurück', async ({ page }) => {
       await anmeldenAlsAdmin(page, { startseite: false });
-      const einsatzId = await seede(page);
-      const flaeche = await oeffne(
+      const einsatzId = await seed(page);
+      const flaeche = await openGrossbild(
         page,
         `/einsaetze/${einsatzId}/lagebesprechung`,
         page.locator('[data-lfh="vorbereitung-zeile"][data-schluessel="auftraege"]'),
@@ -133,9 +140,9 @@ for (const fenster of [
       await expect(vorbereitung).toContainText('Aufträge offen');
       await expect(vorbereitung).not.toContainText('Quelle');
 
-      expect(await kleinsteSchrift(flaeche)).toBeGreaterThanOrEqual(28 * anteil - 0.5);
-      expect(await kleinsteZahl(flaeche)).toBeGreaterThanOrEqual(72 * anteil - 0.5);
-      expect(await ueberlauf(flaeche)).toEqual([]);
+      expect(await smallestFontSize(flaeche)).toBeGreaterThanOrEqual(28 * anteil - 0.5);
+      expect(await smallestNumberSize(flaeche)).toBeGreaterThanOrEqual(72 * anteil - 0.5);
+      expect(await findOverflow(flaeche)).toEqual([]);
 
       await page.keyboard.press('Escape');
       await expect(flaeche).toHaveCount(0);

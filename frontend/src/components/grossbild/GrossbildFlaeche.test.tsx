@@ -7,6 +7,7 @@ import {
   type ZonenEintrag,
 } from '../../alarm/alarmZoneSpeicher';
 import GrossbildFlaeche from './GrossbildFlaeche';
+import { setzeLiveStatusFuerTest } from '../../live/liveStatusStore';
 
 const UEBUNG = { einsatzart: 'uebung' as const };
 
@@ -14,7 +15,7 @@ let vollbildAnfordern: ReturnType<typeof vi.fn>;
 let vollbildVerlassen: ReturnType<typeof vi.fn>;
 let vollbildElement: Element | null = null;
 
-function setzeVollbild(el: Element | null) {
+function setVollbildElement(el: Element | null) {
   vollbildElement = el;
   document.dispatchEvent(new Event('fullscreenchange'));
 }
@@ -26,11 +27,11 @@ beforeEach(() => {
     get: () => vollbildElement,
   });
   vollbildAnfordern = vi.fn(function (this: Element) {
-    setzeVollbild(this);
+    setVollbildElement(this);
     return Promise.resolve();
   });
   vollbildVerlassen = vi.fn(() => {
-    setzeVollbild(null);
+    setVollbildElement(null);
     return Promise.resolve();
   });
   Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', {
@@ -53,6 +54,7 @@ afterEach(() => {
   document.getElementById('root')?.remove();
   document.documentElement.style.overflow = '';
   zoneZuruecksetzenFuerTests();
+  setzeLiveStatusFuerTest('idle');
 });
 
 /** Seite mit Knopf „Großbild“, wie Lagebild und Lagebesprechung sie bauen. */
@@ -77,7 +79,7 @@ function Seite({ einsatz }: { einsatz?: { einsatzart: 'uebung' | 'realeinsatz' }
   );
 }
 
-function oeffnen() {
+function openGrossbild() {
   render(<Seite />, { container: document.getElementById('root')! });
   fireEvent.click(screen.getByRole('button', { name: 'Großbild' }));
 }
@@ -95,7 +97,7 @@ function eintrag(stufe: 'alarm' | 'hinweis', titel: string): ZonenEintrag {
 
 describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
   it('zeigt die Fläche als Dialog außerhalb der App und fordert Vollbild für sie an', () => {
-    oeffnen();
+    openGrossbild();
     const dialog = screen.getByRole('dialog', { name: 'Lagebild' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(document.getElementById('root')!.contains(dialog)).toBe(false);
@@ -106,7 +108,7 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
   });
 
   it('sperrt die App dahinter und das Rollen des Dokuments, solange sie steht', () => {
-    oeffnen();
+    openGrossbild();
     expect(document.getElementById('root')!.inert).toBe(true);
     expect(document.documentElement.style.overflow).toBe('hidden');
     fireEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
@@ -125,20 +127,20 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
   });
 
   it('endet, wenn der Browser das Vollbild verlässt (Esc im Vollbild)', () => {
-    oeffnen();
-    act(() => setzeVollbild(null));
+    openGrossbild();
+    act(() => setVollbildElement(null));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('endet mit Esc, wenn kein Vollbild läuft', () => {
     vollbildAnfordern.mockImplementation(() => Promise.reject(new Error('abgelehnt')));
-    oeffnen();
+    openGrossbild();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('beendet beim Verlassen ein laufendes Vollbild', () => {
-    oeffnen();
+    openGrossbild();
     fireEvent.click(screen.getByRole('button', { name: 'Großbild verlassen' }));
     expect(vollbildVerlassen).toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -146,7 +148,7 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
 
   it('bleibt bei abgelehntem Vollbild stehen und bietet „Vollbild“ an', async () => {
     vollbildAnfordern.mockImplementationOnce(() => Promise.reject(new Error('abgelehnt')));
-    oeffnen();
+    openGrossbild();
     await act(async () => undefined);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Vollbild' }));
@@ -155,13 +157,13 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
   });
 
   it('zeigt im Vollbild keinen Knopf „Vollbild“', () => {
-    oeffnen();
+    openGrossbild();
     expect(screen.queryByRole('button', { name: 'Vollbild' })).toBeNull();
   });
 
   it('hat ohne Vollbild-API keinen Knopf „Vollbild“ und füllt das Fenster', () => {
     delete (HTMLElement.prototype as { requestFullscreen?: unknown }).requestFullscreen;
-    oeffnen();
+    openGrossbild();
     const dialog = screen.getByRole('dialog');
     expect(dialog.style.position).toBe('fixed');
     expect(screen.queryByRole('button', { name: 'Vollbild' })).toBeNull();
@@ -169,7 +171,7 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
 
   it('hat außer Verlassen und Vollbild nichts zu bedienen', () => {
     vollbildAnfordern.mockImplementationOnce(() => Promise.reject(new Error('abgelehnt')));
-    oeffnen();
+    openGrossbild();
     const knoepfe = screen
       .getAllByRole('button')
       .filter((b) => screen.getByRole('dialog').contains(b));
@@ -178,7 +180,7 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
 
   it('nennt Alarme der Alarmzone als Zahl, ohne Titel', () => {
     act(() => zoneSetzen(Symbol('t'), [eintrag('alarm', 'Herr Muster vermisst')]));
-    oeffnen();
+    openGrossbild();
     expect(screen.getByText('1 Alarm offen')).toBeInTheDocument();
     expect(screen.queryByText(/Muster/)).toBeNull();
     act(() =>
@@ -193,8 +195,33 @@ describe('GrossbildFlaeche (LLH-1747, Spec `grossbild-ansicht`)', () => {
   });
 
   it('zeigt ohne Einträge keine Alarmzahl', () => {
-    oeffnen();
+    openGrossbild();
     expect(screen.queryByText(/Alarm/)).toBeNull();
+  });
+
+  it('lässt keine Taste zu den Kürzeln der App durch, Esc beendet trotzdem (Review vor dem PR)', () => {
+    // Die Sprungpalette hört am `window` (CommandPaletteProvider); im Großbild darf sie nicht aufgehen.
+    const appKuerzel = vi.fn();
+    window.addEventListener('keydown', appKuerzel);
+    try {
+      openGrossbild();
+      fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true });
+      expect(appKuerzel).not.toHaveBeenCalled();
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      // Danach erreicht jede Taste die App wieder.
+      fireEvent.keyDown(document.body, { key: 'k', ctrlKey: true });
+      expect(appKuerzel).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener('keydown', appKuerzel);
+    }
+  });
+
+  it('nennt eine getrennte Live-Verbindung', () => {
+    openGrossbild();
+    expect(screen.queryByText('Verbindung getrennt')).toBeNull();
+    act(() => setzeLiveStatusFuerTest('lost'));
+    expect(screen.getByText('Verbindung getrennt')).toBeInTheDocument();
   });
 
   it('trägt bei einer Übung die Übungsmarke', () => {

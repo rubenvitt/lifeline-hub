@@ -98,6 +98,7 @@ export function GrossZeile({
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <span
+          data-lfh={art === 'zahl' ? 'gross-zahl' : 'gross-wort'}
           style={{
             fontFamily: art === 'zahl' ? schrift.zahl : schrift.text,
             fontVariantNumeric: art === 'zahl' ? 'tabular-nums' : undefined,

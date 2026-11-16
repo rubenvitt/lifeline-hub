@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
+import type { AbrufZustand } from '../api/abrufZustand';
 import type { LagebesprechungStand } from '../api/types';
 import LagebesprechungGrossbild from './LagebesprechungGrossbild';
 import type { VorbereitungsZeile } from './vorbereitung';
@@ -43,13 +44,21 @@ function stand(terminMs: number | null): LagebesprechungStand {
   } as unknown as LagebesprechungStand;
 }
 
-function zeige(terminMs: number | null = Date.now() + 25 * 60_000) {
+function renderGrossbild(
+  terminMs: number | null = Date.now() + 25 * 60_000,
+  standAbruf: AbrufZustand = 'daten',
+) {
   return render(
     <LagebesprechungGrossbild
       einsatz={undefined}
       stand={stand(terminMs)}
-      standZustand="daten"
-      vorbereitung={{ zeilen: ZEILEN, standWire: '2026-11-16 13:32:00', laedt: false }}
+      standAbruf={standAbruf}
+      vorbereitung={{
+        zeilen: ZEILEN,
+        standWire: wire(Date.now() - 12_000),
+        standMs: Date.now() - 12_000,
+        laedt: false,
+      }}
       onVerlassen={() => undefined}
     />,
   );
@@ -60,7 +69,7 @@ const kennzahl = (titel: string) =>
 
 describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => {
   it('zeigt Termin und abgeschlossene Besprechungen', () => {
-    zeige();
+    renderGrossbild();
     expect(screen.getByRole('dialog', { name: 'Lagebesprechung' })).toBeInTheDocument();
     expect(kennzahl('Nächste Lagebesprechung')).toHaveTextContent(/in 2[45] min/);
     expect(kennzahl('Abgeschlossen')).toHaveTextContent('3');
@@ -68,21 +77,24 @@ describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => 
   });
 
   it('zeigt einen überfälligen Termin mit Wort und Ton `achtung`', () => {
-    zeige(Date.now() - 5 * 60_000 - 30_000);
+    renderGrossbild(Date.now() - 5 * 60_000 - 30_000);
     const termin = kennzahl('Nächste Lagebesprechung');
     expect(termin).toHaveTextContent('seit 5 min überfällig');
     expect(termin).toHaveAttribute('data-ton', 'achtung');
   });
 
   it('zeigt ohne Termin „—“ und „kein Termin“', () => {
-    zeige(null);
+    renderGrossbild(null);
     expect(kennzahl('Nächste Lagebesprechung')).toHaveTextContent('—kein Termin');
   });
 
   it('zeigt alle Zeilen der Vorbereitung in ihrer Reihenfolge, ohne Quelle', () => {
-    zeige();
+    renderGrossbild();
     const block = screen.getByRole('region', { name: 'Vorbereitung' });
-    expect(block).toHaveTextContent('Stand');
+    // Uhrzeit und Alter des Stands stehen im Kopf, wie im Lagebild.
+    expect(document.querySelector('[data-lfh="grossbild-meta"]')).toHaveTextContent(
+      /· Stand vor 1\d s$/,
+    );
     const titel = within(block)
       .getAllByRole('listitem')
       .map((z) => z.firstElementChild?.textContent);
@@ -91,7 +103,7 @@ describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => 
   });
 
   it('setzt Zahlen groß und Wörter als Wort', () => {
-    zeige();
+    renderGrossbild();
     const block = screen.getByRole('region', { name: 'Vorbereitung' });
     expect(within(block).getByText('0/12/58//70').style.whiteSpace).toBe('nowrap');
     expect(within(block).getByText('Nr. 3').style.whiteSpace).toBe('nowrap');
@@ -101,8 +113,15 @@ describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => 
     ).toBe('');
   });
 
+  it('zeigt eine ladende Termin-Abfrage als „wird abgerufen“, nie als 0', () => {
+    renderGrossbild(null, 'laden');
+    expect(kennzahl('Abgeschlossen')).toHaveAttribute('data-zustand', 'laden');
+    expect(kennzahl('Abgeschlossen')).toHaveTextContent('wird abgerufen');
+    expect(kennzahl('Abgeschlossen')).not.toHaveTextContent('0');
+  });
+
   it('nennt eine gesperrte Quelle mit Grund', () => {
-    zeige();
+    renderGrossbild();
     const z = within(screen.getByRole('region', { name: 'Vorbereitung' }))
       .getAllByRole('listitem')
       .find((l) => l.textContent?.startsWith('Nachforderungen offen'))!;
@@ -110,7 +129,7 @@ describe('LagebesprechungGrossbild (LLH-1747, Spec `grossbild-ansicht`)', () => 
   });
 
   it('hat keine Bedienung außer der Hülle', () => {
-    zeige();
+    renderGrossbild();
     const dialog = screen.getByRole('dialog');
     expect(dialog.querySelector('a')).toBeNull();
     expect(

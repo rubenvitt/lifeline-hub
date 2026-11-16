@@ -1,7 +1,7 @@
 import { useUhr } from '../abloesung/useUhr';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { zeitKurz } from '../anzeige/zeitDarstellung';
+import type { AbrufZustand } from '../api/abrufZustand';
 import type { EinsatzAnzeige, LagebesprechungStand } from '../api/types';
 import {
   GROSS_BEZUG,
@@ -14,6 +14,7 @@ import {
 } from '../components/grossbild';
 import { useRollen } from '../components/instrument';
 import { modulName } from '../einsatz/modulRegistry';
+import { lagebildZeit, standText } from '../pages/lage-dashboard/lagebild';
 import { lagebesprechungZustand } from './lagebesprechungZustand';
 import type { Vorbereitung } from './useVorbereitung';
 
@@ -28,7 +29,11 @@ const SPALTEN = 3;
 interface LagebesprechungGrossbildProps {
   einsatz: EinsatzAnzeige | undefined;
   stand: LagebesprechungStand | undefined;
-  standZustand: GrossZustand;
+  /**
+   * Zustand der Termin-Abfrage aus `abrufZustand`, nie aus `isLoading`: eine ohne Netz pausierte
+   * Abfrage ist nicht `isLoading` und stünde sonst als „0 abgeschlossen“ da (Review vor dem PR).
+   */
+  standAbruf: AbrufZustand;
   vorbereitung: Vorbereitung;
   onVerlassen: () => void;
 }
@@ -46,16 +51,23 @@ interface LagebesprechungGrossbildProps {
 export default function LagebesprechungGrossbild({
   einsatz,
   stand,
-  standZustand,
+  standAbruf,
   vorbereitung,
   onVerlassen,
 }: LagebesprechungGrossbildProps) {
   const { rollen } = useRollen();
+  // `gesperrt` gibt es hier nicht: die Seite prüft ihre eigene Freigabe.
+  const standZustand: GrossZustand =
+    standAbruf === 'laden' || standAbruf === 'fehler' ? standAbruf : 'daten';
   const { konventionen: konv } = useAnzeigeKonventionen();
-  const jetzt = useUhr(30_000);
+  // 5-s-Takt wie im Lagebild: „Stand vor n s“ läuft mit, ohne jede Sekunde zu rendern.
+  const jetzt = useUhr(5_000);
   const termin = stand?.naechste_lagebesprechung_at;
   const darstellung = lagebesprechungZustand(termin, jetzt);
-  const { zeilen, standWire } = vorbereitung;
+  const { zeilen, standMs } = vorbereitung;
+  // Uhrzeit und Alter des Stands wie im Lagebild: ohne Live-Kanal sieht man an der Wand, dass die
+  // Zahlen alt werden (Spec „Dieselben Zahlen wie die Seite“: den Datenstand mit Alter nennen).
+  const meta = `${lagebildZeit(jetzt.valueOf(), konv)} · ${standText(standMs, jetzt.valueOf(), konv)}`;
   const jeSpalte = Math.ceil(zeilen.length / SPALTEN);
   const spalten = Array.from({ length: SPALTEN }, (_, i) =>
     zeilen.slice(i * jeSpalte, (i + 1) * jeSpalte),
@@ -64,6 +76,7 @@ export default function LagebesprechungGrossbild({
   return (
     <GrossbildFlaeche
       titel={modulName('lagebesprechung')}
+      meta={meta}
       einsatz={einsatz}
       onVerlassen={onVerlassen}
     >
@@ -123,11 +136,6 @@ export default function LagebesprechungGrossbild({
           }}
         >
           Vorbereitung
-          {standWire && (
-            <span style={{ letterSpacing: 0, textTransform: 'none', fontWeight: 400 }}>
-              Stand {zeitKurz(standWire, konv)}
-            </span>
-          )}
         </h2>
         <div
           style={{

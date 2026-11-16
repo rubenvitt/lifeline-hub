@@ -22,8 +22,13 @@ import { VERLAUF_STUNDEN, type Verlauf } from './verlauf';
 
 /** So viele Gefahrentypen passen bei 1920 × 1080 unter das Band; der Rest steht als „+ n weitere“. */
 export const GEFAHREN_HOECHSTENS = 5;
-/** So viele Stunden des Verlaufs, jüngste zuerst. */
-const VERLAUF_ZEILEN = 5;
+/**
+ * So viele Stunden des Verlaufs, jüngste zuerst. Fünf Zeilen samt „Spitze …“ ragten bei 16:9 um
+ * rund 16 px über die untere Reihe (Review vor dem PR).
+ */
+const VERLAUF_ZEILEN = 4;
+/** Zeilen eines Hinweissatzes; Gebietsnamen dürfen 200 Zeichen lang sein. */
+const SATZ_HOECHSTENS_ZEILEN = 2;
 /** Ab so vielen Sichtungszeilen zwei Spaltenpaare, damit nichts unten abreißt. */
 const SICHTUNG_EINSPALTIG_HOECHSTENS = 5;
 /** Längere Werte (Stärke „0/12/58//70“) stehen in der kleinen Zahl, sonst sprengen sie die Spalte. */
@@ -191,15 +196,27 @@ function Block({
   );
 }
 
-/** Satz statt Inhalt, wenn ein Block nichts zeigen kann; nie eine 0. */
-function Satz({ children, ton }: { children: ReactNode; ton?: 'achtung' }) {
+/**
+ * Satz statt Inhalt, wenn ein Block nichts zeigen kann (nie eine 0), oder ein Hinweis darunter. Mit
+ * `zeilen` endet ein langer Satz mit „…“, der ganze Text steht im `title` und im DOM: sonst schnitte
+ * der Block ihn unten still ab.
+ */
+function Satz({ children, ton, zeilen }: { children: string; ton?: 'achtung'; zeilen?: number }) {
   const { rollen } = useRollen();
   return (
     <span
+      title={zeilen != null ? children : undefined}
       style={{
         fontSize: grossMass(GROSS_BEZUG.text),
         lineHeight: 1.2,
         color: ton === 'achtung' ? rollen.achtungText : rollen.gedaempft,
+        ...(zeilen != null && {
+          display: '-webkit-box',
+          WebkitLineClamp: zeilen,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          overflowWrap: 'anywhere',
+        }),
       }}
     >
       {children}
@@ -260,10 +277,14 @@ function GefahrenBlock({
               );
             })}
           </GrossZeilen>
-          {weitere > 0 && <Satz>+ {weitere} weitere</Satz>}
+          {weitere > 0 && <Satz>{`+ ${weitere} weitere`}</Satz>}
         </>
       )}
-      {zustand === 'daten' && beurteilung && <Satz ton="achtung">{beurteilung}</Satz>}
+      {zustand === 'daten' && beurteilung && (
+        <Satz ton="achtung" zeilen={SATZ_HOECHSTENS_ZEILEN}>
+          {beurteilung}
+        </Satz>
+      )}
     </Block>
   );
 }
@@ -323,9 +344,7 @@ function VerlaufBlock({ zustand, verlauf }: LagebildGrossbildProps['verlauf']) {
             ))}
           </GrossZeilen>
           {verlauf.spitze && (
-            <Satz>
-              Spitze {verlauf.spitze.stunde} Uhr · {verlauf.spitze.gesamt}
-            </Satz>
+            <Satz>{`Spitze ${verlauf.spitze.stunde} Uhr · ${verlauf.spitze.gesamt}`}</Satz>
           )}
         </>
       )}
