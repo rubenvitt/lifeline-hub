@@ -25,7 +25,7 @@
 ## 5. Regeln, Doku, Abschluss
 
 - [x] 5.1 `frontend/AGENTS.md`: „Eine Heimat je Zahl“ (Abschnittsstärke, Einheiten eines Abschnitts, UHS-Kräfte), „Eine Baumlogik der Kräfte“ (`loeseAbgestellte`), Organigramm (Platzierung nach D3), Zeile 1152 (Stärke EINMAL summieren). Grep auf `abschnittDerObersten` und „Abschnitt ihrer obersten Einheit“ in Code-Kommentaren und `docs/` ist leer.
-- [ ] 5.2 Anwenderdoku nach `docs/anwender/AGENTS.md`: `meldebild.md` (Zeile „n von m“, Stärke und Filter „Abschnitt“ mit abgestellter Untereinheit), `einsatzabschnitte.md` (Stärke zählt, wer im Abschnitt steht, Liste mit eigener Stärke, Organigramm), `lagebild.md`/`lagemonitor.md` (Kräfte an UHS nur aktive). Bilder mit sichtbarer Zahl über den Bildlauf erneuern. Wächter der Anwenderdoku grün.
+- [x] 5.2 Anwenderdoku nach `docs/anwender/AGENTS.md`: `meldebild.md` (Zeile „n von m“, Stärke und Filter „Abschnitt“ mit abgestellter Untereinheit), `einsatzabschnitte.md` (Stärke zählt, wer im Abschnitt steht, Liste mit eigener Stärke, Organigramm), `lagebild.md`/`lagemonitor.md` (Kräfte an UHS nur aktive). Bilder mit sichtbarer Zahl über den Bildlauf erneuern. Wächter der Anwenderdoku grün.
 - [ ] 5.3 `mise exec -- openspec validate rwfa43cy-staerke-eine-zaehlweise --strict` und `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
 
 ## 6. Befunde aus dem Review (16.11.2026, D3, D4, D8)
