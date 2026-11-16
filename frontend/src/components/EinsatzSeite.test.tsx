@@ -726,7 +726,7 @@ describe('EinsatzSeite — klebender Seitenkopf', () => {
 /**
  * Review zjt7c073 (B4): Mit `fensterInhalt` steckt die Leiste in `FensterRahmen` in einem eigenen
  * Wrapper, der ihr Containing Block ist; kleben kann sie dort nicht. Sie meldet sich dann auch
- * nicht als Rahmenquelle, sonst lägen Fokusabstand und Alarmkante um ihre Höhe zu tief.
+ * nicht als Rahmenquelle, sonst lägen Fokusabstand und klebende Inhalte um ihre Höhe zu tief.
  */
 describe('EinsatzSeite — Arbeitsfläche bis zum Fensterende', () => {
   it('der Seitenkopf klebt nicht und zählt nicht zur Rahmenhöhe', async () => {

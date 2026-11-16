@@ -35,7 +35,8 @@ setzen Status, tragen nach und streichen.
    unterwegs, Eintreffen 16:10 · 1 NEF angefordert“. Ein Klick darauf öffnet die Nachforderungen.
 3. Im Raster je Einheit „Status“, „Rückmeldung“ (Uhrzeit der letzten), „Auftrag“ (der jüngste
    offene, als Verweis), „Stärke“, „Abschnitt“, „Seit“ und „Im Einsatz“ lesen. Eine getönte Zeile
-   nennt ihren Grund als Wort, etwa „1 Ausfall“, „1 Ausfall Material“ oder „Rückm. überfällig“.
+   nennt in der Spalte „Status“ ihren Grund als rotes Etikett, etwa „1 Ausfall“, „1 Ausfall
+   Material“ oder „Rückm. überfällig seit 47 min“.
    „nicht übernommen“ hinter dem Namen kennzeichnet eine Einheit, die ein Bereitstellungsraum
    unangemeldet gebucht hat und die noch niemand übernommen oder abgewiesen hat (Kapitel
    [Einheiten](einheiten.md)).
@@ -182,8 +183,9 @@ gesetzten Filter entfällt der Zulauf, weil er zu keiner Auswahl gehört.
 ### Rückmeldung und Frist
 
 Als Rückmeldung zählt jede Meldung, die an die Einheit gebunden ist, gleich welcher Art. Ist die
-letzte älter als die Frist, steht ihre Uhrzeit hervorgehoben und die Zeile trägt „Rückm.
-überfällig“; ohne jede Rückmeldung steht „—“ und die Zeile trägt „keine Rückm.“. Die Frist beträgt
+letzte älter als die Frist, steht ihre Uhrzeit in Rot, und die Zeile trägt das rote Etikett
+„Rückm. überfällig seit …“ mit der Zeit seit Ablauf der Frist; ohne jede Rückmeldung steht „—“ in
+Rot und die Zeile trägt „keine Rückm.“. Die Frist beträgt
 60 Minuten, solange nichts anderes eingestellt ist. Einsatzleitung und Führungspersonal ändern sie
 in den Einstellungen des Einsatzes unter „Verhalten & Automatik“, Feld „Rückmeldefrist Einheiten
 (Minuten)“. In der Verwaltung unter „Einsatz-Vorgaben“ steht dasselbe Feld als Vorgabe der

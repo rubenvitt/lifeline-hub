@@ -665,7 +665,17 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(screen.queryByRole('columnheader', { name: /Fahrzeuge und Personal/ })).toBeNull();
     const grund = (key: string) =>
       zeile(container, key)!.querySelector('[data-lfh="meldebild-toenungsgrund"]');
-    await waitFor(() => expect(grund('eh-21')).toHaveTextContent(/^1 Ausfall · keine Rückm\.$/));
+    const etiketten = (key: string) =>
+      Array.from(grund(key)?.querySelectorAll('[data-lfh="status-chip"]') ?? []).map((c) => [
+        c.textContent,
+        c.getAttribute('data-ton'),
+      ]);
+    await waitFor(() =>
+      expect(etiketten('eh-21')).toEqual([
+        ['1 Ausfall', 'alarm'],
+        ['keine Rückm.', 'alarm'],
+      ]),
+    );
     expect(grund('eh-20')).toBeNull();
   });
 
@@ -874,7 +884,7 @@ describe('KraefteuebersichtPage — Raster', () => {
     expect(screen.queryByRole('region', { name: 'Einheiten ohne Rückmeldung' })).toBeNull();
   });
 
-  it('überfällig: Uhrzeit in achtung, Wort „überfällig", Zeile getönt', async () => {
+  it('überfällig: Uhrzeit in alarm, Wort „überfällig", Etikett mit Dauer, Zeile getönt', async () => {
     mitEinheit();
     vi.mocked(holeRueckmeldungen).mockResolvedValue({
       ...KEINE_RUECKMELDUNGEN,
@@ -888,7 +898,14 @@ describe('KraefteuebersichtPage — Raster', () => {
     });
     expect(c.textContent).toMatch(/\d{4}$/);
     expect(c.getAttribute('aria-label')).toMatch(/^Rückmeldung überfällig · /);
+    // LLH-1741: ein Zustand, eine Rolle — überfällig ist Alarm wie „keine“.
+    expect(c).toHaveAttribute('data-rolle', 'alarm');
     expect(zeile(container, 'eh-20')).toHaveClass('meldebild-problemzeile');
+    const etikett = zeile(container, 'eh-20')!.querySelector(
+      '[data-lfh="meldebild-toenungsgrund"] [data-lfh="status-chip"]',
+    );
+    expect(etikett).toHaveAttribute('data-ton', 'alarm');
+    expect(etikett?.textContent).toMatch(/^Rückm\. überfällig seit \d+ min$/);
   });
 
   it('„Ohne Einheit" trägt keine Rückmeldung und zählt nicht in die Kachel', async () => {

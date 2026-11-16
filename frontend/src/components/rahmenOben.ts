@@ -34,10 +34,10 @@ export type RahmenEbene = 'kopf' | 'seitenkopf';
 
 /**
  * Die Ränge der klebenden Quellen der Ebene `kopf`, von oben nach unten (LLH-1728, design.md D2,
- * ADR-0055). Eine Quelle klebt unter allen mit kleinerem Rang; ihre Reihenfolge im DOM muss dazu
+ * ADR-0056). Eine Quelle klebt unter allen mit kleinerem Rang; ihre Reihenfolge im DOM muss dazu
  * passen. Der Seitenkopf (Ebene `seitenkopf`) steht unter allen und nimmt `--lfh-kopf-oben`.
  */
-export const RAHMEN_RANG = { betriebszeile: 0, kopf: 1, uebungsband: 2 } as const;
+export const RAHMEN_RANG = { betriebszeile: 0, kopf: 1, uebungsband: 2, alarmzone: 3 } as const;
 
 export type RahmenRang = (typeof RAHMEN_RANG)[keyof typeof RAHMEN_RANG];
 
@@ -88,7 +88,7 @@ function sumAbove(rang: RahmenRang): number {
   return oben;
 }
 
-/** Hört auf Änderungen beider Summen, außerhalb von React (`alarmOben.ts`). */
+/** Hört auf Änderungen beider Summen, außerhalb von React. */
 export function abonniereRahmenOben(h: () => void): () => void {
   hoerer.add(h);
   return () => hoerer.delete(h);
@@ -147,7 +147,7 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
     // der IconRail, `calc(100dvh - var(--lfh-rahmen-oben))`), und Vorfahren, die der Fensterrahmen
     // beobachtet, wüchsen noch in derselben Auslieferungsrunde. Beim Live-Wechsel der Dichte
     // meldete der Browser dann „ResizeObserver loop completed with undelivered notifications“
-    // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen` und `alarmOben`.
+    // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen`.
     let scheduled = 0;
     const observer = new ResizeObserver(() => {
       if (scheduled) return;
@@ -169,11 +169,12 @@ export function useRahmenObenQuelle<T extends HTMLElement>(
 
 /**
  * Eine klebende Quelle im Stapel der Ebene `kopf` (LLH-1728, design.md D2): Betriebszeile, Kopf,
- * Übungsband. Sie meldet ihre Höhe (`ref`), und `oben` ist die Summe der Quellen mit kleinerem
- * Rang, also ihr `top`. Keine Rückkopplung: weder die eigene Höhe noch die der Quellen darunter
- * verschiebt es. Rail, Modulpanel und Seitenkopf hängen sich unter die ganze Ebene
- * (`--lfh-kopf-oben`, zjt7c073 D2). Vorher galt „Summe ohne mich“ (LLH-1725, D4); das trug nur,
- * solange genau eine Quelle unter den übrigen hing.
+ * Übungsband (LLH-1725) und Alarmzone (LLH-1735, design.md D2 in
+ * `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`). Sie meldet ihre Höhe (`ref`), und
+ * `oben` ist die Summe der Quellen mit kleinerem Rang, also ihr `top`. Keine Rückkopplung: weder die
+ * eigene Höhe noch die der Quellen darunter verschiebt es. Die Reihenfolge im DOM muss zum Rang
+ * passen. Rail, Modulpanel und Seitenkopf hängen sich unter die ganze Ebene (`--lfh-kopf-oben`,
+ * zjt7c073 D2); der klebende Seitenkopf zählt für das `top` nicht mit.
  */
 export function useRahmenObenStapel<T extends HTMLElement>(
   aktiv: boolean,

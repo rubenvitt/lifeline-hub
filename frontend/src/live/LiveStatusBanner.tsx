@@ -104,7 +104,7 @@ export default function LiveStatusBanner({
 
   const stoerung = !istOnline || status === 'lost';
   const klebt = klebend && !mittel && stoerung;
-  // Rang 0: über dem Kopf, der am Handy jetzt auch klebt (LLH-1728, design.md D2, ADR-0055).
+  // Rang 0: über dem Kopf, der am Handy jetzt auch klebt (LLH-1728, design.md D2, ADR-0056).
   const { ref: zeileRef, oben: zeileOben } = useRahmenObenStapel<HTMLDivElement>(
     klebt,
     RAHMEN_RANG.betriebszeile,

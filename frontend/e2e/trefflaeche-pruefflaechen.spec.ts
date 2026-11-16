@@ -1251,11 +1251,7 @@ test('C14 · Materialliste: Ort, Ausgeben, Gruppierung und Zeilenaktionen halten
           ziele: segment(/^Nach (Ort|Status)$/),
           mindestens: 2,
         },
-        {
-          sorte: 'Material aus dem Einsatz nehmen',
-          ziele: knopf(/^.+ aus dem Einsatz nehmen$/),
-          mindestens: 2,
-        },
+        // „Aus dem Einsatz nehmen“ steht seit LLH-1722 im Zeilenmenü (kein eigener Knopf mehr).
         {
           sorte: 'Material Weitere Aktionen',
           ziele: knopf(/^Weitere Aktionen zu .+$/),

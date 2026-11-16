@@ -44,9 +44,10 @@ Eine neue Unwetterwarnung meldet die App von selbst als Alarm.
 
 ### Auf eine Unwetterwarnung reagieren
 
-1. Erscheint rechts oben der Alarm „Unwetterwarnung“ mit Ereignis und Zeitraum, „Öffnen“ wählen.
+1. Erscheint in der Alarmzone unter der Kopfzeile (auf dem Handy in der Leiste unten) der Alarm
+   „Unwetterwarnung“ mit Ereignis und Zeitraum, „Öffnen“ wählen.
 
-   ![Hinweis „Unwetterwarnung“ zu Heftigem Starkregen mit dem Knopf „Öffnen“](../bilder/wetter-pegel/unwetter-hinweis.png)
+   ![Alarm „Unwetterwarnung“ zu Heftigem Starkregen in der Alarmzone mit dem Knopf „Öffnen“](../bilder/wetter-pegel/unwetter-hinweis.png)
 
 2. „Wetter & Pegel“ öffnet sich; die Warnung steht unter „Warnungen (DWD)“.
 
@@ -119,8 +120,8 @@ schwer oder extrem (rot und darüber) am Einsatzort, mit dem Alarmton, auf jeder
 Einsatzes und, wenn Benachrichtigungen erlaubt sind, auch im verdeckten Tab. Je Person und Einsatz
 meldet die App dieselbe Warnung nur einmal. Wie jeder Alarm lässt er sich unter
 „Benachrichtigungen“ nicht abschalten (Kapitel
-[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Kommen viele Alarme zugleich, fasst
-die App sie wie alle Benachrichtigungen zu einem Sammeltoast zusammen. Warnungen geringer und
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Kommen mehrere Alarme zugleich, bündelt
+die Alarmzone sie wie alle Benachrichtigungen; eine neuere Unwetterwarnung ersetzt die ältere. Warnungen geringer und
 mäßiger Stufe lösen nichts aus. Der
 Beginn einer angekündigten Unwetterwarnung steht zudem im Überblick unter „Nächste Marken“. Jede
 geltende oder angekündigte Warnung, gleich welcher Stufe, steht außerdem still als Marke im

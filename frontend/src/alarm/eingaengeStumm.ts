@@ -16,7 +16,7 @@ import { ALLE_ARTEN, BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 
 const SCHLUESSEL = 'lfh:eingaenge:stumm';
 
-/** Die Eingangsarten des Einsatzes: Stufe Eingang, keine Org-Art, nicht Unwetter (ein Toast). */
+/** Die Eingangsarten des Einsatzes: Stufe Eingang, keine Org-Art, nicht Unwetter (Alarmzone). */
 export const EINGANG_ARTEN: readonly BenachrichtigungArt[] = ALLE_ARTEN.filter(
   (a) =>
     BENACHRICHTIGUNG_ARTEN[a].stufe === 'hinweis' &&

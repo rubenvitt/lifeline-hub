@@ -188,12 +188,16 @@ async function waehleAus(container: HTMLElement, platzhalter: string, eintrag: s
 const paneel = (titel: string) => screen.getByRole('region', { name: titel });
 const BESATZUNG = 'Fahrzeuge und Besatzung';
 /** Zeile einer Person, eines Fahrzeugs oder eines Materialpostens. */
+// Der Rückgängig-Hinweis nennt den Namen auch (LLH-1722): gesucht wird nur in den Zeilen.
 const zeileVon = (text: string) =>
   screen
-    .getByText(text, { exact: false })
-    .closest(
-      '[data-lfh="einheit-person"], [data-lfh="einheit-fahrzeug"], [data-lfh="material-am-ort-zeile"]',
-    ) as HTMLElement;
+    .getAllByText(text, { exact: false })
+    .map((t) =>
+      t.closest(
+        '[data-lfh="einheit-person"], [data-lfh="einheit-fahrzeug"], [data-lfh="material-am-ort-zeile"]',
+      ),
+    )
+    .find((z) => z != null) as HTMLElement;
 
 /**
  * Mitglieder einer Einheit, wie sie das Einheit-DTO und die Einsatzlisten tragen (die Besatzung
@@ -253,6 +257,21 @@ function mitMitgliedern(
 }
 
 /** Das zuletzt geöffnete Menü einer Person (jede Person hat ihr eigenes Portal). */
+/** Wählt im ⋮ eines Fahrzeugs (LLH-1722). */
+async function waehleImFahrzeugMenue(funkrufname: string, eintrag: string) {
+  await userEvent.click(
+    screen.getByRole('button', { name: `Aktionen zu Fahrzeug ${funkrufname}` }),
+  );
+  const menue = await waitFor(() => {
+    const offen = document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(offen.length).toBeGreaterThan(0);
+    return offen[offen.length - 1];
+  });
+  await userEvent.click(within(menue).getByText(eintrag));
+}
+
 async function waehleImMenue(name: string, eintrag: string) {
   await userEvent.click(screen.getByRole('button', { name: `Aktionen zu Person ${name}` }));
   const menue = await waitFor(() => {
@@ -783,6 +802,7 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
     expect(screen.queryByRole('button', { name: /^Status von / })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Aus Einheit lösen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Aktionen zu Person/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Fahrzeug/ })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Einheit auflösen oder stornieren' })).toBeNull();
     expect(screen.queryByText('Person zuordnen …')).toBeNull();
     expect(screen.queryByText('Fahrzeug zuordnen …')).toBeNull();
@@ -799,7 +819,8 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
       await screen.findByRole('button', { name: 'Status von FW 1/44-1 ändern' }),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aktionen zu Person Max Mustermann' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Aus Einheit lösen' })).toBeInTheDocument();
+    // „Aus Einheit lösen“ steht seit LLH-1722 im ⋮ des Fahrzeugs.
+    expect(screen.getByRole('button', { name: 'Aktionen zu Fahrzeug FW 1/44-1' })).toBeVisible();
     expect(screen.getByText('Person zuordnen …')).toBeInTheDocument();
     expect(
       screen.getByRole('region', { name: 'Einheit auflösen oder stornieren' }),
@@ -1140,7 +1161,9 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
       await within(zeileVon('Max Mustermann')).findByText('Person führt die Einheit'),
     ).toHaveAttribute('data-fehler');
     expect(zeileVon('Uwe Unter').querySelector('[data-fehler]')).toBeNull();
-    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    // Kein Fehler-Toast; der gelungene Schritt bietet „Rückgängig“ (LLH-1722).
+    expect(document.querySelector('.ant-message-error')).toBeNull();
+    expect(screen.getByText('Uwe Unter aus Einheit gelöst')).toBeInTheDocument();
   });
 
   it('Als Einheitsführer: der Grund steht an der Zeile, die nächste Aktion dort räumt ihn', async () => {
@@ -1178,9 +1201,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
       http.patch('/api/einsaetze/1/material/40', abgelehnt('Material ist verliehen')),
     );
     await screen.findByText('FW 1/44-1');
-    await userEvent.click(
-      within(zeileVon('FW 1/44-1')).getByRole('button', { name: 'Aus Einheit lösen' }),
-    );
+    await waehleImFahrzeugMenue('FW 1/44-1', 'Aus Einheit lösen');
     await userEvent.click(
       within(zeileVon('Tragkraftspritze')).getByRole('button', {
         name: 'Tragkraftspritze aus Einheit lösen',
@@ -1211,9 +1232,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
       ),
     );
     await screen.findByText('FW 1/44-1');
-    await userEvent.click(
-      within(zeileVon('FW 1/44-1')).getByRole('button', { name: 'Aus Einheit lösen' }),
-    );
+    await waehleImFahrzeugMenue('FW 1/44-1', 'Aus Einheit lösen');
     await within(zeileVon('FW 1/44-1')).findByText('Fahrzeug ist schon gelöst');
     await waehleImMenue('Max Mustermann', 'Aus Einheit lösen');
     await within(zeileVon('Max Mustermann')).findByText('Person ist schon gelöst');

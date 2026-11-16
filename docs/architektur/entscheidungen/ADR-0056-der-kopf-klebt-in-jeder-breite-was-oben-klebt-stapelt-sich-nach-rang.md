@@ -1,5 +1,5 @@
 ---
-id: ADR-0055
+id: ADR-0056
 titel: Der Kopf klebt in jeder Breite, und was oben klebt, stapelt sich nach Rang
 status: akzeptiert
 datum: 2026-11-15
@@ -9,12 +9,13 @@ gilt_fuer:
   - frontend/src/components/AppLayout.tsx
   - frontend/src/live/LiveStatusBanner.tsx
   - frontend/src/components/instrument/Uebung.tsx
+  - frontend/src/alarm/AlarmZone.tsx
 herleitung:
   - openspec/changes/archive/2026-11-15-ejt520so-handy-kopfleiste-fixiert/design.md
   - Zunder LLH-1728 (Inhalt der Handy-Zeile, Reichweite und Stapel abgestimmt mit Ruben am 15.11.2026)
 ---
 
-# ADR-0055: Der Kopf klebt in jeder Breite, und was oben klebt, stapelt sich nach Rang
+# ADR-0056: Der Kopf klebt in jeder Breite, und was oben klebt, stapelt sich nach Rang
 
 ## Regeln
 
@@ -35,6 +36,7 @@ verlange 'RAHMEN_RANG\.kopf' frontend/src/einsatz/EinsatzLayout.tsx
 verlange 'RAHMEN_RANG\.kopf' frontend/src/components/AppLayout.tsx
 verlange 'RAHMEN_RANG\.betriebszeile' frontend/src/live/LiveStatusBanner.tsx
 verlange 'RAHMEN_RANG\.uebungsband' frontend/src/components/instrument/Uebung.tsx
+verlange 'RAHMEN_RANG\.alarmzone' frontend/src/alarm/AlarmZone.tsx
 verbiete 'mittel \? \{ \.\.\.KOPF_STIL, \.\.\.RAHMEN_KLEBT \}' frontend/src/einsatz/EinsatzLayout.tsx frontend/src/components/AppLayout.tsx
 verbiete 'useRahmenObenQuelle' frontend/src/einsatz/EinsatzLayout.tsx frontend/src/components/AppLayout.tsx frontend/src/live/LiveStatusBanner.tsx frontend/src/components/instrument/Uebung.tsx
 ```
@@ -51,5 +53,6 @@ Kopf mit Platzhalter und ein Stapel nach Rang.
 
 Der Kopf ist in jeder Breite erreichbar und bleibt am Handy einzeilig, weil Suche und Benutzermenü
 dort in die Navigation wandern und die Alarmzentrale den Ruhezustand als Symbol zeigt. Betriebszeile,
-Kopf und Übungsband stehen in fester Reihenfolge übereinander; gestört nimmt das am Handy oben über
+Kopf, Übungsband und Alarmzone (LLH-1735, dort zuerst mit eigenen Rängen
+eingeführt und hier zusammengeführt) stehen in fester Reihenfolge übereinander; gestört nimmt das am Handy oben über
 110 px. Wer eine weitere klebende Rahmenquelle einführt, vergibt ihr einen Rang und ändert diese ADR.

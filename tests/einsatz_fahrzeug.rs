@@ -999,8 +999,8 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
 
     let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
     assert_eq!(s, StatusCode::OK, "{json}");
-    assert_eq!(json["beendet_als"], "entlassen");
-    assert!(json["beendet_at"].is_string() && json["beendet_von"].is_i64());
+    assert_eq!(json["fahrzeug"]["beendet_als"], "entlassen");
+    assert!(json["fahrzeug"]["beendet_at"].is_string() && json["fahrzeug"]["beendet_von"].is_i64());
     assert_eq!(funkrufnamen(&app, &admin, einsatz, "").await, ["Florian 2"]);
     assert_eq!(
         funkrufnamen(&app, &admin, einsatz, "?entlassene=1").await,
@@ -1068,6 +1068,143 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
         StatusCode::CONFLICT,
         "ein aktives Fahrzeug wird nicht reaktiviert"
     );
+}
+
+/// LLH-1722 (Spec `kraefte-entlassung`, „Entlassung eines Fahrzeugs zurücknehmen“): Nach
+/// „Entlassen“ und „Rückgängig“ steht das Fahrzeug im selben Zustand wie vorher — Status samt
+/// „Status seit“, Einheit, Besatzung. Ein zweites Rücknehmen und eines nach „Erneut disponieren“
+/// sind 409.
+#[tokio::test]
+async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "83-1").await;
+    let einheit = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna Müller").await;
+    for (methode, pfad) in [
+        ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}")),
+        ("PUT", format!("fahrzeuge/{ef}/besatzung/{ep}")),
+    ] {
+        let (s, j) = anfrage(
+            &app,
+            methode,
+            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert!(s.is_success(), "{pfad}: {j}");
+    }
+    let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
+    let s2 = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"].as_str().unwrap().starts_with("2"))
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(&format!(r#"{{"status_id":{s2}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let stand = |j: &serde_json::Value| {
+        (
+            j["status_id"].clone(),
+            j["status_seit"].clone(),
+            j["einheit_id"].clone(),
+            j["aktueller_br_id"].clone(),
+        )
+    };
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        None,
+    )
+    .await;
+    let vorher = stand(
+        liste
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["id"] == ef)
+            .unwrap(),
+    );
+    assert_eq!(vorher.0, s2);
+
+    let (s, entlassen) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    assert_eq!(s, StatusCode::OK, "{entlassen}");
+    assert_eq!(entlassen["fahrzeug"]["beendet_als"], "entlassen");
+    assert_eq!(entlassen["vorzustand"]["einheit_id"], einheit);
+    assert_eq!(
+        entlassen["vorzustand"]["besatzung"],
+        serde_json::json!([ep])
+    );
+    let vorzustand = entlassen["vorzustand"].to_string();
+
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&vorzustand),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["ausgelassen"], serde_json::json!([]));
+    assert_eq!(stand(&json["fahrzeug"]), vorher);
+    let (_, personal) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    let anna = personal
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == ep)
+        .unwrap();
+    assert_eq!(anna["fahrzeug_id"], ef);
+    assert!(system_etb_inhalte(&app, &admin, einsatz)
+        .await
+        .iter()
+        .any(|t| t == "Fahrzeug «83-1»: Entlassung zurückgenommen"));
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&vorzustand),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "schon zurückgenommen");
+
+    let (_, entlassen) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, ef, "reaktivieren").await.0,
+        StatusCode::OK
+    );
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &admin,
+        Some(&entlassen["vorzustand"].to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "nach „Erneut disponieren“");
 }
 
 /// design.md D3: Storno direkt nach der Disposition (204, in keiner Liste); nach einem

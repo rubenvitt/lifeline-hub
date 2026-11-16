@@ -40,6 +40,8 @@ const RAHMEN = [
   'live/LiveStatusBanner.tsx',
   // Das Übungsband klebt selbst unter den übrigen Quellen und ist Quelle der Höhe (LLH-1725, D4).
   'components/instrument/Uebung.tsx',
+  // Die Alarmzone klebt unter dem Übungsband und ist Quelle der Höhe (LLH-1735, design.md D2).
+  'alarm/AlarmZone.tsx',
 ];
 
 /** Zeilen vor und nach einem `sticky`, in denen sein `top` steht. */

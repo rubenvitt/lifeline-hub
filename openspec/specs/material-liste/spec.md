@@ -229,9 +229,10 @@ MUST NOT auf der Materialseite stehen.
 
 ### Requirement: Zeilenaktionen der Materialliste
 
-Jede Zeile der Materialliste SHALL für schreibberechtigte Personen „Aus dem Einsatz nehmen“
-sichtbar anbieten und die übrigen Handlungen in einem Zeilenmenü bündeln, dessen Name den Posten
-nennt: bei einem Verbrauchsgut „Menge ändern …“, „Ausgabe zurücknehmen …“, „Aufteilen …“, „Als
+Jede Zeile der Materialliste SHALL für schreibberechtigte Personen ihre Handlungen in einem
+Zeilenmenü bündeln, dessen Name den Posten nennt; sein erster Eintrag MUST neutral „Aus dem
+Einsatz nehmen“ sein, kein Knopf in der Zeile und keine Hauptaktion der Karte (LLH-1722). Danach
+folgen bei einem Verbrauchsgut „Menge ändern …“, „Ausgabe zurücknehmen …“, „Aufteilen …“, „Als
 Gerät führen“, „Angaben ändern …“ und „Stornieren“; bei einem Gerät „Als Verbrauchsgut führen“,
 „Angaben ändern …“ und „Stornieren“. Die Einträge zur Art MUST nur ein Ad-hoc-Posten tragen; ein
 Stamm-Posten trägt die Art seines Stammeintrags (LLH-1224). Ein Eintrag, den es für die Art gibt, der aber gerade nicht
@@ -256,6 +257,14 @@ tragen, wenn das Modul Nachforderungen bedienbar ist (LLH-1403, Spec `nachforder
 #### Scenario: Gerät ohne Mengeneinträge
 - **WHEN** die Person das Zeilenmenü eines Geräts öffnet
 - **THEN** stehen darin weder „Menge ändern …“ noch „Ausgabe zurücknehmen …“ noch „Aufteilen …“
+
+#### Scenario: Aus dem Einsatz nehmen im Menü
+- **WHEN** die Person das Zeilenmenü der Wolldecke öffnet
+- **THEN** steht „Aus dem Einsatz nehmen“ als erster Eintrag, neutral, und die Zeile trägt keinen Knopf dafür
+
+#### Scenario: Karte am Handy
+- **WHEN** die Materialliste als Karten erscheint
+- **THEN** trägt keine Karte einen Knopf „Aus dem Einsatz nehmen“, und ihr Menü beginnt damit
 
 ### Requirement: Gruppierung nach Ort oder Status
 

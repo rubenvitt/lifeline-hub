@@ -3773,7 +3773,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
 // ── Verpflegungsstellen (LLH-1040) ────────────────────────────────────────────────────
 //
 // Ansicht „Stellen“: eine GEPLANTE Stelle trägt drei Aktionen hinter einem `MenueAusloeser`, eine
-// AKTIVE zwei Knöpfe („Bearbeiten …“, „Auflösen …“) in `stelle-aktionen` (Lücke `marginSM` =
+// AKTIVE zwei Knöpfe („Bearbeiten …“, „Auflösen“) in `stelle-aktionen` (Lücke `marginSM` =
 // 7 / 11 / 16 px). Die Stellenwahl der Ausgabeansicht ist ein antd-`Select` (`.ant-select` trägt
 // die Steuerhöhe); vorgewählt ist die einzige zugeordnete Stelle.
 
@@ -3834,7 +3834,7 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
     if (dichte === 'handschuh') {
       expect(
         luecke,
-        `Abstand „Bearbeiten …“ ↔ „Auflösen …“ (handschuh, gemessen ${luecke}px)`,
+        `Abstand „Bearbeiten …“ ↔ „Auflösen“ (handschuh, gemessen ${luecke}px)`,
       ).toBeGreaterThanOrEqual(16 - SUBPIXEL);
     }
 
@@ -5174,7 +5174,7 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
     await expect(page.getByRole('note', { name: 'Legende der Matrix' })).toBeVisible();
     // LLH-1090: statt der Zellzählung die Beurteilung des Gebiets, ohne Knopf.
     await expect(
-      page.locator('[data-lfh="gefahrengebiet-beurteilung"]').getByText('nicht beurteilt'),
+      page.locator('[data-lfh="gefahrengebiet-beurteilung"]').getByText('unbestätigt'),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Beurteilung bestätigen' })).toHaveCount(0);
 

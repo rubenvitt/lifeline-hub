@@ -261,6 +261,21 @@ describe('zeilenMenue — Vermerke und Verfasser hinter den Handlungen', () => {
       ).toEqual(['vermerk:anhang-3', 'vorschau:anhang-3', 'vermerk:anhang-2']);
     });
 
+    it('bietet die Vorschau auch für ein HEIC/HEIF-Foto, das die App selbst dekodiert (LLH-1887)', () => {
+      const r = { ...alle, kannBerichtigen: false, kannWiedervorlage: false, kannAuftrag: false };
+      for (const mime of ['image/heic', 'image/heif']) {
+        const heic: Vermerk = {
+          ...foto,
+          text: 'Anhang IMG_0412.HEIC',
+          datei: { ...foto.datei!, dateiname: 'IMG_0412.HEIC', mime },
+        };
+        expect(zeilenMenue(Z.eintrag, r, { vermerke: [heic] }).map((m) => m.label)).toEqual([
+          'Anhang IMG_0412.HEIC herunterladen',
+          'Vorschau: IMG_0412.HEIC',
+        ]);
+      }
+    });
+
     it('die Wahl zeigt die Vorschau bzw. lädt das Original', () => {
       const aufrufe = {
         berichtigen: vi.fn(),

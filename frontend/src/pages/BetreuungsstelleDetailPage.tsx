@@ -95,6 +95,13 @@ type KopfMenue = 'karte' | 'verorten' | 'stornieren';
 /** Ein Dialog zur Zeit; jeder frisch montiert. */
 type Dialog = 'belegung' | 'schliessen' | 'stornieren';
 
+/** Ein Statusübergang mit dem Status davor, für das Rückgängig nach dem Schließen. */
+interface StatusSchritt {
+  id: number;
+  ziel: BetreuungsstelleStatus;
+  vorher: BetreuungsstelleStatus;
+}
+
 /** Die offene Bearbeiten-Sitzung: der Stand beim Öffnen (dreiseitiger PATCH) und die Werte. */
 interface Sitzung {
   beimOeffnen: Betreuungsstelle;
@@ -242,13 +249,24 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       );
     },
   });
+  // Die Variablen tragen Stelle und Status davor, damit ein Rückgängig genau diese Stelle in
+  // genau diesen Status zurücksetzt, auch wenn inzwischen eine andere Stelle angezeigt wird.
   const statusMut = useMutation({
-    mutationFn: (status: BetreuungsstelleStatus) => aendereStelle(einsatzId, stelleId, { status }),
-    onSuccess: (s) => {
+    mutationFn: ({ id, ziel }: StatusSchritt) => aendereStelle(einsatzId, id, { status: ziel }),
+    onSuccess: (s, { id, vorher }) => {
       invalidiere();
-      message.success(
-        `Betreuungsstelle ${s.bezeichnung}: ${betreuungsstelleStatus[s.status].label}`,
-      );
+      const text = `Betreuungsstelle ${s.bezeichnung}: ${betreuungsstelleStatus[s.status].label}`;
+      // „Schließen“ einer leeren Stelle ist umkehrbar (LLH-1722, `frontend/AGENTS.md`, „Beenden:
+      // Verb, Ort und Sicherung je Art“): der Rückweg ist der Statusübergang zurück in den Status
+      // davor, „vorbereitet“ oder „in Betrieb“. Eine belegte Stelle schließt über die
+      // Leermeldung (`schliessenMut`), ohne Rückweg.
+      if (s.status === 'geschlossen' && vorher !== 'geschlossen') {
+        zeigeRueckgaengig(message, text, () =>
+          statusMut.mutate({ id, ziel: vorher, vorher: 'geschlossen' }),
+        );
+      } else {
+        message.success(text);
+      }
     },
   });
   // Die Leermeldung vor dem Schließen: ohne Rückgängig-Toast — ein Rückweg auf die alte Zahl
@@ -325,6 +343,10 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   const handlung = STATUS_HANDLUNG[s.status];
   const veraltet = betreuungQuery.isError;
 
+  function setzeStatus(ziel: BetreuungsstelleStatus) {
+    statusMut.mutate({ id: s.id, ziel, vorher: s.status });
+  }
+
   function statusWechsel() {
     resetStatus();
     if (!namentlichGefuehrt && schliessenBrauchtLeermeldung(handlung.ziel, s.belegung?.belegt)) {
@@ -333,7 +355,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       setDialog('schliessen');
       return;
     }
-    statusMut.mutate(handlung.ziel);
+    setzeStatus(handlung.ziel);
   }
 
   function starteBearbeiten() {
@@ -737,7 +759,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
                       setDialog('schliessen');
                     } else {
                       resetStatus();
-                      statusMut.mutate('geschlossen');
+                      setzeStatus('geschlossen');
                     }
                   },
                 }

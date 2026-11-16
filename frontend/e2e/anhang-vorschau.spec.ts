@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { FOTO_JPEG } from './bildFixture';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
-import { einsatzDialogOeffnen } from './einsatz-kern';
+import { einsatzDialogOeffnen, einsatzPerApi } from './einsatz-kern';
+import { ladeInDichte } from './trefflaeche-kern';
 
 /**
  * Bildvorschau an Anhängen im Browser (LFH-759, Spec `anhang-vorschau`): das Vorschaubild vom
@@ -41,7 +42,7 @@ async function schadenMitFoto(page: Page, einsatzId: string): Promise<number> {
   return schadenId;
 }
 
-async function etbEintragMitHeic(page: Page, einsatzId: string) {
+async function etbEintragMitHeic(page: Page, einsatzId: string): Promise<number> {
   const anhang = await page.request.post(`/api/einsaetze/${einsatzId}/etb/anhaenge`, {
     multipart: { datei: { name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: HEIC } },
   });
@@ -57,6 +58,7 @@ async function etbEintragMitHeic(page: Page, einsatzId: string) {
     },
   });
   expect(eintrag.status(), await eintrag.text()).toBe(201);
+  return (await eintrag.json()).lfd_nr as number;
 }
 
 /** Wartet, bis das Bild wirklich dekodiert ist, und liefert seine natürlichen Maße. */
@@ -137,5 +139,39 @@ test('Vorschau und Großansicht eines Schadenfotos, HEIC aus dem ETB, nie das Or
       `${datei} kam erst jetzt, vom festen Pfad`,
     ).toBe(true);
   }
+  expect(anfragen.filter((u) => u.includes('fassung=original'))).toEqual([]);
+});
+
+/**
+ * HEIC in der kompakten Spaltenzeile (LLH-1887): dort steht der Anhang nur als Vermerk, die
+ * Großansicht kommt über das Zeilenmenü und dekodiert das Gerät, nie das Original. Ein eigener
+ * Test: im Test oben wären es zu viele volle Ladungen in einem Browserkontext, Chromium bricht
+ * dann die Modulabrufe des Dev-Servers ab (`net::ERR_INSUFFICIENT_RESOURCES`, LLH-1614).
+ */
+test('HEIC in der kompakten Spaltenzeile: Großansicht über das Zeilenmenü, nie das Original', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize(FUEKW);
+  const anfragen: string[] = [];
+  page.on('request', (r) => anfragen.push(r.url()));
+
+  // Ohne Startseite und Einsatzdialog: jede volle Ladung zählt hier (LFH-1114, LLH-1665).
+  await anmeldenAlsAdmin(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Vorschau kompakt ${Date.now()}`);
+  const nr = await etbEintragMitHeic(page, einsatzId);
+  await wechsleZuRolle(page, 'beobachter', einsatzId);
+  await ladeInDichte(page, `/einsaetze/${einsatzId}/etb`, 'kompakt');
+  await page.getByRole('button', { name: `Aktionen zu Eintrag ${nr}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Vorschau: IMG_0001.HEIC' }).click();
+  const ansicht = page.locator('.ant-image-preview');
+  await expect(ansicht).toBeVisible({ timeout: 30_000 });
+  const gross = ansicht.locator('img.ant-image-preview-img');
+  await expect(gross).toHaveAttribute('src', /^blob:/);
+  await expect
+    .poll(() => gross.evaluate((i: HTMLImageElement) => i.naturalWidth))
+    .toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
+  await expect(ansicht).toBeHidden();
   expect(anfragen.filter((u) => u.includes('fassung=original'))).toEqual([]);
 });

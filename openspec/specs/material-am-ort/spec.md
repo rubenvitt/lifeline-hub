@@ -65,7 +65,8 @@ gelöster Posten MUST ohne Ort im Einsatz bleiben. Eine Ablehnung MUST an der Ze
 
 Die Zeile eines selbst gelösten Postens MUST an ihrer Stelle und in ihrer Höhe als „Gelöst“ stehen
 bleiben, bis Zeiger und Fokus den Baustein verlassen haben und seit dem letzten Tipp darin einige
-Sekunden vergangen sind. An der Stelle des Lösen-Knopfs MUST dann nichts auslösen.
+Sekunden vergangen sind. An der Stelle des Lösen-Knopfs MUST dann nichts auslösen. An einem Ort,
+der nicht beendet ist, MUST die gehaltene Zeile daneben einen Knopf „Rückgängig“ tragen.
 
 #### Scenario: Zwei schnelle Tipps lösen einen Posten
 - **WHEN** die Person an der UHS mit den Posten Trage und Lichtmast zweimal schnell auf „Lösen“ in der Zeile der Trage tippt
@@ -75,11 +76,15 @@ Sekunden vergangen sind. An der Stelle des Lösen-Knopfs MUST dann nichts auslö
 - **WHEN** die Person die Trage gelöst hat und Zeiger und Fokus den Baustein verlassen
 - **THEN** fällt die Zeile der Trage nach wenigen Sekunden weg, und die übrigen Zeilen rücken nach
 
+#### Scenario: Rückgängig in der gehaltenen Zeile
+- **WHEN** die Person nach dem Lösen der Trage in deren gehaltener Zeile „Rückgängig“ wählt
+- **THEN** liegt die Trage wieder an diesem Ort und zeigt ihre Zeile mit dem Lösen-Knopf
+
 ### Requirement: Lösen rückgängig machen
 
-An einem Ort, der nicht beendet ist, SHALL das Lösen einen Rückgängig-Weg anbieten, der den Posten
-über denselben Schreibweg wieder diesem Ort zuordnet. Eine Ablehnung MUST über dem Baustein stehen
-bleiben, auch wenn die gelöste Zeile wegfällt.
+An einem Ort, der nicht beendet ist, SHALL das Lösen einen Rückgängig-Weg im Hinweis und in der
+gehaltenen Zeile anbieten, der den Posten über denselben Schreibweg wieder diesem Ort zuordnet.
+Eine Ablehnung MUST über dem Baustein stehen bleiben, auch wenn die gelöste Zeile wegfällt.
 
 #### Scenario: Lösen rückgängig machen
 - **WHEN** die Person nach dem Lösen der Trage im Hinweis „Rückgängig“ wählt
@@ -87,7 +92,7 @@ bleiben, auch wenn die gelöste Zeile wegfällt.
 
 #### Scenario: Kein Rückgängig am beendeten Ort
 - **WHEN** die Person an der aufgelösten UHS die Trage löst
-- **THEN** nennt der Hinweis „Trage gelöst“ ohne „Rückgängig“, denn die UHS nimmt kein Material mehr an
+- **THEN** nennt der Hinweis „Trage gelöst“ ohne „Rückgängig“, die gehaltene Zeile trägt keinen Knopf „Rückgängig“, denn die UHS nimmt kein Material mehr an
 
 ### Requirement: Material am Ort ausgeben
 

@@ -112,7 +112,10 @@ export default function EvakuierungsbezirkPage() {
   // „Stand melden“ am Spiegel als Antrag (LLH-1492, D13); alles Übrige bleibt gesperrt.
   const zeigeMelden = darfBeantragen(einsatz) && !bearbeiten;
 
+  // „Bearbeiten“ steht im ⋮ (LLH-1722, `frontend/AGENTS.md`, „Genau eine Primäraktion“): der Kopf
+  // trägt höchstens zwei Knöpfe, „Stand melden“ und den Räumungsschritt.
   const menue: MenueEintrag<MenueAktion>[] = [
+    { key: 'bearbeiten', label: 'Bearbeiten' },
     ...plan.menue.map((s) => ({ key: s.key, label: s.label })),
     ...(plan.aufheben
       ? [{ key: plan.aufheben.key, label: plan.aufheben.label, gefahr: true as const }]
@@ -125,6 +128,10 @@ export default function EvakuierungsbezirkPage() {
     ...(plan.aufheben ? [plan.aufheben] : []),
   ];
   const waehle = (key: MenueAktion) => {
+    if (key === 'bearbeiten') {
+      starteBearbeiten();
+      return;
+    }
     if (key === 'stornieren') {
       handlungen.bezirkAktion('stornieren', bezirk);
       return;
@@ -176,7 +183,6 @@ export default function EvakuierungsbezirkPage() {
                 {plan.knopf.label}
               </Button>
             )}
-            {zeigeKopf && <Button onClick={starteBearbeiten}>Bearbeiten</Button>}
             {zeigeKopf && (
               <MenueAusloeser
                 eintraege={menue}

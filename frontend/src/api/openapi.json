@@ -8188,6 +8188,88 @@
           "polizei"
         ]
       },
+      "EntlassungAntwort": {
+        "type": "object",
+        "description": "Antwort von `POST …/fahrzeuge/{ef_id}/entlassen` (LLH-1722).",
+        "required": [
+          "fahrzeug",
+          "vorzustand"
+        ],
+        "properties": {
+          "fahrzeug": {
+            "$ref": "#/components/schemas/EinsatzFahrzeugAnzeige"
+          },
+          "vorzustand": {
+            "$ref": "#/components/schemas/EntlassungVorzustand"
+          }
+        }
+      },
+      "EntlassungRuecknahmeAntwort": {
+        "type": "object",
+        "description": "Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722).",
+        "required": [
+          "fahrzeug",
+          "ausgelassen"
+        ],
+        "properties": {
+          "ausgelassen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuecknahmeAusgelassen"
+            }
+          },
+          "fahrzeug": {
+            "$ref": "#/components/schemas/EinsatzFahrzeugAnzeige"
+          }
+        }
+      },
+      "EntlassungVorzustand": {
+        "type": "object",
+        "description": "Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung\neines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).\nKommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.\nDie Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom\nClient zu übernehmen.",
+        "required": [
+          "entlassen_at"
+        ],
+        "properties": {
+          "beladung": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Beladung (`einsatz_material.id`)."
+          },
+          "besatzung": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Besatzung (`einsatz_personal.id`)."
+          },
+          "br_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "entlassen_at": {
+            "type": "string",
+            "description": "Zeitpunkt dieses Entlassens; Kennung, an der die Rücknahme es wiedererkennt."
+          },
+          "fuehrungsstelle": {
+            "type": "boolean",
+            "description": "Trug das Fahrzeug die Führungsstelle?"
+          }
+        }
+      },
       "Ereignis": {
         "type": "string",
         "description": "Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in\n`migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und\n`0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test\n`jede_variante_passiert_den_db_check`). Zugleich Schema-Anker der Union in\n[`AnmeldeEintragAnzeige`] (LFH-120).",
@@ -17981,6 +18063,24 @@
             "type": "integer",
             "format": "int64",
             "description": "Effektive Rückmeldefrist in Minuten (Einsatz ?? Org ?? 60)."
+          }
+        }
+      },
+      "RuecknahmeAusgelassen": {
+        "type": "object",
+        "description": "Ein Teil des Vorzustands, den die Rücknahme ausgelassen hat, mit dem Grund in Worten.",
+        "required": [
+          "bezeichnung",
+          "grund"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string",
+            "description": "Was nicht zurückkam („Einheit «1. Zug»“, „Anna Müller“, „Stromerzeuger“)."
+          },
+          "grund": {
+            "type": "string",
+            "description": "Warum („inzwischen aufgelöst“, „sitzt inzwischen auf einem anderen Fahrzeug“)."
           }
         }
       },

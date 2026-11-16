@@ -1,7 +1,7 @@
 import type { Dokument } from '../api/types';
 import { dokumentDownloadPfad } from '../api/dokumente';
 import {
-  istBildMime,
+  isBildMime,
   originalDateiname,
   originalPfad,
   originalZugaenglicherName,
@@ -75,7 +75,7 @@ export default function EtbDokumente({
               >
                 Dokument „{d.titel}“ · {groesse}
               </AnhangVerweis>
-              {darfOriginal && istBildMime(d.mime) && (
+              {darfOriginal && isBildMime(d.mime) && (
                 <a
                   href={originalPfad(href)}
                   download={originalDateiname(d.dateiname)}

@@ -39,7 +39,7 @@ void schriften.then(() => {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <ThemeModeProvider>
-          <AntApp notification={{ maxCount: 3 }}>
+          <AntApp>
             <RouterProvider router={router} />
           </AntApp>
         </ThemeModeProvider>

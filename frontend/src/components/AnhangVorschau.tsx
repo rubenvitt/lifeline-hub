@@ -10,14 +10,15 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { Image, Spin } from 'antd';
+import { Image, Modal, Spin } from 'antd';
 import { QueryClientContext, useQuery } from '@tanstack/react-query';
 import { useRollen } from './instrument/rollenwerte';
 import {
   einsatzIdAusPfad,
   grossansichtPfad,
-  hatServerVorschau,
-  istHeicMime,
+  hasServerVorschau,
+  hasVorschau,
+  isHeicMime,
   vorschauPfad,
 } from '../api/anhangFassung';
 import { einsatzKeys } from '../api/queryKeys';
@@ -136,6 +137,62 @@ export function AnhangVorschauGruppe({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Großansicht eines Bild-Anhangs ohne Vorschaubild im Fluss, etwa aus dem ETB-Zeilenmenü (Review
+ * L1): dieselbe Überlagerung wie am Vorschaubild. Ein HEIC/HEIF dekodiert das Gerät (LLH-1887);
+ * solange das dauert, dreht sich ein Ladezeichen. Scheitert es, kommt eine Meldung statt einer
+ * leeren Großansicht. Nie `fassung=original`.
+ */
+export function AnhangGrossansicht({
+  href,
+  mime,
+  dateiname,
+  onSchliessen,
+  melde,
+}: {
+  href: string;
+  mime: string;
+  dateiname: string;
+  onSchliessen: () => void;
+  melde: (text: string) => void;
+}) {
+  const heic = isHeicMime(mime);
+  const { ergebnis, isFetching } = useHeicVorschau(href, heic);
+  // Ein Fehler im Cache zählt erst, wenn der neue Versuch durch ist: beim Öffnen liefert die Abfrage
+  // ihn sofort und dekodiert im Hintergrund neu, etwa wieder mit Netz (Review B6).
+  const hasFailed = heic && !isFetching && ergebnis != null && 'fehler' in ergebnis;
+  // Die Rückrufe über eine Ref: der Effekt soll genau einmal je Fehlschlag laufen, nicht mit
+  // jeder neuen Funktionsidentität des Aufrufers.
+  const callbacks = useRef({ onSchliessen, melde });
+  callbacks.current = { onSchliessen, melde };
+  useEffect(() => {
+    if (!hasFailed) return;
+    callbacks.current.melde(`${dateiname}: keine Vorschau möglich`);
+    callbacks.current.onSchliessen();
+  }, [hasFailed, dateiname]);
+
+  const gross = !heic
+    ? grossansichtPfad(href)
+    : ergebnis != null && !('fehler' in ergebnis)
+      ? ergebnis.gross
+      : null;
+  if (gross == null) {
+    // Ein schließbarer Dialog, keine Vollbildmaske: Dekodieren kann dauern (Datei, Decoder, andere
+    // Kacheln vor ihm). Escape und das Kreuz führen zurück (Review B7).
+    return hasFailed ? null : (
+      <Modal open title={dateiname} footer={null} centered onCancel={onSchliessen}>
+        <Spin /> <span>wird umgewandelt …</span>
+      </Modal>
+    );
+  }
+  return (
+    <Image.PreviewGroup
+      items={[gross]}
+      preview={{ open: true, onOpenChange: (offen) => !offen && onSchliessen() }}
+    />
+  );
+}
+
 interface Props {
   /** Download-Adresse der bereinigten Fassung (dieselbe wie am Download-Verweis). */
   href: string;
@@ -155,14 +212,9 @@ function typKuerzel(dateiname: string, mime: string | null | undefined): string 
   return (mime?.split('/')[1] ?? 'Datei').toUpperCase();
 }
 
-/** Ob es für diesen Anhang überhaupt eine Vorschau gibt (vom Server oder auf dem Gerät). */
-function hatVorschau(mime: string | null | undefined): boolean {
-  return hatServerVorschau(mime) || istHeicMime(mime);
-}
-
 export default function AnhangVorschau(props: Props) {
   const gruppe = useContext(Gruppe);
-  if (gruppe == null && hatVorschau(props.mime) && props.grossansicht !== false) {
+  if (gruppe == null && hasVorschau(props.mime) && props.grossansicht !== false) {
     return (
       <AnhangVorschauGruppe>
         <Kachel {...props} />
@@ -174,7 +226,7 @@ export default function AnhangVorschau(props: Props) {
 
 function Kachel(props: Props) {
   const client = useContext(QueryClientContext);
-  if (hatServerVorschau(props.mime)) {
+  if (hasServerVorschau(props.mime)) {
     return (
       <KachelAnzeige
         {...props}
@@ -184,7 +236,7 @@ function Kachel(props: Props) {
   }
   // HEIC braucht den Query-Cache (Object-URLs, Freigabe beim Verlassen). Ohne Provider, etwa in
   // einem nackt gerenderten Bauteil, gibt es keine Vorschau, aber auch keinen Fehler.
-  if (istHeicMime(props.mime) && client != null) return <HeicKachel {...props} />;
+  if (isHeicMime(props.mime) && client != null) return <HeicKachel {...props} />;
   return null;
 }
 
@@ -228,7 +280,7 @@ function Platzhalter({ dateiname, mime }: Pick<Props, 'dateiname' | 'mime'>) {
 }
 
 /** Ergebnis der HEIC-Dekodierung im Query-Cache: zwei Object-URLs oder ein stiller Fehler. */
-type HeicErgebnis = { klein: string; gross: string } | { fehler: true };
+export type HeicErgebnis = { klein: string; gross: string } | { fehler: true };
 
 /** Einmal sichtbar, bleibt sichtbar. Ohne `IntersectionObserver` (jsdom) nie: dort gibt es nichts zu sehen. */
 function useEinmalSichtbar(ref: RefObject<HTMLElement | null>): boolean {
@@ -249,6 +301,40 @@ function useEinmalSichtbar(ref: RefObject<HTMLElement | null>): boolean {
 }
 
 /**
+ * HEIC/HEIF auf dem Gerät dekodieren (LFH-759), im Query-Cache je Anhang: Kachel und Großansicht
+ * aus dem ETB-Zeilenmenü (LLH-1887) teilen sich das Ergebnis. `aktiv` hält die Arbeit zurück, bis
+ * jemand das Bild sehen will. Der Decoder kommt nur über `import()`.
+ */
+export function useHeicVorschau(
+  href: string,
+  aktiv: boolean,
+): { ergebnis: HeicErgebnis | undefined; isFetching: boolean } {
+  const abfrage = useQuery({
+    queryKey: einsatzKeys.anhangHeicVorschau(einsatzIdAusPfad(href) ?? 0, href),
+    queryFn: async (): Promise<HeicErgebnis> => {
+      try {
+        const { dekodiereHeic } = await import('../heic/dekodiereHeic');
+        const { klein, gross } = await dekodiereHeic(href);
+        return { klein: URL.createObjectURL(klein), gross: URL.createObjectURL(gross) };
+      } catch {
+        return { fehler: true };
+      }
+    },
+    enabled: aktiv,
+    // Ein Ergebnis gilt für immer (ein Anhang ändert sich nie), ein Fehler nicht: beim nächsten
+    // Einblenden oder Öffnen, etwa wieder mit Netz, wird neu dekodiert.
+    staleTime: (q) => (q.state.data != null && !('fehler' in q.state.data) ? Infinity : 0),
+    gcTime: 5 * 60_000,
+    retry: false,
+    // Im Einsatz-LAN ohne Internet meldet der Browser womöglich „offline“, der eigene Server ist
+    // aber da (wie Druck und Instanzkopplung, Review LLH-1497). Mit der Vorgabe `online` pausierte
+    // die Abfrage dann endlos; so versucht sie es, und scheitert sie, steht der Platzhalter da.
+    networkMode: 'always',
+  });
+  return { ergebnis: abfrage.data, isFetching: abfrage.isFetching };
+}
+
+/**
  * HEIC/HEIF (design.md D8): die bereinigte Fassung wird erst geladen und auf dem Gerät
  * dekodiert, wenn die Kachel sichtbar wird; der Decoder (Worker + WASM) kommt erst dann per
  * `import()`. Fehler bleiben still (Platzhalter), sie gehen nicht an den globalen Handler.
@@ -257,25 +343,7 @@ function HeicKachel(props: Props) {
   const { kachel } = useKachelStil();
   const platz = useRef<HTMLSpanElement>(null);
   const sichtbar = useEinmalSichtbar(platz);
-  const abfrage = useQuery({
-    queryKey: einsatzKeys.anhangHeicVorschau(einsatzIdAusPfad(props.href) ?? 0, props.href),
-    queryFn: async (): Promise<HeicErgebnis> => {
-      try {
-        const { dekodiereHeic } = await import('../heic/dekodiereHeic');
-        const { klein, gross } = await dekodiereHeic(props.href);
-        return { klein: URL.createObjectURL(klein), gross: URL.createObjectURL(gross) };
-      } catch {
-        return { fehler: true };
-      }
-    },
-    enabled: sichtbar,
-    // Ein Ergebnis gilt für immer (ein Anhang ändert sich nie), ein Fehler nicht: beim nächsten
-    // Einblenden, etwa wieder mit Netz, versucht es die Kachel neu.
-    staleTime: (q) => (q.state.data != null && !('fehler' in q.state.data) ? Infinity : 0),
-    gcTime: 5 * 60_000,
-    retry: false,
-  });
-  const daten = abfrage.data;
+  const daten = useHeicVorschau(props.href, sichtbar).ergebnis;
   if (daten == null) {
     return <span ref={platz} data-lfh="anhang-vorschau-laedt" aria-hidden="true" style={kachel} />;
   }

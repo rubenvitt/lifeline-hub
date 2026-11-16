@@ -176,8 +176,8 @@ Bildlauf hat.
 - Tabellen mit stehender Kopfzeile und waagerechtem Scrollen (Katalogtabelle, Tabellenzweig der
   Datensicht, Gefahrenmatrix): rückwärts in die erste Zeile getabbt, MUST das Ziel ganz unter
   der Kopfzeile stehen, auch wo der Browser den Fokusabstand am Scrollcontainer beschneidet.
-- Rahmen: die klebende Kopfleiste gegenüber den Zielen von Seitenkopf und Inhalt; ein Fokus in
-  der Kopfleiste selbst MUST die Seite nicht rollen.
+- Rahmen: die klebende Kopfleiste samt Übungsband und Alarmzone gegenüber den Zielen von
+  Seitenkopf und Inhalt; ein Fokus in der Kopfleiste selbst MUST die Seite nicht rollen.
 
 #### Scenario: Tabben durch die Zeitachse des ETB
 - **WHEN** der Fokus vom ersten Zeilenauslöser aus mit Tab durch 15 Einträge läuft, bei 390 × 600 und 1366 × 520
@@ -198,6 +198,10 @@ Bildlauf hat.
 #### Scenario: Rückwärts unter dem klebenden Kopf
 - **WHEN** der Fokus auf einer gerollten Seite bei 1366 × 520 mit Shift+Tab von unten durch die Ziele des Inhalts läuft
 - **THEN** liegt kein Ziel vollständig hinter der Kopfleiste
+
+#### Scenario: Rückwärts unter der Alarmzone
+- **WHEN** ein Alarm in der Alarmzone steht und der Fokus auf einer gerollten Seite bei 1366 × 520 mit Shift+Tab von unten durch die Ziele des Inhalts läuft
+- **THEN** liegt kein Ziel vollständig hinter Kopfleiste oder Alarmzone
 
 #### Scenario: Tab durch die Kopfleiste
 - **WHEN** die Seite gerollt ist und der Fokus mit Tab durch die Ziele der Kopfleiste läuft
@@ -265,7 +269,9 @@ Das Laden des ETB, der Lagekarte und der Gefahrenmatrix auf dem Handschirm MUST 
 Layoutverschiebung ablaufen, die nicht auf eine Eingabe folgt: Die Summe der
 Verschiebungen (CLS) nach dem Erscheinen des Inhalts MUST höchstens 0,1 betragen.
 Eine Fremdänderung einer Matrixzelle, die live eintrifft, MUST die Tabelle nicht
-verschieben.
+verschieben. Ausgenommen ist das Erscheinen und Gehen der Alarmzone (Spec
+`benachrichtigungen`, „Alarmzone verdeckt nichts“): ein Alarm darf den Inhalt um seine Zeile
+verschieben; gemessen wird ohne anstehenden Alarm.
 
 #### Scenario: Gefahrenmatrix lädt auf dem Handschirm
 - **WHEN** die Gefahrenmatrix bei 390 × 844 frisch geladen wird, bis alle 58 Zellen und die Überschrift des Gebiets stehen
@@ -494,7 +500,9 @@ Beim Laden einer Einsatzseite MUST die Kopfleiste im ersten Bild so viele Zeilen
 fertig geladenen Zustand, in jeder Stufe der Dichte-Staffel und an jeder Breite ab `xl`. Ein
 Inhalt der Kopfleiste, der erst nach einem Abruf feststeht, MUST NOT ihre Breite ändern. Die
 Summe der Verschiebungen ohne vorherige Eingabe MUST bei 1280 × 800 in `kompakt` und
-`komfortabel` unter 0,1 liegen, an der Umbruchkante der Kopfleiste höchstens 0,01.
+`komfortabel` unter 0,1 liegen, an der Umbruchkante der Kopfleiste höchstens 0,01. Gemessen wird
+ohne anstehenden Alarm; die Alarmzone verschiebt den Inhalt mit Absicht (Spec
+`benachrichtigungen`, „Alarmzone verdeckt nichts“).
 
 #### Scenario: Arbeitsplatzmaß
 - **WHEN** Überblick, Meldebild und ETB eines Einsatzes bei 1280 × 800 in `kompakt` und in `komfortabel` geladen werden

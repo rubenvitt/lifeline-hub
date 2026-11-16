@@ -420,3 +420,58 @@ describe('Stapel nach Rang (LLH-1728, design.md D2)', () => {
     expect(screen.getByTestId('band').dataset.oben).toBe('52');
   });
 });
+
+describe('useRahmenObenStapel mit Rang (Alarmzone unter dem Übungsband, LLH-1735)', () => {
+  it('stapelt nach Rang: die Zone klebt unter dem Band, das Band nicht unter der Zone', () => {
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+        <Stapel hoehe={40} rang={RAHMEN_RANG.alarmzone} name="zone" />
+      </>,
+    );
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(screen.getByTestId('zone').dataset.oben).toBe('76');
+    expect(readRahmenOben()).toBe(116);
+  });
+
+  it('ohne Band klebt die Zone direkt unter dem Kopf', () => {
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} aktiv={false} name="band" />
+        <Stapel hoehe={40} rang={RAHMEN_RANG.alarmzone} name="zone" />
+      </>,
+    );
+    expect(screen.getByTestId('zone').dataset.oben).toBe('52');
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(readRahmenOben()).toBe(92);
+  });
+
+  it('Band und Zone zählen zur Kopfebene; ein klebender Seitenkopf zählt für ihr `top` nicht', () => {
+    function SeitenkopfQuelle() {
+      const ref = useRahmenObenQuelle<HTMLDivElement>(true, 'seitenkopf');
+      return (
+        <div
+          ref={(el) => {
+            if (el) Object.defineProperty(el, 'offsetHeight', { configurable: true, value: 45 });
+            ref(el);
+          }}
+        />
+      );
+    }
+    render(
+      <>
+        <Quelle hoehe={52} aktiv name="kopf" />
+        <Stapel hoehe={24} rang={RAHMEN_RANG.uebungsband} name="band" />
+        <Stapel hoehe={40} rang={RAHMEN_RANG.alarmzone} name="zone" />
+        <SeitenkopfQuelle />
+      </>,
+    );
+    expect(screen.getByTestId('band').dataset.oben).toBe('52');
+    expect(screen.getByTestId('zone').dataset.oben).toBe('76');
+    // Rail, Modulpanel und Seitenkopf hängen an der Kopfhöhe: unter der Zone.
+    expect(readKopfOben()).toBe(116);
+    expect(readRahmenOben()).toBe(161);
+  });
+});

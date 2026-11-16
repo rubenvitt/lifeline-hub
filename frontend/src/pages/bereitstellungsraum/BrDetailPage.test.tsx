@@ -665,6 +665,17 @@ describe('BrDetailPage — Fahrzeuge der Einheiten zählen mit (LLH-1095)', () =
   });
 });
 
+/** Der Bestätigungsknopf der offenen Rückfrage (nicht der gleichnamige Knopf im Abschnitt). */
+async function bestaetige(name: string) {
+  const knopf = (await screen.findAllByRole('button', { name })).find((b) =>
+    b.closest('.ant-popconfirm'),
+  );
+  expect(knopf).toBeDefined();
+  return knopf!;
+}
+const beendenAbschnitt = () =>
+  screen.getByRole('region', { name: 'Bereitstellungsraum auflösen oder stornieren' });
+
 describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
   function seiteMit(br: BrDetail, aufrufe: string[]) {
     server.use(
@@ -688,8 +699,12 @@ describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     const aufrufe: string[] = [];
     seiteMit(brDetail({ status: 'aktiv' }), aufrufe);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
-    const ok = await screen.findByRole('button', { name: 'BR auflösen' });
+    // Seit LLH-1722 im letzten Abschnitt, nicht im Kopf.
+    await screen.findByRole('region', { name: 'Bereitstellungsraum auflösen oder stornieren' });
+    const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
+    expect(within(kopf).queryByRole('button', { name: /auflösen/i })).toBeNull();
+    await userEvent.click(within(beendenAbschnitt()).getByRole('button', { name: 'BR auflösen' }));
+    const ok = await bestaetige('BR auflösen');
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
     expect(aufrufe).toEqual([]);
@@ -708,16 +723,19 @@ describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
       aufrufe,
     );
 
-    const knopf = await screen.findByRole('button', { name: 'Auflösen' });
+    const knopf = await within(
+      await screen.findByRole('region', { name: 'Bereitstellungsraum auflösen oder stornieren' }),
+    ).findByRole('button', { name: 'BR auflösen' });
     expect(knopf).toBeDisabled();
-    expect(screen.getByText('noch 2 belegt')).toBeInTheDocument();
+    expect(knopf).toHaveAccessibleDescription('noch 2 belegt');
     expect(screen.queryByText(/Nur möglich/)).not.toBeInTheDocument();
   });
 
   it('aktiv und leer: kein Satz in der Rückfrage, nur die Handlung', async () => {
     seiteMit(brDetail({ status: 'aktiv' }), []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
-    await screen.findByRole('button', { name: 'BR auflösen' });
+    await screen.findByRole('region', { name: 'Bereitstellungsraum auflösen oder stornieren' });
+    await userEvent.click(within(beendenAbschnitt()).getByRole('button', { name: 'BR auflösen' }));
+    await bestaetige('BR auflösen');
     expect(screen.queryByText(/Nur möglich/)).not.toBeInTheDocument();
     expect(screen.queryByText(/belegt/)).not.toBeInTheDocument();
   });
@@ -727,8 +745,12 @@ describe('BrDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     seiteMit(brDetail({ status: 'geplant' }), aufrufe);
 
     expect(await screen.findByRole('button', { name: 'In Betrieb nehmen' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Stornieren' }));
-    const ok = await screen.findByRole('button', { name: 'BR stornieren' });
+    // Kein „Stornieren“ im Kopf (LLH-1722): es steht im letzten Abschnitt.
+    expect(screen.queryByRole('button', { name: 'Stornieren' })).toBeNull();
+    await userEvent.click(
+      within(beendenAbschnitt()).getByRole('button', { name: 'BR stornieren' }),
+    );
+    const ok = await bestaetige('BR stornieren');
     expect(ok).toHaveClass('ant-btn-dangerous');
     expect(screen.queryByRole('button', { name: 'OK' })).not.toBeInTheDocument();
     expect(aufrufe).toEqual([]);
@@ -1112,46 +1134,54 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('Status: der Grund steht im Seitenhinweis, kein Toast', async () => {
+  it('Auflösen: der Grund steht im Abschnitt, kein Toast (LLH-1722)', async () => {
     server.use(
       http.post('/api/einsaetze/1/bereitstellungsraeume/1/status', () =>
         HttpResponse.json({ error: 'BR ist noch belegt' }, { status: 409 }),
       ),
     );
     seite(brDetail({ status: 'aktiv' }), abgelehnt('x'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'BR auflösen' }));
+    await screen.findByRole('region', { name: 'Bereitstellungsraum auflösen oder stornieren' });
+    await userEvent.click(within(beendenAbschnitt()).getByRole('button', { name: 'BR auflösen' }));
+    await userEvent.click(await bestaetige('BR auflösen'));
 
-    const grund = await within(hinweis()!).findByRole('alert');
+    const grund = await within(beendenAbschnitt()).findByRole('alert');
     expect(grund).toHaveTextContent('BR ist noch belegt');
-    expect(grund).toHaveTextContent('Status nicht geändert');
+    expect(grund).toHaveTextContent('Nicht aufgelöst');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
-  it('Storno: der Grund steht im Seitenhinweis, „In Betrieb nehmen“ räumt ihn', async () => {
+  it('Storno: der Grund steht im Abschnitt, der nächste Versuch räumt ihn (LLH-1722)', async () => {
+    let n = 0;
     server.use(
-      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', () =>
-        HttpResponse.json({ error: 'BR hat Belegungen' }, { status: 409 }),
-      ),
-      http.post('/api/einsaetze/1/bereitstellungsraeume/1/status', async () => {
+      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', async () => {
+        n += 1;
+        if (n === 1) return HttpResponse.json({ error: 'BR hat Belegungen' }, { status: 409 });
         await delay('infinite');
-        return HttpResponse.json({});
+        return new HttpResponse(null, { status: 204 });
       }),
     );
     seite(brDetail({ status: 'geplant' }), abgelehnt('x'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'BR stornieren' }));
+    await screen.findByRole('region', { name: 'Bereitstellungsraum auflösen oder stornieren' });
+    await userEvent.click(
+      within(beendenAbschnitt()).getByRole('button', { name: 'BR stornieren' }),
+    );
+    await userEvent.click(await bestaetige('BR stornieren'));
 
-    const grund = await within(hinweis()!).findByRole('alert');
+    const grund = await within(beendenAbschnitt()).findByRole('alert');
     expect(grund).toHaveTextContent('BR hat Belegungen');
     expect(grund).toHaveTextContent('Nicht storniert');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 
-    await userEvent.click(screen.getByRole('button', { name: 'In Betrieb nehmen' }));
-    await waitFor(() => expect(hinweis()).toBeNull());
+    // Das ausblendende Ladezeichen bleibt in jsdom im Namen stehen („loading BR stornieren“).
+    await userEvent.click(
+      within(beendenAbschnitt()).getByRole('button', { name: /BR stornieren$/ }),
+    );
+    await userEvent.click(await bestaetige('BR stornieren'));
+    await waitFor(() => expect(within(beendenAbschnitt()).queryByRole('alert')).toBeNull());
   });
 
-  it('Storno mit Material im Raum: der Grund (422) steht im Seitenhinweis (LLH-1249)', async () => {
+  it('Storno mit Material im Raum: der Grund (422) steht im Abschnitt (LLH-1249)', async () => {
     const grundText = 'Storno nicht möglich — noch 2 Material-Posten im BR; erst lösen';
     server.use(
       http.delete('/api/einsaetze/1/bereitstellungsraeume/1', () =>
@@ -1159,10 +1189,13 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
       ),
     );
     seite(brDetail({ status: 'geplant' }), abgelehnt('x'));
-    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'BR stornieren' }));
+    await screen.findByRole('region', { name: 'Bereitstellungsraum auflösen oder stornieren' });
+    await userEvent.click(
+      within(beendenAbschnitt()).getByRole('button', { name: 'BR stornieren' }),
+    );
+    await userEvent.click(await bestaetige('BR stornieren'));
 
-    const grund = await within(hinweis()!).findByRole('alert');
+    const grund = await within(beendenAbschnitt()).findByRole('alert');
     expect(grund).toHaveTextContent(grundText);
     expect(grund).toHaveTextContent('Nicht storniert');
   });
@@ -1301,7 +1334,7 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
-  it('steht an den Raumdaten, nicht im Seitenkopf: geplant trägt der Kopf zwei Aktionen', async () => {
+  it('steht an den Raumdaten, nicht im Seitenkopf: geplant trägt der Kopf nur „In Betrieb nehmen“ (LLH-1722)', async () => {
     seite(brDetail({ status: 'geplant' }));
     const knopf = await screen.findByRole('button', { name: 'Bearbeiten' });
     const kopf = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]')!;
@@ -1313,7 +1346,7 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
         .getAllByRole('button')
         .filter((b) => !b.hasAttribute('disabled'))
         .map((b) => b.textContent),
-    ).toEqual(['In Betrieb nehmen', 'Stornieren']);
+    ).toEqual(['In Betrieb nehmen']);
   });
 
   it('Wechsel zu einem anderen Raum: der Dialog geht nicht für den nächsten Raum auf', async () => {

@@ -177,7 +177,7 @@ mit dem Grund stehen bleiben.
 
 ### Requirement: Gefahren je Gebiet in der Gefahren-/Schadenlage
 Die Übernahme der Gefahren-/Schadenlage SHALL einen Teil „Gefahrengebiete“ enthalten: je Gebiet
-den Namen, bei einem nicht beurteilten „nicht beurteilt“, und darunter jede gesetzte Gefahr (Stufe
+den Namen, bei einem unbestätigten „(unbestätigt)“, und darunter jede gesetzte Gefahr (Stufe
 über „keine“ oder mit Erläuterung) mit Stufe und Erläuterung in der Folge der Matrix. Die
 Erläuterung und der Gebietsname sind Beurteilung der eigenen Führung, kein Freitext Dritter, und
 SHALL übernommen werden; „gemeldet von“ und der Name der letzten Änderung MUST draußen bleiben.
@@ -193,6 +193,10 @@ SHALL übernommen werden; „gemeldet von“ und der Name der letzten Änderung 
 #### Scenario: Gefahren gesperrt
 - **WHEN** das Modul Gefahren für die Person gesperrt ist und sie die Gefahren-/Schadenlage übernimmt
 - **THEN** steht der Teil „Gefahrengebiete“ als „— (nicht freigegeben)“, und weder Gebiete noch Matrizen wurden angefragt
+
+#### Scenario: Unbestätigtes Gebiet
+- **WHEN** das Gebiet „Zone B“ noch niemand bestätigt hat
+- **THEN** nennt der Teil „Gefahrengebiete“ es als „Zone B (unbestätigt)“, nie „nicht beurteilt“
 
 ### Requirement: Inhalt der Lageentwicklung
 Die Übernahme SHALL die ETB-Einträge seit dem Eintrag der letzten abgehaltenen Lagebesprechung

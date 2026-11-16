@@ -801,6 +801,10 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
     }) => {
       test.setTimeout(150_000);
       await page.setViewportSize(viewport);
+      // Seit LLH-1722 trägt jedes Fahrzeug ein ⋮; bei 390 px landet ein Personen-⋮ dann unten
+      // rechts unter dem Devtools-Knopf, den es nur im DEV-Build gibt. Ohne ihn hat die Seite bei
+      // 390 px keinen angepinnten Verdecker; geprüft wird dort nur, dass jedes Ziel per Tab kommt.
+      await ohneDevtoolsKnopf(page);
       await anmelden(page);
       const { pfad, namen } = await seedEinheitPersonalGesperrt(page, rolle);
       const messwerte: string[] = [];
@@ -841,8 +845,8 @@ for (const rolle of ['beobachter', 'fuehrungspersonal'] as const) {
         ).toEqual(ziele.map(({ name }) => name).sort());
         if (viewport.width >= 992) {
           expect(befund.stoppsInRegion, 'der Lauf erreicht die Rail').toBeGreaterThan(0);
+          expect(befund.fixierteKandidaten).toBeGreaterThan(0);
         }
-        expect(befund.fixierteKandidaten).toBeGreaterThan(0);
         expect(befund.verdeckt, befund.verdeckt.join('\n')).toEqual([]);
         messwerte.push(
           `${dichte}: ${befund.besuchteZiele.length} Routenziele, ${befund.stoppsGesamt} Stopps, ${befund.verdeckt.length} Verdeckungen`,

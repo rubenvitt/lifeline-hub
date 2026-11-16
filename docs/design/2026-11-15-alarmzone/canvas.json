@@ -1,0 +1,34 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-15T17:14:06Z" },
+  "title": "Alarmzone und Eingangsleiste",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Fükw 1440 × 900 · Alarmzone unter dem Kopf, drei Alarme gebündelt" },
+    "Zone-Zustaende.dc.html": { "x": 1520, "y": 0, "w": 1180, "h": 900, "title": "Alarmzone · Zustände" },
+    "Handy-Leiste.dc.html": { "x": 0, "y": 1320, "w": 390, "h": 844, "title": "Handy 390 × 844 · eine Leiste unten" },
+    "Handy-Tippen.dc.html": { "x": 470, "y": 1320, "w": 390, "h": 844, "title": "Handy 390 × 844 · beim Tippen" },
+    "Handy-Blatt.dc.html": { "x": 940, "y": 1320, "w": 390, "h": 844, "title": "Handy 390 × 844 · Blatt „Alarme und Eingänge“" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Zone-Zustaende.dc.html",
+    "Handy-Leiste.dc.html",
+    "Handy-Tippen.dc.html",
+    "Handy-Blatt.dc.html"
+  ],
+  "notes": {
+    "t1": { "x": 0, "y": -300, "text": "Alarmzone am Fükw und am Tablet", "kind": "title1", "maxW": 2700 },
+    "t2": { "x": 0, "y": 1020, "text": "Handy: eine Leiste für Alarm und Eingänge", "kind": "title1", "maxW": 1330 }
+  },
+  "designSystems": [
+    {
+      "title": "Lifeline Hub",
+      "namespace": "lifeline-hub",
+      "artifact": "https://claude.ai/artifact/DKJZJmJyX8CkE4dBJAPyF5",
+      "version": null,
+      "copiedAt": "2026-11-15T17:14:06Z"
+    }
+  ]
+}

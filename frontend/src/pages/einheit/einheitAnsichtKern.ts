@@ -197,6 +197,18 @@ export function visibleBesatzungRows(
   };
 }
 
+/**
+ * Die sichtbaren Zeilen samt der gehaltenen Fahrzeuge (LLH-1722): eine gelöste Fahrzeugzeile steht
+ * noch da, also gehört ein Grund an ihr nicht in den Seitenhinweis, sonst stünde er doppelt.
+ */
+export function mitGehaltenenFahrzeugen(
+  sichtbar: VisibleBesatzungRows,
+  gehalten: ReadonlyMap<number, string>,
+): VisibleBesatzungRows {
+  if (gehalten.size === 0) return sichtbar;
+  return { ...sichtbar, fahrzeuge: new Map([...sichtbar.fahrzeuge, ...gehalten]) };
+}
+
 // ── Zuordnen aus Einsatz und Stamm (D7, D8) ───────────────────────────────────
 
 /**
@@ -335,9 +347,10 @@ export type PersonMenuKey = 'fuehrer' | 'vom-fahrzeug' | 'aus-einheit' | `auf:${
 
 /**
  * Die Einträge des Menüs einer Person in der Folge aus D9: „Als Einheitsführer“ (nicht beim EF),
- * „Auf <Funkrufname>“ je anderem Fahrzeug der Einheit, dann rot „Vom Fahrzeug lösen“ (nur wer auf
- * einem Fahrzeug sitzt) und „Aus Einheit lösen“. Den Trenner setzt `MenueAusloeser` vor die
- * roten. Die Besatzungswege brauchen `canEditBesatzung`, die übrigen `canEditEinheit`; der
+ * „Auf <Funkrufname>“ je anderem Fahrzeug der Einheit, dann „Vom Fahrzeug lösen“ (nur wer auf
+ * einem Fahrzeug sitzt) und „Aus Einheit lösen“. Beide Lösen-Einträge stehen neutral: sie haben
+ * einen Rückgängig-Hinweis, rot ist im Menü nur Unumkehrbares (LLH-1722, `frontend/AGENTS.md`,
+ * „Destruktiv ist nicht gleich destruktiv“). Die Besatzungswege brauchen `canEditBesatzung`, die übrigen `canEditEinheit`; der
  * Aufrufer reicht `canEditBesatzung` nur, wenn die Besatzung zu sehen ist (`hasBesatzung`).
  */
 export function buildPersonMenuItems(
@@ -356,13 +369,28 @@ export function buildPersonMenuItems(
       }
     }
     if (person.fahrzeugId != null) {
-      items.push({ key: 'vom-fahrzeug', label: 'Vom Fahrzeug lösen', gefahr: true });
+      items.push({ key: 'vom-fahrzeug', label: 'Vom Fahrzeug lösen' });
     }
   }
   if (rechte.canEditEinheit) {
-    items.push({ key: 'aus-einheit', label: 'Aus Einheit lösen', gefahr: true });
+    items.push({ key: 'aus-einheit', label: 'Aus Einheit lösen' });
   }
   return items;
+}
+
+/** Das einzige Menü eines Fahrzeugs der Einheit (LLH-1722). */
+export type FahrzeugMenuKey = 'aus-einheit';
+
+/**
+ * Die Einträge des Menüs eines Fahrzeugs (LLH-1722, Spec `einheit-ansicht`, „Aktionen je Fahrzeug
+ * über ein Menü“): neutral „Aus Einheit lösen“, nur mit Schreibrecht im Modul Einheiten. Es steht
+ * im ⋮ statt als roter Knopf in der Zeile: sonst rückte nach dem Lösen der Knopf der nächsten Zeile
+ * unter den Finger. FMS-Wahl und „Personal der Einheit übernehmen“ bleiben an der Zeile.
+ */
+export function buildFahrzeugMenuItems(
+  rechte: Pick<EinheitRechte, 'canEditEinheit'>,
+): MenueEintrag<FahrzeugMenuKey>[] {
+  return rechte.canEditEinheit ? [{ key: 'aus-einheit', label: 'Aus Einheit lösen' }] : [];
 }
 
 // ── Aufgelöste Einheit (LLH-1266) ─────────────────────────────────────────────

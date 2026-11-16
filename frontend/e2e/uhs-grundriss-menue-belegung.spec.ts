@@ -143,8 +143,9 @@ test('UHS Grundriss: der erste Klick nach einem Drag öffnet das Platzmenü', as
   const wartebereich = dropZone(page, 'Wartebereich (Eingang)');
   await ziehe(page, page.getByText(personName).first(), wartebereich);
   await expect(wartebereich.getByText(personName)).toBeVisible();
-  // Serverstand, nicht der optimistische: erst mit der Personenliste steht der Kopf endgültig.
-  await expect(page.getByRole('button', { name: 'Auflösen (noch 1 Person)' })).toBeVisible();
+  // Der Kopf hängt nicht mehr an der Belegung: „Auflösen“ steht seit LLH-1722 im ⋮ des Kopfs,
+  // dessen Breite fest ist. Die Personenliste ist da, sobald das ⋮ steht.
+  await expect(page.getByRole('button', { name: /^Weitere Aktionen zu / })).toBeVisible();
   const marke = page
     .locator('[aria-roledescription="draggable"]')
     .filter({ has: page.locator('[data-lfh="personenkarte"]', { hasText: personName }) });
@@ -170,9 +171,9 @@ test('UHS Grundriss: der erste Klick nach einem Drag öffnet das Platzmenü', as
 });
 
 // Ablegen des ersten Patienten lässt den Grundriss stehen, auch wenn der Seitenkopf auf der
-// Kippe steht (LLH-1627). Aus „Auflösen“ wird „Auflösen (noch 1 Person)“; der Knopf hält die
-// Breite dieser Form schon vorher (`components/BreiteHalten.tsx`). Ohne das wuchs er beim Ablegen,
-// die Aktionen brachen in eine zweite Zeile, und alles darunter rückte ~35 px.
+// Kippe steht (LLH-1627). Früher wurde aus „Auflösen“ „Auflösen (noch 1 Person)“, und der Knopf
+// wuchs; seit LLH-1722 steht „Auflösen“ im ⋮ des Kopfs, und der Grund im Menüeintrag. Der Test
+// hält fest, dass der Kopf beim Ablegen weiter nicht wächst.
 //
 // Die Kippe ist gebaut, nicht vom Zufall der Namenslängen abhängig: der Titelblock bekommt genau
 // den Platz neben den Aktionen, bis auf 1 px. Jeder Zuwachs der Aktionen bräche dann um.
@@ -180,8 +181,8 @@ test('UHS Grundriss: Ablegen aus „Noch nicht aufgenommen“ verschiebt den Gru
   page,
 }) => {
   const personName = await grundrissMitZweiPlaetzen(page);
-  // Serverstand: die Personenliste ist da, niemand belegt, der Kopf steht endgültig.
-  await expect(page.getByRole('button', { name: 'Auflösen', exact: true })).toBeEnabled();
+  // Der Kopf steht endgültig, sobald sein ⋮ steht (LLH-1722).
+  await expect(page.getByRole('button', { name: /^Weitere Aktionen zu / })).toBeVisible();
 
   const kopf = page.locator('[data-lfh="seitenkopf"]');
   await kopf.evaluate((el) => {
@@ -203,8 +204,12 @@ test('UHS Grundriss: Ablegen aus „Noch nicht aufgenommen“ verschiebt den Gru
   );
 
   await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
-  // Serverstand nach dem Ablegen: erst mit der neuen Personenliste wechselt der Wortlaut.
-  await expect(page.getByRole('button', { name: 'Auflösen (noch 1 Person)' })).toBeDisabled();
+  // Serverstand nach dem Ablegen: die Person steht auf dem Platz.
+  await expect(
+    page
+      .locator('[data-testid="platz-karte"]', { hasText: 'Behandlungsplatz 1' })
+      .getByText(personName),
+  ).toBeVisible();
 
   const nachher = (await kopf.boundingBox())!;
   expect(Math.round(nachher.height), 'Seitenkopf ist beim Ablegen gewachsen').toBe(

@@ -15,7 +15,7 @@ import {
 } from '../instrument';
 import DownloadAnker from '../DownloadAnker';
 import { AnhangVorschauGruppe } from '../AnhangVorschau';
-import { istBildMime, originalPfad } from '../../api/anhangFassung';
+import { isBildMime, originalPfad } from '../../api/anhangFassung';
 import { useDarfOriginalLaden } from '../../einsatz/useDarfOriginalLaden';
 import { SpeicherFehler } from '../SpeicherHinweis';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
@@ -230,7 +230,7 @@ export default function ErfassungsAnhaenge({
           <DownloadAnker
             href={quelle.downloadPfad(a.id)}
             originalHref={
-              darfOriginal && istBildMime(a.mime)
+              darfOriginal && isBildMime(a.mime)
                 ? originalPfad(quelle.downloadPfad(a.id))
                 : undefined
             }

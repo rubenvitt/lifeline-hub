@@ -36,6 +36,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **Zeitdarstellung (taktisch und Datum mit Uhrzeit)** (`components/Zeitdarstellung/`, Gruppe Daten)
 - **Zeiteingabe (Wert mit Schnellwahl, leer, unlesbar)** (`components/Zeiteingabe/`, Gruppe Formular)
 - **Ortsfeld (leer, verortet, nur Text; Kartenbild nur in der App)** (`components/Ortsfeld/`, Gruppe Formular)
+- **Alarmzone (gebündelt, aufgeklappt)** (`components/Alarmzone/`, Gruppe Rückmeldung)
 - **Eingänge (Knopf im Kopf und Eingangsband)** (`components/Eingaenge/`, Gruppe Rückmeldung)
 - **SichtungsWahl (BBK-Flächen, ohne und mit Wahl)** (`components/SichtungsWahl/`, Gruppe Fach)
 - **Körperschema (Lesen)** (`components/Koerperschema/`, Gruppe Fach)
@@ -99,7 +100,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   und `components/FunkUndTelefon.tsx` (Verbindungen) · `components/InlineAngabe.tsx` ·
   `components/tabellenFilter.tsx` (Filterchips und Kopfmarke; Träger `KatalogTabelle`,
   `Datensicht`; Sortieren und Filtern in der Bedien-Leitlinie) · `alarm/EingaengeKnopf.tsx` und
-  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `personen/SichtungsWahl.tsx` ·
+  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `alarm/AlarmZone.tsx` (Alarmzone,
+  Rahmen) · `personen/SichtungsWahl.tsx` ·
   `personen/koerperschema/Koerperschema.tsx` · `zeichen/EinsatzZeichen.tsx` (taktische Zeichen,
   am Schirm mit `useZeichenTheme`, LLH-1409). Jeder hat eine Karte im Design System.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
@@ -107,8 +109,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
   `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion
-  ihren Wortlaut mit den Daten („Auflösen (noch 2 Personen)“), hält `components/BreiteHalten.tsx`
-  die Breite der breitesten Form (LLH-1627). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
+  ihren Wortlaut mit den Daten (früher „Auflösen (noch 2 Personen)“, seit LLH-1722 im ⋮), hält
+  `components/BreiteHalten.tsx` die Breite der breitesten Form (LLH-1627). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
   `flaeche.seiteBreit` fällt beim Umbau.
 - **Orientierung** (LFH-954, Spec `seiten-orientierung`): den Tab-Titel setzen nur die Rahmen über
   `components/useDokumentTitel.ts`, aus dem Modulnamen der Registry („Seite · Einsatz ·
@@ -157,19 +159,26 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     (`useRahmenOben`) dazu der klebende Seitenkopf. Die Kopfhöhe nehmen nur, was neben dem Inhalt
     klebt (Rail, Modulpanel, Verwaltungsmenü), der Seitenkopf selbst und die Klebe-Entscheidungen;
     alles andere die Rahmenhöhe (Guard). Innerhalb der Ebene `kopf` stapelt sich der Rahmen nach
-    Rang (`RAHMEN_RANG`: Betriebszeile, Kopf, Übungsband; `useRahmenObenStapel`, LLH-1728,
-    ADR-0055): jede Quelle klebt unter denen mit kleinerem Rang.
+    Rang (`RAHMEN_RANG`: Betriebszeile, Kopf, Übungsband, Alarmzone; `useRahmenObenStapel`,
+    LLH-1728, ADR-0056): jede Quelle klebt unter denen mit kleinerem Rang.
   - **Wer oben klebt, hängt sich unter den Rahmen:** `top: var(--lfh-rahmen-oben)` bzw.
     rc-tables `sticky={{ offsetHeader: useRahmenOben() }}` (`components/rahmenOben.ts`, gemessen,
     nie gerechnet), also auch unter den klebenden Seitenkopf. Ausnahme nur mit Vermerk
     `rahmen-oben: frei` und Grund (Guard `components/rahmenOben.guard.test.ts`). Den Fokusabstand
     trägt `scroll-padding-block-start` am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen;
     bei Fokus im Seitenkopf gilt nur die Kopfhöhe.
-  - **Stehende Alarme liegen unter der Bedienkante** (LFH-1112, Spec
-    `einsatztauglichkeit-layout`): unter Kommandoleiste und Seitenkopf, solange er im Bild ist,
-    gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
-    Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
-    deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
+  - **Alarme stehen in der Alarmzone, nie über dem Inhalt** (LLH-1735, Spec
+    `benachrichtigungen`, „Alarmzone verdeckt nichts“, Herleitung
+    `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/design.md`; löst LFH-1112 ab): Alarme, Org-Hinweise und
+    die Unwetterwarnung zeichnet `alarm/AlarmZone.tsx` direkt unter Kopf und Übungsband, nie
+    antds `notification` (`AntApp` trägt kein `notification`-Prop). Die Zone ist eine
+    Rahmenquelle der Ebene `kopf` unter dem Übungsband (`useRahmenObenStapel` mit
+    `RAHMEN_RANG.alarmzone`): Rail, Modulpanel und Seitenkopf kleben unter ihr. Sie schiebt den Inhalt
+    und liegt auf `RAHMEN_EBENE` unter Drawer und Dialogen. Ab zwei Einträgen bündelt sie.
+    Im Einsatz unter `md` trägt die Leiste am Handschirm die Alarme (`alarm/HandyLeiste.tsx`).
+    ✕ blendet aus (`blendeAus`, sessionStorage je Tab), quittiert wird nur mit „Öffnen“ und
+    „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
+    Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
     Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
     Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
@@ -249,7 +258,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (neu) nur aus dem Modulzähler (`pages/lage-dashboard/fuehrungsZahlen.ts`), nie aus einer Liste
   gezählt; Betroffene/SK über `verdichtePersonen` (→ `sichtungsbild`), Kräfte über `verdichte`,
   Warnstufe über `verdichteGefahrengebiete`, Material-Ausfall (Posten mit Statusrolle Alarm oder
-  Achtung) über `kraefte/materialVerdichtungKern.ts`. Stärke einer Menge nur über `summiereStaerke`
+  Achtung) über `kraefte/materialVerdichtungKern.ts`. Ausfall einer Einheit (Mittel, Material) nur
+  über die Gründe der Tönung des Meldebilds (`toenungsGruende`); der Überblick summiert sie je
+  Abschnitt. Die Rückmeldung eines Abschnitts urteilt je Einheit des Teilbaums, nie über die
+  jüngste Meldung allein (LLH-1739, `abschnittGruende`). Stärke einer Menge nur über `summiereStaerke`
   (Wurzeln der Menge; ein Abschnitt zählt seine obersten Einheiten wie das Meldebild), Formatierung
   nur `anzeige/staerke.ts:staerkeText`. Belegung eines Bereitstellungsraums (LLH-1095, Spec
   `bereitstellungsraum-belegung`): Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
@@ -432,7 +444,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Nachweis `e2e/dialogfuss-dichte.spec.ts`, `e2e/dokumente.spec.ts`.
 - **Destruktiv ist nicht gleich destruktiv** (LFH-363): Umkehrbares („Außer Dienst",
   „Deaktivieren", eine gelöste Zuordnung) → Abstand + `danger`, keine Rückfrage; Unumkehrbares →
-  Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}` und benanntem `okText`.
+  Rückfrage, `Popconfirm` mit `okButtonProps={{ danger: true }}` und benanntem `okText`. **Im
+  ⋮-Menü ist nur Unumkehrbares rot** (LLH-1722, D2): ein Lösen, Entlassen oder Austragen mit
+  Rückgängig steht neutral unter den umkehrbaren, `gefahr` nur für Stornieren, Auflösen und
+  Ähnliches (Wächter `components/menueFarbe.guard.test.ts`). In der Zeile trennt der rote Knopf,
+  im Menü der Trenner.
   **Unumkehrbares für den ganzen Einsatz steht nicht im Kopf oder Menü einer Arbeitsseite**
   (LFH-960, Spec `bedien-wortlaut`): der Einsatzabschluss steht als letzter Abschnitt auf den
   Einsatzdaten, nur für die Einsatzleitung, bestätigt mit „Einsatz endgültig abschließen“.

@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 330
-quellen: [frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
 ---
 
 ## Überblick
@@ -179,16 +179,18 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
 4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen. Er bleibt ohne Ort im Einsatz. Die Zeile
    bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein
-   anderer Knopf unter den Finger rückt. „Rückgängig“ im Hinweis oben holt den Posten zurück.
+   anderer Knopf unter den Finger rückt. „Rückgängig“ in der Zeile oder im Hinweis oben holt den Posten zurück.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
 
 Für Einsatzleitung und Führungspersonal, wenn ein Fahrzeug den Einsatz verlässt:
 
 1. In der Zeile des Fahrzeugs „Weitere Aktionen“ öffnen und „Entlassen“ wählen, auf dem Handy
-   „Entlassen“ auf der Karte. Eine Rückfrage gibt es nicht.
+   ebenso im Menü der Karte. Eine Rückfrage gibt es nicht.
 2. Das Fahrzeug verlässt die Liste und das FMS-Tableau. Der Hinweis unten bietet einige Sekunden
-   lang „Rückgängig“.
+   lang „Rückgängig“: Es holt das Fahrzeug mit Status, Einheit, Besatzung, Bereitstellungsraum,
+   Führungsstelle und Beladung zurück. Was inzwischen anders gebunden ist, nennt ein Hinweis über
+   der Liste.
 3. Unter der Liste „Entlassen“ aufklappen. Dort stehen alle entlassenen Fahrzeuge mit Typ und
    Zeitpunkt.
 
@@ -312,9 +314,16 @@ Bereitstellungsraum; seine Besatzung bleibt als Personal im Einsatz, nur ohne Fa
 Beladung bleibt im Einsatz zurück, ohne Ort; das Einsatztagebuch nennt, wie viele Posten. Aufträge
 nennen es weiter als Empfänger. In Stärke, Statusband, Lagemonitor, Lagekarte und Auswahllisten
 zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter, ebenso das Meldebild
-und seine Übernahme in einen Lagebericht. Erneut disponiert,
-steht es wieder in der Liste, mit dem Anfangsstatus wie beim Disponieren; Besatzung, Einheit und
-Bereitstellungsraum kommen nicht zurück.
+und seine Übernahme in einen Lagebericht.
+
+„Rückgängig“ direkt nach dem Entlassen nimmt es zurück, als wäre nichts geschehen: derselbe Status
+seit derselben Zeit, dieselbe Einheit, Besatzung, Führungsstelle und Beladung, ein Wiedereintritt in
+den Bereitstellungsraum. Was inzwischen anders gebunden ist (eine Person sitzt auf einem anderen
+Fahrzeug, die Einheit ist aufgelöst, ein Posten liegt woanders) oder wofür das Recht im Modul
+fehlt, bleibt aus; der Hinweis über der Liste und das Einsatztagebuch nennen es. Das gelingt nur
+der Person, die entlassen hat, und nur in den ersten zehn Minuten. Danach führt nur „Erneut
+disponieren“ zurück: Das Fahrzeug steht wieder in der Liste, mit dem Anfangsstatus wie beim
+Disponieren; Besatzung, Einheit und Bereitstellungsraum kommen dabei nicht zurück.
 
 Stornieren korrigiert eine Fehldisposition und lässt keine Spur. Es geht nur in den ersten 15
 Minuten nach der Disposition und nur, solange das Fahrzeug noch nichts im Einsatz hat: keinen
@@ -331,7 +340,8 @@ Bereitstellungsraum belegen lehnt die App ab.
 
 Disponieren, jeder Statuswechsel, das Zuordnen und Lösen der Besatzung, das Zuordnen zu einer
 Einheit, das Ändern der Angaben eines Ad-hoc-Fahrzeugs (ein Eintrag, der jede Änderung mit altem
-und neuem Wert nennt), das Entlassen, das erneute Disponieren und das Stornieren stehen im
+und neuem Wert nennt), das Entlassen, seine Rücknahme („Entlassung zurückgenommen“, mit dem, was
+ausblieb), das erneute Disponieren und das Stornieren stehen im
 Einsatztagebuch. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
 Einheit und Funkrufnamen. Ebenso steht „Personal der Einheit übernehmen“ als ein Eintrag mit Zahl
 und Namen der Kräfte. Ein Fahrzeug als eigene Einheit zu führen schreibt drei Einträge: die

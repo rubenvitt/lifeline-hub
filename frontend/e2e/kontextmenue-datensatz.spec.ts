@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('am Fükw-Rechner (Tabelle)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test('Rechtsklick zeigt Primäraktion und ⋮-Einträge aus einer Quelle; Escape schließt', async ({
+  test('Rechtsklick zeigt die ⋮-Einträge aus einer Quelle, „Aus dem Einsatz nehmen“ zuerst; Escape schließt', async ({
     page,
   }) => {
     const einsatzId = await einsatzMitMaterial(page);
@@ -60,7 +60,9 @@ test.describe('am Fükw-Rechner (Tabelle)', () => {
     // Rechtsklick in die Zeile, nicht auf einen Link oder Knopf.
     await zeile.getByText('Stromerzeuger', { exact: true }).click({ button: 'right' });
     await expect(kontextMenue(page)).toBeVisible();
-    expect(await eintraegeVon(kontextMenue(page))).toEqual(['Aus dem Einsatz nehmen', ...punkte]);
+    // Material hat keine Primäraktion mehr; „Aus dem Einsatz nehmen“ führt das ⋮ an (LLH-1722).
+    expect(punkte[0]).toBe('Aus dem Einsatz nehmen');
+    expect(await eintraegeVon(kontextMenue(page))).toEqual(punkte);
     await expect(
       kontextMenue(page).getByRole('menuitem', { name: 'Aus dem Einsatz nehmen' }),
     ).toBeFocused();

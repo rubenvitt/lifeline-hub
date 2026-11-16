@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Handy Blatt Alarme und Eingänge</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-700.woff2") format("woff2");font-weight:700}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.tel{width:390px;height:844px;box-sizing:border-box;position:relative;background:#08090b;color:#e8ebee;font-family:"LFH Archivo",system-ui,sans-serif;font-size:15px;line-height:21px;overflow:hidden}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.kl{height:52px;display:flex;align-items:center;gap:8px;padding:0 12px 0 52px;background:#0c0e11;border-bottom:1px solid #22262b;font-weight:600}
+.dunkel{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+.blatt{position:absolute;left:0;right:0;bottom:0;height:600px;box-sizing:border-box;background:#14171b;border-top:1px solid #2e343a;display:flex;flex-direction:column}
+.griff{height:20px;display:flex;align-items:center;justify-content:center}
+.griff i{width:40px;height:4px;background:#626a73;display:block}
+.bk{height:48px;display:flex;align-items:center;gap:8px;padding:0 4px 0 16px;border-bottom:1px solid #22262b}
+.bk h2{margin:0;flex:1;font-size:17px;font-weight:600}
+.x{width:48px;height:48px;border:0;background:transparent;color:#9aa2ab;display:inline-flex;align-items:center;justify-content:center}
+.inh{flex:1;min-height:0;overflow:hidden}
+.ab{display:flex;align-items:baseline;gap:8px;padding:12px 16px 6px;font-size:12px;letter-spacing:.14em;color:#9aa2ab;font-weight:700}
+.ab.al{color:#ff6b6b}
+.ab span{letter-spacing:0;font-weight:400}
+.al-z{margin:0 0 4px;padding:10px 12px 12px 16px;background:#1c0a0d;box-shadow:inset 4px 0 0 #ff6b6b;display:flex;flex-direction:column;gap:6px}
+.zk{display:flex;align-items:baseline;gap:8px}
+.zk b{flex:1;font-weight:600}
+.zk .mono{color:#9aa2ab;font-size:13px}
+.zt{color:#c6ccd2;font-size:14px;line-height:19px}
+.rw{display:flex;gap:8px;margin-top:4px}
+.kn{height:48px;box-sizing:border-box;padding:0 14px;border:1px solid #626a73;background:transparent;color:#e8ebee;font:inherit;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.kn.pri{background:#4d94d6;border-color:#4d94d6;color:#08090b;font-weight:600}
+.kn.x2{width:48px;padding:0;border-color:transparent;color:#9aa2ab;margin-left:auto}
+.ei{display:flex;flex-direction:column;gap:2px;padding:10px 16px;border-top:1px solid #22262b;box-shadow:inset 3px 0 0 #4d94d6}
+.ei.alt{box-shadow:none}
+.ei .zt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fuss{display:flex;gap:8px;padding:8px 16px;border-top:1px solid #2e343a}
+.fuss .kn{flex:1}
+</style>
+</helmet>
+<div class="tel">
+  <header class="kl">Starkregen Musterstadt</header>
+  <div class="dunkel" aria-hidden="true"></div>
+  <section class="blatt" role="dialog" aria-label="Alarme und Eingänge">
+    <div class="griff" aria-hidden="true"><i></i></div>
+    <div class="bk"><h2>Alarme und Eingänge</h2><button type="button" class="x" aria-label="Schließen"><svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
+    <div class="inh">
+      <div class="ab al">ALARM <span>1</span></div>
+      <div class="al-z">
+        <div class="zk"><b>Auftrag überfällig</b><span class="mono">1912</span></div>
+        <div class="zt">Auftrag #12 an S2 · Frist 1910</div>
+        <div class="rw">
+          <button type="button" class="kn pri">Öffnen</button>
+          <button type="button" class="kn">Gelesen</button>
+          <button type="button" class="kn x2" aria-label="Ausblenden, ohne zu quittieren"><svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        </div>
+      </div>
+      <div class="ab">EINGÄNGE <span>3 neu</span></div>
+      <div class="ei"><div class="zk"><b>Erinnerung fällig: Pegel prüfen</b><span class="mono">1750</span></div><div class="zt">Pegel Mühlbach am Wehr ablesen und an S2 melden</div></div>
+      <div class="ei"><div class="zk"><b>Meldung · Florian 3</b><span class="mono">1802</span></div><div class="zt">Wasser steht 20 cm in der Unterführung B 3, Sperrung angefordert</div></div>
+      <div class="ei"><div class="zk"><b>Neuer Auftrag</b><span class="mono">1810</span></div><div class="zt">Auftrag #14 an S2</div></div>
+      <div class="ei alt"><div class="zk"><b style="font-weight: 400; color: #c6ccd2">Lagebericht · Version 3</b><span class="mono">1745</span></div></div>
+    </div>
+    <div class="fuss">
+      <button type="button" class="kn">Alle gelesen</button>
+      <button type="button" class="kn">Zum Verlauf</button>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

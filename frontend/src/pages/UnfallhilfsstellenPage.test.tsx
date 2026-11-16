@@ -595,7 +595,8 @@ describe('UhsDetailPage', () => {
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
     );
     renderPage('/einsaetze/1/unfallhilfsstellen/7');
-    await screen.findByRole('button', { name: /BHP 50/ });
+    // Der Wechsler im Titel, nicht das ⋮ des Kopfs („Weitere Aktionen zu BHP 50“, LLH-1722).
+    await screen.findByRole('button', { name: /^BHP 50/ });
     await waitFor(() => expect(liesLetzteUhs(1)).toBe(7));
   });
 });

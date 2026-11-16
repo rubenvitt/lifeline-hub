@@ -92,6 +92,73 @@ describe('SlashMenu', () => {
     expect(onSchliessen).toHaveBeenCalled();
   });
 
+  it('rollt die per Tastatur gewählte Zeile ins Bild (LLH-1847)', () => {
+    // jsdom kennt `scrollIntoView` nicht; der Spion steht für den Browser.
+    const rolle = vi.fn();
+    const vorher = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = rolle;
+    try {
+      const ref = createRef<SlashMenuHandle>();
+      renderMitProviders(
+        <SlashMenu
+          ref={ref}
+          offen
+          filter=""
+          bausteine={bausteine}
+          gesetzteFelder={[]}
+          onWahl={vi.fn()}
+          onSchliessen={vi.fn()}
+        />,
+      );
+      rolle.mockClear();
+      act(() => {
+        ref.current!.handleKey('ArrowUp');
+      });
+      // ArrowUp vom ersten Eintrag springt auf den letzten: genau der muss ins Bild.
+      const optionen = screen.getAllByRole('option');
+      const letzte = optionen[optionen.length - 1];
+      expect(letzte).toHaveAttribute('aria-selected', 'true');
+      expect(rolle).toHaveBeenCalledTimes(1);
+      expect(rolle.mock.contexts[0]).toBe(letzte);
+      // Nur so weit wie nötig: die Seite hinter dem Menü darf nicht mitrollen.
+      expect(rolle).toHaveBeenCalledWith({ block: 'nearest' });
+    } finally {
+      Element.prototype.scrollIntoView = vorher;
+    }
+  });
+
+  it.each([
+    // Oberkante des Ankers, frei oben (Rahmen + klebende Köpfe), erwartete Höhe.
+    [800, 100, '280px'], // genug Platz: die Vorgabe
+    [300, 100, '188px'], // 300 − 4 Abstand − 100 Rahmen − 8 Luft
+    [150, 100, '64px'], // kaum Platz: zwei Zeilen (2 × controlHeight) bleiben
+  ])(
+    'nach oben: Höhe bis unter den Rahmen begrenzt (Anker %i, frei %i → %s, LLH-1847)',
+    (ankerOben, topInset, hoehe) => {
+      renderMitProviders(
+        <div data-testid="anker" style={{ position: 'relative' }}>
+          <SlashMenu
+            offen
+            filter=""
+            bausteine={bausteine}
+            gesetzteFelder={[]}
+            richtung="oben"
+            topInset={topInset}
+            onWahl={vi.fn()}
+            onSchliessen={vi.fn()}
+          />
+        </div>,
+        // Gemessen wird beim Öffnen; jsdom kennt keine Lage, also die des Ankers vorgeben.
+      );
+      const anker = screen.getByTestId('anker');
+      anker.getBoundingClientRect = () => ({ top: ankerOben }) as DOMRect;
+      act(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+      expect(screen.getByTestId('slash-menu').style.maxHeight).toBe(hoehe);
+    },
+  );
+
   it('stellt Typen als ERSTE Sektion voran, wenn der Aufrufer sie anbietet (Neuentwurf S4)', () => {
     const onWahl = vi.fn();
     const ref = createRef<SlashMenuHandle>();

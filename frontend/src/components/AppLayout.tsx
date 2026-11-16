@@ -6,6 +6,7 @@ import { useEinsatzRueckweg } from '../einsatz/einsatzRueckweg';
 import { useAuth } from '../auth/AuthContext';
 import { darfPlanen, darfVerwaltung } from '../einsatz/schreibrecht';
 import { farbenDunkel, rahmenFarben } from '../theme/tokens';
+import AlarmZone from '../alarm/AlarmZone';
 import OrgBenachrichtigungen from '../alarm/OrgBenachrichtigungen';
 import BenutzerMenu from './BenutzerMenu';
 import { RAHMEN_KLEBT, RAHMEN_RANG, useRahmenObenStapel } from './rahmenOben';
@@ -260,6 +261,9 @@ export default function AppLayout() {
           </div>
         </KopfRechts>
       </Header>
+      {/* Alarmzone (LLH-1735): Org-Hinweise direkt unter dem Kopf, in jeder Breite; der Org-Rahmen
+         hat keine Leiste am Handschirm (design.md D5). */}
+      <AlarmZone />
       <Content style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
         <Ebene1OrtProvider value={ebene1Ort}>
           <Outlet />
