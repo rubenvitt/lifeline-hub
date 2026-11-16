@@ -40,6 +40,15 @@ describe('EinsatzfunktionZelle (LLH-1067)', () => {
     expect(screen.queryByText('Funktion eintragen')).toBeNull();
   });
 
+  it('im Fluss (Karte) bleibt die Qualifikation sichtbar, solange die Funktion bearbeitet wird', async () => {
+    zelle();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Funktion zu Anna Muster eintragen' }),
+    );
+    expect(screen.getByRole('combobox', { name: 'Funktion zu Anna Muster' })).toBeInTheDocument();
+    expect(screen.getByText('Notfallsanitäter')).toBeVisible();
+  });
+
   it('leer ohne Qualifikation: die Aufforderung als Wort bleibt', () => {
     zelle({ funktion: null });
     expect(

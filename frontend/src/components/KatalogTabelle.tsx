@@ -544,7 +544,17 @@ export function setzeKopfFreiraum(wurzel: HTMLElement): void {
   // Dieselbe Messung für die fixierte Kennung, siehe `SPALTEN_FREIRAUM`.
   const kennung = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-start');
   wurzel.style.setProperty(SPALTEN_FREIRAUM, `${kennung?.offsetWidth ?? 0}px`);
+  // Und für die rechts fixierte Aktionsspalte (LLH-1789), siehe `AKTION_FREIRAUM`.
+  const aktion = wurzel.querySelector<HTMLElement>('th.ant-table-cell-fix-end');
+  wurzel.style.setProperty(AKTION_FREIRAUM, `${aktion?.offsetWidth ?? 0}px`);
 }
+
+/**
+ * CSS-Variable für den Freiraum NEBEN der rechts fixierten Aktionsspalte (LLH-1789); gelesen in
+ * `theme/sprache.css` (`scroll-padding-inline-end`). Vorwärts getabbt hielte der Browser ein Ziel
+ * im rechten Streifen unter der klebenden Spalte für sichtbar und rollte nicht.
+ */
+export const AKTION_FREIRAUM = '--lfh-tabellen-aktion-breite';
 
 /**
  * CSS-Variable für den Freiraum NEBEN der fixierten Kennung; gelesen in `theme/sprache.css`
@@ -573,6 +583,8 @@ export function useKopfFreiraum(tabelle: RefObject<TableRef | null>): void {
     // Die Kennung wächst mit der Dichte, ohne dass sich die Wurzel ändern muss.
     const kennung = wurzel.querySelector('th.ant-table-cell-fix-start');
     if (kennung) beobachter.observe(kennung);
+    const aktion = wurzel.querySelector('th.ant-table-cell-fix-end');
+    if (aktion) beobachter.observe(aktion);
     return () => beobachter.disconnect();
   }, [tabelle]);
 }

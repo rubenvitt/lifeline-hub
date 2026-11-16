@@ -1,5 +1,6 @@
 import { AutoComplete, Button, Tooltip, Typography, theme } from 'antd';
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
+import { useAngabeForm } from '../components/angabeForm';
 import { IconStift } from '../icons';
 import { InlineAngabe } from '../components/InlineAngabe';
 import { PERSONAL_EINSATZFUNKTION_MAX } from '../api/eingabegrenzen';
@@ -53,6 +54,8 @@ export default function EinsatzfunktionZelle({
   onSpeichern,
 }: EinsatzfunktionZelleProps) {
   const { token } = theme.useToken();
+  const [offen, setOffen] = useState(false);
+  const angabeForm = useAngabeForm().form;
   const wert = einsatzfunktion ?? '';
   const qualifikation = funktion ? (
     <Typography.Text type="secondary" style={{ display: 'block', overflowWrap: 'anywhere' }}>
@@ -63,6 +66,10 @@ export default function EinsatzfunktionZelle({
   if (!darfSchreiben && !wert.trim()) return qualifikation ?? <>—</>;
 
   const leerMitQualifikation = !wert.trim() && Boolean(funktion);
+  // Im Fluss (Karte) ersetzt die offene Eingabe den Auslöser samt Qualifikation; dann steht sie
+  // darunter, damit beide sichtbar bleiben (Spec `personal-einsatzangaben`). Schwebend in der
+  // Tabelle bleibt der Auslöser stehen.
+  const imFluss = angabeForm === 'fluss';
 
   return (
     <div style={{ minWidth: 0 }}>
@@ -75,6 +82,8 @@ export default function EinsatzfunktionZelle({
         gleich={(a, b) => a.trim() === b.trim()}
         darfSchreiben={darfSchreiben}
         onSpeichern={(w) => onSpeichern(w.trim() || null)}
+        onOeffnen={() => setOffen(true)}
+        onSchliessen={() => setOffen(false)}
         ausloeser={
           leerMitQualifikation
             ? ({ ref, onClick, disabled }) => (
@@ -114,7 +123,7 @@ export default function EinsatzfunktionZelle({
           />
         )}
       />
-      {leerMitQualifikation ? null : qualifikation}
+      {leerMitQualifikation && !(offen && imFluss) ? null : qualifikation}
     </div>
   );
 }

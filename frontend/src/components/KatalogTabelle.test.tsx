@@ -16,6 +16,7 @@ import KatalogTabelle, {
   filterKopfStil,
   fliessBreite,
   setzeKopfFreiraum,
+  AKTION_FREIRAUM,
   polsterKlickRiegel,
   sortierKopfStyle,
   tabellenTokens,
@@ -1054,6 +1055,16 @@ describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
     wurzel.appendChild(kopf);
     setzeKopfFreiraum(wurzel);
     expect(wurzel.style.getPropertyValue(KOPF_FREIRAUM)).toBe('39px');
+  });
+
+  it('misst die rechts fixierte Aktionsspalte für scroll-padding-inline-end (LLH-1789)', () => {
+    const wurzel = document.createElement('div');
+    const aktion = document.createElement('th');
+    aktion.className = 'ant-table-cell ant-table-cell-fix-end';
+    Object.defineProperty(aktion, 'offsetWidth', { value: 124 });
+    wurzel.appendChild(aktion);
+    setzeKopfFreiraum(wurzel);
+    expect(wurzel.style.getPropertyValue(AKTION_FREIRAUM)).toBe('124px');
   });
 
   it('ohne stehende Kopfzeile ist der Freiraum 0, nicht ein alter Wert', () => {

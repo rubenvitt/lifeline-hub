@@ -64,7 +64,6 @@ import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
 import { KennungMitZusatz } from '../components/KennungMitZusatz';
-import { useViewport } from '../components/useViewport';
 import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
@@ -342,6 +341,10 @@ const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
   { key: 'seit', sortWert: true },
   { key: 'besatzung', sortWert: true },
   { key: 'kennzeichen', sortWert: true },
+  // Ohne Sortierung und Filter, aber voreingestellt aus: fehlte sie hier, fiele sie aus der
+  // gemerkten Spaltenwahl, stünde nach dem Neuladen unverlangt da, und der Schalter meldete eine
+  // eigene Wahl (LLH-1790).
+  { key: 'bemerkung' },
 ];
 const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
   'typ',
@@ -386,7 +389,6 @@ function FahrzeugeInhalt() {
   const { dichte } = useDichte();
   /** Nur der Menüauslöser (Entscheidung 14.10.2026, `components/menueSpalte.ts`). */
   const aktionenBreite = menueSpaltenBreite(dichte);
-  const { abBreite } = useViewport();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
   const [adhocWeitereOffen, setAdhocWeitereOffen] = useState(false);
@@ -894,8 +896,6 @@ function FahrzeugeInhalt() {
    * nie. Wer eine Breite ändert, misst neu
    * (`e2e/gate1-ueberlauf.spec.ts`, „Tabellen am Führungsarbeitsplatz“ und „Kräfte-Listen“).
    */
-  // Steht die Spalte „Typ“ (ab `xxl`, dieselbe Schwelle wie ihr `abBreite`)?
-  const typSpalteDa = abBreite('xxl');
   const spalten = spaltenFuer<EinsatzFahrzeug>()([
     {
       title: 'Funkrufname',
@@ -906,9 +906,9 @@ function FahrzeugeInhalt() {
       suchText: (ef) => ef.funkrufname,
       // `wrap`: die Marken dürfen unter den Funkrufnamen rutschen, statt die Fließspalte über ihr
       // Maß zu drücken (wie `PersonalPage`, LFH-975).
-      // Unter `xxl` steht der Typ als zweite Zeile darunter, ab `xxl` in seiner Spalte (LLH-1790,
-      // Spec `fahrzeug-bearbeitung`, „Typ eines Fahrzeugs in der Liste“). Der Kartentitel nimmt
-      // dasselbe `render`: am Handy steht der Typ also auch in der Karte.
+      // Steht die Spalte „Typ“ nicht (unter `xxl` oder per Hand verborgen), steht der Typ als zweite
+      // Zeile darunter (LLH-1790, Spec `fahrzeug-bearbeitung`, „Typ eines Fahrzeugs in der Liste“);
+      // steht sie, nur dort. Der Kartentitel nimmt dasselbe `render`: am Handy steht er in der Karte.
       render: (_, ef) => (
         <KennungMitZusatz
           kennung={
@@ -919,7 +919,8 @@ function FahrzeugeInhalt() {
               {ef.ist_demo && <DemoMarke />}
             </Space>
           }
-          zusatz={typSpalteDa ? null : ef.fahrzeugtyp}
+          zusatz={ef.fahrzeugtyp}
+          ausSpalte="typ"
         />
       ),
     },

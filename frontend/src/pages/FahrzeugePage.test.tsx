@@ -908,6 +908,20 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('columnheader', { name: 'Träger' })).toBeNull();
   });
 
+  it('eine gemerkte Wahl mit der voreingestellten Bemerkung heißt nach dem Neuladen „Spalten“ (LLH-1790)', async () => {
+    // Gemerkt wie nach „Status ab- und wieder anwählen“: nur die Voreinstellung.
+    localStorage.setItem('lfh:spalten:fahrzeuge', JSON.stringify({ aus: ['bemerkung'], an: [] }));
+    try {
+      setzeViewportBreite(1440);
+      render(einsatz());
+      await screen.findByText('Florian 1');
+      expect(screen.queryByRole('columnheader', { name: /^Bemerkung/ })).toBeNull();
+      expect(screen.getByRole('button', { name: /^Spalten —/ })).toBeInTheDocument();
+    } finally {
+      localStorage.removeItem('lfh:spalten:fahrzeuge');
+    }
+  });
+
   describe('Typ unter dem Funkrufnamen (LLH-1790, Spec fahrzeug-bearbeitung)', () => {
     const kennungsZelle = (container: HTMLElement) =>
       container.querySelector<HTMLElement>('[data-row-key="10"] td')!;
@@ -935,6 +949,16 @@ describe('FahrzeugePage', () => {
       await screen.findByText('Florian 1');
       const karte = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]')!;
       expect(within(karte).getAllByText('LF 20')).toHaveLength(1);
+    });
+
+    it('unter xxl von Hand eingeblendet: der Typ steht in der Spalte und nicht doppelt (LLH-1790)', async () => {
+      setzeViewportBreite(1440);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      await userEvent.click(screen.getByRole('button', { name: /^Spalten —/ }));
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Typ' }));
+      expect(await screen.findByRole('columnheader', { name: /^Typ/ })).toBeInTheDocument();
+      expect(within(kennungsZelle(container)).queryByText('LF 20')).toBeNull();
     });
 
     it('ohne Freigabe Einheiten steht der Typ in der Karte einmal, nicht zusätzlich als Feld', async () => {

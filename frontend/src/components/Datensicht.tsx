@@ -17,6 +17,7 @@ import {
   useState,
 } from 'react';
 import { Link } from 'react-router';
+import { KEINE_SPALTEN, SichtbareSpaltenKontext } from './KennungMitZusatz';
 import KatalogTabelle, { type KatalogSpalte } from './KatalogTabelle';
 import { Liste, ListenEintrag, type ListenKopf } from './Liste';
 import type { UnterEbene } from './Markdown';
@@ -2875,7 +2876,13 @@ export default function Datensicht<T extends object, const K extends string>(
       )}
       {verdeckteFehlerBlock}
       {/* GENAU EIN Zweig im Baum, kein Umschalten per verborgener Fläche. */}
-      {alsTabelle ? tabelle : kartenZweig}
+      {/* Welche Spalten die Tabelle wirklich zeigt (LLH-1790): eine Kennung mit Zusatz (Typ unter
+          dem Funkrufnamen) lässt ihn weg, wenn seine Spalte steht. Im Kartenzweig steht keine. */}
+      <SichtbareSpaltenKontext.Provider
+        value={alsTabelle ? gezeigteSpaltenSchluessel : KEINE_SPALTEN}
+      >
+        {alsTabelle ? tabelle : kartenZweig}
+      </SichtbareSpaltenKontext.Provider>
       {kontext.menue}
     </section>
   );
