@@ -961,6 +961,22 @@ describe('FahrzeugePage', () => {
       expect(within(kennungsZelle(container)).queryByText('LF 20')).toBeNull();
     });
 
+    it('die Suche trifft den Typ auch, wenn er nur unter dem Funkrufnamen steht', async () => {
+      setzeViewportBreite(1440);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      const suche = screen.getByRole('searchbox');
+      await userEvent.type(suche, 'LF 20');
+      await waitFor(() =>
+        expect(container.querySelectorAll('tr.ant-table-row[data-row-key]')).toHaveLength(1),
+      );
+      await userEvent.clear(suche);
+      await userEvent.type(suche, 'HLF');
+      await waitFor(() =>
+        expect(container.querySelectorAll('tr.ant-table-row[data-row-key]')).toHaveLength(0),
+      );
+    });
+
     it('ohne Freigabe Einheiten steht der Typ in der Karte einmal, nicht zusätzlich als Feld', async () => {
       setzeViewportBreite(390);
       server.use(

@@ -33,7 +33,7 @@ Lagekarte MUST allein aus der Qualifikation abgeleitet werden, nie aus der Einsa
 
 #### Scenario: Personalliste ohne Einsatzfunktion
 - **WHEN** Anna Beispiel mit der Qualifikation „Zugführer, Sprechfunker“ ohne Einsatzfunktion in der Personalliste steht und die Rolle Personal schreiben darf
-- **THEN** steht in ihrer Zelle „Funktion“ „Zugführer, Sprechfunker“ als Wert in einer Zeile, daneben ein Knopf „Funktion zu Anna Beispiel eintragen“, und nirgends der Text „Funktion eintragen“
+- **THEN** steht in ihrer Zelle „Funktion“ „Zugführer, Sprechfunker“ als Wert, daneben ein Knopf „Funktion zu Anna Beispiel eintragen“, und die Zeile zeigt den Text „Funktion eintragen“ nicht sichtbar (ein Tooltip darf ihn ergänzen)
 
 #### Scenario: Personalliste mit Einsatzfunktion
 - **WHEN** dieselbe Person die Einsatzfunktion „Gruppenführerin“ bekommt

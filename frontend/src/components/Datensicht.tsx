@@ -82,7 +82,10 @@ import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGeda
  *   · `KatalogTabelle` + Bildlauf bleibt für die Stammdaten-VERGLEICHSTABELLEN; keine wird Karte.
  *   · `form: 'tabelle'` für Vergleichsflächen, die auch schmal verglichen werden (Meldebild;
  *     Prüflisten-Kriterium 14 verbietet dort Karten).
- *   · `form: 'auto'` für Einsatzmodule, in denen ein Datensatz eine Einheit ist.
+ *   · `form: 'auto'` für Einsatzmodule, in denen ein Datensatz eine Einheit ist. Dazu die
+ *     Einheiten-Gliederung (LLH-1787): ihr Vergleich über Ist und Soll trägt ab `md`; am Handy
+ *     setzte die schrumpfende Namensspalte Namen Buchstabe für Buchstabe, die Karte trägt Ist
+ *     und Soll je Einheit, der Baum steht eingerückt.
  *   · `form: 'karte'` für Module, die kartenbasiert gelesen werden (Befehle, Lageberichte).
  *
  * Was die Karte NICHT kann, ist an der Aufrufstelle sichtbar: eine Spalte ohne Platz im
@@ -138,9 +141,10 @@ import { GEDAECHTNIS_ENTPRELLUNG_MS, type ListenGedaechtnis } from './listenGeda
 /** Einzug je Baumebene in px: antds Vorgabe (`indentSize`), seit LFH-977 selbst gezeichnet. */
 const BAUM_EINZUG_PX = 15;
 /**
- * Einzug je Baumebene unter md (LLH-1029, vormals die Einheiten-Gliederung, LFH-975): am Handy
- * fräße der volle Einzug auf drei Ebenen ein Viertel der ersten Spalte. Das Aufklappsymbol behält
- * seine Breite, es ist ein Bedienziel.
+ * Einzug je Baumebene unter md im TABELLENZWEIG (LLH-1029, LFH-975): am Handy fräße der volle
+ * Einzug auf drei Ebenen ein Viertel der ersten Spalte. Das Aufklappsymbol behält seine Breite, es
+ * ist ein Bedienziel. Die Einheiten-Gliederung steht dort seit LLH-1787 als Karten (Einzug über
+ * die Polsterung der Karte); Bäume mit `form="tabelle"` (Meldebild, Funkplan) nutzen ihn weiter.
  */
 const BAUM_EINZUG_SCHMAL_PX = 8;
 

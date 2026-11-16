@@ -52,7 +52,8 @@ Ein neuer Spaltenbauer `aktionsSpalte({ aktion, weitere, dichte })` in `componen
 (Primäraktion, optional) und `weitere` (⋮) sind die Kartenplan-Paare, die Karte und Kontextmenü
 schon lesen. So entsteht keine zweite Aktionsliste.
 
-- **Ab `md`:** `KatalogTabelle` setzt an einer Spalte mit `amEnde` `fixed: 'right'`. Die Schatten
+- **Ab `md`:** `Datensicht` setzt an einer Spalte mit `amEnde` `fixed: 'right'` (dort liegt die
+  Übersetzung ihrer Spalten; direkte `KatalogTabelle`-Nutzer fixieren selbst). Die Schatten
   für `fix-end` stehen in `theme/sprache.css` schon. Die Breite ist fest: `menueSpaltenBreite`
   (⋮) plus, bei Primäraktion, die Breite ihres Knopfs. Diese wird aus der Beschriftung über
   `canvas.measureText` in der Schrift der Stufe gemessen, zuzüglich Knopfpolster und Fuge. Die
@@ -86,8 +87,11 @@ kontrollierten antd-`Popover` am Wertknopf (`trigger` leer, `placement="bottomLe
 - Eine Tabelle hält höchstens eine schwebende Bearbeitung offen. Öffnet jemand eine zweite,
   während die erste unverändert ist, schließt die erste. Ist die erste geändert, bekommt sie den
   Fokus zurück, und die zweite öffnet nicht.
-- Die Zeilenschleuse hält die Folge: Reacts Fokusereignisse folgen dem React-Baum, also zählt
-  der Fokus im Portal als „in der Sicht“ (`useZuflussSchleuse`, `checkVerlassen`).
+- Die Zeilenschleuse hält die Folge: `checkVerlassen` (`useZuflussSchleuse`) prüft das
+  Fokusziel am DOM und nimmt `.ant-popover` wie die Menü-Overlays als „in der Sicht“ (im
+  Review vor dem PR nachgetragen; vorher taute der Fokus im Popover die Schleuse).
+- Tab aus dem Popover geht zum nächsten Ziel nach der Zelle, Shift+Tab vom ersten Ziel zurück
+  auf die Anzeige; sonst liefe der Fokus ans Ende des Dokuments.
 - `BemerkungZelle` liest den Kontext nicht.
 
 Verworfen: eine Zelle fester Größe mit ✓/✕. Zwei 72-px-Knöpfe sprengen in `handschuh` eine
@@ -109,10 +113,10 @@ Breite fehlenden Spalten, und der Zähler log wieder.
 ### D4 Typ unter dem Funkrufnamen (`i7lwykpt`)
 
 Ein kleiner Baustein `KennungMitZusatz` (Kennung, darunter gedämpft ein Zusatz in der Rolle
-`text2`, 12 px) kommt in die `render` der Spalte `funkrufname` und in den Kartentitel. Unter
-`xxl` zeigt er den Typ, ab `xxl` nicht, dann trägt ihn die Spalte. Als Quelle der Breite gilt
-dieselbe wie bei `abBreite` (`useViewport`/antd `Grid`). Eine Handwahl, die „Typ“ ab `xxl`
-abwählt, blendet ihn bewusst aus, ohne Ersatzzeile. Der Baustein ist so geschnitten, dass
+`text2`, 12 px) kommt in die `render` der Spalte `funkrufname` und in den Kartentitel. Er zeigt
+den Typ, solange die Spalte „Typ“ nicht in der Tabelle steht, nach Breite und Handwahl: die
+`Datensicht` reicht die wirklich gezeigten Spalten als Kontext (`SichtbareSpaltenKontext`), so
+steht der Typ nie doppelt und nie ganz verborgen (Befund aus dem Review vor dem PR). Der Baustein ist so geschnitten, dass
 LLH-1791 (Funktion unter dem Namen) ihn mitnutzen kann.
 
 ### D5 Einheiten am Handy: Baum als Karten (`i5c54naq`)

@@ -13,7 +13,7 @@ klebenden Kopfzeile gleich breit) ist im Branch behoben.
 ## 2. i7lwykpt: Typ unter dem Funkrufnamen
 
 - [x] 2.1 Baustein `components/KennungMitZusatz.tsx` (Kennung, gedämpfter Zusatz, kein leerer Zusatz); Unit-Test rot→grün
-- [x] 2.2 `pages/FahrzeugePage.tsx`: Funkrufname-Zelle und Kartentitel zeigen unter `xxl` den Typ, ab `xxl` nicht; Karte auch mit Freigabe Einheiten; Spalte `typ` bleibt ab `xxl`. Tests „KTW unter dem Funkrufnamen bei 1440“, „nicht doppelt ab xxl“, „Karte mit Freigabe Einheiten“, „Suche nach Typ“ rot→grün
+- [x] 2.2 `pages/FahrzeugePage.tsx`: Funkrufname-Zelle und Kartentitel zeigen unter `xxl` den Typ, ab `xxl` nicht; Karte auch mit Freigabe Einheiten; Spalte `typ` bleibt ab `xxl`. Tests „KTW unter dem Funkrufnamen bei 1440“, „nicht doppelt ab xxl“, „unter xxl von Hand eingeblendet nicht doppelt“, „Karte mit Freigabe Einheiten“, „Suche nach Typ“ rot→grün (die beiden letzten im Review nachgetragen)
 
 ## 3. cq38dy2l: Aktionsspalte immer im Bild
 
@@ -22,7 +22,7 @@ klebenden Kopfzeile gleich breit) ist im Branch behoben.
 - [x] 3.3 `Datensicht`/`KatalogTabelle` unter `md` bei `form="tabelle"`: Aktionsspalte entfällt, Kennungsspalte rendert `KennungMitAktion` (Primäraktion und ⋮); Unit-Test rot→grün
 - [x] 3.4 `betreuung/BezirkTabelle.tsx` und `betreuung/StellenBlock.tsx` auf den Baustein umstellen, `meldenInKennung`/`KENNUNG_MAX_PX` entfernen; ihre Tests bleiben grün, ⋮ am Handy neu in der Kennung (Test rot→grün)
 - [x] 3.5 `pages/MaterialPage.tsx`, `personen/personenSpalten.tsx`, `pages/FahrzeugePage.tsx`: ihre reinen ⋮-Spalten tragen `amEnde` (eigenes `render` bleibt, Breite schon `menueSpaltenBreite`); Seitentests grün
-- [x] 3.6 e2e: Lage von Primäraktion und ⋮ im Tabellenrahmen ohne Rollen (Evakuierung 1440 × 900 mit Panel, Material 1024 × 768, Betreuung 1024 × 768 `handschuh`, Evakuierung 390 × 844), alle drei Stufen, in `e2e/gate1-ueberlauf.spec.ts`; Fokus-Nachweis „Durch eine Zeile neben der fixierten Aktionsspalte“ in `e2e/fokus-verdeckung.spec.ts`; beide grün
+- [x] 3.6 e2e: Lage von Primäraktion und ⋮ im Tabellenrahmen ohne Rollen (Evakuierung und Betreuung bei 1440 × 900 `kompakt`, 1024 × 768 `handschuh`, 390 × 844 `komfortabel`) und „Waagerecht gerollt“ an der Fahrzeugliste in `e2e/gate1-ueberlauf.spec.ts`; Fokus-Nachweis „Durch eine Zeile neben der fixierten Aktionsspalte“ an der Fahrzeugliste in `e2e/fokus-verdeckung.spec.ts`; alle grün
 
 ## 4. j10okn8m: Bearbeiten in der Zelle ohne Sprung
 

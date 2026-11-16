@@ -1651,6 +1651,43 @@ test.describe('Gate 1 · Bearbeiten ohne Sprung (LLH-1795)', () => {
  */
 test.describe('Gate 1 · Aktion im Bild (LLH-1789)', () => {
   test.describe.configure({ mode: 'parallel' });
+  // Spec-Szenario „Waagerecht gerollt“: am Anfang und am Ende des Querscrolls steht das ⋮ am
+  // rechten Rand, und die rollenden Spalten behalten ihre Breite.
+  test('Fahrzeuge 1024 px, handschuh: gerollt bleibt das ⋮ am Rand, die Spalten bleiben breit', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await anmelden(page, { startseite: false });
+    const einsatzId = await seedeKraefte(page);
+    await page.addInitScript(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
+    const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
+    const zeile = region.locator('tr.ant-table-row').filter({ hasText: KRAFT_FAHRZEUG });
+    const menue = zeile.getByRole('button', { name: /^Weitere Aktionen zu / });
+    await expect(menue).toBeVisible();
+    const koerper = region.locator('.ant-table-body').first();
+    const ueber = await koerper.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(ueber, 'Vorbedingung: die Tabelle läuft waagerecht über').toBeGreaterThan(0);
+    const breiten = () =>
+      region.evaluate((el) =>
+        [...el.querySelectorAll<HTMLElement>('.ant-table-sticky-holder thead th')].map((th) =>
+          Math.round(th.getBoundingClientRect().width),
+        ),
+      );
+    const vorher = await breiten();
+    for (const ziel of [ueber, 0]) {
+      await koerper.evaluate((el, x) => el.scrollTo({ left: x }), ziel);
+      const rahmen = (await koerper.boundingBox())!;
+      const b = (await menue.boundingBox())!;
+      expect(b.x + b.width, `⋮ im Rahmen bei scrollLeft ${ziel}`).toBeLessThanOrEqual(
+        rahmen.x + rahmen.width + 1,
+      );
+      expect(b.x, `⋮ im Rahmen bei scrollLeft ${ziel}`).toBeGreaterThanOrEqual(rahmen.x - 1);
+      expect(await breiten()).toEqual(vorher);
+    }
+  });
+
   for (const { breite, hoehe, dichte } of [
     { breite: 1440, hoehe: 900, dichte: 'kompakt' },
     { breite: 1024, hoehe: 768, dichte: 'handschuh' },

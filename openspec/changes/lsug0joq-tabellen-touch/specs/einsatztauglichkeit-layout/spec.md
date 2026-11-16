@@ -15,7 +15,7 @@ sind Evakuierung, Betreuung, Material, Betroffene und Fahrzeuge.
 - **THEN** liegen „Stand melden“ und das ⋮ jeder Zeile ganz innerhalb des Tabellenrahmens, ohne dass die Tabelle gerollt wurde
 
 #### Scenario: Waagerecht gerollt
-- **WHEN** die Materialliste bei 1024 × 768 in `handschuh` waagerecht bis zum Anfang gerollt ist
+- **WHEN** die Fahrzeugliste bei 1024 × 768 in `handschuh` waagerecht bis zum Anfang gerollt ist
 - **THEN** steht das ⋮ jeder Zeile weiter am rechten Rand des Rahmens, und Spalten, die darunter rollen, bleiben in ihrer Breite unverändert
 
 #### Scenario: Handschirm ohne Karten
@@ -24,7 +24,7 @@ sind Evakuierung, Betreuung, Material, Betroffene und Fahrzeuge.
 
 #### Scenario: Zeile nur mit Menü
 - **WHEN** die Fahrzeugliste ab `md` als Tabelle steht und ihre Zeilen nur ein ⋮ tragen
-- **THEN** steht das ⋮ in einer rechts fixierten Spalte von der Breite einer Steuerhöhe der Stufe zuzüglich Zellpolster
+- **THEN** steht das ⋮ in einer rechts fixierten Spalte, so breit wie die Steuerhöhe der Stufe oder der Kopf „Aktionen“, was breiter ist, zuzüglich Zellpolster
 
 ### Requirement: Bearbeiten in einer Tabellenzelle verschiebt die Tabelle nicht
 
@@ -112,7 +112,7 @@ Bildlauf hat.
 - **THEN** steht jedes Ziel der ersten Zeile ganz unter der Kopfzeile, auch eines außerhalb der fixierten Spalte
 
 #### Scenario: Durch eine Zeile neben der fixierten Aktionsspalte
-- **WHEN** der Fokus in der Materialliste bei 1024 × 768 in `handschuh` mit Tab durch die Ziele einer Zeile läuft und die Tabelle waagerecht überläuft
+- **WHEN** der Fokus in der Fahrzeugliste bei 1024 × 600 in `handschuh` mit Tab durch die Ziele einer Zeile läuft und die Tabelle waagerecht überläuft
 - **THEN** liegt kein Ziel einer rollenden Spalte vollständig hinter der rechts fixierten Aktionsspalte
 
 #### Scenario: Kartenknöpfe über dem Fuß

@@ -22,9 +22,9 @@ herleitung:
 - MUST: Die Kopftabelle der stehenden Kopfzeile ist fest (`table-layout: fixed`), und jede
   Spalte hält die gerechnete Mindestbreite ihres Kopfs (`frontend/AGENTS.md`, „Kopf und Körper
   sind gleich breit“).
-- MUST: Eine Aktionsspalte trägt `amEnde`; ab `md` steht sie rechts fixiert, unter `md` zieht
-  ihr Inhalt in die fixierte Kennung (`frontend/AGENTS.md`, „Die Hauptaktion einer Zeile bleibt
-  im Bild“).
+- MUST: Die Aktionsspalte einer `Datensicht` trägt `amEnde`; ab `md` steht sie rechts fixiert,
+  unter `md` zieht ihr Inhalt in die fixierte Kennung (`frontend/AGENTS.md`, „Die Hauptaktion
+  einer Zeile bleibt im Bild“). Direkte `KatalogTabelle`-Nutzer fixieren selbst (`fixed: 'right'`).
 - MUST: In einer Tabellenzelle schwebt die Bearbeitung einer `InlineAngabe` an der Zelle;
   `KatalogTabelle` setzt den Kontext, keine Seite (`frontend/AGENTS.md`, „In einer Tabellenzelle
   schwebt die Bearbeitung“).
