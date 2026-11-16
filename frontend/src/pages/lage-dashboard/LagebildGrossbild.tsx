@@ -60,7 +60,7 @@ interface LagebildGrossbildProps {
 
 /**
  * Lagebild im Großbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des Großbilds im Lagebild“;
- * design.md D5 in `openspec/changes/ckl1wbvz-grossbild-lage/`).
+ * design.md D5 in `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`).
  *
  * Die Seite reicht ihre schon berechneten Werte herein, das Großbild rechnet nichts selbst: das Band
  * und der Führungsstand kommen als {@link KennzahlAnzeige} aus `kennzahlAnzeige.ts`, Gefahren,

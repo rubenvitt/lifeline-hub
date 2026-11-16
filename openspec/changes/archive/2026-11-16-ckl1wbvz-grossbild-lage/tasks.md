@@ -78,7 +78,7 @@ ist. Pfade relativ zu `frontend/src/`, Läufe in `frontend/` über `mise exec --
   neu aufnehmen (`pnpm doku:bilder --grep lagebild`, `--grep lagebesprechung`); Wächter der Doku grün.
 - [x] 5.3 `frontend/AGENTS.md`: Bausteine unter `components/grossbild/` in die Liste „Bausteine
   außerhalb von `instrument/`“ aufnehmen, mit Verweis auf die Spec.
-- [ ] 5.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis für den PR festhalten.
+- [x] 5.4 `./scripts/check-all.sh --geaendert --ohne-e2e` grün; Ergebnis für den PR festhalten.
 
 ## Workflow follow-up
 

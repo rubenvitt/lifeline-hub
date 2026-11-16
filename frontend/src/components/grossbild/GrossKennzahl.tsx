@@ -32,7 +32,7 @@ interface GrossKennzahlProps {
 
 /**
  * Eine Kennzahl im Großbild (LLH-1747, Spec `grossbild-ansicht`; design.md D4 in
- * `openspec/changes/ckl1wbvz-grossbild-lage/`): Bezeichnung, darunter die Zahl (Mono, feste Ziffern,
+ * `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`): Bezeichnung, darunter die Zahl (Mono, feste Ziffern,
  * 96 bzw. 72 px bei 1920 × 1080), darunter die Notiz. Alle Größen aus {@link grossMass}, also
  * mitwachsend.
  *

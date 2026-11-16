@@ -9,7 +9,7 @@ lagen Bezeichnung und Wert rund 1500 px auseinander.
 https://claude.ai/artifact/2A2jye29b7KuXJVvYfmN4m (Artifact-Typ „Design“, Design System „Lifeline
 Hub“). Die Schriften lädt der Canvas aus `ds/lifeline-hub/`; im Repo fallen die Flächen auf die
 Systemschrift zurück. Der Lösungsweg wurde am 16.11.2026 mit Ruben abgestimmt, die Change dazu ist
-`openspec/changes/ckl1wbvz-grossbild-lage/`.
+`openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`.
 
 Das Design System hing am 16.11.2026 unter https://claude.ai/artifact/2irtEnowNvCAAkAzKL2YNo (Stand
 1792911536-f512), nicht unter der Adresse in `docs/design/design-system/ARTIFACT.md`; die war aus

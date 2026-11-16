@@ -1,6 +1,6 @@
 /**
  * Großbild-Skala (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entfernung“; design.md D3 in
- * `openspec/changes/ckl1wbvz-grossbild-lage/`).
+ * `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`).
  *
  * Die Bezugsgrößen sind die des Lagemonitors bei 1920 × 1080 (`geraet/LagemonitorPage.tsx`,
  * `GROSS`): Zahl 96, Zahl klein 72, Titel 32, Text 28. Bis der Lagemonitor auf diese Bausteine

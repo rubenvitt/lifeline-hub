@@ -53,7 +53,7 @@ function countText(n: number, eins: string, viele: string): string {
 
 /**
  * Hülle des Großbilds (LLH-1747, Spec `grossbild-ansicht`; design.md D2 in
- * `openspec/changes/ckl1wbvz-grossbild-lage/`).
+ * `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`).
  *
  * Per Portal neben der App, fest über das ganze Fenster, ohne Bildlauf. Beim Öffnen fordert sie
  * Vollbild für sich selbst an (nicht für das Dokument): dann zeigt der Browser nur sie, Rahmen und

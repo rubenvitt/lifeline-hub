@@ -35,7 +35,7 @@ Freitext). Der Wert steht direkt neben der Bezeichnung (Spaltenraster mit gedeck
 Bezeichnung, LLH-1747), nie am anderen Rand der Paneelbreite.
 
 **Großbild** (LLH-1747, Spec `grossbild-ansicht`,
-`openspec/changes/ckl1wbvz-grossbild-lage/design.md`): `lagebesprechung/LagebesprechungGrossbild.tsx`
+`openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/design.md`): `lagebesprechung/LagebesprechungGrossbild.tsx`
 zeigt Termin und Vorbereitung aus `useVorbereitung`, also dieselben Zeilen wie das Paneel, ohne
 Quellenangabe und ohne Bedienung außer der Hülle (`components/grossbild/`). Die Quelle bleibt im
 Paneel und in der Übernahme.

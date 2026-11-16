@@ -46,7 +46,7 @@ interface LagebesprechungGrossbildProps {
 
 /**
  * Lagebesprechung im Großbild (LLH-1747, Spec `grossbild-ansicht`, „Inhalt des Großbilds in der
- * Lagebesprechung“; design.md D5 in `openspec/changes/ckl1wbvz-grossbild-lage/`).
+ * Lagebesprechung“; design.md D5 in `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`).
  *
  * Oben der Termin mit seinem Zustand (dasselbe Wort und derselbe Ton wie im Paneel „Termin“, Regel
  * „Überfälliger Besprechungstermin“ in `lagebesprechung/AGENTS.md`) und die Zahl der
