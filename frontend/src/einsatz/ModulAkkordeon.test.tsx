@@ -120,10 +120,10 @@ describe('ModulAkkordeon · Dichte der Kopfzeile', () => {
   });
 
   it('trägt ZWEI Angaben, nicht eine (LFH-365)', () => {
-    // Konkreter Wert als LITERAL: waagerecht `padding` der Stufe (26 in `handschuh`).
+    // Konkreter Wert als LITERAL: waagerecht `padding` der Stufe (24 in `handschuh`).
     const stil = akkordeonKopfStil(tokenFuer('handschuh'), farbenDunkel, { offen: false });
     expect(stil.minHeight).toBe(72);
-    expect(stil.padding).toBe('0 26px');
+    expect(stil.padding).toBe('0 24px');
   });
 
   it('zeigt die offene Kategorie mit Fläche und Ortsmarke, die geschlossene gedämpft', () => {
