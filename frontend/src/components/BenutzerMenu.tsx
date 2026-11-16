@@ -359,8 +359,8 @@ export default function BenutzerMenu({
             {initialen(benutzer.anzeigename)}
           </span>
           {/* Unter `xl` bleibt die Kachel allein; der Name steht in der Kopfgruppe des Dropdowns, das
-            `aria-label` benennt den Trigger. Höhe und Mindestbreite folgen der Dichte; 40 px sind nur
-            der kompakte Höhenboden (LFH-460). */}
+            `aria-label` benennt den Trigger. Höhe und Mindestbreite folgen der Dichte; der Höhenboden
+            steht am `height` des Knopfs (LFH-460, im Drawer LLH-1728). */}
           {inNavigation && (
             <span
               style={{

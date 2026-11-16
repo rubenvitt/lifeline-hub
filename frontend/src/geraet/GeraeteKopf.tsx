@@ -80,7 +80,16 @@ function useJuengsterDatenstand(): number {
  * Darstellung erklärte sich nicht). Die Endzeit in der Zeitdarstellung steht im Hinweis und im
  * zugänglichen Namen. Unter einer Stunde mit Wort und Farbe hervorgehoben (WCAG 1.4.1).
  */
-function KopplungsEnde({ laeuftAbAt, zelle }: { laeuftAbAt: string; zelle: { padding: number } }) {
+function KopplungsEnde({
+  laeuftAbAt,
+  zelle,
+  mitSymbol,
+}: {
+  laeuftAbAt: string;
+  zelle: { padding: number };
+  /** Unter `md` ohne Uhr-Symbol: das Wort „Kopplung“ trägt die Zelle allein, Platz für die Zeile. */
+  mitSymbol: boolean;
+}) {
   const jetzt = useMinutenTakt();
   const bald = kopplungEndetBald(laeuftAbAt, jetzt);
   // Die Hülle hat keinen `EinsatzAnzeigeProvider` (`geraet/AGENTS.md`): der Hook liefert dort die
@@ -103,9 +112,11 @@ function KopplungsEnde({ laeuftAbAt, zelle }: { laeuftAbAt: string; zelle: { pad
       title={bald ? `Kopplung bis ${ende} · Verlängern: Einsatzleitung` : `Kopplung bis ${ende}`}
       style={kopfZelleStil(zelle)}
     >
-      <span aria-hidden="true" style={{ display: 'inline-flex', color: farbe }}>
-        <IconUhr size={16} />
-      </span>
+      {mitSymbol && (
+        <span aria-hidden="true" style={{ display: 'inline-flex', color: farbe }}>
+          <IconUhr size={16} />
+        </span>
+      )}
       <span
         aria-hidden="true"
         style={{
@@ -135,9 +146,10 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
   const stand = useJuengsterDatenstand();
   const stelle = useStellenName(geraet);
   const { konventionen } = useAnzeigeKonventionen();
-  // Unter `md` rücken die Zellen zusammen wie im Einsatzkopf (LLH-1728, D3): mit der vollen
-  // Polsterung bräche die rechte Gruppe auf 390 px seit der Restzeit „Kopplung noch 5 h“ (LLH-1734)
-  // in eine zweite Zeile, und die Ausgabeansicht rollte um deren Höhe (LLH-1294).
+  // Unter `md` rücken die Zellen zusammen wie im Einsatzkopf (LLH-1728, D3), und die Restzeit steht
+  // ohne Uhr-Symbol: sonst bräche die rechte Gruppe auf 390 px seit „Kopplung noch 5 h“ (LLH-1734)
+  // in `kompakt` und `komfortabel` in eine zweite Zeile, und die Ausgabeansicht rollte um deren
+  // Höhe (LLH-1294). In `handschuh` bricht sie weiter um, wie schon vorher.
   const mittel = useViewport().abBreite('md');
   const zellToken = mittel ? token : { padding: token.paddingXS };
   return (
@@ -171,8 +183,8 @@ export function GeraeteKopf({ geraet }: { geraet: GeraetAnzeige }) {
         </span>
       </div>
       <KopfRechts>
-        <KopplungsEnde laeuftAbAt={geraet.laeuft_ab_at} zelle={zellToken} />
-        <SyncAnzeige liveErwartet />
+        <KopplungsEnde laeuftAbAt={geraet.laeuft_ab_at} zelle={zellToken} mitSymbol={mittel} />
+        <SyncAnzeige liveErwartet zelle={zellToken} />
         {ohneVerbindung && stand > 0 && (
           // Eigene Zelle statt `Datenstand`: dessen Sekundärtext folgt dem Modus, der Kopf ist
           // immer dunkel.

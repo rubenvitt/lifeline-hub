@@ -186,6 +186,13 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
   const kopfNach = (await kopf.boundingBox())!;
   // Die Kopfzeile steht unter dem klebenden Rahmen, statt mit der Seite aus dem Bild zu wandern.
   const oben = await rahmenOben(page);
+  // Vorbedingung: unter `md` klebt der Kopf (LLH-1728), der Rahmen reicht also mindestens bis an
+  // seine Unterkante (darunter kann mehr kleben, etwa die Alarmzone). Fiele die Messung aus, stünde
+  // hier 0, und ein Tabellenkopf bei y = 0, verdeckt unter dem Kopf, bestünde.
+  const kopfleiste = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+  expect(oben, 'Vorbedingung: der Rahmen reicht bis unter die Kopfleiste').toBeGreaterThanOrEqual(
+    kopfleiste.y + kopfleiste.height - 0.5,
+  );
   expect(
     Math.abs(kopfNach.y - oben),
     `Kopfzeile steht unter dem Rahmen bei ${oben} px (${kopfVor.y} → ${kopfNach.y})`,
@@ -314,6 +321,13 @@ test('Katalogtabelle bei 390 px: scrollt auch ohne Aktionsspalte in sich, Kopfze
   ).toBeGreaterThan((await rahmenOben(page)) + hoeheVor);
   const kopfNach = (await kopf.boundingBox())!;
   const oben = await rahmenOben(page);
+  // Vorbedingung: unter `md` klebt der Kopf (LLH-1728), der Rahmen reicht also mindestens bis an
+  // seine Unterkante (darunter kann mehr kleben, etwa die Alarmzone). Fiele die Messung aus, stünde
+  // hier 0, und ein Tabellenkopf bei y = 0, verdeckt unter dem Kopf, bestünde.
+  const kopfleiste = (await page.locator('[data-lfh="rahmen-kopf"]').boundingBox())!;
+  expect(oben, 'Vorbedingung: der Rahmen reicht bis unter die Kopfleiste').toBeGreaterThanOrEqual(
+    kopfleiste.y + kopfleiste.height - 0.5,
+  );
   expect(
     Math.abs(kopfNach.y - oben),
     `Kopfzeile steht unter dem Rahmen bei ${oben} px (${kopfVor.y} → ${kopfNach.y})`,

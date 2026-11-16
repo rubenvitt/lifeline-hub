@@ -404,7 +404,12 @@ for (const modus of ['light', 'dark'] as const) {
     // (2) SEITENGRUND — dieselben drei Rollen in der Verdichtungszeile.
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
-    await expect(page.getByRole('link', { name: 'Kräfteübersicht', exact: true })).toHaveCount(1);
+    // In der Zeile gesucht: die Einsatz-Navigation trägt seit LLH-1732 einen gleichnamigen Link.
+    await expect(
+      page
+        .locator('[data-lfh="verdichtungszeile"]')
+        .getByRole('link', { name: 'Kräfteübersicht', exact: true }),
+    ).toHaveCount(1);
     for (const m of ZEILEN_ZAHLEN) {
       // In der Zeile gesucht: der Zählerstreifen der Tabelle schreibt dieselben Wörter (LFH-973).
       const ziel = page.locator('[data-lfh="verdichtungszeile"]').getByText(m);

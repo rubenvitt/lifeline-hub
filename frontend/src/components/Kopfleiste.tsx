@@ -361,6 +361,8 @@ export const SYNC_DARSTELLUNG: Record<Exclude<SyncZustand, 'ruhe'>, SyncDarstell
  * Fall `aria-label` und `title`.
  *
  * `kompakt` (unter `md`): nur Icon, auch bei Störung; das Wort steht in der Betriebszeile.
+ * `zelle`: die Polsterung der Nachbarzellen, ohne das Wort zu nehmen (Gerätekopf unter `md`, der
+ * keine Betriebszeile hat und das Wort selbst tragen muss).
  */
 export function syncZeigtWort(zustand: Exclude<SyncZustand, 'ruhe'>, kompakt: boolean): boolean {
   if (kompakt) return false;
@@ -370,9 +372,11 @@ export function syncZeigtWort(zustand: Exclude<SyncZustand, 'ruhe'>, kompakt: bo
 export function SyncAnzeige({
   liveErwartet,
   kompakt = false,
+  zelle,
 }: {
   liveErwartet: boolean;
   kompakt?: boolean;
+  zelle?: { padding: number };
 }) {
   const { token } = theme.useToken();
   const { benutzer } = useAuth();
@@ -394,7 +398,7 @@ export function SyncAnzeige({
       role="img"
       aria-label={satz}
       title={satz}
-      style={kopfZelleStil(kompakt ? { padding: token.paddingXS } : token)}
+      style={kopfZelleStil(zelle ?? (kompakt ? { padding: token.paddingXS } : token))}
     >
       <span aria-hidden="true" style={{ display: 'inline-flex', color: d.farbe }}>
         <Icon size={16} />
