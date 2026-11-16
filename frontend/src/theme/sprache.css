@@ -303,8 +303,9 @@
   outline-offset: 2px;
 }
 /* Startfokus auf der GRUPPE (eon26eat D8): ein eigener Ring um alle Kacheln, damit keine einzelne
-   wie vorausgewählt aussieht. Auch bei programmatischem Fokus, denn die Erfassung setzt ihn. */
-.lfh-sichtungswahl:focus {
+   wie vorausgewählt aussieht. Nur `:focus-visible`: ein Tipp in die Lücke zwischen zwei Kacheln
+   (oder Safari, das den Fokus beim Tipp an die Gruppe gibt) zeichnet keinen Ring. */
+.lfh-sichtungswahl:focus-visible {
   outline: 2px solid var(--lfh-bedien);
   outline-offset: 4px;
 }

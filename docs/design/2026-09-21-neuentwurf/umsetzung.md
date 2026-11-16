@@ -56,6 +56,15 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
 
 ## Palette Nachtbetrieb (aus den Inline-Styles)
 
+> **Nachtrag 16.11.2026 (Change `eon26eat-farbe-entlasten`, LLH-1720):** Die Flächen unten sind
+> der Stand des Entwurfs. Seither gelten **vier Flächenstufen** je Modus mit mindestens
+> 1,10 : 1 je Schritt (D5): nachts `grund` = `paneel` `#08090b`, `kopf` = `flaeche` `#151719`,
+> `flaeche2` `#1f2123`, `flaeche3` `#27292b`; der dauerdunkle Rahmen (Kopfzeile, Rail) behält
+> `#0c0e11`/`#16191d`/`#14171b`. Die Textstufen, der Steuerrahmen und die Berichtigungskante
+> (`#d41b25`) sind dazu nachgezogen. „gebunden“ (auch „Anfahrt“, „Einsatzort“) ist neutral
+> (Spec `statusrollen`). Maßgeblich für die Werte sind `frontend/src/theme/tokens.ts` und
+> `rollen.css`, nicht diese Tabelle.
+
 | Rolle | Wert | Verwendung im Entwurf |
 |---|---|---|
 | grund | `#08090b` | Seitengrund, Inhaltsfläche |
@@ -73,7 +82,7 @@ Shell-Rahmen · neue Bausteine · neu gedachte Screens.
 | bedien | `#4d94d6` (Hover `#7db3e8`) | Primärknopf, Fokus, aktive Modulmarke, Links |
 | marke | `#a8071a` | Quadrat der Bildmarke, SK-I-Balken, akut (aktive Rail-Marke seit `eon26eat-farbe-entlasten` D7 in bedien) |
 | alarm (Text) | `#ff6b6b` | überfällig, Ausfall |
-| achtung (Text) | `#e8cc3a` | Warnstufe hoch, Anfahrt |
+| achtung (Text) | `#e8cc3a` | Warnstufe hoch (Anfahrt seit `eon26eat-farbe-entlasten` neutral) |
 | normal | `#52c41a` / Text `#7ddc4a` | einsatzbereit, SYNC |
 | bedien-Text auf Fläche | `#8ec2f0` | (Nachtrag 16.11.2026: „gebunden/Einsatzort“ ist seit `eon26eat-farbe-entlasten` D1 neutral, Spec `statusrollen`) |
 | Statusflächen | normal `#0d1a0a` · achtung `#1c1705` · alarm `#1c0a0d` · bedien `#0d1620` | Statuszelle/Status-Chip |

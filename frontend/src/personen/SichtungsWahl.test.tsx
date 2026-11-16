@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { Sichtungskategorie } from '../api/types';
 import { renderMitProviders } from '../test/utils';
-import { farbenDunkel, sichtungsfarben, sichtungsflaechen } from '../theme/tokens';
+import { farbenHell, sichtungsfarben, sichtungsflaechen, sichtungsToenung } from '../theme/tokens';
 import SichtungsWahl, { sichtungsFlaecheStil, sichtungsLuecke } from './SichtungsWahl';
 
 /** Ein kontrollierter Rahmen wie im `Form.Item`: der Wert lebt außen. */
@@ -91,7 +91,9 @@ describe('SichtungsWahl — Wahl und Zustand', () => {
     // Nicht gewählt behält die Farbe (eon26eat D8, Spec `sichtungswahl`): 4-px-Innenrahmen in
     // der Anzeigefarbe auf getönter Fläche, kein 8-px-Streifen mehr.
     expect(sk1.style.backgroundColor).not.toBe(rgb(sichtungsflaechen.rot.flaeche));
-    expect(sk1.style.backgroundColor).not.toBe(rgb(farbenDunkel.flaeche));
+    // Die Test-Provider rendern hell: getönt heißt, nicht der helle Grund der Maske.
+    expect(sk1.style.backgroundColor).not.toBe(rgb(farbenHell.flaeche));
+    expect(sk1.style.backgroundColor).toBe(rgb(sichtungsToenung('rot', farbenHell.flaeche)));
     expect(sk1.style.boxShadow).toBe(`inset 0 0 0 4px ${sichtungsfarben.rot}`);
     expect(sk1.style.borderInlineStart).not.toContain('8px');
     expect(sk1).toBeEnabled();

@@ -430,7 +430,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 **Farbachsen** (Vertrag `theme/statusFarben.ts`)
 
 - **Betroffene** (LFH-455, `StatusTag`, Rand-Form über `darstellungsart="rand"`): Personenstatus neutral, „vermisst" `achtung`; Schaden
-  „offen" `achtung`, „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
+  „offen" neutral (Eingang, Spec `statusrollen`), „übergeben" `bedien`, „abgeschlossen" neutral; Ausmaß „gering" neutral,
   „mittel"/„groß" `achtung`, „katastrophal" `alarm`.
 - **Lagezustand** (LFH-608, `abschnittLagezustand`): planmäßig `normal`, angespannt `achtung`,
   kritisch `alarm`; nicht beurteilt = leeres Feld. Nur der Wechsel schreibt System-ETB. Im
@@ -1019,7 +1019,8 @@ anwendbar), „nicht geprüft" ist keins.
   Normalbetriebs (unterwegs, eingesetzt, eingegangen, läuft planmäßig) trägt nie Gelb: „gebunden“
   ist überall `neutral` und kommt immer aus `statusKategorie`, nie fest in einer Seite; der
   Eingang „Neu“/„Offen“ ist neutral mit leiser Kante (`linieStark`), Dringliches zeigt die
-  Priorität. Einzige Ausnahme an der Kategorie vorbei: der Sprechwunsch (FMS 5 und 0) ist gelb;
+  Priorität. Die ZAHL der noch nicht gesichteten Meldungen (Kennzahl „Unbearbeitet“) bleibt
+  dagegen gelb: gezählt ist sie Handlungsbedarf (Entscheidung 16.11.2026). Einzige Ausnahme an der Kategorie vorbei: der Sprechwunsch (FMS 5 und 0) ist gelb;
   wer den Status EINES Fahrzeugs oder einer Einheit färbt, geht über `fahrzeugStatusRolle` bzw.
   `kategorieDarstellung` (`theme/statusFarben.ts`). Herleitung:
   `openspec/changes/eon26eat-farbe-entlasten/design.md` (D1–D4).
@@ -1101,8 +1102,9 @@ und `pages/personen/`.
   nur „wieder aktiv“; was inzwischen anders gebunden ist, lässt es aus und nennt es im
   `SeitenHinweis`, statt es still zu überschreiben (Vorbedingung `nur_wenn_frei` beim Zuordnen,
   LLH-1722). Lücken stehen bei „Beenden: Verb, Ort und Sicherung je Art“.
-- **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`colorError` vor `colorWarning`; prüfbar
-  über `data-alarm`/`data-unbearbeitet`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
+- **Linker Kartenrand: EINE Farbe, Gefahr gewinnt** (`alarm` vor dem Eingang in `linieStark`,
+  sonst `linie`; prüfbar über `data-alarm`/`data-unbearbeitet`; der Eingang ist neutral, Spec
+  `statusrollen`). „unbearbeitet" sitzt am `StatusDeskriptor`, keine
   fünfte `KommPhase`.
 - **Speicherfehler an die Seite, Erfolg an den Toast** (LFH-1077): der Grund einer Ablehnung
   steht am Ort der Handlung, bis zum nächsten Absenden (mittesten): im Dialog über `speicherung`

@@ -81,6 +81,8 @@ describe('IconRail', () => {
     const aktiv = screen.getByRole('button', { name: 'Lage' });
     // Die Marke ist die Bedienrolle des Rahmens, nicht die Alarm- und nicht die Markenrolle.
     expect(aktiv.style.boxShadow).toContain('2px 0 0');
+    // Die Farbe am Element, nicht nur an der Konstante: die Bedienrolle des Rahmens.
+    expect(aktiv.style.boxShadow).toContain(rahmenFarben.bedien);
     expect(rahmenFarben.bedien).toBe(farbenDunkel.bedien);
     expect(rahmenFarben.bedien).not.toBe(alarm);
     expect(rahmenFarben.bedien).not.toBe(farbenDunkel.marke);
