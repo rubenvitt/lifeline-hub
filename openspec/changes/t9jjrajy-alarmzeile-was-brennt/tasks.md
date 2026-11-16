@@ -94,8 +94,9 @@ Zunder: LLH-1743 (t9jjrajy). Freigegeben 16.11.2026 mit D6 = B (Monitor ohne Aus
 - [x] 5.3 Anwenderdoku: `docs/anwender/kapitel/ueberblick.md`, `lagebild.md`, `lagemonitor.md`
   (Zeile, Rollen der Seiten, entfallene Kennzahlen), Bilder über den Bildlauf erneuern;
   Doku-Wächter grün (`docs/anwender/AGENTS.md`).
-- [ ] 5.4 Folgeaufgabe per `zunder-task-anlegen`: Ausfall-Regel an den Server, damit der Monitor
-  sie zeigt (D6 B), an LLH-1746 hängen; Link im PR.
+- [x] 5.4 Folgeaufgabe per `zunder-task-anlegen`: Ausfall-Regel an den Server, damit der Monitor
+  sie zeigt (D6 B), an LLH-1746 hängen; Link im PR. Angelegt: LLH-1929
+  (https://zunder.rubeen.dev/#/aufgabe/t31o93c2k279hpnglvh99q6y).
 - [ ] 5.5 `./scripts/check-all.sh --geaendert --ohne-e2e` grün;
   `mise exec -- openspec validate t9jjrajy-alarmzeile-was-brennt --strict` grün.
 
