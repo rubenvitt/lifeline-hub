@@ -101,6 +101,7 @@ pub struct LagemonitorZone {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct LagemonitorGefahrengebiet {
     /// Bezeichnung des Gefahrengebiets (nicht die Beschriftung der Zone), falls gesetzt.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bezeichnung: Option<String>,
     /// Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste.
     pub warnstufe: crate::gefahr::Warnstufe,

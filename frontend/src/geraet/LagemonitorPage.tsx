@@ -341,7 +341,8 @@ function Kacheln({ lage, sk1Neu }: { lage: LagemonitorAnzeige; sk1Neu: boolean }
   const k = lage.kraefte;
   const s = k.staerke;
   // Überbelegte zuerst (LLH-1746), dann die vollsten: passt nicht jede UHS in die Kachel, fehlen
-  // die leeren, nie eine überbelegte hinter „+n weitere“.
+  // zuerst die leeren. Eine überbelegte fällt nur hinter „+n weitere“, wenn mehr als sechs es sind;
+  // die Titelzeile zählt dann trotzdem alle.
   const uhsSichtbar = [...lage.uhs]
     .sort(
       (x, y) =>

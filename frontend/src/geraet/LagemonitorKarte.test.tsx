@@ -241,6 +241,47 @@ describe('LagemonitorKarte Marken (LLH-1746)', () => {
     expect(absperrung.dataset.rolle).toBeUndefined();
   });
 
+  it('ein langer Name wird gekürzt, die Stufe bleibt ganz stehen', async () => {
+    const lang = 'Hangrutsch am Hang hinter der Grundschule Kirchberg Richtung Ortsausgang Nord';
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={{ lat: 52.52, lon: 13.405 }}
+        uhs={[]}
+        zonen={[
+          {
+            id: 1,
+            typ: 'gefahrengebiet',
+            geometrie: POLY,
+            gebiet: { bezeichnung: lang, warnstufe: 'hoch', bestaetigt: false },
+          },
+        ]}
+      />,
+    );
+    await waitFor(() => expect(marke('monitor-zone')).toHaveLength(1));
+    const [gebiet] = marke('monitor-zone');
+    const name = gebiet.querySelector<HTMLElement>('[data-lfh="monitor-zone-name"]')!;
+    const stufe = gebiet.querySelector<HTMLElement>('[data-lfh="monitor-zone-stufe"]')!;
+    expect(name).toHaveTextContent(lang);
+    expect(name.style.textOverflow).toBe('ellipsis');
+    expect(name.style.overflow).toBe('hidden');
+    expect(name.style.maxWidth).toBe('448px');
+    expect(stufe).toHaveTextContent('· hoch · unbestätigt');
+    expect(stufe.style.flexShrink).toBe('0');
+  });
+
+  it('ohne Zonenbeschriftung (Lagebild für Externe) keine Zonenmarken', async () => {
+    renderMitProviders(
+      <LagemonitorKarte
+        einsatzort={{ lat: 52.52, lon: 13.405 }}
+        uhs={[]}
+        zonen={[{ id: 2, typ: 'absperrbereich', geometrie: POLY }]}
+        zonenBeschriften={false}
+      />,
+    );
+    await waitFor(() => expect(karte.marker).toBe(1));
+    expect(marke('monitor-zone')).toHaveLength(0);
+  });
+
   it('zeigt an der UHS Belegte und Plätze, überbelegt in der Alarmrolle', async () => {
     const uhs = (id: number, bezeichnung: string, belegt: number, plaetze: number) => ({
       id,
@@ -265,6 +306,11 @@ describe('LagemonitorKarte Marken (LLH-1746)', () => {
     expect(turnhalle.dataset.ueberbelegt).toBe('ja');
     expect(schule).toHaveTextContent('Schule · 5/5');
     expect(schule.dataset.ueberbelegt).toBe('nein');
+    // Die Alarmrolle selbst: Rand und Fläche unterscheiden sich von der vollen, nicht überbelegten.
+    expect(turnhalle.style.borderColor).not.toBe(schule.style.borderColor);
+    expect(turnhalle.style.background).not.toBe(schule.style.background);
+    expect(turnhalle.style.color).not.toBe(schule.style.color);
+    expect(zelt.style.borderColor).toBe(schule.style.borderColor);
     expect(zelt).toHaveTextContent('Zelt · 2');
     expect(zelt.dataset.ueberbelegt).toBe('nein');
   });

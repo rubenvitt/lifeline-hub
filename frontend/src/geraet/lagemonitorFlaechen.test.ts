@@ -169,7 +169,7 @@ describe('zonenMarkenText (Spec `lagemonitor`, „Gefahrenzonen mit Name und War
       zonenMarkenText(
         zone({ gebiet: { bezeichnung: null, warnstufe: 'keine', bestaetigt: true } }),
       ),
-    ).toBe('Gefahrengebiet · keine');
+    ).toBe('Gefahrengebiet · keine Stufe');
     expect(zonenMarkenText(zone({}))).toBe('Gefahrengebiet');
   });
   it('Absperrung und Sperrgebiet: nur das Artwort', () => {

@@ -61,11 +61,12 @@ der Name des Beurteilenden wird nicht übernommen.
 ### D2 Beschriftung als DOM-Marke, Text aus einer reinen Funktion
 
 `lagemonitorFlaechen.ts` liefert neben den Abschnittsmarken Zonenmarken `{ id, text, rolle,
-lat, lon }`: Text „<Bezeichnung oder ‚Gefahrengebiet‘> · <warnstufeKarte[stufe].label>“, bei
+lat, lon }`: Text „<Bezeichnung oder ‚Gefahrengebiet‘> · <stufenWort(stufe)>“ (das Wort der Lagekarte: „keine Stufe“, nie „keine“), bei
 `bestaetigt = false` „ · unbestätigt“ (`UNBESTAETIGT` aus `pages/gefahren/beurteilung.ts`);
 Absperrbereich, Absperrgrenze und Sperrgebiet `zoneTypLabel(typ)`; eine Gefahrengebiet-Zone ohne
 `gebiet` „Gefahrengebiet“ ohne Stufe (wie die Lagekarte: ohne Gebiet keine Stufe). Ort: Schwerpunkt
-des Polygons (`polygonZentroid`), bei einer Linie die Mitte zwischen ihren mittleren Stützpunkten. Die Karte zeichnet sie
+des Polygons (`polygonZentroid`), bei einer Linie die Mitte zwischen ihren mittleren Stützpunkten. Ein langer Name wird in der Marke gekürzt (höchstens 16 Schriftgrößen breit), die Stufe bleibt
+ganz stehen. Die Karte zeichnet sie
 wie die Abschnittsmarken in `schrift` (28 px am Monitor), Rand in der Rolle der Stufe
 (`rollenFarbe`), Text in `rollen.text`.
 
@@ -80,6 +81,13 @@ wie die Abschnittsmarken in `schrift` (28 px am Monitor), Rand in der Rolle der 
 Hat eine Zone `gebiet`, nimmt `baueMonitorFlaechen` den Stil aus `gefahrengebietStil(warnstufe,
 token)`; sonst `zoneStil(typ, null)` wie bisher. Den Token reicht `LagemonitorKarte` aus
 `useRollen()` hinein, damit die Funktion rein bleibt (wie `useLagekarteDaten`).
+
+### D3a Live: das Ereignis `gefahr` frischt das Lagebild des Monitors auf
+
+Warnstufe, Bestätigung und Name ändern sich über die Gefahren-Routen, die nur `gefahr` verteilen.
+Der Monitor liest das Modul `gefahrenzonen` und bekommt das Ereignis; `EINSATZ_STREAM_EVENTS.gefahr`
+nimmt deshalb `EINSATZ_KEYS.lagemonitor` auf, wie `lage_zone` seit LLH-1153. Ohne das stünde eine
+neue Stufe bis zum nächsten 30-s-Abruf alt an der Wand.
 
 ### D4 Überbelegung: eine Regel, drei Stellen
 
@@ -98,7 +106,8 @@ Rand und Text in `rollen.alarmText` (dieselbe Alarmfläche wie die Zahl in der K
 
 ### D5 Lagebild für Externe
 
-`extern/lagebildKarte.ts` setzt kein `gebiet`: die Zonen dort bleiben unbeschriftet und im
+`extern/lagebildKarte.ts` setzt kein `gebiet`, und die Seite schaltet die Zonenmarken ab
+(`zonenBeschriften={false}` an `LagemonitorKarte`): die Zonen dort bleiben unbeschriftet und im
 statischen Stil, wie heute. Die UHS-Marke mit `belegt/plaetze` und Alarmrolle gilt dort mit,
 weil die Feature-Form `plaetze` schon trägt; das ist dieselbe Information wie in der UHS-Liste
 dieser Seite und kein neues Feld.

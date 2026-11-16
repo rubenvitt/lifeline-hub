@@ -14,7 +14,12 @@ import {
   type FlaechenFeatureCollection,
   type ZonenFeatureCollection,
 } from '../pages/lagekarte/kartenLayer';
-import { gefahrengebietStil, zoneStil, zoneTypLabel } from '../pages/lagekarte/zonenStil';
+import {
+  gefahrengebietStil,
+  stufenWort,
+  zoneStil,
+  zoneTypLabel,
+} from '../pages/lagekarte/zonenStil';
 import { warnstufeKarte, type Statusrolle } from '../theme/statusFarben';
 
 /** Beschriftung einer Abschnittsfläche auf dem Monitor, am Schwerpunkt der Fläche. */
@@ -32,6 +37,9 @@ export interface MonitorAbschnittMarke {
 export interface MonitorZonenMarke {
   id: number;
   text: string;
+  /** Name und Stufe getrennt ({@link zonenMarkenTeile}). */
+  name: string;
+  stufe: string | null;
   rolle: Statusrolle | null;
   lat: number;
   lon: number;
@@ -47,19 +55,28 @@ export interface MonitorFlaechen {
 }
 
 /**
- * Text der Marke einer Gefahrenzone (LLH-1746, Spec `lagemonitor`, „Gefahrenzonen mit Name und
- * Warnstufe“): ein Gefahrengebiet mit der Bezeichnung seines Gebiets (sonst „Gefahrengebiet“), der
- * Stufe im Wort der Lagekarte (`warnstufeKarte`) und „unbestätigt“, solange niemand die Beurteilung
- * bestätigt hat. Ohne Gebiet fehlt die Stufe wie auf der Lagekarte. Absperrungen und Sperrgebiete
- * tragen ihr Artwort; den Freitext einer Zone kennt der Monitor nicht.
+ * Teile der Marke einer Gefahrenzone (LLH-1746, Spec `lagemonitor`, „Gefahrenzonen mit Name und
+ * Warnstufe“): `name` ist bei einem Gefahrengebiet die Bezeichnung seines Gebiets (sonst
+ * „Gefahrengebiet“), `stufe` die Stufe im Wort der Lagekarte (`stufenWort`: „keine Stufe“, nie
+ * „keine“, das läse sich als „keine Gefahr“) und „unbestätigt“, solange niemand die Beurteilung
+ * bestätigt hat. Ohne Gebiet ist `stufe` `null` wie auf der Lagekarte. Absperrungen und
+ * Sperrgebiete tragen ihr Artwort; den Freitext einer Zone kennt der Monitor nicht. Getrennt, damit
+ * die Karte einen langen Namen kürzen kann, ohne die Stufe zu verlieren.
  */
-export function zonenMarkenText(zone: LagemonitorZone): string {
+export function zonenMarkenTeile(zone: LagemonitorZone): { name: string; stufe: string | null } {
   const gebiet = zone.gebiet;
-  if (zone.typ !== 'gefahrengebiet' || !gebiet) return zoneTypLabel(zone.typ);
+  if (zone.typ !== 'gefahrengebiet' || !gebiet)
+    return { name: zoneTypLabel(zone.typ), stufe: null };
   const name = gebiet.bezeichnung?.trim() || zoneTypLabel('gefahrengebiet');
-  const teile = [name, warnstufeKarte[gebiet.warnstufe].label];
-  if (!gebiet.bestaetigt) teile.push(UNBESTAETIGT);
-  return teile.join(' · ');
+  const stufe = [stufenWort(gebiet.warnstufe)];
+  if (!gebiet.bestaetigt) stufe.push(UNBESTAETIGT);
+  return { name, stufe: stufe.join(' · ') };
+}
+
+/** Die ganze Marke als ein Text: „Hangrutsch Kirchberg · hoch · unbestätigt“. */
+export function zonenMarkenText(zone: LagemonitorZone): string {
+  const { name, stufe } = zonenMarkenTeile(zone);
+  return stufe ? `${name} · ${stufe}` : name;
 }
 
 /**
@@ -115,6 +132,7 @@ export function baueMonitorFlaechen(
       zonenMarken.push({
         id: z.id,
         text: zonenMarkenText(z),
+        ...zonenMarkenTeile(z),
         rolle: stufe ? warnstufeKarte[stufe].rolle : null,
         lon: ort[0],
         lat: ort[1],

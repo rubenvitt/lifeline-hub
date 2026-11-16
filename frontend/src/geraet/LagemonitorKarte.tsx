@@ -83,6 +83,7 @@ export default function LagemonitorKarte({
   abschnitte = [],
   schrift = GROSS_TEXT,
   bedienbar = false,
+  zonenBeschriften = true,
   anfrage = absolutiereProxyAnfrage,
 }: {
   einsatzort: MonitorPunkt | null;
@@ -93,6 +94,11 @@ export default function LagemonitorKarte({
   schrift?: number;
   /** Verschieben und Zoomen zulassen. */
   bedienbar?: boolean;
+  /**
+   * Gefahrenzonen mit Name und Stufe beschriften (LLH-1746). Das Lagebild für Externe lässt sie
+   * unbeschriftet (design.md D5 der Change `m4i2toor-lagemonitor-zonen-ueberbelegung`).
+   */
+  zonenBeschriften?: boolean;
   /** `transformRequest` der Karte; die Vorgabe absolutiert die Proxy-Adressen. */
   anfrage?: (url: string) => maplibregl.RequestParameters;
 }) {
@@ -240,12 +246,13 @@ export default function LagemonitorKarte({
       });
       neu.push(new maplibregl.Marker({ element: el }).setLngLat([a.lon, a.lat]));
     }
-    for (const z of flaechen.zonenMarken) {
+    for (const z of zonenBeschriften ? flaechen.zonenMarken : []) {
       const el = document.createElement('div');
-      el.textContent = z.text;
       el.setAttribute('data-lfh', 'monitor-zone');
+      el.setAttribute('aria-label', z.text);
       if (z.rolle) el.setAttribute('data-rolle', z.rolle);
       Object.assign(el.style, {
+        display: 'flex',
         fontSize: `${schrift}px`,
         fontWeight: '600',
         padding: '2px 10px',
@@ -255,6 +262,23 @@ export default function LagemonitorKarte({
         color: rollen.text,
         border: `2px solid ${z.rolle ? rollenFarbe(z.rolle, token) : rollen.linieStark}`,
       });
+      // Ein langer Name (Freitext bis 200 Zeichen) wird gekürzt; die Stufe bleibt ganz stehen.
+      const name = document.createElement('span');
+      name.textContent = z.name;
+      name.setAttribute('data-lfh', 'monitor-zone-name');
+      Object.assign(name.style, {
+        maxWidth: `${schrift * 16}px`,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      });
+      el.append(name);
+      if (z.stufe) {
+        const stufe = document.createElement('span');
+        stufe.textContent = `\u00a0· ${z.stufe}`;
+        stufe.setAttribute('data-lfh', 'monitor-zone-stufe');
+        stufe.style.flexShrink = '0';
+        el.append(stufe);
+      }
       neu.push(new maplibregl.Marker({ element: el }).setLngLat([z.lon, z.lat]));
     }
     for (const u of verortet) {
@@ -287,6 +311,7 @@ export default function LagemonitorKarte({
     dunkel,
     rollen,
     schrift,
+    zonenBeschriften,
   ]);
 
   if (!ausschnitt) {
