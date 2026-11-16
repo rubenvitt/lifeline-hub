@@ -459,7 +459,9 @@ export function baueFernmeldenetz(q: FernmeldenetzQuellen): Fernmeldenetz {
 
   const abschnitte = q.abschnitte.daten;
   const einheiten = q.einheiten.zustand === 'daten' ? q.einheiten.daten : null;
-  const org = baueFuehrungsorganisation(abschnitte, einheiten);
+  // Wie der Funkplan: eine abgestellte Untereinheit bleibt am Führungsweg ihres Verbands
+  // (LLH-1744); nur das Organigramm hängt sie unter ihren Abschnitt.
+  const org = baueFuehrungsorganisation(abschnitte, einheiten, { abgestellteLoesen: false });
   const abschnittJeId = new Map(abschnitte.map((a) => [a.id, a]));
   const einheitJeId = new Map((einheiten ?? []).map((e) => [e.id, e]));
 

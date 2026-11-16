@@ -78,6 +78,11 @@ function gruppiere<T, K>(liste: readonly T[], schluessel: (x: T) => K): Map<K, T
 export function baueFuehrungsorganisation(
   abschnitte: readonly Einsatzabschnitt[],
   einheiten: readonly Einheit[] | null,
+  /**
+   * `false`: abgestellte Untereinheiten bleiben am Verband (Fernmeldeskizze, wie der Funkplan,
+   * LLH-1744). Vorgabe `true`: das Organigramm hängt sie wie das Meldebild unter ihren Abschnitt.
+   */
+  { abgestellteLoesen = true }: { abgestellteLoesen?: boolean } = {},
 ): Fuehrungsorganisation {
   const einheitenFehlen = einheiten == null;
   const alleEinheiten = einheiten ?? [];
@@ -85,7 +90,7 @@ export function baueFuehrungsorganisation(
   const gesehen = new Set<string>();
 
   const einheitIds = new Set(alleEinheiten.map((e) => e.id));
-  const abgestellt = abgestelltVon(alleEinheiten);
+  const abgestellt = abgestellteLoesen ? abgestelltVon(alleEinheiten) : () => undefined;
   const istUntereinheit = (e: Einheit) =>
     e.ueber_einheit_id != null && einheitIds.has(e.ueber_einheit_id) && !abgestellt(e);
   const untereinheiten = gruppiere(
