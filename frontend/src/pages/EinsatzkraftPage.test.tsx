@@ -334,7 +334,7 @@ describe('EinsatzkraftPage – Einteilung (3.2)', () => {
 
   it('springt ins Meldebild und in die Einheit', async () => {
     renderAnsicht();
-    expect(await screen.findByRole('link', { name: /Meldebild/ })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: /Kräfteübersicht/ })).toHaveAttribute(
       'href',
       '/einsaetze/7/kraefteuebersicht',
     );

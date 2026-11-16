@@ -356,7 +356,8 @@ export default function ChatPage() {
       typ: EtbTyp;
       text: string;
       anhangIds: number[];
-    }) => heraufstufenZuEtb(v.einsatzId, v.nid, v.typ, v.text, v.anhangIds),
+      inMeldungseingang: boolean;
+    }) => heraufstufenZuEtb(v.einsatzId, v.nid, v.typ, v.text, v.anhangIds, v.inMeldungseingang),
     onSuccess: (_daten, v) => {
       invalidiereNachrichten(v.einsatzId);
       setHeraufstufenAuswahl(null);
@@ -676,10 +677,13 @@ export default function ChatPage() {
         offen={heraufstufen !== null}
         nachricht={heraufstufen}
         senden={heraufstufenSpeicherung.isPending}
+        // Mit Meldung schreibt die Heraufstufung auch in die Meldungen (y3zh5ymv D8): deren
+        // Freigabe entscheidet, ob der Dialog es anbietet; der Server prüft sie selbst (403).
+        meldungenFrei={!istGesperrt('meldungen')}
         onAbbrechen={() => setHeraufstufenAuswahl(null)}
         // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn der Eintrag angekommen
         // ist.
-        onHeraufstufen={(typ, text, anhangIds) =>
+        onHeraufstufen={(typ, text, anhangIds, inMeldungseingang) =>
           heraufstufen
             ? heraufstufenMutation.mutateAsync({
                 einsatzId,
@@ -687,6 +691,7 @@ export default function ChatPage() {
                 typ,
                 text,
                 anhangIds,
+                inMeldungseingang,
               })
             : Promise.reject(new Error('Keine Quellnachricht'))
         }

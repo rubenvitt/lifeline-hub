@@ -343,6 +343,59 @@ describe('MeldungenPage', () => {
     expect(screen.queryByText('Florian Nord 1')).not.toBeInTheDocument();
   });
 
+  /**
+   * Schnellaktion „Meldung erfassen“ der Sprungpalette (Spec `meldungseingang`, „Das
+   * Meldungsformular öffnet sich über die Adresse“). Als Paar mit der Gegenaussage unten.
+   */
+  it('?neu=1 öffnet das Meldungsformular und räumt den Parameter', async () => {
+    renderPage('/einsaetze/1/meldungen?neu=1');
+    expect(
+      (await screen.findAllByRole('button', { name: 'Formular schließen' })).length,
+    ).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getByTestId('loc-search')).toHaveTextContent(/^$/));
+  });
+
+  it('ohne ?neu=1 bleibt das Formular zu', async () => {
+    renderPage();
+    expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Formular schließen' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * Der Riegel selbst (Review vor dem PR): ohne Recht verbraucht `?neu=1` den Auftrag, und ein
+   * später ankommendes Schreibrecht öffnet das Formular nicht nachträglich.
+   */
+  it('?neu=1 ohne Recht öffnet das Formular auch nicht, wenn das Recht danach kommt', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage('/einsaetze/1/meldungen?neu=1', client);
+    expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('loc-search')).toHaveTextContent(/^$/));
+
+    await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
+
+    expect(await screen.findByRole('button', { name: 'Meldung erfassen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Formular schließen' })).not.toBeInTheDocument();
+  });
+
+  it('?neu=1 öffnet für Beobachter nichts, räumt aber den Parameter', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1,
+      bezeichnung: 'Lage',
+      status: 'aktiv',
+      meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    renderPage('/einsaetze/1/meldungen?neu=1');
+    expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('loc-search')).toHaveTextContent(/^$/));
+    expect(screen.queryByRole('button', { name: 'Formular schließen' })).not.toBeInTheDocument();
+  });
+
   it('Beobachter sieht Posteingang, aber keine Erfassung', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValueOnce({
       id: 1,

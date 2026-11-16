@@ -108,7 +108,7 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/lageberichte/${id}`);
     // Alle Abschnitte stehen offen; die Übernahme steht im Kopf der Eigenen Lage.
     await page
-      .getByRole('button', { name: 'Aus Meldebild und Führungsorganisation übernehmen' })
+      .getByRole('button', { name: 'Aus Kräfteübersicht und Führungsorganisation übernehmen' })
       .click();
     const feld = page.getByRole('textbox', { name: 'Eigene Lage' });
     await expect(feld).not.toHaveValue('');

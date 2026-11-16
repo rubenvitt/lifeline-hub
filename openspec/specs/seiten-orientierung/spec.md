@@ -56,7 +56,7 @@ Einsatzrahmens mit „ÜBUNG · “ beginnen, vor einer Zählung ungelesener Ein
 
 ### Requirement: Ortspfad nennt den Einsatz und kürzt nur ihn
 
-Die Seiten Einsatzdaten, Meldebild, Lagekarte und Einsatz-Einstellungen SHALL einen Ortspfad
+Die Seiten Einsatzdaten, Kräfteübersicht, Lagekarte und Einsatz-Einstellungen SHALL einen Ortspfad
 „Einsätze › <Einsatz> ›“ vor ihrem h1 führen, das ETB nur „Einsätze ›“ (Kopf einzeilig bei
 1440 px). Einsatzdaten SHALL das h1 „Einsatzdaten“ tragen.
 Im Einsatzrahmen SHALL der Ortspfad erst ab `md` stehen; darunter nennt die Kopfleiste den
@@ -192,18 +192,19 @@ Wechsel zwischen Kapiteln MUST den Rückweg nicht ändern.
 
 Ein Klick auf eine andere Kategorie der Rail SHALL in das Modul dieser Kategorie führen, in dem
 die Person im selben Einsatz zuletzt war, jede Ankunft gezählt. Gemerkt wird je Person und Einsatz
-für zwölf Stunden. Ohne gültigen Eintrag oder wenn das gemerkte Modul gesperrt oder ausgeblendet
-ist, MUST der Klick ins erste freigegebene Modul der Kategorie führen.
+für zwölf Stunden. Ohne gültigen Eintrag, wenn das gemerkte Modul gesperrt oder ausgeblendet ist
+oder nicht mehr zur Kategorie gehört, MUST der Klick ins erste freigegebene Modul der Kategorie
+führen.
 
 #### Scenario: Zurück in die Kräfte
 
-- **WHEN** eine Person in Kräfte das Modul Ablösung öffnet, dann in Erfassung wechselt und wieder
+- **WHEN** eine Person in Kräfte das Modul Ablösung öffnet, dann in Betroffene & Schäden wechselt und wieder
   auf Kräfte klickt
 - **THEN** steht sie in Ablösung, nicht im ersten Modul der Kategorie
 
 #### Scenario: Ankunft über die Sprungpalette
 
-- **WHEN** eine Person über die Sprungpalette Ablösung öffnet, in Erfassung wechselt und dann auf
+- **WHEN** eine Person über die Sprungpalette Ablösung öffnet, in Betroffene & Schäden wechselt und dann auf
   Kräfte klickt
 - **THEN** steht sie in Ablösung
 
@@ -218,6 +219,12 @@ ist, MUST der Klick ins erste freigegebene Modul der Kategorie führen.
 - **WHEN** das zuletzt besuchte Modul einer Kategorie für die Person gesperrt worden ist und sie
   auf die Kategorie klickt
 - **THEN** steht sie im ersten freigegebenen Modul der Kategorie
+
+#### Scenario: Gemerktes Modul in eine andere Kategorie gewandert
+
+- **WHEN** für die Kategorie Betroffene & Schäden noch das ETB gemerkt ist, das jetzt zu Führung gehört, und
+  die Person auf Betroffene & Schäden klickt
+- **THEN** steht sie im ersten freigegebenen Modul der Kategorie Betroffene & Schäden
 
 #### Scenario: Anderer Einsatz, andere Person
 

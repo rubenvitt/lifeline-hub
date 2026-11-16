@@ -612,7 +612,7 @@ export function rendereMeldebildMarkdown(
   const v = bild.verdichtung;
   const zeilen: string[] = [];
 
-  zeilen.push('# Kräftemeldebild');
+  zeilen.push('# Kräfteübersicht');
   zeilen.push('');
   zeilen.push(`**Stand:** ${stand}`);
   zeilen.push('');

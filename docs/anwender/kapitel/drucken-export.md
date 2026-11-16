@@ -1,7 +1,7 @@
 ---
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
-reihenfolge: 150
+reihenfolge: 170
 quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css]
 ---
 
@@ -19,7 +19,7 @@ Gedruckt werden können unter anderem:
 - der Schichtplan als Aushang je Posten oder Schichtzettel je Person ([Ablösung](abloesung.md)),
 - das Blatt einer Person, als Druckansicht ([Betroffene und Sichtung](betroffene.md)),
 - Einsatzbefehle und Lageberichte,
-- Meldebild, Funkplan, Kommunikationsplan und das Organigramm der Einsatzabschnitte,
+- Kräfteübersicht, Funkplan, Kommunikationsplan und das Organigramm der Einsatzabschnitte,
 - der Ausschnitt der Lagekarte als Lageplan ([Lagekarte, Zeichnen und Messen](lagekarte.md)),
 - die Bewertung eines Gefahrengebiets mit ihren Erläuterungen ([Gefahren](gefahren.md)),
 - der Einsatzbericht („Einsatzbericht drucken“ in den Einsatzdaten),
@@ -82,11 +82,11 @@ Export sofort und meldet das an der Seite.
 ### Ein Dokument oder einen Plan drucken
 
 1. Den Einsatzbefehl, Lagebericht oder den Plan öffnen.
-2. „Drucken / als PDF“ wählen. Bei Dokumenten steht der Punkt im Kopf der Seite, bei Meldebild,
+2. „Drucken / als PDF“ wählen. Bei Dokumenten steht der Punkt im Kopf der Seite, bei Kräfteübersicht,
    Funkplan, Kommunikationsplan und Organigramm an der Ansicht selbst.
 3. Im Druckdialog des Browsers drucken oder als PDF speichern.
 
-Meldebild, Funkplan und Organigramm klappen zum Drucken alle Zweige auf.
+Kräfteübersicht, Funkplan und Organigramm klappen zum Drucken alle Zweige auf.
 
 ### Den Lageplan drucken
 

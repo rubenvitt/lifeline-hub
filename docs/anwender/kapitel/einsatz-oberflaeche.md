@@ -78,8 +78,9 @@ die Verwaltung (Kapitel [Stammdaten](stammdaten.md)); im Einsatz lassen sich die
 
 ### Ein Modul öffnen
 
-1. Links eine Kategorie wählen: „Führung“, „Kräfte“, „Erfass.“ (Erfassung), „Lage“, „Komm.“
-   (Kommunikation) oder unten „Einst.“ (Einstellungen). Die App springt in das Modul der
+1. Links eine Kategorie wählen: „Führung“, „Kräfte“ (Kräfte & Mittel), „Betroff.“ (Betroffene &
+   Schäden), „Lage“, „Komm.“ (Kommunikation) oder unten „Einst.“ (Einstellungen). Das ETB steht
+   unter „Führung“, direkt hinter dem Überblick. Die App springt in das Modul der
    Kategorie, das in diesem Einsatz zuletzt offen war, beim ersten Mal in ihr erstes Modul, und
    zeigt daneben ihre Module. Unter jedem Modul steht in bis zu zwei Zeilen, was es enthält.
 
@@ -352,7 +353,7 @@ bleibt. Dasselbe gilt in der Verwaltung.
 
 Einige Einträge der Modulliste sind **Sprungmarken** in eine Ansicht eines Moduls. Sie stehen
 eingerückt mit einer feinen Linie direkt unter diesem Modul: „Entscheidungen“ unter „ETB“
-(Kategorie „Erfassung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
+(Kategorie „Führung“, nur Entscheidungen), „Patienten“ und „Vermisste“ unter „Betroffene“,
 „FMS-Tableau“ unter „Fahrzeuge“, „Ohne Schicht“ unter „Ablösung“ sowie „Fernmeldeskizze“ und
 „Kommunikationsplan“ unter „Fernmeldewesen“ (Kategorie „Kommunikation“). Nach dem Sprung ist das
 Modul darüber hervorgehoben. Das
@@ -404,10 +405,24 @@ eigenes Kontextmenü an der Stelle, auf die gedrückt wurde.
 Ohne Eingabe stehen oben die zuletzt ausgeführten Befehle und die zuletzt geöffneten Module.
 Mit Eingabe sucht die Palette in Modulen, Ansichten (den Sprungmarken der Modulliste, etwa
 „Kommunikationsplan“ oder „Vermisste“), Schnellaktionen („Person erfassen“, „ETB-Eintrag schreiben“,
-„Anruf erfassen“ …), laufenden Einsätzen, Einstellungen und, ab zwei Zeichen, in den Datensätzen des
-Einsatzes: Personen, Fahrzeuge, Personal, Einheiten, Einträge des Einsatztagebuchs und weitere.
+„Meldung erfassen“, „Auftrag erteilen“, „Nachforderung stellen“, „Fahrzeugstatus setzen“, „Anruf
+erfassen“ …), laufenden Einsätzen, Einstellungen, der „Hilfe“ und, ab zwei Zeichen, in den
+Datensätzen des Einsatzes: Personen, Fahrzeuge (auch über Fahrzeugtyp und Kennzeichen), Personal
+(auch über die Funktion), Einheiten, Einträge des Einsatztagebuchs und weitere.
 Module und Ansichten, die der Einsatz nicht freigibt, fehlen; Schnellaktionen stehen nur dort, wo die eigene
 Rolle schreiben darf.
+
+Ein Treffer braucht für jedes getippte Wort einen Wortanfang oder, ab drei Zeichen, einen Teil
+eines Wortes; „rtw“ findet also Fahrzeuge vom Typ RTW, aber nicht die Lagekarte. Umlaute und ihre
+Umschrift gelten gleich („kraefte“ findet „Kräfte“). Module sind auch unter gängigen Abkürzungen
+und früheren Namen zu finden, etwa „BHP“ für die Unfallhilfsstellen, „Tagebuch“ für das ETB und
+„Meldebild“ für die Kräfteübersicht.
+
+Die Schnellaktionen stehen nach eigener Nutzung geordnet: was eine Person am häufigsten
+ausführt, steht oben, bei Gleichstand gilt die feste Folge (Person, ETB-Eintrag, Meldung,
+Lagemeldung, Auftrag, Nachforderung, Fahrzeugstatus, dann die übrigen). Die Zählung gehört der
+Person, nicht dem Gerät, und gilt deshalb an jedem Rechner. Solange die Palette offen ist, bleibt
+die Folge stehen.
 
 „Koordinaten: …“ in der Palette stellt das Koordinatenformat für dieses Gerät ein. Es gilt vor
 der Vorgabe des Einsatzes und der Organisation, bis eine andere Wahl getroffen wird.

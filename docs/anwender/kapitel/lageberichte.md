@@ -1,7 +1,7 @@
 ---
 titel: Lageberichte
 gruppen: [fuehrung]
-reihenfolge: 260
+reihenfolge: 420
 quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/useDokumentFreigabe.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
@@ -60,11 +60,11 @@ sie.
    oder eigener Text. Externe Stellen wie die übergeordnete Führung kommen mit „Externe Stelle
    hinzufügen“ dazu.
 5. Den Text in die Abschnitte schreiben. Im Lagevortrag zur Information steht im Kopf eines
-   Abschnitts ein Knopf, der Inhalte übernimmt, etwa „Aus Meldebild und Führungsorganisation
+   Abschnitts ein Knopf, der Inhalte übernimmt, etwa „Aus Kräfteübersicht und Führungsorganisation
    übernehmen“ in „Eigene Lage“. Sind dort Abschnitte leer, füllt „Leere Abschnitte aus dem
    Lagebild füllen“ über der Gliederung alle auf einmal; gefüllte bleiben, wie sie sind.
 
-   ![Entwurf mit Gliederung links und „Leere Abschnitte aus dem Lagebild füllen“ darüber, Titel, Zeitstand und Verteiler und den offenen Abschnitten, darin „Eigene Lage“ mit übernommenem Kräftemeldebild](../bilder/lageberichte/entwurf.png)
+   ![Entwurf mit Gliederung links und „Leere Abschnitte aus dem Lagebild füllen“ darüber, Titel, Zeitstand und Verteiler und den offenen Abschnitten, darin „Eigene Lage“ mit übernommener Kräfteübersicht](../bilder/lageberichte/entwurf.png)
 
 6. „Lesefassung“ oben im Entwurf zeigt den ganzen Bericht gesetzt, so wie er gedruckt wird;
    „Bearbeiten“ führt zu den Textfeldern zurück. Gedruckt wird, was gerade steht.
@@ -99,7 +99,7 @@ sie.
 | Abschnitt | Knopf | Was übernommen wird |
 | --- | --- | --- |
 | Gefahren-/Schadenlage | „Aus dem Lagebild übernehmen“ | Betroffene, Vermisste, Sichtung, offene Schäden, höchste Warnstufe, Gefahren je Gebiet mit Stufe und Erläuterung, Wetterwarnungen, Bedingungen am Einsatzort, Stand und Trend der Pegel (nur bei festgelegtem Pegel) |
-| Eigene Lage | „Aus Meldebild und Führungsorganisation übernehmen“ | Kräftemeldebild und Führungsorganisation des ganzen Einsatzes |
+| Eigene Lage | „Aus Kräfteübersicht und Führungsorganisation übernehmen“ | Kräfteübersicht und Führungsorganisation des ganzen Einsatzes |
 | Lageentwicklung | „Aus dem ETB übernehmen“ | neue Einträge seit der letzten Lagebesprechung je Typ, neue Entscheidungen mit Nummer und Zeit, eine berichtigte mit „berichtigt → Nr. …“ |
 | Besondere (Führungs-)Probleme | „Aus dem Führungsstand übernehmen“ | überfällige Aufträge, Meldungen mit überfälliger Bestätigung, ungesichtete Meldungen, Lücken im Funkplan |
 

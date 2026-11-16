@@ -1,7 +1,7 @@
 ---
 titel: Ablösung
 gruppen: [fuehrung]
-reihenfolge: 360
+reihenfolge: 280
 quellen: [src/abloesung/schichtplan/plan_repo.rs, frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, frontend/src/abloesung/beginnText.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/einsatz/sprungmarken.ts, openspec/specs/kraefte-abloesung/spec.md, src/schichtmodell/repo.rs, frontend/src/pages/EinsaetzePage.tsx, frontend/src/abloesung/schichtplan/SchichtplanAnsicht.tsx, frontend/src/abloesung/schichtplan/SchichtplanEditor.tsx, frontend/src/abloesung/schichtplan/SchichtplanRaster.tsx, frontend/src/abloesung/schichtplan/SchichtplanListe.tsx, frontend/src/abloesung/schichtplan/SchichtplanSchleuse.tsx, frontend/src/abloesung/schichtplan/zeilenSchleuse.ts, frontend/src/abloesung/schichtplan/SchichtplanPersonen.tsx, frontend/src/abloesung/schichtplan/SchichtplanBlockDialog.tsx, frontend/src/abloesung/schichtplan/blockMenue.ts, frontend/src/abloesung/schichtplan/raster.ts, frontend/src/abloesung/schichtplan/schichtplanZeilen.ts, frontend/src/api/schichtplan.ts, src/abloesung/schichtplan/pruefung.rs, frontend/src/abloesung/lautPlan.ts, src/abloesung/schichtplan/kopplung.rs, frontend/src/abloesung/schichtplan/SchichtenErzeugenDialog.tsx, src/abloesung/schichtplan/repo.rs, src/abloesung/schichtplan/zerlegung.rs, frontend/src/abloesung/schichtplan/SchichtplanEinlesen.tsx, src/abloesung/schichtplan/uebernahme/datei.rs, src/abloesung/schichtplan/uebernahme/abgleich.rs, src/abloesung/schichtplan/uebernahme/repo.rs, frontend/public/beispiele/schichtplan-stadtfest.csv, frontend/src/pages/SchichtplanDruckPage.tsx, frontend/src/abloesung/schichtplan/ausgabe/, frontend/src/abloesung/schichtplan/SchichtplanWechselDialog.tsx, src/abloesung/schichtplan/vollzug.rs, src/abloesung/schichtplan/ausgabe/, src/routes/abloesung_schichtplan.rs, frontend/src/abloesung/schichtplan/GrenzwerteZeile.tsx, frontend/src/abloesung/grenzwerte.ts, frontend/src/abloesung/schichtplan/SchichtplanWechselLeiste.tsx, src/abloesung/schichtplan/wechselpunkte.rs, frontend/src/abloesung/schichtplan/HelferListe.tsx, src/abloesung/repo/lesen.rs, src/abloesung/repo/beginn.rs, src/abloesung/repo/planung.rs, src/abloesung/repo/fristen.rs, src/abloesung/repo/vorgabe.rs, src/abloesung/repo/vollzug.rs, src/abloesung/repo/ruecknahme.rs]
 ---
 
@@ -713,7 +713,7 @@ mitlaufenden Untereinheiten und deren Personen „Entlassung“ statt „Ablösu
 an Einheiten, die gerade im Einsatz sind; ohne offenen Einsatzabschnitt bleibt ihre Zeitachse, wie sie
 ist. Diese Ereignisse
 lassen sich nicht
-von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
+von Hand streichen (Kapitel [Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)). Umgekehrt beginnt das
 Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe oben). Wird die Zeit
 des Eintreffens berichtigt, wandert eine mit ihm begonnene Schicht mit; wurde ihr Beginn von Hand
 geändert, bleibt er, wo er war.
@@ -773,9 +773,9 @@ und 8 h. Über dem Raster steht, welche Werte gelten, etwa „Höchstdienst 12 h
 Mindestruhe 8 h (Vorgabe)“. Geändert werden sie in den Einstellungen des Einsatzes, Reiter
 „Ablösung“, unter „Dienst und Ruhe“ (Kapitel
 [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Wer sie ändern darf, kommt
-über „ändern“ neben der Zeile dorthin. Mit denselben Werten stuft das Meldebild die Kräfte ein,
+über „ändern“ neben der Zeile dorthin. Mit denselben Werten stuft die Kräfteübersicht die Kräfte ein,
 die tatsächlich im Einsatz sind („zu lang“, „Ruhe zu kurz“, Kapitel
-[Meldebild und Kräfte-Zeitachse](meldebild.md)).
+[Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)).
 
 In der Zeile eines Postens liegen Blöcke nicht übereinander; ein Zug, der einen anderen Block
 überdecken würde, wird nicht übernommen. In der Pause dürfen Blöcke gleichzeitig laufen. Ein

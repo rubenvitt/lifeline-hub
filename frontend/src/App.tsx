@@ -136,7 +136,7 @@ import SeiteNichtGefunden from './einsatz/SeiteNichtGefunden';
 import ModulRedirect from './einsatz/ModulRedirect';
 import AltpfadWeiterleitung from './einsatz/AltpfadWeiterleitung';
 import ModulStub from './einsatz/ModulStub';
-import { modulRegistry } from './einsatz/modulRegistry';
+import { modulName, modulRegistry } from './einsatz/modulRegistry';
 import {
   EINSTELLUNGEN_SEKTIONEN,
   GERAET_START_PFAD,
@@ -217,7 +217,9 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   kraefteuebersicht: (
     <Suspense
       fallback={
-        <div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>Meldebild wird geladen…</div>
+        <div style={{ padding: 'var(--lfh-seiten-polsterung)' }}>
+          {modulName('kraefteuebersicht')} wird geladen…
+        </div>
       }
     >
       <KraefteuebersichtPage />

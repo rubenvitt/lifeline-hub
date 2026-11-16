@@ -114,7 +114,7 @@ Jedes Druckstück SHALL auf der ersten Seite einen Druckkopf tragen, der das Dok
 Bildschirm zuordenbar macht: Name der Organisation, Logo der Organisation (falls hinterlegt),
 Dokumentart und -titel, Einsatzbezeichnung mit Einsatznummer (falls vergeben), Stand der Daten
 bzw. die gedruckte Auswahl, Name der druckenden Person und Druckzeitpunkt. Zeitangaben im
-Druckkopf MUST in der Zeitzone der Organisation stehen. Lagebericht, Befehl, Meldebild,
+Druckkopf MUST in der Zeitzone der Organisation stehen. Lagebericht, Befehl, Kräfteübersicht,
 ETB-Druck, Einsatzbericht und Auftrag MUST denselben Druckkopf verwenden. Am Bildschirm SHALL der
 Druckkopf nur auf den Druckansichten (ETB-Druck, Druck der Modul-Listen, Einsatzbericht, Auftrag)
 sichtbar sein.
@@ -128,8 +128,8 @@ eines Realeinsatzes SHALL nirgends „ÜBUNG“ tragen.
 
 #### Scenario: Meldebild mit Auswahl
 
-- **WHEN** ein gefiltertes Meldebild gedruckt wird
-- **THEN** nennt der Druckkopf Organisation, „Meldebild“, Einsatz, Stand, Auswahl, die
+- **WHEN** eine gefilterte Kräfteübersicht gedruckt wird
+- **THEN** nennt der Druckkopf Organisation, „Kräfteübersicht“, Einsatz, Stand, Auswahl, die
   druckende Person („Gedruckt von“) und den Druckzeitpunkt („Gedruckt am“)
 
 #### Scenario: Organisation ohne Logo

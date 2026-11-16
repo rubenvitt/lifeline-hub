@@ -764,6 +764,15 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   (`fordere_zielmodul::<Meldungen>`), nie stilles Herunterstufen. Live-Ereignisse und Hinweis
   laufen über `meldung::live_publikation_sicherstellen`, auch im Replay-Pfad; die Meldung verhält
   sich danach wie eine erfasste. Nachweis `tests/etb_meldungseingang.rs`.
+- **Chat → Meldung (y3zh5ymv D8):** `routes/chat.rs::heraufstufen` legt bei
+  `in_meldungseingang: true` (nur Typ `meldung`/`lage`, sonst 422; Art `sonstige` bzw.
+  `lagemeldung`) im selben `write_retry!` wie Eintrag und Rückverweis die Meldung an
+  (`chat::repo::heraufstufen_zu_etb` ruft `meldung::repo::anlegen_zu_etb_tx`, kein Auto-ETB, ohne
+  `client_id`: eine zweite Heraufstufung sperrt der 409-Guard). Absender ist der Anzeigename der
+  Person, die die Nachricht schrieb, Meldeweg `sonstige`, Ereigniszeit und Eingang die Zeit der
+  Nachricht. Ohne Freigabe der Meldungen 403 vor jedem Schreiben; fehlt das Feld, wird nur
+  protokolliert. Live wie beim ETB über `meldung::live_publikation_sicherstellen`. Nachweis
+  `tests/chat_meldungseingang.rs`.
 - **Kenntnisnahme über die Meldung:** `POST …/meldungen/{mid}/lage-gesehen` und
   `POST …/lage/gesehen` mit `meldung_ids` (höchstens `LAGE_GESEHEN_MAX`); beide stehen in
   `PFAD_KEY` auf `lagemeldungen`, nicht auf `meldungen`.

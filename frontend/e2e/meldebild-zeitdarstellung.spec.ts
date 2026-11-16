@@ -22,7 +22,7 @@ test('Meldebild: „Seit“ taktisch `1446`, mit „Datum und Uhrzeit“ am Ger�
   await seedKraeftebaum(page, einsatzId);
 
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
-  const bereich = page.getByRole('region', { name: 'Meldebild' });
+  const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
   await expect(bereich).toHaveCount(1);
   const zug = bereich.locator('tr').filter({ hasText: '1. Zug Musterstadt-Nordwest' }).first();
   const seit = zug.locator('[data-lfh="meldebild-seit"]');

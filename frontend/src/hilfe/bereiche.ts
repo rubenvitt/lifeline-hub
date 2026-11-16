@@ -1,18 +1,21 @@
 /**
  * Bereiche der Anwenderdokumentation (LFH-1096, `docs/anwender/README.md`). Jeder Bereich hat
- * einen Hunderterblock der `reihenfolge` (Einstieg 0–99, Führungsmittel 100–199 …), daraus
+ * einen Hunderterblock der `reihenfolge` (Einstieg 0–99, Führung 100–199 …), daraus
  * ergibt sich die Gruppierung der Navigation und der Übersicht.
+ *
+ * Die Bereiche folgen den Kategorien der Navigation (y3zh5ymv D11, Wächter
+ * `bereiche.guard.test.ts`).
  *
  * Eigenes Modul ohne Kapiteltexte, wie `gruppen.ts`. KOPIE für die Website:
  * `website/src/daten/bereiche.ts` (website/AGENTS.md, „Kopien statt zweiter Quelle“).
  */
 export const BEREICHE = [
   'Einstieg',
-  'Führungsmittel',
+  'Führung',
+  'Kräfte & Mittel',
+  'Betroffene & Schäden',
   'Lage',
-  'Kräfte',
-  'Führungsorganisation',
-  'Betroffene',
+  'Kommunikation',
   'Einstellungen und Verwaltung',
   'Gekoppelte Geräte',
 ] as const;

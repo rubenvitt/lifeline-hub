@@ -3,7 +3,7 @@ use crate::chat::erwaehnung::{self, ErwaehnungEingabe};
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Auftraege, Chat, Etb};
+use crate::einsatz::modul::{Auftraege, Chat, Etb, Meldungen};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -329,9 +329,18 @@ pub struct HeraufstufenBody {
     /// entscheidet die Person im Dialog, nicht eine Vorgabe „alle".
     #[serde(default)]
     pub anhang_ids: Vec<i64>,
+    /// Legt bei Typ `meldung`/`lage` die Meldung im Meldungseingang mit an (y3zh5ymv D8, Spec
+    /// `meldungseingang`, „Chat-Heraufstufung von Meldung und Lage …“). Fehlt das Feld (ältere
+    /// Clients) oder ist es `false`, wird nur protokolliert, wie beim ETB (LLH-1037).
+    #[serde(default)]
+    pub in_meldungseingang: Option<bool>,
 }
 
 /// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb — Nachricht → ETB.
+///
+/// Mit `in_meldungseingang: true` (nur Typ `meldung`/`lage`, sonst 422) entsteht im selben Commit
+/// die Meldung (Art `sonstige` bzw. `lagemeldung`); das verlangt zusätzlich die Freigabe des
+/// Moduls `meldungen` (403, nie stilles Herunterstufen). Regel: `src/AGENTS.md`, „Chat → Meldung“.
 /// Schreibrecht + aktiv + Freigabe des Moduls `etb`. Server erzwingt die zulässigen ETB-Typen.
 pub async fn heraufstufen(
     State(state): State<AppState>,
@@ -355,6 +364,19 @@ pub async fn heraufstufen(
         return Err(AppError::Validation(
             "Für die Heraufstufung sind nur meldung/anordnung/lage/entscheidung zulässig".into(),
         ));
+    }
+    let meldungsart = match (req.in_meldungseingang.unwrap_or(false), typ) {
+        (false, _) => None,
+        (true, EtbTyp::Lage) => Some(crate::meldung::ART_LAGEMELDUNG),
+        (true, EtbTyp::Meldung) => Some(crate::meldung::ART_SONSTIGE),
+        (true, _) => {
+            return Err(AppError::UnprocessableEntity(
+                "In den Meldungseingang gehen nur Nachrichten vom Typ Meldung oder Lage".into(),
+            ))
+        }
+    };
+    if meldungsart.is_some() {
+        ctx.fordere_zielmodul::<Meldungen>(&state.pool).await?;
     }
 
     // Wie Chat-Senden und ETB-Erfassen: doppelte IDs gelten als eine, die Grenze ist die des
@@ -384,7 +406,28 @@ pub async fn heraufstufen(
     // Auch der Rückfall: eine ältere Nachricht kann länger sein als die Grenze (LFH-937).
     hoechstens(&inhalt, "Inhalt", crate::etb::INHALT_MAX)?;
 
-    let etb_id = repo::heraufstufen_zu_etb(
+    // Die Meldung trägt die Angaben der Nachricht (Spec `meldungseingang`, „Die Meldung aus dem
+    // Chat übernimmt die Angaben der Nachricht“): Absender ist, wer sie schrieb, Ereigniszeit und
+    // Eingang ihre Zeit, der Wortlaut der des Eintrags.
+    let meldung = meldungsart.map(|art| crate::meldung::repo::MeldungDaten {
+        absender: &quelle.autor_name,
+        empfaenger: None,
+        empfaenger_funktion: None,
+        meldeweg: crate::etb::MeldeWeg::Sonstige.as_str(),
+        inhalt: &inhalt,
+        meldungsart: art,
+        prioritaet: crate::meldung::PRIO_NORMAL,
+        richtung: crate::meldung::RICHTUNG_INTERN,
+        ereigniszeit: &quelle.erstellt_at,
+        eingang_at: &quelle.erstellt_at,
+        bestaetigung_pflicht: false,
+        bestaetigung_frist_at: None,
+        einheit_id: None,
+        abschnitt_id: None,
+        geo: None,
+    });
+
+    let (etb_id, meldung_id) = match repo::heraufstufen_zu_etb(
         &state.pool,
         einsatz_id,
         nachricht_id,
@@ -393,11 +436,40 @@ pub async fn heraufstufen(
         &inhalt,
         &quelle.erstellt_at,
         &anhang_ids,
+        meldung.as_ref(),
     )
-    .await?;
+    .await
+    {
+        Ok(ids) => ids,
+        Err(fehler @ AppError::Conflict(_)) => {
+            // Schon heraufgestuft: scheiterte beim ersten Mal die Zustellung NACH dem Commit, gibt
+            // es ohne `client_id` keinen Replay wie beim ETB. Der zweite Versuch holt sie hier
+            // nach; `live_publikation_sicherstellen` ist über `live_published_at` idempotent.
+            if let Some(etb) = quelle.etb_eintrag_id {
+                if let Some(mid) =
+                    crate::meldung::repo::meldung_id_zum_etb_eintrag(&state.pool, einsatz_id, etb)
+                        .await?
+                {
+                    let m = crate::meldung::repo::laden(&state.pool, mid, &crate::zeit::jetzt())
+                        .await?;
+                    crate::meldung::live_publikation_sicherstellen(&state, &m).await?;
+                }
+            }
+            return Err(fehler);
+        }
+        Err(fehler) => return Err(fehler),
+    };
 
-    // Beide Events publizieren (wie lagebericht::freigeben): ETB-Eintrag + Chat-Update.
-    state.live.publiziere(einsatz_id, etb_id);
+    // Beide Events publizieren (wie lagebericht::freigeben): ETB-Eintrag + Chat-Update. Mit Meldung
+    // publiziert deren Weg den Eintrag mit (über `etb_meldung_id`), dazu `meldung` und die
+    // Benachrichtigungen, genau einmal (wie `routes/etb.rs::erfassen`).
+    if let Some(meldung_id) = meldung_id {
+        let meldung =
+            crate::meldung::repo::laden(&state.pool, meldung_id, &crate::zeit::jetzt()).await?;
+        crate::meldung::live_publikation_sicherstellen(&state, &meldung).await?;
+    } else {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok(Json(nachricht))

@@ -67,7 +67,7 @@ describe('MaterialVerdichtung', () => {
 
   it('verlinkt auf das Meldebild', () => {
     setup([]);
-    expect(screen.getByRole('link', { name: 'Meldebild' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Kräfteübersicht' })).toHaveAttribute(
       'href',
       '/einsaetze/1/kraefteuebersicht',
     );

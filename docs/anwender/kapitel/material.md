@@ -1,7 +1,7 @@
 ---
 titel: Material
 gruppen: [fuehrung]
-reihenfolge: 340
+reihenfolge: 240
 quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
 ---
 
@@ -23,7 +23,7 @@ Disponieren und ändern dürfen Einsatzleitung und Führungspersonal.
 
 1. Unter „Kräfte & Mittel“ „Material“ öffnen.
 2. Die Zeile über der Liste zählt die Posten: „einsatzbereit“, „im Einsatz“ und „Ausfall“.
-   „Meldebild“ führt ins Meldebild.
+   „Kräfteübersicht“ führt in die Kräfteübersicht.
 
    ![Materialliste nach Ort gruppiert, im Kopf „Nach Ort“ gewählt; über der Tabelle „1 Sanitätszug Musterstadt · 1 Betreuungsgruppe · 1 UHS Turnhalle Musterstadt · 2 ohne Ort“, die Spende-Decken mit „30 von 50 übrig“ und „Ausgeben“ in der Spalte „Menge“, je Posten das Menü „Weitere Aktionen“](../bilder/material/material.png)
 
@@ -287,9 +287,9 @@ vorher zugleich Einheit «Staffel A»“.
 Die Zeile über der Liste zählt Posten, nicht Mengen, und immer die ganze Liste, auch wenn ein Filter
 gesetzt ist. „Ausfall“ fasst defekt, verbraucht, Desinfektion nötig und aufgebraucht zusammen; ein
 teilweise ausgegebenes Verbrauchsgut zählt nach seinem Status. Nur die Ausfall-Zahl ist
-farbig, und nur, wenn sie über null liegt. Im Meldebild nennt die Zeile einer Einheit den Ausfall
-ihres Materials nach derselben Regel; die Zahl der Kräfte im Meldebild zählt nur Personal und
-Fahrzeuge (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
+farbig, und nur, wenn sie über null liegt. In der Kräfteübersicht nennt die Zeile einer Einheit den Ausfall
+ihres Materials nach derselben Regel; die Zahl der Kräfte in der Kräfteübersicht zählt nur Personal und
+Fahrzeuge (Kapitel [Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)).
 
 ### Mehrere Posten derselben Art
 
@@ -326,8 +326,8 @@ jede Organisation; „verbraucht“ und „Desinfektion nötig“ gibt es nur f�
 ### Aus dem Einsatz nehmen und Stornieren
 
 Aus dem Einsatz nehmen ist der Normalweg: Der Posten verlässt seinen Ort. In
-Auswahllisten, im Meldebild und in der UHS zählt er nicht mehr; der Block „Aus dem Einsatz
-genommen“ unter der Liste führt ihn weiter, ebenso das Meldebild und seine Übernahme in einen
+Auswahllisten, in der Kräfteübersicht und in der UHS zählt er nicht mehr; der Block „Aus dem Einsatz
+genommen“ unter der Liste führt ihn weiter, ebenso die Kräfteübersicht und ihre Übernahme in einen
 Lagebericht. Erneut disponiert, steht er wieder in der Liste, mit
 derselben Menge und demselben Status, aber ohne Ort. „Material disponieren“
 legt dagegen immer eine neue Zeile an.

@@ -1,7 +1,7 @@
 import { Breadcrumb, Tabs } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
@@ -11,6 +11,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { parseAuftraegeReiter } from '../routing/deeplinks';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { modulName } from '../einsatz/modulRegistry';
 
 export default function AuftraegePage() {
@@ -40,6 +41,21 @@ export default function AuftraegePage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
+
+  // Schnellaktion „Auftrag erteilen“ (Sprungpalette): ?neu=1 öffnet den Dialog der Einzelaufträge.
+  // Gelesen HIER, nicht in der Liste: der Guard der Schnellaktionen ordnet Leser über den
+  // Dateinamen ihrem Modul zu. Muster wie `TierePage`: erst nach dem Laden des Einsatzes
+  // entscheiden, immer räumen, einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1558).
+  const neuAuftrag = useLinkAuftrag();
+  const [erteilenAngefordert, setErteilenAngefordert] = useState(false);
+  const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
+    if (einsatzQuery.isLoading) return;
+    if (darfSchreibenRoh) setErteilenAngefordert(true);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, darfSchreibenRoh]);
 
   // Seitenzustände wie die Nachbarseiten (oxgob5gk D11): Skelett statt Spinner, Fehler mit Ursache.
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
@@ -95,6 +111,8 @@ export default function AuftraegePage() {
                 einsatzId={einsatzId}
                 darfSchreiben={darfSchreiben}
                 onSeitenFehler={setSeitenFehler}
+                erteilenAngefordert={erteilenAngefordert}
+                onErteilenAngenommen={() => setErteilenAngefordert(false)}
               />
             ),
           },

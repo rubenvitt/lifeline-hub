@@ -754,9 +754,14 @@ export function parseEtbDruckFilter(params: URLSearchParams): EtbFilterWerte {
  */
 export function lagemeldungenPfad(
   einsatzId: number,
-  opts: { von?: string; bis?: string } = {},
+  /** `neu` öffnet das Formular mit der Art Lagemeldung (Schnellaktion, Leser `LagemeldungenPage`). */
+  opts: { von?: string; bis?: string; neu?: boolean } = {},
 ): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'lagemeldungen'), { von: opts.von, bis: opts.bis });
+  return mitQuery(einsatzModulPfad(einsatzId, 'lagemeldungen'), {
+    von: opts.von,
+    bis: opts.bis,
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 /** Umkehr von {@link lagemeldungenPfad}; die Zeitwerte gehen ungeprüft durch wie im ETB. */
@@ -1018,8 +1023,15 @@ export function parseAbschnitteAnsicht(params: URLSearchParams): AbschnitteAnsic
     : undefined;
 }
 
-export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'meldungen'), { meldung: opts.meldung });
+/** `neu` öffnet das Meldungsformular (Schnellaktion „Meldung erfassen“, Leser `MeldungenPage`). */
+export function meldungenPfad(
+  einsatzId: number,
+  opts: { meldung?: number; neu?: boolean } = {},
+): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'meldungen'), {
+    meldung: opts.meldung,
+    neu: opts.neu ? 1 : undefined,
+  });
 }
 
 /**
@@ -1163,7 +1175,8 @@ export type AuftraegeReiter = 'auftraege' | 'befehle';
 
 export function auftraegePfad(
   einsatzId: number,
-  opts: { auftrag?: number; befehl?: number; reiter?: AuftraegeReiter } = {},
+  /** `neu` öffnet „Auftrag erteilen“ (Schnellaktion, Leser `AuftraegePage`). */
+  opts: { auftrag?: number; befehl?: number; reiter?: AuftraegeReiter; neu?: boolean } = {},
 ): string {
   // `?befehl=` wählt einen Befehl in der Liste (oxgob5gk D6) und meint immer den Reiter Befehle.
   const befehl = opts.auftrag === undefined ? opts.befehl : undefined;
@@ -1176,6 +1189,7 @@ export function auftraegePfad(
       (opts.reiter === 'befehle' || befehl !== undefined) && opts.auftrag === undefined
         ? 'befehle'
         : undefined,
+    neu: opts.neu ? 1 : undefined,
   });
 }
 

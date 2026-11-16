@@ -23,7 +23,7 @@ import {
   schadenDetailPfad,
   uhsDetailPfad,
 } from '../routing/deeplinks';
-import { textStufe, UNBEWERTET, type Treffer } from './fuzzy';
+import { normalisiere, textStufe, trifftText, UNBEWERTET, type Treffer } from './fuzzy';
 import {
   DATENSATZ_MINDESTZEICHEN,
   PALETTE_MODI,
@@ -129,8 +129,8 @@ const DECKEL_JE_QUELLE = 5;
 const DECKEL_GESAMT = 15;
 
 /**
- * Liest eine gedruckte Kennung als Zahl, für einen EXAKTEN Zahlenvergleich: Fuse über eine Zahl
- * träfe bei '42' auch R-142 und R-420; bei einer Registriernummer wäre das ein falscher Patient.
+ * Liest eine gedruckte Kennung als Zahl, für einen EXAKTEN Zahlenvergleich: eine Teilwortsuche über
+ * eine Zahl träfe bei '42' auch R-142 und R-420; bei einer Registriernummer wäre das ein falscher Patient.
  *
  * Führende Nullen fallen weg (`R-042` ist nur die Anzeige der Zahl). Der Sortenbuchstabe BINDET
  * ('R-42' findet die Person 42, nicht den Schaden 42); '#' und die blanke Zahl binden nicht.
@@ -157,6 +157,12 @@ interface Kandidat {
    */
   zweitnummer: number | null;
   basisLabel: string;
+  /**
+   * Weitere Texte, über die der Datensatz gefunden wird (Fahrzeugtyp, Kennzeichen, Funktion; Spec
+   * `sprungpalette`, „Fahrzeuge und Personal über ihre Merkmale“). Trifft nur ein Merkmal, hängt
+   * es mit „ · “ an die Beschriftung, sonst wäre der Treffer nicht nachprüfbar.
+   */
+  merkmale: string[];
   ziel: string;
   /** Lese-Vorschau (Taste →); fehlt bei einer Quelle ohne Vorschau. */
   vorschau?: VorschauZiel;
@@ -188,6 +194,8 @@ function baueQuelle<T>(
     nummer?: (x: T) => number | null | undefined;
     zweitnummer?: (x: T) => number | null | undefined;
     label: (x: T) => string;
+    /** Suchbare Merkmale neben dem Label, leere Werte fallen weg (siehe `Kandidat.merkmale`). */
+    merkmale?: (x: T) => (string | null | undefined)[];
     ziel: (einsatzId: number, x: T) => string;
     /**
      * Das Vorschauziel, in DERSELBEN Tabelle wie Beschriftung und Sprungziel, damit die Zuordnung je
@@ -217,6 +225,7 @@ function baueQuelle<T>(
       nummer: f.nummer?.(x) ?? null,
       zweitnummer: f.zweitnummer?.(x) ?? null,
       basisLabel: f.label(x),
+      merkmale: (f.merkmale?.(x) ?? []).filter((m): m is string => !!m?.trim()),
       ziel: f.ziel(einsatzId, x),
       vorschau: f.vorschau?.(einsatzId, x),
       fundstellen: f.fundstellen?.(x),
@@ -229,7 +238,7 @@ function baueQuelle<T>(
  * beieinander.
  *
  * Die Reihenfolge ist nur Gleichstandsachse (die Ordnung machen Stufe und `ordneTreffer`); sie
- * folgt der Erfassungshäufigkeit wie `SCHNELLAKTIONEN`.
+ * folgt der Erfassungshäufigkeit, wie die feste Folge von `SCHNELLAKTIONEN`.
  *
  * Beschriftungen sind wiederverwendet (`personLabel` fällt bei fehlendem Namen auf 'R-042'
  * zurück, `schadenLabel`/`meldungLabel` bringen die Nummer mit). ETB, Fahrzeug, Personal und
@@ -319,12 +328,14 @@ function quellen(k: DatensatzKontext): Quelle[] {
       id: (f) => f.id,
       // Der Funkrufname trägt NUR das Fahrzeug — Personal und Einheit haben `name`.
       label: (f) => f.funkrufname,
+      merkmale: (f) => [f.fahrzeugtyp, f.kennzeichen],
       ziel: (id, f) => fahrzeugePfad(id, { fahrzeug: f.id }),
       vorschau: (einsatzId, f) => ({ art: 'fahrzeug', einsatzId, id: f.id }),
     }),
     baueQuelle('personal', 'text', q.personal, e, {
       id: (p) => p.id,
       label: (p) => p.name,
+      merkmale: (p) => [p.funktion, p.einsatzfunktion],
       // Die Palette öffnet die Personenansicht (LLH-1060 D2), wie die Einheit ihre Seite.
       ziel: (id, p) => einsatzkraftPfad(id, p.id),
       vorschau: (einsatzId, p) => ({ art: 'personal', einsatzId, id: p.id }),
@@ -423,7 +434,7 @@ function auftragZeile(a: Auftrag): string {
  * Die Rechteachse ist die LESEACHSE `istModulFreigegeben` je Modul (ein Beobachter behält seine
  * Suche), nicht `darfImEinsatzSchreiben`.
  *
- * `score` ist für alle Treffer {@link UNBEWERTET}: sie liefen nicht durch Fuse, eine 0 behauptete
+ * `score` ist für alle Treffer {@link UNBEWERTET}: sie liefen nicht durch `filtereBefehle`, eine 0 behauptete
  * den bestmöglichen Wert (siehe `fuzzy.ts`).
  *
  * DER MODUSFILTER STEHT HIER EIN ZWEITES MAL, obwohl `useDatensaetze` gesperrte Listen gar nicht
@@ -436,7 +447,7 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
   if (!suche) return [];
 
   const zahl = zahlAusSuche(suche);
-  const klein = suche.toLowerCase();
+  const gesucht = normalisiere(suche);
   const erlaubt = PALETTE_MODI[k.modus].quellen;
   const offen = quellen(k).filter((qu) => {
     if (erlaubt !== null && !erlaubt.includes(qu.quelle)) return false;
@@ -469,9 +480,9 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
     index: number;
   }[] = [];
 
-  const alsTreffer = (kand: Kandidat, stufe: 0 | 1 | 2 | 3): Treffer => {
+  const alsTreffer = (kand: Kandidat, stufe: 0 | 1 | 2 | 3, hinweis?: string): Treffer => {
     gesehen.add(schluessel(kand));
-    return { befehl: befehlFuer(kand, k.navigate), score: UNBEWERTET, stufe };
+    return { befehl: befehlFuer(kand, k.navigate, hinweis), score: UNBEWERTET, stufe };
   };
 
   if (zahl) {
@@ -508,14 +519,17 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
     if (qu.zweig === 'zahl') continue;
     for (const kand of qu.kandidaten) {
       if (gesehen.has(schluessel(kand))) continue;
-      // Teilzeichenkette ohne Groß-/Kleinschreibung, dieselbe Regel wie die Suchachse der
-      // `Datensicht`, über das BASISLABEL.
-      if (!qu.serverGefiltert && !kand.basisLabel.toLowerCase().includes(klein)) continue;
-      // Die Stufe kommt aus dem Basislabel OHNE Modulherkunft: sonst stünde bei 'personen' jede Person
-      // auf Stufe 1 über allem, was wirklich so heißt.
-      const stufe = textStufe(kand.basisLabel, suche);
+      // Teilzeichenkette in `normalisiere`-Form (Groß/klein und Umschrift egal), dieselbe Regel wie
+      // die Suchachse der `Datensicht`, über das BASISLABEL; erst danach über die Merkmale.
+      const imLabel = qu.serverGefiltert || normalisiere(kand.basisLabel).includes(gesucht);
+      // Merkmale nach der Regel der Befehle (design.md D3): unter drei Zeichen nur am Wortanfang.
+      const merkmal = imLabel ? undefined : kand.merkmale.find((m) => trifftText(m, suche));
+      if (!imLabel && merkmal === undefined) continue;
+      // Die Stufe kommt aus dem Basislabel OHNE Modulherkunft (bzw. aus dem Merkmal): sonst stünde
+      // bei 'personen' jede Person auf Stufe 1 über allem, was wirklich so heißt.
+      const stufe = textStufe(merkmal ?? kand.basisLabel, suche);
       roh.push({
-        treffer: alsTreffer(kand, stufe),
+        treffer: alsTreffer(kand, stufe, merkmal),
         heim: heim(kand),
         quelle: qi,
         stufe,
@@ -673,14 +687,19 @@ export function sichtbareDatensaetze(
  * so erbt er den Bedienziel-Boden aus `palettenZeilenStil`. Icon und Modulherkunft kommen aus
  * der `modulRegistry`, keine zweite Namensquelle.
  */
-function befehlFuer(kand: Kandidat, navigate: DatensatzKontext['navigate']): Befehl {
+function befehlFuer(
+  kand: Kandidat,
+  navigate: DatensatzKontext['navigate'],
+  /** Das Merkmal, über das der Datensatz getroffen wurde, wenn nicht über sein Label. */
+  hinweis?: string,
+): Befehl {
   const m = modulRegistry.find((x) => x.key === kand.modulKey);
   return {
     id: schluessel(kand),
     gruppe: 'datensaetze',
     // Die Modulherkunft steht als KONTEXT rechts und als Schlagwort, damit „personen“ weiter
     // Personen-Datensätze findet.
-    label: kand.basisLabel,
+    label: hinweis ? `${kand.basisLabel} · ${hinweis}` : kand.basisLabel,
     kontext: m?.label ?? kand.modulKey,
     schlagworte: [m?.label ?? kand.modulKey],
     icon: m?.icon,

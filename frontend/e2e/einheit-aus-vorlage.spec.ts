@@ -52,7 +52,7 @@ test('Einheit aus Vorlage bilden: Dialog → Vorschau → Meldebild (LLH-1049)',
 
   // Das Meldebild räumt `?einheit=` nach dem Anwenden.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/kraefteuebersicht$`));
-  const meldebild = page.getByRole('region', { name: 'Meldebild' });
+  const meldebild = page.getByRole('region', { name: 'Kräfteübersicht' });
   const markiert = meldebild.locator('tr.zeile-hervorgehoben');
   await expect(markiert).toHaveCount(1);
   await expect(markiert).toContainText(v.zug);

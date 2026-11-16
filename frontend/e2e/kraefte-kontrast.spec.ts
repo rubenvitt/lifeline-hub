@@ -362,7 +362,7 @@ for (const modus of ['light', 'dark'] as const) {
     // Zahl und Wort der Kennzahl „keine Rückmeldung“ (alarm), je auf der Paneelfläche.
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
-    await expect(page.getByRole('region', { name: 'Meldebild' })).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Kräfteübersicht' })).toHaveCount(1);
     const einheiten = page.getByRole('region', { name: 'Einheiten nach FMS-Status' });
     // Vorbedingung: alle drei Töne stehen in der Verteilung, sonst misst sie weniger.
     await expect(einheiten.getByRole('listitem'), 'drei Statuszeilen').toHaveCount(
@@ -404,7 +404,7 @@ for (const modus of ['light', 'dark'] as const) {
     // (2) SEITENGRUND — dieselben drei Rollen in der Verdichtungszeile.
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
-    await expect(page.getByRole('link', { name: 'Meldebild', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('link', { name: 'Kräfteübersicht', exact: true })).toHaveCount(1);
     for (const m of ZEILEN_ZAHLEN) {
       // In der Zeile gesucht: der Zählerstreifen der Tabelle schreibt dieselben Wörter (LFH-973).
       const ziel = page.locator('[data-lfh="verdichtungszeile"]').getByText(m);

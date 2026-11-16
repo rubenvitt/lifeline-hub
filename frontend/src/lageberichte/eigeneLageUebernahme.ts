@@ -76,7 +76,7 @@ const nachweis = <T>(liste: Geladen<T[]>, zu: (l: T[]) => BeendeteKraft[]) =>
  * Einsatz (ohne Filter), jeder mit dem Stand seiner ältesten Liste. Rechnet keine Zahl selbst.
  */
 export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
-  knopf: 'Aus Meldebild und Führungsorganisation übernehmen',
+  knopf: 'Aus Kräfteübersicht und Führungsorganisation übernehmen',
   ersetzenTitel: 'Eigene Lage ersetzen?',
   ersetzenText: 'Vorhandener Text wird ersetzt.',
   verfuegbar: (freigaben) => {
@@ -86,7 +86,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
     return {
       frei: false,
       grund:
-        `Kräftemeldebild nicht freigegeben (${meldebild.join(', ')}), ` +
+        `Kräfteübersicht nicht freigegeben (${meldebild.join(', ')}), ` +
         `Führungsorganisation nicht freigegeben (${organisation.join(', ')})`,
     };
   },
@@ -166,7 +166,7 @@ export const EIGENE_LAGE_QUELLE: UebernahmeQuelle = {
             dtg,
           },
         )
-      : teilFehlt('Kräftemeldebild', zustaende(MELDEBILD));
+      : teilFehlt('Kräfteübersicht', zustaende(MELDEBILD));
 
     const organisation =
       abschnitte.zustand === 'daten'

@@ -172,7 +172,7 @@ describe('FahrzeugePage', () => {
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatz());
-    const link = await screen.findByRole('link', { name: 'Meldebild' });
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/7/kraefteuebersicht');
   });
 

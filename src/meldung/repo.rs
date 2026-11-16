@@ -520,6 +520,23 @@ pub async fn is_etb_eintrag_einer_meldung(
     .await?)
 }
 
+/// Die Meldung, deren Eintrag `etb_id` ist (`etb_meldung_id`), falls es eine gibt. Für das
+/// Nachholen einer verlorenen Live-Zustellung bei der Chat-Heraufstufung (y3zh5ymv, Review vor dem
+/// PR): dort gibt es keine `client_id`, der zweite Versuch kommt über den Eintrag.
+pub async fn meldung_id_zum_etb_eintrag(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    etb_id: i64,
+) -> Result<Option<i64>, AppError> {
+    Ok(sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM meldung WHERE einsatz_id = ? AND etb_meldung_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(etb_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
 /// Beidseitiger Backlink Meldung ↔ ETB-Eintrag (Pattern B, beide Richtungen).
 async fn verlinke_tx(
     conn: &mut SqliteConnection,

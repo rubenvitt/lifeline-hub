@@ -28,6 +28,16 @@ describe('heraufstufenZuEtb', () => {
     });
   });
 
+  it('sendet `in_meldungseingang` nur, wenn die Meldung mit angelegt werden soll', async () => {
+    const fetchMock = sendeMock();
+    await heraufstufenZuEtb(7, 3, 'meldung', 'Deich', [], true);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({
+      typ: 'meldung',
+      inhalt: 'Deich',
+      in_meldungseingang: true,
+    });
+  });
+
   it('lässt das Feld ohne Auswahl weg', async () => {
     const fetchMock = sendeMock();
     await heraufstufenZuEtb(7, 3, 'lage', 'Deich', []);

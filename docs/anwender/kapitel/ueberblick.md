@@ -1,7 +1,7 @@
 ---
 titel: Überblick
 gruppen: [fuehrung]
-reihenfolge: 200
+reihenfolge: 100
 quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/erinnerung/erinnerungZustand.ts, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx, src/einsatz/funktion.rs, src/einsatz/mod.rs]
 ---
 
@@ -28,7 +28,7 @@ Modulen selbst.
    „kritisch“), den festen Auftrag, bei Aufträgen an den Abschnitt die Zahl der erledigten, die
    letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „nicht verfügbar“ mit
    Zahl und Balken) lesen. Was im Abschnitt brennt, steht als rotes Etikett direkt neben dem
-   Lagezustand, mit denselben Zahlen wie im Meldebild: „Rückm. überfällig seit 47 min“ (bei
+   Lagezustand, mit denselben Zahlen wie in der Kräfteübersicht: „Rückm. überfällig seit 47 min“ (bei
    mehreren Einheiten „3 Einh. Rückm. überfällig, längste seit 47 min“), „keine Rückm.“, „1
    Ausfall“ und „1 Ausfall Material“. Der Lagezustand bleibt dabei, wie die Führung ihn beurteilt
    hat; ein „planmäßig“ mit rotem Etikett daneben heißt: die Beurteilung ist zu prüfen.

@@ -78,7 +78,11 @@ test('Einheit und Fahrzeug in der Zeile setzen, Ansicht, Fahrzeugseite und Melde
 
   // Fokus und Zeiger verlassen die Liste, dann wandert die Zeile in die Gruppe der Einheit.
   await page.mouse.move(0, 0);
-  await page.getByRole('link', { name: 'Meldebild' }).focus();
+  // Der Modulmenü-Eintrag, nicht der gleichnamige Verweis der Verdichtungszeile im Inhalt.
+  await page
+    .locator('[data-lfh="modul-panel"]')
+    .getByRole('link', { name: 'Kräfteübersicht' })
+    .focus();
   await expect(region.getByText(new RegExp(`1 ${EINHEIT}`))).toBeVisible();
   await expect(region.getByText(/nicht eingeteilt/)).toHaveCount(0);
 
@@ -100,7 +104,7 @@ test('Einheit und Fahrzeug in der Zeile setzen, Ansicht, Fahrzeugseite und Melde
 
   // ── Das Meldebild zeigt die Person unter dem Fahrzeug (Stufe „mit Fahrzeugen“) ──
   await page.goto(`/einsaetze/${s.einsatzId}/kraefteuebersicht`);
-  const meldebild = page.getByRole('region', { name: 'Meldebild' });
+  const meldebild = page.getByRole('region', { name: 'Kräfteübersicht' });
   await page.getByRole('radio', { name: 'mit Fahrzeugen', exact: true }).click();
   const fzKnoten = meldebild.locator(`tr[data-row-key="ef-${s.fahrzeugId}"]`);
   await expect(fzKnoten).toBeVisible();

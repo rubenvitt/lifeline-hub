@@ -192,7 +192,7 @@ describe('MaterialPage', () => {
    */
   it('verlinkt das Meldebild (vormals Kräfteübersicht) über der Tabelle', async () => {
     render(einsatzAktiv, [em]);
-    const link = await screen.findByRole('link', { name: 'Meldebild' });
+    const link = await screen.findByRole('link', { name: 'Kräfteübersicht' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/kraefteuebersicht');
   });
 

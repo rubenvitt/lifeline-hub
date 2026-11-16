@@ -103,6 +103,12 @@ export interface ModulEintrag {
    */
   beschreibung?: string;
   /**
+   * Synonyme für die Sprungpalette (y3zh5ymv D2, Spec `sprungpalette`, „Module sind über
+   * Synonyme auffindbar“): Abkürzungen, Alltagswörter und frühere Namen. Nirgends sichtbar, nur
+   * suchbar. Ein früherer Modulname kommt immer hierher.
+   */
+  schlagworte?: readonly string[];
+  /**
    * Deep-Link: das Modul leitet auf die `route` eines anderen Moduls um. Heute von keinem Eintrag
    * genutzt, als Infrastruktur erhalten.
    */
@@ -129,11 +135,15 @@ export const kategorien: Kategorie[] = [
     icon: { umriss: IconLkw, gefuellt: IconLkwGefuellt },
   },
   {
+    // Die Kategorie der Betroffenen (y3zh5ymv D10, bis dahin „Erfassung“ samt ETB). „& Schäden“
+    // wie „Kräfte & Mittel“: allein „Betroffene“ hieße sie wie ihr erstes Modul, und zwei Ziele
+    // trügen in der Navigation denselben Namen. Der Schlüssel bleibt `erfassung`: an ihm hängt das
+    // gemerkte Modul je Kategorie im Browserspeicher.
     key: 'erfassung',
-    label: 'Erfassung',
-    // Kurzform wie „Komm.“/„Einst.“: „ERFASSUNG“ ist in 9 px Versalien breiter als die 60-px-Rail
-    // (LFH-644). Die Sperrung bleibt Token, keine Ausnahme je Etikett.
-    kurz: 'Erfass.',
+    label: 'Betroffene & Schäden',
+    // Kurzform wie „Komm.“/„Einst.“: „BETROFFENE“ ist in 9 px Versalien breiter als die 60-px-Rail
+    // (LFH-644, gemessen in `e2e/rail-etikett.spec.ts`). Die Sperrung bleibt Token.
+    kurz: 'Betroff.',
     icon: { umriss: IconKlemmbrett, gefuellt: IconKlemmbrettGefuellt },
   },
   {
@@ -169,6 +179,18 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Kennzahlen, Fristen, Entscheidungen',
   },
+  // ETB als Führungsmittel direkt hinter dem Überblick (y3zh5ymv D10; bis dahin unter Erfassung).
+  {
+    key: 'etb',
+    kategorie: 'fuehrung',
+    label: 'ETB',
+    icon: IconKlemmbrett,
+    route: 'etb',
+    status: 'fertig',
+    beschreibung: 'Einsatztagebuch',
+    zaehlerQuelle: 'etb',
+    schlagworte: ['Tagebuch', 'Einsatztagebuch'],
+  },
   {
     key: 'einsatzdaten',
     kategorie: 'fuehrung',
@@ -187,6 +209,7 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Abschnitte und ihre Einheiten',
     zaehlerQuelle: 'einsatzabschnitte',
+    schlagworte: ['EA'],
   },
   {
     key: 'auftraege',
@@ -218,16 +241,18 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Lagepläne, Formulare, Fotos',
     zaehlerQuelle: 'dokumente',
   },
-  // Kräfte & Mittel — das Meldebild steht vorn als Verdichtung der Kategorie. Route und Schlüssel
+  // Kräfte & Mittel — die Kräfteübersicht steht vorn als Verdichtung der Kategorie. Bis y3zh5ymv
+  // (D7) hieß sie „Meldebild“, der frühere Name bleibt Synonym. Route und Schlüssel
   // `kraefteuebersicht` bleiben, damit Deeplinks und gespeicherte Standard-Module nicht brechen.
   {
     key: 'kraefteuebersicht',
     kategorie: 'kraefte',
-    label: 'Meldebild',
+    label: 'Kräfteübersicht',
     icon: IconListeDetails,
     route: 'kraefteuebersicht',
     status: 'fertig',
     beschreibung: 'Status, Stärke, Gliederung',
+    schlagworte: ['Meldebild', 'Stärke', 'Kräfte'],
   },
   {
     key: 'einheiten',
@@ -256,6 +281,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'fahrzeuge',
     status: 'fertig',
     beschreibung: 'Disponierte Fahrzeuge',
+    schlagworte: ['FMS', 'RTW', 'KTW', 'Kennzeichen'],
   },
   {
     key: 'material',
@@ -285,6 +311,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'bereitstellungsraeume',
     status: 'fertig',
     beschreibung: 'Bereitgestellte Einheiten und Fahrzeuge',
+    schlagworte: ['BR'],
   },
   {
     // LLH-1078: aus „Kommunikation“ hierher, dort sucht die Führung Kräfte. Schlüssel und Route
@@ -314,16 +341,6 @@ export const modulRegistry: ModulEintrag[] = [
   },
   // Erfassung
   {
-    key: 'etb',
-    kategorie: 'erfassung',
-    label: 'ETB',
-    icon: IconKlemmbrett,
-    route: 'etb',
-    status: 'fertig',
-    beschreibung: 'Einsatztagebuch',
-    zaehlerQuelle: 'etb',
-  },
-  {
     key: 'personen',
     kategorie: 'erfassung',
     label: 'Betroffene',
@@ -332,6 +349,7 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Vermisste, Betroffene, Patienten',
     zaehlerQuelle: 'personen',
+    schlagworte: ['Patient', 'Vermisst'],
   },
   {
     key: 'unfallhilfsstellen',
@@ -341,6 +359,7 @@ export const modulRegistry: ModulEintrag[] = [
     route: 'unfallhilfsstellen',
     status: 'fertig',
     beschreibung: 'Behandlungsplätze, Belegung, Material',
+    schlagworte: ['BHP', 'UHS', 'Behandlungsplatz'],
   },
   {
     // Räumung als MENGE mit Zeitbezug, seit LLH-1034 ein eigenes Modul neben der Betreuung. Der

@@ -1,7 +1,7 @@
 ---
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
-reihenfolge: 330
+reihenfolge: 230
 quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs]
 ---
 
@@ -262,7 +262,7 @@ Fahrzeug inzwischen einer Einheit an oder ist es entlassen, entsteht nichts. Der
 
 Die Kräfte-Zeitachse der neuen Einheit bleibt zunächst leer, auch wenn das Fahrzeug schon einen
 Status hat: ein Eintrag entsteht erst beim nächsten Statuswechsel mit Zeitachsen-Marke oder als
-Nachtrag von Hand (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)). Im Meldebild steht die
+Nachtrag von Hand (Kapitel [Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)). In der Kräfteübersicht steht die
 Einheit sofort, mit dem Fahrzeug und der Stärke ihrer Besatzung.
 
 ### Personal der Einheit übernehmen
@@ -276,7 +276,7 @@ Personen zu und gilt ganz oder gar nicht.
 ### Beladung
 
 Die Beladung ist das Material, dessen Ort das Fahrzeug ist (Kapitel [Material](material.md)). Sie
-steht im Meldebild unter dem Fahrzeug nach der Besatzung, und ein ausgefallener Posten darin tönt
+steht in der Kräfteübersicht unter dem Fahrzeug nach der Besatzung, und ein ausgefallener Posten darin tönt
 die Einheit des Fahrzeugs. Ein Posten von einem anderen Ort wird ohne Rückfrage umgehängt; das
 Einsatztagebuch nennt den alten und den neuen Ort. Ohne Freigabe des Moduls Material fehlt der
 Block „Beladung“.
@@ -303,9 +303,9 @@ die Bemerkung höchstens 2.000.
 
 ### Status der Einheit und Zeitachse
 
-Aus dem Status ihrer Fahrzeuge leitet sich der Status der Einheit im Meldebild ab. Trägt ein
+Aus dem Status ihrer Fahrzeuge leitet sich der Status der Einheit in der Kräfteübersicht ab. Trägt ein
 Statuswert im Katalog eine Zeitachsen-Marke, schreibt der Wechsel auch die Kräfte-Zeitachse der
-Einheit (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
+Einheit (Kapitel [Kräfteübersicht und Kräfte-Zeitachse](meldebild.md)).
 
 ### Entlassen und Stornieren
 
@@ -313,8 +313,8 @@ Entlassen ist der Normalweg: Das Fahrzeug verlässt seine Einheit, die Führungs
 Bereitstellungsraum; seine Besatzung bleibt als Personal im Einsatz, nur ohne Fahrzeug. Seine
 Beladung bleibt im Einsatz zurück, ohne Ort; das Einsatztagebuch nennt, wie viele Posten. Aufträge
 nennen es weiter als Empfänger. In Stärke, Statusband, Lagemonitor, Lagekarte und Auswahllisten
-zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter, ebenso das Meldebild
-und seine Übernahme in einen Lagebericht.
+zählt es nicht mehr; der Block „Entlassen“ unter der Liste führt es weiter, ebenso die Kräfteübersicht
+und ihre Übernahme in einen Lagebericht.
 
 „Rückgängig“ direkt nach dem Entlassen nimmt es zurück, als wäre nichts geschehen: derselbe Status
 seit derselben Zeit, dieselbe Einheit, Besatzung, Führungsstelle und Beladung, ein Wiedereintritt in

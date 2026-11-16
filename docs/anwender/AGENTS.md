@@ -137,10 +137,15 @@ würde abgeschaltet.
 ## Kapitelpakete und Reihenfolge (LFH-1127, D7)
 
 Jedes Modul bekommt ein Kapitel, geschrieben in acht Paketen. Jedes Paket vergibt `reihenfolge`
-nur in seinem Block, damit parallele PRs nicht kollidieren: 1 Einstieg 0–99, 2 Führungsmittel
-100–199, 3 Lage 200–299, 4 Kräfte 300–399, 5 Führungsorganisation 400–499, 6 Betroffene
-500–599, 7 Einstellungen und Verwaltung 600–699, 8 Gekoppelte Geräte 700–799. Die
-Kapitelübersicht steht in `README.md`, nach `reihenfolge` geordnet.
+nur in seinem Block, damit parallele PRs nicht kollidieren. Die Blöcke folgen den Kategorien der
+Navigation (y3zh5ymv D11): 1 Einstieg 0–99, 2 Führung 100–199, 3 Kräfte & Mittel 200–299,
+4 Betroffene & Schäden 300–399, 5 Lage 400–499, 6 Kommunikation 500–599, 7 Einstellungen und
+Verwaltung 600–699, 8 Gekoppelte Geräte 700–799. Im Block steht ein Modulkapitel in der Folge der
+Modul-Registry, Kapitel ohne Modul dahinter (Drucken und Export bei Führung, Vorplanung bei
+Kräfte & Mittel). Das Kapitel eines Moduls steht im Block seiner Kategorie; wer ein Modul in eine
+andere Kategorie schiebt, hängt sein Kapitel um (Wächter `hilfe/bereiche.guard.test.ts`, dort
+auch die Zuordnung Modul → Kapitel). Die Kapitelübersicht steht in `README.md`, nach `reihenfolge`
+geordnet.
 
 ## Lesergruppen (D8)
 

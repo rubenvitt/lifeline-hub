@@ -81,7 +81,7 @@ test('Fahrzeug als eigene Einheit führen: die Besatzung kommt mit, das Meldebil
   expect(einheit, 'die gebildete Einheit steht in der Liste').toBeDefined();
 
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht?einheit=${einheit!.id}`);
-  const meldebild = page.getByRole('region', { name: 'Meldebild' });
+  const meldebild = page.getByRole('region', { name: 'Kräfteübersicht' });
   const markiert = meldebild.locator('tr.zeile-hervorgehoben');
   await expect(markiert).toContainText(funkrufname);
   // Die Besatzung zählt in der Stärke der Einheit: ein Unterführer, eine Mannschaft.

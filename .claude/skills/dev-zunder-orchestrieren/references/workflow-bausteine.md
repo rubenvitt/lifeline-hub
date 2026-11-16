@@ -38,7 +38,7 @@ export const meta = {
   description: 'Scope a Zunder parent task and its subtasks against the codebase',
   phases: [{ title: 'Scope' }],
 }
-const SUBTASKS = args.subtasks  // [{kurz, name, description}], kurz = erste 8 Hex-Zeichen der UUID
+const SUBTASKS = args.subtasks  // [{kurz, name, description}], kurz = erste 8 Zeichen der Zunder-ID
 const SCOPE = {
   type: 'object',
   properties: {

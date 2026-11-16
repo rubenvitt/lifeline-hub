@@ -80,8 +80,10 @@ function Adresse() {
   return <output data-testid="adresse">{decodeURIComponent(useLocation().search)}</output>;
 }
 
-function renderPage(pfad = '/einsaetze/1/lagemeldungen') {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderPage(
+  pfad = '/einsaetze/1/lagemeldungen',
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
@@ -498,6 +500,43 @@ describe('LagemeldungenPage', () => {
         expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull(),
       );
       expect(listeLageMeldungen.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    /** Schnellaktion „Lagemeldung erfassen“ (Spec `meldungseingang`, Adresse mit `?neu=1`). */
+    it('?neu=1 öffnet das Formular mit der Art Lagemeldung und räumt den Parameter', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      renderPage('/einsaetze/1/lagemeldungen?neu=1');
+      expect(
+        await screen.findByRole('region', { name: 'Lagemeldung erfassen' }),
+      ).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+    });
+
+    /** Der Riegel selbst: die später ankommende Freigabe öffnet das Formular nicht nachträglich. */
+    it('?neu=1 ohne Modul Meldungen öffnet auch dann nichts, wenn die Freigabe danach kommt', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      ladeModulFreigaben.mockResolvedValueOnce({ meldungen: { sichtbar: true, zugriff: false } });
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      renderPage('/einsaetze/1/lagemeldungen?neu=1', client);
+      expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+
+      ladeModulFreigaben.mockResolvedValue({ meldungen: { sichtbar: true, zugriff: true } });
+      await act(() => client.invalidateQueries());
+
+      expect(
+        await screen.findByRole('button', { name: 'Lagemeldung erfassen' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull();
+    });
+
+    it('?neu=1 öffnet ohne Modul Meldungen nichts, räumt aber den Parameter', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      ladeModulFreigaben.mockResolvedValue({ meldungen: { sichtbar: true, zugriff: false } });
+      renderPage('/einsaetze/1/lagemeldungen?neu=1');
+      expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByTestId('adresse')).toHaveTextContent(/^$/));
+      expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull();
     });
 
     it('ohne Schreibrecht: Nur Ansicht mit Grund, kein Erfassen', async () => {

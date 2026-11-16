@@ -65,6 +65,9 @@ describe('Sprungmarken (LFH-620)', () => {
   it('steht im Panel dort, wo der Entwurf sie führt', () => {
     expect(folge(moduleNachKategorie('fuehrung'), sprungmarkenNachKategorie('fuehrung'))).toEqual([
       'ueberblick',
+      // y3zh5ymv D10: das ETB samt Marke steht in der Führung.
+      'etb',
+      '↗entscheidungen',
       'einsatzdaten',
       'einsatzabschnitte',
       'auftraege',
@@ -85,8 +88,6 @@ describe('Sprungmarken (LFH-620)', () => {
     ]);
     expect(folge(moduleNachKategorie('erfassung'), sprungmarkenNachKategorie('erfassung'))).toEqual(
       [
-        'etb',
-        '↗entscheidungen',
         'personen',
         '↗patienten',
         '↗vermisste',
@@ -135,8 +136,8 @@ describe('Sprungmarken (LFH-620)', () => {
   });
 
   it('hängt eine Marke ohne auffindbaren Anker ans Ende, statt sie zu verlieren', () => {
-    const module = moduleNachKategorie('erfassung').filter((m) => m.key !== 'etb');
-    const zeilen = folge(module, sprungmarkenNachKategorie('erfassung'));
+    const module = moduleNachKategorie('fuehrung').filter((m) => m.key !== 'etb');
+    const zeilen = folge(module, sprungmarkenNachKategorie('fuehrung'));
     expect(zeilen[zeilen.length - 1]).toBe('↗entscheidungen');
   });
 

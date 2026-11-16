@@ -35,7 +35,8 @@ import {
   type SegmentOption,
 } from '../components/instrument';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { useModulFreigabenStand, useSprungSperre } from '../einsatz/useSprungSperre';
+import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { MELDUNG_STATUS } from '../kommunikation';
 import PrioBadge from '../kommunikation/PrioBadge';
@@ -159,6 +160,22 @@ export default function LagemeldungenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
+  // Schnellaktion „Lagemeldung erfassen“ (Sprungpalette; Spec `meldungseingang`, „Das
+  // Meldungsformular öffnet sich über die Adresse“): ?neu=1 öffnet das Formular. Entschieden wird
+  // erst mit geladenem Einsatz UND bekannten Freigaben (das Recht verlangt das Modul Meldungen),
+  // geräumt wird immer, einmal je Verlaufseintrag (`useLinkAuftrag`, LLH-1558).
+  const neuAuftrag = useLinkAuftrag();
+  const freigabenStand = useModulFreigabenStand(einsatzId);
+  const freigabenBekannt = freigabenStand.freigaben !== undefined || freigabenStand.gescheitert;
+  const darfErfassenRoh =
+    einsatzQuery.data != null && darfBeantragen(einsatzQuery.data) && !meldungenGesperrt;
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (neuAuftrag.verbraucht()) return;
+    if (einsatzQuery.isLoading || !freigabenBekannt) return;
+    if (darfErfassenRoh) setFormOffen(true);
+    neuAuftrag.raeume('neu');
+  }, [searchParams, neuAuftrag, einsatzQuery.isLoading, freigabenBekannt, darfErfassenRoh]);
   const lageQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),

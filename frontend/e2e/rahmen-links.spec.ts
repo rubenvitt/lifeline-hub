@@ -82,12 +82,13 @@ test('Strg-Klick und Mittelklick öffnen Modul und Kategorie in einem neuen Tab'
     ).length;
   }
 
+  // Das ETB steht in der Führung (y3zh5ymv D10); deren Panel ist auf /etb offen.
   const panel = page.locator('[data-lfh="modul-panel"]');
-  const betroffene = panel.getByRole('link', { name: /^Betroffene(,|$)/ });
-  await betroffene.click({ modifiers: ['ControlOrMeta'] });
+  const einsatzdaten = panel.getByRole('link', { name: /^Einsatzdaten(,|$)/ });
+  await einsatzdaten.click({ modifiers: ['ControlOrMeta'] });
   await expect
-    .poll(() => neueFertigeTabs(`/einsaetze/${einsatzId}/personen`), {
-      message: 'Strg-Klick öffnet Betroffene in einem neuen Tab',
+    .poll(() => neueFertigeTabs(`/einsaetze/${einsatzId}/einsatzdaten`), {
+      message: 'Strg-Klick öffnet die Einsatzdaten in einem neuen Tab',
     })
     .toBe(1);
 
@@ -101,14 +102,14 @@ test('Strg-Klick und Mittelklick öffnen Modul und Kategorie in einem neuen Tab'
 
   // Der Ausgangstab bleibt im ETB, und die Rail bleibt auf seiner Kategorie.
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/etb$`));
-  await expect(rail.getByRole('link', { name: 'Erfassung', exact: true })).toHaveAttribute(
+  await expect(rail.getByRole('link', { name: 'Führung', exact: true })).toHaveAttribute(
     'aria-current',
     'true',
   );
 
   // Gegenprobe: der einfache Klick bleibt im Tab.
-  await betroffene.click();
-  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
+  await einsatzdaten.click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einsatzdaten$`));
   // Genau drei Tabs in diesem Kontext: Ausgangstab, Modul, Kategorie — kein weiterer, auch kein
   // leerer.
   const imKontext = async () =>

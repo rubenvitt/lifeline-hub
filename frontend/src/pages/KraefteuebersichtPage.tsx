@@ -1099,7 +1099,7 @@ export default function KraefteuebersichtPage() {
       // frühere POST + PATCH ließ bei gescheitertem PATCH einen leeren Entwurf stehen.
       const lb = await legeLageberichtAn(einsatzId, {
         vorlage: 'freitext',
-        titel: `Kräftemeldebild ${stand}`,
+        titel: `Kräfteübersicht ${stand}`,
         abschnitte: [{ schluessel: 'text', text: md }],
       });
       return lb.id;
@@ -1340,7 +1340,7 @@ export default function KraefteuebersichtPage() {
             Meldeblatt nicht zuordenbar. Am Schirm verborgen. Der Stand ist der älteste
             erfolgreiche Listenabruf, nicht die Druckzeit. */}
         <Druckkopf
-          dokumentart="Meldebild"
+          dokumentart={modulName('kraefteuebersicht')}
           einsatz={einsatz}
           sichtbarkeit="druck"
           zeilen={[
@@ -1507,7 +1507,11 @@ export default function KraefteuebersichtPage() {
               { wert: 'alles', label: 'alles' },
             ]}
           />
-          <SpaltenSchalter bezeichnung="Meldebild" spalten={spalten} {...spaltenSchalter} />
+          <SpaltenSchalter
+            bezeichnung={modulName('kraefteuebersicht')}
+            spalten={spalten}
+            {...spaltenSchalter}
+          />
           {darfSchreiben && (
             <Button
               loading={uebernehmen.isPending}
@@ -1558,7 +1562,7 @@ export default function KraefteuebersichtPage() {
             „—" samt Wort im zugänglichen Namen. Eine Tönungsfarbe für beide Fälle, wie im
             Entwurf. */}
         <Datensicht
-          bezeichnung="Meldebild"
+          bezeichnung={modulName('kraefteuebersicht')}
           form="tabelle"
           spalten={spalten}
           spaltenSchalterAussen={spaltenSchalter}

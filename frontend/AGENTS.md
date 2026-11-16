@@ -178,8 +178,13 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**
-  (`redirectZiel()`); Aufträge/Befehle unter Führung; **Meldebild** heißt sichtbar die
-  Kräfteübersicht — **Schlüssel und Route bleiben `kraefteuebersicht`**.
+  (`redirectZiel()`); ETB direkt dahinter, Aufträge/Befehle unter Führung (y3zh5ymv D10). Das
+  Kräftemodul heißt sichtbar **Kräfteübersicht** (y3zh5ymv D7, löst LFH-965 D1 ab), **Schlüssel
+  und Route bleiben `kraefteuebersicht`**; „Sachverhalt / Meldebild“ der Einsatzdaten ist der
+  Leitstellenbegriff und bleibt.
+- **Synonyme** (y3zh5ymv D2): `ModulEintrag.schlagworte` trägt Abkürzungen, Alltagswörter und
+  frühere Namen; die Sprungpalette sucht darüber, sichtbar sind sie nirgends. Wer ein Modul
+  umbenennt, legt den alten Namen dort ab.
 - **Ein Name je Modul** (LFH-965, Spec `modul-benennung`): Menü, Sprungpalette, h1, Ortspfad und
   Tab tragen das `label` der Registry, Seiten holen es über `modulName(key)`, nie als Literal.
   `beschreibung` ist die zweite Zeile in Modulmenü und Sprungpalette: wenige Fachwörter, kein

@@ -137,7 +137,7 @@ async function queueEintraege(page: Page): Promise<number> {
 
 const ROUTEN = [
   { name: 'ETB', modul: 'etb', inhalt: 'Offline-Probe Lagemeldung' },
-  { name: 'Meldebild', modul: 'kraefteuebersicht', inhalt: 'Offline-Probe Zug' },
+  { name: 'Kräfteübersicht', modul: 'kraefteuebersicht', inhalt: 'Offline-Probe Zug' },
   { name: 'Betroffene', modul: 'personen', inhalt: 'Offlineprobe' },
   { name: 'Aufträge', modul: 'auftraege', inhalt: 'Offline-Probe Auftrag' },
   { name: 'Lagekarte', modul: 'lagekarte', inhalt: null },

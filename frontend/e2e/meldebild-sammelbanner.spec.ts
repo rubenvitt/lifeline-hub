@@ -37,8 +37,8 @@ async function lage(page: Page) {
     return {
       seitenzeile: kante('[data-lfh="meldebild-werkzeuge"]')!,
       anker: kante('[data-lfh="datensicht-werkzeuge"]')!,
-      tabelle: kante('section[aria-label="Meldebild"] .ant-table-wrapper')!,
-      kopf: kante('section[aria-label="Meldebild"] .ant-table-thead')!,
+      tabelle: kante('section[aria-label="Kräfteübersicht"] .ant-table-wrapper')!,
+      kopf: kante('section[aria-label="Kräfteübersicht"] .ant-table-thead')!,
       pille: kante('[data-lfh="datensicht-banner-pille"] button'),
       abstand: parseFloat(
         getComputedStyle(document.querySelector('[data-lfh="meldebild-werkzeuge"]')!)
@@ -65,7 +65,7 @@ for (const viewport of BREITEN) {
     );
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await strom;
-    const bereich = page.getByRole('region', { name: 'Meldebild' });
+    const bereich = page.getByRole('region', { name: 'Kräfteübersicht' });
     await expect(bereich.locator(`tr[data-row-key="eh-${b.zug}"]`)).toBeVisible();
 
     // ── 1. Keine Standzeile: der Anker hat keine Höhe, die Tabelle folgt dem Außenabstand.

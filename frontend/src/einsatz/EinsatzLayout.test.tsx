@@ -124,9 +124,12 @@ function setup(
           {/* Erstes freigegebenes Modul der Kategorie 'lage': der Rail-Klick auf eine fremde Kategorie
               navigiert dorthin; ohne diese Route bliebe der Rahmen leer. */}
           <Route path="lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
-          {/* Zweites Ziel INNERHALB von 'erfassung': 'personen' ist dort nicht das erste Modul ('etb') —
-              nur so sagt die Pfad-Sonde beim Selbstklick-Test etwas aus. */}
+          {/* Ziele INNERHALB von 'erfassung' („Betroffene & Schäden“): 'schaeden' ist dort nicht das
+              erste Modul ('personen') — nur so sagt die Pfad-Sonde beim Selbstklick-Test etwas aus. */}
           <Route path="personen" element={<div>Personen-Inhalt</div>} />
+          <Route path="schaeden" element={<div>Schäden-Inhalt</div>} />
+          {/* Zweites Ziel in 'fuehrung', der Kategorie des ETB (y3zh5ymv D10). */}
+          <Route path="einsatzdaten" element={<div>Einsatzdaten-Inhalt</div>} />
         </Route>
       </Routes>
       <PfadAnzeige />
@@ -253,15 +256,15 @@ describe('EinsatzLayout', () => {
     // einem Routen-Effekt grün.
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
 
-    await userEvent.click(screen.getByRole('link', { name: 'Betroffene' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Einsatzdaten' }));
 
-    expect(await screen.findByText('Personen-Inhalt')).toBeInTheDocument();
-    expect(leseZuletztModule(admin.id, 7)).toEqual(['personen']);
+    expect(await screen.findByText('Einsatzdaten-Inhalt')).toBeInTheDocument();
+    expect(leseZuletztModule(admin.id, 7)).toEqual(['einsatzdaten']);
   });
 
   /**
    * Die Panel-Gruppe „Zuletzt" gibt es nicht (Begründung an `ModulPanel`); der Speicher lebt für
-   * die Kommandopalette. 'lagekarte' liegt in 'lage', offen ist 'erfassung': stünde die Gruppe
+   * die Kommandopalette. 'lagekarte' liegt in 'lage', offen ist 'fuehrung': stünde die Gruppe
    * noch, wäre „Lagekarte" hier ein Knopf. Die Vorbedingung macht die Abwesenheit zur Aussage.
    */
   it('zeigt gemerkte Module nicht als „Zuletzt"-Gruppe im Panel', async () => {
@@ -270,19 +273,19 @@ describe('EinsatzLayout', () => {
     merkeModulBesuch(admin.id, 7, 'lagekarte');
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'Betroffene' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Einsatzdaten' })).toBeInTheDocument();
     expect(screen.queryByText('Zuletzt')).toBeNull();
     expect(queryNavEintrag('Lagekarte')).toBeNull();
   });
 
   it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
     setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
-    // 'personen' ausblenden; das Erfassung-Panel ist via /etb offen.
-    setup(freigabenFixture({ personen: { sichtbar: false, zugriff: false } }));
+    // 'einsatzdaten' ausblenden; das Panel der Führung ist via /etb offen.
+    setup(freigabenFixture({ einsatzdaten: { sichtbar: false, zugriff: false } }));
     // Erst der Panel-Anker, dann die Abwesenheit ABWARTEN: bis die Freigaben ankommen, steht
     // „Personen" offen da (LFH-788). Der ETB-Inhalt allein sagt darüber nichts.
     expect(await screen.findByRole('link', { name: 'ETB' })).toBeInTheDocument();
-    await waitFor(() => expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument());
+    await waitFor(() => expect(queryNavEintrag('Einsatzdaten')).not.toBeInTheDocument());
   });
 
   it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
@@ -591,12 +594,12 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByRole('link', { name: 'ETB' })).toBeInTheDocument());
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Erfassung' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Führung' }));
 
     expect(queryNavEintrag('ETB')).not.toBeInTheDocument();
     // Die Rail bleibt auf der Kategorie — sonst wäre „zugeklappt" von „keine Kategorie aktiv"
     // nicht zu unterscheiden.
-    expect(await screen.findByRole('link', { name: 'Erfassung' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Führung' })).toHaveAttribute(
       'aria-current',
       'true',
     );
@@ -672,7 +675,7 @@ describe('EinsatzLayout', () => {
         'aria-expanded',
         'false',
       );
-      expect(await screen.findByRole('link', { name: 'Erfassung' })).toHaveAttribute(
+      expect(await screen.findByRole('link', { name: 'Führung' })).toHaveAttribute(
         'aria-expanded',
         'false',
       );
@@ -743,7 +746,7 @@ describe('EinsatzLayout', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Navigation öffnen' }));
 
       const dialog = await screen.findByRole('dialog');
-      expect(within(dialog).getByRole('button', { name: 'Erfassung' })).toHaveAttribute(
+      expect(within(dialog).getByRole('button', { name: 'Führung' })).toHaveAttribute(
         'aria-expanded',
         'true',
       );
@@ -918,8 +921,9 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
   it('springt über eine Sprungmarke ins Zielmodul, ohne sie als Besuch zu merken', async () => {
     setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     localStorage.clear();
-    setup();
-    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    // Start in der Kategorie der Marke (Betroffene & Schäden), damit ihr Panel offen ist.
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/schaeden');
+    await waitFor(() => expect(screen.getByText('Schäden-Inhalt')).toBeInTheDocument());
 
     await userEvent.click(
       screen.getByRole('link', { name: 'Vermisste, springt zu Personen · Vermisst' }),
@@ -953,26 +957,26 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
 
   /**
    * LLH-1734 (Spec `seiten-orientierung`): der Rail-Sprung führt ins zuletzt besuchte Modul der
-   * Kategorie. Start in 'personen' (nicht das erste Modul von Erfassung) als Ankunft per Adresse:
-   * auch sie zählt. Vorher landete der Rückweg in 'etb'.
+   * Kategorie. Start in 'schaeden' (nicht das erste Modul von „Betroffene & Schäden“) als Ankunft
+   * per Adresse: auch sie zählt. Vorher landete der Rückweg im ersten Modul.
    */
   it('springt zurück ins zuletzt besuchte Modul der Kategorie', async () => {
     localStorage.clear();
-    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen');
-    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/schaeden');
+    await waitFor(() => expect(screen.getByText('Schäden-Inhalt')).toBeInTheDocument());
     await freigabenAngekommen();
 
     await userEvent.click(screen.getByRole('link', { name: 'Lage' }));
     await waitFor(() => expect(pfad()).toBe('/einsaetze/7/lage-dashboard'));
     // Die Adresse des Rail-Links zeigt dorthin, wohin der Klick springt (LLH-1732): Strg/⌘+Klick
     // landet im neuen Tab im selben Modul.
-    expect(screen.getByRole('link', { name: 'Erfassung' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Betroffene & Schäden' })).toHaveAttribute(
       'href',
-      '/einsaetze/7/personen',
+      '/einsaetze/7/schaeden',
     );
 
-    await userEvent.click(screen.getByRole('link', { name: 'Erfassung' }));
-    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
+    await userEvent.click(screen.getByRole('link', { name: 'Betroffene & Schäden' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/schaeden'));
     // Ankünfte füllen „Zuletzt besucht“ der Palette nicht (Spec `navigation-zuletzt-besucht`).
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
@@ -981,10 +985,10 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     localStorage.clear();
     localStorage.setItem(
       `lfh:nav:kategorie-modul:${admin.id}:7`,
-      JSON.stringify({ erfassung: { key: 'personen', at: Date.now() } }),
+      JSON.stringify({ erfassung: { key: 'schaeden', at: Date.now() } }),
     );
     setup(
-      freigabenFixture({ personen: { zugriff: false } }),
+      freigabenFixture({ schaeden: { zugriff: false } }),
       {},
       admin,
       '/einsaetze/7/lage-dashboard',
@@ -992,8 +996,8 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     await waitFor(() => expect(screen.getByText('Dashboard-Inhalt')).toBeInTheDocument());
     await freigabenAngekommen();
 
-    await userEvent.click(screen.getByRole('link', { name: 'Erfassung' }));
-    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/etb'));
+    await userEvent.click(screen.getByRole('link', { name: 'Betroffene & Schäden' }));
+    await waitFor(() => expect(pfad()).toBe('/einsaetze/7/personen'));
   });
 
   /**
@@ -1015,17 +1019,17 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
   it('navigiert beim Klick auf die AKTIVE Kategorie nicht, sondern klappt nur zu', async () => {
     setzeViewportBreite(XL); // Panel ohne Wahl offen (LFH-952)
     // Der Selbstklick ist der Zuklapp-Umschalter mit Persistenz; ohne diese Gegenaussage färbte
-    // auch ein bedingungslos navigierender Klick den Test darüber grün. Startpunkt 'personen',
-    // nicht 'etb' (das erste Modul der Kategorie) — sonst änderte ein falscher Sprung den Pfad nicht.
-    setup(freigabenFixture(), {}, admin, '/einsaetze/7/personen');
-    await waitFor(() => expect(screen.getByText('Personen-Inhalt')).toBeInTheDocument());
+    // auch ein bedingungslos navigierender Klick den Test darüber grün. Startpunkt 'schaeden',
+    // nicht 'personen' (das erste Modul der Kategorie) — sonst änderte ein falscher Sprung den Pfad nicht.
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/schaeden');
+    await waitFor(() => expect(screen.getByText('Schäden-Inhalt')).toBeInTheDocument());
     const vorher = pfad();
 
-    // „Erfassung" ist die Kategorie von 'personen' — der Klick trifft die aktive.
-    await userEvent.click(await screen.findByRole('link', { name: 'Erfassung' }));
+    // „Betroffene & Schäden“ ist die Kategorie von 'schaeden' — der Klick trifft die aktive.
+    await userEvent.click(await screen.findByRole('link', { name: 'Betroffene & Schäden' }));
 
     expect(pfad()).toBe(vorher);
-    // Panel zugeklappt: ein Erfassung-Modul wie „Personen" steht nicht mehr im Baum
+    // Panel zugeklappt: ein Modul der Kategorie wie „Betroffene“ steht nicht mehr im Baum
     // (dieselbe Abfrage wie im Bestandstest zum gemerkten Einklapp-Zustand oben).
     expect(queryNavEintrag('Betroffene')).not.toBeInTheDocument();
   });
@@ -1039,13 +1043,15 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     setup(
       freigabenFixture({
         'lage-dashboard': { zugriff: false },
-        personen: { zugriff: false },
+        einsatzdaten: { zugriff: false },
       }),
     );
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     // Erst wenn die Freigaben da sind, steht das gesperrte Modul mit Schloss in der Liste.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Betroffene' })).toBeDisabled());
-    expect(screen.getByRole('button', { name: 'Betroffene' })).toHaveAttribute(
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Einsatzdaten' })).toBeDisabled(),
+    );
+    expect(screen.getByRole('button', { name: 'Einsatzdaten' })).toHaveAttribute(
       'title',
       'Keine Berechtigung',
     );
@@ -1071,17 +1077,18 @@ describe('EinsatzLayout · Rail-Klick (LFH-337 · H12)', () => {
     // Das gesperrte Lage-Dashboard überspringt auch die Adresse, wie der Sprung (LFH-669).
     const lage = await screen.findByRole('link', { name: 'Lage' });
     expect(lage).toHaveAttribute('href', '/einsaetze/7/lagekarte');
-    expect(screen.getByRole('link', { name: 'Betroffene' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Betroffene & Schäden' })).toHaveAttribute(
       'href',
       '/einsaetze/7/personen',
     );
-    expect(
-      screen.getByRole('link', { name: 'Vermisste, springt zu Personen · Vermisst' }),
-    ).toHaveAttribute('href', '/einsaetze/7/personen?filter=vermisst&ansicht=zeilen');
+    expect(screen.getByRole('link', { name: 'Einsatzdaten' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/einsatzdaten',
+    );
 
     const vorher = pfad();
     fireEvent.click(lage, { ctrlKey: true });
-    fireEvent.click(screen.getByRole('link', { name: 'Betroffene' }), { ctrlKey: true });
+    fireEvent.click(screen.getByRole('link', { name: 'Einsatzdaten' }), { ctrlKey: true });
     expect(pfad()).toBe(vorher);
     expect(leseZuletztModule(admin.id, 7)).toEqual([]);
   });
