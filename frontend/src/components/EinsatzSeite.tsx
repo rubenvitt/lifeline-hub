@@ -20,7 +20,6 @@ import { MenueAusloeser } from './MenueAusloeser';
 import { useViewport } from './useViewport';
 import { SEITENKOPF_KLEBT, useSeitenkopfKleben } from './seitenkopfKleben';
 import { useModusFarben } from './rahmenStil';
-import { useAlarmKante } from './alarmOben';
 import StatusTag from './StatusTag';
 import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
 import { einsatzStatus } from '../theme/statusFarben';
@@ -475,8 +474,6 @@ export default function EinsatzSeite({
   const { token } = theme.useToken();
   const farben = useModusFarben();
   const aktionenRef = useRef<HTMLDivElement>(null);
-  // Stehende Alarme beginnen unter dem Seitenkopf, solange er im Bild ist (LFH-1112).
-  const alarmKante = useAlarmKante<HTMLDivElement>();
   // Klebt der Seitenkopf, zählt er zum Rahmen über dem Inhalt (zjt7c073 D2/D3). Mit
   // `fensterInhalt` steckt er in `FensterRahmen` in einem eigenen Wrapper, der sein Containing
   // Block ist: kleben kann er dort nicht, also meldet er sich auch nicht als Rahmenquelle.
@@ -485,11 +482,10 @@ export default function EinsatzSeite({
   // Eine Ref-Funktion für alle Abnehmer; stabil, sonst hängte React sie bei jedem Render um.
   const kopfLeiste = useCallback(
     (el: HTMLDivElement | null) => {
-      alarmKante(el);
       klebeRef(el);
       kopfRef?.(el);
     },
-    [alarmKante, klebeRef, kopfRef],
+    [klebeRef, kopfRef],
   );
   const { istSchmal } = useViewport();
   const seitenWurzel = useRef<HTMLDivElement>(null);

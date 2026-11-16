@@ -1,5 +1,5 @@
 import { Button, Drawer, Popover, Switch, theme } from 'antd';
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
@@ -8,13 +8,19 @@ import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useAuthOptional } from '../auth/AuthContext';
 import Datenstand from '../components/Datenstand';
 import { Augenbraue } from '../components/instrument';
-import { IconPosteingang } from '../icons';
+import { useRollen } from '../components/instrument/rollenwerte';
+import { useViewport } from '../components/useViewport';
+import { useAlarmZone } from './alarmZoneSpeicher';
+import { IconKreuz, IconPosteingang } from '../icons';
 import { saveEingaengeGelesenOfflineCapable } from '../offline/schreiben';
 import { useVorgemerkteSchreibaktionen } from '../offline/useVorgemerkteSchreibaktionen';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { BENACHRICHTIGUNGEN_PFAD } from '../routing/deeplinks';
 import { rahmenFarben, schrift } from '../theme/tokens';
+import { verlaufInhalt, type VerlaufInhalt } from './benachrichtigungGedaechtnis';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
+import { ladeErinnerungTitel } from './erinnerungInhalt';
+import { ladeMeldungInhalt } from './meldungInhalt';
 import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
 import { EINGANG_ARTEN, setzeStumm, useStummeArten } from './eingaengeStumm';
 import EingaengeZahl from './EingaengeZahl';
@@ -31,6 +37,44 @@ function istNeu(a: BenachrichtigungAnzeige): boolean {
   return !a.quittiert_at && a.stufe !== 'still';
 }
 
+/**
+ * Was der Eintrag unter „Neu“ zeigt (LLH-1737, Spec `benachrichtigungen`, „Der Verlauf nennt den
+ * Inhalt einer Meldung“): bei einer Meldung Absender und Wortlautanfang (`meldungInhalt.ts`), bei
+ * einer fälligen Erinnerung ihr Titel (`erinnerungInhalt.ts`), wie Alarmzone und Eingangsband.
+ * Nur für Neues: „Früher“ kann 200 Einträge lang sein, und dort ist alles schon gelesen.
+ */
+/**
+ * Zählt das Öffnen von Klappfläche bzw. Blatt: bei jedem Öffnen holt der Verlauf fehlenden Inhalt
+ * neu. Ein Zähler, kein Wahrheitswert: antd zeichnet die geschlossene Fläche nicht neu.
+ */
+const VerlaufOffen = createContext(0);
+
+function useVerlaufInhalt(a: BenachrichtigungAnzeige): VerlaufInhalt {
+  const qc = useQueryClient();
+  const neu = istNeu(a);
+  const oeffnung = useContext(VerlaufOffen);
+  const [inhalt, setInhalt] = useState(() => verlaufInhalt.get(a.id) ?? null);
+  useEffect(() => {
+    if (!neu || verlaufInhalt.has(a.id)) return;
+    let aktiv = true;
+    void Promise.all([ladeMeldungInhalt(a), ladeErinnerungTitel(a, qc)]).then(([m, titel]) => {
+      const wert: VerlaufInhalt | null = m
+        ? { titel: m.titel ?? a.titel, detail: m.anfang ?? a.detail }
+        : titel
+          ? { titel: `${a.titel}: ${titel}`, detail: a.detail }
+          : null;
+      // Nur ein Inhalt wird gemerkt: lief die Frist ab oder fehlte das Netz, holt das nächste
+      // Öffnen neu (Review vor dem PR). Eine Art ohne Inhalt fragt ohnehin nicht nach.
+      if (wert) verlaufInhalt.set(a.id, wert);
+      if (aktiv) setInhalt(wert);
+    });
+    return () => {
+      aktiv = false;
+    };
+  }, [a, neu, oeffnung, qc]);
+  return inhalt ?? { titel: a.titel, detail: a.detail };
+}
+
 function Eintrag({
   a,
   quittiere,
@@ -42,6 +86,7 @@ function Eintrag({
 }) {
   const { token } = theme.useToken();
   const art = BENACHRICHTIGUNG_ARTEN[a.art]?.name;
+  const { titel, detail } = useVerlaufInhalt(a);
   return (
     <li style={{ listStyle: 'none' }}>
       <Link
@@ -74,7 +119,7 @@ function Eintrag({
         <span style={{ minWidth: 0 }}>
           <span style={{ display: 'block', fontWeight: istNeu(a) ? 600 : 400 }}>
             {a.stufe === 'alarm' ? 'Alarm: ' : null}
-            {a.titel}
+            {titel}
           </span>
           <span
             style={{
@@ -83,7 +128,7 @@ function Eintrag({
               color: token.colorTextSecondary,
             }}
           >
-            {[art !== a.titel ? art : undefined, a.detail].filter(Boolean).join(' · ')}
+            {[art !== a.titel ? art : undefined, detail].filter(Boolean).join(' · ')}
           </span>
         </span>
         <span aria-hidden="true">↗</span>
@@ -292,6 +337,77 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
 }
 
 /**
+ * Alarme im Blatt am Handschirm (LLH-1738, Spec `benachrichtigungen`, „Eine Leiste am
+ * Handschirm“, Entwurf `docs/design/2026-11-15-alarmzone/Handy-Blatt.dc.html`): unter `md` steht
+ * keine Alarmzone, das Blatt nennt die Alarme deshalb über den Eingängen, jeder mit „Öffnen“,
+ * „Gelesen“ und ✕ wie in der Zone. Ohne Alarm steht nichts.
+ */
+function AlarmAbschnitt({ schliessen }: { schliessen: () => void }) {
+  const { token } = theme.useToken();
+  const { rollen } = useRollen();
+  const { eintraege } = useAlarmZone();
+  // Ab `md` steht die Alarmzone oben; das Blatt (Tablet mit Finger) wiederholt sie nicht.
+  const { istSchmal } = useViewport();
+  if (!istSchmal || eintraege.length === 0) return null;
+  // Hinweise der Organisation sind keine Alarme (Review vor dem PR): eigenes Wort, eigene Farbe.
+  const alarme = eintraege.filter((e) => e.stufe === 'alarm').length;
+  const hinweise = eintraege.length - alarme;
+  return (
+    <section aria-label="Alarme" style={{ marginBlockEnd: token.marginSM }}>
+      <Augenbraue als="h2" style={{ color: alarme > 0 ? rollen.alarmText : rollen.bedienText }}>
+        {[
+          alarme > 0 ? (alarme === 1 ? 'Alarm' : `${alarme} Alarme`) : null,
+          hinweise > 0 ? (hinweise === 1 ? 'Hinweis' : `${hinweise} Hinweise`) : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      </Augenbraue>
+      {[...eintraege].reverse().map((e) => (
+        <div
+          key={e.schluessel}
+          data-lfh="alarm-eintrag"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: token.paddingXXS,
+            marginBlockStart: token.paddingXS,
+            padding: `${token.paddingXS}px ${token.paddingSM}px`,
+            background: e.stufe === 'alarm' ? rollen.alarmFlaeche : rollen.bedienFlaeche,
+            boxShadow: `inset 4px 0 0 ${e.stufe === 'alarm' ? rollen.alarm : rollen.bedien}`,
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>{e.titel}</span>
+          {e.beschreibung && (
+            <span title={e.beschreibungVoll} style={{ color: rollen.text2 }}>
+              {e.beschreibung}
+            </span>
+          )}
+          <span style={{ display: 'flex', gap: token.paddingXS }}>
+            <Button
+              type="primary"
+              onClick={() => {
+                schliessen();
+                e.oeffnen();
+              }}
+            >
+              Öffnen
+            </Button>
+            {e.gelesen && <Button onClick={e.gelesen}>Gelesen</Button>}
+            <Button
+              type="text"
+              aria-label="Ausblenden, ohne zu quittieren"
+              icon={<IconKreuz />}
+              onClick={e.ausblenden}
+              style={{ marginInlineStart: 'auto' }}
+            />
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/**
  * Knopf „Eingänge“ in der Kommandoleiste (LLH-1143, design.md D6): das Zeichen des Posteingangs
  * (die Glocke trägt schon Ton und Erinnerungen) mit der Zahl der ungelesenen Eingänge als
  * Plakette ({@link EingaengeZahl}, nimmt keine Breite). Ab `md` öffnet er eine Klappfläche.
@@ -307,7 +423,12 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
 export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
   const { token } = theme.useToken();
   const buendelt = useKopfBuendelt();
+  const { istSchmal } = useViewport();
   const [offen, setOffen] = useState(false);
+  const [oeffnung, setOeffnung] = useState(0);
+  useEffect(() => {
+    if (offen) setOeffnung((n) => n + 1);
+  }, [offen]);
   useVerlaufAbgleich(einsatzId);
   const ungelesen = useBenachrichtigungVerlauf(einsatzId).data?.ungelesen ?? 0;
 
@@ -322,7 +443,11 @@ export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
   }, [einsatzId]);
 
   const schliessen = () => setOffen(false);
-  const paneel = <VerlaufPaneel einsatzId={einsatzId} schliessen={schliessen} />;
+  const paneel = (
+    <VerlaufOffen.Provider value={oeffnung}>
+      <VerlaufPaneel einsatzId={einsatzId} schliessen={schliessen} />
+    </VerlaufOffen.Provider>
+  );
 
   if (buendelt) {
     return (
@@ -331,10 +456,12 @@ export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
         onClose={schliessen}
         placement="bottom"
         size="auto"
-        title={null}
+        // Am Handschirm trägt das Blatt auch die Alarme (LLH-1738): sein Name sagt es.
+        title={istSchmal ? 'Alarme und Eingänge' : null}
         closable
         styles={{ body: { paddingBlock: token.paddingSM } }}
       >
+        <AlarmAbschnitt schliessen={schliessen} />
         {paneel}
       </Drawer>
     );

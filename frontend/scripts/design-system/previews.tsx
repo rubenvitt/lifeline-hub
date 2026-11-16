@@ -86,6 +86,8 @@ import { Ortsfeld } from '../../src/anzeige/Ortsfeld';
 import type { OrtSucheAntwort } from '../../src/api/karteOrtSuche';
 import type { OrtVorschau } from '../../src/api/ortVorschau';
 import { einsatzKeys } from '../../src/api/queryKeys';
+import AlarmZone from '../../src/alarm/AlarmZone';
+import { zoneSetzen, type ZonenEintrag } from '../../src/alarm/alarmZoneSpeicher';
 import EingaengeKnopf from '../../src/alarm/EingaengeKnopf';
 import Eingangsband from '../../src/alarm/Eingangsband';
 import SichtungsWahl from '../../src/personen/SichtungsWahl';
@@ -547,6 +549,48 @@ async function warteAufOrtVorschau(container: HTMLElement): Promise<void> {
   if (vorschlaege.length !== 2) {
     throw new Error('Design System: Vorschlag „Als Adresse übernehmen“ fehlt');
   }
+}
+
+const ZONE_BEISPIEL = Symbol('design-system');
+
+function zonenEintrag(schluessel: string, titel: string, beschreibung: string, name: string) {
+  const eintrag: ZonenEintrag = {
+    schluessel,
+    stufe: 'alarm',
+    titel,
+    beschreibung,
+    name,
+    oeffnen: nichts,
+    gelesen: nichts,
+    ausblenden: nichts,
+  };
+  return eintrag;
+}
+
+/**
+ * Die Alarmzone gebündelt und aufgeklappt: Kopfzeile mit Zahl und Arten, darunter je Alarm eine
+ * Zeile. In der App klebt sie unter Kopf und Übungsband; hier steht sie im Fluss der Karte.
+ */
+function AlarmZoneBeispiel() {
+  useState(() => {
+    zoneSetzen(ZONE_BEISPIEL, [
+      zonenEintrag('b-1', 'Auftrag überfällig', 'Auftrag #12 an S2 · 1912', 'Auftrag überfällig'),
+      zonenEintrag(
+        'b-2',
+        'Auftrag überfällig',
+        'Auftrag #11 an Florian 3 · 1916',
+        'Auftrag überfällig',
+      ),
+      zonenEintrag(
+        'b-3',
+        'Bestätigung ausstehend · RTW 2',
+        'Patient ansprechbar, Transport ins Klinikum · 1923',
+        'Bestätigung ausstehend',
+      ),
+    ]);
+    return null;
+  });
+  return <AlarmZone />;
 }
 
 /** Der Knopf „Eingänge“ ohne und mit ungelesenen Eingängen, auf dem dauerdunklen Rahmengrund. */
@@ -1351,6 +1395,22 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     docAnchor: 'export function Ortsfeld',
     content: () => <OrtsfeldBeispiel />,
     interact: warteAufOrtVorschau,
+  },
+  {
+    name: 'Alarmzone',
+    title: 'Alarmzone (gebündelt, aufgeklappt)',
+    group: 'Rückmeldung',
+    height: 490,
+    source: 'alarm/AlarmZone.tsx',
+    docAnchor: 'export default function AlarmZone',
+    content: () => <AlarmZoneBeispiel />,
+    interact: async (wurzel) => {
+      const knopf = [...wurzel.querySelectorAll('button')].find((b) =>
+        b.textContent?.startsWith('+ 2 weitere'),
+      );
+      if (!knopf) throw new Error('Design System: „+ 2 weitere“ fehlt an der Alarmzone');
+      await act(async () => knopf.click());
+    },
   },
   {
     name: 'Eingaenge',

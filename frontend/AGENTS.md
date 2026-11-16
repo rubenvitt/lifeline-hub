@@ -75,7 +75,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   und `components/FunkUndTelefon.tsx` (Verbindungen) · `components/InlineAngabe.tsx` ·
   `components/tabellenFilter.tsx` (Filterchips und Kopfmarke; Träger `KatalogTabelle`,
   `Datensicht`; Sortieren und Filtern in der Bedien-Leitlinie) · `alarm/EingaengeKnopf.tsx` und
-  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `personen/SichtungsWahl.tsx` ·
+  `alarm/Eingangsband.tsx` (Eingänge, Layout und Live) · `alarm/AlarmZone.tsx` (Alarmzone,
+  Rahmen) · `personen/SichtungsWahl.tsx` ·
   `personen/koerperschema/Koerperschema.tsx` · `zeichen/EinsatzZeichen.tsx` (taktische Zeichen,
   am Schirm mit `useZeichenTheme`, LLH-1409). Jeder hat eine Karte im Design System.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
@@ -131,11 +132,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     `rahmen-oben: frei` und Grund (Guard `components/rahmenOben.guard.test.ts`). Den Fokusabstand
     trägt `scroll-padding-block-start` am Dokument (`index.css`), ausgesetzt bei Fokus im Rahmen;
     bei Fokus im Seitenkopf gilt nur die Kopfhöhe.
-  - **Stehende Alarme liegen unter der Bedienkante** (LFH-1112, Spec
-    `einsatztauglichkeit-layout`): unter Kommandoleiste und Seitenkopf, solange er im Bild ist,
-    gerollt unter dem Rahmen. Gemessen in `components/alarmOben.ts` (`useAlarmKante` an Kopf und
-    Seitenkopf), angewandt über antds `--notification-top` in `index.css`; `AntApp` trägt
-    deshalb kein `top`. Nachweis `e2e/alarm-verdeckung.spec.ts`.
+  - **Alarme stehen in der Alarmzone, nie über dem Inhalt** (LLH-1735, Spec
+    `benachrichtigungen`, „Alarmzone verdeckt nichts“, Herleitung
+    `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/design.md`; löst LFH-1112 ab): Alarme, Org-Hinweise und
+    die Unwetterwarnung zeichnet `alarm/AlarmZone.tsx` direkt unter Kopf und Übungsband, nie
+    antds `notification` (`AntApp` trägt kein `notification`-Prop). Die Zone ist eine
+    Rahmenquelle der Ebene `kopf` unter dem Übungsband (`useRahmenObenStapel` mit
+    `RANG_ALARMZONE`): Rail, Modulpanel und Seitenkopf kleben unter ihr. Sie schiebt den Inhalt
+    und liegt auf `RAHMEN_EBENE` unter Drawer und Dialogen. Ab zwei Einträgen bündelt sie.
+    Im Einsatz unter `md` trägt die Leiste am Handschirm die Alarme (`alarm/HandyLeiste.tsx`).
+    ✕ blendet aus (`blendeAus`, sessionStorage je Tab), quittiert wird nur mit „Öffnen“ und
+    „Gelesen“ (LLH-1736). Greifer `[data-lfh="alarmzone"]`, `[data-lfh="alarm-eintrag"]`;
+    Nachweis `e2e/alarm-verdeckung.spec.ts`.
   - **Kopfleiste: der Name hat Vorrang** (LLH-1726, Spec `kopfleiste`): Rangfolge Einsatzname vor
     Suche vor Daueranzeigen. Ab `lg` gibt ein Raster dem Namen (16 px) seine Eigenbreite, bevor die
     Suche mehr als ihre Lupe bekommt (`kopfRasterSpalten`); die Umbruch-Basis hängt an der Dichte,
@@ -1097,17 +1105,21 @@ und `pages/personen/`.
 - Stick-to-bottom hängt an der jüngsten id, nicht an der Länge.
 - **Live-Updates springen nicht unter dem Cursor:** Sammelbanner statt Einschieben (CLS ≤ 0,1,
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
-  lesbarem Text.**
+  lesbarem Text.** Einzige Ausnahme ist die Alarmzone (LLH-1735, Entscheidung Ruben 15.11.2026):
+  ein Alarm schiebt den Inhalt um seine Zeile, statt ihn zu verdecken; CLS-Messungen laufen ohne
+  anstehenden Alarm.
 - **Ein Eingang ist Information, kein Alarm** (LLH-1062, LLH-1143, Spec `benachrichtigungen`,
   „Eingangshinweis“): alle Eingänge eines Einsatzes (Stufe `hinweis`) stehen gebündelt im
-  Eingangsband **unten** (`alarm/Eingangsband.tsx`, `alarm/useEingangshinweis.tsx`), nie als
-  antd-Notification: die drei Toastplätze oben tragen nur Alarme, Org-Hinweise und Unwetter, und
-  `maxCount` zählt das Band nicht. Der dezente Ton höchstens 1 je 2 min, kein neuer Eintrag
+  Eingangsband **unten** (`alarm/Eingangsband.tsx`, `alarm/useEingangshinweis.tsx`), nie in der
+  Alarmzone: die trägt nur Alarme, Org-Hinweise und Unwetter. Am Handschirm teilen sich Alarme
+  und Eingänge eine Leiste von 48 px, die bei Fokus in einem Eingabefeld einklappt, außer ein
+  Alarm steht an (LLH-1738). ✕ blendet aus, ohne zu quittieren. Der dezente Ton höchstens 1 je 2 min, kein neuer Eintrag
   während einer Eingabe (erst beim Verlassen des Feldes), keiner auf der Seite, deren
   Sammelbanner ihn trägt. Kein eigener Zeitgeber. e2e-Greifer: `[data-lfh="eingangsband"]`.
 - **Eine Zahl für Eingänge** (LLH-1143, Spec `benachrichtigungen`, „Ungelesene Eingänge im
   Tab-Titel“): Knopf „Eingänge“ (`alarm/EingaengeKnopf.tsx`, Zelle `kopf-alarm`), Tab-Titel und
-  App-Badge lesen denselben Verlauf (`alarm/useBenachrichtigungVerlauf.ts`, ein Key, ein Abruf);
+  App-Badge und die Leiste am Handschirm (`alarm/HandyLeiste.tsx`, LLH-1738) lesen denselben
+  Verlauf (`alarm/useBenachrichtigungVerlauf.ts`, ein Key, ein Abruf);
   abgeglichen wird er nur im Knopf (`useVerlaufAbgleich`). Keine zweite Zahl daneben. Die Zahl
   steht als Plakette über dem Zeichen (`alarm/EingaengeZahl.tsx`, nimmt keine Breite). Bündelt
   der Kopf die Alarmzentrale (`useKopfBuendelt`, Handschirm und Tablet mit Finger), trägt deren

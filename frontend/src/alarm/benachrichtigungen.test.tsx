@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App as AntApp } from 'antd';
 import { http, HttpResponse } from 'msw';
@@ -15,7 +15,9 @@ import { BENACHRICHTIGUNG_WINDOW_EVENT, meldeNachreichen } from '../live/benachr
 import { beendeHuelle, starteMacHuelle, starteWindowsHuelle } from '../test/huelle';
 import { server } from '../test/server';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
+import AlarmZone from './AlarmZone';
 import { spieleAlarmTon } from './alarmTon';
+import { istAusgeblendet } from './benachrichtigungGedaechtnis';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
 import { offeneDesktopAlarme, schliesseAlleDesktopAlarme } from './desktopAlarm';
 import { setzeEingangTonZurueck } from './useEingangshinweis';
@@ -136,6 +138,7 @@ function Route1() {
       <button type="button" onClick={() => navigate('/einsaetze/2/start')}>
         Einsatz wechseln
       </button>
+      <AlarmZone />
       <AlarmZentrale einsatzId={einsatzId} />
       <output data-testid="route">
         {location.pathname}
@@ -158,21 +161,13 @@ function renderZentrale() {
 }
 
 async function warteBisNotificationWeg(titel: string) {
-  await waitFor(() => {
-    for (const el of screen.queryAllByText(titel)) {
-      const notice = el.closest<HTMLElement>('.ant-notification-notice');
-      if (notice) {
-        fireEvent.transitionEnd(notice);
-        fireEvent.animationEnd(notice);
-      }
-    }
-    expect(screen.queryByText(titel)).not.toBeInTheDocument();
-  });
+  await waitFor(() => expect(screen.queryByText(titel)).not.toBeInTheDocument());
 }
 
+/** Die Zeile eines Eintrags der Alarmzone (LLH-1735). */
 function notice(titel: string): HTMLElement {
-  const el = screen.getByText(titel).closest<HTMLElement>('.ant-notification-notice');
-  if (!el) throw new Error(`kein Toast „${titel}“`);
+  const el = screen.getByText(titel).closest<HTMLElement>('[data-lfh="alarm-eintrag"]');
+  if (!el) throw new Error(`kein Eintrag „${titel}“`);
   return el;
 }
 
@@ -183,8 +178,9 @@ function band(): HTMLElement {
   return el;
 }
 
+/** Einträge der Alarmzone, gebündelt oder nicht. */
 function toastZahl(): number {
-  return document.querySelectorAll('.ant-notification-notice').length;
+  return Number(document.querySelector<HTMLElement>('[data-lfh="alarmzone"]')?.dataset.anzahl ?? 0);
 }
 
 function setzeHidden(hidden: boolean) {
@@ -253,15 +249,15 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
 
-  it('Alarm, Tab sichtbar: Warn-Toast und Alarmton', async () => {
+  it('Alarm, Tab sichtbar: Eintrag in der Alarmzone und Alarmton', async () => {
     const ueberfaellig = benachrichtigung(41, 'auftrag_ueberfaellig', 'auftrag', 7);
     serverMit([ueberfaellig]);
     const { Ctor } = stubMeldungen();
     renderZentrale();
     live(ueberfaellig);
 
-    const toast = await screen.findByText('Auftrag überfällig');
-    expect(toast.closest('.ant-notification-notice-warning')).not.toBeNull();
+    await screen.findByText('Auftrag überfällig');
+    expect(within(notice('Auftrag überfällig')).getByText('ALARM')).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('alarm');
     expect(Ctor).not.toHaveBeenCalled();
   });
@@ -431,7 +427,7 @@ describe('Desktop-App: native Meldung (tasks.md 5.2)', () => {
 });
 
 describe('Quittieren über alle Verbindungen (tasks.md 2.2)', () => {
-  it('Zwei Tabs: ✕ im ersten quittiert, das Quittier-Ereignis nimmt den Toast im zweiten weg', async () => {
+  it('Zwei Tabs: „Gelesen“ im ersten quittiert, das Quittier-Ereignis nimmt den Eintrag im zweiten weg', async () => {
     const auftrag = benachrichtigung(40, 'auftrag_ueberfaellig', 'auftrag', 12);
     const s = serverMit([auftrag]);
     const { meldungen } = stubMeldungen();
@@ -441,11 +437,12 @@ describe('Quittieren über alle Verbindungen (tasks.md 2.2)', () => {
     await screen.findByText('Auftrag überfällig');
     expect(offeneDesktopAlarme()).toBe(1);
 
-    // Erster Tab: ✕ quittiert auf dem Server.
+    // Erster Tab: „Gelesen“ quittiert auf dem Server, die Seite bleibt.
     await userEvent.click(
-      within(notice('Auftrag überfällig')).getByRole('button', { name: /close|schließen/i }),
+      within(notice('Auftrag überfällig')).getByRole('button', { name: 'Gelesen' }),
     );
     await waitFor(() => expect(s.quittiert).toEqual([40]));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/start');
     expect(meldungen[0].close).toHaveBeenCalled();
     // Die Push-Meldung des Service Workers geht mit (LLH-1223, D7).
     expect(schliessePushMeldungen).toHaveBeenCalledWith(40);
@@ -472,7 +469,7 @@ describe('Quittieren über alle Verbindungen (tasks.md 2.2)', () => {
     expect(s.quittiert).toEqual([]);
   });
 
-  it('das Quittier-Ereignis nimmt eine gebündelte Benachrichtigung aus dem Sammeltoast', async () => {
+  it('das Quittier-Ereignis nimmt eine gebündelte Benachrichtigung aus der Zone', async () => {
     const liste = [1, 2, 3, 4].map((n) =>
       benachrichtigung(50 + n, 'auftrag_ueberfaellig', 'auftrag', n),
     );
@@ -482,10 +479,40 @@ describe('Quittieren über alle Verbindungen (tasks.md 2.2)', () => {
       live(b);
       await screen.findByText(`Auftrag #${b.bezug_id}`);
     }
-    expect(await screen.findByText('3 weitere überfällige Aufträge')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '+ 3 weitere' })).toBeInTheDocument();
 
     live(liste[0], true);
-    expect(await screen.findByText('2 weitere überfällige Aufträge')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '+ 2 weitere' })).toBeInTheDocument();
+    expect(toastZahl()).toBe(3);
+  });
+
+  it('✕ blendet aus, ohne zu quittieren; das Nachreichen bringt den Alarm nicht zurück (LLH-1736)', async () => {
+    const auftrag = benachrichtigung(40, 'auftrag_ueberfaellig', 'auftrag', 12);
+    const s = serverMit([auftrag], [auftrag]);
+    const { meldungen } = stubMeldungen();
+    setzeHidden(true);
+    renderZentrale();
+    await screen.findByText('Auftrag überfällig');
+
+    await userEvent.click(
+      within(notice('Auftrag überfällig')).getByRole('button', {
+        name: 'Ausblenden, ohne zu quittieren',
+      }),
+    );
+    await warteBisNotificationWeg('Auftrag überfällig');
+    // Die OS-Meldung dieses Tabs geht mit, die Push-Meldungen anderer Geräte bleiben.
+    expect(meldungen[0].close).toHaveBeenCalled();
+    expect(schliessePushMeldungen).not.toHaveBeenCalled();
+    expect(s.quittiert).toEqual([]);
+
+    act(() => meldeNachreichen());
+    await waitFor(() => expect(s.offeneAbrufe.anzahl).toBe(2));
+    expect(screen.queryByText('Auftrag überfällig')).not.toBeInTheDocument();
+    expect(s.quittiert).toEqual([]);
+    // Quittiert ein anderes Gerät, ist das Merken erledigt.
+    expect(istAusgeblendet(40)).toBe(true);
+    live(auftrag, true);
+    expect(istAusgeblendet(40)).toBe(false);
   });
 
   it('„Alle gelesen“ auf einem anderen Gerät räumt die Eingänge, nie einen Alarm (LLH-1143)', async () => {
@@ -587,8 +614,8 @@ describe('Nachreichen (tasks.md 2.3)', () => {
   });
 });
 
-describe('Sammeltoast (tasks.md 2.4)', () => {
-  it('Fünf Alarme: der Sammeltoast nennt je Art die Zahl und springt zu Meldungen, Aufträgen und Ablösungen', async () => {
+describe('Gebündelte Alarmzone (LLH-1735)', () => {
+  it('Fünf Alarme: die Zone nennt je Art die Zahl, jede Zeile springt und quittiert nur sich', async () => {
     const liste = [
       benachrichtigung(61, 'auftrag_ueberfaellig', 'auftrag', 1),
       benachrichtigung(62, 'auftrag_ueberfaellig', 'auftrag', 2),
@@ -603,24 +630,25 @@ describe('Sammeltoast (tasks.md 2.4)', () => {
       await waitFor(() => expect(ton).toHaveBeenCalledTimes(liste.indexOf(b) + 1));
     }
 
-    // Vier im Sammeltoast, der jüngste bleibt einzeln stehen: alle fünf sind zu sehen.
-    const sammel = (await screen.findByText('4 weitere Alarme')).closest<HTMLElement>(
-      '.ant-notification-notice',
-    )!;
-    expect(within(sammel).getByText('2 × Auftrag überfällig')).toBeInTheDocument();
-    expect(within(sammel).getByText('1 × Sofortmeldung')).toBeInTheDocument();
-    expect(within(sammel).getByText('1 × Ablösung fällig')).toBeInTheDocument();
-    expect(within(sammel).getByRole('button', { name: 'Zu Aufträgen' })).toBeInTheDocument();
-    expect(within(sammel).getByRole('button', { name: 'Zu Meldungen' })).toBeInTheDocument();
-    expect(within(sammel).getByRole('button', { name: 'Zu Ablösungen' })).toBeInTheDocument();
+    // Zu: der jüngste mit „+ 4 weitere“; auf: Kopfzeile mit Zahl und Arten.
+    await userEvent.click(await screen.findByRole('button', { name: '+ 4 weitere' }));
+    expect(screen.getByText('5 Alarme')).toBeInTheDocument();
+    expect(
+      screen.getByText('2 × Auftrag überfällig · 1 × Sofortmeldung · 2 × Ablösung fällig'),
+    ).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-lfh="alarm-eintrag"]')).toHaveLength(5);
 
-    await userEvent.click(within(sammel).getByRole('button', { name: 'Zu Aufträgen' }));
-    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege');
-    // Der Sprung räumt alle Toasts ab und quittiert sie.
-    await waitFor(() => expect([...s.quittiert].sort()).toEqual([61, 62, 63, 64, 65]));
+    const zeile = screen
+      .getByText('Auftrag #1')
+      .closest<HTMLElement>('[data-lfh="alarm-eintrag"]')!;
+    await userEvent.click(within(zeile).getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege?auftrag=1');
+    // Der Sprung quittiert nur seinen Alarm, die übrigen vier stehen weiter.
+    await waitFor(() => expect(s.quittiert).toEqual([61]));
+    expect(toastZahl()).toBe(4);
   });
 
-  it('Eingänge zählen nicht ins Budget: drei Alarme und fünf Eingänge, kein Sammeltoast (LLH-1143)', async () => {
+  it('Eingänge stehen nicht in der Zone: drei Alarme und fünf Eingänge (LLH-1143)', async () => {
     const alarme = [1, 2, 3].map((n) =>
       benachrichtigung(80 + n, 'sofortmeldung', 'meldung', n, {
         titel: 'Sofortmeldung eingegangen',
@@ -632,11 +660,10 @@ describe('Sammeltoast (tasks.md 2.4)', () => {
     serverMit([...alarme, ...eingaenge]);
     renderZentrale();
     for (const b of alarme) live(b);
-    await waitFor(() => expect(screen.getAllByText('Sofortmeldung eingegangen')).toHaveLength(3));
+    await waitFor(() => expect(toastZahl()).toBe(3));
     for (const b of eingaenge) live(b);
     await waitFor(() => expect(band()).toHaveTextContent('5 neue Eingänge'));
 
     expect(toastZahl()).toBe(3);
-    expect(screen.queryByText(/weitere Alarme|weitere Hinweise/)).not.toBeInTheDocument();
   });
 });

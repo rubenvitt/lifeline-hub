@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Handy beim Tippen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-400.woff2") format("woff2");font-weight:400}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-600.woff2") format("woff2");font-weight:600}
+@font-face{font-family:"LFH Archivo";src:url("ds/lifeline-hub/fonts/lfh-archivo-700.woff2") format("woff2");font-weight:700}
+@font-face{font-family:"LFH Mono";src:url("ds/lifeline-hub/fonts/lfh-jetbrains-mono-500.woff2") format("woff2");font-weight:500}
+body{margin:0}
+.tel{width:390px;height:844px;box-sizing:border-box;display:flex;flex-direction:column;background:#08090b;color:#e8ebee;font-family:"LFH Archivo",system-ui,sans-serif;font-size:15px;line-height:21px;overflow:hidden}
+.mono{font-family:"LFH Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.kl{height:52px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 0;background:#0c0e11;border-bottom:1px solid #22262b}
+.kl button{width:52px;height:52px;border:0;background:transparent;color:#e8ebee;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.kl .ein{flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.li{flex:1;min-height:0;overflow:hidden}
+.z{padding:7px 12px 8px 9px;border-bottom:1px solid #22262b;border-left:3px solid #2e343a;background:#0f1215}
+.z.m{border-left-color:#1677ff}.z.a{border-left-color:#d46b08}
+.k{display:flex;align-items:baseline;gap:8px;font-size:13px;color:#c6ccd2;white-space:nowrap;overflow:hidden}
+.k .zt{font-size:15px;color:#e8ebee}
+.k .ty{font-size:12px;font-weight:600}
+.m .ty{color:#5c9dff}.a .ty{color:#e8852a}
+.t{margin-top:2px}
+.leiste{height:48px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 4px 0 12px;border-top:1px solid #4a1c20;background:#1c0a0d;box-shadow:inset 4px 0 0 #ff6b6b}
+.leiste .al{color:#ff6b6b;font-weight:600;white-space:nowrap}
+.leiste .tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c6ccd2;font-size:14px}
+.leiste a{height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center;color:#9aa2ab}
+.sz{flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:8px 12px;border-top:1px solid #2e343a;background:#0f1215}
+.rw{display:flex;gap:8px}
+.kn{height:48px;box-sizing:border-box;padding:0 12px;border:1px solid #626a73;background:#16191d;color:#e8ebee;font:inherit;font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.kn.pri{background:#4d94d6;border-color:#4d94d6;color:#08090b;font-weight:600}
+textarea{flex:1;min-width:0;height:72px;box-sizing:border-box;border:1px solid #4d94d6;border-left:3px solid #1677ff;background:#08090b;color:#e8ebee;font:inherit;font-size:15px;padding:8px 10px;resize:none;outline:2px solid #4d94d6;outline-offset:-1px}
+.tast{height:300px;flex-shrink:0;background:#1b1e22;border-top:1px solid #2e343a;display:flex;align-items:center;justify-content:center;color:#838b94;font-size:13px;letter-spacing:.06em}
+</style>
+</helmet>
+<div class="tel">
+  <header class="kl">
+    <button type="button" aria-label="Menü"><svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><path d="M0 1h22M0 8h22M0 15h22" stroke="currentColor" stroke-width="1.6"/></svg></button>
+    <span class="ein">Starkregen Musterstadt</span>
+    <span class="mono">19:27</span>
+  </header>
+  <div class="li">
+    <div class="z m"><div class="k"><span class="zt mono">1924</span><span class="ty">MELDUNG</span><span>Florian 3 → EL</span></div><div class="t">Wasser in der Unterführung B 3 steigt, jetzt 35 cm.</div></div>
+    <div class="z a"><div class="k"><span class="zt mono">1921</span><span class="ty">ANORDNUNG</span><span>EL → THW OV</span></div><div class="t">Zusätzlich 200 Sandsäcke an die Unterführung B 3.</div></div>
+  </div>
+  <div class="leiste" role="status" aria-label="Alarm steht an">
+    <span class="al">1 Alarm</span>
+    <span class="tx">Auftrag überfällig · #12 an S2</span>
+    <a href="Handy-Blatt.dc.html" aria-label="Alarme und Eingänge öffnen"><svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></a>
+  </div>
+  <div class="sz">
+    <div class="rw"><button type="button" class="kn">Meldung</button><button type="button" class="kn mono">1927</button><button type="button" class="kn">Von: Florian 3</button></div>
+    <div class="rw"><textarea aria-label="Inhalt">Pegel Mühlbach 2,10 m, steigend</textarea><button type="button" class="kn pri">Erfassen</button></div>
+  </div>
+  <div class="tast" aria-hidden="true">BILDSCHIRMTASTATUR</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

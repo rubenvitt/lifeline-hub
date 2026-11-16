@@ -253,13 +253,14 @@ und die Einsatzleitung den Hinweis **„In die Lage übernommen“** mit Sprung 
 
 Alle Hinweise auf Meldungen stehen gebündelt im **Eingangsband** unten, etwa „3 neue Meldungen“,
 mit Absender und Anfang des Wortlauts der jüngsten zwei; andere Eingänge stehen mit darin. Es
-belegt keinen der Plätze der Alarme, und sein Ton kommt höchstens alle zwei Minuten.
+steht nie in der Alarmzone, und sein Ton kommt höchstens alle zwei Minuten.
 
 - **„Sichten“** an einer Meldung im Hinweis setzt sie auf „Gesichtet“. Sobald jemand eine
   Meldung sichtet, bestätigt oder weiter bearbeitet, verschwindet ihr Hinweis bei allen. Eine
   als gesehen gekennzeichnete Lagemeldung nimmt „In die Lage übernommen“ ebenso weg.
-- **„Öffnen“** bzw. **„Zu Meldungen“** springt zur Meldung bzw. in die Liste; das Schließen
-  nimmt den Hinweis nur für einen selbst weg.
+- **„Öffnen“** bzw. **„Zu Meldungen“** springt zur Meldung bzw. in die Liste. ✕ blendet den
+  Hinweis nur in diesem Tab aus, ohne ihn zu quittieren: Er bleibt unter „Eingänge“ bei „Neu“,
+  und andere Tabs und Geräte zeigen ihn weiter.
 - Wer gerade in ein Feld schreibt, sieht den Hinweis erst, wenn er das Feld verlässt.
 - Auf der Seite „Meldungen“ selbst erscheint kein Hinweis; dort stehen die neuen
   Meldungen in der Liste.

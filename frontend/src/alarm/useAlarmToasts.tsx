@@ -1,15 +1,8 @@
-import { App, Button } from 'antd';
-import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import type { BenachrichtigungStufe } from '../api/types';
-import {
-  sammelTitel,
-  sammelZeilen,
-  ZIEL_SPRUENGE,
-  zielPfad,
-  type AlarmZiel,
-  type SammelGruppe,
-} from './benachrichtigungKatalog';
+import { blendeAus } from './benachrichtigungGedaechtnis';
+import { zoneRaeumen, zoneSetzen, type ZonenEintrag } from './alarmZoneSpeicher';
 import {
   type DesktopMeldung,
   schliesseAlleDesktopAlarme,
@@ -17,12 +10,9 @@ import {
   zeigeDesktopAlarm,
 } from './desktopAlarm';
 
-/** Höchstens so viele einzelne Toasts; ab dem nächsten bündelt der Sammeltoast die älteren. */
-export const MAX_SICHTBARE_TOASTS = 3;
-
-/** Ein Toast, wie ihn eine Benachrichtigung oder der Unwetterhinweis meldet. */
+/** Ein Eintrag der Alarmzone, wie ihn eine Benachrichtigung oder der Unwetterhinweis meldet. */
 export type AlarmToastEintrag = {
-  /** Fachlicher Schlüssel ohne Präfix, etwa `b-40` oder `unwetter-…`. Gleicher Schlüssel, ein Toast. */
+  /** Fachlicher Schlüssel ohne Präfix, etwa `b-40` oder `unwetter-…`. Gleicher Schlüssel, ein Eintrag. */
   schluessel: string;
   art: 'warning' | 'info';
   titel: string;
@@ -34,14 +24,10 @@ export type AlarmToastEintrag = {
   beschreibungVoll?: string;
   /** Ziel von „Öffnen“ und vom Klick auf die OS-Meldung. */
   pfad: string;
-  /** Sprung im Sammeltoast. */
-  ziel: AlarmZiel;
-  /** Gruppe für den Titel des Sammeltoasts. */
-  gruppe: SammelGruppe;
-  /** Kurzer Name für die Zählzeilen des Sammeltoasts. */
+  /** Kurzer Name für die Zählung der gebündelten Zone. */
   name: string;
   stufe: BenachrichtigungStufe;
-  /** Server-Benachrichtigung hinter dem Toast: Schließen und Öffnen quittieren sie. */
+  /** Server-Benachrichtigung hinter dem Eintrag: „Öffnen“ und „Gelesen“ quittieren sie. */
   benachrichtigungId?: number;
   /**
    * OS-Meldung bei verdecktem Tab (`desktopAlarm.ts`, dort auch der Weg der Desktop-App). `tag`
@@ -51,58 +37,55 @@ export type AlarmToastEintrag = {
 };
 
 /**
- * `neu`: der Toast steht neu da, der Aufrufer darf einen Ton spielen. `vorhanden`: derselbe
+ * `neu`: der Eintrag steht neu da, der Aufrufer darf einen Ton spielen. `vorhanden`: derselbe
  * Schlüssel stand schon (Replay, Nachreichen), kein zweiter Ton.
  */
 export type MeldeErgebnis = 'neu' | 'vorhanden' | 'inaktiv';
 
-type Eintrag = AlarmToastEintrag & { key: string; ids: Set<number> };
+/**
+ * Wie ein Eintrag geht (LLH-1736, design.md D4): `gelesen` quittiert seine Benachrichtigungen
+ * („Öffnen“, „Gelesen“), `ausgeblendet` merkt sie sich für diesen Tab und quittiert nicht (✕),
+ * `weg` räumt ohne beides (Quittier-Ereignis, Ersatz des Unwetterhinweises).
+ */
+type Abgang = 'gelesen' | 'ausgeblendet' | 'weg';
+
+type Eintrag = AlarmToastEintrag & { ids: Set<number> };
 
 type Scope = {
-  keyPrefix: string;
-  sammelKey: string;
+  besitzer: symbol;
   aktiv: boolean;
-  sammelOffen: boolean;
-  /** Alle Toasts des Scopes, einzeln oder gebündelt, nach fachlichem Schlüssel. */
+  /** Alle Einträge, älteste zuerst (Einfügereihenfolge der Map). */
   eintraege: Map<string, Eintrag>;
-  /** Einzeln sichtbare Schlüssel, älteste zuerst. */
-  einzeln: string[];
-  /** Gebündelte Schlüssel in der Reihenfolge des Verdrängens. */
-  gebuendelt: Set<string>;
-  /** OS-Meldung je Schlüssel: das Quittieren im Toast schließt sie mit (LFH-951). */
+  /** OS-Meldung je Schlüssel: das Gehen eines Eintrags schließt sie mit (LFH-951). */
   desktop: Map<string, DesktopMeldung>;
 };
 
 export interface AlarmToasts {
   melde: (eintrag: AlarmToastEintrag) => MeldeErgebnis;
-  /** Nimmt einen Toast ohne Quittung weg (ein neuerer Unwetterhinweis ersetzt den älteren). */
+  /** Nimmt einen Eintrag ohne Quittung weg (ein neuerer Unwetterhinweis ersetzt den älteren). */
   entferne: (schluessel: string) => void;
-  /** Das Quittier-Ereignis: Toast und OS-Meldung gehen, auch aus dem Sammeltoast. */
+  /** Das Quittier-Ereignis: Eintrag und OS-Meldung gehen. */
   entferneBenachrichtigung: (id: number) => void;
-  istEinzeln: (schluessel: string) => boolean;
+  istSichtbar: (schluessel: string) => boolean;
   zeigt: (id: number) => boolean;
 }
 
 /**
- * Das gemeinsame Toast-Budget der Zentralen (LFH-663, design.md D5): höchstens drei einzelne
- * Toasts; beim vierten wandern die drei vorherigen in einen Sammeltoast, der neueste bleibt
- * einzeln, danach wandert je neuem Toast der bisher neueste hinein. Benachrichtigungen und
- * Unwetterhinweise teilen dieses eine Budget; ein Schlüssel ist ein Toast.
+ * Die Einträge der Alarmzone einer Zentrale (LLH-1735/LLH-1736, design.md D1 in
+ * `openspec/changes/archive/2026-11-15-zu9ptja2-alarmzone/`): Benachrichtigungen und Unwetterhinweise teilen die eine
+ * Zone, ein Schlüssel ist ein Eintrag. Gezeichnet wird nicht hier, sondern in `AlarmZone` (oben)
+ * und in der Leiste am Handschirm; beide lesen `alarmZoneSpeicher`.
  *
- * Quittiert wird nur, was der Nutzer wegnimmt: ✕, „Öffnen“, ✕ am Sammeltoast und dessen Sprung.
- * Was beim Verlassen des Layouts oder beim Einsatzwechsel geht, bleibt offen und kommt beim
- * nächsten Nachreichen wieder. `einsatzId` `null` ist die Org-Zentrale.
- *
- * Toasts über `App.useApp().notification` (kein statischer Import, sonst Kontext-Leak in Tests).
- * `notification.destroy` ruft kein `onClose`.
+ * Quittiert wird nur, was der Nutzer öffnet oder als gelesen markiert. ✕ blendet aus
+ * (`blendeAus`, sessionStorage), und was beim Verlassen des Layouts oder beim Einsatzwechsel geht,
+ * bleibt offen und kommt beim nächsten Nachreichen wieder. `einsatzId` `null` ist die
+ * Org-Zentrale.
  */
 export function useAlarmToasts(
   einsatzId: number | null,
   quittiere?: (id: number) => void,
 ): AlarmToasts {
-  const { notification } = App.useApp();
   const navigate = useNavigate();
-  const instanzId = useId();
   // Über eine Ref: ein neuer Rückruf darf den Scope nicht abräumen (der Cleanup hängt an ihm).
   const quittiereRef = useRef(quittiere);
   quittiereRef.current = quittiere;
@@ -110,21 +93,16 @@ export function useAlarmToasts(
   // `AlarmToasts` ließe die Zentrale bei jedem Seitenwechsel neu abonnieren und nachreichen.
   const navigateRef = useRef(navigate);
   navigateRef.current = navigate;
-  // Je Instanz und Einsatz ein eigener Scope: beim Einsatzwechsel werden genau dessen Toasts
-  // abgeräumt, ohne fremde Notifications anzutasten.
-  const scope = useMemo<Scope>(() => {
-    const keyPrefix = `alarm-${einsatzId ?? 'org'}-${instanzId}`;
-    return {
-      keyPrefix,
-      sammelKey: `${keyPrefix}-zusammenfassung`,
+  // Je Einsatz ein eigener Scope: beim Einsatzwechsel gehen genau dessen Einträge.
+  const scope = useMemo<Scope>(
+    () => ({
+      besitzer: Symbol(`alarm-${einsatzId ?? 'org'}`),
       aktiv: true,
-      sammelOffen: false,
       eintraege: new Map(),
-      einzeln: [],
-      gebuendelt: new Set(),
       desktop: new Map(),
-    };
-  }, [einsatzId, instanzId]);
+    }),
+    [einsatzId],
+  );
 
   /**
    * Schließt die OS-Meldung zum Schlüssel. Über das Objekt, nicht den `tag`: zum selben Bezug kann
@@ -140,118 +118,43 @@ export function useAlarmToasts(
     [scope],
   );
 
-  /** Buchführung eines erledigten Toasts; `durchNutzer` quittiert seine Benachrichtigungen. */
-  const erledigt = useCallback(
-    (schluessel: string, durchNutzer: boolean) => {
+  // Rückrufe der Zone über eine Ref: `veroeffentlichen` baut sie je Eintrag neu.
+  const abgangRef = useRef<(schluessel: string, abgang: Abgang) => void>(() => {});
+
+  const veroeffentlichen = useCallback(() => {
+    if (!scope.aktiv) return;
+    const eintraege: ZonenEintrag[] = [...scope.eintraege.values()].map((e) => ({
+      schluessel: e.schluessel,
+      stufe: e.stufe,
+      titel: e.titel,
+      beschreibung: e.beschreibung,
+      beschreibungVoll: e.beschreibungVoll,
+      name: e.name,
+      oeffnen: () => {
+        if (!scope.aktiv) return;
+        navigateRef.current(e.pfad);
+        abgangRef.current(e.schluessel, 'gelesen');
+      },
+      gelesen: e.ids.size > 0 ? () => abgangRef.current(e.schluessel, 'gelesen') : undefined,
+      ausblenden: () => abgangRef.current(e.schluessel, 'ausgeblendet'),
+    }));
+    zoneSetzen(scope.besitzer, eintraege);
+  }, [scope]);
+
+  /** Buchführung eines gehenden Eintrags samt Quittung oder Ausblenden. */
+  const abgang = useCallback(
+    (schluessel: string, wie: Abgang) => {
       const eintrag = scope.eintraege.get(schluessel);
       desktopSchliessen(schluessel);
+      if (!eintrag) return;
       scope.eintraege.delete(schluessel);
-      scope.einzeln = scope.einzeln.filter((s) => s !== schluessel);
-      scope.gebuendelt.delete(schluessel);
-      if (durchNutzer && eintrag) for (const id of eintrag.ids) quittiereRef.current?.(id);
+      if (wie === 'gelesen') for (const id of eintrag.ids) quittiereRef.current?.(id);
+      if (wie === 'ausgeblendet') for (const id of eintrag.ids) blendeAus(id);
+      veroeffentlichen();
     },
-    [desktopSchliessen, scope],
+    [desktopSchliessen, scope, veroeffentlichen],
   );
-
-  const alleSchliessen = useCallback(
-    (durchNutzer: boolean) => {
-      for (const schluessel of scope.einzeln) {
-        const eintrag = scope.eintraege.get(schluessel);
-        if (eintrag) notification.destroy(eintrag.key);
-      }
-      if (scope.sammelOffen) notification.destroy(scope.sammelKey);
-      scope.sammelOffen = false;
-      const eintraege = [...scope.eintraege.values()];
-      scope.eintraege.clear();
-      scope.einzeln = [];
-      scope.gebuendelt.clear();
-      scope.desktop.clear();
-      // Mit den Toasts gehen die OS-Meldungen: Einsatzwechsel, Unmount und „Zu …“ (LFH-951).
-      schliesseAlleDesktopAlarme();
-      if (durchNutzer)
-        for (const e of eintraege) for (const id of e.ids) quittiereRef.current?.(id);
-    },
-    [notification, scope],
-  );
-
-  const zeigeZusammenfassung = useCallback(() => {
-    if (!scope.aktiv) return;
-    const eintraege = [...scope.gebuendelt]
-      .map((s) => scope.eintraege.get(s))
-      .filter((e): e is Eintrag => e != null);
-    if (eintraege.length === 0) {
-      if (scope.sammelOffen) notification.destroy(scope.sammelKey);
-      scope.sammelOffen = false;
-      return;
-    }
-    const ziele = new Set(eintraege.map((e) => e.ziel));
-    const zeilen = sammelZeilen(eintraege);
-    scope.sammelOffen = true;
-    // Zahl und Art im Titel, je Art eine Zählzeile, das Ziel am Knopf (LFH-1078).
-    notification.warning({
-      key: scope.sammelKey,
-      title: sammelTitel(eintraege),
-      description:
-        zeilen.length > 0 ? (
-          <>
-            {zeilen.map((z) => (
-              <div key={z}>{z}</div>
-            ))}
-          </>
-        ) : undefined,
-      duration: 0,
-      actions: (
-        <>
-          {ZIEL_SPRUENGE.filter(({ ziel }) => ziele.has(ziel)).map(({ ziel, text }, index) => (
-            <Button
-              key={ziel}
-              type={index === 0 ? 'primary' : 'default'}
-              onClick={() => {
-                if (!scope.aktiv) return;
-                navigateRef.current(zielPfad(ziel, einsatzId));
-                alleSchliessen(true);
-              }}
-            >
-              {text}
-            </Button>
-          ))}
-        </>
-      ),
-      onClose: () => {
-        scope.sammelOffen = false;
-        // Mit der Zusammenfassung sind ihre Toasts quittiert, auch die OS-Meldungen dazu.
-        for (const schluessel of [...scope.gebuendelt]) erledigt(schluessel, true);
-      },
-    });
-  }, [alleSchliessen, einsatzId, erledigt, notification, scope]);
-
-  const zeigeEinzeln = useCallback(
-    (eintrag: Eintrag) => {
-      const oeffnen = () => {
-        if (!scope.aktiv) return;
-        navigateRef.current(eintrag.pfad);
-        notification.destroy(eintrag.key);
-        erledigt(eintrag.schluessel, true);
-      };
-      notification[eintrag.art]({
-        key: eintrag.key,
-        title: eintrag.titel,
-        description: eintrag.beschreibungVoll ? (
-          <span title={eintrag.beschreibungVoll}>{eintrag.beschreibung}</span>
-        ) : (
-          eintrag.beschreibung
-        ),
-        duration: 0,
-        actions: (
-          <Button type="primary" onClick={oeffnen}>
-            Öffnen
-          </Button>
-        ),
-        onClose: () => erledigt(eintrag.schluessel, true),
-      });
-    },
-    [erledigt, notification, scope],
-  );
+  abgangRef.current = abgang;
 
   const zeigeDesktop = useCallback(
     (eintrag: Eintrag) => {
@@ -272,45 +175,19 @@ export function useAlarmToasts(
   const melde = useCallback(
     (neu: AlarmToastEintrag): MeldeErgebnis => {
       if (!scope.aktiv) return 'inaktiv';
-      const id = neu.benachrichtigungId;
       // Dieselbe Benachrichtigung noch einmal (Replay, Nachreichen): nichts.
       if (scope.eintraege.has(neu.schluessel)) return 'vorhanden';
-
-      if (scope.gebuendelt.size > 0 || scope.einzeln.length >= MAX_SICHTBARE_TOASTS) {
-        for (const verdraengt of scope.einzeln) {
-          const e = scope.eintraege.get(verdraengt);
-          if (e) notification.destroy(e.key);
-          scope.gebuendelt.add(verdraengt);
-        }
-        scope.einzeln = [];
-        zeigeZusammenfassung();
-      }
-
-      const eintrag: Eintrag = {
-        ...neu,
-        key: `${scope.keyPrefix}-${neu.schluessel}`,
-        ids: new Set(id != null ? [id] : []),
-      };
+      const id = neu.benachrichtigungId;
+      const eintrag: Eintrag = { ...neu, ids: new Set(id != null ? [id] : []) };
       scope.eintraege.set(neu.schluessel, eintrag);
-      scope.einzeln.push(neu.schluessel);
-      zeigeEinzeln(eintrag);
+      veroeffentlichen();
       zeigeDesktop(eintrag);
       return 'neu';
     },
-    [notification, scope, zeigeDesktop, zeigeEinzeln, zeigeZusammenfassung],
+    [scope, veroeffentlichen, zeigeDesktop],
   );
 
-  const entferne = useCallback(
-    (schluessel: string) => {
-      const eintrag = scope.eintraege.get(schluessel);
-      if (!eintrag) return;
-      const warEinzeln = scope.einzeln.includes(schluessel);
-      if (warEinzeln) notification.destroy(eintrag.key);
-      erledigt(schluessel, false);
-      if (!warEinzeln) zeigeZusammenfassung();
-    },
-    [erledigt, notification, scope, zeigeZusammenfassung],
-  );
+  const entferne = useCallback((schluessel: string) => abgang(schluessel, 'weg'), [abgang]);
 
   const entferneBenachrichtigung = useCallback(
     (id: number) => {
@@ -323,29 +200,29 @@ export function useAlarmToasts(
     [entferne, scope],
   );
 
-  const istEinzeln = useCallback(
-    (schluessel: string) => scope.einzeln.includes(schluessel),
-    [scope],
-  );
+  const istSichtbar = useCallback((schluessel: string) => scope.eintraege.has(schluessel), [scope]);
 
   const zeigt = useCallback(
     (id: number) => [...scope.eintraege.values()].some((e) => e.ids.has(id)),
     [scope],
   );
 
-  // `duration: 0`-Notices überleben sonst ihre Komponente. Bei Logout, Unmount und vor dem
-  // nächsten Einsatz werden deshalb nur die Toasts dieses Scopes zerstört, ohne Quittung.
+  // Bei Logout, Unmount und vor dem nächsten Einsatz gehen nur die Einträge dieses Scopes, ohne
+  // Quittung; mit ihnen die OS-Meldungen (LFH-951).
   useEffect(() => {
     // StrictMode führt Setup → Cleanup → Setup aus; der zweite Setup gibt den Scope wieder frei.
     scope.aktiv = true;
     return () => {
       scope.aktiv = false;
-      alleSchliessen(false);
+      scope.eintraege.clear();
+      scope.desktop.clear();
+      schliesseAlleDesktopAlarme();
+      zoneRaeumen(scope.besitzer);
     };
-  }, [alleSchliessen, scope]);
+  }, [scope]);
 
   return useMemo(
-    () => ({ melde, entferne, entferneBenachrichtigung, istEinzeln, zeigt }),
-    [entferne, entferneBenachrichtigung, istEinzeln, melde, zeigt],
+    () => ({ melde, entferne, entferneBenachrichtigung, istSichtbar, zeigt }),
+    [entferne, entferneBenachrichtigung, istSichtbar, melde, zeigt],
   );
 }
