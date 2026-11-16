@@ -89,8 +89,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Schrift`, antds `token.fontSize*` oder `var(--lfh-…)` in CSS; Rechnungen nehmen `schriftPx`.
   **Kein Größen-Literal** (`fontSize: 12`, `font-size: 12px`, `monoStil`), ohne Schuldmenge:
   Wächter `theme/schriftLiteral.guard.test.ts`. Ausnahmen nur Druckblätter (pt), die
-  Fernsicht-Skala des Lagemonitors (`fernsicht`) und Zeichnungen mit eigenem Maßstab (Lagekarte,
-  Fernmeldeskizze, taktische Zeichen).
+  Fernsicht-Skala des Lagemonitors (`fernsicht`), die Großbild-Skala (`grossMass`, LLH-1747) und
+  Zeichnungen mit eigenem Maßstab (Lagekarte, Fernmeldeskizze, taktische Zeichen).
 - **Mono nur für Zahl, Zeit, Kennung und Funkrufname** (LLH-1777, Spec `schriftrollen`;
   umgekehrt 15.11.2026: der Neuentwurf setzte auch die Meta-Zeilen in Mono): `zahlStil` trägt
   Mono, Kennungen sind auch das Typwort der Zeitachse, `/typ`, Tastenkürzel, die Wortmarke und
