@@ -39,10 +39,12 @@ Alle Flächen zählen dieselben Köpfe: aktive `einsatz_personal`-Zeilen, eingeo
 
 **Non-Goals:**
 
-- Server: `ist_kumuliert`, Einheiten-DTO und Lagemonitor-Antwort bleiben unverändert. Die
+- Server: `ist_kumuliert`, Einheiten-DTO und Lagemonitor-Antwort bleiben unverändert. Einzige
+  Serveränderung ist der Bereich des Abschnittsgeräts (D8). Die
   Verbandsstärke einer Einheit (Einheit-Detail, Zeile „kumuliert“ in den Einheiten) bleibt die
   Stärke samt aller Untereinheiten, wo immer diese stehen.
-- Der Funkplan bleibt beim Führungsweg des Verbands, die Gruppe bleibt also unter ihrem Zug.
+- Der Funkplan bleibt beim Führungsweg des Verbands, die Gruppe bleibt also unter ihrem Zug. Die
+  Fernmeldeskizze ebenso (D3).
 - Die UHS-Kräfte (`uhs_id`) gehen nicht in eine Abschnittsstärke ein. Sie sind eine eigene Achse.
 - Wortlaut „direkt“ am Gliederungsknoten (LFH-973) und die Zahl „5 Einheiten“ bleiben.
 
@@ -108,6 +110,11 @@ bleiben, der Kommunikationsplan setzt seine Ebene weiter darauf.
 
 Die Abschnittsknoten rechnen weiter über `abschnittStaerken(...).inklUnter` (D1).
 
+**Fernmeldeskizze** (Review 16.11.2026): `baueFernmeldenetz` liest denselben Baum als Vorlage für
+Auto-Layout und Führungsmittel. Sie bleibt die zweite Darstellung des Funkplans und behält den
+Verband: `baueFuehrungsorganisation` bekommt die Option `abgestellteLoesen` (Vorgabe `true`), und die
+Skizze ruft sie mit `false`. Ohne Lösen ist auch die Stärke eines Einheitsknotens die des Verbands.
+
 *Offen zur Freigabe:* Alternativ bleibt die Platzierung wie im Funkplan, und nur die Zahlen ändern
 sich. EA 1.1 zeigte dann 0/1/1//2 ohne Einheitknoten darunter, und der Zug zeigte seine
 Verbandsstärke. Empfehlung: D3, weil das Organigramm die Gliederung der Abschnitte zeigt und das
@@ -120,8 +127,11 @@ Einheiten mit diesem wirksamen Abschnitt, ohne Unterabschnitte. Daraus kommt die
 „n Einheiten direkt“ am Gliederungsknoten. Auch die Liste „Zugeordnete Einheiten“ im Detail
 liest diese Menge. Jede Einheit steht dort mit ihrer eigenen Stärke („eigene“ statt „kumuliert“),
 sodass die Liste die „Stärke“ des Abschnitts ergibt. Eine Einheit ohne eigenen Abschnitt trägt
-den Zusatz „über <Obereinheit>“. Den Griff zum Ziehen behält sie mit `abschnittId: null` wie
-bisher.
+den Zusatz „über <Obereinheit>“. Ihr Griff trägt den wirksamen Abschnitt (Review 16.11.2026): Ziehen
+auf den Abschnitt, in dem sie schon steht, ist gesperrt und schreibt keinen festen Abschnitt.
+
+Dieselbe Menge zählt die Leiste der Lagekarte als Einheiten eines Abschnitts
+(`pages/lagekarte/leistenDaten.ts`, über `einheitenImAbschnitt`).
 
 ### D5 Zeile über dem Meldebild
 
@@ -142,12 +152,27 @@ weiter auch geplante UHS.
 ### D7 Regeln und Fixture
 
 - `regeln.json`, Abschnitt `staerke`: `_regel` neu formuliert, `erwartet_abschnitte` nach D1
-  (10: eigene 1/2/6, inkl. 2/2/10; 11: 0/0/2; 12: 1/0/4). Neu `erwartet_abgestellt`: Knoten C
-  wird Wurzel unter 11, A kumuliert ohne C. Die Rust-Erwartung `erwartet_ist_kumuliert` bleibt.
+  (10: eigene 1/2/6, inkl. 2/2/10; 11: 0/0/2; 12: 1/0/4). Neu `erwartet_wurzeln_je_abschnitt`:
+  die Einheiten-Wurzeln je Abschnitt im Kräftebild, C steht unter 11. Die Rust-Erwartung
+  `erwartet_ist_kumuliert` bleibt.
 - `frontend/AGENTS.md`, „Eine Heimat je Zahl“: Stärke eines Abschnitts nur über `abschnittStaerken`
   (wirksamer Abschnitt, eigene Stärke), Einheiten eines Abschnitts nur über
   `einheitenImAbschnitt`, UHS-Kräfte nur über `zaehltKraefteAnUhs`. Unter „Eine Baumlogik der
   Kräfte“ kommt `loeseAbgestellte` dazu, unter dem Organigramm die Platzierung nach D3.
+
+### D8 Bereich des Abschnittsgeräts über den wirksamen Abschnitt (Review 16.11.2026)
+
+`Abschnittsbereich::laden` (`src/geraet/abschnitt.rs`) wählt bisher die Einheiten mit eigenem
+`abschnitt_id` im Teilbaum. Eine Untereinheit ohne eigenen Abschnitt fehlte dem Gerät deshalb in der
+Liste, und seit D1 auch in der Stärke. Neu: die aktiven Einheiten, deren wirksamer Abschnitt im
+Teilbaum liegt, also der eigene, sonst der der nächsten aktiven Obereinheit mit Abschnitt. Gerechnet
+wird in einer Abfrage (rekursiver Aufstieg über `ueber_einheit_id`, zyklussicher über eine
+Tiefengrenze). Folge: Liste, Stärke und Schreibrecht des Geräts umfassen die geerbte Untereinheit,
+wie für ihre Obereinheit. Eine abgestellte Untereinheit mit eigenem Abschnitt außerhalb des
+Teilbaums bleibt draußen.
+
+*Verworfen:* Das Gerät rechnet weiter nach Unterstellung (Spec-Ausnahme, abweichende Zahl), und eine
+Folgeaufgabe (ein Fehler, den der Diff einführt, wird keine Folgeaufgabe).
 
 ## Risks / Trade-offs
 

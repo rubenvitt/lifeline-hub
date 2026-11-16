@@ -31,6 +31,12 @@ Obereinheit.
   Abschnitt trägt
 - **THEN** zählt B bei X
 
+#### Scenario: Abschnittsansicht am Gerät mit geerbter Untereinheit
+- **WHEN** ein Gerät an den Abschnitt X gekoppelt ist, Einheit A (1/1/2) in X steht und die ihr
+  unterstellte Einheit B (0/1/8) keinen eigenen Abschnitt trägt
+- **THEN** zeigt das Gerät für X die Stärke 1/2/10//13 wie die Seite Einsatzabschnitte und führt B in
+  seiner Einheitenliste
+
 #### Scenario: Abschnitt mit nur einer abgestellten Einheit
 - **WHEN** im Abschnitt „UHS Turnhalle“ nur die Sanitätsgruppe (0/1/1) steht, die dem Zug in einem
   anderen Abschnitt unterstellt ist

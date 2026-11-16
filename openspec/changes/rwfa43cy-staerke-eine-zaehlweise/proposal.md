@@ -42,6 +42,11 @@ Ursachen (am Code bestätigt):
 - **Meldebild-Zeile:** „12 von 12 Kräften · 8 von 8 Fahrzeugen“ statt „20 von 20 Kräften“.
 - **UHS-Kräfte zählen nur an aktiven UHS**, im Lagebild wie im Monitor (eine Funktion). Das Lagebild
   nennt sie „n Kräfte an UHS“.
+- **Abschnittsgerät** (Review 16.11.2026): Der Server gibt einem an einen Abschnitt gekoppelten Gerät
+  auch die Untereinheiten, die den Abschnitt von ihrer Obereinheit erben. Es sieht und zählt sie und
+  darf für sie handeln wie für ihre Obereinheit. Sonst fehlte ihre Stärke am Gerät.
+- **Fernmeldeskizze** (Review 16.11.2026): Sie behält den Verband wie der Funkplan. Nur das
+  Organigramm löst abgestellte Einheiten.
 - Projektregel „Eine Heimat je Zahl“ (`frontend/AGENTS.md`) und Anwenderdoku nachgezogen.
 
 ## Capabilities
@@ -57,6 +62,8 @@ Ursachen (am Code bestätigt):
   an aktiven UHS“.
 - `kraeftebaum`: Eine abgestellte Untereinheit steht im Meldebild unter ihrem eigenen Abschnitt, nicht
   unter ihrer Obereinheit.
+- `fuehrungsorganisation`: Knotenaufbau (abgestellte Einheit unter ihrem Abschnitt) und Stärke eines
+  Einheitsknotens (samt der Untereinheiten, die unter ihm stehen).
 
 ## Impact
 
@@ -76,4 +83,7 @@ Ursachen (am Code bestätigt):
 - Regeln: `frontend/AGENTS.md` („Eine Heimat je Zahl“, „Eine Baumlogik der Kräfte“, Organigramm).
 - Anwenderdoku: `meldebild.md`, `einsatzabschnitte.md`, `lagebild.md` (falls die Notiz dort steht),
   Bilder, wo die Zahl sichtbar ist.
-- Kein Backend, keine Migration, keine API-Änderung.
+- Backend: `src/geraet/abschnitt.rs` (`Abschnittsbereich::laden` über den wirksamen Abschnitt) mit
+  Test. Keine Migration, keine Änderung an DTOs.
+- Weitere Stellen aus dem Review: `pages/lagekarte/leistenDaten.ts` (Einheitenzahl je Abschnitt),
+  `fernmeldewesen/fernmeldeskizze.ts` (Verband), Griff der Liste „Zugeordnete Einheiten“.

@@ -9,7 +9,7 @@
 ## 2. Meldebild und Überblick (D2)
 
 - [x] 2.1 `kraefte/kraeftebaumKern.ts`: `loeseAbgestellte(einheiten, abschnitte, alle)` und `abgestelltVon` mit `abgestelltAus` am Knoten. Tests in `kraeftebaumKern.test.ts`: abgestellte Gruppe wird Wurzel samt Kindern, Gruppe ohne eigenen Abschnitt bleibt, Gruppe mit gleichem Abschnitt bleibt, Zyklus und Waise unverändert.
-- [x] 2.2 `kraefte/kraeftebild.ts`: `baueKraeftebild` nutzt `loeseAbgestellte`, die abgestellte Zeile trägt „aus <Obereinheit>“ (Name aus `quelle`). `filtereKraefte` filtert nach `abschnittDerEinheit`, `abschnittDerObersten` entfällt samt Verweisen. Tests in `kraeftebild.test.ts`: Abschnittszeilen gleich `abschnittStaerken`, Zug ohne Gruppe, Kopf unverändert, Filter EA 1 / EA 1.1. Fixture `erwartet_abgestellt` ergänzen und in `verdichtungFixture.test.ts` prüfen.
+- [x] 2.2 `kraefte/kraeftebild.ts`: `baueKraeftebild` nutzt `loeseAbgestellte`, die abgestellte Zeile trägt „aus <Obereinheit>“ (Name aus `quelle`). `filtereKraefte` filtert nach `abschnittDerEinheit`, `abschnittDerObersten` entfällt samt Verweisen. Tests in `kraeftebild.test.ts`: Abschnittszeilen gleich `abschnittStaerken`, Zug ohne Gruppe, Kopf unverändert, Filter EA 1 / EA 1.1. Fixture `erwartet_wurzeln_je_abschnitt` ergänzen und in `verdichtungFixture.test.ts` prüfen.
 - [x] 2.3 Überblick: `ueberblickDaten.test.ts` um den Fall ergänzen, dass eine abgestellte Gruppe mit Ausfall den Abschnitt ihres Einsatzes tönt und nicht den ihres Zugs (bei verschiedenen obersten Abschnitten). Grün ohne Codeänderung in `ueberblickDaten.ts`, sonst nachziehen.
 
 ## 3. Organigramm (D3)
@@ -27,6 +27,17 @@
 - [x] 5.1 `frontend/AGENTS.md`: „Eine Heimat je Zahl“ (Abschnittsstärke, Einheiten eines Abschnitts, UHS-Kräfte), „Eine Baumlogik der Kräfte“ (`loeseAbgestellte`), Organigramm (Platzierung nach D3), Zeile 1152 (Stärke EINMAL summieren). Grep auf `abschnittDerObersten` und „Abschnitt ihrer obersten Einheit“ in Code-Kommentaren und `docs/` ist leer.
 - [ ] 5.2 Anwenderdoku nach `docs/anwender/AGENTS.md`: `meldebild.md` (Zeile „n von m“, Stärke und Filter „Abschnitt“ mit abgestellter Untereinheit), `einsatzabschnitte.md` (Stärke zählt, wer im Abschnitt steht, Liste mit eigener Stärke, Organigramm), `lagebild.md`/`lagemonitor.md` (Kräfte an UHS nur aktive). Bilder mit sichtbarer Zahl über den Bildlauf erneuern. Wächter der Anwenderdoku grün.
 - [ ] 5.3 `mise exec -- openspec validate rwfa43cy-staerke-eine-zaehlweise --strict` und `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+
+## 6. Befunde aus dem Review (16.11.2026, D3, D4, D8)
+
+- [ ] 6.1 `src/geraet/abschnitt.rs`: `Abschnittsbereich::laden` über den wirksamen Abschnitt (D8). Rust-Test zuerst: Untereinheit ohne eigenen Abschnitt unter einer Einheit im Teilbaum gehört dazu, abgestellte mit Abschnitt außerhalb nicht, aufgelöste Obereinheit vererbt nicht, Zyklus hängt nicht. `cargo test` des Moduls grün.
+- [ ] 6.2 `fuehrungsorganisation.ts`: Option `abgestellteLoesen` (Vorgabe `true`); `fernmeldewesen/fernmeldeskizze.ts:baueFernmeldenetz` ruft mit `false`. Test: in der Skizze hängt die abgestellte Gruppe am Zug, im Organigramm unter ihrem Abschnitt. Delta-Spec `fuehrungsorganisation` dazu.
+- [ ] 6.3 Liste „Zugeordnete Einheiten“: Griff trägt den wirksamen Abschnitt; Test, dass Ziehen auf denselben Abschnitt gesperrt ist (`canDropEinheit`).
+- [ ] 6.4 `pages/lagekarte/leistenDaten.ts`: Einheiten eines Abschnitts über `einheitenImAbschnitt`; Test mit geerbter Untereinheit und aufgelöster Einheit.
+- [ ] 6.5 Kopfkommentar `kraefte/einheitenGliederung.ts`: `ist_kumuliert` gleicht Einheit-Ansicht und `summiereStaerke`, nicht der Abschnittsstärke.
+- [ ] 6.6 `EinsatzabschnittePage.test.tsx`: Fall mit geerbter Gruppe, `ist` ≠ `ist_kumuliert`, Liste zeigt „eigene“ und „über <Obereinheit>“, Summe = Stärke. Mutationsprobe: mit `ist_kumuliert` rot.
+- [ ] 6.7 `LageDashboardPage.test.tsx`: neuer UHS-Test nicht zwischen Kommentar und seinem Test.
+- [ ] 6.8 Anwenderdoku `geraet-einsatzabschnitt.md`: Einheitenliste umfasst Untereinheiten mit geerbtem Abschnitt; Wächter grün.
 
 ## Workflow follow-up
 
