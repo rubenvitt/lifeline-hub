@@ -282,6 +282,12 @@ export type DatensichtSpalte<T, K extends string = string> = AntdErbe<T> & {
   /** Nicht abwählbar (Aktionsspalte). Spalte 0 ist es immer, unabhängig vom Flag. */
   immerSichtbar?: boolean;
   /**
+   * Die Aktionsspalte (LLH-1789, Spec `einsatztauglichkeit-layout`, „Die Hauptaktion einer
+   * Tabellenzeile bleibt im Bild“): ab `md` steht sie rechts fixiert, unter `md` reitet ihr Inhalt
+   * in der fixierten Kennung mit, und die Spalte entfällt. Gebaut über `aktionsSpalte()`.
+   */
+  amEnde?: true;
+  /**
    * Zahl, Zeit, Kennung (Funkrufname, Nr., Koordinate): Mono mit `tabular-nums` in BEIDEN Zweigen.
    * Durchgereicht an {@link KatalogSpalte.zahl}.
    */
@@ -1931,6 +1937,8 @@ export default function Datensicht<T extends object, const K extends string>(
   );
   const kopfStilGefiltert = useMemo(() => kopfGefiltertStil(rollenwerte(token)), [token]);
 
+  /** Ab `md` steht die Aktionsspalte rechts fixiert, darunter in der Kennung (LLH-1789). */
+  const aktionRechts = abBreite('md');
   const antdSpalten = useMemo<KatalogSpalte<T>[]>(
     () =>
       gezeigteSpalten.map((spalte) => {
@@ -1941,6 +1949,7 @@ export default function Datensicht<T extends object, const K extends string>(
           filter,
           abBreite: _ab,
           immerSichtbar,
+          amEnde,
           ...antd
         } = spalte;
         void etikett;
@@ -1948,6 +1957,8 @@ export default function Datensicht<T extends object, const K extends string>(
         void _ab;
         void immerSichtbar;
         const gebaut: KatalogSpalte<T> = { ...antd };
+        // Ab `md` rechts fixiert (LLH-1789); darunter zieht sie in die Kennung (`tabellenSpalten`).
+        if (amEnde && aktionRechts) gebaut.fixed = 'right';
 
         /**
          * Der Titel-Link steht in BEIDEN Zweigen, als Tastatur- und Berührungsziel der Zeile. Trägt
@@ -2014,6 +2025,7 @@ export default function Datensicht<T extends object, const K extends string>(
       filterWerte,
       filterZaehlung,
       kopfStilGefiltert,
+      aktionRechts,
     ],
   );
 
@@ -2109,7 +2121,7 @@ export default function Datensicht<T extends object, const K extends string>(
       : zelle(ersteSpalte, zeile, index);
   };
   const ausloeserNeben = abBreite('xl');
-  const tabellenSpalten: KatalogSpalte<T>[] =
+  const tabellenSpaltenRoh: KatalogSpalte<T>[] =
     aufklappen && antdSpalten.length > 0 && ersteSpalte
       ? [
           {
@@ -2178,6 +2190,47 @@ export default function Datensicht<T extends object, const K extends string>(
             ...antdSpalten.slice(1),
           ]
         : antdSpalten;
+
+  /**
+   * Unter `md` zieht die Aktionsspalte (`amEnde`) in die fixierte Kennung (LLH-1789, design.md D1):
+   * eine zweite fixierte Spalte fräße am Handy dauerhaft 82–124 px, und am Ende des Querscrolls
+   * läge die Hauptaktion außer Sicht. Primäraktion und ⋮ stehen unter der Kennung.
+   */
+  const aktionsIndex = aktionRechts
+    ? -1
+    : tabellenSpaltenRoh.findIndex(
+        (s, i) => i > 0 && gezeigteSpalten.some((g) => g.amEnde && g.key === s.key),
+      );
+  const tabellenSpalten: KatalogSpalte<T>[] =
+    aktionsIndex > 0 && ersteSpalte
+      ? (() => {
+          const aktion = tabellenSpaltenRoh[aktionsIndex];
+          const ohne = tabellenSpaltenRoh.filter((_, i) => i !== aktionsIndex);
+          const erste = ohne[0];
+          return [
+            {
+              ...erste,
+              render: (wert: unknown, zeile: T, index: number) => (
+                <div
+                  data-lfh="datensicht-kennung-aktion"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: token.marginXS,
+                  }}
+                >
+                  {erste.render
+                    ? (erste.render(wert, zeile, index) as ReactNode)
+                    : zelle(ersteSpalte, zeile, index)}
+                  {aktion.render?.(undefined, zeile, index) as ReactNode}
+                </div>
+              ),
+            },
+            ...ohne.slice(1),
+          ];
+        })()
+      : tabellenSpaltenRoh;
 
   /**
    * Der Zeilenfehler steht in der KENNUNGSZELLE unter ihrem Inhalt: sie ist immer sichtbar (wie

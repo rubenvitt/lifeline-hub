@@ -30,3 +30,12 @@ export function textBreite(
   leinwand.font = `${gewicht} ${groesse}px ${schrift || 'sans-serif'}`;
   return leinwand.measureText(text).width + zusatz + 2;
 }
+
+/**
+ * Die Schriftfamilie des Fließtexts (`--lfh-schrift-text`) für {@link textBreite}, einmal je Montage
+ * gelesen. Leer, solange es kein Dokument gibt; dann misst die Leinwand in der Vorgabeschrift.
+ */
+export function leseTextSchrift(): string {
+  if (typeof document === 'undefined') return '';
+  return getComputedStyle(document.documentElement).getPropertyValue('--lfh-schrift-text').trim();
+}

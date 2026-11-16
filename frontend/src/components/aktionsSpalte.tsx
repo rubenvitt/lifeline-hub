@@ -24,6 +24,11 @@ export interface SpaltenAktion<T> {
   zugaenglicherName?: (zeile: T) => string;
   sichtbar?: (zeile: T) => boolean;
   gesperrt?: (zeile: T) => boolean;
+  /**
+   * Was an der Stelle des Knopfs steht, wenn er für diese Zeile nicht sichtbar ist (etwa der
+   * Kurzgrund „namentlich“ einer Betreuungsstelle, LLH-1612). Fehlt = nichts.
+   */
+  ersatz?: (zeile: T) => ReactNode;
 }
 
 /** Was die Spalte vom ⋮ braucht (wie `WeitereAktionen`). */
@@ -70,16 +75,18 @@ export function AktionsInhalt<T>({
   aktion?: SpaltenAktion<T>;
   weitere?: SpaltenWeitere<T>;
 }): ReactNode {
-  const knopf =
-    aktion && (aktion.sichtbar?.(zeile) ?? true) ? (
-      <Button
-        aria-label={aktion.zugaenglicherName?.(zeile)}
-        disabled={aktion.gesperrt?.(zeile) ?? false}
-        onClick={() => aktion.onKlick(zeile)}
-      >
-        {aktion.etikett}
-      </Button>
-    ) : null;
+  const sichtbar = aktion != null && (aktion.sichtbar?.(zeile) ?? true);
+  const knopf = !aktion ? null : !sichtbar ? (
+    (aktion.ersatz?.(zeile) ?? null)
+  ) : (
+    <Button
+      aria-label={aktion.zugaenglicherName?.(zeile)}
+      disabled={aktion.gesperrt?.(zeile) ?? false}
+      onClick={() => aktion.onKlick(zeile)}
+    >
+      {aktion.etikett}
+    </Button>
+  );
   const eintraege = weitere?.eintraege(zeile) ?? [];
   const menue =
     weitere && eintraege.length > 0 ? (
