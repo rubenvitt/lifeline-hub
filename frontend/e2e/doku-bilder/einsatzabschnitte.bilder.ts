@@ -89,6 +89,9 @@ test.describe(KAPITEL, () => {
     await expect(wurzel.getByText('ELW 2 Musterstadt')).toBeVisible();
     await expect(wurzel).toContainText('Max Mustermann');
     await expect(organigramm.getByText('UHS Turnhalle').first()).toBeVisible();
+    // Lagezustand am Knoten und die Sammelzeile der fehlenden Leitung (LLH-1742).
+    await expect(organigramm.locator('[data-lfh="org-lagezustand"]').first()).toBeVisible();
+    await expect(organigramm.locator('[data-lfh="org-ohne-leitung"]')).toBeVisible();
     await fotografiere(organigramm, KAPITEL, 'organigramm');
   });
 });
