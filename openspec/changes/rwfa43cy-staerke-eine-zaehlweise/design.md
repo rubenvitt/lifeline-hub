@@ -136,7 +136,9 @@ Dieselbe Menge zählt die Leiste der Lagekarte als Einheiten eines Abschnitts
 
 ### D5 Zeile über dem Meldebild
 
-Die Zeile zeigt zwei Zahlen: `${p} von ${P} Kräften · ${f} von ${F} Fahrzeugen`, aus
+Nur bei gesetztem Filter (Entscheidung 16.11.2026): Die Werkzeugzeile hatte bei 1366 px nur rund
+10 px Luft, die längere Zeile ließ sie umbrechen. Ohne Filter nennen Statusband und Seitenkopf die
+Zahlen schon. Mit Filter zeigt die Zeile zwei Zahlen: `${p} von ${P} Kräften · ${f} von ${F} Fahrzeugen`, aus
 `anzahlPersonal` und `anzahlFahrzeuge` der gefilterten und der ganzen Verdichtung. Ist eine der
 beiden Listen unbekannt, steht für sie „—“ (heute steht dann die ganze Zeile auf „—“). Ist die
 Mittelliste gesperrt, bleibt der vorhandene Sperrhinweis. Die Fahrzeugzahl entfällt dann, und

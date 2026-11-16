@@ -39,6 +39,7 @@
 - [x] 6.7 `LageDashboardPage.test.tsx`: neuer UHS-Test nicht zwischen Kommentar und seinem Test.
 - [x] 6.9 Nach-Review: „Rückgängig“ nach dem Ziehen einer geerbten Einheit schickt `abschnitt_id: null` zurück (Test in `EinsatzabschnittePage.test.tsx`).
 - [x] 6.10 Nach-Review: Geräteliste ordnet und beschriftet nach dem wirksamen Abschnitt, „über …“, eigene Stärke (Tests in `GeraetAbschnitt.test.tsx`); Regel in `frontend/src/geraet/AGENTS.md`, Kommentar `fernmeldewesen/luecken.ts`.
+- [x] 6.12 Zeile „n von m Kräften · n von m Fahrzeugen“ nur bei gesetztem Filter (Werkzeugzeile bricht sonst um); Seitentests und e2e `meldebild-tabelle`, `gate3-trefflaeche` grün; Anwenderdoku `meldebild.md`, Bild neu.
 - [x] 6.11 Bild `geraet-einsatzabschnitt` neu aufnehmen.
 - [x] 6.8 Anwenderdoku `geraet-einsatzabschnitt.md`: Einheitenliste umfasst Untereinheiten mit geerbtem Abschnitt; Wächter grün.
 

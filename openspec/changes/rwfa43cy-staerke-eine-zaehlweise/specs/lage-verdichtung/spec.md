@@ -59,10 +59,10 @@ Eine Zahl, die mit „Kräfte“ beschriftet ist, SHALL Personen zählen. Fahrze
 Material MUST NOT in eine Zahl „Kräfte“ eingehen; nennt eine Stelle sie mit, dann als eigene Zahl
 mit eigenem Wort.
 
-#### Scenario: Zeile über dem Meldebild
+#### Scenario: Zeile über dem Meldebild ohne Filter
 - **WHEN** der Einsatz 12 Personen und 8 Fahrzeuge führt und kein Filter gesetzt ist
-- **THEN** steht über dem Meldebild „12 von 12 Kräften · 8 von 8 Fahrzeugen“, nicht „20 von 20
-  Kräften“
+- **THEN** steht in der Werkzeugzeile des Meldebilds keine Auswahlzahl, und nirgends „20 von 20
+  Kräften“; die Zahlen nennen Statusband und Seitenkopf
 
 #### Scenario: Gefilterte Auswahl
 - **WHEN** ein Filter 5 der 12 Personen und 2 der 8 Fahrzeuge durchlässt

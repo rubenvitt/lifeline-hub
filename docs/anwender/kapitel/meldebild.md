@@ -60,9 +60,10 @@ setzen Status, tragen nach und streichen.
 7. Zum Eingrenzen oben rechts unter „Abschnitt“ einen Einsatzabschnitt wählen, in „Suche...“ einen
    Namen eingeben oder unter „Filter“ nach „Trägerorganisation“ oder „Status“ (verfügbar,
    gebunden, nicht verfügbar) filtern; der Knopf nennt dann die Zahl, etwa „Filter (1)“. Jeder
-   gesetzte Filter steht als Marke in der Werkzeugzeile und lässt sich dort einzeln entfernen. Die
-   Zahlen links, etwa „12 von 12 Kräften · 8 von 8 Fahrzeugen“, nennen, wie viele Personen und
-   Fahrzeuge die Auswahl zeigt; „Filter zurücksetzen“ hebt alle Filter auf. Trifft die Suche ein Fahrzeug, steht seine ganze Beladung
+   gesetzte Filter steht als Marke in der Werkzeugzeile und lässt sich dort einzeln entfernen.
+   Solange ein Filter gesetzt ist, nennen die Zahlen links, etwa „5 von 12 Kräften · 2 von 8
+   Fahrzeugen“, wie viele Personen und Fahrzeuge die Auswahl zeigt; „Filter zurücksetzen“ hebt
+   alle Filter auf. Trifft die Suche ein Fahrzeug, steht seine ganze Beladung
    darunter; trifft sie einen Posten der Beladung, steht das Fahrzeug mit seiner Einheit darüber,
    aber nur mit diesem Posten.
 
