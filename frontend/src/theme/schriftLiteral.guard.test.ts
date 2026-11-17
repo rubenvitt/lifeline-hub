@@ -54,11 +54,11 @@ const SRC = (() => {
   throw new Error(`Schrift-Literal-Guard findet frontend/src nicht (cwd: ${process.cwd()})`);
 })();
 
-/** Die Dateien des Lagemonitors, die die Fernsicht-Skala (`fernsicht` im Theme) setzen. */
-export const FERNSICHT_DATEIEN: readonly string[] = [
-  'geraet/LagemonitorPage.tsx',
-  'geraet/LagemonitorKarte.tsx',
-];
+/**
+ * Die Dateien des Lagemonitors, die die Fernsicht-Skala (`fernsicht` im Theme) als Zahl setzen.
+ * Die Monitorseite nimmt sie über `grossMass` (LLH-1930), nur die Karte braucht die Zahl.
+ */
+export const FERNSICHT_DATEIEN: readonly string[] = ['geraet/LagemonitorKarte.tsx'];
 
 /**
  * Zeichnungen mit eigenem Maßstab (Spec `schriftskala`): ihre Schriften sind Zeichnungseinheiten

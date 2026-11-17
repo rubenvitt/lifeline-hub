@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fernsicht } from '../../theme/tokens';
 import { GROSS_BEZUG, grossMass } from './grossMass';
 
 /** Rechnet einen Ausdruck von {@link grossMass} für ein Fenster aus, wie der Browser es täte. */
@@ -35,7 +36,13 @@ describe('grossMass', () => {
     expect(evaluateMass(grossMass(GROSS_BEZUG.text), 720, 400, 0.5)).toBe(14);
   });
 
-  it('hält die Bezugswerte des Lagemonitors', () => {
+  it('nimmt die Schriftgrößen aus der Fernsicht-Skala des Themes (LLH-1930)', () => {
+    expect(GROSS_BEZUG).toMatchObject({
+      zahl: fernsicht.kennzahl,
+      zahlKlein: fernsicht.kennzahlKlein,
+      titel: fernsicht.titel,
+      text: fernsicht.text,
+    });
     expect(GROSS_BEZUG).toMatchObject({ zahl: 96, zahlKlein: 72, titel: 32, text: 28 });
   });
 });

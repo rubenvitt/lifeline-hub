@@ -28,7 +28,8 @@ import { baueMonitorFlaechen, belegungText, istUeberbelegt } from './lagemonitor
 
 /**
  * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`),
- * aus der Fernsicht-Skala des Themes wie `GROSS.text` in `LagemonitorPage.tsx`.
+ * aus der Fernsicht-Skala des Themes wie `GROSS_BEZUG.text` (`components/grossbild/grossMass.ts`);
+ * die Kartenbibliothek nimmt eine Zahl, keine CSS-Länge.
  */
 const GROSS_TEXT = fernsicht.text;
 
