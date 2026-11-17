@@ -38,7 +38,7 @@ per TDD: erst der rote Test, dann der Code.
 
 - [ ] 5.1 `frontend/e2e/einsatzabschluss.spec.ts` umstellen: Dialog mit offenem Punkt, Eintippen, Abschluss, Wiederöffnen mit Grund, ETB zeigt beide Einträge; Lauf grün
 - [x] 5.2 `docs/anwender/kapitel/einsatzabschluss.md` nach `docs/anwender/AGENTS.md` (Kapitelform, `quellen:`): offene Punkte, Eintippen, gebundene Kräfte, Wiederöffnen binnen 24 h, was beendet bleibt; „keinen Weg zurück“ entfällt; `einsatzdaten.md`/`aufbewahrung.md` wo sie den Abschluss beschreiben; Wächter der Anwenderdoku grün
-- [ ] 5.3 Bildlauf `frontend/e2e/doku-bilder/einsatzabschluss.bilder.ts`: Bild des Dialogs statt `abschluss-rueckfrage.png`, Bild „Einsatz wieder öffnen“; Bilder erzeugt und eingebunden
+- [x] 5.3 Bildlauf `frontend/e2e/doku-bilder/einsatzabschluss.bilder.ts`: Bild des Dialogs statt `abschluss-rueckfrage.png`, Bild „Einsatz wieder öffnen“; Bilder erzeugt und eingebunden
 
 ## 6. Verifikation
 
