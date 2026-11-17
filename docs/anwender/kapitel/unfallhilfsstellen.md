@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/UhsBearbeitenModal.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenModal.tsx, frontend/src/components/AnlegenModal.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenModal.tsx, frontend/src/components/AnlegenModal.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/uhs/UhsAngaben.tsx, frontend/src/pages/uhs/uhsPatch.ts]
 ---
 
 ## Überblick
@@ -40,17 +40,21 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
 
 ### Bezeichnung, Standort, Soll und Notiz ändern
 
-1. Die Stelle öffnen und oben „Bearbeiten“ wählen.
-2. „Bezeichnung“, „Standort (optional)“ oder „Notiz (optional)“ ändern. Den Standort mit Enter
-   oder „Ort suchen“ suchen und einen Treffer wählen, eine Koordinate eintippen oder den Punkt über
-   „Auf Karte wählen“ setzen; ein geleerter Standort löscht auch die Koordinate.
-3. Unter „Soll-Anzahl (optional)“ eintragen, wie viele Kräfte die Stelle braucht (1 bis 200), und
-   unter „Qualifikationssoll“ mit „Qualifikation fordern“, welche Qualifikationen mindestens dabei
-   sein müssen.
-4. „Speichern“ wählen. Gespeichert wird nur, was sich geändert hat. Das Soll steht im Kopf der
-   Stelle vor der Notiz.
+1. Die Stelle öffnen, den Bereich „Angaben“ wählen und dort „Bearbeiten“ wählen. Die Angaben
+   werden an Ort und Stelle zu Eingabefeldern.
+2. „Bezeichnung“, „Standort“ oder „Notiz“ ändern. Den Standort mit Enter oder „Ort suchen“ suchen
+   und einen Treffer wählen, eine Koordinate eintippen oder den Punkt über „Auf Karte wählen“
+   setzen; ein geleerter Standort löscht auch die Koordinate.
+3. Unter „Soll-Anzahl“ eintragen, wie viele Kräfte die Stelle braucht (1 bis 200), und unter
+   „Qualifikationssoll“ mit „Qualifikation fordern“, welche Qualifikationen mindestens dabei sein
+   müssen.
+4. „Speichern“ wählen, oder Enter; Escape oder „Abbrechen“ verwirft die Eingabe. Gespeichert wird
+   nur, was sich geändert hat. Das Soll steht auch im Kopf der Stelle vor der Notiz.
 
-Eine aufgelöste oder stornierte Stelle lässt sich nicht mehr bearbeiten.
+Hat jemand anderes die Stelle inzwischen geändert, fragt die App „Zwischenzeitlich geändert“:
+„Meine Änderung übernehmen“ speichert trotzdem, „Verwerfen und neu laden“ zeigt den neuen Stand.
+Eine aufgelöste oder stornierte Stelle lässt sich nicht mehr bearbeiten; ihre Angaben bleiben
+lesbar.
 
 ### Die Liste der Unfallhilfsstellen sortieren und filtern
 
@@ -75,7 +79,7 @@ hat.
 1. Im Modulpanel „Unfallhilfsstellen“ öffnen. Es öffnet sich die zuletzt besuchte oder eine
    aktive Stelle; andere wählt der Umschalter im Titel.
 
-   ![Unfallhilfsstelle mit der Leiste „Belegung“, „Material“, „Kräfte“, „Bewegungen“ und „Dateien“ über dem Grundriss, darin zwei belegte und mehrere freie Plätze, Wartebereich und Transport](../bilder/unfallhilfsstellen/grundriss.png)
+   ![Unfallhilfsstelle mit der Leiste „Belegung“, „Material“, „Kräfte“, „Bewegungen“, „Dateien“ und „Angaben“ über dem Grundriss, darin zwei belegte und mehrere freie Plätze, Wartebereich und Transport](../bilder/unfallhilfsstellen/grundriss.png)
 
 2. Die Fläche zeigt jeden Platz mit seiner Verfügbarkeit („frei“, „belegt“, „in Aufbereitung“,
    „defekt“, „gesperrt“) und dem Patienten darauf. Jede Patientenmarke trägt vorn die Sichtung
@@ -88,8 +92,9 @@ hat.
    verlassen hat und noch nicht übergeben ist, mit Fahrzeug, Ziel, Transportpriorität und der
    Zeit seit der Abfahrt; ab einer Stunde trägt die Zeile „Übergabe offen“.
 4. Die Leiste über dem Grundriss wechselt zwischen „Belegung“ (dem Grundriss), „Material“,
-   „Kräfte“, „Bewegungen“ und „Dateien“. Jeder Bereich füllt dieselbe Fläche bis zum unteren
-   Fensterrand; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und Platz.
+   „Kräfte“, „Bewegungen“, „Dateien“ und „Angaben“. Jeder Bereich füllt dieselbe Fläche bis zum
+   unteren Fensterrand; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und
+   Platz, „Angaben“ die Stammdaten der Stelle.
    Der gewählte Bereich steht in der Adresse, ein Lesezeichen öffnet ihn direkt.
 
 Auf einem breiten Bildschirm stehen Wartebereich, Fläche und „Unterwegs“ nebeneinander; dann

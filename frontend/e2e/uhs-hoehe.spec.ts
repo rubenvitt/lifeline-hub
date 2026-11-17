@@ -282,7 +282,7 @@ for (const [breite, hoehe] of [
     await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
 
     const leiste = page.getByRole('tablist', {
-      name: 'Belegung, Material, Kräfte, Bewegungen und Dateien',
+      name: 'Belegung, Material, Kräfte, Bewegungen, Dateien und Angaben',
     });
     const material = leiste.getByRole('tab', { name: 'Material', exact: true });
     // Ohne Bildlauf: die Seite steht oben, und der Reiter liegt im Fenster über dem Grundriss.
@@ -304,7 +304,7 @@ for (const [breite, hoehe] of [
     expect(abstand).toBeGreaterThanOrEqual(0);
 
     const flaechen: Record<string, number> = {};
-    for (const name of ['Belegung', 'Material', 'Kräfte', 'Bewegungen', 'Dateien']) {
+    for (const name of ['Belegung', 'Material', 'Kräfte', 'Bewegungen', 'Dateien', 'Angaben']) {
       await leiste.getByRole('tab', { name, exact: true }).click();
       await expect(leiste.getByRole('tab', { name, exact: true })).toHaveAttribute(
         'aria-selected',

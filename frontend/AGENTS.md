@@ -106,7 +106,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
   `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
-  einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
+  einzige Baustein dafür, siehe „UI-Form-Leitlinie“; weitere Handlungen am Datensatz über
+  `zusatz` vor „Bearbeiten“, nur im Lesezustand, LLH-1920) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `UebungsMarke`/`UebungsBand`
   (Kennzeichnung einer Übung, Regel unter „Rahmen“, „Übung“) · `AlarmZeile` („Was brennt“, LLH-1743,
@@ -446,7 +447,9 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    und Bemerkungen verweisen darauf, statt ihn unter jede Zelle jeder Zeile zu schreiben.
 4. **Nur geänderte Felder senden** (PATCH), nie das ganze Formular; ohne Änderung kein Aufruf.
    Konflikt über `geaendert_at`: ein 409 fragt „Zwischenzeitlich geändert“ mit „Meine Änderung
-   übernehmen“ / „Verwerfen und neu laden“.
+   übernehmen“ / „Verwerfen und neu laden“. Zeichnet die Route den Sperrkonflikt aus
+   (`grund: "veraltet"`, `isVeraltet`, `src/AGENTS.md`, Statuscode-Konvention), fragt nur er;
+   ein anderer 409 steht als Grund am Paneel (`isSperrkonflikt`, LLH-1920).
 5. **Prüffehler sichtbar** unter der Zelle (`DatenfeldEingabe`), eine Ablehnung als
    `SpeicherFehler` am Paneel. Enter speichert, Escape bricht ab; Fokus beim Öffnen ins erste Feld,
    beim Schließen zurück auf „Bearbeiten“.
@@ -455,8 +458,8 @@ Ansicht“; schreibt LFH-19 und LFH-979 fort)
    die Liste mit erneutem Öffnen.
 
 Kein Fach-Modul baut einen zweiten Baustein dafür; die Seiten stellen ihre Fach-Tickets um
-(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte,
-Bereitstellungsraum, Betreuung).
+(Einsatzabschnitte, Einheit, Personal, Personendaten, Tier/Schaden, Lageberichte, Betreuung).
+UHS (Bereich „Angaben“) und Bereitstellungsraum („Raumdaten“) sind umgestellt (LLH-1920).
 
 **Ort von „Bearbeiten“ und Form des Anlegens** (LLH-1722, D8): „Bearbeiten“ eines Paneels steht
 im Paneelkopf, das der ganzen Ansicht im Kopf nach der Zwei-Handlungen-Regel (sonst im ⋮ des
@@ -466,8 +469,7 @@ Serienerfassung neben einer Liste; **kein Drawer zum Anlegen** (Spec `bedien-mus
 Datensatz anlegen“). Einsatzgebundene Datensätze legen über `components/AnlegenModal.tsx` an
 (UHS, Bereitstellungsraum), jeder Einstieg öffnet denselben Dialog. Eingeklappt über der Liste
 bleiben, weil dort in Serie erfasst wird: Nachforderung, Meldungen, Erinnerungen (geprüft
-LLH-1921); die Lagemeldung erfasst im Dialog. Altstelle mit Folgeaufgabe (LLH-1920): UHS und
-Bereitstellungsraum bearbeiten im Modal (`UhsBearbeitenModal`, `BrBearbeitenModal`).
+LLH-1921); die Lagemeldung erfasst im Dialog.
 
 **Die Liste ist die zweite Frage** (LFH-330): „welcher von diesen?" → Tabelle
 (`components/KatalogTabelle.tsx`, `components/Datensicht.tsx` `form="tabelle"`); „was ist mit diesem?" →
