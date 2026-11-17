@@ -217,6 +217,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Fokus aus dem Bild, mit Fokus `fixed` oben links über `RAHMEN_EBENE` (`.lfh-sprung-inhalt`, von
     den Fokusabständen in `index.css` ausgenommen). Die Gerätehülle hat keinen. Nachweis
     `e2e/sprung-zum-inhalt.spec.ts`.
+  - **Jede Rahmenebene hat eine Fehlergrenze** (c11mj7y1, LLH-1822, Spec `seiten-zustaende`,
+    „Fehlergrenze je Rahmen“ und „Letztes Netz an der Wurzel“, Change `a12ms7g9-seitenzustaende`
+    D1/D2): unter `EinsatzLayout`, `AppLayout`, `AdminLayout`, `GeraeteLayout` und
+    `GeraetEinsatzRahmen` genau eine pfadlose Kindroute mit
+    `errorElement={<Fehlergrenze rahmen="…" />}` (`components/Fehlergrenze.tsx`), die alle Seiten
+    des Rahmens umschließt; nie ein `errorElement` am Layout selbst, es ersetzte den Rahmen. Die
+    oberste Route trägt das letzte Netz (`rahmen="wurzel"`, ganze Seite ohne `AuthProvider`). Die
+    Grenze zeigt nie Meldung oder Stack, nur „Neu laden“ und den sicheren Ort des Rahmens („Zum
+    Überblick“ über `einsatz/useUeberblickRueckweg.ts`, „Zur Einsatzliste“, „Zur Startseite“), und
+    meldet den Wurf einmal je Fehlerobjekt über `meldeClientFehler` (`api/clientFehler.ts`). Ein
+    neuer Rahmen kommt mit seiner Grenze in den Wächter `App.fehlergrenze.guard.test.tsx`.
+    Nachweis `e2e/fehlergrenze.spec.ts`.
   - **Modulpanel:** `navPersistenz` ist dreiwertig; ohne Wahl zwischen `lg` und `xl` zu, ab `xl`
     offen. Eine Wahl schreiben nur der Griff „Menü“ und der Selbstklick, nie ein Rail-Sprung.
 - **Modulstruktur** (`einsatz/modulRegistry.ts`): Startseite **Führung · Überblick**

@@ -408,12 +408,16 @@ Erklärender Text gehört dorthin statt in die Oberfläche. Regeln:
 
 Wirft eine Seite im Browser beim Zeichnen, soll nur die Seite weichen, nicht ihr Rahmen, und der
 Betreiber soll es im Log sehen, ohne dass Daten des Einsatzes dorthin gelangen (Spec
-`seiten-zustaende`, Herleitung in der Change `a12ms7g9-seitenzustaende`, D1 bis D3). Der Bericht
-geht über `meldeClientFehler` in `frontend/src/api/clientFehler.ts`: einmal je Fehlerobjekt, mit
-Routenmuster statt Pfad (`gemerktesRoutenMuster` in `frontend/src/rueckmeldung/adresse.ts`),
-App-Version, Meldung und Stack gekürzt, gesendet per `apiSendKeepalive` aus
-`frontend/src/api/client.ts` ohne Wiederholen und ohne Warteschlange; ein Fehler beim Senden wird
-verschluckt. Der Server (`src/routes/client_fehler.rs`, `POST /api/client-fehler`) nimmt nur mit
-Sitzung an, begrenzt Body (`CLIENT_FEHLER_BODY_MAX` in `src/app.rs`) und Felder (`*_MAX`,
-Abschnitt 8.4), speichert nichts und schreibt höchstens eine Warnzeile je Minute über
+`seiten-zustaende`, Herleitung in der Change `a12ms7g9-seitenzustaende`, D1 bis D3). Die Grenze ist
+`frontend/src/components/Fehlergrenze.tsx`, eingehängt als `errorElement` einer pfadlosen Route
+unter jedem Rahmen und an der obersten Route (`frontend/src/App.tsx`, Regel und Wächter in
+`frontend/AGENTS.md`, Rahmen); der Router zeichnet sie im `<Outlet/>` des Rahmens und räumt sie beim
+nächsten Ortswechsel ab. Der Bericht geht über `meldeClientFehler` in
+`frontend/src/api/clientFehler.ts`: einmal je Fehlerobjekt, mit Routenmuster statt Pfad
+(`gemerktesRoutenMuster` in `frontend/src/rueckmeldung/adresse.ts`), App-Version, Meldung und Stack
+gekürzt, gesendet per `apiSendKeepalive` aus `frontend/src/api/client.ts` ohne Wiederholen und ohne
+Warteschlange; ein Fehler beim Senden wird verschluckt. Der Server (`src/routes/client_fehler.rs`,
+`POST /api/client-fehler`) nimmt nur mit Sitzung an, auch von einer Gerätesitzung
+(`geraet::ALLE_GERAETE`), begrenzt Body (`CLIENT_FEHLER_BODY_MAX` in `src/app.rs`) und Felder
+(`*_MAX`, Abschnitt 8.4), speichert nichts und schreibt höchstens eine Warnzeile je Minute über
 `log_drossel::Sammelzeile` (Abschnitt 8.16), ohne Benutzer und Organisation.

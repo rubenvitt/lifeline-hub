@@ -20,24 +20,24 @@
 
 ## 2. c11mj7y1 (LLH-1822): Fehlergrenze je Rahmen
 
-- [ ] 2.1 `frontend/src/components/Fehlergrenze.tsx` (`rahmen`: `einsatz` | `ebene1` | `verwaltung`
+- [x] 2.1 `frontend/src/components/Fehlergrenze.tsx` (`rahmen`: `einsatz` | `ebene1` | `verwaltung`
   | `geraet` | `wurzel`): `useRouteError`, Paneelform mit Kante in `alarm`, Titel und Satz aus
   D2, „Neu laden“ und der rahmenabhängige zweite Ausweg, Aufruf von `meldeClientFehler` im
   Effekt. Die Rückweg-Wahl im Einsatz teilt sich die Grenze mit `SeiteNichtGefunden` (eine
   herausgezogene Funktion). Belegt durch Vitests je Rahmen: deutscher Text, genau zwei Knöpfe,
   keine Fehlermeldung oder kein Stack im DOM, „Zum Überblick“ führt bei gesperrtem Überblick ins
   erste freie Modul, die Wurzel-Variante zeichnet ohne `AuthProvider`.
-- [ ] 2.2 `App.tsx`: pfadlose Kindroute mit `errorElement` unter `EinsatzLayout`, `AppLayout`,
+- [x] 2.2 `App.tsx`: pfadlose Kindroute mit `errorElement` unter `EinsatzLayout`, `AppLayout`,
   `AdminLayout`, `GeraeteLayout`, `GeraetEinsatzRahmen`, dazu `errorElement` an der Wurzelroute.
   Belegt durch einen Wächter-Test an `appRouten` (jede Layout-Route hat genau eine solche
   Kindroute, die Wurzel ein `errorElement`) und einen Integrationstest über
   `createMemoryRouter(appRouten)`, in dem ein Modul wirft: Rail und Kopf bleiben bedienbar, ein
   Wechsel über die Rail zeigt wieder die normale Seite, genau ein Bericht geht ab.
-- [ ] 2.3 e2e `frontend/e2e/fehlergrenze.spec.ts`: ein Modul per eingeschleustem Wurf (Route mit
+- [x] 2.3 e2e `frontend/e2e/fehlergrenze.spec.ts`: ein Modul per eingeschleustem Wurf (Route mit
   kaputter Antwort, die beim Zeichnen wirft) zum Absturz bringen. Der Rahmen bleibt, der Text
   ist deutsch, „Unexpected Application Error“ fehlt, ein `POST /api/client-fehler` geht ab. Lauf
   der einen Spec grün.
-- [ ] 2.4 `frontend/AGENTS.md`: Regel „Jede Rahmenebene hat eine Fehlergrenze“ samt Wächter.
+- [x] 2.4 `frontend/AGENTS.md`: Regel „Jede Rahmenebene hat eine Fehlergrenze“ samt Wächter.
   Anwenderkapitel `docs/anwender/kapitel/einsatz-oberflaeche.md`: Abschnitt zur Fehlerseite und
   ihren zwei Auswegen, unpersönlich formuliert. Den Wächter der Anwenderdoku
   (`anwenderdoku.guard.test.ts`) und Prettier über `frontend/AGENTS.md` grün sehen.
