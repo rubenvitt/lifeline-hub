@@ -1,6 +1,7 @@
 import { App, Input } from 'antd';
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { istVeraltet } from '../../api/client';
 import { aktualisiereBr } from '../../api/einsatzBereitstellungsraum';
 import { BR_BEZEICHNUNG_MAX, BR_NOTIZ_MAX, BR_STANDORT_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -86,6 +87,8 @@ export default function BrRaumdaten({
         void qc.invalidateQueries({ queryKey: einsatzKeys.geraete(einsatzId) });
       }}
       onNeuLaden={onNeuLaden}
+      // Der Server zeichnet den Sperrkonflikt aus; storniert oder doppelt steht als Grund am Paneel.
+      istSperrkonflikt={istVeraltet}
       darfSchreiben={bearbeitbar}
       zusatz={bearbeitbar ? <AufKarteVerorten einsatzId={einsatzId} br={br} /> : undefined}
     />

@@ -1311,7 +1311,10 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
         if (erster) {
           erster = false;
           return HttpResponse.json(
-            { error: 'Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.' },
+            {
+              error: 'Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.',
+              grund: 'veraltet',
+            },
             { status: 409 },
           );
         }
@@ -1360,10 +1363,10 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
     expect(stand.bodies).toEqual([]);
   });
 
-  it('Ablehnung: der Grund steht am Paneel, die Eingabe bleibt offen, kein Toast', async () => {
+  it('Ablehnung (409 ohne Sperrkonflikt): der Grund steht am Paneel, keine Rückfrage, kein Toast', async () => {
     seite(brDetail(), {
       patch: () =>
-        HttpResponse.json({ error: 'Stornierter BR kann nicht geändert werden' }, { status: 422 }),
+        HttpResponse.json({ error: 'Stornierter BR kann nicht geändert werden' }, { status: 409 }),
     });
 
     await userEvent.click(await bearbeiten());
@@ -1374,7 +1377,32 @@ describe('BrDetailPage — Raumdaten in der Ansicht bearbeiten (LFH-1147, LLH-19
       'Stornierter BR kann nicht geändert werden',
     );
     expect(feld('Notiz')).toHaveValue('neu');
+    expect(screen.queryByRole('dialog', { name: 'Zwischenzeitlich geändert' })).toBeNull();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('doppelte Bezeichnung (409): der Grund steht am Paneel statt „Zwischenzeitlich geändert“', async () => {
+    seite(brDetail(), {
+      patch: () =>
+        HttpResponse.json(
+          {
+            error:
+              'Ein Bereitstellungsraum mit dieser Bezeichnung existiert bereits in diesem Einsatz',
+          },
+          { status: 409 },
+        ),
+    });
+
+    await userEvent.click(await bearbeiten());
+    await userEvent.clear(feld('Bezeichnung'));
+    await userEvent.type(feld('Bezeichnung'), 'BR Ost');
+    await userEvent.click(speichern());
+
+    expect(await within(paneel()).findByRole('alert')).toHaveTextContent(
+      'existiert bereits in diesem Einsatz',
+    );
+    expect(screen.queryByRole('dialog', { name: 'Zwischenzeitlich geändert' })).toBeNull();
+    expect(feld('Bezeichnung')).toHaveValue('BR Ost');
   });
 
   it('steht im Paneelkopf der Raumdaten, nicht im Seitenkopf: geplant trägt der Kopf nur „In Betrieb nehmen“ (LLH-1722)', async () => {

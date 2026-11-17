@@ -256,6 +256,46 @@ describe('BearbeitbaresPaneel · Konflikt', () => {
     await waitFor(() => expect(screen.queryByRole('spinbutton')).toBeNull());
   });
 
+  it('mit `istSperrkonflikt`: ein anderer 409 steht als Grund am Paneel, keine Rückfrage (LLH-1920)', async () => {
+    const user = userEvent.setup();
+    rendern(
+      <FunkPaneel
+        istSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
+        onSpeichern={async () => {
+          throw new ApiError(409, 'Rufname schon vergeben');
+        }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    await user.clear(kanal);
+    await user.type(kanal, '43');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Rufname schon vergeben')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Zwischenzeitlich geändert' })).toBeNull();
+    expect(screen.getByRole('spinbutton', { name: 'Kanal' })).toHaveValue('43');
+  });
+
+  it('mit `istSperrkonflikt`: der Sperrkonflikt fragt weiter nach', async () => {
+    const user = userEvent.setup();
+    rendern(
+      <FunkPaneel
+        istSperrkonflikt={(e) => e instanceof ApiError && e.grund === 'veraltet'}
+        onSpeichern={async () => {
+          throw new ApiError(409, 'geändert', { grund: 'veraltet' });
+        }}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Funk bearbeiten' }));
+    const kanal = await screen.findByRole('spinbutton', { name: 'Kanal' });
+    await user.clear(kanal);
+    await user.type(kanal, '43');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' }),
+    ).toBeInTheDocument();
+  });
+
   it('„Verwerfen und neu laden“ schließt und lädt neu', async () => {
     const user = userEvent.setup();
     const onNeuLaden = vi.fn();

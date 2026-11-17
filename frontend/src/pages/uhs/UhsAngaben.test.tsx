@@ -175,7 +175,10 @@ describe('UhsAngaben · Konflikt', () => {
     const rumpfe = mitschnitt((n) =>
       n === 1
         ? HttpResponse.json(
-            { error: 'Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.' },
+            {
+              error: 'Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.',
+              grund: 'veraltet',
+            },
             { status: 409 },
           )
         : undefined,
@@ -195,7 +198,7 @@ describe('UhsAngaben · Konflikt', () => {
   it('„Verwerfen und neu laden“ lädt neu', async () => {
     mitschnitt(() =>
       HttpResponse.json(
-        { error: 'Der Datensatz wurde zwischenzeitlich geändert.' },
+        { error: 'Der Datensatz wurde zwischenzeitlich geändert.', grund: 'veraltet' },
         { status: 409 },
       ),
     );
@@ -206,5 +209,25 @@ describe('UhsAngaben · Konflikt', () => {
     const frage = await screen.findByRole('dialog', { name: 'Zwischenzeitlich geändert' });
     await userEvent.click(within(frage).getByRole('button', { name: 'Verwerfen und neu laden' }));
     expect(onNeuLaden).toHaveBeenCalled();
+  });
+
+  it('doppelte Bezeichnung (409 ohne Sperrkonflikt): Grund am Paneel, keine Rückfrage', async () => {
+    mitschnitt(() =>
+      HttpResponse.json(
+        { error: 'Eine UHS mit dieser Bezeichnung existiert bereits in diesem Einsatz' },
+        { status: 409 },
+      ),
+    );
+    zeige();
+    await oeffne();
+    const bezeichnung = within(paneel()).getByLabelText('Bezeichnung');
+    await userEvent.clear(bezeichnung);
+    await userEvent.type(bezeichnung, 'BHP 51');
+    await userEvent.click(within(paneel()).getByRole('button', { name: 'Speichern' }));
+    expect(await within(paneel()).findByRole('alert')).toHaveTextContent(
+      'existiert bereits in diesem Einsatz',
+    );
+    expect(screen.queryByRole('dialog', { name: 'Zwischenzeitlich geändert' })).toBeNull();
+    expect(bezeichnung).toHaveValue('BHP 51');
   });
 });

@@ -225,9 +225,9 @@ pub async fn aktualisiere(
                         .fetch_optional(pool)
                         .await?;
                 if existiert.is_some() {
-                    return Err(AppError::Conflict(
-                        "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
-                    ));
+                    // Eigener Grund (LLH-1920): der Client fragt nur hier „Zwischenzeitlich
+                    // geändert“, nicht bei einer doppelten Bezeichnung.
+                    return Err(AppError::Veraltet);
                 }
             }
             Err(AppError::NotFound)
@@ -532,7 +532,7 @@ mod tests {
         .await
         .unwrap_err();
         assert!(
-            matches!(err, AppError::Conflict(_)),
+            matches!(err, AppError::Veraltet),
             "veralteter Stand muss 409 (Conflict) sein, war: {err:?}"
         );
 

@@ -1,6 +1,7 @@
 import { App, Input, InputNumber } from 'antd';
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { istVeraltet } from '../../api/client';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
 import { UHS_SOLL_ANZAHL_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -94,6 +95,8 @@ export default function UhsAngaben({
         void qc.invalidateQueries({ queryKey: einsatzKeys.lagemonitor(einsatzId) });
       }}
       onNeuLaden={onNeuLaden}
+      // Der Server zeichnet den Sperrkonflikt aus; storniert oder doppelt steht als Grund am Paneel.
+      istSperrkonflikt={istVeraltet}
       darfSchreiben={bearbeitbar}
     />
   );

@@ -278,10 +278,9 @@ pub async fn update_tx(
     .execute(&mut *conn)
     .await;
     match ergebnis {
-        // Die Zeile gibt es (`laden_tx` oben): keine Änderung heißt veralteter Stand.
-        Ok(r) if r.rows_affected() == 0 => Err(AppError::Conflict(
-            "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
-        )),
+        // Die Zeile gibt es (`laden_tx` oben): keine Änderung heißt veralteter Stand. Eigener
+        // Grund, damit der Client ihn von einer doppelten Bezeichnung (auch 409) trennt.
+        Ok(r) if r.rows_affected() == 0 => Err(AppError::Veraltet),
         Ok(_) => laden_tx(conn, einsatz_id, id).await,
         Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(AppError::Conflict(
             "Ein Bereitstellungsraum mit dieser Bezeichnung existiert bereits in diesem Einsatz"
@@ -734,7 +733,7 @@ mod tests {
         .await
         .unwrap_err();
         assert!(
-            matches!(err, AppError::Conflict(_)),
+            matches!(err, AppError::Veraltet),
             "veralteter Stand muss 409 sein: {err:?}"
         );
         let geladen =

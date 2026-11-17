@@ -88,6 +88,12 @@ export interface BearbeitbaresPaneelProps<W extends object, P = Partial<W>> {
   onSpeichern: (patch: P, basis: CasBasis | undefined) => Promise<unknown>;
   /** „Verwerfen und neu laden“ nach einem 409, etwa `query.refetch`. */
   onNeuLaden?: () => void;
+  /**
+   * Welcher Fehler der Sperrkonflikt ist, der „Zwischenzeitlich geändert“ fragt; Vorgabe jeder 409
+   * (`istKonflikt`). Eine Route, die ihn auszeichnet, gibt `istVeraltet`: ihr übriger 409
+   * (storniert, doppelte Bezeichnung) steht dann als Grund am Paneel (LLH-1920).
+   */
+  istSperrkonflikt?: (e: unknown) => boolean;
   darfSchreiben: boolean;
   /** Kurzgrund ohne Schreibrecht; ohne Grund entfällt „Bearbeiten“. */
   grund?: string;
@@ -152,6 +158,7 @@ function Innen<W extends object, P = Partial<W>>({
   patch: zuPatch,
   onSpeichern,
   onNeuLaden,
+  istSperrkonflikt = istKonflikt,
   darfSchreiben,
   grund,
   modus = 'paneel',
@@ -230,9 +237,9 @@ function Innen<W extends object, P = Partial<W>>({
       schliesse();
     } catch (e) {
       setLaeuft(false);
-      // Nur der 409 MIT Basis ist der Sperrkonflikt; beim Übernehmen zeigt ein weiterer 409 die
+      // Nur der Sperrkonflikt MIT Basis fragt nach; beim Übernehmen zeigt ein weiterer 409 die
       // Servermeldung, sonst wäre „Meine Änderung übernehmen“ ein toter Knopf.
-      if (istKonflikt(e) && basis !== undefined) setKonflikt({ patch });
+      if (istSperrkonflikt(e) && basis !== undefined) setKonflikt({ patch });
       else setFehler(e);
     }
   };

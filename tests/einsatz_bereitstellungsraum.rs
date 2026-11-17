@@ -4035,7 +4035,7 @@ async fn patch_mit_veraltetem_basisstand_gibt_409() {
         .await
         .unwrap();
 
-    let (s, _) = patch_br(
+    let (s, v409) = patch_br(
         &app,
         &cookie,
         eid,
@@ -4044,6 +4044,8 @@ async fn patch_mit_veraltetem_basisstand_gibt_409() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
+    // Eigener Grund: der Client fragt nur beim Sperrkonflikt „Zwischenzeitlich geändert“.
+    assert_eq!(v409["grund"], "veraltet", "{v409}");
 
     let (s, v) = patch_br(
         &app,
