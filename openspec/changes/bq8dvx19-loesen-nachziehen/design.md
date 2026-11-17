@@ -87,7 +87,11 @@ Lesestellen übergehen ein Paar, also den Austritt mit Rücknahme und die Rückn
   `ruecknahme_von IS NULL`.
 - Frontend `wartetSeit`: Die Belegungsschritte tragen `ruecknahme_von`. Ein Austritt merkt sich
   das `beginn` davor; eine Rücknahme stellt es wieder her.
-- Verlauf (BR und Person): Die Rücknahme erscheint als eigene Zeile „Austragen zurückgenommen“.
+- Verlauf (BR und Person, UHS-Bewegungen): Die Rücknahme erscheint als eigene Zeile „Austragen
+  zurückgenommen“.
+- Weitere Lesestellen, die der Review vor dem PR fand: `has_zugang_nach_tx` (ein nachgereichter
+  Verbleib), „seit“ beim Übernehmen eines Fahrzeugs als Einheit und der Storno einer Übernahme
+  (`aus_nachforderung.rs`) übergehen die Rücknahme bzw. das Paar ebenso.
 
 Verworfen:
 
@@ -111,7 +115,9 @@ liest alles Weitere selbst: Raum bzw. UHS und Platz aus dem Ereignis vor dem Aus
 Riegel, in derselben Transaktion (alles 409 mit Grund, nichts geschrieben):
 
 1. Das Ereignis ist ein Austritt dieser Kraft bzw. Person in diesem Einsatz (sonst 404), kein
-   Ausrücken (BR: Notiz bzw. Abruf-Bezug; das prüft der Schritt im Repo, `ausruecken`).
+   Ausrücken (das Ereignis davor ist kein Abruf) und ohne Anlass: Systemwege (Storno einer
+   Übernahme, Rückweg einer Ablösung, automatischer Austritt an der UHS) buchen ihren Austritt mit
+   Notiz, das Austragen über die Oberfläche ohne (Review vor dem PR).
 2. Es ist das jüngste Belegungsereignis der Kraft bzw. Person (größte `id`, alle Arten).
 3. Es ist noch nicht zurückgenommen.
 4. Es ist höchstens zehn Minuten alt (wie die Rücknahme der Entlassung, LLH-1722 D5).

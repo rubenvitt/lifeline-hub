@@ -1640,7 +1640,7 @@ export default function Grundriss({
     onMutate: ({ platzId }) => platzFehler.beginne(platzId),
     onSuccess: (antwort, v) => {
       if (antwort.ohne_platz) {
-        void message.info(`${v.kennung} wieder im Wartebereich: der Platz ist vergeben`);
+        void message.info(`${v.kennung} wieder im Wartebereich: der Platz ist nicht frei`);
       }
       invalidate();
     },

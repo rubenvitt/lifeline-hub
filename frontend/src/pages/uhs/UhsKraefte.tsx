@@ -20,7 +20,7 @@ import { Select } from '../../components/Select';
 import { teilwortSuche } from '../../components/teilwortSuche';
 import { Datenfeld, Datenraster, useRollen } from '../../components/instrument';
 import { SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
-import { zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
+import { schliesseRueckgaengig, zeigeRueckgaengig } from '../../kommunikation/rueckgaengig';
 import { useHoldGeloest } from '../../components/useHoldGeloest';
 import { useZeilenFehler } from '../../components/useZeilenFehler';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
@@ -216,7 +216,10 @@ export default function UhsKraefte({ einsatzId, uhs, schreibgeschuetzt, einheitZ
               aria-label={`Rückgängig: ${k.name} zurück an die UHS`}
               loading={laufend.has(k.id)}
               onClick={() => {
-                if (!laufend.has(k.id)) rueckgaengigMut.mutate(k);
+                if (laufend.has(k.id)) return;
+                // Derselbe Rückweg wie im Hinweis: der schließt sich (Review LLH-1924).
+                schliesseRueckgaengig(message);
+                rueckgaengigMut.mutate(k);
               }}
             >
               Rückgängig

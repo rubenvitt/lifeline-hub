@@ -1,7 +1,7 @@
 import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 import { AdresseSteht } from '../test/adresseSteht';
@@ -712,6 +712,57 @@ describe('FahrzeugePage', () => {
     expect(
       await within(block).findByText('Anna Crew sitzt inzwischen auf «83-2»'),
     ).toBeInTheDocument();
+  });
+
+  it('fällt die gehaltene Zeile, steht die Ablehnung ihres Rückgängig oben (Review LLH-1924)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let gesetzt = true;
+    server.use(
+      http.delete('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', () => {
+        gesetzt = false;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.put('/api/einsaetze/7/fahrzeuge/10/besatzung/:epId', () =>
+        HttpResponse.json({ error: 'Anna Crew sitzt inzwischen auf «83-2»' }, { status: 409 }),
+      ),
+    );
+    const { container } = render(einsatz(), [
+      person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
+    ]);
+    server.use(
+      http.get('/api/einsaetze/7/personal', () =>
+        HttpResponse.json([
+          person({ id: 100, name: 'Anna Crew', fahrzeug_id: gesetzt ? 10 : null }),
+        ]),
+      ),
+    );
+    await screen.findByText('Florian 1');
+    await klappeZeileAuf(container);
+    const block = container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
+    await user.click(
+      await within(block).findByRole('button', { name: 'Anna Crew vom Fahrzeug lösen' }),
+    );
+    expect(await screen.findByText('Anna Crew vom Fahrzeug gelöst')).toBeInTheDocument();
+    await user.click(
+      await within(block).findByRole('button', {
+        name: 'Rückgängig: Anna Crew zurück auf das Fahrzeug',
+      }),
+    );
+    expect(
+      await within(block).findByText('Anna Crew sitzt inzwischen auf «83-2»'),
+    ).toBeInTheDocument();
+    // Zeiger und Fokus verlassen den Block, die Haltezeit läuft ab: die Zeile fällt, der Grund
+    // steht im Seitenhinweis.
+    await user.pointer({ target: document.body });
+    act(() => (document.activeElement as HTMLElement | null)?.blur());
+    act(() => vi.advanceTimersByTime(10_000));
+    await waitFor(() =>
+      expect(within(block).queryByRole('button', { name: 'Anna Crew gelöst' })).toBeNull(),
+    );
+    expect(screen.getByText('Anna Crew sitzt inzwischen auf «83-2»')).toBeInTheDocument();
+    expect(screen.getByText('Nicht zurückgenommen')).toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it('nach „Vom Fahrzeug lösen“ setzt „Rückgängig“ die Person wieder auf das Fahrzeug (LLH-1722)', async () => {

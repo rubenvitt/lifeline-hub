@@ -288,12 +288,13 @@ export default function PersonenDetailPage() {
   // Patientenkopf“): der Hinweis nimmt genau diesen Austritt zurück, mit Platz und Wartezeit.
   const { message } = App.useApp();
   const austrittZurueckMutation = useMutation({
-    mutationFn: (v: { austrittId: number; kennung: string; uhs: string }) =>
-      nimmUhsAustrittZurueck(einsatzId, personId, v.austrittId),
+    // Person und Austritt aus dem Austragen, nicht aus dem Render beim Klick (Review LLH-1924).
+    mutationFn: (v: { austrittId: number; personId: number; kennung: string; uhs: string }) =>
+      nimmUhsAustrittZurueck(einsatzId, v.personId, v.austrittId),
     onSuccess: (antwort, v) => {
       if (antwort.ohne_platz) {
         void message.info(
-          `${v.kennung} wieder in ${v.uhs}, im Wartebereich: der Platz ist vergeben`,
+          `${v.kennung} wieder in ${v.uhs}, im Wartebereich: der Platz ist nicht frei`,
         );
       }
       invalidateUhs();
@@ -306,7 +307,11 @@ export default function PersonenDetailPage() {
     onSuccess: (antwort, v) => {
       invalidateUhs();
       zeigeRueckgaengig(message, `${v.kennung} aus ${v.uhs} ausgetragen`, () =>
-        austrittZurueckMutation.mutate({ ...v, austrittId: antwort.id }),
+        austrittZurueckMutation.mutate({
+          ...v,
+          austrittId: antwort.id,
+          personId: antwort.person_id,
+        }),
       );
     },
   });

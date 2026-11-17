@@ -1409,7 +1409,7 @@ describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => 
     ) as HTMLElement;
     await userEvent.click(within(hinweis).getByRole('button', { name: 'Rückgängig' }));
     expect(
-      await screen.findByText('R-001 wieder in BHP 50, im Wartebereich: der Platz ist vergeben'),
+      await screen.findByText('R-001 wieder in BHP 50, im Wartebereich: der Platz ist nicht frei'),
     ).toBeInTheDocument();
   });
 

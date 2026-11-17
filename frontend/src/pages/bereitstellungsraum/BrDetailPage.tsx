@@ -365,7 +365,7 @@ export default function BrDetailPage() {
       // nimmt seinen Verband mit und hat keinen Rückweg.
       if (belegung.daten.art === 'austritt' && !belegung.ausruecken) {
         zeigeRueckgaengig(message, belegungsQuittung(belegung), () =>
-          austrittZurueckMut.mutate({ belegung, austrittId: antwort.id }),
+          austrittZurueckMut.mutate({ belegung, austrittId: antwort.id, brId: antwort.br_id }),
         );
       } else {
         message.success({ content: belegungsQuittung(belegung), key: 'br-belegung' });
@@ -382,23 +382,28 @@ export default function BrDetailPage() {
 
   // „Rückgängig“ nach dem Austragen (LLH-1924): die Kraft steht mit ihrer Wartezeit wieder im
   // Raum. Ihre Zeile ist weg, also steht eine Ablehnung im Seitenhinweis.
-  const [austrittZurueckFehler, setAustrittZurueckFehler] = useState<{
+  // Der Grund gehört zu seinem Raum: nach einem Wechsel des Raums steht er nicht am nächsten.
+  const [austrittZurueckGrund, setAustrittZurueckFehler] = useState<{
     fehler: unknown;
     titel: string;
+    brId: number;
   } | null>(null);
+  const austrittZurueckFehler = austrittZurueckGrund?.brId === brId ? austrittZurueckGrund : null;
   const austrittZurueckMut = useMutation({
-    mutationFn: (v: { belegung: BelegungMitName; austrittId: number }) =>
-      nimmBrAustrittZurueck(einsatzId, brId, v.austrittId),
+    // Raum und Austritt aus dem Austragen, nicht aus der Adresse beim Klick (Review LLH-1924).
+    mutationFn: (v: { belegung: BelegungMitName; austrittId: number; brId: number }) =>
+      nimmBrAustrittZurueck(einsatzId, v.brId, v.austrittId),
     onMutate: () => setAustrittZurueckFehler(null),
     onSuccess: (_antwort, { belegung }) => {
       const { objekt_typ, objekt_id } = belegung.daten;
       (objekt_typ === 'einheit' ? einheitenZufluss : fahrzeugeZufluss).merkeEigene(objekt_id);
       invalidate();
     },
-    onError: (fehler, { belegung }) =>
+    onError: (fehler, { belegung, brId: raum }) =>
       setAustrittZurueckFehler({
         fehler,
         titel: `${belegungsObjekt(belegung)} nicht zurückgenommen`,
+        brId: raum,
       }),
   });
 

@@ -42,7 +42,8 @@ Das System SHALL einen Austritt zurücknehmen, den die Belegungsroute gebucht ha
 MUST ein neues Ereignis sein, das die Kraft in denselben Raum zurückbringt und den Austritt
 nennt, den es zurücknimmt. Sie MUST abgelehnt werden (409 mit Grund, ohne Ereignis, ETB-Eintrag
 und Änderung), wenn der Austritt nicht das jüngste Belegungsereignis der Kraft ist, älter als
-zehn Minuten ist, schon zurückgenommen ist oder ein Ausrücken war.
+zehn Minuten ist, schon zurückgenommen ist, ein Ausrücken war oder einen eigenen Anlass trägt
+(Austritt eines Systemwegs wie Storno einer Übernahme oder Rückweg einer Ablösung).
 
 #### Scenario: Rücknahme gleich nach dem Austragen
 - **WHEN** „HLF 20“ aus dem BR Sportplatz ausgetragen wird und die Rücknahme dieses Austritts eine Minute später eingeht
@@ -55,6 +56,10 @@ zehn Minuten ist, schon zurückgenommen ist oder ein Ausrücken war.
 #### Scenario: Zu spät
 - **WHEN** die Rücknahme eines Austritts elf Minuten nach dem Austragen eingeht
 - **THEN** lehnt der Server mit 409 ab, und die Kraft bleibt ausgetragen
+
+#### Scenario: Austritt eines Systemwegs
+- **WHEN** der Storno einer Übernahme „1. Zug“ aus dem Raum ausgebucht hat und die Rücknahme dieses Austritts eingeht
+- **THEN** lehnt der Server mit 409 ab, und „1. Zug“ bleibt ausgetragen
 
 #### Scenario: Raum inzwischen aufgelöst
 - **WHEN** der Raum nach dem Austragen aufgelöst wurde und die Rücknahme eingeht

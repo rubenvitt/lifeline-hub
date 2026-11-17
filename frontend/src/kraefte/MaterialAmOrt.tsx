@@ -17,7 +17,7 @@ import { useHoldGeloest } from '../components/useHoldGeloest';
 import { ZeilenMenueAusloeser } from '../components/ZeilenMenueAusloeser';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
-import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { schliesseRueckgaengig, zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { materialPfad } from '../routing/deeplinks';
 import MaterialAdhocDialog from './MaterialAdhocDialog';
@@ -426,7 +426,10 @@ export default function MaterialAmOrt({
                       aria-label={`Rückgängig: ${p.bezeichnung} zurück an diesen Ort`}
                       loading={rueckgaengig.isPending && rueckgaengig.variables?.id === p.id}
                       onClick={() => {
-                        if (!rueckgaengig.isPending) rueckgaengig.mutate(p);
+                        if (rueckgaengig.isPending) return;
+                        // Derselbe Rückweg wie im Hinweis: der schließt sich (Review LLH-1924).
+                        schliesseRueckgaengig(message);
+                        rueckgaengig.mutate(p);
                       }}
                     >
                       Rückgängig

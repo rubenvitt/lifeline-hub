@@ -106,7 +106,7 @@ import {
   buildEinheitOptions,
 } from '../kraefte/kraeftebaumKern';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
-import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
+import { schliesseRueckgaengig, zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import EigeneEinheitDialog from '../kraefte/EigeneEinheitDialog';
 import BesatzungUebernehmenDialog from '../kraefte/BesatzungUebernehmenDialog';
@@ -714,6 +714,16 @@ function FahrzeugeInhalt() {
     [personalQuery.data],
   );
   const besatzungHalten = useHoldGeloest(besatzungQuelle, String(einsatzId));
+  const [besatzungRueckFehler, setBesatzungRueckFehler] = useState<{
+    fehler: unknown;
+    epId: number;
+  } | null>(null);
+  // Der Grund einer abgelehnten Rücknahme, deren Zeile nicht mehr steht.
+  const besatzungRueckOhneZeile =
+    besatzungRueckFehler != null &&
+    !besatzungHalten.rows.some((r) => r.p.id === besatzungRueckFehler.epId)
+      ? besatzungRueckFehler.fehler
+      : null;
   const [besatzungLaufend, setBesatzungLaufend] = useState<ReadonlySet<number>>(new Set());
   const markiereBesatzung = (epId: number, an: boolean) =>
     setBesatzungLaufend((alt) => {
@@ -730,6 +740,7 @@ function FahrzeugeInhalt() {
       ordneBesatzungZu(einsatzId, v.efId, v.epId, { nurWennFrei: true }),
     onMutate: (v) => {
       setRueckgaengigFehler(null);
+      setBesatzungRueckFehler(null);
       freigebenFehler.beginne(v.epId);
       markiereBesatzung(v.epId, true);
     },
@@ -737,10 +748,10 @@ function FahrzeugeInhalt() {
       besatzungHalten.release(v.epId);
       invalidate();
     },
+    // An der gehaltenen Zeile; fällt sie, steht der Grund im Seitenhinweis (`besatzungRueckFehler`).
     onError: (e, v) => {
-      const gehalten = besatzungHalten.rows.some((r) => r.p.id === v.epId && r.isGeloest);
-      if (gehalten) freigebenFehler.melde(v.epId, e, 'Nicht zurückgenommen');
-      else setRueckgaengigFehler(e);
+      freigebenFehler.melde(v.epId, e, 'Nicht zurückgenommen');
+      setBesatzungRueckFehler({ fehler: e, epId: v.epId });
     },
     onSettled: (_d, _e, v) => markiereBesatzung(v.epId, false),
   });
@@ -1214,12 +1225,15 @@ function FahrzeugeInhalt() {
         </Space>
       }
       hinweis={
-        nurAnsicht || rueckgaengigFehler != null || ausgelassenText != null ? (
+        nurAnsicht ||
+        rueckgaengigFehler != null ||
+        besatzungRueckOhneZeile != null ||
+        ausgelassenText != null ? (
           <>
             <SeitenHinweise
               rechteText={einsatzRechteGrund(einsatz)}
               rechteFehlt={nurAnsicht}
-              fehler={rueckgaengigFehler}
+              fehler={rueckgaengigFehler ?? besatzungRueckOhneZeile}
               fehlerTitel="Nicht zurückgenommen"
               fehlerFallback="Rückgängig fehlgeschlagen"
             />
@@ -1351,9 +1365,11 @@ function FahrzeugeInhalt() {
                       }}
                       crewZeilen={besatzungHalten.rows.filter((z) => z.p.fahrzeug_id === ef.id)}
                       laeuft={(epId) => besatzungLaufend.has(epId)}
-                      onZurueck={(p) =>
-                        besatzungZurueckMutation.mutate({ efId: ef.id, epId: p.id })
-                      }
+                      onZurueck={(p) => {
+                        // Derselbe Rückweg wie im Hinweis: der schließt sich (Review LLH-1924).
+                        schliesseRueckgaengig(message);
+                        besatzungZurueckMutation.mutate({ efId: ef.id, epId: p.id });
+                      }}
                       haltenProps={besatzungHalten.rootProps}
                       zuordnenFehler={zuordnenFehler.grund(ef.id)}
                       freigebenFehler={freigebenFehler.grund}

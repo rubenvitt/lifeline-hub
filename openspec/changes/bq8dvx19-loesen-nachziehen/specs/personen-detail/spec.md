@@ -5,7 +5,8 @@ Das System SHALL den Austritt einer Person aus einer UHS zurücknehmen. Die Rüc
 neues Belegungsereignis sein, das den Austritt nennt. Sie bringt die Person in dieselbe UHS, auf
 ihren Platz davor, wenn er frei oder nur durch diesen Austritt in Aufbereitung ist, sonst in den
 Wartebereich. Abgelehnt (409, ohne Änderung) MUST sie werden, wenn der Austritt nicht der jüngste
-Schritt der Person ist, älter als zehn Minuten oder schon zurückgenommen ist.
+Schritt der Person ist, älter als zehn Minuten, schon zurückgenommen ist oder ein automatischer
+Austritt mit Anlass war.
 
 #### Scenario: Zurück auf den Platz
 - **WHEN** eine Person auf Platz 3 der UHS Turnhalle ausgetragen wird und Platz 3 dadurch in Aufbereitung geht und die Rücknahme eine Minute später eingeht
@@ -13,7 +14,7 @@ Schritt der Person ist, älter als zehn Minuten oder schon zurückgenommen ist.
 
 #### Scenario: Platz inzwischen vergeben
 - **WHEN** nach dem Austragen eine andere Person auf Platz 3 gelegt wurde und die Rücknahme eingeht
-- **THEN** steht die Person wieder in der UHS Turnhalle im Wartebereich, und die Antwort sagt, dass der Platz vergeben ist
+- **THEN** steht die Person wieder in der UHS Turnhalle im Wartebereich, und die Antwort sagt, dass der Platz nicht frei war
 
 #### Scenario: Person inzwischen in einer anderen UHS
 - **WHEN** die Person nach dem Austragen in die UHS Zelt Nord aufgenommen wurde und die Rücknahme eingeht
