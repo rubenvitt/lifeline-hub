@@ -8,7 +8,6 @@ import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import type { LagemonitorAbschnitt, LagemonitorUhs, LagemonitorZone } from '../api/types';
 import { useRollen } from '../components/instrument';
-import { fernsicht } from '../theme/tokens';
 import {
   absolutiereProxyAnfrage,
   aktuelleAttribution,
@@ -24,14 +23,15 @@ import {
 } from '../pages/lagekarte/kartenLayer';
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
 import { rollenFarbe } from '../theme/statusFarben';
+import { GROSS_BEZUG } from '../components/grossbild/grossMass';
 import { baueMonitorFlaechen, belegungText, istUeberbelegt } from './lagemonitorFlaechen';
 
 /**
  * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`),
- * aus der Fernsicht-Skala des Themes wie `GROSS_BEZUG.text` (`components/grossbild/grossMass.ts`);
- * die Kartenbibliothek nimmt eine Zahl, keine CSS-Länge.
+ * aus der Großbild-Skala (`components/grossbild/grossMass.ts`); die Kartenbibliothek nimmt eine
+ * Zahl, keine CSS-Länge.
  */
-const GROSS_TEXT = fernsicht.text;
+const GROSS_TEXT = GROSS_BEZUG.text;
 
 /**
  * Ein Punkt, den die Karte zeigen muss: der Einsatzort, jede verortete UHS und jeder Stützpunkt

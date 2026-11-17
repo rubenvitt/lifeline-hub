@@ -6,7 +6,8 @@ import { Link, Route, Routes, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 import { AdresseSteht } from '../test/adresseSteht';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders, sortTarget } from '../test/utils';
+import { neuerQueryClient, renderMitProviders, sortTarget } from '../test/utils';
+import type { QueryClient } from '@tanstack/react-query';
 import { setzeViewportBreite } from '../test/viewport';
 import { einsatzKeys } from '../api/queryKeys';
 import FahrzeugePage from './FahrzeugePage';
@@ -90,6 +91,8 @@ function render(
     route?: string;
     /** Neben der Seite, etwa ein Link auf eine Adresse derselben Seite. */
     daneben?: ReactNode;
+    /** Vorbefüllter Cache, etwa ein alter Stand aus dem Lagebild. */
+    client?: QueryClient;
   } = {},
 ) {
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
@@ -121,7 +124,11 @@ function render(
         {optionen.weitereRouten}
       </Routes>
     </>,
-    { route: optionen.route ?? '/einsaetze/7/fahrzeuge', datenRouter: true },
+    {
+      route: optionen.route ?? '/einsaetze/7/fahrzeuge',
+      datenRouter: true,
+      client: optionen.client,
+    },
   );
 }
 
@@ -289,6 +296,72 @@ describe('FahrzeugePage', () => {
     await waitFor(() =>
       expect(container.querySelector('[data-row-key="10"]')).toHaveClass('zeile-hervorgehoben'),
     );
+  });
+
+  // Spec `seiten-zustaende`, „Liste ohne Detailpaneel“ (LLH-1827).
+  it('?fahrzeug=<id> eines Fahrzeugs, das nicht im Einsatz steht, zeigt den Hinweis und räumt den Parameter', async () => {
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
+      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
+      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+    );
+    function Suche() {
+      return <output data-testid="suche">{useLocation().search}</output>;
+    }
+    const { container } = renderMitProviders(
+      <Routes>
+        <Route
+          path="/einsaetze/:id/fahrzeuge"
+          element={
+            <>
+              <Suche />
+              <FahrzeugePage />
+            </>
+          }
+        />
+      </Routes>,
+      { route: '/einsaetze/7/fahrzeuge?fahrzeug=99999', datenRouter: true },
+    );
+    expect(await screen.findByText('Fahrzeug #99999 gibt es nicht (mehr)')).toBeInTheDocument();
+    expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent(''));
+  });
+
+  // Review a12ms7g9 (F5): Ein alter Stand im Cache (Lagebild, veraltet markiert) kennt ein eben
+  // disponiertes Fahrzeug nicht. Geprüft wird gegen die frische Antwort, nicht gegen den Cache.
+  it('?fahrzeug=<id> mit altem Stand im Cache: kein Hinweis, die Zeile aus der frischen Antwort ist hervorgehoben', async () => {
+    const client = neuerQueryClient();
+    client.setQueryData(einsatzKeys.fahrzeuge(7), [], { updatedAt: 0 });
+    // Die Entlassenen frisch im Cache: sonst wartete der Sprung schon auf sie.
+    client.setQueryDefaults(einsatzKeys.fahrzeugeEntlassene(7), { staleTime: Infinity });
+    client.setQueryData(einsatzKeys.fahrzeugeEntlassene(7), []);
+    const { container } = render(einsatz(), [], ef, [], [], {
+      route: '/einsaetze/7/fahrzeuge?fahrzeug=10',
+      client,
+    });
+    await screen.findByText('Florian 1');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="10"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
+  });
+
+  // Review a12ms7g9 (F6): Ein entlassenes Fahrzeug steht im Block „Entlassen“ derselben Seite,
+  // etwa über einen Link aus der Ansicht einer aufgelösten Einheit.
+  it('?fahrzeug=<id> eines entlassenen Fahrzeugs zeigt keinen Hinweis und räumt den Parameter', async () => {
+    const entlassen = {
+      ...ef,
+      id: 11,
+      funkrufname: 'Florian 2',
+      beendet_at: '2026-05-26 12:00:00',
+    };
+    render(einsatz(), [], ef, [entlassen], [], { route: '/einsaetze/7/fahrzeuge?fahrzeug=11' });
+    expect(await screen.findByText('Entlassen (1)')).toBeInTheDocument();
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/fahrzeuge'));
+    expect(screen.queryByText(/gibt es nicht \(mehr\)/)).toBeNull();
   });
 
   it('Einsatzleitung im aktiven Einsatz sieht Disponieren-/Entlassen-Aktionen', async () => {

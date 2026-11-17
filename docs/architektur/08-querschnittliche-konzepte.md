@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 12.11.2026 (Einwurf-Zugang, LLH-1654).
+Stand: 17.11.2026 (Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -217,8 +217,9 @@ zur Admin-Spur: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Admin-Spur�
 Der Server loggt über `tracing`; jeder Request läuft in einem Span mit Methode, Pfad und
 Request-ID (`x-request-id`). Gegen Log-Flut fasst `src/log_drossel.rs` Ereignisse, die ein Fremder je Anfrage auslösen kann,
 zu Sammelzeilen zusammen, und
-HTTP/1-Köpfe über `HTTP1_MAX_KOPF` weist `src/verbindung.rs` mit 431 ab. Beschreibung für den
-Betrieb: [`docs/betrieb/observability.md`](../betrieb/observability.md).
+HTTP/1-Köpfe über `HTTP1_MAX_KOPF` weist `src/verbindung.rs` mit 431 ab. Abstürze im Browser
+kommen als gedrosselte Warnzeile an (Abschnitt 8.30).
+Beschreibung für den Betrieb: [`docs/betrieb/observability.md`](../betrieb/observability.md).
 
 ## 8.17 Anmeldung, Sitzung und Transportsicherheit
 
@@ -402,3 +403,21 @@ Die Anwenderdokumentation liegt als Kapitel unter [`docs/anwender/`](../anwender
 in der App unter „Hilfe“ (`frontend/src/hilfe/`, Wächter `hilfe/anwenderdoku.guard.test.ts`).
 Erklärender Text gehört dorthin statt in die Oberfläche. Regeln:
 [`docs/anwender/AGENTS.md`](../anwender/AGENTS.md).
+
+## 8.30 Fehlergrenze und Client-Fehlerbericht
+
+Wirft eine Seite im Browser beim Zeichnen, soll nur die Seite weichen, nicht ihr Rahmen, und der
+Betreiber soll es im Log sehen, ohne dass Daten des Einsatzes dorthin gelangen (Spec
+`seiten-zustaende`, Herleitung in der Change `a12ms7g9-seitenzustaende`, D1 bis D3). Die Grenze ist
+`frontend/src/components/Fehlergrenze.tsx`, eingehängt als `errorElement` einer pfadlosen Route
+unter jedem Rahmen und an der obersten Route (`frontend/src/App.tsx`, Regel und Wächter in
+`frontend/AGENTS.md`, Rahmen); der Router zeichnet sie im `<Outlet/>` des Rahmens und räumt sie beim
+nächsten Ortswechsel ab. Der Bericht geht über `meldeClientFehler` in
+`frontend/src/api/clientFehler.ts`: einmal je Fehlerobjekt, mit Routenmuster statt Pfad
+(`gemerktesRoutenMuster` in `frontend/src/rueckmeldung/adresse.ts`), App-Version, Meldung und Stack
+gekürzt, gesendet per `apiSendKeepalive` aus `frontend/src/api/client.ts` ohne Wiederholen und ohne
+Warteschlange; ein Fehler beim Senden wird verschluckt. Der Server (`src/routes/client_fehler.rs`,
+`POST /api/client-fehler`) nimmt nur mit Sitzung an, auch von einer Gerätesitzung
+(`geraet::ALLE_GERAETE`), begrenzt Body (`CLIENT_FEHLER_BODY_MAX` in `src/app.rs`) und Felder
+(`*_MAX`, Abschnitt 8.4), speichert nichts und schreibt höchstens eine Warnzeile je Minute über
+`log_drossel::Sammelzeile` (Abschnitt 8.16), ohne Benutzer und Organisation.

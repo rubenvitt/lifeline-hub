@@ -1,7 +1,7 @@
 import { Breadcrumb, Button, Space } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeEvakuierung } from '../api/evakuierung';
 import { einsatzKeys } from '../api/queryKeys';
@@ -16,7 +16,12 @@ import { raeumungPlan, type RaeumungSchritt } from '../betreuung/raeumungSchritt
 import { useBezirkHandlungen } from '../betreuung/useBezirkHandlungen';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenNichtGefunden,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import StatusTag from '../components/StatusTag';
 import { Paneel, useRollen } from '../components/instrument';
@@ -66,7 +71,12 @@ export default function EvakuierungsbezirkPage() {
   const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
   const bezirke = useMemo(() => evakuierungQuery.data?.bezirke ?? [], [evakuierungQuery.data]);
   const bezirk = bezirke.find((b) => b.id === bezirkId) ?? null;
-  const handlungen = useBezirkHandlungen({ einsatzId, bezirke, darfSchreiben });
+  const handlungen = useBezirkHandlungen({
+    einsatzId,
+    bezirke,
+    darfSchreiben,
+    nachStorno: evakuierungPfad(einsatzId),
+  });
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
 
   // Bearbeiten-Sitzung: der Stand beim Öffnen, eingefroren (dreiseitiger PATCH, design.md D6).
@@ -81,7 +91,16 @@ export default function EvakuierungsbezirkPage() {
   }, [bezirkId, stammdatenReset]);
 
   const uebersicht = evakuierungPfad(einsatzId);
-  if (bezirkId == null) return <Navigate to={uebersicht} replace />;
+  // Gibt es nicht (mehr): unlesbare Kennung, unbekannt, fremd oder storniert (die Übersicht führt
+  // nur nicht stornierte Bezirke). Das Muster statt einer stillen Weiterleitung, die Adresse bleibt
+  // (LLH-1827, `SeitenNichtGefunden`).
+  const nichtGefunden = (
+    <SeitenNichtGefunden
+      titel="Diesen Evakuierungsbezirk gibt es nicht (mehr)"
+      rueckweg={{ label: 'Zur Evakuierung', pfad: uebersicht }}
+    />
+  );
+  if (bezirkId == null) return nichtGefunden;
   if (einsatzQuery.isLoading || evakuierungQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return (
@@ -101,8 +120,7 @@ export default function EvakuierungsbezirkPage() {
       />
     );
   }
-  // Unbekannt, fremd oder storniert (die Übersicht führt nur nicht stornierte Bezirke): zurück.
-  if (!bezirk) return <Navigate to={uebersicht} replace />;
+  if (!bezirk) return nichtGefunden;
 
   const einsatz = einsatzQuery.data;
   const bearbeiten = beimOeffnen != null;

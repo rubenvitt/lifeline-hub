@@ -1,6 +1,6 @@
 import { Button, Flex, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { PaneelZustand, StatusChip, useRollen } from '../components/instrument';
+import { PaneelZustand, StatusChip, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -116,12 +116,10 @@ export default function SitzungsListe({
                 </Space>
                 <span style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
                   angemeldet{' '}
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {zeitpunkt(s.angemeldet_at)}
-                  </span>
+                  <span style={monoStil(token.fontSizeSM)}>{zeitpunkt(s.angemeldet_at)}</span>
                   {' · '}zuletzt{' '}
                   {zuletzt ?? (
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={monoStil(token.fontSizeSM)}>
                       {zeitpunkt(s.zuletzt_gesehen_at)}
                     </span>
                   )}

@@ -10,7 +10,7 @@ import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 
 import { Button, Dropdown, Space, Table, Tooltip, Typography } from 'antd';
 import type { TableColumnsType, TableRef } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
-import { schriftStil, useRollen } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { zellFlaechenStil } from './zellStil';
@@ -28,7 +28,6 @@ import { useKopfFreiraum } from '../../components/KatalogTabelle';
 import { useRahmenOben } from '../../components/rahmenOben';
 import { useFokusUnterKopf } from '../../components/fokusUnterKopf';
 import { useDruckModus } from '../../components/druck/useDruckModus';
-
 import './gefahrenMatrix.css';
 
 /**
@@ -412,7 +411,7 @@ export default function GefahrenMatrix({
           <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
         </Typography.Text>
         {laedt && (
-          <Typography.Text style={schriftStil('text')}>Bewertungen laden …</Typography.Text>
+          <Typography.Text style={monoStil(token.fontSize)}>Bewertungen laden …</Typography.Text>
         )}
       </div>
       <Table<ZeilenDaten>

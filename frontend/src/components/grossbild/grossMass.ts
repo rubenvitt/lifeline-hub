@@ -1,12 +1,10 @@
-import { fernsicht } from '../../theme/tokens';
-
 /**
  * Großbild-Skala (LLH-1747, Spec `grossbild-ansicht`, „Lesbar aus der Entfernung“; design.md D3 in
  * `openspec/changes/archive/2026-11-16-ckl1wbvz-grossbild-lage/`).
  *
- * Die Schriftgrößen sind die Fernsicht-Skala des Themes (`fernsicht` in `theme/tokens.ts`, Spec
- * `schriftskala`) bei 1920 × 1080: Zahl 96, Zahl klein 72, Titel 32, Text 28. Sie stehen nur dort;
- * der Lagemonitor nimmt sie über diese Skala, fest auf ein Pixel je Bezugspixel (LLH-1930).
+ * Die Schriftgrößen gelten bei 1920 × 1080: Zahl 96, Zahl klein 72, Titel 32, Text 28. Sie stehen
+ * nur hier; der Lagemonitor nimmt sie über diese Skala, fest auf ein Pixel je Bezugspixel
+ * (LLH-1930), seine Kartenkachel liest `GROSS_BEZUG.text` als Zahl.
  *
  * `grossMass(px)` macht daraus eine CSS-Länge, die mit dem Fenster geht: bei 1920 × 1080 genau
  * `px`, auf einem Beamer mit 1280 × 720 zwei Drittel, auf 4K das Doppelte. Die knappere Achse
@@ -14,10 +12,10 @@ import { fernsicht } from '../../theme/tokens';
  * keine Untergrenze: eine Untergrenze bräche die Regel „ohne Bildlauf“.
  */
 export const GROSS_BEZUG = {
-  zahl: fernsicht.kennzahl,
-  zahlKlein: fernsicht.kennzahlKlein,
-  titel: fernsicht.titel,
-  text: fernsicht.text,
+  zahl: 96,
+  zahlKlein: 72,
+  titel: 32,
+  text: 28,
   /** Wort statt Zahl in einer Großbild-Zeile (Warnstufe „hoch“). */
   wort: 40,
   /** Abstände der Fläche. */

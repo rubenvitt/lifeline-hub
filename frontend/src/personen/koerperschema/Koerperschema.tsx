@@ -10,7 +10,7 @@ import type {
   VerletzungSchwere,
 } from '../../api/types';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { Segmentleiste, schriftStil, useRollen, zahlStil } from '../../components/instrument';
+import { Segmentleiste, monoStil, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useViewport } from '../../components/useViewport';
 import BestaetigtVonFeld, { BESTAETIGT_FELD } from '../../geraet/BestaetigtVonFeld';
@@ -285,7 +285,7 @@ export default function Koerperschema({
                 onStern={(id) => !laeuft && setAuswahl({ art: 'stern', id })}
               />
               <figcaption
-                style={{ ...schriftStil('meta'), color: rollen.gedaempft, textAlign: 'center' }}
+                style={{ ...monoStil(12), color: rollen.gedaempft, textAlign: 'center' }}
                 aria-hidden="true"
               >
                 {ansicht}
@@ -352,7 +352,7 @@ export default function Koerperschema({
                 style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
               >
                 <Typography.Text strong>
-                  <span style={zahlStil('text')}>{stern.nummer}</span>{' '}
+                  <span style={monoStil(13)}>{stern.nummer}</span>{' '}
                   {verletzungText(stern.verletzung)}
                 </Typography.Text>
                 {aufhebenGesperrt && (
@@ -436,8 +436,8 @@ export function VerletzungsListe({ eintraege }: { eintraege: readonly Nummeriert
     >
       {eintraege.map(({ nummer, verletzung: v }) => (
         <li key={v.id}>
-          <span style={{ ...zahlStil('text', 500) }}>{nummer}</span> {verletzungText(v)} ·{' '}
-          <span style={zahlStil('text')}>
+          <span style={{ ...monoStil(13, 500) }}>{nummer}</span> {verletzungText(v)} ·{' '}
+          <span style={monoStil(13)}>
             <ZeitAnzeige wert={v.zeitpunkt_at} rolle="kurz" />
           </span>
         </li>

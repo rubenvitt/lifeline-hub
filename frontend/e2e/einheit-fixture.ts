@@ -127,7 +127,10 @@ export function kopfFelder(page: Page): { name: string; huelle: Locator; fokus: 
  * die einzige Kraft der Einheit schon sitzt; es hält die Trefffläche, ist aber kein Tabulatorstopp
  * und steht deshalb nicht unter `ziele`.
  */
-export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug: string }) {
+export function zuordnungsZiele(
+  page: Page,
+  namen: { personal: string; fahrzeug: string; material: string },
+) {
   const besatzung = zuordnungsKarte(page, 'Fahrzeuge und Besatzung');
   const material = zuordnungsKarte(page, 'Material');
   const fahrzeugZeile = besatzung.getByRole('group', { name: `Fahrzeug ${namen.fahrzeug}` });
@@ -147,8 +150,10 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
   });
   const personZuordnen = besatzung.getByRole('combobox', { name: 'Person zuordnen' });
   const fahrzeugZuordnen = besatzung.getByRole('combobox', { name: 'Fahrzeug zuordnen' });
-  // Der Baustein Material am Ort nennt den Posten im Namen („Messkiste 446 aus Einheit lösen“).
-  const materialLoesen = material.getByRole('button', { name: /aus Einheit lösen$/ });
+  // Der Baustein Material am Ort nennt den Posten im Namen. Bietet die Zeile „Ausgeben“, steht
+  // „Lösen“ im ⋮ (LLH-1924): Bedienziele sind dann „Messkiste 446 ausgeben“ und das ⋮.
+  const materialAusgeben = material.getByRole('button', { name: `${namen.material} ausgeben` });
+  const materialMenue = material.getByRole('button', { name: `Aktionen zu ${namen.material}` });
   const materialZuordnen = material.getByRole('combobox', { name: 'Material zuordnen' });
   /** Die Hülle des antd-Felds: sie ist das Bedienziel, nicht das innere Eingabefeld. */
   const huelle = (feld: Locator) =>
@@ -163,7 +168,8 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
       { name: 'Fahrzeug: Aktionen', ziel: fahrzeugMenue, fokus: fahrzeugMenue },
       { name: 'Person zuordnen', ziel: huelle(personZuordnen), fokus: personZuordnen },
       { name: 'Fahrzeug zuordnen', ziel: huelle(fahrzeugZuordnen), fokus: fahrzeugZuordnen },
-      { name: 'Material aus Einheit lösen', ziel: materialLoesen, fokus: materialLoesen },
+      { name: 'Material ausgeben', ziel: materialAusgeben, fokus: materialAusgeben },
+      { name: 'Material: Aktionen', ziel: materialMenue, fokus: materialMenue },
       { name: 'Material zuordnen', ziel: huelle(materialZuordnen), fokus: materialZuordnen },
     ],
     zeilen: [
@@ -184,7 +190,7 @@ export function zuordnungsZiele(page: Page, namen: { personal: string; fahrzeug:
     ],
     stapel: [
       { name: 'Fahrzeuge und Besatzung', aktion: personMenue, auswahl: huelle(personZuordnen) },
-      { name: 'Material', aktion: materialLoesen, auswahl: huelle(materialZuordnen) },
+      { name: 'Material', aktion: materialMenue, auswahl: huelle(materialZuordnen) },
     ],
   };
 }
@@ -199,7 +205,7 @@ export async function detailBereit(page: Page) {
     besatzung.getByRole('button', { name: 'Aktionen zu Person Messperson 446' }),
   ).toHaveCount(1);
   await expect(
-    zuordnungsKarte(page, 'Material').getByRole('button', { name: /aus Einheit lösen$/ }),
+    zuordnungsKarte(page, 'Material').getByRole('button', { name: 'Aktionen zu Messkiste 446' }),
   ).toHaveCount(1);
 }
 
@@ -259,7 +265,7 @@ export async function checkGesperrtReady(page: Page, rolle: SperrRolle) {
  */
 export function zuordnungTargetsGesperrt(
   page: Page,
-  namen: { personal: string; fahrzeug: string },
+  namen: { personal: string; fahrzeug: string; material: string },
   rolle: SperrRolle,
 ) {
   const besatzung = zuordnungsKarte(page, 'Fahrzeuge und Besatzung');
@@ -288,7 +294,8 @@ export function zuordnungTargetsGesperrt(
   });
   const personZuordnen = besatzung.getByRole('combobox', { name: 'Person zuordnen' });
   const fahrzeugZuordnen = besatzung.getByRole('combobox', { name: 'Fahrzeug zuordnen' });
-  const materialLoesen = material.getByRole('button', { name: /aus Einheit lösen$/ });
+  const materialAusgeben = material.getByRole('button', { name: `${namen.material} ausgeben` });
+  const materialMenue = material.getByRole('button', { name: `Aktionen zu ${namen.material}` });
   const materialZuordnen = material.getByRole('combobox', { name: 'Material zuordnen' });
   return {
     ziele: [
@@ -296,7 +303,8 @@ export function zuordnungTargetsGesperrt(
       { name: 'Fahrzeug: Aktionen', ziel: fahrzeugMenue, fokus: fahrzeugMenue },
       { name: 'Person: Aktionen', ziel: personMenue, fokus: personMenue },
       { name: 'Fahrzeug zuordnen', ziel: huelle(fahrzeugZuordnen), fokus: fahrzeugZuordnen },
-      { name: 'Material aus Einheit lösen', ziel: materialLoesen, fokus: materialLoesen },
+      { name: 'Material ausgeben', ziel: materialAusgeben, fokus: materialAusgeben },
+      { name: 'Material: Aktionen', ziel: materialMenue, fokus: materialMenue },
       { name: 'Material zuordnen', ziel: huelle(materialZuordnen), fokus: materialZuordnen },
     ],
     gesperrt: [
@@ -311,7 +319,7 @@ export function zuordnungTargetsGesperrt(
     ],
     stapel: [
       { name: 'Fahrzeuge und Besatzung', aktion: personMenue, auswahl: huelle(personZuordnen) },
-      { name: 'Material', aktion: materialLoesen, auswahl: huelle(materialZuordnen) },
+      { name: 'Material', aktion: materialMenue, auswahl: huelle(materialZuordnen) },
     ],
   };
 }

@@ -1,7 +1,7 @@
 import { IconPfeilRunter } from '../../icons';
 import { Button } from 'antd';
 import type { CSSProperties, ReactNode, Ref } from 'react';
-import { useRollen, schriftStil } from './rollenwerte';
+import { monoStil, useRollen } from './rollenwerte';
 
 /**
  * Sammelbanner — „12 neue Meldungen" statt eingeschobener Zeilen (Neuentwurf S4;
@@ -80,10 +80,7 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
             flex: '1 1 auto',
             justifyContent: 'flex-start',
             gap: token.paddingXS,
-            // Schmal: die Kurzform wächst mit der Dichte (`meta`, LLH-1774) und teilt die
-            // Werkzeugzeile am Handy mit der Segmentleiste; `paddingSM` ließ „1 neu“ in
-            // `handschuh` 4 px zu eng (`e2e/gate1-ueberlauf.spec.ts`, Sammelbanner).
-            paddingInline: token.paddingXS,
+            paddingInline: token.paddingSM,
             background: rollen.bannerGrund,
             border: `1px solid ${rollen.bannerLinie}`,
             color: rollen.bedienText,
@@ -92,10 +89,7 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
           <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
             <IconPfeilRunter />
           </span>
-          <span
-            data-lfh="sammelbanner-kurz"
-            style={{ ...schriftStil('meta'), whiteSpace: 'nowrap' }}
-          >
+          <span data-lfh="sammelbanner-kurz" style={{ ...monoStil(12), whiteSpace: 'nowrap' }}>
             {kurz}
           </span>
         </Button>
@@ -122,22 +116,14 @@ export default function Sammelbanner({ children, aktion, kurz, style, ref }: Sam
       <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.bedien }}>
         <IconPfeilRunter />
       </span>
-      <span
-        style={{
-          flex: '1 1 auto',
-          minWidth: 0,
-          // Die Mitteilung des Bands: Rolle `warnung` (Spec `schriftskala`, Warnhinweise).
-          ...schriftStil('warnung'),
-          color: rollen.bedienText,
-        }}
-      >
+      <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, color: rollen.bedienText }}>
         {children}
       </span>
       {aktion != null && (
         <Button
           type="link"
           onClick={aktion.onKlick}
-          style={{ ...schriftStil('meta'), paddingInline: token.paddingXS }}
+          style={{ ...monoStil(11), paddingInline: token.paddingXS }}
         >
           {aktion.label}
         </Button>

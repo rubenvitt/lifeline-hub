@@ -1,13 +1,7 @@
 import type { EinheitZeichenPatch } from '../../api/einheiten';
 import type { Einheit } from '../../api/types';
 import { InlineAngabe } from '../../components/InlineAngabe';
-import {
-  Datenfeld,
-  Datenraster,
-  Paneel,
-  useRollen,
-  schriftGroesse,
-} from '../../components/instrument';
+import { Datenfeld, Datenraster, Paneel, useRollen } from '../../components/instrument';
 import { Select } from '../../components/Select';
 import { orgVorgabe } from '../../components/vorgabeText';
 import EinheitZeichen from '../../kraefte/EinheitZeichen';
@@ -116,10 +110,7 @@ export default function EinheitZeichenPaneel({
           />
           {/* Leer gilt die Vorgabe der Organisation; das Zeichen im Kopf trägt sie schon. */}
           {organisation == null && orgDefault && (
-            <div
-              data-lfh="zeichen-vorgabe"
-              style={{ color: rollen.gedaempft, fontSize: schriftGroesse('klein') }}
-            >
+            <div data-lfh="zeichen-vorgabe" style={{ color: rollen.gedaempft, fontSize: 12 }}>
               {orgVorgabe(labelOf(ORGANISATION_OPTIONS, orgDefault)!)}
             </div>
           )}

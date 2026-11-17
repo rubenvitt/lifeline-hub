@@ -1,6 +1,6 @@
 import { IconPerson, IconTelefon } from '../../icons';
 import { Space, theme } from 'antd';
-import { StatusChip, schriftStil, zahlStil } from '../../components/instrument';
+import { StatusChip, monoStil } from '../../components/instrument';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import StatusTag from '../../components/StatusTag';
@@ -36,10 +36,10 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
       <span>{abschnitt.name}</span>
       {lage && <StatusTag darstellung={lage} darstellungsart="rand" />}
       {/* Zahlen in Mono, kein farbiges Etikett: Blau ist die Bedienrolle. */}
-      <span style={{ ...zahlStil('klein'), color: token.colorText }}>
+      <span style={{ ...monoStil(12), color: token.colorText }}>
         <StaerkeAnzeige wert={staerke} />
       </span>
-      <span style={{ ...schriftStil('meta'), color: token.colorTextSecondary }}>
+      <span style={{ ...monoStil(12), color: token.colorTextSecondary }}>
         {/* Was gezählt wird, steht dran (LFH-973): nur die direkt zugeordneten, der Überblick
             zählt „inkl. UA“. */}
         {anzahlEinheiten === 1 ? '1 Einheit' : `${anzahlEinheiten} Einheiten`} direkt

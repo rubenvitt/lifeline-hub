@@ -48,6 +48,8 @@ async fn rufname_mit_veraltetem_stand_ist_409() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    // Sperrkonflikt ausgezeichnet (src/AGENTS.md, Statuscode-Konvention, LLH-1920).
+    assert_eq!(j["grund"], "veraltet", "{j:?}");
     assert_eq!(lesen(&app, &admin, einsatz).await["rufname"], "Florian 2");
 }
 

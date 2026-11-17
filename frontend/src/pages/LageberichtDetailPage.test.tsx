@@ -15,6 +15,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite, setzeViewportZurueck } from '../test/viewport';
+import { erwarteNichtGefunden } from '../test/nichtGefunden';
 
 vi.mock('../api/einsaetze');
 vi.mock('../api/lageberichte');
@@ -68,9 +69,37 @@ function renderBei(route: string) {
 }
 
 describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
-  it('leitet bei ungültiger Lagebericht-ID auf die Liste um', async () => {
-    renderBei('/einsaetze/1/lageberichte/abc');
-    expect(await screen.findByText('LB-LISTE')).toBeInTheDocument();
+  // Spec `seiten-zustaende`, „Ein Muster für ein Objekt, das es nicht gibt“ (LLH-1827, D4).
+  const muster = {
+    titel: 'Diesen Lagebericht gibt es nicht (mehr)',
+    knopf: 'Zu den Lageberichten',
+    liste: 'LB-LISTE',
+  };
+  const einsatzAktiv = { id: 1, status: 'aktiv', meine_rolle: 'einsatzleitung' };
+
+  it('zeigt bei ungültiger Lagebericht-ID das Muster statt still auf die Liste umzuleiten', async () => {
+    const { router } = renderBei('/einsaetze/1/lageberichte/abc');
+    expect(await screen.findByText(muster.titel)).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/einsaetze/1/lageberichte/abc');
+    await erwarteNichtGefunden(muster);
+  });
+
+  it('zeigt bei 404 das Muster mit dem Weg zu den Lageberichten', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(einsatzAktiv as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockRejectedValue(
+      new ApiError(404, 'Nicht gefunden'),
+    );
+    renderBei('/einsaetze/1/lageberichte/99');
+    await erwarteNichtGefunden(muster);
+  });
+
+  it('behält bei 500 den Abruffehler mit „Erneut abrufen“', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue(einsatzAktiv as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockRejectedValue(new ApiError(500, 'kaputt'));
+    renderBei('/einsaetze/1/lageberichte/99');
+    expect(await screen.findByText('Lagebericht konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
+    expect(screen.queryByText(muster.titel)).toBeNull();
   });
 
   it('verlinkt vom freigegebenen Lagebericht per ?eintrag= auf den ETB-Eintrag (LFH-25)', async () => {
