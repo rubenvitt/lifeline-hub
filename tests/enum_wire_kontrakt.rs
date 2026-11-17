@@ -411,6 +411,7 @@ fn serde_wire_gleich_as_str() {
         AbrufAufgehoben,
     });
     enum_wire_as_str!(lifeline_hub::bereitstellungsraum::BrVerlaufArt {
+        AustrittZurueckgenommen,
         Eintritt,
         WechselHerein,
         WechselHinaus,

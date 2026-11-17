@@ -635,6 +635,7 @@ use utoipa::OpenApi;
         crate::tier::TierGeschlecht,
         crate::tier::TierStatus,
         crate::uhs::BelegungAnzeige,
+        crate::uhs::BelegungRuecknahme,
         crate::uhs::AufenthaltAnzeige,
         crate::uhs::BelegungsArt,
         crate::uhs::PlatzAnzeige,

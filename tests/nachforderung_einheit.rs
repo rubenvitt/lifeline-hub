@@ -1181,3 +1181,133 @@ async fn abgerufenes_fahrzeug_wird_erst_nach_aufheben_ueberfuehrt() {
         "Eintrittszeit des Fahrzeugs, nicht die des Abrufs"
     );
 }
+
+/// Bucht einen Austritt über die Belegungsroute und nimmt ihn gleich zurück (LLH-1924).
+async fn austragen_und_zuruecknehmen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    br: i64,
+    typ: &str,
+    objekt: i64,
+) {
+    let (s, aus) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung"),
+        cookie,
+        Some(&json!({ "objekt_typ": typ, "objekt_id": objekt, "art": "austritt" }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{aus:?}");
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung/{}/zuruecknehmen",
+            aus["id"]
+        ),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+}
+
+/// LLH-1924 (Review): ein zurückgenommenes Austragen ändert nicht, seit wann das Fahrzeug im Raum
+/// steht; die Einheit, die es übernimmt, tritt zum Zeitpunkt des ursprünglichen Eintritts ein.
+#[tokio::test]
+async fn uebernahme_nach_zurueckgenommenem_austragen_haelt_seit() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = raum(&app, &admin, e, "Nord").await;
+    let n = nachforderung(
+        &app,
+        &admin,
+        e,
+        json!({ "ziel_br_id": nord }),
+        "eingetroffen",
+    )
+    .await;
+    let ef = adhoc_fahrzeug(&app, &admin, e, "RTW 7").await;
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/bereitstellungsraeume/{nord}/belegung"),
+        &admin,
+        Some(&json!({ "objekt_typ": "fahrzeug", "objekt_id": ef, "art": "eintritt" }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    sqlx::query("UPDATE br_belegung SET zeitpunkt_at = '2026-01-02 10:00:00' WHERE id = ?")
+        .bind(j["id"].as_i64().unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    austragen_und_zuruecknehmen(&app, &admin, e, nord, "fahrzeug", ef).await;
+
+    let (s, j) = uebernehmen(
+        &app,
+        &admin,
+        e,
+        json!({ "nachforderung_id": n, "einheiten": [{ "name": "RTW 7" }],
+                "in_bereitstellungsraum": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let neu = j["einheit_ids"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .as_i64()
+        .unwrap();
+    let seit: String = sqlx::query_scalar(
+        "SELECT zeitpunkt_at FROM br_belegung \
+         WHERE objekt_typ = 'einheit' AND objekt_id = ? AND art = 'eintritt'",
+    )
+    .bind(neu)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(seit, "2026-01-02 10:00:00");
+}
+
+/// LLH-1924 (Review): nach einem zurückgenommenen Austragen bucht der Storno der Übernahme eine
+/// verknüpfte Einheit trotzdem aus dem Raum aus; sie bleibt aktiv.
+#[tokio::test]
+async fn storno_nach_zurueckgenommenem_austragen_bucht_aus() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = raum(&app, &admin, e, "Nord").await;
+    let n = nachforderung(
+        &app,
+        &admin,
+        e,
+        json!({ "ziel_br_id": nord }),
+        "eingetroffen",
+    )
+    .await;
+    let zug = einheit_bilden(&app, &admin, e, "83-1").await;
+    let (s, j) = uebernehmen(
+        &app,
+        &admin,
+        e,
+        json!({ "nachforderung_id": n, "einheiten": [{ "einheit_id": zug }],
+                "in_bereitstellungsraum": true }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    austragen_und_zuruecknehmen(&app, &admin, e, nord, "einheit", zug).await;
+
+    let (s, j) = storniere(&app, &admin, e, zug).await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let alle = einheiten(&app, &admin, e).await;
+    let x = alle.iter().find(|x| x["id"] == zug).expect("bleibt aktiv");
+    assert!(
+        x["aktueller_br_id"].is_null(),
+        "aus BR Nord ausgebucht: {x:?}"
+    );
+}

@@ -1318,6 +1318,12 @@ export interface components {
             person_id: number;
             /** Format: int64 */
             platz_id?: number | null;
+            /**
+             * Format: int64
+             * @description Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie
+             *     zurücknimmt. Wartezeit und Aufenthalt übergehen das Paar.
+             */
+            ruecknahme_von?: number | null;
             /** Format: int64 */
             uhs_id: number;
             zeitpunkt_at: string;
@@ -1361,6 +1367,14 @@ export interface components {
          * @enum {string}
          */
         BelegungQuelle: "meldung" | "registrierung";
+        /**
+         * @description Antwort auf die Rücknahme eines Austritts (LLH-1924, design.md D3): das neue Ereignis und ob
+         *     die Person ihren Platz davor nicht zurückbekam und im Wartebereich steht.
+         */
+        BelegungRuecknahme: {
+            ereignis: components["schemas"]["BelegungAnzeige"];
+            ohne_platz: boolean;
+        };
         /**
          * @description Eine Belegungsmeldung im Verlauf einer Stelle (LFH-676), gebaut wie
          *     [`StandVerlaufEintrag`].
@@ -1795,6 +1809,12 @@ export interface components {
             /** Format: int64 */
             objekt_id: number;
             objekt_typ: components["schemas"]["ObjektTyp"];
+            /**
+             * Format: int64
+             * @description Nur an der Rücknahme eines Austritts (LLH-1924, design.md D2): der Austritt, den sie
+             *     zurücknimmt.
+             */
+            ruecknahme_von?: number | null;
             zeitpunkt_at: string;
             /**
              * Format: int64
@@ -1918,7 +1938,7 @@ export interface components {
          *     `wechsel_herein`, für den verlassenen `wechsel_hinaus`. Kein CHECK, nur Anzeige.
          * @enum {string}
          */
-        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt" | "abruf" | "abruf_aufgehoben";
+        BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt" | "abruf" | "abruf_aufgehoben" | "austritt_zurueckgenommen";
         /**
          * @description Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
          *     `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).

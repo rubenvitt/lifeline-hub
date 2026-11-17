@@ -8969,3 +8969,131 @@ async fn lagemonitor_bekommt_sofortmeldung_im_live_kanal_ohne_inhalt() {
     assert!(!gelesen.contains("meldung_id"), "{gelesen}");
     assert!(!gelesen.contains("Verborgen"), "{gelesen}");
 }
+
+// ---------- Rücknahme am Gerät (LLH-1924, Review) ----------
+
+/// Das UHS-Tablet nimmt ein Austragen aus der eigenen UHS zurück, eines aus einer fremden nicht.
+#[tokio::test]
+async fn tablet_nimmt_nur_das_eigene_austragen_zurueck() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let p = person_in(&app, &geraet, einsatz, None).await;
+    let pid = p["id"].as_i64().unwrap();
+    let belegung = format!("/api/einsaetze/{einsatz}/personen/{pid}/uhs-belegung");
+    let austragen = |cookie: String| {
+        let app = app.clone();
+        let belegung = belegung.clone();
+        async move {
+            let (s, v) = anfrage_json(
+                &app,
+                "POST",
+                &belegung,
+                &cookie,
+                Some(&json!({"art": "austritt"})),
+            )
+            .await;
+            assert_eq!(s, StatusCode::CREATED, "{v}");
+            v["id"].as_i64().unwrap()
+        }
+    };
+
+    let aus = austragen(geraet.clone()).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{belegung}/{aus}/zuruecknehmen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "eigene UHS: {v}");
+
+    // Die Einsatzleitung verlegt sie nach Süd und trägt sie dort aus: das Tablet nimmt das nicht
+    // zurück.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &belegung,
+        &admin,
+        Some(&json!({"art": "wechsel", "uhs_id": sued})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let aus = austragen(admin.clone()).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{belegung}/{aus}/zuruecknehmen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "fremde UHS: {v}");
+}
+
+/// Das BR-Gerät nimmt ein Austragen im eigenen Raum zurück; ein Austritt im fremden Raum ist 404.
+#[tokio::test]
+async fn br_geraet_nimmt_nur_das_eigene_austragen_zurueck() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
+    let schule = br_anlegen(&app, &admin, einsatz, "BR Schule", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
+    let lf = einheit_bilden(&app, &admin, einsatz, "LF Nord").await;
+    let rtw = einheit_bilden(&app, &admin, einsatz, "RTW 1").await;
+    let zurueck = |br: i64, id: &Value| {
+        format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/belegung/{id}/zuruecknehmen")
+    };
+
+    belegen(&app, &geraet, einsatz, sportplatz, lf, "eintritt").await;
+    let (s, aus) = belegen(&app, &geraet, einsatz, sportplatz, lf, "austritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{aus}");
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &zurueck(sportplatz, &aus["id"]),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "eigener Raum: {v}");
+
+    belegen(&app, &admin, einsatz, schule, rtw, "eintritt").await;
+    let (s, aus) = belegen(&app, &admin, einsatz, schule, rtw, "austritt").await;
+    assert_eq!(s, StatusCode::CREATED, "{aus}");
+    let (s, _) = anfrage(&app, "POST", &zurueck(schule, &aus["id"]), &geraet, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+}
+
+/// Das Rückgängig nach „Abziehen“ nennt auch am Laptop die UHS, an der die Kraft inzwischen
+/// steht (409); ohne den Schalter bleibt es 403.
+#[tokio::test]
+async fn laptop_rueckgaengig_nach_abziehen_nennt_die_andere_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let (s, k) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/kraefte"),
+        &geraet,
+        Some(&json!({"name": "Ben Sani"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{k}");
+    let kraft =
+        |uhs: i64, q: &str| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/kraefte/{}{q}", k["id"]);
+    let (s, _) = anfrage(&app, "DELETE", &kraft(nord, ""), &geraet, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = anfrage(&app, "PUT", &kraft(sued, ""), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, v) = anfrage(&app, "PUT", &kraft(nord, "?nur_wenn_frei=1"), &geraet, None).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["error"], "Ben Sani steht inzwischen an UHS «UHS Süd»");
+    let (s, _) = anfrage(&app, "PUT", &kraft(nord, ""), &geraet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}

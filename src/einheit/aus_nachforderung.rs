@@ -416,11 +416,11 @@ async fn ueberfuehren_tx(
                 ));
             }
             // Der Zeitpunkt, zu dem es in den Raum kam (Eintritt oder Wechsel), nicht der eines
-            // späteren Abrufs oder seiner Aufhebung.
+            // späteren Abrufs oder seiner Aufhebung und nicht der einer Rücknahme (LLH-1924).
             let zeitpunkt: String = sqlx::query_scalar(
                 "SELECT zeitpunkt_at FROM br_belegung \
                  WHERE einsatz_id = ? AND objekt_typ = 'fahrzeug' AND objekt_id = ? \
-                   AND art IN ('eintritt', 'wechsel') \
+                   AND art IN ('eintritt', 'wechsel') AND ruecknahme_von IS NULL \
                  ORDER BY id DESC LIMIT 1",
             )
             .bind(r.einsatz_id)
@@ -643,9 +643,13 @@ async fn austritt_gebucht_tx(
     let Some(belegung_id) = belegung_id else {
         return Ok(None);
     };
+    // Ein zurückgenommenes Austragen samt Rücknahme zählt nicht (LLH-1924): danach steht die
+    // Einheit wie vorher mit der Buchung der Übernahme im Raum.
     let juengstes: Option<i64> = sqlx::query_scalar(
-        "SELECT MAX(id) FROM br_belegung \
-         WHERE einsatz_id = ? AND objekt_typ = 'einheit' AND objekt_id = ?",
+        "SELECT MAX(x.id) FROM br_belegung x \
+         WHERE x.einsatz_id = ? AND x.objekt_typ = 'einheit' AND x.objekt_id = ? \
+           AND x.ruecknahme_von IS NULL \
+           AND NOT EXISTS (SELECT 1 FROM br_belegung r WHERE r.ruecknahme_von = x.id)",
     )
     .bind(einsatz_id)
     .bind(einheit_id)
