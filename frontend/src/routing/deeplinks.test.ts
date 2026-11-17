@@ -881,6 +881,14 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       '/einsaetze/5/einsatzdaten?paneel=fuehrung',
     );
   });
+  it('einsatzdatenPfad mit den Sprungaufträgen der Startliste (LLH-1815)', () => {
+    expect(einsatzdatenPfad(E, { paneel: 'einsatzort' })).toBe(
+      '/einsaetze/5/einsatzdaten?paneel=einsatzort',
+    );
+    expect(einsatzdatenPfad(E, { paneel: 'fuehrungsstelle' })).toBe(
+      '/einsaetze/5/einsatzdaten?paneel=fuehrungsstelle',
+    );
+  });
 });
 
 describe('personenAufnahmePfad', () => {

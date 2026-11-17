@@ -251,10 +251,20 @@ export function tierePfad(einsatzId: number, opts: { neu?: boolean } = {}): stri
 }
 
 /**
- * Seite Einsatzdaten. `?paneel=fuehrung` ist ein AUFTRAG (apply-then-clean): die Seite rollt zum
- * Paneel „Führung“, sobald es geladen ist (LLH-1850, Hinweisband „Führung zurückholen“).
+ * Sprungaufträge der Einsatzdaten: `fuehrung` aus dem Hinweisband „Führung zurückholen“ (LLH-1850),
+ * `einsatzort` und `fuehrungsstelle` aus der Startliste im Überblick (LLH-1815).
  */
-export function einsatzdatenPfad(einsatzId: number, opts: { paneel?: 'fuehrung' } = {}): string {
+export type EinsatzdatenPaneel = 'fuehrung' | 'einsatzort' | 'fuehrungsstelle';
+
+/**
+ * Seite Einsatzdaten. `?paneel=` ist ein AUFTRAG (apply-then-clean): die Seite rollt zum genannten
+ * Paneel, sobald es steht, und nimmt den Parameter aus der Adresse („Führung“, LLH-1850;
+ * „Einsatzort“ und „Eigene Führungsstelle“, LLH-1815).
+ */
+export function einsatzdatenPfad(
+  einsatzId: number,
+  opts: { paneel?: EinsatzdatenPaneel } = {},
+): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'einsatzdaten'), { paneel: opts.paneel });
 }
 
