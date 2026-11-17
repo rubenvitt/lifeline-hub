@@ -424,6 +424,32 @@ test('Lagebericht (freigegeben) druckt im normalen Fluss über mehrere Seiten', 
  * Endmarke des LETZTEN Abschnitts steht als dargestellter Markdown-Absatz jenseits der ersten
  * Seite, und kein Textfeld ist im Druck sichtbar.
  */
+/**
+ * LLH-1840: Aus dem Nachtbetrieb malte Chromium mit „Hintergrundgrafiken“ den Seitenrand in der
+ * dunklen Canvas-Farbe (#121212), weil `<html>` inline `color-scheme: dark` trägt. Im Druck setzt
+ * `druck.css` das helle Schema am Dokument durch. Geprüft am berechneten Wert unter Druckmedium;
+ * diskriminierend, weil der Bildschirm im selben Lauf weiter `dark` zeigt.
+ */
+test('Druck aus dem Nachtbetrieb erzwingt das helle Farbschema am Dokument (LLH-1840)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('lifeline-hub.theme', 'dark'));
+  await anmelden(page, { startseite: false });
+  const einsatzId = await einsatzPerApi(page, `E2E Druck Nacht ${Date.now()}`);
+  const id = await lageberichtSaeen(page, einsatzId, true);
+  await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('[data-lfh="druckwurzel"]')).toBeAttached();
+  const schema = () => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+  expect(await schema(), 'am Bildschirm bleibt der Nachtbetrieb').toBe('dark');
+  await page.emulateMedia({ media: 'print' });
+  try {
+    expect(await schema(), 'im Druck ist das Dokument hell').toBe('light');
+  } finally {
+    await page.emulateMedia({ media: null });
+  }
+});
+
 test('Lagebericht (Entwurf, Bearbeiten) druckt jeden Abschnitt vollständig als Markdown', async ({
   page,
 }) => {
