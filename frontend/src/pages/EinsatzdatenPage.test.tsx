@@ -2447,7 +2447,7 @@ describe('Sprung zu „Einsatzort“ und „Eigene Führungsstelle“ (LLH-1815)
     try {
       setup({
         einsatz: { meine_rolle: 'beobachter' },
-        benutzer: { ...admin, system_rolle: 'benutzer' } as BenutzerAnzeige,
+        benutzer: { ...admin, system_rolle: 'keiner' },
         route: '/einsaetze/7/einsatzdaten?paneel=einsatzort',
       });
       await screen.findByRole('region', { name: 'Einsatzort' });
