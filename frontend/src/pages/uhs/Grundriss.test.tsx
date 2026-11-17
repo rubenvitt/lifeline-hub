@@ -896,6 +896,47 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     expect(await screen.findByRole('radiogroup', { name: 'Patient' })).toBeInTheDocument();
   });
 
+  it('Zeilen im Dialog „Patient zuweisen“ brechen um statt über den Rand zu laufen (LLH-1793)', async () => {
+    const p = person({
+      id: 5,
+      registrier_nr: 5,
+      aktuelle_uhs_id: null,
+      name: 'Maximiliane Musterfrau-Langenberg',
+      zustand: 'Schnittwunde am Unterarm, blutet stark',
+    });
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p]);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
+    await userEvent.click(within(offenesMenue()).getByText('Patient zuweisen'));
+    const wahl = await screen.findByRole('radiogroup', { name: 'Patient' });
+    // Zeile 1 (Kennung und Name) darf umbrechen, Zeile 2 (Wartezeit, Zustand) kürzt sich; beide
+    // schrumpfen mit der Breite des Dialogs (`minWidth: 0`).
+    const name = within(wahl).getByText(/Maximiliane Musterfrau-Langenberg/);
+    const zeile1 = name.closest<HTMLElement>('[data-lfh="kandidat-zeile1"]')!;
+    const zeile2 = within(wahl)
+      .getByText('Schnittwunde am Unterarm, blutet stark')
+      .closest<HTMLElement>('[data-lfh="kandidat-zeile2"]')!;
+    expect(zeile1.style.whiteSpace).not.toBe('nowrap');
+    expect(zeile1.style.overflowWrap).toBe('break-word');
+    expect(zeile2.style.minWidth).toBe('0px');
+    expect(zeile2.style.whiteSpace).toBe('nowrap');
+    expect(zeile2.style.overflow).toBe('hidden');
+  });
+
+  it('der Platztitel bricht an Silbengrenzen, nicht mitten im Wort ohne Trennstrich (LLH-1793)', async () => {
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Transportbereitstellung' })],
+    });
+    renderGrundriss(uhs, []);
+    const karte = await screen.findByTestId('platz-karte');
+    // `strong` setzt antd in den Titel-Span; der Stil liegt am Span darum.
+    const titel = within(karte).getByText('Transportbereitstellung').parentElement!;
+    // `hyphens` und `word-break` kennt jsdom nicht; beide prüft `anzeige/wortumbruch.test.ts`.
+    expect(titel.style.overflowWrap).toBe('break-word');
+  });
+
   it('löst beim Klick auf einen Menüeintrag NICHT zusätzlich die Platzzuweisung aus', async () => {
     // Das Dropdown rendert im Portal, sein Synthetic Event steigt aber im Komponentenbaum auf und
     // erreicht den Wurzel-onClick der Karte. Mit zuweisbarer Person rendern, sonst zeigte der
@@ -1441,7 +1482,7 @@ describe('Grundriss – Bedienform der Platzkarte je Dichtestufe (LFH-359/LFH-37
 
   it('trägt in kompakt die Knopfzeile mit vollem marginSM, und sie passt in die Karte', () => {
     const form = platzBedienform(tokenFuer('kompakt'));
-    expect(form).toEqual({ form: 'zeile', abstand: 7 });
+    expect(form).toEqual({ form: 'zeile', abstand: 8 });
     // Knopfbreiten + Lücken ≤ Innenbreite. Icon-only-Knöpfe sind `controlHeightSM` breit, der Boden
     // in kompakt ist 24.
     const t = tokenFuer('kompakt');

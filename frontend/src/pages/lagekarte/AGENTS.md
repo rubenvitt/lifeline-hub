@@ -6,8 +6,10 @@ Pfade relativ zu `frontend/src/`.
 **Die Lagekarte bedient den Kontext mobil** (LFH-557, Entscheidung 30.09.2026): lesen, verorten,
 eine Figur zeichnen; Vergleichen und Verwalten bleiben Fükw und Tablet. Die Form ist **kein
 Drawer**, die Leiste trägt Inhalt, und die Ausnahme des Navigations-Drawers gilt für sie nicht.
-Ab `lg` steht die Leiste (300 px) neben der Karte, darunter **unter** ihr, am Handschirm per
-Vorgabe zu (`lagekarte/leistenWahl.ts`), und jeder Kartenmodus gibt die Karte frei (LFH-765).
+Ab `lg` steht die Leiste (300 px) neben der Karte, darunter **unter** ihr, am Handschirm und bei
+grobem Zeiger (Touch, auch ab `lg`, LLH-1751) per Vorgabe zu (`leisteSichtbar` in
+`lagekarte/leistenWahl.ts`; eine gemerkte Wahl und eine Auswahl gehen vor), und jeder Kartenmodus
+gibt die Karte frei (LFH-765).
 Nachweis bei 390 px: `e2e/lagekarte-smoke.spec.ts` (Überdeckung, freie Karte über dem Fuß),
 `e2e/lagekarte-touch.spec.ts` (Gesten, Modi). Eine neue feste Breite in der Kartenspalte bricht
 diese Zusage.
@@ -105,9 +107,15 @@ diese Zusage.
 - **Schwebende Bänder werden gestapelt, nicht per `zIndex` gestaffelt** (LFH-355,
   `pages/lagekarte/KartenFuss.tsx`): ein Rahmen (`pointerEvents: 'none'`), Bänder als
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
-  Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen. Das
+  Knopfspalte (`fussStil(kartenKnopfBreite)`) und oben an der Karte; kein `overflow` am Rahmen. Das
   Werkzeugmenü ist das oberste Kind (`marginBlockEnd: 'auto'`, rollt in sich) und überdeckt so
   weder Knopfblock noch Bänder.
+- **Kartenknöpfe tragen ein Wort unter dem Symbol** (LLH-1751, Spec `lagekarte-kartenknoepfe`):
+  „Norden“, „Position“, „Messen“, „Zeichnen“, „Leiste“ über die Prop `wort` an `Kartenknopf`
+  (`KartenUeberlagerung.tsx`), in jeder Dichte; Zoom bleibt „+“/„−“ ohne Wort. Der `aria-label`
+  bleibt der volle Name, ein `title` entfällt bei Knöpfen mit Wort. Alle Knöpfe des Blocks sind
+  `kartenKnopfBreite` breit; Kartenfuß (`fussStil`) und linke Überlagerung (`maxWidth`) enden an
+  dieser Breite, nie an der Kante. Ein neuer Knopf mit längerem Wort braucht eine neue Breite.
 - **Das Zeitachsen-Band hat höchstens zwei Reihen** (LFH-899, Spec `lagekarte-zeitachse`,
   `openspec/changes/archive/2026-10-04-lfh-899-zeitachse-band-flacher/design.md`): zwei Gruppen,
   die nicht in sich umbrechen (Wiedergabe: Ausblenden, Abspielen, Schieber · Stand: Auswahl
@@ -118,6 +126,15 @@ diese Zusage.
   letztes Argument `BEDIENUNG` (Knopf, Tipp, `flyToZiel`) oder `AUTOMATISCH` (Startansicht,
   Eigenpositions-Anflug); Wächter `kamera.guard.test.ts`. Daran entfällt der erste Anflug der
   Eigenposition nach einer Bedienung.
+- **Ein Marker-Tipp fliegt nicht an, ein Anflug zoomt nur heran** (LLH-1751, Specs
+  `lagekarte-klickziele`, `lagekarte-objektsuche`): `onMarkerWaehlen(schluessel, { anfliegen })`
+  setzt `flyToZiel` nur auf Wunsch; der Tipp auf der Karte wählt ohne Anflug und setzt `sichtZiel`:
+  verdeckt die aufgehende Leiste den Marker, schiebt `Kartenflaeche` ihn per `panBy` um den kleinsten
+  Versatz herein (`nachfuehrVersatz`), nie mit Zoom. Jedes `flyToZiel` fliegt mit
+  `anflugZoom(map.getZoom(), laufendesZiel)` (`kamera.ts`), also nie heraus, auch nicht mitten in
+  einem laufenden Anflug. Der Bündel-Tipp zoomt weiter gewollt hinein. Ein Wechsel der
+  Leistenansicht hält die Leiste für die Sitzung offen (`zeige`), auch wenn nur eine Auswahl sie
+  öffnete.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
 - **Karte ohne Grafik** (LLH-1353, Spec `lagekarte-kartengrundlage`): ohne WebGL2 wirft maplibres
   Konstruktor `GPUInitializationError`. Der Karten-Effekt baut die Karte nur über

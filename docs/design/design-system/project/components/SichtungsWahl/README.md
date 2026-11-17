@@ -1,7 +1,6 @@
 # SichtungsWahl (BBK-Flächen, ohne und mit Wahl)
 
-Die Wahl einer Sichtungskategorie nach BBK (LLH-1083, Spec `sichtungswahl`; Herleitung
-`openspec/changes/archive/2026-10-18-knc0jyjd-sichtungswahl-flaechen/design.md`). Ein Baustein für Erfassung,
+Die Wahl einer Sichtungskategorie nach BBK. Ein Baustein für Erfassung,
 Nachsichtung, Patientenkopf und Zeilen-Popover; die ANZEIGE bleibt `SichtungsTag`.
 
 ── FLÄCHE STATT FARBFELD ──────────────────────────────────────────────────────────────

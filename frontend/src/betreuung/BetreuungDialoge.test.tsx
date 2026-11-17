@@ -135,7 +135,7 @@ async function budgetUndAufklappen(dialog: HTMLElement, sichtbar: number) {
 
 /** Radio-Knöpfe in Knopfform: das `<input>` trägt `pointer-events: none`, geklickt wird das Etikett. */
 async function waehle(dialog: HTMLElement, name: string) {
-  await userEvent.click(within(dialog).getByRole('radio', { name }).closest('label')!);
+  await userEvent.click(within(dialog).getByRole('radio', { name }));
 }
 
 /** Struktur, aus der „Enter sendet" folgt (Erfassungs-Norm B4). */
@@ -679,6 +679,32 @@ describe('RaeumungDialog', () => {
     await waehle(dialog, 'angeordnet');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ raeumung: 'angeordnet' }));
+  });
+
+  // Review vor dem PR (LLH-1808): die Segmentleiste meldete auch den Klick auf das schon gewählte
+  // Segment, das Feld galt als berührt und ein Speichern drehte die fremde Meldung zurück.
+  it('LFH-681: ein Klick auf den schon gewählten Zustand übernimmt den Live-Stand weiter', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onSchliessen = vi.fn();
+    const { rerender } = renderMitProviders(
+      raeumungDialog(bezirk({ raeumung: 'angeordnet' }), onErfassen, onSchliessen),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    await waehle(dialog, 'angeordnet');
+    rerender(raeumungDialog(bezirk({ raeumung: 'geraeumt' }), onErfassen, onSchliessen));
+    await waitFor(() =>
+      expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    // Erst das Ende des Speicherns abwarten: ohne Änderung schließt der Dialog ohne Aufruf.
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+    expect(onErfassen).not.toHaveBeenCalled();
+  });
+
+  it('setzt den Fokus beim Öffnen auf die Wahl des Räumungszustands (Erfassungs-Norm)', async () => {
+    renderMitProviders(raeumungDialog(bezirk({ raeumung: 'laeuft' }), vi.fn()));
+    const dialog = await screen.findByRole('dialog', { name: 'Räumung: Uferstraße 12–40' });
+    await waitFor(() => expect(within(dialog).getByRole('radio', { name: 'läuft' })).toHaveFocus());
   });
 
   it('LFH-681: eine eigene Wahl bleibt stehen, wenn der Live-Stand wechselt (Gegenstück)', async () => {

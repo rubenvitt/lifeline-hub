@@ -78,7 +78,7 @@ describe('CommandPaletteTrigger', () => {
     });
     expect(suchfeldStil(tokenFuer('kompakt')).minHeight).toBe(30);
     expect(suchfeldStil(tokenFuer('handschuh')).minHeight).toBe(72);
-    expect(suchfeldStil(tokenFuer('handschuh')).padding).toBe('7px 16px');
+    expect(suchfeldStil(tokenFuer('handschuh')).padding).toBe('8px 16px');
     expect(suchfeldStil(tokenFuer('kompakt')).maxWidth).toBe(520);
     expect(suchfeldStil(tokenFuer('kompakt')).background).toBe(rahmenFarben.feld);
     // Hinweistext im Suchfeld hält die Tag-Schwelle auf `feld` (LFH-434).

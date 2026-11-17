@@ -39,6 +39,7 @@ import {
   useKopfBeimVerlassen,
   zumKopf,
 } from '../components/listenFenster';
+import { flaeche } from '../theme/tokens';
 
 export default function ErinnerungenPage() {
   const { id } = useParams();
@@ -234,7 +235,7 @@ export default function ErinnerungenPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );

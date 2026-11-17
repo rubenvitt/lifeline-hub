@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { Navigate, useNavigate } from 'react-router';
 import { useRef, useState, type ReactNode } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
@@ -42,6 +43,7 @@ export default function Direkteinstieg<T extends { id: number }>({
   anlegen,
 }: DirekteinstiegProps<T>) {
   const navigate = useNavigate();
+  const { token } = theme.useToken();
   const entscheidung = useRef<{ id: number | null } | null>(null);
   if (!entscheidung.current && query.data) entscheidung.current = { id: waehle(query.data) };
   const [offen, setOffen] = useState(false);
@@ -62,7 +64,7 @@ export default function Direkteinstieg<T extends { id: number }>({
   if (id != null) return <Navigate to={detailPfad(id)} replace />;
 
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ padding: token.paddingLG }}>
       <SeitenLeer
         titel={leerTitel}
         aktion={{ label: leerAktionLabel, onClick: () => setOffen(true) }}

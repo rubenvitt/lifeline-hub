@@ -450,6 +450,7 @@ impl Szenario {
                 | Vorgang::Lagebericht(_)
                 | Vorgang::Erinnerung(_)
                 | Vorgang::ErinnerungErledigt { .. }
+                | Vorgang::LagebesprechungTermin { .. }
                 | Vorgang::Etb { .. } => None,
             };
             if let Some(eintrag) = eintrag {
@@ -839,6 +840,9 @@ pub enum Vorgang {
     Erinnerung(ErinnerungVorlage),
     /// Früher angelegte Erinnerung erledigen (Status und Vollzug wie im Handler). Kein ETB.
     ErinnerungErledigt { erinnerung: &'static str },
+    /// Termin der nächsten Lagebesprechung setzen, wie `PUT …/lagebesprechung/termin` (LLH-1752):
+    /// `termin_vor_min` Minuten vor dem Import, negativ = in der Zukunft. Kein ETB.
+    LagebesprechungTermin { termin_vor_min: i64 },
     /// Fachlicher ETB-Eintrag, `ereigniszeit` = Schrittzeit. Ein Vermerk der Einsatzleitung:
     /// `rufname` steht in Von UND An (LFH-894), damit er nicht wie ein Systemeintrag aussieht.
     Etb {
@@ -1096,6 +1100,10 @@ const fn erinnerung(
             faellig_vor_min,
         }),
     )
+}
+
+const fn lagebesprechung_termin(vor_min: i64, termin_vor_min: i64) -> Schritt {
+    s(vor_min, Vorgang::LagebesprechungTermin { termin_vor_min })
 }
 
 const fn erledigt(vor_min: i64, erinnerung: &'static str) -> Schritt {
@@ -1793,6 +1801,9 @@ pub const DREHBUCH: &[Schritt] = &[
         "Lagebesprechung mit allen Abschnittsleitern im Einsatzleitwagen.",
         -20,
     ),
+    // Derselbe Zeitpunkt als Termin am Einsatz (LLH-1752): sonst zeigten die Seite
+    // Lagebesprechung und ihr Großbild „kein Termin“, während die Erinnerung läuft.
+    lagebesprechung_termin(20, -20),
     rueckmeldung(
         15,
         "Sanitätsgruppe UHS",
@@ -2154,6 +2165,7 @@ mod tests {
                     assert!(erinnerungen.contains(erinnerung), "{erinnerung}");
                     assert!(erledigt.insert(erinnerung), "{erinnerung} doppelt erledigt");
                 }
+                Vorgang::LagebesprechungTermin { .. } => {}
                 Vorgang::Abschnitt(v) => {
                     if let Some(ueber) = v.ueber {
                         assert!(abschnitte.contains(ueber), "{ueber} vor {}", v.schluessel);

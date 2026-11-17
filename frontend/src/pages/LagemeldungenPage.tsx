@@ -66,6 +66,7 @@ import { useLetzteLagebesprechung } from '../lagebesprechung/useLetzteLagebespre
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
 import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
+import { flaeche } from '../theme/tokens';
 
 const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
   { wert: 'alle', label: 'Alle Orte' },
@@ -292,7 +293,7 @@ export default function LagemeldungenPage() {
 
   if (einsatzQuery.isLoading) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+      <div style={{ textAlign: 'center', paddingTop: flaeche.zustandOben }}>
         <Spin size="large" />
       </div>
     );
@@ -392,7 +393,7 @@ export default function LagemeldungenPage() {
       }
       aktionen={
         (l.is_neu && darfSchreiben) || (darfBearbeiten && bearbeitetId !== l.meldung_id) ? (
-          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 7 / 11 / 16 px, antds Vorgabe
+          // Zielabstand der Dichte-Staffel (LLH-1273): `marginSM` = 8 / 12 / 16 px, antds Vorgabe
           // `paddingXS` ließ 3 / 5 / 7 px.
           <Space wrap size={token.marginSM}>
             {l.is_neu && darfSchreiben && (

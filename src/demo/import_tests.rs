@@ -408,7 +408,9 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                     ),
                 );
             }
-            Vorgang::Erinnerung(_) | Vorgang::ErinnerungErledigt { .. } => {}
+            Vorgang::Erinnerung(_)
+            | Vorgang::ErinnerungErledigt { .. }
+            | Vorgang::LagebesprechungTermin { .. } => {}
             Vorgang::Abschnitt(v) => eintrag(
                 "system",
                 crate::einsatzabschnitt::etb_text_angelegt(v.name, v.lagezustand),
@@ -1340,6 +1342,16 @@ async fn module_nach_dem_drehbuch() {
             (s("offen"), zeit_vor(-20)),
         ]
     );
+
+    // Termin der nächsten Lagebesprechung (LLH-1752): gesetzt wie über die Seite, zum Zeitpunkt
+    // der Erinnerung — sonst zeigten Seite und Großbild „kein Termin“, während sie läuft.
+    let termin: Option<String> =
+        sqlx::query_scalar("SELECT naechste_lagebesprechung_at FROM einsatz WHERE id = ?")
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(termin, Some(zeit_vor(-20)));
 
     // Personal: alle zwölf Kräfte einer Einheit zugeordnet (Ist-Stärke im Meldebild).
     assert_eq!(

@@ -2,7 +2,7 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 330
-quellen: [src/public_api/rechner.rs, frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs, frontend/src/pages/RegistrierlisteDruckPage.tsx]
+quellen: [src/public_api/rechner.rs, frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/StelleBelegungslinie.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs, frontend/src/pages/UnterkunftPlanenPage.tsx, frontend/src/betreuung/StelleUnterkunft.tsx, frontend/src/betreuung/unterkunft/, src/unterkunft/, frontend/src/betreuung/registrierung/, src/betreuung/registrierung.rs, src/routes/betreuung_registrierung.rs, frontend/src/pages/RegistrierlisteDruckPage.tsx, frontend/src/components/aktionsSpalte.tsx]
 ---
 
 ## Überblick
@@ -171,7 +171,8 @@ aufnehmen kann und was sie dafür braucht:
    lässt sich gleich ins Feld tippen, „Auf Karte wählen“ setzt den Punkt auf einer großen Karte.
    „Anlegen“ wählen. Die Stelle steht auf „vorbereitet“.
 2. Öffnet die Stelle, ihre Bezeichnung wählen und auf ihrer Seite „In Betrieb nehmen“ wählen.
-3. An der Stelle in der Tabelle oder auf ihrer Seite „Belegung melden“ wählen.
+3. An der Stelle in der Tabelle oder auf ihrer Seite „Belegung melden“ wählen. In der Tabelle
+   steht es am rechten Rand, am Handy unter dem Namen der Stelle.
 4. Unter „Belegt gesamt (Personen)“ die Gesamtzahl der Untergebrachten eintragen.
 
    ![Dialog „Belegung melden: Gesamtschule“ mit bisheriger Belegung, Kapazität und neuer Anzahl](../bilder/betreuung/belegung-melden.png)

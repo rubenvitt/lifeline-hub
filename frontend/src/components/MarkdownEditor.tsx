@@ -1,5 +1,5 @@
 import { IconAuge } from '../icons';
-import { Button, Input, Typography } from 'antd';
+import { Button, Input, Typography, theme } from 'antd';
 import type { GetRef } from 'antd';
 import {
   forwardRef,
@@ -117,6 +117,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   ref,
 ) {
   const [vorschauOffen, setVorschauOffen] = useState(false);
+  const { token } = theme.useToken();
 
   const textfeld = (
     <Input.TextArea
@@ -171,7 +172,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     <div className="markdown-editor">
       {textfeld}
       {!umschalterAussen && (
-        <div style={{ marginTop: 4 }}>
+        <div style={{ marginTop: token.marginXS }}>
           <Button type="text" icon={<IconAuge />} onClick={() => setVorschauOffen((v) => !v)}>
             Vorschau
           </Button>

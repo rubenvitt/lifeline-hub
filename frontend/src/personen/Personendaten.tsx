@@ -809,7 +809,7 @@ function PersonendatenInhalt({
               flexWrap: 'wrap',
               alignItems: 'center',
               // Auch umgebrochen stehen die Knöpfe ≥ 8 / ≥ 16 px auseinander (Leitlinie, wie der
-              // Dialogfuß: `padding` = 11/18/26 px); gemessen in `e2e/gate3-trefflaeche.spec.ts`.
+              // Dialogfuß: `padding` = 12/20/24 px); gemessen in `e2e/gate3-trefflaeche.spec.ts`.
               columnGap: token.padding,
               rowGap: token.padding,
               marginTop: token.marginXS,

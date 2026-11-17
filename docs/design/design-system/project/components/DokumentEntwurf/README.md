@@ -1,7 +1,7 @@
 # DokumentEntwurf (Bearbeiten und Lesefassung)
 
 Die Schreibfläche jedes gegliederten Führungsdokuments — Lagebericht und Befehl
-(`entwurf/AGENTS.md`, „Gegliederte Dokumente“; Herleitung LLH-1074, vorher LFH-348). EIN
+(`entwurf/AGENTS.md`, „Gegliederte Dokumente“, vorher LFH-348). EIN
 Baustein, damit dasselbe Dokument nicht zwei Bedienformen hat.
 
 - **Paneel „Entwurf“** mit dem Füllstand („5/8 Abschnitte“) und dem Umschalter „Bearbeiten |
